@@ -1,0 +1,18 @@
+### VisualStudioCode ###
+.vscode/*
+*.code-workspace
+
+### Exclude Compiled Lib Folder ###
+[Ll]ib/
+
+### Nothing on Ext is Maintained ###
+[Ee]xt/
+
+### Working Dir Except Test Files ###
+[Ww]orkingDir/
+![Ww]orkingDir/TestScenes/*.json
+![Ww]orkingDir/Scenes/*.json
+
+### Nothing on Bin or Build Folder ###
+[Bb]in/
+[Bb]uild/
