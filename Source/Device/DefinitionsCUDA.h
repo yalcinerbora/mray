@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Log.h"
+#include "Core/Error.h"
 
 namespace mray::cuda
 {
@@ -31,7 +32,7 @@ namespace mray::cuda
                            file,
                            line);
 
-            throw DeviceError(DeviceError::OUT_OF_MEMORY);
+            throw MRayError("GPU Device is out of memory!");
         }
     }
 }

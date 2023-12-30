@@ -35,3 +35,9 @@ inline void MRAY_ERROR_LOG(fmt::format_string<Args...> fstr, Args&&... args)
                fmt::format(fg(fmt::color::crimson), "Error"),
                s);
 }
+
+template<class... Args>
+inline std::string MRAY_FORMAT(fmt::format_string<Args...> fstr, Args&&... args)
+{
+    return fmt::format(fstr, std::forward<Args>(args)...);
+}

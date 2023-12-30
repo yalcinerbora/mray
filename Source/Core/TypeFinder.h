@@ -60,7 +60,7 @@ namespace TypeFinder
 
     // Finds the function in given tuple
     template<class CheckType, class Tuple>
-    constexpr auto GetFunctionTuple(Tuple&& tuple)
+    constexpr auto GetTupleElement(Tuple&& tuple)
     {
         using namespace Detail;
         return LoopAndFind<CheckType, Tuple, 0>(std::forward<Tuple>(tuple));
@@ -68,7 +68,7 @@ namespace TypeFinder
 
     // Finds the function in given variadic template parameters
     template<class Surface, class... KVTypes>
-    constexpr auto GetFunctionVariadic()
+    constexpr auto GetTupleElementVariadic()
     {
         constexpr std::tuple<KVTypes...> GenFuncList = std::make_tuple(KVTypes{}...);
         return GetFunctionTuple<Surface, decltype(GenFuncList)>(std::move(GenFuncList));

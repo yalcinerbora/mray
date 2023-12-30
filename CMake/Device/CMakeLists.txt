@@ -1,23 +1,31 @@
 set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/Device)
 
 # SOURCES
-set(SRC_MEMORY
-    ${CURRENT_SOURCE_DIR}/DeviceMemory.h
-    ${CURRENT_SOURCE_DIR}/DeviceMemory.cpp
-    ${CURRENT_SOURCE_DIR}/TexturesCUDA.h)
+set(SRC_CUDA_MEMORY
+    ${CURRENT_SOURCE_DIR}/DeviceMemoryCUDA.h
+    ${CURRENT_SOURCE_DIR}/DeviceMemoryCUDA.cpp
+    ${CURRENT_SOURCE_DIR}/TextureCUDA.h
+    ${CURRENT_SOURCE_DIR}/TextureCUDA.cpp
+    ${CURRENT_SOURCE_DIR}/TextureViewCUDA.h)
 
-set(SRC_COMMON
-    ${CURRENT_SOURCE_DIR}/GPUSystem.h
+set(SRC_CUDA
+    ${CURRENT_SOURCE_DIR}/GPUSystemCUDA.h
     ${CURRENT_SOURCE_DIR}/GPUSystemCUDA.hpp
     ${CURRENT_SOURCE_DIR}/GPUSystemCUDA.cu
     ${CURRENT_SOURCE_DIR}/DefinitionsCUDA.h)
 
+set(SRC_COMMON
+    ${CURRENT_SOURCE_DIR}/GPUSystem.h
+    ${CURRENT_SOURCE_DIR}/GPUTypes.h)
+
 set(SRC_ALL
-    ${SRC_MEMORY}
+    ${SRC_CUDA_MEMORY}
+    ${SRC_CUDA}
     ${SRC_COMMON})
 
 # IDE Filters
-source_group("Memory" FILES ${SRC_MEMORY})
+source_group("CUDA/Memory" FILES ${SRC_CUDA_MEMORY})
+source_group("CUDA" FILES ${SRC_CUDA})
 source_group("" FILES ${SRC_COMMON})
 
 # DLL File

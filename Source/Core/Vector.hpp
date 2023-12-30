@@ -69,9 +69,9 @@ template <std::unsigned_integral IT>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector<N, T>::Vector(const UNorm<N, IT>& unorm)  requires (std::floating_point<T>)
 {
-    static constexpr float MAX = static_cast<float>(UNorm<N, IT>::Max());
-    static constexpr float MIN = static_cast<float>(UNorm<N, IT>::Min());
-    static constexpr float DELTA = 1 / (MAX - MIN);
+    constexpr float MAX = static_cast<float>(UNorm<N, IT>::Max());
+    constexpr float MIN = static_cast<float>(UNorm<N, IT>::Min());
+    constexpr float DELTA = 1 / (MAX - MIN);
     // TODO: Specialize using intrinsics maybe?
     // Also check more precise way to do this (if available?)
     UNROLL_LOOP
@@ -101,10 +101,10 @@ constexpr Vector<N, T>::Vector(const SNorm<N, IT>& snorm)  requires (std::floati
     // so negative numbers will have **higher** precision
     //
     // TODO: check if this is not OK
-    static constexpr T MIN = static_cast<T>(UNorm<N, IT>::Min());
-    static constexpr T MAX = static_cast<T>(UNorm<N, IT>::Max());
-    static constexpr T NEG_DELTA = 1 / (0 - MIN);
-    static constexpr T POS_DELTA = 1 / (MAX - 0);
+    constexpr T MIN = static_cast<T>(UNorm<N, IT>::Min());
+    constexpr T MAX = static_cast<T>(UNorm<N, IT>::Max());
+    constexpr T NEG_DELTA = 1 / (0 - MIN);
+    constexpr T POS_DELTA = 1 / (MAX - 0);
     // Sanity check
     static_assert(MIN < 0 && MAX > 0, "For snorm types; zero should be between \"min-max\"");
 

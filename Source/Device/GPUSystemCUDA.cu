@@ -1,12 +1,52 @@
 #include "GPUSystem.h"
+#include "DeviceMemoryCUDA.h"
+#include <cuda.h>
 
 namespace mray::cuda
 {
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+GPUQueueCUDA::GPUQueueCUDA(uint32_t multiprocessorCount,
+                           DeviceQueueType t)
+    : multiprocessorCount(multiprocessorCount)
+{
+    switch(t)
+    {
+        case DeviceQueueType::NORMAL:
+            CUDA_CHECK(cudaStreamCreate(&stream));
+            break;
+        case DeviceQueueType::FIRE_AND_FORGET:
+            stream = cudaStreamFireAndForget;
+            break;
+        case DeviceQueueType::TAIL_LAUNCH:
+            stream = cudaStreamTailLaunch;
+            break;
+        default:
+            assert(false);
+            break;
+    }
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+GPUQueueCUDA::~GPUQueueCUDA()
+{
+    if(stream != cudaStreamTailLaunch ||
+       stream != cudaStreamFireAndForget ||
+       stream != (cudaStream_t)0)
+    {
+        CUDA_CHECK(cudaStreamDestroy(stream));
+    }
+}
 
 GPUDeviceCUDA::GPUDeviceCUDA(int deviceId)
     : deviceId(deviceId)
 {
     CUDA_CHECK(cudaGetDeviceProperties(&props, deviceId));
+}
+
+bool GPUDeviceCUDA::operator==(const GPUDeviceCUDA& other) const
+{
+    return deviceId == other.deviceId;
 }
 
 int GPUDeviceCUDA::DeviceId() const
@@ -44,6 +84,17 @@ const GPUQueue& GPUDeviceCUDA::GetQueue(uint32_t index) const
     return queues[index];
 }
 
+DeviceLocalMemoryCUDA GPUDeviceCUDA::GetAMemory() const
+{
+    return DeviceLocalMemoryCUDA(*this);
+}
+
+//template<uint32_t DIMS, class T>
+//DeviceTextureCUDA<DIMS, T> GPUDeviceCUDA::GetTexture() const
+//{
+//
+//}
+
 GPUSystemCUDA::GPUSystemCUDA()
 {
     // Initialize the CUDA
@@ -55,11 +106,11 @@ GPUSystemCUDA::GPUSystemCUDA()
     err = cudaGetDeviceCount(&deviceCount);
     if(err == cudaErrorInsufficientDriver)
     {
-        throw DeviceError(DeviceError::OLD_DRIVER);
+        throw MRayError("Device has no drivers!");
     }
     else if(err == cudaErrorNoDevice)
     {
-        throw DeviceError(DeviceError::NO_DEVICE);
+        throw MRayError("No device is found!");
     }
 
     // All Fine Start Query Devices
@@ -166,6 +217,11 @@ void GPUSystemCUDA::SyncAll() const
         CUDA_CHECK(cudaSetDevice(gpu.DeviceId()));
         CUDA_CHECK(cudaDeviceSynchronize());
     }
+}
+
+DeviceMemoryCUDA GPUSystemCUDA::GetAMemory() const
+{
+    return DeviceMemory(*this);
 }
 
 }

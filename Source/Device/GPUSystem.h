@@ -1,104 +1,26 @@
 #pragma once
 
-#include <cstdint>
-#include <string>
-#include <array>
-#include <vector>
+
 #include "Core/Definitions.h"
+#include "Core/Error.h"
 
-struct DeviceError
-{
-    public:
-    enum Type
-    {
-        OK,
-        OLD_DRIVER,
-        NO_DEVICE,
-        OUT_OF_MEMORY,
-        // End
-        END
-    };
-
-    private:
-    Type        type;
-
-    public:
-    // Constructors & Destructor
-    DeviceError(Type = Type::OK);
-
-    operator Type() const;
-    operator std::string_view() const;
-};
-
-inline DeviceError::DeviceError(DeviceError::Type t)
-    : type(t)
-{}
-
-#include "Core/Log.h"
-
-inline DeviceError::operator Type() const
-{
-    std::string gg("gg");
-    std::string fmt22 = fmt::format(fg(fmt::color::green),
-                                  std::string("CUDA Failure"));
-
-    MRAY_ERROR_LOG("{:s} {:s}", gg, gg);
-
-    return type;
-}
-
-inline DeviceError::operator std::string_view() const
-{
-    using ErrorStrings = std::array<std::string_view, Type::END>;
-
-    static constexpr const ErrorStrings Errors =
-    {
-        "OK",
-        "Driver is not up-to-date",
-        "No cuda capable device is found",
-        "GPU is out of memory"
-    };
-
-    return Errors[static_cast<int>(type)];
-}
-
-static constexpr uint32_t WarpSize();
-static constexpr uint32_t StaticThreadPerBlock1D();
-static constexpr uint32_t TotalQueuePerDevice();
-
-enum class DeviceQueueType
-{
-    NORMAL,
-    FIRE_AND_FORGET,
-    TAIL_LAUNCH
-};
-
-struct KernelAttributes
-{
-    size_t  localMemoryPerThread;
-    size_t  constantMemorySize;
-    int     maxDynamicSharedMemorySize;
-    int     maxTBP;
-    int     registerCountPerThread;
-    size_t  staticSharedMemorySize;
-};
-
-// Generic Call Parameters
-struct KernelCallParameters1D
-{
-    uint32_t gridSize;
-    uint32_t blockSize;
-    uint32_t blockId;
-    uint32_t threadId;
-};
+#include "GPUTypes.h"
 
 #ifdef MRAY_GPU_BACKEND_CUDA
     #include "GPUSystemCUDA.hpp"
+    #include "TextureViewCUDA.h"
+    #include "DeviceMemoryCUDA.h"
 
     // Alias the types
-    using GPUDevice     = mray::cuda::GPUDeviceCUDA;
-    using GPUQueue      = mray::cuda::GPUQueueCUDA;
-    using GPUSystem     = mray::cuda::GPUSystemCUDA;
+    using GPUDevice         = mray::cuda::GPUDeviceCUDA;
+    using GPUQueue          = mray::cuda::GPUQueueCUDA;
+    using GPUSystem         = mray::cuda::GPUSystemCUDA;
+    using DeviceMemory      = mray::cuda::DeviceMemoryCUDA;
+    using DeviceLocalMemory = mray::cuda::DeviceLocalMemoryCUDA;
+    //using HostLocalMemory   = mray::cuda::HostLocalMemoryCUDA;
+
+    template<uint32_t DIM, class T>
+    using TextureView   = mray::cuda::TextureViewCUDA<DIM, T>;
 
 
 //#elif defined MRAY_GPU_BACKEND_SYCL
@@ -123,7 +45,36 @@ struct KernelCallParameters1D
 #endif
 
 
-// Define an emulator type as well
+// Concept Checks
+template<class MemType>
+concept DeviceMemBaseC = requires(MemType m)
+{
+    {m.EnlargeBuffer(size_t{})} -> std::same_as<void>;
+    {m.Size()} -> std::same_as<size_t>;
+};
+
+template<class MemType>
+concept DeviceLocalMemC = requires(MemType m,
+                                   const GPUDevice& dev,
+                                   const GPUQueue& queue)
+{
+    requires DeviceMemBaseC<MemType>;
+    {m.MigrateToOtherDevice(dev, queue)} -> std::same_as<void>;
+    {m.Device()} -> std::same_as<GPUDevice>;
+};
+
+template<class MemType>
+concept DeviceMemC = requires(MemType m)
+{
+    requires DeviceMemBaseC<MemType>;
+    {m.System()} -> std::same_as<GPUSystem>;
+};
+
+//static_assert(DeviceMemC<DeviceMemory>,
+//              "Device memory does not satisfy its concept!");
+//
+//static_assert(DeviceLocalMemC<DeviceLocalMemory>,
+//              "Device local memory does not satisfy its concept!");
 
 
 

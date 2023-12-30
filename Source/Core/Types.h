@@ -9,10 +9,21 @@
 #include "AABB.h"
 #include "Quaternion.h"
 
-#include "Hit.h"
-#include "Key.h"
+//#include "Hit.h"
+//#include "Key.h"
 
-using MetaHitPtr = MetaHitPtrT<Vector2, Vector3>;
+// Rename the std::optional, gpu may not like it
+// most(all after c++20) of optional is constexpr
+// so the "relaxed-constexpr" flag of nvcc will be able to compile it
+// Just to be sure, aliasing here to ease refactoring
+template <class T>
+using Optional = std::optional<T>;
+// Same as optional
+template <class T, std::size_t Extent = std::dynamic_extent>
+using Span = std::span<T, Extent>;
+
+
+//using MetaHitPtr = MetaHitPtrT<Vector2, Vector3>;
 
 // Differential portion of a ray
 class DiffRay{};
@@ -62,145 +73,135 @@ class SpectrumGroup
 
 };
 
-//using
-
-// Some key types
-// these are defined seperately for fine-tuning
-// for different use-cases.
-
-// Work key when a ray hit an object
-// this key will be used to partition
-// rays with respect to materials
-using WorkId = KeyT<uint32_t, 16, 16>;
-
-// Medium key
-using MediumId = KeyT<uint32_t, 8, 24>;
-// Primitive key
-using PrimitiveId = KeyT<uint32_t, 4, 28>;
-// Transform key
-using TransformId = KeyT<uint32_t, 8, 24>;
-// Material key
-using MaterialId = KeyT<uint32_t, 10, 22>;
-
-using RayIdPack = std::tuple<PrimitiveId, MaterialId, TransformId, MediumId>;
-
-using RayIndex = uint32_t;
-
-template <class T>
-struct Sample
-{
-    T           sampledResult;
-    Float       pdf;
-};
-
-template <class T>
-struct Intersection
-{
-    Float   tMin;
-    T       hit;
-};
-
-struct BxDFResult
-{
-    Ray         wO;
-    Spectrum    reflectance;
-    MediumId    mediumId;
-};
-
-struct VoxelizationParameters
-{
-    AABB3 sceneExtents;
-    Vector3i resolution;
-};
-
-// Rename the std::optional, gpu may not like it
-// most(all after c++20) of optional is constexpr
-// so the "relaxed-constexpr" flag of nvcc will be able to compile it
-template <class T>
-using Optional = std::optional<T>;
-
-// Same as optional
-template <class T, std::size_t Extent = std::dynamic_extent>
-using Span = std::span<T, Extent>;
-
-// Most barebone leaf
-struct DefaultLeaf
-{
-    PrimitiveId primId;
-};
-
-// It may seem useless but it can be used by debug
-// materials where directly material related info
-// is queried
-using EmptySurface = EmptyType;
-
-struct BasicSurface
-{
-    Vector3 position;
-    Vector3 geoNormal;
-};
-
-struct BarycentricSurface
-{
-    Vector3 position;
-    Vector3 baryCoords;
-};
-
-struct DefaultSurface
-{
-    Vector3     position;
-    Vector3     geoNormal;
-    Quaternion  shadingTBN;
-    Vector2     uv;
-
-    Vector2     dpdu;
-    Vector2     dpdv;
-
-    //
-    bool        backSide;
-};
-
-struct alignas(32) RayGMem
-{
-    Vector3     pos;
-    Float       tMin;
-    Vector3     dir;
-    Float       tMax;
-};
-
-struct RayReg
-{
-    Ray     r;
-    Vector2 t;
-
-    MRAY_HYBRID         RayReg(const RayGMem* gRays, RayIndex index);
-    MRAY_HYBRID void    Update(RayGMem* gRays, RayIndex index) const;
-    MRAY_HYBRID void    UpdateTMax(RayGMem* gRays, RayIndex index) const;
-};
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-RayReg::RayReg(const RayGMem* gRays, RayIndex index)
-{
-    RayGMem rayGMem = gRays[index];
-    r = Ray(rayGMem.dir, rayGMem.pos);
-    t = Vector2(rayGMem.tMin, rayGMem.tMax);
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-void RayReg::Update(RayGMem* gRays, RayIndex index) const
-{
-    RayGMem rayGMem =
-    {
-        .pos = r.Pos(),
-        .tMin = t[0],
-        .dir = r.Dir(),
-        .tMax = t[1]
-    };
-    gRays[index] = rayGMem;
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-void RayReg::UpdateTMax(RayGMem* gRays, RayIndex index) const
-{
-    gRays[index].tMax = t[1];
-}
+////using
+//
+//// Some key types
+//// these are defined seperately for fine-tuning
+//// for different use-cases.
+//
+//// Work key when a ray hit an object
+//// this key will be used to partition
+//// rays with respect to materials
+//using WorkId = KeyT<uint32_t, 16, 16>;
+//
+//// Medium key
+//using MediumId = KeyT<uint32_t, 8, 24>;
+//// Primitive key
+//using PrimitiveId = KeyT<uint32_t, 4, 28>;
+//// Transform key
+//using TransformId = KeyT<uint32_t, 8, 24>;
+//// Material key
+//using MaterialId = KeyT<uint32_t, 10, 22>;
+//
+//using RayIdPack = std::tuple<PrimitiveId, MaterialId, TransformId, MediumId>;
+//
+//using RayIndex = uint32_t;
+//
+//template <class T>
+//struct Sample
+//{
+//    T           sampledResult;
+//    Float       pdf;
+//};
+//
+//template <class T>
+//struct Intersection
+//{
+//    Float   tMin;
+//    T       hit;
+//};
+//
+//struct BxDFResult
+//{
+//    Ray         wO;
+//    Spectrum    reflectance;
+//    MediumId    mediumId;
+//};
+//
+//struct VoxelizationParameters
+//{
+//    AABB3 sceneExtents;
+//    Vector3i resolution;
+//};
+//
+//// Most barebone leaf
+//struct DefaultLeaf
+//{
+//    PrimitiveId primId;
+//};
+//
+//// It may seem useless but it can be used by debug
+//// materials where directly material related info
+//// is queried
+//using EmptySurface = EmptyType;
+//
+//struct BasicSurface
+//{
+//    Vector3 position;
+//    Vector3 geoNormal;
+//};
+//
+//struct BarycentricSurface
+//{
+//    Vector3 position;
+//    Vector3 baryCoords;
+//};
+//
+//struct DefaultSurface
+//{
+//    Vector3     position;
+//    Vector3     geoNormal;
+//    Quaternion  shadingTBN;
+//    Vector2     uv;
+//
+//    Vector2     dpdu;
+//    Vector2     dpdv;
+//
+//    //
+//    bool        backSide;
+//};
+//
+//struct alignas(32) RayGMem
+//{
+//    Vector3     pos;
+//    Float       tMin;
+//    Vector3     dir;
+//    Float       tMax;
+//};
+//
+//struct RayReg
+//{
+//    Ray     r;
+//    Vector2 t;
+//
+//    MRAY_HYBRID         RayReg(const RayGMem* gRays, RayIndex index);
+//    MRAY_HYBRID void    Update(RayGMem* gRays, RayIndex index) const;
+//    MRAY_HYBRID void    UpdateTMax(RayGMem* gRays, RayIndex index) const;
+//};
+//
+//MRAY_HYBRID MRAY_CGPU_INLINE
+//RayReg::RayReg(const RayGMem* gRays, RayIndex index)
+//{
+//    RayGMem rayGMem = gRays[index];
+//    r = Ray(rayGMem.dir, rayGMem.pos);
+//    t = Vector2(rayGMem.tMin, rayGMem.tMax);
+//}
+//
+//MRAY_HYBRID MRAY_CGPU_INLINE
+//void RayReg::Update(RayGMem* gRays, RayIndex index) const
+//{
+//    RayGMem rayGMem =
+//    {
+//        .pos = r.Pos(),
+//        .tMin = t[0],
+//        .dir = r.Dir(),
+//        .tMax = t[1]
+//    };
+//    gRays[index] = rayGMem;
+//}
+//
+//MRAY_HYBRID MRAY_CGPU_INLINE
+//void RayReg::UpdateTMax(RayGMem* gRays, RayIndex index) const
+//{
+//    gRays[index].tMax = t[1];
+//}

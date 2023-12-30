@@ -15,7 +15,7 @@ class RayT
     Vector<3,T>                     position;
     public:
     // Constructors & Destructor
-    MRAY_HYBRID constexpr           RayT() = default;
+    constexpr                       RayT() = default;
     MRAY_HYBRID constexpr explicit  RayT(const Vector<3, T>& direction,
                                          const Vector<3, T>& position);
     MRAY_HYBRID constexpr explicit  RayT(const Vector<3, T>[2]);
