@@ -2,6 +2,7 @@
 
 #include "Definitions.h"
 #include <cmath>
+#include <bit>
 
 namespace MathFunctions
 {
@@ -20,8 +21,14 @@ namespace MathFunctions
     template <std::floating_point T>
     MRAY_HYBRID  T              SqrtMax(T a);
 
+
     template <std::integral T>
-    MRAY_HYBRID constexpr T     AlignToMultiple(T value, T alignment);
+    MRAY_HYBRID constexpr T     DivideUp(T value, T alignment);
+    template <std::integral T>
+    MRAY_HYBRID constexpr T     NextMultiple(T value, T alignment);
+
+    template <std::integral T>
+    MRAY_HYBRID constexpr T     NextPowerOfTwo(T value);
 }
 
 template <std::integral T>
@@ -65,7 +72,21 @@ T MathFunctions::SqrtMax(T a)
 
 template <std::integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T MathFunctions::AlignToMultiple(T value, T divisor)
+constexpr T MathFunctions::DivideUp(T value, T divisor)
 {
     return (value + divisor - 1) / divisor;
 }
+
+template <std::integral T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr T MathFunctions::NextMultiple(T value, T divisor)
+{
+    return DivideUp(value, divisor) * divisor;
+}
+
+template <std::integral T>
+MRAY_HYBRID constexpr T MathFunctions::NextPowerOfTwo(T value)
+{
+    return std::bit_floor<T>(value);
+}
+

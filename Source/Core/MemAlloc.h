@@ -3,6 +3,16 @@
 #include <tuple>
 #include <concepts>
 
+inline size_t operator ""_MiB(size_t s)
+{
+    return 1024 * 1024 * s;
+}
+
+inline size_t operator ""_KiB(size_t s)
+{
+    return 1024 * s;
+}
+
 //template <class MemT>
 //concept MemoryC = requires(MemT)
 //{

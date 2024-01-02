@@ -7,12 +7,12 @@
 
 #ifdef MRAY_DEBUG
 
-    template<class FStr, class... Args>
+    template<class... Args>
     inline void MRAY_DEBUG_LOG(fmt::format_string<Args...> fstr, Args&&... args)
     {
         std::string s = fmt::format(fstr, std::forward<Args>(args)...);
         fmt::print(stdout, "{:s}: {:s}\n",
-                   fmt::format(fg(fmt::color::blanched_almond), "Debug"),
+                   fmt::format(fg(fmt::color::royal_blue), "Debug"),
                    s);
     }
 #else
@@ -20,11 +20,22 @@
     inline constexpr void MRAY_DEBUG_LOG(Args&&...) {}
 #endif
 
+
+
 template<class... Args>
 inline void MRAY_LOG(fmt::format_string<Args...> fstr, Args&&... args)
 {
     std::string s = fmt::format(fstr, std::forward<Args>(args)...);
     fmt::print(stdout, "{:s}\n", s);
+}
+
+template<class... Args>
+inline void MRAY_WARNING_LOG(fmt::format_string<Args...> fstr, Args&&... args)
+{
+    std::string s = fmt::format(fstr, std::forward<Args>(args)...);
+    fmt::print(stdout, "{:s}: {:s}\n",
+               fmt::format(fg(fmt::color::golden_rod), "Warning"),
+               s);
 }
 
 template<class... Args>

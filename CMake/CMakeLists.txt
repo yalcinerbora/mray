@@ -121,6 +121,7 @@ add_subdirectory(Device)
 add_subdirectory(MRay)
 
 # Tests
-# if(MRAY_BUILD_TESTS)
-#     add_subdirectory(Tests)
-# endif()
+if(MRAY_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(Tests)
+endif()

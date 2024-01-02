@@ -9,6 +9,16 @@
 #include "DefinitionsCUDA.h"
 #include "GPUTypes.h"
 
+// Cuda Kernel Optimization Hints
+// Since we call all of the kernels in a static manner
+// (in case of Block Size) hint the compiler
+// using __launch_bounds__ expression
+#define MRAY_DEVICE_LAUNCH_BOUNDS(X) __launch_bounds__(X)
+#define MRAY_DEVICE_LAUNCH_BOUNDS_1D \
+        MRAY_DEVICE_LAUNCH_BOUNDS __launch_bounds__(StaticThreadPerBlock1D())
+
+#define MRAY_GRID_CONSTANT __grid_constant__
+
 static constexpr uint32_t WarpSize()
 {
     return 32u;
@@ -37,6 +47,8 @@ class DeviceTextureCUDA;
 
 class GPUQueueCUDA
 {
+    friend cudaStream_t ToHandleCUDA(const GPUQueueCUDA&);
+
     private:
     cudaStream_t        stream;
     uint32_t            multiprocessorCount;
@@ -201,7 +213,7 @@ uint32_t GPUQueueCUDA::DetermineGridStrideBlock(const void* kernelPtr,
     // TODO: Make better SM determination
     uint32_t blockPerSM = RecommendedBlockCountPerSM(kernelPtr, threadCount, sharedMemSize);
     // Only call enough SM
-    uint32_t totalRequiredBlocks = MathFunctions::AlignToMultiple(workCount, threadCount);
+    uint32_t totalRequiredBlocks = MathFunctions::DivideUp(workCount, threadCount);
     uint32_t requiredSMCount = (totalRequiredBlocks + blockPerSM - 1) / blockPerSM;
     uint32_t smCount = std::min(multiprocessorCount, requiredSMCount);
     uint32_t blockCount = std::min(requiredSMCount, smCount * blockPerSM);
@@ -222,6 +234,12 @@ GPUQueueCUDA& GPUQueueCUDA::operator=(GPUQueueCUDA&& other)
     multiprocessorCount = other.multiprocessorCount;
     stream = other.stream;
     other.stream = (cudaStream_t)0;
+}
+
+
+inline cudaStream_t ToHandleCUDA(const GPUQueueCUDA& q)
+{
+    return q.stream;
 }
 
 }

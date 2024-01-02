@@ -4,16 +4,6 @@
 #include "GPUSystemCUDA.h"
 #include "GPUSystem.h"
 
-// Cuda Kernel Optimization Hints
-// Since we call all of the kernels in a static manner
-// (in case of Block Size) hint the compiler
-// using __launch_bounds__ expression
-#define MRAY_DEVICE_LAUNCH_BOUNDS(X) __launch_bounds__(X)
-#define MRAY_DEVICE_LAUNCH_BOUNDS_1D \
-        MRAY_DEVICE_LAUNCH_BOUNDS __launch_bounds__(StaticThreadPerBlock1D())
-
-#define MRAY_GRID_CONSTANT __grid_constant__
-
 namespace CudaKernelCalls
 {
     template <class K, class... Args>
@@ -57,7 +47,7 @@ void GPUQueueCUDA::IssueKernel(uint32_t sharedMemSize, uint32_t workCount,
                                Function&& f, Args&&... args) const
 {
     using namespace CudaKernelCalls;
-    uint32_t blockCount = MathFunctions::AlignToMultiple(workCount, StaticThreadPerBlock1D());
+    uint32_t blockCount = MathFunctions::DivideUp(workCount, StaticThreadPerBlock1D());
     uint32_t blockSize = StaticThreadPerBlock1D();
 
     KernelCallCUDA<StaticThreadPerBlock1D()>

@@ -5,6 +5,7 @@ set(SRC_CUDA_MEMORY
     ${CURRENT_SOURCE_DIR}/DeviceMemoryCUDA.h
     ${CURRENT_SOURCE_DIR}/DeviceMemoryCUDA.cpp
     ${CURRENT_SOURCE_DIR}/TextureCUDA.h
+    ${CURRENT_SOURCE_DIR}/TextureCUDA.hpp
     ${CURRENT_SOURCE_DIR}/TextureCUDA.cpp
     ${CURRENT_SOURCE_DIR}/TextureViewCUDA.h)
 
@@ -31,8 +32,11 @@ source_group("" FILES ${SRC_COMMON})
 # DLL File
 add_library(DeviceLib STATIC ${SRC_ALL})
 
-target_link_libraries(DeviceLib PRIVATE
+target_link_libraries(DeviceLib
+                      PUBLIC
                       CoreLib
+                      CUDA::cuda_driver
+                      PRIVATE
                       mray::meta_compile_opts
                       mray::cuda_extra_compile_opts)
 

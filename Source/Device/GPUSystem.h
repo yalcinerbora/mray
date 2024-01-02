@@ -7,8 +7,8 @@
 #include "GPUTypes.h"
 
 #ifdef MRAY_GPU_BACKEND_CUDA
-    #include "GPUSystemCUDA.hpp"
-    #include "TextureViewCUDA.h"
+    #include "GPUSystemCUDA.h"
+    #include "TextureCUDA.h"
     #include "DeviceMemoryCUDA.h"
 
     // Alias the types
@@ -17,10 +17,13 @@
     using GPUSystem         = mray::cuda::GPUSystemCUDA;
     using DeviceMemory      = mray::cuda::DeviceMemoryCUDA;
     using DeviceLocalMemory = mray::cuda::DeviceLocalMemoryCUDA;
-    //using HostLocalMemory   = mray::cuda::HostLocalMemoryCUDA;
+    using HostLocalMemory   = mray::cuda::HostLocalMemoryCUDA;
 
     template<uint32_t DIM, class T>
-    using TextureView   = mray::cuda::TextureViewCUDA<DIM, T>;
+    using TextureView = mray::cuda::TextureViewCUDA<DIM, T>;
+
+    template<uint32_t DIM, class T>
+    using Texture = mray::cuda::TextureCUDA<DIM, T>;
 
 
 //#elif defined MRAY_GPU_BACKEND_SYCL
