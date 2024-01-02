@@ -51,4 +51,16 @@ TEST(GPUMemory, DeviceMemory)
             memory.ResizeBuffer(newSize);
         }
     }
+
+    // Memcpy Test
+    {
+        DeviceMemory memoryFrom({&system.BestDevice()}, 3_MiB, 8_MiB);
+        DeviceMemory memoryTo({&system.BestDevice()}, 1_MiB, 4_MiB);
+        memoryFrom.ResizeBuffer(2_MiB);
+        memoryTo.ResizeBuffer(1_MiB);
+
+        CUDA_CHECK(cudaMemcpy(static_cast<void*>(memoryTo),
+                              static_cast<void*>(memoryFrom),
+                              1_MiB, cudaMemcpyDefault));
+    }
 }

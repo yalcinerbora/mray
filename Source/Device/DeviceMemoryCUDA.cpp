@@ -21,6 +21,7 @@ DeviceLocalMemoryCUDA::DeviceLocalMemoryCUDA(const GPUDeviceCUDA& device,
                                              bool isUsedForTexMapping)
     : DeviceLocalMemoryCUDA(device)
 {
+    assert(sizeInBytes != 0);
     size = sizeInBytes;
     isTexMappable = isUsedForTexMapping;
 
@@ -53,7 +54,7 @@ DeviceLocalMemoryCUDA::DeviceLocalMemoryCUDA(const GPUDeviceCUDA& device,
 }
 
 DeviceLocalMemoryCUDA::DeviceLocalMemoryCUDA(const DeviceLocalMemoryCUDA& other)
-    : DeviceLocalMemoryCUDA(*(other.gpu), other.size)
+    : DeviceLocalMemoryCUDA(*(other.gpu), other.size, other.isTexMappable)
 {
     CUDA_DRIVER_CHECK(cuMemcpy(std::bit_cast<CUdeviceptr>(dPtr),
                                std::bit_cast<CUdeviceptr>(other.dPtr), size));
@@ -65,11 +66,13 @@ DeviceLocalMemoryCUDA::DeviceLocalMemoryCUDA(DeviceLocalMemoryCUDA&& other) noex
     , size(other.size)
     , allocSize(other.allocSize)
     , memHandle(other.memHandle)
+    , isTexMappable(other.isTexMappable)
 {
     other.dPtr = nullptr;
-    other.memHandle = 0;
-    other.allocSize = 0;
     other.size = 0;
+    other.allocSize = 0;
+    other.memHandle = 0;
+
 }
 
 DeviceLocalMemoryCUDA::~DeviceLocalMemoryCUDA()
@@ -101,9 +104,12 @@ DeviceLocalMemoryCUDA& DeviceLocalMemoryCUDA::operator=(DeviceLocalMemoryCUDA&& 
     assert(this != &other);
     // Remove old memory
     CUdeviceptr driverPtr = std::bit_cast<CUdeviceptr>(dPtr);
-    CUDA_DRIVER_CHECK(cuMemUnmap(driverPtr, allocSize));
-    CUDA_DRIVER_CHECK(cuMemRelease(memHandle));
-    CUDA_DRIVER_CHECK(cuMemAddressFree(driverPtr, allocSize));
+    if(allocSize != 0)
+    {
+        CUDA_DRIVER_CHECK(cuMemUnmap(driverPtr, allocSize));
+        CUDA_DRIVER_CHECK(cuMemRelease(memHandle));
+        CUDA_DRIVER_CHECK(cuMemAddressFree(driverPtr, allocSize));
+    }
 
     allocSize = other.allocSize;
     gpu = other.gpu;
@@ -113,9 +119,10 @@ DeviceLocalMemoryCUDA& DeviceLocalMemoryCUDA::operator=(DeviceLocalMemoryCUDA&& 
     isTexMappable = other.isTexMappable;
 
     other.dPtr = nullptr;
+    other.size = 0;
     other.allocSize = 0;
     other.memHandle = 0;
-    other.size = 0;
+
 
     return *this;
 }
