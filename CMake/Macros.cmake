@@ -15,7 +15,7 @@ macro(populate_mray_directory_variables)
     set(MRAY_RESOURCE_DIRECTORY ${ARGV0}Resources)
     # Working Dir is used for debugging (currently shaders are here so...)
     # For Visual Studio Projects this is copied to WorkingDir property for executables
-    set(MRAY_WORKING_DIRECTORY ${ARGV0}/WorkingDir)
+    set(MRAY_WORKING_DIRECTORY ${ARGV0}WorkingDir)
 
     # Platform Specific Lib Bin Ext Folders
     set(MRAY_PLATFORM_LIB_DIRECTORY ${MRAY_LIB_DIRECTORY}/${MRAY_PLATFORM_NAME})

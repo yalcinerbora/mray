@@ -9,9 +9,9 @@
 /[Ee]xt/
 
 ### Working Dir Except Test Files ###
-[Ww]orkingDir/
-![Ww]orkingDir/TestScenes/*.json
-![Ww]orkingDir/Scenes/*.json
+/[Ww]orkingDir/
+!/[Ww]orkingDir/TestScenes/*.json
+!/[Ww]orkingDir/Scenes/*.json
 
 ### Nothing on Bin or Build Folder ###
 /[Bb]in/

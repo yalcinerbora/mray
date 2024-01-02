@@ -5,6 +5,7 @@
 #include "Log.h"
 
 // Very generic error
+// Throw it return it, stick in a stew
 struct MRayError
 {
     public:
@@ -17,7 +18,9 @@ struct MRayError
     private:
     Type                    type = OK;
     std::string             customInfo;
-//    std::source_location    sourceInfo;
+    // std::source_location crashes the nvcc compiler (at least on CUDA 12.1)
+    // so this is commented out will be enabled when it is fixed
+    //std::source_location    sourceInfo;
 
     public:
     MRayError(std::string && = "");
@@ -45,7 +48,6 @@ inline MRayError::operator bool()
 inline std::string MRayError::GetError() const
 {
     return MRAY_FORMAT("Error ||| {:s}", customInfo);
-
     //return MRAY_FORMAT("{:s}[{:d}]:[{:d}] -> {:s} ||| {:s}",
     //                   sourceInfo.file_name(), sourceInfo.line(),
     //                   sourceInfo.column(),

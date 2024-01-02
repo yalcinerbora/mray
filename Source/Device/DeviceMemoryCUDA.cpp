@@ -56,6 +56,8 @@ DeviceLocalMemoryCUDA::DeviceLocalMemoryCUDA(const GPUDeviceCUDA& device,
 DeviceLocalMemoryCUDA::DeviceLocalMemoryCUDA(const DeviceLocalMemoryCUDA& other)
     : DeviceLocalMemoryCUDA(*(other.gpu), other.size, other.isTexMappable)
 {
+
+    CUDA_CHECK(cudaSetDevice(gpu->DeviceId()));
     CUDA_DRIVER_CHECK(cuMemcpy(std::bit_cast<CUdeviceptr>(dPtr),
                                std::bit_cast<CUdeviceptr>(other.dPtr), size));
 }
@@ -138,7 +140,7 @@ void DeviceLocalMemoryCUDA::ResizeBuffer(size_t newSize)
     //CUDA_DRIVER_CHECK(cuMemcpy(std::bit_cast<CUdeviceptr>(newMem.dPtr),
     //                           std::bit_cast<CUdeviceptr>(dPtr), copySize));
     //std::memcpy(newMem.dPtr, dPtr, copySize);
-
+    CUDA_CHECK(cudaSetDevice(gpu->DeviceId()));
     CUDA_CHECK(cudaMemcpy(newMem.dPtr, dPtr, copySize, cudaMemcpyDefault));
 
     *this = std::move(newMem);
@@ -170,6 +172,7 @@ HostLocalMemoryCUDA::HostLocalMemoryCUDA(const GPUSystemCUDA& system,
                                          size_t sizeInBytes)
     : HostLocalMemoryCUDA(system)
 {
+    assert(sizeInBytes != 0);
     // TODO: change this to virtual memory calls as well
     CUDA_MEM_THROW(cudaHostAlloc(&hPtr, sizeInBytes, cudaHostAllocMapped));
     CUDA_CHECK(cudaHostGetDevicePointer(&dPtr, hPtr, 0));

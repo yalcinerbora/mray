@@ -41,7 +41,34 @@ GPUQueueCUDA::~GPUQueueCUDA()
 GPUDeviceCUDA::GPUDeviceCUDA(int deviceId)
     : deviceId(deviceId)
 {
+
+    // Enforce non-async functions to explicitly synchronize
+    CUDA_CHECK(cudaInitDevice(deviceId,
+                              cudaDeviceSyncMemops |
+                              cudaDeviceScheduleAuto,
+                              cudaInitDeviceFlagsAreValid));
     CUDA_CHECK(cudaGetDeviceProperties(&props, deviceId));
+
+    // Check if we synchronized the non-async mem copies
+    uint32_t flags = 0;
+    CUDA_CHECK(cudaGetDeviceFlags(&flags));
+    if((flags & cudaDeviceSyncMemops) == 0)
+    {
+        std::string err = MRAY_FORMAT("Unable to set \"cudaDevice"
+                                      "SyncMemops\" flag on device!({:s})", props.name);
+        throw MRayError(std::move(err));
+    }
+
+    // Check VMM support (entire system requires this functionality)
+    int vmmEnabled = 0;
+    auto vmmAttib = CU_DEVICE_ATTRIBUTE_VIRTUAL_MEMORY_MANAGEMENT_SUPPORTED;
+    CUDA_DRIVER_CHECK(cuDeviceGetAttribute(&vmmEnabled, vmmAttib, deviceId));
+    if(vmmEnabled != 0)
+    {
+        std::string err = MRAY_FORMAT("The device do not have virtual memory "
+                                      "management support!({:s})", props.name);
+        throw MRayError(std::move(err));
+    }
 }
 
 bool GPUDeviceCUDA::operator==(const GPUDeviceCUDA& other) const
