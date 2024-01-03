@@ -69,6 +69,6 @@ struct TextureInitParams
     Float                   maxMipmapClamp  = 100.0f;
 
     // Dimension Related (must be set)
-    Vector<D, uint32_t>     size;
-    uint32_t                mipCount;
+    Vector<D, uint32_t>     size            = Vector<D, uint32_t>::Zero();
+    uint32_t                mipCount        = 0;
 };

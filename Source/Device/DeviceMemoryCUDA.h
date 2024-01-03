@@ -23,6 +23,7 @@ TODO: should we interface these?
 #include <vector>
 
 #include "Core/Definitions.h"
+#include "Core/MemAlloc.h"
 #include <cuda.h>
 
 namespace mray::cuda
@@ -57,8 +58,8 @@ class DeviceLocalMemoryCUDA
     DeviceLocalMemoryCUDA&  operator=(DeviceLocalMemoryCUDA&&) noexcept;
 
     // Access
-    explicit                operator void* ();
-    explicit                operator const void* () const;
+    explicit                operator Byte* ();
+    explicit                operator const Byte* () const;
 
     // Misc
     void                    ResizeBuffer(size_t newSize);
@@ -88,10 +89,10 @@ class HostLocalMemoryCUDA
     HostLocalMemoryCUDA&    operator=(HostLocalMemoryCUDA&&) noexcept;
 
     // Access
-    void*                   HostPtr();
-    const void*             HostPtr() const;
-    void*                   DevicePtr();
-    const void*             DevicePtr() const;
+    explicit                operator Byte* ();
+    explicit                operator const Byte* () const;
+    Byte*                   DevicePtr();
+    const Byte*             DevicePtr() const;
 
     // Misc
     void                    ResizeBuffer(size_t newSize);
@@ -139,8 +140,8 @@ class DeviceMemoryCUDA
         DeviceMemoryCUDA&       operator=(DeviceMemoryCUDA&&) noexcept = default;
 
         // Access
-        explicit                operator void*();
-        explicit                operator const void*() const;
+        explicit                operator Byte*();
+        explicit                operator const Byte*() const;
         // Misc
         void                    ResizeBuffer(size_t newSize);
         size_t                  Size() const;
@@ -151,29 +152,47 @@ inline const GPUDeviceCUDA& DeviceLocalMemoryCUDA::Device() const
     return *gpu;
 }
 
-inline DeviceLocalMemoryCUDA::operator void* ()
+inline DeviceLocalMemoryCUDA::operator Byte*()
 {
-    return dPtr;
+    return reinterpret_cast<Byte*>(dPtr);
 }
 
-inline DeviceLocalMemoryCUDA::operator const void* () const
+inline DeviceLocalMemoryCUDA::operator const Byte*() const
 {
-    return dPtr;
+    return reinterpret_cast<const Byte*>(dPtr);
 }
 
-inline DeviceMemoryCUDA::operator void*()
+
+inline HostLocalMemoryCUDA::operator Byte*()
 {
-    return std::bit_cast<void*>(mPtr);
+    return reinterpret_cast<Byte*>(hPtr);
 }
 
-inline DeviceMemoryCUDA::operator const void*() const
+inline HostLocalMemoryCUDA::operator const Byte*() const
 {
-    return std::bit_cast<const void*>(mPtr);
+    return reinterpret_cast<const Byte*>(hPtr);
+}
+
+inline DeviceMemoryCUDA::operator Byte*()
+{
+    return std::bit_cast<Byte*>(mPtr);
+}
+
+inline DeviceMemoryCUDA::operator const Byte*() const
+{
+    return std::bit_cast<const Byte*>(mPtr);
 }
 
 inline CUmemGenericAllocationHandle ToHandleCUDA(const DeviceLocalMemoryCUDA& mem)
 {
     return mem.memHandle;
 }
+
+static_assert(MemoryC<DeviceLocalMemoryCUDA>,
+              "\"DeviceLocalMemoryCUDA\" does not satisfy memory concept.");
+static_assert(MemoryC<HostLocalMemoryCUDA>,
+              "\"HostLocalMemoryCUDA\" does not satisfy memory concept.");
+static_assert(MemoryC<DeviceMemoryCUDA>,
+              "\"DeviceMemoryCUDA\" does not satisfy memory concept.");
 
 }

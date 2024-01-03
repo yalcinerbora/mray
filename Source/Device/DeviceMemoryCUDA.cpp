@@ -226,24 +226,14 @@ HostLocalMemoryCUDA& HostLocalMemoryCUDA::operator=(HostLocalMemoryCUDA&& other)
     return *this;
 }
 
-void* HostLocalMemoryCUDA::HostPtr()
+Byte* HostLocalMemoryCUDA::DevicePtr()
 {
-    return hPtr;
+    return reinterpret_cast<Byte*>(dPtr);
 }
 
-const void* HostLocalMemoryCUDA::HostPtr() const
+const Byte* HostLocalMemoryCUDA::DevicePtr() const
 {
-    return hPtr;
-}
-
-void* HostLocalMemoryCUDA::DevicePtr()
-{
-    return dPtr;
-}
-
-const void* HostLocalMemoryCUDA::DevicePtr() const
-{
-    return dPtr;
+    return reinterpret_cast<const Byte*>(dPtr);
 }
 
 void HostLocalMemoryCUDA::ResizeBuffer(size_t newSize)

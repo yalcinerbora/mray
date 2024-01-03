@@ -63,7 +63,7 @@ GPUDeviceCUDA::GPUDeviceCUDA(int deviceId)
     int vmmEnabled = 0;
     auto vmmAttib = CU_DEVICE_ATTRIBUTE_VIRTUAL_MEMORY_MANAGEMENT_SUPPORTED;
     CUDA_DRIVER_CHECK(cuDeviceGetAttribute(&vmmEnabled, vmmAttib, deviceId));
-    if(vmmEnabled != 0)
+    if(vmmEnabled == 0)
     {
         std::string err = MRAY_FORMAT("The device do not have virtual memory "
                                       "management support!({:s})", props.name);

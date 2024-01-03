@@ -4,6 +4,8 @@
 #include "Device/GPUSystem.h"
 #include "Core/MemAlloc.h"
 #include "Core/Log.h"
+#include "Core/Vector.h"
+#include "Core/Matrix.h"
 
 TEST(GPUMemory, DeviceMemory_Allocate)
 {
@@ -63,23 +65,23 @@ TEST(GPUMemory, DeviceMemory_Allocate)
 
         size_t copySize = 1_MiB << i;
 
-        CUDA_CHECK(cudaMemset(static_cast<void*>(memoryTo), 0x00,
+        CUDA_CHECK(cudaMemset(static_cast<Byte*>(memoryTo), 0x00,
                               memoryTo.Size()));
-        CUDA_CHECK(cudaMemset(static_cast<void*>(memoryFrom), 0x11,
+        CUDA_CHECK(cudaMemset(static_cast<Byte*>(memoryFrom), 0x12,
                               memoryFrom.Size()));
 
-        CUDA_CHECK(cudaMemcpy(static_cast<void*>(memoryTo),
-                              static_cast<void*>(memoryFrom),
+        CUDA_CHECK(cudaMemcpy(static_cast<Byte*>(memoryTo),
+                              static_cast<Byte*>(memoryFrom),
                               copySize, cudaMemcpyDefault));
 
         std::vector<Byte> hostAlloc(copySize, 0x00);
         CUDA_CHECK(cudaMemcpy(hostAlloc.data(),
-                              static_cast<void*>(memoryTo),
+                              static_cast<Byte*>(memoryTo),
                               copySize, cudaMemcpyDefault));
 
         for(Byte b : hostAlloc)
         {
-            EXPECT_EQ(b, 0x11);
+            EXPECT_EQ(b, 0x12);
         }
     }
 }
@@ -192,17 +194,93 @@ TEST(GPUMemory, HostLocalMemory_Allocate)
 
         CUDA_CHECK(cudaMemset(memoryTo.DevicePtr(), 0x00,
                               memoryTo.Size()));
-        CUDA_CHECK(cudaMemset(static_cast<void*>(memoryFrom), 0x11,
+        CUDA_CHECK(cudaMemset(static_cast<Byte*>(memoryFrom), 0x11,
                               memoryFrom.Size()));
 
         CUDA_CHECK(cudaMemcpy(memoryTo.DevicePtr(),
-                              static_cast<void*>(memoryFrom),
+                              static_cast<Byte*>(memoryFrom),
                               copySize, cudaMemcpyDefault));
 
-        Byte* hData = reinterpret_cast<Byte*>(memoryTo.HostPtr());
+        const Byte* hData = static_cast<const Byte*>(memoryTo);
         for(size_t j = 0 ; j < memoryTo.Size(); j++)
         {
             EXPECT_EQ(hData[j], 0x11);
         }
+    }
+}
+
+template <class T>
+class GPUMemoryAlloc : public testing::Test
+{
+    using MemoryType = T;
+
+    public:
+    GPUSystem                   system;
+    std::unique_ptr<MemoryType> memory;
+
+    public:
+    GPUMemoryAlloc()
+    {
+        if constexpr(std::is_same_v<MemoryType, DeviceMemory>)
+        {
+            std::vector<const GPUDevice*> devices = {&system.BestDevice()};
+            memory = std::make_unique<MemoryType>(devices, 4_MiB, 16_MiB);
+        }
+        else if constexpr(std::is_same_v<MemoryType, DeviceLocalMemory>)
+            memory = std::make_unique<MemoryType>(system.BestDevice());
+        else
+            memory = std::make_unique<MemoryType>(system);
+    };
+
+};
+
+using Implementations = ::testing::Types<DeviceLocalMemory,
+                                         HostLocalMemory,
+                                         DeviceMemory>;
+
+TYPED_TEST_SUITE(GPUMemoryAlloc, Implementations);
+
+TYPED_TEST(GPUMemoryAlloc, MultiAlloc)
+{
+    Float* dFloats;
+    Vector3* dVectors;
+    Matrix4x4* dMatrices;
+    MemAlloc::AllocateMultiData(std::tie(dFloats,
+                                         dVectors,
+                                         dMatrices),
+                                *(this->memory),
+                                {100, 50, 40});
+
+    CUDA_CHECK(cudaMemset(dFloats, 0x12, 100 * sizeof(Float)));
+    CUDA_CHECK(cudaMemset(dVectors, 0x34, 50 * sizeof(Vector3)));
+    CUDA_CHECK(cudaMemset(dMatrices, 0x56, 40 * sizeof(Matrix4x4)));
+
+    std::vector<Float> hFloats(100, 0.0f);
+    std::vector<Vector3> hVectors(50, Vector3::Zero());
+    std::vector<Matrix4x4> hMatrices(40, Matrix4x4::Zero());
+    CUDA_CHECK(cudaMemcpy(hFloats.data(), dFloats, 100 * sizeof(Float),
+                          cudaMemcpyDefault));
+    CUDA_CHECK(cudaMemcpy(hVectors.data(), dVectors, 50 * sizeof(Vector3),
+                          cudaMemcpyDefault));
+    CUDA_CHECK(cudaMemcpy(hMatrices.data(), dMatrices, 40 * sizeof(Matrix4x4),
+                          cudaMemcpyDefault));
+    const Byte* data = nullptr;
+
+    data = reinterpret_cast<const Byte*>(hFloats.data());
+    for(size_t i = 0; i < 100 * sizeof(Float); i++)
+    {
+        EXPECT_EQ(data[i], 0x12);
+    }
+
+    data = reinterpret_cast<const Byte*>(hVectors.data());
+    for(size_t i = 0; i < 50 * sizeof(Vector3); i++)
+    {
+        EXPECT_EQ(data[i], 0x34);
+    }
+
+    data = reinterpret_cast<const Byte*>(hMatrices.data());
+    for(size_t i = 0; i < 40 * sizeof(Matrix4x4); i++)
+    {
+        EXPECT_EQ(data[i], 0x56);
     }
 }

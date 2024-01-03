@@ -1,26 +1,26 @@
 #pragma once
 
 template<int N, ArithmeticC T>
-template <std::convertible_to C>
+template <std::convertible_to<T> C>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Matrix<N, T>::Matrix(C t)
 {
     UNROLL_LOOP
     for(int i = 0; i < N * N; i++)
     {
-        matrix[i] = static_cast<C>(t);
+        matrix[i] = static_cast<T>(t);
     }
 }
 
 template<int N, ArithmeticC T>
-template <std::convertible_to C>
+template <std::convertible_to<T> C>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Matrix<N, T>::Matrix(const C* data)
 {
     UNROLL_LOOP
     for(int i = 0; i < N * N; i++)
     {
-        matrix[i] = static_cast<C>(data[i]);
+        matrix[i] = static_cast<T>(data[i]);
     }
 }
 
@@ -747,7 +747,7 @@ template<int N, ArithmeticC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Matrix<N, T> Matrix<N, T>::Zero()
 {
-    return Matrix<N, T>(0);
+    return Matrix<N, T>(T{0});
 }
 
 template<int N, ArithmeticC T>

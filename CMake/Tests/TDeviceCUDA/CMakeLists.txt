@@ -4,7 +4,7 @@ message(STATUS "Configuring ${CURRENT_SOURCE_DIR}")
 
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/T_DeviceMemory.cpp
-    ${CURRENT_SOURCE_DIR}/T_DeviceLocalMemory.cpp)
+    ${CURRENT_SOURCE_DIR}/T_Texture.cpp)
 
 message(STATUS ${SRC_COMMON})
 

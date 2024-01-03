@@ -17,9 +17,9 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Matrix
     public:
     // Constructors & Destructor
     constexpr                       Matrix() = default;
-    template<std::convertible_to C>
+    template<std::convertible_to<T> C>
     MRAY_HYBRID constexpr explicit  Matrix(C);
-    template<std::convertible_to C>
+    template<std::convertible_to<T> C>
     MRAY_HYBRID constexpr explicit  Matrix(const C* data);
     template <class... Args>
     MRAY_HYBRID constexpr explicit  Matrix(const Args... dataList) requires (std::convertible_to<Args, T> && ...) && (sizeof...(Args) == N*N);
