@@ -15,26 +15,25 @@ TYPED_TEST(GPUTextureTest, Construct)
     static constexpr auto D = GPUTextureTest<TypeParam>::D;
     using ChannelType = typename GPUTextureTest<TypeParam>::ChannelType;
     using ParamType = typename GPUTextureTest<TypeParam>::ParamType;
-    using SizeType = typename ParamType::SizeType;
+    using SizeType = typename GPUTextureTest<TypeParam>::SizeType;
 
     {
         ParamType tParams = {};
         tParams.size = SizeType(33);
         tParams.mipCount = 1;
+        tParams.normIntegers = false;
 
         Texture<D, ChannelType> tex(system.BestDevice(), tParams);
     }
-
 }
 
 
 TYPED_TEST(GPUTextureTest, Allocate)
 {
-    static constexpr auto D = 3;
-    using ChannelType = Vector3uc;
-
-    using ParamType = TextureInitParams<D, ChannelType>;
-    using SizeType = typename ParamType::SizeType;
+    static constexpr auto D = GPUTextureTest<TypeParam>::D;
+    using ChannelType = typename GPUTextureTest<TypeParam>::ChannelType;
+    using ParamType = typename GPUTextureTest<TypeParam>::ParamType;
+    using SizeType = typename GPUTextureTest<TypeParam>::SizeType;
     using TexType = Texture<D, ChannelType>;
     static constexpr uint32_t TOTAL_TEX_COUNT = 128;
 
@@ -52,6 +51,8 @@ TYPED_TEST(GPUTextureTest, Allocate)
         ParamType tParams = {};
         tParams.size = SizeType(64);
         tParams.mipCount = 1;
+        tParams.normIntegers = false;
+
         TexType tex(system.BestDevice(), tParams);
 
         sizes.emplace_back(tex.Size());
@@ -79,3 +80,50 @@ TYPED_TEST(GPUTextureTest, Allocate)
 }
 
 
+TYPED_TEST(GPUTextureTest, Copy)
+{
+    static constexpr auto D = GPUTextureTest<TypeParam>::D;
+    using ChannelType = typename GPUTextureTest<TypeParam>::ChannelType;
+    using ParamType = typename GPUTextureTest<TypeParam>::ParamType;
+    using SizeType = typename GPUTextureTest<TypeParam>::SizeType;
+    using TexType = Texture<D, ChannelType>;
+    using PaddedChannelType = typename TexType::PaddedChannelType;
+
+    GPUSystem system;
+
+    // Do a default allocate
+    ParamType tParams = {};
+    tParams.size = SizeType(16);
+    tParams.mipCount = 1;
+    tParams.normIntegers = false;
+    TexType tex(system.BestDevice(), tParams);
+
+    // Allocation
+    TextureBackingMemory memory(system.BestDevice());
+    memory.ResizeBuffer(tex.Size());
+
+    const GPUQueue& queue = system.BestDevice().GetQueue(0);
+    tex.CommitMemory(queue, memory, 0);
+
+    // Get a fence and calculate a checkerboard pattern
+    GPUFence afterAllocFence = system.BestDevice().GetQueue(0).Barrier();
+
+    uint32_t total;
+    if constexpr (D == 1)
+        total = tParams.size;
+    else
+        total = tParams.size.Multiply();
+
+    std::vector<PaddedChannelType> data(total, PaddedChannelType(0));
+    for(uint32_t i = 0; i < total; i++)
+    {
+        if(i % 2 == 0)
+            data[i] = PaddedChannelType(1);
+    };
+    afterAllocFence.Wait();
+    // Mem is ready now go memcpy
+    tex.CopyFromAsync(queue, 0, TextureExtent<D>(0), tex.Extents(),
+                      Span<const PaddedChannelType>(data.cbegin(), data.cend()));
+    system.BestDevice().GetQueue(0).Barrier().Wait();
+
+}
