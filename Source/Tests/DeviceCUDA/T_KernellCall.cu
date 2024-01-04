@@ -7,7 +7,7 @@
 
 #include "T_TextureTypes.h"
 
-MRAY_GPU MRAY_CGPU_INLINE
+MRAY_HYBRID MRAY_CGPU_INLINE
 void HelloWorldKernel(KernelCallParams params,
                       uint32_t& dRef,
                       size_t total)

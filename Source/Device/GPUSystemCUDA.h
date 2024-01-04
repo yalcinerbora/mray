@@ -5,6 +5,7 @@
 #include <cuda_runtime.h>
 #include <vector>
 
+#include "Core/Types.h"
 #include "Core/MathFunctions.h"
 #include "DefinitionsCUDA.h"
 #include "GPUTypes.h"
@@ -118,6 +119,15 @@ class GPUQueueCUDA
     MRAY_HYBRID void    IssueExactKernelL(KernelExactIssueParams,
                                          //
                                          Lambda&&) const;
+
+    // Memory Movement (Async)
+    template <class T>
+    MRAY_HOST void      CopyAsync(Span<T> regionTo, Span<const T> regionFrom) const;
+
+    template <uint32_t D, class T>
+    MRAY_HOST void      CopyAsync(Texture<D, T>& texTo,
+                                  const TextureDim<D>& offset,
+                                  Span<const T> regionFrom) const;
 
     // Synchronization
     MRAY_HYBRID
@@ -285,6 +295,25 @@ GPUQueueCUDA::~GPUQueueCUDA()
     #endif
 
 }
+
+// Memory Movement (Async)
+template <class T>
+MRAY_HOST void GPUQueueCUDA::CopyAsync(Span<T> regionTo, Span<const T> regionFrom) const
+{
+    assert(regionTo.size_bytes() == regionFrom.size_bytes());
+    CUDA_CHECK(cudaMemcpyAsync(regionTo.data(), region.from.data(),
+                          regionFrom.size_bytes(),
+                          cudaMemcpyDefault, stream));
+}
+
+//template <uint32_t D, class T>
+//MRAY_HOST void GPUQueueCUDA::CopyAsync(Texture<D, T>& texTo, uint32_t mipLevel,
+//                                       const TextureSize<T>& texOffset,
+//                                       Span<const T> regionFrom) const
+//{
+//    // Implementation is templated so its complex
+//    texTo.Set()
+//}
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 GPUFenceCUDA GPUQueueCUDA::Barrier() const

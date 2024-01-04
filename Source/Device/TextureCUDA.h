@@ -100,7 +100,6 @@ class TextureCUDA
                                          size_t offset);
 };
 
-
 class TextureBackingMemoryCUDA
 {
     MRAY_HYBRID
