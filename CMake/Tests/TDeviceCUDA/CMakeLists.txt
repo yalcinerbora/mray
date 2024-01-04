@@ -4,7 +4,9 @@ message(STATUS "Configuring ${CURRENT_SOURCE_DIR}")
 
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/T_DeviceMemory.cpp
-    ${CURRENT_SOURCE_DIR}/T_Texture.cpp)
+    ${CURRENT_SOURCE_DIR}/T_TextureTypes.h
+    ${CURRENT_SOURCE_DIR}/T_Texture.cpp
+    ${CURRENT_SOURCE_DIR}/T_TextureAccess.cu)
 
 message(STATUS ${SRC_COMMON})
 
@@ -22,6 +24,10 @@ target_link_libraries(TDeviceCUDA PRIVATE
 gtest_discover_tests(TDeviceCUDA)
 
 set_target_properties(TDeviceCUDA PROPERTIES FOLDER ${MRAY_TEST_TARGETS_FOLDER})
+set_target_properties(TDeviceCUDA PROPERTIES
+                      POSITION_INDEPENDENT_CODE ON
+                      CUDA_SEPARABLE_COMPILATION ON
+                      CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
 if(MSVC)
 

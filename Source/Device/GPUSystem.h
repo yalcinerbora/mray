@@ -12,12 +12,14 @@
     #include "DeviceMemoryCUDA.h"
 
     // Alias the types
-    using GPUDevice         = mray::cuda::GPUDeviceCUDA;
-    using GPUQueue          = mray::cuda::GPUQueueCUDA;
-    using GPUSystem         = mray::cuda::GPUSystemCUDA;
-    using DeviceMemory      = mray::cuda::DeviceMemoryCUDA;
-    using DeviceLocalMemory = mray::cuda::DeviceLocalMemoryCUDA;
-    using HostLocalMemory   = mray::cuda::HostLocalMemoryCUDA;
+    using GPUDevice             = mray::cuda::GPUDeviceCUDA;
+    using GPUQueue              = mray::cuda::GPUQueueCUDA;
+    using GPUFence              = mray::cuda::GPUFenceCUDA;
+    using GPUSystem             = mray::cuda::GPUSystemCUDA;
+    using DeviceMemory          = mray::cuda::DeviceMemoryCUDA;
+    using DeviceLocalMemory     = mray::cuda::DeviceLocalMemoryCUDA;
+    using HostLocalMemory       = mray::cuda::HostLocalMemoryCUDA;
+    using TextureBackingMemory  = mray::cuda::TextureBackingMemoryCUDA;
 
     template<uint32_t DIM, class T>
     using TextureView = mray::cuda::TextureViewCUDA<DIM, T>;
@@ -28,7 +30,7 @@
 
 //#elif defined MRAY_GPU_BACKEND_SYCL
 //    // TODO:
-//    //#include "GPUSystemSycl.hpp"
+//    //#include "GPUSystemSycl.h"
 #else
     #error Please define a GPU Backend!
 #endif

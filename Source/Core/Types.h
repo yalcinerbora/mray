@@ -2,15 +2,6 @@
 
 #include <span>
 #include <optional>
-#include <concepts>
-
-#include "Vector.h"
-#include "Ray.h"
-#include "AABB.h"
-#include "Quaternion.h"
-
-//#include "Hit.h"
-//#include "Key.h"
 
 // Rename the std::optional, gpu may not like it
 // most(all after c++20) of optional is constexpr
@@ -23,55 +14,64 @@ template <class T, std::size_t Extent = std::dynamic_extent>
 using Span = std::span<T, Extent>;
 
 
-//using MetaHitPtr = MetaHitPtrT<Vector2, Vector3>;
-
-// Differential portion of a ray
-class DiffRay{};
-
-class RNGDispenser
-{
-    public:
-    Vector2 NextUniform2D()
-    {
-        return Vector2::Zero();
-    }
-};
-
-// Spectral Samples or RGB color etc.
-// For spectrum we need wavelengths as well,
-// but for RGB we dont need it.
+//#include <concepts>
 //
-// So frequencies are seperate.
-// The intra-render calculations will hold SpectrumT types
-// throughout.
-//
-// On spectral mode, boundary calculations will require accessing
-// the wavelengths for sampling (i.e. from RGB texture for input boundary case
-// or converting to the output image for output boundary case).
-//
-// Pairing these two as a single type is not good because of these.
-// We hold a seperate entity that holds waves
-//
-// TODO: The design leaks here,
-// change this to prevent Vector + Spectrum addition etc.
-//
-// CRTP is the best bet for minimal code duplication (like in PBRT)
-template <int SPS, std::floating_point T>
-using SpectrumT = Vector<SPS, T>;
+//#include "Vector.h"
+//#include "Ray.h"
+//#include "AABB.h"
+//#include "Quaternion.h"
 
-template <int SPS, std::floating_point T>
-using SpectrumWavesT = Vector<SPS, T>;
-
-// Actual spectrum for this compilation
-// For RGB values this should at least be 3
-using Spectrum      = SpectrumT<SpectraPerSpectrum, Float>;
-using SpectrumWaves = SpectrumWavesT<SpectraPerSpectrum, Float>;
-
-// Similar to the other types this
-class SpectrumGroup
-{
-
-};
+//#include "Hit.h"
+//#include "Key.h"
+////using MetaHitPtr = MetaHitPtrT<Vector2, Vector3>;
+//
+//// Differential portion of a ray
+//class DiffRay{};
+//
+//class RNGDispenser
+//{
+//    public:
+//    Vector2 NextUniform2D()
+//    {
+//        return Vector2::Zero();
+//    }
+//};
+//
+//// Spectral Samples or RGB color etc.
+//// For spectrum we need wavelengths as well,
+//// but for RGB we dont need it.
+////
+//// So frequencies are seperate.
+//// The intra-render calculations will hold SpectrumT types
+//// throughout.
+////
+//// On spectral mode, boundary calculations will require accessing
+//// the wavelengths for sampling (i.e. from RGB texture for input boundary case
+//// or converting to the output image for output boundary case).
+////
+//// Pairing these two as a single type is not good because of these.
+//// We hold a seperate entity that holds waves
+////
+//// TODO: The design leaks here,
+//// change this to prevent Vector + Spectrum addition etc.
+////
+//// CRTP is the best bet for minimal code duplication (like in PBRT)
+//template <int SPS, std::floating_point T>
+//using SpectrumT = Vector<SPS, T>;
+//
+//template <int SPS, std::floating_point T>
+//using SpectrumWavesT = Vector<SPS, T>;
+//
+//// Actual spectrum for this compilation
+//// For RGB values this should at least be 3
+//using Spectrum      = SpectrumT<SpectraPerSpectrum, Float>;
+//using SpectrumWaves = SpectrumWavesT<SpectraPerSpectrum, Float>;
+//
+//// Similar to the other types this
+//class SpectrumGroup
+//{
+//
+//};
 
 ////using
 //

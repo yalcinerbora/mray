@@ -242,44 +242,44 @@ TYPED_TEST_SUITE(GPUMemoryAlloc, Implementations);
 
 TYPED_TEST(GPUMemoryAlloc, MultiAlloc)
 {
-    Float* dFloats;
-    Vector3* dVectors;
-    Matrix4x4* dMatrices;
+    Span<Float> dFloats;
+    Span<Vector3> dVectors;
+    Span<Matrix4x4> dMatrices;
     MemAlloc::AllocateMultiData(std::tie(dFloats,
                                          dVectors,
                                          dMatrices),
                                 *(this->memory),
                                 {100, 50, 40});
 
-    CUDA_CHECK(cudaMemset(dFloats, 0x12, 100 * sizeof(Float)));
-    CUDA_CHECK(cudaMemset(dVectors, 0x34, 50 * sizeof(Vector3)));
-    CUDA_CHECK(cudaMemset(dMatrices, 0x56, 40 * sizeof(Matrix4x4)));
+    CUDA_CHECK(cudaMemset(dFloats.data(), 0x12, dFloats.size_bytes()));
+    CUDA_CHECK(cudaMemset(dVectors.data(), 0x34, dVectors.size_bytes()));
+    CUDA_CHECK(cudaMemset(dMatrices.data(), 0x56, dMatrices.size_bytes()));
 
-    std::vector<Float> hFloats(100, 0.0f);
-    std::vector<Vector3> hVectors(50, Vector3::Zero());
-    std::vector<Matrix4x4> hMatrices(40, Matrix4x4::Zero());
-    CUDA_CHECK(cudaMemcpy(hFloats.data(), dFloats, 100 * sizeof(Float),
+    std::vector<Float> hFloats(dFloats.size(), 0.0f);
+    std::vector<Vector3> hVectors(dVectors.size(), Vector3::Zero());
+    std::vector<Matrix4x4> hMatrices(dMatrices.size(), Matrix4x4::Zero());
+    CUDA_CHECK(cudaMemcpy(hFloats.data(), dFloats.data(), dFloats.size_bytes(),
                           cudaMemcpyDefault));
-    CUDA_CHECK(cudaMemcpy(hVectors.data(), dVectors, 50 * sizeof(Vector3),
+    CUDA_CHECK(cudaMemcpy(hVectors.data(), dVectors.data(), dVectors.size_bytes(),
                           cudaMemcpyDefault));
-    CUDA_CHECK(cudaMemcpy(hMatrices.data(), dMatrices, 40 * sizeof(Matrix4x4),
+    CUDA_CHECK(cudaMemcpy(hMatrices.data(), dMatrices.data(), dMatrices.size_bytes(),
                           cudaMemcpyDefault));
     const Byte* data = nullptr;
 
     data = reinterpret_cast<const Byte*>(hFloats.data());
-    for(size_t i = 0; i < 100 * sizeof(Float); i++)
+    for(size_t i = 0; i < dFloats.size_bytes(); i++)
     {
         EXPECT_EQ(data[i], 0x12);
     }
 
     data = reinterpret_cast<const Byte*>(hVectors.data());
-    for(size_t i = 0; i < 50 * sizeof(Vector3); i++)
+    for(size_t i = 0; i < dVectors.size_bytes(); i++)
     {
         EXPECT_EQ(data[i], 0x34);
     }
 
     data = reinterpret_cast<const Byte*>(hMatrices.data());
-    for(size_t i = 0; i < 40 * sizeof(Matrix4x4); i++)
+    for(size_t i = 0; i < dMatrices.size_bytes(); i++)
     {
         EXPECT_EQ(data[i], 0x56);
     }

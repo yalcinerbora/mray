@@ -21,10 +21,13 @@ TODO: should we interface these?
 #include <tuple>
 #include <cassert>
 #include <vector>
+#include <cuda.h>
 
 #include "Core/Definitions.h"
 #include "Core/MemAlloc.h"
-#include <cuda.h>
+
+#include "GPUTypes.h"
+
 
 namespace mray::cuda
 {
@@ -35,22 +38,18 @@ class GPUQueueCUDA;
 
 class DeviceLocalMemoryCUDA
 {
-    friend CUmemGenericAllocationHandle ToHandleCUDA(const DeviceLocalMemoryCUDA& mem);
-
     private:
     const GPUDeviceCUDA*            gpu;
     void*                           dPtr;
     size_t                          size;
     size_t                          allocSize;
     CUmemGenericAllocationHandle    memHandle;
-    bool                            isTexMappable;
 
     protected:
     public:
     // Constructors & Destructor
                             DeviceLocalMemoryCUDA(const GPUDeviceCUDA& gpu);
-                            DeviceLocalMemoryCUDA(const GPUDeviceCUDA& gpu, size_t sizeInBytes,
-                                                  bool isUsedForTexMapping = false);
+                            DeviceLocalMemoryCUDA(const GPUDeviceCUDA& gpu, size_t sizeInBytes);
                             DeviceLocalMemoryCUDA(const DeviceLocalMemoryCUDA&);
                             DeviceLocalMemoryCUDA(DeviceLocalMemoryCUDA&&) noexcept;
                             ~DeviceLocalMemoryCUDA();
@@ -181,11 +180,6 @@ inline DeviceMemoryCUDA::operator Byte*()
 inline DeviceMemoryCUDA::operator const Byte*() const
 {
     return std::bit_cast<const Byte*>(mPtr);
-}
-
-inline CUmemGenericAllocationHandle ToHandleCUDA(const DeviceLocalMemoryCUDA& mem)
-{
-    return mem.memHandle;
 }
 
 static_assert(MemoryC<DeviceLocalMemoryCUDA>,

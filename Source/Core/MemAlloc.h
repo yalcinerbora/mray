@@ -4,6 +4,7 @@
 #include <concepts>
 
 #include "MathFunctions.h"
+#include "Types.h"
 
 inline size_t operator ""_GiB(size_t s)
 {
@@ -80,25 +81,26 @@ namespace MemAlloc::Detail
 
     template<std::size_t I = 0, class... Tp>
     requires (I == sizeof...(Tp))
-    constexpr void CalculatePointers(std::tuple<Tp*&...>&, size_t&, Byte*,
+    constexpr void CalculateSpans(std::tuple<Span<Tp>&...>&, size_t&, Byte*,
                                      const std::array<size_t, sizeof...(Tp)>&)
     {}
 
     template<std::size_t I = 0, class... Tp>
     requires (I < sizeof...(Tp))
-    constexpr void CalculatePointers(std::tuple<Tp*&...>& t, size_t& offset, Byte* memory,
-                                     const std::array<size_t, sizeof...(Tp)>& alignedSizeList)
+    constexpr void CalculateSpans(std::tuple<Span<Tp>&...>& t, size_t& offset, Byte* memory,
+                                  const std::array<size_t, sizeof...(Tp)>& alignedSizeList)
     {
         using CurrentType = typename std::tuple_element_t<I, std::tuple<Tp...>>;
         // Set Pointer
         size_t size = alignedSizeList[I];
         CurrentType* tPtr = reinterpret_cast<CurrentType*>(memory + offset);
         tPtr = std::launder(tPtr);
-        std::get<I>(t) = (size == 0) ? nullptr : tPtr;
+        std::get<I>(t) = Span<CurrentType>((size == 0) ? nullptr : tPtr,
+                                           size / sizeof(CurrentType));
         // Increment Offset
         offset += size;
         // Statically Recurse over other pointers
-        CalculatePointers<I + 1, Tp...>(t, offset, memory, alignedSizeList);
+        CalculateSpans<I + 1, Tp...>(t, offset, memory, alignedSizeList);
     }
 }
 
@@ -112,11 +114,11 @@ constexpr size_t DefaultSystemAlignment()
 }
 
 template <MemoryC Memory, ImplicitLifetimeC... Args>
-void AllocateMultiData(std::tuple<Args*&...> pointers, Memory& memory,
+void AllocateMultiData(std::tuple<Span<Args>&...> spans, Memory& memory,
                        const std::array<size_t, sizeof...(Args)>& countList,
                        size_t alignment = DefaultSystemAlignment())
 {
-    std::array<size_t, sizeof...(Args)> alignedSizeList = {};
+    std::array<size_t, sizeof...(Args)> alignedSizeList;
     // Acquire total size & allocation size of each array
     size_t totalSize = Detail::AcquireTotalSize<0, Args...>(alignedSizeList,
                                                             countList,
@@ -126,9 +128,32 @@ void AllocateMultiData(std::tuple<Args*&...> pointers, Memory& memory,
     Byte* ptr = static_cast<Byte*>(memory);
     // Populate pointers
     size_t offset = 0;
-    Detail::CalculatePointers(pointers, offset, ptr, alignedSizeList);
+    Detail::CalculateSpans(spans, offset, ptr, alignedSizeList);
 
     assert(totalSize == offset);
 }
+
+template <class Memory>
+requires requires(Memory m) { {m.ResizeBuffer(size_t{})} -> std::same_as<void>; }
+void AllocateTextureSpace(std::vector<size_t>& offsets,
+                          Memory& memory,
+                          const std::vector<size_t>& sizes,
+                          const std::vector<size_t>& alignments)
+{
+    assert(sizes.size() == alignments.size());
+    offsets.resize(sizes.size());
+
+    size_t totalSize = 0;
+    for(size_t i = 0; i < sizes.size(); i++)
+    {
+        size_t alignedSize = MathFunctions::NextMultiple(sizes[i], alignments[i]);
+        offsets[i] = totalSize;
+        totalSize += alignedSize;
+    }
+
+    // Allocate Memory
+    memory.ResizeBuffer(totalSize);
+}
+
 
 }

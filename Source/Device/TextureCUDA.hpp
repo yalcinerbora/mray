@@ -3,8 +3,8 @@ namespace mray::cuda
 {
     // Doing this instead of partial template classes etc
     // There is only three dimensions so it is clearer?
-    template <uint32_t D, uint32_t I>
-    cudaExtent MakeCudaExtent(const Vector<D, uint32_t>& dim)
+    template <uint32_t D, uint32_t I, class T>
+    cudaExtent MakeCudaExtent(const T& dim)
     {
         if constexpr(D == 1)
         {
@@ -58,7 +58,7 @@ namespace mray::cuda
         // Warnings
         if(texParams.normIntegers && !IsNormConvertible)
         {
-            MRAY_ERROR_LOG("{:s}", "Requested channel type cannot be converted to normalized form."
+            MRAY_WARNING_LOG("Requested channel type cannot be converted to normalized form."
                              " Setting \"unormIntegers\" to false");
             texParams.normIntegers = false;
         };
@@ -211,25 +211,24 @@ namespace mray::cuda
 
     template<int D, class T>
     void TextureCUDA<D, T>::CommitMemory(const GPUQueueCUDA& queue,
-                                         const DeviceLocalMemoryCUDA& deviceMem,
+                                         const TextureBackingMemoryCUDA& deviceMem,
                                          size_t offset)
     {
-        cudaArraySparseProperties sparseProps;
-        CUDA_CHECK(cudaMipmappedArrayGetSparseProperties(&sparseProps, data));
-
+        assert(deviceMem.Device() == *gpu);
         // Given span of memory, commit for usage.
+        CUarrayMapInfo mappingInfo = {};
+        mappingInfo.resourceType = CU_RESOURCE_TYPE_MIPMAPPED_ARRAY;
+        mappingInfo.resource.mipmap = std::bit_cast<CUmipmappedArray>(data);
 
-        CUarrayMapInfo mapingInfo;
-        mapingInfo.resourceType = CU_RESOURCE_TYPE_MIPMAPPED_ARRAY;
-        mapingInfo.resource.mipmap = std::bit_cast<CUmipmappedArray>(data);
+        mappingInfo.memHandleType = CU_MEM_HANDLE_TYPE_GENERIC;
+        mappingInfo.memHandle.memHandle = ToHandleCUDA(deviceMem);
 
-        mapingInfo.memHandleType = CU_MEM_HANDLE_TYPE_GENERIC;
-        mapingInfo.memHandle.memHandle = ToHandleCUDA(deviceMem);
+        mappingInfo.memOperationType = CU_MEM_OPERATION_TYPE_MAP;
 
-        mapingInfo.offset = offset;
-        mapingInfo.deviceBitMask = (1 << gpu->DeviceId());
+        mappingInfo.offset = offset;
+        mappingInfo.deviceBitMask = (1 << gpu->DeviceId());
 
-        CUDA_DRIVER_CHECK(cuMemMapArrayAsync(&mapingInfo, 1, ToHandleCUDA(queue)));
+        CUDA_DRIVER_CHECK(cuMemMapArrayAsync(&mappingInfo, 1, ToHandleCUDA(queue)));
     }
 
 }

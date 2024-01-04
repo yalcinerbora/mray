@@ -13,24 +13,18 @@ DeviceLocalMemoryCUDA::DeviceLocalMemoryCUDA(const GPUDeviceCUDA& device)
     , size(0)
     , allocSize(0)
     , memHandle(0)
-    , isTexMappable(false)
 {}
 
-DeviceLocalMemoryCUDA::DeviceLocalMemoryCUDA(const GPUDeviceCUDA& device,
-                                             size_t sizeInBytes,
-                                             bool isUsedForTexMapping)
+DeviceLocalMemoryCUDA::DeviceLocalMemoryCUDA(const GPUDeviceCUDA& device, size_t sizeInBytes)
     : DeviceLocalMemoryCUDA(device)
 {
     assert(sizeInBytes != 0);
     size = sizeInBytes;
-    isTexMappable = isUsedForTexMapping;
 
     CUmemAllocationProp props = {};
     props.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
     props.location.id = gpu->DeviceId();
     props.type = CU_MEM_ALLOCATION_TYPE_PINNED;
-    props.allocFlags.usage = (isTexMappable) ? CU_MEM_CREATE_USAGE_TILE_POOL
-                                             : 0;
 
     size_t granularity;
     CUDA_DRIVER_CHECK(cuMemGetAllocationGranularity(&granularity, &props,
@@ -54,7 +48,7 @@ DeviceLocalMemoryCUDA::DeviceLocalMemoryCUDA(const GPUDeviceCUDA& device,
 }
 
 DeviceLocalMemoryCUDA::DeviceLocalMemoryCUDA(const DeviceLocalMemoryCUDA& other)
-    : DeviceLocalMemoryCUDA(*(other.gpu), other.size, other.isTexMappable)
+    : DeviceLocalMemoryCUDA(*(other.gpu), other.size)
 {
 
     CUDA_CHECK(cudaSetDevice(gpu->DeviceId()));
@@ -68,13 +62,11 @@ DeviceLocalMemoryCUDA::DeviceLocalMemoryCUDA(DeviceLocalMemoryCUDA&& other) noex
     , size(other.size)
     , allocSize(other.allocSize)
     , memHandle(other.memHandle)
-    , isTexMappable(other.isTexMappable)
 {
     other.dPtr = nullptr;
     other.size = 0;
     other.allocSize = 0;
     other.memHandle = 0;
-
 }
 
 DeviceLocalMemoryCUDA::~DeviceLocalMemoryCUDA()
@@ -93,9 +85,7 @@ DeviceLocalMemoryCUDA& DeviceLocalMemoryCUDA::operator=(const DeviceLocalMemoryC
     assert(this != &other);
 
     // Allocate fresh via move assignment operator
-    (*this) = DeviceLocalMemoryCUDA(*other.gpu, other.size, other.isTexMappable);
-
-    //
+    (*this) = DeviceLocalMemoryCUDA(*other.gpu, other.size);
     CUDA_DRIVER_CHECK(cuMemcpy(std::bit_cast<CUdeviceptr>(dPtr),
                                std::bit_cast<CUdeviceptr>(other.dPtr), size));
     return *this;
@@ -118,7 +108,6 @@ DeviceLocalMemoryCUDA& DeviceLocalMemoryCUDA::operator=(DeviceLocalMemoryCUDA&& 
     dPtr = other.dPtr;
     size = other.size;
     memHandle = other.memHandle;
-    isTexMappable = other.isTexMappable;
 
     other.dPtr = nullptr;
     other.size = 0;
@@ -133,16 +122,12 @@ void DeviceLocalMemoryCUDA::ResizeBuffer(size_t newSize)
 {
     // Do slow enlargement here, device local memory does not allocate
     // more than once. Device memory can be used for that instead
-    DeviceLocalMemoryCUDA newMem(*gpu, newSize, isTexMappable);
+    DeviceLocalMemoryCUDA newMem(*gpu, newSize);
 
     // Copy to new memory
     size_t copySize = std::min(newSize, size);
-    //CUDA_DRIVER_CHECK(cuMemcpy(std::bit_cast<CUdeviceptr>(newMem.dPtr),
-    //                           std::bit_cast<CUdeviceptr>(dPtr), copySize));
-    //std::memcpy(newMem.dPtr, dPtr, copySize);
-    CUDA_CHECK(cudaSetDevice(gpu->DeviceId()));
-    CUDA_CHECK(cudaMemcpy(newMem.dPtr, dPtr, copySize, cudaMemcpyDefault));
-
+    CUDA_DRIVER_CHECK(cuMemcpy(std::bit_cast<CUdeviceptr>(newMem.dPtr),
+                               std::bit_cast<CUdeviceptr>(dPtr), copySize));
     *this = std::move(newMem);
 }
 
@@ -154,7 +139,7 @@ size_t DeviceLocalMemoryCUDA::Size() const
 void DeviceLocalMemoryCUDA::MigrateToOtherDevice(const GPUDeviceCUDA& deviceTo)
 {
     // Allocate over the other device
-    DeviceLocalMemoryCUDA newMem(deviceTo, size, isTexMappable);
+    DeviceLocalMemoryCUDA newMem(deviceTo, size);
     CUDA_CHECK(cudaMemcpyPeer(newMem.dPtr, newMem.gpu->DeviceId(),
                               dPtr, gpu->DeviceId(), size));
 
@@ -221,8 +206,8 @@ HostLocalMemoryCUDA& HostLocalMemoryCUDA::operator=(HostLocalMemoryCUDA&& other)
     dPtr = other.dPtr;
 
     other.size = 0;
-    other.hPtr = 0;
-    other.dPtr = 0;
+    other.hPtr = nullptr;
+    other.dPtr = nullptr;
     return *this;
 }
 
@@ -299,7 +284,7 @@ DeviceMemoryCUDA::DeviceMemoryCUDA(const std::vector<const GPUDeviceCUDA*>& devi
 
 DeviceMemoryCUDA::~DeviceMemoryCUDA()
 {
-    CUDA_DRIVER_CHECK(cuMemUnmap(mPtr, allocSize));
+    if(allocSize != 0) CUDA_DRIVER_CHECK(cuMemUnmap(mPtr, allocSize));
     for(const Allocations& a : allocs)
     {
         CUDA_DRIVER_CHECK(cuMemRelease(a.handle));

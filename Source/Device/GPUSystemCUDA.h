@@ -39,14 +39,31 @@ static constexpr uint32_t TotalQueuePerDevice()
 namespace mray::cuda
 {
 
+class GPUQueueCUDA;
 class GPUDeviceCUDA;
-class DeviceMemoryCUDA;
-class DeviceLocalMemoryCUDA;
-template<uint32_t DIMS, class T>
-class DeviceTextureCUDA;
+
+class GPUFenceCUDA
+{
+    MRAY_HYBRID
+    friend cudaEvent_t ToHandleCUDA(const GPUFenceCUDA&);
+
+    private:
+    cudaEvent_t                 eventC;
+
+    public:
+    MRAY_HYBRID                 GPUFenceCUDA(const GPUQueueCUDA&);
+                                GPUFenceCUDA(const GPUFenceCUDA&) = delete;
+    MRAY_HYBRID                 GPUFenceCUDA(GPUFenceCUDA&&) noexcept;
+    GPUFenceCUDA&               operator=(const GPUFenceCUDA&) = delete;
+    MRAY_HYBRID GPUFenceCUDA&   operator=(GPUFenceCUDA&&) noexcept;
+    MRAY_HYBRID                 ~GPUFenceCUDA();
+
+    MRAY_HYBRID void            Wait() const;
+};
 
 class GPUQueueCUDA
 {
+    MRAY_HYBRID
     friend cudaStream_t ToHandleCUDA(const GPUQueueCUDA&);
 
     private:
@@ -64,46 +81,47 @@ class GPUQueueCUDA
     MRAY_HYBRID                 GPUQueueCUDA(uint32_t multiprocessorCount,
                                              DeviceQueueType t = DeviceQueueType::NORMAL);
                                 GPUQueueCUDA(const GPUQueueCUDA&) = delete;
-    MRAY_HYBRID                 GPUQueueCUDA(GPUQueueCUDA&&);
+    MRAY_HYBRID                 GPUQueueCUDA(GPUQueueCUDA&&) noexcept;
     GPUQueueCUDA&               operator=(const GPUQueueCUDA&) = delete;
-    MRAY_HYBRID GPUQueueCUDA&   operator=(GPUQueueCUDA&&);
+    MRAY_HYBRID GPUQueueCUDA&   operator=(GPUQueueCUDA&&) noexcept;
     MRAY_HYBRID                 ~GPUQueueCUDA();
 
     // Classic GPU Calls
     // Create just enough blocks according to work size
-    template<class Function, class... Args>
-    MRAY_HYBRID void    IssueKernel(uint32_t sharedMemSize,
-                                    uint32_t workCount,
+    template<auto DeviceFunction, class... Args>
+    MRAY_HYBRID void    IssueKernel(KernelIssueParams,
                                     //
-                                    Function&&, Args&&...) const;
-    template<class Function, class... Args>
-    MRAY_HYBRID void    IssueKernel(uint32_t workCount,
-                                    //
-                                    Function&&, Args&&...) const;
+                                    Args&&...) const;
+    template<class Lambda>
+    MRAY_HYBRID void    IssueKernelL(KernelIssueParams,
+                                     //
+                                     Lambda&&) const;
     // Grid-Stride Kernels
     // Kernel is launched just enough blocks to
     // fully saturate the GPU.
-    template<class Function, class... Args>
-    MRAY_HOST void      IssueSaturatingKernel(uint32_t sharedMemSize,
-                                              uint32_t workCount,
+    template<auto DeviceFunction, class... Args>
+    MRAY_HYBRID void    IssueSaturatingKernel(KernelIssueParams,
                                               //
-                                              Function&&, Args&&...) const;
-    template<class Function, class... Args>
-    MRAY_HOST void      IssueSaturatingKernel(uint32_t workCount,
-                                              //
-                                              Function&&, Args&&...) const;
+                                              Args&&...) const;
+    template<class Lambda>
+    MRAY_HYBRID void    IssueSaturatingKernelL(KernelIssueParams,
+                                               //
+                                               Lambda&&) const;
     // Exact Kernel Calls
     // You 1-1 specify block and grid dimensions
     // Important: These can not be annottated with launch_bounds
-    template<class Function, class... Args>
-    MRAY_HYBRID void    IssueExactKernel(uint32_t sharedMemSize,
-                                         uint32_t gridDim, uint32_t blockDim,
+    template<auto DeviceFunction, class... Args>
+    MRAY_HYBRID void    IssueExactKernel(KernelExactIssueParams,
                                          //
-                                         Function&&, Args&&...) const;
-    template<class Function, class... Args>
-    MRAY_HYBRID void    IssueExactKernel(uint32_t gridDim, uint32_t blockDim,
+                                         Args&&...) const;
+    template<class Lambda>
+    MRAY_HYBRID void    IssueExactKernelL(KernelExactIssueParams,
                                          //
-                                         Function&&, Args&&...) const;
+                                         Lambda&&) const;
+
+    // Synchronization
+    MRAY_HYBRID
+    GPUFenceCUDA        Barrier() const;
 
     MRAY_HYBRID
     static uint32_t     RecommendedBlockCountPerSM(const void* kernelPtr,
@@ -125,9 +143,9 @@ class GPUDeviceCUDA
     // Constructors & Destructor
     explicit                GPUDeviceCUDA(int deviceId);
                             GPUDeviceCUDA(const GPUDeviceCUDA&) = delete;
-                            GPUDeviceCUDA(GPUDeviceCUDA&&) = default;
+                            GPUDeviceCUDA(GPUDeviceCUDA&&) noexcept = default;
     GPUDeviceCUDA&          operator=(const GPUDeviceCUDA&) = delete;
-    GPUDeviceCUDA&          operator=(GPUDeviceCUDA&&) = default;
+    GPUDeviceCUDA&          operator=(GPUDeviceCUDA&&) noexcept = default;
                             ~GPUDeviceCUDA() = default;
 
     bool                    operator==(const GPUDeviceCUDA&) const;
@@ -141,12 +159,6 @@ class GPUDeviceCUDA
     uint32_t                MaxActiveBlockPerSM(uint32_t threadsPerBlock = StaticThreadPerBlock1D()) const;
 
     const GPUQueueCUDA&     GetQueue(uint32_t index) const;
-
-    // Memory Related
-    DeviceLocalMemoryCUDA   GetAMemory() const;
-    //template <uint32_t DIM, class T>
-    //TextureCUDA<DIM,T>      GetATexture() const;
-
 };
 
 class GPUSystemCUDA
@@ -186,10 +198,99 @@ class GPUSystemCUDA
 
     // Simple & Slow System Synchronization
     void                    SyncAll() const;
-
-    // MemoryRelated
-    DeviceMemoryCUDA        GetAMemory() const;
 };
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+GPUFenceCUDA::GPUFenceCUDA(const GPUQueueCUDA& q)
+    : eventC((cudaEvent_t)0)
+{
+    CUDA_CHECK(cudaEventCreateWithFlags(&eventC, cudaEventDisableTiming));
+    cudaStream_t stream = ToHandleCUDA(q);
+    CUDA_CHECK(cudaEventRecord(eventC, stream));
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+GPUFenceCUDA::GPUFenceCUDA(GPUFenceCUDA&& other) noexcept
+    : eventC(other.eventC)
+{
+    other.eventC = (cudaEvent_t)0;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+GPUFenceCUDA& GPUFenceCUDA::operator=(GPUFenceCUDA&& other) noexcept
+{
+    eventC = other.eventC;
+    other.eventC = (cudaEvent_t)0;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+GPUFenceCUDA::~GPUFenceCUDA()
+{
+    if(eventC != (cudaEvent_t)0)
+        CUDA_CHECK(cudaEventDestroy(eventC));
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+void GPUFenceCUDA::Wait() const
+{
+    #ifndef __CUDA_ARCH__
+        CUDA_CHECK(cudaEventSynchronize(eventC));
+    #else
+        // TODO: Reason about this
+        //
+        // CUDA_CHECK(cudaStreamWaitEvent(stream, event));
+        __trap();
+    #endif
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+GPUQueueCUDA::GPUQueueCUDA(uint32_t multiprocessorCount,
+                           DeviceQueueType t)
+    : multiprocessorCount(multiprocessorCount)
+{
+
+    switch(t)
+    {
+        case DeviceQueueType::NORMAL:
+            CUDA_CHECK(cudaStreamCreateWithFlags(&stream,
+                                                 cudaStreamNonBlocking));
+            break;
+        default:
+            assert(false);
+            break;
+
+        // Only valid on device
+        #ifdef __CUDA_ARCH__
+            case DeviceQueueType::FIRE_AND_FORGET:
+                stream = cudaStreamFireAndForget;
+                break;
+            case DeviceQueueType::TAIL_LAUNCH:
+                stream = cudaStreamTailLaunch;
+                break;
+        #endif
+    }
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+GPUQueueCUDA::~GPUQueueCUDA()
+{
+    #ifdef __CUDA_ARCH__
+        if(stream != cudaStreamTailLaunch ||
+           stream != cudaStreamFireAndForget ||
+           stream != (cudaStream_t)0)
+            CUDA_CHECK(cudaStreamDestroy(stream));
+    #else
+        if(stream != (cudaStream_t)0)
+            CUDA_CHECK(cudaStreamDestroy(stream));
+    #endif
+
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+GPUFenceCUDA GPUQueueCUDA::Barrier() const
+{
+    return GPUFenceCUDA(*this);
+}
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t GPUQueueCUDA::RecommendedBlockCountPerSM(const void* kernelPtr,
@@ -221,7 +322,7 @@ uint32_t GPUQueueCUDA::DetermineGridStrideBlock(const void* kernelPtr,
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-GPUQueueCUDA::GPUQueueCUDA(GPUQueueCUDA&& other)
+GPUQueueCUDA::GPUQueueCUDA(GPUQueueCUDA&& other) noexcept
     : stream(other.stream)
     , multiprocessorCount(other.multiprocessorCount)
 {
@@ -229,17 +330,23 @@ GPUQueueCUDA::GPUQueueCUDA(GPUQueueCUDA&& other)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-GPUQueueCUDA& GPUQueueCUDA::operator=(GPUQueueCUDA&& other)
+GPUQueueCUDA& GPUQueueCUDA::operator=(GPUQueueCUDA&& other) noexcept
 {
     multiprocessorCount = other.multiprocessorCount;
     stream = other.stream;
     other.stream = (cudaStream_t)0;
 }
 
-
-inline cudaStream_t ToHandleCUDA(const GPUQueueCUDA& q)
+MRAY_HYBRID MRAY_CGPU_INLINE
+cudaStream_t ToHandleCUDA(const GPUQueueCUDA& q)
 {
     return q.stream;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+cudaEvent_t ToHandleCUDA(const GPUFenceCUDA& f)
+{
+    return f.eventC;
 }
 
 }

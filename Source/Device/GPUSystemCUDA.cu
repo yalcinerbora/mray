@@ -5,39 +5,6 @@
 namespace mray::cuda
 {
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-GPUQueueCUDA::GPUQueueCUDA(uint32_t multiprocessorCount,
-                           DeviceQueueType t)
-    : multiprocessorCount(multiprocessorCount)
-{
-    switch(t)
-    {
-        case DeviceQueueType::NORMAL:
-            CUDA_CHECK(cudaStreamCreate(&stream));
-            break;
-        case DeviceQueueType::FIRE_AND_FORGET:
-            stream = cudaStreamFireAndForget;
-            break;
-        case DeviceQueueType::TAIL_LAUNCH:
-            stream = cudaStreamTailLaunch;
-            break;
-        default:
-            assert(false);
-            break;
-    }
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-GPUQueueCUDA::~GPUQueueCUDA()
-{
-    if(stream != cudaStreamTailLaunch ||
-       stream != cudaStreamFireAndForget ||
-       stream != (cudaStream_t)0)
-    {
-        CUDA_CHECK(cudaStreamDestroy(stream));
-    }
-}
-
 GPUDeviceCUDA::GPUDeviceCUDA(int deviceId)
     : deviceId(deviceId)
 {
@@ -68,6 +35,14 @@ GPUDeviceCUDA::GPUDeviceCUDA(int deviceId)
         std::string err = MRAY_FORMAT("The device do not have virtual memory "
                                       "management support!({:s})", props.name);
         throw MRayError(std::move(err));
+    }
+
+    // All Seems Fine Allocate Queues
+    //
+    CUDA_CHECK(cudaSetDevice(deviceId));
+    for(uint32_t i = 0; i < QueuePerDevice; i++)
+    {
+        queues.emplace_back(props.multiProcessorCount);
     }
 }
 
@@ -110,17 +85,6 @@ const GPUQueue& GPUDeviceCUDA::GetQueue(uint32_t index) const
 {
     return queues[index];
 }
-
-DeviceLocalMemoryCUDA GPUDeviceCUDA::GetAMemory() const
-{
-    return DeviceLocalMemoryCUDA(*this);
-}
-
-//template<uint32_t DIMS, class T>
-//DeviceTextureCUDA<DIMS, T> GPUDeviceCUDA::GetTexture() const
-//{
-//
-//}
 
 GPUSystemCUDA::GPUSystemCUDA()
 {
@@ -245,10 +209,5 @@ void GPUSystemCUDA::SyncAll() const
         CUDA_CHECK(cudaDeviceSynchronize());
     }
 }
-
-//DeviceMemoryCUDA GPUSystemCUDA::GetAMemory() const
-//{
-//    return DeviceMemory(*this);
-//}
 
 }

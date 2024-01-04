@@ -17,6 +17,7 @@ set(SRC_CUDA
 
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/GPUSystem.h
+    ${CURRENT_SOURCE_DIR}/GPUSystem.hpp
     ${CURRENT_SOURCE_DIR}/GPUTypes.h)
 
 set(SRC_ALL

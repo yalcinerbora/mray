@@ -9,6 +9,8 @@
 namespace mray::cuda
 {
 
+class TextureBackingMemoryCUDA;
+
 template <class T>
 constexpr bool IsNormConvertibleCUDA()
 {
@@ -94,9 +96,41 @@ class TextureCUDA
     size_t                  Size() const;
     size_t                  Alignment() const;
     void                    CommitMemory(const GPUQueueCUDA& queue,
-                                         const DeviceLocalMemoryCUDA& deviceMem,
+                                         const TextureBackingMemoryCUDA& deviceMem,
                                          size_t offset);
 };
+
+
+class TextureBackingMemoryCUDA
+{
+    MRAY_HYBRID
+    friend CUmemGenericAllocationHandle ToHandleCUDA(const TextureBackingMemoryCUDA& mem);
+
+    private:
+    const GPUDeviceCUDA*            gpu;
+    size_t                          size;
+    size_t                          allocSize;
+    CUmemGenericAllocationHandle    memHandle;
+
+    public:
+
+    // Constructors & Destructor
+                                TextureBackingMemoryCUDA(const GPUDeviceCUDA& device);
+                                TextureBackingMemoryCUDA(const GPUDeviceCUDA& device, size_t sizeInBytes);
+                                TextureBackingMemoryCUDA(const TextureBackingMemoryCUDA&) = delete;
+                                TextureBackingMemoryCUDA(TextureBackingMemoryCUDA&&) noexcept;
+                                ~TextureBackingMemoryCUDA();
+    TextureBackingMemoryCUDA&   operator=(const TextureBackingMemoryCUDA&) = delete;
+    TextureBackingMemoryCUDA&   operator=(TextureBackingMemoryCUDA&&) noexcept;
+
+    void                        ResizeBuffer(size_t newSize);
+    const GPUDeviceCUDA&        Device() const;
+};
+
+inline CUmemGenericAllocationHandle ToHandleCUDA(const TextureBackingMemoryCUDA& mem)
+{
+    return mem.memHandle;
+}
 
 }
 

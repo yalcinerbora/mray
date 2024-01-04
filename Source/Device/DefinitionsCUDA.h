@@ -75,9 +75,15 @@ namespace mray::cuda
 #ifdef MRAY_DEBUG
     #define CUDA_CHECK(func) mray::cuda::GPUAssert((func), __FILE__, __LINE__)
     #define CUDA_DRIVER_CHECK(func) mray::cuda::GPUDriverAssert((func), __FILE__, __LINE__)
-    #define CUDA_KERNEL_CHECK() \
+
+    #ifdef __CUDA_ARCH__
+        #define CUDA_KERNEL_CHECK()
+    #else
+        #define CUDA_KERNEL_CHECK() \
                     CUDA_CHECK(cudaDeviceSynchronize()); \
                     CUDA_CHECK(cudaGetLastError())
+    #endif
+
 #else
     #define CUDA_CHECK(func) func
     #define CUDA_DRIVER_CHECK(func) func
