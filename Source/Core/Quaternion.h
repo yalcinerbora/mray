@@ -9,6 +9,9 @@
 template<FloatingPointC T>
 class Quat
 {
+    public:
+    using InnerType = T;
+
     private:
     Vector<4, T>            v;
 

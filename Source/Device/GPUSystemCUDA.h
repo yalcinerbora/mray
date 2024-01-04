@@ -124,11 +124,6 @@ class GPUQueueCUDA
     template <class T>
     MRAY_HOST void      CopyAsync(Span<T> regionTo, Span<const T> regionFrom) const;
 
-    template <uint32_t D, class T>
-    MRAY_HOST void      CopyAsync(Texture<D, T>& texTo,
-                                  const TextureDim<D>& offset,
-                                  Span<const T> regionFrom) const;
-
     // Synchronization
     MRAY_HYBRID
     GPUFenceCUDA        Barrier() const;
@@ -298,22 +293,14 @@ GPUQueueCUDA::~GPUQueueCUDA()
 
 // Memory Movement (Async)
 template <class T>
-MRAY_HOST void GPUQueueCUDA::CopyAsync(Span<T> regionTo, Span<const T> regionFrom) const
+MRAY_HOST
+void GPUQueueCUDA::CopyAsync(Span<T> regionTo, Span<const T> regionFrom) const
 {
     assert(regionTo.size_bytes() == regionFrom.size_bytes());
-    CUDA_CHECK(cudaMemcpyAsync(regionTo.data(), region.from.data(),
+    CUDA_CHECK(cudaMemcpyAsync(regionTo.data(), regionFrom.data(),
                           regionFrom.size_bytes(),
                           cudaMemcpyDefault, stream));
 }
-
-//template <uint32_t D, class T>
-//MRAY_HOST void GPUQueueCUDA::CopyAsync(Texture<D, T>& texTo, uint32_t mipLevel,
-//                                       const TextureSize<T>& texOffset,
-//                                       Span<const T> regionFrom) const
-//{
-//    // Implementation is templated so its complex
-//    texTo.Set()
-//}
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 GPUFenceCUDA GPUQueueCUDA::Barrier() const

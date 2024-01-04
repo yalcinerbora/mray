@@ -20,6 +20,23 @@ namespace mray::cuda
         }
     }
 
+    template <uint32_t D, uint32_t I, class T>
+    cudaPos MakeCudaPos(const T& dim)
+    {
+        if constexpr(D == 1)
+        {
+            return make_cudaPos(dim, I, I);
+        }
+        else if constexpr(D == 2)
+        {
+            return make_cudaPos(dim[0], dim[1], I);
+        }
+        else if constexpr(D == 3)
+        {
+            return make_cudaPos(dim[0], dim[1], dim[2]);
+        }
+    }
+
     static cudaTextureAddressMode DetermineAddressMode(EdgeResolveType e)
     {
         switch(e)
@@ -210,6 +227,18 @@ namespace mray::cuda
     }
 
     template<int D, class T>
+    TextureExtent<D> TextureCUDA<D, T>::Extents() const
+    {
+        return texParams.size;
+    }
+
+    template<int D, class T>
+    uint32_t TextureCUDA<D, T>::MipCount() const
+    {
+        return texParams.mipCount;
+    }
+
+    template<int D, class T>
     void TextureCUDA<D, T>::CommitMemory(const GPUQueueCUDA& queue,
                                          const TextureBackingMemoryCUDA& deviceMem,
                                          size_t offset)
@@ -231,4 +260,29 @@ namespace mray::cuda
         CUDA_DRIVER_CHECK(cuMemMapArrayAsync(&mappingInfo, 1, ToHandleCUDA(queue)));
     }
 
+    template<int D, class T>
+    void TextureCUDA<D, T>::CopyFromAsync(const GPUQueueCUDA& queue,
+                                          uint32_t mipLevel,
+                                          const TextureExtent<D>& offset,
+                                          const TextureExtent<D>& sizes,
+                                          Span<const PaddedChannelType> regionFrom)
+    {
+        cudaArray_t levelArray;
+        CUDA_CHECK(cudaGetMipmappedArrayLevel(&levelArray, data, mipLevel));
+
+        cudaMemcpy3DParms p = {};
+        p.kind = cudaMemcpyDefault;
+        p.extent = MakeCudaExtent<D, 1>(sizes);
+
+        p.dstArray = levelArray;
+        p.dstPos = MakeCudaPos<D, 0>(offset);
+
+        p.srcPos = make_cudaPos(0, 0, 0);
+        //
+        void* ptr = const_cast<Byte*>(reinterpret_cast<const Byte*>(regionFrom.data()));
+        p.srcPtr = make_cudaPitchedPtr(ptr,
+                                       p.extent.width * sizeof(PaddedChannelType),
+                                       p.extent.width, p.extent.height);
+        CUDA_CHECK(cudaMemcpy3DAsync(&p, ToHandleCUDA(queue)));
+    }
 }

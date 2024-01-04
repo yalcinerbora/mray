@@ -59,6 +59,7 @@ class TextureCUDA
     static_assert(D >= 1 && D <= 3, "At most 3D textures are supported");
 
     public:
+    using PaddedChannelType = typename PaddedChannelT<ChannelCount, T>::type;
 
     private:
     const GPUDeviceCUDA*        gpu;
@@ -95,9 +96,18 @@ class TextureCUDA
 
     size_t                  Size() const;
     size_t                  Alignment() const;
+
+    TextureExtent<D>        Extents() const;
+    uint32_t                MipCount() const;
+
     void                    CommitMemory(const GPUQueueCUDA& queue,
                                          const TextureBackingMemoryCUDA& deviceMem,
                                          size_t offset);
+    void                    CopyFromAsync(const GPUQueueCUDA& queue,
+                                          uint32_t mipLevel,
+                                          const TextureExtent<D>& offset,
+                                          const TextureExtent<D>& size,
+                                          Span<const PaddedChannelType> regionFrom);
 };
 
 class TextureBackingMemoryCUDA

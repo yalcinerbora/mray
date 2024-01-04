@@ -8,8 +8,6 @@ set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/T_Texture.cpp
     ${CURRENT_SOURCE_DIR}/T_KernelCall.cu)
 
-message(STATUS ${SRC_COMMON})
-
 source_group("" FILES ${SRC_COMMON})
 
 add_executable(TDeviceCUDA ${SRC_COMMON})

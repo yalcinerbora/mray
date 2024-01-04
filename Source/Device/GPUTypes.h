@@ -75,7 +75,13 @@ template <uint32_t D> requires(D > 1 && D < 4)
 struct TextureSizeT<D> { using type = Vector<D, uint32_t>; };
 
 template <uint32_t D>
-using TextureDim = typename TextureSizeT<D>::type;
+using TextureExtent = typename TextureSizeT<D>::type;
+
+template <uint32_t C, class T, class = void> struct PaddedChannelT;
+template <uint32_t C, class T> requires(C != 3)
+struct PaddedChannelT<C, T> { using type = T; };
+template <uint32_t C, class T> requires(C == 3)
+struct PaddedChannelT<C, T> { using type = Vector<C + 1, typename T::InnerType>; };
 
 // Texture initialization parameters
 // Defaults are for x -> normalized float conversion
@@ -97,7 +103,7 @@ struct TextureInitParams
     Float                   maxMipmapClamp  = 100.0f;
 
     // Dimension Related (must be set)
-    TextureDim<D>           size            = TextureDim<D>(0);
+    TextureExtent<D>        size            = TextureExtent<D>(0);
     uint32_t                mipCount        = 0;
 };
 

@@ -20,6 +20,9 @@ class AABB
     static_assert(N == 2 || N == 3 || N == 4, "AABB size should be 2, 3 or 4");
 
     public:
+    using InnerType = T;
+
+    public:
     static constexpr int            AABBVertexCount = 8;
     friend struct                   AABBOffsetChecker;
 

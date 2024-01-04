@@ -10,6 +10,9 @@ Ray struct for convenient usability.
 template<FloatingPointC T>
 class RayT
 {
+    public:
+    using InnerType = T;
+
     private:
     Vector<3,T>                     direction;
     Vector<3,T>                     position;
