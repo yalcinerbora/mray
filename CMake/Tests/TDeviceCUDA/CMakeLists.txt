@@ -6,7 +6,7 @@ set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/T_DeviceMemory.cpp
     ${CURRENT_SOURCE_DIR}/T_TextureTypes.h
     ${CURRENT_SOURCE_DIR}/T_Texture.cpp
-    ${CURRENT_SOURCE_DIR}/T_TextureAccess.cu)
+    ${CURRENT_SOURCE_DIR}/T_KernelCall.cu)
 
 message(STATUS ${SRC_COMMON})
 
