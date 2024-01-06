@@ -136,6 +136,8 @@ class GPUQueueCUDA
     // Memory Movement (Async)
     template <class T>
     MRAY_HOST void      MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const;
+    template <class T>
+    MRAY_HOST void      MemsetAsync(Span<T> region, uint8_t perByteValue) const;
 
     // Synchronization
     MRAY_HYBRID
@@ -332,6 +334,15 @@ void GPUQueueCUDA::MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const
                                cudaMemcpyDefault, stream));
 }
 
+template <class T>
+MRAY_HOST
+void GPUQueueCUDA::MemsetAsync(Span<T> region, uint8_t perByteValue) const
+{
+    // TODO: Check if memory is not pure-host memory
+    CUDA_CHECK(cudaMemsetAsync(region.data(), perByteValue,
+                               region.size_bytes(), stream));
+}
+
 MRAY_HYBRID MRAY_CGPU_INLINE
 GPUFenceCUDA GPUQueueCUDA::Barrier() const
 {
@@ -397,8 +408,7 @@ MRAY_HOST
 void GPUSystemCUDA::Memset(Span<T> region, uint8_t perByteValue) const
 {
     // TODO: Check if memory is not pure-host memory
-    CUDA_CHECK(cudaMemset(region.data(),
-                          perByteValue,
+    CUDA_CHECK(cudaMemset(region.data(), perByteValue,
                           region.size_bytes()));
 }
 

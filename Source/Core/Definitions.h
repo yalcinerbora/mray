@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cassert>
+#include <cstddef>
 
 #ifdef MRAY_GPU_BACKEND_CUDA
 
@@ -56,7 +57,7 @@ static_assert(SpectraPerSpectrum <= 4,
 
 using Float = float;
 
-using Byte = unsigned char;
+using Byte = std::byte;
 
 class EmptyType{};
 

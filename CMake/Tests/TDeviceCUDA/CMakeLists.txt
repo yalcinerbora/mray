@@ -6,7 +6,8 @@ set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/T_DeviceMemory.cpp
     ${CURRENT_SOURCE_DIR}/T_TextureTypes.h
     ${CURRENT_SOURCE_DIR}/T_Texture.cu
-    ${CURRENT_SOURCE_DIR}/T_KernelCall.cu)
+    ${CURRENT_SOURCE_DIR}/T_KernelCall.cu
+    ${CURRENT_SOURCE_DIR}/T_Algorithms.cu)
 
 source_group("" FILES ${SRC_COMMON})
 

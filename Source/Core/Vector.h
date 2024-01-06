@@ -41,7 +41,8 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
     static_assert(N == 2 || N == 3 || N == 4, "Vector size should be 2, 3 or 4");
 
     public:
-    using InnerType = T;
+    using InnerType             = T;
+    static constexpr int Dims   = N;
 
     private:
     std::array<T, N>                vector;

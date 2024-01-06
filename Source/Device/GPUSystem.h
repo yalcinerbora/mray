@@ -28,7 +28,6 @@
     template<uint32_t DIM, class T>
     using Texture = mray::cuda::TextureCUDA<DIM, T>;
 
-
 //#elif defined MRAY_GPU_BACKEND_SYCL
 //    // TODO:
 //    //#include "GPUSystemSycl.h"

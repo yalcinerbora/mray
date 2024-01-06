@@ -15,6 +15,9 @@ set(SRC_CUDA
     ${CURRENT_SOURCE_DIR}/GPUSystemCUDA.cu
     ${CURRENT_SOURCE_DIR}/DefinitionsCUDA.h)
 
+set(SRC_CUDA_ALGS
+    ${CURRENT_SOURCE_DIR}/AlgorithmsCUDA.h)
+
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/GPUSystem.h
     ${CURRENT_SOURCE_DIR}/GPUSystem.hpp
@@ -23,11 +26,13 @@ set(SRC_COMMON
 set(SRC_ALL
     ${SRC_CUDA_MEMORY}
     ${SRC_CUDA}
+    ${SRC_CUDA_ALGS}
     ${SRC_COMMON})
 
 # IDE Filters
 source_group("CUDA/Memory" FILES ${SRC_CUDA_MEMORY})
 source_group("CUDA" FILES ${SRC_CUDA})
+source_group("CUDA/Algorithms" FILES ${SRC_CUDA_ALGS})
 source_group("" FILES ${SRC_COMMON})
 
 # DLL File

@@ -76,14 +76,14 @@ TEST(GPUMemory, DeviceMemory_Allocate)
                               static_cast<Byte*>(memoryFrom),
                               copySize, cudaMemcpyDefault));
 
-        std::vector<Byte> hostAlloc(copySize, 0x00);
+        std::vector<Byte> hostAlloc(copySize, Byte{0x00});
         CUDA_CHECK(cudaMemcpy(hostAlloc.data(),
                               static_cast<Byte*>(memoryTo),
                               copySize, cudaMemcpyDefault));
 
         for(Byte b : hostAlloc)
         {
-            EXPECT_EQ(b, 0x12);
+            EXPECT_EQ(b, Byte{0x12});
         }
     }
 }
@@ -206,7 +206,7 @@ TEST(GPUMemory, HostLocalMemory_Allocate)
         const Byte* hData = static_cast<const Byte*>(memoryTo);
         for(size_t j = 0 ; j < memoryTo.Size(); j++)
         {
-            EXPECT_EQ(hData[j], 0x11);
+            EXPECT_EQ(hData[j], Byte{0x11});
         }
     }
 }
@@ -271,18 +271,18 @@ TYPED_TEST(GPUMemoryAlloc, MultiAlloc)
     data = reinterpret_cast<const Byte*>(hFloats.data());
     for(size_t i = 0; i < dFloats.size_bytes(); i++)
     {
-        EXPECT_EQ(data[i], 0x12);
+        EXPECT_EQ(data[i], Byte{0x12});
     }
 
     data = reinterpret_cast<const Byte*>(hVectors.data());
     for(size_t i = 0; i < dVectors.size_bytes(); i++)
     {
-        EXPECT_EQ(data[i], 0x34);
+        EXPECT_EQ(data[i], Byte{0x34});
     }
 
     data = reinterpret_cast<const Byte*>(hMatrices.data());
     for(size_t i = 0; i < dMatrices.size_bytes(); i++)
     {
-        EXPECT_EQ(data[i], 0x56);
+        EXPECT_EQ(data[i], Byte{0x56});
     }
 }
