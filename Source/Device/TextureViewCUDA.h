@@ -56,7 +56,7 @@ constexpr auto VectorTypeToCUDA()
         TexTypeMapping<Vector3uc,   uchar4>{},
         TexTypeMapping<Vector4uc,   uchar4>{},
         // Char
-        TexTypeMapping<int8_t,      int16_t>{},
+        TexTypeMapping<int8_t,      int8_t>{},
         TexTypeMapping<Vector2c,    char2>{},
         TexTypeMapping<Vector3c,    char4>{},
         TexTypeMapping<Vector4c,    char4>{},
@@ -121,10 +121,10 @@ static constexpr auto VectorTypeToChannels()
 }
 
 template <class MRayType, class CudaType, int Channels>
-class CudaTexToMRayType {};
+struct CudaTexToMRayType {};
 
 template <class MRayType, class CudaType>
-class CudaTexToMRayType<MRayType, CudaType, 1>
+struct CudaTexToMRayType<MRayType, CudaType, 1>
 {
     static constexpr MRayType Convert(CudaType scalar)
     {
@@ -133,7 +133,7 @@ class CudaTexToMRayType<MRayType, CudaType, 1>
 };
 
 template <class MRayType, class CudaType>
-class CudaTexToMRayType<MRayType, CudaType, 2>
+struct CudaTexToMRayType<MRayType, CudaType, 2>
 {
     static constexpr MRayType Convert(CudaType vec)
     {
@@ -142,7 +142,7 @@ class CudaTexToMRayType<MRayType, CudaType, 2>
 };
 
 template <class MRayType, class CudaType>
-class CudaTexToMRayType<MRayType, CudaType, 3>
+struct CudaTexToMRayType<MRayType, CudaType, 3>
 {
     static constexpr MRayType Convert(CudaType vec)
     {
@@ -151,7 +151,7 @@ class CudaTexToMRayType<MRayType, CudaType, 3>
 };
 
 template <class MRayType, class CudaType>
-class CudaTexToMRayType<MRayType, CudaType, 4>
+struct CudaTexToMRayType<MRayType, CudaType, 4>
 {
     static constexpr MRayType Convert(CudaType vec)
     {
@@ -166,9 +166,12 @@ class TextureViewCUDA;
 template<class T>
 class TextureViewCUDA<1, T>
 {
+    public:
+    static constexpr uint32_t Channels = VectorTypeToChannels<T>().Channels;
+
     private:
     using CudaType = typename decltype(VectorTypeToCUDA<T>())::MappedType;
-    using ConvertType = CudaTexToMRayType<T, CudaType, VectorTypeToChannels<T>()>;
+    using ConvertType = CudaTexToMRayType<T, CudaType, Channels>;
     cudaTextureObject_t texHandle;
 
     public:
@@ -186,9 +189,12 @@ class TextureViewCUDA<1, T>
 template<class T>
 class TextureViewCUDA<2, T>
 {
+    public:
+    static constexpr uint32_t Channels = VectorTypeToChannels<T>().Channels;
+
     private:
     using CudaType = typename decltype(VectorTypeToCUDA<T>())::MappedType;
-    using ConvertType = CudaTexToMRayType<T, CudaType, VectorTypeToChannels<T>()>;
+    using ConvertType = CudaTexToMRayType<T, CudaType, Channels>;
     cudaTextureObject_t texHandle;
 
     public:
@@ -205,9 +211,12 @@ class TextureViewCUDA<2, T>
 template<class T>
 class TextureViewCUDA<3, T>
 {
+    public:
+    static constexpr uint32_t Channels = VectorTypeToChannels<T>().Channels;
+
     private:
     using CudaType = typename decltype(VectorTypeToCUDA<T>())::MappedType;
-    using ConvertType = CudaTexToMRayType<T, CudaType, VectorTypeToChannels<T>()>;
+    using ConvertType = CudaTexToMRayType<T, CudaType, Channels>;
     cudaTextureObject_t texHandle;
 
     public:
@@ -225,7 +234,7 @@ template<class T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Optional<T> TextureViewCUDA<1, T>::operator()(Float uv) const
 {
-    CudaType t = tex2D<CudaType>(texHandle, uv);
+    CudaType t = tex1D<CudaType>(texHandle, uv);
     return ConvertType::Convert(t);
 }
 
@@ -243,7 +252,7 @@ template<class T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Optional<T> TextureViewCUDA<1, T>::operator()(Float uv, Float mipLevel) const
 {
-    CudaType t = tex2DLod<CudaType>(texHandle, uv, mipLevel);
+    CudaType t = tex1DLod<CudaType>(texHandle, uv, mipLevel);
     return ConvertType::Convert(t);
 }
 
@@ -253,7 +262,8 @@ Optional<T> TextureViewCUDA<2, T>::operator()(Vector2 uv) const
 {
     bool isResident = false;
     CudaType t = tex2D<CudaType>(texHandle, uv[0], uv[1], &isResident);
-    return (isResident) ? ConvertType::Convert(t) : std::nullopt;
+    if(isResident) return ConvertType::Convert(t);
+    return std::nullopt;
 }
 
 template<class T>
@@ -265,7 +275,8 @@ Optional<T> TextureViewCUDA<2, T>::operator()(Vector2 uv, Vector2 dpdx,
     CudaType t = tex2DGrad<CudaType>(texHandle, uv[0], uv[1],
                                      {dpdx[0], dpdx[1]},
                                      {dpdy[0], dpdy[1]}, &isResident);
-    return (isResident) ? ConvertType::Convert(t) : std::nullopt;
+    if(isResident) return ConvertType::Convert(t);
+    return std::nullopt;
 }
 
 template<class T>
@@ -275,7 +286,8 @@ Optional<T> TextureViewCUDA<2, T>::operator()(Vector2 uv, Float mipLevel) const
     bool isResident = false;
     CudaType t = tex2DLod<CudaType>(texHandle, uv[0], uv[1], mipLevel,
                                     &isResident);
-    return (isResident) ? ConvertType::Convert(t) : std::nullopt;
+    if(isResident) return ConvertType::Convert(t);
+    return std::nullopt;
 }
 
 template<class T>
@@ -286,7 +298,8 @@ Optional<T> TextureViewCUDA<3, T>::operator()(Vector3 uv) const
     CudaType t = tex3D<CudaType>(texHandle,
                                  uv[0], uv[1], uv[2],
                                  &isResident);
-    return (isResident) ? ConvertType::Convert(t) : std::nullopt;
+    if(isResident) return ConvertType::Convert(t);
+    return std::nullopt;
 }
 
 template<class T>
@@ -300,7 +313,8 @@ Optional<T> TextureViewCUDA<3, T>::operator()(Vector3 uv, Vector3 dpdx,
                                      {dpdx[0], dpdx[1], dpdx[2]},
                                      {dpdy[0], dpdy[1], dpdy[2]},
                                      &isResident);
-    return (isResident) ? ConvertType::Convert(t) : std::nullopt;
+    if(isResident) return ConvertType::Convert(t);
+    return std::nullopt;
 }
 
 template<class T>
@@ -312,7 +326,8 @@ Optional<T> TextureViewCUDA<3, T>::operator()(Vector3 uv, Float mipLevel) const
                                     uv[0], uv[1], uv[2],
                                     mipLevel,
                                     &isResident);
-    return (isResident) ? ConvertType::Convert(t) : std::nullopt;
+    if(isResident) return ConvertType::Convert(t);
+    return std::nullopt;
 }
 
 }

@@ -14,6 +14,12 @@ template <class T, std::size_t Extent = std::dynamic_extent>
 using Span = std::span<T, Extent>;
 
 
+template<class T, std::size_t Extent = std::dynamic_extent>
+constexpr Span<const T, Extent> ToConstSpan(Span<T, Extent> s)
+{
+    return Span<const T, Extent>(s);
+}
+
 //#include <concepts>
 //
 //#include "Vector.h"

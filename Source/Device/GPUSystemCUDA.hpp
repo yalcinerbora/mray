@@ -8,76 +8,25 @@ namespace CudaKernelCalls
 {
     using namespace mray::cuda;
 
-    // Passing the device function directly as a template parameter
-    // So that NVCC distinguishes host/device'ness of the function pt
-    template <auto DeviceFunction, class... Args>
-    MRAY_KERNEL
-    static void KernelCallCUDA(Args... fArgs)
-    {
-        // Grid-stride loop
-        KernelCallParams launchParams
-        {
-            .gridSize = gridDim.x,
-            .blockSize = blockDim.x,
-            .blockId = blockIdx.x,
-            .threadId = threadIdx.x
-        };
-        DeviceFunction(launchParams, std::forward<Args>(fArgs)...);
-    }
-
-    template <uint32_t TPB, auto DeviceFunction, class... Args>
-    __launch_bounds__(TPB)
-    MRAY_KERNEL
-    static void KernelCallBoundedCUDA(Args... fArgs)
-    {
-        // Grid-stride loop
-        KernelCallParams launchParams
-        {
-            .gridSize = gridDim.x,
-            .blockSize = blockDim.x,
-            .blockId = blockIdx.x,
-            .threadId = threadIdx.x
-        };
-        DeviceFunction(launchParams, std::forward<Args>(fArgs)...);
-    }
-
-
-    template <class Lambda>
-    MRAY_KERNEL
+    template <class Lambda, uint32_t Bounds = StaticThreadPerBlock1D()>
+    MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(Bounds)
     static void KernelCallLambdaCUDA(Lambda func)
     {
-        // Grid-stride loop
-        KernelCallParams launchParams
-        {
-            .gridSize = gridDim.x,
-            .blockSize = blockDim.x,
-            .blockId = blockIdx.x,
-            .threadId = threadIdx.x
-        };
-        func(launchParams);
-    }
-
-    template <uint32_t TPB, class Lambda>
-    __launch_bounds__(TPB)
-    MRAY_KERNEL
-    static void KernelCallBoundedLambdaCUDA(Lambda func)
-    {
-        // Grid-stride loop
-        KernelCallParams launchParams
-        {
-            .gridSize = gridDim.x,
-            .blockSize = blockDim.x,
-            .blockId = blockIdx.x,
-            .threadId = threadIdx.x
-        };
-        func(launchParams);
+        func(KernelCallParamsCUDA());
     }
 }
 
 namespace mray::cuda
 {
+MRAY_GPU MRAY_CGPU_INLINE
+KernelCallParamsCUDA::KernelCallParamsCUDA()
+    : gridSize(gridDim.x)
+    , blockSize(blockDim.x)
+    , blockId(blockIdx.x)
+    , threadId(threadIdx.x)
+{}
 
-template<auto DeviceFunction, class... Args>
+template<auto Kernel, class... Args>
 MRAY_HYBRID inline
 void GPUQueueCUDA::IssueKernel(KernelIssueParams p,
                                Args&&... fArgs) const
@@ -86,28 +35,27 @@ void GPUQueueCUDA::IssueKernel(KernelIssueParams p,
     uint32_t blockCount = MathFunctions::DivideUp(p.workCount, StaticThreadPerBlock1D());
     uint32_t blockSize = StaticThreadPerBlock1D();
 
-    KernelCallBoundedCUDA<StaticThreadPerBlock1D(), DeviceFunction, Args...>
-    <<<blockCount, blockSize, p.sharedMemSize, stream>>>
+    Kernel<<<blockCount, blockSize, p.sharedMemSize, stream>>>
     (
-        fArgs...
+        std::forward<Args>(fArgs)...
     );
     CUDA_KERNEL_CHECK();
 }
 
 template<class Lambda>
 MRAY_HYBRID inline
-void GPUQueueCUDA::IssueKernelL(KernelIssueParams p,
+void GPUQueueCUDA::IssueLambda(KernelIssueParams p,
                                 //
                                 Lambda&& func) const
 {
     static_assert(std::is_rvalue_reference_v<decltype(func)>,
-                  "Not passing Lambda as rvalue_reference. This kernell call "
+                  "Not passing Lambda as rvalue_reference. This kernel call "
                   "would've been failed in runtime!");
     using namespace CudaKernelCalls;
     uint32_t blockCount = MathFunctions::DivideUp(p.workCount, StaticThreadPerBlock1D());
     uint32_t blockSize = StaticThreadPerBlock1D();
 
-    KernelCallBoundedLambdaCUDA<StaticThreadPerBlock1D(), Lambda>
+    KernelCallLambdaCUDA<Lambda>
     <<<blockCount, blockSize, p.sharedMemSize, stream>>>
     (
         std::forward<Lambda>(func)
@@ -115,7 +63,7 @@ void GPUQueueCUDA::IssueKernelL(KernelIssueParams p,
     CUDA_KERNEL_CHECK();
 }
 
-template<auto DeviceFunction, class... Args>
+template<auto Kernel, class... Args>
 MRAY_HYBRID inline
 void GPUQueueCUDA::IssueSaturatingKernel(KernelIssueParams p,
                                          //
@@ -123,33 +71,31 @@ void GPUQueueCUDA::IssueSaturatingKernel(KernelIssueParams p,
 {
     using namespace CudaKernelCalls;
 
-    const void* kernelPtr = static_cast<const void*>(&KernelCallBoundedCUDA<StaticThreadPerBlock1D(), DeviceFunction, Args...>);
+    const void* kernelPtr = static_cast<const void*>(Kernel);
     uint32_t threadCount = StaticThreadPerBlock1D();
     uint32_t blockCount = DetermineGridStrideBlock(kernelPtr,
                                                    p.sharedMemSize,
                                                    threadCount,
                                                    p.workCount);
 
-
-    KernelCallBoundedCUDA<StaticThreadPerBlock1D(), DeviceFunction, Args...>
-    <<<blockCount, threadCount, p.sharedMemSize, stream>>>
+    Kernel<<<blockCount, threadCount, p.sharedMemSize, stream>>>
     (
-        fArgs...
+        std::forward<Args>(fArgs)...
     );
     CUDA_KERNEL_CHECK();
 }
 
 template<class Lambda>
 MRAY_HYBRID inline
-void GPUQueueCUDA::IssueSaturatingKernelL(KernelIssueParams p,
-                                          //
-                                          Lambda&& func) const
+void GPUQueueCUDA::IssueSaturatingLambda(KernelIssueParams p,
+                                         //
+                                         Lambda&& func) const
 {
     static_assert(std::is_rvalue_reference_v<decltype(func)>,
-                  "Not passing Lambda as rvalue_reference. This kernell call "
+                  "Not passing Lambda as rvalue_reference. This kernel call "
                   "would've been failed in runtime!");
     using namespace CudaKernelCalls;
-    const void* kernelPtr = static_cast<const void*>(&KernelCallBoundedLambdaCUDA<StaticThreadPerBlock1D(), Lambda>);
+    const void* kernelPtr = static_cast<const void*>(&KernelCallLambdaCUDA<Lambda, StaticThreadPerBlock1D()>);
     uint32_t threadCount = StaticThreadPerBlock1D();
     uint32_t blockCount = DetermineGridStrideBlock(kernelPtr,
                                                    p.sharedMemSize,
@@ -157,44 +103,43 @@ void GPUQueueCUDA::IssueSaturatingKernelL(KernelIssueParams p,
                                                    p.workCount);
 
 
-    KernelCallBoundedLambdaCUDA<StaticThreadPerBlock1D(), Lambda>
+    KernelCallLambdaCUDA<Lambda>
     <<<blockCount, threadCount, p.sharedMemSize, stream>>>
     (
-        func
+        std::forward<Lambda>(func)
     );
     CUDA_KERNEL_CHECK();
 }
 
-template<auto DeviceFunction, class... Args>
+template<auto Kernel, class... Args>
 MRAY_HYBRID inline
 void GPUQueueCUDA::IssueExactKernel(KernelExactIssueParams p,
                                     //
                                     Args&&... fArgs) const
 {
     using namespace CudaKernelCalls;
-    KernelCallCUDA<DeviceFunction, Args...>
-    <<<p.gridSize, p.blockSize, p.sharedMemSize, stream>>>
+    Kernel<<<p.gridSize, p.blockSize, p.sharedMemSize, stream>>>
     (
-        fArgs...
+        std::forward<Args>(fArgs)...
     );
     CUDA_KERNEL_CHECK();
 }
 
-template<class Lambda>
+template<class Lambda, uint32_t Bounds>
 MRAY_HOST inline
-void GPUQueueCUDA::IssueExactKernelL(KernelExactIssueParams p,
+void GPUQueueCUDA::IssueExactLambda(KernelExactIssueParams p,
                                     //
                                     Lambda&& func) const
 {
     static_assert(std::is_rvalue_reference_v<decltype(func)>,
-                  "Not passing Lambda as rvalue_reference. This kernell call "
+                  "Not passing Lambda as rvalue_reference. This kernel call "
                   "would've been failed in runtime!");
     using namespace CudaKernelCalls;
 
-    KernelCallLambdaCUDA<Lambda>
+    KernelCallLambdaCUDA<Lambda, Bounds>
     <<<p.gridSize, p.blockSize, p.sharedMemSize, stream>>>
     (
-        func
+        std::forward<Lambda>(func)
     );
     CUDA_KERNEL_CHECK();
 }

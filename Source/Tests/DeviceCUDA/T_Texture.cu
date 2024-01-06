@@ -3,10 +3,31 @@
 #include <numeric>
 
 #include "Device/GPUSystem.h"
+#include "Device/GPUsystem.hpp"
 #include "Device/TextureCUDA.h"
 
 #include "T_TextureTypes.h"
 
+template <uint32_t D, class T>
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void CheckCheckerboardPattern(Span<uint8_t> dResults,
+                              TextureView<D, T> tex,
+                              TextureExtent<D> extent,
+                              uint32_t totalPixels)
+{
+
+    KernelCallParams params;
+    for(uint32_t globalId = params.GlobalId();
+        globalId < totalPixels;
+        globalId += params.TotalSize())
+    {
+        UVType<D> uv = LinearToFloatIndex<D>(extent, globalId);
+        T out = tex(uv).value();
+        T compare = (globalId % 2 == 0) ? T(1) : T(0);
+        uint8_t result = (out != compare) ? 1 : 0;
+        dResults[globalId] = result;
+    }
+}
 
 TYPED_TEST(GPUTextureTest, Construct)
 {
@@ -26,7 +47,6 @@ TYPED_TEST(GPUTextureTest, Construct)
         Texture<D, ChannelType> tex(system.BestDevice(), tParams);
     }
 }
-
 
 TYPED_TEST(GPUTextureTest, Allocate)
 {
@@ -91,11 +111,21 @@ TYPED_TEST(GPUTextureTest, Copy)
 
     GPUSystem system;
 
+    // Allocate Asymetric to check padding/access issues
+    SizeType sz = SizeType(16);
+    if constexpr(D == 2)
+        sz = SizeType(16, 32);
+    else if constexpr(D == 3)
+        sz = SizeType(16, 32, 8);
+
+
     // Do a default allocate
     ParamType tParams = {};
-    tParams.size = SizeType(16);
+    tParams.size = sz;
     tParams.mipCount = 1;
     tParams.normIntegers = false;
+    tParams.normCoordinates = false;
+    tParams.interp = InterpolationType::NEAREST;
     TexType tex(system.BestDevice(), tParams);
 
     // Allocation
@@ -114,16 +144,48 @@ TYPED_TEST(GPUTextureTest, Copy)
     else
         total = tParams.size.Multiply();
 
-    std::vector<PaddedChannelType> data(total, PaddedChannelType(0));
+    std::vector<PaddedChannelType> hData(total, PaddedChannelType(0));
     for(uint32_t i = 0; i < total; i++)
     {
-        if(i % 2 == 0)
-            data[i] = PaddedChannelType(1);
+        if((i % 2) == 0)
+            hData[i] = PaddedChannelType(1);
     };
     afterAllocFence.Wait();
     // Mem is ready now go memcpy
-    tex.CopyFromAsync(queue, 0, TextureExtent<D>(0), tex.Extents(),
-                      Span<const PaddedChannelType>(data.cbegin(), data.cend()));
+    tex.CopyFromAsync(queue, 0u, TextureExtent<D>(0), tex.Extents(),
+                      Span<const PaddedChannelType>(hData.data(), hData.size()));
+
+    DeviceLocalMemory mem(system.BestDevice());
+    Span<uint8_t> dTrueFalseBuffer;
+    MemAlloc::AllocateMultiData(std::tie(dTrueFalseBuffer), mem,
+                                {total});
+    dTrueFalseBuffer = dTrueFalseBuffer.subspan(0, total);
+
+    // Get a texture view (same as the inner type)
+    TextureView<D, ChannelType> view = tex. template View<ChannelType>();
+    queue.IssueKernel<CheckCheckerboardPattern<D, ChannelType>>
+    (
+        KernelIssueParams{.workCount = total, .sharedMemSize = 0},
+        dTrueFalseBuffer,
+        view,
+        tex.Extents(),
+        total
+    );
+
+    std::vector<uint8_t> hTrueFalseBuffer(total, 0);
+    queue.MemcpyAsync(Span<uint8_t>(hTrueFalseBuffer),
+                      ToConstSpan(dTrueFalseBuffer));
+    // Wait the copy
     system.BestDevice().GetQueue(0).Barrier().Wait();
 
+    uint8_t anyFalse = std::reduce
+    (   hTrueFalseBuffer.cbegin(),
+        hTrueFalseBuffer.cend(),
+        uint8_t{0x00},
+        [](uint8_t lhs, uint8_t rhs)
+        {
+            return lhs | rhs;
+        }
+    );
+    EXPECT_EQ(anyFalse, 0x00);
 }

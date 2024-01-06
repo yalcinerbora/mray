@@ -12,6 +12,7 @@
     #include "DeviceMemoryCUDA.h"
 
     // Alias the types
+    using KernelCallParams      = mray::cuda::KernelCallParamsCUDA;
     using GPUDevice             = mray::cuda::GPUDeviceCUDA;
     using GPUQueue              = mray::cuda::GPUQueueCUDA;
     using GPUFence              = mray::cuda::GPUFenceCUDA;
@@ -37,12 +38,12 @@
 
 // After the inclusion of device specific implementation
 // these should be defined
-#ifndef MRAY_DEVICE_LAUNCH_BOUNDS_1D
-    #error "MRAY_DEVICE_LAUNCH_BOUNDS_1D" is not defined!
+#ifndef MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+    #error "MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT" is not defined!
 #endif
 
-#ifndef MRAY_DEVICE_LAUNCH_BOUNDS
-    #error "MRAY_DEVICE_LAUNCH_BOUNDS" is not defined!
+#ifndef MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM
+    #error "MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM" is not defined!
 #endif
 
 #ifndef MRAY_GRID_CONSTANT

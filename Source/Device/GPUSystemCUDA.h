@@ -14,9 +14,9 @@
 // Since we call all of the kernels in a static manner
 // (in case of Block Size) hint the compiler
 // using __launch_bounds__ expression
-#define MRAY_DEVICE_LAUNCH_BOUNDS(X) __launch_bounds__(X)
-#define MRAY_DEVICE_LAUNCH_BOUNDS_1D \
-        MRAY_DEVICE_LAUNCH_BOUNDS __launch_bounds__(StaticThreadPerBlock1D())
+#define MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(X) __launch_bounds__(X)
+#define MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT \
+        MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(StaticThreadPerBlock1D())
 
 #define MRAY_GRID_CONSTANT __grid_constant__
 
@@ -42,6 +42,19 @@ namespace mray::cuda
 
 class GPUQueueCUDA;
 class GPUDeviceCUDA;
+
+// Generic Call Parameters
+struct KernelCallParamsCUDA
+{
+    uint32_t gridSize;
+    uint32_t blockSize;
+    uint32_t blockId;
+    uint32_t threadId;
+
+    MRAY_GPU            KernelCallParamsCUDA();
+    MRAY_GPU uint32_t   GlobalId() const;
+    MRAY_GPU uint32_t   TotalSize() const;
+};
 
 class GPUFenceCUDA
 {
@@ -89,40 +102,40 @@ class GPUQueueCUDA
 
     // Classic GPU Calls
     // Create just enough blocks according to work size
-    template<auto DeviceFunction, class... Args>
+    template<auto Kernel, class... Args>
     MRAY_HYBRID void    IssueKernel(KernelIssueParams,
                                     //
                                     Args&&...) const;
     template<class Lambda>
-    MRAY_HYBRID void    IssueKernelL(KernelIssueParams,
+    MRAY_HYBRID void    IssueLambda(KernelIssueParams,
                                      //
-                                     Lambda&&) const;
+                                    Lambda&&) const;
     // Grid-Stride Kernels
     // Kernel is launched just enough blocks to
     // fully saturate the GPU.
-    template<auto DeviceFunction, class... Args>
+    template<auto Kernel, class... Args>
     MRAY_HYBRID void    IssueSaturatingKernel(KernelIssueParams,
                                               //
                                               Args&&...) const;
     template<class Lambda>
-    MRAY_HYBRID void    IssueSaturatingKernelL(KernelIssueParams,
-                                               //
-                                               Lambda&&) const;
+    MRAY_HYBRID void    IssueSaturatingLambda(KernelIssueParams,
+                                              //
+                                              Lambda&&) const;
     // Exact Kernel Calls
     // You 1-1 specify block and grid dimensions
     // Important: These can not be annottated with launch_bounds
-    template<auto DeviceFunction, class... Args>
+    template<auto Kernel, class... Args>
     MRAY_HYBRID void    IssueExactKernel(KernelExactIssueParams,
                                          //
                                          Args&&...) const;
-    template<class Lambda>
-    MRAY_HYBRID void    IssueExactKernelL(KernelExactIssueParams,
+    template<class Lambda, uint32_t Bounds = StaticThreadPerBlock1D()>
+    MRAY_HYBRID void    IssueExactLambda(KernelExactIssueParams,
                                          //
                                          Lambda&&) const;
 
     // Memory Movement (Async)
     template <class T>
-    MRAY_HOST void      CopyAsync(Span<T> regionTo, Span<const T> regionFrom) const;
+    MRAY_HOST void      MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const;
 
     // Synchronization
     MRAY_HYBRID
@@ -201,9 +214,26 @@ class GPUSystemCUDA
 
     size_t                  TotalMemory() const;
 
+    template <class T>
+    MRAY_HOST void          Memcpy(Span<T> regionTo, Span<const T> regionFrom) const;
+    template <class T>
+    MRAY_HOST void          Memset(Span<T> region, uint8_t perByteValue) const;
+
     // Simple & Slow System Synchronization
     void                    SyncAll() const;
 };
+
+MRAY_GPU MRAY_CGPU_INLINE
+uint32_t KernelCallParamsCUDA::GlobalId() const
+{
+    return blockId * blockSize + threadId;
+}
+
+MRAY_GPU MRAY_CGPU_INLINE
+uint32_t KernelCallParamsCUDA::TotalSize() const
+{
+    return gridSize * blockSize;
+}
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 GPUFenceCUDA::GPUFenceCUDA(const GPUQueueCUDA& q)
@@ -280,8 +310,8 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 GPUQueueCUDA::~GPUQueueCUDA()
 {
     #ifdef __CUDA_ARCH__
-        if(stream != cudaStreamTailLaunch ||
-           stream != cudaStreamFireAndForget ||
+        if(stream != cudaStreamTailLaunch &&
+           stream != cudaStreamFireAndForget &&
            stream != (cudaStream_t)0)
             CUDA_CHECK(cudaStreamDestroy(stream));
     #else
@@ -294,12 +324,12 @@ GPUQueueCUDA::~GPUQueueCUDA()
 // Memory Movement (Async)
 template <class T>
 MRAY_HOST
-void GPUQueueCUDA::CopyAsync(Span<T> regionTo, Span<const T> regionFrom) const
+void GPUQueueCUDA::MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const
 {
-    assert(regionTo.size_bytes() == regionFrom.size_bytes());
+    assert(regionTo.size_bytes() >= regionFrom.size_bytes());
     CUDA_CHECK(cudaMemcpyAsync(regionTo.data(), regionFrom.data(),
-                          regionFrom.size_bytes(),
-                          cudaMemcpyDefault, stream));
+                               regionFrom.size_bytes(),
+                               cudaMemcpyDefault, stream));
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -351,6 +381,25 @@ GPUQueueCUDA& GPUQueueCUDA::operator=(GPUQueueCUDA&& other) noexcept
     multiprocessorCount = other.multiprocessorCount;
     stream = other.stream;
     other.stream = (cudaStream_t)0;
+}
+
+template <class T>
+MRAY_HOST
+void GPUSystemCUDA::Memcpy(Span<T> regionTo, Span<const T> regionFrom) const
+{
+    assert(regionTo.size_bytes() >= regionFrom.size_bytes());
+    CUDA_CHECK(cudaMemcpy(regionTo.data(), regionFrom.data(),
+                          regionTo.size_bytes(), cudaMemcpyDefault));
+}
+
+template <class T>
+MRAY_HOST
+void GPUSystemCUDA::Memset(Span<T> region, uint8_t perByteValue) const
+{
+    // TODO: Check if memory is not pure-host memory
+    CUDA_CHECK(cudaMemset(region.data(),
+                          perByteValue,
+                          region.size_bytes()));
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE

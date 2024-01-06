@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Vector.h"
+#include <type_traits>
 
 static constexpr uint32_t WarpSize();
 static constexpr uint32_t StaticThreadPerBlock1D();
@@ -40,17 +41,7 @@ struct KernelExactIssueParams
     uint32_t sharedMemSize = 0;
 };
 
-// Generic Call Parameters
-struct KernelCallParams
-{
-    uint32_t gridSize;
-    uint32_t blockSize;
-    uint32_t blockId;
-    uint32_t threadId;
 
-    MRAY_HYBRID uint32_t GlobalId() const;
-    MRAY_HYBRID uint32_t TotalSize() const;
-};
 
 // Texture Related
 enum class InterpolationType
@@ -68,20 +59,29 @@ enum class EdgeResolveType
 };
 
 // Texture Size Type Metaprogramming
-template <uint32_t D, class = void> struct TextureSizeT;
+template <uint32_t D, class = void> struct TextureExtentT;
 template <uint32_t D> requires(D == 1)
-struct TextureSizeT<D> { using type = uint32_t; };
+struct TextureExtentT<D> { using type = uint32_t; };
 template <uint32_t D> requires(D > 1 && D < 4)
-struct TextureSizeT<D> { using type = Vector<D, uint32_t>; };
-
+struct TextureExtentT<D> { using type = Vector<D, uint32_t>; };
 template <uint32_t D>
-using TextureExtent = typename TextureSizeT<D>::type;
+using TextureExtent = typename TextureExtentT<D>::type;
 
 template <uint32_t C, class T, class = void> struct PaddedChannelT;
 template <uint32_t C, class T> requires(C != 3)
 struct PaddedChannelT<C, T> { using type = T; };
 template <uint32_t C, class T> requires(C == 3)
 struct PaddedChannelT<C, T> { using type = Vector<C + 1, typename T::InnerType>; };
+template <uint32_t C, class T>
+using PaddedChannel = typename PaddedChannelT<C, T>::type;
+
+template <uint32_t D, class = void> struct UVTypeT;
+template <uint32_t D> requires(D == 1)
+struct UVTypeT<D> { using type = Float; };
+template <uint32_t D> requires(D > 1 && D < 4)
+struct UVTypeT<D> { using type = Vector<D, Float>; };
+template <uint32_t D>
+using UVType = typename UVTypeT<D>::type;
 
 // Texture initialization parameters
 // Defaults are for x -> normalized float conversion
@@ -107,14 +107,30 @@ struct TextureInitParams
     uint32_t                mipCount        = 0;
 };
 
+template<uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t KernelCallParams::GlobalId() const
+UVType<D> LinearToFloatIndex(const TextureExtent<D>& extents,
+                             uint32_t linearIndex)
 {
-    return blockId * blockSize + threadId;
+    if constexpr(D == 1)
+        return linearIndex;
+    else if constexpr(D == 2)
+        return UVType<D>(linearIndex % extents[0] + Float{0.5},
+                         linearIndex / extents[0] + Float{0.5});
+    else if constexpr(D == 3)
+        return UVType<D>(linearIndex % extents[0] + Float{0.5},
+                         linearIndex / extents[0] + Float{0.5},
+                         linearIndex / extents[0] * extents[1] + Float{0.5});
+    else static_assert(D <= 3, "Only up to 3D textures are supported!");
+    return UVType<D>(std::numeric_limits<Float>::max());
 }
 
+template<uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t KernelCallParams::TotalSize() const
+UVType<D> LinearToUV(const TextureExtent<D>& extents,
+                     uint32_t linearIndex)
 {
-    return gridSize * blockSize;
+    UVType<D> indicesFloat = LinearToFloatIndex<D>(extents, linearIndex);
+    UVType<D> extentsFloat = UVType<D>(extents);
+    return indicesFloat / extentsFloat;
 }

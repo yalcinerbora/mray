@@ -59,7 +59,7 @@ class TextureCUDA
     static_assert(D >= 1 && D <= 3, "At most 3D textures are supported");
 
     public:
-    using PaddedChannelType = typename PaddedChannelT<ChannelCount, T>::type;
+    using PaddedChannelType = PaddedChannel<ChannelCount, T>;
 
     private:
     const GPUDeviceCUDA*        gpu;
@@ -90,8 +90,9 @@ class TextureCUDA
     TextureViewCUDA<D, QT>  View() const;
 
     template<class QT>
-    requires(VectorTypeToChannels<T>().Channels ==
-             VectorTypeToChannels<QT>().Channels)
+    requires(!std::is_same_v<QT, T> &&
+             (VectorTypeToChannels<T>().Channels ==
+              VectorTypeToChannels<QT>().Channels))
     TextureViewCUDA<D, QT>  View() const;
 
     size_t                  Size() const;

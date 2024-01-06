@@ -161,7 +161,6 @@ inline DeviceLocalMemoryCUDA::operator const Byte*() const
     return reinterpret_cast<const Byte*>(dPtr);
 }
 
-
 inline HostLocalMemoryCUDA::operator Byte*()
 {
     return reinterpret_cast<Byte*>(hPtr);

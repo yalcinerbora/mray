@@ -186,8 +186,9 @@ namespace mray::cuda
 
     template<int D, class T>
     template<class QT>
-    requires(VectorTypeToChannels<T>().Channels ==
-             VectorTypeToChannels<QT>().Channels)
+    requires(!std::is_same_v<QT, T> &&
+             (VectorTypeToChannels<T>().Channels ==
+              VectorTypeToChannels<QT>().Channels))
     TextureViewCUDA<D, QT> TextureCUDA<D, T>::View() const
     {
         constexpr bool IsFloatType = std::is_same_v<QT, Float> ||

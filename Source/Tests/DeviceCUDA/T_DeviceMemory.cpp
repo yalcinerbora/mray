@@ -7,6 +7,8 @@
 #include "Core/Vector.h"
 #include "Core/Matrix.h"
 
+#include "Device/GPUTypes.h"
+
 TEST(GPUMemory, DeviceMemory_Allocate)
 {
     GPUSystem system;
@@ -251,19 +253,19 @@ TYPED_TEST(GPUMemoryAlloc, MultiAlloc)
                                 *(this->memory),
                                 {100, 50, 40});
 
-    CUDA_CHECK(cudaMemset(dFloats.data(), 0x12, dFloats.size_bytes()));
-    CUDA_CHECK(cudaMemset(dVectors.data(), 0x34, dVectors.size_bytes()));
-    CUDA_CHECK(cudaMemset(dMatrices.data(), 0x56, dMatrices.size_bytes()));
+    this->system.Memset<Float>(dFloats, 0x12);
+    this->system.Memset<Vector3>(dVectors, 0x34);
+    this->system.Memset<Matrix4x4>(dMatrices, 0x56);
 
     std::vector<Float> hFloats(dFloats.size(), 0.0f);
     std::vector<Vector3> hVectors(dVectors.size(), Vector3::Zero());
     std::vector<Matrix4x4> hMatrices(dMatrices.size(), Matrix4x4::Zero());
-    CUDA_CHECK(cudaMemcpy(hFloats.data(), dFloats.data(), dFloats.size_bytes(),
-                          cudaMemcpyDefault));
-    CUDA_CHECK(cudaMemcpy(hVectors.data(), dVectors.data(), dVectors.size_bytes(),
-                          cudaMemcpyDefault));
-    CUDA_CHECK(cudaMemcpy(hMatrices.data(), dMatrices.data(), dMatrices.size_bytes(),
-                          cudaMemcpyDefault));
+    this->system.Memcpy(Span<Float>(hFloats.begin(), hFloats.end()),
+                        ToConstSpan(dFloats));
+    this->system.Memcpy(Span<Vector3>(hVectors.begin(), hVectors.end()),
+                        ToConstSpan(dVectors));
+    this->system.Memcpy(Span<Matrix4x4>(hMatrices.begin(), hMatrices.end()),
+                        ToConstSpan(dMatrices));
     const Byte* data = nullptr;
 
     data = reinterpret_cast<const Byte*>(hFloats.data());
