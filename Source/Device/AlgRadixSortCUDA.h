@@ -4,27 +4,13 @@
 #include "Core/Types.h"
 #include "GPUSystemCUDA.h"
 
-#include <cub/cub.cuh>
-#include <cuda/functional>
+#include <cub/device/device_radix_sort.cuh>
 
 // Direct wrappers over CUB at the moment
 // Probably be refactored later
 // Add as you need
 namespace mray::cuda::algorithms
 {
-    template <class T>
-    MRAY_HOST
-    size_t ReduceTMSize(size_t elementCount);
-
-    template <class T, class BinaryOp>
-    MRAY_HOST
-    void Reduce(Span<T, 1> dReducedValue,
-                Span<Byte> dTempMemory,
-                Span<const T> dValues,
-                const T& initialValue,
-                const GPUQueueCUDA& queue,
-                BinaryOp&&);
-
     template <bool IsAscending, class K, class V>
     MRAY_HOST
     size_t RadixSortTMSize(size_t elementCount);
@@ -40,41 +26,6 @@ namespace mray::cuda::algorithms
 
 namespace mray::cuda::algorithms
 {
-    template <class T>
-    MRAY_HOST inline
-    size_t ReduceTMSize(size_t elementCount)
-    {
-        using namespace cub;
-
-        T* dIn = nullptr;
-        T* dOut = nullptr;
-        void* dTM = nullptr;
-        size_t result;
-        CUDA_CHECK(DeviceReduce::Reduce(dTM, result, dIn, dOut,
-                                        static_cast<int>(elementCount),
-                                        [] MRAY_HYBRID(T, T)->T{ return T{}; }, T{}));
-        return result;
-    }
-
-    template <class T, class BinaryOp>
-    MRAY_HOST inline
-    void Reduce(Span<T, 1> dReducedValue,
-                Span<Byte> dTempMemory,
-                Span<const T> dValues,
-                const T& initialValue,
-                const GPUQueueCUDA& queue,
-                BinaryOp&& op)
-    {
-        using namespace cub;
-        //reinterpret_cast<void*>(dTempMemory.data()),
-        size_t size;
-        CUDA_CHECK(DeviceReduce::Reduce(dTempMemory.data(), size,
-                                        dValues.data(), dReducedValue.data(),
-                                        static_cast<int>(dValues.size()),
-                                        std::forward<BinaryOp>(op), initialValue,
-                                        ToHandleCUDA(queue)));
-    }
-
     template <bool IsAscending, class K, class V>
     MRAY_HOST inline
     size_t RadixSortTMSize(size_t elementCount)
@@ -113,7 +64,7 @@ namespace mray::cuda::algorithms
         cub::DoubleBuffer<V> values(dValueDoubleBuffer[0].data(),
                                     dValueDoubleBuffer[1].data());
 
-        size_t size;
+        size_t size = dTempMemory.size();
         if constexpr(IsAscending)
             CUDA_CHECK(DeviceRadixSort::SortPairs(dTempMemory.data(), size, keys, values,
                                                   dKeyDoubleBuffer[0].size(),

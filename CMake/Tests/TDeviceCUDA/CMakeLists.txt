@@ -7,7 +7,11 @@ set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/T_TextureTypes.h
     ${CURRENT_SOURCE_DIR}/T_Texture.cu
     ${CURRENT_SOURCE_DIR}/T_KernelCall.cu
-    ${CURRENT_SOURCE_DIR}/T_Algorithms.cu)
+    ${CURRENT_SOURCE_DIR}/T_AlgTypes.h
+    ${CURRENT_SOURCE_DIR}/T_AlgReduce.cu
+    ${CURRENT_SOURCE_DIR}/T_AlgRadixSort.cu
+    ${CURRENT_SOURCE_DIR}/T_AlgBinPartition.cu
+)
 
 source_group("" FILES ${SRC_COMMON})
 

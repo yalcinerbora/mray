@@ -16,7 +16,10 @@ set(SRC_CUDA
     ${CURRENT_SOURCE_DIR}/DefinitionsCUDA.h)
 
 set(SRC_CUDA_ALGS
-    ${CURRENT_SOURCE_DIR}/AlgorithmsCUDA.h)
+    ${CURRENT_SOURCE_DIR}/AlgReduceCUDA.h
+    ${CURRENT_SOURCE_DIR}/AlgScanCUDA.h
+    ${CURRENT_SOURCE_DIR}/AlgRadixSortCUDA.h
+    ${CURRENT_SOURCE_DIR}/AlgBinPartitionCUDA.h)
 
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/GPUSystem.h

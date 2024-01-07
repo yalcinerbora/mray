@@ -4,7 +4,11 @@
 // from non "*.cu" files
 #ifdef MRAY_GPU_BACKEND_CUDA
     #include "GPUSystemCUDA.hpp"
-    #include "AlgorithmsCUDA.h"
+
+    // TODO: Seperate these
+    #include "AlgReduceCUDA.h"
+    #include "AlgRadixSortCUDA.h"
+    #include "AlgBinPartitionCUDA.h"
 
     namespace DeviceAlgorithms = mray::cuda::algorithms;
 
