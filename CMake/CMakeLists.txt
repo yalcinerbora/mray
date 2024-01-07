@@ -112,9 +112,10 @@ add_subdirectory(Core)
 add_subdirectory(Device)
 
 # DLLs
+add_subdirectory(Tracer)
 #add_subdirectory(GFGSurfaceLoader)
 #add_subdirectory(ImageLoader)
-#add_subdirectory(TracerCUDA)
+
 #add_subdirectory(VisorGL)
 
 # Execs

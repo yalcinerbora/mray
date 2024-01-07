@@ -2,6 +2,7 @@
 
 #include <span>
 #include <optional>
+#include <variant>
 
 // Rename the std::optional, gpu may not like it
 // most(all after c++20) of optional is constexpr
@@ -12,6 +13,9 @@ using Optional = std::optional<T>;
 // Same as optional
 template <class T, std::size_t Extent = std::dynamic_extent>
 using Span = std::span<T, Extent>;
+// ...
+template <class... Types>
+using Variant = std::variant<Types...>;
 
 
 template<class T, std::size_t Extent = std::dynamic_extent>

@@ -59,7 +59,6 @@ class alignas(ChooseNormAlignment(N * sizeof(T))) SNorm
     MRAY_HYBRID constexpr T&        operator[](int);
 };
 
-
 template <int N, std::unsigned_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr T UNorm<N, T>::Min()
@@ -117,7 +116,6 @@ constexpr const T& SNorm<N, T>::operator[](int i) const
 {
     return v[i];
 }
-
 
 // Word Types
 using UNorm4x8      = UNorm<4, uint8_t>;
