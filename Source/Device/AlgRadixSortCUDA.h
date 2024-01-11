@@ -54,15 +54,18 @@ namespace mray::cuda::algorithms
                        const Vector2ui& bitRange)
     {
         using namespace cub;
+        using namespace std::literals;
+        static const NVTXKernelName kernelName = NVTXKernelName(queue.ProfilerDomain(), "KCRadixSort"sv);
+        NVTXAnnotate annotate = kernelName.Annotate();
 
         assert(dKeyDoubleBuffer[0].size() == dKeyDoubleBuffer[1].size());
         assert(dValueDoubleBuffer[0].size() == dValueDoubleBuffer[1].size());
         assert(dKeyDoubleBuffer[0].size() == dValueDoubleBuffer[0].size());
 
-        cub::DoubleBuffer<K> keys(dKeyDoubleBuffer[0].data(),
-                                  dKeyDoubleBuffer[1].data());
-        cub::DoubleBuffer<V> values(dValueDoubleBuffer[0].data(),
-                                    dValueDoubleBuffer[1].data());
+        DoubleBuffer<K> keys(dKeyDoubleBuffer[0].data(),
+                             dKeyDoubleBuffer[1].data());
+        DoubleBuffer<V> values(dValueDoubleBuffer[0].data(),
+                               dValueDoubleBuffer[1].data());
 
         size_t size = dTempMemory.size();
         if constexpr(IsAscending)

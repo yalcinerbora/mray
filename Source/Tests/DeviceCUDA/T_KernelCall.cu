@@ -46,9 +46,11 @@ void ParentKernel(Span<uint32_t> dOutBuffer,
     KernelCallParams params;
     if(params.GlobalId() == 0)
     {
-        const GPUQueue tailQueue(deviceSMCount, DeviceQueueType::TAIL_LAUNCH);
+        const GPUQueue tailQueue(deviceSMCount, nullptr,
+                                 DeviceQueueType::TAIL_LAUNCH);
         tailQueue.IssueKernel<NestedKernel>
         (
+            "GTest Nested Kernel",
             KernelIssueParams{totalThreads, 0},
             dOutBuffer,
             dReferenceValue,
@@ -100,6 +102,7 @@ void KernelCallFreeFunctionTester(const GPUSystem& system)
     // ====================== //
     queue.IssueKernel<HelloWorldKernel>
     (
+        "GTest Hello World Kernel",
         KernelIssueParams{totalThreads, 0u},
         dWriteSpan,
         dReference,
@@ -112,6 +115,7 @@ void KernelCallFreeFunctionTester(const GPUSystem& system)
     // ====================== //
     queue.IssueSaturatingKernel<HelloWorldKernel>
     (
+        "GTest Hello World Kernel Saturating",
         KernelIssueParams{totalThreads, 0u},
         dWriteSpan,
         dReference,
@@ -124,6 +128,7 @@ void KernelCallFreeFunctionTester(const GPUSystem& system)
     // ====================== //
     queue.IssueExactKernel<HelloWorldKernel>
     (
+        "GTest Hello World Kernel Exact",
         KernelExactIssueParams{1u, totalThreads, 0u},
         dWriteSpan,
         dReference,
@@ -187,6 +192,7 @@ void KernelCallLambdaTester(const GPUSystem& system)
     // ====================== //
     queue.IssueLambda
     (
+        "GTest Hello World Kernel Lambda",
         KernelIssueParams{totalThreads, 0u},
         std::move(LambdaKernel)
     );
@@ -197,6 +203,7 @@ void KernelCallLambdaTester(const GPUSystem& system)
     // ====================== //
     queue.IssueSaturatingLambda
     (
+        "GTest Hello World Kernel Saturating",
         KernelIssueParams{totalThreads, 0u},
         std::move(LambdaKernel)
     );
@@ -208,6 +215,7 @@ void KernelCallLambdaTester(const GPUSystem& system)
     // ====================== //
     queue.IssueExactLambda
     (
+        "GTest Hello World Kernel Exact",
         KernelExactIssueParams{1u, totalThreads, 0u},
         std::move(LambdaKernel)
     );
@@ -257,6 +265,7 @@ void KernelCallNestedTester(const GPUSystem& system)
     // ====================== //
     queue.IssueKernel<ParentKernel>
     (
+        "GTest Parent Kernel",
         KernelIssueParams{totalThreads, 0u},
         dWriteSpan,
         dReference,
@@ -270,6 +279,7 @@ void KernelCallNestedTester(const GPUSystem& system)
     // ====================== //
     queue.IssueSaturatingKernel<ParentKernel>
     (
+        "GTest Parent Kernel Saturating",
         KernelIssueParams{totalThreads, 0u},
         dWriteSpan,
         dReference,
@@ -283,6 +293,7 @@ void KernelCallNestedTester(const GPUSystem& system)
     // ====================== //
     queue.IssueExactKernel<ParentKernel>
     (
+        "GTest Parent Kernel Exact",
         KernelExactIssueParams{1u, totalThreads, 0u},
         dWriteSpan,
         dReference,

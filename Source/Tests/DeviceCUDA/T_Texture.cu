@@ -165,6 +165,7 @@ TYPED_TEST(GPUTextureTest, Copy)
     TextureView<D, ChannelType> view = tex. template View<ChannelType>();
     queue.IssueKernel<CheckCheckerboardPattern<D, ChannelType>>
     (
+        "GTest Texture CheckCheckerboard",
         KernelIssueParams{.workCount = total, .sharedMemSize = 0},
         dTrueFalseBuffer,
         view,

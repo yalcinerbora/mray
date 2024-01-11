@@ -282,7 +282,8 @@ elseif(UNIX AND NOT APPLE)
     mark_as_advanced(TBB_DIR)
     set(MRAY_PLATFORM_SPEC_LIBRARIES
         ${MRAY_PLATFORM_SPEC_LIBRARIES}
-        TBB::tbb)
+        TBB::tbb
+        dl)
 endif()
 
 target_link_libraries(meta_compile_opts INTERFACE

@@ -5,6 +5,8 @@
 #include <cuda_runtime.h>
 #include <vector>
 
+#include <nvtx3/nvToolsExt.h>
+
 #include "Core/Types.h"
 #include "Core/MathFunctions.h"
 #include "DefinitionsCUDA.h"
@@ -85,6 +87,7 @@ class GPUQueueCUDA
     private:
     cudaStream_t        stream;
     uint32_t            multiprocessorCount;
+    nvtxDomainHandle_t  nvtxDomain;
 
     MRAY_HYBRID
     uint32_t            DetermineGridStrideBlock(const void* kernelPtr,
@@ -95,6 +98,7 @@ class GPUQueueCUDA
     public:
     // Constructors & Destructor
     MRAY_HYBRID                 GPUQueueCUDA(uint32_t multiprocessorCount,
+                                             nvtxDomainHandle_t domain,
                                              DeviceQueueType t = DeviceQueueType::NORMAL);
                                 GPUQueueCUDA(const GPUQueueCUDA&) = delete;
     MRAY_HYBRID                 GPUQueueCUDA(GPUQueueCUDA&&) noexcept;
@@ -105,33 +109,39 @@ class GPUQueueCUDA
     // Classic GPU Calls
     // Create just enough blocks according to work size
     template<auto Kernel, class... Args>
-    MRAY_HYBRID void    IssueKernel(KernelIssueParams,
+    MRAY_HYBRID void    IssueKernel(std::string_view name,
+                                    KernelIssueParams,
                                     //
                                     Args&&...) const;
     template<class Lambda>
-    MRAY_HYBRID void    IssueLambda(KernelIssueParams,
+    MRAY_HYBRID void    IssueLambda(std::string_view name,
+                                    KernelIssueParams,
                                      //
                                     Lambda&&) const;
     // Grid-Stride Kernels
     // Kernel is launched just enough blocks to
     // fully saturate the GPU.
     template<auto Kernel, class... Args>
-    MRAY_HYBRID void    IssueSaturatingKernel(KernelIssueParams,
+    MRAY_HYBRID void    IssueSaturatingKernel(std::string_view name,
+                                              KernelIssueParams,
                                               //
                                               Args&&...) const;
     template<class Lambda>
-    MRAY_HYBRID void    IssueSaturatingLambda(KernelIssueParams,
+    MRAY_HYBRID void    IssueSaturatingLambda(std::string_view name,
+                                              KernelIssueParams,
                                               //
                                               Lambda&&) const;
     // Exact Kernel Calls
     // You 1-1 specify block and grid dimensions
     // Important: These can not be annottated with launch_bounds
     template<auto Kernel, class... Args>
-    MRAY_HYBRID void    IssueExactKernel(KernelExactIssueParams,
+    MRAY_HYBRID void    IssueExactKernel(std::string_view name,
+                                         KernelExactIssueParams,
                                          //
                                          Args&&...) const;
     template<class Lambda, uint32_t Bounds = StaticThreadPerBlock1D()>
-    MRAY_HYBRID void    IssueExactLambda(KernelExactIssueParams,
+    MRAY_HYBRID void    IssueExactLambda(std::string_view name,
+                                         KernelExactIssueParams,
                                          //
                                          Lambda&&) const;
 
@@ -152,6 +162,8 @@ class GPUQueueCUDA
     static uint32_t     RecommendedBlockCountPerSM(const void* kernelPtr,
                                                    uint32_t threadsPerBlock,
                                                    uint32_t sharedMemSize);
+
+    nvtxDomainHandle_t  ProfilerDomain() const;
 };
 
 class GPUDeviceCUDA
@@ -166,7 +178,7 @@ class GPUDeviceCUDA
     protected:
     public:
     // Constructors & Destructor
-    explicit                GPUDeviceCUDA(int deviceId);
+    explicit                GPUDeviceCUDA(int deviceId, nvtxDomainHandle_t);
                             GPUDeviceCUDA(const GPUDeviceCUDA&) = delete;
                             GPUDeviceCUDA(GPUDeviceCUDA&&) noexcept = default;
     GPUDeviceCUDA&          operator=(const GPUDeviceCUDA&) = delete;
@@ -195,6 +207,7 @@ class GPUSystemCUDA
     private:
     GPUList                 systemGPUs;
     GPUPtrList              systemGPUPtrs;
+    nvtxDomainHandle_t      nvtxDomain;
 
     protected:
     public:
@@ -204,6 +217,7 @@ class GPUSystemCUDA
                             GPUSystemCUDA(GPUSystemCUDA&&) = delete;
     GPUSystemCUDA&          operator=(const GPUSystemCUDA&) = delete;
     GPUSystemCUDA&          operator=(GPUSystemCUDA&&) = delete;
+                            ~GPUSystemCUDA();
 
     // Multi-Device Splittable Smart GPU Calls
     // Automatic device split and stream split on devices
@@ -290,8 +304,10 @@ void GPUFenceCUDA::Wait() const
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 GPUQueueCUDA::GPUQueueCUDA(uint32_t multiprocessorCount,
+                           nvtxDomainHandle_t domain,
                            DeviceQueueType t)
     : multiprocessorCount(multiprocessorCount)
+    , nvtxDomain(domain)
 {
 
     switch(t)
@@ -314,6 +330,24 @@ GPUQueueCUDA::GPUQueueCUDA(uint32_t multiprocessorCount,
                 break;
         #endif
     }
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+GPUQueueCUDA::GPUQueueCUDA(GPUQueueCUDA&& other) noexcept
+    : stream(other.stream)
+    , multiprocessorCount(other.multiprocessorCount)
+    , nvtxDomain(other.nvtxDomain)
+{
+    other.stream = (cudaStream_t)0;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+GPUQueueCUDA& GPUQueueCUDA::operator=(GPUQueueCUDA&& other) noexcept
+{
+    multiprocessorCount = other.multiprocessorCount;
+    nvtxDomain = other.nvtxDomain;
+    stream = other.stream;
+    other.stream = (cudaStream_t)0;
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -391,22 +425,6 @@ uint32_t GPUQueueCUDA::DetermineGridStrideBlock(const void* kernelPtr,
     uint32_t smCount = std::min(multiprocessorCount, requiredSMCount);
     uint32_t blockCount = std::min(requiredSMCount, smCount * blockPerSM);
     return blockCount;
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-GPUQueueCUDA::GPUQueueCUDA(GPUQueueCUDA&& other) noexcept
-    : stream(other.stream)
-    , multiprocessorCount(other.multiprocessorCount)
-{
-    other.stream = (cudaStream_t)0;
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-GPUQueueCUDA& GPUQueueCUDA::operator=(GPUQueueCUDA&& other) noexcept
-{
-    multiprocessorCount = other.multiprocessorCount;
-    stream = other.stream;
-    other.stream = (cudaStream_t)0;
 }
 
 template <class T>

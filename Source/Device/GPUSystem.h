@@ -85,4 +85,43 @@ static_assert(DeviceLocalMemC<DeviceLocalMemory>,
               "Device local memory does not satisfy its concept!");
 
 
+namespace DeviceDebug
+{
 
+using namespace std::string_view_literals;
+
+template<class T>
+static void DumpGPUMemToStream(std::ostream& s,
+                               Span<const T> data,
+                               const GPUQueue& queue,
+                               std::string_view seperator = "\n"sv)
+{
+    std::vector<T> hostBuffer(data.size());
+    queue.MemcpyAsync(Span<T>(hostBuffer), data);
+    queue.Barrier().Wait();
+
+    for(const T& d : hostBuffer)
+    {
+        s << MRAY_FORMAT("{}{:s}", d, seperator);
+    }
+}
+
+template<class T>
+static void DumpGPUMemToFile(const std::string& fName,
+                             Span<const T> data,
+                             const GPUQueue& queue,
+                             std::string_view seperator = "\n"sv)
+{
+    std::ofstream file(fName);
+    DumpGPUMemToStream(file, data, queue, seperator);
+}
+
+template<class T>
+static void DumpGPUMemToStdOut(Span<const T> data,
+                               const GPUQueue& queue,
+                               std::string_view seperator = "\n"sv)
+{
+    DumpGPUMemToStream(std::cout, data, seperator);
+}
+
+}

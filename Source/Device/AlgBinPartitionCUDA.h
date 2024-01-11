@@ -54,8 +54,13 @@ namespace mray::cuda::algorithms
                          const GPUQueueCUDA& queue,
                          UnaryOp&& op)
     {
-        assert(dInput.size() == dOutput.size());
         using namespace cub;
+        using namespace std::literals;
+        static const NVTXKernelName kernelName = NVTXKernelName(queue.ProfilerDomain(), "KCBinaryPartition"sv);
+        NVTXAnnotate annotate = kernelName.Annotate();
+
+        assert(dInput.size() == dOutput.size());
+
 
         size_t size = dTempMemory.size();
         CUDA_CHECK(DevicePartition::If(dTempMemory.data(), size,

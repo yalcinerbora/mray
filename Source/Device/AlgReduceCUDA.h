@@ -53,6 +53,10 @@ namespace mray::cuda::algorithms
                 BinaryOp&& op)
     {
         using namespace cub;
+        using namespace std::literals;
+        static const NVTXKernelName kernelName = NVTXKernelName(queue.ProfilerDomain(), "KCReduce"sv);
+        NVTXAnnotate annotate = kernelName.Annotate();
+
         size_t size = dTempMemory.size();
         CUDA_CHECK(DeviceReduce::Reduce(dTempMemory.data(), size,
                                         dValues.data(), dReducedValue.data(),

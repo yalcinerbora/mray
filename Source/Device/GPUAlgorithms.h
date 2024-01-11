@@ -31,15 +31,19 @@ namespace mray::algorithms
             .workCount = static_cast<uint32_t>(dOut.size()),
             .sharedMemSize = 0
         };
-        queue.IssueLambda(p, [=] MRAY_HYBRID(KernelCallParams kp)
-        {
-            for(uint32_t i = kp.GlobalId();
-                i < static_cast<uint32_t>(dOut.size());
-                i += kp.TotalSize())
+        queue.IssueLambda
+        (
+            "KCIota", p,
+            [=] MRAY_HYBRID(KernelCallParams kp)
             {
-                dOut[i] = T(i) + hInitialValue;
+                for(uint32_t i = kp.GlobalId();
+                    i < static_cast<uint32_t>(dOut.size());
+                    i += kp.TotalSize())
+                {
+                    dOut[i] = T(i) + hInitialValue;
+                }
             }
-        });
+        );
     }
 
     template <class T, class UnaryFunction>
@@ -54,15 +58,19 @@ namespace mray::algorithms
             .workCount = static_cast<uint32_t>(dOut.size()),
             .sharedMemSize = 0
         };
-        queue.IssueLambda(p, [=] MRAY_HYBRID(KernelCallParams kp)
-        {
-            for(uint32_t i = kp.GlobalId();
-                i < static_cast<uint32_t>(dOut.size());
-                i += kp.TotalSize())
+        queue.IssueLambda
+        (
+            "KCTransform", p,
+            [=] MRAY_HYBRID(KernelCallParams kp)
             {
-                dOut[i] = TransFunction(dIn[i]);
+                for(uint32_t i = kp.GlobalId();
+                    i < static_cast<uint32_t>(dOut.size());
+                    i += kp.TotalSize())
+                {
+                    dOut[i] = TransFunction(dIn[i]);
+                }
             }
-        });
+        );
     }
 }
 

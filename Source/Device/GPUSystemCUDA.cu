@@ -5,10 +5,9 @@
 namespace mray::cuda
 {
 
-GPUDeviceCUDA::GPUDeviceCUDA(int deviceId)
+GPUDeviceCUDA::GPUDeviceCUDA(int deviceId, nvtxDomainHandle_t domain)
     : deviceId(deviceId)
 {
-
     // Enforce non-async functions to explicitly synchronize
     CUDA_CHECK(cudaInitDevice(deviceId,
                               cudaDeviceSyncMemops |
@@ -42,7 +41,7 @@ GPUDeviceCUDA::GPUDeviceCUDA(int deviceId)
     CUDA_CHECK(cudaSetDevice(deviceId));
     for(uint32_t i = 0; i < QueuePerDevice; i++)
     {
-        queues.emplace_back(props.multiProcessorCount);
+        queues.emplace_back(props.multiProcessorCount, domain);
     }
 }
 
@@ -87,10 +86,9 @@ const GPUQueue& GPUDeviceCUDA::GetQueue(uint32_t index) const
 }
 
 GPUSystemCUDA::GPUSystemCUDA()
+    : nvtxDomain(nvtxDomainCreateA("MRayCUDA"))
 {
     // Initialize the CUDA
-    CUDA_CHECK(cudaFree(nullptr));
-
     int deviceCount;
     cudaError err;
 
@@ -107,13 +105,18 @@ GPUSystemCUDA::GPUSystemCUDA()
     // All Fine Start Query Devices
     for(int i = 0; i < deviceCount; i++)
     {
-        systemGPUs.emplace_back(i);
+        systemGPUs.emplace_back(i, nvtxDomain);
         systemGPUPtrs.push_back(&systemGPUs.back());
     }
 
     // TODO: Do topology stuff here
     // handle selection etc. this is too
     // primitive currently
+}
+
+GPUSystemCUDA::~GPUSystemCUDA()
+{
+    nvtxDomainDestroy(nvtxDomain);
 }
 
 std::vector<size_t> GPUSystemCUDA::SplitWorkToMultipleGPU(uint32_t workCount,

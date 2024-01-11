@@ -28,7 +28,6 @@ TODO: should we interface these?
 
 #include "GPUTypes.h"
 
-
 namespace mray::cuda
 {
 

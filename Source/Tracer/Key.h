@@ -85,5 +85,11 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr KeyT<T, BB, IB> KeyT<T, BB, IB>::CombinedKey(T batch, T id)
 {
     return KeyT((batch << IdBits) | (id & IdMask));
+}
 
+template <class T, uint32_t BB, uint32_t IB>
+MRAY_HOST
+static std::ostream& operator<<(std::ostream& os, const KeyT<T, BB, IB>& key)
+{
+    return os << std::hex << key.FetchBatchPortion() << '|' << key.FetchIndexPortion();
 }

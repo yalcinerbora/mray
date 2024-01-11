@@ -14,7 +14,7 @@
 #include "cub/block/block_adjacent_difference.cuh"
 
 template<int TPB>
-MRAY_KERNEL //MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
 void KCFindSplits(//Output
                   const Span<uint32_t> gMarks,
                   // Input
@@ -45,6 +45,7 @@ void KCFindSplits(//Output
     {
         bool foundSplit = (BitFunctions::FetchSubPortion(current.key, batchBitRange) !=
                            BitFunctions::FetchSubPortion(prev.key, batchBitRange));
+        foundSplit |= (current.value == 0);
 
         uint32_t mark = (foundSplit) ? current.value : INVALID_LOCATION;
         return mark;
@@ -137,12 +138,13 @@ void KCFindSplits(//Output
 #endif // MRAY_GPU_BACKEND_CUDA
 
 
-MRAY_KERNEL //MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCFindBinMatIds(// Output
                      Span<CommonKey> gBinKeys,
                      // I-O
                      Span<uint32_t> gBinRanges,
                      // Input
+                     Span<const uint32_t> dDenseSplitIndices,
                      Span<const CommonKey> gSortedHitKeys,
                      Span<const uint32_t, 1> gPartitionCount,
                      // Constants
@@ -155,9 +157,9 @@ void KCFindBinMatIds(// Output
         globalId < partitionCount;
         globalId += kp.TotalSize())
     {
-        uint32_t index = gBinRanges[globalId];
-        CommonKey key = gSortedHitKeys[index];
-        gBinKeys[globalId] = key;
+        uint32_t index = dDenseSplitIndices[globalId];
+        gBinRanges[globalId] = dDenseSplitIndices[globalId];
+        gBinKeys[globalId] = gSortedHitKeys[index];
     }
 
     if(kp.GlobalId() == 0)
@@ -189,7 +191,7 @@ RayPartitioner::RayPartitioner(const GPUSystem& system,
                                uint32_t maxElementEstimate,
                                uint32_t maxPartitionEstimate)
     : system(system)
-    , deviceMem(system.AllGPUs(), 1,
+    , deviceMem(system.AllGPUs(), 32_MiB,
                 PartitionerDeviceBufferSize(maxElementEstimate),
                 true)
     , hostMem(system,
@@ -234,7 +236,7 @@ RayPartitioner::InitialBuffers RayPartitioner::Start(uint32_t rayCountIn,
 
     hPartitionStartOffsets = hPartitionStartOffsets.subspan(0, maxPartitionCount + 1);
     hPartitionKeys = hPartitionKeys.subspan(0, maxPartitionCount);
-    hPartitionCount = Span<uint32_t, 1>(hPartCount);
+    hPartitionCount = Span<uint32_t, 1>(hPartCount.subspan(0, 1));
 
     return InitialBuffers
     {
@@ -285,13 +287,15 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
     // Rename/Repurpose buffers for readability
     Span<CommonIndex> dSortedRayIndices = dIndicesDB[0];
     Span<CommonKey> dSortedKeys = dKeysDB[0];
-    Span<uint32_t> dSparseSplitIndices = RepurposeAlloc<uint32_t>(dIndices[0]).subspan(0, partitionedRayCount);
+    Span<uint32_t> dSparseSplitIndices = RepurposeAlloc<uint32_t>(dIndices[1]).subspan(0, partitionedRayCount);
+    Span<uint32_t> dDenseSplitIndices = RepurposeAlloc<uint32_t>(dKeys[1]).subspan(0, partitionedRayCount);
 
     // Mark the split positions
     uint32_t blockCount = (queue.RecommendedBlockCountPerSM(KCFindSplits<FIND_SPLITS_TPB>, FIND_SPLITS_TPB, 0) *
                            queue.SMCount());
     queue.IssueExactKernel<KCFindSplits<FIND_SPLITS_TPB>>
     (
+        "KCFindSplits",
         KernelExactIssueParams{.gridSize = blockCount, .blockSize = FIND_SPLITS_TPB},
         //
         dSparseSplitIndices,
@@ -299,10 +303,16 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
         keyBatchBitRange
     );
 
+    //DeviceDebug::DumpGPUMemToFile("dSparseSplitIndices",
+    //                              ToConstSpan(dSparseSplitIndices), queue);
+    //DeviceDebug::DumpGPUMemToFile("dSortedKeys",
+    //                              ToConstSpan(dSortedKeys), queue);
+
     // Partition to host visible buffer
     DeviceAlgorithms::BinaryPartition
     (
-        hPartitionStartOffsets,
+        //hPartitionStartOffsets,
+        dDenseSplitIndices,
         hPartitionCount,
         dTempMemory,
         ToConstSpan(dSparseSplitIndices),
@@ -316,10 +326,12 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
     // Mark the split positions
     queue.IssueKernel<KCFindBinMatIds>
     (
+        "KCFindBinMatIds",
         KernelIssueParams{.workCount = maxPartitionCount},
         //
         hPartitionKeys,
         hPartitionStartOffsets,
+        ToConstSpan(dDenseSplitIndices),
         ToConstSpan(dSortedKeys),
         ToConstSpan(hPartitionCount),
         partitionedRayCount
