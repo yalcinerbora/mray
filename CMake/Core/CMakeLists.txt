@@ -27,6 +27,7 @@ set(SRC_MATH
     ${CURRENT_SOURCE_DIR}/ShapeFunctions.h)
 
 set(SRC_UTILITY
+    ${CURRENT_SOURCE_DIR}/BitFunctions.h
     ${CURRENT_SOURCE_DIR}/MemAlloc.h
     ${CURRENT_SOURCE_DIR}/TypeFinder.h
     ${CURRENT_SOURCE_DIR}/NormTypes.h

@@ -18,6 +18,8 @@
 #define MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT \
         MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(StaticThreadPerBlock1D())
 
+#define MRAY_DEVICE_BLOCK_SYNC() __syncthreads()
+
 #define MRAY_GRID_CONSTANT __grid_constant__
 
 static constexpr uint32_t WarpSize()
@@ -51,9 +53,9 @@ struct KernelCallParamsCUDA
     uint32_t blockId;
     uint32_t threadId;
 
-    MRAY_GPU            KernelCallParamsCUDA();
-    MRAY_GPU uint32_t   GlobalId() const;
-    MRAY_GPU uint32_t   TotalSize() const;
+    MRAY_GPU                KernelCallParamsCUDA();
+    MRAY_HYBRID uint32_t    GlobalId() const;
+    MRAY_HYBRID uint32_t    TotalSize() const;
 };
 
 class GPUFenceCUDA
@@ -144,6 +146,9 @@ class GPUQueueCUDA
     GPUFenceCUDA        Barrier() const;
 
     MRAY_HYBRID
+    uint32_t            SMCount() const;
+
+    MRAY_HYBRID
     static uint32_t     RecommendedBlockCountPerSM(const void* kernelPtr,
                                                    uint32_t threadsPerBlock,
                                                    uint32_t sharedMemSize);
@@ -185,9 +190,11 @@ class GPUSystemCUDA
 {
     public:
     using GPUList = std::vector<GPUDeviceCUDA>;
+    using GPUPtrList = std::vector<const GPUDeviceCUDA*>;
 
     private:
     GPUList                 systemGPUs;
+    GPUPtrList              systemGPUPtrs;
 
     protected:
     public:
@@ -208,6 +215,7 @@ class GPUSystemCUDA
     // Misc
     const GPUList&          SystemDevices() const;
     const GPUDeviceCUDA&    BestDevice() const;
+    const GPUPtrList&       AllGPUs() const;
 
     // Get Kernel Attributes & Set Dynamic Shared Memory Size
     KernelAttributes        GetKernelAttributes(const void* kernelPtr) const;
@@ -225,13 +233,13 @@ class GPUSystemCUDA
     void                    SyncAll() const;
 };
 
-MRAY_GPU MRAY_CGPU_INLINE
+MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t KernelCallParamsCUDA::GlobalId() const
 {
     return blockId * blockSize + threadId;
 }
 
-MRAY_GPU MRAY_CGPU_INLINE
+MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t KernelCallParamsCUDA::TotalSize() const
 {
     return gridSize * blockSize;
@@ -347,6 +355,13 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 GPUFenceCUDA GPUQueueCUDA::Barrier() const
 {
     return GPUFenceCUDA(*this);
+}
+
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+uint32_t GPUQueueCUDA::SMCount() const
+{
+    return multiprocessorCount;
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE

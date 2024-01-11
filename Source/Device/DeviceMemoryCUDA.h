@@ -76,11 +76,14 @@ class HostLocalMemoryCUDA
     void*                   hPtr;
     void*                   dPtr;
     size_t                  size;
+    bool                    neverDecrease = false;
 
     public:
-                            HostLocalMemoryCUDA(const GPUSystemCUDA& system);
                             HostLocalMemoryCUDA(const GPUSystemCUDA& system,
-                                                size_t sizeInBytes);
+                                                bool neverDecrease = false);
+                            HostLocalMemoryCUDA(const GPUSystemCUDA& system,
+                                                size_t sizeInBytes,
+                                                bool neverDecrease = false);
                             HostLocalMemoryCUDA(const HostLocalMemoryCUDA&);
                             HostLocalMemoryCUDA(HostLocalMemoryCUDA&&) noexcept;
                             ~HostLocalMemoryCUDA();
@@ -123,6 +126,7 @@ class DeviceMemoryCUDA
 
     CUdeviceptr                 mPtr;
     size_t                      allocSize;
+    bool                        neverDecrease = false;
 
     size_t                      FindCommonGranularity() const;
     size_t                      NextDeviceIndex();
@@ -131,7 +135,8 @@ class DeviceMemoryCUDA
         // Constructors & Destructor
                                 DeviceMemoryCUDA(const std::vector<const GPUDeviceCUDA*>& devices,
                                                  size_t allocationGranularity,
-                                                 size_t preReserveSize);
+                                                 size_t preReserveSize,
+                                                 bool neverDecrease = false);
                                 DeviceMemoryCUDA(const DeviceMemoryCUDA&) = delete;
                                 DeviceMemoryCUDA(DeviceMemoryCUDA&&) noexcept = default;
                                 ~DeviceMemoryCUDA();

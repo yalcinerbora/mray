@@ -9,7 +9,7 @@
 #include "Hit.h"
 #include "Key.h"
 
-using MetaHitPtr = MetaHitPtrT<Vector2, Vector3>;
+using MetaHit = MetaHitPtrT<Vector2, Vector3>;
 
 // Differential portion of a ray
 class DiffRay{};
@@ -59,8 +59,6 @@ class SpectrumGroup
 
 };
 
-//using
-
 // Some key types
 // these are defined seperately for fine-tuning
 // for different use-cases.
@@ -68,20 +66,39 @@ class SpectrumGroup
 // Work key when a ray hit an object
 // this key will be used to partition
 // rays with respect to materials
-using WorkId = KeyT<uint32_t, 16, 16>;
+using WorkKey = KeyT<uint32_t, 16, 16>;
+using AccelKey = WorkKey;
 
-// Medium key
-using MediumId = KeyT<uint32_t, 8, 24>;
 // Primitive key
 using PrimitiveId = KeyT<uint32_t, 4, 28>;
-// Transform key
-using TransformId = KeyT<uint32_t, 8, 24>;
 // Material key
 using MaterialId = KeyT<uint32_t, 10, 22>;
+// Transform key
+using TransformId = KeyT<uint32_t, 8, 24>;
+// Medium key
+using MediumId = KeyT<uint32_t, 8, 24>;
 
-using RayIdPack = std::tuple<PrimitiveId, MaterialId, TransformId, MediumId>;
+// CommonKeyType (TODO: make this compile time combination of
+// above keys' inner types)
+using CommonKey = uint32_t;
 
 using RayIndex = uint32_t;
+
+using CommonIndex = uint32_t;
+
+// Triplet of Ids
+static constexpr size_t HitIdPackAlignment = (sizeof(PrimitiveId) +
+                                              sizeof(MaterialId) +
+                                              sizeof(TransformId) +
+                                              sizeof(MediumId));
+struct alignas (HitIdPackAlignment) HitIdPack
+{
+    PrimitiveId     primId;
+    MaterialId      matId;
+    TransformId     transId;
+    MediumId        mediumId;
+};
+
 
 template <class T>
 struct Sample

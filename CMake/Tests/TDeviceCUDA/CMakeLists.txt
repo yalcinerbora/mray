@@ -11,6 +11,7 @@ set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/T_AlgReduce.cu
     ${CURRENT_SOURCE_DIR}/T_AlgRadixSort.cu
     ${CURRENT_SOURCE_DIR}/T_AlgBinPartition.cu
+    ${CURRENT_SOURCE_DIR}/T_AlgCommon.cu
 )
 
 source_group("" FILES ${SRC_COMMON})

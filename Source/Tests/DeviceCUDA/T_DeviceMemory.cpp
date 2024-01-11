@@ -147,7 +147,7 @@ TEST(GPUMemory, HostLocalMemory_Allocate)
     GPUSystem system;
     // Check invalid params
     {
-        EXPECT_DEBUG_DEATH(HostLocalMemory memory(system, 0), ".*");
+        EXPECT_DEBUG_DEATH(HostLocalMemory memory(system, 0, true), ".*");
     }
     // Simple Test
     {

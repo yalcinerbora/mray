@@ -4,6 +4,7 @@
 
 #include "Device/GPUSystem.h"
 #include "Device/GPUSystem.hpp"
+#include "Device/GPUAlgorithms.h"
 
 #include "T_AlgTypes.h"
 
@@ -88,7 +89,6 @@ void BinPartitionTest(const GPUSystem& system)
         ExpectEqualVecOrArithmetic(expected, hOutputsLambda[i]);
     }
 }
-
 
 TYPED_TEST(DeviceAlorithmsTest, BinaryPartition)
 {

@@ -146,16 +146,19 @@ void DeviceLocalMemoryCUDA::MigrateToOtherDevice(const GPUDeviceCUDA& deviceTo)
     *this = std::move(newMem);
 }
 
-HostLocalMemoryCUDA::HostLocalMemoryCUDA(const GPUSystemCUDA& system)
+HostLocalMemoryCUDA::HostLocalMemoryCUDA(const GPUSystemCUDA& system,
+                                         bool neverDecrease)
     : system(system)
     , hPtr(nullptr)
     , dPtr(nullptr)
     , size(0)
+    , neverDecrease(neverDecrease)
 {}
 
 HostLocalMemoryCUDA::HostLocalMemoryCUDA(const GPUSystemCUDA& system,
-                                         size_t sizeInBytes)
-    : HostLocalMemoryCUDA(system)
+                                         size_t sizeInBytes,
+                                         bool neverDecrease)
+    : HostLocalMemoryCUDA(system, neverDecrease)
 {
     assert(sizeInBytes != 0);
     // TODO: change this to virtual memory calls as well
@@ -165,7 +168,7 @@ HostLocalMemoryCUDA::HostLocalMemoryCUDA(const GPUSystemCUDA& system,
 }
 
 HostLocalMemoryCUDA::HostLocalMemoryCUDA(const HostLocalMemoryCUDA& other)
-    : HostLocalMemoryCUDA(other.system, other.size)
+    : HostLocalMemoryCUDA(other.system, other.size, other.neverDecrease)
 {
     std::memcpy(hPtr, other.hPtr, size);
 }
@@ -175,6 +178,7 @@ HostLocalMemoryCUDA::HostLocalMemoryCUDA(HostLocalMemoryCUDA&& other) noexcept
     , hPtr(other.hPtr)
     , dPtr(other.dPtr)
     , size(other.size)
+    , neverDecrease(other.neverDecrease)
 {
     other.hPtr = nullptr;
     other.dPtr = nullptr;
@@ -191,6 +195,7 @@ HostLocalMemoryCUDA& HostLocalMemoryCUDA::operator=(const HostLocalMemoryCUDA& o
     assert(this != &other);
 
     size = other.size;
+    neverDecrease = other.neverDecrease;
     CUDA_CHECK(cudaFreeHost(hPtr));
     CUDA_MEM_THROW(cudaHostAlloc(&hPtr, size, cudaHostAllocMapped));
     CUDA_CHECK(cudaHostGetDevicePointer(&dPtr, hPtr, 0));
@@ -204,6 +209,7 @@ HostLocalMemoryCUDA& HostLocalMemoryCUDA::operator=(HostLocalMemoryCUDA&& other)
     size = other.size;
     hPtr = other.hPtr;
     dPtr = other.dPtr;
+    neverDecrease = other.neverDecrease;
 
     other.size = 0;
     other.hPtr = nullptr;
@@ -223,6 +229,8 @@ const Byte* HostLocalMemoryCUDA::DevicePtr() const
 
 void HostLocalMemoryCUDA::ResizeBuffer(size_t newSize)
 {
+    if(neverDecrease && newSize <= size) return;
+
     HostLocalMemoryCUDA newMem(system, newSize);
     std::memcpy(newMem.hPtr, hPtr, size);
     *this = std::move(newMem);
@@ -262,8 +270,10 @@ size_t DeviceMemoryCUDA::NextDeviceIndex()
 
 DeviceMemoryCUDA::DeviceMemoryCUDA(const std::vector<const GPUDeviceCUDA*>& devices,
                                    size_t allocGranularity,
-                                   size_t resGranularity)
+                                   size_t resGranularity,
+                                   bool neverDecrease)
     : allocSize(0)
+    , neverDecrease(neverDecrease)
 {
     assert(resGranularity != 0);
     assert(allocGranularity != 0);
@@ -339,9 +349,8 @@ void DeviceMemoryCUDA::ResizeBuffer(size_t newSize)
         }
     }
     // Shrink the memory
-    if(newSize < allocSize)
+    if(!neverDecrease && newSize < allocSize)
     {
-        //MRAY_LOG("Shrink");
         size_t offset = allocSize;
         auto it = allocs.crbegin();
         for(; it != allocs.crend(); it++)

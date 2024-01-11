@@ -108,6 +108,7 @@ GPUSystemCUDA::GPUSystemCUDA()
     for(int i = 0; i < deviceCount; i++)
     {
         systemGPUs.emplace_back(i);
+        systemGPUPtrs.push_back(&systemGPUs.back());
     }
 
     // TODO: Do topology stuff here
@@ -153,6 +154,11 @@ std::vector<size_t> GPUSystemCUDA::SplitWorkToMultipleGPU(uint32_t workCount,
 const GPUSystemCUDA::GPUList& GPUSystemCUDA::SystemDevices() const
 {
     return systemGPUs;
+}
+
+const GPUSystemCUDA::GPUPtrList& GPUSystemCUDA::AllGPUs() const
+{
+    return systemGPUPtrs;
 }
 
 const GPUDeviceCUDA& GPUSystemCUDA::BestDevice() const

@@ -5,12 +5,6 @@
 #ifdef MRAY_GPU_BACKEND_CUDA
     #include "GPUSystemCUDA.hpp"
 
-    // TODO: Seperate these
-    #include "AlgReduceCUDA.h"
-    #include "AlgRadixSortCUDA.h"
-    #include "AlgBinPartitionCUDA.h"
-
-    namespace DeviceAlgorithms = mray::cuda::algorithms;
 
 //#elif defined MRAY_GPU_BACKEND_SYCL
 //    // TODO:

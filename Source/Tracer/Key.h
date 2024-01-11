@@ -82,7 +82,7 @@ constexpr T KeyT<T, BB, IB>::FetchIndexPortion() const
 
 template <class T, uint32_t BB, uint32_t IB>
 MRAY_HYBRID MRAY_CGPU_INLINE
-static constexpr KeyT<T, BB, IB> KeyT<T, BB, IB>::CombinedKey(T batch, T id)
+constexpr KeyT<T, BB, IB> KeyT<T, BB, IB>::CombinedKey(T batch, T id)
 {
     return KeyT((batch << IdBits) | (id & IdMask));
 

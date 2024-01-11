@@ -24,6 +24,23 @@ constexpr Span<const T, Extent> ToConstSpan(Span<T, Extent> s)
     return Span<const T, Extent>(s);
 }
 
+// TODO add arrays maybe? (decay changes c arrays to ptrs)
+template<class T0, std::size_t E0,
+         class T1, std::size_t E1>
+requires std::is_same_v<std::decay_t<T0>, std::decay_t<T1>>
+constexpr bool IsSubspan(Span<T0, E0> checkedSpan, Span<T1, E1> bigSpan)
+{
+    ptrdiff_t diff = checkedSpan.data() - bigSpan.data();
+    if(diff >= 0)
+    {
+        size_t diffS = static_cast<size_t>(diff);
+        bool ptrInRange = diffS < bigSpan.size();
+        bool backInRange = (diffS + checkedSpan.size()) <= bigSpan.size();
+        return (ptrInRange && backInRange);
+    }
+    else return false;
+}
+
 //#include <concepts>
 //
 //#include "Vector.h"

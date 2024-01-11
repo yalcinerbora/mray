@@ -20,7 +20,12 @@ set(SRC_MATERIALS
 set(SRC_RENDERERS
     ${CURRENT_SOURCE_DIR}/RendererC.h)
 
+set(SRC_RAY_CASTERS
+    ${CURRENT_SOURCE_DIR}/RayCasterI.h)
+
 set(SRC_UTILITY
+    ${CURRENT_SOURCE_DIR}/RayPartitioner.h
+    ${CURRENT_SOURCE_DIR}/RayPartitioner.cu
     ${CURRENT_SOURCE_DIR}/ParamVaryingData.h
     ${CURRENT_SOURCE_DIR}/ShapeFunctions.h
     ${CURRENT_SOURCE_DIR}/GraphicsFunctions.h
@@ -35,6 +40,7 @@ set(SRC_ALL
     ${SRC_MATERIALS}
     ${SRC_TRANSFORMS}
     ${SRC_RENDERERS}
+    ${SRC_RAY_CASTERS}
     ${SRC_UTILITY}
     ${SRC_COMMON})
 
@@ -43,6 +49,7 @@ source_group("Primitives" FILES ${SRC_PRIMITIVES})
 source_group("Transforms" FILES ${SRC_TRANSFORMS})
 source_group("Materials" FILES ${SRC_MATERIALS})
 source_group("Renderers" FILES ${SRC_RENDERERS})
+source_group("RayCasters" FILES ${SRC_RAY_CASTERS})
 source_group("Utility" FILES ${SRC_UTILITY})
 source_group("" FILES ${SRC_COMMON})
 
@@ -58,3 +65,22 @@ set_target_properties(TracerCUDA PROPERTIES
                       POSITION_INDEPENDENT_CODE ON
                       CUDA_SEPARABLE_COMPILATION ON
                       CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+
+# Object Files for compilation
+add_library(TracerCUDA_Objects STATIC $<TARGET_OBJECTS:TracerCUDA>)
+
+target_link_libraries(TracerCUDA_Objects
+                      PUBLIC
+                      DeviceLib
+                      CoreLib
+                      PRIVATE
+                      mray::meta_compile_opts
+                      mray::cuda_extra_compile_opts)
+
+set_target_properties(TracerCUDA_Objects PROPERTIES
+                      POSITION_INDEPENDENT_CODE ON
+                      CUDA_SEPARABLE_COMPILATION ON
+                      CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+
+# Hide this on IDE
+set_target_properties(TracerCUDA_Objects PROPERTIES FOLDER ${MRAY_PREDEFINED_TARGETS_FOLDER})

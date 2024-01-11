@@ -61,7 +61,7 @@ class RendererWork
         const RayIndex*     gRayInIndices;
         // Unsorte;
         const RayGMem*      gRaysIn;
-        const RayIdPack*    gRayIds;
+        const HitIdPack*    gRayIds;
         const MetaHitPtr    gHitParams;
         const RayPayload&   payloadIn;
         uint32_t            inSize;

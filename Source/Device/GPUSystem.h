@@ -49,12 +49,16 @@
     #error "MRAY_GRID_CONSTANT" is not defined!
 #endif
 
+#ifndef MRAY_DEVICE_BLOCK_SYNC
+    #error "MRAY_DEVICE_BLOCK_SYNC" is not defined!
+#endif
+
 
 // Concept Checks
 template<class MemType>
 concept DeviceMemBaseC = requires(MemType m)
 {
-    {m.EnlargeBuffer(size_t{})} -> std::same_as<void>;
+    {m.ResizeBuffer(size_t{})} -> std::same_as<void>;
     {m.Size()} -> std::same_as<size_t>;
 };
 
@@ -64,22 +68,21 @@ concept DeviceLocalMemC = requires(MemType m,
                                    const GPUQueue& queue)
 {
     requires DeviceMemBaseC<MemType>;
-    {m.MigrateToOtherDevice(dev, queue)} -> std::same_as<void>;
-    {m.Device()} -> std::same_as<GPUDevice>;
+    {m.MigrateToOtherDevice(dev)} -> std::same_as<void>;
+    {m.Device()} -> std::same_as<const GPUDevice&>;
 };
 
 template<class MemType>
 concept DeviceMemC = requires(MemType m)
 {
     requires DeviceMemBaseC<MemType>;
-    {m.System()} -> std::same_as<GPUSystem>;
 };
 
-//static_assert(DeviceMemC<DeviceMemory>,
-//              "Device memory does not satisfy its concept!");
-//
-//static_assert(DeviceLocalMemC<DeviceLocalMemory>,
-//              "Device local memory does not satisfy its concept!");
+static_assert(DeviceMemC<DeviceMemory>,
+              "Device memory does not satisfy its concept!");
+
+static_assert(DeviceLocalMemC<DeviceLocalMemory>,
+              "Device local memory does not satisfy its concept!");
 
 
 

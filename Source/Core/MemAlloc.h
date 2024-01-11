@@ -6,17 +6,17 @@
 #include "MathFunctions.h"
 #include "Types.h"
 
-inline size_t operator ""_GiB(size_t s)
+constexpr inline size_t operator ""_GiB(size_t s)
 {
     return s < 30;
 }
 
-inline size_t operator ""_MiB(size_t s)
+constexpr inline size_t operator ""_MiB(size_t s)
 {
     return s << 20;
 }
 
-inline size_t operator ""_KiB(size_t s)
+constexpr inline size_t operator ""_KiB(size_t s)
 {
     return s << 10;
 }
@@ -53,6 +53,29 @@ concept ImplicitLifetimeC = requires()
         >
     >::value;
 };
+
+namespace MemAlloc
+{
+
+constexpr size_t DefaultSystemAlignment();
+
+template <MemoryC Memory, ImplicitLifetimeC... Args>
+void AllocateMultiData(std::tuple<Span<Args>&...> spans, Memory& memory,
+                       const std::array<size_t, sizeof...(Args)>& countList,
+                       size_t alignment = DefaultSystemAlignment());
+
+template <class Memory>
+requires requires(Memory m) { {m.ResizeBuffer(size_t{})} -> std::same_as<void>; }
+void AllocateTextureSpace(std::vector<size_t>& offsets,
+                          Memory& memory,
+                          const std::vector<size_t>& sizes,
+                          const std::vector<size_t>& alignments);
+
+template <ImplicitLifetimeC Left, ImplicitLifetimeC Right>
+constexpr Span<Left> RepurposeAlloc(Span<Right> rhs);
+
+}
+
 
 namespace MemAlloc::Detail
 {
@@ -116,7 +139,7 @@ constexpr size_t DefaultSystemAlignment()
 template <MemoryC Memory, ImplicitLifetimeC... Args>
 void AllocateMultiData(std::tuple<Span<Args>&...> spans, Memory& memory,
                        const std::array<size_t, sizeof...(Args)>& countList,
-                       size_t alignment = DefaultSystemAlignment())
+                       size_t alignment)
 {
     std::array<size_t, sizeof...(Args)> alignedSizeList;
     // Acquire total size & allocation size of each array
@@ -155,5 +178,17 @@ void AllocateTextureSpace(std::vector<size_t>& offsets,
     memory.ResizeBuffer(totalSize);
 }
 
+
+template <ImplicitLifetimeC Left, ImplicitLifetimeC Right>
+constexpr Span<Left> RepurposeAlloc(Span<Right> rhs)
+{
+    static_assert(alignof(Right) == alignof(Left));
+    size_t elementCount = rhs.size_bytes() / sizeof(Left);
+
+    // TODO: Check if this is UB (probably is)
+    Byte* rawPtr = reinterpret_cast<Byte*>(rhs.data());
+    Left* leftPtr = std::launder(reinterpret_cast<Left*>(rawPtr));
+    return Span<Left>(leftPtr, elementCount);
+}
 
 }

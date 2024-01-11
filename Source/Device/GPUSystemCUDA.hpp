@@ -30,6 +30,7 @@ MRAY_HYBRID inline
 void GPUQueueCUDA::IssueKernel(KernelIssueParams p,
                                Args&&... fArgs) const
 {
+    assert(p.workCount != 0);
     using namespace CudaKernelCalls;
     uint32_t blockCount = MathFunctions::DivideUp(p.workCount, StaticThreadPerBlock1D());
     uint32_t blockSize = StaticThreadPerBlock1D();
@@ -44,9 +45,10 @@ void GPUQueueCUDA::IssueKernel(KernelIssueParams p,
 template<class Lambda>
 MRAY_HYBRID inline
 void GPUQueueCUDA::IssueLambda(KernelIssueParams p,
-                                //
-                                Lambda&& func) const
+                               //
+                               Lambda&& func) const
 {
+    assert(p.workCount != 0);
     static_assert(std::is_rvalue_reference_v<decltype(func)>,
                   "Not passing Lambda as rvalue_reference. This kernel call "
                   "would've been failed in runtime!");
@@ -68,6 +70,7 @@ void GPUQueueCUDA::IssueSaturatingKernel(KernelIssueParams p,
                                          //
                                          Args&&... fArgs) const
 {
+    assert(p.workCount != 0);
     using namespace CudaKernelCalls;
 
     const void* kernelPtr = static_cast<const void*>(Kernel);
@@ -90,6 +93,7 @@ void GPUQueueCUDA::IssueSaturatingLambda(KernelIssueParams p,
                                          //
                                          Lambda&& func) const
 {
+    assert(p.workCount != 0);
     static_assert(std::is_rvalue_reference_v<decltype(func)>,
                   "Not passing Lambda as rvalue_reference. This kernel call "
                   "would've been failed in runtime!");
@@ -116,6 +120,7 @@ void GPUQueueCUDA::IssueExactKernel(KernelExactIssueParams p,
                                     //
                                     Args&&... fArgs) const
 {
+    assert(p.gridSize != 0);
     using namespace CudaKernelCalls;
     Kernel<<<p.gridSize, p.blockSize, p.sharedMemSize, stream>>>
     (
@@ -130,6 +135,7 @@ void GPUQueueCUDA::IssueExactLambda(KernelExactIssueParams p,
                                     //
                                     Lambda&& func) const
 {
+    assert(p.gridSize != 0);
     static_assert(std::is_rvalue_reference_v<decltype(func)>,
                   "Not passing Lambda as rvalue_reference. This kernel call "
                   "would've been failed in runtime!");
