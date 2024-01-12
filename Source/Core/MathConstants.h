@@ -21,11 +21,12 @@ namespace MathConstants
 
     // Epsilons (Totally arbitrary)
     // TODO: Reason about these values
-    MRAY_FPSC T VerySmallEpsilon()  { return T{1.0e-9}; }
+    MRAY_FPSC T VerySmallEpsilon()  { return T{1.0e-8}; }
     MRAY_FPSC T SmallEpsilon()      { return T{1.0e-7}; }
     MRAY_FPSC T Epsilon()           { return T{1.0e-5}; }
     MRAY_FPSC T LargeEpsilon()      { return T{1.0e-4}; }
     MRAY_FPSC T VeryLargeEpsilon()  { return T{1.0e-3}; }
+    MRAY_FPSC T HugeEpsilon()       { return T{1.0e-2}; }
 
 }
 

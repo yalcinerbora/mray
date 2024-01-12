@@ -36,10 +36,11 @@ namespace GraphicsFunctions
     //  wi  normal
     //
     // So wi should be aligned with the normal, it is caller's responsibility
-    // to provide the appropriate normal. It returns wo again outwards from the
-    // surface. For total internal reflection case, function does not modify "out".
-    MRAY_HYBRID bool    Refract(Vector3& out, const Vector3& normal,
-                                const Vector3& v, Float etaFrom, Float etaTo);
+    // to provide the appropriate normal. It returns wo again "outwards" from the
+    // surface. Both "normal" and "wi" is assumed to be normalized.
+    MRAY_HYBRID
+    Optional<Vector3>   Refract(const Vector3& normal, const Vector3& v,
+                                Float etaFrom, Float etaTo);
 
     // Changes the direction of vector "v" towards n
     MRAY_HYBRID
@@ -50,7 +51,7 @@ namespace GraphicsFunctions
     // Unit hemisphere's normal is implicitly +Z
     MRAY_HYBRID Sample<Vector3>     SampleCosDirection(const Vector2& xi);
     MRAY_HYBRID constexpr Float     PDFCosDirection(const Vector3& v,
-                                                const Vector3& n = Vector3::ZAxis());
+                                                    const Vector3& n = Vector3::ZAxis());
     // Sample uniform direction from unit hemisphere
     // Unit hemisphere's normal is implicitly +Z
     MRAY_HYBRID Sample<Vector3>     SampleUniformDirection(const Vector2& xi);
@@ -132,8 +133,8 @@ constexpr Vector3 Reflect(const Vector3& normal, const Vector3& v)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-bool Refract(Vector3& out, const Vector3& normal,
-             const Vector3& v, Float etaFrom, Float etaTo)
+Optional<Vector3> Refract(const Vector3& normal,
+                          const Vector3& v, Float etaFrom, Float etaTo)
 {
     using MathFunctions::SqrtMax;
     // Convention of wi (v) and normal is as follows
@@ -149,8 +150,8 @@ bool Refract(Vector3& out, const Vector3& normal,
     //  wi  normal
     //
     // So wi should be aligned with the normal, it is caller's responsibility
-    // to provide the appropriate normal. It returns wo again outwards from the
-    // surface. For total internal reflection case, function does not modify "out".
+    // to provide the appropriate normal. It returns wo again "outwards" from the
+    // surface. Both "normal" and "wi" is assumed to be normalized.
     Float etaRatio = etaFrom / etaTo;
     Float cosIn = normal.Dot(v);
     Float sinInSqr = fmax(Float{0}, Float{1} - cosIn * cosIn);
@@ -159,10 +160,9 @@ bool Refract(Vector3& out, const Vector3& normal,
     Float cosOut = SqrtMax(Float{1} - sinOutSqr);
 
     // Check total internal reflection
-    if(sinOutSqr >= Float{1}) return false;
+    if(sinOutSqr >= Float{1}) return std::nullopt;
 
-    out = (etaRatio * (-v) + (etaRatio * cosIn - cosOut) * normal);
-    return true;
+    return (etaRatio * (-v) + (etaRatio * cosIn - cosOut) * normal);
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -232,7 +232,6 @@ constexpr Float PDFUniformDirection()
 {
     return MathConstants::InvPi<Float>() * Float{0.5};
 }
-
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 Vector3 SphericalToCartesian(const Vector3& sphrRTP)
@@ -418,7 +417,7 @@ constexpr Vector<2, T>  CocentricOctohedralWrapInt(const Vector<2, T>& st,
 MRAY_HYBRID
 constexpr Vector3 GSOrthonormalize(const Vector3& x, const Vector3& y)
 {
-    return x - y * x.Dot(y);
+    return (x - y * x.Dot(y)).Normalize();
 }
 
 MRAY_HYBRID

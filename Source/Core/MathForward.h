@@ -143,3 +143,13 @@ using AABB4d = AABB<4, double>;
     using AABB3h = AABB<3, half>;
     using AABB4h = AABB<4, half>;
 #endif
+
+
+template<class T>
+concept ArrayLikeC = requires(T t)
+{
+    typename T::InnerType;
+    T::Dims;
+    { t.AsArray() } -> std::same_as<std::array<typename T::InnerType, T::Dims>&>;
+    { std::as_const(t).AsArray() } -> std::same_as<const std::array<typename T::InnerType, T::Dims>&>;
+};

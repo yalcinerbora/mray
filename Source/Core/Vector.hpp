@@ -119,20 +119,6 @@ constexpr Vector<N, T>::Vector(const SNorm<N, IT>& snorm)  requires (std::floati
 }
 
 template <int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-Vector<N, T>::operator T* ()
-{
-    return vector;
-}
-
-template <int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-Vector<N, T>::operator const T* () const
-{
-    return vector;
-}
-
-template <int N, ArithmeticC T>
 template<int M, class C>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Vector<N, T>::operator Vector<M, C>() const requires (M <= N) && std::convertible_to<C, T>
@@ -158,6 +144,20 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr const T& Vector<N, T>::operator[](int i) const
 {
     return vector[i];
+}
+
+template<int N, ArithmeticC T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr const std::array<T, N>& Vector<N, T>::AsArray() const
+{
+    return vector;
+}
+
+template<int N, ArithmeticC T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr std::array<T, N>& Vector<N, T>::AsArray()
+{
+    return vector;
 }
 
 template <int N, ArithmeticC T>
@@ -954,18 +954,4 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector<N, T> operator*(T left, const Vector<N, T>& vec)
 {
     return vec * left;
-}
-
-template<int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr const std::array<T, N>&  Vector<N, T>::AsArray() const
-{
-    return vector;
-}
-
-template<int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr std::array<T, N> Vector<N, T>::AsArray()
-{
-    return vector;
 }

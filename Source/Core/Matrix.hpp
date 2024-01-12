@@ -65,20 +65,6 @@ constexpr Matrix<N, T>::Matrix(const Matrix<M, T>& other) requires (M > N)
 
 template<int N, ArithmeticC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Matrix<N, T>::operator T*()
-{
-    return matrix;
-}
-
-template<int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-Matrix<N, T>::operator const T*() const
-{
-    return matrix;
-}
-
-template<int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr T& Matrix<N, T>::operator[](int i)
 {
     return matrix[i];
@@ -103,6 +89,20 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr const T& Matrix<N, T>::operator()(int row, int column) const
 {
     return matrix[row * N + column];
+}
+
+template<int N, ArithmeticC T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr const std::array<T, N*N>& Matrix<N, T>::AsArray() const
+{
+    return matrix;
+}
+
+template<int N, ArithmeticC T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr std::array<T, N*N>& Matrix<N, T>::AsArray()
+{
+    return matrix;
 }
 
 template<int N, ArithmeticC T>

@@ -49,8 +49,17 @@ set(MRAY_MSVC_OPTIONS
     /external:anglebrackets # Minimize warnings on external stuff
     /external:W0            # i.e. it is included with the <...> syntax.
 
-    # TODO: Reason about the Debug and Release Builds (no pdb stuff etc.)
-    #/Z7             # Internally put the PDB files (for debugging)
+    # Release Debug Build
+    # Generate pdb and enable optimizations
+    # Also flag address sanitizer
+    $<$<CONFIG:ReleaseDBG>:/O2>
+    $<$<CONFIG:ReleaseDBG>:/Zi>
+    $<$<CONFIG:ReleaseDBG>:/Oy->
+    $<$<CONFIG:ReleaseDBG>:/fsanitize=address>
+
+    # Debug Specific
+    # CMAKE does not have this on debug build (in x64, this is ignored i think bu w/e)
+    $<$<CONFIG:Debug>:/Oy->
 )
 
 set(MRAY_CLANG_OPTIONS
@@ -70,6 +79,9 @@ set(MRAY_CLANG_OPTIONS
     -Wdouble-promotion      # warn if float is implicit promoted to double
     -Wformat=2              # warn on security issues around functions that format output (ie printf)
     -Wimplicit-fallthrough  # warn on statements that fallthrough without an explicit annotation
+
+    $<$<CONFIG:ReleaseDBG>:-O2>
+    $<$<CONFIG:ReleaseDBG>:-g>
 )
 
 set(MRAY_GCC_OPTIONS
@@ -148,6 +160,7 @@ endif()
 # Generic Preprocessor Definitions
 set(MRAY_PREPROCESSOR_DEFS_GENERIC
     $<$<CONFIG:Debug>:MRAY_DEBUG>
+    $<$<CONFIG:ReleaseDBG>:MRAY_DEBUG>
     $<$<CONFIG:Release>:NDEBUG>)
 
 if(MSVC)
@@ -156,7 +169,10 @@ if(MSVC)
         -D_UNICODE
         -DUNICODE
         -DNOMINMAX
-        -DMRAY_MSVC)
+        -DMRAY_MSVC
+        $<$<CONFIG:ReleaseDBG>:_DISABLE_VECTOR_ANNOTATION>
+        $<$<CONFIG:ReleaseDBG>:_DISABLE_STRING_ANNOTATION>
+        )
 elseif(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
     set(MRAY_PREPROCESSOR_DEFS_GENERIC
         ${MRAY_PREPROCESSOR_DEFS_GENERIC}
@@ -232,7 +248,12 @@ if(MSVC)
                         # After adding W4 and other compiler warning flags
                         # 'prelinked_fatbinc' unref parameter did show up
                         # This is nvcc's problem (I guess?) so ignore it
-                        $<DEVICE_LINK:-Xcompiler=/wd4100>)
+                        $<DEVICE_LINK:-Xcompiler=/wd4100>
+                        # ASAN does not like incremental builds
+                        $<HOST_LINK:$<$<CONFIG:ReleaseDBG>:/INCREMENTAL:NO>>
+                        $<HOST_LINK:$<$<CONFIG:ReleaseDBG>:/wholearchive:clang_rt.asan_dynamic-x86_64.lib>>
+                        $<HOST_LINK:$<$<CONFIG:ReleaseDBG>:/wholearchive:clang_rt.asan_dynamic_runtime_thunk-x86_64.lib>>
+                        )
 endif()
 
 target_compile_definitions(meta_compile_opts

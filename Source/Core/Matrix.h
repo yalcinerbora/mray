@@ -12,11 +12,11 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Matrix
     static_assert(N == 2 || N == 3 || N == 4, "Matrix size should be 2x2, 3x3 or 4x4");
 
     public:
-    using InnerType             = T;
-    static constexpr int Dims   = N;
+    using InnerType                 = T;
+    static constexpr int Dims       = N * N;
 
     private:
-    T                               matrix[N * N];
+    std::array<T, N*N>              matrix;
 
     public:
     // Constructors & Destructor
@@ -32,12 +32,15 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Matrix
     MRAY_HYBRID constexpr explicit  Matrix(const Matrix<M, T>&) requires (M > N);
 
     // Accessors
-    MRAY_HYBRID explicit            operator T*();
-    MRAY_HYBRID explicit            operator const T*() const;
-    MRAY_HYBRID constexpr T&        operator[](int);
-    MRAY_HYBRID constexpr const T&  operator[](int) const;
-    MRAY_HYBRID constexpr T&        operator()(int row, int column);
-    MRAY_HYBRID constexpr const T&  operator()(int row, int column) const;
+    MRAY_HYBRID constexpr T&            operator[](int);
+    MRAY_HYBRID constexpr const T&      operator[](int) const;
+    MRAY_HYBRID constexpr T&            operator()(int row, int column);
+    MRAY_HYBRID constexpr const T&      operator()(int row, int column) const;
+    // Structured Binding Helper
+    MRAY_HYBRID
+    constexpr const std::array<T, N*N>& AsArray() const;
+    MRAY_HYBRID
+    constexpr std::array<T, N*N>&       AsArray();
 
     // Modify
     MRAY_HYBRID constexpr void      operator+=(const Matrix&);
@@ -184,3 +187,8 @@ concept MatrixC = requires()
     std::is_same_v<T, Matrix4x4i>   ||
     std::is_same_v<T, Matrix4x4ui>;
 };
+
+// TODO: Add more?
+static_assert(ArrayLikeC<Matrix2x2>, "Matrix2x2 is not ArrayLike!");
+static_assert(ArrayLikeC<Matrix3x3>, "Matrix3x3 is not ArrayLike!");
+static_assert(ArrayLikeC<Matrix4x4>, "Matrix4x4 is not ArrayLike!");

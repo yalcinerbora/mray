@@ -68,10 +68,13 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
     MRAY_HYBRID constexpr explicit  Vector(const SNorm<N, IT>&) requires (std::floating_point<T>);
 
     // Accessors
-    MRAY_HYBRID explicit            operator T*();
-    MRAY_HYBRID explicit            operator const T* () const;
-    MRAY_HYBRID constexpr T&        operator[](int);
-    MRAY_HYBRID constexpr const T&  operator[](int) const;
+    MRAY_HYBRID constexpr T&            operator[](int);
+    MRAY_HYBRID constexpr const T&      operator[](int) const;
+    // Structured Binding Helper
+    MRAY_HYBRID
+    constexpr const std::array<T, N>&   AsArray() const;
+    MRAY_HYBRID
+    constexpr std::array<T, N>&         AsArray();
 
     // Type cast
     template<int M, class C>
@@ -160,12 +163,6 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
     static MRAY_HYBRID constexpr Vector     ZAxis() requires (N == 3);
     static MRAY_HYBRID constexpr Vector     Cross(const Vector&, const Vector&) requires std::floating_point<T> && (N == 3);
     static MRAY_HYBRID constexpr Vector     OrthogonalVector(const Vector&) requires std::floating_point<T> && (N == 3);
-
-    // Structured Binding Helper
-    MRAY_HYBRID
-    constexpr const std::array<T, N>&       AsArray() const;
-    MRAY_HYBRID
-    constexpr std::array<T, N>              AsArray();
 };
 
 // Left scalar multiplication
@@ -222,3 +219,8 @@ concept VectorC = requires()
     std::is_same_v<T, Vector4c>   ||
     std::is_same_v<T, Vector4uc>;
 };
+
+// TODO: Add more?
+static_assert(ArrayLikeC<Vector2>, "Vec2 is not ArrayLike!");
+static_assert(ArrayLikeC<Vector3>, "Vec3 is not ArrayLike!");
+static_assert(ArrayLikeC<Vector4>, "Vec4 is not ArrayLike!");

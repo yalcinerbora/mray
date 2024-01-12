@@ -4,6 +4,7 @@ message(STATUS "Configuring ${CURRENT_SOURCE_DIR}")
 
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/T_RayPartitioner.cu
+    ${CURRENT_SOURCE_DIR}/T_GraphicsFunctionsCPU.cpp
 )
 
 source_group("" FILES ${SRC_COMMON})
@@ -14,6 +15,7 @@ target_link_libraries(TTracerCUDA PRIVATE
                       TracerCUDA_Objects
                       mray::meta_compile_opts
                       mray::cuda_extra_compile_opts
+                      mray::test_common
                       gtest::gtest
                       gtest::gtest_main)
 

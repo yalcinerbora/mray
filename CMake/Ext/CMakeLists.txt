@@ -12,8 +12,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${MRAY_DIRECTORY}CMake")
 include(PreventInSourceBuilds)
 
 # Only Debug and Release
-set(CMAKE_CONFIGURATION_TYPES Debug;ReleaseDBG;Release CACHE STRING "Configuration types, for multi-config generators (MRay supports only Debug, ReleaseDBG and Release)")
-set(CMAKE_BUILD_TYPE Release CACHE STRING "Configuration type for single-config generators. (MRay supports only Debug, ReleaseDBG and Release)")
+set(CMAKE_CONFIGURATION_TYPES Debug;Release CACHE STRING "Configuration types, for multi-config generators (MRay supports only Debug and Release for external libraries)")
+set(CMAKE_BUILD_TYPE Release CACHE STRING "Configuration type for single-config generators. (MRay supports only Debug and Release for external libraries)")
 
 # ExternalProject_Add warpper
 include(ExtDownloadDeps)

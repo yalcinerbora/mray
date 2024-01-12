@@ -22,6 +22,7 @@ target_link_libraries(TDeviceCUDA PRIVATE
                       DeviceLib
                       mray::meta_compile_opts
                       mray::cuda_extra_compile_opts
+                      mray::test_common
                       gtest::gtest
                       gtest::gtest_main)
 
