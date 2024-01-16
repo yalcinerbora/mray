@@ -269,7 +269,7 @@ constexpr Vector<M, T> Matrix<N, T>::operator*(const Vector<M, T>& right) const 
     UNROLL_LOOP
     for(int i = 0; i < M; i++)
     {
-        Vector<M, T> leftRow = Vector<M, T>(matrix + i * N);
+        Vector<M, T> leftRow = Vector<M, T>(matrix.data() + i * N);
         v[i] = leftRow.Dot(right);
     }
     return v;

@@ -5,6 +5,7 @@
 #include "Core/Error.h"
 
 #include "GPUTypes.h"
+#include "GPUSystemForward.h"
 
 #ifdef MRAY_GPU_BACKEND_CUDA
     #include "GPUSystemCUDA.h"
@@ -94,7 +95,7 @@ template<class T>
 static void DumpGPUMemToStream(std::ostream& s,
                                Span<const T> data,
                                const GPUQueue& queue,
-                               std::string_view seperator = "\n"sv)
+                               std::string_view seperator)
 {
     std::vector<T> hostBuffer(data.size());
     queue.MemcpyAsync(Span<T>(hostBuffer), data);
@@ -110,7 +111,7 @@ template<class T>
 static void DumpGPUMemToFile(const std::string& fName,
                              Span<const T> data,
                              const GPUQueue& queue,
-                             std::string_view seperator = "\n"sv)
+                             std::string_view seperator)
 {
     std::ofstream file(fName);
     DumpGPUMemToStream(file, data, queue, seperator);
@@ -119,7 +120,7 @@ static void DumpGPUMemToFile(const std::string& fName,
 template<class T>
 static void DumpGPUMemToStdOut(Span<const T> data,
                                const GPUQueue& queue,
-                               std::string_view seperator = "\n"sv)
+                               std::string_view seperator)
 {
     DumpGPUMemToStream(std::cout, data, seperator);
 }

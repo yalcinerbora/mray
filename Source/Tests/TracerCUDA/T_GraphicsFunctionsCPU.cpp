@@ -110,7 +110,7 @@ TEST(GraphicsFunctionsTest, SampleUniformHemisphere)
         for(uint32_t i = 0; i < Iterations; i++)
         {
             Vector2 xi(dist0(rng0), dist1(rng1));
-            Sample<Vector3> sample = SampleUniformDirection(xi);
+            SampleT<Vector3> sample = SampleUniformDirection(xi);
             // Integral of sin(theta) d(omega)
             total += (1 / sample.pdf);
         }
@@ -130,7 +130,7 @@ TEST(GraphicsFunctionsTest, SampleUniformHemisphere)
         for(uint32_t i = 0; i < Iterations; i++)
         {
             Vector2 xi(dist0(rng0), dist1(rng1));
-            Sample<Vector3> sample = SampleUniformDirection(xi);
+            SampleT<Vector3> sample = SampleUniformDirection(xi);
             // Integral of cos(theta) d(omega)
             double functionVal = sample.sampledResult.Dot(Vector3::ZAxis());
             functionVal *= MathConstants::InvPi<double>();
@@ -156,7 +156,7 @@ TEST(GraphicsFunctionsTest, SampleCosineHemisphere)
         for(uint32_t i = 0; i < Iterations; i++)
         {
             Vector2 xi(dist0(rng0), dist1(rng1));
-            Sample<Vector3> sample = SampleUniformDirection(xi);
+            SampleT<Vector3> sample = SampleUniformDirection(xi);
             // Integral of sin(theta) d(omega)
             total += (1 / sample.pdf);
         }
@@ -176,7 +176,7 @@ TEST(GraphicsFunctionsTest, SampleCosineHemisphere)
         for(uint32_t i = 0; i < Iterations; i++)
         {
             Vector2 xi(dist0(rng0), dist1(rng1));
-            Sample<Vector3> sample = SampleCosDirection(xi);
+            SampleT<Vector3> sample = SampleCosDirection(xi);
             // Integral of cos(theta) d(omega)
             double functionVal = sample.sampledResult.Dot(Vector3::ZAxis());
             functionVal *= MathConstants::InvPi<double>();

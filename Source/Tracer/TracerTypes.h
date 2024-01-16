@@ -9,19 +9,15 @@
 #include "Hit.h"
 #include "Key.h"
 
+template <std::unsigned_integral T>
+struct RNGDispenserT;
+
+using RNGDispenser = RNGDispenserT<uint32_t>;
+
 using MetaHit = MetaHitPtrT<Vector2, Vector3>;
 
 // Differential portion of a ray
 class DiffRay{};
-
-class RNGDispenser
-{
-    public:
-    Vector2 NextUniform2D()
-    {
-        return Vector2::Zero();
-    }
-};
 
 // Spectral Samples or RGB color etc.
 // For spectrum we need wavelengths as well,
@@ -63,54 +59,64 @@ class SpectrumGroup
 // these are defined seperately for fine-tuning
 // for different use-cases.
 
+// Common Key/Index Types
+// (TODO: make these compile time def (via cmake input)
+// and all the key combination bit sizes)
+// User may want to mix and match these
+using CommonKey = uint32_t;
+using CommonIndex = uint32_t;
+
 // Work key when a ray hit an object
 // this key will be used to partition
 // rays with respect to materials
-using WorkKey = KeyT<uint32_t, 16, 16>;
-using AccelKey = WorkKey;
+using SurfaceWorkKey = KeyT<CommonKey, 16, 16>;
+using AccelWorkKey = KeyT<CommonKey, 8, 24>;
 
+// Accelerator key
+using AcceleratorId = KeyT<CommonKey, 8, 24>;
 // Primitive key
-using PrimitiveId = KeyT<uint32_t, 4, 28>;
+using PrimitiveId = KeyT<CommonKey, 4, 28>;
 // Material key
-using MaterialId = KeyT<uint32_t, 10, 22>;
+using MaterialId = KeyT<CommonKey, 10, 22>;
 // Transform key
-using TransformId = KeyT<uint32_t, 8, 24>;
+using TransformId = KeyT<CommonKey, 8, 24>;
 // Medium key
-using MediumId = KeyT<uint32_t, 8, 24>;
+using MediumId = KeyT<CommonKey, 8, 24>;
 
-// CommonKeyType (TODO: make this compile time combination of
-// above keys' inner types)
-using CommonKey = uint32_t;
+using RayIndex = CommonIndex;
 
-using RayIndex = uint32_t;
-
-using CommonIndex = uint32_t;
-
-// Triplet of Ids
+// Quadruplet of Ids
 static constexpr size_t HitIdPackAlignment = (sizeof(PrimitiveId) +
                                               sizeof(MaterialId) +
                                               sizeof(TransformId) +
-                                              sizeof(MediumId));
+                                              sizeof(AcceleratorId));
 struct alignas (HitIdPackAlignment) HitIdPack
 {
     PrimitiveId     primId;
     MaterialId      matId;
     TransformId     transId;
-    MediumId        mediumId;
+    AcceleratorId   accelId;
 };
 
+static constexpr size_t AccelIdPackAlignment = (sizeof(TransformId) +
+                                                sizeof(AcceleratorId));
+struct alignas (AccelIdPackAlignment) AcceleratorIdPack
+{
+    TransformId     transId;
+    AcceleratorId   accelId;
+};
 
 template <class T>
-struct Sample
+struct SampleT
 {
     T           sampledResult;
     Float       pdf;
 };
 
 template <class T>
-struct Intersection
+struct IntersectionT
 {
-    Float   tMin;
+    Float   t;
     T       hit;
 };
 
@@ -170,41 +176,34 @@ struct alignas(32) RayGMem
     Float       tMin;
     Vector3     dir;
     Float       tMax;
+
 };
 
-struct RayReg
-{
-    Ray     r;
-    Vector2 t;
-
-    MRAY_HYBRID         RayReg(const RayGMem* gRays, RayIndex index);
-    MRAY_HYBRID void    Update(RayGMem* gRays, RayIndex index) const;
-    MRAY_HYBRID void    UpdateTMax(RayGMem* gRays, RayIndex index) const;
-};
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-RayReg::RayReg(const RayGMem* gRays, RayIndex index)
+std::pair<Ray, Vector2> RayFromGMem(Span<const RayGMem> gRays, RayIndex index)
 {
     RayGMem rayGMem = gRays[index];
-    r = Ray(rayGMem.dir, rayGMem.pos);
-    t = Vector2(rayGMem.tMin, rayGMem.tMax);
+    return std::make_pair(Ray(rayGMem.dir, rayGMem.pos),
+                          Vector2(rayGMem.tMin, rayGMem.tMax));
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-void RayReg::Update(RayGMem* gRays, RayIndex index) const
+void RayToGMem(Span<RayGMem> gRays, RayIndex index,
+               const Ray& r, const Vector2& tMinMax)
 {
     RayGMem rayGMem =
     {
         .pos = r.Pos(),
-        .tMin = t[0],
+        .tMin = tMinMax[0],
         .dir = r.Dir(),
-        .tMax = t[1]
+        .tMax = tMinMax[1]
     };
     gRays[index] = rayGMem;
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-void RayReg::UpdateTMax(RayGMem* gRays, RayIndex index) const
+void UpdateTMax(Span<RayGMem> gRays, RayIndex index, Float tMax)
 {
-    gRays[index].tMax = t[1];
+    gRays[index].tMax = tMax;
 }

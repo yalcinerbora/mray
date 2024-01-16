@@ -5,7 +5,8 @@ message(STATUS "Configuring ${CURRENT_SOURCE_DIR}")
 set(SRC_PRIMITIVES
     ${CURRENT_SOURCE_DIR}/PrimitiveC.h
     ${CURRENT_SOURCE_DIR}/PrimitiveDefaultTriangle.h
-    ${CURRENT_SOURCE_DIR}/PrimitiveDefaultTriangle.hpp)
+    ${CURRENT_SOURCE_DIR}/PrimitiveDefaultTriangle.hpp
+    ${CURRENT_SOURCE_DIR}/PrimitiveDefaultTriangle.cpp)
 
 set(SRC_TRANSFORMS
     ${CURRENT_SOURCE_DIR}/TransformC.h
@@ -16,6 +17,15 @@ set(SRC_MATERIALS
     ${CURRENT_SOURCE_DIR}/MaterialC.h
     ${CURRENT_SOURCE_DIR}/MaterialsDefault.h
     ${CURRENT_SOURCE_DIR}/MaterialsDefault.hpp)
+
+set(SRC_ACCELLERATORS
+    ${CURRENT_SOURCE_DIR}/AcceleratorC.h
+    ${CURRENT_SOURCE_DIR}/AcceleratorInstance.h
+    ${CURRENT_SOURCE_DIR}/AcceleratorLinear.h
+    ${CURRENT_SOURCE_DIR}/AcceleratorLinear.hpp)
+
+set(SRC_RANDOM
+    ${CURRENT_SOURCE_DIR}/Random.h)
 
 set(SRC_RENDERERS
     ${CURRENT_SOURCE_DIR}/RendererC.h)
@@ -38,6 +48,8 @@ set(SRC_COMMON
 set(SRC_ALL
     ${SRC_PRIMITIVES}
     ${SRC_MATERIALS}
+    ${SRC_ACCELLERATORS}
+    ${SRC_RANDOM}
     ${SRC_TRANSFORMS}
     ${SRC_RENDERERS}
     ${SRC_RAY_CASTERS}
@@ -48,6 +60,8 @@ set(SRC_ALL
 source_group("Primitives" FILES ${SRC_PRIMITIVES})
 source_group("Transforms" FILES ${SRC_TRANSFORMS})
 source_group("Materials" FILES ${SRC_MATERIALS})
+source_group("Accelerators" FILES ${SRC_ACCELLERATORS})
+source_group("Random" FILES ${SRC_RANDOM})
 source_group("Renderers" FILES ${SRC_RENDERERS})
 source_group("RayCasters" FILES ${SRC_RAY_CASTERS})
 source_group("Utility" FILES ${SRC_UTILITY})

@@ -65,7 +65,7 @@ namespace mray::cuda
         }
     }
 
-    template<int D, class T>
+    template<uint32_t D, class T>
     TextureCUDA<D, T>::TextureCUDA(const GPUDeviceCUDA& device,
                                    const TextureInitParams<D, T>& p)
         : gpu(&device)
@@ -121,7 +121,7 @@ namespace mray::cuda
 
     }
 
-    template<int D, class T>
+    template<uint32_t D, class T>
     TextureCUDA<D, T>::TextureCUDA(TextureCUDA&& other) noexcept
         : gpu(other.gpu)
         , tex(other.tex)
@@ -136,7 +136,7 @@ namespace mray::cuda
         other.tex = (cudaTextureObject_t)0;
     }
 
-    template<int D, class T>
+    template<uint32_t D, class T>
     TextureCUDA<D, T>& TextureCUDA<D, T>::operator=(TextureCUDA&& other) noexcept
     {
         assert(this != &other);
@@ -160,7 +160,7 @@ namespace mray::cuda
         return *this;
     }
 
-    template<int D, class T>
+    template<uint32_t D, class T>
     TextureCUDA<D, T>::~TextureCUDA()
     {
         if(data)
@@ -171,7 +171,7 @@ namespace mray::cuda
         }
     }
 
-    template<int D, class T>
+    template<uint32_t D, class T>
     template<class QT>
     requires(std::is_same_v<QT, T>)
     TextureViewCUDA<D, QT> TextureCUDA<D, T>::View() const
@@ -184,7 +184,7 @@ namespace mray::cuda
         return TextureViewCUDA<D, QT>(tex);
     }
 
-    template<int D, class T>
+    template<uint32_t D, class T>
     template<class QT>
     requires(!std::is_same_v<QT, T> &&
              (VectorTypeToChannels<T>().Channels ==
@@ -215,31 +215,31 @@ namespace mray::cuda
         }
     }
 
-    template<int D, class T>
+    template<uint32_t D, class T>
     size_t TextureCUDA<D, T>::Size() const
     {
         return size;
     }
 
-    template<int D, class T>
+    template<uint32_t D, class T>
     size_t TextureCUDA<D, T>::Alignment() const
     {
         return alignment;
     }
 
-    template<int D, class T>
+    template<uint32_t D, class T>
     TextureExtent<D> TextureCUDA<D, T>::Extents() const
     {
         return texParams.size;
     }
 
-    template<int D, class T>
+    template<uint32_t D, class T>
     uint32_t TextureCUDA<D, T>::MipCount() const
     {
         return texParams.mipCount;
     }
 
-    template<int D, class T>
+    template<uint32_t D, class T>
     void TextureCUDA<D, T>::CommitMemory(const GPUQueueCUDA& queue,
                                          const TextureBackingMemoryCUDA& deviceMem,
                                          size_t offset)
@@ -261,7 +261,7 @@ namespace mray::cuda
         CUDA_DRIVER_CHECK(cuMemMapArrayAsync(&mappingInfo, 1, ToHandleCUDA(queue)));
     }
 
-    template<int D, class T>
+    template<uint32_t D, class T>
     void TextureCUDA<D, T>::CopyFromAsync(const GPUQueueCUDA& queue,
                                           uint32_t mipLevel,
                                           const TextureExtent<D>& offset,

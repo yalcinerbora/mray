@@ -28,8 +28,8 @@ class alignas(ChooseNormAlignment(N * sizeof(T))) UNorm
 //class UNorm
 {
     public:
-    static_assert(N == 2 || N == 3 || N == 4,
-                  "For UNorm types; N should be 2,3, or 4");
+    static_assert(N == 2 || N == 4 || N == 8 || N == 16 || N == 32,
+                  "For UNorm types; N should be 2,4,8,16, or 32");
 
     MRAY_HYBRID static constexpr T Max();
     MRAY_HYBRID static constexpr T Min();
@@ -46,8 +46,8 @@ template <int N, std::signed_integral T>
 class alignas(ChooseNormAlignment(N * sizeof(T))) SNorm
 {
     public:
-    static_assert(N == 2 || N == 3 || N == 4,
-                  "For UNorm types; N should be 2,3, or 4");
+    static_assert(N == 2 || N == 4 || N == 8 || N == 16 || N == 32,
+                  "For UNorm types; N should be 2,4,8,16, or 32");
 
     MRAY_HYBRID static constexpr T Max();
     MRAY_HYBRID static constexpr T Min();

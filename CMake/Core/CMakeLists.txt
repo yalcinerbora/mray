@@ -35,7 +35,8 @@ set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/Types.h)
 
 set(SRC_COMMON
-    ${CURRENT_SOURCE_DIR}/Definitions.h)
+    ${CURRENT_SOURCE_DIR}/Definitions.h
+    ${CURRENT_SOURCE_DIR}/MRayDataType.h)
 
 set(SRC_ALL
     ${SRC_SYSTEM}

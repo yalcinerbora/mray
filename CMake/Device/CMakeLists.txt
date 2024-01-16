@@ -23,6 +23,7 @@ set(SRC_CUDA_ALGS
 
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/GPUAlgorithms.h
+    ${CURRENT_SOURCE_DIR}/GPUSystemForward.h
     ${CURRENT_SOURCE_DIR}/GPUSystem.h
     ${CURRENT_SOURCE_DIR}/GPUSystem.hpp
     ${CURRENT_SOURCE_DIR}/GPUTypes.h)

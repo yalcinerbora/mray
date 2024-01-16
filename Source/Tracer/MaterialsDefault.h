@@ -7,9 +7,9 @@ namespace LambertMatDetail
 {
     struct LambertMatData
     {
-        Span<const ParamVaryingData<2, Spectrum>>            dAlbedo;
-        Span<const Optional<ParamVaryingData<2, Vector3>>>   dNormalMaps;
-        Span<const MediumId>                                 dMediumIds;
+        Span<ParamVaryingData<2, Spectrum>>             dAlbedo;
+        Span<Optional<ParamVaryingData<2, Vector3>>>    dNormalMaps;
+        Span<MediumId>                                  dMediumIds;
     };
 
     template <class SpectrumTransformer = SpectrumConverterContextIdentity>

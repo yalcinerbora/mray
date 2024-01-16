@@ -46,7 +46,7 @@ constexpr bool IsNormConvertibleCUDA()
             std::is_same_v<T, Vector4c>);
 }
 
-template<int D, class T>
+template<uint32_t D, class T>
 class TextureCUDA
 {
     using UnderlyingType = typename TextureInitParams<D, T>::UnderlyingType;

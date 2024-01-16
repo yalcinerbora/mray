@@ -1,8 +1,11 @@
 #pragma once
 
 #include <limits>
+#include <string_view>
+#include <unordered_map>
 
 #include "Core/TypeFinder.h"
+#include "Core/MRayDataType.h"
 #include "Core/Vector.h"
 #include "Core/Ray.h"
 #include "Core/Quaternion.h"
@@ -13,6 +16,7 @@
 #include "ShapeFunctions.h"
 #include "GraphicsFunctions.h"
 #include "Transforms.h"
+#include "Random.h"
 
 namespace DefaultTriangleDetail
 {
@@ -21,50 +25,43 @@ namespace DefaultTriangleDetail
     // SoA data of triangle group
     struct TriangleData
     {
-        // Per sub-batch attributes
-        LookupTable         subBatchTable;
-        const bool*         cullFace;
-
         // Per vertex attributes
-        const Vector3*      positions;
-        const Quaternion*   tbnRotations;
-        const Vector2*      uvs;
+        Span<const Vector3>     positions;
+        Span<const Quaternion>  tbnRotations;
+        Span<const Vector2>     uvs;
         // Single-indexed vertices
-        const PrimitiveId*  indexList;
+        Span<const Vector3ui>   indexList;
     };
 
     using TriHit            = Vector2;
-    using TriIntersection   = Optional<Intersection<TriHit>>;
+    using TriIntersection   = Optional<IntersectionT<TriHit>>;
     using TriLeaf           = DefaultLeaf;
 
     template<class TransContextType = IdentityTransformContext>
     class Triangle
     {
+        public:
+        using DataSoA           = TriangleData;
+        using AcceleratorLeaf   = TriLeaf;
+        using Hit               = TriHit;
+        using Intersection      = TriIntersection;
+
         private:
         const TriangleData&         data;
         PrimitiveId                 id;
         Vector3                     positions[ShapeFunctions::Triangle::TRI_VERTEX_COUNT];
+        const TransContextType&     transformContext;
 
-        const TransContextType&    transformContext;
 
         public:
-        using AcceleratorLeaf   = TriLeaf;
-        using Hit               = TriHit;
-        using IntersectionT     = TriIntersection;
-
-        MRAY_HYBRID
-                            Triangle(const TransContextType& transform,
+        MRAY_HYBRID         Triangle(const TransContextType& transform,
                                      const TriangleData& data, PrimitiveId id);
 
         MRAY_HYBRID
-        AcceleratorLeaf     GenerateLeaf() const;
+        Intersection        Intersects(const Ray& ray) const;
 
         MRAY_HYBRID
-        IntersectionT       Intersects(const Ray& ray,
-                                       const AcceleratorLeaf& leaf) const;
-
-        MRAY_HYBRID
-        Sample<Vector3>     SamplePosition(const RNGDispenser& rng) const;
+        SampleT<Vector3>    SamplePosition(const RNGDispenser& rng) const;
 
         MRAY_HYBRID
         Float               PdfPosition(const Vector3& position) const;
@@ -88,8 +85,7 @@ namespace DefaultTriangleDetail
                                      const VoxelizationParameters& voxelParams) const;
 
         MRAY_HYBRID
-        Vector2             SurfaceParametrization(const Hit& hit,
-                                                   const AcceleratorLeaf& leaf) const;
+        Vector2             SurfaceParametrization(const Hit& hit) const;
 
         // Surface Generation
         MRAY_HYBRID
@@ -129,8 +125,8 @@ namespace DefaultSkinnedTriangleDetail
     struct SkinnedTriangleData : public DefaultTriangleDetail::TriangleData
     {
         // Extra per-primitive attributes
-        const UNorm4x8*     skinWeights;
-        const Vector4uc*    skinIndices;
+        Span<const UNorm4x8>     skinWeights;
+        Span<const Vector4uc>    skinIndices;
     };
 
     // Default skinned triangle has 4 transform per primitive
@@ -218,63 +214,95 @@ namespace DefaultSkinnedTriangleDetail
     static_assert(TransformContextC<SkinnedTransformContext>);
 }
 
-struct PrimGroupTriangle
+class PrimGroupTriangle : public PrimitiveGroup<PrimGroupTriangle>
 {
-    using DataSoA = DefaultTriangleDetail::TriangleData;
+    public:
+    using DataSoA       = DefaultTriangleDetail::TriangleData;
+    using Hit           = typename DefaultTriangleDetail::TriHit;
 
     template <class TContext = IdentityTransformContext>
     using Primitive = DefaultTriangleDetail:: template Triangle<TContext>;
-    // Hit info is barycentrics for triangle
-    using Hit = typename DefaultTriangleDetail::TriHit;
-    using AcceleratorLeaf = typename DefaultTriangleDetail::TriLeaf;
 
     // Transform Context Generators
     static constexpr auto TransContextGeneratorList = std::make_tuple
     (
-        TypeFinder::KeyFuncT<IdentityTransformGroup,
-                             IdentityTransformContext,
-                             &GenTContextIdentity<DataSoA>>{},
-        TypeFinder::KeyFuncT<SingleTransformGroup,
-                             SingleTransformContext,
-                             &GenTContextSingle<DataSoA>>{}
+        TypeFinder::KeyTFuncPair<IdentityTransformGroup,
+                                 IdentityTransformContext,
+                                 &GenTContextIdentity<DataSoA>>{},
+        TypeFinder::KeyTFuncPair<SingleTransformGroup,
+                                 SingleTransformContext,
+                                 &GenTContextSingle<DataSoA>>{}
     );
+    // The actual name of the type
+    static std::string_view TypeName();
+    static constexpr size_t AttributeCount = 4;
 
-    //// Surface Generators
-    //static constexpr auto SurfaceGeneratorList = std::make_tuple
-    //(
-    //    TypeFinderFinder::KeyFuncT<EmptySurface, & GenTContextIdentity<DataSoA>>{},
-    //    TypeFinderFinder::KeyFuncT<BasicSurface, & GenTContextSingle<DataSoA>>{},
-    //    TypeFinderFinder::KeyFuncT<BarycentricSurface, &GenTContextSingle<DataSoA>>{},
-    //    TypeFinderFinder::KeyFuncT<DefaultSurface, &GenTContextSingle<DataSoA>>{}
-    //);
+    private:
+    Span<Vector3>       dPositions;
+    Span<Quaternion>    dTBNRotations;
+    Span<Vector2>       dUVs;
+    Span<Vector3ui>     dIndexList;
+    DataSoA             soa;
+
+    public:
+
+    void                    CommitReservations() override;
+    uint32_t                GetAttributeCount() const override;
+    PrimAttributeInfo       GetAttributeInfo(uint32_t attributeIndex) const override;
+    void                    PushAttributeData(uint32_t batchId, uint32_t attributeIndex,
+                                              std::vector<Byte> data) override;
+    void                    PushAttributeData(PrimBatchId batchId, uint32_t attributeIndex,
+                                              Vector2ui subBatchRange, std::vector<Byte> data) override;
 };
 
-struct PrimGroupSkinnedTriangle
+class PrimGroupSkinnedTriangle : public PrimitiveGroup<PrimGroupSkinnedTriangle>
 {
-    using DataSoA = DefaultSkinnedTriangleDetail::SkinnedTriangleData;
+    public:
+    using DataSoA       = DefaultSkinnedTriangleDetail::SkinnedTriangleData;
+    using Hit           = typename DefaultTriangleDetail::TriHit;
 
     template <class TContext = IdentityTransformContext>
-    using Primitive = DefaultTriangleDetail:: template Triangle<TContext>;
-    // Hit info is barycentrics for triangle
-    using Hit = typename DefaultTriangleDetail::TriHit;
-    using AcceleratorLeaf = typename DefaultTriangleDetail::TriLeaf;
+    using Primitive     = DefaultTriangleDetail:: template Triangle<TContext>;
 
     // Transform Context Generators
     static constexpr auto TransContextGeneratorList = std::make_tuple
     (
-        TypeFinder::KeyFuncT<IdentityTransformGroup,
-                             IdentityTransformContext,
-                             &GenTContextIdentity<DataSoA>>{},
-        TypeFinder::KeyFuncT<SingleTransformGroup,
-                             SingleTransformContext,
-                             &GenTContextSingle<DataSoA>>{},
-        TypeFinder::KeyFuncT<MultiTransformGroup,
-                             DefaultSkinnedTriangleDetail::SkinnedTransformContext,
-                             &DefaultSkinnedTriangleDetail::GenTContextSkinned>{}
+        TypeFinder::KeyTFuncPair<IdentityTransformGroup,
+                                 IdentityTransformContext,
+                                 &GenTContextIdentity<DataSoA>>{},
+        TypeFinder::KeyTFuncPair<SingleTransformGroup,
+                                 SingleTransformContext,
+                                 &GenTContextSingle<DataSoA>>{},
+        TypeFinder::KeyTFuncPair<MultiTransformGroup,
+                                 DefaultSkinnedTriangleDetail::SkinnedTransformContext,
+                                 &DefaultSkinnedTriangleDetail::GenTContextSkinned>{}
     );
+    // Actual Name of the Type
+    static std::string_view TypeName();
+    static constexpr size_t AttributeCount = 6;
+
+    private:
+    Span<Vector3>       dPositions;
+    Span<Quaternion>    dTBNRotations;
+    Span<Vector2>       dUVs;
+    Span<Vector3ui>     dIndexList;
+    Span<UNorm4x8>      dSkinWeights;
+    Span<Vector4uc>     dSkinIndices;
+    DataSoA             soa;
+
+    public:
+    //
+
+    void                    CommitReservations() override;
+    uint32_t                GetAttributeCount() const override;
+    PrimAttributeInfo       GetAttributeInfo(uint32_t attributeIndex) const override;
+    void                    PushAttributeData(uint32_t batchId, uint32_t attributeIndex,
+                                              std::vector<Byte> data) override;
+    void                    PushAttributeData(PrimBatchId batchId, uint32_t attributeIndex,
+                                              Vector2ui subBatchRange, std::vector<Byte> data) override;
 };
 
 #include "PrimitiveDefaultTriangle.hpp"
 
 static_assert(PrimitiveGroupC<PrimGroupTriangle>);
-//static_assert(PrimitiveGroupC<PrimGroupSkinnedTriangle>);
+static_assert(PrimitiveGroupC<PrimGroupSkinnedTriangle>);

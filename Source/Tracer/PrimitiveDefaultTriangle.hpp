@@ -15,14 +15,10 @@ Triangle<T>::Triangle(const T& transform,
 {
     static constexpr auto VPP = ShapeFunctions::Triangle::TRI_VERTEX_COUNT;
 
-    PrimitiveId index0 = data.indexList[id * VPP + 0];
-    PrimitiveId index1 = data.indexList[id * VPP + 1];
-    PrimitiveId index2 = data.indexList[id * VPP + 2];
-
-    positions[0] = data.positions[index0];
-    positions[1] = data.positions[index1];
-    positions[2] = data.positions[index2];
-
+    Vector3ui index = data.indexList[id];
+    positions[0] = data.positions[index[0]];
+    positions[1] = data.positions[index[1]];
+    positions[2] = data.positions[index[2]];
     // Apply the transform
     positions[0] = transform.ApplyP(positions[0]);
     positions[1] = transform.ApplyP(positions[1]);
@@ -31,15 +27,7 @@ Triangle<T>::Triangle(const T& transform,
 
 template<class T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-TriLeaf Triangle<T>::GenerateLeaf() const
-{
-    return TriLeaf{.primId = id};
-}
-
-template<class T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-TriIntersection Triangle<T>::Intersects(const Ray& ray,
-                                        const TriLeaf& leaf) const
+TriIntersection Triangle<T>::Intersects(const Ray& ray) const
 {
     uint32_t primSubBatchId = data.subBatchTable.FindIndex(id);
     const bool cullBackface = data.cullFace[primSubBatchId];
@@ -52,8 +40,9 @@ TriIntersection Triangle<T>::Intersects(const Ray& ray,
                                              positions,
                                              cullBackface);
 
-    TriIntersection result = (!intersects) ? std::nullopt_t : Intersection<TriHit>{
-        .tMin = t,
+    TriIntersection result = (!intersects) ? std::nullopt_t : IntersectionT<TriHit>
+    {
+        .t = t,
         .hit = Vector2(baryCoords)
     };
     return result;
@@ -61,9 +50,9 @@ TriIntersection Triangle<T>::Intersects(const Ray& ray,
 
 template<class T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Sample<Vector3> Triangle<T>::SamplePosition(const RNGDispenser& rng) const
+SampleT<Vector3> Triangle<T>::SamplePosition(const RNGDispenser& rng) const
 {
-    Vector2 xi = rng.NextUniform2D();
+    Vector2 xi = rng.NextFloat2D();
     Float r1 = sqrt(xi[0]);
     Float r2 = xi[1];
     // Generate Random Barycentrics
@@ -80,7 +69,7 @@ Sample<Vector3> Triangle<T>::SamplePosition(const RNGDispenser& rng) const
     Float area = GetSurfaceArea();
     Float pdf = 1.0f / area;
 
-    return Sample<Vector3>
+    return SampleT<Vector3>
     {
         .pdf = pdf,
         .sampledResult = position
@@ -322,16 +311,12 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
 
 template<class T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Vector2 Triangle<T>::SurfaceParametrization(const Hit& hit,
-                                            const TriLeaf& leaf) const
+Vector2 Triangle<T>::SurfaceParametrization(const Hit& hit) const
 {
-    PrimitiveId index0 = data.indexList[id * 3 + 0];
-    PrimitiveId index1 = data.indexList[id * 3 + 1];
-    PrimitiveId index2 = data.indexList[id * 3 + 2];
-
-    Vector2 uv0 = data.uvs[index0];
-    Vector2 uv1 = data.uvs[index1];
-    Vector2 uv2 = data.uvs[index2];
+    Vector3ui index = data.indexList[id];
+    Vector2 uv0 = data.uvs[index[0]];
+    Vector2 uv1 = data.uvs[index[1]];
+    Vector2 uv2 = data.uvs[index[2]];
 
     Vector3 baryCoords = Vector3(hit[0], hit[1], 1 - hit[1] - hit[0]);
 
@@ -434,14 +419,11 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     // Position should be in world space
     Vector3 geoNormal = ShapeFunctions::Triangle::Normal(positions);
 
-    PrimitiveId i0 = data.indexList[id * VPP + 0];
-    PrimitiveId i1 = data.indexList[id * VPP + 1];
-    PrimitiveId i2 = data.indexList[id * VPP + 2];
-
+    Vector3ui index = data.indexList[id];
     // Tangent Space Rotation Query
-    Quaternion q0 = data.tbnRotations[i0];
-    Quaternion q1 = data.tbnRotations[i1];
-    Quaternion q2 = data.tbnRotations[i2];
+    Quaternion q0 = data.tbnRotations[index[0]];
+    Quaternion q1 = data.tbnRotations[index[1]];
+    Quaternion q2 = data.tbnRotations[index[2]];
     Quaternion tbn = Quaternion::BarySLerp(q0, q1, q2, a, b);
     tbn.NormalizeSelf();
 
@@ -474,7 +456,6 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
 }
 
 }
-
 
 namespace DefaultSkinnedTriangleDetail
 {

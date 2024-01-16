@@ -2,6 +2,11 @@
 
 #include <type_traits>
 #include <tuple>
+#include <unordered_map>
+
+#include "Core/MRayDataType.h"
+#include "Core/MemAlloc.h"
+#include "Device/GPUSystemForward.h"
 
 #include "TracerTypes.h"
 
@@ -15,15 +20,28 @@ enum class PrimTransformType : uint8_t
     // Meaning that inverse of this can be applied to ray
     // and for instanced primitives, a single accelerator can be built
     // for group of primitives (meshes)
-    CONSTANT_LOCAL_TRANSFORM,
-    // Each primitive in a group will different (maybe)
-    // and multiple transforms.
+    LOCALLY_CONSTANT_TRANSFORM,
+    // Each primitive in a group will different
+    // and (maybe) multiple transforms.
     // This prevents the ray-casting to utilize a single local space
     // accelerator. Such primitive instantiations
     // will have unique accelerators.
     // As an example, skinned meshes and morph targets
     // will have such property.
     PER_PRIMITIVE_TRANSFORM
+};
+
+enum class PrimitiveAttributeLogic
+{
+    POSITION,
+    INDEX,
+    NORMAL,
+    RADIUS,
+    TANGENT,
+    UV0,
+    UV1,
+    WEIGHT,
+    WEIGHT_INDEX
 };
 
 class IdentityTransformContext;
@@ -39,38 +57,29 @@ using TransformContextGenFunc = TransformContext(*)(const TransformData&,
                                                     TransformId,
                                                     PrimitiveId);
 
-template <class PrimType, class PrimGroupType>
+template <class PrimType>
 concept PrimC = requires(PrimType pt)
 {
-    typename PrimType::AcceleratorLeaf;
     typename PrimType::Hit;
+    typename PrimType::DataSoA;
 
     // Has this specific constructor
     requires requires(const IdentityTransformContext& tc,
-                      const typename PrimGroupType::DataSoA & soaData)
-    {PrimType(tc, soaData, PrimitiveId{});};
-
-
-    // Mandatory member functions
-    // Generate a accelerator leaf with this key
-    // Default implementations probably just writes key and primitive id
-    {pt.GenerateLeaf()
-    } -> std::same_as<typename PrimType::AcceleratorLeaf>;
-
-    // Intersect function
-    requires requires(Float f, typename PrimType::Hit h)
+                      const typename PrimType::DataSoA& soaData)
     {
-        {pt.Intersects(Ray{},
-                       typename PrimType::AcceleratorLeaf{})
-        } -> std::same_as<Optional<Intersection<typename PrimType::Hit>>>;
+        PrimType(tc, soaData, PrimitiveId{});
     };
 
+    // Intersect function
+    {pt.Intersects(Ray{})
+    } -> std::same_as<Optional<IntersectionT<typename PrimType::Hit>>>;
+
     // Parametrized sampling
-    requires requires(Float f, Vector3 v3)
+    requires requires(Float f, Vector3 v3, RNGDispenser rng)
     {
         // Sample a position over the parametrized surface
-        {pt.SamplePosition(RNGDispenser{})
-        } -> std::same_as<Sample<Vector3>>;
+        {pt.SamplePosition(rng)
+        } -> std::same_as<SampleT<Vector3>>;
 
         // PDF of sampling such position
         // Conservative towards non-zero values
@@ -108,42 +117,17 @@ concept PrimC = requires(PrimType pt)
         } -> std::same_as<uint32_t>;
     };
 
+    // TODO: Better design maybe? // Only 2D surface parametrization?
+    //
     // Accelerator "AnyHit" requirements
-    // I
-    // TODO: **Design**
-    //
-    // Design 1 attach "map" alpha/displacement
-    // to the primitive (sub-primitive-bath)
-    // Good: Prims will not require to have uv parametrization
-    //
-    // Bad: Same primitive having/not having
-    //   alpha map would require a data duplication
-    //
-    //      Sthocastic parametrization (rng) is mandated
-    //  what if user had different technique?
-    //
-    //      What about displacement maps?
-    //
-    // Design 2 is better, I think...
-    //{pt.AlphaTest(typename PrimGroupType::Hit{},
-    //              typename PrimGroupType::AcceleratorLeaf{},
-    //              Float{})
-    //} -> std::same_as<bool>;
-
-    // Design 2 Acquire primitives surface parametrization
+    // Acquire primitive's surface parametrization
     // (Aka. uv map)
     // Good: No data duplication no prinicpiled data for alpha testing
     //
     // Bad: All prims somehow has uv parametrization (if not available,
     // alpha maping cannot be done, but they can return garbage so its OK)
-    //
-    //      Only 2D surface parametrization?
-    {pt.SurfaceParametrization(typename PrimGroupType::Hit{},
-                               typename PrimGroupType::AcceleratorLeaf{})
+    {pt.SurfaceParametrization(typename PrimType::Hit{})
     } -> std::same_as<Vector2>;
-
-    // Still we will do these tests on anyhit shader (given hw acceleration)
-    // how to attach maps to any hit shader?
 };
 
 template <class PGType>
@@ -151,22 +135,20 @@ concept PrimitiveGroupC = requires()
 {
     // Mandatory Types
     // Primitive type satisfies its concept (at least on default form)
-    requires PrimC<typename PGType::template Primitive<>, PGType>;
+    requires PrimC<typename PGType::template Primitive<>>;
 
     // SoA fashion primitive data. This will be used to access internal
     // of the primitive with a given an index
     typename PGType::DataSoA;
+    std::is_same_v<typename PGType::DataSoA,
+                   typename PGType::template Primitive<>::DataSoA>;
     // Hit Data, ray will temporarily holds this information when ray casting is resolved
     // Delegates this to work kernel, work kernel will generate differential surface using this,
     // PrimSoA and TransformId,
     typename PGType::Hit;
     requires std::is_same_v<typename PGType::Hit,
                             typename PGType::template Primitive<>::Hit>;
-    // What should this primitive's accelerator hold on its "leafs". Most of the time this is default
-    // type (work key and primitive id is present on the leaves).
-    typename PGType::AcceleratorLeaf;
-    requires std::is_same_v<typename PGType::AcceleratorLeaf,
-                            typename PGType::template Primitive<>::AcceleratorLeaf>;
+
     // Transform context generator list of the primitive is used to
     // statically select a appropirate function for given primitive and transform
     //
@@ -188,10 +170,8 @@ concept PrimitiveGroupC = requires()
     // You can write completely new primitive type for that generation.
     PGType::TransContextGeneratorList;
 
-    //// List of differential surface
-    //// generator functions that this primitive can generate.
-    //// A material will require one of these.
-    //PGType::SurfaceGeneratorList;
+    // Can query the type
+    {PGType::TypeName()} -> std::same_as<std::string_view>;
 
     //// TODO: Some Functions
 };
@@ -202,7 +182,7 @@ concept PrimWithSurfaceC = requires(PrimType mg,
                                     Surface& surface)
 {
     // Base concept
-    requires PrimC<PrimType, PrimGroupType>;
+    requires PrimC<PrimType>;
 
     // TODO: Ask on stackoverflow how to
     // constrain the function to thave a specific
@@ -215,3 +195,168 @@ concept PrimWithSurfaceC = requires(PrimType mg,
     } -> std::same_as<void>;
 
 };
+
+// Some common types
+using PrimAttributeInfo = std::pair<PrimitiveAttributeLogic, MRayDataTypeRT>;
+using PrimBatchId = uint32_t;
+using PrimCount = std::pair<uint32_t, uint32_t>;
+using PrimRange = std::pair<Vector2ui, Vector2ui>;
+using PrimitiveRangeMap = std::unordered_map<PrimBatchId, PrimRange>;
+using PrimitiveCountMap = std::unordered_map<PrimBatchId, PrimCount>;
+
+class PrimitiveGroupI
+{
+    public:
+    virtual ~PrimitiveGroupI() = default;
+
+    virtual PrimBatchId         ReservePrimitiveBatch(uint32_t primitiveCount,
+                                                      uint32_t attributeCount) = 0;
+    virtual bool                RemoveReservation(PrimBatchId batchId) = 0;
+    virtual void                CommitReservations() = 0;
+    virtual bool                IsInCommitState() const = 0;
+    virtual uint32_t            GetAttributeCount() const = 0;
+    virtual PrimAttributeInfo   GetAttributeInfo(uint32_t attributeIndex) const = 0;
+    virtual void                PushAttributeData(PrimBatchId batchId, uint32_t attributeIndex,
+                                                  std::vector<Byte> data) = 0;
+    virtual void                PushAttributeData(PrimBatchId batchId, uint32_t attributeIndex,
+                                                  Vector2ui subBatchRange, std::vector<Byte> data) = 0;
+    virtual size_t              GPUMemoryUsage() const = 0;
+
+    //virtual const PrimitiveRangeMap& GetCommitted
+};
+
+// Intermediate class that handles memory management
+// Using CRTP for errors etc.
+template<class Child>
+class PrimitiveGroup : public PrimitiveGroupI
+{
+    static constexpr size_t HashTableReserveSize = 64;
+    // Device Memory Related
+    static constexpr size_t AllocGranularity = 64_MiB;
+    static constexpr size_t InitialReservation = 256_MiB;
+
+    private:
+    PrimBatchId         batchCounter;
+    protected:
+    const GPUSystem&    gpuSystem;
+
+    PrimitiveRangeMap   batchRanges;
+    PrimitiveCountMap   batchCounts;
+    bool                isCommitted;
+    DeviceMemory        memory;
+
+    template <class... Args>
+    std::tuple<Span<Args>...>   GenericCommit(std::array<bool, sizeof...(Args)> isAttributeList);
+
+    public:
+                                PrimitiveGroup(const GPUSystem&);
+
+    PrimBatchId                 ReservePrimitiveBatch(uint32_t primitiveCount,
+                                                      uint32_t attributeCount) override;
+    virtual bool                RemoveReservation(PrimBatchId batchId) override;
+    virtual bool                IsInCommitState() const override;
+    virtual bool                GPUMemoryUsage() const override;
+};
+
+template<class Child>
+template <class... Args>
+std::tuple<Span<Args>...> PrimitiveGroup<Child>::GenericCommit(std::array<bool, sizeof...(Args)> isAttributeList)
+{
+    assert(batchRanges.empty());
+    if(isCommitted)
+    {
+        MRAY_WARNING_LOG("{:s} is in committed state, "
+                         " you cannot re-commit!", Child::TypeName());
+        return std::tuple<Span<Args>...>{};
+    }
+    // Cacluate offsets
+    Vector2ui offsets = Vector2ui::Zero();
+    for(const auto& c : batchCounts)
+    {
+        std::pair range(Vector2ui(offsets[0], offsets[0] + c.second.first),
+                        Vector2ui(offsets[1], offsets[1] + c.second.second));
+        [[maybe_unused]]
+        auto r = batchRanges.emplace(c.first, range);
+        assert(r.second);
+
+        offsets = Vector2ui(range.first[1], range.second[1]);
+    }
+    // Rename for clarity
+    Vector2ui totalSize = offsets;
+
+    // Generate offsets etc
+    constexpr size_t TotalElements = sizeof...(Args);
+    std::array<size_t, TotalElements> sizes;
+    for(size_t i = 0; i < TotalElements; i++)
+    {
+        bool isAttribute = isAttributeList[i];
+        sizes[i] = (isAttribute) ? totalSize[1] : totalSize[0];
+    }
+
+    std::tuple<Span<Args>...> result;
+    MemAlloc::AllocateMultiData<DeviceMemory, Args...>(result, memory, sizes);
+    isCommitted = true;
+    return result;
+}
+
+template<class Child>
+PrimitiveGroup<Child>::PrimitiveGroup(const GPUSystem& s)
+    : gpuSystem(s)
+    , batchCounter(0)
+    , isCommitted(false)
+    , memory(gpuSystem.AllGPUs(), AllocGranularity, InitialReservation)
+{
+    batchRanges.reserve(HashTableReserveSize);
+    batchCounts.reserve(HashTableReserveSize);
+}
+
+template<class Child>
+PrimBatchId PrimitiveGroup<Child>::ReservePrimitiveBatch(uint32_t primitiveCount,
+                                                         uint32_t attributeCount)
+{
+    if(isCommitted)
+    {
+        MRAY_WARNING_LOG("{:s} is in committed state, "
+                         " you change cannot change reservations!",
+                         Child::TypeName());
+        return std::numeric_limits<PrimBatchId>::max();
+    }
+
+    [[maybe_unused]]
+    auto r = batchCounts.emplace(batchCounter, std::pair(primitiveCount, attributeCount));
+    assert(r.second);
+    batchCounter++;
+    return batchCounter - 1;
+}
+
+template<class Child>
+bool PrimitiveGroup<Child>::RemoveReservation(PrimBatchId batchId)
+{
+    if(isCommitted)
+    {
+        MRAY_WARNING_LOG("{:s} is in committed state, "
+                         " you change cannot change reservations!",
+                         Child::TypeName());
+        return false;
+    }
+
+    bool isRemoved = static_cast<bool>(batchCounts.erase(batchId));
+    if(!isRemoved)
+    {
+        MRAY_WARNING_LOG("{:s}: unable to remove reservation for batch {}!",
+                         Child::TypeName(), batchId);
+    }
+    return isRemoved;
+}
+
+template<class Child>
+bool PrimitiveGroup<Child>::IsInCommitState() const
+{
+    return isCommitted;
+}
+
+template<class Child>
+bool PrimitiveGroup<Child>::GPUMemoryUsage() const
+{
+    return memory.Size();
+}

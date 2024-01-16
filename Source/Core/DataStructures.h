@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Vector.h"
+#include "Core/Types.h"
 
 // Stratified Discrete Alias Table
 //

@@ -15,8 +15,6 @@ class RayCaster
     public:
     virtual ~RayCaster() = default;
 
-    virtual void GenerateRays() = 0;
-
     // Cast Rays and Find HitIds, and WorkKeys.
     // (the last one will be used to partition)
     virtual void CastRays(// Output

@@ -49,12 +49,12 @@ namespace GraphicsFunctions
     // Simple Sampling Functions
     // Sample cosine weighted direction from unit hemisphere
     // Unit hemisphere's normal is implicitly +Z
-    MRAY_HYBRID Sample<Vector3>     SampleCosDirection(const Vector2& xi);
+    MRAY_HYBRID SampleT<Vector3>    SampleCosDirection(const Vector2& xi);
     MRAY_HYBRID constexpr Float     PDFCosDirection(const Vector3& v,
                                                     const Vector3& n = Vector3::ZAxis());
     // Sample uniform direction from unit hemisphere
     // Unit hemisphere's normal is implicitly +Z
-    MRAY_HYBRID Sample<Vector3>     SampleUniformDirection(const Vector2& xi);
+    MRAY_HYBRID SampleT<Vector3>    SampleUniformDirection(const Vector2& xi);
     MRAY_HYBRID constexpr Float     PDFUniformDirection();
 
     // Coordinate Conversions
@@ -172,7 +172,7 @@ constexpr Vector3 Orient(const Vector3& v, const Vector3& n)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Sample<Vector3> SampleCosDirection(const Vector2& xi)
+SampleT<Vector3> SampleCosDirection(const Vector2& xi)
 {
     using namespace MathConstants;
     using MathFunctions::SqrtMax;
@@ -190,7 +190,7 @@ Sample<Vector3> SampleCosDirection(const Vector2& xi)
     Float pdf = dir[2] * InvPi<Float>();
 
     // Finally the result!
-    return Sample<Vector3>
+    return SampleT<Vector3>
     {
         .sampledResult = dir,
         .pdf = pdf
@@ -205,7 +205,7 @@ constexpr Float PDFCosDirection(const Vector3& v, const Vector3& n)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Sample<Vector3> SampleUniformDirection(const Vector2& xi)
+SampleT<Vector3> SampleUniformDirection(const Vector2& xi)
 {
     using namespace MathConstants;
     using MathFunctions::SqrtMax;
@@ -220,7 +220,7 @@ Sample<Vector3> SampleUniformDirection(const Vector2& xi)
 
     // Uniform pdf is invariant
     constexpr Float pdf = InvPi<Float>() * Float{0.5};
-    return Sample<Vector3>
+    return SampleT<Vector3>
     {
         .sampledResult = dir,
         .pdf = pdf
