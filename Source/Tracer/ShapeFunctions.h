@@ -2,6 +2,7 @@
 
 #include "Core/Vector.h"
 #include "Core/Types.h"
+#include "GraphicsFunctions.h"
 
 namespace ShapeFunctions
 {
@@ -80,4 +81,6 @@ Vector3 Triangle::PointToBarycentrics(Span<const Vector3, TRI_VERTEX_COUNT> posi
     Float b = (d00 * d21 - d01 * d20) * denom;
     Float c = 1.0f - a - b;
     return Vector3(a, b, c);
+}
+
 }

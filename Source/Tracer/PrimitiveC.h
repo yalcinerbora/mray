@@ -124,18 +124,12 @@ concept PrimitiveC = requires(PrimType pt)
         // Conservative towards non-zero values
         // primitive may try to resolve position is on surface
         // but inherently assumes position is on surface
-        {pt.PdfSurface(Vector3{})
+        {pt.PdfSurface(typename PrimType::Hit{})
         } -> std::same_as<Float>;
-
-        // Projected normal of a closeby position (utilized by light sampler)
-        {pt.ProjectedNormal(Vector3{})
-        } ->std::same_as<Optional<Vector3>>;
 
         {pt.SampleRNCount()
         } -> std::same_as<uint32_t>;
     };
-
-
 
     // Total surface area
     {pt.GetSurfaceArea()
@@ -161,6 +155,10 @@ concept PrimitiveC = requires(PrimType pt)
                      VoxelizationParameters{})
         } -> std::same_as<uint32_t>;
     };
+
+    // Generate a basic surface from hit (utilized by light sampler)
+    {pt.SurfaceFromHit(typename PrimType::Hit{})
+    } ->std::same_as<Optional<BasicSurface>>;
 
     // Project a closeby surface and find the hit parameters
     {pt.ProjectedHit(Vector3{})
@@ -242,7 +240,7 @@ concept PrimitiveWithSurfaceC = requires(PrimType mg,
                                     Surface& surface)
 {
     // Base concept
-    requires PrimC<PrimType>;
+    requires PrimitiveC<PrimType>;
 
     // TODO: Ask on stackoverflow how to
     // constrain the function to thave a specific

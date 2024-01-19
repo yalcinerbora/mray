@@ -59,9 +59,7 @@ namespace DefaultTriangleDetail
         Intersection            Intersects(const Ray& ray) const;
         MRAY_HYBRID
         SampleT<BasicSurface>   SampleSurface(const RNGDispenser& rng) const;
-        MRAY_HYBRID Float       PdfSurface(const Vector3& position) const;
-        MRAY_HYBRID
-        Optional<Vector3>       ProjectedNormal(const Vector3& point) const;
+        MRAY_HYBRID Float       PdfSurface(const Hit& hit) const;
         MRAY_HYBRID uint32_t    SampleRNCount() const;
         MRAY_HYBRID Float       GetSurfaceArea() const;
         MRAY_HYBRID AABB3       GetAABB() const;
@@ -70,6 +68,8 @@ namespace DefaultTriangleDetail
                                          Span<Vector2us>& normals,
                                          bool onlyCalculateSize,
                                          const VoxelizationParameters& voxelParams) const;
+        MRAY_HYBRID
+        Optional<BasicSurface>  SurfaceFromHit(const Hit& hit) const;
         MRAY_HYBRID
         Optional<Hit>           ProjectedHit(const Vector3& point) const;
         MRAY_HYBRID Vector2     SurfaceParametrization(const Hit& hit) const;

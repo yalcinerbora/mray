@@ -34,17 +34,17 @@ namespace LightDetail
                                       const LightData& soa, LightId);
 
         MRAY_HYBRID
-        SampleT<Vector3>    SampleProjSurface(RNGDispenser& dispenser,
-                                              const Vector3& normDir) const;
+        SampleT<Vector3>    SampleSolidAngle(RNGDispenser& dispenser,
+                                             const Vector3& distantPoint,
+                                             const Vector3& dir) const;
         MRAY_HYBRID
-        Float               PdfProjSurface(const Vector3& position,
-                                           const Vector3& normDir) const;
+        Float               PdfSolidAngle(const typename Primitive::Hit& hit,
+                                          const Vector3& distantPoint,
+                                          const Vector3& dir) const;
         MRAY_HYBRID
-        uint32_t            SampleProjSurfaceRNCount() const;
+        uint32_t            SampleSolidAngleRNCount() const;
         MRAY_HYBRID
-        SampleT<Ray>        SampleRay(
-                                      RNGDispenser& dispenser,
-                                      ) const;
+        SampleT<Ray>        SampleRay(RNGDispenser& dispenser) const;
         MRAY_HYBRID
         Float               PdfRay(const Ray&) const;
         MRAY_HYBRID
@@ -61,6 +61,5 @@ namespace LightDetail
     };
 
 }
-
 
 #include "Lights.hpp"

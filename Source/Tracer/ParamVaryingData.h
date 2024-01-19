@@ -3,18 +3,15 @@
 #include "Device/GPUSystem.h"
 
 // Meta Texture Type
-template <uint32_t DIMS, class T>//, class TextureT = TextureView<DIMS, T>>
+template <uint32_t DIMS, class T>
 class ParamVaryingData
 {
     static_assert(DIMS == 1 || DIMS == 2 || DIMS == 3,
                   "Surface varying data at most have 3 dimensions");
-    //using Texture = TextureAccessor::template TextureType<DIMS, T>;
     using Texture = TextureView<DIMS, T>;
 
     private:
-    bool                        isTex;
-    Texture                     t;
-    T                           baseData;
+    Variant<Texture, T>         t;
 
     public:
     // Base Access
@@ -41,7 +38,6 @@ concept SpectrumConverterContextC = requires()
     requires SpectrumConverterC<typename C::Converter>;
 };
 
-// Most barebone spectrum conversion (delegation)
 namespace SpectrumConverterDetail
 {
 
@@ -56,19 +52,18 @@ struct RendererSpectrum
     MRAY_HYBRID Spectrum    operator()(const Spectrum& s) const;
 };
 
-template<class Converter, uint32_t DIMS, class TextureAccessor = DefaultTextureAccessor>
-class RendererParamVaryingData
+template<class Converter, uint32_t DIMS>
+class RendererParamVaryingSpectrum
 {
+    using PVD = ParamVaryingData<DIMS, Spectrum>;
+
     private:
-    const Converter&                            converter;
-    const ParamVaryingData<DIMS, Spectrum,
-                           TextureAccessor>&    input;
+    const Converter&            converter;
+    const PVD&                  input;
 
     public:
     //
-    MRAY_HYBRID     RendererParamVaryingData(const Converter& c,
-                                             const ParamVaryingData<DIMS, Spectrum,
-                                                                    TextureAccessor>& p);
+    MRAY_HYBRID RendererParamVaryingSpectrum(const Converter& c, const PVD& p);
 
     MRAY_HYBRID Optional<Spectrum>  operator()(Vector<DIMS, Float> uvCoords) const;
     // Gradient Access
@@ -87,8 +82,8 @@ struct SpectrumConverterContext
 {
     using Converter = C;
 
-    template<uint32_t DIMS, class TA = DefaultTextureAccessor>
-    using RendererParamVaryingData = SpectrumConverterDetail:: template RendererParamVaryingData<C, DIMS, TA>;
+    template<uint32_t DIMS>
+    using RendererParamVaryingData = SpectrumConverterDetail:: template RendererParamVaryingSpectrum<C, DIMS>;
     using RendererSpectrum = SpectrumConverterDetail:: template RendererSpectrum<C>;
 };
 
@@ -104,34 +99,34 @@ static_assert(SpectrumConverterC<SpectrumConverterIdentity>,
 static_assert(SpectrumConverterContextC<SpectrumConverterContextIdentity>,
               "\"SpectrumConverterContextIdentity\" do not satistfy \"SpectrumConverterContextC\" concept." );
 
-template <uint32_t DIMS, class T, class TA>
+template <uint32_t DIMS, class T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Optional<T> ParamVaryingData<DIMS, T, TA>::operator()(Vector<DIMS, Float> uvCoords) const
+Optional<T> ParamVaryingData<DIMS, T>::operator()(Vector<DIMS, Float> uvCoords) const
 {
-    if(isTex)
+    if(std::holds_alternative<Texture>(t))
         return t(uvCoords);
-    return baseData;
+    return t;
 }
 
-template <uint32_t DIMS, class T, class TA>
+template <uint32_t DIMS, class T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Optional<T> ParamVaryingData<DIMS, T, TA>::operator()(Vector<DIMS, Float> uvCoords,
-                                                      Vector<DIMS, Float> dpdu,
-                                                      Vector<DIMS, Float> dpdv) const
+Optional<T> ParamVaryingData<DIMS, T>::operator()(Vector<DIMS, Float> uvCoords,
+                                                  Vector<DIMS, Float> dpdu,
+                                                  Vector<DIMS, Float> dpdv) const
 {
-    if(isTex)
+    if(std::holds_alternative<Texture>(t))
         return t(uvCoords, dpdu, dpdv);
-    return baseData;
+    return t;
 }
 
-template <uint32_t DIMS, class T, class TA>
+template <uint32_t DIMS, class T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Optional<T> ParamVaryingData<DIMS, T, TA>::operator()(Vector<DIMS, Float> uvCoords,
-                                                      uint32_t mipLevel) const
+Optional<T> ParamVaryingData<DIMS, T>::operator()(Vector<DIMS, Float> uvCoords,
+                                                  uint32_t mipLevel) const
 {
-    if(isTex)
+    if(std::holds_alternative<Texture>(t))
         return t(uvCoords, mipLevel);
-    return baseData;
+    return t;
 }
 
 namespace SpectrumConverterDetail
@@ -150,33 +145,32 @@ Spectrum RendererSpectrum<C>::operator()(const Spectrum& s) const
     return c.Convert(s);
 }
 
-template<class Converter, uint32_t D, class TA>
+template<class C, uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
-RendererParamVaryingData<Converter, D, TA>::RendererParamVaryingData(const Converter& c,
-                                                                     const ParamVaryingData<D, Spectrum, TA>& p)
+RendererParamVaryingSpectrum<C, D>::RendererParamVaryingSpectrum(const C& c, const ParamVaryingData<D, Spectrum>& p)
     : converter(c)
     , input(p)
 {}
 
-template<class C, uint32_t D, class TA>
+template<class C, uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Optional<Spectrum> RendererParamVaryingData<C, D, TA>::operator()(Vector<D, Float> uvCoords) const
+Optional<Spectrum> RendererParamVaryingSpectrum<C, D>::operator()(Vector<D, Float> uvCoords) const
 {
     return converter(input(uvCoords));
 }
 
-template<class C, uint32_t D, class TA>
+template<class C, uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Optional<Spectrum> RendererParamVaryingData<C, D, TA>::operator()(Vector<D, Float> uvCoords,
+Optional<Spectrum> RendererParamVaryingSpectrum<C, D>::operator()(Vector<D, Float> uvCoords,
                                                                   Vector<D, Float> dpdu,
                                                                   Vector<D, Float> dpdv) const
 {
     return converter.Convert(input(uvCoords, dpdu, dpdv));
 }
 
-template<class C, uint32_t D, class TA>
+template<class C, uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Optional<Spectrum> RendererParamVaryingData<C, D, TA>::operator()(Vector<D, Float> uvCoords,
+Optional<Spectrum> RendererParamVaryingSpectrum<C, D>::operator()(Vector<D, Float> uvCoords,
                                                                   uint32_t mipLevel) const
 {
     return converter.Convert(input(uvCoords, mipLevel));

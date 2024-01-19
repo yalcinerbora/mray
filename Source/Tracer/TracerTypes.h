@@ -167,7 +167,7 @@ using EmptySurface = EmptyType;
 struct BasicSurface
 {
     Vector3 position;
-    Vector3 geoNormal;
+    Vector3 normal;
 };
 
 struct BarycentricSurface

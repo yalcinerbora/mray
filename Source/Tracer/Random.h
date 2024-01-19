@@ -8,7 +8,7 @@
 namespace RNGFunctions
 {
     template<std::floating_point F, std::unsigned_integral T>
-    F ToFloat01(T);
+    static F ToFloat01(T);
 
     // TODO: Implement double as well
     template<>

@@ -69,6 +69,7 @@ SampleT<BasicSurface> Triangle<T>::SampleSurface(const RNGDispenser& rng) const
     Float area = GetSurfaceArea();
     Float pdf = 1.0f / area;
 
+    Vector3ui index = data.indexList[id];
     Quaternion q0 = data.tbnRotations[index[0]];
     Quaternion q1 = data.tbnRotations[index[1]];
     Quaternion q2 = data.tbnRotations[index[2]];
@@ -89,29 +90,14 @@ SampleT<BasicSurface> Triangle<T>::SampleSurface(const RNGDispenser& rng) const
 
 template<class T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Optional<Vector3> Triangle<T>::ProjectedNormal(const Vector3& point) const
+Float Triangle<T>::PdfSurface(const Hit& hit) const
 {
-    using namespace ShapeFunctions::Triangle;
-    Vector3 projPoint = Project(positions, point);
-    Vector3 baryCoords = PointToBarycentrics(positions, projPoint);
+    Vector3 baryCoords = Vector3(hit[0], hit[1], 1 - hit[0] - hit[1]);
     if(baryCoords[0] < 0 || baryCoords[0] > 1 ||
        baryCoords[1] < 0 || baryCoords[1] > 1 ||
        baryCoords[2] < 0 || baryCoords[2] > 1)
-        return std::nullopt;
+        return Float{0};
 
-    Quaternion q0 = data.tbnRotations[index[0]];
-    Quaternion q1 = data.tbnRotations[index[1]];
-    Quaternion q2 = data.tbnRotations[index[2]];
-    Quaternion tbn = Quaternion::BarySLerp(q0, q1, q2, a, b);
-    Vector3 normal = tbn.Conjugate().ApplyRotation(Vector3::ZAxis());
-
-    return normal;
-}
-
-template<class T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-Float Triangle<T>::PdfSurface(const Vector3& point) const
-{
     Float pdf = 1.0f / GetSurfaceArea();
     return pdf;
 }
@@ -341,9 +327,39 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
     return writeIndex;
 }
 
+
 template<class T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Optional<Hit> Triangle<T>::ProjectedHit(const Vector3& point) const
+Optional<BasicSurface> Triangle<T>::SurfaceFromHit(const Hit& hit) const
+{
+    Vector3 baryCoords = Vector3(hit[0], hit[1], 1 - hit[0] - hit[1]);
+    if(baryCoords[0] < 0 || baryCoords[0] > 1 ||
+       baryCoords[1] < 0 || baryCoords[1] > 1 ||
+       baryCoords[2] < 0 || baryCoords[2] > 1)
+        return std::nullopt;
+
+    Vector3 position = (positions[0] * baryCoords[0] +
+                        positions[1] * baryCoords[1] +
+                        positions[2] * baryCoords[2]);
+
+    Vector3ui index = data.indexList[id];
+    Quaternion q0 = data.tbnRotations[index[0]];
+    Quaternion q1 = data.tbnRotations[index[1]];
+    Quaternion q2 = data.tbnRotations[index[2]];
+    Quaternion tbn = Quaternion::BarySLerp(q0, q1, q2, baryCoords[0], baryCoords[1]);
+    Vector3 normal = tbn.Conjugate().ApplyRotation(Vector3::ZAxis());
+
+    return BasicSurface
+    {
+        .position = position,
+        .normal = normal
+    };
+}
+
+
+template<class T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Optional<TriHit> Triangle<T>::ProjectedHit(const Vector3& point) const
 {
     using namespace ShapeFunctions::Triangle;
     Vector3 projPoint = Project(positions, point);
@@ -408,7 +424,7 @@ void Triangle<T>::GenerateSurface(BasicSurface& result,
     result = BasicSurface
     {
         .position = pos,
-        .geoNormal = geoNormal
+        .normal = geoNormal
     };
 }
 
