@@ -4,6 +4,8 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <vector>
+#include <mutex>
+#include <list>
 
 #include <nvtx3/nvToolsExt.h>
 
@@ -43,6 +45,24 @@ static constexpr uint32_t TotalQueuePerDevice()
 
 namespace mray::cuda
 {
+
+class BufferDestructor
+{
+    // Buffer destruction related
+    struct HostVectorI { virtual ~HostVectorI() = default; };
+    template <class T>
+    struct HostVector final : public HostVectorI
+    {
+        std::vector<T> data;
+        HostVector(std::vector<T>&& d) : data(d) {};
+    };
+    public:
+    using OwningType = std::unique_ptr<HostVectorI>;
+
+    template<class T>
+    static OwningType* IssueBufferForDestruction(std::vector<T> buffer);
+    static void DestroyCallback(void* ptr);
+};
 
 class GPUQueueCUDA;
 class GPUDeviceCUDA;
@@ -88,6 +108,8 @@ class GPUQueueCUDA
     cudaStream_t        stream;
     uint32_t            multiprocessorCount;
     nvtxDomainHandle_t  nvtxDomain;
+
+
 
     MRAY_HYBRID
     uint32_t            DetermineGridStrideBlock(const void* kernelPtr,
@@ -150,6 +172,8 @@ class GPUQueueCUDA
     MRAY_HOST void      MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const;
     template <class T>
     MRAY_HOST void      MemsetAsync(Span<T> region, uint8_t perByteValue) const;
+    template <class T>
+    MRAY_HOST void      IssueBufferForDestruction(std::vector<T> data) const;
 
     // Synchronization
     MRAY_HYBRID
@@ -246,6 +270,17 @@ class GPUSystemCUDA
     // Simple & Slow System Synchronization
     void                    SyncAll() const;
 };
+
+template <class T>
+inline BufferDestructor::OwningType* BufferDestructor::IssueBufferForDestruction(std::vector<T> buffer)
+{
+    // TODO: Is there any better way to do this?
+    // Callback is void ptr (C API), only void ptr can persist
+    // between scopes.
+    HostVector<T>* wrappedData = new HostVector<T>{std::move(buffer)};
+    OwningType* ptr = new OwningType(wrappedData);
+    return ptr;
+}
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t KernelCallParamsCUDA::GlobalId() const
@@ -383,6 +418,14 @@ void GPUQueueCUDA::MemsetAsync(Span<T> region, uint8_t perByteValue) const
     // TODO: Check if memory is not pure-host memory
     CUDA_CHECK(cudaMemsetAsync(region.data(), perByteValue,
                                region.size_bytes(), stream));
+}
+
+template <class T>
+MRAY_HOST void GPUQueueCUDA::IssueBufferForDestruction(std::vector<T> data) const
+{
+    using OwningType = typename BufferDestructor::OwningType;
+    OwningType* ptr = BufferDestructor::IssueBufferForDestruction(std::move(data));
+    CUDA_CHECK(cudaLaunchHostFunc(stream, &BufferDestructor::DestroyCallback, ptr));
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE

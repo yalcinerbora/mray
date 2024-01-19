@@ -67,7 +67,7 @@ namespace mray::cuda
 
     template<uint32_t D, class T>
     TextureCUDA<D, T>::TextureCUDA(const GPUDeviceCUDA& device,
-                                   const TextureInitParams<D, T>& p)
+                                   const TextureInitParams<D>& p)
         : gpu(&device)
         , tex(0)
         , texParams(p)

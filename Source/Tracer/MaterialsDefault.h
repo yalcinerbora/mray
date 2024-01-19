@@ -20,36 +20,30 @@ namespace LambertMatDetail
         using AlbedoMap = typename SpectrumTransformer:: template RendererParamVaryingData<2>;
 
         private:
-        const AlbedoMap                 albedoTex;
-        const OptionalNormalMap&        normalMapTex;
-        MediumId                        mediumId;
+        const AlbedoMap             albedoTex;
+        const OptionalNormalMap&    normalMapTex;
+        MediumId                    mediumId;
 
         public:
         MRAY_HYBRID
         LambertMaterial(const typename SpectrumTransformer::Converter& sTransContext,
                         const LambertMatData& soa, MaterialId id);
-        MRAY_HYBRID
-        Sample<BxDFResult> SampleBxDF(const Vector3& wI,
-                                      const Surface& surface,
-                                      RNGDispenser& dispenser) const;
-        MRAY_HYBRID
-        Float Pdf(const Ray& wI,
-                  const Ray& wO,
-                  const Surface& surface) const;
-        MRAY_HYBRID
-        uint32_t SampleRNCount() const;
-        MRAY_HYBRID
-        Spectrum Evaluate(const Ray& wO,
-                          const Vector3& wI,
-                          const Surface& surface) const;
-        MRAY_HYBRID
-        bool IsEmissive() const;
-        MRAY_HYBRID
-        Spectrum Emit(const Vector3& wO,
-                      const Surface& surf) const;
 
         MRAY_HYBRID
-        bool IsAllTexturesAreResident(const Surface& surface) const;
+        SampleT<BxDFResult>     SampleBxDF(const Vector3& wI,
+                                           const Surface& surface,
+                                           RNGDispenser& dispenser) const;
+        MRAY_HYBRID Float       Pdf(const Ray& wI,
+                                const Ray& wO,
+                                const Surface& surface) const;
+        MRAY_HYBRID uint32_t    SampleRNCount() const;
+        MRAY_HYBRID Spectrum    Evaluate(const Ray& wO,
+                                         const Vector3& wI,
+                                         const Surface& surface) const;
+        MRAY_HYBRID bool        IsEmissive() const;
+        MRAY_HYBRID Spectrum    Emit(const Vector3& wO,
+                                     const Surface& surf) const;
+        MRAY_HYBRID bool        IsAllTexturesAreResident(const Surface& surface) const;
     };
 
 }

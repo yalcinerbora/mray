@@ -1,7 +1,10 @@
 #pragma once
 
 #include <concepts>
+#include <vector>
+
 #include "Core/MathForward.h"
+#include "GenericGroup.h"
 
 template <class TContext>
 concept TransformContextC = requires(const TContext& t,
@@ -22,8 +25,11 @@ concept TransformContextC = requires(const TContext& t,
     {t.InvApply(aabb)} -> std::same_as<AABB3>;
 };
 
-template <class TContext>
+template <class TGType>
 concept TransformGroupC = requires()
 {
-    true;
+    typename TGType::DataSoA;
+
+    // Can query the type
+    {TGType::TypeName()} -> std::same_as<std::string_view>;
 };

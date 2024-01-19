@@ -9,6 +9,21 @@
 #include "Hit.h"
 #include "Key.h"
 
+enum class MRayColorSpace
+{
+    RGB_LINEAR,
+    RGB_SRGB,
+    XYZ
+};
+
+enum class AcceleratorType
+{
+    SOFTWARE_NONE,
+    SOFTWARE_BASIC_BVH,
+    HARDWARE
+};
+
+
 template <std::unsigned_integral T>
 struct RNGDispenserT;
 
@@ -74,14 +89,19 @@ using AccelWorkKey = KeyT<CommonKey, 8, 24>;
 
 // Accelerator key
 using AcceleratorId = KeyT<CommonKey, 8, 24>;
-// Primitive key
-using PrimitiveId = KeyT<CommonKey, 4, 28>;
-// Material key
-using MaterialId = KeyT<CommonKey, 10, 22>;
-// Transform key
-using TransformId = KeyT<CommonKey, 8, 24>;
-// Medium key
-using MediumId = KeyT<CommonKey, 8, 24>;
+
+using PrimitiveId   = KeyT<CommonKey, 4, 28>;
+using MaterialId    = KeyT<CommonKey, 10, 22>;
+using TransformId   = KeyT<CommonKey, 8, 24>;
+using MediumId      = KeyT<CommonKey, 8, 24>;
+using LightId       = KeyT<CommonKey, 8, 24>;
+using CameraId      = KeyT<CommonKey, 8, 24>;
+
+using MaterialIdList    = std::vector<MaterialId>;
+using TransformIdList   = std::vector<TransformId>;
+using MediumIdList      = std::vector<MediumId>;
+using LightIdList       = std::vector<LightId>;
+using CameraIdList      = std::vector<CameraId>;
 
 using RayIndex = CommonIndex;
 
@@ -179,6 +199,11 @@ struct alignas(32) RayGMem
 
 };
 
+//struct RayTPair
+//{
+//    Ray         ray;
+//    Vector2     tMinMax;
+//};
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 std::pair<Ray, Vector2> RayFromGMem(Span<const RayGMem> gRays, RayIndex index)

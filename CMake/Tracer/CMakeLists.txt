@@ -11,7 +11,8 @@ set(SRC_PRIMITIVES
 set(SRC_TRANSFORMS
     ${CURRENT_SOURCE_DIR}/TransformC.h
     ${CURRENT_SOURCE_DIR}/Transforms.h
-    ${CURRENT_SOURCE_DIR}/Transforms.hpp)
+    ${CURRENT_SOURCE_DIR}/Transforms.hpp
+    ${CURRENT_SOURCE_DIR}/Transforms.cpp)
 
 set(SRC_MATERIALS
     ${CURRENT_SOURCE_DIR}/MaterialC.h
@@ -24,14 +25,17 @@ set(SRC_ACCELLERATORS
     ${CURRENT_SOURCE_DIR}/AcceleratorLinear.h
     ${CURRENT_SOURCE_DIR}/AcceleratorLinear.hpp)
 
+set(SRC_LIGHTS
+    ${CURRENT_SOURCE_DIR}/LightC.h
+    ${CURRENT_SOURCE_DIR}/Lights.h
+    ${CURRENT_SOURCE_DIR}/Lights.hpp
+    ${CURRENT_SOURCE_DIR}/Lights.cpp)
+
 set(SRC_RANDOM
     ${CURRENT_SOURCE_DIR}/Random.h)
 
 set(SRC_RENDERERS
     ${CURRENT_SOURCE_DIR}/RendererC.h)
-
-set(SRC_RAY_CASTERS
-    ${CURRENT_SOURCE_DIR}/RayCasterI.h)
 
 set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/RayPartitioner.h
@@ -43,16 +47,18 @@ set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/Hit.h)
 
 set(SRC_COMMON
-    ${CURRENT_SOURCE_DIR}/TracerTypes.h)
+    ${CURRENT_SOURCE_DIR}/TracerTypes.h
+    ${CURRENT_SOURCE_DIR}/TracerInterface.h
+    ${CURRENT_SOURCE_DIR}/GenericGroup.h)
 
 set(SRC_ALL
     ${SRC_PRIMITIVES}
     ${SRC_MATERIALS}
     ${SRC_ACCELLERATORS}
+    ${SRC_LIGHTS}
     ${SRC_RANDOM}
     ${SRC_TRANSFORMS}
     ${SRC_RENDERERS}
-    ${SRC_RAY_CASTERS}
     ${SRC_UTILITY}
     ${SRC_COMMON})
 
@@ -61,9 +67,9 @@ source_group("Primitives" FILES ${SRC_PRIMITIVES})
 source_group("Transforms" FILES ${SRC_TRANSFORMS})
 source_group("Materials" FILES ${SRC_MATERIALS})
 source_group("Accelerators" FILES ${SRC_ACCELLERATORS})
+source_group("Lights" FILES ${SRC_LIGHTS})
 source_group("Random" FILES ${SRC_RANDOM})
 source_group("Renderers" FILES ${SRC_RENDERERS})
-source_group("RayCasters" FILES ${SRC_RAY_CASTERS})
 source_group("Utility" FILES ${SRC_UTILITY})
 source_group("" FILES ${SRC_COMMON})
 

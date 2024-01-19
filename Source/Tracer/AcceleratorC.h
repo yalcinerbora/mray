@@ -6,6 +6,7 @@
 #include "Core/Types.h"
 #include "Device/GPUSystemForward.h"
 #include "Random.h"
+#include "PrimitiveC.h"
 
 class IdentityTransformContext;
 
@@ -22,7 +23,7 @@ struct HitResultT
 // material id. Most of the time this should be enough
 struct AcceleratorLeaf
 {
-    MaterialId  materialId;
+    //MaterialId  materialId;
     PrimitiveId primitiveId;
 };
 
@@ -98,32 +99,55 @@ concept BaseAccelC = requires(BaseAccel ac,
                        gpuSystem)} -> std::same_as<void>;
 };
 
+
+
+namespace TracerLimits
+{
+    static constexpr size_t MaxPrimBatchPerSurface = 8;
+}
+
+using SurfPrimIdList = std::array<PrimBatchId, TracerLimits::MaxPrimBatchPerSurface>;
+using SurfMatIdList = std::array<MaterialId, TracerLimits::MaxPrimBatchPerSurface>;
+
+using PrimMatIdPair = std::pair<PrimBatchId, MaterialId>;
+using PrimMatIdPairList = std::array<PrimMatIdPair, TracerLimits::MaxPrimBatchPerSurface>;
+
+using PrimBatchListToAccelMapping = std::unordered_map<SurfPrimIdList, uint32_t>;
+using LocalSurfaceToAccelMapping = std::unordered_map<uint32_t, uint32_t>;
+
+using AlphaMap = TextureView<2, Float>;
+
 class AcceleratorGroupI
 {
     public:
     virtual     ~AcceleratorGroupI() = default;
 
-    virtual void Construct(AcceleratorId) = 0;
-    virtual void Reconstruct(AcceleratorId) = 0;
-};
+    virtual void CastLocalRays(// Output
+                               Span<HitIdPack> dHitIds,
+                               Span<MetaHit> dHitParams,
+                               // I-O
+                               Span<BackupRNGState> rngStates,
+                               // Input
+                               Span<const RayGMem> dRays,
+                               Span<const RayIndex> dRayIndices,
+                               Span<const AcceleratorIdPack> dAccelIdPacks,
+                               // Constants
+                               const GPUSystem& s) = 0;
 
-class AcceleratorInstanceGroupI
-{
-    public:
-    virtual         ~AcceleratorInstanceGroupI() = default;
+    // Map of traversables
 
-    // Interface
-    virtual void    CastLocalRays(// Output
-                                  Span<HitIdPack> dHitIds,
-                                  Span<MetaHit> dHitParams,
-                                  // I-O
-                                  Span<BackupRNGState> rngStates,
-                                  // Input
-                                  Span<const RayGMem> dRays,
-                                  Span<const RayIndex> dRayIndices,
-                                  Span<const AcceleratorIdPack> dAccelIdPacks,
-                                  // Constants
-                                  const GPUSystem& s) = 0;
+//    virtual void Construct(AcceleratorId) = 0;
+//    virtual void Reconstruct(AcceleratorId) = 0;
+
+    virtual AcceleratorId   ReserveSurface(const SurfPrimIdList& primIds,
+                                           const SurfMatIdList& matIds) = 0;
+    // How to commit? we need transforms
+    virtual void            CommitReservations(const std::vector<BaseAcceleratorLeaf>&) = 0;
+
+
+    virtual std::vector<BaseAcceleratorLeaf> A() const = 0;
+    virtual std::vector<BaseAcceleratorLeaf> B() const = 0;
+
 };
 
 class AcceleratorBaseI
@@ -151,8 +175,31 @@ class AcceleratorBaseI
                                 // Constants
                                 const GPUSystem& s) = 0;
 
-    virtual void Construct() = 0;
-    virtual void Reconstruct() = 0;
+
+    virtual void CastLocalRays(// Output
+                               Span<HitIdPack> dHitIds,
+                               Span<MetaHit> dHitParams,
+                               // I-O
+                               Span<BackupRNGState> rngStates,
+                               // Input
+                               Span<const RayGMem> dRays,
+                               Span<const RayIndex> dRayIndices,
+                               Span<const AcceleratorIdPack> dAccelIdPacks,
+                               // Constants
+                               const GPUSystem& s) = 0;
+
+    //
+    virtual SurfaceId   ReserveSurface(TransformId, const PrimMatIdPairList& primMatPairings) = 0;
+    // Optional alpha map / cull face flag etc
+    // TODO: Make the design available to the user?
+    virtual void        AttachAlphaMap(SurfaceId surfaceId, uint32_t pairingIndex,
+                                       AlphaMap alphaMap);
+    virtual void        SetBackfaceCulling(SurfaceId surfaceId, uint32_t pairingIndex,
+                                           bool doCullBackface);
+
+    // Commit all the surfaces that is requested
+    // Generate accelerators
+    virtual void        CommitSurfaces();
 };
 
 

@@ -85,11 +85,9 @@ using UVType = typename UVTypeT<D>::type;
 
 // Texture initialization parameters
 // Defaults are for x -> normalized float conversion
-template <uint32_t D, class UnderlyingT>
+template <uint32_t D>
 struct TextureInitParams
 {
-    using UnderlyingType    = UnderlyingT;
-
     bool                    normIntegers    = true;
     bool                    normCoordinates = true;
     bool                    convertSRGB     = false;

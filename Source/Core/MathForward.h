@@ -1,5 +1,7 @@
 #pragma once
 
+#include <concepts>
+#include <utility>
 #include "Definitions.h"
 
 #ifdef MRAY_HETEROGENEOUS

@@ -98,7 +98,9 @@ namespace MRayDataDetail
             ValKeyTypePair<MR_SNORM_32x8,   SNorm32x8>{},
             ValKeyTypePair<MR_SNORM_16x16,  SNorm16x16>{},
             ValKeyTypePair<MR_SNORM_8x32,   SNorm8x32>{},
-            ValKeyTypePair<MR_SNORM_4x64,   SNorm4x64>{}
+            ValKeyTypePair<MR_SNORM_4x64,   SNorm4x64>{},
+
+            ValKeyTypePair<MR_STRING,       std::string>{}
         );
         constexpr auto EList = MRayDataEnumTypeMapping;
         return GetTupleElement<E>(MRayDataEnumTypeMapping);

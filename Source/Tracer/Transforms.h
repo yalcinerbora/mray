@@ -6,6 +6,7 @@
 
 #include "TransformC.h"
 #include "TracerTypes.h"
+#include "TracerInterface.h"
 
 namespace TransformDetail
 {
@@ -21,11 +22,9 @@ namespace TransformDetail
         Span<Span<const Matrix4x4>> transforms;
         Span<Span<const Matrix4x4>> invTransforms;
     };
-
 }
 
-// Most simple transform context
-class IdentityTransformContext
+class TransformContextIdentity
 {
     public:
     MRAY_HYBRID Vector3 ApplyP(const Vector3& point) const;
@@ -41,14 +40,14 @@ class IdentityTransformContext
 
 };
 
-class SingleTransformContext
+class TransformContextSingle
 {
     private:
     const Matrix4x4& transform;
     const Matrix4x4& invTransform;
 
     public:
-    MRAY_HYBRID         SingleTransformContext(const typename TransformDetail::SingleTransformSoA&,
+    MRAY_HYBRID         TransformContextSingle(const typename TransformDetail::SingleTransformSoA&,
                                                TransformId tId);
 
     MRAY_HYBRID Vector3 ApplyP(const Vector3& point) const;
@@ -63,30 +62,70 @@ class SingleTransformContext
     MRAY_HYBRID Ray     InvApply(const Ray&) const;
 };
 
-class IdentityTransformGroup
+template<class Child>
+using GenericGroupTransform = GenericGroup<Child, TransformId, TransAttributeInfo>;
+
+class TransformGroupIdentity final : public GenericGroupTransform<TransformGroupIdentity>
 {
+    using typename GenericGroupTransform<TransformGroupIdentity>::AttribInfoList;
+
     public:
-    // Everything is implicit no need for type by concept will require it
     using DataSoA = EmptyType;
+    static std::string_view TypeName();
+
+    public:
+                    TransformGroupIdentity(uint32_t groupId,
+                                           const GPUSystem& s);
+    virtual void    Commit() override;
+    virtual void    PushAttribute(Vector2ui idRange,
+                                  uint32_t attributeIndex,
+                                  std::vector<Byte> data) override;
+    AttribInfoList  AttributeInfo() const override;
 };
 
-class SingleTransformGroup
+class TransformGroupSingle final : public GenericGroupTransform<TransformGroupSingle>
 {
+    using typename GenericGroupTransform<TransformGroupSingle>::AttribInfoList;
+
     public:
     using DataSoA = typename TransformDetail::SingleTransformSoA;
+    static std::string_view     TypeName();
 
+    private:
+    Span<Matrix4x4> transforms;
+    Span<Matrix4x4> invTransforms;
+    DataSoA         soa;
+
+    public:
+                    TransformGroupSingle(uint32_t groupId, const GPUSystem& s);
+    void            Commit() override;
+    void            PushAttribute(Vector2ui idRange,
+                                  uint32_t attributeIndex,
+                                  std::vector<Byte> data) override;
+    AttribInfoList  AttributeInfo() const override;
 };
 
-class MultiTransformGroup
+class TransformGroupMulti final : public GenericGroupTransform<TransformGroupMulti>
 {
+    using typename GenericGroupTransform<TransformGroupMulti>::AttribInfoList;
+
     public:
     using DataSoA = typename TransformDetail::MultiTransformSoA;
+    static std::string_view TypeName();
 
-};
+    private:
+    Span<Matrix4x4> transforms;
+    Span<Matrix4x4> invTransforms;
+    Span<uint32_t>  indices;
+    DataSoA         soa;
 
-class MorphTargetGroup
-{
-
+    public:
+                    TransformGroupMulti(uint32_t groupId, const GPUSystem& s);
+    void            Commit() override;
+    void            PushAttribute(Vector2ui idRange,
+                                  uint32_t attributeIndex,
+                                  std::vector<Byte> data) override;
+    AttribInfoList  AttributeInfo() const override;
 };
 
 // Meta Transform Generator Functions
@@ -94,25 +133,25 @@ class MorphTargetGroup
 // Provided here for consistency
 template <class PrimitiveGroupSoA>
 MRAY_HYBRID MRAY_CGPU_INLINE
-IdentityTransformContext GenTContextIdentity(const typename IdentityTransformGroup::DataSoA&,
+TransformContextIdentity GenTContextIdentity(const typename TransformGroupIdentity::DataSoA&,
                                              const PrimitiveGroupSoA&,
                                              TransformId,
                                              PrimitiveId)
 {
-    return IdentityTransformContext{};
+    return TransformContextIdentity{};
 }
 
 template <class PrimitiveGroupSoA>
 MRAY_HYBRID MRAY_CGPU_INLINE
-SingleTransformContext GenTContextSingle(const typename SingleTransformGroup::DataSoA& transformData,
+TransformContextSingle GenTContextSingle(const typename TransformGroupSingle::DataSoA& transformData,
                                          const PrimitiveGroupSoA&,
                                          TransformId tId,
                                          PrimitiveId)
 {
-    return SingleTransformContext(transformData, tId);
+    return TransformContextSingle(transformData, tId);
 }
 
-static_assert(TransformContextC<IdentityTransformContext>);
-static_assert(TransformContextC<SingleTransformContext>);
+static_assert(TransformContextC<TransformContextIdentity>);
+static_assert(TransformContextC<TransformContextSingle>);
 
 #include "Transforms.hpp"

@@ -3,6 +3,33 @@
 #include <span>
 #include <optional>
 #include <variant>
+#include <vector>
+
+#include "MathFunctions.h"
+
+// Untill c++23, we custom define this
+// https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2674r0.pdf
+// Directly from the above paper
+template <class T>
+concept ImplicitLifetimeC = requires()
+{
+    std::disjunction
+    <
+        std::is_scalar<T>,
+        std::is_array<T>,
+        std::is_aggregate<T>,
+        std::conjunction
+        <
+            std::is_trivially_destructible<T>,
+            std::disjunction
+            <
+                std::is_trivially_default_constructible<T>,
+                std::is_trivially_copy_constructible<T>,
+                std::is_trivially_move_constructible<T>
+            >
+        >
+    >::value;
+};
 
 // Rename the std::optional, gpu may not like it
 // most(all after c++20) of optional is constexpr
@@ -43,6 +70,18 @@ template<class T, std::size_t Extent = std::dynamic_extent>
 constexpr Span<const T, Extent> ToConstSpan(Span<T, Extent> s)
 {
     return Span<const T, Extent>(s);
+}
+
+template<ImplicitLifetimeC T>
+constexpr Span<T> ToSpan(std::vector<Byte> v)
+{
+    assert(reinterpret_cast<uintptr_t>(v.data()) % alignof(T) == 0);
+    assert(v.size() % sizeof(T) == 0);
+
+    // TODO: Check if this is UB
+    T* tPtr = reinterpret_cast<T*>(v.data());
+    size_t size = v.size() / sizeof(T);
+    return Span<T>(tPtr, size);
 }
 
 // TODO add arrays maybe? (decay changes c arrays to ptrs)

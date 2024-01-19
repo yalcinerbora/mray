@@ -2,18 +2,14 @@
 
 #include "Device/GPUSystem.h"
 
-//using DefaultTextureAccessor = TextureAccessorCUDA;
-//
-//
-//using DefaultTextureAccessor = TextureAccessorHost;
-
 // Meta Texture Type
-template <uint32_t DIMS, class T, class TextureAccessor = DefaultTextureAccessor>
+template <uint32_t DIMS, class T>//, class TextureT = TextureView<DIMS, T>>
 class ParamVaryingData
 {
     static_assert(DIMS == 1 || DIMS == 2 || DIMS == 3,
                   "Surface varying data at most have 3 dimensions");
-    using Texture = TextureAccessor::template TextureType<DIMS, T>;
+    //using Texture = TextureAccessor::template TextureType<DIMS, T>;
+    using Texture = TextureView<DIMS, T>;
 
     private:
     bool                        isTex;

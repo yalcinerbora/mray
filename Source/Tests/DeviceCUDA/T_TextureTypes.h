@@ -15,7 +15,7 @@ class GPUTextureTest : public testing::Test
     public:
     static constexpr auto D = T::D;
     using ChannelType = typename T::T;
-    using ParamType = TextureInitParams<D, ChannelType>;
+    using ParamType = TextureInitParams<D>;
     using SizeType = TextureExtent<D>;
 };
 

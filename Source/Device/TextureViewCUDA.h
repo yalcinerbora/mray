@@ -168,11 +168,12 @@ class TextureViewCUDA<1, T>
 {
     public:
     static constexpr uint32_t Channels = VectorTypeToChannels<T>().Channels;
-
     private:
     using CudaType = typename decltype(VectorTypeToCUDA<T>())::MappedType;
     using ConvertType = CudaTexToMRayType<T, CudaType, Channels>;
-    cudaTextureObject_t texHandle;
+
+    private:
+    cudaTextureObject_t     texHandle;
 
     public:
     MRAY_HOST               TextureViewCUDA(cudaTextureObject_t t) : texHandle(t) {}
@@ -191,11 +192,12 @@ class TextureViewCUDA<2, T>
 {
     public:
     static constexpr uint32_t Channels = VectorTypeToChannels<T>().Channels;
-
     private:
     using CudaType = typename decltype(VectorTypeToCUDA<T>())::MappedType;
     using ConvertType = CudaTexToMRayType<T, CudaType, Channels>;
-    cudaTextureObject_t texHandle;
+
+    private:
+    cudaTextureObject_t     texHandle;
 
     public:
     MRAY_HOST               TextureViewCUDA(cudaTextureObject_t t) : texHandle(t) {}
@@ -213,11 +215,12 @@ class TextureViewCUDA<3, T>
 {
     public:
     static constexpr uint32_t Channels = VectorTypeToChannels<T>().Channels;
-
     private:
     using CudaType = typename decltype(VectorTypeToCUDA<T>())::MappedType;
     using ConvertType = CudaTexToMRayType<T, CudaType, Channels>;
-    cudaTextureObject_t texHandle;
+
+    private:
+    cudaTextureObject_t     texHandle;
 
     public:
     MRAY_HOST               TextureViewCUDA(cudaTextureObject_t t) : texHandle(t) {}

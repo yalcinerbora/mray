@@ -50,9 +50,9 @@ TriIntersection Triangle<T>::Intersects(const Ray& ray) const
 
 template<class T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<Vector3> Triangle<T>::SamplePosition(const RNGDispenser& rng) const
+SampleT<BasicSurface> Triangle<T>::SampleSurface(const RNGDispenser& rng) const
 {
-    Vector2 xi = rng.NextFloat2D();
+    Vector2 xi = rng.NextFloat2D<0>();
     Float r1 = sqrt(xi[0]);
     Float r2 = xi[1];
     // Generate Random Barycentrics
@@ -69,16 +69,48 @@ SampleT<Vector3> Triangle<T>::SamplePosition(const RNGDispenser& rng) const
     Float area = GetSurfaceArea();
     Float pdf = 1.0f / area;
 
-    return SampleT<Vector3>
+    Quaternion q0 = data.tbnRotations[index[0]];
+    Quaternion q1 = data.tbnRotations[index[1]];
+    Quaternion q2 = data.tbnRotations[index[2]];
+    Quaternion tbn = Quaternion::BarySLerp(q0, q1, q2, a, b);
+    Vector3 normal = tbn.Conjugate().ApplyRotation(Vector3::ZAxis());
+
+    using ShapeFunctions::Triangle::Normal;
+    return SampleT<BasicSurface>
     {
         .pdf = pdf,
-        .sampledResult = position
+        .sampledResult = BasicSurface
+        {
+            .position = position,
+            .geoNormal = normal
+        }
     };
 }
 
 template<class T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float Triangle<T>::PdfPosition(const Vector3& position) const
+Optional<Vector3> Triangle<T>::ProjectedNormal(const Vector3& point) const
+{
+    using namespace ShapeFunctions::Triangle;
+    Vector3 projPoint = Project(positions, point);
+    Vector3 baryCoords = PointToBarycentrics(positions, projPoint);
+    if(baryCoords[0] < 0 || baryCoords[0] > 1 ||
+       baryCoords[1] < 0 || baryCoords[1] > 1 ||
+       baryCoords[2] < 0 || baryCoords[2] > 1)
+        return std::nullopt;
+
+    Quaternion q0 = data.tbnRotations[index[0]];
+    Quaternion q1 = data.tbnRotations[index[1]];
+    Quaternion q2 = data.tbnRotations[index[2]];
+    Quaternion tbn = Quaternion::BarySLerp(q0, q1, q2, a, b);
+    Vector3 normal = tbn.Conjugate().ApplyRotation(Vector3::ZAxis());
+
+    return normal;
+}
+
+template<class T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float Triangle<T>::PdfSurface(const Vector3& point) const
 {
     Float pdf = 1.0f / GetSurfaceArea();
     return pdf;
@@ -311,6 +343,16 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
 
 template<class T>
 MRAY_HYBRID MRAY_CGPU_INLINE
+Optional<Hit> Triangle<T>::ProjectedHit(const Vector3& point) const
+{
+    using namespace ShapeFunctions::Triangle;
+    Vector3 projPoint = Project(positions, point);
+    Vector3 baryCoords = PointToBarycentrics(positions, projPoint);
+    return Hit(baryCoords);
+}
+
+template<class T>
+MRAY_HYBRID MRAY_CGPU_INLINE
 Vector2 Triangle<T>::SurfaceParametrization(const Hit& hit) const
 {
     Vector3ui index = data.indexList[id];
@@ -461,7 +503,7 @@ namespace DefaultSkinnedTriangleDetail
 {
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-SkinnedTransformContext::SkinnedTransformContext(const typename MultiTransformGroup::DataSoA& transformData,
+TransformContextSkinned::TransformContextSkinned(const typename TransformGroupMulti::DataSoA& transformData,
                                                  const SkinnedTriangleData& triData,
                                                  TransformId tId,
                                                  PrimitiveId pId)
@@ -490,12 +532,12 @@ SkinnedTransformContext::SkinnedTransformContext(const typename MultiTransformGr
 
 // Transform Context Generators
 MRAY_HYBRID MRAY_CGPU_INLINE
-SkinnedTransformContext GenTContextSkinned(const typename MultiTransformGroup::DataSoA& tData,
+TransformContextSkinned GenTContextSkinned(const typename TransformGroupMulti::DataSoA& tData,
                                            const SkinnedTriangleData& pData,
                                            TransformId tId,
                                            PrimitiveId pId)
 {
-    return SkinnedTransformContext(tData, pData, tId, pId);
+    return TransformContextSkinned(tData, pData, tId, pId);
 }
 
 }

@@ -9,7 +9,7 @@
 // types will have these accessing bits
 // It has two portions, "Batch" portion which isolates the type,
 // and index portion which isolates index of that batch
-template <class T, uint32_t BBits, uint32_t IBits>
+template <std::unsigned_integral T, uint32_t BBits, uint32_t IBits>
 class alignas(sizeof(T)) KeyT
 {
     public:
@@ -39,6 +39,8 @@ class alignas(sizeof(T)) KeyT
 
     MRAY_HYBRID
     static constexpr KeyT       CombinedKey(T batch, T id);
+    MRAY_HYBRID
+    static constexpr KeyT       InvalidKey();
 
     // Sanity Checks
     static_assert((IdBits + BatchBits) == std::numeric_limits<T>::digits,
@@ -48,48 +50,55 @@ class alignas(sizeof(T)) KeyT
                   "Masks representing portions of HitKey should complement each other.");
 };
 
-template <class T, uint32_t BB, uint32_t IB>
+template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr KeyT<T, BB, IB>::KeyT(T v)
     : value(v)
 {}
 
-template <class T, uint32_t BB, uint32_t IB>
+template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr KeyT<T, BB, IB>::operator T() const
 {
     return value;
 }
 
-template <class T, uint32_t BB, uint32_t IB>
+template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr KeyT<T, BB, IB>::operator T&()
 {
     return value;
 }
 
-template <class T, uint32_t BB, uint32_t IB>
+template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr T KeyT<T, BB, IB>::FetchBatchPortion() const
 {
     return (value & BatchMask) >> IdBits;
 }
 
-template <class T, uint32_t BB, uint32_t IB>
+template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr T KeyT<T, BB, IB>::FetchIndexPortion() const
 {
     return value & IdMask;
 }
 
-template <class T, uint32_t BB, uint32_t IB>
+template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr KeyT<T, BB, IB> KeyT<T, BB, IB>::CombinedKey(T batch, T id)
 {
     return KeyT((batch << IdBits) | (id & IdMask));
 }
 
-template <class T, uint32_t BB, uint32_t IB>
+template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr KeyT<T, BB, IB> KeyT<T, BB, IB>::InvalidKey()
+{
+    return KeyT(std::numeric_limits<T>::max());
+}
+
+template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
 MRAY_HOST
 static std::ostream& operator<<(std::ostream& os, const KeyT<T, BB, IB>& key)
 {

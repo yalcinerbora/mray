@@ -1,10 +1,10 @@
 #include "AcceleratorC.h"
 #include "TransformC.h"
 #include "PrimitiveC.h"
-#include "SimpleRNG.h"
+#include "Random.h"
 
 template<AccelGroupC AcceleratorGroupType, TransformGroupC TransformGroupType>
-class AcceleratorInstanceGroup : public AcceleratorInstanceGroupI
+class AcceleratorWork : public AcceleratorWorkI
 {
     public:
     using TransformGroup    = TransformGroupType;
@@ -17,14 +17,10 @@ class AcceleratorInstanceGroup : public AcceleratorInstanceGroupI
     const TransformGroup&       transGroup;
 
     public:
-    AcceleratorInstanceGroup(const AcceleratorGroup& ag,
-                             const TransformGroup& tg,
-                             const GPUDevice& residentDevice);
-
+    AcceleratorWork(const AcceleratorGroup& ag,
+                    const TransformGroup& tg);
 
     static std::string_view TypeName() const;
-
-    //void Instantiate(const std::vector<AcceleratorIdPack>&);
 
     // Cast Local rays
     void CastLocalRays(// Output
@@ -38,11 +34,26 @@ class AcceleratorInstanceGroup : public AcceleratorInstanceGroupI
                        Span<const AcceleratorIdPack> dAccelIdPacks,
                        // Constants
                        const GPUQueue& queue) override;
+
+    void AcquireTransformedAABB(Span<AABB, 1> dAccelAABB,
+                                const std::array<PrimRange, TracerLimits::MaxPrimBatchPerSurface>&,
+                                TransformId id) override;
+    {
+
+    }
+
+    void AcquireTransformedPositions(Span<Vector3> dPositions,
+                                     const std::array<PrimRange, TracerLimits::MaxPrimBatchPerSurface>&,
+                                     TransformId) override;
+    {
+
+    }
+
 };
 
 
 template<AccelGroupC AG, TransformGroupC TG>
-AcceleratorInstanceGroup<AG, TG>::AcceleratorInstanceGroup(const AcceleratorGroup& ag,
+AcceleratorWork<AG, TG>::AcceleratorInstanceGroup(const AcceleratorGroup& ag,
                                                            const TransformGroup& tg,
                                                            const GPUDevice& residentDevice)
 {
@@ -50,7 +61,7 @@ AcceleratorInstanceGroup<AG, TG>::AcceleratorInstanceGroup(const AcceleratorGrou
 }
 
 template<AccelGroupC AG, TransformGroupC TG>
-void AcceleratorInstanceGroup<AG, TG>::CastLocalRays(// Output
+void AcceleratorWork<AG, TG>::CastLocalRays(// Output
                                                      Span<HitIdPack> dHitIds,
                                                      Span<MetaHit> dHitParams,
                                                      // I-O
@@ -72,7 +83,7 @@ void AcceleratorInstanceGroup<AG, TG>::CastLocalRays(// Output
     using PrimSoA       = typename PrimitiveGroup::DataSoAConst;
     using AccelSoA      = typename AcceleratorGroup::DataSoAConst;
     using TransSoA      = typename TransformGroup::DataSoAConst;
-    using c   = typename AcceleratorGroup:: template Accelerator<TG>;
+    using Accelerator   = typename AcceleratorGroup:: template Accelerator<TG>;
     TransSoA    tSoA = tg.DataSoA();
     AccelSoA    aSoA = ag.DataSoA();
     PrimSoA     pSoA = pg.DataSoA();

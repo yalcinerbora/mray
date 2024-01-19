@@ -49,13 +49,14 @@ constexpr bool IsNormConvertibleCUDA()
 template<uint32_t D, class T>
 class TextureCUDA
 {
-    using UnderlyingType = typename TextureInitParams<D, T>::UnderlyingType;
+    using UnderlyingType = T;
+    //using UnderlyingType = typename TextureInitParams<D, T>::UnderlyingType;
     using CudaType = typename decltype(VectorTypeToCUDA<T>())::MappedType;
     static constexpr uint32_t ChannelCount = VectorTypeToChannels<T>().Channels;
     static constexpr bool IsNormConvertible = IsNormConvertibleCUDA<T>();
 
     // Sanity Checks
-    static_assert(std::is_same_v<UnderlyingType, T>);
+    //static_assert(std::is_same_v<UnderlyingType, T>);
     static_assert(D >= 1 && D <= 3, "At most 3D textures are supported");
 
     public:
@@ -65,7 +66,7 @@ class TextureCUDA
     const GPUDeviceCUDA*        gpu;
     cudaTextureObject_t         tex         = (cudaTextureObject_t)0;
     cudaMipmappedArray_t        data        = nullptr;
-    TextureInitParams<D, T>     texParams;
+    TextureInitParams<D>        texParams;
 
     // Allocation related
     bool                        allocated   = false;
@@ -77,7 +78,7 @@ class TextureCUDA
     // Constructors & Destructor
                             TextureCUDA() = delete;
                             TextureCUDA(const GPUDeviceCUDA& device,
-                                        const TextureInitParams<D, T>& p);
+                                        const TextureInitParams<D>& p);
                             TextureCUDA(const TextureCUDA&) = delete;
                             TextureCUDA(TextureCUDA&&) noexcept;
     TextureCUDA&            operator=(const TextureCUDA&) = delete;

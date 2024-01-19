@@ -153,5 +153,7 @@ enum class MRayDataEnum : uint32_t
     MR_SNORM_32x8,
     MR_SNORM_16x16,
     MR_SNORM_8x32,
-    MR_SNORM_4x64
+    MR_SNORM_4x64,
+
+    MR_STRING
 };

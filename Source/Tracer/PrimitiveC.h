@@ -9,6 +9,7 @@
 #include "Device/GPUSystemForward.h"
 
 #include "TracerTypes.h"
+#include "TracerInterface.h"
 
 // Transform types
 // This enumeration is tied to a primitive group
@@ -41,10 +42,48 @@ enum class PrimitiveAttributeLogic
     UV0,
     UV1,
     WEIGHT,
-    WEIGHT_INDEX
+    WEIGHT_INDEX,
+
+    END
 };
 
-class IdentityTransformContext;
+struct PrimAttributeConverter
+{
+    using enum PrimitiveAttributeLogic;
+    static constexpr std::array<std::string_view, std::to_underlying(END)> Names =
+    {
+        "Position",
+        "Index",
+        "Normal",
+        "Radius",
+        "Tangent",
+        "UV0",
+        "UV1",
+        "Weight",
+        "Weight Index"
+    };
+    static constexpr std::string_view           ToString(PrimitiveAttributeLogic e);
+    static constexpr PrimitiveAttributeLogic    FromString(std::string_view e);
+};
+
+constexpr std::string_view PrimAttributeConverter::ToString(PrimitiveAttributeLogic e)
+{
+    return Names[std::to_underlying(e)];
+}
+
+constexpr PrimitiveAttributeLogic PrimAttributeConverter::FromString(std::string_view sv)
+{
+    using IntType = std::underlying_type_t<PrimitiveAttributeLogic>;
+    IntType i = 0;
+    for(const std::string_view& checkSV : Names)
+    {
+        if(checkSV == sv) return PrimitiveAttributeLogic(i);
+        i++;
+    }
+    return PrimitiveAttributeLogic(END);
+}
+
+class TransformContextIdentity;
 
 template<class Surface, class Prim, class Hit>
 using SurfaceGenFunc = Surface(Prim::*)(const Hit&,
@@ -58,13 +97,13 @@ using TransformContextGenFunc = TransformContext(*)(const TransformData&,
                                                     PrimitiveId);
 
 template <class PrimType>
-concept PrimC = requires(PrimType pt)
+concept PrimitiveC = requires(PrimType pt)
 {
     typename PrimType::Hit;
     typename PrimType::DataSoA;
 
     // Has this specific constructor
-    requires requires(const IdentityTransformContext& tc,
+    requires requires(const TransformContextIdentity& tc,
                       const typename PrimType::DataSoA& soaData)
     {
         PrimType(tc, soaData, PrimitiveId{});
@@ -78,19 +117,25 @@ concept PrimC = requires(PrimType pt)
     requires requires(Float f, Vector3 v3, RNGDispenser rng)
     {
         // Sample a position over the parametrized surface
-        {pt.SamplePosition(rng)
-        } -> std::same_as<SampleT<Vector3>>;
+        {pt.SampleSurface(rng)
+        } -> std::same_as<SampleT<BasicSurface>>;
 
         // PDF of sampling such position
         // Conservative towards non-zero values
         // primitive may try to resolve position is on surface
         // but inherently assumes position is on surface
-        {pt.PdfPosition(Vector3{})
+        {pt.PdfSurface(Vector3{})
         } -> std::same_as<Float>;
+
+        // Projected normal of a closeby position (utilized by light sampler)
+        {pt.ProjectedNormal(Vector3{})
+        } ->std::same_as<Optional<Vector3>>;
 
         {pt.SampleRNCount()
         } -> std::same_as<uint32_t>;
     };
+
+
 
     // Total surface area
     {pt.GetSurfaceArea()
@@ -117,6 +162,10 @@ concept PrimC = requires(PrimType pt)
         } -> std::same_as<uint32_t>;
     };
 
+    // Project a closeby surface and find the hit parameters
+    {pt.ProjectedHit(Vector3{})
+    } -> std::same_as<Optional<typename PrimType::Hit>>;
+
     // TODO: Better design maybe? // Only 2D surface parametrization?
     //
     // Accelerator "AnyHit" requirements
@@ -131,11 +180,11 @@ concept PrimC = requires(PrimType pt)
 };
 
 template <class PGType>
-concept PrimitiveGroupC = requires()
+concept PrimitiveGroupC = requires(PGType pg)
 {
     // Mandatory Types
     // Primitive type satisfies its concept (at least on default form)
-    requires PrimC<typename PGType::template Primitive<>>;
+    requires PrimitiveC<typename PGType::template Primitive<>>;
 
     // SoA fashion primitive data. This will be used to access internal
     // of the primitive with a given an index
@@ -170,15 +219,26 @@ concept PrimitiveGroupC = requires()
     // You can write completely new primitive type for that generation.
     PGType::TransContextGeneratorList;
 
+    // Compile-time constant of transform logic
+    PGType::TransformLogic;
+
     // Can query the type
     {PGType::TypeName()} -> std::same_as<std::string_view>;
 
-    //// TODO: Some Functions
+    {pg.ReservePrimitiveBatch(PrimCount{})} -> std::same_as<PrimBatchId>;
+    {pg.CommitReservations()} -> std::same_as<void>;
+    {pg.IsInCommitState()} -> std::same_as<bool>;
+    {pg.AttributeInfo()} -> std::same_as<PrimAttributeInfoList>;
+    {pg.PushAttribute(PrimBatchId{}, uint32_t{},
+                      std::vector<Byte>{})} -> std::same_as<void>;
+    {pg.PushAttribute(PrimBatchId{}, uint32_t{}, Vector2ui{},
+                      std::vector<Byte>{})} ->std::same_as<void>;
+    {pg.GPUMemoryUsage()} -> std::same_as<size_t>;
 };
 
 // Support Concepts
 template <class PrimType, class PrimGroupType, class Surface>
-concept PrimWithSurfaceC = requires(PrimType mg,
+concept PrimitiveWithSurfaceC = requires(PrimType mg,
                                     Surface& surface)
 {
     // Base concept
@@ -197,32 +257,28 @@ concept PrimWithSurfaceC = requires(PrimType mg,
 };
 
 // Some common types
-using PrimAttributeInfo = std::pair<PrimitiveAttributeLogic, MRayDataTypeRT>;
-using PrimBatchId = uint32_t;
-using PrimCount = std::pair<uint32_t, uint32_t>;
-using PrimRange = std::pair<Vector2ui, Vector2ui>;
-using PrimitiveRangeMap = std::unordered_map<PrimBatchId, PrimRange>;
-using PrimitiveCountMap = std::unordered_map<PrimBatchId, PrimCount>;
+struct PrimRange { Vector2ui primRange; Vector2ui attributeRange; };
+
+using BatchIdType = typename PrimLocalBatchId::T;
+
+using PrimitiveRangeMap = std::unordered_map<BatchIdType, PrimRange>;
+using PrimitiveCountMap = std::unordered_map<BatchIdType, PrimCount>;
 
 class PrimitiveGroupI
 {
     public:
     virtual ~PrimitiveGroupI() = default;
 
-    virtual PrimBatchId         ReservePrimitiveBatch(uint32_t primitiveCount,
-                                                      uint32_t attributeCount) = 0;
-    virtual bool                RemoveReservation(PrimBatchId batchId) = 0;
-    virtual void                CommitReservations() = 0;
-    virtual bool                IsInCommitState() const = 0;
-    virtual uint32_t            GetAttributeCount() const = 0;
-    virtual PrimAttributeInfo   GetAttributeInfo(uint32_t attributeIndex) const = 0;
-    virtual void                PushAttributeData(PrimBatchId batchId, uint32_t attributeIndex,
+    virtual PrimBatchId             ReservePrimitiveBatch(PrimCount) = 0;
+    virtual void                    CommitReservations() = 0;
+    virtual bool                    IsInCommitState() const = 0;
+    virtual PrimAttributeInfoList   AttributeInfo() const = 0;
+    virtual void                    PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
                                                   std::vector<Byte> data) = 0;
-    virtual void                PushAttributeData(PrimBatchId batchId, uint32_t attributeIndex,
-                                                  Vector2ui subBatchRange, std::vector<Byte> data) = 0;
-    virtual size_t              GPUMemoryUsage() const = 0;
-
-    //virtual const PrimitiveRangeMap& GetCommitted
+    virtual void                    PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
+                                                  const Vector2ui& subBatchRange,
+                                                  std::vector<Byte> data) = 0;
+    virtual size_t                  GPUMemoryUsage() const = 0;
 };
 
 // Intermediate class that handles memory management
@@ -230,13 +286,13 @@ class PrimitiveGroupI
 template<class Child>
 class PrimitiveGroup : public PrimitiveGroupI
 {
-    static constexpr size_t HashTableReserveSize = 64;
+    static constexpr size_t     HashTableReserveSize = 64;
     // Device Memory Related
-    static constexpr size_t AllocGranularity = 64_MiB;
-    static constexpr size_t InitialReservation = 256_MiB;
+    static constexpr size_t     AllocGranularity = 64_MiB;
+    static constexpr size_t     InitialReservation = 256_MiB;
 
     private:
-    PrimBatchId         batchCounter;
+    uint32_t            batchCounter;
     protected:
     const GPUSystem&    gpuSystem;
 
@@ -244,23 +300,35 @@ class PrimitiveGroup : public PrimitiveGroupI
     PrimitiveCountMap   batchCounts;
     bool                isCommitted;
     DeviceMemory        memory;
+    uint32_t            primGroupId;
 
     template <class... Args>
     std::tuple<Span<Args>...>   GenericCommit(std::array<bool, sizeof...(Args)> isAttributeList);
 
-    public:
-                                PrimitiveGroup(const GPUSystem&);
+    template <class T>
+    void                        GenericPushData(PrimBatchId batchId,
+                                                const Span<T>& primData,
+                                                std::vector<Byte> data,
+                                                bool isPerPrimitive) const;
+    template <class T>
+    void                        GenericPushData(PrimBatchId batchId,
+                                                const Span<T>& primData,
+                                                const Vector2ui& subBatchRange,
+                                                std::vector<Byte> data,
+                                                bool isPerPrimitive) const;
 
-    PrimBatchId                 ReservePrimitiveBatch(uint32_t primitiveCount,
-                                                      uint32_t attributeCount) override;
-    virtual bool                RemoveReservation(PrimBatchId batchId) override;
+
+    public:
+                                PrimitiveGroup(uint32_t primGroupId, const GPUSystem&);
+
+    PrimBatchId                 ReservePrimitiveBatch(PrimCount) override;
     virtual bool                IsInCommitState() const override;
-    virtual bool                GPUMemoryUsage() const override;
+    virtual size_t              GPUMemoryUsage() const override;
 };
 
 template<class Child>
 template <class... Args>
-std::tuple<Span<Args>...> PrimitiveGroup<Child>::GenericCommit(std::array<bool, sizeof...(Args)> isAttributeList)
+std::tuple<Span<Args>...> PrimitiveGroup<Child>::GenericCommit(std::array<bool, sizeof...(Args)> isPerPrimitiveList)
 {
     assert(batchRanges.empty());
     if(isCommitted)
@@ -273,13 +341,16 @@ std::tuple<Span<Args>...> PrimitiveGroup<Child>::GenericCommit(std::array<bool, 
     Vector2ui offsets = Vector2ui::Zero();
     for(const auto& c : batchCounts)
     {
-        std::pair range(Vector2ui(offsets[0], offsets[0] + c.second.first),
-                        Vector2ui(offsets[1], offsets[1] + c.second.second));
+        PrimRange range
+        {
+            .primRange = Vector2ui(offsets[0], offsets[0] + c.second.primCount),
+            .attributeRange = Vector2ui(offsets[1], offsets[1] + c.second.attributeCount)
+        };
         [[maybe_unused]]
         auto r = batchRanges.emplace(c.first, range);
         assert(r.second);
 
-        offsets = Vector2ui(range.first[1], range.second[1]);
+        offsets = Vector2ui(range.primRange[1], range.attributeRange[1]);
     }
     // Rename for clarity
     Vector2ui totalSize = offsets;
@@ -289,8 +360,8 @@ std::tuple<Span<Args>...> PrimitiveGroup<Child>::GenericCommit(std::array<bool, 
     std::array<size_t, TotalElements> sizes;
     for(size_t i = 0; i < TotalElements; i++)
     {
-        bool isAttribute = isAttributeList[i];
-        sizes[i] = (isAttribute) ? totalSize[1] : totalSize[0];
+        bool isPerPrimitive = isPerPrimitiveList[i];
+        sizes[i] = (isPerPrimitive) ? totalSize[0] : totalSize[1];
     }
 
     std::tuple<Span<Args>...> result;
@@ -300,10 +371,57 @@ std::tuple<Span<Args>...> PrimitiveGroup<Child>::GenericCommit(std::array<bool, 
 }
 
 template<class Child>
-PrimitiveGroup<Child>::PrimitiveGroup(const GPUSystem& s)
+template <class T>
+void PrimitiveGroup<Child>::GenericPushData(PrimBatchId batchId,
+                                            const Span<T>& primData,
+                                            std::vector<Byte> data,
+                                            bool isPerPrimitive) const
+{
+    // TODO: parallel issue maybe?
+    // TODO: utilize multi device maybe
+    const GPUQueue& deviceQueue = gpuSystem.BestDevice().GetQueue(0);
+
+    const auto it = batchRanges.find(static_cast<BatchIdType>(batchId.localBatchId));
+    Vector2ui attribRange = (isPerPrimitive)
+                                ? it->second.primRange
+                                : it->second.attributeRange;
+    size_t count = attribRange[1] - attribRange[0];
+    Span<T> dSubBatch = primData.subspan(attribRange[0], count);
+    deviceQueue.MemcpyAsync(dSubBatch, ToSpan<const T>(data));
+    deviceQueue.IssueBufferForDestruction(std::move(data));
+}
+
+template<class Child>
+template <class T>
+void PrimitiveGroup<Child>::GenericPushData(PrimBatchId batchId,
+                                            const Span<T>& primData,
+                                            const Vector2ui& subBatchRange,
+                                            std::vector<Byte> data,
+                                            bool isPerPrimitive) const
+{
+    // TODO: parallel issue maybe?
+    // TODO: utilize multi device maybe
+    const GPUQueue& deviceQueue = gpuSystem.BestDevice().GetQueue(0);
+
+    const auto it = batchRanges.find(static_cast<BatchIdType>(batchId.localBatchId));
+    Vector2ui attribRange = (isPerPrimitive)
+                                ? it->second.primRange
+                                : it->second.attributeRange;
+    size_t count = attribRange[1] - attribRange[0];
+    Span<T> dSubBatch = primData.subspan(attribRange[0], count);
+    size_t subCount = subBatchRange[1] - subBatchRange[0];
+    Span<T> dSubSubBatch = dSubBatch.subspan(subBatchRange[0], subCount);
+
+    deviceQueue.MemcpyAsync(dSubBatch, ToSpan<const T>(data));
+    deviceQueue.IssueBufferForDestruction(std::move(data));
+}
+
+template<class Child>
+PrimitiveGroup<Child>::PrimitiveGroup(uint32_t primGroupId, const GPUSystem& s)
     : gpuSystem(s)
     , batchCounter(0)
     , isCommitted(false)
+    , primGroupId(primGroupId)
     , memory(gpuSystem.AllGPUs(), AllocGranularity, InitialReservation)
 {
     batchRanges.reserve(HashTableReserveSize);
@@ -311,8 +429,7 @@ PrimitiveGroup<Child>::PrimitiveGroup(const GPUSystem& s)
 }
 
 template<class Child>
-PrimBatchId PrimitiveGroup<Child>::ReservePrimitiveBatch(uint32_t primitiveCount,
-                                                         uint32_t attributeCount)
+PrimBatchId PrimitiveGroup<Child>::ReservePrimitiveBatch(PrimCount primCount)
 {
     if(isCommitted)
     {
@@ -321,32 +438,16 @@ PrimBatchId PrimitiveGroup<Child>::ReservePrimitiveBatch(uint32_t primitiveCount
                          Child::TypeName());
         return std::numeric_limits<PrimBatchId>::max();
     }
-
     [[maybe_unused]]
-    auto r = batchCounts.emplace(batchCounter, std::pair(primitiveCount, attributeCount));
+    auto r = batchCounts.emplace(batchCounter, primCount);
     assert(r.second);
     batchCounter++;
-    return batchCounter - 1;
-}
 
-template<class Child>
-bool PrimitiveGroup<Child>::RemoveReservation(PrimBatchId batchId)
-{
-    if(isCommitted)
+    return PrimBatchId
     {
-        MRAY_WARNING_LOG("{:s} is in committed state, "
-                         " you change cannot change reservations!",
-                         Child::TypeName());
-        return false;
-    }
-
-    bool isRemoved = static_cast<bool>(batchCounts.erase(batchId));
-    if(!isRemoved)
-    {
-        MRAY_WARNING_LOG("{:s}: unable to remove reservation for batch {}!",
-                         Child::TypeName(), batchId);
-    }
-    return isRemoved;
+        .primGroupId = PrimGroupId{primGroupId},
+        .localBatchId = PrimLocalBatchId{batchCounter - 1}
+    };
 }
 
 template<class Child>
@@ -356,7 +457,7 @@ bool PrimitiveGroup<Child>::IsInCommitState() const
 }
 
 template<class Child>
-bool PrimitiveGroup<Child>::GPUMemoryUsage() const
+size_t PrimitiveGroup<Child>::GPUMemoryUsage() const
 {
     return memory.Size();
 }

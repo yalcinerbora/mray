@@ -30,30 +30,6 @@ concept MemoryC = requires(MemT m, const MemT cm)
     { static_cast<Byte*>(m) } -> std::same_as<Byte*>;
 };
 
-// Untill c++23, we custom define this
-// https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2674r0.pdf
-// Directly from the above paper
-template <class T>
-concept ImplicitLifetimeC = requires()
-{
-    std::disjunction
-    <
-        std::is_scalar<T>,
-        std::is_array<T>,
-        std::is_aggregate<T>,
-        std::conjunction
-        <
-            std::is_trivially_destructible<T>,
-            std::disjunction
-            <
-                std::is_trivially_default_constructible<T>,
-                std::is_trivially_copy_constructible<T>,
-                std::is_trivially_move_constructible<T>
-            >
-        >
-    >::value;
-};
-
 namespace MemAlloc
 {
 

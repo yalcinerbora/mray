@@ -7,14 +7,14 @@ template <class SpectrumTransformer>
 MRAY_HYBRID MRAY_CGPU_INLINE
 LambertMaterial<SpectrumTransformer>::LambertMaterial(const typename SpectrumTransformer::Converter& specTransformer,
                                                       const LambertMatData& soa, MaterialId id)
-    : albedoTex(specTransformer, soa.dAlbedo[id])
-    , normalMapTex(soa.dNormalMaps[id])
-    , mediumId(soa.dMediumIds[id])
+    : albedoTex(specTransformer, soa.dAlbedo[id.FetchIndexPortion()])
+    , normalMapTex(soa.dNormalMaps[id.FetchIndexPortion()])
+    , mediumId(soa.dMediumIds[id.FetchIndexPortion()])
 {}
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Sample<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3& wI,
+SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3& wI,
                                                    const Surface& surface,
                                                    RNGDispenser& dispenser) const
 {
