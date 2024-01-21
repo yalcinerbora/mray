@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Device/GPUSystem.h"
+#include "TracerTypes.h"
 
 // Meta Texture Type
 template <uint32_t DIMS, class T>

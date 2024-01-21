@@ -4,6 +4,8 @@
 #include <tuple>
 #include <cstddef>
 
+#include "Types.h"
+
 // Compile time recursion on a Tuple of KeyValueType types.
 //
 // Returns a compile-time value (in this case a function)
@@ -86,7 +88,7 @@ namespace TypeFinder
         }
 
         template<auto CheckValue, class Tuple, size_t I>
-        requires (I < std::tuple_size_v<Tuple>) //&& HasKeyAsValueC<std::tuple_element_t<I, Tuple>>)
+        requires (I < std::tuple_size_v<Tuple> && HasKeyAsValueC<std::tuple_element_t<I, Tuple>>)
         constexpr size_t LoopAndFindV(Tuple&& t)
         {
             constexpr auto Key = std::tuple_element_t<I, Tuple>::Key;
@@ -112,8 +114,8 @@ namespace TypeFinder
     template<class CheckType, class... KVTypes>
     constexpr auto GetTupleElementVariadic()
     {
-        constexpr std::tuple<KVTypes...> GenFuncList = std::make_tuple(KVTypes{}...);
-        return GetTupleElement<CheckType, std::tuple<KVTypes...>>(std::move(GenFuncList));
+        constexpr Tuple<KVTypes...> GenFuncList = std::make_tuple(KVTypes{}...);
+        return GetTupleElement<CheckType, Tuple<KVTypes...>>(std::move(GenFuncList));
     }
 
     // Concrete value version "CheckType" is some form of value
@@ -128,7 +130,7 @@ namespace TypeFinder
     template<auto CheckValue, class... KVTypes>
     constexpr auto GetTupleElementVariadic()
     {
-        constexpr std::tuple<KVTypes...> GenFuncList = std::make_tuple(KVTypes{}...);
-        return GetTupleElement<CheckValue, std::tuple<KVTypes...>>(std::move(GenFuncList));
+        constexpr Tuple<KVTypes...> GenFuncList = std::make_tuple(KVTypes{}...);
+        return GetTupleElement<CheckValue, Tuple<KVTypes...>>(std::move(GenFuncList));
     }
 }

@@ -20,7 +20,7 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3& wI,
 {
     using GraphicsFunctions::SampleCosDirection;
     // Sampling a vector from cosine weighted hemispherical distribution
-    Vector2 xi = dispenser.NextUniform2D();
+    Vector2 xi = dispenser.NextFloat2D<0>();
     auto [wO, pdf] = SampleCosDirection(xi);
 
     // Check normal Mapping
@@ -47,7 +47,7 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3& wI,
     // directly delegate the incoming position as outgoing
     Ray wORay = Ray(wO, surface.position);
 
-    return Sample<BxDFResult>
+    return SampleT<BxDFResult>
     {
         .sampledResult = BxDFResult
         {
@@ -93,12 +93,11 @@ Spectrum LambertMaterial<ST>::Evaluate(const Ray& wO,
     // wO and wI is already in world space
     normal = surface.shadingTBN.ApplyInvRotation(normal);
 
-    float nDotL = max(normal.Dot(wO.Dir()), 0.0f);
+    Float nDotL = max(normal.Dot(wO.Dir()), 0.0);
     Spectrum albedo = sTransContext(albedoTex(surface.uv,
                                               surface.dpdu,
                                               surface.dpdv));
-    return nDotL * albedo * MathConstants::InvPi;
-    return Spectrum{};
+    return nDotL * albedo * MathConstants::InvPi<Float>();
 }
 
 template <class ST>
@@ -120,8 +119,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 bool LambertMaterial<ST>::IsAllTexturesAreResident(const Surface& surface) const
 {
     bool allResident = true;
-    allResident &= albedoTex(surface.uv,
-                             surface.dpdu,
+    allResident &= albedoTex(surface.uv, surface.dpdu,
                              surface.dpdv).has_value();
     if(normalMapTex)
     {

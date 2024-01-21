@@ -78,7 +78,8 @@ namespace mray::algorithms
 
     #include "AlgReduceCUDA.h"
     #include "AlgRadixSortCUDA.h"
-    #include "AlgBinPartitionCUDA.h"
+    #include "AlgBinaryPartitionCUDA.h"
+    #include "AlgBinarySearchCUDA.h"
 
     namespace DeviceAlgorithms
     {

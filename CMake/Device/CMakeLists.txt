@@ -19,7 +19,8 @@ set(SRC_CUDA_ALGS
     ${CURRENT_SOURCE_DIR}/AlgReduceCUDA.h
     ${CURRENT_SOURCE_DIR}/AlgScanCUDA.h
     ${CURRENT_SOURCE_DIR}/AlgRadixSortCUDA.h
-    ${CURRENT_SOURCE_DIR}/AlgBinPartitionCUDA.h)
+    ${CURRENT_SOURCE_DIR}/AlgBinaryPartitionCUDA.h
+    ${CURRENT_SOURCE_DIR}/AlgBinarySearchCUDA.h)
 
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/GPUAlgorithms.h

@@ -13,8 +13,6 @@ Triangle<T>::Triangle(const T& transform,
     , positions{}
     , transformContext(transform)
 {
-    static constexpr auto VPP = ShapeFunctions::Triangle::TRI_VERTEX_COUNT;
-
     Vector3ui index = data.indexList[id];
     positions[0] = data.positions[index[0]];
     positions[1] = data.positions[index[1]];
@@ -27,30 +25,29 @@ Triangle<T>::Triangle(const T& transform,
 
 template<class T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-TriIntersection Triangle<T>::Intersects(const Ray& ray) const
+Optional<TriIntersection> Triangle<T>::Intersects(const Ray& ray, bool cullBackface) const
 {
-    uint32_t primSubBatchId = data.subBatchTable.FindIndex(id);
-    const bool cullBackface = data.cullFace[primSubBatchId];
-
     // Intersection
     float t;
     Vector3 baryCoords;
-    bool intersects = false;
     bool intersects = ray.IntersectsTriangle(baryCoords, t,
                                              positions,
                                              cullBackface);
-
-    TriIntersection result = (!intersects) ? std::nullopt_t : IntersectionT<TriHit>
+    if(intersects)
     {
-        .t = t,
-        .hit = Vector2(baryCoords)
-    };
-    return result;
+        return TriIntersection
+        {
+            .t = t,
+            .hit = Vector2(baryCoords)
+        };
+    }
+    else
+        return std::nullopt;
 }
 
 template<class T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<BasicSurface> Triangle<T>::SampleSurface(const RNGDispenser& rng) const
+SampleT<BasicSurface> Triangle<T>::SampleSurface(RNGDispenser& rng) const
 {
     Vector2 xi = rng.NextFloat2D<0>();
     Float r1 = sqrt(xi[0]);
@@ -79,12 +76,12 @@ SampleT<BasicSurface> Triangle<T>::SampleSurface(const RNGDispenser& rng) const
     using ShapeFunctions::Triangle::Normal;
     return SampleT<BasicSurface>
     {
-        .pdf = pdf,
         .sampledResult = BasicSurface
         {
             .position = position,
-            .geoNormal = normal
-        }
+            .normal = normal
+        },
+        .pdf = pdf
     };
 }
 
@@ -142,8 +139,6 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
 {
     using namespace MathConstants;
     using namespace GraphicsFunctions;
-    using Vector3::XAxis;
-    using Vector3::YAxis;
 
     // Clang signbit definition is only on std namespace
     // this is a crappy workaround, since this is only a device function
@@ -175,9 +170,17 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
     Quaternion rot;
     switch(domAxis)
     {
-        case 0: rot = Quaternion(Pi<Float>() * Float {0.5}, -domSign * YAxis()); break;
-        case 1: rot = Quaternion(Pi<Float>() * Float {0.5},  domSign * XAxis()); break;
-        case 2: rot = (hasNegSign) ? Quaternion(Pi<Float>(), YAxis()) : Quaternion::Identity(); break;
+        case 0: rot = Quaternion(Pi<Float>() * Float {0.5}, -domSign * Vector3::YAxis()); break;
+        case 1: rot = Quaternion(Pi<Float>() * Float {0.5},  domSign * Vector3::XAxis()); break;
+        case 2: rot = (hasNegSign) ? Quaternion(Pi<Float>(), Vector3::YAxis()) : Quaternion::Identity(); break;
+        default: assert(false); return 0;
+    }
+    Vector2i rasterResolution;
+    switch(domAxis)
+    {
+        case 0: rasterResolution = Vector2i(voxelParams.resolution[2], voxelParams.resolution[1]); break;
+        case 1: rasterResolution = Vector2i(voxelParams.resolution[0], voxelParams.resolution[2]); break;
+        case 2: rasterResolution = Vector2i(voxelParams.resolution[0], voxelParams.resolution[1]); break;
         default: assert(false); return 0;
     }
     // Generate a projection matrix (orthogonal)
@@ -215,20 +218,19 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
     aabbMax = Vector2::Max(aabbMax, positions2D[2]);
 
     // Convert to [0, resolution] (pixel space)
-    Float voxelResolution = Float{voxelParams.resolution};
-    Vector2i xRangeInt(floor((Float{0.5} + Float{0.5} *aabbMin[0]) * voxelResolution),
-                       ceil((Float{0.5} + Float{0.5} *aabbMax[0]) * voxelResolution));
-    Vector2i yRangeInt(floor((Float{0.5} + Float{0.5} *aabbMin[1]) * voxelResolution),
-                       ceil((Float{0.5} + Float{0.5} *aabbMax[1]) * voxelResolution));
+    Vector2i xRangeInt(floor((Float{0.5} + Float{0.5} * aabbMin[0]) * rasterResolution[0]),
+                       ceil((Float{0.5} + Float{0.5} * aabbMax[0]) * rasterResolution[0]));
+    Vector2i yRangeInt(floor((Float{0.5} + Float{0.5} * aabbMin[1]) * rasterResolution[1]),
+                       ceil((Float{0.5} + Float{0.5} * aabbMax[1]) * rasterResolution[1]));
     // Clip the range
-    xRangeInt.ClampSelf(0, voxelParams.resolution);
-    yRangeInt.ClampSelf(0, voxelParams.resolution);
+    xRangeInt.ClampSelf(0, rasterResolution[0]);
+    yRangeInt.ClampSelf(0, rasterResolution[1]);
 
     // Conservative Rasterization
     // Move all the edges "outwards" at least half a pixel
     // Notice NDC is [-1, 1] pixel size is 2 / resolution
-    const float halfPixel = Float{1} / voxelResolution;
-    const float deltaPix = Float{2} * halfPixel;
+    const Vector2 halfPixel = Vector2(1) / Vector2(rasterResolution);
+    const Vector2 deltaPix = Vector2(2) * halfPixel;
     // https://developer.nvidia.com/gpugems/gpugems2/part-v-image-oriented-computing/chapter-42-conservative-rasterization
     // This was CG shader code which was optimized
     // with a single cross product you can find the line equation
@@ -241,9 +243,9 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
     planes[2] = Vector3::Cross(Vector3(positions2D[0] - positions2D[2], 0),
                                Vector3(positions2D[2], 1));
     // Move the planes by the appropriate diagonal
-    planes[0][2] -= Vector2(halfPixel).Dot(Vector2(planes[0]).Abs());
-    planes[1][2] -= Vector2(halfPixel).Dot(Vector2(planes[1]).Abs());
-    planes[2][2] -= Vector2(halfPixel).Dot(Vector2(planes[2]).Abs());
+    planes[0][2] -= halfPixel.Dot(Vector2(planes[0]).Abs());
+    planes[1][2] -= halfPixel.Dot(Vector2(planes[1]).Abs());
+    planes[2][2] -= halfPixel.Dot(Vector2(planes[2]).Abs());
     // Compute the intersection point of the planes.
     // Again this code utilizes cross product to find x,y positions with (w)
     // which was implicitly divided by the rasterizer pipeline
@@ -273,8 +275,8 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
     for(int x = xRangeInt[0]; x < xRangeInt[1]; x++)
     {
         // Gen Point (+0.5 for pixel middle)
-        Vector2 pos = Vector2((static_cast<float>(x) + Float{0.5}) * deltaPix - Float{1},
-                              (static_cast<float>(y) + Float{0.5}) * deltaPix - Float{1});
+        Vector2 pos = Vector2((Float(x) + Float{0.5}) * deltaPix[0] - Float{1},
+                              (Float(y) + Float{0.5}) * deltaPix[1] - Float{1});
 
         // Cramer's Rule
         Vector2 eCons2 = pos - positionsConsv2D[0];
@@ -301,14 +303,12 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
                                     positions[2] * actualC);
 
                 Vector3 voxelIndexF = ((voxelPos - sceneAABB.Min()) / sceneAABB.Span());
-                voxelIndexF *= voxelResolution;
-                Vector3ui voxelIndex = Vector3ui(static_cast<uint32_t>(voxelIndexF[0]),
-                                                 static_cast<uint32_t>(voxelIndexF[1]),
-                                                 static_cast<uint32_t>(voxelIndexF[2]));
+                voxelIndexF *= Vector3(voxelParams.resolution);
+                Vector3ui voxelIndex = Vector3ui(voxelIndexF);
 
                 // TODO: This sometimes happen but it shouldn't??
                 // Clamp the Voxel due to numerical errors
-                voxelIndex.ClampSelf(0, voxelParams.resolution - 1);
+                voxelIndex.ClampSelf(Vector3ui::Zero(), Vector3ui(voxelParams.resolution - 1));
 
                 uint64_t voxelIndexMorton = MortonCode::Compose3D<uint64_t>(voxelIndex);
                 // Write the found voxel
@@ -356,7 +356,6 @@ Optional<BasicSurface> Triangle<T>::SurfaceFromHit(const Hit& hit) const
     };
 }
 
-
 template<class T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Optional<TriHit> Triangle<T>::ProjectedHit(const Vector3& point) const
@@ -402,10 +401,6 @@ void Triangle<T>::GenerateSurface(BasicSurface& result,
                                   const Ray& ray,
                                   const DiffRay& differentials) const
 {
-    // Check if the prim is two-sided
-    uint32_t primSubBatchId = data.subBatchTable.FindIndex(id);
-    bool twoSided = !data.cullFace[primSubBatchId];
-
     Float a = baryCoords[0];
     Float b = baryCoords[1];
     Float c = Float{1} - a - b;
@@ -418,7 +413,7 @@ void Triangle<T>::GenerateSurface(BasicSurface& result,
     using ShapeFunctions::Triangle::Normal;
     Vector3 geoNormal = Normal(positions);
 
-    bool backSide = twoSided && (geoNormal.Dot(ray.Dir()) > 0.0f);
+    bool backSide = (geoNormal.Dot(ray.Dir()) > 0.0f);
     if(backSide) geoNormal = -geoNormal;
 
     result = BasicSurface
@@ -445,7 +440,7 @@ void Triangle<T>::GenerateSurface(BarycentricSurface& result,
                    positions[1] * b +
                    positions[2] * c);
 
-    return BarycentricSurface
+    result = BarycentricSurface
     {
         .position = pos,
         .baryCoords = Vector3(a, b, c)
@@ -460,12 +455,6 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
                                   const Ray& ray,
                                   const DiffRay& differentials) const
 {
-    static constexpr auto VPP = ShapeFunctions::Triangle::TRI_VERTEX_COUNT;
-
-    // Check if the prim is two-sided
-    uint32_t primSubBatchId = data.subBatchTable.FindIndex(id);
-    bool twoSided = !data.cullFace[primSubBatchId];
-
     Float a = baryCoords[0];
     Float b = baryCoords[1];
     Float c = Float{1} - a - b;
@@ -485,9 +474,8 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     Quaternion tbn = Quaternion::BarySLerp(q0, q1, q2, a, b);
     tbn.NormalizeSelf();
 
-    // If The requested primitive is two sided
     // Flip the surface definitions (normal, geometric normal)
-    bool backSide = twoSided && (geoNormal.Dot(ray.Dir()) > 0.0f);
+    bool backSide = (geoNormal.Dot(ray.Dir()) > 0.0f);
     if(backSide)
     {
         geoNormal = -geoNormal;

@@ -110,7 +110,7 @@ class DeviceMemoryCUDA
         CUmemGenericAllocationHandle    handle;
         size_t                          allocSize;
     };
-    using VARanges = std::pair<CUdeviceptr, size_t>;
+    using VARanges = Pair<CUdeviceptr, size_t>;
 
 
     private:

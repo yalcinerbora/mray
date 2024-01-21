@@ -6,10 +6,11 @@
 
 #include "Core/MRayDataType.h"
 #include "Core/MemAlloc.h"
-#include "Device/GPUSystemForward.h"
+#include "Device/GPUSystem.h"
 
 #include "TracerTypes.h"
 #include "TracerInterface.h"
+#include "Transforms.h"
 
 // Transform types
 // This enumeration is tied to a primitive group
@@ -50,7 +51,7 @@ enum class PrimitiveAttributeLogic
 struct PrimAttributeConverter
 {
     using enum PrimitiveAttributeLogic;
-    static constexpr std::array<std::string_view, std::to_underlying(END)> Names =
+    static constexpr std::array<std::string_view, static_cast<size_t>(END)> Names =
     {
         "Position",
         "Index",
@@ -68,7 +69,7 @@ struct PrimAttributeConverter
 
 constexpr std::string_view PrimAttributeConverter::ToString(PrimitiveAttributeLogic e)
 {
-    return Names[std::to_underlying(e)];
+    return Names[static_cast<uint32_t>(e)];
 }
 
 constexpr PrimitiveAttributeLogic PrimAttributeConverter::FromString(std::string_view sv)
@@ -83,8 +84,6 @@ constexpr PrimitiveAttributeLogic PrimAttributeConverter::FromString(std::string
     return PrimitiveAttributeLogic(END);
 }
 
-class TransformContextIdentity;
-
 template<class Surface, class Prim, class Hit>
 using SurfaceGenFunc = Surface(Prim::*)(const Hit&,
                                         const DiffRay&,
@@ -97,39 +96,37 @@ using TransformContextGenFunc = TransformContext(*)(const TransformData&,
                                                     PrimitiveId);
 
 template <class PrimType>
-concept PrimitiveC = requires(PrimType pt)
+concept PrimitiveC = requires(PrimType pt, RNGDispenser& rng,
+                              Span<uint64_t> mortonCodes,
+                              Span<Vector2us> voxelNormals)
 {
     typename PrimType::Hit;
     typename PrimType::DataSoA;
 
     // Has this specific constructor
-    requires requires(const TransformContextIdentity& tc,
-                      const typename PrimType::DataSoA& soaData)
-    {
-        PrimType(tc, soaData, PrimitiveId{});
-    };
+    //requires requires(const TransformContextIdentity& tc,
+    //                  const typename PrimType::DataSoA& soaData)
+    PrimType(TransformContextIdentity{},
+             typename PrimType::DataSoA{}, PrimitiveId{});
 
     // Intersect function
-    {pt.Intersects(Ray{})
+    {pt.Intersects(Ray{}, bool{})
     } -> std::same_as<Optional<IntersectionT<typename PrimType::Hit>>>;
 
     // Parametrized sampling
-    requires requires(Float f, Vector3 v3, RNGDispenser rng)
-    {
-        // Sample a position over the parametrized surface
-        {pt.SampleSurface(rng)
-        } -> std::same_as<SampleT<BasicSurface>>;
+    // Sample a position over the parametrized surface
+    {pt.SampleSurface(rng)
+    } -> std::same_as<SampleT<BasicSurface>>;
 
-        // PDF of sampling such position
-        // Conservative towards non-zero values
-        // primitive may try to resolve position is on surface
-        // but inherently assumes position is on surface
-        {pt.PdfSurface(typename PrimType::Hit{})
-        } -> std::same_as<Float>;
+    // PDF of sampling such position
+    // Conservative towards non-zero values
+    // primitive may try to resolve position is on surface
+    // but inherently assumes position is on surface
+    {pt.PdfSurface(typename PrimType::Hit{})
+    } -> std::same_as<Float>;
 
-        {pt.SampleRNCount()
-        } -> std::same_as<uint32_t>;
-    };
+    {pt.SampleRNCount()
+    } -> std::same_as<uint32_t>;
 
     // Total surface area
     {pt.GetSurfaceArea()
@@ -149,12 +146,9 @@ concept PrimitiveC = requires(PrimType pt)
     // voxels will be used for approixmate invariant scene representation
     // Many methods require discretized scene representation
     // for GPU-based renderer voxels are a good choice
-    requires requires(Span<uint64_t> s0, Span<Vector2us> s1)
-    {
-        {pt.Voxelize(s0, s1, bool{},
-                     VoxelizationParameters{})
-        } -> std::same_as<uint32_t>;
-    };
+    {pt.Voxelize(mortonCodes, voxelNormals, bool{},
+                 VoxelizationParameters{})
+    } -> std::same_as<uint32_t>;
 
     // Generate a basic surface from hit (utilized by light sampler)
     {pt.SurfaceFromHit(typename PrimType::Hit{})
@@ -297,11 +291,11 @@ class PrimitiveGroup : public PrimitiveGroupI
     PrimitiveRangeMap   batchRanges;
     PrimitiveCountMap   batchCounts;
     bool                isCommitted;
-    DeviceMemory        memory;
+    DeviceMemory        deviceMem;
     uint32_t            primGroupId;
 
     template <class... Args>
-    std::tuple<Span<Args>...>   GenericCommit(std::array<bool, sizeof...(Args)> isAttributeList);
+    Tuple<Span<Args>...>        GenericCommit(std::array<bool, sizeof...(Args)> isAttributeList);
 
     template <class T>
     void                        GenericPushData(PrimBatchId batchId,
@@ -324,16 +318,47 @@ class PrimitiveGroup : public PrimitiveGroupI
     virtual size_t              GPUMemoryUsage() const override;
 };
 
+template<class TransContextType = TransformContextIdentity>
+class EmptyPrimitive
+{
+    public:
+    using DataSoA           = EmptyType;
+    using Hit               = EmptyType;
+    using Intersection      = Optional<IntersectionT<EmptyType>>;
+
+    constexpr               EmptyPrimitive(const TransContextType&,
+                                           const DataSoA&, PrimitiveId);
+    constexpr Intersection  Intersects(const Ray&, bool) const;
+    constexpr
+    SampleT<BasicSurface>   SampleSurface(const RNGDispenser&) const;
+    constexpr Float         PdfSurface(const Hit& hit) const;
+    constexpr uint32_t      SampleRNCount() const;
+    constexpr Float         GetSurfaceArea() const;
+    constexpr AABB3         GetAABB() const;
+    constexpr Vector3       GetCenter() const;
+    constexpr uint32_t      Voxelize(Span<uint64_t>& mortonCodes,
+                                     Span<Vector2us>& normals,
+                                     bool onlyCalculateSize,
+                                     const VoxelizationParameters& voxelParams) const;
+    constexpr
+    Optional<BasicSurface>  SurfaceFromHit(const Hit& hit) const;
+    constexpr Optional<Hit> ProjectedHit(const Vector3& point) const;
+    constexpr Vector2       SurfaceParametrization(const Hit& hit) const;
+};
+
+static_assert(PrimitiveC<EmptyPrimitive<>>,
+              "Empty primitive does not satisfy Primitive concept!");
+
 template<class Child>
 template <class... Args>
-std::tuple<Span<Args>...> PrimitiveGroup<Child>::GenericCommit(std::array<bool, sizeof...(Args)> isPerPrimitiveList)
+Tuple<Span<Args>...> PrimitiveGroup<Child>::GenericCommit(std::array<bool, sizeof...(Args)> isPerPrimitiveList)
 {
     assert(batchRanges.empty());
     if(isCommitted)
     {
         MRAY_WARNING_LOG("{:s} is in committed state, "
                          " you cannot re-commit!", Child::TypeName());
-        return std::tuple<Span<Args>...>{};
+        return Tuple<Span<Args>...>{};
     }
     // Cacluate offsets
     Vector2ui offsets = Vector2ui::Zero();
@@ -362,8 +387,8 @@ std::tuple<Span<Args>...> PrimitiveGroup<Child>::GenericCommit(std::array<bool, 
         sizes[i] = (isPerPrimitive) ? totalSize[0] : totalSize[1];
     }
 
-    std::tuple<Span<Args>...> result;
-    MemAlloc::AllocateMultiData<DeviceMemory, Args...>(result, memory, sizes);
+    Tuple<Span<Args>...> result;
+    MemAlloc::AllocateMultiData<DeviceMemory, Args...>(result, deviceMem, sizes);
     isCommitted = true;
     return result;
 }
@@ -420,7 +445,7 @@ PrimitiveGroup<Child>::PrimitiveGroup(uint32_t primGroupId, const GPUSystem& s)
     , batchCounter(0)
     , isCommitted(false)
     , primGroupId(primGroupId)
-    , memory(gpuSystem.AllGPUs(), AllocGranularity, InitialReservation)
+    , deviceMem(s.AllGPUs(), AllocGranularity, InitialReservation, true)
 {
     batchRanges.reserve(HashTableReserveSize);
     batchCounts.reserve(HashTableReserveSize);
@@ -457,5 +482,79 @@ bool PrimitiveGroup<Child>::IsInCommitState() const
 template<class Child>
 size_t PrimitiveGroup<Child>::GPUMemoryUsage() const
 {
-    return memory.Size();
+    return deviceMem.Size();
+}
+
+template<class TC>
+constexpr EmptyPrimitive<TC>::EmptyPrimitive(const TC&, const DataSoA&, PrimitiveId)
+{}
+
+template<class TC>
+constexpr Optional<IntersectionT<EmptyType>> EmptyPrimitive<TC>::Intersects(const Ray&, bool) const
+{
+    return std::nullopt;
+}
+
+template<class TC>
+constexpr SampleT<BasicSurface> EmptyPrimitive<TC>::SampleSurface(const RNGDispenser&) const
+{
+    return SampleT<BasicSurface>{};
+}
+
+template<class TC>
+constexpr Float EmptyPrimitive<TC>::PdfSurface(const Hit& hit) const
+{
+    return Float{std::numeric_limits<Float>::signaling_NaN()};
+}
+
+template<class TC>
+constexpr uint32_t EmptyPrimitive<TC>::SampleRNCount() const
+{
+    return 0;
+}
+
+template<class TC>
+constexpr Float EmptyPrimitive<TC>::GetSurfaceArea() const
+{
+    return std::numeric_limits<Float>::signaling_NaN();
+}
+
+template<class TC>
+constexpr AABB3 EmptyPrimitive<TC>::GetAABB() const
+{
+    return AABB3(Vector3(std::numeric_limits<Float>::signaling_NaN()),
+                 Vector3(std::numeric_limits<Float>::signaling_NaN()));
+}
+
+template<class TC>
+constexpr Vector3 EmptyPrimitive<TC>::GetCenter() const
+{
+    return Vector3(std::numeric_limits<Float>::signaling_NaN());
+}
+
+template<class TC>
+constexpr uint32_t EmptyPrimitive<TC>::Voxelize(Span<uint64_t>& mortonCodes,
+                                                Span<Vector2us>& normals,
+                                                bool onlyCalculateSize,
+                                                const VoxelizationParameters& voxelParams) const
+{
+    return 0;
+}
+
+template<class TC>
+constexpr Optional<BasicSurface> EmptyPrimitive<TC>::SurfaceFromHit(const Hit& hit) const
+{
+    return std::nullopt;
+}
+
+template<class TC>
+constexpr Optional<EmptyType> EmptyPrimitive<TC>::ProjectedHit(const Vector3& point) const
+{
+    return std::nullopt;
+}
+
+template<class TC>
+constexpr Vector2 EmptyPrimitive<TC>::SurfaceParametrization(const Hit& hit) const
+{
+    return Vector2::Zero();
 }

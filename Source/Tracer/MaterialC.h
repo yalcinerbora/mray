@@ -6,7 +6,7 @@
 #include "TracerTypes.h"
 
 template <class MatType, class MatGroupType>
-concept MaterialC = requires(MatType mt)
+concept MaterialC = requires(MatType mt, RNGDispenser& rng)
 {
     // Has a surface definition
     // Materials can only act on a single surface type
@@ -20,13 +20,9 @@ concept MaterialC = requires(MatType mt)
     // instead of a direction)
     // This means for other types ray.pos == surface.pos
     // At the same time we sample a reflectio
-    requires requires(RNGDispenser& rng)
-    {
-        {mt.SampleBxDF(Vector3{},
-                       typename MatType::Surface{},
-                       rng)
-        } -> std::same_as<Sample<BxDFResult>>;
-    };
+    {mt.SampleBxDF(Vector3{}, typename MatType::Surface{},
+                   rng)
+    } -> std::same_as<SampleT<BxDFResult>>;
 
     // Given wO (with outgoing position)
     // and wI (with incoming position)

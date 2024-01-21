@@ -17,7 +17,8 @@ set(SRC_TRANSFORMS
 set(SRC_MATERIALS
     ${CURRENT_SOURCE_DIR}/MaterialC.h
     ${CURRENT_SOURCE_DIR}/MaterialsDefault.h
-    ${CURRENT_SOURCE_DIR}/MaterialsDefault.hpp)
+    ${CURRENT_SOURCE_DIR}/MaterialsDefault.hpp
+    ${CURRENT_SOURCE_DIR}/MaterialsDefault.cpp)
 
 set(SRC_ACCELLERATORS
     ${CURRENT_SOURCE_DIR}/AcceleratorC.h
@@ -29,10 +30,12 @@ set(SRC_LIGHTS
     ${CURRENT_SOURCE_DIR}/LightC.h
     ${CURRENT_SOURCE_DIR}/Lights.h
     ${CURRENT_SOURCE_DIR}/Lights.hpp
-    ${CURRENT_SOURCE_DIR}/Lights.cpp)
+    ${CURRENT_SOURCE_DIR}/Lights.cu)
 
 set(SRC_RANDOM
-    ${CURRENT_SOURCE_DIR}/Random.h)
+    ${CURRENT_SOURCE_DIR}/Random.h
+    ${CURRENT_SOURCE_DIR}/Distributions.h
+)
 
 set(SRC_RENDERERS
     ${CURRENT_SOURCE_DIR}/RendererC.h)

@@ -206,7 +206,7 @@ struct alignas(32) RayGMem
 //};
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-std::pair<Ray, Vector2> RayFromGMem(Span<const RayGMem> gRays, RayIndex index)
+Pair<Ray, Vector2> RayFromGMem(Span<const RayGMem> gRays, RayIndex index)
 {
     RayGMem rayGMem = gRays[index];
     return std::make_pair(Ray(rayGMem.dir, rayGMem.pos),

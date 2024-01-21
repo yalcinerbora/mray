@@ -29,7 +29,7 @@ namespace TracerConstants
 }
 
 // Generic Attribute Info
-using GenericAttributeInfo = std::pair<std::string, MRayDataTypeRT>;
+using GenericAttributeInfo = Pair<std::string, MRayDataTypeRT>;
 using TypeNameList = std::vector<std::string>;
 
 // Prim related

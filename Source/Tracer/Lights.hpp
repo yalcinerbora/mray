@@ -5,8 +5,8 @@ namespace LightDetail
 
 template<PrimitiveC P, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-PrimLight<P, SC>::PrimLight(const typename SC::Converter& specTransformer,
-                            const P& p, const LightData& soa, LightId id)
+Light<P, SC>::Light(const typename SC::Converter& specTransformer,
+                    const P& p, const LightData& soa, LightId id)
     : prim(p)
     , radiance(specTransformer, soa.dRadiances[id.FetchIndexPortion()])
     , initialMedium(soa.dMediumIds[id.FetchIndexPortion()])
@@ -15,17 +15,17 @@ PrimLight<P, SC>::PrimLight(const typename SC::Converter& specTransformer,
 
 template<PrimitiveC P, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<Vector3> PrimLight<P, SC>::SampleSolidAngle(RNGDispenser& rng,
-                                                    const Vector3& distantPoint,
-                                                    const Vector3& dir) const
+SampleT<Vector3> Light<P, SC>::SampleSolidAngle(RNGDispenser& rng,
+                                                const Vector3& distantPoint,
+                                                const Vector3& dir) const
 {
     SampleT<BasicSurface> surfaceSample = prim.SampleSurface(rng);
 
-    Float NdL = surfaceSample.sampledResult.geoNormal.Dot(-dir);
+    Float NdL = surfaceSample.sampledResult.normal.Dot(-dir);
     NdL = (isTwoSided) ? abs(NdL) : max(Float{0}, NdL);
     // Get projected area
     Float pdf = (NdL == 0) ? Float{0.0} : surfaceSample.pdf / NdL;
-    pdf *= (distantPoint - surfaceSample.sampledresult.position).LengthSqr();
+    pdf *= (distantPoint - surfaceSample.sampledResult.position).LengthSqr();
 
     return SampleT<Vector3>
     {
@@ -36,55 +36,57 @@ SampleT<Vector3> PrimLight<P, SC>::SampleSolidAngle(RNGDispenser& rng,
 
 template<PrimitiveC P, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float PrimLight<P, SC>::PdfSolidAngle(const typename P::Hit& hit,
-                                      const Vector3& distantPoint,
-                                      const Vector3& dir) const
+Float Light<P, SC>::PdfSolidAngle(const typename P::Hit& hit,
+                                  const Vector3& distantPoint,
+                                  const Vector3& dir) const
 {
     // Project point to surface (function assumes
-    Optional<BasicSurface> surface = prim.SurfaceFromHit(hit);
-    if(!surface) return Float{0};
+    Optional<BasicSurface> surfaceOpt = prim.SurfaceFromHit(hit);
+    if(!surfaceOpt) return Float{0};
+
+    BasicSurface surface = surfaceOpt.value();
 
     Float pdf = prim.PdfSurface(hit);
     Float NdL = surface.normal.Dot(-dir);
     NdL = (isTwoSided) ? abs(NdL) : max(Float{0}, NdL);
     // Get projected area
     pdf = (NdL == 0) ? Float{0.0} : pdf / NdL;
-    pdf *= (distantPoint - surface.position);
+    pdf *= (distantPoint - surface.position).LengthSqr();
     return pdf;
 }
 
 template<PrimitiveC P, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t PrimLight<P, SC>::SampleSolidAngleRNCount() const
+uint32_t Light<P, SC>::SampleSolidAngleRNCount() const
 {
     return prim.SampleRNCount();
 }
 
 template<PrimitiveC P, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<Ray> PrimLight<P, SC>::SampleRay(RNGDispenser& dispenser) const
+SampleT<Ray> Light<P, SC>::SampleRay(RNGDispenser& dispenser) const
 {
     // What is the probability?
 }
 
 template<PrimitiveC P, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float PrimLight<P, SC>::PdfRay(const Ray&) const
+Float Light<P, SC>::PdfRay(const Ray&) const
 {
 
 }
 
 template<PrimitiveC P, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t PrimLight<P, SC>::SampleRayRNCount() const
+uint32_t Light<P, SC>::SampleRayRNCount() const
 {
     return 4;
 }
 
 template<PrimitiveC P, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum PrimLight<P, SC>::Emit(const Vector3& wO,
-                                const typename P::Hit& hitParams) const
+Spectrum Light<P, SC>::Emit(const Vector3& wO,
+                            const typename P::Hit& hitParams) const
 {
     // Find
     Vector2 uv = radiance.Constant()
@@ -95,8 +97,8 @@ Spectrum PrimLight<P, SC>::Emit(const Vector3& wO,
 
 template<PrimitiveC P, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum PrimLight<P, SC>::Emit(const Vector3& wO,
-                                const Vector3& surfacePoint) const
+Spectrum Light<P, SC>::Emit(const Vector3& wO,
+                            const Vector3& surfacePoint) const
 {
     using Hit = typename P::Hit;
     Optional<Hit> hit = prim.ProjectedHit(surfacePoint);
@@ -110,7 +112,7 @@ Spectrum PrimLight<P, SC>::Emit(const Vector3& wO,
 
 template<PrimitiveC P, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-bool PrimLight<P, SC>::IsPrimitiveBackedLight() const
+bool Light<P, SC>::IsPrimitiveBackedLight() const
 {
     return true;
 }

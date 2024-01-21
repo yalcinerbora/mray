@@ -51,7 +51,7 @@ class GenericGroup : public GenericGroupI<IdType, AttribInfo>
     DeviceMemory        memory;
 
     template <class... Args>
-    std::tuple<Span<Args>...>   GenericCommit();
+    Tuple<Span<Args>...>        GenericCommit();
     template <class T>
     void                        GenericPushData(Vector2ui idRange,
                                                 const Span<T>& copyRegion,
@@ -66,7 +66,7 @@ class GenericGroup : public GenericGroupI<IdType, AttribInfo>
 
 template<class C, class ID, class AI>
 template <class... Args>
-std::tuple<Span<Args>...> GenericGroup<C, ID, AI>::GenericCommit()
+Tuple<Span<Args>...> GenericGroup<C, ID, AI>::GenericCommit()
 {
     if(isCommitted)
     {
@@ -82,7 +82,7 @@ std::tuple<Span<Args>...> GenericGroup<C, ID, AI>::GenericCommit()
     {
         sizes[i] = totalItemCount;
     }
-    std::tuple<Span<Args>...> result;
+    Tuple<Span<Args>...> result;
     MemAlloc::AllocateMultiData<DeviceMemory, Args...>(result, memory, sizes);
     isCommitted = true;
     return result;

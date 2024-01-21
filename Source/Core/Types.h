@@ -37,12 +37,18 @@ concept ImplicitLifetimeC = requires()
 // Just to be sure, aliasing here to ease refactoring
 template <class T>
 using Optional = std::optional<T>;
-// Same as optional
+
 template <class T, std::size_t Extent = std::dynamic_extent>
 using Span = std::span<T, Extent>;
-// ...
+
 template <class... Types>
 using Variant = std::variant<Types...>;
+
+template <class T0, class T1>
+using Pair = std::pair<T0, T1>;
+
+template <class... Args>
+using Tuple = std::tuple<Args...>;
 
 // Bitspan
 // Not exact match of a std::span but suits the needs

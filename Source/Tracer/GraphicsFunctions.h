@@ -89,12 +89,12 @@ namespace GraphicsFunctions
     // Orthonormalization Gram-Schmidt process
     // Returns first (n-1) modified vectors.
     MRAY_HYBRID
-    constexpr Vector3                       GSOrthonormalize(const Vector3& x,
-                                                             const Vector3& y);
+    constexpr Vector3                   GSOrthonormalize(const Vector3& x,
+                                                         const Vector3& y);
     MRAY_HYBRID
-    constexpr std::pair<Vector3, Vector3>   GSOrthonormalize(const Vector3& x,
-                                                             const Vector3& y,
-                                                             const Vector3& z);
+    constexpr Pair<Vector3, Vector3>    GSOrthonormalize(const Vector3& x,
+                                                        const Vector3& y,
+                                                        const Vector3& z);
 
     namespace MortonCode
     {
@@ -421,9 +421,9 @@ constexpr Vector3 GSOrthonormalize(const Vector3& x, const Vector3& y)
 }
 
 MRAY_HYBRID
-constexpr std::pair<Vector3, Vector3> GSOrthonormalize(const Vector3& x,
-                                                       const Vector3& y,
-                                                       const Vector3& z)
+constexpr Pair<Vector3, Vector3> GSOrthonormalize(const Vector3& x,
+                                                  const Vector3& y,
+                                                  const Vector3& z)
 {
     Vector3 rY = GSOrthonormalize(y, z);
     Vector3 rX = GSOrthonormalize(x, rY);

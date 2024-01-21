@@ -109,7 +109,7 @@ namespace TracerLimits
 using SurfPrimIdList = std::array<PrimBatchId, TracerLimits::MaxPrimBatchPerSurface>;
 using SurfMatIdList = std::array<MaterialId, TracerLimits::MaxPrimBatchPerSurface>;
 
-using PrimMatIdPair = std::pair<PrimBatchId, MaterialId>;
+using PrimMatIdPair = Pair<PrimBatchId, MaterialId>;
 using PrimMatIdPairList = std::array<PrimMatIdPair, TracerLimits::MaxPrimBatchPerSurface>;
 
 using PrimBatchListToAccelMapping = std::unordered_map<SurfPrimIdList, uint32_t>;

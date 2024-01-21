@@ -34,7 +34,7 @@ namespace DefaultTriangleDetail
     };
 
     using TriHit            = Vector2;
-    using TriIntersection   = Optional<IntersectionT<TriHit>>;
+    using TriIntersection   = IntersectionT<TriHit>;
     using TriLeaf           = DefaultLeaf;
 
     template<class TransContextType = TransformContextIdentity>
@@ -43,7 +43,7 @@ namespace DefaultTriangleDetail
         public:
         using DataSoA           = TriangleData;
         using Hit               = TriHit;
-        using Intersection      = TriIntersection;
+        using Intersection      = Optional<TriIntersection>;
 
         private:
         const TriangleData&         data;
@@ -56,9 +56,9 @@ namespace DefaultTriangleDetail
         MRAY_HYBRID             Triangle(const TransContextType& transform,
                                          const TriangleData& data, PrimitiveId id);
         MRAY_HYBRID
-        Intersection            Intersects(const Ray& ray) const;
+        Intersection            Intersects(const Ray& ray, bool cullBackface) const;
         MRAY_HYBRID
-        SampleT<BasicSurface>   SampleSurface(const RNGDispenser& rng) const;
+        SampleT<BasicSurface>   SampleSurface(RNGDispenser& rng) const;
         MRAY_HYBRID Float       PdfSurface(const Hit& hit) const;
         MRAY_HYBRID uint32_t    SampleRNCount() const;
         MRAY_HYBRID Float       GetSurfaceArea() const;
@@ -76,10 +76,10 @@ namespace DefaultTriangleDetail
 
         // Surface Generation
         MRAY_HYBRID void        GenerateSurface(EmptySurface&,
-                                            // Inputs
-                                            const Hit&,
-                                            const Ray&,
-                                            const DiffRay&) const;
+                                                // Inputs
+                                                const Hit&,
+                                                const Ray&,
+                                                const DiffRay&) const;
 
         MRAY_HYBRID void        GenerateSurface(BasicSurface&,
                                                 // Inputs

@@ -2,6 +2,8 @@
 
 #include "MaterialC.h"
 #include "ParamVaryingData.h"
+#include "GraphicsFunctions.h"
+#include "Random.h"
 
 namespace LambertMatDetail
 {
