@@ -5,6 +5,8 @@
 #include "TracerTypes.h"
 #include "Device/GPUAlgorithms.h"
 
+namespace Distributions
+{
 // TODO: Maybe move data to textures?
 template <uint32_t DIMS>
 class DistributionPwC;
@@ -14,11 +16,10 @@ class DistributionPwC<1>
 {
     private:
     Span<const Float> dCDF;
-    Float             normRecip;
     Float             sizeRecip;
 
     public:
-    MRAY_HYBRID     DistributionPwC(const Span<const Float>& data, Float normRecip);
+    MRAY_HYBRID     DistributionPwC(const Span<const Float>& data);
 
     MRAY_HYBRID
     SampleT<Float>  SampleIndex(Float xi) const;
@@ -31,7 +32,7 @@ class DistributionPwC<1>
     MRAY_HYBRID
     uint32_t        Size() const;
     MRAY_HYBRID
-    uint32_t        SizeRecip() const;
+    Float           SizeRecip() const;
 };
 
 // Lets see if I can do this fully templated
@@ -48,7 +49,7 @@ class DistributionPwC
 
     public:
     MRAY_HYBRID         DistributionPwC(const Span<const DistributionPwC<DIMS - 1>>& nextDists,
-                                        const Span<const DistributionPwC<1>>& myDist);
+                                        const DistributionPwC<1>& myDist);
     MRAY_HYBRID
     SampleT<VectorT>    SampleIndex(const Vector<DIMS, Float>& xi) const;
     MRAY_HYBRID
@@ -63,23 +64,65 @@ class DistributionPwC
     VectorT             SizeRecip() const;
 };
 
+class DistributionPwCGroup2D
+{
+    public:
+    using Distribution      = Distributions::DistributionPwC<2>;
+    using Distribution1D    = Distributions::DistributionPwC<1>;
+
+    struct DistData
+    {
+        Span<Float>             dCDFsX;
+        Span<Float>             dCDFsY;
+        Span<Distribution1D>    dDistsX;
+        Span<Distribution1D, 1> dDistY;
+    };
+
+    private:
+        const GPUSystem&            system;
+        DeviceMemory                memory;
+        Span<Distribution>          dDistributions;
+        std::vector<DistData>       distData;
+        std::vector<Vector2ui>      sizes;
+
+    protected:
+    public:
+                                    DistributionPwCGroup2D(const GPUSystem&);
+
+        uint32_t                    Reserve(Vector2ui size);
+        void                        Commit();
+        void                        Construct(uint32_t index,
+                                              const Span<const Float>& function);
+
+        Span<const Distribution>    DeviceDistributions() const;
+
+        size_t                      GPUMemoryUsage() const;
+};
+
+}
+
+namespace Distributions
+{
+
 MRAY_HYBRID MRAY_CGPU_INLINE
-DistributionPwC<1>::DistributionPwC(const Span<const Float>& data, Float normRecip)
+DistributionPwC<1>::DistributionPwC(const Span<const Float>& data)
     : dCDF(data)
-    , normRecip(normRecip)
-    , sizeRecip(1 / Float{dCDF.size() - 1})
+    , sizeRecip(Float{1} / static_cast<Float>(dCDF.size()))
 {}
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Float> DistributionPwC<1>::SampleIndex(Float xi) const
 {
-    uint32_t index = DeviceAlgorithms::LowerBound(dCDF, xi);
-    Float t = (xi - dCDF[i - 1]) / (dCDF[i] - dCDF[i - 1]);
+    using namespace DeviceAlgorithms;
+    uint32_t index = static_cast<uint32_t>(LowerBound(dCDF, xi));
+    Float prevCDF = (index == 0) ? Float{0.0} : dCDF[index - 1];
+    Float t = (xi - prevCDF) / (dCDF[index] - prevCDF);
+    Float indexF = static_cast<Float>(index) + t;
 
     return SampleT<Float>
     {
-        .pdf = PdfIndex(index),
-        .sampledResult = Float{index} + t
+        .sampledResult = indexF,
+        .pdf = PdfIndex(indexF)
     };
 }
 
@@ -94,63 +137,66 @@ SampleT<Float> DistributionPwC<1>::SampleUV(Float xi) const
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float DistributionPwC<1>::PdfIndex(Float index) const
 {
-    uint32_t indexI = uint32_t{index};
-    return (dCDF[indexI + 1] - dCDF[indexI]);
+    uint32_t indexI = static_cast<uint32_t>(index);
+    Float myCDF = (indexI == 0) ? Float{0.0} : dCDF[indexI];
+    return (dCDF[indexI + 1] - myCDF);
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float DistributionPwC<1>::PdfUV(const Float uv) const
 {
-    return PdfIndex[uv * Float{dCDF.size()}]);
+    return PdfIndex(uv * static_cast<Float>(dCDF.size()));
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t DistributionPwC<1>::Size() const
 {
-    return static_cast<uint32_t>(dCDF.size() - 1);
+    return static_cast<uint32_t>(dCDF.size());
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t DistributionPwC<1>::SizeRecip() const
+Float DistributionPwC<1>::SizeRecip() const
 {
     return sizeRecip;
 }
 
 template <uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
-DistributionPwC<D>::DistributionPwC(const Span<const DistributionPwC<DIMS - 1>>& nextDists,
-                                    const Span<const DistributionPwC<1>>& myDist)
-    : nextDists(nextDists)
+DistributionPwC<D>::DistributionPwC(const Span<const DistributionPwC<D - 1>>& nextDists,
+                                    const DistributionPwC<1>& myDist)
+    : dNextDistributions(nextDists)
     , dCurrentDistribution(myDist)
 {}
 
 template <uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<VectorT> DistributionPwC<D>::SampleIndex(const VectorT& xi) const
+SampleT<Vector<D,Float>> DistributionPwC<D>::SampleIndex(const VectorT& xi) const
 {
     using NextVecT = Vector<D-1, Float>;
 
     SampleT<Float> r = dCurrentDistribution.SampleIndex(xi[D - 1]);
     uint32_t index = uint32_t{r.sampledResult};
-    SampleT<NextVecT> rN = dNextDistribution[index];
+    SampleT<NextVecT> rN = dNextDistributions[index];
 
     return SampleT<VectorT>
     {
-        .sampledResult = VectorT(rN.sampledResult, rSampledResult),
+        .sampledResult = VectorT(rN.sampledResult, r.sampledResult),
         .pdf = r.pdf * rN.pdf
     };
 }
 
 template <uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<VectorT> DistributionPwC<D>::SampleUV(const VectorT& xi) const
+SampleT<Vector<D, Float>> DistributionPwC<D>::SampleUV(const VectorT& xi) const
 {
+    using NextVecT = Vector<D - 1, Float>;
+
     SampleT<Float> r = dCurrentDistribution.SampleIndex(xi[D - 1]);
     uint32_t index = uint32_t{r.sampledResult};
-    SampleT<NextVecT> rN = dNextDistribution[index];
+    SampleT<NextVecT> rN = dNextDistributions[index];
 
-    VectorT result(rN.sampledResult, rSampledResult);
-    result *= sizeRecip;
+    VectorT result(rN.sampledResult, r.sampledResult);
+    result *= SizeRecip();
 
     return SampleT<VectorT>
     {
@@ -173,7 +219,7 @@ template <uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float DistributionPwC<D>::PdfUV(const VectorT& uv) const
 {
-    Float indexF = uv[D - 1] * dCurrentDistribution.size();
+    Float indexF = uv[D - 1] * dCurrentDistribution.Size();
     uint32_t indexI = static_cast<uint32_t>(indexF);
     Float pdfA = dNextDistributions[indexI].PdfIndex(indexF);
     Float pdfB = dCurrentDistribution.PdfUV(uv[D - 1]);
@@ -182,15 +228,20 @@ Float DistributionPwC<D>::PdfUV(const VectorT& uv) const
 
 template <uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
-SizeT DistributionPwC<D>::Size() const
+Vector<D, uint32_t> DistributionPwC<D>::Size() const
 {
-    return size;
+    return SizeT(dNextDistributions[0].Size(),
+                   dCurrentDistribution.Size());
 }
 
 template <uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t DistributionPwC<D>::SizeRecip() const
+Vector<D, Float> DistributionPwC<D>::SizeRecip() const
 {
     return VectorT(dNextDistributions[0].SizeRecip(),
                    dCurrentDistribution.SizeRecip());
 }
+
+}
+
+using DistributionPwCGroup2D = Distributions::DistributionPwCGroup2D;

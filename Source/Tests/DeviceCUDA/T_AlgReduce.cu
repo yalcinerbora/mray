@@ -76,7 +76,6 @@ void ReduceTest(const GPUSystem& system)
     ExpectEqualVecOrArithmetic(result, hResultLambda);
 }
 
-
 TYPED_TEST(DeviceAlorithmsTest, Reduce)
 {
     using Value = typename DeviceAlorithmsTest<TypeParam>::ValueType;

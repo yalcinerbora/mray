@@ -25,6 +25,7 @@
 #define MRAY_DEVICE_BLOCK_SYNC() __syncthreads()
 
 #define MRAY_GRID_CONSTANT __grid_constant__
+#define MRAY_SHARED_MEMORY __shared__
 
 static constexpr uint32_t WarpSize()
 {

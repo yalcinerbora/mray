@@ -35,6 +35,7 @@ set(SRC_LIGHTS
 set(SRC_RANDOM
     ${CURRENT_SOURCE_DIR}/Random.h
     ${CURRENT_SOURCE_DIR}/Distributions.h
+    ${CURRENT_SOURCE_DIR}/Distributions.cu
 )
 
 set(SRC_RENDERERS

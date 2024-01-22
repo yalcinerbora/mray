@@ -76,6 +76,7 @@ namespace mray::algorithms
 
 #ifdef MRAY_GPU_BACKEND_CUDA
 
+    #include "AlgScanCUDA.h"
     #include "AlgReduceCUDA.h"
     #include "AlgRadixSortCUDA.h"
     #include "AlgBinaryPartitionCUDA.h"

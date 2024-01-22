@@ -54,6 +54,10 @@
     #error "MRAY_DEVICE_BLOCK_SYNC" is not defined!
 #endif
 
+#ifndef MRAY_SHARED_MEMORY
+    #error "MRAY_SHARED_MEMORY" is not defined!
+#endif
+
 
 // Concept Checks
 template<class MemType>

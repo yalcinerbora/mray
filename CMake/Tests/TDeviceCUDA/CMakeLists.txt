@@ -8,6 +8,7 @@ set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/T_Texture.cu
     ${CURRENT_SOURCE_DIR}/T_KernelCall.cu
     ${CURRENT_SOURCE_DIR}/T_AlgTypes.h
+    ${CURRENT_SOURCE_DIR}/T_AlgScan.cu
     ${CURRENT_SOURCE_DIR}/T_AlgReduce.cu
     ${CURRENT_SOURCE_DIR}/T_AlgRadixSort.cu
     ${CURRENT_SOURCE_DIR}/T_AlgBinPartition.cu

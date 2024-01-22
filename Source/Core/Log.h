@@ -4,6 +4,14 @@
 
 #include <fmt/core.h>
 #include <fmt/color.h>
+#include <fmt/ranges.h>
+
+//#include "Formatters.h"
+
+#include "Vector.h"
+template <VectorC V>
+auto format_as(const V& v) { return v.AsArray(); }
+
 
 #ifdef MRAY_DEBUG
 
