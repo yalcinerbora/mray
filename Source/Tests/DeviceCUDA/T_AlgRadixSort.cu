@@ -37,11 +37,6 @@ void RadixSortTest(const GPUSystem& system)
                                 {ElementCount, ElementCount,
                                  ElementCount, ElementCount,
                                  tempMemSize});
-    dKeys[0] = dKeys[0].subspan(0, ElementCount);
-    dKeys[1] = dKeys[1].subspan(0, ElementCount);
-    dValues[0] = dValues[0].subspan(0, ElementCount);
-    dValues[1] = dValues[1].subspan(0, ElementCount);
-
 
     Span<Span<Key>, 2> dKeysDB = Span<Span<Key>, 2>(dKeys);
     Span<Span<Value>, 2> dValuesDB = Span<Span<Value>, 2>(dValues);

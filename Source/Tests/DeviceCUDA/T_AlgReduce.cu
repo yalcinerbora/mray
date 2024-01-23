@@ -40,25 +40,22 @@ void ReduceTest(const GPUSystem& system)
     MemAlloc::AllocateMultiData(std::tie(dInputs, dTempMemory, dOutput),
                                 mem, {ElementCount, tempMemSize, 1});
 
-    Span<Value> dOutputExact = dOutput.subspan(0, 1);
-    Span<Value> dInputsExact = dInputs.subspan(0, ElementCount);
-
     std::vector<Value> hInputs(ElementCount, Value(0));
     std::iota(hInputs.begin(), hInputs.end(), Value(0));
 
     const GPUQueue& queue = system.BestDevice().GetQueue(0);
-    queue.MemcpyAsync(dInputsExact, Span<const Value>(hInputs.begin(), hInputs.end()));
+    queue.MemcpyAsync(dInputs, Span<const Value>(hInputs.begin(), hInputs.end()));
 
-    DeviceAlgorithms::Reduce(Span<Value, 1>(dOutputExact), dTempMemory,
+    DeviceAlgorithms::Reduce(Span<Value, 1>(dOutput), dTempMemory,
                              ToConstSpan(dInputs.subspan(0, ElementCount)),
                              Value(0), queue, Adder<Value>());
 
     Value hResult;
-    queue.MemcpyAsync(Span<Value>(&hResult, 1), ToConstSpan(dOutputExact));
-    queue.MemsetAsync(dOutputExact, 0x00);
+    queue.MemcpyAsync(Span<Value>(&hResult, 1), ToConstSpan(dOutput));
+    queue.MemsetAsync(dOutput, 0x00);
 
     // Do the reduction again with a lambda
-    DeviceAlgorithms::Reduce(Span<Value, 1>(dOutputExact), dTempMemory,
+    DeviceAlgorithms::Reduce(Span<Value, 1>(dOutput), dTempMemory,
                              ToConstSpan(dInputs.subspan(0, ElementCount)),
                              Value(0), queue,
                              []MRAY_HYBRID(const Value& l, const Value& r)
@@ -67,7 +64,7 @@ void ReduceTest(const GPUSystem& system)
                              });
 
     Value hResultLambda;
-    queue.MemcpyAsync(Span<Value>(&hResultLambda, 1), ToConstSpan(dOutputExact));
+    queue.MemcpyAsync(Span<Value>(&hResultLambda, 1), ToConstSpan(dOutput));
     queue.Barrier().Wait();
 
     Value result = (Value(ElementCount) * (Value(ElementCount) - Value(1))) / Value(2);

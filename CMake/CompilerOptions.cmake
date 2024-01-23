@@ -100,6 +100,7 @@ set(MRAY_CUDA_OPTIONS
     # Debug Related
     $<$<CONFIG:Debug>:-G>
     $<$<CONFIG:ReleaseDBG>:-lineinfo>
+    $<$<CONFIG:Release>:-lineinfo>
     # Extended Lambdas (__device__ tagged lambdas)
     -extended-lambda
     # Use fast math creates self intersection issues on

@@ -39,29 +39,22 @@ void MultiScanTest(const GPUSystem& system)
     MemAlloc::AllocateMultiData(std::tie(dInputs, dOutputs),
                                 mem, {ElementCount, ElementCount});
 
-    Span<Value> dOutputsExact = dOutputs.subspan(0, ElementCount);
-    Span<Value> dInputsExact = dInputs.subspan(0, ElementCount);
-
     std::vector<Value> hInputs(ElementCount, Value(0));
     std::iota(hInputs.begin(), hInputs.end(), Value(0));
 
     const GPUQueue& queue = system.BestDevice().GetQueue(0);
-    queue.MemcpyAsync(dInputsExact, Span<const Value>(hInputs.begin(), hInputs.end()));
+    queue.MemcpyAsync(dInputs, Span<const Value>(hInputs.begin(), hInputs.end()));
 
-    DeviceAlgorithms::InclusiveMultiScan(dOutputsExact, ToConstSpan(dInputsExact),
+    DeviceAlgorithms::InclusiveMultiScan(dOutputs, ToConstSpan(dInputs),
                                          SegmentSize, Value(0), queue, Adder<Value>());
 
     std::vector<Value> hResults(ElementCount);
     queue.MemcpyAsync(Span<Value>(hResults.begin(), hResults.end()),
-                      ToConstSpan(dOutputsExact));
-
-    DeviceDebug::DumpGPUMemToFile("multiScanFreeF", ToConstSpan(dOutputsExact),
-                                  queue);
-
-    queue.MemsetAsync(dOutputsExact, 0x00);
+                      ToConstSpan(dOutputs));
+    queue.MemsetAsync(dOutputs, 0x00);
 
     // Do the reduction again with a lambda
-    DeviceAlgorithms::InclusiveMultiScan(dOutputsExact, ToConstSpan(dInputsExact),
+    DeviceAlgorithms::InclusiveMultiScan(dOutputs, ToConstSpan(dInputs),
                                          SegmentSize, Value(0), queue,
                                          []MRAY_HYBRID(const Value & l, const Value & r)
     {
@@ -70,11 +63,8 @@ void MultiScanTest(const GPUSystem& system)
 
     std::vector<Value> hResultsLambda(ElementCount);
     queue.MemcpyAsync(Span<Value>(hResultsLambda.begin(), hResultsLambda.end()),
-                      ToConstSpan(dOutputsExact));
+                      ToConstSpan(dOutputs));
     queue.Barrier().Wait();
-
-    DeviceDebug::DumpGPUMemToFile("multiScanLambda", ToConstSpan(dOutputsExact),
-                                  queue);
 
     for(size_t i = 0; i < ElementCount; i++)
     {

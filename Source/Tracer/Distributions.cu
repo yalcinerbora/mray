@@ -61,15 +61,8 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
             {
                 // Contiguous index
                 uint32_t index = processedItemsSoFar + kp.threadId * ITEMS_PER_THREAD + i;
-                if(index >= yCount)
-                {
-                    uint32_t indexStrided = index * xCount + (xCount - 1);
-                    dataRegisters[i] = dXCDFs[indexStrided];
-                }
-                else
-                {
-                    dataRegisters[i] = Float(0);
-                }
+                uint32_t indexStrided = index * xCount + (xCount - 1);
+                dataRegisters[i] = (index >= yCount) ? Float(0) : dXCDFs[indexStrided];
             }
 
             // Scan
@@ -90,12 +83,9 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
     };
 
     MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-    void KCNormalizeX(Span<Float> dXCDFs, uint32_t yCount)
+    void KCNormalizeXY(Span<Float> dXCDFs, Span<Float> dYCDFs)
     {
         KernelCallParams kp;
-
-        const uint32_t xCount = static_cast<uint32_t>(dXCDFs.size() / yCount);
-
         static constexpr uint32_t ITEMS_PER_THREAD = 4;
         static constexpr uint32_t DATA_PER_BLOCK = TPB * ITEMS_PER_THREAD;
 
@@ -104,19 +94,18 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
 
         MRAY_SHARED_MEMORY Float sTotalRecip;
 
-        // Block-stride loop
-        for(uint32_t block = kp.blockId; block < yCount; block += kp.gridSize)
+        auto NormalizeRow = [&](Span<Float> rowData)
         {
-            auto dBlockInOut = dXCDFs.subspan(block * xCount, xCount);
+            uint32_t rowCount = static_cast<uint32_t>(rowData.size());
 
-            if(kp.threadId == 0) sTotalRecip = Float(1) / dXCDFs[dBlockInOut[xCount - 1]];
+            if(kp.threadId == 0) sTotalRecip = Float(1) / rowData[rowCount - 1];
             MRAY_DEVICE_BLOCK_SYNC();
 
             uint32_t processedItemsSoFar = 0;
-            while(processedItemsSoFar != xCount)
+            while(processedItemsSoFar != rowCount)
             {
-                uint32_t validItems = min(DATA_PER_BLOCK, xCount - processedItemsSoFar);
-                auto dSubBlockInOut = dBlockInOut.subspan(processedItemsSoFar, validItems);
+                uint32_t validItems = min(DATA_PER_BLOCK, rowCount - processedItemsSoFar);
+                auto dSubBlockInOut = rowData.subspan(processedItemsSoFar, validItems);
 
                 // Load
                 Float dataRegisters[ITEMS_PER_THREAD];
@@ -132,7 +121,6 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
                 {
                     dataRegisters[i] *= sTotalRecip;
                 }
-
                 // Store
                 if(validItems == DATA_PER_BLOCK) [[likely]]
                     BlockStore().Store(dSubBlockInOut.data(), dataRegisters);
@@ -141,7 +129,20 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
 
                 processedItemsSoFar += validItems;
             }
+
+            MRAY_DEVICE_BLOCK_SYNC();
+        };
+
+        // Block-stride loop (one block for each row)
+        uint32_t yCount = static_cast<uint32_t>(dYCDFs.size());
+        for(uint32_t block = kp.blockId; block < yCount; block += kp.gridSize)
+        {
+            uint32_t xCount = static_cast<uint32_t>(dXCDFs.size() / yCount);
+            auto dRowCDF = dXCDFs.subspan(block * xCount, xCount);
+            NormalizeRow(dRowCDF);
         }
+        // Let first block to divide the thing as well
+        if(kp.blockId == 0) NormalizeRow(dYCDFs);
     }
 
 #else
@@ -149,18 +150,18 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
 #endif
 
 
-DistributionPwCGroup2D::DistributionPwCGroup2D(const GPUSystem& s)
+DistributionGroupPwC2D::DistributionGroupPwC2D(const GPUSystem& s)
     : system(s)
     , memory(s.AllGPUs(), 32_MiB, 64_MiB)
 {}
 
-uint32_t DistributionPwCGroup2D::Reserve(Vector2ui size)
+uint32_t DistributionGroupPwC2D::Reserve(Vector2ui size)
 {
     sizes.push_back(size);
     return static_cast<uint32_t>(sizes.size() - 1);
 }
 
-void DistributionPwCGroup2D::Commit()
+void DistributionGroupPwC2D::Commit()
 {
     using SizeList = std::array<size_t, 4>;
     // Commit the reservations
@@ -172,9 +173,9 @@ void DistributionPwCGroup2D::Commit()
         return SizeList
         {
             // X CDF Data
-            (vec[0] + 1) * vec[1],
+            vec[0] * vec[1],
             // Y CDF Data
-            (vec[1] + 1),
+            vec[1],
             // X Dist1D Align Size
             vec[1],
             // Dist2D Itself
@@ -234,7 +235,7 @@ void DistributionPwCGroup2D::Commit()
     }
 }
 
-void DistributionPwCGroup2D::Construct(uint32_t index,
+void DistributionGroupPwC2D::Construct(uint32_t index,
                                        const Span<const Float>& function)
 {
     using namespace DeviceAlgorithms;
@@ -264,27 +265,58 @@ void DistributionPwCGroup2D::Construct(uint32_t index,
         ToConstSpan(d.dCDFsX)
     );
 
-    queue.IssueExactKernel<KCNormalizeX>
+    uint32_t xCount = static_cast<uint32_t>(sizes[index][0]);
+    queue.IssueSaturatingKernel<KCNormalizeXY>
     (
-        "Dist2D-NormalizeX"sv,
-        KernelExactIssueParams{.gridSize = 1, .blockSize = TPB},
+        "Dist2D-NormalizeXY"sv,
+        KernelIssueParams{.workCount = xCount * TPB},
         //
         d.dCDFsX,
-        yCount
+        d.dCDFsY
     );
 
-    // TODO.........
-    // DO construction over the GPU
+    queue.IssueSaturatingLambda
+    (
+        "Dist2D-ConstructDist"sv,
+        KernelIssueParams{.workCount = yCount},
+        [d, xCount, yCount, dDist = dDistributions.subspan(index, 1)] MRAY_GPU(KernelCallParams kp)
+        {
+            for(uint32_t i = kp.GlobalId(); i < yCount;
+                i += kp.TotalSize())
+            {
+                d.dDistsX[i] = Distribution1D(ToConstSpan(d.dCDFsX.subspan(i * xCount, xCount)));
+            }
+            MRAY_DEVICE_BLOCK_SYNC();
+
+            if(kp.GlobalId() == 0)
+            {
+                d.dDistY[0] = Distribution1D(d.dCDFsY);
+                dDist[0] = Distribution(ToConstSpan(d.dDistsX), d.dDistY[0]);
+            }
+        }
+    );
 }
 
-Span<const DistributionPwC<2>> DistributionPwCGroup2D::DeviceDistributions() const
+Span<const DistributionPwC<2>> DistributionGroupPwC2D::DeviceDistributions() const
 {
     return ToConstSpan(dDistributions);
 }
 
-size_t DistributionPwCGroup2D::GPUMemoryUsage() const
+size_t DistributionGroupPwC2D::GPUMemoryUsage() const
 {
     return memory.Size();
+}
+
+typename DistributionGroupPwC2D::DistDataConst DistributionGroupPwC2D::DistMemory(uint32_t index) const
+{
+    const DistData& d = distData[index];
+    return DistDataConst
+    {
+        .dCDFsX = ToConstSpan(d.dCDFsX),
+        .dCDFsY = ToConstSpan(d.dCDFsY),
+        .dDistsX = ToConstSpan(d.dDistsX),
+        .dDistY = ToConstSpan(d.dDistY),
+    };
 }
 
 }

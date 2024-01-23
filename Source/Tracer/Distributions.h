@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <type_traits>
+
 #include "Core/Types.h"
 #include "TracerTypes.h"
 #include "Device/GPUAlgorithms.h"
@@ -64,7 +66,7 @@ class DistributionPwC
     VectorT             SizeRecip() const;
 };
 
-class DistributionPwCGroup2D
+class DistributionGroupPwC2D
 {
     public:
     using Distribution      = Distributions::DistributionPwC<2>;
@@ -78,6 +80,14 @@ class DistributionPwCGroup2D
         Span<Distribution1D, 1> dDistY;
     };
 
+    struct DistDataConst
+    {
+        Span<const Float>             dCDFsX;
+        Span<const Float>             dCDFsY;
+        Span<const Distribution1D>    dDistsX;
+        Span<const Distribution1D, 1> dDistY;
+    };
+
     private:
         const GPUSystem&            system;
         DeviceMemory                memory;
@@ -87,7 +97,7 @@ class DistributionPwCGroup2D
 
     protected:
     public:
-                                    DistributionPwCGroup2D(const GPUSystem&);
+                                    DistributionGroupPwC2D(const GPUSystem&);
 
         uint32_t                    Reserve(Vector2ui size);
         void                        Commit();
@@ -97,6 +107,8 @@ class DistributionPwCGroup2D
         Span<const Distribution>    DeviceDistributions() const;
 
         size_t                      GPUMemoryUsage() const;
+        // For testing
+        DistDataConst               DistMemory(uint32_t index) const;
 };
 
 }
@@ -116,13 +128,18 @@ SampleT<Float> DistributionPwC<1>::SampleIndex(Float xi) const
     using namespace DeviceAlgorithms;
     uint32_t index = static_cast<uint32_t>(LowerBound(dCDF, xi));
     Float prevCDF = (index == 0) ? Float{0.0} : dCDF[index - 1];
-    Float t = (xi - prevCDF) / (dCDF[index] - prevCDF);
-    Float indexF = static_cast<Float>(index) + t;
+    Float myCDF = dCDF[index];
+    Float t = (xi - prevCDF) / (myCDF - prevCDF);
 
+    Float indexF = static_cast<Float>(index) + t;
+    indexF = (indexF < 1.0) ? indexF : nextafter(indexF, Float{-1});
+    assert(indexF < static_cast<Float>(dCDF.size()));
+
+    Float pdf = (myCDF - prevCDF) * static_cast<Float>(dCDF.size());
     return SampleT<Float>
     {
         .sampledResult = indexF,
-        .pdf = PdfIndex(indexF)
+        .pdf = pdf
     };
 }
 
@@ -137,9 +154,13 @@ SampleT<Float> DistributionPwC<1>::SampleUV(Float xi) const
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float DistributionPwC<1>::PdfIndex(Float index) const
 {
+    assert(index < 1);
     uint32_t indexI = static_cast<uint32_t>(index);
-    Float myCDF = (indexI == 0) ? Float{0.0} : dCDF[indexI];
-    return (dCDF[indexI + 1] - myCDF);
+    Float prevCDF = (indexI == 0) ? Float{0.0} : dCDF[indexI - 1];
+    Float myCDF = dCDF[indexI];
+
+    Float pdf = (myCDF - prevCDF) * static_cast<Float>(dCDF.size());
+    return pdf;
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -172,11 +193,17 @@ template <uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Vector<D,Float>> DistributionPwC<D>::SampleIndex(const VectorT& xi) const
 {
-    using NextVecT = Vector<D-1, Float>;
-
+    using NextIndexT = std::conditional_t<(D - 1) == 1, Float, Vector<D - 1, Float>>;
     SampleT<Float> r = dCurrentDistribution.SampleIndex(xi[D - 1]);
-    uint32_t index = uint32_t{r.sampledResult};
-    SampleT<NextVecT> rN = dNextDistributions[index];
+    uint32_t index = static_cast<uint32_t>(r.sampledResult);
+
+    // Dist<1> asks for Float since there is no Vector<1, T> type
+    // Compile time change the statement if "D == 2" (2D Distribution)
+    SampleT<NextIndexT> rN;
+    if constexpr((D - 1) == 1)
+        rN = dNextDistributions[index].SampleIndex(xi[0]);
+    else
+        rN = dNextDistributions[index].SampleIndex(xi);
 
     return SampleT<VectorT>
     {
@@ -244,4 +271,4 @@ Vector<D, Float> DistributionPwC<D>::SizeRecip() const
 
 }
 
-using DistributionPwCGroup2D = Distributions::DistributionPwCGroup2D;
+using DistributionGroupPwC2D = Distributions::DistributionGroupPwC2D;

@@ -41,10 +41,6 @@ void BinPartitionTest(const GPUSystem& system)
     MemAlloc::AllocateMultiData(std::tie(dInputs, dOutputs, dTempMemory, dOffset),
                                 mem, {ElementCount, ElementCount, tempMemSize, 1});
 
-    Span<uint32_t> dOffsetExact = dOffset.subspan(0, 1);
-    Span<Value> dOutputsExact = dOutputs.subspan(0, ElementCount);
-    Span<Value> dInputsExact = dInputs.subspan(0, ElementCount);
-
     std::vector<Value> hInputs(ElementCount, Value(0));
     std::iota(hInputs.begin(), hInputs.end(), Value(0));
     std::mt19937 rng(123);
@@ -54,30 +50,30 @@ void BinPartitionTest(const GPUSystem& system)
     }
 
     const GPUQueue& queue = system.BestDevice().GetQueue(0);
-    queue.MemcpyAsync(dInputsExact, Span<const Value>(hInputs.begin(), hInputs.end()));
+    queue.MemcpyAsync(dInputs, Span<const Value>(hInputs.begin(), hInputs.end()));
 
-    DeviceAlgorithms::BinaryPartition(dOutputsExact, Span<uint32_t, 1>(dOffsetExact),
-                                      dTempMemory, ToConstSpan(dInputsExact),
+    DeviceAlgorithms::BinaryPartition(dOutputs, Span<uint32_t, 1>(dOffset),
+                                      dTempMemory, ToConstSpan(dInputs),
                                       queue, Partitioner<Value>());
 
     uint32_t hOffsetFunctor;
     std::vector<Value> hOutputsFunctor(ElementCount, Value(0));
-    queue.MemcpyAsync(Span<uint32_t>(&hOffsetFunctor, 1), ToConstSpan(dOffsetExact));
-    queue.MemcpyAsync(Span<Value>(hOutputsFunctor.begin(), hOutputsFunctor.end()), ToConstSpan(dOutputsExact));
-    queue.MemsetAsync(dOffsetExact, 0x00);
-    queue.MemsetAsync(dOutputsExact, 0x00);
+    queue.MemcpyAsync(Span<uint32_t>(&hOffsetFunctor, 1), ToConstSpan(dOffset));
+    queue.MemcpyAsync(Span<Value>(hOutputsFunctor.begin(), hOutputsFunctor.end()), ToConstSpan(dOutputs));
+    queue.MemsetAsync(dOffset, 0x00);
+    queue.MemsetAsync(dOutputs, 0x00);
 
     // Do the reduction again with a lambda
-    DeviceAlgorithms::BinaryPartition(dOutputsExact, Span<uint32_t, 1>(dOffsetExact),
-                                      dTempMemory, ToConstSpan(dInputsExact),
+    DeviceAlgorithms::BinaryPartition(dOutputs, Span<uint32_t, 1>(dOffset),
+                                      dTempMemory, ToConstSpan(dInputs),
                                       queue, []MRAY_HYBRID(const Value& t) -> bool
                                       {
                                           return t != Value(0);
                                       });
     uint32_t hOffsetLambda;
     std::vector<Value> hOutputsLambda(ElementCount, Value(0));
-    queue.MemcpyAsync(Span<uint32_t>(&hOffsetLambda, 1), ToConstSpan(dOffsetExact));
-    queue.MemcpyAsync(Span<Value>(hOutputsLambda.begin(), hOutputsLambda.end()), ToConstSpan(dOutputsExact));
+    queue.MemcpyAsync(Span<uint32_t>(&hOffsetLambda, 1), ToConstSpan(dOffset));
+    queue.MemcpyAsync(Span<Value>(hOutputsLambda.begin(), hOutputsLambda.end()), ToConstSpan(dOutputs));
     queue.Barrier().Wait();
 
     //

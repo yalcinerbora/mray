@@ -36,18 +36,17 @@ void IotaTest(const GPUSystem& system)
 
     Span<Value> dOutputs;
     MemAlloc::AllocateMultiData(std::tie(dOutputs), mem, {ElementCount});
-    Span<Value> dOutputsExact = dOutputs.subspan(0, ElementCount);
 
     Value initialValue = Value(0);
 
     std::vector<Value> hReference(ElementCount, Value(0));
     std::iota(hReference.begin(), hReference.end(), initialValue);
 
-    DeviceAlgorithms::Iota(dOutputsExact, initialValue, queue);
+    DeviceAlgorithms::Iota(dOutputs, initialValue, queue);
 
     std::vector<Value> hOutputs(ElementCount, Value(0));
     queue.MemcpyAsync(Span<Value>(hOutputs.begin(), hOutputs.end()),
-                      ToConstSpan(dOutputsExact));
+                      ToConstSpan(dOutputs));
     queue.Barrier().Wait();
 
     for(uint32_t i = 0; i < ElementCount; i++)
@@ -66,26 +65,23 @@ void TransformTest(const GPUSystem& system)
     Span<Value> dOutputs, dInputs;
     MemAlloc::AllocateMultiData(std::tie(dOutputs, dInputs), mem,
                                 {ElementCount, ElementCount});
-    Span<Value> dOutputsExact = dOutputs.subspan(0, ElementCount);
-    Span<Value> dInputsExact = dInputs.subspan(0, ElementCount);
 
     Value initialValue = Value(0);
 
     std::vector<Value> hIota(ElementCount, Value(0));
     std::iota(hIota.begin(), hIota.end(), initialValue);
 
-    queue.MemcpyAsync(dInputsExact,
-                      Span<const Value>(hIota.begin(), hIota.end()));
+    queue.MemcpyAsync(dInputs, Span<const Value>(hIota.begin(), hIota.end()));
 
 
-    DeviceAlgorithms::Transform(dOutputsExact,
-                                ToConstSpan(dInputsExact),
+    DeviceAlgorithms::Transform(dOutputs,
+                                ToConstSpan(dInputs),
                                 queue,
                                 Transformer<Value>());
 
     std::vector<Value> hOutputs(ElementCount, Value(0));
     queue.MemcpyAsync(Span<Value>(hOutputs.begin(), hOutputs.end()),
-                      ToConstSpan(dOutputsExact));
+                      ToConstSpan(dOutputs));
     queue.Barrier().Wait();
 
     for(uint32_t i = 0; i < ElementCount; i++)

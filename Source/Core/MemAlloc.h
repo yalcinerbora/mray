@@ -81,25 +81,28 @@ namespace MemAlloc::Detail
     template<std::size_t I = 0, class... Tp>
     requires (I == sizeof...(Tp))
     constexpr void CalculateSpans(Tuple<Span<Tp>&...>&, size_t&, Byte*,
-                                     const std::array<size_t, sizeof...(Tp)>&)
+                                  const std::array<size_t, sizeof...(Tp)>&,
+                                  const std::array<size_t, sizeof...(Tp)>&)
     {}
 
     template<std::size_t I = 0, class... Tp>
     requires (I < sizeof...(Tp))
     constexpr void CalculateSpans(Tuple<Span<Tp>&...>& t, size_t& offset, Byte* memory,
-                                  const std::array<size_t, sizeof...(Tp)>& alignedSizeList)
+                                  const std::array<size_t, sizeof...(Tp)>& alignedSizeList,
+                                  const std::array<size_t, sizeof...(Tp)>& countList)
     {
         using CurrentType = typename std::tuple_element_t<I, Tuple<Tp...>>;
         // Set Pointer
         size_t size = alignedSizeList[I];
         CurrentType* tPtr = reinterpret_cast<CurrentType*>(memory + offset);
         tPtr = std::launder(tPtr);
-        std::get<I>(t) = Span<CurrentType>((size == 0) ? nullptr : tPtr,
-                                           size / sizeof(CurrentType));
+        std::get<I>(t) = Span<CurrentType>((size == 0) ? nullptr : tPtr, countList[I]);
+        assert(size / sizeof(CurrentType) >= countList[I]);
+
         // Increment Offset
         offset += size;
         // Statically Recurse over other pointers
-        CalculateSpans<I + 1, Tp...>(t, offset, memory, alignedSizeList);
+        CalculateSpans<I + 1, Tp...>(t, offset, memory, alignedSizeList, countList);
     }
 }
 
@@ -127,7 +130,7 @@ void AllocateMultiData(Tuple<Span<Args>&...> spans, Memory& memory,
     Byte* ptr = static_cast<Byte*>(memory);
     // Populate pointers
     size_t offset = 0;
-    Detail::CalculateSpans(spans, offset, ptr, alignedSizeList);
+    Detail::CalculateSpans(spans, offset, ptr, alignedSizeList, countList);
 
     assert(totalSize == offset);
 }
