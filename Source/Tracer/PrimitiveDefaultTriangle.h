@@ -11,10 +11,10 @@
 #include "Core/Quaternion.h"
 #include "Core/Matrix.h"
 #include "Core/DataStructures.h"
+#include "Core/GraphicsFunctions.h"
 
 #include "PrimitiveC.h"
 #include "ShapeFunctions.h"
-#include "GraphicsFunctions.h"
 #include "Transforms.h"
 #include "Random.h"
 
@@ -35,22 +35,21 @@ namespace DefaultTriangleDetail
 
     using TriHit            = Vector2;
     using TriIntersection   = IntersectionT<TriHit>;
-    using TriLeaf           = DefaultLeaf;
 
-    template<class TransContextType = TransformContextIdentity>
+    template<TransformContextC TransContextType = TransformContextIdentity>
     class Triangle
     {
         public:
         using DataSoA           = TriangleData;
         using Hit               = TriHit;
         using Intersection      = Optional<TriIntersection>;
+        using TransformContext  = TransContextType;
 
         private:
-        const TriangleData&         data;
+        Ref<const TriangleData>     data;
+        Ref<const TransContextType> transformContext;
         PrimitiveId                 id;
         Vector3                     positions[ShapeFunctions::Triangle::TRI_VERTEX_COUNT];
-        const TransContextType&     transformContext;
-
 
         public:
         MRAY_HYBRID             Triangle(const TransContextType& transform,
@@ -73,6 +72,8 @@ namespace DefaultTriangleDetail
         MRAY_HYBRID
         Optional<Hit>           ProjectedHit(const Vector3& point) const;
         MRAY_HYBRID Vector2     SurfaceParametrization(const Hit& hit) const;
+
+        const TransContextType& GetTransformContext() const;
 
         // Surface Generation
         MRAY_HYBRID void        GenerateSurface(EmptySurface&,
@@ -117,7 +118,6 @@ namespace DefaultSkinnedTriangleDetail
 
     using TriHit            = DefaultTriangleDetail::TriHit;
     using TriIntersection   = DefaultTriangleDetail::TriIntersection;
-    using TriLeaf           = DefaultTriangleDetail::TriLeaf;
 
     template<class TransContextType = TransformContextIdentity>
     using SkinnedTriangle   = DefaultTriangleDetail::Triangle<TransContextType>;
@@ -197,13 +197,13 @@ namespace DefaultSkinnedTriangleDetail
     static_assert(TransformContextC<TransformContextSkinned>);
 }
 
-class PrimGroupTriangle : public PrimitiveGroup<PrimGroupTriangle>
+class PrimGroupTriangle : public PrimitiveGroupT<PrimGroupTriangle>
 {
     public:
     using DataSoA       = DefaultTriangleDetail::TriangleData;
     using Hit           = typename DefaultTriangleDetail::TriHit;
 
-    template <class TContext = TransformContextIdentity>
+    template <TransformContextC TContext = TransformContextIdentity>
     using Primitive = DefaultTriangleDetail:: template Triangle<TContext>;
 
     // Transform Context Generators
@@ -239,9 +239,10 @@ class PrimGroupTriangle : public PrimitiveGroup<PrimGroupTriangle>
     void                    PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
                                           const Vector2ui& subBatchRange,
                                           std::vector<Byte> data) override;
+    DataSoA                 SoA() const;
 };
 
-class PrimGroupSkinnedTriangle : public PrimitiveGroup<PrimGroupSkinnedTriangle>
+class PrimGroupSkinnedTriangle : public PrimitiveGroupT<PrimGroupSkinnedTriangle>
 {
     public:
     using DataSoA       = DefaultSkinnedTriangleDetail::SkinnedTriangleData;
@@ -288,6 +289,7 @@ class PrimGroupSkinnedTriangle : public PrimitiveGroup<PrimGroupSkinnedTriangle>
     void                    PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
                                           const Vector2ui& subBatchRange,
                                           std::vector<Byte> data) override;
+    DataSoA                 SoA() const;
 };
 
 #include "PrimitiveDefaultTriangle.hpp"

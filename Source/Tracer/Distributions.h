@@ -66,6 +66,11 @@ class DistributionPwC
     VectorT             SizeRecip() const;
 };
 
+static_assert(std::is_move_constructible_v<DistributionPwC<1>>);
+static_assert(std::is_move_assignable_v<DistributionPwC<1>>);
+static_assert(std::is_move_constructible_v<DistributionPwC<2>>);
+static_assert(std::is_move_assignable_v<DistributionPwC<2>>);
+
 class DistributionGroupPwC2D
 {
     public:

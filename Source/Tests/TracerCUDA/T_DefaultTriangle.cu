@@ -7,6 +7,8 @@
 
 #include "Tracer/MaterialsDefault.h"
 
+#include "Tracer/Lights.h"
+
 TEST(DefaultTriangle, Basic)
 {
     GPUSystem s;

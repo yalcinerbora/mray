@@ -3,7 +3,7 @@
 namespace DefaultTriangleDetail
 {
 
-template<class T>
+template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Triangle<T>::Triangle(const T& transform,
                       const TriangleData& data,
@@ -23,7 +23,7 @@ Triangle<T>::Triangle(const T& transform,
     positions[2] = transform.ApplyP(positions[2]);
 }
 
-template<class T>
+template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Optional<TriIntersection> Triangle<T>::Intersects(const Ray& ray, bool cullBackface) const
 {
@@ -45,7 +45,7 @@ Optional<TriIntersection> Triangle<T>::Intersects(const Ray& ray, bool cullBackf
         return std::nullopt;
 }
 
-template<class T>
+template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<BasicSurface> Triangle<T>::SampleSurface(RNGDispenser& rng) const
 {
@@ -66,10 +66,10 @@ SampleT<BasicSurface> Triangle<T>::SampleSurface(RNGDispenser& rng) const
     Float area = GetSurfaceArea();
     Float pdf = 1.0f / area;
 
-    Vector3ui index = data.indexList[id];
-    Quaternion q0 = data.tbnRotations[index[0]];
-    Quaternion q1 = data.tbnRotations[index[1]];
-    Quaternion q2 = data.tbnRotations[index[2]];
+    Vector3ui index = data.get().indexList[id];
+    Quaternion q0 = data.get().tbnRotations[index[0]];
+    Quaternion q1 = data.get().tbnRotations[index[1]];
+    Quaternion q2 = data.get().tbnRotations[index[2]];
     Quaternion tbn = Quaternion::BarySLerp(q0, q1, q2, a, b);
     Vector3 normal = tbn.Conjugate().ApplyRotation(Vector3::ZAxis());
 
@@ -85,7 +85,7 @@ SampleT<BasicSurface> Triangle<T>::SampleSurface(RNGDispenser& rng) const
     };
 }
 
-template<class T>
+template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float Triangle<T>::PdfSurface(const Hit& hit) const
 {
@@ -99,28 +99,28 @@ Float Triangle<T>::PdfSurface(const Hit& hit) const
     return pdf;
 }
 
-template<class T>
+template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t Triangle<T>::SampleRNCount() const
 {
     return 2;
 }
 
-template<class T>
+template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float Triangle<T>::GetSurfaceArea() const
 {
     return ShapeFunctions::Triangle::Area(positions);
 }
 
-template<class T>
+template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 AABB3 Triangle<T>::GetAABB() const
 {
     return ShapeFunctions::Triangle::BoundingBox(positions);
 }
 
-template<class T>
+template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Vector3 Triangle<T>::GetCenter() const
 {
@@ -130,7 +130,7 @@ Vector3 Triangle<T>::GetCenter() const
     return center;
 }
 
-template<class T>
+template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
                                Span<Vector2us>& normals,
@@ -328,7 +328,7 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
 }
 
 
-template<class T>
+template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Optional<BasicSurface> Triangle<T>::SurfaceFromHit(const Hit& hit) const
 {
@@ -342,10 +342,10 @@ Optional<BasicSurface> Triangle<T>::SurfaceFromHit(const Hit& hit) const
                         positions[1] * baryCoords[1] +
                         positions[2] * baryCoords[2]);
 
-    Vector3ui index = data.indexList[id];
-    Quaternion q0 = data.tbnRotations[index[0]];
-    Quaternion q1 = data.tbnRotations[index[1]];
-    Quaternion q2 = data.tbnRotations[index[2]];
+    Vector3ui index = data.get().indexList[id];
+    Quaternion q0 = data.get().tbnRotations[index[0]];
+    Quaternion q1 = data.get().tbnRotations[index[1]];
+    Quaternion q2 = data.get().tbnRotations[index[2]];
     Quaternion tbn = Quaternion::BarySLerp(q0, q1, q2, baryCoords[0], baryCoords[1]);
     Vector3 normal = tbn.Conjugate().ApplyRotation(Vector3::ZAxis());
 
@@ -356,7 +356,7 @@ Optional<BasicSurface> Triangle<T>::SurfaceFromHit(const Hit& hit) const
     };
 }
 
-template<class T>
+template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Optional<TriHit> Triangle<T>::ProjectedHit(const Vector3& point) const
 {
@@ -366,14 +366,14 @@ Optional<TriHit> Triangle<T>::ProjectedHit(const Vector3& point) const
     return Hit(baryCoords);
 }
 
-template<class T>
+template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Vector2 Triangle<T>::SurfaceParametrization(const Hit& hit) const
 {
-    Vector3ui index = data.indexList[id];
-    Vector2 uv0 = data.uvs[index[0]];
-    Vector2 uv1 = data.uvs[index[1]];
-    Vector2 uv2 = data.uvs[index[2]];
+    Vector3ui index = data.get().indexList[id];
+    Vector2 uv0 = data.get().uvs[index[0]];
+    Vector2 uv1 = data.get().uvs[index[1]];
+    Vector2 uv2 = data.get().uvs[index[2]];
 
     Vector3 baryCoords = Vector3(hit[0], hit[1], 1 - hit[1] - hit[0]);
 
@@ -384,7 +384,13 @@ Vector2 Triangle<T>::SurfaceParametrization(const Hit& hit) const
     return uv;
 }
 
-template<class T>
+template<TransformContextC T>
+const T& Triangle<T>::GetTransformContext() const
+{
+    return transformContext;
+}
+
+template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 void Triangle<T>::GenerateSurface(EmptySurface&,
                                   // Inputs
@@ -393,7 +399,7 @@ void Triangle<T>::GenerateSurface(EmptySurface&,
                                   const DiffRay& differentials) const
 {}
 
-template<class T>
+template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 void Triangle<T>::GenerateSurface(BasicSurface& result,
                                   // Inputs
@@ -423,7 +429,7 @@ void Triangle<T>::GenerateSurface(BasicSurface& result,
     };
 }
 
-template<class T>
+template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 void Triangle<T>::GenerateSurface(BarycentricSurface& result,
                                   // Inputs
@@ -447,7 +453,7 @@ void Triangle<T>::GenerateSurface(BarycentricSurface& result,
     };
 }
 
-template<class T>
+template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 void Triangle<T>::GenerateSurface(DefaultSurface& result,
                                   // Inputs
@@ -466,11 +472,11 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     // Position should be in world space
     Vector3 geoNormal = ShapeFunctions::Triangle::Normal(positions);
 
-    Vector3ui index = data.indexList[id];
+    Vector3ui index = data.get().indexList[id];
     // Tangent Space Rotation Query
-    Quaternion q0 = data.tbnRotations[index[0]];
-    Quaternion q1 = data.tbnRotations[index[1]];
-    Quaternion q2 = data.tbnRotations[index[2]];
+    Quaternion q0 = data.get().tbnRotations[index[0]];
+    Quaternion q1 = data.get().tbnRotations[index[1]];
+    Quaternion q2 = data.get().tbnRotations[index[2]];
     Quaternion tbn = Quaternion::BarySLerp(q0, q1, q2, a, b);
     tbn.NormalizeSelf();
 

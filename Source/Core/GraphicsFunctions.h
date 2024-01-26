@@ -34,10 +34,11 @@ namespace GraphicsFunctions
     //  wi  normal
     //
     // So wi should be aligned with the normal, it is caller's responsibility
-    // to provide the appropriate normal. It returns wo again outwards from the
-    // surface. For total internal reflection case, function does not modify "out".
-    MRAY_HYBRID bool    Refract(Vector3& out, const Vector3& normal,
-                                const Vector3& v, Float etaFrom, Float etaTo);
+    // to provide the appropriate normal. It returns wo again "outwards" from the
+    // surface. Both "normal" and "wi" is assumed to be normalized.
+    MRAY_HYBRID
+    Optional<Vector3>   Refract(const Vector3& normal, const Vector3& v,
+                                Float etaFrom, Float etaTo);
 
     // Changes the direction of vector "v" towards n
     MRAY_HYBRID
@@ -46,12 +47,12 @@ namespace GraphicsFunctions
     // Simple Sampling Functions
     // Sample cosine weighted direction from unit hemisphere
     // Unit hemisphere's normal is implicitly +Z
-    MRAY_HYBRID Sample<Vector3>     SampleCosDirection(const Vector2& xi);
+    MRAY_HYBRID SampleT<Vector3>    SampleCosDirection(const Vector2& xi);
     MRAY_HYBRID constexpr Float     PDFCosDirection(const Vector3& v,
-                                                const Vector3& n = Vector3::ZAxis());
+                                                    const Vector3& n = Vector3::ZAxis());
     // Sample uniform direction from unit hemisphere
     // Unit hemisphere's normal is implicitly +Z
-    MRAY_HYBRID Sample<Vector3>     SampleUniformDirection(const Vector2& xi);
+    MRAY_HYBRID SampleT<Vector3>    SampleUniformDirection(const Vector2& xi);
     MRAY_HYBRID constexpr Float     PDFUniformDirection();
 
     // Coordinate Conversions
@@ -90,8 +91,11 @@ namespace GraphicsFunctions
                                                          const Vector3& y);
     MRAY_HYBRID
     constexpr Pair<Vector3, Vector3>    GSOrthonormalize(const Vector3& x,
-                                                         const Vector3& y,
-                                                         const Vector3& z);
+                                                        const Vector3& y,
+                                                        const Vector3& z);
+
+    MRAY_HYBRID constexpr Vector2       UVToSphericalAngles(const Vector2& uv);
+    MRAY_HYBRID constexpr Vector2       SphericalAnglesToUV(const Vector2& thetaPhi);
 
     namespace MortonCode
     {
@@ -130,8 +134,8 @@ constexpr Vector3 Reflect(const Vector3& normal, const Vector3& v)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-bool Refract(Vector3& out, const Vector3& normal,
-             const Vector3& v, Float etaFrom, Float etaTo)
+Optional<Vector3> Refract(const Vector3& normal,
+                          const Vector3& v, Float etaFrom, Float etaTo)
 {
     using MathFunctions::SqrtMax;
     // Convention of wi (v) and normal is as follows
@@ -147,8 +151,8 @@ bool Refract(Vector3& out, const Vector3& normal,
     //  wi  normal
     //
     // So wi should be aligned with the normal, it is caller's responsibility
-    // to provide the appropriate normal. It returns wo again outwards from the
-    // surface. For total internal reflection case, function does not modify "out".
+    // to provide the appropriate normal. It returns wo again "outwards" from the
+    // surface. Both "normal" and "wi" is assumed to be normalized.
     Float etaRatio = etaFrom / etaTo;
     Float cosIn = normal.Dot(v);
     Float sinInSqr = fmax(Float{0}, Float{1} - cosIn * cosIn);
@@ -157,10 +161,9 @@ bool Refract(Vector3& out, const Vector3& normal,
     Float cosOut = SqrtMax(Float{1} - sinOutSqr);
 
     // Check total internal reflection
-    if(sinOutSqr >= Float{1}) return false;
+    if(sinOutSqr >= Float{1}) return std::nullopt;
 
-    out = (etaRatio * (-v) + (etaRatio * cosIn - cosOut) * normal);
-    return true;
+    return (etaRatio * (-v) + (etaRatio * cosIn - cosOut) * normal);
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -170,7 +173,7 @@ constexpr Vector3 Orient(const Vector3& v, const Vector3& n)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Sample<Vector3> SampleCosDirection(const Vector2& xi)
+SampleT<Vector3> SampleCosDirection(const Vector2& xi)
 {
     using namespace MathConstants;
     using MathFunctions::SqrtMax;
@@ -188,7 +191,7 @@ Sample<Vector3> SampleCosDirection(const Vector2& xi)
     Float pdf = dir[2] * InvPi<Float>();
 
     // Finally the result!
-    return Sample<Vector3>
+    return SampleT<Vector3>
     {
         .sampledResult = dir,
         .pdf = pdf
@@ -203,7 +206,7 @@ constexpr Float PDFCosDirection(const Vector3& v, const Vector3& n)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Sample<Vector3> SampleUniformDirection(const Vector2& xi)
+SampleT<Vector3> SampleUniformDirection(const Vector2& xi)
 {
     using namespace MathConstants;
     using MathFunctions::SqrtMax;
@@ -217,8 +220,8 @@ Sample<Vector3> SampleUniformDirection(const Vector2& xi)
     dir[2] = xi[0];
 
     // Uniform pdf is invariant
-    Float pdf = InvPi<Float>() * Float{0.5};
-    return Sample<Vector3>
+    constexpr Float pdf = InvPi<Float>() * Float{0.5};
+    return SampleT<Vector3>
     {
         .sampledResult = dir,
         .pdf = pdf
@@ -230,7 +233,6 @@ constexpr Float PDFUniformDirection()
 {
     return MathConstants::InvPi<Float>() * Float{0.5};
 }
-
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 Vector3 SphericalToCartesian(const Vector3& sphrRTP)
@@ -416,7 +418,7 @@ constexpr Vector<2, T>  CocentricOctohedralWrapInt(const Vector<2, T>& st,
 MRAY_HYBRID
 constexpr Vector3 GSOrthonormalize(const Vector3& x, const Vector3& y)
 {
-    return x - y * x.Dot(y);
+    return (x - y * x.Dot(y)).Normalize();
 }
 
 MRAY_HYBRID
@@ -428,6 +430,34 @@ constexpr Pair<Vector3, Vector3> GSOrthonormalize(const Vector3& x,
     Vector3 rX = GSOrthonormalize(x, rY);
     return std::make_pair(rX, rY);
 }
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Vector2 UVToSphericalAngles(const Vector2& uv)
+{
+    using namespace MathConstants;
+    return Vector2(// [-pi, pi]
+                   (uv[0] * Pi<Float>() * 2) - Pi<Float>(),
+                   // [0, pi]
+                   (1 - uv[1]) * Pi<Float>());
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Vector2 SphericalAnglesToUV(const Vector2& thetaPhi)
+{
+    using namespace MathConstants;
+    // Theta range [-pi, pi)
+    assert(thetaPhi[0] >= -Pi<Float>() &&
+           thetaPhi[0] < Pi<Float>());
+    // phi range [0, pi]
+    assert(thetaPhi[1] >= 0 &&
+           thetaPhi[1] <= Pi<Float>());
+
+    // Normalize to generate UV [0, 1]
+    Float u = (thetaPhi[0] + Pi<Float>()) * 0.5f / Pi<Float>();
+    Float v = 1 - (thetaPhi[1] * InvPi<Float>());
+    return Vector2(u, v);
+}
+
 
 namespace MortonCode
 {
@@ -451,6 +481,7 @@ namespace MortonCode
         uint32_t z = Expand3D(val[2]);
         return ((x << 0) | (y << 1) | (z << 2));
     }
+
     template <>
     MRAY_HYBRID MRAY_CGPU_INLINE
     constexpr uint64_t Compose3D(const Vector3ui& val)
@@ -493,6 +524,7 @@ namespace MortonCode
         uint32_t z = Shrink3D(code >> 2);
         return Vector3ui(x, y, z);
     }
+
     template <>
     MRAY_HYBRID MRAY_CGPU_INLINE
     constexpr Vector3ui Decompose3D(uint64_t code)
@@ -533,6 +565,7 @@ namespace MortonCode
         uint32_t y = Expand2D(val[1]);
         return ((x << 0) | (y << 1));
     }
+
     template <>
     MRAY_HYBRID MRAY_CGPU_INLINE
     constexpr uint64_t Compose2D(const Vector2ui& val)
@@ -594,60 +627,3 @@ namespace MortonCode
 }
 
 }
-//HYBRD_FUNC [[nodiscard]] Ray            Transform(const Quaternion<T>&) const;
-//HYBRD_FUNC [[nodiscard]] Ray            Transform(const Matrix<3, T>&) const;
-//HYBRD_FUNC [[nodiscard]] Ray            Transform(const Matrix<4, T>&) const;
-//HYBRD_FUNC Ray                          TransformSelf(const Quaternion<T>&);
-//HYBRD_FUNC Ray&                         TransformSelf(const Matrix<3, T>&);
-//HYBRD_FUNC Ray&                         TransformSelf(const Matrix<4, T>&);
-
-//template <std::floating_point T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//RayT<T> RayT<T>::Transform(const Quaternion<T>& q) const
-//{
-//    return RayT<T>(q.ApplyRotation(direction),
-//                  q.ApplyRotation(position));
-//}
-//
-//template <std::floating_point T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//RayT<T> RayT<T>::Transform(const Matrix<3, T>& mat) const
-//{
-//    return RayT<T>(mat * direction,
-//                  mat * position);
-//}
-//
-//template <std::floating_point T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//RayT<T> RayT<T>::Transform(const Matrix<4, T>& mat) const
-//{
-//    return RayT<T>(mat * Vector<4, T>(direction, static_cast<T>(0.0)),
-//                  mat * Vector<4, T>(position, static_cast<T>(1.0)));
-//}
-//
-//template <std::floating_point T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//RayT<T> RayT<T>::TransformSelf(const Quaternion<T>& q)
-//{
-//    RayT<T> r = Transform(q);
-//    (*this) = r;
-//    return *this;
-//}
-//
-//template <std::floating_point T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//RayT<T>& RayT<T>::TransformSelf(const Matrix<3, T>& mat)
-//{
-//    RayT<T> r = Transform(mat);
-//    (*this) = r;
-//    return *this;
-//}
-//
-//template <std::floating_point T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//RayT<T>& RayT<T>::TransformSelf(const Matrix<4, T>& mat)
-//{
-//    RayT<T> r = Transform(mat);
-//    (*this) = r;
-//    return *this;
-//}

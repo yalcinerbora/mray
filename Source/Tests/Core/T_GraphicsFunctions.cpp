@@ -4,8 +4,8 @@
 
 #include "Core/Vector.h"
 #include "Core/Quaternion.h"
+#include "Core/GraphicsFunctions.h"
 
-#include "Tracer/GraphicsFunctions.h"
 #include "GTestWrappers.h"
 
 TEST(GraphicsFunctionsTest, Reflect)

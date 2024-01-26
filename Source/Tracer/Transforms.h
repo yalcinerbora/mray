@@ -43,23 +43,23 @@ class TransformContextIdentity
 class TransformContextSingle
 {
     private:
-    const Matrix4x4& transform;
-    const Matrix4x4& invTransform;
+    Ref<const Matrix4x4>    transform;
+    Ref<const Matrix4x4>    invTransform;
 
     public:
-    MRAY_HYBRID         TransformContextSingle(const typename TransformDetail::SingleTransformSoA&,
-                                               TransformId tId);
+    MRAY_HYBRID             TransformContextSingle(const typename TransformDetail::SingleTransformSoA&,
+                                                   TransformId tId);
 
-    MRAY_HYBRID Vector3 ApplyP(const Vector3& point) const;
-    MRAY_HYBRID Vector3 ApplyV(const Vector3& vec) const;
-    MRAY_HYBRID Vector3 ApplyN(const Vector3& normal) const;
-    MRAY_HYBRID AABB3   Apply(const AABB3&) const;
-    MRAY_HYBRID Ray     Apply(const Ray&) const;
-    MRAY_HYBRID Vector3 InvApplyP(const Vector3& point) const;
-    MRAY_HYBRID Vector3 InvApplyV(const Vector3& vec) const;
-    MRAY_HYBRID Vector3 InvApplyN(const Vector3& normal) const;
-    MRAY_HYBRID AABB3   InvApply(const AABB3&) const;
-    MRAY_HYBRID Ray     InvApply(const Ray&) const;
+    MRAY_HYBRID Vector3     ApplyP(const Vector3& point) const;
+    MRAY_HYBRID Vector3     ApplyV(const Vector3& vec) const;
+    MRAY_HYBRID Vector3     ApplyN(const Vector3& normal) const;
+    MRAY_HYBRID AABB3       Apply(const AABB3&) const;
+    MRAY_HYBRID Ray         Apply(const Ray&) const;
+    MRAY_HYBRID Vector3     InvApplyP(const Vector3& point) const;
+    MRAY_HYBRID Vector3     InvApplyV(const Vector3& vec) const;
+    MRAY_HYBRID Vector3     InvApplyN(const Vector3& normal) const;
+    MRAY_HYBRID AABB3       InvApply(const AABB3&) const;
+    MRAY_HYBRID Ray         InvApply(const Ray&) const;
 };
 
 template<class Child>
@@ -81,6 +81,8 @@ class TransformGroupIdentity final : public GenericGroupTransform<TransformGroup
                                   uint32_t attributeIndex,
                                   std::vector<Byte> data) override;
     AttribInfoList  AttributeInfo() const override;
+
+    DataSoA         SoA() const;
 };
 
 class TransformGroupSingle final : public GenericGroupTransform<TransformGroupSingle>
@@ -103,6 +105,8 @@ class TransformGroupSingle final : public GenericGroupTransform<TransformGroupSi
                                   uint32_t attributeIndex,
                                   std::vector<Byte> data) override;
     AttribInfoList  AttributeInfo() const override;
+
+    DataSoA         SoA() const;
 };
 
 class TransformGroupMulti final : public GenericGroupTransform<TransformGroupMulti>
@@ -126,6 +130,8 @@ class TransformGroupMulti final : public GenericGroupTransform<TransformGroupMul
                                   uint32_t attributeIndex,
                                   std::vector<Byte> data) override;
     AttribInfoList  AttributeInfo() const override;
+
+    DataSoA         SoA() const;
 };
 
 // Meta Transform Generator Functions

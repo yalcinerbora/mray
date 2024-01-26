@@ -23,13 +23,18 @@ concept TransformContextC = requires(const TContext& t,
     {t.InvApplyN(v)} -> std::same_as<Vector3>;
     {t.InvApply(r)} -> std::same_as<Ray>;
     {t.InvApply(aabb)} -> std::same_as<AABB3>;
+
+    // Type traits
+    requires std::is_trivially_copyable_v<TContext>;
+    requires std::is_trivially_destructible_v<TContext>;
 };
 
 template <class TGType>
-concept TransformGroupC = requires()
+concept TransformGroupC = requires(TGType tg)
 {
     typename TGType::DataSoA;
-
     // Can query the type
     {TGType::TypeName()} -> std::same_as<std::string_view>;
+    // Can request DataSoA
+    {tg.SoA()}-> std::same_as<typename TGType::DataSoA>;
 };

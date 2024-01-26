@@ -1,8 +1,9 @@
 #pragma once
 
+#include "Core/GraphicsFunctions.h"
+
 #include "MaterialC.h"
 #include "ParamVaryingData.h"
-#include "GraphicsFunctions.h"
 #include "Random.h"
 
 namespace LambertMatDetail
@@ -17,9 +18,9 @@ namespace LambertMatDetail
     template <class SpectrumTransformer = SpectrumConverterContextIdentity>
     struct LambertMaterial
     {
-        using Surface = DefaultSurface;
+        using Surface           = DefaultSurface;
         using OptionalNormalMap = Optional<ParamVaryingData<2, Vector3>>;
-        using AlbedoMap = typename SpectrumTransformer:: template RendererParamVaryingData<2>;
+        using AlbedoMap         = typename SpectrumTransformer:: template RendererParamVaryingData<2>;
 
         private:
         const AlbedoMap             albedoTex;

@@ -33,6 +33,11 @@ std::string_view TransformGroupSingle::TypeName()
     return name;
 }
 
+typename TransformGroupIdentity::DataSoA TransformGroupIdentity::SoA() const
+{
+    return EmptyType{};
+}
+
 TransformGroupSingle::TransformGroupSingle(uint32_t groupId,
                      const GPUSystem& s)
     : BaseType(groupId, s)
@@ -76,6 +81,11 @@ TransformGroupSingle::AttribInfoList TransformGroupSingle::AttributeInfo() const
     return std::vector(LogicList.cbegin(), LogicList.cend());
 }
 
+typename TransformGroupSingle::DataSoA TransformGroupSingle::SoA() const
+{
+    return soa;
+}
+
 std::string_view TransformGroupMulti::TypeName()
 {
     using namespace std::literals;
@@ -103,4 +113,9 @@ void TransformGroupMulti::PushAttribute(Vector2ui idRange,
 TransformGroupMulti::AttribInfoList TransformGroupMulti::AttributeInfo() const
 {
     return AttribInfoList();
+}
+
+typename TransformGroupMulti::DataSoA TransformGroupMulti::SoA() const
+{
+    return soa;
 }

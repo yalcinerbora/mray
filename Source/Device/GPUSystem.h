@@ -32,6 +32,10 @@
 //#elif defined MRAY_GPU_BACKEND_SYCL
 //    // TODO:
 //    //#include "GPUSystemSycl.h"
+#elif defined GPU_BACKEND_HOST
+
+    //DeviceVisit()
+
 #else
     #error Please define a GPU Backend!
 #endif

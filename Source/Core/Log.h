@@ -9,7 +9,7 @@
 //#include "Formatters.h"
 
 #include "Vector.h"
-template <VectorC V>
+template <ArrayLikeC V>
 auto format_as(const V& v) { return v.AsArray(); }
 
 

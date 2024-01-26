@@ -2,7 +2,7 @@
 
 #include "Core/Vector.h"
 #include "Core/Types.h"
-#include "GraphicsFunctions.h"
+#include "Core/GraphicsFunctions.h"
 
 namespace ShapeFunctions
 {

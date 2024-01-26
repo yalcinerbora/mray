@@ -9,7 +9,7 @@ std::string_view PrimGroupTriangle::TypeName()
 
 PrimGroupTriangle::PrimGroupTriangle(uint32_t primGroupId,
                          const GPUSystem& sys)
-    : PrimitiveGroup(primGroupId, sys)
+    : PrimitiveGroupT(primGroupId, sys)
 {}
 
 void PrimGroupTriangle::CommitReservations()
@@ -83,6 +83,11 @@ void PrimGroupTriangle::PushAttribute(PrimBatchId batchId,
     }
 }
 
+typename PrimGroupTriangle::DataSoA PrimGroupTriangle::SoA() const
+{
+    return soa;
+}
+
 std::string_view PrimGroupSkinnedTriangle::TypeName()
 {
     using namespace std::literals;
@@ -92,7 +97,7 @@ std::string_view PrimGroupSkinnedTriangle::TypeName()
 
 PrimGroupSkinnedTriangle::PrimGroupSkinnedTriangle(uint32_t primGroupId,
                                                    const GPUSystem& sys)
-    : PrimitiveGroup(primGroupId, sys)
+    : PrimitiveGroupT(primGroupId, sys)
 {}
 
 void PrimGroupSkinnedTriangle::CommitReservations()
@@ -176,4 +181,9 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchId batchId, uint32_t attri
         default : MRAY_WARNING_LOG("{:s}: Unknown Attribute Index {:d}",
                                    TypeName(), attributeIndex);
     }
+}
+
+typename PrimGroupSkinnedTriangle::DataSoA PrimGroupSkinnedTriangle::SoA() const
+{
+    return soa;
 }

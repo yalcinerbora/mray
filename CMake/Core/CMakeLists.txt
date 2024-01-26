@@ -21,10 +21,8 @@ set(SRC_MATH
     ${CURRENT_SOURCE_DIR}/Vector.h
     ${CURRENT_SOURCE_DIR}/Vector.hpp
     ${CURRENT_SOURCE_DIR}/MathForward.h
-
     ${CURRENT_SOURCE_DIR}/MathFunctions.h
-    ${CURRENT_SOURCE_DIR}/GraphicsFunctions.h
-    ${CURRENT_SOURCE_DIR}/ShapeFunctions.h)
+)
 
 set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/BitFunctions.h
@@ -32,7 +30,9 @@ set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/TypeFinder.h
     ${CURRENT_SOURCE_DIR}/NormTypes.h
     ${CURRENT_SOURCE_DIR}/Log.h
-    ${CURRENT_SOURCE_DIR}/Types.h)
+    ${CURRENT_SOURCE_DIR}/Types.h
+    ${CURRENT_SOURCE_DIR}/GraphicsFunctions.h
+    ${CURRENT_SOURCE_DIR}/ShapeFunctions.h)
 
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/Definitions.h

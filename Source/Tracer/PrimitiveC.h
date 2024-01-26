@@ -6,6 +6,8 @@
 
 #include "Core/MRayDataType.h"
 #include "Core/MemAlloc.h"
+#include "Core/TypeFinder.h"
+
 #include "Device/GPUSystem.h"
 
 #include "TracerTypes.h"
@@ -95,19 +97,20 @@ using TransformContextGenFunc = TransformContext(*)(const TransformData&,
                                                     TransformId,
                                                     PrimitiveId);
 
-template <class PrimType>
-concept PrimitiveC = requires(PrimType pt, RNGDispenser& rng,
+template <class PrimType, class TransformContext = typename PrimType::TransformContext>
+concept PrimitiveC = requires(PrimType pt,
+                              TransformContext tc,
+                              RNGDispenser& rng,
                               Span<uint64_t> mortonCodes,
                               Span<Vector2us> voxelNormals)
 {
     typename PrimType::Hit;
     typename PrimType::DataSoA;
+    typename PrimType::TransformContext;
+    typename PrimType::Intersection;
 
     // Has this specific constructor
-    //requires requires(const TransformContextIdentity& tc,
-    //                  const typename PrimType::DataSoA& soaData)
-    PrimType(TransformContextIdentity{},
-             typename PrimType::DataSoA{}, PrimitiveId{});
+    PrimType(tc, typename PrimType::DataSoA{}, PrimitiveId{});
 
     // Intersect function
     {pt.Intersects(Ray{}, bool{})
@@ -169,6 +172,14 @@ concept PrimitiveC = requires(PrimType pt, RNGDispenser& rng,
     // alpha maping cannot be done, but they can return garbage so its OK)
     {pt.SurfaceParametrization(typename PrimType::Hit{})
     } -> std::same_as<Vector2>;
+
+    {pt.GetTransformContext()} -> std::same_as<const typename PrimType::TransformContext&>;
+
+    // Type traits
+    requires std::is_trivially_copyable_v<PrimType>;
+    requires std::is_trivially_destructible_v<PrimType>;
+    requires std::is_move_assignable_v<PrimType>;
+    requires std::is_move_constructible_v<PrimType>;
 };
 
 template <class PGType>
@@ -217,6 +228,9 @@ concept PrimitiveGroupC = requires(PGType pg)
     // Can query the type
     {PGType::TypeName()} -> std::same_as<std::string_view>;
 
+    // Acquire SoA struct of this primitive group
+    {pg.SoA()} -> std::same_as<typename PGType::DataSoA>;
+
     {pg.ReservePrimitiveBatch(PrimCount{})} -> std::same_as<PrimBatchId>;
     {pg.CommitReservations()} -> std::same_as<void>;
     {pg.IsInCommitState()} -> std::same_as<bool>;
@@ -248,6 +262,11 @@ concept PrimitiveWithSurfaceC = requires(PrimType mg,
 
 };
 
+
+// Compile-time transform context generator finder
+template <PrimitiveGroupC PrimGroup, TransformGroupC TransGroup>
+constexpr auto AcquireTransformContextGenerator();
+
 // Some common types
 struct PrimRange { Vector2ui primRange; Vector2ui attributeRange; };
 
@@ -276,7 +295,7 @@ class PrimitiveGroupI
 // Intermediate class that handles memory management
 // Using CRTP for errors etc.
 template<class Child>
-class PrimitiveGroup : public PrimitiveGroupI
+class PrimitiveGroupT : public PrimitiveGroupI
 {
     static constexpr size_t     HashTableReserveSize = 64;
     // Device Memory Related
@@ -311,22 +330,27 @@ class PrimitiveGroup : public PrimitiveGroupI
 
 
     public:
-                                PrimitiveGroup(uint32_t primGroupId, const GPUSystem&);
+                                PrimitiveGroupT(uint32_t primGroupId, const GPUSystem&);
 
     PrimBatchId                 ReservePrimitiveBatch(PrimCount) override;
     virtual bool                IsInCommitState() const override;
     virtual size_t              GPUMemoryUsage() const override;
 };
 
-template<class TransContextType = TransformContextIdentity>
+template<TransformContextC TransContextType = TransformContextIdentity>
 class EmptyPrimitive
 {
     public:
     using DataSoA           = EmptyType;
     using Hit               = EmptyType;
     using Intersection      = Optional<IntersectionT<EmptyType>>;
+    using TransformContext  = TransContextType;
 
-    constexpr               EmptyPrimitive(const TransContextType&,
+    private:
+    Ref<const TransformContext> transformContext;
+
+    public:
+    constexpr               EmptyPrimitive(const TransformContext&,
                                            const DataSoA&, PrimitiveId);
     constexpr Intersection  Intersects(const Ray&, bool) const;
     constexpr
@@ -344,14 +368,62 @@ class EmptyPrimitive
     Optional<BasicSurface>  SurfaceFromHit(const Hit& hit) const;
     constexpr Optional<Hit> ProjectedHit(const Vector3& point) const;
     constexpr Vector2       SurfaceParametrization(const Hit& hit) const;
+    const TransformContext& GetTransformContext() const;
+};
+
+class EmptyPrimGroup : public PrimitiveGroupT<EmptyPrimGroup>
+{
+    public:
+    using DataSoA       = EmptyType;
+    using Hit           = EmptyType;
+
+    template <TransformContextC TContext = TransformContextIdentity>
+    using Primitive = EmptyPrimitive<TContext>;
+
+    // Transform Context Generators
+    static constexpr auto TransContextGeneratorList = std::make_tuple
+    (
+        TypeFinder::KeyTFuncPair<TransformGroupIdentity,
+                                 TransformContextIdentity,
+                                 &GenTContextIdentity<DataSoA>>{},
+        TypeFinder::KeyTFuncPair<TransformGroupSingle,
+                                 TransformContextSingle,
+                                 &GenTContextSingle<DataSoA>>{}
+    );
+
+    // The actual name of the type
+    static std::string_view TypeName();
+    static constexpr auto   TransformLogic = PrimTransformType::LOCALLY_CONSTANT_TRANSFORM;
+
+                            EmptyPrimGroup(uint32_t primGroupId,
+                                           const GPUSystem& sys);
+
+    void                    CommitReservations() override;
+    PrimAttributeInfoList   AttributeInfo() const override;
+    void                    PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
+                                          std::vector<Byte> data) override;
+    void                    PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
+                                          const Vector2ui& subBatchRange,
+                                          std::vector<Byte> data) override;
+    DataSoA                 SoA() const;
 };
 
 static_assert(PrimitiveC<EmptyPrimitive<>>,
               "Empty primitive does not satisfy Primitive concept!");
+static_assert(PrimitiveGroupC<EmptyPrimGroup>,
+              "Empty primitive group does not satisfy PrimitiveGroup concept!");
+
+template <PrimitiveGroupC PrimGroup, TransformGroupC TransGroup>
+constexpr auto AcquireTransformContextGenerator()
+{
+    using namespace TypeFinder;
+    constexpr auto FList = PrimGroup::TransContextGeneratorList;
+    return GetTupleElement<TransGroup>(std::forward<decltype(FList)>(FList));
+}
 
 template<class Child>
 template <class... Args>
-Tuple<Span<Args>...> PrimitiveGroup<Child>::GenericCommit(std::array<bool, sizeof...(Args)> isPerPrimitiveList)
+Tuple<Span<Args>...> PrimitiveGroupT<Child>::GenericCommit(std::array<bool, sizeof...(Args)> isPerPrimitiveList)
 {
     assert(batchRanges.empty());
     if(isCommitted)
@@ -395,10 +467,10 @@ Tuple<Span<Args>...> PrimitiveGroup<Child>::GenericCommit(std::array<bool, sizeo
 
 template<class Child>
 template <class T>
-void PrimitiveGroup<Child>::GenericPushData(PrimBatchId batchId,
-                                            const Span<T>& primData,
-                                            std::vector<Byte> data,
-                                            bool isPerPrimitive) const
+void PrimitiveGroupT<Child>::GenericPushData(PrimBatchId batchId,
+                                             const Span<T>& primData,
+                                             std::vector<Byte> data,
+                                             bool isPerPrimitive) const
 {
     // TODO: parallel issue maybe?
     // TODO: utilize multi device maybe
@@ -416,11 +488,11 @@ void PrimitiveGroup<Child>::GenericPushData(PrimBatchId batchId,
 
 template<class Child>
 template <class T>
-void PrimitiveGroup<Child>::GenericPushData(PrimBatchId batchId,
-                                            const Span<T>& primData,
-                                            const Vector2ui& subBatchRange,
-                                            std::vector<Byte> data,
-                                            bool isPerPrimitive) const
+void PrimitiveGroupT<Child>::GenericPushData(PrimBatchId batchId,
+                                             const Span<T>& primData,
+                                             const Vector2ui& subBatchRange,
+                                             std::vector<Byte> data,
+                                             bool isPerPrimitive) const
 {
     // TODO: parallel issue maybe?
     // TODO: utilize multi device maybe
@@ -440,7 +512,7 @@ void PrimitiveGroup<Child>::GenericPushData(PrimBatchId batchId,
 }
 
 template<class Child>
-PrimitiveGroup<Child>::PrimitiveGroup(uint32_t primGroupId, const GPUSystem& s)
+PrimitiveGroupT<Child>::PrimitiveGroupT(uint32_t primGroupId, const GPUSystem& s)
     : gpuSystem(s)
     , batchCounter(0)
     , isCommitted(false)
@@ -452,7 +524,7 @@ PrimitiveGroup<Child>::PrimitiveGroup(uint32_t primGroupId, const GPUSystem& s)
 }
 
 template<class Child>
-PrimBatchId PrimitiveGroup<Child>::ReservePrimitiveBatch(PrimCount primCount)
+PrimBatchId PrimitiveGroupT<Child>::ReservePrimitiveBatch(PrimCount primCount)
 {
     if(isCommitted)
     {
@@ -474,65 +546,66 @@ PrimBatchId PrimitiveGroup<Child>::ReservePrimitiveBatch(PrimCount primCount)
 }
 
 template<class Child>
-bool PrimitiveGroup<Child>::IsInCommitState() const
+bool PrimitiveGroupT<Child>::IsInCommitState() const
 {
     return isCommitted;
 }
 
 template<class Child>
-size_t PrimitiveGroup<Child>::GPUMemoryUsage() const
+size_t PrimitiveGroupT<Child>::GPUMemoryUsage() const
 {
     return deviceMem.Size();
 }
 
-template<class TC>
-constexpr EmptyPrimitive<TC>::EmptyPrimitive(const TC&, const DataSoA&, PrimitiveId)
+template<TransformContextC TC>
+constexpr EmptyPrimitive<TC>::EmptyPrimitive(const TC& tc, const DataSoA&, PrimitiveId)
+    : transformContext(tc)
 {}
 
-template<class TC>
+template<TransformContextC TC>
 constexpr Optional<IntersectionT<EmptyType>> EmptyPrimitive<TC>::Intersects(const Ray&, bool) const
 {
     return std::nullopt;
 }
 
-template<class TC>
+template<TransformContextC TC>
 constexpr SampleT<BasicSurface> EmptyPrimitive<TC>::SampleSurface(const RNGDispenser&) const
 {
     return SampleT<BasicSurface>{};
 }
 
-template<class TC>
+template<TransformContextC TC>
 constexpr Float EmptyPrimitive<TC>::PdfSurface(const Hit& hit) const
 {
     return Float{std::numeric_limits<Float>::signaling_NaN()};
 }
 
-template<class TC>
+template<TransformContextC TC>
 constexpr uint32_t EmptyPrimitive<TC>::SampleRNCount() const
 {
     return 0;
 }
 
-template<class TC>
+template<TransformContextC TC>
 constexpr Float EmptyPrimitive<TC>::GetSurfaceArea() const
 {
     return std::numeric_limits<Float>::signaling_NaN();
 }
 
-template<class TC>
+template<TransformContextC TC>
 constexpr AABB3 EmptyPrimitive<TC>::GetAABB() const
 {
     return AABB3(Vector3(std::numeric_limits<Float>::signaling_NaN()),
                  Vector3(std::numeric_limits<Float>::signaling_NaN()));
 }
 
-template<class TC>
+template<TransformContextC TC>
 constexpr Vector3 EmptyPrimitive<TC>::GetCenter() const
 {
     return Vector3(std::numeric_limits<Float>::signaling_NaN());
 }
 
-template<class TC>
+template<TransformContextC TC>
 constexpr uint32_t EmptyPrimitive<TC>::Voxelize(Span<uint64_t>& mortonCodes,
                                                 Span<Vector2us>& normals,
                                                 bool onlyCalculateSize,
@@ -541,20 +614,69 @@ constexpr uint32_t EmptyPrimitive<TC>::Voxelize(Span<uint64_t>& mortonCodes,
     return 0;
 }
 
-template<class TC>
+template<TransformContextC TC>
 constexpr Optional<BasicSurface> EmptyPrimitive<TC>::SurfaceFromHit(const Hit& hit) const
 {
     return std::nullopt;
 }
 
-template<class TC>
+template<TransformContextC TC>
 constexpr Optional<EmptyType> EmptyPrimitive<TC>::ProjectedHit(const Vector3& point) const
 {
     return std::nullopt;
 }
 
-template<class TC>
+template<TransformContextC TC>
 constexpr Vector2 EmptyPrimitive<TC>::SurfaceParametrization(const Hit& hit) const
 {
     return Vector2::Zero();
+}
+
+template<TransformContextC TC>
+const TC& EmptyPrimitive<TC>::GetTransformContext() const
+{
+    return transformContext;
+}
+
+inline
+std::string_view EmptyPrimGroup::TypeName()
+{
+    using namespace std::literals;
+    static std::string_view name = "(P)Empty"sv;
+    return name;
+}
+
+inline
+EmptyPrimGroup::EmptyPrimGroup(uint32_t primGroupId,
+                               const GPUSystem& sys)
+    : PrimitiveGroupT(primGroupId, sys)
+{}
+
+inline
+void EmptyPrimGroup::CommitReservations()
+{
+    isCommitted = true;
+}
+
+inline
+PrimAttributeInfoList EmptyPrimGroup::AttributeInfo() const
+{
+    static const std::array<PrimAttributeInfo, 0> LogicList;
+    return std::vector(LogicList.cbegin(), LogicList.cend());
+}
+
+inline
+void EmptyPrimGroup::PushAttribute(PrimBatchId, uint32_t,
+                                   std::vector<Byte>)
+{}
+
+inline
+void EmptyPrimGroup::PushAttribute(PrimBatchId, uint32_t, const Vector2ui&,
+                                   std::vector<Byte>)
+{}
+
+inline
+typename EmptyPrimGroup::DataSoA EmptyPrimGroup::SoA() const
+{
+    return EmptyType{};
 }

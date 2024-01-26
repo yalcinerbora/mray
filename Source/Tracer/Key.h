@@ -3,6 +3,9 @@
 #include <cstdint>
 #include <iomanip>
 
+#include <fmt/format.h>
+#include <fmt/core.h>
+
 #include "Core/Definitions.h"
 
 // Main Key Logic, All Primitive, Transform, Material, Medium,
@@ -98,9 +101,26 @@ constexpr KeyT<T, BB, IB> KeyT<T, BB, IB>::InvalidKey()
     return KeyT(std::numeric_limits<T>::max());
 }
 
-template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
-MRAY_HOST
-static std::ostream& operator<<(std::ostream& os, const KeyT<T, BB, IB>& key)
+// Format helpers for debugging
+template<std::unsigned_integral T, uint32_t BB, uint32_t IB>
+auto format_as(const KeyT<T, BB, IB>& k)
 {
-    return os << std::hex << key.FetchBatchPortion() << '|' << key.FetchIndexPortion();
+    std::string s = fmt::format("[{:0>{}b}|{:0>{}b}]",
+                                k.FetchBatchPortion(), BB,
+                                k.FetchIndexPortion(), IB);
+    return s;
+}
+
+
+// Rely on overload resolution to write in hexedecimal
+template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
+struct HexKeyT : public KeyT<T, BB, IB> {};
+
+template<std::unsigned_integral T, uint32_t BB, uint32_t IB>
+auto format_as(const HexKeyT<T, BB, IB>& k)
+{
+    std::string s = fmt::format("[{:0>{}X}|{:0>{}X}]",
+                                k.FetchBatchPortion(), (BB + 3) / 4,
+                                k.FetchIndexPortion(), (IB + 3) / 4);
+    return s;
 }

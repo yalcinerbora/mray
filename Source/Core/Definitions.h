@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 
 #ifdef MRAY_GPU_BACKEND_CUDA
 

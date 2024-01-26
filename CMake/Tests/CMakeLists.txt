@@ -8,5 +8,6 @@ target_include_directories(test_common INTERFACE ${MRAY_SOURCE_DIRECTORY}/Tests)
 add_library(mray::test_common ALIAS test_common)
 
 # TODO: Selectively enable/disable device tests
+add_subdirectory(TCore)
 add_subdirectory(TDeviceCUDA)
 add_subdirectory(TTracerCUDA)

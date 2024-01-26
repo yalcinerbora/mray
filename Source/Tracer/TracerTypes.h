@@ -127,13 +127,6 @@ struct alignas (AccelIdPackAlignment) AcceleratorIdPack
 };
 
 template <class T>
-struct SampleT
-{
-    T           sampledResult;
-    Float       pdf;
-};
-
-template <class T>
 struct IntersectionT
 {
     Float   t;
@@ -198,12 +191,6 @@ struct alignas(32) RayGMem
     Float       tMax;
 
 };
-
-//struct RayTPair
-//{
-//    Ray         ray;
-//    Vector2     tMinMax;
-//};
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 Pair<Ray, Vector2> RayFromGMem(Span<const RayGMem> gRays, RayIndex index)

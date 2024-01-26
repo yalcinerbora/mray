@@ -126,45 +126,49 @@ namespace TransformGen
 {
     // Extraction Functions
     template<std::floating_point T>
-    MRAY_HYBRID constexpr Vector<3, T>     ExtractScale(const Matrix<4, T>&);
+    MRAY_HYBRID constexpr Vector<3, T>  ExtractScale(const Matrix<4, T>&);
     template<std::floating_point T>
-    MRAY_HYBRID constexpr Vector<3, T>     ExtractTranslation(const Matrix<4, T>&);
+    MRAY_HYBRID constexpr Vector<3, T>  ExtractTranslation(const Matrix<4, T>&);
     template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<4, T>     Translate(const Vector<3, T>&);
+    MRAY_HYBRID constexpr Matrix<4, T>  Translate(const Vector<3, T>&);
     template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<4, T>     Scale(T);
+    MRAY_HYBRID constexpr Matrix<4, T>  Scale(T);
     template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix <4, T>    Scale(T x, T y, T z);
+    MRAY_HYBRID constexpr Matrix <4, T> Scale(T x, T y, T z);
     template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<4, T>     Rotate(T angle, const Vector<3, T>&);
+    MRAY_HYBRID constexpr Matrix<4, T>  Rotate(T angle, const Vector<3, T>&);
     template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<4, T>     Rotate(const Quat<T>&);
+    MRAY_HYBRID constexpr Matrix<4, T>  Rotate(const Quat<T>&);
     template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<4, T>     Perspective(T fovXRadians, T aspectRatio,
-                                                       T nearPlane, T farPlane);
+    MRAY_HYBRID constexpr Matrix<4, T>  Perspective(T fovXRadians, T aspectRatio,
+                                                    T nearPlane, T farPlane);
     template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<4, T>     Ortogonal(T left, T right,
-                                                     T top, T bottom,
-                                                     T nearPlane, T farPlane);
+    MRAY_HYBRID constexpr Matrix<4, T>  Ortogonal(T left, T right,
+                                                  T top, T bottom,
+                                                  T nearPlane, T farPlane);
     template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<4, T>     Ortogonal(T width, T height,
-                                                     T nearPlane, T farPlane);
+    MRAY_HYBRID constexpr Matrix<4, T>  Ortogonal(T width, T height,
+                                                  T nearPlane, T farPlane);
 
     template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<4, T>     LookAt(const Vector<3, T>& eyePos,
-                                                  const Vector<3, T>& at,
-                                                  const Vector<3, T>& up);
+    MRAY_HYBRID constexpr Matrix<4, T>  LookAt(const Vector<3, T>& eyePos,
+                                               const Vector<3, T>& at,
+                                               const Vector<3, T>& up);
     template<std::floating_point T>
-    MRAY_HYBRID constexpr void             Space(Matrix<3, T>&,
-                                                 const Vector<3, T>& x,
+    MRAY_HYBRID constexpr Matrix<3, T>  Space(const Vector<3, T>& x,
+                                              const Vector<3, T>& y,
+                                              const Vector<3, T>& z);
+
+    template<std::floating_point T>
+    MRAY_HYBRID constexpr Matrix<3, T>  InvSpace(const Vector<3, T>& x,
                                                  const Vector<3, T>& y,
                                                  const Vector<3, T>& z);
 
     template<std::floating_point T>
-    MRAY_HYBRID constexpr void             InvSpace(Matrix<3, T>&,
-                                                    const Vector<3, T>& x,
-                                                    const Vector<3, T>& y,
-                                                    const Vector<3, T>& z);
+    MRAY_HYBRID constexpr Vector<3, T> YUpToZUp(const Vector<3, T>& vec);
+
+    template<std::floating_point T>
+    MRAY_HYBRID constexpr Vector<3, T> ZUpToYUp(const Vector<3, T>& vec);
 }
 
 // Implementation

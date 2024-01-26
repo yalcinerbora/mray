@@ -1,30 +1,26 @@
-set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/Tests/TracerCUDA)
+set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/Tests/Core)
 
 message(STATUS "Configuring ${CURRENT_SOURCE_DIR}")
 
 set(SRC_COMMON
-    ${CURRENT_SOURCE_DIR}/T_RayPartitioner.cu
-    ${CURRENT_SOURCE_DIR}/T_DefaultTriangle.cu
-    ${CURRENT_SOURCE_DIR}/T_DefaultLights.cu
-    ${CURRENT_SOURCE_DIR}/T_Distributions.cu
+    ${CURRENT_SOURCE_DIR}/T_GraphicsFunctions.cpp
 )
 
 source_group("" FILES ${SRC_COMMON})
 
-add_executable(TTracerCUDA ${SRC_COMMON})
+add_executable(TCore ${SRC_COMMON})
 
-target_link_libraries(TTracerCUDA PRIVATE
-                      TracerCUDA_Objects
+target_link_libraries(TCore PRIVATE
+                      CoreLib
                       mray::meta_compile_opts
-                      mray::cuda_extra_compile_opts
                       mray::test_common
                       gtest::gtest
                       gtest::gtest_main)
 
-gtest_discover_tests(TTracerCUDA)
+gtest_discover_tests(TCore)
 
-set_target_properties(TTracerCUDA PROPERTIES FOLDER ${MRAY_TEST_TARGETS_FOLDER})
-set_target_properties(TTracerCUDA PROPERTIES
+set_target_properties(TCore PROPERTIES FOLDER ${MRAY_TEST_TARGETS_FOLDER})
+set_target_properties(TCore PROPERTIES
                       POSITION_INDEPENDENT_CODE ON
                       CUDA_SEPARABLE_COMPILATION ON
                       CUDA_RESOLVE_DEVICE_SYMBOLS ON)
@@ -32,7 +28,7 @@ set_target_properties(TTracerCUDA PROPERTIES
 if(MSVC)
 
     set(DEBUG_ARGS "--gtest_filter=*.* --gtest_catch_exceptions=0 --gtest_repeat=1 --gtest_shuffle=0")
-    set_target_properties(TTracerCUDA PROPERTIES
+    set_target_properties(TCore PROPERTIES
                           VS_DEBUGGER_WORKING_DIRECTORY ${MRAY_WORKING_DIRECTORY}
                           VS_DEBUGGER_COMMAND_ARGUMENTS ${DEBUG_ARGS})
 endif()

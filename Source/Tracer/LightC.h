@@ -1,1 +1,362 @@
 #pragma once
+
+#include "Core/Definitions.h"
+#include <Core/Types.h>
+
+#include "TracerTypes.h"
+#include "ParamVaryingData.h"
+#include "Transforms.h"
+
+#include "Device/GPUSystem.hpp"
+
+template<class LightType>
+concept LightC = requires(LightType l,
+                          typename LightType::SpectrumConverter sc,
+                          typename LightType::Primitive prim,
+                          typename LightType::Primitive::Hit hit,
+                          RNGDispenser rng)
+{
+    typename LightType::SpectrumConverter;
+    typename LightType::Primitive;
+    typename LightType::DataSoA;
+
+    // Constructor Type
+    LightType(sc, prim, const typename LightType::DataSoA{}, LightId{});
+
+    // API
+    {l.SampleSolidAngle(rng, Vector3{})} -> std::same_as<SampleT<Vector3>>;
+    {l.PdfSolidAngle(hit, Vector3{}, Vector3{})} -> std::same_as<Float>;
+    {l.SampleSolidAngleRNCount()} -> std::same_as<uint32_t>;
+    {l.SampleRay(rng)} -> std::same_as<SampleT<Ray>>;
+    {l.PdfRay(Ray{})} -> std::same_as<Float>;
+    {l.SampleRayRNCount()} -> std::same_as<uint32_t>;
+    {l.EmitViaHit(Vector3{}, hit)} -> std::same_as<Spectrum>;
+    {l.EmitViaSurfacePoint(Vector3{}, Vector3{})} -> std::same_as<Spectrum>;
+    {l.IsPrimitiveBackedLight()} -> std::same_as<bool>;
+
+    // Type traits
+    requires std::is_trivially_copyable_v<LightType>;
+    requires std::is_trivially_destructible_v<LightType>;
+    requires std::is_move_assignable_v<LightType>;
+    requires std::is_move_constructible_v<LightType>;
+};
+
+template<class LGType>
+concept LightGroupC = requires(LGType lg)
+{
+    // Every light mandatorily backed by a primitive
+    // Light group holds the type of the backed primitive group
+    typename LGType::PrimGroup;
+    typename LGType:: template Primitive<>;
+    // Internal Light type that satisfies its concept
+    requires LightC<typename LGType::Light<>>;
+
+    // SoA fashion light data. This will be used to access internal
+    // of the light with a given an index
+    typename LGType::DataSoA;
+    std::is_same_v<typename LGType::DataSoA,
+                   typename LGType::template Light<>::DataSoA>;
+
+    // Can query the type
+    {LGType::TypeName()} -> std::same_as<std::string_view>;
+
+    // Acquire SoA struct of this primitive group
+    {lg.SoA()} -> std::same_as<typename LGType::DataSoA>;
+
+    // Runtime Acquire the primitive group
+    {lg.PrimitiveGroup()} -> std::same_as<const typename LGType::PrimGroup&>;
+};
+
+template<LightC LightType, class LightVariantT>
+LightVariantT AssignVariant(const typename LightType::Primitive& p,
+                            const typename LightType::DataSoA& soa, LightId id)
+{
+    return LightVariantT(std::in_place_type_t<LightType>{}, p, soa, id);
+}
+
+// Meta Light Class
+// This will be used for routines that requires
+// every light type at hand. (The example for this is the NEE
+// routines that will sample a light source from the lights all over the scene).
+// For that case either we would require virtual polymorphism, or a variant
+// type/visit. This class utilizes the second one.
+// All these functions should decay to "switch case" / "if else"
+// statements.
+template<class CommonHitT, class MetaLightT,
+         class SpectrumTransformer = SpectrumConverterContextIdentity>
+class MetaLightView
+{
+    using SpectrumConverter = typename SpectrumTransformer::Converter;
+    private:
+    const MetaLightT&        light;
+    const SpectrumConverter& sConverter;
+
+    public:
+    MRAY_HYBRID         MetaLightView(const SpectrumConverter& sTransContext,
+                                      const MetaLightT&);
+
+    MRAY_HYBRID
+    SampleT<Vector3>    SampleSolidAngle(RNGDispenser& dispenser,
+                                         const Vector3& distantPoint) const;
+    MRAY_HYBRID
+    Float               PdfSolidAngle(const CommonHitT& hit,
+                                      const Vector3& distantPoint,
+                                      const Vector3& dir) const;
+    MRAY_HYBRID
+    uint32_t            SampleSolidAngleRNCount() const;
+    MRAY_HYBRID
+    SampleT<Ray>        SampleRay(RNGDispenser& dispenser) const;
+    MRAY_HYBRID
+    Float               PdfRay(const Ray&) const;
+    MRAY_HYBRID
+    uint32_t            SampleRayRNCount() const;
+
+    MRAY_HYBRID
+    Spectrum            EmitViaHit(const Vector3& wO,
+                                   const CommonHitT& hit) const;
+    MRAY_HYBRID
+    Spectrum            EmitViaSurfacePoint(const Vector3& wO,
+                                            const Vector3& surfacePoint) const;
+
+    MRAY_HYBRID bool    IsPrimitiveBackedLight() const;
+};
+
+template<LightC... Lights>
+class MetaLightArray
+{
+    using LightVariant = Variant<Lights...>;// UniqueVariant<Lights...>;
+    using PrimVariant   = UniqueVariant<typename Lights::Primitive...>;
+
+    // Only these two transform contexts are supported
+    // TODO: Reason about extensibility (what if we want to add single transform
+    // with different layout?)
+    using TContextVariant = Variant<TransformContextIdentity,
+                                    TransformContextSingle>;
+
+    using IdentitySConverter    = typename SpectrumConverterContextIdentity::Converter;
+
+    private:
+    const GPUSystem&            system;
+    Span<PrimVariant>           dLightPrimitiveList;
+    Span<LightVariant>          dLightList;
+    Span<TContextVariant>       dTContextList;
+    Span<IdentitySConverter>    dSConverter;
+
+    DeviceMemory                memory;
+
+    public:
+                                MetaLightArray(const GPUSystem&);
+
+    template<LightGroupC LightGroup, TransformGroupC TransformGroup>
+    void                        AddBatch(const LightGroup& lg, const TransformGroup& tg,
+                                         const Span<const PrimitiveId>& primitiveIds,
+                                         const Span<const LightId>& lightIds,
+                                         const Span<const TransformId>& transformIds,
+                                         const Vector2ui& batchRange);
+    Span<const LightVariant>    Array() const;
+
+};
+
+template<class CH, class ML, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+MetaLightView<CH, ML, SC>::MetaLightView(const SpectrumConverter& sConverter,
+                                         const ML& l)
+    : light(l)
+    , sConverter(sConverter)
+{}
+
+template<class CH, class ML, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+SampleT<Vector3> MetaLightView<CH, ML, SC>::SampleSolidAngle(RNGDispenser& rng,
+                                                             const Vector3& distantPoint) const
+{
+    return DeviceVisit(light, [&](auto&& l) -> Float
+    {
+        return l.SampleSolidAngle(rng, distantPoint);
+    });
+}
+
+template<class CH, class ML, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float MetaLightView<CH, ML, SC>::PdfSolidAngle(const CH& hit,
+                                               const Vector3& distantPoint,
+                                               const Vector3& dir) const
+{
+    return DeviceVisit(light, [=]<class LT>(LT&& l) -> Float
+    {
+        using PrimType = typename LT::Primitive;
+        using HitType = typename PrimType::Hit;
+        return l.PdfSolidAngle(HitType(hit), distantPoint, dir);
+    });
+}
+
+template<class CH, class ML, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+uint32_t MetaLightView<CH, ML, SC>::SampleSolidAngleRNCount() const
+{
+    return DeviceVisit(light, [&](auto&& l) -> Float
+    {
+        return l.SampleSolidAngleRNCount();
+    });
+}
+
+template<class CH, class ML, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+SampleT<Ray> MetaLightView<CH, ML, SC>::SampleRay(RNGDispenser& rng) const
+{
+    return DeviceVisit(light, [&](auto&& l) -> SampleT<Ray>
+    {
+        return l.SampleRay(rng);
+    });
+}
+
+template<class CH, class ML, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float MetaLightView<CH, ML, SC>::PdfRay(const Ray& ray) const
+{
+    return DeviceVisit(light, [&](auto&& l) -> SampleT<Ray>
+    {
+        return l.SampleRay(ray);
+    });
+}
+
+template<class CH, class ML, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+uint32_t MetaLightView<CH, ML, SC>::SampleRayRNCount() const
+{
+    return DeviceVisit(light, [&](auto&& l) -> SampleT<Ray>
+    {
+        return l.SampleRayRNCount();
+    });
+}
+
+template<class CH, class ML, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Spectrum MetaLightView<CH, ML, SC>::EmitViaHit(const Vector3& wO, const CH& hit) const
+{
+    return DeviceVisit(light, [=]<class LT>(LT&& l) -> Spectrum
+    {
+        using PrimType = typename LT::Primitive;
+        using HitType = typename PrimType::Hit;
+        return l.Emit(wO, HitType(hit));
+    });
+}
+
+template<class CH, class ML, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Spectrum MetaLightView<CH, ML, SC>::EmitViaSurfacePoint(const Vector3& wO,
+                                                        const Vector3& surfacePoint) const
+{
+    return DeviceVisit(light, [&](auto&& l) -> SampleT<Ray>
+    {
+        return specConverter(l.SampleRay(wO, surfacePoint));
+    });
+}
+
+template<class CH, class ML, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool MetaLightView<CH, ML, SC>::IsPrimitiveBackedLight() const
+{
+    return DeviceVisit(light, [&](auto&& l) -> bool
+    {
+        return IsPrimitiveBackedLight();
+    });
+}
+
+template<LightC... L>
+MetaLightArray<L...>::MetaLightArray(const GPUSystem& s)
+    : system(s)
+    , memory(system.AllGPUs(), 2_MiB, 16_MiB)
+{}
+
+template<LightC... L>
+template<LightGroupC LightGroup, TransformGroupC TransformGroup>
+void MetaLightArray<L...>::AddBatch(const LightGroup& lg, const TransformGroup& tg,
+                                    const Span<const PrimitiveId>& primitiveIds,
+                                    const Span<const LightId>& lightIds,
+                                    const Span<const TransformId>& transformIds,
+                                    const Vector2ui& batchRange)
+{
+    const GPUQueue& queue = system.BestDevice().GetQueue(0);
+
+    using TGSoA = typename TransformGroup::DataSoA;
+    using LGSoA = typename LightGroup::DataSoA;
+    using PGSoA = typename LightGroup::PrimGroup::DataSoA;
+
+    PGSoA pgData = lg.PrimitiveGroup().SoA();
+    LGSoA lgData = lg.SoA();
+    TGSoA tgData = tg.SoA();
+
+    uint32_t lightCount = (batchRange[1] - batchRange[0]);
+    assert(lightIds.size() == lightCount);
+
+    // Given light construct the transformed light
+    // This means having a primitive context
+    auto ConstructKernel = [=, this] MRAY_HYBRID(KernelCallParams kp)
+    {
+        for(uint32_t i = kp.GlobalId(); i < lightCount; i += kp.TotalSize())
+        {
+            // Determine types, transform context primitive etc.
+            // Compile-time find the transform generator function and return type
+            using PrimGroup = typename LightGroup::PrimGroup;
+            constexpr auto TContextGen = AcquireTransformContextGenerator<PrimGroup, TransformGroup>();
+            constexpr auto TGenFunc = decltype(TContextGen)::Function;
+            // Define the types
+            // First, this kernel uses a transform context
+            // that this primitive group provides to generate a surface
+            using TContextType = typename decltype(TContextGen)::ReturnType;
+            // Assert that this context is either single-transform or identity-transform
+            // Currently, each light can only be transformed via
+            // single or or identity transform (no skinned meshes :/)
+            static_assert(std::is_same_v<TContextType, TransformContextIdentity> ||
+                          std::is_same_v<TContextType, TransformContextSingle>);
+
+            // Second, we are using this primitive
+            using Primitive = typename PrimGroup:: template Primitive<TContextType>;
+
+            // Light type has to be with identity spectrum conversion
+            // meta light will handle the spectrum conversion instead of the light
+            using Light = typename LightGroup:: template Light<TContextType>;
+            // Check if the light type is in variant list
+            static_assert((std::is_same_v<Light, L> || ...),
+                          "This light type is not in variant list!");
+
+            // Find the lights starting location
+            uint32_t index = batchRange[0] + i;
+
+            // Primitives do not own the transform contexts,
+            // save it to global memory.
+            dTContextList[index] = TGenFunc(tgData, pgData,
+                                            transformIds[i],
+                                            primitiveIds[i]);
+            // Now construct the primitive, it refers to the tc on global memory
+            auto& p = dLightPrimitiveList[index];
+            p.template emplace<Primitive>(std::get<TContextType>(dTContextList[index]),
+                                          pgData, primitiveIds[i]);
+
+            // And finally construct the light, and this also refers to primitive
+            // on the global memory.
+            // Construct the lights with identity spectrum transform
+            // context since it depends on per-ray data.
+            auto& l = dLightList[index];
+            l.template emplace<Light>(dSConverter[0],
+                                      std::get<Primitive>(dLightPrimitiveList[index]),
+                                      lgData, lightIds[i]);
+        }
+    };
+
+    using namespace std::literals;
+    queue.IssueSaturatingLambda
+    (
+        "KCConstructMetaLight"sv,
+        KernelIssueParams{.workCount = lightCount},
+        //
+        std::move(ConstructKernel)
+    );
+}
+
+template<LightC... L>
+Span<const typename MetaLightArray<L...>::LightVariant> MetaLightArray<L...>::Array() const
+{
+    return ToConstSpan(dLightList);
+}

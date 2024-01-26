@@ -1052,22 +1052,34 @@ constexpr Matrix<4, T> TransformGen::LookAt(const Vector<3, T>& eyePos,
 
 template<std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr void TransformGen::Space(Matrix<3, T>& m,
-                                   const Vector<3, T>& x,
-                                   const Vector<3, T>& y,
-                                   const Vector<3, T>& z)
+constexpr Matrix<3, T> TransformGen::Space(const Vector<3, T>& x,
+                                           const Vector<3, T>& y,
+                                           const Vector<3, T>& z)
 {
-    m = Matrix<3, T>(x, y, z);
+    return Matrix<3, T>(x, y, z);
 }
 
 template<std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr void TransformGen::InvSpace(Matrix<3, T>& m,
-                                      const Vector<3, T>& x,
-                                      const Vector<3, T>& y,
-                                      const Vector<3, T>& z)
+constexpr Matrix<3, T> TransformGen::InvSpace(const Vector<3, T>& x,
+                                              const Vector<3, T>& y,
+                                              const Vector<3, T>& z)
 {
-    m = Matrix<3, T>(x[0], y[0], z[0],
-                     x[1], y[1], z[1],
-                     x[2], y[2], z[2]);
+    return Matrix<3, T>(x[0], y[0], z[0],
+                        x[1], y[1], z[1],
+                        x[2], y[2], z[2]);
+}
+
+template<std::floating_point T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Vector<3, T> TransformGen::YUpToZUp(const Vector<3, T>& v)
+{
+    return Vector<3, T>(v[2], v[0], v[1]);
+}
+
+template<std::floating_point T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Vector<3, T> TransformGen::ZUpToYUp(const Vector<3, T>& v)
+{
+    return Vector<3, T>(v[1], v[2], v[0]);
 }

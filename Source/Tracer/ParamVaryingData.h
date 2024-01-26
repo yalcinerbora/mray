@@ -46,7 +46,7 @@ template<class Converter>
 struct RendererSpectrum
 {
     private:
-    const Converter& c;
+    Ref<const Converter> c;
 
     public:
     MRAY_HYBRID             RendererSpectrum(const Converter& c);
@@ -59,8 +59,8 @@ class RendererParamVaryingSpectrum
     using PVD = ParamVaryingData<DIMS, Spectrum>;
 
     private:
-    const Converter&            converter;
-    const PVD&                  input;
+    Ref<const Converter>        converter;
+    Ref<const PVD>              input;
 
     public:
     //
@@ -157,7 +157,7 @@ template<class C, uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Optional<Spectrum> RendererParamVaryingSpectrum<C, D>::operator()(Vector<D, Float> uvCoords) const
 {
-    return converter(input(uvCoords));
+    return converter.get().Convert(input.get()(uvCoords));
 }
 
 template<class C, uint32_t D>
@@ -166,7 +166,7 @@ Optional<Spectrum> RendererParamVaryingSpectrum<C, D>::operator()(Vector<D, Floa
                                                                   Vector<D, Float> dpdu,
                                                                   Vector<D, Float> dpdv) const
 {
-    return converter.Convert(input(uvCoords, dpdu, dpdv));
+    return converter.get().Convert(input.get()(uvCoords, dpdu, dpdv));
 }
 
 template<class C, uint32_t D>
@@ -174,7 +174,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Optional<Spectrum> RendererParamVaryingSpectrum<C, D>::operator()(Vector<D, Float> uvCoords,
                                                                   uint32_t mipLevel) const
 {
-    return converter.Convert(input(uvCoords, mipLevel));
+    return converter.get().Convert(input.get()(uvCoords, mipLevel));
 }
 
 }

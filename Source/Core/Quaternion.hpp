@@ -388,11 +388,11 @@ constexpr Quat<T> operator*(T t, const Quat<T>& q)
 
 template <class T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-void TransformGen::Space(Quat<T>& q,
-                         const Vector<3, T>& xIn,
-                         const Vector<3, T>& y,
-                         const Vector<3, T>& z)
+Quat<T> TransformGen::Space(const Vector<3, T>& xIn,
+                            const Vector<3, T>& y,
+                            const Vector<3, T>& z)
 {
+    Quat<T> q;
     // Flip the coordinate system if inverted
     Vector<3, T> x = xIn;
     if((Cross(x, y) - z).Abs() > Vector3(0.1))
@@ -445,6 +445,7 @@ void TransformGen::Space(Quat<T>& q,
     q *= T{0.5} / sqrt(t);
     q.NormalizeSelf();
     q.ConjugateSelf();
+    return q;
 
     //// Another implementation that i found in stack overflow
     //// https://stackoverflow.com/questions/63734840/how-to-convert-rotation-matrix-to-quaternion
@@ -493,11 +494,9 @@ void TransformGen::Space(Quat<T>& q,
 
 template <class T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-void TransformGen::InvSpace(Quat<T>& q,
-                            const Vector<3, T>& x,
+Quat<T> TransformGen::InvSpace(const Vector<3, T>& x,
                             const Vector<3, T>& y,
                             const Vector<3, T>& z)
 {
-    TransformGen::Space(q, x, y, z);
-    q.ConjugateSelf();
+    return Space(x, y, z).Conjugate();
 }
