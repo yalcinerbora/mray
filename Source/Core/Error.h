@@ -12,7 +12,7 @@ struct MRayError
     enum Type
     {
         OK,
-        ERROR,
+        HAS_ERROR
     };
 
     private:
@@ -35,7 +35,7 @@ struct MRayError
 
 inline MRayError::MRayError(std::string&& s)
                             //std::source_location loc)
-    : type(MRayError::ERROR)
+    : type(MRayError::HAS_ERROR)
     , customInfo(s)
     //, sourceInfo(loc)
 {}

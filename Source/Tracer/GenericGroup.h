@@ -7,8 +7,10 @@
 
 #include "Core/Types.h"
 #include "Core/MemAlloc.h"
-#include "Device/GPUSystem.h"
 
+#include "MRayInput/MRayInput.h"
+
+#include "Device/GPUSystem.h"
 #include "TracerTypes.h"
 
 template <class IdType, class AttribInfo>
@@ -26,7 +28,7 @@ class GenericGroupI
     virtual bool    IsInCommitState() const = 0;
     virtual void    PushAttribute(Vector2ui idRange,
                                   uint32_t attributeIndex,
-                                  std::vector<Byte> data) = 0;
+                                  MRayInput data) = 0;
     virtual size_t  GPUMemoryUsage() const = 0;
     virtual AttribInfoList AttributeInfo() const = 0;
 };
@@ -55,7 +57,7 @@ class GenericGroup : public GenericGroupI<IdType, AttribInfo>
     template <class T>
     void                        GenericPushData(Vector2ui idRange,
                                                 const Span<T>& copyRegion,
-                                                std::vector<Byte> data) const;
+                                                MRayInput data) const;
 
     public:
                                 GenericGroup(uint32_t groupId, const GPUSystem&);
@@ -92,7 +94,7 @@ template<class C, class ID, class AI>
 template <class T>
 void GenericGroup<C, ID, AI>::GenericPushData(Vector2ui idRange,
                                               const Span<T>& dData,
-                                              std::vector<Byte> data) const
+                                              MRayInput data) const
 {
     // TODO: parallel issue maybe?
     // TODO: utilize multi device maybe

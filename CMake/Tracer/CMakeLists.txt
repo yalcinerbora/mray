@@ -29,14 +29,12 @@ set(SRC_ACCELLERATORS
 set(SRC_LIGHTS
     ${CURRENT_SOURCE_DIR}/LightC.h
     ${CURRENT_SOURCE_DIR}/Lights.h
-    ${CURRENT_SOURCE_DIR}/Lights.hpp
-    ${CURRENT_SOURCE_DIR}/Lights.cu)
+    ${CURRENT_SOURCE_DIR}/Lights.hpp)
 
 set(SRC_RANDOM
     ${CURRENT_SOURCE_DIR}/Random.h
     ${CURRENT_SOURCE_DIR}/Distributions.h
-    ${CURRENT_SOURCE_DIR}/Distributions.cu
-)
+    ${CURRENT_SOURCE_DIR}/Distributions.cu)
 
 set(SRC_RENDERERS
     ${CURRENT_SOURCE_DIR}/RendererC.h)
@@ -78,9 +76,11 @@ source_group("" FILES ${SRC_COMMON})
 
 add_library(TracerCUDA SHARED ${SRC_ALL})
 
-target_link_libraries(TracerCUDA PRIVATE
+target_link_libraries(TracerCUDA
+                      PRIVATE
                       DeviceLib
                       CoreLib
+                      MRayInputLib
                       mray::meta_compile_opts
                       mray::cuda_extra_compile_opts)
 
@@ -96,6 +96,7 @@ target_link_libraries(TracerCUDA_Objects
                       PUBLIC
                       DeviceLib
                       CoreLib
+                      MRayInputLib
                       PRIVATE
                       mray::meta_compile_opts
                       mray::cuda_extra_compile_opts)

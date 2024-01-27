@@ -44,11 +44,12 @@ PrimAttributeInfoList PrimGroupTriangle::AttributeInfo() const
 }
 
 void PrimGroupTriangle::PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
-                                      std::vector<Byte> data)
+                                      MRayInput data)
 {
     auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
     {
-        GenericPushData(batchId, d, data, isPerPrimitive);
+        GenericPushData(batchId, d,
+                        std::move(data), isPerPrimitive);
     };
 
     switch(attributeIndex)
@@ -65,11 +66,12 @@ void PrimGroupTriangle::PushAttribute(PrimBatchId batchId, uint32_t attributeInd
 void PrimGroupTriangle::PushAttribute(PrimBatchId batchId,
                                       uint32_t attributeIndex,
                                       const Vector2ui& subBatchRange,
-                                      std::vector<Byte> data)
+                                      MRayInput data)
 {
     auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
     {
-        GenericPushData(batchId, d, subBatchRange, data, isPerPrimitive);
+        GenericPushData(batchId, d, subBatchRange,
+                        std::move(data), isPerPrimitive);
     };
 
     switch(attributeIndex)
@@ -141,11 +143,12 @@ PrimAttributeInfoList PrimGroupSkinnedTriangle::AttributeInfo() const
 }
 
 void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
-                                             std::vector<Byte> data)
+                                             MRayInput data)
 {
     auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
     {
-        GenericPushData(batchId, d, data, isPerPrimitive);
+        GenericPushData(batchId, d,
+                        std::move(data), isPerPrimitive);
     };
 
     switch(attributeIndex)
@@ -163,11 +166,12 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchId batchId, uint32_t attri
 
 void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
                                              const Vector2ui& subBatchRange,
-                                             std::vector<Byte> data)
+                                             MRayInput data)
 {
     auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
     {
-        GenericPushData(batchId, d, subBatchRange, data, isPerPrimitive);
+        GenericPushData(batchId, d, subBatchRange,
+                        std::move(data), isPerPrimitive);
     };
 
     switch(attributeIndex)

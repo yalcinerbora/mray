@@ -47,24 +47,6 @@ static constexpr uint32_t TotalQueuePerDevice()
 namespace mray::cuda
 {
 
-class BufferDestructor
-{
-    // Buffer destruction related
-    struct HostVectorI { virtual ~HostVectorI() = default; };
-    template <class T>
-    struct HostVector final : public HostVectorI
-    {
-        std::vector<T> data;
-        HostVector(std::vector<T>&& d) : data(d) {};
-    };
-    public:
-    using OwningType = std::unique_ptr<HostVectorI>;
-
-    template<class T>
-    static OwningType* IssueBufferForDestruction(std::vector<T> buffer);
-    static void DestroyCallback(void* ptr);
-};
-
 class GPUQueueCUDA;
 class GPUDeviceCUDA;
 
@@ -173,8 +155,8 @@ class GPUQueueCUDA
     MRAY_HOST void      MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const;
     template <class T>
     MRAY_HOST void      MemsetAsync(Span<T> region, uint8_t perByteValue) const;
-    template <class T>
-    MRAY_HOST void      IssueBufferForDestruction(std::vector<T> data) const;
+
+    MRAY_HOST void      IssueBufferForDestruction(MRayInput data) const;
 
     // Synchronization
     MRAY_HYBRID
@@ -271,17 +253,6 @@ class GPUSystemCUDA
     // Simple & Slow System Synchronization
     void                    SyncAll() const;
 };
-
-template <class T>
-inline BufferDestructor::OwningType* BufferDestructor::IssueBufferForDestruction(std::vector<T> buffer)
-{
-    // TODO: Is there any better way to do this?
-    // Callback is void ptr (C API), only void ptr can persist
-    // between scopes.
-    HostVector<T>* wrappedData = new HostVector<T>{std::move(buffer)};
-    OwningType* ptr = new OwningType(wrappedData);
-    return ptr;
-}
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t KernelCallParamsCUDA::GlobalId() const
@@ -421,12 +392,11 @@ void GPUQueueCUDA::MemsetAsync(Span<T> region, uint8_t perByteValue) const
                                region.size_bytes(), stream));
 }
 
-template <class T>
-MRAY_HOST void GPUQueueCUDA::IssueBufferForDestruction(std::vector<T> data) const
+MRAY_HOST inline
+void GPUQueueCUDA::IssueBufferForDestruction(MRayInput data) const
 {
-    using OwningType = typename BufferDestructor::OwningType;
-    OwningType* ptr = BufferDestructor::IssueBufferForDestruction(std::move(data));
-    CUDA_CHECK(cudaLaunchHostFunc(stream, &BufferDestructor::DestroyCallback, ptr));
+    void* ptr = MRayInputIssueBufferForDestruction(std::move(data));
+    CUDA_CHECK(cudaLaunchHostFunc(stream, &MRayInputDestroyCallback, ptr));
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE

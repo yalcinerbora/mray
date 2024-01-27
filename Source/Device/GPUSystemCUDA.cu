@@ -5,11 +5,7 @@
 namespace mray::cuda
 {
 
-void BufferDestructor::DestroyCallback(void* ptr)
-{
-    OwningType* ptrTyped = reinterpret_cast<OwningType*>(ptr);
-    delete ptrTyped;
-};
+
 
 GPUDeviceCUDA::GPUDeviceCUDA(int deviceId, nvtxDomainHandle_t domain)
     : deviceId(deviceId)

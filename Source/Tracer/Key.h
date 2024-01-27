@@ -111,7 +111,6 @@ auto format_as(const KeyT<T, BB, IB>& k)
     return s;
 }
 
-
 // Rely on overload resolution to write in hexedecimal
 template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
 struct HexKeyT : public KeyT<T, BB, IB> {};

@@ -113,6 +113,7 @@ add_subdirectory(Device)
 
 # DLLs
 add_subdirectory(Tracer)
+add_subdirectory(MRayInput)
 #add_subdirectory(GFGSurfaceLoader)
 #add_subdirectory(ImageLoader)
 

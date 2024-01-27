@@ -1,6 +1,9 @@
 #pragma once
 
 #include "Core/Vector.h"
+#include "Core/MemAlloc.h"
+#include "MRayInput/MRayInput.h"
+
 #include <type_traits>
 
 static constexpr uint32_t WarpSize();
@@ -40,8 +43,6 @@ struct KernelExactIssueParams
     uint32_t blockSize;
     uint32_t sharedMemSize = 0;
 };
-
-
 
 // Texture Related
 enum class InterpolationType

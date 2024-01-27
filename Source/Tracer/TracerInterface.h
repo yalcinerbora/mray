@@ -9,19 +9,10 @@
 
 #include "TracerTypes.h"
 
-template <std::unsigned_integral T>
-struct GenericId
-{
-    T id;
-    constexpr explicit operator T() { return id; }
-};
+#define MRAY_GENERIC_ID(NAME, TYPE) enum class NAME : TYPE {}
 
-#define MRAY_GENERIC_ID_BODY(NAME, TYPE) NAME : GenericId<TYPE>\
-{\
-    using T = TYPE; \
-    using GenericId<T>::id; \
-    using GenericId<T>::operator T; \
-}
+namespace MRayInputDetail { class MRayInput; }
+using MRayInput = MRayInputDetail::MRayInput;
 
 namespace TracerConstants
 {
@@ -33,45 +24,45 @@ using GenericAttributeInfo = Pair<std::string, MRayDataTypeRT>;
 using TypeNameList = std::vector<std::string>;
 
 // Prim related
-struct MRAY_GENERIC_ID_BODY(PrimGroupId, uint32_t);
-struct MRAY_GENERIC_ID_BODY(PrimLocalBatchId, uint32_t);
+MRAY_GENERIC_ID(PrimGroupId, uint32_t);
+MRAY_GENERIC_ID(PrimLocalBatchId, uint32_t);
 struct PrimBatchId { PrimGroupId primGroupId; PrimLocalBatchId localBatchId; };
 struct PrimCount { uint32_t primCount; uint32_t attributeCount; };
 using PrimBatchIdList = std::vector<PrimBatchId>;
 using PrimAttributeInfo = GenericAttributeInfo;
 using PrimAttributeInfoList = std::vector<PrimAttributeInfo>;
 // Texture Related
-struct MRAY_GENERIC_ID_BODY(TextureId, uint32_t);
+MRAY_GENERIC_ID(TextureId, uint32_t);
 // Transform Related
-struct MRAY_GENERIC_ID_BODY(TransGroupId, uint32_t);
+MRAY_GENERIC_ID(TransGroupId, uint32_t);
 using TransAttributeInfo = GenericAttributeInfo;
 using TransAttributeInfoList = std::vector<TransAttributeInfo>;
 // Light Related
-struct MRAY_GENERIC_ID_BODY(LightGroupId, uint32_t);
+MRAY_GENERIC_ID(LightGroupId, uint32_t);
 using LightAttributeInfo = GenericAttributeInfo;
 using LightAttributeInfoList = std::vector<LightAttributeInfo>;
 // Camera Related
-struct MRAY_GENERIC_ID_BODY(CameraGroupId, uint32_t);
+MRAY_GENERIC_ID(CameraGroupId, uint32_t);
 using CamAttributeInfo = GenericAttributeInfo;
 using CamAttributeInfoList = std::vector<CamAttributeInfo>;
 // Material Related
-struct MRAY_GENERIC_ID_BODY(MatGroupId, uint32_t);
+MRAY_GENERIC_ID(MatGroupId, uint32_t);
 using MatAttributeInfo = GenericAttributeInfo;
 using MatAttributeInfoList = std::vector<MatAttributeInfo>;
 // Medium Related
-struct MRAY_GENERIC_ID_BODY(MediumGroupId, uint32_t);
+MRAY_GENERIC_ID(MediumGroupId, uint32_t);
 using MediumAttributeInfo = GenericAttributeInfo;
 using MediumAttributeInfoList = std::vector<MediumAttributeInfo>;
 // Surface Related
-struct MRAY_GENERIC_ID_BODY(SurfaceId, uint32_t);
-struct MRAY_GENERIC_ID_BODY(LightSurfaceId, uint32_t);
-struct MRAY_GENERIC_ID_BODY(CamSurfaceId, uint32_t);
+MRAY_GENERIC_ID(SurfaceId, uint32_t);
+MRAY_GENERIC_ID(LightSurfaceId, uint32_t);
+MRAY_GENERIC_ID(CamSurfaceId, uint32_t);
 using SurfaceMatList = std::array<PrimBatchId, TracerConstants::MaxPrimBatchPerSurface>;
 using SurfacePrimList = std::array<PrimLocalBatchId, TracerConstants::MaxPrimBatchPerSurface>;
 using OptionalAlphaMapList = std::array<Optional<TextureId>, TracerConstants::MaxPrimBatchPerSurface>;
 using CullBackfaceFlagList = std::array<bool, TracerConstants::MaxPrimBatchPerSurface>;
 // Renderer Related
-struct MRAY_GENERIC_ID_BODY(RendererId, uint32_t);
+MRAY_GENERIC_ID(RendererId, uint32_t);
 using RendererAttributeInfo = GenericAttributeInfo;
 using RendererAttributeInfoList = std::vector<GenericAttributeInfo>;
 
@@ -134,11 +125,11 @@ class TracerInterfaceI
     // Acquire Attribute Info
     virtual void            PushPrimAttribute(PrimBatchId,
                                               uint32_t attributeIndex,
-                                              std::vector<Byte> data) = 0;
+                                              MRayInput data) = 0;
     virtual void            PushPrimAttribute(PrimBatchId,
                                               uint32_t attributeIndex,
                                               Vector2ui subBatchRange,
-                                              std::vector<Byte> data) = 0;
+                                              MRayInput data) = 0;
     //================================//
     //            Material            //
     //================================//
@@ -152,7 +143,7 @@ class TracerInterfaceI
     //
     virtual void        PushMatAttribute(MatGroupId, Vector2ui range,
                                          uint32_t attributeIndex,
-                                         std::vector<Byte> data) = 0;
+                                         MRayInput data) = 0;
     virtual void        PushMatAttribute(MatGroupId, Vector2ui range,
                                          uint32_t attributeIndex,
                                          std::vector<TextureId>) = 0;
@@ -174,7 +165,7 @@ class TracerInterfaceI
     // Direct mip data
     // TODO: add more later (sub data etc)
     virtual void            PushTextureData(TextureId, uint32_t mipLevel,
-                                            std::vector<Byte> data) = 0;
+                                            MRayInput data) = 0;
     //================================//
     //          Transform             //
     //================================//
@@ -186,7 +177,7 @@ class TracerInterfaceI
     //
     virtual void            PushTransAttribute(TransGroupId, Vector2ui range,
                                                uint32_t attributeIndex,
-                                               std::vector<Byte> data) = 0;
+                                               MRayInput data) = 0;
     //================================//
     //            Lights              //
     //================================//
@@ -201,7 +192,7 @@ class TracerInterfaceI
     //
     virtual void            PushLightAttribute(LightGroupId, Vector2ui range,
                                                uint32_t attributeIndex,
-                                               std::vector<Byte> data) = 0;
+                                               MRayInput data) = 0;
     //================================//
     //           Cameras              //
     //================================//
@@ -213,7 +204,7 @@ class TracerInterfaceI
     //
     virtual void            PushCamAttribute(CameraGroupId, Vector2ui range,
                                              uint32_t attributeIndex,
-                                             std::vector<Byte> data) = 0;
+                                             MRayInput data) = 0;
     //================================//
     //            Medium              //
     //================================//
@@ -225,7 +216,7 @@ class TracerInterfaceI
     //
     virtual void            PushMediumAttribute(MediumGroupId, Vector2ui range,
                                                 uint32_t attributeIndex,
-                                                std::vector<Byte> data) = 0;
+                                                MRayInput data) = 0;
     virtual void            PushMediumAttribute(MediumGroupId, Vector2ui range,
                                                 uint32_t attributeIndex,
                                                 std::vector<TextureId> textures) = 0;

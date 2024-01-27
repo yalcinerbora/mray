@@ -10,22 +10,33 @@
 
 #include "Core/Log.h"
 
+// Meta Light Test Types
+using LightGroupSkysphereCoOcto = LightGroupSkysphere<CoOctoCoordConverter>;
+using LightGroupSkysphereSpherical = LightGroupSkysphere<SphericalCoordConverter>;
+
+using TContextVariant = Variant<TransformContextIdentity,
+                                TransformContextSingle>;
+using LightVariantIn = Variant
+<
+    typename LightGroupSkysphereCoOcto:: template Light<TransformContextSingle>,
+    typename LightGroupSkysphereCoOcto:: template Light<TransformContextIdentity>,
+    typename LightGroupPrim<PrimGroupTriangle>:: template Light<TransformContextSingle>,
+    typename LightGroupPrim<PrimGroupTriangle>:: template Light<TransformContextIdentity>
+>;
+
+using MetaLightList = MetaLightArray<TContextVariant, LightVariantIn>;
+using MetaLight = typename MetaLightList::MetaLight;
+using MetaLightView = typename MetaLightList::MetaLightView<Vector2>;
+
+
 TEST(DefaultLights, DISABLED_Skysphere)
 {
 }
 
 TEST(DefaultLights, MetaLight)
 {
-    using LightGroupSkysphereCoOcto = LightGroupSkysphere<CoOctoCoordConverter>;
-    using LightGroupSkysphereSpherical = LightGroupSkysphere<SphericalCoordConverter>;
-
-    LightId lId;
-    lId = LightId(0x1100ABC0);
-
-    MRAY_LOG("{}", lId);
-    MRAY_LOG("{}", HexKeyT(lId));
-
     GPUSystem system;
+    // Generate some groups
     // PGs
     EmptyPrimGroup emptyPrimGroup(0u, system);
     PrimGroupTriangle triangleGroup(1u, system);
@@ -36,14 +47,7 @@ TEST(DefaultLights, MetaLight)
     LightGroupPrim<PrimGroupTriangle> triangleLightGroup(0u, system, triangleGroup);
     LightGroupSkysphereCoOcto skysphereCOLightGroup(0u, system, emptyPrimGroup);
 
-    using MetaLightList = MetaLightArray
-    <
-        typename LightGroupSkysphereCoOcto:: template Light<TransformContextSingle>,
-        typename LightGroupSkysphereCoOcto:: template Light<TransformContextIdentity>,
-        typename LightGroupPrim<PrimGroupTriangle>:: template Light<TransformContextSingle>,
-        typename LightGroupPrim<PrimGroupTriangle>:: template Light<TransformContextIdentity>
-    >;
-
+    // Add ids
 
     Span<const LightId> lightIds;
     Span<const PrimitiveId> primIds;
@@ -65,4 +69,6 @@ TEST(DefaultLights, MetaLight)
     lightList.AddBatch(skysphereCOLightGroup, singleTG,
                        primIds, lightIds, transformIds,
                        Vector2ui(0, 1));
+
+
 }

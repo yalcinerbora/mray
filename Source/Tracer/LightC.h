@@ -67,13 +67,6 @@ concept LightGroupC = requires(LGType lg)
     {lg.PrimitiveGroup()} -> std::same_as<const typename LGType::PrimGroup&>;
 };
 
-template<LightC LightType, class LightVariantT>
-LightVariantT AssignVariant(const typename LightType::Primitive& p,
-                            const typename LightType::DataSoA& soa, LightId id)
-{
-    return LightVariantT(std::in_place_type_t<LightType>{}, p, soa, id);
-}
-
 // Meta Light Class
 // This will be used for routines that requires
 // every light type at hand. (The example for this is the NEE
@@ -84,7 +77,7 @@ LightVariantT AssignVariant(const typename LightType::Primitive& p,
 // statements.
 template<class CommonHitT, class MetaLightT,
          class SpectrumTransformer = SpectrumConverterContextIdentity>
-class MetaLightView
+class MetaLightViewT
 {
     using SpectrumConverter = typename SpectrumTransformer::Converter;
     private:
@@ -92,8 +85,8 @@ class MetaLightView
     const SpectrumConverter& sConverter;
 
     public:
-    MRAY_HYBRID         MetaLightView(const SpectrumConverter& sTransContext,
-                                      const MetaLightT&);
+    MRAY_HYBRID         MetaLightViewT(const SpectrumConverter& sTransContext,
+                                       const MetaLightT&);
 
     MRAY_HYBRID
     SampleT<Vector3>    SampleSolidAngle(RNGDispenser& dispenser,
@@ -121,19 +114,22 @@ class MetaLightView
     MRAY_HYBRID bool    IsPrimitiveBackedLight() const;
 };
 
-template<LightC... Lights>
-class MetaLightArray
+template<class... >
+class MetaLightArray;
+
+// Specialize the array
+template<TransformContextC... TContexts, LightC... Lights>
+class MetaLightArray<Variant<TContexts...>, Variant<Lights...>>
 {
-    using LightVariant = Variant<Lights...>;// UniqueVariant<Lights...>;
-    using PrimVariant   = UniqueVariant<typename Lights::Primitive...>;
-
-    // Only these two transform contexts are supported
-    // TODO: Reason about extensibility (what if we want to add single transform
-    // with different layout?)
-    using TContextVariant = Variant<TransformContextIdentity,
-                                    TransformContextSingle>;
-
+    using LightVariant          = Variant<std::monostate, Lights...>;
+    using PrimVariant           = UniqueVariant<std::monostate, typename Lights::Primitive...>;
+    using TContextVariant       = Variant<std::monostate, TContexts...>;
     using IdentitySConverter    = typename SpectrumConverterContextIdentity::Converter;
+
+    public:
+    using MetaLight             = LightVariant;
+    template<class CommonHitT, class SpectrumTransformer = SpectrumConverterContextIdentity>
+    using MetaLightView         = MetaLightViewT<CommonHitT, MetaLight, SpectrumTransformer>;
 
     private:
     const GPUSystem&            system;
@@ -159,16 +155,16 @@ class MetaLightArray
 
 template<class CH, class ML, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-MetaLightView<CH, ML, SC>::MetaLightView(const SpectrumConverter& sConverter,
-                                         const ML& l)
+MetaLightViewT<CH, ML, SC>::MetaLightViewT(const SpectrumConverter& sConverter,
+                                           const ML& l)
     : light(l)
     , sConverter(sConverter)
 {}
 
 template<class CH, class ML, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<Vector3> MetaLightView<CH, ML, SC>::SampleSolidAngle(RNGDispenser& rng,
-                                                             const Vector3& distantPoint) const
+SampleT<Vector3> MetaLightViewT<CH, ML, SC>::SampleSolidAngle(RNGDispenser& rng,
+                                                              const Vector3& distantPoint) const
 {
     return DeviceVisit(light, [&](auto&& l) -> Float
     {
@@ -178,9 +174,9 @@ SampleT<Vector3> MetaLightView<CH, ML, SC>::SampleSolidAngle(RNGDispenser& rng,
 
 template<class CH, class ML, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float MetaLightView<CH, ML, SC>::PdfSolidAngle(const CH& hit,
-                                               const Vector3& distantPoint,
-                                               const Vector3& dir) const
+Float MetaLightViewT<CH, ML, SC>::PdfSolidAngle(const CH& hit,
+                                                const Vector3& distantPoint,
+                                                const Vector3& dir) const
 {
     return DeviceVisit(light, [=]<class LT>(LT&& l) -> Float
     {
@@ -192,7 +188,7 @@ Float MetaLightView<CH, ML, SC>::PdfSolidAngle(const CH& hit,
 
 template<class CH, class ML, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t MetaLightView<CH, ML, SC>::SampleSolidAngleRNCount() const
+uint32_t MetaLightViewT<CH, ML, SC>::SampleSolidAngleRNCount() const
 {
     return DeviceVisit(light, [&](auto&& l) -> Float
     {
@@ -202,7 +198,7 @@ uint32_t MetaLightView<CH, ML, SC>::SampleSolidAngleRNCount() const
 
 template<class CH, class ML, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<Ray> MetaLightView<CH, ML, SC>::SampleRay(RNGDispenser& rng) const
+SampleT<Ray> MetaLightViewT<CH, ML, SC>::SampleRay(RNGDispenser& rng) const
 {
     return DeviceVisit(light, [&](auto&& l) -> SampleT<Ray>
     {
@@ -212,7 +208,7 @@ SampleT<Ray> MetaLightView<CH, ML, SC>::SampleRay(RNGDispenser& rng) const
 
 template<class CH, class ML, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float MetaLightView<CH, ML, SC>::PdfRay(const Ray& ray) const
+Float MetaLightViewT<CH, ML, SC>::PdfRay(const Ray& ray) const
 {
     return DeviceVisit(light, [&](auto&& l) -> SampleT<Ray>
     {
@@ -222,7 +218,7 @@ Float MetaLightView<CH, ML, SC>::PdfRay(const Ray& ray) const
 
 template<class CH, class ML, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t MetaLightView<CH, ML, SC>::SampleRayRNCount() const
+uint32_t MetaLightViewT<CH, ML, SC>::SampleRayRNCount() const
 {
     return DeviceVisit(light, [&](auto&& l) -> SampleT<Ray>
     {
@@ -232,7 +228,7 @@ uint32_t MetaLightView<CH, ML, SC>::SampleRayRNCount() const
 
 template<class CH, class ML, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum MetaLightView<CH, ML, SC>::EmitViaHit(const Vector3& wO, const CH& hit) const
+Spectrum MetaLightViewT<CH, ML, SC>::EmitViaHit(const Vector3& wO, const CH& hit) const
 {
     return DeviceVisit(light, [=]<class LT>(LT&& l) -> Spectrum
     {
@@ -244,8 +240,8 @@ Spectrum MetaLightView<CH, ML, SC>::EmitViaHit(const Vector3& wO, const CH& hit)
 
 template<class CH, class ML, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum MetaLightView<CH, ML, SC>::EmitViaSurfacePoint(const Vector3& wO,
-                                                        const Vector3& surfacePoint) const
+Spectrum MetaLightViewT<CH, ML, SC>::EmitViaSurfacePoint(const Vector3& wO,
+                                                         const Vector3& surfacePoint) const
 {
     return DeviceVisit(light, [&](auto&& l) -> SampleT<Ray>
     {
@@ -255,7 +251,7 @@ Spectrum MetaLightView<CH, ML, SC>::EmitViaSurfacePoint(const Vector3& wO,
 
 template<class CH, class ML, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-bool MetaLightView<CH, ML, SC>::IsPrimitiveBackedLight() const
+bool MetaLightViewT<CH, ML, SC>::IsPrimitiveBackedLight() const
 {
     return DeviceVisit(light, [&](auto&& l) -> bool
     {
@@ -263,19 +259,19 @@ bool MetaLightView<CH, ML, SC>::IsPrimitiveBackedLight() const
     });
 }
 
-template<LightC... L>
-MetaLightArray<L...>::MetaLightArray(const GPUSystem& s)
+template<TransformContextC... TC, LightC... L>
+MetaLightArray<Variant<TC...>, Variant<L...>>::MetaLightArray(const GPUSystem& s)
     : system(s)
     , memory(system.AllGPUs(), 2_MiB, 16_MiB)
 {}
 
-template<LightC... L>
+template<TransformContextC... TC, LightC... L>
 template<LightGroupC LightGroup, TransformGroupC TransformGroup>
-void MetaLightArray<L...>::AddBatch(const LightGroup& lg, const TransformGroup& tg,
-                                    const Span<const PrimitiveId>& primitiveIds,
-                                    const Span<const LightId>& lightIds,
-                                    const Span<const TransformId>& transformIds,
-                                    const Vector2ui& batchRange)
+void MetaLightArray<Variant<TC...>, Variant<L...>>::AddBatch(const LightGroup& lg, const TransformGroup& tg,
+                                                             const Span<const PrimitiveId>& primitiveIds,
+                                                             const Span<const LightId>& lightIds,
+                                                             const Span<const TransformId>& transformIds,
+                                                             const Vector2ui& batchRange)
 {
     const GPUQueue& queue = system.BestDevice().GetQueue(0);
 
@@ -355,8 +351,8 @@ void MetaLightArray<L...>::AddBatch(const LightGroup& lg, const TransformGroup& 
     );
 }
 
-template<LightC... L>
-Span<const typename MetaLightArray<L...>::LightVariant> MetaLightArray<L...>::Array() const
+template<TransformContextC... TC, LightC... L>
+Span<const Variant<std::monostate, L...>> MetaLightArray<Variant<TC...>, Variant<L...>>::Array() const
 {
     return ToConstSpan(dLightList);
 }

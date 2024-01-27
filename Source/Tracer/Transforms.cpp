@@ -17,8 +17,7 @@ void TransformGroupIdentity::Commit()
     GenericCommit<>();
 }
 
-void TransformGroupIdentity::PushAttribute(Vector2ui, uint32_t,
-                                           std::vector<Byte>)
+void TransformGroupIdentity::PushAttribute(Vector2ui, uint32_t, MRayInput)
 {}
 
 TransformGroupIdentity::AttribInfoList TransformGroupIdentity::AttributeInfo() const
@@ -59,7 +58,7 @@ void TransformGroupSingle::Commit()
 
 void TransformGroupSingle::PushAttribute(Vector2ui idRange,
                                          uint32_t attributeIndex,
-                                         std::vector<Byte> data)
+                                         MRayInput data)
 {
     switch(attributeIndex)
     {
@@ -105,7 +104,7 @@ void TransformGroupMulti::Commit()
 
 void TransformGroupMulti::PushAttribute(Vector2ui idRange,
                                         uint32_t attributeIndex,
-                                        std::vector<Byte> data)
+                                        MRayInput data)
 {
 
 }

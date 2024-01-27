@@ -235,10 +235,10 @@ class PrimGroupTriangle : public PrimitiveGroupT<PrimGroupTriangle>
     void                    CommitReservations() override;
     PrimAttributeInfoList   AttributeInfo() const override;
     void                    PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
-                                          std::vector<Byte> data) override;
+                                          MRayInput data) override;
     void                    PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
                                           const Vector2ui& subBatchRange,
-                                          std::vector<Byte> data) override;
+                                          MRayInput data) override;
     DataSoA                 SoA() const;
 };
 
@@ -285,10 +285,10 @@ class PrimGroupSkinnedTriangle : public PrimitiveGroupT<PrimGroupSkinnedTriangle
     void                    CommitReservations() override;
     PrimAttributeInfoList   AttributeInfo() const override;
     void                    PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
-                                          std::vector<Byte> data) override;
+                                          MRayInput data) override;
     void                    PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
                                           const Vector2ui& subBatchRange,
-                                          std::vector<Byte> data) override;
+                                          MRayInput data) override;
     DataSoA                 SoA() const;
 };
 

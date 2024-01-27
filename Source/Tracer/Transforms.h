@@ -79,7 +79,7 @@ class TransformGroupIdentity final : public GenericGroupTransform<TransformGroup
     virtual void    Commit() override;
     virtual void    PushAttribute(Vector2ui idRange,
                                   uint32_t attributeIndex,
-                                  std::vector<Byte> data) override;
+                                  MRayInput data) override;
     AttribInfoList  AttributeInfo() const override;
 
     DataSoA         SoA() const;
@@ -103,7 +103,7 @@ class TransformGroupSingle final : public GenericGroupTransform<TransformGroupSi
     void            Commit() override;
     void            PushAttribute(Vector2ui idRange,
                                   uint32_t attributeIndex,
-                                  std::vector<Byte> data) override;
+                                  MRayInput data) override;
     AttribInfoList  AttributeInfo() const override;
 
     DataSoA         SoA() const;
@@ -128,7 +128,7 @@ class TransformGroupMulti final : public GenericGroupTransform<TransformGroupMul
     void            Commit() override;
     void            PushAttribute(Vector2ui idRange,
                                   uint32_t attributeIndex,
-                                  std::vector<Byte> data) override;
+                                  MRayInput data) override;
     AttribInfoList  AttributeInfo() const override;
 
     DataSoA         SoA() const;

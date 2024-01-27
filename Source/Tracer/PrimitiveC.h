@@ -183,7 +183,7 @@ concept PrimitiveC = requires(PrimType pt,
 };
 
 template <class PGType>
-concept PrimitiveGroupC = requires(PGType pg)
+concept PrimitiveGroupC = requires(PGType pg, MRayInput input)
 {
     // Mandatory Types
     // Primitive type satisfies its concept (at least on default form)
@@ -236,9 +236,9 @@ concept PrimitiveGroupC = requires(PGType pg)
     {pg.IsInCommitState()} -> std::same_as<bool>;
     {pg.AttributeInfo()} -> std::same_as<PrimAttributeInfoList>;
     {pg.PushAttribute(PrimBatchId{}, uint32_t{},
-                      std::vector<Byte>{})} -> std::same_as<void>;
+                      std::move(input))} -> std::same_as<void>;
     {pg.PushAttribute(PrimBatchId{}, uint32_t{}, Vector2ui{},
-                      std::vector<Byte>{})} ->std::same_as<void>;
+                      std::move(input))} ->std::same_as<void>;
     {pg.GPUMemoryUsage()} -> std::same_as<size_t>;
 };
 
@@ -270,7 +270,7 @@ constexpr auto AcquireTransformContextGenerator();
 // Some common types
 struct PrimRange { Vector2ui primRange; Vector2ui attributeRange; };
 
-using BatchIdType = typename PrimLocalBatchId::T;
+using BatchIdType = std::underlying_type_t<PrimLocalBatchId>;
 
 using PrimitiveRangeMap = std::unordered_map<BatchIdType, PrimRange>;
 using PrimitiveCountMap = std::unordered_map<BatchIdType, PrimCount>;
@@ -285,10 +285,10 @@ class PrimitiveGroupI
     virtual bool                    IsInCommitState() const = 0;
     virtual PrimAttributeInfoList   AttributeInfo() const = 0;
     virtual void                    PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
-                                                  std::vector<Byte> data) = 0;
+                                                  MRayInput data) = 0;
     virtual void                    PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
                                                   const Vector2ui& subBatchRange,
-                                                  std::vector<Byte> data) = 0;
+                                                  MRayInput data) = 0;
     virtual size_t                  GPUMemoryUsage() const = 0;
 };
 
@@ -319,13 +319,13 @@ class PrimitiveGroupT : public PrimitiveGroupI
     template <class T>
     void                        GenericPushData(PrimBatchId batchId,
                                                 const Span<T>& primData,
-                                                std::vector<Byte> data,
+                                                MRayInput data,
                                                 bool isPerPrimitive) const;
     template <class T>
     void                        GenericPushData(PrimBatchId batchId,
                                                 const Span<T>& primData,
                                                 const Vector2ui& subBatchRange,
-                                                std::vector<Byte> data,
+                                                MRayInput data,
                                                 bool isPerPrimitive) const;
 
 
@@ -401,10 +401,10 @@ class EmptyPrimGroup : public PrimitiveGroupT<EmptyPrimGroup>
     void                    CommitReservations() override;
     PrimAttributeInfoList   AttributeInfo() const override;
     void                    PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
-                                          std::vector<Byte> data) override;
+                                          MRayInput data) override;
     void                    PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
                                           const Vector2ui& subBatchRange,
-                                          std::vector<Byte> data) override;
+                                          MRayInput data) override;
     DataSoA                 SoA() const;
 };
 
@@ -469,7 +469,7 @@ template<class Child>
 template <class T>
 void PrimitiveGroupT<Child>::GenericPushData(PrimBatchId batchId,
                                              const Span<T>& primData,
-                                             std::vector<Byte> data,
+                                             MRayInput data,
                                              bool isPerPrimitive) const
 {
     // TODO: parallel issue maybe?
@@ -491,7 +491,7 @@ template <class T>
 void PrimitiveGroupT<Child>::GenericPushData(PrimBatchId batchId,
                                              const Span<T>& primData,
                                              const Vector2ui& subBatchRange,
-                                             std::vector<Byte> data,
+                                             MRayInput data,
                                              bool isPerPrimitive) const
 {
     // TODO: parallel issue maybe?
@@ -667,12 +667,12 @@ PrimAttributeInfoList EmptyPrimGroup::AttributeInfo() const
 
 inline
 void EmptyPrimGroup::PushAttribute(PrimBatchId, uint32_t,
-                                   std::vector<Byte>)
+                                   MRayInput)
 {}
 
 inline
 void EmptyPrimGroup::PushAttribute(PrimBatchId, uint32_t, const Vector2ui&,
-                                   std::vector<Byte>)
+                                   MRayInput)
 {}
 
 inline

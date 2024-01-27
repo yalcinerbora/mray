@@ -174,18 +174,6 @@ constexpr Span<const T, Extent> ToConstSpan(Span<T, Extent> s)
     return Span<const T, Extent>(s);
 }
 
-template<ImplicitLifetimeC T>
-constexpr Span<T> ToSpan(std::vector<Byte> v)
-{
-    assert(reinterpret_cast<uintptr_t>(v.data()) % alignof(T) == 0);
-    assert(v.size() % sizeof(T) == 0);
-
-    // TODO: Check if this is UB
-    T* tPtr = reinterpret_cast<T*>(v.data());
-    size_t size = v.size() / sizeof(T);
-    return Span<T>(tPtr, size);
-}
-
 // TODO add arrays maybe? (decay changes c arrays to ptrs)
 template<class T0, std::size_t E0,
          class T1, std::size_t E1>
