@@ -44,7 +44,7 @@ OptionalHitR<PG> AcceleratorLinear<PG, TG>::IntersectionCheck(const Ray& ray,
 
         // The actual context
         TContextType transformContext = TGenFunc(transformSoA, primitiveSoA,
-                                                 transformId, l.primitiveId);
+                                                 transformKey, l.primitiveKey);
 
         transformedRay = transformContext.InvApply(ray);
     }
@@ -55,7 +55,7 @@ OptionalHitR<PG> AcceleratorLinear<PG, TG>::IntersectionCheck(const Ray& ray,
         transformedRay = ray;
     }
 
-    Primitive prim = Primitive(IdentityTransformContext{}, primData, leaf.primitiveId);
+    Primitive prim = Primitive(IdentityTransformContext{}, primData, leaf.primitiveKey);
     Optional<Intersection> intersection = p.Intersects(transformedRay, tMinMax);
 
     // Intersection decisions
@@ -74,8 +74,8 @@ OptionalHitR<PG> AcceleratorLinear<PG, TG>::IntersectionCheck(const Ray& ray,
     // It is a hit! Update
     result = HitResult
     {
-        .materialId = leaf.materialId,
-        .primitiveId = leaf.primitiveId,
+        .materialKey = leaf.materialKey,
+        .primitiveKey = leaf.primitiveKey,
         .hit = intersection->hit,
         .t = intersection->t
     };
@@ -86,12 +86,12 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 AcceleratorLinear<PG, TG>::AcceleratorLinear(const TransDataSoA& tSoA,
                                              const PrimDataSoA& pSoA,
                                              const DataSoA& dataSoA,
-                                             TransformId tId,
-                                             AcceleratorId aId)
+                                             TransformKey tId,
+                                             AcceleratorKey aId)
     : cullFace(dataSoA.cullFace[aId.FetchIndexPortion()])
     , alphaMap(dataSoA.dAlphaMaps[aId.FetchIndexPortion()])
     , leafs(ToConstSpan(dataSoa.dLeafs[aId.FetchIndexPortion()]))
-    , transformId(tId)
+    , transformKey(tId)
     , transformSoA(tSoA)
     , primitiveSoA(pSoA)
 {}

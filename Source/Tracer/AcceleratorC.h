@@ -13,8 +13,8 @@ class IdentityTransformContext;
 template<class HitType>
 struct HitResultT
 {
-    MaterialId      materialId;
-    PrimitiveId     primitiveId;
+    MaterialKey     materialKey;
+    PrimitiveKey    primitiveKey;
     HitType         hit;
     Float           t;
 };
@@ -23,14 +23,13 @@ struct HitResultT
 // material id. Most of the time this should be enough
 struct AcceleratorLeaf
 {
-    //MaterialId  materialId;
-    PrimitiveId primitiveId;
+    PrimitiveKey primitiveKey;
 };
 
 struct BaseAcceleratorLeaf
 {
-    TransformId     transformId;
-    AcceleratorId   accelId;
+    TransformKey     transformKey;
+    AcceleratorKey   accelKey;
 };
 
 template <class AccelType>
@@ -189,7 +188,7 @@ class AcceleratorBaseI
                                const GPUSystem& s) = 0;
 
     //
-    virtual SurfaceId   ReserveSurface(TransformId, const PrimMatIdPairList& primMatPairings) = 0;
+    virtual SurfaceId   ReserveSurface(TransformKey, const PrimMatIdPairList& primMatPairings) = 0;
     // Optional alpha map / cull face flag etc
     // TODO: Make the design available to the user?
     virtual void        AttachAlphaMap(SurfaceId surfaceId, uint32_t pairingIndex,

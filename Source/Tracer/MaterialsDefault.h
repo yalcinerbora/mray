@@ -8,11 +8,11 @@
 
 namespace LambertMatDetail
 {
-    struct LambertMatData
+    struct alignas(32) LambertMatData
     {
-        Span<ParamVaryingData<2, Spectrum>>             dAlbedo;
-        Span<Optional<ParamVaryingData<2, Vector3>>>    dNormalMaps;
-        Span<MediumId>                                  dMediumIds;
+        Span<const ParamVaryingData<2, Spectrum>>       dAlbedo;
+        Span<const Optional<TextureView<2, Vector3>>>   dNormalMaps;
+        Span<const MediumKey>                           dMediumIds;
     };
 
     template <class SpectrumTransformer = SpectrumConverterContextIdentity>
@@ -21,16 +21,18 @@ namespace LambertMatDetail
         using Surface           = DefaultSurface;
         using OptionalNormalMap = Optional<ParamVaryingData<2, Vector3>>;
         using AlbedoMap         = typename SpectrumTransformer:: template RendererParamVaryingData<2>;
+        using SpectrumConverter = typename SpectrumTransformer::Converter;
+        using DataSoA           = LambertMatData;
 
         private:
         const AlbedoMap             albedoTex;
         const OptionalNormalMap&    normalMapTex;
-        MediumId                    mediumId;
+        MediumKey                   mediumId;
 
         public:
         MRAY_HYBRID
-        LambertMaterial(const typename SpectrumTransformer::Converter& sTransContext,
-                        const LambertMatData& soa, MaterialId id);
+        LambertMaterial(const SpectrumConverter& sTransContext,
+                        const DataSoA& soa, MaterialKey mk);
 
         MRAY_HYBRID
         SampleT<BxDFResult>     SampleBxDF(const Vector3& wI,
@@ -51,13 +53,38 @@ namespace LambertMatDetail
 
 }
 
-struct MatGroupLambert
+class MatGroupLambert : public GenericGroupMaterial<MatGroupLambert>
 {
-    using DataSoA = LambertMatDetail::LambertMatData;
+    public:
+    using DataSoA   = LambertMatDetail::LambertMatData;
     template<class STContext = SpectrumConverterContextIdentity>
-    using Material = LambertMatDetail::LambertMaterial<STContext>;
+    using Material  = LambertMatDetail::LambertMaterial<STContext>;
+    using Surface   = typename Material<>::Surface;
 
-    using Surface = typename Material<>::Surface;
+    private:
+    Span<ParamVaryingData<2, Spectrum>>     dAlbedo;
+    Span<Optional<TextureView<2, Vector3>>> dNormalMaps;
+    Span<MediumKey>                         dMediumIds;
+    DataSoA                                 soa;
+
+    public:
+    static std::string_view TypeName();
+
+                        MatGroupLambert(uint32_t groupId, const GPUSystem&);
+    void                CommitReservations() override;
+    AttribInfoList      AttributeInfo() const override;
+    void                PushAttribute(MaterialKey batchId,
+                                      uint32_t attributeIndex,
+                                      MRayInput data) override;
+    void                PushAttribute(MaterialKey batchId,
+                                      const Vector2ui& subRange,
+                                      uint32_t attributeIndex,
+                                      MRayInput data) override;
+    void                PushAttribute(const Vector<2, MaterialKey::Type>& idRange,
+                                      uint32_t attributeIndex,
+                                      MRayInput data) override;
+
+    DataSoA             SoA() const;
 };
 
 #include "MaterialsDefault.hpp"

@@ -37,14 +37,14 @@ class AcceleratorWork : public AcceleratorWorkI
 
     void AcquireTransformedAABB(Span<AABB, 1> dAccelAABB,
                                 const std::array<PrimRange, TracerLimits::MaxPrimBatchPerSurface>&,
-                                TransformId id) override;
+                                TransformKey id) override;
     {
 
     }
 
     void AcquireTransformedPositions(Span<Vector3> dPositions,
                                      const std::array<PrimRange, TracerLimits::MaxPrimBatchPerSurface>&,
-                                     TransformId) override;
+                                     TransformKey) override;
     {
 
     }
@@ -114,7 +114,7 @@ void AcceleratorWork<AG, TG>::CastLocalRays(// Output
                 using TContextType = typename decltype(TContextGen)::ReturnType;
                 // The actual context
                 TContextType transformContext = TGenFunc(transformSoA, primitiveSoA,
-                                                         transformId, PrimitiveId(0));
+                                                         transformKey, PrimitiveKey(0));
 
                 ray = transformContext.InvApply(ray);
             }
@@ -130,8 +130,8 @@ void AcceleratorWork<AG, TG>::CastLocalRays(// Output
             {
                 dHitIds[i] = HitIdPack
                 {
-                    .primId     = hit.primitiveId,
-                    .matId      = hit.materialId,
+                    .primId     = hit.primitiveKey,
+                    .matId      = hit.materialKey,
                     .transId    = tId,
                     .accelId    = aId
                 };

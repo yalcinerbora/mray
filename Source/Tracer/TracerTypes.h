@@ -9,19 +9,6 @@
 #include "Hit.h"
 #include "Key.h"
 
-enum class MRayColorSpace
-{
-    RGB_LINEAR,
-    RGB_SRGB,
-    XYZ
-};
-
-enum class AcceleratorType
-{
-    SOFTWARE_NONE,
-    SOFTWARE_BASIC_BVH,
-    HARDWARE
-};
 
 
 template <std::unsigned_integral T>
@@ -88,42 +75,36 @@ using SurfaceWorkKey = KeyT<CommonKey, 16, 16>;
 using AccelWorkKey = KeyT<CommonKey, 8, 24>;
 
 // Accelerator key
-using AcceleratorId = KeyT<CommonKey, 8, 24>;
-
-using PrimitiveId   = KeyT<CommonKey, 4, 28>;
-using MaterialId    = KeyT<CommonKey, 10, 22>;
-using TransformId   = KeyT<CommonKey, 8, 24>;
-using MediumId      = KeyT<CommonKey, 8, 24>;
-using LightId       = KeyT<CommonKey, 8, 24>;
-using CameraId      = KeyT<CommonKey, 8, 24>;
-
-using MaterialIdList    = std::vector<MaterialId>;
-using TransformIdList   = std::vector<TransformId>;
-using MediumIdList      = std::vector<MediumId>;
-using LightIdList       = std::vector<LightId>;
-using CameraIdList      = std::vector<CameraId>;
+using AcceleratorKey    = KeyT<CommonKey, 8, 24>;
+using PrimitiveKey      = KeyT<CommonKey, 4, 28>;
+using PrimBatchKey      = KeyT<CommonKey, 4, 28>;
+using MaterialKey       = KeyT<CommonKey, 10, 22>;
+using TransformKey      = KeyT<CommonKey, 8, 24>;
+using MediumKey         = KeyT<CommonKey, 8, 24>;
+using LightKey          = KeyT<CommonKey, 8, 24>;
+using CameraKey         = KeyT<CommonKey, 8, 24>;
 
 using RayIndex = CommonIndex;
 
 // Quadruplet of Ids
-static constexpr size_t HitIdPackAlignment = (sizeof(PrimitiveId) +
-                                              sizeof(MaterialId) +
-                                              sizeof(TransformId) +
-                                              sizeof(AcceleratorId));
+static constexpr size_t HitIdPackAlignment = (sizeof(PrimitiveKey) +
+                                              sizeof(MaterialKey) +
+                                              sizeof(TransformKey) +
+                                              sizeof(AcceleratorKey));
 struct alignas (HitIdPackAlignment) HitIdPack
 {
-    PrimitiveId     primId;
-    MaterialId      matId;
-    TransformId     transId;
-    AcceleratorId   accelId;
+    PrimitiveKey     primKey;
+    MaterialKey      matId;
+    TransformKey     transId;
+    AcceleratorKey   accelId;
 };
 
-static constexpr size_t AccelIdPackAlignment = (sizeof(TransformId) +
-                                                sizeof(AcceleratorId));
+static constexpr size_t AccelIdPackAlignment = (sizeof(TransformKey) +
+                                                sizeof(AcceleratorKey));
 struct alignas (AccelIdPackAlignment) AcceleratorIdPack
 {
-    TransformId     transId;
-    AcceleratorId   accelId;
+    TransformKey    transId;
+    AcceleratorKey  accelId;
 };
 
 template <class T>
@@ -137,7 +118,7 @@ struct BxDFResult
 {
     Ray         wO;
     Spectrum    reflectance;
-    MediumId    mediumId;
+    MediumKey   mediumId;
 };
 
 struct VoxelizationParameters
@@ -147,9 +128,10 @@ struct VoxelizationParameters
 };
 
 // Most barebone leaf
+
 struct DefaultLeaf
 {
-    PrimitiveId primId;
+    PrimitiveKey primKey;
 };
 
 // It may seem useless but it can be used by debug

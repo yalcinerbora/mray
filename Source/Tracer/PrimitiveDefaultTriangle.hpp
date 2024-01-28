@@ -7,13 +7,13 @@ template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Triangle<T>::Triangle(const T& transform,
                       const TriangleData& data,
-                      PrimitiveId id)
+                      PrimitiveKey key)
     : data(data)
-    , id(id)
+    , key(key)
     , positions{}
     , transformContext(transform)
 {
-    Vector3ui index = data.indexList[id];
+    Vector3ui index = data.indexList[key.FetchIndexPortion()];
     positions[0] = data.positions[index[0]];
     positions[1] = data.positions[index[1]];
     positions[2] = data.positions[index[2]];
@@ -66,7 +66,7 @@ SampleT<BasicSurface> Triangle<T>::SampleSurface(RNGDispenser& rng) const
     Float area = GetSurfaceArea();
     Float pdf = 1.0f / area;
 
-    Vector3ui index = data.get().indexList[id];
+    Vector3ui index = data.get().indexList[key.FetchIndexPortion()];
     Quaternion q0 = data.get().tbnRotations[index[0]];
     Quaternion q1 = data.get().tbnRotations[index[1]];
     Quaternion q2 = data.get().tbnRotations[index[2]];
@@ -342,7 +342,7 @@ Optional<BasicSurface> Triangle<T>::SurfaceFromHit(const Hit& hit) const
                         positions[1] * baryCoords[1] +
                         positions[2] * baryCoords[2]);
 
-    Vector3ui index = data.get().indexList[id];
+    Vector3ui index = data.get().indexList[key.FetchIndexPortion()];
     Quaternion q0 = data.get().tbnRotations[index[0]];
     Quaternion q1 = data.get().tbnRotations[index[1]];
     Quaternion q2 = data.get().tbnRotations[index[2]];
@@ -370,7 +370,7 @@ template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Vector2 Triangle<T>::SurfaceParametrization(const Hit& hit) const
 {
-    Vector3ui index = data.get().indexList[id];
+    Vector3ui index = data.get().indexList[key.FetchIndexPortion()];
     Vector2 uv0 = data.get().uvs[index[0]];
     Vector2 uv1 = data.get().uvs[index[1]];
     Vector2 uv2 = data.get().uvs[index[2]];
@@ -472,7 +472,7 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     // Position should be in world space
     Vector3 geoNormal = ShapeFunctions::Triangle::Normal(positions);
 
-    Vector3ui index = data.get().indexList[id];
+    Vector3ui index = data.get().indexList[key.FetchIndexPortion()];
     // Tangent Space Rotation Query
     Quaternion q0 = data.get().tbnRotations[index[0]];
     Quaternion q1 = data.get().tbnRotations[index[1]];
@@ -515,13 +515,13 @@ namespace DefaultSkinnedTriangleDetail
 MRAY_HYBRID MRAY_CGPU_INLINE
 TransformContextSkinned::TransformContextSkinned(const typename TransformGroupMulti::DataSoA& transformData,
                                                  const SkinnedTriangleData& triData,
-                                                 TransformId tId,
-                                                 PrimitiveId pId)
+                                                 TransformKey tK,
+                                                 PrimitiveKey pK)
 {
-    Vector4 weights = Vector4(triData.skinWeights[pId]);
-    Vector4uc indices = triData.skinIndices[pId];
-    const Span<const Matrix4x4>& t = transformData.transforms[tId];
-    const Span<const Matrix4x4>& tInverse = transformData.invTransforms[tId];
+    Vector4 weights = Vector4(triData.skinWeights[pK.FetchIndexPortion()]);
+    Vector4uc indices = triData.skinIndices[pK.FetchIndexPortion()];
+    const Span<const Matrix4x4>& t = transformData.transforms[tK.FetchIndexPortion()];
+    const Span<const Matrix4x4>& tInverse = transformData.invTransforms[tK.FetchIndexPortion()];
 
     // Blend Transforms
     transform = Matrix4x4::Zero();
@@ -544,10 +544,10 @@ TransformContextSkinned::TransformContextSkinned(const typename TransformGroupMu
 MRAY_HYBRID MRAY_CGPU_INLINE
 TransformContextSkinned GenTContextSkinned(const typename TransformGroupMulti::DataSoA& tData,
                                            const SkinnedTriangleData& pData,
-                                           TransformId tId,
-                                           PrimitiveId pId)
+                                           TransformKey tK,
+                                           PrimitiveKey pK)
 {
-    return TransformContextSkinned(tData, pData, tId, pId);
+    return TransformContextSkinned(tData, pData, tK, pK);
 }
 
 }

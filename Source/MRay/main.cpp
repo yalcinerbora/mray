@@ -1,17 +1,16 @@
 
-//#define MRAY_GPU_BACKEND_CUDA
-//
-//#include "Tracer/PrimitiveC.h"
-//#include "Tracer/PrimitiveDefaultTriangle.h"
-
 #include "Core/Types.h"
 
 #include <iostream>
 
-template <typename T> void TD() { std::cout << __FUNCSIG__ << std::endl; }
-
 int main()
 {
+    // Load Args
+    // Load visor if requested
 
-    TD<UniqueVariant<int, char, int, char, float, char, double>>();
+    // Load tracer from DLL
+    // Load scene loader
+
+    //ask scene loader to load a scene
+
 }

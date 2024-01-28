@@ -41,18 +41,18 @@ FreeList::FreeList()
 // so in a translation unit the init order is top down?
 // Then destruction order is bottom-up?
 // Guarantee that this is true
-MRAY_INPUT_DLL PoolMemResource mainR = PoolMemResource(POOL_OPTIONS, std::pmr::new_delete_resource());
-MRAY_INPUT_DLL FreeList freeList;
+MRAY_INPUT_ENTRYPOINT PoolMemResource mainR = PoolMemResource(POOL_OPTIONS, std::pmr::new_delete_resource());
+MRAY_INPUT_ENTRYPOINT FreeList freeList;
 
 }
 
-MRAY_INPUT_DLL void* MRayInputIssueBufferForDestruction(MRayInputDetail::MRayInput buffer)
+MRAY_INPUT_ENTRYPOINT void* MRayInputIssueBufferForDestruction(MRayInputDetail::MRayInput buffer)
 {
     using namespace MRayInputDetail;
     return reinterpret_cast<void*>(freeList.GetALocation(std::move(buffer)));
 }
 
-MRAY_INPUT_DLL void MRayInputDestroyCallback(void* ptr)
+MRAY_INPUT_ENTRYPOINT void MRayInputDestroyCallback(void* ptr)
 {
     using namespace MRayInputDetail;
     FreeListNode* nodePtr = std::launder(reinterpret_cast<FreeListNode*>(ptr));
@@ -63,4 +63,3 @@ MRAY_INPUT_DLL void MRayInputDestroyCallback(void* ptr)
     nodePtr->input = std::move(MRayInput());
     freeList.GiveTheLocation(nodePtr);
 }
-

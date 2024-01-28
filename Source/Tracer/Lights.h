@@ -13,14 +13,14 @@ namespace LightDetail
 {
     using DistributionPwC2D = typename DistributionGroupPwC2D::Distribution;
 
-    struct LightData
+    struct alignas(32) LightData
     {
         Span<const ParamVaryingData<2, Spectrum>>   dRadiances;
         Span<const MediumId>                        dMediumIds;
         Bitspan<const uint32_t>                     dIsTwoSidedFlags;
     };
 
-    struct LightSkysphereData
+    struct alignas(32) LightSkysphereData
     {
         Span<const ParamVaryingData<2, Spectrum>>   dRadiances;
         Span<const MediumId>                        dMediumIds;
@@ -85,7 +85,7 @@ namespace LightDetail
         public:
         MRAY_HYBRID         LightPrim(const SpectrumConverter& sTransContext,
                                       const Primitive& p,
-                                      const LightData& soa, LightId);
+                                      const LightData& soa, LightKey);
 
         MRAY_HYBRID
         SampleT<Vector3>    SampleSolidAngle(RNGDispenser& rng,
@@ -136,7 +136,7 @@ namespace LightDetail
         public:
         MRAY_HYBRID         LightSkysphere(const typename SpectrumTransformer::Converter& sTransContext,
                                            const Primitive& p,
-                                           const DataSoA& soa, LightId);
+                                           const DataSoA& soa, LightKey);
 
         MRAY_HYBRID
         SampleT<Vector3>    SampleSolidAngle(RNGDispenser& dispenser,

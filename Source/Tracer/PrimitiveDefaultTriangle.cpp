@@ -8,8 +8,10 @@ std::string_view PrimGroupTriangle::TypeName()
 }
 
 PrimGroupTriangle::PrimGroupTriangle(uint32_t primGroupId,
-                         const GPUSystem& sys)
-    : PrimitiveGroupT(primGroupId, sys)
+                                     const GPUSystem& sys)
+    : GenericGroupT(primGroupId, sys,
+                    DefaultTriangleDetail::DeviceMemAllocationGranularity,
+                    DefaultTriangleDetail::DeviceMemReservationSize)
 {}
 
 void PrimGroupTriangle::CommitReservations()
@@ -33,22 +35,45 @@ PrimAttributeInfoList PrimGroupTriangle::AttributeInfo() const
 {
     using enum MRayDataEnum;
     using enum PrimitiveAttributeLogic;
+    using enum AttributeOptionality;
     static const std::array<PrimAttributeInfo, AttributeCount> LogicList =
     {
-        PrimAttributeInfo(PrimAttributeConverter::ToString(POSITION), MRayDataType<MR_VECTOR_3>()),
-        PrimAttributeInfo(PrimAttributeConverter::ToString(NORMAL),   MRayDataType<MR_QUATERNION>()),
-        PrimAttributeInfo(PrimAttributeConverter::ToString(UV0),      MRayDataType<MR_VECTOR_2>()),
-        PrimAttributeInfo(PrimAttributeConverter::ToString(INDEX),    MRayDataType<MR_VECTOR_3UI>()),
+        PrimAttributeInfo(PrimAttributeConverter::ToString(POSITION), MR_MANDATORY, MRayDataType<MR_VECTOR_3>()),
+        PrimAttributeInfo(PrimAttributeConverter::ToString(NORMAL),   MR_OPTIONAL,  MRayDataType<MR_QUATERNION>()),
+        PrimAttributeInfo(PrimAttributeConverter::ToString(UV0),      MR_OPTIONAL,  MRayDataType<MR_VECTOR_2>()),
+        PrimAttributeInfo(PrimAttributeConverter::ToString(INDEX),    MR_MANDATORY, MRayDataType<MR_VECTOR_3UI>()),
     };
     return std::vector(LogicList.cbegin(), LogicList.cend());
 }
 
-void PrimGroupTriangle::PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
+void PrimGroupTriangle::PushAttribute(PrimBatchKey batchKey,
+                                      uint32_t attributeIndex,
                                       MRayInput data)
 {
     auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
     {
-        GenericPushData(batchId, d,
+        GenericPushData(batchKey, d, std::move(data), isPerPrimitive);
+    };
+
+    switch(attributeIndex)
+    {
+        case 0  : PushData(dPositions, false);      break;  // Position
+        case 1  : PushData(dTBNRotations, false);   break;  // Normal
+        case 2  : PushData(dUVs, false);            break;  // UVs
+        case 3  : PushData(dIndexList, true);       break;  // Indices
+        default : MRAY_WARNING_LOG("{:s}: Unknown Attribute Index {:d}",
+                                   TypeName(), attributeIndex);
+    }
+}
+
+void PrimGroupTriangle::PushAttribute(PrimBatchKey batchKey,
+                                      const Vector2ui& subRange,
+                                      uint32_t attributeIndex,
+                                      MRayInput data)
+{
+    auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
+    {
+        GenericPushData(batchKey, subRange, d,
                         std::move(data), isPerPrimitive);
     };
 
@@ -63,15 +88,13 @@ void PrimGroupTriangle::PushAttribute(PrimBatchId batchId, uint32_t attributeInd
     }
 }
 
-void PrimGroupTriangle::PushAttribute(PrimBatchId batchId,
+void PrimGroupTriangle::PushAttribute(const Vector<2, PrimBatchKey::Type>& idRange,
                                       uint32_t attributeIndex,
-                                      const Vector2ui& subBatchRange,
                                       MRayInput data)
 {
     auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
     {
-        GenericPushData(batchId, d, subBatchRange,
-                        std::move(data), isPerPrimitive);
+        GenericPushData(idRange, d, std::move(data), false, isPerPrimitive);
     };
 
     switch(attributeIndex)
@@ -99,7 +122,9 @@ std::string_view PrimGroupSkinnedTriangle::TypeName()
 
 PrimGroupSkinnedTriangle::PrimGroupSkinnedTriangle(uint32_t primGroupId,
                                                    const GPUSystem& sys)
-    : PrimitiveGroupT(primGroupId, sys)
+    : GenericGroupT(primGroupId, sys,
+                    DefaultTriangleDetail::DeviceMemAllocationGranularity,
+                    DefaultTriangleDetail::DeviceMemReservationSize)
 {}
 
 void PrimGroupSkinnedTriangle::CommitReservations()
@@ -130,24 +155,31 @@ PrimAttributeInfoList PrimGroupSkinnedTriangle::AttributeInfo() const
 {
     using enum MRayDataEnum;
     using enum PrimitiveAttributeLogic;
+    using enum AttributeOptionality;
     static const std::array<PrimAttributeInfo, AttributeCount> LogicList =
     {
-        PrimAttributeInfo(PrimAttributeConverter::ToString(POSITION),     MRayDataType<MR_VECTOR_3>()),
-        PrimAttributeInfo(PrimAttributeConverter::ToString(NORMAL),       MRayDataType<MR_QUATERNION>()),
-        PrimAttributeInfo(PrimAttributeConverter::ToString(UV0),          MRayDataType<MR_VECTOR_2>()),
-        PrimAttributeInfo(PrimAttributeConverter::ToString(WEIGHT),       MRayDataType<MR_UNORM_4x8>()),
-        PrimAttributeInfo(PrimAttributeConverter::ToString(WEIGHT_INDEX), MRayDataType<MR_VECTOR_4UC>()),
-        PrimAttributeInfo(PrimAttributeConverter::ToString(INDEX),        MRayDataType<MR_VECTOR_3UI>())
+        PrimAttributeInfo(PrimAttributeConverter::ToString(POSITION),
+                          MR_MANDATORY, MRayDataType<MR_VECTOR_3>()),
+        PrimAttributeInfo(PrimAttributeConverter::ToString(NORMAL),
+                          MR_OPTIONAL, MRayDataType<MR_QUATERNION>()),
+        PrimAttributeInfo(PrimAttributeConverter::ToString(UV0),
+                          MR_OPTIONAL, MRayDataType<MR_VECTOR_2>()),
+        PrimAttributeInfo(PrimAttributeConverter::ToString(WEIGHT),
+                          MR_MANDATORY, MRayDataType<MR_UNORM_4x8>()),
+        PrimAttributeInfo(PrimAttributeConverter::ToString(WEIGHT_INDEX),
+                          MR_MANDATORY, MRayDataType<MR_VECTOR_4UC>()),
+        PrimAttributeInfo(PrimAttributeConverter::ToString(INDEX),
+                          MR_MANDATORY, MRayDataType<MR_VECTOR_3UI>())
     };
     return std::vector(LogicList.cbegin(), LogicList.cend());
 }
 
-void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
+void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey, uint32_t attributeIndex,
                                              MRayInput data)
 {
     auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
     {
-        GenericPushData(batchId, d,
+        GenericPushData(batchKey, d,
                         std::move(data), isPerPrimitive);
     };
 
@@ -164,13 +196,14 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchId batchId, uint32_t attri
     }
 }
 
-void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
-                                             const Vector2ui& subBatchRange,
+void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey,
+                                             const Vector2ui& subRange,
+                                             uint32_t attributeIndex,
                                              MRayInput data)
 {
     auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
     {
-        GenericPushData(batchId, d, subBatchRange,
+        GenericPushData(batchKey, subRange, d,
                         std::move(data), isPerPrimitive);
     };
 
@@ -184,6 +217,28 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchId batchId, uint32_t attri
         case 5  : PushData(dIndexList, true);       break;  // Indices
         default : MRAY_WARNING_LOG("{:s}: Unknown Attribute Index {:d}",
                                    TypeName(), attributeIndex);
+    }
+}
+
+void PrimGroupSkinnedTriangle::PushAttribute(const Vector<2, PrimBatchKey::Type>& idRange,
+                                             uint32_t attributeIndex,
+                                             MRayInput data)
+{
+    auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
+    {
+        GenericPushData(idRange, d, std::move(data), false, isPerPrimitive);
+    };
+
+    switch(attributeIndex)
+    {
+        case 0: PushData(dPositions, false);      break;  // Position
+        case 1: PushData(dTBNRotations, false);   break;  // Normal
+        case 2: PushData(dUVs, false);            break;  // UVs
+        case 3: PushData(dSkinWeights, false);    break;  // Weights
+        case 4: PushData(dSkinIndices, false);    break;  // WeightIndices
+        case 5: PushData(dIndexList, true);       break;  // Indices
+        default: MRAY_WARNING_LOG("{:s}: Unknown Attribute Index {:d}",
+                                  TypeName(), attributeIndex);
     }
 }
 

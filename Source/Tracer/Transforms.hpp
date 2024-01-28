@@ -62,9 +62,9 @@ Ray TransformContextIdentity::InvApply(const Ray& ray) const
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 TransformContextSingle::TransformContextSingle(const typename TransformDetail::SingleTransformSoA& tData,
-                                               TransformId tId)
-    : transform(tData.transforms[tId])
-    , invTransform(tData.invTransforms[tId])
+                                               TransformKey tK)
+    : transform(tData.transforms[tK.FetchIndexPortion()])
+    , invTransform(tData.invTransforms[tK.FetchIndexPortion()])
 {}
 
 MRAY_HYBRID MRAY_CGPU_INLINE

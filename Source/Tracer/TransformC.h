@@ -4,6 +4,8 @@
 #include <vector>
 
 #include "Core/MathForward.h"
+#include "Core/TracerI.h"
+
 #include "GenericGroup.h"
 
 template <class TContext>
@@ -33,8 +35,11 @@ template <class TGType>
 concept TransformGroupC = requires(TGType tg)
 {
     typename TGType::DataSoA;
-    // Can query the type
-    {TGType::TypeName()} -> std::same_as<std::string_view>;
     // Can request DataSoA
     {tg.SoA()}-> std::same_as<typename TGType::DataSoA>;
+
+    requires GenericGroupC<TGType>;
 };
+
+template<class Child>
+using GenericGroupTransform = GenericGroupT<Child, TransformKey, TransAttributeInfo>;

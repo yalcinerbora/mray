@@ -6,21 +6,19 @@
 
 #include "TransformC.h"
 #include "TracerTypes.h"
-#include "TracerInterface.h"
 
 namespace TransformDetail
 {
-    struct SingleTransformSoA
+    struct alignas(32) SingleTransformSoA
     {
         Span<const Matrix4x4> transforms;
         Span<const Matrix4x4> invTransforms;
     };
 
-    struct MultiTransformSoA
+    struct alignas(32) MultiTransformSoA
     {
-        // TODO: Add static inner span maybe?
-        Span<Span<const Matrix4x4>> transforms;
-        Span<Span<const Matrix4x4>> invTransforms;
+        Span<const Span<const Matrix4x4>> transforms;
+        Span<const Span<const Matrix4x4>> invTransforms;
     };
 }
 
@@ -48,7 +46,7 @@ class TransformContextSingle
 
     public:
     MRAY_HYBRID             TransformContextSingle(const typename TransformDetail::SingleTransformSoA&,
-                                                   TransformId tId);
+                                                   TransformKey tId);
 
     MRAY_HYBRID Vector3     ApplyP(const Vector3& point) const;
     MRAY_HYBRID Vector3     ApplyV(const Vector3& vec) const;
@@ -62,33 +60,33 @@ class TransformContextSingle
     MRAY_HYBRID Ray         InvApply(const Ray&) const;
 };
 
-template<class Child>
-using GenericGroupTransform = GenericGroup<Child, TransformId, TransAttributeInfo>;
-
 class TransformGroupIdentity final : public GenericGroupTransform<TransformGroupIdentity>
 {
-    using typename GenericGroupTransform<TransformGroupIdentity>::AttribInfoList;
-
     public:
     using DataSoA = EmptyType;
     static std::string_view TypeName();
 
     public:
-                    TransformGroupIdentity(uint32_t groupId,
-                                           const GPUSystem& s);
-    virtual void    Commit() override;
-    virtual void    PushAttribute(Vector2ui idRange,
+                    TransformGroupIdentity(uint32_t groupId, const GPUSystem&);
+    void            CommitReservations() override;
+    AttribInfoList  AttributeInfo() const override;
+    void            PushAttribute(TransformKey batchId,
                                   uint32_t attributeIndex,
                                   MRayInput data) override;
-    AttribInfoList  AttributeInfo() const override;
+    void            PushAttribute(TransformKey batchId,
+                                  const Vector2ui& subBatchRange,
+                                  uint32_t attributeIndex,
+                                  MRayInput data) override;
+    void            PushAttribute(const Vector<2, TransformKey::Type>& idRange,
+                                  uint32_t attributeIndex,
+                                  MRayInput data) override;
+
 
     DataSoA         SoA() const;
 };
 
 class TransformGroupSingle final : public GenericGroupTransform<TransformGroupSingle>
 {
-    using typename GenericGroupTransform<TransformGroupSingle>::AttribInfoList;
-
     public:
     using DataSoA = typename TransformDetail::SingleTransformSoA;
     static std::string_view     TypeName();
@@ -99,20 +97,25 @@ class TransformGroupSingle final : public GenericGroupTransform<TransformGroupSi
     DataSoA         soa;
 
     public:
-                    TransformGroupSingle(uint32_t groupId, const GPUSystem& s);
-    void            Commit() override;
-    void            PushAttribute(Vector2ui idRange,
+                    TransformGroupSingle(uint32_t groupId, const GPUSystem&);
+    void            CommitReservations() override;
+    AttribInfoList  AttributeInfo() const override;
+    void            PushAttribute(TransformKey batchId,
                                   uint32_t attributeIndex,
                                   MRayInput data) override;
-    AttribInfoList  AttributeInfo() const override;
+    void            PushAttribute(TransformKey batchId,
+                                  const Vector2ui& subRange,
+                                  uint32_t attributeIndex,
+                                  MRayInput data) override;
+    void            PushAttribute(const Vector<2, TransformKey::Type>& idRange,
+                                  uint32_t attributeIndex,
+                                  MRayInput data) override;
 
     DataSoA         SoA() const;
 };
 
 class TransformGroupMulti final : public GenericGroupTransform<TransformGroupMulti>
 {
-    using typename GenericGroupTransform<TransformGroupMulti>::AttribInfoList;
-
     public:
     using DataSoA = typename TransformDetail::MultiTransformSoA;
     static std::string_view TypeName();
@@ -120,16 +123,24 @@ class TransformGroupMulti final : public GenericGroupTransform<TransformGroupMul
     private:
     Span<Matrix4x4> transforms;
     Span<Matrix4x4> invTransforms;
+
     Span<uint32_t>  indices;
     DataSoA         soa;
 
     public:
                     TransformGroupMulti(uint32_t groupId, const GPUSystem& s);
-    void            Commit() override;
-    void            PushAttribute(Vector2ui idRange,
+    void            CommitReservations() override;
+    AttribInfoList  AttributeInfo() const override;
+    void            PushAttribute(TransformKey batchId,
                                   uint32_t attributeIndex,
                                   MRayInput data) override;
-    AttribInfoList  AttributeInfo() const override;
+    void            PushAttribute(TransformKey batchId,
+                                  const Vector2ui& subRange,
+                                  uint32_t attributeIndex,
+                                  MRayInput data) override;
+    void            PushAttribute(const Vector<2, TransformKey::Type>& idRange,
+                                  uint32_t attributeIndex,
+                                  MRayInput data) override;
 
     DataSoA         SoA() const;
 };
@@ -141,8 +152,8 @@ template <class PrimitiveGroupSoA>
 MRAY_HYBRID MRAY_CGPU_INLINE
 TransformContextIdentity GenTContextIdentity(const typename TransformGroupIdentity::DataSoA&,
                                              const PrimitiveGroupSoA&,
-                                             TransformId,
-                                             PrimitiveId)
+                                             TransformKey,
+                                             PrimitiveKey)
 {
     return TransformContextIdentity{};
 }
@@ -151,13 +162,50 @@ template <class PrimitiveGroupSoA>
 MRAY_HYBRID MRAY_CGPU_INLINE
 TransformContextSingle GenTContextSingle(const typename TransformGroupSingle::DataSoA& transformData,
                                          const PrimitiveGroupSoA&,
-                                         TransformId tId,
-                                         PrimitiveId)
+                                         TransformKey tId,
+                                         PrimitiveKey)
 {
     return TransformContextSingle(transformData, tId);
 }
 
+#include "Transforms.hpp"
+
 static_assert(TransformContextC<TransformContextIdentity>);
 static_assert(TransformContextC<TransformContextSingle>);
+static_assert(TransformGroupC<TransformGroupIdentity>);
+static_assert(TransformGroupC<TransformGroupSingle>);
+static_assert(TransformGroupC<TransformGroupMulti>);
 
-#include "Transforms.hpp"
+inline std::string_view TransformGroupIdentity::TypeName()
+{
+    using namespace std::literals;
+    static std::string_view name = "(T)Identity"sv;
+    return name;
+}
+
+inline TransformGroupIdentity::TransformGroupIdentity(uint32_t groupId,
+                                                      const GPUSystem& s)
+    : GenericGroupT(groupId, s)
+{}
+
+inline void TransformGroupIdentity::CommitReservations()
+{
+    isCommitted = true;
+}
+
+inline void TransformGroupIdentity::PushAttribute(TransformKey, uint32_t, MRayInput)
+{}
+
+inline void TransformGroupIdentity::PushAttribute(TransformKey,
+                                                  const Vector2ui&,
+                                                  uint32_t, MRayInput)
+{}
+
+inline void TransformGroupIdentity::PushAttribute(const Vector<2, TransformKey::Type>&,
+                                                  uint32_t, MRayInput)
+{}
+
+inline TransformGroupIdentity::AttribInfoList TransformGroupIdentity::AttributeInfo() const
+{
+    return AttribInfoList();
+}

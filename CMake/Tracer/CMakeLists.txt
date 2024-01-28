@@ -12,7 +12,7 @@ set(SRC_TRANSFORMS
     ${CURRENT_SOURCE_DIR}/TransformC.h
     ${CURRENT_SOURCE_DIR}/Transforms.h
     ${CURRENT_SOURCE_DIR}/Transforms.hpp
-    ${CURRENT_SOURCE_DIR}/Transforms.cpp)
+    ${CURRENT_SOURCE_DIR}/Transforms.cu)
 
 set(SRC_MATERIALS
     ${CURRENT_SOURCE_DIR}/MaterialC.h
@@ -49,7 +49,6 @@ set(SRC_UTILITY
 
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/TracerTypes.h
-    ${CURRENT_SOURCE_DIR}/TracerInterface.h
     ${CURRENT_SOURCE_DIR}/GenericGroup.h)
 
 set(SRC_ALL
@@ -80,7 +79,7 @@ target_link_libraries(TracerCUDA
                       PRIVATE
                       DeviceLib
                       CoreLib
-                      MRayInputLib
+                      MRayInput
                       mray::meta_compile_opts
                       mray::cuda_extra_compile_opts)
 
@@ -96,7 +95,7 @@ target_link_libraries(TracerCUDA_Objects
                       PUBLIC
                       DeviceLib
                       CoreLib
-                      MRayInputLib
+                      MRayInput
                       PRIVATE
                       mray::meta_compile_opts
                       mray::cuda_extra_compile_opts)

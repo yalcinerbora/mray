@@ -37,7 +37,7 @@ namespace LinearAccelDetail
         Span<const AcceleratorLeaf> leafs;
         const Optional<AlphaMap>&   alphaMap;
         // Primitive Related
-        TransformId                 transformId;
+        TransformKey                transformKey;
         const TransDataSoA&         transformSoA;
         const PrimDataSoA&          primitiveSoA;
 
@@ -51,7 +51,7 @@ namespace LinearAccelDetail
                                                   const PrimDataSoA& pSoA,
                                                   const DataSoA& dataSoA,
                                                   AcceleratorId aId,
-                                                  TransformId tId);
+                                                  TransformKey tId);
 
         MRAY_HYBRID
         Optional<HitResult>     ClosestHit(BackupRNG& rng, const Ray&, const Vector2&) const;
@@ -169,7 +169,7 @@ class AcceleratorGroupLinear final : public AcceleratorGroupI
                              ...);
                     ReferAccelerator(a, r.first->second);
                 }
-                AABB3 aabb = GenerateAABB(r.first->second, l.transformId, accWork);
+                AABB3 aabb = GenerateAABB(r.first->second, l.transformKey, accWork);
                 result.push_back(aabb);
 
             }
@@ -179,7 +179,7 @@ class AcceleratorGroupLinear final : public AcceleratorGroupI
             MRAY_LOG("{:s}: Constructing Accelerator {}", TypeName(),
                      ...);
             ConstructAccelerator(a, accWork);
-            AABB3 aabb = GenerateAABB(r.first->second, l.transformId, accWork);
+            AABB3 aabb = GenerateAABB(r.first->second, l.transformKey, accWork);
             result.push_back(aabb);
             perAccelLeafs.push_back(leafs);
         }
@@ -194,7 +194,7 @@ class AcceleratorBaseLinear final : public AcceleratorBaseI
     std::vector<BaseAcceleratorLeaf> leafs;
 
     //
-    AcceleratorId ReserveSurface(TransformId, const PrimMatIdPairList& primMatPairings) override
+    AcceleratorId ReserveSurface(TransformKey, const PrimMatIdPairList& primMatPairings) override
     {
         // Assert all primitives are same...
     }

@@ -1,13 +1,10 @@
 #pragma once
 
-#include <future>
 #include <cstdint>
 
-#include "Core/Definitions.h"
-#include "Core/Vector.h"
-#include "Core/MRayDataType.h"
-
-#include "TracerTypes.h"
+#include "Definitions.h"
+#include "Vector.h"
+#include "MRayDataType.h"
 
 #define MRAY_GENERIC_ID(NAME, TYPE) enum class NAME : TYPE {}
 
@@ -19,14 +16,38 @@ namespace TracerConstants
     static constexpr size_t MaxPrimBatchPerSurface = 8;
 }
 
+enum class MRayColorSpace
+{
+    RGB_LINEAR
+};
+
+enum class AcceleratorType
+{
+    SOFTWARE_NONE,
+    SOFTWARE_BASIC_BVH,
+    HARDWARE
+};
+
+enum class AttributeOptionality
+{
+    MR_MANDATORY,
+    MR_OPTIONAL
+};
+
+enum class AttributeTexturable
+{
+    MR_CONSTANT_ONLY,
+    MR_TEXTURE_OR_CONSTANT,
+    MR_TEXTURE_ONLY,
+};
+
 // Generic Attribute Info
-using GenericAttributeInfo = Pair<std::string, MRayDataTypeRT>;
+using GenericAttributeInfo = Tuple<std::string, AttributeOptionality, MRayDataTypeRT>;
 using TypeNameList = std::vector<std::string>;
 
 // Prim related
 MRAY_GENERIC_ID(PrimGroupId, uint32_t);
-MRAY_GENERIC_ID(PrimLocalBatchId, uint32_t);
-struct PrimBatchId { PrimGroupId primGroupId; PrimLocalBatchId localBatchId; };
+MRAY_GENERIC_ID(PrimBatchId, uint32_t);
 struct PrimCount { uint32_t primCount; uint32_t attributeCount; };
 using PrimBatchIdList = std::vector<PrimBatchId>;
 using PrimAttributeInfo = GenericAttributeInfo;
@@ -35,30 +56,36 @@ using PrimAttributeInfoList = std::vector<PrimAttributeInfo>;
 MRAY_GENERIC_ID(TextureId, uint32_t);
 // Transform Related
 MRAY_GENERIC_ID(TransGroupId, uint32_t);
+MRAY_GENERIC_ID(TransformId, uint32_t);
 using TransAttributeInfo = GenericAttributeInfo;
 using TransAttributeInfoList = std::vector<TransAttributeInfo>;
 // Light Related
 MRAY_GENERIC_ID(LightGroupId, uint32_t);
+MRAY_GENERIC_ID(LightId, uint32_t);
 using LightAttributeInfo = GenericAttributeInfo;
 using LightAttributeInfoList = std::vector<LightAttributeInfo>;
 // Camera Related
 MRAY_GENERIC_ID(CameraGroupId, uint32_t);
+MRAY_GENERIC_ID(CameraId, uint32_t);
 using CamAttributeInfo = GenericAttributeInfo;
 using CamAttributeInfoList = std::vector<CamAttributeInfo>;
 // Material Related
 MRAY_GENERIC_ID(MatGroupId, uint32_t);
-using MatAttributeInfo = GenericAttributeInfo;
+MRAY_GENERIC_ID(MaterialId, uint32_t);
+using MatAttributeInfo = Tuple<std::string, AttributeOptionality,
+                               AttributeTexturable, MRayDataTypeRT>;
 using MatAttributeInfoList = std::vector<MatAttributeInfo>;
 // Medium Related
 MRAY_GENERIC_ID(MediumGroupId, uint32_t);
+MRAY_GENERIC_ID(MediumId, uint32_t);
 using MediumAttributeInfo = GenericAttributeInfo;
 using MediumAttributeInfoList = std::vector<MediumAttributeInfo>;
 // Surface Related
 MRAY_GENERIC_ID(SurfaceId, uint32_t);
 MRAY_GENERIC_ID(LightSurfaceId, uint32_t);
 MRAY_GENERIC_ID(CamSurfaceId, uint32_t);
-using SurfaceMatList = std::array<PrimBatchId, TracerConstants::MaxPrimBatchPerSurface>;
-using SurfacePrimList = std::array<PrimLocalBatchId, TracerConstants::MaxPrimBatchPerSurface>;
+using SurfaceMatList = std::array<MaterialId, TracerConstants::MaxPrimBatchPerSurface>;
+using SurfacePrimList = std::array<PrimBatchId, TracerConstants::MaxPrimBatchPerSurface>;
 using OptionalAlphaMapList = std::array<Optional<TextureId>, TracerConstants::MaxPrimBatchPerSurface>;
 using CullBackfaceFlagList = std::array<bool, TracerConstants::MaxPrimBatchPerSurface>;
 // Renderer Related
@@ -66,14 +93,20 @@ MRAY_GENERIC_ID(RendererId, uint32_t);
 using RendererAttributeInfo = GenericAttributeInfo;
 using RendererAttributeInfoList = std::vector<GenericAttributeInfo>;
 
+using MaterialIdList    = std::vector<MaterialId>;
+using TransformIdList   = std::vector<TransformId>;
+using MediumIdList      = std::vector<MediumId>;
+using LightIdList       = std::vector<LightId>;
+using CameraIdList      = std::vector<CameraId>;
+
 namespace TracerConstants
 {
     // Implicit Mediums that are always present on a tracer system
-    static constexpr MediumId VacuumMediumId        = MediumId(0);
-    static constexpr LightId NullLightId            = LightId(0);
-    static constexpr LightId IdentityTransformId    = TransformId(0);
-    static constexpr PrimGroupId EmptyPrimitive     = PrimGroupId{0};
-    static constexpr PrimBatchId EmptyPrimBatch     = PrimBatchId{EmptyPrimitive, PrimLocalBatchId{0}};
+    static constexpr MediumId VacuumMediumId            = MediumId(0);
+    static constexpr LightId NullLightId                = LightId(0);
+    static constexpr TransformId IdentityTransformId    = TransformId(0);
+    static constexpr PrimGroupId EmptyPrimitive         = PrimGroupId{0};
+    static constexpr PrimBatchId EmptyPrimBatch         = PrimBatchId{0};
 
     static constexpr auto NoAlphaMapList = OptionalAlphaMapList
     {
@@ -88,10 +121,10 @@ namespace TracerConstants
     };
 };
 
-class TracerInterfaceI
+class TracerI
 {
     public:
-    virtual     ~TracerInterfaceI() = default;
+    virtual     ~TracerI() = default;
 
     //================================//
     //            Generic             //
@@ -193,6 +226,9 @@ class TracerInterfaceI
     virtual void            PushLightAttribute(LightGroupId, Vector2ui range,
                                                uint32_t attributeIndex,
                                                MRayInput data) = 0;
+    virtual void            PushLightAttribute(LightGroupId, Vector2ui range,
+                                               uint32_t attributeIndex,
+                                               std::vector<TextureId>) = 0;
     //================================//
     //           Cameras              //
     //================================//

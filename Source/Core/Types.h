@@ -151,9 +151,8 @@ constexpr auto detail::LoopAndInvoke(VariantT&& v, Func&& f) -> decltype(auto)
     else
     {
         #ifdef __CUDA_ARCH__
-            #ifdef MRAY_DEBUG
+            if constexpr (MRAY_IS_DEBUG)
                 printf("Invalid variant access on device!\n");
-            #endif
         __trap();
         #else
             throw MRayError("Invalid variant access on device!");

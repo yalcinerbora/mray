@@ -31,19 +31,19 @@ class alignas(sizeof(T)) KeyT
 
     public:
     // Constructors & Destructor
-                                KeyT() = default;
-    MRAY_HYBRID constexpr       KeyT(T v);
+                                    KeyT() = default;
+    MRAY_HYBRID explicit constexpr  KeyT(T v);
     //
-    MRAY_HYBRID constexpr       operator T() const;
-    MRAY_HYBRID constexpr       operator T&();
+    MRAY_HYBRID constexpr           operator T() const;
+    MRAY_HYBRID constexpr           operator T&();
     // Access
-    MRAY_HYBRID constexpr T     FetchBatchPortion() const;
-    MRAY_HYBRID constexpr T     FetchIndexPortion() const;
+    MRAY_HYBRID constexpr T         FetchBatchPortion() const;
+    MRAY_HYBRID constexpr T         FetchIndexPortion() const;
 
     MRAY_HYBRID
-    static constexpr KeyT       CombinedKey(T batch, T id);
+    static constexpr KeyT           CombinedKey(T batch, T id);
     MRAY_HYBRID
-    static constexpr KeyT       InvalidKey();
+    static constexpr KeyT           InvalidKey();
 
     // Sanity Checks
     static_assert((IdBits + BatchBits) == std::numeric_limits<T>::digits,

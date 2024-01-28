@@ -8,7 +8,7 @@ namespace ShapeFunctions
 {
 namespace Triangle
 {
-    static constexpr PrimitiveId TRI_VERTEX_COUNT = 3;
+    static constexpr uint32_t TRI_VERTEX_COUNT = 3;
 
     MRAY_HYBRID AABB3   BoundingBox(Span<const Vector3, TRI_VERTEX_COUNT> positions);
     MRAY_HYBRID Float   Area(Span<const Vector3, TRI_VERTEX_COUNT> positions);

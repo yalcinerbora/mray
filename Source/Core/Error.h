@@ -23,6 +23,7 @@ struct MRayError
     //std::source_location    sourceInfo;
 
     public:
+    MRayError(Type);
     MRayError(std::string && = "");
         //, std::source_location = std::source_location::current());
 
@@ -32,6 +33,10 @@ struct MRayError
     std::string AppendInfo(const std::string&);
 
 };
+
+inline MRayError::MRayError(Type t)
+    : type(t)
+{}
 
 inline MRayError::MRayError(std::string&& s)
                             //std::source_location loc)

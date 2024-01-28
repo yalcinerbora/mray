@@ -20,10 +20,13 @@
 
 namespace DefaultTriangleDetail
 {
-    using LookupTable = StratifiedIntegerAliasTable<PrimitiveId::Type>;
+    constexpr size_t DeviceMemAllocationGranularity = 32_MiB;
+    constexpr size_t DeviceMemReservationSize = 256_MiB;
+
+    using LookupTable = StratifiedIntegerAliasTable<PrimitiveKey::Type>;
 
     // SoA data of triangle group
-    struct TriangleData
+    struct alignas(64) TriangleData
     {
         // Per vertex attributes
         Span<const Vector3>     positions;
@@ -48,12 +51,12 @@ namespace DefaultTriangleDetail
         private:
         Ref<const TriangleData>     data;
         Ref<const TransContextType> transformContext;
-        PrimitiveId                 id;
+        PrimitiveKey                key;
         Vector3                     positions[ShapeFunctions::Triangle::TRI_VERTEX_COUNT];
 
         public:
         MRAY_HYBRID             Triangle(const TransContextType& transform,
-                                         const TriangleData& data, PrimitiveId id);
+                                         const TriangleData& data, PrimitiveKey key);
         MRAY_HYBRID
         Intersection            Intersects(const Ray& ray, bool cullBackface) const;
         MRAY_HYBRID
@@ -133,8 +136,8 @@ namespace DefaultSkinnedTriangleDetail
         MRAY_HYBRID
         TransformContextSkinned(const typename TransformGroupMulti::DataSoA& transformData,
                                 const SkinnedTriangleData& triData,
-                                TransformId tId,
-                                PrimitiveId pId);
+                                TransformKey tId,
+                                PrimitiveKey pId);
 
         Vector3 ApplyP(const Vector3& point) const
         {
@@ -191,13 +194,13 @@ namespace DefaultSkinnedTriangleDetail
     MRAY_HYBRID
     TransformContextSkinned GenTContextSkinned(const typename TransformGroupMulti::DataSoA&,
                                                const SkinnedTriangleData&,
-                                               TransformId,
-                                               PrimitiveId);
+                                               TransformKey,
+                                               PrimitiveKey);
 
     static_assert(TransformContextC<TransformContextSkinned>);
 }
 
-class PrimGroupTriangle : public PrimitiveGroupT<PrimGroupTriangle>
+class PrimGroupTriangle : public GenericGroupPrimitive<PrimGroupTriangle>
 {
     public:
     using DataSoA       = DefaultTriangleDetail::TriangleData;
@@ -234,15 +237,20 @@ class PrimGroupTriangle : public PrimitiveGroupT<PrimGroupTriangle>
 
     void                    CommitReservations() override;
     PrimAttributeInfoList   AttributeInfo() const override;
-    void                    PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
+    void                    PushAttribute(PrimBatchKey batchKey,
+                                          uint32_t attributeIndex,
                                           MRayInput data) override;
-    void                    PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
-                                          const Vector2ui& subBatchRange,
+    void                    PushAttribute(PrimBatchKey batchKey,
+                                          const Vector2ui& subRange,
+                                          uint32_t attributeIndex,
+                                          MRayInput data) override;
+    void                    PushAttribute(const Vector<2, PrimBatchKey::Type>& idRange,
+                                          uint32_t attributeIndex,
                                           MRayInput data) override;
     DataSoA                 SoA() const;
 };
 
-class PrimGroupSkinnedTriangle : public PrimitiveGroupT<PrimGroupSkinnedTriangle>
+class PrimGroupSkinnedTriangle : public GenericGroupPrimitive<PrimGroupSkinnedTriangle>
 {
     public:
     using DataSoA       = DefaultSkinnedTriangleDetail::SkinnedTriangleData;
@@ -284,10 +292,15 @@ class PrimGroupSkinnedTriangle : public PrimitiveGroupT<PrimGroupSkinnedTriangle
 
     void                    CommitReservations() override;
     PrimAttributeInfoList   AttributeInfo() const override;
-    void                    PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
+    void                    PushAttribute(PrimBatchKey batchKey,
+                                          uint32_t attributeIndex,
                                           MRayInput data) override;
-    void                    PushAttribute(PrimBatchId batchId, uint32_t attributeIndex,
-                                          const Vector2ui& subBatchRange,
+    void                    PushAttribute(PrimBatchKey batchKey,
+                                          const Vector2ui& subRange,
+                                          uint32_t attributeIndex,
+                                          MRayInput data) override;
+    void                    PushAttribute(const Vector<2, PrimBatchKey::Type>& idRange,
+                                          uint32_t attributeIndex,
                                           MRayInput data) override;
     DataSoA                 SoA() const;
 };

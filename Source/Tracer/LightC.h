@@ -21,7 +21,7 @@ concept LightC = requires(LightType l,
     typename LightType::DataSoA;
 
     // Constructor Type
-    LightType(sc, prim, const typename LightType::DataSoA{}, LightId{});
+    LightType(sc, prim, const typename LightType::DataSoA{}, LightKey{});
 
     // API
     {l.SampleSolidAngle(rng, Vector3{})} -> std::same_as<SampleT<Vector3>>;
@@ -49,7 +49,7 @@ concept LightGroupC = requires(LGType lg)
     typename LGType::PrimGroup;
     typename LGType:: template Primitive<>;
     // Internal Light type that satisfies its concept
-    requires LightC<typename LGType::Light<>>;
+    requires LightC<typename LGType::template Light<>>;
 
     // SoA fashion light data. This will be used to access internal
     // of the light with a given an index
@@ -57,14 +57,13 @@ concept LightGroupC = requires(LGType lg)
     std::is_same_v<typename LGType::DataSoA,
                    typename LGType::template Light<>::DataSoA>;
 
-    // Can query the type
-    {LGType::TypeName()} -> std::same_as<std::string_view>;
-
     // Acquire SoA struct of this primitive group
     {lg.SoA()} -> std::same_as<typename LGType::DataSoA>;
 
     // Runtime Acquire the primitive group
     {lg.PrimitiveGroup()} -> std::same_as<const typename LGType::PrimGroup&>;
+
+    GenericGroupC<LGType>;
 };
 
 // Meta Light Class
@@ -145,9 +144,9 @@ class MetaLightArray<Variant<TContexts...>, Variant<Lights...>>
 
     template<LightGroupC LightGroup, TransformGroupC TransformGroup>
     void                        AddBatch(const LightGroup& lg, const TransformGroup& tg,
-                                         const Span<const PrimitiveId>& primitiveIds,
-                                         const Span<const LightId>& lightIds,
-                                         const Span<const TransformId>& transformIds,
+                                         const Span<const PrimitiveKey>& primitiveKeys,
+                                         const Span<const LightKey>& lightKeys,
+                                         const Span<const TransformKey>& transformKeys,
                                          const Vector2ui& batchRange);
     Span<const LightVariant>    Array() const;
 
@@ -268,9 +267,9 @@ MetaLightArray<Variant<TC...>, Variant<L...>>::MetaLightArray(const GPUSystem& s
 template<TransformContextC... TC, LightC... L>
 template<LightGroupC LightGroup, TransformGroupC TransformGroup>
 void MetaLightArray<Variant<TC...>, Variant<L...>>::AddBatch(const LightGroup& lg, const TransformGroup& tg,
-                                                             const Span<const PrimitiveId>& primitiveIds,
-                                                             const Span<const LightId>& lightIds,
-                                                             const Span<const TransformId>& transformIds,
+                                                             const Span<const PrimitiveKey>& primitiveKeys,
+                                                             const Span<const LightKey>& lightKeys,
+                                                             const Span<const TransformKey>& transformKeys,
                                                              const Vector2ui& batchRange)
 {
     const GPUQueue& queue = system.BestDevice().GetQueue(0);
@@ -284,7 +283,7 @@ void MetaLightArray<Variant<TC...>, Variant<L...>>::AddBatch(const LightGroup& l
     TGSoA tgData = tg.SoA();
 
     uint32_t lightCount = (batchRange[1] - batchRange[0]);
-    assert(lightIds.size() == lightCount);
+    assert(lightKeys.size() == lightCount);
 
     // Given light construct the transformed light
     // This means having a primitive context
@@ -323,12 +322,12 @@ void MetaLightArray<Variant<TC...>, Variant<L...>>::AddBatch(const LightGroup& l
             // Primitives do not own the transform contexts,
             // save it to global memory.
             dTContextList[index] = TGenFunc(tgData, pgData,
-                                            transformIds[i],
-                                            primitiveIds[i]);
+                                            transformKeys[i],
+                                            primitiveKeys[i]);
             // Now construct the primitive, it refers to the tc on global memory
             auto& p = dLightPrimitiveList[index];
             p.template emplace<Primitive>(std::get<TContextType>(dTContextList[index]),
-                                          pgData, primitiveIds[i]);
+                                          pgData, primitiveKeys[i]);
 
             // And finally construct the light, and this also refers to primitive
             // on the global memory.
@@ -337,7 +336,7 @@ void MetaLightArray<Variant<TC...>, Variant<L...>>::AddBatch(const LightGroup& l
             auto& l = dLightList[index];
             l.template emplace<Light>(dSConverter[0],
                                       std::get<Primitive>(dLightPrimitiveList[index]),
-                                      lgData, lightIds[i]);
+                                      lgData, lightKeys[i]);
         }
     };
 

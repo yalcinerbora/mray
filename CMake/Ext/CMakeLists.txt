@@ -73,21 +73,20 @@ mray_build_ext_dependency_git(
             -DFMT_PKGCONFIG_DIR=${MRAY_PLATFORM_NAME}/$<CONFIG>/pkgconfig
 )
 
-# Get nlohmann-json
-# mray_build_ext_dependency_git(
-#         NAME nlohmann_json_ext
-#         URL "https://github.com/nlohmann/json.git"
-#         TAG "5d2754306d67d1e654a1a34e1d2e74439a9d53b3" # 16.06.2023 Latest Commit
-#         LICENSE_NAME "LICENSE.MIT"
-#         BUILD_ARGS
-#             -DJSON_BuildTests=OFF
-#             -DBUILD_TESTING=OFF
-#             -DNLOHMANN_JSON_CONFIG_INSTALL_DIR=${MRAY_CONFIG_LIB_DIRECTORY}/cmake/json
-#             -DNLOHMANN_JSON_INCLUDE_INSTALL_DIR=${MRAY_LIB_INCLUDE_DIRECTORY}
-#             -DNLOHMANN_JSON_PKGCONFIG_INSTALL_DIR=${MRAY_CONFIG_LIB_DIRECTORY}/pkgconfig
-#             # This is not cached and it install to a wrong folder :(
-#             -DNLOHMANN_ADD_NATVIS=OFF
-# )
+# Get simd-json
+mray_build_ext_dependency_git(
+        NAME simd_json_ext
+        URL "https://github.com/simdjson/simdjson.git"
+        TAG "6060be2fdf62edf4a8f51a8b0883d57d09397b30" # v3.6.3
+        LICENSE_NAME "LICENSE"
+        BUILD_ARGS
+            -DBUILD_TESTING=OFF
+            -DSIMDJSON_BUILD_SHARED=OFF
+            -DSIMDJSON_BUILD_BASH=OFF
+            -DSIMDJSON_CXX_STANDARD="20"
+            -DSIMDJSON_ENABLE_THREADS=ON
+            -DSIMDJSON_EXCEPTIONS=ON
+)
 
 # Get assimp
 # mray_build_ext_dependency_git(

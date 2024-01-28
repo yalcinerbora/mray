@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #ifdef MRAY_WINDOWS
 
     #define MRAY_DLL_IMPORT __declspec(dllimport)

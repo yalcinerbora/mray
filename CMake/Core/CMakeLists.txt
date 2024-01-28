@@ -9,6 +9,10 @@ set(SRC_SYSTEM
     ${CURRENT_SOURCE_DIR}/SharedLibrary.h
     ${CURRENT_SOURCE_DIR}/SharedLibrary.cpp)
 
+set(SRC_INTERFACES
+    ${CURRENT_SOURCE_DIR}/SceneLoaderI.h
+    ${CURRENT_SOURCE_DIR}/TracerI.h)
+
 set(SRC_MATH
     ${CURRENT_SOURCE_DIR}/AABB.h
     ${CURRENT_SOURCE_DIR}/AABB.hpp
@@ -42,6 +46,7 @@ set(SRC_COMMON
 
 set(SRC_ALL
     ${SRC_SYSTEM}
+    ${SRC_INTERFACES}
     ${SRC_CONTAINERS}
     ${SRC_MATH}
     ${SRC_UTILITY}
@@ -49,6 +54,7 @@ set(SRC_ALL
 
 # IDE Filters
 source_group("System" FILES ${SRC_SYSTEM})
+source_group("Interfaces" FILES ${SRC_INTERFACES})
 source_group("Containers" FILES ${SRC_CONTAINERS})
 source_group("Math" FILES ${SRC_MATH})
 source_group("Utility" FILES ${SRC_UTILITY})

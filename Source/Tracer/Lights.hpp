@@ -6,11 +6,11 @@ namespace LightDetail
 template<PrimitiveC P, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
 LightPrim<P, SC>::LightPrim(const typename SC::Converter& specTransformer,
-                            const P& p, const LightData& soa, LightId id)
+                            const P& p, const LightData& soa, LightKey key)
     : prim(p)
-    , radiance(specTransformer, soa.dRadiances[id.FetchIndexPortion()])
-    , initialMedium(soa.dMediumIds[id.FetchIndexPortion()])
-    , isTwoSided(soa.dIsTwoSidedFlags[id.FetchIndexPortion()])
+    , radiance(specTransformer, soa.dRadiances[key.FetchIndexPortion()])
+    , initialMedium(soa.dMediumIds[key.FetchIndexPortion()])
+    , isTwoSided(soa.dIsTwoSidedFlags[key.FetchIndexPortion()])
 {}
 
 template<PrimitiveC P, class SC>
@@ -201,11 +201,11 @@ Float CoOctoCoordConverter::ToSolidAnglePdf(Float pdf, const Vector2&)
 template<CoordConverterC CC, TransformContextC TC, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
 LightSkysphere<CC, TC, SC>::LightSkysphere(const typename SC::Converter& specTransformer,
-                                           const Primitive& p, const LightSkysphereData& soa, LightId id)
+                                           const Primitive& p, const LightSkysphereData& soa, LightKey key)
     : prim(p)
-    , radiance(specTransformer, soa.dRadiances[id.FetchIndexPortion()])
-    , initialMedium(soa.dMediumIds[id.FetchIndexPortion()])
-    , dist2D(soa.dDistributions[id.FetchIndexPortion()])
+    , radiance(specTransformer, soa.dRadiances[key.FetchIndexPortion()])
+    , initialMedium(soa.dMediumIds[key.FetchIndexPortion()])
+    , dist2D(soa.dDistributions[key.FetchIndexPortion()])
     , sceneDiameter(soa.sceneDiameter)
 {}
 

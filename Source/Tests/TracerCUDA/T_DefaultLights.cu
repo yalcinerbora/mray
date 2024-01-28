@@ -49,25 +49,24 @@ TEST(DefaultLights, MetaLight)
 
     // Add ids
 
-    Span<const LightId> lightIds;
-    Span<const PrimitiveId> primIds;
-    Span<const TransformId> transformIds;
+    Span<const LightKey> lightKeys;
+    Span<const PrimitiveKey> primKeys;
+    Span<const TransformKey> transformKeys;
 
     MetaLightList lightList = MetaLightList(system);
     lightList.AddBatch(triangleLightGroup, identityTG,
-                       primIds, lightIds, transformIds,
+                       primKeys, lightKeys, transformKeys,
                        Vector2ui(0, 1));
-
     lightList.AddBatch(triangleLightGroup, singleTG,
-                       primIds, lightIds, transformIds,
+                       primKeys, lightKeys, transformKeys,
                        Vector2ui(0, 1));
 
     lightList.AddBatch(skysphereCOLightGroup, identityTG,
-                       primIds, lightIds, transformIds,
+                       primKeys, lightKeys, transformKeys,
                        Vector2ui(0, 1));
 
     lightList.AddBatch(skysphereCOLightGroup, singleTG,
-                       primIds, lightIds, transformIds,
+                       primKeys, lightKeys, transformKeys,
                        Vector2ui(0, 1));
 
 

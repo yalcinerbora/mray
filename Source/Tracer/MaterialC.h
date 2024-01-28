@@ -1,20 +1,24 @@
 #pragma once
 
 #include "Core/Types.h"
-#include "ParamVaryingData.h"
+#include "Core/TracerI.h"
 
 #include "TracerTypes.h"
+#include "GenericGroup.h"
 
-template <class MatType, class MatGroupType>
-concept MaterialC = requires(MatType mt, RNGDispenser& rng)
+template <class MatType>
+concept MaterialC = requires(MatType mt,
+                             typename MatType::SpectrumConverter sc,
+                             RNGDispenser rng)
 {
     // Has a surface definition
     // Materials can only act on a single surface type
+    typename MatType::SpectrumConverter;
     typename MatType::Surface;
+    typename MatType::DataSoA;
 
     // Constructor
-    MatType(SpectrumConverterContextIdentity::Converter{},
-            typename MatGroupType::DataSoA{}, MaterialId{});
+    MatType(sc, typename MatType::DataSoA{}, MaterialKey{});
 
     // Sample should support BSSRDF (it will return a "ray"
     // instead of a direction)
@@ -29,16 +33,14 @@ concept MaterialC = requires(MatType mt, RNGDispenser& rng)
     // Calculate the pdf value
     // TODO: should we provide a surface?
     // For BSSRDF how tf we get the pdf???
-    {mt.Pdf(Ray{}, Ray{},
-            typename MatType::Surface{})
+    {mt.Pdf(Ray{}, Ray{}, typename MatType::Surface{})
     } -> std::same_as<Float>;
 
     // How many random numbers the sampler of this class uses
     {mt.SampleRNCount()} -> std::same_as<uint32_t>;
 
     // Evaluate material given w0, wI
-    {mt.Evaluate(Ray{}, Vector3{},
-                 typename MatType::Surface{})
+    {mt.Evaluate(Ray{}, Vector3{}, typename MatType::Surface{})
     }-> std::same_as<Spectrum>;
 
     // Emissive Query
@@ -57,10 +59,12 @@ template <class MGType>
 concept MaterialGroupC = requires()
 {
     // Material type satisfies its concept (at least on default form)
-    requires MaterialC<typename MGType::template Material<>, MGType>;
+    requires MaterialC<typename MGType::template Material<>>;
     // SoA fashion material data. This will be used to access internal
     // of the primitive with a given an index
     typename MGType::DataSoA;
+    std::is_same_v<typename MGType::DataSoA,
+                   typename MGType::template Material<>::DataSoA>;
     // Surface Type. Materials can only act on single surface
     typename MGType::Surface;
     // Sanity check
@@ -68,4 +72,8 @@ concept MaterialGroupC = requires()
                             typename MGType::template Material<>::Surface>;
 
     // TODO: Some Functions
+    GenericGroupC<MGType>;
 };
+
+template<class Child>
+using GenericGroupMaterial = GenericGroupT<Child, MaterialKey, MatAttributeInfo>;

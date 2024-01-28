@@ -107,10 +107,10 @@ class RendererWork
 
         // Actually load per-work data
         // Indices (Ids)
-        PrimitiveId pId         = std::get<0>(gRayIds[i]);
-        MaterialId  matId       = std::get<1>(gRayIds[i]);
-        TransformId tId         = std::get<2>(gRayIds[i]);
-        MediumId    mediumId    = std::get<3>(gRayIds[i]);
+        PrimitiveKey pId         = std::get<0>(gRayIds[i]);
+        MaterialKey  matId       = std::get<1>(gRayIds[i]);
+        TransformKey tId         = std::get<2>(gRayIds[i]);
+        MediumKey    mediumId    = std::get<3>(gRayIds[i]);
         // Ray & "Ray Hit"
         RayReg  rayReg(gRaysIn, gRayInIndices[i]);
         Hit hit = gHitParams.Ref<Hit>(i);

@@ -5,10 +5,10 @@
 #include "Core/System.h"
 #include "Core/Types.h"
 
-#ifdef MRAY_INPUT_DLL_EXPORT
-    #define MRAY_INPUT_DLL MRAY_DLL_EXPORT
+#ifdef MRAY_INPUT_SHARED_EXPORT
+    #define MRAY_INPUT_ENTRYPOINT MRAY_DLL_EXPORT
 #else
-    #define MRAY_INPUT_DLL MRAY_DLL_IMPORT
+    #define MRAY_INPUT_ENTRYPOINT MRAY_DLL_IMPORT
 #endif
 
 namespace MRayInputDetail
@@ -16,8 +16,8 @@ namespace MRayInputDetail
     class MRayInput;
 }
 
-MRAY_INPUT_DLL extern void* MRayInputIssueBufferForDestruction(MRayInputDetail::MRayInput buffer);
-MRAY_INPUT_DLL extern void MRayInputDestroyCallback(void* ptr);
+MRAY_INPUT_ENTRYPOINT extern void* MRayInputIssueBufferForDestruction(MRayInputDetail::MRayInput buffer);
+MRAY_INPUT_ENTRYPOINT extern void MRayInputDestroyCallback(void* ptr);
 
 namespace MRayInputDetail
 {
@@ -95,8 +95,8 @@ class FreeList
 
 using PoolMemResource = std::pmr::synchronized_pool_resource;
 
-MRAY_INPUT_DLL extern PoolMemResource   mainR;
-MRAY_INPUT_DLL extern FreeList          freeList;
+MRAY_INPUT_ENTRYPOINT extern PoolMemResource   mainR;
+MRAY_INPUT_ENTRYPOINT extern FreeList          freeList;
 
 }
 

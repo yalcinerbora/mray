@@ -5,11 +5,11 @@ namespace LambertMatDetail
 
 template <class SpectrumTransformer>
 MRAY_HYBRID MRAY_CGPU_INLINE
-LambertMaterial<SpectrumTransformer>::LambertMaterial(const typename SpectrumTransformer::Converter& specTransformer,
-                                                      const LambertMatData& soa, MaterialId id)
-    : albedoTex(specTransformer, soa.dAlbedo[id.FetchIndexPortion()])
-    , normalMapTex(soa.dNormalMaps[id.FetchIndexPortion()])
-    , mediumId(soa.dMediumIds[id.FetchIndexPortion()])
+LambertMaterial<SpectrumTransformer>::LambertMaterial(const SpectrumConverter& specTransformer,
+                                                      const DataSoA& soa, MaterialKey mk)
+    : albedoTex(specTransformer, soa.dAlbedo[mk.FetchIndexPortion()])
+    , normalMapTex(soa.dNormalMaps[mk.FetchIndexPortion()])
+    , mediumId(soa.dMediumIds[mk.FetchIndexPortion()])
 {}
 
 template <class ST>
