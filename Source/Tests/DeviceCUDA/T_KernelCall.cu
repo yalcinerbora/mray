@@ -22,9 +22,8 @@ void HelloWorldKernel(Span<uint32_t> dOutBuffer,
     }
 }
 
-
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void NestedKernel(Span<uint32_t> dOutBuffer,
+void NestedKernel(uint32_t* dOutBuffer,
                   const uint32_t& dReferenceValue,
                   uint32_t totalThreads)
 {
@@ -38,7 +37,7 @@ void NestedKernel(Span<uint32_t> dOutBuffer,
 }
 
 MRAY_KERNEL
-void ParentKernel(Span<uint32_t> dOutBuffer,
+void ParentKernel(uint32_t* dOutBuffer,
                   const uint32_t& dReferenceValue,
                   uint32_t totalThreads,
                   uint32_t deviceSMCount)
@@ -48,7 +47,7 @@ void ParentKernel(Span<uint32_t> dOutBuffer,
     {
         const GPUQueue tailQueue(deviceSMCount, nullptr,
                                  DeviceQueueType::TAIL_LAUNCH);
-        tailQueue.IssueKernel<NestedKernel>
+        tailQueue.DeviceIssueKernel<NestedKernel>
         (
             "GTest Nested Kernel",
             KernelIssueParams{totalThreads, 0},
@@ -267,7 +266,7 @@ void KernelCallNestedTester(const GPUSystem& system)
     (
         "GTest Parent Kernel",
         KernelIssueParams{totalThreads, 0u},
-        dWriteSpan,
+        dWriteSpan.data(),
         dReference,
         totalThreads,
         system.BestDevice().SMCount()
@@ -281,7 +280,7 @@ void KernelCallNestedTester(const GPUSystem& system)
     (
         "GTest Parent Kernel Saturating",
         KernelIssueParams{totalThreads, 0u},
-        dWriteSpan,
+        dWriteSpan.data(),
         dReference,
         totalThreads,
         system.BestDevice().SMCount()
@@ -295,7 +294,7 @@ void KernelCallNestedTester(const GPUSystem& system)
     (
         "GTest Parent Kernel Exact",
         KernelExactIssueParams{1u, totalThreads, 0u},
-        dWriteSpan,
+        dWriteSpan.data(),
         dReference,
         totalThreads,
         system.BestDevice().SMCount()

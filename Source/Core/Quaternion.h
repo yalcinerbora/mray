@@ -30,8 +30,8 @@ class Quat
     MRAY_HYBRID explicit    operator const T* () const;
 
     // Access
-    MRAY_HYBRID constexpr T&         operator[](int);
-    MRAY_HYBRID constexpr const T&   operator[](int) const;
+    MRAY_HYBRID constexpr T&         operator[](unsigned int);
+    MRAY_HYBRID constexpr const T&   operator[](unsigned int) const;
 
     // Operators
     MRAY_HYBRID constexpr Quat  operator*(const Quat&) const;
@@ -81,6 +81,7 @@ static_assert(std::is_trivially_default_constructible_v<Quaternion> == true, "Qu
 static_assert(std::is_trivially_destructible_v<Quaternion> == true, "Quaternion has to be trivially destructible");
 static_assert(std::is_trivially_copyable_v<Quaternion> == true, "Quaternion has to be trivially copyable");
 static_assert(std::is_polymorphic_v<Quaternion> == false, "Quaternion should not be polymorphic");
+static_assert(ImplicitLifetimeC<Quaternion>, "Quaternions should have implicit lifetime");
 
 // Left Scalar operators
 template<class T>

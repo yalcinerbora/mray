@@ -6,7 +6,7 @@ set(SRC_PRIMITIVES
     ${CURRENT_SOURCE_DIR}/PrimitiveC.h
     ${CURRENT_SOURCE_DIR}/PrimitiveDefaultTriangle.h
     ${CURRENT_SOURCE_DIR}/PrimitiveDefaultTriangle.hpp
-    ${CURRENT_SOURCE_DIR}/PrimitiveDefaultTriangle.cpp)
+    ${CURRENT_SOURCE_DIR}/PrimitiveDefaultTriangle.cu)
 
 set(SRC_TRANSFORMS
     ${CURRENT_SOURCE_DIR}/TransformC.h

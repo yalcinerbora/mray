@@ -1,6 +1,6 @@
 #pragma once
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr AABB<N, T>::AABB(const Vector<N, T>& min,
                            const Vector<N, T>& max)
@@ -8,7 +8,7 @@ constexpr AABB<N, T>::AABB(const Vector<N, T>& min,
     , max(max)
 {}
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr AABB<N, T>::AABB(const T* dataMin,
                            const T* dataMax)
@@ -16,7 +16,7 @@ constexpr AABB<N, T>::AABB(const T* dataMin,
     , max(dataMax)
 {}
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 template <class... ArgsMin, class... ArgsMax>
 requires (sizeof...(ArgsMin) == N) && (std::convertible_to<T, ArgsMin> && ...) &&
          (sizeof...(ArgsMax) == N) && (std::convertible_to<T, ArgsMax> && ...)
@@ -27,63 +27,63 @@ constexpr AABB<N, T>::AABB(const ArgsMin... dataListMin,
     , max(dataListMax...)
 {}
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr const Vector<N, T>& AABB<N, T>::Min() const
 {
     return min;
 }
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr const Vector<N, T>& AABB<N, T>::Max() const
 {
     return max;
 }
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector<N, T> AABB<N, T>::Min()
 {
     return min;
 }
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector<N, T> AABB<N, T>::Max()
 {
     return max;
 }
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 constexpr MRAY_HYBRID MRAY_CGPU_INLINE
 void AABB<N, T>::SetMin(const Vector<N, T>& v)
 {
     min = v;
 }
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr void AABB<N, T>::SetMax(const Vector<N, T>& v)
 {
     max = v;
 }
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector<N, T> AABB<N, T>::Span() const
 {
     return (max - min);
 }
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector<N, T> AABB<N, T>::Centroid() const
 {
     return min + (Span() * T{0.5});
 }
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr AABB<N, T> AABB<N, T>::Union(const AABB<N, T>& aabb) const
 {
@@ -91,7 +91,7 @@ constexpr AABB<N, T> AABB<N, T>::Union(const AABB<N, T>& aabb) const
                       Vector<N, T>::Max(max, aabb.max));
 }
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr AABB<N, T>& AABB<N, T>::UnionSelf(const AABB<N, T>& aabb)
 {
@@ -101,7 +101,7 @@ constexpr AABB<N, T>& AABB<N, T>::UnionSelf(const AABB<N, T>& aabb)
 }
 
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr bool AABB<N, T>::IsInside(const Vector<N, T>& point) const
 {
@@ -114,14 +114,14 @@ constexpr bool AABB<N, T>::IsInside(const Vector<N, T>& point) const
     return result;
 }
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr bool AABB<N, T>::IsOutside(const Vector<N, T>& point) const
 {
     return !IsInside(point);
 }
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector<N, T> AABB<N, T>::FurthestCorner(const Vector<N, T>& point) const
 {
@@ -142,7 +142,7 @@ constexpr Vector<N, T> AABB<N, T>::FurthestCorner(const Vector<N, T>& point) con
     return result;
 }
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr bool AABB<N, T>::IntersectsSphere(const Vector<N, T>& sphrPos,
                                             float sphrRadius) const
@@ -163,14 +163,14 @@ constexpr bool AABB<N, T>::IntersectsSphere(const Vector<N, T>& sphrPos,
     return false;
 }
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr AABB<N, T> AABB<N, T>::Zero()
 {
     return AABB(Vector<N, T>(0), Vector<N, T>(0));
 }
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr AABB<N, T> AABB<N, T>::Covering()
 {
@@ -178,7 +178,7 @@ constexpr AABB<N, T> AABB<N, T>::Covering()
                 Vector<N, T>(std::numeric_limits<T>::max()));
 }
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr AABB<N, T> AABB<N, T>::Negative()
 {

@@ -130,7 +130,7 @@ static void DumpGPUMemToStdOut(Span<const T> data,
                                const GPUQueue& queue,
                                std::string_view seperator)
 {
-    DumpGPUMemToStream(std::cout, data, seperator);
+    DumpGPUMemToStream(std::cout, data, queue, seperator);
 }
 
 }

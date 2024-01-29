@@ -14,7 +14,7 @@ These are convenience register classes for GPU.
 
 #include "Vector.h"
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 class AABB
 {
     static_assert(N == 2 || N == 3 || N == 4, "AABB size should be 2, 3 or 4");

@@ -6,14 +6,14 @@
 // Matrices are row-major
 // Matrix vector multiplications (m * v) only
 // Assumes vector is column vector
-template<int N, ArithmeticC T>
+template<unsigned int N, ArithmeticC T>
 class alignas(ChooseVectorAlignment(N * sizeof(T))) Matrix
 {
     static_assert(N == 2 || N == 3 || N == 4, "Matrix size should be 2x2, 3x3 or 4x4");
 
     public:
-    using InnerType                 = T;
-    static constexpr int Dims       = N * N;
+    using InnerType                      = T;
+    static constexpr unsigned int Dims   = N * N;
 
     private:
     std::array<T, N*N>              matrix;
@@ -28,14 +28,14 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Matrix
     template <class... Args>
     MRAY_HYBRID constexpr explicit  Matrix(const Args... dataList) requires (std::convertible_to<Args, T> && ...) && (sizeof...(Args) == N*N);
     MRAY_HYBRID constexpr explicit  Matrix(const Vector<N, T> rows[N]);
-    template <int M>
+    template <unsigned int M>
     MRAY_HYBRID constexpr explicit  Matrix(const Matrix<M, T>&) requires (M > N);
 
     // Accessors
-    MRAY_HYBRID constexpr T&            operator[](int);
-    MRAY_HYBRID constexpr const T&      operator[](int) const;
-    MRAY_HYBRID constexpr T&            operator()(int row, int column);
-    MRAY_HYBRID constexpr const T&      operator()(int row, int column) const;
+    MRAY_HYBRID constexpr T&            operator[](unsigned int);
+    MRAY_HYBRID constexpr const T&      operator[](unsigned int) const;
+    MRAY_HYBRID constexpr T&            operator()(unsigned int row, unsigned int column);
+    MRAY_HYBRID constexpr const T&      operator()(unsigned int row, unsigned int column) const;
     // Structured Binding Helper
     MRAY_HYBRID
     constexpr const std::array<T, N*N>& AsArray() const;
@@ -56,7 +56,7 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Matrix
     MRAY_HYBRID constexpr Matrix        operator/(const Matrix&) const;
     MRAY_HYBRID constexpr Matrix        operator/(T) const;
     MRAY_HYBRID constexpr Matrix        operator*(const Matrix&) const;
-    template<int M>
+    template<unsigned int M>
     MRAY_HYBRID constexpr Vector<M, T>  operator*(const Vector<M, T>&) const requires (M == N) || ((M + 1) == N);
     MRAY_HYBRID constexpr Matrix        operator*(T) const;
 
@@ -92,9 +92,9 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Matrix
 
     MRAY_HYBRID constexpr RayT<T>           TransformRay(const RayT<T>&) const requires (N == 3);
     MRAY_HYBRID constexpr RayT<T>           TransformRay(const RayT<T>&) const requires (N == 4);
-    template <int M>
+    template <unsigned int M>
     MRAY_HYBRID constexpr AABB<M, T>        TransformAABB(const AABB<M, T>&) const requires((M+1) == N);
-    template <int M>
+    template <unsigned int M>
     MRAY_HYBRID constexpr Vector<M, T>      LeftMultiply(const Vector<M, T>&) const requires (M <= N);
 
     static MRAY_HYBRID constexpr Matrix     Lerp(const Matrix&, const Matrix&, T) requires std::floating_point<T>;
@@ -108,8 +108,8 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Matrix
 };
 
 // Left Scalar operators
-template<int N, ArithmeticC T>
-MRAY_HYBRID constexpr  Matrix<N, T> operator*(float, const Matrix<N, T>&);
+template<unsigned int N, ArithmeticC T>
+MRAY_HYBRID constexpr  Matrix<N, T> operator*(T, const Matrix<N, T>&);
 
 // Spacial Matrix4x4 -> Matrix3x3
 template<ArithmeticC T>
@@ -120,6 +120,7 @@ static_assert(std::is_trivially_default_constructible_v<Matrix4x4> == true, "Mat
 static_assert(std::is_trivially_destructible_v<Matrix4x4> == true, "Matrices has to be trivially destructible");
 static_assert(std::is_trivially_copyable_v<Matrix4x4> == true, "Matrices has to be trivially copyable");
 static_assert(std::is_polymorphic_v<Matrix4x4> == false, "Matrices should not be polymorphic");
+static_assert(ImplicitLifetimeC<Matrix4x4>, "Matrices should have implicit lifetime");
 
 // Transformation Matrix Generation
 namespace TransformGen

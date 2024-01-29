@@ -37,7 +37,7 @@ namespace mray::cuda
         }
     }
 
-    static cudaTextureAddressMode DetermineAddressMode(EdgeResolveType e)
+    inline cudaTextureAddressMode DetermineAddressMode(EdgeResolveType e)
     {
         switch(e)
         {
@@ -52,7 +52,7 @@ namespace mray::cuda
         }
     }
 
-    static cudaTextureFilterMode DetermineFilterMode(InterpolationType i)
+    inline cudaTextureFilterMode DetermineFilterMode(InterpolationType i)
     {
         switch(i)
         {
@@ -133,7 +133,7 @@ namespace mray::cuda
 
     {
         other.data = nullptr;
-        other.tex = (cudaTextureObject_t)0;
+        other.tex = cudaTextureObject_t(0);
     }
 
     template<uint32_t D, class T>
@@ -156,7 +156,7 @@ namespace mray::cuda
         alignment = other.alignment;
 
         other.data = nullptr;
-        other.tex = (cudaTextureObject_t)0;
+        other.tex = cudaTextureObject_t(0);
         return *this;
     }
 

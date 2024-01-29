@@ -107,7 +107,7 @@ Vector2 RNGDispenserT<T>::NextFloat2D()
 MRAY_HYBRID MRAY_CGPU_INLINE
 Xoroshiro64::Xoroshiro64(State& dState)
     : dState(dState)
-    , rState(rState)
+    , rState(dState)
 {}
 
 MRAY_HYBRID MRAY_CGPU_INLINE

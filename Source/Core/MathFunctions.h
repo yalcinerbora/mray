@@ -44,7 +44,7 @@ template <std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 T MathFunctions::Clamp(T v, T minVal, T maxVal)
 {
-    return fmin(fmax(minVal, v), maxVal);
+    return std::min(std::max(minVal, v), maxVal);
 }
 
 template <std::floating_point T>
@@ -67,7 +67,7 @@ template <std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 T MathFunctions::SqrtMax(T a)
 {
-    return sqrt(fmax(Float{0}, a));
+    return std::sqrt(std::max(Float{0}, a));
 }
 
 template <std::integral T>

@@ -130,7 +130,7 @@ constexpr bool RayT<T>::IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
     // Ray-Tri Intersection
     Vector<3, T> e0 = t1 - t0;
     Vector<3, T> e1 = t2 - t0;
-    Vector<3, T> p = Cross<T>(direction, e1);
+    Vector<3, T> p = Vector3::Cross(direction, e1);
     T det = e0.Dot(p);
 
     if((cullFace && (det < SmallEpsilon<T>())) ||
@@ -146,7 +146,7 @@ constexpr bool RayT<T>::IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
     if(baryCoords[0] < 0 || baryCoords[0] > 1)
         return false;
 
-    Vector<3, T> qVec = Cross<T>(tVec, e0);
+    Vector<3, T> qVec = Vector3::Cross(tVec, e0);
     baryCoords[1] = direction.Dot(qVec) * invDet;
     // Early Skip 2
     if((baryCoords[1] < 0) || (baryCoords[1] + baryCoords[0]) > 1)
@@ -334,9 +334,9 @@ RayT<float> RayT<float>::Nudge(const Vector3f& dir) const
     // Either use an epsilon (float_scale in this case)
     // or use the calculated offset
     Vector3f nextPos;
-    nextPos[0] = (fabs(p[0]) < ORIGIN) ? (p[0] + FLOAT_SCALE * dir[0]) : pointI[0];
-    nextPos[1] = (fabs(p[1]) < ORIGIN) ? (p[1] + FLOAT_SCALE * dir[1]) : pointI[1];
-    nextPos[2] = (fabs(p[2]) < ORIGIN) ? (p[2] + FLOAT_SCALE * dir[2]) : pointI[2];
+    nextPos[0] = (fabsf(p[0]) < ORIGIN) ? (p[0] + FLOAT_SCALE * dir[0]) : pointI[0];
+    nextPos[1] = (fabsf(p[1]) < ORIGIN) ? (p[1] + FLOAT_SCALE * dir[1]) : pointI[1];
+    nextPos[2] = (fabsf(p[2]) < ORIGIN) ? (p[2] + FLOAT_SCALE * dir[2]) : pointI[2];
 
     return RayT(direction, nextPos);
 }

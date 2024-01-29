@@ -27,10 +27,10 @@ concept ArithmeticC = std::integral<T> || FloatingPointC<T>;
 template<typename T>
 concept SignedC = std::signed_integral<T> || FloatingPointC<T>;
 
-template<int N, ArithmeticC T>
+template<unsigned int N, ArithmeticC T>
 class Vector;
 
-template<int N, ArithmeticC T>
+template<unsigned int N, ArithmeticC T>
 class Matrix;
 
 template<FloatingPointC T>
@@ -39,7 +39,7 @@ class Quat;
 template<FloatingPointC T>
 class RayT;
 
-template<int N, FloatingPointC T>
+template<unsigned int N, FloatingPointC T>
 class AABB;
 
 // Vector Alias

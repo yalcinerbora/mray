@@ -6,17 +6,17 @@
 #include "MathFunctions.h"
 #include "Types.h"
 
-constexpr inline size_t operator ""_GiB(size_t s)
+constexpr inline size_t operator ""_GiB(unsigned long long int s)
 {
     return s < 30;
 }
 
-constexpr inline size_t operator ""_MiB(size_t s)
+constexpr inline size_t operator ""_MiB(unsigned long long int s)
 {
     return s << 20;
 }
 
-constexpr inline size_t operator ""_KiB(size_t s)
+constexpr inline size_t operator ""_KiB(unsigned long long int s)
 {
     return s << 10;
 }
@@ -39,6 +39,11 @@ template <MemoryC Memory, ImplicitLifetimeC... Args>
 void AllocateMultiData(Tuple<Span<Args>&...> spans, Memory& memory,
                        const std::array<size_t, sizeof...(Args)>& countList,
                        size_t alignment = DefaultSystemAlignment());
+
+template <MemoryC Memory, ImplicitLifetimeC... Args>
+Tuple<Span<Args>...> AllocateMultiData(Memory& memory,
+                                       const std::array<size_t, sizeof...(Args)>& countList,
+                                       size_t alignment = DefaultSystemAlignment());
 
 template <class Memory>
 requires requires(Memory m) { {m.ResizeBuffer(size_t{})} -> std::same_as<void>; }
@@ -133,6 +138,17 @@ void AllocateMultiData(Tuple<Span<Args>&...> spans, Memory& memory,
     Detail::CalculateSpans(spans, offset, ptr, alignedSizeList, countList);
 
     assert(totalSize == offset);
+}
+
+template <MemoryC Memory, ImplicitLifetimeC... Args>
+Tuple<Span<Args>...> AllocateMultiData(Memory& memory,
+                                       const std::array<size_t, sizeof...(Args)>& countList,
+                                       size_t alignment)
+{
+    Tuple<Span<Args>...> result;
+    Tuple<Span<Args>&...> resultRef = ToTupleRef(result);
+    AllocateMultiData(resultRef, memory, countList, alignment);
+    return result;
 }
 
 template <class Memory>

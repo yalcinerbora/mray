@@ -229,7 +229,7 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
     // Conservative Rasterization
     // Move all the edges "outwards" at least half a pixel
     // Notice NDC is [-1, 1] pixel size is 2 / resolution
-    const Vector2 halfPixel = Vector2(1) / Vector2(rasterResolution);
+    const Vector2 halfPixel = Vector2(1) / Vector2(rasterResolution[0], rasterResolution[1]);
     const Vector2 deltaPix = Vector2(2) * halfPixel;
     // https://developer.nvidia.com/gpugems/gpugems2/part-v-image-oriented-computing/chapter-42-conservative-rasterization
     // This was CG shader code which was optimized
@@ -303,12 +303,19 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
                                     positions[2] * actualC);
 
                 Vector3 voxelIndexF = ((voxelPos - sceneAABB.Min()) / sceneAABB.Span());
-                voxelIndexF *= Vector3(voxelParams.resolution);
-                Vector3ui voxelIndex = Vector3ui(voxelIndexF);
+                voxelIndexF *= Vector3(voxelParams.resolution[0],
+                                       voxelParams.resolution[1],
+                                       voxelParams.resolution[2]);
+                Vector3ui voxelIndex = Vector3ui(voxelIndexF[0],
+                                                 voxelIndexF[1],
+                                                 voxelIndexF[2]);
 
                 // TODO: This sometimes happen but it shouldn't??
                 // Clamp the Voxel due to numerical errors
-                voxelIndex.ClampSelf(Vector3ui::Zero(), Vector3ui(voxelParams.resolution - 1));
+                voxelIndex.ClampSelf(Vector3ui::Zero(),
+                                     Vector3ui(voxelParams.resolution[0] - 1,
+                                               voxelParams.resolution[1] - 1,
+                                               voxelParams.resolution[2] - 1));
 
                 uint64_t voxelIndexMorton = MortonCode::Compose3D<uint64_t>(voxelIndex);
                 // Write the found voxel

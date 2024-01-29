@@ -155,7 +155,7 @@ Optional<Vector3> Refract(const Vector3& normal,
     // surface. Both "normal" and "wi" is assumed to be normalized.
     Float etaRatio = etaFrom / etaTo;
     Float cosIn = normal.Dot(v);
-    Float sinInSqr = fmax(Float{0}, Float{1} - cosIn * cosIn);
+    Float sinInSqr = std::max(Float{0}, Float{1} - cosIn * cosIn);
     // Snell's Law
     Float sinOutSqr = etaRatio * etaRatio * sinInSqr;
     Float cosOut = SqrtMax(Float{1} - sinOutSqr);
@@ -180,11 +180,11 @@ SampleT<Vector3> SampleCosDirection(const Vector2& xi)
 
     // Generated direction is on unit space (+Z oriented hemisphere)
     Float xi1Angle = Float{2} * Pi<Float>() * xi[1];
-    Float xi0Sqrt = sqrt(xi[0]);
+    Float xi0Sqrt = std::sqrt(xi[0]);
 
     Vector3 dir;
-    dir[0] = xi0Sqrt * cos(xi1Angle);
-    dir[1] = xi0Sqrt * sin(xi1Angle);
+    dir[0] = xi0Sqrt * std::cos(xi1Angle);
+    dir[1] = xi0Sqrt * std::sin(xi1Angle);
     dir[2] = SqrtMax(Float{1} - Vector2(dir).Dot(Vector2(dir)));
 
     // Fast tangent space dot product and domain constant
@@ -215,8 +215,8 @@ SampleT<Vector3> SampleUniformDirection(const Vector2& xi)
     Float xi1Angle = 2 * Pi<Float>() * xi[1];
 
     Vector3 dir;
-    dir[0] = xi0Sqrt * cos(xi1Angle);
-    dir[1] = xi0Sqrt * sin(xi1Angle);
+    dir[0] = xi0Sqrt * std::cos(xi1Angle);
+    dir[1] = xi0Sqrt * std::sin(xi1Angle);
     dir[2] = xi[0];
 
     // Uniform pdf is invariant
@@ -238,9 +238,9 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Vector3 SphericalToCartesian(const Vector3& sphrRTP)
 {
     const auto& [r, theta, phi] = sphrRTP.AsArray();
-    Float x = r * cos(theta) * sin(phi);
-    Float y = r * sin(theta) * sin(phi);
-    Float z = r * cos(phi);
+    Float x = r * std::cos(theta) * std::sin(phi);
+    Float y = r * std::sin(theta) * std::sin(phi);
+    Float z = r * std::cos(phi);
     return Vector3(x, y, z);
 }
 
@@ -251,10 +251,10 @@ Vector3 CartesianToSpherical(const Vector3& xyz)
     Vector3 norm = xyz.Normalize();
     Float r = xyz.Length();
     // range [-pi, pi]
-    Float azimuth = atan2(norm[1], norm[0]);
+    Float azimuth = std::atan2(norm[1], norm[0]);
     // range [0, pi]
     // Dot product between ZAxis and normalized vector
-    Float incl = acos(norm[2]);
+    Float incl = std::acos(norm[2]);
     return Vector3(r, azimuth, incl);
 }
 
@@ -263,9 +263,9 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Vector3 UnitSphericalToCartesian(const Vector2& sphrTP)
 {
     const auto& [theta, phi] = sphrTP.AsArray();
-    Float x = cos(theta) * sin(phi);
-    Float y = sin(theta) * sin(phi);
-    Float z = cos(phi);
+    Float x = std::cos(theta) * std::sin(phi);
+    Float y = std::sin(theta) * std::sin(phi);
+    Float z = std::cos(phi);
     return Vector3(x, y, z);
 }
 
@@ -284,11 +284,11 @@ Vector2 CartesianToUnitSpherical(const Vector3& xyz)
 {
     // Convert to Spherical Coordinates
     // range [-pi, pi]
-    Float azimuth = atan2(xyz[1], xyz[0]);
+    Float azimuth = std::atan2(xyz[1], xyz[0]);
     // range [0, pi]
     // Sometimes normalized cartesian coords may invoke NaN here
     // clamp it to the range
-    Float incl = acos(MathFunctions::Clamp<Float>(xyz[2], -1, 1));
+    Float incl = std::acos(MathFunctions::Clamp<Float>(xyz[2], -1, 1));
     return Vector2(azimuth, incl);
 }
 
@@ -301,12 +301,12 @@ Vector2 DirectionToCocentricOctohedral(const Vector3& dir)
     // Edge case
     if(dir[0] == 0 && dir[1] == 0) return Vector2(0);
 
-    Float xAbs = abs(dir[0]);
-    Float yAbs = abs(dir[1]);
+    Float xAbs = std::abs(dir[0]);
+    Float yAbs = std::abs(dir[1]);
     Float atanIn = yAbs / xAbs;
-    Float phiPrime = atan(atanIn);
+    Float phiPrime = std::atan(atanIn);
 
-    Float radius = sqrt(Float{1} - abs(dir[2]));
+    Float radius = std::sqrt(Float{1} - std::abs(dir[2]));
 
     Float v = radius * TwoOvrPi * phiPrime;
     Float u = radius - v;
@@ -319,8 +319,8 @@ Vector2 DirectionToCocentricOctohedral(const Vector3& dir)
         v = vPrime;
     }
     // Sign extend the uv
-    u *= (signbit(dir[0]) ? Float{-1} : Float{1});
-    v *= (signbit(dir[1]) ? Float{-1} : Float{1});
+    u *= (std::signbit(dir[0]) ? Float{-1} : Float{1});
+    v *= (std::signbit(dir[1]) ? Float{-1} : Float{1});
 
     // Finally
     // [-1,1] to [0,1]
@@ -352,12 +352,12 @@ Vector3 CocentricOctohedralToDirection(const Vector2& st)
     // Avoid division by zero
     if(radius != 0) phiPrime = ((uvAbs[1] - uvAbs[0]) / radius + 1) * PiOvr4;
     // Coords
-    Float cosPhi = (signbit(uv[0]) ? -1 : 1) * cos(phiPrime);
-    Float sinPhi = (signbit(uv[1]) ? -1 : 1) * sin(phiPrime);
+    Float cosPhi = (std::signbit(uv[0]) ? -1 : 1) * std::cos(phiPrime);
+    Float sinPhi = (std::signbit(uv[1]) ? -1 : 1) * std::sin(phiPrime);
     Float z = (signbit(d) ? -1 : 1) * (1 - radius * radius);
 
     // Now all is OK do the cocentric disk stuff
-    Float xyFactor = radius * sqrt(2 - radius * radius);
+    Float xyFactor = radius * std::sqrt(2 - radius * radius);
     Float x = cosPhi * xyFactor;
     Float y = sinPhi * xyFactor;
 
@@ -379,8 +379,8 @@ Vector2 CocentricOctohedralWrap(const Vector2& st)
     if(st[0] < 0) stConv[0] = -2 - st[0];
     if(st[1] < 0) stConv[1] = -2 - st[1];
 
-    Float iS; Float fS = abs(modf(stConv[0], &iS));
-    Float iT; Float fT = abs(modf(stConv[1], &iT));
+    Float iS; Float fS = std::abs(std::modf(stConv[0], &iS));
+    Float iT; Float fT = std::abs(std::modf(stConv[1], &iT));
     IntType iSInt = static_cast<IntType>(iS);
     IntType iTInt = static_cast<IntType>(iT);
     bool doMirror = static_cast<bool>((iSInt & 0x1) ^ (iTInt & 0x1));

@@ -15,7 +15,12 @@ target_link_libraries(TCore PRIVATE
                       mray::meta_compile_opts
                       mray::test_common
                       gtest::gtest
-                      gtest::gtest_main)
+                      gtest::gtest_main
+
+                      # This is requires on linux since currently tests do not have
+                      # and .cu files so CMake does not add CUDA related libs
+                      CUDA::cudart
+                      )
 
 gtest_discover_tests(TCore)
 

@@ -17,8 +17,8 @@ PrimGroupTriangle::PrimGroupTriangle(uint32_t primGroupId,
 void PrimGroupTriangle::CommitReservations()
 {
     std::array<bool, AttributeCount> isAttribute = {false, false, false, true};
-    auto [p, n, uv, i] = GenericCommit<Vector3, Quaternion,
-                                       Vector2, Vector3ui>(isAttribute);
+    auto [p, n, uv, i] = this->GenericCommit<Vector3, Quaternion,
+                                             Vector2, Vector3ui>(isAttribute);
 
     dPositions = p;
     dTBNRotations = n;

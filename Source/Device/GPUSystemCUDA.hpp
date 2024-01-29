@@ -80,7 +80,7 @@ KernelCallParamsCUDA::KernelCallParamsCUDA()
 {}
 
 template<auto Kernel, class... Args>
-MRAY_HYBRID inline
+MRAY_HOST inline
 void GPUQueueCUDA::IssueKernel(std::string_view name,
                                KernelIssueParams p,
                                Args&&... fArgs) const
@@ -88,7 +88,7 @@ void GPUQueueCUDA::IssueKernel(std::string_view name,
     #ifndef __CUDA_ARCH__
         static const NVTXKernelName kernelName = NVTXKernelName(nvtxDomain, name);
         NVTXAnnotate annotate = kernelName.Annotate();
-    #endif;
+    #endif
 
     assert(p.workCount != 0);
     using namespace CudaKernelCalls;
@@ -103,7 +103,7 @@ void GPUQueueCUDA::IssueKernel(std::string_view name,
 }
 
 template<class Lambda>
-MRAY_HYBRID inline
+MRAY_HOST inline
 void GPUQueueCUDA::IssueLambda(std::string_view name,
                                KernelIssueParams p,
                                //
@@ -112,7 +112,7 @@ void GPUQueueCUDA::IssueLambda(std::string_view name,
     #ifndef __CUDA_ARCH__
         static const NVTXKernelName kernelName = NVTXKernelName(nvtxDomain, name);
         NVTXAnnotate annotate = kernelName.Annotate();
-    #endif;
+    #endif
 
     assert(p.workCount != 0);
     static_assert(std::is_rvalue_reference_v<decltype(func)>,
@@ -131,7 +131,7 @@ void GPUQueueCUDA::IssueLambda(std::string_view name,
 }
 
 template<auto Kernel, class... Args>
-MRAY_HYBRID inline
+MRAY_HOST inline
 void GPUQueueCUDA::IssueSaturatingKernel(std::string_view name,
                                          KernelIssueParams p,
                                          //
@@ -140,12 +140,12 @@ void GPUQueueCUDA::IssueSaturatingKernel(std::string_view name,
     #ifndef __CUDA_ARCH__
         static const NVTXKernelName kernelName = NVTXKernelName(nvtxDomain, name);
         NVTXAnnotate annotate = kernelName.Annotate();
-    #endif;
+    #endif
 
     assert(p.workCount != 0);
     using namespace CudaKernelCalls;
 
-    const void* kernelPtr = static_cast<const void*>(Kernel);
+    const void* kernelPtr = reinterpret_cast<const void*>(Kernel);
     uint32_t threadCount = StaticThreadPerBlock1D();
     uint32_t blockCount = DetermineGridStrideBlock(kernelPtr,
                                                    p.sharedMemSize,
@@ -160,7 +160,7 @@ void GPUQueueCUDA::IssueSaturatingKernel(std::string_view name,
 }
 
 template<class Lambda>
-MRAY_HYBRID inline
+MRAY_HOST inline
 void GPUQueueCUDA::IssueSaturatingLambda(std::string_view name,
                                          KernelIssueParams p,
                                          //
@@ -169,14 +169,14 @@ void GPUQueueCUDA::IssueSaturatingLambda(std::string_view name,
     #ifndef __CUDA_ARCH__
         static const NVTXKernelName kernelName = NVTXKernelName(nvtxDomain, name);
         NVTXAnnotate annotate = kernelName.Annotate();
-    #endif;
+    #endif
 
     assert(p.workCount != 0);
     static_assert(std::is_rvalue_reference_v<decltype(func)>,
                   "Not passing Lambda as rvalue_reference. This kernel call "
                   "would've been failed in runtime!");
     using namespace CudaKernelCalls;
-    const void* kernelPtr = static_cast<const void*>(&KernelCallLambdaCUDA<Lambda, StaticThreadPerBlock1D()>);
+    const void* kernelPtr = reinterpret_cast<const void*>(&KernelCallLambdaCUDA<Lambda, StaticThreadPerBlock1D()>);
     uint32_t threadCount = StaticThreadPerBlock1D();
     uint32_t blockCount = DetermineGridStrideBlock(kernelPtr,
                                                    p.sharedMemSize,
@@ -193,7 +193,7 @@ void GPUQueueCUDA::IssueSaturatingLambda(std::string_view name,
 }
 
 template<auto Kernel, class... Args>
-MRAY_HYBRID inline
+MRAY_HOST inline
 void GPUQueueCUDA::IssueExactKernel(std::string_view name,
                                     KernelExactIssueParams p,
                                     //
@@ -202,7 +202,7 @@ void GPUQueueCUDA::IssueExactKernel(std::string_view name,
     #ifndef __CUDA_ARCH__
         static const NVTXKernelName kernelName = NVTXKernelName(nvtxDomain, name);
         NVTXAnnotate annotate = kernelName.Annotate();
-    #endif;
+    #endif
 
     assert(p.gridSize != 0);
     using namespace CudaKernelCalls;
@@ -214,7 +214,7 @@ void GPUQueueCUDA::IssueExactKernel(std::string_view name,
 }
 
 template<class Lambda, uint32_t Bounds>
-MRAY_HYBRID inline
+MRAY_HOST inline
 void GPUQueueCUDA::IssueExactLambda(std::string_view name,
                                     KernelExactIssueParams p,
                                     //
@@ -223,7 +223,167 @@ void GPUQueueCUDA::IssueExactLambda(std::string_view name,
     #ifndef __CUDA_ARCH__
         static const NVTXKernelName kernelName = NVTXKernelName(nvtxDomain, name);
         NVTXAnnotate annotate = kernelName.Annotate();
-    #endif;
+    #endif
+
+    assert(p.gridSize != 0);
+    static_assert(std::is_rvalue_reference_v<decltype(func)>,
+                  "Not passing Lambda as rvalue_reference. This kernel call "
+                  "would've been failed in runtime!");
+    using namespace CudaKernelCalls;
+
+    KernelCallLambdaCUDA<Lambda, Bounds>
+    <<<p.gridSize, p.blockSize, p.sharedMemSize, stream>>>
+    (
+        std::forward<Lambda>(func)
+    );
+    CUDA_KERNEL_CHECK();
+}
+
+template<auto Kernel, class... Args>
+MRAY_GPU inline
+void GPUQueueCUDA::DeviceIssueKernel(std::string_view name,
+                                     KernelIssueParams p,
+                                     Args&&... fArgs) const
+{
+    #ifndef __CUDA_ARCH__
+        static const NVTXKernelName kernelName = NVTXKernelName(nvtxDomain, name);
+        NVTXAnnotate annotate = kernelName.Annotate();
+    #endif
+
+    assert(p.workCount != 0);
+    using namespace CudaKernelCalls;
+    uint32_t blockCount = MathFunctions::DivideUp(p.workCount, StaticThreadPerBlock1D());
+    uint32_t blockSize = StaticThreadPerBlock1D();
+
+    Kernel<<<blockCount, blockSize, p.sharedMemSize, stream>>>
+    (
+        std::forward<Args>(fArgs)...
+    );
+    CUDA_KERNEL_CHECK();
+}
+
+template<class Lambda>
+MRAY_GPU inline
+void GPUQueueCUDA::DeviceIssueLambda(std::string_view name,
+                                     KernelIssueParams p,
+                                     //
+                                     Lambda&& func) const
+{
+    #ifndef __CUDA_ARCH__
+        static const NVTXKernelName kernelName = NVTXKernelName(nvtxDomain, name);
+        NVTXAnnotate annotate = kernelName.Annotate();
+    #endif
+
+    assert(p.workCount != 0);
+    static_assert(std::is_rvalue_reference_v<decltype(func)>,
+                  "Not passing Lambda as rvalue_reference. This kernel call "
+                  "would've been failed in runtime!");
+    using namespace CudaKernelCalls;
+    uint32_t blockCount = MathFunctions::DivideUp(p.workCount, StaticThreadPerBlock1D());
+    uint32_t blockSize = StaticThreadPerBlock1D();
+
+    KernelCallLambdaCUDA<Lambda>
+    <<<blockCount, blockSize, p.sharedMemSize, stream>>>
+    (
+        std::forward<Lambda>(func)
+    );
+    CUDA_KERNEL_CHECK();
+}
+
+template<auto Kernel, class... Args>
+MRAY_GPU inline
+void GPUQueueCUDA::DeviceIssueSaturatingKernel(std::string_view name,
+                                               KernelIssueParams p,
+                                               //
+                                               Args&&... fArgs) const
+{
+    #ifndef __CUDA_ARCH__
+        static const NVTXKernelName kernelName = NVTXKernelName(nvtxDomain, name);
+        NVTXAnnotate annotate = kernelName.Annotate();
+    #endif
+
+    assert(p.workCount != 0);
+    using namespace CudaKernelCalls;
+
+    const void* kernelPtr = reinterpret_cast<const void*>(Kernel);
+    uint32_t threadCount = StaticThreadPerBlock1D();
+    uint32_t blockCount = DetermineGridStrideBlock(kernelPtr,
+                                                   p.sharedMemSize,
+                                                   threadCount,
+                                                   p.workCount);
+
+    Kernel<<<blockCount, threadCount, p.sharedMemSize, stream>>>
+    (
+        std::forward<Args>(fArgs)...
+    );
+    CUDA_KERNEL_CHECK();
+}
+
+template<class Lambda>
+MRAY_GPU inline
+void GPUQueueCUDA::DeviceIssueSaturatingLambda(std::string_view name,
+                                               KernelIssueParams p,
+                                               //
+                                               Lambda&& func) const
+{
+    #ifndef __CUDA_ARCH__
+        static const NVTXKernelName kernelName = NVTXKernelName(nvtxDomain, name);
+        NVTXAnnotate annotate = kernelName.Annotate();
+    #endif
+
+    assert(p.workCount != 0);
+    static_assert(std::is_rvalue_reference_v<decltype(func)>,
+                  "Not passing Lambda as rvalue_reference. This kernel call "
+                  "would've been failed in runtime!");
+    using namespace CudaKernelCalls;
+    const void* kernelPtr = reinterpret_cast<const void*>(&KernelCallLambdaCUDA<Lambda, StaticThreadPerBlock1D()>);
+    uint32_t threadCount = StaticThreadPerBlock1D();
+    uint32_t blockCount = DetermineGridStrideBlock(kernelPtr,
+                                                   p.sharedMemSize,
+                                                   threadCount,
+                                                   p.workCount);
+
+
+    KernelCallLambdaCUDA<Lambda>
+    <<<blockCount, threadCount, p.sharedMemSize, stream>>>
+    (
+        std::forward<Lambda>(func)
+    );
+    CUDA_KERNEL_CHECK();
+}
+
+template<auto Kernel, class... Args>
+MRAY_GPU inline
+void GPUQueueCUDA::DeviceIssueExactKernel(std::string_view name,
+                                          KernelExactIssueParams p,
+                                          //
+                                          Args&&... fArgs) const
+{
+    #ifndef __CUDA_ARCH__
+        static const NVTXKernelName kernelName = NVTXKernelName(nvtxDomain, name);
+        NVTXAnnotate annotate = kernelName.Annotate();
+    #endif
+
+    assert(p.gridSize != 0);
+    using namespace CudaKernelCalls;
+    Kernel<<<p.gridSize, p.blockSize, p.sharedMemSize, stream>>>
+    (
+        std::forward<Args>(fArgs)...
+    );
+    CUDA_KERNEL_CHECK();
+}
+
+template<class Lambda, uint32_t Bounds>
+MRAY_GPU inline
+void GPUQueueCUDA::DeviceIssueExactLambda(std::string_view name,
+                                          KernelExactIssueParams p,
+                                          //
+                                          Lambda&& func) const
+{
+    #ifndef __CUDA_ARCH__
+        static const NVTXKernelName kernelName = NVTXKernelName(nvtxDomain, name);
+        NVTXAnnotate annotate = kernelName.Annotate();
+    #endif
 
     assert(p.gridSize != 0);
     static_assert(std::is_rvalue_reference_v<decltype(func)>,

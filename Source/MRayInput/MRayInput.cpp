@@ -60,6 +60,6 @@ MRAY_INPUT_ENTRYPOINT void MRayInputDestroyCallback(void* ptr)
     // If we do this inside the lock there is a potential deadlock
     // (maybe?) since MRayInput uses synchronized_pool_resource
     // and it may have a mutex
-    nodePtr->input = std::move(MRayInput());
+    nodePtr->input = MRayInput();
     freeList.GiveTheLocation(nodePtr);
 }

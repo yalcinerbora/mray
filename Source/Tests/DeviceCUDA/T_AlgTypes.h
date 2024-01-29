@@ -27,6 +27,15 @@ using Implementations = ::testing::Types
 
 TYPED_TEST_SUITE(DeviceAlorithmsTest, Implementations);
 
+// Temporarily define a increment for iota
+template <unsigned int D, class T>
+Vector<D, T>& operator++(Vector<D, T>& a)
+{
+    for(unsigned int i = 0; i < D; i++)
+        a[i] += 1;
+    return a;
+}
+
 // Helpers
 template <class T>
 void ExpectEqualVecOrArithmetic(const T& expected, const T& checked)

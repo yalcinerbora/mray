@@ -253,9 +253,9 @@ TYPED_TEST(GPUMemoryAlloc, MultiAlloc)
                                 *(this->memory),
                                 {100, 50, 40});
 
-    this->system.Memset<Float>(dFloats, 0x12);
-    this->system.Memset<Vector3>(dVectors, 0x34);
-    this->system.Memset<Matrix4x4>(dMatrices, 0x56);
+    this->system.template Memset<Float>(dFloats, 0x12);
+    this->system.template Memset<Vector3>(dVectors, 0x34);
+    this->system.template Memset<Matrix4x4>(dMatrices, 0x56);
 
     std::vector<Float> hFloats(dFloats.size(), 0.0f);
     std::vector<Vector3> hVectors(dVectors.size(), Vector3::Zero());

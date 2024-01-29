@@ -35,14 +35,14 @@ static consteval unsigned int ChooseVectorAlignment(unsigned int totalSize)
         return 16;          // 4byte Vector4 Types
 }
 
-template<int N, ArithmeticC T>
+template<unsigned int N, ArithmeticC T>
 class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
 {
     static_assert(N == 2 || N == 3 || N == 4, "Vector size should be 2, 3 or 4");
 
     public:
-    using InnerType             = T;
-    static constexpr int Dims   = N;
+    using InnerType                     = T;
+    static constexpr unsigned int Dims  = N;
 
     private:
     std::array<T, N>                vector;
@@ -54,12 +54,14 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
     MRAY_HYBRID constexpr explicit  Vector(C);
     template<std::convertible_to<T> C>
     MRAY_HYBRID constexpr explicit  Vector(const C* data);
-    template <class... Args>
-    MRAY_HYBRID constexpr explicit  Vector(const Args... dataList) requires (std::convertible_to<Args, T> && ...) && (sizeof...(Args) == N);
+    template <std::convertible_to<T>... Args>
+    MRAY_HYBRID constexpr explicit  Vector(const Args... dataList); //requires (, T> && ...) && (sizeof...(Args) == N);
     template <class... Args>
     MRAY_HYBRID constexpr           Vector(const Vector<N - sizeof...(Args), T>&,
                                            const Args... dataList) requires (N - sizeof...(Args) > 1);
-    template <int M>
+    template<std::convertible_to<T> C>
+    MRAY_HYBRID constexpr explicit  Vector(const Vector<N, C>&);
+    template <unsigned int M>
     MRAY_HYBRID constexpr explicit  Vector(const Vector<M, T>&) requires (M > N);
     // NormTypes Related Constructors
     template <std::unsigned_integral IT>
@@ -68,8 +70,8 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
     MRAY_HYBRID constexpr explicit  Vector(const SNorm<N, IT>&) requires (std::floating_point<T>);
 
     // Accessors
-    MRAY_HYBRID constexpr T&            operator[](int);
-    MRAY_HYBRID constexpr const T&      operator[](int) const;
+    MRAY_HYBRID constexpr T&            operator[](unsigned int);
+    MRAY_HYBRID constexpr const T&      operator[](unsigned int) const;
     // Structured Binding Helper
     MRAY_HYBRID
     constexpr const std::array<T, N>&   AsArray() const;
@@ -77,7 +79,7 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
     constexpr std::array<T, N>&         AsArray();
 
     // Type cast
-    template<int M, class C>
+    template<unsigned int M, class C>
     MRAY_HYBRID explicit            operator Vector<M, C>() const requires (M <= N) && std::convertible_to<C, T>;
 
     // Modify
@@ -120,8 +122,8 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
     // Max Min Reduction functions are selections instead
     // since it sometimes useful to fetch the which index
     // (axis) is maximum/minimum so that you can do other stuff with it.
-    MRAY_HYBRID constexpr int       Max() const;
-    MRAY_HYBRID constexpr int       Min() const;
+    MRAY_HYBRID constexpr unsigned int  Max() const;
+    MRAY_HYBRID constexpr unsigned int  Min() const;
 
     MRAY_HYBRID constexpr T         Length() const requires std::floating_point<T>;
     MRAY_HYBRID constexpr T         LengthSqr() const;
@@ -166,7 +168,7 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
 };
 
 // Left scalar multiplication
-template<int N, ArithmeticC T>
+template<unsigned int N, ArithmeticC T>
 MRAY_HYBRID constexpr Vector<N, T> operator*(T, const Vector<N, T>&);
 
 // Sanity Checks for Vectors
@@ -174,6 +176,7 @@ static_assert(std::is_trivially_default_constructible_v<Vector3> == true, "Vecto
 static_assert(std::is_trivially_destructible_v<Vector3> == true, "Vectors has to be trivially destructible");
 static_assert(std::is_trivially_copyable_v<Vector3> == true, "Vectors has to be trivially copyable");
 static_assert(std::is_polymorphic_v<Vector3> == false, "Vectors should not be polymorphic");
+static_assert(ImplicitLifetimeC<Vector3>, "Vectors should have implicit lifetime");
 
 // Alignment Checks
 static_assert(sizeof(Vector2) == 8, "Vector2 should be tightly packed");

@@ -30,7 +30,7 @@ struct MRayError
     operator bool();
 
     std::string GetError() const;
-    std::string AppendInfo(const std::string&);
+    void        AppendInfo(const std::string&);
 
 };
 
@@ -59,7 +59,7 @@ inline std::string MRayError::GetError() const
     //                   sourceInfo.function_name(), customInfo);
 }
 
-inline std::string MRayError::AppendInfo(const std::string& s)
+inline void MRayError::AppendInfo(const std::string& s)
 {
     customInfo += s;
 }

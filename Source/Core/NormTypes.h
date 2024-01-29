@@ -10,7 +10,7 @@ static consteval unsigned int ChooseNormAlignment(unsigned int totalSize)
     // https://graphics.stanford.edu/%7Eseander/bithacks.html#RoundUpPowerOf2
 
     // Assume Int is at least
-    int ts = totalSize;
+    unsigned int ts = totalSize;
     ts--;
     ts |= ts >> 1;
     ts |= ts >> 2;
@@ -19,13 +19,12 @@ static consteval unsigned int ChooseNormAlignment(unsigned int totalSize)
     ts++;
 
     // Set to CUDA data fetch maximum (128 byte)
-    return (ts < 32) ? ts : 32;
+    return (ts < 32u) ? ts : 32u;
 }
 
 // TODO: Explicitly state the alignments
-template <int N, std::unsigned_integral T>
+template <unsigned int N, std::unsigned_integral T>
 class alignas(ChooseNormAlignment(N * sizeof(T))) UNorm
-//class UNorm
 {
     public:
     static_assert(N == 2 || N == 4 || N == 8 || N == 16 || N == 32,
@@ -35,14 +34,14 @@ class alignas(ChooseNormAlignment(N * sizeof(T))) UNorm
     MRAY_HYBRID static constexpr T Min();
 
     private:
-    T           v[N];
+    T                               v[N];
     public:
     // TODO:
-    MRAY_HYBRID constexpr const T&  operator[](int) const;
-    MRAY_HYBRID constexpr T&        operator[](int);
+    MRAY_HYBRID constexpr const T&  operator[](unsigned int) const;
+    MRAY_HYBRID constexpr T&        operator[](unsigned int);
 };
 
-template <int N, std::signed_integral T>
+template <unsigned int N, std::signed_integral T>
 class alignas(ChooseNormAlignment(N * sizeof(T))) SNorm
 {
     public:
@@ -53,70 +52,69 @@ class alignas(ChooseNormAlignment(N * sizeof(T))) SNorm
     MRAY_HYBRID static constexpr T Min();
 
     private:
-    T v[N];
+    T                               v[N];
     public:
-    MRAY_HYBRID constexpr const T&  operator[](int) const;
-    MRAY_HYBRID constexpr T&        operator[](int);
+    MRAY_HYBRID constexpr const T&  operator[](unsigned int) const;
+    MRAY_HYBRID constexpr T&        operator[](unsigned int);
 };
 
-template <int N, std::unsigned_integral T>
+template <unsigned int N, std::unsigned_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr T UNorm<N, T>::Min()
 {
     return std::numeric_limits<T>::min();
 }
 
-template <int N, std::unsigned_integral T>
+template <unsigned int N, std::unsigned_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr T UNorm<N, T>::Max()
 {
     return std::numeric_limits<T>::max();
 }
 
-template <int N, std::unsigned_integral T>
+template <unsigned int N, std::unsigned_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T& UNorm<N,T>::operator[](int i)
+constexpr T& UNorm<N,T>::operator[](unsigned int i)
 {
     return v[i];
 }
 
 // =======================================//
 
-template <int N, std::signed_integral T>
+template <unsigned int N, std::signed_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr T SNorm<N, T>::Min()
 {
     return std::numeric_limits<T>::min();
 }
 
-template <int N, std::signed_integral T>
+template <unsigned int N, std::signed_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr T SNorm<N, T>::Max()
 {
     return std::numeric_limits<T>::max();
 }
 
-template <int N, std::unsigned_integral T>
+template <unsigned int N, std::unsigned_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr const T& UNorm<N, T>::operator[](int i) const
+constexpr const T& UNorm<N, T>::operator[](unsigned int i) const
 {
     return v[i];
 }
 
-template <int N, std::signed_integral T>
+template <unsigned int N, std::signed_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T& SNorm<N, T>::operator[](int i)
+constexpr T& SNorm<N, T>::operator[](unsigned int i)
 {
     return v[i];
 }
 
-template <int N, std::signed_integral T>
+template <unsigned int N, std::signed_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr const T& SNorm<N, T>::operator[](int i) const
+constexpr const T& SNorm<N, T>::operator[](unsigned int i) const
 {
     return v[i];
 }
-
 // Word Types
 using UNorm4x8      = UNorm<4, uint8_t>;
 using UNorm2x16     = UNorm<2, uint16_t>;
@@ -150,3 +148,5 @@ using SNorm32x8     = SNorm<32, int8_t>;
 using SNorm16x16    = SNorm<16, int16_t>;
 using SNorm8x32     = SNorm<8, int32_t>;
 using SNorm4x64     = SNorm<4, int64_t>;
+
+static_assert(ImplicitLifetimeC<UNorm4x8>, "UNorm4x8 is not implicit lifetime class");

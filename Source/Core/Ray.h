@@ -51,13 +51,13 @@ class RayT
                                                   const Vector<3, T>& max,
                                                   const Vector<2, T>& tMinMax = Vector<2, T>(-INFINITY, INFINITY)) const;
 
-    MRAY_HYBRID constexpr NO_DISCARD RayT           NormalizeDir() const;
-    MRAY_HYBRID constexpr RayT&                     NormalizeDirSelf();
-    MRAY_HYBRID constexpr NO_DISCARD RayT           Advance(T) const;
-    MRAY_HYBRID constexpr NO_DISCARD RayT           Advance(T t, const Vector<3,T>& dir) const;
-    MRAY_HYBRID constexpr RayT&                     AdvanceSelf(T);
-    MRAY_HYBRID constexpr RayT&                     AdvanceSelf(T t, const Vector<3, T>& dir);
-    MRAY_HYBRID constexpr NO_DISCARD Vector<3,T>    AdvancedPos(T t) const;
+    NO_DISCARD MRAY_HYBRID constexpr RayT           NormalizeDir() const;
+               MRAY_HYBRID constexpr RayT&          NormalizeDirSelf();
+    NO_DISCARD MRAY_HYBRID constexpr RayT           Advance(T) const;
+    NO_DISCARD MRAY_HYBRID constexpr RayT           Advance(T t, const Vector<3,T>& dir) const;
+               MRAY_HYBRID constexpr RayT&          AdvanceSelf(T);
+               MRAY_HYBRID constexpr RayT&          AdvanceSelf(T t, const Vector<3, T>& dir);
+    NO_DISCARD MRAY_HYBRID constexpr Vector<3,T>    AdvancedPos(T t) const;
 
     // TODO: Make these constexpr later (resolve memcpy pattern etc)
     MRAY_HYBRID NO_DISCARD RayT                     Nudge(const Vector<3, T>& dir) const;
@@ -72,5 +72,6 @@ static_assert(std::is_trivially_default_constructible_v<Ray> == true, "Ray has t
 static_assert(std::is_trivially_destructible_v<Ray> == true, "Ray has to be trivially destructible");
 static_assert(std::is_trivially_copyable_v<Ray> == true, "Ray has to be trivially copyable");
 static_assert(std::is_polymorphic_v<Ray> == false, "Ray should not be polymorphic");
+static_assert(ImplicitLifetimeC<Ray>, "Rays should have implicit lifetime");
 
 #include "Ray.hpp"

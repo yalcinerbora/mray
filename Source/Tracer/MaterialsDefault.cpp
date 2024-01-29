@@ -37,9 +37,9 @@ typename MatGroupLambert::AttribInfoList MatGroupLambert::AttributeInfo() const
     };
     return std::vector(LogicList.cbegin(), LogicList.cend());
 }
-void MatGroupLambert::PushAttribute(MaterialKey id,
+void MatGroupLambert::PushAttribute(MaterialKey,
                                     uint32_t attributeIndex,
-                                    MRayInput data)
+                                    MRayInput)
 {
     //switch(attributeIndex)
     //{
@@ -52,10 +52,10 @@ void MatGroupLambert::PushAttribute(MaterialKey id,
                                 TypeName(), attributeIndex));
 }
 
-void MatGroupLambert::PushAttribute(MaterialKey id,
-                                    const Vector2ui& subRange,
+void MatGroupLambert::PushAttribute(MaterialKey,
+                                    const Vector2ui&,
                                     uint32_t attributeIndex,
-                                    MRayInput data)
+                                    MRayInput)
 {
     //switch(attributeIndex)
     //{
@@ -68,9 +68,9 @@ void MatGroupLambert::PushAttribute(MaterialKey id,
                                 TypeName(), attributeIndex));
 }
 
-void MatGroupLambert::PushAttribute(const Vector<2, MaterialKey::Type>& idRange,
+void MatGroupLambert::PushAttribute(const Vector<2, MaterialKey::Type>&,
                                     uint32_t attributeIndex,
-                                    MRayInput data)
+                                    MRayInput)
 {
     //switch(attributeIndex)
     //{

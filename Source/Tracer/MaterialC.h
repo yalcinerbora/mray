@@ -72,7 +72,7 @@ concept MaterialGroupC = requires()
                             typename MGType::template Material<>::Surface>;
 
     // TODO: Some Functions
-    GenericGroupC<MGType>;
+    requires GenericGroupC<MGType>;
 };
 
 template<class Child>

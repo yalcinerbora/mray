@@ -14,7 +14,7 @@ LambertMaterial<SpectrumTransformer>::LambertMaterial(const SpectrumConverter& s
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3& wI,
+SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
                                                    const Surface& surface,
                                                    RNGDispenser& dispenser) const
 {
@@ -61,16 +61,16 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3& wI,
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float LambertMaterial<ST>::Pdf(const Ray& wI,
+Float LambertMaterial<ST>::Pdf(const Ray&,
                                const Ray& wO,
                                const Surface& surface) const
 {
     using GraphicsFunctions::PDFCosDirection;
 
-    Vector3 normal = (normalMapTex) ? (*normalMapTex)(surface.uv)
+    Vector3 normal = (normalMapTex) ? (*normalMapTex)(surface.uv).value()
                                     : Vector3::ZAxis();
     Float pdf = PDFCosDirection(wO.Dir(), normal);
-    return max(pdf, Float{0});
+    return std::max(pdf, Float(0));
 }
 
 template <class ST>
@@ -83,17 +83,17 @@ uint32_t LambertMaterial<ST>::SampleRNCount() const
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum LambertMaterial<ST>::Evaluate(const Ray& wO,
-                                       const Vector3& wI,
+                                       const Vector3&,
                                        const Surface& surface) const
 {
-    Vector3 normal = (normalMapTex) ? (*normalMapTex)(surface.uv)
+    Vector3 normal = (normalMapTex) ? (*normalMapTex)(surface.uv).value()
                                     : Vector3::ZAxis();
 
     // Calculate lightning in local space since
     // wO and wI is already in world space
     normal = surface.shadingTBN.ApplyInvRotation(normal);
 
-    Float nDotL = max(normal.Dot(wO.Dir()), 0.0);
+    Float nDotL = std::max(normal.Dot(wO.Dir()), Float(0));
     Spectrum albedo = sTransContext(albedoTex(surface.uv,
                                               surface.dpdu,
                                               surface.dpdv));
@@ -109,7 +109,7 @@ bool LambertMaterial<ST>::IsEmissive() const
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum LambertMaterial<ST>::Emit(const Vector3& wO, const Surface& surf) const
+Spectrum LambertMaterial<ST>::Emit(const Vector3&, const Surface&) const
 {
     return Spectrum::Zero();
 }

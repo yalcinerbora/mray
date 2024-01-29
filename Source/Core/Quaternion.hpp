@@ -8,21 +8,21 @@ constexpr Quat<T>::Quat(T w, T x, T y, T z)
 
 template<FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T>::Quat(const T* v)
-    : v(v)
+constexpr Quat<T>::Quat(const T* vv)
+    : v(vv)
 {}
 
 template<FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Quat<T>::Quat(T angle, const Vector<3, T>& axis)
 {
-    angle *= 0.5;
-    T sinAngle = sin(angle);
+    angle *= T(0.5);
+    T sinAngle = std::sin(angle);
 
     v[1] = axis[0] * sinAngle;
     v[2] = axis[1] * sinAngle;
     v[3] = axis[2] * sinAngle;
-    v[0] = cos(angle);
+    v[0] = std::cos(angle);
 }
 
 template<FloatingPointC T>
@@ -61,14 +61,14 @@ Quat<T>::operator const T* () const
 
 template<FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T& Quat<T>::operator[](int i)
+constexpr T& Quat<T>::operator[](unsigned int i)
 {
     return v[i];
 }
 
 template<FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr const T& Quat<T>::operator[](int i) const
+constexpr const T& Quat<T>::operator[](unsigned int i) const
 {
     return v[i];
 }
@@ -274,8 +274,8 @@ constexpr  Quat<T> Quat<T>::SLerp(const Quat<T>& start,
     if(cosFlipped < (1 - Epsilon<T>()))
     {
         T angle = acos(cosFlipped);
-        s0 = sin(angle * (1 - t)) / sin(angle);
-        s1 = sin(angle * t) / sin(angle);
+        s0 = std::sin(angle * (1 - t)) / sin(angle);
+        s1 = std::sin(angle * t) / sin(angle);
     }
     else
     {
@@ -348,8 +348,8 @@ constexpr Quat<T> Quat<T>::RotationBetweenZAxis(const Vector<3, T>& b)
     T zDotD = b[2];
 
     // Half angle theorem
-    T sin = sqrt((1 - zDotD) * static_cast<T>(0.5));
-    T cos = sqrt((zDotD + 1) * static_cast<T>(0.5));
+    T sin = std::sqrt((1 - zDotD) * T(0.5));
+    T cos = std::sqrt((zDotD + 1) * T(0.5));
 
     zCrossD.NormalizeSelf();
     T x = zCrossD[0] * sin;
@@ -357,13 +357,13 @@ constexpr Quat<T> Quat<T>::RotationBetweenZAxis(const Vector<3, T>& b)
     T z = zCrossD[2] * sin;
     T w = cos;
     // Handle singularities
-    if(abs(zDotD + 1) < LargeEpsilon<T>())
+    if(std::abs(zDotD + T(1)) < LargeEpsilon<T>())
     {
         // Spaces are 180 degree apart
         // Define pi turn
         return Quat<T>(0, 0, 1, 0);
     }
-    else if(abs(zDotD - 1) < LargeEpsilon<T>())
+    else if(std::abs(zDotD - T(1)) < LargeEpsilon<T>())
     {
         // Spaces are nearly equivalent
         // Just turn identity
@@ -395,7 +395,7 @@ Quat<T> TransformGen::Space(const Vector<3, T>& xIn,
     Quat<T> q;
     // Flip the coordinate system if inverted
     Vector<3, T> x = xIn;
-    if((Cross(x, y) - z).Abs() > Vector3(0.1))
+    if((Vector3::Cross(x, y) - z).Abs() > Vector3(0.1))
     {
         x = -x;
     }

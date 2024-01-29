@@ -67,13 +67,14 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Ray> LightPrim<P, SC>::SampleRay(RNGDispenser& rng) const
 {
     // What is the probability?
+    //return SampleT<Ray>{};
 }
 
 template<PrimitiveC P, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float LightPrim<P, SC>::PdfRay(const Ray&) const
 {
-
+    //return 0;
 }
 
 template<PrimitiveC P, class SC>

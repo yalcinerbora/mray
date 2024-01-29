@@ -4,33 +4,10 @@
 #include <optional>
 #include <variant>
 #include <vector>
+#include <functional>
 
 #include "MathFunctions.h"
 #include "Error.h"
-
-// Untill c++23, we custom define this
-// https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2674r0.pdf
-// Directly from the above paper
-template <class T>
-concept ImplicitLifetimeC = requires()
-{
-    std::disjunction
-    <
-        std::is_scalar<T>,
-        std::is_array<T>,
-        std::is_aggregate<T>,
-        std::conjunction
-        <
-            std::is_trivially_destructible<T>,
-            std::disjunction
-            <
-                std::is_trivially_default_constructible<T>,
-                std::is_trivially_copy_constructible<T>,
-                std::is_trivially_move_constructible<T>
-            >
-        >
-    >::value;
-};
 
 // Rename the std::optional, gpu may not like it
 // most(all after c++20) of optional is constexpr
@@ -66,14 +43,22 @@ namespace detail
 {
     template<uint32_t I, class VariantT, class Func>
     requires(I < std::variant_size_v<std::remove_reference_t<VariantT>>)
-    MRAY_HYBRID MRAY_CGPU_INLINE
+    MRAY_HYBRID
     constexpr auto LoopAndInvoke(VariantT&& v, Func&& f) -> decltype(auto);
+
+    template<class... Args, std::size_t... I>
+    MRAY_HYBRID
+    constexpr Tuple<Args&...> ToTupleRef(Tuple<Args...>&t,
+                                         std::index_sequence<I...>);
 }
 
 template<class VariantT, class Func>
 MRAY_HYBRID
 constexpr auto DeviceVisit(VariantT&& v, Func&& f) -> decltype(auto);
 
+template<class... Args, typename Indices = std::index_sequence_for<Args...>>
+MRAY_HYBRID
+constexpr Tuple<Args&...> ToTupleRef(Tuple<Args...>& t);
 
 // Some span wrappers for convenience
 template<class T, std::size_t Extent = std::dynamic_extent>
@@ -160,11 +145,26 @@ constexpr auto detail::LoopAndInvoke(VariantT&& v, Func&& f) -> decltype(auto)
     }
 }
 
+template<class... Args, std::size_t... I>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Tuple<Args&...> detail::ToTupleRef(Tuple<Args...>&t,
+                                             std::index_sequence<I...>)
+{
+    return std::tie(std::get<I>(t)...);
+};
+
 template<class VariantT, class Func>
-MRAY_HYBRID
+MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr auto DeviceVisit(VariantT&& v, Func&& f) -> decltype(auto)
 {
     return detail::LoopAndInvoke<0>(std::forward<VariantT>(v), std::forward<Func>(f));
+}
+
+template<class... Args, typename Indices>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Tuple<Args&...> ToTupleRef(Tuple<Args...>& t)
+{
+    return detail::ToTupleRef(t, Indices{});
 }
 
 template<class T, std::size_t Extent>
@@ -242,5 +242,5 @@ constexpr uint32_t Bitspan<T>::Size() const
 template <std::unsigned_integral T>
 constexpr uint32_t Bitspan<T>::ByteSize() const
 {
-    return MathFunctions::NextMultiple(size, sizeof(T));
+    return MathFunctions::NextMultiple<uint32_t>(size, static_cast<uint32_t>(sizeof(T)));
 }

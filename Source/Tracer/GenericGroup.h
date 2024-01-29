@@ -66,7 +66,7 @@ template <class IdTypeT, class AttribInfo>
 class GenericGroupI
 {
     public:
-    using IdType            = typename IdTypeT;
+    using IdType            = IdTypeT;
     using IdInteger         = typename IdType::Type;
     using IdList            = std::vector<IdType>;
     using AttribInfoList    = std::vector<AttribInfo>;
@@ -186,8 +186,9 @@ Tuple<Span<Args>...> GenericGroupT<C, ID, AI>::GenericCommit(std::array<bool, si
         sizes[i] = (isPerItem) ? totalSize[0] : totalSize[1];
     }
 
+    using namespace MemAlloc;
     Tuple<Span<Args>...> result;
-    MemAlloc::AllocateMultiData(result, deviceMem, sizes);
+    result = AllocateMultiData<DeviceMemory, Args...>(deviceMem, sizes);
     isCommitted = true;
     return result;
 }

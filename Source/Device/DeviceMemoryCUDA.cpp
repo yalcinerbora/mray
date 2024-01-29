@@ -264,7 +264,7 @@ size_t DeviceMemoryCUDA::FindCommonGranularity() const
 
 size_t DeviceMemoryCUDA::NextDeviceIndex()
 {
-    curDeviceIndex = (curDeviceIndex + 1) % static_cast<int>(deviceIds.size());
+    curDeviceIndex = (curDeviceIndex + 1) % deviceIds.size();
     return curDeviceIndex;
 }
 
@@ -362,7 +362,8 @@ void DeviceMemoryCUDA::ResizeBuffer(size_t newSize)
             CUDA_DRIVER_CHECK(cuMemUnmap(mPtr + offset, allocationGranularity));
             CUDA_DRIVER_CHECK(cuMemRelease(it->handle));
         }
-        allocs.resize(std::distance(it, allocs.crend()));
+        assert(std::distance(it, allocs.crend()) >= 0);
+        allocs.resize(static_cast<size_t>(std::distance(it, allocs.crend())));
         allocSize = offset + allocationGranularity;
     }
     // Enlarge the memory

@@ -33,8 +33,8 @@ constexpr MetaHitPtrT<Args...>::MetaHitPtrT()
 
 template<class... Args>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr MetaHitPtrT<Args...>::MetaHitPtrT(Byte* dPtr, uint32_t combinedSize)
-    : ptr(static_cast<std::variant<Args...>>(ptr))
+constexpr MetaHitPtrT<Args...>::MetaHitPtrT(Byte* dPtr, uint32_t)
+    : ptr(static_cast<std::variant<Args...>>(dPtr))
 {}
 
 template<class... Args>

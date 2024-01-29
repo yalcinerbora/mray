@@ -91,6 +91,9 @@ set(MRAY_GCC_OPTIONS
     -Wduplicated-branches       # warn if if / else branches have duplicated code
     -Wlogical-op                # warn about logical operations being used where bitwise were probably wanted
     -Wuseless-cast              # warn if you perform a cast to the same type
+
+    -Wno-shadow
+    -Wno-abi                  # Disable ABI warnings (it occured due to nvcc)
 )
 
 set(MRAY_CUDA_OPTIONS
@@ -152,7 +155,7 @@ if(MSVC)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
     set(MRAY_CXX_OPTIONS ${MRAY_CLANG_OPTIONS})
 elseif(CMAKE_CXX_COMPILER_ID MATCHES ".*GNU")
-    set(MRAY_CXX_OPTIONS ${MRAY_GNU_OPTIONS})
+    set(MRAY_CXX_OPTIONS ${MRAY_GCC_OPTIONS})
 endif()
 
 #================#
@@ -230,8 +233,6 @@ target_compile_options(meta_compile_opts INTERFACE
 
 # Link Options
 target_link_options(meta_compile_opts INTERFACE
-                    # C++ Link Opts
-                    $<$<COMPILE_LANGUAGE:CXX>:/DEBUG>
                     # CUDA Link Options
                     # All kernels started to show this warning
                     # (when a kernel uses a virtual function) even the
@@ -246,6 +247,8 @@ target_link_options(meta_compile_opts INTERFACE
 
 if(MSVC)
     target_link_options(meta_compile_opts INTERFACE
+                        # C++ Link Opts
+                        $<$<COMPILE_LANGUAGE:CXX>:/DEBUG>
                         # After adding W4 and other compiler warning flags
                         # 'prelinked_fatbinc' unref parameter did show up
                         # This is nvcc's problem (I guess?) so ignore it
@@ -310,6 +313,8 @@ endif()
 
 target_link_libraries(meta_compile_opts INTERFACE
                       ${MRAY_PLATFORM_SPEC_LIBRARIES})
+
+add_dependencies(meta_compile_opts MRayExternal)
 
 endblock()
 

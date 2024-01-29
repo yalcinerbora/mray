@@ -18,15 +18,6 @@ struct Adder
     }
 };
 
-// Temporarily define a increment for iota
-template <int D, class T>
-Vector<D, T> operator++(Vector<D, T>& a)
-{
-    for(int i = 0; i < D; i++)
-        a[i] += 1;
-    return a;
-}
-
 template<class Value>
 void MultiScanTest(const GPUSystem& system)
 {

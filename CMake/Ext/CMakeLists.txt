@@ -64,6 +64,8 @@ mray_build_ext_dependency_git(
             -DFMT_DEBUG_POSTFIX:STRING=
             -DFMT_DOC=OFF
             -DFMT_TEST=OFF
+            #
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON
             # FMT has specific install variables for various stuff
             # set them specifically
             -DFMT_INC_DIR=Include
@@ -83,7 +85,7 @@ mray_build_ext_dependency_git(
             -DBUILD_TESTING=OFF
             -DSIMDJSON_BUILD_SHARED=OFF
             -DSIMDJSON_BUILD_BASH=OFF
-            -DSIMDJSON_CXX_STANDARD="20"
+            -DSIMDJSON_CXX_STANDARD=17
             -DSIMDJSON_ENABLE_THREADS=ON
             -DSIMDJSON_EXCEPTIONS=ON
 )

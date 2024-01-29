@@ -30,8 +30,6 @@ namespace LightDetail
 
     struct SphericalCoordConverter
     {
-        static constexpr auto B = std::integral_constant<int, 4>::value;
-
         MRAY_HYBRID
         static Vector2  DirToUV(const Vector3& dirYUp);
         MRAY_HYBRID
@@ -44,8 +42,6 @@ namespace LightDetail
 
     struct CoOctoCoordConverter
     {
-        static constexpr auto A = std::integral_constant<double, 3.0>::value;
-
         MRAY_HYBRID
         static Vector2  DirToUV(const Vector3& dirYUp);
         MRAY_HYBRID

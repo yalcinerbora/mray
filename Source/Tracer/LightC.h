@@ -14,6 +14,7 @@ concept LightC = requires(LightType l,
                           typename LightType::SpectrumConverter sc,
                           typename LightType::Primitive prim,
                           typename LightType::Primitive::Hit hit,
+                          typename LightType::DataSoA data,
                           RNGDispenser rng)
 {
     typename LightType::SpectrumConverter;
@@ -21,7 +22,7 @@ concept LightC = requires(LightType l,
     typename LightType::DataSoA;
 
     // Constructor Type
-    LightType(sc, prim, const typename LightType::DataSoA{}, LightKey{});
+    LightType(sc, prim, data, LightKey{});
 
     // API
     {l.SampleSolidAngle(rng, Vector3{})} -> std::same_as<SampleT<Vector3>>;
@@ -63,7 +64,7 @@ concept LightGroupC = requires(LGType lg)
     // Runtime Acquire the primitive group
     {lg.PrimitiveGroup()} -> std::same_as<const typename LGType::PrimGroup&>;
 
-    GenericGroupC<LGType>;
+    //requires GenericGroupC<LGType>;
 };
 
 // Meta Light Class
@@ -177,10 +178,9 @@ Float MetaLightViewT<CH, ML, SC>::PdfSolidAngle(const CH& hit,
                                                 const Vector3& distantPoint,
                                                 const Vector3& dir) const
 {
-    return DeviceVisit(light, [=]<class LT>(LT&& l) -> Float
+    return DeviceVisit(light, [=](auto&& l) -> Float
     {
-        using PrimType = typename LT::Primitive;
-        using HitType = typename PrimType::Hit;
+        using HitType = decltype(l)::Primitive::Hit;
         return l.PdfSolidAngle(HitType(hit), distantPoint, dir);
     });
 }
@@ -229,10 +229,9 @@ template<class CH, class ML, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum MetaLightViewT<CH, ML, SC>::EmitViaHit(const Vector3& wO, const CH& hit) const
 {
-    return DeviceVisit(light, [=]<class LT>(LT&& l) -> Spectrum
+    return DeviceVisit(light, [=](auto&& l) -> Spectrum
     {
-        using PrimType = typename LT::Primitive;
-        using HitType = typename PrimType::Hit;
+        using HitType = decltype(l)::Primitive::Hit;
         return l.Emit(wO, HitType(hit));
     });
 }

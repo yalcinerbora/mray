@@ -120,7 +120,7 @@ static constexpr auto VectorTypeToChannels()
     return GetTupleElement<T>(FList);
 }
 
-template <class MRayType, class CudaType, int Channels>
+template <class MRayType, class CudaType, uint32_t Channels>
 struct CudaTexToMRayType {};
 
 template <class MRayType, class CudaType>

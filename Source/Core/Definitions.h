@@ -56,6 +56,30 @@ static_assert(SpectraPerSpectrum <= 4,
               "Spectra per spectrum can at most be 4"
               " (Due to Vector template at most hold 4 floats).");
 
+// Untill c++23, we custom define this
+// https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2674r0.pdf
+// Directly from the above paper
+template <class T>
+concept ImplicitLifetimeC = requires()
+{
+    std::disjunction
+    <
+        std::is_scalar<T>,
+        std::is_array<T>,
+        std::is_aggregate<T>,
+        std::conjunction
+        <
+            std::is_trivially_destructible<T>,
+            std::disjunction
+            <
+                std::is_trivially_default_constructible<T>,
+                std::is_trivially_copy_constructible<T>,
+                std::is_trivially_move_constructible<T>
+            >
+        >
+    >::value;
+};
+
 // TODO: This should come from CMake
 using Float = float;
 

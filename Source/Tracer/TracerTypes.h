@@ -40,10 +40,10 @@ class DiffRay{};
 // change this to prevent Vector + Spectrum addition etc.
 //
 // CRTP is the best bet for minimal code duplication (like in PBRT)
-template <int SPS, std::floating_point T>
+template <unsigned int SPS, std::floating_point T>
 using SpectrumT = Vector<SPS, T>;
 
-template <int SPS, std::floating_point T>
+template <unsigned int SPS, std::floating_point T>
 using SpectrumWavesT = Vector<SPS, T>;
 
 // Actual spectrum for this compilation

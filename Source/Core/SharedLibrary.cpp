@@ -61,7 +61,7 @@ static std::wstring ConvertWCharWin32(const std::string& unicodeStr)
 
 #endif
 
-void* SharedLibrary::GetProcAdressInternal(const std::string& fName)
+const void* SharedLibrary::GetProcAdressInternal(const std::string& fName) const
 {
     #ifdef MRAY_WINDOWS
         FARPROC proc = GetProcAddress((HINSTANCE)libHandle, fName.c_str());
@@ -73,7 +73,7 @@ void* SharedLibrary::GetProcAdressInternal(const std::string& fName)
     #elif defined MRAY_LINUX
         void* result = dlsym(libHandle, fName.c_str());
         if(result == nullptr)
-            METU_ERROR_LOG("{}", dlerror());
+            MRAY_ERROR_LOG("{}", dlerror());
         return result;
     #endif
 }

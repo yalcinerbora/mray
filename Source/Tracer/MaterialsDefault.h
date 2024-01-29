@@ -19,7 +19,7 @@ namespace LambertMatDetail
     struct LambertMaterial
     {
         using Surface           = DefaultSurface;
-        using OptionalNormalMap = Optional<ParamVaryingData<2, Vector3>>;
+        using OptionalNormalMap = Optional<TextureView<2, Vector3>>;
         using AlbedoMap         = typename SpectrumTransformer:: template RendererParamVaryingData<2>;
         using SpectrumConverter = typename SpectrumTransformer::Converter;
         using DataSoA           = LambertMatData;

@@ -8,15 +8,6 @@
 
 #include "T_AlgTypes.h"
 
-// Temporarily define a increment for iota
-template <int D, class T>
-Vector<D, T> operator++(Vector<D, T>& a)
-{
-    for(int i = 0; i < D; i++)
-        a[i] += 1;
-    return a;
-}
-
 template<bool IsAscending, class Key, class Value>
 void RadixSortTest(const GPUSystem& system)
 {

@@ -64,7 +64,7 @@ class TextureCUDA
 
     private:
     const GPUDeviceCUDA*        gpu;
-    cudaTextureObject_t         tex         = (cudaTextureObject_t)0;
+    cudaTextureObject_t         tex         = cudaTextureObject_t(0);
     cudaMipmappedArray_t        data        = nullptr;
     TextureInitParams<D>        texParams;
 
@@ -111,7 +111,6 @@ class TextureCUDA
                                           const TextureExtent<D>& size,
                                           Span<const PaddedChannelType> regionFrom);
 };
-
 class TextureBackingMemoryCUDA
 {
     MRAY_HYBRID

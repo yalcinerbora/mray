@@ -103,9 +103,8 @@ namespace mray::cuda::algorithms
         using namespace std::literals;
         assert(dValues.size() % segmentSize == 0);
 
-        uint32_t gridSize = queue.SMCount();
-        gridSize *= queue.RecommendedBlockCountPerSM(&KCInclusiveMultiScan<T, BinaryOp>,
-                                                     TPB, 0);
+        const void* kernelPtr = reinterpret_cast<const void*>(&KCInclusiveMultiScan<T, BinaryOp>);
+        uint32_t gridSize = queue.SMCount() * queue.RecommendedBlockCountPerSM(kernelPtr, TPB, 0);
         uint32_t totalBlocks = static_cast<uint32_t>(dValues.size() / segmentSize);
 
         queue.IssueExactKernel<KCInclusiveMultiScan<T, BinaryOp>>

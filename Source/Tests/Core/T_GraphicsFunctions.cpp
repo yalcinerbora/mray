@@ -61,7 +61,7 @@ TEST(GraphicsFunctionsTest, Refract)
 
         Optional<Vector3> result = Refract(normal, v, eta0, eta1);
 
-        EXPECT_THROW(auto const a = result.value(), std::bad_optional_access);
+        EXPECT_THROW(result.value();, std::bad_optional_access);
     }
 }
 
@@ -112,7 +112,7 @@ TEST(GraphicsFunctionsTest, SampleUniformHemisphere)
             Vector2 xi(dist0(rng0), dist1(rng1));
             SampleT<Vector3> sample = SampleUniformDirection(xi);
             // Integral of sin(theta) d(omega)
-            total += (1 / sample.pdf);
+            total += static_cast<double>((1 / sample.pdf));
         }
 
         double result = total / double{Iterations};
@@ -132,9 +132,9 @@ TEST(GraphicsFunctionsTest, SampleUniformHemisphere)
             Vector2 xi(dist0(rng0), dist1(rng1));
             SampleT<Vector3> sample = SampleUniformDirection(xi);
             // Integral of cos(theta) d(omega)
-            double functionVal = sample.sampledResult.Dot(Vector3::ZAxis());
+            double functionVal = static_cast<double>(sample.sampledResult.Dot(Vector3::ZAxis()));
             functionVal *= MathConstants::InvPi<double>();
-            total += (functionVal / sample.pdf);
+            total += (functionVal / static_cast<double>(sample.pdf));
         }
 
         double result = total / double{Iterations};
@@ -158,7 +158,7 @@ TEST(GraphicsFunctionsTest, SampleCosineHemisphere)
             Vector2 xi(dist0(rng0), dist1(rng1));
             SampleT<Vector3> sample = SampleUniformDirection(xi);
             // Integral of sin(theta) d(omega)
-            total += (1 / sample.pdf);
+            total += static_cast<double>(1 / sample.pdf);
         }
 
         double result = total / double{Iterations};
@@ -178,9 +178,9 @@ TEST(GraphicsFunctionsTest, SampleCosineHemisphere)
             Vector2 xi(dist0(rng0), dist1(rng1));
             SampleT<Vector3> sample = SampleCosDirection(xi);
             // Integral of cos(theta) d(omega)
-            double functionVal = sample.sampledResult.Dot(Vector3::ZAxis());
+            double functionVal = static_cast<double>(sample.sampledResult.Dot(Vector3::ZAxis()));
             functionVal *= MathConstants::InvPi<double>();
-            total += (functionVal / sample.pdf);
+            total += (functionVal / static_cast<double>(sample.pdf));
         }
 
         double result = total / double{Iterations};

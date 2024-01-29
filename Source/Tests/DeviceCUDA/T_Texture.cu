@@ -3,7 +3,7 @@
 #include <numeric>
 
 #include "Device/GPUSystem.h"
-#include "Device/GPUsystem.hpp"
+#include "Device/GPUSystem.hpp"
 #include "Device/TextureCUDA.h"
 
 #include "T_TextureTypes.h"
