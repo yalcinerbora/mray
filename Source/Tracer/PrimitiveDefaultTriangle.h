@@ -239,14 +239,17 @@ class PrimGroupTriangle : public GenericGroupPrimitive<PrimGroupTriangle>
     PrimAttributeInfoList   AttributeInfo() const override;
     void                    PushAttribute(PrimBatchKey batchKey,
                                           uint32_t attributeIndex,
-                                          MRayInput data) override;
+                                          MRayInput data,
+                                          const GPUQueue& queue) override;
     void                    PushAttribute(PrimBatchKey batchKey,
                                           const Vector2ui& subRange,
                                           uint32_t attributeIndex,
-                                          MRayInput data) override;
+                                          MRayInput data,
+                                          const GPUQueue& queue) override;
     void                    PushAttribute(const Vector<2, PrimBatchKey::Type>& idRange,
                                           uint32_t attributeIndex,
-                                          MRayInput data) override;
+                                          MRayInput data,
+                                          const GPUQueue& queue) override;
     DataSoA                 SoA() const;
 };
 
@@ -294,14 +297,17 @@ class PrimGroupSkinnedTriangle : public GenericGroupPrimitive<PrimGroupSkinnedTr
     PrimAttributeInfoList   AttributeInfo() const override;
     void                    PushAttribute(PrimBatchKey batchKey,
                                           uint32_t attributeIndex,
-                                          MRayInput data) override;
+                                          MRayInput data,
+                                          const GPUQueue& queue) override;
     void                    PushAttribute(PrimBatchKey batchKey,
                                           const Vector2ui& subRange,
                                           uint32_t attributeIndex,
-                                          MRayInput data) override;
+                                          MRayInput data,
+                                          const GPUQueue& queue) override;
     void                    PushAttribute(const Vector<2, PrimBatchKey::Type>& idRange,
                                           uint32_t attributeIndex,
-                                          MRayInput data) override;
+                                          MRayInput data,
+                                          const GPUQueue& queue) override;
     DataSoA                 SoA() const;
 };
 

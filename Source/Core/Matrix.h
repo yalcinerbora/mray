@@ -156,14 +156,14 @@ namespace TransformGen
                                                const Vector<3, T>& at,
                                                const Vector<3, T>& up);
     template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<3, T>  Space(const Vector<3, T>& x,
-                                              const Vector<3, T>& y,
-                                              const Vector<3, T>& z);
+    MRAY_HYBRID constexpr Matrix<3, T>  ToSpaceMat(const Vector<3, T>& x,
+                                                   const Vector<3, T>& y,
+                                                   const Vector<3, T>& z);
 
     template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<3, T>  InvSpace(const Vector<3, T>& x,
-                                                 const Vector<3, T>& y,
-                                                 const Vector<3, T>& z);
+    MRAY_HYBRID constexpr Matrix<3, T>  ToInvSpaceMat(const Vector<3, T>& x,
+                                                      const Vector<3, T>& y,
+                                                      const Vector<3, T>& z);
 
     template<std::floating_point T>
     MRAY_HYBRID constexpr Vector<3, T> YUpToZUp(const Vector<3, T>& vec);

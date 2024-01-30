@@ -323,14 +323,17 @@ class EmptyPrimGroup : public GenericGroupPrimitive<EmptyPrimGroup>
     PrimAttributeInfoList   AttributeInfo() const override;
     void                    PushAttribute(PrimBatchKey batchId,
                                           uint32_t attributeIndex,
-                                          MRayInput data) override;
+                                          MRayInput data,
+                                          const GPUQueue&) override;
     void                    PushAttribute(PrimBatchKey batchId,
                                           const Vector2ui& subBatchRange,
                                           uint32_t attributeIndex,
-                                          MRayInput data) override;
+                                          MRayInput data,
+                                          const GPUQueue&) override;
     void                    PushAttribute(const Vector<2, PrimBatchKey::Type>& idRange,
                                           uint32_t attributeIndex,
-                                          MRayInput data) override;
+                                          MRayInput data,
+                                          const GPUQueue&) override;
     DataSoA                 SoA() const;
 };
 
@@ -457,17 +460,17 @@ PrimAttributeInfoList EmptyPrimGroup::AttributeInfo() const
 
 inline
 void EmptyPrimGroup::PushAttribute(PrimBatchKey, uint32_t,
-                                   MRayInput)
+                                   MRayInput, const GPUQueue&)
 {}
 
 inline
 void EmptyPrimGroup::PushAttribute(PrimBatchKey, const Vector2ui&,
-                                   uint32_t, MRayInput)
+                                   uint32_t, MRayInput, const GPUQueue&)
 {}
 
 inline
 void EmptyPrimGroup::PushAttribute(const Vector<2, PrimBatchKey::Type>&,
-                                   uint32_t, MRayInput)
+                                   uint32_t, MRayInput, const GPUQueue&)
 {}
 
 inline

@@ -1,4 +1,28 @@
 #include "PrimitiveDefaultTriangle.h"
+#include "Device/GPUAlgorithms.h"
+
+template<class I>
+struct KCAdjustIndices
+{
+    private:
+    uint32_t attributeOffset;
+    public:
+    MRAY_HYBRID     KCAdjustIndices(uint32_t attributeOffset);
+    MRAY_HYBRID I   operator()(const I& t) const;
+};
+
+template<class I>
+MRAY_HYBRID MRAY_CGPU_INLINE
+KCAdjustIndices<I>::KCAdjustIndices(uint32_t attributeOffset)
+    : attributeOffset(attributeOffset)
+{}
+
+template<class I>
+MRAY_HYBRID MRAY_CGPU_INLINE
+I KCAdjustIndices<I>::operator()(const I& t) const
+{
+    return t + attributeOffset;
+}
 
 std::string_view PrimGroupTriangle::TypeName()
 {
@@ -48,11 +72,13 @@ PrimAttributeInfoList PrimGroupTriangle::AttributeInfo() const
 
 void PrimGroupTriangle::PushAttribute(PrimBatchKey batchKey,
                                       uint32_t attributeIndex,
-                                      MRayInput data)
+                                      MRayInput data,
+                                      const GPUQueue& queue)
 {
     auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
     {
-        GenericPushData(batchKey, d, std::move(data), isPerPrimitive);
+        GenericPushData(batchKey, d, std::move(data),
+                        isPerPrimitive, queue);
     };
 
     switch(attributeIndex)
@@ -63,18 +89,30 @@ void PrimGroupTriangle::PushAttribute(PrimBatchKey batchKey,
         case 3  : PushData(dIndexList, true);       break;  // Indices
         default : MRAY_WARNING_LOG("{:s}: Unknown Attribute Index {:d}",
                                    TypeName(), attributeIndex);
+    }
+
+    if(attributeIndex == 3)
+    {
+        auto range = this->itemRanges[batchKey.FetchIndexPortion()].itemRange;
+        auto attributeStart = this->itemRanges[batchKey.FetchIndexPortion()].attributeRange[0];
+        size_t count = range[1] - range[0];
+        Span<Vector3ui> batchSpan = dIndexList.subspan(range[0], count);
+
+        DeviceAlgorithms::InPlaceTransform(batchSpan, queue,
+                                           KCAdjustIndices<Vector3ui>(attributeStart));
     }
 }
 
 void PrimGroupTriangle::PushAttribute(PrimBatchKey batchKey,
                                       const Vector2ui& subRange,
                                       uint32_t attributeIndex,
-                                      MRayInput data)
+                                      MRayInput data,
+                                      const GPUQueue& queue)
 {
     auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
     {
         GenericPushData(batchKey, subRange, d,
-                        std::move(data), isPerPrimitive);
+                        std::move(data), isPerPrimitive, queue);
     };
 
     switch(attributeIndex)
@@ -85,16 +123,30 @@ void PrimGroupTriangle::PushAttribute(PrimBatchKey batchKey,
         case 3  : PushData(dIndexList, true);       break;  // Indices
         default : MRAY_WARNING_LOG("{:s}: Unknown Attribute Index {:d}",
                                    TypeName(), attributeIndex);
+    }
+
+    if(attributeIndex == 3)
+    {
+        auto range = this->itemRanges[batchKey.FetchIndexPortion()].itemRange;
+        auto innerRange = Vector2ui(range[0] + subRange[0], subRange[1]);
+        auto attributeStart = this->itemRanges[batchKey.FetchIndexPortion()].attributeRange[0];
+        size_t count = innerRange[1] - innerRange[0];
+        Span<Vector3ui> batchSpan = dIndexList.subspan(innerRange[0], count);
+
+        DeviceAlgorithms::InPlaceTransform(batchSpan, queue,
+                                           KCAdjustIndices<Vector3ui>(attributeStart));
     }
 }
 
 void PrimGroupTriangle::PushAttribute(const Vector<2, PrimBatchKey::Type>& idRange,
                                       uint32_t attributeIndex,
-                                      MRayInput data)
+                                      MRayInput data,
+                                      const GPUQueue& queue)
 {
     auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
     {
-        GenericPushData(idRange, d, std::move(data), false, isPerPrimitive);
+        GenericPushData(idRange, d, std::move(data),
+                        false, isPerPrimitive, queue);
     };
 
     switch(attributeIndex)
@@ -106,6 +158,23 @@ void PrimGroupTriangle::PushAttribute(const Vector<2, PrimBatchKey::Type>& idRan
         default : MRAY_WARNING_LOG("{:s}: Unknown Attribute Index {:d}",
                                    TypeName(), attributeIndex);
     }
+
+    if(attributeIndex != 3) return;
+
+    // Now here we need to do for loop
+    for(auto i = idRange[0]; i < idRange[1]; i++)
+    {
+        PrimBatchKey k = PrimBatchKey(i);
+
+        auto range = this->itemRanges[k.FetchIndexPortion()].itemRange;
+        auto attributeStart = this->itemRanges[k.FetchIndexPortion()].attributeRange[0];
+        size_t count = range[1] - range[0];
+        Span<Vector3ui> batchSpan = dIndexList.subspan(range[0], count);
+
+        DeviceAlgorithms::InPlaceTransform(batchSpan, queue,
+                                           KCAdjustIndices<Vector3ui>(attributeStart));
+    }
+
 }
 
 typename PrimGroupTriangle::DataSoA PrimGroupTriangle::SoA() const
@@ -175,12 +244,13 @@ PrimAttributeInfoList PrimGroupSkinnedTriangle::AttributeInfo() const
 }
 
 void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey, uint32_t attributeIndex,
-                                             MRayInput data)
+                                             MRayInput data,
+                                             const GPUQueue& queue)
 {
     auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
     {
-        GenericPushData(batchKey, d,
-                        std::move(data), isPerPrimitive);
+        GenericPushData(batchKey, d, std::move(data),
+                        isPerPrimitive, queue);
     };
 
     switch(attributeIndex)
@@ -194,17 +264,29 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey, uint32_t att
         default : MRAY_WARNING_LOG("{:s}: Unknown Attribute Index {:d}",
                                    TypeName(), attributeIndex);
     }
+
+    if(attributeIndex == 3)
+    {
+        auto range = this->itemRanges[batchKey.FetchIndexPortion()].itemRange;
+        auto attributeStart = this->itemRanges[batchKey.FetchIndexPortion()].attributeRange[0];
+        size_t count = range[1] - range[0];
+        Span<Vector3ui> batchSpan = dIndexList.subspan(range[0], count);
+
+        DeviceAlgorithms::InPlaceTransform(batchSpan, queue,
+                                           KCAdjustIndices<Vector3ui>(attributeStart));
+    }
 }
 
 void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey,
                                              const Vector2ui& subRange,
                                              uint32_t attributeIndex,
-                                             MRayInput data)
+                                             MRayInput data,
+                                             const GPUQueue& queue)
 {
     auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
     {
-        GenericPushData(batchKey, subRange, d,
-                        std::move(data), isPerPrimitive);
+        GenericPushData(batchKey, subRange, d, std::move(data),
+                        isPerPrimitive, queue);
     };
 
     switch(attributeIndex)
@@ -218,15 +300,29 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey,
         default : MRAY_WARNING_LOG("{:s}: Unknown Attribute Index {:d}",
                                    TypeName(), attributeIndex);
     }
+
+    if(attributeIndex == 3)
+    {
+        auto range = this->itemRanges[batchKey.FetchIndexPortion()].itemRange;
+        auto innerRange = Vector2ui(range[0] + subRange[0], subRange[1]);
+        auto attributeStart = this->itemRanges[batchKey.FetchIndexPortion()].attributeRange[0];
+        size_t count = innerRange[1] - innerRange[0];
+        Span<Vector3ui> batchSpan = dIndexList.subspan(innerRange[0], count);
+
+        DeviceAlgorithms::InPlaceTransform(batchSpan, queue,
+                                           KCAdjustIndices<Vector3ui>(attributeStart));
+    }
 }
 
 void PrimGroupSkinnedTriangle::PushAttribute(const Vector<2, PrimBatchKey::Type>& idRange,
                                              uint32_t attributeIndex,
-                                             MRayInput data)
+                                             MRayInput data,
+                                             const GPUQueue& queue)
 {
     auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
     {
-        GenericPushData(idRange, d, std::move(data), false, isPerPrimitive);
+        GenericPushData(idRange, d, std::move(data), false,
+                        isPerPrimitive, queue);
     };
 
     switch(attributeIndex)
@@ -239,6 +335,22 @@ void PrimGroupSkinnedTriangle::PushAttribute(const Vector<2, PrimBatchKey::Type>
         case 5: PushData(dIndexList, true);       break;  // Indices
         default: MRAY_WARNING_LOG("{:s}: Unknown Attribute Index {:d}",
                                   TypeName(), attributeIndex);
+    }
+
+    if(attributeIndex != 3) return;
+
+    // Now here we need to do for loop
+    for(auto i = idRange[0]; i < idRange[1]; i++)
+    {
+        PrimBatchKey k = PrimBatchKey(i);
+
+        auto range = this->itemRanges[k.FetchIndexPortion()].itemRange;
+        auto attributeStart = this->itemRanges[k.FetchIndexPortion()].attributeRange[0];
+        size_t count = range[1] - range[0];
+        Span<Vector3ui> batchSpan = dIndexList.subspan(range[0], count);
+
+        DeviceAlgorithms::InPlaceTransform(batchSpan, queue,
+                                           KCAdjustIndices<Vector3ui>(attributeStart));
     }
 }
 

@@ -35,7 +35,8 @@ using ItemCountMapT = std::map<T, ItemCountT<T>>;
 template <class GenericGroupType>
 concept GenericGroupC = requires(GenericGroupType gg,
                                  MRayInput input,
-                                 typename GenericGroupType::IdType id)
+                                 typename GenericGroupType::IdType id,
+                                 const GPUQueue& q)
 {
     typename GenericGroupType::IdType;
     typename GenericGroupType::IdInteger;
@@ -48,14 +49,13 @@ concept GenericGroupC = requires(GenericGroupType gg,
     {gg.IsInCommitState()} -> std::same_as<bool>;
     {gg.AttributeInfo()
     } -> std::same_as<typename GenericGroupType::AttribInfoList>;
-    {gg.PushAttribute(id, uint32_t{}, std::move(input))
+    {gg.PushAttribute(id, uint32_t{}, std::move(input), q)
     } -> std::same_as<void>;
-    {gg.PushAttribute(id, Vector2ui{},
-                      uint32_t{}, std::move(input))
+    {gg.PushAttribute(id, Vector2ui{}, uint32_t{}, std::move(input), q)
     } ->std::same_as<void>;
     {gg.PushAttribute(Vector<2, typename GenericGroupType::IdInteger>{},
-                      uint32_t{},
-                      std::move(input))} ->std::same_as<void>;
+                      uint32_t{}, std::move(input), q)
+    } ->std::same_as<void>;
     {gg.GPUMemoryUsage()} -> std::same_as<size_t>;
 
     // Can query the type
@@ -79,14 +79,17 @@ class GenericGroupI
     virtual bool            IsInCommitState() const = 0;
     virtual void            PushAttribute(IdType id,
                                           uint32_t attributeIndex,
-                                          MRayInput data) = 0;
+                                          MRayInput data,
+                                          const GPUQueue& queue) = 0;
     virtual void            PushAttribute(IdType id,
                                           const Vector2ui& subRange,
                                           uint32_t attributeIndex,
-                                          MRayInput data) = 0;
+                                          MRayInput data,
+                                          const GPUQueue& queue) = 0;
     virtual void            PushAttribute(const Vector<2, IdInteger>& idRange,
                                           uint32_t attributeIndex,
-                                          MRayInput data) = 0;
+                                          MRayInput data,
+                                          const GPUQueue& queue) = 0;
 
     virtual size_t          GPUMemoryUsage() const = 0;
     virtual AttribInfoList  AttributeInfo() const = 0;
@@ -126,18 +129,21 @@ class GenericGroupT : public GenericGroupI<IdType, AttribInfo>
                                                 const Span<T>& copyRegion,
                                                 MRayInput data,
                                                 bool isContiguous,
-                                                bool isPerItem) const;
+                                                bool isPerItem,
+                                                const GPUQueue& queue) const;
     template <class T>
     void                        GenericPushData(IdType id,
                                                 const Span<T>& copyRegion,
                                                 MRayInput data,
-                                                bool isPerItem) const;
+                                                bool isPerItem,
+                                                const GPUQueue& queue) const;
     template <class T>
     void                        GenericPushData(IdType id,
                                                 const Vector2ui& subRange,
                                                 const Span<T>& copyRegion,
                                                 MRayInput data,
-                                                bool isPerItem) const;
+                                                bool isPerItem,
+                                                const GPUQueue& queue) const;
 
     public:
                                 GenericGroupT(uint32_t groupId, const GPUSystem&,
@@ -200,9 +206,9 @@ void GenericGroupT<C, ID, AI>::GenericPushData(const Vector<2, IdInteger>& idRan
                                                const Span<T>& copyRegion,
                                                MRayInput data,
                                                bool isContiguous,
-                                               bool isPerItem) const
+                                               bool isPerItem,
+                                               const GPUQueue& deviceQueue) const
 {
-    const GPUQueue& deviceQueue = gpuSystem.BestDevice().GetQueue(0);
     if(isContiguous)
     {
         size_t count = idRange[1] - idRange[0];
@@ -237,10 +243,9 @@ template <class T>
 void GenericGroupT<C, ID, AI>::GenericPushData(ID id,
                                                const Span<T>& copyRegion,
                                                MRayInput data,
-                                               bool isPerItem) const
+                                               bool isPerItem,
+                                               const GPUQueue& deviceQueue) const
 {
-    const GPUQueue& deviceQueue = gpuSystem.BestDevice().GetQueue(0);
-
     const auto it = itemRanges.find(id);
     Vector2ui attribRange = (isPerItem)
                                 ? it->second.itemRange
@@ -257,10 +262,9 @@ void GenericGroupT<C, ID, AI>::GenericPushData(ID id,
                                                const Vector2ui& subRange,
                                                const Span<T>& copyRegion,
                                                MRayInput data,
-                                               bool isPerItem) const
+                                               bool isPerItem,
+                                               const GPUQueue& deviceQueue) const
 {
-    const GPUQueue& deviceQueue = gpuSystem.BestDevice().GetQueue(0);
-
     const auto it = itemRanges.find(id);
     Vector2ui attribRange = (isPerItem)
                                 ? it->second.itemRange
@@ -305,7 +309,7 @@ typename GenericGroupT<C, ID, AI>::IdList GenericGroupT<C, ID, AI>::Reserve(cons
         auto r = itemCounts.emplace(static_cast<IdInteger>(itemCounts.size()), i);
         assert(r.second);
 
-        IdInteger innerId  = static_cast<IdInteger>(itemCounts.size());
+        IdInteger innerId  = r.first->first;
         result.push_back(ID::CombinedKey(groupId, innerId));
     }
     return result;

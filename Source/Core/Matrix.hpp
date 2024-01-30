@@ -419,7 +419,7 @@ constexpr Matrix<N, T> Matrix<N, T>::Inverse() const requires std::floating_poin
     {
         return m00 * m11 - m01 * m10;
     };
-    const T* m = matrix;
+    const auto& m = matrix;
 
     T s0 = Det2x2(m[0], m[1], m[4], m[5]);
     T s1 = Det2x2(m[0], m[2], m[4], m[6]);
@@ -454,11 +454,11 @@ constexpr Matrix<N, T> Matrix<N, T>::Inverse() const requires std::floating_poin
         (+m[ 4] * c4 - m[ 5] * c2 + m[ 7] * c0),
         (-m[ 0] * c4 + m[ 1] * c2 - m[ 3] * c0),
         (+m[12] * s4 - m[13] * s2 + m[15] * s0),
-        (-m[ 8] * s4 + m[ 9] * s2 - m[11] * s0)
+        (-m[ 8] * s4 + m[ 9] * s2 - m[11] * s0),
         // Row3
         (-m[ 4] * c3 + m[ 5] * c1 - m[ 6] * c0),
         (+m[ 0] * c3 - m[ 1] * c1 + m[ 2] * c0),
-        (-m[12] * s3 + m[13] * s1 - m[14] * s0)
+        (-m[12] * s3 + m[13] * s1 - m[14] * s0),
         (+m[ 8] * s3 - m[ 9] * s1 + m[10] * s0)
     );
     return inv * det;
@@ -1052,18 +1052,18 @@ constexpr Matrix<4, T> TransformGen::LookAt(const Vector<3, T>& eyePos,
 
 template<std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<3, T> TransformGen::Space(const Vector<3, T>& x,
-                                           const Vector<3, T>& y,
-                                           const Vector<3, T>& z)
+constexpr Matrix<3, T> TransformGen::ToSpaceMat(const Vector<3, T>& x,
+                                                const Vector<3, T>& y,
+                                                const Vector<3, T>& z)
 {
     return Matrix<3, T>(x, y, z);
 }
 
 template<std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<3, T> TransformGen::InvSpace(const Vector<3, T>& x,
-                                              const Vector<3, T>& y,
-                                              const Vector<3, T>& z)
+constexpr Matrix<3, T> TransformGen::ToInvSpaceMat(const Vector<3, T>& x,
+                                                   const Vector<3, T>& y,
+                                                   const Vector<3, T>& z)
 {
     return Matrix<3, T>(x[0], y[0], z[0],
                         x[1], y[1], z[1],

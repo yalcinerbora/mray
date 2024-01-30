@@ -57,7 +57,7 @@ class Quat
     MRAY_HYBRID constexpr T                 Length() const;
     MRAY_HYBRID constexpr T                 LengthSqr() const;
     MRAY_HYBRID NO_DISCARD constexpr Quat   Conjugate() const;
-    MRAY_HYBRID NO_DISCARD constexpr Quat&  ConjugateSelf();
+    MRAY_HYBRID constexpr Quat&             ConjugateSelf();
     MRAY_HYBRID constexpr T                 Dot(const Quat&) const;
     MRAY_HYBRID constexpr Vector<3, T>      ApplyRotation(const Vector<3, T>&) const;
     MRAY_HYBRID constexpr Vector<3, T>      ApplyInvRotation(const Vector<3, T>&) const;
@@ -90,14 +90,14 @@ MRAY_HYBRID Quat<T> operator*(T, const Quat<T>&);
 // Static Utility
 namespace TransformGen
 {
-    template <class T>
-    MRAY_HYBRID Quat<T> Space(const Vector<3, T>& x,
+    template<std::floating_point T>
+    MRAY_HYBRID Quat<T> ToSpaceQuat(const Vector<3, T>& x,
                               const Vector<3, T>& y,
                               const Vector<3, T>& z);
-    template <class T>
-    MRAY_HYBRID Quat<T> InvSpace(const Vector<3, T>& x,
-                                 const Vector<3, T>& y,
-                                 const Vector<3, T>& z);
+    template<std::floating_point T>
+    MRAY_HYBRID Quat<T> ToInvSpaceQuat(const Vector<3, T>& x,
+                                       const Vector<3, T>& y,
+                                       const Vector<3, T>& z);
 }
 
 // Implementation

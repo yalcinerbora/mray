@@ -21,12 +21,15 @@ inline MRayInput::MRayInput(MRayInput&& other)
     , ownedMem(std::move(other.ownedMem))
     , usedBytes(other.usedBytes)
     , alignment(other.alignment)
-{}
+{
+    other.ownedMem = Span<Byte>();
+}
 
 inline MRayInput& MRayInput::operator=(MRayInput&& other)
 {
     assert(this != &other);
-    mainR.deallocate(ownedMem.data(), ownedMem.size(), alignment);
+    if(ownedMem.data() != nullptr)
+        mainR.deallocate(ownedMem.data(), ownedMem.size(), alignment);
     ownedMem = other.ownedMem;
     typeHash = other.typeHash;
     usedBytes = other.usedBytes;
@@ -38,7 +41,8 @@ inline MRayInput& MRayInput::operator=(MRayInput&& other)
 
 inline MRayInput::~MRayInput()
 {
-    mainR.deallocate(ownedMem.data(), ownedMem.size(), alignment);
+    if(ownedMem.data() != nullptr)
+        mainR.deallocate(ownedMem.data(), ownedMem.size(), alignment);
 }
 
 template<ImplicitLifetimeC T>

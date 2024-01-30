@@ -75,14 +75,17 @@ class MatGroupLambert : public GenericGroupMaterial<MatGroupLambert>
     AttribInfoList      AttributeInfo() const override;
     void                PushAttribute(MaterialKey batchId,
                                       uint32_t attributeIndex,
-                                      MRayInput data) override;
+                                      MRayInput data,
+                                      const GPUQueue& queue) override;
     void                PushAttribute(MaterialKey batchId,
                                       const Vector2ui& subRange,
                                       uint32_t attributeIndex,
-                                      MRayInput data) override;
+                                      MRayInput data,
+                                      const GPUQueue& queue) override;
     void                PushAttribute(const Vector<2, MaterialKey::Type>& idRange,
                                       uint32_t attributeIndex,
-                                      MRayInput data) override;
+                                      MRayInput data,
+                                      const GPUQueue& queue) override;
 
     DataSoA             SoA() const;
 };

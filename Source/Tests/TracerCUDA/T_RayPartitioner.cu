@@ -10,8 +10,7 @@ void SimulateBasicPathTracer()
     GPUSystem system;
     const GPUQueue& queue = system.BestDevice().GetQueue(0);
 
-    //static constexpr size_t RayCount = 2'000;
-    static constexpr size_t RayCount = 2'000'000;
+    static constexpr size_t RayCount = 500'000;
     // This is calculated via combining
     // medium type count & surface type count.
     // Technically this should be low. In a case with

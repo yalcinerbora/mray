@@ -39,7 +39,8 @@ typename MatGroupLambert::AttribInfoList MatGroupLambert::AttributeInfo() const
 }
 void MatGroupLambert::PushAttribute(MaterialKey,
                                     uint32_t attributeIndex,
-                                    MRayInput)
+                                    MRayInput,
+                                    const GPUQueue&)
 {
     //switch(attributeIndex)
     //{
@@ -55,7 +56,8 @@ void MatGroupLambert::PushAttribute(MaterialKey,
 void MatGroupLambert::PushAttribute(MaterialKey,
                                     const Vector2ui&,
                                     uint32_t attributeIndex,
-                                    MRayInput)
+                                    MRayInput,
+                                    const GPUQueue&)
 {
     //switch(attributeIndex)
     //{
@@ -70,7 +72,8 @@ void MatGroupLambert::PushAttribute(MaterialKey,
 
 void MatGroupLambert::PushAttribute(const Vector<2, MaterialKey::Type>&,
                                     uint32_t attributeIndex,
-                                    MRayInput)
+                                    MRayInput,
+                                    const GPUQueue&)
 {
     //switch(attributeIndex)
     //{

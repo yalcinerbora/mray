@@ -61,7 +61,7 @@ TEST(GraphicsFunctionsTest, Refract)
 
         Optional<Vector3> result = Refract(normal, v, eta0, eta1);
 
-        EXPECT_THROW(result.value();, std::bad_optional_access);
+        EXPECT_THROW((void) result.value(), std::bad_optional_access);
     }
 }
 

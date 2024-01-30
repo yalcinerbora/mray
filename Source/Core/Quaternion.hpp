@@ -386,11 +386,11 @@ constexpr Quat<T> operator*(T t, const Quat<T>& q)
     return q * t;
 }
 
-template <class T>
+template<std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Quat<T> TransformGen::Space(const Vector<3, T>& xIn,
-                            const Vector<3, T>& y,
-                            const Vector<3, T>& z)
+Quat<T> TransformGen::ToSpaceQuat(const Vector<3, T>& xIn,
+                                  const Vector<3, T>& y,
+                                  const Vector<3, T>& z)
 {
     Quat<T> q;
     // Flip the coordinate system if inverted
@@ -442,7 +442,7 @@ Quat<T> TransformGen::Space(const Vector<3, T>& xIn,
                         x[1] - y[0]);
         }
     }
-    q *= T{0.5} / sqrt(t);
+    q *= T{0.5} / std::sqrt(t);
     q.NormalizeSelf();
     q.ConjugateSelf();
     return q;
@@ -492,11 +492,11 @@ Quat<T> TransformGen::Space(const Vector<3, T>& xIn,
 
 }
 
-template <class T>
+template <std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Quat<T> TransformGen::InvSpace(const Vector<3, T>& x,
-                            const Vector<3, T>& y,
-                            const Vector<3, T>& z)
+Quat<T> TransformGen::ToInvSpaceQuat(const Vector<3, T>& x,
+                                     const Vector<3, T>& y,
+                                     const Vector<3, T>& z)
 {
     return Space(x, y, z).Conjugate();
 }
