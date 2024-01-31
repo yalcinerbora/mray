@@ -4,7 +4,8 @@ set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/EntryPoint.h
     ${CURRENT_SOURCE_DIR}/EntryPoint.cpp
     ${CURRENT_SOURCE_DIR}/SceneLoaderMRay.h
-    ${CURRENT_SOURCE_DIR}/SceneLoaderMRay.cpp)
+    ${CURRENT_SOURCE_DIR}/SceneLoaderMRay.cpp
+    ${CURRENT_SOURCE_DIR}/NodeNames.h)
 
 source_group("" FILES ${SRC_COMMON})
 add_library(SceneLoaderMRay SHARED ${SRC_COMMON})
@@ -14,7 +15,7 @@ target_link_libraries(SceneLoaderMRay
                       CoreLib
                       MRayInput
                       mray::meta_compile_opts
-                      simdjson::simdjson)
+                      nlohmann::json)
 
 target_compile_definitions(SceneLoaderMRay
                            PRIVATE

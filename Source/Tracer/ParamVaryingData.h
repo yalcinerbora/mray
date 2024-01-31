@@ -14,7 +14,12 @@ class ParamVaryingData
     private:
     Variant<Texture, T>         t;
 
+
+
     public:
+    MRAY_HYBRID                 ParamVaryingData(const T&);
+    MRAY_HYBRID                 ParamVaryingData(const Texture&);
+
     // Base Access
     MRAY_HYBRID Optional<T>     operator()(Vector<DIMS, Float> uvCoords) const;
     // Gradient Access
@@ -99,6 +104,18 @@ static_assert(SpectrumConverterC<SpectrumConverterIdentity>,
               "\"SpectrumConverterIdentity\" do not satistfy \"SpectrumConverterC\" concept.");
 static_assert(SpectrumConverterContextC<SpectrumConverterContextIdentity>,
               "\"SpectrumConverterContextIdentity\" do not satistfy \"SpectrumConverterContextC\" concept." );
+
+template <uint32_t DIMS, class T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+ParamVaryingData<DIMS, T>::ParamVaryingData(const T& tt)
+    : t(tt)
+{}
+
+template <uint32_t DIMS, class T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+ParamVaryingData<DIMS, T>::ParamVaryingData(const Texture& tt)
+    : t(tt)
+{}
 
 template <uint32_t DIMS, class T>
 MRAY_HYBRID MRAY_CGPU_INLINE

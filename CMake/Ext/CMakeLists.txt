@@ -75,19 +75,31 @@ mray_build_ext_dependency_git(
             -DFMT_PKGCONFIG_DIR=${MRAY_PLATFORM_NAME}/$<CONFIG>/pkgconfig
 )
 
-# Get simd-json
+# Get nlohmann-json
 mray_build_ext_dependency_git(
-        NAME simd_json_ext
-        URL "https://github.com/simdjson/simdjson.git"
-        TAG "6060be2fdf62edf4a8f51a8b0883d57d09397b30" # v3.6.3
-        LICENSE_NAME "LICENSE"
+        NAME nlohmann_json_ext
+        URL "https://github.com/nlohmann/json.git"
+        TAG "9cca280a4d0ccf0c08f47a99aa71d1b0e52f8d03" # v3.11.3
+        LICENSE_NAME "LICENSE.MIT"
         BUILD_ARGS
+            -DJSON_BuildTests=OFF
             -DBUILD_TESTING=OFF
-            -DSIMDJSON_BUILD_SHARED=OFF
-            -DSIMDJSON_BUILD_BASH=OFF
-            -DSIMDJSON_CXX_STANDARD=17
-            -DSIMDJSON_ENABLE_THREADS=ON
-            -DSIMDJSON_EXCEPTIONS=ON
+            -DJSON_BuildTests=OFF
+            -DJSON_MultipleHeaders=OFF
+            -DNLOHMANN_JSON_CONFIG_INSTALL_DIR=${MRAY_CONFIG_LIB_DIRECTORY}/cmake/json
+            -DNLOHMANN_JSON_INCLUDE_INSTALL_DIR=${MRAY_LIB_INCLUDE_DIRECTORY}
+            -DNLOHMANN_JSON_PKGCONFIG_INSTALL_DIR=${MRAY_CONFIG_LIB_DIRECTORY}/pkgconfig
+            # This is not cached and it install to a wrong folder :(
+            -DNLOHMANN_ADD_NATVIS=OFF
+)
+
+mray_build_ext_dependency_git(
+        NAME thread_pool_ext
+        URL "https://github.com/yalcinerbora/thread-pool.git"
+        TAG "6c4ff304d09e0cdbfc085991d7c23fdfc0c48c1c" # v4.0.1 (Forked from original repo)
+        LICENSE_NAME "LICENSE.txt"
+        BUILD_ARGS
+            -DTHREADPOOL_INSTALL=ON
 )
 
 # Get assimp

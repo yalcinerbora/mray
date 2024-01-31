@@ -9,6 +9,9 @@ target_link_libraries(MRay PRIVATE
                       CoreLib
                       mray::meta_compile_opts)
 
+# TODO DELETE THIS LATER
+target_link_libraries(MRay PRIVATE SceneLoaderMRay)
+
 # Not-linked but dependent targets
 # add_dependencies(MRay
 #                  TracerCUDA

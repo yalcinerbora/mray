@@ -176,7 +176,10 @@ class TextureViewCUDA<1, T>
     cudaTextureObject_t     texHandle;
 
     public:
+    // Full Texture object access
     MRAY_HOST               TextureViewCUDA(cudaTextureObject_t t) : texHandle(t) {}
+
+
     // Base Access
     MRAY_HYBRID Optional<T> operator()(Float uv) const;
     // Gradient Access

@@ -26,7 +26,8 @@ set(MRAY_EXTERNAL_LIBRARIES_STAMP ${MRAY_CONFIG_LIB_DIRECTORY}/MRayLib.stamp)
 
 set(MRAY_EXTERNAL_LIBRARIES
     ${MRAY_CONFIG_LIB_DIRECTORY}/fmt${CMAKE_STATIC_LIBRARY_SUFFIX}
-    ${MRAY_CONFIG_LIB_DIRECTORY}/simdjson$<$<CONFIG:Debug>:d>${CMAKE_SHARED_LIBRARY_SUFFIX}
+    ${MRAY_LIB_INCLUDE_DIRECTORY}/nlohmann/json.hpp
+    ${MRAY_LIB_INCLUDE_DIRECTORY}/nlohmann/json_fwd.hpp
 
     # ${MRAY_CONFIG_LIB_DIRECTORY}/ZLIB$<$<CONFIG:Debug>:d>
     # ${MRAY_CONFIG_LIB_DIRECTORY}/assimp$<$<CONFIG:Debug>:d>
@@ -168,7 +169,14 @@ function(gen_imported_target)
 
 endfunction()
 
-#gen_imported_target(NAME ZLIB::ZLIB SHARED DEBUG_TARGET ZLIBd RELEASE_TARGET ZLIB)
+# Header only libraries
+# Create mock targets, project layout enables direct access to the headers
+# These are generated for verbosity
+add_library(json INTERFACE)
+add_library(nlohmann::json ALIAS json)
+add_library(thread_pool INTERFACE)
+add_library(bs::thread_pool ALIAS thread_pool)
+
 gen_imported_target(NAME fmt::fmt STATIC DEBUG_TARGET fmt RELEASE_TARGET fmt
                     EXTRA_DEFINES FMT_USE_NONTYPE_TEMPLATE_ARGS=0)
 gen_imported_target(NAME simdjson::simdjson STATIC DEBUG_TARGET simdjsond RELEASE_TARGET simdjson)
@@ -182,6 +190,7 @@ gen_imported_target(NAME simdjson::simdjson STATIC DEBUG_TARGET simdjsond RELEAS
 # gen_imported_target(NAME imgui::imgui_ti STATIC DEBUG_TARGET imgui_tex_inspectd RELEASE_TARGET imgui_tex_inspect)
 # gen_imported_target(NAME oiio::oiio SHARED DEBUG_TARGET OpenImageIOd RELEASE_TARGET OpenImageIO)
 # gen_imported_target(NAME oiio::oiio_util SHARED DEBUG_TARGET OpenImageIO_Utild RELEASE_TARGET OpenImageIO_Util)
+#gen_imported_target(NAME ZLIB::ZLIB SHARED DEBUG_TARGET ZLIBd RELEASE_TARGET ZLIB)
 
 if(MRAY_BUILD_TESTS)
     gen_imported_target(NAME gtest::gtest SHARED DEBUG_TARGET gtest RELEASE_TARGET gtest)

@@ -4,6 +4,7 @@ message(STATUS "Configuring ${CURRENT_SOURCE_DIR}")
 
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/T_GraphicsFunctions.cpp
+    ${CURRENT_SOURCE_DIR}/T_MPMCQueue.cpp
 )
 
 source_group("" FILES ${SRC_COMMON})

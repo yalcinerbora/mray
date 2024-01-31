@@ -62,6 +62,6 @@ MRayError SharedLibrary::GenerateObjectWithArgs(SharedLibPtr<T>& ptr,
     ObjDestroyerFunc<T> destFunc = reinterpret_cast<ObjDestroyerFunc<T>>(GetProcAdressInternal(mangledNames.mangledDestructorName));
     if(!destFunc) return err;
     ptr = SharedLibPtr<T>(genFunc(std::forward<Args&&>(args)...), destFunc);
-    return MRayError();
+    return MRayError::OK;
 }
 

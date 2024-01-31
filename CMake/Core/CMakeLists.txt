@@ -36,7 +36,9 @@ set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/Log.h
     ${CURRENT_SOURCE_DIR}/Types.h
     ${CURRENT_SOURCE_DIR}/GraphicsFunctions.h
-    ${CURRENT_SOURCE_DIR}/ShapeFunctions.h)
+    ${CURRENT_SOURCE_DIR}/ShapeFunctions.h
+    ${CURRENT_SOURCE_DIR}/Timer.h
+    ${CURRENT_SOURCE_DIR}/MPMCQueue.h)
 
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/Definitions.h
@@ -64,7 +66,8 @@ source_group("" FILES ${SRC_COMMON})
 add_library(CoreLib STATIC ${SRC_ALL})
 
 target_link_libraries(CoreLib
-                      PUBLIC fmt::fmt
+                      PUBLIC
+                      fmt::fmt
                       PRIVATE mray::meta_compile_opts)
 
 # set_target_properties(CoreLib PROPERTIES

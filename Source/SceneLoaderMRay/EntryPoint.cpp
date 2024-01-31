@@ -3,9 +3,9 @@
 
 // C Mangling, we will load these in runtime
 extern "C" MRAY_SCENELOADER_MRAY_ENTRYPOINT
-SceneLoaderI* SceneLoaderMRayDetail::ConstructSceneLoaderMRay()
+SceneLoaderI* SceneLoaderMRayDetail::ConstructSceneLoaderMRay(BS::thread_pool& p)
 {
-    return new SceneLoaderMRay();
+    return new SceneLoaderMRay(p);
 }
 
 extern "C" MRAY_SCENELOADER_MRAY_ENTRYPOINT

@@ -47,7 +47,7 @@ inline MRayError::MRayError(std::string&& s)
 
 inline MRayError::operator bool()
 {
-    return type == MRayError::OK;
+    return type != MRayError::OK;
 }
 
 inline std::string MRayError::GetError() const
