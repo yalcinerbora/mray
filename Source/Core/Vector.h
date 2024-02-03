@@ -20,6 +20,7 @@ N should be 2, 3 or 4 at most.
 #include "MathForward.h"
 #include "MathFunctions.h"
 #include "NormTypes.h"
+#include "Types.h"
 
 static consteval unsigned int ChooseVectorAlignment(unsigned int totalSize)
 {
@@ -53,7 +54,7 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
     template<std::convertible_to<T> C>
     MRAY_HYBRID constexpr explicit  Vector(C);
     template<std::convertible_to<T> C>
-    MRAY_HYBRID constexpr explicit  Vector(const C* data);
+    MRAY_HYBRID constexpr explicit  Vector(Span<const C , N> data);
     template <std::convertible_to<T>... Args>
     MRAY_HYBRID constexpr explicit  Vector(const Args... dataList); //requires (, T> && ...) && (sizeof...(Args) == N);
     template <class... Args>

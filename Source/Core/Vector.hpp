@@ -15,7 +15,7 @@ constexpr Vector<N, T>::Vector(C data)
 template <unsigned int N, ArithmeticC T>
 template<std::convertible_to<T> C>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<N, T>::Vector(const C* data)
+constexpr Vector<N, T>::Vector(Span<const C, N> data)
 {
     UNROLL_LOOP
     for(unsigned int i = 0; i < N; i++)

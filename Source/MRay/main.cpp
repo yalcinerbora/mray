@@ -24,7 +24,7 @@ int main()
 
     if(e) MRAY_ERROR_LOG("{}", e.GetError());
 
-    loader->LoadScene("Scenes/Kitchen/Kitchen.json");
+    //loader->LoadScene("Scenes/Kitchen/Kitchen.json");
 
     // Load Args
     // Load visor if requested

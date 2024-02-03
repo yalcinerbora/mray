@@ -11,6 +11,22 @@
 namespace MRayInputDetail { class MRayInput; }
 using MRayInput = MRayInputDetail::MRayInput;
 
+enum class PrimitiveAttributeLogic
+{
+    POSITION,
+    INDEX,
+    NORMAL,
+    RADIUS,
+    TANGENT,
+    BITANGENT,
+    UV0,
+    UV1,
+    WEIGHT,
+    WEIGHT_INDEX,
+
+    END
+};
+
 namespace TracerConstants
 {
     static constexpr size_t MaxPrimBatchPerSurface = 8;
@@ -45,12 +61,48 @@ enum class AttributeTexturable
 using GenericAttributeInfo = Tuple<std::string, AttributeOptionality, MRayDataTypeRT>;
 using TypeNameList = std::vector<std::string>;
 
+struct PrimAttributeStringifier
+{
+    using enum PrimitiveAttributeLogic;
+    static constexpr std::array<std::string_view, static_cast<size_t>(END)> Names =
+    {
+        "Position",
+        "Index",
+        "Normal",
+        "Radius",
+        "Tangent",
+        "UV0",
+        "UV1",
+        "Weight",
+        "Weight Index"
+    };
+    static constexpr std::string_view           ToString(PrimitiveAttributeLogic e);
+    static constexpr PrimitiveAttributeLogic    FromString(std::string_view e);
+};
+
+constexpr std::string_view PrimAttributeStringifier::ToString(PrimitiveAttributeLogic e)
+{
+    return Names[static_cast<uint32_t>(e)];
+}
+
+constexpr PrimitiveAttributeLogic PrimAttributeStringifier::FromString(std::string_view sv)
+{
+    using IntType = std::underlying_type_t<PrimitiveAttributeLogic>;
+    IntType i = 0;
+    for(const std::string_view& checkSV : Names)
+    {
+        if(checkSV == sv) return PrimitiveAttributeLogic(i);
+        i++;
+    }
+    return PrimitiveAttributeLogic(END);
+}
+
 // Prim related
 MRAY_GENERIC_ID(PrimGroupId, uint32_t);
 MRAY_GENERIC_ID(PrimBatchId, uint32_t);
 struct PrimCount { uint32_t primCount; uint32_t attributeCount; };
 using PrimBatchIdList = std::vector<PrimBatchId>;
-using PrimAttributeInfo = GenericAttributeInfo;
+using PrimAttributeInfo = Tuple<PrimitiveAttributeLogic, AttributeOptionality, MRayDataTypeRT>;
 using PrimAttributeInfoList = std::vector<PrimAttributeInfo>;
 // Texture Related
 MRAY_GENERIC_ID(TextureId, uint32_t);
@@ -121,7 +173,7 @@ namespace TracerConstants
     };
 };
 
-class TracerI
+class [[nodiscard]] TracerI
 {
     public:
     virtual     ~TracerI() = default;
@@ -142,6 +194,14 @@ class TracerI
     virtual TransAttributeInfoList      TransAttributeInfo(TransGroupId) const = 0;
     virtual LightAttributeInfoList      LightAttributeInfo(LightGroupId) const = 0;
     virtual RendererAttributeInfoList   RendererAttributeInfo(RendererId) const = 0;
+
+    virtual std::string                 TypeName(PrimGroupId) const = 0;
+    virtual std::string                 TypeName(CameraGroupId) const = 0;
+    virtual std::string                 TypeName(MediumGroupId) const = 0;
+    virtual std::string                 TypeName(MatGroupId) const = 0;
+    virtual std::string                 TypeName(TransGroupId) const = 0;
+    virtual std::string                 TypeName(LightGroupId) const = 0;
+    virtual std::string                 TypeName(RendererId) const = 0;
 
     //================================//
     //           Primitive            //

@@ -7,40 +7,36 @@ namespace NodeNames
     using namespace std;
     using namespace literals;
 
-    static constexpr string_view SCENE_EXT      = "mscene"sv;
-    static constexpr string_view ANIM_EXT       = "manim"sv;
     // Common Base Arrays
-    static constexpr string_view CAMERA_BASE                = "Cameras"sv;
-    static constexpr string_view LIGHT_BASE                 = "Lights"sv;
-    static constexpr string_view MEDIUM_BASE                = "Mediums"sv;
-    static constexpr string_view TEXTURE_BASE               = "Textures"sv;
-    static constexpr string_view ACCELERATOR_BASE           = "Accelerators"sv;
-    static constexpr string_view TRANSFORM_BASE             = "Transforms"sv;
-    static constexpr string_view PRIMITIVE_BASE             = "Primitives"sv;
-    static constexpr string_view MATERIAL_BASE              = "Materials"sv;
-    static constexpr string_view SURFACE_DATA_BASE          = "SurfaceData"sv;
-    // Boundaries
-    static constexpr string_view BASE_ACCELERATOR           = "BaseAccelerator"sv;
-    static constexpr string_view BASE_BOUNDARY_LIGHT        = "BaseBoundaryLight"sv;
-    static constexpr string_view BASE_MEDIUM                = "BaseMedium"sv;
-    static constexpr string_view BASE_BOUNDARY_TRANSFORM    = "BaseBoundaryTransform"sv;
+    static constexpr string_view CAMERA_LIST        = "Cameras"sv;
+    static constexpr string_view LIGHT_LIST         = "Lights"sv;
+    static constexpr string_view MEDIUM_LIST        = "Mediums"sv;
+    static constexpr string_view TEXTURE_LIST       = "Textures"sv;
+    static constexpr string_view TRANSFORM_LIST     = "Transforms"sv;
+    static constexpr string_view PRIMITIVE_LIST     = "Primitives"sv;
+    static constexpr string_view MATERIAL_LIST      = "Materials"sv;
+    // Surfaces
+    static constexpr string_view BOUNDARY               = "Boundary"sv;
+    static constexpr string_view SURFACE_LIST           = "Surfaces"sv;
+    static constexpr string_view LIGHT_SURFACE_LIST     = "LightSurfaces"sv;
+    static constexpr string_view CAMERA_SURFACE_LIST    = "CameraSurfaces"sv;
 
-    static constexpr string_view SURFACE_BASE               = "Surfaces"sv;
-    static constexpr string_view LIGHT_SURFACE_BASE         = "LightSurfaces"sv;
-    static constexpr string_view CAMERA_SURFACE_BASE        = "CameraSurfaces"sv;
-
-    // Common Names
+    // Json Node Common Names
     static constexpr string_view ID             = "id"sv;
     static constexpr string_view TYPE           = "type"sv;
     static constexpr string_view NAME           = "name"sv;
     static constexpr string_view TAG            = "tag"sv;
+    // Primitive Type related
+    static constexpr string_view INNER_INDEX            = "innerIndex"sv;
+    static constexpr string_view NODE_PRIMITIVE         = ".nodeTriangle"sv;
+    static constexpr string_view INDEXED_NODE_PRIMITIVE = ".nodeTriangleIndexed"sv;
+
     // Common Names
     static constexpr string_view POSITION       = "position"sv;
     static constexpr string_view DATA           = "data"sv;
     // Surface Related Names
     static constexpr string_view TRANSFORM      = "transform"sv;
     static constexpr string_view PRIMITIVE      = "primitive"sv;
-    static constexpr string_view ACCELERATOR    = "accelerator"sv;
     static constexpr string_view MATERIAL       = "material"sv;
     // Material & Light Common Names
     static constexpr string_view MEDIUM         = "medium"sv;

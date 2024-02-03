@@ -103,46 +103,46 @@ mray_build_ext_dependency_git(
 )
 
 # Get assimp
-# mray_build_ext_dependency_git(
-#     NAME assimp_ext
-#     URL "https://github.com/assimp/assimp.git"
-#     TAG "9519a62dd20799c5493c638d1ef5a6f484e5faf1" # v.5.2.5
-#     LICENSE_NAME "LICENSE"
-#     BUILD_ARGS
-#         -DASSIMP_BUILD_ALL_EXPORTERS_BY_DEFAULT=OFF
-#         -DASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT=ON
-#         -DASSIMP_BUILD_TESTS=OFF
-#         -DASSIMP_BUILD_ZLIB=ON
-#         -DASSIMP_INJECT_DEBUG_POSTFIX=OFF
-#         -DASSIMP_INSTALL=ON
-#         -DBUILD_SHARED_LIBS=ON
-#         -DASSIMP_HUNTER_ENABLED=OFF
-#         # Non-unix related
-#         -DASSIMP_LIB_INSTALL_DIR=${MRAY_PLATFORM_NAME}/$<CONFIG>
-#         -DASSIMP_INCLUDE_INSTALL_DIR=Include
-#         -DASSIMP_BIN_INSTALL_DIR=${MRAY_PLATFORM_NAME}/$<CONFIG>
-#         # Windows related
-#         -DLIBRARY_SUFFIX:STRING=
-#         -DUSE_STATIC_CRT=OFF
-#         # There is a bug on this one maybe?
-#         -DASSIMP_INSTALL_PDB=OFF
+mray_build_ext_dependency_git(
+    NAME assimp_ext
+    URL "https://github.com/assimp/assimp.git"
+    TAG "6a08c39e3a91ef385e76515cfad86aca4bfd57ff" # v.5.3.1
+    LICENSE_NAME "LICENSE"
+    BUILD_ARGS
+        -DASSIMP_BUILD_ALL_EXPORTERS_BY_DEFAULT=OFF
+        -DASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT=ON
+        -DASSIMP_BUILD_TESTS=OFF
+        -DASSIMP_BUILD_ZLIB=ON
+        -DASSIMP_INJECT_DEBUG_POSTFIX=OFF
+        -DASSIMP_INSTALL=ON
+        -DBUILD_SHARED_LIBS=ON
+        -DASSIMP_HUNTER_ENABLED=OFF
+        # Non-unix related
+        -DASSIMP_LIB_INSTALL_DIR=${MRAY_PLATFORM_NAME}/$<CONFIG>
+        -DASSIMP_INCLUDE_INSTALL_DIR=Include
+        -DASSIMP_BIN_INSTALL_DIR=${MRAY_PLATFORM_NAME}/$<CONFIG>
+        # Windows related
+        -DLIBRARY_SUFFIX:STRING=
+        -DUSE_STATIC_CRT=OFF
+        # There is a bug on this one maybe?
+        -DASSIMP_INSTALL_PDB=OFF
 
-#     DEPENDENCIES
-#         zlib_ext
+    DEPENDENCIES
+        zlib_ext
 
-# )
+)
 
 # Get GFG
-# mray_build_ext_dependency_git(
-#     NAME gfg_ext
-#     URL "https://github.com/yalcinerbora/GFGFileFormat.git"
-#     TAG "4a0b800f3af9db101364958b856a00a4f80c8839" # 23.06.2023 Latest Commit
-#     LICENSE_NAME "LICENSE"
-#     SOURCE_SUBDIR "Build/CMake"
-#     BUILD_ARGS
-#         -DGFG_INSTALL=ON
-#         -DGFG_BUILD_MAYA_PLUG_IN=OFF
-# )
+mray_build_ext_dependency_git(
+    NAME gfg_ext
+    URL "https://github.com/yalcinerbora/GFGFileFormat.git"
+    TAG "4a0b800f3af9db101364958b856a00a4f80c8839" # 23.06.2023 Latest Commit
+    LICENSE_NAME "LICENSE"
+    SOURCE_SUBDIR "Build/CMake"
+    BUILD_ARGS
+        -DGFG_INSTALL=ON
+        -DGFG_BUILD_MAYA_PLUG_IN=OFF
+)
 
 # Get spdlog
 mray_build_ext_dependency_git(

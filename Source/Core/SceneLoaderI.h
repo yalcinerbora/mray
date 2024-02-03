@@ -11,6 +11,6 @@ class SceneLoaderI
     public:
     virtual ~SceneLoaderI() = default;
 
-    virtual Pair<MRayError, double> LoadScene(const std::string& filePath) = 0;
-        //,const TracerI& tracer) = 0;
+    virtual Pair<MRayError, double> LoadScene(TracerI& tracer,
+                                              const std::string& filePath) = 0;
 };

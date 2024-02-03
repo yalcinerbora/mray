@@ -3,6 +3,8 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <array>
+#include <string_view>
 
 #ifdef MRAY_GPU_BACKEND_CUDA
 
@@ -180,5 +182,89 @@ enum class MRayDataEnum : uint32_t
     MR_SNORM_8x32,
     MR_SNORM_4x64,
 
-    MR_STRING
+    MR_STRING,
+
+    MR_END
 };
+
+struct MRayDataTypeStringifier
+{
+    using enum MRayDataEnum;
+    static constexpr std::array<std::string_view, static_cast<size_t>(MR_END)> Names =
+    {
+        "CHAR",
+        "VECTOR_2C",
+        "VECTOR_3C",
+        "VECTOR_4C",
+        "SHORT",
+        "VECTOR_2S",
+        "VECTOR_3S",
+        "VECTOR_4S",
+        "INT",
+        "VECTOR_2I",
+        "VECTOR_3I",
+        "VECTOR_4I",
+        "UCHAR",
+        "VECTOR_2UC",
+        "VECTOR_3UC",
+        "VECTOR_4UC",
+        "USHORT",
+        "VECTOR_2US",
+        "VECTOR_3US",
+        "VECTOR_4US",
+        "UINT",
+        "VECTOR_2UI",
+        "VECTOR_3UI",
+        "VECTOR_4UI",
+        "FLOAT",
+        "VECTOR_2F",
+        "VECTOR_3F",
+        "VECTOR_4F",
+        "DOUBLE",
+        "VECTOR_2D",
+        "VECTOR_3D",
+        "VECTOR_4D",
+        "DEFAULT_FLT",
+        "VECTOR_2",
+        "VECTOR_3",
+        "VECTOR_4",
+        "QUATERNION",
+        "MATRIX_4x4",
+        "MATRIX_3x3",
+        "AABB3_ENUM",
+        "RAY",
+        "UNORM_4x8",
+        "UNORM_2x16",
+        "SNORM_4x8",
+        "SNORM_2x16",
+        "UNORM_8x8",
+        "UNORM_4x16",
+        "UNORM_2x32",
+        "SNORM_8x8",
+        "SNORM_4x16",
+        "SNORM_2x32",
+        "UNORM_16x8",
+        "UNORM_8x16",
+        "UNORM_4x32",
+        "UNORM_2x64",
+        "SNORM_16x8",
+        "SNORM_8x16",
+        "SNORM_4x32",
+        "SNORM_2x64",
+        "UNORM_32x8",
+        "UNORM_16x16",
+        "UNORM_8x32",
+        "UNORM_4x64",
+        "SNORM_32x8",
+        "SNORM_16x16",
+        "SNORM_8x32",
+        "SNORM_4x64",
+        "STRING"
+    };
+    static constexpr std::string_view ToString(MRayDataEnum e);
+};
+
+constexpr std::string_view MRayDataTypeStringifier::ToString(MRayDataEnum e)
+{
+    return Names[static_cast<uint32_t>(e)];
+}

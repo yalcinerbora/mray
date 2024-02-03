@@ -15,7 +15,7 @@ constexpr Matrix<N, T>::Matrix(C t)
 template <unsigned int N, ArithmeticC T>
 template <std::convertible_to<T> C>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T>::Matrix(const C* data)
+constexpr Matrix<N, T>::Matrix(Span<const C, N*N> data)
 {
     UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
@@ -269,7 +269,7 @@ constexpr Vector<M, T> Matrix<N, T>::operator*(const Vector<M, T>& right) const 
     UNROLL_LOOP
     for(unsigned int i = 0; i < M; i++)
     {
-        Vector<M, T> leftRow = Vector<M, T>(matrix.data() + i * N);
+        Vector<M, T> leftRow = Vector<M, T>(Span<const T, M>(matrix.data() + i * N, M));
         v[i] = leftRow.Dot(right);
     }
     return v;

@@ -35,57 +35,6 @@ enum class PrimTransformType : uint8_t
     PER_PRIMITIVE_TRANSFORM
 };
 
-enum class PrimitiveAttributeLogic
-{
-    POSITION,
-    INDEX,
-    NORMAL,
-    RADIUS,
-    TANGENT,
-    UV0,
-    UV1,
-    WEIGHT,
-    WEIGHT_INDEX,
-
-    END
-};
-
-struct PrimAttributeConverter
-{
-    using enum PrimitiveAttributeLogic;
-    static constexpr std::array<std::string_view, static_cast<size_t>(END)> Names =
-    {
-        "Position",
-        "Index",
-        "Normal",
-        "Radius",
-        "Tangent",
-        "UV0",
-        "UV1",
-        "Weight",
-        "Weight Index"
-    };
-    static constexpr std::string_view           ToString(PrimitiveAttributeLogic e);
-    static constexpr PrimitiveAttributeLogic    FromString(std::string_view e);
-};
-
-constexpr std::string_view PrimAttributeConverter::ToString(PrimitiveAttributeLogic e)
-{
-    return Names[static_cast<uint32_t>(e)];
-}
-
-constexpr PrimitiveAttributeLogic PrimAttributeConverter::FromString(std::string_view sv)
-{
-    using IntType = std::underlying_type_t<PrimitiveAttributeLogic>;
-    IntType i = 0;
-    for(const std::string_view& checkSV : Names)
-    {
-        if(checkSV == sv) return PrimitiveAttributeLogic(i);
-        i++;
-    }
-    return PrimitiveAttributeLogic(END);
-}
-
 template<class Surface, class Prim, class Hit>
 using SurfaceGenFunc = Surface(Prim::*)(const Hit&,
                                         const DiffRay&,

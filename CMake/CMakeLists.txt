@@ -115,6 +115,7 @@ add_subdirectory(Device)
 add_subdirectory(Tracer)
 add_subdirectory(MRayInput)
 add_subdirectory(SceneLoaderMRay)
+add_subdirectory(MeshLoader)
 
 #add_subdirectory(GFGSurfaceLoader)
 #add_subdirectory(ImageLoader)

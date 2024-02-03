@@ -3,6 +3,7 @@
 #include <concepts>
 #include <utility>
 #include "Definitions.h"
+#include "Types.h"
 
 #ifdef MRAY_HETEROGENEOUS
     #include <cuda/half.h>
@@ -148,10 +149,14 @@ using AABB4d = AABB<4, double>;
 
 
 template<class T>
-concept ArrayLikeC = requires(T t)
+concept ArrayLikeC = requires(T t, Span<const typename T::InnerType, T::Dims> span)
 {
     typename T::InnerType;
     T::Dims;
+    T(span);
     { t.AsArray() } -> std::same_as<std::array<typename T::InnerType, T::Dims>&>;
     { std::as_const(t).AsArray() } -> std::same_as<const std::array<typename T::InnerType, T::Dims>&>;
 };
+
+template <ArrayLikeC V>
+auto format_as(const V& v) { return v.AsArray(); }

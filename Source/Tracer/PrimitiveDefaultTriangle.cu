@@ -62,10 +62,10 @@ PrimAttributeInfoList PrimGroupTriangle::AttributeInfo() const
     using enum AttributeOptionality;
     static const std::array<PrimAttributeInfo, AttributeCount> LogicList =
     {
-        PrimAttributeInfo(PrimAttributeConverter::ToString(POSITION), MR_MANDATORY, MRayDataType<MR_VECTOR_3>()),
-        PrimAttributeInfo(PrimAttributeConverter::ToString(NORMAL),   MR_OPTIONAL,  MRayDataType<MR_QUATERNION>()),
-        PrimAttributeInfo(PrimAttributeConverter::ToString(UV0),      MR_OPTIONAL,  MRayDataType<MR_VECTOR_2>()),
-        PrimAttributeInfo(PrimAttributeConverter::ToString(INDEX),    MR_MANDATORY, MRayDataType<MR_VECTOR_3UI>()),
+        PrimAttributeInfo(POSITION, MR_MANDATORY, MRayDataType<MR_VECTOR_3>()),
+        PrimAttributeInfo(NORMAL,   MR_OPTIONAL,  MRayDataType<MR_QUATERNION>()),
+        PrimAttributeInfo(UV0,      MR_OPTIONAL,  MRayDataType<MR_VECTOR_2>()),
+        PrimAttributeInfo(INDEX,    MR_MANDATORY, MRayDataType<MR_VECTOR_3UI>()),
     };
     return std::vector(LogicList.cbegin(), LogicList.cend());
 }
@@ -227,18 +227,12 @@ PrimAttributeInfoList PrimGroupSkinnedTriangle::AttributeInfo() const
     using enum AttributeOptionality;
     static const std::array<PrimAttributeInfo, AttributeCount> LogicList =
     {
-        PrimAttributeInfo(PrimAttributeConverter::ToString(POSITION),
-                          MR_MANDATORY, MRayDataType<MR_VECTOR_3>()),
-        PrimAttributeInfo(PrimAttributeConverter::ToString(NORMAL),
-                          MR_OPTIONAL, MRayDataType<MR_QUATERNION>()),
-        PrimAttributeInfo(PrimAttributeConverter::ToString(UV0),
-                          MR_OPTIONAL, MRayDataType<MR_VECTOR_2>()),
-        PrimAttributeInfo(PrimAttributeConverter::ToString(WEIGHT),
-                          MR_MANDATORY, MRayDataType<MR_UNORM_4x8>()),
-        PrimAttributeInfo(PrimAttributeConverter::ToString(WEIGHT_INDEX),
-                          MR_MANDATORY, MRayDataType<MR_VECTOR_4UC>()),
-        PrimAttributeInfo(PrimAttributeConverter::ToString(INDEX),
-                          MR_MANDATORY, MRayDataType<MR_VECTOR_3UI>())
+        PrimAttributeInfo(POSITION,     MR_MANDATORY,   MRayDataType<MR_VECTOR_3>()),
+        PrimAttributeInfo(NORMAL,       MR_OPTIONAL,    MRayDataType<MR_QUATERNION>()),
+        PrimAttributeInfo(UV0,          MR_OPTIONAL,    MRayDataType<MR_VECTOR_2>()),
+        PrimAttributeInfo(WEIGHT,       MR_MANDATORY,   MRayDataType<MR_UNORM_4x8>()),
+        PrimAttributeInfo(WEIGHT_INDEX, MR_MANDATORY,   MRayDataType<MR_VECTOR_4UC>()),
+        PrimAttributeInfo(INDEX,        MR_MANDATORY,   MRayDataType<MR_VECTOR_3UI>())
     };
     return std::vector(LogicList.cbegin(), LogicList.cend());
 }

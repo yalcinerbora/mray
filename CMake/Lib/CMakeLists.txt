@@ -28,10 +28,11 @@ set(MRAY_EXTERNAL_LIBRARIES
     ${MRAY_CONFIG_LIB_DIRECTORY}/fmt${CMAKE_STATIC_LIBRARY_SUFFIX}
     ${MRAY_LIB_INCLUDE_DIRECTORY}/nlohmann/json.hpp
     ${MRAY_LIB_INCLUDE_DIRECTORY}/nlohmann/json_fwd.hpp
+    ${MRAY_LIB_INCLUDE_DIRECTORY}/BS/BS_thread_pool.hpp
+    ${MRAY_CONFIG_LIB_DIRECTORY}/assimp$<$<CONFIG:Debug>:d>
+    ${MRAY_CONFIG_LIB_DIRECTORY}/GFGFileIO$<$<CONFIG:Debug>:d>
 
     # ${MRAY_CONFIG_LIB_DIRECTORY}/ZLIB$<$<CONFIG:Debug>:d>
-    # ${MRAY_CONFIG_LIB_DIRECTORY}/assimp$<$<CONFIG:Debug>:d>
-    # ${MRAY_CONFIG_LIB_DIRECTORY}/GFGFileIO$<$<CONFIG:Debug>:d>
     # ${MRAY_CONFIG_LIB_DIRECTORY}/spdlog$<$<CONFIG:Debug>:d>${CMAKE_SHARED_LIBRARY_SUFFIX}
     # ${MRAY_CONFIG_LIB_DIRECTORY}/glbinding$<$<CONFIG:Debug>:d>
     # ${MRAY_CONFIG_LIB_DIRECTORY}/glfw3$<$<CONFIG:Debug>:d>dll
@@ -173,6 +174,7 @@ endfunction()
 # Create mock targets, project layout enables direct access to the headers
 # These are generated for verbosity
 add_library(json INTERFACE)
+target_compile_definitions(json INTERFACE JSON_DIAGNOSTICS=1)
 add_library(nlohmann::json ALIAS json)
 add_library(thread_pool INTERFACE)
 add_library(bs::thread_pool ALIAS thread_pool)
@@ -180,8 +182,8 @@ add_library(bs::thread_pool ALIAS thread_pool)
 gen_imported_target(NAME fmt::fmt STATIC DEBUG_TARGET fmt RELEASE_TARGET fmt
                     EXTRA_DEFINES FMT_USE_NONTYPE_TEMPLATE_ARGS=0)
 gen_imported_target(NAME simdjson::simdjson STATIC DEBUG_TARGET simdjsond RELEASE_TARGET simdjson)
-# gen_imported_target(NAME assimp::assimp SHARED DEBUG_TARGET assimpd RELEASE_TARGET assimp)
-# gen_imported_target(NAME GFGFileIO::GFGFileIO STATIC DEBUG_TARGET GFGFileIOd RELEASE_TARGET GFGFileIO)
+gen_imported_target(NAME assimp::assimp SHARED DEBUG_TARGET assimpd RELEASE_TARGET assimp)
+gen_imported_target(NAME gfgfileio::gfgfileio STATIC DEBUG_TARGET GFGFileIOd RELEASE_TARGET GFGFileIO)
 # gen_imported_target(NAME spdlog::spdlog SHARED DEBUG_TARGET spdlogd RELEASE_TARGET spdlog)
 # gen_imported_target(NAME glbinding::glbinding SHARED DEBUG_TARGET glbindingd RELEASE_TARGET glbinding
 #                     EXTRA_INCLUDES ${MRAY_LIB_INCLUDE_DIRECTORY}/glbinding/3rdparty)

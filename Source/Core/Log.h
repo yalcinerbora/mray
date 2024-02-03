@@ -6,13 +6,6 @@
 #include <fmt/color.h>
 #include <fmt/ranges.h>
 
-//#include "Formatters.h"
-
-#include "Vector.h"
-template <ArrayLikeC V>
-auto format_as(const V& v) { return v.AsArray(); }
-
-
 #ifdef MRAY_DEBUG
 
     template<class... Args>

@@ -104,12 +104,6 @@ namespace MRayDataDetail
     {
         return GetTupleElement<E>(MRayDataEnumTypeMapping);
     }
-
-    //template<class T>
-    //constexpr auto TypeToDataEnum()
-    //{
-    //    return GetTupleElement<T>(MRayDataEnumTypeMapping);
-    //}
 }
 
 template<MRayDataEnum E>
@@ -125,7 +119,7 @@ struct MRayDataTypeRT
 {
     const size_t size;
     const size_t alignment;
-    const MRayDataEnum name;
+    const MRayDataEnum type;
 
     template<MRayDataEnum E>
     MRayDataTypeRT(MRayDataType<E>);
@@ -139,5 +133,5 @@ template<MRayDataEnum E>
 inline MRayDataTypeRT::MRayDataTypeRT(MRayDataType<E>)
     : size(MRayDataType<E>::Size)
     , alignment(MRayDataType<E>::Alignment)
-    , name(E)
+    , type(E)
 {}

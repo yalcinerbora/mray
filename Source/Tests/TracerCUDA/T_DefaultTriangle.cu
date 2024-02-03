@@ -120,21 +120,21 @@ TEST(DefaultTriangle, TypeCheck)
     PrimAttributeInfoList list = triGroup.AttributeInfo();
 
     using namespace std::literals;
-    EXPECT_EQ(std::get<0>(list[0]), "Position"sv);
+    EXPECT_EQ(std::get<0>(list[0]), PrimitiveAttributeLogic::POSITION);
     EXPECT_EQ(std::get<1>(list[0]), AttributeOptionality::MR_MANDATORY);
-    EXPECT_EQ(std::get<2>(list[0]).name, MRayDataEnum::MR_VECTOR_3);
+    EXPECT_EQ(std::get<2>(list[0]).type, MRayDataEnum::MR_VECTOR_3);
 
-    EXPECT_EQ(std::get<0>(list[1]), "Normal"sv);
+    EXPECT_EQ(std::get<0>(list[1]), PrimitiveAttributeLogic::NORMAL);
     EXPECT_EQ(std::get<1>(list[1]), AttributeOptionality::MR_OPTIONAL);
-    EXPECT_EQ(std::get<2>(list[1]).name, MRayDataEnum::MR_QUATERNION);
+    EXPECT_EQ(std::get<2>(list[1]).type, MRayDataEnum::MR_QUATERNION);
 
-    EXPECT_EQ(std::get<0>(list[2]), "UV0"sv);
+    EXPECT_EQ(std::get<0>(list[2]), PrimitiveAttributeLogic::UV0);
     EXPECT_EQ(std::get<1>(list[2]), AttributeOptionality::MR_OPTIONAL);
-    EXPECT_EQ(std::get<2>(list[2]).name, MRayDataEnum::MR_VECTOR_2);
+    EXPECT_EQ(std::get<2>(list[2]).type, MRayDataEnum::MR_VECTOR_2);
 
-    EXPECT_EQ(std::get<0>(list[3]), "Index"sv);
+    EXPECT_EQ(std::get<0>(list[3]), PrimitiveAttributeLogic::INDEX);
     EXPECT_EQ(std::get<1>(list[3]), AttributeOptionality::MR_MANDATORY);
-    EXPECT_EQ(std::get<2>(list[3]).name, MRayDataEnum::MR_VECTOR_3UI);
+    EXPECT_EQ(std::get<2>(list[3]).type, MRayDataEnum::MR_VECTOR_3UI);
 }
 
 TEST(DefaultTriangle, Load)
