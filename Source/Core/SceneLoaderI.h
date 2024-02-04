@@ -13,4 +13,12 @@ class SceneLoaderI
 
     virtual Pair<MRayError, double> LoadScene(TracerI& tracer,
                                               const std::string& filePath) = 0;
+    virtual Pair<MRayError, double> LoadScene(TracerI& tracer, std::istream& sceneData) = 0;
 };
+
+namespace BS
+{
+    class thread_pool;
+}
+
+using SceneLoaderConstructorArgs = Tuple<BS::thread_pool&>;

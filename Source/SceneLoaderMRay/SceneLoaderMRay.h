@@ -75,10 +75,12 @@ class SceneLoaderMRay : public SceneLoaderI
 
     MRayError   LoadAll(TracerI&);
     MRayError   OpenFile(const std::string& filePath);
+    MRayError   ReadStream(std::istream& sceneData);
 
     void        CreateTypeMapping(const std::vector<SurfaceStruct>&,
                                   const std::vector<CameraSurfaceStruct>&,
-                                  const std::vector<LightSurfaceStruct>&);
+                                  const std::vector<LightSurfaceStruct>&,
+                                  const LightSurfaceStruct& boundary);
 
     void        LoadTextures(TracerI&, ExceptionList&);
     void        LoadMediums(TracerI&, ExceptionList&);
@@ -97,4 +99,6 @@ class SceneLoaderMRay : public SceneLoaderI
 
     Pair<MRayError, double> LoadScene(TracerI& tracer,
                                       const std::string& filePath) override;
+
+    Pair<MRayError, double> LoadScene(TracerI& tracer, std::istream& sceneData) override;
 };

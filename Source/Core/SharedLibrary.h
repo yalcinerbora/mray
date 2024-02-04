@@ -8,6 +8,7 @@ Functionality to Load DLLs or SOs
 
 #include "Error.h"
 #include "System.h"
+#include "Types.h"
 
 struct SharedLibArgs
 {
@@ -45,17 +46,20 @@ class SharedLibrary
         SharedLibrary&      operator=(SharedLibrary&&) noexcept;
                             ~SharedLibrary();
 
-        template <class T, class... Args>
+        template <class ArgTuple, class T, class... Args>
         MRayError           GenerateObjectWithArgs(SharedLibPtr<T>&,
                                                    const SharedLibArgs& mangledNames,
                                                    Args&&...) const;
 };
 
-template <class T, class... Args>
+template <class ArgTuple, class T, class... Args>
 MRayError SharedLibrary::GenerateObjectWithArgs(SharedLibPtr<T>& ptr,
                                                 const SharedLibArgs& mangledNames,
                                                 Args&&... args) const
 {
+    static_assert(std::is_same_v<ArgTuple, Tuple<Args...>>,
+                  "Shared library class constructor's arguments did not match!");
+
     MRayError err("[DLLError] Exported function name is not found");
     ObjGeneratorFuncArgs<T, Args&&...> genFunc = reinterpret_cast<ObjGeneratorFuncArgs<T, Args&&...>>(GetProcAdressInternal(mangledNames.mangledConstructorName));
     if(!genFunc) return err;

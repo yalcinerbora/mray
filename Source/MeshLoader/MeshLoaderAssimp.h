@@ -38,10 +38,6 @@ class MeshLoaderAssimp : public MeshLoaderI
                                     MeshLoaderAssimp();
 
     std::unique_ptr<MeshFileI>      OpenFile(std::string& filePath) override;
-
-    // Design leak... change this later
-    private:
-    std::unique_ptr<MeshFileI>      OpenJson(const nlohmann::json& jsonObject) override;
 };
 
 // Sanity checks

@@ -5,15 +5,16 @@
 #include "Core/Timer.h"
 
 #include "MeshLoader/EntryPoint.h"
+#include "MeshLoaderJson.h"
 
 #include <nlohmann/json.hpp>
 #include <filesystem>
 #include <fstream>
 #include <memory>
 #include <string_view>
-
 #include <barrier>
 #include <atomic>
+#include <istream>
 
 #include "JsonNode.h"
 
@@ -71,8 +72,8 @@ static void LoadPrimitive(TracerI& tracer,
             for(size_t i = 0; i < quats.size(); i++)
             {
                 quats[i] = TransformGen::ToSpaceQuat(tangents[i],
-                                                        bitangents[i],
-                                                        normals[i]);
+                                                     bitangents[i],
+                                                     normals[i]);
             }
             tracer.PushPrimAttribute(batchId, attributeIndex, std::move(q));
         }
@@ -167,10 +168,177 @@ std::vector<LightSurfaceStruct> SceneLoaderMRay::LoadLightSurfaces(const nlohman
     return result;
 }
 
-void SceneLoaderMRay::CreateTypeMapping(const std::vector<SurfaceStruct>&,
-                                        const std::vector<CameraSurfaceStruct>&,
-                                        const std::vector<LightSurfaceStruct>&)
+void SceneLoaderMRay::CreateTypeMapping(const std::vector<SurfaceStruct>& surfaces,
+                                        const std::vector<CameraSurfaceStruct>& lightSurfaces,
+                                        const std::vector<LightSurfaceStruct>& camSurfaces,
+                                        const LightSurfaceStruct& boundary)
 {
+    // Given N definition items, and M references on those items
+    // where M >= N, create a map of common definitions -> referred definition list.
+
+    // Definition items assumed to be random. Worst case this is O(N * M).
+    // On a proper scene with transforms, M >> N. But N >> M can be possible if we
+    // allow including multiple definition arrays (and some form of #include equavilence)
+    //
+    // This implementations assumes the first case is most common. So we create a HT
+    // of N's and their locations. Then iterate over the M's and create the type
+    constexpr uint32_t ARRAY_INDEX = 0;
+    constexpr uint32_t INNER_INDEX = 1;
+    constexpr uint32_t IS_MULTI_NODE = 2;
+    using ItemLocation = Tuple<uint32_t, uint32_t, bool>;
+    using ItemLocationMap = std::unordered_map<uint32_t, ItemLocation>;
+
+    auto CreateHT = [](ItemLocationMap& result,
+                       const nlohmann::json& definitions) -> void
+    {
+        for(uint32_t i = 0; i < definitions.size(); i++)
+        {
+            const auto& node = definitions[i];
+            const auto idNode = node.at(NodeNames::ID);
+            ItemLocation itemLoc;
+            std::get<ARRAY_INDEX>(itemLoc) = i;
+            if(!idNode.is_array())
+            {
+                std::get<INNER_INDEX>(itemLoc) = 0;
+                std::get<IS_MULTI_NODE>(itemLoc) = false;
+                result.emplace(idNode.get<uint32_t>(), itemLoc);
+            }
+            else
+            {
+                for(uint32_t j = 0; j < idNode.size(); j++)
+                {
+                    const auto& id = idNode[j];
+                    std::get<INNER_INDEX>(itemLoc) = j;
+                    std::get<IS_MULTI_NODE>(itemLoc) = true;
+                    result.emplace(id.get<uint32_t>(), itemLoc);
+                }
+            }
+        }
+    };
+
+    using namespace TracerConstants;
+    // Prims
+    ItemLocationMap primHT;
+    primHT.reserve(surfaces.size() * MaxPrimBatchPerSurface +
+                   lightSurfaces.size());
+    std::future<void> primHTReady = threadPool.submit_task(
+    [&primHT, CreateHT, &sceneJson = this->sceneJson]()
+    {
+        CreateHT(primHT, sceneJson.at(NodeNames::PRIMITIVE_LIST));
+    });
+    // Materials
+    ItemLocationMap matHT;
+    matHT.reserve(surfaces.size() * MaxPrimBatchPerSurface);
+    std::future<void> matHTReady = threadPool.submit_task(
+    [&matHT, CreateHT, &sceneJson = this->sceneJson]()
+    {
+        CreateHT(matHT, sceneJson.at(NodeNames::MATERIAL_LIST));
+    });
+    // Cameras
+    ItemLocationMap camHT;
+    camHT.reserve(camSurfaces.size());
+    std::future<void> camHTReady = threadPool.submit_task(
+    [&camHT, CreateHT, &sceneJson = this->sceneJson]()
+    {
+        CreateHT(camHT, sceneJson.at(NodeNames::CAMERA_LIST));
+    });
+    // Lights
+    // +1 Comes from boundary light
+    ItemLocationMap lightHT;
+    lightHT.reserve(lightSurfaces.size() + 1);
+    std::future<void> lightHTReady = threadPool.submit_task(
+    [&lightHT, CreateHT, &sceneJson = this->sceneJson]()
+    {
+        return CreateHT(lightHT, sceneJson.at(NodeNames::LIGHT_LIST));
+    });
+    // Transforms
+    ItemLocationMap transformHT;
+    transformHT.reserve(lightSurfaces.size() +
+                        surfaces.size() +
+                        camSurfaces.size() + 1);
+    std::future<void> transformHTReady = threadPool.submit_task(
+    [&transformHT, CreateHT, &sceneJson = this->sceneJson]()
+    {
+        return CreateHT(transformHT, sceneJson.at(NodeNames::TRANSFORM_LIST));
+    });
+    // Mediums
+    // Medium worst case is practically impossible
+    // Each surface has max of 8 materials, each may require two
+    // (inside/outside medium) + every (light + camera) surface
+    // having unique medium (Utilizing arbitrary count of 512)
+    // Worst case, we will have couple of rehashes nothing critical.
+    ItemLocationMap mediumHT;
+    mediumHT.reserve(512);
+    std::future<void> mediumHTReady = threadPool.submit_task(
+    [&mediumHT, CreateHT, &sceneJson = this->sceneJson]()
+    {
+        return CreateHT(mediumHT, sceneJson.at(NodeNames::MEDIUM_LIST));
+    });
+    // Textures
+    // It is hard to find estimate the worst case texture count as well.
+    // Simple Heuristic: Each surface has unique material, each requiring
+    // two textures, there are total of 16 mediums each require a single
+    // texture
+    ItemLocationMap textureHT;
+    textureHT.reserve(surfaces.size() * MaxPrimBatchPerSurface * 2 +
+                      16);
+    std::future<void> textureHTReady = threadPool.submit_task(
+    [&textureHT, CreateHT, &sceneJson = this->sceneJson]()
+    {
+        return CreateHT(textureHT, sceneJson.at(NodeNames::TEXTURE_LIST));
+    });
+
+    // Check boundary first
+    auto PushToTypeMapping =
+    [&sceneJson = std::as_const(sceneJson)](TypeMappedNodes& typeMappings,
+                                            const ItemLocationMap& map, uint32_t id,
+                                            const std::string_view& listName)
+    {
+        const auto& it = map.find(id);
+        if(it == map.end())
+            throw MRayError(MRAY_FORMAT("Id({:d}) could not be "
+                                        "located in {:s}",
+                                        id, listName));
+        const auto& location =  it->second;
+        uint32_t arrayIndex = std::get<ARRAY_INDEX>(location);
+        uint32_t innerIndex = std::get<INNER_INDEX>(location);
+        bool isMultiNode = std::get<IS_MULTI_NODE>(location);
+        auto node = MRayJsonNode(sceneJson[listName][arrayIndex], innerIndex);
+        std::string_view type = node.Type();
+        auto result = typeMappings[type].emplace_back(std::move(node));
+    };
+
+
+    // Start with boundary
+    using namespace NodeNames;
+    lightHTReady.wait();
+    PushToTypeMapping(lightNodes, lightHT, boundary.lightId, LIGHT_LIST);
+    mediumHTReady.wait();
+    PushToTypeMapping(mediumNodes, mediumHT, boundary.mediumId, MEDIUM_LIST);
+    transformHTReady.wait();
+    PushToTypeMapping(transformNodes, transformHT, boundary.transformId, TRANSFORM_LIST);
+
+    //
+    matHTReady.wait();
+    primHTReady.wait();
+    for(const auto& s : surfaces)
+    {
+        for(uint8_t i = 0; i < s.pairCount; i++)
+        {
+            uint32_t matId = std::get<SurfaceStruct::MATERIAL_INDEX>(s.matPrimBatchPairs[i]);
+            uint32_t primId = std::get<SurfaceStruct::PRIM_INDEX>(s.matPrimBatchPairs[i]);
+            PushToTypeMapping(materialNodes, matHT, matId, MATERIAL_LIST);
+            PushToTypeMapping(primNodes, primHT, primId, PRIMITIVE_LIST);
+            PushToTypeMapping(transformNodes, transformHT,
+                              s.transformId, TRANSFORM_LIST);
+        }
+    }
+    // TODO: Do this for lights etc as well
+
+
+    // Now check items one by one.....
+    // TODO: we dont have information about textures here?
+
 
 }
 
@@ -242,34 +410,43 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
                     std::string_view fileName = node.CommonData<std::string_view>(NodeNames::NAME);
                     uint32_t innerIndex = node.AccessData<uint32_t>(NodeNames::INNER_INDEX);
 
+                    const std::unique_ptr<MeshFileI>* meshFile = nullptr;
                     std::string key = std::filesystem::path(fileName).stem().string();
                     if(fileName != NodeNames::NODE_PRIMITIVE &&
                        fileName != NodeNames::INDEXED_NODE_PRIMITIVE)
                     {
                         std::string_view tag = node.Tag();
                         key += tag;
+
+                        const auto& loaderIt = loaders.find(key);
+                        const auto& ml = (loaderIt != loaders.end())
+                                            ? loaderIt->second
+                                            : loaders.emplace(key,
+                                                              meshLoaderPool->AcquireALoader(key)).first->second;
+
+                        std::string fileAbsolutePath = SceneLoaderMRay::SceneRelativePathToAbsolute(fileName, scenePath);
+                        const auto& fileIt = meshFiles.find(fileAbsolutePath);
+                        auto meshFilePtr = ml->OpenFile(fileAbsolutePath);
+                        meshFile = (fileIt != meshFiles.end())
+                                    ? &fileIt->second
+                                    : &meshFiles.emplace(fileAbsolutePath,
+                                                         std::move(meshFilePtr)).first->second;
                     }
-
-                    const auto& loaderIt = loaders.find(key);
-                    const auto& ml = (loaderIt != loaders.end())
-                                        ? loaderIt->second
-                                        : loaders.emplace(key,
-                                                          meshLoaderPool->AcquireALoader(key)).first->second;
-
-                    std::string fileAbsolutePath = SceneLoaderMRay::SceneRelativePathToAbsolute(fileName, scenePath);
-                    const auto& fileIt = meshFiles.find(fileAbsolutePath);
-                    const auto& meshFile = (fileIt != meshFiles.end())
-                                            ? fileIt->second
-                                            : meshFiles.emplace(fileAbsolutePath,
-                                                                ml->OpenFile(fileAbsolutePath)).first->second;
+                    else
+                    {
+                        // Do not use mesh loader here wrap node as a mesh loader
+                        auto meshFilePtr = std::make_unique<MeshFileJson>(m.second[i].RawNode());
+                        meshFile = &meshFiles.emplace(std::to_string(m.second[i].Id()),
+                                                      std::move(meshFilePtr)).first->second;
+                    }
 
                     PrimCount pc
                     {
-                        .primCount = meshFile->MeshPrimitiveCount(innerIndex),
-                        .attributeCount = meshFile->MeshAttributeCount(innerIndex)
+                        .primCount = (*meshFile)->MeshPrimitiveCount(innerIndex),
+                        .attributeCount = (*meshFile)->MeshAttributeCount(innerIndex)
                     };
                     PrimBatchId batchId = tracer.ReservePrimitiveBatch(groupId, pc);
-                    batchFiles[i - start] = Pair(innerIndex, &meshFile);
+                    batchFiles[i - start] = Pair(innerIndex, meshFile);
                     groupBatchList->allocator++;
                     localBatchList[i - start] = Pair(node.Id(), batchId);
                 }
@@ -386,15 +563,15 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
     try
     {
         LightSurfaceStruct boundary                 = LoadBoundary(*boundaryJson.value());
-        std::vector<SurfaceStruct> surfaces         = LoadSurfaces(*camSurfJson.value());
-        std::vector<CameraSurfaceStruct> camSurfs   = LoadCamSurfaces(*lightSurfJson.value(),
+        std::vector<SurfaceStruct> surfaces         = LoadSurfaces(*surfJson.value());
+        std::vector<CameraSurfaceStruct> camSurfs   = LoadCamSurfaces(*camSurfJson.value(),
                                                                       boundary.mediumId);
-        std::vector<LightSurfaceStruct> lightSurfs  = LoadLightSurfaces(*surfJson.value(),
+        std::vector<LightSurfaceStruct> lightSurfs  = LoadLightSurfaces(*lightSurfJson.value(),
                                                                         boundary.mediumId);
 
         // Surfaces are loaded now create type/ node pairings
         // These are stored in the loader's state
-        CreateTypeMapping(surfaces, camSurfs, lightSurfs);
+        CreateTypeMapping(surfaces, camSurfs, lightSurfs, boundary);
 
         // Multi-threaded section
         ExceptionList exceptionList;
@@ -426,7 +603,7 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
 
         // Check if any exceptions are occured
         // Concat to a single exception and return it
-        if(exceptionList.exceptions.size() != 0)
+        if(exceptionList.size != 0)
         {
             MRayError err("");
             for(const auto& e : exceptionList.exceptions)
@@ -483,6 +660,20 @@ MRayError SceneLoaderMRay::OpenFile(const std::string& filePath)
     return MRayError::OK;
 }
 
+MRayError SceneLoaderMRay::ReadStream(std::istream& sceneData)
+{
+    // Parse Json
+    try
+    {
+        sceneJson = nlohmann::json::parse(sceneData, nullptr, true, true);
+    }
+    catch(const nlohmann::json::parse_error& e)
+    {
+        return MRayError(std::string(e.what()));
+    }
+    return MRayError::OK;
+}
+
 SceneLoaderMRay::SceneLoaderMRay(BS::thread_pool& pool)
     :threadPool(pool)
 {}
@@ -497,5 +688,16 @@ Pair<MRayError, double> SceneLoaderMRay::LoadScene(TracerI& tracer,
     t.Split();
 
     return {MRayError::OK, t.Elapsed<Second>()};
+}
 
+Pair<MRayError, double> SceneLoaderMRay::LoadScene(TracerI& tracer,
+                                                   std::istream& sceneData)
+{
+    Timer t; t.Start();
+    MRayError e = MRayError::OK;
+    if(e = ReadStream(sceneData)) return {e, -0.0};
+    if(e = LoadAll(tracer)) return {e, -0.0};
+    t.Split();
+
+    return {MRayError::OK, t.Elapsed<Second>()};
 }

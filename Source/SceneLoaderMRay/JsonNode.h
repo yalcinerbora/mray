@@ -9,8 +9,14 @@
 
 #include "NodeNames.h"
 
-using IdPair = Pair<uint32_t, uint32_t>;
+// specifically use tuple here to achieve verbose access
+using IdPair = Tuple<uint32_t, uint32_t>;
 using IdPairList = std::array<IdPair, TracerConstants::MaxPrimBatchPerSurface>;
+
+static constexpr uint32_t EMPTY_TRANSFORM = std::numeric_limits<uint32_t>::max();
+static constexpr uint32_t EMPTY_MEDIUM = std::numeric_limits<uint32_t>::max();
+//static constexpr uint32_t EMPTY_TRANSFORM = std::numeric_limits<uint32_t>::max();
+//static constexpr uint32_t EMPTY_TRANSFORM = std::numeric_limits<uint32_t>::max();
 
 enum class TextureChannelType
 {
@@ -58,8 +64,8 @@ struct TracerSceneView
 
 struct SurfaceStruct
 {
-    static constexpr int MATERIAL_INDEX = 0;
-    static constexpr int PRIM_INDEX = 1;
+    static constexpr size_t MATERIAL_INDEX = 0;
+    static constexpr size_t PRIM_INDEX = 1;
 
     uint32_t        transformId;
     IdPairList      matPrimBatchPairs;
@@ -110,12 +116,13 @@ class MRayJsonNode
     uint32_t                innerIndex;
 
     public:
-                        MRayJsonNode(nlohmann::json& node,
+                        MRayJsonNode(const nlohmann::json& node,
                                      uint32_t innerIndex = 0);
 
-    std::string_view    Type() const;
-    std::string_view    Tag() const;
-    uint32_t            Id() const;
+    const nlohmann::json&   RawNode() const;
+    std::string_view        Type() const;
+    std::string_view        Tag() const;
+    uint32_t                Id() const;
     // Inner node unspecific data access
     template<class T>
     T                   CommonData(std::string_view name) const;

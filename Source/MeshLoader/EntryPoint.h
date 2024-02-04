@@ -44,8 +44,6 @@ class MeshLoaderI
     virtual                             ~MeshLoaderI() = default;
 
     virtual std::unique_ptr<MeshFileI>  OpenFile(std::string& filePath) = 0;
-    // Design leak... change this later
-    virtual std::unique_ptr<MeshFileI>  OpenJson(const nlohmann::json& jsonObject) = 0;
 };
 
 // This is loaded once for the process

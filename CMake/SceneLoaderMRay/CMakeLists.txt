@@ -5,8 +5,8 @@ set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/EntryPoint.cpp
     ${CURRENT_SOURCE_DIR}/SceneLoaderMRay.h
     ${CURRENT_SOURCE_DIR}/SceneLoaderMRay.cpp
-    ${CURRENT_SOURCE_DIR}/MeshLoaderMRayJson.h
-    ${CURRENT_SOURCE_DIR}/MeshLoaderMRayJson.cpp
+    ${CURRENT_SOURCE_DIR}/MeshLoaderJson.h
+    ${CURRENT_SOURCE_DIR}/MeshLoaderJson.cpp
     ${CURRENT_SOURCE_DIR}/JsonNode.h
     ${CURRENT_SOURCE_DIR}/JsonNode.hpp
     ${CURRENT_SOURCE_DIR}/NodeNames.h)

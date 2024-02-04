@@ -28,14 +28,68 @@ inline void from_json(const nlohmann::json& n, NodeTexStruct& ts)
     ts.channelLayout = LoadTextureAccessLayout(n.at(TEXTURE_CHANNEL));
 }
 
-inline void from_json(const nlohmann::json&, SurfaceStruct&)
-{}
+inline void from_json(const nlohmann::json& n, SurfaceStruct& s)
+{
+    auto it = n.find(NodeNames::TRANSFORM);
+    s.transformId = (it == n.end())
+                        ? EMPTY_TRANSFORM
+                        : it->get<uint32_t>();
 
-inline void from_json(const nlohmann::json&, LightSurfaceStruct&)
-{}
+    const auto& matArray = n.at(NodeNames::MATERIAL);
+    const auto& primArray = n.at(NodeNames::PRIMITIVE);
+    if(matArray.size() != primArray.size())
+        throw MRayError("Material/Primitive pair lists does not match on a surface!");
 
-inline void from_json(const nlohmann::json&, CameraSurfaceStruct&)
-{}
+    if(matArray.is_number_integer() &&
+       primArray.is_number_integer())
+    {
+        IdPair p;
+        std::get<SurfaceStruct::MATERIAL_INDEX>(p) = matArray;
+        std::get<SurfaceStruct::PRIM_INDEX>(p) = primArray;
+        s.pairCount = 1;
+        s.matPrimBatchPairs[0] = p;
+    }
+    else
+    {
+        for(size_t i = 0; i < matArray.size(); i++)
+        {
+            IdPair p;
+            std::get<SurfaceStruct::MATERIAL_INDEX>(p) = matArray[i];
+            std::get<SurfaceStruct::PRIM_INDEX>(p) = primArray[i];
+            s.matPrimBatchPairs[i] = p;
+
+        }
+        s.pairCount = static_cast<uint8_t>(matArray.size());
+    }
+}
+
+inline void from_json(const nlohmann::json& n, LightSurfaceStruct& s)
+{
+    auto itT = n.find(NodeNames::TRANSFORM);
+    s.transformId = (itT == n.end())
+                        ? EMPTY_TRANSFORM
+                        : itT->get<uint32_t>();
+    auto itM = n.find(NodeNames::MEDIUM);
+    s.mediumId = (itM == n.end())
+                    ? EMPTY_MEDIUM
+                    : itM->get<uint32_t>();
+
+    s.lightId = n.at(NodeNames::LIGHT);
+}
+
+inline void from_json(const nlohmann::json& n, CameraSurfaceStruct& s)
+{
+    auto itT = n.find(NodeNames::TRANSFORM);
+    s.transformId = (itT == n.end())
+                        ? EMPTY_TRANSFORM
+                        : itT->get<uint32_t>();
+    auto itM = n.find(NodeNames::MEDIUM);
+    s.mediumId = (itM == n.end())
+                    ? EMPTY_MEDIUM
+                    : itM->get<uint32_t>();
+
+    s.cameraId = n.at(NodeNames::CAMERA);
+}
 
 template<ArrayLikeC T>
 void from_json(const nlohmann::json& n, T& out)
@@ -43,13 +97,18 @@ void from_json(const nlohmann::json& n, T& out)
     out = T(Span<const typename T::InnerType, T::DIMS>(n.cbegin(), n.cend()));
 }
 
-inline MRayJsonNode::MRayJsonNode(nlohmann::json& node, uint32_t innerIndex)
+inline MRayJsonNode::MRayJsonNode(const nlohmann::json& node, uint32_t innerIndex)
     : node(node)
     , innerIndex(innerIndex)
 {
     // Check the multi-nodeness
     auto n = node.at(NodeNames::ID);
     isMultiNode = n.is_array();
+}
+
+inline const nlohmann::json& MRayJsonNode::RawNode() const
+{
+    return node;
 }
 
 inline std::string_view MRayJsonNode::Type() const

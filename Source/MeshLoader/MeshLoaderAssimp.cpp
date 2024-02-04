@@ -201,9 +201,3 @@ std::unique_ptr<MeshFileI> MeshLoaderAssimp::OpenFile(std::string& filePath)
 {
     return std::unique_ptr<MeshFileI>(new MeshFileAssimp(importer, filePath));
 }
-
-// Design leak... change this later
-std::unique_ptr<MeshFileI> MeshLoaderAssimp::OpenJson(const nlohmann::json&)
-{
-    throw MRayError("Assimp Mesh Loader does not support json!");
-}
