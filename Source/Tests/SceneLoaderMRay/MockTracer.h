@@ -19,13 +19,21 @@ class TracerMock : public TracerI
     TypeNameList        CameraGroups() const override;
     TypeNameList        MediumGroups() const override;
 
-    PrimAttributeInfoList       PrimAttributeInfo(PrimGroupId) const override;
-    CamAttributeInfoList        CamAttributeInfo(CameraGroupId) const override;
-    MediumAttributeInfoList     MediumAttributeInfo(MediumGroupId) const override;
-    MatAttributeInfoList        MatAttributeInfo(MatGroupId) const override;
-    TransAttributeInfoList      TransAttributeInfo(TransGroupId) const override;
-    LightAttributeInfoList      LightAttributeInfo(LightGroupId) const override;
-    RendererAttributeInfoList   RendererAttributeInfo(RendererId) const override;
+    PrimAttributeInfoList       AttributeInfo(PrimGroupId) const override;
+    CamAttributeInfoList        AttributeInfo(CameraGroupId) const override;
+    MediumAttributeInfoList     AttributeInfo(MediumGroupId) const override;
+    MatAttributeInfoList        AttributeInfo(MatGroupId) const override;
+    TransAttributeInfoList      AttributeInfo(TransGroupId) const override;
+    LightAttributeInfoList      AttributeInfo(LightGroupId) const override;
+    RendererAttributeInfoList   AttributeInfo(RendererId) const override;
+
+    PrimAttributeInfoList       PrimAttributeInfo(std::string_view) const override;
+    CamAttributeInfoList        CamAttributeInfo(std::string_view) const override;
+    MediumAttributeInfoList     MediumAttributeInfo(std::string_view) const override;
+    MatAttributeInfoList        MatAttributeInfo(std::string_view) const override;
+    TransAttributeInfoList      TransAttributeInfo(std::string_view) const override;
+    LightAttributeInfoList      LightAttributeInfo(std::string_view) const override;
+    RendererAttributeInfoList   RendererAttributeInfo(std::string_view) const override;
 
     std::string     TypeName(PrimGroupId) const override;
     std::string     TypeName(CameraGroupId) const override;
@@ -175,37 +183,72 @@ inline TypeNameList TracerMock::MediumGroups() const
     return std::vector<std::string>();
 }
 
-inline PrimAttributeInfoList TracerMock::PrimAttributeInfo(PrimGroupId) const
+inline PrimAttributeInfoList TracerMock::AttributeInfo(PrimGroupId) const
 {
     return PrimAttributeInfoList{};
 }
 
-inline CamAttributeInfoList TracerMock::CamAttributeInfo(CameraGroupId) const
+inline CamAttributeInfoList TracerMock::AttributeInfo(CameraGroupId) const
 {
     return CamAttributeInfoList{};
 }
 
-inline MediumAttributeInfoList TracerMock::MediumAttributeInfo(MediumGroupId) const
+inline MediumAttributeInfoList TracerMock::AttributeInfo(MediumGroupId) const
 {
     return MediumAttributeInfoList{};
 }
 
-inline MatAttributeInfoList TracerMock::MatAttributeInfo(MatGroupId) const
+inline MatAttributeInfoList TracerMock::AttributeInfo(MatGroupId) const
 {
     return MatAttributeInfoList{};
 }
 
-inline TransAttributeInfoList TracerMock::TransAttributeInfo(TransGroupId) const
+inline TransAttributeInfoList TracerMock::AttributeInfo(TransGroupId) const
 {
     return TransAttributeInfoList{};
 }
 
-inline LightAttributeInfoList TracerMock::LightAttributeInfo(LightGroupId) const
+inline LightAttributeInfoList TracerMock::AttributeInfo(LightGroupId) const
 {
     return LightAttributeInfoList{};
 }
 
-inline RendererAttributeInfoList TracerMock::RendererAttributeInfo(RendererId) const
+inline RendererAttributeInfoList TracerMock::AttributeInfo(RendererId) const
+{
+    return RendererAttributeInfoList{};
+}
+
+inline PrimAttributeInfoList TracerMock::PrimAttributeInfo(std::string_view) const
+{
+    return PrimAttributeInfoList{};
+}
+
+inline CamAttributeInfoList TracerMock::CamAttributeInfo(std::string_view) const
+{
+    return CamAttributeInfoList{};
+}
+
+inline MediumAttributeInfoList TracerMock::MediumAttributeInfo(std::string_view) const
+{
+    return MediumAttributeInfoList{};
+}
+
+inline MatAttributeInfoList TracerMock::MatAttributeInfo(std::string_view) const
+{
+    return MatAttributeInfoList{};
+}
+
+inline TransAttributeInfoList TracerMock::TransAttributeInfo(std::string_view) const
+{
+    return TransAttributeInfoList{};
+}
+
+inline LightAttributeInfoList TracerMock::LightAttributeInfo(std::string_view) const
+{
+    return LightAttributeInfoList{};
+}
+
+inline RendererAttributeInfoList TracerMock::RendererAttributeInfo(std::string_view) const
 {
     return RendererAttributeInfoList{};
 }

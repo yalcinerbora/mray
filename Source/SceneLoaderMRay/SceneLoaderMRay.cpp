@@ -3,6 +3,7 @@
 #include "Core/TracerI.h"
 #include "Core/Log.h"
 #include "Core/Timer.h"
+#include "Core/NormTypes.h"
 
 #include "MeshLoader/EntryPoint.h"
 #include "MeshLoaderJson.h"
@@ -25,16 +26,16 @@ static void LoadPrimitive(TracerI& tracer,
                           const std::unique_ptr<MeshFileI>& meshFile)
 {
     using enum PrimitiveAttributeLogic;
-    const auto& attributeList = tracer.PrimAttributeInfo(groupId);
+    const auto& attributeList = tracer.AttributeInfo(groupId);
 
     for(uint32_t attributeIndex = 0;
         attributeIndex < attributeList.size();
         attributeIndex++)
     {
         const auto& attribute = attributeList[attributeIndex];
-        PrimitiveAttributeLogic attribLogic = std::get<0>(attribute);
-        AttributeOptionality optionality = std::get<1>(attribute);
-        MRayDataTypeRT groupsLayout = std::get<2>(attribute);
+        PrimitiveAttributeLogic attribLogic = std::get<PrimAttributeInfo::LOGIC_INDEX>(attribute);
+        AttributeOptionality optionality = std::get<PrimAttributeInfo::OPTIONALITY_INDEX>(attribute);
+        MRayDataTypeRT groupsLayout = std::get<PrimAttributeInfo::LAYOUT_INDEX>(attribute);
         MRayDataTypeRT filesLayout = meshFile->AttributeLayout(attribLogic,
                                                                meshInternalIndex);
 
@@ -50,11 +51,11 @@ static void LoadPrimitive(TracerI& tracer,
             continue;
         }
         // Special case for default triangle
-        if(attribLogic == NORMAL && groupsLayout.type == MRayDataEnum::MR_QUATERNION &&
+        if(attribLogic == NORMAL && groupsLayout.Name() == MRayDataEnum::MR_QUATERNION &&
            meshFile->HasAttribute(TANGENT) && meshFile->HasAttribute(BITANGENT) &&
-           meshFile->AttributeLayout(TANGENT).type == MRayDataEnum::MR_VECTOR_3 &&
-           meshFile->AttributeLayout(BITANGENT).type == MRayDataEnum::MR_VECTOR_3 &&
-           meshFile->AttributeLayout(NORMAL).type == MRayDataEnum::MR_VECTOR_3)
+           meshFile->AttributeLayout(TANGENT).Name() == MRayDataEnum::MR_VECTOR_3 &&
+           meshFile->AttributeLayout(BITANGENT).Name() == MRayDataEnum::MR_VECTOR_3 &&
+           meshFile->AttributeLayout(NORMAL).Name() == MRayDataEnum::MR_VECTOR_3)
         {
             size_t normalCount = meshFile->MeshAttributeCount(meshInternalIndex);
             MRayInput q(std::in_place_type_t<Quaternion>{}, normalCount);
@@ -78,7 +79,7 @@ static void LoadPrimitive(TracerI& tracer,
             tracer.PushPrimAttribute(batchId, attributeIndex, std::move(q));
         }
         // Is this data's layout match with the primitive group
-        else if(groupsLayout.type != filesLayout.type)
+        else if(groupsLayout.Name() != filesLayout.Name())
         {
             // TODO: Add CPU conversion logic here for basic conversions
             // (Both is floating point type and conversion is *not* narrowing)
@@ -90,9 +91,9 @@ static void LoadPrimitive(TracerI& tracer,
                                         "(which is {:s})",
                                         meshFile->Name(), meshInternalIndex,
                                         PrimAttributeStringifier::ToString(attribLogic),
-                                        MRayDataTypeStringifier::ToString(filesLayout.type),
+                                        MRayDataTypeStringifier::ToString(filesLayout.Name()),
                                         tracer.TypeName(groupId),
-                                        MRayDataTypeStringifier::ToString(groupsLayout.type)));
+                                        MRayDataTypeStringifier::ToString(groupsLayout.Name())));
         }
         // All Good, load and send
         else
@@ -168,178 +169,69 @@ std::vector<LightSurfaceStruct> SceneLoaderMRay::LoadLightSurfaces(const nlohman
     return result;
 }
 
-void SceneLoaderMRay::CreateTypeMapping(const std::vector<SurfaceStruct>& surfaces,
-                                        const std::vector<CameraSurfaceStruct>& lightSurfaces,
-                                        const std::vector<LightSurfaceStruct>& camSurfaces,
-                                        const LightSurfaceStruct& boundary)
+void SceneLoaderMRay::DryRunLightsForPrim(std::vector<uint32_t>& primIds,
+                                          const TypeMappedNodes& lightNodes,
+                                          const TracerI& tracer)
 {
-    // Given N definition items, and M references on those items
-    // where M >= N, create a map of common definitions -> referred definition list.
-
-    // Definition items assumed to be random. Worst case this is O(N * M).
-    // On a proper scene with transforms, M >> N. But N >> M can be possible if we
-    // allow including multiple definition arrays (and some form of #include equavilence)
-    //
-    // This implementations assumes the first case is most common. So we create a HT
-    // of N's and their locations. Then iterate over the M's and create the type
-    constexpr uint32_t ARRAY_INDEX = 0;
-    constexpr uint32_t INNER_INDEX = 1;
-    constexpr uint32_t IS_MULTI_NODE = 2;
-    using ItemLocation = Tuple<uint32_t, uint32_t, bool>;
-    using ItemLocationMap = std::unordered_map<uint32_t, ItemLocation>;
-
-    auto CreateHT = [](ItemLocationMap& result,
-                       const nlohmann::json& definitions) -> void
+    for(const auto& l : lightNodes)
     {
-        for(uint32_t i = 0; i < definitions.size(); i++)
+        LightAttributeInfoList lightAttributes = tracer.LightAttributeInfo(l.first);
+        if(l.first != NodeNames::LIGHT_TYPE_PRIMITIVE)
+            continue;
+        // Light Type is primitive, it has to have "primitive" field
+        for(const auto& node : l.second)
         {
-            const auto& node = definitions[i];
-            const auto idNode = node.at(NodeNames::ID);
-            ItemLocation itemLoc;
-            std::get<ARRAY_INDEX>(itemLoc) = i;
-            if(!idNode.is_array())
-            {
-                std::get<INNER_INDEX>(itemLoc) = 0;
-                std::get<IS_MULTI_NODE>(itemLoc) = false;
-                result.emplace(idNode.get<uint32_t>(), itemLoc);
-            }
-            else
-            {
-                for(uint32_t j = 0; j < idNode.size(); j++)
-                {
-                    const auto& id = idNode[j];
-                    std::get<INNER_INDEX>(itemLoc) = j;
-                    std::get<IS_MULTI_NODE>(itemLoc) = true;
-                    result.emplace(id.get<uint32_t>(), itemLoc);
-                }
-            }
-        }
-    };
-
-    using namespace TracerConstants;
-    // Prims
-    ItemLocationMap primHT;
-    primHT.reserve(surfaces.size() * MaxPrimBatchPerSurface +
-                   lightSurfaces.size());
-    std::future<void> primHTReady = threadPool.submit_task(
-    [&primHT, CreateHT, &sceneJson = this->sceneJson]()
-    {
-        CreateHT(primHT, sceneJson.at(NodeNames::PRIMITIVE_LIST));
-    });
-    // Materials
-    ItemLocationMap matHT;
-    matHT.reserve(surfaces.size() * MaxPrimBatchPerSurface);
-    std::future<void> matHTReady = threadPool.submit_task(
-    [&matHT, CreateHT, &sceneJson = this->sceneJson]()
-    {
-        CreateHT(matHT, sceneJson.at(NodeNames::MATERIAL_LIST));
-    });
-    // Cameras
-    ItemLocationMap camHT;
-    camHT.reserve(camSurfaces.size());
-    std::future<void> camHTReady = threadPool.submit_task(
-    [&camHT, CreateHT, &sceneJson = this->sceneJson]()
-    {
-        CreateHT(camHT, sceneJson.at(NodeNames::CAMERA_LIST));
-    });
-    // Lights
-    // +1 Comes from boundary light
-    ItemLocationMap lightHT;
-    lightHT.reserve(lightSurfaces.size() + 1);
-    std::future<void> lightHTReady = threadPool.submit_task(
-    [&lightHT, CreateHT, &sceneJson = this->sceneJson]()
-    {
-        return CreateHT(lightHT, sceneJson.at(NodeNames::LIGHT_LIST));
-    });
-    // Transforms
-    ItemLocationMap transformHT;
-    transformHT.reserve(lightSurfaces.size() +
-                        surfaces.size() +
-                        camSurfaces.size() + 1);
-    std::future<void> transformHTReady = threadPool.submit_task(
-    [&transformHT, CreateHT, &sceneJson = this->sceneJson]()
-    {
-        return CreateHT(transformHT, sceneJson.at(NodeNames::TRANSFORM_LIST));
-    });
-    // Mediums
-    // Medium worst case is practically impossible
-    // Each surface has max of 8 materials, each may require two
-    // (inside/outside medium) + every (light + camera) surface
-    // having unique medium (Utilizing arbitrary count of 512)
-    // Worst case, we will have couple of rehashes nothing critical.
-    ItemLocationMap mediumHT;
-    mediumHT.reserve(512);
-    std::future<void> mediumHTReady = threadPool.submit_task(
-    [&mediumHT, CreateHT, &sceneJson = this->sceneJson]()
-    {
-        return CreateHT(mediumHT, sceneJson.at(NodeNames::MEDIUM_LIST));
-    });
-    // Textures
-    // It is hard to find estimate the worst case texture count as well.
-    // Simple Heuristic: Each surface has unique material, each requiring
-    // two textures, there are total of 16 mediums each require a single
-    // texture
-    ItemLocationMap textureHT;
-    textureHT.reserve(surfaces.size() * MaxPrimBatchPerSurface * 2 +
-                      16);
-    std::future<void> textureHTReady = threadPool.submit_task(
-    [&textureHT, CreateHT, &sceneJson = this->sceneJson]()
-    {
-        return CreateHT(textureHT, sceneJson.at(NodeNames::TEXTURE_LIST));
-    });
-
-    // Check boundary first
-    auto PushToTypeMapping =
-    [&sceneJson = std::as_const(sceneJson)](TypeMappedNodes& typeMappings,
-                                            const ItemLocationMap& map, uint32_t id,
-                                            const std::string_view& listName)
-    {
-        const auto& it = map.find(id);
-        if(it == map.end())
-            throw MRayError(MRAY_FORMAT("Id({:d}) could not be "
-                                        "located in {:s}",
-                                        id, listName));
-        const auto& location =  it->second;
-        uint32_t arrayIndex = std::get<ARRAY_INDEX>(location);
-        uint32_t innerIndex = std::get<INNER_INDEX>(location);
-        bool isMultiNode = std::get<IS_MULTI_NODE>(location);
-        auto node = MRayJsonNode(sceneJson[listName][arrayIndex], innerIndex);
-        std::string_view type = node.Type();
-        auto result = typeMappings[type].emplace_back(std::move(node));
-    };
-
-
-    // Start with boundary
-    using namespace NodeNames;
-    lightHTReady.wait();
-    PushToTypeMapping(lightNodes, lightHT, boundary.lightId, LIGHT_LIST);
-    mediumHTReady.wait();
-    PushToTypeMapping(mediumNodes, mediumHT, boundary.mediumId, MEDIUM_LIST);
-    transformHTReady.wait();
-    PushToTypeMapping(transformNodes, transformHT, boundary.transformId, TRANSFORM_LIST);
-
-    //
-    matHTReady.wait();
-    primHTReady.wait();
-    for(const auto& s : surfaces)
-    {
-        for(uint8_t i = 0; i < s.pairCount; i++)
-        {
-            uint32_t matId = std::get<SurfaceStruct::MATERIAL_INDEX>(s.matPrimBatchPairs[i]);
-            uint32_t primId = std::get<SurfaceStruct::PRIM_INDEX>(s.matPrimBatchPairs[i]);
-            PushToTypeMapping(materialNodes, matHT, matId, MATERIAL_LIST);
-            PushToTypeMapping(primNodes, primHT, primId, PRIMITIVE_LIST);
-            PushToTypeMapping(transformNodes, transformHT,
-                              s.transformId, TRANSFORM_LIST);
+            uint32_t primId = node.AccessData<uint32_t>(NodeNames::PRIMITIVE);
+            primIds.push_back(primId);
         }
     }
-    // TODO: Do this for lights etc as well
+}
 
+template <class TracerInterfaceFunc>
+void SceneLoaderMRay::DryRunNodesForTex(std::vector<NodeTexStruct>& textureIds,
+                                        const TypeMappedNodes& nodes,
+                                        const TracerI& tracer,
+                                        TracerInterfaceFunc&& func)
+{
+    for(const auto& n : nodes)
+    {
+        TexturedAttributeInfoList texAttributes = std::invoke(func, tracer, n.first);
+        // Light Type is primitive, it has to have "primitive" field
+        for(const auto& node : n.second)
+        for(const auto& att : texAttributes)
+        {
+            AttributeTexturable texturable = std::get<MatAttributeInfo::TEXTURABLE_INDEX>(att);
+            AttributeOptionality optional = std::get<MatAttributeInfo::OPTIONALITY_INDEX>(att);
+            std::string_view name = std::get<MatAttributeInfo::LOGIC_INDEX>(att);
+            if(texturable == AttributeTexturable::MR_CONSTANT_ONLY)
+                continue;
 
-    // Now check items one by one.....
-    // TODO: we dont have information about textures here?
-
-
+            if(texturable == AttributeTexturable::MR_TEXTURE_ONLY)
+            {
+                if(optional == AttributeOptionality::MR_OPTIONAL)
+                {
+                    auto ts = node.AccessOptionalData<NodeTexStruct>(name);
+                    if(ts.has_value()) textureIds.push_back(ts.value());
+                }
+                else
+                {
+                    auto ts = node.AccessData<NodeTexStruct>(name);
+                    textureIds.push_back(ts);
+                }
+            }
+            else if(texturable == AttributeTexturable::MR_TEXTURE_OR_CONSTANT)
+            {
+                MRayDataTypeRT dataType = std::get<MatAttributeInfo::LAYOUT_INDEX>(att);
+                std::visit([&node, name, &textureIds](auto&& dataType)
+                {
+                    using T = std::remove_cvref_t<decltype(dataType)>::Type;
+                    auto value = node.AccessTexturableData<T>(name);
+                    if(std::holds_alternative<NodeTexStruct>(value))
+                        textureIds.push_back(std::get<NodeTexStruct>(value));
+                }, dataType);
+            }
+        }
+    }
 }
 
 void SceneLoaderMRay::LoadTextures(TracerI&, ExceptionList&)
@@ -511,6 +403,233 @@ void SceneLoaderMRay::LoadLights(TracerI&, ExceptionList&)
 
 }
 
+void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
+                                        const std::vector<SurfaceStruct>& surfaces,
+                                        const std::vector<CameraSurfaceStruct>& camSurfaces,
+                                        const std::vector<LightSurfaceStruct>& lightSurfaces,
+                                        const LightSurfaceStruct& boundary)
+{
+    // Given N definition items, and M references on those items
+    // where M >= N, create a map of common definitions -> referred definition list.
+
+    // Definition items assumed to be random. Worst case this is O(N * M).
+    // On a proper scene with transforms, M >> N. But N >> M can be possible if we
+    // allow including multiple definition arrays (and some form of #include equavilence)
+    //
+    // This implementations assumes the first case is most common. So we create a HT
+    // of N's and their locations. Then iterate over the M's and create the type
+    constexpr uint32_t ARRAY_INDEX = 0;
+    constexpr uint32_t INNER_INDEX = 1;
+    constexpr uint32_t IS_MULTI_NODE = 2;
+    using ItemLocation = Tuple<uint32_t, uint32_t, bool>;
+    using ItemLocationMap = std::unordered_map<uint32_t, ItemLocation>;
+
+    auto CreateHT = [](ItemLocationMap& result,
+                       const nlohmann::json& definitions) -> void
+    {
+        for(uint32_t i = 0; i < definitions.size(); i++)
+        {
+            const auto& node = definitions[i];
+            const auto idNode = node.at(NodeNames::ID);
+            ItemLocation itemLoc;
+            std::get<ARRAY_INDEX>(itemLoc) = i;
+            if(!idNode.is_array())
+            {
+                std::get<INNER_INDEX>(itemLoc) = 0;
+                std::get<IS_MULTI_NODE>(itemLoc) = false;
+                result.emplace(idNode.get<uint32_t>(), itemLoc);
+            }
+            else
+            {
+                for(uint32_t j = 0; j < idNode.size(); j++)
+                {
+                    const auto& id = idNode[j];
+                    std::get<INNER_INDEX>(itemLoc) = j;
+                    std::get<IS_MULTI_NODE>(itemLoc) = true;
+                    result.emplace(id.get<uint32_t>(), itemLoc);
+                }
+            }
+        }
+    };
+
+    using namespace TracerConstants;
+    // Prims
+    ItemLocationMap primHT;
+    primHT.reserve(surfaces.size() * MaxPrimBatchPerSurface +
+                   lightSurfaces.size());
+    std::future<void> primHTReady = threadPool.submit_task(
+    [&primHT, CreateHT, &sceneJson = this->sceneJson]()
+    {
+        CreateHT(primHT, sceneJson.at(NodeNames::PRIMITIVE_LIST));
+    });
+    // Materials
+    ItemLocationMap matHT;
+    matHT.reserve(surfaces.size() * MaxPrimBatchPerSurface);
+    std::future<void> matHTReady = threadPool.submit_task(
+    [&matHT, CreateHT, &sceneJson = this->sceneJson]()
+    {
+        CreateHT(matHT, sceneJson.at(NodeNames::MATERIAL_LIST));
+    });
+    // Cameras
+    ItemLocationMap camHT;
+    camHT.reserve(camSurfaces.size());
+    std::future<void> camHTReady = threadPool.submit_task(
+    [&camHT, CreateHT, &sceneJson = this->sceneJson]()
+    {
+        CreateHT(camHT, sceneJson.at(NodeNames::CAMERA_LIST));
+    });
+    // Lights
+    // +1 Comes from boundary light
+    ItemLocationMap lightHT;
+    lightHT.reserve(lightSurfaces.size() + 1);
+    std::future<void> lightHTReady = threadPool.submit_task(
+    [&lightHT, CreateHT, &sceneJson = this->sceneJson]()
+    {
+        return CreateHT(lightHT, sceneJson.at(NodeNames::LIGHT_LIST));
+    });
+    // Transforms
+    ItemLocationMap transformHT;
+    transformHT.reserve(lightSurfaces.size() +
+                        surfaces.size() +
+                        camSurfaces.size() + 1);
+    std::future<void> transformHTReady = threadPool.submit_task(
+    [&transformHT, CreateHT, &sceneJson = this->sceneJson]()
+    {
+        return CreateHT(transformHT, sceneJson.at(NodeNames::TRANSFORM_LIST));
+    });
+    // Mediums
+    // Medium worst case is practically impossible
+    // Each surface has max of 8 materials, each may require two
+    // (inside/outside medium) + every (light + camera) surface
+    // having unique medium (Utilizing arbitrary count of 512)
+    // Worst case, we will have couple of rehashes nothing critical.
+    ItemLocationMap mediumHT;
+    mediumHT.reserve(512);
+    std::future<void> mediumHTReady = threadPool.submit_task(
+    [&mediumHT, CreateHT, &sceneJson = this->sceneJson]()
+    {
+        return CreateHT(mediumHT, sceneJson.at(NodeNames::MEDIUM_LIST));
+    });
+    // Textures
+    // It is hard to find estimate the worst case texture count as well.
+    // Simple Heuristic: Each surface has unique material, each requiring
+    // two textures, there are total of 16 mediums each require a single
+    // texture
+    ItemLocationMap textureHT;
+    textureHT.reserve(surfaces.size() * MaxPrimBatchPerSurface * 2 +
+                      16);
+    std::future<void> textureHTReady = threadPool.submit_task(
+    [&textureHT, CreateHT, &sceneJson = this->sceneJson]()
+    {
+        return CreateHT(textureHT, sceneJson.at(NodeNames::TEXTURE_LIST));
+    });
+
+    // Check boundary first
+    auto PushToTypeMapping =
+    [&sceneJson = std::as_const(sceneJson)](TypeMappedNodes& typeMappings,
+                                            const ItemLocationMap& map, uint32_t id,
+                                            const std::string_view& listName)
+    {
+        const auto& it = map.find(id);
+        if(it == map.end())
+            throw MRayError(MRAY_FORMAT("Id({:d}) could not be "
+                                        "located in {:s}",
+                                        id, listName));
+        const auto& location =  it->second;
+        uint32_t arrayIndex = std::get<ARRAY_INDEX>(location);
+        uint32_t innerIndex = std::get<INNER_INDEX>(location);
+        bool isMultiNode = std::get<IS_MULTI_NODE>(location);
+        auto node = MRayJsonNode(sceneJson[listName][arrayIndex], innerIndex);
+        std::string_view type = node.Type();
+        auto result = typeMappings[type].emplace_back(std::move(node));
+    };
+
+    // Start with boundary
+    using namespace NodeNames;
+    lightHTReady.wait();
+    PushToTypeMapping(lightNodes, lightHT, boundary.lightId, LIGHT_LIST);
+    mediumHTReady.wait();
+    PushToTypeMapping(mediumNodes, mediumHT, boundary.mediumId, MEDIUM_LIST);
+    transformHTReady.wait();
+    PushToTypeMapping(transformNodes, transformHT, boundary.transformId, TRANSFORM_LIST);
+
+    // Prim/Material Surfaces
+    matHTReady.wait();
+    primHTReady.wait();
+
+    std::vector<NodeTexStruct> textureIds;
+    textureIds.reserve(surfaces.size() * 2);
+    for(const auto& s : surfaces)
+    {
+        for(uint8_t i = 0; i < s.pairCount; i++)
+        {
+            uint32_t matId = std::get<SurfaceStruct::MATERIAL_INDEX>(s.matPrimBatchPairs[i]);
+            uint32_t primId = std::get<SurfaceStruct::PRIM_INDEX>(s.matPrimBatchPairs[i]);
+            PushToTypeMapping(materialNodes, matHT, matId, MATERIAL_LIST);
+            PushToTypeMapping(primNodes, primHT, primId, PRIMITIVE_LIST);
+            PushToTypeMapping(transformNodes, transformHT,
+                              s.transformId, TRANSFORM_LIST);
+
+            if(s.alphaMaps[i].has_value())
+                textureIds.push_back(s.alphaMaps[i].value());
+        }
+    }
+    // Camera Surfaces
+    camHTReady.wait();
+    for(const auto& c : camSurfaces)
+    {
+        PushToTypeMapping(cameraNodes, camHT, c.cameraId, CAMERA_LIST);
+        PushToTypeMapping(mediumNodes, mediumHT, c.mediumId, MEDIUM_LIST);
+        PushToTypeMapping(transformNodes, transformHT,
+                          c.transformId, TRANSFORM_LIST);
+    }
+    // Light Surfaces
+    lightHTReady.wait();
+    for(const auto& l : lightSurfaces)
+    {
+        l.lightId;
+        PushToTypeMapping(lightNodes, lightHT, l.lightId, LIGHT_LIST);
+        PushToTypeMapping(mediumNodes, mediumHT, l.mediumId, MEDIUM_LIST);
+        PushToTypeMapping(transformNodes, transformHT,
+                          l.transformId, TRANSFORM_LIST);
+    }
+
+    // Now double indirections...
+    // We need to iterate lights once to find primitive's that are required
+    // by these lights. Lights are generic so we need look at the light via
+    // the tracer. We call this dry run, since we do most of the scene-related
+    // load work but we do not actually load the data.
+    std::vector<uint32_t> primitiveIds;
+    primitiveIds.reserve(lightSurfaces.size());
+    DryRunLightsForPrim(primitiveIds, lightNodes, tracer);
+    for(const auto& p : primitiveIds)
+        PushToTypeMapping(primNodes, primHT, p, PRIMITIVE_LIST);
+
+    // This is true for textures as well. Materials may/may not require textures
+    // (or mediums) so we need to check these as well
+    DryRunNodesForTex(textureIds, materialNodes, tracer,
+                      &TracerI::MatAttributeInfo);
+    DryRunNodesForTex(textureIds, mediumNodes, tracer,
+                      &TracerI::MediumAttributeInfo);
+
+    // And finally create texture mappings
+    textureHTReady.wait();
+    for(const auto& t : textureIds)
+    {
+        const auto& it = textureHT.find(t.texId);
+        if(it == textureHT.end())
+            throw MRayError(MRAY_FORMAT("Id({:d}) could not be "
+                                        "located in {:s}",
+                                        t.texId, TEXTURE_LIST));
+        const auto& location = it->second;
+        uint32_t arrayIndex = std::get<ARRAY_INDEX>(location);
+        uint32_t innerIndex = std::get<INNER_INDEX>(location);
+        bool isMultiNode = std::get<IS_MULTI_NODE>(location);
+        auto node = MRayJsonNode(sceneJson[TEXTURE_LIST][arrayIndex], innerIndex);
+        textureNodes.emplace(t, std::move(node));
+    }
+}
+
 void SceneLoaderMRay::CreateSurfaces(TracerI&, const std::vector<SurfaceStruct>&)
 {
 
@@ -568,10 +687,9 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
                                                                       boundary.mediumId);
         std::vector<LightSurfaceStruct> lightSurfs  = LoadLightSurfaces(*lightSurfJson.value(),
                                                                         boundary.mediumId);
-
         // Surfaces are loaded now create type/ node pairings
         // These are stored in the loader's state
-        CreateTypeMapping(surfaces, camSurfs, lightSurfs, boundary);
+        CreateTypeMapping(tracer, surfaces, camSurfs, lightSurfs, boundary);
 
         // Multi-threaded section
         ExceptionList exceptionList;
@@ -610,6 +728,8 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
             {
                 err.AppendInfo(e.GetError() + "\n");
             }
+            threadPool.purge();
+            threadPool.wait();
             return err;
         }
 
@@ -630,11 +750,15 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
     // MRay related errros
     catch(const MRayError& e)
     {
+        threadPool.purge();
+        threadPool.wait();
         return e;
     }
     // Json related errors
     catch(const nlohmann::json::exception& e)
     {
+        threadPool.purge();
+        threadPool.wait();
         return MRayError(std::string(e.what()));
     }
     return MRayError::OK;

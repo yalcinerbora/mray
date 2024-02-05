@@ -30,10 +30,11 @@ typename MatGroupLambert::AttribInfoList MatGroupLambert::AttributeInfo() const
     using enum MRayDataEnum;
     using enum AttributeOptionality;
     using enum AttributeTexturable;
+    using enum AttributeIsArray;
     static const std::array<MatAttributeInfo, 2> LogicList =
     {
-        MatAttributeInfo("Albedo", MR_MANDATORY, MR_TEXTURE_OR_CONSTANT,  MRayDataType<MR_VECTOR_3>()),
-        MatAttributeInfo("NormalMap", MR_OPTIONAL, MR_TEXTURE_ONLY, MRayDataType<MR_VECTOR_3>())
+        MatAttributeInfo("Albedo", MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
+        MatAttributeInfo("NormalMap", MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_OPTIONAL, MR_TEXTURE_ONLY)
     };
     return std::vector(LogicList.cbegin(), LogicList.cend());
 }

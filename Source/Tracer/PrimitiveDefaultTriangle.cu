@@ -60,12 +60,15 @@ PrimAttributeInfoList PrimGroupTriangle::AttributeInfo() const
     using enum MRayDataEnum;
     using enum PrimitiveAttributeLogic;
     using enum AttributeOptionality;
+    using enum AttributeIsArray;
+    // Here we mark them as "IS_SCALAR", because primitive group is group of primitives
+    // and not primitive batches
     static const std::array<PrimAttributeInfo, AttributeCount> LogicList =
     {
-        PrimAttributeInfo(POSITION, MR_MANDATORY, MRayDataType<MR_VECTOR_3>()),
-        PrimAttributeInfo(NORMAL,   MR_OPTIONAL,  MRayDataType<MR_QUATERNION>()),
-        PrimAttributeInfo(UV0,      MR_OPTIONAL,  MRayDataType<MR_VECTOR_2>()),
-        PrimAttributeInfo(INDEX,    MR_MANDATORY, MRayDataType<MR_VECTOR_3UI>()),
+        PrimAttributeInfo(POSITION, MRayDataType<MR_VECTOR_3>(),    IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(NORMAL,   MRayDataType<MR_QUATERNION>(),  IS_SCALAR, MR_OPTIONAL),
+        PrimAttributeInfo(UV0,      MRayDataType<MR_VECTOR_2>(),    IS_SCALAR, MR_OPTIONAL),
+        PrimAttributeInfo(INDEX,    MRayDataType<MR_VECTOR_3UI>(),  IS_SCALAR, MR_MANDATORY),
     };
     return std::vector(LogicList.cbegin(), LogicList.cend());
 }
@@ -225,14 +228,15 @@ PrimAttributeInfoList PrimGroupSkinnedTriangle::AttributeInfo() const
     using enum MRayDataEnum;
     using enum PrimitiveAttributeLogic;
     using enum AttributeOptionality;
+    using enum AttributeIsArray;
     static const std::array<PrimAttributeInfo, AttributeCount> LogicList =
     {
-        PrimAttributeInfo(POSITION,     MR_MANDATORY,   MRayDataType<MR_VECTOR_3>()),
-        PrimAttributeInfo(NORMAL,       MR_OPTIONAL,    MRayDataType<MR_QUATERNION>()),
-        PrimAttributeInfo(UV0,          MR_OPTIONAL,    MRayDataType<MR_VECTOR_2>()),
-        PrimAttributeInfo(WEIGHT,       MR_MANDATORY,   MRayDataType<MR_UNORM_4x8>()),
-        PrimAttributeInfo(WEIGHT_INDEX, MR_MANDATORY,   MRayDataType<MR_VECTOR_4UC>()),
-        PrimAttributeInfo(INDEX,        MR_MANDATORY,   MRayDataType<MR_VECTOR_3UI>())
+        PrimAttributeInfo(POSITION,     MRayDataType<MR_VECTOR_3>(),    IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(NORMAL,       MRayDataType<MR_QUATERNION>(),  IS_SCALAR, MR_OPTIONAL),
+        PrimAttributeInfo(UV0,          MRayDataType<MR_VECTOR_2>(),    IS_SCALAR, MR_OPTIONAL),
+        PrimAttributeInfo(WEIGHT,       MRayDataType<MR_UNORM_4x8>(),   IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(WEIGHT_INDEX, MRayDataType<MR_VECTOR_4UC>(),  IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(INDEX,        MRayDataType<MR_VECTOR_3UI>(),  IS_SCALAR, MR_MANDATORY)
     };
     return std::vector(LogicList.cbegin(), LogicList.cend());
 }

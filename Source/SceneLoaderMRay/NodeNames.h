@@ -38,20 +38,25 @@ namespace NodeNames
     static constexpr string_view TRANSFORM      = "transform"sv;
     static constexpr string_view PRIMITIVE      = "primitive"sv;
     static constexpr string_view MATERIAL       = "material"sv;
+    static constexpr string_view ALPHA_MAP      = "alphaMap"sv;
+    static constexpr string_view CULL_FACE      = "cullBackFace"sv;
     // Material & Light Common Names
     static constexpr string_view MEDIUM         = "medium"sv;
     static constexpr string_view LIGHT          = "light"sv;
     static constexpr string_view CAMERA         = "camera"sv;
     // Texture Related Names
-    static constexpr string_view TEXTURE_IS_CACHED  = "isCached"sv;
-    static constexpr string_view TEXTURE_FILTER     = "filter"sv;
-    static constexpr string_view TEXTURE_FILE       = "file"sv;
-    static constexpr string_view TEXTURE_SIGNED     = "signed"sv;
-    static constexpr string_view TEXTURE_MIPMAP     = "generateMipmaps"sv;
     static constexpr string_view TEXTURE_CHANNEL    = "channels"sv;
     static constexpr string_view TEXTURE_NAME       = "texture"sv;
     // Light Related
     static constexpr string_view LIGHT_TYPE_PRIMITIVE   = "Primitive"sv;
-    // Identity Transform Type Name
-    static constexpr string_view TRANSFORM_IDENTITY     = "Identity"sv;
+
+    //static constexpr string_view TEXTURE_IS_CACHED  = "isCached"sv;
+    //static constexpr string_view TEXTURE_FILTER     = "filter"sv;
+    //static constexpr string_view TEXTURE_FILE       = "file"sv;
+    //static constexpr string_view TEXTURE_SIGNED     = "signed"sv;
+    //static constexpr string_view TEXTURE_MIPMAP     = "generateMipmaps"sv;
+
+
+    //// Identity Transform Type Name
+    //static constexpr string_view TRANSFORM_IDENTITY     = "Identity"sv;
 }

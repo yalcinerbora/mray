@@ -1,22 +1,16 @@
 #pragma once
 
-#include <nlohmann/json.hpp>
-
 #include "Core/Log.h"
 #include "Core/Error.h"
 #include "Core/Types.h"
 #include "Core/TracerI.h"
 
-#include "NodeNames.h"
+#include <nlohmann/json.hpp>
 
-// specifically use tuple here to achieve verbose access
-using IdPair = Tuple<uint32_t, uint32_t>;
-using IdPairList = std::array<IdPair, TracerConstants::MaxPrimBatchPerSurface>;
+#include "NodeNames.h"
 
 static constexpr uint32_t EMPTY_TRANSFORM = std::numeric_limits<uint32_t>::max();
 static constexpr uint32_t EMPTY_MEDIUM = std::numeric_limits<uint32_t>::max();
-//static constexpr uint32_t EMPTY_TRANSFORM = std::numeric_limits<uint32_t>::max();
-//static constexpr uint32_t EMPTY_TRANSFORM = std::numeric_limits<uint32_t>::max();
 
 enum class TextureChannelType
 {
@@ -62,13 +56,31 @@ struct TracerSceneView
     std::vector<Surfaces>       surfaces;
 };
 
+struct NodeTexStruct
+{
+    uint32_t            texId;
+    TextureAccessLayout channelLayout;
+
+    auto operator<=>(const NodeTexStruct& rhs) const = default;
+};
+
 struct SurfaceStruct
 {
+    private:
+    static constexpr auto PPS = TracerConstants::MaxPrimBatchPerSurface;
+    public:
     static constexpr size_t MATERIAL_INDEX = 0;
     static constexpr size_t PRIM_INDEX = 1;
+    using IdPair        = Tuple<uint32_t, uint32_t>;
+    using IdPairList    = std::array<IdPair, PPS>;
+    using TextureList   = std::array<Optional<NodeTexStruct>, PPS>;
+    using CullList      = std::array<bool, PPS>;
 
+    //
     uint32_t        transformId;
     IdPairList      matPrimBatchPairs;
+    TextureList     alphaMaps;
+    CullList        doCullBackFace;
     int8_t          pairCount;
 };
 
@@ -88,23 +100,21 @@ struct CameraSurfaceStruct : public EndpointSurfaceStruct
     uint32_t cameraId;
 };
 
-struct NodeTexStruct
-{
-    uint32_t            texId;
-    TextureAccessLayout channelLayout;
-};
 
 // Json converters
 void from_json(const nlohmann::json&, NodeTexStruct&);
-
 void from_json(const nlohmann::json&, SurfaceStruct&);
-
 void from_json(const nlohmann::json&, LightSurfaceStruct&);
-
 void from_json(const nlohmann::json&, CameraSurfaceStruct&);
 
 template<ArrayLikeC T>
 void from_json(const nlohmann::json&, T&);
+template<std::floating_point T>
+void from_json(const nlohmann::json&, Quat<T>&);
+template<std::floating_point T>
+void from_json(const nlohmann::json&, AABB<3, T>&);
+template<std::floating_point T>
+void from_json(const nlohmann::json&, RayT<T>&);
 
 TextureAccessLayout LoadTextureAccessLayout(const nlohmann::json& node);
 
@@ -140,9 +150,9 @@ class MRayJsonNode
     Optional<MRayInput> AccessOptionalDataArray(std::string_view name) const;
     // Texturable (either data T, or texture struct)
     template<class T>
-    Variant<NodeTexStruct, T>               AccessTexturableData(std::string_view name);
+    Variant<NodeTexStruct, T>               AccessTexturableData(std::string_view name) const;
     template<class T>
-    std::vector<Variant<NodeTexStruct, T>>  AccessTexturableDataArray(std::string_view name);
+    std::vector<Variant<NodeTexStruct, T>>  AccessTexturableDataArray(std::string_view name) const;
 };
 
 #include "JsonNode.hpp"

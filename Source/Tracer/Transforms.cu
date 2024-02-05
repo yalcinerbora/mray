@@ -112,9 +112,10 @@ TransformGroupSingle::AttribInfoList TransformGroupSingle::AttributeInfo() const
 {
     using enum MRayDataEnum;
     using enum AttributeOptionality;
+    using enum AttributeIsArray;
     static const std::array<TransAttributeInfo, 1> LogicList =
     {
-        TransAttributeInfo("Transform", MR_MANDATORY, MRayDataType<MR_MATRIX_4x4>()),
+        TransAttributeInfo("Transform", MRayDataType<MR_MATRIX_4x4>(), IS_SCALAR, MR_MANDATORY)
     };
     return std::vector(LogicList.cbegin(), LogicList.cend());
 }
@@ -269,9 +270,10 @@ TransformGroupMulti::AttribInfoList TransformGroupMulti::AttributeInfo() const
 {
     using enum MRayDataEnum;
     using enum AttributeOptionality;
+    using enum AttributeIsArray;
     static const std::array<TransAttributeInfo, 1> LogicList =
     {
-        TransAttributeInfo("Transform", MR_MANDATORY, MRayDataType<MR_MATRIX_4x4>())
+        TransAttributeInfo("Transform", MRayDataType<MR_MATRIX_4x4>(), IS_ARRAY, MR_MANDATORY)
     };
     return std::vector(LogicList.cbegin(), LogicList.cend());
 }

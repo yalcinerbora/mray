@@ -32,6 +32,7 @@ class SceneLoaderMRay : public SceneLoaderI
     };
 
     using TypeMappedNodes       = std::map<std::string_view, std::vector<MRayJsonNode>>;
+    using TexTypeMappedNodes    = std::map<NodeTexStruct, MRayJsonNode>;
 
     using PrimIdMappings        = std::map<uint32_t, PrimBatchId>;
     using CamIdMappings         = std::map<uint32_t, CameraId>;
@@ -39,7 +40,7 @@ class SceneLoaderMRay : public SceneLoaderI
     using TransformIdMappings   = std::map<uint32_t, TransformId>;
     using MaterialIdMappings    = std::map<uint32_t, MaterialId>;
     using MediumIdMappings      = std::map<uint32_t, MediumId>;
-    using TextureIdMappings     = std::map<uint32_t, TextureId>;
+    using TextureIdMappings     = std::map<NodeTexStruct, TextureId>;
 
     template <class Map>
     struct MutexedMap
@@ -48,8 +49,8 @@ class SceneLoaderMRay : public SceneLoaderI
         Map         map;
     };
 
-    static std::string          SceneRelativePathToAbsolute(std::string_view sceneRelativePath,
-                                                            std::string_view scenePath);
+    static std::string  SceneRelativePathToAbsolute(std::string_view sceneRelativePath,
+                                                    std::string_view scenePath);
 
     private:
     std::string         scenePath;
@@ -61,10 +62,12 @@ class SceneLoaderMRay : public SceneLoaderI
     TypeMappedNodes     cameraNodes;
     TypeMappedNodes     transformNodes;
     TypeMappedNodes     lightNodes;
-    TypeMappedNodes     textureNodes;
     TypeMappedNodes     materialNodes;
     TypeMappedNodes     mediumNodes;
 
+    TexTypeMappedNodes  textureNodes;
+
+    //Scene id to -> Tracer id maps
     MutexedMap<PrimIdMappings>  primMappings;
 
     static LightSurfaceStruct               LoadBoundary(const nlohmann::json&);
@@ -72,15 +75,14 @@ class SceneLoaderMRay : public SceneLoaderI
     static std::vector<CameraSurfaceStruct> LoadCamSurfaces(const nlohmann::json&, uint32_t boundaryMediumId);
     static std::vector<LightSurfaceStruct>  LoadLightSurfaces(const nlohmann::json&, uint32_t boundaryMediumId);
 
-
-    MRayError   LoadAll(TracerI&);
-    MRayError   OpenFile(const std::string& filePath);
-    MRayError   ReadStream(std::istream& sceneData);
-
-    void        CreateTypeMapping(const std::vector<SurfaceStruct>&,
-                                  const std::vector<CameraSurfaceStruct>&,
-                                  const std::vector<LightSurfaceStruct>&,
-                                  const LightSurfaceStruct& boundary);
+    static void DryRunLightsForPrim(std::vector<uint32_t>&,
+                                    const TypeMappedNodes&,
+                                    const TracerI&);
+    template <class TracerInterfaceFunc>
+    static void DryRunNodesForTex(std::vector<NodeTexStruct>&,
+                                  const TypeMappedNodes&,
+                                  const TracerI&,
+                                  TracerInterfaceFunc&&);
 
     void        LoadTextures(TracerI&, ExceptionList&);
     void        LoadMediums(TracerI&, ExceptionList&);
@@ -90,9 +92,19 @@ class SceneLoaderMRay : public SceneLoaderI
     void        LoadCameras(TracerI&, ExceptionList&);
     void        LoadLights(TracerI&, ExceptionList&);
 
+    void        CreateTypeMapping(const TracerI&,
+                                  const std::vector<SurfaceStruct>&,
+                                  const std::vector<CameraSurfaceStruct>&,
+                                  const std::vector<LightSurfaceStruct>&,
+                                  const LightSurfaceStruct& boundary);
+
     void        CreateSurfaces(TracerI&, const std::vector<SurfaceStruct>&);
     void        CreateLightSurfaces(TracerI&, const std::vector<LightSurfaceStruct>&);
     void        CreateCamSurfaces(TracerI&, const std::vector<CameraSurfaceStruct>&);
+
+    MRayError   LoadAll(TracerI&);
+    MRayError   OpenFile(const std::string& filePath);
+    MRayError   ReadStream(std::istream& sceneData);
 
     public:
                 SceneLoaderMRay(BS::thread_pool& pool);

@@ -120,21 +120,41 @@ TEST(DefaultTriangle, TypeCheck)
     PrimAttributeInfoList list = triGroup.AttributeInfo();
 
     using namespace std::literals;
-    EXPECT_EQ(std::get<0>(list[0]), PrimitiveAttributeLogic::POSITION);
-    EXPECT_EQ(std::get<1>(list[0]), AttributeOptionality::MR_MANDATORY);
-    EXPECT_EQ(std::get<2>(list[0]).type, MRayDataEnum::MR_VECTOR_3);
+    EXPECT_EQ(std::get<PrimAttributeInfo::LOGIC_INDEX>(list[0]),
+              PrimitiveAttributeLogic::POSITION);
+    EXPECT_EQ(std::get<PrimAttributeInfo::LAYOUT_INDEX>(list[0]).Name(),
+              MRayDataEnum::MR_VECTOR_3);
+    EXPECT_EQ(std::get<PrimAttributeInfo::OPTIONALITY_INDEX>(list[0]),
+              AttributeOptionality::MR_MANDATORY);
+    EXPECT_EQ(std::get<PrimAttributeInfo::IS_ARRAY_INDEX>(list[0]),
+              AttributeIsArray::IS_SCALAR);
 
-    EXPECT_EQ(std::get<0>(list[1]), PrimitiveAttributeLogic::NORMAL);
-    EXPECT_EQ(std::get<1>(list[1]), AttributeOptionality::MR_OPTIONAL);
-    EXPECT_EQ(std::get<2>(list[1]).type, MRayDataEnum::MR_QUATERNION);
+    EXPECT_EQ(std::get<PrimAttributeInfo::LOGIC_INDEX>(list[1]),
+              PrimitiveAttributeLogic::NORMAL);
+    EXPECT_EQ(std::get<PrimAttributeInfo::LAYOUT_INDEX>(list[1]).Name(),
+              MRayDataEnum::MR_QUATERNION);
+    EXPECT_EQ(std::get<PrimAttributeInfo::OPTIONALITY_INDEX>(list[1]),
+              AttributeOptionality::MR_OPTIONAL);
+    EXPECT_EQ(std::get<PrimAttributeInfo::IS_ARRAY_INDEX>(list[1]),
+              AttributeIsArray::IS_SCALAR);
 
-    EXPECT_EQ(std::get<0>(list[2]), PrimitiveAttributeLogic::UV0);
-    EXPECT_EQ(std::get<1>(list[2]), AttributeOptionality::MR_OPTIONAL);
-    EXPECT_EQ(std::get<2>(list[2]).type, MRayDataEnum::MR_VECTOR_2);
+    EXPECT_EQ(std::get<PrimAttributeInfo::LOGIC_INDEX>(list[2]),
+              PrimitiveAttributeLogic::UV0);
+    EXPECT_EQ(std::get<PrimAttributeInfo::LAYOUT_INDEX>(list[2]).Name(),
+              MRayDataEnum::MR_VECTOR_2);
+    EXPECT_EQ(std::get<PrimAttributeInfo::OPTIONALITY_INDEX>(list[2]),
+              AttributeOptionality::MR_OPTIONAL);
+    EXPECT_EQ(std::get<PrimAttributeInfo::IS_ARRAY_INDEX>(list[2]),
+              AttributeIsArray::IS_SCALAR);
 
-    EXPECT_EQ(std::get<0>(list[3]), PrimitiveAttributeLogic::INDEX);
-    EXPECT_EQ(std::get<1>(list[3]), AttributeOptionality::MR_MANDATORY);
-    EXPECT_EQ(std::get<2>(list[3]).type, MRayDataEnum::MR_VECTOR_3UI);
+    EXPECT_EQ(std::get<PrimAttributeInfo::LOGIC_INDEX>(list[2]),
+              PrimitiveAttributeLogic::INDEX);
+    EXPECT_EQ(std::get<PrimAttributeInfo::LAYOUT_INDEX>(list[2]).Name(),
+              MRayDataEnum::MR_VECTOR_3UI);
+    EXPECT_EQ(std::get<PrimAttributeInfo::OPTIONALITY_INDEX>(list[2]),
+              AttributeOptionality::MR_MANDATORY);
+    EXPECT_EQ(std::get<PrimAttributeInfo::IS_ARRAY_INDEX>(list[2]),
+              AttributeIsArray::IS_SCALAR);
 }
 
 TEST(DefaultTriangle, Load)

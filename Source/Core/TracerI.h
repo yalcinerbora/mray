@@ -57,8 +57,48 @@ enum class AttributeTexturable
     MR_TEXTURE_ONLY,
 };
 
+enum class AttributeIsArray
+{
+    IS_SCALAR,
+    IS_ARRAY
+};
+
 // Generic Attribute Info
-using GenericAttributeInfo = Tuple<std::string, AttributeOptionality, MRayDataTypeRT>;
+struct GenericAttributeInfo : public Tuple<std::string, MRayDataTypeRT,
+                                           AttributeIsArray, AttributeOptionality>
+{
+    using Base = Tuple<std::string, MRayDataTypeRT,
+                       AttributeIsArray, AttributeOptionality>;
+    using Base::Base;
+    enum
+    {
+        LOGIC_INDEX         = 0,
+        LAYOUT_INDEX        = 1,
+        IS_ARRAY_INDEX      = 2,
+        OPTIONALITY_INDEX   = 3
+    };
+};
+
+struct TexturedAttributeInfo : public Tuple<std::string, MRayDataTypeRT,
+                                            AttributeIsArray, AttributeOptionality,
+                                            AttributeTexturable>
+{
+    using Base = Tuple<std::string, MRayDataTypeRT,
+                       AttributeIsArray, AttributeOptionality,
+                       AttributeTexturable>;
+    using Base::Base;
+    enum
+    {
+        LOGIC_INDEX         = 0,
+        LAYOUT_INDEX        = 1,
+        IS_ARRAY_INDEX      = 2,
+        OPTIONALITY_INDEX   = 3,
+        TEXTURABLE_INDEX    = 4
+    };
+};
+using GenericAttributeInfoList = std::vector<GenericAttributeInfo>;
+using TexturedAttributeInfoList = std::vector<TexturedAttributeInfo>;
+
 using TypeNameList = std::vector<std::string>;
 
 struct PrimAttributeStringifier
@@ -102,7 +142,20 @@ MRAY_GENERIC_ID(PrimGroupId, uint32_t);
 MRAY_GENERIC_ID(PrimBatchId, uint32_t);
 struct PrimCount { uint32_t primCount; uint32_t attributeCount; };
 using PrimBatchIdList = std::vector<PrimBatchId>;
-using PrimAttributeInfo = Tuple<PrimitiveAttributeLogic, AttributeOptionality, MRayDataTypeRT>;
+struct PrimAttributeInfo : public Tuple<PrimitiveAttributeLogic, MRayDataTypeRT,
+                                        AttributeIsArray, AttributeOptionality>
+{
+    using Base = Tuple<PrimitiveAttributeLogic, MRayDataTypeRT,
+                       AttributeIsArray, AttributeOptionality>;
+    using Base::Base;
+    enum
+    {
+        LOGIC_INDEX         = 0,
+        LAYOUT_INDEX        = 1,
+        IS_ARRAY_INDEX      = 2,
+        OPTIONALITY_INDEX   = 3
+    };
+};
 using PrimAttributeInfoList = std::vector<PrimAttributeInfo>;
 // Texture Related
 MRAY_GENERIC_ID(TextureId, uint32_t);
@@ -124,13 +177,12 @@ using CamAttributeInfoList = std::vector<CamAttributeInfo>;
 // Material Related
 MRAY_GENERIC_ID(MatGroupId, uint32_t);
 MRAY_GENERIC_ID(MaterialId, uint32_t);
-using MatAttributeInfo = Tuple<std::string, AttributeOptionality,
-                               AttributeTexturable, MRayDataTypeRT>;
+using MatAttributeInfo = TexturedAttributeInfo;
 using MatAttributeInfoList = std::vector<MatAttributeInfo>;
 // Medium Related
 MRAY_GENERIC_ID(MediumGroupId, uint32_t);
 MRAY_GENERIC_ID(MediumId, uint32_t);
-using MediumAttributeInfo = GenericAttributeInfo;
+using MediumAttributeInfo = TexturedAttributeInfo;
 using MediumAttributeInfoList = std::vector<MediumAttributeInfo>;
 // Surface Related
 MRAY_GENERIC_ID(SurfaceId, uint32_t);
@@ -187,13 +239,21 @@ class [[nodiscard]] TracerI
     virtual TypeNameList        CameraGroups() const = 0;
     virtual TypeNameList        MediumGroups() const = 0;
 
-    virtual PrimAttributeInfoList       PrimAttributeInfo(PrimGroupId) const = 0;
-    virtual CamAttributeInfoList        CamAttributeInfo(CameraGroupId) const = 0;
-    virtual MediumAttributeInfoList     MediumAttributeInfo(MediumGroupId) const = 0;
-    virtual MatAttributeInfoList        MatAttributeInfo(MatGroupId) const = 0;
-    virtual TransAttributeInfoList      TransAttributeInfo(TransGroupId) const = 0;
-    virtual LightAttributeInfoList      LightAttributeInfo(LightGroupId) const = 0;
-    virtual RendererAttributeInfoList   RendererAttributeInfo(RendererId) const = 0;
+    virtual PrimAttributeInfoList       AttributeInfo(PrimGroupId) const = 0;
+    virtual CamAttributeInfoList        AttributeInfo(CameraGroupId) const = 0;
+    virtual MediumAttributeInfoList     AttributeInfo(MediumGroupId) const = 0;
+    virtual MatAttributeInfoList        AttributeInfo(MatGroupId) const = 0;
+    virtual TransAttributeInfoList      AttributeInfo(TransGroupId) const = 0;
+    virtual LightAttributeInfoList      AttributeInfo(LightGroupId) const = 0;
+    virtual RendererAttributeInfoList   AttributeInfo(RendererId) const = 0;
+
+    virtual PrimAttributeInfoList       PrimAttributeInfo(std::string_view) const = 0;
+    virtual CamAttributeInfoList        CamAttributeInfo(std::string_view) const = 0;
+    virtual MediumAttributeInfoList     MediumAttributeInfo(std::string_view) const = 0;
+    virtual MatAttributeInfoList        MatAttributeInfo(std::string_view) const = 0;
+    virtual TransAttributeInfoList      TransAttributeInfo(std::string_view) const = 0;
+    virtual LightAttributeInfoList      LightAttributeInfo(std::string_view) const = 0;
+    virtual RendererAttributeInfoList   RendererAttributeInfo(std::string_view) const = 0;
 
     virtual std::string                 TypeName(PrimGroupId) const = 0;
     virtual std::string                 TypeName(CameraGroupId) const = 0;

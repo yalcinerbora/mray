@@ -3,6 +3,8 @@
 #include <concepts>
 #include <limits>
 
+#include "MathForward.h"
+
 static consteval unsigned int ChooseNormAlignment(unsigned int totalSize)
 {
     // Do alignment to power of two boundaries;
@@ -26,37 +28,86 @@ static consteval unsigned int ChooseNormAlignment(unsigned int totalSize)
 template <unsigned int N, std::unsigned_integral T>
 class alignas(ChooseNormAlignment(N * sizeof(T))) UNorm
 {
-    public:
     static_assert(N == 2 || N == 4 || N == 8 || N == 16 || N == 32,
                   "For UNorm types; N should be 2,4,8,16, or 32");
 
-    MRAY_HYBRID static constexpr T Max();
-    MRAY_HYBRID static constexpr T Min();
-
-    private:
-    T                               v[N];
     public:
+    using InnerType                     = T;
+    static constexpr unsigned int Dims  = N;
+    private:
+    std::array<T, N>                v;
+
+    public:
+    // Constructors & Destructor
+    constexpr                       UNorm() = default;
+    template<std::convertible_to<T> C>
+    MRAY_HYBRID constexpr explicit  UNorm(Span<const C, N> data);
     // TODO:
     MRAY_HYBRID constexpr const T&  operator[](unsigned int) const;
     MRAY_HYBRID constexpr T&        operator[](unsigned int);
+    MRAY_HYBRID static constexpr T  Max();
+    MRAY_HYBRID static constexpr T  Min();
+
+    MRAY_HYBRID
+    constexpr const std::array<T, N>&   AsArray() const;
+    MRAY_HYBRID
+    constexpr std::array<T, N>&         AsArray();
 };
 
 template <unsigned int N, std::signed_integral T>
 class alignas(ChooseNormAlignment(N * sizeof(T))) SNorm
 {
-    public:
     static_assert(N == 2 || N == 4 || N == 8 || N == 16 || N == 32,
                   "For UNorm types; N should be 2,4,8,16, or 32");
-
-    MRAY_HYBRID static constexpr T Max();
-    MRAY_HYBRID static constexpr T Min();
+    public:
+    using InnerType                     = T;
+    static constexpr unsigned int Dims  = N;
 
     private:
-    T                               v[N];
+    std::array<T, N>                v;
+
     public:
+    // Constructors & Destructor
+    constexpr                       SNorm() = default;
+    template<std::convertible_to<T> C>
+    MRAY_HYBRID constexpr explicit  SNorm(Span<const C, N> data);
+    // TODO:
     MRAY_HYBRID constexpr const T&  operator[](unsigned int) const;
     MRAY_HYBRID constexpr T&        operator[](unsigned int);
+    MRAY_HYBRID static constexpr T  Max();
+    MRAY_HYBRID static constexpr T  Min();
+    MRAY_HYBRID
+    constexpr const std::array<T, N>&   AsArray() const;
+    MRAY_HYBRID
+    constexpr std::array<T, N>&         AsArray();
+
 };
+
+template <unsigned int N, std::unsigned_integral T>
+template<std::convertible_to<T> C>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr UNorm<N, T>::UNorm(Span<const C, N> data)
+{
+    UNROLL_LOOP
+    for(unsigned int i = 0; i < N; i++)
+    {
+        v[i] = static_cast<T>(data[i]);
+    }
+}
+
+template <unsigned int N, std::unsigned_integral T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr T& UNorm<N,T>::operator[](unsigned int i)
+{
+    return v[i];
+}
+
+template <unsigned int N, std::unsigned_integral T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr const T& UNorm<N, T>::operator[](unsigned int i) const
+{
+    return v[i];
+}
 
 template <unsigned int N, std::unsigned_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -74,32 +125,29 @@ constexpr T UNorm<N, T>::Max()
 
 template <unsigned int N, std::unsigned_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T& UNorm<N,T>::operator[](unsigned int i)
+constexpr const std::array<T, N>& UNorm<N, T>::AsArray() const
 {
-    return v[i];
-}
-
-// =======================================//
-
-template <unsigned int N, std::signed_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T SNorm<N, T>::Min()
-{
-    return std::numeric_limits<T>::min();
-}
-
-template <unsigned int N, std::signed_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T SNorm<N, T>::Max()
-{
-    return std::numeric_limits<T>::max();
+    return v;
 }
 
 template <unsigned int N, std::unsigned_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr const T& UNorm<N, T>::operator[](unsigned int i) const
+constexpr std::array<T, N>& UNorm<N, T>::AsArray()
 {
-    return v[i];
+    return v;
+}
+
+// =======================================//
+template <unsigned int N, std::signed_integral T>
+template<std::convertible_to<T> C>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr SNorm<N, T>::SNorm(Span<const C, N> data)
+{
+    UNROLL_LOOP
+    for(unsigned int i = 0; i < N; i++)
+    {
+        v[i] = static_cast<T>(data[i]);
+    }
 }
 
 template <unsigned int N, std::signed_integral T>
@@ -115,6 +163,35 @@ constexpr const T& SNorm<N, T>::operator[](unsigned int i) const
 {
     return v[i];
 }
+
+template <unsigned int N, std::signed_integral T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr T SNorm<N, T>::Min()
+{
+    return std::numeric_limits<T>::min();
+}
+
+template <unsigned int N, std::signed_integral T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr T SNorm<N, T>::Max()
+{
+    return std::numeric_limits<T>::max();
+}
+
+template <unsigned int N, std::signed_integral T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr const std::array<T, N>& SNorm<N, T>::AsArray() const
+{
+    return v;
+}
+
+template <unsigned int N, std::signed_integral T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr std::array<T, N>& SNorm<N, T>::AsArray()
+{
+    return v;
+}
+
 // Word Types
 using UNorm4x8      = UNorm<4, uint8_t>;
 using UNorm2x16     = UNorm<2, uint16_t>;
@@ -149,4 +226,8 @@ using SNorm16x16    = SNorm<16, int16_t>;
 using SNorm8x32     = SNorm<8, int32_t>;
 using SNorm4x64     = SNorm<4, int64_t>;
 
+static_assert(ArrayLikeC<UNorm4x8>, "UNorm4x8 is not array like!");
+static_assert(ArrayLikeC<SNorm4x8>, "SNorm4x8 is not array like!");
+
 static_assert(ImplicitLifetimeC<UNorm4x8>, "UNorm4x8 is not implicit lifetime class");
+static_assert(ImplicitLifetimeC<SNorm4x8>, "SNorm4x8 is not implicit lifetime class");

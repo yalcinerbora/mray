@@ -115,23 +115,130 @@ struct MRayDataType
     static constexpr MRayDataEnum Name = E;
 };
 
-struct MRayDataTypeRT
-{
-    const size_t size;
-    const size_t alignment;
-    const MRayDataEnum type;
 
-    template<MRayDataEnum E>
-    MRayDataTypeRT(MRayDataType<E>);
+// Lets see how good are the compilers are
+// This is used to generate switch/case code
+// For type reading on scene loader
+using MRayDataTypeBase = Variant
+<
+    MRayDataType<MRayDataEnum::MR_CHAR>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_2C>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_3C>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_4C>,
+
+    MRayDataType<MRayDataEnum::MR_SHORT>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_2S>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_3S>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_4S>,
+
+    MRayDataType<MRayDataEnum::MR_INT>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_2I>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_3I>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_4I>,
+
+    MRayDataType<MRayDataEnum::MR_UCHAR>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_2UC>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_3UC>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_4UC>,
+
+    MRayDataType<MRayDataEnum::MR_USHORT>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_2US>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_3US>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_4US>,
+
+    MRayDataType<MRayDataEnum::MR_UINT>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_2UI>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_3UI>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_4UI>,
+
+    MRayDataType<MRayDataEnum::MR_FLOAT>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_2F>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_3F>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_4F>,
+
+    MRayDataType<MRayDataEnum::MR_DOUBLE>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_2D>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_3D>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_4D>,
+
+    MRayDataType<MRayDataEnum::MR_DEFAULT_FLT>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_2>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_3>,
+    MRayDataType<MRayDataEnum::MR_VECTOR_4>,
+
+    MRayDataType<MRayDataEnum::MR_QUATERNION>,
+    MRayDataType<MRayDataEnum::MR_MATRIX_4x4>,
+    MRayDataType<MRayDataEnum::MR_MATRIX_3x3>,
+    MRayDataType<MRayDataEnum::MR_AABB3_ENUM>,
+    MRayDataType<MRayDataEnum::MR_RAY>,
+
+    MRayDataType<MRayDataEnum::MR_UNORM_4x8>,
+    MRayDataType<MRayDataEnum::MR_UNORM_2x16>,
+    MRayDataType<MRayDataEnum::MR_SNORM_4x8>,
+    MRayDataType<MRayDataEnum::MR_SNORM_2x16>,
+
+    MRayDataType<MRayDataEnum::MR_UNORM_8x8>,
+    MRayDataType<MRayDataEnum::MR_UNORM_4x16>,
+    MRayDataType<MRayDataEnum::MR_UNORM_2x32>,
+    MRayDataType<MRayDataEnum::MR_SNORM_8x8>,
+    MRayDataType<MRayDataEnum::MR_SNORM_4x16>,
+    MRayDataType<MRayDataEnum::MR_SNORM_2x32>,
+
+    MRayDataType<MRayDataEnum::MR_UNORM_16x8>,
+    MRayDataType<MRayDataEnum::MR_UNORM_8x16>,
+    MRayDataType<MRayDataEnum::MR_UNORM_4x32>,
+    MRayDataType<MRayDataEnum::MR_UNORM_2x64>,
+    MRayDataType<MRayDataEnum::MR_SNORM_16x8>,
+    MRayDataType<MRayDataEnum::MR_SNORM_8x16>,
+    MRayDataType<MRayDataEnum::MR_SNORM_4x32>,
+    MRayDataType<MRayDataEnum::MR_SNORM_2x64>,
+
+    MRayDataType<MRayDataEnum::MR_STRING>
+
+    // These are removed because of excessive recursion
+    // of template instantiation
+
+    //MRayDataType<MRayDataEnum::MR_UNORM_32x8>,
+    //MRayDataType<MRayDataEnum::MR_UNORM_16x16>,
+    //MRayDataType<MRayDataEnum::MR_UNORM_8x32>,
+    //MRayDataType<MRayDataEnum::MR_UNORM_4x64>,
+    //MRayDataType<MRayDataEnum::MR_SNORM_32x8>,
+    //MRayDataType<MRayDataEnum::MR_SNORM_16x16>,
+    //MRayDataType<MRayDataEnum::MR_SNORM_8x32>,
+    //MRayDataType<MRayDataEnum::MR_SNORM_4x64>,
+
+
+>;
+
+struct MRayDataTypeRT : public MRayDataTypeBase
+{
+    constexpr MRayDataEnum Name() const;
+    constexpr size_t Size() const;
+    constexpr size_t Alignment() const;
+
+    using MRayDataTypeBase::MRayDataTypeBase;
 };
 
-// Runtime query of an data enum
-// Good old switch case here, did not bother for metaprogramming stuff
-Pair<size_t, size_t> FindSizeAndAlignment(MRayDataEnum e);
+inline constexpr MRayDataEnum MRayDataTypeRT::Name() const
+{
+    return std::visit([](auto&& d) -> MRayDataEnum
+    {
+        return std::remove_cvref_t<decltype(d)>::Name;
+    }, *this);
+}
 
-template<MRayDataEnum E>
-inline MRayDataTypeRT::MRayDataTypeRT(MRayDataType<E>)
-    : size(MRayDataType<E>::Size)
-    , alignment(MRayDataType<E>::Alignment)
-    , type(E)
-{}
+inline constexpr size_t MRayDataTypeRT::Size() const
+{
+    return std::visit([](auto&& d) -> size_t
+    {
+        return std::remove_cvref_t<decltype(d)>::Size;
+    }, *this);
+}
+
+inline constexpr size_t MRayDataTypeRT::Alignment() const
+{
+    return std::visit([](auto&& d) -> size_t
+    {
+        return std::remove_cvref_t<decltype(d)>::Alignment;
+    }, *this);
+}
