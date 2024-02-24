@@ -2,6 +2,7 @@
 
 #include "Vector.h"
 #include "Core/Types.h"
+#include <bit>
 
 // Stratified Discrete Alias Table
 //
@@ -61,7 +62,7 @@ template <std::unsigned_integral T>
 class StratifiedIntegerAliasTable
 {
     private:
-    T               gcd;
+    T               gcdShift;
     const T*        gAliasRanges;
 
     public:
@@ -70,55 +71,100 @@ class StratifiedIntegerAliasTable
     uint32_t        FindIndex(T id) const;
 };
 
+
+// A simple lookup table with linear probing.
+// It is a hash table but it is specifically not called hash table
+// since it is not generic, you can not remove data from it.
+//
+// Data Management is outside of the scope of the hash table
+// since it may reside on GPU
+
+template <class LookupStrategy, std::unsigned_integral H, class Key>
+concept LookupStrategyC = requires()
+{
+    { LookupStrategy::Hash(Key{}, size_t{}) } -> std::same_as<H>;
+    { LookupStrategy::IsSentinel(H{}) } -> std::same_as<bool>;
+    { LookupStrategy::IsEmpty(H{}) } -> std::same_as<bool>;
+};
+
+template <class K, class V, std::unsigned_integral H,
+          uint32_t VEC_LENGTH, LookupStrategyC<H, K> Strategy>
+class LookupTable
+{
+    static constexpr uint32_t VL = VEC_LENGTH;
+    // Vec can be 2-3-4 so check if VL is 3, rest will be caught by
+    // Vector class
+    static_assert(std::has_single_bit(VL), "Lookup table hash chunk size"
+                  " must be power of two");
+    static constexpr uint32_t VEC_SHIFT = (VL == 2) : 1 ? 2;
+
+    private:
+    // Keys and values are seperate,
+    // keys are small, values may be large
+    Span<Vector<4, H>>  hashes;
+    Span<V>             values;
+    uint32_t            tableSize;
+
+    public:
+                        LookupTable(const Span<Vector<VL, H>>& hashes,
+                                    const Span<V>& values,
+                                    size_t tableSize);
+
+    Optional<const V&>  Search(const K&) const;
+};
+
 template <std::unsigned_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 StratifiedIntegerAliasTable<T>::StratifiedIntegerAliasTable(const T* dAliasRanges, T gcd)
-    : gcd(gcd)
+    : gcdShift(static_cast<T>(std::popcount(gcd - 1)))
     , gAliasRanges(dAliasRanges)
-{}
+{
+    assert(std::has_single_bit(gcd));
+}
 
 template <std::unsigned_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t StratifiedIntegerAliasTable<T>::FindIndex(T id) const
 {
-    // TODO: Enforce GCD to be power of two to change this to shift
-    uint32_t tableIndex = id / gcd;
+    uint32_t tableIndex = id >> gcdShift;
     return gAliasRanges[tableIndex];
 }
 
-
-
-
-// A simple hash table with linear probing.
-template <class K, class V>
-class HashMapView
+template <class K, class V, std::unsigned_integral H,
+          uint32_t VECL, LookupStrategyC<H, K> S>
+MRAY_HYBRID MRAY_CGPU_INLINE
+LookupTable<K, V, H, VECL, S>::LookupTable(const Span<Vector<VL, H>>& hashes,
+                                           const Span<V>& values,
+                                           size_t tableSize)
+    : hashes(hashes)
+    , values(values)
+    , tableSize(tableSize)
 {
-    private:
-    // Keys and values are seperate,
-    // keys are small, values may be large
-    Span<K> keys;
-    Span<V> values;
+    assert(tableSize == values.size());
+    assert(tableSize * VECL <= hashes.size());
+}
 
-    public:
-};
+template <class K, class V, std::unsigned_integral H,
+          uint32_t VECL, LookupStrategyC<H, K> S>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Optional<const V&> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
+{
+    H hashVal = S::Hash(k);
+    H index = hashVal % tableSize;
 
-
-
-//IssueQueue stream,
-//Get queue
-
-//template<class Function, class... Args>
-//MRAY_HOST
-//void KC_X(uint32_t sharedMemSize,
-//          size_t workCount,
-//          //
-//          Function&& f, Args&&... args)
-//{
-//    //CUDA_CHECK(cudaSetDevice(deviceId));
-//    uint32_t blockCount = static_cast<uint32_t>((workCount + (StaticThreadPerBlock1D - 1)) / StaticThreadPerBlock1D);
-//    uint32_t blockSize = StaticThreadPerBlock1D;
-//
-//    //std::forward<Kernel>(f)<<<blockCount, blockSize, sharedMemSize, stream>>>(std::forward<Args>(args)...);
-//    CUDA_KERNEL_CHECK();
-//}
-
+    while(true)
+    {
+        uint32_t vectorIndex = index >> VEC_SHIFT;
+        Vector<4, H> hashChunk = hashes[vectorIndex];
+        UNROLL_LOOP
+        for(uint32_t i = 0; i < VL; i++)
+        {
+            if(vectorIndex + i >= tableSize) break;
+            if(S::IsEmpty(hashChunk[i])) std::nullopt_t;
+            if(hashVal == hashChunk[i]) return value[vectorizedIndex + i];
+        }
+        index = (index >= tableSize) ? 0 : (index + VL);
+        assert(index != hashVal % tableSize);
+    }
+    return std::nullopt_t;
+}

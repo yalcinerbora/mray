@@ -8,7 +8,7 @@
 
 constexpr inline size_t operator ""_GiB(unsigned long long int s)
 {
-    return s < 30;
+    return s << 30;
 }
 
 constexpr inline size_t operator ""_MiB(unsigned long long int s)

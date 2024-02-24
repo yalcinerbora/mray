@@ -298,7 +298,7 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
             {
                 for(size_t i = start; i < end; i++)
                 {
-                    const MRayJsonNode& node = m.second[i];
+                    const JsonNode& node = m.second[i];
                     std::string_view fileName = node.CommonData<std::string_view>(NodeNames::NAME);
                     uint32_t innerIndex = node.AccessData<uint32_t>(NodeNames::INNER_INDEX);
 
@@ -404,9 +404,9 @@ void SceneLoaderMRay::LoadLights(TracerI&, ExceptionList&)
 }
 
 void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
-                                        const std::vector<SurfaceStruct>& surfaces,
-                                        const std::vector<CameraSurfaceStruct>& camSurfaces,
-                                        const std::vector<LightSurfaceStruct>& lightSurfaces,
+                                        const SceneSurfList& surfaces,
+                                        const SceneCamSurfList& camSurfaces,
+                                        const SceneLightSurfList& lightSurfaces,
                                         const LightSurfaceStruct& boundary)
 {
     // Given N definition items, and M references on those items
@@ -539,7 +539,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
         uint32_t arrayIndex = std::get<ARRAY_INDEX>(location);
         uint32_t innerIndex = std::get<INNER_INDEX>(location);
         bool isMultiNode = std::get<IS_MULTI_NODE>(location);
-        auto node = MRayJsonNode(sceneJson[listName][arrayIndex], innerIndex);
+        auto node = JsonNode(sceneJson[listName][arrayIndex], innerIndex);
         std::string_view type = node.Type();
         auto result = typeMappings[type].emplace_back(std::move(node));
     };
@@ -625,7 +625,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
         uint32_t arrayIndex = std::get<ARRAY_INDEX>(location);
         uint32_t innerIndex = std::get<INNER_INDEX>(location);
         bool isMultiNode = std::get<IS_MULTI_NODE>(location);
-        auto node = MRayJsonNode(sceneJson[TEXTURE_LIST][arrayIndex], innerIndex);
+        auto node = JsonNode(sceneJson[TEXTURE_LIST][arrayIndex], innerIndex);
         textureNodes.emplace(t, std::move(node));
     }
 }
@@ -681,15 +681,16 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
     // TODO: Change this to std::expected maybe c++23?
     try
     {
-        LightSurfaceStruct boundary                 = LoadBoundary(*boundaryJson.value());
-        std::vector<SurfaceStruct> surfaces         = LoadSurfaces(*surfJson.value());
-        std::vector<CameraSurfaceStruct> camSurfs   = LoadCamSurfaces(*camSurfJson.value(),
-                                                                      boundary.mediumId);
-        std::vector<LightSurfaceStruct> lightSurfs  = LoadLightSurfaces(*lightSurfJson.value(),
-                                                                        boundary.mediumId);
+        LightSurfaceStruct boundary = LoadBoundary(*boundaryJson.value());
+        SceneSurfList surfaces = LoadSurfaces(*surfJson.value());
+        SceneCamSurfList camSurfs = LoadCamSurfaces(*camSurfJson.value(),
+                                                    boundary.mediumId);
+        SceneLightSurfList lightSurfs = LoadLightSurfaces(*lightSurfJson.value(),
+                                                          boundary.mediumId);
         // Surfaces are loaded now create type/ node pairings
         // These are stored in the loader's state
-        CreateTypeMapping(tracer, surfaces, camSurfs, lightSurfs, boundary);
+        CreateTypeMapping(tracer, surfaces, camSurfs,
+                          lightSurfs, boundary);
 
         // Multi-threaded section
         ExceptionList exceptionList;
@@ -728,8 +729,6 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
             {
                 err.AppendInfo(e.GetError() + "\n");
             }
-            threadPool.purge();
-            threadPool.wait();
             return err;
         }
 

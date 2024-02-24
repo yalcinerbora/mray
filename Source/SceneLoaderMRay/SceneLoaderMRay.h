@@ -8,7 +8,7 @@
 
 #include "JsonNode.h"
 
-class MRayJsonNode;
+class JsonNode;
 
 struct SceneNode
 {
@@ -31,8 +31,8 @@ class SceneLoaderMRay : public SceneLoaderI
         void                AddException(MRayError&&);
     };
 
-    using TypeMappedNodes       = std::map<std::string_view, std::vector<MRayJsonNode>>;
-    using TexTypeMappedNodes    = std::map<NodeTexStruct, MRayJsonNode>;
+    using TypeMappedNodes       = std::map<std::string_view, std::vector<JsonNode>>;
+    using TexTypeMappedNodes    = std::map<NodeTexStruct, JsonNode>;
 
     using PrimIdMappings        = std::map<uint32_t, PrimBatchId>;
     using CamIdMappings         = std::map<uint32_t, CameraId>;
@@ -93,9 +93,9 @@ class SceneLoaderMRay : public SceneLoaderI
     void        LoadLights(TracerI&, ExceptionList&);
 
     void        CreateTypeMapping(const TracerI&,
-                                  const std::vector<SurfaceStruct>&,
-                                  const std::vector<CameraSurfaceStruct>&,
-                                  const std::vector<LightSurfaceStruct>&,
+                                  const SceneSurfList&,
+                                  const SceneCamSurfList&,
+                                  const SceneLightSurfList&,
                                   const LightSurfaceStruct& boundary);
 
     void        CreateSurfaces(TracerI&, const std::vector<SurfaceStruct>&);

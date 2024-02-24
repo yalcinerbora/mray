@@ -1,0 +1,129 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 20,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "hidden": true,
+            "name": "folders",
+            "description": "this config only provies binary dir",
+            "binaryDir": "${sourceDir}/../Bin/CMake",
+            "installDir": "${sourceDir}/../Bin/Install",
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            }
+        },
+        {
+            "hidden": true,
+            "name": "host",
+            "cacheVariables": {
+                "MRAY_DEVICE_BACKEND": "MRAY_GPU_BACKEND_HOST",
+                "MRAY_USE_OPTIX": false
+            }
+        },
+        {
+            "hidden": true,
+            "name": "cuda",
+            "cacheVariables": {
+                "MRAY_DEVICE_BACKEND": "MRAY_GPU_BACKEND_CUDA",
+                "MRAY_USE_OPTIX": false
+            }
+        },
+        {
+            "hidden": true,
+            "name": "cuda-optix",
+            "inherits": "cuda",
+            "cacheVariables": { "MRAY_USE_OPTIX": true }
+        },
+        {
+            "hidden": true,
+            "name": "win",
+            "inherits": "folders",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "win-ninja",
+            "displayName": "Ninja x64",
+            "inherits": [ "win", "host" ],
+            "generator": "Ninja Multi-Config"
+        },
+        {
+            "name": "win-msbuild",
+            "displayName": "MSBuild x64",
+            "inherits": [ "win", "host" ],
+            "generator": "Visual Studio 17 2022"
+        },
+        {
+            "name": "win-ninja-cuda",
+            "displayName": "Ninja x64 - CUDA",
+            "inherits": [ "win", "cuda-optix" ],
+            "generator": "Ninja Multi-Config"
+        },
+        {
+            "name": "win-msbuild-cuda",
+            "displayName": "MSBuild x64 - CUDA",
+            "inherits": [ "win", "cuda-optix" ],
+            "generator": "Visual Studio 17 2022"
+        },
+        {
+            "hidden": true,
+            "name": "linux",
+            "inherits": "folders",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            }
+        },
+        {
+            "hidden": true,
+            "name": "linux-clang",
+            "inherits": "linux",
+            "cacheVariables": {
+                "CMAKE_CXX_COMPILER": "clang++",
+                "CMAKE_C_COMPILER": "clang"
+            }
+        },
+        {
+            "hidden": true,
+            "name": "linux-gcc",
+            "inherits": "linux",
+            "cacheVariables": {
+                "CMAKE_CXX_COMPILER": "g++",
+                "CMAKE_C_COMPILER": "gcc"
+            }
+        },
+        {
+            "name": "linux-clang-ninja",
+            "displayName": "Clang x64 Ninja",
+            "inherits": [ "linux-clang", "host" ],
+            "generator": "Ninja Multi-Config"
+        },
+        {
+            "name": "linux-clang-ninja-cuda",
+            "displayName": "Clang x64 Ninja - CUDA",
+            "inherits": [ "linux-clang", "cuda-optix" ],
+            "generator": "Ninja Multi-Config"
+        },
+        {
+            "name": "linux-gcc-ninja",
+            "displayName": "GCC x64 Ninja",
+            "inherits": [ "linux-gcc", "host" ],
+            "generator": "Ninja Multi-Config"
+        },
+        {
+            "name": "linux-gcc-ninja-cuda",
+            "displayName": "GCC x64 Ninja - CUDA",
+            "inherits": [ "linux-gcc", "cuda-optix" ],
+            "generator": "Ninja Multi-Config"
+        }
+    ]
+}

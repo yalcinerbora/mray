@@ -154,7 +154,7 @@ void from_json(const nlohmann::json& n, RayT<T>& out)
                   V(ToConstSpan(S(v1))));
 }
 
-inline MRayJsonNode::MRayJsonNode(const nlohmann::json& node, uint32_t innerIndex)
+inline JsonNode::JsonNode(const nlohmann::json& node, uint32_t innerIndex)
     : node(node)
     , innerIndex(innerIndex)
 {
@@ -163,22 +163,22 @@ inline MRayJsonNode::MRayJsonNode(const nlohmann::json& node, uint32_t innerInde
     isMultiNode = n.is_array();
 }
 
-inline const nlohmann::json& MRayJsonNode::RawNode() const
+inline const nlohmann::json& JsonNode::RawNode() const
 {
     return node;
 }
 
-inline std::string_view MRayJsonNode::Type() const
+inline std::string_view JsonNode::Type() const
 {
     return node.at(NodeNames::TYPE);
 }
 
-inline std::string_view MRayJsonNode::Tag() const
+inline std::string_view JsonNode::Tag() const
 {
     return node.at(NodeNames::TAG);
 }
 
-inline uint32_t MRayJsonNode::Id() const
+inline uint32_t JsonNode::Id() const
 {
     const auto& nodeArray = (isMultiNode) ? node.at(NodeNames::ID).at(innerIndex)
                                           : node.at(NodeNames::ID);
@@ -187,13 +187,13 @@ inline uint32_t MRayJsonNode::Id() const
 
 // Inner node unspecific data access
 template<class T>
-T MRayJsonNode::CommonData(std::string_view name) const
+T JsonNode::CommonData(std::string_view name) const
 {
     return node.at(name).get<T>();
 }
 
 template<class T>
-MRayInput MRayJsonNode::CommonDataArray(std::string_view name) const
+MRayInput JsonNode::CommonDataArray(std::string_view name) const
 {
     const auto& nodeArray = node.at(name);
     MRayInput input(std::in_place_type_t<T>{}, nodeArray.size());
@@ -206,7 +206,7 @@ MRayInput MRayJsonNode::CommonDataArray(std::string_view name) const
 
 // Inner index related data loading
 template<class T>
-T MRayJsonNode::AccessData(std::string_view name) const
+T JsonNode::AccessData(std::string_view name) const
 {
     const auto& n = (isMultiNode) ? node.at(name).at(innerIndex)
                                   : node.at(name);
@@ -214,7 +214,7 @@ T MRayJsonNode::AccessData(std::string_view name) const
 }
 
 template<class T>
-MRayInput MRayJsonNode::AccessDataArray(std::string_view name) const
+MRayInput JsonNode::AccessDataArray(std::string_view name) const
 {
     const auto& nodeArray = (isMultiNode) ? node.at(name).at(innerIndex)
                                           : node.at(name);
@@ -228,7 +228,7 @@ MRayInput MRayJsonNode::AccessDataArray(std::string_view name) const
 }
 // Optional Data
 template<class T>
-Optional<T> MRayJsonNode::AccessOptionalData(std::string_view name) const
+Optional<T> JsonNode::AccessOptionalData(std::string_view name) const
 {
     // Entire entry is missing (which is not defined all items on this node)
     if(node.find(name) == node.cend()) return std::nullopt;
@@ -247,7 +247,7 @@ Optional<T> MRayJsonNode::AccessOptionalData(std::string_view name) const
 }
 
 template<class T>
-Optional<MRayInput> MRayJsonNode::AccessOptionalDataArray(std::string_view name) const
+Optional<MRayInput> JsonNode::AccessOptionalDataArray(std::string_view name) const
 {
     // Entire entry is missing (which is not defined all items on this node)
     if(node.find(name) == node.cend()) return std::nullopt;
@@ -275,7 +275,7 @@ Optional<MRayInput> MRayJsonNode::AccessOptionalDataArray(std::string_view name)
 
 // Texturable (either data T, or texture struct)
 template<class T>
-Variant<NodeTexStruct, T> MRayJsonNode::AccessTexturableData(std::string_view name) const
+Variant<NodeTexStruct, T> JsonNode::AccessTexturableData(std::string_view name) const
 {
     using V = Variant<NodeTexStruct, T>;
     const auto& n = (isMultiNode) ? node.at(name).at(innerIndex)
@@ -285,7 +285,7 @@ Variant<NodeTexStruct, T> MRayJsonNode::AccessTexturableData(std::string_view na
 }
 
 template<class T>
-std::vector<Variant<NodeTexStruct, T>> MRayJsonNode::AccessTexturableDataArray(std::string_view name) const
+std::vector<Variant<NodeTexStruct, T>> JsonNode::AccessTexturableDataArray(std::string_view name) const
 {
     using V = Variant<NodeTexStruct, T>;
     const auto& nArray = (isMultiNode) ? node.at(name).at(innerIndex)

@@ -83,6 +83,7 @@ struct SurfaceStruct
     CullList        doCullBackFace;
     int8_t          pairCount;
 };
+using SceneSurfList = std::vector<SurfaceStruct>;
 
 struct EndpointSurfaceStruct
 {
@@ -94,12 +95,13 @@ struct LightSurfaceStruct : public EndpointSurfaceStruct
 {
     uint32_t lightId;
 };
+using SceneLightSurfList = std::vector<LightSurfaceStruct>;
 
 struct CameraSurfaceStruct : public EndpointSurfaceStruct
 {
     uint32_t cameraId;
 };
-
+using SceneCamSurfList = std::vector<CameraSurfaceStruct>;
 
 // Json converters
 void from_json(const nlohmann::json&, NodeTexStruct&);
@@ -118,7 +120,7 @@ void from_json(const nlohmann::json&, RayT<T>&);
 
 TextureAccessLayout LoadTextureAccessLayout(const nlohmann::json& node);
 
-class MRayJsonNode
+class JsonNode
 {
     private:
     const nlohmann::json&   node;
@@ -126,8 +128,8 @@ class MRayJsonNode
     uint32_t                innerIndex;
 
     public:
-                        MRayJsonNode(const nlohmann::json& node,
-                                     uint32_t innerIndex = 0);
+                        JsonNode(const nlohmann::json& node,
+                                 uint32_t innerIndex = 0);
 
     const nlohmann::json&   RawNode() const;
     std::string_view        Type() const;
