@@ -79,7 +79,7 @@ class StratifiedIntegerAliasTable
 // Data Management is outside of the scope of the hash table
 // since it may reside on GPU
 
-template <class LookupStrategy, std::unsigned_integral H, class Key>
+template <class LookupStrategy, class H, class Key>
 concept LookupStrategyC = requires()
 {
     { LookupStrategy::Hash(Key{}, size_t{}) } -> std::same_as<H>;
@@ -96,20 +96,21 @@ class LookupTable
     // Vector class
     static_assert(std::has_single_bit(VL), "Lookup table hash chunk size"
                   " must be power of two");
-    static constexpr uint32_t VEC_SHIFT = (VL == 2) : 1 ? 2;
+    static constexpr uint32_t VEC_SHIFT = (VL == 2) ? 1 : 2;
 
     private:
     // Keys and values are seperate,
     // keys are small, values may be large
     Span<Vector<4, H>>  hashes;
+    Span<K>             keys;
     Span<V>             values;
-    uint32_t            tableSize;
 
     public:
-                        LookupTable(const Span<Vector<VL, H>>& hashes,
-                                    const Span<V>& values,
-                                    size_t tableSize);
+    MRAY_HYBRID         LookupTable(const Span<Vector<VL, H>>& hashes,
+                                    const Span<K>& keys,
+                                    const Span<V>& values);
 
+    MRAY_HYBRID
     Optional<const V&>  Search(const K&) const;
 };
 
@@ -134,13 +135,13 @@ template <class K, class V, std::unsigned_integral H,
           uint32_t VECL, LookupStrategyC<H, K> S>
 MRAY_HYBRID MRAY_CGPU_INLINE
 LookupTable<K, V, H, VECL, S>::LookupTable(const Span<Vector<VL, H>>& hashes,
-                                           const Span<V>& values,
-                                           size_t tableSize)
+                                           const Span<K>& keys,
+                                           const Span<V>& values)
     : hashes(hashes)
+    , keys(keys)
     , values(values)
-    , tableSize(tableSize)
 {
-    assert(tableSize == values.size());
+    assert(keys.size() == values.size());
     assert(tableSize * VECL <= hashes.size());
 }
 
@@ -149,6 +150,7 @@ template <class K, class V, std::unsigned_integral H,
 MRAY_HYBRID MRAY_CGPU_INLINE
 Optional<const V&> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
 {
+    uint32_t tableSize = static_cast<uint32_t>(keys.size());
     H hashVal = S::Hash(k);
     H index = hashVal % tableSize;
 
@@ -159,12 +161,21 @@ Optional<const V&> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
         UNROLL_LOOP
         for(uint32_t i = 0; i < VL; i++)
         {
+            // Roll to start of the case special case
+            // (since we are bulk reading)
             if(vectorIndex + i >= tableSize) break;
-            if(S::IsEmpty(hashChunk[i])) std::nullopt_t;
-            if(hashVal == hashChunk[i]) return value[vectorizedIndex + i];
+            // If empty, this means linear probe chain is iterated
+            // and we did not find the value return null
+            if(S::IsEmpty(hashChunk[i])) return std::nullopt;
+
+            // Actual comparison case, if hash is equal it does not mean
+            // keys are equal, check them only if the hashes are equal
+            uint32_t globalIndex = vectorIndex + i;
+            if(hashVal == hashChunk[i] && keys[globalIndex] == k)
+                return values[globalIndex];
         }
         index = (index >= tableSize) ? 0 : (index + VL);
         assert(index != hashVal % tableSize);
     }
-    return std::nullopt_t;
+    return std::nullopt;
 }
