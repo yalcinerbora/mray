@@ -2,6 +2,29 @@
 
 #include <string_view>
 
+static constexpr std::string_view EmptyScene = std::string_view
+{R"({})"};
+
+static constexpr std::string_view MinimalValidScene = std::string_view
+{R"(
+{
+	"Lights": [{ "id" : 0, "type" : "Null"}],
+	"Mediums": [{ "id" : 0, "type" : "Vacuum"}],
+	"Transforms":[{"id": 0, "type": "Identity"}],
+	"Cameras": [{"id": 0, "type": "Pinhole"}],
+
+	//
+	"Boundary":
+	{
+		"medium": 0,
+		"light" : 0,
+		"transform": 0
+	},
+	"CameraSurfaces" : [{"camera": 0}],
+	"LightSurfaces"  : [],
+	"Surfaces"       : []
+})"};
+
 static constexpr std::string_view BasicScene = std::string_view
 {R"(
 {

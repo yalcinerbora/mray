@@ -42,23 +42,11 @@ append_cmake_prefix_path(${META_MRAY_CMAKE_PREFIX_PATH})
 append_cmake_prefix_path(${META_MRAY_PKGCONFIG_PREFIX_PATH})
 append_cmake_prefix_path(${MRAY_LIB_DIRECTORY})
 
-# Get ZLib
-# mray_build_ext_dependency_git(
-#         NAME zlib_ext
-#         URL "https://github.com/yalcinerbora/zlib.git"
-#         TAG "ed47d72d2053d7bb526080e6841e340183428322" # v1.2.13 (Modern CMAKE)
-#         LICENSE_NAME "LICENSE"
-#         BUILD_ARGS
-#             -DZLIB_BUILD_SHARED=ON
-#             -DZLIB_BUILD_EXAMPLES=OFF
-#             -DZLIB_INSTALL=ON
-# )
-
 # Get FMT
 mray_build_ext_dependency_git(
         NAME fmt_ext
         URL "https://github.com/fmtlib/fmt.git"
-        TAG "f5e54359df4c26b6230fc61d38aa294581393084" # v10.1.1
+        TAG "e57ca2e3685b160617d3d95fcd9e789c4e06ca88" # v10.1.0
         LICENSE_NAME "LICENSE.rst"
         BUILD_ARGS
             -DFMT_DEBUG_POSTFIX:STRING=
@@ -93,6 +81,7 @@ mray_build_ext_dependency_git(
             -DNLOHMANN_ADD_NATVIS=OFF
 )
 
+# BS Thread pool
 mray_build_ext_dependency_git(
         NAME thread_pool_ext
         URL "https://github.com/yalcinerbora/thread-pool.git"
@@ -126,10 +115,6 @@ mray_build_ext_dependency_git(
         -DUSE_STATIC_CRT=OFF
         # There is a bug on this one maybe?
         -DASSIMP_INSTALL_PDB=OFF
-
-    DEPENDENCIES
-        zlib_ext
-
 )
 
 # Get GFG
@@ -234,7 +219,7 @@ if(MRAY_BUILD_TESTS)
 endif()
 
 # Image Libraries compiled into oiio
-#add_subdirectory(oiio)
+add_subdirectory(oiio)
 
 set(MRAY_ALL_EXT_DEP_TARGETS ${MRAY_ALL_EXT_DEP_TARGETS}
     ${MRAY_OIIO_EXT_DEP_TARGETS})

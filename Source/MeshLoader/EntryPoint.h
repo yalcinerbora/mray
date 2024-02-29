@@ -3,7 +3,6 @@
 
 #include <string>
 #include <memory>
-#include <nlohmann/json_fwd.hpp>
 
 #include "Core/Error.h"
 #include "Core/MRayDataType.h"

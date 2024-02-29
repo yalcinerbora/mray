@@ -49,6 +49,7 @@ namespace NodeNames
     static constexpr string_view TEXTURE_NAME       = "texture"sv;
     // Light Related
     static constexpr string_view LIGHT_TYPE_PRIMITIVE   = "Primitive"sv;
+    static constexpr string_view TRANSFORM_TYPE_IDENTITY = "Identity"sv;
 
     //static constexpr string_view TEXTURE_IS_CACHED  = "isCached"sv;
     //static constexpr string_view TEXTURE_FILTER     = "filter"sv;

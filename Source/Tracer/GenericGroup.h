@@ -223,8 +223,7 @@ void GenericGroupT<C, ID, AI>::GenericPushData(const Vector<2, IdInteger>& idRan
             auto loc = itemRanges.find(i);
             if(loc == itemRanges.end())
             {
-                throw MRayError(MRAY_FORMAT("{:s} id is not found!",
-                                            C::TypeName()));
+                throw MRayError("{:s} id is not found!", C::TypeName());
             }
             Vector<2, IdInteger> r = (isPerItem)
                                         ? loc->second.itemRange
@@ -296,9 +295,9 @@ typename GenericGroupT<C, ID, AI>::IdList GenericGroupT<C, ID, AI>::Reserve(cons
 {
     if(isCommitted)
     {
-        throw MRayError(MRAY_FORMAT("{:s} is in committed state, "
-                                    " you change cannot change reservations!",
-                                    C::TypeName()));
+        throw MRayError("{:s} is in committed state, "
+                        " you change cannot change reservations!",
+                        C::TypeName());
     }
 
     IdList result;

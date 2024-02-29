@@ -187,6 +187,60 @@ enum class MRayDataEnum : uint32_t
     MR_END
 };
 
+enum class MRayPixelEnum : uint32_t
+{
+    // UNORMS
+    MR_R8_UNORM,
+    MR_RG8_UNORM,
+    MR_RGB8_UNORM,
+    MR_RGBA8_UNORM,
+
+    MR_R16_UNORM,
+    MR_RG16_UNORM,
+    MR_RGB16_UNORM,
+    MR_RGBA16_UNORM,
+
+    // SNORMS
+    MR_R8_SNORM,
+    MR_RG8_SNORM,
+    MR_RGB8_SNORM,
+    MR_RGBA8_SNORM,
+
+    MR_R16_SNORM,
+    MR_RG16_SNORM,
+    MR_RGB16_SNORM,
+    MR_RGBA16_SNORM,
+
+    // FLOAT
+    MR_R_HALF,
+    MR_RG_HALF,
+    MR_RGB_HALF,
+    MR_RGBA_HALF,
+
+    MR_R_FLOAT,
+    MR_RG_FLOAT,
+    MR_RGB_FLOAT,
+    MR_RGBA_FLOAT,
+
+    // Graphics Related Compressed Images
+    // https://docs.microsoft.com/en-us/windows/win32/direct3d11/texture-block-compression-in-direct3d-11
+    // CUDA also support these but it is pain in the ass to properly load into
+    // textureObjects
+    // https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html#group__CUDART__TYPES_1g6b3a50368a0aa592f65e928adca9b929
+    MR_BC1_UNORM,
+    MR_BC2_UNORM,
+    MR_BC3_UNORM,
+    MR_BC4_UNORM,
+    MR_BC4_SNORM,
+    MR_BC5_UNORM,
+    MR_BC5_SNORM,
+    MR_BC6H_UFLOAT,
+    MR_BC6H_SFLOAT,
+    MR_BC7_UNORM,
+
+    MR_END
+};
+
 struct MRayDataTypeStringifier
 {
     using enum MRayDataEnum;
@@ -264,7 +318,55 @@ struct MRayDataTypeStringifier
     static constexpr std::string_view ToString(MRayDataEnum e);
 };
 
+struct MRayPixelTypeStringifier
+{
+    using enum MRayPixelEnum;
+    static constexpr std::array<std::string_view, static_cast<size_t>(MR_END)> Names =
+    {
+        "MR_R8_UNORM",
+        "MR_RG8_UNORM",
+        "MR_RGB8_UNORM",
+        "MR_RGBA8_UNORM",
+        "MR_R16_UNORM",
+        "MR_RG16_UNORM",
+        "MR_RGB16_UNORM",
+        "MR_RGBA16_UNORM",
+        "MR_R8_SNORM",
+        "MR_RG8_SNORM",
+        "MR_RGB8_SNORM",
+        "MR_RGBA8_SNORM",
+        "MR_R16_SNORM",
+        "MR_RG16_SNORM",
+        "MR_RGB16_SNORM",
+        "MR_RGBA16_SNORM",
+        "MR_R_HALF",
+        "MR_RG_HALF",
+        "MR_RGB_HALF",
+        "MR_RGBA_HALF",
+        "MR_R_FLOAT",
+        "MR_RG_FLOAT",
+        "MR_RGB_FLOAT",
+        "MR_RGBA_FLOAT",
+        "MR_BC1_UNORM",
+        "MR_BC2_UNORM",
+        "MR_BC3_UNORM",
+        "MR_BC4_UNORM",
+        "MR_BC4_SNORM",
+        "MR_BC5_UNORM",
+        "MR_BC5_SNORM",
+        "MR_BC6H_UFLOAT",
+        "MR_BC6H_SFLOAT",
+        "MR_BC7_UNORM"
+    };
+    static constexpr std::string_view ToString(MRayPixelEnum e);
+};
+
 constexpr std::string_view MRayDataTypeStringifier::ToString(MRayDataEnum e)
+{
+    return Names[static_cast<uint32_t>(e)];
+}
+
+constexpr std::string_view MRayPixelTypeStringifier::ToString(MRayPixelEnum e)
 {
     return Names[static_cast<uint32_t>(e)];
 }

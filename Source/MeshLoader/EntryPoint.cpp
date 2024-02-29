@@ -39,8 +39,8 @@ MeshLoaderPtr MeshLoaderPool::AcquireALoader(const std::string& extension) const
     auto it = generators.find(extension);
     if(it == generators.cend())
     {
-        throw MRayError(MRAY_FORMAT("Unable to find a mesh loader "
-                                    "for extension *.{}", extension));
+        throw MRayError("Unable to find a mesh loader "
+                        "for extension *.{}", extension);
     }
     return it->second();
 }

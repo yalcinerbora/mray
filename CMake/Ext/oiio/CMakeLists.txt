@@ -114,23 +114,26 @@ set(IMATH_INSTALL_LOC ${OIIO_TMP_DIR}/imath)
 mray_build_ext_dependency_git(
         NAME imath_ext
         URL "https://github.com/AcademySoftwareFoundation/Imath.git"
-        TAG "d690a3fcff4e877ead5ae56c7e964595ade8a35e" # v3.1.9
+        TAG "9fe5ed213cd99237976f2eb48b8bf86e112d90fa" # v3.1.10
 
         LICENSE_NAME "LICENSE.md"
-        DONT_OVERRIDE_INSTALL_SUFFIXES
-        OVERRIDE_INSTALL_PREFIX ${IMATH_INSTALL_LOC}
+        # OpenImageIO uses Imath as a subdirectory on includes.
+        # Altough we do not use it, we need to install it to proper folder
+        #DONT_OVERRIDE_INSTALL_SUFFIXES
+        #OVERRIDE_INSTALL_PREFIX ${IMATH_INSTALL_LOC}
+
         BUILD_ARGS
             -DBUILD_SHARED_LIBS=OFF
             -DBUILD_TESTING=OFF
             -DCMAKE_DEBUG_POSTFIX:STRING=d
 )
-append_cmake_prefix_path(${IMATH_INSTALL_LOC})
+#append_cmake_prefix_path(${IMATH_INSTALL_LOC})
 
 set(OPENEXR_INSTALL_LOC ${OIIO_TMP_DIR}/openexr)
 mray_build_ext_dependency_git(
         NAME openexr_ext
         URL "https://github.com/AcademySoftwareFoundation/openexr.git"
-        TAG "68d9e1e17620cef00e59b43fa42c97fbcf90e72b" # v3.1.8
+        TAG "456bf42dc2fddb647c0e9ab911656e5cf757fc36" # v3.2.0
 
         LICENSE_NAME "LICENSE.md"
         DONT_OVERRIDE_INSTALL_SUFFIXES
@@ -150,7 +153,6 @@ mray_build_ext_dependency_git(
 
         DEPENDENCIES
             imath_ext
-            oiio_zlib_ext
 )
 append_cmake_prefix_path(${OPENEXR_INSTALL_LOC})
 
@@ -189,7 +191,7 @@ set(JPEGTURBO_INSTALL_LOC ${OIIO_TMP_DIR}/jpegTurbo)
 mray_build_ext_dependency_git(
         NAME libjpeg_turbo_ext
         URL "https://github.com/libjpeg-turbo/libjpeg-turbo.git"
-        TAG "8ecba3647edb6dd940463fedf38ca33a8e2a73d1" # v2.1.5.1
+        TAG "6c87537f60941f3c265c339fe60d1e31d2a42ccf" # v3.0.0.0
 
         LICENSE_NAME "LICENSE.md"
         DONT_OVERRIDE_INSTALL_SUFFIXES
@@ -230,13 +232,15 @@ append_cmake_prefix_path(${LIBPNG_INSTALL_LOC})
 mray_build_ext_dependency_git(
         NAME oiio_ext
         URL "https://github.com/OpenImageIO/oiio.git"
-        TAG "e7fe4064814e1758e47cb4700e33ef930673a427" # v2.4.12.0
+        TAG "c518e2da23cca3915beb70e7b7f2e0fd485af24d" # v2.5.7.0
 
         LICENSE_NAME "LICENSE.md"
         BUILD_ARGS
             # OIIO caches xxx_ROOT variables
             # and libarries does not change between configs
-            -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
+
+            # TODO: Change this later(oiio has "print" clashes with fmt)
+            -DCMAKE_CXX_STANDARD=20
             -DBoost_USE_STATIC_LIBS=ON
             -DBoost_NO_WARN_NEW_VERSIONS=ON
             -DEMBEDPLUGINS=ON
@@ -289,26 +293,26 @@ mray_build_ext_dependency_git(
 set(MRAY_OIIO_SRC_LOCATION ${MRAY_EXT_DIRECTORY}/oiio_ext/)
 
 # DL'in file here instead
-file(DOWNLOAD https://github.com/OpenImageIO/oiio/pull/3862.patch
-              ${MRAY_OIIO_SRC_LOCATION}/../3862.patch)
+# file(DOWNLOAD https://github.com/OpenImageIO/oiio/pull/3862.patch
+#               ${MRAY_OIIO_SRC_LOCATION}/../3862.patch)
 
-ExternalProject_Add_Step(oiio_ext patch_extra
-                WORKING_DIRECTORY ${MRAY_OIIO_SRC_LOCATION}/
-                # Couldnt able to make this work
-                # COMMAND curl --create-dirs -s -o ${MRAY_OIIO_SRC_LOCATION}/3862.patch
-                #         "https://github.com/OpenImageIO/oiio/pull/3862.patch"
-                # Download patch at configure step, then copy here
-                #
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                        ${MRAY_OIIO_SRC_LOCATION}/../3862.patch
-                        .
-                # This is also not good, it will move head back and forth but this tecnhically
-                # will run only initially so it is kinda fine.
-                COMMAND git am 3862.patch
-                DEPENDEES download update
-                DEPENDERS configure
-                COMMENT "Applying a patch to oiio"
-)
+# ExternalProject_Add_Step(oiio_ext patch_extra
+#                 WORKING_DIRECTORY ${MRAY_OIIO_SRC_LOCATION}/
+#                 # Couldnt able to make this work
+#                 # COMMAND curl --create-dirs -s -o ${MRAY_OIIO_SRC_LOCATION}/3862.patch
+#                 #         "https://github.com/OpenImageIO/oiio/pull/3862.patch"
+#                 # Download patch at configure step, then copy here
+#                 #
+#                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
+#                         ${MRAY_OIIO_SRC_LOCATION}/../3862.patch
+#                         .
+#                 # This is also not good, it will move head back and forth but this tecnhically
+#                 # will run only initially so it is kinda fine.
+#                 COMMAND git am 3862.patch
+#                 DEPENDEES download update
+#                 DEPENDERS configure
+#                 COMMENT "Applying a patch to oiio"
+# )
 
 # Get the name of the deps outside
 set(MRAY_OIIO_EXT_DEP_TARGETS

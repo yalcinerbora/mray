@@ -50,8 +50,8 @@ void MatGroupLambert::PushAttribute(MaterialKey,
     //    default: throw MRayError(MRAY_FORMAT("{:s}: Unkown AttributeIndex {:d}",
     //                                         TypeName(), attributeIndex));
     //}
-    throw MRayError(MRAY_FORMAT("{:s}: Unkown AttributeIndex {:d}",
-                                TypeName(), attributeIndex));
+    throw MRayError("{:s}: Unkown AttributeIndex {:d}",
+                    TypeName(), attributeIndex);
 }
 
 void MatGroupLambert::PushAttribute(MaterialKey,
@@ -67,8 +67,8 @@ void MatGroupLambert::PushAttribute(MaterialKey,
     //    default: throw MRayError(MRAY_FORMAT("{:s}: Unkown AttributeIndex {:d}",
     //                                         TypeName(), attributeIndex));
     //}
-    throw MRayError(MRAY_FORMAT("{:s}: Unkown AttributeIndex {:d}",
-                                TypeName(), attributeIndex));
+    throw MRayError("{:s}: Unkown AttributeIndex {:d}",
+                    TypeName(), attributeIndex);
 }
 
 void MatGroupLambert::PushAttribute(const Vector<2, MaterialKey::Type>&,
@@ -83,8 +83,8 @@ void MatGroupLambert::PushAttribute(const Vector<2, MaterialKey::Type>&,
     //    default: throw MRayError(MRAY_FORMAT("{:s}: Unkown AttributeIndex {:d}",
     //                                         TypeName(), attributeIndex));
     //}
-    throw MRayError(MRAY_FORMAT("{:s}: Unkown AttributeIndex {:d}",
-                                TypeName(), attributeIndex));
+    throw MRayError("{:s}: Unkown AttributeIndex {:d}",
+                    TypeName(), attributeIndex);
 }
 
 typename MatGroupLambert::DataSoA MatGroupLambert::SoA() const

@@ -227,12 +227,12 @@ RayPartitioner::InitialBuffers RayPartitioner::Start(uint32_t rayCountIn,
 
     Span<uint32_t> hPartCount;
     MemAlloc::AllocateMultiData(std::tie(hPartitionStartOffsets,
-                                            hPartitionKeys,
-                                            hPartCount),
+                                         hPartitionKeys,
+                                         hPartCount),
                                 hostMem,
                                 {maxPartitionCount + 1,
-                                    maxPartitionCount,
-                                    1});
+                                 maxPartitionCount,
+                                 1});
 
     hPartitionStartOffsets = hPartitionStartOffsets.subspan(0, maxPartitionCount + 1);
     hPartitionKeys = hPartitionKeys.subspan(0, maxPartitionCount);
@@ -303,11 +303,6 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
         ToConstSpan(dSortedKeys),
         keyBatchBitRange
     );
-
-    //DeviceDebug::DumpGPUMemToFile("dSparseSplitIndices",
-    //                              ToConstSpan(dSparseSplitIndices), queue);
-    //DeviceDebug::DumpGPUMemToFile("dSortedKeys",
-    //                              ToConstSpan(dSortedKeys), queue);
 
     // Partition to host visible buffer
     DeviceAlgorithms::BinaryPartition

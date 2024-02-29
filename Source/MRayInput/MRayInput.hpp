@@ -80,6 +80,18 @@ inline Span<T> MRayInput::AccessAs()
                     usedBytes / sizeof(T));
 }
 
+template<>
+inline Span<const Byte> MRayInput::AccessAs() const
+{
+    return ToConstSpan(ownedMem);
+}
+
+template<>
+inline Span<Byte> MRayInput::AccessAs()
+{
+    return ownedMem;
+}
+
 // =========================== //
 //    String Specialization    //
 // =========================== //

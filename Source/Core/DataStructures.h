@@ -142,7 +142,7 @@ LookupTable<K, V, H, VECL, S>::LookupTable(const Span<Vector<VL, H>>& hashes,
     , values(values)
 {
     assert(keys.size() == values.size());
-    assert(tableSize * VECL <= hashes.size());
+    assert(keys.size() * VECL <= hashes.size());
 }
 
 template <class K, class V, std::unsigned_integral H,

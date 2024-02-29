@@ -37,7 +37,7 @@ void SceneLoaderMRayTest::SetUp()
     };
     MRayError e = dllFile->GenerateObjectWithArgs<SceneLoaderConstructorArgs>(loader, args,
                                                                                      *pool);
-    EXPECT_TRUE(!e);
+    EXPECT_TRUE(!static_cast<bool>(e));
 }
 
 void SceneLoaderMRayTest::TearDown()
@@ -45,6 +45,27 @@ void SceneLoaderMRayTest::TearDown()
     pool = nullptr;
     loader = {nullptr, nullptr};
     dllFile = nullptr;
+}
+
+TEST_F(SceneLoaderMRayTest, Empty)
+{
+    TracerMock tracer;
+
+    std::istringstream ss{std::string(EmptyScene)};
+    auto result = loader->LoadScene(tracer, ss);
+    EXPECT_TRUE(static_cast<bool>(result.first));
+}
+
+TEST_F(SceneLoaderMRayTest, MinimalValid)
+{
+    TracerMock tracer;
+
+    std::istringstream ss{std::string(MinimalValidScene)};
+    auto result = loader->LoadScene(tracer, ss);
+
+    MRAY_ERROR_LOG("{}", result.first.GetError());
+
+    EXPECT_FALSE(result.first);
 }
 
 TEST_F(SceneLoaderMRayTest, Basic)
@@ -59,8 +80,8 @@ TEST_F(SceneLoaderMRayTest, Basic)
     EXPECT_FALSE(result.first);
 }
 
-TEST_F(SceneLoaderMRayTest, Kitchen)
-{
-    //TracerMock tracer;
-    //auto result = loader->LoadScene("Kitchen/Kitchen.json");
-}
+//TEST_F(SceneLoaderMRayTest, Kitchen)
+//{
+//    TracerMock tracer;
+//    auto result = loader->LoadScene(tracer, "Kitchen/Kitchen.json");
+//}

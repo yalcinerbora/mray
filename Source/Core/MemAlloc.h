@@ -116,7 +116,16 @@ namespace MemAlloc
 
 constexpr size_t DefaultSystemAlignment()
 {
-    // TODO: properly check this?
+    // Each device has multiple alignment expositions,
+    // (CUDA malloc provides 256byte aligned mem)
+    // Did not checked other HW vendors, but
+    // "AllocateMultiData" should behave as if multiple allocations
+    // occurs contiguously, so this alignment should match it
+    // Since this is in core library there is no proper way to
+    // programaticcaly check this so it is given as a constant.
+    //
+    // TODO: Programatically check this for each HW vendor that this
+    // code is compiled
     return 256;
 }
 

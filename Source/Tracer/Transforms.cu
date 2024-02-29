@@ -56,8 +56,8 @@ void TransformGroupSingle::PushAttribute(TransformKey id , uint32_t attributeInd
                                     KCInvertTransforms());
 
     }
-    else throw MRayError(MRAY_FORMAT("{:s}: Unkown AttributeIndex {:d}",
-                                     TypeName(), attributeIndex));
+    else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
+                         TypeName(), attributeIndex);
 }
 
 void TransformGroupSingle::PushAttribute(TransformKey id,
@@ -81,8 +81,8 @@ void TransformGroupSingle::PushAttribute(TransformKey id,
         DeviceAlgorithms::Transform(subInvTRange, ToConstSpan(subTRange), queue,
                                     KCInvertTransforms());
     }
-    else throw MRayError(MRAY_FORMAT("{:s}: Unkown AttributeIndex {:d}",
-                                             TypeName(), attributeIndex));
+    else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
+                         TypeName(), attributeIndex);
 }
 
 void TransformGroupSingle::PushAttribute(const Vector<2, TransformKey::Type>& idRange,
@@ -104,8 +104,8 @@ void TransformGroupSingle::PushAttribute(const Vector<2, TransformKey::Type>& id
         DeviceAlgorithms::Transform(subInvTRange, ToConstSpan(subTRange), queue,
                                     KCInvertTransforms());
     }
-    else throw MRayError(MRAY_FORMAT("{:s}: Unkown AttributeIndex {:d}",
-                                     TypeName(), attributeIndex));
+    else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
+                         TypeName(), attributeIndex);
 }
 
 TransformGroupSingle::AttribInfoList TransformGroupSingle::AttributeInfo() const
@@ -214,8 +214,8 @@ void TransformGroupMulti::PushAttribute(TransformKey id , uint32_t attributeInde
         DeviceAlgorithms::Transform(subInvTRange, ToConstSpan(subTRange), queue,
                                     KCInvertTransforms());
     }
-    else throw MRayError(MRAY_FORMAT("{:s}: Unkown AttributeIndex {:d}",
-                                     TypeName(), attributeIndex));
+    else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
+                         TypeName(), attributeIndex);
 }
 
 void TransformGroupMulti::PushAttribute(TransformKey id,
@@ -239,8 +239,8 @@ void TransformGroupMulti::PushAttribute(TransformKey id,
         DeviceAlgorithms::Transform(subInvTRange, ToConstSpan(subTRange), queue,
                                     KCInvertTransforms());
     }
-    else throw MRayError(MRAY_FORMAT("{:s}: Unkown AttributeIndex {:d}",
-                                     TypeName(), attributeIndex));
+    else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
+                         TypeName(), attributeIndex);
 }
 
 void TransformGroupMulti::PushAttribute(const Vector<2, TransformKey::Type>& idRange,
@@ -262,8 +262,8 @@ void TransformGroupMulti::PushAttribute(const Vector<2, TransformKey::Type>& idR
         DeviceAlgorithms::Transform(subInvTRange, ToConstSpan(subTRange), queue,
                                     KCInvertTransforms());
     }
-    else throw MRayError(MRAY_FORMAT("{:s}: Unkown AttributeIndex {:d}",
-                                     TypeName(), attributeIndex));
+    else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
+                         TypeName(), attributeIndex);
 }
 
 TransformGroupMulti::AttribInfoList TransformGroupMulti::AttributeInfo() const

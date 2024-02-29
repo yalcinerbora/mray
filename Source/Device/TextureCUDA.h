@@ -111,6 +111,7 @@ class TextureCUDA
                                           const TextureExtent<D>& size,
                                           Span<const PaddedChannelType> regionFrom);
 };
+
 class TextureBackingMemoryCUDA
 {
     MRAY_HYBRID

@@ -10,8 +10,6 @@ namespace mray::cuda
         #ifndef __CUDA_ARCH__
             if(code == cudaSuccess) return;
 
-            std::string greenErrorCode = fmt::format(fg(fmt::color::green),
-                                                        std::string("CUDA Failure"));
             MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
                             fmt::format(fg(fmt::color::green),
                                         std::string("CUDA Failure")),

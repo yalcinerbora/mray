@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-//#include <source_location>
 #include "Log.h"
 
 // Very generic error
@@ -16,33 +15,29 @@ struct MRayError
     };
 
     private:
-    Type                    type = OK;
-    std::string             customInfo;
-    // std::source_location crashes the nvcc compiler (at least on CUDA 12.1)
-    // so this is commented out will be enabled when it is fixed
-    //std::source_location    sourceInfo;
+    Type        type = OK;
+    std::string customInfo;
 
     public:
-    MRayError(Type);
-    MRayError(std::string && = "");
-        //, std::source_location = std::source_location::current());
+                MRayError(Type = Type::OK);
+    // This pattern emerges, so added as a template
+    template<class... Args>
+                MRayError(fmt::format_string<Args...> fstr, Args&&... args);
 
-    operator bool();
+    explicit operator bool();
 
     std::string GetError() const;
     void        AppendInfo(const std::string&);
-
 };
 
 inline MRayError::MRayError(Type t)
     : type(t)
 {}
 
-inline MRayError::MRayError(std::string&& s)
-                            //std::source_location loc)
+template<class... Args>
+inline MRayError::MRayError(fmt::format_string<Args...> fstr, Args&&... args)
     : type(MRayError::HAS_ERROR)
-    , customInfo(s)
-    //, sourceInfo(loc)
+    , customInfo(MRAY_FORMAT(fstr, std::forward<Args>(args)...))
 {}
 
 inline MRayError::operator bool()
@@ -52,11 +47,7 @@ inline MRayError::operator bool()
 
 inline std::string MRayError::GetError() const
 {
-    return MRAY_FORMAT("Error ||| {:s}", customInfo);
-    //return MRAY_FORMAT("{:s}[{:d}]:[{:d}] -> {:s} ||| {:s}",
-    //                   sourceInfo.file_name(), sourceInfo.line(),
-    //                   sourceInfo.column(),
-    //                   sourceInfo.function_name(), customInfo);
+    return MRAY_FORMAT("|| {:s}", customInfo);
 }
 
 inline void MRayError::AppendInfo(const std::string& s)
