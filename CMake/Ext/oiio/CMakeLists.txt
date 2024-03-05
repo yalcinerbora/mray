@@ -119,8 +119,8 @@ mray_build_ext_dependency_git(
         LICENSE_NAME "LICENSE.md"
         # OpenImageIO uses Imath as a subdirectory on includes.
         # Altough we do not use it, we need to install it to proper folder
-        #DONT_OVERRIDE_INSTALL_SUFFIXES
-        #OVERRIDE_INSTALL_PREFIX ${IMATH_INSTALL_LOC}
+        # DONT_OVERRIDE_INSTALL_SUFFIXES
+        # OVERRIDE_INSTALL_PREFIX ${IMATH_INSTALL_LOC}
 
         BUILD_ARGS
             -DBUILD_SHARED_LIBS=OFF

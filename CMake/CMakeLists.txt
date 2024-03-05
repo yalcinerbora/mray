@@ -113,7 +113,7 @@ add_subdirectory(Device)
 
 # DLLs
 add_subdirectory(Tracer)
-add_subdirectory(MRayInput)
+add_subdirectory(TransientPool)
 add_subdirectory(SceneLoaderMRay)
 add_subdirectory(MeshLoader)
 add_subdirectory(ImageLoader)

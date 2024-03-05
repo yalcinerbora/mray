@@ -8,10 +8,10 @@ set(SRC_COMMON
 source_group("" FILES ${SRC_COMMON})
 add_library(MRayInput SHARED ${SRC_COMMON})
 
-target_link_libraries(MRayInput PRIVATE
+target_link_libraries(TransientPool PRIVATE
                       CoreLib
                       mray::meta_compile_opts)
 
-target_compile_definitions(MRayInput
+target_compile_definitions(TransientPool
                            PRIVATE
                            MRAY_INPUT_SHARED_EXPORT)
