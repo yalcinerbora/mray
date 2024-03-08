@@ -79,7 +79,7 @@ target_link_libraries(TracerCUDA
                       PRIVATE
                       DeviceLib
                       CoreLib
-                      MRayInput
+                      TransientPool
                       mray::meta_compile_opts
                       mray::cuda_extra_compile_opts)
 
@@ -95,7 +95,7 @@ target_link_libraries(TracerCUDA_Objects
                       PUBLIC
                       DeviceLib
                       CoreLib
-                      MRayInput
+                      TransientPool
                       PRIVATE
                       mray::meta_compile_opts
                       mray::cuda_extra_compile_opts)

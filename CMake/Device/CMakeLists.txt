@@ -47,7 +47,7 @@ add_library(DeviceLib STATIC ${SRC_ALL})
 target_link_libraries(DeviceLib
                       PUBLIC
                       CoreLib
-                      MRayInput
+                      TransientPool
                       CUDA::cuda_driver
                       PRIVATE
                       mray::meta_compile_opts

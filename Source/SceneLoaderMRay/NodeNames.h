@@ -24,12 +24,13 @@ namespace NodeNames
     // Json Node Common Names
     static constexpr string_view ID             = "id"sv;
     static constexpr string_view TYPE           = "type"sv;
-    static constexpr string_view NAME           = "name"sv;
+    static constexpr string_view FILE           = "file"sv;
     static constexpr string_view TAG            = "tag"sv;
     // Primitive Type related
     static constexpr string_view INNER_INDEX            = "innerIndex"sv;
-    static constexpr string_view NODE_PRIMITIVE         = ".nodeTriangle"sv;
-    static constexpr string_view INDEXED_NODE_PRIMITIVE = ".nodeTriangleIndexed"sv;
+    static constexpr string_view NODE_PRIM_TRI          = "nodeTriangle"sv;
+    static constexpr string_view NODE_PRIM_TRI_INDEXED  = "nodeTriangleIndexed"sv;
+    static constexpr string_view NODE_PRIM_SPHERE       = "nodeSphere"sv;
 
     // Common Names
     static constexpr string_view POSITION       = "position"sv;
@@ -48,8 +49,14 @@ namespace NodeNames
     static constexpr string_view TEXTURE_CHANNEL    = "channels"sv;
     static constexpr string_view TEXTURE_NAME       = "texture"sv;
     // Light Related
-    static constexpr string_view LIGHT_TYPE_PRIMITIVE   = "Primitive"sv;
-    static constexpr string_view TRANSFORM_TYPE_IDENTITY = "Identity"sv;
+    static constexpr string_view LIGHT_TYPE_PRIMITIVE       = "Primitive"sv;
+    static constexpr string_view TRANSFORM_TYPE_IDENTITY    = "Identity"sv;
+
+    // Texture Node Related Names
+    static constexpr string_view TEX_NODE_FILE = "file"sv;
+    static constexpr string_view TEX_NODE_AS_SIGNED = "asSigned"sv;
+    static constexpr string_view TEX_NODE_IS_DATA = "isData"sv;
+
 
     //static constexpr string_view TEXTURE_IS_CACHED  = "isCached"sv;
     //static constexpr string_view TEXTURE_FILTER     = "filter"sv;

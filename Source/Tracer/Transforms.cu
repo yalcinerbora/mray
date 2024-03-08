@@ -41,7 +41,7 @@ void TransformGroupSingle::CommitReservations()
 }
 
 void TransformGroupSingle::PushAttribute(TransformKey id , uint32_t attributeIndex,
-                                         MRayInput data, const GPUQueue& queue)
+                                         TransientData data, const GPUQueue& queue)
 {
     if(attributeIndex == 0)
     {
@@ -63,7 +63,7 @@ void TransformGroupSingle::PushAttribute(TransformKey id , uint32_t attributeInd
 void TransformGroupSingle::PushAttribute(TransformKey id,
                                          const Vector2ui& subRange,
                                          uint32_t attributeIndex,
-                                         MRayInput data,
+                                         TransientData data,
                                          const GPUQueue& queue)
 {
     if(attributeIndex == 0)
@@ -86,7 +86,7 @@ void TransformGroupSingle::PushAttribute(TransformKey id,
 }
 
 void TransformGroupSingle::PushAttribute(const Vector<2, TransformKey::Type>& idRange,
-                                         uint32_t attributeIndex, MRayInput data,
+                                         uint32_t attributeIndex, TransientData data,
                                          const GPUQueue& queue)
 {
     if(attributeIndex == 0)
@@ -199,7 +199,7 @@ void TransformGroupMulti::CommitReservations()
 }
 
 void TransformGroupMulti::PushAttribute(TransformKey id , uint32_t attributeIndex,
-                                         MRayInput data, const GPUQueue& queue)
+                                        TransientData data, const GPUQueue& queue)
 {
     if(attributeIndex == 0)
     {
@@ -221,7 +221,7 @@ void TransformGroupMulti::PushAttribute(TransformKey id , uint32_t attributeInde
 void TransformGroupMulti::PushAttribute(TransformKey id,
                                         const Vector2ui& subRange,
                                         uint32_t attributeIndex,
-                                        MRayInput data,
+                                        TransientData data,
                                         const GPUQueue& queue)
 {
     if(attributeIndex == 0)
@@ -244,7 +244,7 @@ void TransformGroupMulti::PushAttribute(TransformKey id,
 }
 
 void TransformGroupMulti::PushAttribute(const Vector<2, TransformKey::Type>& idRange,
-                                        uint32_t attributeIndex, MRayInput data,
+                                        uint32_t attributeIndex, TransientData data,
                                         const GPUQueue& queue)
 {
     if(attributeIndex == 0)

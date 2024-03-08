@@ -5,21 +5,21 @@
 #include "Core/System.h"
 #include "Core/Types.h"
 
-#ifdef MRAY_INPUT_SHARED_EXPORT
-    #define MRAY_INPUT_ENTRYPOINT MRAY_DLL_EXPORT
+#ifdef MRAY_TRANSIENT_POOL_SHARED_EXPORT
+    #define MRAY_TRANSIENT_POOL_ENTRYPOINT MRAY_DLL_EXPORT
 #else
-    #define MRAY_INPUT_ENTRYPOINT MRAY_DLL_IMPORT
+    #define MRAY_TRANSIENT_POOL_ENTRYPOINT MRAY_DLL_IMPORT
 #endif
 
-namespace MRayInputDetail
+namespace TransientPoolDetail
 {
-    class MRayInput;
+    class TransientData;
 }
 
-MRAY_INPUT_ENTRYPOINT extern void* MRayInputIssueBufferForDestruction(MRayInputDetail::MRayInput buffer);
-MRAY_INPUT_ENTRYPOINT extern void MRayInputDestroyCallback(void* ptr);
+MRAY_TRANSIENT_POOL_ENTRYPOINT extern void* TransientPoolIssueBufferForDestruction(TransientPoolDetail::TransientData buffer);
+MRAY_TRANSIENT_POOL_ENTRYPOINT extern void TransientPoolDestroyCallback(void* ptr);
 
-namespace MRayInputDetail
+namespace TransientPoolDetail
 {
 
 template <class T>
@@ -29,25 +29,25 @@ concept StringC = std::disjunction_v
     std::is_same<T, std::string_view>
 >;
 
-class MRayInput
+class TransientData
 {
-    friend void ::MRayInputDestroyCallback(void*);
-    MRayInput() = default;
+    friend void     ::TransientPoolDestroyCallback(void*);
+                    TransientData() = default;
 
     private:
-    size_t      typeHash;
-    Span<Byte>  ownedMem;
-    size_t      usedBytes;
-    size_t      alignment;
+    size_t          typeHash;
+    Span<Byte>      ownedMem;
+    size_t          usedBytes;
+    size_t          alignment;
 
     public:
     template<ImplicitLifetimeC T>
-                MRayInput(std::in_place_type_t<T>, size_t count);
-                MRayInput(const MRayInput&) = delete;
-                MRayInput(MRayInput&&);
-    MRayInput&  operator=(const MRayInput&) = delete;
-    MRayInput&  operator=(MRayInput&&);
-                ~MRayInput();
+                    TransientData(std::in_place_type_t<T>, size_t count);
+                    TransientData(const TransientData&) = delete;
+                    TransientData(TransientData&&);
+    TransientData&  operator=(const TransientData&) = delete;
+    TransientData&  operator=(TransientData&&);
+                    ~TransientData();
 
     template<ImplicitLifetimeC T>
     void            Push(Span<const T>);
@@ -60,8 +60,8 @@ class MRayInput
     //    String Specialization    //
     // =========================== //
     template<StringC T>
-                        MRayInput(std::in_place_type_t<T>,
-                                  size_t charCount);
+                        TransientData(std::in_place_type_t<T>,
+                                      size_t charCount);
     template<StringC T>
     void                Push(Span<const T, 1>);
     std::string_view    AccessAsString() const;
@@ -72,9 +72,9 @@ class MRayInput
 // Rolling a simple free-list impl
 struct FreeListNode
 {
-    MRayInput input;
-    FreeListNode* prev = nullptr;
-    FreeListNode* next = nullptr;
+    TransientData   input;
+    FreeListNode*   prev = nullptr;
+    FreeListNode*   next = nullptr;
 };
 
 class FreeList
@@ -88,25 +88,25 @@ class FreeList
 
     public:
                     FreeList();
-    FreeListNode*   GetALocation(MRayInput buffer);
+    FreeListNode*   GetALocation(TransientData buffer);
     void            GiveTheLocation(FreeListNode* node);
 
 };
 
 using PoolMemResource = std::pmr::synchronized_pool_resource;
 
-MRAY_INPUT_ENTRYPOINT extern PoolMemResource   mainR;
-MRAY_INPUT_ENTRYPOINT extern FreeList          freeList;
+MRAY_TRANSIENT_POOL_ENTRYPOINT extern PoolMemResource   mainR;
+MRAY_TRANSIENT_POOL_ENTRYPOINT extern FreeList          freeList;
 
 }
 
-#include "MRayInput.hpp"
+#include "TransientPool.hpp"
 
-// Only MRayInput is exposed to the user
-using MRayInput = MRayInputDetail::MRayInput;
+// Only TransientData is exposed to the user
+using TransientData = TransientPoolDetail::TransientData;
 
 template<ImplicitLifetimeC T>
-inline Span<T> ToSpan(const MRayInput& v)
+inline Span<T> ToSpan(const TransientData& v)
 {
     return v.AccessAs<T>();
 }

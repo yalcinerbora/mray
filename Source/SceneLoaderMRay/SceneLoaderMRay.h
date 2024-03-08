@@ -56,7 +56,6 @@ class SceneLoaderMRay : public SceneLoaderI
     std::string         scenePath;
     nlohmann::json      sceneJson;
     BS::thread_pool&    threadPool;
-    MeshLoaderPoolPtr   meshLoaderPool;
 
     TypeMappedNodes     primNodes;
     TypeMappedNodes     cameraNodes;
@@ -68,7 +67,10 @@ class SceneLoaderMRay : public SceneLoaderI
     TexTypeMappedNodes  textureNodes;
 
     //Scene id to -> Tracer id maps
-    MutexedMap<PrimIdMappings>  primMappings;
+    MutexedMap<MediumIdMappings>    mediumMappings;
+    MutexedMap<PrimIdMappings>      primMappings;
+    MutexedMap<MaterialIdMappings>  matMappings;
+    TextureIdMappings               texMappings;
 
     static LightSurfaceStruct               LoadBoundary(const nlohmann::json&);
     static std::vector<SurfaceStruct>       LoadSurfaces(const nlohmann::json&);

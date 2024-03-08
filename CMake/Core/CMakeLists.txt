@@ -2,7 +2,8 @@ set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/Core)
 
 # SOURCES
 set(SRC_CONTAINERS
-    ${CURRENT_SOURCE_DIR}/DataStructures.h)
+    ${CURRENT_SOURCE_DIR}/DataStructures.h
+    ${CURRENT_SOURCE_DIR}/DataStructures.hpp)
 
 set(SRC_SYSTEM
     ${CURRENT_SOURCE_DIR}/System.h

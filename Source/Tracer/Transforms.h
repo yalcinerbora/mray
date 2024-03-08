@@ -72,16 +72,16 @@ class TransformGroupIdentity final : public GenericGroupTransform<TransformGroup
     AttribInfoList  AttributeInfo() const override;
     void            PushAttribute(TransformKey batchId,
                                   uint32_t attributeIndex,
-                                  MRayInput data,
+                                  TransientData data,
                                   const GPUQueue& queue) override;
     void            PushAttribute(TransformKey batchId,
                                   const Vector2ui& subBatchRange,
                                   uint32_t attributeIndex,
-                                  MRayInput data,
+                                  TransientData data,
                                   const GPUQueue& queue) override;
     void            PushAttribute(const Vector<2, TransformKey::Type>& idRange,
                                   uint32_t attributeIndex,
-                                  MRayInput data,
+                                  TransientData data,
                                   const GPUQueue& queue) override;
 
     DataSoA         SoA() const;
@@ -104,16 +104,16 @@ class TransformGroupSingle final : public GenericGroupTransform<TransformGroupSi
     AttribInfoList  AttributeInfo() const override;
     void            PushAttribute(TransformKey batchId,
                                   uint32_t attributeIndex,
-                                  MRayInput data,
+                                  TransientData data,
                                   const GPUQueue& queue) override;
     void            PushAttribute(TransformKey batchId,
                                   const Vector2ui& subRange,
                                   uint32_t attributeIndex,
-                                  MRayInput data,
+                                  TransientData data,
                                   const GPUQueue& queue) override;
     void            PushAttribute(const Vector<2, TransformKey::Type>& idRange,
                                   uint32_t attributeIndex,
-                                  MRayInput data,
+                                  TransientData data,
                                   const GPUQueue& queue) override;
 
     DataSoA         SoA() const;
@@ -138,16 +138,16 @@ class TransformGroupMulti final : public GenericGroupTransform<TransformGroupMul
     AttribInfoList  AttributeInfo() const override;
     void            PushAttribute(TransformKey batchId,
                                   uint32_t attributeIndex,
-                                  MRayInput data,
+                                  TransientData data,
                                   const GPUQueue& queue) override;
     void            PushAttribute(TransformKey batchId,
                                   const Vector2ui& subRange,
                                   uint32_t attributeIndex,
-                                  MRayInput data,
+                                  TransientData data,
                                   const GPUQueue& queue) override;
     void            PushAttribute(const Vector<2, TransformKey::Type>& idRange,
                                   uint32_t attributeIndex,
-                                  MRayInput data,
+                                  TransientData data,
                                   const GPUQueue& queue) override;
 
     DataSoA         SoA() const;
@@ -202,17 +202,17 @@ inline void TransformGroupIdentity::CommitReservations()
 }
 
 inline void TransformGroupIdentity::PushAttribute(TransformKey, uint32_t,
-                                                  MRayInput, const GPUQueue&)
+                                                  TransientData, const GPUQueue&)
 {}
 
 inline void TransformGroupIdentity::PushAttribute(TransformKey,
                                                   const Vector2ui&,
-                                                  uint32_t, MRayInput,
+                                                  uint32_t, TransientData,
                                                   const GPUQueue&)
 {}
 
 inline void TransformGroupIdentity::PushAttribute(const Vector<2, TransformKey::Type>&,
-                                                  uint32_t, MRayInput,
+                                                  uint32_t, TransientData,
                                                   const GPUQueue&)
 {}
 

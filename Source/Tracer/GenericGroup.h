@@ -10,7 +10,7 @@
 #include "Core/Types.h"
 #include "Core/MemAlloc.h"
 
-#include "MRayInput/MRayInput.h"
+#include "TransientPool/TransientPool.h"
 
 #include "Device/GPUSystem.h"
 #include "TracerTypes.h"
@@ -34,7 +34,7 @@ using ItemCountMapT = std::map<T, ItemCountT<T>>;
 
 template <class GenericGroupType>
 concept GenericGroupC = requires(GenericGroupType gg,
-                                 MRayInput input,
+                                 TransientData input,
                                  typename GenericGroupType::IdType id,
                                  const GPUQueue& q)
 {
@@ -79,16 +79,16 @@ class GenericGroupI
     virtual bool            IsInCommitState() const = 0;
     virtual void            PushAttribute(IdType id,
                                           uint32_t attributeIndex,
-                                          MRayInput data,
+                                          TransientData data,
                                           const GPUQueue& queue) = 0;
     virtual void            PushAttribute(IdType id,
                                           const Vector2ui& subRange,
                                           uint32_t attributeIndex,
-                                          MRayInput data,
+                                          TransientData data,
                                           const GPUQueue& queue) = 0;
     virtual void            PushAttribute(const Vector<2, IdInteger>& idRange,
                                           uint32_t attributeIndex,
-                                          MRayInput data,
+                                          TransientData data,
                                           const GPUQueue& queue) = 0;
 
     virtual size_t          GPUMemoryUsage() const = 0;
@@ -127,21 +127,21 @@ class GenericGroupT : public GenericGroupI<IdType, AttribInfo>
     template <class T>
     void                        GenericPushData(const Vector<2, IdInteger>& idRange,
                                                 const Span<T>& copyRegion,
-                                                MRayInput data,
+                                                TransientData data,
                                                 bool isContiguous,
                                                 bool isPerItem,
                                                 const GPUQueue& queue) const;
     template <class T>
     void                        GenericPushData(IdType id,
                                                 const Span<T>& copyRegion,
-                                                MRayInput data,
+                                                TransientData data,
                                                 bool isPerItem,
                                                 const GPUQueue& queue) const;
     template <class T>
     void                        GenericPushData(IdType id,
                                                 const Vector2ui& subRange,
                                                 const Span<T>& copyRegion,
-                                                MRayInput data,
+                                                TransientData data,
                                                 bool isPerItem,
                                                 const GPUQueue& queue) const;
 
@@ -204,7 +204,7 @@ template<class C, class ID, class AI>
 template <class T>
 void GenericGroupT<C, ID, AI>::GenericPushData(const Vector<2, IdInteger>& idRange,
                                                const Span<T>& copyRegion,
-                                               MRayInput data,
+                                               TransientData data,
                                                bool isContiguous,
                                                bool isPerItem,
                                                const GPUQueue& deviceQueue) const
@@ -241,7 +241,7 @@ template<class C, class ID, class AI>
 template <class T>
 void GenericGroupT<C, ID, AI>::GenericPushData(ID id,
                                                const Span<T>& copyRegion,
-                                               MRayInput data,
+                                               TransientData data,
                                                bool isPerItem,
                                                const GPUQueue& deviceQueue) const
 {
@@ -260,7 +260,7 @@ template <class T>
 void GenericGroupT<C, ID, AI>::GenericPushData(ID id,
                                                const Vector2ui& subRange,
                                                const Span<T>& copyRegion,
-                                               MRayInput data,
+                                               TransientData data,
                                                bool isPerItem,
                                                const GPUQueue& deviceQueue) const
 {

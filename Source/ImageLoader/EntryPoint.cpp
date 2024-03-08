@@ -2,12 +2,14 @@
 #include "EntryPoint.h"
 #include "ImageLoader.h"
 
-extern "C" MRAY_MESHLOADER_ENTRYPOINT
-ImageLoaderI* ImageLoaderInstance()
+extern "C" MRAY_IMAGEOADER_ENTRYPOINT
+ImageLoaderI* ImageLoaderDetail::ConstructImageLoader()
 {
-    static std::unique_ptr<ImageLoader> instance = nullptr;
-    if(instance == nullptr)
-        instance = std::make_unique<ImageLoader>();
+    return new ImageLoader();
+}
 
-    return instance.get();
+extern "C" MRAY_IMAGEOADER_ENTRYPOINT
+void ImageLoaderDetail::DestroyImageLoader(ImageLoaderI* ptr)
+{
+    delete ptr;
 }

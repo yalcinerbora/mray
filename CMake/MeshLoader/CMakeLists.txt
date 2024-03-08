@@ -15,7 +15,7 @@ add_library(MeshLoader SHARED ${SRC_COMMON})
 target_link_libraries(MeshLoader
                       PRIVATE
                       CoreLib
-                      MRayInput
+                      TransientPool
                       mray::meta_compile_opts
                       assimp::assimp
                       gfgfileio::gfgfileio)

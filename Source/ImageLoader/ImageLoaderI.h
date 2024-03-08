@@ -6,10 +6,11 @@
 #include <string>
 #include <memory>
 
+#include "Core/DataStructures.h"
 #include "Core/Vector.h"
 #include "Core/Flag.h"
 #include "Core/MRayDataType.h"
-#include "MRayInput/MRayInput.h"
+#include "TransientPool/TransientPool.h"
 
 enum class ImageType
 {
@@ -48,15 +49,23 @@ enum class ImageFlagTypes
     // We might need to pad a 4th channel to the image.
     // This enables that
     TRY_3C_4C_CONVERSION = 1,
+    // Data is probably encoded exactly and/or raw data
+    // (probably normal map, roughness etc.)
+    // Do not try to convert to the system defined common renderer color space
+    DISREGARD_COLOR_SPACE = 2,
 
     END
 };
 
 using ImageIOFlags = Flag<ImageFlagTypes>;
 
-// TODO: refine this, what about:
-// -deep images? (for spectral maybe) (only for writing probably)
-// -image tile
+// TODO: Images are just as complex as the renderer itself...
+// (Too many conventions standarts etc..)
+// OIIO helps tramendously however, it is just a passthrough.
+//
+// So we restrict the data to some basic formats
+//  - Deep images are ignored (or maybe only the 1st depth is read)
+//  - If image is tiled hopefully it is read via scanline methods
 template<uint32_t D>
 requires(D == 2 || D == 3)
 struct ImageHeader
@@ -64,18 +73,36 @@ struct ImageHeader
     Vector<D, uint32_t>     dimensions;
     uint32_t                mipCount;
     MRayPixelTypeRT         pixelType;
+    //
+    MRayColorSpaceEnum      colorSpace;
+    Float                   gamma;
+};
+
+template<uint32_t D>
+requires(D == 2 || D == 3)
+struct ImageMip
+{
+    Vector<D, uint32_t>     mipSize;
+    TransientData           pixels;
 };
 
 template<uint32_t D>
 requires(D == 2 || D == 3)
 struct Image
 {
+    // This array is just to elide heap, so max 1Mx1M texture size
+    static constexpr size_t MAX_MIP_COUNT = 20;
+    using MipMapArray = StaticVector<ImageMip<D>, MAX_MIP_COUNT>;
+
     ImageHeader<D>  header;
-    MRayInput       pixels;
+    MipMapArray     imgData;
 };
 
 class ImageLoaderI
 {
+    public:
+    static MRayPixelTypeRT      TryExpandTo4CFormat(MRayPixelTypeRT pf);
+
     public:
         virtual                 ~ImageLoaderI() = default;
 
@@ -84,26 +111,42 @@ class ImageLoaderI
         // (it will have a similar
         // interface of OIIO)
         virtual Expected<Image<2>>          ReadImage2D(const std::string& filePath,
-                                                        const ImageIOFlags = ImageIOFlags()) const = 0;
+                                                        ImageIOFlags = ImageIOFlags()) const = 0;
         // Read subportion of the image
         // i.e., given RGBA image, you can read RG, portion as a 2 channel image
         // Only contiguous channels are supported
         virtual Expected<Image<2>>          ReadImageSubChannel(const std::string& filePath,
                                                                 ImageChannelType,
-                                                                const ImageIOFlags = ImageIOFlags()) const = 0;
+                                                                ImageIOFlags = ImageIOFlags()) const = 0;
 
         // Lightweight version (if OIIO supports), image files are read and only size/type
         // information will be provided. Thus, tracer can preallocate the required memory.
         virtual Expected<ImageHeader<2>>    ReadImageHeader2D(const std::string& filePath,
-                                                              const ImageIOFlags = ImageIOFlags()) const = 0;
+                                                              ImageIOFlags = ImageIOFlags()) const = 0;
         // Write Functions
         virtual MRayError           WriteImage2D(const Image<2>&,
                                                  const std::string& filePath,
                                                  ImageType extension,
-                                                 const ImageIOFlags = ImageIOFlags()) const = 0;
+                                                 ImageIOFlags = ImageIOFlags()) const = 0;
         // TODO: Add 3D variants
 
 };
+
+inline MRayPixelTypeRT ImageLoaderI::TryExpandTo4CFormat(MRayPixelTypeRT pt)
+{
+    MRayPixelEnum pf = pt.Name();
+    using enum MRayPixelEnum;
+    switch(pf)
+    {
+        case MR_RGB8_UNORM:     return MRayPixelTypeRT(MRayPixelType<MR_RGBA8_UNORM>{});
+        case MR_RGB16_UNORM:    return MRayPixelTypeRT(MRayPixelType<MR_RGBA16_UNORM>{});
+        case MR_RGB8_SNORM:     return MRayPixelTypeRT(MRayPixelType<MR_RGBA8_SNORM>{});
+        case MR_RGB16_SNORM:    return MRayPixelTypeRT(MRayPixelType<MR_RGBA16_SNORM>{});
+        case MR_RGB_HALF:       return MRayPixelTypeRT(MRayPixelType<MR_RGBA_HALF>{});
+        case MR_RGB_FLOAT:      return MRayPixelTypeRT(MRayPixelType<MR_RGBA_FLOAT>{});
+        default:                return pt;
+    }
+}
 
 //inline int8_t ImageLoaderI::ChannelTypeToChannelIndex(ImageChannelType channel)
 //{
@@ -355,21 +398,7 @@ class ImageLoaderI
 //    }
 //}
 //
-//inline PixelFormat ImageLoaderI::Expanded4CFormat(PixelFormat pf)
-//{
-//    switch(pf)
-//    {
-//
-//        case PixelFormat::RGB8_UNORM:     return PixelFormat::RGBA8_UNORM;
-//        case PixelFormat::RGB16_UNORM:    return PixelFormat::RGBA16_UNORM;
-//        case PixelFormat::RGB8_SNORM:     return PixelFormat::RGBA8_SNORM;
-//        case PixelFormat::RGB16_SNORM:    return PixelFormat::RGBA16_SNORM;
-//        case PixelFormat::RGB_HALF:       return PixelFormat::RGBA_HALF;
-//        case PixelFormat::RGB_FLOAT:      return PixelFormat::RGBA_FLOAT;
-//
-//        default: return PixelFormat::END;
-//    }
-//}
+
 //
 //inline bool ImageLoaderI::Is4CExpandable(PixelFormat pf)
 //{

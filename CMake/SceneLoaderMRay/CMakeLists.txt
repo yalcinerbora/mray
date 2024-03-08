@@ -17,7 +17,8 @@ add_library(SceneLoaderMRay SHARED ${SRC_COMMON})
 target_link_libraries(SceneLoaderMRay
                       PRIVATE
                       CoreLib
-                      MRayInput
+                      ImageLoader
+                      TransientPool
                       mray::meta_compile_opts
                       nlohmann::json)
 

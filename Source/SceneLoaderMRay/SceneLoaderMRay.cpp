@@ -8,6 +8,8 @@
 #include "MeshLoader/EntryPoint.h"
 #include "MeshLoaderJson.h"
 
+#include "ImageLoader/EntryPoint.h"
+
 #include <nlohmann/json.hpp>
 #include <filesystem>
 #include <fstream>
@@ -23,7 +25,7 @@ static void LoadPrimitive(TracerI& tracer,
                           PrimGroupId groupId,
                           PrimBatchId batchId,
                           uint32_t meshInternalIndex,
-                          const std::unique_ptr<MeshFileI>& meshFile)
+                          const MeshFileI* meshFile)
 {
     using enum PrimitiveAttributeLogic;
     const auto& attributeList = tracer.AttributeInfo(groupId);
@@ -58,13 +60,13 @@ static void LoadPrimitive(TracerI& tracer,
            meshFile->AttributeLayout(NORMAL).Name() == MRayDataEnum::MR_VECTOR_3)
         {
             size_t normalCount = meshFile->MeshAttributeCount(meshInternalIndex);
-            MRayInput q(std::in_place_type_t<Quaternion>{}, normalCount);
+            TransientData q(std::in_place_type_t<Quaternion>{}, normalCount);
             Span<Quaternion> quats = q.AccessAs<Quaternion>();
 
             // Utilize TBN matrix directly
-            MRayInput t = meshFile->GetAttribute(TANGENT, meshInternalIndex);
-            MRayInput b = meshFile->GetAttribute(BITANGENT, meshInternalIndex);
-            MRayInput n = meshFile->GetAttribute(attribLogic, meshInternalIndex);
+            TransientData t = meshFile->GetAttribute(TANGENT, meshInternalIndex);
+            TransientData b = meshFile->GetAttribute(BITANGENT, meshInternalIndex);
+            TransientData n = meshFile->GetAttribute(attribLogic, meshInternalIndex);
 
             Span<const Vector3> tangents    = t.AccessAs<const Vector3>();
             Span<const Vector3> bitangents  = b.AccessAs<const Vector3>();
@@ -234,41 +236,397 @@ void SceneLoaderMRay::DryRunNodesForTex(std::vector<NodeTexStruct>& textureIds,
     }
 }
 
-void SceneLoaderMRay::LoadTextures(TracerI&, ExceptionList&)
+template<class Loader, class IdType>
+void LoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, IdType>>& outputMappings,
+                typename SceneLoaderMRay::ExceptionList& exceptions,
+                const typename SceneLoaderMRay::TypeMappedNodes& nodes,
+                Loader&& loader)
 {
-    // Issue loads to the thread pool
-    for(const auto& t : textureNodes)
+    static_assert(std::is_same_v<IdType, typename Loader::IdType>);
+    using GroupIdType = typename Loader::GroupIdType;
+    using PerGroupList = std::vector<Pair<uint32_t, IdType>>;
+    using IdList = std::vector<IdType>;
+
+    for(const auto& node : nodes)
     {
-        //
+        const uint32_t groupEntityCount = static_cast<uint32_t>(m.second.size());
+        auto groupEntityList = std::make_shared<PerGroupList>(groupEntityCount);
+
+        std::string_view entityTypeName = m.first;
+        GroupIdType groupId = loader.CreateGroup(std::string(entityTypeName));
+
+        // Construct Barrier
+        auto BarrierFunc = [groupId, &loader]() noexcept
+        {
+            // When barrier completed
+            // Reserve the space for mappings
+            // Commit group reservations
+            loader.CommitReservations(groupId);
+        };
+        // Determine the thread size
+        uint32_t threadCount = std::min(threadPool.get_thread_count(),
+                                        groupEntityCount);
+
+        using Barrier = std::barrier<decltype(BarrierFunc)>;
+        auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
+
+        auto future = threadPool.submit_blocks(std::size_t(0), std::size_t(groupEntityCount),
+        // Copy the shared pointers, capture by reference the rest
+        [&, this, barrier, groupEntityList](size_t start, size_t end)
+        {
+            size_t localEntityCount = start - end;
+            try
+            {
+                IdList generatedIds = loader.ReserveEntities(groupId, localEntityCount);
+                for(size_t i = start; i < end; i++)
+                {
+                    size_t localI = i - start;
+                    const auto& groupList = *groupEntityList;
+                    groupList[i] = std::make_pair(m.second[i].Id(), generatedIds[localI]);
+                }
+            }
+            catch(MRayError& e)
+            {
+                exceptions.AddException(std::move(e));
+                barrier->arrive_and_drop();
+                return;
+            }
+
+            // Commit barrier
+            barrier->arrive_and_wait();
+            // Group is committed, now we can issue writes
+            try
+            {
+                const auto& groupList = *groupEntityList;
+                for(size_t i = start; i < end; i++)
+                    loader.LoadEntitiy(groupList[i].second, m.second[i].Id());
+            }
+            catch(MRayError& e)
+            {
+                exceptions.AddException(std::move(e));
+            }
+        }, threadCount);
+
+        // Move future to shared_ptr
+        using FutureSharedPtr = std::shared_ptr<BS::multi_future<void>>;
+        FutureSharedPtr futureShared = std::make_shared<BS::multi_future<void>>(std::move(future));
+
+        // Issue a one final task that pushes the primitives to the global map
+        threadPool.detach_task([&, this, future = futureShared, groupEntityList]()
+        {
+            // Wait other tasks to complere
+            future->wait();
+            // After this point groupBatchList is fully loaded
+            std::scoped_lock lock(outputMappings.mutex);
+            matMappings.map.insert(groupEntityList->cbegin(), groupEntityList->cend());
+        });
     }
 }
 
-void SceneLoaderMRay::LoadMediums(TracerI&, ExceptionList&)
+void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
 {
+    using TextureIdList = std::vector<std::pair<NodeTexStruct, TextureId>>;
 
+    // Construct Image Loader
+    std::shared_ptr<ImageLoaderI> imgLoader = CreateImageLoader();
+    auto texIdListPtr = std::make_shared<TextureIdList>(textureNodes.size());
+
+    // Flatten the std::map (we can't multi-thread it efficiently)
+    // TODO: Ensure uniqueness without a std::map maybe? (Flatmap?)
+    std::vector<std::pair<NodeTexStruct, JsonNode>> flattenedTexMap;
+    flattenedTexMap.reserve(textureNodes.size());
+    for(const auto& [texStruct, jsonNode] : textureNodes)
+        flattenedTexMap.emplace_back(texStruct, jsonNode);
+
+    // Issue loads to the thread pool
+    auto BarrierFunc = [&tracer]() noexcept
+    {
+        // When barrier completed
+        // Reserve the space for mappings
+        // Commit textures greoups reservations
+        tracer.CommitTextures();
+    };
+
+    // Determine the thread size
+    uint32_t threadCount = std::min(threadPool.get_thread_count(),
+                                    static_cast<uint32_t>(flattenedTexMap.size()));
+
+    using Barrier = std::barrier<decltype(BarrierFunc)>;
+    auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
+
+    auto future = threadPool.submit_blocks(std::size_t(0), flattenedTexMap.size(),
+    // Copy the shared pointers, capture by reference the rest
+    [&, texIdListPtr, barrier](size_t start, size_t end)
+    {
+        // TODO: check if we twice opening is bottleneck?
+        // We are opening here to determining size/format
+        // and on the other iteration we actual memcpy it
+        size_t localTextureCount = end - start;
+        try
+        {
+            for(size_t i = start; i < end; i++)
+            {
+                const auto& [texStruct, jsonNode] = flattenedTexMap[i];
+                auto fileName = jsonNode.AccessData<std::string>(NodeNames::TEX_NODE_FILE);
+                fileName = SceneLoaderMRay::SceneRelativePathToAbsolute(fileName, scenePath);
+
+                // Currently no flags are utilized on header load time
+                // TODO: Check here if this fails
+                Expected<ImageHeader<2>> headerE = imgLoader->ReadImageHeader2D(fileName);
+                if(!headerE.has_value())
+                {
+                    exceptions.AddException(std::move(headerE.error()));
+                    barrier->arrive_and_drop();
+                    return;
+                }
+
+                // Always expand to 4 channel due to HW limitation
+                headerE.value().pixelType = ImageLoaderI::TryExpandTo4CFormat(headerE.value().pixelType);
+
+                const auto& header = headerE.value();
+                TextureId tId = tracer.CreateTexture2D(header.dimensions,
+                                                       header.mipCount,
+                                                       header.pixelType.Name());
+
+                auto& texIdList = *texIdListPtr;
+                texIdList[i] = std::make_pair(texStruct, tId);
+            }
+        }
+        catch(MRayError& e)
+        {
+            exceptions.AddException(std::move(e));
+            barrier->arrive_and_drop();
+            return;
+        }
+        // Barrier code is invoked, and all textures are allocated
+        barrier->arrive_and_wait();
+
+        try
+        {
+            for(size_t i = start; i < end; i++)
+            {
+                const auto& [texStruct, jsonNode] = flattenedTexMap[i];
+                bool loadAsSigned = jsonNode.AccessData<bool>(NodeNames::TEX_NODE_AS_SIGNED);
+                bool isData = jsonNode.AccessData<bool>(NodeNames::TEX_NODE_IS_DATA);
+                auto fileName = jsonNode.AccessData<std::string>(NodeNames::TEX_NODE_FILE);
+                fileName = SceneLoaderMRay::SceneRelativePathToAbsolute(fileName, scenePath);
+
+                using enum ImageIOFlags::F;
+                ImageIOFlags flags;
+                flags[DISREGARD_COLOR_SPACE] = isData;
+                flags[LOAD_AS_SIGNED] = loadAsSigned;
+                flags[TRY_3C_4C_CONVERSION] = true;     // Always do channel expand (HW limitation)
+
+                Expected<Image<2>> imgE = imgLoader->ReadImage2D(fileName, flags);
+                if(!imgE.has_value())
+                {
+                    exceptions.AddException(std::move(imgE.error()));
+                    return;
+                }
+
+                auto& img = imgE.value();
+                // Send data mip by mip
+                for(uint32_t j = 0; j < img.header.mipCount; i++)
+                {
+                    auto& texIdList = *texIdListPtr;
+                    tracer.PushTextureData(texIdList[i].second, j,
+                                           std::move(img.imgData[j].pixels));
+                }
+            }
+        }
+        catch(MRayError& e)
+        {
+            exceptions.AddException(std::move(e));
+            return;
+        }
+    }, threadCount);
+
+    // Move the future to shared ptr
+    using FutureSharedPtr = std::shared_ptr<BS::multi_future<void>>;
+    FutureSharedPtr futureShared = std::make_shared<BS::multi_future<void>>(std::move(future));
+
+    // Issue a one final task that pushes the primitives to the global map
+    threadPool.detach_task([&, this, future = futureShared, texIdListPtr]()
+    {
+        // Wait other tasks to complere
+        future->wait();
+        // Thread Generated Textures are finalized
+        for(const auto& pair : (*texIdListPtr))
+            texMappings.emplace(pair.first, pair.second);
+    });
+    // All important data is in shared_ptrs we can safely exit scope.
 }
 
-void SceneLoaderMRay::LoadMaterials(TracerI&, ExceptionList&)
+void SceneLoaderMRay::LoadMediums(TracerI& tracer, ExceptionList& exceptions)
 {
+    // Rare usage of in-function class
+    struct MediumLoader
+    {
+        private:
+        TracerI& tracer;
 
+        public:
+        MediumLoader(TracerI& t) : tracer(t) {}
+        MediumGroupId CreateGroup(const std::string gn)
+        {
+            return tracer.CreateMediumGroup(gn);
+        }
+        void CommitReservations(MediumGroupId groupId)
+        {
+            return tracer.CommitMediumReservations(groupId);
+        }
+        std::vector<MediumId> ReserveEntities(MediumGroupId groupId, uint32_t count)
+        {
+            return tracer.ReserveMediums(groupId, count);
+        }
+        void LoadEntitiy(MediumGroupId groupId, MediumId id, const JsonNode& node)
+        {
+            // Test
+            Vector2ui range = Vector2ui(static_cast<uint32_t>(id),
+                                        static_cast<uint32_t>(id) + 1);
+            TransientData test(std::in_place_type_t<Vector3>{}, 1);
+            tracer.PushMediumAttribute(groupId, range, 0, std::move(test));
+        }
+    };
+
+    LoadGroups(mediumMappings, exceptions, mediumNodes, MediumLoader(tracer));
 }
 
-void SceneLoaderMRay::LoadTransforms(TracerI&, ExceptionList&)
+void SceneLoaderMRay::LoadMaterials(TracerI& tracer, ExceptionList& exceptions)
 {
+    // Issue loads to the thread pool
+    for(const auto& m : materialNodes)
+    {
+        uint32_t groupMatCount = static_cast<uint32_t>(m.second.size());
+        using GroupMaterialList = std::vector<Pair<uint32_t, MaterialId>>;
+        auto groupMatList = std::make_shared<GroupMaterialList>(groupMatCount);
 
+        std::string_view matTypeName = m.first;
+        MatGroupId groupId = tracer.CreateMaterialGroup(std::string(matTypeName));
+
+        // Construct Barrier
+        auto BarrierFunc = [groupId, groupMatList, &tracer]() noexcept
+        {
+            // When barrier completed
+            // Reserve the space for mappings
+            // Commit mat group reservations
+            tracer.CommitMatReservations(groupId);
+        };
+        // Determine the thread size
+        uint32_t threadCount = std::min(threadPool.get_thread_count(),
+                                        groupMatCount);
+
+        using Barrier = std::barrier<decltype(BarrierFunc)>;
+        auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
+
+        auto future = threadPool.submit_blocks(std::size_t(0), m.second.size(),
+        // Copy the shared pointers, capture by reference the rest
+        [&, this, barrier, groupMatList](size_t start, size_t end)
+        {
+            try
+            {
+                for(size_t i = start; i < end; i++)
+                {
+                    // Each material optionally express medium interface
+                    // that are seperating???
+                    using namespace NodeNames;
+                    const JsonNode& node = m.second[i];
+                    auto mediumFront = node.AccessOptionalData<uint32_t>(MAT_NODE_MEDIUM_FRONT);
+                    auto mediumBack = node.AccessOptionalData<uint32_t>(MAT_NODE_MEDIUM_BACK);
+
+                    mediumMappings.map.
+
+                    MaterialId mId = tracer.ReserveMaterial(groupId,
+                                                            );
+                    (*groupMatList)[i] = std::make_pair(nodeId(), mId);
+
+                }
+            }
+            catch(MRayError& e)
+            {
+                exceptions.AddException(std::move(e));
+                barrier->arrive_and_drop();
+                return;
+            }
+
+            // Commit barrier
+            barrier->arrive_and_wait();
+            // Material Group is committed, we can issue writes to it now
+            try
+            {
+                for(size_t i = start; i < end; i++)
+                {
+                    ..............
+                }
+            }
+            catch(MRayError& e)
+            {
+                exceptions.AddException(std::move(e));
+            }
+        }, threadCount);
+
+        // Move future to shared_ptr
+        using FutureSharedPtr = std::shared_ptr<BS::multi_future<void>>;
+        FutureSharedPtr futureShared = std::make_shared<BS::multi_future<void>>(std::move(future));
+
+        // Issue a one final task that pushes the primitives to the global map
+        threadPool.detach_task([&, this, future = futureShared, groupMatList]()
+        {
+            // Wait other tasks to complere
+            future->wait();
+            // After this point groupBatchList is fully loaded
+            std::scoped_lock lock(matMappings.mutex);
+            matMappings.map.insert(groupMatList->flatMaterials.cbegin(),
+                                   groupMatList->flatMaterials.cend());
+        });
+    }
+}
+
+void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ExceptionList& exceptions)
+{
+    // Rare usage of in-function class
+    struct TransformLoader
+    {
+        private:
+        TracerI& tracer;
+
+        public:
+        TransformLoader(TracerI& t) : tracer(t) {}
+        TransGroupId CreateGroup(const std::string gn)
+        {
+            return tracer.CreateTransformGroup(gn);
+        }
+        void CommitReservations(MediumGroupId groupId)
+        {
+            return tracer.CommitMediumReservations(groupId);
+        }
+        std::vector<TransformId> ReserveEntities(TransGroupId groupId, uint32_t count)
+        {
+            return tracer.ReserveTransformations(groupId, count);
+        }
+        void LoadEntitiy(TransGroupId groupId, TransformId id, const JsonNode& node)
+        {
+            Vector2ui range = Vector2ui(static_cast<uint32_t>(id),
+                                        static_cast<uint32_t>(id) + 1);
+
+            TransientData test(std::in_place_type_t<Vector3>{}, 1);
+            tracer.PushTransAttribute(groupId, range, 0, std::move(test));
+        }
+    };
+
+    LoadGroups(mediumMappings, exceptions, mediumNodes, TransformLoader(tracer));
 }
 
 void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
 {
+    using PrimGroupBatchList = std::vector<Pair<uint32_t, PrimBatchId>>;
+    std::shared_ptr<const MeshLoaderPoolI> meshLoaderPool = CreateMeshLoaderPool();
+
     // Issue loads to the thread pool
     for(const auto& m : primNodes)
     {
-        struct PrimGroupBatchList
-        {
-            std::atomic_size_t allocator = 0;
-            std::vector<Pair<uint32_t, PrimBatchId>> flatGroupBatches;
-        };
-        auto groupBatchList = std::make_shared<PrimGroupBatchList>();
+        uint32_t groupBatchCount = static_cast<uint32_t>(m.second.size());
+        auto groupBatchList = std::make_shared<PrimGroupBatchList>(groupBatchCount);
 
         std::string_view primTypeName = m.first;
         PrimGroupId groupId = tracer.CreatePrimitiveGroup(std::string(primTypeName));
@@ -278,75 +636,104 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
         {
             // When barrier completed
             // Reserve the space for mappings
-            // Commit prim greoups reservations
+            // Commit prim groups reservations
             tracer.CommitPrimReservations(groupId);
-            groupBatchList->flatGroupBatches.resize(groupBatchList->allocator);
-            groupBatchList->allocator = 0;
         };
         // Determine the thread size
         uint32_t threadCount = std::min(threadPool.get_thread_count(),
-                                        static_cast<uint32_t>(m.second.size()));
+                                        groupBatchCount);
 
         using Barrier = std::barrier<decltype(BarrierFunc)>;
         auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
 
         auto future = threadPool.submit_blocks(std::size_t(0), m.second.size(),
         // Copy the shared pointers, capture by reference the rest
-        [&, this, barrier, groupBatchList](size_t start, size_t end)
+        [&, this, barrier, meshLoaderPool, groupBatchList](size_t start, size_t end)
         {
-            std::vector<Pair<uint32_t, PrimBatchId>> localBatchList;
-            std::map<std::string, std::unique_ptr<MeshLoaderI>> loaders;
-            std::map<std::string, std::unique_ptr<MeshFileI>> meshFiles;
-            std::vector<Pair<uint32_t, const std::unique_ptr<MeshFileI>*>> batchFiles;
+            size_t localBatchCount = end - start;
 
-            batchFiles.reserve(end - start);
+            // TODO: Too many micro allocations due to map
+            // revise over this.
+            //
+            // Per "dll" loaders
+            // Key is a "tag" entry on the json. For example, "assimp" tag
+            // will call assimp mesh loader. If "assimp" does not support .obj for example
+            // loader will generate an error.
+            //
+            // The reason for this approach is to provide a utility for user to add new dlls
+            // for specific file extensions via per mesh file basis.
+            // If assimp "sucks" for new fbx files, however robustly works on old fbx files
+            // user can write new loader with a tag and load these files.
+            std::map<std::string, std::unique_ptr<MeshLoaderI>> loaders;
+            // Mesh files that opened via some loader
+            // This is here unfortunately as a limitation/functionality of the assimp.
+            // Assimp can post process meshes crates tangents/optimization etc. This means
+            // we cannot pre-determine the size of the vertices/indices just by looking a some
+            // form of header on the file. So we load the entire mesh and store before the commit
+            // of the primitive group.
+            //
+            // Key is the full path of the mesh file. For in node primitives,
+            //  it is the scene "primitiveId".
+            std::map<std::string, std::unique_ptr<MeshFileI>> meshFiles;
+            // Each mesh may have multiple submeshes so we don't wastefully open the same file
+            // multiple times
+            std::vector<Pair<uint32_t, const MeshFileI*>> batchFiles;
+            batchFiles.reserve(localBatchCount);
+
             try
             {
                 for(size_t i = start; i < end; i++)
                 {
                     const JsonNode& node = m.second[i];
-                    std::string_view fileName = node.CommonData<std::string_view>(NodeNames::NAME);
-                    uint32_t innerIndex = node.AccessData<uint32_t>(NodeNames::INNER_INDEX);
+                    std::string tag = std::string(node.Tag());
 
-                    const std::unique_ptr<MeshFileI>* meshFile = nullptr;
-                    std::string key = std::filesystem::path(fileName).stem().string();
-                    if(fileName != NodeNames::NODE_PRIMITIVE &&
-                       fileName != NodeNames::INDEXED_NODE_PRIMITIVE)
+                    uint32_t innerIndex = 0;
+                    const MeshFileI* meshFile = nullptr;
+
+                    if(tag == NodeNames::NODE_PRIM_TRI ||
+                       tag == NodeNames::NODE_PRIM_TRI_INDEXED)
                     {
-                        std::string_view tag = node.Tag();
-                        key += tag;
-
-                        const auto& loaderIt = loaders.find(key);
-                        const auto& ml = (loaderIt != loaders.end())
-                                            ? loaderIt->second
-                                            : loaders.emplace(key,
-                                                              meshLoaderPool->AcquireALoader(key)).first->second;
-
-                        std::string fileAbsolutePath = SceneLoaderMRay::SceneRelativePathToAbsolute(fileName, scenePath);
-                        const auto& fileIt = meshFiles.find(fileAbsolutePath);
-                        auto meshFilePtr = ml->OpenFile(fileAbsolutePath);
-                        meshFile = (fileIt != meshFiles.end())
-                                    ? &fileIt->second
-                                    : &meshFiles.emplace(fileAbsolutePath,
-                                                         std::move(meshFilePtr)).first->second;
+                        using namespace NodeNames;
+                        auto meshFilePtr = std::make_unique<JsonTriangle>(m.second[i],
+                                                                          tag == NODE_PRIM_TRI_INDEXED);
+                        meshFile = meshFiles.emplace(std::to_string(m.second[i].Id()),
+                                                     std::move(meshFilePtr)).first->second.get();
+                    }
+                    else if(tag == NodeNames::NODE_PRIM_SPHERE)
+                    {
+                        using namespace NodeNames;
+                        auto meshFilePtr = std::make_unique<JsonSphere>(m.second[i],
+                                                                        tag == NODE_PRIM_TRI_INDEXED);
+                        meshFile = meshFiles.emplace(std::to_string(m.second[i].Id()),
+                                                     std::move(meshFilePtr)).first->second.get();
                     }
                     else
                     {
-                        // Do not use mesh loader here wrap node as a mesh loader
-                        auto meshFilePtr = std::make_unique<MeshFileJson>(m.second[i].RawNode());
-                        meshFile = &meshFiles.emplace(std::to_string(m.second[i].Id()),
-                                                      std::move(meshFilePtr)).first->second;
+                        std::string fileName = node.CommonData<std::string>(NodeNames::FILE);
+                        fileName = SceneLoaderMRay::SceneRelativePathToAbsolute(fileName, scenePath);
+                        innerIndex = node.AccessData<uint32_t>(NodeNames::INNER_INDEX);
+
+                        // Find a Loader
+                        auto r0 = loaders.emplace(tag, nullptr);
+                        if(!r0.second) r0.first->second = meshLoaderPool->AcquireALoader(tag);
+                        const auto& meshLoader = r0.first->second;
+
+                        // Find mesh file
+                        // TODO: this is slow probably due to long file name as key
+                        auto r1 = meshFiles.emplace(fileName, nullptr);
+                        if(!r1.second) r1.first->second = meshLoader->OpenFile(fileName);
+                        meshFile = r1.first->second.get();
                     }
 
+                    // Finally Reserve primitives
                     PrimCount pc
                     {
-                        .primCount = (*meshFile)->MeshPrimitiveCount(innerIndex),
-                        .attributeCount = (*meshFile)->MeshAttributeCount(innerIndex)
+                        .primCount = meshFile->MeshPrimitiveCount(innerIndex),
+                        .attributeCount = meshFile->MeshAttributeCount(innerIndex)
                     };
-                    PrimBatchId batchId = tracer.ReservePrimitiveBatch(groupId, pc);
-                    batchFiles[i - start] = Pair(innerIndex, meshFile);
-                    groupBatchList->allocator++;
-                    localBatchList[i - start] = Pair(node.Id(), batchId);
+                    PrimBatchId tracerId = tracer.ReservePrimitiveBatch(groupId, pc);
+                    (*groupBatchList)[i] = std::make_pair(node.Id(), tracerId);
+                    batchFiles.emplace_back(innerIndex, meshFile);
                 }
             }
             catch(MRayError& e)
@@ -363,16 +750,11 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
             {
                 for(size_t i = start; i < end; i++)
                 {
-                    const auto& batchFile = batchFiles[i - start];
-
-                    // First, write the batch ids, to the list
-                    size_t location = groupBatchList->allocator.fetch_add(localBatchList.size());
-                    std::copy(localBatchList.cbegin(), localBatchList.cend(),
-                              groupBatchList->flatGroupBatches.begin() + location);
-                    // Load
-                    const auto& batchId = localBatchList[i - start].second;
+                    size_t localIndex = end - i;
+                    const auto& [innerIndex, meshFile] = batchFiles[localIndex];
+                    PrimBatchId batchId = (*groupBatchList)[i].second;
                     LoadPrimitive(tracer, groupId, batchId,
-                                  batchFile.first, *batchFile.second);
+                                  innerIndex, meshFile);
                 }
             }
             catch(MRayError& e)
@@ -715,6 +1097,10 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
         threadPool.wait();
         // Types that depend on textures
         LoadMediums(tracer, exceptionList);
+        // Waiting here because Materials depend on mediums
+        // In mray, materials seperate two mediums.
+        threadPool.wait();
+
         LoadMaterials(tracer, exceptionList);
         // Does not depend on textures but may depend on later
         LoadTransforms(tracer, exceptionList);

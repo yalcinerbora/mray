@@ -8,8 +8,8 @@
 
 #define MRAY_GENERIC_ID(NAME, TYPE) enum class NAME : TYPE {}
 
-namespace MRayInputDetail { class MRayInput; }
-using MRayInput = MRayInputDetail::MRayInput;
+namespace TransientPoolDetail { class TransientData; }
+using TransientData = TransientPoolDetail::TransientData;
 
 enum class PrimitiveAttributeLogic
 {
@@ -31,11 +31,6 @@ namespace TracerConstants
 {
     static constexpr size_t MaxPrimBatchPerSurface = 8;
 }
-
-enum class MRayColorSpace
-{
-    RGB_LINEAR
-};
 
 enum class AcceleratorType
 {
@@ -278,11 +273,11 @@ class [[nodiscard]] TracerI
     // Acquire Attribute Info
     virtual void            PushPrimAttribute(PrimBatchId,
                                               uint32_t attributeIndex,
-                                              MRayInput data) = 0;
+                                              TransientData data) = 0;
     virtual void            PushPrimAttribute(PrimBatchId,
                                               uint32_t attributeIndex,
                                               Vector2ui subBatchRange,
-                                              MRayInput data) = 0;
+                                              TransientData data) = 0;
     //================================//
     //            Material            //
     //================================//
@@ -296,7 +291,7 @@ class [[nodiscard]] TracerI
     //
     virtual void        PushMatAttribute(MatGroupId, Vector2ui range,
                                          uint32_t attributeIndex,
-                                         MRayInput data) = 0;
+                                         TransientData data) = 0;
     virtual void        PushMatAttribute(MatGroupId, Vector2ui range,
                                          uint32_t attributeIndex,
                                          std::vector<TextureId>) = 0;
@@ -304,12 +299,12 @@ class [[nodiscard]] TracerI
     //            Texture             //
     //================================//
     // All textures must be defined on the same color space
-    virtual void        CommitTexColorSpace(MRayColorSpace = MRayColorSpace::RGB_LINEAR) = 0;
+    virtual void        CommitTexColorSpace(MRayColorSpaceEnum = MRayColorSpaceEnum::MR_DEFAULT) = 0;
     // All textures are implicitly float convertible
     virtual TextureId   CreateTexture2D(Vector2ui size, uint32_t mipCount,
-                                        MRayDataEnum pixelType) = 0;
+                                        MRayPixelEnum pixelType) = 0;
     virtual TextureId   CreateTexture3D(Vector3ui size, uint32_t mipCount,
-                                        MRayDataEnum pixelType) = 0;
+                                        MRayPixelEnum pixelType) = 0;
     // Requested texture may be represented by a different type
     // (float3 -> float4 due to padding)
     virtual MRayDataTypeRT  GetTexturePixelType(TextureId) const = 0;
@@ -318,7 +313,7 @@ class [[nodiscard]] TracerI
     // Direct mip data
     // TODO: add more later (sub data etc)
     virtual void            PushTextureData(TextureId, uint32_t mipLevel,
-                                            MRayInput data) = 0;
+                                            TransientData data) = 0;
     //================================//
     //          Transform             //
     //================================//
@@ -330,7 +325,7 @@ class [[nodiscard]] TracerI
     //
     virtual void            PushTransAttribute(TransGroupId, Vector2ui range,
                                                uint32_t attributeIndex,
-                                               MRayInput data) = 0;
+                                               TransientData data) = 0;
     //================================//
     //            Lights              //
     //================================//
@@ -345,7 +340,7 @@ class [[nodiscard]] TracerI
     //
     virtual void            PushLightAttribute(LightGroupId, Vector2ui range,
                                                uint32_t attributeIndex,
-                                               MRayInput data) = 0;
+                                               TransientData data) = 0;
     virtual void            PushLightAttribute(LightGroupId, Vector2ui range,
                                                uint32_t attributeIndex,
                                                std::vector<TextureId>) = 0;
@@ -360,7 +355,7 @@ class [[nodiscard]] TracerI
     //
     virtual void            PushCamAttribute(CameraGroupId, Vector2ui range,
                                              uint32_t attributeIndex,
-                                             MRayInput data) = 0;
+                                             TransientData data) = 0;
     //================================//
     //            Medium              //
     //================================//
@@ -372,7 +367,7 @@ class [[nodiscard]] TracerI
     //
     virtual void            PushMediumAttribute(MediumGroupId, Vector2ui range,
                                                 uint32_t attributeIndex,
-                                                MRayInput data) = 0;
+                                                TransientData data) = 0;
     virtual void            PushMediumAttribute(MediumGroupId, Vector2ui range,
                                                 uint32_t attributeIndex,
                                                 std::vector<TextureId> textures) = 0;

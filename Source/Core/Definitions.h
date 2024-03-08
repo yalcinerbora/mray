@@ -94,7 +94,7 @@ class EmptyType{};
 //namespace MRayDataDetail
 //{
 
-enum class MRayDataEnum : uint32_t
+enum class MRayDataEnum : uint16_t
 {
     MR_CHAR,
     MR_VECTOR_2C,
@@ -187,7 +187,7 @@ enum class MRayDataEnum : uint32_t
     MR_END
 };
 
-enum class MRayPixelEnum : uint32_t
+enum class MRayPixelEnum : uint16_t
 {
     // UNORMS
     MR_R8_UNORM,
@@ -237,6 +237,27 @@ enum class MRayPixelEnum : uint32_t
     MR_BC6H_UFLOAT,
     MR_BC6H_SFLOAT,
     MR_BC7_UNORM,
+
+    MR_END
+};
+
+enum class MRayColorSpaceEnum : uint32_t
+{
+    // These are more or less mapped from OIIO/OCIO
+    // https://opencolorio.readthedocs.io/en/latest/configurations/aces_1.0.3.html#colorspaces
+    //
+    // https://openimageio.readthedocs.io/en/latest/stdmetadata.html#color-information
+    //
+    // TODO: check D60 variants
+    // TODO: Color spaces are overwheling... Reiterate over these
+    // Luminance linearity are not covered by this enum, a seperate enum (or float)
+    // will define if the color space is log or linear
+    MR_ACES2065_1,
+    MR_ACES_CG,
+    MR_REC_709,
+    MR_REC_2020,
+    MR_DCI_P3,
+    MR_DEFAULT, // Use it "as is" disregard everything about color spaces
 
     MR_END
 };
@@ -361,12 +382,32 @@ struct MRayPixelTypeStringifier
     static constexpr std::string_view ToString(MRayPixelEnum e);
 };
 
+struct MRayColorSpaceStringifier
+{
+    using enum MRayColorSpaceEnum;
+    static constexpr std::array<std::string_view, static_cast<size_t>(MR_END)> Names =
+    {
+        "ACES2065_1",
+        "ACES_CG",
+        "REC_709",
+        "REC_2020",
+        "DCI_P3",
+        "DEFAULT",
+    };
+    static constexpr std::string_view ToString(MRayColorSpaceEnum e);
+};
+
 constexpr std::string_view MRayDataTypeStringifier::ToString(MRayDataEnum e)
 {
     return Names[static_cast<uint32_t>(e)];
 }
 
 constexpr std::string_view MRayPixelTypeStringifier::ToString(MRayPixelEnum e)
+{
+    return Names[static_cast<uint32_t>(e)];
+}
+
+constexpr std::string_view MRayColorSpaceStringifier::ToString(MRayColorSpaceEnum e)
 {
     return Names[static_cast<uint32_t>(e)];
 }

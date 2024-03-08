@@ -14,29 +14,30 @@ class MeshFileAssimp : public MeshFileI
     std::unique_ptr<const aiScene>  scene;
 
     public:
-                            MeshFileAssimp(Assimp::Importer&,
-                                           const std::string& filePath);
+                    MeshFileAssimp(Assimp::Importer&,
+                                   const std::string& filePath);
 
-    AABB3       AABB(uint32_t innerId = 0) const override;
-    uint32_t    MeshPrimitiveCount(uint32_t innerId = 0) const override;
-    uint32_t    MeshAttributeCount(uint32_t innerId = 0) const override;
-    std::string Name() const override;
+    AABB3           AABB(uint32_t innerId = 0) const override;
+    uint32_t        MeshPrimitiveCount(uint32_t innerId = 0) const override;
+    uint32_t        MeshAttributeCount(uint32_t innerId = 0) const override;
+    std::string     Name() const override;
     // Entire Data Fetch
     bool            HasAttribute(PrimitiveAttributeLogic, uint32_t innerId = 0) const override;
-    MRayInput       GetAttribute(PrimitiveAttributeLogic, uint32_t innerId = 0) const override;
+    TransientData   GetAttribute(PrimitiveAttributeLogic, uint32_t innerId = 0) const override;
     MRayDataTypeRT  AttributeLayout(PrimitiveAttributeLogic, uint32_t innerId = 0) const override;
 };
 
 class MeshLoaderAssimp : public MeshLoaderI
 {
+    public:
+    static constexpr std::string_view   Tag = "assimp";
     private:
     static constexpr std::string_view   AssimpLogFileName = "log_assimp";
 
-    Assimp::Importer                    importer;
+    Assimp::Importer                importer;
 
     public:
                                     MeshLoaderAssimp();
-
     std::unique_ptr<MeshFileI>      OpenFile(std::string& filePath) override;
 };
 

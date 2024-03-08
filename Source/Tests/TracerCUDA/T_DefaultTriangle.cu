@@ -182,16 +182,16 @@ TEST(DefaultTriangle, Load)
     triGroup.CommitReservations();
     PrimAttributeInfoList primIdList = triGroup.AttributeInfo();
 
-    MRayInput inputIndex(std::in_place_type<Vector3ui>, IndexCount);
+    TransientData inputIndex(std::in_place_type<Vector3ui>, IndexCount);
     inputIndex.Push<Vector3ui>(indices);
 
-    MRayInput inputPos(std::in_place_type<Vector3>, VertexCount);
+    TransientData inputPos(std::in_place_type<Vector3>, VertexCount);
     inputPos.Push<Vector3>(positions);
 
-    MRayInput inputNormal(std::in_place_type<Quaternion>, VertexCount);
+    TransientData inputNormal(std::in_place_type<Quaternion>, VertexCount);
     inputNormal.Push<Quaternion>(normalsQuat);
 
-    MRayInput inputUV(std::in_place_type<Vector2>, VertexCount);
+    TransientData inputUV(std::in_place_type<Vector2>, VertexCount);
     inputUV.Push<Vector2>(uvs);
 
     // Fire and forget style load

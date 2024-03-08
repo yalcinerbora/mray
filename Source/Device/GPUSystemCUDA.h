@@ -191,7 +191,7 @@ class GPUQueueCUDA
     template <class T>
     MRAY_HOST void      MemsetAsync(Span<T> region, uint8_t perByteValue) const;
 
-    MRAY_HOST void      IssueBufferForDestruction(MRayInput data) const;
+    MRAY_HOST void      IssueBufferForDestruction(TransientData data) const;
 
     // Synchronization
     MRAY_HYBRID
@@ -430,10 +430,10 @@ void GPUQueueCUDA::MemsetAsync(Span<T> region, uint8_t perByteValue) const
 }
 
 MRAY_HOST inline
-void GPUQueueCUDA::IssueBufferForDestruction(MRayInput data) const
+void GPUQueueCUDA::IssueBufferForDestruction(TransientData data) const
 {
-    void* ptr = MRayInputIssueBufferForDestruction(std::move(data));
-    CUDA_CHECK(cudaLaunchHostFunc(stream, &MRayInputDestroyCallback, ptr));
+    void* ptr = TransientPoolIssueBufferForDestruction(std::move(data));
+    CUDA_CHECK(cudaLaunchHostFunc(stream, &TransientPoolDestroyCallback, ptr));
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE

@@ -75,7 +75,7 @@ PrimAttributeInfoList PrimGroupTriangle::AttributeInfo() const
 
 void PrimGroupTriangle::PushAttribute(PrimBatchKey batchKey,
                                       uint32_t attributeIndex,
-                                      MRayInput data,
+                                      TransientData data,
                                       const GPUQueue& queue)
 {
     auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
@@ -109,7 +109,7 @@ void PrimGroupTriangle::PushAttribute(PrimBatchKey batchKey,
 void PrimGroupTriangle::PushAttribute(PrimBatchKey batchKey,
                                       const Vector2ui& subRange,
                                       uint32_t attributeIndex,
-                                      MRayInput data,
+                                      TransientData data,
                                       const GPUQueue& queue)
 {
     auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
@@ -143,7 +143,7 @@ void PrimGroupTriangle::PushAttribute(PrimBatchKey batchKey,
 
 void PrimGroupTriangle::PushAttribute(const Vector<2, PrimBatchKey::Type>& idRange,
                                       uint32_t attributeIndex,
-                                      MRayInput data,
+                                      TransientData data,
                                       const GPUQueue& queue)
 {
     auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
@@ -242,7 +242,7 @@ PrimAttributeInfoList PrimGroupSkinnedTriangle::AttributeInfo() const
 }
 
 void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey, uint32_t attributeIndex,
-                                             MRayInput data,
+                                             TransientData data,
                                              const GPUQueue& queue)
 {
     auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
@@ -278,7 +278,7 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey, uint32_t att
 void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey,
                                              const Vector2ui& subRange,
                                              uint32_t attributeIndex,
-                                             MRayInput data,
+                                             TransientData data,
                                              const GPUQueue& queue)
 {
     auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)
@@ -314,7 +314,7 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey,
 
 void PrimGroupSkinnedTriangle::PushAttribute(const Vector<2, PrimBatchKey::Type>& idRange,
                                              uint32_t attributeIndex,
-                                             MRayInput data,
+                                             TransientData data,
                                              const GPUQueue& queue)
 {
     auto PushData = [&]<class T>(const Span<T>&d, bool isPerPrimitive)

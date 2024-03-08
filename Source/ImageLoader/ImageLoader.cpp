@@ -29,7 +29,7 @@ bool IsSignConvertible(MRayPixelTypeRT pf)
     }
 }
 
-Expected<MRayPixelTypeRT> ImageLoader::OIIOImageSpecToPixelFormat(const OIIO::ImageSpec& spec)
+Expected<MRayPixelTypeRT> ImageLoader::PixelFormatToMRay(const OIIO::ImageSpec& spec)
 {
     using ResultT = Expected<MRayPixelTypeRT>;
     using enum MRayPixelEnum;
@@ -121,7 +121,7 @@ Expected<MRayPixelTypeRT> ImageLoader::OIIOImageSpecToPixelFormat(const OIIO::Im
     return MRayError("Uknown image pixel type");
 }
 
-Expected<OIIO::ImageSpec> ImageLoader::PixelFormatToOIIOImageSpec(const ImageHeader<2>& header)
+Expected<OIIO::ImageSpec> ImageLoader::PixelFormatToOIIO(const ImageHeader<2>& header)
 {
     MRayPixelEnum pixType = header.pixelType.Name();
     int nChannels = static_cast<int>(header.pixelType.ChannelCount());
@@ -197,114 +197,244 @@ Expected<OIIO::ImageSpec> ImageLoader::PixelFormatToOIIOImageSpec(const ImageHea
                            nChannels, td);
 }
 
-Expected<Image<2>> ImageLoader::ReadImage2D(const std::string& filePath,
-                                            const ImageIOFlags flags) const
+Expected<std::string> ImageLoader::ColorSpaceToOIIO(const ColorSpacePack& pack)
 {
-    auto inFile = OIIO::ImageInput::open(filePath);
-    if(!inFile) return MRayError("OIIO Error ({})", OIIO::geterror());
+    const auto&[gamma, type] = pack;
+    std::string suffix = (gamma == 1.0f) ? "" : MRAY_FORMAT("{:1}", gamma);
 
-    // Check the spec
+    // TODO: these are probably wrong check it
+    std::string prefix;
+    switch(pack.second)
+    {
+        case MRayColorSpaceEnum::MR_ACES2065_1: prefix = "ACES2065-1";  break;
+        case MRayColorSpaceEnum::MR_ACES_CG:    prefix = "ACEScg";      break;
+        case MRayColorSpaceEnum::MR_REC_709:    prefix = "Rec709";      break;
+        case MRayColorSpaceEnum::MR_REC_2020:   prefix = "Rec2020";
+        case MRayColorSpaceEnum::MR_DCI_P3:     prefix = "DCIP3";
+        case MRayColorSpaceEnum::MR_DEFAULT:    prefix = "scene_linear";
+        default: return MRayError("Unable to convert color space type to OIIO type {}",
+                                  MRayColorSpaceStringifier::ToString(type));
+    }
+    return prefix + suffix;
+}
+
+Expected<ColorSpacePack> ImageLoader::ColorSpaceToMRay(const std::string& oiioString)
+{
+    using namespace std::literals;
+    using enum MRayColorSpaceEnum;
+    using MapType = std::tuple<std::string_view, MRayColorSpaceEnum, Float>;
+    using ArrayType = std::array<MapType, 6>;
+
+    // TODO: Not complete, add later
+    static constexpr ArrayType LookupList =
+    {
+        MapType{"ACES2065-1"sv,     MR_ACES2065_1,  Float(1)},
+        MapType{"ACEScg"sv,         MR_ACES_CG,     Float(1)},
+        MapType{"Rec709"sv,         MR_REC_709,     Float(2.222)},
+        MapType{"sRGB"sv,           MR_REC_709,     Float(2.2)},
+        MapType{"lin_srgb"sv,       MR_REC_709,     Float(1)},
+        MapType{"adobeRGB"sv,       MR_REC_709,     Float(2.19922)},
+    };
+
+    for(const auto& checkType : LookupList)
+    {
+        if(std::get<0>(checkType) != oiioString) continue;
+
+        return ColorSpacePack
+        {
+            std::get<2>(checkType),
+            std::get<1>(checkType)
+        };
+    }
+    return MRayError("Unable to convert OIIO type to color space type \"{}\"",
+                     oiioString);
+
+}
+
+Expected<std::string_view> ImageLoader::ImageTypeToExtension(ImageType type)
+{
+    using namespace std::literals;
+    switch(type)
+    {
+        case ImageType::PNG: return ".png";
+        case ImageType::JPG: return ".jpg";
+        case ImageType::BMP: return ".bmp";
+        case ImageType::HDR: return ".hdr";
+        case ImageType::EXR: return ".exr";
+        default: return MRayError("Unknown image type");
+    }
+}
+
+Expected<ImageHeader<2>> ImageLoader::ReadImageHeaderInternal(const OIIO::ImageInput::unique_ptr& inFile,
+                                                              const std::string& filePath,
+                                                              ImageIOFlags flags) const
+{
     const OIIO::ImageSpec& spec = inFile->spec();
 
-    Expected<MRayPixelTypeRT> pixFormatE = OIIOImageSpecToPixelFormat(spec);
+    // Determine color space
+    Expected<MRayPixelTypeRT> pixFormatE = PixelFormatToMRay(spec);
     if(!pixFormatE.has_value()) return pixFormatE.error();
-
     const MRayPixelTypeRT& pixFormat = pixFormatE.value();
+
+    // Determine dimension
     auto dimension = Vector2ui(spec.width, spec.height);
+
+    // Determine color space
+    OIIO::ustring colorSpaceOIIO;
+    spec.getattribute("oiio:ColorSpace", OIIO::TypeString,
+                      &colorSpaceOIIO);
+
+    Expected<ColorSpacePack> colorSpaceE = ColorSpaceToMRay(std::string(colorSpaceOIIO));
+    if(!colorSpaceE.has_value())
+    {
+        MRayError e = colorSpaceE.error();
+        e.AppendInfo(MRAY_FORMAT("({})", filePath));
+        return e;
+    }
+    const auto& colorSpace = colorSpaceE.value();
+
+    // TODO: Support tiled images
+    if(spec.tile_width != 0 || spec.tile_height != 0 || spec.tile_depth != 0)
+        return MRayError("Tiled images are not currently supported.({})",
+                         filePath);
 
     // TODO: Do a conversion to an highest precision channel for these
     if(!spec.channelformats.empty())
         return MRayError("Channel-specific formats are not supported.({})",
                          filePath);
     // Is this for deep images??
+    // Or mip
     if(spec.format.is_array())
         return MRayError("Arrayed per-pixel formats are not supported.({})",
                          filePath);
 
-    // Calculate the final spec according to the flags
-    // channel expand and sign convert..
-    OIIO::ImageSpec finalSpec = spec;
+    // Mipmap determination
+    // Iterate through mips and find the amount
+    int32_t mipCount = 0;
+    for(; inFile->seek_subimage(0, mipCount); mipCount++);
 
-    // Check if sign convertible
-    OIIO::TypeDesc readFormat = spec.format;
-    if(flags[ImageFlagTypes::LOAD_AS_SIGNED] && !IsSignConvertible(pixFormat))
-        return MRayError("Image type is not sign convertible.({})",
-                         filePath);
-    else if(flags[ImageFlagTypes::LOAD_AS_SIGNED])
+    if(mipCount > Image<2>::MAX_MIP_COUNT)
+        return MRayError("Mip map count exceeds the maximum amount ({}) on file \"{}\"",
+                         Image<2>::MAX_MIP_COUNT, filePath);
+
+    bool isDefaultColorSpace = flags[ImageFlagTypes::DISREGARD_COLOR_SPACE];
+    using enum MRayColorSpaceEnum;
+    return ImageHeader<2>
     {
-        readFormat = (spec.format == OIIO::TypeDesc::UINT16)
-                        ? OIIO::TypeDesc::INT16
-                        : OIIO::TypeDesc::INT8;
-        finalSpec.format = readFormat;
-    }
-
-    // Find the x stride to do a channel expand
-    bool doChannelExpand = (pixFormat.ChannelCount() == 3 && flags[ImageFlagTypes::TRY_3C_4C_CONVERSION]);
-    int nChannels = (doChannelExpand) ? (spec.nchannels + 1) : (spec.nchannels);
-    OIIO::stride_t xStride = (doChannelExpand)
-                                ? (nChannels * readFormat.size())
-                                : (OIIO::AutoStride);
-    // Change the final spec as well for color convert
-    if(doChannelExpand) finalSpec.nchannels = nChannels;
-
-    // Allocate the expanded (or non-expanded) buffer and directly load into it
-    MRayInput input(std::in_place_type_t<Byte>{},
-                    spec.width * spec.height * nChannels * readFormat.size());
-    OIIO::stride_t scanLineSize = spec.width * nChannels * readFormat.size();
-    Byte* dataLastElement = input.AccessAs<Byte>().data() + (dimension[1] - 1) * scanLineSize;
-    // Now we can read the file directly flipped and with proper format etc. etc.
-    if(!inFile->read_image(readFormat, dataLastElement, xStride, -scanLineSize))
-        return MRayError("OIIO Error ({})", inFile->geterror());
-
-    // Re-adjust the pixelFormat (we may have done channel expand and sign convert
-    Expected<MRayPixelTypeRT> pixFormatFinalE = OIIOImageSpecToPixelFormat(finalSpec);
-    if(!pixFormatFinalE.has_value())
-        return pixFormatFinalE.error();
-
-    return Image<2>
-    {
-        .header = ImageHeader<2>
-        {
-            .dimensions = dimension,
-            // TODO: Mip count
-            .mipCount = 1,
-            .pixelType = pixFormatFinalE.value()
-        },
-        .pixels = std::move(input)
+        .dimensions = dimension,
+        .mipCount = static_cast<uint32_t>(mipCount),
+        .pixelType = pixFormat,
+        .colorSpace = (isDefaultColorSpace) ? MR_DEFAULT : colorSpace.second,
+        .gamma = (isDefaultColorSpace) ? 1 : colorSpace.first
     };
+}
+
+Expected<Image<2>> ImageLoader::ReadImage2D(const std::string& filePath,
+                                            ImageIOFlags flags) const
+{
+    auto inFile = OIIO::ImageInput::open(filePath);
+    if(!inFile) return MRayError("OIIO Error ({})", OIIO::geterror());
+
+    Expected<ImageHeader<2>> headerE = ReadImageHeaderInternal(inFile, filePath, flags);
+    if(!headerE.has_value()) return headerE.error();
+
+    const auto& header = headerE.value();
+
+    Image<2> result;
+    result.header = header;
+    for(int32_t mipLevel = 0; inFile->seek_subimage(0, mipLevel); mipLevel++)
+    {
+        // Calculate the final spec according to the flags
+        // channel expand and sign convert..
+        OIIO::ImageSpec spec = inFile->spec();
+        OIIO::ImageSpec finalSpec = spec;
+
+        // Check if sign convertible
+        OIIO::TypeDesc readFormat = spec.format;
+        if(flags[ImageFlagTypes::LOAD_AS_SIGNED] && !IsSignConvertible(header.pixelType))
+            return MRayError("Image type is not sign convertible.({})", filePath);
+        else if(flags[ImageFlagTypes::LOAD_AS_SIGNED])
+        {
+            readFormat = (spec.format == OIIO::TypeDesc::UINT16)
+                            ? OIIO::TypeDesc::INT16
+                            : OIIO::TypeDesc::INT8;
+            finalSpec.format = readFormat;
+        }
+
+        // Find the x stride to do a channel expand
+        bool doChannelExpand = (header.pixelType.ChannelCount() == 3 &&
+                                flags[ImageFlagTypes::TRY_3C_4C_CONVERSION]);
+        int nChannels = (doChannelExpand) ? (spec.nchannels + 1) : (spec.nchannels);
+        OIIO::stride_t xStride = (doChannelExpand)
+                                    ? (nChannels * readFormat.size())
+                                    : (OIIO::AutoStride);
+        // Change the final spec as well for color convert
+        if(doChannelExpand) finalSpec.nchannels = nChannels;
+
+        // Allocate the expanded (or non-expanded) buffer and directly load into it
+        TransientData pixels(std::in_place_type_t<Byte>{},
+                             spec.width* spec.height* nChannels* readFormat.size());
+        OIIO::stride_t scanLineSize = spec.width * nChannels * readFormat.size();
+        Byte* dataLastElement = pixels.AccessAs<Byte>().data() + (header.dimensions[1] - 1) * scanLineSize;
+        // Now we can read the file directly flipped and with proper format etc. etc.
+        if(!inFile->read_image(readFormat, dataLastElement, xStride, -scanLineSize))
+            return MRayError("OIIO Error ({})", inFile->geterror());
+
+        // Re-adjust the pixelFormat (we may have done channel expand and sign convert
+        Expected<MRayPixelTypeRT> pixFormatFinalE = PixelFormatToMRay(finalSpec);
+        if(!pixFormatFinalE.has_value()) return pixFormatFinalE.error();
+
+        result.imgData.emplace_back(ImageMip<2>
+        {
+            .mipSize = Vector2ui(spec.width, spec.height),
+            .pixels = std::move(pixels)
+        });
+    };
+    return result;
 }
 
 Expected<Image<2>> ImageLoader::ReadImageSubChannel(const std::string&,
                                                     ImageChannelType,
-                                                    const ImageIOFlags) const
+                                                    ImageIOFlags flags) const
 {
     return MRayError::OK;
 }
 
-Expected<ImageHeader<2>> ImageLoader::ReadImageHeader2D(const std::string&,
-                                                        const ImageIOFlags) const
+Expected<ImageHeader<2>> ImageLoader::ReadImageHeader2D(const std::string& filePath,
+                                                        ImageIOFlags flags) const
 {
-    return MRayError::OK;
+    auto inFile = OIIO::ImageInput::open(filePath);
+    if(!inFile) return MRayError("OIIO Error ({})", OIIO::geterror());
+
+    return ReadImageHeaderInternal(inFile, filePath, flags);
 }
 
 MRayError ImageLoader::WriteImage2D(const Image<2>& imgIn,
                                     const std::string& filePath,
                                     ImageType extension,
-                                    const ImageIOFlags flags) const
+                                    ImageIOFlags) const
 {
-    auto out = OIIO::ImageOutput::create(filePath);
+    const auto& extE = ImageTypeToExtension(extension);
+    if(!extE.has_value()) return extE.error();
 
-    Expected<OIIO::ImageSpec> specE = PixelFormatToOIIOImageSpec(imgIn.header);
+    std::string_view ext = extE.value();
+    std::string fullPath = filePath + std::string(ext);
+    auto out = OIIO::ImageOutput::create(fullPath);
+
+    if(imgIn.header.mipCount > 1)
+        MRAY_WARNING_LOG("Only writing mip0 to the image ({})", fullPath);
+
+    Expected<OIIO::ImageSpec> specE = PixelFormatToOIIO(imgIn.header);
     if(!specE.has_value()) return specE.error();
 
     const OIIO::ImageSpec& spec = specE.value();
     OIIO::stride_t scanLineSize = static_cast<OIIO::stride_t>(spec.scanline_bytes());
 
-    const Byte* dataLastElement = imgIn.pixels.AccessAs<Byte>().data();
+    const Byte* dataLastElement = imgIn.imgData[0].pixels.AccessAs<Byte>().data();
     dataLastElement += (imgIn.header.dimensions[1] - 1) * scanLineSize;
 
     // TODO: properly write an error check/out code for these.
-    if(!out->open(filePath, spec))
+    if(!out->open(fullPath, spec))
         return MRayError("OIIO Error ({})", out->geterror());
     if(!out->write_image(spec.format, dataLastElement, OIIO::AutoStride, -scanLineSize))
         return MRayError("OIIO Error ({})", out->geterror());

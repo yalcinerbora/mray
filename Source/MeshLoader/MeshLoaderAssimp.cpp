@@ -4,7 +4,7 @@
 #include <assimp/postprocess.h>
 #include <filesystem>
 
-#include "MRayInput/MRayInput.h"
+#include "TransientPool/TransientPool.h"
 
 MeshFileAssimp::MeshFileAssimp(Assimp::Importer& imp,
                                const std::string& fPath)
@@ -42,7 +42,7 @@ MeshFileAssimp::MeshFileAssimp(Assimp::Importer& imp,
 AABB3 MeshFileAssimp::AABB(uint32_t innerId) const
 {
     if(innerId >= scene->mNumMeshes)
-        throw MRayError("Inner index is out of range");;
+        throw MRayError("Inner index is out of range");
 
     const auto& aabb = scene->mMeshes[innerId]->mAABB;
     return AABB3(Vector3(aabb.mMin.x, aabb.mMin.y, aabb.mMin.z),
@@ -71,14 +71,14 @@ std::string MeshFileAssimp::Name() const
     return std::filesystem::path(filePath).filename().string();
 }
 
-MRayInput MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic,
-                                       uint32_t innerId) const
+TransientData MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic,
+                                           uint32_t innerId) const
 {
-    auto PushVertexAttribute = [&]<class T>() -> MRayInput
+    auto PushVertexAttribute = [&]<class T>() -> TransientData
     {
         const auto& mesh = scene->mMeshes[innerId];
         size_t localCount = mesh->mNumVertices;
-        MRayInput input(std::in_place_type_t<T>{}, localCount);
+        TransientData input(std::in_place_type_t<T>{}, localCount);
 
         const T* attributePtr;
         using enum PrimitiveAttributeLogic;
@@ -108,7 +108,7 @@ MRayInput MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic,
                 }
                 return std::move(input);
             }
-            default: return MRayInput(std::in_place_type_t<Byte>{}, 0);
+            default: return TransientData(std::in_place_type_t<Byte>{}, 0);
         }
         input.Push(Span<const T>(attributePtr, localCount));
         return std::move(input);
@@ -119,7 +119,7 @@ MRayInput MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic,
     const auto& mesh = scene->mMeshes[innerId];
     if(attribLogic == PrimitiveAttributeLogic::INDEX)
     {
-        MRayInput input(std::in_place_type_t<Vector3ui>{}, mesh->mNumFaces);
+        TransientData input(std::in_place_type_t<Vector3ui>{}, mesh->mNumFaces);
         for(unsigned int i = 0; i < mesh->mNumFaces; i++)
         {
             const auto& face = mesh->mFaces[i];

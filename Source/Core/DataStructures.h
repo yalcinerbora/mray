@@ -3,6 +3,7 @@
 #include "Vector.h"
 #include "Core/Types.h"
 #include <bit>
+#include <type_traits>
 
 // Stratified Discrete Alias Table
 //
@@ -78,7 +79,6 @@ class StratifiedIntegerAliasTable
 //
 // Data Management is outside of the scope of the hash table
 // since it may reside on GPU
-
 template <class LookupStrategy, class H, class Key>
 concept LookupStrategyC = requires()
 {
@@ -114,68 +114,77 @@ class LookupTable
     Optional<const V&>  Search(const K&) const;
 };
 
-template <std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-StratifiedIntegerAliasTable<T>::StratifiedIntegerAliasTable(const T* dAliasRanges, T gcd)
-    : gcdShift(static_cast<T>(std::popcount(gcd - 1)))
-    , gAliasRanges(dAliasRanges)
+// Simple host-only, static-sized array
+// This is not a replacement of std::array but it is statically
+// allocated but dynamically-sized std::vector like data structure.
+//
+// So it is between std::array and std::vector,
+// underlying type does not have to be default constructible unlike std::array
+// Probably work on device as well, but currently not needed there so annotations
+// are skipped purposefully.
+//
+// Tries to be API compatible (but not really) with std::vector
+//
+// Lets not make the mistake of old std::vector impl
+enum class StaticVecSize : size_t {};
+
+template<class T, size_t N>
+class alignas(alignof(T)) StaticVector
 {
-    assert(std::has_single_bit(gcd));
-}
+    static constexpr size_t JUMP_SIZE = std::max(sizeof(T), alignof(T));
+    static constexpr size_t ALLOCATION_SIZE = sizeof(T) * JUMP_SIZE;
 
-template <std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t StratifiedIntegerAliasTable<T>::FindIndex(T id) const
-{
-    uint32_t tableIndex = id >> gcdShift;
-    return gAliasRanges[tableIndex];
-}
+    private:
+    Byte        storage[ALLOCATION_SIZE];
+    size_t      count;
 
-template <class K, class V, std::unsigned_integral H,
-          uint32_t VECL, LookupStrategyC<H, K> S>
-MRAY_HYBRID MRAY_CGPU_INLINE
-LookupTable<K, V, H, VECL, S>::LookupTable(const Span<Vector<VL, H>>& hashes,
-                                           const Span<K>& keys,
-                                           const Span<V>& values)
-    : hashes(hashes)
-    , keys(keys)
-    , values(values)
-{
-    assert(keys.size() == values.size());
-    assert(keys.size() * VECL <= hashes.size());
-}
+    constexpr Byte*         ItemLocation(size_t);
+    constexpr const Byte*   ItemLocation(size_t) const;
+    constexpr T*            ItemAt(size_t);
+    constexpr const T*      ItemAt(size_t) const;
+    constexpr void          DestructObjectAt(size_t);
 
-template <class K, class V, std::unsigned_integral H,
-          uint32_t VECL, LookupStrategyC<H, K> S>
-MRAY_HYBRID MRAY_CGPU_INLINE
-Optional<const V&> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
-{
-    uint32_t tableSize = static_cast<uint32_t>(keys.size());
-    H hashVal = S::Hash(k);
-    H index = hashVal % tableSize;
 
-    while(true)
-    {
-        uint32_t vectorIndex = index >> VEC_SHIFT;
-        Vector<4, H> hashChunk = hashes[vectorIndex];
-        UNROLL_LOOP
-        for(uint32_t i = 0; i < VL; i++)
-        {
-            // Roll to start of the case special case
-            // (since we are bulk reading)
-            if(vectorIndex + i >= tableSize) break;
-            // If empty, this means linear probe chain is iterated
-            // and we did not find the value return null
-            if(S::IsEmpty(hashChunk[i])) return std::nullopt;
+    //constexpr void          ConstrcutObjectAt(size_t);
 
-            // Actual comparison case, if hash is equal it does not mean
-            // keys are equal, check them only if the hashes are equal
-            uint32_t globalIndex = vectorIndex + i;
-            if(hashVal == hashChunk[i] && keys[globalIndex] == k)
-                return values[globalIndex];
-        }
-        index = (index >= tableSize) ? 0 : (index + VL);
-        assert(index != hashVal % tableSize);
-    }
-    return std::nullopt;
-}
+    public:
+    // Constructors & Destructor
+    constexpr               StaticVector();
+    constexpr explicit      StaticVector(StaticVecSize count)   requires std::is_default_constructible_v<T>;
+    constexpr explicit      StaticVector(StaticVecSize count,
+                                         const T& initialValue) requires std::is_copy_constructible_v<T>;
+    constexpr               StaticVector(const StaticVector&)   = delete;
+    constexpr               StaticVector(const StaticVector&)   requires std::is_copy_constructible_v<T>;
+    constexpr               StaticVector(StaticVector&&)        = delete;
+    constexpr               StaticVector(StaticVector&&)        requires std::is_move_constructible_v<T>;
+
+    constexpr StaticVector& operator=(const StaticVector&)      = delete;
+    constexpr StaticVector& operator=(const StaticVector&)      requires std::is_copy_assignable_v<T>;
+    constexpr StaticVector& operator=(StaticVector&&)           = delete;
+    constexpr StaticVector& operator=(StaticVector&&)           requires std::is_move_assignable_v<T>;
+    constexpr               ~StaticVector()                     = default;
+    constexpr               ~StaticVector()                     requires(!std::is_trivially_destructible_v<T>);
+
+    //
+    constexpr T&            operator[](size_t);
+    constexpr const T&      operator[](size_t) const;
+    constexpr T*            data();
+    constexpr const T*      data() const;
+    constexpr T&            back();
+    constexpr const T&      back() const;
+    constexpr T&            front();
+    constexpr const T&      front() const;
+
+    constexpr size_t        size() const;
+    constexpr size_t        isEmpty() const;
+    constexpr size_t        capacity() const;
+
+    constexpr void          clear();
+    constexpr void          push_back(const T&);
+    constexpr void          push_back(T&&);
+    template<class... Args>
+    constexpr T&            emplace_back(Args&&...);
+    constexpr void          pop_back();
+};
+
+#include "DataStructures.hpp"

@@ -18,7 +18,7 @@ target_compile_definitions(ImageLoader PRIVATE
 
 target_link_libraries(ImageLoader PRIVATE
                       CoreLib
-                      MRayInput
+                      TransientPool
                       mray::meta_compile_opts
                       oiio::oiio
                       oiio::oiio_util)

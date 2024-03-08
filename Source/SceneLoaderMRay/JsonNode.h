@@ -128,8 +128,8 @@ class JsonNode
     uint32_t                innerIndex;
 
     public:
-                        JsonNode(const nlohmann::json& node,
-                                 uint32_t innerIndex = 0);
+                            JsonNode(const nlohmann::json& node,
+                                     uint32_t innerIndex = 0);
 
     const nlohmann::json&   RawNode() const;
     std::string_view        Type() const;
@@ -137,19 +137,19 @@ class JsonNode
     uint32_t                Id() const;
     // Inner node unspecific data access
     template<class T>
-    T                   CommonData(std::string_view name) const;
+    T                       CommonData(std::string_view name) const;
     template<class T>
-    MRayInput           CommonDataArray(std::string_view name) const;
+    TransientData           CommonDataArray(std::string_view name) const;
     // Inner index related data loading
     template<class T>
-    T                   AccessData(std::string_view name) const;
+    T                       AccessData(std::string_view name) const;
     template<class T>
-    MRayInput           AccessDataArray(std::string_view name) const;
+    TransientData           AccessDataArray(std::string_view name) const;
     // Optional Data
     template<class T>
-    Optional<T>         AccessOptionalData(std::string_view name) const;
+    Optional<T>             AccessOptionalData(std::string_view name) const;
     template<class T>
-    Optional<MRayInput> AccessOptionalDataArray(std::string_view name) const;
+    Optional<TransientData> AccessOptionalDataArray(std::string_view name) const;
     // Texturable (either data T, or texture struct)
     template<class T>
     Variant<NodeTexStruct, T>               AccessTexturableData(std::string_view name) const;

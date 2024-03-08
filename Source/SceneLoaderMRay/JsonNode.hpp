@@ -193,10 +193,10 @@ T JsonNode::CommonData(std::string_view name) const
 }
 
 template<class T>
-MRayInput JsonNode::CommonDataArray(std::string_view name) const
+TransientData JsonNode::CommonDataArray(std::string_view name) const
 {
     const auto& nodeArray = node.at(name);
-    MRayInput input(std::in_place_type_t<T>{}, nodeArray.size());
+    TransientData input(std::in_place_type_t<T>{}, nodeArray.size());
     for(const auto n : nodeArray)
     {
         input.Push(n.get<T>());
@@ -214,12 +214,12 @@ T JsonNode::AccessData(std::string_view name) const
 }
 
 template<class T>
-MRayInput JsonNode::AccessDataArray(std::string_view name) const
+TransientData JsonNode::AccessDataArray(std::string_view name) const
 {
     const auto& nodeArray = (isMultiNode) ? node.at(name).at(innerIndex)
                                           : node.at(name);
 
-    MRayInput input(std::in_place_type_t<T>{}, nodeArray.size());
+    TransientData input(std::in_place_type_t<T>{}, nodeArray.size());
     for(const auto n : nodeArray)
     {
         input.Push(n.get<T>());
@@ -247,7 +247,7 @@ Optional<T> JsonNode::AccessOptionalData(std::string_view name) const
 }
 
 template<class T>
-Optional<MRayInput> JsonNode::AccessOptionalDataArray(std::string_view name) const
+Optional<TransientData> JsonNode::AccessOptionalDataArray(std::string_view name) const
 {
     // Entire entry is missing (which is not defined all items on this node)
     if(node.find(name) == node.cend()) return std::nullopt;
@@ -258,7 +258,7 @@ Optional<MRayInput> JsonNode::AccessOptionalDataArray(std::string_view name) con
 
     // Here user may provide "-" string which means data is
     // not present for this item in node
-    MRayInput input(std::in_place_type_t<T>{}, nodeArray.size());
+    TransientData input(std::in_place_type_t<T>{}, nodeArray.size());
     using namespace std::literals;
     if(nodeArray.is_string() &&
        nodeArray.get<std::string_view>() == "-"sv)

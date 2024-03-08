@@ -13,7 +13,8 @@ class Flag
         static_assert(sizeof(Enum) <= sizeof(size_t),
                       "Flag -> Enum may have more than size_t amount of data");
 
-        using F = Enum;
+        using F         = Enum;
+        using BitRef    = typename std::bitset<S>::reference;
 
     private:
         std::bitset<S> flagData;
@@ -32,7 +33,7 @@ class Flag
         Flag&           operator=(Flag&&) = default;
                         ~Flag() = default;
 
-        bool&           operator[](Enum);
+        BitRef          operator[](Enum);
         bool            operator[](Enum) const;
 
         Flag&           operator|(Enum);
@@ -63,7 +64,7 @@ Flag<Enum, S>::Flag(const std::array<Enum, C>& vals)
 }
 
 template<class Enum, int S>
-bool& Flag<Enum, S>::operator[](Enum e)
+typename std::bitset<S>::reference Flag<Enum, S>::operator[](Enum e)
 {
     return flagData[static_cast<size_t>(e)];
 }

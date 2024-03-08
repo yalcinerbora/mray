@@ -132,7 +132,7 @@ concept PrimitiveC = requires(PrimType pt,
 };
 
 template <class PGType>
-concept PrimitiveGroupC = requires(PGType pg, MRayInput input)
+concept PrimitiveGroupC = requires(PGType pg, TransientData input)
 {
     // Mandatory Types
     // Primitive type satisfies its concept (at least on default form)
@@ -272,16 +272,16 @@ class EmptyPrimGroup : public GenericGroupPrimitive<EmptyPrimGroup>
     PrimAttributeInfoList   AttributeInfo() const override;
     void                    PushAttribute(PrimBatchKey batchId,
                                           uint32_t attributeIndex,
-                                          MRayInput data,
+                                          TransientData data,
                                           const GPUQueue&) override;
     void                    PushAttribute(PrimBatchKey batchId,
                                           const Vector2ui& subBatchRange,
                                           uint32_t attributeIndex,
-                                          MRayInput data,
+                                          TransientData data,
                                           const GPUQueue&) override;
     void                    PushAttribute(const Vector<2, PrimBatchKey::Type>& idRange,
                                           uint32_t attributeIndex,
-                                          MRayInput data,
+                                          TransientData data,
                                           const GPUQueue&) override;
     DataSoA                 SoA() const;
 };
@@ -409,17 +409,17 @@ PrimAttributeInfoList EmptyPrimGroup::AttributeInfo() const
 
 inline
 void EmptyPrimGroup::PushAttribute(PrimBatchKey, uint32_t,
-                                   MRayInput, const GPUQueue&)
+                                   TransientData, const GPUQueue&)
 {}
 
 inline
 void EmptyPrimGroup::PushAttribute(PrimBatchKey, const Vector2ui&,
-                                   uint32_t, MRayInput, const GPUQueue&)
+                                   uint32_t, TransientData, const GPUQueue&)
 {}
 
 inline
 void EmptyPrimGroup::PushAttribute(const Vector<2, PrimBatchKey::Type>&,
-                                   uint32_t, MRayInput, const GPUQueue&)
+                                   uint32_t, TransientData, const GPUQueue&)
 {}
 
 inline

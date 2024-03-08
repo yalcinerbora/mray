@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Core/TracerI.h"
-#include "MRayInput/MRayInput.h"
+#include "TransientPool/TransientPool.h"
 
 #include <map>
 
@@ -51,11 +51,11 @@ class TracerMock : public TracerI
     bool            IsPrimCommitted(PrimGroupId) const override;
     void            PushPrimAttribute(PrimBatchId,
                                       uint32_t attributeIndex,
-                                      MRayInput data) override;
+                                      TransientData data) override;
     void            PushPrimAttribute(PrimBatchId,
                                       uint32_t attributeIndex,
                                       Vector2ui subBatchRange,
-                                      MRayInput data) override;
+                                      TransientData data) override;
 
     MatGroupId  CreateMaterialGroup(std::string typeName) override;
     MaterialId  ReserveMaterial(MatGroupId,
@@ -65,7 +65,7 @@ class TracerMock : public TracerI
     bool        IsMatCommitted(MatGroupId) const override;
     void        PushMatAttribute(MatGroupId, Vector2ui range,
                                  uint32_t attributeIndex,
-                                 MRayInput data) override;
+                                 TransientData data) override;
     void        PushMatAttribute(MatGroupId, Vector2ui range,
                                  uint32_t attributeIndex,
                                  std::vector<TextureId>) override;
@@ -73,13 +73,13 @@ class TracerMock : public TracerI
 
     void            CommitTexColorSpace(MRayColorSpace = MRayColorSpace::RGB_LINEAR) override;
     TextureId       CreateTexture2D(Vector2ui size, uint32_t mipCount,
-                                    MRayDataEnum pixelType) override;
+                                    MRayPixelEnum pixelType) override;
     TextureId       CreateTexture3D(Vector3ui size, uint32_t mipCount,
-                                    MRayDataEnum pixelType) override;
+                                    MRayPixelEnum pixelType) override;
     MRayDataTypeRT  GetTexturePixelType(TextureId) const override;
     void            CommitTextures() override;
     void            PushTextureData(TextureId, uint32_t mipLevel,
-                                    MRayInput data) override;
+                                    TransientData data) override;
 
 
     TransGroupId    CreateTransformGroup(std::string typeName) override;
@@ -88,7 +88,7 @@ class TracerMock : public TracerI
     bool            IsTransCommitted(TransGroupId) const override;
     void            PushTransAttribute(TransGroupId, Vector2ui range,
                                        uint32_t attributeIndex,
-                                       MRayInput data) override;
+                                       TransientData data) override;
 
 
     LightGroupId    CreateLightGroup(std::string typeName,
@@ -99,7 +99,7 @@ class TracerMock : public TracerI
     bool            IsLightCommitted(LightGroupId) const override;
     void            PushLightAttribute(LightGroupId, Vector2ui range,
                                        uint32_t attributeIndex,
-                                       MRayInput data) override;
+                                       TransientData data) override;
     void            PushLightAttribute(LightGroupId, Vector2ui range,
                                        uint32_t attributeIndex,
                                        std::vector<TextureId>) override;
@@ -111,7 +111,7 @@ class TracerMock : public TracerI
     bool            IsCamCommitted(CameraGroupId) const override;
     void            PushCamAttribute(CameraGroupId, Vector2ui range,
                                      uint32_t attributeIndex,
-                                     MRayInput data) override;
+                                     TransientData data) override;
 
 
     MediumGroupId   CreateMediumGroup(std::string typeName) override;
@@ -119,8 +119,8 @@ class TracerMock : public TracerI
     void            CommitMediumReservations(MediumGroupId) override;
     bool            IsMediumCommitted(MediumGroupId) const override;
     void            PushMediumAttribute(MediumGroupId, Vector2ui range,
-                                                uint32_t attributeIndex,
-                                                MRayInput data) override;
+                                        uint32_t attributeIndex,
+                                        TransientData data) override;
     void            PushMediumAttribute(MediumGroupId, Vector2ui range,
                                         uint32_t attributeIndex,
                                         std::vector<TextureId> textures) override;
@@ -315,14 +315,14 @@ inline bool TracerMock::IsPrimCommitted(PrimGroupId) const
 
 inline void TracerMock::PushPrimAttribute(PrimBatchId,
                                           uint32_t,
-                                          MRayInput)
+                                          TransientData)
 {
 }
 
 inline void TracerMock::PushPrimAttribute(PrimBatchId,
-                                  uint32_t,
-                                  Vector2ui,
-                                  MRayInput)
+                                          uint32_t,
+                                          Vector2ui,
+                                          TransientData)
 {
 }
 
@@ -349,7 +349,7 @@ inline bool TracerMock::IsMatCommitted(MatGroupId) const
 
 inline void TracerMock::PushMatAttribute(MatGroupId, Vector2ui,
                                          uint32_t,
-                                         MRayInput)
+                                         TransientData)
 {
 }
 
@@ -364,13 +364,13 @@ inline void TracerMock::CommitTexColorSpace(MRayColorSpace)
 }
 
 inline TextureId TracerMock::CreateTexture2D(Vector2ui, uint32_t,
-                                             MRayDataEnum)
+                                             MRayPixelEnum)
 {
     return TextureId(0);
 }
 
 inline TextureId TracerMock::CreateTexture3D(Vector3ui, uint32_t,
-                                MRayDataEnum)
+                                             MRayPixelEnum)
 {
     return TextureId(0);
 }
@@ -385,7 +385,7 @@ inline void TracerMock::CommitTextures()
 }
 
 inline void TracerMock::PushTextureData(TextureId, uint32_t,
-                                        MRayInput)
+                                        TransientData)
 {
 }
 
@@ -410,7 +410,7 @@ inline bool TracerMock::IsTransCommitted(TransGroupId) const
 
 inline void TracerMock::PushTransAttribute(TransGroupId, Vector2ui,
                                            uint32_t,
-                                           MRayInput)
+                                           TransientData)
 {
 }
 
@@ -437,7 +437,7 @@ inline bool TracerMock::IsLightCommitted(LightGroupId) const
 
 inline void TracerMock::PushLightAttribute(LightGroupId, Vector2ui,
                                            uint32_t,
-                                           MRayInput)
+                                           TransientData)
 {
 }
 
@@ -468,7 +468,7 @@ inline bool TracerMock::IsCamCommitted(CameraGroupId) const
 
 inline void TracerMock::PushCamAttribute(CameraGroupId, Vector2ui,
                                          uint32_t,
-                                         MRayInput)
+                                         TransientData)
 {
 
 }
@@ -494,7 +494,7 @@ inline bool TracerMock::IsMediumCommitted(MediumGroupId) const
 
 inline void TracerMock::PushMediumAttribute(MediumGroupId, Vector2ui,
                                     uint32_t,
-                                    MRayInput)
+                                            TransientData)
 {
 
 }

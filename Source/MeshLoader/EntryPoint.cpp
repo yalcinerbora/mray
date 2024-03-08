@@ -11,7 +11,7 @@ using GeneratorFuncType = std::unique_ptr<BaseType> (*)(Args&&... args);
 template<class BaseType, class Type, class...Args>
 std::unique_ptr<BaseType> GenerateType(Args&&... args)
 {
-    return std::make_unique<BaseType>(new Type(std::forward<Args>(args...)));
+    return std::make_unique<BaseType>(new Type(std::forward<Args>(args)...));
 }
 
 using MeshLoaderPtr = std::unique_ptr<MeshLoaderI>;
@@ -31,21 +31,31 @@ class MeshLoaderPool : public MeshLoaderPoolI
 
 MeshLoaderPool::MeshLoaderPool()
 {
-    // Load a load b load c
+    generators.emplace(MeshLoaderAssimp::Tag,
+                       &GenerateType<MeshLoaderI, MeshLoaderAssimp>);
+    generators.emplace(MeshLoaderGFG::Tag,
+                       &GenerateType<MeshLoaderI, MeshLoaderGFG>);
 }
 
-MeshLoaderPtr MeshLoaderPool::AcquireALoader(const std::string& extension) const
+MeshLoaderPtr MeshLoaderPool::AcquireALoader(const std::string& tag) const
 {
-    auto it = generators.find(extension);
+    auto it = generators.find(tag);
     if(it == generators.cend())
     {
         throw MRayError("Unable to find a mesh loader "
-                        "for extension *.{}", extension);
+                        "with tag {}", tag);
     }
     return it->second();
 }
 
-MRAY_MESHLOADER_ENTRYPOINT std::unique_ptr<const MeshLoaderPoolI> GetMeshLoader()
+extern "C" MRAY_MESHLOADER_ENTRYPOINT
+MeshLoaderPoolI* MeshLoaderDetail::ConstructMeshLoaderPool()
 {
-    return std::unique_ptr<const MeshLoaderPoolI>(new MeshLoaderPool());
+    return new MeshLoaderPool();
+}
+
+extern "C" MRAY_MESHLOADER_ENTRYPOINT
+void MeshLoaderDetail::DestroyMeshLoaderPool(MeshLoaderPoolI* ptr)
+{
+    delete ptr;
 }

@@ -1,12 +1,12 @@
 #pragma once
 
-namespace MRayInputDetail
+namespace TransientPoolDetail
 {
 
 // TypeId hash may generate false positives, but it should
 // catch some error most of the time
 template<ImplicitLifetimeC T>
-inline MRayInput::MRayInput(std::in_place_type_t<T>, size_t count)
+inline TransientData::TransientData(std::in_place_type_t<T>, size_t count)
     : typeHash(typeid(T).hash_code())
     , usedBytes(0)
     , alignment(alignof(T))
@@ -16,7 +16,7 @@ inline MRayInput::MRayInput(std::in_place_type_t<T>, size_t count)
     ownedMem = Span<Byte>(ptr, count * sizeof(T));
 }
 
-inline MRayInput::MRayInput(MRayInput&& other)
+inline TransientData::TransientData(TransientData&& other)
     : typeHash(other.typeHash)
     , ownedMem(std::move(other.ownedMem))
     , usedBytes(other.usedBytes)
@@ -25,7 +25,7 @@ inline MRayInput::MRayInput(MRayInput&& other)
     other.ownedMem = Span<Byte>();
 }
 
-inline MRayInput& MRayInput::operator=(MRayInput&& other)
+inline TransientData& TransientData::operator=(TransientData&& other)
 {
     assert(this != &other);
     if(ownedMem.data() != nullptr)
@@ -39,21 +39,21 @@ inline MRayInput& MRayInput::operator=(MRayInput&& other)
     return *this;
 }
 
-inline MRayInput::~MRayInput()
+inline TransientData::~TransientData()
 {
     if(ownedMem.data() != nullptr)
         mainR.deallocate(ownedMem.data(), ownedMem.size(), alignment);
 }
 
 template<ImplicitLifetimeC T>
-inline void MRayInput::Push(Span<const T> data)
+inline void TransientData::Push(Span<const T> data)
 {
     if(typeHash != typeid(T).hash_code())
-       throw MRayError("MRayInput(Push): Object did constructed with this type!");
+       throw MRayError("TransientData(Push): Object did constructed with this type!");
 
     size_t writeSize = data.size_bytes();
     if((writeSize + usedBytes) > ownedMem.size())
-        throw MRayError("MRayInput(Push): Out of bounds push over the buffer");
+        throw MRayError("TransientData(Push): Out of bounds push over the buffer");
 
     const Byte* writeBytes = reinterpret_cast<const Byte*>(data.data());
     std::memcpy(ownedMem.data() + usedBytes, writeBytes, writeSize);
@@ -61,33 +61,33 @@ inline void MRayInput::Push(Span<const T> data)
 }
 
 template<ImplicitLifetimeC T>
-inline Span<const T> MRayInput::AccessAs() const
+inline Span<const T> TransientData::AccessAs() const
 {
     if(typeHash != typeid(T).hash_code())
-       throw MRayError("MRayInput(AccessAs): Object did constructed with this type!");
+       throw MRayError("TransientData(AccessAs): Object did constructed with this type!");
 
     return Span<const T>(std::launder(reinterpret_cast<T*>(ownedMem.data())),
                          usedBytes / sizeof(T));
 }
 
 template<ImplicitLifetimeC T>
-inline Span<T> MRayInput::AccessAs()
+inline Span<T> TransientData::AccessAs()
 {
     if(typeHash != typeid(T).hash_code())
-       throw MRayError("MRayInput(AccessAs): Object did constructed with this type!");
+       throw MRayError("TransientData(AccessAs): Object did constructed with this type!");
 
     return Span<T>(std::launder(reinterpret_cast<T*>(ownedMem.data())),
                     usedBytes / sizeof(T));
 }
 
 template<>
-inline Span<const Byte> MRayInput::AccessAs() const
+inline Span<const Byte> TransientData::AccessAs() const
 {
     return ToConstSpan(ownedMem);
 }
 
 template<>
-inline Span<Byte> MRayInput::AccessAs()
+inline Span<Byte> TransientData::AccessAs()
 {
     return ownedMem;
 }
@@ -99,7 +99,7 @@ inline Span<Byte> MRayInput::AccessAs()
 // Strings are special, assume as char array
 // count should be the count of
 template<StringC T>
-inline MRayInput::MRayInput(std::in_place_type_t<T>, size_t charCount)
+inline TransientData::TransientData(std::in_place_type_t<T>, size_t charCount)
     : typeHash(typeid(std::string).hash_code())
     , usedBytes(0)
     , alignment(alignof(typename std::string::value_type))
@@ -110,43 +110,43 @@ inline MRayInput::MRayInput(std::in_place_type_t<T>, size_t charCount)
 }
 
 template<StringC T>
-inline void MRayInput::Push(Span<const T, 1> str)
+inline void TransientData::Push(Span<const T, 1> str)
 {
     if(typeHash != typeid(std::string).hash_code() &&
        typeHash != typeid(std::string_view).hash_code())
-        throw MRayError("MRayInput(Push): Object did constructed with "
+        throw MRayError("TransientData(Push): Object did constructed with "
                         "either std::string or std::string_view!");
 
     size_t writeSize = str[0].size();
     if((writeSize + usedBytes) > ownedMem.size())
-        throw MRayError("MRayInput(Push): Out of bounds push over the buffer");
+        throw MRayError("TransientData(Push): Out of bounds push over the buffer");
 
     const Byte* writeBytes = reinterpret_cast<const Byte*>(str.data());
     std::memcpy(ownedMem.data() + usedBytes, writeBytes, writeSize);
     usedBytes += writeSize;
 }
 
-inline std::string_view MRayInput::AccessAsString() const
+inline std::string_view TransientData::AccessAsString() const
 {
     if(typeHash != typeid(std::string).hash_code() &&
        typeHash != typeid(std::string_view).hash_code())
-       throw MRayError("MRayInput(AccessAsString): Object did constructed with "
+       throw MRayError("TransientData(AccessAsString): Object did constructed with "
                        "either std::string or std::string_view!");
 
     return std::string_view(reinterpret_cast<char*>(ownedMem.data()), usedBytes);
 }
 
-inline std::string_view MRayInput::AccessAsString()
+inline std::string_view TransientData::AccessAsString()
 {
     if(typeHash != typeid(std::string).hash_code() &&
        typeHash != typeid(std::string_view).hash_code())
-        throw MRayError("MRayInput(AccessAsString): Object did constructed with "
+        throw MRayError("TransientData(AccessAsString): Object did constructed with "
                         "either std::string or std::string_view!");
 
     return std::string_view(reinterpret_cast<char*>(ownedMem.data()), usedBytes);
 }
 
-inline FreeListNode* FreeList::GetALocation(MRayInput buffer)
+inline FreeListNode* FreeList::GetALocation(TransientData buffer)
 {
     FreeListNode* n = nullptr;
     std::lock_guard<std::mutex> lock(m);

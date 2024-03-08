@@ -8,7 +8,7 @@
 #include "Core/MRayDataType.h"
 #include "Core/TracerI.h"
 
-#include "MRayInput/MRayInput.h"
+#include "TransientPool/TransientPool.h"
 
 
 #ifdef MRAY_MESHLOADER_SHARED_EXPORT
@@ -32,7 +32,7 @@ class MeshFileI
 
     // Entire Data Fetch
     virtual bool            HasAttribute(PrimitiveAttributeLogic, uint32_t innerId = 0) const = 0;
-    virtual MRayInput       GetAttribute(PrimitiveAttributeLogic, uint32_t innerId = 0) const = 0;
+    virtual TransientData   GetAttribute(PrimitiveAttributeLogic, uint32_t innerId = 0) const = 0;
     virtual MRayDataTypeRT  AttributeLayout(PrimitiveAttributeLogic, uint32_t innerId = 0) const = 0;
 };
 
@@ -49,9 +49,27 @@ class MeshLoaderI
 class MeshLoaderPoolI
 {
     public:
-    virtual std::unique_ptr<MeshLoaderI>  AcquireALoader(const std::string& extension) const = 0;
+    virtual                                 ~MeshLoaderPoolI() = default;
+    virtual std::unique_ptr<MeshLoaderI>    AcquireALoader(const std::string& tag) const = 0;
 };
 
-MRAY_MESHLOADER_ENTRYPOINT std::unique_ptr<const MeshLoaderPoolI> GetMeshLoader();
+// C Interface (Used when dynamically loading the DLL)
+namespace MeshLoaderDetail
+{
+    extern "C" MRAY_MESHLOADER_ENTRYPOINT
+    MeshLoaderPoolI* ConstructMeshLoaderPool();
 
-using MeshLoaderPoolPtr = std::unique_ptr<const MeshLoaderPoolI>;
+    extern "C" MRAY_MESHLOADER_ENTRYPOINT
+    void DestroyMeshLoaderPool(MeshLoaderPoolI*);
+
+}
+
+// C++ Interface
+inline
+std::unique_ptr<MeshLoaderPoolI, decltype(&MeshLoaderDetail::DestroyMeshLoaderPool)>
+CreateMeshLoaderPool()
+{
+    using namespace MeshLoaderDetail;
+    using Ptr = std::unique_ptr<MeshLoaderPoolI, decltype(&DestroyMeshLoaderPool)>;
+    return Ptr(ConstructMeshLoaderPool(), &DestroyMeshLoaderPool);
+}
