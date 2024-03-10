@@ -140,6 +140,140 @@ std::vector<TransientData> GenericAttributeLoad(const AttributeCountList& totalC
     return result;
 }
 
+
+std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountList& totalCounts,
+                                                           const TexturedAttributeInfoList& list,
+                                                           Span<const JsonNode> nodes,
+                                                           const typename SceneLoaderMRay::TextureIdMappings& texMappings)
+{
+    std::vector<TexturedAttributeData> result;
+    result.reserve(list.size());
+
+    for(size_t i = 0; i < totalCounts.size(); i++)
+    {
+        std::visit([&](auto&& dataType)
+        {
+            using T = std::remove_cvref_t<decltype(dataType)>::Type;
+            auto initData = TexturedAttributeData
+            {
+                .data = TransientData(std::in_place_type_t<T>{}, totalCounts[i]),
+                .textures = std::vector<Optional<TextureId>>()
+            };
+            result.push_back(std::move(initData));
+        },
+        std::get<TexturedAttributeInfo::LAYOUT_INDEX>(list[i]));
+    }
+
+    // Now data is set we can load
+    for(const JsonNode& node : nodes)
+    {
+        uint32_t i = 0;
+        for(const auto& l : list)
+        {
+            using enum TexturedAttributeInfo::E;
+            std::string_view name = std::get<LOGIC_INDEX>(l);
+            AttributeOptionality optional = std::get<OPTIONALITY_INDEX>(l);
+            AttributeIsArray isArray = std::get<IS_ARRAY_INDEX>(l);
+            AttributeTexturable texturability = std::get<TEXTURABLE_INDEX>(l);
+
+            // Base checks
+            if(isArray == AttributeIsArray::IS_ARRAY)
+            {
+                throw MRayError("Attribute \"{}\" can not be texturable and array "
+                                "at the same time! Json: {}",
+                                name, nlohmann::to_string(node.RawNode()));
+            }
+            if(texturability == AttributeTexturable::MR_TEXTURE_OR_CONSTANT &&
+               optional == AttributeOptionality::MR_OPTIONAL)
+            {
+                throw MRayError("Attribute \"{}\" can not be \"texture or constant\" "
+                                "*and* \"optional\" at the same time! Json: {}",
+                                name, nlohmann::to_string(node.RawNode()));
+            }
+
+            // Only texture no type needed
+            if(texturability == AttributeTexturable::MR_TEXTURE_ONLY)
+            {
+                if(optional == AttributeOptionality::MR_MANDATORY)
+                {
+                    NodeTexStruct texStruct = node.AccessTexture(name);
+                    result[i].textures.push_back(texMappings.at(texStruct));
+                }
+                else if(optional == AttributeOptionality::MR_OPTIONAL)
+                {
+                    Optional<NodeTexStruct> texStruct = node.AccessOptionalTexture(name);
+                    TextureId id = (texStruct.has_value())
+                                        ? texMappings.at(texStruct.value())
+                                        : TracerConstants::InvalidTexture;
+                    result[i].textures.push_back(id);
+                }
+                continue;
+            }
+
+            // Same as GenericAttributeInfo
+            // TODO: Share functionality,  this is copy pase code
+            if(texturability == AttributeTexturable::MR_CONSTANT_ONLY)
+            {
+                std::visit([&](auto&& dataType)
+                {
+                    using T = std::remove_cvref_t<decltype(dataType)>::Type;
+                    if(isArray == AttributeIsArray::IS_ARRAY &&
+                       optional != AttributeOptionality::MR_MANDATORY)
+                    {
+                        Optional<TransientData> data = node.AccessOptionalDataArray<T>(name);
+                        if(!data.has_value()) return;
+                        result[i].data.Push(ToSpan<const T>(data.value()));
+                    }
+                    else if(isArray == AttributeIsArray::IS_ARRAY &&
+                            optional == AttributeOptionality::MR_MANDATORY)
+                    {
+                        TransientData data = node.AccessDataArray<T>(name);
+                        result[i].data.Push(ToSpan<const T>(data));
+                    }
+                    else if(isArray != AttributeIsArray::IS_ARRAY &&
+                            optional != AttributeOptionality::MR_MANDATORY)
+                    {
+                        Optional<T> data = node.AccessOptionalData<T>(name);
+                        if(!data.has_value()) return;
+                        result[i].data.Push(Span<const T>(&data.value(), 1));
+                    }
+                    else if(isArray != AttributeIsArray::IS_ARRAY &&
+                            optional == AttributeOptionality::MR_MANDATORY)
+                    {
+                        T data = node.AccessData<T>(name);
+                        result[i].data.Push(Span<const T>(&data, 1));
+                    }
+                },
+                std::get<LAYOUT_INDEX>(l));
+            }
+            //  Now the hairy part
+            if(texturability == AttributeTexturable::MR_TEXTURE_OR_CONSTANT)
+            {
+                std::visit([&](auto&& dataType)
+                {
+                    using T = std::remove_cvref_t<decltype(dataType)>::Type;
+                    Variant<NodeTexStruct, T> texturable = node.AccessTexturableData<T>(name);
+                    if(std::holds_alternative<NodeTexStruct>(texturable))
+                    {
+                        TextureId id = texMappings.at(std::get<NodeTexStruct>(texturable));
+                        result[i].textures.emplace_back(id);
+                        T phony;
+                        result[i].data.Push(Span<const T>(&phony, 1));
+                    }
+                    else
+                    {
+                        result[i].textures.emplace_back(std::nullopt);
+                        result[i].data.Push(Span<const T>(&std::get<T>(texturable), 1));
+                    }
+                },
+                std::get<LAYOUT_INDEX>(l));
+            }
+            i++;
+        }
+    }
+    return result;
+}
+
 void LoadPrimitive(TracerI& tracer,
                    PrimGroupId groupId,
                    PrimBatchId batchId,

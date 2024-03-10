@@ -214,7 +214,8 @@ namespace TracerConstants
     static constexpr TransformId IdentityTransformId    = TransformId(0);
     static constexpr PrimGroupId EmptyPrimitive         = PrimGroupId{0};
     static constexpr PrimBatchId EmptyPrimBatch         = PrimBatchId{0};
-    static constexpr MediumPair  VacuumMediumPair       = std::make_pair(VacuumMediumId, VacuumMediumId);
+    static constexpr TextureId InvalidTexture           = TextureId{0};
+    static constexpr MediumPair VacuumMediumPair        = std::make_pair(VacuumMediumId, VacuumMediumId);
 
     static constexpr auto NoAlphaMapList = OptionalAlphaMapList
     {
