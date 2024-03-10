@@ -45,12 +45,12 @@ AABB3 JsonTriangle::AABB(uint32_t) const
 
 uint32_t JsonTriangle::MeshPrimitiveCount(uint32_t) const
 {
-    return indices.AccessAs<Vector3ui>().size();
+    return static_cast<uint32_t>(indices.AccessAs<Vector3ui>().size());
 }
 
 uint32_t JsonTriangle::MeshAttributeCount(uint32_t) const
 {
-    return positions.AccessAs<Vector3>().size();
+    return static_cast<uint32_t>(positions.AccessAs<Vector3>().size());
 }
 
 bool JsonTriangle::HasAttribute(PrimitiveAttributeLogic attribLogic, uint32_t) const
@@ -72,7 +72,7 @@ TransientData JsonTriangle::GetAttribute(PrimitiveAttributeLogic attribLogic, ui
         auto inSpan = t.AccessAs<T>();
         TransientData result(std::in_place_type_t<T>(), inSpan.size());
         auto outSpan = result.AccessAs<T>();
-        std::copy(inSpan.begin(), inSpan.end(), outSpan.begin);
+        std::copy(inSpan.begin(), inSpan.end(), outSpan.begin());
         return std::move(result);
     };
 

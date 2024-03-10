@@ -58,9 +58,7 @@ class TracerMock : public TracerI
                                       TransientData data) override;
 
     MatGroupId  CreateMaterialGroup(std::string typeName) override;
-    MaterialId  ReserveMaterial(MatGroupId,
-                                MediumId frontMedium = TracerConstants::VacuumMediumId,
-                                MediumId backMedium = TracerConstants::VacuumMediumId) override;
+    MaterialId  ReserveMaterial(MatGroupId, MediumPair = TracerConstants::VacuumMediumPair) override;
     void        CommitMatReservations(MatGroupId) override;
     bool        IsMatCommitted(MatGroupId) const override;
     void        PushMatAttribute(MatGroupId, Vector2ui range,
@@ -71,7 +69,7 @@ class TracerMock : public TracerI
                                  std::vector<TextureId>) override;
 
 
-    void            CommitTexColorSpace(MRayColorSpace = MRayColorSpace::RGB_LINEAR) override;
+    void            CommitTexColorSpace(MRayColorSpaceEnum = MRayColorSpaceEnum::MR_DEFAULT) override;
     TextureId       CreateTexture2D(Vector2ui size, uint32_t mipCount,
                                     MRayPixelEnum pixelType) override;
     TextureId       CreateTexture3D(Vector3ui size, uint32_t mipCount,
@@ -83,7 +81,8 @@ class TracerMock : public TracerI
 
 
     TransGroupId    CreateTransformGroup(std::string typeName) override;
-    TransformIdList ReserveTransformations(TransGroupId, uint32_t count) override;
+    TransformId     ReserveTransformation(TransGroupId, uint32_t) override;
+    TransformIdList ReserveTransformations(TransGroupId, std::vector<uint32_t>) override;
     void            CommitTransReservations(TransGroupId) override;
     bool            IsTransCommitted(TransGroupId) const override;
     void            PushTransAttribute(TransGroupId, Vector2ui range,
@@ -359,20 +358,20 @@ inline void TracerMock::PushMatAttribute(MatGroupId, Vector2ui,
 {
 }
 
-inline void TracerMock::CommitTexColorSpace(MRayColorSpace)
+inline void TracerMock::CommitTexColorSpace(MRayColorSpaceEnum)
 {
 }
 
 inline TextureId TracerMock::CreateTexture2D(Vector2ui, uint32_t,
                                              MRayPixelEnum)
 {
-    return TextureId(0);
+    return TextureId{0};
 }
 
 inline TextureId TracerMock::CreateTexture3D(Vector3ui, uint32_t,
                                              MRayPixelEnum)
 {
-    return TextureId(0);
+    return TextureId{0};
 }
 
 inline MRayDataTypeRT TracerMock::GetTexturePixelType(TextureId) const

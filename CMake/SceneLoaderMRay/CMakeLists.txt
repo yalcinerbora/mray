@@ -18,6 +18,7 @@ target_link_libraries(SceneLoaderMRay
                       PRIVATE
                       CoreLib
                       ImageLoader
+                      MeshLoader
                       TransientPool
                       mray::meta_compile_opts
                       nlohmann::json)

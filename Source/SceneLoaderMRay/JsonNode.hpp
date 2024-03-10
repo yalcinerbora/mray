@@ -197,10 +197,11 @@ TransientData JsonNode::CommonDataArray(std::string_view name) const
 {
     const auto& nodeArray = node.at(name);
     TransientData input(std::in_place_type_t<T>{}, nodeArray.size());
-    for(const auto n : nodeArray)
-    {
-        input.Push(n.get<T>());
-    }
+
+    Span<T> data = input.AccessAs<T>();
+    for(size_t i = 0; i < nodeArray.size(); i++)
+        data[i] = nodeArray[i].get<T>();
+
     return std::move(input);
 }
 
@@ -218,12 +219,12 @@ TransientData JsonNode::AccessDataArray(std::string_view name) const
 {
     const auto& nodeArray = (isMultiNode) ? node.at(name).at(innerIndex)
                                           : node.at(name);
-
     TransientData input(std::in_place_type_t<T>{}, nodeArray.size());
-    for(const auto n : nodeArray)
-    {
-        input.Push(n.get<T>());
-    }
+
+    Span<T> data = input.AccessAs<T>();
+    for(size_t i = 0; i < nodeArray.size(); i++)
+        data[i] = nodeArray[i].get<T>();
+
     return std::move(input);
 }
 // Optional Data
@@ -265,10 +266,10 @@ Optional<TransientData> JsonNode::AccessOptionalDataArray(std::string_view name)
         return std::nullopt;
     else
     {
-        for(const auto n : nodeArray)
-        {
-            input.Push(n.get<T>());
-        }
+        Span<T> data = input.AccessAs<T>();
+        for(size_t i = 0; i < nodeArray.size(); i++)
+            data[i] = nodeArray[i].get<T>();
+
         return std::move(input);
     }
 }

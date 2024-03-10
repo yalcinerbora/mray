@@ -27,7 +27,7 @@ class MeshFileAssimp : public MeshFileI
     MRayDataTypeRT  AttributeLayout(PrimitiveAttributeLogic, uint32_t innerId = 0) const override;
 };
 
-class MeshLoaderAssimp : public MeshLoaderI
+class MeshLoaderAssimp final : public MeshLoaderI
 {
     public:
     static constexpr std::string_view   Tag = "assimp";

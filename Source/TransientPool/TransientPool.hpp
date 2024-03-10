@@ -48,8 +48,11 @@ inline TransientData::~TransientData()
 template<ImplicitLifetimeC T>
 inline void TransientData::Push(Span<const T> data)
 {
-    if(typeHash != typeid(T).hash_code())
-       throw MRayError("TransientData(Push): Object did constructed with this type!");
+    if constexpr(EnableTypeCheck)
+    {
+        if(typeHash != typeid(T).hash_code())
+            throw MRayError("TransientData(Push): Object did constructed with this type!");
+    }
 
     size_t writeSize = data.size_bytes();
     if((writeSize + usedBytes) > ownedMem.size())
@@ -63,9 +66,11 @@ inline void TransientData::Push(Span<const T> data)
 template<ImplicitLifetimeC T>
 inline Span<const T> TransientData::AccessAs() const
 {
-    if(typeHash != typeid(T).hash_code())
-       throw MRayError("TransientData(AccessAs): Object did constructed with this type!");
-
+    if constexpr(EnableTypeCheck)
+    {
+        if(typeHash != typeid(T).hash_code())
+            throw MRayError("TransientData(AccessAs): Object did constructed with this type!");
+    }
     return Span<const T>(std::launder(reinterpret_cast<T*>(ownedMem.data())),
                          usedBytes / sizeof(T));
 }
@@ -73,9 +78,11 @@ inline Span<const T> TransientData::AccessAs() const
 template<ImplicitLifetimeC T>
 inline Span<T> TransientData::AccessAs()
 {
-    if(typeHash != typeid(T).hash_code())
-       throw MRayError("TransientData(AccessAs): Object did constructed with this type!");
-
+    if constexpr(EnableTypeCheck)
+    {
+        if(typeHash != typeid(T).hash_code())
+            throw MRayError("TransientData(AccessAs): Object did constructed with this type!");
+    }
     return Span<T>(std::launder(reinterpret_cast<T*>(ownedMem.data())),
                     usedBytes / sizeof(T));
 }
@@ -98,8 +105,21 @@ inline Span<Byte> TransientData::AccessAs()
 
 // Strings are special, assume as char array
 // count should be the count of
-template<StringC T>
-inline TransientData::TransientData(std::in_place_type_t<T>, size_t charCount)
+template<>
+inline TransientData::TransientData(std::in_place_type_t<std::string>,
+                                    size_t charCount)
+    : typeHash(typeid(std::string).hash_code())
+    , usedBytes(0)
+    , alignment(alignof(typename std::string::value_type))
+{
+    using CharType = typename std::string::value_type;
+    Byte* ptr = reinterpret_cast<Byte*>(mainR.allocate(charCount * sizeof(CharType), alignof(CharType)));
+    ownedMem = Span<Byte>(ptr, charCount * sizeof(CharType));
+}
+
+template<>
+inline TransientData::TransientData(std::in_place_type_t<std::string_view>,
+                                    size_t charCount)
     : typeHash(typeid(std::string).hash_code())
     , usedBytes(0)
     , alignment(alignof(typename std::string::value_type))
@@ -112,10 +132,13 @@ inline TransientData::TransientData(std::in_place_type_t<T>, size_t charCount)
 template<StringC T>
 inline void TransientData::Push(Span<const T, 1> str)
 {
-    if(typeHash != typeid(std::string).hash_code() &&
-       typeHash != typeid(std::string_view).hash_code())
-        throw MRayError("TransientData(Push): Object did constructed with "
-                        "either std::string or std::string_view!");
+    if constexpr(EnableTypeCheck)
+    {
+        if(typeHash != typeid(std::string).hash_code() &&
+           typeHash != typeid(std::string_view).hash_code())
+            throw MRayError("TransientData(Push): Object did constructed with "
+                            "either std::string or std::string_view!");
+    }
 
     size_t writeSize = str[0].size();
     if((writeSize + usedBytes) > ownedMem.size())
@@ -128,21 +151,26 @@ inline void TransientData::Push(Span<const T, 1> str)
 
 inline std::string_view TransientData::AccessAsString() const
 {
-    if(typeHash != typeid(std::string).hash_code() &&
-       typeHash != typeid(std::string_view).hash_code())
-       throw MRayError("TransientData(AccessAsString): Object did constructed with "
-                       "either std::string or std::string_view!");
+    if constexpr(EnableTypeCheck)
+    {
+        if(typeHash != typeid(std::string).hash_code() &&
+           typeHash != typeid(std::string_view).hash_code())
+            throw MRayError("TransientData(AccessAsString): Object did constructed with "
+                            "either std::string or std::string_view!");
+    }
 
     return std::string_view(reinterpret_cast<char*>(ownedMem.data()), usedBytes);
 }
 
 inline std::string_view TransientData::AccessAsString()
 {
-    if(typeHash != typeid(std::string).hash_code() &&
-       typeHash != typeid(std::string_view).hash_code())
-        throw MRayError("TransientData(AccessAsString): Object did constructed with "
-                        "either std::string or std::string_view!");
-
+    if constexpr(EnableTypeCheck)
+    {
+        if(typeHash != typeid(std::string).hash_code() &&
+           typeHash != typeid(std::string_view).hash_code())
+            throw MRayError("TransientData(AccessAsString): Object did constructed with "
+                            "either std::string or std::string_view!");
+    }
     return std::string_view(reinterpret_cast<char*>(ownedMem.data()), usedBytes);
 }
 

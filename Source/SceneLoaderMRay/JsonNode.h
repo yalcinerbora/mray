@@ -145,6 +145,7 @@ class JsonNode
     T                       AccessData(std::string_view name) const;
     template<class T>
     TransientData           AccessDataArray(std::string_view name) const;
+    size_t                  AccessDataArraySize(std::string_view name) const;
     // Optional Data
     template<class T>
     Optional<T>             AccessOptionalData(std::string_view name) const;
@@ -152,9 +153,8 @@ class JsonNode
     Optional<TransientData> AccessOptionalDataArray(std::string_view name) const;
     // Texturable (either data T, or texture struct)
     template<class T>
-    Variant<NodeTexStruct, T>               AccessTexturableData(std::string_view name) const;
-    template<class T>
-    std::vector<Variant<NodeTexStruct, T>>  AccessTexturableDataArray(std::string_view name) const;
+    Variant<NodeTexStruct, T>   AccessTexturableData(std::string_view name) const;
+    Optional<NodeTexStruct>     AccessOptionalTexture(std::string_view name) const;
 };
 
 #include "JsonNode.hpp"

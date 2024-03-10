@@ -22,6 +22,9 @@ MRAY_TRANSIENT_POOL_ENTRYPOINT extern void TransientPoolDestroyCallback(void* pt
 namespace TransientPoolDetail
 {
 
+// TODO: Make this Preprocessor def
+static constexpr bool EnableTypeCheck = true;
+
 template <class T>
 concept StringC = std::disjunction_v
 <
@@ -59,11 +62,12 @@ class TransientData
     // =========================== //
     //    String Specialization    //
     // =========================== //
-    template<StringC T>
-                        TransientData(std::in_place_type_t<T>,
-                                      size_t charCount);
+    //template<StringC T>
+    //                    TransientData(std::in_place_type_t<T>,
+    //                                  size_t charCount);
     template<StringC T>
     void                Push(Span<const T, 1>);
+
     std::string_view    AccessAsString() const;
     std::string_view    AccessAsString();
 };

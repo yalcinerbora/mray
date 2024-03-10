@@ -145,7 +145,8 @@ void TransformGroupMulti::CommitReservations()
     //auto [t, it, bt22, bit22] =
     auto [t, it, batchT, batchInvT] =
         GenericCommit<Matrix4x4, Matrix4x4,
-                      Span<const Matrix4x4>, Span<const Matrix4x4>>({true, true, true, true});
+                      Span<const Matrix4x4>,
+                      Span<const Matrix4x4>>({true, true, true, true});
     transforms = t;
     invTransforms = it;
     batchedTransforms = batchT;

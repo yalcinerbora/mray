@@ -5,6 +5,7 @@
 #include "Definitions.h"
 #include "Vector.h"
 #include "MRayDataType.h"
+#include "DataStructures.h"
 
 #define MRAY_GENERIC_ID(NAME, TYPE) enum class NAME : TYPE {}
 
@@ -30,6 +31,7 @@ enum class PrimitiveAttributeLogic
 namespace TracerConstants
 {
     static constexpr size_t MaxPrimBatchPerSurface = 8;
+    static constexpr size_t MaxAttributePerGroup = 16;
 }
 
 enum class AcceleratorType
@@ -48,8 +50,8 @@ enum class AttributeOptionality
 enum class AttributeTexturable
 {
     MR_CONSTANT_ONLY,
-    MR_TEXTURE_OR_CONSTANT,
-    MR_TEXTURE_ONLY,
+    MR_TEXTURABLE,
+    MR_OPTIONAL_TEXTURE
 };
 
 enum class AttributeIsArray
@@ -65,7 +67,7 @@ struct GenericAttributeInfo : public Tuple<std::string, MRayDataTypeRT,
     using Base = Tuple<std::string, MRayDataTypeRT,
                        AttributeIsArray, AttributeOptionality>;
     using Base::Base;
-    enum
+    enum E
     {
         LOGIC_INDEX         = 0,
         LAYOUT_INDEX        = 1,
@@ -82,7 +84,7 @@ struct TexturedAttributeInfo : public Tuple<std::string, MRayDataTypeRT,
                        AttributeIsArray, AttributeOptionality,
                        AttributeTexturable>;
     using Base::Base;
-    enum
+    enum E
     {
         LOGIC_INDEX         = 0,
         LAYOUT_INDEX        = 1,
@@ -91,8 +93,11 @@ struct TexturedAttributeInfo : public Tuple<std::string, MRayDataTypeRT,
         TEXTURABLE_INDEX    = 4
     };
 };
-using GenericAttributeInfoList = std::vector<GenericAttributeInfo>;
-using TexturedAttributeInfoList = std::vector<TexturedAttributeInfo>;
+
+using GenericAttributeInfoList = StaticVector<GenericAttributeInfo,
+                                              TracerConstants::MaxAttributePerGroup>;
+using TexturedAttributeInfoList = StaticVector<TexturedAttributeInfo,
+                                               TracerConstants::MaxAttributePerGroup>;
 
 using TypeNameList = std::vector<std::string>;
 
@@ -158,27 +163,28 @@ MRAY_GENERIC_ID(TextureId, uint32_t);
 MRAY_GENERIC_ID(TransGroupId, uint32_t);
 MRAY_GENERIC_ID(TransformId, uint32_t);
 using TransAttributeInfo = GenericAttributeInfo;
-using TransAttributeInfoList = std::vector<TransAttributeInfo>;
+using TransAttributeInfoList = GenericAttributeInfoList;
 // Light Related
 MRAY_GENERIC_ID(LightGroupId, uint32_t);
 MRAY_GENERIC_ID(LightId, uint32_t);
-using LightAttributeInfo = GenericAttributeInfo;
-using LightAttributeInfoList = std::vector<LightAttributeInfo>;
+using LightAttributeInfo = TexturedAttributeInfo;
+using LightAttributeInfoList = TexturedAttributeInfoList;
 // Camera Related
 MRAY_GENERIC_ID(CameraGroupId, uint32_t);
 MRAY_GENERIC_ID(CameraId, uint32_t);
 using CamAttributeInfo = GenericAttributeInfo;
-using CamAttributeInfoList = std::vector<CamAttributeInfo>;
+using CamAttributeInfoList = GenericAttributeInfoList;
 // Material Related
 MRAY_GENERIC_ID(MatGroupId, uint32_t);
 MRAY_GENERIC_ID(MaterialId, uint32_t);
 using MatAttributeInfo = TexturedAttributeInfo;
-using MatAttributeInfoList = std::vector<MatAttributeInfo>;
+using MatAttributeInfoList = TexturedAttributeInfoList;
 // Medium Related
 MRAY_GENERIC_ID(MediumGroupId, uint32_t);
 MRAY_GENERIC_ID(MediumId, uint32_t);
+using MediumPair = Pair<MediumId, MediumId>;
 using MediumAttributeInfo = TexturedAttributeInfo;
-using MediumAttributeInfoList = std::vector<MediumAttributeInfo>;
+using MediumAttributeInfoList = TexturedAttributeInfoList;
 // Surface Related
 MRAY_GENERIC_ID(SurfaceId, uint32_t);
 MRAY_GENERIC_ID(LightSurfaceId, uint32_t);
@@ -190,13 +196,15 @@ using CullBackfaceFlagList = std::array<bool, TracerConstants::MaxPrimBatchPerSu
 // Renderer Related
 MRAY_GENERIC_ID(RendererId, uint32_t);
 using RendererAttributeInfo = GenericAttributeInfo;
-using RendererAttributeInfoList = std::vector<GenericAttributeInfo>;
+using RendererAttributeInfoList = GenericAttributeInfoList;
 
 using MaterialIdList    = std::vector<MaterialId>;
 using TransformIdList   = std::vector<TransformId>;
 using MediumIdList      = std::vector<MediumId>;
 using LightIdList       = std::vector<LightId>;
 using CameraIdList      = std::vector<CameraId>;
+
+using AttributeCountList = StaticVector<size_t, TracerConstants::MaxAttributePerGroup>;
 
 namespace TracerConstants
 {
@@ -206,6 +214,7 @@ namespace TracerConstants
     static constexpr TransformId IdentityTransformId    = TransformId(0);
     static constexpr PrimGroupId EmptyPrimitive         = PrimGroupId{0};
     static constexpr PrimBatchId EmptyPrimBatch         = PrimBatchId{0};
+    static constexpr MediumPair  VacuumMediumPair       = std::make_pair(VacuumMediumId, VacuumMediumId);
 
     static constexpr auto NoAlphaMapList = OptionalAlphaMapList
     {
@@ -264,9 +273,8 @@ class [[nodiscard]] TracerI
     // Generates the primitive group
     // Only single primitive group per type can be available in a tracer
     virtual PrimGroupId     CreatePrimitiveGroup(std::string typeName) = 0;
-    virtual PrimBatchId     ReservePrimitiveBatch(PrimGroupId, PrimCount) = 0;
-    virtual PrimBatchIdList ReservePrimitiveBatches(PrimGroupId,
-                                                    std::vector<PrimCount> primitiveCounts) = 0;
+    virtual PrimBatchId     ReservePrimitiveBatch(PrimGroupId, AttributeCountList) = 0;
+    virtual PrimBatchIdList ReservePrimitiveBatches(PrimGroupId, std::vector<AttributeCountList>) = 0;
     // Commit (The actual allocation will occur here)
     virtual void            CommitPrimReservations(PrimGroupId) = 0;
     virtual bool            IsPrimCommitted(PrimGroupId) const = 0;
@@ -281,10 +289,12 @@ class [[nodiscard]] TracerI
     //================================//
     //            Material            //
     //================================//
-    virtual MatGroupId  CreateMaterialGroup(std::string typeName) = 0;
-    virtual MaterialId  ReserveMaterial(MatGroupId,
-                                        MediumId frontMedium = TracerConstants::VacuumMediumId,
-                                        MediumId backMedium = TracerConstants::VacuumMediumId) = 0;
+    virtual MatGroupId      CreateMaterialGroup(std::string typeName) = 0;
+    virtual MaterialId      ReserveMaterial(MatGroupId, AttributeCountList,
+                                            MediumPair = TracerConstants::VacuumMediumPair) = 0;
+    virtual MaterialIdList  ReserveMaterials(MatGroupId,
+                                             std::vector<AttributeCountList>,
+                                             std::vector<MediumPair>) = 0;
     //
     virtual void        CommitMatReservations(MatGroupId) = 0;
     virtual bool        IsMatCommitted(MatGroupId) const = 0;
@@ -292,6 +302,10 @@ class [[nodiscard]] TracerI
     virtual void        PushMatAttribute(MatGroupId, Vector2ui range,
                                          uint32_t attributeIndex,
                                          TransientData data) = 0;
+    virtual void        PushMatAttribute(MatGroupId, Vector2ui range,
+                                         uint32_t attributeIndex,
+                                         TransientData data,
+                                         std::vector<Optional<TextureId>>) = 0;
     virtual void        PushMatAttribute(MatGroupId, Vector2ui range,
                                          uint32_t attributeIndex,
                                          std::vector<TextureId>) = 0;
@@ -318,7 +332,8 @@ class [[nodiscard]] TracerI
     //          Transform             //
     //================================//
     virtual TransGroupId    CreateTransformGroup(std::string typeName) = 0;
-    virtual TransformIdList ReserveTransformations(TransGroupId, uint32_t count) = 0;
+    virtual TransformId     ReserveTransformation(TransGroupId, AttributeCountList) = 0;
+    virtual TransformIdList ReserveTransformations(TransGroupId, std::vector<AttributeCountList>) = 0;
     //
     virtual void            CommitTransReservations(TransGroupId) = 0;
     virtual bool            IsTransCommitted(TransGroupId) const = 0;
@@ -332,8 +347,11 @@ class [[nodiscard]] TracerI
     // Analytical / Primitive-backed Lights
     virtual LightGroupId    CreateLightGroup(std::string typeName,
                                              PrimGroupId = TracerConstants::EmptyPrimitive) = 0;
-    virtual LightIdList     ReserveLights(LightGroupId,
-                                          PrimBatchId = TracerConstants::EmptyPrimBatch) = 0;
+    virtual LightId         ReserveLight(LightGroupId, AttributeCountList,
+                                         PrimBatchId = TracerConstants::EmptyPrimBatch) = 0;
+    virtual LightId         ReserveLights(LightGroupId,
+                                          std::vector<AttributeCountList>,
+                                          std::vector<PrimBatchId> = std::vector<PrimBatchId>{}) = 0;
     //
     virtual void            CommitLightReservations(LightGroupId) = 0;
     virtual bool            IsLightCommitted(LightGroupId) const = 0;
@@ -343,12 +361,18 @@ class [[nodiscard]] TracerI
                                                TransientData data) = 0;
     virtual void            PushLightAttribute(LightGroupId, Vector2ui range,
                                                uint32_t attributeIndex,
+                                               TransientData,
+                                               std::vector<Optional<TextureId>>) = 0;
+    virtual void            PushLightAttribute(LightGroupId, Vector2ui range,
+                                               uint32_t attributeIndex,
                                                std::vector<TextureId>) = 0;
+
     //================================//
     //           Cameras              //
     //================================//
     virtual CameraGroupId   CreateCameraGroup(std::string typeName) = 0;
-    virtual CameraIdList    ReserveCameras(CameraGroupId, uint32_t count) = 0;
+    virtual CameraId        ReserveCamera(CameraGroupId, AttributeCountList) = 0;
+    virtual CameraIdList    ReserveCameras(CameraGroupId, std::vector<AttributeCountList>) = 0;
     //
     virtual void            CommitCamReservations(CameraGroupId) = 0;
     virtual bool            IsCamCommitted(CameraGroupId) const = 0;
@@ -360,7 +384,8 @@ class [[nodiscard]] TracerI
     //            Medium              //
     //================================//
     virtual MediumGroupId   CreateMediumGroup(std::string typeName) = 0;
-    virtual MediumIdList    ReserveMediums(MediumGroupId, uint32_t count) = 0;
+    virtual MediumId        ReserveMedium(MediumGroupId, AttributeCountList) = 0;
+    virtual MediumIdList    ReserveMediums(MediumGroupId, std::vector<AttributeCountList>) = 0;
     //
     virtual void            CommitMediumReservations(MediumGroupId) = 0;
     virtual bool            IsMediumCommitted(MediumGroupId) const = 0;
@@ -370,7 +395,12 @@ class [[nodiscard]] TracerI
                                                 TransientData data) = 0;
     virtual void            PushMediumAttribute(MediumGroupId, Vector2ui range,
                                                 uint32_t attributeIndex,
+                                                TransientData,
+                                                std::vector<Optional<TextureId>> textures) = 0;
+    virtual void            PushMediumAttribute(MediumGroupId, Vector2ui range,
+                                                uint32_t attributeIndex,
                                                 std::vector<TextureId> textures) = 0;
+
     //================================//
     //     Accelerator & Surfaces     //
     //================================//

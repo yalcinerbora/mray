@@ -21,11 +21,129 @@
 
 #include "JsonNode.h"
 
-static void LoadPrimitive(TracerI& tracer,
-                          PrimGroupId groupId,
-                          PrimBatchId batchId,
-                          uint32_t meshInternalIndex,
-                          const MeshFileI* meshFile)
+
+
+template<class GroupId>
+Optional<TransientData> GenericAttributeLoad(const JsonNode& node,
+                                             const GenericAttributeInfo& attribInfo)
+{
+    Optional<TransientData> result;
+
+    using enum GenericAttributeInfo::E;
+    std::string name = std::get<LOGIC_INDEX>(attrib);
+    MRayDataTypeRT layout = std::get<LAYOUT_INDEX>(attrib);
+    bool isArray = (std::get<IS_ARRAY_INDEX>(attrib) ==
+                    AttributeIsArray::IS_ARRAY);
+    bool isOptional = (std::get<OPTIONALITY_INDEX>(attrib) ==
+                        AttributeOptionality::MR_OPTIONAL);
+
+    auto r = std::visit([&](auto&& dataType) -> Optional<TransientData>
+    {
+        using T = std::remove_cvref_t<decltype(dataType)>::Type;
+
+        if(isArray && isOptional)
+        {
+            return node.AccessOptionalDataArray<T>(name);
+        }
+        else if(isArray && !isOptional)
+        {
+            return node.AccessDataArray<T>(name);
+        }
+        else if(!isArray && isOptional)
+        {
+            TransientData result(std::in_place_type_t<T>{}, 1);
+            Optional<T> r = node.AccessOptionalData<T>(name);
+            if(!r.has_value()) return std::nullopt;
+
+            T val = r.value();
+            result.Push<T>(Span<const T, 1>(&val, 1));
+            return std::move(result);
+        }
+        else
+        {
+            TransientData result(std::in_place_type_t<T>{}, 1);
+            T val = node.AccessData<T>(name);
+            result.Push<T>(Span<const T, 1>(&val, 1));
+            return std::move(result);
+        }
+    }, layout);
+
+    return r;
+}
+
+template<class AttributeInfoType>
+void GenericJsonLoad(TransientData& dataOut,
+                     std::vector<Optional<NodeTexStruct>>& texOut,
+                     const AttributeInfoType& attrib, const JsonNode& node)
+{
+    using enum AttributeInfoType::E;
+    std::string name = std::get<LOGIC_INDEX>(attrib);
+    MRayDataTypeRT layout = std::get<LAYOUT_INDEX>(attrib);
+    bool isArray = (std::get<IS_ARRAY_INDEX>(attrib) ==
+                    AttributeIsArray::IS_ARRAY);
+    bool isOptional = (std::get<OPTIONALITY_INDEX>(attrib) ==
+                        AttributeOptionality::MR_OPTIONAL);
+    bool isTexturable = false;
+    if constexpr(std::is_same_v<AttributeInfoType, TexturedAttributeInfo>)
+        isTexturable = (std::get<TEXTURABLE_INDEX>(attrib) !=
+                        AttributeTexturable::MR_CONSTANT_ONLY);
+
+    bool isOptionalTexture = false;
+    if constexpr(std::is_same_v<AttributeInfoType, TexturedAttributeInfo>)
+        isOptionalTexture = (std::get<TEXTURABLE_INDEX>(attrib) ==
+                             AttributeTexturable::MR_OPTIONAL_TEXTURE);
+
+    auto r = std::visit([&](auto&& dataType) -> void
+    {
+        using T = std::remove_cvref_t<decltype(dataType)>::Type;
+
+        if(isTexturable)
+        {
+            using NTS = NodeTexStruct;
+            if(isOptionalTexture)
+                texOut.push_back(node.AccessOptionalTexture(name));
+            else
+            {
+                Variant<NTS, T> result = node.AccessTexturableData<T>(name);
+                if(std::holds_alternative<T>())
+                {
+                    texOut.push_back(std::nullopt);
+                    dataOut.Push(Span<const T>(&std::get<T>(result), 1))
+                }
+                else
+                {
+                    T _{};
+                    texOut.push_back(std::get<NTS>(result));
+                    dataOut.Push(Span<const T>(&_, 1))
+                }
+            }
+        }
+        else if(isArray)
+        {
+            Optional<TransientData> result;
+            result = (isOptional)
+                        ? node.AccessOptionalDataArray<T>(name)
+                        : node.AccessDataArray<T>(name);
+            if(result.has_value())
+                dataOut.Push(ToConstSpan(ToSpan<T>(result.value())));
+        }
+        else
+        {
+            Optional<T> result;
+            result = (isOptional)
+                        ? node.AccessOptionalData<T>(name)
+                        : node.AccessData<T>(name);
+            if(result.has_value())
+                dataOut.Push<T>(Span<const T>(&result.value(), 1));
+        }
+    }, layout);
+}
+
+void LoadPrimitive(TracerI& tracer,
+                   PrimGroupId groupId,
+                   PrimBatchId batchId,
+                   uint32_t meshInternalIndex,
+                   const MeshFileI* meshFile)
 {
     using enum PrimitiveAttributeLogic;
     const auto& attributeList = tracer.AttributeInfo(groupId);
@@ -240,20 +358,20 @@ template<class Loader, class IdType>
 void LoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, IdType>>& outputMappings,
                 typename SceneLoaderMRay::ExceptionList& exceptions,
                 const typename SceneLoaderMRay::TypeMappedNodes& nodes,
+                BS::thread_pool& threadPool,
                 Loader&& loader)
 {
-    static_assert(std::is_same_v<IdType, typename Loader::IdType>);
-    using GroupIdType = typename Loader::GroupIdType;
-    using PerGroupList = std::vector<Pair<uint32_t, IdType>>;
-    using IdList = std::vector<IdType>;
+    using GroupIdType   = typename Loader::GroupIdType;
+    using IdPair        = Pair<uint32_t, IdType>;
+    using PerGroupList  = std::vector<IdPair>;
+    using IdList        = std::vector<IdType>;
 
-    for(const auto& node : nodes)
+    for(const auto& [typeName, nodes] : nodeLists)
     {
-        const uint32_t groupEntityCount = static_cast<uint32_t>(m.second.size());
+        const uint32_t groupEntityCount = static_cast<uint32_t>(nodes.size());
         auto groupEntityList = std::make_shared<PerGroupList>(groupEntityCount);
 
-        std::string_view entityTypeName = m.first;
-        GroupIdType groupId = loader.CreateGroup(std::string(entityTypeName));
+        GroupIdType groupId = loader.CreateGroup(std::string(typeName));
 
         // Construct Barrier
         auto BarrierFunc = [groupId, &loader]() noexcept
@@ -272,17 +390,20 @@ void LoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, IdType>>
 
         auto future = threadPool.submit_blocks(std::size_t(0), std::size_t(groupEntityCount),
         // Copy the shared pointers, capture by reference the rest
-        [&, this, barrier, groupEntityList](size_t start, size_t end)
+        [&, barrier, groupEntityList](size_t start, size_t end)
         {
-            size_t localEntityCount = start - end;
+            size_t localCount = start - end;
+            auto nodeRange = Span<const JsonNode>(nodes.cbegin() + start, localCount);
+            IdList generatedIds;
             try
             {
-                IdList generatedIds = loader.ReserveEntities(groupId, localEntityCount);
+                generatedIds = loader.ReserveEntities(groupId, nodeRange);
                 for(size_t i = start; i < end; i++)
                 {
                     size_t localI = i - start;
-                    const auto& groupList = *groupEntityList;
-                    groupList[i] = std::make_pair(m.second[i].Id(), generatedIds[localI]);
+                    auto& groupList = *groupEntityList;
+                    groupList[i] = std::make_pair(nodes[i].Id(),
+                                                  generatedIds[localI]);
                 }
             }
             catch(MRayError& e)
@@ -298,8 +419,7 @@ void LoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, IdType>>
             try
             {
                 const auto& groupList = *groupEntityList;
-                for(size_t i = start; i < end; i++)
-                    loader.LoadEntitiy(groupList[i].second, m.second[i].Id());
+                loader.LoadEntities(groupId, nodeRange, generatedIds);
             }
             catch(MRayError& e)
             {
@@ -312,13 +432,13 @@ void LoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, IdType>>
         FutureSharedPtr futureShared = std::make_shared<BS::multi_future<void>>(std::move(future));
 
         // Issue a one final task that pushes the primitives to the global map
-        threadPool.detach_task([&, this, future = futureShared, groupEntityList]()
+        threadPool.detach_task([&, future = futureShared, groupEntityList]()
         {
             // Wait other tasks to complere
             future->wait();
             // After this point groupBatchList is fully loaded
             std::scoped_lock lock(outputMappings.mutex);
-            matMappings.map.insert(groupEntityList->cbegin(), groupEntityList->cend());
+            outputMappings.map.insert(groupEntityList->cbegin(), groupEntityList->cend());
         });
     }
 }
@@ -361,7 +481,6 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
         // TODO: check if we twice opening is bottleneck?
         // We are opening here to determining size/format
         // and on the other iteration we actual memcpy it
-        size_t localTextureCount = end - start;
         try
         {
             for(size_t i = start; i < end; i++)
@@ -459,11 +578,24 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
 
 void SceneLoaderMRay::LoadMediums(TracerI& tracer, ExceptionList& exceptions)
 {
+    struct AttribData
+    {
+        bool isTextured;
+        bool isOptional;
+        bool isArray;
+        TransientData d;
+        std::vector<Optional<NodeTexStruct>> a;
+    };
+
     // Rare usage of in-function class
     struct MediumLoader
     {
+        public:
+        using GroupIdType = MediumGroupId;
+
         private:
-        TracerI& tracer;
+        TracerI&            tracer;
+
 
         public:
         MediumLoader(TracerI& t) : tracer(t) {}
@@ -475,118 +607,143 @@ void SceneLoaderMRay::LoadMediums(TracerI& tracer, ExceptionList& exceptions)
         {
             return tracer.CommitMediumReservations(groupId);
         }
-        std::vector<MediumId> ReserveEntities(MediumGroupId groupId, uint32_t count)
+        MediumIdList ReserveEntities(MediumGroupId groupId, Span<const JsonNode> nodes)
         {
-            return tracer.ReserveMediums(groupId, count);
+            return tracer.ReserveMediums(groupId, nodes.size());
         }
-        void LoadEntitiy(MediumGroupId groupId, MediumId id, const JsonNode& node)
+        void LoadEntitiy(MediumGroupId groupId,
+                         Span<const JsonNode> nodes,
+                         const MediumIdList& idList)
         {
-            // Test
-            Vector2ui range = Vector2ui(static_cast<uint32_t>(id),
-                                        static_cast<uint32_t>(id) + 1);
-            TransientData test(std::in_place_type_t<Vector3>{}, 1);
-            tracer.PushMediumAttribute(groupId, range, 0, std::move(test));
+            assert(nodes.size() == idList.size());
+            MediumAttributeInfoList list = tracer.AttributeInfo(groupId);
+            std::vector<AttribData> data(list.size());
+            for(size_t i = 0; i < nodes.size(); i++)
+            {
+                const JsonNode& node = nodes[i];
+                MediumId id = idList[i];
+
+                for(const MediumAttributeInfo& attrib : list)
+                {
+                    GenericJsonLoad()...;
+                }
+
+            }
+
+            tracer.Push
         }
     };
 
-    LoadGroups(mediumMappings, exceptions, mediumNodes, MediumLoader(tracer));
+    LoadGroups(mediumMappings, exceptions, mediumNodes,
+               threadPool, MediumLoader(tracer));
 }
 
 void SceneLoaderMRay::LoadMaterials(TracerI& tracer, ExceptionList& exceptions)
 {
-    // Issue loads to the thread pool
-    for(const auto& m : materialNodes)
-    {
-        uint32_t groupMatCount = static_cast<uint32_t>(m.second.size());
-        using GroupMaterialList = std::vector<Pair<uint32_t, MaterialId>>;
-        auto groupMatList = std::make_shared<GroupMaterialList>(groupMatCount);
+    //// Issue loads to the thread pool
+    //for(const auto& m : materialNodes)
+    //{
+    //    uint32_t groupMatCount = static_cast<uint32_t>(m.second.size());
+    //    using GroupMaterialList = std::vector<Pair<uint32_t, MaterialId>>;
+    //    auto groupMatList = std::make_shared<GroupMaterialList>(groupMatCount);
 
-        std::string_view matTypeName = m.first;
-        MatGroupId groupId = tracer.CreateMaterialGroup(std::string(matTypeName));
+    //    std::string_view matTypeName = m.first;
+    //    MatGroupId groupId = tracer.CreateMaterialGroup(std::string(matTypeName));
 
-        // Construct Barrier
-        auto BarrierFunc = [groupId, groupMatList, &tracer]() noexcept
-        {
-            // When barrier completed
-            // Reserve the space for mappings
-            // Commit mat group reservations
-            tracer.CommitMatReservations(groupId);
-        };
-        // Determine the thread size
-        uint32_t threadCount = std::min(threadPool.get_thread_count(),
-                                        groupMatCount);
+    //    // Construct Barrier
+    //    auto BarrierFunc = [groupId, groupMatList, &tracer]() noexcept
+    //    {
+    //        // When barrier completed
+    //        // Reserve the space for mappings
+    //        // Commit mat group reservations
+    //        tracer.CommitMatReservations(groupId);
+    //    };
+    //    // Determine the thread size
+    //    uint32_t threadCount = std::min(threadPool.get_thread_count(),
+    //                                    groupMatCount);
 
-        using Barrier = std::barrier<decltype(BarrierFunc)>;
-        auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
+    //    using Barrier = std::barrier<decltype(BarrierFunc)>;
+    //    auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
 
-        auto future = threadPool.submit_blocks(std::size_t(0), m.second.size(),
-        // Copy the shared pointers, capture by reference the rest
-        [&, this, barrier, groupMatList](size_t start, size_t end)
-        {
-            try
-            {
-                for(size_t i = start; i < end; i++)
-                {
-                    // Each material optionally express medium interface
-                    // that are seperating???
-                    using namespace NodeNames;
-                    const JsonNode& node = m.second[i];
-                    auto mediumFront = node.AccessOptionalData<uint32_t>(MAT_NODE_MEDIUM_FRONT);
-                    auto mediumBack = node.AccessOptionalData<uint32_t>(MAT_NODE_MEDIUM_BACK);
+    //    auto future = threadPool.submit_blocks(std::size_t(0), m.second.size(),
+    //    // Copy the shared pointers, capture by reference the rest
+    //    [&, this, barrier, groupMatList](size_t start, size_t end)
+    //    {
+    //        try
+    //        {
+    //            for(size_t i = start; i < end; i++)
+    //            {
+    //                //// Each material optionally express medium interface
+    //                //// that are seperating???
+    //                //using namespace NodeNames;
+    //                //const JsonNode& node = m.second[i];
+    //                //auto mediumFront = node.AccessOptionalData<uint32_t>(MAT_NODE_MEDIUM_FRONT);
+    //                //auto mediumBack = node.AccessOptionalData<uint32_t>(MAT_NODE_MEDIUM_BACK);
 
-                    mediumMappings.map.
+    //                //mediumMappings.map.
 
-                    MaterialId mId = tracer.ReserveMaterial(groupId,
-                                                            );
-                    (*groupMatList)[i] = std::make_pair(nodeId(), mId);
+    //                //MaterialId mId = tracer.ReserveMaterial(groupId,
+    //                //                                        );
+    //                //(*groupMatList)[i] = std::make_pair(nodeId(), mId);
 
-                }
-            }
-            catch(MRayError& e)
-            {
-                exceptions.AddException(std::move(e));
-                barrier->arrive_and_drop();
-                return;
-            }
+    //            }
+    //        }
+    //        catch(MRayError& e)
+    //        {
+    //            exceptions.AddException(std::move(e));
+    //            barrier->arrive_and_drop();
+    //            return;
+    //        }
 
-            // Commit barrier
-            barrier->arrive_and_wait();
-            // Material Group is committed, we can issue writes to it now
-            try
-            {
-                for(size_t i = start; i < end; i++)
-                {
-                    ..............
-                }
-            }
-            catch(MRayError& e)
-            {
-                exceptions.AddException(std::move(e));
-            }
-        }, threadCount);
+    //        // Commit barrier
+    //        barrier->arrive_and_wait();
+    //        // Material Group is committed, we can issue writes to it now
+    //        try
+    //        {
+    //            for(size_t i = start; i < end; i++)
+    //            {
+    //                //..............
+    //            }
+    //        }
+    //        catch(MRayError& e)
+    //        {
+    //            exceptions.AddException(std::move(e));
+    //        }
+    //    }, threadCount);
 
-        // Move future to shared_ptr
-        using FutureSharedPtr = std::shared_ptr<BS::multi_future<void>>;
-        FutureSharedPtr futureShared = std::make_shared<BS::multi_future<void>>(std::move(future));
+    //    // Move future to shared_ptr
+    //    using FutureSharedPtr = std::shared_ptr<BS::multi_future<void>>;
+    //    FutureSharedPtr futureShared = std::make_shared<BS::multi_future<void>>(std::move(future));
 
-        // Issue a one final task that pushes the primitives to the global map
-        threadPool.detach_task([&, this, future = futureShared, groupMatList]()
-        {
-            // Wait other tasks to complere
-            future->wait();
-            // After this point groupBatchList is fully loaded
-            std::scoped_lock lock(matMappings.mutex);
-            matMappings.map.insert(groupMatList->flatMaterials.cbegin(),
-                                   groupMatList->flatMaterials.cend());
-        });
-    }
+    //    // Issue a one final task that pushes the primitives to the global map
+    //    threadPool.detach_task([&, this, future = futureShared, groupMatList]()
+    //    {
+    //        // Wait other tasks to complere
+    //        future->wait();
+    //        // After this point groupBatchList is fully loaded
+    //        std::scoped_lock lock(matMappings.mutex);
+    //        matMappings.map.insert(groupMatList->flatMaterials.cbegin(),
+    //                               groupMatList->flatMaterials.cend());
+    //    });
+    //}
 }
 
 void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ExceptionList& exceptions)
 {
+    struct A
+    {
+
+    };
+
+    thread_local uint32_t localAttributeSize = 0;
+
+
     // Rare usage of in-function class
     struct TransformLoader
     {
+        public:
+        using GroupIdType = TransGroupId;
+
         private:
         TracerI& tracer;
 
@@ -596,25 +753,61 @@ void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ExceptionList& exceptions)
         {
             return tracer.CreateTransformGroup(gn);
         }
-        void CommitReservations(MediumGroupId groupId)
+        void CommitReservations(TransGroupId groupId)
         {
-            return tracer.CommitMediumReservations(groupId);
+            return tracer.CommitTransReservations(groupId);
         }
-        std::vector<TransformId> ReserveEntities(TransGroupId groupId, uint32_t count)
+        TransformIdList ReserveEntities(TransGroupId groupId,
+                                        Span<const JsonNode> nodes)
         {
-            return tracer.ReserveTransformations(groupId, count);
+            std::vector<uint32_t> counts;
+            counts.reserve(nodes.size());
+            // Find the first arrayed type in nodes
+            // Accumulate the type
+            // Reserve transforms accordingly
+            TransAttributeInfoList list = tracer.AttributeInfo(groupId);
+            for(const auto& l : list)
+            {
+                using enum AttributeIsArray;
+                using enum TransAttributeInfo::E;
+                if(std::get<IS_ARRAY_INDEX>(l) != IS_ARRAY)
+                    continue;
+                std::string_view name = std::get<LOGIC_INDEX>(l);
+
+                for(const JsonNode& node : nodes)
+                {
+                    size_t count = static_cast<uint32_t>(node.AccessDataArraySize(name));
+                    counts.push_back(count);
+                    localAttributeSize += count;
+                }
+                break;
+            }
+            return tracer.ReserveTransformations(groupId, counts);
         }
         void LoadEntitiy(TransGroupId groupId, TransformId id, const JsonNode& node)
         {
-            Vector2ui range = Vector2ui(static_cast<uint32_t>(id),
-                                        static_cast<uint32_t>(id) + 1);
+            std::vector<Optional<TransientData>> attributeData = GenericLoad(tracer,
+                                                                             groupId,
+                                                                             node);
+            uint32_t attributeIndex = 0;
+            for(auto& data : attributeData)
+            {
+                if(!data.has_value()) continue;
 
-            TransientData test(std::in_place_type_t<Vector3>{}, 1);
-            tracer.PushTransAttribute(groupId, range, 0, std::move(test));
+                Vector2ui range(static_cast<uint32_t>(id),
+                                static_cast<uint32_t>(id) + 1);
+
+                tracer.PushTransAttribute(groupId, range,
+                                          attributeIndex,
+                                          std::move(data.value()));
+                attributeIndex++;
+            }
+
         }
     };
 
-    LoadGroups(mediumMappings, exceptions, mediumNodes, TransformLoader(tracer));
+    LoadGroups(transformMappings, exceptions,
+               transformNodes, threadPool, TransformLoader(tracer));
 }
 
 void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
@@ -694,16 +887,15 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
                        tag == NodeNames::NODE_PRIM_TRI_INDEXED)
                     {
                         using namespace NodeNames;
-                        auto meshFilePtr = std::make_unique<JsonTriangle>(m.second[i],
-                                                                          tag == NODE_PRIM_TRI_INDEXED);
+                        bool isIndexed = (tag == NODE_PRIM_TRI_INDEXED);
+                        auto meshFilePtr = std::make_unique<JsonTriangle>(m.second[i], isIndexed);
                         meshFile = meshFiles.emplace(std::to_string(m.second[i].Id()),
                                                      std::move(meshFilePtr)).first->second.get();
                     }
                     else if(tag == NodeNames::NODE_PRIM_SPHERE)
                     {
                         using namespace NodeNames;
-                        auto meshFilePtr = std::make_unique<JsonSphere>(m.second[i],
-                                                                        tag == NODE_PRIM_TRI_INDEXED);
+                        auto meshFilePtr = std::make_unique<JsonSphere>(m.second[i]);
                         meshFile = meshFiles.emplace(std::to_string(m.second[i].Id()),
                                                      std::move(meshFilePtr)).first->second.get();
                     }
@@ -774,8 +966,8 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
             future->wait();
             // After this point groupBatchList is fully loaded
             std::scoped_lock lock(primMappings.mutex);
-            primMappings.map.insert(groupBatchList->flatGroupBatches.cbegin(),
-                                    groupBatchList->flatGroupBatches.cend());
+            primMappings.map.insert(groupBatchList->cbegin(),
+                                    groupBatchList->cend());
         });
     }
 }
@@ -807,8 +999,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     // of N's and their locations. Then iterate over the M's and create the type
     constexpr uint32_t ARRAY_INDEX = 0;
     constexpr uint32_t INNER_INDEX = 1;
-    constexpr uint32_t IS_MULTI_NODE = 2;
-    using ItemLocation = Tuple<uint32_t, uint32_t, bool>;
+    using ItemLocation = Pair<uint32_t, uint32_t>;
     using ItemLocationMap = std::unordered_map<uint32_t, ItemLocation>;
 
     auto CreateHT = [](ItemLocationMap& result,
@@ -823,18 +1014,13 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
             if(!idNode.is_array())
             {
                 std::get<INNER_INDEX>(itemLoc) = 0;
-                std::get<IS_MULTI_NODE>(itemLoc) = false;
                 result.emplace(idNode.get<uint32_t>(), itemLoc);
             }
-            else
+            else for(uint32_t j = 0; j < idNode.size(); j++)
             {
-                for(uint32_t j = 0; j < idNode.size(); j++)
-                {
-                    const auto& id = idNode[j];
-                    std::get<INNER_INDEX>(itemLoc) = j;
-                    std::get<IS_MULTI_NODE>(itemLoc) = true;
-                    result.emplace(id.get<uint32_t>(), itemLoc);
-                }
+                const auto& id = idNode[j];
+                std::get<INNER_INDEX>(itemLoc) = j;
+                result.emplace(id.get<uint32_t>(), itemLoc);
             }
         }
     };
@@ -929,7 +1115,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
         const auto& location =  it->second;
         uint32_t arrayIndex = std::get<ARRAY_INDEX>(location);
         uint32_t innerIndex = std::get<INNER_INDEX>(location);
-        bool isMultiNode = std::get<IS_MULTI_NODE>(location);
+
         auto node = JsonNode(sceneJson[listName][arrayIndex], innerIndex);
         std::string_view type = node.Type();
         auto result = typeMappings[type].emplace_back(std::move(node));

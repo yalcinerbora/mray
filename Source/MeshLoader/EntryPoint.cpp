@@ -11,7 +11,7 @@ using GeneratorFuncType = std::unique_ptr<BaseType> (*)(Args&&... args);
 template<class BaseType, class Type, class...Args>
 std::unique_ptr<BaseType> GenerateType(Args&&... args)
 {
-    return std::make_unique<BaseType>(new Type(std::forward<Args>(args)...));
+    return std::make_unique<Type>(std::forward<Args>(args)...);
 }
 
 using MeshLoaderPtr = std::unique_ptr<MeshLoaderI>;

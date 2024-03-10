@@ -67,6 +67,7 @@ class SceneLoaderMRay : public SceneLoaderI
     TexTypeMappedNodes  textureNodes;
 
     //Scene id to -> Tracer id maps
+    MutexedMap<TransformIdMappings> transformMappings;
     MutexedMap<MediumIdMappings>    mediumMappings;
     MutexedMap<PrimIdMappings>      primMappings;
     MutexedMap<MaterialIdMappings>  matMappings;
