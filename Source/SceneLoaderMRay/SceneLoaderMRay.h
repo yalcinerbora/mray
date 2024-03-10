@@ -71,6 +71,7 @@ class SceneLoaderMRay : public SceneLoaderI
     MutexedMap<MediumIdMappings>    mediumMappings;
     MutexedMap<PrimIdMappings>      primMappings;
     MutexedMap<MaterialIdMappings>  matMappings;
+    MutexedMap<CamIdMappings>       camMappings;
     TextureIdMappings               texMappings;
 
     static LightSurfaceStruct               LoadBoundary(const nlohmann::json&);

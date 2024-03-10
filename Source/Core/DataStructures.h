@@ -72,7 +72,6 @@ class StratifiedIntegerAliasTable
     uint32_t        FindIndex(T id) const;
 };
 
-
 // A simple lookup table with linear probing.
 // It is a hash table but it is specifically not called hash table
 // since it is not generic, you can not remove data from it.
@@ -174,6 +173,12 @@ class alignas(alignof(T)) StaticVector
     constexpr const T&      back() const;
     constexpr T&            front();
     constexpr const T&      front() const;
+
+    // Don't bother implementing actual iterators pointer should suffice?
+    constexpr T*            begin();
+    constexpr const T*      begin() const;
+    constexpr T*            end();
+    constexpr const T*      end() const;
 
     constexpr size_t        size() const;
     constexpr size_t        isEmpty() const;

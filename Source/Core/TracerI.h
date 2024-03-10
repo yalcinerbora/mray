@@ -50,8 +50,8 @@ enum class AttributeOptionality
 enum class AttributeTexturable
 {
     MR_CONSTANT_ONLY,
-    MR_TEXTURABLE,
-    MR_OPTIONAL_TEXTURE
+    MR_TEXTURE_OR_CONSTANT,
+    MR_TEXTURE_ONLY
 };
 
 enum class AttributeIsArray
@@ -273,8 +273,8 @@ class [[nodiscard]] TracerI
     // Generates the primitive group
     // Only single primitive group per type can be available in a tracer
     virtual PrimGroupId     CreatePrimitiveGroup(std::string typeName) = 0;
-    virtual PrimBatchId     ReservePrimitiveBatch(PrimGroupId, AttributeCountList) = 0;
-    virtual PrimBatchIdList ReservePrimitiveBatches(PrimGroupId, std::vector<AttributeCountList>) = 0;
+    virtual PrimBatchId     ReservePrimitiveBatch(PrimGroupId, PrimCount) = 0;
+    virtual PrimBatchIdList ReservePrimitiveBatches(PrimGroupId, std::vector<PrimCount>) = 0;
     // Commit (The actual allocation will occur here)
     virtual void            CommitPrimReservations(PrimGroupId) = 0;
     virtual bool            IsPrimCommitted(PrimGroupId) const = 0;
@@ -294,7 +294,7 @@ class [[nodiscard]] TracerI
                                             MediumPair = TracerConstants::VacuumMediumPair) = 0;
     virtual MaterialIdList  ReserveMaterials(MatGroupId,
                                              std::vector<AttributeCountList>,
-                                             std::vector<MediumPair>) = 0;
+                                             std::vector<MediumPair> = {}) = 0;
     //
     virtual void        CommitMatReservations(MatGroupId) = 0;
     virtual bool        IsMatCommitted(MatGroupId) const = 0;
@@ -349,7 +349,7 @@ class [[nodiscard]] TracerI
                                              PrimGroupId = TracerConstants::EmptyPrimitive) = 0;
     virtual LightId         ReserveLight(LightGroupId, AttributeCountList,
                                          PrimBatchId = TracerConstants::EmptyPrimBatch) = 0;
-    virtual LightId         ReserveLights(LightGroupId,
+    virtual LightIdList     ReserveLights(LightGroupId,
                                           std::vector<AttributeCountList>,
                                           std::vector<PrimBatchId> = std::vector<PrimBatchId>{}) = 0;
     //
@@ -452,7 +452,7 @@ class [[nodiscard]] TracerI
     virtual void        CommitRendererReservations(RendererId) = 0;
     virtual bool        IsRendererCommitted(RendererId) const = 0;
     virtual void        PushRendererAttribute(RendererId, uint32_t attributeIndex,
-                                              std::vector<Byte> data) = 0;
+                                              TransientData data) = 0;
     //================================//
     //           Rendering            //
     //================================//

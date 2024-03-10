@@ -57,17 +57,25 @@ class TracerMock : public TracerI
                                       Vector2ui subBatchRange,
                                       TransientData data) override;
 
-    MatGroupId  CreateMaterialGroup(std::string typeName) override;
-    MaterialId  ReserveMaterial(MatGroupId, MediumPair = TracerConstants::VacuumMediumPair) override;
-    void        CommitMatReservations(MatGroupId) override;
-    bool        IsMatCommitted(MatGroupId) const override;
-    void        PushMatAttribute(MatGroupId, Vector2ui range,
-                                 uint32_t attributeIndex,
-                                 TransientData data) override;
-    void        PushMatAttribute(MatGroupId, Vector2ui range,
-                                 uint32_t attributeIndex,
-                                 std::vector<TextureId>) override;
+    MatGroupId      CreateMaterialGroup(std::string typeName) override;
+    MaterialId      ReserveMaterial(MatGroupId, AttributeCountList,
+                                    MediumPair = TracerConstants::VacuumMediumPair) override;
+    MaterialIdList  ReserveMaterials(MatGroupId,
+                                     std::vector<AttributeCountList>,
+                                     std::vector<MediumPair> = {}) override;
 
+    void            CommitMatReservations(MatGroupId) override;
+    bool            IsMatCommitted(MatGroupId) const override;
+    void            PushMatAttribute(MatGroupId, Vector2ui range,
+                                     uint32_t attributeIndex,
+                                     TransientData data) override;
+    void            PushMatAttribute(MatGroupId, Vector2ui range,
+                                     uint32_t attributeIndex,
+                                     TransientData,
+                                     std::vector<Optional<TextureId>> textures) override;
+    void            PushMatAttribute(MatGroupId, Vector2ui range,
+                                     uint32_t attributeIndex,
+                                     std::vector<TextureId>) override;
 
     void            CommitTexColorSpace(MRayColorSpaceEnum = MRayColorSpaceEnum::MR_DEFAULT) override;
     TextureId       CreateTexture2D(Vector2ui size, uint32_t mipCount,
@@ -81,8 +89,8 @@ class TracerMock : public TracerI
 
 
     TransGroupId    CreateTransformGroup(std::string typeName) override;
-    TransformId     ReserveTransformation(TransGroupId, uint32_t) override;
-    TransformIdList ReserveTransformations(TransGroupId, std::vector<uint32_t>) override;
+    TransformId     ReserveTransformation(TransGroupId, AttributeCountList) override;
+    TransformIdList ReserveTransformations(TransGroupId, std::vector<AttributeCountList>) override;
     void            CommitTransReservations(TransGroupId) override;
     bool            IsTransCommitted(TransGroupId) const override;
     void            PushTransAttribute(TransGroupId, Vector2ui range,
@@ -92,8 +100,10 @@ class TracerMock : public TracerI
 
     LightGroupId    CreateLightGroup(std::string typeName,
                                      PrimGroupId = TracerConstants::EmptyPrimitive) override;
-    LightIdList     ReserveLights(LightGroupId,
-                                  PrimBatchId = TracerConstants::EmptyPrimBatch) override;
+    LightId         ReserveLight(LightGroupId, AttributeCountList,
+                                 PrimBatchId = TracerConstants::EmptyPrimBatch) override;
+    LightIdList     ReserveLights(LightGroupId, std::vector<AttributeCountList>,
+                                  std::vector<PrimBatchId> = std::vector<PrimBatchId>{}) override;
     void            CommitLightReservations(LightGroupId) override;
     bool            IsLightCommitted(LightGroupId) const override;
     void            PushLightAttribute(LightGroupId, Vector2ui range,
@@ -101,11 +111,16 @@ class TracerMock : public TracerI
                                        TransientData data) override;
     void            PushLightAttribute(LightGroupId, Vector2ui range,
                                        uint32_t attributeIndex,
+                                       TransientData,
+                                       std::vector<Optional<TextureId>> textures) override;
+    void            PushLightAttribute(LightGroupId, Vector2ui range,
+                                       uint32_t attributeIndex,
                                        std::vector<TextureId>) override;
 
 
     CameraGroupId   CreateCameraGroup(std::string typeName) override;
-    CameraIdList    ReserveCameras(CameraGroupId, uint32_t count) override;
+    CameraId        ReserveCamera(CameraGroupId, AttributeCountList) override;
+    CameraIdList    ReserveCameras(CameraGroupId, std::vector<AttributeCountList>) override;
     void            CommitCamReservations(CameraGroupId) override;
     bool            IsCamCommitted(CameraGroupId) const override;
     void            PushCamAttribute(CameraGroupId, Vector2ui range,
@@ -114,12 +129,17 @@ class TracerMock : public TracerI
 
 
     MediumGroupId   CreateMediumGroup(std::string typeName) override;
-    MediumIdList    ReserveMediums(MediumGroupId, uint32_t count) override;
+    MediumId        ReserveMedium(MediumGroupId, AttributeCountList) override;
+    MediumIdList    ReserveMediums(MediumGroupId, std::vector<AttributeCountList>) override;
     void            CommitMediumReservations(MediumGroupId) override;
     bool            IsMediumCommitted(MediumGroupId) const override;
     void            PushMediumAttribute(MediumGroupId, Vector2ui range,
                                         uint32_t attributeIndex,
                                         TransientData data) override;
+    void            PushMediumAttribute(MediumGroupId, Vector2ui range,
+                                        uint32_t attributeIndex,
+                                        TransientData,
+                                        std::vector<Optional<TextureId>> textures) override;
     void            PushMediumAttribute(MediumGroupId, Vector2ui range,
                                         uint32_t attributeIndex,
                                         std::vector<TextureId> textures) override;
@@ -143,7 +163,7 @@ class TracerMock : public TracerI
     void        CommitRendererReservations(RendererId) override;
     bool        IsRendererCommitted(RendererId) const override;
     void        PushRendererAttribute(RendererId, uint32_t attributeIndex,
-                                      std::vector<Byte> data) override;
+                                      TransientData data) override;
 
     void        StartRender(RendererId, CamSurfaceId) override;
     void        StoptRender() override;
@@ -297,8 +317,7 @@ inline PrimBatchId TracerMock::ReservePrimitiveBatch(PrimGroupId, PrimCount)
     return PrimBatchId(0);
 }
 
-inline PrimBatchIdList TracerMock::ReservePrimitiveBatches(PrimGroupId,
-                                                           std::vector<PrimCount>)
+inline PrimBatchIdList TracerMock::ReservePrimitiveBatches(PrimGroupId, std::vector<PrimCount>)
 {
     return PrimBatchIdList{};
 }
@@ -330,11 +349,17 @@ inline MatGroupId TracerMock::CreateMaterialGroup(std::string)
     return MatGroupId(0);
 }
 
-inline MaterialId TracerMock::ReserveMaterial(MatGroupId,
-                                              MediumId,
-                                              MediumId)
+inline MaterialId TracerMock::ReserveMaterial(MatGroupId, AttributeCountList,
+                                              MediumPair)
 {
     return MaterialId(0);
+}
+
+inline MaterialIdList TracerMock::ReserveMaterials(MatGroupId,
+                                                   std::vector<AttributeCountList>,
+                                                   std::vector<MediumPair>)
+{
+    return MaterialIdList{};
 }
 
 inline void TracerMock::CommitMatReservations(MatGroupId)
@@ -350,6 +375,14 @@ inline void TracerMock::PushMatAttribute(MatGroupId, Vector2ui,
                                          uint32_t,
                                          TransientData)
 {
+}
+
+inline void TracerMock::PushMatAttribute(MatGroupId, Vector2ui,
+                                         uint32_t,
+                                         TransientData,
+                                         std::vector<Optional<TextureId>>)
+{
+
 }
 
 inline void TracerMock::PushMatAttribute(MatGroupId, Vector2ui,
@@ -393,7 +426,12 @@ inline TransGroupId TracerMock::CreateTransformGroup(std::string)
     return TransGroupId(0);
 }
 
-inline TransformIdList TracerMock::ReserveTransformations(TransGroupId, uint32_t)
+inline TransformId TracerMock::ReserveTransformation(TransGroupId, AttributeCountList)
+{
+    return TransformId(0);
+}
+
+inline TransformIdList TracerMock::ReserveTransformations(TransGroupId, std::vector<AttributeCountList>)
 {
     return TransformIdList{};
 }
@@ -419,8 +457,16 @@ inline LightGroupId TracerMock::CreateLightGroup(std::string,
     return LightGroupId(0);
 }
 
+inline LightId TracerMock::ReserveLight(LightGroupId,
+                                        AttributeCountList,
+                                        PrimBatchId)
+{
+    return LightId(0);
+}
+
 inline LightIdList TracerMock::ReserveLights(LightGroupId,
-                                             PrimBatchId)
+                                             std::vector<AttributeCountList>,
+                                             std::vector<PrimBatchId>)
 {
     return LightIdList{};
 }
@@ -441,6 +487,14 @@ inline void TracerMock::PushLightAttribute(LightGroupId, Vector2ui,
 }
 
 inline void TracerMock::PushLightAttribute(LightGroupId, Vector2ui,
+                                    uint32_t,
+                                    TransientData,
+                                    std::vector<Optional<TextureId>>)
+{
+
+}
+
+inline void TracerMock::PushLightAttribute(LightGroupId, Vector2ui,
                                    uint32_t,
                                    std::vector<TextureId>)
 {
@@ -451,7 +505,14 @@ inline CameraGroupId TracerMock::CreateCameraGroup(std::string)
     return CameraGroupId(0);
 }
 
-inline CameraIdList TracerMock::ReserveCameras(CameraGroupId, uint32_t)
+inline CameraId TracerMock::ReserveCamera(CameraGroupId,
+                                          AttributeCountList)
+{
+    return CameraId(0);
+}
+
+inline CameraIdList TracerMock::ReserveCameras(CameraGroupId,
+                                               std::vector<AttributeCountList>)
 {
     return CameraIdList{};
 }
@@ -477,7 +538,13 @@ inline MediumGroupId TracerMock::CreateMediumGroup(std::string)
     return MediumGroupId(0);
 }
 
-inline MediumIdList TracerMock::ReserveMediums(MediumGroupId, uint32_t)
+inline MediumId TracerMock::ReserveMedium(MediumGroupId, AttributeCountList)
+{
+    return MediumId(0);
+}
+
+inline MediumIdList TracerMock::ReserveMediums(MediumGroupId,
+                                               std::vector<AttributeCountList>)
 {
     return MediumIdList{};
 }
@@ -492,10 +559,17 @@ inline bool TracerMock::IsMediumCommitted(MediumGroupId) const
 }
 
 inline void TracerMock::PushMediumAttribute(MediumGroupId, Vector2ui,
-                                    uint32_t,
+                                            uint32_t,
                                             TransientData)
 {
 
+}
+
+inline void TracerMock::PushMediumAttribute(MediumGroupId, Vector2ui,
+                                            uint32_t,
+                                            TransientData,
+                                            std::vector<Optional<TextureId>>)
+{
 }
 
 inline void TracerMock::PushMediumAttribute(MediumGroupId, Vector2ui,
@@ -548,13 +622,14 @@ inline bool TracerMock::IsRendererCommitted(RendererId) const
 }
 
 inline void TracerMock::PushRendererAttribute(RendererId, uint32_t,
-                                              std::vector<Byte>)
+                                              TransientData)
 {
 
 }
 
 inline void TracerMock::StartRender(RendererId, CamSurfaceId)
 {
+
 }
 
 inline void TracerMock::StoptRender()

@@ -181,6 +181,7 @@ requires std::is_move_assignable_v<T>
             DestructObjectAt(i);
         new(ItemLocation(i)) T(other[i]);
     }
+    return *this;
 }
 
 template<class T, size_t N>
@@ -205,7 +206,7 @@ constexpr const T& StaticVector<T, N>::operator[](size_t i) const
 template<class T, size_t N>
 constexpr T* StaticVector<T, N>::data()
 {
-    return *ItemAt(0);
+    return ItemAt(0);
 }
 
 template<class T, size_t N>
@@ -236,6 +237,30 @@ template<class T, size_t N>
 constexpr const T& StaticVector<T, N>::front() const
 {
     return *ItemAt(0);
+}
+
+template<class T, size_t N>
+constexpr T* StaticVector<T, N>::begin()
+{
+    return data();
+}
+
+template<class T, size_t N>
+constexpr const T* StaticVector<T, N>::begin() const
+{
+    return data();
+}
+
+template<class T, size_t N>
+constexpr T* StaticVector<T, N>::end()
+{
+    return data() + count;
+}
+
+template<class T, size_t N>
+constexpr const T* StaticVector<T, N>::end() const
+{
+    return data() + count;
 }
 
 template<class T, size_t N>
@@ -273,7 +298,7 @@ template<class T, size_t N>
 constexpr void StaticVector<T, N>::push_back(const T& t)
 {
     assert(count < N);
-    new(ItemLocation(count)) T(std::forward<T>(t));
+    new(ItemLocation(count)) T(t);
     count++;
 }
 

@@ -1,5 +1,12 @@
 #pragma once
 
+inline bool IsDashed(const nlohmann::json& n)
+{
+    using namespace std::literals;
+    static constexpr std::string_view DASH = "-"sv;
+    return (n.is_string() && n.get<std::string_view>() == DASH);
+}
+
 inline TextureAccessLayout LoadTextureAccessLayout(const nlohmann::json& node)
 {
     using namespace std::literals;
@@ -185,7 +192,6 @@ inline uint32_t JsonNode::Id() const
     return nodeArray.get<uint32_t>();
 }
 
-// Inner node unspecific data access
 template<class T>
 T JsonNode::CommonData(std::string_view name) const
 {
@@ -205,7 +211,27 @@ TransientData JsonNode::CommonDataArray(std::string_view name) const
     return std::move(input);
 }
 
-// Inner index related data loading
+inline size_t JsonNode::CheckDataArraySize(std::string_view name) const
+{
+    const auto& n = (isMultiNode) ? node.at(name).at(innerIndex)
+                                  : node.at(name);
+    return n.size();
+}
+
+inline size_t JsonNode::CheckOptionalDataArraySize(std::string_view name) const
+{
+    const auto& n = (isMultiNode) ? node.at(name).at(innerIndex)
+                                  : node.at(name);
+    return IsDashed(n) ? 0 : n.size();
+}
+
+inline bool JsonNode::CheckOptionalData(std::string_view name) const
+{
+    const auto& n = (isMultiNode) ? node.at(name).at(innerIndex)
+                                  : node.at(name);
+    return IsDashed(n);
+}
+
 template<class T>
 T JsonNode::AccessData(std::string_view name) const
 {
@@ -224,7 +250,6 @@ TransientData JsonNode::AccessDataArray(std::string_view name) const
     Span<T> data = input.AccessAs<T>();
     for(size_t i = 0; i < nodeArray.size(); i++)
         data[i] = nodeArray[i].get<T>();
-
     return std::move(input);
 }
 // Optional Data
@@ -240,11 +265,8 @@ Optional<T> JsonNode::AccessOptionalData(std::string_view name) const
 
     // Here user may provide "-" string which means data is
     // not present for this item in node
-    using namespace std::literals;
-    if(n.is_string() && n.get<std::string_view>() == "-"sv)
-        return std::nullopt;
-    else
-        return n.get<T>();
+    if(IsDashed(n)) return std::nullopt;
+    else            return n.get<T>();
 }
 
 template<class T>
@@ -260,9 +282,7 @@ Optional<TransientData> JsonNode::AccessOptionalDataArray(std::string_view name)
     // Here user may provide "-" string which means data is
     // not present for this item in node
     TransientData input(std::in_place_type_t<T>{}, nodeArray.size());
-    using namespace std::literals;
-    if(nodeArray.is_string() &&
-       nodeArray.get<std::string_view>() == "-"sv)
+    if(IsDashed(node))
         return std::nullopt;
     else
     {
@@ -285,18 +305,17 @@ Variant<NodeTexStruct, T> JsonNode::AccessTexturableData(std::string_view name) 
                            : V(n.get<T>());
 }
 
-template<class T>
-std::vector<Variant<NodeTexStruct, T>> JsonNode::AccessTexturableDataArray(std::string_view name) const
+inline NodeTexStruct JsonNode::AccessTexture(std::string_view name) const
 {
-    using V = Variant<NodeTexStruct, T>;
-    const auto& nArray = (isMultiNode) ? node.at(name).at(innerIndex)
+    const auto& n = (isMultiNode) ? node.at(name).at(innerIndex)
                                   : node.at(name);
+    return n.get<NodeTexStruct>();
+}
 
-    std::vector<Variant<NodeTexStruct, T>> output; output.reserve(nArray.size());
-    for(const auto& n : nArray)
-    {
-        Variant<NodeTexStruct, T> v = (n.is_object()) ? V(n.get<NodeTexStruct>())
-                                                      : V(n.get<T>());
-        output.push_back(v);
-    }
+inline Optional<NodeTexStruct> JsonNode::AccessOptionalTexture(std::string_view name) const
+{
+    const auto& n = (isMultiNode) ? node.at(name).at(innerIndex)
+                                  : node.at(name);
+    if(IsDashed(n)) return std::nullopt;
+    else            return n.get<NodeTexStruct>();
 }

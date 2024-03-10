@@ -21,122 +21,123 @@
 
 #include "JsonNode.h"
 
-
-
-template<class GroupId>
-Optional<TransientData> GenericAttributeLoad(const JsonNode& node,
-                                             const GenericAttributeInfo& attribInfo)
+struct TexturedAttributeData
 {
-    Optional<TransientData> result;
+    TransientData                       data;
+    std::vector<Optional<TextureId>>    textures;
+};
 
-    using enum GenericAttributeInfo::E;
-    std::string name = std::get<LOGIC_INDEX>(attrib);
-    MRayDataTypeRT layout = std::get<LAYOUT_INDEX>(attrib);
-    bool isArray = (std::get<IS_ARRAY_INDEX>(attrib) ==
-                    AttributeIsArray::IS_ARRAY);
-    bool isOptional = (std::get<OPTIONALITY_INDEX>(attrib) ==
-                        AttributeOptionality::MR_OPTIONAL);
+AttributeCountList GenericFindAttributeCounts(std::vector<AttributeCountList>& attributeCounts,
+                                              const GenericAttributeInfoList& list,
+                                              Span<const JsonNode> nodes)
+{
+    AttributeCountList totalCounts(StaticVecSize(list.size()));
 
-    auto r = std::visit([&](auto&& dataType) -> Optional<TransientData>
+    for(const JsonNode& node : nodes)
     {
-        using T = std::remove_cvref_t<decltype(dataType)>::Type;
+        AttributeCountList nodeCountList;
+        uint32_t attribIndex = 0;
+        for(const auto& l : list)
+        {
+            using enum TransAttributeInfo::E;
+            std::string_view name = std::get<LOGIC_INDEX>(l);
+            AttributeOptionality optional = std::get<OPTIONALITY_INDEX>(l);
+            AttributeIsArray isArray = std::get<IS_ARRAY_INDEX>(l);
 
-        if(isArray && isOptional)
-        {
-            return node.AccessOptionalDataArray<T>(name);
+            size_t entityAttribCount = 0;
+            if(isArray == AttributeIsArray::IS_ARRAY &&
+               optional != AttributeOptionality::MR_MANDATORY)
+            {
+                // Check optional attribute is present
+                entityAttribCount = node.CheckOptionalDataArraySize(name);
+            }
+            else if(isArray == AttributeIsArray::IS_ARRAY &&
+                    optional == AttributeOptionality::MR_MANDATORY)
+            {
+                entityAttribCount = node.CheckDataArraySize(name);
+            }
+            else if(isArray != AttributeIsArray::IS_ARRAY &&
+                    optional != AttributeOptionality::MR_MANDATORY)
+            {
+                entityAttribCount = node.CheckOptionalData(name) ? 1 : 0;
+            }
+            else if(isArray != AttributeIsArray::IS_ARRAY &&
+                    optional == AttributeOptionality::MR_MANDATORY)
+            {
+                entityAttribCount = 1;
+            }
+            nodeCountList.push_back(entityAttribCount);
+            totalCounts[attribIndex] += entityAttribCount;
+            attribIndex++;
         }
-        else if(isArray && !isOptional)
-        {
-            return node.AccessDataArray<T>(name);
-        }
-        else if(!isArray && isOptional)
-        {
-            TransientData result(std::in_place_type_t<T>{}, 1);
-            Optional<T> r = node.AccessOptionalData<T>(name);
-            if(!r.has_value()) return std::nullopt;
-
-            T val = r.value();
-            result.Push<T>(Span<const T, 1>(&val, 1));
-            return std::move(result);
-        }
-        else
-        {
-            TransientData result(std::in_place_type_t<T>{}, 1);
-            T val = node.AccessData<T>(name);
-            result.Push<T>(Span<const T, 1>(&val, 1));
-            return std::move(result);
-        }
-    }, layout);
-
-    return r;
+        attributeCounts.push_back(std::move(nodeCountList));
+    }
+    return totalCounts;
 }
 
-template<class AttributeInfoType>
-void GenericJsonLoad(TransientData& dataOut,
-                     std::vector<Optional<NodeTexStruct>>& texOut,
-                     const AttributeInfoType& attrib, const JsonNode& node)
+std::vector<TransientData> GenericAttributeLoad(const AttributeCountList& totalCounts,
+                                                const GenericAttributeInfoList& list,
+                                                Span<const JsonNode> nodes)
 {
-    using enum AttributeInfoType::E;
-    std::string name = std::get<LOGIC_INDEX>(attrib);
-    MRayDataTypeRT layout = std::get<LAYOUT_INDEX>(attrib);
-    bool isArray = (std::get<IS_ARRAY_INDEX>(attrib) ==
-                    AttributeIsArray::IS_ARRAY);
-    bool isOptional = (std::get<OPTIONALITY_INDEX>(attrib) ==
-                        AttributeOptionality::MR_OPTIONAL);
-    bool isTexturable = false;
-    if constexpr(std::is_same_v<AttributeInfoType, TexturedAttributeInfo>)
-        isTexturable = (std::get<TEXTURABLE_INDEX>(attrib) !=
-                        AttributeTexturable::MR_CONSTANT_ONLY);
+    std::vector<TransientData> result;
+    result.reserve(list.size());
 
-    bool isOptionalTexture = false;
-    if constexpr(std::is_same_v<AttributeInfoType, TexturedAttributeInfo>)
-        isOptionalTexture = (std::get<TEXTURABLE_INDEX>(attrib) ==
-                             AttributeTexturable::MR_OPTIONAL_TEXTURE);
-
-    auto r = std::visit([&](auto&& dataType) -> void
+    for(size_t i = 0; i < totalCounts.size(); i++)
     {
-        using T = std::remove_cvref_t<decltype(dataType)>::Type;
+        std::visit([&](auto&& dataType)
+        {
+            using T = std::remove_cvref_t<decltype(dataType)>::Type;
+            result.emplace_back(std::in_place_type_t<T>{}, totalCounts[i]);
+        },
+        std::get<GenericAttributeInfo::LAYOUT_INDEX>(list[i]));
+    }
 
-        if(isTexturable)
+    // Now data is set we can load
+    for(const JsonNode& node : nodes)
+    {
+        uint32_t i = 0;
+        for(const auto& l : list)
         {
-            using NTS = NodeTexStruct;
-            if(isOptionalTexture)
-                texOut.push_back(node.AccessOptionalTexture(name));
-            else
+            using enum GenericAttributeInfo::E;
+            std::string_view name = std::get<LOGIC_INDEX>(l);
+            AttributeOptionality optional = std::get<OPTIONALITY_INDEX>(l);
+            AttributeIsArray isArray = std::get<IS_ARRAY_INDEX>(l);
+
+            std::visit([&](auto&& dataType)
             {
-                Variant<NTS, T> result = node.AccessTexturableData<T>(name);
-                if(std::holds_alternative<T>())
+                using T = std::remove_cvref_t<decltype(dataType)>::Type;
+                if(isArray == AttributeIsArray::IS_ARRAY &&
+                   optional != AttributeOptionality::MR_MANDATORY)
                 {
-                    texOut.push_back(std::nullopt);
-                    dataOut.Push(Span<const T>(&std::get<T>(result), 1))
+                    Optional<TransientData> data = node.AccessOptionalDataArray<T>(name);
+                    if(!data.has_value()) return;
+                    result[i].Push(ToSpan<const T>(data.value()));
                 }
-                else
+                else if(isArray == AttributeIsArray::IS_ARRAY &&
+                        optional == AttributeOptionality::MR_MANDATORY)
                 {
-                    T _{};
-                    texOut.push_back(std::get<NTS>(result));
-                    dataOut.Push(Span<const T>(&_, 1))
+                    TransientData data = node.AccessDataArray<T>(name);
+                    result[i].Push(ToSpan<const T>(data));
                 }
-            }
+                else if(isArray != AttributeIsArray::IS_ARRAY &&
+                        optional != AttributeOptionality::MR_MANDATORY)
+                {
+                    Optional<T> data = node.AccessOptionalData<T>(name);
+                    if(!data.has_value()) return;
+                    result[i].Push(Span<const T>(&data.value(), 1));
+                }
+                else if(isArray != AttributeIsArray::IS_ARRAY &&
+                        optional == AttributeOptionality::MR_MANDATORY)
+                {
+                    T data = node.AccessData<T>(name);
+                    result[i].Push(Span<const T>(&data, 1));
+                }
+            },
+            std::get<LAYOUT_INDEX>(l));
+            i++;
         }
-        else if(isArray)
-        {
-            Optional<TransientData> result;
-            result = (isOptional)
-                        ? node.AccessOptionalDataArray<T>(name)
-                        : node.AccessDataArray<T>(name);
-            if(result.has_value())
-                dataOut.Push(ToConstSpan(ToSpan<T>(result.value())));
-        }
-        else
-        {
-            Optional<T> result;
-            result = (isOptional)
-                        ? node.AccessOptionalData<T>(name)
-                        : node.AccessData<T>(name);
-            if(result.has_value())
-                dataOut.Push<T>(Span<const T>(&result.value(), 1));
-        }
-    }, layout);
+    }
+    return result;
 }
 
 void LoadPrimitive(TracerI& tracer,
@@ -203,7 +204,7 @@ void LoadPrimitive(TracerI& tracer,
         {
             // TODO: Add CPU conversion logic here for basic conversions
             // (Both is floating point type and conversion is *not* narrowing)
-            // For the rest below error should be fine
+            // For the rest the error below should be fine
 
             // We require exact match currently
             throw MRayError("Mesh File{:s}:[{:d}]'s data layout of \"{}\""
@@ -357,7 +358,7 @@ void SceneLoaderMRay::DryRunNodesForTex(std::vector<NodeTexStruct>& textureIds,
 template<class Loader, class IdType>
 void LoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, IdType>>& outputMappings,
                 typename SceneLoaderMRay::ExceptionList& exceptions,
-                const typename SceneLoaderMRay::TypeMappedNodes& nodes,
+                const typename SceneLoaderMRay::TypeMappedNodes& nodeLists,
                 BS::thread_pool& threadPool,
                 Loader&& loader)
 {
@@ -405,25 +406,22 @@ void LoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, IdType>>
                     groupList[i] = std::make_pair(nodes[i].Id(),
                                                   generatedIds[localI]);
                 }
+
+                // Commit barrier
+                barrier->arrive_and_wait();
+                // Group is committed, now we can issue writes
+                loader.LoadEntities(groupId, generatedIds, nodeRange);
             }
             catch(MRayError& e)
             {
                 exceptions.AddException(std::move(e));
                 barrier->arrive_and_drop();
-                return;
             }
-
-            // Commit barrier
-            barrier->arrive_and_wait();
-            // Group is committed, now we can issue writes
-            try
+            catch(nlohmann::json::exception& e)
             {
-                const auto& groupList = *groupEntityList;
-                loader.LoadEntities(groupId, nodeRange, generatedIds);
-            }
-            catch(MRayError& e)
-            {
-                exceptions.AddException(std::move(e));
+                exceptions.AddException(MRayError("Json Error ({})",
+                                                  std::string(e.what())));
+                barrier->arrive_and_drop();
             }
         }, threadCount);
 
@@ -578,167 +576,17 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
 
 void SceneLoaderMRay::LoadMediums(TracerI& tracer, ExceptionList& exceptions)
 {
-    struct AttribData
-    {
-        bool isTextured;
-        bool isOptional;
-        bool isArray;
-        TransientData d;
-        std::vector<Optional<NodeTexStruct>> a;
-    };
 
-    // Rare usage of in-function class
-    struct MediumLoader
-    {
-        public:
-        using GroupIdType = MediumGroupId;
-
-        private:
-        TracerI&            tracer;
-
-
-        public:
-        MediumLoader(TracerI& t) : tracer(t) {}
-        MediumGroupId CreateGroup(const std::string gn)
-        {
-            return tracer.CreateMediumGroup(gn);
-        }
-        void CommitReservations(MediumGroupId groupId)
-        {
-            return tracer.CommitMediumReservations(groupId);
-        }
-        MediumIdList ReserveEntities(MediumGroupId groupId, Span<const JsonNode> nodes)
-        {
-            return tracer.ReserveMediums(groupId, nodes.size());
-        }
-        void LoadEntitiy(MediumGroupId groupId,
-                         Span<const JsonNode> nodes,
-                         const MediumIdList& idList)
-        {
-            assert(nodes.size() == idList.size());
-            MediumAttributeInfoList list = tracer.AttributeInfo(groupId);
-            std::vector<AttribData> data(list.size());
-            for(size_t i = 0; i < nodes.size(); i++)
-            {
-                const JsonNode& node = nodes[i];
-                MediumId id = idList[i];
-
-                for(const MediumAttributeInfo& attrib : list)
-                {
-                    GenericJsonLoad()...;
-                }
-
-            }
-
-            tracer.Push
-        }
-    };
-
-    LoadGroups(mediumMappings, exceptions, mediumNodes,
-               threadPool, MediumLoader(tracer));
 }
 
 void SceneLoaderMRay::LoadMaterials(TracerI& tracer, ExceptionList& exceptions)
 {
-    //// Issue loads to the thread pool
-    //for(const auto& m : materialNodes)
-    //{
-    //    uint32_t groupMatCount = static_cast<uint32_t>(m.second.size());
-    //    using GroupMaterialList = std::vector<Pair<uint32_t, MaterialId>>;
-    //    auto groupMatList = std::make_shared<GroupMaterialList>(groupMatCount);
 
-    //    std::string_view matTypeName = m.first;
-    //    MatGroupId groupId = tracer.CreateMaterialGroup(std::string(matTypeName));
-
-    //    // Construct Barrier
-    //    auto BarrierFunc = [groupId, groupMatList, &tracer]() noexcept
-    //    {
-    //        // When barrier completed
-    //        // Reserve the space for mappings
-    //        // Commit mat group reservations
-    //        tracer.CommitMatReservations(groupId);
-    //    };
-    //    // Determine the thread size
-    //    uint32_t threadCount = std::min(threadPool.get_thread_count(),
-    //                                    groupMatCount);
-
-    //    using Barrier = std::barrier<decltype(BarrierFunc)>;
-    //    auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
-
-    //    auto future = threadPool.submit_blocks(std::size_t(0), m.second.size(),
-    //    // Copy the shared pointers, capture by reference the rest
-    //    [&, this, barrier, groupMatList](size_t start, size_t end)
-    //    {
-    //        try
-    //        {
-    //            for(size_t i = start; i < end; i++)
-    //            {
-    //                //// Each material optionally express medium interface
-    //                //// that are seperating???
-    //                //using namespace NodeNames;
-    //                //const JsonNode& node = m.second[i];
-    //                //auto mediumFront = node.AccessOptionalData<uint32_t>(MAT_NODE_MEDIUM_FRONT);
-    //                //auto mediumBack = node.AccessOptionalData<uint32_t>(MAT_NODE_MEDIUM_BACK);
-
-    //                //mediumMappings.map.
-
-    //                //MaterialId mId = tracer.ReserveMaterial(groupId,
-    //                //                                        );
-    //                //(*groupMatList)[i] = std::make_pair(nodeId(), mId);
-
-    //            }
-    //        }
-    //        catch(MRayError& e)
-    //        {
-    //            exceptions.AddException(std::move(e));
-    //            barrier->arrive_and_drop();
-    //            return;
-    //        }
-
-    //        // Commit barrier
-    //        barrier->arrive_and_wait();
-    //        // Material Group is committed, we can issue writes to it now
-    //        try
-    //        {
-    //            for(size_t i = start; i < end; i++)
-    //            {
-    //                //..............
-    //            }
-    //        }
-    //        catch(MRayError& e)
-    //        {
-    //            exceptions.AddException(std::move(e));
-    //        }
-    //    }, threadCount);
-
-    //    // Move future to shared_ptr
-    //    using FutureSharedPtr = std::shared_ptr<BS::multi_future<void>>;
-    //    FutureSharedPtr futureShared = std::make_shared<BS::multi_future<void>>(std::move(future));
-
-    //    // Issue a one final task that pushes the primitives to the global map
-    //    threadPool.detach_task([&, this, future = futureShared, groupMatList]()
-    //    {
-    //        // Wait other tasks to complere
-    //        future->wait();
-    //        // After this point groupBatchList is fully loaded
-    //        std::scoped_lock lock(matMappings.mutex);
-    //        matMappings.map.insert(groupMatList->flatMaterials.cbegin(),
-    //                               groupMatList->flatMaterials.cend());
-    //    });
-    //}
 }
 
 void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ExceptionList& exceptions)
 {
-    struct A
-    {
-
-    };
-
-    thread_local uint32_t localAttributeSize = 0;
-
-
-    // Rare usage of in-function class
+    thread_local AttributeCountList totalCounts = {};
     struct TransformLoader
     {
         public:
@@ -760,49 +608,34 @@ void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ExceptionList& exceptions)
         TransformIdList ReserveEntities(TransGroupId groupId,
                                         Span<const JsonNode> nodes)
         {
-            std::vector<uint32_t> counts;
-            counts.reserve(nodes.size());
+            std::vector<AttributeCountList> attributeCounts = {};
+            attributeCounts.reserve(nodes.size());
             // Find the first arrayed type in nodes
             // Accumulate the type
             // Reserve transforms accordingly
             TransAttributeInfoList list = tracer.AttributeInfo(groupId);
-            for(const auto& l : list)
-            {
-                using enum AttributeIsArray;
-                using enum TransAttributeInfo::E;
-                if(std::get<IS_ARRAY_INDEX>(l) != IS_ARRAY)
-                    continue;
-                std::string_view name = std::get<LOGIC_INDEX>(l);
-
-                for(const JsonNode& node : nodes)
-                {
-                    size_t count = static_cast<uint32_t>(node.AccessDataArraySize(name));
-                    counts.push_back(count);
-                    localAttributeSize += count;
-                }
-                break;
-            }
-            return tracer.ReserveTransformations(groupId, counts);
+            totalCounts = GenericFindAttributeCounts(attributeCounts, list, nodes);
+            return tracer.ReserveTransformations(groupId, attributeCounts);
         }
-        void LoadEntitiy(TransGroupId groupId, TransformId id, const JsonNode& node)
+        void LoadEntities(TransGroupId groupId,
+                          const TransformIdList& ids,
+                          Span<const JsonNode> nodes)
         {
-            std::vector<Optional<TransientData>> attributeData = GenericLoad(tracer,
-                                                                             groupId,
-                                                                             node);
-            uint32_t attributeIndex = 0;
-            for(auto& data : attributeData)
+            TransAttributeInfoList list = tracer.AttributeInfo(groupId);
+            auto dataOut = GenericAttributeLoad(totalCounts,
+                                                list,
+                                                nodes);
+            uint32_t attribIndex = 0;
+            for(auto& data : dataOut)
             {
-                if(!data.has_value()) continue;
-
-                Vector2ui range(static_cast<uint32_t>(id),
-                                static_cast<uint32_t>(id) + 1);
-
-                tracer.PushTransAttribute(groupId, range,
-                                          attributeIndex,
-                                          std::move(data.value()));
-                attributeIndex++;
+                TransformId idStart = ids.front();
+                TransformId idEnd = ids.front();
+                auto range = Vector2ui(static_cast<uint32_t>(idStart),
+                                       static_cast<uint32_t>(idEnd));
+                tracer.PushTransAttribute(groupId, range, attribIndex,
+                                          std::move(data));
+                attribIndex++;
             }
-
         }
     };
 
@@ -812,172 +645,355 @@ void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ExceptionList& exceptions)
 
 void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
 {
-    using PrimGroupBatchList = std::vector<Pair<uint32_t, PrimBatchId>>;
+    //using PrimGroupBatchList = std::vector<Pair<uint32_t, PrimBatchId>>;
     std::shared_ptr<const MeshLoaderPoolI> meshLoaderPool = CreateMeshLoaderPool();
 
-    // Issue loads to the thread pool
-    for(const auto& m : primNodes)
+    // TODO: Too many micro allocations due to map
+    // revise over this.
+    //
+    // Per "dll" loaders
+    // Key is a "tag" entry on the json. For example, "assimp" tag
+    // will call assimp mesh loader. If "assimp" does not support .obj for example
+    // loader will generate an error.
+    //
+    // The reason for this approach is to provide a utility for user to add new dlls
+    // for specific file extensions via per mesh file basis.
+    // If assimp "sucks" for new fbx files, however robustly works on old fbx files
+    // user can write new loader with a tag and load these files.
+    thread_local std::map<std::string, std::unique_ptr<MeshLoaderI>> loaders;
+    // Mesh files that opened via some loader
+    // This is here unfortunately as a limitation/functionality of the assimp.
+    // Assimp can post process meshes crates tangents/optimization etc. This means
+    // we cannot pre-determine the size of the vertices/indices just by looking a some
+    // form of header on the file. So we load the entire mesh and store before the commit
+    // of the primitive group.
+    //
+    // Key is the full path of the mesh file. For in node primitives,
+    //  it is the scene "primitiveId".
+    thread_local std::map<std::string, std::unique_ptr<MeshFileI>> meshFiles;
+    // Each mesh may have multiple submeshes so we don't wastefully open the same file
+    // multiple times
+    thread_local std::vector<Pair<uint32_t, const MeshFileI*>> batchFiles;
+
+    struct PrimitiveLoader
     {
-        uint32_t groupBatchCount = static_cast<uint32_t>(m.second.size());
-        auto groupBatchList = std::make_shared<PrimGroupBatchList>(groupBatchCount);
+        public:
+        using GroupIdType = PrimGroupId;
 
-        std::string_view primTypeName = m.first;
-        PrimGroupId groupId = tracer.CreatePrimitiveGroup(std::string(primTypeName));
+        private:
+        TracerI&                                tracer;
+        const std::string&                      scenePath;
+        std::shared_ptr<const MeshLoaderPoolI>  meshLoaderPool;
 
-        // Construct Barrier
-        auto BarrierFunc = [groupId, groupBatchList, &tracer]() noexcept
+        public:
+        PrimitiveLoader(TracerI& t, const std::string& sp,
+                        std::shared_ptr<const MeshLoaderPoolI> mlp)
+            : tracer(t)
+            , scenePath(sp)
+            , meshLoaderPool(mlp)
+        {}
+
+        PrimGroupId CreateGroup(const std::string gn)
         {
-            // When barrier completed
-            // Reserve the space for mappings
-            // Commit prim groups reservations
-            tracer.CommitPrimReservations(groupId);
-        };
-        // Determine the thread size
-        uint32_t threadCount = std::min(threadPool.get_thread_count(),
-                                        groupBatchCount);
-
-        using Barrier = std::barrier<decltype(BarrierFunc)>;
-        auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
-
-        auto future = threadPool.submit_blocks(std::size_t(0), m.second.size(),
-        // Copy the shared pointers, capture by reference the rest
-        [&, this, barrier, meshLoaderPool, groupBatchList](size_t start, size_t end)
+            return tracer.CreatePrimitiveGroup(gn);
+        }
+        void CommitReservations(PrimGroupId groupId)
         {
-            size_t localBatchCount = end - start;
+            return tracer.CommitPrimReservations(groupId);
+        }
+        PrimBatchIdList ReserveEntities(PrimGroupId groupId,
+                                        Span<const JsonNode> nodes)
+        {
+            batchFiles.reserve(nodes.size());
+            PrimBatchIdList idList;
+            idList.reserve(nodes.size());
 
-            // TODO: Too many micro allocations due to map
-            // revise over this.
-            //
-            // Per "dll" loaders
-            // Key is a "tag" entry on the json. For example, "assimp" tag
-            // will call assimp mesh loader. If "assimp" does not support .obj for example
-            // loader will generate an error.
-            //
-            // The reason for this approach is to provide a utility for user to add new dlls
-            // for specific file extensions via per mesh file basis.
-            // If assimp "sucks" for new fbx files, however robustly works on old fbx files
-            // user can write new loader with a tag and load these files.
-            std::map<std::string, std::unique_ptr<MeshLoaderI>> loaders;
-            // Mesh files that opened via some loader
-            // This is here unfortunately as a limitation/functionality of the assimp.
-            // Assimp can post process meshes crates tangents/optimization etc. This means
-            // we cannot pre-determine the size of the vertices/indices just by looking a some
-            // form of header on the file. So we load the entire mesh and store before the commit
-            // of the primitive group.
-            //
-            // Key is the full path of the mesh file. For in node primitives,
-            //  it is the scene "primitiveId".
-            std::map<std::string, std::unique_ptr<MeshFileI>> meshFiles;
-            // Each mesh may have multiple submeshes so we don't wastefully open the same file
-            // multiple times
-            std::vector<Pair<uint32_t, const MeshFileI*>> batchFiles;
-            batchFiles.reserve(localBatchCount);
-
-            try
+            for(const JsonNode& node : nodes)
             {
-                for(size_t i = start; i < end; i++)
+                std::string tag = std::string(node.Tag());
+
+                uint32_t innerIndex = 0;
+                const MeshFileI* meshFile = nullptr;
+                if(tag == NodeNames::NODE_PRIM_TRI ||
+                   tag == NodeNames::NODE_PRIM_TRI_INDEXED)
                 {
-                    const JsonNode& node = m.second[i];
-                    std::string tag = std::string(node.Tag());
-
-                    uint32_t innerIndex = 0;
-                    const MeshFileI* meshFile = nullptr;
-
-                    if(tag == NodeNames::NODE_PRIM_TRI ||
-                       tag == NodeNames::NODE_PRIM_TRI_INDEXED)
-                    {
-                        using namespace NodeNames;
-                        bool isIndexed = (tag == NODE_PRIM_TRI_INDEXED);
-                        auto meshFilePtr = std::make_unique<JsonTriangle>(m.second[i], isIndexed);
-                        meshFile = meshFiles.emplace(std::to_string(m.second[i].Id()),
-                                                     std::move(meshFilePtr)).first->second.get();
-                    }
-                    else if(tag == NodeNames::NODE_PRIM_SPHERE)
-                    {
-                        using namespace NodeNames;
-                        auto meshFilePtr = std::make_unique<JsonSphere>(m.second[i]);
-                        meshFile = meshFiles.emplace(std::to_string(m.second[i].Id()),
-                                                     std::move(meshFilePtr)).first->second.get();
-                    }
-                    else
-                    {
-                        std::string fileName = node.CommonData<std::string>(NodeNames::FILE);
-                        fileName = SceneLoaderMRay::SceneRelativePathToAbsolute(fileName, scenePath);
-                        innerIndex = node.AccessData<uint32_t>(NodeNames::INNER_INDEX);
-
-                        // Find a Loader
-                        auto r0 = loaders.emplace(tag, nullptr);
-                        if(!r0.second) r0.first->second = meshLoaderPool->AcquireALoader(tag);
-                        const auto& meshLoader = r0.first->second;
-
-                        // Find mesh file
-                        // TODO: this is slow probably due to long file name as key
-                        auto r1 = meshFiles.emplace(fileName, nullptr);
-                        if(!r1.second) r1.first->second = meshLoader->OpenFile(fileName);
-                        meshFile = r1.first->second.get();
-                    }
-
-                    // Finally Reserve primitives
-                    PrimCount pc
-                    {
-                        .primCount = meshFile->MeshPrimitiveCount(innerIndex),
-                        .attributeCount = meshFile->MeshAttributeCount(innerIndex)
-                    };
-                    PrimBatchId tracerId = tracer.ReservePrimitiveBatch(groupId, pc);
-                    (*groupBatchList)[i] = std::make_pair(node.Id(), tracerId);
-                    batchFiles.emplace_back(innerIndex, meshFile);
+                    using namespace NodeNames;
+                    bool isIndexed = (tag == NODE_PRIM_TRI_INDEXED);
+                    auto meshFilePtr = std::make_unique<JsonTriangle>(node, isIndexed);
+                    meshFile = meshFiles.emplace(std::to_string(node.Id()),
+                                                 std::move(meshFilePtr)).first->second.get();
                 }
-            }
-            catch(MRayError& e)
-            {
-                exceptions.AddException(std::move(e));
-                barrier->arrive_and_drop();
-                return;
-            }
-
-            // Commit barrier
-            barrier->arrive_and_wait();
-            // Primitive Group is committed, we can issue writes to it now
-            try
-            {
-                for(size_t i = start; i < end; i++)
+                else if(tag == NodeNames::NODE_PRIM_SPHERE)
                 {
-                    size_t localIndex = end - i;
-                    const auto& [innerIndex, meshFile] = batchFiles[localIndex];
-                    PrimBatchId batchId = (*groupBatchList)[i].second;
-                    LoadPrimitive(tracer, groupId, batchId,
-                                  innerIndex, meshFile);
+                    using namespace NodeNames;
+                    auto meshFilePtr = std::make_unique<JsonSphere>(node);
+                    meshFile = meshFiles.emplace(std::to_string(node.Id()),
+                                                 std::move(meshFilePtr)).first->second.get();
                 }
-            }
-            catch(MRayError& e)
-            {
-                exceptions.AddException(std::move(e));
-            }
-        }, threadCount);
+                else
+                {
+                    std::string fileName = node.CommonData<std::string>(NodeNames::FILE);
+                    fileName = SceneLoaderMRay::SceneRelativePathToAbsolute(fileName, scenePath);
+                    innerIndex = node.AccessData<uint32_t>(NodeNames::INNER_INDEX);
 
-        // Move future to shared_ptr
-        using FutureSharedPtr = std::shared_ptr<BS::multi_future<void>>;
-        FutureSharedPtr futureShared = std::make_shared<BS::multi_future<void>>(std::move(future));
+                    // Find a Loader
+                    auto r0 = loaders.emplace(tag, nullptr);
+                    if(!r0.second) r0.first->second = meshLoaderPool->AcquireALoader(tag);
+                    const auto& meshLoader = r0.first->second;
 
-        // Issue a one final task that pushes the primitives to the global map
-        threadPool.detach_task([&, this, future = futureShared, groupBatchList]()
+                    // Find mesh file
+                    // TODO: this is slow probably due to long file name as key
+                    auto r1 = meshFiles.emplace(fileName, nullptr);
+                    if(!r1.second) r1.first->second = meshLoader->OpenFile(fileName);
+                    meshFile = r1.first->second.get();
+                }
+
+                // Finally Reserve primitives
+                PrimCount pc
+                {
+                    .primCount = meshFile->MeshPrimitiveCount(innerIndex),
+                    .attributeCount = meshFile->MeshAttributeCount(innerIndex)
+                };
+                PrimBatchId tracerId = tracer.ReservePrimitiveBatch(groupId, pc);
+                idList.push_back(tracerId);
+            }
+            return idList;
+        }
+        void LoadEntities(PrimGroupId groupId,
+                          const PrimBatchIdList& ids,
+                          Span<const JsonNode> nodes)
         {
-            // Wait other tasks to complere
-            future->wait();
-            // After this point groupBatchList is fully loaded
-            std::scoped_lock lock(primMappings.mutex);
-            primMappings.map.insert(groupBatchList->cbegin(),
-                                    groupBatchList->cend());
-        });
-    }
+            for(size_t i = 0; i < nodes.size(); i++)
+            {
+                const auto& [innerIndex, meshFile] = batchFiles[i];
+                LoadPrimitive(tracer, groupId, ids[i],
+                              innerIndex, meshFile);
+            }
+        }
+    };
+
+    LoadGroups(primMappings, exceptions,
+               primNodes, threadPool,
+               PrimitiveLoader(tracer, scenePath,
+                               meshLoaderPool));
+
+    //// Issue loads to the thread pool
+    //for(const auto& m : primNodes)
+    //{
+    //    uint32_t groupBatchCount = static_cast<uint32_t>(m.second.size());
+    //    auto groupBatchList = std::make_shared<PrimGroupBatchList>(groupBatchCount);
+
+    //    std::string_view primTypeName = m.first;
+    //    PrimGroupId groupId = tracer.CreatePrimitiveGroup(std::string(primTypeName));
+
+    //    // Construct Barrier
+    //    auto BarrierFunc = [groupId, groupBatchList, &tracer]() noexcept
+    //    {
+    //        // When barrier completed
+    //        // Reserve the space for mappings
+    //        // Commit prim groups reservations
+    //        tracer.CommitPrimReservations(groupId);
+    //    };
+    //    // Determine the thread size
+    //    uint32_t threadCount = std::min(threadPool.get_thread_count(),
+    //                                    groupBatchCount);
+
+    //    using Barrier = std::barrier<decltype(BarrierFunc)>;
+    //    auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
+
+    //    auto future = threadPool.submit_blocks(std::size_t(0), m.second.size(),
+    //    // Copy the shared pointers, capture by reference the rest
+    //    [&, this, barrier, meshLoaderPool, groupBatchList](size_t start, size_t end)
+    //    {
+    //        size_t localBatchCount = end - start;
+
+    //        // TODO: Too many micro allocations due to map
+    //        // revise over this.
+    //        //
+    //        // Per "dll" loaders
+    //        // Key is a "tag" entry on the json. For example, "assimp" tag
+    //        // will call assimp mesh loader. If "assimp" does not support .obj for example
+    //        // loader will generate an error.
+    //        //
+    //        // The reason for this approach is to provide a utility for user to add new dlls
+    //        // for specific file extensions via per mesh file basis.
+    //        // If assimp "sucks" for new fbx files, however robustly works on old fbx files
+    //        // user can write new loader with a tag and load these files.
+    //        std::map<std::string, std::unique_ptr<MeshLoaderI>> loaders;
+    //        // Mesh files that opened via some loader
+    //        // This is here unfortunately as a limitation/functionality of the assimp.
+    //        // Assimp can post process meshes crates tangents/optimization etc. This means
+    //        // we cannot pre-determine the size of the vertices/indices just by looking a some
+    //        // form of header on the file. So we load the entire mesh and store before the commit
+    //        // of the primitive group.
+    //        //
+    //        // Key is the full path of the mesh file. For in node primitives,
+    //        //  it is the scene "primitiveId".
+    //        std::map<std::string, std::unique_ptr<MeshFileI>> meshFiles;
+    //        // Each mesh may have multiple submeshes so we don't wastefully open the same file
+    //        // multiple times
+    //        std::vector<Pair<uint32_t, const MeshFileI*>> batchFiles;
+    //        batchFiles.reserve(localBatchCount);
+
+    //        try
+    //        {
+    //            for(size_t i = start; i < end; i++)
+    //            {
+    //                const JsonNode& node = m.second[i];
+    //                std::string tag = std::string(node.Tag());
+
+    //                uint32_t innerIndex = 0;
+    //                const MeshFileI* meshFile = nullptr;
+
+    //                if(tag == NodeNames::NODE_PRIM_TRI ||
+    //                   tag == NodeNames::NODE_PRIM_TRI_INDEXED)
+    //                {
+    //                    using namespace NodeNames;
+    //                    bool isIndexed = (tag == NODE_PRIM_TRI_INDEXED);
+    //                    auto meshFilePtr = std::make_unique<JsonTriangle>(m.second[i], isIndexed);
+    //                    meshFile = meshFiles.emplace(std::to_string(m.second[i].Id()),
+    //                                                 std::move(meshFilePtr)).first->second.get();
+    //                }
+    //                else if(tag == NodeNames::NODE_PRIM_SPHERE)
+    //                {
+    //                    using namespace NodeNames;
+    //                    auto meshFilePtr = std::make_unique<JsonSphere>(m.second[i]);
+    //                    meshFile = meshFiles.emplace(std::to_string(m.second[i].Id()),
+    //                                                 std::move(meshFilePtr)).first->second.get();
+    //                }
+    //                else
+    //                {
+    //                    std::string fileName = node.CommonData<std::string>(NodeNames::FILE);
+    //                    fileName = SceneLoaderMRay::SceneRelativePathToAbsolute(fileName, scenePath);
+    //                    innerIndex = node.AccessData<uint32_t>(NodeNames::INNER_INDEX);
+
+    //                    // Find a Loader
+    //                    auto r0 = loaders.emplace(tag, nullptr);
+    //                    if(!r0.second) r0.first->second = meshLoaderPool->AcquireALoader(tag);
+    //                    const auto& meshLoader = r0.first->second;
+
+    //                    // Find mesh file
+    //                    // TODO: this is slow probably due to long file name as key
+    //                    auto r1 = meshFiles.emplace(fileName, nullptr);
+    //                    if(!r1.second) r1.first->second = meshLoader->OpenFile(fileName);
+    //                    meshFile = r1.first->second.get();
+    //                }
+
+    //                // Finally Reserve primitives
+    //                PrimCount pc
+    //                {
+    //                    .primCount = meshFile->MeshPrimitiveCount(innerIndex),
+    //                    .attributeCount = meshFile->MeshAttributeCount(innerIndex)
+    //                };
+    //                PrimBatchId tracerId = tracer.ReservePrimitiveBatch(groupId, pc);
+    //                (*groupBatchList)[i] = std::make_pair(node.Id(), tracerId);
+    //                batchFiles.emplace_back(innerIndex, meshFile);
+    //            }
+    //        }
+    //        catch(MRayError& e)
+    //        {
+    //            exceptions.AddException(std::move(e));
+    //            barrier->arrive_and_drop();
+    //            return;
+    //        }
+
+    //        // Commit barrier
+    //        barrier->arrive_and_wait();
+    //        // Primitive Group is committed, we can issue writes to it now
+    //        try
+    //        {
+    //            for(size_t i = start; i < end; i++)
+    //            {
+    //                size_t localIndex = end - i;
+    //                const auto& [innerIndex, meshFile] = batchFiles[localIndex];
+    //                PrimBatchId batchId = (*groupBatchList)[i].second;
+    //                LoadPrimitive(tracer, groupId, batchId,
+    //                              innerIndex, meshFile);
+    //            }
+    //        }
+    //        catch(MRayError& e)
+    //        {
+    //            exceptions.AddException(std::move(e));
+    //        }
+    //    }, threadCount);
+
+    //    // Move future to shared_ptr
+    //    using FutureSharedPtr = std::shared_ptr<BS::multi_future<void>>;
+    //    FutureSharedPtr futureShared = std::make_shared<BS::multi_future<void>>(std::move(future));
+
+    //    // Issue a one final task that pushes the primitives to the global map
+    //    threadPool.detach_task([&, this, future = futureShared, groupBatchList]()
+    //    {
+    //        // Wait other tasks to complere
+    //        future->wait();
+    //        // After this point groupBatchList is fully loaded
+    //        std::scoped_lock lock(primMappings.mutex);
+    //        primMappings.map.insert(groupBatchList->cbegin(),
+    //                                groupBatchList->cend());
+    //    });
+    //}
 }
 
-void SceneLoaderMRay::LoadCameras(TracerI&, ExceptionList&)
+void SceneLoaderMRay::LoadCameras(TracerI& tracer, ExceptionList& exceptions)
 {
+    thread_local AttributeCountList totalCounts = {};
+    struct CameraLoader
+    {
+        public:
+        using GroupIdType = CameraGroupId;
 
+        private:
+        TracerI& tracer;
+
+        public:
+        CameraLoader(TracerI& t) : tracer(t) {}
+        CameraGroupId CreateGroup(const std::string gn)
+        {
+            return tracer.CreateCameraGroup(gn);
+        }
+        void CommitReservations(CameraGroupId groupId)
+        {
+            return tracer.CommitCamReservations(groupId);
+        }
+        CameraIdList ReserveEntities(CameraGroupId groupId,
+                                     Span<const JsonNode> nodes)
+        {
+            std::vector<AttributeCountList> attributeCounts = {};
+            attributeCounts.reserve(nodes.size());
+            // Find the first arrayed type in nodes
+            // Accumulate the type
+            // Reserve transforms accordingly
+            CamAttributeInfoList list = tracer.AttributeInfo(groupId);
+            totalCounts = GenericFindAttributeCounts(attributeCounts, list, nodes);
+            return tracer.ReserveCameras(groupId, attributeCounts);
+        }
+        void LoadEntities(CameraGroupId groupId,
+                          const CameraIdList& ids,
+                          Span<const JsonNode> nodes)
+        {
+            CamAttributeInfoList list = tracer.AttributeInfo(groupId);
+            auto dataOut = GenericAttributeLoad(totalCounts,
+                                                list,
+                                                nodes);
+            uint32_t attribIndex = 0;
+            for(auto& data : dataOut)
+            {
+                CameraId idStart = ids.front();
+                CameraId idEnd = ids.front();
+                auto range = Vector2ui(static_cast<uint32_t>(idStart),
+                                       static_cast<uint32_t>(idEnd));
+                tracer.PushCamAttribute(groupId, range, attribIndex,
+                                        std::move(data));
+                attribIndex++;
+            }
+        }
+    };
+
+    LoadGroups(camMappings, exceptions,
+               cameraNodes, threadPool, CameraLoader(tracer));
 }
 
-void SceneLoaderMRay::LoadLights(TracerI&, ExceptionList&)
+void SceneLoaderMRay::LoadLights(TracerI& tracer, ExceptionList& exceptions)
 {
 
 }
@@ -1201,7 +1217,6 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
         const auto& location = it->second;
         uint32_t arrayIndex = std::get<ARRAY_INDEX>(location);
         uint32_t innerIndex = std::get<INNER_INDEX>(location);
-        bool isMultiNode = std::get<IS_MULTI_NODE>(location);
         auto node = JsonNode(sceneJson[TEXTURE_LIST][arrayIndex], innerIndex);
         textureNodes.emplace(t, std::move(node));
     }
@@ -1304,7 +1319,7 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
         // Concat to a single exception and return it
         if(exceptionList.size != 0)
         {
-            MRayError err("");
+            MRayError err(MRayError::HAS_ERROR);
             for(const auto& e : exceptionList.exceptions)
             {
                 err.AppendInfo(e.GetError() + "\n");
@@ -1322,9 +1337,6 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
         CreateSurfaces(tracer, surfaces);
         CreateLightSurfaces(tracer, lightSurfs);
         CreateCamSurfaces(tracer, camSurfs);
-
-        // Wait the surface creations
-        threadPool.wait();
     }
     // MRay related errros
     catch(const MRayError& e)

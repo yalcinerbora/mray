@@ -62,9 +62,6 @@ class TransientData
     // =========================== //
     //    String Specialization    //
     // =========================== //
-    //template<StringC T>
-    //                    TransientData(std::in_place_type_t<T>,
-    //                                  size_t charCount);
     template<StringC T>
     void                Push(Span<const T, 1>);
 
