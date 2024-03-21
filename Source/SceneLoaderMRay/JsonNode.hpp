@@ -161,47 +161,52 @@ void from_json(const nlohmann::json& n, RayT<T>& out)
                   V(ToConstSpan(S(v1))));
 }
 
-inline JsonNode::JsonNode(const nlohmann::json& node, uint32_t innerIndex)
-    : node(node)
+inline JsonNode::JsonNode(const nlohmann::json& n, uint32_t innerIndex)
+    : node(&n)
     , innerIndex(innerIndex)
 {
     // Check the multi-nodeness
-    auto n = node.at(NodeNames::ID);
-    isMultiNode = n.is_array();
+    auto inner = node->at(NodeNames::ID);
+    isMultiNode = inner.is_array();
+}
+
+inline bool JsonNode::operator<(const JsonNode other) const
+{
+    return Id() < other.Id();
 }
 
 inline const nlohmann::json& JsonNode::RawNode() const
 {
-    return node;
+    return *node;
 }
 
 inline std::string_view JsonNode::Type() const
 {
-    return node.at(NodeNames::TYPE);
+    return node->at(NodeNames::TYPE);
 }
 
 inline std::string_view JsonNode::Tag() const
 {
-    return node.at(NodeNames::TAG);
+    return node->at(NodeNames::TAG);
 }
 
 inline uint32_t JsonNode::Id() const
 {
-    const auto& nodeArray = (isMultiNode) ? node.at(NodeNames::ID).at(innerIndex)
-                                          : node.at(NodeNames::ID);
+    const auto& nodeArray = (isMultiNode) ? node->at(NodeNames::ID).at(innerIndex)
+                                          : node->at(NodeNames::ID);
     return nodeArray.get<uint32_t>();
 }
 
 template<class T>
 T JsonNode::CommonData(std::string_view name) const
 {
-    return node.at(name).get<T>();
+    return node->at(name).get<T>();
 }
 
 template<class T>
 TransientData JsonNode::CommonDataArray(std::string_view name) const
 {
-    const auto& nodeArray = node.at(name);
+    const auto& nodeArray = node->at(name);
     TransientData input(std::in_place_type_t<T>{}, nodeArray.size());
 
     Span<T> data = input.AccessAs<T>();
@@ -213,38 +218,38 @@ TransientData JsonNode::CommonDataArray(std::string_view name) const
 
 inline size_t JsonNode::CheckDataArraySize(std::string_view name) const
 {
-    const auto& n = (isMultiNode) ? node.at(name).at(innerIndex)
-                                  : node.at(name);
+    const auto& n = (isMultiNode) ? node->at(name).at(innerIndex)
+                                  : node->at(name);
     return n.size();
 }
 
 inline size_t JsonNode::CheckOptionalDataArraySize(std::string_view name) const
 {
-    const auto& n = (isMultiNode) ? node.at(name).at(innerIndex)
-                                  : node.at(name);
+    const auto& n = (isMultiNode) ? node->at(name).at(innerIndex)
+                                  : node->at(name);
     return IsDashed(n) ? 0 : n.size();
 }
 
 inline bool JsonNode::CheckOptionalData(std::string_view name) const
 {
-    const auto& n = (isMultiNode) ? node.at(name).at(innerIndex)
-                                  : node.at(name);
+    const auto& n = (isMultiNode) ? node->at(name).at(innerIndex)
+                                  : node->at(name);
     return IsDashed(n);
 }
 
 template<class T>
 T JsonNode::AccessData(std::string_view name) const
 {
-    const auto& n = (isMultiNode) ? node.at(name).at(innerIndex)
-                                  : node.at(name);
+    const auto& n = (isMultiNode) ? node->at(name).at(innerIndex)
+                                  : node->at(name);
     return n.get<T>();
 }
 
 template<class T>
 TransientData JsonNode::AccessDataArray(std::string_view name) const
 {
-    const auto& nodeArray = (isMultiNode) ? node.at(name).at(innerIndex)
-                                          : node.at(name);
+    const auto& nodeArray = (isMultiNode) ? node->at(name).at(innerIndex)
+                                          : node->at(name);
     TransientData input(std::in_place_type_t<T>{}, nodeArray.size());
 
     Span<T> data = input.AccessAs<T>();
@@ -257,11 +262,11 @@ template<class T>
 Optional<T> JsonNode::AccessOptionalData(std::string_view name) const
 {
     // Entire entry is missing (which is not defined all items on this node)
-    if(node.find(name) == node.cend()) return std::nullopt;
+    if(node->find(name) == node->cend()) return std::nullopt;
 
     // Elements are available fetch the inner entry
-    const auto& n = (isMultiNode) ? node.at(name).at(innerIndex)
-                                  : node.at(name);
+    const auto& n = (isMultiNode) ? node->at(name).at(innerIndex)
+                                  : node->at(name);
 
     // Here user may provide "-" string which means data is
     // not present for this item in node
@@ -273,16 +278,16 @@ template<class T>
 Optional<TransientData> JsonNode::AccessOptionalDataArray(std::string_view name) const
 {
     // Entire entry is missing (which is not defined all items on this node)
-    if(node.find(name) == node.cend()) return std::nullopt;
+    if(node->find(name) == node->cend()) return std::nullopt;
 
     // Elements are available fetch the inner entry
-    const auto& nodeArray = (isMultiNode) ? node.at(name).at(innerIndex)
-                                          : node.at(name);
+    const auto& nodeArray = (isMultiNode) ? node->at(name).at(innerIndex)
+                                          : node->at(name);
 
     // Here user may provide "-" string which means data is
     // not present for this item in node
     TransientData input(std::in_place_type_t<T>{}, nodeArray.size());
-    if(IsDashed(node))
+    if(IsDashed(nodeArray))
         return std::nullopt;
     else
     {
@@ -299,23 +304,23 @@ template<class T>
 Variant<NodeTexStruct, T> JsonNode::AccessTexturableData(std::string_view name) const
 {
     using V = Variant<NodeTexStruct, T>;
-    const auto& n = (isMultiNode) ? node.at(name).at(innerIndex)
-                                  : node.at(name);
+    const auto& n = (isMultiNode) ? node->at(name).at(innerIndex)
+                                  : node->at(name);
     return (n.is_object()) ? V(n.get<NodeTexStruct>())
                            : V(n.get<T>());
 }
 
 inline NodeTexStruct JsonNode::AccessTexture(std::string_view name) const
 {
-    const auto& n = (isMultiNode) ? node.at(name).at(innerIndex)
-                                  : node.at(name);
+    const auto& n = (isMultiNode) ? node->at(name).at(innerIndex)
+                                  : node->at(name);
     return n.get<NodeTexStruct>();
 }
 
 inline Optional<NodeTexStruct> JsonNode::AccessOptionalTexture(std::string_view name) const
 {
-    const auto& n = (isMultiNode) ? node.at(name).at(innerIndex)
-                                  : node.at(name);
+    const auto& n = (isMultiNode) ? node->at(name).at(innerIndex)
+                                  : node->at(name);
     if(IsDashed(n)) return std::nullopt;
     else            return n.get<NodeTexStruct>();
 }

@@ -10,12 +10,6 @@
 
 class JsonNode;
 
-struct SceneNode
-{
-    nlohmann::json& jsonNode;
-    uint32_t        innerIndex;
-};
-
 class SceneLoaderMRay : public SceneLoaderI
 {
     public:
@@ -31,15 +25,15 @@ class SceneLoaderMRay : public SceneLoaderI
         void                AddException(MRayError&&);
     };
 
-    using TypeMappedNodes       = std::map<std::string_view, std::vector<JsonNode>>;
+    using TypeMappedNodes       = std::map<std::string, FlatSet<JsonNode>>;
     using TexTypeMappedNodes    = std::map<NodeTexStruct, JsonNode>;
 
-    using PrimIdMappings        = std::map<uint32_t, PrimBatchId>;
-    using CamIdMappings         = std::map<uint32_t, CameraId>;
-    using LightIdMappings       = std::map<uint32_t, LightId>;
-    using TransformIdMappings   = std::map<uint32_t, TransformId>;
-    using MaterialIdMappings    = std::map<uint32_t, MaterialId>;
-    using MediumIdMappings      = std::map<uint32_t, MediumId>;
+    using PrimIdMappings        = std::map<uint32_t, Pair<PrimGroupId, PrimBatchId>>;
+    using CamIdMappings         = std::map<uint32_t, Pair<CameraGroupId, CameraId>>;
+    using LightIdMappings       = std::map<uint32_t, Pair<LightGroupId, LightId>>;
+    using TransformIdMappings   = std::map<uint32_t, Pair<TransGroupId, TransformId>>;
+    using MaterialIdMappings    = std::map<uint32_t, Pair<MatGroupId, MaterialId>>;
+    using MediumIdMappings      = std::map<uint32_t, Pair<MediumGroupId, MediumId>>;
     using TextureIdMappings     = std::map<NodeTexStruct, TextureId>;
 
     template <class Map>
@@ -51,28 +45,35 @@ class SceneLoaderMRay : public SceneLoaderI
 
     static std::string  SceneRelativePathToAbsolute(std::string_view sceneRelativePath,
                                                     std::string_view scenePath);
+    static std::string  CreatePrimBackedLightType(std::string_view lightType,
+                                                  std::string_view primType);
 
     private:
     std::string         scenePath;
     nlohmann::json      sceneJson;
     BS::thread_pool&    threadPool;
 
+    // Temporary Internal Data
     TypeMappedNodes     primNodes;
     TypeMappedNodes     cameraNodes;
     TypeMappedNodes     transformNodes;
     TypeMappedNodes     lightNodes;
     TypeMappedNodes     materialNodes;
     TypeMappedNodes     mediumNodes;
-
     TexTypeMappedNodes  textureNodes;
 
-    //Scene id to -> Tracer id maps
+    // Scene id to -> Tracer id mappings
     MutexedMap<TransformIdMappings> transformMappings;
     MutexedMap<MediumIdMappings>    mediumMappings;
     MutexedMap<PrimIdMappings>      primMappings;
     MutexedMap<MaterialIdMappings>  matMappings;
     MutexedMap<CamIdMappings>       camMappings;
+    MutexedMap<LightIdMappings>     lightMappings;
     TextureIdMappings               texMappings;
+
+    std::vector<SurfaceId>          mRaySurfaces;
+    std::vector<LightSurfaceId>     mRayLightSurfaces;
+    std::vector<CamSurfaceId>       mRayCamSurfaces;
 
     static LightSurfaceStruct               LoadBoundary(const nlohmann::json&);
     static std::vector<SurfaceStruct>       LoadSurfaces(const nlohmann::json&);
@@ -90,7 +91,8 @@ class SceneLoaderMRay : public SceneLoaderI
 
     void        LoadTextures(TracerI&, ExceptionList&);
     void        LoadMediums(TracerI&, ExceptionList&);
-    void        LoadMaterials(TracerI&, ExceptionList&);
+    void        LoadMaterials(TracerI&, ExceptionList&,
+                              uint32_t boundaryMediumId);
     void        LoadTransforms(TracerI&, ExceptionList&);
     void        LoadPrimitives(TracerI&, ExceptionList&);
     void        LoadCameras(TracerI&, ExceptionList&);

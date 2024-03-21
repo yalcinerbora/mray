@@ -332,7 +332,7 @@ template <PrimitiveGroupC PG>
 std::string_view LightGroupPrim<PG>::TypeName()
 {
     using namespace std::literals;
-    static std::string name = "(L)PrimLight"sv + PG::TypeName();
+    static const std::string name = "(L)"sv + PG::TypeName() + "Light"sv;
     return name;
 }
 

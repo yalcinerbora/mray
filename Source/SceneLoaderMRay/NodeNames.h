@@ -42,6 +42,8 @@ namespace NodeNames
     static constexpr string_view ALPHA_MAP      = "alphaMap"sv;
     static constexpr string_view CULL_FACE      = "cullBackFace"sv;
     // Material & Light Common Names
+    static constexpr string_view MEDIUM_FRONT   = "mediumFront"sv;
+    static constexpr string_view MEDIUM_BACK    = "mediumBack"sv;
     static constexpr string_view MEDIUM         = "medium"sv;
     static constexpr string_view LIGHT          = "light"sv;
     static constexpr string_view CAMERA         = "camera"sv;
@@ -53,9 +55,9 @@ namespace NodeNames
     static constexpr string_view TRANSFORM_TYPE_IDENTITY    = "Identity"sv;
 
     // Texture Node Related Names
-    static constexpr string_view TEX_NODE_FILE = "file"sv;
+    static constexpr string_view TEX_NODE_FILE      = "file"sv;
     static constexpr string_view TEX_NODE_AS_SIGNED = "asSigned"sv;
-    static constexpr string_view TEX_NODE_IS_DATA = "isData"sv;
+    static constexpr string_view TEX_NODE_IS_DATA   = "isData"sv;
 
 
     //static constexpr string_view TEXTURE_IS_CACHED  = "isCached"sv;

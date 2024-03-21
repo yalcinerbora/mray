@@ -20,16 +20,29 @@ set(SRC_MATERIALS
     ${CURRENT_SOURCE_DIR}/MaterialsDefault.hpp
     ${CURRENT_SOURCE_DIR}/MaterialsDefault.cpp)
 
+set(SRC_CAMERAS
+    ${CURRENT_SOURCE_DIR}/CameraC.h
+    ${CURRENT_SOURCE_DIR}/CamerasDefault.h
+    ${CURRENT_SOURCE_DIR}/CamerasDefault.hpp
+    ${CURRENT_SOURCE_DIR}/CamerasDefault.cpp)
+
+set(SRC_MEDIUMS
+    ${CURRENT_SOURCE_DIR}/MediumC.h
+    ${CURRENT_SOURCE_DIR}/MediumsDefault.h
+    ${CURRENT_SOURCE_DIR}/MediumsDefault.hpp
+    ${CURRENT_SOURCE_DIR}/MediumsDefault.cpp)
+
+set(SRC_LIGHTS
+    ${CURRENT_SOURCE_DIR}/LightC.h
+    ${CURRENT_SOURCE_DIR}/Lights.h
+    ${CURRENT_SOURCE_DIR}/Lights.hpp)
+
 set(SRC_ACCELLERATORS
     ${CURRENT_SOURCE_DIR}/AcceleratorC.h
     ${CURRENT_SOURCE_DIR}/AcceleratorInstance.h
     ${CURRENT_SOURCE_DIR}/AcceleratorLinear.h
     ${CURRENT_SOURCE_DIR}/AcceleratorLinear.hpp)
 
-set(SRC_LIGHTS
-    ${CURRENT_SOURCE_DIR}/LightC.h
-    ${CURRENT_SOURCE_DIR}/Lights.h
-    ${CURRENT_SOURCE_DIR}/Lights.hpp)
 
 set(SRC_RANDOM
     ${CURRENT_SOURCE_DIR}/Random.h
@@ -54,11 +67,13 @@ set(SRC_COMMON
 set(SRC_ALL
     ${SRC_PRIMITIVES}
     ${SRC_MATERIALS}
-    ${SRC_ACCELLERATORS}
+    ${SRC_CAMERAS}
+    ${SRC_MEDIUMS}
     ${SRC_LIGHTS}
-    ${SRC_RANDOM}
     ${SRC_TRANSFORMS}
+    ${SRC_ACCELLERATORS}
     ${SRC_RENDERERS}
+    ${SRC_RANDOM}
     ${SRC_UTILITY}
     ${SRC_COMMON})
 
@@ -66,6 +81,8 @@ set(SRC_ALL
 source_group("Primitives" FILES ${SRC_PRIMITIVES})
 source_group("Transforms" FILES ${SRC_TRANSFORMS})
 source_group("Materials" FILES ${SRC_MATERIALS})
+source_group("Mediums" FILES ${SRC_MEDIUMS})
+source_group("Cameras" FILES ${SRC_CAMERAS})
 source_group("Accelerators" FILES ${SRC_ACCELLERATORS})
 source_group("Lights" FILES ${SRC_LIGHTS})
 source_group("Random" FILES ${SRC_RANDOM})

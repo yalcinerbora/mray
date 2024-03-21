@@ -32,6 +32,13 @@ namespace TracerConstants
 {
     static constexpr size_t MaxPrimBatchPerSurface = 8;
     static constexpr size_t MaxAttributePerGroup = 16;
+
+    static constexpr std::string_view LIGHT_PREFIX      = "(L)";
+    static constexpr std::string_view TRANSFORM_PREFIX  = "(T)";
+    static constexpr std::string_view PRIM_PREFIX       = "(P)";
+    static constexpr std::string_view MAT_PREFIX        = "(M)";
+    static constexpr std::string_view CAM_PREFIX        = "(C)";
+    static constexpr std::string_view MEDIUM_PREFIX     = "(Me)";
 }
 
 enum class AcceleratorType
@@ -189,10 +196,10 @@ using MediumAttributeInfoList = TexturedAttributeInfoList;
 MRAY_GENERIC_ID(SurfaceId, uint32_t);
 MRAY_GENERIC_ID(LightSurfaceId, uint32_t);
 MRAY_GENERIC_ID(CamSurfaceId, uint32_t);
-using SurfaceMatList = std::array<MaterialId, TracerConstants::MaxPrimBatchPerSurface>;
-using SurfacePrimList = std::array<PrimBatchId, TracerConstants::MaxPrimBatchPerSurface>;
-using OptionalAlphaMapList = std::array<Optional<TextureId>, TracerConstants::MaxPrimBatchPerSurface>;
-using CullBackfaceFlagList = std::array<bool, TracerConstants::MaxPrimBatchPerSurface>;
+using SurfaceMatList        = StaticVector<MaterialId, TracerConstants::MaxPrimBatchPerSurface>;
+using SurfacePrimList       = StaticVector<PrimBatchId, TracerConstants::MaxPrimBatchPerSurface>;
+using OptionalAlphaMapList  = StaticVector<Optional<TextureId>, TracerConstants::MaxPrimBatchPerSurface>;
+using CullBackfaceFlagList  = StaticVector<bool, TracerConstants::MaxPrimBatchPerSurface>;
 // Renderer Related
 MRAY_GENERIC_ID(RendererId, uint32_t);
 using RendererAttributeInfo = GenericAttributeInfo;
@@ -217,17 +224,10 @@ namespace TracerConstants
     static constexpr TextureId InvalidTexture           = TextureId{0};
     static constexpr MediumPair VacuumMediumPair        = std::make_pair(VacuumMediumId, VacuumMediumId);
 
-    static constexpr auto NoAlphaMapList = OptionalAlphaMapList
-    {
-        std::nullopt,std::nullopt,std::nullopt,std::nullopt,
-        std::nullopt,std::nullopt,std::nullopt,std::nullopt
-    };
-
-    static constexpr auto CullFaceTrueList = CullBackfaceFlagList
-    {
-        true, true, true, true,
-        true, true, true, true
-    };
+    static const auto NoAlphaMapList = OptionalAlphaMapList(StaticVecSize(MaxPrimBatchPerSurface),
+                                                            std::nullopt);
+    static const auto CullFaceTrueList = CullBackfaceFlagList(StaticVecSize(MaxPrimBatchPerSurface),
+                                                              true);
 };
 
 class [[nodiscard]] TracerI
@@ -252,13 +252,13 @@ class [[nodiscard]] TracerI
     virtual LightAttributeInfoList      AttributeInfo(LightGroupId) const = 0;
     virtual RendererAttributeInfoList   AttributeInfo(RendererId) const = 0;
 
-    virtual PrimAttributeInfoList       PrimAttributeInfo(std::string_view) const = 0;
-    virtual CamAttributeInfoList        CamAttributeInfo(std::string_view) const = 0;
-    virtual MediumAttributeInfoList     MediumAttributeInfo(std::string_view) const = 0;
-    virtual MatAttributeInfoList        MatAttributeInfo(std::string_view) const = 0;
-    virtual TransAttributeInfoList      TransAttributeInfo(std::string_view) const = 0;
-    virtual LightAttributeInfoList      LightAttributeInfo(std::string_view) const = 0;
-    virtual RendererAttributeInfoList   RendererAttributeInfo(std::string_view) const = 0;
+    virtual PrimAttributeInfoList       AttributeInfoPrim(std::string_view) const = 0;
+    virtual CamAttributeInfoList        AttributeInfoCam(std::string_view) const = 0;
+    virtual MediumAttributeInfoList     AttributeInfoMedium(std::string_view) const = 0;
+    virtual MatAttributeInfoList        AttributeInfoMat(std::string_view) const = 0;
+    virtual TransAttributeInfoList      AttributeInfoTrans(std::string_view) const = 0;
+    virtual LightAttributeInfoList      AttributeInfoLight(std::string_view) const = 0;
+    virtual RendererAttributeInfoList   AttributeInfoRenderer(std::string_view) const = 0;
 
     virtual std::string                 TypeName(PrimGroupId) const = 0;
     virtual std::string                 TypeName(CameraGroupId) const = 0;
@@ -346,8 +346,7 @@ class [[nodiscard]] TracerI
     //            Lights              //
     //================================//
     // Analytical / Primitive-backed Lights
-    virtual LightGroupId    CreateLightGroup(std::string typeName,
-                                             PrimGroupId = TracerConstants::EmptyPrimitive) = 0;
+    virtual LightGroupId    CreateLightGroup(std::string typeName) = 0;
     virtual LightId         ReserveLight(LightGroupId, AttributeCountList,
                                          PrimBatchId = TracerConstants::EmptyPrimBatch) = 0;
     virtual LightIdList     ReserveLights(LightGroupId,

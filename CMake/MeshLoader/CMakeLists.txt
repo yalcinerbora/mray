@@ -23,3 +23,11 @@ target_link_libraries(MeshLoader
 target_compile_definitions(MeshLoader
                            PRIVATE
                            MRAY_MESHLOADER_SHARED_EXPORT)
+
+# Copy DLLS
+if(MSVC)
+add_custom_command(TARGET MeshLoader POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                   "${MRAY_CONFIG_LIB_DIRECTORY}/assimp$<$<CONFIG:Debug>:d>.dll"
+                   ${MRAY_CONFIG_BIN_DIRECTORY})
+endif()

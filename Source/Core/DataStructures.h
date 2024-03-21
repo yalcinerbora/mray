@@ -4,6 +4,8 @@
 #include "Core/Types.h"
 #include <bit>
 #include <type_traits>
+#include <numeric>
+#include <algorithm>
 
 // Stratified Discrete Alias Table
 //
@@ -123,12 +125,15 @@ class LookupTable
 // are skipped purposefully.
 //
 // Tries to be API compatible (but not really) with std::vector
+// All is marked "constexpr" however it is hard/impossible (maybe?) to
+// create compile-time version of it for all types trivial/non-trivial
+// (copy/move)-constrcutible types, etc.
 //
 // Lets not make the mistake of old std::vector impl
 enum class StaticVecSize : size_t {};
 
 template<class T, size_t N>
-class alignas(alignof(T)) StaticVector
+class alignas(std::max(alignof(T), size_t(8))) StaticVector
 {
     static constexpr size_t JUMP_SIZE = std::max(sizeof(T), alignof(T));
     static constexpr size_t ALLOCATION_SIZE = sizeof(T) * JUMP_SIZE;
@@ -142,9 +147,8 @@ class alignas(alignof(T)) StaticVector
     constexpr T*            ItemAt(size_t);
     constexpr const T*      ItemAt(size_t) const;
     constexpr void          DestructObjectAt(size_t);
-
-
-    //constexpr void          ConstrcutObjectAt(size_t);
+    template<class... Args>
+    constexpr T&            ConstructObjectAt(size_t, Args...);
 
     public:
     // Constructors & Destructor
@@ -190,6 +194,133 @@ class alignas(alignof(T)) StaticVector
     template<class... Args>
     constexpr T&            emplace_back(Args&&...);
     constexpr void          pop_back();
+};
+
+
+// Flat set implementation (only MSVC has c++23 flat_map/set currently)
+// This is a basic impl prob not std compliant
+
+enum class IsSorted : size_t
+{};
+
+template<class T,
+         class Compare = std::less<T>,
+         class Container = std::vector<T>>
+class FlatSet
+{
+    public:
+    using iterator                  = typename Container::iterator;
+    using const_iterator            = typename Container::const_iterator;
+    using reverse_iterator          = typename Container::reverse_iterator;
+    using const_reverse_iterator    = typename Container::const_reverse_iterator;
+
+    private:
+    Container           container;
+    Compare             compare;
+
+    public:
+    // Constructors & Destructor
+                    FlatSet();
+                    FlatSet(Container);
+    template <class Alloc>
+                    FlatSet(Container, const Alloc&);
+    explicit        FlatSet(const Compare&);
+    template <class Alloc>
+                    FlatSet(const Compare&, const Alloc&);
+    template <class Alloc>
+                    FlatSet(const Alloc&);
+    template <class InputIterator>
+                    FlatSet(InputIterator, InputIterator,
+                            const Compare& = Compare());
+    template <class InputIterator, class Alloc>
+                    FlatSet(InputIterator, InputIterator,
+                            const Compare&, const Alloc&);
+    template <class InputIterator, class Alloc>
+                    FlatSet(InputIterator, InputIterator,
+                            const Alloc&);
+    template <class Alloc>
+                    FlatSet(std::initializer_list<T>,
+                            const Compare&, const Alloc&);
+    template <class Alloc>
+                    FlatSet(std::initializer_list<T>, const Alloc&);
+
+    // Sorted Variants
+                    FlatSet(IsSorted, Container);
+    template <class Alloc>
+                    FlatSet(IsSorted, Container, const Alloc&);
+    template <class InputIterator>
+                    FlatSet(IsSorted, InputIterator, InputIterator,
+                            const Compare& = Compare());
+    template <class InputIterator, class Alloc>
+                    FlatSet(IsSorted, InputIterator, InputIterator,
+                            const Compare&, const Alloc&);
+    template <class InputIterator, class Alloc>
+                    FlatSet(IsSorted, InputIterator, InputIterator,
+                            const Alloc&);
+                    FlatSet(std::initializer_list<T>,
+                            const Compare& = Compare());
+                    FlatSet(IsSorted, std::initializer_list<T>,
+                            const Compare& = Compare());
+    template <class Alloc>
+                    FlatSet(IsSorted, std::initializer_list<T>,
+                            const Compare&, const Alloc&);
+    template <class Alloc>
+                    FlatSet(IsSorted, std::initializer_list<T>,
+                            const Alloc&);
+    // Iterators
+    iterator        begin();
+    const_iterator  begin() const;
+    const_iterator  cbegin() const;
+
+    iterator        end();
+    const_iterator  end() const;
+    const_iterator  cend() const;
+
+    iterator        rbegin();
+    const_iterator  rbegin() const;
+    const_iterator  crbegin() const;
+
+    iterator        rend();
+    const_iterator  rend() const;
+    const_iterator  crend() const;
+
+    // Capacity
+    bool            empty() const;
+    size_t          size() const;
+    size_t          max_size() const;
+
+    // Modifiers
+    template<class... Args>
+    std::pair<iterator, bool>   emplace(Args&&...);
+    // TODO: emplace_hint
+
+    std::pair<iterator, bool>   insert(const T&);
+    std::pair<iterator, bool>   insert(T&&);
+    // TODO: other inserts
+
+    // Container Swap
+    Container       extract() &&;
+    void            replace(Container&&);
+
+    // TODO: erease
+    // TODO: swap
+    void            clear();
+
+    // Lookup
+    iterator        find(const T&);
+    const_iterator  find(const T&) const;
+    size_t          count(const T&) const;
+    bool            contains(const T&) const;
+    iterator        lower_bound(const T&);
+    const_iterator  lower_bound(const T&) const;
+    iterator        upper_bound(const T&);
+    const_iterator  upper_bound(const T&) const;
+    iterator        equal_range(const T&);
+    const_iterator  equal_range(const T&) const;
+
+    // Indexed access EXTRA from standard
+    T&              operator[](size_t);
+    const T&        operator[](size_t) const;
 };
 
 #include "DataStructures.hpp"

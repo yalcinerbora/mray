@@ -11,7 +11,7 @@
 
 #if defined MRAY_WINDOWS
 
-static void PrintErrorWin32()
+static std::string FormatErrorWin32()
 {
     DWORD errorMessageID = GetLastError();
 
@@ -22,11 +22,10 @@ static void PrintErrorWin32()
                                  NULL, errorMessageID,
                                  MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
                                  (LPSTR)&messageBuffer, 0, NULL);
-
     // Get the buffer
     std::string message(messageBuffer, size);
-    MRAY_ERROR_LOG("{:s}", message);
     LocalFree(messageBuffer);
+    return message;
 }
 
 static std::wstring ConvertWCharWin32(const std::string& unicodeStr)
@@ -67,26 +66,27 @@ const void* SharedLibrary::GetProcAdressInternal(const std::string& fName) const
         FARPROC proc = GetProcAddress((HINSTANCE)libHandle, fName.c_str());
         if(proc == nullptr)
         {
-            PrintErrorWin32();
+            throw MRayError("{}", FormatErrorWin32());
         }
         return (void*)proc;
     #elif defined MRAY_LINUX
         void* result = dlsym(libHandle, fName.c_str());
         if(result == nullptr)
-            MRAY_ERROR_LOG("{}", dlerror());
+            throw MRayError("{}", dlerror());
         return result;
     #endif
 }
 
 SharedLibrary::SharedLibrary(const std::string& libName)
 {
+    std::string potentialError;
     std::string libWithExt = libName;
     #if defined MRAY_WINDOWS
         libWithExt += WinDLLExt;
         libHandle = (void*)LoadLibrary(ConvertWCharWin32(libWithExt).c_str());
         if(libHandle == nullptr)
         {
-            PrintErrorWin32();
+            potentialError = FormatErrorWin32();
         }
     #elif defined METURAY_LINUX
         libWithExt = "lib";
@@ -99,11 +99,11 @@ SharedLibrary::SharedLibrary(const std::string& libName)
         libWithExt = Utility::MergeFileFolder(execPath, libWithExt);
         libHandle = dlopen(libWithExt.c_str(), RTLD_NOW);
         if(libHandle == nullptr)
-            METU_ERROR_LOG("{}", dlerror());
+            potentialError = dlerror();
     #endif
 
     if(libHandle == nullptr)
-        throw MRayError("[DLLError] D");
+        throw MRayError("[DLLError] {}", potentialError);
 }
 
 SharedLibrary::~SharedLibrary()

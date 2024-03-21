@@ -6,6 +6,7 @@
 #include "Core/TracerI.h"
 
 #include <nlohmann/json.hpp>
+#include <functional>
 
 #include "NodeNames.h"
 
@@ -122,15 +123,18 @@ TextureAccessLayout LoadTextureAccessLayout(const nlohmann::json& node);
 
 class JsonNode
 {
-
     private:
-    const nlohmann::json&   node;
-    bool                    isMultiNode;
-    uint32_t                innerIndex;
+    const nlohmann::json*           node;
+    bool                            isMultiNode;
+    uint32_t                        innerIndex;
 
     public:
                             JsonNode(const nlohmann::json& node,
                                      uint32_t innerIndex = 0);
+
+    // Id-based comparison
+    bool                    operator<(const JsonNode other) const;
+
 
     const nlohmann::json&   RawNode() const;
     std::string_view        Type() const;

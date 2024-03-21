@@ -90,6 +90,16 @@ mray_build_ext_dependency_git(
 )
 append_cmake_prefix_path(${ZLIB_INSTALL_LOC})
 
+# Copy zlib.dll to "Lib"
+ExternalProject_Add_Step(oiio_zlib_ext install_extra
+                WORKING_DIRECTORY ${ZLIB_INSTALL_LOC}/
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        zlib$<$<CONFIG:Debug>:d>${CMAKE_SHARED_LIBRARY_SUFFIX}
+                        ${MRAY_CONFIG_LIB_DIRECTORY}
+                DEPENDEES install
+                COMMENT "Copy zlib to Lib folder"
+)
+
 # Boost FS and thread
 set(BOOST_INSTALL_LOC ${OIIO_TMP_DIR}/boost)
 mray_build_ext_dependency_git(
@@ -258,7 +268,7 @@ mray_build_ext_dependency_git(
             -DBUILD_MISSING_FMT=OFF # We have a fmt
             -DINTERNALIZE_FMT=OFF # On Linux this was required
             -DALWAYS_PREFER_CONFIG=ON
-            # Do not use system
+            # Do not use system (clash with miniconda etc...)
             -DCMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH=OFF
             -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
             # Dep Root Files
@@ -284,35 +294,8 @@ mray_build_ext_dependency_git(
             libjpeg_turbo_ext
             libpng_ext
             fmt_ext
+            oiio_zlib_ext
 )
-
-# Issue of https://github.com/OpenImageIO/oiio/pull/3862
-# It is not merged but we can patch it!
-# I will add this as an extra step since we cant modify
-# patch step after.
-set(MRAY_OIIO_SRC_LOCATION ${MRAY_EXT_DIRECTORY}/oiio_ext/)
-
-# DL'in file here instead
-# file(DOWNLOAD https://github.com/OpenImageIO/oiio/pull/3862.patch
-#               ${MRAY_OIIO_SRC_LOCATION}/../3862.patch)
-
-# ExternalProject_Add_Step(oiio_ext patch_extra
-#                 WORKING_DIRECTORY ${MRAY_OIIO_SRC_LOCATION}/
-#                 # Couldnt able to make this work
-#                 # COMMAND curl --create-dirs -s -o ${MRAY_OIIO_SRC_LOCATION}/3862.patch
-#                 #         "https://github.com/OpenImageIO/oiio/pull/3862.patch"
-#                 # Download patch at configure step, then copy here
-#                 #
-#                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
-#                         ${MRAY_OIIO_SRC_LOCATION}/../3862.patch
-#                         .
-#                 # This is also not good, it will move head back and forth but this tecnhically
-#                 # will run only initially so it is kinda fine.
-#                 COMMAND git am 3862.patch
-#                 DEPENDEES download update
-#                 DEPENDERS configure
-#                 COMMENT "Applying a patch to oiio"
-# )
 
 # Get the name of the deps outside
 set(MRAY_OIIO_EXT_DEP_TARGETS

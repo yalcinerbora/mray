@@ -66,55 +66,64 @@ Optional<const V&> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
     return std::nullopt;
 }
 
-
 template<class T, size_t N>
 constexpr Byte* StaticVector<T, N>::ItemLocation(size_t i)
 {
+    assert(i < N);
     return storage + i * JUMP_SIZE;
 }
 
 template<class T, size_t N>
 constexpr const Byte* StaticVector<T, N>::ItemLocation(size_t i) const
 {
+    assert(i < N);
     return storage + i * JUMP_SIZE;
 }
 
 template<class T, size_t N>
-constexpr T* StaticVector<T, N>::ItemAt(size_t i )
+constexpr T* StaticVector<T, N>::ItemAt(size_t i)
 {
-    assert(count > i);
     return std::launder(reinterpret_cast<T*>(ItemLocation(i)));
 }
 
 template<class T, size_t N>
 constexpr const T* StaticVector<T, N>::ItemAt(size_t i) const
 {
-    assert(count > i);
     return std::launder(reinterpret_cast<const T*>(ItemLocation(i)));
+}
+
+template<class T, size_t N>
+template<class... Args>
+constexpr T& StaticVector<T, N>::ConstructObjectAt(size_t i, Args... args)
+{
+    return *std::construct_at(reinterpret_cast<T*>(ItemLocation(i)),
+                              std::forward<Args>(args)...);
 }
 
 template<class T, size_t N>
 constexpr void StaticVector<T, N>::DestructObjectAt(size_t i)
 {
-    assert(count > i);
+    assert(i < count);
     T* item = std::launder(reinterpret_cast<T*>(ItemLocation(i)));
     item->~T();
 }
 
 template<class T, size_t N>
 constexpr StaticVector<T, N>::StaticVector()
-    : count(0)
+    : storage()
+    , count(0)
 {}
 
 template<class T, size_t N>
 constexpr StaticVector<T, N>::StaticVector(StaticVecSize countIn)
 requires std::is_default_constructible_v<T>
-    : count(static_cast<size_t>(countIn))
+    : storage()
+    , count(static_cast<size_t>(countIn))
 {
     assert(count <= N);
     for(size_t i = 0; i < count; i++)
     {
-        new(ItemLocation(i)) T();
+        ConstructObjectAt(i);
     }
 }
 
@@ -122,35 +131,40 @@ template<class T, size_t N>
 constexpr StaticVector<T, N>::StaticVector(StaticVecSize countIn,
                                            const T& initialValue)
 requires std::is_copy_constructible_v<T>
-    : count(static_cast<size_t>(countIn))
+    : storage()
+    , count(static_cast<size_t>(countIn))
 {
     assert(count <= N);
     for(size_t i = 0; i < count; i++)
     {
-        new(ItemLocation(i)) T(initialValue);
+        ConstructObjectAt(i, initialValue);
     }
 }
 
 template<class T, size_t N>
 constexpr StaticVector<T, N>::StaticVector(const StaticVector& other)
 requires std::is_copy_constructible_v<T>
-    : count(other.count)
+    : storage()
+    , count(other.count)
 {
     assert(count <= N);
     for(size_t i = 0; i < count; i++)
     {
-        new(ItemLocation(i)) T(other[i]);
+        ConstructObjectAt(i, other[i]);
     }
 }
 
 template<class T, size_t N>
 constexpr StaticVector<T, N>::StaticVector(StaticVector&& other)
 requires std::is_move_constructible_v<T>
+    : storage()
+    , count(other.count)
 {
     assert(count <= N);
     for(size_t i = 0; i < count; i++)
     {
-        new(ItemLocation(i)) T(std::move(other[i]));
+        // TODO: This is %99 wrong, check it
+        ConstructObjectAt(i, std::move(other[i]));
     }
 }
 
@@ -164,7 +178,7 @@ requires std::is_copy_assignable_v<T>
     {
         if constexpr(!std::is_trivially_default_constructible_v<T>)
             DestructObjectAt(i);
-        new(ItemLocation(i)) T(other[i]);
+        ConstructObjectAt(i, other[i]);
     }
 }
 
@@ -179,7 +193,7 @@ requires std::is_move_assignable_v<T>
     {
         if constexpr(!std::is_trivially_default_constructible_v<T>)
             DestructObjectAt(i);
-        new(ItemLocation(i)) T(other[i]);
+        ConstructObjectAt(i, std::move(other[i]));
     }
     return *this;
 }
@@ -194,12 +208,14 @@ requires(!std::is_trivially_destructible_v<T>)
 template<class T, size_t N>
 constexpr T& StaticVector<T, N>::operator[](size_t i)
 {
+    assert(i < count);
     return *ItemAt(i);
 }
 
 template<class T, size_t N>
 constexpr const T& StaticVector<T, N>::operator[](size_t i) const
 {
+    assert(i < count);
     return *ItemAt(i);
 }
 
@@ -230,12 +246,14 @@ constexpr const T& StaticVector<T, N>::back() const
 template<class T, size_t N>
 constexpr T& StaticVector<T, N>::front()
 {
+    assert(count > 0);
     return *ItemAt(0);
 }
 
 template<class T, size_t N>
 constexpr const T& StaticVector<T, N>::front() const
 {
+    assert(count > 0);
     return *ItemAt(0);
 }
 
@@ -298,7 +316,7 @@ template<class T, size_t N>
 constexpr void StaticVector<T, N>::push_back(const T& t)
 {
     assert(count < N);
-    new(ItemLocation(count)) T(t);
+    ConstructObjectAt(count, t);
     count++;
 }
 
@@ -306,7 +324,7 @@ template<class T, size_t N>
 constexpr void StaticVector<T, N>::push_back(T&& t)
 {
     assert(count < N);
-    new(ItemLocation(count)) T(std::forward<T>(t));
+    ConstructObjectAt(count, std::forward<T>(t));
     count++;
 }
 
@@ -315,9 +333,9 @@ template<class... Args>
 constexpr T& StaticVector<T, N>::emplace_back(Args&&... args)
 {
     assert(count < N);
-    T* ptr = new(ItemLocation(count)) T(std::forward<Args>(args)...);
+    T& ref = ConstructObjectAt(count, std::forward<Args>(args)...);
     count++;
-    return *ptr;
+    return ref;
 }
 
 template<class T, size_t N>
@@ -329,4 +347,412 @@ constexpr void StaticVector<T, N>::pop_back()
         DestructObjectAt(count - 1);
     }
     count--;
+}
+
+
+template <class T, class Comp, class Cont>
+FlatSet<T, Comp, Cont>::FlatSet()
+{}
+
+template <class T, class Comp, class Cont>
+FlatSet<T, Comp, Cont>::FlatSet(Cont c)
+    : FlatSet(IsSorted(), c)
+{
+    std::sort(container.begin(), container.end(), compare);
+}
+
+template <class T, class Comp, class Cont>
+template <class Alloc>
+FlatSet<T, Comp, Cont>::FlatSet(Cont c, const Alloc& a)
+    : FlatSet(IsSorted(), c, a)
+{
+    std::sort(container.begin(), container.end(), compare);
+}
+
+template <class T, class Comp, class Cont>
+FlatSet<T, Comp, Cont>::FlatSet(const Comp& comp)
+    : container()
+    , compare(comp)
+{}
+
+template <class T, class Comp, class Cont>
+template <class Alloc>
+FlatSet<T, Comp, Cont>::FlatSet(const Comp& comp, const Alloc& a)
+    : container(a)
+    , compare(comp)
+{}
+
+template <class T, class Comp, class Cont>
+template <class Alloc>
+FlatSet<T, Comp, Cont>::FlatSet(const Alloc& a)
+    : container(a)
+{}
+
+template <class T, class Comp, class Cont>
+template <class InputIterator>
+FlatSet<T, Comp, Cont>::FlatSet(InputIterator first, InputIterator last,
+                                const Comp& comp)
+    : FlatSet(IsSorted(), first, last, comp)
+{
+    std::sort(container.begin(), container.end(), compare);
+}
+
+template <class T, class Comp, class Cont>
+template <class InputIterator, class Alloc>
+FlatSet<T, Comp, Cont>::FlatSet(InputIterator first, InputIterator last,
+                                const Comp& comp, const Alloc& a)
+    : FlatSet(IsSorted(), first, last, comp, a)
+{
+    std::sort(container.begin(), container.end(), compare);
+}
+
+template <class T, class Comp, class Cont>
+template <class InputIterator, class Alloc>
+FlatSet<T, Comp, Cont>::FlatSet(InputIterator first, InputIterator last,
+                                const Alloc& a)
+    : FlatSet(IsSorted(), first, last, a)
+{
+    std::sort(container.begin(), container.end(), compare);
+}
+
+template <class T, class Comp, class Cont>
+FlatSet<T, Comp, Cont>::FlatSet(std::initializer_list<T> il,
+                                const Comp& comp)
+    : FlatSet(IsSorted(), il, comp)
+{
+    std::sort(container.begin(), container.end(), compare);
+}
+
+template <class T, class Comp, class Cont>
+template <class Alloc>
+FlatSet<T, Comp, Cont>::FlatSet(std::initializer_list<T> il,
+                                const Comp& comp, const Alloc& a)
+    : FlatSet(IsSorted(), il, comp, a)
+{
+    std::sort(container.begin(), container.end(), compare);
+}
+
+template <class T, class Comp, class Cont>
+template <class Alloc>
+FlatSet<T, Comp, Cont>::FlatSet(std::initializer_list<T> il, const Alloc& a)
+    : FlatSet(IsSorted(), il, a)
+{
+    std::sort(container.begin(), container.end(), compare);
+}
+
+template <class T, class Comp, class Cont>
+FlatSet<T, Comp, Cont>::FlatSet(IsSorted, Cont c)
+    : container(c)
+{}
+
+template <class T, class Comp, class Cont>
+template <class Alloc>
+FlatSet<T, Comp, Cont>::FlatSet(IsSorted, Cont c, const Alloc& a)
+    : container(c, a)
+{}
+
+template <class T, class Comp, class Cont>
+template <class InputIterator>
+FlatSet<T, Comp, Cont>::FlatSet(IsSorted, InputIterator first,
+                                InputIterator last,
+                                const Comp& comp)
+    : container(first, last)
+    , compare(comp)
+{}
+
+template <class T, class Comp, class Cont>
+template <class InputIterator, class Alloc>
+FlatSet<T, Comp, Cont>::FlatSet(IsSorted, InputIterator first,
+                                InputIterator last,
+                                const Comp& comp, const Alloc& a)
+    : container(first, last, a)
+    , compare(comp)
+{}
+
+template <class T, class Comp, class Cont>
+template <class InputIterator, class Alloc>
+FlatSet<T, Comp, Cont>::FlatSet(IsSorted, InputIterator first,
+                                InputIterator last,
+                                const Alloc& a)
+    : container(first, last, a)
+    , compare(Comp())
+{}
+
+template <class T, class Comp, class Cont>
+FlatSet<T, Comp, Cont>::FlatSet(IsSorted, std::initializer_list<T> il,
+                                const Comp& comp)
+    : container(il)
+    , compare(comp)
+{}
+
+template <class T, class Comp, class Cont>
+template <class Alloc>
+FlatSet<T, Comp, Cont>::FlatSet(IsSorted, std::initializer_list<T> il,
+                                const Comp& comp, const Alloc& a)
+    : container(il, a)
+    , compare(comp)
+
+{}
+
+template <class T, class Comp, class Cont>
+template <class Alloc>
+FlatSet<T, Comp, Cont>::FlatSet(IsSorted, std::initializer_list<T> il,
+                                const Alloc& a)
+    : container(il, a)
+    , compare(Comp())
+{}
+
+template <class T, class Comp, class Cont>
+typename FlatSet<T, Comp, Cont>::iterator FlatSet<T, Comp, Cont>::begin()
+{
+    return container.begin();
+}
+
+template <class T, class Comp, class Cont>
+typename FlatSet<T, Comp, Cont>::const_iterator FlatSet<T, Comp, Cont>::begin() const
+{
+    return container.begin();
+}
+
+template <class T, class Comp, class Cont>
+typename FlatSet<T, Comp, Cont>::const_iterator
+FlatSet<T, Comp, Cont>::cbegin() const
+{
+    return container.cbegin();
+}
+
+template <class T, class Comp, class Cont>
+typename FlatSet<T, Comp, Cont>::iterator
+FlatSet<T, Comp, Cont>::end()
+{
+    return container.end();
+}
+
+template <class T, class Comp, class Cont>
+typename FlatSet<T, Comp, Cont>::const_iterator
+FlatSet<T, Comp, Cont>::end() const
+{
+    return container.end();
+}
+
+template <class T, class Comp, class Cont>
+typename FlatSet<T, Comp, Cont>::const_iterator
+FlatSet<T, Comp, Cont>::cend() const
+{
+    return container.cend();
+}
+
+template <class T, class Comp, class Cont>
+typename FlatSet<T, Comp, Cont>::iterator
+FlatSet<T, Comp, Cont>::rbegin()
+{
+    return container.rbegin();
+}
+
+template <class T, class Comp, class Cont>
+typename FlatSet<T, Comp, Cont>::const_iterator
+FlatSet<T, Comp, Cont>::rbegin() const
+{
+    return container.rbegin();
+}
+
+template <class T, class Comp, class Cont>
+typename FlatSet<T, Comp, Cont>::const_iterator
+FlatSet<T, Comp, Cont>::crbegin() const
+{
+    return container.crbegin();
+}
+
+template <class T, class Comp, class Cont>
+typename FlatSet<T, Comp, Cont>::iterator
+FlatSet<T, Comp, Cont>::rend()
+{
+    return container.rend();
+}
+
+template <class T, class Comp, class Cont>
+typename FlatSet<T, Comp, Cont>::const_iterator
+FlatSet<T, Comp, Cont>::rend() const
+{
+    return container.rend();
+}
+
+template <class T, class Comp, class Cont>
+typename FlatSet<T, Comp, Cont>::const_iterator
+FlatSet<T, Comp, Cont>::crend() const
+{
+    return container.crend();
+}
+
+template <class T, class Comp, class Cont>
+bool FlatSet<T, Comp, Cont>::empty() const
+{
+    return container.empty();
+}
+
+template <class T, class Comp, class Cont>
+size_t FlatSet<T, Comp, Cont>::size() const
+{
+    return container.size();
+}
+
+template <class T, class Comp, class Cont>
+size_t FlatSet<T, Comp, Cont>::max_size() const
+{
+    return std::numeric_limits<size_t>::max();
+}
+
+template <class T, class Comp, class Cont>
+template<class... Args>
+std::pair<typename FlatSet<T, Comp, Cont>::iterator, bool>
+FlatSet<T, Comp, Cont>::emplace(Args&&... args)
+{
+    // delegate to move insert
+    return insert(T(std::forward<Args>(args)...));
+}
+
+template <class T, class Comp, class Cont>
+std::pair<typename FlatSet<T, Comp, Cont>::iterator, bool>
+FlatSet<T, Comp, Cont>::insert(const T& t)
+{
+    // delegate to move version
+    return insert(T(t));
+}
+
+template <class T, class Comp, class Cont>
+std::pair<typename FlatSet<T, Comp, Cont>::iterator, bool>
+FlatSet<T, Comp, Cont>::insert(T&& t)
+{
+    auto loc = std::lower_bound(container.begin(), container.end(),
+                                t, compare);
+    bool shouldInsert = (loc == container.end());
+    if(!shouldInsert)
+    {
+        // Utilize less than for equavilency check
+        // user may not define other operators (such as '==')
+        shouldInsert = !(!compare(t, *loc) &&
+                         !compare(*loc, t));
+    }
+    if(shouldInsert)
+        loc = container.insert(loc, std::forward<T>(t));
+
+    return std::pair(loc, shouldInsert);
+}
+template <class T, class Comp, class Cont>
+Cont FlatSet<T, Comp, Cont>::extract() &&
+{
+    return container;
+}
+
+template <class T, class Comp, class Cont>
+void FlatSet<T, Comp, Cont>::replace(Cont&& c)
+{
+    container = std::move(c);
+}
+
+template <class T, class Comp, class Cont>
+void FlatSet<T, Comp, Cont>::clear()
+{
+    container.clear();
+}
+
+template <class T, class Comp, class Cont>
+typename FlatSet<T, Comp, Cont>::iterator
+FlatSet<T, Comp, Cont>::find(const T& t)
+{
+    auto loc = std::lower_bound(container.begin(), container.end(),
+                                t, compare);
+    if(loc == container.end()) return;
+    if(!compare(t, *loc) && !compare(*loc, t))
+        return loc;
+    else return container.end();
+}
+
+template <class T, class Comp, class Cont>
+typename FlatSet<T, Comp, Cont>::const_iterator
+FlatSet<T, Comp, Cont>::find(const T& t) const
+{
+    auto loc = std::lower_bound(container.begin(), container.end(),
+                                t, compare);
+    if(loc == container.end()) return;
+    if(!compare(t, *loc) && !compare(*loc, t))
+        return loc;
+    else return container.end();
+}
+
+template <class T, class Comp, class Cont>
+size_t FlatSet<T, Comp, Cont>::count(const T& t) const
+{
+    auto loc = find(t);
+    return (loc != container.end()) ? 1 : 0;
+}
+
+template <class T, class Comp, class Cont>
+bool FlatSet<T, Comp, Cont>::contains(const T& t) const
+{
+    auto loc = find(t);
+    return (loc != container.end()) ? 1 : 0;
+}
+
+template <class T, class Comp, class Cont>
+typename FlatSet<T, Comp, Cont>::iterator
+FlatSet<T, Comp, Cont>::lower_bound(const T& t)
+{
+    return std::lower_bound(container.begin(), container.end(),
+                            t, compare);
+}
+
+template <class T, class Comp, class Cont>
+typename FlatSet<T, Comp, Cont>::const_iterator
+FlatSet<T, Comp, Cont>::lower_bound(const T& t) const
+{
+    return std::lower_bound(container.cbegin(), container.cend(),
+                            t, compare);
+}
+
+template <class T, class Comp, class Cont>
+typename FlatSet<T, Comp, Cont>::iterator
+FlatSet<T, Comp, Cont>::upper_bound(const T& t)
+{
+    return std::upper_bound(container.begin(), container.end(),
+                            t, compare);
+}
+
+template <class T, class Comp, class Cont>
+typename FlatSet<T, Comp, Cont>::const_iterator
+FlatSet<T, Comp, Cont>::upper_bound(const T& t) const
+{
+    return std::upper_bound(container.cbegin(), container.cend(),
+                            t, compare);
+}
+
+template <class T, class Comp, class Cont>
+typename FlatSet<T, Comp, Cont>::iterator
+FlatSet<T, Comp, Cont>::equal_range(const T& t)
+{
+    return std::equal_range(container.begin(), container.end(),
+                            t, compare);
+}
+
+
+template <class T, class Comp, class Cont>
+typename FlatSet<T, Comp, Cont>::const_iterator
+FlatSet<T, Comp, Cont>::equal_range(const T& t) const
+{
+    return std::equal_range(container.cbegin(), container.cend(),
+                            t, compare);
+}
+
+template <class T, class Comp, class Cont>
+T& FlatSet<T, Comp, Cont>::operator[](size_t i)
+{
+    assert(i < container.size());
+    return container[i];
+}
+
+template <class T, class Comp, class Cont>
+const T& FlatSet<T, Comp, Cont>::operator[](size_t i) const
+{
+    assert(i < container.size());
+    return container[i];
 }

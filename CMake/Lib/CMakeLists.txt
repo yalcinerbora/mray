@@ -70,29 +70,6 @@ endif()
 add_custom_target(MRayExternal ALL DEPENDS ${MRAY_EXTERNAL_LIBRARIES_STAMP})
 set_target_properties(MRayExternal PROPERTIES FOLDER ${MRAY_PREDEFINED_TARGETS_FOLDER})
 
-#  Add a custom command on mvsc to dll copy
-
-# Tests
-# On windows we need to copy the dlls to the binary folder
-if(MSVC)
-    # add_custom_command(TARGET MRayExternal POST_BUILD
-    #                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    #                    "${MRAY_CONFIG_LIB_DIRECTORY}/spdlog$<$<CONFIG:Debug>:d>.dll"
-    #                    "${MRAY_CONFIG_LIB_DIRECTORY}/ZLIB$<$<CONFIG:Debug>:d>1.dll"
-    #                    ${MRAY_CONFIG_BIN_DIRECTORY})
-
-    # Extra DLL copy for tests
-    if(${MRAY_BUILD_TESTS})
-        add_custom_command(TARGET MRayExternal POST_BUILD
-                           COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                           "${MRAY_CONFIG_LIB_DIRECTORY}/gtest.dll"
-                           "${MRAY_CONFIG_LIB_DIRECTORY}/gtest_main.dll"
-                           "${MRAY_CONFIG_LIB_DIRECTORY}/gmock.dll"
-                           "${MRAY_CONFIG_LIB_DIRECTORY}/gmock_main.dll"
-                           ${MRAY_CONFIG_BIN_DIRECTORY})
-    endif()
-endif()
-
 # Everything should be fine now
 # Our directory structure is solid
 # I've tried find_package route but it is messy :(

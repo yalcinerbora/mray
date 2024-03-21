@@ -27,6 +27,7 @@ target_link_libraries(ImageLoader PRIVATE
 if(MSVC)
     add_custom_command(TARGET ImageLoader POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                       "${MRAY_CONFIG_LIB_DIRECTORY}/zlib$<$<CONFIG:Debug>:d>.dll"
                        "${MRAY_CONFIG_LIB_DIRECTORY}/OpenImageIO$<$<CONFIG:Debug>:d>.dll"
                        "${MRAY_CONFIG_LIB_DIRECTORY}/OpenImageIO_Util$<$<CONFIG:Debug>:d>.dll"
                        ${MRAY_CONFIG_BIN_DIRECTORY})
