@@ -133,6 +133,15 @@ class TracerMock : public TracerI
     size_t transGroupCounter;
     size_t lightGroupCounter;
 
+    // Surface Related
+    std::atomic_size_t  surfaceCounter      = 0;
+    std::atomic_size_t  lightSurfaceCounter = 0;
+    std::atomic_size_t  camSurfaceCounter   = 0;
+
+    // Texture Related
+    std::atomic_size_t  textureCounter  = 0;
+    bool                globalTexCommit = false;
+
     mutable std::mutex pGLock;
     mutable std::mutex cGLock;
     mutable std::mutex meGLock;
@@ -669,9 +678,34 @@ inline PrimBatchId TracerMock::ReservePrimitiveBatch(PrimGroupId id, PrimCount c
     return PrimBatchId(batchId);
 }
 
-inline PrimBatchIdList TracerMock::ReservePrimitiveBatches(PrimGroupId, std::vector<PrimCount>)
+inline PrimBatchIdList TracerMock::ReservePrimitiveBatches(PrimGroupId id,
+                                                           std::vector<PrimCount> primCounts)
 {
-    return PrimBatchIdList{};
+    std::atomic_size_t* atomicCounter = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(pGLock);
+        atomicCounter = &primGroups.at(id).batchCounter;
+    }
+
+    size_t batchIdFirst = atomicCounter->fetch_add(primCounts.size());
+    if(print)
+    {
+        std::string log;
+        for(const auto& count : primCounts)
+        {
+            log += MRAY_FORMAT("Reserving primitive over PrimGroup({}), VCount: {}, PCount: {}",
+                               static_cast<uint32_t>(id), count.attributeCount, count.primCount);
+        }
+        MRAY_LOG("{}", log);
+    }
+
+    PrimBatchIdList result;
+    result.reserve(primCounts.size());
+    for(size_t i = 0; i < primCounts.size(); i++)
+    {
+        result.push_back(PrimBatchId(i + batchIdFirst));
+    };
+    return result;
 }
 
 inline void TracerMock::CommitPrimReservations(PrimGroupId id)
@@ -700,10 +734,16 @@ inline void TracerMock::PushPrimAttribute(PrimGroupId gId,
                                           uint32_t attribIndex,
                                           TransientData data)
 {
-    if(!print) return;
     std::lock_guard<std::mutex> lock(pGLock);
 
-    const auto& attribType = primGroups.at(gId).mp.attribInfo[attribIndex];
+    const auto& pg = primGroups.at(gId);
+    if(!pg.isComitted)
+        throw MRayError("PrimitiveGroup({}) is not committed. "
+                        "You can not push data to it!",
+                        static_cast<uint32_t>(gId));
+    if(!print) return;
+
+    const auto& attribType = pg.mp.attribInfo[attribIndex];
     MRayDataTypeRT dataTypeRT = std::get<PrimAttributeInfo::LAYOUT_INDEX>(attribType);
     MRayDataEnum dataEnum = dataTypeRT.Name();
     size_t dataCount = AcquireTransientDataCount(dataTypeRT, data);
@@ -719,10 +759,16 @@ inline void TracerMock::PushPrimAttribute(PrimGroupId gId,
                                           Vector2ui subBatchRange,
                                           TransientData data)
 {
-    if(!print) return;
     std::lock_guard<std::mutex> lock(pGLock);
 
-    const auto& attribType = primGroups.at(gId).mp.attribInfo[attribIndex];
+    const auto& pg = primGroups.at(gId);
+    if(!pg.isComitted)
+        throw MRayError("PrimitiveGroup({}) is not committed! "
+                        "You can not push data to it!",
+                        static_cast<uint32_t>(gId));
+    if(!print) return;
+
+    const auto& attribType = pg.mp.attribInfo[attribIndex];
     MRayDataTypeRT dataTypeRT = std::get<PrimAttributeInfo::LAYOUT_INDEX>(attribType);
     MRayDataEnum dataEnum = dataTypeRT.Name();
     size_t dataCount = AcquireTransientDataCount(dataTypeRT, data);
@@ -733,86 +779,238 @@ inline void TracerMock::PushPrimAttribute(PrimGroupId gId,
              MRayDataTypeStringifier::ToString(dataEnum), dataCount);
 }
 
-inline MatGroupId TracerMock::CreateMaterialGroup(std::string)
+inline MatGroupId TracerMock::CreateMaterialGroup(std::string name)
 {
-    //auto loc = primMockPack.find(name);
-    //if(loc == primMockPack.cend())
-    //    throw MRayError("Failed to find primitive type: {}", name);
-    //return static_cast<PrimGroupId>(primGroupCounter.fetch_add(1));
+    auto loc = matMockPack.find(name);
+    if(loc == matMockPack.cend())
+        throw MRayError("Failed to find material type: {}", name);
 
-    return MatGroupId(0);
+    std::lock_guard<std::mutex> lock(pGLock);
+    MatGroupId id = static_cast<MatGroupId>(matGroupCounter++);
+    matGroups.try_emplace(id, loc->second, id,
+                           std::vector<MaterialId>(),
+                           0, false);
+    return id;
 }
 
-inline MaterialId TracerMock::ReserveMaterial(MatGroupId, AttributeCountList,
-                                              MediumPair)
+inline MaterialId TracerMock::ReserveMaterial(MatGroupId id, AttributeCountList count,
+                                              MediumPair mediumPair)
 {
-    return MaterialId(0);
+    std::atomic_size_t* atomicCounter = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(mtGLock);
+        atomicCounter = &matGroups.at(id).idCounter;
+    }
+
+    if(print)
+    {
+        std::string attribCountString = "[";
+        for(const auto& c : count)
+        {
+            attribCountString += MRAY_FORMAT("{}, ", c);
+        }
+        attribCountString += "]";
+
+        MRAY_LOG("Reserving material over MaterialGroup({}), AttribCount: {}, "
+                 "MediumPair: ({}, {})", static_cast<uint32_t>(id),
+                 attribCountString,
+                 static_cast<uint32_t>(mediumPair.first),
+                 static_cast<uint32_t>(mediumPair.second));
+    }
+    size_t matId = atomicCounter->fetch_add(1);
+    return MaterialId(matId);
 }
 
-inline MaterialIdList TracerMock::ReserveMaterials(MatGroupId,
-                                                   std::vector<AttributeCountList>,
-                                                   std::vector<MediumPair>)
+inline MaterialIdList TracerMock::ReserveMaterials(MatGroupId id,
+                                                   std::vector<AttributeCountList> countList,
+                                                   std::vector<MediumPair> medPairs)
 {
-    return MaterialIdList{};
+    assert(medPairs.size() == countList.size());
+    std::atomic_size_t* atomicCounter = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(mtGLock);
+        atomicCounter = &matGroups.at(id).idCounter;
+    }
+
+    size_t matIdFirst = atomicCounter->fetch_add(countList.size());
+    if(print)
+    {
+        std::string log;
+        for(size_t i = 0; i < countList.size(); i++)
+        {
+            const AttributeCountList& count = countList[i];
+            const MediumPair& mediumPair = medPairs[i];
+
+            std::string attribCountString = "[";
+            for(const auto& c : count)
+            {
+                attribCountString += MRAY_FORMAT("{}, ", c);
+            }
+            attribCountString += "]";
+
+            log += MRAY_FORMAT("Reserving material over MaterialGroup({}), AttribCount: {}, "
+                               "MediumPair: ({}, {})", static_cast<uint32_t>(id),
+                               attribCountString,
+                               static_cast<uint32_t>(mediumPair.first),
+                               static_cast<uint32_t>(mediumPair.second));
+        }
+        MRAY_LOG("{}", log);
+    }
+
+    MaterialIdList result;
+    result.reserve(countList.size());
+    for(size_t i = 0; i < countList.size(); i++)
+    {
+        result.push_back(MaterialId(i + matIdFirst));
+    };
+    return result;
 }
 
-inline void TracerMock::CommitMatReservations(MatGroupId)
+inline void TracerMock::CommitMatReservations(MatGroupId id)
 {
+    bool* isCommitted = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(mtGLock);
+        isCommitted = &matGroups.at(id).isComitted;
+    }
+
+    if(*isCommitted)
+        throw MRayError("MaterialGroup({}) is already comitted!",
+                        static_cast<uint32_t>(id));
+    else
+        *isCommitted = true;
 }
 
-inline bool TracerMock::IsMatCommitted(MatGroupId) const
+inline bool TracerMock::IsMatCommitted(MatGroupId id) const
 {
-    return false;
+    std::lock_guard<std::mutex> lock(mtGLock);
+    return matGroups.at(id).isComitted;
 }
 
-inline void TracerMock::PushMatAttribute(MatGroupId, Vector2ui,
-                                         uint32_t,
-                                         TransientData)
+inline void TracerMock::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
+                                         uint32_t attribIndex,
+                                         TransientData data)
 {
+    std::lock_guard<std::mutex> lock(mtGLock);
+
+    const auto& mg = matGroups.at(gId);
+    if(!mg.isComitted)
+        throw MRayError("MaterialGroup({}) is not committed! "
+                        "You can not push data to it!",
+                        static_cast<uint32_t>(gId));
+    if(!print) return;
+
+    const auto& attribType = mg.mp.attribInfo[attribIndex];
+    MRayDataTypeRT dataTypeRT = std::get<PrimAttributeInfo::LAYOUT_INDEX>(attribType);
+    MRayDataEnum dataEnum = dataTypeRT.Name();
+    size_t dataCount = AcquireTransientDataCount(dataTypeRT, data);
+
+    MRAY_LOG("Pushing mat attribute of ({}:[{}, {}]),"
+             "DataType: {:s}, ByteSize: {}",
+             static_cast<uint32_t>(gId), matRange[0], matRange[1],
+             MRayDataTypeStringifier::ToString(dataEnum), dataCount);
 }
 
-inline void TracerMock::PushMatAttribute(MatGroupId, Vector2ui,
-                                         uint32_t,
-                                         TransientData,
-                                         std::vector<Optional<TextureId>>)
+inline void TracerMock::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
+                                         uint32_t attribIndex, TransientData data,
+                                         std::vector<Optional<TextureId>> textures)
 {
+    std::lock_guard<std::mutex> lock(mtGLock);
 
+    const auto& mg = matGroups.at(gId);
+    if(!mg.isComitted)
+        throw MRayError("MaterialGroup({}) is not committed! "
+                        "You can not push data to it!",
+                        static_cast<uint32_t>(gId));
+    if(!print) return;
+
+    const auto& attribType = mg.mp.attribInfo[attribIndex];
+    MRayDataTypeRT dataTypeRT = std::get<PrimAttributeInfo::LAYOUT_INDEX>(attribType);
+    MRayDataEnum dataEnum = dataTypeRT.Name();
+    size_t dataCount = AcquireTransientDataCount(dataTypeRT, data);
+
+    MRAY_LOG("Pushing mat texturable attribute of ({}:[{}, {}]),"
+             "DataType: {:s}, ByteSize: {}",
+             static_cast<uint32_t>(gId), matRange[0], matRange[1],
+             MRayDataTypeStringifier::ToString(dataEnum), dataCount);
 }
 
-inline void TracerMock::PushMatAttribute(MatGroupId, Vector2ui,
-                                         uint32_t,
-                                         std::vector<TextureId>)
+inline void TracerMock::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
+                                         uint32_t attribIndex,
+                                         std::vector<TextureId> textures)
 {
+    std::lock_guard<std::mutex> lock(mtGLock);
+    const auto& mg = matGroups.at(gId);
+    if(!mg.isComitted)
+        throw MRayError("MaterialGroup({}) is not committed! "
+                        "You can not push data to it!",
+                        static_cast<uint32_t>(gId));
+    if(!print) return;
+
+    std::string textureIdString;
+    for(const auto& t : textures)
+    {
+        textureIdString += MRAY_FORMAT("{}, ", static_cast<uint32_t>(t));
+    }
+
+    MRAY_LOG("Pushing mat texture attribute of ({}:[{}, {}]),"
+             "TextureIds: [{:s}]", static_cast<uint32_t>(gId),
+             matRange[0], matRange[1], textureIdString);
 }
 
-inline void TracerMock::CommitTexColorSpace(MRayColorSpaceEnum)
+inline void TracerMock::CommitTexColorSpace(MRayColorSpaceEnum colorSpace)
 {
+    if(!print) return;
+
+    MRAY_LOG("Committing global texture space to {}",
+             MRayColorSpaceStringifier::ToString(colorSpace));
 }
 
-inline TextureId TracerMock::CreateTexture2D(Vector2ui, uint32_t,
-                                             MRayPixelEnum)
+inline TextureId TracerMock::CreateTexture2D(Vector2ui dimensions, uint32_t mipCount,
+                                             MRayPixelEnum pixelType)
 {
-    return TextureId{0};
+    size_t texId = textureCounter.fetch_add(1);
+    if(print)
+        MRAY_LOG("Creating Texture2D({}) Dim: ({}, {}), Mip:{}, PixelType:{}",
+                 static_cast<uint32_t>(texId), dimensions[0], dimensions[1],
+                 mipCount, MRayPixelTypeStringifier::ToString(pixelType));
+    return TextureId(texId);
 }
 
-inline TextureId TracerMock::CreateTexture3D(Vector3ui, uint32_t,
-                                             MRayPixelEnum)
+inline TextureId TracerMock::CreateTexture3D(Vector3ui dimensions, uint32_t mipCount,
+                                             MRayPixelEnum pixelType)
 {
-    return TextureId{0};
+    size_t texId = textureCounter.fetch_add(1);
+    if(print)
+        MRAY_LOG("Creating Texture3D({}) Dim: ({}, {}, {}), Mip:{}, PixelType:{}",
+                 static_cast<uint32_t>(texId), dimensions[0], dimensions[1],
+                 dimensions[2], mipCount,
+                 MRayPixelTypeStringifier::ToString(pixelType));
+    return TextureId(texId);
 }
 
-inline MRayDataTypeRT TracerMock::GetTexturePixelType(TextureId) const
+inline MRayDataTypeRT TracerMock::GetTexturePixelType(TextureId tId) const
 {
-    return MRayDataType<MRayDataEnum::MR_CHAR>{};
+    throw MRayError("\"GetTexturePixelType\" is not implemented in mock tracer!");
 }
 
 inline void TracerMock::CommitTextures()
 {
+    if(globalTexCommit)
+        throw MRayError("Textures are already comitted!");
+    globalTexCommit = true;
 }
 
-inline void TracerMock::PushTextureData(TextureId, uint32_t,
+inline void TracerMock::PushTextureData(TextureId tId, uint32_t mipLevel,
                                         TransientData)
 {
+    if(!globalTexCommit)
+        throw MRayError("Textures are not comitted. "
+                        "You can not push data to textures!");
+
+    if(!print) return;
+    MRAY_LOG("Pushing data to Texture({}) MipLevel:{}",
+             static_cast<uint32_t>(tId), mipLevel);
 }
 
 inline TransGroupId TracerMock::CreateTransformGroup(std::string)
@@ -972,41 +1170,90 @@ inline void TracerMock::PushMediumAttribute(MediumGroupId, Vector2ui,
 
 }
 
-inline SurfaceId TracerMock::CreateSurface(SurfacePrimList,
-                                           SurfaceMatList,
-                                           TransformId,
-                                           OptionalAlphaMapList,
-                                           CullBackfaceFlagList)
+inline SurfaceId TracerMock::CreateSurface(SurfacePrimList primList,
+                                           SurfaceMatList matList,
+                                           TransformId tId,
+                                           OptionalAlphaMapList alphaMaps,
+                                           CullBackfaceFlagList cullFaceFlags)
 {
-    return SurfaceId{};
+    assert(primList.size() == matList.size());
+    assert(matList.size() == alphaMaps.size());
+    assert(alphaMaps.size() == cullFaceFlags.size());
+
+    size_t surfId = surfaceCounter.fetch_add(1);
+    if(!print) return SurfaceId(surfId);
+
+    std::string primIdString;
+    std::string matIdString;
+    std::string alphaMapString;
+    std::string cullFaceString;
+
+    for(size_t i = 0; i < primList.size(); i++)
+    {
+        primIdString += MRAY_FORMAT("{}, ", static_cast<uint32_t>(primList[i]));
+        matIdString += MRAY_FORMAT("{}, ", static_cast<uint32_t>(matList[i]));
+        cullFaceString += MRAY_FORMAT("{}, ", cullFaceFlags[i]);
+        alphaMapString += (alphaMaps[i].has_value())
+                            ? MRAY_FORMAT("{}, ", static_cast<uint32_t>(matList[i]))
+                            : "None";
+    }
+
+    MRAY_LOG("Creating Surface({}): Trans:{}, Prim: [{}], Mat: [{}], AlphaMap: [{}], CullFace: [{}]",
+             surfId, static_cast<uint32_t>(tId), primIdString, matIdString, alphaMapString, cullFaceString);
+    return SurfaceId(surfId);
 }
 
-inline LightSurfaceId TracerMock::CreateLightSurface(LightId,
-                                                     TransformId,
-                                                     MediumId)
+inline LightSurfaceId TracerMock::CreateLightSurface(LightId lId,
+                                                     TransformId tId,
+                                                     MediumId mId)
 {
-    return LightSurfaceId{0};
+    size_t lightSurfId = lightSurfaceCounter.fetch_add(1);
+    if(!print) return LightSurfaceId(lightSurfId);
+
+
+    MRAY_LOG("Creating LightSurface({}): Light: {}, Trans: {}, Medium: {}",
+             lightSurfId, static_cast<uint32_t>(lId), static_cast<uint32_t>(tId),
+             static_cast<uint32_t>(mId));
+    return LightSurfaceId(lightSurfId);
 }
 
-inline CamSurfaceId TracerMock::CreateCameraSurface(CameraId,
-                                             TransformId,
-                                             MediumId)
+inline CamSurfaceId TracerMock::CreateCameraSurface(CameraId cId,
+                                                    TransformId tId,
+                                                    MediumId mId)
 {
-    return CamSurfaceId{0};
+    size_t camSurfId = camSurfaceCounter.fetch_add(1);
+    if(!print) return CamSurfaceId(camSurfId);
+
+    MRAY_LOG("Creating CameraSurface({}): Camera: {}, Trans: {}, Medium: {}",
+             camSurfId, static_cast<uint32_t>(cId), static_cast<uint32_t>(tId),
+             static_cast<uint32_t>(mId));
+    return CamSurfaceId(camSurfId);
 }
 
-inline void TracerMock::CommitSurfaces(AcceleratorType)
+inline void TracerMock::CommitSurfaces(AcceleratorType accelType)
 {
+    if(!print) return;
+
+    std::string accelTypeName;
+    using enum AcceleratorType;
+    switch(accelType)
+    {
+        case SOFTWARE_NONE:         accelTypeName = "Software None";    break;
+        case SOFTWARE_BASIC_BVH:    accelTypeName = "Software BVH";     break;
+        case HARDWARE:              accelTypeName = "Hardware";     break;
+    }
+    MRAY_LOG("Committing surface with accelerator type: \"{}\"",
+             accelTypeName);
 }
 
 inline RendererId TracerMock::CreateRenderer(std::string typeName)
 {
-    return RendererId{};
+    throw MRayError("\"CreateRenderer\" is not implemented in mock tracer!");
 }
 
 inline void TracerMock::CommitRendererReservations(RendererId)
 {
-
+    throw MRayError("\"CommitRendererReservations\" is not implemented in mock tracer!");
 }
 
 inline bool TracerMock::IsRendererCommitted(RendererId) const
@@ -1017,14 +1264,15 @@ inline bool TracerMock::IsRendererCommitted(RendererId) const
 inline void TracerMock::PushRendererAttribute(RendererId, uint32_t,
                                               TransientData)
 {
-
+    throw MRayError("\"PushRendererAttribute\" is not implemented in mock tracer!");
 }
 
 inline void TracerMock::StartRender(RendererId, CamSurfaceId)
 {
-
+    throw MRayError("\"StartRender\" is not implemented in mock tracer!");
 }
 
 inline void TracerMock::StoptRender()
 {
+    throw MRayError("\"StoptRender\" is not implemented in mock tracer!");
 }
