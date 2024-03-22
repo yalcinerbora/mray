@@ -36,7 +36,7 @@ namespace TracerConstants
     static constexpr std::string_view LIGHT_PREFIX      = "(L)";
     static constexpr std::string_view TRANSFORM_PREFIX  = "(T)";
     static constexpr std::string_view PRIM_PREFIX       = "(P)";
-    static constexpr std::string_view MAT_PREFIX        = "(M)";
+    static constexpr std::string_view MAT_PREFIX        = "(Mt)";
     static constexpr std::string_view CAM_PREFIX        = "(C)";
     static constexpr std::string_view MEDIUM_PREFIX     = "(Me)";
 }
@@ -282,10 +282,10 @@ class [[nodiscard]] TracerI
     virtual void            CommitPrimReservations(PrimGroupId) = 0;
     virtual bool            IsPrimCommitted(PrimGroupId) const = 0;
     // Acquire Attribute Info
-    virtual void            PushPrimAttribute(PrimBatchId,
+    virtual void            PushPrimAttribute(PrimGroupId, PrimBatchId,
                                               uint32_t attributeIndex,
                                               TransientData data) = 0;
-    virtual void            PushPrimAttribute(PrimBatchId,
+    virtual void            PushPrimAttribute(PrimGroupId, PrimBatchId,
                                               uint32_t attributeIndex,
                                               Vector2ui subBatchRange,
                                               TransientData data) = 0;

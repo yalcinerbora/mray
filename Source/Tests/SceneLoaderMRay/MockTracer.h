@@ -5,46 +5,118 @@
 
 #include <map>
 
+size_t AcquireTransientDataCount(MRayDataTypeRT dataTypeRT,
+                                 const TransientData& data)
+{
+    return std::visit([&data](auto&& type)
+    {
+        using T = typename std::remove_cvref_t<decltype(type)>::Type;
+        return data.AccessAs<const T>().size();
+    }, dataTypeRT);
+}
+
+
+
 // Mock tracer has
 struct PrimMockPack
 {
-    PrimAttributeInfoList attribInfo;
+    PrimAttributeInfoList   attribInfo;
+    std::string_view        name;
 };
 
 struct CamMockPack
 {
-    CamAttributeInfoList attribInfo;
+    CamAttributeInfoList    attribInfo;
+    std::string_view        name;
 };
 
 struct MedMockPack
 {
     MediumAttributeInfoList attribInfo;
+    std::string_view        name;
 };
 
 struct MatMockPack
 {
-    MatAttributeInfoList attribInfo;
+    MatAttributeInfoList    attribInfo;
+    std::string_view        name;
 };
 
 struct TransMockPack
 {
-    TransAttributeInfoList attribInfo;
+    TransAttributeInfoList  attribInfo;
+    std::string_view        name;
 };
 
 struct LightMockPack
 {
-    LightAttributeInfoList attribInfo;
+    LightAttributeInfoList  attribInfo;
+    std::string_view        name;
+};
+
+struct PrimGroupMock
+{
+    const PrimMockPack&         mp;
+    PrimGroupId                 id;
+    std::vector<PrimBatchId>    batchList;
+    std::atomic_size_t          batchCounter;
+    bool                        isComitted;
+};
+
+struct MatGroupMock
+{
+    const MatMockPack&      mp;
+    MatGroupId              id;
+    std::vector<MaterialId> matList;
+    std::atomic_size_t      idCounter;
+    bool                    isComitted;
+};
+
+struct MediumGroupMock
+{
+    const MedMockPack&      mp;
+    MediumGroupId           id;
+    std::vector<MediumId>   medList;
+    std::atomic_size_t      idCounter;
+    bool                    isComitted;
+};
+
+struct TransGroupMock
+{
+    const TransMockPack&        mp;
+    MediumGroupId               id;
+    std::vector<TransformId>    transList;
+    std::atomic_size_t          idCounter;
+    bool                        isComitted;
+};
+
+struct LightGroupMock
+{
+    const LightMockPack&    mp;
+    LightGroupId            id;
+    std::vector<LightId>    lightList;
+    std::atomic_size_t      idCounter;
+    bool                    isComitted;
+};
+
+struct CamGroupMock
+{
+    const CamMockPack&      mp;
+    LightGroupId            id;
+    std::vector<CameraId>   camList;
+    std::atomic_size_t      idCounter;
+    bool                    isComitted;
 };
 
 class TracerMock : public TracerI
 {
     private:
-    std::map<PrimGroupId, const PrimAttributeInfoList&>     primAttribMap;
-    std::map<CameraGroupId, const CamAttributeInfoList&>    camAttribMap;
-    std::map<MediumGroupId, const MediumAttributeInfoList&> mediumAttribMap;
-    std::map<MatGroupId, const MatAttributeInfoList&>       matAttribMap;
-    std::map<TransGroupId, const TransAttributeInfoList&>   transAttribMap;
-    std::map<LightGroupId, const LightAttributeInfoList&>   lightAttribMap;
+    std::map<PrimGroupId, PrimGroupMock>        primGroups;
+    std::map<CameraGroupId, CamGroupMock>       camGroups;
+    std::map<MediumGroupId, MediumGroupMock>    mediumGroups;
+    std::map<MatGroupId, MatGroupMock>          matGroups;
+    std::map<TransGroupId, TransGroupMock>      transGroups;
+    std::map<LightGroupId, LightGroupMock>      lightGroups;
 
     // Mock packs
     std::map<std::string_view, PrimMockPack>    primMockPack;
@@ -54,10 +126,25 @@ class TracerMock : public TracerI
     std::map<std::string_view, TransMockPack>   transMockPack;
     std::map<std::string_view, LightMockPack>   lightMockPack;
 
-    bool                unqiueGroups;
+    size_t primGroupCounter;
+    size_t camGroupCounter;
+    size_t mediumGroupCounter;
+    size_t matGroupCounter;
+    size_t transGroupCounter;
+    size_t lightGroupCounter;
+
+    mutable std::mutex pGLock;
+    mutable std::mutex cGLock;
+    mutable std::mutex meGLock;
+    mutable std::mutex mtGLock;
+    mutable std::mutex tGLock;
+    mutable std::mutex lGLock;
+
+    // Properties
+    bool                print;
 
     public:
-                        TracerMock(bool uniqueGroups = true);
+                        TracerMock(bool print= true);
 
     TypeNameList        PrimitiveGroups() const override;
     TypeNameList        MaterialGroups() const override;
@@ -96,10 +183,10 @@ class TracerMock : public TracerI
                                             std::vector<PrimCount> primitiveCounts) override;
     void            CommitPrimReservations(PrimGroupId) override;
     bool            IsPrimCommitted(PrimGroupId) const override;
-    void            PushPrimAttribute(PrimBatchId,
+    void            PushPrimAttribute(PrimGroupId, PrimBatchId,
                                       uint32_t attributeIndex,
                                       TransientData data) override;
-    void            PushPrimAttribute(PrimBatchId,
+    void            PushPrimAttribute(PrimGroupId, PrimBatchId,
                                       uint32_t attributeIndex,
                                       Vector2ui subBatchRange,
                                       TransientData data) override;
@@ -215,8 +302,8 @@ class TracerMock : public TracerI
     void        StoptRender() override;
 };
 
-inline TracerMock::TracerMock(bool ug)
-    : unqiueGroups(ug)
+inline TracerMock::TracerMock(bool pl)
+    : print(pl)
 {
     using enum MRayDataEnum;
     using enum PrimitiveAttributeLogic;
@@ -227,7 +314,7 @@ inline TracerMock::TracerMock(bool ug)
     // =================== //
     //     Primitives      //
     // =================== //
-    primMockPack["(P)DefaultTriangle"] = PrimMockPack
+    primMockPack["(P)Triangle"] = PrimMockPack
     {
         .attribInfo = PrimAttributeInfoList
         {
@@ -235,10 +322,11 @@ inline TracerMock::TracerMock(bool ug)
             PrimAttributeInfo(NORMAL,   MRayDataType<MR_QUATERNION>(),  IS_SCALAR, MR_OPTIONAL),
             PrimAttributeInfo(UV0,      MRayDataType<MR_VECTOR_2>(),    IS_SCALAR, MR_OPTIONAL),
             PrimAttributeInfo(INDEX,    MRayDataType<MR_VECTOR_3UI>(),  IS_SCALAR, MR_MANDATORY)
-        }
+        },
+        .name = "(P)Triangle"
     };
 
-    primMockPack["(P)DefaultTriangleSkinned"] = PrimMockPack
+    primMockPack["(P)TriangleSkinned"] = PrimMockPack
     {
         .attribInfo = PrimAttributeInfoList
         {
@@ -248,7 +336,8 @@ inline TracerMock::TracerMock(bool ug)
             PrimAttributeInfo(WEIGHT,       MRayDataType<MR_UNORM_4x8>(),   IS_SCALAR, MR_MANDATORY),
             PrimAttributeInfo(WEIGHT_INDEX, MRayDataType<MR_VECTOR_4UC>(),  IS_SCALAR, MR_MANDATORY),
             PrimAttributeInfo(INDEX,        MRayDataType<MR_VECTOR_3UI>(),  IS_SCALAR, MR_MANDATORY)
-        }
+        },
+        .name = "(P)TriangleSkinned"
     };
 
     // =================== //
@@ -262,7 +351,8 @@ inline TracerMock::TracerMock(bool ug)
                              IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
             MatAttributeInfo("normalMap", MRayDataType<MR_VECTOR_3>(),
                              IS_SCALAR, MR_OPTIONAL, MR_TEXTURE_ONLY)
-        }
+        },
+        .name = "(Mt)Lambert"
     };
     matMockPack["(Mt)Unreal"] = MatMockPack
     {
@@ -278,20 +368,26 @@ inline TracerMock::TracerMock(bool ug)
                              IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
             MatAttributeInfo("normalMap", MRayDataType<MR_VECTOR_3>(),
                              IS_SCALAR, MR_OPTIONAL, MR_TEXTURE_ONLY)
-        }
+        },
+        .name = "(Mt)Unreal"
     };
 
     // =================== //
     //       Lights        //
     // =================== //
-    lightMockPack["(L)Null"] = LightMockPack{};
+    lightMockPack["(L)Null"] = LightMockPack
+    {
+        .attribInfo = {},
+        .name = "(L)Null"
+    };
     lightMockPack["(L)Skysphere"] = LightMockPack
     {
         .attribInfo = LightAttributeInfoList
         {
             LightAttributeInfo("radiance", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
                                MR_MANDATORY, MR_TEXTURE_OR_CONSTANT)
-        }
+        },
+        .name = "(L)Skysphere"
     };
     lightMockPack["(L)Primitive(P)Triangle"] = LightMockPack
     {
@@ -299,7 +395,8 @@ inline TracerMock::TracerMock(bool ug)
         {
             LightAttributeInfo("radiance", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
                                MR_MANDATORY, MR_TEXTURE_OR_CONSTANT)
-        }
+        },
+        .name ="(L)Primitive(P)Triangle"
     };
     lightMockPack["(L)Rectangle"] = LightMockPack
     {
@@ -313,7 +410,8 @@ inline TracerMock::TracerMock(bool ug)
                                MR_MANDATORY, MR_CONSTANT_ONLY),
             LightAttributeInfo("up", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
                                MR_MANDATORY, MR_CONSTANT_ONLY)
-        }
+        },
+        .name = "(L)Rectangle"
     };
 
     // =================== //
@@ -329,32 +427,43 @@ inline TracerMock::TracerMock(bool ug)
             CamAttributeInfo("gaze", MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY),
             CamAttributeInfo("position", MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY),
             CamAttributeInfo("up", MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY)
-        }
+        },
+        .name = "(C)Pinhole"
     };
 
     // =================== //
     //     Transforms      //
     // =================== //
-    transMockPack["(T)Identity"] = TransMockPack {};
+    transMockPack["(T)Identity"] = TransMockPack
+    {
+        .attribInfo = {},
+        .name = "(T)Identity"
+    };
     transMockPack["(T)Single"] = TransMockPack
     {
         .attribInfo = TransAttributeInfoList
         {
             TransAttributeInfo("matrix", MRayDataType<MR_MATRIX_4x4>(), IS_SCALAR, MR_MANDATORY)
-        }
+        },
+        .name = "(T)Single"
     };
     transMockPack["(T)Multi"] = TransMockPack
     {
         .attribInfo = TransAttributeInfoList
         {
             TransAttributeInfo("matrix", MRayDataType<MR_MATRIX_4x4>(), IS_ARRAY, MR_MANDATORY)
-        }
+        },
+        .name = "(T)Multi"
     };
 
     // =================== //
     //       Mediums       //
     // =================== //
-    medMockPack["(Md)Vacuum"] = MedMockPack{};
+    medMockPack["(Md)Vacuum"] = MedMockPack
+    {
+        .attribInfo = {},
+        .name = "(Md)Vacuum"
+    };
     medMockPack["(Md)Homogeneous"] = MedMockPack
     {
         .attribInfo = TexturedAttributeInfoList
@@ -363,7 +472,8 @@ inline TracerMock::TracerMock(bool ug)
                                 IS_SCALAR, MR_MANDATORY, MR_CONSTANT_ONLY),
             MediumAttributeInfo("ior", MRayDataType<MR_DEFAULT_FLT>(),
                                 IS_SCALAR, MR_MANDATORY, MR_CONSTANT_ONLY)
-        }
+        },
+        .name = "(Md)Homogeneous"
     };
 }
 
@@ -425,32 +535,32 @@ inline TypeNameList TracerMock::LightGroups() const
 
 inline PrimAttributeInfoList TracerMock::AttributeInfo(PrimGroupId id) const
 {
-    return primAttribMap.at(id);
+    return primGroups.at(id).mp.attribInfo;
 }
 
 inline CamAttributeInfoList TracerMock::AttributeInfo(CameraGroupId id) const
 {
-    return camAttribMap.at(id);
+    return camGroups.at(id).mp.attribInfo;
 }
 
 inline MediumAttributeInfoList TracerMock::AttributeInfo(MediumGroupId id) const
 {
-    return mediumAttribMap.at(id);
+    return mediumGroups.at(id).mp.attribInfo;
 }
 
 inline MatAttributeInfoList TracerMock::AttributeInfo(MatGroupId id) const
 {
-    return matAttribMap.at(id);
+    return matGroups.at(id).mp.attribInfo;
 }
 
 inline TransAttributeInfoList TracerMock::AttributeInfo(TransGroupId id) const
 {
-    return transAttribMap.at(id);
+    return transGroups.at(id).mp.attribInfo;
 }
 
 inline LightAttributeInfoList TracerMock::AttributeInfo(LightGroupId id) const
 {
-    return lightAttribMap.at(id);
+    return lightGroups.at(id).mp.attribInfo;
 }
 
 inline RendererAttributeInfoList TracerMock::AttributeInfo(RendererId) const
@@ -458,34 +568,34 @@ inline RendererAttributeInfoList TracerMock::AttributeInfo(RendererId) const
     return RendererAttributeInfoList{};
 }
 
-inline PrimAttributeInfoList TracerMock::AttributeInfoPrim(std::string_view) const
+inline PrimAttributeInfoList TracerMock::AttributeInfoPrim(std::string_view name) const
 {
-    return PrimAttributeInfoList{};
+    return primMockPack.at(name).attribInfo;
 }
 
-inline CamAttributeInfoList TracerMock::AttributeInfoCam(std::string_view) const
+inline CamAttributeInfoList TracerMock::AttributeInfoCam(std::string_view name) const
 {
-    return CamAttributeInfoList{};
+    return camMockPack.at(name).attribInfo;
 }
 
-inline MediumAttributeInfoList TracerMock::AttributeInfoMedium(std::string_view) const
+inline MediumAttributeInfoList TracerMock::AttributeInfoMedium(std::string_view name) const
 {
-    return MediumAttributeInfoList{};
+    return medMockPack.at(name).attribInfo;
 }
 
-inline MatAttributeInfoList TracerMock::AttributeInfoMat(std::string_view) const
+inline MatAttributeInfoList TracerMock::AttributeInfoMat(std::string_view name) const
 {
-    return MatAttributeInfoList{};
+    return matMockPack.at(name).attribInfo;
 }
 
-inline TransAttributeInfoList TracerMock::AttributeInfoTrans(std::string_view) const
+inline TransAttributeInfoList TracerMock::AttributeInfoTrans(std::string_view name) const
 {
-    return TransAttributeInfoList{};
+    return transMockPack.at(name).attribInfo;
 }
 
-inline LightAttributeInfoList TracerMock::AttributeInfoLight(std::string_view) const
+inline LightAttributeInfoList TracerMock::AttributeInfoLight(std::string_view name) const
 {
-    return LightAttributeInfoList{};
+    return lightMockPack.at(name).attribInfo;
 }
 
 inline RendererAttributeInfoList TracerMock::AttributeInfoRenderer(std::string_view) const
@@ -493,34 +603,34 @@ inline RendererAttributeInfoList TracerMock::AttributeInfoRenderer(std::string_v
     return RendererAttributeInfoList{};
 }
 
-inline std::string TracerMock::TypeName(PrimGroupId) const
+inline std::string TracerMock::TypeName(PrimGroupId id) const
 {
-    return std::string{};
+    return std::string(primGroups.at(id).mp.name);
 }
 
-inline std::string TracerMock::TypeName(CameraGroupId) const
+inline std::string TracerMock::TypeName(CameraGroupId id) const
 {
-    return std::string{};
+    return std::string(camGroups.at(id).mp.name);
 }
 
-inline std::string TracerMock::TypeName(MediumGroupId) const
+inline std::string TracerMock::TypeName(MediumGroupId id) const
 {
-    return std::string{};
+    return std::string(mediumGroups.at(id).mp.name);
 }
 
-inline std::string TracerMock::TypeName(MatGroupId) const
+inline std::string TracerMock::TypeName(MatGroupId id) const
 {
-    return std::string{};
+    return std::string(matGroups.at(id).mp.name);
 }
 
-inline std::string TracerMock::TypeName(TransGroupId) const
+inline std::string TracerMock::TypeName(TransGroupId id) const
 {
-    return std::string{};
+    return std::string(transGroups.at(id).mp.name);
 }
 
-inline std::string TracerMock::TypeName(LightGroupId) const
+inline std::string TracerMock::TypeName(LightGroupId id) const
 {
-    return std::string{};
+    return std::string(lightGroups.at(id).mp.name);
 }
 
 inline std::string TracerMock::TypeName(RendererId) const
@@ -528,14 +638,35 @@ inline std::string TracerMock::TypeName(RendererId) const
     return std::string{};
 }
 
-inline PrimGroupId TracerMock::CreatePrimitiveGroup(std::string)
+inline PrimGroupId TracerMock::CreatePrimitiveGroup(std::string name)
 {
-    return PrimGroupId(0);
+    auto loc = primMockPack.find(name);
+    if(loc == primMockPack.cend())
+        throw MRayError("Failed to find primitive type: {}", name);
+
+
+    std::lock_guard<std::mutex> lock(pGLock);
+    PrimGroupId id = static_cast<PrimGroupId>(primGroupCounter++);
+    primGroups.try_emplace(id, loc->second, id,
+                           std::vector<PrimBatchId>(),
+                           0, false);
+    return id;
 }
 
-inline PrimBatchId TracerMock::ReservePrimitiveBatch(PrimGroupId, PrimCount)
+inline PrimBatchId TracerMock::ReservePrimitiveBatch(PrimGroupId id, PrimCount count)
 {
-    return PrimBatchId(0);
+    std::atomic_size_t* atomicCounter = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(pGLock);
+        atomicCounter = &primGroups.at(id).batchCounter;
+    }
+
+    if(print)
+        MRAY_LOG("Reserving primitive over PrimGroup({}), VCount: {}, PCount: {}",
+                 static_cast<uint32_t>(id), count.attributeCount, count.primCount);
+
+    size_t batchId = atomicCounter->fetch_add(1);
+    return PrimBatchId(batchId);
 }
 
 inline PrimBatchIdList TracerMock::ReservePrimitiveBatches(PrimGroupId, std::vector<PrimCount>)
@@ -543,30 +674,72 @@ inline PrimBatchIdList TracerMock::ReservePrimitiveBatches(PrimGroupId, std::vec
     return PrimBatchIdList{};
 }
 
-inline void TracerMock::CommitPrimReservations(PrimGroupId)
+inline void TracerMock::CommitPrimReservations(PrimGroupId id)
 {
+    bool* isCommitted = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(pGLock);
+        isCommitted = &primGroups.at(id).isComitted;
+    }
+
+    if(*isCommitted)
+        throw MRayError("PrimitiveGroup({}) is already comitted!",
+                        static_cast<uint32_t>(id));
+    else
+        *isCommitted = true;
 }
 
-inline bool TracerMock::IsPrimCommitted(PrimGroupId) const
+inline bool TracerMock::IsPrimCommitted(PrimGroupId id) const
 {
-    return false;
+    std::lock_guard<std::mutex> lock(pGLock);
+    return primGroups.at(id).isComitted;
 }
 
-inline void TracerMock::PushPrimAttribute(PrimBatchId,
-                                          uint32_t,
-                                          TransientData)
+inline void TracerMock::PushPrimAttribute(PrimGroupId gId,
+                                          PrimBatchId batchId,
+                                          uint32_t attribIndex,
+                                          TransientData data)
 {
+    if(!print) return;
+    std::lock_guard<std::mutex> lock(pGLock);
+
+    const auto& attribType = primGroups.at(gId).mp.attribInfo[attribIndex];
+    MRayDataTypeRT dataTypeRT = std::get<PrimAttributeInfo::LAYOUT_INDEX>(attribType);
+    MRayDataEnum dataEnum = dataTypeRT.Name();
+    size_t dataCount = AcquireTransientDataCount(dataTypeRT, data);
+    MRAY_LOG("Pushing prim attribute of ({}:{}),"
+             "DataType: {:s}, ByteSize: {}",
+             static_cast<uint32_t>(gId), static_cast<uint32_t>(batchId),
+             MRayDataTypeStringifier::ToString(dataEnum), dataCount);
 }
 
-inline void TracerMock::PushPrimAttribute(PrimBatchId,
-                                          uint32_t,
-                                          Vector2ui,
-                                          TransientData)
+inline void TracerMock::PushPrimAttribute(PrimGroupId gId,
+                                          PrimBatchId batchId,
+                                          uint32_t attribIndex,
+                                          Vector2ui subBatchRange,
+                                          TransientData data)
 {
+    if(!print) return;
+    std::lock_guard<std::mutex> lock(pGLock);
+
+    const auto& attribType = primGroups.at(gId).mp.attribInfo[attribIndex];
+    MRayDataTypeRT dataTypeRT = std::get<PrimAttributeInfo::LAYOUT_INDEX>(attribType);
+    MRayDataEnum dataEnum = dataTypeRT.Name();
+    size_t dataCount = AcquireTransientDataCount(dataTypeRT, data);
+    MRAY_LOG("Pushing prim attribute of ({}:{})->[{}, {}],"
+             "DataType: {:s}, ByteSize: {}",
+             static_cast<uint32_t>(gId), static_cast<uint32_t>(batchId),
+             subBatchRange[0], subBatchRange[1],
+             MRayDataTypeStringifier::ToString(dataEnum), dataCount);
 }
 
 inline MatGroupId TracerMock::CreateMaterialGroup(std::string)
 {
+    //auto loc = primMockPack.find(name);
+    //if(loc == primMockPack.cend())
+    //    throw MRayError("Failed to find primitive type: {}", name);
+    //return static_cast<PrimGroupId>(primGroupCounter.fetch_add(1));
+
     return MatGroupId(0);
 }
 

@@ -3,7 +3,7 @@
 std::string_view MatGroupLambert::TypeName()
 {
     using namespace std::literals;
-    static std::string_view name = "(M)Lambert"sv;
+    static std::string_view name = "(Mt)Lambert"sv;
     return name;
 }
 
