@@ -108,16 +108,16 @@ void TransformGroupSingle::PushAttribute(const Vector<2, TransformKey::Type>& id
                          TypeName(), attributeIndex);
 }
 
-TransformGroupSingle::AttribInfoList TransformGroupSingle::AttributeInfo() const
+TransAttributeInfoList TransformGroupSingle::AttributeInfo() const
 {
     using enum MRayDataEnum;
     using enum AttributeOptionality;
     using enum AttributeIsArray;
-    static const std::array<TransAttributeInfo, 1> LogicList =
+    static const TransAttributeInfoList LogicList =
     {
         TransAttributeInfo("Transform", MRayDataType<MR_MATRIX_4x4>(), IS_SCALAR, MR_MANDATORY)
     };
-    return std::vector(LogicList.cbegin(), LogicList.cend());
+    return LogicList;
 }
 
 typename TransformGroupSingle::DataSoA TransformGroupSingle::SoA() const
@@ -267,16 +267,16 @@ void TransformGroupMulti::PushAttribute(const Vector<2, TransformKey::Type>& idR
                          TypeName(), attributeIndex);
 }
 
-TransformGroupMulti::AttribInfoList TransformGroupMulti::AttributeInfo() const
+TransAttributeInfoList TransformGroupMulti::AttributeInfo() const
 {
     using enum MRayDataEnum;
     using enum AttributeOptionality;
     using enum AttributeIsArray;
-    static const std::array<TransAttributeInfo, 1> LogicList =
+    static const TransAttributeInfoList LogicList =
     {
         TransAttributeInfo("Transform", MRayDataType<MR_MATRIX_4x4>(), IS_ARRAY, MR_MANDATORY)
     };
-    return std::vector(LogicList.cbegin(), LogicList.cend());
+    return LogicList;
 }
 
 typename TransformGroupMulti::DataSoA TransformGroupMulti::SoA() const

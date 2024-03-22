@@ -153,6 +153,7 @@ class alignas(std::max(alignof(T), size_t(8))) StaticVector
     public:
     // Constructors & Destructor
     constexpr               StaticVector();
+    constexpr               StaticVector(std::initializer_list<T>);
     constexpr explicit      StaticVector(StaticVecSize count)   requires std::is_default_constructible_v<T>;
     constexpr explicit      StaticVector(StaticVecSize count,
                                          const T& initialValue) requires std::is_copy_constructible_v<T>;

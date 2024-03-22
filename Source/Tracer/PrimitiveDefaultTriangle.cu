@@ -27,7 +27,7 @@ I KCAdjustIndices<I>::operator()(const I& t) const
 std::string_view PrimGroupTriangle::TypeName()
 {
     using namespace std::literals;
-    static std::string_view name = "(P)DefaultTriangle"sv;
+    static std::string_view name = "(P)Triangle"sv;
     return name;
 }
 
@@ -63,14 +63,14 @@ PrimAttributeInfoList PrimGroupTriangle::AttributeInfo() const
     using enum AttributeIsArray;
     // Here we mark them as "IS_SCALAR", because primitive group is group of primitives
     // and not primitive batches
-    static const std::array<PrimAttributeInfo, AttributeCount> LogicList =
+    static const PrimAttributeInfoList LogicList =
     {
         PrimAttributeInfo(POSITION, MRayDataType<MR_VECTOR_3>(),    IS_SCALAR, MR_MANDATORY),
         PrimAttributeInfo(NORMAL,   MRayDataType<MR_QUATERNION>(),  IS_SCALAR, MR_OPTIONAL),
         PrimAttributeInfo(UV0,      MRayDataType<MR_VECTOR_2>(),    IS_SCALAR, MR_OPTIONAL),
         PrimAttributeInfo(INDEX,    MRayDataType<MR_VECTOR_3UI>(),  IS_SCALAR, MR_MANDATORY)
     };
-    return std::vector(LogicList.cbegin(), LogicList.cend());
+    return LogicList;
 }
 
 void PrimGroupTriangle::PushAttribute(PrimBatchKey batchKey,
@@ -188,7 +188,7 @@ typename PrimGroupTriangle::DataSoA PrimGroupTriangle::SoA() const
 std::string_view PrimGroupSkinnedTriangle::TypeName()
 {
     using namespace std::literals;
-    static std::string_view name = "(P)DefaultTriangleSkinned"sv;
+    static std::string_view name = "(P)TriangleSkinned"sv;
     return name;
 }
 
@@ -229,7 +229,7 @@ PrimAttributeInfoList PrimGroupSkinnedTriangle::AttributeInfo() const
     using enum PrimitiveAttributeLogic;
     using enum AttributeOptionality;
     using enum AttributeIsArray;
-    static const std::array<PrimAttributeInfo, AttributeCount> LogicList =
+    static const PrimAttributeInfoList LogicList =
     {
         PrimAttributeInfo(POSITION,     MRayDataType<MR_VECTOR_3>(),    IS_SCALAR, MR_MANDATORY),
         PrimAttributeInfo(NORMAL,       MRayDataType<MR_QUATERNION>(),  IS_SCALAR, MR_OPTIONAL),
@@ -238,7 +238,7 @@ PrimAttributeInfoList PrimGroupSkinnedTriangle::AttributeInfo() const
         PrimAttributeInfo(WEIGHT_INDEX, MRayDataType<MR_VECTOR_4UC>(),  IS_SCALAR, MR_MANDATORY),
         PrimAttributeInfo(INDEX,        MRayDataType<MR_VECTOR_3UI>(),  IS_SCALAR, MR_MANDATORY)
     };
-    return std::vector(LogicList.cbegin(), LogicList.cend());
+    return LogicList;
 }
 
 void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey, uint32_t attributeIndex,

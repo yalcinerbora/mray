@@ -403,8 +403,8 @@ void EmptyPrimGroup::CommitReservations()
 inline
 PrimAttributeInfoList EmptyPrimGroup::AttributeInfo() const
 {
-    static const std::array<PrimAttributeInfo, 0> LogicList;
-    return std::vector(LogicList.cbegin(), LogicList.cend());
+    static const PrimAttributeInfoList LogicList;
+    return LogicList;
 }
 
 inline

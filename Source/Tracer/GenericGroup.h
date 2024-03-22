@@ -69,7 +69,7 @@ class GenericGroupI
     using IdType            = IdTypeT;
     using IdInteger         = typename IdType::Type;
     using IdList            = std::vector<IdType>;
-    using AttribInfoList    = std::vector<AttribInfo>;
+    using AttribInfoList    = StaticVector<AttribInfo, TracerConstants::MaxAttributePerGroup>;
 
     public:
     virtual                 ~GenericGroupI() = default;

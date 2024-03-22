@@ -498,7 +498,8 @@ void SceneLoaderMRay::DryRunNodesForTex(std::vector<NodeTexStruct>& textureIds,
     }
 }
 
-template<class Loader, class GroupIdType, class IdType>
+template<class ThreadLocalData, class Loader,
+         class GroupIdType, class IdType>
 void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, Pair<GroupIdType, IdType>>>& outputMappings,
                        typename SceneLoaderMRay::ExceptionList& exceptions,
                        const typename SceneLoaderMRay::TypeMappedNodes& nodeLists,
@@ -534,16 +535,26 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
         using Barrier = std::barrier<decltype(BarrierFunc)>;
         auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
 
-        auto future = threadPool.submit_blocks(std::size_t(0), std::size_t(groupEntityCount),
+        // BS_threadpool submit_blocks (all every submit variant I think, passes
+        // the lambda by forwarding reference, however in our case we utilize the
+        // lambda's scope as a thread local storage, forwarding does not work in this case
+        // shared_ptrs are deleted when the 'first' thread exits the scope.
+        //
+        // So here we force the lambda to be 'const' thus compiler has to forward by copy
+        // and achieve expected behaviour.
         // Copy the shared pointers, capture by reference the rest
-        [&, loader, barrier, groupEntityList](size_t start, size_t end)
+        const auto LoadTask = [&, loader, barrier, groupEntityList](size_t start, size_t end)
         {
+            // Default construct this
+            ThreadLocalData threadLocalData;
+
             size_t localCount = end - start;
             auto nodeRange = Span<const JsonNode>(nodes.cbegin() + start, localCount);
             IdList generatedIds;
             try
             {
-                generatedIds = loader->THRDReserveEntities(groupId, nodeRange);
+                generatedIds = loader->THRDReserveEntities(threadLocalData,
+                                                           groupId, nodeRange);
                 for(size_t i = start; i < end; i++)
                 {
                     size_t localI = i - start;
@@ -556,7 +567,8 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
                 // Commit barrier
                 barrier->arrive_and_wait();
                 // Group is committed, now we can issue writes
-                loader->THRDLoadEntities(groupId, generatedIds, nodeRange);
+                loader->THRDLoadEntities(threadLocalData, groupId,
+                                         generatedIds, nodeRange);
             }
             catch(MRayError& e)
             {
@@ -569,7 +581,10 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
                                                   std::string(e.what())));
                 barrier->arrive_and_drop();
             }
-        }, threadCount);
+        };
+        auto future = threadPool.submit_blocks(std::size_t(0),
+                                               std::size_t(groupEntityCount),
+                                               LoadTask, threadCount);
 
         // Move future to shared_ptr
         using FutureSharedPtr = std::shared_ptr<BS::multi_future<void>>;
@@ -618,9 +633,10 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
     using Barrier = std::barrier<decltype(BarrierFunc)>;
     auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
 
-    auto future = threadPool.submit_blocks(std::size_t(0), flattenedTexMap.size(),
+    // Same situation discribed in 'GenericLoad' function,
+    // force pass by copy.
     // Copy the shared pointers, capture by reference the rest
-    [&, texIdListPtr, barrier](size_t start, size_t end)
+    const auto TextureLoadTask = [&, texIdListPtr, barrier](size_t start, size_t end)
     {
         // TODO: check if we twice opening is bottleneck?
         // We are opening here to determining size/format
@@ -694,7 +710,10 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
             exceptions.AddException(std::move(e));
             barrier->arrive_and_drop();
         }
-    }, threadCount);
+    };
+
+    auto future = threadPool.submit_blocks(std::size_t(0), flattenedTexMap.size(),
+                                           TextureLoadTask, threadCount);
 
     // Move the future to shared ptr
     using FutureSharedPtr = std::shared_ptr<BS::multi_future<void>>;
@@ -714,7 +733,6 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
 
 void SceneLoaderMRay::LoadMediums(TracerI& tracer, ExceptionList& exceptions)
 {
-    thread_local AttributeCountList totalCounts = {};
     struct MediumLoader
     {
         private:
@@ -738,7 +756,8 @@ void SceneLoaderMRay::LoadMediums(TracerI& tracer, ExceptionList& exceptions)
             return tracer.CommitMediumReservations(groupId);
         }
 
-        MediumIdList THRDReserveEntities(MediumGroupId groupId,
+        MediumIdList THRDReserveEntities(AttributeCountList& totalCounts,
+                                         MediumGroupId groupId,
                                          Span<const JsonNode> nodes)
         {
             std::vector<AttributeCountList> attributeCounts = {};
@@ -751,7 +770,8 @@ void SceneLoaderMRay::LoadMediums(TracerI& tracer, ExceptionList& exceptions)
             return tracer.ReserveMediums(groupId, std::move(attributeCounts));
         }
 
-        void THRDLoadEntities(MediumGroupId groupId,
+        void THRDLoadEntities(const AttributeCountList& totalCounts,
+                              MediumGroupId groupId,
                               const MediumIdList& ids,
                               Span<const JsonNode> nodes)
         {
@@ -771,17 +791,15 @@ void SceneLoaderMRay::LoadMediums(TracerI& tracer, ExceptionList& exceptions)
             }
         }
     };
-
-    GenericLoadGroups(mediumMappings, exceptions,
-                      mediumNodes, threadPool,
-                      MediumLoader(tracer, texMappings));
+    GenericLoadGroups<AttributeCountList>(mediumMappings, exceptions,
+                                          mediumNodes, threadPool,
+                                          MediumLoader(tracer, texMappings));
 }
 
 void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
                                     ExceptionList& exceptions,
                                     uint32_t boundaryMediumId)
 {
-    thread_local AttributeCountList totalCounts = {};
     struct MaterialLoader
     {
         private:
@@ -811,7 +829,8 @@ void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
             return tracer.CommitMatReservations(groupId);
         }
 
-        MaterialIdList THRDReserveEntities(MatGroupId groupId,
+        MaterialIdList THRDReserveEntities(AttributeCountList& totalCounts,
+                                           MatGroupId groupId,
                                            Span<const JsonNode> nodes)
         {
             std::vector<AttributeCountList> attributeCounts = {};
@@ -837,7 +856,8 @@ void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
             return tracer.ReserveMaterials(groupId, std::move(attributeCounts), ioMediums);
         }
 
-        void THRDLoadEntities(MatGroupId groupId,
+        void THRDLoadEntities(const AttributeCountList& totalCounts,
+                              MatGroupId groupId,
                               const MaterialIdList& ids,
                               Span<const JsonNode> nodes)
         {
@@ -858,15 +878,14 @@ void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
         }
     };
 
-    GenericLoadGroups(matMappings, exceptions,
-                      materialNodes, threadPool,
-                      MaterialLoader(tracer, boundaryMediumId,
-                                     texMappings, mediumMappings.map));
+    GenericLoadGroups<AttributeCountList>(matMappings, exceptions,
+                                          materialNodes, threadPool,
+                                          MaterialLoader(tracer, boundaryMediumId,
+                                                         texMappings, mediumMappings.map));
 }
 
 void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ExceptionList& exceptions)
 {
-    thread_local AttributeCountList totalCounts = {};
     struct TransformLoader
     {
         private:
@@ -886,7 +905,8 @@ void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ExceptionList& exceptions)
             return tracer.CommitTransReservations(groupId);
         }
 
-        TransformIdList THRDReserveEntities(TransGroupId groupId,
+        TransformIdList THRDReserveEntities(AttributeCountList& totalCounts,
+                                            TransGroupId groupId,
                                             Span<const JsonNode> nodes)
         {
             std::vector<AttributeCountList> attributeCounts = {};
@@ -899,7 +919,8 @@ void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ExceptionList& exceptions)
             return tracer.ReserveTransformations(groupId, std::move(attributeCounts));
         }
 
-        void THRDLoadEntities(TransGroupId groupId,
+        void THRDLoadEntities(const AttributeCountList& totalCounts,
+                              TransGroupId groupId,
                               const TransformIdList& ids,
                               Span<const JsonNode> nodes)
         {
@@ -921,39 +942,44 @@ void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ExceptionList& exceptions)
         }
     };
 
-    GenericLoadGroups(transformMappings, exceptions,
-                      transformNodes, threadPool, TransformLoader(tracer));
+    GenericLoadGroups<AttributeCountList>(transformMappings, exceptions,
+                                          transformNodes, threadPool,
+                                          TransformLoader(tracer));
 }
 
 void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
 {
     std::shared_ptr<const MeshLoaderPoolI> meshLoaderPool = CreateMeshLoaderPool();
-    // TODO: Too many micro allocations due to map
-    // revise over this.
-    //
-    // Per "dll" loaders
-    // Key is a "tag" entry on the json. For example, "assimp" tag
-    // will call assimp mesh loader. If "assimp" does not support .obj for example
-    // loader will generate an error.
-    //
-    // The reason for this approach is to provide a utility for user to add new dlls
-    // for specific file extensions via per mesh file basis.
-    // If assimp "sucks" for new fbx files, however robustly works on old fbx files
-    // user can write new loader with a tag and load these files.
-    thread_local std::map<std::string, std::unique_ptr<MeshLoaderI>> loaders;
-    // Mesh files that opened via some loader
-    // This is here unfortunately as a limitation/functionality of the assimp.
-    // Assimp can post process meshes crates tangents/optimization etc. This means
-    // we cannot pre-determine the size of the vertices/indices just by looking a some
-    // form of header on the file. So we load the entire mesh and store before the commit
-    // of the primitive group.
-    //
-    // Key is the full path of the mesh file. For in node primitives,
-    //  it is the scene "primitiveId".
-    thread_local std::map<std::string, std::unique_ptr<MeshFileI>> meshFiles;
-    // Each mesh may have multiple submeshes so we don't wastefully open the same file
-    // multiple times
-    thread_local std::vector<Pair<uint32_t, const MeshFileI*>> batchFiles;
+
+    struct PrimThreadLocalData
+    {
+        // TODO: Too many micro allocations due to map
+        // revise over this.
+        //
+        // Per "dll" loaders
+        // Key is a "tag" entry on the json. For example, "assimp" tag
+        // will call assimp mesh loader. If "assimp" does not support .obj for example
+        // loader will generate an error.
+        //
+        // The reason for this approach is to provide a utility for user to add new dlls
+        // for specific file extensions via per mesh file basis.
+        // If assimp "sucks" for new fbx files, however robustly works on old fbx files
+        // user can write new loader with a tag and load these files.
+        std::map<std::string, std::unique_ptr<MeshLoaderI>> loaders;
+        // Mesh files that opened via some loader
+        // This is here unfortunately as a limitation/functionality of the assimp.
+        // Assimp can post process meshes crates tangents/optimization etc. This means
+        // we cannot pre-determine the size of the vertices/indices just by looking a some
+        // form of header on the file. So we load the entire mesh and store before the commit
+        // of the primitive group.
+        //
+        // Key is the full path of the mesh file. For in node primitives,
+        //  it is the scene "primitiveId".
+        std::map<std::string, std::unique_ptr<MeshFileI>> meshFiles;
+        // Each mesh may have multiple submeshes so we don't wastefully open the same file
+        // multiple times
+        std::vector<Pair<uint32_t, const MeshFileI*>> batchFiles;
+    };
 
     struct PrimitiveLoader
     {
@@ -981,19 +1007,18 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
             return tracer.CommitPrimReservations(groupId);
         }
 
-        PrimBatchIdList THRDReserveEntities(PrimGroupId groupId,
+        PrimBatchIdList THRDReserveEntities(PrimThreadLocalData& threadLocalData,
+                                            PrimGroupId groupId,
                                             Span<const JsonNode> nodes)
         {
-            // Above thread_local variables may be filled
-            // from another iteration, clear these
-            batchFiles.clear();
-            meshFiles.clear();
-            loaders.clear();
+            auto& batchFiles = threadLocalData.batchFiles;
+            auto& meshFiles = threadLocalData.meshFiles;
+            auto& loaders = threadLocalData.loaders;
 
-            //
             batchFiles.reserve(nodes.size());
             PrimBatchIdList idList;
             idList.reserve(nodes.size());
+
 
             for(const JsonNode& node : nodes)
             {
@@ -1047,28 +1072,28 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
             return idList;
         }
 
-        void THRDLoadEntities(PrimGroupId groupId,
+        void THRDLoadEntities(const PrimThreadLocalData& threadLocalData,
+                              PrimGroupId groupId,
                               const PrimBatchIdList& ids,
                               Span<const JsonNode> nodes)
         {
             for(size_t i = 0; i < nodes.size(); i++)
             {
-                const auto& [innerIndex, meshFile] = batchFiles[i];
+                const auto& [innerIndex, meshFile] = threadLocalData.batchFiles[i];
                 LoadPrimitive(tracer, groupId, ids[i],
                               innerIndex, meshFile);
             }
         }
     };
 
-    GenericLoadGroups(primMappings, exceptions,
-                      primNodes, threadPool,
-                      PrimitiveLoader(tracer, scenePath,
-                                      meshLoaderPool));
+    GenericLoadGroups<PrimThreadLocalData>(primMappings, exceptions,
+                                           primNodes, threadPool,
+                                           PrimitiveLoader(tracer, scenePath,
+                                                           meshLoaderPool));
 }
 
 void SceneLoaderMRay::LoadCameras(TracerI& tracer, ExceptionList& exceptions)
 {
-    thread_local AttributeCountList totalCounts = {};
     struct CameraLoader
     {
         private:
@@ -1085,7 +1110,8 @@ void SceneLoaderMRay::LoadCameras(TracerI& tracer, ExceptionList& exceptions)
         {
             return tracer.CommitCamReservations(groupId);
         }
-        CameraIdList THRDReserveEntities(CameraGroupId groupId,
+        CameraIdList THRDReserveEntities(AttributeCountList& totalCounts,
+                                         CameraGroupId groupId,
                                          Span<const JsonNode> nodes)
         {
             std::vector<AttributeCountList> attributeCounts = {};
@@ -1097,7 +1123,8 @@ void SceneLoaderMRay::LoadCameras(TracerI& tracer, ExceptionList& exceptions)
             totalCounts = GenericFindAttributeCounts(attributeCounts, list, nodes);
             return tracer.ReserveCameras(groupId, attributeCounts);
         }
-        void THRDLoadEntities(CameraGroupId groupId,
+        void THRDLoadEntities(const AttributeCountList& totalCounts,
+                              CameraGroupId groupId,
                               const CameraIdList& ids,
                               Span<const JsonNode> nodes)
         {
@@ -1119,13 +1146,13 @@ void SceneLoaderMRay::LoadCameras(TracerI& tracer, ExceptionList& exceptions)
         }
     };
 
-    GenericLoadGroups(camMappings, exceptions,
-                      cameraNodes, threadPool, CameraLoader(tracer));
+    GenericLoadGroups<AttributeCountList>(camMappings, exceptions,
+                                          cameraNodes, threadPool,
+                                          CameraLoader(tracer));
 }
 
 void SceneLoaderMRay::LoadLights(TracerI& tracer, ExceptionList& exceptions)
 {
-    thread_local AttributeCountList totalCounts = {};
     struct LightLoader
     {
         private:
@@ -1152,7 +1179,8 @@ void SceneLoaderMRay::LoadLights(TracerI& tracer, ExceptionList& exceptions)
             return tracer.CommitLightReservations(groupId);
         }
 
-        LightIdList THRDReserveEntities(LightGroupId groupId,
+        LightIdList THRDReserveEntities(AttributeCountList& totalCounts,
+                                        LightGroupId groupId,
                                         Span<const JsonNode> nodes)
         {
             std::vector<AttributeCountList> attributeCounts = {};
@@ -1187,7 +1215,8 @@ void SceneLoaderMRay::LoadLights(TracerI& tracer, ExceptionList& exceptions)
                                         primBatches);
         }
 
-        void THRDLoadEntities(LightGroupId groupId,
+        void THRDLoadEntities(const AttributeCountList& totalCounts,
+                              LightGroupId groupId,
                               const LightIdList& ids,
                               Span<const JsonNode> nodes)
         {
@@ -1208,10 +1237,10 @@ void SceneLoaderMRay::LoadLights(TracerI& tracer, ExceptionList& exceptions)
         }
     };
 
-    GenericLoadGroups(lightMappings, exceptions,
-                      lightNodes, threadPool,
-                      LightLoader(tracer, texMappings,
-                                  primMappings.map));
+    GenericLoadGroups<AttributeCountList>(lightMappings, exceptions,
+                                          lightNodes, threadPool,
+                                          LightLoader(tracer, texMappings,
+                                                      primMappings.map));
 }
 
 void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,

@@ -163,7 +163,8 @@ struct PrimAttributeInfo : public Tuple<PrimitiveAttributeLogic, MRayDataTypeRT,
         OPTIONALITY_INDEX   = 3
     };
 };
-using PrimAttributeInfoList = std::vector<PrimAttributeInfo>;
+using PrimAttributeInfoList = StaticVector<PrimAttributeInfo,
+                                           TracerConstants::MaxAttributePerGroup>;
 // Texture Related
 MRAY_GENERIC_ID(TextureId, uint32_t);
 // Transform Related
@@ -243,6 +244,7 @@ class [[nodiscard]] TracerI
     virtual TypeNameList        TransformGroups() const = 0;
     virtual TypeNameList        CameraGroups() const = 0;
     virtual TypeNameList        MediumGroups() const = 0;
+    virtual TypeNameList        LightGroups() const = 0;
 
     virtual PrimAttributeInfoList       AttributeInfo(PrimGroupId) const = 0;
     virtual CamAttributeInfoList        AttributeInfo(CameraGroupId) const = 0;

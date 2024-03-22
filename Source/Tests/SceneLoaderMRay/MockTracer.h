@@ -64,6 +64,7 @@ class TracerMock : public TracerI
     TypeNameList        TransformGroups() const override;
     TypeNameList        CameraGroups() const override;
     TypeNameList        MediumGroups() const override;
+    TypeNameList        LightGroups() const override;
 
     PrimAttributeInfoList       AttributeInfo(PrimGroupId) const override;
     CamAttributeInfoList        AttributeInfo(CameraGroupId) const override;
@@ -221,6 +222,7 @@ inline TracerMock::TracerMock(bool ug)
     using enum PrimitiveAttributeLogic;
     using enum AttributeOptionality;
     using enum AttributeIsArray;
+    using enum AttributeTexturable;
 
     // =================== //
     //     Primitives      //
@@ -250,16 +252,127 @@ inline TracerMock::TracerMock(bool ug)
     };
 
     // =================== //
-    //     Primitives      //
+    //     Materials       //
     // =================== //
+    matMockPack["(Mt)Lambert"] = MatMockPack
+    {
+        .attribInfo = MatAttributeInfoList
+        {
+            MatAttributeInfo("albedo", MRayDataType<MR_VECTOR_3>(),
+                             IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
+            MatAttributeInfo("normalMap", MRayDataType<MR_VECTOR_3>(),
+                             IS_SCALAR, MR_OPTIONAL, MR_TEXTURE_ONLY)
+        }
+    };
+    matMockPack["(Mt)Unreal"] = MatMockPack
+    {
+        .attribInfo = MatAttributeInfoList
+        {
+            MatAttributeInfo("albedo", MRayDataType<MR_VECTOR_3>(),
+                             IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
+            MatAttributeInfo("metallic", MRayDataType<MR_DEFAULT_FLT>(),
+                             IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
+            MatAttributeInfo("specular", MRayDataType<MR_DEFAULT_FLT>(),
+                             IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
+            MatAttributeInfo("roughness", MRayDataType<MR_DEFAULT_FLT>(),
+                             IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
+            MatAttributeInfo("normalMap", MRayDataType<MR_VECTOR_3>(),
+                             IS_SCALAR, MR_OPTIONAL, MR_TEXTURE_ONLY)
+        }
+    };
+
+    // =================== //
+    //       Lights        //
+    // =================== //
+    lightMockPack["(L)Null"] = LightMockPack{};
+    lightMockPack["(L)Skysphere"] = LightMockPack
+    {
+        .attribInfo = LightAttributeInfoList
+        {
+            LightAttributeInfo("radiance", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+                               MR_MANDATORY, MR_TEXTURE_OR_CONSTANT)
+        }
+    };
+    lightMockPack["(L)Primitive(P)Triangle"] = LightMockPack
+    {
+        .attribInfo = LightAttributeInfoList
+        {
+            LightAttributeInfo("radiance", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+                               MR_MANDATORY, MR_TEXTURE_OR_CONSTANT)
+        }
+    };
+    lightMockPack["(L)Rectangle"] = LightMockPack
+    {
+        .attribInfo = LightAttributeInfoList
+        {
+            LightAttributeInfo("radiance", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+                               MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
+            LightAttributeInfo("position", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+                               MR_MANDATORY, MR_CONSTANT_ONLY),
+            LightAttributeInfo("right", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+                               MR_MANDATORY, MR_CONSTANT_ONLY),
+            LightAttributeInfo("up", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+                               MR_MANDATORY, MR_CONSTANT_ONLY)
+        }
+    };
+
+    // =================== //
+    //       Cameras       //
+    // =================== //
+    camMockPack["(C)Pinhole"] = CamMockPack
+    {
+        .attribInfo = CamAttributeInfoList
+        {
+            CamAttributeInfo("fov", MRayDataType<MR_DEFAULT_FLT>(), IS_SCALAR, MR_MANDATORY),
+            CamAttributeInfo("isFovX", MRayDataType<MR_CHAR>(), IS_SCALAR, MR_MANDATORY),
+            CamAttributeInfo("planes", MRayDataType<MR_VECTOR_2>(), IS_SCALAR, MR_MANDATORY),
+            CamAttributeInfo("gaze", MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY),
+            CamAttributeInfo("position", MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY),
+            CamAttributeInfo("up", MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY)
+        }
+    };
+
+    // =================== //
+    //     Transforms      //
+    // =================== //
+    transMockPack["(T)Identity"] = TransMockPack {};
+    transMockPack["(T)Single"] = TransMockPack
+    {
+        .attribInfo = TransAttributeInfoList
+        {
+            TransAttributeInfo("matrix", MRayDataType<MR_MATRIX_4x4>(), IS_SCALAR, MR_MANDATORY)
+        }
+    };
+    transMockPack["(T)Multi"] = TransMockPack
+    {
+        .attribInfo = TransAttributeInfoList
+        {
+            TransAttributeInfo("matrix", MRayDataType<MR_MATRIX_4x4>(), IS_ARRAY, MR_MANDATORY)
+        }
+    };
+
+    // =================== //
+    //       Mediums       //
+    // =================== //
+    medMockPack["(Md)Vacuum"] = MedMockPack{};
+    medMockPack["(Md)Homogeneous"] = MedMockPack
+    {
+        .attribInfo = TexturedAttributeInfoList
+        {
+            MediumAttributeInfo("absorbtion", MRayDataType<MR_VECTOR_3>(),
+                                IS_SCALAR, MR_MANDATORY, MR_CONSTANT_ONLY),
+            MediumAttributeInfo("ior", MRayDataType<MR_DEFAULT_FLT>(),
+                                IS_SCALAR, MR_MANDATORY, MR_CONSTANT_ONLY)
+        }
+    };
 }
 
 inline TypeNameList TracerMock::PrimitiveGroups() const
 {
     return std::vector<std::string>
     {
-        "(P)DefaultTriangle",
-        "(P)DefaultTriangleSkinned"
+        "(P)Triangle",
+        "(P)TriangleSkinned"
     };
 }
 
@@ -277,7 +390,8 @@ inline TypeNameList TracerMock::TransformGroups() const
     return std::vector<std::string>
     {
         "(T)Identity",
-        "(T)Single"
+        "(T)Single",
+        "(T)Multi"
     };
 }
 
@@ -295,6 +409,17 @@ inline TypeNameList TracerMock::MediumGroups() const
     {
         "(Md)Vacuum",
         "(Md)Homogeneous"
+    };
+}
+
+inline TypeNameList TracerMock::LightGroups() const
+{
+    return std::vector<std::string>
+    {
+        "(L)Null",
+        "(L)Skysphere",
+        "(L)Rectangle",
+        "(L)Primitive(P)Triangle"
     };
 }
 

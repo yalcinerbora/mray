@@ -115,6 +115,19 @@ constexpr StaticVector<T, N>::StaticVector()
 {}
 
 template<class T, size_t N>
+constexpr StaticVector<T, N>::StaticVector(std::initializer_list<T> init)
+    : count(init.size())
+{
+    assert(init.size() <= N);
+    size_t i = 0;
+    for(const T& t : init)
+    {
+        ConstructObjectAt(i, t);
+        i++;
+    }
+}
+
+template<class T, size_t N>
 constexpr StaticVector<T, N>::StaticVector(StaticVecSize countIn)
 requires std::is_default_constructible_v<T>
     : storage()

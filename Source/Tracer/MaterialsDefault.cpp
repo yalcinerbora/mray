@@ -25,18 +25,18 @@ void MatGroupLambert::CommitReservations()
     soa.dMediumIds = ToConstSpan(dMediumIds);
 }
 
-typename MatGroupLambert::AttribInfoList MatGroupLambert::AttributeInfo() const
+MatAttributeInfoList MatGroupLambert::AttributeInfo() const
 {
     using enum MRayDataEnum;
     using enum AttributeOptionality;
     using enum AttributeTexturable;
     using enum AttributeIsArray;
-    static const std::array<MatAttributeInfo, 2> LogicList =
+    static const MatAttributeInfoList LogicList =
     {
-        MatAttributeInfo("Albedo", MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
-        MatAttributeInfo("NormalMap", MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_OPTIONAL, MR_TEXTURE_ONLY)
+        MatAttributeInfo("albedo", MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
+        MatAttributeInfo("normalMap", MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_OPTIONAL, MR_TEXTURE_ONLY)
     };
-    return std::vector(LogicList.cbegin(), LogicList.cend());
+    return LogicList;
 }
 void MatGroupLambert::PushAttribute(MaterialKey,
                                     uint32_t attributeIndex,
