@@ -126,12 +126,12 @@ class TracerMock : public TracerI
     std::map<std::string_view, TransMockPack>   transMockPack;
     std::map<std::string_view, LightMockPack>   lightMockPack;
 
-    size_t primGroupCounter;
-    size_t camGroupCounter;
-    size_t mediumGroupCounter;
-    size_t matGroupCounter;
-    size_t transGroupCounter;
-    size_t lightGroupCounter;
+    size_t primGroupCounter     = 0;
+    size_t camGroupCounter      = 0;
+    size_t mediumGroupCounter   = 0;
+    size_t matGroupCounter      = 0;
+    size_t transGroupCounter    = 0;
+    size_t lightGroupCounter    = 0;
 
     // Surface Related
     std::atomic_size_t  surfaceCounter      = 0;
@@ -153,7 +153,7 @@ class TracerMock : public TracerI
     bool                print;
 
     public:
-                        TracerMock(bool print= true);
+                        TracerMock(bool print = true);
 
     TypeNameList        PrimitiveGroups() const override;
     TypeNameList        MaterialGroups() const override;
@@ -379,6 +379,16 @@ inline TracerMock::TracerMock(bool pl)
                              IS_SCALAR, MR_OPTIONAL, MR_TEXTURE_ONLY)
         },
         .name = "(Mt)Unreal"
+    };
+    matMockPack["(Mt)Reflect"] = MatMockPack
+    {
+        .attribInfo = MatAttributeInfoList{},
+        .name = "(Mt)Reflect"
+    };
+    matMockPack["(Mt)Refract"] = MatMockPack
+    {
+        .attribInfo = MatAttributeInfoList{},
+        .name = "(Mt)Refract"
     };
 
     // =================== //
@@ -664,15 +674,19 @@ inline PrimGroupId TracerMock::CreatePrimitiveGroup(std::string name)
 
 inline PrimBatchId TracerMock::ReservePrimitiveBatch(PrimGroupId id, PrimCount count)
 {
+    std::string_view name;
     std::atomic_size_t* atomicCounter = nullptr;
     {
         std::lock_guard<std::mutex> lock(pGLock);
-        atomicCounter = &primGroups.at(id).batchCounter;
+        auto& val = primGroups.at(id);
+        atomicCounter = &val.batchCounter;
+        name = val.mp.name;
     }
 
     if(print)
-        MRAY_LOG("Reserving primitive over PrimGroup({}), VCount: {}, PCount: {}",
-                 static_cast<uint32_t>(id), count.attributeCount, count.primCount);
+        MRAY_LOG("Reserving primitive over PrimGroup({})[{}], VCount: {}, PCount: {}",
+                 static_cast<uint32_t>(id), name,
+                 count.attributeCount, count.primCount);
 
     size_t batchId = atomicCounter->fetch_add(1);
     return PrimBatchId(batchId);
@@ -681,10 +695,13 @@ inline PrimBatchId TracerMock::ReservePrimitiveBatch(PrimGroupId id, PrimCount c
 inline PrimBatchIdList TracerMock::ReservePrimitiveBatches(PrimGroupId id,
                                                            std::vector<PrimCount> primCounts)
 {
+    std::string_view name;
     std::atomic_size_t* atomicCounter = nullptr;
     {
         std::lock_guard<std::mutex> lock(pGLock);
-        atomicCounter = &primGroups.at(id).batchCounter;
+        auto& value = primGroups.at(id);
+        atomicCounter = &value.batchCounter;
+        name = value.mp.name;
     }
 
     size_t batchIdFirst = atomicCounter->fetch_add(primCounts.size());
@@ -693,8 +710,11 @@ inline PrimBatchIdList TracerMock::ReservePrimitiveBatches(PrimGroupId id,
         std::string log;
         for(const auto& count : primCounts)
         {
-            log += MRAY_FORMAT("Reserving primitive over PrimGroup({}), VCount: {}, PCount: {}",
-                               static_cast<uint32_t>(id), count.attributeCount, count.primCount);
+            log += MRAY_FORMAT("Reserving primitive over PrimGroup({})[{}], "
+                               "VCount: {}, PCount: {}\n",
+                               static_cast<uint32_t>(id), name,
+                               count.attributeCount,
+                               count.primCount);
         }
         MRAY_LOG("{}", log);
     }
@@ -710,15 +730,18 @@ inline PrimBatchIdList TracerMock::ReservePrimitiveBatches(PrimGroupId id,
 
 inline void TracerMock::CommitPrimReservations(PrimGroupId id)
 {
+    std::string_view v;
     bool* isCommitted = nullptr;
     {
         std::lock_guard<std::mutex> lock(pGLock);
-        isCommitted = &primGroups.at(id).isComitted;
+        auto& val = primGroups.at(id);
+        isCommitted = &val.isComitted;
+        v = val.mp.name;
     }
 
     if(*isCommitted)
-        throw MRayError("PrimitiveGroup({}) is already comitted!",
-                        static_cast<uint32_t>(id));
+        throw MRayError("PrimitiveGroup({})[{}] is already comitted!",
+                        static_cast<uint32_t>(id), v);
     else
         *isCommitted = true;
 }
@@ -738,18 +761,19 @@ inline void TracerMock::PushPrimAttribute(PrimGroupId gId,
 
     const auto& pg = primGroups.at(gId);
     if(!pg.isComitted)
-        throw MRayError("PrimitiveGroup({}) is not committed. "
+        throw MRayError("PrimitiveGroup({})[{}] is not committed. "
                         "You can not push data to it!",
-                        static_cast<uint32_t>(gId));
+                        static_cast<uint32_t>(gId), pg.mp.name);
     if(!print) return;
 
     const auto& attribType = pg.mp.attribInfo[attribIndex];
     MRayDataTypeRT dataTypeRT = std::get<PrimAttributeInfo::LAYOUT_INDEX>(attribType);
     MRayDataEnum dataEnum = dataTypeRT.Name();
     size_t dataCount = AcquireTransientDataCount(dataTypeRT, data);
-    MRAY_LOG("Pushing prim attribute of ({}:{}),"
+    MRAY_LOG("Pushing prim attribute of ({}[{}]:{}),"
              "DataType: {:s}, ByteSize: {}",
-             static_cast<uint32_t>(gId), static_cast<uint32_t>(batchId),
+             static_cast<uint32_t>(gId), pg.mp.name,
+             static_cast<uint32_t>(batchId),
              MRayDataTypeStringifier::ToString(dataEnum), dataCount);
 }
 
@@ -772,9 +796,10 @@ inline void TracerMock::PushPrimAttribute(PrimGroupId gId,
     MRayDataTypeRT dataTypeRT = std::get<PrimAttributeInfo::LAYOUT_INDEX>(attribType);
     MRayDataEnum dataEnum = dataTypeRT.Name();
     size_t dataCount = AcquireTransientDataCount(dataTypeRT, data);
-    MRAY_LOG("Pushing prim attribute of ({}:{})->[{}, {}],"
+    MRAY_LOG("Pushing prim attribute of ({}[{}]:{})->[{}, {}],"
              "DataType: {:s}, ByteSize: {}",
-             static_cast<uint32_t>(gId), static_cast<uint32_t>(batchId),
+             static_cast<uint32_t>(gId), pg.mp.name,
+             static_cast<uint32_t>(batchId),
              subBatchRange[0], subBatchRange[1],
              MRayDataTypeStringifier::ToString(dataEnum), dataCount);
 }
@@ -849,7 +874,7 @@ inline MaterialIdList TracerMock::ReserveMaterials(MatGroupId id,
             attribCountString += "]";
 
             log += MRAY_FORMAT("Reserving material over MaterialGroup({}), AttribCount: {}, "
-                               "MediumPair: ({}, {})", static_cast<uint32_t>(id),
+                               "MediumPair: ({}, {})\n", static_cast<uint32_t>(id),
                                attribCountString,
                                static_cast<uint32_t>(mediumPair.first),
                                static_cast<uint32_t>(mediumPair.second));
@@ -1044,7 +1069,7 @@ inline TransformId TracerMock::ReserveTransformation(TransGroupId id, AttributeC
         }
         attribCountString += "]";
 
-        MRAY_LOG("Reserving transform over TransformGroup({}), AttribCount: {}",
+        MRAY_LOG("Reserving transform over TransformGroup({}), AttribCount: {}\n",
                  static_cast<uint32_t>(id), attribCountString);
     }
     size_t transId = atomicCounter->fetch_add(1);
@@ -1074,7 +1099,7 @@ inline TransformIdList TracerMock::ReserveTransformations(TransGroupId id,
             }
             attribCountString += "]";
 
-            log += MRAY_FORMAT("Reserving transform over TransformGroup({}), AttribCount: {}",
+            log += MRAY_FORMAT("Reserving transform over TransformGroup({}), AttribCount: {}\n",
                                static_cast<uint32_t>(id), attribCountString);
         }
         MRAY_LOG("{}", log);
@@ -1207,7 +1232,7 @@ inline LightIdList TracerMock::ReserveLights(LightGroupId id,
                 : MRAY_FORMAT("{}", static_cast<uint32_t>(primBatches[i]));
 
             log += MRAY_FORMAT("Reserving light over LightGroup({}), AttribCount: {} "
-                               "PrimBatchId: {:s}", static_cast<uint32_t>(id),
+                               "PrimBatchId: {:s}\n", static_cast<uint32_t>(id),
                                attribCountString, batchString);
         }
         MRAY_LOG("{}", log);
@@ -1377,7 +1402,7 @@ inline CameraIdList TracerMock::ReserveCameras(CameraGroupId id,
             }
             attribCountString += "]";
 
-            log += MRAY_FORMAT("Reserving camera over CameraGroup({}), AttribCount: {}",
+            log += MRAY_FORMAT("Reserving camera over CameraGroup({}), AttribCount: {}\n",
                                static_cast<uint32_t>(id), attribCountString);
         }
         MRAY_LOG("{}", log);
@@ -1498,7 +1523,7 @@ inline MediumIdList TracerMock::ReserveMediums(MediumGroupId id,
             }
             attribCountString += "]";
 
-            log += MRAY_FORMAT("Reserving medium over MediumGroup({}), AttribCount: {}",
+            log += MRAY_FORMAT("Reserving medium over MediumGroup({}), AttribCount: {}\n",
                                static_cast<uint32_t>(id), attribCountString);
         }
         MRAY_LOG("{}", log);

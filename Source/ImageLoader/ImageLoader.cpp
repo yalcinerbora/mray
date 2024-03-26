@@ -294,18 +294,18 @@ Expected<ImageHeader<2>> ImageLoader::ReadImageHeaderInternal(const OIIO::ImageI
     const auto& colorSpace = colorSpaceE.value();
 
     // TODO: Support tiled images
-    if(spec.tile_width != 0 || spec.tile_height != 0 || spec.tile_depth != 0)
-        return MRayError("Tiled images are not currently supported.({})",
+    if(spec.tile_width != 0 || spec.tile_height != 0)
+        return MRayError("Tiled images are not currently supported ({}).",
                          filePath);
 
     // TODO: Do a conversion to an highest precision channel for these
     if(!spec.channelformats.empty())
-        return MRayError("Channel-specific formats are not supported.({})",
+        return MRayError("Channel-specific formats are not supported ({}).",
                          filePath);
     // Is this for deep images??
     // Or mip
     if(spec.format.is_array())
-        return MRayError("Arrayed per-pixel formats are not supported.({})",
+        return MRayError("Arrayed per-pixel formats are not supported ({}).",
                          filePath);
 
     // Mipmap determination

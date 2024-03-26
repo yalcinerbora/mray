@@ -235,24 +235,28 @@ constexpr const T& StaticVector<T, N>::operator[](size_t i) const
 template<class T, size_t N>
 constexpr T* StaticVector<T, N>::data()
 {
+    assert(count != 0);
     return ItemAt(0);
 }
 
 template<class T, size_t N>
 constexpr const T* StaticVector<T, N>::data() const
 {
+    assert(count != 0);
     return ItemAt(0);
 }
 
 template<class T, size_t N>
 constexpr T& StaticVector<T, N>::back()
 {
+    assert(count != 0);
     return ItemAt(count - 1);
 }
 
 template<class T, size_t N>
 constexpr const T& StaticVector<T, N>::back() const
 {
+    assert(count != 0);
     return ItemAt(count - 1);
 }
 
@@ -273,25 +277,25 @@ constexpr const T& StaticVector<T, N>::front() const
 template<class T, size_t N>
 constexpr T* StaticVector<T, N>::begin()
 {
-    return data();
+    return ItemAt(0);
 }
 
 template<class T, size_t N>
 constexpr const T* StaticVector<T, N>::begin() const
 {
-    return data();
+    return ItemAt(0);
 }
 
 template<class T, size_t N>
 constexpr T* StaticVector<T, N>::end()
 {
-    return data() + count;
+    return ItemAt(0) + count;
 }
 
 template<class T, size_t N>
 constexpr const T* StaticVector<T, N>::end() const
 {
-    return data() + count;
+    return ItemAt(0) + count;
 }
 
 template<class T, size_t N>
@@ -363,18 +367,18 @@ constexpr void StaticVector<T, N>::pop_back()
 }
 
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 FlatSet<T, Comp, Cont>::FlatSet()
 {}
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 FlatSet<T, Comp, Cont>::FlatSet(Cont c)
     : FlatSet(IsSorted(), c)
 {
     std::sort(container.begin(), container.end(), compare);
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 template <class Alloc>
 FlatSet<T, Comp, Cont>::FlatSet(Cont c, const Alloc& a)
     : FlatSet(IsSorted(), c, a)
@@ -382,26 +386,26 @@ FlatSet<T, Comp, Cont>::FlatSet(Cont c, const Alloc& a)
     std::sort(container.begin(), container.end(), compare);
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 FlatSet<T, Comp, Cont>::FlatSet(const Comp& comp)
     : container()
     , compare(comp)
 {}
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 template <class Alloc>
 FlatSet<T, Comp, Cont>::FlatSet(const Comp& comp, const Alloc& a)
     : container(a)
     , compare(comp)
 {}
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 template <class Alloc>
 FlatSet<T, Comp, Cont>::FlatSet(const Alloc& a)
     : container(a)
 {}
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 template <class InputIterator>
 FlatSet<T, Comp, Cont>::FlatSet(InputIterator first, InputIterator last,
                                 const Comp& comp)
@@ -410,7 +414,7 @@ FlatSet<T, Comp, Cont>::FlatSet(InputIterator first, InputIterator last,
     std::sort(container.begin(), container.end(), compare);
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 template <class InputIterator, class Alloc>
 FlatSet<T, Comp, Cont>::FlatSet(InputIterator first, InputIterator last,
                                 const Comp& comp, const Alloc& a)
@@ -419,7 +423,7 @@ FlatSet<T, Comp, Cont>::FlatSet(InputIterator first, InputIterator last,
     std::sort(container.begin(), container.end(), compare);
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 template <class InputIterator, class Alloc>
 FlatSet<T, Comp, Cont>::FlatSet(InputIterator first, InputIterator last,
                                 const Alloc& a)
@@ -428,7 +432,7 @@ FlatSet<T, Comp, Cont>::FlatSet(InputIterator first, InputIterator last,
     std::sort(container.begin(), container.end(), compare);
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 FlatSet<T, Comp, Cont>::FlatSet(std::initializer_list<T> il,
                                 const Comp& comp)
     : FlatSet(IsSorted(), il, comp)
@@ -436,7 +440,7 @@ FlatSet<T, Comp, Cont>::FlatSet(std::initializer_list<T> il,
     std::sort(container.begin(), container.end(), compare);
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 template <class Alloc>
 FlatSet<T, Comp, Cont>::FlatSet(std::initializer_list<T> il,
                                 const Comp& comp, const Alloc& a)
@@ -445,7 +449,7 @@ FlatSet<T, Comp, Cont>::FlatSet(std::initializer_list<T> il,
     std::sort(container.begin(), container.end(), compare);
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 template <class Alloc>
 FlatSet<T, Comp, Cont>::FlatSet(std::initializer_list<T> il, const Alloc& a)
     : FlatSet(IsSorted(), il, a)
@@ -453,18 +457,18 @@ FlatSet<T, Comp, Cont>::FlatSet(std::initializer_list<T> il, const Alloc& a)
     std::sort(container.begin(), container.end(), compare);
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 FlatSet<T, Comp, Cont>::FlatSet(IsSorted, Cont c)
     : container(c)
 {}
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 template <class Alloc>
 FlatSet<T, Comp, Cont>::FlatSet(IsSorted, Cont c, const Alloc& a)
     : container(c, a)
 {}
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 template <class InputIterator>
 FlatSet<T, Comp, Cont>::FlatSet(IsSorted, InputIterator first,
                                 InputIterator last,
@@ -473,7 +477,7 @@ FlatSet<T, Comp, Cont>::FlatSet(IsSorted, InputIterator first,
     , compare(comp)
 {}
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 template <class InputIterator, class Alloc>
 FlatSet<T, Comp, Cont>::FlatSet(IsSorted, InputIterator first,
                                 InputIterator last,
@@ -482,7 +486,7 @@ FlatSet<T, Comp, Cont>::FlatSet(IsSorted, InputIterator first,
     , compare(comp)
 {}
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 template <class InputIterator, class Alloc>
 FlatSet<T, Comp, Cont>::FlatSet(IsSorted, InputIterator first,
                                 InputIterator last,
@@ -491,14 +495,14 @@ FlatSet<T, Comp, Cont>::FlatSet(IsSorted, InputIterator first,
     , compare(Comp())
 {}
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 FlatSet<T, Comp, Cont>::FlatSet(IsSorted, std::initializer_list<T> il,
                                 const Comp& comp)
     : container(il)
     , compare(comp)
 {}
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 template <class Alloc>
 FlatSet<T, Comp, Cont>::FlatSet(IsSorted, std::initializer_list<T> il,
                                 const Comp& comp, const Alloc& a)
@@ -507,7 +511,7 @@ FlatSet<T, Comp, Cont>::FlatSet(IsSorted, std::initializer_list<T> il,
 
 {}
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 template <class Alloc>
 FlatSet<T, Comp, Cont>::FlatSet(IsSorted, std::initializer_list<T> il,
                                 const Alloc& a)
@@ -515,107 +519,109 @@ FlatSet<T, Comp, Cont>::FlatSet(IsSorted, std::initializer_list<T> il,
     , compare(Comp())
 {}
 
-template <class T, class Comp, class Cont>
-typename FlatSet<T, Comp, Cont>::iterator FlatSet<T, Comp, Cont>::begin()
+template <class T, class Comp, RandomAccessContainerC Cont>
+typename FlatSet<T, Comp, Cont>::iterator
+FlatSet<T, Comp, Cont>::begin()
 {
     return container.begin();
 }
 
-template <class T, class Comp, class Cont>
-typename FlatSet<T, Comp, Cont>::const_iterator FlatSet<T, Comp, Cont>::begin() const
+template <class T, class Comp, RandomAccessContainerC Cont>
+typename FlatSet<T, Comp, Cont>::const_iterator
+FlatSet<T, Comp, Cont>::begin() const
 {
     return container.begin();
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 typename FlatSet<T, Comp, Cont>::const_iterator
 FlatSet<T, Comp, Cont>::cbegin() const
 {
     return container.cbegin();
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 typename FlatSet<T, Comp, Cont>::iterator
 FlatSet<T, Comp, Cont>::end()
 {
     return container.end();
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 typename FlatSet<T, Comp, Cont>::const_iterator
 FlatSet<T, Comp, Cont>::end() const
 {
     return container.end();
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 typename FlatSet<T, Comp, Cont>::const_iterator
 FlatSet<T, Comp, Cont>::cend() const
 {
     return container.cend();
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 typename FlatSet<T, Comp, Cont>::iterator
 FlatSet<T, Comp, Cont>::rbegin()
 {
     return container.rbegin();
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 typename FlatSet<T, Comp, Cont>::const_iterator
 FlatSet<T, Comp, Cont>::rbegin() const
 {
     return container.rbegin();
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 typename FlatSet<T, Comp, Cont>::const_iterator
 FlatSet<T, Comp, Cont>::crbegin() const
 {
     return container.crbegin();
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 typename FlatSet<T, Comp, Cont>::iterator
 FlatSet<T, Comp, Cont>::rend()
 {
     return container.rend();
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 typename FlatSet<T, Comp, Cont>::const_iterator
 FlatSet<T, Comp, Cont>::rend() const
 {
     return container.rend();
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 typename FlatSet<T, Comp, Cont>::const_iterator
 FlatSet<T, Comp, Cont>::crend() const
 {
     return container.crend();
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 bool FlatSet<T, Comp, Cont>::empty() const
 {
     return container.empty();
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 size_t FlatSet<T, Comp, Cont>::size() const
 {
     return container.size();
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 size_t FlatSet<T, Comp, Cont>::max_size() const
 {
     return std::numeric_limits<size_t>::max();
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 template<class... Args>
 std::pair<typename FlatSet<T, Comp, Cont>::iterator, bool>
 FlatSet<T, Comp, Cont>::emplace(Args&&... args)
@@ -624,7 +630,7 @@ FlatSet<T, Comp, Cont>::emplace(Args&&... args)
     return insert(T(std::forward<Args>(args)...));
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 std::pair<typename FlatSet<T, Comp, Cont>::iterator, bool>
 FlatSet<T, Comp, Cont>::insert(const T& t)
 {
@@ -632,7 +638,7 @@ FlatSet<T, Comp, Cont>::insert(const T& t)
     return insert(T(t));
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 std::pair<typename FlatSet<T, Comp, Cont>::iterator, bool>
 FlatSet<T, Comp, Cont>::insert(T&& t)
 {
@@ -651,25 +657,26 @@ FlatSet<T, Comp, Cont>::insert(T&& t)
 
     return std::pair(loc, shouldInsert);
 }
-template <class T, class Comp, class Cont>
+
+template <class T, class Comp, RandomAccessContainerC Cont>
 Cont FlatSet<T, Comp, Cont>::extract() &&
 {
     return container;
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 void FlatSet<T, Comp, Cont>::replace(Cont&& c)
 {
     container = std::move(c);
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 void FlatSet<T, Comp, Cont>::clear()
 {
     container.clear();
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 typename FlatSet<T, Comp, Cont>::iterator
 FlatSet<T, Comp, Cont>::find(const T& t)
 {
@@ -681,7 +688,7 @@ FlatSet<T, Comp, Cont>::find(const T& t)
     else return container.end();
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 typename FlatSet<T, Comp, Cont>::const_iterator
 FlatSet<T, Comp, Cont>::find(const T& t) const
 {
@@ -693,21 +700,21 @@ FlatSet<T, Comp, Cont>::find(const T& t) const
     else return container.end();
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 size_t FlatSet<T, Comp, Cont>::count(const T& t) const
 {
     auto loc = find(t);
     return (loc != container.end()) ? 1 : 0;
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 bool FlatSet<T, Comp, Cont>::contains(const T& t) const
 {
     auto loc = find(t);
     return (loc != container.end()) ? 1 : 0;
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 typename FlatSet<T, Comp, Cont>::iterator
 FlatSet<T, Comp, Cont>::lower_bound(const T& t)
 {
@@ -715,7 +722,7 @@ FlatSet<T, Comp, Cont>::lower_bound(const T& t)
                             t, compare);
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 typename FlatSet<T, Comp, Cont>::const_iterator
 FlatSet<T, Comp, Cont>::lower_bound(const T& t) const
 {
@@ -723,7 +730,7 @@ FlatSet<T, Comp, Cont>::lower_bound(const T& t) const
                             t, compare);
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 typename FlatSet<T, Comp, Cont>::iterator
 FlatSet<T, Comp, Cont>::upper_bound(const T& t)
 {
@@ -731,7 +738,7 @@ FlatSet<T, Comp, Cont>::upper_bound(const T& t)
                             t, compare);
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 typename FlatSet<T, Comp, Cont>::const_iterator
 FlatSet<T, Comp, Cont>::upper_bound(const T& t) const
 {
@@ -739,7 +746,7 @@ FlatSet<T, Comp, Cont>::upper_bound(const T& t) const
                             t, compare);
 }
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 typename FlatSet<T, Comp, Cont>::iterator
 FlatSet<T, Comp, Cont>::equal_range(const T& t)
 {
@@ -748,7 +755,7 @@ FlatSet<T, Comp, Cont>::equal_range(const T& t)
 }
 
 
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 typename FlatSet<T, Comp, Cont>::const_iterator
 FlatSet<T, Comp, Cont>::equal_range(const T& t) const
 {
@@ -756,14 +763,7 @@ FlatSet<T, Comp, Cont>::equal_range(const T& t) const
                             t, compare);
 }
 
-template <class T, class Comp, class Cont>
-T& FlatSet<T, Comp, Cont>::operator[](size_t i)
-{
-    assert(i < container.size());
-    return container[i];
-}
-
-template <class T, class Comp, class Cont>
+template <class T, class Comp, RandomAccessContainerC Cont>
 const T& FlatSet<T, Comp, Cont>::operator[](size_t i) const
 {
     assert(i < container.size());

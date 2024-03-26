@@ -27,7 +27,7 @@ class SceneLoaderMRayTest : public ::testing::Test
 
 void SceneLoaderMRayTest::SetUp()
 {
-    pool = std::make_unique<BS::thread_pool>(2, [](){});
+    pool = std::make_unique<BS::thread_pool>(1, [](){});
     dllFile = std::make_unique<SharedLibrary>("SceneLoaderMRay");
 
     SharedLibArgs args
@@ -50,7 +50,6 @@ void SceneLoaderMRayTest::TearDown()
 TEST_F(SceneLoaderMRayTest, Empty)
 {
     TracerMock tracer;
-
     std::istringstream ss{std::string(EmptyScene)};
     auto result = loader->LoadScene(tracer, ss);
     EXPECT_TRUE(static_cast<bool>(result.first));
@@ -59,29 +58,45 @@ TEST_F(SceneLoaderMRayTest, Empty)
 TEST_F(SceneLoaderMRayTest, MinimalValid)
 {
     TracerMock tracer;
-
     std::istringstream ss{std::string(MinimalValidScene)};
     auto result = loader->LoadScene(tracer, ss);
+    EXPECT_FALSE(static_cast<bool>(result.first));
 
-    MRAY_ERROR_LOG("{}", result.first.GetError());
-
-    EXPECT_FALSE(result.first);
+    // Might as well print the error here
+    if(result.first)
+        MRAY_ERROR_LOG("{}", result.first.GetError());
 }
 
 TEST_F(SceneLoaderMRayTest, Basic)
 {
     TracerMock tracer;
-
     std::istringstream ss{std::string(BasicScene)};
     auto result = loader->LoadScene(tracer, ss);
+    EXPECT_FALSE(static_cast<bool>(result.first));
 
-    MRAY_ERROR_LOG("{}", result.first.GetError());
-
-    EXPECT_FALSE(result.first);
+    if(result.first)
+        MRAY_ERROR_LOG("{}", result.first.GetError());
 }
 
-//TEST_F(SceneLoaderMRayTest, Kitchen)
-//{
-//    TracerMock tracer;
-//    auto result = loader->LoadScene(tracer, "Kitchen/Kitchen.json");
-//}
+TEST_F(SceneLoaderMRayTest, Kitchen)
+{
+    //while(true)
+    for(uint32_t i = 0; i < 512; i++)
+    //for(uint32_t i = 0; i < 1; i++)
+    {
+        TracerMock tracer(true);
+
+        if(i > 0) SetUp();
+
+        auto result = loader->LoadScene(tracer, "Kitchen/Kitchen.json");
+        EXPECT_FALSE(static_cast<bool>(result.first));
+
+        MRAY_LOG("{} --- {}ms",
+                 result.first.GetError(),
+                 result.second);
+
+        TearDown();
+    }
+    //EXPECT_FALSE(result.first);
+
+}

@@ -170,9 +170,9 @@ inline JsonNode::JsonNode(const nlohmann::json& n, uint32_t innerIndex)
     isMultiNode = inner.is_array();
 }
 
-inline bool JsonNode::operator<(const JsonNode other) const
+inline auto JsonNode::operator<=>(const JsonNode other) const
 {
-    return Id() < other.Id();
+    return Id() <=> other.Id();
 }
 
 inline const nlohmann::json& JsonNode::RawNode() const
@@ -209,10 +209,11 @@ TransientData JsonNode::CommonDataArray(std::string_view name) const
     const auto& nodeArray = node->at(name);
     TransientData input(std::in_place_type_t<T>{}, nodeArray.size());
 
-    Span<T> data = input.AccessAs<T>();
     for(size_t i = 0; i < nodeArray.size(); i++)
-        data[i] = nodeArray[i].get<T>();
-
+    {
+        T val = nodeArray[i].get<T>();
+        input.Push(Span<const T>(&val, 1));
+    }
     return std::move(input);
 }
 
@@ -225,6 +226,9 @@ inline size_t JsonNode::CheckDataArraySize(std::string_view name) const
 
 inline size_t JsonNode::CheckOptionalDataArraySize(std::string_view name) const
 {
+    // Entire entry is missing (which is not defined all items on this node)
+    if(node->find(name) == node->cend()) return 0;
+
     const auto& n = (isMultiNode) ? node->at(name).at(innerIndex)
                                   : node->at(name);
     return IsDashed(n) ? 0 : n.size();
@@ -232,6 +236,9 @@ inline size_t JsonNode::CheckOptionalDataArraySize(std::string_view name) const
 
 inline bool JsonNode::CheckOptionalData(std::string_view name) const
 {
+    // Entire entry is missing (which is not defined all items on this node)
+    if(node->find(name) == node->cend()) return false;
+
     const auto& n = (isMultiNode) ? node->at(name).at(innerIndex)
                                   : node->at(name);
     return IsDashed(n);
@@ -252,9 +259,11 @@ TransientData JsonNode::AccessDataArray(std::string_view name) const
                                           : node->at(name);
     TransientData input(std::in_place_type_t<T>{}, nodeArray.size());
 
-    Span<T> data = input.AccessAs<T>();
     for(size_t i = 0; i < nodeArray.size(); i++)
-        data[i] = nodeArray[i].get<T>();
+    {
+        T val = nodeArray[i].get<T>();
+        input.Push(Span<const T>(&val, 1));
+    }
     return std::move(input);
 }
 // Optional Data
@@ -291,10 +300,11 @@ Optional<TransientData> JsonNode::AccessOptionalDataArray(std::string_view name)
         return std::nullopt;
     else
     {
-        Span<T> data = input.AccessAs<T>();
         for(size_t i = 0; i < nodeArray.size(); i++)
-            data[i] = nodeArray[i].get<T>();
-
+        {
+            T val = nodeArray[i].get<T>();
+            input.Push(Span<const T>(&val, 1));
+        }
         return std::move(input);
     }
 }
@@ -319,6 +329,9 @@ inline NodeTexStruct JsonNode::AccessTexture(std::string_view name) const
 
 inline Optional<NodeTexStruct> JsonNode::AccessOptionalTexture(std::string_view name) const
 {
+    // Entire entry is missing (which is not defined all items on this node)
+    if(node->find(name) == node->cend()) return std::nullopt;
+
     const auto& n = (isMultiNode) ? node->at(name).at(innerIndex)
                                   : node->at(name);
     if(IsDashed(n)) return std::nullopt;

@@ -166,6 +166,7 @@ struct Expected : protected Variant<T, MRayError>
     explicit
     constexpr operator  bool() const noexcept;
     constexpr bool      has_value() const noexcept;
+    constexpr bool      has_error() const noexcept;
 
     constexpr const T&  value() const;
     constexpr T&        value();
@@ -282,13 +283,19 @@ constexpr uint32_t Bitspan<T>::ByteSize() const
 template <class T>
 constexpr Expected<T>::operator bool() const noexcept
 {
-    return has_value();
+    return has_error();
 }
 
 template <class T>
 constexpr bool Expected<T>::has_value() const noexcept
 {
-    return std::holds_alternative<MRayError>(*this);
+    return !std::holds_alternative<MRayError>(*this);
+}
+
+template <class T>
+constexpr bool Expected<T>::has_error() const noexcept
+{
+    return !has_value();
 }
 
 template <class T>

@@ -38,7 +38,7 @@ namespace TracerConstants
     static constexpr std::string_view PRIM_PREFIX       = "(P)";
     static constexpr std::string_view MAT_PREFIX        = "(Mt)";
     static constexpr std::string_view CAM_PREFIX        = "(C)";
-    static constexpr std::string_view MEDIUM_PREFIX     = "(Me)";
+    static constexpr std::string_view MEDIUM_PREFIX     = "(Md)";
 }
 
 enum class AcceleratorType
@@ -118,6 +118,7 @@ struct PrimAttributeStringifier
         "Normal",
         "Radius",
         "Tangent",
+        "BiTangent",
         "UV0",
         "UV1",
         "Weight",

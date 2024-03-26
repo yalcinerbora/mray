@@ -154,6 +154,7 @@ bool MeshFileAssimp::HasAttribute(PrimitiveAttributeLogic attribLogic, uint32_t 
     using enum PrimitiveAttributeLogic;
     switch(attribLogic)
     {
+        case INDEX:     return true;
         case POSITION:  return mesh->HasPositions();
         case NORMAL:    return mesh->HasNormals();
         case BITANGENT:

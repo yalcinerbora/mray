@@ -133,7 +133,7 @@ class JsonNode
                                      uint32_t innerIndex = 0);
 
     // Id-based comparison
-    bool                    operator<(const JsonNode other) const;
+    auto                    operator<=>(const JsonNode other) const;
 
 
     const nlohmann::json&   RawNode() const;

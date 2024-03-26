@@ -25,8 +25,8 @@ class SceneLoaderMRay : public SceneLoaderI
         void                AddException(MRayError&&);
     };
 
-    using TypeMappedNodes       = std::map<std::string, FlatSet<JsonNode>>;
-    using TexTypeMappedNodes    = std::map<NodeTexStruct, JsonNode>;
+    using TypeMappedNodes       = std::map<std::string, std::vector<JsonNode>>;    
+    using TexMappedNodes        = std::vector<Pair<NodeTexStruct, JsonNode>>;
 
     using PrimIdMappings        = std::map<uint32_t, Pair<PrimGroupId, PrimBatchId>>;
     using CamIdMappings         = std::map<uint32_t, Pair<CameraGroupId, CameraId>>;
@@ -45,8 +45,6 @@ class SceneLoaderMRay : public SceneLoaderI
 
     static std::string  SceneRelativePathToAbsolute(std::string_view sceneRelativePath,
                                                     std::string_view scenePath);
-    static std::string  CreatePrimBackedLightType(std::string_view lightType,
-                                                  std::string_view primType);
 
     private:
     std::string         scenePath;
@@ -60,7 +58,7 @@ class SceneLoaderMRay : public SceneLoaderI
     TypeMappedNodes     lightNodes;
     TypeMappedNodes     materialNodes;
     TypeMappedNodes     mediumNodes;
-    TexTypeMappedNodes  textureNodes;
+    TexMappedNodes      textureNodes;
 
     // Scene id to -> Tracer id mappings
     MutexedMap<TransformIdMappings> transformMappings;
@@ -83,10 +81,11 @@ class SceneLoaderMRay : public SceneLoaderI
     static void DryRunLightsForPrim(std::vector<uint32_t>&,
                                     const TypeMappedNodes&,
                                     const TracerI&);
-    template <class TracerInterfaceFunc>
+    template <class TracerInterfaceFunc, class AnnotateFunc>
     static void DryRunNodesForTex(std::vector<NodeTexStruct>&,
                                   const TypeMappedNodes&,
                                   const TracerI&,
+                                  AnnotateFunc&&,
                                   TracerInterfaceFunc&&);
 
     void        LoadTextures(TracerI&, ExceptionList&);

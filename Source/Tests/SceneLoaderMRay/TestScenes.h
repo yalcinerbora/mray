@@ -11,7 +11,16 @@ static constexpr std::string_view MinimalValidScene = std::string_view
 	"Lights": [{ "id" : 0, "type" : "Null"}],
 	"Mediums": [{ "id" : 0, "type" : "Vacuum"}],
 	"Transforms":[{"id": 0, "type": "Identity"}],
-	"Cameras": [{"id": 0, "type": "Pinhole"}],
+	"Cameras":
+	[{
+		"id": 0, "type": "Pinhole",
+		"fov": 0,
+		"isFovX": true,
+		"planes": [0,0],
+		"gaze": [0,0,0],
+		"position": [0,0,0],
+		"up": [0,0,0]
+	}],
 
 	//
 	"Boundary":
@@ -28,15 +37,25 @@ static constexpr std::string_view MinimalValidScene = std::string_view
 static constexpr std::string_view BasicScene = std::string_view
 {R"(
 {
+	"Cameras":
+	[{
+		"id": 0, "type": "Pinhole",
+		"fov": 0,
+		"isFovX": true,
+		"planes": [0,0],
+		"gaze": [0,0,0],
+		"position": [0,0,0],
+		"up": [0,0,0]
+	}],
 	"Lights": [{ "id" : 0, "type" : "Null"}],
 	"Mediums": [{ "id" : 0, "type" : "Vacuum"}],
 	"Transforms":[{"id": 0, "type": "Identity"}],
-	"Materials":[{"id": 0, "type": "Barycentric", "albedo" : [0, 1, 0]}],
+	"Materials":[{"id": 0, "type": "Lambert", "albedo" : [0, 1, 0]}],
 	"Primitives":
 	[{
 		"id": 0,
 		"type": "Triangle",
-		"name": ".nodeTriangle",
+		"tag": "nodeTriangle",
 		"position": [[   0,  0.5, 0],
 					 [-0.5, -0.5, 0],
 					 [ 0.5, -0.5, 0]],
@@ -57,9 +76,7 @@ static constexpr std::string_view BasicScene = std::string_view
 
 	"Surfaces":
 	[{
-		"transform": 0, "accelerator": 0,
-		"material": 0,
-		"primitive": 0
+		"transform": 0, "material": 0, "primitive": 0
 	}],
 	"LightSurfaces": [],
 	"CameraSurfaces": [{"camera": 0}]

@@ -26,7 +26,8 @@ class JsonTriangle : public MeshFileI
     TransientData           indices;
     Optional<TransientData> normals;
     Optional<TransientData> uvs;
-
+    Optional<TransientData> tangents;
+    Optional<TransientData> bitangents;
 
     public:
                     JsonTriangle(const JsonNode&, bool isIndexed);

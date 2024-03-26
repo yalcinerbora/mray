@@ -6,6 +6,7 @@
 #include <type_traits>
 #include <numeric>
 #include <algorithm>
+#include <iterator>
 
 // Stratified Discrete Alias Table
 //
@@ -179,7 +180,7 @@ class alignas(std::max(alignof(T), size_t(8))) StaticVector
     constexpr T&            front();
     constexpr const T&      front() const;
 
-    // Don't bother implementing actual iterators pointer should suffice?
+    // TODO: Don't bother implementing actual iterators pointer should suffice?
     constexpr T*            begin();
     constexpr const T*      begin() const;
     constexpr T*            end();
@@ -200,13 +201,19 @@ class alignas(std::max(alignof(T), size_t(8))) StaticVector
 
 // Flat set implementation (only MSVC has c++23 flat_map/set currently)
 // This is a basic impl prob not std compliant
-
 enum class IsSorted : size_t
 {};
 
+template<class Container>
+concept RandomAccessContainerC = requires()
+{
+    // TODO: Should we check const_iterator as well?
+    requires std::random_access_iterator<typename Container::iterator>;
+};
+
 template<class T,
          class Compare = std::less<T>,
-         class Container = std::vector<T>>
+         RandomAccessContainerC Container = std::vector<T>>
 class FlatSet
 {
     public:
@@ -319,8 +326,8 @@ class FlatSet
     iterator        equal_range(const T&);
     const_iterator  equal_range(const T&) const;
 
-    // Indexed access EXTRA from standard
-    T&              operator[](size_t);
+    // Indexed access **extra** from standard
+    // Only non-modifying version is provided
     const T&        operator[](size_t) const;
 };
 

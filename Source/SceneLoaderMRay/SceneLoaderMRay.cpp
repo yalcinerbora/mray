@@ -27,6 +27,51 @@ struct TexturedAttributeData
     std::vector<Optional<TextureId>>    textures;
 };
 
+std::string AddPrimitivePrefix(std::string_view primType)
+{
+    return (std::string(TracerConstants::PRIM_PREFIX) +
+            std::string(primType));
+}
+
+std::string AddAddLightPrefix(std::string_view lightType)
+{
+    return (std::string(TracerConstants::LIGHT_PREFIX) +
+            std::string(lightType));
+}
+
+std::string AddTransformPrefix(std::string_view transformType)
+{
+    return (std::string(TracerConstants::TRANSFORM_PREFIX) +
+            std::string(transformType));
+}
+
+std::string AddMaterialPrefix(std::string_view matType)
+{
+    return (std::string(TracerConstants::MAT_PREFIX) +
+            std::string(matType));
+}
+
+std::string AddCameraPrefix(std::string_view camType)
+{
+    return (std::string(TracerConstants::CAM_PREFIX) +
+            std::string(camType));
+}
+
+std::string AddMediumPrefix(std::string_view medType)
+{
+    return (std::string(TracerConstants::MEDIUM_PREFIX) +
+            std::string(medType));
+}
+
+std::string CreatePrimBackedLightType(std::string_view primType)
+{
+    using namespace std::literals;
+    auto result = ("Primitive"s +
+                   std::string(TracerConstants::PRIM_PREFIX) +
+                   std::string(primType));
+    return result;
+}
+
 template<class AttributeInfoList>
 AttributeCountList GenericFindAttributeCounts(std::vector<AttributeCountList>& attributeCounts,
                                               const AttributeInfoList& list,
@@ -281,9 +326,32 @@ void LoadPrimitive(TracerI& tracer,
                    uint32_t meshInternalIndex,
                    const MeshFileI* meshFile)
 {
+    using enum MRayDataEnum;
     using enum PrimitiveAttributeLogic;
     const auto& attributeList = tracer.AttributeInfo(groupId);
-
+    // Meshes are quite different from other type groups,
+    // Types should somewhat make sense since there are many file types
+    // (.obj, .fbx, .usd even).
+    // MRay enumerates these in "PrimitiveAttributeLogic". I did not want this as
+    // string since strings have unbounded logic. This hinders
+    // to extend the functionality somewhat but in the end all of the primitives
+    // (discrete or not) has some form of tangents, positions, uvs etc.
+    // (Probably one exception is the Bezier curve's control points but you can
+    // put it as tangent maybe?)
+    //
+    // This is all fun and games untill this point.
+    //
+    // Some primitive groups may mandate some attributes, others may not.
+    // Some files may have that attribute some may not.
+    // In between this matrix of dependencies we can generate these from other attributes
+    // (if available). All these things complicates the implementation.
+    //
+    // On top of all these complications, our default primitive requires normals as
+    // quaternions for space efficiency (to tangent space transformation is held as a quat)
+    //
+    // The solution here is to rely on assimp's tangent/bitangent generation capabilities
+    // and use it. On the other hand, for in json triangle primitives compute it on the
+    // class.
     for(uint32_t attributeIndex = 0;
         attributeIndex < attributeList.size();
         attributeIndex++)
@@ -296,43 +364,45 @@ void LoadPrimitive(TracerI& tracer,
                                                                meshInternalIndex);
 
         // Is this data available?
-        if(!meshFile->HasAttribute(attribLogic))
+        if(!meshFile->HasAttribute(attribLogic) &&
+           optionality == AttributeOptionality::MR_MANDATORY)
         {
-            if(optionality == AttributeOptionality::MR_MANDATORY)
-                throw MRayError("Mesh File{:s}:[{:d}] do not have \"{}\""
-                                "which is mandatory for {}",
-                                meshFile->Name(), meshInternalIndex,
-                                PrimAttributeStringifier::ToString(attribLogic),
-                                tracer.TypeName(groupId));
-            continue;
+            throw MRayError("Mesh File{:s}:[{:d}] do not have \"{}\" "
+                            "which is mandatory for {}",
+                            meshFile->Name(), meshInternalIndex,
+                            PrimAttributeStringifier::ToString(attribLogic),
+                            tracer.TypeName(groupId));
         }
-        // Special case for default triangle
-        if(attribLogic == NORMAL && groupsLayout.Name() == MRayDataEnum::MR_QUATERNION &&
+        // Data is available...
+        // "Normal" attribute's special case, if mesh has tangents
+        // Convert normal/tangent to quaternion, store it as normal
+        // normals are defined as to tangent space transformations
+        // (shading tangent space that is)
+        if(attribLogic == NORMAL && groupsLayout.Name() == MR_QUATERNION &&
            meshFile->HasAttribute(TANGENT) && meshFile->HasAttribute(BITANGENT) &&
-           meshFile->AttributeLayout(TANGENT).Name() == MRayDataEnum::MR_VECTOR_3 &&
-           meshFile->AttributeLayout(BITANGENT).Name() == MRayDataEnum::MR_VECTOR_3 &&
-           meshFile->AttributeLayout(NORMAL).Name() == MRayDataEnum::MR_VECTOR_3)
+           meshFile->AttributeLayout(TANGENT).Name() == MR_VECTOR_3 &&
+           meshFile->AttributeLayout(BITANGENT).Name() == MR_VECTOR_3 &&
+           meshFile->AttributeLayout(NORMAL).Name() == MR_VECTOR_3)
         {
             size_t normalCount = meshFile->MeshAttributeCount(meshInternalIndex);
-            TransientData q(std::in_place_type_t<Quaternion>{}, normalCount);
-            Span<Quaternion> quats = q.AccessAs<Quaternion>();
-
+            TransientData quats(std::in_place_type_t<Quaternion>{}, normalCount);
             // Utilize TBN matrix directly
             TransientData t = meshFile->GetAttribute(TANGENT, meshInternalIndex);
             TransientData b = meshFile->GetAttribute(BITANGENT, meshInternalIndex);
             TransientData n = meshFile->GetAttribute(attribLogic, meshInternalIndex);
 
-            Span<const Vector3> tangents    = t.AccessAs<const Vector3>();
-            Span<const Vector3> bitangents  = b.AccessAs<const Vector3>();
-            Span<const Vector3> normals     = n.AccessAs<const Vector3>();
+            Span<const Vector3> tangents = t.AccessAs<const Vector3>();
+            Span<const Vector3> bitangents = b.AccessAs<const Vector3>();
+            Span<const Vector3> normals = n.AccessAs<const Vector3>();
 
-            for(size_t i = 0; i < quats.size(); i++)
+            for(size_t i = 0; i < normalCount; i++)
             {
-                quats[i] = TransformGen::ToSpaceQuat(tangents[i],
-                                                     bitangents[i],
-                                                     normals[i]);
+                Quaternion q = TransformGen::ToSpaceQuat(tangents[i],
+                                                         bitangents[i],
+                                                         normals[i]);
+                quats.Push(Span<const Quaternion>(&q, 1));
             }
-            tracer.PushPrimAttribute(groupId, batchId, attributeIndex, std::move(q));
+            tracer.PushPrimAttribute(groupId, batchId, attributeIndex, std::move(quats));
         }
         // Is this data's layout match with the primitive group
         else if(groupsLayout.Name() != filesLayout.Name())
@@ -343,7 +413,7 @@ void LoadPrimitive(TracerI& tracer,
 
             // We require exact match currently
             throw MRayError("Mesh File{:s}:[{:d}]'s data layout of \"{}\""
-                            "(has type{:s}) does not match the {}'s data layout "
+                            "(has type {:s}) does not match the {}'s data layout "
                             "(which is {:s})",
                             meshFile->Name(), meshInternalIndex,
                             PrimAttributeStringifier::ToString(attribLogic),
@@ -365,7 +435,7 @@ void SceneLoaderMRay::ExceptionList::AddException(MRayError&& err)
     size_t location = size.fetch_add(1);
     // If too many exceptions skip it
     if(location < MaxExceptionSize)
-        exceptions[location] = std::forward<MRayError>(err);
+        exceptions[location] = std::move(err);
 }
 
 std::string SceneLoaderMRay::SceneRelativePathToAbsolute(std::string_view sceneRelativePath,
@@ -374,14 +444,6 @@ std::string SceneLoaderMRay::SceneRelativePathToAbsolute(std::string_view sceneR
     using namespace std::filesystem;
     path fullPath = path(scenePath) / path(sceneRelativePath);
     return absolute(fullPath).string();
-}
-
-std::string SceneLoaderMRay::CreatePrimBackedLightType(std::string_view,
-                                                       std::string_view primType)
-{
-    using namespace std::literals;
-    std::string result = std::string(primType) + std::string("Light"sv);
-    return result;
 }
 
 LightSurfaceStruct SceneLoaderMRay::LoadBoundary(const nlohmann::json& n)
@@ -439,8 +501,11 @@ void SceneLoaderMRay::DryRunLightsForPrim(std::vector<uint32_t>& primIds,
 {
     for(const auto& l : lightNodes)
     {
-        LightAttributeInfoList lightAttributes = tracer.AttributeInfoLight(l.first);
-        if(l.first != NodeNames::LIGHT_TYPE_PRIMITIVE)
+        std::string annotatedType = AddAddLightPrefix(l.first);
+        LightAttributeInfoList lightAttributes = tracer.AttributeInfoLight(annotatedType);
+        // We already annotated primitive-backed light names with "(P)..."
+        // suffix, check if the first part is "Primitive"
+        if(l.first.find(NodeNames::LIGHT_TYPE_PRIMITIVE) == std::string::npos)
             continue;
         // Light Type is primitive, it has to have "primitive" field
         for(const auto& node : l.second)
@@ -451,16 +516,17 @@ void SceneLoaderMRay::DryRunLightsForPrim(std::vector<uint32_t>& primIds,
     }
 }
 
-template <class TracerInterfaceFunc>
+template <class TracerInterfaceFunc, class AnnotateFunc>
 void SceneLoaderMRay::DryRunNodesForTex(std::vector<NodeTexStruct>& textureIds,
                                         const TypeMappedNodes& nodes,
                                         const TracerI& tracer,
-                                        TracerInterfaceFunc&& func)
+                                        AnnotateFunc&& Annotate,
+                                        TracerInterfaceFunc&& AcquireAttributeInfo)
 {
     for(const auto& n : nodes)
     {
-        TexturedAttributeInfoList texAttributes = std::invoke(func, tracer, n.first);
-        // Light Type is primitive, it has to have "primitive" field
+        TexturedAttributeInfoList texAttributes = std::invoke(AcquireAttributeInfo,
+                                                              tracer, Annotate(n.first));
         for(const auto& node : n.second)
         for(const auto& att : texAttributes)
         {
@@ -527,7 +593,6 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
             // When barrier completed
             // Reserve the space for mappings
             // Commit group reservations
-            //loader.CommitReservations(groupId);
             loaderIn.CommitReservations(groupId);
         };
         // Determine the thread size
@@ -553,6 +618,7 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
             // [loader = loader] did not work (maybe MSVC bug?)
             auto loaderIn = loader;
 
+            bool barrierPassed = false;
             size_t localCount = end - start;
             auto nodeRange = Span<const JsonNode>(nodes.cbegin() + start, localCount);
             IdList generatedIds;
@@ -570,24 +636,36 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
 
                 // Commit barrier
                 barrier->arrive_and_wait();
+                barrierPassed = true;
                 // Group is committed, now we can issue writes
                 loaderIn.THRDLoadEntities(groupId, generatedIds, nodeRange);
             }
             catch(MRayError& e)
             {
                 exceptions.AddException(std::move(e));
-                barrier->arrive_and_drop();
+
+                if(!barrierPassed) barrier->arrive_and_drop();
             }
             catch(nlohmann::json::exception& e)
             {
                 exceptions.AddException(MRayError("Json Error ({})",
                                                   std::string(e.what())));
-                barrier->arrive_and_drop();
+
+                if(!barrierPassed) barrier->arrive_and_drop();
+            }
+            catch(std::exception& e)
+            {
+                exceptions.AddException(MRayError("Unknown Error ({})",
+                                                  std::string(e.what())));
+
+                if(!barrierPassed) barrier->arrive_and_drop();
             }
         };
         auto future = threadPool.submit_blocks(std::size_t(0),
                                                std::size_t(groupEntityCount),
                                                LoadTask, threadCount);
+
+        future.wait();
 
         // Move future to shared_ptr
         using FutureSharedPtr = std::shared_ptr<BS::multi_future<void>>;
@@ -613,13 +691,6 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
     std::shared_ptr<ImageLoaderI> imgLoader = CreateImageLoader();
     auto texIdListPtr = std::make_shared<TextureIdList>(textureNodes.size());
 
-    // Flatten the std::map (we can't multi-thread it efficiently)
-    // TODO: Ensure uniqueness without a std::map maybe? (Flatmap?)
-    std::vector<std::pair<NodeTexStruct, JsonNode>> flattenedTexMap;
-    flattenedTexMap.reserve(textureNodes.size());
-    for(const auto& [texStruct, jsonNode] : textureNodes)
-        flattenedTexMap.emplace_back(texStruct, jsonNode);
-
     // Issue loads to the thread pool
     auto BarrierFunc = [&tracer]() noexcept
     {
@@ -631,7 +702,7 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
 
     // Determine the thread size
     uint32_t threadCount = std::min(threadPool.get_thread_count(),
-                                    static_cast<uint32_t>(flattenedTexMap.size()));
+                                    static_cast<uint32_t>(textureNodes.size()));
 
     using Barrier = std::barrier<decltype(BarrierFunc)>;
     auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
@@ -639,7 +710,7 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
     // Same situation discribed in 'GenericLoad' function,
     // force pass by copy.
     // Copy the shared pointers, capture by reference the rest
-    const auto TextureLoadTask = [&, texIdListPtr, barrier](size_t start, size_t end)
+    const auto TextureLoadTask = [&, texIdListPtr, imgLoader, barrier](size_t start, size_t end)
     {
         // TODO: check if we twice opening is bottleneck?
         // We are opening here to determining size/format
@@ -648,7 +719,7 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
         {
             for(size_t i = start; i < end; i++)
             {
-                const auto& [texStruct, jsonNode] = flattenedTexMap[i];
+                const auto& [texStruct, jsonNode] = textureNodes[i];
                 auto fileName = jsonNode.AccessData<std::string>(NodeNames::TEX_NODE_FILE);
                 fileName = SceneLoaderMRay::SceneRelativePathToAbsolute(fileName, scenePath);
 
@@ -679,7 +750,7 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
 
             for(size_t i = start; i < end; i++)
             {
-                const auto& [texStruct, jsonNode] = flattenedTexMap[i];
+                const auto& [texStruct, jsonNode] = textureNodes[i];
                 bool loadAsSigned = jsonNode.AccessData<bool>(NodeNames::TEX_NODE_AS_SIGNED);
                 bool isData = jsonNode.AccessData<bool>(NodeNames::TEX_NODE_IS_DATA);
                 auto fileName = jsonNode.AccessData<std::string>(NodeNames::TEX_NODE_FILE);
@@ -715,7 +786,7 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
         }
     };
 
-    auto future = threadPool.submit_blocks(std::size_t(0), flattenedTexMap.size(),
+    auto future = threadPool.submit_blocks(std::size_t(0), textureNodes.size(),
                                            TextureLoadTask, threadCount);
 
     // Move the future to shared ptr
@@ -751,8 +822,7 @@ void SceneLoaderMRay::LoadMediums(TracerI& tracer, ExceptionList& exceptions)
 
         MediumGroupId CreateGroup(std::string gn)
         {
-            gn = std::string(TracerConstants::MEDIUM_PREFIX) + gn;
-            return tracer.CreateMediumGroup(std::move(gn));
+            return tracer.CreateMediumGroup(AddMediumPrefix(gn));
         }
 
         void CommitReservations(MediumGroupId groupId)
@@ -823,8 +893,7 @@ void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
 
         MatGroupId CreateGroup(std::string gn)
         {
-            gn = std::string(TracerConstants::MAT_PREFIX) + gn;
-            return tracer.CreateMaterialGroup(std::move(gn));
+            return tracer.CreateMaterialGroup(AddMaterialPrefix(gn));
         }
 
         void CommitReservations(MatGroupId groupId)
@@ -853,7 +922,7 @@ void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
             // Find the first arrayed type in nodes
             // Accumulate the type
             // Reserve transforms accordingly
-            MediumAttributeInfoList list = tracer.AttributeInfo(groupId);
+            MatAttributeInfoList list = tracer.AttributeInfo(groupId);
             totalCounts = GenericFindAttributeCounts(attributeCounts, list, nodes);
             return tracer.ReserveMaterials(groupId, std::move(attributeCounts), ioMediums);
         }
@@ -898,8 +967,7 @@ void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ExceptionList& exceptions)
 
         TransGroupId CreateGroup(std::string gn)
         {
-            gn = std::string(TracerConstants::TRANSFORM_PREFIX) + gn;
-            return tracer.CreateTransformGroup(std::move(gn));
+            return tracer.CreateTransformGroup(AddTransformPrefix(gn));
         }
 
         void CommitReservations(TransGroupId groupId)
@@ -997,8 +1065,7 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
 
         PrimGroupId CreateGroup(std::string gn)
         {
-            gn = std::string(TracerConstants::PRIM_PREFIX) + gn;
-            return tracer.CreatePrimitiveGroup(std::move(gn));
+            return tracer.CreatePrimitiveGroup(AddPrimitivePrefix(gn));
         }
 
         void CommitReservations(PrimGroupId groupId)
@@ -1042,17 +1109,17 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
                     innerIndex = node.AccessData<uint32_t>(NodeNames::INNER_INDEX);
 
                     // Find a Loader
-                    auto r0 = loaders.emplace(tag, nullptr);
-                    if(!r0.second) r0.first->second = meshLoaderPool->AcquireALoader(tag);
-                    const auto& meshLoader = r0.first->second;
+                    auto loaderIt = loaders.emplace(tag, nullptr);
+                    if(loaderIt.second)
+                        loaderIt.first->second = meshLoaderPool->AcquireALoader(tag);
+                    const auto& meshLoader = loaderIt.first->second;
 
                     // Find mesh file
                     // TODO: this is slow probably due to long file name as key
-                    auto r1 = meshFiles.emplace(fileName, nullptr);
-                    if(!r1.second) r1.first->second = meshLoader->OpenFile(fileName);
-                    meshFile = r1.first->second.get();
+                    auto fileIt = meshFiles.emplace(fileName, nullptr);
+                    if(fileIt.second) fileIt.first->second = meshLoader->OpenFile(fileName);
+                    meshFile = fileIt.first->second.get();
                 }
-
                 // Finally Reserve primitives
                 PrimCount pc
                 {
@@ -1061,6 +1128,7 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
                 };
                 PrimBatchId tracerId = tracer.ReservePrimitiveBatch(groupId, pc);
                 idList.push_back(tracerId);
+                batchFiles.emplace_back(innerIndex, meshFile);
             }
             return idList;
         }
@@ -1096,8 +1164,7 @@ void SceneLoaderMRay::LoadCameras(TracerI& tracer, ExceptionList& exceptions)
         CameraLoader(TracerI& t) : tracer(t) {}
         CameraGroupId CreateGroup(std::string gn)
         {
-            gn = std::string(TracerConstants::CAM_PREFIX) + gn;
-            return tracer.CreateCameraGroup(std::move(gn));
+            return tracer.CreateCameraGroup(AddCameraPrefix(gn));
         }
         void CommitReservations(CameraGroupId groupId)
         {
@@ -1252,6 +1319,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     constexpr uint32_t INNER_INDEX = 1;
     using ItemLocation = Pair<uint32_t, uint32_t>;
     using ItemLocationMap = std::unordered_map<uint32_t, ItemLocation>;
+    using AnnotationFunction = std::string(&)(std::string_view);
+
 
     auto CreateHT = [](ItemLocationMap& result,
                        const nlohmann::json& definitions) -> void
@@ -1354,6 +1423,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     [&sceneJson = std::as_const(sceneJson)](TypeMappedNodes& typeMappings,
                                             const ItemLocationMap& map, uint32_t id,
                                             const std::string_view& listName,
+                                            //const AnnotationFunction& Annotate,
                                             bool skipUnknown = false)
     {
         const auto it = map.find(id);
@@ -1368,8 +1438,9 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
         uint32_t innerIndex = std::get<INNER_INDEX>(location);
 
         auto node = JsonNode(sceneJson[listName][arrayIndex], innerIndex);
+        //std::string type = Annotate(std::string(node.Type()));
         std::string type = std::string(node.Type());
-        typeMappings[type].emplace(std::move(node));
+        typeMappings[type].emplace_back(std::move(node));
     };
 
     // Start with boundary
@@ -1415,9 +1486,6 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     lightHTReady.wait();
     for(const auto& l : lightSurfaces)
     {
-        l.lightId;
-        PushToTypeMapping(lightNodes, lightHT, l.lightId, LIGHT_LIST);
-
         // We could not use "PushToTypeMapping" here
         // lights are slightly different
         // If a light is primitive-backed
@@ -1451,10 +1519,9 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
             std::string_view primTypeName = sceneJson[PRIMITIVE_LIST]
                                                         [primListIndex]
                                                         [TYPE];
-            finalTypeName = CreatePrimBackedLightType(primTypeName,
-                                                      lightTypeName);
+            finalTypeName = CreatePrimBackedLightType(primTypeName);
         }
-        lightNodes[finalTypeName].emplace(std::move(node));
+        lightNodes[finalTypeName].emplace_back(std::move(node));
 
 
         PushToTypeMapping(mediumNodes, mediumHT, l.mediumId, MEDIUM_LIST);
@@ -1476,8 +1543,10 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     // This is true for textures as well. Materials may/may not require textures
     // (or mediums) so we need to check these as well
     DryRunNodesForTex(textureIds, materialNodes, tracer,
+                      &AddMaterialPrefix,
                       &TracerI::AttributeInfoMat);
     DryRunNodesForTex(textureIds, mediumNodes, tracer,
+                      &AddMediumPrefix,
                       &TracerI::AttributeInfoMedium);
 
     // And finally create texture mappings
@@ -1493,8 +1562,66 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
         uint32_t arrayIndex = std::get<ARRAY_INDEX>(location);
         uint32_t innerIndex = std::get<INNER_INDEX>(location);
         auto node = JsonNode(sceneJson[TEXTURE_LIST][arrayIndex], innerIndex);
-        textureNodes.emplace(t, std::move(node));
+        textureNodes.emplace_back(t, std::move(node));
     }
+
+    // Eliminate the duplicates
+    auto EliminateDuplicates = [](std::vector<JsonNode>& nodes)
+    {
+        std::sort(nodes.begin(), nodes.end());
+        auto endIt = std::unique(nodes.begin(), nodes.end(),
+                                 [](const JsonNode& n0,
+                                    const JsonNode& n1)
+        {
+            return n0.Id() == n1.Id();
+        });
+        nodes.erase(endIt, nodes.end());
+    };
+
+    // TODO: Load balance here maybe?
+    // Per-type per-array will be too fine grained?
+    // (i.e., for cameras, probably a scene has at most 1-2 camera types 5-10 camera,
+    // but a primitive may have thousands of primitives (not indiviual, as a batch))
+    threadPool.detach_task([this, &EliminateDuplicates]()
+    {
+        for(auto& p : primNodes) EliminateDuplicates(p.second);
+    });
+    threadPool.detach_task([this, &EliminateDuplicates]()
+    {
+        for(auto& c : cameraNodes) EliminateDuplicates(c.second);
+    });
+    threadPool.detach_task([this, &EliminateDuplicates]()
+    {
+        for(auto& t : transformNodes) EliminateDuplicates(t.second);
+    });
+    threadPool.detach_task([this, &EliminateDuplicates]()
+    {
+        for(auto& l : lightNodes) EliminateDuplicates(l.second);
+    });
+    threadPool.detach_task([this, &EliminateDuplicates]()
+    {
+        for(auto& m : materialNodes) EliminateDuplicates(m.second);
+    });
+    threadPool.detach_task([this, &EliminateDuplicates]()
+    {
+        for(auto& m : mediumNodes) EliminateDuplicates(m.second);
+    });
+    threadPool.detach_task([this]()
+    {
+        auto LessThan = [](const auto& lhs, const auto& rhs)
+        {
+            return lhs.first < rhs.first;
+        };
+        auto Equal = [](const auto& lhs, const auto& rhs)
+        {
+            return lhs.first == rhs.first;
+        };
+        std::sort(textureNodes.begin(), textureNodes.end(), LessThan);
+        auto last = std::unique(textureNodes.begin(), textureNodes.end(), Equal);
+        textureNodes.erase(last, textureNodes.end());
+    });
+
+    threadPool.wait();
 }
 
 void SceneLoaderMRay::CreateSurfaces(TracerI& tracer, const std::vector<SurfaceStruct>& surfs)
@@ -1523,6 +1650,7 @@ void SceneLoaderMRay::CreateSurfaces(TracerI& tracer, const std::vector<SurfaceS
             primList.push_back(pId);
             matList.push_back(mId);
             alphaMaps.push_back(tId);
+            cullFace.push_back(surf.doCullBackFace[i]);
         }
         SurfaceId mRaySurf = tracer.CreateSurface(primList, matList,
                                                   transformId,
@@ -1612,6 +1740,23 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
 
         // Multi-threaded section
         ExceptionList exceptionList;
+        // Concat to a single exception and return it
+        auto ConcatIfError = [&exceptionList]() -> MRayError
+        {
+            if(exceptionList.size != 0)
+            {
+                MRayError err("Errors from Threads:\n");
+                size_t exceptionCount = exceptionList.size;
+                for(size_t i = 0; i < exceptionCount; i++)
+                {
+                    using namespace std::literals;
+                    const auto& e = exceptionList.exceptions[i];
+                    err.AppendInfo(" "s + e.GetError() + "\n");
+                }
+                return err;
+            }
+            else return MRayError::OK;
+        };
 
         // Many things depend on textures, so this is first
         // (currently only materials/alpha mapped surfaces,
@@ -1623,13 +1768,31 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
         // or a user may create a custom primitive type that holds
         // a texture etc.
         threadPool.wait();
+        // We already bottlenecked ourselves here (by waiting),
+        // might as well check if errors are occured and return early
+        if(auto e = ConcatIfError(); e) return e;
+
         // Types that depend on textures
         LoadMediums(tracer, exceptionList);
         // Waiting here because Materials depend on mediums
         // In mray, materials seperate two mediums.
         threadPool.wait();
+        // Same as above
+        if(auto e = ConcatIfError(); e) return e;
 
         LoadMaterials(tracer, exceptionList, boundary.mediumId);
+
+
+
+        // DEBUG
+        // DEBUG
+        threadPool.wait();
+        if(auto e = ConcatIfError(); e) return e;
+        return MRayError::OK;
+
+        // DEBUG
+        // DEBUG
+
         // Does not depend on textures but may depend on later
         LoadTransforms(tracer, exceptionList);
         LoadPrimitives(tracer, exceptionList);
@@ -1637,22 +1800,13 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
         // Lights may depend on primitives (primitive-backed lights)
         // So we need to wait primitive id mappings to complete
         threadPool.wait();
+        if(auto e = ConcatIfError(); e) return e;
+
         LoadLights(tracer, exceptionList);
 
         // Finally, wait all load operations to complete
         threadPool.wait();
-
-        // Check if any exceptions are occured
-        // Concat to a single exception and return it
-        if(exceptionList.size != 0)
-        {
-            MRayError err(MRayError::HAS_ERROR);
-            for(const auto& e : exceptionList.exceptions)
-            {
-                err.AppendInfo(e.GetError() + "\n");
-            }
-            return err;
-        }
+        if(auto e = ConcatIfError(); e) return e;
 
         // Scene id -> tracer id mappings are created
         // and reside on the object's state.
@@ -1684,9 +1838,9 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
 
 MRayError SceneLoaderMRay::OpenFile(const std::string& filePath)
 {
-    const auto path = std::filesystem::path(filePath);
-    std::ifstream file(path);
+    scenePath = std::filesystem::path(filePath).remove_filename().string();
 
+    std::ifstream file(filePath);
     if(!file.is_open())
         return MRayError("Scene file \"{}\" is not found",
                          filePath);
@@ -1704,6 +1858,9 @@ MRayError SceneLoaderMRay::OpenFile(const std::string& filePath)
 
 MRayError SceneLoaderMRay::ReadStream(std::istream& sceneData)
 {
+    // For stream loads, we relate the path to cwd.
+    scenePath = std::filesystem::current_path().string();
+
     // Parse Json
     try
     {
@@ -1729,7 +1886,7 @@ Pair<MRayError, double> SceneLoaderMRay::LoadScene(TracerI& tracer,
     if(e = LoadAll(tracer)) return {e, -0.0};
     t.Split();
 
-    return {MRayError::OK, t.Elapsed<Second>()};
+    return {MRayError::OK, t.Elapsed<Millisecond>()};
 }
 
 Pair<MRayError, double> SceneLoaderMRay::LoadScene(TracerI& tracer,
@@ -1740,6 +1897,5 @@ Pair<MRayError, double> SceneLoaderMRay::LoadScene(TracerI& tracer,
     if(e = ReadStream(sceneData)) return {e, -0.0};
     if(e = LoadAll(tracer)) return {e, -0.0};
     t.Split();
-
-    return {MRayError::OK, t.Elapsed<Second>()};
+    return {MRayError::OK, t.Elapsed<Millisecond>()};
 }

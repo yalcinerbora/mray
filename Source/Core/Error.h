@@ -47,10 +47,13 @@ inline MRayError::operator bool()
 
 inline std::string MRayError::GetError() const
 {
-    return MRAY_FORMAT("|| {:s}", customInfo);
+    return customInfo;
 }
 
 inline void MRayError::AppendInfo(const std::string& s)
 {
-    customInfo += s;
+    if(customInfo.empty())
+        customInfo = MRAY_FORMAT("{:s}", s);
+    else
+        customInfo += MRAY_FORMAT("|| {:s}", s);
 }

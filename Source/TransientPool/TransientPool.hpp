@@ -7,10 +7,14 @@ namespace TransientPoolDetail
 // catch some error most of the time
 template<ImplicitLifetimeC T>
 inline TransientData::TransientData(std::in_place_type_t<T>, size_t count)
-    : typeHash(typeid(T).hash_code())
+    : typeHash(0)
     , usedBytes(0)
     , alignment(alignof(T))
 {
+    if constexpr(EnableTypeCheck)
+    {
+        typeHash = typeid(T).hash_code();
+    }
     Byte* ptr = reinterpret_cast<Byte*>(mainR.allocate(count * sizeof(T), alignof(T)));
     // TODO: add start_lifetime_as ?
     ownedMem = Span<Byte>(ptr, count * sizeof(T));

@@ -1,25 +1,142 @@
 #include "MeshLoaderJson.h"
 #include "JsonNode.h"
+#include "Core/ShapeFunctions.h"
 
+// TODO: This is bad design reiterate over this
 JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
     : id(jn.Id())
     , positions(jn.AccessDataArray<Vector3>(JsonMeshNames::NODE_POSITION))
     , indices((isIndexed)
                 ? jn.AccessDataArray<Vector3ui>(JsonMeshNames::NODE_INDEX)
                 : TransientData(std::in_place_type_t<Vector3ui>(),
-                                positions.AccessAs<uint32_t>().size()))
+                                positions.AccessAs<Vector3>().size() /
+                                ShapeFunctions::Triangle::TRI_VERTEX_COUNT))
     , normals(jn.AccessOptionalDataArray<Vector3>(JsonMeshNames::NODE_NORMAL))
     , uvs(jn.AccessOptionalDataArray<Vector2>(JsonMeshNames::NODE_UV))
 {
     // Generate indices if not indexed
     if(!isIndexed)
     {
-        auto indexSpan = indices.AccessAs<Vector3ui>();
+        size_t pc = (positions.AccessAs<Vector3>().size() /
+                     ShapeFunctions::Triangle::TRI_VERTEX_COUNT);
+        uint32_t primCount = static_cast<uint32_t>(pc);
         Vector3ui initialIndex = Vector3ui(0, 1, 2);
-        for(auto& index : indexSpan)
+        for(uint32_t i = 0; i < primCount; i++)
         {
-            index = initialIndex;
+            indices.Push(Span<const Vector3ui>(&initialIndex, 1));
             initialIndex = initialIndex + 3;
+        }
+    }
+    size_t attribCount = MeshAttributeCount();
+    size_t primCount = MeshPrimitiveCount();
+    Span<Vector3ui> iSpan = indices.AccessAs<Vector3ui>();
+    Span<Vector3> pSpan = positions.AccessAs<Vector3>();
+
+    // We do not have normals, calculate
+    if(!normals.has_value())
+    {
+        normals = TransientData(std::in_place_type_t<Vector3>(), attribCount);
+        TransientData& data = normals.value();
+        // Zero the data
+        for(size_t i = 0; i < attribCount; i++)
+        {
+            Vector3 zero = Vector3::Zero();
+            data.Push(Span<const Vector3>(&zero, 1));
+        }
+        Span<Vector3> nSpan = data.AccessAs<Vector3>();
+        // Calculate normals
+        for(size_t i = 0; i < primCount; i++)
+        {
+            Vector3ui index = iSpan[i];
+
+            using namespace ShapeFunctions::Triangle;
+            std::array<Vector3, TRI_VERTEX_COUNT> p =
+            {
+                pSpan[index[0]],
+                pSpan[index[1]],
+                pSpan[index[2]]
+            };
+            Vector3 normal = Normal(p);
+
+            // Add the normals these may be shared
+            nSpan[index[0]] += normal;
+            nSpan[index[1]] += normal;
+            nSpan[index[2]] += normal;
+        }
+        // And normalize it
+        for(auto& n : nSpan) n.NormalizeSelf();
+    }
+    Span<Vector3> nSpan = normals.value().AccessAs<Vector3>();
+
+    // We have to create tangents (due to quaternion thing)
+    tangents = TransientData(std::in_place_type_t<Vector3>(), attribCount);
+    bitangents = TransientData(std::in_place_type_t<Vector3>(), attribCount);
+    // Zero the data
+    for(size_t i = 0; i < attribCount; i++)
+    {
+        Vector3 zero = Vector3::Zero();
+        tangents.value().Push(Span<const Vector3>(&zero, 1));
+        bitangents.value().Push(Span<const Vector3>(&zero, 1));
+    }
+    Span<Vector3> tSpan = tangents.value().AccessAs<Vector3>();
+    Span<Vector3> bSpan = bitangents.value().AccessAs<Vector3>();
+
+    // Utilize uvs (align the tangent to uv vectors)
+    if(uvs.has_value())
+    {
+        Span<Vector2> uvSpan = uvs.value().AccessAs<Vector2>();
+        for(size_t i = 0; i < primCount; i++)
+        {
+            Vector3ui index = iSpan[i];
+
+            using namespace ShapeFunctions::Triangle;
+            Vector3 n0 = nSpan[index[0]];
+            Vector3 n1 = nSpan[index[1]];
+            Vector3 n2 = nSpan[index[2]];
+
+            Vector3 p0 = pSpan[index[0]];
+            Vector3 p1 = pSpan[index[1]];
+            Vector3 p2 = pSpan[index[2]];
+
+            Vector2 uv0 = uvSpan[index[0]];
+            Vector2 uv1 = uvSpan[index[1]];
+            Vector2 uv2 = uvSpan[index[2]];
+
+            // Generate the tangents for this triangle orientation
+            Vector3f t0 = CalculateTangent(p0, p1, p2,
+                                           uv0, uv1, uv2);
+            Vector3f t1 = CalculateTangent(p1, p2, p0,
+                                           uv1, uv2, uv0);
+            Vector3f t2 = CalculateTangent(p2, p0, p1,
+                                           uv2, uv0, uv1);
+
+            if(t0.HasNaN()) t0 = Vector3::OrthogonalVector(n0);
+            if(t1.HasNaN()) t1 = Vector3::OrthogonalVector(n1);
+            if(t2.HasNaN()) t2 = Vector3::OrthogonalVector(n2);
+
+            // Add the normals these may be shared
+            tSpan[index[0]] += t0;
+            tSpan[index[1]] += t1;
+            tSpan[index[2]] += t2;
+
+        }
+        // Normalize and calculate bitangent
+        for(size_t i = 0; i < primCount; i++)
+        {
+            tSpan[i].NormalizeSelf();
+            bSpan[i] = Vector3::Cross(nSpan[i], tSpan[i]);
+        }
+    }
+    // Just put random orthogonal spaces
+    else
+    {
+        for(size_t i = 0; i < attribCount; i++)
+        {
+            Vector3 n = normals.value().AccessAs<Vector3>()[i];
+            Vector3 t = Vector3::OrthogonalVector(n);
+            Vector3 b = Vector3::Cross(n, t);
+            tSpan[i] = t;
+            bSpan[i] = b;
         }
     }
 }
@@ -58,21 +175,26 @@ bool JsonTriangle::HasAttribute(PrimitiveAttributeLogic attribLogic, uint32_t) c
     using enum PrimitiveAttributeLogic;
     switch(attribLogic)
     {
-        case POSITION:  return true;
-        case NORMAL:    return normals.has_value();
-        case UV0:       return uvs.has_value();
-        default:        return false;
+        case POSITION:
+        case INDEX:
+        case TANGENT:
+        case BITANGENT:
+        case NORMAL:
+        case UV0:
+            return true;
+        default:
+            return false;
     }
 }
 
 TransientData JsonTriangle::GetAttribute(PrimitiveAttributeLogic attribLogic, uint32_t) const
 {
+    // TODO: This is bad design reiterate over this
     auto ExplicitCopy = []<class T>(const TransientData& t) ->  TransientData
     {
         auto inSpan = t.AccessAs<T>();
         TransientData result(std::in_place_type_t<T>(), inSpan.size());
-        auto outSpan = result.AccessAs<T>();
-        std::copy(inSpan.begin(), inSpan.end(), outSpan.begin());
+        result.Push(inSpan);
         return std::move(result);
     };
 
@@ -81,6 +203,8 @@ TransientData JsonTriangle::GetAttribute(PrimitiveAttributeLogic attribLogic, ui
     {
         case POSITION:  return ExplicitCopy.operator()<Vector3>(positions);
         case NORMAL:    return ExplicitCopy.operator()<Vector3>(normals.value());
+        case TANGENT:   return ExplicitCopy.operator()<Vector3>(tangents.value());
+        case BITANGENT: return ExplicitCopy.operator()<Vector3>(bitangents.value());
         case UV0:       return ExplicitCopy.operator()<Vector2>(uvs.value());
         case INDEX:     return ExplicitCopy.operator()<Vector3ui>(indices);
         default:        throw MRayError("Unknown attribute logic!");
@@ -91,7 +215,9 @@ MRayDataTypeRT JsonTriangle::AttributeLayout(PrimitiveAttributeLogic attribLogic
 {
     using enum MRayDataEnum;
     if(attribLogic == PrimitiveAttributeLogic::POSITION ||
-       attribLogic == PrimitiveAttributeLogic::NORMAL)
+       attribLogic == PrimitiveAttributeLogic::NORMAL ||
+       attribLogic == PrimitiveAttributeLogic::TANGENT ||
+       attribLogic == PrimitiveAttributeLogic::BITANGENT)
         return MRayDataTypeRT(MRayDataType<MR_VECTOR_3>());
     else if(attribLogic == PrimitiveAttributeLogic::UV0)
         return MRayDataTypeRT(MRayDataType<MR_VECTOR_2>());
