@@ -54,13 +54,13 @@ get_property(MRAY_IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(MRAY_IS_MULTI_CONFIG)
     add_custom_command(OUTPUT ${MRAY_EXTERNAL_LIBRARIES_STAMP}
         COMMAND ${CMAKE_COMMAND} ${MRAY_EXT_CONFIG_META_ARGS}
-        COMMAND ${CMAKE_COMMAND} --build ${MRAY_EXT_BUILD_DIR} --config $<IF:$<CONFIG:ReleaseDBG>,Release,$<CONFIG>>
+        COMMAND ${CMAKE_COMMAND} --build ${MRAY_EXT_BUILD_DIR} --config $<IF:$<CONFIG:SanitizeR>,Release,$<CONFIG>>
         COMMAND ${CMAKE_COMMAND} -E touch ${MRAY_EXTERNAL_LIBRARIES_STAMP}
         COMMENT "Compiling external libraries($<CONFIG>). This may take a while..."
     )
 else()
     add_custom_command(OUTPUT ${MRAY_EXTERNAL_LIBRARIES_STAMP}
-        COMMAND ${CMAKE_COMMAND} ${MRAY_EXT_CONFIG_META_ARGS} -DCMAKE_BUILD_TYPE=$<IF:$<CONFIG:ReleaseDBG>,Release,$<CONFIG>>
+        COMMAND ${CMAKE_COMMAND} ${MRAY_EXT_CONFIG_META_ARGS} -DCMAKE_BUILD_TYPE=$<IF:$<CONFIG:SanitizeR>,Release,$<CONFIG>>
         COMMAND ${CMAKE_COMMAND} --build ${MRAY_EXT_BUILD_DIR}
         COMMAND ${CMAKE_COMMAND} -E touch ${MRAY_EXTERNAL_LIBRARIES_STAMP}
         COMMENT "Compiling external libraries($<CONFIG>). This may take a while..."
@@ -69,6 +69,8 @@ endif()
 
 add_custom_target(MRayExternal ALL DEPENDS ${MRAY_EXTERNAL_LIBRARIES_STAMP})
 set_target_properties(MRayExternal PROPERTIES FOLDER ${MRAY_PREDEFINED_TARGETS_FOLDER})
+set_target_properties(MRayExternal PROPERTIES EXCLUDE_FROM_ALL  TRUE)
+
 
 # Everything should be fine now
 # Our directory structure is solid
@@ -125,7 +127,7 @@ function(gen_imported_target)
         IMPORTED_LOCATION_DEBUG "${MRAY_PLATFORM_LIB_DIRECTORY}/Debug/${DBG_NAME}${TGT_SUFFIX}"
         IMPORTED_LOCATION_RELEASE "${MRAY_PLATFORM_LIB_DIRECTORY}/Release/${REL_NAME}${TGT_SUFFIX}"
     )
-    set_target_properties(${GEN_IMPORTED_TGT_NAME} PROPERTIES MAP_IMPORTED_CONFIG_RELEASEDBG Release)
+    set_target_properties(${GEN_IMPORTED_TGT_NAME} PROPERTIES MAP_IMPORTED_CONFIG_SANITIZER Release)
 
     if(GEN_IMPORTED_TGT_EXTRA_INCLUDES)
         target_include_directories(${GEN_IMPORTED_TGT_NAME}

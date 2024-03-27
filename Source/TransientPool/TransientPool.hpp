@@ -52,6 +52,11 @@ inline TransientData::~TransientData()
         mainR.deallocate(ownedMem.data(), ownedMem.size(), alignment);
 }
 
+inline void TransientData::ReserveAll()
+{
+    usedBytes = ownedMem.size_bytes();
+}
+
 template<ImplicitLifetimeC T>
 inline void TransientData::Push(Span<const T> data)
 {

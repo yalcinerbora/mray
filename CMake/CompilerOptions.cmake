@@ -52,14 +52,15 @@ set(MRAY_MSVC_OPTIONS
     # Release Debug Build
     # Generate pdb and enable optimizations
     # Also flag address sanitizer
-    $<$<CONFIG:ReleaseDBG>:/O2>
-    $<$<CONFIG:ReleaseDBG>:/Zi>
-    $<$<CONFIG:ReleaseDBG>:/Oy->
-    $<$<CONFIG:ReleaseDBG>:/fsanitize=address>
+    $<$<CONFIG:ASanR>:/O2>
+    $<$<CONFIG:ASanR>:/Zi>
+    $<$<CONFIG:ASanR>:/Oy->
+    $<$<CONFIG:ASanR>:/fsanitize=address>
 
     # Debug Specific
     # CMAKE does not have this on debug build (in x64, this is ignored i think bu w/e)
     $<$<CONFIG:Debug>:/Oy->
+    $<$<CONFIG:Release>:/Zi> # Also add debug info on release builds (for profiling etc.)
 )
 
 set(MRAY_CLANG_OPTIONS
@@ -80,8 +81,9 @@ set(MRAY_CLANG_OPTIONS
     -Wformat=2              # warn on security issues around functions that format output (ie printf)
     -Wimplicit-fallthrough  # warn on statements that fallthrough without an explicit annotation
 
-    $<$<CONFIG:ReleaseDBG>:-O2>
-    $<$<CONFIG:ReleaseDBG>:-g>
+    $<$<CONFIG:ASanR>:-O2>
+    $<$<CONFIG:ASanR>:-g>
+    $<$<CONFIG:Release>:-g> # Also add debug info on release builds (for profiling etc.)
 )
 
 set(MRAY_GCC_OPTIONS
@@ -102,7 +104,7 @@ set(MRAY_CUDA_OPTIONS
     #-Wreorder
     # Debug Related
     $<$<CONFIG:Debug>:-G>
-    $<$<CONFIG:ReleaseDBG>:-lineinfo>
+    $<$<CONFIG:ASanR>:-lineinfo>
     $<$<CONFIG:Release>:-lineinfo>
     # Extended Lambdas (__device__ tagged lambdas)
     -extended-lambda
@@ -164,7 +166,7 @@ endif()
 # Generic Preprocessor Definitions
 set(MRAY_PREPROCESSOR_DEFS_GENERIC
     $<$<CONFIG:Debug>:MRAY_DEBUG>
-    $<$<CONFIG:ReleaseDBG>:MRAY_DEBUG>
+    $<$<CONFIG:ASanR>:MRAY_DEBUG>
     $<$<CONFIG:Release>:NDEBUG>)
 
 if(MSVC)
@@ -174,8 +176,8 @@ if(MSVC)
         -DUNICODE
         -DNOMINMAX
         -DMRAY_MSVC
-        $<$<CONFIG:ReleaseDBG>:_DISABLE_VECTOR_ANNOTATION>
-        $<$<CONFIG:ReleaseDBG>:_DISABLE_STRING_ANNOTATION>
+        $<$<CONFIG:ASanR>:_DISABLE_VECTOR_ANNOTATION>
+        $<$<CONFIG:ASanR>:_DISABLE_STRING_ANNOTATION>
         )
 elseif(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
     set(MRAY_PREPROCESSOR_DEFS_GENERIC
@@ -254,9 +256,9 @@ if(MSVC)
                         # This is nvcc's problem (I guess?) so ignore it
                         $<DEVICE_LINK:-Xcompiler=/wd4100>
                         # ASAN does not like incremental builds
-                        $<HOST_LINK:$<$<CONFIG:ReleaseDBG>:/INCREMENTAL:NO>>
-                        $<HOST_LINK:$<$<CONFIG:ReleaseDBG>:/wholearchive:clang_rt.asan_dynamic-x86_64.lib>>
-                        $<HOST_LINK:$<$<CONFIG:ReleaseDBG>:/wholearchive:clang_rt.asan_dynamic_runtime_thunk-x86_64.lib>>
+                        $<HOST_LINK:$<$<CONFIG:ASanR>:/INCREMENTAL:NO>>
+                        $<HOST_LINK:$<$<CONFIG:ASanR>:/wholearchive:clang_rt.asan_dynamic-x86_64.lib>>
+                        $<HOST_LINK:$<$<CONFIG:ASanR>:/wholearchive:clang_rt.asan_dynamic_runtime_thunk-x86_64.lib>>
                         )
 endif()
 

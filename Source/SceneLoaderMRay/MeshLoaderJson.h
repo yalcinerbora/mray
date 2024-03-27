@@ -32,15 +32,15 @@ class JsonTriangle : public MeshFileI
     public:
                     JsonTriangle(const JsonNode&, bool isIndexed);
 
-    AABB3           AABB(uint32_t innerId = 0) const override;
-    uint32_t        MeshPrimitiveCount(uint32_t innerId = 0) const override;
-    uint32_t        MeshAttributeCount(uint32_t innerId = 0) const override;
+    AABB3           AABB() const override;
+    uint32_t        MeshPrimitiveCount() const override;
+    uint32_t        MeshAttributeCount() const override;
     std::string     Name() const override;
 
     // Entire Data Fetch
-    bool            HasAttribute(PrimitiveAttributeLogic, uint32_t innerId = 0) const override;
-    TransientData   GetAttribute(PrimitiveAttributeLogic, uint32_t innerId = 0) const override;
-    MRayDataTypeRT  AttributeLayout(PrimitiveAttributeLogic, uint32_t innerId = 0) const override;
+    bool            HasAttribute(PrimitiveAttributeLogic) const override;
+    TransientData   GetAttribute(PrimitiveAttributeLogic) const override;
+    MRayDataTypeRT  AttributeLayout(PrimitiveAttributeLogic) const override;
 };
 
 class JsonSphere : public MeshFileI
@@ -53,14 +53,14 @@ class JsonSphere : public MeshFileI
     public:
                     JsonSphere(const JsonNode&);
 
-    AABB3           AABB(uint32_t innerId = 0) const override;
-    uint32_t        MeshPrimitiveCount(uint32_t innerId = 0) const override;
-    uint32_t        MeshAttributeCount(uint32_t innerId = 0) const override;
+    AABB3           AABB() const override;
+    uint32_t        MeshPrimitiveCount() const override;
+    uint32_t        MeshAttributeCount() const override;
     std::string     Name() const override;
 
     // Entire Data Fetch
-    bool            HasAttribute(PrimitiveAttributeLogic, uint32_t innerId = 0) const override;
-    TransientData   GetAttribute(PrimitiveAttributeLogic, uint32_t innerId = 0) const override;
-    MRayDataTypeRT  AttributeLayout(PrimitiveAttributeLogic, uint32_t innerId = 0) const override;
+    bool            HasAttribute(PrimitiveAttributeLogic) const override;
+    TransientData   GetAttribute(PrimitiveAttributeLogic) const override;
+    MRayDataTypeRT  AttributeLayout(PrimitiveAttributeLogic) const override;
 };
 

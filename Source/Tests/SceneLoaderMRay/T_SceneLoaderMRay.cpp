@@ -27,7 +27,8 @@ class SceneLoaderMRayTest : public ::testing::Test
 
 void SceneLoaderMRayTest::SetUp()
 {
-    pool = std::make_unique<BS::thread_pool>(1, [](){});
+    pool = std::make_unique<BS::thread_pool>(std::thread::hardware_concurrency(),
+                                             [](){});
     dllFile = std::make_unique<SharedLibrary>("SceneLoaderMRay");
 
     SharedLibArgs args
@@ -81,10 +82,10 @@ TEST_F(SceneLoaderMRayTest, Basic)
 TEST_F(SceneLoaderMRayTest, Kitchen)
 {
     //while(true)
-    for(uint32_t i = 0; i < 512; i++)
+    for(uint32_t i = 0; i < 128; i++)
     //for(uint32_t i = 0; i < 1; i++)
     {
-        TracerMock tracer(true);
+        TracerMock tracer(false);
 
         if(i > 0) SetUp();
 

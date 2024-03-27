@@ -66,8 +66,12 @@ using Vector3ui = Vector<3, uint32_t>;
 using Vector4ui = Vector<4, uint32_t>;
 // Long Types
 using Vector2l  = Vector<2, int64_t>;
+using Vector3l  = Vector<3, int64_t>;
+using Vector4l  = Vector<4, int64_t>;
+
 using Vector2ul = Vector<2, uint64_t>;
 using Vector3ul = Vector<3, uint64_t>;
+using Vector4ul = Vector<4, uint64_t>;
 // Short
 using Vector2s  = Vector<2, int16_t>;
 using Vector2us = Vector<2, uint16_t>;

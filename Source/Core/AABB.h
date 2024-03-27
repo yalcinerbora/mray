@@ -35,8 +35,8 @@ class AABB
     constexpr                   AABB() = default;
     MRAY_HYBRID constexpr       AABB(const Vector<N, T>& min,
                                      const Vector<N, T>& max);
-    MRAY_HYBRID constexpr       AABB(const T* dataMin,
-                                     const T* dataMax);
+    MRAY_HYBRID constexpr       AABB(Span<const T, N> dataMin,
+                                     Span<const T, N> dataMax);
 
     template <class... ArgsMin, class... ArgsMax>
     requires (sizeof...(ArgsMin) == N) && (std::convertible_to<T, ArgsMin> && ...) &&
@@ -55,7 +55,7 @@ class AABB
     MRAY_HYBRID constexpr void                  SetMax(const Vector<N, T>&);
 
     // Functionality
-    MRAY_HYBRID constexpr Vector<N, T>          Span() const;
+    MRAY_HYBRID constexpr Vector<N, T>          GeomSpan() const;
     MRAY_HYBRID constexpr Vector<N, T>          Centroid() const;
     MRAY_HYBRID NO_DISCARD constexpr AABB       Union(const AABB&) const;
     MRAY_HYBRID constexpr AABB&                 UnionSelf(const AABB&);

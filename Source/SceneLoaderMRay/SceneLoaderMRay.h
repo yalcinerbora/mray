@@ -25,7 +25,7 @@ class SceneLoaderMRay : public SceneLoaderI
         void                AddException(MRayError&&);
     };
 
-    using TypeMappedNodes       = std::map<std::string, std::vector<JsonNode>>;    
+    using TypeMappedNodes       = std::map<std::string, std::vector<JsonNode>>;
     using TexMappedNodes        = std::vector<Pair<NodeTexStruct, JsonNode>>;
 
     using PrimIdMappings        = std::map<uint32_t, Pair<PrimGroupId, PrimBatchId>>;

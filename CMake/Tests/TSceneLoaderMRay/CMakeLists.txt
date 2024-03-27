@@ -30,7 +30,7 @@ set_target_properties(TSceneLoaderMRay PROPERTIES
                       POSITION_INDEPENDENT_CODE ON)
 
 if(MSVC)
-    add_custom_command(TARGET TSceneLoaderMRay POST_BUILD
+    add_custom_command(TARGET TSceneLoaderMRay PRE_BUILD
                         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                         "${MRAY_CONFIG_LIB_DIRECTORY}/gtest.dll"
                         "${MRAY_CONFIG_LIB_DIRECTORY}/gtest_main.dll"

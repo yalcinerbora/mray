@@ -141,7 +141,7 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
     }
 }
 
-AABB3 JsonTriangle::AABB(uint32_t) const
+AABB3 JsonTriangle::AABB() const
 {
     auto indexSpan = indices.AccessAs<Vector3ui>();
     auto positionSpan = positions.AccessAs<Vector3>();
@@ -160,17 +160,17 @@ AABB3 JsonTriangle::AABB(uint32_t) const
     return result;
 }
 
-uint32_t JsonTriangle::MeshPrimitiveCount(uint32_t) const
+uint32_t JsonTriangle::MeshPrimitiveCount() const
 {
     return static_cast<uint32_t>(indices.AccessAs<Vector3ui>().size());
 }
 
-uint32_t JsonTriangle::MeshAttributeCount(uint32_t) const
+uint32_t JsonTriangle::MeshAttributeCount() const
 {
     return static_cast<uint32_t>(positions.AccessAs<Vector3>().size());
 }
 
-bool JsonTriangle::HasAttribute(PrimitiveAttributeLogic attribLogic, uint32_t) const
+bool JsonTriangle::HasAttribute(PrimitiveAttributeLogic attribLogic) const
 {
     using enum PrimitiveAttributeLogic;
     switch(attribLogic)
@@ -187,7 +187,7 @@ bool JsonTriangle::HasAttribute(PrimitiveAttributeLogic attribLogic, uint32_t) c
     }
 }
 
-TransientData JsonTriangle::GetAttribute(PrimitiveAttributeLogic attribLogic, uint32_t) const
+TransientData JsonTriangle::GetAttribute(PrimitiveAttributeLogic attribLogic) const
 {
     // TODO: This is bad design reiterate over this
     auto ExplicitCopy = []<class T>(const TransientData& t) ->  TransientData
@@ -211,7 +211,7 @@ TransientData JsonTriangle::GetAttribute(PrimitiveAttributeLogic attribLogic, ui
     }
 }
 
-MRayDataTypeRT JsonTriangle::AttributeLayout(PrimitiveAttributeLogic attribLogic, uint32_t) const
+MRayDataTypeRT JsonTriangle::AttributeLayout(PrimitiveAttributeLogic attribLogic) const
 {
     using enum MRayDataEnum;
     if(attribLogic == PrimitiveAttributeLogic::POSITION ||
@@ -242,22 +242,22 @@ JsonSphere::JsonSphere(const JsonNode& jn)
     , radius(jn.AccessData<Float>(JsonMeshNames::NODE_RADIUS))
 {}
 
-AABB3 JsonSphere::AABB(uint32_t) const
+AABB3 JsonSphere::AABB() const
 {
     return AABB3(position - radius, position + radius);
 }
 
-uint32_t JsonSphere::MeshPrimitiveCount(uint32_t) const
+uint32_t JsonSphere::MeshPrimitiveCount() const
 {
     return 1;
 }
 
-uint32_t JsonSphere::MeshAttributeCount(uint32_t) const
+uint32_t JsonSphere::MeshAttributeCount() const
 {
     return 1;
 }
 
-bool JsonSphere::HasAttribute(PrimitiveAttributeLogic attribLogic, uint32_t) const
+bool JsonSphere::HasAttribute(PrimitiveAttributeLogic attribLogic) const
 {
     using enum PrimitiveAttributeLogic;
     switch(attribLogic)
@@ -268,7 +268,7 @@ bool JsonSphere::HasAttribute(PrimitiveAttributeLogic attribLogic, uint32_t) con
     }
 }
 
-TransientData JsonSphere::GetAttribute(PrimitiveAttributeLogic attribLogic, uint32_t) const
+TransientData JsonSphere::GetAttribute(PrimitiveAttributeLogic attribLogic) const
 {
     using namespace JsonMeshNames;
     if(attribLogic == PrimitiveAttributeLogic::POSITION)
@@ -286,7 +286,7 @@ TransientData JsonSphere::GetAttribute(PrimitiveAttributeLogic attribLogic, uint
     else throw MRayError("Unknown attribute logic!");
 }
 
-MRayDataTypeRT JsonSphere::AttributeLayout(PrimitiveAttributeLogic attribLogic, uint32_t) const
+MRayDataTypeRT JsonSphere::AttributeLayout(PrimitiveAttributeLogic attribLogic) const
 {
     using enum MRayDataEnum;
     using enum PrimitiveAttributeLogic;

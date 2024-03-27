@@ -36,7 +36,7 @@ set_target_properties(TDeviceCUDA PROPERTIES
                       CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
 if(MSVC)
-    add_custom_command(TARGET TDeviceCUDA POST_BUILD
+    add_custom_command(TARGET TDeviceCUDA PRE_BUILD
                         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                         "${MRAY_CONFIG_LIB_DIRECTORY}/gtest.dll"
                         "${MRAY_CONFIG_LIB_DIRECTORY}/gtest_main.dll"

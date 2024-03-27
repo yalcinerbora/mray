@@ -441,7 +441,7 @@ inline TracerMock::TracerMock(bool pl)
         .attribInfo = CamAttributeInfoList
         {
             CamAttributeInfo("fov", MRayDataType<MR_DEFAULT_FLT>(), IS_SCALAR, MR_MANDATORY),
-            CamAttributeInfo("isFovX", MRayDataType<MR_CHAR>(), IS_SCALAR, MR_MANDATORY),
+            CamAttributeInfo("isFovX", MRayDataType<MR_BOOL>(), IS_SCALAR, MR_MANDATORY),
             CamAttributeInfo("planes", MRayDataType<MR_VECTOR_2>(), IS_SCALAR, MR_MANDATORY),
             CamAttributeInfo("gaze", MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY),
             CamAttributeInfo("position", MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY),

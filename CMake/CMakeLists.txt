@@ -7,7 +7,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}")
 include(PreventInSourceBuilds)
 
 # Only Debug and Release
-set(CMAKE_CONFIGURATION_TYPES Debug;ReleaseDBG;Release CACHE STRING "Build configurations. ReleaseDBG has sanitized output")
+set(CMAKE_CONFIGURATION_TYPES Debug;ASanR;Release CACHE STRING "Build configurations. ASanR has sanitized output")
 #set(CMAKE_DEFAULT_BUILD_TYPE Release CACHE STRING "Selected by user")
 set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type for singlue config generators")
 

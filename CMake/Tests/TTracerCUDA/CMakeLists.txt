@@ -30,7 +30,7 @@ set_target_properties(TTracerCUDA PROPERTIES
                       CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
 if(MSVC)
-    add_custom_command(TARGET TTracerCUDA POST_BUILD
+    add_custom_command(TARGET TTracerCUDA PRE_BUILD
                         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                         "${MRAY_CONFIG_LIB_DIRECTORY}/gtest.dll"
                         "${MRAY_CONFIG_LIB_DIRECTORY}/gtest_main.dll"

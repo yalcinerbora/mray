@@ -10,8 +10,8 @@ constexpr AABB<N, T>::AABB(const Vector<N, T>& min,
 
 template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr AABB<N, T>::AABB(const T* dataMin,
-                           const T* dataMax)
+constexpr AABB<N, T>::AABB(Span<const T, N> dataMin,
+                           Span<const T, N> dataMax)
     : min(dataMin)
     , max(dataMax)
 {}
@@ -71,7 +71,7 @@ constexpr void AABB<N, T>::SetMax(const Vector<N, T>& v)
 
 template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<N, T> AABB<N, T>::Span() const
+constexpr Vector<N, T> AABB<N, T>::GeomSpan() const
 {
     return (max - min);
 }
@@ -80,7 +80,7 @@ template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector<N, T> AABB<N, T>::Centroid() const
 {
-    return min + (Span() * T{0.5});
+    return min + (GeomSpan() * T{0.5});
 }
 
 template<unsigned int N, FloatingPointC T>

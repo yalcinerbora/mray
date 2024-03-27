@@ -25,15 +25,15 @@ class MeshFileI
 
     virtual             ~MeshFileI() = default;
 
-    virtual AABB3       AABB(uint32_t innerId = 0) const = 0;
-    virtual uint32_t    MeshPrimitiveCount(uint32_t innerId = 0) const = 0;
-    virtual uint32_t    MeshAttributeCount(uint32_t innerId = 0) const = 0;
+    virtual AABB3       AABB() const = 0;
+    virtual uint32_t    MeshPrimitiveCount() const = 0;
+    virtual uint32_t    MeshAttributeCount() const = 0;
     virtual std::string Name() const = 0;
 
     // Entire Data Fetch
-    virtual bool            HasAttribute(PrimitiveAttributeLogic, uint32_t innerId = 0) const = 0;
-    virtual TransientData   GetAttribute(PrimitiveAttributeLogic, uint32_t innerId = 0) const = 0;
-    virtual MRayDataTypeRT  AttributeLayout(PrimitiveAttributeLogic, uint32_t innerId = 0) const = 0;
+    virtual bool            HasAttribute(PrimitiveAttributeLogic) const = 0;
+    virtual TransientData   GetAttribute(PrimitiveAttributeLogic) const = 0;
+    virtual MRayDataTypeRT  AttributeLayout(PrimitiveAttributeLogic) const = 0;
 };
 
 // This is per thread (that is why there is another abstraction (MeshFile))
@@ -42,7 +42,8 @@ class MeshLoaderI
     public:
     virtual                             ~MeshLoaderI() = default;
 
-    virtual std::unique_ptr<MeshFileI>  OpenFile(std::string& filePath) = 0;
+    virtual std::unique_ptr<MeshFileI>  OpenFile(std::string& filePath,
+                                                 uint32_t innerIndex = 0) = 0;
 };
 
 // This is loaded once for the process

@@ -7,10 +7,12 @@
 #include "TransientPool/TransientPool.h"
 
 MeshFileAssimp::MeshFileAssimp(Assimp::Importer& imp,
-                               const std::string& fPath)
+                               const std::string& fPath,
+                               uint32_t internalIndex)
     : importer(imp)
     , filePath(fPath)
     , scene(nullptr)
+    , innerIndex(internalIndex)
 {
     unsigned int flags = static_cast<unsigned int>
     (
@@ -35,34 +37,29 @@ MeshFileAssimp::MeshFileAssimp(Assimp::Importer& imp,
         aiProcess_RemoveRedundantMaterials
     );
     const aiScene* sceneRaw = importer.ReadFile(filePath, flags);
-    if(!sceneRaw) throw MRayError("Unable to read file");
+    if(!sceneRaw) throw MRayError("Assimp: Unable to read file \"{}\"", Name());
     scene.reset(importer.GetOrphanedScene());
+
+    if(innerIndex >= scene->mNumMeshes)
+        throw MRayError("Inner index is out of range");
 }
 
-AABB3 MeshFileAssimp::AABB(uint32_t innerId) const
+AABB3 MeshFileAssimp::AABB() const
 {
-    if(innerId >= scene->mNumMeshes)
-        throw MRayError("Inner index is out of range");
-
-    const auto& aabb = scene->mMeshes[innerId]->mAABB;
+    const auto& aabb = scene->mMeshes[innerIndex]->mAABB;
     return AABB3(Vector3(aabb.mMin.x, aabb.mMin.y, aabb.mMin.z),
                  Vector3(aabb.mMax.x, aabb.mMax.y, aabb.mMax.z));
 }
 
-uint32_t MeshFileAssimp::MeshPrimitiveCount(uint32_t innerId) const
+uint32_t MeshFileAssimp::MeshPrimitiveCount() const
 {
-    if(innerId >= scene->mNumMeshes)
-        throw MRayError("Inner index is out of range");
-    const auto& mesh = scene->mMeshes[innerId];
+    const auto& mesh = scene->mMeshes[innerIndex];
     return mesh->mNumFaces;
 }
 
-uint32_t MeshFileAssimp::MeshAttributeCount(uint32_t innerId) const
+uint32_t MeshFileAssimp::MeshAttributeCount() const
 {
-    if(innerId >= scene->mNumMeshes)
-        throw MRayError("Inner index is out of range");
-
-    const auto& mesh = scene->mMeshes[innerId];
+    const auto& mesh = scene->mMeshes[innerIndex];
     return mesh->mNumVertices;
 }
 
@@ -71,12 +68,11 @@ std::string MeshFileAssimp::Name() const
     return std::filesystem::path(filePath).filename().string();
 }
 
-TransientData MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic,
-                                           uint32_t innerId) const
+TransientData MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) const
 {
     auto PushVertexAttribute = [&]<class T>() -> TransientData
     {
-        const auto& mesh = scene->mMeshes[innerId];
+        const auto& mesh = scene->mMeshes[innerIndex];
         size_t localCount = mesh->mNumVertices;
         TransientData input(std::in_place_type_t<T>{}, localCount);
 
@@ -114,9 +110,7 @@ TransientData MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic,
         return std::move(input);
     };
 
-    if(innerId >= scene->mNumMeshes)
-        throw MRayError("Inner index is out of range");
-    const auto& mesh = scene->mMeshes[innerId];
+    const auto& mesh = scene->mMeshes[innerIndex];
     if(attribLogic == PrimitiveAttributeLogic::INDEX)
     {
         TransientData input(std::in_place_type_t<Vector3ui>{}, mesh->mNumFaces);
@@ -146,10 +140,9 @@ TransientData MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic,
     }
 }
 
-bool MeshFileAssimp::HasAttribute(PrimitiveAttributeLogic attribLogic, uint32_t innerId) const
+bool MeshFileAssimp::HasAttribute(PrimitiveAttributeLogic attribLogic) const
 {
-    if(innerId >= scene->mNumMeshes) return false;
-    const auto& mesh = scene->mMeshes[innerId];
+    const auto& mesh = scene->mMeshes[innerIndex];
 
     using enum PrimitiveAttributeLogic;
     switch(attribLogic)
@@ -165,7 +158,7 @@ bool MeshFileAssimp::HasAttribute(PrimitiveAttributeLogic attribLogic, uint32_t 
     }
 }
 
-MRayDataTypeRT MeshFileAssimp::AttributeLayout(PrimitiveAttributeLogic attribLogic, uint32_t) const
+MRayDataTypeRT MeshFileAssimp::AttributeLayout(PrimitiveAttributeLogic attribLogic) const
 {
     // Assimp always loads to Vector3/2's so no need to check per-inner item etc.
     using enum MRayDataEnum;
@@ -193,12 +186,10 @@ MeshLoaderAssimp::MeshLoaderAssimp()
     importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS,
                                 aiComponent_BONEWEIGHTS |
                                 aiComponent_COLORS);
-
-    Assimp::DefaultLogger::create(AssimpLogFileName.data(),
-                                  Assimp::Logger::VERBOSE);
 }
 
-std::unique_ptr<MeshFileI> MeshLoaderAssimp::OpenFile(std::string& filePath)
+std::unique_ptr<MeshFileI> MeshLoaderAssimp::OpenFile(std::string& filePath,
+                                                      uint32_t innerIndex)
 {
-    return std::unique_ptr<MeshFileI>(new MeshFileAssimp(importer, filePath));
+    return std::unique_ptr<MeshFileI>(new MeshFileAssimp(importer, filePath, innerIndex));
 }

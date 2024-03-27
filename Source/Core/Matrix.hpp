@@ -253,7 +253,7 @@ constexpr Matrix<N, T> Matrix<N, T>::operator*(const Matrix& right) const
         UNROLL_LOOP
         for(int j = 0; j < N; j++)
         {
-            Vector<N, T> leftRow = Vector<N, T>(matrix + j * N);
+            auto leftRow = Vector<N, T>(Span<const T, N>(matrix.data() + j * N, N));
             m(i, j) = leftRow.Dot(col);
         }
     }
@@ -269,7 +269,7 @@ constexpr Vector<M, T> Matrix<N, T>::operator*(const Vector<M, T>& right) const 
     UNROLL_LOOP
     for(unsigned int i = 0; i < M; i++)
     {
-        Vector<M, T> leftRow = Vector<M, T>(Span<const T, M>(matrix.data() + i * N, M));
+        auto leftRow = Vector<M, T>(Span<const T, M>(matrix.data() + i * N, M));
         v[i] = leftRow.Dot(right);
     }
     return v;

@@ -31,6 +31,9 @@ class MeshLoaderPool : public MeshLoaderPoolI
 
 MeshLoaderPool::MeshLoaderPool()
 {
+    Assimp::DefaultLogger::create(MeshLoaderAssimp::AssimpLogFileName.data(),
+                                  Assimp::Logger::VERBOSE);
+
     generators.emplace(MeshLoaderAssimp::Tag,
                        &GenerateType<MeshLoaderI, MeshLoaderAssimp>);
     generators.emplace(MeshLoaderGFG::Tag,

@@ -302,7 +302,7 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
                                     positions[1] * actualB +
                                     positions[2] * actualC);
 
-                Vector3 voxelIndexF = ((voxelPos - sceneAABB.Min()) / sceneAABB.Span());
+                Vector3 voxelIndexF = ((voxelPos - sceneAABB.Min()) / sceneAABB.GeomSpan());
                 voxelIndexF *= Vector3(voxelParams.resolution[0],
                                        voxelParams.resolution[1],
                                        voxelParams.resolution[2]);

@@ -52,6 +52,7 @@ class TransientData
     TransientData&  operator=(TransientData&&);
                     ~TransientData();
 
+    void            ReserveAll();
     template<ImplicitLifetimeC T>
     void            Push(Span<const T>);
     template<ImplicitLifetimeC T>

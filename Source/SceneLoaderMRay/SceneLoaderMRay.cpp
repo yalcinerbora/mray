@@ -360,8 +360,7 @@ void LoadPrimitive(TracerI& tracer,
         PrimitiveAttributeLogic attribLogic = std::get<PrimAttributeInfo::LOGIC_INDEX>(attribute);
         AttributeOptionality optionality = std::get<PrimAttributeInfo::OPTIONALITY_INDEX>(attribute);
         MRayDataTypeRT groupsLayout = std::get<PrimAttributeInfo::LAYOUT_INDEX>(attribute);
-        MRayDataTypeRT filesLayout = meshFile->AttributeLayout(attribLogic,
-                                                               meshInternalIndex);
+        MRayDataTypeRT filesLayout = meshFile->AttributeLayout(attribLogic);
 
         // Is this data available?
         if(!meshFile->HasAttribute(attribLogic) &&
@@ -384,12 +383,12 @@ void LoadPrimitive(TracerI& tracer,
            meshFile->AttributeLayout(BITANGENT).Name() == MR_VECTOR_3 &&
            meshFile->AttributeLayout(NORMAL).Name() == MR_VECTOR_3)
         {
-            size_t normalCount = meshFile->MeshAttributeCount(meshInternalIndex);
+            size_t normalCount = meshFile->MeshAttributeCount();
             TransientData quats(std::in_place_type_t<Quaternion>{}, normalCount);
             // Utilize TBN matrix directly
-            TransientData t = meshFile->GetAttribute(TANGENT, meshInternalIndex);
-            TransientData b = meshFile->GetAttribute(BITANGENT, meshInternalIndex);
-            TransientData n = meshFile->GetAttribute(attribLogic, meshInternalIndex);
+            TransientData t = meshFile->GetAttribute(TANGENT);
+            TransientData b = meshFile->GetAttribute(BITANGENT);
+            TransientData n = meshFile->GetAttribute(attribLogic);
 
             Span<const Vector3> tangents = t.AccessAs<const Vector3>();
             Span<const Vector3> bitangents = b.AccessAs<const Vector3>();
@@ -425,9 +424,123 @@ void LoadPrimitive(TracerI& tracer,
         else
         {
             tracer.PushPrimAttribute(groupId, batchId, attributeIndex,
-                                     meshFile->GetAttribute(attribLogic, meshInternalIndex));
+                                     meshFile->GetAttribute(attribLogic));
         }
     }
+}
+
+std::vector<TransientData> TransformAttributeLoad(const AttributeCountList& totalCounts,
+                                                  const GenericAttributeInfoList& list,
+                                                  Span<const JsonNode> nodes)
+{
+    using namespace std::literals;
+    static constexpr auto SINGLE_TRANSFORM_TYPE = "Single"sv;
+    static constexpr auto MULTI_TRANSFORM_TYPE = "Multi"sv;
+    static constexpr auto LAYOUT = "layout"sv;
+    static constexpr auto LAYOUT_TRS = "trs"sv;
+    static constexpr auto LAYOUT_MATRIX = "matrix"sv;
+
+    // TODO: Change this as well, transform logic should not be in loader
+    // I think we need to layer these kind of things in an intermediate
+    // system that sits between loader and tracer. (Which should be on GPU as well
+    // or it will be slow)
+    std::string_view type = nodes[0].CommonData<std::string_view>(NodeNames::TYPE);
+    if(type != SINGLE_TRANSFORM_TYPE && type != MULTI_TRANSFORM_TYPE)
+        return GenericAttributeLoad(totalCounts, list, nodes);
+
+    //
+    assert(list.size() == 1);
+    assert(totalCounts.size() == 1);
+    std::vector<TransientData> result;
+    result.push_back(TransientData(std::in_place_type_t<Matrix4x4>{},
+                                   totalCounts.front()));
+
+    const GenericAttributeInfo& info = list.front();
+    for(const auto& n : nodes)
+    {
+        bool isArray = (std::get<GenericAttributeInfo::IS_ARRAY_INDEX>(info) ==
+                        AttributeIsArray::IS_ARRAY);
+
+        std::string_view layout = nodes[0].CommonData<std::string_view>(LAYOUT);
+        if(layout == LAYOUT_TRS)
+        {
+            static constexpr auto TRANSLATE = "translate"sv;
+            static constexpr auto ROTATE = "rotate"sv;
+            static constexpr auto SCALE = "scale"sv;
+
+            auto GenTransformFromTRS = [](const Vector3& t,
+                                          const Vector3& r,
+                                          const Vector3& s)
+            {
+                Matrix4x4 transform = TransformGen::Scale(s[0], s[1], s[2]);
+                transform = TransformGen::Rotate(r[0], Vector3::XAxis()) * transform;
+                transform = TransformGen::Rotate(r[1], Vector3::YAxis()) * transform;
+                transform = TransformGen::Rotate(r[2], Vector3::ZAxis()) * transform;
+                transform = TransformGen::Translate(t) * transform;
+                return transform;
+            };
+
+            if(isArray)
+            {
+                using OptionalVec3List = std::vector<Optional<Vector3>>;
+
+                Optional<TransientData> tL = n.AccessOptionalDataArray<Vector3>(TRANSLATE);
+                Optional<TransientData> rL = n.AccessOptionalDataArray<Vector3>(ROTATE);
+                Optional<TransientData> sL = n.AccessOptionalDataArray<Vector3>(SCALE);
+
+                Span<const Vector3> tSpan = (tL.has_value())
+                                                ? tL.value().AccessAs<Vector3>()
+                                                : Span<const Vector3>();
+                Span<const Vector3> rSpan = (rL.has_value())
+                                                ? rL.value().AccessAs<Vector3>()
+                                                : Span<const Vector3>();
+                Span<const Vector3> sSpan = (sL.has_value())
+                                                ? sL.value().AccessAs<Vector3>()
+                                                : Span<const Vector3>();
+
+                for(size_t i = 0; i < tSpan.size(); i++)
+                {
+                    Vector3 t = (tSpan.empty()) ? tSpan[i] : Vector3::Zero();
+                    Vector3 r = (rSpan.empty()) ? rSpan[i] : Vector3::Zero();
+                    Vector3 s = (sSpan.empty()) ? sSpan[i] : Vector3(1);
+
+                    Matrix4x4 transform = GenTransformFromTRS(t, r, s);
+                    result[0].Push(Span<const Matrix4x4>(&transform, 1));
+                }
+            }
+            else
+            {
+                Vector3 t = n.AccessOptionalData<Vector3>(TRANSLATE).value_or(Vector3::Zero());
+                Vector3 r = n.AccessOptionalData<Vector3>(ROTATE).value_or(Vector3::Zero());
+                Vector3 s = n.AccessOptionalData<Vector3>(SCALE).value_or(Vector3(1));
+
+                Matrix4x4 transform = GenTransformFromTRS(t, r, s);
+                result[0].Push(Span<const Matrix4x4>(&transform, 1));
+            }
+
+        }
+        else if(layout == LAYOUT_MATRIX)
+        {
+            static constexpr auto MATRIX = "matrix"sv;
+
+            if(isArray)
+            {
+                TransientData t = n.AccessDataArray<Matrix4x4>(MATRIX);
+                result[0].Push(t.AccessAs<const Matrix4x4>());
+            }
+            else
+            {
+                Matrix4x4 t = n.AccessData<Matrix4x4>(MATRIX);
+                result[0].Push(Span<const Matrix4x4>(&t, 1));
+            }
+        }
+        else
+        {
+            throw MRayError("Unkown transform layout");
+        }
+    }
+
+    return result;
 }
 
 void SceneLoaderMRay::ExceptionList::AddException(MRayError&& err)
@@ -993,9 +1106,9 @@ void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ExceptionList& exceptions)
                               Span<const JsonNode> nodes)
         {
             TransAttributeInfoList list = tracer.AttributeInfo(groupId);
-            auto dataOut = GenericAttributeLoad(totalCounts,
-                                                list,
-                                                nodes);
+            auto dataOut = TransformAttributeLoad(totalCounts,
+                                                  list,
+                                                  nodes);
             uint32_t attribIndex = 0;
             for(auto& data : dataOut)
             {
@@ -1117,14 +1230,14 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
                     // Find mesh file
                     // TODO: this is slow probably due to long file name as key
                     auto fileIt = meshFiles.emplace(fileName, nullptr);
-                    if(fileIt.second) fileIt.first->second = meshLoader->OpenFile(fileName);
+                    if(fileIt.second) fileIt.first->second = meshLoader->OpenFile(fileName, innerIndex);
                     meshFile = fileIt.first->second.get();
                 }
                 // Finally Reserve primitives
                 PrimCount pc
                 {
-                    .primCount = meshFile->MeshPrimitiveCount(innerIndex),
-                    .attributeCount = meshFile->MeshAttributeCount(innerIndex)
+                    .primCount = meshFile->MeshPrimitiveCount(),
+                    .attributeCount = meshFile->MeshAttributeCount()
                 };
                 PrimBatchId tracerId = tracer.ReservePrimitiveBatch(groupId, pc);
                 idList.push_back(tracerId);
@@ -1795,18 +1908,6 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
         if(auto e = ConcatIfError(); e) return e;
 
         LoadMaterials(tracer, exceptionList, boundary.mediumId);
-
-
-
-        //// DEBUG
-        //// DEBUG
-        //threadPool.wait();
-        //if(auto e = ConcatIfError(); e) return e;
-        //return MRayError::OK;
-
-        //// DEBUG
-        //// DEBUG
-
         // Does not depend on textures but may depend on later
         LoadTransforms(tracer, exceptionList);
         LoadPrimitives(tracer, exceptionList);
@@ -1821,6 +1922,7 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
         // Finally, wait all load operations to complete
         threadPool.wait();
         if(auto e = ConcatIfError(); e) return e;
+        return MRayError::OK;
 
         // Scene id -> tracer id mappings are created
         // and reside on the object's state.
