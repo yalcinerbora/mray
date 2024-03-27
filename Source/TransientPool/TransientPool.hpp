@@ -15,7 +15,10 @@ inline TransientData::TransientData(std::in_place_type_t<T>, size_t count)
     {
         typeHash = typeid(T).hash_code();
     }
-    Byte* ptr = reinterpret_cast<Byte*>(mainR.allocate(count * sizeof(T), alignof(T)));
+    Byte* ptr = (count == 0)
+                    ? nullptr
+                    : static_cast<Byte*>(mainR.allocate(count * sizeof(T),
+                                                        alignof(T)));
     // TODO: add start_lifetime_as ?
     ownedMem = Span<Byte>(ptr, count * sizeof(T));
 }

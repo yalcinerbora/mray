@@ -27,6 +27,7 @@ struct TexturedAttributeData
     std::vector<Optional<TextureId>>    textures;
 };
 
+
 std::string AddPrimitivePrefix(std::string_view primType)
 {
     return (std::string(TracerConstants::PRIM_PREFIX) +
@@ -253,7 +254,6 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
                                         : TracerConstants::InvalidTexture;
                     result[i].textures.push_back(id);
                 }
-                continue;
             }
 
             // Same as GenericAttributeInfo
@@ -264,7 +264,7 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
                 {
                     using T = std::remove_cvref_t<decltype(dataType)>::Type;
                     if(isArray == AttributeIsArray::IS_ARRAY &&
-                       optional != AttributeOptionality::MR_MANDATORY)
+                       optional == AttributeOptionality::MR_OPTIONAL)
                     {
                         Optional<TransientData> data = node.AccessOptionalDataArray<T>(name);
                         if(!data.has_value()) return;
@@ -276,14 +276,14 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
                         TransientData data = node.AccessDataArray<T>(name);
                         result[i].data.Push(ToSpan<const T>(data));
                     }
-                    else if(isArray != AttributeIsArray::IS_ARRAY &&
-                            optional != AttributeOptionality::MR_MANDATORY)
+                    else if(isArray == AttributeIsArray::IS_SCALAR &&
+                            optional == AttributeOptionality::MR_OPTIONAL)
                     {
                         Optional<T> data = node.AccessOptionalData<T>(name);
                         if(!data.has_value()) return;
                         result[i].data.Push(Span<const T>(&data.value(), 1));
                     }
-                    else if(isArray != AttributeIsArray::IS_ARRAY &&
+                    else if(isArray == AttributeIsArray::IS_SCALAR &&
                             optional == AttributeOptionality::MR_MANDATORY)
                     {
                         T data = node.AccessData<T>(name);
@@ -914,7 +914,7 @@ void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
             {
                 using namespace NodeNames;
                 uint32_t medInId = node.AccessOptionalData<uint32_t>(MEDIUM_FRONT).value_or(boundaryMediumId);
-                uint32_t medOutId = node.AccessOptionalData<uint32_t>(MEDIUM_FRONT).value_or(boundaryMediumId);
+                uint32_t medOutId = node.AccessOptionalData<uint32_t>(MEDIUM_BACK).value_or(boundaryMediumId);
                 ioMediums.emplace_back(mediumMappings.at(medInId).second,
                                        mediumMappings.at(medOutId).second);
             }
@@ -1549,6 +1549,20 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
                       &AddMediumPrefix,
                       &TracerI::AttributeInfoMedium);
 
+    // And finally, materials can define in/out mediums
+    for(const auto& nodes : materialNodes)
+    for(const auto& node : nodes.second)
+    {
+        auto optMedFront = node.AccessOptionalData<uint32_t>(MEDIUM_FRONT);
+        auto optMedBack = node.AccessOptionalData<uint32_t>(MEDIUM_BACK);
+        if(optMedFront.has_value())
+            PushToTypeMapping(mediumNodes, mediumHT,
+                              optMedFront.value(), MEDIUM_LIST);
+        if(optMedBack.has_value())
+            PushToTypeMapping(mediumNodes, mediumHT,
+                              optMedBack.value(), MEDIUM_LIST);
+    }
+
     // And finally create texture mappings
     textureHTReady.wait();
     for(const auto& t : textureIds)
@@ -1784,14 +1798,14 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
 
 
 
-        // DEBUG
-        // DEBUG
-        threadPool.wait();
-        if(auto e = ConcatIfError(); e) return e;
-        return MRayError::OK;
+        //// DEBUG
+        //// DEBUG
+        //threadPool.wait();
+        //if(auto e = ConcatIfError(); e) return e;
+        //return MRayError::OK;
 
-        // DEBUG
-        // DEBUG
+        //// DEBUG
+        //// DEBUG
 
         // Does not depend on textures but may depend on later
         LoadTransforms(tracer, exceptionList);
