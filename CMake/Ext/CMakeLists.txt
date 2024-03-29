@@ -183,18 +183,18 @@ mray_build_ext_dependency_git(
 # )
 
 # Get CLI11
-# mray_build_ext_dependency_git(
-#     NAME cli11_ext
-#     URL "https://github.com/CLIUtils/CLI11.git"
-#     TAG "291c58789c031208f08f4f261a858b5b7083e8e2" # v2.3.2
-#     LICENSE_NAME "LICENSE"
-#     BUILD_ARGS
-#         -DBUILD_TESTING=OFF
-#         -DCLI11_BUILD_EXAMPLES=OFF
-#         -DCLI11_BUILD_EXAMPLES_JSON=OFF
-#         -DCLI11_BUILD_TESTS=OFF
-#         -DCLI11_SINGLE_FILE=OFF
-# )
+mray_build_ext_dependency_git(
+    NAME cli11_ext
+    URL "https://github.com/CLIUtils/CLI11.git"
+    TAG "291c58789c031208f08f4f261a858b5b7083e8e2" # v2.3.2
+    LICENSE_NAME "LICENSE"
+    BUILD_ARGS
+        -DBUILD_TESTING=OFF
+        -DCLI11_BUILD_EXAMPLES=OFF
+        -DCLI11_BUILD_EXAMPLES_JSON=OFF
+        -DCLI11_BUILD_TESTS=OFF
+        -DCLI11_SINGLE_FILE=OFF
+)
 
 # Get ImGUI
 #include(DownloadDearImGUI.cmake)
@@ -224,12 +224,3 @@ add_subdirectory(oiio)
 set(MRAY_ALL_EXT_DEP_TARGETS ${MRAY_ALL_EXT_DEP_TARGETS}
     ${MRAY_OIIO_EXT_DEP_TARGETS})
 
-# # Finally create a timestamp
-# set(MRAY_EXT_LIBS_STAMP_FILE ${MRAY_CONFIG_LIB_DIRECTORY}/lib.stamp)
-
-# add_custom_target(finalize_ext_libs ALL
-#     COMMAND ${CMAKE_COMMAND} -E touch ${MRAY_EXT_LIBS_STAMP_FILE}
-#     DEPENDS
-#         ${MRAY_ALL_EXT_DEP_TARGETS}
-#     COMMENT "Finalizing $<CONFIG> ext libraries with a ${MRAY_CONFIG_LIB_DIRECTORY}/lib.stamp"
-# )

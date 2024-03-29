@@ -299,6 +299,18 @@ constexpr const T* StaticVector<T, N>::end() const
 }
 
 template<class T, size_t N>
+constexpr const T* StaticVector<T, N>::cbegin() const
+{
+    return begin();
+}
+
+template<class T, size_t N>
+constexpr const T* StaticVector<T, N>::cend() const
+{
+    return end();
+}
+
+template<class T, size_t N>
 constexpr size_t StaticVector<T, N>::size() const
 {
     return count;

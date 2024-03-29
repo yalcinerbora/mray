@@ -181,10 +181,14 @@ class alignas(std::max(alignof(T), size_t(8))) StaticVector
     constexpr const T&      front() const;
 
     // TODO: Don't bother implementing actual iterators pointer should suffice?
+    // Tap in the backwards compatibility of C++ with C arrays
     constexpr T*            begin();
     constexpr const T*      begin() const;
     constexpr T*            end();
     constexpr const T*      end() const;
+
+    constexpr const T*      cbegin() const;
+    constexpr const T*      cend() const;
 
     constexpr size_t        size() const;
     constexpr size_t        isEmpty() const;

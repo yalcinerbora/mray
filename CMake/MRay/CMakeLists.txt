@@ -1,21 +1,30 @@
 set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/MRay)
 
-set(SRC_COMMON ${CURRENT_SOURCE_DIR}/main.cpp)
+set(SRC_SUBCOMMAND
+    ${CURRENT_SOURCE_DIR}/ConvertCommand.cpp
+    ${CURRENT_SOURCE_DIR}/ConvertCommand.h
+    ${CURRENT_SOURCE_DIR}/CommandI.h)
+
+set(SRC_COMMON
+    ${CURRENT_SOURCE_DIR}/main.cpp)
 
 source_group("" FILES ${SRC_COMMON})
-add_executable(MRay ${SRC_COMMON})
+source_group("Subcommands" FILES ${SRC_SUBCOMMAND})
+
+set(SRC_ALL
+    ${SRC_SUBCOMMAND}
+    ${SRC_COMMON})
+
+add_executable(MRay ${SRC_ALL})
 
 target_link_libraries(MRay PRIVATE
                       CoreLib
+                      cli11::cli11
                       mray::meta_compile_opts)
 
-# TODO DELETE THIS LATER
-target_link_libraries(MRay PRIVATE SceneLoaderMRay)
-
 # Not-linked but dependent targets
-# add_dependencies(MRay
-#                  TracerCUDA
-#                  VisorGL)
+add_dependencies(MRay
+                 TracerCUDA)
 
 # Debug Parameters (For my own use case)
 if(MSVC)

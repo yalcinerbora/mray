@@ -8,7 +8,8 @@ set(SRC_CONTAINERS
 set(SRC_SYSTEM
     ${CURRENT_SOURCE_DIR}/System.h
     ${CURRENT_SOURCE_DIR}/SharedLibrary.h
-    ${CURRENT_SOURCE_DIR}/SharedLibrary.cpp)
+    ${CURRENT_SOURCE_DIR}/SharedLibrary.cpp
+    ${CURRENT_SOURCE_DIR}/MRayDescriptions.h)
 
 set(SRC_INTERFACES
     ${CURRENT_SOURCE_DIR}/SceneLoaderI.h
@@ -72,17 +73,3 @@ target_link_libraries(CoreLib
                       PUBLIC
                       fmt::fmt
                       PRIVATE mray::meta_compile_opts)
-
-# set_target_properties(CoreLib PROPERTIES
-#                       POSITION_INDEPENDENT_CODE ON
-#                       CUDA_SEPARABLE_COMPILATION ON
-#                       CUDA_RESOLVE_DEVICE_SYMBOLS ON)
-
-# Copy DLLS
-# if(MSVC)
-#     add_custom_command(TARGET CoreLib POST_BUILD
-#                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-#                        "${MRAY_CONFIG_LIB_DIRECTORY}/spdlog$<$<CONFIG:Debug>:d>.dll"
-#                        "${MRAY_CONFIG_LIB_DIRECTORY}/ZLIB$<$<CONFIG:Debug>:d>1.dll"
-#                        ${MRAY_CONFIG_BIN_DIRECTORY})
-# endif()

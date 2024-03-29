@@ -1,15 +1,21 @@
 cmake_minimum_required(VERSION 3.26)
 
+# Some things that will be fed to both CMAKE and C++
+set(MRAY_PROJECT_NAME "MRay")
+set(MRAY_PROJECT_DESCRIPTION "GPU-based rendering framework / renderer.")
+set(MRAY_VERSION_MAJOR "0")
+set(MRAY_VERSION_MINOR "1")
+set(MRAY_VERSION_PATCH "0")
+
 # All CMake Related files is in the current folder
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}")
 
-# Do not use in source builds
+# Do not use in-source builds
 include(PreventInSourceBuilds)
 
 # Only Debug and Release
-set(CMAKE_CONFIGURATION_TYPES Debug;ASanR;Release CACHE STRING "Build configurations. ASanR has sanitized output")
-#set(CMAKE_DEFAULT_BUILD_TYPE Release CACHE STRING "Selected by user")
-set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type for singlue config generators")
+set(CMAKE_CONFIGURATION_TYPES Debug;SanitizeR;Release CACHE STRING "Build configurations. SanitizeR has sanitized output")
+set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type for single config generators")
 
 # Architecture
 # Use a drop-down menu for selecting Compute Capability
@@ -51,10 +57,10 @@ set(MRAY_PREDEFINED_TARGETS_FOLDER "CustomTargets")
 set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER ${MRAY_PREDEFINED_TARGETS_FOLDER})
 
 # Project Name etc..
-project(MRay
+project(${MRAY_PROJECT_NAME}
         LANGUAGES CUDA CXX
-        VERSION 0.1.0
-        DESCRIPTION "MRay: Research oriented renderer."
+        VERSION "${MRAY_VERSION_MAJOR}.${MRAY_VERSION_MINOR}.${MRAY_VERSION_PATCH}"
+        DESCRIPTION ${MRAY_PROJECT_DESCRIPTION}
 )
 
 include(Macros)
@@ -90,6 +96,25 @@ set(CMAKE_COLOR_DIAGNOSTICS ON)
 #   mray::cuda_extra_compile_opts
 include(CompilerOptions.cmake)
 
+# Generate Configuration Header
+cmake_path(GET CMAKE_CXX_COMPILER STEM MRAY_COMPILER_NAME)
+cmake_path(GET CMAKE_CUDA_COMPILER STEM MRAY_CUDA_COMPILER_NAME)
+
+# Determine gpu platform via MRAY_DEVICE_BACKEND
+if(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_CUDA")
+    set(MRAY_GPU_PLATFORM_NAME "CUDA")
+else()
+    message(FATAL_ERROR "Unknown Device backend!"
+                        "Please set MRAY_DEVICE_BACKEND to a valid backend")
+endif()
+
+configure_file(${MRAY_SOURCE_DIRECTORY}/mray_cmake.h.in
+               ${CMAKE_CURRENT_BINARY_DIR}/mray_cmake.h
+               NO_SOURCE_PERMISSIONS
+               @ONLY)
+target_include_directories(meta_compile_opts
+                           SYSTEM INTERFACE "${CMAKE_CURRENT_BINARY_DIR}")
+
 # After Everything is set
 # Include NVCC compile to ptx routine
 # Since Optix programs require precompiled *.ptx files
@@ -98,8 +123,10 @@ if(MRAY_USE_OPTIX)
 endif()
 
 # Enable LTO / Device-LTO
+# Device LTO is slow so we disabled it.
+# TODO: Enable LTO via config maybe?
+# or enable LTO only for Host side (check if this is possible)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE FASLE)
-# Device LTO is slow so we disabled it
 #set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_DEBUG FALSE)
 

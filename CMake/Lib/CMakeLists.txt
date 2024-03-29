@@ -157,6 +157,8 @@ target_compile_definitions(json INTERFACE JSON_DIAGNOSTICS=1)
 add_library(nlohmann::json ALIAS json)
 add_library(thread_pool INTERFACE)
 add_library(bs::thread_pool ALIAS thread_pool)
+add_library(cli11 INTERFACE)
+add_library(cli11::cli11 ALIAS cli11)
 
 gen_imported_target(NAME fmt::fmt STATIC DEBUG_TARGET fmt RELEASE_TARGET fmt
                     EXTRA_DEFINES FMT_USE_NONTYPE_TEMPLATE_ARGS=0)
@@ -165,8 +167,8 @@ gen_imported_target(NAME assimp::assimp SHARED DEBUG_TARGET assimpd RELEASE_TARG
 gen_imported_target(NAME gfgfileio::gfgfileio STATIC DEBUG_TARGET GFGFileIOd RELEASE_TARGET GFGFileIO)
 gen_imported_target(NAME oiio::oiio SHARED DEBUG_TARGET OpenImageIOd RELEASE_TARGET OpenImageIO)
 gen_imported_target(NAME oiio::oiio_util SHARED DEBUG_TARGET OpenImageIO_Utild RELEASE_TARGET OpenImageIO_Util)
+gen_imported_target(NAME spdlog::spdlog SHARED DEBUG_TARGET spdlogd RELEASE_TARGET spdlog)
 
-# gen_imported_target(NAME spdlog::spdlog SHARED DEBUG_TARGET spdlogd RELEASE_TARGET spdlog)
 # gen_imported_target(NAME glbinding::glbinding SHARED DEBUG_TARGET glbindingd RELEASE_TARGET glbinding
 #                     EXTRA_INCLUDES ${MRAY_LIB_INCLUDE_DIRECTORY}/glbinding/3rdparty)
 # gen_imported_target(NAME glfw3::glfw3 SHARED DEBUG_TARGET glfw3ddll RELEASE_TARGET glfw3dll)

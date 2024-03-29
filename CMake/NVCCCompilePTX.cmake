@@ -60,7 +60,7 @@ FUNCTION(NVCC_COMPILE_PTX)
         # OptiX Documentation says that -G'ed kernels may fail
         # So -lineinfo is used on both configurations
         $<$<CONFIG:Debug>:-G>
-        $<$<CONFIG:ASanR>:-lineinfo>
+        $<$<CONFIG:SanitizeR>:-lineinfo>
         # Debug related preprocessor flags
         $<$<CONFIG:Debug>:-DMRAY_DEBUG>
         $<$<CONFIG:Release>:-DNDEBUG>
