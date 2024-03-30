@@ -41,11 +41,12 @@ int main(int argc, const char* const argv[])
     {
         using namespace MRay;
         return MRAY_FORMAT("{}: {}\n"
+                           "-----\n"
                            "Version    : {}\n"
                            "Platform   : {}\n"
                            "C++        : {}\n"
                            "Device C++ : {}\n"
-                           "\n"
+                           "-----\n"
                            "{}",
                            Name, Description,
                            VersionString,

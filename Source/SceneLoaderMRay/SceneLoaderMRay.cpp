@@ -191,7 +191,7 @@ std::vector<TransientData> GenericAttributeLoad(const AttributeCountList& totalC
 std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountList& totalCounts,
                                                            const TexturedAttributeInfoList& list,
                                                            Span<const JsonNode> nodes,
-                                                           const typename SceneLoaderMRay::TextureIdMappings& texMappings)
+                                                           const typename TracerIdPack::TextureIdMappings& texMappings)
 {
     std::vector<TexturedAttributeData> result;
     result.reserve(list.size());
@@ -555,6 +555,9 @@ std::string SceneLoaderMRay::SceneRelativePathToAbsolute(std::string_view sceneR
                                                          std::string_view scenePath)
 {
     using namespace std::filesystem;
+    // Skip if path is absolute
+    if(path(sceneRelativePath).is_absolute()) return std::string(sceneRelativePath);
+    // Create an absolute path relative to the scene.json file
     path fullPath = path(scenePath) / path(sceneRelativePath);
     return absolute(fullPath).string();
 }
@@ -1922,7 +1925,6 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
         // Finally, wait all load operations to complete
         threadPool.wait();
         if(auto e = ConcatIfError(); e) return e;
-        return MRayError::OK;
 
         // Scene id -> tracer id mappings are created
         // and reside on the object's state.
@@ -1989,29 +1991,62 @@ MRayError SceneLoaderMRay::ReadStream(std::istream& sceneData)
     return MRayError::OK;
 }
 
+TracerIdPack SceneLoaderMRay::MoveIdPack(double durationMS)
+{
+    return TracerIdPack
+    {
+        .prims = std::move(primMappings.map),
+        .cams = std::move(camMappings.map),
+        .lights = std::move(lightMappings.map),
+        .transforms = std::move(transformMappings.map),
+        .mats = std::move(matMappings.map),
+        .mediums = std::move(mediumMappings.map),
+        .surfaces = std::move(mRaySurfaces),
+        .camSurfaces = std::move(mRayCamSurfaces),
+        .lightSurfaces = std::move(mRayLightSurfaces),
+
+        .loadTimeMS = durationMS
+    };
+}
+
+void SceneLoaderMRay::ClearIntermediateBuffers()
+{
+    primNodes.clear();
+    cameraNodes.clear();
+    transformNodes.clear();
+    lightNodes.clear();
+    materialNodes.clear();
+    mediumNodes.clear();
+    textureNodes.clear();
+}
+
 SceneLoaderMRay::SceneLoaderMRay(BS::thread_pool& pool)
     :threadPool(pool)
 {}
 
-Pair<MRayError, double> SceneLoaderMRay::LoadScene(TracerI& tracer,
-                                                   const std::string& filePath)
+Expected<TracerIdPack> SceneLoaderMRay::LoadScene(TracerI& tracer,
+                                                  const std::string& filePath)
 {
     Timer t; t.Start();
     MRayError e = MRayError::OK;
-    if(e = OpenFile(filePath)) return {e, -0.0};
-    if(e = LoadAll(tracer)) return {e, -0.0};
+    if(e = OpenFile(filePath)) return e;
+    if(e = LoadAll(tracer)) return e;
     t.Split();
 
-    return {MRayError::OK, t.Elapsed<Millisecond>()};
+    ClearIntermediateBuffers();
+    return MoveIdPack(t.Elapsed<Millisecond>());
 }
 
-Pair<MRayError, double> SceneLoaderMRay::LoadScene(TracerI& tracer,
-                                                   std::istream& sceneData)
+Expected<TracerIdPack> SceneLoaderMRay::LoadScene(TracerI& tracer,
+                                                  std::istream& sceneData)
 {
     Timer t; t.Start();
     MRayError e = MRayError::OK;
-    if(e = ReadStream(sceneData)) return {e, -0.0};
-    if(e = LoadAll(tracer)) return {e, -0.0};
+    if(e = ReadStream(sceneData)) return e;
+    if(e = LoadAll(tracer)) return e;
     t.Split();
-    return {MRayError::OK, t.Elapsed<Millisecond>()};
+
+    ClearIntermediateBuffers();
+    return MoveIdPack(t.Elapsed<Millisecond>());
 }
+

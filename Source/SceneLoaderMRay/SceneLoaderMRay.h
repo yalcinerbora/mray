@@ -5,10 +5,9 @@
 #include "MeshLoader/EntryPoint.h"
 #include "Core/SceneLoaderI.h"
 #include "Core/TracerI.h"
+#include "Core/Flag.h"
 
 #include "JsonNode.h"
-
-class JsonNode;
 
 class SceneLoaderMRay : public SceneLoaderI
 {
@@ -25,16 +24,14 @@ class SceneLoaderMRay : public SceneLoaderI
         void                AddException(MRayError&&);
     };
 
-    using TypeMappedNodes       = std::map<std::string, std::vector<JsonNode>>;
-    using TexMappedNodes        = std::vector<Pair<NodeTexStruct, JsonNode>>;
-
-    using PrimIdMappings        = std::map<uint32_t, Pair<PrimGroupId, PrimBatchId>>;
-    using CamIdMappings         = std::map<uint32_t, Pair<CameraGroupId, CameraId>>;
-    using LightIdMappings       = std::map<uint32_t, Pair<LightGroupId, LightId>>;
-    using TransformIdMappings   = std::map<uint32_t, Pair<TransGroupId, TransformId>>;
-    using MaterialIdMappings    = std::map<uint32_t, Pair<MatGroupId, MaterialId>>;
-    using MediumIdMappings      = std::map<uint32_t, Pair<MediumGroupId, MediumId>>;
-    using TextureIdMappings     = std::map<NodeTexStruct, TextureId>;
+    private:
+    using PrimIdMappings        = typename TracerIdPack::PrimIdMappings;
+    using CamIdMappings         = typename TracerIdPack::CamIdMappings;
+    using LightIdMappings       = typename TracerIdPack::LightIdMappings;
+    using TransformIdMappings   = typename TracerIdPack::TransformIdMappings;
+    using MaterialIdMappings    = typename TracerIdPack::MaterialIdMappings;
+    using MediumIdMappings      = typename TracerIdPack::MediumIdMappings;
+    using TextureIdMappings     = typename TracerIdPack::TextureIdMappings;
 
     template <class Map>
     struct MutexedMap
@@ -52,6 +49,8 @@ class SceneLoaderMRay : public SceneLoaderI
     BS::thread_pool&    threadPool;
 
     // Temporary Internal Data
+    using TypeMappedNodes   = std::map<std::string, std::vector<JsonNode>>;
+    using TexMappedNodes    = std::vector<Pair<NodeTexStruct, JsonNode>>;
     TypeMappedNodes     primNodes;
     TypeMappedNodes     cameraNodes;
     TypeMappedNodes     transformNodes;
@@ -107,15 +106,23 @@ class SceneLoaderMRay : public SceneLoaderI
     void        CreateLightSurfaces(TracerI&, const std::vector<LightSurfaceStruct>&);
     void        CreateCamSurfaces(TracerI&, const std::vector<CameraSurfaceStruct>&);
 
-    MRayError   LoadAll(TracerI&);
-    MRayError   OpenFile(const std::string& filePath);
-    MRayError   ReadStream(std::istream& sceneData);
+    MRayError       LoadAll(TracerI&);
+    MRayError       OpenFile(const std::string& filePath);
+    MRayError       ReadStream(std::istream& sceneData);
+
+    TracerIdPack    MoveIdPack(double durationMS);
+    void            ClearIntermediateBuffers();
 
     public:
-                SceneLoaderMRay(BS::thread_pool& pool);
+                            SceneLoaderMRay(BS::thread_pool& pool);
+                            SceneLoaderMRay(const SceneLoaderMRay&) = delete;
+    SceneLoaderMRay&        operator=(const SceneLoaderMRay&) = delete;
 
-    Pair<MRayError, double> LoadScene(TracerI& tracer,
+    // Scene Loading
+    Expected<TracerIdPack>  LoadScene(TracerI& tracer,
                                       const std::string& filePath) override;
-
-    Pair<MRayError, double> LoadScene(TracerI& tracer, std::istream& sceneData) override;
+    Expected<TracerIdPack>  LoadScene(TracerI& tracer,
+                                      std::istream& sceneData) override;
 };
+
+//

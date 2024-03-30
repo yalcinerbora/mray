@@ -53,7 +53,7 @@ TEST_F(SceneLoaderMRayTest, Empty)
     TracerMock tracer;
     std::istringstream ss{std::string(EmptyScene)};
     auto result = loader->LoadScene(tracer, ss);
-    EXPECT_TRUE(static_cast<bool>(result.first));
+    EXPECT_TRUE(result.has_error());
 }
 
 TEST_F(SceneLoaderMRayTest, MinimalValid)
@@ -61,11 +61,11 @@ TEST_F(SceneLoaderMRayTest, MinimalValid)
     TracerMock tracer;
     std::istringstream ss{std::string(MinimalValidScene)};
     auto result = loader->LoadScene(tracer, ss);
-    EXPECT_FALSE(static_cast<bool>(result.first));
+    EXPECT_FALSE(result.has_error());
 
     // Might as well print the error here
-    if(result.first)
-        MRAY_ERROR_LOG("{}", result.first.GetError());
+    if(result.has_error())
+        MRAY_ERROR_LOG("{}", result.error().GetError());
 }
 
 TEST_F(SceneLoaderMRayTest, Basic)
@@ -73,31 +73,28 @@ TEST_F(SceneLoaderMRayTest, Basic)
     TracerMock tracer;
     std::istringstream ss{std::string(BasicScene)};
     auto result = loader->LoadScene(tracer, ss);
-    EXPECT_FALSE(static_cast<bool>(result.first));
+    EXPECT_FALSE(result.has_error());
 
-    if(result.first)
-        MRAY_ERROR_LOG("{}", result.first.GetError());
+    if(result.has_error())
+        MRAY_ERROR_LOG("{}", result.error().GetError());
 }
 
 TEST_F(SceneLoaderMRayTest, Kitchen)
 {
-    //while(true)
-    for(uint32_t i = 0; i < 128; i++)
-    //for(uint32_t i = 0; i < 1; i++)
+    for(uint32_t i = 0; i < 16; i++)
     {
-        TracerMock tracer(false);
-
         if(i > 0) SetUp();
 
+        TracerMock tracer(false);
         auto result = loader->LoadScene(tracer, "Kitchen/Kitchen.json");
-        EXPECT_FALSE(static_cast<bool>(result.first));
+        EXPECT_FALSE(result.has_error());
 
-        MRAY_LOG("{} --- {}ms",
-                 result.first.GetError(),
-                 result.second);
+        if(result.has_error())
+            MRAY_LOG("Err! :: {}ms", result.error().GetError());
+        else
+            MRAY_LOG("OK! :: {}ms", result.value().loadTimeMS);
 
         TearDown();
     }
     //EXPECT_FALSE(result.first);
-
 }
