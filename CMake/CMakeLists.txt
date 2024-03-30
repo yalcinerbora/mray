@@ -144,6 +144,7 @@ add_subdirectory(TransientPool)
 add_subdirectory(SceneLoaderMRay)
 add_subdirectory(MeshLoader)
 add_subdirectory(ImageLoader)
+add_subdirectory(GFGConverter)
 
 #add_subdirectory(VisorGL)
 

@@ -4,6 +4,7 @@
 #include "Core/Error.h"
 #include "Core/Types.h"
 #include "Core/TracerI.h"
+#include "Core/SceneLoaderI.h"
 
 #include <nlohmann/json.hpp>
 #include <functional>
@@ -16,14 +17,6 @@ static constexpr uint32_t EMPTY_MEDIUM = std::numeric_limits<uint32_t>::max();
 enum class TextureChannelType
 {
     R, G, B, A
-};
-
-enum class TextureAccessLayout
-{
-    R, G, B, A,
-    RG, GB, BA,
-    RGB, GBA,
-    RGBA
 };
 
 struct TracerSceneView
@@ -57,13 +50,7 @@ struct TracerSceneView
     std::vector<Surfaces>       surfaces;
 };
 
-struct NodeTexStruct
-{
-    uint32_t            texId;
-    TextureAccessLayout channelLayout;
 
-    auto operator<=>(const NodeTexStruct& rhs) const = default;
-};
 
 struct SurfaceStruct
 {

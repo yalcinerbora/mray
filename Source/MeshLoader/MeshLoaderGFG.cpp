@@ -182,6 +182,8 @@ std::string MeshFileGFG::Name() const
     return fileName;
 }
 
+#include <gfg/GFGFileExporter.h>
+
 bool MeshFileGFG::HasAttribute(PrimitiveAttributeLogic logic) const
 {
     // By definition, GFG is indexed.
