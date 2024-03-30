@@ -62,14 +62,13 @@ int main(int argc, const char* const argv[])
         appList.emplace_back(command, command->GenApp(app));
 
     // Actual parsing
-    //CLI11_PARSE(app, argc, argv);
     try
     {
-        (app).parse((argc), (argv));                                                                                   \
+        app.parse(argc, argv);                                                                                   \
     }
     catch(const CLI::ParseError& e)
     {
-        return (app).exit(e);                                                                                          \
+        return app.exit(e);                                                                                          \
     }
 
     // Find the first parsed subcommand
