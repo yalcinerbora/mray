@@ -13,7 +13,7 @@ InitializeCommands() noexcept
 {
     static const StaticVector<CommandI*, MAX_SUBCOMMAND_COUNT> CommandList =
     {
-        ConvertCommand::Instance()
+        &ConvertCommand::Instance()
     };
     return CommandList;
 };

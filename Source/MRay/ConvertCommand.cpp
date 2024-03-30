@@ -1,4 +1,6 @@
 #include "ConvertCommand.h"
+#include "GFGConverter/GFGConverter.h"
+
 #include <CLI/CLI.hpp>
 #include <string_view>
 
@@ -12,7 +14,41 @@ namespace MRayDefs::SceneConvert
 
 MRayError ConvertCommand::Invoke()
 {
-    return MRayError("Not implemented!");
+
+    if(useGFG)
+    {
+        using namespace MRayConvert;
+        using enum ConvFlagEnum;
+        ConversionFlags flags;
+        if(compaqMesh) flags |= PACK_GFG;
+        if(convQuats) flags |= NORMAL_AS_QUATERNION;
+        if(!overwrite) flags |= FAIL_ON_OVERWRITE;
+
+        namespace fs = std::filesystem;
+        using namespace std::string_literals;
+
+        if(outFileName.empty())
+        {
+            auto inPath = fs::path(inFileName);
+            auto newName = inPath.stem().string() + "_gfg"s + inPath.extension().string();
+            inPath.replace_filename(fs::path(newName));
+            outFileName = inPath.string();
+        }
+
+        Expected<double> result = MRayConvert::ConvertMeshesToGFG(outFileName,
+                                                                  inFileName,
+                                                                  flags);
+
+        if(result.has_error())
+            return result.error();
+
+        MRAY_LOG("Conversion took {}ms.", result.value());
+        return MRayError::OK;
+    }
+    else
+    {
+        return MRayError("Not yet implemented!");
+    }
 }
 
 CLI::App* ConvertCommand::GenApp(CLI::App& mainApp)
@@ -33,24 +69,28 @@ CLI::App* ConvertCommand::GenApp(CLI::App& mainApp)
                           "Output file (If not set, input file's "
                           "path/stem will be used)."s);
 
-    // To GFG
+    converter->add_flag("--overwrite, -w"s, overwrite,
+                        "Overwrite output files."s);
+
+    // To GFG Options (TODO: remove "required" when other conversions are implemented)
     CLI::Option* gfgOpt;
     gfgOpt = converter->add_flag("--gfg, -g"s, useGFG,
                                  "Convert mesh files to GFG (GFG is a simple, binary, "
-                                 "load-optimized file type)."s);
+                                 "load-optimized file type)."s)
+        ->required();
     //
-    converter->add_flag("--compaq, -c"s, compaqMesh,
+    converter->add_flag("--pack, -p"s, compaqMesh,
                         "Creates a single GFG mesh file for entire scene."s)
         ->needs(gfgOpt);
     //
-    converter->add_flag("--smart, -s"s, removeDefs,
-                        "Only convert the used mesh files to GFG."s)
+    converter->add_flag("--quatnorm, -q"s, convQuats,
+                        "Convert normals to tangent space quaternions."s)
         ->needs(gfgOpt);
     return converter;
 }
 
-CommandI* ConvertCommand::Instance()
+CommandI& ConvertCommand::Instance()
 {
     static ConvertCommand c = {};
-    return &c;
+    return c;
 }

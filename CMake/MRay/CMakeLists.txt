@@ -19,6 +19,7 @@ add_executable(MRay ${SRC_ALL})
 
 target_link_libraries(MRay PRIVATE
                       CoreLib
+                      GFGConverter
                       cli11::cli11
                       mray::meta_compile_opts)
 

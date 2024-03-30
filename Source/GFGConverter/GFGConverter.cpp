@@ -73,9 +73,9 @@ struct VectorBackedMemory
 static_assert(MemoryC<VectorBackedMemory>, "");
 
 MRAY_GFGCONVERTER_ENTRYPOINT
-Expected<double> MRayConvert::ConvertMeshesToGFG(ConversionFlags flags,
+Expected<double> MRayConvert::ConvertMeshesToGFG(const std::string& outFileName,
                                                  const std::string& inFileName,
-                                                 const std::string& outFileName)
+                                                 ConversionFlags flags)
 {
     using enum ConvFlagEnum;
     namespace fs = std::filesystem;
