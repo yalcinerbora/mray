@@ -293,7 +293,7 @@ MRayDataTypeRT JsonSphere::AttributeLayout(PrimitiveAttributeLogic attribLogic) 
     switch(attribLogic)
     {
         case POSITION:  return MRayDataTypeRT(MRayDataType<MR_VECTOR_3>());
-        case RADIUS:    return MRayDataTypeRT(MRayDataType<MR_DEFAULT_FLT>());
+        case RADIUS:    return MRayDataTypeRT(MRayDataType<MR_FLOAT>());
         default:        throw MRayError("Unknown attribute logic!");
     }
 }

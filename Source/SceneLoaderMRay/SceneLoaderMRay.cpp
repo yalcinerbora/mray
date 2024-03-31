@@ -352,11 +352,10 @@ void LoadPrimitive(TracerI& tracer,
     // The solution here is to rely on assimp's tangent/bitangent generation capabilities
     // and use it. On the other hand, for in json triangle primitives compute it on the
     // class.
-    for(uint32_t attributeIndex = 0;
-        attributeIndex < attributeList.size();
-        attributeIndex++)
+    for(uint32_t attribIndex = 0; attribIndex < attributeList.size();
+        attribIndex++)
     {
-        const auto& attribute = attributeList[attributeIndex];
+        const auto& attribute = attributeList[attribIndex];
         PrimitiveAttributeLogic attribLogic = std::get<PrimAttributeInfo::LOGIC_INDEX>(attribute);
         AttributeOptionality optionality = std::get<PrimAttributeInfo::OPTIONALITY_INDEX>(attribute);
         MRayDataTypeRT groupsLayout = std::get<PrimAttributeInfo::LAYOUT_INDEX>(attribute);
@@ -401,17 +400,21 @@ void LoadPrimitive(TracerI& tracer,
                                                          normals[i]);
                 quats.Push(Span<const Quaternion>(&q, 1));
             }
-            tracer.PushPrimAttribute(groupId, batchId, attributeIndex, std::move(quats));
+            tracer.PushPrimAttribute(groupId, batchId, attribIndex,
+                                     std::move(quats));
         }
-        // Is this data's layout match with the primitive group
-        else if(groupsLayout.Name() != filesLayout.Name())
+        // All Good, load and send
+        else if(groupsLayout.Name() == filesLayout.Name())
         {
-            // TODO: Add CPU conversion logic here for basic conversions
-            // (Both is floating point type and conversion is *not* narrowing)
-            // For the rest the error below should be fine
+            tracer.PushPrimAttribute(groupId, batchId, attribIndex,
+                                     meshFile->GetAttribute(attribLogic));
 
+        }
+        // Data's layout does not match with the primitive group
+        else
+        {
             // We require exact match currently
-            throw MRayError("Mesh File{:s}:[{:d}]'s data layout of \"{}\""
+            throw MRayError("Mesh File {:s}:[{:d}]'s data layout of \"{}\" "
                             "(has type {:s}) does not match the {}'s data layout "
                             "(which is {:s})",
                             meshFile->Name(), meshInternalIndex,
@@ -419,12 +422,6 @@ void LoadPrimitive(TracerI& tracer,
                             MRayDataTypeStringifier::ToString(filesLayout.Name()),
                             tracer.TypeName(groupId),
                             MRayDataTypeStringifier::ToString(groupsLayout.Name()));
-        }
-        // All Good, load and send
-        else
-        {
-            tracer.PushPrimAttribute(groupId, batchId, attributeIndex,
-                                     meshFile->GetAttribute(attribLogic));
         }
     }
 }
@@ -559,7 +556,7 @@ std::string SceneLoaderMRay::SceneRelativePathToAbsolute(std::string_view sceneR
     if(path(sceneRelativePath).is_absolute()) return std::string(sceneRelativePath);
     // Create an absolute path relative to the scene.json file
     path fullPath = path(scenePath) / path(sceneRelativePath);
-    return absolute(fullPath).string();
+    return absolute(fullPath).generic_string();
 }
 
 LightSurfaceStruct SceneLoaderMRay::LoadBoundary(const nlohmann::json& n)

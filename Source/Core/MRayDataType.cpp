@@ -46,14 +46,6 @@ Pair<size_t, size_t> FindSizeAndAlignment(MRayDataEnum e)
         case MR_VECTOR_4UL:   return SA.operator()<MR_VECTOR_4L>();
 
         case MR_FLOAT:        return SA.operator()<MR_FLOAT>();
-        case MR_VECTOR_2F:    return SA.operator()<MR_VECTOR_2F>();
-        case MR_VECTOR_3F:    return SA.operator()<MR_VECTOR_3F>();
-        case MR_VECTOR_4F:    return SA.operator()<MR_VECTOR_4F>();
-        case MR_DOUBLE:       return SA.operator()<MR_DOUBLE>();
-        case MR_VECTOR_2D:    return SA.operator()<MR_VECTOR_2D>();
-        case MR_VECTOR_3D:    return SA.operator()<MR_VECTOR_3D>();
-        case MR_VECTOR_4D:    return SA.operator()<MR_VECTOR_4D>();
-        case MR_DEFAULT_FLT:  return SA.operator()<MR_DEFAULT_FLT>();
         case MR_VECTOR_2:     return SA.operator()<MR_VECTOR_2>();
         case MR_VECTOR_3:     return SA.operator()<MR_VECTOR_3>();
         case MR_VECTOR_4:     return SA.operator()<MR_VECTOR_4>();
@@ -61,7 +53,7 @@ Pair<size_t, size_t> FindSizeAndAlignment(MRayDataEnum e)
         case MR_QUATERNION:   return SA.operator()<MR_QUATERNION>();
         case MR_MATRIX_4x4:   return SA.operator()<MR_MATRIX_4x4>();
         case MR_MATRIX_3x3:   return SA.operator()<MR_MATRIX_3x3>();
-        case MR_AABB3_ENUM:   return SA.operator()<MR_AABB3_ENUM>();
+        case MR_AABB3:        return SA.operator()<MR_AABB3>();
         case MR_RAY:          return SA.operator()<MR_RAY>();
         case MR_UNORM_4x8:    return SA.operator()<MR_UNORM_4x8>();
         case MR_UNORM_2x16:   return SA.operator()<MR_UNORM_2x16>();

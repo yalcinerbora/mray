@@ -369,11 +369,11 @@ inline TracerMock::TracerMock(bool pl)
         {
             MatAttributeInfo("albedo", MRayDataType<MR_VECTOR_3>(),
                              IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
-            MatAttributeInfo("metallic", MRayDataType<MR_DEFAULT_FLT>(),
+            MatAttributeInfo("metallic", MRayDataType<MR_FLOAT>(),
                              IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
-            MatAttributeInfo("specular", MRayDataType<MR_DEFAULT_FLT>(),
+            MatAttributeInfo("specular", MRayDataType<MR_FLOAT>(),
                              IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
-            MatAttributeInfo("roughness", MRayDataType<MR_DEFAULT_FLT>(),
+            MatAttributeInfo("roughness", MRayDataType<MR_FLOAT>(),
                              IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
             MatAttributeInfo("normalMap", MRayDataType<MR_VECTOR_3>(),
                              IS_SCALAR, MR_OPTIONAL, MR_TEXTURE_ONLY)
@@ -440,7 +440,7 @@ inline TracerMock::TracerMock(bool pl)
     {
         .attribInfo = CamAttributeInfoList
         {
-            CamAttributeInfo("fov", MRayDataType<MR_DEFAULT_FLT>(), IS_SCALAR, MR_MANDATORY),
+            CamAttributeInfo("fov", MRayDataType<MR_FLOAT>(), IS_SCALAR, MR_MANDATORY),
             CamAttributeInfo("isFovX", MRayDataType<MR_BOOL>(), IS_SCALAR, MR_MANDATORY),
             CamAttributeInfo("planes", MRayDataType<MR_VECTOR_2>(), IS_SCALAR, MR_MANDATORY),
             CamAttributeInfo("gaze", MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY),
@@ -489,7 +489,7 @@ inline TracerMock::TracerMock(bool pl)
         {
             MediumAttributeInfo("absorbtion", MRayDataType<MR_VECTOR_3>(),
                                 IS_SCALAR, MR_MANDATORY, MR_CONSTANT_ONLY),
-            MediumAttributeInfo("ior", MRayDataType<MR_DEFAULT_FLT>(),
+            MediumAttributeInfo("ior", MRayDataType<MR_FLOAT>(),
                                 IS_SCALAR, MR_MANDATORY, MR_CONSTANT_ONLY)
         },
         .name = "(Md)Homogeneous"

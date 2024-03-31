@@ -81,6 +81,7 @@ TEST_F(SceneLoaderMRayTest, Basic)
 
 TEST_F(SceneLoaderMRayTest, Kitchen)
 {
+    double all = 0.0;
     for(uint32_t i = 0; i < 16; i++)
     {
         if(i > 0) SetUp();
@@ -92,9 +93,36 @@ TEST_F(SceneLoaderMRayTest, Kitchen)
         if(result.has_error())
             MRAY_LOG("Err! :: {}ms", result.error().GetError());
         else
+        {
             MRAY_LOG("OK! :: {}ms", result.value().loadTimeMS);
-
+            all += result.value().loadTimeMS;
+        }
         TearDown();
     }
-    //EXPECT_FALSE(result.first);
+
+    MRAY_LOG("Average: {}ms", all / 512.0);
+}
+
+TEST_F(SceneLoaderMRayTest, KitchenGFG)
+{
+    double all = 0.0;
+    for(uint32_t i = 0; i < 16; i++)
+    {
+        if(i > 0) SetUp();
+
+        TracerMock tracer(false);
+        auto result = loader->LoadScene(tracer, "Kitchen/KitchenGFG.json");
+        EXPECT_FALSE(result.has_error());
+
+        if(result.has_error())
+            MRAY_LOG("Err! :: {}ms", result.error().GetError());
+        else
+        {
+            MRAY_LOG("OK! :: {}ms", result.value().loadTimeMS);
+            all += result.value().loadTimeMS;
+        }
+        TearDown();
+    }
+
+    MRAY_LOG("Average: {}ms", all / 512.0);
 }

@@ -22,18 +22,17 @@ Optional<GFGVertexComponent> MeshFileGFG::FindComponent(PrimitiveAttributeLogic 
 
 MRayDataTypeRT MeshFileGFG::GFGDataTypeToMRayDataType(GFGDataType t)
 {
+    static_assert(std::is_same_v<Float, float>,
+                  "Currently \"MeshLoaderGFG\" do not support double "
+                  "precision mode change this later.");
+
     using enum MRayDataEnum;
     switch(t)
     {
         case GFGDataType::FLOAT_1:  return MRayDataTypeRT(MRayDataType<MR_FLOAT>{});
-        case GFGDataType::FLOAT_2:  return MRayDataTypeRT(MRayDataType<MR_VECTOR_2F>{});
-        case GFGDataType::FLOAT_3:  return MRayDataTypeRT(MRayDataType<MR_VECTOR_3F>{});
-        case GFGDataType::FLOAT_4:  return MRayDataTypeRT(MRayDataType<MR_VECTOR_4F>{});
-
-        case GFGDataType::DOUBLE_1: return MRayDataTypeRT(MRayDataType<MR_DOUBLE>{});
-        case GFGDataType::DOUBLE_2: return MRayDataTypeRT(MRayDataType<MR_VECTOR_2D>{});
-        case GFGDataType::DOUBLE_3: return MRayDataTypeRT(MRayDataType<MR_VECTOR_3D>{});
-        case GFGDataType::DOUBLE_4: return MRayDataTypeRT(MRayDataType<MR_VECTOR_4D>{});
+        case GFGDataType::FLOAT_2:  return MRayDataTypeRT(MRayDataType<MR_VECTOR_2>{});
+        case GFGDataType::FLOAT_3:  return MRayDataTypeRT(MRayDataType<MR_VECTOR_3>{});
+        case GFGDataType::FLOAT_4:  return MRayDataTypeRT(MRayDataType<MR_VECTOR_4>{});
 
         case GFGDataType::INT8_1:   return MRayDataTypeRT(MRayDataType<MR_INT8>{});
         case GFGDataType::INT8_2:   return MRayDataTypeRT(MRayDataType<MR_VECTOR_2C>{});
@@ -81,6 +80,8 @@ MRayDataTypeRT MeshFileGFG::GFGDataTypeToMRayDataType(GFGDataType t)
         case GFGDataType::NORM16_2: return MRayDataTypeRT(MRayDataType<MR_SNORM_2x16>{});
         case GFGDataType::UNORM16_2:return MRayDataTypeRT(MRayDataType<MR_UNORM_2x16>{});
 
+        case GFGDataType::QUATERNION: return MRayDataTypeRT(MRayDataType<MR_QUATERNION>{});
+
         // These are not supported
         // TODO: Change this
         case GFGDataType::NORM8_1:
@@ -121,6 +122,10 @@ MRayDataTypeRT MeshFileGFG::GFGDataTypeToMRayDataType(GFGDataType t)
         case GFGDataType::UINT8_4_4:
         case GFGDataType::UINT16_2_4:
         case GFGDataType::UINT_2_10_10_10:
+        case GFGDataType::DOUBLE_1:
+        case GFGDataType::DOUBLE_2:
+        case GFGDataType::DOUBLE_3:
+        case GFGDataType::DOUBLE_4:
         case GFGDataType::END:
         default: throw MRayError("GFG: Unsupported data type");
     }
@@ -128,7 +133,7 @@ MRayDataTypeRT MeshFileGFG::GFGDataTypeToMRayDataType(GFGDataType t)
 
 MeshFileGFG::MeshFileGFG(const std::string& filePath,
                          uint32_t internalIndex)
-    : file(filePath)
+    : file(filePath, std::ofstream::binary)
     , reader(file)
     , loader(&reader)
     , fileName(std::filesystem::path(filePath).filename().string())
@@ -202,10 +207,10 @@ TransientData MeshFileGFG::GetAttribute(PrimitiveAttributeLogic logic) const
         using enum MRayDataEnum;
         switch(m.headerCore.indexSize)
         {
-            case 1: dataType = MRayDataTypeRT(MRayDataType<MR_VECTOR_3UC>{});
-            case 2: dataType = MRayDataTypeRT(MRayDataType<MR_VECTOR_3US>{});
-            case 4: dataType = MRayDataTypeRT(MRayDataType<MR_VECTOR_3UI>{});
-            case 8: dataType = MRayDataTypeRT(MRayDataType<MR_VECTOR_3UL>{});
+            case 1: dataType = MRayDataTypeRT(MRayDataType<MR_VECTOR_3UC>{}); break;
+            case 2: dataType = MRayDataTypeRT(MRayDataType<MR_VECTOR_3US>{}); break;
+            case 4: dataType = MRayDataTypeRT(MRayDataType<MR_VECTOR_3UI>{}); break;
+            case 8: dataType = MRayDataTypeRT(MRayDataType<MR_VECTOR_3UL>{}); break;
             default: throw MRayError("GFG: Unkown index layout \"{}\"", Name());
         }
         return std::visit([&](auto&& v) -> TransientData
@@ -243,6 +248,7 @@ TransientData MeshFileGFG::GetAttribute(PrimitiveAttributeLogic logic) const
             // TODO: Change this later
             loader.MeshVertexComponentDataGroup(reinterpret_cast<uint8_t*>(span.data()),
                                                 innerIndex, comp.logic);
+
             return std::move(result);
         }, type);
     }

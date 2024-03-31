@@ -70,6 +70,10 @@ std::string MeshFileAssimp::Name() const
 
 TransientData MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) const
 {
+    static_assert(std::is_same_v<Float, float>,
+                  "Currently \"MeshLoaderAssimp\" do not support double "
+                  "precision mode change this later.");
+
     auto PushVertexAttribute = [&]<class T>() -> TransientData
     {
         const auto& mesh = scene->mMeshes[innerIndex];
@@ -106,6 +110,12 @@ TransientData MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) 
             }
             default: return TransientData(std::in_place_type_t<Byte>{}, 0);
         }
+
+        if constexpr(std::is_same_v<Float, double>)
+        {
+
+        }
+
         input.Push(Span<const T>(attributePtr, localCount));
         return std::move(input);
     };

@@ -42,7 +42,7 @@ MRayError ConvertCommand::Invoke()
         if(result.has_error())
             return result.error();
 
-        MRAY_LOG("Conversion took {}ms.", result.value());
+        MRAY_LOG("Conversion took {}s.", result.value());
         return MRayError::OK;
     }
     else

@@ -136,20 +136,10 @@ enum class MRayDataEnum : uint16_t
     MR_VECTOR_3UL,
     MR_VECTOR_4UL,
 
-    // TODO: Add half here (find a good lib)
-    MR_FLOAT,
-    MR_VECTOR_2F,
-    MR_VECTOR_3F,
-    MR_VECTOR_4F,
-
-    MR_DOUBLE,
-    MR_VECTOR_2D,
-    MR_VECTOR_3D,
-    MR_VECTOR_4D,
-
     // Default floating point related types
     // of the system
-    MR_DEFAULT_FLT,
+    // TODO: Add other type of floats as well
+    MR_FLOAT,
     MR_VECTOR_2,
     MR_VECTOR_3,
     MR_VECTOR_4,
@@ -157,7 +147,7 @@ enum class MRayDataEnum : uint16_t
     MR_QUATERNION,
     MR_MATRIX_4x4,
     MR_MATRIX_3x3,
-    MR_AABB3_ENUM, // Clashes with the typename
+    MR_AABB3,
     MR_RAY,
 
     // Normalized Types
@@ -285,14 +275,6 @@ struct MRayDataTypeStringifier
         "VECTOR_3UL",
         "VECTOR_4UL",
         "FLOAT",
-        "VECTOR_2F",
-        "VECTOR_3F",
-        "VECTOR_4F",
-        "DOUBLE",
-        "VECTOR_2D",
-        "VECTOR_3D",
-        "VECTOR_4D",
-        "DEFAULT_FLT",
         "VECTOR_2",
         "VECTOR_3",
         "VECTOR_4",

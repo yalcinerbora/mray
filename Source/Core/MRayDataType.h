@@ -83,16 +83,6 @@ namespace MRayDataDetail
         ValKeyTypePair<MRayDataEnum::MR_VECTOR_4UL,   Vector4ul>{},
 
         ValKeyTypePair<MRayDataEnum::MR_FLOAT,        float>{},
-        ValKeyTypePair<MRayDataEnum::MR_VECTOR_2F,    Vector2f>{},
-        ValKeyTypePair<MRayDataEnum::MR_VECTOR_3F,    Vector3f>{},
-        ValKeyTypePair<MRayDataEnum::MR_VECTOR_4F,    Vector4f>{},
-
-        ValKeyTypePair<MRayDataEnum::MR_DOUBLE,       double>{},
-        ValKeyTypePair<MRayDataEnum::MR_VECTOR_2D,    Vector2d>{},
-        ValKeyTypePair<MRayDataEnum::MR_VECTOR_3D,    Vector3d>{},
-        ValKeyTypePair<MRayDataEnum::MR_VECTOR_4D,    Vector4d>{},
-
-        ValKeyTypePair<MRayDataEnum::MR_DEFAULT_FLT,  Float>{},
         ValKeyTypePair<MRayDataEnum::MR_VECTOR_2,     Vector2>{},
         ValKeyTypePair<MRayDataEnum::MR_VECTOR_3,     Vector3>{},
         ValKeyTypePair<MRayDataEnum::MR_VECTOR_4,     Vector4>{},
@@ -100,7 +90,7 @@ namespace MRayDataDetail
         ValKeyTypePair<MRayDataEnum::MR_QUATERNION,   Quaternion>{},
         ValKeyTypePair<MRayDataEnum::MR_MATRIX_4x4,   Matrix4x4>{},
         ValKeyTypePair<MRayDataEnum::MR_MATRIX_3x3,   Matrix2x2>{},
-        ValKeyTypePair<MRayDataEnum::MR_AABB3_ENUM,   AABB3>{},
+        ValKeyTypePair<MRayDataEnum::MR_AABB3,        AABB3>{},
         ValKeyTypePair<MRayDataEnum::MR_RAY,          Ray>{},
 
         ValKeyTypePair<MRayDataEnum::MR_UNORM_4x8,    UNorm4x8>{},
@@ -262,16 +252,6 @@ using MRayDataTypeBase = Variant
     MRayDataType<MRayDataEnum::MR_VECTOR_4UL>,
 
     MRayDataType<MRayDataEnum::MR_FLOAT>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_2F>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_3F>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_4F>,
-
-    MRayDataType<MRayDataEnum::MR_DOUBLE>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_2D>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_3D>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_4D>,
-
-    MRayDataType<MRayDataEnum::MR_DEFAULT_FLT>,
     MRayDataType<MRayDataEnum::MR_VECTOR_2>,
     MRayDataType<MRayDataEnum::MR_VECTOR_3>,
     MRayDataType<MRayDataEnum::MR_VECTOR_4>,
@@ -279,7 +259,7 @@ using MRayDataTypeBase = Variant
     MRayDataType<MRayDataEnum::MR_QUATERNION>,
     MRayDataType<MRayDataEnum::MR_MATRIX_4x4>,
     MRayDataType<MRayDataEnum::MR_MATRIX_3x3>,
-    MRayDataType<MRayDataEnum::MR_AABB3_ENUM>,
+    MRayDataType<MRayDataEnum::MR_AABB3>,
     MRayDataType<MRayDataEnum::MR_RAY>,
 
     MRayDataType<MRayDataEnum::MR_UNORM_4x8>,
