@@ -251,7 +251,7 @@ GenericGroupT<C, ID, AI>::Reserve(const std::vector<AttributeCountList>& countAr
     if(isCommitted)
     {
         throw MRayError("{:s} is in committed state, "
-                        " you change cannot change reservations!",
+                        " you cannot change reservations!",
                         C::TypeName());
     }
     // Lets not use zero

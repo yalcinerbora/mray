@@ -77,7 +77,7 @@ concept MaterialGroupC = requires()
 };
 
 
-using GenericTextureView = Variant
+using GenericTextureView2D = Variant
 <
     TextureView<2, Float>,
     TextureView<2, Vector2>,
@@ -86,7 +86,16 @@ using GenericTextureView = Variant
     TextureView<2, Spectrum>
 >;
 
-using MaterialTextureMap = std::map<TextureId, GenericTextureView>;
+using GenericTextureView3D = Variant
+<
+    TextureView<3, Float>,
+    TextureView<3, Vector2>,
+    TextureView<3, Vector3>,
+    TextureView<3, Vector4>,
+    TextureView<3, Spectrum>
+>;
+
+using MaterialTexture2DMap = std::map<TextureId, GenericTextureView2D>;
 
 template<class Child>
 class GenericGroupMaterial : public GenericGroupT<Child, MaterialKey, MatAttributeInfo>
@@ -97,6 +106,8 @@ class GenericGroupMaterial : public GenericGroupT<Child, MaterialKey, MatAttribu
 
     protected:
     const MaterialTextureMap&   globalTextureViews;
+
+    virtual void    HandleMediumPairs(const std::vector<Pair<MediumKey, MediumKey>>&) = 0;
 
     template<class T>
     void            GenericPushTex2DAttribute(Span<ParamVaryingData<2, T>>,
@@ -246,4 +257,16 @@ GenericGroupMaterial<C>::Reserve(const std::vector<AttributeCountList>&)
 {
     throw MRayError("{}: Materials cannot be reserved via this function!",
                     C::TypeName());
+}
+
+template<class C>
+typename GenericGroupMaterial<C>::IdList
+GenericGroupMaterial<C>::Reserve(const std::vector<AttributeCountList>& countArrayList,
+                                 const std::vector<Pair<MediumKey, MediumKey>>& mediumPairs)
+{
+    // We blocked the virutal chain, but we should be able to use it here
+    // We will do the same here anyways migh as well use it.
+    auto result = Parent:::Reserve(countArrayList);
+    HandleMediumPairs(mediumPairs);
+    return result;
 }
