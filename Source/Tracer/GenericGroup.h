@@ -15,35 +15,22 @@
 #include "Device/GPUSystem.h"
 #include "TracerTypes.h"
 
-// Some common types
-// Item and attribute is seperated to support primitives
-// Each primitive in a batch may utilize the same attribute so
-// "itemCount >= attributeCount"
-// For materials for example, it is exactly "itemCount == attributeCount"
-template <std::unsigned_integral T>
-struct ItemRangeT { Vector<2, T> itemRange; Vector<2, T> attributeRange; };
 
-template <std::unsigned_integral T>
-struct ItemCountT { T itemCount; T attributeCount; };
-
-template <std::unsigned_integral T>
-using ItemRangeMapT = std::map<T, ItemRangeT<T>>;
-
-template <std::unsigned_integral T>
-using ItemCountMapT = std::map<T, ItemCountT<T>>;
+using AttributeRanges = StaticVector<Vector<2, size_t>,
+                                     TracerConstants::MaxAttributePerGroup>;
 
 template <class GenericGroupType>
 concept GenericGroupC = requires(GenericGroupType gg,
                                  TransientData input,
-                                 typename GenericGroupType::IdType id,
+                                 typename GenericGroupType::Id id,
                                  const GPUQueue& q)
 {
-    typename GenericGroupType::IdType;
-    typename GenericGroupType::IdInteger;
+    typename GenericGroupType::Id;
+    typename GenericGroupType::IdInt;
     typename GenericGroupType::IdList;
     typename GenericGroupType::AttribInfoList;
 
-    {gg.Reserve(std::vector<ItemCountT<typename GenericGroupType::IdInteger>>{})
+    {gg.Reserve(std::vector<AttributeCountList>{})
     } -> std::same_as<typename GenericGroupType::IdList>;
     {gg.CommitReservations()} -> std::same_as<void>;
     {gg.IsInCommitState()} -> std::same_as<bool>;
@@ -51,10 +38,9 @@ concept GenericGroupC = requires(GenericGroupType gg,
     } -> std::same_as<typename GenericGroupType::AttribInfoList>;
     {gg.PushAttribute(id, uint32_t{}, std::move(input), q)
     } -> std::same_as<void>;
-    {gg.PushAttribute(id, Vector2ui{}, uint32_t{}, std::move(input), q)
+    {gg.PushAttribute(id, uint32_t{}, Vector2ui{}, std::move(input), q)
     } ->std::same_as<void>;
-    {gg.PushAttribute(Vector<2, typename GenericGroupType::IdInteger>{},
-                      uint32_t{}, std::move(input), q)
+    {gg.PushAttribute(id, id, uint32_t{}, std::move(input), q)
     } ->std::same_as<void>;
     {gg.GPUMemoryUsage()} -> std::same_as<size_t>;
 
@@ -62,31 +48,30 @@ concept GenericGroupC = requires(GenericGroupType gg,
     {GenericGroupType::TypeName()} -> std::same_as<std::string_view>;
 };
 
-template <class IdTypeT, class AttribInfo>
+template <class IdTypeT, class AttribInfoT>
 class GenericGroupI
 {
     public:
-    using IdType            = IdTypeT;
-    using IdInteger         = typename IdType::Type;
-    using IdList            = std::vector<IdType>;
+    using Id                = IdTypeT;
+    using IdInt             = typename Id::Type;
+    using IdList            = std::vector<Id>;
+    using AttribInfo        = AttribInfoT;
     using AttribInfoList    = StaticVector<AttribInfo, TracerConstants::MaxAttributePerGroup>;
 
     public:
     virtual                 ~GenericGroupI() = default;
     //
-    virtual IdList          Reserve(const std::vector<ItemCountT<IdInteger>>&) = 0;
+    virtual IdList          Reserve(const std::vector<AttributeCountList>&) = 0;
     virtual void            CommitReservations() = 0;
     virtual bool            IsInCommitState() const = 0;
-    virtual void            PushAttribute(IdType id,
-                                          uint32_t attributeIndex,
+    virtual void            PushAttribute(Id id, uint32_t attributeIndex,
                                           TransientData data,
                                           const GPUQueue& queue) = 0;
-    virtual void            PushAttribute(IdType id,
+    virtual void            PushAttribute(Id id, uint32_t attributeIndex,
                                           const Vector2ui& subRange,
-                                          uint32_t attributeIndex,
                                           TransientData data,
                                           const GPUQueue& queue) = 0;
-    virtual void            PushAttribute(const Vector<2, IdInteger>& idRange,
+    virtual void            PushAttribute(Id idStart, Id idEnd,
                                           uint32_t attributeIndex,
                                           TransientData data,
                                           const GPUQueue& queue) = 0;
@@ -96,21 +81,22 @@ class GenericGroupI
 };
 
 // Implementation of the common parts
-template<class Child, class IdType, class AttribInfo>
-class GenericGroupT : public GenericGroupI<IdType, AttribInfo>
+template<class Child, class IdTypeT, class AttribInfoT>
+class GenericGroupT : public GenericGroupI<IdTypeT, AttribInfoT>
 {
     static constexpr size_t MapReserveSize = 512;
 
     public:
-    using InterfaceType = GenericGroupI<IdType, AttribInfo>;
-    using BaseType      = GenericGroupT<Child, IdType, AttribInfo>;
+    using InterfaceType = GenericGroupI<IdTypeT, AttribInfoT>;
+    using BaseType      = GenericGroupT<Child, IdTypeT, AttribInfoT>;
+    using typename InterfaceType::Id;
+    using typename InterfaceType::IdInt;
     using typename InterfaceType::IdList;
+    using typename InterfaceType::AttribInfo;
     using typename InterfaceType::AttribInfoList;
-    using typename InterfaceType::IdInteger;
-    using ItemRangeMap  = ItemRangeMapT<IdInteger>;
-    using ItemCountMap  = ItemCountMapT<IdInteger>;
-    using ItemRange     = ItemRangeT<IdInteger>;
-    using ItemCount     = ItemCountT<IdInteger>;
+
+    using ItemRangeMap  = std::map<IdInt, AttributeRanges>;
+    using ItemCountMap  = std::map<IdInt, AttributeCountList>;
 
     protected:
     ItemRangeMap        itemRanges;
@@ -118,47 +104,47 @@ class GenericGroupT : public GenericGroupI<IdType, AttribInfo>
 
     const GPUSystem&    gpuSystem;
     bool                isCommitted;
-    IdInteger           groupId;
+    IdInt               groupId;
     DeviceMemory        deviceMem;
 
     template <class... Args>
-    Tuple<Span<Args>...>        GenericCommit(std::array<bool, sizeof...(Args)> isPerItemList);
+    Tuple<Span<Args>...>        GenericCommit(std::array<size_t, sizeof...(Args)> countLookup);
 
     template <class T>
-    void                        GenericPushData(const Vector<2, IdInteger>& idRange,
-                                                const Span<T>& copyRegion,
+    void                        GenericPushData(const Span<T>& dAttributeRegion,
+                                                //
+                                                IdInt id, uint32_t attribIndex,
                                                 TransientData data,
-                                                bool isContiguous,
-                                                bool isPerItem,
-                                                const GPUQueue& queue) const;
+                                                const GPUQueue& deviceQueue) const;
     template <class T>
-    void                        GenericPushData(IdType id,
-                                                const Span<T>& copyRegion,
+    void                        GenericPushData(const Span<T>& dAttributeRegion,
+                                                //
+                                                Vector<2, IdInt> idRange,
+                                                uint32_t attribIndex,
                                                 TransientData data,
-                                                bool isPerItem,
-                                                const GPUQueue& queue) const;
+                                                const GPUQueue& deviceQueue) const;
     template <class T>
-    void                        GenericPushData(IdType id,
+    void                        GenericPushData(const Span<T>& dAttributeRegion,
+                                                //
+                                                IdInt id, uint32_t attribIndex,
                                                 const Vector2ui& subRange,
-                                                const Span<T>& copyRegion,
                                                 TransientData data,
-                                                bool isPerItem,
-                                                const GPUQueue& queue) const;
+                                                const GPUQueue& deviceQueue) const;
 
     public:
                                 GenericGroupT(uint32_t groupId, const GPUSystem&,
                                               size_t allocationGranularity = 2_MiB,
-                                              size_t initialReservartionSize = 32_MiB);
-    IdList                      Reserve(const std::vector<ItemCount>&) override;
+                                              size_t initialReservartionSize = 4_MiB);
+    IdList                      Reserve(const std::vector<AttributeCountList>&) override;
     virtual bool                IsInCommitState() const override;
     virtual size_t              GPUMemoryUsage() const override;
 };
 
 template<class C, class ID, class AI>
 template <class... Args>
-Tuple<Span<Args>...> GenericGroupT<C, ID, AI>::GenericCommit(std::array<bool, sizeof...(Args)> isPerItemList)
+Tuple<Span<Args>...> GenericGroupT<C, ID, AI>::GenericCommit(std::array<size_t, sizeof...(Args)> countLookup)
 {
-    assert(itemRanges.empty());
+    constexpr size_t TypeCount = sizeof...(Args);
     if(isCommitted)
     {
         MRAY_WARNING_LOG("{:s} is in committed state, "
@@ -166,114 +152,84 @@ Tuple<Span<Args>...> GenericGroupT<C, ID, AI>::GenericCommit(std::array<bool, si
         return Tuple<Span<Args>...>{};
     }
     // Cacluate offsets
-    Vector<2, IdInteger> offsets = Vector<2, IdInteger>::Zero();
+    std::array<size_t, TypeCount> offsets = {0ull};
     for(const auto& c : itemCounts)
     {
-        ItemRange range
+        const auto& counts = c.second;
+        AttributeRanges range;
+        for(size_t i = 0; i < TypeCount; i++)
         {
-            .itemRange = Vector<2,IdInteger>(offsets[0], offsets[0] + c.second.itemCount),
-            .attributeRange = Vector<2,IdInteger>(offsets[1], offsets[1] + c.second.attributeCount)
-        };
+            size_t count = counts[countLookup[i]];
+            range.emplace_back(offsets[i], offsets[i] + count);
+            offsets[i] += count;
+        }
+
         [[maybe_unused]]
         auto r = itemRanges.emplace(c.first, range);
         assert(r.second);
-
-        offsets = Vector<2, IdInteger>(range.itemRange[1], range.attributeRange[1]);
     }
     // Rename for clarity
-    Vector<2, IdInteger> totalSize = offsets;
-
-    // Generate offsets etc
-    constexpr size_t TotalElements = sizeof...(Args);
-    std::array<size_t, TotalElements> sizes;
-    for(size_t i = 0; i < TotalElements; i++)
-    {
-        bool isPerItem = isPerItemList[i];
-        sizes[i] = (isPerItem) ? totalSize[0] : totalSize[1];
-    }
+    const auto& totalSize = offsets;
 
     using namespace MemAlloc;
     Tuple<Span<Args>...> result;
-    result = AllocateMultiData<DeviceMemory, Args...>(deviceMem, sizes);
+    result = AllocateMultiData<DeviceMemory, Args...>(deviceMem, totalSize);
     isCommitted = true;
     return result;
 }
 
-
 template<class C, class ID, class AI>
 template <class T>
-void GenericGroupT<C, ID, AI>::GenericPushData(const Vector<2, IdInteger>& idRange,
-                                               const Span<T>& copyRegion,
+void GenericGroupT<C, ID, AI>::GenericPushData(const Span<T>& dAttributeRegion,
+                                               //
+                                               IdInt id, uint32_t attribIndex,
                                                TransientData data,
-                                               bool isContiguous,
-                                               bool isPerItem,
                                                const GPUQueue& deviceQueue) const
 {
-    if(isContiguous)
-    {
-        size_t count = idRange[1] - idRange[0];
-        Span<T> dSubBatch = copyRegion.subspan(idRange[0], count);
-        deviceQueue.MemcpyAsync(dSubBatch, ToSpan<const T>(data));
-        deviceQueue.IssueBufferForDestruction(std::move(data));
-    }
-    else
-    {
-        for(IdInteger i = idRange[0]; i < idRange[1]; i++)
-        {
-            auto loc = itemRanges.find(i);
-            if(loc == itemRanges.end())
-            {
-                throw MRayError("{:s} id is not found!", C::TypeName());
-            }
-            Vector<2, IdInteger> r = (isPerItem)
-                                        ? loc->second.itemRange
-                                        : loc->second.attributeRange;
-            size_t count = r[1] - r[0];
-            Span<T> dSubBatch = copyRegion.subspan(r[0], count);
-            deviceQueue.MemcpyAsync(dSubBatch, ToSpan<const T>(data));
-        }
-        // Finally issue the buffer for destruction
-        deviceQueue.IssueBufferForDestruction(std::move(data));
-    }
-}
+    auto range = itemRanges.at(id)[attribIndex];
+    size_t itemCount = range[1] - range[0];
+    assert(data.Size<T>() == itemCount);
 
-template<class C, class ID, class AI>
-template <class T>
-void GenericGroupT<C, ID, AI>::GenericPushData(ID id,
-                                               const Span<T>& copyRegion,
-                                               TransientData data,
-                                               bool isPerItem,
-                                               const GPUQueue& deviceQueue) const
-{
-    const auto it = itemRanges.find(id);
-    Vector2ui attribRange = (isPerItem)
-                                ? it->second.itemRange
-                                : it->second.attributeRange;
-    size_t count = attribRange[1] - attribRange[0];
-    Span<T> dSubBatch = copyRegion.subspan(attribRange[0], count);
+    Span<T> dSubBatch = dAttributeRegion.subspan(range[0], itemCount);
     deviceQueue.MemcpyAsync(dSubBatch, ToSpan<const T>(data));
     deviceQueue.IssueBufferForDestruction(std::move(data));
 }
 
 template<class C, class ID, class AI>
 template <class T>
-void GenericGroupT<C, ID, AI>::GenericPushData(ID id,
-                                               const Vector2ui& subRange,
-                                               const Span<T>& copyRegion,
+void GenericGroupT<C, ID, AI>::GenericPushData(const Span<T>& dAttributeRegion,
+                                               //
+                                               Vector<2, IdInt> idRange,
+                                               uint32_t attribIndex,
                                                TransientData data,
-                                               bool isPerItem,
                                                const GPUQueue& deviceQueue) const
 {
-    const auto it = itemRanges.find(id);
-    Vector2ui attribRange = (isPerItem)
-                                ? it->second.itemRange
-                                : it->second.attributeRange;
-    size_t count = attribRange[1] - attribRange[0];
-    Span<T> dSubBatch = copyRegion.subspan(attribRange[0], count);
-    size_t subCount = subRange[1] - subRange[0];
-    Span<T> dSubSubBatch = dSubBatch.subspan(subRange[0], subCount);
+    auto rangeStart = itemRanges.at(idRange[0])[attribIndex];
+    auto rangeEnd   = itemRanges.at(idRange[1])[attribIndex];
+    size_t itemCount = rangeEnd[1] - rangeStart[0];
+    assert(data.Size<T>() == itemCount);
 
+    Span<T> dSubBatch = dAttributeRegion.subspan(rangeStart[0], itemCount);
     deviceQueue.MemcpyAsync(dSubBatch, ToSpan<const T>(data));
+    deviceQueue.IssueBufferForDestruction(std::move(data));
+}
+
+template<class C, class ID, class AI>
+template <class T>
+void GenericGroupT<C, ID, AI>::GenericPushData(const Span<T>& dAttributeRegion,
+                                               //
+                                               IdInt id, uint32_t attribIndex,
+                                               const Vector2ui& subRange,
+                                               TransientData data,
+                                               const GPUQueue& deviceQueue) const
+{
+    auto range = itemRanges.at(id)[attribIndex];
+    size_t itemCount = subRange[1] - subRange[0];
+    assert(data.Size<T>() <= itemCount);
+
+    auto dLocalSpan = dAttributeRegion.subspan(range[0], range[1] - range[0]);
+    auto dLocalSubspan = dLocalSpan.subspan(subRange[0], itemCount);
+    deviceQueue.MemcpyAsync(dLocalSubspan, ToSpan<const T>(data));
     deviceQueue.IssueBufferForDestruction(std::move(data));
 }
 
@@ -285,31 +241,32 @@ GenericGroupT<C, ID, AI>::GenericGroupT(uint32_t groupId, const GPUSystem& s,
     , isCommitted(false)
     , groupId(groupId)
     , deviceMem(gpuSystem.AllGPUs(), allocationGranularity, initialReservartionSize)
-{
-    //itemRanges.reserve(MapReserveSize);
-    //itemCounts.reserve(MapReserveSize);
-}
+{}
 
 template<class C, class ID, class AI>
-typename GenericGroupT<C, ID, AI>::IdList GenericGroupT<C, ID, AI>::Reserve(const std::vector<ItemCount>& itemCountList)
+typename GenericGroupT<C, ID, AI>::IdList
+GenericGroupT<C, ID, AI>::Reserve(const std::vector<AttributeCountList>& countArrayList)
 {
+    assert(!countArrayList.empty());
     if(isCommitted)
     {
         throw MRayError("{:s} is in committed state, "
                         " you change cannot change reservations!",
                         C::TypeName());
     }
-
-    IdList result;
-    result.reserve(itemCountList.size());
-    for(const ItemCount& i : itemCountList)
+    // Lets not use zero
+    IdInt lastId = (itemCounts.empty()) ? 0 : std::prev(itemCounts.end())->first + 1;
+    IdList result(countArrayList.size());
+    for(size_t i = 0; i < countArrayList.size(); i++)
     {
+        IdInt id = lastId++;
+
         [[maybe_unused]]
-        auto r = itemCounts.emplace(static_cast<IdInteger>(itemCounts.size()), i);
+        auto r = itemCounts.emplace(id, countArrayList[i]);
         assert(r.second);
 
-        IdInteger innerId  = r.first->first;
-        result.push_back(ID::CombinedKey(groupId, innerId));
+        // Convert result to actual groupId packed id
+        result[i] = ID::CombinedKey(groupId, id);
     }
     return result;
 }

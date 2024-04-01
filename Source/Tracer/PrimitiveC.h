@@ -275,11 +275,11 @@ class EmptyPrimGroup : public GenericGroupPrimitive<EmptyPrimGroup>
                                           TransientData data,
                                           const GPUQueue&) override;
     void                    PushAttribute(PrimBatchKey batchId,
-                                          const Vector2ui& subBatchRange,
                                           uint32_t attributeIndex,
+                                          const Vector2ui& subBatchRange,
                                           TransientData data,
                                           const GPUQueue&) override;
-    void                    PushAttribute(const Vector<2, PrimBatchKey::Type>& idRange,
+    void                    PushAttribute(PrimBatchKey idStart, PrimBatchKey idEnd,
                                           uint32_t attributeIndex,
                                           TransientData data,
                                           const GPUQueue&) override;
@@ -413,12 +413,13 @@ void EmptyPrimGroup::PushAttribute(PrimBatchKey, uint32_t,
 {}
 
 inline
-void EmptyPrimGroup::PushAttribute(PrimBatchKey, const Vector2ui&,
-                                   uint32_t, TransientData, const GPUQueue&)
+void EmptyPrimGroup::PushAttribute(PrimBatchKey, uint32_t,
+                                   const Vector2ui&,
+                                   TransientData, const GPUQueue&)
 {}
 
 inline
-void EmptyPrimGroup::PushAttribute(const Vector<2, PrimBatchKey::Type>&,
+void EmptyPrimGroup::PushAttribute(PrimBatchKey, PrimBatchKey,
                                    uint32_t, TransientData, const GPUQueue&)
 {}
 

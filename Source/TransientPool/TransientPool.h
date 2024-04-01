@@ -59,6 +59,8 @@ class TransientData
     Span<const T>   AccessAs() const;
     template<ImplicitLifetimeC T>
     Span<T>         AccessAs();
+    template<ImplicitLifetimeC T>
+    size_t          Size() const;
 
     // =========================== //
     //    String Specialization    //

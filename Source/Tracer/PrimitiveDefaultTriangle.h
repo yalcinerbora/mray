@@ -242,11 +242,11 @@ class PrimGroupTriangle : public GenericGroupPrimitive<PrimGroupTriangle>
                                           TransientData data,
                                           const GPUQueue& queue) override;
     void                    PushAttribute(PrimBatchKey batchKey,
-                                          const Vector2ui& subRange,
                                           uint32_t attributeIndex,
+                                          const Vector2ui& subRange,
                                           TransientData data,
                                           const GPUQueue& queue) override;
-    void                    PushAttribute(const Vector<2, PrimBatchKey::Type>& idRange,
+    void                    PushAttribute(PrimBatchKey idStart, PrimBatchKey idEnd,
                                           uint32_t attributeIndex,
                                           TransientData data,
                                           const GPUQueue& queue) override;
@@ -300,11 +300,12 @@ class PrimGroupSkinnedTriangle : public GenericGroupPrimitive<PrimGroupSkinnedTr
                                           TransientData data,
                                           const GPUQueue& queue) override;
     void                    PushAttribute(PrimBatchKey batchKey,
-                                          const Vector2ui& subRange,
                                           uint32_t attributeIndex,
+                                          const Vector2ui& subRange,
                                           TransientData data,
                                           const GPUQueue& queue) override;
-    void                    PushAttribute(const Vector<2, PrimBatchKey::Type>& idRange,
+    void                    PushAttribute(PrimBatchKey idStart,
+                                          PrimBatchKey idEnd,
                                           uint32_t attributeIndex,
                                           TransientData data,
                                           const GPUQueue& queue) override;

@@ -99,6 +99,17 @@ inline Span<T> TransientData::AccessAs()
                     usedBytes / sizeof(T));
 }
 
+template<ImplicitLifetimeC T>
+size_t TransientData::Size() const
+{
+    if constexpr(EnableTypeCheck)
+    {
+        if(typeHash != typeid(T).hash_code())
+            throw MRayError("TransientData(Size): Object did constructed with this type!");
+    }
+    return usedBytes / sizeof(T);
+}
+
 template<>
 inline Span<const Byte> TransientData::AccessAs() const
 {

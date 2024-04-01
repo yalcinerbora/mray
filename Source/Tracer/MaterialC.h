@@ -5,6 +5,7 @@
 
 #include "TracerTypes.h"
 #include "GenericGroup.h"
+#include "ParamVaryingData.h"
 
 template <class MatType>
 concept MaterialC = requires(MatType mt,
@@ -75,5 +76,174 @@ concept MaterialGroupC = requires()
     requires GenericGroupC<MGType>;
 };
 
+
+using GenericTextureView = Variant
+<
+    TextureView<2, Float>,
+    TextureView<2, Vector2>,
+    TextureView<2, Vector3>,
+    TextureView<2, Vector4>,
+    TextureView<2, Spectrum>
+>;
+
+using MaterialTextureMap = std::map<TextureId, GenericTextureView>;
+
 template<class Child>
-using GenericGroupMaterial = GenericGroupT<Child, MaterialKey, MatAttributeInfo>;
+class GenericGroupMaterial : public GenericGroupT<Child, MaterialKey, MatAttributeInfo>
+{
+    using Parent = GenericGroupT<Child, MaterialKey, MatAttributeInfo>;
+    using typename Parent::IdList;
+
+
+    protected:
+    const MaterialTextureMap&   globalTextureViews;
+
+    template<class T>
+    void            GenericPushTex2DAttribute(Span<ParamVaryingData<2, T>>,
+                                              //
+                                              MaterialKey idStart, MaterialKey idEnd,
+                                              uint32_t attributeIndex,
+                                              TransientData,
+                                              const std::vector<Optional<TextureView<2, T>>>&,
+                                              const GPUQueue& queue);
+    template<class T>
+    void            GenericPushTex2DAttribute(Span<Optional<TextureView<2, T>>>,
+                                              //
+                                              MaterialKey idStart, MaterialKey idEnd,
+                                              uint32_t attributeIndex,
+                                              const std::vector<Optional<TextureView<2, T>>>&,
+                                              const GPUQueue& queue);
+
+    template<class T>
+    void            GenericPushTex2DAttribute(Span<TextureView<2, T>>,
+                                              //
+                                              MaterialKey idStart, MaterialKey idEnd,
+                                              uint32_t attributeIndex,
+                                              const std::vector<TextureView<2, T>>&,
+                                              const GPUQueue& queue);
+
+    public:
+    // Constructors & Destructor
+                    GenericGroupMaterial(uint32_t groupId, const GPUSystem&,
+                                         const MaterialTextureMap&,
+                                         size_t allocationGranularity = 2_MiB,
+                                         size_t initialReservartionSize = 4_MiB);
+
+    // Swap the interfaces (old switcharoo)
+    IdList            Reserve(const std::vector<AttributeCountList>&) override;
+    virtual IdList    Reserve(const std::vector<AttributeCountList>&,
+                              const std::vector<Pair<MediumKey, MediumKey>>&) = 0;
+
+
+    // Textured Push Functions
+    // TODO: Add more maybe?
+    // Materials probably will use 2D texture only so...
+    virtual void    PushTex2DAttribute(MaterialKey idStart, MaterialKey idEnd,
+                                       uint32_t attributeIndex,
+                                       TransientData,
+                                       const std::vector<Optional<TextureId>>&,
+                                       const GPUQueue& queue) = 0;
+    virtual void    PushTex2DAttribute(MaterialKey idStart, MaterialKey idEnd,
+                                       uint32_t attributeIndex,
+                                       const std::vector<TextureId>&,
+                                       const GPUQueue& queue) = 0;
+};
+
+template<class C>
+GenericGroupMaterial<C>::GenericGroupMaterial(uint32_t groupId, const GPUSystem& gpuSystem,
+                                              const MaterialTextureMap& map,
+                                              size_t allocationGranularity,
+                                              size_t initialReservartionSize)
+    : Parent(groupId, gpuSystem,
+             allocationGranularity,
+             initialReservartionSize)
+    , globalTextureViews(map)
+{}
+
+template<class C>
+template<class T>
+void GenericGroupMaterial<C>::GenericPushTex2DAttribute(Span<ParamVaryingData<2, T>> attributeSpan,
+                                                        //
+                                                        MaterialKey idStart, MaterialKey idEnd,
+                                                        uint32_t attributeIndex,
+                                                        TransientData hData,
+                                                        const std::vector<Optional<TextureView<2, T>>>& hOptTextures,
+                                                        const GPUQueue& queue)
+{
+
+    // Now we need to be careful
+    auto rangeStart = this->itemRanges.at(idStart.FetchIndexPortion())[attributeIndex];
+    auto rangeEnd = this->itemRanges.at(idStart.FetchIndexPortion())[attributeIndex];
+    size_t count = rangeEnd[1] - rangeStart[0];
+    Span<ParamVaryingData<2, T>> dSubspan = attributeSpan.subspan(rangeStart[0],
+                                                                  count);
+
+    // TODO: Use stream ordered memory allocator
+    // This is blocking
+    DeviceMemory tempMem;
+    Span<Optional<TextureView<2, T>>> dTempTexViews;
+    Span<T> dTempAttributeData;
+    MemAlloc::AllocateMultiData(std::tie(dTempTexViews, dTempAttributeData),
+                                tempMem, {count, count});
+
+    Span<Optional<TextureView<2, T>>> hTempTexViews = hOptTextures;
+    Span<T> hTempAttributeData = hData.AccessAs<T>();
+    queue.MemcpyAsync(dTempTexViews, ToConstSpan(hTempTexViews));
+    queue.MemcpyAsync(dTempAttributeData, ToConstSpan(hTempAttributeData));
+
+
+    using namespace std::string_literals;
+    static const std::string KernelName = "KCGenParamVaryingData\""s + std::string(C::TypeName()) + "\"";
+
+    auto KCGenParamVaryingData = [dTempTexViews, dTempAttributeData, dSubspan, count]
+    (KernelCallParams kp)
+    {
+        for(uint32_t i = kp.GlobalId(); i < count;
+            i += kp.TotalSize())
+        {
+            dSubspan[i] = (dTempTexViews[i].has_value())
+                                ? dTempTexViews[i].value()
+                                : dTempAttributeData[i];
+        }
+    };
+
+    queue.DeviceIssueSaturatingLambda
+    (
+        KernelName,
+        KernelIssueParams{.workCount = count},
+        //
+        std::move(KCGenParamVaryingData)
+    );
+}
+
+template<class C>
+template<class T>
+void GenericGroupMaterial<C>::GenericPushTex2DAttribute(Span<Optional<TextureView<2, T>>> dOptTexSpan,
+                                                        //
+                                                        MaterialKey idStart, MaterialKey idEnd,
+                                                        uint32_t attributeIndex,
+                                                        const std::vector<Optional<TextureView<2, T>>>& hOptTexViews,
+                                                        const GPUQueue& queue)
+{
+    // YOLO memcpy!
+}
+
+template<class C>
+template<class T>
+void GenericGroupMaterial<C>::GenericPushTex2DAttribute(Span<TextureView<2, T>> dTexSpan,
+                                                        //
+                                                        MaterialKey idStart, MaterialKey idEnd,
+                                                        uint32_t attributeIndex,
+                                                        const std::vector<TextureView<2, T>>& hTexViews,
+                                                        const GPUQueue& queue)
+{
+    // YOLO memcpy!
+}
+
+template<class C>
+typename GenericGroupMaterial<C>::IdList
+GenericGroupMaterial<C>::Reserve(const std::vector<AttributeCountList>&)
+{
+    throw MRayError("{}: Materials cannot be reserved via this function!",
+                    C::TypeName());
+}

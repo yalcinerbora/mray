@@ -75,11 +75,11 @@ class TransformGroupIdentity final : public GenericGroupTransform<TransformGroup
                                   TransientData data,
                                   const GPUQueue& queue) override;
     void            PushAttribute(TransformKey batchId,
-                                  const Vector2ui& subBatchRange,
                                   uint32_t attributeIndex,
+                                  const Vector2ui& subBatchRange,
                                   TransientData data,
                                   const GPUQueue& queue) override;
-    void            PushAttribute(const Vector<2, TransformKey::Type>& idRange,
+    void            PushAttribute(TransformKey idStart, TransformKey idEnd,
                                   uint32_t attributeIndex,
                                   TransientData data,
                                   const GPUQueue& queue) override;
@@ -107,11 +107,11 @@ class TransformGroupSingle final : public GenericGroupTransform<TransformGroupSi
                                   TransientData data,
                                   const GPUQueue& queue) override;
     void            PushAttribute(TransformKey batchId,
-                                  const Vector2ui& subRange,
                                   uint32_t attributeIndex,
+                                  const Vector2ui& subRange,
                                   TransientData data,
                                   const GPUQueue& queue) override;
-    void            PushAttribute(const Vector<2, TransformKey::Type>& idRange,
+    void            PushAttribute(TransformKey idStart, TransformKey  idEnd,
                                   uint32_t attributeIndex,
                                   TransientData data,
                                   const GPUQueue& queue) override;
@@ -128,8 +128,6 @@ class TransformGroupMulti final : public GenericGroupTransform<TransformGroupMul
     private:
     Span<Matrix4x4> transforms;
     Span<Matrix4x4> invTransforms;
-
-    Span<uint32_t>  indices;
     DataSoA         soa;
 
     public:
@@ -141,11 +139,11 @@ class TransformGroupMulti final : public GenericGroupTransform<TransformGroupMul
                                   TransientData data,
                                   const GPUQueue& queue) override;
     void            PushAttribute(TransformKey batchId,
-                                  const Vector2ui& subRange,
                                   uint32_t attributeIndex,
+                                  const Vector2ui& subRange,
                                   TransientData data,
                                   const GPUQueue& queue) override;
-    void            PushAttribute(const Vector<2, TransformKey::Type>& idRange,
+    void            PushAttribute(TransformKey idStart, TransformKey  idEnd,
                                   uint32_t attributeIndex,
                                   TransientData data,
                                   const GPUQueue& queue) override;
@@ -206,12 +204,13 @@ inline void TransformGroupIdentity::PushAttribute(TransformKey, uint32_t,
 {}
 
 inline void TransformGroupIdentity::PushAttribute(TransformKey,
+                                                  uint32_t,
                                                   const Vector2ui&,
-                                                  uint32_t, TransientData,
+                                                  TransientData,
                                                   const GPUQueue&)
 {}
 
-inline void TransformGroupIdentity::PushAttribute(const Vector<2, TransformKey::Type>&,
+inline void TransformGroupIdentity::PushAttribute(TransformKey, TransformKey,
                                                   uint32_t, TransientData,
                                                   const GPUQueue&)
 {}

@@ -7,15 +7,17 @@ std::string_view MatGroupLambert::TypeName()
     return name;
 }
 
-MatGroupLambert::MatGroupLambert(uint32_t groupId, const GPUSystem& s)
-    : GenericGroupT(groupId, s)
+MatGroupLambert::MatGroupLambert(uint32_t groupId,
+                                 const MaterialTextureMap& map,
+                                 const GPUSystem& s)
+    : GenericGroupMaterial(groupId, s, map)
 {}
 
 void MatGroupLambert::CommitReservations()
 {
     auto [a, nm, mIds] = GenericCommit<ParamVaryingData<2, Spectrum>,
-                                 Optional<TextureView<2, Vector3>>,
-                                 MediumKey>({true, true, true});
+                                       Optional<TextureView<2, Vector3>>,
+                                       MediumKey>({0, 0, 0});
     dAlbedo = a;
     dNormalMaps = nm;
     dMediumIds = mIds;
@@ -55,8 +57,8 @@ void MatGroupLambert::PushAttribute(MaterialKey,
 }
 
 void MatGroupLambert::PushAttribute(MaterialKey,
-                                    const Vector2ui&,
                                     uint32_t attributeIndex,
+                                    const Vector2ui&,
                                     TransientData,
                                     const GPUQueue&)
 {
@@ -71,7 +73,7 @@ void MatGroupLambert::PushAttribute(MaterialKey,
                     TypeName(), attributeIndex);
 }
 
-void MatGroupLambert::PushAttribute(const Vector<2, MaterialKey::Type>&,
+void MatGroupLambert::PushAttribute(MaterialKey, MaterialKey,
                                     uint32_t attributeIndex,
                                     TransientData,
                                     const GPUQueue&)

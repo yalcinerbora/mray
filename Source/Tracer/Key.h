@@ -34,8 +34,11 @@ class alignas(sizeof(T)) KeyT
                                     KeyT() = default;
     MRAY_HYBRID explicit constexpr  KeyT(T v);
     //
-    MRAY_HYBRID constexpr           operator T() const;
-    MRAY_HYBRID constexpr           operator T&();
+    MRAY_HYBRID explicit constexpr  operator T() const;
+    MRAY_HYBRID explicit constexpr  operator T&();
+
+    MRAY_HYBRID bool                operator==(const KeyT& rhs) const;
+
     // Access
     MRAY_HYBRID constexpr T         FetchBatchPortion() const;
     MRAY_HYBRID constexpr T         FetchIndexPortion() const;
@@ -71,6 +74,13 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr KeyT<T, BB, IB>::operator T&()
 {
     return value;
+}
+
+template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool KeyT<T, BB, IB>::operator==(const KeyT& rhs) const
+{
+    return (value == rhs.value);
 }
 
 template <std::unsigned_integral T, uint32_t BB, uint32_t IB>

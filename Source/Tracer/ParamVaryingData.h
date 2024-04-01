@@ -14,8 +14,6 @@ class ParamVaryingData
     private:
     Variant<Texture, T>         t;
 
-
-
     public:
     MRAY_HYBRID                 ParamVaryingData(const T&);
     MRAY_HYBRID                 ParamVaryingData(const Texture&);

@@ -26,13 +26,13 @@ typename TransformGroupIdentity::DataSoA TransformGroupIdentity::SoA() const
 }
 
 TransformGroupSingle::TransformGroupSingle(uint32_t groupId,
-                     const GPUSystem& s)
+                                           const GPUSystem& s)
     : BaseType(groupId, s)
 {}
 
 void TransformGroupSingle::CommitReservations()
 {
-    auto [t, it] = GenericCommit<Matrix4x4, Matrix4x4>({true, true});
+    auto [t, it] = GenericCommit<Matrix4x4, Matrix4x4>({0, 0});
     transforms = t;
     invTransforms = it;
 
@@ -45,9 +45,11 @@ void TransformGroupSingle::PushAttribute(TransformKey id , uint32_t attributeInd
 {
     if(attributeIndex == 0)
     {
-        GenericPushData(id, transforms, std::move(data), true, queue);
+        GenericPushData(transforms, id.FetchIndexPortion(),
+                        attributeIndex,
+                        std::move(data), queue);
 
-        auto range = itemRanges[id.FetchIndexPortion()].itemRange;
+        auto range = itemRanges.at(id.FetchIndexPortion())[0];
         size_t count = range[1] - range[0];
         Span<Matrix4x4> subTRange = transforms.subspan(range[0], count);
         Span<Matrix4x4> subInvTRange = invTransforms.subspan(range[0], count);
@@ -61,17 +63,18 @@ void TransformGroupSingle::PushAttribute(TransformKey id , uint32_t attributeInd
 }
 
 void TransformGroupSingle::PushAttribute(TransformKey id,
-                                         const Vector2ui& subRange,
                                          uint32_t attributeIndex,
+                                         const Vector2ui& subRange,
                                          TransientData data,
                                          const GPUQueue& queue)
 {
     if(attributeIndex == 0)
     {
-        GenericPushData(id, subRange, transforms,
-                        std::move(data), true, queue);
+        GenericPushData(transforms, id.FetchIndexPortion(),
+                        attributeIndex, subRange,
+                        std::move(data), queue);
 
-        auto range = itemRanges[id.FetchIndexPortion()].itemRange;
+        auto range = itemRanges.at(id.FetchIndexPortion())[0];
         auto innerRange = Vector2ui(range[0] + subRange[0], subRange[1]);
         size_t count = innerRange[1] - innerRange[0];
 
@@ -85,21 +88,23 @@ void TransformGroupSingle::PushAttribute(TransformKey id,
                          TypeName(), attributeIndex);
 }
 
-void TransformGroupSingle::PushAttribute(const Vector<2, TransformKey::Type>& idRange,
+void TransformGroupSingle::PushAttribute(TransformKey idStart, TransformKey idEnd,
                                          uint32_t attributeIndex, TransientData data,
                                          const GPUQueue& queue)
 {
     if(attributeIndex == 0)
     {
-        GenericPushData(idRange, transforms, std::move(data),
-                        true, true, queue);
+        auto idRange = Vector<2, IdInt>(idStart.FetchIndexPortion(),
+                                        idEnd.FetchIndexPortion());
+        GenericPushData(transforms, idRange, attributeIndex,
+                        std::move(data), queue);
 
-        auto rangeStart = itemRanges[TransformKey(idRange[0]).FetchIndexPortion()].itemRange[0];
-        auto rangeEnd = itemRanges[TransformKey(idRange[1]).FetchIndexPortion()].itemRange[1];
-        size_t count = rangeEnd - rangeStart;
+        auto rangeStart = itemRanges.at(idRange[0])[0];
+        auto rangeEnd = itemRanges.at(idRange[1])[1];
+        size_t count = rangeEnd[1] - rangeStart[0];
 
-        Span<Matrix4x4> subTRange = transforms.subspan(rangeStart, count);
-        Span<Matrix4x4> subInvTRange = invTransforms.subspan(rangeEnd, count);
+        Span<Matrix4x4> subTRange = transforms.subspan(rangeStart[0], count);
+        Span<Matrix4x4> subInvTRange = invTransforms.subspan(rangeStart[0], count);
 
         DeviceAlgorithms::Transform(subInvTRange, ToConstSpan(subTRange), queue,
                                     KCInvertTransforms());
@@ -146,7 +151,7 @@ void TransformGroupMulti::CommitReservations()
     auto [t, it, batchT, batchInvT] =
         GenericCommit<Matrix4x4, Matrix4x4,
                       Span<const Matrix4x4>,
-                      Span<const Matrix4x4>>({true, true, true, true});
+                      Span<const Matrix4x4>>({0, 0, 0, 0});
     transforms = t;
     invTransforms = it;
     batchedTransforms = batchT;
@@ -155,19 +160,17 @@ void TransformGroupMulti::CommitReservations()
     // TODO: Improve this?
     // Locally creating buffers ...
     const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
-    DeviceLocalMemory mem(gpuSystem.BestDevice());
-    Span<Vector<2, IdInteger>> dFlattenedRanges;
+    DeviceLocalMemory tempMemory(gpuSystem.BestDevice());
+    Span<Vector<2, size_t>> dFlattenedRanges;
     MemAlloc::AllocateMultiData(std::tie(dFlattenedRanges),
-                                mem, {itemRanges.size()});
+                                tempMemory, {itemRanges.size()});
 
-    std::vector<Vector<2, IdInteger>> hFlattenedRanges;
+    std::vector<Vector<2, size_t>> hFlattenedRanges;
     hFlattenedRanges.reserve(itemRanges.size());
-
     for(const auto& range : itemRanges)
-    {
-        hFlattenedRanges.push_back(range.second.itemRange);
-    }
-    using HostSpan = Span<const Vector<2, IdInteger>>;
+        hFlattenedRanges.push_back(range.second[0]);
+
+    using HostSpan = Span<const Vector<2, size_t>>;
     queue.MemcpyAsync(dFlattenedRanges,
                       HostSpan(hFlattenedRanges.cbegin(),
                                hFlattenedRanges.cend()));
@@ -182,8 +185,8 @@ void TransformGroupMulti::CommitReservations()
         {
             for(uint32_t i = 0; i < workCount; i += kp.TotalSize())
             {
-                Vector<2, IdInteger> range = dFlattenedRanges[i];
-                IdInteger size = range[1] - range[0];
+                Vector<2, size_t> range = dFlattenedRanges[i];
+                size_t size = range[1] - range[0];
 
                 batchedTransforms[i] = transforms.subspan(range[0], size);
                 batchedInvTransforms[i] = invTransforms.subspan(range[0], size);
@@ -191,23 +194,21 @@ void TransformGroupMulti::CommitReservations()
         }
     );
 
-
     soa.transforms = ToConstSpan(batchedTransforms);
     soa.invTransforms = ToConstSpan(batchedInvTransforms);
-
     // Wait here before locally deleting stuff.
     queue.Barrier().Wait();
 }
 
-void TransformGroupMulti::PushAttribute(TransformKey id , uint32_t attributeIndex,
+void TransformGroupMulti::PushAttribute(TransformKey id, uint32_t attributeIndex,
                                         TransientData data, const GPUQueue& queue)
 {
     if(attributeIndex == 0)
     {
-        GenericPushData(id, transforms, std::move(data),
-                        true, queue);
+        GenericPushData(transforms, id.FetchIndexPortion(), attributeIndex,
+                        std::move(data), queue);
 
-        auto range = itemRanges[id.FetchIndexPortion()].itemRange;
+        auto range = itemRanges.at(id.FetchIndexPortion())[0];
         size_t count = range[1] - range[0];
         Span<Matrix4x4> subTRange = transforms.subspan(range[0], count);
         Span<Matrix4x4> subInvTRange = invTransforms.subspan(range[0], count);
@@ -220,17 +221,18 @@ void TransformGroupMulti::PushAttribute(TransformKey id , uint32_t attributeInde
 }
 
 void TransformGroupMulti::PushAttribute(TransformKey id,
-                                        const Vector2ui& subRange,
                                         uint32_t attributeIndex,
+                                        const Vector2ui& subRange,
                                         TransientData data,
                                         const GPUQueue& queue)
 {
     if(attributeIndex == 0)
     {
-        GenericPushData(id, subRange, transforms, std::move(data),
-                        true, queue);
+        GenericPushData(transforms, id.FetchIndexPortion(),
+                        attributeIndex, subRange,
+                        std::move(data), queue);
 
-        auto range = itemRanges[id.FetchIndexPortion()].itemRange;
+        auto range = itemRanges.at(id.FetchIndexPortion())[attributeIndex];
         auto innerRange = Vector2ui(range[0] + subRange[0], subRange[1]);
         size_t count = innerRange[1] - innerRange[0];
 
@@ -244,21 +246,23 @@ void TransformGroupMulti::PushAttribute(TransformKey id,
                          TypeName(), attributeIndex);
 }
 
-void TransformGroupMulti::PushAttribute(const Vector<2, TransformKey::Type>& idRange,
+void TransformGroupMulti::PushAttribute(TransformKey idStart, TransformKey idEnd,
                                         uint32_t attributeIndex, TransientData data,
                                         const GPUQueue& queue)
 {
     if(attributeIndex == 0)
     {
-        GenericPushData(idRange, transforms, std::move(data),
-                        true, true, queue);
+        auto idRange = Vector<2, IdInt>(idStart.FetchIndexPortion(),
+                                        idEnd.FetchIndexPortion());
+        GenericPushData(transforms, idRange, attributeIndex,
+                        std::move(data), queue);
 
-        auto rangeStart = itemRanges[TransformKey(idRange[0]).FetchIndexPortion()].itemRange[0];
-        auto rangeEnd = itemRanges[TransformKey(idRange[1]).FetchIndexPortion()].itemRange[1];
-        size_t count = rangeEnd - rangeStart;
+        auto rangeStart = (itemRanges.at(idRange[0]))[attributeIndex];
+        auto rangeEnd   = (itemRanges.at(idRange[1]))[attributeIndex];
+        size_t count = rangeEnd[1] - rangeStart[0];
 
-        Span<Matrix4x4> subTRange = transforms.subspan(rangeStart, count);
-        Span<Matrix4x4> subInvTRange = invTransforms.subspan(rangeEnd, count);
+        Span<Matrix4x4> subTRange = transforms.subspan(rangeStart[0], count);
+        Span<Matrix4x4> subInvTRange = invTransforms.subspan(rangeStart[0], count);
 
         DeviceAlgorithms::Transform(subInvTRange, ToConstSpan(subTRange), queue,
                                     KCInvertTransforms());

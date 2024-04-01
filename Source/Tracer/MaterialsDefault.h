@@ -70,19 +70,20 @@ class MatGroupLambert : public GenericGroupMaterial<MatGroupLambert>
     public:
     static std::string_view TypeName();
 
-                        MatGroupLambert(uint32_t groupId, const GPUSystem&);
+                        MatGroupLambert(uint32_t groupId, const MaterialTextureMap&,
+                                        const GPUSystem&);
     void                CommitReservations() override;
     AttribInfoList      AttributeInfo() const override;
-    void                PushAttribute(MaterialKey batchId,
+    void                PushAttribute(MaterialKey id,
                                       uint32_t attributeIndex,
                                       TransientData data,
                                       const GPUQueue& queue) override;
-    void                PushAttribute(MaterialKey batchId,
+    void                PushAttribute(MaterialKey id,
+                                      uint32_t attributeIndex,
                                       const Vector2ui& subRange,
-                                      uint32_t attributeIndex,
                                       TransientData data,
                                       const GPUQueue& queue) override;
-    void                PushAttribute(const Vector<2, MaterialKey::Type>& idRange,
+    void                PushAttribute(MaterialKey idStart, MaterialKey idEnd,
                                       uint32_t attributeIndex,
                                       TransientData data,
                                       const GPUQueue& queue) override;

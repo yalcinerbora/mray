@@ -81,8 +81,9 @@ TEST_F(SceneLoaderMRayTest, Basic)
 
 TEST_F(SceneLoaderMRayTest, Kitchen)
 {
+    static constexpr size_t TOTAL_RUNS = 16;
     double all = 0.0;
-    for(uint32_t i = 0; i < 16; i++)
+    for(uint32_t i = 0; i < TOTAL_RUNS; i++)
     {
         if(i > 0) SetUp();
 
@@ -91,22 +92,22 @@ TEST_F(SceneLoaderMRayTest, Kitchen)
         EXPECT_FALSE(result.has_error());
 
         if(result.has_error())
-            MRAY_LOG("Err! :: {}ms", result.error().GetError());
-        else
         {
-            MRAY_LOG("OK! :: {}ms", result.value().loadTimeMS);
-            all += result.value().loadTimeMS;
+            MRAY_LOG("Err! :: {}", result.error().GetError());
+            ASSERT_FALSE(true);
         }
+        else all += result.value().loadTimeMS;
+
         TearDown();
     }
-
-    MRAY_LOG("Average: {}ms", all / 512.0);
+    MRAY_LOG("Average: {:.3f}ms", all / static_cast<double>(TOTAL_RUNS));
 }
 
 TEST_F(SceneLoaderMRayTest, KitchenGFG)
 {
+    static constexpr size_t TOTAL_RUNS = 16;
     double all = 0.0;
-    for(uint32_t i = 0; i < 16; i++)
+    for(uint32_t i = 0; i < TOTAL_RUNS; i++)
     {
         if(i > 0) SetUp();
 
@@ -115,14 +116,14 @@ TEST_F(SceneLoaderMRayTest, KitchenGFG)
         EXPECT_FALSE(result.has_error());
 
         if(result.has_error())
-            MRAY_LOG("Err! :: {}ms", result.error().GetError());
-        else
         {
-            MRAY_LOG("OK! :: {}ms", result.value().loadTimeMS);
-            all += result.value().loadTimeMS;
+            MRAY_LOG("Err! :: {}", result.error().GetError());
+            ASSERT_FALSE(true);
         }
+        else all += result.value().loadTimeMS;
+
         TearDown();
     }
 
-    MRAY_LOG("Average: {}ms", all / 512.0);
+    MRAY_LOG("Average: {:.3f}ms", all / static_cast<double>(TOTAL_RUNS));
 }

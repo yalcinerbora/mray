@@ -117,7 +117,7 @@ void SimulateBasicPathTracer()
         std::uniform_int_distribution<CommonKey> distH(0, materialCount[0] - 1);
         std::uniform_int_distribution<CommonKey> distL(0, materialCount[1] - 1);
 
-        k = TheKey::CombinedKey(distH(rng), distL(rng));
+        k = static_cast<CommonKey>(TheKey::CombinedKey(distH(rng), distL(rng)));
     }
     queue.MemcpyAsync(dInitialKeys, ToConstSpan(hHitKeysSpan));
 
