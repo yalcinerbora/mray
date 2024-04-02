@@ -8,8 +8,8 @@ set(SRC_SUBCOMMAND
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/main.cpp)
 
-source_group("" FILES ${SRC_COMMON})
 source_group("Subcommands" FILES ${SRC_SUBCOMMAND})
+source_group("" FILES ${SRC_COMMON})
 
 set(SRC_ALL
     ${SRC_SUBCOMMAND}

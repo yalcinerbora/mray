@@ -33,7 +33,7 @@ target_sources(imgui PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/imgui_widgets.cpp
 
             ${CMAKE_CURRENT_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
 )
 
 # imgui backends directly include imgui.h
@@ -41,8 +41,7 @@ target_sources(imgui PRIVATE
 set(IMGUI_BACKEND_HEADERS
     # Backend Headers
     ${CMAKE_CURRENT_SOURCE_DIR}/backends/imgui_impl_glfw.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/backends/imgui_impl_opengl3.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/backends/imgui_impl_opengl3_loader.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/backends/imgui_impl_vulkan.h
 )
 
 target_link_libraries(imgui glfw)

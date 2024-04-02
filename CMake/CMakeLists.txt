@@ -109,11 +109,11 @@ else()
 endif()
 
 configure_file(${MRAY_SOURCE_DIRECTORY}/mray_cmake.h.in
-               ${CMAKE_CURRENT_BINARY_DIR}/mray_cmake.h
+               ${CMAKE_CURRENT_BINARY_DIR}/mray_gen/mray_cmake.h
                NO_SOURCE_PERMISSIONS
                @ONLY)
 target_include_directories(meta_compile_opts
-                           SYSTEM INTERFACE "${CMAKE_CURRENT_BINARY_DIR}")
+                           SYSTEM INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/mray_gen")
 
 # After Everything is set
 # Include NVCC compile to ptx routine
@@ -145,8 +145,7 @@ add_subdirectory(SceneLoaderMRay)
 add_subdirectory(MeshLoader)
 add_subdirectory(ImageLoader)
 add_subdirectory(GFGConverter)
-
-#add_subdirectory(VisorGL)
+add_subdirectory(Visor)
 
 # Execs
 add_subdirectory(MRay)
