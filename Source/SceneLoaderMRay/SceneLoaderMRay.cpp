@@ -828,31 +828,47 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
         // TODO: check if we twice opening is bottleneck?
         // We are opening here to determining size/format
         // and on the other iteration we actual memcpy it
+        bool barrierPassed = false;
         try
         {
             for(size_t i = start; i < end; i++)
             {
-                const auto& [texStruct, jsonNode] = textureNodes[i];
+                const auto& [texStruct, jsonNode, is2D] = textureNodes[i];
                 auto fileName = jsonNode.AccessData<std::string>(NodeNames::TEX_NODE_FILE);
+                auto isColor = jsonNode.AccessOptionalData<bool>(NodeNames::TEX_NODE_COLORIMETRIC)
+                                .value_or(NodeNames::TEX_NODE_COLORIMETRIC_DEFAULT);
                 fileName = SceneLoaderMRay::SceneRelativePathToAbsolute(fileName, scenePath);
 
                 // Currently no flags are utilized on header load time
                 // TODO: Check here if this fails
-                Expected<ImageHeader<2>> headerE = imgLoader->ReadImageHeader2D(fileName);
-                if(!headerE.has_value())
+                TextureId tId;
+                if(is2D)
                 {
-                    exceptions.AddException(std::move(headerE.error()));
+                    Expected<ImageHeader<2>> headerE = imgLoader->ReadImageHeader2D(fileName);
+                    if(!headerE.has_value())
+                    {
+                        exceptions.AddException(std::move(headerE.error()));
+                        barrier->arrive_and_drop();
+                        return;
+                    }
+
+                    // Always expand to 4 channel due to HW limitation
+                    headerE.value().pixelType = ImageLoaderI::TryExpandTo4CFormat(headerE.value().pixelType);
+
+                    const auto& header = headerE.value();
+                    tId = tracer.CreateTexture2D(header.dimensions,
+                                                 header.mipCount,
+                                                 header.pixelType.Name(),
+                                                 isColor
+                                                    ? AttributeIsColor::IS_COLOR
+                                                    : AttributeIsColor::IS_PURE_DATA);
+                }
+                else
+                {
+                    exceptions.AddException(MRayError("3D Textures are not supported atm."));
                     barrier->arrive_and_drop();
                     return;
                 }
-
-                // Always expand to 4 channel due to HW limitation
-                headerE.value().pixelType = ImageLoaderI::TryExpandTo4CFormat(headerE.value().pixelType);
-
-                const auto& header = headerE.value();
-                TextureId tId = tracer.CreateTexture2D(header.dimensions,
-                                                       header.mipCount,
-                                                       header.pixelType.Name());
 
                 auto& texIdList = *texIdListPtr;
                 texIdList[i] = std::make_pair(texStruct, tId);
@@ -860,11 +876,13 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
 
             // Barrier code is invoked, and all textures are allocated
             barrier->arrive_and_wait();
+            barrierPassed = true;
 
             for(size_t i = start; i < end; i++)
             {
-                const auto& [texStruct, jsonNode] = textureNodes[i];
-                bool loadAsSigned = jsonNode.AccessData<bool>(NodeNames::TEX_NODE_AS_SIGNED);
+                const auto& [texStruct, jsonNode, is2D] = textureNodes[i];
+                bool loadAsSigned = jsonNode.AccessOptionalData<bool>(NodeNames::TEX_NODE_AS_SIGNED)
+                                        .value_or(NodeNames::TEX_NODE_AS_SIGNED_DEFAULT);
                 bool isData = jsonNode.AccessData<bool>(NodeNames::TEX_NODE_IS_DATA);
                 auto fileName = jsonNode.AccessData<std::string>(NodeNames::TEX_NODE_FILE);
                 fileName = SceneLoaderMRay::SceneRelativePathToAbsolute(fileName, scenePath);
@@ -875,27 +893,50 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
                 flags[LOAD_AS_SIGNED] = loadAsSigned;
                 flags[TRY_3C_4C_CONVERSION] = true;     // Always do channel expand (HW limitation)
 
-                Expected<Image<2>> imgE = imgLoader->ReadImage2D(fileName, flags);
-                if(!imgE.has_value())
+                if(is2D)
                 {
-                    exceptions.AddException(std::move(imgE.error()));
-                    return;
-                }
+                    Expected<Image<2>> imgE = imgLoader->ReadImage2D(fileName, flags);
+                    if(!imgE.has_value())
+                    {
+                        exceptions.AddException(std::move(imgE.error()));
+                        return;
+                    }
 
-                auto& img = imgE.value();
-                // Send data mip by mip
-                for(uint32_t j = 0; j < img.header.mipCount; i++)
+                    auto& img = imgE.value();
+                    // Send data mip by mip
+                    for(uint32_t j = 0; j < img.header.mipCount; i++)
+                    {
+                        auto& texIdList = *texIdListPtr;
+                        tracer.PushTextureData(texIdList[i].second, j,
+                                               std::move(img.imgData[j].pixels));
+                    }
+                }
+                else
                 {
-                    auto& texIdList = *texIdListPtr;
-                    tracer.PushTextureData(texIdList[i].second, j,
-                                           std::move(img.imgData[j].pixels));
+                    exceptions.AddException(MRayError("3D Textures are not supported atm."));
+                    barrier->arrive_and_drop();
+                    return;
                 }
             }
         }
         catch(MRayError& e)
         {
             exceptions.AddException(std::move(e));
-            barrier->arrive_and_drop();
+            if(!barrierPassed) barrier->arrive_and_drop();
+        }
+        catch(nlohmann::json::exception& e)
+        {
+            exceptions.AddException(MRayError("Json Error ({})",
+                                              std::string(e.what())));
+
+            if(!barrierPassed) barrier->arrive_and_drop();
+        }
+        catch(std::exception& e)
+        {
+            exceptions.AddException(MRayError("Unknown Error ({})",
+                                              std::string(e.what())));
+
+            if(!barrierPassed) barrier->arrive_and_drop();
         }
     };
 
@@ -1689,7 +1730,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
         uint32_t arrayIndex = std::get<ARRAY_INDEX>(location);
         uint32_t innerIndex = std::get<INNER_INDEX>(location);
         auto node = JsonNode(sceneJson[TEXTURE_LIST][arrayIndex], innerIndex);
-        textureNodes.emplace_back(t, std::move(node));
+        // TODO: Add support for 3D texs.
+        textureNodes.emplace_back(t, std::move(node), true);
     }
 
     // Eliminate the duplicates
@@ -1737,11 +1779,11 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     {
         auto LessThan = [](const auto& lhs, const auto& rhs)
         {
-            return lhs.first < rhs.first;
+            return std::get<0>(lhs) < std::get<0>(rhs);
         };
         auto Equal = [](const auto& lhs, const auto& rhs)
         {
-            return lhs.first == rhs.first;
+            return std::get<0>(lhs) == std::get<0>(rhs);
         };
         std::sort(textureNodes.begin(), textureNodes.end(), LessThan);
         auto last = std::unique(textureNodes.begin(), textureNodes.end(), Equal);

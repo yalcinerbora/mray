@@ -61,6 +61,12 @@ enum class AttributeTexturable
     MR_TEXTURE_ONLY
 };
 
+enum class AttributeIsColor
+{
+    IS_COLOR,
+    IS_PURE_DATA
+};
+
 enum class AttributeIsArray
 {
     IS_SCALAR,
@@ -85,11 +91,11 @@ struct GenericAttributeInfo : public Tuple<std::string, MRayDataTypeRT,
 
 struct TexturedAttributeInfo : public Tuple<std::string, MRayDataTypeRT,
                                             AttributeIsArray, AttributeOptionality,
-                                            AttributeTexturable>
+                                            AttributeTexturable, AttributeIsColor>
 {
     using Base = Tuple<std::string, MRayDataTypeRT,
                        AttributeIsArray, AttributeOptionality,
-                       AttributeTexturable>;
+                       AttributeTexturable, AttributeIsColor>;
     using Base::Base;
     enum E
     {
@@ -97,7 +103,8 @@ struct TexturedAttributeInfo : public Tuple<std::string, MRayDataTypeRT,
         LAYOUT_INDEX        = 1,
         IS_ARRAY_INDEX      = 2,
         OPTIONALITY_INDEX   = 3,
-        TEXTURABLE_INDEX    = 4
+        TEXTURABLE_INDEX    = 4,
+        COLOROMETRY_INDEX   = 5,
     };
 };
 
@@ -320,9 +327,11 @@ class [[nodiscard]] TracerI
     virtual void        CommitTexColorSpace(MRayColorSpaceEnum = MRayColorSpaceEnum::MR_DEFAULT) = 0;
     // All textures are implicitly float convertible
     virtual TextureId   CreateTexture2D(Vector2ui size, uint32_t mipCount,
-                                        MRayPixelEnum pixelType) = 0;
+                                        MRayPixelEnum pixelType,
+                                        AttributeIsColor isColorTexture) = 0;
     virtual TextureId   CreateTexture3D(Vector3ui size, uint32_t mipCount,
-                                        MRayPixelEnum pixelType) = 0;
+                                        MRayPixelEnum pixelType,
+                                        AttributeIsColor isColorTexture) = 0;
     // Requested texture may be represented by a different type
     // (float3 -> float4 due to padding)
     virtual MRayDataTypeRT  GetTexturePixelType(TextureId) const = 0;
@@ -349,7 +358,8 @@ class [[nodiscard]] TracerI
     //            Lights              //
     //================================//
     // Analytical / Primitive-backed Lights
-    virtual LightGroupId    CreateLightGroup(std::string typeName) = 0;
+    virtual LightGroupId    CreateLightGroup(std::string typeName,
+                                             PrimGroupId = TracerConstants::EmptyPrimitive) = 0;
     virtual LightId         ReserveLight(LightGroupId, AttributeCountList,
                                          PrimBatchId = TracerConstants::EmptyPrimBatch) = 0;
     virtual LightIdList     ReserveLights(LightGroupId,

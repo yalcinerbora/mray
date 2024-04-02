@@ -10,7 +10,7 @@ namespace LambertMatDetail
 {
     struct alignas(32) LambertMatData
     {
-        Span<const ParamVaryingData<2, Spectrum>>       dAlbedo;
+        Span<const ParamVaryingData<2, Vector3>>       dAlbedo;
         Span<const Optional<TextureView<2, Vector3>>>   dNormalMaps;
         Span<const MediumKey>                           dMediumIds;
     };
@@ -53,7 +53,7 @@ namespace LambertMatDetail
 
 }
 
-class MatGroupLambert : public GenericGroupMaterial<MatGroupLambert>
+class MatGroupLambert final : public GenericMaterialGroup<MatGroupLambert>
 {
     public:
     using DataSoA   = LambertMatDetail::LambertMatData;
@@ -62,33 +62,52 @@ class MatGroupLambert : public GenericGroupMaterial<MatGroupLambert>
     using Surface   = typename Material<>::Surface;
 
     private:
-    Span<ParamVaryingData<2, Spectrum>>     dAlbedo;
+    Span<ParamVaryingData<2, Vector3>>      dAlbedo;
     Span<Optional<TextureView<2, Vector3>>> dNormalMaps;
     Span<MediumKey>                         dMediumIds;
     DataSoA                                 soa;
 
+    protected:
+    void                HandleMediums(const MediumPairList&) override;
+
     public:
     static std::string_view TypeName();
 
-                        MatGroupLambert(uint32_t groupId, const MaterialTextureMap&,
-                                        const GPUSystem&);
-    void                CommitReservations() override;
-    AttribInfoList      AttributeInfo() const override;
-    void                PushAttribute(MaterialKey id,
-                                      uint32_t attributeIndex,
-                                      TransientData data,
-                                      const GPUQueue& queue) override;
-    void                PushAttribute(MaterialKey id,
-                                      uint32_t attributeIndex,
-                                      const Vector2ui& subRange,
-                                      TransientData data,
-                                      const GPUQueue& queue) override;
-    void                PushAttribute(MaterialKey idStart, MaterialKey idEnd,
-                                      uint32_t attributeIndex,
-                                      TransientData data,
-                                      const GPUQueue& queue) override;
+                    MatGroupLambert(uint32_t groupId,
+                                    const TextureView2DMap&,
+                                    const GPUSystem&);
+    void            CommitReservations() override;
+    AttribInfoList  AttributeInfo() const override;
+    void            PushAttribute(MaterialKey id,
+                                  uint32_t attributeIndex,
+                                  TransientData data,
+                                  const GPUQueue& queue) override;
+    void            PushAttribute(MaterialKey id,
+                                  uint32_t attributeIndex,
+                                  const Vector2ui& subRange,
+                                  TransientData data,
+                                  const GPUQueue& queue) override;
+    void            PushAttribute(MaterialKey idStart, MaterialKey idEnd,
+                                  uint32_t attributeIndex,
+                                  TransientData data,
+                                  const GPUQueue& queue) override;
 
-    DataSoA             SoA() const;
+    // Extra
+    void            PushTex2DAttribute(MaterialKey idStart, MaterialKey idEnd,
+                                       uint32_t attributeIndex,
+                                       TransientData,
+                                       std::vector<Optional<TextureId>>,
+                                       const GPUQueue& queue) override;
+    void            PushTex2DAttribute(MaterialKey idStart, MaterialKey idEnd,
+                                       uint32_t attributeIndex,
+                                       std::vector<Optional<TextureId>>,
+                                       const GPUQueue& queue) override;
+    void            PushTex2DAttribute(MaterialKey idStart, MaterialKey idEnd,
+                                       uint32_t attributeIndex,
+                                       std::vector<TextureId>,
+                                       const GPUQueue& queue) override;
+
+    DataSoA         SoA() const;
 };
 
 #include "MaterialsDefault.hpp"

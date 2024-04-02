@@ -200,7 +200,7 @@ namespace DefaultSkinnedTriangleDetail
     static_assert(TransformContextC<TransformContextSkinned>);
 }
 
-class PrimGroupTriangle : public GenericGroupPrimitive<PrimGroupTriangle>
+class PrimGroupTriangle final : public GenericGroupPrimitive<PrimGroupTriangle>
 {
     public:
     using DataSoA       = DefaultTriangleDetail::TriangleData;
@@ -253,7 +253,7 @@ class PrimGroupTriangle : public GenericGroupPrimitive<PrimGroupTriangle>
     DataSoA                 SoA() const;
 };
 
-class PrimGroupSkinnedTriangle : public GenericGroupPrimitive<PrimGroupSkinnedTriangle>
+class PrimGroupSkinnedTriangle final : public GenericGroupPrimitive<PrimGroupSkinnedTriangle>
 {
     public:
     using DataSoA       = DefaultSkinnedTriangleDetail::SkinnedTriangleData;

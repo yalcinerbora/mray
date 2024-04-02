@@ -94,6 +94,7 @@ struct LightGroupMock
 {
     const LightMockPack&    mp;
     LightGroupId            id;
+    PrimGroupId             primGId;
     std::vector<LightId>    lightList;
     std::atomic_size_t      idCounter;
     bool                    isComitted;
@@ -222,9 +223,11 @@ class TracerMock : public TracerI
 
     void            CommitTexColorSpace(MRayColorSpaceEnum = MRayColorSpaceEnum::MR_DEFAULT) override;
     TextureId       CreateTexture2D(Vector2ui size, uint32_t mipCount,
-                                    MRayPixelEnum pixelType) override;
+                                    MRayPixelEnum pixelType,
+                                    AttributeIsColor) override;
     TextureId       CreateTexture3D(Vector3ui size, uint32_t mipCount,
-                                    MRayPixelEnum pixelType) override;
+                                    MRayPixelEnum pixelType,
+                                    AttributeIsColor) override;
     MRayDataTypeRT  GetTexturePixelType(TextureId) const override;
     void            CommitTextures() override;
     void            PushTextureData(TextureId, uint32_t mipLevel,
@@ -241,7 +244,8 @@ class TracerMock : public TracerI
                                        TransientData data) override;
 
 
-    LightGroupId    CreateLightGroup(std::string typeName) override;
+    LightGroupId    CreateLightGroup(std::string typeName,
+                                     PrimGroupId = TracerConstants::EmptyPrimitive) override;
     LightId         ReserveLight(LightGroupId, AttributeCountList,
                                  PrimBatchId = TracerConstants::EmptyPrimBatch) override;
     LightIdList     ReserveLights(LightGroupId, std::vector<AttributeCountList>,
@@ -319,6 +323,7 @@ inline TracerMock::TracerMock(bool pl)
     using enum AttributeOptionality;
     using enum AttributeIsArray;
     using enum AttributeTexturable;
+    using enum AttributeIsColor;
 
     // =================== //
     //     Primitives      //
@@ -357,9 +362,9 @@ inline TracerMock::TracerMock(bool pl)
         .attribInfo = MatAttributeInfoList
         {
             MatAttributeInfo("albedo", MRayDataType<MR_VECTOR_3>(),
-                             IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
+                             IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR),
             MatAttributeInfo("normalMap", MRayDataType<MR_VECTOR_3>(),
-                             IS_SCALAR, MR_OPTIONAL, MR_TEXTURE_ONLY)
+                             IS_SCALAR, MR_OPTIONAL, MR_TEXTURE_ONLY, IS_PURE_DATA)
         },
         .name = "(Mt)Lambert"
     };
@@ -368,15 +373,15 @@ inline TracerMock::TracerMock(bool pl)
         .attribInfo = MatAttributeInfoList
         {
             MatAttributeInfo("albedo", MRayDataType<MR_VECTOR_3>(),
-                             IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
+                             IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR),
             MatAttributeInfo("metallic", MRayDataType<MR_FLOAT>(),
-                             IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
+                             IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_PURE_DATA),
             MatAttributeInfo("specular", MRayDataType<MR_FLOAT>(),
-                             IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
+                             IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_PURE_DATA),
             MatAttributeInfo("roughness", MRayDataType<MR_FLOAT>(),
-                             IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
+                             IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_PURE_DATA),
             MatAttributeInfo("normalMap", MRayDataType<MR_VECTOR_3>(),
-                             IS_SCALAR, MR_OPTIONAL, MR_TEXTURE_ONLY)
+                             IS_SCALAR, MR_OPTIONAL, MR_TEXTURE_ONLY, IS_PURE_DATA)
         },
         .name = "(Mt)Unreal"
     };
@@ -404,7 +409,7 @@ inline TracerMock::TracerMock(bool pl)
         .attribInfo = LightAttributeInfoList
         {
             LightAttributeInfo("radiance", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
-                               MR_MANDATORY, MR_TEXTURE_OR_CONSTANT)
+                               MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR)
         },
         .name = "(L)Skysphere"
     };
@@ -413,7 +418,7 @@ inline TracerMock::TracerMock(bool pl)
         .attribInfo = LightAttributeInfoList
         {
             LightAttributeInfo("radiance", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
-                               MR_MANDATORY, MR_TEXTURE_OR_CONSTANT)
+                               MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR)
         },
         .name ="(L)Primitive(P)Triangle"
     };
@@ -422,13 +427,13 @@ inline TracerMock::TracerMock(bool pl)
         .attribInfo = LightAttributeInfoList
         {
             LightAttributeInfo("radiance", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
-                               MR_MANDATORY, MR_TEXTURE_OR_CONSTANT),
+                               MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR),
             LightAttributeInfo("position", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
-                               MR_MANDATORY, MR_CONSTANT_ONLY),
+                               MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA),
             LightAttributeInfo("right", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
-                               MR_MANDATORY, MR_CONSTANT_ONLY),
+                               MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA),
             LightAttributeInfo("up", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
-                               MR_MANDATORY, MR_CONSTANT_ONLY)
+                               MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA)
         },
         .name = "(L)Rectangle"
     };
@@ -488,9 +493,11 @@ inline TracerMock::TracerMock(bool pl)
         .attribInfo = TexturedAttributeInfoList
         {
             MediumAttributeInfo("absorbtion", MRayDataType<MR_VECTOR_3>(),
-                                IS_SCALAR, MR_MANDATORY, MR_CONSTANT_ONLY),
+                                IS_SCALAR, MR_MANDATORY,
+                                MR_CONSTANT_ONLY, IS_PURE_DATA),
             MediumAttributeInfo("ior", MRayDataType<MR_FLOAT>(),
-                                IS_SCALAR, MR_MANDATORY, MR_CONSTANT_ONLY)
+                                IS_SCALAR, MR_MANDATORY,
+                                MR_CONSTANT_ONLY, IS_PURE_DATA)
         },
         .name = "(Md)Homogeneous"
     };
@@ -992,25 +999,30 @@ inline void TracerMock::CommitTexColorSpace(MRayColorSpaceEnum colorSpace)
 }
 
 inline TextureId TracerMock::CreateTexture2D(Vector2ui dimensions, uint32_t mipCount,
-                                             MRayPixelEnum pixelType)
+                                             MRayPixelEnum pixelType,
+                                             AttributeIsColor isColorTexture)
 {
     size_t texId = textureCounter.fetch_add(1);
     if(print)
-        MRAY_LOG("Creating Texture2D({}) Dim: ({}, {}), Mip:{}, PixelType:{}",
+        MRAY_LOG("Creating Texture2D({}) Dim: ({}, {}), "
+                 "Mip:{}, PixelType:{}, IsColor:{}",
                  static_cast<uint32_t>(texId), dimensions[0], dimensions[1],
-                 mipCount, MRayPixelTypeStringifier::ToString(pixelType));
+                 mipCount, MRayPixelTypeStringifier::ToString(pixelType),
+                 (isColorTexture == AttributeIsColor::IS_COLOR) ? true : false);
     return TextureId(texId);
 }
 
 inline TextureId TracerMock::CreateTexture3D(Vector3ui dimensions, uint32_t mipCount,
-                                             MRayPixelEnum pixelType)
+                                             MRayPixelEnum pixelType,
+                                             AttributeIsColor isColorTexture)
 {
     size_t texId = textureCounter.fetch_add(1);
     if(print)
-        MRAY_LOG("Creating Texture3D({}) Dim: ({}, {}, {}), Mip:{}, PixelType:{}",
+        MRAY_LOG("Creating Texture3D({}) Dim: ({}, {}, {}), "
+                 "Mip:{}, PixelType:{}, IsColor:{}",
                  static_cast<uint32_t>(texId), dimensions[0], dimensions[1],
-                 dimensions[2], mipCount,
-                 MRayPixelTypeStringifier::ToString(pixelType));
+                 dimensions[2], mipCount, MRayPixelTypeStringifier::ToString(pixelType),
+                 (isColorTexture == AttributeIsColor::IS_COLOR) ? true : false);
     return TextureId(texId);
 }
 
@@ -1159,7 +1171,8 @@ inline void TracerMock::PushTransAttribute(TransGroupId gId, Vector2ui transRang
              MRayDataTypeStringifier::ToString(dataEnum), dataCount);
 }
 
-inline LightGroupId TracerMock::CreateLightGroup(std::string name)
+inline LightGroupId TracerMock::CreateLightGroup(std::string name,
+                                                 PrimGroupId primGId)
 {
     auto loc = lightMockPack.find(name);
     if(loc == lightMockPack.cend())
@@ -1167,7 +1180,7 @@ inline LightGroupId TracerMock::CreateLightGroup(std::string name)
 
     std::lock_guard<std::mutex> lock(lGLock);
     LightGroupId id = static_cast<LightGroupId>(lightGroupCounter++);
-    lightGroups.try_emplace(id, loc->second, id,
+    lightGroups.try_emplace(id, loc->second, id, primGId,
                             std::vector<LightId>(),
                             0, false);
     return id;

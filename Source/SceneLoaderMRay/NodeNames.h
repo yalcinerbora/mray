@@ -55,10 +55,12 @@ namespace NodeNames
     static constexpr string_view TRANSFORM_TYPE_IDENTITY    = "Identity"sv;
 
     // Texture Node Related Names
-    static constexpr string_view TEX_NODE_FILE      = "file"sv;
-    static constexpr string_view TEX_NODE_AS_SIGNED = "asSigned"sv;
-    static constexpr string_view TEX_NODE_IS_DATA   = "isData"sv;
-
+    static constexpr string_view TEX_NODE_FILE          = "file"sv;
+    static constexpr string_view TEX_NODE_AS_SIGNED     = "asSigned"sv;
+    static constexpr bool TEX_NODE_AS_SIGNED_DEFAULT    = false;
+    static constexpr string_view TEX_NODE_IS_DATA       = "isData"sv;
+    static constexpr string_view TEX_NODE_COLORIMETRIC  = "colorimetric"sv;
+    static constexpr bool TEX_NODE_COLORIMETRIC_DEFAULT = true;
 
     //static constexpr string_view TEXTURE_IS_CACHED  = "isCached"sv;
     //static constexpr string_view TEXTURE_FILTER     = "filter"sv;

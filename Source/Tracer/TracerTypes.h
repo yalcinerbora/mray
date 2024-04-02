@@ -9,8 +9,6 @@
 #include "Hit.h"
 #include "Key.h"
 
-
-
 template <std::unsigned_integral T>
 struct RNGDispenserT;
 
@@ -50,12 +48,6 @@ using SpectrumWavesT = Vector<SPS, T>;
 // For RGB values this should at least be 3
 using Spectrum      = SpectrumT<SpectraPerSpectrum, Float>;
 using SpectrumWaves = SpectrumWavesT<SpectraPerSpectrum, Float>;
-
-// Similar to the other types this
-class SpectrumGroup
-{
-
-};
 
 // Some key types
 // these are defined seperately for fine-tuning

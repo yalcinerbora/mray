@@ -32,7 +32,7 @@ class ParamVaryingData
 template <class C>
 concept SpectrumConverterC = requires(C c)
 {
-    {c.Convert(Optional<Spectrum>{})} -> std::same_as<Optional<Spectrum>>;
+    {c.Convert(Optional<Vector3>{})} -> std::same_as<Optional<Spectrum>>;
 };
 
 template <class C>
@@ -53,13 +53,13 @@ struct RendererSpectrum
 
     public:
     MRAY_HYBRID             RendererSpectrum(const Converter& c);
-    MRAY_HYBRID Spectrum    operator()(const Spectrum& s) const;
+    MRAY_HYBRID Spectrum    operator()(const Vector3& s) const;
 };
 
 template<class Converter, uint32_t DIMS>
 class RendererParamVaryingSpectrum
 {
-    using PVD = ParamVaryingData<DIMS, Spectrum>;
+    using PVD = ParamVaryingData<DIMS, Vector3>;
 
     private:
     Ref<const Converter>        converter;
@@ -94,7 +94,7 @@ struct SpectrumConverterContext
 // Concerete Identity Spectrum Converter
 struct SpectrumConverterIdentity
 {
-    MRAY_HYBRID Optional<Spectrum> Convert(const Optional<Spectrum>& c) const;
+    MRAY_HYBRID Optional<Spectrum> Convert(const Optional<Vector3>& c) const;
 };
 
 using SpectrumConverterContextIdentity = SpectrumConverterContext<SpectrumConverterIdentity>;
@@ -156,14 +156,14 @@ RendererSpectrum<C>::RendererSpectrum(const C& c)
 
 template<class C>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum RendererSpectrum<C>::operator()(const Spectrum& s) const
+Spectrum RendererSpectrum<C>::operator()(const Vector3& s) const
 {
     return c.Convert(s);
 }
 
 template<class C, uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
-RendererParamVaryingSpectrum<C, D>::RendererParamVaryingSpectrum(const C& c, const ParamVaryingData<D, Spectrum>& p)
+RendererParamVaryingSpectrum<C, D>::RendererParamVaryingSpectrum(const C& c, const ParamVaryingData<D, Vector3>& p)
     : converter(c)
     , input(p)
 {}
@@ -195,7 +195,8 @@ Optional<Spectrum> RendererParamVaryingSpectrum<C, D>::operator()(Vector<D, Floa
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Optional<Spectrum> SpectrumConverterIdentity::Convert(const Optional<Spectrum>& c) const
+Optional<Spectrum> SpectrumConverterIdentity::Convert(const Optional<Vector3>& c) const
 {
-    return c;
+    if(!c.has_value()) return std::nullopt;
+    return Spectrum(c.value(), Float(0));
 }

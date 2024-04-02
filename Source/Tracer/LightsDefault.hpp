@@ -329,20 +329,95 @@ static_assert(LightC<LightSkysphere<CoOctoCoordConverter>>);
 
 
 template <PrimitiveGroupC PG>
+void LightGroupPrim<PG>::HandlePrimBatches(const PrimBatchList&)
+{
+
+}
+
+template <PrimitiveGroupC PG>
 std::string_view LightGroupPrim<PG>::TypeName()
 {
-    using namespace std::literals;
-    static const std::string name = "(L)"sv + PG::TypeName() + "Light"sv;
+    using namespace std::string_literals;
+    static const std::string name = "(L)"s + std::string(PG::TypeName()) + "Light"s;
     return name;
 }
 
 template <PrimitiveGroupC PG>
 LightGroupPrim<PG>::LightGroupPrim(uint32_t groupId,
                                    const GPUSystem& system,
-                                   const PG& pg)
-    : system(system)
-    , primGroup(pg)
+                                   const TextureView2DMap& map,
+                                   const PrimGroup& primGroup)
+    : Parent(groupId, system, map)
+    , primGroup(primGroup)
 {}
+
+template <PrimitiveGroupC PG>
+void LightGroupPrim<PG>::CommitReservations()
+{
+
+}
+
+template <PrimitiveGroupC PG>
+LightAttributeInfoList LightGroupPrim<PG>::AttributeInfo() const
+{
+    return LightAttributeInfoList{};
+}
+
+template <PrimitiveGroupC PG>
+void LightGroupPrim<PG>::PushAttribute(LightKey id,
+                                       uint32_t attributeIndex,
+                                       TransientData data,
+                                       const GPUQueue& queue)
+{
+
+}
+
+template <PrimitiveGroupC PG>
+void LightGroupPrim<PG>::PushAttribute(LightKey id,
+                                       uint32_t attributeIndex,
+                                       const Vector2ui& subRange,
+                                       TransientData data,
+                                       const GPUQueue& queue)
+{
+
+}
+
+template <PrimitiveGroupC PG>
+void LightGroupPrim<PG>::PushAttribute(LightKey idStart, LightKey idEnd,
+                                       uint32_t attributeIndex,
+                                       TransientData data,
+                                       const GPUQueue& queue)
+{
+
+}
+
+template <PrimitiveGroupC PG>
+void LightGroupPrim<PG>::PushTex2DAttribute(LightKey idStart, LightKey idEnd,
+                                            uint32_t attributeIndex,
+                                            TransientData,
+                                            std::vector<Optional<TextureId>>,
+                                            const GPUQueue& queue)
+{
+
+}
+
+template <PrimitiveGroupC PG>
+void LightGroupPrim<PG>::PushTex2DAttribute(LightKey idStart, LightKey idEnd,
+                                            uint32_t attributeIndex,
+                                            std::vector<Optional<TextureId>>,
+                                            const GPUQueue& queue)
+{
+
+}
+
+template <PrimitiveGroupC PG>
+void LightGroupPrim<PG>::PushTex2DAttribute(LightKey idStart, LightKey idEnd,
+                                            uint32_t attributeIndex,
+                                            std::vector<TextureId>,
+                                            const GPUQueue& queue)
+{
+
+}
 
 template <PrimitiveGroupC PG>
 typename LightGroupPrim<PG>::DataSoA LightGroupPrim<PG>::SoA() const
@@ -357,6 +432,10 @@ const PG& LightGroupPrim<PG>::PrimitiveGroup() const
 }
 
 template <LightDetail::CoordConverterC CC>
+void LightGroupSkysphere<CC>::HandlePrimBatches(const PrimBatchList&)
+{}
+
+template <LightDetail::CoordConverterC CC>
 std::string_view LightGroupSkysphere<CC>::TypeName()
 {
     using namespace std::literals;
@@ -368,11 +447,79 @@ std::string_view LightGroupSkysphere<CC>::TypeName()
 template <LightDetail::CoordConverterC CC>
 LightGroupSkysphere<CC>::LightGroupSkysphere(uint32_t groupId,
                                              const GPUSystem& system,
+                                             const TextureView2DMap& map,
                                              const PrimGroup& primGroup)
-    : system(system)
+    : Parent(groupId, system, map)
     , primGroup(primGroup)
-    , groupId(groupId)
 {}
+
+template <LightDetail::CoordConverterC CC>
+void LightGroupSkysphere<CC>::CommitReservations()
+{
+
+}
+
+template <LightDetail::CoordConverterC CC>
+LightAttributeInfoList LightGroupSkysphere<CC>::AttributeInfo() const
+{
+    return LightAttributeInfoList{};
+}
+
+template <LightDetail::CoordConverterC CC>
+void LightGroupSkysphere<CC>::PushAttribute(LightKey id,
+                                            uint32_t attributeIndex,
+                                            TransientData data,
+                                            const GPUQueue& queue)
+{
+
+}
+
+template <LightDetail::CoordConverterC CC>
+void LightGroupSkysphere<CC>::PushAttribute(LightKey id,
+                                            uint32_t attributeIndex,
+                                            const Vector2ui& subRange,
+                                            TransientData data,
+                                            const GPUQueue& queue)
+{
+
+}
+
+template <LightDetail::CoordConverterC CC>
+void LightGroupSkysphere<CC>::PushAttribute(LightKey idStart, LightKey idEnd,
+                                            uint32_t attributeIndex,
+                                            TransientData data,
+                                            const GPUQueue& queue)
+{
+
+}
+
+template <LightDetail::CoordConverterC CC>
+void LightGroupSkysphere<CC>::PushTex2DAttribute(LightKey idStart, LightKey idEnd,
+                                                 uint32_t attributeIndex,
+                                                 TransientData,
+                                                 std::vector<Optional<TextureId>>,
+                                                 const GPUQueue& queue)
+{
+
+}
+
+template <LightDetail::CoordConverterC CC>
+void LightGroupSkysphere<CC>::PushTex2DAttribute(LightKey idStart, LightKey idEnd,
+                                                 uint32_t attributeIndex,
+                                                 std::vector<Optional<TextureId>>,
+                                                 const GPUQueue& queue)
+{
+
+}
+
+template <LightDetail::CoordConverterC CC>
+void LightGroupSkysphere<CC>::PushTex2DAttribute(LightKey idStart, LightKey idEnd,
+                                                 uint32_t attributeIndex,
+                                                 std::vector<TextureId>,
+                                                 const GPUQueue& queue)
+{
+
+}
 
 template <LightDetail::CoordConverterC CC>
 typename LightGroupSkysphere<CC>::DataSoA LightGroupSkysphere<CC>::SoA() const

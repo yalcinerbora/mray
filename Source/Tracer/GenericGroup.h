@@ -13,8 +13,19 @@
 #include "TransientPool/TransientPool.h"
 
 #include "Device/GPUSystem.h"
-#include "TracerTypes.h"
 
+#include "TracerTypes.h"
+#include "ParamVaryingData.h"
+
+// Texture Related types
+using GenericTextureView2D = Variant
+<
+    TextureView<2, Float>,
+    TextureView<2, Vector2>,
+    TextureView<2, Vector3>,
+    TextureView<2, Vector4>
+>;
+using TextureView2DMap = std::map<TextureId, GenericTextureView2D>;
 
 using AttributeRanges = StaticVector<Vector<2, size_t>,
                                      TracerConstants::MaxAttributePerGroup>;
@@ -138,6 +149,71 @@ class GenericGroupT : public GenericGroupI<IdTypeT, AttribInfoT>
     IdList                      Reserve(const std::vector<AttributeCountList>&) override;
     virtual bool                IsInCommitState() const override;
     virtual size_t              GPUMemoryUsage() const override;
+};
+
+template<class Child, class IdType, class AttributeInfoType>
+class GenericTexturedGroupT : public GenericGroupT<Child, IdType, AttributeInfoType>
+{
+    using Parent = GenericGroupT<Child, IdType, AttributeInfoType>;
+
+    template<class T>
+    std::vector<TextureView<2, T>>
+        ConvertToView(std::vector<TextureId> texIds,
+                      uint32_t attributeIndex) const;
+
+    template<class T>
+    std::vector<Optional<TextureView<2, T>>>
+        ConvertToView(std::vector<Optional<TextureId>> texIds,
+                      uint32_t attributeIndex) const;
+
+    protected:
+    const TextureView2DMap& globalTextureViews;
+
+    template<class T>
+    void            GenericPushTex2DAttribute(Span<ParamVaryingData<2, T>>,
+                                              //
+                                              IdType idStart, IdType idEnd,
+                                              uint32_t attributeIndex,
+                                              TransientData,
+                                              std::vector<Optional<TextureId>>,
+                                              const GPUQueue& queue);
+    template<class T>
+    void            GenericPushTex2DAttribute(Span<Optional<TextureView<2, T>>>,
+                                              //
+                                              IdType idStart, IdType idEnd,
+                                              uint32_t attributeIndex,
+                                              std::vector<Optional<TextureId>>,
+                                              const GPUQueue& queue);
+
+    template<class T>
+    void            GenericPushTex2DAttribute(Span<TextureView<2, T>>,
+                                              //
+                                              IdType idStart, IdType idEnd,
+                                              uint32_t attributeIndex,
+                                              std::vector<TextureId>,
+                                              const GPUQueue& queue);
+
+    public:
+    // Constructors & Destructor
+    GenericTexturedGroupT(uint32_t groupId, const GPUSystem&,
+                          const TextureView2DMap&,
+                          size_t allocationGranularity = 2_MiB,
+                          size_t initialReservartionSize = 4_MiB);
+
+    // Extra textured functionality
+    virtual void    PushTex2DAttribute(IdType idStart, IdType idEnd,
+                                       uint32_t attributeIndex,
+                                       TransientData,
+                                       std::vector<Optional<TextureId>>,
+                                       const GPUQueue& queue) = 0;
+    virtual void    PushTex2DAttribute(IdType idStart, IdType idEnd,
+                                       uint32_t attributeIndex,
+                                       std::vector<Optional<TextureId>>,
+                                       const GPUQueue& queue) = 0;
+    virtual void    PushTex2DAttribute(IdType idStart, IdType idEnd,
+                                       uint32_t attributeIndex,
+                                       std::vector<TextureId>,
+                                       const GPUQueue& queue) = 0;
 };
 
 template<class C, class ID, class AI>
@@ -281,4 +357,162 @@ template<class C, class ID, class AI>
 size_t GenericGroupT<C, ID, AI>::GPUMemoryUsage() const
 {
     return deviceMem.Size();
+}
+
+template<class C, class I, class A>
+template<class T>
+std::vector<TextureView<2, T>>
+GenericTexturedGroupT<C, I, A>::ConvertToView(std::vector<TextureId> texIds,
+                                              uint32_t attributeIndex) const
+{
+    using ViewType = TextureView<2, T>;
+    std::vector<ViewType> result;
+    result.reserve(texIds.size());
+    for(const auto& texId : texIds)
+    {
+        const GenericTextureView2D& view = globalTextureViews.at(texId);
+        if(!std::holds_alternative<ViewType>(view))
+        {
+            MRAY_ERROR_LOG("{:s}: Given texture view does not have "
+                           "a correct type for, Attribute {:d}",
+                           C::TypeName(), attributeIndex);
+            return std::vector<Optional<TextureView<2, T>>>{};
+        }
+        result.push_back(std::get<ViewType>(view));
+    }
+    return result;
+}
+
+template<class C, class I, class A>
+template<class T>
+std::vector<Optional<TextureView<2, T>>>
+GenericTexturedGroupT<C, I, A>::ConvertToView(std::vector<Optional<TextureId>> texIds,
+                                              uint32_t attributeIndex) const
+{
+    using ViewType = TextureView<2, T>;
+
+    std::vector<Optional<ViewType>> result;
+    result.reserve(texIds.size());
+    for(const auto& texId : texIds)
+    {
+        if(!texId)
+        {
+            result.push_back(std::nullopt);
+            continue;
+        }
+
+        const GenericTextureView2D& view = globalTextureViews.at(texId.value());
+        if(!std::holds_alternative<ViewType>(view))
+        {
+            MRAY_ERROR_LOG("{:s}: Given texture view does not have "
+                           "a correct type for, Attribute {:d}",
+                           C::TypeName(), attributeIndex);
+            return std::vector<Optional<TextureView<2, T>>>{};
+        }
+        result.push_back(std::get<ViewType>(view));
+    }
+    return result;
+}
+
+
+template<class C, class I, class A>
+GenericTexturedGroupT<C, I, A>::GenericTexturedGroupT(uint32_t groupId, const GPUSystem& gpuSystem,
+                                                      const TextureView2DMap& map,
+                                                      size_t allocationGranularity,
+                                                      size_t initialReservartionSize)
+    : Parent(groupId, gpuSystem,
+             allocationGranularity,
+             initialReservartionSize)
+    , globalTextureViews(map)
+{}
+
+template<class C, class I, class A>
+template<class T>
+void GenericTexturedGroupT<C, I, A>::GenericPushTex2DAttribute(Span<ParamVaryingData<2, T>> dAttributeSpan,
+                                                               //
+                                                               I idStart, I idEnd,
+                                                               uint32_t attributeIndex,
+                                                               TransientData hData,
+                                                               std::vector<Optional<TextureId>> optionalTexIds,
+                                                               const GPUQueue& queue)
+{
+    auto hOptTexViews = ConvertToView<T>(std::move(optionalTexIds),
+                                         attributeIndex);
+
+    // Now we need to be careful
+    auto rangeStart = this->itemRanges.at(idStart.FetchIndexPortion())[attributeIndex];
+    auto rangeEnd = this->itemRanges.at(idEnd.FetchIndexPortion())[attributeIndex];
+    size_t count = rangeEnd[1] - rangeStart[0];
+    Span<ParamVaryingData<2, T>> dSubspan = dAttributeSpan.subspan(rangeStart[0], count);
+
+    assert(dSubspan.size() == hOptTexViews.size());
+    assert(hOptTexViews.size() == hData.Size<T>());
+
+    // Construct in host, then memcpy
+    std::vector<ParamVaryingData<2, T>> hParamVaryingData;
+    hParamVaryingData.reserve(dSubspan.size());
+    Span<const T> hDataSpan = hData.AccessAs<T>();
+    for(size_t i = 0; i < hOptTexViews.size(); i++)
+    {
+        auto pvd = hOptTexViews[i].has_value()
+            ? ParamVaryingData<2, T>(hOptTexViews[i].value())
+            : ParamVaryingData<2, T>(hDataSpan[i]);
+        hParamVaryingData.push_back(pvd);
+    }
+    auto hParamVaryingDataSpan = Span<const ParamVaryingData<2, T>>(hParamVaryingData.cbegin(),
+                                                                    hParamVaryingData.cend());
+    queue.MemcpyAsync(dSubspan, hParamVaryingDataSpan);
+    // TODO: Try to find a way to remove this wait
+    queue.Barrier().Wait();
+
+}
+
+template<class C, class I, class A>
+template<class T>
+void GenericTexturedGroupT<C, I, A>::GenericPushTex2DAttribute(Span<Optional<TextureView<2, T>>> dAttributeSpan,
+                                                               //
+                                                               I idStart, I idEnd,
+                                                               uint32_t attributeIndex,
+                                                               std::vector<Optional<TextureId>> optionalTexIds,
+                                                               const GPUQueue& queue)
+{
+    auto hOptTexViews = ConvertToView<T>(std::move(optionalTexIds),
+                                         attributeIndex);
+
+    // YOLO memcpy here! Hopefully it works
+    auto rangeStart = this->itemRanges.at(idStart.FetchIndexPortion())[attributeIndex];
+    auto rangeEnd = this->itemRanges.at(idEnd.FetchIndexPortion())[attributeIndex];
+    size_t count = rangeEnd[1] - rangeStart[0];
+    Span<Optional<TextureView<2, T>>> dSubspan = dAttributeSpan.subspan(rangeStart[0],
+                                                                        count);
+    Span<Optional<TextureView<2, T>>> hSpan(hOptTexViews.begin(), hOptTexViews.end());
+    assert(hSpan.size() == dSubspan.size());
+    queue.MemcpyAsync(dSubspan, ToConstSpan(hSpan));
+    // TODO: Try to find a way to remove this wait
+    queue.Barrier().Wait();
+}
+
+template<class C, class I, class A>
+template<class T>
+void GenericTexturedGroupT<C, I, A>::GenericPushTex2DAttribute(Span<TextureView<2, T>> dAttributeSpan,
+                                                               //
+                                                               I idStart, I idEnd,
+                                                               uint32_t attributeIndex,
+                                                               std::vector<TextureId> textureIds,
+                                                               const GPUQueue& queue)
+{
+    auto hTexViews = ConvertToView<T>(std::move(textureIds),
+                                      attributeIndex);
+
+    // YOLO memcpy here! Hopefully it works
+    auto rangeStart = this->itemRanges.at(idStart.FetchIndexPortion())[attributeIndex];
+    auto rangeEnd = this->itemRanges.at(idEnd.FetchIndexPortion())[attributeIndex];
+    size_t count = rangeEnd[1] - rangeStart[0];
+    Span<TextureView<2, T>> dSubspan = dAttributeSpan.subspan(rangeStart[0],
+                                                              count);
+    Span<TextureView<2, T>> hSpan(hTexViews.cbegin(), hTexViews.cend());
+    assert(hSpan.size() == dSubspan.size());
+    queue.MemcpyAsync(dSubspan, ToConstSpan(hSpan));
+    // TODO: Try to find a way to remove this wait
+    queue.Barrier().Wait();
 }

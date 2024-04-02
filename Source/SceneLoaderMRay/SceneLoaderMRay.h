@@ -50,7 +50,7 @@ class SceneLoaderMRay : public SceneLoaderI
 
     // Temporary Internal Data
     using TypeMappedNodes   = std::map<std::string, std::vector<JsonNode>>;
-    using TexMappedNodes    = std::vector<Pair<NodeTexStruct, JsonNode>>;
+    using TexMappedNodes    = std::vector<Tuple<NodeTexStruct, JsonNode, bool>>;
     TypeMappedNodes     primNodes;
     TypeMappedNodes     cameraNodes;
     TypeMappedNodes     transformNodes;

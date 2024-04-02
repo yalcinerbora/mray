@@ -15,14 +15,14 @@ namespace LightDetail
 
     struct alignas(32) LightData
     {
-        Span<const ParamVaryingData<2, Spectrum>>   dRadiances;
+        Span<const ParamVaryingData<2, Vector3>>    dRadiances;
         Span<const MediumId>                        dMediumIds;
         Bitspan<const uint32_t>                     dIsTwoSidedFlags;
     };
 
     struct alignas(32) LightSkysphereData
     {
-        Span<const ParamVaryingData<2, Spectrum>>   dRadiances;
+        Span<const ParamVaryingData<2, Vector3>>    dRadiances;
         Span<const MediumId>                        dMediumIds;
         Span<const DistributionPwC2D>               dDistributions;
         Float                                       sceneDiameter;
@@ -163,8 +163,10 @@ namespace LightDetail
 }
 
 template <PrimitiveGroupC PrimGroupT>
-class LightGroupPrim
+class LightGroupPrim final : public GenericLightGroup<LightGroupPrim<PrimGroupT>>
 {
+    using Parent        = GenericLightGroup<LightGroupPrim<PrimGroupT>>;
+
     public:
     using PrimGroup     = PrimGroupT;
     using DataSoA       = typename LightDetail::LightData;
@@ -178,16 +180,54 @@ class LightGroupPrim
     using Light = typename LightDetail::LightPrim<Primitive<TransformContext>, SpectrumConverterContext>;
 
     private:
-    uint32_t            groupId;
-    const GPUSystem&    system;
     const PrimGroup&    primGroup;
-    DataSoA             soa;
+    Span<ParamVaryingData<2, Vector3>>  dRadiances;
+    Span<MediumKey>                     dMediumIds;
+    Bitspan<uint32_t>                   dIsTwoSidedFlags;
+    DataSoA                             soa;
+
+    protected:
+    void        HandlePrimBatches(const PrimBatchList&) override;
 
     public:
     static std::string_view TypeName();
-                            LightGroupPrim(uint32_t groupId,
-                                           const GPUSystem& system,
-                                           const PrimGroup& primGroup);
+
+    public:
+    // Constructors & Destructor
+                LightGroupPrim(uint32_t groupId,
+                               const GPUSystem& system,
+                               const TextureView2DMap&,
+                               const PrimGroup&);
+
+    void                    CommitReservations() override;
+    LightAttributeInfoList  AttributeInfo() const override;
+
+    void            PushAttribute(LightKey id,
+                                  uint32_t attributeIndex,
+                                  TransientData data,
+                                  const GPUQueue& queue) override;
+    void            PushAttribute(LightKey id,
+                                  uint32_t attributeIndex,
+                                  const Vector2ui& subRange,
+                                  TransientData data,
+                                  const GPUQueue& queue) override;
+    void            PushAttribute(LightKey idStart, LightKey idEnd,
+                                  uint32_t attributeIndex,
+                                  TransientData data,
+                                  const GPUQueue& queue) override;
+    void            PushTex2DAttribute(LightKey idStart, LightKey idEnd,
+                                       uint32_t attributeIndex,
+                                       TransientData,
+                                       std::vector<Optional<TextureId>>,
+                                       const GPUQueue& queue) override;
+    void            PushTex2DAttribute(LightKey idStart, LightKey idEnd,
+                                       uint32_t attributeIndex,
+                                       std::vector<Optional<TextureId>>,
+                                       const GPUQueue& queue) override;
+    void            PushTex2DAttribute(LightKey idStart, LightKey idEnd,
+                                       uint32_t attributeIndex,
+                                       std::vector<TextureId>,
+                                       const GPUQueue& queue) override;
 
     DataSoA                 SoA() const;
     const PrimGroup&        PrimitiveGroup() const;
@@ -195,8 +235,10 @@ class LightGroupPrim
 };
 
 template <LightDetail::CoordConverterC CoordConverter>
-class LightGroupSkysphere
+class LightGroupSkysphere final : public GenericLightGroup<LightGroupSkysphere<CoordConverter>>
 {
+    using Parent            = GenericLightGroup<LightGroupSkysphere<CoordConverter>>;
+    using DistributionPwC2D = typename DistributionGroupPwC2D::Distribution;
     public:
     using PrimGroup     = EmptyPrimGroup;
     using DataSoA       = typename LightDetail::LightSkysphereData;
@@ -210,25 +252,66 @@ class LightGroupSkysphere
     using Light = typename LightDetail::LightSkysphere<CoordConverter, TransformContext, SpectrumConverterContext>;
 
     private:
-    uint32_t            groupId;
-    const GPUSystem&    system;
-    const PrimGroup&    primGroup;
-    DataSoA             soa;
+    const PrimGroup&                    primGroup;
+    Span<ParamVaryingData<2, Vector3>>  dRadiances;
+    Span<MediumId>                      dMediumIds;
+    Span<DistributionPwC2D>             dDistributions;
+    Float                               sceneDiameter;
+    DataSoA                             soa;
+
+    protected:
+    void                    HandlePrimBatches(const PrimBatchList&) override;
 
     public:
     static std::string_view TypeName();
 
-                            LightGroupSkysphere(uint32_t groupId,
-                                                const GPUSystem& system,
-                                                const PrimGroup& primGroup);
+    public:
+    //
+                LightGroupSkysphere(uint32_t groupId,
+                                    const GPUSystem& system,
+                                    const TextureView2DMap&,
+                                    const PrimGroup&);
+
+
+    void                    CommitReservations() override;
+    LightAttributeInfoList  AttributeInfo() const override;
+
+    void            PushAttribute(LightKey id,
+                                  uint32_t attributeIndex,
+                                  TransientData data,
+                                  const GPUQueue& queue) override;
+    void            PushAttribute(LightKey id,
+                                  uint32_t attributeIndex,
+                                  const Vector2ui& subRange,
+                                  TransientData data,
+                                  const GPUQueue& queue) override;
+    void            PushAttribute(LightKey idStart, LightKey idEnd,
+                                  uint32_t attributeIndex,
+                                  TransientData data,
+                                  const GPUQueue& queue) override;
+    void            PushTex2DAttribute(LightKey idStart, LightKey idEnd,
+                                       uint32_t attributeIndex,
+                                       TransientData,
+                                       std::vector<Optional<TextureId>>,
+                                       const GPUQueue& queue) override;
+    void            PushTex2DAttribute(LightKey idStart, LightKey idEnd,
+                                       uint32_t attributeIndex,
+                                       std::vector<Optional<TextureId>>,
+                                       const GPUQueue& queue) override;
+    void            PushTex2DAttribute(LightKey idStart, LightKey idEnd,
+                                       uint32_t attributeIndex,
+                                       std::vector<TextureId>,
+                                       const GPUQueue& queue) override;
 
     DataSoA                 SoA() const;
     const PrimGroup&        PrimitiveGroup() const;
 
 };
 
-#include "Lights.hpp"
+#include "LightsDefault.hpp"
 
 using CoOctoCoordConverter = LightDetail::CoOctoCoordConverter;
 using SphericalCoordConverter = LightDetail::SphericalCoordConverter;
 
+extern template class LightGroupSkysphere<CoOctoCoordConverter>;
+extern template class LightGroupSkysphere<SphericalCoordConverter>;

@@ -6,7 +6,7 @@
 
 #include "Tracer/PrimitiveDefaultTriangle.h"
 #include "Tracer/LightC.h"
-#include "Tracer/Lights.h"
+#include "Tracer/LightsDefault.h"
 
 #include "Core/Log.h"
 
@@ -44,8 +44,8 @@ TEST(DefaultLights, MetaLight)
     TransformGroupIdentity identityTG(0u, system);
     TransformGroupSingle singleTG(1u, system);
     // LGs
-    LightGroupPrim<PrimGroupTriangle> triangleLightGroup(0u, system, triangleGroup);
-    LightGroupSkysphereCoOcto skysphereCOLightGroup(0u, system, emptyPrimGroup);
+    LightGroupPrim<PrimGroupTriangle> triangleLightGroup(0u, system, {}, triangleGroup);
+    LightGroupSkysphereCoOcto skysphereCOLightGroup(0u, system, {}, emptyPrimGroup);
 
     // Add ids
 

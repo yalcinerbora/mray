@@ -91,8 +91,12 @@ void PrimGroupTriangle::PushAttribute(PrimBatchKey batchKey,
         case 1  : PushData(dTBNRotations);  break;  // Normal
         case 2  : PushData(dUVs);           break;  // UVs
         case 3  : PushData(dIndexList);     break;  // Indices
-        default : MRAY_WARNING_LOG("{:s}: Unknown Attribute Index {:d}",
-                                   TypeName(), attributeIndex);
+        default :
+        {
+            MRAY_ERROR_LOG("{:s}: Unknown Attribute Index {:d}",
+                           TypeName(), attributeIndex);
+            return;
+        }
     }
 
     if(attributeIndex != 3) return;
@@ -126,8 +130,12 @@ void PrimGroupTriangle::PushAttribute(PrimBatchKey batchKey,
         case 1  : PushData(dTBNRotations);  break;  // Normal
         case 2  : PushData(dUVs);           break;  // UVs
         case 3  : PushData(dIndexList);     break;  // Indices
-        default : MRAY_WARNING_LOG("{:s}: Unknown Attribute Index {:d}",
-                                   TypeName(), attributeIndex);
+        default :
+        {
+            MRAY_ERROR_LOG("{:s}: Unknown Attribute Index {:d}",
+                           TypeName(), attributeIndex);
+            return;
+        }
     }
 
     if(attributeIndex != 3) return;
@@ -162,8 +170,12 @@ void PrimGroupTriangle::PushAttribute(PrimBatchKey idStart, PrimBatchKey idEnd,
         case 1  : PushData(dTBNRotations);  break;  // Normal
         case 2  : PushData(dUVs);           break;  // UVs
         case 3  : PushData(dIndexList);     break;  // Indices
-        default : MRAY_WARNING_LOG("{:s}: Unknown Attribute Index {:d}",
-                                   TypeName(), attributeIndex);
+        default:
+        {
+            MRAY_ERROR_LOG("{:s}: Unknown Attribute Index {:d}",
+                           TypeName(), attributeIndex);
+            return;
+        }
     }
 
     if(attributeIndex != 3) return;
@@ -262,8 +274,12 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey, uint32_t att
         case 3  : PushData(dSkinWeights);   break;  // Weights
         case 4  : PushData(dSkinIndices);   break;  // Weights
         case 5  : PushData(dIndexList);     break;  // Indices
-        default : MRAY_WARNING_LOG("{:s}: Unknown Attribute Index {:d}",
-                                   TypeName(), attributeIndex);
+        default :
+        {
+            MRAY_ERROR_LOG("{:s}: Unknown Attribute Index {:d}",
+                           TypeName(), attributeIndex);
+            return;
+        }
     }
 
     if(attributeIndex != 3) return;
@@ -298,8 +314,12 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey,
         case 3  : PushData(dSkinWeights);   break;  // Weights
         case 4  : PushData(dSkinIndices);   break;  // WeightIndices
         case 5  : PushData(dIndexList);     break;  // Indices
-        default : MRAY_WARNING_LOG("{:s}: Unknown Attribute Index {:d}",
-                                   TypeName(), attributeIndex);
+        default :
+        {
+            MRAY_ERROR_LOG("{:s}: Unknown Attribute Index {:d}",
+                           TypeName(), attributeIndex);
+            return;
+        }
     }
 
     if(attributeIndex != 3) return;
@@ -336,8 +356,12 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey idStart, PrimBatchKey 
         case 3: PushData(dSkinWeights);     break;  // Weights
         case 4: PushData(dSkinIndices);     break;  // WeightIndices
         case 5: PushData(dIndexList);       break;  // Indices
-        default: MRAY_WARNING_LOG("{:s}: Unknown Attribute Index {:d}",
-                                  TypeName(), attributeIndex);
+        default :
+        {
+            MRAY_ERROR_LOG("{:s}: Unknown Attribute Index {:d}",
+                           TypeName(), attributeIndex);
+            return;
+        }
     }
 
     if(attributeIndex != 3) return;

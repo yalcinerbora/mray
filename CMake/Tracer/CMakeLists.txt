@@ -34,8 +34,9 @@ set(SRC_MEDIUMS
 
 set(SRC_LIGHTS
     ${CURRENT_SOURCE_DIR}/LightC.h
-    ${CURRENT_SOURCE_DIR}/Lights.h
-    ${CURRENT_SOURCE_DIR}/Lights.hpp)
+    ${CURRENT_SOURCE_DIR}/LightsDefault.h
+    ${CURRENT_SOURCE_DIR}/LightsDefault.hpp
+    ${CURRENT_SOURCE_DIR}/LightsDefault.cu)
 
 set(SRC_ACCELLERATORS
     ${CURRENT_SOURCE_DIR}/AcceleratorC.h
