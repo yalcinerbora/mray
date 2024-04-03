@@ -1,11 +1,15 @@
 set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/Visor)
 
 set(SRC_WINDOW
-    ${CURRENT_SOURCE_DIR}/Visor.cpp
-    ${CURRENT_SOURCE_DIR}/Visor.h
+    ${CURRENT_SOURCE_DIR}/VisorWindow.cpp
+    ${CURRENT_SOURCE_DIR}/VisorWindow.h
     ${CURRENT_SOURCE_DIR}/VisorI.h)
 
 set(SRC_COMMON
+    ${CURRENT_SOURCE_DIR}/VulkanAllocators.cpp
+    ${CURRENT_SOURCE_DIR}/VulkanAllocators.h
+    ${CURRENT_SOURCE_DIR}/Visor.cpp
+    ${CURRENT_SOURCE_DIR}/Visor.h
     ${CURRENT_SOURCE_DIR}/EntryPoint.cpp
     ${CURRENT_SOURCE_DIR}/EntryPoint.h)
 

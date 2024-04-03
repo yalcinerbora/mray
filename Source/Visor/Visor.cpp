@@ -3,73 +3,14 @@
 #include "Core/MRayDescriptions.h"
 #include "Core/DataStructures.h"
 #include "Core/MemAlloc.h"
-#include "Core/System.h"
+
 
 #include <Imgui/imgui.h>
 #include <Imgui/imgui_impl_glfw.h>
 #include <Imgui/imgui_impl_vulkan.h>
 
-void* VKAPI_CALL VulkanHostAllocator::Allocate(void*, size_t size, size_t align,
-                                               VkSystemAllocationScope)
-{
-    #ifdef MRAY_WINDOWS
-        return _aligned_malloc(size, align);
-    #elif defined MRAY_LINUX
-        return aligned_alloc(size, align);
-    #endif
-}
-
-void* VKAPI_CALL VulkanHostAllocator::Realloc(void*, void* ptr,
-                                              size_t size, size_t align,
-                                              VkSystemAllocationScope)
-{
-    #ifdef MRAY_WINDOWS
-        return _aligned_realloc(ptr, size, align);
-    #elif defined MRAY_LINUX
-    {
-        //https://stackoverflow.com/questions/64884745/is-there-a-linux-equivalent-of-aligned-realloc
-        auto newPtr = aligned_alloc(size, align);
-        auto oldSize = malloc_usable_size(ptr);
-        std::memcpy(newPtr, ptr, oldSize);
-        std::free(ptr);
-    }
-    #endif
-}
-
-void VKAPI_CALL VulkanHostAllocator::Free(void*, void* ptr)
-{
-    #ifdef MRAY_WINDOWS
-        _aligned_free(ptr);
-    #elif defined MRAY_LINUX
-        free(ptr);
-    #endif
-}
-
-void VKAPI_CALL VulkanHostAllocator::InternalAllocNotify(void*, size_t size,
-                                                         VkInternalAllocationType type,
-                                                         VkSystemAllocationScope scope)
-{
-}
-
-void VKAPI_CALL VulkanHostAllocator::InternalFreeNotify(void*, size_t size,
-                                                        VkInternalAllocationType type,
-                                                        VkSystemAllocationScope scope)
-{
-}
-
-const VkAllocationCallbacks* VulkanHostAllocator::Functions()
-{
-    static const VkAllocationCallbacks result =
-    {
-        .pUserData = nullptr,
-        .pfnAllocation = &Allocate,
-        .pfnReallocation = &Realloc,
-        .pfnFree = &Free,
-        .pfnInternalAllocation = &InternalAllocNotify,
-        .pfnInternalFree = InternalFreeNotify
-    };
-    return &result;
-}
+#include "VisorWindow.h"
+#include "VulkanAllocators.h"
 
 VKAPI_ATTR VkBool32 VKAPI_CALL
 VisorDebugSystem::Callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -110,7 +51,6 @@ VisorDebugSystem::Callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverit
     return VK_FALSE;
 }
 
-
 MRayError VisorDebugSystem::Initialize(VkInstance inst)
 {
     instance = inst;
@@ -139,7 +79,7 @@ VisorDebugSystem::~VisorDebugSystem()
 
 const VkDebugUtilsMessengerCreateInfoEXT* VisorDebugSystem::CreateInfo()
 {
-    static const VkDebugUtilsMessengerCreateInfoEXT createInfo =
+    static constexpr VkDebugUtilsMessengerCreateInfoEXT createInfo =
     {
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
         .pNext = nullptr,
@@ -211,9 +151,9 @@ VkInstanceCreateInfo VisorVulkan::EnableValidation(VkInstanceCreateInfo vInfo)
     vInfo.enabledLayerCount = static_cast<uint32_t>(RequestedLayers.size());
     vInfo.ppEnabledLayerNames = RequestedLayers.data();
 
-    extensionList.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    vInfo.enabledExtensionCount = static_cast<uint32_t>(extensionList.size());
-    vInfo.ppEnabledExtensionNames = extensionList.data();
+    instanceExtList.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    vInfo.enabledExtensionCount = static_cast<uint32_t>(instanceExtList.size());
+    vInfo.ppEnabledExtensionNames = instanceExtList.data();
 
     // TODO: normally this is not required either we make or break it
     // Move the layers to runtime
@@ -222,41 +162,75 @@ VkInstanceCreateInfo VisorVulkan::EnableValidation(VkInstanceCreateInfo vInfo)
     return vInfo;
 }
 
-
 // Callbacks
 void VisorVulkan::ErrorCallbackGLFW(int errorCode, const char* err)
 {
-    MRAY_ERROR_LOG("GLFW: EC[{}]\"{}\"", errorCode, err);
+    MRAY_ERROR_LOG("GLFW:[{}]: \"{}\"", errorCode, err);
 }
 
+void VisorVulkan::WindowPosGLFW(GLFWwindow* wind, int posX, int posY)
+{
+    auto wPtr = static_cast<VisorWindow*>(glfwGetWindowUserPointer(wind));
+    wPtr->WndPosChanged(posX, posY);
+}
 
+void VisorVulkan::WindowFBGLFW(GLFWwindow* wind, int newX, int newY)
+{
+    auto wPtr = static_cast<VisorWindow*>(glfwGetWindowUserPointer(wind));
+    wPtr->WndFBChanged(newX, newY);
+}
 
+void VisorVulkan::WindowSizeGLFW(GLFWwindow* wind, int newX, int newY)
+{
+    auto wPtr = static_cast<VisorWindow*>(glfwGetWindowUserPointer(wind));
+    wPtr->WndResized(newX, newY);
+}
 
-//VKAPI_ATTR VkBool32 VKAPI_CALL
-//VulkanDebugCallback(VkDebugReportFlagsEXT flags,
-//                    VkDebugReportObjectTypeEXT objectType,
-//                    uint64_t object,
-//                    size_t location,
-//                    int32_t messageCode,
-//                    const char* pLayerPrefix,
-//                    const char* pMessage,
-//                    void*)
-//{
-//    MRAY_ERROR_LOG("----[VK]----\n"
-//                   "Flags      : {}\n",
-//                   "ObjectType : {}\n",
-//                   "Object     : {}\n",
-//                   "Location   : {}\n",
-//                   "MsgCode    : {}\n",
-//                   "LayerPrefix: {}\n",
-//                   "Message    : {}\n",
-//                   "----[VK]----\n",
-//                   flags, static_cast<uint32_t>(objectType), object, location,
-//                   messageCode, pLayerPrefix, pMessage);
-//    return VK_FALSE;
-//};
+void VisorVulkan::WindowCloseGLFW(GLFWwindow* wind)
+{
+    auto wPtr = static_cast<VisorWindow*>(glfwGetWindowUserPointer(wind));
+    wPtr->WndClosed();
+}
 
+void VisorVulkan::WindowRefreshGLFW(GLFWwindow* wind)
+{
+    auto wPtr = static_cast<VisorWindow*>(glfwGetWindowUserPointer(wind));
+    wPtr->WndRefreshed();
+}
 
+void VisorVulkan::WindowFocusedGLFW(GLFWwindow* wind, int isFocused)
+{
+    auto wPtr = static_cast<VisorWindow*>(glfwGetWindowUserPointer(wind));
+    wPtr->WndFocused(isFocused);
+}
+
+void VisorVulkan::WindowMinimizedGLFW(GLFWwindow* wind, int isMinimized)
+{
+    auto wPtr = static_cast<VisorWindow*>(glfwGetWindowUserPointer(wind));
+    wPtr->WndMinimized(static_cast<bool>(isMinimized));
+}
+
+void VisorVulkan::KeyboardUsedGLFW(GLFWwindow* wind,
+                                   int key, int scanCode, int action, int modifier)
+{
+    auto wPtr = static_cast<VisorWindow*>(glfwGetWindowUserPointer(wind));
+    wPtr->KeyboardUsed(key, scanCode, action, modifier);
+}
+void VisorVulkan::MouseMovedGLFW(GLFWwindow* wind, double px, double py)
+{
+    auto wPtr = static_cast<VisorWindow*>(glfwGetWindowUserPointer(wind));
+    wPtr->MouseMoved(px, py);
+}
+void VisorVulkan::MousePressedGLFW(GLFWwindow* wind, int key, int action, int modifier)
+{
+    auto wPtr = static_cast<VisorWindow*>(glfwGetWindowUserPointer(wind));
+    wPtr->MousePressed(key, action, modifier);
+}
+void VisorVulkan::MouseScrolledGLFW(GLFWwindow* wind, double dx, double dy)
+{
+    auto wPtr = static_cast<VisorWindow*>(glfwGetWindowUserPointer(wind));
+    wPtr->MouseScrolled(dx, dy);
+}
 
 MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig)
 {
@@ -268,6 +242,11 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
 
     auto deviceList = StaticVector<VkPhysicalDevice, 32>(StaticVecSize(deviceCount));
     vkEnumeratePhysicalDevices(instanceVk, &deviceCount, deviceList.data());
+
+    static constexpr std::array<const char*, 1> RequiredExtensions =
+    {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    };
 
     for(const auto& pDevice : deviceList)
     {
@@ -304,6 +283,38 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
            !visorConfig.enforceIGPU)
             continue;
 
+        // All good, check extensions
+        uint32_t extensionCount;
+        vkEnumerateDeviceExtensionProperties(pDevice, nullptr,
+                                             &extensionCount, nullptr);
+
+        // Many extension better to use heap here
+        std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+        vkEnumerateDeviceExtensionProperties(pDevice, nullptr, &extensionCount,
+                                             availableExtensions.data());
+        // TODO: Change linear search later
+        bool hasAllExtensions = true;
+        for(const auto& rExt : RequiredExtensions)
+        {
+            auto loc = std::find_if(availableExtensions.cbegin(),
+                                    availableExtensions.cbegin(),
+                                    [&rExt](const VkExtensionProperties& p)
+            {
+                return std::strncmp(rExt, p.extensionName,
+                                    VK_MAX_EXTENSION_NAME_SIZE) == 0;
+            });
+            if(loc != availableExtensions.cend()) continue;
+
+            hasAllExtensions = false;
+            break;
+        }
+
+        // Required extensions are not available on this device skip
+        if(!hasAllExtensions) continue;
+
+        for(const auto& extName : RequiredExtensions)
+            deviceExtList.push_back(extName);
+
         // The first device that matches the conditions
         // is deemed enough.
         //
@@ -322,7 +333,7 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
             .pNext = nullptr,
             .flags = 0,
-            .queueFamilyIndex = queueFamilyIndex,
+            .queueFamilyIndex = selectedQueueFamilyIndex,
             .queueCount = 1,
             .pQueuePriorities = &priority
         };
@@ -335,8 +346,8 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
             .pQueueCreateInfos = &queueCI,
             .enabledLayerCount = static_cast<uint32_t>(layerList.size()),
             .ppEnabledLayerNames = layerList.data(),
-            .enabledExtensionCount = static_cast<uint32_t>(extensionList.size()),
-            .ppEnabledExtensionNames = extensionList.data(),
+            .enabledExtensionCount = static_cast<uint32_t>(deviceExtList.size()),
+            .ppEnabledExtensionNames = deviceExtList.data(),
             // Get all the features?
             // TODO: Does this has a drawback?
             .pEnabledFeatures = &features
@@ -349,6 +360,8 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
             return MRayError("Unable to create logical device on \"{}\"!",
                              props.deviceName);
 
+        // Store the selected physical device
+        pDeviceVk = pDevice;
 
         // All is nice!
         // Report the device and exit
@@ -371,15 +384,27 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
         MRAY_LOG("----Visor-GPU----\n"
                  "Name      : {}\n"
                  "Max Tex2D : [{}, {}]\n"
-                 "Memory    : {}MiB\n"
-                 "----Visor-GPU----\n",
+                 "Memory    : {:.3f}GiB\n"
+                 "-----------------\n",
                  props.deviceName,
                  props.limits.maxImageDimension2D,
                  props.limits.maxImageDimension2D,
-                 (memSize / 1024 / 1024));
+                 (static_cast<double>(memSize) / 1024.0 / 1024.0 / 1024.0));
 
         return MRayError::OK;
     }
+
+    return MRayError("Unable to find Vulkan capable devices!");
+}
+
+Expected<VisorWindow> VisorVulkan::GenerateWindow(const VisorConfig& config)
+{
+    VisorWindow w;
+    MRayError e = w.Initialize(deviceVk, pDeviceVk,
+                               instanceVk, queueFamilyIndex,
+                               WindowTitle, config);
+    if(e) return e;
+    return w;
 }
 
 MRayError VisorVulkan::MTInitialize(VisorConfig visorConfig)
@@ -392,11 +417,12 @@ MRayError VisorVulkan::MTInitialize(VisorConfig visorConfig)
         const char* errString; glfwGetError(&errString);
         return MRayError("GLFW: {}", errString);
     }
+    glfwSetErrorCallback(&VisorVulkan::ErrorCallbackGLFW);
 
     uint32_t glfwExtCount;
     auto glfwExtNames = glfwGetRequiredInstanceExtensions(&glfwExtCount);
     for(uint32_t i = 0; i < glfwExtCount; i++)
-        extensionList.push_back(glfwExtNames[i]);
+        instanceExtList.push_back(glfwExtNames[i]);
 
 
     const VkApplicationInfo VisorAppInfo =
@@ -423,8 +449,8 @@ MRayError VisorVulkan::MTInitialize(VisorConfig visorConfig)
         .pApplicationInfo = &VisorAppInfo,
         .enabledLayerCount = 0,
         .ppEnabledLayerNames = nullptr,
-        .enabledExtensionCount = static_cast<uint32_t>(extensionList.size()),
-        .ppEnabledExtensionNames = extensionList.data(),
+        .enabledExtensionCount = static_cast<uint32_t>(instanceExtList.size()),
+        .ppEnabledExtensionNames = instanceExtList.data(),
     };
 
     // Add debug layer if "DEBUG"
@@ -452,36 +478,27 @@ MRayError VisorVulkan::MTInitialize(VisorConfig visorConfig)
     if(e) return e;
 
 
+    // Init Imgui stuff
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    //io.
+    ImGui::StyleColorsDark();
 
-    //IMGUI_CHECKVERSION();
-    //ImGui::CreateContext();
-    //ImGuiIO& io = ImGui::GetIO();
-    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    auto windowE = GenerateWindow(visorConfig);
+    if(windowE.has_error())
+        return windowE.error();
+    window = std::move(windowE.value());
 
-    //ImGui::StyleColorsDark();
-
-
-    //glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-
-    //window = glfwCreateWindow(config.wSize[0], config.wSize[1],
-    //                          WindowTitle.c_str(),
-    //                          nullptr, nullptr);
-
-    //VkRenderPass renderPass;
-    //VkInstance instance;
-    //VkSurfaceKHR surface;
-    //VkResult err2 = glfwCreateWindowSurface(instance, window, nullptr, &surface);
-    //if(err2)
-    //{
-    //    // Window surface creation failed
-    //    return MRayError("Unable to create vksurf");
-    //}
 
     //ImGui_ImplGlfw_InitForVulkan(window, true);
 
     //ImGui_ImplVulkan_InitInfo init_info = {};
 
     //ImGui_ImplVulkan_Init(&init_info, renderPass);
+
+    return MRayError::OK;
 }
 
 void VisorVulkan::MTWaitForInputs()
@@ -523,4 +540,6 @@ void VisorVulkan::MTDestroy()
     //vkDestroySurfaceKHR(instanceVk, surfaceVk, VulkanHostAllocator::Functions());
     vkDestroyDevice(deviceVk, VulkanHostAllocator::Functions());
     vkDestroyInstance(instanceVk, VulkanHostAllocator::Functions());
+
+    glfwTerminate();
 }

@@ -7,28 +7,13 @@
 
 #include "Core/Error.h"
 #include "Core/DataStructures.h"
+#include "VisorWindow.h"
 
 // We gonna use this alot I think
 template<size_t N>
 using CStringList = StaticVector<const char*, N>;
 
-class VulkanHostAllocator
-{
-    private:
-    static void* VKAPI_CALL Allocate(void*, size_t, size_t,
-                                     VkSystemAllocationScope);
-    static void* VKAPI_CALL Realloc(void*, void*, size_t, size_t,
-                                    VkSystemAllocationScope);
-    static void VKAPI_CALL  Free(void*, void*);
-    static void VKAPI_CALL  InternalAllocNotify(void*, size_t,
-                                                VkInternalAllocationType,
-                                                VkSystemAllocationScope);
-    static void VKAPI_CALL  InternalFreeNotify(void*, size_t,
-                                               VkInternalAllocationType,
-                                               VkSystemAllocationScope);
-    public:
-    static const VkAllocationCallbacks* Functions();
-};
+
 
 class VisorDebugSystem
 {
@@ -65,28 +50,39 @@ class VisorVulkan : public VisorI
     static const std::string Name;
     static const std::string WindowTitle;
 
-    // Callbacks
-    // GLFW
-    static void             ErrorCallbackGLFW(int errorCode, const char* err);
-    //
+    // GLFW Callbacks
+    public:
+    static void     ErrorCallbackGLFW(int, const char*);
+    static void     WindowPosGLFW(GLFWwindow*, int, int);
+    static void     WindowFBGLFW(GLFWwindow*, int, int);
+    static void     WindowSizeGLFW(GLFWwindow*, int, int);
+    static void     WindowCloseGLFW(GLFWwindow*);
+    static void     WindowRefreshGLFW(GLFWwindow*);
+    static void     WindowFocusedGLFW(GLFWwindow*, int);
+    static void     WindowMinimizedGLFW(GLFWwindow*, int);
+    static void     KeyboardUsedGLFW(GLFWwindow*, int, int, int, int);
+    static void     MouseMovedGLFW(GLFWwindow*, double, double);
+    static void     MousePressedGLFW(GLFWwindow*, int, int, int);
+    static void     MouseScrolledGLFW(GLFWwindow*, double, double);
 
 
     private:
-    // Vulkan related
-    CStringList<64>     extensionList;
+    CStringList<32>     instanceExtList;
+    CStringList<32>     deviceExtList;
     CStringList<16>     layerList;
+
     VkInstance          instanceVk = nullptr;
     VkDevice            deviceVk = nullptr;
+    VkPhysicalDevice    pDeviceVk = nullptr;
     uint32_t            queueFamilyIndex = std::numeric_limits<uint32_t>::max();
     VisorDebugSystem    debugSystem;
-    // GLFW related
-    GLFWwindow*         window = nullptr;
 
-    private:
-    // Vulkan related
     VkInstanceCreateInfo    EnableValidation(VkInstanceCreateInfo);
     MRayError               QueryAndPickPhysicalDevice(const VisorConfig&);
+    Expected<VisorWindow>   GenerateWindow(const VisorConfig&);
 
+    // TODO: Move this away when multi-window is required
+    VisorWindow         window;
 
     //void                THRDProcessCommands();
     public:
