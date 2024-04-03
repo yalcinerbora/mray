@@ -194,7 +194,9 @@ class alignas(std::max(alignof(T), size_t(8))) StaticVector
     constexpr size_t        isEmpty() const;
     constexpr size_t        capacity() const;
 
+    constexpr void          resize(size_t size);
     constexpr void          clear();
+
     constexpr void          push_back(const T&);
     constexpr void          push_back(T&&);
     template<class... Args>

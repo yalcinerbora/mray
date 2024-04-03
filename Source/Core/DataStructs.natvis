@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+	<Type Name="StaticVector&lt;*&gt;">
+		<DisplayString>{{ count = {count}, N = {$T2} }}</DisplayString>
+		<Expand>
+			<ArrayItems>
+				<Size>count</Size>
+				<ValuePointer>($T1*)storage</ValuePointer>
+			</ArrayItems>
+		</Expand>
+
+	</Type>
+
+</AutoVisualizer>

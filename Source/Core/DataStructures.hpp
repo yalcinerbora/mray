@@ -329,6 +329,23 @@ constexpr size_t StaticVector<T, N>::capacity() const
 }
 
 template<class T, size_t N>
+constexpr void StaticVector<T, N>::resize(size_t size)
+{
+    assert(size <= N);
+    if(size == count) return;
+
+    size_t start = count, end = size;
+    if(size < count) std::swap(start, end);
+
+    for(size_t i = start; i < end; i++)
+    {
+        if(size < count) DestructObjectAt(i);
+        else ConstructObjectAt(i);
+    }
+    count = size;
+}
+
+template<class T, size_t N>
 constexpr void StaticVector<T, N>::clear()
 {
     if constexpr(!std::is_trivially_destructible_v<T>)

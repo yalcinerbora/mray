@@ -3,6 +3,10 @@ set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/MRay)
 set(SRC_SUBCOMMAND
     ${CURRENT_SOURCE_DIR}/ConvertCommand.cpp
     ${CURRENT_SOURCE_DIR}/ConvertCommand.h
+    ${CURRENT_SOURCE_DIR}/VisorCommand.cpp
+    ${CURRENT_SOURCE_DIR}/VisorCommand.h
+    ${CURRENT_SOURCE_DIR}/RunCommand.cpp
+    ${CURRENT_SOURCE_DIR}/RunCommand.h
     ${CURRENT_SOURCE_DIR}/CommandI.h)
 
 set(SRC_COMMON
@@ -25,6 +29,7 @@ target_link_libraries(MRay PRIVATE
 
 # Not-linked but dependent targets
 add_dependencies(MRay
+                 Visor
                  TracerCUDA)
 
 # Debug Parameters (For my own use case)

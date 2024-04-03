@@ -4,7 +4,7 @@
 #include <CLI/CLI.hpp>
 #include <string_view>
 
-namespace MRayDefs::SceneConvert
+namespace MRayCLI::ConvertNames
 {
     using namespace std::literals;
     static constexpr auto Name = "convert"sv;
@@ -53,7 +53,7 @@ MRayError ConvertCommand::Invoke()
 
 CLI::App* ConvertCommand::GenApp(CLI::App& mainApp)
 {
-    using namespace MRayDefs::SceneConvert;
+    using namespace MRayCLI::ConvertNames;
 
     CLI::App* converter = mainApp.add_subcommand(std::string(Name),
                                                  std::string(Description));

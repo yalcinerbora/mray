@@ -7,12 +7,14 @@
 #include <string_view>
 #include "CommandI.h"
 #include "ConvertCommand.h"
+#include "VisorCommand.h"
 
 const StaticVector<CommandI*, MAX_SUBCOMMAND_COUNT>&
 InitializeCommands() noexcept
 {
     static const StaticVector<CommandI*, MAX_SUBCOMMAND_COUNT> CommandList =
     {
+        &VisorCommand::Instance(),
         &ConvertCommand::Instance()
     };
     return CommandList;
@@ -55,21 +57,14 @@ int main(int argc, const char* const argv[])
                            DeviceCompilerName,
                            License);
     });
-
     // Create Subcommands
     const auto& commandList = InitializeCommands();
     for(CommandI* command : commandList)
         appList.emplace_back(command, command->GenApp(app));
 
     // Actual parsing
-    try
-    {
-        app.parse(argc, argv);                                                                                   \
-    }
-    catch(const CLI::ParseError& e)
-    {
-        return app.exit(e);                                                                                          \
-    }
+    try { app.parse(argc, argv); }
+    catch(const CLI::ParseError& e) { return app.exit(e); }
 
     // Find the first parsed subcommand
     // This is fine, since we do not utilize multiple subcommands at the same time
@@ -78,15 +73,7 @@ int main(int argc, const char* const argv[])
     {
         return sc.second->parsed();
     });
-
-
-
-    if(appIt == appList.cend())
-    {
-        // openup GUI etc.
-        MRAY_ERROR_LOG("GUI mode is not yet implemented!");
-        return 1;
-    }
+    assert(appIt != appList.cend());
 
     MRayError e = appIt->first->Invoke();
     if(e)

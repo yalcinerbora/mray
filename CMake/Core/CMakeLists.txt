@@ -5,6 +5,11 @@ set(SRC_CONTAINERS
     ${CURRENT_SOURCE_DIR}/DataStructures.h
     ${CURRENT_SOURCE_DIR}/DataStructures.hpp)
 
+if(MSVC)
+    set(SRC_CONTAINERS ${SRC_CONTAINERS}
+        ${CURRENT_SOURCE_DIR}/DataStructs.natvis)
+endif()
+
 set(SRC_SYSTEM
     ${CURRENT_SOURCE_DIR}/System.h
     ${CURRENT_SOURCE_DIR}/SharedLibrary.h

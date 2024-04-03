@@ -23,7 +23,7 @@ namespace VisorDetail
 // C++ Interface
 inline
 std::unique_ptr<VisorI, decltype(&VisorDetail::DestroyVisor)>
-CreateMeshLoaderPool()
+CreateVisor()
 {
     using namespace VisorDetail;
     using Ptr = std::unique_ptr<VisorI, decltype(&DestroyVisor)>;

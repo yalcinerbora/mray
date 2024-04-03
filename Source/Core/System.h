@@ -33,7 +33,6 @@
                 SetVT(STD_ERROR_HANDLE));
     }
 
-
 #elif defined MRAY_LINUX
 
     #define MRAY_DLL_IMPORT
@@ -44,6 +43,7 @@
     {
         return true;
     }
+
 #else
     #error System preprocessor definition is not set properly! (CMake should have handled this)
 #endif
