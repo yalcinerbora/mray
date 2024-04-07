@@ -20,6 +20,8 @@ InitializeCommands() noexcept
     return CommandList;
 };
 
+#include "Core/Matrix.h"
+
 int main(int argc, const char* const argv[])
 {
     StaticVector<TypedCommand, MAX_SUBCOMMAND_COUNT> appList;

@@ -1,4 +1,7 @@
 set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/Visor)
+set(SHADER_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/Visor/Shaders)
+
+include(SlangCompileSpirV.cmake)
 
 set(SRC_WINDOW
     ${CURRENT_SOURCE_DIR}/VisorWindow.cpp
@@ -13,10 +16,18 @@ set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/EntryPoint.cpp
     ${CURRENT_SOURCE_DIR}/EntryPoint.h)
 
+set(SRC_SHADERS
+    ${SHADER_SOURCE_DIR}/ColorFunctions.slang
+    ${SHADER_SOURCE_DIR}/TonemapFunctions.slang
+    ${SHADER_SOURCE_DIR}/Tonemap.slang
+    ${SHADER_SOURCE_DIR}/TonemapTypeGen.slang)
+
+source_group("Shaders" FILES ${SRC_SHADERS})
 source_group("Window" FILES ${SRC_WINDOW})
 source_group("" FILES ${SRC_COMMON})
 
 set(SRC_ALL
+    ${SRC_SHADERS}
     ${SRC_WINDOW}
     ${SRC_COMMON})
 
@@ -26,7 +37,7 @@ target_link_libraries(Visor PRIVATE
                       CoreLib
                       glfw3::glfw3
                       imgui::imgui
-                      vulkan::vulkan-1
+                      vulkan::vulkan
                       mray::meta_compile_opts)
 
 target_compile_definitions(Visor

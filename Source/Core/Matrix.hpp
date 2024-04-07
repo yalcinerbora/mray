@@ -387,7 +387,7 @@ constexpr Matrix<N, T> Matrix<N, T>::Inverse() const requires std::floating_poin
         return m00 * m11 - m01 * m10;
     };
 
-    const T* m = matrix;
+    const auto& m = matrix;
     T m00 = Det2x2(m[4], m[5], m[7], m[8]);  //
     T m01 = Det2x2(m[3], m[5], m[6], m[8]);  // Det Portion
     T m02 = Det2x2(m[3], m[4], m[6], m[7]);  //
@@ -402,9 +402,13 @@ constexpr Matrix<N, T> Matrix<N, T>::Inverse() const requires std::floating_poin
 
     T det = m[0] * m00 - m[1] * m01 + m[2] * m02;
     T detInv = 1 / det;
-    return detInv * Matrix<3, T>( m00, -m01,  m02,
-                                 -m10,  m11, -m12,
-                                  m20, -m21,  m22);
+
+    //return detInv * Matrix<3, T>( m00, -m01,  m02,
+    //                             -m10,  m11, -m12,
+    //                              m20, -m21,  m22);
+    return detInv * Matrix<3, T>(m00, -m10, m20,
+                                 -m01, m11, -m21,
+                                 m02, -m12, m22);
 }
 
 template <unsigned int N, ArithmeticC T>
@@ -428,15 +432,16 @@ constexpr Matrix<N, T> Matrix<N, T>::Inverse() const requires std::floating_poin
     T s4 = Det2x2(m[1], m[3], m[5], m[7]);
     T s5 = Det2x2(m[2], m[3], m[6], m[7]);
 
-    T c0 = Det2x2(m[10], m[11], m[14], m[15]);
-    T c1 = Det2x2(m[ 9], m[11], m[13], m[15]);
-    T c2 = Det2x2(m[ 9], m[10], m[13], m[14]);
-    T c3 = Det2x2(m[ 8], m[11], m[12], m[15]);
-    T c4 = Det2x2(m[ 8], m[10], m[12], m[14]);
-    T c5 = Det2x2(m[ 8], m[ 9], m[12], m[13]);
+    T c5 = Det2x2(m[10], m[11], m[14], m[15]);
+    T c4 = Det2x2(m[ 9], m[11], m[13], m[15]);
+    T c3 = Det2x2(m[ 9], m[10], m[13], m[14]);
+    T c2 = Det2x2(m[ 8], m[11], m[12], m[15]);
+    T c1 = Det2x2(m[ 8], m[10], m[12], m[14]);
+    T c0 = Det2x2(m[ 8], m[ 9], m[12], m[13]);
 
     T det = ((s0 * c5) - (s1 * c4) + (s2 * c3) +
              (s3 * c2) - (s4 * c1) + (s5 * c0));
+    T detInv = 1 / det;
 
     Matrix<N, T> inv
     (
@@ -461,7 +466,7 @@ constexpr Matrix<N, T> Matrix<N, T>::Inverse() const requires std::floating_poin
         (-m[12] * s3 + m[13] * s1 - m[14] * s0),
         (+m[ 8] * s3 - m[ 9] * s1 + m[10] * s0)
     );
-    return inv * det;
+    return inv * detInv;
 }
 
 template <unsigned int N, ArithmeticC T>

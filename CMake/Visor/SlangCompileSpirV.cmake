@@ -1,15 +1,49 @@
 # Similar approach related to this
 # https://github.com/NVIDIA/OptiX_Apps/blob/master/3rdparty/CMake/nvcuda_compile_ptx.cmake
 
-# Generate a custom build rule to translate *.cu files to *.ptx files.
-# nvcc_compile_ptx(
-#   MAIN_TARGET TargetName
-#   SOURCES file1.cu file2.cu ...
-#   GENERATED_TARGET <generated target, (variable stores TargetName_Optix)>
+# Generate a custom build rule to translate a single *.slang file to *.spir-v file.
+# slang_gen_spirv(
+#   SOURCE file1.slang
 #   EXTRA_OPTIONS <opions for nvcc> ...
 # )
+function(slang_gen_spriv)
+    set(oneValueArgs SOURCE)
+    set(multiValueArgs EXTRA_OPTIONS)
 
-# Generates *.ptx files for the given source files.
+    cmake_parse_arguments(SLANG_GEN_SPIRV "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+    # Add default compile options
+    set(SLANG_COMPILE_OPTIONS "")
+    list(APPEND SLANG_COMPILE_OPTIONS ${SLANG_GEN_SPIRV_EXTRA_OPTIONS}
+
+        -fvk-use-entrypoint-name
+        -target spirv
+        -fspv-reflect
+        -emit-spirv-directly
+        $<$<CONFIG:Debug>:-O1>
+        $<$<CONFIG:Release>:-O3>
+        -fp-mode $<$<CONFIG:Debug>:precise> $<$<CONFIG:Release>:fast>
+        # Debug related preprocessor flags
+        $<$<CONFIG:Debug>:-g>
+        $<$<CONFIG:Debug>:-DMRAY_DEBUG>
+        $<$<CONFIG:Release>:-DNDEBUG>
+    )
+
+    add_custom_command(
+        OUTPUT  "${OUTPUT}"
+        COMMENT "Builidng PTX File (CC_${COMPUTE_CAPABILITY}) ${INPUT}"
+        MAIN_DEPENDENCY "${INPUT}"
+        # Try c++ parsing mode maybe it works
+        IMPLICIT_DEPENDS CXX "${INPUT}"
+        COMMAND ${MRAY_SLANG_COMPILER} ${NVCC_COMPILE_OPTIONS}
+                    "--gpu-architecture=${CC_FLAG}"
+                    -o ${OUTPUT}
+                    ${INPUT}
+    )
+
+endfunction()
+
+# Generates *.spir-v files for the given source files.
 # Unlike the copied code;
 #    It also generates a custom target for files since I did not want to see
 #    PTX output on the Visual Studio.
@@ -28,16 +62,14 @@
 #    only (7.5 or above)
 #    TODO: change this to make it compatible with older versions of the optix
 
-function(nvcc_compile_ptx)
+function(NVCC_COMPILE_PTX)
     set(oneValueArgs GENERATED_TARGET MAIN_TARGET)
     set(multiValueArgs EXTRA_OPTIONS SOURCES)
 
-    cmake_parse_arguments(NVCC_COMPILE_PTX "${options}" "${oneValueArgs}"
-                         "${multiValueArgs}" ${ARGN})
+    CMAKE_PARSE_ARGUMENTS(NVCC_COMPILE_PTX "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
-    # Add -- ptx and extra provided options
-    # Main Compile Options as well form the system
-    set(NVCC_COMPILE_OPTIONS "")
+
+
     # Linux wants this i dunno why
     if(UNIX)
         list(APPEND NVCC_COMPILE_OPTIONS --compiler-bindir=${CMAKE_CXX_COMPILER})
@@ -57,11 +89,9 @@ function(nvcc_compile_ptx)
         # So -lineinfo is used on both configurations
         $<$<CONFIG:Debug>:-G>
         $<$<CONFIG:SanitizeR>:-lineinfo>
-        $<$<CONFIG:Release>:-lineinfo>
         # Debug related preprocessor flags
         $<$<CONFIG:Debug>:-DMRAY_DEBUG>
         $<$<CONFIG:Release>:-DNDEBUG>
-        $<$<CONFIG:SanitizeR>:-DNDEBUG>
         -DMRAY_CUDA
      )
 
@@ -69,7 +99,7 @@ function(nvcc_compile_ptx)
     set(PTX_TARGET "${NVCC_COMPILE_PTX_MAIN_TARGET}_Optix")
 
     # Custom build rule to generate ptx files from cuda files
-    foreach(INPUT ${NVCC_COMPILE_PTX_SOURCES})
+    FOREACH(INPUT ${NVCC_COMPILE_PTX_SOURCES})
 
         get_filename_component(INPUT_STEM "${INPUT}" NAME_WE)
 
@@ -89,14 +119,15 @@ function(nvcc_compile_ptx)
         endif()
 
         # Generate New Ptx file for each CC Requested
-        foreach(COMPUTE_CAPABILITY ${COMPUTE_CAPABILITY_LIST})
+        FOREACH(COMPUTE_CAPABILITY ${COMPUTE_CAPABILITY_LIST})
             # Generate the *.ptx files to the appropirate bin directory.
             set(OUTPUT_STEM "${INPUT_STEM}.CC_${COMPUTE_CAPABILITY}")
             set(OUTPUT_FILE "${OUTPUT_STEM}.optixir")
             set(OUTPUT_DIR "${MRAY_CONFIG_BIN_DIRECTORY}/OptiXShaders")
             set(OUTPUT "${OUTPUT_DIR}/${OUTPUT_FILE}")
 
-
+            set(DEP_FILE "${OUTPUT_STEM}.d")
+            set(DEP_PATH "${OUTPUT_DIR}/${DEP_FILE}")
 
             list(APPEND PTX_FILES ${OUTPUT})
 
@@ -107,34 +138,29 @@ function(nvcc_compile_ptx)
             endif()
 
             # This prints the standalone NVCC command line for each CUDA file.
+            #message(STATUS "${CMAKE_CUDA_COMPILER} ${NVCC_COMPILE_OPTIONS} ${INPUT} -o ${OUTPUT} -odir ${OUTPUT_DIR}")
+            #message(STATUS ${NVCC_COMPILE_OPTIONS})
             add_custom_command(
                 OUTPUT  "${OUTPUT}"
                 COMMENT "Builidng PTX File (CC_${COMPUTE_CAPABILITY}) ${INPUT}"
                 MAIN_DEPENDENCY "${INPUT}"
-                IMPLICIT_DEPENDS CXX "${INPUT}"
+                DEPFILE "${DEP_PATH}"
                 COMMAND ${CMAKE_CUDA_COMPILER} ${NVCC_COMPILE_OPTIONS}
-                         #-MD
+                         -MD
                          "--gpu-architecture=${CC_FLAG}"
                          -o ${OUTPUT}
                          ${INPUT}
-            )
 
-            # TODO: Check that if this works now
-            # This fails but dunno why? (relative path etc maybe?)
-            # set(DEP_FILE "${OUTPUT_STEM}.d")
-            # set(DEP_PATH "${OUTPUT_DIR}/${DEP_FILE}")
-            # add_custom_command(
-            #     OUTPUT  "${OUTPUT}"
-            #     COMMENT "Builidng PTX File (CC_${COMPUTE_CAPABILITY}) ${INPUT}"
-            #     IMPLICIT_DEPENDS CXX "${INPUT}"
-            #     DEPFILE "${DEP_PATH}"
-            #     COMMAND ${CMAKE_CUDA_COMPILER} ${NVCC_COMPILE_OPTIONS}
-            #             -MD
-            #             -o ${DEP_PATH}
-            #             ${INPUT}
-            # )
-        endforeach()
-  endforeach()
+                # TODO: Check that if this works
+                # IMPLICIT_DEPENDS CXX "${INPUT}"
+                # DEPFILE "${DEP_PATH}"
+                # COMMAND ${CMAKE_CUDA_COMPILER} ${NVCC_COMPILE_OPTIONS}
+                #         -M
+                #         -o ${DEP_PATH}
+                #         ${INPUT}
+            )
+        ENDFOREACH()
+  ENDFOREACH()
 
   # Custom Target for PTX Files Main Target should depend on this target
   add_custom_target(${PTX_TARGET}
@@ -144,4 +170,4 @@ function(nvcc_compile_ptx)
                     )
 
   set(${NVCC_COMPILE_PTX_GENERATED_TARGET} ${PTX_TARGET} PARENT_SCOPE)
-endfunction()
+ENDFUNCTION()

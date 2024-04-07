@@ -67,7 +67,7 @@ else()
     )
 endif()
 
-add_custom_target(MRayExternal ALL DEPENDS ${MRAY_EXTERNAL_LIBRARIES_STAMP})
+add_custom_target(MRayExternal DEPENDS ${MRAY_EXTERNAL_LIBRARIES_STAMP})
 set_target_properties(MRayExternal PROPERTIES FOLDER ${MRAY_PREDEFINED_TARGETS_FOLDER})
 set_target_properties(MRayExternal PROPERTIES EXCLUDE_FROM_ALL  TRUE)
 
@@ -169,7 +169,7 @@ gen_imported_target(NAME oiio::oiio SHARED DEBUG_TARGET OpenImageIOd RELEASE_TAR
 gen_imported_target(NAME oiio::oiio_util SHARED DEBUG_TARGET OpenImageIO_Utild RELEASE_TARGET OpenImageIO_Util)
 gen_imported_target(NAME spdlog::spdlog SHARED DEBUG_TARGET spdlogd RELEASE_TARGET spdlog)
 gen_imported_target(NAME imgui::imgui STATIC DEBUG_TARGET imguid RELEASE_TARGET imgui)
-gen_imported_target(NAME vulkan::vulkan-1 STATIC DEBUG_TARGET vulkan-1d RELEASE_TARGET vulkan-1)
+gen_imported_target(NAME vulkan::vulkan STATIC DEBUG_TARGET vulkan-1d RELEASE_TARGET vulkan-1)
 gen_imported_target(NAME glfw3::glfw3 SHARED DEBUG_TARGET glfw3ddll RELEASE_TARGET glfw3dll)
 
 # gen_imported_target(NAME imgui::imgui_ti STATIC DEBUG_TARGET imgui_tex_inspectd RELEASE_TARGET imgui_tex_inspect)
