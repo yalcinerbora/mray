@@ -69,7 +69,7 @@ endif()
 
 add_custom_target(MRayExternal DEPENDS ${MRAY_EXTERNAL_LIBRARIES_STAMP})
 set_target_properties(MRayExternal PROPERTIES FOLDER ${MRAY_PREDEFINED_TARGETS_FOLDER})
-set_target_properties(MRayExternal PROPERTIES EXCLUDE_FROM_ALL  TRUE)
+set_target_properties(MRayExternal PROPERTIES EXCLUDE_FROM_ALL TRUE)
 
 
 # Everything should be fine now

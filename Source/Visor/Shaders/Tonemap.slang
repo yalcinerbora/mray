@@ -1,6 +1,6 @@
 module Tonemap;
-import ColorFunctions;
-import TonemapFunctions;
+
+__include "TonemapFunctions";
 
 static const uint32_t STATIC_THREAD_PER_BLOCK_1D = 256;
 
@@ -10,11 +10,11 @@ extern struct Tonemapper : ITonemapper;
 //              FUNCTORS                //
 //======================================//
 
-interface IBinaryOp { float op(in float v0, float v1); }
+interface IBinaryOp { static float op(float v0, float v1); }
 
 struct AddOp : IBinaryOp
 {
-    float op(in float v0, float v1)
+    static float op(float v0, float v1)
     {
         return v0 + v1;
     }
@@ -22,7 +22,7 @@ struct AddOp : IBinaryOp
 
 struct MaxOp : IBinaryOp
 {
-    float op(in float v0, float v1)
+    static float op(float v0, float v1)
     {
         return max(v0, v1);
     }
@@ -47,32 +47,51 @@ struct TonemapParameters
 
     Texture2D<float3>               inputTex;
     RWTexture2D<float3>             outputTex;
-    StructuredBuffer<TMParams>      tonemapParams;
+    TMParams                        tonemapParams;
     RWStructuredBuffer<MaxAndAvg>   maxAndAvg;
+    ColorConverterOut::GammaParams  outGammaParams;
 }
 
-ParameterBlock<TonemapParameters> tonemapParameters;
-ParameterBlock<ColorConverterOut::GammaParams> gammaParamsOut;
+ParameterBlock<TonemapParameters> params;
 
 groupshared float sReduceBuffer[STATIC_THREAD_PER_BLOCK_1D];
-float BlockLocalReduction(in float value, in uint localId, in IBinaryOp binaryOp)
+
+float BlockLocalReduction<T : IBinaryOp>(in float value, in uint localId, in T op)
 {
     // Unrolled parallel reduction using shared mem
     sReduceBuffer[localId] = value;
     AllMemoryBarrierWithGroupSync();
 
-    static const uint START = (STATIC_THREAD_PER_BLOCK_1D >> 1);
-    [ForceUnroll]
-    for (uint i = START; i != 0; i >> 1)
-    {
-        if (localId < i) sReduceBuffer[localId] = binaryOp.op(sReduceBuffer[localId],
-                                                              sReduceBuffer[localId + i]);
-        AllMemoryBarrierWithGroupSync();
-    }
+    // This failed due to exceeding a threshold
+    // so hand unrolling
+    //static const uint START = (STATIC_THREAD_PER_BLOCK_1D >> 1);
+    //[ForceUnroll]
+    // for (uint i = START; i != 0; i >> 1)
+    //{
+    //    if (localId < i) sReduceBuffer[localId] = T::op(sReduceBuffer[localId], sReduceBuffer[localId + i]);
+    //    AllMemoryBarrierWithGroupSync();
+    //}
+    if (localId < 128) sReduceBuffer[localId] = T::op(sReduceBuffer[localId], sReduceBuffer[localId + 128]);
+    AllMemoryBarrierWithGroupSync();
+    if (localId < 64) sReduceBuffer[localId] = T::op(sReduceBuffer[localId], sReduceBuffer[localId + 64]);
+    AllMemoryBarrierWithGroupSync();
+    if (localId < 32) sReduceBuffer[localId] = T::op(sReduceBuffer[localId], sReduceBuffer[localId + 32]);
+    AllMemoryBarrierWithGroupSync();
+    if (localId < 16) sReduceBuffer[localId] = T::op(sReduceBuffer[localId], sReduceBuffer[localId + 16]);
+    AllMemoryBarrierWithGroupSync();
+    if (localId <  8) sReduceBuffer[localId] = T::op(sReduceBuffer[localId], sReduceBuffer[localId + 8]);
+    AllMemoryBarrierWithGroupSync();
+    if (localId <  4) sReduceBuffer[localId] = T::op(sReduceBuffer[localId], sReduceBuffer[localId + 4]);
+    AllMemoryBarrierWithGroupSync();
+    if (localId <  2) sReduceBuffer[localId] = T::op(sReduceBuffer[localId], sReduceBuffer[localId + 2]);
+    AllMemoryBarrierWithGroupSync();
+    if (localId <  1) sReduceBuffer[localId] = T::op(sReduceBuffer[localId], sReduceBuffer[localId + 1]);
+    AllMemoryBarrierWithGroupSync();
+
     return sReduceBuffer[localId];
 }
 
-void AtomicFloatOp(out uint outLoc, float val, IBinaryOp binaryOp)
+void AtomicFloatOp<T : IBinaryOp>(inout uint outLoc, float val, in T)
 {
     // CAS Atomic operation for Atomic Max for floats
     // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#atomic-functions
@@ -84,7 +103,7 @@ void AtomicFloatOp(out uint outLoc, float val, IBinaryOp binaryOp)
     {
         assumed = old;
         float assumedF = asfloat(assumed);
-        float newValF = binaryOp.op(assumedF, val);
+        float newValF = T::op(assumedF, val);
         uint newVal = asuint(newValF);
         InterlockedCompareExchange(outLoc, assumed, newVal, old);
 
@@ -97,8 +116,7 @@ void AtomicFloatOp(out uint outLoc, float val, IBinaryOp binaryOp)
 [shader("compute")]
 [numthreads(STATIC_THREAD_PER_BLOCK_1D, 1, 1)]
 void KCFindAvgMaxLum(uint3 globalId: SV_DispatchThreadID,
-                     uint3 localId: SV_GroupThreadID,
-                     TonemapParameters params)
+                     uint3 localId: SV_GroupThreadID)
 {
     uint2 dim;
     params.inputTex.GetDimensions(dim[0], dim[1]);
@@ -131,8 +149,7 @@ void KCFindAvgMaxLum(uint3 globalId: SV_DispatchThreadID,
 //======================================//
 [shader("compute")]
 [numthreads(STATIC_THREAD_PER_BLOCK_1D, 1, 1)]
-void KCTonemapImage(uint3 globalId : SV_DispatchThreadID,
-                    TonemapParameters params)
+void KCTonemapImage(uint3 globalId : SV_DispatchThreadID)
 {
     uint2 dim;
     params.inputTex.GetDimensions(dim[0], dim[1]);
@@ -147,9 +164,10 @@ void KCTonemapImage(uint3 globalId : SV_DispatchThreadID,
 
     float3 outColorSDR = Tonemapper.ToneMap(inColorHDR,
                                             inColorSpace, outColorSpace,
-                                            gammaParamsOut,
+                                            params.outGammaParams,
+                                            params.tonemapParams,
                                             params.maxAndAvg[0].ReadAvgLum(),
                                             params.maxAndAvg[0].ReadMaxLum());
 
-    params.outputTex[globalId] = outColorSDR;
+    params.outputTex[pixId] = outColorSDR;
 }

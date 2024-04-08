@@ -1,173 +1,138 @@
 # Similar approach related to this
 # https://github.com/NVIDIA/OptiX_Apps/blob/master/3rdparty/CMake/nvcuda_compile_ptx.cmake
 
-# Generate a custom build rule to translate a single *.slang file to *.spir-v file.
-# slang_gen_spirv(
-#   SOURCE file1.slang
-#   EXTRA_OPTIONS <opions for nvcc> ...
-# )
-function(slang_gen_spriv)
-    set(oneValueArgs SOURCE)
-    set(multiValueArgs EXTRA_OPTIONS)
+set(MRAY_SPIRV_EXTENSION ".spv")
+set(MRAY_SPIRV_ASM_EXTENSION ".spv-asm")
 
-    cmake_parse_arguments(SLANG_GEN_SPIRV "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+# Generate a custom build rule to create *.slang-module from given files.
+# Slang module files implicitly stored on the "${TARGET_LOCAL_SHADER_MODULE_OUT_DIRECTORY}".
+#
+#   OUTPUT <output file name>             : extensionless output module name
+#   SOURCES <file1> <file2> ...           : source files to compile (with .slang extension)
+#   INCLUDES <include1> <include2> ...    : include directories (should not have -I prefix)
+#   EXTRA_OPTIONS <option1> <option2> ... : additional options for the compiler
+function(slang_gen_module)
+    set(oneValueArgs OUTPUT)
+    set(multiValueArgs EXTRA_OPTIONS SOURCES INCLUDES)
+    cmake_parse_arguments(SLANG_GEN_MODULE "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+    list(TRANSFORM SLANG_GEN_MODULE_INCLUDES PREPEND "-I")
 
     # Add default compile options
     set(SLANG_COMPILE_OPTIONS "")
-    list(APPEND SLANG_COMPILE_OPTIONS ${SLANG_GEN_SPIRV_EXTRA_OPTIONS}
-
-        -fvk-use-entrypoint-name
-        -target spirv
-        -fspv-reflect
-        -emit-spirv-directly
-        $<$<CONFIG:Debug>:-O1>
+    list(APPEND SLANG_COMPILE_OPTIONS ${SLANG_GEN_MODULE_EXTRA_OPTIONS}
+        # Config related preprocessor flags
         $<$<CONFIG:Release>:-O3>
-        -fp-mode $<$<CONFIG:Debug>:precise> $<$<CONFIG:Release>:fast>
-        # Debug related preprocessor flags
+        $<$<CONFIG:Debug>:-O1>
         $<$<CONFIG:Debug>:-g>
         $<$<CONFIG:Debug>:-DMRAY_DEBUG>
         $<$<CONFIG:Release>:-DNDEBUG>
+        ${SLANG_GEN_MODULE_INCLUDES}
     )
+    set(MODULE_NAME "${SLANG_GEN_MODULE_OUTPUT}.slang-module")
+    set(MODULE_OUTPUT_PATH "${MRAY_SHADER_MODULE_OUT_DIRECTORY}/${MODULE_NAME}")
 
     add_custom_command(
-        OUTPUT  "${OUTPUT}"
-        COMMENT "Builidng PTX File (CC_${COMPUTE_CAPABILITY}) ${INPUT}"
-        MAIN_DEPENDENCY "${INPUT}"
-        # Try c++ parsing mode maybe it works
-        IMPLICIT_DEPENDS CXX "${INPUT}"
-        COMMAND ${MRAY_SLANG_COMPILER} ${NVCC_COMPILE_OPTIONS}
-                    "--gpu-architecture=${CC_FLAG}"
-                    -o ${OUTPUT}
-                    ${INPUT}
+        OUTPUT  ${MODULE_OUTPUT_PATH}
+        COMMENT "[SHADER] Building slang-module \"${MODULE_NAME}\""
+        DEPENDS ${SLANG_GEN_MODULE_SOURCES}
+        COMMAND ${MRAY_SLANG_COMPILER} ${SLANG_COMPILE_OPTIONS}
+                -o ${MODULE_OUTPUT_PATH}
+                ${SLANG_GEN_MODULE_SOURCES}
     )
 
 endfunction()
 
-# Generates *.spir-v files for the given source files.
-# Unlike the copied code;
-#    It also generates a custom target for files since I did not want to see
-#    PTX output on the Visual Studio.
+
+# Generate a custom build rule to create *.spv and optionally *.spv-asm from given module group.
+# Support type generation semantics via slang linking.
+# Spir-V files implicitly stored on the "${MRAY_SHADER_OUT_DIRECTORY}".
 #
-#    It returns the generated target for depedency setting.
+#   OUTPUT_PREFIX <output>                : extensionless output file prefix, it will be concatanated
+#                                         : with preprocessor macro
+#   MODULES <file1> <file2> ...           : module files to compile (without extension, and
+#                                         : without a path) Path is implicitly "${MRAY_SHADER_MODULE_OUT_DIRECTORY}"
+#   INCLUDES <include1> <include2> ...    : include directories (should not have -I prefix)
+#   EXTRA_OPTIONS <option1> <option2> ... : additional options for the compiler
 #
-#    It tries to set the dependencies automatically (dunno if this works tho)
-#
-#    Additionally it generates different PTX for each Compute Capability defined
-#    in CMAKE_CUDA_ARCHITECTURES variable
-#
-#    Finally It also outputs as <filename>_CC[50,61..].o.ptx
-#    because it is a good pun =) (Normally it was goint to be optx but maybe some
-#    files)
-#    Unfortunately this is changed it is now .optixir =(, and only optixir is used
-#    only (7.5 or above)
-#    TODO: change this to make it compatible with older versions of the optix
+#   TYPEGEN_SHADER_FILE                   : a slang file that exports the types. May be guarded by a macro
+#   TYPEGEN_MACRO                         : a macro that guards the type generation will be fed to the slang.
+#   GEN_ASSEMBLY                          : Generate both spirv binary and assembly
+function(slang_gen_spriv)
+    set(oneValueArgs
+        OUTPUT_PREFIX
+        TYPEGEN_SHADER_FILE
+        TYPEGEN_MACRO)
+    set(multiValueArgs
+        EXTRA_OPTIONS
+        MODULES
+        INCLUDES
+        DEPENDS)
+    set(options GEN_ASSEMBLY)
+    cmake_parse_arguments(SLANG_GEN_SPIRV "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
-function(NVCC_COMPILE_PTX)
-    set(oneValueArgs GENERATED_TARGET MAIN_TARGET)
-    set(multiValueArgs EXTRA_OPTIONS SOURCES)
+    list(TRANSFORM SLANG_GEN_SPIRV_INCLUDES PREPEND "-I")
+    list(TRANSFORM SLANG_GEN_SPIRV_MODULES APPEND ".slang-module")
+    list(TRANSFORM SLANG_GEN_SPIRV_MODULES PREPEND "${MRAY_SHADER_MODULE_OUT_DIRECTORY}/")
 
-    CMAKE_PARSE_ARGUMENTS(NVCC_COMPILE_PTX "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+    set(OUTPUT_NAME "${SLANG_GEN_SPIRV_OUTPUT_PREFIX}-${SLANG_GEN_SPIRV_TYPEGEN_MACRO}")
+    slang_gen_module(OUTPUT "${OUTPUT_NAME}"
+                     SOURCES ${SLANG_GEN_SPIRV_TYPEGEN_SHADER_FILE}
+                     EXTRA_OPTIONS "-D${SLANG_GEN_SPIRV_TYPEGEN_MACRO}")
 
-
-
-    # Linux wants this i dunno why
-    if(UNIX)
-        list(APPEND NVCC_COMPILE_OPTIONS --compiler-bindir=${CMAKE_CXX_COMPILER})
-    endif()
-    # Generic Options
-    list(APPEND NVCC_COMPILE_OPTIONS ${NVCC_COMPILE_PTX_EXTRA_OPTIONS}
-        # Include Directories
-        "-I${OPTIX_INCLUDE_DIR}"
-        "-I${MRAY_SOURCE_DIRECTORY}"
-        "-I${MRAY_LIB_INCLUDE_DIRECTORY}"
-        --optix-ir
-        --machine=64
-        "-std=c++${CMAKE_CUDA_STANDARD}"
-        "--relocatable-device-code=true"
-        "--keep-device-functions"
-        # OptiX Documentation says that -G'ed kernels may fail
-        # So -lineinfo is used on both configurations
-        $<$<CONFIG:Debug>:-G>
-        $<$<CONFIG:SanitizeR>:-lineinfo>
-        # Debug related preprocessor flags
+    # Add default compile options
+    set(SLANG_COMPILE_OPTIONS "")
+    list(APPEND SLANG_COMPILE_OPTIONS ${SLANG_GEN_SPIRV_EXTRA_OPTIONS}
+        -fvk-use-entrypoint-name
+        -capability sm_6_0
+        -fspv-reflect
+        -emit-spirv-directly
+        -fp-mode $<$<CONFIG:Debug>:precise> $<$<CONFIG:Release>:fast>
+        # Config related preprocessor flags
+        $<$<CONFIG:Release>:-O3>
+        $<$<CONFIG:Debug>:-O1>
+        $<$<CONFIG:Debug>:-g>
         $<$<CONFIG:Debug>:-DMRAY_DEBUG>
         $<$<CONFIG:Release>:-DNDEBUG>
-        -DMRAY_CUDA
-     )
+        ${SLANG_GEN_SPIRV_INCLUDES}
+    )
 
-    # Custom Target Name
-    set(PTX_TARGET "${NVCC_COMPILE_PTX_MAIN_TARGET}_Optix")
+    #set(OUTPUT_FILE "${OUTPUT_NAME}.spv-asm")
+    set(TYPE_MODULE "${MRAY_SHADER_MODULE_OUT_DIRECTORY}/${OUTPUT_NAME}.slang-module")
+    list(APPEND SPIRV_DEPS ${SLANG_GEN_SPIRV_DEPENDS} ${TYPE_MODULE} ${SLANG_GEN_SPIRV_MODULES})
+    set(SPIRV_OUTPUT_PATH "${MRAY_SHADER_OUT_DIRECTORY}/${OUTPUT_NAME}")
 
-    # Custom build rule to generate ptx files from cuda files
-    FOREACH(INPUT ${NVCC_COMPILE_PTX_SOURCES})
+    message(STATUS ${SLANG_GEN_SPIRV_GEN_ASSEMBLY})
 
-        get_filename_component(INPUT_STEM "${INPUT}" NAME_WE)
+    set(DEPENDENCY_LIST)
+    if(SLANG_GEN_SPIRV_GEN_ASSEMBLY)
+        set(OUT_SPV_ASM ${SPIRV_OUTPUT_PATH}${MRAY_SPIRV_ASM_EXTENSION})
+        add_custom_command(
+            OUTPUT  ${OUT_SPV_ASM}
+            COMMENT "[SHADER] Building spir-V assembly \"${OUTPUT_NAME}${MRAY_SPIRV_ASM_EXTENSION}\""
+            DEPENDS ${SPIRV_DEPS}
+            COMMAND ${MRAY_SLANG_COMPILER} ${SLANG_COMPILE_OPTIONS}
+                    -o ${OUT_SPV_ASM}
+                    ${SLANG_GEN_SPIRV_MODULES}
+                    ${TYPE_MODULE})
 
-        if(${CMAKE_CUDA_ARCHITECTURES} STREQUAL "all")
-            # We need to manually set the list here
-            set(COMPUTE_CAPABILITY_LIST
-                50 52 53
-                60 61 62
-                70 72 75
-                80 86 87 89
-                90 90a)
-        elseif(${CMAKE_CUDA_ARCHITECTURES} STREQUAL "all-major")
-            set(COMPUTE_CAPABILITY_LIST 50 60 70 80 90)
-        else()
-            # "native" or old school numbered style is selected do nothing
-            set(COMPUTE_CAPABILITY_LIST ${CMAKE_CUDA_ARCHITECTURES})
-        endif()
+        message(STATUS ${OUT_SPV_ASM})
+        set(DEPENDENCY_LIST ${DEPENDENCY_LIST} ${OUT_SPV_ASM})
 
-        # Generate New Ptx file for each CC Requested
-        FOREACH(COMPUTE_CAPABILITY ${COMPUTE_CAPABILITY_LIST})
-            # Generate the *.ptx files to the appropirate bin directory.
-            set(OUTPUT_STEM "${INPUT_STEM}.CC_${COMPUTE_CAPABILITY}")
-            set(OUTPUT_FILE "${OUTPUT_STEM}.optixir")
-            set(OUTPUT_DIR "${MRAY_CONFIG_BIN_DIRECTORY}/OptiXShaders")
-            set(OUTPUT "${OUTPUT_DIR}/${OUTPUT_FILE}")
+    endif()
 
-            set(DEP_FILE "${OUTPUT_STEM}.d")
-            set(DEP_PATH "${OUTPUT_DIR}/${DEP_FILE}")
+    set(OUT_SPV ${SPIRV_OUTPUT_PATH}${MRAY_SPIRV_EXTENSION})
+    add_custom_command(
+        OUTPUT  ${OUT_SPV}
+        COMMENT "[SHADER] Building spir-V \"${OUTPUT_NAME}${MRAY_SPIRV_EXTENSION}\""
+        DEPENDS ${SPIRV_DEPS}
+        COMMAND ${MRAY_SLANG_COMPILER} ${SLANG_COMPILE_OPTIONS}
+                -o ${OUT_SPV}
+                ${SLANG_GEN_SPIRV_MODULES}
+                ${TYPE_MODULE})
 
-            list(APPEND PTX_FILES ${OUTPUT})
+    set(DEPENDENCY_LIST ${DEPENDENCY_LIST} ${OUT_SPV})
+    set(SLANG_GEN_SPIRV_OUTPUT_LIST ${SLANG_GEN_SPIRV_OUTPUT_LIST}
+                ${DEPENDENCY_LIST} PARENT_SCOPE)
 
-            set(CC_FLAG ${COMPUTE_CAPABILITY})
-            if(${COMPUTE_CAPABILITY} MATCHES "^[0-9]+$")
-                # If numbered add compute
-                set(CC_FLAG compute_${COMPUTE_CAPABILITY})
-            endif()
-
-            # This prints the standalone NVCC command line for each CUDA file.
-            #message(STATUS "${CMAKE_CUDA_COMPILER} ${NVCC_COMPILE_OPTIONS} ${INPUT} -o ${OUTPUT} -odir ${OUTPUT_DIR}")
-            #message(STATUS ${NVCC_COMPILE_OPTIONS})
-            add_custom_command(
-                OUTPUT  "${OUTPUT}"
-                COMMENT "Builidng PTX File (CC_${COMPUTE_CAPABILITY}) ${INPUT}"
-                MAIN_DEPENDENCY "${INPUT}"
-                DEPFILE "${DEP_PATH}"
-                COMMAND ${CMAKE_CUDA_COMPILER} ${NVCC_COMPILE_OPTIONS}
-                         -MD
-                         "--gpu-architecture=${CC_FLAG}"
-                         -o ${OUTPUT}
-                         ${INPUT}
-
-                # TODO: Check that if this works
-                # IMPLICIT_DEPENDS CXX "${INPUT}"
-                # DEPFILE "${DEP_PATH}"
-                # COMMAND ${CMAKE_CUDA_COMPILER} ${NVCC_COMPILE_OPTIONS}
-                #         -M
-                #         -o ${DEP_PATH}
-                #         ${INPUT}
-            )
-        ENDFOREACH()
-  ENDFOREACH()
-
-  # Custom Target for PTX Files Main Target should depend on this target
-  add_custom_target(${PTX_TARGET}
-                    DEPENDS ${PTX_FILES}
-                    # Add Source files for convenience
-                    SOURCES ${NVCC_COMPILE_PTX_SOURCES}
-                    )
-
-  set(${NVCC_COMPILE_PTX_GENERATED_TARGET} ${PTX_TARGET} PARENT_SCOPE)
-ENDFUNCTION()
+endfunction()

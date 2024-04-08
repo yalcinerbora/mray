@@ -51,3 +51,42 @@ add_custom_command(TARGET Visor POST_BUILD
                    "${MRAY_CONFIG_LIB_DIRECTORY}/glfw3$<$<CONFIG:Debug>:d>.dll"
                    ${MRAY_CONFIG_BIN_DIRECTORY})
 endif()
+
+# ==============================#
+#        Shader Related         #
+# ==============================#
+# TODO: make this a cool function later...
+set(MRAY_SLANG_COMPILER ${MRAY_PLATFORM_LIB_DIRECTORY}/slang/slangc${CMAKE_EXECUTABLE_SUFFIX})
+set(MRAY_SHADER_OUT_DIRECTORY ${MRAY_CONFIG_BIN_DIRECTORY}/Shaders)
+set(MRAY_SHADER_MODULE_OUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Shaders/$<CONFIG>)
+set(SLANG_GEN_SPIRV_OUTPUT_LIST "")
+
+# ============ #
+#    MODULES   #
+# ============ #
+slang_gen_module(OUTPUT "Tonemap"
+                 SOURCES
+                 ${SHADER_SOURCE_DIR}/Tonemap.slang)
+slang_gen_module(OUTPUT "ColorFunctions"
+                 SOURCES
+                 ${SHADER_SOURCE_DIR}/ColorFunctions.slang)
+
+# ============ #
+#    SPIR-V    #
+# ============ #
+slang_gen_spriv(OUTPUT_PREFIX "Tonemap"
+                TYPEGEN_SHADER_FILE  "${SHADER_SOURCE_DIR}/TonemapTypeGen.slang"
+                TYPEGEN_MACRO "MRAY_TONEMAP_REINHARD_ACES_CG_TO_SRGB"
+                INCLUDES ${SHADER_SOURCE_DIR}
+                MODULES "Tonemap" "ColorFunctions"
+                GEN_ASSEMBLY)
+
+slang_gen_spriv(OUTPUT_PREFIX "Tonemap"
+                TYPEGEN_SHADER_FILE  "${SHADER_SOURCE_DIR}/TonemapTypeGen.slang"
+                TYPEGEN_MACRO "MRAY_TONEMAP_EMPTY_ACES_CG_TO_HDR10"
+                INCLUDES ${SHADER_SOURCE_DIR}
+                MODULES "Tonemap" "ColorFunctions"
+                GEN_ASSEMBLY)
+
+add_custom_target(VisorShaders DEPENDS ${SLANG_GEN_SPIRV_OUTPUT_LIST})
+add_dependencies(Visor VisorShaders)

@@ -205,7 +205,6 @@ mray_build_ext_dependency_git(
 
 # Get ImGUI
 include(DownloadDearImGUI.cmake)
-
 # Get ImGUI Tex Inspect
 #include(DownloadImGUITexInspect.cmake)
 
@@ -228,6 +227,44 @@ include(DownloadDearImGUI.cmake)
 
 # # Image Libraries compiled into oiio
 # add_subdirectory(oiio)
+
+
+# slang shader compiler
+# this is a bit tricky, since we will not build it
+# but we will download the exce and copy it
+# so external project should not work? (TODO: Check this)
+include(FetchContent)
+# Slang version v.2024.1.6
+# We are downloading an executable, validate it with MD5 hash at least.
+# Slang does not provide a sha256 hash, so we will create it.
+# !!!!
+# THE HASHES ARE GENERATED ON WINDOWS SYSTEM "Get-FileHash" COMMAND MANUALLY
+# Technically you are still thrusting me, please be advised.
+# !!!
+# Force TLS certificate check
+set(CMAKE_TLS_VERIFY ON)
+
+if(MSVC)
+    set(SLANGC_PLATFORM_NAME "windows-x64")
+    set(SLANGC_ZIP_NAME "slang-2024.1.6-win64.zip")
+    set(SLANGC_SHA256_HASH "093A9D53BB5B44BF23446701F6BAEE47E08B6FE036E1A87A2155A8824AEAD786")
+elseif(UNIX AND NOT APPLE)
+    set(SLANGC_PLATFORM_NAME "linux-x64")
+    set(SLANGC_ZIP_NAME "slang-2024.1.6-linux-x86_x64.tar.gz")
+    set(SLANGC_SHA256_HASH "09E0A0443F142F6DB5ED9EAB2CC568EB3529461DDDE6426A02E75D1446B092E1")
+else()
+    message(FATAL_ERROR "Unsupported platform for macos(?)")
+endif()
+
+FetchContent_Declare(slangc_ext
+    URL "https://github.com/shader-slang/slang/releases/download/v2024.1.6/${SLANGC_ZIP_NAME}"
+    URL_HASH "SHA256=${SLANGC_SHA256_HASH}")
+FetchContent_MakeAvailable(slangc_ext)
+
+# Now write it to the MRAY_LIB_DIRECTORY
+file(GLOB SLANGC_BINARIES
+    "${slangc_ext_SOURCE_DIR}/bin/${SLANGC_PLATFORM_NAME}/release/*")
+file(COPY ${SLANGC_BINARIES} DESTINATION ${MRAY_PLATFORM_LIB_DIRECTORY}/slang)
 
 set(MRAY_ALL_EXT_DEP_TARGETS ${MRAY_ALL_EXT_DEP_TARGETS}
     ${MRAY_OIIO_EXT_DEP_TARGETS})

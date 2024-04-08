@@ -34,7 +34,7 @@ MRayError VisorCommand::Invoke()
 
     // ....
     VisorConfig vConf = {};
-    vConf.enforceIGPU = false;
+    vConf.enforceIGPU = true;
     vConf.wSize = Vector2i(640, 360);
     e = visorSystem->MTInitialize(vConf);
     if(e) return e;
