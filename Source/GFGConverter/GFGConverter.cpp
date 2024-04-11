@@ -17,6 +17,7 @@
 #include "Core/MemAlloc.h"
 #include "Core/Vector.h"
 #include "Core/Quaternion.h"
+#include "Core/Filesystem.h"
 
 // TODO: Type leak change it? (This functionaly is
 // highly intrusive, probably needs a redesign?)
@@ -24,18 +25,6 @@
 
 static const std::string ASSIMP_TAG = "assimp";
 static const std::string GFG_TAG = "gfg";
-
-std::string  SceneRelativePathToAbsolute(std::string_view sceneRelativePath,
-                                         std::string_view scenePath)
-{
-    using namespace std::filesystem;
-    // Skip if path is absolute
-    if(path(sceneRelativePath).is_absolute())
-        return std::string(sceneRelativePath);
-    // Create an absolute path relative to the scene.json file
-    path fullPath = path(scenePath) / path(sceneRelativePath);
-    return absolute(fullPath).generic_string();
-}
 
 struct MeshGroup
 {
@@ -168,8 +157,8 @@ MRayError THRDProcessMesh(Span<const MeshGroup> meshes,
 
     for(const auto& mesh : meshes)
     {
-        std::string meshPath = SceneRelativePathToAbsolute(mesh.filePath,
-                                                           inScenePath);
+        std::string meshPath = Filesystem::RelativePathToAbsolute(mesh.filePath,
+                                                                  inScenePath);
 
         // TODO: Delete previously created files??
         const aiScene* assimpScene = importer.ReadFile(meshPath, assimpFlags);
@@ -425,8 +414,9 @@ MRayError ValidateOutputFiles(MRayConvert::ConversionFlags flags,
         }
         else for(const auto& mesh : parsedMeshes)
         {
-            std::string meshPath = SceneRelativePathToAbsolute(mesh.filePath,
-                                                               inScenePath);
+
+            std::string meshPath = Filesystem::RelativePathToAbsolute(mesh.filePath,
+                                                                      inScenePath);
             auto gfgPath = fs::path(meshPath).replace_extension(fs::path(GFG_TAG));
 
             if(fs::exists(gfgPath))
@@ -577,8 +567,8 @@ Expected<double> MRayConvert::ConvertMeshesToGFG(const std::string& outFileName,
         }
         else for(const auto& m : parsedMeshes)
         {
-            std::string meshPath = SceneRelativePathToAbsolute(m.filePath,
-                                                               inScenePath);
+            std::string meshPath = Filesystem::RelativePathToAbsolute(m.filePath,
+                                                                      inScenePath);
 
             nlohmann::json primNode;
             auto gfgPath = fs::path(meshPath).replace_extension(fs::path(GFG_TAG));
@@ -615,8 +605,8 @@ Expected<double> MRayConvert::ConvertMeshesToGFG(const std::string& outFileName,
                 if(files.is_string())
                 {
                     std::string texPath = files.get<std::string>();
-                    std::string texPathAbs = SceneRelativePathToAbsolute(texPath,
-                                                                         inScenePath);
+                    std::string texPathAbs = Filesystem::RelativePathToAbsolute(texPath,
+                                                                                inScenePath);
                     auto outScenePath = fs::path(outFileName).remove_filename().generic_string();
                     std::string texRelPath = fs::relative(fs::path(texPathAbs),
                                                           outScenePath).generic_string();
@@ -625,8 +615,8 @@ Expected<double> MRayConvert::ConvertMeshesToGFG(const std::string& outFileName,
                 else for(auto& f : files)
                 {
                     std::string texPath = f.get<std::string>();
-                    std::string texPathAbs = SceneRelativePathToAbsolute(texPath,
-                                                                         inScenePath);
+                    std::string texPathAbs = Filesystem::RelativePathToAbsolute(texPath,
+                                                                                inScenePath);
                     auto outScenePath = fs::path(outFileName).remove_filename().generic_string();
                     std::string texRelPath = fs::relative(fs::path(texPathAbs),
                                                           outScenePath).generic_string();

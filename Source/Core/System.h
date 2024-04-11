@@ -1,6 +1,9 @@
 #pragma once
 
 #include <memory>
+#include <string>
+
+std::string GetProcessPath();
 
 #ifdef MRAY_WINDOWS
 

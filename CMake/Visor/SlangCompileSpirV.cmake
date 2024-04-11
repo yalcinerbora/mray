@@ -85,7 +85,6 @@ function(slang_gen_spriv)
     list(APPEND SLANG_COMPILE_OPTIONS ${SLANG_GEN_SPIRV_EXTRA_OPTIONS}
         -fvk-use-entrypoint-name
         -capability sm_6_0
-        -fspv-reflect
         -emit-spirv-directly
         -fp-mode $<$<CONFIG:Debug>:precise> $<$<CONFIG:Release>:fast>
         # Config related preprocessor flags

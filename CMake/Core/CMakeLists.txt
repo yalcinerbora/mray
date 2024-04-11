@@ -12,6 +12,7 @@ endif()
 
 set(SRC_SYSTEM
     ${CURRENT_SOURCE_DIR}/System.h
+    ${CURRENT_SOURCE_DIR}/System.cpp
     ${CURRENT_SOURCE_DIR}/SharedLibrary.h
     ${CURRENT_SOURCE_DIR}/SharedLibrary.cpp
     ${CURRENT_SOURCE_DIR}/MRayDescriptions.h)
@@ -47,7 +48,8 @@ set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/GraphicsFunctions.h
     ${CURRENT_SOURCE_DIR}/ShapeFunctions.h
     ${CURRENT_SOURCE_DIR}/Timer.h
-    ${CURRENT_SOURCE_DIR}/MPMCQueue.h)
+    ${CURRENT_SOURCE_DIR}/MPMCQueue.h
+    ${CURRENT_SOURCE_DIR}/Filesystem.h)
 
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/Definitions.h

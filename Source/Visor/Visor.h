@@ -13,8 +13,6 @@
 template<size_t N>
 using CStringList = StaticVector<const char*, N>;
 
-
-
 class VisorDebugSystem
 {
     private:
@@ -34,6 +32,7 @@ class VisorDebugSystem
                         VisorDebugSystem() = default;
                         VisorDebugSystem(const VisorDebugSystem&) = delete;
     VisorDebugSystem&   operator=(const VisorDebugSystem&) = delete;
+    VisorDebugSystem&   operator=(VisorDebugSystem&&);
                         ~VisorDebugSystem();
 
     static const VkDebugUtilsMessengerCreateInfoEXT*
@@ -52,7 +51,6 @@ class VisorVulkan : public VisorI
 
     // GLFW Callbacks
     public:
-    static void     ErrorCallbackGLFW(int, const char*);
     static void     WindowPosGLFW(GLFWwindow*, int, int);
     static void     WindowFBGLFW(GLFWwindow*, int, int);
     static void     WindowSizeGLFW(GLFWwindow*, int, int);
@@ -64,7 +62,10 @@ class VisorVulkan : public VisorI
     static void     MouseMovedGLFW(GLFWwindow*, double, double);
     static void     MousePressedGLFW(GLFWwindow*, int, int, int);
     static void     MouseScrolledGLFW(GLFWwindow*, double, double);
+    static void     RegisterCallbacks(GLFWwindow*);
 
+    static void     ErrorCallbackGLFW(int, const char*);
+    static void     MonitorCallback(GLFWmonitor*, int action);
 
     private:
     CStringList<32>     instanceExtList;
@@ -74,21 +75,33 @@ class VisorVulkan : public VisorI
     VkInstance          instanceVk = nullptr;
     VkDevice            deviceVk = nullptr;
     VkPhysicalDevice    pDeviceVk = nullptr;
+    VkQueue             mainQueueVk = nullptr;
     uint32_t            queueFamilyIndex = std::numeric_limits<uint32_t>::max();
+
     VisorDebugSystem    debugSystem;
+    std::string         processPath;
 
     VkInstanceCreateInfo    EnableValidation(VkInstanceCreateInfo);
     MRayError               QueryAndPickPhysicalDevice(const VisorConfig&);
     Expected<VisorWindow>   GenerateWindow(const VisorConfig&);
+    MRayError               InitImGui();
 
     // TODO: Move this away when multi-window is required
+    // but imgui looks like single-windowed?
     VisorWindow         window;
 
-    //void                THRDProcessCommands();
     public:
+    // Constructors & Destructor
                         VisorVulkan() = default;
-
-    MRayError           MTInitialize(VisorConfig) override;
+                        VisorVulkan(const VisorVulkan&) = delete;
+                        VisorVulkan(VisorVulkan&&) = delete;
+    VisorVulkan&        operator=(const VisorVulkan&) = delete;
+    VisorVulkan&        operator=(VisorVulkan&&) = delete;
+                        ~VisorVulkan() = default;
+    //
+    MRayError           MTInitialize(VisorConfig,
+                                     const std::string& processPath) override;
+    bool                MTIsTerminated() override;
     void                MTWaitForInputs() override;
     void                MTRender() override;
     void                MTDestroy() override;

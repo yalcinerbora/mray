@@ -3,16 +3,24 @@ set(SHADER_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/Visor/Shaders)
 
 include(SlangCompileSpirV.cmake)
 
-set(SRC_WINDOW
+set(SRC_VISOR
+    ${CURRENT_SOURCE_DIR}/FramePool.cpp
+    ${CURRENT_SOURCE_DIR}/FramePool.h
     ${CURRENT_SOURCE_DIR}/VisorWindow.cpp
     ${CURRENT_SOURCE_DIR}/VisorWindow.h
-    ${CURRENT_SOURCE_DIR}/VisorI.h)
+    ${CURRENT_SOURCE_DIR}/FontAtlas.h
+    ${CURRENT_SOURCE_DIR}/FontAtlas.cpp)
 
-set(SRC_COMMON
+set(SRC_VULKAN
+    ${CURRENT_SOURCE_DIR}/VulkanTypes.h
     ${CURRENT_SOURCE_DIR}/VulkanAllocators.cpp
     ${CURRENT_SOURCE_DIR}/VulkanAllocators.h
+    ${CURRENT_SOURCE_DIR}/VulkanCapabilityFinder.h)
+
+set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/Visor.cpp
     ${CURRENT_SOURCE_DIR}/Visor.h
+    ${CURRENT_SOURCE_DIR}/VisorI.h
     ${CURRENT_SOURCE_DIR}/EntryPoint.cpp
     ${CURRENT_SOURCE_DIR}/EntryPoint.h)
 
@@ -23,12 +31,14 @@ set(SRC_SHADERS
     ${SHADER_SOURCE_DIR}/TonemapTypeGen.slang)
 
 source_group("Shaders" FILES ${SRC_SHADERS})
-source_group("Window" FILES ${SRC_WINDOW})
+source_group("Vulkan" FILES ${SRC_VULKAN})
+source_group("Visor" FILES ${SRC_VISOR})
 source_group("" FILES ${SRC_COMMON})
 
 set(SRC_ALL
     ${SRC_SHADERS}
-    ${SRC_WINDOW}
+    ${SRC_VISOR}
+    ${SRC_VULKAN}
     ${SRC_COMMON})
 
 add_library(Visor SHARED ${SRC_ALL})
@@ -43,6 +53,12 @@ target_link_libraries(Visor PRIVATE
 target_compile_definitions(Visor
                            PRIVATE
                            MRAY_VISOR_SHARED_EXPORT)
+
+add_custom_command(TARGET Visor POST_BUILD
+                   COMMENT "Copying fonts.."
+                   COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+                   "${MRAY_RESOURCE_DIRECTORY}/Fonts"
+                   "${MRAY_CONFIG_BIN_DIRECTORY}/Fonts")
 
 if(MSVC)
 add_custom_command(TARGET Visor POST_BUILD
@@ -90,3 +106,4 @@ slang_gen_spriv(OUTPUT_PREFIX "Tonemap"
 
 add_custom_target(VisorShaders DEPENDS ${SLANG_GEN_SPIRV_OUTPUT_LIST})
 add_dependencies(Visor VisorShaders)
+

@@ -202,6 +202,8 @@ class alignas(std::max(alignof(T), size_t(8))) StaticVector
     template<class... Args>
     constexpr T&            emplace_back(Args&&...);
     constexpr void          pop_back();
+
+    constexpr void          remove(T*);
 };
 
 

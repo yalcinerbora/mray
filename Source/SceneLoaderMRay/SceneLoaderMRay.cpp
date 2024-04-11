@@ -4,6 +4,7 @@
 #include "Core/Log.h"
 #include "Core/Timer.h"
 #include "Core/NormTypes.h"
+#include "Core/Filesystem.h"
 
 #include "MeshLoader/EntryPoint.h"
 #include "MeshLoaderJson.h"
@@ -548,16 +549,6 @@ void SceneLoaderMRay::ExceptionList::AddException(MRayError&& err)
         exceptions[location] = std::move(err);
 }
 
-std::string SceneLoaderMRay::SceneRelativePathToAbsolute(std::string_view sceneRelativePath,
-                                                         std::string_view scenePath)
-{
-    using namespace std::filesystem;
-    // Skip if path is absolute
-    if(path(sceneRelativePath).is_absolute()) return std::string(sceneRelativePath);
-    // Create an absolute path relative to the scene.json file
-    path fullPath = path(scenePath) / path(sceneRelativePath);
-    return absolute(fullPath).generic_string();
-}
 
 LightSurfaceStruct SceneLoaderMRay::LoadBoundary(const nlohmann::json& n)
 {
@@ -837,7 +828,7 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
                 auto fileName = jsonNode.AccessData<std::string>(NodeNames::TEX_NODE_FILE);
                 auto isColor = jsonNode.AccessOptionalData<bool>(NodeNames::TEX_NODE_COLORIMETRIC)
                                 .value_or(NodeNames::TEX_NODE_COLORIMETRIC_DEFAULT);
-                fileName = SceneLoaderMRay::SceneRelativePathToAbsolute(fileName, scenePath);
+                fileName = Filesystem::RelativePathToAbsolute(fileName, scenePath);
 
                 // Currently no flags are utilized on header load time
                 // TODO: Check here if this fails
@@ -885,7 +876,7 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
                                         .value_or(NodeNames::TEX_NODE_AS_SIGNED_DEFAULT);
                 bool isData = jsonNode.AccessData<bool>(NodeNames::TEX_NODE_IS_DATA);
                 auto fileName = jsonNode.AccessData<std::string>(NodeNames::TEX_NODE_FILE);
-                fileName = SceneLoaderMRay::SceneRelativePathToAbsolute(fileName, scenePath);
+                fileName = Filesystem::RelativePathToAbsolute(fileName, scenePath);
 
                 using enum ImageIOFlags::F;
                 ImageIOFlags flags;
@@ -1259,7 +1250,7 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
                 else
                 {
                     std::string fileName = node.CommonData<std::string>(NodeNames::FILE);
-                    fileName = SceneLoaderMRay::SceneRelativePathToAbsolute(fileName, scenePath);
+                    fileName = Filesystem::RelativePathToAbsolute(fileName, scenePath);
                     innerIndex = node.AccessData<uint32_t>(NodeNames::INNER_INDEX);
 
                     // Find a Loader

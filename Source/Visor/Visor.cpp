@@ -4,13 +4,14 @@
 #include "Core/DataStructures.h"
 #include "Core/MemAlloc.h"
 
-
 #include <Imgui/imgui.h>
 #include <Imgui/imgui_impl_glfw.h>
 #include <Imgui/imgui_impl_vulkan.h>
 
 #include "VisorWindow.h"
 #include "VulkanAllocators.h"
+#include "VulkanCapabilityFinder.h"
+#include "FontAtlas.h"
 
 VKAPI_ATTR VkBool32 VKAPI_CALL
 VisorDebugSystem::Callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -46,7 +47,7 @@ VisorDebugSystem::Callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverit
     else
         type = "UNKNOWN"sv;
 
-    MRAY_LOG("-[Vulkan]:[{}]:[{}]: {}",
+    MRAY_LOG("[Vulkan]:[{}]:[{}]: {}",
              severity, type, pCallbackData->pMessage);
     return VK_FALSE;
 }
@@ -68,6 +69,21 @@ MRayError VisorDebugSystem::Initialize(VkInstance inst)
     if(result != VK_SUCCESS)
         return MRayError("Unable to create Vulkan Debug Messenger!");
     return MRayError::OK;
+}
+
+VisorDebugSystem& VisorDebugSystem::operator=(VisorDebugSystem&& other)
+{
+    assert(this != &other);
+
+    if(instance && messenger)
+        vkDestroyDbgMessenger(instance, messenger,
+                              VulkanHostAllocator::Functions());
+
+    instance = other.instance;
+    vkCreateDbgMessenger = other.vkCreateDbgMessenger;
+    vkDestroyDbgMessenger = other.vkDestroyDbgMessenger;
+    messenger = other.messenger;
+    return *this;
 }
 
 VisorDebugSystem::~VisorDebugSystem()
@@ -112,15 +128,7 @@ VkInstanceCreateInfo VisorVulkan::EnableValidation(VkInstanceCreateInfo vInfo)
 
     uint32_t layerCount;
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-
-    // TODO: This will fail in future
-    static constexpr uint32_t MaxLayerCount = 64;
-    std::array<VkLayerProperties, MaxLayerCount> availableLayers;
-    if(layerCount > MaxLayerCount)
-    {
-        MRAY_ERROR_LOG("Too many validation layers");
-        return vInfo;
-    }
+    std::vector<VkLayerProperties> availableLayers(layerCount);
 
     bool allLayersOK = true;
     vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
@@ -137,7 +145,6 @@ VkInstanceCreateInfo VisorVulkan::EnableValidation(VkInstanceCreateInfo vInfo)
         {
             MRAY_LOG("Visor: Unable to find layer \"{}\"", layer);
             allLayersOK &= false;
-            break;
         }
     }
 
@@ -162,12 +169,7 @@ VkInstanceCreateInfo VisorVulkan::EnableValidation(VkInstanceCreateInfo vInfo)
     return vInfo;
 }
 
-// Callbacks
-void VisorVulkan::ErrorCallbackGLFW(int errorCode, const char* err)
-{
-    MRAY_ERROR_LOG("GLFW:[{}]: \"{}\"", errorCode, err);
-}
-
+// Callbacks (Window Related)
 void VisorVulkan::WindowPosGLFW(GLFWwindow* wind, int posX, int posY)
 {
     auto wPtr = static_cast<VisorWindow*>(glfwGetWindowUserPointer(wind));
@@ -194,8 +196,13 @@ void VisorVulkan::WindowCloseGLFW(GLFWwindow* wind)
 
 void VisorVulkan::WindowRefreshGLFW(GLFWwindow* wind)
 {
+    MRAY_LOG("Refreshed!");
+
     auto wPtr = static_cast<VisorWindow*>(glfwGetWindowUserPointer(wind));
     wPtr->WndRefreshed();
+
+
+    wPtr->Render();
 }
 
 void VisorVulkan::WindowFocusedGLFW(GLFWwindow* wind, int isFocused)
@@ -216,20 +223,62 @@ void VisorVulkan::KeyboardUsedGLFW(GLFWwindow* wind,
     auto wPtr = static_cast<VisorWindow*>(glfwGetWindowUserPointer(wind));
     wPtr->KeyboardUsed(key, scanCode, action, modifier);
 }
+
 void VisorVulkan::MouseMovedGLFW(GLFWwindow* wind, double px, double py)
 {
     auto wPtr = static_cast<VisorWindow*>(glfwGetWindowUserPointer(wind));
     wPtr->MouseMoved(px, py);
 }
+
 void VisorVulkan::MousePressedGLFW(GLFWwindow* wind, int key, int action, int modifier)
 {
     auto wPtr = static_cast<VisorWindow*>(glfwGetWindowUserPointer(wind));
     wPtr->MousePressed(key, action, modifier);
 }
+
 void VisorVulkan::MouseScrolledGLFW(GLFWwindow* wind, double dx, double dy)
 {
     auto wPtr = static_cast<VisorWindow*>(glfwGetWindowUserPointer(wind));
     wPtr->MouseScrolled(dx, dy);
+}
+
+void VisorVulkan::RegisterCallbacks(GLFWwindow* w)
+{
+    glfwSetWindowPosCallback(w, &VisorVulkan::WindowPosGLFW);
+    glfwSetFramebufferSizeCallback(w, &VisorVulkan::WindowFBGLFW);
+    glfwSetWindowSizeCallback(w, &VisorVulkan::WindowSizeGLFW);
+    glfwSetWindowCloseCallback(w, &VisorVulkan::WindowCloseGLFW);
+    glfwSetWindowRefreshCallback(w, &VisorVulkan::WindowRefreshGLFW);
+    glfwSetWindowFocusCallback(w, &VisorVulkan::WindowFocusedGLFW);
+    glfwSetWindowIconifyCallback(w, &VisorVulkan::WindowMinimizedGLFW);
+
+    glfwSetKeyCallback(w, &VisorVulkan::KeyboardUsedGLFW);
+    glfwSetCursorPosCallback(w, &VisorVulkan::MouseMovedGLFW);
+    glfwSetMouseButtonCallback(w, &VisorVulkan::MousePressedGLFW);
+    glfwSetScrollCallback(w, &VisorVulkan::MouseScrolledGLFW);
+}
+
+// System related
+void VisorVulkan::ErrorCallbackGLFW(int errorCode, const char* err)
+{
+    MRAY_ERROR_LOG("[GLFW]:[{}]: \"{}\"", errorCode, err);
+}
+
+void VisorVulkan::MonitorCallback(GLFWmonitor* monitor, int action)
+{
+    MRAY_LOG("Monitor!!!!!");
+    if(action == GLFW_CONNECTED)
+    {
+        MRAY_LOG("[GLFW]: New Monitor: {}",
+                 glfwGetMonitorName(monitor));
+        FontAtlas::Instance().AddMonitorFont(monitor);
+    }
+    else if(action == GLFW_DISCONNECTED)
+    {
+        MRAY_LOG("[GLFW]: Monitor Removed: {}",
+                 glfwGetMonitorName(monitor));
+        FontAtlas::Instance().RemoveMonitorFont(monitor);
+    }
 }
 
 MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig)
@@ -243,18 +292,20 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     auto deviceList = StaticVector<VkPhysicalDevice, 32>(StaticVecSize(deviceCount));
     vkEnumeratePhysicalDevices(instanceVk, &deviceCount, deviceList.data());
 
-    static constexpr std::array<const char*, 1> RequiredExtensions =
+    static constexpr std::array<const char*, 3> RequiredExtensions =
     {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME,
+        VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME
     };
 
     for(const auto& pDevice : deviceList)
     {
-        VkPhysicalDeviceProperties props;
-        vkGetPhysicalDeviceProperties(pDevice, &props);
+        VkPhysicalDeviceProperties deviceProps;
+        vkGetPhysicalDeviceProperties(pDevice, &deviceProps);
 
-        VkPhysicalDeviceFeatures features;
-        vkGetPhysicalDeviceFeatures(pDevice, &features);
+        VkPhysicalDeviceFeatures deviceFeatures;
+        vkGetPhysicalDeviceFeatures(pDevice, &deviceFeatures);
 
         uint32_t queuePropCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(pDevice, &queuePropCount, nullptr);
@@ -275,11 +326,11 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
         if(!isUsableDevice) continue;
 
         // If device is *not* IGPU but we want IGPU continue
-        if(props.deviceType != VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU &&
+        if(deviceProps.deviceType != VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU &&
            visorConfig.enforceIGPU)
             continue;
         // Other way around
-        if(props.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU &&
+        if(deviceProps.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU &&
            !visorConfig.enforceIGPU)
             continue;
 
@@ -293,21 +344,13 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
         vkEnumerateDeviceExtensionProperties(pDevice, nullptr, &extensionCount,
                                              availableExtensions.data());
         // TODO: Change linear search later
-        bool hasAllExtensions = true;
-        for(const auto& rExt : RequiredExtensions)
+        bool hasAllExtensions =
+        CheckAllInList(availableExtensions.cbegin(), availableExtensions.cend(),
+                       RequiredExtensions.cbegin(), RequiredExtensions.cend(),
+                       [](const VkExtensionProperties& p, const char* const name)
         {
-            auto loc = std::find_if(availableExtensions.cbegin(),
-                                    availableExtensions.cbegin(),
-                                    [&rExt](const VkExtensionProperties& p)
-            {
-                return std::strncmp(rExt, p.extensionName,
-                                    VK_MAX_EXTENSION_NAME_SIZE) == 0;
-            });
-            if(loc != availableExtensions.cend()) continue;
-
-            hasAllExtensions = false;
-            break;
-        }
+            return std::strncmp(name, p.extensionName, VK_MAX_EXTENSION_NAME_SIZE) == 0;
+        });
 
         // Required extensions are not available on this device skip
         if(!hasAllExtensions) continue;
@@ -350,7 +393,7 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
             .ppEnabledExtensionNames = deviceExtList.data(),
             // Get all the features?
             // TODO: Does this has a drawback?
-            .pEnabledFeatures = &features
+            .pEnabledFeatures = &deviceFeatures
         };
 
         // Actual device creation
@@ -358,7 +401,7 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
                           VulkanHostAllocator::Functions(),
                           &deviceVk))
             return MRayError("Unable to create logical device on \"{}\"!",
-                             props.deviceName);
+                             deviceProps.deviceName);
 
         // Store the selected physical device
         pDeviceVk = pDevice;
@@ -386,10 +429,14 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
                  "Max Tex2D : [{}, {}]\n"
                  "Memory    : {:.3f}GiB\n"
                  "-----------------\n",
-                 props.deviceName,
-                 props.limits.maxImageDimension2D,
-                 props.limits.maxImageDimension2D,
+                 deviceProps.deviceName,
+                 deviceProps.limits.maxImageDimension2D,
+                 deviceProps.limits.maxImageDimension2D,
                  (static_cast<double>(memSize) / 1024.0 / 1024.0 / 1024.0));
+
+        // Get the queue
+        vkGetDeviceQueue(deviceVk, queueFamilyIndex, 0,
+                         &mainQueueVk);
 
         return MRayError::OK;
     }
@@ -400,16 +447,54 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
 Expected<VisorWindow> VisorVulkan::GenerateWindow(const VisorConfig& config)
 {
     VisorWindow w;
-    MRayError e = w.Initialize(deviceVk, pDeviceVk,
-                               instanceVk, queueFamilyIndex,
-                               WindowTitle, config);
+    VulkanSystemView handlesVk =
+    {
+        .instanceVk     = instanceVk,
+        .pDeviceVk      = pDeviceVk,
+        .deviceVk       = deviceVk,
+        .queueIndex     = queueFamilyIndex,
+        .mainQueueVk    = mainQueueVk
+    };
+    MRayError e = w.Initialize(handlesVk, WindowTitle, config);
     if(e) return e;
     return w;
 }
 
-MRayError VisorVulkan::MTInitialize(VisorConfig visorConfig)
+MRayError VisorVulkan::InitImGui()
+{
+    // Init Imgui stuff
+    if(!IMGUI_CHECKVERSION())
+        return MRayError("ImGui: Version mistmatch!");
+
+    if(ImGui::CreateContext() == nullptr)
+        return MRayError("ImGui: Unable to create context!");
+
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
+    // Pre-generate fonts
+    FontAtlas::Instance(processPath);
+
+    int monitorCount;
+    GLFWmonitor** monitorList = glfwGetMonitors(&monitorCount);
+    for(int i = 0; i < monitorCount; i++)
+        FontAtlas::Instance().AddMonitorFont(monitorList[i]);
+
+    ImGui::StyleColorsDark();
+    return MRayError::OK;
+}
+
+MRayError VisorVulkan::MTInitialize(VisorConfig visorConfig,
+                                    const std::string& pPath)
 {
     MRayError e = MRayError::OK;
+    processPath = pPath;
+
+    // From here
+    // https://github.com/ocornut/imgui/blob/master/examples/example_glfw_vulkan/main.cpp
+    // TBH, did not check what portability one is but
+    // its here
+    instanceExtList.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
     int err = glfwInit();
     if(err != GLFW_TRUE)
@@ -418,6 +503,7 @@ MRayError VisorVulkan::MTInitialize(VisorConfig visorConfig)
         return MRayError("GLFW: {}", errString);
     }
     glfwSetErrorCallback(&VisorVulkan::ErrorCallbackGLFW);
+    glfwSetMonitorCallback(&VisorVulkan::MonitorCallback);
 
     uint32_t glfwExtCount;
     auto glfwExtNames = glfwGetRequiredInstanceExtensions(&glfwExtCount);
@@ -477,28 +563,21 @@ MRayError VisorVulkan::MTInitialize(VisorConfig visorConfig)
     e = QueryAndPickPhysicalDevice(visorConfig);
     if(e) return e;
 
+    // Imgui
+    e = InitImGui();
+    if(e) return e;
 
-    // Init Imgui stuff
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    //io.
-    ImGui::StyleColorsDark();
-
+    // Main window
     auto windowE = GenerateWindow(visorConfig);
     if(windowE.has_error())
         return windowE.error();
     window = std::move(windowE.value());
-
-
-    //ImGui_ImplGlfw_InitForVulkan(window, true);
-
-    //ImGui_ImplVulkan_InitInfo init_info = {};
-
-    //ImGui_ImplVulkan_Init(&init_info, renderPass);
-
     return MRayError::OK;
+}
+
+bool VisorVulkan::MTIsTerminated()
+{
+    return window.ShouldClose();
 }
 
 void VisorVulkan::MTWaitForInputs()
@@ -508,38 +587,28 @@ void VisorVulkan::MTWaitForInputs()
 
 void VisorVulkan::MTRender()
 {
-    VkCommandBuffer commandBuffer;
-
-
-    ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-
-    // GUI Setup
-    //---------
-    ImGui::ShowDemoWindow();
-    //---------
-
-    // IssueCommand
-    // -->
-
-    // Rendering
-    // ---------
-
-    ImGui::Render();
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+    window.Render();
 }
 
 void VisorVulkan::MTDestroy()
 {
-    ImGui_ImplVulkan_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
+    // Finalize everything
+    vkDeviceWaitIdle(deviceVk);
+    // Destroy swapchain window etc..
+    window = VisorWindow();
+
+    // Destroy Imgui
+    FontAtlas::Instance().ClearFonts();
     ImGui::DestroyContext();
-
-
-    //vkDestroySurfaceKHR(instanceVk, surfaceVk, VulkanHostAllocator::Functions());
+    // Destroy vulkan etc..
     vkDestroyDevice(deviceVk, VulkanHostAllocator::Functions());
-    vkDestroyInstance(instanceVk, VulkanHostAllocator::Functions());
 
+    if constexpr(MRAY_IS_DEBUG)
+    {
+        debugSystem = VisorDebugSystem();
+    }
+
+    vkDestroyInstance(instanceVk, VulkanHostAllocator::Functions());
+    // Terminal glfw system
     glfwTerminate();
 }

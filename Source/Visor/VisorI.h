@@ -19,7 +19,9 @@ class VisorI
     public:
     virtual             ~VisorI() = default;
     //
-    virtual MRayError   MTInitialize(VisorConfig) = 0;
+    virtual MRayError   MTInitialize(VisorConfig,
+                                     const std::string& processPath) = 0;
+    virtual bool        MTIsTerminated() = 0;
     virtual void        MTWaitForInputs() = 0;
     virtual void        MTRender()  = 0;
     virtual void        MTDestroy() = 0;

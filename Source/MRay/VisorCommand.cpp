@@ -6,7 +6,7 @@
 #include "Visor/EntryPoint.h"
 
 #include "Core/SharedLibrary.h"
-
+#include "Core/System.h"
 
 namespace MRayCLI::VisorNames
 {
@@ -32,15 +32,30 @@ MRayError VisorCommand::Invoke()
                                                       VisorDLLArgs);
     if(e) return e;
 
-    // ....
+    // TODO: Acq visor config from file
     VisorConfig vConf = {};
     vConf.enforceIGPU = true;
+    vConf.displayHDR = true;
     vConf.wSize = Vector2i(640, 360);
-    e = visorSystem->MTInitialize(vConf);
+
+    // Actual initialization, process path should be called from here
+    // In dll it may return .dll's path (on windows, I think)
+    std::string processPath = GetProcessPath();
+    e = visorSystem->MTInitialize(vConf, processPath);
     if(e) return e;
 
-    return MRayError::OK;
+    // ====================== //
+    //     Real-time Loop     //
+    // ====================== //
+    while(!visorSystem->MTIsTerminated())
+    {
+        visorSystem->MTWaitForInputs();
+        visorSystem->MTRender();
+    }
 
+    // GG!
+    visorSystem->MTDestroy();
+    return MRayError::OK;
 }
 
 CLI::App* VisorCommand::GenApp(CLI::App& mainApp)

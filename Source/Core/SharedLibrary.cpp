@@ -34,7 +34,7 @@ static std::wstring ConvertWCharWin32(const std::string& unicodeStr)
         const size_t length = unicodeStr.length();
         const DWORD kFlags = MB_ERR_INVALID_CHARS;
 
-        // Quarry string size
+        // Query string size
         const int utf16Length = ::MultiByteToWideChar(
             CP_UTF8,                    // Source string is in UTF-8
             kFlags,                     // Conversion flags

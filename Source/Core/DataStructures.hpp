@@ -201,6 +201,7 @@ requires std::is_move_assignable_v<T>
 {
     assert(count <= N);
     assert(this != &other);
+
     count = other.count;
     for(size_t i = 0; i < count; i++)
     {
@@ -208,6 +209,7 @@ requires std::is_move_assignable_v<T>
             DestructObjectAt(i);
         ConstructObjectAt(i, std::move(other[i]));
     }
+    other.count = 0;
     return *this;
 }
 
@@ -395,6 +397,16 @@ constexpr void StaticVector<T, N>::pop_back()
     count--;
 }
 
+template<class T, size_t N>
+constexpr void StaticVector<T, N>::remove(T* loc)
+{
+    assert(loc >= begin() && loc < end());
+    for(T* i = loc; i != (end() - 1); i++)
+    {
+        std::swap(*i, *(i + 1));
+    }
+    pop_back();
+}
 
 template <class T, class Comp, RandomAccessContainerC Cont>
 FlatSet<T, Comp, Cont>::FlatSet()

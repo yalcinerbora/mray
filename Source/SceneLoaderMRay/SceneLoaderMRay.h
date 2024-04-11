@@ -40,9 +40,6 @@ class SceneLoaderMRay : public SceneLoaderI
         Map         map;
     };
 
-    static std::string  SceneRelativePathToAbsolute(std::string_view sceneRelativePath,
-                                                    std::string_view scenePath);
-
     private:
     std::string         scenePath;
     nlohmann::json      sceneJson;
