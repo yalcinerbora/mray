@@ -101,8 +101,6 @@ function(slang_gen_spriv)
     list(APPEND SPIRV_DEPS ${SLANG_GEN_SPIRV_DEPENDS} ${TYPE_MODULE} ${SLANG_GEN_SPIRV_MODULES})
     set(SPIRV_OUTPUT_PATH "${MRAY_SHADER_OUT_DIRECTORY}/${OUTPUT_NAME}")
 
-    message(STATUS ${SLANG_GEN_SPIRV_GEN_ASSEMBLY})
-
     set(DEPENDENCY_LIST)
     if(SLANG_GEN_SPIRV_GEN_ASSEMBLY)
         set(OUT_SPV_ASM ${SPIRV_OUTPUT_PATH}${MRAY_SPIRV_ASM_EXTENSION})
@@ -115,7 +113,6 @@ function(slang_gen_spriv)
                     ${SLANG_GEN_SPIRV_MODULES}
                     ${TYPE_MODULE})
 
-        message(STATUS ${OUT_SPV_ASM})
         set(DEPENDENCY_LIST ${DEPENDENCY_LIST} ${OUT_SPV_ASM})
 
     endif()

@@ -8,6 +8,7 @@
 
 #include "VulkanTypes.h"
 #include "FramePool.h"
+#include "VisorGUI.h"
 
 struct ImFont;
 struct GLFWwindow;
@@ -50,7 +51,6 @@ class Swapchain
 
     // Imgui Related
     VkDescriptorPool            imguiDescPool   = nullptr;
-    //glfwWindow*
 
     //
     MRayError                   FixSwapchain(bool isFirstFix = false);
@@ -84,6 +84,9 @@ class VisorWindow
     GLFWwindow*         window          = nullptr;
     bool                hdrRequested    = false;
     VulkanSystemView    handlesVk       = {};
+    bool                stopPresenting  = false;
+    VisorGUI            gui;
+
 
     private:
     friend class VisorVulkan;
@@ -98,6 +101,7 @@ class VisorWindow
     void        MouseMoved(double px, double py);
     void        MousePressed(int button, int action, int modifier);
     void        MouseScrolled(double dx, double dy);
+    void        PathDropped(int count, const char** paths);
     // Only Visor can create windows
                 VisorWindow() = default;
     // Thus, only visor can initialize windows
@@ -120,4 +124,5 @@ class VisorWindow
     void                PresentFrame();
     ImFont*             CurrentFont();
     void                Render();
+
 };

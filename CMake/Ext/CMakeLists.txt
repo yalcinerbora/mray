@@ -206,22 +206,22 @@ mray_build_ext_dependency_git(
 )
 
 # TODO: Add Vulkan Validation Layer, currently dll comes from SDK
-mray_build_ext_dependency_git(
-    NAME vulkan_validation_layer_ext
-    URL "https://github.com/KhronosGroup/Vulkan-ValidationLayers.git"
-    TAG "8506077b9a25a00684e8be24b779733ae1405a54" # 1.3.280
-    LICENSE_NAME "LICENSE.txt"
-    FORCE_RELEASE
-    BUILD_ARGS
-        -DUPDATE_DEPS=ON
-        -DBUILD_TESTS=OFF
-        -DVULKAN_HEADERS_INSTALL_DIR=${MRAY_LIB_DIRECTORY}/share
-        -DVULKAN_LOADER_INSTALL_DIR=${MRAY_LIB_DIRECTORY}/share
+# mray_build_ext_dependency_git(
+#     NAME vulkan_validation_layer_ext
+#     URL "https://github.com/KhronosGroup/Vulkan-ValidationLayers.git"
+#     TAG "8506077b9a25a00684e8be24b779733ae1405a54" # 1.3.280
+#     LICENSE_NAME "LICENSE.txt"
+#     FORCE_RELEASE
+#     BUILD_ARGS
+#         -DUPDATE_DEPS=ON
+#         -DBUILD_TESTS=OFF
+#         -DVULKAN_HEADERS_INSTALL_DIR=${MRAY_LIB_DIRECTORY}/share
+#         -DVULKAN_LOADER_INSTALL_DIR=${MRAY_LIB_DIRECTORY}/share
 
-    DEPENDENCIES
-        vulkan_headers_ext
-        vulkan_loader_ext
-)
+#     DEPENDENCIES
+#         vulkan_headers_ext
+#         vulkan_loader_ext
+# )
 
 # Get ImGUI
 include(DownloadDearImGUI.cmake)

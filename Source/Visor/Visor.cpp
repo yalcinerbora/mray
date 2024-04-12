@@ -196,13 +196,8 @@ void VisorVulkan::WindowCloseGLFW(GLFWwindow* wind)
 
 void VisorVulkan::WindowRefreshGLFW(GLFWwindow* wind)
 {
-    MRAY_LOG("Refreshed!");
-
     auto wPtr = static_cast<VisorWindow*>(glfwGetWindowUserPointer(wind));
     wPtr->WndRefreshed();
-
-
-    wPtr->Render();
 }
 
 void VisorVulkan::WindowFocusedGLFW(GLFWwindow* wind, int isFocused)
@@ -242,6 +237,12 @@ void VisorVulkan::MouseScrolledGLFW(GLFWwindow* wind, double dx, double dy)
     wPtr->MouseScrolled(dx, dy);
 }
 
+void VisorVulkan::PathDroppedGLFW(GLFWwindow* wind, int count, const char** paths)
+{
+    auto wPtr = static_cast<VisorWindow*>(glfwGetWindowUserPointer(wind));
+    wPtr->PathDropped(count, paths);
+}
+
 void VisorVulkan::RegisterCallbacks(GLFWwindow* w)
 {
     glfwSetWindowPosCallback(w, &VisorVulkan::WindowPosGLFW);
@@ -256,6 +257,7 @@ void VisorVulkan::RegisterCallbacks(GLFWwindow* w)
     glfwSetCursorPosCallback(w, &VisorVulkan::MouseMovedGLFW);
     glfwSetMouseButtonCallback(w, &VisorVulkan::MousePressedGLFW);
     glfwSetScrollCallback(w, &VisorVulkan::MouseScrolledGLFW);
+    glfwSetDropCallback(w, &VisorVulkan::PathDroppedGLFW);
 }
 
 // System related
@@ -520,6 +522,10 @@ MRayError VisorVulkan::InitImGui()
         FontAtlas::Instance().AddMonitorFont(monitorList[i]);
 
     ImGui::StyleColorsDark();
+    auto& style = ImGui::GetStyle();
+    //style.Colors[ImGuiCol_Button] = ImVec4(0, 0, 0, 0.1f);
+    style.Colors[ImGuiCol_Button] = style.Colors[ImGuiCol_MenuBarBg];
+    style.Colors[ImGuiCol_Button].w = 0.1f;
     return MRayError::OK;
 }
 

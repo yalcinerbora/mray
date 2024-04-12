@@ -62,6 +62,7 @@ class VisorVulkan : public VisorI
     static void     MouseMovedGLFW(GLFWwindow*, double, double);
     static void     MousePressedGLFW(GLFWwindow*, int, int, int);
     static void     MouseScrolledGLFW(GLFWwindow*, double, double);
+    static void     PathDroppedGLFW(GLFWwindow*, int, const char**);
     static void     RegisterCallbacks(GLFWwindow*);
 
     static void     ErrorCallbackGLFW(int, const char*);

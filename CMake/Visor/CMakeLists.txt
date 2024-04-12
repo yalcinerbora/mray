@@ -3,6 +3,10 @@ set(SHADER_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/Visor/Shaders)
 
 include(SlangCompileSpirV.cmake)
 
+set(SRC_GUI
+    ${CURRENT_SOURCE_DIR}/VisorGUI.cpp
+    ${CURRENT_SOURCE_DIR}/VisorGUI.h)
+
 set(SRC_VISOR
     ${CURRENT_SOURCE_DIR}/FramePool.cpp
     ${CURRENT_SOURCE_DIR}/FramePool.h
@@ -31,11 +35,13 @@ set(SRC_SHADERS
     ${SHADER_SOURCE_DIR}/TonemapTypeGen.slang)
 
 source_group("Shaders" FILES ${SRC_SHADERS})
+source_group("GUI" FILES ${SRC_GUI})
 source_group("Vulkan" FILES ${SRC_VULKAN})
 source_group("Visor" FILES ${SRC_VISOR})
 source_group("" FILES ${SRC_COMMON})
 
 set(SRC_ALL
+    ${SRC_GUI}
     ${SRC_SHADERS}
     ${SRC_VISOR}
     ${SRC_VULKAN}

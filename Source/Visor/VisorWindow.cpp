@@ -169,7 +169,7 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
         {
             return sf.colorSpace == cSpace;
         });
-        if(loc == surfaceTypeList.cend())
+        if(loc == surfaceTypeList.cend() && isFirstFix)
             MRAY_WARNING_LOG("Unable to create HDR surface, falling back to SDR...");
     }
     //
@@ -204,17 +204,17 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
                             capabilities.maxImageExtent.height);
 
 
-    MRAY_LOG("=================\n"
-             "New swapchain\n"
-             "ColorSpace  : {}\n"
-             "PresentMode : {}\n"
-             "Extent      : [{}, {}]\n"
-             "Format Enum : {}\n"
-             "=================\n",
-             VkColorSpaceToString(colorSpace),
-             VkPresentModeToString(presentMode),
-             extent.width, extent.height,
-             static_cast<VkFlags>(format));
+    //MRAY_LOG("=================\n"
+    //         "New swapchain\n"
+    //         "ColorSpace  : {}\n"
+    //         "PresentMode : {}\n"
+    //         "Extent      : [{}, {}]\n"
+    //         "Format Enum : {}\n"
+    //         "=================\n",
+    //         VkColorSpaceToString(colorSpace),
+    //         VkPresentModeToString(presentMode),
+    //         extent.width, extent.height,
+    //         static_cast<VkFlags>(format));
 
     // Images
     uint32_t requestedImgCount = capabilities.minImageCount + 1;
@@ -578,10 +578,12 @@ void VisorWindow::WndPosChanged(int, int)
 
 void VisorWindow::WndFBChanged(int newX, int newY)
 {
-    // TODO: Add more
-    assert(newX >= 0);
-    assert(newY >= 0);
+    assert(newX >= 0 && newY >= 0);
+    // Send FBO size change request
     swapchain.FBOSizeChanged(Vector2ui(newX, newY));
+
+    // But do not present if any size is 0
+    stopPresenting = (newX == 0 || newY == 0);
 }
 
 void VisorWindow::WndResized(int, int)
@@ -594,14 +596,22 @@ void VisorWindow::WndClosed()
 
 void VisorWindow::WndRefreshed()
 {
+    // TODO: This feels wrong, (rendering from a callback)
+    // but with "waitEvents" instead of poll, currently main loop
+    // stays idle (MT runs this blocks).
+    Render();
 }
 
 void VisorWindow::WndFocused(bool)
 {
 }
 
-void VisorWindow::WndMinimized(bool)
+void VisorWindow::WndMinimized(bool isMinimized)
 {
+    stopPresenting = isMinimized;
+
+    MRAY_LOG("{} presenting!",
+             (stopPresenting) ? "Stop" : "Start");
 }
 
 void VisorWindow::KeyboardUsed(int /*key*/, int /*scancode*/,
@@ -620,6 +630,14 @@ void VisorWindow::MousePressed(int /*button*/, int /*action*/,
 
 void VisorWindow::MouseScrolled(double, double)
 {
+}
+
+void VisorWindow::PathDropped(int count, const char** paths)
+{
+    for(int i = 0; i < count; i++)
+    {
+        MRAY_LOG("Path: {}", paths[i]);
+    }
 }
 
 MRayError VisorWindow::Initialize(VulkanSystemView handles,
@@ -736,24 +754,9 @@ ImFont* VisorWindow::CurrentFont()
 
 void VisorWindow::Render()
 {
-    ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-    ImGui::PushFont(CurrentFont());
+    if(stopPresenting) return;
 
-    // GUI Setup
-    //---------
-    ImGui::ShowDemoWindow();
-    //---------
-
-    // IssueCommand
-    // -->
-
-    // Rendering
-    // ---------
-
-    ImGui::PopFont();
-    ImGui::Render();
+    gui.Render(CurrentFont());
 
     // Wait availablility of the command buffer
     FramePack frameHandles = NextFrame();

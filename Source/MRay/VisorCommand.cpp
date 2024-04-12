@@ -36,7 +36,7 @@ MRayError VisorCommand::Invoke()
     VisorConfig vConf = {};
     vConf.enforceIGPU = true;
     vConf.displayHDR = true;
-    vConf.wSize = Vector2i(640, 360);
+    vConf.wSize = Vector2i(1280, 720);
 
     // Actual initialization, process path should be called from here
     // In dll it may return .dll's path (on windows, I think)
