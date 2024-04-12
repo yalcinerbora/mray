@@ -558,7 +558,7 @@ void Swapchain::PresentFrame(VkSemaphore waitSingal)
     if(result == VK_ERROR_OUT_OF_DATE_KHR ||
        result == VK_SUBOPTIMAL_KHR || fboSizeChanged)
     {
-        vkDeviceWaitIdle(handlesVk.deviceVk);
+        //vkDeviceWaitIdle(handlesVk.deviceVk);
         fboSizeChanged = false;
         FixSwapchain();
     }
@@ -695,7 +695,7 @@ VisorWindow& VisorWindow::operator=(VisorWindow&& other)
     handlesVk = other.handlesVk;
 
     // Move window user pointer as well
-    glfwSetWindowUserPointer(window, this);
+    if(window) glfwSetWindowUserPointer(window, this);
     return *this;
 }
 

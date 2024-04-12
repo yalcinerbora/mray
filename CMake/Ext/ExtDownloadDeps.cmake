@@ -18,7 +18,7 @@ endmacro()
 function(mray_build_ext_dependency_git)
 
     # Parse Args
-    set(options SKIP_INSTALL DONT_OVERRIDE_INSTALL_SUFFIXES)
+    set(options SKIP_INSTALL DONT_OVERRIDE_INSTALL_SUFFIXES FORCE_RELEASE)
     set(oneValueArgs NAME URL TAG SOURCE_SUBDIR OVERRIDE_INSTALL_PREFIX LICENSE_NAME)
     set(multiValueArgs BUILD_ARGS DEPENDENCIES SPECIFIC_SUBMODULES)
 

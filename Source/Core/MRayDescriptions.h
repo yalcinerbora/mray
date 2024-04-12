@@ -29,7 +29,7 @@ namespace MRay
     // TODO: Make authors from cmake as well, create contributors file, parse it etc.
     // Or add maintainers here and do similar thing as
     static constexpr auto Authors = "Yalciner B."sv;
-    static constexpr auto License = "Apache-2.0 License (https://www.apache.org/licenses/LICENSE-2.0)\n. "
+    static constexpr auto License = "Apache-2.0 License (https://www.apache.org/licenses/LICENSE-2.0).\n"
                                     "This project utilize many open-source libraries. "
                                     "Please refer to *_LICENSE files for library licenses."sv;
 

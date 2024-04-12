@@ -118,7 +118,7 @@ using namespace std::string_literals;
 const std::string VisorVulkan::Name = std::string(MRay::Name) + "-Visor"s;
 const std::string VisorVulkan::WindowTitle = Name + " "s + std::string(MRay::VersionString);
 
-VkInstanceCreateInfo VisorVulkan::EnableValidation(VkInstanceCreateInfo vInfo)
+bool VisorVulkan::EnableValidation(VkInstanceCreateInfo& vInfo)
 {
     using namespace std::literals;
     static constexpr std::array<const char*, 1> RequestedLayers =
@@ -143,16 +143,16 @@ VkInstanceCreateInfo VisorVulkan::EnableValidation(VkInstanceCreateInfo vInfo)
 
         if(it == availableLayers.cend())
         {
-            MRAY_LOG("Visor: Unable to find layer \"{}\"", layer);
+            MRAY_WARNING_LOG("Visor: Unable to find layer \"{}\"", layer);
             allLayersOK &= false;
         }
     }
 
     if(!allLayersOK)
     {
-        MRAY_LOG("Visor: Unable to find some layers, "
-                 "disabling all of the layers!");
-        return vInfo;
+        MRAY_WARNING_LOG("Visor: Unable to find validation related layers, "
+                         "skipping....");
+        return false;
     }
 
     vInfo.enabledLayerCount = static_cast<uint32_t>(RequestedLayers.size());
@@ -166,7 +166,7 @@ VkInstanceCreateInfo VisorVulkan::EnableValidation(VkInstanceCreateInfo vInfo)
     // Move the layers to runtime
     layerList.resize(RequestedLayers.size());
     std::copy(RequestedLayers.cbegin(), RequestedLayers.cend(), layerList.begin());
-    return vInfo;
+    return true;
 }
 
 // Callbacks (Window Related)
@@ -299,6 +299,16 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
         VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME
     };
 
+
+    static constexpr size_t MAX_GPU = 32;
+    struct DeviceParams
+    {
+        VkPhysicalDeviceType    type;
+        VkPhysicalDevice        pDevice;
+        uint32_t                queueFamilyIndex;
+    };
+    StaticVector<DeviceParams, MAX_GPU>  goodDevices;
+
     for(const auto& pDevice : deviceList)
     {
         VkPhysicalDeviceProperties deviceProps;
@@ -325,15 +335,6 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
         // If device is not capable continue
         if(!isUsableDevice) continue;
 
-        // If device is *not* IGPU but we want IGPU continue
-        if(deviceProps.deviceType != VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU &&
-           visorConfig.enforceIGPU)
-            continue;
-        // Other way around
-        if(deviceProps.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU &&
-           !visorConfig.enforceIGPU)
-            continue;
-
         // All good, check extensions
         uint32_t extensionCount;
         vkEnumerateDeviceExtensionProperties(pDevice, nullptr,
@@ -343,7 +344,7 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
         std::vector<VkExtensionProperties> availableExtensions(extensionCount);
         vkEnumerateDeviceExtensionProperties(pDevice, nullptr, &extensionCount,
                                              availableExtensions.data());
-        // TODO: Change linear search later
+        //
         bool hasAllExtensions =
         CheckAllInList(availableExtensions.cbegin(), availableExtensions.cend(),
                        RequiredExtensions.cbegin(), RequiredExtensions.cend(),
@@ -355,93 +356,131 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
         // Required extensions are not available on this device skip
         if(!hasAllExtensions) continue;
 
-        for(const auto& extName : RequiredExtensions)
-            deviceExtList.push_back(extName);
-
-        // The first device that matches the conditions
-        // is deemed enough.
         //
-        // TODO: Change this when MRay is capable enough
-        // to support SYCL.
-        //
-        // For like 5 ppl in the world that has 2 different vendor
-        // devices on the same PC, we may need this functionality
-        //
-        // Now actually create the device and queue
-
-        // TODO: Get the dedicated DMA queue maybe?
-        float priority = 1.0f;
-        VkDeviceQueueCreateInfo queueCI =
-        {
-            .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = 0,
-            .queueFamilyIndex = selectedQueueFamilyIndex,
-            .queueCount = 1,
-            .pQueuePriorities = &priority
-        };
-        VkDeviceCreateInfo deviceCI =
-        {
-            .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = 0,
-            .queueCreateInfoCount = 1,
-            .pQueueCreateInfos = &queueCI,
-            .enabledLayerCount = static_cast<uint32_t>(layerList.size()),
-            .ppEnabledLayerNames = layerList.data(),
-            .enabledExtensionCount = static_cast<uint32_t>(deviceExtList.size()),
-            .ppEnabledExtensionNames = deviceExtList.data(),
-            // Get all the features?
-            // TODO: Does this has a drawback?
-            .pEnabledFeatures = &deviceFeatures
-        };
-
-        // Actual device creation
-        if(vkCreateDevice(pDevice, &deviceCI,
-                          VulkanHostAllocator::Functions(),
-                          &deviceVk))
-            return MRayError("Unable to create logical device on \"{}\"!",
-                             deviceProps.deviceName);
-
-        // Store the selected physical device
-        pDeviceVk = pDevice;
-
-        // All is nice!
-        // Report the device and exit
-        queueFamilyIndex = selectedQueueFamilyIndex;
-
-        VkPhysicalDeviceMemoryProperties memProps;
-        vkGetPhysicalDeviceMemoryProperties(pDevice, &memProps);
-
-        size_t memSize = 0;
-        for(size_t i = 0; i < memProps.memoryHeapCount; i++)
-        {
-            const VkMemoryHeap& heap = memProps.memoryHeaps[i];
-            if(heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
-            {
-                memSize = heap.size;
-                break;
-            }
-        }
-
-        MRAY_LOG("----Visor-GPU----\n"
-                 "Name      : {}\n"
-                 "Max Tex2D : [{}, {}]\n"
-                 "Memory    : {:.3f}GiB\n"
-                 "-----------------\n",
-                 deviceProps.deviceName,
-                 deviceProps.limits.maxImageDimension2D,
-                 deviceProps.limits.maxImageDimension2D,
-                 (static_cast<double>(memSize) / 1024.0 / 1024.0 / 1024.0));
-
-        // Get the queue
-        vkGetDeviceQueue(deviceVk, queueFamilyIndex, 0,
-                         &mainQueueVk);
-
-        return MRayError::OK;
+        goodDevices.emplace_back(deviceProps.deviceType, pDevice,
+                                 selectedQueueFamilyIndex);
     }
 
-    return MRayError("Unable to find Vulkan capable devices!");
+    // Bad luck...
+    if(goodDevices.isEmpty())
+        return MRayError("Unable to find Vulkan capable devices!");
+
+    auto loc = std::find_if(goodDevices.cbegin(),
+                            goodDevices.cend(),
+    [forceIGPU = visorConfig.enforceIGPU](const auto& gpu)
+    {
+        VkPhysicalDeviceType checkType = (forceIGPU)
+                    ? VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU
+                    : VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+        return gpu.type == checkType;
+    });
+    if(loc == goodDevices.cend())
+    {
+        using namespace std::string_view_literals;
+        MRAY_WARNING_LOG("\"EnforceIGPU\" is {} but couldn't find {} GPU! "
+                         "Continuing with first capable gpu",
+                         (visorConfig.enforceIGPU) ? "on"sv : "off"sv,
+                         (visorConfig.enforceIGPU) ? "integrated"sv : "discrete"sv);
+        loc = goodDevices.cbegin();
+    };
+
+    // All should be fine, add extensions
+    // Continue creating logical device
+    for(const auto& extName : RequiredExtensions)
+    deviceExtList.push_back(extName);
+
+    DeviceParams selectedDevice = *loc;
+
+    // Re-acquire props
+    VkPhysicalDeviceProperties selectedDeviceProps;
+    vkGetPhysicalDeviceProperties(selectedDevice.pDevice, &selectedDeviceProps);
+
+    // The first device that matches the conditions
+    // is deemed enough.
+    //
+    // TODO: Change this when MRay is capable enough
+    // to support SYCL.
+    //
+    // For like 5 ppl in the world that has 2 different vendor
+    // devices on the same PC, we may need this functionality
+    //
+    // Now actually create the device and queue
+
+    // TODO: Get the dedicated DMA queue maybe?
+    float priority = 1.0f;
+    VkDeviceQueueCreateInfo queueCI =
+    {
+        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .queueFamilyIndex = selectedDevice.queueFamilyIndex,
+        .queueCount = 1,
+        .pQueuePriorities = &priority
+    };
+
+    //  Re-acquire device features here
+    VkPhysicalDeviceFeatures deviceFeatures;
+    vkGetPhysicalDeviceFeatures(selectedDevice.pDevice, &deviceFeatures);
+    VkDeviceCreateInfo deviceCI =
+    {
+        .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .queueCreateInfoCount = 1,
+        .pQueueCreateInfos = &queueCI,
+        .enabledLayerCount = static_cast<uint32_t>(layerList.size()),
+        .ppEnabledLayerNames = (layerList.size() != 0) ? layerList.data() : nullptr,
+        .enabledExtensionCount = static_cast<uint32_t>(deviceExtList.size()),
+        .ppEnabledExtensionNames = deviceExtList.data(),
+        // Get all the features?
+        // TODO: Does this has a drawback?
+        .pEnabledFeatures = &deviceFeatures
+    };
+
+    // Actual device creation
+    if(vkCreateDevice(selectedDevice.pDevice, &deviceCI,
+                        VulkanHostAllocator::Functions(),
+                        &deviceVk))
+        return MRayError("Unable to create logical device on \"{}\"!",
+                         selectedDeviceProps.deviceName);
+
+    // Store the selected physical device
+    pDeviceVk = selectedDevice.pDevice;
+
+    // All is nice!
+    // Report the device and exit
+    queueFamilyIndex = selectedDevice.queueFamilyIndex;
+
+    VkPhysicalDeviceMemoryProperties memProps;
+    vkGetPhysicalDeviceMemoryProperties(selectedDevice.pDevice,
+                                        &memProps);
+
+    size_t memSize = 0;
+    for(size_t i = 0; i < memProps.memoryHeapCount; i++)
+    {
+        const VkMemoryHeap& heap = memProps.memoryHeaps[i];
+        if(heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+        {
+            memSize = heap.size;
+            break;
+        }
+    }
+
+    MRAY_LOG("----Visor-GPU----\n"
+                "Name      : {}\n"
+                "Max Tex2D : [{}, {}]\n"
+                "Memory    : {:.3f}GiB\n"
+                "-----------------\n",
+                selectedDeviceProps.deviceName,
+                selectedDeviceProps.limits.maxImageDimension2D,
+                selectedDeviceProps.limits.maxImageDimension2D,
+                (static_cast<double>(memSize) / 1024.0 / 1024.0 / 1024.0));
+
+    // Get the queue
+    vkGetDeviceQueue(deviceVk, queueFamilyIndex, 0,
+                     &mainQueueVk);
+
+    return MRayError::OK;
 }
 
 Expected<VisorWindow> VisorVulkan::GenerateWindow(const VisorConfig& config)
@@ -540,10 +579,12 @@ MRayError VisorVulkan::MTInitialize(VisorConfig visorConfig,
     };
 
     // Add debug layer if "DEBUG"
+    bool validationLayerFound = false;
     if constexpr(MRAY_IS_DEBUG)
     {
-        instanceCreateInfo = EnableValidation(instanceCreateInfo);
-        instanceCreateInfo.pNext = (const void*)VisorDebugSystem::CreateInfo();
+        validationLayerFound = EnableValidation(instanceCreateInfo);
+        if(validationLayerFound)
+            instanceCreateInfo.pNext = static_cast<const void*>(VisorDebugSystem::CreateInfo());
     }
 
     // Finally create instance
@@ -553,7 +594,7 @@ MRayError VisorVulkan::MTInitialize(VisorConfig visorConfig,
     if(r != VK_SUCCESS)
         return MRayError("Unable to create Vulkan Instance");
 
-    if constexpr(MRAY_IS_DEBUG)
+    if(MRAY_IS_DEBUG && validationLayerFound)
     {
         e = debugSystem.Initialize(instanceVk);
         if(e) return e;

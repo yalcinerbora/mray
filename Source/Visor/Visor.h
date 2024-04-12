@@ -81,7 +81,7 @@ class VisorVulkan : public VisorI
     VisorDebugSystem    debugSystem;
     std::string         processPath;
 
-    VkInstanceCreateInfo    EnableValidation(VkInstanceCreateInfo);
+    bool                    EnableValidation(VkInstanceCreateInfo&);
     MRayError               QueryAndPickPhysicalDevice(const VisorConfig&);
     Expected<VisorWindow>   GenerateWindow(const VisorConfig&);
     MRayError               InitImGui();

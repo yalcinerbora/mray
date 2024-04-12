@@ -52,8 +52,10 @@ void FontAtlas::AddMonitorFont(GLFWmonitor* monitor)
                                         monitorScaleX);
     ImGuiIO& io = ImGui::GetIO();
     ImFontConfig config;
+    config.RasterizerDensity = 2.0f;
     config.SizePixels = scaledPixelSize;
     config.PixelSnapH = false;
+    config.OversampleH = config.OversampleV = 2;
     config.MergeMode = false;
     std::string monoTTFPath = Filesystem::RelativePathToAbsolute(VERA_MONO_FONT_PATH,
                                                                  executablePath);
