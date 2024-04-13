@@ -36,6 +36,9 @@ std::string GetProcessPath();
                 SetVT(STD_ERROR_HANDLE));
     }
 
+    static constexpr bool MRAY_IS_ON_WINDOWS    = true;
+    static constexpr bool MRAY_IS_ON_LINUX      = false;
+
 #elif defined MRAY_LINUX
 
     #define MRAY_DLL_IMPORT
@@ -46,6 +49,9 @@ std::string GetProcessPath();
     {
         return true;
     }
+
+    static constexpr bool MRAY_IS_ON_WINDOWS    = false;
+    static constexpr bool MRAY_IS_ON_LINUX      = true;
 
 #else
     #error System preprocessor definition is not set properly! (CMake should have handled this)

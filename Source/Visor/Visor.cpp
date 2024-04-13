@@ -3,6 +3,7 @@
 #include "Core/MRayDescriptions.h"
 #include "Core/DataStructures.h"
 #include "Core/MemAlloc.h"
+#include "Core/System.h"
 
 #include <Imgui/imgui.h>
 #include <Imgui/imgui_impl_glfw.h>
@@ -12,6 +13,10 @@
 #include "VulkanAllocators.h"
 #include "VulkanCapabilityFinder.h"
 #include "FontAtlas.h"
+
+#ifdef MRAY_WINDOWS
+    #include <vulkan/vulkan_win32.h>
+#endif
 
 VKAPI_ATTR VkBool32 VKAPI_CALL
 VisorDebugSystem::Callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -294,13 +299,25 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     auto deviceList = StaticVector<VkPhysicalDevice, 32>(StaticVecSize(deviceCount));
     vkEnumeratePhysicalDevices(instanceVk, &deviceCount, deviceList.data());
 
-    static constexpr std::array<const char*, 3> RequiredExtensions =
+
+    static StaticVector<const char*, 16> RequiredExtensions =
     {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME,
-        VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME
+        VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
+        VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
+        VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME
     };
-
+    if constexpr(MRAY_IS_ON_WINDOWS)
+    {
+        RequiredExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
+        RequiredExtensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME);
+    }
+    else if constexpr(MRAY_IS_ON_LINUX)
+    {
+        RequiredExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
+        RequiredExtensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
+    }
 
     static constexpr size_t MAX_GPU = 32;
     struct DeviceParams

@@ -34,7 +34,7 @@ MRayError VisorCommand::Invoke()
 
     // TODO: Acq visor config from file
     VisorConfig vConf = {};
-    vConf.enforceIGPU = true;
+    vConf.enforceIGPU = false;
     vConf.displayHDR = true;
     vConf.wSize = Vector2i(1280, 720);
 

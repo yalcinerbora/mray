@@ -119,10 +119,10 @@ class VisorWindow
     VisorWindow&    operator=(VisorWindow&&);
                     ~VisorWindow();
 
-    bool                ShouldClose();
-    FramePack           NextFrame();
-    void                PresentFrame();
-    ImFont*             CurrentFont();
-    void                Render();
+    bool            ShouldClose();
+    FramePack       NextFrame();
+    void            PresentFrame();
+    ImFont*         CurrentFont();
+    void            Render();
 
 };
