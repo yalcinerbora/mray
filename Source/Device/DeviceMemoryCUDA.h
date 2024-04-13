@@ -150,6 +150,14 @@ class DeviceMemoryCUDA
         size_t                  Size() const;
 };
 
+class ExternalMemoryCUDA
+{
+    private:
+    SystemMemoryHandle      memHandle;
+    SystemMemoryHandle      memSize;
+    public:
+};
+
 inline const GPUDeviceCUDA& DeviceLocalMemoryCUDA::Device() const
 {
     return *gpu;

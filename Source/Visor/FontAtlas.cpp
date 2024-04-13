@@ -48,6 +48,14 @@ void FontAtlas::AddMonitorFont(GLFWmonitor* monitor)
                                &monitorScaleY);
     assert(monitorScaleX == monitorScaleY);
 
+    // Only add font with this scale if not available
+    auto loc = std::find_if(monitorFonts.cbegin(), monitorFonts.cend(),
+                            [monitorScaleX](const auto& pair)
+    {
+        return monitorScaleX == pair.first;
+    });
+    if(loc != monitorFonts.cend()) return;
+
     float scaledPixelSize = std::roundf(PIXEL_SIZE * INITIAL_SCALE *
                                         monitorScaleX);
     ImGuiIO& io = ImGui::GetIO();
@@ -77,15 +85,7 @@ void FontAtlas::AddMonitorFont(GLFWmonitor* monitor)
                                                     &config, icon_ranges);
     // We are merging this must be true
     assert(font == iconFont);
-
-    // Add scale if not available
-    auto loc = std::find_if(monitorFonts.cbegin(), monitorFonts.cend(),
-                            [monitorScaleX](const auto& pair)
-    {
-        return monitorScaleX == pair.first;
-    });
-    if(loc == monitorFonts.cend())
-        monitorFonts.emplace_back(monitorScaleX, font);
+    monitorFonts.emplace_back(monitorScaleX, font);
 }
 
 void FontAtlas::RemoveMonitorFont(GLFWmonitor*)

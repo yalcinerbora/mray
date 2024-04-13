@@ -119,11 +119,12 @@ MRayError FramePool::Initialize(const VulkanSystemView& handlesVk)
 
 FramePack FramePool::AcquireNextFrame(Swapchain& swapchain)
 {
+    vkWaitForFences(deviceVk, 1, &fences[frameIndex],
+                    VK_TRUE, std::numeric_limits<uint64_t>::max());
+
     VkSemaphore imgAvailSem = semaphores[frameIndex].imageAvailableSignal;
     FramebufferPack fbPack = swapchain.NextFrame(imgAvailSem);
 
-    vkWaitForFences(deviceVk, 1, &fences[frameIndex],
-                    VK_TRUE, std::numeric_limits<uint64_t>::max());
     vkResetFences(deviceVk, 1, &fences[frameIndex]);
 
     FramePack framePack = {};

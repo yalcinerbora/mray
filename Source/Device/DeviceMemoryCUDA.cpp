@@ -180,6 +180,7 @@ HostLocalMemoryCUDA::HostLocalMemoryCUDA(HostLocalMemoryCUDA&& other) noexcept
     , size(other.size)
     , neverDecrease(other.neverDecrease)
 {
+    CUDA_CHECK(cudaFreeHost(hPtr));
     other.hPtr = nullptr;
     other.dPtr = nullptr;
     other.size = 0;
