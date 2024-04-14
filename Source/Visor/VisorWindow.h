@@ -13,6 +13,7 @@
 struct ImFont;
 struct GLFWwindow;
 struct VisorConfig;
+struct VisorState;
 
 class Swapchain
 {
@@ -86,6 +87,7 @@ class VisorWindow
     VulkanSystemView    handlesVk       = {};
     bool                stopPresenting  = false;
     VisorGUI            gui;
+    const VisorState*   visorState      = nullptr;
 
 
     private:
@@ -120,6 +122,7 @@ class VisorWindow
                     ~VisorWindow();
 
     bool            ShouldClose();
+    void            AttachGlobalState(const VisorState&);
     FramePack       NextFrame();
     void            PresentFrame();
     ImFont*         CurrentFont();

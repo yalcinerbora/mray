@@ -8,6 +8,7 @@
 #include "Core/Error.h"
 #include "Core/DataStructures.h"
 #include "VisorWindow.h"
+#include "VisorState.h"
 
 // We gonna use this alot I think
 template<size_t N>
@@ -90,6 +91,8 @@ class VisorVulkan : public VisorI
     // TODO: Move this away when multi-window is required
     // but imgui looks like single-windowed?
     VisorWindow         window;
+    //
+    VisorState          visorGlobalState;
 
     public:
     // Constructors & Destructor

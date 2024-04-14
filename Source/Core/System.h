@@ -39,6 +39,7 @@ std::string GetProcessPath();
     static constexpr bool MRAY_IS_ON_WINDOWS    = true;
     static constexpr bool MRAY_IS_ON_LINUX      = false;
 
+    using SystemSemaphoreHandle = HANDLE;
     using SystemMemoryHandle = HANDLE;
 
 #elif defined MRAY_LINUX
@@ -55,6 +56,7 @@ std::string GetProcessPath();
     static constexpr bool MRAY_IS_ON_WINDOWS    = false;
     static constexpr bool MRAY_IS_ON_LINUX      = true;
 
+    using SystemSemaphoreHandle = int;
     using SystemMemoryHandle = int;
 
 #else

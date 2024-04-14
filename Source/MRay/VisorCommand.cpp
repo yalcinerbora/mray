@@ -8,6 +8,7 @@
 #include "Core/SharedLibrary.h"
 #include "Core/System.h"
 
+
 namespace MRayCLI::VisorNames
 {
     using namespace std::literals;

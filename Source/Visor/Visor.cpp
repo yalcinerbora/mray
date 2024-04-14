@@ -516,6 +516,8 @@ Expected<VisorWindow> VisorVulkan::GenerateWindow(const VisorConfig& config)
     };
     MRayError e = w.Initialize(handlesVk, WindowTitle, config);
     if(e) return e;
+
+    w.AttachGlobalState(visorGlobalState);
     return w;
 }
 

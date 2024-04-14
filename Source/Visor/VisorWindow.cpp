@@ -689,6 +689,7 @@ VisorWindow::VisorWindow(VisorWindow&& other)
     , window(std::exchange(other.window, nullptr))
     , hdrRequested(other.hdrRequested)
     , handlesVk(other.handlesVk)
+    , visorState(other.visorState)
 {
     glfwSetWindowUserPointer(window, this);
 }
@@ -711,6 +712,7 @@ VisorWindow& VisorWindow::operator=(VisorWindow&& other)
     // Tehcnically we do not need to set this
     // by definition, vulkan handles should be the same
     handlesVk = other.handlesVk;
+    visorState = other.visorState;
 
     // Move window user pointer as well
     if(window) glfwSetWindowUserPointer(window, this);
@@ -752,11 +754,16 @@ ImFont* VisorWindow::CurrentFont()
     return FontAtlas::Instance().GetMonitorFont(x);
 }
 
+void VisorWindow::AttachGlobalState(const VisorState& state)
+{
+    visorState = &state;
+}
+
 void VisorWindow::Render()
 {
     if(stopPresenting) return;
 
-    gui.Render(CurrentFont());
+    gui.Render(CurrentFont(), nullptr, *visorState);
 
     // Wait availablility of the command buffer
     FramePack frameHandles = NextFrame();

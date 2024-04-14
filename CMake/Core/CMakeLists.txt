@@ -15,7 +15,8 @@ set(SRC_SYSTEM
     ${CURRENT_SOURCE_DIR}/System.cpp
     ${CURRENT_SOURCE_DIR}/SharedLibrary.h
     ${CURRENT_SOURCE_DIR}/SharedLibrary.cpp
-    ${CURRENT_SOURCE_DIR}/MRayDescriptions.h)
+    ${CURRENT_SOURCE_DIR}/MRayDescriptions.h
+    ${CURRENT_SOURCE_DIR}/RealtimeThread.h)
 
 set(SRC_INTERFACES
     ${CURRENT_SOURCE_DIR}/SceneLoaderI.h

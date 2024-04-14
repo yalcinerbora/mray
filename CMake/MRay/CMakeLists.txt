@@ -9,13 +9,20 @@ set(SRC_SUBCOMMAND
     ${CURRENT_SOURCE_DIR}/RunCommand.h
     ${CURRENT_SOURCE_DIR}/CommandI.h)
 
+set(SRC_TRACER
+    ${CURRENT_SOURCE_DIR}/TransferQueue.h
+    ${CURRENT_SOURCE_DIR}/TracerThread.h
+    ${CURRENT_SOURCE_DIR}/TracerThread.cpp)
+
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/main.cpp)
 
+source_group("Tracer" FILES ${SRC_TRACER})
 source_group("Subcommands" FILES ${SRC_SUBCOMMAND})
 source_group("" FILES ${SRC_COMMON})
 
 set(SRC_ALL
+    ${SRC_TRACER}
     ${SRC_SUBCOMMAND}
     ${SRC_COMMON})
 

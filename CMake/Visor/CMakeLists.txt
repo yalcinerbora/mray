@@ -10,6 +10,7 @@ set(SRC_GUI
 set(SRC_VISOR
     ${CURRENT_SOURCE_DIR}/FramePool.cpp
     ${CURRENT_SOURCE_DIR}/FramePool.h
+    ${CURRENT_SOURCE_DIR}/VisorState.h
     ${CURRENT_SOURCE_DIR}/VisorWindow.cpp
     ${CURRENT_SOURCE_DIR}/VisorWindow.h
     ${CURRENT_SOURCE_DIR}/FontAtlas.h

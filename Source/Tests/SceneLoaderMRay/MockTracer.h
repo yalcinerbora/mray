@@ -311,8 +311,11 @@ class TracerMock : public TracerI
     void        PushRendererAttribute(RendererId, uint32_t attributeIndex,
                                       TransientData data) override;
 
-    void        StartRender(RendererId, CamSurfaceId) override;
-    void        StoptRender() override;
+    void        StartRender(RendererId, CamSurfaceId,
+                            RenderImageParams) override;
+    void        StopRender() override;
+    //
+    Optional<TracerImgOutput> DoRenderWork() override;
 };
 
 inline TracerMock::TracerMock(bool pl)
@@ -1741,12 +1744,18 @@ inline void TracerMock::PushRendererAttribute(RendererId, uint32_t,
     throw MRayError("\"PushRendererAttribute\" is not implemented in mock tracer!");
 }
 
-inline void TracerMock::StartRender(RendererId, CamSurfaceId)
+inline void TracerMock::StartRender(RendererId, CamSurfaceId,
+                                    RenderImageParams)
 {
     throw MRayError("\"StartRender\" is not implemented in mock tracer!");
 }
 
-inline void TracerMock::StoptRender()
+inline void TracerMock::StopRender()
 {
-    throw MRayError("\"StoptRender\" is not implemented in mock tracer!");
+    throw MRayError("\"StopRender\" is not implemented in mock tracer!");
+}
+
+inline Optional<TracerImgOutput> TracerMock::DoRenderWork()
+{
+    throw MRayError("\"DoRenderWork\" is not implemented in mock tracer!");
 }

@@ -1,4 +1,5 @@
 #include "VisorGUI.h"
+#include "VisorState.h"
 
 #include <Imgui/imgui.h>
 #include <Imgui/imgui_internal.h>
@@ -71,8 +72,7 @@ MainStatusBar::MainStatusBar()
     , stopped(false)
 {}
 
-Optional<RunState> MainStatusBar::Render(const TracerAnalyticData& tracerData,
-                                         const SceneAnalyticData& sceneData)
+Optional<RunState> MainStatusBar::Render(const VisorState& visorState)
 {
     using namespace std::string_literals;
     ImGuiWindowFlags window_flags = (ImGuiWindowFlags_NoScrollbar |
@@ -89,27 +89,27 @@ Optional<RunState> MainStatusBar::Render(const TracerAnalyticData& tracerData,
     {
         if(ImGui::BeginMenuBar())
         {
-            double usedGPUMemMiB = tracerData.usedGPUMemoryMiB;
-            double totalGPUMemGiB = tracerData.totalGPUMemoryMiB / 1024.0;
+            double usedGPUMemMiB = visorState.tracer.usedGPUMemoryMiB;
+            double totalGPUMemGiB = visorState.tracer.totalGPUMemoryMiB / 1024.0;
             std::string memUsage = fmt::format("{:.1f}MiB / {:.1f}GiB",
                                                usedGPUMemMiB, totalGPUMemGiB);
 
             ImGui::Text("%s", memUsage.c_str());
             ImGui::Separator();
-            ImGui::Text("%s", (std::to_string(tracerData.renderResolution[0]) + "x" +
-                               std::to_string(tracerData.renderResolution[1])).c_str());
+            ImGui::Text("%s", (std::to_string(visorState.renderer.renderResolution[0]) + "x" +
+                               std::to_string(visorState.renderer.renderResolution[1])).c_str());
             ImGui::Separator();
             ImGui::Text("%s", fmt::format("{:>7.3f}{:s}",
-                                          tracerData.throughput,
-                                          tracerData.throughputSuffix).c_str());
+                                          visorState.renderer.throughput,
+                                          visorState.renderer.throughputSuffix).c_str());
             ImGui::Separator();
             ImGui::Text("%s", (fmt::format("{:>6.0f}{:s}",
-                                           tracerData.workPerPixel,
-                                           tracerData.workPerPixelSuffix).c_str()));
+                                           visorState.renderer.workPerPixel,
+                                           visorState.renderer.workPerPixelSuffix).c_str()));
             ImGui::Separator();
 
             std::string prefix = std::string(RENDERING_NAME);
-            std::string body = (prefix + " " + sceneData.sceneName + "...");
+            std::string body = (prefix + " " + visorState.scene.sceneName + "...");
             if(paused)
                 body += " ("s + std::string(PAUSED_NAME) + ")"s;
             else if(stopped)
@@ -177,19 +177,96 @@ Optional<RunState> MainStatusBar::Render(const TracerAnalyticData& tracerData,
     return (isChanged) ? Optional<RunState>(newRunState) : std::nullopt;
 }
 
-// Demonstrate creating a window covering the entire screen/viewport
-static void ShowExampleAppFullscreen(bool* p_open)
+void VisorGUI::ShowFrameOverlay(bool& isOpen, const VisorState& visorState)
+{
+    static int location = 1;
+    ImGuiWindowFlags window_flags = (ImGuiWindowFlags_NoDecoration |
+                                     ImGuiWindowFlags_AlwaysAutoResize |
+                                     ImGuiWindowFlags_NoSavedSettings |
+                                     ImGuiWindowFlags_NoFocusOnAppearing |
+                                     ImGuiWindowFlags_NoNav |
+                                     ImGuiWindowFlags_NoMove);
+
+    const float PADDING = 10.0f;
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImVec2 work_pos = viewport->WorkPos; // Use work area to avoid menu-bar/task-bar, if any!
+    ImVec2 work_size = viewport->WorkSize;
+    ImVec2 window_pos, window_pos_pivot;
+    window_pos.x = (location & 1)
+                        ? (work_pos.x + work_size.x - PADDING)
+                        : (work_pos.x + PADDING);
+    window_pos.y = (location & 2)
+                        ? (work_pos.y + work_size.y - PADDING)
+                        : (work_pos.y + PADDING);
+    window_pos_pivot.x = (location & 1) ? 1.0f : 0.0f;
+    window_pos_pivot.y = (location & 2) ? 1.0f : 0.0f;
+    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, window_pos_pivot);
+    ImGui::SetNextWindowBgAlpha(0.33f); // Transparent background
+
+    if(ImGui::Begin("##VisorOverlay", &isOpen, window_flags))
+    {
+        ImGui::Text("Frame  : %.2f", visorState.visor.frameTime);
+        ImGui::Text("Memory : %.2f", visorState.visor.usedGPUMemoryMiB);
+
+
+        if(ImGui::BeginPopupContextWindow())
+        {
+            if(ImGui::MenuItem("Top-left", NULL, location == 0)) location = 0;
+            if(ImGui::MenuItem("Top-right", NULL, location == 1)) location = 1;
+            if(ImGui::MenuItem("Bottom-left", NULL, location == 2)) location = 2;
+            if(ImGui::MenuItem("Bottom-right", NULL, location == 3)) location = 3;
+            if(isOpen && ImGui::MenuItem("Close")) isOpen = false;
+            ImGui::EndPopup();
+        }
+    }
+    ImGui::End();
+}
+
+void VisorGUI::ShowTopMenu(bool& isOpen, const VisorState& visorState)
+{
+    if(ImGui::BeginMainMenuBar())
+    {
+        if(ImGui::Button("Tone Mapping"))
+        {
+            //tmWindow.ToggleWindowOpen();
+        }
+
+        static constexpr const char* VISOR_INFO_NAME = "VisorInfo";
+        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x -
+                        ImGui::CalcTextSize(VISOR_INFO_NAME).x -
+                        ImGui::GetStyle().ItemSpacing.x * 3);
+        ImGui::Separator();
+        ImGui::ToggleButton(VISOR_INFO_NAME, fpsInfoOn);
+        if(fpsInfoOn) ShowFrameOverlay(fpsInfoOn, visorState);
+
+        ImGui::EndMainMenuBar();
+    }
+}
+
+Optional<RunState> VisorGUI::ShowStatusBar(bool& isOpen,
+                                           const VisorState& visorState)
+{
+
+    return statusBar.Render(visorState);
+    // Acquire state
+}
+
+void VisorGUI::ShowMainImage()
 {
     static bool use_work_area = true;
-    static ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
+    static ImGuiWindowFlags flags = (ImGuiWindowFlags_NoDecoration |
+                                     ImGuiWindowFlags_NoMove |
+                                     ImGuiWindowFlags_NoSavedSettings |
+                                     ImGuiWindowFlags_NoBackground);
 
-    // We demonstrate using the full viewport area or the work area (without menu-bars, task-bars etc.)
+    // We demonstrate using the full viewport area or the work area"
+    // (without menu-bars, task-bars etc.)
     // Based on your use case you may want one or the other.
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(use_work_area ? viewport->WorkPos : viewport->Pos);
     ImGui::SetNextWindowSize(use_work_area ? viewport->WorkSize : viewport->Size);
 
-    if(ImGui::Begin("Example: Fullscreen window", p_open, flags))
+    if(ImGui::Begin("Example: Fullscreen window", nullptr, flags))
     {
         ImGui::Checkbox("Use work area instead of main area", &use_work_area);
 
@@ -200,20 +277,18 @@ static void ShowExampleAppFullscreen(bool* p_open)
         ImGui::CheckboxFlags("ImGuiWindowFlags_NoCollapse", &flags, ImGuiWindowFlags_NoCollapse);
         ImGui::CheckboxFlags("ImGuiWindowFlags_NoScrollbar", &flags, ImGuiWindowFlags_NoScrollbar);
         ImGui::Unindent();
-
-        if(p_open && ImGui::Button("Close this window"))
-            *p_open = false;
     }
     ImGui::End();
+
 }
 
-void VisorGUI::Render(ImFont* windowScaledFont)
+void VisorGUI::Render(ImFont* windowScaledFont, VkDescriptorSet displayImage,
+                      const VisorState& visorState)
 {
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     ImGui::PushFont(windowScaledFont);
-
 
     if(ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_M))
         topBarOn = !topBarOn;
@@ -223,68 +298,23 @@ void VisorGUI::Render(ImFont* windowScaledFont)
     ImGuiWindowFlags window_flags = (ImGuiWindowFlags_NoScrollbar |
                                      ImGuiWindowFlags_NoSavedSettings |
                                      ImGuiWindowFlags_MenuBar);
-    if(topBarOn)
-    {
-        if(ImGui::BeginViewportSideBar("##MenuBar", NULL,
-                                       ImGuiDir_Up,
-                                       ImGui::GetFrameHeight(),
-                                       window_flags))
-        {
-            if(ImGui::BeginMenuBar())
-            {
-                if(ImGui::Button("Tone Mapping"))
-                {
-                    //tmWindow.ToggleWindowOpen();
-                }
-                ImGui::EndMenuBar();
-            }
-        }
-        ImGui::End();
-    }
+    if(topBarOn) ShowTopMenu(topBarOn, visorState);
+    if(bottomBarOn) ShowStatusBar(bottomBarOn, visorState);
 
-    if(bottomBarOn)
-    {
-        TracerAnalyticData ad =
-        {
-            .throughput = 20.2339494,
-            .throughputSuffix = "MRays/sec",
-            .workPerPixel = 1.2,
-            .workPerPixelSuffix = "spp",
-            .iterationTimeMS = 10.123131,
-            .totalGPUMemoryMiB = 8000,
-            .usedGPUMemoryMiB = 500,
-            .renderResolution = {3840, 2160}
-        };
-
-        SceneAnalyticData sad =
-        {
-            .sceneName = "Kitchen.json",
-            .sceneLoadTime = 10.2,
-            .sceneUpdateTime = 0.3,
-            .groupCounts = {},
-            .accKeyMax = {0, 0},
-            .workKeyMax = {0, 0}
-        };
-
-        Optional<RunState> newState = statusBar.Render(ad, sad);
-        // Acquire state
-    }
-
-    /*ImGui::*/
-
-    ImGui::ShowDemoWindow();
-    //static bool isOpen = true;
-    //ShowExampleAppFullscreen(&isOpen);
-
-
-    // IssueCommand
-    // -->
+    // ImGui::ShowDemoWindow();
+    ShowMainImage();
 
     // Rendering
     // ---------
-    static int i = 0;
-    MRAY_LOG("Rendering Frame!{}", i++);
+    //static int i = 0;
+    //MRAY_LOG("Rendering Frame!{}", i++);
 
     ImGui::PopFont();
     ImGui::Render();
+}
+
+VkDescriptorSet VisorGUI::AddTexForRender(VkImageView imageVk, VkSampler samplerVk)
+{
+    return ImGui_ImplVulkan_AddTexture(samplerVk, imageVk,
+                                       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }

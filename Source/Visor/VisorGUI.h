@@ -3,54 +3,10 @@
 #include "Core/MathForward.h"
 #include "Core/Vector.h"
 #include "Core/Types.h"
+#include "vulkan/vulkan.h"
 
+struct VisorState;
 struct ImFont;
-
-struct TracerAnalyticData
-{
-    // Performance
-    double          throughput;
-    std::string     throughputSuffix;
-    //
-    double          workPerPixel;
-    std::string     workPerPixelSuffix;
-    // Timings
-    float           iterationTimeMS;
-
-    // Memory Related
-    double          totalGPUMemoryMiB;
-    double          usedGPUMemoryMiB;
-
-    // Image related
-    const Vector2i  renderResolution;
-};
-
-struct SceneAnalyticData
-{
-    enum SceneGroupTypes
-    {
-        MATERIAL,
-        PRIMITIVE,
-        LIGHT,
-        CAMERA,
-        ACCELERATOR,
-        TRANSFORM,
-        MEDIUM,
-
-        END
-    };
-
-    // Generic
-    std::string                 sceneName;
-    // Timings
-    double                      sceneLoadTime;      // secs
-    double                      sceneUpdateTime;    // secs
-    // Group Counts
-    std::array<uint32_t, END>   groupCounts;
-    // Key Maximums
-    Vector2i                    accKeyMax;
-    Vector2i                    workKeyMax;
-};
 
 enum class RunState
 {
@@ -81,18 +37,26 @@ class MainStatusBar
                 MainStatusBar();
                 ~MainStatusBar() = default;
 
-    Optional<RunState>    Render(const TracerAnalyticData&,
-                                 const SceneAnalyticData&);
+    Optional<RunState>    Render(const VisorState&);
 };
-
 
 class VisorGUI
 {
     private:
-    MainStatusBar       statusBar;
-    bool topBarOn       = true;
-    bool bottomBarOn    = true;
+    MainStatusBar   statusBar;
+    bool            fpsInfoOn      = false;
+    bool            topBarOn       = true;
+    bool            bottomBarOn    = true;
+
+    void                ShowFrameOverlay(bool&, const VisorState&);
+    void                ShowTopMenu(bool&, const VisorState&);
+    Optional<RunState>  ShowStatusBar(bool&, const VisorState&);
+    void                ShowMainImage();
 
     public:
-    void Render(ImFont* windowScaledFont);
+    void            Render(ImFont* windowScaledFont,
+                           VkDescriptorSet displayImage,
+                           const VisorState& globalState);
+
+    VkDescriptorSet AddTexForRender(VkImageView, VkSampler);
 };

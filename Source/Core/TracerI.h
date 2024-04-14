@@ -6,8 +6,29 @@
 #include "Vector.h"
 #include "MRayDataType.h"
 #include "DataStructures.h"
+#include "System.h"
 
 #define MRAY_GENERIC_ID(NAME, TYPE) enum class NAME : TYPE {}
+
+struct TracerImgOutput
+{
+    SystemSemaphoreHandle   imgReadySignal;
+    SystemSemaphoreHandle   imgUsedSignal;
+    const Byte*             imagePtr;
+    uint32_t                sampleSectionOffset;
+    Vector2i                regionMin;
+    Vector2i                regionMax;
+    uint32_t                layerIndex;
+    MRayColorSpaceEnum      colorSpace;
+};
+
+struct RenderImageParams
+{
+    Vector2i            resolution;
+    Vector2i            regionMin;
+    Vector2i            regionMax;
+    MRayColorSpaceEnum  colorSpace;
+};
 
 namespace TransientPoolDetail { class TransientData; }
 using TransientData = TransientPoolDetail::TransientData;
@@ -461,6 +482,7 @@ class [[nodiscard]] TracerI
     //           Renderers            //
     //================================//
     virtual RendererId  CreateRenderer(std::string typeName) = 0;
+    virtual void        DestroyRenderer(RendererId) = 0;
     //
     virtual void        CommitRendererReservations(RendererId) = 0;
     virtual bool        IsRendererCommitted(RendererId) const = 0;
@@ -469,6 +491,12 @@ class [[nodiscard]] TracerI
     //================================//
     //           Rendering            //
     //================================//
-    virtual void        StartRender(RendererId, CamSurfaceId) = 0;
-    virtual void        StoptRender() = 0;
+    virtual void        StartRender(RendererId, CamSurfaceId,
+                                    RenderImageParams) = 0;
+    virtual void        StopRender() = 0;
+
+    // Renderer does a subsection of the img rendering
+    // and returns an output
+    virtual Optional<TracerImgOutput> DoRenderWork() = 0;
+
 };
