@@ -24,7 +24,6 @@ void TracerThread::LoopWork()
     if(!newScenePath.empty())
     {
         tracer->ClearAll();
-        tracer->
     }
 
 
@@ -55,6 +54,6 @@ TracerThread::TracerThread(TransferQueue& queue,
         constructorMangledName,
         destructorMangledName
     };
-    MRayError err = dllFile.GenerateObjectWithArgs<TracerI>(tracer, args);
+    MRayError err = dllFile.GenerateObjectWithArgs<Tuple<>, TracerI>(tracer, args);
     if(err) throw err;
 }

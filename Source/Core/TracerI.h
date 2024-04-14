@@ -499,4 +499,8 @@ class [[nodiscard]] TracerI
     // and returns an output
     virtual Optional<TracerImgOutput> DoRenderWork() = 0;
 
+    //================================//
+    //             Misc.              //
+    //================================//
+    virtual void    ClearAll() = 0;
 };

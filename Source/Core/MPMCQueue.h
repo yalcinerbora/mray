@@ -133,7 +133,7 @@ void MPMCQueue<T>::Enqueue(T&& item)
 template<class T>
 bool MPMCQueue<T>::TryEnqueue(T&& item)
 {
-    if (isTerminated) return;
+    if (isTerminated) return false;
     {
         std::unique_lock<std::mutex> lock(mutex);
         if(IsFull() || isTerminated) return false;

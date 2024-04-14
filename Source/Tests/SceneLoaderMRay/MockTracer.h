@@ -306,6 +306,7 @@ class TracerMock : public TracerI
 
 
     RendererId  CreateRenderer(std::string typeName) override;
+    void        DestroyRenderer(RendererId) override;
     void        CommitRendererReservations(RendererId) override;
     bool        IsRendererCommitted(RendererId) const override;
     void        PushRendererAttribute(RendererId, uint32_t attributeIndex,
@@ -316,6 +317,8 @@ class TracerMock : public TracerI
     void        StopRender() override;
     //
     Optional<TracerImgOutput> DoRenderWork() override;
+
+    void        ClearAll() override;
 };
 
 inline TracerMock::TracerMock(bool pl)
@@ -1728,6 +1731,11 @@ inline RendererId TracerMock::CreateRenderer(std::string typeName)
     throw MRayError("\"CreateRenderer\" is not implemented in mock tracer!");
 }
 
+inline void TracerMock::DestroyRenderer(RendererId)
+{
+    throw MRayError("\"DestroyRenderer\" is not implemented in mock tracer!");
+}
+
 inline void TracerMock::CommitRendererReservations(RendererId)
 {
     throw MRayError("\"CommitRendererReservations\" is not implemented in mock tracer!");
@@ -1759,3 +1767,6 @@ inline Optional<TracerImgOutput> TracerMock::DoRenderWork()
 {
     throw MRayError("\"DoRenderWork\" is not implemented in mock tracer!");
 }
+
+inline void TracerMock::ClearAll()
+{}
