@@ -17,6 +17,7 @@ set(SRC_VISOR
     ${CURRENT_SOURCE_DIR}/FontAtlas.cpp)
 
 set(SRC_VULKAN
+    ${CURRENT_SOURCE_DIR}/VulkanPipeline.h
     ${CURRENT_SOURCE_DIR}/VulkanTypes.h
     ${CURRENT_SOURCE_DIR}/VulkanAllocators.cpp
     ${CURRENT_SOURCE_DIR}/VulkanAllocators.h
@@ -52,6 +53,7 @@ add_library(Visor SHARED ${SRC_ALL})
 
 target_link_libraries(Visor PRIVATE
                       CoreLib
+                      TransientPool
                       glfw3::glfw3
                       imgui::imgui
                       vulkan::vulkan

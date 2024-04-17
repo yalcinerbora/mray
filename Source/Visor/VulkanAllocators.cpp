@@ -1,6 +1,9 @@
 #include "VulkanAllocators.h"
 #include "Core/System.h"
 
+#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_to_string.hpp>
+
 void* VKAPI_CALL VulkanHostAllocator::Allocate(void*, size_t size, size_t align,
                                                VkSystemAllocationScope)
 {
@@ -37,17 +40,15 @@ void VKAPI_CALL VulkanHostAllocator::Free(void*, void* ptr)
     #endif
 }
 
-void VKAPI_CALL VulkanHostAllocator::InternalAllocNotify(void*, size_t size,
-                                                         VkInternalAllocationType type,
-                                                         VkSystemAllocationScope scope)
-{
-}
+void VKAPI_CALL VulkanHostAllocator::InternalAllocNotify(void*, size_t,
+                                                         VkInternalAllocationType,
+                                                         VkSystemAllocationScope)
+{}
 
-void VKAPI_CALL VulkanHostAllocator::InternalFreeNotify(void*, size_t size,
-                                                        VkInternalAllocationType type,
-                                                        VkSystemAllocationScope scope)
-{
-}
+void VKAPI_CALL VulkanHostAllocator::InternalFreeNotify(void*, size_t,
+                                                        VkInternalAllocationType,
+                                                        VkSystemAllocationScope)
+{}
 
 const VkAllocationCallbacks* VulkanHostAllocator::Functions()
 {
@@ -61,4 +62,20 @@ const VkAllocationCallbacks* VulkanHostAllocator::Functions()
         .pfnInternalFree = InternalFreeNotify
     };
     return &result;
+}
+
+VulkanDeviceAllocator::VulkanDeviceAllocator(VkDevice d, uint32_t hI)
+    : deviceVk(d)
+    , heapIndex(hI)
+{}
+
+VulkanDeviceAllocator& VulkanDeviceAllocator::Instance(VkDevice deviceVk,
+                                                       uint32_t heapIndex)
+{
+    static VulkanDeviceAllocator allocator;
+    if(deviceVk != nullptr)
+    {
+        allocator = VulkanDeviceAllocator(deviceVk, heapIndex);
+    }
+    return allocator;
 }

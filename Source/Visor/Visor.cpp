@@ -503,7 +503,8 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     return MRayError::OK;
 }
 
-Expected<VisorWindow> VisorVulkan::GenerateWindow(const VisorConfig& config)
+Expected<VisorWindow> VisorVulkan::GenerateWindow(TransferQueue::VisorView& transferQueue,
+                                                  const VisorConfig& vConfig)
 {
     VisorWindow w;
     VulkanSystemView handlesVk =
@@ -514,10 +515,9 @@ Expected<VisorWindow> VisorVulkan::GenerateWindow(const VisorConfig& config)
         .queueIndex     = queueFamilyIndex,
         .mainQueueVk    = mainQueueVk
     };
-    MRayError e = w.Initialize(handlesVk, WindowTitle, config);
+    MRayError e = w.Initialize(transferQueue, handlesVk,
+                               WindowTitle, vConfig);
     if(e) return e;
-
-    w.AttachGlobalState(visorGlobalState);
     return w;
 }
 
@@ -549,11 +549,13 @@ MRayError VisorVulkan::InitImGui()
     return MRayError::OK;
 }
 
-MRayError VisorVulkan::MTInitialize(VisorConfig visorConfig,
+MRayError VisorVulkan::MTInitialize(TransferQueue& transferQueue,
+                                    const VisorConfig& visorConfig,
                                     const std::string& pPath)
 {
     MRayError e = MRayError::OK;
     processPath = pPath;
+    config = config;
 
     // From here
     // https://github.com/ocornut/imgui/blob/master/examples/example_glfw_vulkan/main.cpp
@@ -635,11 +637,17 @@ MRayError VisorVulkan::MTInitialize(VisorConfig visorConfig,
     if(e) return e;
 
     // Main window
-    auto windowE = GenerateWindow(visorConfig);
+    auto windowE = GenerateWindow(transferQueue.GetVisorView(),
+                                  visorConfig);
     if(windowE.has_error())
         return windowE.error();
     window = std::move(windowE.value());
     return MRayError::OK;
+}
+
+void VisorVulkan::TriggerEvent()
+{
+    glfwPostEmptyEvent();
 }
 
 bool VisorVulkan::MTIsTerminated()
@@ -649,7 +657,10 @@ bool VisorVulkan::MTIsTerminated()
 
 void VisorVulkan::MTWaitForInputs()
 {
-    glfwWaitEvents();
+    if(config.realTime)
+        glfwPollEvents();
+    else
+        glfwWaitEvents();
 }
 
 void VisorVulkan::MTRender()

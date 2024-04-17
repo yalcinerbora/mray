@@ -137,7 +137,7 @@ template<class T, size_t N>
 class alignas(std::max(alignof(T), size_t(8))) StaticVector
 {
     static constexpr size_t JUMP_SIZE = std::max(sizeof(T), alignof(T));
-    static constexpr size_t ALLOCATION_SIZE = sizeof(T) * JUMP_SIZE;
+    static constexpr size_t ALLOCATION_SIZE = N * JUMP_SIZE;
 
     private:
     Byte        storage[ALLOCATION_SIZE];

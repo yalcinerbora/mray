@@ -53,6 +53,7 @@ namespace TracerConstants
 {
     static constexpr size_t MaxPrimBatchPerSurface = 8;
     static constexpr size_t MaxAttributePerGroup = 16;
+    static constexpr size_t MaxRendererAttributeCount = 32;
 
     static constexpr std::string_view LIGHT_PREFIX      = "(L)";
     static constexpr std::string_view TRANSFORM_PREFIX  = "(T)";
@@ -133,7 +134,6 @@ using GenericAttributeInfoList = StaticVector<GenericAttributeInfo,
                                               TracerConstants::MaxAttributePerGroup>;
 using TexturedAttributeInfoList = StaticVector<TexturedAttributeInfo,
                                                TracerConstants::MaxAttributePerGroup>;
-
 using TypeNameList = std::vector<std::string>;
 
 struct PrimAttributeStringifier
@@ -233,7 +233,8 @@ using CullBackfaceFlagList  = StaticVector<bool, TracerConstants::MaxPrimBatchPe
 // Renderer Related
 MRAY_GENERIC_ID(RendererId, uint32_t);
 using RendererAttributeInfo = GenericAttributeInfo;
-using RendererAttributeInfoList = GenericAttributeInfoList;
+using RendererAttributeInfoList = StaticVector<GenericAttributeInfo,
+                                               TracerConstants::MaxRendererAttributeCount>;
 
 using MaterialIdList    = std::vector<MaterialId>;
 using TransformIdList   = std::vector<TransformId>;

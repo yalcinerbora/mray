@@ -8,7 +8,6 @@
 #include "Core/Error.h"
 #include "Core/DataStructures.h"
 #include "VisorWindow.h"
-#include "VisorState.h"
 
 // We gonna use this alot I think
 template<size_t N>
@@ -82,17 +81,16 @@ class VisorVulkan : public VisorI
 
     VisorDebugSystem    debugSystem;
     std::string         processPath;
-
-    bool                    EnableValidation(VkInstanceCreateInfo&);
-    MRayError               QueryAndPickPhysicalDevice(const VisorConfig&);
-    Expected<VisorWindow>   GenerateWindow(const VisorConfig&);
-    MRayError               InitImGui();
-
+    VisorConfig         config;
     // TODO: Move this away when multi-window is required
     // but imgui looks like single-windowed?
     VisorWindow         window;
-    //
-    VisorState          visorGlobalState;
+
+    bool                    EnableValidation(VkInstanceCreateInfo&);
+    MRayError               QueryAndPickPhysicalDevice(const VisorConfig&);
+    Expected<VisorWindow>   GenerateWindow(TransferQueue::VisorView&,
+                                           const VisorConfig&);
+    MRayError               InitImGui();
 
     public:
     // Constructors & Destructor
@@ -103,10 +101,12 @@ class VisorVulkan : public VisorI
     VisorVulkan&        operator=(VisorVulkan&&) = delete;
                         ~VisorVulkan() = default;
     //
-    MRayError           MTInitialize(VisorConfig,
+    MRayError           MTInitialize(TransferQueue& transferQueue,
+                                     const VisorConfig&,
                                      const std::string& processPath) override;
     bool                MTIsTerminated() override;
     void                MTWaitForInputs() override;
     void                MTRender() override;
     void                MTDestroy() override;
+    void                TriggerEvent() override;
 };

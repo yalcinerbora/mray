@@ -6,9 +6,11 @@
 class VisorCommand : public CommandI
 {
     private:
-    std::string         tracerConfig    = "";
-    std::string         visorConfig     = "";
-    std::string         sceneFile       = "";
+    std::string         tracerConfigFile    = "";
+    std::string         visorConfigFile     = "";
+    std::string         sceneFile           = "";
+    std::string         renderConfigFile    = "";
+    Vector2i            imgRes              = Vector2i::Zero();
 
     private:            VisorCommand() = default;
     public:

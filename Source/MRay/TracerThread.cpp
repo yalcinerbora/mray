@@ -1,7 +1,5 @@
 #include "TracerThread.h"
 
-
-
 void TracerThread::LoopWork()
 {
     uint32_t rendererIndex = std::numeric_limits<uint32_t>::max();
@@ -11,7 +9,7 @@ void TracerThread::LoopWork()
     std::string newScenePath = "";
 
     // On every "frame", we will do the latest common commands
-    VisorCommand command;
+    VisorAction command;
     while(transferQueue.TryDequeue(command))
     {
         // Technically this loop may not terminate,
@@ -19,6 +17,8 @@ void TracerThread::LoopWork()
         // it should not be possible
 
         // Process command....
+        //
+
     }
 
     if(!newScenePath.empty())
@@ -41,19 +41,31 @@ void TracerThread::InitialWork()
 void TracerThread::FinalWork()
 {}
 
-TracerThread::TracerThread(TransferQueue& queue,
-                           std::string& sharedLibraryPath,
-                           const std::string& constructorMangledName,
-                           const std::string& destructorMangledName)
-    : dllFile(sharedLibraryPath)
+TracerThread::TracerThread(TransferQueue& queue)
+    : dllFile{nullptr}
     , tracer{nullptr, nullptr}
     , transferQueue(queue.GetTracerView())
+{}
+
+MRayError TracerThread::MTInitialize(const std::string& tracerConfig)
 {
+    std::string sharedLibraryPath = "";
+    std::string constructorMangledName = "";
+    std::string destructorMangledName = "";
+
     SharedLibArgs args =
     {
         constructorMangledName,
         destructorMangledName
     };
-    MRayError err = dllFile.GenerateObjectWithArgs<Tuple<>, TracerI>(tracer, args);
-    if(err) throw err;
+    MRayError err = dllFile->GenerateObjectWithArgs<Tuple<>, TracerI>(tracer, args);
+    if(err) return err;
+
+    return MRayError::OK;
+}
+
+bool TracerThread::InternallyTerminated() const
+{
+    // TODO: Add crash condition
+    return false;
 }

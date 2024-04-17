@@ -6,23 +6,23 @@
 
 #include "TransferQueue.h"
 
-class TracerThread : public RealtimeThread
+class TracerThread final : public RealtimeThread
 {
     private:
-    SharedLibrary               dllFile;
-    SharedLibPtr<TracerI>       tracer;
-    TransferQueue::TracerView   transferQueue;
+    std::unique_ptr<SharedLibrary>  dllFile;
+    SharedLibPtr<TracerI>           tracer;
+    TransferQueue::TracerView       transferQueue;
     //
-    void                        LoopWork() override;
-    void                        InitialWork() override;
-    void                        FinalWork() override;
+    void        LoopWork() override;
+    void        InitialWork() override;
+    void        FinalWork() override;
 
     public:
     // Constructors & Destructor
-                TracerThread(TransferQueue& queue,
-                             std::string& sharedLibraryPath,
-                             const std::string& constructorMangledName,
-                             const std::string& destructorMangledName);
-    virtual     ~TracerThread() = default;
+                TracerThread(TransferQueue& queue);
+                ~TracerThread() = default;
+
+    MRayError   MTInitialize(const std::string& tracerConfig);
+    bool        InternallyTerminated() const override;
 
 };

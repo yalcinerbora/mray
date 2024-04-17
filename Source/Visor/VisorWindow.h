@@ -9,11 +9,11 @@
 #include "VulkanTypes.h"
 #include "FramePool.h"
 #include "VisorGUI.h"
+#include "VisorState.h"
 
 struct ImFont;
 struct GLFWwindow;
 struct VisorConfig;
-struct VisorState;
 
 class Swapchain
 {
@@ -86,9 +86,10 @@ class VisorWindow
     bool                hdrRequested    = false;
     VulkanSystemView    handlesVk       = {};
     bool                stopPresenting  = false;
-    VisorGUI            gui;
-    const VisorState*   visorState      = nullptr;
-
+    //
+    VisorGUI                    gui;
+    VisorState                  visorState      = {};
+    TransferQueue::VisorView*   transferQueue;
 
     private:
     friend class VisorVulkan;
@@ -107,7 +108,8 @@ class VisorWindow
     // Only Visor can create windows
                 VisorWindow() = default;
     // Thus, only visor can initialize windows
-    MRayError   Initialize(VulkanSystemView handlesVk,
+    MRayError   Initialize(TransferQueue::VisorView& transferQueue,
+                           const VulkanSystemView& handlesVk,
                            const std::string& windowTitle,
                            const VisorConfig& config);
 
@@ -122,10 +124,75 @@ class VisorWindow
                     ~VisorWindow();
 
     bool            ShouldClose();
-    void            AttachGlobalState(const VisorState&);
     FramePack       NextFrame();
     void            PresentFrame();
     ImFont*         CurrentFont();
     void            Render();
 
 };
+
+
+//class AccumulateImageStage
+//{
+//    VulkanSystemView handlesVk;
+//    VkDeviceMemory a;
+//    VkImage img;
+//    VkImage mg;
+//    VkDescriptorSet s;
+//    VkSemaphore saaaa;
+//
+//    VkPipeline computePipeline;
+//
+//
+//    AccumulateImageStage(uint32_t frameCount)
+//    {
+//        VkShaderModule shader;
+//        VkPipelineLayout pipelineLayout;
+//
+//        VkPipelineLayoutCreateInfo pInfo =
+//        {
+//            .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+//            .pNext = nullptr
+//        };
+//        vkCreatePipelineLayout(handlesVk.deviceVk, &pInfo,
+//                               VulkanHostAllocator::Functions(),
+//                               &pipelineLayout);
+//
+//        VkComputePipelineCreateInfo cInfo =
+//        {
+//            .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+//            .pNext = nullptr,
+//            .flags = 0,
+//            .stage =
+//            {
+//                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+//                .pNext = nullptr,
+//                .flags = 0,
+//                .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+//                .module = shader,
+//                .pName = "AccumImage"
+//            },
+//            .layout = pipelineLayout,
+//            .basePipelineHandle = nullptr,
+//            .basePipelineIndex = 0
+//        };
+//
+//        vkCreateComputePipelines(handlesVk.deviceVk, nullptr,
+//                                 1, &cInfo,
+//                                 VulkanHostAllocator::Functions(),
+//                                 &computePipeline);
+//
+//        //vkCmdDispatch()
+//
+//
+//    }
+//
+//    void Record(uint32_t f, RenderImageSection s)
+//    {
+//
+//
+//
+//
+//    }
+//
+//};

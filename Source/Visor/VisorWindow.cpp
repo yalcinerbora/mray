@@ -640,10 +640,12 @@ void VisorWindow::PathDropped(int count, const char** paths)
     }
 }
 
-MRayError VisorWindow::Initialize(VulkanSystemView handles,
+MRayError VisorWindow::Initialize(TransferQueue::VisorView& transferQueueIn,
+                                  const VulkanSystemView& handles,
                                   const std::string& windowTitle,
                                   const VisorConfig& config)
 {
+    transferQueue = &transferQueueIn;
     handlesVk = handles;
     hdrRequested = config.displayHDR;
 
@@ -754,20 +756,80 @@ ImFont* VisorWindow::CurrentFont()
     return FontAtlas::Instance().GetMonitorFont(x);
 }
 
-void VisorWindow::AttachGlobalState(const VisorState& state)
-{
-    visorState = &state;
-}
-
 void VisorWindow::Render()
 {
     if(stopPresenting) return;
 
-    gui.Render(CurrentFont(), nullptr, *visorState);
+
+    //
+    Optional<MRayColorSpaceEnum> newColorSpace;
+    Optional<RenderImageSection> newImageSection;
+    Optional<bool>               newClearSignal;
+
+    TracerResponse response;
+    while(transferQueue->TryDequeue(response))
+    {
+        using RespType = typename TracerResponse::Type;
+        RespType tp = static_cast<RespType>(response.index());
+
+        using enum TracerResponse::Type;
+
+        // Stop consuming commands if image section
+        // related things are in the queue
+        // these require to be processed.
+        //
+        // For other things, the latest value is enough
+        // (most of these are analytics etc)
+        bool stopConsuming = false;
+        switch(tp)
+        {
+            case CAMERA_INIT_TRANSFORM: visorState.transform = std::get<CAMERA_INIT_TRANSFORM>(response); break;
+            case SCENE_ANALYTICS:       visorState.scene     = std::get<SCENE_ANALYTICS>(response);       break;
+            case TRACER_ANALYTICS:      visorState.tracer    = std::get<TRACER_ANALYTICS>(response);      break;
+            case RENDERER_ANALYTICS:    visorState.renderer  = std::get<RENDERER_ANALYTICS>(response);    break;
+            case RENDERER_OPTIONS:      break; // TODO: User may change the render options during runtime
+            case IMAGE_COLOR_SPACE:
+            {
+                newColorSpace = std::get<IMAGE_COLOR_SPACE>(response);
+                stopConsuming = true;
+                break;
+            }
+            case CLEAR_IMAGE_SECTION:
+            {
+                newClearSignal = std::get<CLEAR_IMAGE_SECTION>(response);
+                stopConsuming = true;
+                break;
+            }
+            case IMAGE_SECTION:
+            {
+                newImageSection = std::get<IMAGE_SECTION>(response);
+                stopConsuming = true;
+                break;
+            }
+            default: MRAY_WARNING_LOG("[Visor] Unkown tracer response is ignored!"); break;
+        }
+        if(stopConsuming) break;
+    }
+
+
+    // Entire image reset + img format change (new alloc maybe)
+    if(newClearSignal)
+    {
+        // Now halt everything,
+    }
+    // Entire image reset, same format
+    // Accum image, tone map etc.
+
+    //if(imageReset)
+
+
+    // ================== //
+    //     GUI RENDER     //
+    // ================== //
+    gui.Render(CurrentFont(), nullptr, visorState);
 
     // Wait availablility of the command buffer
     FramePack frameHandles = NextFrame();
-
     VkCommandBufferBeginInfo cbBeginInfo =
     {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -803,10 +865,8 @@ void VisorWindow::Render()
     vkCmdBeginRenderPass(frameHandles.commandBuffer, &rpBeginInfo,
                          VK_SUBPASS_CONTENTS_INLINE);
 
-
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
                                     frameHandles.commandBuffer);
-
     vkCmdEndRenderPass(frameHandles.commandBuffer);
     vkEndCommandBuffer(frameHandles.commandBuffer);
 
