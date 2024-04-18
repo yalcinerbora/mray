@@ -6,10 +6,12 @@
 
 #include "Core/Types.h"
 
+using SizeAlignPair = Pair<VkDeviceSize, VkDeviceSize>;
+
 template <class T>
 concept VulkanMemObjectC = requires(const T constT, T t)
 {
-    { constT.MemRequirements() } -> std::same_as<Pair<VkDeviceSize, VkDeviceSize>>;
+    { constT.MemRequirements() } -> std::same_as<SizeAlignPair>;
     {
         t.AttachMemory(VkDeviceMemory{}, VkDeviceSize{})
     } -> std::same_as<void>;

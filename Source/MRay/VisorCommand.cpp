@@ -29,7 +29,7 @@ Expected<VisorConfig> LoadVisorConfig(const std::string& configJsonPath)
 
     // Object keys
     static constexpr auto DLL_NAME          = "VisorDLL"sv;
-    static constexpr auto OPTIONS_NAME      = "VisorDLL"sv;
+    static constexpr auto OPTIONS_NAME      = "VisorOptions"sv;
     static constexpr auto INTERVAL_OUT_NAME = "IntervalOutput"sv;
     // DLL entries
     static constexpr auto DLL_FILE_NAME         = "name"sv;
@@ -38,7 +38,7 @@ Expected<VisorConfig> LoadVisorConfig(const std::string& configJsonPath)
     // Options
     static constexpr auto OPT_CBUFFER_NAME      = "commandBufferSize"sv;
     static constexpr auto OPT_RBUFFER_NAME      = "responseBufferSize"sv;
-    static constexpr auto OPT_ENFORCE_IGPU_NAME = "displayHDR"sv;
+    static constexpr auto OPT_ENFORCE_IGPU_NAME = "enforceIGPU"sv;
     static constexpr auto OPT_DISPLAY_HDR_NAME  = "displayHDR"sv;
     static constexpr auto OPT_WINDOW_SIZE_NAME  = "windowSize"sv;
     static constexpr auto OPT_REAL_TIME_NAME    = "realTime"sv;
@@ -134,12 +134,12 @@ MRayError VisorCommand::Invoke()
     if(e) return e;
 
     // Get the tracer dll
-    TracerThread tracerThread(transferQueue);
-    e = tracerThread.MTInitialize(tracerConfigFile);
-    if(e) return e;
+    //TracerThread tracerThread(transferQueue);
+    //e = tracerThread.MTInitialize(tracerConfigFile);
+    //if(e) return e;
 
     // Start the tracer thread
-    tracerThread.Start();
+    //tracerThread.Start();
 
     // ====================== //
     //     Real-time Loop     //
@@ -152,7 +152,7 @@ MRayError VisorCommand::Invoke()
 
     // GG!
     visorSystem->MTDestroy();
-    tracerThread.Stop();
+    //tracerThread.Stop();
     return MRayError::OK;
 }
 
@@ -163,29 +163,29 @@ CLI::App* VisorCommand::GenApp(CLI::App& mainApp)
         ->alias(std::string(Name));
 
     //// Input
-    //visorApp->add_option("tracerConf, t"s, tracerConfigFile,
+    //visorApp->add_option("--tracerConf, -t"s, tracerConfigFile,
     //                     "Tracer configuration file, mainly specifies the "
     //                     "tracer dll name to be loaded."s)
     //    ->check(CLI::ExistingFile)
     //    ->required();
     //
-    visorApp->add_option("visorConf, v"s, visorConfigFile,
+    visorApp->add_option("--visorConf, --vConf"s, visorConfigFile,
                          "Visor configuration file."s)
         ->check(CLI::ExistingFile)
         ->required();
     //
-    //CLI::Option* sceneOption = visorApp->add_option("scene, s"s, sceneFile,
+    //CLI::Option* sceneOption = visorApp->add_option("--scene, -s"s, sceneFile,
     //                                                "Initial scene file (optional)."s)
     //    ->check(CLI::ExistingFile);
 
-    //CLI::Option* rendOption = visorApp->add_option("renderConf, r"s, renderConfig,
+    //CLI::Option* rendOption = visorApp->add_option("--renderConf, -r"s, renderConfig,
     //                                               "Initial renderer to be launched. "
     //                                               "Requires a scene to be set (optional)."s)
     //    ->check(CLI::ExistingFile)
     //    ->needs(sceneOption);
 
     //// TODO: Change this to be a region maybe?
-    //visorApp->add_option("resolution, r"s, imgRes,
+    //visorApp->add_option("--resolution, -r"s, imgRes,
     //                     "Initial renderer to be launched. "
     //                     "Requires a scene to be set (optional)."s)
     //    ->check(CLI::ExistingFile)

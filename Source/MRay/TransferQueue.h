@@ -74,15 +74,39 @@ struct RendererOptionPack
     AttributeList               attributes;
 };
 
+struct RenderBufferInfo
+{
+    // Buffer range
+    Byte*                   data;
+    size_t                  totalSize;
+    // These semaphores will be used to synchronize
+    // Tracer will signal this semaphore
+    SystemSemaphoreHandle   readyForReadSignal;
+    // Visor will signal this semaphore
+    SystemSemaphoreHandle   readFinishedSignal;
+    // Data types of the render buffer
+    // actual underlying data type is always float
+    MRayColorSpaceEnum      renderColorSpace;
+    // Total size of the film
+    Vector2i                resolution;
+    // Render output may be spectral data then this represents
+    // amount of spectral samples (equally distributed)
+    uint32_t                depth;
+};
+
 struct RenderImageSection
 {
-    Vector2i                pixelMin;
-    Vector2i                pixelMax;
-    uint32_t                index;
-    Byte*                   data;
-    Float*                  sampleData;
-    SystemSemaphoreHandle   readyForReadSignal;
-    SystemSemaphoreHandle   readFinishedSignal;
+    // Logical layout of the data
+    // Incoming data is between these pixel ranges
+    Vector2i    pixelMin;
+    Vector2i    pixelMax;
+    // In addition to the per pixel accumulation
+    Float       globalWeight;
+
+    // Pixel data starts over this offset (this should be almost always zero)
+    size_t      pixelStartOffset;
+    // SampleCount start offset over the buffer
+    size_t      sampleStartOffset;
 };
 
 struct TracerResponse : public std::variant
@@ -92,14 +116,14 @@ struct TracerResponse : public std::variant
     TracerAnalyticData,     // tracer analytics
     RendererAnalyticData,   // renderer analytics
     RendererOptionPack,     // renderer options;
-    MRayColorSpaceEnum,     // color space of the image
+    RenderBufferInfo,       // render output information
     bool,
     RenderImageSection      // image section;
 >
 {
     using Base = std::variant<CameraTransform, SceneAnalyticData,
                               TracerAnalyticData, RendererAnalyticData,
-                              RendererOptionPack, MRayColorSpaceEnum,
+                              RendererOptionPack, RenderBufferInfo,
                               bool, RenderImageSection>;
     enum Type
     {
@@ -109,8 +133,8 @@ struct TracerResponse : public std::variant
         TRACER_ANALYTICS = 2,       // tracer analytics
         RENDERER_ANALYTICS = 3,     // renderer analytics
         RENDERER_OPTIONS = 4,       // renderer options
-        IMAGE_COLOR_SPACE = 5,      // Color space of the streaming output
-                                    // this will be sent just before render starts
+
+        RENDER_BUFFER_INFO = 5,     // Output buffer information
         CLEAR_IMAGE_SECTION = 6,    // Clear the image section
         IMAGE_SECTION = 7           // Respond with an image section, this
                                     // may or may not be the entire responsible
@@ -148,8 +172,8 @@ struct VisorAction : public std::variant
                                     // "SceneAnalytics" struct
         CHANGE_TIME = 4,            // Change the time of the scene. Min max values are in
                                     // "SceneAnalytics" strcut
-        START_STOP_RENDER = 5,      // Start stop the rendering.
-        PAUSE_RENDER = 6            // Pause the rendering
+        START_STOP_RENDER = 6,      // Start stop the rendering.
+        PAUSE_RENDER = 7            // Pause the rendering
     };
 
     using Base::Base;

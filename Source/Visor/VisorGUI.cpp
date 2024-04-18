@@ -1,5 +1,7 @@
 #include "VisorGUI.h"
 #include "VisorState.h"
+#include "VulkanTypes.h"
+#include "TonemapStage.h"
 
 #include <Imgui/imgui.h>
 #include <Imgui/imgui_internal.h>
@@ -226,10 +228,7 @@ void VisorGUI::ShowTopMenu(bool& isOpen, const VisorState& visorState)
 {
     if(ImGui::BeginMainMenuBar())
     {
-        if(ImGui::Button("Tone Mapping"))
-        {
-            //tmWindow.ToggleWindowOpen();
-        }
+        if(tonemapperGUI) tonemapperGUI->Render();
 
         static constexpr const char* VISOR_INFO_NAME = "VisorInfo";
         ImGui::SameLine(ImGui::GetWindowContentRegionMax().x -
@@ -253,37 +252,28 @@ Optional<RunState> VisorGUI::ShowStatusBar(bool& isOpen,
 
 void VisorGUI::ShowMainImage()
 {
-    static bool use_work_area = true;
-    static ImGuiWindowFlags flags = (ImGuiWindowFlags_NoDecoration |
-                                     ImGuiWindowFlags_NoMove |
-                                     ImGuiWindowFlags_NoSavedSettings |
-                                     ImGuiWindowFlags_NoBackground);
+    static const ImGuiWindowFlags flags = (ImGuiWindowFlags_NoDecoration |
+                                           ImGuiWindowFlags_NoMove |
+                                           ImGuiWindowFlags_NoSavedSettings |
+                                           ImGuiWindowFlags_NoBackground |
+                                           ImGuiWindowFlags_NoTitleBar |
+                                           ImGuiWindowFlags_NoScrollbar |
+                                           ImGuiWindowFlags_NoCollapse);
 
     // We demonstrate using the full viewport area or the work area"
     // (without menu-bars, task-bars etc.)
     // Based on your use case you may want one or the other.
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(use_work_area ? viewport->WorkPos : viewport->Pos);
-    ImGui::SetNextWindowSize(use_work_area ? viewport->WorkSize : viewport->Size);
-
-    if(ImGui::Begin("Example: Fullscreen window", nullptr, flags))
+    ImGui::SetNextWindowPos(viewport->WorkPos);
+    ImGui::SetNextWindowSize(viewport->WorkSize);
+    if(ImGui::Begin("MainWindow", nullptr, flags))
     {
-        ImGui::Checkbox("Use work area instead of main area", &use_work_area);
-
-        ImGui::CheckboxFlags("ImGuiWindowFlags_NoBackground", &flags, ImGuiWindowFlags_NoBackground);
-        ImGui::CheckboxFlags("ImGuiWindowFlags_NoDecoration", &flags, ImGuiWindowFlags_NoDecoration);
-        ImGui::Indent();
-        ImGui::CheckboxFlags("ImGuiWindowFlags_NoTitleBar", &flags, ImGuiWindowFlags_NoTitleBar);
-        ImGui::CheckboxFlags("ImGuiWindowFlags_NoCollapse", &flags, ImGuiWindowFlags_NoCollapse);
-        ImGui::CheckboxFlags("ImGuiWindowFlags_NoScrollbar", &flags, ImGuiWindowFlags_NoScrollbar);
-        ImGui::Unindent();
+        //ImGui::Image(std::bit_cast<ImTextureID>(mainImage), {256.0f, 256.0f});
     }
     ImGui::End();
-
 }
 
-void VisorGUI::Render(ImFont* windowScaledFont, VkDescriptorSet displayImage,
-                      const VisorState& visorState)
+void VisorGUI::Render(ImFont* windowScaledFont, const VisorState& visorState)
 {
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -301,20 +291,21 @@ void VisorGUI::Render(ImFont* windowScaledFont, VkDescriptorSet displayImage,
     if(topBarOn) ShowTopMenu(topBarOn, visorState);
     if(bottomBarOn) ShowStatusBar(bottomBarOn, visorState);
 
-    // ImGui::ShowDemoWindow();
     ShowMainImage();
-
-    // Rendering
-    // ---------
-    //static int i = 0;
-    //MRAY_LOG("Rendering Frame!{}", i++);
 
     ImGui::PopFont();
     ImGui::Render();
 }
 
-VkDescriptorSet VisorGUI::AddTexForRender(VkImageView imageVk, VkSampler samplerVk)
+void VisorGUI::ChangeDisplayImage(const VulkanImage& img)
 {
-    return ImGui_ImplVulkan_AddTexture(samplerVk, imageVk,
-                                       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    if(mainImage) ImGui_ImplVulkan_RemoveTexture(mainImage);
+    //
+    mainImage = ImGui_ImplVulkan_AddTexture(img.Sampler(), img.View(),
+                                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+}
+
+void VisorGUI::ChangeTonemapperGUI(GUITonemapperI* newTonemapperGUI)
+{
+    tonemapperGUI = newTonemapperGUI;
 }

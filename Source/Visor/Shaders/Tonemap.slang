@@ -134,7 +134,7 @@ void KCFindAvgMaxLum(uint3 globalId: SV_DispatchThreadID,
     // TODO: If have free time, check the full down reduction
     // (one extra call for this compute shader on an intermediate buffer, not the texture)
     // is faster or slower (probably faster but setting that up is a hassle)
-    if (localId.x == 0)
+    if(localId.x == 0)
     {
         float old;
         float totalRecip = 1.0f / float(dim.x + dim.y);
@@ -155,13 +155,11 @@ void KCTonemapImage(uint3 globalId : SV_DispatchThreadID)
     params.inputTex.GetDimensions(dim[0], dim[1]);
     uint2 pixId = uint2(globalId.x % dim.x,
                         globalId.x / dim.x);
-
     //
     float3 inColorHDR = params.inputTex.Load(uint3(pixId, 0), int2(0, 0));
 
     ColorConverterIn  inColorSpace;
     ColorConverterOut outColorSpace;
-
     float3 outColorSDR = Tonemapper.ToneMap(inColorHDR,
                                             inColorSpace, outColorSpace,
                                             params.outGammaParams,

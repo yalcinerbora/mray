@@ -42,11 +42,14 @@ class VulkanComputePipeline
     static Expected<std::vector<Byte>> DevourFile(const std::string& shaderName,
                                                   const std::string& executablePath);
 
+    void Clear();
     public:
                             VulkanComputePipeline() = default;
                             VulkanComputePipeline(VkDevice deviceVk);
                             VulkanComputePipeline(const VulkanComputePipeline&) = delete;
+                            VulkanComputePipeline(VulkanComputePipeline&&);
     VulkanComputePipeline&  operator=(const VulkanComputePipeline&) = delete;
+    VulkanComputePipeline&  operator=(VulkanComputePipeline&&);
                             ~VulkanComputePipeline();
 
     MRayError               Initialize(const Descriptor2DList<ShaderBindingInfo>& bindingInfo,
@@ -82,8 +85,10 @@ VulkanComputePipeline::DevourFile(const std::string& shaderName,
     return source;
 }
 
-inline VulkanComputePipeline::~VulkanComputePipeline()
+inline void VulkanComputePipeline::Clear()
 {
+    if(!deviceVk) return;
+
     for(auto& setLayout : setLayouts)
     {
         vkDestroyDescriptorSetLayout(deviceVk, setLayout,
@@ -91,11 +96,37 @@ inline VulkanComputePipeline::~VulkanComputePipeline()
     }
     vkDestroyPipelineLayout(deviceVk, pipelineLayout,
                             VulkanHostAllocator::Functions());
+
+    vkDestroyPipeline(deviceVk, computePipeline,
+                      VulkanHostAllocator::Functions());
 }
 
 inline VulkanComputePipeline::VulkanComputePipeline(VkDevice deviceVk)
     : deviceVk(deviceVk)
 {}
+
+inline VulkanComputePipeline::VulkanComputePipeline(VulkanComputePipeline&& other)
+    : deviceVk(other.deviceVk)
+    , computePipeline(std::exchange(other.computePipeline, nullptr))
+    , pipelineLayout(std::exchange(other.pipelineLayout, nullptr))
+    , setLayouts(std::move(other.setLayouts))
+{}
+
+inline VulkanComputePipeline& VulkanComputePipeline::operator=(VulkanComputePipeline&& other)
+{
+    assert(this != &other);
+    Clear();
+    deviceVk = other.deviceVk;
+    computePipeline = std::exchange(other.computePipeline, nullptr);
+    pipelineLayout = std::exchange(other.pipelineLayout, nullptr);
+    setLayouts = std::move(other.setLayouts);
+    return *this;
+}
+
+inline VulkanComputePipeline::~VulkanComputePipeline()
+{
+    Clear();
+}
 
 inline MRayError VulkanComputePipeline::Initialize(const Descriptor2DList<ShaderBindingInfo>& bindingInfoList,
                                                    const std::string& shaderName,
@@ -165,7 +196,7 @@ inline MRayError VulkanComputePipeline::Initialize(const Descriptor2DList<Shader
     {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .pNext = nullptr,
-        .setLayoutCount = setLayouts.size(),
+        .setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
         .pSetLayouts = setLayouts.data(),
         .pushConstantRangeCount = 0,
         .pPushConstantRanges = nullptr
@@ -206,7 +237,7 @@ inline MRayError VulkanComputePipeline::Initialize(const Descriptor2DList<Shader
                           VulkanHostAllocator::Functions());
 }
 
-VkDescriptorSet
+inline VkDescriptorSet
 VulkanComputePipeline::AcquireSet(VkDescriptorPool pool,
                                   uint32_t setIndex)
 {
@@ -223,17 +254,13 @@ VulkanComputePipeline::AcquireSet(VkDescriptorPool pool,
     return set;
 }
 
-void VulkanComputePipeline::BindSet(VkCommandBuffer cmd, uint32_t setIndex,
-                                    VkDescriptorSet set)
+inline void VulkanComputePipeline::BindSet(VkCommandBuffer cmd, uint32_t setIndex,
+                                           VkDescriptorSet set)
 {
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
                             pipelineLayout, setIndex, 1,
                             &set, 0, nullptr);
 }
-
-
-
-
 
 // ========================================================================//
 
@@ -248,7 +275,7 @@ struct VulkanBufferSpan
     explicit operator VkDescriptorBufferInfo() const;
 };
 
-explicit VulkanBufferSpan::operator VkDescriptorBufferInfo() const
+inline VulkanBufferSpan::operator VkDescriptorBufferInfo() const
 {
     return VkDescriptorBufferInfo
     {
@@ -288,13 +315,13 @@ class VulkanPipelineView
                       const DescriptorBindList<ImageDescriptorData>&);
 };
 
-VulkanPipelineView::VulkanPipelineView(VkDescriptorPool pool,
+inline VulkanPipelineView::VulkanPipelineView(VkDescriptorPool pool,
                                        VulkanComputePipeline pipeline)
 {
 
 }
 
-void VulkanPipelineView::ReferToBuffer(uint32_t setIndex,
+inline void VulkanPipelineView::ReferToBuffer(uint32_t setIndex,
                                        const DescriptorBindList<BufferDescriptorData>& bindings)
 {
     DescriptorBindList<VkWriteDescriptorSet> writeSets;
@@ -318,11 +345,11 @@ void VulkanPipelineView::ReferToBuffer(uint32_t setIndex,
         writeSets.push_back(writeInfo);
     }
 
-    vkUpdateDescriptorSets(deviceVk, writeSets.size(),
+    vkUpdateDescriptorSets(deviceVk, static_cast<uint32_t>(writeSets.size()),
                            writeSets.data(), 0, nullptr);
 }
 
-void VulkanPipelineView::ReferToImage(uint32_t setIndex,
+inline void VulkanPipelineView::ReferToImage(uint32_t setIndex,
                                       const DescriptorBindList<ImageDescriptorData>&)
 {
 

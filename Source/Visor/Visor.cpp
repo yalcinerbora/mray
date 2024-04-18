@@ -555,7 +555,7 @@ MRayError VisorVulkan::MTInitialize(TransferQueue& transferQueue,
 {
     MRayError e = MRayError::OK;
     processPath = pPath;
-    config = config;
+    config = visorConfig;
 
     // From here
     // https://github.com/ocornut/imgui/blob/master/examples/example_glfw_vulkan/main.cpp

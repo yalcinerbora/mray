@@ -11,6 +11,9 @@
 #include "VisorGUI.h"
 #include "VisorState.h"
 
+#include "AccumImageStage.h"
+#include "TonemapStage.h"
+
 struct ImFont;
 struct GLFWwindow;
 struct VisorConfig;
@@ -73,7 +76,7 @@ class Swapchain
     FramebufferPack     NextFrame(VkSemaphore imgAvailSignal);
     void                PresentFrame(VkSemaphore waitSignal);
     void                FBOSizeChanged(Vector2ui newSize);
-
+    VkColorSpaceKHR     ColorSpace() const;
 };
 
 class VisorWindow
@@ -84,12 +87,17 @@ class VisorWindow
     VkSurfaceKHR        surfaceVk       = nullptr;
     GLFWwindow*         window          = nullptr;
     bool                hdrRequested    = false;
-    VulkanSystemView    handlesVk       = {};
     bool                stopPresenting  = false;
+
+    static VulkanSystemView handlesVk;
     //
     VisorGUI                    gui;
     VisorState                  visorState      = {};
-    TransferQueue::VisorView*   transferQueue;
+    TransferQueue::VisorView*   transferQueue   = nullptr;
+    VkDescriptorPool            mainDescPool    = nullptr;
+    // Rendering Stages
+    AccumImageStage accumulateStage = AccumImageStage(handlesVk);
+    TonemapStage    tonemapStage    = TonemapStage(handlesVk);
 
     private:
     friend class VisorVulkan;
@@ -113,6 +121,8 @@ class VisorWindow
                            const std::string& windowTitle,
                            const VisorConfig& config);
 
+    void        StartRenderpass(const FramePack& frameHandle);
+    void        StartCommandBuffer(const FramePack& frameHandle);
     public:
     // Constructors & Destructor
     // TODO: Imgui has global state but relates to glfwWindow.
@@ -130,6 +140,7 @@ class VisorWindow
     void            Render();
 
 };
+
 
 
 //class AccumulateImageStage

@@ -5,6 +5,8 @@
 #include "Core/Types.h"
 #include "vulkan/vulkan.h"
 
+class GUITonemapperI;
+class VulkanImage;
 struct VisorState;
 struct ImFont;
 
@@ -44,10 +46,15 @@ class VisorGUI
 {
     private:
     MainStatusBar   statusBar;
-    bool            fpsInfoOn      = false;
-    bool            topBarOn       = true;
-    bool            bottomBarOn    = true;
-
+    bool            fpsInfoOn       = false;
+    bool            topBarOn        = true;
+    bool            bottomBarOn     = true;
+    //
+    GUITonemapperI* tonemapperGUI   = nullptr;
+    //
+    VkDescriptorSet mainImage       = nullptr;
+    Vector2i        imgSize         = Vector2i::Zero();
+    //
     void                ShowFrameOverlay(bool&, const VisorState&);
     void                ShowTopMenu(bool&, const VisorState&);
     Optional<RunState>  ShowStatusBar(bool&, const VisorState&);
@@ -55,8 +62,7 @@ class VisorGUI
 
     public:
     void            Render(ImFont* windowScaledFont,
-                           VkDescriptorSet displayImage,
                            const VisorState& globalState);
-
-    VkDescriptorSet AddTexForRender(VkImageView, VkSampler);
+     void           ChangeDisplayImage(const VulkanImage&);
+     void           ChangeTonemapperGUI(GUITonemapperI*);
 };

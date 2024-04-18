@@ -433,10 +433,9 @@ MRayError Swapchain::Initialize(VulkanSystemView handles,
     surface     = surf;
     tryHDR      = isHDR;
 
-    // TODO: Add more for textures
     static const StaticVector<VkDescriptorPoolSize, 1> imguiPoolSizes =
     {
-        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 },
+        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8 },
     };
     VkDescriptorPoolCreateInfo descPoolInfo =
     {
@@ -572,6 +571,13 @@ void Swapchain::FBOSizeChanged(Vector2ui newSize)
     fboSizeChanged = true;
 }
 
+VkColorSpaceKHR Swapchain::ColorSpace() const
+{
+    return colorSpace;
+}
+
+VulkanSystemView VisorWindow::handlesVk = {};
+
 void VisorWindow::WndPosChanged(int, int)
 {
 }
@@ -680,8 +686,70 @@ MRayError VisorWindow::Initialize(TransferQueue::VisorView& transferQueueIn,
     e = framePool.Initialize(handlesVk);
     if(e) return e;
 
+    // Finally Create a descriptor pool
+    // TODO: Check if large pool has performance penalty
+    static const StaticVector<VkDescriptorPoolSize, 4> imguiPoolSizes =
+    {
+        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 32 },
+        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 32 },
+        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 32 },
+        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 32 }
+    };
+    VkDescriptorPoolCreateInfo descPoolInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+        .maxSets = 1,
+        .poolSizeCount = static_cast<uint32_t>(imguiPoolSizes.size()),
+        .pPoolSizes = imguiPoolSizes.data()
+    };
+    vkCreateDescriptorPool(handlesVk.deviceVk, &descPoolInfo,
+                           VulkanHostAllocator::Functions(),
+                           &mainDescPool);
+
+
     glfwShowWindow(window);
     return MRayError::OK;
+}
+
+void VisorWindow::StartRenderpass(const FramePack& frameHandle)
+{
+    VkClearValue clearValue = {};
+    clearValue.color.float32[0] = 1.0f;
+    clearValue.color.float32[1] = 0.0f;
+    clearValue.color.float32[2] = 0.0f;
+    clearValue.color.float32[3] = 0.0f;
+    //
+    clearValue.depthStencil.depth = 0.0f;
+    clearValue.depthStencil.stencil = 0;
+    VkRenderPassBeginInfo rpBeginInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        .pNext = nullptr,
+        .renderPass = frameHandle.renderPass,
+        .framebuffer = frameHandle.fbo,
+        .renderArea = VkRect2D
+        {
+            .offset = {0, 0},
+            .extent = frameHandle.extent
+        },
+        .clearValueCount = 1,
+        .pClearValues = &clearValue
+    };
+    vkCmdBeginRenderPass(frameHandle.commandBuffer, &rpBeginInfo,
+                         VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void VisorWindow::StartCommandBuffer(const FramePack& frameHandle)
+{
+    VkCommandBufferBeginInfo cbBeginInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .pNext = nullptr,
+        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+        .pInheritanceInfo = nullptr
+    };
+    vkBeginCommandBuffer(frameHandle.commandBuffer, &cbBeginInfo);
 }
 
 VisorWindow::VisorWindow(VisorWindow&& other)
@@ -690,8 +758,11 @@ VisorWindow::VisorWindow(VisorWindow&& other)
     , surfaceVk(std::exchange(other.surfaceVk, nullptr))
     , window(std::exchange(other.window, nullptr))
     , hdrRequested(other.hdrRequested)
-    , handlesVk(other.handlesVk)
     , visorState(other.visorState)
+    , transferQueue(other.transferQueue)
+    , mainDescPool(std::exchange(other.mainDescPool, nullptr))
+    , accumulateStage(std::move(other.accumulateStage))
+    , tonemapStage(std::move(other.tonemapStage))
 {
     glfwSetWindowUserPointer(window, this);
 }
@@ -701,19 +772,24 @@ VisorWindow& VisorWindow::operator=(VisorWindow&& other)
     assert(this != &other);
     framePool = std::move(other.framePool);
     swapchain = std::move(other.swapchain);
+    accumulateStage = std::move(other.accumulateStage);
+    tonemapStage = std::move(other.tonemapStage);
+    transferQueue = other.transferQueue;
 
     if(window)
     {
         ImGui_ImplGlfw_Shutdown();
+        vkDestroyDescriptorPool(handlesVk.deviceVk, mainDescPool,
+                                VulkanHostAllocator::Functions());
         vkDestroySurfaceKHR(handlesVk.instanceVk, surfaceVk,
                             VulkanHostAllocator::Functions());
         glfwDestroyWindow(window);
     }
+    mainDescPool = std::exchange(other.mainDescPool, nullptr);
     window = std::exchange(other.window, nullptr);
     surfaceVk = std::exchange(other.surfaceVk, nullptr);
     // Tehcnically we do not need to set this
     // by definition, vulkan handles should be the same
-    handlesVk = other.handlesVk;
     visorState = other.visorState;
 
     // Move window user pointer as well
@@ -727,6 +803,8 @@ VisorWindow::~VisorWindow()
     if(window)
     {
         ImGui_ImplGlfw_Shutdown();
+        vkDestroyDescriptorPool(handlesVk.deviceVk, mainDescPool,
+                                VulkanHostAllocator::Functions());
         vkDestroySurfaceKHR(handlesVk.instanceVk, surfaceVk,
                             VulkanHostAllocator::Functions());
         glfwDestroyWindow(window);
@@ -760,9 +838,8 @@ void VisorWindow::Render()
 {
     if(stopPresenting) return;
 
-
     //
-    Optional<MRayColorSpaceEnum> newColorSpace;
+    Optional<RenderBufferInfo>   newRenderBuffer;
     Optional<RenderImageSection> newImageSection;
     Optional<bool>               newClearSignal;
 
@@ -784,13 +861,13 @@ void VisorWindow::Render()
         switch(tp)
         {
             case CAMERA_INIT_TRANSFORM: visorState.transform = std::get<CAMERA_INIT_TRANSFORM>(response); break;
-            case SCENE_ANALYTICS:       visorState.scene     = std::get<SCENE_ANALYTICS>(response);       break;
-            case TRACER_ANALYTICS:      visorState.tracer    = std::get<TRACER_ANALYTICS>(response);      break;
-            case RENDERER_ANALYTICS:    visorState.renderer  = std::get<RENDERER_ANALYTICS>(response);    break;
+            case SCENE_ANALYTICS:       visorState.scene = std::get<SCENE_ANALYTICS>(response);       break;
+            case TRACER_ANALYTICS:      visorState.tracer = std::get<TRACER_ANALYTICS>(response);      break;
+            case RENDERER_ANALYTICS:    visorState.renderer = std::get<RENDERER_ANALYTICS>(response);    break;
             case RENDERER_OPTIONS:      break; // TODO: User may change the render options during runtime
-            case IMAGE_COLOR_SPACE:
+            case RENDER_BUFFER_INFO:
             {
-                newColorSpace = std::get<IMAGE_COLOR_SPACE>(response);
+                newRenderBuffer = std::get<RENDER_BUFFER_INFO>(response);
                 stopConsuming = true;
                 break;
             }
@@ -811,64 +888,54 @@ void VisorWindow::Render()
         if(stopConsuming) break;
     }
 
+    // ================== //
+    //    Command Start   //
+    // ================== //
+    // Wait availablility of the command buffer
+    FramePack frameHandle = NextFrame();
+    StartCommandBuffer(frameHandle);
 
     // Entire image reset + img format change (new alloc maybe)
-    if(newClearSignal)
+    if(newRenderBuffer)
     {
-        // Now halt everything,
+        accumulateStage.ResetBuffers(newRenderBuffer.value());
+        auto tonemapperGUI = tonemapStage.ChangeTonemapper(newRenderBuffer.value().renderColorSpace,
+                                                           swapchain.ColorSpace());
+        // A fatal error for visor, we can't tonemap image
+        if(tonemapperGUI) throw tonemapperGUI.error();
+
+        tonemapStage.ResizeImage(newRenderBuffer.value().resolution);
+        gui.ChangeDisplayImage(tonemapStage.GetImage());
+        gui.ChangeTonemapperGUI(tonemapperGUI.value());
     }
-    // Entire image reset, same format
-    // Accum image, tone map etc.
+    // Image clear so np
+    else if(newClearSignal)
+    {
+        accumulateStage.IssueClear(frameHandle.commandBuffer);
+    }
+    else if(newImageSection)
+    {
+        accumulateStage.IssueAccumulation(frameHandle.commandBuffer,
+                                          newImageSection.value());
+    }
 
-    //if(imageReset)
-
+    // Do tonemap
+    if(newClearSignal || newRenderBuffer)
+    {
+        tonemapStage.TonemapImage(frameHandle.commandBuffer,
+                                  accumulateStage.GetImage());
+    }
 
     // ================== //
     //     GUI RENDER     //
     // ================== //
-    gui.Render(CurrentFont(), nullptr, visorState);
-
-    // Wait availablility of the command buffer
-    FramePack frameHandles = NextFrame();
-    VkCommandBufferBeginInfo cbBeginInfo =
-    {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .pNext = nullptr,
-        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-        .pInheritanceInfo = nullptr
-    };
-    vkBeginCommandBuffer(frameHandles.commandBuffer, &cbBeginInfo);
-
-    //
-    VkClearValue clearValue = {};
-    clearValue.color.float32[0] = 1.0f;
-    clearValue.color.float32[1] = 0.0f;
-    clearValue.color.float32[2] = 0.0f;
-    clearValue.color.float32[3] = 0.0f;
-    //
-    clearValue.depthStencil.depth = 0.0f;
-    clearValue.depthStencil.stencil = 0;
-    VkRenderPassBeginInfo rpBeginInfo =
-    {
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .pNext = nullptr,
-        .renderPass = frameHandles.renderPass,
-        .framebuffer = frameHandles.fbo,
-        .renderArea = VkRect2D
-        {
-            .offset = {0, 0},
-            .extent = frameHandles.extent
-        },
-        .clearValueCount = 1,
-        .pClearValues = &clearValue
-    };
-    vkCmdBeginRenderPass(frameHandles.commandBuffer, &rpBeginInfo,
-                         VK_SUBPASS_CONTENTS_INLINE);
-
+    StartRenderpass(frameHandle);
+    gui.Render(CurrentFont(), visorState);
+    // Draw the GUI
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
-                                    frameHandles.commandBuffer);
-    vkCmdEndRenderPass(frameHandles.commandBuffer);
-    vkEndCommandBuffer(frameHandles.commandBuffer);
+                                    frameHandle.commandBuffer);
 
+    vkCmdEndRenderPass(frameHandle.commandBuffer);
+    vkEndCommandBuffer(frameHandle.commandBuffer);
     PresentFrame();
 }
