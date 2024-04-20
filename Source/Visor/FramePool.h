@@ -52,6 +52,7 @@ class FramePool
                     ~FramePool();
 
     MRayError       Initialize(const VulkanSystemView& handlesVk);
+    VkCommandBuffer AllocateCommandBuffer() const;
 
     FramePack       AcquireNextFrame(Swapchain& swapchain);
     void            PresentThisFrame(Swapchain& swapchain);

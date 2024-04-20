@@ -571,7 +571,12 @@ void Swapchain::FBOSizeChanged(Vector2ui newSize)
     fboSizeChanged = true;
 }
 
-VkColorSpaceKHR Swapchain::ColorSpace() const
+Pair<MRayColorSpaceEnum, Float> Swapchain::ColorSpace() const
+{
+    return VkConversions::VkToMRayColorSpace(colorSpace);
+}
+
+VkColorSpaceKHR Swapchain::ColorSpaceVk() const
 {
     return colorSpace;
 }
@@ -648,12 +653,14 @@ void VisorWindow::PathDropped(int count, const char** paths)
 
 MRayError VisorWindow::Initialize(TransferQueue::VisorView& transferQueueIn,
                                   const VulkanSystemView& handles,
+                                  BS::thread_pool* tp,
                                   const std::string& windowTitle,
                                   const VisorConfig& config)
 {
     transferQueue = &transferQueueIn;
     handlesVk = handles;
     hdrRequested = config.displayHDR;
+    threadPool = tp;
 
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -685,28 +692,6 @@ MRayError VisorWindow::Initialize(TransferQueue::VisorView& transferQueueIn,
 
     e = framePool.Initialize(handlesVk);
     if(e) return e;
-
-    // Finally Create a descriptor pool
-    // TODO: Check if large pool has performance penalty
-    static const StaticVector<VkDescriptorPoolSize, 4> imguiPoolSizes =
-    {
-        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 32 },
-        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 32 },
-        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 32 },
-        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 32 }
-    };
-    VkDescriptorPoolCreateInfo descPoolInfo =
-    {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
-        .maxSets = 1,
-        .poolSizeCount = static_cast<uint32_t>(imguiPoolSizes.size()),
-        .pPoolSizes = imguiPoolSizes.data()
-    };
-    vkCreateDescriptorPool(handlesVk.deviceVk, &descPoolInfo,
-                           VulkanHostAllocator::Functions(),
-                           &mainDescPool);
-
 
     glfwShowWindow(window);
     return MRayError::OK;
@@ -760,7 +745,6 @@ VisorWindow::VisorWindow(VisorWindow&& other)
     , hdrRequested(other.hdrRequested)
     , visorState(other.visorState)
     , transferQueue(other.transferQueue)
-    , mainDescPool(std::exchange(other.mainDescPool, nullptr))
     , accumulateStage(std::move(other.accumulateStage))
     , tonemapStage(std::move(other.tonemapStage))
 {
@@ -779,13 +763,10 @@ VisorWindow& VisorWindow::operator=(VisorWindow&& other)
     if(window)
     {
         ImGui_ImplGlfw_Shutdown();
-        vkDestroyDescriptorPool(handlesVk.deviceVk, mainDescPool,
-                                VulkanHostAllocator::Functions());
         vkDestroySurfaceKHR(handlesVk.instanceVk, surfaceVk,
                             VulkanHostAllocator::Functions());
         glfwDestroyWindow(window);
     }
-    mainDescPool = std::exchange(other.mainDescPool, nullptr);
     window = std::exchange(other.window, nullptr);
     surfaceVk = std::exchange(other.surfaceVk, nullptr);
     // Tehcnically we do not need to set this
@@ -803,8 +784,6 @@ VisorWindow::~VisorWindow()
     if(window)
     {
         ImGui_ImplGlfw_Shutdown();
-        vkDestroyDescriptorPool(handlesVk.deviceVk, mainDescPool,
-                                VulkanHostAllocator::Functions());
         vkDestroySurfaceKHR(handlesVk.instanceVk, surfaceVk,
                             VulkanHostAllocator::Functions());
         glfwDestroyWindow(window);
@@ -839,9 +818,11 @@ void VisorWindow::Render()
     if(stopPresenting) return;
 
     //
-    Optional<RenderBufferInfo>   newRenderBuffer;
-    Optional<RenderImageSection> newImageSection;
-    Optional<bool>               newClearSignal;
+    Optional<RenderBufferInfo>      newRenderBuffer;
+    Optional<RenderImageSection>    newImageSection;
+    Optional<bool>                  newClearSignal;
+    Optional<RenderImageSaveInfo>   newSaveInfo;
+    RenderImagePool::IsHDRImage     isHDRSave;
 
     TracerResponse response;
     while(transferQueue->TryDequeue(response))
@@ -883,9 +864,32 @@ void VisorWindow::Render()
                 stopConsuming = true;
                 break;
             }
+            case SAVE_AS_HDR:
+            {
+                newSaveInfo = std::get<SAVE_AS_HDR>(response);
+                isHDRSave = RenderImagePool::HDR;
+                stopConsuming = true;
+                break;
+            }
+            case SAVE_AS_SDR:
+            {
+                newSaveInfo = std::get<SAVE_AS_SDR>(response);
+                isHDRSave = RenderImagePool::SDR;
+                stopConsuming = true;
+                break;
+            }
             default: MRAY_WARNING_LOG("[Visor] Unkown tracer response is ignored!"); break;
         }
         if(stopConsuming) break;
+    }
+
+    //....
+    if(newSaveInfo)
+    {
+        //renderImagePool.SaveImage(, isHDRSave,
+        //                          filePath);
+
+        // Should we a need a pool
     }
 
     // ================== //
@@ -898,32 +902,78 @@ void VisorWindow::Render()
     // Entire image reset + img format change (new alloc maybe)
     if(newRenderBuffer)
     {
-        accumulateStage.ResetBuffers(newRenderBuffer.value());
+        // Flush the device, we will need to reallocate
+        vkDeviceWaitIdle(handlesVk.deviceVk);
+
+        const auto& newRB = newRenderBuffer.value();
+        RenderImageInitInfo renderImageInitParams =
+        {
+            newRB.resolution,
+            newRB.renderColorSpace,
+            swapchain.ColorSpace(),
+            newRB.depth,
+            (newRB.depth > 1)
+        };
+        renderImagePool = RenderImagePool(threadPool, handlesVk,
+                                          renderImageInitParams);
+
+        // Change the images, reset descriptor sets
+        accumulateStage.ChangeImage(&renderImagePool.GetHDRImage(),
+                                    &renderImagePool.GetSampleImage());
+        tonemapStage.ChangeImage(&renderImagePool.GetHDRImage(),
+                                 &renderImagePool.GetSDRImage());
+
+        // Change the tonemapper if it is new
         auto tonemapperGUI = tonemapStage.ChangeTonemapper(newRenderBuffer.value().renderColorSpace,
-                                                           swapchain.ColorSpace());
+                                                           swapchain.ColorSpaceVk());
         // A fatal error for visor, we can't tonemap image
         if(tonemapperGUI) throw tonemapperGUI.error();
 
-        tonemapStage.ResizeImage(newRenderBuffer.value().resolution);
-        gui.ChangeDisplayImage(tonemapStage.GetImage());
+        // Send GUI the new display image
+        gui.ChangeDisplayImage(renderImagePool.GetSDRImage());
         gui.ChangeTonemapperGUI(tonemapperGUI.value());
     }
     // Image clear so np
     else if(newClearSignal)
     {
-        accumulateStage.IssueClear(frameHandle.commandBuffer);
+        //VkClearColorValue value = {};
+        //value.float32[0] = 0.0f; value.float32[1] = 0.0f;
+        //value.float32[2] = 0.0f; value.float32[3] = 0.0f;
+        //pixelImage.IssueClear(cmd, value);
+        //sampleImage.IssueClear(cmd, value);
+
+        //accumulateStage.IssueClear(frameHandle.commandBuffer);
     }
     else if(newImageSection)
     {
-        accumulateStage.IssueAccumulation(frameHandle.commandBuffer,
-                                          newImageSection.value());
+        //accumulateStage.IssueAccumulation(frameHandle.commandBuffer,
+        //                                  newImageSection.value());
+        //accumulateStage.IssueAccumulation(..., newImageSection.value());
     }
 
     // Do tonemap
     if(newClearSignal || newRenderBuffer)
     {
-        tonemapStage.TonemapImage(frameHandle.commandBuffer,
-                                  accumulateStage.GetImage());
+        //tonemapStage.TonemapImage(frameHandle.commandBuffer,
+        //                          rendeImagePool.GetImage());
+    }
+
+    // Linearize the compute event with imGui img reads
+    // ImGui has its shaders in binary, but I'm pretty sure they read images
+    // from fragment shader.
+    if(newRenderBuffer || newClearSignal || newRenderBuffer)
+    {
+        VkMemoryBarrier barrier =
+        {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+            .pNext = nullptr,
+            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT
+        };
+        vkCmdPipelineBarrier(frameHandle.commandBuffer,
+                             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                             0, 1, &barrier, 0, nullptr, 0, nullptr);
     }
 
     // ================== //

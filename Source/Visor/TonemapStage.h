@@ -28,9 +28,9 @@ class TonemapStage
     using TonemapperMap = std::map<ShaderKey, std::unique_ptr<TonemapperI>>;
 
     private:
-    VulkanImage             sdrImage;
     VulkanBuffer            uniformBuffer;
-    VkDeviceMemory          deviceMemVk = nullptr;
+    const VulkanImage*      sdrImage = nullptr;
+    const VulkanImage*      hdrImage = nullptr;
     //
     TonemapperMap           tonemappers;
     TonemapperI*            currentTonemapper = nullptr;
@@ -46,9 +46,10 @@ class TonemapStage
                         ~TonemapStage();
     //
     MRayError                   Initialize(const std::string& execPath);
-    void                        ResizeImage(const Vector2i& imgExtent);
+    void                        ChangeImage(const VulkanImage* hdrImageIn,
+                                            const VulkanImage* sdrImageIn);
     Expected<GUITonemapperI*>   ChangeTonemapper(MRayColorSpaceEnum renderColorSpace,
                                                  VkColorSpaceKHR swapchainColorSpace);
-    void                        TonemapImage(VkCommandBuffer, const VulkanImage& img);
-    const VulkanImage&          GetImage();
+    // Actions
+    void                        IssueTonemap(VkCommandBuffer);
 };

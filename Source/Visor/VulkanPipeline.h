@@ -20,6 +20,14 @@ using DescriptorBindList = StaticVector<T, VISOR_MAX_SHADER_BINDINGS>;
 template <class T>
 using Descriptor2DList = DescriptorSetList<DescriptorBindList<T>>;
 
+struct ShaderBindingData
+{
+    using DescriptorInfo = Variant<VkDescriptorBufferInfo, VkDescriptorImageInfo>;
+    uint32_t            index;
+    VkDescriptorType    type;
+    DescriptorInfo      dataInfo;
+};
+
 struct ShaderBindingInfo
 {
     uint32_t bindingPoint;
@@ -31,7 +39,9 @@ struct ShaderBindingInfo
 // is done via other means.
 class VulkanComputePipeline
 {
+    public:
     using SetLayouts        = DescriptorSetList<VkDescriptorSetLayout>;
+    using DescriptorSets    = DescriptorSetList<VkDescriptorSet>;
 
     private:
     VkDevice            deviceVk        = nullptr;
@@ -56,9 +66,9 @@ class VulkanComputePipeline
                                        const std::string& shaderName,
                                        const std::string& executablePath,
                                        const std::string& entryPointName);
-    VkDescriptorSet         AcquireSet(VkDescriptorPool pool,
-                                       uint32_t setIndex);
-
+    DescriptorSets          GenerateDescriptorSets(VkDescriptorPool pool);
+    void                    BindSetData(VkDescriptorSet descriptorSet,
+                                        const DescriptorBindList<ShaderBindingData>& bindingDataList);
     void                    BindSet(VkCommandBuffer cmd,
                                     uint32_t setIndex,
                                     VkDescriptorSet set);
@@ -235,23 +245,60 @@ inline MRayError VulkanComputePipeline::Initialize(const Descriptor2DList<Shader
     // pipeline
     vkDestroyShaderModule(deviceVk, shaderModule,
                           VulkanHostAllocator::Functions());
+
+    return MRayError::OK;
 }
 
-inline VkDescriptorSet
-VulkanComputePipeline::AcquireSet(VkDescriptorPool pool,
-                                  uint32_t setIndex)
+inline typename VulkanComputePipeline::DescriptorSets
+VulkanComputePipeline::GenerateDescriptorSets(VkDescriptorPool pool)
 {
-    VkDescriptorSet set;
-    VkDescriptorSetAllocateInfo allocInfo =
+    DescriptorSets sets;
+    for(const auto& setLayout : setLayouts)
     {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .pNext = nullptr,
-        .descriptorPool = pool,
-        .descriptorSetCount = 1,
-        .pSetLayouts = &setLayouts[setIndex],
-    };
-    vkAllocateDescriptorSets(deviceVk, &allocInfo, &set);
-    return set;
+        VkDescriptorSet set;
+        VkDescriptorSetAllocateInfo allocInfo =
+        {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            .pNext = nullptr,
+            .descriptorPool = pool,
+            .descriptorSetCount = 1,
+            .pSetLayouts = &setLayout,
+        };
+        vkAllocateDescriptorSets(deviceVk, &allocInfo, &set);
+        sets.push_back(set);
+    }
+    return sets;
+}
+
+inline void VulkanComputePipeline::BindSetData(VkDescriptorSet descriptorSet,
+                                               const DescriptorBindList<ShaderBindingData>& bindingDataList)
+{
+    // TODO: This function does not refer to any members of "VulkanComputePipeline"
+    // change to free function.
+    DescriptorBindList<VkWriteDescriptorSet> writeSets;
+    for(const auto& bindingData : bindingDataList)
+    {
+        bool isBuffer = std::holds_alternative<VkDescriptorBufferInfo>(bindingData.dataInfo);
+        bool isImage = std::holds_alternative<VkDescriptorImageInfo>(bindingData.dataInfo);
+
+        VkWriteDescriptorSet writeInfo =
+        {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .pNext = nullptr,
+            .dstSet = descriptorSet,
+            .dstBinding = bindingData.index,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = bindingData.type,
+            .pImageInfo = isImage ? &std::get<VkDescriptorImageInfo>(bindingData.dataInfo) : nullptr,
+            .pBufferInfo = isBuffer ? &std::get<VkDescriptorBufferInfo>(bindingData.dataInfo) : nullptr,
+            .pTexelBufferView = nullptr
+        };
+        writeSets.push_back(writeInfo);
+    }
+
+    vkUpdateDescriptorSets(deviceVk, static_cast<uint32_t>(writeSets.size()),
+                            writeSets.data(), 0, nullptr);
 }
 
 inline void VulkanComputePipeline::BindSet(VkCommandBuffer cmd, uint32_t setIndex,
@@ -260,97 +307,4 @@ inline void VulkanComputePipeline::BindSet(VkCommandBuffer cmd, uint32_t setInde
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
                             pipelineLayout, setIndex, 1,
                             &set, 0, nullptr);
-}
-
-// ========================================================================//
-
-
-
-struct VulkanBufferSpan
-{
-    VkBuffer        buffer;
-    VkDeviceSize    offset;
-    VkDeviceSize    size;
-
-    explicit operator VkDescriptorBufferInfo() const;
-};
-
-inline VulkanBufferSpan::operator VkDescriptorBufferInfo() const
-{
-    return VkDescriptorBufferInfo
-    {
-        .buffer = buffer,
-        .offset = offset,
-        .range = size
-    };
-}
-
-struct BufferDescriptorData
-{
-    uint32_t            index;
-    VkDescriptorType    type;
-    VulkanBufferSpan    span;
-};
-
-struct ImageDescriptorData
-{
-    uint32_t            index;
-    VkDescriptorType    type;
-    VulkanBufferSpan    span;
-};
-
-class VulkanPipelineView
-{
-    DescriptorSetList<VkDescriptorSet>  descriptors;
-    VkDevice                            deviceVk;
-
-    public:
-    VulkanPipelineView(VkDescriptorPool,
-                       VulkanComputePipeline);
-
-    //
-    void ReferToBuffer(uint32_t setIndex,
-                       const DescriptorBindList<BufferDescriptorData>&);
-    void ReferToImage(uint32_t setIndex,
-                      const DescriptorBindList<ImageDescriptorData>&);
-};
-
-inline VulkanPipelineView::VulkanPipelineView(VkDescriptorPool pool,
-                                       VulkanComputePipeline pipeline)
-{
-
-}
-
-inline void VulkanPipelineView::ReferToBuffer(uint32_t setIndex,
-                                       const DescriptorBindList<BufferDescriptorData>& bindings)
-{
-    DescriptorBindList<VkWriteDescriptorSet> writeSets;
-
-    for(const auto& binding : bindings)
-    {
-        auto bufferInfo = static_cast<VkDescriptorBufferInfo>(binding.span);
-        VkWriteDescriptorSet writeInfo =
-        {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .pNext = nullptr,
-            .dstSet = descriptors[setIndex],
-            .dstBinding = binding.index,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = binding.type,
-            .pImageInfo = nullptr,
-            .pBufferInfo = &bufferInfo,
-            .pTexelBufferView = nullptr
-        };
-        writeSets.push_back(writeInfo);
-    }
-
-    vkUpdateDescriptorSets(deviceVk, static_cast<uint32_t>(writeSets.size()),
-                           writeSets.data(), 0, nullptr);
-}
-
-inline void VulkanPipelineView::ReferToImage(uint32_t setIndex,
-                                      const DescriptorBindList<ImageDescriptorData>&)
-{
-
 }

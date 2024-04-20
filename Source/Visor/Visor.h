@@ -73,11 +73,16 @@ class VisorVulkan : public VisorI
     CStringList<32>     deviceExtList;
     CStringList<16>     layerList;
 
-    VkInstance          instanceVk = nullptr;
-    VkDevice            deviceVk = nullptr;
-    VkPhysicalDevice    pDeviceVk = nullptr;
-    VkQueue             mainQueueVk = nullptr;
-    uint32_t            queueFamilyIndex = std::numeric_limits<uint32_t>::max();
+    VkInstance          instanceVk          = nullptr;
+    VkDevice            deviceVk            = nullptr;
+    VkPhysicalDevice    pDeviceVk           = nullptr;
+    VkQueue             mainQueueVk         = nullptr;
+    VkCommandPool       mainCommandPool     = nullptr;
+    VkDescriptorPool    mainDescPool        = nullptr;
+    uint32_t            queueFamilyIndex    = std::numeric_limits<uint32_t>::max();
+    uint32_t            deviceLocalMemIndex = std::numeric_limits<uint32_t>::max();
+    uint32_t            hostVisibleMemIndex = std::numeric_limits<uint32_t>::max();
+
 
     VisorDebugSystem    debugSystem;
     std::string         processPath;
@@ -89,6 +94,7 @@ class VisorVulkan : public VisorI
     bool                    EnableValidation(VkInstanceCreateInfo&);
     MRayError               QueryAndPickPhysicalDevice(const VisorConfig&);
     Expected<VisorWindow>   GenerateWindow(TransferQueue::VisorView&,
+                                           BS::thread_pool*,
                                            const VisorConfig&);
     MRayError               InitImGui();
 
@@ -102,6 +108,7 @@ class VisorVulkan : public VisorI
                         ~VisorVulkan() = default;
     //
     MRayError           MTInitialize(TransferQueue& transferQueue,
+                                     BS::thread_pool*,
                                      const VisorConfig&,
                                      const std::string& processPath) override;
     bool                MTIsTerminated() override;

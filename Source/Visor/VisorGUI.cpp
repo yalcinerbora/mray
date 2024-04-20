@@ -41,7 +41,7 @@ namespace ImGui
 }
 
 RunState DetermineTracerState(bool stopToggle,
-                              bool runToggle,
+                              bool,
                               bool pauseToggle)
 {
     if(stopToggle)
@@ -224,7 +224,7 @@ void VisorGUI::ShowFrameOverlay(bool& isOpen, const VisorState& visorState)
     ImGui::End();
 }
 
-void VisorGUI::ShowTopMenu(bool& isOpen, const VisorState& visorState)
+void VisorGUI::ShowTopMenu(const VisorState& visorState)
 {
     if(ImGui::BeginMainMenuBar())
     {
@@ -242,8 +242,7 @@ void VisorGUI::ShowTopMenu(bool& isOpen, const VisorState& visorState)
     }
 }
 
-Optional<RunState> VisorGUI::ShowStatusBar(bool& isOpen,
-                                           const VisorState& visorState)
+Optional<RunState> VisorGUI::ShowStatusBar(const VisorState& visorState)
 {
 
     return statusBar.Render(visorState);
@@ -285,11 +284,11 @@ void VisorGUI::Render(ImFont* windowScaledFont, const VisorState& visorState)
     if(ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_N))
         bottomBarOn = !bottomBarOn;
 
-    ImGuiWindowFlags window_flags = (ImGuiWindowFlags_NoScrollbar |
-                                     ImGuiWindowFlags_NoSavedSettings |
-                                     ImGuiWindowFlags_MenuBar);
-    if(topBarOn) ShowTopMenu(topBarOn, visorState);
-    if(bottomBarOn) ShowStatusBar(bottomBarOn, visorState);
+    //ImGuiWindowFlags window_flags = (ImGuiWindowFlags_NoScrollbar |
+    //                                 ImGuiWindowFlags_NoSavedSettings |
+    //                                 ImGuiWindowFlags_MenuBar);
+    if(topBarOn) ShowTopMenu(visorState);
+    if(bottomBarOn) ShowStatusBar(visorState);
 
     ShowMainImage();
 

@@ -5,8 +5,6 @@ PFN_vkGetMemoryHostPointerPropertiesEXT AccumImageStage::vkGetMemoryHostPointerP
 
 AccumImageStage::AccumImageStage(const VulkanSystemView& handles)
     : handlesVk(&handles)
-    , pixelImage(handles)
-    , sampleImage(handles)
     , uniformBuffer(handles)
 {
     if(vkGetMemoryHostPointerProperties == nullptr)
@@ -18,10 +16,7 @@ AccumImageStage::AccumImageStage(const VulkanSystemView& handles)
 }
 
 AccumImageStage::AccumImageStage(AccumImageStage&& other)
-    : pixelImage(std::move(other.pixelImage))
-    , sampleImage(std::move(other.sampleImage))
-    , uniformBuffer(std::move(other.uniformBuffer))
-    , imgAndBufferMemory(std::exchange(other.imgAndBufferMemory, nullptr))
+    : uniformBuffer(std::move(other.uniformBuffer))
     , foreignMemory(std::exchange(other.foreignMemory, nullptr))
     , foreignBuffer(std::exchange(other.foreignBuffer, nullptr))
     , readyForReadSignalVk(std::exchange(other.readyForReadSignalVk, nullptr))
@@ -34,10 +29,7 @@ AccumImageStage& AccumImageStage::operator=(AccumImageStage&& other)
 {
     assert(this != &other);
     Clear();
-    pixelImage = std::move(other.pixelImage);
-    sampleImage = std::move(other.sampleImage);
     uniformBuffer = std::move(other.uniformBuffer);
-    imgAndBufferMemory = std::exchange(other.imgAndBufferMemory, nullptr);
     foreignMemory = std::exchange(other.foreignMemory, nullptr);
     foreignBuffer = std::exchange(other.foreignBuffer, nullptr);
     readyForReadSignalVk = std::exchange(other.readyForReadSignalVk, nullptr);
@@ -68,9 +60,9 @@ MRayError AccumImageStage::Initialize(const std::string& execPath,
         }
     },
     "AccumInput.spv"s, execPath, "KCAccumulateInputs"s);
-
     if(e) return e;
 
+    descriptorSets = pipeline.GenerateDescriptorSets(pool);
 
     return MRayError::OK;
 }
@@ -78,12 +70,7 @@ MRayError AccumImageStage::Initialize(const std::string& execPath,
 void AccumImageStage::Clear()
 {
     if(!foreignBuffer) return;
-
-    pixelImage = VulkanImage(*handlesVk);
-    sampleImage = VulkanImage(*handlesVk);
     uniformBuffer = VulkanBuffer(*handlesVk);
-    vkFreeMemory(handlesVk->deviceVk, imgAndBufferMemory,
-                 VulkanHostAllocator::Functions());
     //
     vkDestroyBuffer(handlesVk->deviceVk, foreignBuffer,
                     VulkanHostAllocator::Functions());
@@ -144,27 +131,11 @@ void AccumImageStage::ImportMemory(const RenderBufferInfo& rbI)
     vkBindBufferMemory(handlesVk->deviceVk, foreignBuffer, foreignMemory, 0);
 }
 
-void AccumImageStage::ResetBuffers(const RenderBufferInfo& rbI)
+void AccumImageStage::ChangeImage(const VulkanImage* hdrImageIn,
+                                const VulkanImage* sdrImageIn)
+{}
+
+void AccumImageStage::IssueAccumulation(VkCommandBuffer cmd,
+                                        const RenderImageSection&)
 {
-    Clear();
-    ImportMemory(rbI);
-
-
-
-}
-
-void AccumImageStage::IssueAccumulation(VkCommandBuffer, const RenderImageSection& newSection)
-{
-
-}
-
-void AccumImageStage::IssueClear(VkCommandBuffer cmd)
-{
-    VkClearColorValue value = {};
-    value.float32[0] = 0.0f; value.float32[1] = 0.0f;
-    value.float32[2] = 0.0f; value.float32[3] = 0.0f;
-
-
-    pixelImage.IssueClear(cmd, value);
-    sampleImage.IssueClear(cmd, value);
 }

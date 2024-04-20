@@ -49,7 +49,7 @@ class ImageLoader final : public ImageLoaderI
         Expected<ImageHeader<2>>    ReadImageHeader2D(const std::string& filePath,
                                                       ImageIOFlags = ImageIOFlags()) const override;
 
-        MRayError                   WriteImage2D(const Image<2>&,
+        MRayError                   WriteImage2D(const WriteImage<2>&,
                                                  const std::string& filePath,
                                                  ImageType extension,
                                                  ImageIOFlags = ImageIOFlags()) const override;

@@ -37,6 +37,14 @@ class VulkanHostAllocator
 
 class VulkanDeviceAllocator
 {
+    public:
+    enum Location
+    {
+        HOST_VISIBLE,
+        DEVICE
+    };
+
+    private:
     template <size_t N>
     using SizeAlignmentList = std::array<Pair<VkDeviceSize, VkDeviceSize>, N>;
 
@@ -44,12 +52,13 @@ class VulkanDeviceAllocator
     using OffsetList = std::array<VkDeviceSize, N>;
 
     private:
-    VkDevice deviceVk   = nullptr;
-    uint32_t heapIndex  = 0;
+    VkDevice deviceVk               = nullptr;
+    uint32_t deviceMemIndex         = std::numeric_limits<uint32_t>::max();
+    uint32_t hostVisibleMemIndex    = std::numeric_limits<uint32_t>::max();
 
     // Constructors & Destructor
     VulkanDeviceAllocator() = default;
-    VulkanDeviceAllocator(VkDevice, uint32_t);
+    VulkanDeviceAllocator(VkDevice, uint32_t, uint32_t);
 
     template<size_t I = 0, class... Tp>
     requires (I == sizeof...(Tp))
@@ -73,44 +82,52 @@ class VulkanDeviceAllocator
 
     public:
     static VulkanDeviceAllocator& Instance(VkDevice deviceVk = nullptr,
-                                           uint32_t heapIndex = 0);
+                                           uint32_t deviceMemIndex = std::numeric_limits<uint32_t>::max(),
+                                           uint32_t hostVisibleMemIndex = std::numeric_limits<uint32_t>::max());
     // The alloaction
     template<VulkanMemObjectC... Args>
-    VkDeviceMemory AllocateMultiObject(Tuple<Args&...> inOutObjects);
+    [[nodiscard]]
+    VkDeviceMemory AllocateMultiObject(Tuple<Args&...> inOutObjects, Location location);
 };
 
 template<size_t I, class... Tp>
 requires (I == sizeof...(Tp))
-void VulkanDeviceAllocator::AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>&,
-                                                     const Tuple<Tp&...>&)
+inline void
+VulkanDeviceAllocator::AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>&,
+                                                const Tuple<Tp&...>&)
 {}
 
 template<std::size_t I, class... Tp>
 requires (I < sizeof...(Tp))
-void VulkanDeviceAllocator::AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>& sizeAlignmentList,
-                                                     const Tuple<Tp&...>& inOutObjects)
+inline void
+VulkanDeviceAllocator::AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>& sizeAlignmentList,
+                                                const Tuple<Tp&...>& inOutObjects)
 {
     sizeAlignmentList[I] = std::get<I>(inOutObjects).MemRequirements();
 }
 
 template<size_t I, class... Tp>
 requires (I == sizeof...(Tp))
-void VulkanDeviceAllocator::AttachMemory(Tuple<Tp&...>&,
-                                         VkDeviceMemory mem,
-                                         const OffsetList<sizeof...(Tp)>&)
+inline void
+VulkanDeviceAllocator::AttachMemory(Tuple<Tp&...>&,
+                                    VkDeviceMemory mem,
+                                    const OffsetList<sizeof...(Tp)>&)
 {}
 
 template<std::size_t I, class... Tp>
 requires (I < sizeof...(Tp))
-void VulkanDeviceAllocator::AttachMemory(Tuple<Tp&...>& inOutObjects,
-                                         VkDeviceMemory mem,
-                                         const OffsetList<sizeof...(Tp)>& offsets)
+inline void
+VulkanDeviceAllocator::AttachMemory(Tuple<Tp&...>& inOutObjects,
+                                    VkDeviceMemory mem,
+                                    const OffsetList<sizeof...(Tp)>& offsets)
 {
     std::get<I>(inOutObjects).AttachMemory(mem, offsets[I]);
 }
 
 template<VulkanMemObjectC... Args>
-VkDeviceMemory VulkanDeviceAllocator::AllocateMultiObject(Tuple<Args&...> inOutObjects)
+inline VkDeviceMemory
+VulkanDeviceAllocator::AllocateMultiObject(Tuple<Args&...> inOutObjects,
+                                           Location location)
 {
     static constexpr size_t N = sizeof...(Args);
     SizeAlignmentList<N> sizeAndAlignments;
@@ -131,14 +148,15 @@ VkDeviceMemory VulkanDeviceAllocator::AllocateMultiObject(Tuple<Args&...> inOutO
         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO,
         .pNext = nullptr,
         .allocationSize = totalSize,
-        .memoryTypeIndex = heapIndex
+        .memoryTypeIndex = (location == DEVICE) ? deviceMemIndex
+                                                : hostVisibleMemIndex
     };
     VkDeviceMemory result;
-    vkAllocateMemory(deviceVk, &allocInfo, VulkanHostAllocator::Functions(), &result);
+    vkAllocateMemory(deviceVk, &allocInfo,
+                     VulkanHostAllocator::Functions(),
+                     &result);
 
     // Attach the allocated memory to the objects
     AttachMemory(inOutObjects, result, offsets);
     return result;
 }
-
-

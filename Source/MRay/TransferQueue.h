@@ -109,6 +109,13 @@ struct RenderImageSection
     size_t      sampleStartOffset;
 };
 
+struct RenderImageSaveInfo
+{
+    std::string     prefix;
+    Float           time;
+    Float           sample;
+};
+
 struct TracerResponse : public std::variant
 <
     CameraTransform,        // initial cam transform
@@ -118,13 +125,16 @@ struct TracerResponse : public std::variant
     RendererOptionPack,     // renderer options;
     RenderBufferInfo,       // render output information
     bool,
-    RenderImageSection      // image section;
+    RenderImageSection,     // image section;
+    RenderImageSaveInfo,
+    RenderImageSaveInfo
 >
 {
     using Base = std::variant<CameraTransform, SceneAnalyticData,
                               TracerAnalyticData, RendererAnalyticData,
                               RendererOptionPack, RenderBufferInfo,
-                              bool, RenderImageSection>;
+                              bool, RenderImageSection, RenderImageSaveInfo,
+                              RenderImageSaveInfo>;
     enum Type
     {
         CAMERA_INIT_TRANSFORM = 0,  // Return a camera initial transform when
@@ -136,10 +146,12 @@ struct TracerResponse : public std::variant
 
         RENDER_BUFFER_INFO = 5,     // Output buffer information
         CLEAR_IMAGE_SECTION = 6,    // Clear the image section
-        IMAGE_SECTION = 7           // Respond with an image section, this
+        IMAGE_SECTION = 7,          // Respond with an image section, this
                                     // may or may not be the entire responsible
                                     // portion. Image sections may be streamed
                                     // continiously.
+        SAVE_AS_HDR = 8,            // Save the image to the disk
+        SAVE_AS_SDR = 9,            // HDR or SDR (Tonemapped)
     };
     using Base::Base;
 };

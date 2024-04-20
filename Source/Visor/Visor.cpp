@@ -14,6 +14,9 @@
 #include "VulkanCapabilityFinder.h"
 #include "FontAtlas.h"
 
+#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_to_string.hpp>
+
 #ifdef MRAY_WINDOWS
     #include <vulkan/vulkan_win32.h>
 #endif
@@ -307,6 +310,7 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
         VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
         VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
         VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME,
+        VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
         VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME
     };
     if constexpr(MRAY_IS_ON_WINDOWS)
@@ -475,48 +479,142 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     vkGetPhysicalDeviceMemoryProperties(selectedDevice.pDevice,
                                         &memProps);
 
-    size_t memSize = 0;
-    for(size_t i = 0; i < memProps.memoryHeapCount; i++)
+    // Show the memory of the device
+    Span<const VkMemoryHeap> memHeapSpan(memProps.memoryHeaps,
+                                         memProps.memoryHeapCount);
+    auto deviceHeap = std::find_if(memHeapSpan.cbegin(),
+                                   memHeapSpan.cend(),
+                                   [](const auto& heap)
     {
-        const VkMemoryHeap& heap = memProps.memoryHeaps[i];
-        if(heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
-        {
-            memSize = heap.size;
-            break;
-        }
-    }
+        return heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT;
+    });
+    assert(deviceHeap != memHeapSpan.cend());
 
+    // Determine the device local memory and host mapped memory
+    Span<const VkMemoryType> memTypeSpan(memProps.memoryTypes,
+                                         memProps.memoryTypeCount);
+    // TODO: Remove this when we are confident about memories
+    if constexpr(MRAY_IS_DEBUG)
+    {
+        for(size_t i = 0; i < memProps.memoryTypeCount; i++)
+        {
+            const VkMemoryType& memType = memProps.memoryTypes[i];
+            std::string s = vk::to_string(vk::MemoryPropertyFlags(memType.propertyFlags));
+            MRAY_DEBUG_LOG("Mem type: {}, HeapIndex: {}", s, memType.heapIndex);
+        }
+    };
+
+    // If device is iGPU, get the combo memory,
+    // This should be as fast as normal memory (speculation but, I mean come on)
+    if(selectedDevice.type == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
+    {
+        auto comboMemoryIt = std::find_if(memTypeSpan.cbegin(),
+                                          memTypeSpan.cend(),
+                                          [](const auto& memType)
+        {
+            return ((memType.propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) &&
+                    (memType.propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT));
+        });
+        deviceLocalMemIndex = static_cast<uint32_t>(std::distance(memTypeSpan.cbegin(),
+                                                                  comboMemoryIt));
+        hostVisibleMemIndex = deviceLocalMemIndex;
+    }
+    // For dGPU's, select two different memories, because it probably be a host pinned
+    // memory (In terms of CUDA) so images will not want to be reside there
+    else
+    {
+        auto deviceLocalIt = std::find_if(memTypeSpan.cbegin(),
+                                          memTypeSpan.cend(),
+                                          [](const auto& memType)
+        {
+            return memType.propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        });
+        // This is guaranteed
+        deviceLocalMemIndex = static_cast<uint32_t>(std::distance(memTypeSpan.cbegin(),
+                                                                  deviceLocalIt));
+        // Host visible mem
+        auto hostVisibleIt = std::find_if(memTypeSpan.cbegin(),
+                                          memTypeSpan.cend(),
+                                          [](const auto& memType)
+        {
+            return memType.propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+        });
+        hostVisibleMemIndex = static_cast<uint32_t>(std::distance(memTypeSpan.cbegin(),
+                                                                  hostVisibleIt));
+    }
+    // Report the GPU
     MRAY_LOG("----Visor-GPU----\n"
-                "Name      : {}\n"
-                "Max Tex2D : [{}, {}]\n"
-                "Memory    : {:.3f}GiB\n"
-                "-----------------\n",
-                selectedDeviceProps.deviceName,
-                selectedDeviceProps.limits.maxImageDimension2D,
-                selectedDeviceProps.limits.maxImageDimension2D,
-                (static_cast<double>(memSize) / 1024.0 / 1024.0 / 1024.0));
+             "Name      : {}\n"
+             "Max Tex2D : [{}, {}]\n"
+             "Memory    : {:.3f}GiB\n"
+             "-----------------\n",
+             selectedDeviceProps.deviceName,
+             selectedDeviceProps.limits.maxImageDimension2D,
+             selectedDeviceProps.limits.maxImageDimension2D,
+             static_cast<double>(deviceHeap->size) / (1024.0 * 1024.0 * 1024.0));
 
     // Get the queue
     vkGetDeviceQueue(deviceVk, queueFamilyIndex, 0,
                      &mainQueueVk);
 
+    // Gen Command Pool
+    VkCommandPoolCreateInfo cpCreateInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+        .queueFamilyIndex = queueFamilyIndex
+    };
+    vkCreateCommandPool(deviceVk, &cpCreateInfo,
+                        VulkanHostAllocator::Functions(),
+                        &mainCommandPool);
+
+    // Gen Descriptor Pool
+        // Finally Create a descriptor pool
+    // TODO: Check if large pool has performance penalty
+    static const StaticVector<VkDescriptorPoolSize, 4> imguiPoolSizes =
+    {
+        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 32 },
+        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 32 },
+        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 32 },
+        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 32 }
+    };
+    VkDescriptorPoolCreateInfo descPoolInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+        .maxSets = 1,
+        .poolSizeCount = static_cast<uint32_t>(imguiPoolSizes.size()),
+        .pPoolSizes = imguiPoolSizes.data()
+    };
+    vkCreateDescriptorPool(deviceVk, &descPoolInfo,
+                           VulkanHostAllocator::Functions(),
+                           &mainDescPool);
+
+    // Initialize the memory allocator
+    VulkanDeviceAllocator::Instance(deviceVk,
+                                    deviceLocalMemIndex,
+                                    hostVisibleMemIndex);
     return MRayError::OK;
 }
 
 Expected<VisorWindow> VisorVulkan::GenerateWindow(TransferQueue::VisorView& transferQueue,
+                                                  BS::thread_pool* tp,
                                                   const VisorConfig& vConfig)
 {
     VisorWindow w;
     VulkanSystemView handlesVk =
     {
-        .instanceVk     = instanceVk,
-        .pDeviceVk      = pDeviceVk,
-        .deviceVk       = deviceVk,
-        .queueIndex     = queueFamilyIndex,
-        .mainQueueVk    = mainQueueVk
+        .instanceVk         = instanceVk,
+        .pDeviceVk          = pDeviceVk,
+        .deviceVk           = deviceVk,
+        .queueIndex         = queueFamilyIndex,
+        .mainQueueVk        = mainQueueVk,
+        .mainCommandPool    = mainCommandPool,
+        .mainDescPool       = mainDescPool
     };
     MRayError e = w.Initialize(transferQueue, handlesVk,
-                               WindowTitle, vConfig);
+                               tp, WindowTitle, vConfig);
     if(e) return e;
     return w;
 }
@@ -543,13 +641,13 @@ MRayError VisorVulkan::InitImGui()
 
     ImGui::StyleColorsDark();
     auto& style = ImGui::GetStyle();
-    //style.Colors[ImGuiCol_Button] = ImVec4(0, 0, 0, 0.1f);
     style.Colors[ImGuiCol_Button] = style.Colors[ImGuiCol_MenuBarBg];
     style.Colors[ImGuiCol_Button].w = 0.1f;
     return MRayError::OK;
 }
 
 MRayError VisorVulkan::MTInitialize(TransferQueue& transferQueue,
+                                    BS::thread_pool* tp,
                                     const VisorConfig& visorConfig,
                                     const std::string& pPath)
 {
@@ -638,7 +736,7 @@ MRayError VisorVulkan::MTInitialize(TransferQueue& transferQueue,
 
     // Main window
     auto windowE = GenerateWindow(transferQueue.GetVisorView(),
-                                  visorConfig);
+                                  tp, visorConfig);
     if(windowE.has_error())
         return windowE.error();
     window = std::move(windowE.value());
@@ -679,6 +777,10 @@ void VisorVulkan::MTDestroy()
     FontAtlas::Instance().ClearFonts();
     ImGui::DestroyContext();
     // Destroy vulkan etc..
+    vkDestroyCommandPool(deviceVk, mainCommandPool,
+                         VulkanHostAllocator::Functions());
+    vkDestroyDescriptorPool(deviceVk, mainDescPool,
+                         VulkanHostAllocator::Functions());
     vkDestroyDevice(deviceVk, VulkanHostAllocator::Functions());
 
     if constexpr(MRAY_IS_DEBUG)

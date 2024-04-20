@@ -8,6 +8,7 @@
 #include <OpenImageIO/imageio.h>
 #include <OpenImageIO/imagebuf.h>
 #include <OpenImageIO/imagebufalgo.h>
+#include <OpenImageIO/deepdata.h>
 
 bool IsSignConvertible(MRayPixelTypeRT pf)
 {
@@ -409,11 +410,15 @@ Expected<ImageHeader<2>> ImageLoader::ReadImageHeader2D(const std::string& fileP
     return ReadImageHeaderInternal(inFile, filePath, flags);
 }
 
-MRayError ImageLoader::WriteImage2D(const Image<2>& imgIn,
+MRayError ImageLoader::WriteImage2D(const WriteImage<2>& imgIn,
                                     const std::string& filePath,
                                     ImageType extension,
                                     ImageIOFlags) const
 {
+    // TODO: Implement deep writing
+    if(imgIn.depth >= 1)
+        return MRayError("Deep image writing is currently not implemented");
+
     const auto& extE = ImageTypeToExtension(extension);
     if(!extE.has_value()) return extE.error();
 
@@ -421,16 +426,13 @@ MRayError ImageLoader::WriteImage2D(const Image<2>& imgIn,
     std::string fullPath = filePath + std::string(ext);
     auto out = OIIO::ImageOutput::create(fullPath);
 
-    if(imgIn.header.mipCount > 1)
-        MRAY_WARNING_LOG("Only writing mip0 to the image ({})", fullPath);
-
     Expected<OIIO::ImageSpec> specE = PixelFormatToOIIO(imgIn.header);
     if(!specE.has_value()) return specE.error();
-
     const OIIO::ImageSpec& spec = specE.value();
+
     OIIO::stride_t scanLineSize = static_cast<OIIO::stride_t>(spec.scanline_bytes());
 
-    const Byte* dataLastElement = imgIn.imgData[0].pixels.AccessAs<Byte>().data();
+    const Byte* dataLastElement = imgIn.pixels.data();
     dataLastElement += (imgIn.header.dimensions[1] - 1) * scanLineSize;
 
     // TODO: properly write an error check/out code for these.

@@ -1,13 +1,54 @@
 #include "VulkanTypes.h"
 #include "Core/Definitions.h"
 
+Pair<MRayColorSpaceEnum, Float>
+VkConversions::VkToMRayColorSpace(VkColorSpaceKHR cSpace)
+{
+    // TODO: These are wrong ...
+    // Gamma EOTF are not defined by a single float on most cases
+    // change this later...
+    using RType = Pair<MRayColorSpaceEnum, Float>;
+    switch(cSpace)
+    {
+        case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
+            return RType{MRayColorSpaceEnum::MR_REC_709, Float(2.2)};
+        case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
+            return RType{MRayColorSpaceEnum::MR_DCI_P3, Float(2.2)};
+        case VK_COLOR_SPACE_DISPLAY_P3_LINEAR_EXT:
+            return RType{MRayColorSpaceEnum::MR_DCI_P3, Float(1.0)};
+        case VK_COLOR_SPACE_DCI_P3_NONLINEAR_EXT:
+            return RType{MRayColorSpaceEnum::MR_DCI_P3, Float(2.2)};
+        case VK_COLOR_SPACE_BT709_LINEAR_EXT:
+            return RType{MRayColorSpaceEnum::MR_REC_709, Float(1.0)};
+        case VK_COLOR_SPACE_BT709_NONLINEAR_EXT:
+            return RType{MRayColorSpaceEnum::MR_REC_709, Float(2.2)};
+        case VK_COLOR_SPACE_BT2020_LINEAR_EXT:
+            return RType{MRayColorSpaceEnum::MR_REC_2020, Float(1.0)};
+        case VK_COLOR_SPACE_HDR10_ST2084_EXT:
+            return RType{MRayColorSpaceEnum::MR_REC_2020, Float(2.2)};
+        case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
+        case VK_COLOR_SPACE_DOLBYVISION_EXT:
+        case VK_COLOR_SPACE_HDR10_HLG_EXT:
+        case VK_COLOR_SPACE_ADOBERGB_LINEAR_EXT:
+        case VK_COLOR_SPACE_ADOBERGB_NONLINEAR_EXT:
+        case VK_COLOR_SPACE_PASS_THROUGH_EXT:
+        case VK_COLOR_SPACE_EXTENDED_SRGB_NONLINEAR_EXT:
+        case VK_COLOR_SPACE_DISPLAY_NATIVE_AMD:
+        default: throw MRayError("Unknown VkColorSpaceEnum! ({})",
+                                 static_cast<uint32_t>(cSpace));
+    }
+}
+
 VulkanImage::VulkanImage(const VulkanSystemView& handles)
     : handlesVk(&handles)
 {}
 
 VulkanImage::VulkanImage(const VulkanSystemView& handles,
-                         VkFormat format, Vector2i extent)
-    : handlesVk(&handles)
+                         VkFormat format, Vector2i extentIn,
+                         uint32_t depthIn)
+    : extent(extentIn)
+    , depth(depthIn)
+    , handlesVk(&handles)
 {
     VkImageCreateInfo imgCInfo =
     {
@@ -18,12 +59,12 @@ VulkanImage::VulkanImage(const VulkanSystemView& handles,
         .format = format,
         .extent =
         {
-            .width = static_cast<uint32_t>(extent[0]),
-            .height = static_cast<uint32_t>(extent[1]),
+            .width = extent[0],
+            .height = extent[1],
             .depth = 1
         },
         .mipLevels = 1,
-        .arrayLayers = 1,
+        .arrayLayers = depth,
         .samples = VK_SAMPLE_COUNT_1_BIT,
         .tiling = VK_IMAGE_TILING_OPTIMAL,
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
@@ -41,7 +82,9 @@ VulkanImage::VulkanImage(const VulkanSystemView& handles,
         .pNext = nullptr,
         .flags = 0,
         .image = imgVk,
-        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .viewType = (depth == 1)
+                        ? VK_IMAGE_VIEW_TYPE_2D
+                        : VK_IMAGE_VIEW_TYPE_2D_ARRAY,
         .format = format,
         .components =
         {
@@ -56,7 +99,7 @@ VulkanImage::VulkanImage(const VulkanSystemView& handles,
             .baseMipLevel = 0,
             .levelCount = 1,
             .baseArrayLayer = 0,
-            .layerCount = 1
+            .layerCount = depth
         }
     };
     vkCreateImageView(handlesVk->deviceVk, &imgViewCInfo,
@@ -117,8 +160,27 @@ void VulkanImage::AttachMemory(VkDeviceMemory memVk, VkDeviceSize offset)
 
 void VulkanImage::IssueClear(VkCommandBuffer cmd, VkClearColorValue color)
 {
-    vkCmdClearColorImage(cmd, imgVk,
-                         VK_IMAGE_LAYOUT_GENERAL, &color, 0, nullptr);
+    vkCmdClearColorImage(cmd, imgVk, VK_IMAGE_LAYOUT_GENERAL,
+                         &color, 0, nullptr);
+}
+
+VkBufferImageCopy VulkanImage::FullCopyParams() const
+{
+    return VkBufferImageCopy
+    {
+        .bufferOffset = 0,
+        .bufferRowLength = 0,
+        .bufferImageHeight = 0,
+        .imageSubresource = VkImageSubresourceLayers
+        {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .mipLevel = 0,
+            .baseArrayLayer = 0,
+            .layerCount = depth
+        },
+        .imageOffset = {0u, 0u, 0u},
+        .imageExtent = {extent[0], extent[1], 1}
+    };
 }
 
 VulkanBuffer::VulkanBuffer(const VulkanSystemView& handles)
@@ -126,10 +188,11 @@ VulkanBuffer::VulkanBuffer(const VulkanSystemView& handles)
 {}
 
 VulkanBuffer::VulkanBuffer(const VulkanSystemView& handles,
-                           VkBufferUsageFlags usageFlags)
+                           VkBufferUsageFlags usageFlags,
+                           size_t size)
     : handlesVk(&handles)
 {
-    size_t totalSize = 0;
+    size_t totalSize = size;
     VkBufferCreateInfo buffCInfo =
     {
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,

@@ -2,6 +2,7 @@
 
 #include <CLI/CLI.hpp>
 #include <string_view>
+#include <BS/BS_thread_pool.hpp>
 
 #include "Visor/EntryPoint.h"
 
@@ -125,10 +126,17 @@ MRayError VisorCommand::Invoke()
         visorSystem->TriggerEvent();
     });
 
+    // Thread pool, many things will need this
+    // TODO: Change this to HW concurrency,
+    // this is for debugging
+    BS::thread_pool threadPool(1);
+
     // Actual initialization, process path should be called from here
     // In dll it may return .dll's path (on windows, I think)
+
     std::string processPath = GetProcessPath();
     e = visorSystem->MTInitialize(transferQueue,
+                                  &threadPool,
                                   visorConfig,
                                   processPath);
     if(e) return e;
@@ -141,6 +149,8 @@ MRayError VisorCommand::Invoke()
     // Start the tracer thread
     //tracerThread.Start();
 
+
+
     // ====================== //
     //     Real-time Loop     //
     // ====================== //
@@ -151,6 +161,7 @@ MRayError VisorCommand::Invoke()
     }
 
     // GG!
+    threadPool.wait();
     visorSystem->MTDestroy();
     //tracerThread.Stop();
     return MRayError::OK;

@@ -17,13 +17,12 @@ class AccumImageStage
         float       globalSampleWeight;
     };
 
+    using DescriptorSets = typename VulkanComputePipeline::DescriptorSets;
+
     private:
     static PFN_vkGetMemoryHostPointerPropertiesEXT vkGetMemoryHostPointerProperties;
     // Device memory backed stuff
-    VulkanImage     pixelImage;
-    VulkanImage     sampleImage;
     VulkanBuffer    uniformBuffer;
-    VkDeviceMemory  imgAndBufferMemory      = nullptr;
     // Host memory backed stuff
     VkDeviceMemory  foreignMemory           = nullptr;
     VkBuffer        foreignBuffer           = nullptr;
@@ -33,6 +32,7 @@ class AccumImageStage
     const VulkanSystemView* handlesVk       = nullptr;
     //
     VulkanComputePipeline pipeline;
+    DescriptorSets        descriptorSets;
 
     void    Clear();
     void    ImportMemory(const RenderBufferInfo&);
@@ -48,13 +48,7 @@ class AccumImageStage
 
     //
     MRayError           Initialize(const std::string& execPath, VkDescriptorPool pool);
-    void                ResetBuffers(const RenderBufferInfo&);
+    void                ChangeImage(const VulkanImage* hdrImageIn,
+                                    const VulkanImage* sdrImageIn);
     void                IssueAccumulation(VkCommandBuffer, const RenderImageSection&);
-    void                IssueClear(VkCommandBuffer);
-    const VulkanImage&  GetImage();
 };
-
-inline const VulkanImage& AccumImageStage::GetImage()
-{
-    return pixelImage;
-}

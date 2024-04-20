@@ -56,8 +56,8 @@ class VisorGUI
     Vector2i        imgSize         = Vector2i::Zero();
     //
     void                ShowFrameOverlay(bool&, const VisorState&);
-    void                ShowTopMenu(bool&, const VisorState&);
-    Optional<RunState>  ShowStatusBar(bool&, const VisorState&);
+    void                ShowTopMenu(const VisorState&);
+    Optional<RunState>  ShowStatusBar(const VisorState&);
     void                ShowMainImage();
 
     public:

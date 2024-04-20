@@ -64,18 +64,21 @@ const VkAllocationCallbacks* VulkanHostAllocator::Functions()
     return &result;
 }
 
-VulkanDeviceAllocator::VulkanDeviceAllocator(VkDevice d, uint32_t hI)
+VulkanDeviceAllocator::VulkanDeviceAllocator(VkDevice d, uint32_t dI, uint32_t hI)
     : deviceVk(d)
-    , heapIndex(hI)
+    , deviceMemIndex(dI)
+    , hostVisibleMemIndex(hI)
 {}
 
 VulkanDeviceAllocator& VulkanDeviceAllocator::Instance(VkDevice deviceVk,
-                                                       uint32_t heapIndex)
+                                                       uint32_t deviceMemIndex,
+                                                       uint32_t hostVisibleMemIndex)
 {
     static VulkanDeviceAllocator allocator;
     if(deviceVk != nullptr)
     {
-        allocator = VulkanDeviceAllocator(deviceVk, heapIndex);
+        allocator = VulkanDeviceAllocator(deviceVk, deviceMemIndex,
+                                          hostVisibleMemIndex);
     }
     return allocator;
 }

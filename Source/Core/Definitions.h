@@ -232,6 +232,7 @@ enum class MRayColorSpaceEnum : uint32_t
     MR_REC_709,
     MR_REC_2020,
     MR_DCI_P3,
+    MR_RAW,
     MR_DEFAULT, // Use it "as is" disregard everything about color spaces
 
     MR_END

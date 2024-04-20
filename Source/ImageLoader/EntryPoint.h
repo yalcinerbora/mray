@@ -23,9 +23,9 @@ namespace ImageLoaderDetail
 }
 
 // C++ Interface
-inline
-std::unique_ptr<ImageLoaderI, decltype(&ImageLoaderDetail::DestroyImageLoader)>
-CreateImageLoader()
+using ImageLoaderIPtr = std::unique_ptr<ImageLoaderI, decltype(&ImageLoaderDetail::DestroyImageLoader)>;
+
+inline ImageLoaderIPtr CreateImageLoader()
 {
     using Ptr = std::unique_ptr<ImageLoaderI, decltype(&ImageLoaderDetail::DestroyImageLoader)>;
     return Ptr(ImageLoaderDetail::ConstructImageLoader(),

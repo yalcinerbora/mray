@@ -5,6 +5,7 @@
 using namespace std::string_literals;
 
 class TransferQueue;
+namespace BS { class thread_pool; }
 
 struct VisorConfig
 {
@@ -28,6 +29,7 @@ class VisorI
     virtual             ~VisorI() = default;
     //
     virtual MRayError   MTInitialize(TransferQueue& transferQueue,
+                                     BS::thread_pool*,
                                      const VisorConfig&,
                                      const std::string& processPath) = 0;
     virtual bool        MTIsTerminated() = 0;

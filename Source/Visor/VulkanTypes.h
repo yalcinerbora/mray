@@ -8,13 +8,22 @@
 
 #include "VulkanAllocators.h"
 
+namespace VkConversions
+{
+    Pair<MRayColorSpaceEnum, Float>
+    VkToMRayColorSpace(VkColorSpaceKHR);
+}
+
+
 struct VulkanSystemView
 {
-    VkInstance          instanceVk      = nullptr;
-    VkPhysicalDevice    pDeviceVk       = nullptr;
-    VkDevice            deviceVk        = nullptr;
-    uint32_t            queueIndex      = std::numeric_limits<uint32_t>::max();
-    VkQueue             mainQueueVk     = nullptr;
+    VkInstance          instanceVk          = nullptr;
+    VkPhysicalDevice    pDeviceVk           = nullptr;
+    VkDevice            deviceVk            = nullptr;
+    uint32_t            queueIndex          = std::numeric_limits<uint32_t>::max();
+    VkQueue             mainQueueVk         = nullptr;
+    VkCommandPool       mainCommandPool     = nullptr;
+    VkDescriptorPool    mainDescPool        = nullptr;
 };
 
 class VulkanImage
@@ -23,13 +32,16 @@ class VulkanImage
     VkImage         imgVk       = nullptr;
     VkImageView     viewVk      = nullptr;
     VkSampler       samplerVk   = nullptr;
+    Vector2ui       extent      = Vector2ui::Zero();
+    uint32_t        depth       = 0;
     const VulkanSystemView* handlesVk = nullptr;
 
     public:
     // Constructors & Destructor
                     VulkanImage(const VulkanSystemView&);
                     VulkanImage(const VulkanSystemView&,
-                                VkFormat format, Vector2i pixRes);
+                                VkFormat format,
+                                Vector2i pixRes, uint32_t depth = 1);
                     VulkanImage(const VulkanImage&) = delete;
                     VulkanImage(VulkanImage&&);
     VulkanImage&    operator=(const VulkanImage&) = delete;
@@ -38,12 +50,14 @@ class VulkanImage
     //
     SizeAlignPair   MemRequirements() const;
     void            AttachMemory(VkDeviceMemory, VkDeviceSize);
-
     void            IssueClear(VkCommandBuffer, VkClearColorValue);
 
     VkImage         Image() const;
     VkImageView     View() const;
     VkSampler       Sampler() const;
+
+    //
+    VkBufferImageCopy FullCopyParams() const;
 };
 
 class VulkanBuffer
@@ -51,11 +65,13 @@ class VulkanBuffer
     private:
     VkBuffer                bufferVk    = nullptr;
     const VulkanSystemView* handlesVk   = nullptr;
+
     public:
     // Constructors & Destructor
                     VulkanBuffer(const VulkanSystemView&);
                     VulkanBuffer(const VulkanSystemView&,
-                                 VkBufferUsageFlags usageFlags);
+                                 VkBufferUsageFlags usageFlags,
+                                 size_t size);
                     VulkanBuffer(const VulkanBuffer&) = delete;
                     VulkanBuffer(VulkanBuffer&&);
     VulkanBuffer&   operator=(const VulkanBuffer&) = delete;
@@ -65,8 +81,11 @@ class VulkanBuffer
     SizeAlignPair   MemRequirements() const;
     void            AttachMemory(VkDeviceMemory, VkDeviceSize);
     VkBuffer        Buffer() const;
-};
 
+    //void            CopyData(Span<const Byte> hRange,
+    //                         VkDeviceSize offset);
+
+};
 
 inline VkImage VulkanImage::Image() const
 {

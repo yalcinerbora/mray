@@ -13,10 +13,13 @@
 
 #include "AccumImageStage.h"
 #include "TonemapStage.h"
+#include "RenderImagePool.h"
 
 struct ImFont;
 struct GLFWwindow;
 struct VisorConfig;
+
+namespace BS { class thread_pool; }
 
 class Swapchain
 {
@@ -73,14 +76,18 @@ class Swapchain
                                    VkSurfaceKHR surface,
                                    bool tryHDR);
 
-    FramebufferPack     NextFrame(VkSemaphore imgAvailSignal);
-    void                PresentFrame(VkSemaphore waitSignal);
-    void                FBOSizeChanged(Vector2ui newSize);
-    VkColorSpaceKHR     ColorSpace() const;
+    FramebufferPack                 NextFrame(VkSemaphore imgAvailSignal);
+    void                            PresentFrame(VkSemaphore waitSignal);
+    void                            FBOSizeChanged(Vector2ui newSize);
+    Pair<MRayColorSpaceEnum, Float> ColorSpace() const;
+    VkColorSpaceKHR                 ColorSpaceVk() const;
 };
 
 class VisorWindow
 {
+    private:
+    static VulkanSystemView handlesVk;
+
     private:
     Swapchain           swapchain       = {};
     FramePool           framePool       = {};
@@ -88,16 +95,16 @@ class VisorWindow
     GLFWwindow*         window          = nullptr;
     bool                hdrRequested    = false;
     bool                stopPresenting  = false;
-
-    static VulkanSystemView handlesVk;
+    BS::thread_pool*    threadPool      = nullptr;
     //
     VisorGUI                    gui;
     VisorState                  visorState      = {};
     TransferQueue::VisorView*   transferQueue   = nullptr;
-    VkDescriptorPool            mainDescPool    = nullptr;
     // Rendering Stages
     AccumImageStage accumulateStage = AccumImageStage(handlesVk);
     TonemapStage    tonemapStage    = TonemapStage(handlesVk);
+    RenderImagePool renderImagePool = RenderImagePool(threadPool,
+                                                      handlesVk);
 
     private:
     friend class VisorVulkan;
@@ -118,6 +125,7 @@ class VisorWindow
     // Thus, only visor can initialize windows
     MRayError   Initialize(TransferQueue::VisorView& transferQueue,
                            const VulkanSystemView& handlesVk,
+                           BS::thread_pool* threadPool,
                            const std::string& windowTitle,
                            const VisorConfig& config);
 
@@ -133,6 +141,7 @@ class VisorWindow
     VisorWindow&    operator=(VisorWindow&&);
                     ~VisorWindow();
 
+    //
     bool            ShouldClose();
     FramePack       NextFrame();
     void            PresentFrame();
@@ -140,70 +149,3 @@ class VisorWindow
     void            Render();
 
 };
-
-
-
-//class AccumulateImageStage
-//{
-//    VulkanSystemView handlesVk;
-//    VkDeviceMemory a;
-//    VkImage img;
-//    VkImage mg;
-//    VkDescriptorSet s;
-//    VkSemaphore saaaa;
-//
-//    VkPipeline computePipeline;
-//
-//
-//    AccumulateImageStage(uint32_t frameCount)
-//    {
-//        VkShaderModule shader;
-//        VkPipelineLayout pipelineLayout;
-//
-//        VkPipelineLayoutCreateInfo pInfo =
-//        {
-//            .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-//            .pNext = nullptr
-//        };
-//        vkCreatePipelineLayout(handlesVk.deviceVk, &pInfo,
-//                               VulkanHostAllocator::Functions(),
-//                               &pipelineLayout);
-//
-//        VkComputePipelineCreateInfo cInfo =
-//        {
-//            .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-//            .pNext = nullptr,
-//            .flags = 0,
-//            .stage =
-//            {
-//                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-//                .pNext = nullptr,
-//                .flags = 0,
-//                .stage = VK_SHADER_STAGE_COMPUTE_BIT,
-//                .module = shader,
-//                .pName = "AccumImage"
-//            },
-//            .layout = pipelineLayout,
-//            .basePipelineHandle = nullptr,
-//            .basePipelineIndex = 0
-//        };
-//
-//        vkCreateComputePipelines(handlesVk.deviceVk, nullptr,
-//                                 1, &cInfo,
-//                                 VulkanHostAllocator::Functions(),
-//                                 &computePipeline);
-//
-//        //vkCmdDispatch()
-//
-//
-//    }
-//
-//    void Record(uint32_t f, RenderImageSection s)
-//    {
-//
-//
-//
-//
-//    }
-//
-//};

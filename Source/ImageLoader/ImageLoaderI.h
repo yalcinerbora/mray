@@ -98,6 +98,15 @@ struct Image
     MipMapArray     imgData;
 };
 
+template<uint32_t D>
+requires(D == 2 || D == 3)
+struct WriteImage
+{
+    ImageHeader<D>      header;
+    uint32_t            depth;
+    Span<const Byte>    pixels;
+};
+
 class ImageLoaderI
 {
     public:
@@ -124,7 +133,7 @@ class ImageLoaderI
         virtual Expected<ImageHeader<2>>    ReadImageHeader2D(const std::string& filePath,
                                                               ImageIOFlags = ImageIOFlags()) const = 0;
         // Write Functions
-        virtual MRayError           WriteImage2D(const Image<2>&,
+        virtual MRayError           WriteImage2D(const WriteImage<2>&,
                                                  const std::string& filePath,
                                                  ImageType extension,
                                                  ImageIOFlags = ImageIOFlags()) const = 0;

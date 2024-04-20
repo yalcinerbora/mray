@@ -13,6 +13,10 @@ set(SRC_VISOR
     ${CURRENT_SOURCE_DIR}/VisorState.h
     ${CURRENT_SOURCE_DIR}/VisorWindow.cpp
     ${CURRENT_SOURCE_DIR}/VisorWindow.h
+    ${CURRENT_SOURCE_DIR}/RenderImagePool.cpp
+    ${CURRENT_SOURCE_DIR}/RenderImagePool.h
+    ${CURRENT_SOURCE_DIR}/TonemapStage.cpp
+    ${CURRENT_SOURCE_DIR}/TonemapStage.h
     ${CURRENT_SOURCE_DIR}/AccumImageStage.cpp
     ${CURRENT_SOURCE_DIR}/AccumImageStage.h
     ${CURRENT_SOURCE_DIR}/FontAtlas.h
@@ -58,6 +62,7 @@ add_library(Visor SHARED ${SRC_ALL})
 target_link_libraries(Visor PRIVATE
                       CoreLib
                       TransientPool
+                      ImageLoader
                       glfw3::glfw3
                       imgui::imgui
                       vulkan::vulkan

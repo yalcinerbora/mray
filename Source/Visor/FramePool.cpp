@@ -6,10 +6,8 @@
 
 void FramePool::Clear()
 {
-    if(!commandPool) return;
+    if(!deviceVk) return;
 
-    vkDestroyCommandPool(deviceVk, commandPool,
-                         VulkanHostAllocator::Functions());
     for(size_t i = 0; i < FRAME_COUNT; i++)
     {
         vkDestroyFence(deviceVk, fences[i],
@@ -39,7 +37,7 @@ FramePool& FramePool::operator=(FramePool&& other)
 {
     Clear();
 
-    commandPool = std::exchange(other.commandPool, nullptr);
+    commandPool = other.commandPool;
     deviceVk = other.deviceVk;
     mainQueueVk = other.mainQueueVk;
     frameIndex = other.frameIndex;
@@ -62,19 +60,7 @@ MRayError FramePool::Initialize(const VulkanSystemView& handlesVk)
 {
     deviceVk = handlesVk.deviceVk;
     mainQueueVk = handlesVk.mainQueueVk;
-
-    // Command buffers
-    VkCommandPoolCreateInfo cpCreateInfo =
-    {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-        .pNext = nullptr,
-        .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = handlesVk.queueIndex
-    };
-    vkCreateCommandPool(deviceVk, &cpCreateInfo,
-                        VulkanHostAllocator::Functions(),
-                        &commandPool);
-
+    commandPool = handlesVk.mainCommandPool;
 
     // Allocate all in one pass
     VkCommandBufferAllocateInfo cbuffAllocInfo =
@@ -87,7 +73,6 @@ MRayError FramePool::Initialize(const VulkanSystemView& handlesVk)
     };
     vkAllocateCommandBuffers(handlesVk.deviceVk,
                              &cbuffAllocInfo, cBuffers.data());
-
 
     // Semaphores and fences
     VkSemaphoreCreateInfo semCreateInfo =
@@ -157,4 +142,19 @@ void FramePool::PresentThisFrame(Swapchain& swapchain)
     vkQueueSubmit(mainQueueVk, 1, &submitInfo, fences[frameIndex]);
     swapchain.PresentFrame(comRecordSem);
     frameIndex = (frameIndex + 1) % FRAME_COUNT;
+}
+
+VkCommandBuffer FramePool::AllocateCommandBuffer() const
+{
+    VkCommandBuffer buffer;
+    VkCommandBufferAllocateInfo cbuffAllocInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .pNext = nullptr,
+        .commandPool = commandPool,
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        .commandBufferCount = 1
+    };
+    vkAllocateCommandBuffers(deviceVk, &cbuffAllocInfo, &buffer);
+    return buffer;
 }
