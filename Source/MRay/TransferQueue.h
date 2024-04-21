@@ -79,11 +79,6 @@ struct RenderBufferInfo
     // Buffer range
     Byte*                   data;
     size_t                  totalSize;
-    // These semaphores will be used to synchronize
-    // Tracer will signal this semaphore
-    SystemSemaphoreHandle   readyForReadSignal;
-    // Visor will signal this semaphore
-    SystemSemaphoreHandle   readFinishedSignal;
     // Data types of the render buffer
     // actual underlying data type is always float
     MRayColorSpaceEnum      renderColorSpace;
@@ -98,11 +93,12 @@ struct RenderImageSection
 {
     // Logical layout of the data
     // Incoming data is between these pixel ranges
-    Vector2i    pixelMin;
-    Vector2i    pixelMax;
+    Vector2ui   pixelMin;
+    Vector2ui   pixelMax;
     // In addition to the per pixel accumulation
-    Float       globalWeight;
-
+    float       globalWeight;
+    //
+    uint64_t    waitCounter;
     // Pixel data starts over this offset (this should be almost always zero)
     size_t      pixelStartOffset;
     // SampleCount start offset over the buffer
@@ -112,8 +108,9 @@ struct RenderImageSection
 struct RenderImageSaveInfo
 {
     std::string     prefix;
-    Float           time;
-    Float           sample;
+    Float           time;   // In seconds
+    Float           sample; // Mostly integer,
+                            // but can be fractional
 };
 
 struct TracerResponse : public std::variant
@@ -158,18 +155,20 @@ struct TracerResponse : public std::variant
 
 struct VisorAction : public std::variant
 <
-    CameraTransform,    // transform
-    uint32_t,           // camera index
-    uint32_t,           // renderer index
-    std::string,        // scene name
-    float,              // scene time
-    bool,               // start/stop render
-    bool                // pause render
+    CameraTransform,        // transform
+    uint32_t,               // camera index
+    uint32_t,               // renderer index
+    std::string,            // scene name
+    float,                  // scene time
+    bool,                   // start/stop render
+    bool,                   // pause render
+    SystemSemaphoreHandle   // Synchronization semaphore
 >
 {
     using Base = std::variant<CameraTransform, uint32_t,
                               uint32_t, std::string,
-                              float, bool, bool>;
+                              float, bool, bool,
+                              SystemSemaphoreHandle>;
     enum Type
     {
         CHANGE_CAM_TRANSFORM = 0,   // Give new transform to the tracer
@@ -185,9 +184,9 @@ struct VisorAction : public std::variant
         CHANGE_TIME = 4,            // Change the time of the scene. Min max values are in
                                     // "SceneAnalytics" strcut
         START_STOP_RENDER = 6,      // Start stop the rendering.
-        PAUSE_RENDER = 7            // Pause the rendering
+        PAUSE_RENDER = 7,           // Pause the rendering
+        SEND_SYNC_SEMAPHORE = 8     // Send synchronization semaphore
     };
-
     using Base::Base;
 };
 

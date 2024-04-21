@@ -40,7 +40,7 @@ void KCAccumulateInputs(uint3 globalId: SV_DispatchThreadID,
 
     // Reads
     int pixLinear = pixIn[1] * pixCount.x + pixIn[0];
-    float3 colorIn = params.inPixels[pixLinear];
+    float3 colorIn = params.inPixels[pixLinear].xyz;
     float sampleIn = params.inSamples[pixLinear];
     //
     float3 colorOut = params.outPixels.Load(pixOut);
@@ -56,3 +56,15 @@ void KCAccumulateInputs(uint3 globalId: SV_DispatchThreadID,
     params.outPixels[pixOut] = newColor;
     params.outSamples[pixOut] = totalSample;
 }
+
+//StructuredBuffer<float> buffer0;
+//StructuredBuffer<float> buffer1;
+//RWStructuredBuffer<float> result;
+
+//[shader("compute")]
+//[numthreads(1, 1, 1)]
+//void KCAccumulateInputs(uint3 threadId: SV_DispatchThreadID)
+//{
+//    uint index = threadId.x;
+//    result[index] = buffer0[index] + buffer1[index];
+//}

@@ -3,6 +3,8 @@
 #include "VulkanTypes.h"
 #include "ImageLoader/EntryPoint.h"
 
+#include "MRay/TransferQueue.h"
+
 class FramePool;
 namespace BS { class thread_pool; }
 
@@ -57,7 +59,7 @@ class RenderImagePool
 
     //
     void                SaveImage(VkSemaphore prevCmdSignal, IsHDRImage,
-                                  const std::string& filePath);
+                                  const RenderImageSaveInfo& fileOutInfo);
     const VulkanImage&  GetHDRImage() const;
     const VulkanImage&  GetSampleImage() const;
     const VulkanImage&  GetSDRImage() const;

@@ -55,6 +55,7 @@ class VulkanImage
     VkImage         Image() const;
     VkImageView     View() const;
     VkSampler       Sampler() const;
+    Vector2ui       Extent() const;
 
     //
     VkBufferImageCopy FullCopyParams() const;
@@ -102,10 +103,16 @@ inline VkSampler VulkanImage::Sampler() const
     return samplerVk;
 }
 
+inline Vector2ui VulkanImage::Extent() const
+{
+    return extent;
+}
+
 inline VkBuffer VulkanBuffer::Buffer() const
 {
     return bufferVk;
 }
+
 
 static_assert(VulkanMemObjectC<VulkanImage>);
 static_assert(VulkanMemObjectC<VulkanBuffer>);

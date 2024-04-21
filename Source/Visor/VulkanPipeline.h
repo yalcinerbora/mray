@@ -43,6 +43,10 @@ class VulkanComputePipeline
     using SetLayouts        = DescriptorSetList<VkDescriptorSetLayout>;
     using DescriptorSets    = DescriptorSetList<VkDescriptorSet>;
 
+    static constexpr uint32_t TPB_1D_X = 256;
+    static constexpr uint32_t TPB_2D_X = 16;
+    static constexpr uint32_t TPB_2D_Y = 16;
+
     private:
     VkDevice            deviceVk        = nullptr;
     VkPipeline          computePipeline = nullptr;
@@ -83,8 +87,9 @@ VulkanComputePipeline::DevourFile(const std::string& shaderName,
     std::streamoff size = std::ifstream(fullPath,
                                         std::ifstream::ate |
                                         std::ifstream::binary).tellg();
-    std::vector<Byte> source(size + 1, Byte(0));
-    std::ifstream shaderFile = std::ifstream(fullPath);
+    assert(size == MathFunctions::NextMultiple(size, std::streamoff(4)));
+    std::vector<Byte> source(size, Byte(0));
+    std::ifstream shaderFile = std::ifstream(fullPath, std::ios::binary);
 
     if(!shaderFile.is_open())
         return MRayError("Unable to open shader file \"{}\"",
@@ -177,9 +182,10 @@ inline MRayError VulkanComputePipeline::Initialize(const Descriptor2DList<Shader
                 .binding = bindingInfo.bindingPoint,
                 .descriptorType = bindingInfo.type,
                 .descriptorCount = bindingInfo.elementCount,
-                .stageFlags = 0,
+                .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
                 .pImmutableSamplers = nullptr
             };
+            bindings.back().push_back(bInfo);
         }
     }
     for(const auto& bindingSet : bindings)

@@ -252,14 +252,14 @@ template<class T, size_t N>
 constexpr T& StaticVector<T, N>::back()
 {
     assert(count != 0);
-    return ItemAt(count - 1);
+    return *ItemAt(count - 1);
 }
 
 template<class T, size_t N>
 constexpr const T& StaticVector<T, N>::back() const
 {
     assert(count != 0);
-    return ItemAt(count - 1);
+    return *ItemAt(count - 1);
 }
 
 template<class T, size_t N>

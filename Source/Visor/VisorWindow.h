@@ -21,6 +21,38 @@ struct VisorConfig;
 
 namespace BS { class thread_pool; }
 
+struct FrameCounter
+{
+    public:
+    static constexpr size_t AVG_FRAME_COUNT = 4;
+    static constexpr float FRAME_COUNT_RECIP = 1.0f / static_cast<float>(AVG_FRAME_COUNT);
+    using FrameList = std::array<float, AVG_FRAME_COUNT>;
+    using QueryData = std::array<uint64_t, 4>;
+
+    private:
+    QueryData   queryData;
+    FrameList   frameCountList;
+    bool        firstFrame      = true;
+    uint32_t    fillIndex       = 0;
+    VkQueryPool queryPool       = nullptr;
+    VkDevice    deviceVk        = nullptr;
+    float       timestampPeriod = 0;
+
+    public:
+                    FrameCounter() = default;
+                    FrameCounter(VkDevice device, VkPhysicalDevice pDevice);
+                    FrameCounter(const FrameCounter&) = delete;
+                    FrameCounter(FrameCounter&&);
+    FrameCounter&   operator=(const FrameCounter&) = delete;
+    FrameCounter&   operator=(FrameCounter&&);
+                    ~FrameCounter();
+
+    void        StartRecord(VkCommandBuffer cmd);
+    void        EndRecord(VkCommandBuffer cmd);
+    float       AvgFrame();
+
+};
+
 class Swapchain
 {
     static const std::array<VkColorSpaceKHR, 4> FormatListHDR;
@@ -99,12 +131,14 @@ class VisorWindow
     //
     VisorGUI                    gui;
     VisorState                  visorState      = {};
+    FrameCounter                frameCounter;
     TransferQueue::VisorView*   transferQueue   = nullptr;
     // Rendering Stages
     AccumImageStage accumulateStage = AccumImageStage(handlesVk);
     TonemapStage    tonemapStage    = TonemapStage(handlesVk);
     RenderImagePool renderImagePool = RenderImagePool(threadPool,
                                                       handlesVk);
+    MainUniformBuffer uniformBuffer = MainUniformBuffer(handlesVk);
 
     private:
     friend class VisorVulkan;
@@ -127,7 +161,8 @@ class VisorWindow
                            const VulkanSystemView& handlesVk,
                            BS::thread_pool* threadPool,
                            const std::string& windowTitle,
-                           const VisorConfig& config);
+                           const VisorConfig& config,
+                           const std::string& processPath);
 
     void        StartRenderpass(const FramePack& frameHandle);
     void        StartCommandBuffer(const FramePack& frameHandle);

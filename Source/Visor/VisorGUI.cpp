@@ -179,7 +179,8 @@ Optional<RunState> MainStatusBar::Render(const VisorState& visorState)
     return (isChanged) ? Optional<RunState>(newRunState) : std::nullopt;
 }
 
-void VisorGUI::ShowFrameOverlay(bool& isOpen, const VisorState& visorState)
+void VisorGUI::ShowFrameOverlay(bool& isOpen,
+                                const VisorState& visorState)
 {
     static int location = 1;
     ImGuiWindowFlags window_flags = (ImGuiWindowFlags_NoDecoration |
@@ -207,8 +208,8 @@ void VisorGUI::ShowFrameOverlay(bool& isOpen, const VisorState& visorState)
 
     if(ImGui::Begin("##VisorOverlay", &isOpen, window_flags))
     {
-        ImGui::Text("Frame  : %.2f", visorState.visor.frameTime);
-        ImGui::Text("Memory : %.2f", visorState.visor.usedGPUMemoryMiB);
+        ImGui::Text("Frame  : %.2f ms", visorState.visor.frameTime);
+        ImGui::Text("Memory : %.2f MiB", visorState.visor.usedGPUMemoryMiB);
 
 
         if(ImGui::BeginPopupContextWindow())
@@ -229,11 +230,12 @@ void VisorGUI::ShowTopMenu(const VisorState& visorState)
     if(ImGui::BeginMainMenuBar())
     {
         if(tonemapperGUI) tonemapperGUI->Render();
-
+        ImGui::Separator();
         static constexpr const char* VISOR_INFO_NAME = "VisorInfo";
-        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x -
-                        ImGui::CalcTextSize(VISOR_INFO_NAME).x -
-                        ImGui::GetStyle().ItemSpacing.x * 3);
+        float offsetX = (ImGui::GetWindowContentRegionMax().x -
+                         ImGui::CalcTextSize(VISOR_INFO_NAME).x -
+                         ImGui::GetStyle().ItemSpacing.x * 3);
+        ImGui::SameLine(offsetX);
         ImGui::Separator();
         ImGui::ToggleButton(VISOR_INFO_NAME, fpsInfoOn);
         if(fpsInfoOn) ShowFrameOverlay(fpsInfoOn, visorState);
@@ -284,9 +286,6 @@ void VisorGUI::Render(ImFont* windowScaledFont, const VisorState& visorState)
     if(ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_N))
         bottomBarOn = !bottomBarOn;
 
-    //ImGuiWindowFlags window_flags = (ImGuiWindowFlags_NoScrollbar |
-    //                                 ImGuiWindowFlags_NoSavedSettings |
-    //                                 ImGuiWindowFlags_MenuBar);
     if(topBarOn) ShowTopMenu(visorState);
     if(bottomBarOn) ShowStatusBar(visorState);
 

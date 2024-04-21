@@ -4,6 +4,7 @@
 #include <Imgui/imgui_impl_glfw.h>
 #include <Imgui/imgui_impl_vulkan.h>
 #include <cassert>
+#include <numeric>
 
 #include "Core/Error.h"
 #include "Core/MemAlloc.h"
@@ -128,6 +129,113 @@ const std::array<VkPresentModeKHR, 3> Swapchain::PresentModes =
     VK_PRESENT_MODE_FIFO_RELAXED_KHR,
     VK_PRESENT_MODE_FIFO_KHR
 };
+
+FrameCounter::FrameCounter(VkDevice device, VkPhysicalDevice pDevice)
+    : deviceVk(device)
+{
+    VkQueryPoolCreateInfo createInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
+        .pNext = 0,
+        .flags = 0,
+        .queryType = VK_QUERY_TYPE_TIMESTAMP,
+        .queryCount = 2,
+        .pipelineStatistics = 0
+    };
+    vkCreateQueryPool(deviceVk, &createInfo,
+                      VulkanHostAllocator::Functions(), &queryPool);
+
+    VkPhysicalDeviceProperties props;
+    vkGetPhysicalDeviceProperties(pDevice, &props);
+    timestampPeriod = props.limits.timestampPeriod;
+}
+
+FrameCounter::FrameCounter(FrameCounter&& other)
+    : queryData(std::exchange(other.queryData, {}))
+    , frameCountList(std::exchange(other.frameCountList, {}))
+    , firstFrame(other.firstFrame)
+    , fillIndex(other.fillIndex)
+    , queryPool(std::exchange(other.queryPool, nullptr))
+    , deviceVk(other.deviceVk)
+    , timestampPeriod(other.timestampPeriod)
+{}
+
+FrameCounter& FrameCounter::operator=(FrameCounter&& other)
+{
+    assert(this != &other);
+
+    if(deviceVk)
+    {
+        vkDestroyQueryPool(deviceVk, queryPool,
+                           VulkanHostAllocator::Functions());
+    }
+
+    queryData = std::exchange(other.queryData, {});
+    frameCountList = std::exchange(other.frameCountList, {});
+    firstFrame = other.firstFrame;
+    fillIndex = other.fillIndex;
+    queryPool = std::exchange(other.queryPool, nullptr);
+    deviceVk = other.deviceVk;
+    timestampPeriod = other.timestampPeriod;
+
+    return *this;
+}
+
+FrameCounter::~FrameCounter()
+{
+    if(!deviceVk) return;
+    vkDestroyQueryPool(deviceVk, queryPool,
+                       VulkanHostAllocator::Functions());
+}
+
+void FrameCounter::StartRecord(VkCommandBuffer cmd)
+{
+    vkCmdResetQueryPool(cmd, queryPool, 0, 2);
+    if(queryData[1] == 0) return;
+
+    vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                        queryPool, 0);
+}
+
+void FrameCounter::EndRecord(VkCommandBuffer cmd)
+{
+    if(queryData[3] == 0) return;
+    vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                        queryPool, 1);
+}
+
+float FrameCounter::AvgFrame()
+{
+    vkGetQueryPoolResults(deviceVk, queryPool,
+                          0, 2, 4 * sizeof(uint64_t),
+                          queryData.data(), 2 * sizeof(uint64_t),
+                          VK_QUERY_RESULT_64_BIT |
+                          VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
+
+    if(queryData[3] != 0 && queryData[1] != 0)
+    {
+        double frameTimeMs = static_cast<double>(queryData[2] - queryData[0]);
+        frameTimeMs *= (timestampPeriod / 1000000.0);
+        float frameTimeMsF = static_cast<float>(frameTimeMs);
+
+        if(firstFrame)
+        {
+            firstFrame = false;
+            std::fill(frameCountList.begin(), frameCountList.end(),
+                      static_cast<float>(frameTimeMs));
+        }
+        else
+        {
+            frameCountList[fillIndex] = frameTimeMsF;
+            fillIndex = (fillIndex + 1) % AVG_FRAME_COUNT;
+        }
+    }
+    float result = std::reduce(frameCountList.begin(),
+                               frameCountList.end(),
+                               0.0f);
+    result *= FRAME_COUNT_RECIP;
+    return result;
+}
 
 MRayError Swapchain::FixSwapchain(bool isFirstFix)
 {
@@ -655,7 +763,8 @@ MRayError VisorWindow::Initialize(TransferQueue::VisorView& transferQueueIn,
                                   const VulkanSystemView& handles,
                                   BS::thread_pool* tp,
                                   const std::string& windowTitle,
-                                  const VisorConfig& config)
+                                  const VisorConfig& config,
+                                  const std::string& processPath)
 {
     transferQueue = &transferQueueIn;
     handlesVk = handles;
@@ -691,6 +800,19 @@ MRayError VisorWindow::Initialize(TransferQueue::VisorView& transferQueueIn,
     if(e) return e;
 
     e = framePool.Initialize(handlesVk);
+    if(e) return e;
+
+    frameCounter = FrameCounter(handlesVk.deviceVk, handlesVk.pDeviceVk);
+
+    // TODO: we go down to the rabbit hole of
+    // move assignment etc, change the entire vulkan object system
+    // this impl. is patch after patch
+    accumulateStage = AccumImageStage(handlesVk);
+    e = accumulateStage.Initialize(processPath);
+    if(e) return e;
+
+    tonemapStage = TonemapStage(handlesVk);
+    e = tonemapStage.Initialize(processPath);
     if(e) return e;
 
     glfwShowWindow(window);
@@ -744,9 +866,11 @@ VisorWindow::VisorWindow(VisorWindow&& other)
     , window(std::exchange(other.window, nullptr))
     , hdrRequested(other.hdrRequested)
     , visorState(other.visorState)
+    , frameCounter(std::move(other.frameCounter))
     , transferQueue(other.transferQueue)
     , accumulateStage(std::move(other.accumulateStage))
     , tonemapStage(std::move(other.tonemapStage))
+    , uniformBuffer(std::move(other.uniformBuffer))
 {
     glfwSetWindowUserPointer(window, this);
 }
@@ -758,6 +882,8 @@ VisorWindow& VisorWindow::operator=(VisorWindow&& other)
     swapchain = std::move(other.swapchain);
     accumulateStage = std::move(other.accumulateStage);
     tonemapStage = std::move(other.tonemapStage);
+    frameCounter = std::move(other.frameCounter);
+    uniformBuffer = std::move(other.uniformBuffer);
     transferQueue = other.transferQueue;
 
     if(window)
@@ -822,7 +948,7 @@ void VisorWindow::Render()
     Optional<RenderImageSection>    newImageSection;
     Optional<bool>                  newClearSignal;
     Optional<RenderImageSaveInfo>   newSaveInfo;
-    RenderImagePool::IsHDRImage     isHDRSave;
+    RenderImagePool::IsHDRImage     isHDRSave = RenderImagePool::SDR;
 
     TracerResponse response;
     while(transferQueue->TryDequeue(response))
@@ -883,11 +1009,12 @@ void VisorWindow::Render()
         if(stopConsuming) break;
     }
 
-    //....
+    //
+    Pair<VkSemaphore, uint64_t> saveSemaphore = {nullptr, 0};
     if(newSaveInfo)
     {
-        //renderImagePool.SaveImage(, isHDRSave,
-        //                          filePath);
+        renderImagePool.SaveImage(framePool.PrevFrameFinishSignal(),
+                                  isHDRSave, newSaveInfo.value());
 
         // Should we a need a pool
     }
@@ -898,6 +1025,7 @@ void VisorWindow::Render()
     // Wait availablility of the command buffer
     FramePack frameHandle = NextFrame();
     StartCommandBuffer(frameHandle);
+    frameCounter.StartRecord(frameHandle.commandBuffer);
 
     // Entire image reset + img format change (new alloc maybe)
     if(newRenderBuffer)
@@ -984,8 +1112,10 @@ void VisorWindow::Render()
     // Draw the GUI
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
                                     frameHandle.commandBuffer);
-
     vkCmdEndRenderPass(frameHandle.commandBuffer);
+
+    frameCounter.EndRecord(frameHandle.commandBuffer);
+    visorState.visor.frameTime = frameCounter.AvgFrame();
     vkEndCommandBuffer(frameHandle.commandBuffer);
     PresentFrame();
 }

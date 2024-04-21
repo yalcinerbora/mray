@@ -158,3 +158,9 @@ VkCommandBuffer FramePool::AllocateCommandBuffer() const
     vkAllocateCommandBuffers(deviceVk, &cbuffAllocInfo, &buffer);
     return buffer;
 }
+
+VkSemaphore FramePool::PrevFrameFinishSignal()
+{
+    uint32_t prevFrame = std::max(frameIndex - 1, FRAME_COUNT - 1);
+    return semaphores[prevFrame].imageAvailableSignal;
+}

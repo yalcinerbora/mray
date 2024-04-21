@@ -164,7 +164,7 @@ RenderImagePool::~RenderImagePool()
 }
 
 void RenderImagePool::SaveImage(VkSemaphore prevCmdSignal,
-                                IsHDRImage t, const std::string& filePath)
+                                IsHDRImage t, const RenderImageSaveInfo& fileOutInfo)
 {
     std::array<uint64_t, 2> copyStartedCounter = {semCounter, 0};
     uint64_t copyFinishedCounter = semCounter + 1;
@@ -193,7 +193,7 @@ void RenderImagePool::SaveImage(VkSemaphore prevCmdSignal,
     };
     vkQueueSubmit(handlesVk->mainQueueVk, 1, &submitInfo, nullptr);
 
-    threadPool->detach_task([this, copyFinishedCounter, filePath, t]()
+    threadPool->detach_task([this, copyFinishedCounter, fileOutInfo, t]()
     {
         VkSemaphoreWaitInfo waitInfo =
         {
@@ -237,6 +237,12 @@ void RenderImagePool::SaveImage(VkSemaphore prevCmdSignal,
             .depth = initInfo.depth,
             .pixels = Span<const Byte>(hStagePtr, imgTightSize)
         };
+
+        using namespace std::string_literals;
+        std::string filePath = (fileOutInfo.prefix + "_"s +
+                                std::to_string(fileOutInfo.sample) + "spp"s +
+                                std::to_string(fileOutInfo.time) + "sec"s);
+
         MRayError e = imgLoader->WriteImage2D(imgInfo, filePath,
                                               imgFileType);
 

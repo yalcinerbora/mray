@@ -25,12 +25,16 @@ struct FrameSemaphorePair
 struct FramePack : public FramebufferPack
 {
     VkCommandBuffer commandBuffer = nullptr;
+    float           prevFrameTime = 0.0f;
 };
 
 class FramePool
 {
-    static constexpr size_t FRAME_COUNT = 2;
+    public:
+    static constexpr uint32_t FRAME_COUNT = 1;
+    static_assert(FRAME_COUNT == 1, "Current single frame in flight is used");
 
+    private:
     template<class T>
     using FrameArray = std::array<T, FRAME_COUNT>;
 
@@ -56,4 +60,5 @@ class FramePool
 
     FramePack       AcquireNextFrame(Swapchain& swapchain);
     void            PresentThisFrame(Swapchain& swapchain);
+    VkSemaphore     PrevFrameFinishSignal();
 };

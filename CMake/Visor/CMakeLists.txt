@@ -15,6 +15,8 @@ set(SRC_VISOR
     ${CURRENT_SOURCE_DIR}/VisorWindow.h
     ${CURRENT_SOURCE_DIR}/RenderImagePool.cpp
     ${CURRENT_SOURCE_DIR}/RenderImagePool.h
+    ${CURRENT_SOURCE_DIR}/MainUniformBuffer.cpp
+    ${CURRENT_SOURCE_DIR}/MainUniformBuffer.h
     ${CURRENT_SOURCE_DIR}/TonemapStage.cpp
     ${CURRENT_SOURCE_DIR}/TonemapStage.h
     ${CURRENT_SOURCE_DIR}/AccumImageStage.cpp

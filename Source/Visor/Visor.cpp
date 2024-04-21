@@ -443,12 +443,24 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     };
 
     //  Re-acquire device features here
-    VkPhysicalDeviceFeatures deviceFeatures;
-    vkGetPhysicalDeviceFeatures(selectedDevice.pDevice, &deviceFeatures);
+    VkPhysicalDeviceTimelineSemaphoreFeatures semFeatures =
+    {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
+        .pNext = nullptr,
+        .timelineSemaphore = 0
+    };
+    VkPhysicalDeviceFeatures2 deviceFeatures2 =
+    {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .pNext = &semFeatures,
+        .features = {}
+    };
+    vkGetPhysicalDeviceFeatures2(selectedDevice.pDevice, &deviceFeatures2);
+
     VkDeviceCreateInfo deviceCI =
     {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pNext = nullptr,
+        .pNext = &deviceFeatures2,
         .flags = 0,
         .queueCreateInfoCount = 1,
         .pQueueCreateInfos = &queueCI,
@@ -458,13 +470,13 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
         .ppEnabledExtensionNames = deviceExtList.data(),
         // Get all the features?
         // TODO: Does this has a drawback?
-        .pEnabledFeatures = &deviceFeatures
+        .pEnabledFeatures = nullptr
     };
 
     // Actual device creation
     if(vkCreateDevice(selectedDevice.pDevice, &deviceCI,
-                        VulkanHostAllocator::Functions(),
-                        &deviceVk))
+                      VulkanHostAllocator::Functions(),
+                      &deviceVk))
         return MRayError("Unable to create logical device on \"{}\"!",
                          selectedDeviceProps.deviceName);
 
@@ -614,7 +626,8 @@ Expected<VisorWindow> VisorVulkan::GenerateWindow(TransferQueue::VisorView& tran
         .mainDescPool       = mainDescPool
     };
     MRayError e = w.Initialize(transferQueue, handlesVk,
-                               tp, WindowTitle, vConfig);
+                               tp, WindowTitle, vConfig,
+                               processPath);
     if(e) return e;
     return w;
 }
