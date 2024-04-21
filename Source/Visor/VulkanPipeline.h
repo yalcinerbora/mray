@@ -102,7 +102,7 @@ VulkanComputePipeline::DevourFile(const std::string& shaderName,
 
 inline void VulkanComputePipeline::Clear()
 {
-    if(!deviceVk) return;
+    if(!computePipeline) return;
 
     for(auto& setLayout : setLayouts)
     {

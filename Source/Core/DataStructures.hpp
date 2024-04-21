@@ -179,6 +179,7 @@ requires std::is_move_constructible_v<T>
         // TODO: This is %99 wrong, check it
         ConstructObjectAt(i, std::move(other[i]));
     }
+    other.count = 0;
 }
 
 template<class T, size_t N>

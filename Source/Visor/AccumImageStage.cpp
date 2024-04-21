@@ -133,12 +133,15 @@ MRayError AccumImageStage::Initialize(const std::string& execPath)
 
 void AccumImageStage::Clear()
 {
-    if(!foreignBuffer) return;
+    if(foreignBuffer)
+    {
 
-    vkFreeMemory(handlesVk->deviceVk, foreignMemory,
-                 VulkanHostAllocator::Functions());
-    vkDestroyBuffer(handlesVk->deviceVk, foreignBuffer,
-                    VulkanHostAllocator::Functions());
+        vkFreeMemory(handlesVk->deviceVk, foreignMemory,
+                     VulkanHostAllocator::Functions());
+        vkDestroyBuffer(handlesVk->deviceVk, foreignBuffer,
+                        VulkanHostAllocator::Functions());
+    }
+    if(!timelineSemaphoreVk) return;
 
     #ifdef MRAY_WINDOWS
     {
