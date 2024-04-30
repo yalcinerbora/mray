@@ -311,7 +311,8 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
         VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
         VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME,
         VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
-        VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME
+        VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME,
+        VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME
     };
     if constexpr(MRAY_IS_ON_WINDOWS)
     {
@@ -443,10 +444,16 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     };
 
     //  Re-acquire device features here
+    VkPhysicalDeviceHostQueryResetFeatures resetFeatures =
+    {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES,
+        .pNext = nullptr,
+        .hostQueryReset = 0
+    };
     VkPhysicalDeviceTimelineSemaphoreFeatures semFeatures =
     {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
-        .pNext = nullptr,
+        .pNext = &resetFeatures,
         .timelineSemaphore = 0
     };
     VkPhysicalDeviceFeatures2 deviceFeatures2 =
@@ -673,6 +680,8 @@ MRayError VisorVulkan::MTInitialize(TransferQueue& transferQueue,
     // TBH, did not check what portability one is but
     // its here
     instanceExtList.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    instanceExtList.push_back(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
+
 
     int err = glfwInit();
     if(err != GLFW_TRUE)

@@ -76,6 +76,7 @@ class RendererWork
     LocalState          perWorkLocalState;
     GlobalState         renererGlobalState;
 
+    MRAY_HYBRID
     void operator()(KernelCallParams kcParams) const
     {
         // Compile-time find the transform generator function and return type

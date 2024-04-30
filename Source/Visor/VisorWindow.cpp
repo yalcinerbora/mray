@@ -144,6 +144,7 @@ FrameCounter::FrameCounter(VkDevice device, VkPhysicalDevice pDevice)
     };
     vkCreateQueryPool(deviceVk, &createInfo,
                       VulkanHostAllocator::Functions(), &queryPool);
+    vkResetQueryPool(deviceVk, queryPool, 0, 2);
 
     VkPhysicalDeviceProperties props;
     vkGetPhysicalDeviceProperties(pDevice, &props);

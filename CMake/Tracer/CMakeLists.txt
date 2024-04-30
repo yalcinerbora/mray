@@ -51,7 +51,10 @@ set(SRC_RANDOM
     ${CURRENT_SOURCE_DIR}/Distributions.cu)
 
 set(SRC_RENDERERS
-    ${CURRENT_SOURCE_DIR}/RendererC.h)
+    ${CURRENT_SOURCE_DIR}/RendererC.h
+    ${CURRENT_SOURCE_DIR}/ImageRenderer.h
+    ${CURRENT_SOURCE_DIR}/ImageRenderer.hpp
+    ${CURRENT_SOURCE_DIR}/ImageRenderer.cu)
 
 set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/RayPartitioner.h
@@ -91,9 +94,9 @@ source_group("Renderers" FILES ${SRC_RENDERERS})
 source_group("Utility" FILES ${SRC_UTILITY})
 source_group("" FILES ${SRC_COMMON})
 
-add_library(TracerCUDA SHARED ${SRC_ALL})
+add_library(TracerLib STATIC ${SRC_ALL})
 
-target_link_libraries(TracerCUDA
+target_link_libraries(TracerLib
                       PRIVATE
                       DeviceLib
                       CoreLib
@@ -101,27 +104,7 @@ target_link_libraries(TracerCUDA
                       mray::meta_compile_opts
                       mray::cuda_extra_compile_opts)
 
-set_target_properties(TracerCUDA PROPERTIES
+set_target_properties(TracerLib PROPERTIES
                       POSITION_INDEPENDENT_CODE ON
                       CUDA_SEPARABLE_COMPILATION ON
                       CUDA_RESOLVE_DEVICE_SYMBOLS ON)
-
-# Object Files for compilation
-add_library(TracerCUDA_Objects STATIC $<TARGET_OBJECTS:TracerCUDA>)
-
-target_link_libraries(TracerCUDA_Objects
-                      PUBLIC
-                      DeviceLib
-                      CoreLib
-                      TransientPool
-                      PRIVATE
-                      mray::meta_compile_opts
-                      mray::cuda_extra_compile_opts)
-
-set_target_properties(TracerCUDA_Objects PROPERTIES
-                      POSITION_INDEPENDENT_CODE ON
-                      CUDA_SEPARABLE_COMPILATION ON
-                      CUDA_RESOLVE_DEVICE_SYMBOLS ON)
-
-# Hide this on IDE
-set_target_properties(TracerCUDA_Objects PROPERTIES FOLDER ${MRAY_PREDEFINED_TARGETS_FOLDER})
