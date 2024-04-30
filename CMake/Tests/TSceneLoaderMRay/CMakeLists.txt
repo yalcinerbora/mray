@@ -1,7 +1,5 @@
 set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/Tests/SceneLoaderMRay)
 
-message(STATUS "Configuring ${CURRENT_SOURCE_DIR}")
-
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/T_SceneLoaderMRay.cpp
     ${CURRENT_SOURCE_DIR}/MockTracer.h

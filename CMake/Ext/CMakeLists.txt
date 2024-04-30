@@ -6,10 +6,10 @@ set(MRAY_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../..)
 cmake_path(NORMAL_PATH MRAY_DIRECTORY)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}")
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${MRAY_DIRECTORY}CMake")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${MRAY_DIRECTORY}CMake/Include")
 
 # Do not use in source builds
-include(PreventInSourceBuilds)
+include("PreventInSourceBuilds")
 
 # Only Debug and Release
 set(CMAKE_CONFIGURATION_TYPES Debug;Release CACHE STRING "Configuration types, for multi-config generators (MRay supports only Debug and Release for external libraries)")
@@ -27,7 +27,7 @@ project(MRayExternal DESCRIPTION "MRay dependency downloader/compiler")
 option(MRAY_BUILD_TESTS "Build Tests" ON)
 
 # Populate the meta directories for this project hierarchy
-include(Macros)
+include("Macros")
 generate_platform_name()
 populate_mray_directory_variables(${MRAY_DIRECTORY})
 

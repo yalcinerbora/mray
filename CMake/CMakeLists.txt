@@ -8,10 +8,10 @@ set(MRAY_VERSION_MINOR "1")
 set(MRAY_VERSION_PATCH "0")
 
 # All CMake Related files is in the current folder
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/Include")
 
 # Do not use in-source builds
-include(PreventInSourceBuilds)
+include("PreventInSourceBuilds")
 
 # Only Debug and Release
 set(CMAKE_CONFIGURATION_TYPES Debug;SanitizeR;Release CACHE STRING "Build configurations. SanitizeR has sanitized output")
@@ -26,8 +26,8 @@ set_property(CACHE CMAKE_CUDA_ARCHITECTURES
 
 set(MRAY_DEVICE_BACKEND "MRAY_GPU_BACKEND_CUDA"
     CACHE STRING "Device backend chosen by the user at CMake configure time")
-         set_property(CACHE MRAY_DEVICE_BACKEND
-                      PROPERTY STRINGS MRAY_GPU_BACKEND_CUDA)
+set_property(CACHE MRAY_DEVICE_BACKEND
+             PROPERTY STRINGS MRAY_GPU_BACKEND_CUDA)
 
 option(MRAY_USE_OPTIX "Try to find and use OptiX" OFF)
 option(MRAY_BUILD_TESTS "Build Tests" ON)
@@ -63,7 +63,7 @@ project(${MRAY_PROJECT_NAME}
         DESCRIPTION ${MRAY_PROJECT_DESCRIPTION}
 )
 
-include(Macros)
+include("Macros")
 # CMAKE Project Definitions and Source, Library Folders are separate
 # Directories
 set(MRAY_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
@@ -94,7 +94,7 @@ set(CMAKE_COLOR_DIAGNOSTICS ON)
 # Generates
 #   mray::meta_compile_opts
 #   mray::cuda_extra_compile_opts
-include(CompilerOptions.cmake)
+include("CompilerOptions")
 
 # Generate Configuration Header
 cmake_path(GET CMAKE_CXX_COMPILER STEM MRAY_COMPILER_NAME)
@@ -136,16 +136,18 @@ add_subdirectory(Lib)
 # BUILDS
 # Libs
 add_subdirectory(Core)
-add_subdirectory(Device)
 
 # DLLs
-add_subdirectory(Tracer)
 add_subdirectory(TransientPool)
 add_subdirectory(SceneLoaderMRay)
 add_subdirectory(MeshLoader)
 add_subdirectory(ImageLoader)
 add_subdirectory(GFGConverter)
 add_subdirectory(Visor)
+
+# Generate Targets
+add_subdirectory(TracerDevice)
+#add_subdirectory(TracerHost)
 
 # Execs
 add_subdirectory(MRay)

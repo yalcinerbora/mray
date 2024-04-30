@@ -1,7 +1,7 @@
 set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/Visor)
 set(SHADER_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/Visor/Shaders)
 
-include(SlangCompileSpirV.cmake)
+include("SlangCompileSpirV.cmake")
 
 set(SRC_GUI
     ${CURRENT_SOURCE_DIR}/VisorGUI.cpp

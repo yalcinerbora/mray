@@ -200,7 +200,6 @@ elseif(UNIX AND NOT APPLE)
 endif()
 
 set(MRAY_PREPROCESSOR_DEFS_CUDA
-    ${MRAY_DEVICE_BACKEND}
     # Suppress Dynamic Parallelism cudaDeviceSyncWarning
     -D__CDPRT_SUPPRESS_SYNC_DEPRECATION_WARNING
 )
