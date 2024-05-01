@@ -826,8 +826,8 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
             {
                 const auto& [texStruct, jsonNode, is2D] = textureNodes[i];
                 auto fileName = jsonNode.AccessData<std::string>(NodeNames::TEX_NODE_FILE);
-                auto isColor = jsonNode.AccessOptionalData<bool>(NodeNames::TEX_NODE_COLORIMETRIC)
-                                .value_or(NodeNames::TEX_NODE_COLORIMETRIC_DEFAULT);
+                auto isColor = jsonNode.AccessOptionalData<bool>(NodeNames::TEX_NODE_IS_COLOR)
+                                .value_or(NodeNames::TEX_NODE_IS_COLOR_DEFAULT);
                 fileName = Filesystem::RelativePathToAbsolute(fileName, scenePath);
 
                 // Currently no flags are utilized on header load time
@@ -874,13 +874,14 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
                 const auto& [texStruct, jsonNode, is2D] = textureNodes[i];
                 bool loadAsSigned = jsonNode.AccessOptionalData<bool>(NodeNames::TEX_NODE_AS_SIGNED)
                                         .value_or(NodeNames::TEX_NODE_AS_SIGNED_DEFAULT);
-                bool isData = jsonNode.AccessData<bool>(NodeNames::TEX_NODE_IS_DATA);
+                auto isColor = jsonNode.AccessOptionalData<bool>(NodeNames::TEX_NODE_IS_COLOR)
+                                        .value_or(NodeNames::TEX_NODE_IS_COLOR_DEFAULT);
                 auto fileName = jsonNode.AccessData<std::string>(NodeNames::TEX_NODE_FILE);
                 fileName = Filesystem::RelativePathToAbsolute(fileName, scenePath);
 
                 using enum ImageIOFlags::F;
                 ImageIOFlags flags;
-                flags[DISREGARD_COLOR_SPACE] = isData;
+                flags[DISREGARD_COLOR_SPACE] = !isColor;
                 flags[LOAD_AS_SIGNED] = loadAsSigned;
                 flags[TRY_3C_4C_CONVERSION] = true;     // Always do channel expand (HW limitation)
 
@@ -895,7 +896,7 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
 
                     auto& img = imgE.value();
                     // Send data mip by mip
-                    for(uint32_t j = 0; j < img.header.mipCount; i++)
+                    for(uint32_t j = 0; j < img.header.mipCount; j++)
                     {
                         auto& texIdList = *texIdListPtr;
                         tracer.PushTextureData(texIdList[i].second, j,
@@ -2078,5 +2079,28 @@ Expected<TracerIdPack> SceneLoaderMRay::LoadScene(TracerI& tracer,
 
     ClearIntermediateBuffers();
     return MoveIdPack(t.Elapsed<Millisecond>());
+}
+
+void SceneLoaderMRay::ClearScene()
+{
+    scenePath.clear();
+    sceneJson.clear();
+    transformMappings.map.clear();
+    mediumMappings.map.clear();
+    primMappings.map.clear();
+    matMappings.map.clear();
+    camMappings.map.clear();
+    lightMappings.map.clear();
+    texMappings.clear();
+    mRaySurfaces.clear();
+    mRayLightSurfaces.clear();
+    mRayCamSurfaces.clear();
+    primNodes.clear();
+    cameraNodes.clear();
+    transformNodes.clear();
+    lightNodes.clear();
+    materialNodes.clear();
+    mediumNodes.clear();
+    textureNodes.clear();
 }
 

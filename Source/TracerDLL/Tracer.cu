@@ -1,5 +1,9 @@
 #include "Tracer.h"
 
+TracerBase::TracerBase(BS::thread_pool& tp)
+    : threadPool(tp)
+{}
+
 TypeNameList TracerBase::PrimitiveGroups() const
 {
     return primTypes;

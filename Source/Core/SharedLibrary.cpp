@@ -123,6 +123,14 @@ SharedLibrary::SharedLibrary(SharedLibrary&& other) noexcept
 
 SharedLibrary& SharedLibrary::operator=(SharedLibrary&& other) noexcept
 {
+    assert(this != &other);
+
+    #if defined MRAY_WINDOWS
+        if(libHandle != nullptr) FreeLibrary((HINSTANCE)libHandle);
+    #elif defined MRAY_LINUX
+        if(libHandle != nullptr) dlclose(libHandle);
+    #endif
+
     libHandle = other.libHandle;
     other.libHandle = nullptr;
     return *this;

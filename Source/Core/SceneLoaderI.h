@@ -52,10 +52,11 @@ class SceneLoaderI
     public:
     virtual ~SceneLoaderI() = default;
 
-    virtual Expected<TracerIdPack> LoadScene(TracerI& tracer,
+    virtual Expected<TracerIdPack>  LoadScene(TracerI& tracer,
                                               const std::string& filePath) = 0;
-    virtual Expected<TracerIdPack> LoadScene(TracerI& tracer,
-                                             std::istream& sceneData) = 0;
+    virtual Expected<TracerIdPack>  LoadScene(TracerI& tracer,
+                                              std::istream& sceneData) = 0;
+    virtual void                    ClearScene() = 0;
 };
 
 namespace BS

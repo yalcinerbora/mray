@@ -13,6 +13,8 @@
 #include "Tracer/TransformC.h"
 #include "Tracer/LightC.h"
 
+namespace BS { class thread_pool; }
+
 class RendererI
 {
     public:
@@ -101,6 +103,7 @@ class TracerBase : public TracerI
     bool                    globalTexCommit     = false;
 
     protected:
+    BS::thread_pool&    threadPool;
     GPUSystem           gpuSystem;
     TextureViewMap      texViewMap;
 
@@ -132,6 +135,8 @@ class TracerBase : public TracerI
     std::map<std::string_view, RendererAttributeInfoList>   rendererAttributeInfoMap;
 
     public:
+                        TracerBase(BS::thread_pool&);
+
     TypeNameList        PrimitiveGroups() const override;
     TypeNameList        MaterialGroups() const override;
     TypeNameList        TransformGroups() const override;

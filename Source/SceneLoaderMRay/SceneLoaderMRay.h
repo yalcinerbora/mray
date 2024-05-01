@@ -120,6 +120,8 @@ class SceneLoaderMRay : public SceneLoaderI
                                       const std::string& filePath) override;
     Expected<TracerIdPack>  LoadScene(TracerI& tracer,
                                       std::istream& sceneData) override;
+
+    void                    ClearScene() override;
 };
 
 //
