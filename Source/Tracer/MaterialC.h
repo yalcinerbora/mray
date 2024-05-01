@@ -6,7 +6,7 @@
 #include "TracerTypes.h"
 #include "GenericGroup.h"
 
-using MediumPairList = const std::vector<Pair<MediumKey, MediumKey>>;
+using MediumKeyPairList = std::vector<Pair<MediumKey, MediumKey>>;
 
 template <class MatType>
 concept MaterialC = requires(MatType mt,
@@ -73,57 +73,87 @@ concept MaterialGroupC = requires()
     requires std::is_same_v<typename MGType::Surface,
                             typename MGType::template Material<>::Surface>;
 
-    // TODO: Some Functions
-    requires GenericGroupC<MGType>;
+    // TODO: Some more functions
+    // ...
+
+    // TODO: This concept requres "Reserve" function to be visible,
+    // however we switched it so...
+    //requires GenericGroupC<MGType>;
 };
 
-template<class Child>
-class GenericMaterialGroup : public GenericTexturedGroupT<Child, MaterialKey, MatAttributeInfo>
+class GenericGroupMaterialT : public GenericTexturedGroupT<MaterialKey, MatAttributeInfo>
 {
-    using Parent = GenericTexturedGroupT<Child, MaterialKey, MatAttributeInfo>;
+    using Parent = GenericTexturedGroupT<MaterialKey, MatAttributeInfo>;
     using typename Parent::IdList;
 
     protected:
-    virtual void    HandleMediums(const MediumPairList&) = 0;
+    virtual void    HandleMediums(const MediumKeyPairList&) = 0;
 
     public:
     // Constructors & Destructor
-                    GenericMaterialGroup(uint32_t groupId, const GPUSystem&,
-                                         const TextureView2DMap&,
-                                         size_t allocationGranularity = 2_MiB,
-                                         size_t initialReservartionSize = 4_MiB);
+                    GenericGroupMaterialT(uint32_t groupId, const GPUSystem&,
+                                          const TextureViewMap&,
+                                          size_t allocationGranularity = 2_MiB,
+                                          size_t initialReservartionSize = 4_MiB);
     // Swap the interfaces (old switcharoo)
+    private:
     IdList          Reserve(const std::vector<AttributeCountList>&) override;
+
+    public:
     virtual IdList  Reserve(const std::vector<AttributeCountList>&,
-                              const MediumPairList&);
+                            const MediumKeyPairList&);
 };
 
-template<class C>
-GenericMaterialGroup<C>::GenericMaterialGroup(uint32_t groupId, const GPUSystem& gpuSystem,
-                                              const TextureView2DMap& map,
-                                              size_t allocationGranularity,
-                                              size_t initialReservartionSize)
+template <class Child>
+class GenericGroupMaterial : public GenericGroupMaterialT
+{
+    public:
+                        GenericGroupMaterial(uint32_t groupId, const GPUSystem&,
+                                             const TextureViewMap&,
+                                             size_t allocationGranularity = 2_MiB,
+                                             size_t initialReservartionSize = 4_MiB);
+    std::string_view    Name() const override;
+};
+
+inline
+GenericGroupMaterialT::GenericGroupMaterialT(uint32_t groupId, const GPUSystem& gpuSystem,
+                                             const TextureViewMap& map,
+                                             size_t allocationGranularity,
+                                             size_t initialReservartionSize)
     : Parent(groupId, gpuSystem, map,
              allocationGranularity,
              initialReservartionSize)
 {}
 
-template<class C>
-typename GenericMaterialGroup<C>::IdList
-GenericMaterialGroup<C>::Reserve(const std::vector<AttributeCountList>&)
+inline typename GenericGroupMaterialT::IdList
+GenericGroupMaterialT::Reserve(const std::vector<AttributeCountList>&)
 {
-    throw MRayError("{}: Materials cannot be reserved via this function!",
-                    C::TypeName());
+    throw MRayError("{}: Materials cannot be reserved via this function!", Name());
 }
 
-template<class C>
-typename GenericMaterialGroup<C>::IdList
-GenericMaterialGroup<C>::Reserve(const std::vector<AttributeCountList>& countArrayList,
-                                 const MediumPairList& mediumPairs)
+inline typename GenericGroupMaterialT::IdList
+GenericGroupMaterialT::Reserve(const std::vector<AttributeCountList>& countArrayList,
+                               const MediumKeyPairList& mediumPairs)
 {
     // We blocked the virutal chain, but we should be able to use it here
     // We will do the same here anyways migh as well use it.
     auto result = Parent::Reserve(countArrayList);
     HandleMediums(mediumPairs);
     return result;
+}
+
+template <class C>
+GenericGroupMaterial<C>::GenericGroupMaterial(uint32_t groupId, const GPUSystem& system,
+                                              const TextureViewMap& map,
+                                              size_t allocationGranularity,
+                                              size_t initialReservartionSize)
+    : GenericGroupMaterialT(groupId, system, map,
+                            allocationGranularity,
+                            initialReservartionSize)
+{}
+
+template <class C>
+std::string_view GenericGroupMaterial<C>::Name() const
+{
+    return C::TypeName();
 }

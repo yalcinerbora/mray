@@ -345,10 +345,10 @@ std::string_view LightGroupPrim<PG>::TypeName()
 template <PrimitiveGroupC PG>
 LightGroupPrim<PG>::LightGroupPrim(uint32_t groupId,
                                    const GPUSystem& system,
-                                   const TextureView2DMap& map,
-                                   const PrimGroup& primGroup)
+                                   const TextureViewMap& map,
+                                   const GenericGroupPrimitiveT& primGroup)
     : Parent(groupId, system, map)
-    , primGroup(primGroup)
+    , primGroup(static_cast<const PrimGroup&>(primGroup))
 {}
 
 template <PrimitiveGroupC PG>
@@ -392,29 +392,29 @@ void LightGroupPrim<PG>::PushAttribute(LightKey idStart, LightKey idEnd,
 }
 
 template <PrimitiveGroupC PG>
-void LightGroupPrim<PG>::PushTex2DAttribute(LightKey idStart, LightKey idEnd,
-                                            uint32_t attributeIndex,
-                                            TransientData,
-                                            std::vector<Optional<TextureId>>,
-                                            const GPUQueue& queue)
+void LightGroupPrim<PG>::PushTexAttribute(LightKey idStart, LightKey idEnd,
+                                          uint32_t attributeIndex,
+                                          TransientData,
+                                          std::vector<Optional<TextureId>>,
+                                          const GPUQueue& queue)
 {
 
 }
 
 template <PrimitiveGroupC PG>
-void LightGroupPrim<PG>::PushTex2DAttribute(LightKey idStart, LightKey idEnd,
-                                            uint32_t attributeIndex,
-                                            std::vector<Optional<TextureId>>,
-                                            const GPUQueue& queue)
+void LightGroupPrim<PG>::PushTexAttribute(LightKey idStart, LightKey idEnd,
+                                          uint32_t attributeIndex,
+                                          std::vector<Optional<TextureId>>,
+                                          const GPUQueue& queue)
 {
 
 }
 
 template <PrimitiveGroupC PG>
-void LightGroupPrim<PG>::PushTex2DAttribute(LightKey idStart, LightKey idEnd,
-                                            uint32_t attributeIndex,
-                                            std::vector<TextureId>,
-                                            const GPUQueue& queue)
+void LightGroupPrim<PG>::PushTexAttribute(LightKey idStart, LightKey idEnd,
+                                          uint32_t attributeIndex,
+                                          std::vector<TextureId>,
+                                          const GPUQueue& queue)
 {
 
 }
@@ -447,10 +447,10 @@ std::string_view LightGroupSkysphere<CC>::TypeName()
 template <LightDetail::CoordConverterC CC>
 LightGroupSkysphere<CC>::LightGroupSkysphere(uint32_t groupId,
                                              const GPUSystem& system,
-                                             const TextureView2DMap& map,
-                                             const PrimGroup& primGroup)
+                                             const TextureViewMap& map,
+                                             const GenericGroupPrimitiveT& primGroup)
     : Parent(groupId, system, map)
-    , primGroup(primGroup)
+    , primGroup(static_cast<const PrimGroup&>(primGroup))
 {}
 
 template <LightDetail::CoordConverterC CC>
@@ -494,29 +494,29 @@ void LightGroupSkysphere<CC>::PushAttribute(LightKey idStart, LightKey idEnd,
 }
 
 template <LightDetail::CoordConverterC CC>
-void LightGroupSkysphere<CC>::PushTex2DAttribute(LightKey idStart, LightKey idEnd,
-                                                 uint32_t attributeIndex,
-                                                 TransientData,
-                                                 std::vector<Optional<TextureId>>,
-                                                 const GPUQueue& queue)
+void LightGroupSkysphere<CC>::PushTexAttribute(LightKey idStart, LightKey idEnd,
+                                               uint32_t attributeIndex,
+                                               TransientData,
+                                               std::vector<Optional<TextureId>>,
+                                               const GPUQueue& queue)
 {
 
 }
 
 template <LightDetail::CoordConverterC CC>
-void LightGroupSkysphere<CC>::PushTex2DAttribute(LightKey idStart, LightKey idEnd,
-                                                 uint32_t attributeIndex,
-                                                 std::vector<Optional<TextureId>>,
-                                                 const GPUQueue& queue)
+void LightGroupSkysphere<CC>::PushTexAttribute(LightKey idStart, LightKey idEnd,
+                                               uint32_t attributeIndex,
+                                               std::vector<Optional<TextureId>>,
+                                               const GPUQueue& queue)
 {
 
 }
 
 template <LightDetail::CoordConverterC CC>
-void LightGroupSkysphere<CC>::PushTex2DAttribute(LightKey idStart, LightKey idEnd,
-                                                 uint32_t attributeIndex,
-                                                 std::vector<TextureId>,
-                                                 const GPUQueue& queue)
+void LightGroupSkysphere<CC>::PushTexAttribute(LightKey idStart, LightKey idEnd,
+                                               uint32_t attributeIndex,
+                                               std::vector<TextureId>,
+                                               const GPUQueue& queue)
 {
 
 }

@@ -27,7 +27,7 @@ typename TransformGroupIdentity::DataSoA TransformGroupIdentity::SoA() const
 
 TransformGroupSingle::TransformGroupSingle(uint32_t groupId,
                                            const GPUSystem& s)
-    : BaseType(groupId, s)
+    : GenericGroupTransform<TransformGroupSingle>(groupId, s)
 {}
 
 void TransformGroupSingle::CommitReservations()
@@ -139,7 +139,7 @@ std::string_view TransformGroupMulti::TypeName()
 
 TransformGroupMulti::TransformGroupMulti(uint32_t groupId,
                                          const GPUSystem& s)
-    : BaseType(groupId, s)
+    : GenericGroupTransform<TransformGroupSingle>(groupId, s)
 {}
 
 void TransformGroupMulti::CommitReservations()

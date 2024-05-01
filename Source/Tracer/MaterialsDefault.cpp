@@ -7,14 +7,14 @@ std::string_view MatGroupLambert::TypeName()
     return name;
 }
 
-void MatGroupLambert::HandleMediums(const MediumPairList& mediumList)
+void MatGroupLambert::HandleMediums(const MediumKeyPairList& mediumList)
 {
 }
 
 MatGroupLambert::MatGroupLambert(uint32_t groupId,
-                                 const TextureView2DMap& map,
+                                 const TextureViewMap& map,
                                  const GPUSystem& s)
-    : GenericMaterialGroup(groupId, s, map)
+    : GenericGroupMaterial<MatGroupLambert>(groupId, s, map)
 {}
 
 void MatGroupLambert::CommitReservations()
@@ -97,48 +97,48 @@ void MatGroupLambert::PushAttribute(MaterialKey, MaterialKey,
 }
 
 
-void MatGroupLambert::PushTex2DAttribute(MaterialKey idStart, MaterialKey idEnd,
-                                         uint32_t attributeIndex,
-                                         TransientData data,
-                                         std::vector<Optional<TextureId>> texIds,
-                                         const GPUQueue& queue)
+void MatGroupLambert::PushTexAttribute(MaterialKey idStart, MaterialKey idEnd,
+                                       uint32_t attributeIndex,
+                                       TransientData data,
+                                       std::vector<Optional<TextureId>> texIds,
+                                       const GPUQueue& queue)
 {
     if(attributeIndex == 0)
     {
-        GenericPushTex2DAttribute<Vector3>(dAlbedo,
-                                           //
-                                           idStart, idEnd,
-                                           attributeIndex,
-                                           std::move(data),
-                                           std::move(texIds),
-                                           queue);
+        GenericPushTexAttribute<2, Vector3>(dAlbedo,
+                                            //
+                                            idStart, idEnd,
+                                            attributeIndex,
+                                            std::move(data),
+                                            std::move(texIds),
+                                            queue);
     }
     else MRAY_ERROR_LOG("{:s}: Attribute {:d} is not \"ParamVarying\", wrong "
                         "function is called", TypeName(), attributeIndex);
 }
 
-void MatGroupLambert::PushTex2DAttribute(MaterialKey idStart, MaterialKey idEnd,
-                                         uint32_t attributeIndex,
-                                         std::vector<Optional<TextureId>> texIds,
-                                         const GPUQueue& queue)
+void MatGroupLambert::PushTexAttribute(MaterialKey idStart, MaterialKey idEnd,
+                                       uint32_t attributeIndex,
+                                       std::vector<Optional<TextureId>> texIds,
+                                       const GPUQueue& queue)
 {
     if(attributeIndex == 1)
     {
-        GenericPushTex2DAttribute<Vector3>(dNormalMaps,
-                                           //
-                                           idStart, idEnd,
-                                           attributeIndex,
-                                           std::move(texIds),
-                                           queue);
+        GenericPushTexAttribute<2, Vector3>(dNormalMaps,
+                                            //
+                                            idStart, idEnd,
+                                            attributeIndex,
+                                            std::move(texIds),
+                                            queue);
     }
     else MRAY_ERROR_LOG("{:s}: Attribute {:d} is not \"Optional Texture\", wrong "
                         "function is called", TypeName(), attributeIndex);
 }
 
-void MatGroupLambert::PushTex2DAttribute(MaterialKey, MaterialKey,
-                                         uint32_t,
-                                         std::vector<TextureId>,
-                                         const GPUQueue&)
+void MatGroupLambert::PushTexAttribute(MaterialKey, MaterialKey,
+                                       uint32_t,
+                                       std::vector<TextureId>,
+                                       const GPUQueue&)
 {
     MRAY_ERROR_LOG("{:s} do not have and mandatory textures!", TypeName());
 }

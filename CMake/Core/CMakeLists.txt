@@ -47,6 +47,7 @@ set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/Types.h
     ${CURRENT_SOURCE_DIR}/Flag.h
     ${CURRENT_SOURCE_DIR}/GraphicsFunctions.h
+    ${CURRENT_SOURCE_DIR}/TypeGenFunction.h
     ${CURRENT_SOURCE_DIR}/ShapeFunctions.h
     ${CURRENT_SOURCE_DIR}/Timer.h
     ${CURRENT_SOURCE_DIR}/MPMCQueue.h

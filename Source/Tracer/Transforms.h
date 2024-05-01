@@ -191,7 +191,7 @@ inline std::string_view TransformGroupIdentity::TypeName()
 
 inline TransformGroupIdentity::TransformGroupIdentity(uint32_t groupId,
                                                       const GPUSystem& s)
-    : GenericGroupT(groupId, s)
+    : GenericGroupTransform<TransformGroupIdentity>(groupId, s)
 {}
 
 inline void TransformGroupIdentity::CommitReservations()

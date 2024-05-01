@@ -204,8 +204,18 @@ concept PrimitiveWithSurfaceC = requires(PrimType mg,
 template <PrimitiveGroupC PrimGroup, TransformGroupC TransGroup>
 constexpr auto AcquireTransformContextGenerator();
 
+using GenericGroupPrimitiveT = GenericGroupT<PrimBatchKey, PrimAttributeInfo>;
+
 template<class Child>
-using GenericGroupPrimitive = GenericGroupT<Child, PrimBatchKey, PrimAttributeInfo>;
+class GenericGroupPrimitive : public GenericGroupT<PrimBatchKey, PrimAttributeInfo>
+{
+    public:
+                     GenericGroupPrimitive(uint32_t groupId,
+                                           const GPUSystem& sys,
+                                           size_t allocationGranularity = 16_MiB,
+                                           size_t initialReservartionSize = 64_MiB);
+    std::string_view Name() const override;
+};
 
 template<TransformContextC TransContextType = TransformContextIdentity>
 class EmptyPrimitive
@@ -297,6 +307,22 @@ constexpr auto AcquireTransformContextGenerator()
     using namespace TypeFinder;
     constexpr auto FList = PrimGroup::TransContextGeneratorList;
     return GetTupleElement<TransGroup>(std::forward<decltype(FList)>(FList));
+}
+
+template<class C>
+GenericGroupPrimitive<C>::GenericGroupPrimitive(uint32_t groupId,
+                                                const GPUSystem& sys,
+                                                size_t allocationGranularity,
+                                                size_t initialReservartionSize)
+    : GenericGroupPrimitiveT(groupId, sys,
+                             allocationGranularity,
+                             initialReservartionSize)
+{}
+
+template<class C>
+std::string_view GenericGroupPrimitive<C>::Name() const
+{
+    return C::TypeName();
 }
 
 template<TransformContextC TC>
@@ -391,7 +417,7 @@ std::string_view EmptyPrimGroup::TypeName()
 inline
 EmptyPrimGroup::EmptyPrimGroup(uint32_t primGroupId,
                                const GPUSystem& sys)
-    : GenericGroupT(primGroupId, sys)
+    : GenericGroupPrimitive(primGroupId, sys)
 {}
 
 inline

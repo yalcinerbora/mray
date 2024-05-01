@@ -10,7 +10,7 @@
 
 #include "Device/GPUSystem.hpp"
 
-using PrimBatchList = const std::vector<PrimBatchKey>;
+using PrimBatchList = std::vector<PrimBatchKey>;
 
 template<class LightType>
 concept LightC = requires(LightType l,
@@ -67,13 +67,14 @@ concept LightGroupC = requires(LGType lg)
     // Runtime Acquire the primitive group
     {lg.PrimitiveGroup()} -> std::same_as<const typename LGType::PrimGroup&>;
 
-    requires GenericGroupC<LGType>;
+    // TODO: This concept requres "Reserve" function to be visible,
+    // however we switched it so...
+    //requires GenericGroupC<LGType>;
 };
 
-template<class Child>
-class GenericLightGroup : public GenericTexturedGroupT<Child, LightKey, LightAttributeInfo>
+class GenericGroupLightT : public GenericTexturedGroupT<LightKey, LightAttributeInfo>
 {
-    using Parent = GenericTexturedGroupT<Child, LightKey, LightAttributeInfo>;
+    using Parent = GenericTexturedGroupT<LightKey, LightAttributeInfo>;
     using typename Parent::IdList;
 
     protected:
@@ -81,14 +82,28 @@ class GenericLightGroup : public GenericTexturedGroupT<Child, LightKey, LightAtt
 
     public:
     // Constructors & Destructor
-                    GenericLightGroup(uint32_t groupId, const GPUSystem&,
-                                      const TextureView2DMap&,
-                                      size_t allocationGranularity = 2_MiB,
-                                      size_t initialReservartionSize = 4_MiB);
+                    GenericGroupLightT(uint32_t groupId, const GPUSystem&,
+                                       const TextureViewMap&,
+                                       size_t allocationGranularity = 2_MiB,
+                                       size_t initialReservartionSize = 4_MiB);
     // Swap the interfaces (old switcharoo)
+    private:
     IdList          Reserve(const std::vector<AttributeCountList>&) override;
+
+    public:
     virtual IdList  Reserve(const std::vector<AttributeCountList>&,
                             const PrimBatchList&);
+};
+
+template <class Child>
+class GenericGroupLight : public GenericGroupLightT
+{
+    public:
+                        GenericGroupLight(uint32_t groupId, const GPUSystem&,
+                                          const TextureViewMap&,
+                                          size_t allocationGranularity = 2_MiB,
+                                          size_t initialReservartionSize = 4_MiB);
+    std::string_view    Name() const override;
 };
 
 // Meta Light Class
@@ -379,32 +394,47 @@ Span<const Variant<std::monostate, L...>> MetaLightArray<Variant<TC...>, Variant
     return ToConstSpan(dLightList);
 }
 
-template <class C>
-GenericLightGroup<C>::GenericLightGroup(uint32_t groupId, const GPUSystem& gpuSystem,
-                                        const TextureView2DMap& map,
-                                        size_t allocationGranularity,
-                                        size_t initialReservartionSize)
+inline
+GenericGroupLightT::GenericGroupLightT(uint32_t groupId, const GPUSystem& gpuSystem,
+                                       const TextureViewMap& map,
+                                       size_t allocationGranularity,
+                                       size_t initialReservartionSize)
     : Parent(groupId, gpuSystem, map,
              allocationGranularity,
              initialReservartionSize)
 {}
 
-template <class C>
-typename GenericLightGroup<C>::IdList
-GenericLightGroup<C>::Reserve(const std::vector<AttributeCountList>&)
+inline typename GenericGroupLightT::IdList
+GenericGroupLightT::Reserve(const std::vector<AttributeCountList>&)
 {
     throw MRayError("{}: Lights cannot be reserved via this function!",
-                    C::TypeName());
+                    Name());
 }
 
-template <class C>
-typename GenericLightGroup<C>::IdList
-GenericLightGroup<C>::Reserve(const std::vector<AttributeCountList>& countArrayList,
-                              const PrimBatchList& primBatches)
+
+inline typename GenericGroupLightT::IdList
+GenericGroupLightT::Reserve(const std::vector<AttributeCountList>& countArrayList,
+                            const PrimBatchList& primBatches)
 {
     // We blocked the virutal chain, but we should be able to use it here
     // We will do the same here anyways migh as well use it.
     auto result = Parent::Reserve(countArrayList);
     HandlePrimBatches(primBatches);
     return result;
+}
+
+template <class C>
+GenericGroupLight<C>::GenericGroupLight(uint32_t groupId, const GPUSystem&,
+                                        const TextureViewMap& map,
+                                        size_t allocationGranularity,
+                                        size_t initialReservartionSize)
+    : GenericGroupLightT(groupId, gpuSystem, map,
+                         allocationGranularity,
+                         initialReservartionSize)
+{}
+
+template <class C>
+std::string_view GenericGroupLight<C>::Name() const
+{
+    return C::TypeName();
 }

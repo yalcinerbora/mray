@@ -15,8 +15,6 @@ size_t AcquireTransientDataCount(MRayDataTypeRT dataTypeRT,
     }, dataTypeRT);
 }
 
-
-
 // Mock tracer has
 struct PrimMockPack
 {

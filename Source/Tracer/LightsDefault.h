@@ -163,9 +163,9 @@ namespace LightDetail
 }
 
 template <PrimitiveGroupC PrimGroupT>
-class LightGroupPrim final : public GenericLightGroup<LightGroupPrim<PrimGroupT>>
+class LightGroupPrim final : public GenericGroupLight<LightGroupPrim<PrimGroupT>>
 {
-    using Parent        = GenericLightGroup<LightGroupPrim<PrimGroupT>>;
+    using Parent        = GenericGroupLight<LightGroupPrim<PrimGroupT>>;
 
     public:
     using PrimGroup     = PrimGroupT;
@@ -194,10 +194,10 @@ class LightGroupPrim final : public GenericLightGroup<LightGroupPrim<PrimGroupT>
 
     public:
     // Constructors & Destructor
-                LightGroupPrim(uint32_t groupId,
-                               const GPUSystem& system,
-                               const TextureView2DMap&,
-                               const PrimGroup&);
+                    LightGroupPrim(uint32_t groupId,
+                                   const GPUSystem& system,
+                                   const TextureViewMap&,
+                                   const GenericGroupPrimitiveT&);
 
     void                    CommitReservations() override;
     LightAttributeInfoList  AttributeInfo() const override;
@@ -215,19 +215,19 @@ class LightGroupPrim final : public GenericLightGroup<LightGroupPrim<PrimGroupT>
                                   uint32_t attributeIndex,
                                   TransientData data,
                                   const GPUQueue& queue) override;
-    void            PushTex2DAttribute(LightKey idStart, LightKey idEnd,
-                                       uint32_t attributeIndex,
-                                       TransientData,
-                                       std::vector<Optional<TextureId>>,
-                                       const GPUQueue& queue) override;
-    void            PushTex2DAttribute(LightKey idStart, LightKey idEnd,
-                                       uint32_t attributeIndex,
-                                       std::vector<Optional<TextureId>>,
-                                       const GPUQueue& queue) override;
-    void            PushTex2DAttribute(LightKey idStart, LightKey idEnd,
-                                       uint32_t attributeIndex,
-                                       std::vector<TextureId>,
-                                       const GPUQueue& queue) override;
+    void            PushTexAttribute(LightKey idStart, LightKey idEnd,
+                                     uint32_t attributeIndex,
+                                     TransientData,
+                                     std::vector<Optional<TextureId>>,
+                                     const GPUQueue& queue) override;
+    void            PushTexAttribute(LightKey idStart, LightKey idEnd,
+                                     uint32_t attributeIndex,
+                                     std::vector<Optional<TextureId>>,
+                                     const GPUQueue& queue) override;
+    void            PushTexAttribute(LightKey idStart, LightKey idEnd,
+                                     uint32_t attributeIndex,
+                                     std::vector<TextureId>,
+                                     const GPUQueue& queue) override;
 
     DataSoA                 SoA() const;
     const PrimGroup&        PrimitiveGroup() const;
@@ -235,9 +235,9 @@ class LightGroupPrim final : public GenericLightGroup<LightGroupPrim<PrimGroupT>
 };
 
 template <LightDetail::CoordConverterC CoordConverter>
-class LightGroupSkysphere final : public GenericLightGroup<LightGroupSkysphere<CoordConverter>>
+class LightGroupSkysphere final : public GenericGroupLight<LightGroupSkysphere<CoordConverter>>
 {
-    using Parent            = GenericLightGroup<LightGroupSkysphere<CoordConverter>>;
+    using Parent            = GenericGroupLight<LightGroupSkysphere<CoordConverter>>;
     using DistributionPwC2D = typename DistributionGroupPwC2D::Distribution;
     public:
     using PrimGroup     = EmptyPrimGroup;
@@ -269,8 +269,8 @@ class LightGroupSkysphere final : public GenericLightGroup<LightGroupSkysphere<C
     //
                 LightGroupSkysphere(uint32_t groupId,
                                     const GPUSystem& system,
-                                    const TextureView2DMap&,
-                                    const PrimGroup&);
+                                    const TextureViewMap&,
+                                    const GenericGroupPrimitiveT&);
 
 
     void                    CommitReservations() override;
@@ -289,19 +289,19 @@ class LightGroupSkysphere final : public GenericLightGroup<LightGroupSkysphere<C
                                   uint32_t attributeIndex,
                                   TransientData data,
                                   const GPUQueue& queue) override;
-    void            PushTex2DAttribute(LightKey idStart, LightKey idEnd,
-                                       uint32_t attributeIndex,
-                                       TransientData,
-                                       std::vector<Optional<TextureId>>,
-                                       const GPUQueue& queue) override;
-    void            PushTex2DAttribute(LightKey idStart, LightKey idEnd,
-                                       uint32_t attributeIndex,
-                                       std::vector<Optional<TextureId>>,
-                                       const GPUQueue& queue) override;
-    void            PushTex2DAttribute(LightKey idStart, LightKey idEnd,
-                                       uint32_t attributeIndex,
-                                       std::vector<TextureId>,
-                                       const GPUQueue& queue) override;
+    void            PushTexAttribute(LightKey idStart, LightKey idEnd,
+                                     uint32_t attributeIndex,
+                                     TransientData,
+                                     std::vector<Optional<TextureId>>,
+                                     const GPUQueue& queue) override;
+    void            PushTexAttribute(LightKey idStart, LightKey idEnd,
+                                     uint32_t attributeIndex,
+                                     std::vector<Optional<TextureId>>,
+                                     const GPUQueue& queue) override;
+    void            PushTexAttribute(LightKey idStart, LightKey idEnd,
+                                     uint32_t attributeIndex,
+                                     std::vector<TextureId>,
+                                     const GPUQueue& queue) override;
 
     DataSoA                 SoA() const;
     const PrimGroup&        PrimitiveGroup() const;

@@ -41,5 +41,31 @@ concept TransformGroupC = requires(TGType tg)
     requires GenericGroupC<TGType>;
 };
 
+using GenericGroupTransformT = GenericGroupT<TransformKey, TransAttributeInfo>;
+
 template<class Child>
-using GenericGroupTransform = GenericGroupT<Child, TransformKey, TransAttributeInfo>;
+class GenericGroupTransform : public GenericGroupTransformT
+{
+    public:
+                        GenericGroupTransform(uint32_t transGroupId,
+                                              const GPUSystem& sys,
+                                              size_t allocationGranularity = 2_MiB,
+                                              size_t initialReservartionSize = 4_MiB);
+    std::string_view    Name() const override;
+};
+
+template <class C>
+GenericGroupTransform<C>::GenericGroupTransform(uint32_t transGroupId,
+                                                const GPUSystem& sys,
+                                                size_t allocationGranularity,
+                                                size_t initialReservartionSize)
+    : GenericGroupTransformT(transGroupId, sys,
+                             allocationGranularity,
+                             initialReservartionSize)
+{}
+
+template <class C>
+std::string_view GenericGroupTransform<C>::Name() const
+{
+    return C::TypeName();
+}

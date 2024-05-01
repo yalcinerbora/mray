@@ -33,9 +33,9 @@ std::string_view PrimGroupTriangle::TypeName()
 
 PrimGroupTriangle::PrimGroupTriangle(uint32_t primGroupId,
                                      const GPUSystem& sys)
-    : GenericGroupT(primGroupId, sys,
-                    DefaultTriangleDetail::DeviceMemAllocationGranularity,
-                    DefaultTriangleDetail::DeviceMemReservationSize)
+    : GenericGroupPrimitive(primGroupId, sys,
+                            DefaultTriangleDetail::DeviceMemAllocationGranularity,
+                            DefaultTriangleDetail::DeviceMemReservationSize)
 {}
 
 void PrimGroupTriangle::CommitReservations()
@@ -208,9 +208,9 @@ std::string_view PrimGroupSkinnedTriangle::TypeName()
 
 PrimGroupSkinnedTriangle::PrimGroupSkinnedTriangle(uint32_t primGroupId,
                                                    const GPUSystem& sys)
-    : GenericGroupT(primGroupId, sys,
-                    DefaultTriangleDetail::DeviceMemAllocationGranularity,
-                    DefaultTriangleDetail::DeviceMemReservationSize)
+    : GenericGroupPrimitive(primGroupId, sys,
+                            DefaultTriangleDetail::DeviceMemAllocationGranularity,
+                            DefaultTriangleDetail::DeviceMemReservationSize)
 {}
 
 void PrimGroupSkinnedTriangle::CommitReservations()
