@@ -2,8 +2,7 @@
 
 #include "VulkanTypes.h"
 #include "ImageLoader/EntryPoint.h"
-
-#include "MRay/TransferQueue.h"
+#include "CommonHeaders/RenderImageStructs.h"
 
 class FramePool;
 namespace BS { class thread_pool; }

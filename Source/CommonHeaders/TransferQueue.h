@@ -6,64 +6,8 @@
 
 #include "TransientPool/TransientPool.h"
 
-struct CameraTransform
-{
-    Vector3f position;
-    Vector3f gazePoint;
-    Vector3f up;
-};
-
-struct TracerAnalyticData
-{
-    using TypeCountPair = Pair<std::string, uint32_t>;
-
-    std::vector<TypeCountPair> camTypes;
-    std::vector<TypeCountPair> lightTypes;
-    std::vector<TypeCountPair> primTypes;
-    std::vector<TypeCountPair> mediumTypes;
-    std::vector<TypeCountPair> materialTypes;
-    std::vector<TypeCountPair> rendererTypes;
-
-    MRayColorSpaceEnum  tracerColorSpace;
-
-    // Memory Related
-    double          totalGPUMemoryMiB;
-    double          usedGPUMemoryMiB;
-};
-
-struct RendererAnalyticData
-{
-    // Performance
-    double          throughput;
-    std::string     throughputSuffix;
-    //
-    double          workPerPixel;
-    std::string     workPerPixelSuffix;
-    // Timings
-    float           iterationTimeMS;
-
-    // Image related
-    Vector2i            renderResolution;
-    MRayColorSpaceEnum  outputColorSpace;
-};
-
-struct SceneAnalyticData
-{
-    // Generic
-    std::string     sceneName;
-    // Timings
-    double          sceneLoadTime;  // secs
-
-    // Amounts
-    uint32_t        mediumCount;
-    uint32_t        primCount;
-    uint32_t        textureCount;
-    uint32_t        surfaceCount;
-    uint32_t        cameraCount;
-
-    AABB3f          sceneExtent;
-    Vector2         timeRange;
-};
+#include "AnalyticStructs.h"
+#include "RenderImageStructs.h"
 
 struct RendererOptionPack
 {
@@ -72,45 +16,6 @@ struct RendererOptionPack
     //
     GenericAttributeInfoList    paramTypes;
     AttributeList               attributes;
-};
-
-struct RenderBufferInfo
-{
-    // Buffer range
-    Byte*                   data;
-    size_t                  totalSize;
-    // Data types of the render buffer
-    // actual underlying data type is always float
-    MRayColorSpaceEnum      renderColorSpace;
-    // Total size of the film
-    Vector2i                resolution;
-    // Render output may be spectral data then this represents
-    // amount of spectral samples (equally distributed)
-    uint32_t                depth;
-};
-
-struct RenderImageSection
-{
-    // Logical layout of the data
-    // Incoming data is between these pixel ranges
-    Vector2ui   pixelMin;
-    Vector2ui   pixelMax;
-    // In addition to the per pixel accumulation
-    float       globalWeight;
-    //
-    uint64_t    waitCounter;
-    // Pixel data starts over this offset (this should be almost always zero)
-    size_t      pixelStartOffset;
-    // SampleCount start offset over the buffer
-    size_t      sampleStartOffset;
-};
-
-struct RenderImageSaveInfo
-{
-    std::string     prefix;
-    Float           time;   // In seconds
-    Float           sample; // Mostly integer,
-                            // but can be fractional
 };
 
 struct TracerResponse : public std::variant

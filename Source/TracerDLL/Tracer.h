@@ -12,24 +12,9 @@
 #include "Tracer/CameraC.h"
 #include "Tracer/TransformC.h"
 #include "Tracer/LightC.h"
+#include "Tracer/RendererC.h"
 
 namespace BS { class thread_pool; }
-
-class RendererI
-{
-    public:
-    RendererAttributeInfoList AttributeInfo() const
-    {
-        return {};
-    };
-
-    std::string_view Name() const
-    {
-        using namespace std::string_view_literals;
-        static constexpr auto R = "TEST"sv;
-        return R;
-    }
-};
 
 using PrimGroupPtr      = std::unique_ptr<GenericGroupPrimitiveT>;
 using CameraGroupPtr    = std::unique_ptr<GenericGroupCameraT>;

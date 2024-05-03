@@ -10,6 +10,7 @@ function(gen_device_test)
     set(CURRENT_SOURCE_DIR ${MRAY_TEST_SOURCE_DIRECTORY}/Device)
 
     set(SRC_COMMON
+    ${CMAKE_CURRENT_FUNCTION_LIST_FILE}
     ${CURRENT_SOURCE_DIR}/T_DeviceMemory.cpp
     ${CURRENT_SOURCE_DIR}/T_TextureTypes.h
     ${CURRENT_SOURCE_DIR}/T_Texture.cu

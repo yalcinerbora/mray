@@ -120,7 +120,6 @@ struct VoxelizationParameters
 };
 
 // Most barebone leaf
-
 struct DefaultLeaf
 {
     PrimitiveKey primKey;

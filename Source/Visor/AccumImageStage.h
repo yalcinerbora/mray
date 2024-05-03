@@ -2,7 +2,9 @@
 
 #include <vulkan/vulkan.h>
 
-#include "MRay/TransferQueue.h"
+#include "CommonHeaders/RenderImageStructs.h"
+#include "Core/System.h"
+
 #include "VulkanTypes.h"
 #include "VulkanPipeline.h"
 #include "MainUniformBuffer.h"

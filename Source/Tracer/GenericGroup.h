@@ -61,6 +61,7 @@ concept GenericGroupC = requires(GenericGroupType gg,
     {gg.GPUMemoryUsage()} -> std::same_as<size_t>;
 
     // Can query the type
+    {gg.Name()} -> std::same_as<std::string_view>;
     {GenericGroupType::TypeName()} -> std::same_as<std::string_view>;
 };
 

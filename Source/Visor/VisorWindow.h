@@ -6,11 +6,12 @@
 #include "Core/Error.h"
 #include "Core/DataStructures.h"
 
+#include "CommonHeaders/TransferQueue.h"
+
 #include "VulkanTypes.h"
 #include "FramePool.h"
 #include "VisorGUI.h"
 #include "VisorState.h"
-
 #include "AccumImageStage.h"
 #include "TonemapStage.h"
 #include "RenderImagePool.h"

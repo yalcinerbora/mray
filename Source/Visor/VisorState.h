@@ -6,7 +6,7 @@
 #include "Core/Vector.h"
 
 //
-#include "MRay/TransferQueue.h"
+#include "CommonHeaders/AnalyticStructs.h"
 
 struct VisorAnalyticData
 {

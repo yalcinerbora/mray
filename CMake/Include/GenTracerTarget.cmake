@@ -73,6 +73,7 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/Hit.h)
 
     set(SRC_COMMON
+        ${CMAKE_CURRENT_FUNCTION_LIST_FILE}
         ${CURRENT_SOURCE_DIR}/TracerTypes.h
         ${CURRENT_SOURCE_DIR}/GenericGroup.h)
 

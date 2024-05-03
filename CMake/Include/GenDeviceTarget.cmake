@@ -35,6 +35,7 @@ function(gen_device_target)
         ${CURRENT_SOURCE_DIR}/AlgBinarySearchCUDA.h)
 
     set(SRC_COMMON
+        ${CMAKE_CURRENT_FUNCTION_LIST_FILE}
         ${CURRENT_SOURCE_DIR}/GPUAlgorithms.h
         ${CURRENT_SOURCE_DIR}/GPUSystemForward.h
         ${CURRENT_SOURCE_DIR}/GPUSystem.h

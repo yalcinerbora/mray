@@ -5,7 +5,42 @@
 namespace mray::cuda
 {
 
+GPUSemaphoreCUDA::GPUSemaphoreCUDA(SystemSemaphoreHandle sem)
+    : semSystem(sem)
+{
+    cudaExternalSemaphoreHandleDesc desc = {};
+    desc.flags = 0;
+    desc.type = (MRAY_IS_ON_WINDOWS)
+        ? cudaExternalSemaphoreHandleTypeTimelineSemaphoreWin32
+        : cudaExternalSemaphoreHandleTypeTimelineSemaphoreFd;
 
+    #ifdef MRAY_WINDOWS
+        desc.handle.win32.handle = std::bit_cast<HANDLE>(sem);
+    #else
+        desc.handle.fd = std::bit_cast<int>(sem);
+    #endif
+    CUDA_CHECK(cudaImportExternalSemaphore(&semCUDA, &desc));
+}
+
+GPUSemaphoreCUDA::GPUSemaphoreCUDA(GPUSemaphoreCUDA&& other)
+    : semSystem(other.semSystem)
+    , semCUDA(std::exchange(other.semCUDA, nullptr))
+{}
+
+GPUSemaphoreCUDA& GPUSemaphoreCUDA::operator=(GPUSemaphoreCUDA&& other)
+{
+    assert(this != &other);
+    if(semCUDA) cudaDestroyExternalSemaphore(semCUDA);
+
+    semSystem = other.semSystem;
+    semCUDA = std::exchange(other.semCUDA, nullptr);
+    return *this;
+}
+
+GPUSemaphoreCUDA::~GPUSemaphoreCUDA()
+{
+    if(semCUDA) cudaDestroyExternalSemaphore(semCUDA);
+}
 
 GPUDeviceCUDA::GPUDeviceCUDA(int deviceId, nvtxDomainHandle_t domain)
     : deviceId(deviceId)

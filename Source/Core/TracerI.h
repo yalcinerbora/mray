@@ -27,7 +27,9 @@ struct RenderImageParams
     Vector2i            resolution;
     Vector2i            regionMin;
     Vector2i            regionMax;
-    MRayColorSpaceEnum  colorSpace;
+    //
+    SystemSemaphoreHandle   semaphore;
+    uint64_t                initialCount;
 };
 
 namespace TransientPoolDetail { class TransientData; }

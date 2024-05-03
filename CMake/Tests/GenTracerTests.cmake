@@ -10,6 +10,7 @@ function(gen_tracer_test)
     set(CURRENT_SOURCE_DIR ${MRAY_TEST_SOURCE_DIRECTORY}/Tracer)
 
     set(SRC_COMMON
+        ${CMAKE_CURRENT_FUNCTION_LIST_FILE}
         ${CURRENT_SOURCE_DIR}/T_RayPartitioner.cu
         ${CURRENT_SOURCE_DIR}/T_DefaultTriangle.cu
         ${CURRENT_SOURCE_DIR}/T_DefaultLights.cu
