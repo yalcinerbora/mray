@@ -36,6 +36,8 @@ function(slang_gen_module)
         OUTPUT  ${MODULE_OUTPUT_PATH}
         COMMENT "[SHADER] Building slang-module \"${MODULE_NAME}\""
         DEPENDS ${SLANG_GEN_MODULE_SOURCES}
+        # Sometimes this command is the very first command, and slang do not create directories I think
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${MRAY_SHADER_MODULE_OUT_DIRECTORY}
         COMMAND ${MRAY_SLANG_COMPILER} ${SLANG_COMPILE_OPTIONS}
                 -o ${MODULE_OUTPUT_PATH}
                 ${SLANG_GEN_MODULE_SOURCES}

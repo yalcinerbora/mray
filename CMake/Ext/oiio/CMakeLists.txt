@@ -15,40 +15,6 @@ set(OIIO_LIB_CONFIG_DIR ${OIIO_LIB_DIR}/${MRAY_PLATFORM_NAME}/$<CONFIG>)
 append_cmake_prefix_path(${OIIO_LIB_CONFIG_DIR}/cmake)
 append_cmake_prefix_path(${OIIO_LIB_CONFIG_DIR}/pkgconfig)
 
-# This one is tedious. It requires boost :(
-# Now external project add boost with proper flags and submodules
-# Clone boost
-# Come on boost, too many deps :(
-set(OIIO_BOOST_SUBMODULE_LIST
-    # CMake
-    tools/cmake
-    # FS Related
-    libs/filesystem
-    libs/assert libs/bind libs/function
-    libs/config libs/container_hash libs/core
-    libs/describe libs/mp11 libs/static_assert
-    libs/type_traits libs/throw_exception libs/detail
-    libs/preprocessor libs/io libs/iterator
-    libs/smart_ptr libs/concept_check libs/move
-    libs/conversion libs/system libs/predef
-    libs/typeof libs/function_types libs/variant2
-    libs/atomic libs/mpl libs/fusion
-    libs/align libs/tuple libs/optional
-    libs/utility libs/functional
-    # Thread Related
-    libs/thread
-    libs/chrono libs/integer libs/container
-    libs/ratio libs/intrusive libs/date_time
-    libs/algorithm libs/rational libs/exception
-    libs/array libs/lexical_cast libs/regex
-    libs/range libs/unordered libs/numeric/conversion
-    libs/tokenizer
-    #
-    libs/headers
-    # I thought this was only for windows but ubuntu compile also required it
-    libs/winapi
-)
-
 # Normally MRay uses structure of arrays style library directory structure
 # which is easy for the consumer libraries to find the actual lib/dlls
 #
@@ -99,25 +65,6 @@ ExternalProject_Add_Step(oiio_zlib_ext install_extra
                 DEPENDEES install
                 COMMENT "Copy zlib to Lib folder"
 )
-
-# Boost FS and thread
-set(BOOST_INSTALL_LOC ${OIIO_TMP_DIR}/boost)
-mray_build_ext_dependency_git(
-        NAME boost_fs_thrd_ext
-        URL "https://github.com/boostorg/boost.git"
-        TAG "b6928ae5c92e21a04bbe17a558e6e066dbe632f6" # v1.82.0
-        # We will only download some of the boost
-        SPECIFIC_SUBMODULES ${OIIO_BOOST_SUBMODULE_LIST}
-
-        LICENSE_NAME "LICENSE_1_0.txt"
-        DONT_OVERRIDE_INSTALL_SUFFIXES
-        OVERRIDE_INSTALL_PREFIX ${BOOST_INSTALL_LOC}
-        BUILD_ARGS
-            -DBUILD_SHARED_LIBS=OFF
-            -DBOOST_INCLUDE_LIBRARIES:STRING=filesystem|thread
-            -DBOOST_INSTALL_LAYOUT=tagged
-)
-append_cmake_prefix_path(${BOOST_INSTALL_LOC})
 
 # OpenEXR & IMath
 set(IMATH_INSTALL_LOC ${OIIO_TMP_DIR}/imath)
@@ -242,17 +189,15 @@ append_cmake_prefix_path(${LIBPNG_INSTALL_LOC})
 mray_build_ext_dependency_git(
         NAME oiio_ext
         URL "https://github.com/OpenImageIO/oiio.git"
-        TAG "c518e2da23cca3915beb70e7b7f2e0fd485af24d" # v2.5.7.0
+        TAG "feb28fd2647b088f5b083621a98fec97fddaf167" # Latest commit as  of  05.05.2024
 
         LICENSE_NAME "LICENSE.md"
         BUILD_ARGS
             # OIIO caches xxx_ROOT variables
-            # and libarries does not change between configs
+            # and libaries does not change between configs
 
             # TODO: Change this later(oiio has "print" clashes with fmt)
             -DCMAKE_CXX_STANDARD=20
-            -DBoost_USE_STATIC_LIBS=ON
-            -DBoost_NO_WARN_NEW_VERSIONS=ON
             -DEMBEDPLUGINS=ON
             -DUSE_PYTHON=OFF
             -DUSE_OPENGL=ON
@@ -264,7 +209,6 @@ mray_build_ext_dependency_git(
             -DBUILD_DOCS=OFF
             -DBUILD_TESTING=OFF
             -DINSTALL_DOCS=OFF
-            -DOIIO_DISABLE_BOOST_STACKTRACE=ON
             -DBUILD_MISSING_FMT=OFF # We have a fmt
             -DINTERNALIZE_FMT=OFF # On Linux this was required
             -DALWAYS_PREFER_CONFIG=ON
@@ -276,19 +220,17 @@ mray_build_ext_dependency_git(
             #-DImath_DIR:PATH=${OIIO_LIB_CONFIG_DIR}/cmake/Imath
             -DImath_ROOT:PATH=${IMATH_INSTALL_LOC}
             -DOpenEXR_ROOT:PATH=${OPENEXR_INSTALL_LOC}
-            -DBoost_ROOT:PATH=${BOOST_INSTALL_LOC}
             -DZLIB_ROOT:PATH=${ZLIB_INSTALL_LOC}
             -DJPEGTurbo_ROOT:PATH=${JPEGTURBO_INSTALL_LOC}
             -DJPEG_ROOT:PATH=${JPEGTURBO_INSTALL_LOC}
             -DTIFF_ROOT:PATH=${LIBTIFF_INSTALL_LOC}
             -DPNG_ROOT:PATH=${LIBPNG_INSTALL_LOC}
-            -DVERBOSE=ON
+            -DVERBOSE=OFF
 
             # Do not install msvc runtime libraries
             -DCMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP=ON
 
         DEPENDENCIES
-            boost_fs_thrd_ext
             openexr_ext
             libtiff_ext
             libjpeg_turbo_ext
