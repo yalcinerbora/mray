@@ -289,17 +289,9 @@ class TracerMock : public TracerI
                                         std::vector<TextureId> textures) override;
 
 
-    SurfaceId       CreateSurface(SurfacePrimList primBatches,
-                                  SurfaceMatList material,
-                                  TransformId = TracerConstants::IdentityTransformId,
-                                  OptionalAlphaMapList alphaMaps = TracerConstants::NoAlphaMapList,
-                                  CullBackfaceFlagList cullFaceFlags = TracerConstants::CullFaceTrueList) override;
-    LightSurfaceId  CreateLightSurface(LightId,
-                                       TransformId = TracerConstants::IdentityTransformId,
-                                       MediumId = TracerConstants::VacuumMediumId) override;
-    CamSurfaceId    CreateCameraSurface(CameraId,
-                                        TransformId = TracerConstants::IdentityTransformId,
-                                        MediumId = TracerConstants::VacuumMediumId) override;
+    SurfaceId       CreateSurface(SurfaceParams) override;
+    LightSurfaceId  CreateLightSurface(LightSurfaceParams) override;
+    CamSurfaceId    CreateCameraSurface(CameraSurfaceParams) override;
     void            CommitSurfaces(AcceleratorType) override;
 
 
@@ -310,11 +302,11 @@ class TracerMock : public TracerI
     void        PushRendererAttribute(RendererId, uint32_t attributeIndex,
                                       TransientData data) override;
 
-    void        StartRender(RendererId, CamSurfaceId,
-                            RenderImageParams) override;
-    void        StopRender() override;
+    void            StartRender(RendererId, CamSurfaceId,
+                                RenderImageParams) override;
+    void            StopRender() override;
     //
-    Optional<TracerImgOutput> DoRenderWork() override;
+    RendererOutput  DoRenderWork() override;
 
     void        ClearAll() override;
 };
@@ -1648,15 +1640,11 @@ inline void TracerMock::PushMediumAttribute(MediumGroupId gId, Vector2ui mediumR
              mediumRange[0], mediumRange[1], textureIdString);
 }
 
-inline SurfaceId TracerMock::CreateSurface(SurfacePrimList primList,
-                                           SurfaceMatList matList,
-                                           TransformId tId,
-                                           OptionalAlphaMapList alphaMaps,
-                                           CullBackfaceFlagList cullFaceFlags)
+inline SurfaceId TracerMock::CreateSurface(SurfaceParams p)
 {
-    assert(primList.size() == matList.size());
-    assert(matList.size() == alphaMaps.size());
-    assert(alphaMaps.size() == cullFaceFlags.size());
+    assert(p.primBatches.size() == p.materials.size());
+    assert(p.materials.size() == p.alphaMaps.size());
+    assert(p.alphaMaps.size() == p.cullFaceFlags.size());
 
     size_t surfId = surfaceCounter.fetch_add(1);
     if(!print) return SurfaceId(surfId);
@@ -1666,45 +1654,44 @@ inline SurfaceId TracerMock::CreateSurface(SurfacePrimList primList,
     std::string alphaMapString;
     std::string cullFaceString;
 
-    for(size_t i = 0; i < primList.size(); i++)
+    for(size_t i = 0; i < p.primBatches.size(); i++)
     {
-        primIdString += MRAY_FORMAT("{}, ", static_cast<uint32_t>(primList[i]));
-        matIdString += MRAY_FORMAT("{}, ", static_cast<uint32_t>(matList[i]));
-        cullFaceString += MRAY_FORMAT("{}, ", cullFaceFlags[i]);
-        alphaMapString += (alphaMaps[i].has_value())
-                            ? MRAY_FORMAT("{}, ", static_cast<uint32_t>(matList[i]))
-                            : "None";
+        primIdString += MRAY_FORMAT("{}, ", static_cast<uint32_t>(p.primBatches[i]));
+        matIdString += MRAY_FORMAT("{}, ", static_cast<uint32_t>(p.materials[i]));
+        cullFaceString += MRAY_FORMAT("{}, ", p.cullFaceFlags[i]);
+        alphaMapString += (p.alphaMaps[i].has_value())
+                            ? MRAY_FORMAT("{}, ", static_cast<uint32_t>(p.alphaMaps[i].value()))
+                            : "None, ";
     }
 
     MRAY_LOG("Creating Surface({}): Trans:{}, Prim: [{}], Mat: [{}], AlphaMap: [{}], CullFace: [{}]",
-             surfId, static_cast<uint32_t>(tId), primIdString, matIdString, alphaMapString, cullFaceString);
+             surfId, static_cast<uint32_t>(p.transformId),
+             primIdString, matIdString, alphaMapString, cullFaceString);
     return SurfaceId(surfId);
 }
 
-inline LightSurfaceId TracerMock::CreateLightSurface(LightId lId,
-                                                     TransformId tId,
-                                                     MediumId mId)
+inline LightSurfaceId TracerMock::CreateLightSurface(LightSurfaceParams p)
 {
     size_t lightSurfId = lightSurfaceCounter.fetch_add(1);
     if(!print) return LightSurfaceId(lightSurfId);
 
 
     MRAY_LOG("Creating LightSurface({}): Light: {}, Trans: {}, Medium: {}",
-             lightSurfId, static_cast<uint32_t>(lId), static_cast<uint32_t>(tId),
-             static_cast<uint32_t>(mId));
+             lightSurfId, static_cast<uint32_t>(p.lightId),
+             static_cast<uint32_t>(p.transformId),
+             static_cast<uint32_t>(p.mediumId));
     return LightSurfaceId(lightSurfId);
 }
 
-inline CamSurfaceId TracerMock::CreateCameraSurface(CameraId cId,
-                                                    TransformId tId,
-                                                    MediumId mId)
+inline CamSurfaceId TracerMock::CreateCameraSurface(CameraSurfaceParams p)
 {
     size_t camSurfId = camSurfaceCounter.fetch_add(1);
     if(!print) return CamSurfaceId(camSurfId);
 
     MRAY_LOG("Creating CameraSurface({}): Camera: {}, Trans: {}, Medium: {}",
-             camSurfId, static_cast<uint32_t>(cId), static_cast<uint32_t>(tId),
-             static_cast<uint32_t>(mId));
+             camSurfId, static_cast<uint32_t>(p.cameraId),
+             static_cast<uint32_t>(p.transformId),
+             static_cast<uint32_t>(p.mediumId));
     return CamSurfaceId(camSurfId);
 }
 
@@ -1718,7 +1705,7 @@ inline void TracerMock::CommitSurfaces(AcceleratorType accelType)
     {
         case SOFTWARE_NONE:         accelTypeName = "Software None";    break;
         case SOFTWARE_BASIC_BVH:    accelTypeName = "Software BVH";     break;
-        case HARDWARE:              accelTypeName = "Hardware";     break;
+        case HARDWARE:              accelTypeName = "Hardware";         break;
     }
     MRAY_LOG("Committing surface with accelerator type: \"{}\"",
              accelTypeName);
@@ -1761,7 +1748,7 @@ inline void TracerMock::StopRender()
     throw MRayError("\"StopRender\" is not implemented in mock tracer!");
 }
 
-inline Optional<TracerImgOutput> TracerMock::DoRenderWork()
+inline RendererOutput TracerMock::DoRenderWork()
 {
     throw MRayError("\"DoRenderWork\" is not implemented in mock tracer!");
 }

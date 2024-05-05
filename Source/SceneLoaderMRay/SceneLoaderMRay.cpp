@@ -5,6 +5,7 @@
 #include "Core/Timer.h"
 #include "Core/NormTypes.h"
 #include "Core/Filesystem.h"
+#include "Core/TypeNameGenerators.h"
 
 #include "MeshLoader/EntryPoint.h"
 #include "MeshLoaderJson.h"
@@ -22,57 +23,13 @@
 
 #include "JsonNode.h"
 
+using namespace TypeNameGen::Runtime;
+
 struct TexturedAttributeData
 {
     TransientData                       data;
     std::vector<Optional<TextureId>>    textures;
 };
-
-
-std::string AddPrimitivePrefix(std::string_view primType)
-{
-    return (std::string(TracerConstants::PRIM_PREFIX) +
-            std::string(primType));
-}
-
-std::string AddAddLightPrefix(std::string_view lightType)
-{
-    return (std::string(TracerConstants::LIGHT_PREFIX) +
-            std::string(lightType));
-}
-
-std::string AddTransformPrefix(std::string_view transformType)
-{
-    return (std::string(TracerConstants::TRANSFORM_PREFIX) +
-            std::string(transformType));
-}
-
-std::string AddMaterialPrefix(std::string_view matType)
-{
-    return (std::string(TracerConstants::MAT_PREFIX) +
-            std::string(matType));
-}
-
-std::string AddCameraPrefix(std::string_view camType)
-{
-    return (std::string(TracerConstants::CAM_PREFIX) +
-            std::string(camType));
-}
-
-std::string AddMediumPrefix(std::string_view medType)
-{
-    return (std::string(TracerConstants::MEDIUM_PREFIX) +
-            std::string(medType));
-}
-
-std::string CreatePrimBackedLightType(std::string_view primType)
-{
-    using namespace std::literals;
-    auto result = ("Primitive"s +
-                   std::string(TracerConstants::PRIM_PREFIX) +
-                   std::string(primType));
-    return result;
-}
 
 template<class AttributeInfoList>
 AttributeCountList GenericFindAttributeCounts(std::vector<AttributeCountList>& attributeCounts,
@@ -1665,7 +1622,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
             std::string_view primTypeName = sceneJson[PRIMITIVE_LIST]
                                                         [primListIndex]
                                                         [TYPE];
-            finalTypeName = CreatePrimBackedLightType(primTypeName);
+            finalTypeName = CreatePrimBackedLightTypeName(primTypeName);
         }
         lightNodes[finalTypeName].emplace_back(std::move(node));
 
@@ -1813,10 +1770,15 @@ void SceneLoaderMRay::CreateSurfaces(TracerI& tracer, const std::vector<SurfaceS
             alphaMaps.push_back(tId);
             cullFace.push_back(surf.doCullBackFace[i]);
         }
-        SurfaceId mRaySurf = tracer.CreateSurface(primList, matList,
-                                                  transformId,
-                                                  alphaMaps,
-                                                  cullFace);
+        SurfaceParams surfParams
+        {
+            primList,
+            matList,
+            transformId,
+            alphaMaps,
+            cullFace
+        };
+        SurfaceId mRaySurf = tracer.CreateSurface(surfParams);
         mRaySurfaces.push_back(mRaySurf);
     }
 }
@@ -1831,8 +1793,11 @@ void SceneLoaderMRay::CreateLightSurfaces(TracerI& tracer, const std::vector<Lig
         TransformId tId = (surf.transformId == EMPTY_TRANSFORM)
                             ? TracerConstants::IdentityTransformId
                             : transformMappings.map.at(surf.transformId).second;
-
-        LightSurfaceId mRaySurf = tracer.CreateLightSurface(lId, tId, mId);
+        LightSurfaceParams lSurfParams
+        {
+            lId, tId, mId
+        };
+        LightSurfaceId mRaySurf = tracer.CreateLightSurface(lSurfParams);
         mRayLightSurfaces.push_back(mRaySurf);
     }
 }
@@ -1848,7 +1813,11 @@ void SceneLoaderMRay::CreateCamSurfaces(TracerI& tracer, const std::vector<Camer
                             ? TracerConstants::IdentityTransformId
                             : transformMappings.map.at(surf.transformId).second;
 
-        CamSurfaceId mRaySurf = tracer.CreateCameraSurface(cId, tId, mId);
+        CameraSurfaceParams cSurfParams
+        {
+            cId, tId, mId
+        };
+        CamSurfaceId mRaySurf = tracer.CreateCameraSurface(cSurfParams);
         mRayCamSurfaces.push_back(mRaySurf);
     }
 }

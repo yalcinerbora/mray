@@ -13,13 +13,6 @@ MRAY_HYBRID Matrix4x4 KCInvertTransforms::operator()(const Matrix4x4& matrix) co
     return matrix.Inverse();
 }
 
-std::string_view TransformGroupSingle::TypeName()
-{
-    using namespace std::literals;
-    static std::string_view name = "(T)Identity"sv;
-    return name;
-}
-
 typename TransformGroupIdentity::DataSoA TransformGroupIdentity::SoA() const
 {
     return EmptyType{};
@@ -128,13 +121,6 @@ TransAttributeInfoList TransformGroupSingle::AttributeInfo() const
 typename TransformGroupSingle::DataSoA TransformGroupSingle::SoA() const
 {
     return soa;
-}
-
-std::string_view TransformGroupMulti::TypeName()
-{
-    using namespace std::literals;
-    static std::string_view name = "(T)Multi"sv;
-    return name;
 }
 
 TransformGroupMulti::TransformGroupMulti(uint32_t groupId,

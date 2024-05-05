@@ -24,13 +24,6 @@ I KCAdjustIndices<I>::operator()(const I& t) const
     return t + attributeOffset;
 }
 
-std::string_view PrimGroupTriangle::TypeName()
-{
-    using namespace std::literals;
-    static std::string_view name = "(P)Triangle"sv;
-    return name;
-}
-
 PrimGroupTriangle::PrimGroupTriangle(uint32_t primGroupId,
                                      const GPUSystem& sys)
     : GenericGroupPrimitive(primGroupId, sys,
@@ -199,12 +192,7 @@ typename PrimGroupTriangle::DataSoA PrimGroupTriangle::SoA() const
     return soa;
 }
 
-std::string_view PrimGroupSkinnedTriangle::TypeName()
-{
-    using namespace std::literals;
-    static std::string_view name = "(P)TriangleSkinned"sv;
-    return name;
-}
+
 
 PrimGroupSkinnedTriangle::PrimGroupSkinnedTriangle(uint32_t primGroupId,
                                                    const GPUSystem& sys)

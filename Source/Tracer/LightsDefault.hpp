@@ -327,7 +327,6 @@ static_assert(LightC<LightSkysphere<CoOctoCoordConverter>>);
 
 }
 
-
 template <PrimitiveGroupC PG>
 void LightGroupPrim<PG>::HandlePrimBatches(const PrimBatchList&)
 {
@@ -337,9 +336,11 @@ void LightGroupPrim<PG>::HandlePrimBatches(const PrimBatchList&)
 template <PrimitiveGroupC PG>
 std::string_view LightGroupPrim<PG>::TypeName()
 {
-    using namespace std::string_literals;
-    static const std::string name = "(L)"s + std::string(PG::TypeName()) + "Light"s;
-    return name;
+    using namespace TypeNameGen::Runtime;
+    using namespace std::string_view_literals;
+    static const auto PGName = PG::TypeName();
+    static const auto Name = CreatePrimBackedLightTypeName(PGName);
+    return Name;
 }
 
 template <PrimitiveGroupC PG>
@@ -438,10 +439,10 @@ void LightGroupSkysphere<CC>::HandlePrimBatches(const PrimBatchList&)
 template <LightDetail::CoordConverterC CC>
 std::string_view LightGroupSkysphere<CC>::TypeName()
 {
-    using namespace std::literals;
-    static std::string name = (std::string("(L)SkysphereLight"sv) +
-                               std::string(PrimGroup::TypeName()));
-    return name;
+    using namespace TypeNameGen::CompTime;
+    using namespace std::string_view_literals;
+    static constexpr auto Name = "Skysphere"sv;
+    return LightTypeName<Name>;
 }
 
 template <LightDetail::CoordConverterC CC>

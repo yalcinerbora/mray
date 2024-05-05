@@ -13,18 +13,9 @@
 #include "Tracer/TransformC.h"
 #include "Tracer/LightC.h"
 #include "Tracer/RendererC.h"
+#include "Tracer/AcceleratorC.h"
 
 namespace BS { class thread_pool; }
-
-using PrimGroupPtr      = std::unique_ptr<GenericGroupPrimitiveT>;
-using CameraGroupPtr    = std::unique_ptr<GenericGroupCameraT>;
-using MediumGroupPtr    = std::unique_ptr<GenericGroupMediumT>;
-using MaterialGroupPtr  = std::unique_ptr<GenericGroupMaterialT>;
-using TransformGroupPtr = std::unique_ptr<GenericGroupTransformT>;
-using LightGroupPtr     = std::unique_ptr<GenericGroupLightT>;
-using RendererPtr       = std::unique_ptr<RendererI>;
-
-//using XX = std::map<std::string_view, PrimGroupGenerator>;
 
 using PrimGenerator     = GeneratorFuncType<GenericGroupPrimitiveT, uint32_t,
                                             GPUSystem&>;
@@ -39,24 +30,67 @@ using TransGenerator    = GeneratorFuncType<GenericGroupTransformT, uint32_t,
 using LightGenerator    = GeneratorFuncType<GenericGroupLightT, uint32_t,
                                             GPUSystem&, const TextureViewMap&,
                                             GenericGroupPrimitiveT&>;
-using RendererGenerator = GeneratorFuncType<RendererI>;
+using RendererGenerator = GeneratorFuncType<RendererI, GPUSystem&>;
+using AccelGenerator    = GeneratorFuncType<BaseAcceleratorI,
+                                            BS::thread_pool&, GPUSystem&>;
 
-// TODO: Move this somewhere safe
+// Type packed surfaces
+using MaterialWorkBatchInfo = std::tuple<GenericGroupTransformT*,
+                                         GenericGroupMaterialT*,
+                                         GenericGroupPrimitiveT*>;
+using LightWorkBatchInfo = std::pair<GenericGroupTransformT*,
+                                     GenericGroupLightT*>;
+
+using CameraWorkBatchInfo = std::pair<GenericGroupTransformT*,
+                                      GenericGroupCameraT*>;
+
+struct WorkBatchInfo
+{
+    std::vector<CameraWorkBatchInfo>    camWorkBatches;
+    std::vector<LightWorkBatchInfo>     lightWorkBatches;
+    std::vector<MaterialWorkBatchInfo>  matWorkBatches;
+};
+
+// TODO: Move these somewhere safe
 template<class K, class V>
 class ThreadSafeMap
 {
     public:
-    using MapType = std::map<K, V>;
-    using Iterator = typename MapType::iterator;
+    using MapType   = std::map<K, V>;
+    using Iterator  = typename MapType::iterator;
     private:
-    std::map<K, V>              map;
+    MapType                     map;
     mutable std::shared_mutex   mutex;
 
     public:
     template<class... Args>
     std::pair<Iterator, bool>   try_emplace(const K& k, Args&&... args);
     const V&                    at(const K& k) const;
+    void                        remove_at(const K&);
     void                        clear();
+
+    const MapType&              Map() const;
+    MapType&                    Map();
+};
+
+template<class T>
+class ThreadSafeVector
+{
+    public:
+    using VecType = std::vector<T>;
+    using Iterator = typename VecType::iterator;
+    private:
+    VecType                     vector;
+    mutable std::shared_mutex   mutex;
+
+    public:
+    template<class... Args>
+    T&                          emplace_back(Args&&... args);
+    const T&                    at(size_t i) const;
+    void                        clear();
+
+    const VecType&              Vec() const;
+    VecType&                    Vec();
 };
 
 class TracerBase : public TracerI
@@ -69,9 +103,15 @@ class TracerBase : public TracerI
     ThreadSafeMap<MatGroupId, MaterialGroupPtr>      matGroups;
     ThreadSafeMap<TransGroupId, TransformGroupPtr>   transGroups;
     ThreadSafeMap<LightGroupId, LightGroupPtr>       lightGroups;
-    ThreadSafeMap<RendererId, RendererPtr>           rendererGroups;
-    // Current Renderer
-    RendererPtr currentRenderer;
+    ThreadSafeMap<RendererId, RendererPtr>           renderers;
+
+    // Surface
+    ThreadSafeVector<Pair<SurfaceId, SurfaceParams>>            surfaces;
+    ThreadSafeVector<Pair<LightSurfaceId, LightSurfaceParams>>  lightSurfaces;
+    ThreadSafeVector<Pair<CamSurfaceId, CameraSurfaceParams>>   cameraSurfaces;
+    //
+    AcceleratorPtr                          accelerator;
+    RendererI*                              currentRenderer = nullptr;
 
     std::atomic_uint32_t    primGroupCounter    = 0;
     std::atomic_uint32_t    camGroupCounter     = 0;
@@ -79,6 +119,7 @@ class TracerBase : public TracerI
     std::atomic_uint32_t    matGroupCounter     = 0;
     std::atomic_uint32_t    transGroupCounter   = 0;
     std::atomic_uint32_t    lightGroupCounter   = 0;
+    std::atomic_uint32_t    redererCounter      = 0;
     // Surface Related
     std::atomic_uint32_t    surfaceCounter      = 0;
     std::atomic_uint32_t    lightSurfaceCounter = 0;
@@ -109,8 +150,9 @@ class TracerBase : public TracerI
     std::map<std::string_view, TransGenerator>      transGenerator;
     std::map<std::string_view, LightGenerator>      lightGenerator;
     std::map<std::string_view, RendererGenerator>   rendererGenerator;
+    std::map<AcceleratorType,  AccelGenerator>      acceleratorGenerator;
 
-    // Type Generators
+    // Current Types
     std::map<std::string_view, PrimAttributeInfoList>       primAttributeInfoMap;
     std::map<std::string_view, CamAttributeInfoList>        camAttributeInfoMap;
     std::map<std::string_view, MediumAttributeInfoList>     medAttributeInfoMap;
@@ -257,17 +299,9 @@ class TracerBase : public TracerI
                                         std::vector<TextureId> textures) override;
 
 
-    SurfaceId       CreateSurface(SurfacePrimList primBatches,
-                                  SurfaceMatList material,
-                                  TransformId = TracerConstants::IdentityTransformId,
-                                  OptionalAlphaMapList alphaMaps = TracerConstants::NoAlphaMapList,
-                                  CullBackfaceFlagList cullFaceFlags = TracerConstants::CullFaceTrueList) override;
-    LightSurfaceId  CreateLightSurface(LightId,
-                                       TransformId = TracerConstants::IdentityTransformId,
-                                       MediumId = TracerConstants::VacuumMediumId) override;
-    CamSurfaceId    CreateCameraSurface(CameraId,
-                                        TransformId = TracerConstants::IdentityTransformId,
-                                        MediumId = TracerConstants::VacuumMediumId) override;
+    SurfaceId       CreateSurface(SurfaceParams) override;
+    LightSurfaceId  CreateLightSurface(LightSurfaceParams) override;
+    CamSurfaceId    CreateCameraSurface(CameraSurfaceParams) override;
     void            CommitSurfaces(AcceleratorType) override;
 
 
@@ -278,13 +312,12 @@ class TracerBase : public TracerI
     void        PushRendererAttribute(RendererId, uint32_t attributeIndex,
                                       TransientData data) override;
 
-    void        StartRender(RendererId, CamSurfaceId,
-                            RenderImageParams) override;
-    void        StopRender() override;
-    //
-    Optional<TracerImgOutput> DoRenderWork() override;
+    void            StartRender(RendererId, CamSurfaceId,
+                                RenderImageParams) override;
+    void            StopRender() override;
+    RendererOutput  DoRenderWork() override;
 
-    void        ClearAll() override;
+    void            ClearAll() override;
 };
 
 template<class K, class V>
@@ -304,8 +337,65 @@ const V& ThreadSafeMap<K, V>::at(const K& k) const
 }
 
 template<class K, class V>
+void ThreadSafeMap<K, V>::remove_at(const K& k)
+{
+    std::unique_lock<std::shared_mutex> l(mutex);
+    map.erase(map.find(k));
+}
+
+template<class K, class V>
 void ThreadSafeMap<K, V>::clear()
 {
     std::unique_lock<std::shared_mutex> l(mutex);
     map.clear();
+}
+
+template<class K, class V>
+const typename ThreadSafeMap<K, V>::MapType&
+ThreadSafeMap<K, V>::Map() const
+{
+    return map;
+}
+
+template<class K, class V>
+typename ThreadSafeMap<K, V>::MapType&
+ThreadSafeMap<K, V>::Map()
+{
+    return map;
+}
+
+template<class T>
+template<class... Args>
+T& ThreadSafeVector<T>::emplace_back(Args&&... args)
+{
+    std::shared_lock<std::shared_mutex> l(mutex);
+    return vector.emplace_back(std::forward<Args>(args)...);
+}
+
+template <class T>
+const T& ThreadSafeVector<T>::at(size_t i) const
+{
+    std::shared_lock<std::shared_mutex> l(mutex);
+    return vector.at(i);
+}
+
+template <class T>
+void ThreadSafeVector<T>::clear()
+{
+    std::unique_lock<std::shared_mutex> l(mutex);
+    vector.clear();
+}
+
+template <class T>
+const typename ThreadSafeVector<T>::VecType&
+ThreadSafeVector<T>::Vec() const
+{
+    return vector;
+}
+
+template <class T>
+typename ThreadSafeVector<T>::VecType&
+ThreadSafeVector<T>::Vec()
+{
+    return vector;
 }

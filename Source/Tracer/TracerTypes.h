@@ -76,6 +76,10 @@ using MediumKey         = KeyT<CommonKey, 8, 24>;
 using LightKey          = KeyT<CommonKey, 8, 24>;
 using CameraKey         = KeyT<CommonKey, 8, 24>;
 
+static_assert(PrimBatchKey::BatchBits == PrimitiveKey::BatchBits,
+              "\"PrimBatch\" batch bits (groupId) must be "
+              "the same of \"Primitive\" batch bits");
+
 using RayIndex = CommonIndex;
 
 // Quadruplet of Ids

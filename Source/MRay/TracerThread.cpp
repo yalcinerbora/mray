@@ -30,7 +30,7 @@ void TracerThread::LoopWork()
     // Set reset renderer etc.
 
 
-    Optional<TracerImgOutput> output = tracer->DoRenderWork();
+    //Optional<TracerImgOutput> output = tracer->DoRenderWork();
     //if(output) transferQueue.Enqueue(...)
 
     }

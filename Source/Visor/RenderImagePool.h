@@ -2,14 +2,14 @@
 
 #include "VulkanTypes.h"
 #include "ImageLoader/EntryPoint.h"
-#include "CommonHeaders/RenderImageStructs.h"
+#include "Common/RenderImageStructs.h"
 
 class FramePool;
 namespace BS { class thread_pool; }
 
 struct RenderImageInitInfo
 {
-    Vector2i                        extent;
+    Vector2ui                       extent;
     MRayColorSpaceEnum              hdrColorSpace;
     Pair<MRayColorSpaceEnum, Float> sdrColorSpace;
     uint32_t depth      = 1;

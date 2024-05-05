@@ -11,6 +11,7 @@
 #include "TransformC.h"
 #include "Random.h"
 
+
 namespace LinearAccelDetail
 {
     // SoA data of triangle group
@@ -47,6 +48,13 @@ namespace LinearAccelDetail
                                                   Float xi,
                                                   const AcceleratorLeaf& l) const;
         public:
+        // Constructor & Destructor
+                                AcceleratorLinear(const TransDataSoA& tSoA,
+                                                  const PrimDataSoA& pSoA,
+                                                  const DataSoA& dataSoA,
+                                                  TransformKey tId,
+                                                  AcceleratorKey aId);
+
         MRAY_HYBRID             AcceleratorLinear(const TransDataSoA& tSoA,
                                                   const PrimDataSoA& pSoA,
                                                   const DataSoA& dataSoA,
@@ -85,10 +93,9 @@ class AcceleratorGroupLinear final : public AcceleratorGroupI
 
     Span<Span<AABB3>>               dAABBs;
     Span<AcceleratorLeaf>           dXXXXX;
+    Span<>;
 
-    std::vector<std::vector>
-
-    // CPU view
+    std::vector<std::vector>;
 
     // Internal concrete accel counter
     uint32_t accelGroupId;
@@ -109,8 +116,8 @@ class AcceleratorGroupLinear final : public AcceleratorGroupI
     {}
 
     //
-    AcceleratorId   ReserveSurface(const SurfPrimIdList& primIds,
-                                   const SurfMatIdList& matIds) override
+    AcceleratorId ReserveSurface(const SurfPrimIdList& primIds,
+                                 const SurfMatIdList& matIds) override
     {
         using enum PrimTransformType;
 
@@ -189,21 +196,15 @@ class AcceleratorGroupLinear final : public AcceleratorGroupI
     }
 };
 
-class AcceleratorBaseLinear final : public AcceleratorBaseI
+class AcceleratorBaseLinear final : public BaseAcceleratorT<AcceleratorBaseLinear>
 {
-    std::vector<BaseAcceleratorLeaf> leafs;
-
-    //
-    AcceleratorId ReserveSurface(TransformKey, const PrimMatIdPairList& primMatPairings) override
-    {
-        // Assert all primitives are same...
-    }
+    private:
+    std::vector<BaseAcceleratorLeaf>                    leafs;
+    std::vector<std::unique_ptr<AcceleratorGroupI*>>    localAccelerators;
 
 
-
-
-
-
+    public:
+    AcceleratorBaseLinear(BS::thread_pool&, GPUSystem&);
 
     // Cast Rays and Find HitIds, and WorkKeys.
     // (the last one will be used to partition)
@@ -227,8 +228,107 @@ class AcceleratorBaseLinear final : public AcceleratorBaseI
                         const GPUSystem& s) override;
 
     // Each leaf has a surface
+    void Construct(BaseAccelConstructParams p) override;
 };
 
 
+inline
+AcceleratorBaseLinear::AcceleratorBaseLinear(BS::thread_pool& tp, GPUSystem& sys)
+    : BaseAcceleratorT<AcceleratorBaseLinear>(tp, sys)
+{
+
+}
+
+template<class KeyType>
+struct BatchFetcher
+{
+    typename KeyType::Type operator()(auto id)
+    {
+        uint32_t batchKeyRaw = static_cast<uint32_t>(id);
+        return KeyType(batchKeyRaw).FetchBatchPortion();
+    }
+};
+using PrimBatchFetcher = BatchFetcher<PrimBatchKey>;
+using TransBatchFetcher = BatchFetcher<TransformKey>;
+
+inline
+void AcceleratorBaseLinear::Construct(BaseAccelConstructParams p)
+{
+    using SurfParam = Pair<SurfaceId, SurfaceParams>;
+    using LightSurfParam = Pair<LightSurfaceId, LightSurfaceParams>;
+    // Pack the surfaces via transform / primitive
+    //
+    // PG TG {S0,...,SN},  -> AccelGroup (One AccelInstance per S)
+    // PG TG {S0,...,SN},  -> AccelGroup
+    // ....
+    // PG TG {S0,...,SN}   -> AccelGroup
+    auto surfList = p.mSurfList;
+    using SurfP = Pair<SurfaceId, SurfaceParams>;
+    std::stable_sort(surfList.begin(), surfList.end(),
+    [](const SurfP& left, const SurfP& right) -> bool
+    {
+        return (left.second.primBatches.front() <
+                right.second.primBatches.front());
+    });
+    //
+    std::stable_sort(surfList.begin(), surfList.end(),
+    [](const SurfP& left, const SurfP& right) -> bool
+    {
+        return (left.second.transformId < right.second.transformId);
+    });
+    // TODO: One linear access to vector should be enough
+    // to generate this after sort, but this is simpler to write
+    // change this if this is a perf bottleneck.
+    std::vector<AccelGroupConstructParams> partitions;
+    auto start = surfList.begin();
+    while(start != surfList.end())
+    {
+        auto pBatchId = start->second.primBatches.front();
+        uint32_t pGroupId = PrimBatchFetcher()(pBatchId);
+        auto end = std::upper_bound(start, surfList.end(), pGroupId,
+        [](const auto& surf,const uint32_t& value)
+        {
+            uint32_t batchPortion = PrimBatchFetcher()(surf.second.primBatches.front());
+            return batchPortion < value;
+        });
+        partitions.emplace_back(AccelGroupConstructParams{});
+        partitions.back().primGroup = p.primGroups.at(PrimGroupId(pGroupId)).get();
+        partitions.back().transformGroups = &p.transformGroups;
+        auto innerStart = start;
+        while(innerStart != end)
+        {
+            TransformId tId = innerStart->second.transformId;
+            uint32_t tGroupId = TransBatchFetcher()(tId);
+            auto innerEnd = std::upper_bound(start, surfList.end(), tGroupId,
+            [](const auto& surf, const uint32_t& value)
+            {
+                auto tId = surf.second.transformId;
+                return TransBatchFetcher()(tId) < value;
+            });
+            auto surfSpan = Span<SurfParam>(innerStart, innerEnd);
+            partitions.back().tGroupSurfs.emplace_back(TransGroupId(tGroupId), surfSpan);
+            innerStart = innerEnd;
+        }
+        start = end;
+    }
+    // Accumulate the light surfaces as well
+    // ...
+
+    // Generate Accelerators
+    for(const auto& partition : partitions)
+    {
+        using namespace TypeNameGen::Runtime;
+        using namespace std::string_view_literals;
+        std::string accelTypeName = CreateAcceleratorType("Linear"sv,
+                                                          partition.primGroup->Name());
+
+        uint32_t aGroupId = idCounter++;
+        auto accelPtr = accelGenerators.at(accelTypeName)(std::move(aGroupId),
+                                                          threadPool, gpuSystem);
+        auto loc = generatedAccels.emplace(aGroupId, std::move(accelPtr));
+        AcceleratorGroupI* acc = loc.first->second.get();
+        acc->Construct(std::move(partition));
+    }
+}
 
 #include "AcceleratorLinear.hpp"

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AnalyticStructs.h"
+#include "TransientPool/TransientPool.h"
 
 struct RenderBufferInfo
 {
@@ -11,7 +12,7 @@ struct RenderBufferInfo
     // actual underlying data type is always float
     MRayColorSpaceEnum  renderColorSpace;
     // Total size of the film
-    Vector2i            resolution;
+    Vector2ui           resolution;
     // Render output may be spectral data then this represents
     // amount of spectral samples (equally distributed)
     uint32_t            depth;
@@ -49,6 +50,6 @@ struct TracerOptions
 
 struct RendererOutput
 {
-    Optional<RendererAnalyticData> analytics;
-    Optional<RenderImageSection> imageOut;
+    Optional<RendererAnalyticData>  analytics;
+    Optional<RenderImageSection>    imageOut;
 };

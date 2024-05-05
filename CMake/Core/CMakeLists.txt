@@ -38,6 +38,7 @@ set(SRC_MATH
 )
 
 set(SRC_UTILITY
+    ${CURRENT_SOURCE_DIR}/TypeNameGenerators.h
     ${CURRENT_SOURCE_DIR}/BitFunctions.h
     ${CURRENT_SOURCE_DIR}/MemAlloc.h
     ${CURRENT_SOURCE_DIR}/TypeFinder.h

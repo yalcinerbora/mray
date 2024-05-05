@@ -6,7 +6,8 @@
 #include "GenericGroup.h"
 #include <map>
 
-using GenericGroupMediumT = GenericTexturedGroupT<MediumKey, MediumAttributeInfo>;
+using GenericGroupMediumT   = GenericTexturedGroupT<MediumKey, MediumAttributeInfo>;
+using MediumGroupPtr        = std::unique_ptr<GenericGroupMediumT>;
 
 template<class Child>
 class GenericGroupMedium : public GenericGroupMediumT

@@ -104,6 +104,8 @@ class GenericGroupMaterialT : public GenericTexturedGroupT<MaterialKey, MatAttri
                             const MediumKeyPairList&);
 };
 
+using MaterialGroupPtr = std::unique_ptr<GenericGroupMaterialT>;
+
 template <class Child>
 class GenericGroupMaterial : public GenericGroupMaterialT
 {

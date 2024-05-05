@@ -1,10 +1,12 @@
 #include "MaterialsDefault.h"
+#include "Core/TypeNameGenerators.h"
 
 std::string_view MatGroupLambert::TypeName()
 {
-    using namespace std::literals;
-    static std::string_view name = "(Mt)Lambert"sv;
-    return name;
+    using namespace TypeNameGen::CompTime;
+    using namespace std::string_view_literals;
+    static constexpr auto Name = "Lambert"sv;
+    return MaterialTypeName<Name>;
 }
 
 void MatGroupLambert::HandleMediums(const MediumKeyPairList& mediumList)

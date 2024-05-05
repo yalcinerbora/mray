@@ -6,7 +6,7 @@
 #include "Core/Vector.h"
 
 //
-#include "CommonHeaders/AnalyticStructs.h"
+#include "Common/AnalyticStructs.h"
 
 struct VisorAnalyticData
 {

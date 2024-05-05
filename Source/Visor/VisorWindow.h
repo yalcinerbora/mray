@@ -6,7 +6,7 @@
 #include "Core/Error.h"
 #include "Core/DataStructures.h"
 
-#include "CommonHeaders/TransferQueue.h"
+#include "Common/TransferQueue.h"
 
 #include "VulkanTypes.h"
 #include "FramePool.h"

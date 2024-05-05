@@ -52,17 +52,18 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/AcceleratorLinear.h
         ${CURRENT_SOURCE_DIR}/AcceleratorLinear.hpp)
 
+    set(SRC_RENDERERS
+        ${CURRENT_SOURCE_DIR}/RendererC.h
+        ${CURRENT_SOURCE_DIR}/RenderImageBuffer.cpp
+        ${CURRENT_SOURCE_DIR}/RenderImageBuffer.h
+        ${CURRENT_SOURCE_DIR}/ImageRenderer.h
+        ${CURRENT_SOURCE_DIR}/ImageRenderer.hpp
+        ${CURRENT_SOURCE_DIR}/ImageRenderer.cu)
 
     set(SRC_RANDOM
         ${CURRENT_SOURCE_DIR}/Random.h
         ${CURRENT_SOURCE_DIR}/Distributions.h
         ${CURRENT_SOURCE_DIR}/Distributions.cu)
-
-    set(SRC_RENDERERS
-        ${CURRENT_SOURCE_DIR}/RendererC.h
-        ${CURRENT_SOURCE_DIR}/ImageRenderer.h
-        ${CURRENT_SOURCE_DIR}/ImageRenderer.hpp
-        ${CURRENT_SOURCE_DIR}/ImageRenderer.cu)
 
     set(SRC_UTILITY
         ${CURRENT_SOURCE_DIR}/RayPartitioner.h

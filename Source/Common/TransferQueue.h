@@ -9,15 +9,6 @@
 #include "AnalyticStructs.h"
 #include "RenderImageStructs.h"
 
-struct RendererOptionPack
-{
-    using AttributeList = StaticVector<TransientData,
-                                       TracerConstants::MaxRendererAttributeCount>;
-    //
-    GenericAttributeInfoList    paramTypes;
-    AttributeList               attributes;
-};
-
 struct TracerResponse : public std::variant
 <
     CameraTransform,        // initial cam transform

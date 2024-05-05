@@ -3,6 +3,7 @@
 #include "Core/MathForward.h"
 #include "Core/Types.h"
 #include "Core/Matrix.h"
+#include "Core/TypeNameGenerators.h"
 
 #include "TransformC.h"
 #include "TracerTypes.h"
@@ -184,9 +185,10 @@ static_assert(TransformGroupC<TransformGroupMulti>);
 
 inline std::string_view TransformGroupIdentity::TypeName()
 {
-    using namespace std::literals;
-    static std::string_view name = "(T)Identity"sv;
-    return name;
+    using namespace TypeNameGen::CompTime;
+    using namespace std::string_view_literals;
+    static constexpr auto Name = "Identity"sv;
+    return TransformTypeName<Name>;
 }
 
 inline TransformGroupIdentity::TransformGroupIdentity(uint32_t groupId,
@@ -218,4 +220,20 @@ inline void TransformGroupIdentity::PushAttribute(TransformKey, TransformKey,
 inline TransformGroupIdentity::AttribInfoList TransformGroupIdentity::AttributeInfo() const
 {
     return AttribInfoList();
+}
+
+inline std::string_view TransformGroupSingle::TypeName()
+{
+    using namespace TypeNameGen::CompTime;
+    using namespace std::string_view_literals;
+    static constexpr auto Name = "Single"sv;
+    return TransformTypeName<Name>;
+}
+
+inline std::string_view TransformGroupMulti::TypeName()
+{
+    using namespace TypeNameGen::CompTime;
+    using namespace std::string_view_literals;
+    static constexpr auto Name = "Multi"sv;
+    return TransformTypeName<Name>;
 }

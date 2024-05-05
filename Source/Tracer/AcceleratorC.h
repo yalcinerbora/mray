@@ -3,10 +3,18 @@
 #include <concepts>
 
 #include "TracerTypes.h"
+
 #include "Core/Types.h"
+#include "Core/TypeGenFunction.h"
+
 #include "Device/GPUSystemForward.h"
+
 #include "Random.h"
+
 #include "PrimitiveC.h"
+#include "LightC.h"
+
+namespace BS { class thread_pool; }
 
 class IdentityTransformContext;
 
@@ -24,6 +32,10 @@ struct HitResultT
 struct AcceleratorLeaf
 {
     PrimitiveKey primitiveKey;
+    // TODO: Materials are comparably small wrt. primitives
+    // so holding a 32-bit value for each triangle is a waste of space.
+    // Reason and change this maybe?
+    MaterialKey  materialKey;
 };
 
 struct BaseAcceleratorLeaf
@@ -43,7 +55,7 @@ concept AccelC = requires(AccelType acc)
     // Has this specific constructor
     requires requires(const IdentityTransformContext& tc,
                       const typename AccelType::DataSoA& soaData)
-    {AccelType(tc, soaData, AcceleratorId{});};
+    {AccelType(tc, soaData, AcceleratorKey{});};
 
     // Closest hit and any hit
     {acc.ClosestHit(Ray{}, Vector2f{})
@@ -69,7 +81,7 @@ concept AccelInstanceGroupC = requires(AccelInstance ag,
                       // Input
                       Span<const RayGMem>{},
                       Span<const RayIndex>{},
-                      Span<const AccelIdPack>{},
+                      Span<const AcceleratorIdPack>{},
                       // Constants
                       gpuSystem)} -> std::same_as<void>;
 };
@@ -98,115 +110,133 @@ concept BaseAccelC = requires(BaseAccel ac,
                        gpuSystem)} -> std::same_as<void>;
 };
 
-
-
 namespace TracerLimits
 {
     static constexpr size_t MaxPrimBatchPerSurface = 8;
 }
 
-using SurfPrimIdList = std::array<PrimBatchId, TracerLimits::MaxPrimBatchPerSurface>;
-using SurfMatIdList = std::array<MaterialId, TracerLimits::MaxPrimBatchPerSurface>;
 
-using PrimMatIdPair = Pair<PrimBatchId, MaterialId>;
-using PrimMatIdPairList = std::array<PrimMatIdPair, TracerLimits::MaxPrimBatchPerSurface>;
-
-using PrimBatchListToAccelMapping = std::unordered_map<SurfPrimIdList, uint32_t>;
+using PrimBatchListToAccelMapping = std::unordered_map<PrimBatchList, uint32_t>;
 using LocalSurfaceToAccelMapping = std::unordered_map<uint32_t, uint32_t>;
+//
 
 using AlphaMap = TextureView<2, Float>;
+
+struct BaseAccelConstructParams
+{
+    using SurfPair = Pair<SurfaceId, SurfaceParams>;
+    using LightSurfPair = Pair<LightSurfaceId, LightSurfaceParams>;
+
+    const std::map<PrimGroupId, PrimGroupPtr>&          primGroups;
+    const std::map<LightGroupId, LightGroupPtr>&        lightGroups;
+    const std::map<TransGroupId, TransformGroupPtr>&    transformGroups;
+    const std::vector<SurfPair>&        mSurfList;
+    const std::vector<LightSurfPair>&   lSurfList;
+};
+
+struct AccelGroupConstructParams
+{
+    using SurfPair              = typename BaseAccelConstructParams::SurfPair;
+    using LightSurfPair         = typename BaseAccelConstructParams::LightSurfPair;
+    using TGroupedSurfaces      = std::vector<Pair<TransGroupId, Span<SurfPair>>>;
+    using TGroupedLightSurfaces = std::vector<Pair<TransGroupId, Span<LightSurfPair>>>;
+
+    const std::map<TransGroupId, TransformGroupPtr>* transformGroups;
+    const GenericGroupPrimitiveT*   primGroup;
+    TGroupedSurfaces                tGroupSurfs;
+    TGroupedLightSurfaces           tGroupLightSurfs;
+};
 
 class AcceleratorGroupI
 {
     public:
-    virtual     ~AcceleratorGroupI() = default;
+    virtual         ~AcceleratorGroupI() = default;
 
-    virtual void CastLocalRays(// Output
-                               Span<HitIdPack> dHitIds,
-                               Span<MetaHit> dHitParams,
-                               // I-O
-                               Span<BackupRNGState> rngStates,
-                               // Input
-                               Span<const RayGMem> dRays,
-                               Span<const RayIndex> dRayIndices,
-                               Span<const AcceleratorIdPack> dAccelIdPacks,
-                               // Constants
-                               const GPUSystem& s) = 0;
+    virtual void    CastLocalRays(// Output
+                                  Span<HitIdPack> dHitIds,
+                                  Span<MetaHit> dHitParams,
+                                  // I-O
+                                  Span<BackupRNGState> rngStates,
+                                  // Input
+                                  Span<const RayGMem> dRays,
+                                  Span<const RayIndex> dRayIndices,
+                                  Span<const AcceleratorIdPack> dAccelIdPacks,
+                                  // Constants
+                                  const GPUSystem& s) = 0;
 
-    // Map of traversables
-
-//    virtual void Construct(AcceleratorId) = 0;
-//    virtual void Reconstruct(AcceleratorId) = 0;
-
-    virtual AcceleratorId   ReserveSurface(const SurfPrimIdList& primIds,
-                                           const SurfMatIdList& matIds) = 0;
-    // How to commit? we need transforms
-    virtual void            CommitReservations(const std::vector<BaseAcceleratorLeaf>&) = 0;
-
-
-    virtual std::vector<BaseAcceleratorLeaf> A() const = 0;
-    virtual std::vector<BaseAcceleratorLeaf> B() const = 0;
-
+    virtual void Construct(AccelGroupConstructParams) = 0;
 };
 
-class AcceleratorBaseI
+using AccelGroupGenerator = GeneratorFuncType<AcceleratorGroupI, uint32_t,
+                                              BS::thread_pool&, GPUSystem&>;
+
+class BaseAcceleratorI
 {
     public:
-    virtual     ~AcceleratorBaseI() = default;
+    virtual         ~BaseAcceleratorI() = default;
 
     // Interface
-    virtual void CastRays(// Output
-                          Span<HitIdPack> dHitIds,
-                          Span<MetaHit> dHitParams,
-                          Span<SurfaceWorkKey> dWorkKeys,
-                          // Input
-                          Span<const RayGMem> dRays,
-                          Span<const RayIndex> dRayIndices,
-                          // Constants
-                          const GPUSystem& s) = 0;
+    virtual void    CastRays(// Output
+                             Span<HitIdPack> dHitIds,
+                             Span<MetaHit> dHitParams,
+                             Span<SurfaceWorkKey> dWorkKeys,
+                             // Input
+                             Span<const RayGMem> dRays,
+                             Span<const RayIndex> dRayIndices,
+                             // Constants
+                             const GPUSystem& s) = 0;
 
-    virtual void CastShadowRays(// Output
-                                Bitspan<uint32_t> dIsVisibleBuffer,
-                                Bitspan<uint32_t> dFoundMediumInterface,
-                                // Input
-                                Span<const RayIndex> dRayIndices,
-                                Span<const RayGMem> dShadowRays,
-                                // Constants
-                                const GPUSystem& s) = 0;
+    virtual void    CastShadowRays(// Output
+                                   Bitspan<uint32_t> dIsVisibleBuffer,
+                                   Bitspan<uint32_t> dFoundMediumInterface,
+                                   // Input
+                                   Span<const RayIndex> dRayIndices,
+                                   Span<const RayGMem> dShadowRays,
+                                   // Constants
+                                   const GPUSystem& s) = 0;
 
+    virtual void    CastLocalRays(// Output
+                                  Span<HitIdPack> dHitIds,
+                                  Span<MetaHit> dHitParams,
+                                  // I-O
+                                  Span<BackupRNGState> rngStates,
+                                  // Input
+                                  Span<const RayGMem> dRays,
+                                  Span<const RayIndex> dRayIndices,
+                                  Span<const AcceleratorIdPack> dAccelIdPacks,
+                                  // Constants
+                                  const GPUSystem& s) = 0;
 
-    virtual void CastLocalRays(// Output
-                               Span<HitIdPack> dHitIds,
-                               Span<MetaHit> dHitParams,
-                               // I-O
-                               Span<BackupRNGState> rngStates,
-                               // Input
-                               Span<const RayGMem> dRays,
-                               Span<const RayIndex> dRayIndices,
-                               Span<const AcceleratorIdPack> dAccelIdPacks,
-                               // Constants
-                               const GPUSystem& s) = 0;
-
-    //
-    virtual SurfaceId   ReserveSurface(TransformKey, const PrimMatIdPairList& primMatPairings) = 0;
-    // Optional alpha map / cull face flag etc
-    // TODO: Make the design available to the user?
-    virtual void        AttachAlphaMap(SurfaceId surfaceId, uint32_t pairingIndex,
-                                       AlphaMap alphaMap);
-    virtual void        SetBackfaceCulling(SurfaceId surfaceId, uint32_t pairingIndex,
-                                           bool doCullBackface);
-
-    // Commit all the surfaces that is requested
-    // Generate accelerators
-    virtual void        CommitSurfaces();
+    // Construction
+    virtual void    Construct(BaseAccelConstructParams p) = 0;
 };
 
+using AccelGroupPtr = std::unique_ptr<AcceleratorGroupI>;
+using AcceleratorPtr = std::unique_ptr<BaseAcceleratorI>;
 
-static_assert(AccelInstanceGroupC<AcceleratorInstanceGroupI>, "");
+template <class Child>
+class BaseAcceleratorT : public BaseAcceleratorI
+{
+    private:
+    protected:
+    BS::thread_pool&    threadPool;
+    GPUSystem&          gpuSystem;
+    uint32_t            idCounter = 0;
 
-// Support Concepts
-//template <class AccelType, class AccelGroupType, class PrimType>
-//concept AccelWithTransformC = requires(PrimType tg)
-//{
-//    requires AccelC<AccelType, AccelGroupType>;
-//};
+    //
+    std::map<std::string_view, AccelGroupGenerator> accelGenerators;
+    std::map<PrimGroupId, AccelGroupPtr>            generatedAccels;
+
+    public:
+                        BaseAcceleratorT(BS::thread_pool&, GPUSystem&,
+                                         std::map<std::string_view, AccelGroupGenerator>&&);
+
+};
+
+template <class C>
+BaseAcceleratorT<C>::BaseAcceleratorT(BS::thread_pool& tp, GPUSystem& system,
+                                      std::map<std::string_view, AccelGroupGenerator>&& aGen)
+    : threadPool(tp)
+    , gpuSystem(system)
+    , accelGenerators(aGen)
+{}

@@ -95,6 +95,8 @@ class GenericGroupLightT : public GenericTexturedGroupT<LightKey, LightAttribute
                             const PrimBatchList&);
 };
 
+using LightGroupPtr = std::unique_ptr<GenericGroupLightT>;
+
 template <class Child>
 class GenericGroupLight : public GenericGroupLightT
 {

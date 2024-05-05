@@ -2,11 +2,12 @@
 
 
 #include "TracerTypes.h"
+#include "RenderImageBuffer.h"
 
 #include "TransientPool/TransientPool.h"
 #include "Device/GPUSystem.h"
 #include "Core/TracerI.h"
-#include "CommonHeaders/RenderImageStructs.h"
+#include "Common/RenderImageStructs.h"
 
 template<class RendererType>
 concept RendererC = requires(RendererType rt,
@@ -167,16 +168,47 @@ class RendererI
     virtual     ~RendererI() = default;
 
     // Interface
-    virtual void            Commit() = 0;
+    virtual MRayError       Commit() = 0;
     virtual bool            IsInCommitState() const = 0;
     virtual AttribInfoList  AttributeInfo() const = 0;
     virtual void            PushAttribute(uint32_t attributeIndex,
                                           TransientData data,
                                           const GPUQueue& q) = 0;
+    virtual RendererOptionPack  CurrentAttributes() const = 0;
     // ...
-    virtual RenderBufferInfo                StartRender(RenderImageBuffer&,
-                                                        const CamSurfaceId&) = 0;
-    virtual Optional<RenderImageSection>    Work() = 0;
-    virtual void                            StopRender() = 0;
-    virtual std::string_view                Name() const = 0;
+    virtual RenderBufferInfo    StartRender(const RenderImageParams&,
+                                            const CameraKey&) = 0;
+    virtual RendererOutput      DoRender() = 0;
+    virtual void                StopRender() = 0;
+
+    virtual std::string_view    Name() const = 0;
 };
+
+using RendererPtr = std::unique_ptr<RendererI>;
+
+template <class Child>
+class RendererT : public RendererI
+{
+    public:
+    using AttribInfoList        = typename RendererI::AttribInfoList;
+    private:
+    protected:
+    const GPUSystem&                    gpuSystem;
+    std::unique_ptr<RenderImageBuffer>  renderBuffer;
+    bool                                rendering = false;
+
+    public:
+                        RendererT(const GPUSystem& s);
+    std::string_view    Name() const override;
+};
+
+template <class C>
+RendererT<C>::RendererT(const GPUSystem& s)
+    : gpuSystem(s)
+{}
+
+template <class C>
+std::string_view RendererT<C>::Name() const
+{
+    return C::TypeName();
+}

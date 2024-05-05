@@ -44,7 +44,7 @@ VulkanImage::VulkanImage(const VulkanSystemView& handles)
 {}
 
 VulkanImage::VulkanImage(const VulkanSystemView& handles,
-                         VkFormat format, Vector2i extentIn,
+                         VkFormat format, Vector2ui extentIn,
                          uint32_t depthIn)
     : extent(extentIn)
     , depth(depthIn)

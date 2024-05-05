@@ -41,7 +41,7 @@ class VulkanImage
                     VulkanImage(const VulkanSystemView&);
                     VulkanImage(const VulkanSystemView&,
                                 VkFormat format,
-                                Vector2i pixRes, uint32_t depth = 1);
+                                Vector2ui pixRes, uint32_t depth = 1);
                     VulkanImage(const VulkanImage&) = delete;
                     VulkanImage(VulkanImage&&);
     VulkanImage&    operator=(const VulkanImage&) = delete;

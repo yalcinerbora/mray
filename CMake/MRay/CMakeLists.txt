@@ -19,21 +19,21 @@ set(SRC_COMMON
 # TODO: Move this somwhere better?
 # (TracerLib/DLL, Visor.dll, MRay.exe both use these)
 # But we need to show this on VS Solution Explorer so adding here
-set(SRC_COMMON_HEADERS
-    ${MRAY_SOURCE_DIRECTORY}/CommonHeaders/RenderImageStructs.h
-    ${MRAY_SOURCE_DIRECTORY}/CommonHeaders/AnalyticStructs.h
-    ${MRAY_SOURCE_DIRECTORY}/CommonHeaders/TransferQueue.h)
+set(SRC_COMMON_GLOBAL
+    ${MRAY_SOURCE_DIRECTORY}/Common/RenderImageStructs.h
+    ${MRAY_SOURCE_DIRECTORY}/Common/AnalyticStructs.h
+    ${MRAY_SOURCE_DIRECTORY}/Common/TransferQueue.h)
 
 source_group("Tracer" FILES ${SRC_TRACER})
 source_group("Subcommands" FILES ${SRC_SUBCOMMAND})
-source_group("Common" FILES ${SRC_COMMON_HEADERS})
+source_group("Common" FILES ${SRC_COMMON_GLOBAL})
 source_group("" FILES ${SRC_COMMON})
 
 set(SRC_ALL
     ${SRC_TRACER}
     ${SRC_SUBCOMMAND}
     ${SRC_COMMON}
-    ${SRC_COMMON_HEADERS})
+    ${SRC_COMMON_GLOBAL})
 
 add_executable(MRay ${SRC_ALL})
 

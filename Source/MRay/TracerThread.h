@@ -4,7 +4,7 @@
 #include "Core/RealtimeThread.h"
 #include "Core/SharedLibrary.h"
 
-#include "CommonTransferQueue.h"
+#include "Common/TransferQueue.h"
 
 class TracerThread final : public RealtimeThread
 {

@@ -8,6 +8,7 @@
 #include "LightC.h"
 
 #include "Core/GraphicsFunctions.h"
+#include "Core/TypeNameGenerators.h"
 
 namespace LightDetail
 {

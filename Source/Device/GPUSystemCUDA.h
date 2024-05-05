@@ -215,9 +215,9 @@ class GPUQueueCUDA
     MRAY_HYBRID
     GPUFenceCUDA        Barrier() const;
     MRAY_HOST
-    void                IssueSemaphoreWait(GPUSemaphoreCUDA&, uint64_t signalValue);
+    void                IssueSemaphoreWait(GPUSemaphoreCUDA&, uint64_t waitValue) const;
     MRAY_HOST
-    void                IssueSemaphoreSignal(GPUSemaphoreCUDA&, uint64_t signalValue);
+    void                IssueSemaphoreSignal(GPUSemaphoreCUDA&, uint64_t signalValue) const;
 
     MRAY_HYBRID
     uint32_t            SMCount() const;
@@ -465,16 +465,16 @@ GPUFenceCUDA GPUQueueCUDA::Barrier() const
 }
 
 MRAY_HOST inline
-void GPUQueueCUDA::IssueSemaphoreWait(GPUSemaphoreCUDA& sem, uint64_t signalValue)
+void GPUQueueCUDA::IssueSemaphoreWait(GPUSemaphoreCUDA& sem, uint64_t waitValue) const
 {
     cudaExternalSemaphoreWaitParams waitParams = {};
-    waitParams.params.fence.value = signalValue;
+    waitParams.params.fence.value = waitValue;
     CUDA_CHECK(cudaWaitExternalSemaphoresAsync(&sem.semCUDA, &waitParams,
                                                1, stream));
 }
 
 MRAY_HOST inline
-void GPUQueueCUDA::IssueSemaphoreSignal(GPUSemaphoreCUDA& sem, uint64_t signalValue)
+void GPUQueueCUDA::IssueSemaphoreSignal(GPUSemaphoreCUDA& sem, uint64_t signalValue) const
 {
     cudaExternalSemaphoreSignalParams signalParams = {};
     signalParams.params.fence.value = signalValue;

@@ -8,25 +8,15 @@
 #include "DataStructures.h"
 #include "System.h"
 
-#define MRAY_GENERIC_ID(NAME, TYPE) enum class NAME : TYPE {}
+#include "Common/RenderImageStructs.h"
 
-struct TracerImgOutput
-{
-    SystemSemaphoreHandle   imgReadySignal;
-    SystemSemaphoreHandle   imgUsedSignal;
-    const Byte*             imagePtr;
-    uint32_t                sampleSectionOffset;
-    Vector2i                regionMin;
-    Vector2i                regionMax;
-    uint32_t                layerIndex;
-    MRayColorSpaceEnum      colorSpace;
-};
+#define MRAY_GENERIC_ID(NAME, TYPE) enum class NAME : TYPE {}
 
 struct RenderImageParams
 {
-    Vector2i            resolution;
-    Vector2i            regionMin;
-    Vector2i            regionMax;
+    Vector2ui               resolution;
+    Vector2ui               regionMin;
+    Vector2ui               regionMax;
     //
     SystemSemaphoreHandle   semaphore;
     uint64_t                initialCount;
@@ -63,6 +53,8 @@ namespace TracerConstants
     static constexpr std::string_view MAT_PREFIX        = "(Mt)";
     static constexpr std::string_view CAM_PREFIX        = "(C)";
     static constexpr std::string_view MEDIUM_PREFIX     = "(Md)";
+    static constexpr std::string_view ACCEL_PREFIX      = "(A)";
+    static constexpr std::string_view RENDERER_PREFIX   = "(R)";
 }
 
 enum class AcceleratorType
@@ -175,6 +167,16 @@ constexpr PrimitiveAttributeLogic PrimAttributeStringifier::FromString(std::stri
     return PrimitiveAttributeLogic(END);
 }
 
+// For transfer of options
+struct RendererOptionPack
+{
+    using AttributeList = StaticVector<TransientData,
+                                       TracerConstants::MaxRendererAttributeCount>;
+    //
+    GenericAttributeInfoList    paramTypes;
+    AttributeList               attributes;
+};
+
 // Prim related
 MRAY_GENERIC_ID(PrimGroupId, uint32_t);
 MRAY_GENERIC_ID(PrimBatchId, uint32_t);
@@ -261,6 +263,29 @@ namespace TracerConstants
                                                             std::nullopt);
     static const auto CullFaceTrueList = CullBackfaceFlagList(StaticVecSize(MaxPrimBatchPerSurface),
                                                               true);
+};
+
+struct SurfaceParams
+{
+    SurfacePrimList         primBatches;
+    SurfaceMatList          materials;
+    TransformId             transformId     = TracerConstants::IdentityTransformId;
+    OptionalAlphaMapList    alphaMaps       = TracerConstants::NoAlphaMapList;
+    CullBackfaceFlagList    cullFaceFlags   = TracerConstants::CullFaceTrueList;
+};
+
+struct LightSurfaceParams
+{
+    LightId     lightId;
+    TransformId transformId = TracerConstants::IdentityTransformId;
+    MediumId    mediumId    = TracerConstants::VacuumMediumId;
+};
+
+struct CameraSurfaceParams
+{
+    CameraId    cameraId;
+    TransformId transformId = TracerConstants::IdentityTransformId;
+    MediumId    mediumId    = TracerConstants::VacuumMediumId;
 };
 
 class [[nodiscard]] TracerI
@@ -463,22 +488,13 @@ class [[nodiscard]] TracerI
     //
     // Surfaces
     // Basic surface
-    virtual SurfaceId       CreateSurface(SurfacePrimList primBatches,
-                                          SurfaceMatList material,
-                                          TransformId = TracerConstants::IdentityTransformId,
-                                          OptionalAlphaMapList alphaMaps = TracerConstants::NoAlphaMapList,
-                                          CullBackfaceFlagList cullFaceFlags = TracerConstants::CullFaceTrueList) = 0;
+    virtual SurfaceId       CreateSurface(SurfaceParams) = 0;
     // These may not be "surfaces" by nature but user must register them.
     // Renderer will only use the cameras/lights registered here
     // Same goes for other surfaces as well
     // Primitive-backed lights imply accelerator generation
-    virtual LightSurfaceId  CreateLightSurface(LightId,
-                                               TransformId = TracerConstants::IdentityTransformId,
-                                               MediumId = TracerConstants::VacuumMediumId) = 0;
-    virtual CamSurfaceId    CreateCameraSurface(CameraId,
-                                                TransformId = TracerConstants::IdentityTransformId,
-                                                MediumId = TracerConstants::VacuumMediumId) = 0;
-
+    virtual LightSurfaceId  CreateLightSurface(LightSurfaceParams) = 0;
+    virtual CamSurfaceId    CreateCameraSurface(CameraSurfaceParams) = 0;
     virtual void            CommitSurfaces(AcceleratorType) = 0;
 
     //================================//
@@ -500,7 +516,7 @@ class [[nodiscard]] TracerI
 
     // Renderer does a subsection of the img rendering
     // and returns an output
-    virtual Optional<TracerImgOutput> DoRenderWork() = 0;
+    virtual RendererOutput DoRenderWork() = 0;
 
     //================================//
     //             Misc.              //

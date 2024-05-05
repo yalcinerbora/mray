@@ -1,6 +1,7 @@
 #pragma once
 
 using GenericGroupCameraT = GenericGroupT<CameraKey, CamAttributeInfo>;
+using CameraGroupPtr      = std::unique_ptr<GenericGroupCameraT>;
 
 template <class Child>
 class GenericGroupCamera : public GenericGroupCameraT

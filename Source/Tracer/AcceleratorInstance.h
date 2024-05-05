@@ -54,25 +54,25 @@ class AcceleratorWork : public AcceleratorWorkI
 
 template<AccelGroupC AG, TransformGroupC TG>
 AcceleratorWork<AG, TG>::AcceleratorInstanceGroup(const AcceleratorGroup& ag,
-                                                           const TransformGroup& tg,
-                                                           const GPUDevice& residentDevice)
+                                                  const TransformGroup& tg,
+                                                  const GPUDevice& residentDevice)
 {
 
 }
 
 template<AccelGroupC AG, TransformGroupC TG>
 void AcceleratorWork<AG, TG>::CastLocalRays(// Output
-                                                     Span<HitIdPack> dHitIds,
-                                                     Span<MetaHit> dHitParams,
-                                                     // I-O
-                                                     Span<BackupRNGState> rngStates,
-                                                     // Input
-                                                     Span<const RayGMem> dRays,
-                                                     Span<const RayIndex> dRayIndices,
-                                                     Span<const AcceleratorIdPack> dAccelIdPacks,
+                                            Span<HitIdPack> dHitIds,
+                                            Span<MetaHit> dHitParams,
+                                            // I-O
+                                            Span<BackupRNGState> rngStates,
+                                            // Input
+                                            Span<const RayGMem> dRays,
+                                            Span<const RayIndex> dRayIndices,
+                                            Span<const AcceleratorIdPack> dAccelIdPacks,
 
-                                                     // Constants
-                                                     const GPUQueue& queue)
+                                            // Constants
+                                            const GPUQueue& queue)
 {
     assert(dRays.size() == dRayIndices.size());
     assert(dRayIndices.size() == dAccelIdPacks.size());

@@ -41,7 +41,8 @@ concept TransformGroupC = requires(TGType tg)
     requires GenericGroupC<TGType>;
 };
 
-using GenericGroupTransformT = GenericGroupT<TransformKey, TransAttributeInfo>;
+using GenericGroupTransformT    = GenericGroupT<TransformKey, TransAttributeInfo>;
+using TransformGroupPtr         = std::unique_ptr<GenericGroupTransformT>;
 
 template<class Child>
 class GenericGroupTransform : public GenericGroupTransformT

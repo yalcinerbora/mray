@@ -1,4 +1,5 @@
 #include "Tracer.h"
+#include <BS/BS_thread_pool.hpp>
 
 TracerBase::TracerBase(BS::thread_pool& tp)
     : threadPool(tp)
@@ -66,7 +67,7 @@ LightAttributeInfoList TracerBase::AttributeInfo(LightGroupId id) const
 
 RendererAttributeInfoList TracerBase::AttributeInfo(RendererId id) const
 {
-    return rendererGroups.at(id)->AttributeInfo();
+    return renderers.at(id)->AttributeInfo();
 }
 
 PrimAttributeInfoList TracerBase::AttributeInfoPrim(std::string_view name) const
@@ -136,7 +137,7 @@ std::string TracerBase::TypeName(LightGroupId id) const
 
 std::string TracerBase::TypeName(RendererId id) const
 {
-    return std::string(rendererGroups.at(id)->Name());
+    return std::string(renderers.at(id)->Name());
 }
 
 PrimGroupId TracerBase::CreatePrimitiveGroup(std::string name)
@@ -677,74 +678,103 @@ void TracerBase::PushMediumAttribute(MediumGroupId gId, Vector2ui mediumRange,
                                            std::move(textures), queue);
 }
 
-SurfaceId TracerBase::CreateSurface(SurfacePrimList,
-                                    SurfaceMatList,
-                                    TransformId,
-                                    OptionalAlphaMapList,
-                                    CullBackfaceFlagList)
+SurfaceId TracerBase::CreateSurface(SurfaceParams p)
 {
-    throw MRayError("\"CreateSurface\" is not implemented in mock tracer!");
+    // Validate that all batches are in the same group
+    uint32_t groupId = 0;
+    uint32_t groupIdFirst = 0;
+    for(size_t i = 0; i < p.primBatches.size(); i++)
+    {
+        PrimBatchKey key(static_cast<uint32_t>(p.primBatches[i]));
+        uint32_t currId = key.FetchBatchPortion();
+        if(i == 0) groupIdFirst = currId;
+        else groupId |= currId;
+    }
+    if(groupIdFirst != groupId)
+        throw MRayError("PrimitiveIds of a surface must "
+                        "be the same type!");
+
+    uint32_t sId = surfaceCounter.fetch_add(1);
+    surfaces.emplace_back(SurfaceId(sId), std::move(p));
+    return SurfaceId(sId);
 }
 
-LightSurfaceId TracerBase::CreateLightSurface(LightId,
-                                              TransformId,
-                                              MediumId)
+LightSurfaceId TracerBase::CreateLightSurface(LightSurfaceParams p)
 {
-    throw MRayError("\"CreateLightSurface\" is not implemented in mock tracer!");
+    uint32_t lightSId = lightSurfaceCounter.fetch_add(1);
+    lightSurfaces.emplace_back(LightSurfaceId(lightSId), std::move(p));
+    return LightSurfaceId(lightSId);
 }
 
-CamSurfaceId TracerBase::CreateCameraSurface(CameraId,
-                                             TransformId,
-                                             MediumId)
+CamSurfaceId TracerBase::CreateCameraSurface(CameraSurfaceParams p)
 {
-    throw MRayError("\"CreateCameraSurface\" is not implemented in mock tracer!");
+    uint32_t camSId = camSurfaceCounter.fetch_add(1);
+    cameraSurfaces.emplace_back(CamSurfaceId(camSId), std::move(p));
+    return CamSurfaceId(camSId);
 }
 
-void TracerBase::CommitSurfaces(AcceleratorType)
+void TracerBase::CommitSurfaces(AcceleratorType type)
 {
-    throw MRayError("\"CommitSurfaces\" is not implemented in mock tracer!");
+    accelerator = acceleratorGenerator.at(type)(threadPool, gpuSystem);
+    accelerator->Construct(BaseAccelConstructParams
+    {
+        .primGroups = primGroups.Map(),
+        .lightGroups = lightGroups.Map(),
+        .transformGroups = transGroups.Map(),
+        .mSurfList = surfaces.Vec(),
+        .lSurfList = lightSurfaces.Vec()
+    });
 }
 
 RendererId TracerBase::CreateRenderer(std::string typeName)
 {
-    throw MRayError("\"DestroyRenderer\" is not implemented in mock tracer!");
+    uint32_t rId = redererCounter.fetch_add(1u);
+    auto renderer =  rendererGenerator.at(typeName)(gpuSystem);
+    renderers.try_emplace(RendererId(rId), std::move(renderer));
+    return RendererId(rId);
 }
 
-void TracerBase::DestroyRenderer(RendererId)
+void TracerBase::DestroyRenderer(RendererId rId)
 {
-    throw MRayError("\"DestroyRenderer\" is not implemented in mock tracer!");
+    renderers.remove_at(rId);
 }
 
-void TracerBase::CommitRendererReservations(RendererId)
+void TracerBase::CommitRendererReservations(RendererId rId)
 {
-    throw MRayError("\"CommitRendererReservations\" is not implemented in mock tracer!");
+    renderers.at(rId)->Commit();
 }
 
-bool TracerBase::IsRendererCommitted(RendererId) const
+bool TracerBase::IsRendererCommitted(RendererId rId) const
 {
-    return false;
+    return renderers.at(rId)->IsInCommitState();
 }
 
-void TracerBase::PushRendererAttribute(RendererId, uint32_t,
-                                              TransientData)
+void TracerBase::PushRendererAttribute(RendererId rId,
+                                       uint32_t attribIndex,
+                                       TransientData data)
 {
-    throw MRayError("\"PushRendererAttribute\" is not implemented in mock tracer!");
+    // TODO: Change this
+    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    renderers.at(rId)->PushAttribute(attribIndex, std::move(data),
+                                     queue);
 }
 
-void TracerBase::StartRender(RendererId, CamSurfaceId,
-                             RenderImageParams)
+void TracerBase::StartRender(RendererId rId, CamSurfaceId cId,
+                             RenderImageParams params)
 {
-    throw MRayError("\"StartRender\" is not implemented in mock tracer!");
+    currentRenderer = renderers.at(rId).get();
+    auto camKey = CameraKey(static_cast<uint32_t>(cId));
+    currentRenderer->StartRender(params, camKey);
 }
 
 void TracerBase::StopRender()
 {
-    throw MRayError("\"StopRender\" is not implemented in mock tracer!");
+    currentRenderer->StopRender();
 }
 
-Optional<TracerImgOutput> TracerBase::DoRenderWork()
+RendererOutput TracerBase::DoRenderWork()
 {
-    throw MRayError("\"DoRenderWork\" is not implemented in mock tracer!");
+    return currentRenderer->DoRender();
 }
 
 void TracerBase::ClearAll()
@@ -755,7 +785,7 @@ void TracerBase::ClearAll()
     matGroups.clear();
     transGroups.clear();
     lightGroups.clear();
-    rendererGroups.clear();
+    renderers.clear();
     //
     primGroupCounter = 0;
     camGroupCounter = 0;

@@ -12,6 +12,7 @@
 #include "Core/Matrix.h"
 #include "Core/DataStructures.h"
 #include "Core/GraphicsFunctions.h"
+#include "Core/TypeNameGenerators.h"
 
 #include "PrimitiveC.h"
 #include "ShapeFunctions.h"
@@ -311,6 +312,22 @@ class PrimGroupSkinnedTriangle final : public GenericGroupPrimitive<PrimGroupSki
                                           const GPUQueue& queue) override;
     DataSoA                 SoA() const;
 };
+
+inline std::string_view PrimGroupTriangle::TypeName()
+{
+    using namespace TypeNameGen::CompTime;
+    using namespace std::string_view_literals;
+    static constexpr auto Name = "Triangle"sv;
+    return PrimTypeName<Name>;
+}
+
+inline std::string_view PrimGroupSkinnedTriangle::TypeName()
+{
+    using namespace TypeNameGen::CompTime;
+    using namespace std::string_view_literals;
+    static constexpr auto Name = "TriangleSkinned"sv;
+    return PrimTypeName<Name>;
+}
 
 #include "PrimitiveDefaultTriangle.hpp"
 

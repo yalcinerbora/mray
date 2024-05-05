@@ -205,6 +205,7 @@ template <PrimitiveGroupC PrimGroup, TransformGroupC TransGroup>
 constexpr auto AcquireTransformContextGenerator();
 
 using GenericGroupPrimitiveT = GenericGroupT<PrimBatchKey, PrimAttributeInfo>;
+using PrimGroupPtr           = std::unique_ptr<GenericGroupPrimitiveT>;
 
 template<class Child>
 class GenericGroupPrimitive : public GenericGroupT<PrimBatchKey, PrimAttributeInfo>
