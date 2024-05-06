@@ -93,7 +93,7 @@ function(slang_gen_spriv)
         -fvk-use-entrypoint-name
         -capability sm_6_0
         -emit-spirv-directly
-        -fp-mode $<$<CONFIG:Debug>:precise> $<$<CONFIG:Release>:fast>
+        -fp-mode $<IF:$<CONFIG:Debug>,precise,fast>
         # Config related preprocessor flags
         $<$<CONFIG:Release>:-O3>
         $<$<CONFIG:Debug>:-O1>
