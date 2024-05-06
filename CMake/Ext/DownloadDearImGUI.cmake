@@ -9,6 +9,7 @@ mray_build_ext_dependency_git(
         -DCMAKE_MODULE_PATH=${MRAY_CONFIG_LIB_DIRECTORY}/cmake
     DEPENDS
         glfw_ext
+        vulkan_headers_ext
 
 )
 
