@@ -25,7 +25,7 @@ enum class PrimTransformType : uint8_t
     // and for instanced primitives, a single accelerator can be built
     // for group of primitives (meshes)
     LOCALLY_CONSTANT_TRANSFORM,
-    // Each primitive in a group will different
+    // Each primitive in a group will have different
     // and (maybe) multiple transforms.
     // This prevents the ray-casting to utilize a single local space
     // accelerator. Such primitive instantiations

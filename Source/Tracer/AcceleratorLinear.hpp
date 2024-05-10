@@ -163,9 +163,28 @@ AcceleratorGroupLinear<PG>::AcceleratorGroupLinear(uint32_t accelGroupId,
                                                    const GenericGroupPrimitiveT& pg)
     : accelGroupId(accelGroupId)
     , pg(static_cast<const GenericGroupPrimitiveT&>(pg))
-    , concreteAccelCounter(0)
-    , surfaceIdCounter(0)
 {}
+
+template<PrimitiveGroupC PG>
+void AcceleratorGroupLinear<PG>::DetermineConcereteAccelCount(const AccelGroupConstructParams& p)
+{
+    using enum PrimTransformType;
+    if constexpr(PG::TransformLogic == LOCALLY_CONSTANT_TRANSFORM)
+    {
+        // This means we can fully utilize the primitive
+        //p.s
+
+
+
+    }
+    else
+    {
+        // PG supports "PER_PRIMITIVE_TRANSFORM", we cannot refer to the same
+        // accelerator, we need to construct an accelerator for each instance
+        concreteAccelCount = instanceCount;
+    }
+
+}
 
 template<PrimitiveGroupC PG>
 void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p)
@@ -232,38 +251,69 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p)
         hTransformKeys[index] = TransformKey(static_cast<uint32_t>(surf.transformId));
         index++;
     }
-    //for(const auto& lSurfList : p.tGroupLightSurfs)
-    //for(const auto& [_, surf] : lSurfList.second)
-    //{
-    //    //surf.
-    //    //const auto& view = p.textureViews->at(surf.alphaMaps[i]);
-    //    //    assert(std::holds_alternative<TextureView<2, Float>>(view));
-    //    //    hAlphaMaps[index][i] = std::get<TextureView<2, Float>>(view);
-    //    //    hCullFaceFlags[index][i] = surf.cullFaceFlags[i];
-    //    //    hMaterialKeys[index][i] == MaterialKey(static_cast<CommonKey>(surf.materials[i]));
-    //    //    hPrimRanges[index][i] = pg.BatchRange(surf.primBatches[i]);
-    //    InitRest(index, 0);
-    //    hTransformKeys[index] = TransformKey(static_cast<uint32_t>(surf.transformId));
-    //    index++;
-    //}
+
+    // TODO: Sharing std::array<..> for lights is waste of space
+    // Maybe enable multi-prim lights later
+    for(const auto& lSurfList : p.tGroupLightSurfs)
+    for(const auto& [_, lSurf] : lSurfList.second)
+    {
+        InitRest(index, 0);
+        PrimBatchId primBatchId = p.lightGroup->LightPrimBatch(lSurf.lightId);
+        hPrimRanges[index].front() = pg.BatchRange(primBatchId);
+        hTransformKeys[index] = TransformKey(static_cast<uint32_t>(lSurf.transformId));
+        index++;
+    }
+    assert(index == totalSurfaceCount);
+
+    // Copy these host vectors to GPU
+
+    // Find out the concerete accel count
+    DetermineConcereteAccelCount();
+
+    // Find the instance type count
+    // Pair of [TransformType, PrimitiveType]
+    // defines an instance, since we are on a prim typed class
+    // we need to check transform groups, this is already partitioned by the
+    // base accelerator, we just need to get the size
+    //
+    // However, light types also has its own partitioned array, so we need to
+    // add only the non-duplicates there
+    instanceTypeCount = p.tGroupSurfs.size();
+    instanceTypeCount += std::transform_reduce(p.tGroupLightSurfs.cbegin(),
+                                               p.tGroupLightSurfs.cend(),
+                                               size_t(0), std::plus{},
+    [&](const auto& groupedLightSurf)
+    {
+        TransGroupId tId = groupedLightSurf.first;
+        auto loc = std::find_if(p.tGroupSurfs.cbegin(),
+                                p.tGroupSurfs.cend(),
+        [tId](const auto groupedSurf)
+        {
+            return groupedSurf.first != tId;
+        });
+        return (loc == p.tGroupSurfs.cend()) ? 0 : 1;
+    });
+
+    // Actual instance count is the total surface count
+    instanceCount = totalSurfaceCount;
 }
 
 template<PrimitiveGroupC PG>
 size_t AcceleratorGroupLinear<PG>::InstanceCount() const
 {
-
+    return instanceCount;
 }
 
 template<PrimitiveGroupC PG>
 uint32_t AcceleratorGroupLinear<PG>::InstanceTypeCount() const
 {
-
+    return instanceTypeCount;
 }
 
 template<PrimitiveGroupC PG>
 uint32_t AcceleratorGroupLinear<PG>::UsedIdBitsInKey() const
 {
-
+    return BitFunctions::RequiredBitsToRepresent(instanceTypeCount);
 }
 
 template<PrimitiveGroupC PG>

@@ -131,9 +131,13 @@ class AcceleratorGroupLinear final : public AcceleratorGroupI
 
     // We do not have an accelerator structure
     // Internal concrete accel counter
-    uint32_t accelGroupId;
-    uint32_t concreteAccelCounter;
-    uint32_t surfaceIdCounter;
+    uint32_t accelGroupId       = 0;
+    uint32_t concreteAccelCount = 0;
+    uint32_t instanceCount      = 0;
+    uint32_t instanceTypeCount  = 0;
+
+    protected:
+    void        DetermineConcereteAccelCount(const AccelGroupConstructParams&);
 
     public:
     // Constructors & Destructor

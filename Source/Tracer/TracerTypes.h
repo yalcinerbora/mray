@@ -63,18 +63,22 @@ using CommonIndex = uint32_t;
 // Work key when a ray hit an object
 // this key will be used to partition
 // rays with respect to materials
-using SurfaceWorkKey = KeyT<CommonKey, 16, 16>;
+using SurfaceWorkKey = KeyT<CommonKey, 14, 18>;
 using AccelWorkKey = KeyT<CommonKey, 8, 24>;
 
 // Accelerator key
 using AcceleratorKey    = KeyT<CommonKey, 12, 20>;
 using PrimitiveKey      = KeyT<CommonKey, 4, 28>;
 using PrimBatchKey      = KeyT<CommonKey, 4, 28>;
-using MaterialKey       = KeyT<CommonKey, 12, 20>;
+using MaterialKey       = KeyT<CommonKey, 10, 22>;
 using TransformKey      = KeyT<CommonKey, 8, 24>;
 using MediumKey         = KeyT<CommonKey, 8, 24>;
-using LightKey          = KeyT<CommonKey, 8, 24>;
 using CameraKey         = KeyT<CommonKey, 8, 24>;
+using LightKey          = MaterialKey;
+using LightOrMatKey     = LightKey;
+
+static_assert(std::is_same_v<LightKey, MaterialKey>,
+              "Material and Light keys must match due to variant like usage");
 
 static_assert(PrimBatchKey::BatchBits == PrimitiveKey::BatchBits,
               "\"PrimBatch\" batch bits (groupId) must be "
@@ -89,10 +93,10 @@ static constexpr size_t HitKeyPackAlignment = (sizeof(PrimitiveKey) +
                                                sizeof(AcceleratorKey));
 struct alignas(HitKeyPackAlignment) HitKeyPack
 {
-    PrimitiveKey     primKey;
-    MaterialKey      matId;     // TODO: There should be light here<--
-    TransformKey     transId;
-    AcceleratorKey   accelId;
+    PrimitiveKey    primKey;
+    LightOrMatKey   matId;
+    TransformKey    transId;
+    AcceleratorKey  accelId;
 
     //....
 };

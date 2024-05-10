@@ -131,11 +131,12 @@ struct AccelGroupConstructParams
     using SurfPair              = typename BaseAccelConstructParams::SurfPair;
     using LightSurfPair         = typename BaseAccelConstructParams::LightSurfPair;
     using TGroupedSurfaces      = std::vector<Pair<TransGroupId, Span<const SurfPair>>>;
-    using TGroupedLightSurfaces = std::vector<Pair<TransGroupId, Span<const PrimBatchId>>>;
+    using TGroupedLightSurfaces = std::vector<Pair<TransGroupId, Span<const LightSurfPair>>>;
 
     const std::map<TransGroupId, TransformGroupPtr>* transformGroups;
     const TextureViewMap*                            textureViews;
     const GenericGroupPrimitiveT*   primGroup;
+    const GenericGroupLightT*       lightGroup;
     TGroupedSurfaces                tGroupSurfs;
     TGroupedLightSurfaces           tGroupLightSurfs;
 };
@@ -233,8 +234,7 @@ class BaseAcceleratorT : public BaseAcceleratorI
                            const std::map<PrimGroupId, PrimGroupPtr>& primGroups,
                            const std::map<TransGroupId, TransformGroupPtr>& transGroups,
                            const TextureViewMap& textureViews);
-    void AddLightSurfacesToPartitions(std::vector<PrimBatchId>&,
-                                      std::vector<AccelGroupConstructParams>& partitions,
+    void AddLightSurfacesToPartitions(std::vector<AccelGroupConstructParams>& partitions,
                                       Span<const typename BaseAccelConstructParams::LightSurfPair> surfList,
                                       const std::map<LightGroupId, LightGroupPtr>& lightGroups);
 
@@ -341,8 +341,7 @@ void BaseAcceleratorT<C>::PartitionSurfaces(std::vector<AccelGroupConstructParam
 }
 
 template <class C>
-void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<PrimBatchId>& lightPrimBatchList,
-                                                       std::vector<AccelGroupConstructParams>& partitions,
+void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<AccelGroupConstructParams>& partitions,
                                                        Span<const typename BaseAccelConstructParams::LightSurfPair> lSurfList,
                                                        const std::map<LightGroupId, LightGroupPtr>& lightGroups)
 {
@@ -357,17 +356,6 @@ void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<PrimBatchId>&
     {
         return left.second.transformId < right.second.transformId;
     }));
-    assert(lightPrimBatchList.empty());
-
-    // First convert lights to prim batches
-    lightPrimBatchList.reserve(lSurfList.size());
-    for(const auto& lSurf : lSurfList)
-    {
-        uint32_t lGroupId = LightGroupIdFetcher()(lSurf.second.lightId);
-        auto groupId = LightGroupId(lGroupId);
-        PrimBatchId primBatchId = lightGroups.at(groupId)->LightPrimBatch(lSurf.second.lightId);
-        lightPrimBatchList.push_back(primBatchId);
-    }
 
     // Now partition
     auto start = lSurfList.begin();
@@ -383,7 +371,8 @@ void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<PrimBatchId>&
 
         //
         auto groupId = LightGroupId(lGroupId);
-        const GenericGroupPrimitiveT* pGroup = &lightGroups.at(groupId)->GenericPrimGroup();
+        const GenericGroupLightT* lGroup = lightGroups.at(groupId).get();
+        const GenericGroupPrimitiveT* pGroup = &lGroup->GenericPrimGroup();
         auto slot = std::find_if(partitions.begin(), partitions.end(),
         [pGroup](const auto& partition)
         {
@@ -395,11 +384,13 @@ void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<PrimBatchId>&
             {
                 .transformGroups = partitions.front().transformGroups,
                 .primGroup = pGroup,
+                .lightGroup = lGroup,
                 .tGroupSurfs = {},
                 .tGroupLightSurfs = {}
             });
             slot = partitions.end() - 1;
         }
+        else if(slot->lightGroup) slot->lightGroup = lGroup;
 
         // Sub-partition wrt. transform
         auto innerStart = start;
@@ -415,10 +406,8 @@ void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<PrimBatchId>&
             });
             size_t elemCount = std::distance(innerStart, loc);
             size_t startDistance = std::distance(lSurfList.begin(), innerStart);
-            Span<const PrimBatchId> pBatchSpan(lightPrimBatchList.cbegin() + startDistance,
-                                               elemCount);
-
-            slot->tGroupLightSurfs.emplace_back(TransGroupId(tGroupId), pBatchSpan);
+            slot->tGroupLightSurfs.emplace_back(TransGroupId(tGroupId),
+                                                lSurfList.subspan(startDistance, elemCount));
             innerStart = loc;
         }
     }
@@ -431,9 +420,7 @@ void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
     PartitionSurfaces(partitions, p.mSurfList, p.primGroups,
                       p.transformGroups, p.texViewMap);
     // Add primitive-backed lights surfaces as well
-    std::vector<PrimBatchId> globalLightPrimBatches;
-    AddLightSurfacesToPartitions(globalLightPrimBatches,
-                                 partitions, p.lSurfList, p.lightGroups);
+    AddLightSurfacesToPartitions(partitions, p.lSurfList, p.lightGroups);
 
     // Generate the accelerators
     for(const auto& partition : partitions)
