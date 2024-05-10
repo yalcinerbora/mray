@@ -131,9 +131,14 @@ MRayError VisorCommand::Invoke()
     // this is for debugging
     BS::thread_pool threadPool(1);
 
+    // Get the tracer dll
+    TracerThread tracerThread(transferQueue, threadPool);
+    //e = tracerThread.MTInitialize(tracerConfigFile);
+    //if(e) return e;
+
+
     // Actual initialization, process path should be called from here
     // In dll it may return .dll's path (on windows, I think)
-
     std::string processPath = GetProcessPath();
     e = visorSystem->MTInitialize(transferQueue,
                                   &threadPool,
@@ -141,15 +146,8 @@ MRayError VisorCommand::Invoke()
                                   processPath);
     if(e) return e;
 
-    // Get the tracer dll
-    //TracerThread tracerThread(transferQueue);
-    //e = tracerThread.MTInitialize(tracerConfigFile);
-    //if(e) return e;
-
     // Start the tracer thread
     //tracerThread.Start();
-
-
 
     // ====================== //
     //     Real-time Loop     //

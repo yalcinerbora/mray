@@ -230,9 +230,10 @@ class LightGroupPrim final : public GenericGroupLight<LightGroupPrim<PrimGroupT>
                                      std::vector<TextureId>,
                                      const GPUQueue& queue) override;
 
-    DataSoA                 SoA() const;
-    const PrimGroup&        PrimitiveGroup() const;
-
+    DataSoA                         SoA() const;
+    const PrimGroup&                PrimitiveGroup() const;
+    const GenericGroupPrimitiveT&   GenericPrimGroup() const override;
+    bool                            IsPrimitiveBacked() const override;
 };
 
 template <LightDetail::CoordConverterC CoordConverter>
@@ -304,8 +305,10 @@ class LightGroupSkysphere final : public GenericGroupLight<LightGroupSkysphere<C
                                      std::vector<TextureId>,
                                      const GPUQueue& queue) override;
 
-    DataSoA                 SoA() const;
-    const PrimGroup&        PrimitiveGroup() const;
+    DataSoA                         SoA() const;
+    const PrimGroup&                PrimitiveGroup() const;
+    const GenericGroupPrimitiveT&   GenericPrimGroup() const override;
+    bool                            IsPrimitiveBacked() const override;
 
 };
 

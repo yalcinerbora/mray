@@ -432,6 +432,18 @@ const PG& LightGroupPrim<PG>::PrimitiveGroup() const
     return primGroup;
 }
 
+template <PrimitiveGroupC PG>
+const GenericGroupPrimitiveT& LightGroupPrim<PG>::GenericPrimGroup() const
+{
+    return primGroup;
+}
+
+template <PrimitiveGroupC PG>
+bool LightGroupPrim<PG>::IsPrimitiveBacked() const
+{
+    return true;
+}
+
 template <LightDetail::CoordConverterC CC>
 void LightGroupSkysphere<CC>::HandlePrimBatches(const PrimBatchList&)
 {}
@@ -532,4 +544,16 @@ template <LightDetail::CoordConverterC CC>
 const typename LightGroupSkysphere<CC>::PrimGroup& LightGroupSkysphere<CC>::PrimitiveGroup() const
 {
     return primGroup;
+}
+
+template <LightDetail::CoordConverterC CC>
+const GenericGroupPrimitiveT& LightGroupSkysphere<CC>::GenericPrimGroup() const
+{
+    return primGroup;
+}
+
+template <LightDetail::CoordConverterC CC>
+bool LightGroupSkysphere<CC>::IsPrimitiveBacked() const
+{
+    return false;
 }

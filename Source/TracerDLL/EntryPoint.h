@@ -18,4 +18,3 @@ TracerI* ConstructTracer(BS::thread_pool&);
 
 extern "C" MRAY_TRACER_DEVICE_ENTRYPOINT
 void DestroyTracer(TracerI*);
-

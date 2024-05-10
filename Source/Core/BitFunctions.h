@@ -2,6 +2,7 @@
 
 #include <concepts>
 #include <cassert>
+#include <bit>
 
 #include "Vector.h"
 
@@ -15,6 +16,9 @@ namespace BitFunctions
 
     template<std::unsigned_integral T>
     constexpr T RotateRight(T value, T shiftAmount);
+
+    template<std::unsigned_integral T>
+    constexpr T RequiredBitsToRepresent(T value);
 }
 
 template<std::integral T>
@@ -44,4 +48,11 @@ constexpr T BitFunctions::RotateRight(T value, T shiftAmount)
     T result = (value >> shiftAmount);
     result |= (value << (Bits - shiftAmount));
     return result;
+}
+
+template<std::unsigned_integral T>
+constexpr T BitFunctions::RequiredBitsToRepresent(T value)
+{
+    constexpr T Bits = sizeof(T) * CHAR_BIT;
+    return (Bits - std::countl_zero(value));
 }

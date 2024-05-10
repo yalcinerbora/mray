@@ -93,6 +93,10 @@ class GenericGroupLightT : public GenericTexturedGroupT<LightKey, LightAttribute
     public:
     virtual IdList  Reserve(const std::vector<AttributeCountList>&,
                             const PrimBatchList&);
+    //
+    virtual bool                            IsPrimitiveBacked() const = 0;
+    virtual const GenericGroupPrimitiveT&   GenericPrimGroup() const = 0;
+    virtual PrimBatchId                     LightPrimBatch(LightId) const = 0;
 };
 
 using LightGroupPtr = std::unique_ptr<GenericGroupLightT>;
@@ -100,12 +104,15 @@ using LightGroupPtr = std::unique_ptr<GenericGroupLightT>;
 template <class Child>
 class GenericGroupLight : public GenericGroupLightT
 {
+    protected:
+    std::map<LightId, PrimBatchId>  primMappings;
     public:
                         GenericGroupLight(uint32_t groupId, const GPUSystem&,
                                           const TextureViewMap&,
                                           size_t allocationGranularity = 2_MiB,
                                           size_t initialReservartionSize = 4_MiB);
     std::string_view    Name() const override;
+    PrimBatchId         LightPrimBatch(LightId) const override;
 };
 
 // Meta Light Class
@@ -439,4 +446,10 @@ template <class C>
 std::string_view GenericGroupLight<C>::Name() const
 {
     return C::TypeName();
+}
+
+template <class C>
+PrimBatchId GenericGroupLight<C>::LightPrimBatch(LightId lId) const
+{
+    return primMappings.at(lId);
 }

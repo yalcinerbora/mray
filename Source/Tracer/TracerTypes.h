@@ -14,7 +14,7 @@ struct RNGDispenserT;
 
 using RNGDispenser = RNGDispenserT<uint32_t>;
 
-using MetaHit = MetaHitPtrT<Vector2, Vector3>;
+using MetaHit = MetaHitT<2>;
 
 // Differential portion of a ray
 class DiffRay{};
@@ -67,10 +67,10 @@ using SurfaceWorkKey = KeyT<CommonKey, 16, 16>;
 using AccelWorkKey = KeyT<CommonKey, 8, 24>;
 
 // Accelerator key
-using AcceleratorKey    = KeyT<CommonKey, 8, 24>;
+using AcceleratorKey    = KeyT<CommonKey, 12, 20>;
 using PrimitiveKey      = KeyT<CommonKey, 4, 28>;
 using PrimBatchKey      = KeyT<CommonKey, 4, 28>;
-using MaterialKey       = KeyT<CommonKey, 10, 22>;
+using MaterialKey       = KeyT<CommonKey, 12, 20>;
 using TransformKey      = KeyT<CommonKey, 8, 24>;
 using MediumKey         = KeyT<CommonKey, 8, 24>;
 using LightKey          = KeyT<CommonKey, 8, 24>;
@@ -83,25 +83,27 @@ static_assert(PrimBatchKey::BatchBits == PrimitiveKey::BatchBits,
 using RayIndex = CommonIndex;
 
 // Quadruplet of Ids
-static constexpr size_t HitIdPackAlignment = (sizeof(PrimitiveKey) +
-                                              sizeof(MaterialKey) +
-                                              sizeof(TransformKey) +
-                                              sizeof(AcceleratorKey));
-struct alignas (HitIdPackAlignment) HitIdPack
+static constexpr size_t HitKeyPackAlignment = (sizeof(PrimitiveKey) +
+                                               sizeof(MaterialKey) +
+                                               sizeof(TransformKey) +
+                                               sizeof(AcceleratorKey));
+struct alignas(HitKeyPackAlignment) HitKeyPack
 {
     PrimitiveKey     primKey;
-    MaterialKey      matId;
+    MaterialKey      matId;     // TODO: There should be light here<--
     TransformKey     transId;
     AcceleratorKey   accelId;
+
+    //....
 };
 
-static constexpr size_t AccelIdPackAlignment = (sizeof(TransformKey) +
-                                                sizeof(AcceleratorKey));
-struct alignas (AccelIdPackAlignment) AcceleratorIdPack
-{
-    TransformKey    transId;
-    AcceleratorKey  accelId;
-};
+//static constexpr size_t AccelIdPackAlignment = (sizeof(TransformKey) +
+//                                                sizeof(AcceleratorKey));
+//struct alignas (AccelIdPackAlignment) AcceleratorIdPack
+//{
+//    TransformKey    transId;
+//    AcceleratorKey  accelId;
+//};
 
 template <class T>
 struct IntersectionT

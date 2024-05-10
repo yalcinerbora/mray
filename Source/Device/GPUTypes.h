@@ -6,6 +6,8 @@
 
 #include <type_traits>
 
+using GPUThreadInitFunction = void(*)();
+
 static constexpr uint32_t WarpSize();
 static constexpr uint32_t StaticThreadPerBlock1D();
 static constexpr uint32_t TotalQueuePerDevice();

@@ -151,7 +151,7 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
     Vector3 normal = ShapeFunctions::Triangle::Normal(positions);
     normal = transformContext.ApplyN(normal);
     // Find the best projection plane (XY, YZ, XZ)
-    int domAxis = normal.Abs().Max();
+    int domAxis = normal.Abs().Maximum();
     bool hasNegSign = signbit(normal[domAxis]);
     float domSign = hasNegSign ? Float{-1} : Float{1};
 

@@ -273,6 +273,11 @@ class GPUSystemCUDA
     GPUPtrList              systemGPUPtrs;
     nvtxDomainHandle_t      nvtxDomain;
 
+    // TODO: Check designs for this, this made the GPUSystem global
+    // which is fine
+    static GPUList*         globalGPUListPtr;
+    static void             ThreadInitFunction();
+
     protected:
     public:
     // Constructors & Destructor
@@ -309,6 +314,7 @@ class GPUSystemCUDA
 
     // Simple & Slow System Synchronization
     void                    SyncAll() const;
+    GPUThreadInitFunction   GetThreadInitFunction() const;
 };
 
 MRAY_HYBRID MRAY_CGPU_INLINE

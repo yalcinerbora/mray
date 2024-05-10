@@ -1,54 +1,65 @@
 #pragma once
 
 #include "Core/Types.h"
+#include "Core/Vector.h"
 
-// Type ereased HitData
-// For triangles and spheres it is Vector2
-// For other things it may be other sized floats so this data
-// is held via (void*)
-// TODO: check std::variant<...>, and CUDA compatiblity
-
-template<class... Args>
-class MetaHitPtrT
+// Size ereased vector of floats
+// For triangles and spheres it is Vector2 (N=2)
+// For other things it may be other sized floats
+// N is compile time constant at most can be 3 maybe?
+template<uint32_t N>
+class MetaHitT
 {
     private:
-    Variant<Args...>*               ptr;
+    Vector<N, Float>        vec;
 
     public:
     // Constructors & Destructor
-    MRAY_HYBRID constexpr           MetaHitPtrT();
-    MRAY_HYBRID constexpr           MetaHitPtrT(Byte* dPtr, uint32_t combinedSize);
+    template<uint32_t M>
+    requires(M <= N)
+    MRAY_HYBRID constexpr   MetaHitT(const Vector<M, Float>&);
+
     // Methods
-    template<class T>
-    MRAY_HYBRID constexpr T&        Ref(uint32_t i);
-    template<class T>
-    MRAY_HYBRID constexpr const T&  Ref(uint32_t i) const;
+    template<uint32_t M>
+    requires(M <= N)
+    MRAY_HYBRID constexpr
+    const Vector<M, Float>& AsVector() const;
+
+    template<uint32_t M>
+    requires(M <= N)
+    MRAY_HYBRID constexpr
+    Vector<M, Float>&       AsVector();
 };
 
-template<class... Args>
+template<uint32_t N>
+template<uint32_t M>
+requires(M <= N)
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr MetaHitPtrT<Args...>::MetaHitPtrT()
-    : ptr(nullptr)
-{}
-
-template<class... Args>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr MetaHitPtrT<Args...>::MetaHitPtrT(Byte* dPtr, uint32_t)
-    : ptr(static_cast<std::variant<Args...>>(dPtr))
-{}
-
-template<class... Args>
-template<class T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T& MetaHitPtrT<Args...>::Ref(uint32_t i)
+constexpr MetaHitT<N>::MetaHitT(const Vector<M, Float>& v)
 {
-    return std::get<T>(ptr[i]);
+    UNROLL_LOOP
+    for(uint32_t i = 0; i < N; i++)
+    {
+        vec[i] = v[i];
+    }
 }
 
-template<class... Args>
-template<class T>
+template<uint32_t N>
+template<uint32_t M>
+requires(M <= N)
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr const T& MetaHitPtrT<Args...>::Ref(uint32_t i) const
+constexpr const Vector<M, Float>&
+MetaHitT<N>::AsVector() const
 {
-    return std::get<T>(ptr[i]);
+    return vec;
+}
+
+template<uint32_t N>
+template<uint32_t M>
+requires(M <= N)
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Vector<M, Float>&
+MetaHitT<N>::AsVector()
+{
+    return vec;
 }

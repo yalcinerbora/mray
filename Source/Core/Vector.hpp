@@ -519,7 +519,7 @@ constexpr T Vector<N, T>::Multiply() const
 
 template <unsigned int N, ArithmeticC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr unsigned int Vector<N, T>::Max() const
+constexpr unsigned int Vector<N, T>::Maximum() const
 {
     unsigned int result = 0;
     T max = vector[0];
@@ -537,7 +537,7 @@ constexpr unsigned int Vector<N, T>::Max() const
 
 template <unsigned int N, ArithmeticC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr unsigned int Vector<N, T>::Min() const
+constexpr unsigned int Vector<N, T>::Minimum() const
 {
     unsigned int result = 0;
     T min = vector[0];

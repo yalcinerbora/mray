@@ -123,8 +123,8 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
     // Max Min Reduction functions are selections instead
     // since it sometimes useful to fetch the which index
     // (axis) is maximum/minimum so that you can do other stuff with it.
-    MRAY_HYBRID constexpr unsigned int  Max() const;
-    MRAY_HYBRID constexpr unsigned int  Min() const;
+    MRAY_HYBRID constexpr unsigned int  Maximum() const;
+    MRAY_HYBRID constexpr unsigned int  Minimum() const;
 
     MRAY_HYBRID constexpr T         Length() const requires std::floating_point<T>;
     MRAY_HYBRID constexpr T         LengthSqr() const;

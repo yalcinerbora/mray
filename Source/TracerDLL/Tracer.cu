@@ -3,7 +3,12 @@
 
 TracerBase::TracerBase(BS::thread_pool& tp)
     : threadPool(tp)
-{}
+{
+    // Inject the CUDA "setDevice()" equavilent to the threads
+    // to initialize CUDA usage
+    BS::concurrency_t threadCount = threadPool.get_thread_count();
+    threadPool.reset(threadCount, gpuSystem.GetThreadInitFunction());
+}
 
 TypeNameList TracerBase::PrimitiveGroups() const
 {
@@ -715,14 +720,58 @@ CamSurfaceId TracerBase::CreateCameraSurface(CameraSurfaceParams p)
 
 void TracerBase::CommitSurfaces(AcceleratorType type)
 {
+    // Pack the surfaces via transform / primitive
+    //
+    // PG TG {S0,...,SN},  -> AccelGroup (One AccelInstance per S)
+    // PG TG {S0,...,SN},  -> AccelGroup
+    // ....
+    // PG TG {S0,...,SN}   -> AccelGroup
+    auto& surfList = surfaces.Vec();
+    using SurfP = Pair<SurfaceId, SurfaceParams>;
+    std::stable_sort(surfList.begin(), surfList.end(),
+                     [](const SurfP& left, const SurfP& right) -> bool
+    {
+        return (left.second.primBatches.front() <
+                right.second.primBatches.front());
+    });
+    //
+    std::stable_sort(surfList.begin(), surfList.end(),
+                     [](const SurfP& left, const SurfP& right) -> bool
+    {
+        return (left.second.transformId < right.second.transformId);
+    });
+    // Do the same thing for lights
+    using LightSurfP = Pair<LightSurfaceId, LightSurfaceParams>;
+    auto& lSurfList = lightSurfaces.Vec();
+    auto lPartitionEnd = std::partition(lSurfList.begin(), lSurfList.end(),
+    [this](const LightSurfP& lSurf)
+    {
+        const auto& map = lightGroups.Map();
+        LightKey lKey(static_cast<uint32_t>(lSurf.second.lightId));
+        auto gId = LightGroupId(lKey.FetchBatchPortion());
+        return map.at(gId)->IsPrimitiveBacked();
+    });
+    std::stable_sort(lSurfList.begin(), lSurfList.end(),
+    [](const LightSurfP& left, const LightSurfP& right)
+    {
+        return left.second.lightId < right.second.lightId;
+    });
+    std::stable_sort(lSurfList.begin(), lSurfList.end(),
+    [](const LightSurfP& left, const LightSurfP& right)
+    {
+        return left.second.transformId < right.second.transformId;
+    });
+    // Send it!
     accelerator = acceleratorGenerator.at(type)(threadPool, gpuSystem);
     accelerator->Construct(BaseAccelConstructParams
     {
+        .texViewMap = texViewMap,
         .primGroups = primGroups.Map(),
         .lightGroups = lightGroups.Map(),
         .transformGroups = transGroups.Map(),
         .mSurfList = surfaces.Vec(),
-        .lSurfList = lightSurfaces.Vec()
+        .lSurfList = Span<const LightSurfP>(lSurfList.begin(),
+                                            lPartitionEnd)
     });
 }
 

@@ -9,6 +9,8 @@
 
 #include "Core/Types.h"
 #include "Core/MemAlloc.h"
+#include "Core/DataStructures.h"
+#include "Core/TracerI.h"
 
 #include "TransientPool/TransientPool.h"
 

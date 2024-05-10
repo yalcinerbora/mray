@@ -137,7 +137,6 @@ void KCFindSplits(//Output
 
 #endif // MRAY_GPU_BACKEND_CUDA
 
-
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCFindBinMatIds(// Output
                      Span<CommonKey> gBinKeys,
@@ -187,21 +186,66 @@ size_t PartitionerHostBufferSize(size_t maxPartitionEstimate)
     return totalBytes;
 }
 
+RayPartitioner::RayPartitioner(const GPUSystem& system)
+    : system(system)
+    , deviceMem(system.AllGPUs(), 2_MiB, 2_MiB)
+    , hostMem(system, 1_KiB)
+    // TODO: Change this, we should use MemAlloc::AllocateMultiData(...) function
+    // to allocate this, but static span mandates value so...
+    , hPartitionCount(reinterpret_cast<uint32_t*>(static_cast<Byte*>(hostMem)), 1)
+    , rayCount(0)
+    , maxPartitionCount(0)
+{}
+
 RayPartitioner::RayPartitioner(const GPUSystem& system,
                                uint32_t maxElementEstimate,
                                uint32_t maxPartitionEstimate)
     : system(system)
-    , deviceMem(system.AllGPUs(), 32_MiB,
+    , deviceMem(system.AllGPUs(), 16_MiB,
                 PartitionerDeviceBufferSize(maxElementEstimate),
                 true)
     , hostMem(system,
               PartitionerHostBufferSize(maxPartitionEstimate),
               true)
-    // TODO: Change this
+    // TODO: Change this, we should use MemAlloc::... function to allocate this,
+    // but static span mandates value so...
     , hPartitionCount(reinterpret_cast<uint32_t*>(static_cast<Byte*>(hostMem)), 1)
     , rayCount(0)
     , maxPartitionCount(0)
 {}
+
+RayPartitioner::RayPartitioner(RayPartitioner&& other)
+    : system(other.system)
+    , deviceMem(std::move(other.deviceMem))
+    , hostMem(std::move(other.hostMem))
+    , dKeys(other.dKeys)
+    , dIndices(other.dIndices)
+    , dTempMemory(other.dTempMemory)
+    , hPartitionStartOffsets(other.hPartitionStartOffsets)
+    , hPartitionCount(other.hPartitionCount)
+    , hPartitionKeys(other.hPartitionKeys)
+    , rayCount(other.rayCount)
+    , maxPartitionCount(other.maxPartitionCount)
+{}
+
+RayPartitioner& RayPartitioner::operator=(RayPartitioner&& other)
+{
+    assert(this != &other);
+    // There should be one system in circulation but just to be sure
+    assert(&system == &other.system);
+    deviceMem = std::move(other.deviceMem);
+    hostMem = std::move(other.hostMem);
+    dKeys = other.dKeys;
+    dIndices = other.dIndices;
+    dKeys = other.dKeys;
+    dTempMemory = other.dTempMemory;
+    hPartitionStartOffsets = other.hPartitionStartOffsets;
+    hPartitionCount = other.hPartitionCount;
+    hPartitionKeys = other.hPartitionKeys;
+    rayCount = other.rayCount;
+    maxPartitionCount = other.maxPartitionCount;
+    return *this;
+}
 
 RayPartitioner::InitialBuffers RayPartitioner::Start(uint32_t rayCountIn,
                                                      uint32_t maxPartitionCountIn)

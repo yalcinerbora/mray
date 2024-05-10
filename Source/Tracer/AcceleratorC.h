@@ -6,11 +6,13 @@
 
 #include "Core/Types.h"
 #include "Core/TypeGenFunction.h"
+#include "Core/BitFunctions.h"
 
 #include "Device/GPUSystemForward.h"
 
 #include "Random.h"
 
+#include "GenericGroup.h"
 #include "PrimitiveC.h"
 #include "LightC.h"
 
@@ -36,12 +38,6 @@ struct AcceleratorLeaf
     // so holding a 32-bit value for each triangle is a waste of space.
     // Reason and change this maybe?
     MaterialKey  materialKey;
-};
-
-struct BaseAcceleratorLeaf
-{
-    TransformKey     transformKey;
-    AcceleratorKey   accelKey;
 };
 
 template <class AccelType>
@@ -76,12 +72,12 @@ concept AccelInstanceGroupC = requires(AccelInstance ag,
                                        GPUSystem gpuSystem)
 {
     {ag.CastLocalRays(// Output
-                      Span<HitIdPack>{},
+                      Span<HitKeyPack>{},
                       Span<MetaHit>{},
                       // Input
                       Span<const RayGMem>{},
                       Span<const RayIndex>{},
-                      Span<const AcceleratorIdPack>{},
+                      Span<const AcceleratorKey>{},
                       // Constants
                       gpuSystem)} -> std::same_as<void>;
 };
@@ -91,7 +87,7 @@ concept BaseAccelC = requires(BaseAccel ac,
                               GPUSystem gpuSystem)
 {
     {ac.CastRays(// Output
-                 Span<HitIdPack>{},
+                 Span<HitKeyPack>{},
                  Span<MetaHit>{},
                  Span<SurfaceWorkKey>{},
                  // Input
@@ -115,11 +111,6 @@ namespace TracerLimits
     static constexpr size_t MaxPrimBatchPerSurface = 8;
 }
 
-
-using PrimBatchListToAccelMapping = std::unordered_map<PrimBatchList, uint32_t>;
-using LocalSurfaceToAccelMapping = std::unordered_map<uint32_t, uint32_t>;
-//
-
 using AlphaMap = TextureView<2, Float>;
 
 struct BaseAccelConstructParams
@@ -127,21 +118,23 @@ struct BaseAccelConstructParams
     using SurfPair = Pair<SurfaceId, SurfaceParams>;
     using LightSurfPair = Pair<LightSurfaceId, LightSurfaceParams>;
 
+    const TextureViewMap&                               texViewMap;
     const std::map<PrimGroupId, PrimGroupPtr>&          primGroups;
     const std::map<LightGroupId, LightGroupPtr>&        lightGroups;
     const std::map<TransGroupId, TransformGroupPtr>&    transformGroups;
-    const std::vector<SurfPair>&        mSurfList;
-    const std::vector<LightSurfPair>&   lSurfList;
+    Span<const SurfPair>                                mSurfList;
+    Span<const LightSurfPair>                           lSurfList;
 };
 
 struct AccelGroupConstructParams
 {
     using SurfPair              = typename BaseAccelConstructParams::SurfPair;
     using LightSurfPair         = typename BaseAccelConstructParams::LightSurfPair;
-    using TGroupedSurfaces      = std::vector<Pair<TransGroupId, Span<SurfPair>>>;
-    using TGroupedLightSurfaces = std::vector<Pair<TransGroupId, Span<LightSurfPair>>>;
+    using TGroupedSurfaces      = std::vector<Pair<TransGroupId, Span<const SurfPair>>>;
+    using TGroupedLightSurfaces = std::vector<Pair<TransGroupId, Span<const PrimBatchId>>>;
 
     const std::map<TransGroupId, TransformGroupPtr>* transformGroups;
+    const TextureViewMap*                            textureViews;
     const GenericGroupPrimitiveT*   primGroup;
     TGroupedSurfaces                tGroupSurfs;
     TGroupedLightSurfaces           tGroupLightSurfs;
@@ -153,18 +146,27 @@ class AcceleratorGroupI
     virtual         ~AcceleratorGroupI() = default;
 
     virtual void    CastLocalRays(// Output
-                                  Span<HitIdPack> dHitIds,
+                                  Span<HitKeyPack> dHitIds,
                                   Span<MetaHit> dHitParams,
+                                  Span<SurfaceWorkKey> dWorkKeys,
                                   // I-O
                                   Span<BackupRNGState> rngStates,
                                   // Input
                                   Span<const RayGMem> dRays,
                                   Span<const RayIndex> dRayIndices,
-                                  Span<const AcceleratorIdPack> dAccelIdPacks,
+                                  Span<const CommonKey> dAccelKeys,
                                   // Constants
-                                  const GPUSystem& s) = 0;
+                                  uint32_t instanceId,
+                                  const GPUQueue& queue) = 0;
 
-    virtual void Construct(AccelGroupConstructParams) = 0;
+    virtual void        Construct(AccelGroupConstructParams) = 0;
+
+    virtual size_t      InstanceCount() const = 0;
+    virtual uint32_t    InstanceTypeCount() const = 0;
+    virtual uint32_t    UsedIdBitsInKey() const = 0;
+    virtual void        WriteInstanceKeysAndAABBs(Span<AABB3> aabbWriteRegion,
+                                                  Span<AcceleratorKey> keyWriteRegion) const = 0;
+    virtual uint32_t    SetKeyOffset(uint32_t) = 0;
 };
 
 using AccelGroupGenerator = GeneratorFuncType<AcceleratorGroupI, uint32_t,
@@ -176,39 +178,47 @@ class BaseAcceleratorI
     virtual         ~BaseAcceleratorI() = default;
 
     // Interface
+    // Fully cast rays to entire scene
     virtual void    CastRays(// Output
-                             Span<HitIdPack> dHitIds,
+                             Span<HitKeyPack> dHitIds,
                              Span<MetaHit> dHitParams,
                              Span<SurfaceWorkKey> dWorkKeys,
+                             // I-O
+                             Span<BackupRNGState> rngStates,
                              // Input
                              Span<const RayGMem> dRays,
                              Span<const RayIndex> dRayIndices,
                              // Constants
                              const GPUSystem& s) = 0;
-
+    // Fully cast rays to entire scene return true/false
+    // If it hits to a surface
     virtual void    CastShadowRays(// Output
                                    Bitspan<uint32_t> dIsVisibleBuffer,
                                    Bitspan<uint32_t> dFoundMediumInterface,
+                                   // I-O
+                                   Span<BackupRNGState> rngStates,
                                    // Input
                                    Span<const RayIndex> dRayIndices,
                                    Span<const RayGMem> dShadowRays,
                                    // Constants
                                    const GPUSystem& s) = 0;
-
+    // Locally cast rays to a accelerator instances
+    // This is multi-ray multi-accelerator instance
     virtual void    CastLocalRays(// Output
-                                  Span<HitIdPack> dHitIds,
+                                  Span<HitKeyPack> dHitIds,
                                   Span<MetaHit> dHitParams,
                                   // I-O
                                   Span<BackupRNGState> rngStates,
                                   // Input
                                   Span<const RayGMem> dRays,
                                   Span<const RayIndex> dRayIndices,
-                                  Span<const AcceleratorIdPack> dAccelIdPacks,
+                                  Span<const AcceleratorKey> dAccelIdPacks,
                                   // Constants
                                   const GPUSystem& s) = 0;
 
     // Construction
-    virtual void    Construct(BaseAccelConstructParams p) = 0;
+    virtual void    Construct(BaseAccelConstructParams) = 0;
+    virtual void    AllocateForTraversal(size_t maxRayCount) = 0;
 };
 
 using AccelGroupPtr = std::unique_ptr<AcceleratorGroupI>;
@@ -218,20 +228,50 @@ template <class Child>
 class BaseAcceleratorT : public BaseAcceleratorI
 {
     private:
+    void PartitionSurfaces(std::vector<AccelGroupConstructParams>&,
+                           Span<const typename BaseAccelConstructParams::SurfPair> surfList,
+                           const std::map<PrimGroupId, PrimGroupPtr>& primGroups,
+                           const std::map<TransGroupId, TransformGroupPtr>& transGroups,
+                           const TextureViewMap& textureViews);
+    void AddLightSurfacesToPartitions(std::vector<PrimBatchId>&,
+                                      std::vector<AccelGroupConstructParams>& partitions,
+                                      Span<const typename BaseAccelConstructParams::LightSurfPair> surfList,
+                                      const std::map<LightGroupId, LightGroupPtr>& lightGroups);
+
     protected:
     BS::thread_pool&    threadPool;
     GPUSystem&          gpuSystem;
-    uint32_t            idCounter = 0;
-
-    //
+    uint32_t            idCounter           = 0;
+    Vector2ui           maxBitsUsedOnKey    = Vector2ui::Zero();
     std::map<std::string_view, AccelGroupGenerator> accelGenerators;
-    std::map<PrimGroupId, AccelGroupPtr>            generatedAccels;
+    std::map<uint32_t, AccelGroupPtr>               generatedAccels;
+    std::map<uint32_t, AcceleratorGroupI*>          accelInstances;
+
+
+    virtual void        InternalConstruct(const std::vector<size_t>& instanceOffsets) = 0;
 
     public:
+    // Constructors & Destructor
                         BaseAcceleratorT(BS::thread_pool&, GPUSystem&,
                                          std::map<std::string_view, AccelGroupGenerator>&&);
 
+    // ....
+    void                Construct(BaseAccelConstructParams) override;
 };
+
+template<class KeyType>
+struct GroupIdFetcher
+{
+    typename KeyType::Type operator()(auto id)
+    {
+        uint32_t batchKeyRaw = static_cast<uint32_t>(id);
+        return KeyType(batchKeyRaw).FetchBatchPortion();
+    }
+};
+
+using PrimGroupIdFetcher = GroupIdFetcher<PrimBatchKey>;
+using TransGroupIdFetcher = GroupIdFetcher<TransformKey>;
+using LightGroupIdFetcher = GroupIdFetcher<LightKey>;
 
 template <class C>
 BaseAcceleratorT<C>::BaseAcceleratorT(BS::thread_pool& tp, GPUSystem& system,
@@ -240,3 +280,220 @@ BaseAcceleratorT<C>::BaseAcceleratorT(BS::thread_pool& tp, GPUSystem& system,
     , gpuSystem(system)
     , accelGenerators(aGen)
 {}
+
+template <class C>
+void BaseAcceleratorT<C>::PartitionSurfaces(std::vector<AccelGroupConstructParams>& partitions,
+                                            Span<const typename BaseAccelConstructParams::SurfPair> surfList,
+                                            const std::map<PrimGroupId, PrimGroupPtr>& primGroups,
+                                            const std::map<TransGroupId, TransformGroupPtr>& transGroups,
+                                            const TextureViewMap& textureViews)
+{
+    using SurfParam = typename BaseAccelConstructParams::SurfPair;
+    assert(std::is_sorted(surfList.begin(), surfList.end(),
+    [](const SurfParam& left, const SurfParam& right) -> bool
+    {
+        return (left.second.primBatches.front() <
+                right.second.primBatches.front());
+    }));
+    assert(std::is_sorted(surfList.begin(), surfList.end(),
+    [](const SurfParam& left, const SurfParam& right) -> bool
+    {
+        return (left.second.transformId < right.second.transformId);
+    }));
+
+    // TODO: One linear access to vector should be enough
+    // to generate this after sort, but this is simpler to write
+    // change this if this is a perf bottleneck.
+    auto start = surfList.begin();
+    while(start != surfList.end())
+    {
+        auto pBatchId = start->second.primBatches.front();
+        uint32_t pGroupId = PrimGroupIdFetcher()(pBatchId);
+        auto end = std::upper_bound(start, surfList.end(), pGroupId,
+        [](const uint32_t& value, const SurfParam& surf)
+        {
+            uint32_t batchPortion = PrimGroupIdFetcher()(surf.second.primBatches.front());
+            return batchPortion < value;
+        });
+
+        partitions.emplace_back(AccelGroupConstructParams{});
+        partitions.back().primGroup = primGroups.at(PrimGroupId(pGroupId)).get();
+        partitions.back().textureViews = &textureViews;
+        partitions.back().transformGroups = &transGroups;
+        auto innerStart = start;
+        while(innerStart != end)
+        {
+            TransformId tId = innerStart->second.transformId;
+            uint32_t tGroupId = TransGroupIdFetcher()(tId);
+            auto innerEnd = std::upper_bound(start, surfList.end(), tGroupId,
+            [](uint32_t value, const SurfParam& surf)
+            {
+                auto tId = surf.second.transformId;
+                return TransGroupIdFetcher()(tId) < value;
+            });
+
+            auto surfSpan = Span<const SurfParam>(innerStart, innerEnd);
+            partitions.back().tGroupSurfs.emplace_back(TransGroupId(tGroupId), surfSpan);
+            innerStart = innerEnd;
+        }
+        start = end;
+    }
+}
+
+template <class C>
+void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<PrimBatchId>& lightPrimBatchList,
+                                                       std::vector<AccelGroupConstructParams>& partitions,
+                                                       Span<const typename BaseAccelConstructParams::LightSurfPair> lSurfList,
+                                                       const std::map<LightGroupId, LightGroupPtr>& lightGroups)
+{
+    using LightSurfP = typename BaseAccelConstructParams::LightSurfPair;
+    assert(std::is_sorted(lSurfList.begin(), lSurfList.end(),
+    [](const LightSurfP& left, const LightSurfP& right)
+    {
+        return left.second.lightId < right.second.lightId;
+    }));
+    assert(std::is_sorted(lSurfList.begin(), lSurfList.end(),
+    [](const LightSurfP& left, const LightSurfP& right)
+    {
+        return left.second.transformId < right.second.transformId;
+    }));
+    assert(lightPrimBatchList.empty());
+
+    // First convert lights to prim batches
+    lightPrimBatchList.reserve(lSurfList.size());
+    for(const auto& lSurf : lSurfList)
+    {
+        uint32_t lGroupId = LightGroupIdFetcher()(lSurf.second.lightId);
+        auto groupId = LightGroupId(lGroupId);
+        PrimBatchId primBatchId = lightGroups.at(groupId)->LightPrimBatch(lSurf.second.lightId);
+        lightPrimBatchList.push_back(primBatchId);
+    }
+
+    // Now partition
+    auto start = lSurfList.begin();
+    while(start != lSurfList.end())
+    {
+        uint32_t lGroupId = LightGroupIdFetcher()(start->second.lightId);
+        auto end = std::upper_bound(start, lSurfList.end(), lGroupId,
+        [](const uint32_t& value, const LightSurfP& surf)
+        {
+            uint32_t batchPortion = LightGroupIdFetcher()(surf.second.lightId);
+            return batchPortion < value;
+        });
+
+        //
+        auto groupId = LightGroupId(lGroupId);
+        const GenericGroupPrimitiveT* pGroup = &lightGroups.at(groupId)->GenericPrimGroup();
+        auto slot = std::find_if(partitions.begin(), partitions.end(),
+        [pGroup](const auto& partition)
+        {
+            return (partition.primGroup == pGroup);
+        });
+        if(slot == partitions.end())
+        {
+            partitions.emplace_back(AccelGroupConstructParams
+            {
+                .transformGroups = partitions.front().transformGroups,
+                .primGroup = pGroup,
+                .tGroupSurfs = {},
+                .tGroupLightSurfs = {}
+            });
+            slot = partitions.end() - 1;
+        }
+
+        // Sub-partition wrt. transform
+        auto innerStart = start;
+        while(innerStart != end)
+        {
+            TransformId tId = innerStart->second.transformId;
+            uint32_t tGroupId = TransGroupIdFetcher()(tId);
+            auto loc = std::upper_bound(innerStart, end, tGroupId,
+            [](uint32_t value, const LightSurfP& surf) -> bool
+            {
+                auto tId = surf.second.transformId;
+                return (TransGroupIdFetcher()(tId) < value);
+            });
+            size_t elemCount = std::distance(innerStart, loc);
+            size_t startDistance = std::distance(lSurfList.begin(), innerStart);
+            Span<const PrimBatchId> pBatchSpan(lightPrimBatchList.cbegin() + startDistance,
+                                               elemCount);
+
+            slot->tGroupLightSurfs.emplace_back(TransGroupId(tGroupId), pBatchSpan);
+            innerStart = loc;
+        }
+    }
+}
+
+template <class C>
+void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
+{
+    std::vector<AccelGroupConstructParams> partitions;
+    PartitionSurfaces(partitions, p.mSurfList, p.primGroups,
+                      p.transformGroups, p.texViewMap);
+    // Add primitive-backed lights surfaces as well
+    std::vector<PrimBatchId> globalLightPrimBatches;
+    AddLightSurfacesToPartitions(globalLightPrimBatches,
+                                 partitions, p.lSurfList, p.lightGroups);
+
+    // Generate the accelerators
+    for(const auto& partition : partitions)
+    {
+        using namespace TypeNameGen::Runtime;
+        using namespace std::string_view_literals;
+        std::string accelTypeName = CreateAcceleratorType(C::TypeName(),
+                                                          partition.primGroup->Name());
+        uint32_t aGroupId = idCounter++;
+        auto accelPtr = accelGenerators.at(accelTypeName)(std::move(aGroupId),
+                                                          threadPool, gpuSystem);
+        auto loc = generatedAccels.emplace(aGroupId, std::move(accelPtr));
+        AcceleratorGroupI* acc = loc.first->second.get();
+        acc->Construct(std::move(partition));
+    }
+    // Find the leaf count
+    std::vector<size_t> instanceOffsets(generatedAccels.size() + 1, 0);
+    std::transform_inclusive_scan(generatedAccels.cbegin(),
+                                  generatedAccels.cend(),
+                                  instanceOffsets.begin() + 1, std::plus{},
+    [](const auto& pair) -> size_t
+    {
+        return pair.second->InstanceCount();
+    });
+    //
+    std::vector<uint32_t> keyOffsets(generatedAccels.size() + 1, 0);
+    std::transform_inclusive_scan(generatedAccels.cbegin(),
+                                  generatedAccels.cend(),
+                                  keyOffsets.begin() + 1, std::plus{},
+    [](const auto& pair) -> uint32_t
+    {
+        return pair.second->InstanceTypeCount();
+    });
+    // Set the offsets
+    uint32_t i = 0;
+    for(auto& group : generatedAccels)
+    {
+        group.second->SetKeyOffset(keyOffsets[i]);
+        i++;
+    }
+
+    // Find the maximum bits used on key
+    uint32_t keyBatchPortionMax = keyOffsets.back();
+    uint32_t keyIdPortionMax = std::transform_reduce(generatedAccels.cbegin(),
+                                                     generatedAccels.cend(),
+                                                     uint32_t(0),
+    [](uint32_t rhs, uint32_t lhs)
+    {
+        return std::max(rhs, lhs);
+    },
+    [](const auto& pair)
+    {
+        return pair.second->UsedIdBitsInKey();
+    });
+    using namespace BitFunctions;
+    maxBitsUsedOnKey = Vector2ui(RequiredBitsToRepresent(keyBatchPortionMax),
+                                 RequiredBitsToRepresent(keyIdPortionMax));
+
+    // Internal construction routine,
+    // we can not fetch the leaf data here because some accelerators are
+    // constructed on CPU (due to laziness)
+    InternalConstruct(instanceOffsets);
+}

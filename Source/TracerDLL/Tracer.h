@@ -110,8 +110,8 @@ class TracerBase : public TracerI
     ThreadSafeVector<Pair<LightSurfaceId, LightSurfaceParams>>  lightSurfaces;
     ThreadSafeVector<Pair<CamSurfaceId, CameraSurfaceParams>>   cameraSurfaces;
     //
-    AcceleratorPtr                          accelerator;
-    RendererI*                              currentRenderer = nullptr;
+    AcceleratorPtr          accelerator;
+    RendererI*              currentRenderer = nullptr;
 
     std::atomic_uint32_t    primGroupCounter    = 0;
     std::atomic_uint32_t    camGroupCounter     = 0;

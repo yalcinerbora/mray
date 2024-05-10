@@ -1,4 +1,5 @@
 #include "TracerThread.h"
+#include <BS/BS_thread_pool.hpp>
 
 void TracerThread::LoopWork()
 {
@@ -41,10 +42,11 @@ void TracerThread::InitialWork()
 void TracerThread::FinalWork()
 {}
 
-TracerThread::TracerThread(TransferQueue& queue)
+TracerThread::TracerThread(TransferQueue& queue, BS::thread_pool& tp)
     : dllFile{nullptr}
     , tracer{nullptr, nullptr}
     , transferQueue(queue.GetTracerView())
+    , threadPool(tp)
 {}
 
 MRayError TracerThread::MTInitialize(const std::string& tracerConfig)
@@ -58,7 +60,8 @@ MRayError TracerThread::MTInitialize(const std::string& tracerConfig)
         constructorMangledName,
         destructorMangledName
     };
-    MRayError err = dllFile->GenerateObjectWithArgs<Tuple<>, TracerI>(tracer, args);
+    MRayError err = dllFile->GenerateObjectWithArgs<TracerConstructorArgs, TracerI>(tracer, args,
+                                                                                    threadPool);
     if(err) return err;
 
     return MRayError::OK;

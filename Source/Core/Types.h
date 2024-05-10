@@ -66,7 +66,7 @@ constexpr Span<const T, Extent> ToConstSpan(Span<T, Extent> s);
 
 //
 template<ImplicitLifetimeC T>
-constexpr Span<T> ToSpan(std::vector<Byte> v);
+constexpr Span<T> ToSpan(std::vector<Byte>& v);
 
 //
 template<class T0, std::size_t E0,

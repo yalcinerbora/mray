@@ -523,3 +523,6 @@ class [[nodiscard]] TracerI
     //================================//
     virtual void    ClearAll() = 0;
 };
+
+namespace BS { class thread_pool; }
+using TracerConstructorArgs = Tuple<BS::thread_pool&>;

@@ -3,14 +3,16 @@
 #include <algorithm>
 
 #include "Core/Types.h"
+
 #include "Device/GPUSystemForward.h"
+
 #include "TracerTypes.h"
 #include "ParamVaryingData.h"
 #include "AcceleratorC.h"
 #include "PrimitiveC.h"
 #include "TransformC.h"
 #include "Random.h"
-
+#include "RayPartitioner.h"
 
 namespace LinearAccelDetail
 {
@@ -48,17 +50,11 @@ namespace LinearAccelDetail
                                                   Float xi,
                                                   const AcceleratorLeaf& l) const;
         public:
-        // Constructor & Destructor
-                                AcceleratorLinear(const TransDataSoA& tSoA,
-                                                  const PrimDataSoA& pSoA,
-                                                  const DataSoA& dataSoA,
-                                                  TransformKey tId,
-                                                  AcceleratorKey aId);
-
+        // Constructors & Destructor
         MRAY_HYBRID             AcceleratorLinear(const TransDataSoA& tSoA,
                                                   const PrimDataSoA& pSoA,
                                                   const DataSoA& dataSoA,
-                                                  AcceleratorId aId,
+                                                  AcceleratorKey aId,
                                                   TransformKey tId);
 
         MRAY_HYBRID
@@ -68,11 +64,42 @@ namespace LinearAccelDetail
     };
 }
 
+using PrimRangeArray     = std::array<Vector2ui, TracerConstants::MaxPrimBatchPerSurface>;
+using MaterialKeyArray   = std::array<MaterialKey, TracerConstants::MaxPrimBatchPerSurface>;
+using CullFaceFlagArray  = std::array<bool, TracerConstants::MaxPrimBatchPerSurface>;
+using AlphaMapArray      = std::array<Optional<AlphaMap>, TracerConstants::MaxPrimBatchPerSurface>;
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+MaterialKey FindMaterialId(const PrimRangeArray& primRanges,
+                           const MaterialKeyArray& matKeys,
+                           PrimitiveKey k)
+{
+    static_assert(std::tuple_size_v<PrimRangeArray> ==
+                  std::tuple_size_v<MaterialKeyArray>);
+    static constexpr uint32_t N = static_cast<uint32_t>(std::tuple_size_v<MaterialKeyArray>);
+
+    // Linear search over the index
+    // List has few elements so linear search should suffice
+    CommonKey primIndex = k.FetchIndexPortion();
+    UNROLL_LOOP
+    for(uint32_t i = 0; i < N; i++)
+    {
+        // Do not do early break here (not every accelerator will use all 8
+        // slots, it may break unrolling. Unused element ranges should be int_max
+        bool inRange = (primIndex >= primRanges[i][0] &&
+                        primIndex < primRanges[i][1]);
+        if(inRange) return matKeys[i];
+    }
+    return MaterialKey::InvalidKey();
+}
+
 
 template<PrimitiveGroupC PrimitiveGroupType>
 class AcceleratorGroupLinear final : public AcceleratorGroupI
 {
     public:
+    static std::string_view TypeName();
+
     using PrimitiveGroup    = PrimitiveGroupType;
     using DataSoA           = LinearAccelDetail::LinearAcceleratorSoA;
     using PrimSoA           = PrimitiveGroupType::DataSoAConst;
@@ -87,248 +114,114 @@ class AcceleratorGroupLinear final : public AcceleratorGroupI
     DeviceMemory                    mem;
     DataSoA                         data;
 
-    Bitspan<uint32_t>               dCullFace;
-    Span<Optional<AlphaMap>>        dAlphaMaps;
-    Span<Span<AcceleratorLeaf>>     dLeafs;
+    //std::map<TransGroupId, auto>     ClosestHitKernels;
+    //std::map<TransGroupId, auto>     AnyHitKernels;
 
-    Span<Span<AABB3>>               dAABBs;
-    Span<AcceleratorLeaf>           dXXXXX;
-    Span<>;
+    //std::map<>;
 
-    std::vector<std::vector>;
+    // Per-instance (All accelerators will have these)
+    Bitspan<uint32_t>           dCullFaceFlags;
+    Span<AlphaMapArray>         dAlphaMaps;
+    Span<MaterialKeyArray>      dMaterialKeys;
+    Span<PrimRangeArray>        dPrimitiveRanges;
+    Span<TransformKey>          dTransformKeys;
+    Span<Span<PrimitiveKey>>    dLeafs;
+    // Global data, all accelerator leafs in
+    Span<PrimitiveKey>          dAllLeafs;
 
+    // We do not have an accelerator structure
     // Internal concrete accel counter
     uint32_t accelGroupId;
     uint32_t concreteAccelCounter;
     uint32_t surfaceIdCounter;
 
-    PrimBatchListToAccelMapping primBatchMapping;
-    LocalSurfaceToAccelMapping  surfMapping;
-    bool isInCommitState = false;
-
     public:
-    AcceleratorGroupLinear(uint32_t accelGroupId,
-                           const PrimitiveGroupI& pg)
-        : accelGroupId(accelGroupId)
-        , pg(static_cast<PrimitiveGroup&>(pg))
-        , concreteAccelCounter(0)
-        , surfaceIdCounter(0)
-    {}
-
+    // Constructors & Destructor
+                AcceleratorGroupLinear(uint32_t accelGroupId,
+                                       const GenericGroupPrimitiveT& pg);
     //
-    AcceleratorId ReserveSurface(const SurfPrimIdList& primIds,
-                                 const SurfMatIdList& matIds) override
-    {
-        using enum PrimTransformType;
+    void        Construct(AccelGroupConstructParams) override;
 
-        // Generate a new accelerator per instance(surface)
-        // only if the transform requirement is locally constant
-        uint32_t concAccelIndex = concreteAccelCounter;
-        if constexpr(TransformLogic == LOCALLY_CONSTANT_TRANSFORM)
-        {
-            SurfPrimIdList sortedPrimIds = primIds;
-            std::sort(sortedPrimIds);
-            auto result = primBatchMapping.emplace(sortedPrimIds,
-                                                   concreteAccelCounter);
-            // Get ready for next
-            if(result.second) concreteAccelCounter++;
-            concAccelIndex = result.first->second;
-        }
-        else concreteAccelCounter++;
+    size_t      InstanceCount() const override;
+    uint32_t    InstanceTypeCount() const override;
+    uint32_t    UsedIdBitsInKey() const override;
+    void        WriteInstanceKeysAndAABBs(Span<AABB3> aabbWriteRegion,
+                                          Span<AcceleratorKey> keyWriteRegion) const override;
+    uint32_t    SetKeyOffset(uint32_t) override;
 
-        surfaceIdCounter++;
-        surfMapping.emplace(surfaceIdCounter, concAccelIndex);
-    }
-
-    // Commit the accelerators return world space AABBs
-    Span<AABB3> CommitReservations(const std::vector<BaseAcceleratorLeaf>& baseLeafs,
-                                   const AcceleratorWorkI& accWork) override;
-    {
-        accelAABBs.reserve(baseLeafs.size());
-        perAccelLeafs.reserve(baseLeafs.size());
-
-        if constexpr(TransformLogic == LOCALLY_CONSTANT_TRANSFORM)
-        {
-            // Create Identity transform work
-            auto tg = IdentityTransformGroup{};
-            const auto& ag = decltype(this);
-            AcceleratorWork<decltype(this), IdentityTransformGroup> work(ag, tg);
-
-            std::unordered_map<uint32_t, Span<AcceleratorLeaf>> constructedAccels;
-            assert(primBatchMapping.empty());
-            std::array<PrimRange, MaxPrimBatchPerSurface> a;
-
-            auto it = constructedAccels.find(primBatchMapping.at());
-            for(const BaseAcceleratorLeaf& l : baseLeafs)
-            {
-                uint32_t accId = l.accelId.FetchIndexPortion();
-                uint32_t instanceId = surfMapping.at(accId);
-                auto r = constructedAccels.emplace(instanceId);
-                if(r.second)
-                {
-                    MRAY_LOG("{:s}: Constructing Accelerator {}", TypeName(),
-                             ...);
-                    ConstructAccelerator(a, indentityWork);
-                }
-                else
-                {
-                    MRAY_LOG("{:s}: Reusing Accelerator for {}", TypeName(),
-                             ...);
-                    ReferAccelerator(a, r.first->second);
-                }
-                AABB3 aabb = GenerateAABB(r.first->second, l.transformKey, accWork);
-                result.push_back(aabb);
-
-            }
-        }
-        else
-        {
-            MRAY_LOG("{:s}: Constructing Accelerator {}", TypeName(),
-                     ...);
-            ConstructAccelerator(a, accWork);
-            AABB3 aabb = GenerateAABB(r.first->second, l.transformKey, accWork);
-            result.push_back(aabb);
-            perAccelLeafs.push_back(leafs);
-        }
-
-        // Memcopy to a span
-
-    }
 };
 
-class AcceleratorBaseLinear final : public BaseAcceleratorT<AcceleratorBaseLinear>
+class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinear>
 {
+    public:
+    static std::string_view     TypeName();
+
     private:
-    std::vector<BaseAcceleratorLeaf>                    leafs;
-    std::vector<std::unique_ptr<AcceleratorGroupI*>>    localAccelerators;
+    DeviceMemory                accelMem;
+    Span<AcceleratorKey>        dLeafs;
+    Span<AABB3>                 dAABBs;
+    //
+    DeviceMemory                stackMem;
+    Span<uint64_t>              dTraversalStack;
+    RayPartitioner              rayPartitioner;
+    size_t                      maxPartitionCount;
 
+    protected:
+    // Each leaf has a surface
+    void InternalConstruct(const std::vector<size_t>& instanceOffsets) override;
 
     public:
-    AcceleratorBaseLinear(BS::thread_pool&, GPUSystem&);
+    // Constructors & Destructor
+    BaseAcceleratorLinear(BS::thread_pool&, GPUSystem&,
+                          std::map<std::string_view, AccelGroupGenerator>&& aGen);
 
-    // Cast Rays and Find HitIds, and WorkKeys.
-    // (the last one will be used to partition)
-    void CastRays(// Output
-                  Span<HitIdPack> dHitIds,
-                  Span<MetaHit> dHitParams,
-                  Span<SurfaceWorkKey> dWorkKeys,
-                  // Input
-                  Span<const RayGMem> dRays,
-                  Span<const RayIndex> dRayIndices,
-                  // Constants
-                  const GPUSystem& s) override;
+    //
+    void    CastRays(// Output
+                     Span<HitKeyPack> dHitIds,
+                     Span<MetaHit> dHitParams,
+                     Span<SurfaceWorkKey> dWorkKeys,
+                     // I-O
+                     Span<BackupRNGState> rngStates,
+                     // Input
+                     Span<const RayGMem> dRays,
+                     Span<const RayIndex> dRayIndices,
+                     // Constants
+                     const GPUSystem& s) override;
 
-    void CastShadowRays(// Output
-                        Bitspan<uint32_t> dIsVisibleBuffer,
-                        Bitspan<uint32_t> dFoundMediumInterface,
-                        // Input
-                        Span<const RayIndex> dRayIndices,
-                        Span<const RayGMem> dShadowRays,
-                        // Constants
-                        const GPUSystem& s) override;
+    void    CastShadowRays(// Output
+                           Bitspan<uint32_t> dIsVisibleBuffer,
+                           Bitspan<uint32_t> dFoundMediumInterface,
+                           // I-O
+                           Span<BackupRNGState> rngStates,
+                           // Input
+                           Span<const RayIndex> dRayIndices,
+                           Span<const RayGMem> dShadowRays,
+                           // Constants
+                           const GPUSystem& s) override;
 
-    // Each leaf has a surface
-    void Construct(BaseAccelConstructParams p) override;
+    void    CastLocalRays(// Output
+                          Span<HitKeyPack> dHitIds,
+                          Span<MetaHit> dHitParams,
+                          // I-O
+                          Span<BackupRNGState> rngStates,
+                          // Input
+                          Span<const RayGMem> dRays,
+                          Span<const RayIndex> dRayIndices,
+                          Span<const AcceleratorKey> dAccelIdPacks,
+                          // Constants
+                          const GPUSystem& s) override;
+
+    void    AllocateForTraversal(size_t maxRayCount) override;
 };
 
-
 inline
-AcceleratorBaseLinear::AcceleratorBaseLinear(BS::thread_pool& tp, GPUSystem& sys)
-    : BaseAcceleratorT<AcceleratorBaseLinear>(tp, sys)
-{
-
-}
-
-template<class KeyType>
-struct BatchFetcher
-{
-    typename KeyType::Type operator()(auto id)
-    {
-        uint32_t batchKeyRaw = static_cast<uint32_t>(id);
-        return KeyType(batchKeyRaw).FetchBatchPortion();
-    }
-};
-using PrimBatchFetcher = BatchFetcher<PrimBatchKey>;
-using TransBatchFetcher = BatchFetcher<TransformKey>;
-
-inline
-void AcceleratorBaseLinear::Construct(BaseAccelConstructParams p)
-{
-    using SurfParam = Pair<SurfaceId, SurfaceParams>;
-    using LightSurfParam = Pair<LightSurfaceId, LightSurfaceParams>;
-    // Pack the surfaces via transform / primitive
-    //
-    // PG TG {S0,...,SN},  -> AccelGroup (One AccelInstance per S)
-    // PG TG {S0,...,SN},  -> AccelGroup
-    // ....
-    // PG TG {S0,...,SN}   -> AccelGroup
-    auto surfList = p.mSurfList;
-    using SurfP = Pair<SurfaceId, SurfaceParams>;
-    std::stable_sort(surfList.begin(), surfList.end(),
-    [](const SurfP& left, const SurfP& right) -> bool
-    {
-        return (left.second.primBatches.front() <
-                right.second.primBatches.front());
-    });
-    //
-    std::stable_sort(surfList.begin(), surfList.end(),
-    [](const SurfP& left, const SurfP& right) -> bool
-    {
-        return (left.second.transformId < right.second.transformId);
-    });
-    // TODO: One linear access to vector should be enough
-    // to generate this after sort, but this is simpler to write
-    // change this if this is a perf bottleneck.
-    std::vector<AccelGroupConstructParams> partitions;
-    auto start = surfList.begin();
-    while(start != surfList.end())
-    {
-        auto pBatchId = start->second.primBatches.front();
-        uint32_t pGroupId = PrimBatchFetcher()(pBatchId);
-        auto end = std::upper_bound(start, surfList.end(), pGroupId,
-        [](const auto& surf,const uint32_t& value)
-        {
-            uint32_t batchPortion = PrimBatchFetcher()(surf.second.primBatches.front());
-            return batchPortion < value;
-        });
-        partitions.emplace_back(AccelGroupConstructParams{});
-        partitions.back().primGroup = p.primGroups.at(PrimGroupId(pGroupId)).get();
-        partitions.back().transformGroups = &p.transformGroups;
-        auto innerStart = start;
-        while(innerStart != end)
-        {
-            TransformId tId = innerStart->second.transformId;
-            uint32_t tGroupId = TransBatchFetcher()(tId);
-            auto innerEnd = std::upper_bound(start, surfList.end(), tGroupId,
-            [](const auto& surf, const uint32_t& value)
-            {
-                auto tId = surf.second.transformId;
-                return TransBatchFetcher()(tId) < value;
-            });
-            auto surfSpan = Span<SurfParam>(innerStart, innerEnd);
-            partitions.back().tGroupSurfs.emplace_back(TransGroupId(tGroupId), surfSpan);
-            innerStart = innerEnd;
-        }
-        start = end;
-    }
-    // Accumulate the light surfaces as well
-    // ...
-
-    // Generate Accelerators
-    for(const auto& partition : partitions)
-    {
-        using namespace TypeNameGen::Runtime;
-        using namespace std::string_view_literals;
-        std::string accelTypeName = CreateAcceleratorType("Linear"sv,
-                                                          partition.primGroup->Name());
-
-        uint32_t aGroupId = idCounter++;
-        auto accelPtr = accelGenerators.at(accelTypeName)(std::move(aGroupId),
-                                                          threadPool, gpuSystem);
-        auto loc = generatedAccels.emplace(aGroupId, std::move(accelPtr));
-        AcceleratorGroupI* acc = loc.first->second.get();
-        acc->Construct(std::move(partition));
-    }
-}
+BaseAcceleratorLinear::BaseAcceleratorLinear(BS::thread_pool& tp, GPUSystem& sys,
+                                             std::map<std::string_view, AccelGroupGenerator>&& aGen)
+    : BaseAcceleratorT<BaseAcceleratorLinear>(tp, sys, std::move(aGen))
+    , accelMem(sys.AllGPUs(), 8_MiB, 32_MiB, false)
+    , stackMem(sys.AllGPUs(), 8_MiB, 32_MiB, false)
+    , rayPartitioner(sys)
+    , maxPartitionCount(0)
+{}
 
 #include "AcceleratorLinear.hpp"

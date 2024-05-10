@@ -40,9 +40,9 @@ class RayPartitioner
     HostLocalMemory     hostMem;
 
     // Device Memory
-    Span<CommonKey>     dKeys[2];
-    Span<CommonIndex>   dIndices[2];
-    Span<Byte>          dTempMemory;
+    std::array<Span<CommonKey>, 2>      dKeys;
+    std::array<Span<CommonIndex>, 2>    dIndices;
+    Span<Byte>                          dTempMemory;
     // Host Memory
     Span<uint32_t>      hPartitionStartOffsets;
     Span<uint32_t, 1>   hPartitionCount;
@@ -52,10 +52,16 @@ class RayPartitioner
     uint32_t            maxPartitionCount;
 
     template<class T>
-    static Span<T>      DetermineOutputSpan(const Span<T> doubleBuffer[2], Span<const T> checkedSpan);
+    static Span<T>      DetermineOutputSpan(const std::array<Span<T>,2>& doubleBuffer,
+                                            Span<const T> checkedSpan);
 
     public:
     // Constructors & Destructor
+                            RayPartitioner(const GPUSystem& system);
+                            RayPartitioner(const RayPartitioner&) = delete;
+                            RayPartitioner(RayPartitioner&&);
+    RayPartitioner&         operator=(const RayPartitioner&) = delete;
+    RayPartitioner&         operator=(RayPartitioner&&);
                             RayPartitioner(const GPUSystem& system,
                                            uint32_t maxElements,
                                            uint32_t maxPartitionCount);
@@ -77,7 +83,8 @@ class RayPartitioner
 };
 
 template<class T>
-Span<T> RayPartitioner::DetermineOutputSpan(const Span<T> doubleBuffer[2], Span<const T> checkedSpan)
+Span<T> RayPartitioner::DetermineOutputSpan(const std::array<Span<T>, 2>& doubleBuffer,
+                                            Span<const T> checkedSpan)
 {
     auto SisterSpan = [s = checkedSpan, db = doubleBuffer](uint32_t from, uint32_t to)
     {

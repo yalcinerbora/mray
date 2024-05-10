@@ -123,6 +123,9 @@ const GPUQueue& GPUDeviceCUDA::GetQueue(uint32_t index) const
 GPUSystemCUDA::GPUSystemCUDA()
     : nvtxDomain(nvtxDomainCreateA("MRayCUDA"))
 {
+    if(globalGPUListPtr) throw MRayError("One process can only have "
+                                         "a single GPUSystem object!");
+
     // Initialize the CUDA
     int deviceCount;
     cudaError err;
@@ -143,10 +146,13 @@ GPUSystemCUDA::GPUSystemCUDA()
         systemGPUs.emplace_back(i, nvtxDomain);
         systemGPUPtrs.push_back(&systemGPUs.back());
     }
-
     // TODO: Do topology stuff here
     // handle selection etc. this is too
     // primitive currently
+
+
+    // TODO: a design leak but what else you can do?
+    globalGPUListPtr = &systemGPUs;
 }
 
 GPUSystemCUDA::~GPUSystemCUDA()
@@ -252,6 +258,21 @@ void GPUSystemCUDA::SyncAll() const
         CUDA_CHECK(cudaSetDevice(gpu.DeviceId()));
         CUDA_CHECK(cudaDeviceSynchronize());
     }
+}
+
+typename GPUSystemCUDA::GPUList*
+GPUSystemCUDA::globalGPUListPtr = nullptr;
+
+void GPUSystemCUDA::ThreadInitFunction()
+{
+    // Set all the devices on the thread, should be enough?
+    for(const auto& device : (*globalGPUListPtr))
+        CUDA_CHECK(cudaSetDevice(device.DeviceId()));
+}
+
+GPUThreadInitFunction GPUSystemCUDA::GetThreadInitFunction() const
+{
+    return &GPUSystemCUDA::ThreadInitFunction;
 }
 
 }
