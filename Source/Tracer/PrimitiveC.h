@@ -204,11 +204,22 @@ concept PrimitiveWithSurfaceC = requires(PrimType mg,
 template <PrimitiveGroupC PrimGroup, TransformGroupC TransGroup>
 constexpr auto AcquireTransformContextGenerator();
 
-using GenericGroupPrimitiveT = GenericGroupT<PrimBatchKey, PrimAttributeInfo>;
+class GenericGroupPrimitiveT : public GenericGroupT<PrimBatchKey, PrimAttributeInfo>
+{
+    public:
+                GenericGroupPrimitiveT(uint32_t groupId,
+                                       const GPUSystem& sys,
+                                       size_t allocationGranularity = 16_MiB,
+                                       size_t initialReservartionSize = 64_MiB);
+
+    void        CopyPrimIds(Span<PrimitiveKey> dOutLocation,
+                            PrimBatchId primBatchId,
+                            const GPUQueue& queue);
+};
 using PrimGroupPtr           = std::unique_ptr<GenericGroupPrimitiveT>;
 
 template<class Child>
-class GenericGroupPrimitive : public GenericGroupT<PrimBatchKey, PrimAttributeInfo>
+class GenericGroupPrimitive : public GenericGroupPrimitiveT
 {
     public:
                      GenericGroupPrimitive(uint32_t groupId,
@@ -308,6 +319,24 @@ constexpr auto AcquireTransformContextGenerator()
     using namespace TypeFinder;
     constexpr auto FList = PrimGroup::TransContextGeneratorList;
     return GetTupleElement<TransGroup>(std::forward<decltype(FList)>(FList));
+}
+
+inline
+GenericGroupPrimitiveT::GenericGroupPrimitiveT(uint32_t groupId,
+                                               const GPUSystem& sys,
+                                               size_t allocationGranularity,
+                                               size_t initialReservartionSize)
+    : GenericGroupT<PrimBatchKey, PrimAttributeInfo>(groupId, sys,
+                                                     allocationGranularity,
+                                                     initialReservartionSize)
+{}
+
+inline
+void GenericGroupPrimitiveT::CopyPrimIds(Span<PrimitiveKey> dOutLocation,
+                                         PrimBatchId primBatchId,
+                                         const GPUQueue& queue)
+{
+    throw MRayError("implement");
 }
 
 template<class C>

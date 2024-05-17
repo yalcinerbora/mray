@@ -63,7 +63,7 @@ using CommonIndex = uint32_t;
 // Work key when a ray hit an object
 // this key will be used to partition
 // rays with respect to materials
-using SurfaceWorkKey = KeyT<CommonKey, 14, 18>;
+using SurfaceWorkKey = TriKeyT<CommonKey, 1, 14, 17>;
 using AccelWorkKey = KeyT<CommonKey, 8, 24>;
 
 // Accelerator key
@@ -97,8 +97,6 @@ struct alignas(HitKeyPackAlignment) HitKeyPack
     LightOrMatKey   matId;
     TransformKey    transId;
     AcceleratorKey  accelId;
-
-    //....
 };
 
 //static constexpr size_t AccelIdPackAlignment = (sizeof(TransformKey) +

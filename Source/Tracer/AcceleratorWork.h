@@ -3,7 +3,26 @@
 #include "PrimitiveC.h"
 #include "Random.h"
 
-template<AccelGroupC AcceleratorGroupType, TransformGroupC TransformGroupType>
+class AcceleratorGroupI;
+
+class AcceleratorWorkI
+{
+    private:
+    protected:
+    virtual void CastLocalRays(// Output
+                               Span<HitKeyPack> dHitKeys,
+                               // I-O
+                               Span<BackupRNGState> rngStates,
+                               // Input
+                               Span<const RayGMem> dRays,
+                               Span<const RayIndex> dRayIndices,
+                               Span<const AcceleratorKey> dAccelIdPacks,
+                               // Constants
+                               const GPUQueue& queue) const = 0;
+};
+
+template<AccelGroupC AcceleratorGroupType,
+         TransformGroupC TransformGroupType>
 class AcceleratorWork : public AcceleratorWorkI
 {
     public:
@@ -11,65 +30,51 @@ class AcceleratorWork : public AcceleratorWorkI
     using AcceleratorGroup  = AcceleratorGroupType;
     using PrimitiveGroup    = typename AcceleratorGroup::PrimitiveGroup;
 
+    static std::string_view TypeName() const;
+
     private:
     const PrimitiveGroup&       primGroup;
     const AcceleratorGroup&     accelGroup;
     const TransformGroup&       transGroup;
 
     public:
-    AcceleratorWork(const AcceleratorGroup& ag,
-                    const TransformGroup& tg);
-
-    static std::string_view TypeName() const;
+    AcceleratorWork(const AcceleratorGroupI& ag,
+                    const GenericGroupTransformT& tg);
 
     // Cast Local rays
     void CastLocalRays(// Output
-                       Span<HitIdPack> dHitIds,
-                       Span<MetaHit> dHitParams,
+                       Span<HitKeyPack> dHitKeys,
                        // I-O
                        Span<BackupRNGState> rngStates,
                        // Input
                        Span<const RayGMem> dRays,
                        Span<const RayIndex> dRayIndices,
-                       Span<const AcceleratorIdPack> dAccelIdPacks,
+                       Span<const CommonKey> dAcceleratorKeys,
                        // Constants
                        const GPUQueue& queue) override;
-
-    void AcquireTransformedAABB(Span<AABB, 1> dAccelAABB,
-                                const std::array<PrimRange, TracerLimits::MaxPrimBatchPerSurface>&,
-                                TransformKey id) override;
-    {
-
-    }
-
-    void AcquireTransformedPositions(Span<Vector3> dPositions,
-                                     const std::array<PrimRange, TracerLimits::MaxPrimBatchPerSurface>&,
-                                     TransformKey) override;
-    {
-
-    }
 
 };
 
 
 template<AccelGroupC AG, TransformGroupC TG>
-AcceleratorWork<AG, TG>::AcceleratorInstanceGroup(const AcceleratorGroup& ag,
-                                                  const TransformGroup& tg,
-                                                  const GPUDevice& residentDevice)
+AcceleratorWork<AG, TG>::AcceleratorInstanceGroup(const AcceleratorGroupI& ag,
+                                                  const GenericGroupTransformT& tg)
+    : accelGroup(static_cast<const AG&>(ag))
+    , transGroup(static_cast<const TG&>(tgIn))
+    , primGroup(static_cast<const PrimitiveGroup&>(*ag.PrimGroup()))
 {
 
 }
 
 template<AccelGroupC AG, TransformGroupC TG>
 void AcceleratorWork<AG, TG>::CastLocalRays(// Output
-                                            Span<HitIdPack> dHitIds,
-                                            Span<MetaHit> dHitParams,
+                                            Span<HitKeyPack> dHitIds,
                                             // I-O
                                             Span<BackupRNGState> rngStates,
                                             // Input
                                             Span<const RayGMem> dRays,
                                             Span<const RayIndex> dRayIndices,
-                                            Span<const AcceleratorIdPack> dAccelIdPacks,
+                                            Span<const CommonKey> dAcceleratorKeys,
 
                                             // Constants
                                             const GPUQueue& queue)
@@ -79,7 +84,7 @@ void AcceleratorWork<AG, TG>::CastLocalRays(// Output
     assert(dAccelIdPacks.size() == dHitParams.size());
     assert(dHitParams.size() == dHitIds.size());
 
-    using PG            = PrimitiveGroup;
+    using PG            = typename AcceleratorGroup::PrimitiveGroup;
     using PrimSoA       = typename PrimitiveGroup::DataSoAConst;
     using AccelSoA      = typename AcceleratorGroup::DataSoAConst;
     using TransSoA      = typename TransformGroup::DataSoAConst;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <bitset>
 
 #include "Core/Types.h"
 
@@ -64,10 +65,8 @@ namespace LinearAccelDetail
     };
 }
 
-using PrimRangeArray     = std::array<Vector2ui, TracerConstants::MaxPrimBatchPerSurface>;
-using MaterialKeyArray   = std::array<MaterialKey, TracerConstants::MaxPrimBatchPerSurface>;
-using CullFaceFlagArray  = std::array<bool, TracerConstants::MaxPrimBatchPerSurface>;
-using AlphaMapArray      = std::array<Optional<AlphaMap>, TracerConstants::MaxPrimBatchPerSurface>;
+
+
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 MaterialKey FindMaterialId(const PrimRangeArray& primRanges,
@@ -93,9 +92,8 @@ MaterialKey FindMaterialId(const PrimRangeArray& primRanges,
     return MaterialKey::InvalidKey();
 }
 
-
 template<PrimitiveGroupC PrimitiveGroupType>
-class AcceleratorGroupLinear final : public AcceleratorGroupI
+class AcceleratorGroupLinear final : public AcceleratorGroupT<PrimitiveGroupType>
 {
     public:
     static std::string_view TypeName();
@@ -110,17 +108,10 @@ class AcceleratorGroupLinear final : public AcceleratorGroupI
     static constexpr auto TransformLogic = PrimitiveGroup::TransformLogic;
 
     private:
-    const PrimitiveGroup&           pg;
-    DeviceMemory                    mem;
-    DataSoA                         data;
-
-    //std::map<TransGroupId, auto>     ClosestHitKernels;
-    //std::map<TransGroupId, auto>     AnyHitKernels;
-
-    //std::map<>;
-
+    DeviceMemory                mem;
+    DataSoA                     data;
     // Per-instance (All accelerators will have these)
-    Bitspan<uint32_t>           dCullFaceFlags;
+    Span<CullFaceFlagArray>     dCullFaceFlags;
     Span<AlphaMapArray>         dAlphaMaps;
     Span<MaterialKeyArray>      dMaterialKeys;
     Span<PrimRangeArray>        dPrimitiveRanges;
@@ -129,30 +120,29 @@ class AcceleratorGroupLinear final : public AcceleratorGroupI
     // Global data, all accelerator leafs in
     Span<PrimitiveKey>          dAllLeafs;
 
-    // We do not have an accelerator structure
-    // Internal concrete accel counter
-    uint32_t accelGroupId       = 0;
-    uint32_t concreteAccelCount = 0;
-    uint32_t instanceCount      = 0;
-    uint32_t instanceTypeCount  = 0;
-
-    protected:
-    void        DetermineConcereteAccelCount(const AccelGroupConstructParams&);
-
     public:
     // Constructors & Destructor
                 AcceleratorGroupLinear(uint32_t accelGroupId,
                                        const GenericGroupPrimitiveT& pg);
     //
-    void        Construct(AccelGroupConstructParams) override;
-
-    size_t      InstanceCount() const override;
-    uint32_t    InstanceTypeCount() const override;
-    uint32_t    UsedIdBitsInKey() const override;
+    void        Construct(AccelGroupConstructParams, const GPUQueue&) override;
     void        WriteInstanceKeysAndAABBs(Span<AABB3> aabbWriteRegion,
                                           Span<AcceleratorKey> keyWriteRegion) const override;
-    uint32_t    SetKeyOffset(uint32_t) override;
 
+    // Functionality
+    void        CastLocalRays(// Output
+                              Span<HitKeyPack> dHitIds,
+                              Span<MetaHit> dHitParams,
+                              Span<SurfaceWorkKey> dWorkKeys,
+                              // I-O
+                              Span<BackupRNGState> rngStates,
+                              // Input
+                              Span<const RayGMem> dRays,
+                              Span<const RayIndex> dRayIndices,
+                              Span<const CommonKey> dAccelKeys,
+                              // Constants
+                              uint32_t instanceId,
+                              const GPUQueue& queue) override;
 };
 
 class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinear>

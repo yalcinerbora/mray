@@ -19,6 +19,7 @@
 namespace BS { class thread_pool; }
 
 class IdentityTransformContext;
+class AcceleratorWorkI;
 
 template<class HitType>
 struct HitResultT
@@ -160,7 +161,8 @@ class AcceleratorGroupI
                                   uint32_t instanceId,
                                   const GPUQueue& queue) = 0;
 
-    virtual void        Construct(AccelGroupConstructParams) = 0;
+    virtual void        Construct(AccelGroupConstructParams,
+                                  const GPUQueue&) = 0;
 
     virtual size_t      InstanceCount() const = 0;
     virtual uint32_t    InstanceTypeCount() const = 0;
@@ -168,6 +170,75 @@ class AcceleratorGroupI
     virtual void        WriteInstanceKeysAndAABBs(Span<AABB3> aabbWriteRegion,
                                                   Span<AcceleratorKey> keyWriteRegion) const = 0;
     virtual uint32_t    SetKeyOffset(uint32_t) = 0;
+};
+
+using PrimRangeArray     = std::array<Vector2ui, TracerConstants::MaxPrimBatchPerSurface>;
+using MaterialKeyArray   = std::array<MaterialKey, TracerConstants::MaxPrimBatchPerSurface>;
+// TODO: std::bitset is CPU oriented class holds the data in (at least i checked MSVC std lib) 32/64-bit integer
+// For CUDA, it can be 8/16-bit, properly packed data (since MaxPrimBatchPerSurface
+// is 8 in the current impl.) This should not be a memory concern untill
+// this codebase becomes production level renderer (doubt)
+using CullFaceFlagArray  = Bitset<TracerConstants::MaxPrimBatchPerSurface>;
+using AlphaMapArray      = std::array<Optional<AlphaMap>, TracerConstants::MaxPrimBatchPerSurface>;
+
+struct AcceleratorLeafResult
+{
+    // Index to "perInstanceLeafRanges" for all unique(concerete) accels
+    std::vector<uint32_t>   concereteAccelIndices;
+    // Leaf [start,end) of each accelerator instance
+    std::vector<Vector2ui>  perInstanceLeafRanges;
+    // Total leaf count required for this accelerator group
+    size_t                  totalLeafCount;
+};
+
+struct LinearizedSurfaceData
+{
+    std::vector<PrimRangeArray>     primRanges;
+    std::vector<MaterialKeyArray>   materialKeys;
+    std::vector<AlphaMapArray>      alphaMaps;
+    std::vector<CullFaceFlagArray>  cullFaceFlags;
+    std::vector<TransformKey>       transformKeys;
+    std::vector<SurfacePrimList>    instancePrimBatches;
+};
+
+template <PrimitiveGroupC PrimitiveGroupType>
+class AcceleratorGroupT : public AcceleratorGroupI
+{
+    using AccelWorkPtr = std::unique_ptr<AcceleratorWorkI>;
+
+    protected:
+    const PrimitiveGroupType&   pg;
+    uint32_t                    accelGroupId       = 0;
+    uint32_t                    concreteAccelCount = 0;
+    uint32_t                    instanceCount      = 0;
+    uint32_t                    instanceTypeCount  = 0;
+
+    // Type Related
+    std::vector<uint32_t>               typeIds;
+    std::map<uint32_t, AccelWorkPtr>    workInstances;
+
+    // Common functionality for ineriting types
+    static size_t                   DetermineInstanceCount(const AccelGroupConstructParams& p);
+    static size_t                   DetermineInstanceTypeCount(const AccelGroupConstructParams& p);
+    static AcceleratorLeafResult    DetermineConcereteAccelCount(const std::vector<SurfacePrimList>& instancePrimBatches,
+                                                                 const std::vector<PrimRangeArray>& instancePrimRanges);
+    template<class T>
+    static std::vector<Span<T>>     CreateLeafSubspans(Span<T> fullRange,
+                                                       const std::vector<Vector2ui>& leafRanges);
+    static LinearizedSurfaceData    LinearizeSurfaceData(const AccelGroupConstructParams& p,
+                                                         size_t totalSurfaceCount,
+                                                         const PrimitiveGroupType& pg);
+
+    public:
+    // Constructors & Destructor
+                AcceleratorGroupT(uint32_t accelGroupId,
+                                  const GenericGroupPrimitiveT& pg);
+
+    size_t      InstanceCount() const override;
+    uint32_t    InstanceTypeCount() const override;
+    uint32_t    UsedIdBitsInKey() const override;
+    uint32_t    SetKeyOffset(uint32_t) override;
+
 };
 
 using AccelGroupGenerator = GeneratorFuncType<AcceleratorGroupI, uint32_t,
@@ -423,6 +494,8 @@ void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
     AddLightSurfacesToPartitions(partitions, p.lSurfList, p.lightGroups);
 
     // Generate the accelerators
+    // TODO: do multi-gpu stuff here
+    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
     for(const auto& partition : partitions)
     {
         using namespace TypeNameGen::Runtime;
@@ -434,7 +507,7 @@ void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
                                                           threadPool, gpuSystem);
         auto loc = generatedAccels.emplace(aGroupId, std::move(accelPtr));
         AcceleratorGroupI* acc = loc.first->second.get();
-        acc->Construct(std::move(partition));
+        acc->Construct(std::move(partition), queue);
     }
     // Find the leaf count
     std::vector<size_t> instanceOffsets(generatedAccels.size() + 1, 0);
@@ -483,4 +556,292 @@ void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
     // we can not fetch the leaf data here because some accelerators are
     // constructed on CPU (due to laziness)
     InternalConstruct(instanceOffsets);
+}
+
+template <PrimitiveGroupC PG>
+size_t AcceleratorGroupT<PG>::DetermineInstanceCount(const AccelGroupConstructParams& p)
+{
+    size_t surfCount = std::transform_reduce(p.tGroupSurfs.cbegin(),
+                                             p.tGroupSurfs.cend(),
+                                             size_t(0), std::plus{},
+                                             [](const auto& groupedSurf)
+    {
+        return groupedSurf.second.size();
+    });
+    size_t lSurfCount = std::transform_reduce(p.tGroupLightSurfs.cbegin(),
+                                              p.tGroupLightSurfs.cend(),
+                                              size_t(0), std::plus{},
+                                              [](const auto& groupedSurf)
+    {
+        return groupedSurf.second.size();
+    });
+    size_t totalSurfaceCount = (surfCount + lSurfCount);
+    return totalSurfaceCount;
+}
+
+template <PrimitiveGroupC PG>
+size_t AcceleratorGroupT<PG>::DetermineInstanceTypeCount(const AccelGroupConstructParams& p)
+{
+    // Find the instance type count
+    // Pair of [TransformType, PrimitiveType]
+    // defines an instance, since we are on a prim typed class
+    // we need to check transform groups, this is already partitioned by the
+    // base accelerator, we just need to get the size
+    //
+    // However, light types also has its own partitioned array, so we need to
+    // add only the non-duplicates there
+    uint32_t instanceTypeCount = p.tGroupSurfs.size();
+    instanceTypeCount += std::transform_reduce(p.tGroupLightSurfs.cbegin(),
+                                               p.tGroupLightSurfs.cend(),
+                                               size_t(0), std::plus{},
+    [&](const auto& groupedLightSurf)
+    {
+        TransGroupId tId = groupedLightSurf.first;
+        auto loc = std::find_if(p.tGroupSurfs.cbegin(),
+                                p.tGroupSurfs.cend(),
+        [tId](const auto groupedSurf)
+        {
+            return groupedSurf.first != tId;
+        });
+        return (loc == p.tGroupSurfs.cend()) ? 0 : 1;
+    });
+    return instanceTypeCount;
+};
+
+template <PrimitiveGroupC PG>
+AcceleratorLeafResult AcceleratorGroupT<PG>::DetermineConcereteAccelCount(const std::vector<SurfacePrimList>& instancePrimBatches,
+                                                                          const std::vector<PrimRangeArray>& instancePrimRanges)
+{
+    assert(instancePrimBatches.size() == instancePrimRanges.size());
+
+    std::vector<uint32_t> acceleratorIndices(instancePrimBatches.size());
+    std::vector<uint32_t> uniqueIndices(instancePrimBatches.size());
+    std::iota(acceleratorIndices.begin(), acceleratorIndices.end(), 0);
+    using enum PrimTransformType;
+    if constexpr(PG::TransformLogic == LOCALLY_CONSTANT_TRANSFORM)
+    {
+        // This means we can fully utilize the primitive
+        // Sort and find the unique primitive groups
+        // only generate accelerators for these, refer with other instances
+        std::vector<uint32_t>& nonUniqueIndices = acceleratorIndices;
+        // Commonalize the innter lists (sort it)
+        for(const SurfacePrimList& lst : instancePrimBatches)
+        {
+            // Hopefully stl calls insertion sort here or something...
+            std::sort(lst.begin(), lst.end(), [](PrimBatchId lhs, PrimBatchId rhs)
+            {
+                return (static_cast<uint32_t>(lhs) < static_cast<uint32_t>(rhs));
+            });
+        }
+        // Do an index/id sort here, c++ does not have it
+        // so sort iota wrt. values and use it to find instances
+        // Use stable sort here to keep the relative transform order of primitives
+        std::stable_sort(nonUniqueIndices.begin(), nonUniqueIndices.end(),
+        [&instancePrimBatches](uint32_t l, uint32_t r)
+        {
+            const SurfacePrimList& lhs = instancePrimBatches[l];
+            const SurfacePrimList& rhs = instancePrimBatches[r];
+            bool result = std::lexicographical_compare(lhs.cbegin(), lhs.cend(),
+                                                       rhs.cbegin(), rhs.cend(),
+            [](PrimBatchId lhs, PrimBatchId rhs)
+            {
+                return (static_cast<uint32_t>(lhs) < static_cast<uint32_t>(rhs));
+            });
+            return result;
+        });
+        std::unique_copy(nonUniqueIndices.begin(), nonUniqueIndices.end(), uniqueIndices.begin(),
+        [&instancePrimBatches](uint32_t l, uint32_t r)
+        {
+            const SurfacePrimList& lhs = instancePrimBatches[l];
+            const SurfacePrimList& rhs = instancePrimBatches[r];
+            auto result = std::lexicographical_compare_three_way(lhs.cbegin(), lhs.cend(),
+                                                                 rhs.cbegin(), rhs.cend(),
+            [](PrimBatchId lhs, PrimBatchId rhs)
+            {
+                return (static_cast<uint32_t>(lhs) < static_cast<uint32_t>(rhs));
+            });
+            return std::is_eq(result);
+        });
+        // Do an inverted search your id on unique indices
+        std::for_each(nonUniqueIndices.begin(), nonUniqueIndices.end(),
+        [&uniqueIndices](uint32_t& index)
+        {
+            auto loc = std::lower_bound(uniqueIndices.begin(), uniqueIndices.end(), index);
+            index = std::distance(uniqueIndices.begin(), loc);
+        });
+    }
+    else
+    {
+        // PG supports "PER_PRIMITIVE_TRANSFORM", we cannot refer to the same
+        // accelerator, we need to construct an accelerator for each instance
+        // Do not bother sorting etc here..
+        // Copy here for continuation
+        acceleratorIndices = uniqueIndices;
+    }
+
+    // Determine the leaf ranges
+    // TODO: We are
+    std::vector<uint32_t> uniquePrimCounts(uniqueIndices.size() + 1);
+    for(uint32_t index : uniqueIndices)
+    {
+        uint32_t totalLocalPrimCount = 0;
+        for(Vector2ui range : instancePrimRanges[index])
+        {
+            if(range == Vector2ui(std::numeric_limits<uint32_t>::max())) break;
+            totalLocalPrimCount += (range[1] - range[0]);
+        }
+        uniquePrimCounts.push_back(totalLocalPrimCount);
+    }
+    std::exclusive_scan(uniquePrimCounts.cbegin(), uniquePrimCounts.cend(),
+                        uniquePrimCounts.begin(), 0u);
+
+    // Rename the variable for better maintenance
+    std::vector<uint32_t>& uniquePrimOffsets = uniquePrimCounts;
+    std::vector<Vector2ui> leafRangeList;
+    leafRangeList.reserve(instancePrimBatches.size());
+    for(uint32_t index : acceleratorIndices)
+    {
+        leafRangeList.push_back(Vector2ui(uniquePrimOffsets[index],
+                                          uniquePrimOffsets[index + 1]));
+    }
+
+    // All done!
+    return AcceleratorLeafResult
+    {
+        .concereteAccelIndices = std::move(uniqueIndices),
+        .perInstanceLeafRanges = std::move(leafRangeList),
+        .totalLeafCount = uniquePrimOffsets.back()
+    };
+}
+
+template <PrimitiveGroupC PG>
+template<class T>
+std::vector<Span<T>>
+AcceleratorGroupT<PG>::CreateLeafSubspans(Span<T> fullRange,
+                                          const std::vector<Vector2ui>& leafRanges)
+{
+    std::vector<Span<T>> instanceLeafData(leafRanges.size());
+    std::transform(leafRanges.cbegin(), leafRanges.cend(),
+                   instanceLeafData.begin(),
+                   [fullRange](const Vector2ui& offset)
+    {
+        uint32_t size = offset[1] - offset[0];
+        return fullRange.subspan(offset[0], size);
+    });
+    return instanceLeafData;
+}
+
+template <PrimitiveGroupC PG>
+LinearizedSurfaceData AcceleratorGroupT<PG>::LinearizeSurfaceData(const AccelGroupConstructParams& p,
+                                                                  size_t totalSurfaceCount,
+                                                                  const PG& pg)
+{
+    LinearizedSurfaceData result = {};
+    result.primRanges.reserve(totalSurfaceCount);
+    result.materialKeys.reserve(totalSurfaceCount);
+    result.alphaMaps.reserve(totalSurfaceCount);
+    result.cullFaceFlags.reserve(totalSurfaceCount);
+    result.transformKeys.reserve(totalSurfaceCount);
+    result.instancePrimBatches.reserve(totalSurfaceCount);
+
+    const auto InitRest = [&](size_t restStart)
+    {
+        using namespace TracerConstants;
+        for(size_t i = restStart; i < MaxPrimBatchPerSurface; i++)
+        {
+            result.alphaMaps.back()[i] = std::nullopt;
+            result.cullFaceFlags.back()[i] = false;
+            result.materialKeys.back()[i] = MaterialKey::InvalidKey();
+            result.primRanges.back()[i] = Vector2ui(std::numeric_limits<uint32_t>::max());
+        }
+    };
+
+    for(const auto& surfList : p.tGroupSurfs)
+    for(const auto& [_, surf] : surfList.second)
+    {
+        result.instancePrimBatches.push_back(surf.primBatches);
+        result.alphaMaps.emplace_back();
+        result.cullFaceFlags.emplace_back();
+        result.materialKeys.emplace_back();
+        result.primRanges.emplace_back();
+        result.transformKeys.emplace_back(TransformKey(static_cast<uint32_t>(surf.transformId)));;
+
+        assert(surf.alphaMaps.size() == surf.cullFaceFlags.size());
+        assert(surf.cullFaceFlags.size() == surf.materials.size());
+        assert(surf.materials.size() == surf.primBatches.size());
+        for(size_t i = 0; i < surf.alphaMaps.size(); i++)
+        {
+            if(surf.alphaMaps[i].has_value())
+            {
+                const GenericTextureView& view = p.textureViews->at(surf.alphaMaps[i].value());
+                assert(std::holds_alternative<AlphaMap>(view));
+                result.alphaMaps.back()[i] = std::get<AlphaMap>(view);
+            }
+            else result.alphaMaps.back()[i] = std::nullopt;
+
+            result.cullFaceFlags.back()[i] = surf.cullFaceFlags[i];
+            result.materialKeys.back()[i] = MaterialKey(static_cast<CommonKey>(surf.materials[i]));
+            result.primRanges.back()[i] = pg.BatchRange(surf.primBatches[i]);
+        }
+        InitRest(surf.alphaMaps.size());
+    }
+    // TODO: Sharing std::array<..> for lights is waste of space
+    // Maybe enable multi-prim lights later
+    for(const auto& lSurfList : p.tGroupLightSurfs)
+    for(const auto& [_, lSurf] : lSurfList.second)
+    {
+        result.alphaMaps.emplace_back();
+        result.cullFaceFlags.emplace_back();
+        result.materialKeys.emplace_back();
+        result.primRanges.emplace_back();
+
+        InitRest(0);
+        PrimBatchId primBatchId = p.lightGroup->LightPrimBatch(lSurf.lightId);
+        result.primRanges.back().front() = pg.BatchRange(primBatchId);
+        result.transformKeys.emplace_back(TransformKey(static_cast<uint32_t>(lSurf.transformId)));
+        result.instancePrimBatches.emplace_back().push_back(primBatchId);
+    }
+    assert(result.alphaMaps.size()             == totalSurfaceCount);
+    assert(result.cullFaceFlags.size()         == totalSurfaceCount);
+    assert(result.materialKeys.size()          == totalSurfaceCount);
+    assert(result.primRanges.size()            == totalSurfaceCount);
+    assert(result.transformKeys.size()         == totalSurfaceCount);
+    assert(result.instancePrimBatches.size()   == totalSurfaceCount);
+    return result;
+}
+
+template <PrimitiveGroupC PG>
+AcceleratorGroupT<PG>::AcceleratorGroupT(uint32_t groupId,
+                                         const GenericGroupPrimitiveT& pgIn)
+    : accelGroupId(groupId)
+    , pg(static_cast<const PG&>(pgIn))
+{}
+
+
+template<PrimitiveGroupC PG>
+size_t AcceleratorGroupT<PG>::InstanceCount() const
+{
+    return instanceCount;
+}
+
+template<PrimitiveGroupC PG>
+uint32_t AcceleratorGroupT<PG>::InstanceTypeCount() const
+{
+    return instanceTypeCount;
+}
+
+template<PrimitiveGroupC PG>
+uint32_t AcceleratorGroupT<PG>::UsedIdBitsInKey() const
+{
+    return BitFunctions::RequiredBitsToRepresent(instanceTypeCount);
+}
+
+template<PrimitiveGroupC PG>
+uint32_t AcceleratorGroupT<PG>::SetKeyOffset(uint32_t offset)
+{
+    std::for_each(typeIds.begin(), typeIds.end(),
+    [offset](uint32_t& id)
+    {
+        id += offset;
+    });
 }

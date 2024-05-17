@@ -48,7 +48,7 @@ function(gen_tracer_target)
 
     set(SRC_ACCELLERATORS
         ${CURRENT_SOURCE_DIR}/AcceleratorC.h
-        ${CURRENT_SOURCE_DIR}/AcceleratorInstance.h
+        ${CURRENT_SOURCE_DIR}/AcceleratorWork.h
         ${CURRENT_SOURCE_DIR}/AcceleratorLinear.cu
         ${CURRENT_SOURCE_DIR}/AcceleratorLinear.h
         ${CURRENT_SOURCE_DIR}/AcceleratorLinear.hpp)

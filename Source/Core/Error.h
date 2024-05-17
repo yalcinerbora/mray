@@ -19,10 +19,16 @@ struct MRayError
     std::string customInfo;
 
     public:
+    // Constructors & Destructor
                 MRayError(Type = Type::OK);
     // This pattern emerges, so added as a template
     template<class... Args>
                 MRayError(fmt::format_string<Args...> fstr, Args&&... args);
+                MRayError(const MRayError&)     = default;
+                MRayError(MRayError&&) noexcept = default;
+    MRayError&  operator=(const MRayError&)     = default;
+    MRayError&  operator=(MRayError&&) noexcept = default;
+                ~MRayError()                    = default;
 
     explicit operator bool();
 

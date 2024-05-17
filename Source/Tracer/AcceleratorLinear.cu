@@ -80,7 +80,7 @@ void BaseAcceleratorLinear::CastRays(// Output
     queue.MemsetAsync(dTraversalStack, 0x00);
 
     // Initialize the ray partitioner
-    size_t currentRayCount = dRays.size();
+    uint32_t currentRayCount = static_cast<uint32_t>(dRays.size());
     uint32_t partitionCount = static_cast<uint32_t>(maxPartitionCount);
     auto [dCurrentIndices, dCurrentKeys] = rayPartitioner.Start(currentRayCount, partitionCount);
     // Copy the ray indices to the local buffer, normally we could utilize

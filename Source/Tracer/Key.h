@@ -19,15 +19,15 @@ class alignas(sizeof(T)) KeyT
     using Type = T;
 
     // Constants
-    static constexpr T          BatchBits = BBits;
-    static constexpr T          IdBits = IBits;
+    static constexpr T  BatchBits = BBits;
+    static constexpr T  IdBits = IBits;
 
-    static constexpr T          IdMask = (0x1ull << IdBits) - 1;
-    static constexpr T          BatchMask = ((0x1ull << BatchBits) - 1) << IdBits;
+    static constexpr T  IdMask = (0x1ull << IdBits) - 1;
+    static constexpr T  BatchMask = ((0x1ull << BatchBits) - 1) << IdBits;
 
     private:
     // Props
-    T                           value;
+    T                   value;
 
     public:
     // Constructors & Destructor
@@ -53,6 +53,54 @@ class alignas(sizeof(T)) KeyT
                   "Bits representing portions of HitKey should complement each other.");
     static_assert((IdMask | BatchMask) == std::numeric_limits<T>::max() &&
                   (IdMask & BatchMask) == std::numeric_limits<T>::min(),
+                  "Masks representing portions of HitKey should complement each other.");
+};
+
+// Triple key type, used for surface work keys,
+template <std::unsigned_integral T, uint32_t FBits, uint32_t BBits, uint32_t IBits>
+class alignas(sizeof(T)) TriKeyT
+{
+    public:
+    using Type = T;
+
+    // Constants
+    static constexpr T  FlagBits = FBits;
+    static constexpr T  BatchBits = BBits;
+    static constexpr T  IdBits = IBits;
+
+    static constexpr T  FlagMask = (0x1ull << FlagBits) - 1 << (FlagBits + IdBits);
+    static constexpr T  BatchMask = ((0x1ull << BatchBits) - 1) << IdBits;
+    static constexpr T  IdMask = (0x1ull << IdBits) - 1;
+
+    private:
+    // Props
+    T                           value;
+
+    public:
+    // Constructors & Destructor
+                                    TriKeyT() = default;
+    MRAY_HYBRID explicit constexpr  TriKeyT(T v);
+    //
+    MRAY_HYBRID explicit constexpr  operator T() const;
+    MRAY_HYBRID explicit constexpr  operator T&();
+
+    MRAY_HYBRID bool                operator==(const TriKeyT& rhs) const;
+
+    // Access
+    MRAY_HYBRID constexpr T         FetchFlagPortion() const;
+    MRAY_HYBRID constexpr T         FetchBatchPortion() const;
+    MRAY_HYBRID constexpr T         FetchIndexPortion() const;
+
+    MRAY_HYBRID
+    static constexpr TriKeyT        CombinedKey(T flag, T batch, T id);
+    MRAY_HYBRID
+    static constexpr TriKeyT        InvalidKey();
+
+    // Sanity Checks
+    static_assert((IdBits + BatchBits + FlagBits) == std::numeric_limits<T>::digits,
+                  "Bits representing portions of HitKey should complement each other.");
+    static_assert((IdMask | BatchMask | FlagMask) == std::numeric_limits<T>::max() &&
+                  (IdMask & BatchMask | FlagMask) == std::numeric_limits<T>::min(),
                   "Masks representing portions of HitKey should complement each other.");
 };
 
@@ -101,12 +149,82 @@ template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr KeyT<T, BB, IB> KeyT<T, BB, IB>::CombinedKey(T batch, T id)
 {
+    assert(batch >= BatchMask);
+    assert(id >= IdMask);
     return KeyT((batch << IdBits) | (id & IdMask));
 }
 
 template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr KeyT<T, BB, IB> KeyT<T, BB, IB>::InvalidKey()
+{
+    return KeyT(std::numeric_limits<T>::max());
+}
+
+template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr TriKeyT<T, FB, BB, IB>::TriKeyT(T v)
+    : value(v)
+{}
+
+template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr TriKeyT<T, FB, BB, IB>::operator T() const
+{
+    return value;
+}
+
+template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr TriKeyT<T, FB, BB, IB>::operator T&()
+{
+    return value;
+}
+
+template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool TriKeyT<T, FB, BB, IB>::operator==(const TriKeyT& rhs) const
+{
+    return (value == rhs.value);
+}
+
+template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr T TriKeyT<T, FB, BB, IB>::FetchFlagPortion() const
+{
+    return (value & FlagMask) >> (BatchBits + IdBits);
+}
+
+template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr T TriKeyT<T, FB, BB, IB>::FetchBatchPortion() const
+{
+    return (value & BatchMask) >> IdBits;
+}
+
+template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr T TriKeyT<T, FB, BB, IB>::FetchIndexPortion() const
+{
+    return (value & IdMask);
+}
+
+template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr TriKeyT<T, FB, BB, IB> TriKeyT<T, FB, BB, IB>::CombinedKey(T flag, T batch, T id)
+{
+    assert(flag >= FlagMask);
+    assert(batch >= BatchMask);
+    assert(id >= IdMask);
+    T flagPortion   = flag << (IdBits + BatchBits);
+    T batchPortion  = batch << IdBits;
+    T idPortion     = id;
+    return TriKeyT(flagPortion | batchPortion | idPortion);
+}
+
+template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr TriKeyT<T, FB, BB, IB> TriKeyT<T, FB, BB, IB>::InvalidKey()
 {
     return KeyT(std::numeric_limits<T>::max());
 }
