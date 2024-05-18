@@ -22,8 +22,7 @@
 namespace LinearAccelDetail
 {
 
-template<PrimitiveGroupC PG>
-using OptionalHitR = Optional<HitResultT<typename PG::Hit>>;
+
 
 template<PrimitiveGroupC PG, TransformGroupC TG>
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -103,12 +102,11 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 AcceleratorLinear<PG, TG>::AcceleratorLinear(const TransDataSoA& tSoA,
                                              const PrimDataSoA& pSoA,
                                              const DataSoA& dataSoA,
-                                             AcceleratorKey aId,
-                                             TransformKey tId)
+                                             AcceleratorKey aId)
     : cullFace(dataSoA.dCullFace[aId.FetchIndexPortion()])
     , alphaMap(dataSoA.dAlphaMaps[aId.FetchIndexPortion()])
     , leafs(ToConstSpan(dataSoA.dLeafs[aId.FetchIndexPortion()]))
-    , transformKey(tId)
+    , transformKey(dataSoA.dInstanceTransforms[aId.FetchIndexPortion()])
     , transformSoA(tSoA)
     , primitiveSoA(pSoA)
 {}
@@ -160,8 +158,9 @@ std::string_view AcceleratorGroupLinear<PG>::TypeName()
 
 template<PrimitiveGroupC PG>
 AcceleratorGroupLinear<PG>::AcceleratorGroupLinear(uint32_t accelGroupId,
-                                                   const GenericGroupPrimitiveT& pg)
-    : AcceleratorGroupT<PG>(accelGroupId, pg)
+                                                   const GenericGroupPrimitiveT& pg,
+                                                   const AccelGroupWorkGenMap& workMap)
+    : AcceleratorGroupT<PG>(accelGroupId, pg, workMap)
 {}
 
 template<PrimitiveGroupC PG>

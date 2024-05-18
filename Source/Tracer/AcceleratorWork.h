@@ -2,8 +2,7 @@
 #include "TransformC.h"
 #include "PrimitiveC.h"
 #include "Random.h"
-
-class AcceleratorGroupI;
+#include "TracerTypes.h"
 
 class AcceleratorWorkI
 {
@@ -21,6 +20,9 @@ class AcceleratorWorkI
                                const GPUQueue& queue) const = 0;
 };
 
+template<PrimitiveGroupC PG>
+using OptionalHitR = Optional<HitResultT<typename PG::Hit>>;
+
 template<AccelGroupC AcceleratorGroupType,
          TransformGroupC TransformGroupType>
 class AcceleratorWork : public AcceleratorWorkI
@@ -30,7 +32,7 @@ class AcceleratorWork : public AcceleratorWorkI
     using AcceleratorGroup  = AcceleratorGroupType;
     using PrimitiveGroup    = typename AcceleratorGroup::PrimitiveGroup;
 
-    static std::string_view TypeName() const;
+    static std::string_view TypeName();
 
     private:
     const PrimitiveGroup&       primGroup;
@@ -57,14 +59,12 @@ class AcceleratorWork : public AcceleratorWorkI
 
 
 template<AccelGroupC AG, TransformGroupC TG>
-AcceleratorWork<AG, TG>::AcceleratorInstanceGroup(const AcceleratorGroupI& ag,
-                                                  const GenericGroupTransformT& tg)
+AcceleratorWork<AG, TG>::AcceleratorWork(const AcceleratorGroupI& ag,
+                                         const GenericGroupTransformT& tg)
     : accelGroup(static_cast<const AG&>(ag))
-    , transGroup(static_cast<const TG&>(tgIn))
-    , primGroup(static_cast<const PrimitiveGroup&>(*ag.PrimGroup()))
-{
-
-}
+    , transGroup(static_cast<const TG&>(tg))
+    , primGroup(static_cast<const PrimitiveGroup&>(ag.PrimGroup()))
+{}
 
 template<AccelGroupC AG, TransformGroupC TG>
 void AcceleratorWork<AG, TG>::CastLocalRays(// Output
@@ -80,18 +80,17 @@ void AcceleratorWork<AG, TG>::CastLocalRays(// Output
                                             const GPUQueue& queue)
 {
     assert(dRays.size() == dRayIndices.size());
-    assert(dRayIndices.size() == dAccelIdPacks.size());
-    assert(dAccelIdPacks.size() == dHitParams.size());
-    assert(dHitParams.size() == dHitIds.size());
+    assert(dRayIndices.size() == dAcceleratorKeys.size());
+    assert(dAcceleratorKeys.size() == dHitIds.size());
 
     using PG            = typename AcceleratorGroup::PrimitiveGroup;
     using PrimSoA       = typename PrimitiveGroup::DataSoAConst;
     using AccelSoA      = typename AcceleratorGroup::DataSoAConst;
     using TransSoA      = typename TransformGroup::DataSoAConst;
     using Accelerator   = typename AcceleratorGroup:: template Accelerator<TG>;
-    TransSoA    tSoA = tg.DataSoA();
-    AccelSoA    aSoA = ag.DataSoA();
-    PrimSoA     pSoA = pg.DataSoA();
+    TransSoA    tSoA = transGroup.DataSoA();
+    AccelSoA    aSoA = accelGroup.DataSoA();
+    PrimSoA     pSoA = primGroup.DataSoA();
 
     auto RayCastKernel = [=] MRAY_HYBRID(KernelCallParams kp)
     {
@@ -103,9 +102,14 @@ void AcceleratorWork<AG, TG>::CastLocalRays(// Output
 
             BackupRNG rng(rngStates[index]);
 
+            // Get ids
+            AcceleratorKey aId(dAcceleratorKeys[index]);
+            // Construct the accelerator view
+            Accelerator acc(tSoA, pSoA, aSoA, aId);
+
             // Do work depending on the prim transorm logic
             using enum PrimTransformType;
-            if constexpr(PG::TransformType == LOCALLY_CONSTANT_TRANSFORM)
+            if(PG::TransformType == LOCALLY_CONSTANT_TRANSFORM)
             {
                 // Transform is local
                 // we can transform the ray and use it on iterations
@@ -118,44 +122,41 @@ void AcceleratorWork<AG, TG>::CastLocalRays(// Output
                 // that this primitive group provides to generate the prim
                 using TContextType = typename decltype(TContextGen)::ReturnType;
                 // The actual context
-                TContextType transformContext = TGenFunc(transformSoA, primitiveSoA,
-                                                         transformKey, PrimitiveKey(0));
+                // Prim id does mean nothing, so set it to zero and call
+                TContextType transformContext = TGenFunc(tSoA, pSoA, acc.TransformKey(),
+                                                         PrimitiveKey(0));
 
                 ray = transformContext.InvApply(ray);
             }
 
-            // Get ids
-            auto [tId, aId] = dAccelIdPacks[index];
-
-            // Construct the accelerator view
-            Accelerator acc(tSoA, pSoA, aSoA, tId, aId);
-            OptionalHitR<PrimitiveGroup> hit = acc.ClosestHit(ray, tMM, rng);
+            // Actual ray cast!
+            OptionalHitR<PG> hit = acc.ClosestHit(ray, tMM, rng);
 
             if(hit)
             {
-                dHitIds[i] = HitIdPack
+                dHitIds[i] = HitKeyPack
                 {
                     .primId     = hit.primitiveKey,
                     .matId      = hit.materialKey,
-                    .transId    = tId,
+                    .transId    = acc.TransformKey(),
                     .accelId    = aId
                 };
-                dHitParams[i] = hit.hit;
-                UpdateTMax(gRays, index, hit.t);
+                UpdateTMax(dRays, index, hit.t);
             }
         }
     };
 
+    using namespace std::string_literals;
     queue.IssueLambda
     (
-        TypeName() + "-CastLocalRays"sv,
-        KernelIssueParams{.workSize = static_cast<uint32_t>(dRays.size())},
+        std::string(TypeName()) + "-CastLocalRays"s,
+        KernelIssueParams{.workCount = static_cast<uint32_t>(dRays.size())},
         std::move(RayCastKernel)
     );
 }
 
 template<AccelGroupC AG, TransformGroupC TG>
-std::string_view AcceleratorInstanceGroup<AG, TG>::TypeName()
+std::string_view AcceleratorWork<AG, TG>::TypeName()
 {
     static std::string name = AG::TypeName() + TG::TypeName();
     return name;

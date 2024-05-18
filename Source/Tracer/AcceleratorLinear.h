@@ -14,6 +14,7 @@
 #include "TransformC.h"
 #include "Random.h"
 #include "RayPartitioner.h"
+#include "AcceleratorWork.h"
 
 namespace LinearAccelDetail
 {
@@ -24,6 +25,7 @@ namespace LinearAccelDetail
         Bitspan<const uint32_t>             dCullFace;
         Span<Optional<AlphaMap>>            dAlphaMaps;
         Span<Span<const AcceleratorLeaf>>   dLeafs;
+        Span<TransformKey>                  dInstanceTransforms;
     };
 
     template<PrimitiveGroupC PrimGroup, TransformGroupC TransGroupType>
@@ -55,17 +57,15 @@ namespace LinearAccelDetail
         MRAY_HYBRID             AcceleratorLinear(const TransDataSoA& tSoA,
                                                   const PrimDataSoA& pSoA,
                                                   const DataSoA& dataSoA,
-                                                  AcceleratorKey aId,
-                                                  TransformKey tId);
-
+                                                  AcceleratorKey aId);
+        MRAY_HYBRID
+        TransformKey            TransformKey() const;
         MRAY_HYBRID
         Optional<HitResult>     ClosestHit(BackupRNG& rng, const Ray&, const Vector2&) const;
         MRAY_HYBRID
         Optional<HitResult>     FirstHit(BackupRNG& rng, const Ray&, const Vector2&) const;
     };
 }
-
-
 
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -123,7 +123,8 @@ class AcceleratorGroupLinear final : public AcceleratorGroupT<PrimitiveGroupType
     public:
     // Constructors & Destructor
                 AcceleratorGroupLinear(uint32_t accelGroupId,
-                                       const GenericGroupPrimitiveT& pg);
+                                       const GenericGroupPrimitiveT& pg,
+                                       const AccelGroupWorkGenMap&);
     //
     void        Construct(AccelGroupConstructParams, const GPUQueue&) override;
     void        WriteInstanceKeysAndAABBs(Span<AABB3> aabbWriteRegion,
@@ -167,7 +168,8 @@ class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinea
     public:
     // Constructors & Destructor
     BaseAcceleratorLinear(BS::thread_pool&, GPUSystem&,
-                          std::map<std::string_view, AccelGroupGenerator>&& aGen);
+                          const AccelGroupGenMap&,
+                          const AccelGroupWorkGlobalMap&);
 
     //
     void    CastRays(// Output
@@ -210,8 +212,9 @@ class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinea
 
 inline
 BaseAcceleratorLinear::BaseAcceleratorLinear(BS::thread_pool& tp, GPUSystem& sys,
-                                             std::map<std::string_view, AccelGroupGenerator>&& aGen)
-    : BaseAcceleratorT<BaseAcceleratorLinear>(tp, sys, std::move(aGen))
+                                             const AccelGroupGenMap& aGen,
+                                             const AccelGroupWorkGlobalMap& globalWorkMap)
+    : BaseAcceleratorT<BaseAcceleratorLinear>(tp, sys, aGen, globalWorkMap)
     , accelMem(sys.AllGPUs(), 8_MiB, 32_MiB, false)
     , stackMem(sys.AllGPUs(), 8_MiB, 32_MiB, false)
     , rayPartitioner(sys)

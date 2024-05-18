@@ -7,8 +7,13 @@ set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/TracerDLL)
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/EntryPoint.h
     ${CURRENT_SOURCE_DIR}/EntryPoint.cu
+    ${CURRENT_SOURCE_DIR}/TracerBase.h
+    ${CURRENT_SOURCE_DIR}/TracerBase.cu
     ${CURRENT_SOURCE_DIR}/Tracer.h
-    ${CURRENT_SOURCE_DIR}/Tracer.cu)
+    # Handmade "unity build" like organization
+    ${CURRENT_SOURCE_DIR}/TracerImpl_1.cu
+    ${CURRENT_SOURCE_DIR}/TracerImpl_2.cu
+    ${CURRENT_SOURCE_DIR}/TracerImpl_3.cu)
 
 set(SRC_ALL
     ${SRC_COMMON})
