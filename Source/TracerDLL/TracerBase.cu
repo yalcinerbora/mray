@@ -1,11 +1,13 @@
-#include "Tracer.h"
+#include "TracerBase.h"
 #include <BS/BS_thread_pool.hpp>
 
-TracerBase::TracerBase(BS::thread_pool& tp)
+TracerBase::TracerBase(BS::thread_pool& tp,
+                       const TypeGeneratorPack& tGen)
     : threadPool(tp)
+    , typeGenerators(tGen)
 {
     // Inject the CUDA "setDevice()" equavilent to the threads
-    // to initialize CUDA usage
+    // to initialize GPU usage
     BS::concurrency_t threadCount = threadPool.get_thread_count();
     threadPool.reset(threadCount, gpuSystem.GetThreadInitFunction());
 }
@@ -147,7 +149,7 @@ std::string TracerBase::TypeName(RendererId id) const
 
 PrimGroupId TracerBase::CreatePrimitiveGroup(std::string name)
 {
-    const auto& genFunc = primGenerator.at(name);
+    const auto& genFunc = typeGenerators.primGenerator.at(name);
 
     uint32_t idInt = primGroupCounter.fetch_add(1);
     PrimGroupId id = static_cast<PrimGroupId>(idInt);
@@ -228,7 +230,7 @@ void TracerBase::PushPrimAttribute(PrimGroupId gId,
 
 MatGroupId TracerBase::CreateMaterialGroup(std::string name)
 {
-    const auto& genFunc = matGenerator.at(name);
+    const auto& genFunc = typeGenerators.matGenerator.at(name);
     uint32_t idInt = matGroupCounter.fetch_add(1);
     MatGroupId id = static_cast<MatGroupId>(idInt);
     matGroups.try_emplace(id, genFunc(static_cast<uint32_t>(id),
@@ -370,7 +372,7 @@ void TracerBase::PushTextureData(TextureId, uint32_t,
 
 TransGroupId TracerBase::CreateTransformGroup(std::string name)
 {
-    const auto& genFunc = transGenerator.at(name);
+    const auto& genFunc = typeGenerators.transGenerator.at(name);
     uint32_t idInt = transGroupCounter.fetch_add(1);
     TransGroupId id = static_cast<TransGroupId>(idInt);
     transGroups.try_emplace(id, genFunc(static_cast<uint32_t>(id), gpuSystem));
@@ -432,7 +434,7 @@ void TracerBase::PushTransAttribute(TransGroupId gId, Vector2ui transRange,
 LightGroupId TracerBase::CreateLightGroup(std::string name,
                                           PrimGroupId primGId)
 {
-    const auto& genFunc = lightGenerator.at(name);
+    const auto& genFunc = typeGenerators.lightGenerator.at(name);
     uint32_t idInt = lightGroupCounter.fetch_add(1);
     LightGroupId id = static_cast<LightGroupId>(idInt);
     GenericGroupPrimitiveT& primGroupPtr = *primGroups.at(primGId).get();
@@ -538,7 +540,7 @@ void TracerBase::PushLightAttribute(LightGroupId gId, Vector2ui lightRange,
 
 CameraGroupId TracerBase::CreateCameraGroup(std::string name)
 {
-    const auto& genFunc = camGenerator.at(name);
+    const auto& genFunc = typeGenerators.camGenerator.at(name);
     uint32_t idInt = camGroupCounter.fetch_add(1);
     CameraGroupId id = static_cast<CameraGroupId>(idInt);
     camGroups.try_emplace(id, genFunc(static_cast<uint32_t>(id), gpuSystem));
@@ -600,7 +602,7 @@ void TracerBase::PushCamAttribute(CameraGroupId gId, Vector2ui camRange,
 
 MediumGroupId TracerBase::CreateMediumGroup(std::string name)
 {
-    const auto& genFunc = medGenerator.at(name);
+    const auto& genFunc = typeGenerators.medGenerator.at(name);
     uint32_t idInt = mediumGroupCounter.fetch_add(1);
     MediumGroupId id = static_cast<MediumGroupId>(idInt);
     mediumGroups.try_emplace(id, genFunc(static_cast<uint32_t>(id), gpuSystem, texViewMap));
@@ -762,7 +764,9 @@ void TracerBase::CommitSurfaces(AcceleratorType type)
         return left.second.transformId < right.second.transformId;
     });
     // Send it!
-    accelerator = acceleratorGenerator.at(type)(threadPool, gpuSystem);
+    accelerator = typeGenerators.baseAcceleratorGenerator.at(type)(threadPool, gpuSystem,
+                                                                   typeGenerators.accelGeneratorMap.at(type),
+                                                                   typeGenerators.accelWorkGeneratorMap.at(type));
     accelerator->Construct(BaseAccelConstructParams
     {
         .texViewMap = texViewMap,
@@ -778,7 +782,7 @@ void TracerBase::CommitSurfaces(AcceleratorType type)
 RendererId TracerBase::CreateRenderer(std::string typeName)
 {
     uint32_t rId = redererCounter.fetch_add(1u);
-    auto renderer =  rendererGenerator.at(typeName)(gpuSystem);
+    auto renderer = typeGenerators.rendererGenerator.at(typeName)(gpuSystem);
     renderers.try_emplace(RendererId(rId), std::move(renderer));
     return RendererId(rId);
 }

@@ -4,7 +4,7 @@
 extern "C" MRAY_TRACER_DEVICE_ENTRYPOINT
 TracerI* ConstructTracer(BS::thread_pool& tp)
 {
-    return new TracerBase(tp);
+    return new Tracer(tp);
 }
 
 extern "C" MRAY_TRACER_DEVICE_ENTRYPOINT

@@ -31,8 +31,10 @@ using LightGenerator    = GeneratorFuncType<GenericGroupLightT, uint32_t,
                                             GPUSystem&, const TextureViewMap&,
                                             GenericGroupPrimitiveT&>;
 using RendererGenerator = GeneratorFuncType<RendererI, GPUSystem&>;
-using AccelGenerator    = GeneratorFuncType<BaseAcceleratorI,
-                                            BS::thread_pool&, GPUSystem&>;
+using BaseAccelGenerator = GeneratorFuncType<BaseAcceleratorI,
+                                            BS::thread_pool&, GPUSystem&,
+                                            const AccelGroupGenMap&,
+                                            const AccelGroupWorkGlobalMap&>;
 
 // Type packed surfaces
 using MaterialWorkBatchInfo = std::tuple<GenericGroupTransformT*,
@@ -49,6 +51,20 @@ struct WorkBatchInfo
     std::vector<CameraWorkBatchInfo>    camWorkBatches;
     std::vector<LightWorkBatchInfo>     lightWorkBatches;
     std::vector<MaterialWorkBatchInfo>  matWorkBatches;
+};
+
+struct TypeGeneratorPack
+{
+    std::map<std::string_view, PrimGenerator>           primGenerator;
+    std::map<std::string_view, CamGenerator>            camGenerator;
+    std::map<std::string_view, MedGenerator>            medGenerator;
+    std::map<std::string_view, MatGenerator>            matGenerator;
+    std::map<std::string_view, TransGenerator>          transGenerator;
+    std::map<std::string_view, LightGenerator>          lightGenerator;
+    std::map<std::string_view, RendererGenerator>       rendererGenerator;
+    std::map<AcceleratorType, BaseAccelGenerator>       baseAcceleratorGenerator;
+    std::map<AcceleratorType, AccelGroupGenMap>         accelGeneratorMap;
+    std::map<AcceleratorType, AccelGroupWorkGlobalMap>  accelWorkGeneratorMap;
 };
 
 // TODO: Move these somewhere safe
@@ -143,14 +159,7 @@ class TracerBase : public TracerI
     TypeNameList        rendererTypes;
 
     // Type Generators
-    std::map<std::string_view, PrimGenerator>       primGenerator;
-    std::map<std::string_view, CamGenerator>        camGenerator;
-    std::map<std::string_view, MedGenerator>        medGenerator;
-    std::map<std::string_view, MatGenerator>        matGenerator;
-    std::map<std::string_view, TransGenerator>      transGenerator;
-    std::map<std::string_view, LightGenerator>      lightGenerator;
-    std::map<std::string_view, RendererGenerator>   rendererGenerator;
-    std::map<AcceleratorType,  AccelGenerator>      acceleratorGenerator;
+    const TypeGeneratorPack&   typeGenerators;
 
     // Current Types
     std::map<std::string_view, PrimAttributeInfoList>       primAttributeInfoMap;
@@ -162,7 +171,8 @@ class TracerBase : public TracerI
     std::map<std::string_view, RendererAttributeInfoList>   rendererAttributeInfoMap;
 
     public:
-                        TracerBase(BS::thread_pool&);
+                        TracerBase(BS::thread_pool&,
+                                   const TypeGeneratorPack&);
 
     TypeNameList        PrimitiveGroups() const override;
     TypeNameList        MaterialGroups() const override;
