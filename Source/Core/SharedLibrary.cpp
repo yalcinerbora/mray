@@ -1,5 +1,6 @@
+#include <cassert>
+
 #include "SharedLibrary.h"
-#include "Log.h"
 #include "System.h"
 
 // Env Headers

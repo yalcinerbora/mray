@@ -23,22 +23,6 @@ namespace TransformDetail
     };
 }
 
-class TransformContextIdentity
-{
-    public:
-    MRAY_HYBRID Vector3 ApplyP(const Vector3& point) const;
-    MRAY_HYBRID Vector3 ApplyV(const Vector3& vec) const;
-    MRAY_HYBRID Vector3 ApplyN(const Vector3& norm) const;
-    MRAY_HYBRID AABB3   Apply(const AABB3& aabb) const;
-    MRAY_HYBRID Ray     Apply(const Ray& ray) const;
-    MRAY_HYBRID Vector3 InvApplyP(const Vector3& point) const;
-    MRAY_HYBRID Vector3 InvApplyV(const Vector3& vec) const;
-    MRAY_HYBRID Vector3 InvApplyN(const Vector3& norm) const;
-    MRAY_HYBRID AABB3   InvApply(const AABB3& aabb) const;
-    MRAY_HYBRID Ray     InvApply(const Ray& ray) const;
-
-};
-
 class TransformContextSingle
 {
     private:
@@ -59,33 +43,6 @@ class TransformContextSingle
     MRAY_HYBRID Vector3     InvApplyN(const Vector3& normal) const;
     MRAY_HYBRID AABB3       InvApply(const AABB3&) const;
     MRAY_HYBRID Ray         InvApply(const Ray&) const;
-};
-
-class TransformGroupIdentity final : public GenericGroupTransform<TransformGroupIdentity>
-{
-    public:
-    using DataSoA = EmptyType;
-    static std::string_view TypeName();
-
-    public:
-                    TransformGroupIdentity(uint32_t groupId, const GPUSystem&);
-    void            CommitReservations() override;
-    AttribInfoList  AttributeInfo() const override;
-    void            PushAttribute(TransformKey batchId,
-                                  uint32_t attributeIndex,
-                                  TransientData data,
-                                  const GPUQueue& queue) override;
-    void            PushAttribute(TransformKey batchId,
-                                  uint32_t attributeIndex,
-                                  const Vector2ui& subBatchRange,
-                                  TransientData data,
-                                  const GPUQueue& queue) override;
-    void            PushAttribute(TransformKey idStart, TransformKey idEnd,
-                                  uint32_t attributeIndex,
-                                  TransientData data,
-                                  const GPUQueue& queue) override;
-
-    DataSoA         SoA() const;
 };
 
 class TransformGroupSingle final : public GenericGroupTransform<TransformGroupSingle>
@@ -154,17 +111,6 @@ class TransformGroupMulti final : public GenericGroupTransform<TransformGroupMul
 
 // Meta Transform Generator Functions
 // (Primitive invariant)
-// Provided here for consistency
-template <class PrimitiveGroupSoA>
-MRAY_HYBRID MRAY_CGPU_INLINE
-TransformContextIdentity GenTContextIdentity(const typename TransformGroupIdentity::DataSoA&,
-                                             const PrimitiveGroupSoA&,
-                                             TransformKey,
-                                             PrimitiveKey)
-{
-    return TransformContextIdentity{};
-}
-
 template <class PrimitiveGroupSoA>
 MRAY_HYBRID MRAY_CGPU_INLINE
 TransformContextSingle GenTContextSingle(const typename TransformGroupSingle::DataSoA& transformData,
@@ -173,53 +119,6 @@ TransformContextSingle GenTContextSingle(const typename TransformGroupSingle::Da
                                          PrimitiveKey)
 {
     return TransformContextSingle(transformData, tId);
-}
-
-#include "Transforms.hpp"
-
-static_assert(TransformContextC<TransformContextIdentity>);
-static_assert(TransformContextC<TransformContextSingle>);
-static_assert(TransformGroupC<TransformGroupIdentity>);
-static_assert(TransformGroupC<TransformGroupSingle>);
-static_assert(TransformGroupC<TransformGroupMulti>);
-
-inline std::string_view TransformGroupIdentity::TypeName()
-{
-    using namespace TypeNameGen::CompTime;
-    using namespace std::string_view_literals;
-    static constexpr auto Name = "Identity"sv;
-    return TransformTypeName<Name>;
-}
-
-inline TransformGroupIdentity::TransformGroupIdentity(uint32_t groupId,
-                                                      const GPUSystem& s)
-    : GenericGroupTransform<TransformGroupIdentity>(groupId, s)
-{}
-
-inline void TransformGroupIdentity::CommitReservations()
-{
-    isCommitted = true;
-}
-
-inline void TransformGroupIdentity::PushAttribute(TransformKey, uint32_t,
-                                                  TransientData, const GPUQueue&)
-{}
-
-inline void TransformGroupIdentity::PushAttribute(TransformKey,
-                                                  uint32_t,
-                                                  const Vector2ui&,
-                                                  TransientData,
-                                                  const GPUQueue&)
-{}
-
-inline void TransformGroupIdentity::PushAttribute(TransformKey, TransformKey,
-                                                  uint32_t, TransientData,
-                                                  const GPUQueue&)
-{}
-
-inline TransformGroupIdentity::AttribInfoList TransformGroupIdentity::AttributeInfo() const
-{
-    return AttribInfoList();
 }
 
 inline std::string_view TransformGroupSingle::TypeName()
@@ -237,3 +136,9 @@ inline std::string_view TransformGroupMulti::TypeName()
     static constexpr auto Name = "Multi"sv;
     return TransformTypeName<Name>;
 }
+
+#include "TransformsDefault.hpp"
+
+static_assert(TransformContextC<TransformContextSingle>);
+static_assert(TransformGroupC<TransformGroupSingle>);
+static_assert(TransformGroupC<TransformGroupMulti>);

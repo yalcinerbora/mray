@@ -53,15 +53,6 @@ namespace LightDetail
         static Float    ToSolidAnglePdf(Float pdf, const Vector2& uv);
     };
 
-    template <class Converter>
-    concept CoordConverterC = requires()
-    {
-        {Converter::DirToUV(Vector3{})} -> std::same_as<Vector2>;
-        {Converter::UVToDir(Vector2{})} -> std::same_as<Vector3>;
-        {Converter::ToSolidAnglePdf(Float{}, Vector2{})} -> std::same_as<Float>;
-        {Converter::ToSolidAnglePdf(Float{}, Vector3{})} -> std::same_as<Float>;
-    };
-
     // Meta Primitive Related Light
     template<PrimitiveC PrimitiveT, class SpectrumTransformer = SpectrumConverterContextIdentity>
     struct LightPrim
@@ -236,13 +227,13 @@ class LightGroupPrim final : public GenericGroupLight<LightGroupPrim<PrimGroupT>
     bool                            IsPrimitiveBacked() const override;
 };
 
-template <LightDetail::CoordConverterC CoordConverter>
+template <CoordConverterC CoordConverter>
 class LightGroupSkysphere final : public GenericGroupLight<LightGroupSkysphere<CoordConverter>>
 {
     using Parent            = GenericGroupLight<LightGroupSkysphere<CoordConverter>>;
     using DistributionPwC2D = typename DistributionGroupPwC2D::Distribution;
     public:
-    using PrimGroup     = EmptyPrimGroup;
+    using PrimGroup     = PrimGroupEmpty;
     using DataSoA       = typename LightDetail::LightSkysphereData;
 
     // Prim Type

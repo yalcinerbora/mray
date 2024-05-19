@@ -1,7 +1,9 @@
 #pragma once
 
 #include <memory_resource>
+#include <mutex>
 
+#include "Core/Definitions.h"
 #include "Core/System.h"
 #include "Core/Types.h"
 

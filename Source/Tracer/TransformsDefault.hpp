@@ -1,66 +1,6 @@
 #pragma once
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 TransformContextIdentity::ApplyP(const Vector3& point) const
-{
-    return point;
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 TransformContextIdentity::ApplyV(const Vector3& vec) const
-{
-    return vec;
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 TransformContextIdentity::ApplyN(const Vector3& norm) const
-{
-    return norm;
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-AABB3 TransformContextIdentity::Apply(const AABB3& aabb) const
-{
-    return aabb;
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-Ray TransformContextIdentity::Apply(const Ray& ray) const
-{
-    return ray;
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 TransformContextIdentity::InvApplyP(const Vector3& point) const
-{
-    return point;
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 TransformContextIdentity::InvApplyV(const Vector3& vec) const
-{
-    return vec;
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 TransformContextIdentity::InvApplyN(const Vector3& norm) const
-{
-    return norm;
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-AABB3 TransformContextIdentity::InvApply(const AABB3& aabb) const
-{
-    return aabb;
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-Ray TransformContextIdentity::InvApply(const Ray& ray) const
-{
-    return ray;
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
 TransformContextSingle::TransformContextSingle(const typename TransformDetail::SingleTransformSoA& tData,
                                                TransformKey tK)
     : transform(tData.transforms[tK.FetchIndexPortion()])

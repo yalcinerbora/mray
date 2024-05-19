@@ -3,7 +3,7 @@
 #include "Core/MathForward.h"
 #include "Core/Vector.h"
 #include "Core/Types.h"
-#include "vulkan/vulkan.h"
+#include <vulkan/vulkan.h>
 
 class GUITonemapperI;
 class VulkanImage;

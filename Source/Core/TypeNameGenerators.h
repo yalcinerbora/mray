@@ -42,54 +42,59 @@ namespace Detail
 namespace CompTime
 {
     using namespace std::string_view_literals;
+    using namespace TracerConstants;
 
     template <const std::string_view& Name>
     static constexpr
-    std::string_view PrimTypeName =
-        Detail::ct_str_join_v<TracerConstants::PRIM_PREFIX, Name>;
+    std::string_view PrimTypeName = Detail::ct_str_join_v<PRIM_PREFIX, Name>;
 
     template <const std::string_view& Name>
     static constexpr
-    std::string_view LightTypeName =
-        Detail::ct_str_join_v<TracerConstants::LIGHT_PREFIX, Name>;
-
-    //template <const std::string_view& PrimName>
-    template <const auto PrimName>
-    static constexpr
-        std::string_view PrimLightTypeName =
-        Detail::ct_str_join_v<TracerConstants::LIGHT_PREFIX, Detail::PRIM_SV, PrimName>;
+    std::string_view TransformTypeName = Detail::ct_str_join_v<TRANSFORM_PREFIX, Name>;
 
     template <const std::string_view& Name>
     static constexpr
-    std::string_view TransformTypeName =
-        Detail::ct_str_join_v<TracerConstants::TRANSFORM_PREFIX, Name>;
+    std::string_view MaterialTypeName = Detail::ct_str_join_v<MAT_PREFIX, Name>;
 
     template <const std::string_view& Name>
     static constexpr
-    std::string_view MaterialTypeName =
-        Detail::ct_str_join_v<TracerConstants::MAT_PREFIX, Name>;
+    std::string_view CameraTypeName = Detail::ct_str_join_v<CAM_PREFIX, Name>;
 
     template <const std::string_view& Name>
     static constexpr
-    std::string_view CameraTypeName =
-        Detail::ct_str_join_v<TracerConstants::CAM_PREFIX, Name>;
+    std::string_view MediumTypeName = Detail::ct_str_join_v<MEDIUM_PREFIX, Name>;
 
     template <const std::string_view& Name>
     static constexpr
-    std::string_view MediumTypeName =
-        Detail::ct_str_join_v<TracerConstants::MEDIUM_PREFIX, Name>;
+    std::string_view RendererTypeName = Detail::ct_str_join_v<RENDERER_PREFIX, Name>;
 
     template <const std::string_view& Name>
     static constexpr
-    std::string_view RendererTypeName =
-        Detail::ct_str_join_v<TracerConstants::RENDERER_PREFIX, Name>;
+    std::string_view LightTypeName = Detail::ct_str_join_v<LIGHT_PREFIX, Name>;
 
-    template <const std::string_view& AccelName,
-              const std::string_view& PrimName>
+    // Hard to make these two constexpr
+    static std::string PrimLightTypeName(std::string_view PrimName)
+    {
+        return (std::string(LIGHT_PREFIX) +
+                std::string(Detail::PRIM_SV) +
+                std::string(PrimName));
+    };
+
+    template <const std::string_view& Name>
     static constexpr
-    std::string_view AccelTypeName =
-        Detail::ct_str_join_v<TracerConstants::ACCEL_PREFIX, AccelName,
-                              PrimName>;
+    std::string_view BaseAccelTypeName = Detail::ct_str_join_v<ACCEL_PREFIX, Name>;
+
+    static std::string AccelGroupTypeName(std::string_view BaseAccelName,
+                                          std::string_view PrimName)
+    {
+        return std::string(BaseAccelName) + std::string(PrimName);
+    }
+
+    static std::string AccelWorkTypeName(const std::string_view& AccelGroupName,
+                                         const std::string_view& TransformName)
+    {
+        return std::string(AccelGroupName) + std::string(TransformName);
+    }
 }
 
 namespace Runtime

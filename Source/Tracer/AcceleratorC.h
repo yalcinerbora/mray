@@ -154,7 +154,7 @@ class AcceleratorGroupI
     virtual uint32_t    UsedIdBitsInKey() const = 0;
     virtual void        WriteInstanceKeysAndAABBs(Span<AABB3> aabbWriteRegion,
                                                   Span<AcceleratorKey> keyWriteRegion) const = 0;
-    virtual uint32_t    SetKeyOffset(uint32_t) = 0;
+    virtual void        SetKeyOffset(uint32_t) = 0;
 
     virtual const GenericGroupPrimitiveT& PrimGroup() const = 0;
 };
@@ -188,16 +188,16 @@ struct LinearizedSurfaceData
     std::vector<SurfacePrimList>    instancePrimBatches;
 };
 
-using AccelGroupWorkGenerator = GeneratorFuncType<AcceleratorWorkI, AcceleratorGroupI&,
-                                                  GenericGroupTransformT&>;
-using AccelGroupWorkGenMap = std::map<std::string_view, AccelGroupWorkGenerator>;
+using AccelWorkGenerator = GeneratorFuncType<AcceleratorWorkI, AcceleratorGroupI&,
+                                             GenericGroupTransformT&>;
+using AccelWorkGenMap = std::map<std::string_view, AccelWorkGenerator>;
 
 using AccelGroupGenerator = GeneratorFuncType<AcceleratorGroupI, uint32_t,
                                               BS::thread_pool&, GPUSystem&,
-                                              const AccelGroupWorkGenMap&>;
+                                              const GenericGroupPrimitiveT&,
+                                              const AccelWorkGenMap&>;
 
 using AccelGroupGenMap = std::map<std::string_view, AccelGroupGenerator>;
-using AccelGroupWorkGlobalMap = std::map<std::string_view, AccelGroupWorkGenMap>;
 
 template <PrimitiveGroupC PrimitiveGroupType>
 class AcceleratorGroupT : public AcceleratorGroupI
@@ -205,6 +205,8 @@ class AcceleratorGroupT : public AcceleratorGroupI
     using AccelWorkPtr = std::unique_ptr<AcceleratorWorkI>;
 
     protected:
+    BS::thread_pool&            threadPool;
+    GPUSystem&                  gpuSystem;
     const PrimitiveGroupType&   pg;
     uint32_t                    accelGroupId       = 0;
     uint32_t                    concreteAccelCount = 0;
@@ -213,14 +215,14 @@ class AcceleratorGroupT : public AcceleratorGroupI
 
     // Type Related
     std::vector<uint32_t>               typeIds;
-    const AccelGroupWorkGenMap&         accelWorkGenerators;
+    const AccelWorkGenMap&              accelWorkGenerators;
     std::map<uint32_t, AccelWorkPtr>    workInstances;
 
     // Common functionality for ineriting types
     static size_t                   DetermineInstanceCount(const AccelGroupConstructParams& p);
     static size_t                   DetermineInstanceTypeCount(const AccelGroupConstructParams& p);
-    static AcceleratorLeafResult    DetermineConcereteAccelCount(const std::vector<SurfacePrimList>& instancePrimBatches,
-                                                                 const std::vector<PrimRangeArray>& instancePrimRanges);
+    static AcceleratorLeafResult    DetermineConcereteAccelCount(std::vector<SurfacePrimList> instancePrimBatches,
+                                                                 std::vector<PrimRangeArray> instancePrimRanges);
     template<class T>
     static std::vector<Span<T>>     CreateLeafSubspans(Span<T> fullRange,
                                                        const std::vector<Vector2ui>& leafRanges);
@@ -231,13 +233,14 @@ class AcceleratorGroupT : public AcceleratorGroupI
     public:
     // Constructors & Destructor
                 AcceleratorGroupT(uint32_t accelGroupId,
+                                  BS::thread_pool&, GPUSystem&,
                                   const GenericGroupPrimitiveT& pg,
-                                  const AccelGroupWorkGenMap&);
+                                  const AccelWorkGenMap&);
 
     size_t      InstanceCount() const override;
     uint32_t    InstanceTypeCount() const override;
     uint32_t    UsedIdBitsInKey() const override;
-    uint32_t    SetKeyOffset(uint32_t) override;
+    void        SetKeyOffset(uint32_t) override;
 
     const GenericGroupPrimitiveT& PrimGroup() const override;
 };
@@ -313,7 +316,7 @@ class BaseAcceleratorT : public BaseAcceleratorI
     uint32_t            idCounter           = 0;
     Vector2ui           maxBitsUsedOnKey    = Vector2ui::Zero();
     const AccelGroupGenMap&                 accelGenerators;
-    const AccelGroupWorkGlobalMap&          workGenGlobalMap;
+    const AccelWorkGenMap&                  workGenGlobalMap;
     std::map<uint32_t, AccelGroupPtr>       generatedAccels;
     std::map<uint32_t, AcceleratorGroupI*>  accelInstances;
 
@@ -324,7 +327,7 @@ class BaseAcceleratorT : public BaseAcceleratorI
     // Constructors & Destructor
                         BaseAcceleratorT(BS::thread_pool&, GPUSystem&,
                                          const AccelGroupGenMap&,
-                                         const AccelGroupWorkGlobalMap&);
+                                         const AccelWorkGenMap&);
 
     // ....
     void                Construct(BaseAccelConstructParams) override;
@@ -347,7 +350,7 @@ using LightGroupIdFetcher = GroupIdFetcher<LightKey>;
 template <class C>
 BaseAcceleratorT<C>::BaseAcceleratorT(BS::thread_pool& tp, GPUSystem& system,
                                       const AccelGroupGenMap& aGen,
-                                      const AccelGroupWorkGlobalMap& globalWorkMap)
+                                      const AccelWorkGenMap& globalWorkMap)
     : threadPool(tp)
     , gpuSystem(system)
     , accelGenerators(aGen)
@@ -507,7 +510,8 @@ void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
         uint32_t aGroupId = idCounter++;
         auto accelPtr = accelGenerators.at(accelTypeName)(std::move(aGroupId),
                                                           threadPool, gpuSystem,
-                                                          workGenGlobalMap.at(accelTypeName));
+                                                          *partition.primGroup,
+                                                          workGenGlobalMap);
         auto loc = generatedAccels.emplace(aGroupId, std::move(accelPtr));
         AcceleratorGroupI* acc = loc.first->second.get();
         acc->Construct(std::move(partition), queue);
@@ -612,8 +616,8 @@ size_t AcceleratorGroupT<PG>::DetermineInstanceTypeCount(const AccelGroupConstru
 };
 
 template <PrimitiveGroupC PG>
-AcceleratorLeafResult AcceleratorGroupT<PG>::DetermineConcereteAccelCount(const std::vector<SurfacePrimList>& instancePrimBatches,
-                                                                          const std::vector<PrimRangeArray>& instancePrimRanges)
+AcceleratorLeafResult AcceleratorGroupT<PG>::DetermineConcereteAccelCount(std::vector<SurfacePrimList> instancePrimBatches,
+                                                                          std::vector<PrimRangeArray> instancePrimRanges)
 {
     assert(instancePrimBatches.size() == instancePrimRanges.size());
 
@@ -628,7 +632,7 @@ AcceleratorLeafResult AcceleratorGroupT<PG>::DetermineConcereteAccelCount(const 
         // only generate accelerators for these, refer with other instances
         std::vector<uint32_t>& nonUniqueIndices = acceleratorIndices;
         // Commonalize the innter lists (sort it)
-        for(const SurfacePrimList& lst : instancePrimBatches)
+        for(SurfacePrimList& lst : instancePrimBatches)
         {
             // Hopefully stl calls insertion sort here or something...
             std::sort(lst.begin(), lst.end(), [](PrimBatchId lhs, PrimBatchId rhs)
@@ -661,7 +665,7 @@ AcceleratorLeafResult AcceleratorGroupT<PG>::DetermineConcereteAccelCount(const 
                                                                  rhs.cbegin(), rhs.cend(),
             [](PrimBatchId lhs, PrimBatchId rhs)
             {
-                return (static_cast<uint32_t>(lhs) < static_cast<uint32_t>(rhs));
+                return (static_cast<uint32_t>(lhs) <=> static_cast<uint32_t>(rhs));
             });
             return std::is_eq(result);
         });
@@ -815,9 +819,12 @@ LinearizedSurfaceData AcceleratorGroupT<PG>::LinearizeSurfaceData(const AccelGro
 
 template <PrimitiveGroupC PG>
 AcceleratorGroupT<PG>::AcceleratorGroupT(uint32_t groupId,
+                                         BS::thread_pool& tp, GPUSystem& sys,
                                          const GenericGroupPrimitiveT& pgIn,
-                                         const AccelGroupWorkGenMap& workGenMap)
-    : accelGroupId(groupId)
+                                         const AccelWorkGenMap& workGenMap)
+    : threadPool(tp)
+    , gpuSystem(sys)
+    , accelGroupId(groupId)
     , pg(static_cast<const PG&>(pgIn))
     , accelWorkGenerators(workGenMap)
 {}
@@ -841,7 +848,7 @@ uint32_t AcceleratorGroupT<PG>::UsedIdBitsInKey() const
 }
 
 template<PrimitiveGroupC PG>
-uint32_t AcceleratorGroupT<PG>::SetKeyOffset(uint32_t offset)
+void AcceleratorGroupT<PG>::SetKeyOffset(uint32_t offset)
 {
     std::for_each(typeIds.begin(), typeIds.end(),
     [offset](uint32_t& id)

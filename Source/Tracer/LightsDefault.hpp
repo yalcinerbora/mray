@@ -336,10 +336,8 @@ void LightGroupPrim<PG>::HandlePrimBatches(const PrimBatchList&)
 template <PrimitiveGroupC PG>
 std::string_view LightGroupPrim<PG>::TypeName()
 {
-    using namespace TypeNameGen::Runtime;
-    using namespace std::string_view_literals;
-    static const auto PGName = PG::TypeName();
-    static const auto Name = CreatePrimBackedLightTypeName(PGName);
+    using namespace TypeNameGen::CompTime;
+    static const auto Name = PrimLightTypeName(PG::TypeName());
     return Name;
 }
 
@@ -444,11 +442,11 @@ bool LightGroupPrim<PG>::IsPrimitiveBacked() const
     return true;
 }
 
-template <LightDetail::CoordConverterC CC>
+template <CoordConverterC CC>
 void LightGroupSkysphere<CC>::HandlePrimBatches(const PrimBatchList&)
 {}
 
-template <LightDetail::CoordConverterC CC>
+template <CoordConverterC CC>
 std::string_view LightGroupSkysphere<CC>::TypeName()
 {
     using namespace TypeNameGen::CompTime;
@@ -457,7 +455,7 @@ std::string_view LightGroupSkysphere<CC>::TypeName()
     return LightTypeName<Name>;
 }
 
-template <LightDetail::CoordConverterC CC>
+template <CoordConverterC CC>
 LightGroupSkysphere<CC>::LightGroupSkysphere(uint32_t groupId,
                                              const GPUSystem& system,
                                              const TextureViewMap& map,
@@ -466,19 +464,19 @@ LightGroupSkysphere<CC>::LightGroupSkysphere(uint32_t groupId,
     , primGroup(static_cast<const PrimGroup&>(primGroup))
 {}
 
-template <LightDetail::CoordConverterC CC>
+template <CoordConverterC CC>
 void LightGroupSkysphere<CC>::CommitReservations()
 {
 
 }
 
-template <LightDetail::CoordConverterC CC>
+template <CoordConverterC CC>
 LightAttributeInfoList LightGroupSkysphere<CC>::AttributeInfo() const
 {
     return LightAttributeInfoList{};
 }
 
-template <LightDetail::CoordConverterC CC>
+template <CoordConverterC CC>
 void LightGroupSkysphere<CC>::PushAttribute(LightKey id,
                                             uint32_t attributeIndex,
                                             TransientData data,
@@ -487,7 +485,7 @@ void LightGroupSkysphere<CC>::PushAttribute(LightKey id,
 
 }
 
-template <LightDetail::CoordConverterC CC>
+template <CoordConverterC CC>
 void LightGroupSkysphere<CC>::PushAttribute(LightKey id,
                                             uint32_t attributeIndex,
                                             const Vector2ui& subRange,
@@ -497,7 +495,7 @@ void LightGroupSkysphere<CC>::PushAttribute(LightKey id,
 
 }
 
-template <LightDetail::CoordConverterC CC>
+template <CoordConverterC CC>
 void LightGroupSkysphere<CC>::PushAttribute(LightKey idStart, LightKey idEnd,
                                             uint32_t attributeIndex,
                                             TransientData data,
@@ -506,7 +504,7 @@ void LightGroupSkysphere<CC>::PushAttribute(LightKey idStart, LightKey idEnd,
 
 }
 
-template <LightDetail::CoordConverterC CC>
+template <CoordConverterC CC>
 void LightGroupSkysphere<CC>::PushTexAttribute(LightKey idStart, LightKey idEnd,
                                                uint32_t attributeIndex,
                                                TransientData,
@@ -516,7 +514,7 @@ void LightGroupSkysphere<CC>::PushTexAttribute(LightKey idStart, LightKey idEnd,
 
 }
 
-template <LightDetail::CoordConverterC CC>
+template <CoordConverterC CC>
 void LightGroupSkysphere<CC>::PushTexAttribute(LightKey idStart, LightKey idEnd,
                                                uint32_t attributeIndex,
                                                std::vector<Optional<TextureId>>,
@@ -525,7 +523,7 @@ void LightGroupSkysphere<CC>::PushTexAttribute(LightKey idStart, LightKey idEnd,
 
 }
 
-template <LightDetail::CoordConverterC CC>
+template <CoordConverterC CC>
 void LightGroupSkysphere<CC>::PushTexAttribute(LightKey idStart, LightKey idEnd,
                                                uint32_t attributeIndex,
                                                std::vector<TextureId>,
@@ -534,25 +532,25 @@ void LightGroupSkysphere<CC>::PushTexAttribute(LightKey idStart, LightKey idEnd,
 
 }
 
-template <LightDetail::CoordConverterC CC>
+template <CoordConverterC CC>
 typename LightGroupSkysphere<CC>::DataSoA LightGroupSkysphere<CC>::SoA() const
 {
     return soa;
 }
 
-template <LightDetail::CoordConverterC CC>
+template <CoordConverterC CC>
 const typename LightGroupSkysphere<CC>::PrimGroup& LightGroupSkysphere<CC>::PrimitiveGroup() const
 {
     return primGroup;
 }
 
-template <LightDetail::CoordConverterC CC>
+template <CoordConverterC CC>
 const GenericGroupPrimitiveT& LightGroupSkysphere<CC>::GenericPrimGroup() const
 {
     return primGroup;
 }
 
-template <LightDetail::CoordConverterC CC>
+template <CoordConverterC CC>
 bool LightGroupSkysphere<CC>::IsPrimitiveBacked() const
 {
     return false;

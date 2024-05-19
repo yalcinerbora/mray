@@ -34,7 +34,7 @@ using RendererGenerator = GeneratorFuncType<RendererI, GPUSystem&>;
 using BaseAccelGenerator = GeneratorFuncType<BaseAcceleratorI,
                                             BS::thread_pool&, GPUSystem&,
                                             const AccelGroupGenMap&,
-                                            const AccelGroupWorkGlobalMap&>;
+                                            const AccelWorkGenMap&>;
 
 // Type packed surfaces
 using MaterialWorkBatchInfo = std::tuple<GenericGroupTransformT*,
@@ -55,16 +55,16 @@ struct WorkBatchInfo
 
 struct TypeGeneratorPack
 {
-    std::map<std::string_view, PrimGenerator>           primGenerator;
-    std::map<std::string_view, CamGenerator>            camGenerator;
-    std::map<std::string_view, MedGenerator>            medGenerator;
-    std::map<std::string_view, MatGenerator>            matGenerator;
-    std::map<std::string_view, TransGenerator>          transGenerator;
-    std::map<std::string_view, LightGenerator>          lightGenerator;
-    std::map<std::string_view, RendererGenerator>       rendererGenerator;
-    std::map<AcceleratorType, BaseAccelGenerator>       baseAcceleratorGenerator;
-    std::map<AcceleratorType, AccelGroupGenMap>         accelGeneratorMap;
-    std::map<AcceleratorType, AccelGroupWorkGlobalMap>  accelWorkGeneratorMap;
+    std::map<std::string_view, PrimGenerator>       primGenerator;
+    std::map<std::string_view, CamGenerator>        camGenerator;
+    std::map<std::string_view, MedGenerator>        medGenerator;
+    std::map<std::string_view, MatGenerator>        matGenerator;
+    std::map<std::string_view, TransGenerator>      transGenerator;
+    std::map<std::string_view, LightGenerator>      lightGenerator;
+    std::map<std::string_view, RendererGenerator>   rendererGenerator;
+    std::map<AcceleratorType, BaseAccelGenerator>   baseAcceleratorGenerator;
+    std::map<AcceleratorType, AccelGroupGenMap>     accelGeneratorMap;
+    std::map<AcceleratorType, AccelWorkGenMap>      accelWorkGeneratorMap;
 };
 
 // TODO: Move these somewhere safe

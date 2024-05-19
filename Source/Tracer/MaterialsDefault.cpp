@@ -14,8 +14,8 @@ void MatGroupLambert::HandleMediums(const MediumKeyPairList& mediumList)
 }
 
 MatGroupLambert::MatGroupLambert(uint32_t groupId,
-                                 const TextureViewMap& map,
-                                 const GPUSystem& s)
+                                 const GPUSystem& s,
+                                 const TextureViewMap& map)
     : GenericGroupMaterial<MatGroupLambert>(groupId, s, map)
 {}
 

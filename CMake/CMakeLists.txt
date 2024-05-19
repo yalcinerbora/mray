@@ -31,6 +31,7 @@ set_property(CACHE MRAY_DEVICE_BACKEND
 
 option(MRAY_USE_OPTIX "Try to find and use OptiX" OFF)
 option(MRAY_BUILD_TESTS "Build Tests" ON)
+option(MRAY_EXPORT_COMPILE_COMMANDS "Export compile commands for IWYU" ON)
 
 # Globals Common for All Projects
 # TODO: Align CUDA Standard with CXX Standard
@@ -51,12 +52,21 @@ if(MRAY_USE_OPTIX)
     endif()
 endif()
 
+# Set compile command export
+if(MRAY_EXPORT_COMPILE_COMMANDS)
+    set(ENV{CMAKE_EXPORT_COMPILE_COMMANDS} ON)
+else()
+    set(ENV{CMAKE_EXPORT_COMPILE_COMMANDS} OFF)
+endif()
+
 # Filter ALL_BUILD and ZERO_CHECK projects
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set(MRAY_PREDEFINED_TARGETS_FOLDER "CustomTargets")
 set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER ${MRAY_PREDEFINED_TARGETS_FOLDER})
 
-# Project Name etc..
+# ====================== #
+#     Project Start      #
+# ====================== #
 project(${MRAY_PROJECT_NAME}
         LANGUAGES CUDA CXX
         VERSION "${MRAY_VERSION_MAJOR}.${MRAY_VERSION_MINOR}.${MRAY_VERSION_PATCH}"
@@ -72,20 +82,21 @@ cmake_path(NORMAL_PATH MRAY_DIRECTORY)
 generate_platform_name()
 populate_mray_directory_variables(${MRAY_DIRECTORY})
 
-# After project is set and nvcc is found invoke find CUDA toolkit
-# we will use curand for sampling
-find_package(CUDAToolkit REQUIRED)
-# Bug on cmake maybe this variable is not advanced
-mark_as_advanced(CUDAToolkit_CUPTI_INCLUDE_DIR)
-
 # Use currently selected compiler for CUDA
 # TODO: Check why this is not set?
+
 if(MSVC)
     set(CMAKE_CUDA_HOST_COMPILER ${CMAKE_CXX_COMPILER})
 else()
     # This should be set automatically I think...
     add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--compiler-bindir=${CMAKE_CXX_COMPILER}>)
 endif()
+
+# After project is set and nvcc is found invoke find CUDA toolkit
+# we will use curand for sampling
+find_package(CUDAToolkit REQUIRED)
+# Bug on cmake maybe this variable is not advanced
+mark_as_advanced(CUDAToolkit_CUPTI_INCLUDE_DIR)
 
 # Force Colored Output on Ninja
 set(CMAKE_COLOR_DIAGNOSTICS ON)

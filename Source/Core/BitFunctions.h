@@ -176,6 +176,7 @@ constexpr Bitset<N>::BitRef& Bitset<N>::BitRef::operator=(bool b)
 {
     Type boolExp = static_cast<Type>(b);
     reference.bits &= (boolExp << index);
+    return *this;
 }
 
 template<size_t N>

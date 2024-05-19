@@ -16,7 +16,7 @@
 
 #include "PrimitiveC.h"
 #include "ShapeFunctions.h"
-#include "Transforms.h"
+#include "TransformsDefault.h"
 #include "Random.h"
 
 namespace DefaultTriangleDetail

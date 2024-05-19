@@ -10,10 +10,7 @@ set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/TracerBase.h
     ${CURRENT_SOURCE_DIR}/TracerBase.cu
     ${CURRENT_SOURCE_DIR}/Tracer.h
-    # Handmade "unity build" like organization
-    ${CURRENT_SOURCE_DIR}/TracerImpl_1.cu
-    ${CURRENT_SOURCE_DIR}/TracerImpl_2.cu
-    ${CURRENT_SOURCE_DIR}/TracerImpl_3.cu)
+    ${CURRENT_SOURCE_DIR}/Tracer.cu)
 
 set(SRC_ALL
     ${SRC_COMMON})

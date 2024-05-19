@@ -94,9 +94,9 @@ static constexpr size_t HitKeyPackAlignment = (sizeof(PrimitiveKey) +
 struct alignas(HitKeyPackAlignment) HitKeyPack
 {
     PrimitiveKey    primKey;
-    LightOrMatKey   matId;
-    TransformKey    transId;
-    AcceleratorKey  accelId;
+    LightOrMatKey   lightOrMatKey;
+    TransformKey    transKey;
+    AcceleratorKey  accelKey;
 };
 
 //static constexpr size_t AccelIdPackAlignment = (sizeof(TransformKey) +

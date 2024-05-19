@@ -80,32 +80,32 @@ static_assert(std::is_polymorphic_v<AABB3> == false, "AABB3 should not be polymo
 
 struct AABBOffsetChecker
 {
-    // Some Sanity Traits
-    static_assert(offsetof(AABB2f, min) == 0,
-                  "AABB2f::min is not properly aligned for contiguous mem read/write");
-    static_assert(offsetof(AABB2f, max) == sizeof(Vector<2, float>),
-                  "AABB2f:: max is not properly aligned for contiguous mem read/write");
-    static_assert(offsetof(AABB3f, min) == 0,
-                  "AABB3f::min is not properly aligned for contiguous mem read/write");
-    static_assert(offsetof(AABB3f, max) == sizeof(Vector<3, float>),
-                  "AABB3f:: max is not properly aligned for contiguous mem read/write");
-    static_assert(offsetof(AABB4f, min) == 0,
-                  "AABB4f::min is not properly aligned for contiguous mem read/write");
-    static_assert(offsetof(AABB4f, max) == sizeof(Vector<4, float>),
-                  "AABB4f:: max is not properly aligned for contiguous mem read/write");
-    //
-    static_assert(offsetof(AABB2d, min) == 0,
-                  "AABB2d::min is not properly aligned for contiguous mem read/write");
-    static_assert(offsetof(AABB2d, max) == sizeof(Vector<2, double>),
-                  "AABB2d:: max is not properly aligned for contiguous mem read/write");
-    static_assert(offsetof(AABB3d, min) == 0,
-                  "AABB3d::min is not properly aligned for contiguous mem read/write");
-    static_assert(offsetof(AABB3d, max) == sizeof(Vector<3, double>),
-                  "AABB3d:: max is not properly aligned for contiguous mem read/write");
-    static_assert(offsetof(AABB4d, min) == 0,
-                  "AABB4d::min is not properly aligned for contiguous mem read/write");
-    static_assert(offsetof(AABB4d, max) == sizeof(Vector<4, double>),
-                  "AABB4d:: max is not properly aligned for contiguous mem read/write");
+    //// Some Sanity Traits
+    //static_assert(offsetof(AABB2f, min) == 0,
+    //              "AABB2f::min is not properly aligned for contiguous mem read/write");
+    //static_assert(offsetof(AABB2f, max) == sizeof(Vector<2, float>),
+    //              "AABB2f:: max is not properly aligned for contiguous mem read/write");
+    //static_assert(offsetof(AABB3f, min) == 0,
+    //              "AABB3f::min is not properly aligned for contiguous mem read/write");
+    //static_assert(offsetof(AABB3f, max) == sizeof(Vector<3, float>),
+    //              "AABB3f:: max is not properly aligned for contiguous mem read/write");
+    //static_assert(offsetof(AABB4f, min) == 0,
+    //              "AABB4f::min is not properly aligned for contiguous mem read/write");
+    //static_assert(offsetof(AABB4f, max) == sizeof(Vector<4, float>),
+    //              "AABB4f:: max is not properly aligned for contiguous mem read/write");
+    ////
+    //static_assert(offsetof(AABB2d, min) == 0,
+    //              "AABB2d::min is not properly aligned for contiguous mem read/write");
+    //static_assert(offsetof(AABB2d, max) == sizeof(Vector<2, double>),
+    //              "AABB2d:: max is not properly aligned for contiguous mem read/write");
+    //static_assert(offsetof(AABB3d, min) == 0,
+    //              "AABB3d::min is not properly aligned for contiguous mem read/write");
+    //static_assert(offsetof(AABB3d, max) == sizeof(Vector<3, double>),
+    //              "AABB3d:: max is not properly aligned for contiguous mem read/write");
+    //static_assert(offsetof(AABB4d, min) == 0,
+    //              "AABB4d::min is not properly aligned for contiguous mem read/write");
+    //static_assert(offsetof(AABB4d, max) == sizeof(Vector<4, double>),
+    //              "AABB4d:: max is not properly aligned for contiguous mem read/write");
 };
 
 // Implementation

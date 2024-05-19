@@ -100,7 +100,7 @@ class AcceleratorGroupLinear final : public AcceleratorGroupT<PrimitiveGroupType
 
     using PrimitiveGroup    = PrimitiveGroupType;
     using DataSoA           = LinearAccelDetail::LinearAcceleratorSoA;
-    using PrimSoA           = PrimitiveGroupType::DataSoAConst;
+    using PrimSoA           = PrimitiveGroupType::DataSoA;
 
     template<class TG>
     using Accelerator = LinearAccelDetail::AcceleratorLinear<PrimitiveGroup, TG>;
@@ -123,8 +123,9 @@ class AcceleratorGroupLinear final : public AcceleratorGroupT<PrimitiveGroupType
     public:
     // Constructors & Destructor
                 AcceleratorGroupLinear(uint32_t accelGroupId,
+                                       BS::thread_pool&, GPUSystem&,
                                        const GenericGroupPrimitiveT& pg,
-                                       const AccelGroupWorkGenMap&);
+                                       const AccelWorkGenMap&);
     //
     void        Construct(AccelGroupConstructParams, const GPUQueue&) override;
     void        WriteInstanceKeysAndAABBs(Span<AABB3> aabbWriteRegion,
@@ -169,7 +170,7 @@ class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinea
     // Constructors & Destructor
     BaseAcceleratorLinear(BS::thread_pool&, GPUSystem&,
                           const AccelGroupGenMap&,
-                          const AccelGroupWorkGlobalMap&);
+                          const AccelWorkGenMap&);
 
     //
     void    CastRays(// Output
@@ -213,7 +214,7 @@ class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinea
 inline
 BaseAcceleratorLinear::BaseAcceleratorLinear(BS::thread_pool& tp, GPUSystem& sys,
                                              const AccelGroupGenMap& aGen,
-                                             const AccelGroupWorkGlobalMap& globalWorkMap)
+                                             const AccelWorkGenMap& globalWorkMap)
     : BaseAcceleratorT<BaseAcceleratorLinear>(tp, sys, aGen, globalWorkMap)
     , accelMem(sys.AllGPUs(), 8_MiB, 32_MiB, false)
     , stackMem(sys.AllGPUs(), 8_MiB, 32_MiB, false)

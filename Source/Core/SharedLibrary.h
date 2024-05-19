@@ -6,16 +6,19 @@ Functionality to Load DLLs or SOs
 
 */
 
+#include <type_traits>
+#include <string>
+
 #include "Error.h"
 #include "System.h"
 #include "Types.h"
 
 struct SharedLibArgs
 {
-    std::string         mangledConstructorName = "\0";
-    std::string         mangledDestructorName = "\0";
+    std::string mangledConstructorName = "\0";
+    std::string mangledDestructorName = "\0";
 
-    bool                operator<(const SharedLibArgs& s) const;
+    bool        operator<(const SharedLibArgs& s) const;
 };
 
 inline bool SharedLibArgs::operator<(const SharedLibArgs& s) const

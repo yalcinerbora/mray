@@ -1,8 +1,13 @@
 #pragma once
 
-#include "VulkanTypes.h"
-#include "VulkanPipeline.h"
+#include <vulkan/vulkan_core.h>
 #include <map>
+#include <memory>
+#include <string>
+#include "Core/Definitions.h"
+#include "Core/Error.h"
+#include "Core/Types.h"
+#include "VulkanTypes.h"
 
 class GUITonemapperI
 {

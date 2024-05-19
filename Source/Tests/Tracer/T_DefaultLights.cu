@@ -26,7 +26,7 @@ using LightVariantIn = Variant
 
 using MetaLightList = MetaLightArray<TContextVariant, LightVariantIn>;
 using MetaLight = typename MetaLightList::MetaLight;
-using MetaLightView = typename MetaLightList::MetaLightView<Vector2>;
+using MetaLightView = typename MetaLightList::MetaLightView<MetaHit>;
 
 
 TEST(DefaultLights, DISABLED_Skysphere)
@@ -38,7 +38,7 @@ TEST(DefaultLights, MetaLight)
     GPUSystem system;
     // Generate some groups
     // PGs
-    EmptyPrimGroup emptyPrimGroup(0u, system);
+    PrimGroupEmpty emptyPrimGroup(0u, system);
     PrimGroupTriangle triangleGroup(1u, system);
     // TGs
     TransformGroupIdentity identityTG(0u, system);

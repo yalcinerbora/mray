@@ -74,8 +74,8 @@ class MatGroupLambert final : public GenericGroupMaterial<MatGroupLambert>
     static std::string_view TypeName();
 
                     MatGroupLambert(uint32_t groupId,
-                                    const TextureViewMap&,
-                                    const GPUSystem&);
+                                    const GPUSystem&,
+                                    const TextureViewMap&);
     void            CommitReservations() override;
     AttribInfoList  AttributeInfo() const override;
     void            PushAttribute(MaterialKey id,

@@ -41,7 +41,7 @@ OptionalHitR<PG> AcceleratorLinear<PG, TG>::IntersectionCheck(const Ray& ray,
     using enum PrimTransformType;
 
     Ray transformedRay;
-    if constexpr(PG::TransformType == PER_PRIMITIVE_TRANSFORM)
+    if constexpr(PG::TransformLogic == PER_PRIMITIVE_TRANSFORM)
     {
         // Primitive has per primitive transform
         // (skinned mesh maybe) we need to transform using primitive's data
@@ -150,17 +150,18 @@ template<PrimitiveGroupC PG>
 std::string_view AcceleratorGroupLinear<PG>::TypeName()
 {
     using namespace TypeNameGen::CompTime;
-    using namespace std::string_view_literals;
-    static const auto Name = CreateAcceleratorType(BaseAcceleratorLinear::TypeName(),
-                                                   PG::TypeName());
+    static const auto Name = AccelGroupTypeName(BaseAcceleratorLinear::TypeName(),
+                                                PG::TypeName());
     return Name;
 }
 
 template<PrimitiveGroupC PG>
 AcceleratorGroupLinear<PG>::AcceleratorGroupLinear(uint32_t accelGroupId,
+                                                   BS::thread_pool& tp, GPUSystem& sys,
                                                    const GenericGroupPrimitiveT& pg,
-                                                   const AccelGroupWorkGenMap& workMap)
-    : AcceleratorGroupT<PG>(accelGroupId, pg, workMap)
+                                                   const AccelWorkGenMap& globalWorkMap)
+    : AcceleratorGroupT<PG>(accelGroupId, tp, sys, pg, globalWorkMap)
+    , mem(sys.AllGPUs(), 2_MiB, 32_MiB)
 {}
 
 template<PrimitiveGroupC PG>
@@ -174,16 +175,16 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
     std::iota(this->typeIds.begin(), this->typeIds.end(), 0);
     // Total instance count (equavilently total surface count)
     this->instanceCount = this->DetermineInstanceCount(p);
-    auto linSurfData = this->LinearizeSurfaceData(p, this->instanceCount);
+    auto linSurfData = this->LinearizeSurfaceData(p, this->instanceCount, this->pg);
     // Find out the concerete accel count and offsets
-    auto leafResult = DetermineConcereteAccelCount(linSurfData.instancePrimBatches,
-                                                   linSurfData.primRanges);
+    auto leafResult = this->DetermineConcereteAccelCount(std::move(linSurfData.instancePrimBatches),
+                                                         std::move(linSurfData.primRanges));
     this->concreteAccelCount = static_cast<uint32_t>(leafResult.concereteAccelIndices.size());
 
     // Generate offset spans
     using PrimKeySpanList = std::vector<Span<PrimitiveKey>>;
-    PrimKeySpanList hInstanceLeafs = CreateLeafSubspans(dAllLeafs,
-                                                        leafResult.perInstanceLeafRanges);
+    PrimKeySpanList hInstanceLeafs = this->CreateLeafSubspans(dAllLeafs,
+                                                              leafResult.perInstanceLeafRanges);
 
     // Copy these host vectors to GPU
     // For linear accelerator we only need these at GPU memory

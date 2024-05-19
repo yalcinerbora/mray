@@ -18,9 +18,9 @@ function(gen_tracer_target)
 
     set(SRC_TRANSFORMS
         ${CURRENT_SOURCE_DIR}/TransformC.h
-        ${CURRENT_SOURCE_DIR}/Transforms.h
-        ${CURRENT_SOURCE_DIR}/Transforms.hpp
-        ${CURRENT_SOURCE_DIR}/Transforms.cu)
+        ${CURRENT_SOURCE_DIR}/TransformsDefault.h
+        ${CURRENT_SOURCE_DIR}/TransformsDefault.hpp
+        ${CURRENT_SOURCE_DIR}/TransformsDefault.cu)
 
     set(SRC_MATERIALS
         ${CURRENT_SOURCE_DIR}/MaterialC.h

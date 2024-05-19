@@ -19,8 +19,10 @@ void KCIntersectBaseLinear(// Output
 
 std::string_view BaseAcceleratorLinear::TypeName()
 {
+    using namespace TypeNameGen::CompTime;
     using namespace std::string_view_literals;
-    return "Linear"sv;
+    static constexpr auto Name = "Linear"sv;
+    return BaseAccelTypeName<Name>;
 }
 
 void BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instanceOffsets)

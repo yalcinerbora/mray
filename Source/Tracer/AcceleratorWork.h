@@ -15,7 +15,7 @@ class AcceleratorWorkI
                                // Input
                                Span<const RayGMem> dRays,
                                Span<const RayIndex> dRayIndices,
-                               Span<const AcceleratorKey> dAccelIdPacks,
+                               Span<const CommonKey> dAccelIdPacks,
                                // Constants
                                const GPUQueue& queue) const = 0;
 };
@@ -53,7 +53,7 @@ class AcceleratorWork : public AcceleratorWorkI
                        Span<const RayIndex> dRayIndices,
                        Span<const CommonKey> dAcceleratorKeys,
                        // Constants
-                       const GPUQueue& queue) override;
+                       const GPUQueue& queue) const override;
 
 };
 
@@ -77,16 +77,16 @@ void AcceleratorWork<AG, TG>::CastLocalRays(// Output
                                             Span<const CommonKey> dAcceleratorKeys,
 
                                             // Constants
-                                            const GPUQueue& queue)
+                                            const GPUQueue& queue) const
 {
     assert(dRays.size() == dRayIndices.size());
     assert(dRayIndices.size() == dAcceleratorKeys.size());
     assert(dAcceleratorKeys.size() == dHitIds.size());
 
     using PG            = typename AcceleratorGroup::PrimitiveGroup;
-    using PrimSoA       = typename PrimitiveGroup::DataSoAConst;
-    using AccelSoA      = typename AcceleratorGroup::DataSoAConst;
-    using TransSoA      = typename TransformGroup::DataSoAConst;
+    using PrimSoA       = typename PrimitiveGroup::DataSoA;
+    using AccelSoA      = typename AcceleratorGroup::DataSoA;
+    using TransSoA      = typename TransformGroup::DataSoA;
     using Accelerator   = typename AcceleratorGroup:: template Accelerator<TG>;
     TransSoA    tSoA = transGroup.DataSoA();
     AccelSoA    aSoA = accelGroup.DataSoA();
@@ -109,7 +109,7 @@ void AcceleratorWork<AG, TG>::CastLocalRays(// Output
 
             // Do work depending on the prim transorm logic
             using enum PrimTransformType;
-            if(PG::TransformType == LOCALLY_CONSTANT_TRANSFORM)
+            if(PG::TransformLogic == LOCALLY_CONSTANT_TRANSFORM)
             {
                 // Transform is local
                 // we can transform the ray and use it on iterations
@@ -130,16 +130,16 @@ void AcceleratorWork<AG, TG>::CastLocalRays(// Output
             }
 
             // Actual ray cast!
-            OptionalHitR<PG> hit = acc.ClosestHit(ray, tMM, rng);
+            OptionalHitR<PG> hit = acc.ClosestHit(rng, ray, tMM);
 
             if(hit)
             {
                 dHitIds[i] = HitKeyPack
                 {
-                    .primId     = hit.primitiveKey,
-                    .matId      = hit.materialKey,
-                    .transId    = acc.TransformKey(),
-                    .accelId    = aId
+                    .primKey        = hit.value().primitiveKey,
+                    .lightOrMatKey  = hit.value().materialKey,
+                    .transKey       = acc.TransformKey(),
+                    .accelKey       = aId
                 };
                 UpdateTMax(dRays, index, hit.t);
             }
@@ -158,6 +158,8 @@ void AcceleratorWork<AG, TG>::CastLocalRays(// Output
 template<AccelGroupC AG, TransformGroupC TG>
 std::string_view AcceleratorWork<AG, TG>::TypeName()
 {
-    static std::string name = AG::TypeName() + TG::TypeName();
-    return name;
+    using namespace TypeNameGen::CompTime;
+    static const std::string Name = AccelWorkTypeName(AG::TypeName(),
+                                                      TG::TypeName());
+    return Name;
 }

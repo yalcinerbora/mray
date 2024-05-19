@@ -5,7 +5,7 @@
 
 #include "TracerTypes.h"
 #include "ParamVaryingData.h"
-#include "Transforms.h"
+#include "TransformsDefault.h"
 #include "GenericGroup.h"
 
 #include "Device/GPUSystem.hpp"
@@ -70,6 +70,15 @@ concept LightGroupC = requires(LGType lg)
     // TODO: This concept requres "Reserve" function to be visible,
     // however we switched it so...
     //requires GenericGroupC<LGType>;
+};
+
+template <class Converter>
+concept CoordConverterC = requires()
+{
+    { Converter::DirToUV(Vector3{}) } -> std::same_as<Vector2>;
+    { Converter::UVToDir(Vector2{}) } -> std::same_as<Vector3>;
+    { Converter::ToSolidAnglePdf(Float{}, Vector2{}) } -> std::same_as<Float>;
+    { Converter::ToSolidAnglePdf(Float{}, Vector3{}) } -> std::same_as<Float>;
 };
 
 class GenericGroupLightT : public GenericTexturedGroupT<LightKey, LightAttributeInfo>
@@ -229,7 +238,8 @@ Float MetaLightViewT<CH, ML, SC>::PdfSolidAngle(const CH& hit,
     return DeviceVisit(light, [=](auto&& l) -> Float
     {
         using HitType = decltype(l)::Primitive::Hit;
-        return l.PdfSolidAngle(HitType(hit), distantPoint, dir);
+        HitType hitIn = hit.template AsVector<HitType::Dims>();
+        return l.PdfSolidAngle(hitIn, distantPoint, dir);
     });
 }
 

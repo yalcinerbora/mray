@@ -1,4 +1,9 @@
 #include "TonemapStage.h"
+#include <cassert>
+#include <type_traits>
+#include <utility>
+#include <map>
+#include "Visor/VulkanTypes.h"
 
 TonemapStage::TonemapStage(const VulkanSystemView& view)
     : uniformBuffer(view)

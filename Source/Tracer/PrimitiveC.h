@@ -11,7 +11,7 @@
 #include "Device/GPUSystem.h"
 
 #include "TracerTypes.h"
-#include "Transforms.h"
+#include "TransformsDefault.h"
 #include "GenericGroup.h"
 
 // Transform types
@@ -215,6 +215,7 @@ class GenericGroupPrimitiveT : public GenericGroupT<PrimBatchKey, PrimAttributeI
     void        CopyPrimIds(Span<PrimitiveKey> dOutLocation,
                             PrimBatchId primBatchId,
                             const GPUQueue& queue);
+    Vector2ui   BatchRange(PrimBatchId) const;
 };
 using PrimGroupPtr           = std::unique_ptr<GenericGroupPrimitiveT>;
 
@@ -263,7 +264,7 @@ class EmptyPrimitive
     const TransformContext& GetTransformContext() const;
 };
 
-class EmptyPrimGroup : public GenericGroupPrimitive<EmptyPrimGroup>
+class PrimGroupEmpty : public GenericGroupPrimitive<PrimGroupEmpty>
 {
     public:
     using DataSoA       = EmptyType;
@@ -287,7 +288,7 @@ class EmptyPrimGroup : public GenericGroupPrimitive<EmptyPrimGroup>
     static std::string_view TypeName();
     static constexpr auto   TransformLogic = PrimTransformType::LOCALLY_CONSTANT_TRANSFORM;
 
-                            EmptyPrimGroup(uint32_t primGroupId,
+                            PrimGroupEmpty(uint32_t primGroupId,
                                            const GPUSystem& sys);
 
     void                    CommitReservations() override;
@@ -310,7 +311,7 @@ class EmptyPrimGroup : public GenericGroupPrimitive<EmptyPrimGroup>
 
 static_assert(PrimitiveC<EmptyPrimitive<>>,
               "Empty primitive does not satisfy Primitive concept!");
-static_assert(PrimitiveGroupC<EmptyPrimGroup>,
+static_assert(PrimitiveGroupC<PrimGroupEmpty>,
               "Empty primitive group does not satisfy PrimitiveGroup concept!");
 
 template <PrimitiveGroupC PrimGroup, TransformGroupC TransGroup>
@@ -335,6 +336,12 @@ inline
 void GenericGroupPrimitiveT::CopyPrimIds(Span<PrimitiveKey> dOutLocation,
                                          PrimBatchId primBatchId,
                                          const GPUQueue& queue)
+{
+    throw MRayError("implement");
+}
+
+inline
+Vector2ui GenericGroupPrimitiveT::BatchRange(PrimBatchId) const
 {
     throw MRayError("implement");
 }
@@ -437,7 +444,7 @@ const TC& EmptyPrimitive<TC>::GetTransformContext() const
 }
 
 inline
-std::string_view EmptyPrimGroup::TypeName()
+std::string_view PrimGroupEmpty::TypeName()
 {
     using namespace std::literals;
     static std::string_view name = "(P)Empty"sv;
@@ -445,42 +452,42 @@ std::string_view EmptyPrimGroup::TypeName()
 }
 
 inline
-EmptyPrimGroup::EmptyPrimGroup(uint32_t primGroupId,
+PrimGroupEmpty::PrimGroupEmpty(uint32_t primGroupId,
                                const GPUSystem& sys)
     : GenericGroupPrimitive(primGroupId, sys)
 {}
 
 inline
-void EmptyPrimGroup::CommitReservations()
+void PrimGroupEmpty::CommitReservations()
 {
     isCommitted = true;
 }
 
 inline
-PrimAttributeInfoList EmptyPrimGroup::AttributeInfo() const
+PrimAttributeInfoList PrimGroupEmpty::AttributeInfo() const
 {
     static const PrimAttributeInfoList LogicList;
     return LogicList;
 }
 
 inline
-void EmptyPrimGroup::PushAttribute(PrimBatchKey, uint32_t,
+void PrimGroupEmpty::PushAttribute(PrimBatchKey, uint32_t,
                                    TransientData, const GPUQueue&)
 {}
 
 inline
-void EmptyPrimGroup::PushAttribute(PrimBatchKey, uint32_t,
+void PrimGroupEmpty::PushAttribute(PrimBatchKey, uint32_t,
                                    const Vector2ui&,
                                    TransientData, const GPUQueue&)
 {}
 
 inline
-void EmptyPrimGroup::PushAttribute(PrimBatchKey, PrimBatchKey,
+void PrimGroupEmpty::PushAttribute(PrimBatchKey, PrimBatchKey,
                                    uint32_t, TransientData, const GPUQueue&)
 {}
 
 inline
-typename EmptyPrimGroup::DataSoA EmptyPrimGroup::SoA() const
+typename PrimGroupEmpty::DataSoA PrimGroupEmpty::SoA() const
 {
     return EmptyType{};
 }
