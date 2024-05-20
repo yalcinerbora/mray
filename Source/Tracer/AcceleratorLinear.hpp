@@ -1,24 +1,5 @@
 #pragma once
 
-#include "AcceleratorLinear.h"
-
-
-
-//struct A
-//{
-//    MaterialToPrimList list;
-//
-//
-//};
-
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//void GenerateAccelLeafs(Span<AcceleratorLeaf> gLeafs,
-//                        Span<const Vector2ui> primBatchOffsets,
-//                        )
-//{
-//
-//}
-
 namespace LinearAccelDetail
 {
 
@@ -29,14 +10,14 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 OptionalHitR<PG> AcceleratorLinear<PG, TG>::IntersectionCheck(const Ray& ray,
                                                               const Vector2f& tMinMax,
                                                               Float xi,
-                                                              const AcceleratorLeaf& l) const
+                                                              const PrimitiveKey& primKey) const
 {
     auto IsInRange = [tMinMax](Float newT) -> bool
     {
         return ((newT >= tMinMax[0]) && (newT < tMinMax[1]));
     };
 
-    using Primitive = typename PG::template Primitive<IdentityTransformContext>;
+    using Primitive = typename PG::template Primitive<TransformContextIdentity>;
     using Intersection = IntersectionT<PrimHit>;
     using enum PrimTransformType;
 
@@ -59,7 +40,7 @@ OptionalHitR<PG> AcceleratorLinear<PG, TG>::IntersectionCheck(const Ray& ray,
 
         // The actual context
         TContextType transformContext = TGenFunc(transformSoA, primitiveSoA,
-                                                 transformKey, l.primitiveKey);
+                                                 transformKey, primKey);
 
         transformedRay = transformContext.InvApply(ray);
     }
@@ -70,30 +51,36 @@ OptionalHitR<PG> AcceleratorLinear<PG, TG>::IntersectionCheck(const Ray& ray,
         transformedRay = ray;
     }
 
-    Primitive prim = Primitive(TransformContextIdentity{}, primitiveSoA, l.primitiveKey);
-    Optional<Intersection> intersection = prim.Intersects(transformedRay, tMinMax);
+    // Construct the primitive
+    Primitive prim = Primitive(TransformContextIdentity{}, primitiveSoA, primKey);
+    // Find the batch index for flags, alpha maps
+    uint32_t index = FindPrimBatchIndex(primRanges, primKey);
 
+    // Actual intersection finally!
+    Optional<Intersection> intersection = prim.Intersects(transformedRay,
+                                                          cullFaceFlags[index]);
     // Intersection decisions
-    OptionalHitR<PG> result = std::nullopt;
-    if(!intersection) return result;
-    if(!IsInRange(intersection->t)) return result;
+    if(!intersection) return std::nullopt;
+    if(!IsInRange(intersection->t)) return std::nullopt;
+
+    Optional<AlphaMap> alphaMap = alphaMaps[index];
     if(alphaMap)
     {
         const auto& alphaMapV = alphaMap.value();
         // This has alpha map check it
-        Vector2 uv = prim.SurfaceParametrization(intersection.hit);
+        Vector2 uv = prim.SurfaceParametrization(intersection.value().hit);
         Float alpha = alphaMapV(uv).value();
         // Stochastic alpha culling
-        if(xi > alpha) return result;
+        if(xi > alpha) return std::nullopt;
     }
 
     // It is a hit! Update
-    result = HitResult
+    return HitResult
     {
-        .materialKey = l.materialKey,
-        .primitiveKey = l.primitiveKey,
-        .hit = intersection->hit,
-        .t = intersection->t
+        .hit            = intersection.value().hit,
+        .t              = intersection.value().t,
+        .primitiveKey   = primKey,
+        .lmKey          = lmKeys[index]
     };
 }
 
@@ -103,13 +90,22 @@ AcceleratorLinear<PG, TG>::AcceleratorLinear(const TransDataSoA& tSoA,
                                              const PrimDataSoA& pSoA,
                                              const DataSoA& dataSoA,
                                              AcceleratorKey aId)
-    : cullFace(dataSoA.dCullFace[aId.FetchIndexPortion()])
-    , alphaMap(dataSoA.dAlphaMaps[aId.FetchIndexPortion()])
+    : primRanges(dataSoA.dPrimitiveRanges[aId.FetchIndexPortion()])
+    , cullFaceFlags(dataSoA.dCullFace[aId.FetchIndexPortion()])
+    , alphaMaps(dataSoA.dAlphaMaps[aId.FetchIndexPortion()])
+    , lmKeys(dataSoA.dLightOrMatKeys[aId.FetchIndexPortion()])
     , leafs(ToConstSpan(dataSoA.dLeafs[aId.FetchIndexPortion()]))
     , transformKey(dataSoA.dInstanceTransforms[aId.FetchIndexPortion()])
     , transformSoA(tSoA)
     , primitiveSoA(pSoA)
 {}
+
+template<PrimitiveGroupC PG, TransformGroupC TG>
+MRAY_HYBRID MRAY_CGPU_INLINE
+TransformKey AcceleratorLinear<PG, TG>::TransformKey() const
+{
+    return transformKey;
+}
 
 template<PrimitiveGroupC PG, TransformGroupC TG>
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -120,9 +116,9 @@ OptionalHitR<PG> AcceleratorLinear<PG, TG>::ClosestHit(BackupRNG& rng,
     Vector2 tMM = tMinMax;
     // Linear search over the array
     OptionalHitR<PG> result = std::nullopt;
-    for(const AcceleratorLeaf leaf : leafs)
+    for(const PrimitiveKey pKeys : leafs)
     {
-        result = IntersectionCheck(ray, tMM, rng.NextFloat(), leaf);
+        result = IntersectionCheck(ray, tMM, rng.NextFloat(), pKeys);
         if(result) tMM[1] = min(tMM[1], result->t);
     }
     return result;
@@ -136,9 +132,9 @@ OptionalHitR<PG> AcceleratorLinear<PG, TG>::FirstHit(BackupRNG& rng,
 {
     // Linear search over the array
     OptionalHitR<PG> result = std::nullopt;
-    for(const AcceleratorLeaf leaf : leafs)
+    for(const PrimitiveKey pKeys : leafs)
     {
-        result = IntersectionCheck(ray, tMinMax, rng.NextFloat(), leaf);
+        result = IntersectionCheck(ray, tMinMax, rng.NextFloat(), pKeys);
         if(result) break;
     }
     return result;
@@ -191,7 +187,7 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
     // additionally we will create instance's globalAABB
     MemAlloc::AllocateMultiData(std::tie(dCullFaceFlags,
                                          dAlphaMaps,
-                                         dMaterialKeys,
+                                         dLightOrMatKeys,
                                          dPrimitiveRanges,
                                          dTransformKeys,
                                          dLeafs,
@@ -205,19 +201,25 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
     // Actual memcpy
     Span<CullFaceFlagArray>     hSpanCullFaceFlags(linSurfData.cullFaceFlags);
     Span<AlphaMapArray>         hSpanAlphaMaps(linSurfData.alphaMaps);
-    Span<MaterialKeyArray>      hSpanMaterialKeys(linSurfData.materialKeys);
+    Span<LightOrMatKeyArray>    hSpanLMKeys(linSurfData.lightOrMatKeys);
     Span<PrimRangeArray>        hSpanPrimitiveRanges(linSurfData.primRanges);
     Span<TransformKey>          hSpanTransformKeys(linSurfData.transformKeys);
     Span<Span<PrimitiveKey>>    hSpanLeafs(hInstanceLeafs);
     queue.MemcpyAsync(dCullFaceFlags,   ToConstSpan(hSpanCullFaceFlags));
     queue.MemcpyAsync(dAlphaMaps,       ToConstSpan(hSpanAlphaMaps));
-    queue.MemcpyAsync(dMaterialKeys,    ToConstSpan(hSpanMaterialKeys));
+    queue.MemcpyAsync(dLightOrMatKeys,  ToConstSpan(hSpanLMKeys));
     queue.MemcpyAsync(dPrimitiveRanges, ToConstSpan(hSpanPrimitiveRanges));
     queue.MemcpyAsync(dTransformKeys,   ToConstSpan(hSpanTransformKeys));
     queue.MemcpyAsync(dLeafs,           ToConstSpan(hSpanLeafs));
 
     //Instantiate X
 
+}
+template<PrimitiveGroupC PG>
+typename AcceleratorGroupLinear<PG>::DataSoA
+AcceleratorGroupLinear<PG>::SoA() const
+{
+    return data;
 }
 
 template<PrimitiveGroupC PG>

@@ -37,8 +37,8 @@ Optional<TriIntersection> Triangle<T>::Intersects(const Ray& ray, bool cullBackf
     {
         return TriIntersection
         {
-            .t = t,
-            .hit = Vector2(baryCoords)
+            .hit = Vector2(baryCoords),
+            .t = t
         };
     }
     else

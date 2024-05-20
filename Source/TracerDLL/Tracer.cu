@@ -217,25 +217,27 @@ void Tracer::AddMediumGenerators(std::map<std::string_view, MedGenerator>& map)
     );
 }
 
-void Tracer::AddAccelGenerators(std::map<AcceleratorType, BaseAccelGenerator>& baseMap,
-                                std::map<AcceleratorType, AccelGroupGenMap>& groupMap,
-                                std::map<AcceleratorType, AccelWorkGenMap>& workMap)
+template<class AcceleratorPack>
+static void AddAccelGeneratorsGeneric(std::map<AcceleratorType, BaseAccelGenerator>& baseMap,
+                                      std::map<AcceleratorType, AccelGroupGenMap>& groupMap,
+                                      std::map<AcceleratorType, AccelWorkGenMap>& workMap,
+                                      AcceleratorType t)
 {
-    // Base
-    using LinAccel = typename DefaultLinearAccelTypePack::BaseType;
-    using enum AcceleratorType;
-    baseMap.emplace(SOFTWARE_NONE, &GenerateType<BaseAcceleratorI, LinAccel,
-                                                 BS::thread_pool&, GPUSystem&,
-                                                 const AccelGroupGenMap&,
-                                                 const AccelWorkGenMap&>);
+        // Base
+    using LinAccel = typename AcceleratorPack::BaseType;
+
+    baseMap.emplace(t, &GenerateType<BaseAcceleratorI, LinAccel,
+                                     BS::thread_pool&, GPUSystem&,
+                                     const AccelGroupGenMap&,
+                                     const AccelWorkGenMap&>);
 
     using GroupGenArgs = Tuple<uint32_t, BS::thread_pool&, GPUSystem&,
                                const GenericGroupPrimitiveT&,
                                const AccelWorkGenMap&>;
-    using AccelGTypes = typename DefaultLinearAccelTypePack::GroupTypes;
+    using AccelGTypes = typename AcceleratorPack::GroupTypes;
     GroupGenArgs*   groupResolver0 = nullptr;
     AccelGTypes*    groupResolver1 = nullptr;
-    auto& genMap = groupMap.emplace(SOFTWARE_NONE, AccelGroupGenMap()).first->second;
+    auto& genMap = groupMap.emplace(t, AccelGroupGenMap()).first->second;
     GenerateMapping<AccelGroupGenerator, AcceleratorGroupI>
     (
         genMap,
@@ -243,17 +245,31 @@ void Tracer::AddAccelGenerators(std::map<AcceleratorType, BaseAccelGenerator>& b
         groupResolver1
     );
 
-    // Now the hard part
-    auto& workMapGlobal = workMap.emplace(SOFTWARE_NONE, AccelWorkGenMap()).first->second;
+    // Works
+    auto& workMapGlobal = workMap.emplace(t, AccelWorkGenMap()).first->second;
     using WorkGenArgs = Tuple<AcceleratorGroupI&, GenericGroupTransformT&>;
-    using AccelWTypes = typename DefaultLinearAccelTypePack::WorkTypes;
+    using AccelWTypes = typename AcceleratorPack::WorkTypes;
     WorkGenArgs* workResolver0 = nullptr;
     AccelWTypes* workResolver1 = nullptr;
-    //GenerateMapping<AccelWorkGenerator, AcceleratorWorkI>
-    //(
-    //    workMapGlobal,
-    //    workResolver0,
-    //    workResolver1
-    //);
+    GenerateMapping<AccelWorkGenerator, AcceleratorWorkI>
+    (
+        workMapGlobal,
+        workResolver0,
+        workResolver1
+    );
+}
+
+void Tracer::AddAccelGenerators(std::map<AcceleratorType, BaseAccelGenerator>& baseMap,
+                                std::map<AcceleratorType, AccelGroupGenMap>& groupMap,
+                                std::map<AcceleratorType, AccelWorkGenMap>& workMap)
+{
+    using enum AcceleratorType;
+    AddAccelGeneratorsGeneric<DefaultLinearAccelTypePack>
+    (
+        baseMap,
+        groupMap,
+        workMap,
+        SOFTWARE_NONE
+    );
 
 }

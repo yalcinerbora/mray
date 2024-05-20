@@ -17,8 +17,6 @@ class Tracer final : public TracerBase
                                    std::map<AcceleratorType, AccelGroupGenMap>&,
                                    std::map<AcceleratorType, AccelWorkGenMap>&);
 
-
-
     //
     //static void AddRendererGenerators_1(std::map<std::string_view, PrimGenerator>&);
     //static void AddRendererGenerators_2(std::map<std::string_view, PrimGenerator>&);
@@ -37,6 +35,9 @@ inline Tracer::Tracer(BS::thread_pool& tp)
     AddMaterialGenerators(GLOBAL_TYPE_GEN.matGenerator);
     AddTransformGenerators(GLOBAL_TYPE_GEN.transGenerator);
     AddLightGenerators(GLOBAL_TYPE_GEN.lightGenerator);
+    AddAccelGenerators(GLOBAL_TYPE_GEN.baseAcceleratorGenerator,
+                       GLOBAL_TYPE_GEN.accelGeneratorMap,
+                       GLOBAL_TYPE_GEN.accelWorkGeneratorMap);
     // Related Types
 
 

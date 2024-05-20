@@ -58,7 +58,7 @@ concept MaterialC = requires(MatType mt,
 };
 
 template <class MGType>
-concept MaterialGroupC = requires()
+concept MaterialGroupC = requires(MGType mg)
 {
     // Material type satisfies its concept (at least on default form)
     requires MaterialC<typename MGType::template Material<>>;

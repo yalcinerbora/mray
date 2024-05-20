@@ -333,9 +333,9 @@ GenericGroupPrimitiveT::GenericGroupPrimitiveT(uint32_t groupId,
 {}
 
 inline
-void GenericGroupPrimitiveT::CopyPrimIds(Span<PrimitiveKey> dOutLocation,
-                                         PrimBatchId primBatchId,
-                                         const GPUQueue& queue)
+void GenericGroupPrimitiveT::CopyPrimIds(Span<PrimitiveKey>,
+                                         PrimBatchId,
+                                         const GPUQueue&)
 {
     throw MRayError("implement");
 }

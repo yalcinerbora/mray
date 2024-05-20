@@ -50,13 +50,12 @@ add_dependencies(MRay
 
 # Debug Parameters (For my own use case)
 if(MSVC)
-
     set(DEBUG_ARGS "")
     string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "-r 640x360 ")
-    string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "-s Scenes/texture.json ")
-    string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "--tConf TracerConfig.json ")
-    string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "--vConf VisorConfig.json ")
-    string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "--rConf RenderConfig.json ")
+    string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "-s Scenes/helloTriangle.json ")
+    string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "--tConf tracerConfig.json ")
+    string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "--vConf visorConfig.json ")
+    string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "--rConf renderConfig.json ")
 
     set_target_properties(MRay PROPERTIES
                           VS_DEBUGGER_WORKING_DIRECTORY ${MRAY_WORKING_DIRECTORY}

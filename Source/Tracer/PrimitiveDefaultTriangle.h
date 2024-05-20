@@ -140,54 +140,64 @@ namespace DefaultSkinnedTriangleDetail
                                 TransformKey tId,
                                 PrimitiveKey pId);
 
+        MRAY_HYBRID MRAY_CGPU_INLINE
         Vector3 ApplyP(const Vector3& point) const
         {
-            return point;
+            return Vector3(transform *  Vector4(point, 1));
         }
 
+        MRAY_HYBRID MRAY_CGPU_INLINE
         Vector3 ApplyV(const Vector3& vec) const
         {
-            return vec;
+            return transform * vec;
         }
 
+        MRAY_HYBRID MRAY_CGPU_INLINE
         Vector3 ApplyN(const Vector3& norm) const
         {
-            return norm;
+            return invTransform.LeftMultiply(norm);
         }
 
+        MRAY_HYBRID MRAY_CGPU_INLINE
         AABB3 Apply(const AABB3& aabb) const
         {
-            return aabb;
+            return transform.TransformAABB(aabb);
         }
 
+        MRAY_HYBRID MRAY_CGPU_INLINE
         Ray Apply(const Ray& ray) const
         {
-            return ray;
+            return transform.TransformRay(ray);
         }
 
+        MRAY_HYBRID MRAY_CGPU_INLINE
         Vector3 InvApplyP(const Vector3& point) const
         {
-            return point;
+            return Vector3(invTransform * Vector4(point, 1));
         }
 
+        MRAY_HYBRID MRAY_CGPU_INLINE
         Vector3 InvApplyV(const Vector3& vec) const
         {
-            return vec;
+            return invTransform * vec;
         }
 
+        MRAY_HYBRID MRAY_CGPU_INLINE
         Vector3 InvApplyN(const Vector3& norm) const
         {
-            return norm;
+            return transform.LeftMultiply(norm);
         }
 
+        MRAY_HYBRID MRAY_CGPU_INLINE
         AABB3 InvApply(const AABB3& aabb) const
         {
-            return aabb;
+            return invTransform.TransformAABB(aabb);
         }
 
+        MRAY_HYBRID MRAY_CGPU_INLINE
         Ray InvApply(const Ray& ray) const
         {
-            return ray;
+            return invTransform.TransformRay(ray);
         }
     };
 

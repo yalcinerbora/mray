@@ -969,10 +969,10 @@ void VisorWindow::Render()
         switch(tp)
         {
             case CAMERA_INIT_TRANSFORM: visorState.transform = std::get<CAMERA_INIT_TRANSFORM>(response); break;
-            case SCENE_ANALYTICS:       visorState.scene = std::get<SCENE_ANALYTICS>(response);       break;
-            case TRACER_ANALYTICS:      visorState.tracer = std::get<TRACER_ANALYTICS>(response);      break;
-            case RENDERER_ANALYTICS:    visorState.renderer = std::get<RENDERER_ANALYTICS>(response);    break;
-            case RENDERER_OPTIONS:      break; // TODO: User may change the render options during runtime
+            case SCENE_ANALYTICS: visorState.scene = std::get<SCENE_ANALYTICS>(response); break;
+            case TRACER_ANALYTICS: visorState.tracer = std::get<TRACER_ANALYTICS>(response); break;
+            case RENDERER_ANALYTICS: visorState.renderer = std::get<RENDERER_ANALYTICS>(response); break;
+            case RENDERER_OPTIONS: break; // TODO: User may change the render options during runtime
             case RENDER_BUFFER_INFO:
             {
                 newRenderBuffer = std::get<RENDER_BUFFER_INFO>(response);

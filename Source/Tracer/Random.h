@@ -8,10 +8,11 @@
 namespace RNGFunctions
 {
     template<std::floating_point F, std::unsigned_integral T>
-    static F ToFloat01(T);
+    MRAY_HYBRID static F ToFloat01(T);
 
     // TODO: Implement double as well
     template<>
+    MRAY_HYBRID MRAY_CGPU_INLINE
     float ToFloat01<float, uint32_t>(uint32_t v)
     {
         // Sanity Checks

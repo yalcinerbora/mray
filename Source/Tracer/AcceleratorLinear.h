@@ -22,26 +22,38 @@ namespace LinearAccelDetail
     struct LinearAcceleratorSoA
     {
         // Per accelerator instance stuff
-        Bitspan<const uint32_t>             dCullFace;
-        Span<Optional<AlphaMap>>            dAlphaMaps;
-        Span<Span<const AcceleratorLeaf>>   dLeafs;
-        Span<TransformKey>                  dInstanceTransforms;
+        Span<const CullFaceFlagArray>           dCullFace;
+        Span<const AlphaMapArray>               dAlphaMaps;
+        Span<const LightOrMatKeyArray>          dLightOrMatKeys;
+        Span<const PrimRangeArray>              dPrimitiveRanges;
+        Span<const TransformKey>                dInstanceTransforms;
+        Span<const Span<const PrimitiveKey>>    dLeafs;
     };
 
-    template<PrimitiveGroupC PrimGroup, TransformGroupC TransGroupType>
+    template<PrimitiveGroupC PrimGroup,
+             TransformGroupC TransGroupType = TransformGroupIdentity>
     class AcceleratorLinear
     {
+        public:
         using PrimHit       = typename PrimGroup::Hit;
-        using HitResult     = HitResultT<PrimHit>;
-        using DataSoA       = LinearAcceleratorSoA;
         using PrimDataSoA   = typename PrimGroup::DataSoA;
         using TransDataSoA  = typename TransGroupType::DataSoA;
+        using HitResult     = HitResultT<PrimHit>;
+        using DataSoA       = LinearAcceleratorSoA;
 
         private:
         // Accel Related
-        bool                        cullFace;
-        Span<const AcceleratorLeaf> leafs;
-        const Optional<AlphaMap>&   alphaMap;
+        // TODO: Check if expansion reduces performance
+        //
+        // Specifically load the range array by value,
+        // we will do linear search over it
+        // Maybe compiler put this on register space
+        PrimRangeArray              primRanges;
+        // Rest is by reference (except the tKey & cullFace, these are a single word)
+        CullFaceFlagArray           cullFaceFlags;
+        const AlphaMapArray&        alphaMaps;
+        const LightOrMatKeyArray&   lmKeys;
+        Span<const PrimitiveKey>    leafs;
         // Primitive Related
         TransformKey                transformKey;
         const TransDataSoA&         transformSoA;
@@ -51,7 +63,7 @@ namespace LinearAccelDetail
         Optional<HitResult>     IntersectionCheck(const Ray& ray,
                                                   const Vector2& tMinMax,
                                                   Float xi,
-                                                  const AcceleratorLeaf& l) const;
+                                                  const PrimitiveKey& primKey) const;
         public:
         // Constructors & Destructor
         MRAY_HYBRID             AcceleratorLinear(const TransDataSoA& tSoA,
@@ -67,31 +79,6 @@ namespace LinearAccelDetail
     };
 }
 
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-MaterialKey FindMaterialId(const PrimRangeArray& primRanges,
-                           const MaterialKeyArray& matKeys,
-                           PrimitiveKey k)
-{
-    static_assert(std::tuple_size_v<PrimRangeArray> ==
-                  std::tuple_size_v<MaterialKeyArray>);
-    static constexpr uint32_t N = static_cast<uint32_t>(std::tuple_size_v<MaterialKeyArray>);
-
-    // Linear search over the index
-    // List has few elements so linear search should suffice
-    CommonKey primIndex = k.FetchIndexPortion();
-    UNROLL_LOOP
-    for(uint32_t i = 0; i < N; i++)
-    {
-        // Do not do early break here (not every accelerator will use all 8
-        // slots, it may break unrolling. Unused element ranges should be int_max
-        bool inRange = (primIndex >= primRanges[i][0] &&
-                        primIndex < primRanges[i][1]);
-        if(inRange) return matKeys[i];
-    }
-    return MaterialKey::InvalidKey();
-}
-
 template<PrimitiveGroupC PrimitiveGroupType>
 class AcceleratorGroupLinear final : public AcceleratorGroupT<PrimitiveGroupType>
 {
@@ -100,9 +87,8 @@ class AcceleratorGroupLinear final : public AcceleratorGroupT<PrimitiveGroupType
 
     using PrimitiveGroup    = PrimitiveGroupType;
     using DataSoA           = LinearAccelDetail::LinearAcceleratorSoA;
-    using PrimSoA           = PrimitiveGroupType::DataSoA;
 
-    template<class TG>
+    template<class TG = TransformGroupIdentity>
     using Accelerator = LinearAccelDetail::AcceleratorLinear<PrimitiveGroup, TG>;
 
     static constexpr auto TransformLogic = PrimitiveGroup::TransformLogic;
@@ -113,7 +99,7 @@ class AcceleratorGroupLinear final : public AcceleratorGroupT<PrimitiveGroupType
     // Per-instance (All accelerators will have these)
     Span<CullFaceFlagArray>     dCullFaceFlags;
     Span<AlphaMapArray>         dAlphaMaps;
-    Span<MaterialKeyArray>      dMaterialKeys;
+    Span<LightOrMatKeyArray>    dLightOrMatKeys;
     Span<PrimRangeArray>        dPrimitiveRanges;
     Span<TransformKey>          dTransformKeys;
     Span<Span<PrimitiveKey>>    dLeafs;
@@ -145,6 +131,8 @@ class AcceleratorGroupLinear final : public AcceleratorGroupT<PrimitiveGroupType
                               // Constants
                               uint32_t instanceId,
                               const GPUQueue& queue) override;
+
+    DataSoA     SoA() const;
 };
 
 class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinear>
@@ -158,7 +146,7 @@ class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinea
     Span<AABB3>                 dAABBs;
     //
     DeviceMemory                stackMem;
-    Span<uint64_t>              dTraversalStack;
+    Span<uint32_t>              dTraversalStack;
     RayPartitioner              rayPartitioner;
     size_t                      maxPartitionCount;
 

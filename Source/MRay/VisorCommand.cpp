@@ -133,8 +133,8 @@ MRayError VisorCommand::Invoke()
 
     // Get the tracer dll
     TracerThread tracerThread(transferQueue, threadPool);
-    //e = tracerThread.MTInitialize(tracerConfigFile);
-    //if(e) return e;
+    e = tracerThread.MTInitialize(tracerConfigFile);
+    if(e) return e;
 
 
     // Actual initialization, process path should be called from here
@@ -147,7 +147,7 @@ MRayError VisorCommand::Invoke()
     if(e) return e;
 
     // Start the tracer thread
-    //tracerThread.Start();
+    tracerThread.Start();
 
     // ====================== //
     //     Real-time Loop     //
@@ -161,7 +161,7 @@ MRayError VisorCommand::Invoke()
     // GG!
     threadPool.wait();
     visorSystem->MTDestroy();
-    //tracerThread.Stop();
+    tracerThread.Stop();
     return MRayError::OK;
 }
 
@@ -171,34 +171,41 @@ CLI::App* VisorCommand::GenApp(CLI::App& mainApp)
     CLI::App* visorApp = mainApp.add_subcommand("", std::string(Description))
         ->alias(std::string(Name));
 
-    //// Input
-    //visorApp->add_option("--tracerConf, -t"s, tracerConfigFile,
-    //                     "Tracer configuration file, mainly specifies the "
-    //                     "tracer dll name to be loaded."s)
-    //    ->check(CLI::ExistingFile)
-    //    ->required();
-    //
+    // Input
+    visorApp->add_option("--tracerConf, --tConf"s, tracerConfigFile,
+                         "Tracer configuration file, mainly specifies the "
+                         "tracer dll name to be loaded."s)
+        ->check(CLI::ExistingFile)
+        ->required()
+        ->expected(1);
+
     visorApp->add_option("--visorConf, --vConf"s, visorConfigFile,
                          "Visor configuration file."s)
         ->check(CLI::ExistingFile)
+        ->required()
+        ->expected(1);
+
+    CLI::Option* sceneOption = visorApp->add_option("--scene, -s"s, sceneFile,
+                                                    "Initial scene file (optional)."s)
+        ->check(CLI::ExistingFile)
+        ->expected(1);
+
+    CLI::Option* rendOption = visorApp->add_option("--renderConf, --rConf"s, renderConfigFile,
+                                                   "Initial renderer to be launched. "
+                                                   "Requires a scene to be set (optional)."s)
+        ->check(CLI::ExistingFile)
+        ->needs(sceneOption)
+        ->expected(1);
+
+    // TODO: Change this to be a region maybe?
+    visorApp->add_option("--resolution, -r"s, imgRes.AsArray(),
+                         "Initial renderer's resolution. "
+                         "Requires a renderer to be set (optional)."s)
+        ->check(CLI::Number)
+        ->expected(1)
+        ->delimiter('x')
+        ->needs(rendOption)
         ->required();
-    //
-    //CLI::Option* sceneOption = visorApp->add_option("--scene, -s"s, sceneFile,
-    //                                                "Initial scene file (optional)."s)
-    //    ->check(CLI::ExistingFile);
-
-    //CLI::Option* rendOption = visorApp->add_option("--renderConf, -r"s, renderConfig,
-    //                                               "Initial renderer to be launched. "
-    //                                               "Requires a scene to be set (optional)."s)
-    //    ->check(CLI::ExistingFile)
-    //    ->needs(sceneOption);
-
-    //// TODO: Change this to be a region maybe?
-    //visorApp->add_option("--resolution, -r"s, imgRes,
-    //                     "Initial renderer to be launched. "
-    //                     "Requires a scene to be set (optional)."s)
-    //    ->check(CLI::ExistingFile)
-    //    ->needs(rendOption);
 
     return visorApp;
 }

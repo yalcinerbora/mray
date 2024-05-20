@@ -18,54 +18,56 @@
 
 namespace BS { class thread_pool; }
 
-class IdentityTransformContext;
 class AcceleratorWorkI;
 
 template<class HitType>
 struct HitResultT
 {
-    MaterialKey     materialKey;
-    PrimitiveKey    primitiveKey;
     HitType         hit;
     Float           t;
-};
-
-// Main accelerator leaf, holds primitive id and
-// material id. Most of the time this should be enough
-struct AcceleratorLeaf
-{
-    PrimitiveKey primitiveKey;
-    // TODO: Materials are comparably small wrt. primitives
-    // so holding a 32-bit value for each triangle is a waste of space.
-    // Reason and change this maybe?
-    MaterialKey  materialKey;
+    PrimitiveKey    primitiveKey;
+    LightOrMatKey   lmKey;
 };
 
 template <class AccelType>
-concept AccelC = requires(AccelType acc)
+concept AccelC = requires(AccelType acc,
+                          BackupRNG& rng)
 {
-    typename AccelType::template PrimType<>;
-    typename AccelType::PrimHit;
     typename AccelType::HitResult;
     typename AccelType::DataSoA;
-
-    // Has this specific constructor
-    requires requires(const IdentityTransformContext& tc,
-                      const typename AccelType::DataSoA& soaData)
-    {AccelType(tc, soaData, AcceleratorKey{});};
+    typename AccelType::PrimDataSoA;
+    typename AccelType::TransDataSoA;
 
     // Closest hit and any hit
-    {acc.ClosestHit(Ray{}, Vector2f{})
+    {acc.ClosestHit(rng, Ray{}, Vector2f{})
     } -> std::same_as<Optional<typename AccelType::HitResult>>;
 
-    {acc.FirstHit(Ray{}, Vector2f{})
+    {acc.FirstHit(rng, Ray{}, Vector2f{})
     }-> std::same_as<Optional<typename AccelType::HitResult>>;
 };
 
-template <class AccelGroupType>
-concept AccelGroupC = requires()
+template <class AGType>
+concept AccelGroupC = requires(AGType ag)
 {
-    true;
+    // Mandatory Types
+    // Accel type satisfies its concept (at least on default form)
+    requires AccelC<typename AGType::template Accelerator<>>;
+
+    // Should define the prim group type
+    typename AGType::PrimitiveGroup;
+    // And access it via function
+    { ag.PrimGroup() } -> std::same_as<const GenericGroupPrimitiveT&>;
+
+    // SoA fashion accelerator data. This will be used to access internal
+    // of the accelerator with a given an index
+    typename AGType::DataSoA;
+    //std::is_same_v<typename AGType::DataSoA,
+    //               typename AGType::template Accelerator<>::DataSoA>;
+    // Acquire SoA struct of this material group
+    { ag.SoA() } -> std::same_as<typename AGType::DataSoA>;
+
+    // Must return its type name
+    { AGType::TypeName() } -> std::same_as<std::string_view>;
 };
 
 template <class BaseAccel>
@@ -159,14 +161,14 @@ class AcceleratorGroupI
     virtual const GenericGroupPrimitiveT& PrimGroup() const = 0;
 };
 
-using PrimRangeArray     = std::array<Vector2ui, TracerConstants::MaxPrimBatchPerSurface>;
-using MaterialKeyArray   = std::array<MaterialKey, TracerConstants::MaxPrimBatchPerSurface>;
+using PrimRangeArray        = std::array<Vector2ui, TracerConstants::MaxPrimBatchPerSurface>;
+using LightOrMatKeyArray    = std::array<LightOrMatKey, TracerConstants::MaxPrimBatchPerSurface>;
 // TODO: std::bitset is CPU oriented class holds the data in (at least i checked MSVC std lib) 32/64-bit integer
 // For CUDA, it can be 8/16-bit, properly packed data (since MaxPrimBatchPerSurface
 // is 8 in the current impl.) This should not be a memory concern untill
 // this codebase becomes production level renderer (doubt)
-using CullFaceFlagArray  = Bitset<TracerConstants::MaxPrimBatchPerSurface>;
-using AlphaMapArray      = std::array<Optional<AlphaMap>, TracerConstants::MaxPrimBatchPerSurface>;
+using CullFaceFlagArray     = Bitset<TracerConstants::MaxPrimBatchPerSurface>;
+using AlphaMapArray         = std::array<Optional<AlphaMap>, TracerConstants::MaxPrimBatchPerSurface>;
 
 struct AcceleratorLeafResult
 {
@@ -181,7 +183,7 @@ struct AcceleratorLeafResult
 struct LinearizedSurfaceData
 {
     std::vector<PrimRangeArray>     primRanges;
-    std::vector<MaterialKeyArray>   materialKeys;
+    std::vector<LightOrMatKeyArray> lightOrMatKeys;
     std::vector<AlphaMapArray>      alphaMaps;
     std::vector<CullFaceFlagArray>  cullFaceFlags;
     std::vector<TransformKey>       transformKeys;
@@ -198,6 +200,36 @@ using AccelGroupGenerator = GeneratorFuncType<AcceleratorGroupI, uint32_t,
                                               const AccelWorkGenMap&>;
 
 using AccelGroupGenMap = std::map<std::string_view, AccelGroupGenerator>;
+
+
+// Generic find routine in an accelerator instance
+// An accelerator consists of multiple prim batches
+// and each have some flags (cull-face etc.)
+// we need to find the index of the corresponding batch
+// to access the data.
+// Since at most (currently 8) prim batch can be available on an accelerator instance,
+// just linear searches over the ranges.
+MRAY_HYBRID MRAY_CGPU_INLINE
+uint32_t FindPrimBatchIndex(const PrimRangeArray& primRanges, PrimitiveKey k)
+{
+    static constexpr uint32_t N = static_cast<uint32_t>(std::tuple_size_v<LightOrMatKeyArray>);
+
+    // Linear search over the index
+    // List has few elements so linear search should suffice
+    CommonKey primIndex = k.FetchIndexPortion();
+    UNROLL_LOOP
+    for(uint32_t i = 0; i < N; i++)
+    {
+        // Do not do early break here (not every accelerator will use all 8
+        // slots, it may break unrolling. Unused element ranges should be int_max
+        // thus, will fail
+        bool inRange = (primIndex >= primRanges[i][0] &&
+                        primIndex < primRanges[i][1]);
+        if(inRange) return i;
+    }
+    // Return INT_MAX here to crash if something goes wrong
+    return std::numeric_limits<uint32_t>::max();
+}
 
 template <PrimitiveGroupC PrimitiveGroupType>
 class AcceleratorGroupT : public AcceleratorGroupI
@@ -219,8 +251,8 @@ class AcceleratorGroupT : public AcceleratorGroupI
     std::map<uint32_t, AccelWorkPtr>    workInstances;
 
     // Common functionality for ineriting types
-    static size_t                   DetermineInstanceCount(const AccelGroupConstructParams& p);
-    static size_t                   DetermineInstanceTypeCount(const AccelGroupConstructParams& p);
+    static uint32_t                 DetermineInstanceCount(const AccelGroupConstructParams& p);
+    static uint32_t                 DetermineInstanceTypeCount(const AccelGroupConstructParams& p);
     static AcceleratorLeafResult    DetermineConcereteAccelCount(std::vector<SurfacePrimList> instancePrimBatches,
                                                                  std::vector<PrimRangeArray> instancePrimRanges);
     template<class T>
@@ -566,7 +598,7 @@ void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
 }
 
 template <PrimitiveGroupC PG>
-size_t AcceleratorGroupT<PG>::DetermineInstanceCount(const AccelGroupConstructParams& p)
+uint32_t AcceleratorGroupT<PG>::DetermineInstanceCount(const AccelGroupConstructParams& p)
 {
     size_t surfCount = std::transform_reduce(p.tGroupSurfs.cbegin(),
                                              p.tGroupSurfs.cend(),
@@ -582,12 +614,12 @@ size_t AcceleratorGroupT<PG>::DetermineInstanceCount(const AccelGroupConstructPa
     {
         return groupedSurf.second.size();
     });
-    size_t totalSurfaceCount = (surfCount + lSurfCount);
+    uint32_t totalSurfaceCount = static_cast<uint32_t>(surfCount + lSurfCount);
     return totalSurfaceCount;
 }
 
 template <PrimitiveGroupC PG>
-size_t AcceleratorGroupT<PG>::DetermineInstanceTypeCount(const AccelGroupConstructParams& p)
+uint32_t AcceleratorGroupT<PG>::DetermineInstanceTypeCount(const AccelGroupConstructParams& p)
 {
     // Find the instance type count
     // Pair of [TransformType, PrimitiveType]
@@ -597,21 +629,22 @@ size_t AcceleratorGroupT<PG>::DetermineInstanceTypeCount(const AccelGroupConstru
     //
     // However, light types also has its own partitioned array, so we need to
     // add only the non-duplicates there
-    uint32_t instanceTypeCount = p.tGroupSurfs.size();
-    instanceTypeCount += std::transform_reduce(p.tGroupLightSurfs.cbegin(),
-                                               p.tGroupLightSurfs.cend(),
-                                               size_t(0), std::plus{},
-    [&](const auto& groupedLightSurf)
+    uint32_t instanceTypeCount = static_cast<uint32_t>(p.tGroupSurfs.size());
+    size_t lightInstanceTypeCount = std::transform_reduce(p.tGroupLightSurfs.cbegin(),
+                                                            p.tGroupLightSurfs.cend(),
+                                                            size_t(0), std::plus{},
+                                                            [&](const auto& groupedLightSurf)
     {
         TransGroupId tId = groupedLightSurf.first;
         auto loc = std::find_if(p.tGroupSurfs.cbegin(),
                                 p.tGroupSurfs.cend(),
-        [tId](const auto groupedSurf)
+                                [tId](const auto groupedSurf)
         {
             return groupedSurf.first != tId;
         });
         return (loc == p.tGroupSurfs.cend()) ? 0 : 1;
     });
+    instanceTypeCount += static_cast<uint32_t>(lightInstanceTypeCount);
     return instanceTypeCount;
 };
 
@@ -674,7 +707,7 @@ AcceleratorLeafResult AcceleratorGroupT<PG>::DetermineConcereteAccelCount(std::v
         [&uniqueIndices](uint32_t& index)
         {
             auto loc = std::lower_bound(uniqueIndices.begin(), uniqueIndices.end(), index);
-            index = std::distance(uniqueIndices.begin(), loc);
+            index = static_cast<uint32_t>(std::distance(uniqueIndices.begin(), loc));
         });
     }
     else
@@ -745,20 +778,20 @@ LinearizedSurfaceData AcceleratorGroupT<PG>::LinearizeSurfaceData(const AccelGro
 {
     LinearizedSurfaceData result = {};
     result.primRanges.reserve(totalSurfaceCount);
-    result.materialKeys.reserve(totalSurfaceCount);
+    result.lightOrMatKeys.reserve(totalSurfaceCount);
     result.alphaMaps.reserve(totalSurfaceCount);
     result.cullFaceFlags.reserve(totalSurfaceCount);
     result.transformKeys.reserve(totalSurfaceCount);
     result.instancePrimBatches.reserve(totalSurfaceCount);
 
-    const auto InitRest = [&](size_t restStart)
+    const auto InitRest = [&](uint32_t restStart)
     {
         using namespace TracerConstants;
-        for(size_t i = restStart; i < MaxPrimBatchPerSurface; i++)
+        for(uint32_t i = restStart; i < static_cast<uint32_t>(MaxPrimBatchPerSurface); i++)
         {
             result.alphaMaps.back()[i] = std::nullopt;
             result.cullFaceFlags.back()[i] = false;
-            result.materialKeys.back()[i] = MaterialKey::InvalidKey();
+            result.lightOrMatKeys.back()[i] = LightOrMatKey::InvalidKey();
             result.primRanges.back()[i] = Vector2ui(std::numeric_limits<uint32_t>::max());
         }
     };
@@ -769,14 +802,14 @@ LinearizedSurfaceData AcceleratorGroupT<PG>::LinearizeSurfaceData(const AccelGro
         result.instancePrimBatches.push_back(surf.primBatches);
         result.alphaMaps.emplace_back();
         result.cullFaceFlags.emplace_back();
-        result.materialKeys.emplace_back();
+        result.lightOrMatKeys.emplace_back();
         result.primRanges.emplace_back();
         result.transformKeys.emplace_back(TransformKey(static_cast<uint32_t>(surf.transformId)));;
 
         assert(surf.alphaMaps.size() == surf.cullFaceFlags.size());
         assert(surf.cullFaceFlags.size() == surf.materials.size());
         assert(surf.materials.size() == surf.primBatches.size());
-        for(size_t i = 0; i < surf.alphaMaps.size(); i++)
+        for(uint32_t i = 0; i < static_cast<uint32_t>(surf.alphaMaps.size()); i++)
         {
             if(surf.alphaMaps[i].has_value())
             {
@@ -785,12 +818,14 @@ LinearizedSurfaceData AcceleratorGroupT<PG>::LinearizeSurfaceData(const AccelGro
                 result.alphaMaps.back()[i] = std::get<AlphaMap>(view);
             }
             else result.alphaMaps.back()[i] = std::nullopt;
-
             result.cullFaceFlags.back()[i] = surf.cullFaceFlags[i];
-            result.materialKeys.back()[i] = MaterialKey(static_cast<CommonKey>(surf.materials[i]));
             result.primRanges.back()[i] = pg.BatchRange(surf.primBatches[i]);
+            MaterialKey mKey(static_cast<CommonKey>(surf.materials[i]));
+            result.lightOrMatKeys.back()[i] = LightOrMatKey::CombinedKey(IS_MAT_KEY_FLAG,
+                                                                         mKey.FetchBatchPortion(),
+                                                                         mKey.FetchIndexPortion());
         }
-        InitRest(surf.alphaMaps.size());
+        InitRest(static_cast<uint32_t>(surf.alphaMaps.size()));
     }
     // TODO: Sharing std::array<..> for lights is waste of space
     // Maybe enable multi-prim lights later
@@ -799,21 +834,26 @@ LinearizedSurfaceData AcceleratorGroupT<PG>::LinearizeSurfaceData(const AccelGro
     {
         result.alphaMaps.emplace_back();
         result.cullFaceFlags.emplace_back();
-        result.materialKeys.emplace_back();
+        result.lightOrMatKeys.emplace_back();
         result.primRanges.emplace_back();
 
         InitRest(0);
         PrimBatchId primBatchId = p.lightGroup->LightPrimBatch(lSurf.lightId);
         result.primRanges.back().front() = pg.BatchRange(primBatchId);
-        result.transformKeys.emplace_back(TransformKey(static_cast<uint32_t>(lSurf.transformId)));
-        result.instancePrimBatches.emplace_back().push_back(primBatchId);
+        result.transformKeys.back() = TransformKey(static_cast<uint32_t>(lSurf.transformId));
+        result.instancePrimBatches.back().front() = primBatchId;
+
+        LightKey lKey(static_cast<CommonKey>(lSurf.lightId));
+        result.lightOrMatKeys.back().front() = LightOrMatKey::CombinedKey(IS_LIGHT_KEY_FLAG,
+                                                                          lKey.FetchBatchPortion(),
+                                                                          lKey.FetchIndexPortion());
     }
-    assert(result.alphaMaps.size()             == totalSurfaceCount);
-    assert(result.cullFaceFlags.size()         == totalSurfaceCount);
-    assert(result.materialKeys.size()          == totalSurfaceCount);
-    assert(result.primRanges.size()            == totalSurfaceCount);
-    assert(result.transformKeys.size()         == totalSurfaceCount);
-    assert(result.instancePrimBatches.size()   == totalSurfaceCount);
+    assert(result.alphaMaps.size()              == totalSurfaceCount);
+    assert(result.cullFaceFlags.size()          == totalSurfaceCount);
+    assert(result.lightOrMatKeys.size()         == totalSurfaceCount);
+    assert(result.primRanges.size()             == totalSurfaceCount);
+    assert(result.transformKeys.size()          == totalSurfaceCount);
+    assert(result.instancePrimBatches.size()    == totalSurfaceCount);
     return result;
 }
 

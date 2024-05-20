@@ -79,9 +79,9 @@ struct VisorAction : public std::variant
                                     // "SceneAnalytics" struct
         CHANGE_TIME = 4,            // Change the time of the scene. Min max values are in
                                     // "SceneAnalytics" strcut
-        START_STOP_RENDER = 6,      // Start stop the rendering.
-        PAUSE_RENDER = 7,           // Pause the rendering
-        SEND_SYNC_SEMAPHORE = 8     // Send synchronization semaphore
+        START_STOP_RENDER = 5,      // Start stop the rendering.
+        PAUSE_RENDER = 6,           // Pause the rendering
+        SEND_SYNC_SEMAPHORE = 7     // Send synchronization semaphore
     };
     using Base::Base;
 };

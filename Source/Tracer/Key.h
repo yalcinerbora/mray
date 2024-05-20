@@ -19,11 +19,11 @@ class alignas(sizeof(T)) KeyT
     using Type = T;
 
     // Constants
-    static constexpr T  BatchBits = BBits;
-    static constexpr T  IdBits = IBits;
+    static constexpr T  BatchBits   = BBits;
+    static constexpr T  IdBits      = IBits;
 
-    static constexpr T  IdMask = (0x1ull << IdBits) - 1;
-    static constexpr T  BatchMask = ((0x1ull << BatchBits) - 1) << IdBits;
+    static constexpr T  BatchMask   = ((0x1ull << BatchBits) - 1) << IdBits;
+    static constexpr T  IdMask      = ((0x1ull << IdBits)    - 1) << 0;
 
     private:
     // Props
@@ -64,17 +64,17 @@ class alignas(sizeof(T)) TriKeyT
     using Type = T;
 
     // Constants
-    static constexpr T  FlagBits = FBits;
-    static constexpr T  BatchBits = BBits;
-    static constexpr T  IdBits = IBits;
+    static constexpr T  FlagBits    = FBits;
+    static constexpr T  BatchBits   = BBits;
+    static constexpr T  IdBits      = IBits;
 
-    static constexpr T  FlagMask = (0x1ull << FlagBits) - 1 << (FlagBits + IdBits);
-    static constexpr T  BatchMask = ((0x1ull << BatchBits) - 1) << IdBits;
-    static constexpr T  IdMask = (0x1ull << IdBits) - 1;
+    static constexpr T  FlagMask    = ((0x1ull << FlagBits)  - 1) << (BatchBits + IdBits);
+    static constexpr T  BatchMask   = ((0x1ull << BatchBits) - 1) << (IdBits);
+    static constexpr T  IdMask      = ((0x1ull << IdBits)    - 1) << 0;
 
     private:
     // Props
-    T                           value;
+    T                               value;
 
     public:
     // Constructors & Destructor
@@ -100,7 +100,7 @@ class alignas(sizeof(T)) TriKeyT
     static_assert((IdBits + BatchBits + FlagBits) == std::numeric_limits<T>::digits,
                   "Bits representing portions of HitKey should complement each other.");
     static_assert((IdMask | BatchMask | FlagMask) == std::numeric_limits<T>::max() &&
-                  (IdMask & BatchMask | FlagMask) == std::numeric_limits<T>::min(),
+                  (IdMask & BatchMask & FlagMask) == std::numeric_limits<T>::min(),
                   "Masks representing portions of HitKey should complement each other.");
 };
 
@@ -226,7 +226,7 @@ template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr TriKeyT<T, FB, BB, IB> TriKeyT<T, FB, BB, IB>::InvalidKey()
 {
-    return KeyT(std::numeric_limits<T>::max());
+    return TriKeyT(std::numeric_limits<T>::max());
 }
 
 // Format helpers for debugging
@@ -234,6 +234,16 @@ template<std::unsigned_integral T, uint32_t BB, uint32_t IB>
 auto format_as(const KeyT<T, BB, IB>& k)
 {
     std::string s = fmt::format("[{:0>{}b}|{:0>{}b}]",
+                                k.FetchBatchPortion(), BB,
+                                k.FetchIndexPortion(), IB);
+    return s;
+}
+
+template<std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
+auto format_as(const TriKeyT<T, FB, BB, IB>& k)
+{
+    std::string s = fmt::format("[{:0>{}b}|{:0>{}b}|{:0>{}b}]",
+                                k.FetchFlagPortion(), FB,
                                 k.FetchBatchPortion(), BB,
                                 k.FetchIndexPortion(), IB);
     return s;

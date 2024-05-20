@@ -70,12 +70,17 @@ using AccelWorkKey = KeyT<CommonKey, 8, 24>;
 using AcceleratorKey    = KeyT<CommonKey, 12, 20>;
 using PrimitiveKey      = KeyT<CommonKey, 4, 28>;
 using PrimBatchKey      = KeyT<CommonKey, 4, 28>;
-using MaterialKey       = KeyT<CommonKey, 10, 22>;
 using TransformKey      = KeyT<CommonKey, 8, 24>;
 using MediumKey         = KeyT<CommonKey, 8, 24>;
 using CameraKey         = KeyT<CommonKey, 8, 24>;
+using MaterialKey       = KeyT<CommonKey, 11, 21>;
 using LightKey          = MaterialKey;
-using LightOrMatKey     = LightKey;
+using LightOrMatKey     = TriKeyT<CommonKey, 1,
+                                  LightKey::BatchBits - 1,
+                                  LightKey::IdBits>;
+
+static constexpr CommonKey IS_MAT_KEY_FLAG = 0;
+static constexpr CommonKey IS_LIGHT_KEY_FLAG = 1;
 
 static_assert(std::is_same_v<LightKey, MaterialKey>,
               "Material and Light keys must match due to variant like usage");
@@ -107,11 +112,11 @@ struct alignas(HitKeyPackAlignment) HitKeyPack
 //    AcceleratorKey  accelId;
 //};
 
-template <class T>
+template <class HitType>
 struct IntersectionT
 {
-    Float   t;
-    T       hit;
+    HitType         hit;
+    Float           t;
 };
 
 struct BxDFResult

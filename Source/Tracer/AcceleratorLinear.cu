@@ -1,19 +1,42 @@
 #include "AcceleratorLinear.h"
 
-MRAY_KERNEL
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCIntersectBaseLinear(// Output
-                           Span<CommonKey> dAccelKeys,
+                           MRAY_GRID_CONSTANT const Span<CommonKey> dAccelKeys,
+                           // I-O
+                           MRAY_GRID_CONSTANT const Span<uint32_t> dTraverseIndices,
                            // Input
-                           Span<const RayGMem> dRays,
-                           Span<const RayIndex> dRayIndices,
+                           MRAY_GRID_CONSTANT const Span<const RayGMem> dRays,
+                           MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices,
                            // Constants
-                           size_t rayCount)
+                           MRAY_GRID_CONSTANT const Span<const AcceleratorKey> dLeafs,
+                           MRAY_GRID_CONSTANT const Span<const AABB3> dAABBs)
 {
+    assert(dAABBs.size() == dLeafs.size());
     KernelCallParams kp;
-    for(uint32_t globalId = kp.GlobalId(); globalId < rayCount;
-        globalId += kp.TotalSize())
+    uint32_t rayCount = static_cast<uint32_t>(dRayIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
     {
+        RayIndex index = dRayIndices[i];
+        auto [ray, tMM] = RayFromGMem(dRays, index);
 
+        AcceleratorKey foundKey = AcceleratorKey::InvalidKey();
+        // Linear search the next instance
+        uint32_t startIndex = dTraverseIndices[index];
+        uint32_t instanceCount = static_cast<uint32_t>(dAABBs.size());
+        for(uint32_t i = startIndex; i < instanceCount; i++)
+        {
+            AABB3 aabb = dAABBs[i];
+            if(ray.IntersectsAABB(aabb.Min(), aabb.Max(), tMM))
+            {
+                // Stop traversal delegate to the inner accelerator
+                foundKey = dLeafs[i];
+                // Save the iteration index
+                dTraverseIndices[index] = i + 1;
+                break;
+            }
+        }
+        dAccelKeys[index] = static_cast<CommonKey>(foundKey);
     }
 }
 
@@ -48,7 +71,6 @@ void BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instanc
     }
     // This is very simple "accelerator" so basically we are done
 }
-
 
 void BaseAcceleratorLinear::AllocateForTraversal(size_t maxRayCount)
 {
@@ -100,11 +122,14 @@ void BaseAcceleratorLinear::CastRays(// Output
             KernelIssueParams{.workCount = 0},
             // Output
             dCurrentKeys,
+            // I-O
+            dTraversalStack,
             // Input
             dRays,
             dCurrentIndices,
             // Constants
-            currentRayCount
+            ToConstSpan(dLeafs),
+            ToConstSpan(dAABBs)
         );
 
         static constexpr CommonKey IdBits = AcceleratorKey::IdBits;
