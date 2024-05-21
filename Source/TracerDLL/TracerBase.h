@@ -170,6 +170,8 @@ class TracerBase : public TracerI
     std::map<std::string_view, LightAttributeInfoList>      lightAttributeInfoMap;
     std::map<std::string_view, RendererAttributeInfoList>   rendererAttributeInfoMap;
 
+    void PopulateAttribInfoAndTypeLists();
+
     public:
                         TracerBase(BS::thread_pool&,
                                    const TypeGeneratorPack&);
@@ -180,6 +182,7 @@ class TracerBase : public TracerI
     TypeNameList        CameraGroups() const override;
     TypeNameList        MediumGroups() const override;
     TypeNameList        LightGroups() const override;
+    TypeNameList        Renderers() const override;
 
     PrimAttributeInfoList       AttributeInfo(PrimGroupId) const override;
     CamAttributeInfoList        AttributeInfo(CameraGroupId) const override;

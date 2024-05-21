@@ -414,11 +414,11 @@ Span<const Variant<std::monostate, L...>> MetaLightArray<Variant<TC...>, Variant
 }
 
 inline
-GenericGroupLightT::GenericGroupLightT(uint32_t groupId, const GPUSystem& gpuSystem,
+GenericGroupLightT::GenericGroupLightT(uint32_t groupId, const GPUSystem& s,
                                        const TextureViewMap& map,
                                        size_t allocationGranularity,
                                        size_t initialReservartionSize)
-    : Parent(groupId, gpuSystem, map,
+    : Parent(groupId, s, map,
              allocationGranularity,
              initialReservartionSize)
 {}
@@ -443,11 +443,11 @@ GenericGroupLightT::Reserve(const std::vector<AttributeCountList>& countArrayLis
 }
 
 template <class C>
-GenericGroupLight<C>::GenericGroupLight(uint32_t groupId, const GPUSystem&,
+GenericGroupLight<C>::GenericGroupLight(uint32_t groupId, const GPUSystem& sys,
                                         const TextureViewMap& map,
                                         size_t allocationGranularity,
                                         size_t initialReservartionSize)
-    : GenericGroupLightT(groupId, gpuSystem, map,
+    : GenericGroupLightT(groupId, sys, map,
                          allocationGranularity,
                          initialReservartionSize)
 {}

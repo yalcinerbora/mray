@@ -128,7 +128,7 @@ using GenericAttributeInfoList = StaticVector<GenericAttributeInfo,
                                               TracerConstants::MaxAttributePerGroup>;
 using TexturedAttributeInfoList = StaticVector<TexturedAttributeInfo,
                                                TracerConstants::MaxAttributePerGroup>;
-using TypeNameList = std::vector<std::string>;
+using TypeNameList = std::vector<std::string_view>;
 
 struct PrimAttributeStringifier
 {
@@ -302,6 +302,7 @@ class [[nodiscard]] TracerI
     virtual TypeNameList        CameraGroups() const = 0;
     virtual TypeNameList        MediumGroups() const = 0;
     virtual TypeNameList        LightGroups() const = 0;
+    virtual TypeNameList        Renderers() const = 0;
 
     virtual PrimAttributeInfoList       AttributeInfo(PrimGroupId) const = 0;
     virtual CamAttributeInfoList        AttributeInfo(CameraGroupId) const = 0;

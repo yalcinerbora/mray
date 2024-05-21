@@ -167,6 +167,8 @@ class VisorWindow
 
     void        StartRenderpass(const FramePack& frameHandle);
     void        StartCommandBuffer(const FramePack& frameHandle);
+    void        HandleGUIChanges(const GUIChanges&);
+
     public:
     // Constructors & Destructor
     // TODO: Imgui has global state but relates to glfwWindow.

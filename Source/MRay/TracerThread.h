@@ -23,10 +23,10 @@ class TracerThread final : public RealtimeThread
     std::map<std::string_view, SceneLoaderPtr>  sceneLoaders;
     SceneLoaderI*                               currentScene = nullptr;
 
-    bool        fatalErrorOccured   = false;
+    bool        isTerminated    = false;
     // Should we do polling or blocking fetch from the queue
     // During rendering, system goes to poll mode to render as fast as possible
-    bool        sleepMode           = true;
+    bool        isInSleepMode   = true;
 
     // Some states
     // TODO: I'm pretty sure this will get complicated really fast

@@ -940,9 +940,70 @@ ImFont* VisorWindow::CurrentFont()
     return FontAtlas::Instance().GetMonitorFont(x);
 }
 
+void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
+{
+    // Check the run state
+    if(changes.statusBarState.first)
+    {
+        RunState state = changes.statusBarState.first.value();
+        switch(state)
+        {
+            case RunState::RUNNING:
+            {
+                transferQueue->Enqueue(VisorAction
+                (
+                    std::in_place_index<VisorAction::START_STOP_RENDER>,
+                    true
+                ));
+                break;
+            }
+            case RunState::STOPPED:
+            {
+                transferQueue->Enqueue(VisorAction
+                (
+                    std::in_place_index<VisorAction::START_STOP_RENDER>,
+                    false
+                ));
+                break;
+            }
+            case RunState::PAUSED:
+            {
+                transferQueue->Enqueue(VisorAction
+                (
+                    std::in_place_index<VisorAction::PAUSE_RENDER>,
+                    true
+                ));
+                break;
+            }
+            default:
+                MRAY_LOG("WRONG!");
+                break;
+        }
+    }
+
+    if(changes.statusBarState.second)
+    {
+        int32_t camCount = static_cast<int32_t>(visorState.scene.cameraCount);
+        int32_t camOffset = changes.statusBarState.second.value();
+        int32_t newCamIndex = visorState.currentCameraIndex + camOffset;
+        newCamIndex = MathFunctions::Roll(newCamIndex, 0, camCount);
+        visorState.currentCameraIndex = newCamIndex;
+
+        transferQueue->Enqueue(VisorAction
+        (
+            std::in_place_index<VisorAction::CHANGE_CAMERA>,
+            newCamIndex
+        ));
+    }
+}
+
 void VisorWindow::Render()
 {
     if(stopPresenting) return;
+
+    //static uint64_t ijk = 0;
+    //MRAY_LOG("[Visor]: Loop {}", ijk);
+    //ijk++;
 
     //
     Optional<RenderBufferInfo>      newRenderBuffer;
@@ -1109,7 +1170,10 @@ void VisorWindow::Render()
     //     GUI RENDER     //
     // ================== //
     StartRenderpass(frameHandle);
-    gui.Render(CurrentFont(), visorState);
+    GUIChanges guiChanges = gui.Render(CurrentFont(), visorState);
+    HandleGUIChanges(guiChanges);
+
+
     // Draw the GUI
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
                                     frameHandle.commandBuffer);

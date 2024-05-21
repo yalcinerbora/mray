@@ -425,11 +425,11 @@ GenericTexturedGroupT<I, A>::ConvertToView(std::vector<Optional<TextureId>> texI
 
 
 template<class I, class A>
-GenericTexturedGroupT<I, A>::GenericTexturedGroupT(uint32_t groupId, const GPUSystem& gpuSystem,
+GenericTexturedGroupT<I, A>::GenericTexturedGroupT(uint32_t groupId, const GPUSystem& s,
                                                    const TextureViewMap& map,
                                                    size_t allocationGranularity,
                                                    size_t initialReservartionSize)
-    : Parent(groupId, gpuSystem,
+    : Parent(groupId, s,
              allocationGranularity,
              initialReservartionSize)
     , globalTextureViews(map)

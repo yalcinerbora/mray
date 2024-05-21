@@ -28,6 +28,10 @@ Expected<VisorConfig> LoadVisorConfig(const std::string& configJsonPath)
 {
     using namespace std::literals;
 
+
+
+
+
     // Object keys
     static constexpr auto DLL_NAME          = "VisorDLL"sv;
     static constexpr auto OPTIONS_NAME      = "VisorOptions"sv;
@@ -118,7 +122,9 @@ MRayError VisorCommand::Invoke()
 
     // Transfer queue, responsible for communication between main thread
     // (window render thread) and tracer thread
-    TransferQueue transferQueue(1, 1, [&visorSystem]()
+    TransferQueue transferQueue(visorConfig.commandBufferSize,
+                                visorConfig.responseBufferSize,
+    [&visorSystem]()
     {
         // Trigge event (on glfw) calls "glfwPostEmptyEvent()"
         // so that when tracer isses a response,
@@ -136,7 +142,6 @@ MRayError VisorCommand::Invoke()
     e = tracerThread.MTInitialize(tracerConfigFile);
     if(e) return e;
 
-
     // Actual initialization, process path should be called from here
     // In dll it may return .dll's path (on windows, I think)
     std::string processPath = GetProcessPath();
@@ -148,6 +153,14 @@ MRayError VisorCommand::Invoke()
 
     // Start the tracer thread
     tracerThread.Start();
+
+    // Initially send the scene to tracer
+    if(sceneFile)
+    {
+        using enum VisorAction::Type;
+        VisorAction va(std::in_place_index<LOAD_SCENE>, sceneFile.value());
+        transferQueue.GetVisorView().Enqueue(std::move(va));
+    }
 
     // ====================== //
     //     Real-time Loop     //
@@ -161,6 +174,7 @@ MRayError VisorCommand::Invoke()
     // GG!
     threadPool.wait();
     visorSystem->MTDestroy();
+    transferQueue.Terminate();
     tracerThread.Stop();
     return MRayError::OK;
 }
@@ -198,7 +212,7 @@ CLI::App* VisorCommand::GenApp(CLI::App& mainApp)
         ->expected(1);
 
     // TODO: Change this to be a region maybe?
-    visorApp->add_option("--resolution, -r"s, imgRes.AsArray(),
+    visorApp->add_option("--resolution, -r"s, imgRes,
                          "Initial renderer's resolution. "
                          "Requires a renderer to be set (optional)."s)
         ->check(CLI::Number)

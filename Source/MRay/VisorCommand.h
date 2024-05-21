@@ -5,12 +5,13 @@
 
 class VisorCommand : public CommandI
 {
+    using OptionalRes = Optional<std::array<uint32_t, 2>>;
     private:
-    std::string         tracerConfigFile    = "";
-    std::string         visorConfigFile     = "";
-    std::string         sceneFile           = "";
-    std::string         renderConfigFile    = "";
-    Vector2i            imgRes              = Vector2i::Zero();
+    std::string             tracerConfigFile    = "";
+    std::string             visorConfigFile     = "";
+    Optional<std::string>   sceneFile           = std::nullopt;
+    Optional<std::string>   renderConfigFile    = std::nullopt;
+    OptionalRes             imgRes              = std::array<uint32_t, 2>{0, 0};
 
     private:            VisorCommand() = default;
     public:

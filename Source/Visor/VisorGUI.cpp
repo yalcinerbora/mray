@@ -10,6 +10,27 @@
 
 #include "../Resources/Fonts/IcoMoonFontTable.h"
 
+const std::map<VisorUserAction, ImGuiKey> VisorGUI::DefaultKeyMap =
+{
+    { VisorUserAction::TOGGLE_TOP_BAR, ImGuiKey::ImGuiKey_M },
+    { VisorUserAction::TOGGLE_BOTTOM_BAR, ImGuiKey::ImGuiKey_N },
+    { VisorUserAction::NEXT_CAM, ImGuiKey::ImGuiKey_Keypad6 },
+    { VisorUserAction::PREV_CAM, ImGuiKey::ImGuiKey_Keypad4 },
+    { VisorUserAction::TOGGLE_MOVEMENT_LOCK, ImGuiKey::ImGuiKey_Keypad5 },
+    { VisorUserAction::PRINT_CUSTOM_CAMERA, ImGuiKey::ImGuiKey_KeypadDecimal },
+    { VisorUserAction::NEXT_RENDERER, ImGuiKey::ImGuiKey_Keypad9 },
+    { VisorUserAction::PREV_RENDERER, ImGuiKey::ImGuiKey_Keypad7 },
+    { VisorUserAction::NEXT_RENDERER_CUSTOM_LOGIC_0, ImGuiKey::ImGuiKey_Keypad3 },
+    { VisorUserAction::PREV_RENDERER_CUSTOM_LOGIC_0, ImGuiKey::ImGuiKey_Keypad1 },
+    { VisorUserAction::NEXT_RENDERER_CUSTOM_LOGIC_1, ImGuiKey::ImGuiKey_KeypadAdd },
+    { VisorUserAction::PREV_RENDERER_CUSTOM_LOGIC_1, ImGuiKey::ImGuiKey_KeypadSubtract },
+    { VisorUserAction::PAUSE_CONT_RENDER, ImGuiKey::ImGuiKey_P },
+    { VisorUserAction::START_STOP_TRACE, ImGuiKey::ImGuiKey_O },
+    { VisorUserAction::CLOSE, ImGuiKey::ImGuiKey_Escape },
+    { VisorUserAction::SAVE_IMAGE, ImGuiKey::ImGuiKey_G },
+    { VisorUserAction::SAVE_IMAGE_HDR, ImGuiKey::ImGuiKey_H }
+};
+
 namespace ImGui
 {
     bool ToggleButton(const char* name, bool& toggle)
@@ -68,22 +89,51 @@ void SetButtonState(bool& stopToggle,
     }
 }
 
-MainStatusBar::MainStatusBar()
-    : paused(false)
-    , running(true)
-    , stopped(false)
+MainStatusBar::MainStatusBar(const std::map<VisorUserAction, ImGuiKey>& km)
+    : keyMap(km)
+    , paused(false)
+    , running(false)
+    , stopped(true)
 {}
 
-Optional<RunState> MainStatusBar::Render(const VisorState& visorState)
+typename GUIChanges::StatusBarChanges
+MainStatusBar::Render(const VisorState& visorState)
 {
+    bool isChanged = false;
+    // Handle keyboard related inputs
+    if(ImGui::IsKeyPressed(keyMap.at(VisorUserAction::START_STOP_TRACE)))
+    {
+        if(!paused)
+        {
+            isChanged = true;
+            stopped = !stopped;
+            running = !running;
+        }
+        else
+        {
+            isChanged = true;
+            paused = false;
+            stopped = true;
+            running = false;
+        }
+    }
+    if(ImGui::IsKeyPressed(keyMap.at(VisorUserAction::PAUSE_CONT_RENDER)))
+    {
+        if(!stopped)
+        {
+            isChanged = true;
+            paused = !paused;
+            running = !running;
+        }
+    }
+
     using namespace std::string_literals;
     ImGuiWindowFlags window_flags = (ImGuiWindowFlags_NoScrollbar |
                                      ImGuiWindowFlags_NoSavedSettings |
                                      ImGuiWindowFlags_MenuBar);
     // Pre-init button state if it changed by keyboard
     //SetButtonState(stopped, running, paused, );
-
-    bool isChanged = false;
+    int32_t camChange = 0;
     float height = ImGui::GetFrameHeight();
     if(ImGui::BeginViewportSideBar("##MainStatusBar", NULL,
                                    ImGuiDir_Down, height,
@@ -126,19 +176,27 @@ Optional<RunState> MainStatusBar::Render(const VisorState& visorState)
                             (buttonSize * 5 + spacingSize * 6 + 2));
 
             ImGui::Separator();
-            ImGui::Button(ICON_ICOMN_ARROW_LEFT);
+            if(ImGui::Button(ICON_ICOMN_ARROW_LEFT) ||
+               ImGui::IsKeyPressed(keyMap.at(VisorUserAction::PREV_CAM)))
+            {
+                camChange--;
+            }
             if(ImGui::IsItemHovered() && GImGui->HoveredIdTimer > 1)
             {
                 ImGui::BeginTooltip();
-                ImGui::Text("Prev Frame");
+                ImGui::Text("Prev Camera");
                 ImGui::EndTooltip();
             }
 
-            ImGui::Button(ICON_ICOMN_ARROW_RIGHT);
+            if(ImGui::Button(ICON_ICOMN_ARROW_RIGHT) ||
+               ImGui::IsKeyPressed(keyMap.at(VisorUserAction::NEXT_CAM)))
+            {
+                camChange++;
+            }
             if(ImGui::IsItemHovered() && GImGui->HoveredIdTimer > 1)
             {
                 ImGui::BeginTooltip();
-                ImGui::Text("Next Frame");
+                ImGui::Text("Next Camera");
                 ImGui::EndTooltip();
             }
             ImGui::Separator();
@@ -175,8 +233,20 @@ Optional<RunState> MainStatusBar::Render(const VisorState& visorState)
     }
     ImGui::End();
 
+
+
     RunState newRunState = DetermineTracerState(stopped, running, paused);
-    return (isChanged) ? Optional<RunState>(newRunState) : std::nullopt;
+    auto runStateResult = (isChanged)
+                ? Optional<RunState>(newRunState)
+                : std::nullopt;
+    auto camIndexResult = (camChange != 0)
+                ? Optional<uint32_t>(camChange)
+                : std::nullopt;
+    return typename GUIChanges::StatusBarChanges
+    {
+       runStateResult,
+       camIndexResult
+    };
 }
 
 void VisorGUI::ShowFrameOverlay(bool& isOpen,
@@ -227,6 +297,11 @@ void VisorGUI::ShowFrameOverlay(bool& isOpen,
 
 void VisorGUI::ShowTopMenu(const VisorState& visorState)
 {
+    if(ImGui::IsKeyPressed(keyMap.at(VisorUserAction::TOGGLE_MOVEMENT_LOCK)))
+    {
+        camLocked = !camLocked;
+    }
+
     if(ImGui::BeginMainMenuBar())
     {
         if(tonemapperGUI) tonemapperGUI->Render();
@@ -234,9 +309,16 @@ void VisorGUI::ShowTopMenu(const VisorState& visorState)
         static constexpr const char* VISOR_INFO_NAME = "VisorInfo";
         float offsetX = (ImGui::GetWindowContentRegionMax().x -
                          ImGui::CalcTextSize(VISOR_INFO_NAME).x -
-                         ImGui::GetStyle().ItemSpacing.x * 3);
+                         ImGui::CalcTextSize(ICON_ICOMN_LOCK).x -
+                         ImGui::GetStyle().ItemSpacing.x * 4);
         ImGui::SameLine(offsetX);
         ImGui::Separator();
+
+        if(camLocked)
+            ImGui::Text(ICON_ICOMN_LOCK);
+        else
+            ImGui::Text(ICON_ICOMN_UNLOCKED);
+
         ImGui::ToggleButton(VISOR_INFO_NAME, fpsInfoOn);
         if(fpsInfoOn) ShowFrameOverlay(fpsInfoOn, visorState);
 
@@ -244,15 +326,15 @@ void VisorGUI::ShowTopMenu(const VisorState& visorState)
     }
 }
 
-Optional<RunState> VisorGUI::ShowStatusBar(const VisorState& visorState)
+typename GUIChanges::StatusBarChanges
+VisorGUI::ShowStatusBar(const VisorState& visorState)
 {
-
     return statusBar.Render(visorState);
-    // Acquire state
 }
 
-void VisorGUI::ShowMainImage()
+Optional<CameraTransform> VisorGUI::ShowMainImage()
 {
+    Optional<CameraTransform> result;
     static const ImGuiWindowFlags flags = (ImGuiWindowFlags_NoDecoration |
                                            ImGuiWindowFlags_NoMove |
                                            ImGuiWindowFlags_NoSavedSettings |
@@ -270,29 +352,45 @@ void VisorGUI::ShowMainImage()
     if(ImGui::Begin("MainWindow", nullptr, flags))
     {
         //ImGui::Image(std::bit_cast<ImTextureID>(mainImage), {256.0f, 256.0f});
+        if(ImGui::IsWindowFocused() && !camLocked)
+        {
+            //result = MovementScheme.
+        }
     }
     ImGui::End();
+    return result;
 }
 
-void VisorGUI::Render(ImFont* windowScaledFont, const VisorState& visorState)
+VisorGUI::VisorGUI(const std::map<VisorUserAction, ImGuiKey>* km)
+    : keyMap((km) ? *km : DefaultKeyMap)
+    , statusBar(keyMap)
+{}
+
+GUIChanges VisorGUI::Render(ImFont* windowScaledFont, const VisorState& visorState)
 {
+    GUIChanges guiChanges;
+
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     ImGui::PushFont(windowScaledFont);
 
-    if(ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_M))
+    if(ImGui::IsKeyPressed(keyMap.at(VisorUserAction::TOGGLE_TOP_BAR)))
         topBarOn = !topBarOn;
-    if(ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_N))
+    if(ImGui::IsKeyPressed(keyMap.at(VisorUserAction::TOGGLE_BOTTOM_BAR)))
         bottomBarOn = !bottomBarOn;
 
     if(topBarOn) ShowTopMenu(visorState);
-    if(bottomBarOn) ShowStatusBar(visorState);
-
+    if(bottomBarOn)
+    {
+        guiChanges.statusBarState = ShowStatusBar(visorState);
+    }
     ShowMainImage();
 
     ImGui::PopFont();
     ImGui::Render();
+
+    return guiChanges;
 }
 
 void VisorGUI::ChangeDisplayImage(const VulkanImage& img)

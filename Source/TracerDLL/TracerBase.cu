@@ -1,6 +1,81 @@
 #include "TracerBase.h"
 #include <BS/BS_thread_pool.hpp>
 
+// TODO: This is not good, we need to instantiate
+// to get the virtual function, change this later
+// (change this with what though?)
+template <class MapOut, class Map, class... Args>
+static void InstantiateAndGetAttribInfo(MapOut& result,
+                                        const Map& map,
+                                        Args&&... args)
+{
+    for(const auto& kv : map)
+    {
+        auto instance = kv.second(std::forward<Args>(args)...);
+        result.emplace(kv.first, instance->AttributeInfo());
+    }
+};
+
+void TracerBase::PopulateAttribInfoAndTypeLists()
+{
+    auto FlattenMapKeys = [](const auto& map)
+    {
+        TypeNameList list; list.reserve(map.size());
+        for(const auto& kv : map)
+            list.emplace_back(kv.first);
+        return list;
+    };
+
+    primTypes = FlattenMapKeys(typeGenerators.primGenerator);
+    camTypes = FlattenMapKeys(typeGenerators.camGenerator);
+    medTypes = FlattenMapKeys(typeGenerators.medGenerator);
+    matTypes = FlattenMapKeys(typeGenerators.matGenerator);
+    transTypes = FlattenMapKeys(typeGenerators.transGenerator);
+    lightTypes = FlattenMapKeys(typeGenerators.lightGenerator);
+    rendererTypes = FlattenMapKeys(typeGenerators.rendererGenerator);
+
+    //
+    InstantiateAndGetAttribInfo(primAttributeInfoMap,
+                                typeGenerators.primGenerator,
+                                0, gpuSystem);
+    InstantiateAndGetAttribInfo(camAttributeInfoMap,
+                                typeGenerators.camGenerator,
+                                0, gpuSystem);
+    InstantiateAndGetAttribInfo(medAttributeInfoMap,
+                                typeGenerators.medGenerator,
+                                0, gpuSystem, texViewMap);
+    InstantiateAndGetAttribInfo(matAttributeInfoMap,
+                                typeGenerators.matGenerator,
+                                0, gpuSystem, texViewMap);
+    InstantiateAndGetAttribInfo(transAttributeInfoMap,
+                                typeGenerators.transGenerator,
+                                0, gpuSystem);
+    InstantiateAndGetAttribInfo(rendererAttributeInfoMap,
+                                typeGenerators.rendererGenerator,
+                                gpuSystem);
+
+    // Light is special so write it by hand
+    // Find instantiate the prim again...
+    for(const auto& kv : typeGenerators.lightGenerator)
+    {
+        using namespace std::string_view_literals;
+        LightGroupPtr instance = nullptr;
+        if(kv.first.find("Prim"sv) != std::string_view::npos)
+        {
+            size_t loc = kv.first.find(TracerConstants::PRIM_PREFIX);
+            auto primType = kv.first.substr(loc);
+            auto pg = typeGenerators.primGenerator.at(primType)(0, gpuSystem);
+            instance = kv.second(0, gpuSystem, texViewMap, *pg.get());
+        }
+        else
+        {
+            PrimGroupEmpty pg(0, gpuSystem);
+            instance = kv.second(0, gpuSystem, texViewMap, pg);
+        }
+        lightAttributeInfoMap.emplace(kv.first, instance->AttributeInfo());
+    }
+}
+
 TracerBase::TracerBase(BS::thread_pool& tp,
                        const TypeGeneratorPack& tGen)
     : threadPool(tp)
@@ -40,6 +115,11 @@ TypeNameList TracerBase::MediumGroups() const
 TypeNameList TracerBase::LightGroups() const
 {
     return lightTypes;
+}
+
+TypeNameList TracerBase::Renderers() const
+{
+    return rendererTypes;
 }
 
 PrimAttributeInfoList TracerBase::AttributeInfo(PrimGroupId id) const

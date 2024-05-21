@@ -160,6 +160,7 @@ class TracerMock : public TracerI
     TypeNameList        CameraGroups() const override;
     TypeNameList        MediumGroups() const override;
     TypeNameList        LightGroups() const override;
+    TypeNameList        Renderers() const override;
 
     PrimAttributeInfoList       AttributeInfo(PrimGroupId) const override;
     CamAttributeInfoList        AttributeInfo(CameraGroupId) const override;
@@ -501,58 +502,69 @@ inline TracerMock::TracerMock(bool pl)
 
 inline TypeNameList TracerMock::PrimitiveGroups() const
 {
-    return std::vector<std::string>
+    using namespace std::string_view_literals;
+    return std::vector<std::string_view>
     {
-        "(P)Triangle",
-        "(P)TriangleSkinned"
+        "(P)Triangle"sv,
+        "(P)TriangleSkinned"sv
     };
 }
 
 inline TypeNameList TracerMock::MaterialGroups() const
 {
-    return std::vector<std::string>
+    using namespace std::string_view_literals;
+    return std::vector<std::string_view>
     {
-        "(Mt)Lambert",
-        "(Mt)Unreal"
+        "(Mt)Lambert"sv,
+        "(Mt)Unreal"sv
     };
 }
 
 inline TypeNameList TracerMock::TransformGroups() const
 {
-    return std::vector<std::string>
+    using namespace std::string_view_literals;
+    return std::vector<std::string_view>
     {
-        "(T)Identity",
-        "(T)Single",
-        "(T)Multi"
+        "(T)Identity"sv,
+        "(T)Single"sv,
+        "(T)Multi"sv
     };
 }
 
 inline TypeNameList TracerMock::CameraGroups() const
 {
-    return std::vector<std::string>
+    using namespace std::string_view_literals;
+    return std::vector<std::string_view>
     {
-        "(C)Pinhole"
+        "(C)Pinhole"sv
     };
 }
 
 inline TypeNameList TracerMock::MediumGroups() const
 {
-    return std::vector<std::string>
+    using namespace std::string_view_literals;
+    return std::vector<std::string_view>
     {
-        "(Md)Vacuum",
-        "(Md)Homogeneous"
+        "(Md)Vacuum"sv,
+        "(Md)Homogeneous"sv
     };
 }
 
 inline TypeNameList TracerMock::LightGroups() const
 {
-    return std::vector<std::string>
+    using namespace std::string_view_literals;
+    return std::vector<std::string_view>
     {
-        "(L)Null",
-        "(L)Skysphere",
-        "(L)Rectangle",
-        "(L)Primitive(P)Triangle"
+        "(L)Null"sv,
+        "(L)Skysphere"sv,
+        "(L)Rectangle"sv,
+        "(L)Prim(P)Triangle"sv
     };
+}
+
+TypeNameList TracerMock::Renderers() const
+{
+    return std::vector<std::string_view>{};
 }
 
 inline PrimAttributeInfoList TracerMock::AttributeInfo(PrimGroupId id) const

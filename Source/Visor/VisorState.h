@@ -21,4 +21,7 @@ struct VisorState
     TracerAnalyticData      tracer;
     VisorAnalyticData       visor;
     RendererAnalyticData    renderer;
+
+    // Internal state
+    int32_t                currentCameraIndex = 0;
 };

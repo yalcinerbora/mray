@@ -13,7 +13,12 @@ namespace MathFunctions
     template <std::floating_point T>
     MRAY_HYBRID constexpr T Lerp(T a, T b, T t);
     template <std::floating_point T>
-    MRAY_HYBRID T           Smoothstep(T a, T b, T t);
+    MRAY_HYBRID constexpr T Smoothstep(T a, T b, T t);
+
+    // TODO: Although not math, put it here
+    // Similar to clamp but rolls
+    template <std::integral T>
+    MRAY_HYBRID constexpr T Roll(T, T minVal, T maxVal);
 
     // This pattern comes out to0 many times due to
     // numeric calculations. It just prevents a to be negative.
@@ -35,6 +40,7 @@ template <std::integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr T MathFunctions::Clamp(T v, T minVal, T maxVal)
 {
+    assert(minVal < maxVal);
     v = (v < minVal) ? minVal : v;
     v = (v > maxVal) ? maxVal : v;
     return v;
@@ -44,6 +50,7 @@ template <std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 T MathFunctions::Clamp(T v, T minVal, T maxVal)
 {
+    assert(minVal < maxVal);
     return std::min(std::max(minVal, v), maxVal);
 }
 
@@ -51,16 +58,34 @@ template <std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr T MathFunctions::Lerp(T a, T b, T t)
 {
+    assert(t >= T(0) && t <= T(1));
     return a * (T{1} - t) + b * t;
 }
 
 template <std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-T MathFunctions::Smoothstep(T a, T b, T t)
+constexpr T MathFunctions::Smoothstep(T a, T b, T t)
 {
+    assert(t >= T(0) && t <= T(1));
     // https://en.wikipedia.org/wiki/Smoothstep
     t = Clamp((t - a) / (b - a), T{0}, T{1});
     return t * t * (T{3} - T{2} * t);
+}
+
+template <std::integral T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr T MathFunctions::Roll(T v, T min, T max)
+{
+    assert(min < max);
+    T diff = max - min;
+    v -= min;
+    v %= diff;
+    if constexpr(std::is_signed_v<T>)
+    {
+        v = (v < 0) ? diff + v : v;
+    }
+    v += min;
+    return v;
 }
 
 template <std::floating_point T>

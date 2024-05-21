@@ -97,12 +97,15 @@ class TransferQueue
         VisorTriggerCommand VisorTrigger;
 
         public:
-                        TracerView(TransferQueue&,
-                                   VisorTriggerCommand&&);
-        void            Dequeue(VisorAction&);
-        bool            TryDequeue(VisorAction&);
-        void            Enqueue(TracerResponse&&);
-        bool            TryEnqueue(TracerResponse&&);
+                TracerView(TransferQueue&,
+                           VisorTriggerCommand&&);
+        void    Dequeue(VisorAction&);
+        bool    TryDequeue(VisorAction&);
+        void    Enqueue(TracerResponse&&);
+        bool    TryEnqueue(TracerResponse&&);
+        //
+        void    Terminate();
+        bool    IsTerminated() const;
     };
 
     class VisorView
@@ -110,11 +113,14 @@ class TransferQueue
         private:
         TransferQueue&  tq;
         public:
-                        VisorView(TransferQueue&);
-        void            Dequeue(TracerResponse&);
-        bool            TryDequeue(TracerResponse&);
-        void            Enqueue(VisorAction&&);
-        bool            TryEnqueue(VisorAction&&);
+                VisorView(TransferQueue&);
+        void    Dequeue(TracerResponse&);
+        bool    TryDequeue(TracerResponse&);
+        void    Enqueue(VisorAction&&);
+        bool    TryEnqueue(VisorAction&&);
+        //
+        void    Terminate();
+        bool    IsTerminated() const;
     };
 
     private:
@@ -172,6 +178,15 @@ inline bool TransferQueue::TracerView::TryEnqueue(TracerResponse&& tr)
     return result;
 }
 
+inline void TransferQueue::TracerView::Terminate()
+{
+    tq.Terminate();
+}
+inline bool TransferQueue::TracerView::IsTerminated() const
+{
+    return tq.responses.IsTerminated() || tq.commands.IsTerminated();
+}
+
 inline TransferQueue::VisorView::VisorView(TransferQueue& t)
     : tq(t)
 {}
@@ -194,6 +209,16 @@ inline void TransferQueue::VisorView::Enqueue(VisorAction&& vc)
 inline bool TransferQueue::VisorView::TryEnqueue(VisorAction&& vc)
 {
     return tq.commands.TryEnqueue(std::move(vc));
+}
+
+inline void TransferQueue::VisorView::Terminate()
+{
+    tq.Terminate();
+}
+
+inline bool TransferQueue::VisorView::IsTerminated() const
+{
+    return tq.responses.IsTerminated() || tq.commands.IsTerminated();
 }
 
 inline TransferQueue::TracerView& TransferQueue::GetTracerView()

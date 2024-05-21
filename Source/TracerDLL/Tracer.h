@@ -41,4 +41,6 @@ inline Tracer::Tracer(BS::thread_pool& tp)
     // Related Types
 
 
+    // Finally Populate the lists
+    PopulateAttribInfoAndTypeLists();
 }
