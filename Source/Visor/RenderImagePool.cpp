@@ -6,16 +6,35 @@ void RenderImagePool::Clear()
 {
     if(!imgMemory) return;
 
+    // Now there may be a save process happening when a new
+    // Image is requested, we need to wait it to finish.
+    // We launched via "detach" so we dont have the
+    VkSemaphoreWaitInfo semWait =
+    {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .semaphoreCount = 1,
+        .pSemaphores = &saveSemaphore.semHandle,
+        .pValues = &saveSemaphore.value
+    };
+    vkWaitSemaphores(handlesVk->deviceVk, &semWait,
+                     std::numeric_limits<uint64_t>::max());
+
+
+    // Now we can unmap and free memory
     vkUnmapMemory(handlesVk->deviceVk, stageMemory);
     vkFreeMemory(handlesVk->deviceVk, imgMemory,
                  VulkanHostAllocator::Functions());
     vkFreeMemory(handlesVk->deviceVk, stageMemory,
                  VulkanHostAllocator::Functions());
 
+    vkDestroySemaphore(handlesVk->deviceVk, saveSemaphore.semHandle,
+                       VulkanHostAllocator::Functions());
     vkFreeCommandBuffers(handlesVk->deviceVk, handlesVk->mainCommandPool, 1,
-                             &hdrCopyCommand);
+                         &hdrCopyCommand);
     vkFreeCommandBuffers(handlesVk->deviceVk, handlesVk->mainCommandPool, 1,
-                             &sdrCopyCommand);
+                         &sdrCopyCommand);
 }
 
 RenderImagePool::RenderImagePool(BS::thread_pool* threadPool,
@@ -115,7 +134,7 @@ RenderImagePool::RenderImagePool(BS::thread_pool* threadPool,
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
         .pNext = nullptr,
         .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
-        .initialValue = semCounter
+        .initialValue = saveSemaphore.value
     };
     VkSemaphoreCreateInfo semCInfo =
     {
@@ -125,7 +144,7 @@ RenderImagePool::RenderImagePool(BS::thread_pool* threadPool,
     };
     vkCreateSemaphore(handlesVk->deviceVk, &semCInfo,
                       VulkanHostAllocator::Functions(),
-                      &saveSemaphore);
+                      &saveSemaphore.semHandle);
 }
 
 RenderImagePool::RenderImagePool(RenderImagePool&& other)
@@ -165,35 +184,65 @@ RenderImagePool::~RenderImagePool()
 
 void RenderImagePool::SaveImage(VkSemaphore prevCmdSignal,
                                 IsHDRImage t, const RenderImageSaveInfo& fileOutInfo)
+
 {
-    std::array<uint64_t, 2> copyStartedCounter = {semCounter, 0};
-    uint64_t copyFinishedCounter = semCounter + 1;
-    VkTimelineSemaphoreSubmitInfo tSemSubmitInfo =
+    // ============= //
+    //   SUBMISSON   //
+    // ============= //
+    uint64_t waitCounter = saveSemaphore.value;
+    uint64_t signalCounter = waitCounter + 1;
+    std::array<VkSemaphoreSubmitInfo, 2> waitSemaphores =
     {
-        .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
-        .pNext = nullptr,
-        .waitSemaphoreValueCount = 2,
-        .pWaitSemaphoreValues = copyStartedCounter.data(),
-        .signalSemaphoreValueCount = 1,
-        .pSignalSemaphoreValues = &copyFinishedCounter
+        VkSemaphoreSubmitInfo
+        {
+            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+            .pNext = nullptr,
+            .semaphore = prevCmdSignal,
+            .value = 0,
+            // TODO change this to more fine-grained later maybe?
+            .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            .deviceIndex = 0
+        },
+        VkSemaphoreSubmitInfo
+        {
+            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+            .pNext = nullptr,
+            .semaphore = saveSemaphore.semHandle,
+            .value = waitCounter,
+            // TODO change this to more fine-grained later maybe?
+            .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            .deviceIndex = 0
+        }
     };
-
-    //prevCmdSignal;
-    std::array<VkSemaphore, 2> waitSemaphores = {saveSemaphore, prevCmdSignal};
-    VkSubmitInfo submitInfo =
+    VkSemaphoreSubmitInfo signalSemaphores = waitSemaphores[1];
+    signalSemaphores.value = signalCounter;
+    VkCommandBufferSubmitInfo commandSubmitInfo =
     {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
         .pNext = nullptr,
-        .waitSemaphoreCount = 2,
-        .pWaitSemaphores = waitSemaphores.data(),
-        .commandBufferCount = 1,
-        .pCommandBuffers = (t == HDR) ? &hdrCopyCommand : &sdrCopyCommand,
-        .signalSemaphoreCount = 1,
-        .pSignalSemaphores = &saveSemaphore
+        .commandBuffer = (t == HDR) ? hdrCopyCommand : sdrCopyCommand,
+        .deviceMask = 0
     };
-    vkQueueSubmit(handlesVk->mainQueueVk, 1, &submitInfo, nullptr);
+    VkSubmitInfo2 submitInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+        .pNext = nullptr,
+        .flags = 0,
+        .waitSemaphoreInfoCount = 2,
+        .pWaitSemaphoreInfos = waitSemaphores.data(),
+        .commandBufferInfoCount = 1,
+        .pCommandBufferInfos = &commandSubmitInfo,
+        .signalSemaphoreInfoCount = 1,
+        .pSignalSemaphoreInfos = &signalSemaphores
+    };
+    // Finally submit!
+    vkQueueSubmit2(handlesVk->mainQueueVk, 1, &submitInfo, nullptr);
+    saveSemaphore.value++;
 
-    threadPool->detach_task([this, copyFinishedCounter, fileOutInfo, t]()
+    // Copy everything on the stack.
+    // Also copy semaphore and its value
+    // Now during this thread's process we may encounter
+    threadPool->detach_task([this, fileOutInfo, t, sem = saveSemaphore]()
     {
         VkSemaphoreWaitInfo waitInfo =
         {
@@ -201,8 +250,8 @@ void RenderImagePool::SaveImage(VkSemaphore prevCmdSignal,
             .pNext = nullptr,
             .flags = 0,
             .semaphoreCount = 1,
-            .pSemaphores = &saveSemaphore,
-            .pValues = &copyFinishedCounter
+            .pSemaphores = &sem.semHandle,
+            .pValues = &sem.value
         };
         vkWaitSemaphores(handlesVk->deviceVk, &waitInfo,
                          std::numeric_limits<uint64_t>::max());
@@ -247,19 +296,21 @@ void RenderImagePool::SaveImage(VkSemaphore prevCmdSignal,
                                               imgFileType);
 
         // Signal ready for next command
-        uint64_t nextCopyCanStartCounter = copyFinishedCounter + 1;
         VkSemaphoreSignalInfo signalInfo =
         {
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO,
             .pNext = nullptr,
-            .semaphore = saveSemaphore,
-            .value = nextCopyCanStartCounter
+            .semaphore = sem.semHandle,
+            .value = sem.value + 1
         };
+        // Signal the next save state, even if there is an error
         vkSignalSemaphore(handlesVk->deviceVk, &signalInfo);
 
-        // Signal the next save state, even if there is an error
+        // Log the error
         if(e) MRAY_ERROR_LOG("{}", e.GetError());
     });
 
-    semCounter++;
+    // Our next wait will be twice as high from prev
+    // Increment once more
+    saveSemaphore.value++;
 }

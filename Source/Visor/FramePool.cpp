@@ -122,24 +122,73 @@ FramePack FramePool::AcquireNextFrame(Swapchain& swapchain)
     return framePack;
 }
 
-void FramePool::PresentThisFrame(Swapchain& swapchain)
+void FramePool::PresentThisFrame(Swapchain& swapchain,
+                                 const Optional<SemaphoreVariant>& waitSemOverride)
 {
     VkSemaphore imgAvailSem = semaphores[frameIndex].imageAvailableSignal;
     VkSemaphore comRecordSem = semaphores[frameIndex].commandsRecordedSignal;
+
+    // ============= //
+    //   SUBMISSON   //
+    // ============= //
+    uint64_t waitCounter = 0;
+    if(waitSemOverride)
+        waitCounter = waitSemOverride.value().Value();
+
     VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    VkSubmitInfo submitInfo =
+    VkSemaphoreSubmitInfo waitSemaphores =
     {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
         .pNext = nullptr,
-        .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &imgAvailSem,
-        .pWaitDstStageMask = &waitStage,
-        .commandBufferCount = 1,
-        .pCommandBuffers = &cBuffers[frameIndex],
-        .signalSemaphoreCount = 1,
-        .pSignalSemaphores = &comRecordSem,
+        .semaphore = (waitSemOverride)
+                        ? waitSemOverride.value().semHandle
+                        : imgAvailSem,
+        .value = waitCounter,
+        // TODO change this to more fine-grained later maybe?
+        .stageMask = waitStage,
+        .deviceIndex = 0
     };
-    vkQueueSubmit(mainQueueVk, 1, &submitInfo, fences[frameIndex]);
+    VkSemaphoreSubmitInfo signalSemaphores = waitSemaphores;
+    signalSemaphores.value = 0;
+    signalSemaphores.semaphore = comRecordSem;
+    VkCommandBufferSubmitInfo commandSubmitInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+        .pNext = nullptr,
+        .commandBuffer = cBuffers[frameIndex],
+        .deviceMask = 0
+
+    };
+    VkSubmitInfo2 submitInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+        .pNext = nullptr,
+        .flags = 0,
+        .waitSemaphoreInfoCount = 1,
+        .pWaitSemaphoreInfos = &waitSemaphores,
+        .commandBufferInfoCount = 1,
+        .pCommandBufferInfos = &commandSubmitInfo,
+        .signalSemaphoreInfoCount = 1,
+        .pSignalSemaphoreInfos = &signalSemaphores
+    };
+    // Finally submit!
+    vkQueueSubmit2(mainQueueVk, 1, &submitInfo, fences[frameIndex]);
+
+    //VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    //VkSubmitInfo submitInfo =
+    //{
+    //    .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+    //    .pNext = nullptr,
+    //    .waitSemaphoreCount = 1,
+    //    .pWaitSemaphores = &imgAvailSem,
+    //    .pWaitDstStageMask = &waitStage,
+    //    .commandBufferCount = 1,
+    //    .pCommandBuffers = &cBuffers[frameIndex],
+    //    .signalSemaphoreCount = 1,
+    //    .pSignalSemaphores = &comRecordSem,
+    //};
+    //vkQueueSubmit(mainQueueVk, 1, &submitInfo, fences[frameIndex]);
+
     swapchain.PresentFrame(comRecordSem);
     frameIndex = (frameIndex + 1) % FRAME_COUNT;
 }
@@ -161,6 +210,6 @@ VkCommandBuffer FramePool::AllocateCommandBuffer() const
 
 VkSemaphore FramePool::PrevFrameFinishSignal()
 {
-    uint32_t prevFrame = std::max(frameIndex - 1, FRAME_COUNT - 1);
+    int32_t prevFrame = MathFunctions::Roll(frameIndex - 1, 0, FRAME_COUNT);
     return semaphores[prevFrame].imageAvailableSignal;
 }

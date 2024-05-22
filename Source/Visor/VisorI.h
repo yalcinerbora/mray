@@ -8,9 +8,10 @@ using namespace std::string_literals;
 class TransferQueue;
 namespace BS { class thread_pool; }
 
-enum ImGuiKey : int;
+// This is basically ImGui stuff
+using VisorInputType = int;
 
-enum class VisorUserAction
+enum class VisorUserAction : int
 {
     TOGGLE_TOP_BAR,
     TOGGLE_BOTTOM_BAR,
@@ -19,6 +20,9 @@ enum class VisorUserAction
     PREV_CAM,
     TOGGLE_MOVEMENT_LOCK,
     PRINT_CUSTOM_CAMERA,
+
+    NEXT_MOVEMENT,
+    PREV_MOVEMENT,
 
     NEXT_RENDERER,
     PREV_RENDERER,
@@ -36,26 +40,42 @@ enum class VisorUserAction
 
     // On-demand img-save
     SAVE_IMAGE,
-    SAVE_IMAGE_HDR
+    SAVE_IMAGE_HDR,
+
+    // Movement Related
+    // TODO: We need to distinguish the key action and mouse action
+    // since Imgui has seperate function for mouse and key.
+    // Currently but "MOUSE_" prefix here for verbosity
+    //
+    MOUSE_ROTATE_MODIFIER,
+    MOUSE_TRANSLATE_MODIFIER,
+    //
+    MOVE_FORWARD,
+    MOVE_BACKWARD,
+    MOVE_RIGHT,
+    MOVE_LEFT,
+    FAST_MOVE_MODIFIER
 };
+
+using VisorKeyMap = std::map<VisorUserAction, VisorInputType>;
 
 struct VisorConfig
 {
     // DLL Related
-    std::string         dllName;
-    std::string         dllCreateFuncName = "ConstructVisor"s;
-    std::string         dllDeleteFuncName = "DestroyVisor"s;
+    std::string dllName;
+    std::string dllCreateFuncName = "ConstructVisor"s;
+    std::string dllDeleteFuncName = "DestroyVisor"s;
     // Window Related
-    bool                enforceIGPU = true;
-    bool                displayHDR  = true;
-    bool                realTime    = false;
-    Vector2i            wSize       = Vector2i(1280, 720);
+    bool        enforceIGPU = true;
+    bool        displayHDR  = true;
+    bool        realTime    = false;
+    Vector2i    wSize       = Vector2i(1280, 720);
     // Technical
-    uint32_t            commandBufferSize   = 8;
-    uint32_t            responseBufferSize  = 8;
+    uint32_t    commandBufferSize   = 8;
+    uint32_t    responseBufferSize  = 8;
 
     // TODO: Move the default keymap to somwhere else
-    std::map<VisorUserAction, ImGuiKey> keyMap;
+    VisorKeyMap keyMap;
 };
 
 class VisorI

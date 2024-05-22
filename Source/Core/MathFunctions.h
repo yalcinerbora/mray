@@ -17,7 +17,7 @@ namespace MathFunctions
 
     // TODO: Although not math, put it here
     // Similar to clamp but rolls
-    template <std::integral T>
+    template <std::signed_integral T>
     MRAY_HYBRID constexpr T Roll(T, T minVal, T maxVal);
 
     // This pattern comes out to0 many times due to
@@ -72,7 +72,7 @@ constexpr T MathFunctions::Smoothstep(T a, T b, T t)
     return t * t * (T{3} - T{2} * t);
 }
 
-template <std::integral T>
+template <std::signed_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr T MathFunctions::Roll(T v, T min, T max)
 {
@@ -80,10 +80,7 @@ constexpr T MathFunctions::Roll(T v, T min, T max)
     T diff = max - min;
     v -= min;
     v %= diff;
-    if constexpr(std::is_signed_v<T>)
-    {
-        v = (v < 0) ? diff + v : v;
-    }
+    v = (v < 0) ? diff + v : v;
     v += min;
     return v;
 }

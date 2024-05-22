@@ -23,5 +23,8 @@ struct VisorState
     RendererAnalyticData    renderer;
 
     // Internal state
-    int32_t                currentCameraIndex = 0;
+    int32_t                 currentCameraIndex = 0;
+    int32_t                 currentRenderIndex = 0;
+    int32_t                 currentRenderLogic0 = 0;
+    int32_t                 currentRenderLogic1 = 0;
 };

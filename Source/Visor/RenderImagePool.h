@@ -37,8 +37,7 @@ class RenderImagePool
     VkCommandBuffer         sdrCopyCommand  = nullptr;
     BS::thread_pool*        threadPool      = nullptr;
     ImageLoaderIPtr         imgLoader;
-    VkSemaphore             saveSemaphore   = nullptr;
-    uint64_t                semCounter      = 0;
+    SemaphoreVariant        saveSemaphore   = {0, nullptr};
     //
     RenderImageInitInfo     initInfo;
 

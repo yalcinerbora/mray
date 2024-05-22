@@ -24,6 +24,7 @@ AccumImageStage::AccumImageStage(AccumImageStage&& other)
     , pipeline(std::move(other.pipeline))
     , hdrImage(other.hdrImage)
     , sampleImage(other.sampleImage)
+    , accumulateCommand(std::exchange(other.accumulateCommand, nullptr))
 {}
 
 AccumImageStage& AccumImageStage::operator=(AccumImageStage&& other)
@@ -40,6 +41,7 @@ AccumImageStage& AccumImageStage::operator=(AccumImageStage&& other)
     pipeline = std::move(other.pipeline);
     hdrImage = other.hdrImage;
     sampleImage = other.sampleImage;
+    accumulateCommand = std::exchange(other.accumulateCommand, nullptr);
     return *this;
 }
 
@@ -110,8 +112,6 @@ MRayError AccumImageStage::Initialize(const std::string& execPath)
     }
     #endif
 
-
-
     using namespace std::string_literals;
     MRayError e = pipeline.Initialize(
     {
@@ -127,6 +127,18 @@ MRayError AccumImageStage::Initialize(const std::string& execPath)
     if(e) return e;
 
     descriptorSets = pipeline.GenerateDescriptorSets(handlesVk->mainDescPool);
+
+    // Allocate Command buffer
+    VkCommandBufferAllocateInfo cBuffAllocInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .pNext = nullptr,
+        .commandPool = handlesVk->mainCommandPool,
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        .commandBufferCount = 1
+    };
+    vkAllocateCommandBuffers(handlesVk->deviceVk, &cBuffAllocInfo,
+                             &accumulateCommand);
 
     return MRayError::OK;
 }
@@ -155,6 +167,9 @@ void AccumImageStage::Clear()
     #endif
     vkDestroySemaphore(handlesVk->deviceVk, timelineSemaphoreVk,
                        VulkanHostAllocator::Functions());
+    vkFreeCommandBuffers(handlesVk->deviceVk,
+                         handlesVk->mainCommandPool, 1,
+                         &accumulateCommand);
 }
 
 void AccumImageStage::ImportExternalHandles(const RenderBufferInfo& rbI)
@@ -256,10 +271,11 @@ void AccumImageStage::ChangeImage(const VulkanImage* hdrImageIn,
 
     vkUpdateDescriptorSets(handlesVk->deviceVk,
                            2, writeInfo.data(), 0, nullptr);
+
 }
 
-void AccumImageStage::IssueAccumulation(VkCommandBuffer cmd,
-                                        const RenderImageSection& section)
+SemaphoreVariant AccumImageStage::IssueAccumulation(VkSemaphore prevCmdSignal,
+                                                    const RenderImageSection& section)
 {
     UniformBuffer buffer =
     {
@@ -309,37 +325,74 @@ void AccumImageStage::IssueAccumulation(VkCommandBuffer cmd,
     // ============= //
     //    DISPATCH   //
     // ============= //
-    uint64_t waitCounter = section.waitCounter + 1;
-    uint64_t signalCounter = section.waitCounter + 1;
-    // TODO: Overwhelmed by Vulkan ...
-    // doing a CPU sync here, maybe GPU sync?
-    // pre-record command buffer and submit via semaphores
-    VkSemaphoreWaitInfo wInfo =
+    // Record command buffer
+    VkCommandBufferBeginInfo bInfo =
     {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .pNext = nullptr,
-        .flags = 0,
-        .semaphoreCount = 1,
-        .pSemaphores = &timelineSemaphoreVk,
-        .pValues = &waitCounter
+        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+        .pInheritanceInfo = nullptr
     };
-    vkWaitSemaphores(handlesVk->deviceVk, &wInfo,
-                     std::numeric_limits<uint64_t>::max());
-    //
+    vkBeginCommandBuffer(accumulateCommand, &bInfo);
     Vector2ui totalPix = section.pixelMax - section.pixelMin;
     Vector2ui TPB = Vector2ui(VulkanComputePipeline::TPB_2D_X,
                               VulkanComputePipeline::TPB_2D_Y);
     Vector2ui groupSize = (totalPix + TPB - Vector2ui(1)) / TPB;
-    vkCmdDispatch(cmd, groupSize[0], groupSize[1], 1);
-    //
-    VkSemaphoreSignalInfo sInfo =
+    vkCmdDispatch(accumulateCommand, groupSize[0], groupSize[1], 1);
+    vkEndCommandBuffer(accumulateCommand);
+
+    // ============= //
+    //   SUBMISSON   //
+    // ============= //
+    uint64_t waitCounter = section.waitCounter;
+    uint64_t signalCounter = section.waitCounter + 1;
+    std::array<VkSemaphoreSubmitInfo, 2> waitSemaphores =
     {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO,
-        .pNext = nullptr,
-        .semaphore = timelineSemaphoreVk,
-        .value = signalCounter
+        VkSemaphoreSubmitInfo
+        {
+            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+            .pNext = nullptr,
+            .semaphore = timelineSemaphoreVk,
+            .value = waitCounter,
+            // TODO change this to more fine-grained later maybe?
+            .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            .deviceIndex = 0
+        },
+        VkSemaphoreSubmitInfo
+        {
+            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+            .pNext = nullptr,
+            .semaphore = prevCmdSignal,
+            .value = 0,
+            // TODO change this to more fine-grained later maybe?
+            .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            .deviceIndex = 0
+        },
     };
-    vkSignalSemaphore(handlesVk->deviceVk, &sInfo);
+    VkSemaphoreSubmitInfo signalSemaphores = waitSemaphores[0];
+    signalSemaphores.value = signalCounter;
+    VkCommandBufferSubmitInfo commandSubmitInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+        .pNext = nullptr,
+        .commandBuffer = accumulateCommand,
+        .deviceMask = 0
+    };
+    VkSubmitInfo2 submitInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+        .pNext = nullptr,
+        .flags = 0,
+        .waitSemaphoreInfoCount = 2,
+        .pWaitSemaphoreInfos = waitSemaphores.data(),
+        .commandBufferInfoCount = 1,
+        .pCommandBufferInfos = &commandSubmitInfo,
+        .signalSemaphoreInfoCount = 1,
+        .pSignalSemaphoreInfos = &signalSemaphores
+    };
+    // Finally submit!
+    vkQueueSubmit2(handlesVk->mainQueueVk, 1, &submitInfo, nullptr);
+    return SemaphoreVariant{signalCounter, timelineSemaphoreVk};
 }
 
 SystemSemaphoreHandle AccumImageStage::GetSemaphoreOSHandle() const

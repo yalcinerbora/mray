@@ -171,11 +171,18 @@ MRayError VisorCommand::Invoke()
         visorSystem->MTRender();
     }
 
-    // GG!
+    // Order is important here
+    // First wait the thread pool
     threadPool.wait();
-    visorSystem->MTDestroy();
+    // Destroy the transfer queue
+    // So that the tracer can drop from queue wait
     transferQueue.Terminate();
+    // First stop the tracer, since tracer commands
+    // submit glfw "empty event" to trigger visor rendering
     tracerThread.Stop();
+    // Now we can destory the tracer
+    visorSystem->MTDestroy();
+    // All Done!
     return MRayError::OK;
 }
 

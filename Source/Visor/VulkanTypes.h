@@ -5,6 +5,7 @@
 
 #include "Core/Vector.h"
 #include "Core/DataStructures.h"
+#include "Core/Types.h"
 
 #include "VulkanAllocators.h"
 
@@ -13,6 +14,17 @@ namespace VkConversions
     Pair<MRayColorSpaceEnum, Float>
     VkToMRayColorSpace(VkColorSpaceKHR);
 }
+
+struct SemaphoreVariant
+{
+    uint64_t    value = std::numeric_limits<uint64_t>::max();
+    VkSemaphore semHandle = nullptr;
+    //
+    bool Value() const
+    {
+        return (value != std::numeric_limits<uint64_t>::max()) ? value : 0;
+    }
+};
 
 
 struct VulkanSystemView

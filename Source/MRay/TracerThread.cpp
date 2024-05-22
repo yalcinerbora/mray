@@ -64,12 +64,16 @@ void TracerThread::LoopWork()
 {
     Optional<CameraTransform>       transform;
     Optional<uint32_t>              rendererIndex;
+    Optional<uint32_t>              renderLogic0;
+    Optional<uint32_t>              renderLogic1;
     Optional<uint32_t>              cameraIndex;
     Optional<std::string>           scenePath;
+    Optional<SystemSemaphoreHandle> syncSem;
     Optional<Float>                 time;
     Optional<bool>                  pauseContinue;
     Optional<bool>                  startStop;
-    Optional<SystemSemaphoreHandle> syncSem;
+    bool                            hdrSaveDemand = false;
+    bool                            sdrSaveDemand = false;
 
     auto ProcessCommand = [&](VisorAction command)
     {
@@ -82,9 +86,13 @@ void TracerThread::LoopWork()
             case CHANGE_CAMERA: cameraIndex = std::get<CHANGE_CAMERA>(command); break;
             case CHANGE_CAM_TRANSFORM: transform = std::get<CHANGE_CAM_TRANSFORM>(command); break;
             case CHANGE_RENDERER: rendererIndex = std::get<CHANGE_RENDERER>(command); break;
+            case CHANGE_RENDER_LOGIC0: renderLogic0 = std::get<CHANGE_RENDER_LOGIC0>(command); break;
+            case CHANGE_RENDER_LOGIC1: renderLogic1 = std::get<CHANGE_RENDER_LOGIC1>(command); break;
             case CHANGE_TIME: time = std::get<CHANGE_TIME>(command); break;
             case LOAD_SCENE: scenePath = std::get<LOAD_SCENE>(command); break;
             case SEND_SYNC_SEMAPHORE: syncSem = std::get<SEND_SYNC_SEMAPHORE>(command); break;
+            case DEMAND_HDR_SAVE: hdrSaveDemand = true; break;
+            case DEMAND_SDR_SAVE: sdrSaveDemand = true; break;
             case PAUSE_RENDER:
             {
                 pauseContinue = std::get<PAUSE_RENDER>(command);
@@ -99,8 +107,8 @@ void TracerThread::LoopWork()
             }
             default:
             {
-                MRAY_ERROR_LOG("Unknown command Id!");
-                isTerminated = true;
+                MRAY_WARNING_LOG("[Tracer] Unkown visor action is ignored!");
+                break;
             }
         }
         return stopConsuming;
@@ -148,9 +156,9 @@ void TracerThread::LoopWork()
             std::in_place_index<TracerResponse::CAMERA_INIT_TRANSFORM>,
             CameraTransform
             {
-                .position = Vector3(1, 2, 3),
-                .gazePoint = Vector3(4, 5, 6),
-                .up = Vector3(7, 8, 9)
+                .position = Vector3::Zero(),
+                .gazePoint = Vector3(0, 0, -1),
+                .up = Vector3(0, 1, 0)
             }
         ));
 
@@ -167,12 +175,11 @@ void TracerThread::LoopWork()
                 .textureCount = 7,
                 .surfaceCount = 9,
                 .cameraCount = 11,
-                .sceneExtent = AABB3::Negative(),
+                .sceneExtent = AABB3(Vector3(0.0, 0.0, 0.0),
+                                     Vector3(10.0, 10.0, 10.0)),
                 .timeRange = Vector2(1, 10)
             }
         ));
-
-        //tracer->Renderers
 
         // Send Tracer Analytics
         transferQueue.Enqueue(TracerResponse
@@ -185,7 +192,14 @@ void TracerThread::LoopWork()
                 .primTypes = {{"C", 1}},
                 .mediumTypes = {{"D", 1}},
                 .materialTypes = {{"E", 1}},
-                .rendererTypes = {"F", "G", "H", "I"},
+                .rendererTypes =
+                {
+                    "TexDisplay",
+                    "DirectTracer",
+                    "PathTracer",
+                    "AOTracer",
+                    "PhotonMapper"
+                },
                 .tracerColorSpace = MRayColorSpaceEnum::MR_ACES_CG,
                 .totalGPUMemoryMiB = 8000.0,
                 .usedGPUMemoryMiB = 100.0
@@ -215,9 +229,9 @@ void TracerThread::LoopWork()
             std::in_place_index<TracerResponse::CAMERA_INIT_TRANSFORM>,
             CameraTransform
             {
-                .position = Vector3(1, 2, 3),
-                .gazePoint = Vector3(4, 5, 6),
-                .up = Vector3(7, 8, 9)
+                .position = Vector3::Zero(),
+                .gazePoint = Vector3(0, 0, -1),
+                .up = Vector3(0, 1, 0)
             }
         ));
 
@@ -241,7 +255,7 @@ void TracerThread::LoopWork()
     if(transform)
     {
         const auto& t = transform.value();
-        MRAY_LOG("[Tracer]: NewTransform {}, {}, {}",
+        MRAY_LOG("[Tracer]: NewTransform G{}, P{}, U{}",
                  t.gazePoint,
                  t.position,
                  t.up);
@@ -254,8 +268,6 @@ void TracerThread::LoopWork()
     if(rendererIndex)
     {
         MRAY_LOG("[Tracer]: NewRenderer {}", rendererIndex.value());
-        // Stop rendering
-
         //// Initial cam transform
         //transferQueue.Enqueue(TracerResponse
         //(
@@ -267,6 +279,46 @@ void TracerThread::LoopWork()
         //        .up = Vector3(7, 8, 9)
         //    }
         //));
+    }
+
+    if(renderLogic0)
+    {
+        MRAY_LOG("[Tracer]: NewRenderLogic0 {}", renderLogic0.value());
+    }
+
+    if(renderLogic1)
+    {
+        MRAY_LOG("[Tracer]: NewRenderLogic1 {}", renderLogic1.value());
+    }
+
+    if(hdrSaveDemand)
+    {
+        MRAY_LOG("[Tracer]: Delegate HDR save");
+        transferQueue.Enqueue(TracerResponse
+        (
+            std::in_place_index<TracerResponse::SAVE_AS_HDR>,
+            RenderImageSaveInfo
+            {
+                .prefix = "exr",
+                .time = 3.0f,
+                .sample = 13
+            }
+        ));
+    }
+
+    if(sdrSaveDemand)
+    {
+        MRAY_LOG("[Tracer]: Delegate SDR save");
+        transferQueue.Enqueue(TracerResponse
+        (
+            std::in_place_index<TracerResponse::SAVE_AS_SDR>,
+            RenderImageSaveInfo
+            {
+                .prefix = "png",
+                .time = 3.0f,
+                .sample = 13
+            }
+        ));
     }
 
     // New time!
@@ -282,12 +334,14 @@ void TracerThread::LoopWork()
     {
         isInSleepMode = pauseContinue.value();
         MRAY_LOG("[Tracer]: Pause/Cont {}", pauseContinue.value());
+        isRendering = false;
     }
 
     // Start/Stop!
     if(startStop)
     {
         isInSleepMode = !startStop.value();
+        isRendering = startStop.value();
         MRAY_LOG("[Tracer]: Start/Stop {}", startStop.value());
     }
 
@@ -296,17 +350,37 @@ void TracerThread::LoopWork()
         MRAY_LOG("[Tracer]: NewSem {}", syncSem.value());
     }
 
-    static uint64_t i = 0;
-    MRAY_LOG("[Tracer]: Loop {}", i);
-    i++;
+    //static uint64_t i = 0;
+    //MRAY_LOG("[Tracer]: Loop {}", i);
+    //i++;
 
-    //// If we are rendering continue...
-    //if(isRendering)
-    //{
-    //    //RendererOutput renderOut = tracer->DoRenderWork();
-    //    //if(renderOut.analytics) transferQueue.Enqueue(renderOut.analytics.value());
-    //    //if(renderOut.imageOut) transferQueue.Enqueue(renderOut.imageOut.value());
-    //}
+    // If we are rendering continue...
+    if(isRendering)
+    {
+        RendererOutput renderOut; // = tracer->DoRenderWork();
+        // if(renderOut.analytics)
+        // if(renderOut.imageOut)
+
+        transferQueue.Enqueue(TracerResponse
+        (
+            std::in_place_index<TracerResponse::RENDERER_ANALYTICS>,
+            RendererAnalyticData
+            {
+                .throughput = 3.32,
+                .throughputSuffix = "M rays/sec",
+                .workPerPixel = 512,
+                .workPerPixelSuffix = "spp",
+                .iterationTimeMS = 20,
+                .renderResolution = Vector2ui(1920, 1080),
+                .outputColorSpace = MRayColorSpaceEnum::MR_ACES_CG,
+                .customLogicSize0 = 3,
+                .customLogicSize1 = 10
+            }
+        ));
+
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(3ms);
+    }
 
 
     // Here check the queue's situation
@@ -315,7 +389,36 @@ void TracerThread::LoopWork()
 }
 
 void TracerThread::InitialWork()
-{}
+{
+    // Do a handshake
+    // Send the initial tracer state
+
+    //tracer->
+    //transferQueue.Enqueue(TracerResponse
+    //(
+    //    std::in_place_index<TracerResponse::TRACER_ANALYTICS>,
+    //    TracerAnalyticData
+    //    {
+    //        .camTypes = {{"A", 1}},
+    //        .lightTypes = {{"B", 1}},
+    //        .primTypes = {{"C", 1}},
+    //        .mediumTypes = {{"D", 1}},
+    //        .materialTypes = {{"E", 1}},
+    //        .rendererTypes =
+    //        {
+    //            "TexDisplay",
+    //            "DirectTracer",
+    //            "PathTracer",
+    //            "AOTracer",
+    //            "PhotonMapper"
+    //        },
+    //        .tracerColorSpace = MRayColorSpaceEnum::MR_ACES_CG,
+    //        .totalGPUMemoryMiB = 8000.0,
+    //        .usedGPUMemoryMiB = 100.0
+    //    }
+    //));
+
+}
 
 void TracerThread::FinalWork()
 {

@@ -444,10 +444,15 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     };
 
     //  Re-acquire device features here
+    VkPhysicalDeviceSynchronization2Features sync2Features =
+    {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES,
+        .synchronization2 = 0
+    };
     VkPhysicalDeviceHostQueryResetFeatures resetFeatures =
     {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES,
-        .pNext = nullptr,
+        .pNext = &sync2Features,
         .hostQueryReset = 0
     };
     VkPhysicalDeviceTimelineSemaphoreFeatures semFeatures =
@@ -462,8 +467,12 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
         .pNext = &semFeatures,
         .features = {}
     };
+    // We explicitly set all these to "false"
+    // We first get the features then immediately feed this to "VkCreateDevice"
+    // If it fails, terminate
     vkGetPhysicalDeviceFeatures2(selectedDevice.pDevice, &deviceFeatures2);
 
+    // Actual device creation
     VkDeviceCreateInfo deviceCI =
     {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -479,14 +488,13 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
         // TODO: Does this has a drawback?
         .pEnabledFeatures = nullptr
     };
-
-    // Actual device creation
     if(vkCreateDevice(selectedDevice.pDevice, &deviceCI,
                       VulkanHostAllocator::Functions(),
                       &deviceVk))
+    {
         return MRayError("Unable to create logical device on \"{}\"!",
                          selectedDeviceProps.deviceName);
-
+    };
     // Store the selected physical device
     pDeviceVk = selectedDevice.pDevice;
 

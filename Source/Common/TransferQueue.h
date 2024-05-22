@@ -54,17 +54,21 @@ struct VisorAction : public std::variant
     CameraTransform,        // transform
     uint32_t,               // camera index
     uint32_t,               // renderer index
+    uint32_t,               // renderer logic0 index
+    uint32_t,               // renderer logic1 index
     std::string,            // scene name
     float,                  // scene time
     bool,                   // start/stop render
     bool,                   // pause render
-    SystemSemaphoreHandle   // Synchronization semaphore
+    SystemSemaphoreHandle,  // Synchronization semaphore
+    bool,                   // Demand HDR save
+    bool                    // Demand SDR save
 >
 {
     using Base = std::variant<CameraTransform, uint32_t,
-                              uint32_t, std::string,
+                              uint32_t, uint32_t, uint32_t, std::string,
                               float, bool, bool,
-                              SystemSemaphoreHandle>;
+                              SystemSemaphoreHandle, bool, bool>;
     enum Type
     {
         CHANGE_CAM_TRANSFORM = 0,   // Give new transform to the tracer
@@ -75,13 +79,21 @@ struct VisorAction : public std::variant
         CHANGE_RENDERER = 2,        // Change the renderer via an index. Tracer will respond
                                     // with initial parametrization of the renderer.
                                     // renderer list is in "TracerAnalytics" structure.
-        LOAD_SCENE = 3,             // Load a scene, tracer will respond with a
+        CHANGE_RENDER_LOGIC0 = 3,   // Change the renderer logic0 via an index.
+                                    // These logic parameters may be useful for debugging,
+                                    // etc.
+        CHANGE_RENDER_LOGIC1 = 4,   // Change the renderer logic1 via an index.
+        LOAD_SCENE = 5,             // Load a scene, tracer will respond with a
                                     // "SceneAnalytics" struct
-        CHANGE_TIME = 4,            // Change the time of the scene. Min max values are in
+        CHANGE_TIME = 6,            // Change the time of the scene. Min max values are in
                                     // "SceneAnalytics" strcut
-        START_STOP_RENDER = 5,      // Start stop the rendering.
-        PAUSE_RENDER = 6,           // Pause the rendering
-        SEND_SYNC_SEMAPHORE = 7     // Send synchronization semaphore
+        START_STOP_RENDER = 7,      // Start stop the rendering.
+        PAUSE_RENDER = 8,           // Pause the rendering
+        SEND_SYNC_SEMAPHORE = 9,    // Send synchronization semaphore
+        DEMAND_HDR_SAVE = 10,       // Request a save event. This goes through tracer
+        DEMAND_SDR_SAVE = 11,       // because tracer knows better when to exactly save.
+                                    // Renderer will trigger a save when it is either on an ~spp
+                                    // boundary (or closer)
     };
     using Base::Base;
 };

@@ -44,6 +44,7 @@ class AccumImageStage : UniformMemoryRequesterI
     VkDeviceMemory          foreignMemory           = nullptr;
     VkBuffer                foreignBuffer           = nullptr;
     VkSemaphore             timelineSemaphoreVk     = nullptr;
+    // TODO: There is a type change here this will probably break on Linux?
     SystemSemaphoreHandle   systemSemHandle         = (MRAY_IS_ON_WINDOWS) ? nullptr : 0;
     // Main system related stuff
     const VulkanSystemView* handlesVk       = nullptr;
@@ -51,9 +52,10 @@ class AccumImageStage : UniformMemoryRequesterI
     VulkanComputePipeline   pipeline;
     DescriptorSets          descriptorSets;
     //
-    const VulkanImage*      hdrImage;
-    const VulkanImage*      sampleImage;
-
+    const VulkanImage*      hdrImage            = nullptr;
+    const VulkanImage*      sampleImage         = nullptr;
+    // Pre-recorded command
+    VkCommandBuffer         accumulateCommand   = nullptr;
     void                    Clear();
 
     public:
@@ -70,7 +72,8 @@ class AccumImageStage : UniformMemoryRequesterI
     void                    ImportExternalHandles(const RenderBufferInfo&);
     void                    ChangeImage(const VulkanImage* hdrImageIn,
                                         const VulkanImage* sampleImageIn);
-    void                    IssueAccumulation(VkCommandBuffer, const RenderImageSection&);
+    SemaphoreVariant        IssueAccumulation(VkSemaphore prevCmdSignal,
+                                              const RenderImageSection&);
     SystemSemaphoreHandle   ExportSemaphore(const RenderBufferInfo&);
 
     SystemSemaphoreHandle   GetSemaphoreOSHandle() const;

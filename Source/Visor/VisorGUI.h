@@ -4,7 +4,10 @@
 #include "Core/MathForward.h"
 #include "Core/Vector.h"
 #include "Core/Types.h"
+
 #include "VisorI.h"
+#include "MovementSchemes.h"
+#include "InputChecker.h"
 
 #include <vulkan/vulkan.h>
 #include <map>
@@ -25,12 +28,28 @@ enum class RunState
 
 using namespace std::string_view_literals;
 
+
+struct TopBarChanges
+{
+    Optional<int32_t> rendererIndex;
+    Optional<int32_t> customLogicIndex0;
+    Optional<int32_t> customLogicIndex1;
+};
+
+struct StatusBarChanges
+{
+    Optional<RunState> runState;
+    Optional<int32_t> cameraIndex;
+};
+
 struct GUIChanges
 {
-    using StatusBarChanges = Pair<Optional<RunState>, Optional<int32_t>>;
-    //
-    StatusBarChanges statusBarState;
-    Optional<CameraTransform> transform;
+    TopBarChanges               topBarChanges;
+    StatusBarChanges            statusBarState;
+    Optional<CameraTransform>   transform;
+    bool                        visorIsClosed = false;
+    bool                        hdrSaveTrigger = false;
+    bool                        sdrSaveTrigger = false;
 };
 
 class MainStatusBar
@@ -40,7 +59,7 @@ class MainStatusBar
     static constexpr auto PAUSED_NAME    = "PAUSED"sv;
     static constexpr auto STOPPED_NAME   = "STOPPED"sv;
 
-    const std::map<VisorUserAction, ImGuiKey>& keyMap;
+    const InputChecker& inputChecker;
 
     bool    paused;
     bool    running;
@@ -49,21 +68,21 @@ class MainStatusBar
     protected:
     public:
     // Constructors & Destructor
-                MainStatusBar(const std::map<VisorUserAction, ImGuiKey>& km);
-                ~MainStatusBar() = default;
+                        MainStatusBar(const InputChecker&);
+                        ~MainStatusBar() = default;
 
     [[nodiscard]]
-    typename GUIChanges::StatusBarChanges
-                Render(const VisorState&);
+    StatusBarChanges    Render(const VisorState&, bool camLocked);
 };
 
 class VisorGUI
 {
+    using MovementSchemeList = std::vector<std::unique_ptr<MovementSchemeI>>;
     public:
-    static const std::map<VisorUserAction, ImGuiKey> DefaultKeyMap;
+    static const VisorKeyMap DefaultKeyMap;
 
     private:
-    const std::map<VisorUserAction, ImGuiKey>& keyMap;
+    InputChecker    inputChecker;
 
     MainStatusBar   statusBar;
     bool            fpsInfoOn       = false;
@@ -76,16 +95,29 @@ class VisorGUI
     VkDescriptorSet mainImage       = nullptr;
     Vector2i        imgSize         = Vector2i::Zero();
     //
-    void                        ShowFrameOverlay(bool&, const VisorState&);
-    void                        ShowTopMenu(const VisorState&);
-    Optional<CameraTransform>   ShowMainImage();
+    MovementSchemeList  movementSchemes;
+    int32_t             movementIndex;
+    //
+    void                ShowFrameOverlay(bool&, const VisorState&);
+    MovementSchemeI&    CurrentMovement();
 
     [[nodiscard]]
-    typename GUIChanges::StatusBarChanges
+    TopBarChanges   ShowTopMenu(const VisorState&);
+
+    [[nodiscard]]
+    Optional<CameraTransform>
+                    ShowMainImage(const VisorState&);
+
+    [[nodiscard]]
+    Optional<int32_t>
+                    ShowRendererComboBox(const VisorState&);
+
+    [[nodiscard]]
+    StatusBarChanges
                     ShowStatusBar(const VisorState&);
 
     public:
-    VisorGUI(const std::map<VisorUserAction, ImGuiKey>* = nullptr);
+    VisorGUI(const VisorKeyMap* = nullptr);
 
     [[nodiscard]]
     GUIChanges      Render(ImFont* windowScaledFont,

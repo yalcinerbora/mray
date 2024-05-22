@@ -927,9 +927,9 @@ FramePack VisorWindow::NextFrame()
     return framePool.AcquireNextFrame(swapchain);
 }
 
-void VisorWindow::PresentFrame()
+void VisorWindow::PresentFrame(Optional<SemaphoreVariant> waitSemOverride)
 {
-    return framePool.PresentThisFrame(swapchain);
+    return framePool.PresentThisFrame(swapchain, waitSemOverride);
 }
 
 ImFont* VisorWindow::CurrentFont()
@@ -943,9 +943,9 @@ ImFont* VisorWindow::CurrentFont()
 void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
 {
     // Check the run state
-    if(changes.statusBarState.first)
+    if(changes.statusBarState.runState)
     {
-        RunState state = changes.statusBarState.first.value();
+        RunState state = changes.statusBarState.runState.value();
         switch(state)
         {
             case RunState::RUNNING:
@@ -981,10 +981,10 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
         }
     }
 
-    if(changes.statusBarState.second)
+    if(changes.statusBarState.cameraIndex)
     {
         int32_t camCount = static_cast<int32_t>(visorState.scene.cameraCount);
-        int32_t camOffset = changes.statusBarState.second.value();
+        int32_t camOffset = changes.statusBarState.cameraIndex.value();
         int32_t newCamIndex = visorState.currentCameraIndex + camOffset;
         newCamIndex = MathFunctions::Roll(newCamIndex, 0, camCount);
         visorState.currentCameraIndex = newCamIndex;
@@ -995,6 +995,69 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
             newCamIndex
         ));
     }
+
+    if(changes.transform)
+    {
+        visorState.transform = changes.transform.value();
+        transferQueue->Enqueue(VisorAction
+        (
+            std::in_place_index<VisorAction::CHANGE_CAM_TRANSFORM>,
+            visorState.transform
+        ));
+    }
+
+    if(changes.topBarChanges.rendererIndex)
+    {
+        uint32_t rIndex = changes.topBarChanges.rendererIndex.value();
+        visorState.currentRenderIndex = rIndex;
+        transferQueue->Enqueue(VisorAction
+        (
+            std::in_place_index<VisorAction::CHANGE_RENDERER>,
+            rIndex
+        ));
+    }
+
+    if(changes.topBarChanges.customLogicIndex0)
+    {
+        uint32_t lIndex = changes.topBarChanges.customLogicIndex0.value();
+        visorState.currentRenderLogic0 = lIndex;
+        transferQueue->Enqueue(VisorAction
+        (
+            std::in_place_index<VisorAction::CHANGE_RENDER_LOGIC0>,
+            lIndex
+        ));
+    }
+    if(changes.topBarChanges.customLogicIndex1)
+    {
+        uint32_t lIndex = changes.topBarChanges.customLogicIndex1.value();
+        visorState.currentRenderLogic1 = lIndex;
+        transferQueue->Enqueue(VisorAction
+        (
+            std::in_place_index<VisorAction::CHANGE_RENDER_LOGIC1>,
+            lIndex
+        ));
+    }
+
+    if(changes.hdrSaveTrigger)
+    {
+        transferQueue->Enqueue(VisorAction
+        (
+            std::in_place_index<VisorAction::DEMAND_HDR_SAVE>,
+            true
+        ));
+    }
+
+    if(changes.sdrSaveTrigger)
+    {
+        transferQueue->Enqueue(VisorAction
+        (
+            std::in_place_index<VisorAction::DEMAND_SDR_SAVE>,
+            true
+        ));
+    }
+
+    if(changes.visorIsClosed)
+        glfwSetWindowShouldClose(window, 1);
 }
 
 void VisorWindow::Render()
@@ -1029,31 +1092,59 @@ void VisorWindow::Render()
         bool stopConsuming = false;
         switch(tp)
         {
-            case CAMERA_INIT_TRANSFORM: visorState.transform = std::get<CAMERA_INIT_TRANSFORM>(response); break;
-            case SCENE_ANALYTICS: visorState.scene = std::get<SCENE_ANALYTICS>(response); break;
-            case TRACER_ANALYTICS: visorState.tracer = std::get<TRACER_ANALYTICS>(response); break;
-            case RENDERER_ANALYTICS: visorState.renderer = std::get<RENDERER_ANALYTICS>(response); break;
-            case RENDERER_OPTIONS: break; // TODO: User may change the render options during runtime
+            case CAMERA_INIT_TRANSFORM:
+            {
+                MRAY_LOG("[Visor]: Transform received");
+                visorState.transform = std::get<CAMERA_INIT_TRANSFORM>(response);
+                break;
+            }
+            case SCENE_ANALYTICS:
+            {
+                MRAY_LOG("[Visor]: Scene Info received");
+                visorState.scene = std::get<SCENE_ANALYTICS>(response);
+                break;
+            }
+            case TRACER_ANALYTICS:
+            {
+                MRAY_LOG("[Visor]: Tracer Info received");
+                visorState.tracer = std::get<TRACER_ANALYTICS>(response);
+                break;
+            }
+            case RENDERER_ANALYTICS:
+            {
+                MRAY_LOG("[Visor]: Render Info received");
+                visorState.renderer = std::get<RENDERER_ANALYTICS>(response);
+                break;
+            }
+            case RENDERER_OPTIONS:
+            {
+                MRAY_LOG("[Visor]: Render Options received and ignored");
+                break; // TODO: User may change the render options during runtime
+            }
             case RENDER_BUFFER_INFO:
             {
+                MRAY_LOG("[Visor]: Render Buffer Info received");
                 newRenderBuffer = std::get<RENDER_BUFFER_INFO>(response);
                 stopConsuming = true;
                 break;
             }
             case CLEAR_IMAGE_SECTION:
             {
+                MRAY_LOG("[Visor]: Clear Image received");
                 newClearSignal = std::get<CLEAR_IMAGE_SECTION>(response);
                 stopConsuming = true;
                 break;
             }
             case IMAGE_SECTION:
             {
+                MRAY_LOG("[Visor]: Image section received");
                 newImageSection = std::get<IMAGE_SECTION>(response);
                 stopConsuming = true;
                 break;
             }
             case SAVE_AS_HDR:
             {
+                MRAY_LOG("[Visor]: Save HDR received");
                 newSaveInfo = std::get<SAVE_AS_HDR>(response);
                 isHDRSave = RenderImagePool::HDR;
                 stopConsuming = true;
@@ -1061,6 +1152,7 @@ void VisorWindow::Render()
             }
             case SAVE_AS_SDR:
             {
+                MRAY_LOG("[Visor]: Save SDR received");
                 newSaveInfo = std::get<SAVE_AS_SDR>(response);
                 isHDRSave = RenderImagePool::SDR;
                 stopConsuming = true;
@@ -1071,16 +1163,47 @@ void VisorWindow::Render()
         if(stopConsuming) break;
     }
 
+    // Current design dictates single operation over the
+    // accumulate/save-hdr/save-sdr/renderbufferInfo/clearImage
+    // commands. Assert it here, just to be sure
+    if constexpr(MRAY_IS_DEBUG)
+    {
+        std::array<bool, 4> predicates =
+        {
+            newRenderBuffer.has_value(),
+            newImageSection.has_value(),
+            newClearSignal.has_value(),
+            newSaveInfo.has_value()
+        };
+        int i = std::transform_reduce(predicates.cbegin(), predicates.cend(),
+                                      0, std::plus{},
+        [](bool v)
+        {
+            return v ? 1 : 0;
+        });
+        assert(i <= 1);
+    }
+
     //
     Pair<VkSemaphore, uint64_t> saveSemaphore = {nullptr, 0};
     if(newSaveInfo)
     {
-        renderImagePool.SaveImage(framePool.PrevFrameFinishSignal(),
-                                  isHDRSave, newSaveInfo.value());
+        //renderImagePool.SaveImage(framePool.PrevFrameFinishSignal(),
+        //                          isHDRSave, newSaveInfo.value());
 
         // Should we a need a pool
     }
 
+    // Before Command Start check if new image section is received
+    // Issue an accumulation and override the main wait semaphore
+    Optional<SemaphoreVariant> waitSemOverride;
+    if(newImageSection)
+    {
+
+        //auto& as = accumulateStage;
+        //waitSemOverride = as.IssueAccumulation(framePool.PrevFrameFinishSignal(),
+        //                                       newImageSection.value());
+    }
     // ================== //
     //    Command Start   //
     // ================== //
@@ -1123,7 +1246,7 @@ void VisorWindow::Render()
         gui.ChangeDisplayImage(renderImagePool.GetSDRImage());
         gui.ChangeTonemapperGUI(tonemapperGUI.value());
     }
-    // Image clear so np
+    // Image clear
     else if(newClearSignal)
     {
         //VkClearColorValue value = {};
@@ -1131,15 +1254,8 @@ void VisorWindow::Render()
         //value.float32[2] = 0.0f; value.float32[3] = 0.0f;
         //pixelImage.IssueClear(cmd, value);
         //sampleImage.IssueClear(cmd, value);
+    }
 
-        //accumulateStage.IssueClear(frameHandle.commandBuffer);
-    }
-    else if(newImageSection)
-    {
-        //accumulateStage.IssueAccumulation(frameHandle.commandBuffer,
-        //                                  newImageSection.value());
-        //accumulateStage.IssueAccumulation(..., newImageSection.value());
-    }
 
     // Do tonemap
     if(newClearSignal || newRenderBuffer)
@@ -1182,5 +1298,5 @@ void VisorWindow::Render()
     frameCounter.EndRecord(frameHandle.commandBuffer);
     visorState.visor.frameTime = frameCounter.AvgFrame();
     vkEndCommandBuffer(frameHandle.commandBuffer);
-    PresentFrame();
+    PresentFrame(waitSemOverride);
 }

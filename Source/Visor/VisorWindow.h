@@ -182,7 +182,7 @@ class VisorWindow
     //
     bool            ShouldClose();
     FramePack       NextFrame();
-    void            PresentFrame();
+    void            PresentFrame(Optional<SemaphoreVariant> waitSemOverride);
     ImFont*         CurrentFont();
     void            Render();
 

@@ -10,7 +10,7 @@
 
 #include "../Resources/Fonts/IcoMoonFontTable.h"
 
-const std::map<VisorUserAction, ImGuiKey> VisorGUI::DefaultKeyMap =
+const VisorKeyMap VisorGUI::DefaultKeyMap =
 {
     { VisorUserAction::TOGGLE_TOP_BAR, ImGuiKey::ImGuiKey_M },
     { VisorUserAction::TOGGLE_BOTTOM_BAR, ImGuiKey::ImGuiKey_N },
@@ -18,6 +18,8 @@ const std::map<VisorUserAction, ImGuiKey> VisorGUI::DefaultKeyMap =
     { VisorUserAction::PREV_CAM, ImGuiKey::ImGuiKey_Keypad4 },
     { VisorUserAction::TOGGLE_MOVEMENT_LOCK, ImGuiKey::ImGuiKey_Keypad5 },
     { VisorUserAction::PRINT_CUSTOM_CAMERA, ImGuiKey::ImGuiKey_KeypadDecimal },
+    { VisorUserAction::NEXT_MOVEMENT, ImGuiKey::ImGuiKey_RightBracket },
+    { VisorUserAction::PREV_MOVEMENT, ImGuiKey::ImGuiKey_LeftBracket },
     { VisorUserAction::NEXT_RENDERER, ImGuiKey::ImGuiKey_Keypad9 },
     { VisorUserAction::PREV_RENDERER, ImGuiKey::ImGuiKey_Keypad7 },
     { VisorUserAction::NEXT_RENDERER_CUSTOM_LOGIC_0, ImGuiKey::ImGuiKey_Keypad3 },
@@ -28,29 +30,45 @@ const std::map<VisorUserAction, ImGuiKey> VisorGUI::DefaultKeyMap =
     { VisorUserAction::START_STOP_TRACE, ImGuiKey::ImGuiKey_O },
     { VisorUserAction::CLOSE, ImGuiKey::ImGuiKey_Escape },
     { VisorUserAction::SAVE_IMAGE, ImGuiKey::ImGuiKey_G },
-    { VisorUserAction::SAVE_IMAGE_HDR, ImGuiKey::ImGuiKey_H }
+    { VisorUserAction::SAVE_IMAGE_HDR, ImGuiKey::ImGuiKey_H },
+    // Movement
+    { VisorUserAction::MOUSE_ROTATE_MODIFIER, ImGuiMouseButton_Left},
+    { VisorUserAction::MOUSE_TRANSLATE_MODIFIER, ImGuiMouseButton_Middle},
+    { VisorUserAction::MOVE_FORWARD, ImGuiKey::ImGuiKey_W},
+    { VisorUserAction::MOVE_BACKWARD, ImGuiKey::ImGuiKey_S},
+    { VisorUserAction::MOVE_RIGHT, ImGuiKey::ImGuiKey_D},
+    { VisorUserAction::MOVE_LEFT, ImGuiKey::ImGuiKey_A},
+    { VisorUserAction::FAST_MOVE_MODIFIER, ImGuiKey::ImGuiKey_LeftShift}
 };
 
 namespace ImGui
 {
-    bool ToggleButton(const char* name, bool& toggle)
+    bool ToggleButton(const char* name, bool& toggle,
+                      bool decorate = true)
     {
         bool result = false;
         if(toggle == true)
         {
             ImVec4 hoverColor = ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered);
 
-            ImGui::PushID(name);
-            ImGui::PushStyleColor(ImGuiCol_Button, hoverColor);
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, hoverColor);
+            if(decorate)
+            {
+                ImGui::PushID(name);
+                ImGui::PushStyleColor(ImGuiCol_Button, hoverColor);
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, hoverColor);
+            }
+
             result = ImGui::Button(name);
             if(ImGui::IsItemClicked(0))
             {
                 result = true;
                 toggle = !toggle;
             }
-            ImGui::PopStyleColor(2);
-            ImGui::PopID();
+            if(decorate)
+            {
+                ImGui::PopStyleColor(2);
+                ImGui::PopID();
+            };
         }
         else if(ImGui::Button(name))
         {
@@ -89,19 +107,19 @@ void SetButtonState(bool& stopToggle,
     }
 }
 
-MainStatusBar::MainStatusBar(const std::map<VisorUserAction, ImGuiKey>& km)
-    : keyMap(km)
+MainStatusBar::MainStatusBar(const InputChecker& ic)
+    : inputChecker(ic)
     , paused(false)
     , running(false)
     , stopped(true)
 {}
 
-typename GUIChanges::StatusBarChanges
-MainStatusBar::Render(const VisorState& visorState)
+StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
+                                       bool camLocked)
 {
     bool isChanged = false;
     // Handle keyboard related inputs
-    if(ImGui::IsKeyPressed(keyMap.at(VisorUserAction::START_STOP_TRACE)))
+    if(inputChecker.CheckKeyPress(VisorUserAction::START_STOP_TRACE))
     {
         if(!paused)
         {
@@ -117,7 +135,7 @@ MainStatusBar::Render(const VisorState& visorState)
             running = false;
         }
     }
-    if(ImGui::IsKeyPressed(keyMap.at(VisorUserAction::PAUSE_CONT_RENDER)))
+    if(inputChecker.CheckKeyPress(VisorUserAction::PAUSE_CONT_RENDER))
     {
         if(!stopped)
         {
@@ -176,12 +194,13 @@ MainStatusBar::Render(const VisorState& visorState)
                             (buttonSize * 5 + spacingSize * 6 + 2));
 
             ImGui::Separator();
+            if(camLocked) ImGui::BeginDisabled();
             if(ImGui::Button(ICON_ICOMN_ARROW_LEFT) ||
-               ImGui::IsKeyPressed(keyMap.at(VisorUserAction::PREV_CAM)))
+               (!camLocked && inputChecker.CheckKeyPress(VisorUserAction::PREV_CAM)))
             {
                 camChange--;
             }
-            if(ImGui::IsItemHovered() && GImGui->HoveredIdTimer > 1)
+            if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
             {
                 ImGui::BeginTooltip();
                 ImGui::Text("Prev Camera");
@@ -189,16 +208,17 @@ MainStatusBar::Render(const VisorState& visorState)
             }
 
             if(ImGui::Button(ICON_ICOMN_ARROW_RIGHT) ||
-               ImGui::IsKeyPressed(keyMap.at(VisorUserAction::NEXT_CAM)))
+               (!camLocked && inputChecker.CheckKeyPress(VisorUserAction::NEXT_CAM)))
             {
                 camChange++;
             }
-            if(ImGui::IsItemHovered() && GImGui->HoveredIdTimer > 1)
+            if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
             {
                 ImGui::BeginTooltip();
                 ImGui::Text("Next Camera");
                 ImGui::EndTooltip();
             }
+            if(camLocked) ImGui::EndDisabled();
             ImGui::Separator();
 
             if(ImGui::ToggleButton(ICON_ICOMN_STOP2, stopped))
@@ -242,10 +262,10 @@ MainStatusBar::Render(const VisorState& visorState)
     auto camIndexResult = (camChange != 0)
                 ? Optional<uint32_t>(camChange)
                 : std::nullopt;
-    return typename GUIChanges::StatusBarChanges
+    return StatusBarChanges
     {
-       runStateResult,
-       camIndexResult
+       .runState = runStateResult,
+       .cameraIndex = camIndexResult
     };
 }
 
@@ -295,18 +315,97 @@ void VisorGUI::ShowFrameOverlay(bool& isOpen,
     ImGui::End();
 }
 
-void VisorGUI::ShowTopMenu(const VisorState& visorState)
+Optional<int32_t> VisorGUI::ShowRendererComboBox(const VisorState& visorState)
 {
-    if(ImGui::IsKeyPressed(keyMap.at(VisorUserAction::TOGGLE_MOVEMENT_LOCK)))
+    if(visorState.tracer.rendererTypes.empty()) return std::nullopt;
+
+    Optional<int32_t> result;
+    const std::vector<std::string>& rTypes = visorState.tracer.rendererTypes;
+    int32_t rCount = static_cast<int32_t>(rTypes.size());
+    int32_t rIndex = visorState.currentRenderIndex;
+    if(inputChecker.CheckKeyPress(VisorUserAction::NEXT_RENDERER) ||
+       inputChecker.CheckKeyPress(VisorUserAction::PREV_RENDERER))
     {
-        camLocked = !camLocked;
+        int32_t i = inputChecker.CheckKeyPress(VisorUserAction::PREV_RENDERER) ? -1 : 1;
+        rIndex += i;
+        rIndex = MathFunctions::Roll(rIndex, 0, rCount);
+        result = rIndex;
     }
+    const int32_t& curRIndex = (result.has_value())
+                                    ? result.value()
+                                    : visorState.currentRenderIndex;
+
+    static const std::string RENDERER_DASHED = "Renderer-"s;
+    float maxSize = std::transform_reduce(rTypes.cbegin(), rTypes.cend(), 0.0f,
+    [](float a, float b) { return std::max(a, b); },
+    [](const std::string& s)
+    {
+        return ImGui::CalcTextSize((RENDERER_DASHED + s).c_str()).x;
+    });
+    std::string prevName = RENDERER_DASHED + rTypes[curRIndex];
+    ImGui::SetNextItemWidth(maxSize + ImGui::GetStyle().FramePadding.x * 2.0f);
+    if(ImGui::BeginCombo("##Renderers", prevName.c_str(),
+                         ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_HeightSmall))
+    {
+        for(int32_t i = 0; i < rCount; i++)
+        {
+            const auto& rendererName = visorState.tracer.rendererTypes[i];
+            bool isSelected = (i == curRIndex);
+            if(ImGui::Selectable(rendererName.c_str(), &isSelected) &&
+               i != curRIndex)
+            {
+                result = i;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    return result;
+}
+
+TopBarChanges VisorGUI::ShowTopMenu(const VisorState& visorState)
+{
+    auto CheckLogic = [&](int32_t index, uint32_t size,
+                          VisorUserAction nextAction,
+                          VisorUserAction prevAction) -> Optional<uint32_t>
+    {
+        Optional<uint32_t> result;
+        if(size == 0) return result;
+
+        int32_t count = static_cast<int32_t>(size);
+        if(inputChecker.CheckKeyPress(nextAction) ||
+           inputChecker.CheckKeyPress(prevAction))
+        {
+            int32_t i = inputChecker.CheckKeyPress(prevAction) ? -1 : 1;
+            index += i;
+            index = MathFunctions::Roll(index, 0, count);
+            result = index;
+        }
+        return result;
+    };
+
+    TopBarChanges result;
+    if(inputChecker.CheckKeyPress(VisorUserAction::TOGGLE_MOVEMENT_LOCK))
+        camLocked = !camLocked;
+
+
+    result.customLogicIndex0 = CheckLogic(visorState.currentRenderLogic0,
+                                          visorState.renderer.customLogicSize0,
+                                          VisorUserAction::NEXT_RENDERER_CUSTOM_LOGIC_0,
+                                          VisorUserAction::PREV_RENDERER_CUSTOM_LOGIC_0);
+    result.customLogicIndex1 = CheckLogic(visorState.currentRenderLogic1,
+                                          visorState.renderer.customLogicSize1,
+                                          VisorUserAction::NEXT_RENDERER_CUSTOM_LOGIC_1,
+                                          VisorUserAction::PREV_RENDERER_CUSTOM_LOGIC_1);
 
     if(ImGui::BeginMainMenuBar())
     {
+        ImGui::Text(" ");
         if(tonemapperGUI) tonemapperGUI->Render();
         ImGui::Separator();
-        static constexpr const char* VISOR_INFO_NAME = "VisorInfo";
+
+        result.rendererIndex = ShowRendererComboBox(visorState);
+
+        static constexpr const char* VISOR_INFO_NAME = "VisorInfo ";
         float offsetX = (ImGui::GetWindowContentRegionMax().x -
                          ImGui::CalcTextSize(VISOR_INFO_NAME).x -
                          ImGui::CalcTextSize(ICON_ICOMN_LOCK).x -
@@ -314,26 +413,36 @@ void VisorGUI::ShowTopMenu(const VisorState& visorState)
         ImGui::SameLine(offsetX);
         ImGui::Separator();
 
-        if(camLocked)
-            ImGui::Text(ICON_ICOMN_LOCK);
-        else
-            ImGui::Text(ICON_ICOMN_UNLOCKED);
+        if(camLocked) ImGui::ToggleButton(ICON_ICOMN_LOCK, camLocked, false);
+        else ImGui::ToggleButton(ICON_ICOMN_UNLOCKED, camLocked, false);
 
         ImGui::ToggleButton(VISOR_INFO_NAME, fpsInfoOn);
         if(fpsInfoOn) ShowFrameOverlay(fpsInfoOn, visorState);
 
         ImGui::EndMainMenuBar();
     }
+    return result;
 }
 
-typename GUIChanges::StatusBarChanges
-VisorGUI::ShowStatusBar(const VisorState& visorState)
+StatusBarChanges VisorGUI::ShowStatusBar(const VisorState& visorState)
 {
-    return statusBar.Render(visorState);
+    return statusBar.Render(visorState, camLocked);
 }
 
-Optional<CameraTransform> VisorGUI::ShowMainImage()
+Optional<CameraTransform> VisorGUI::ShowMainImage(const VisorState& visorState)
 {
+    int32_t movementCount = static_cast<uint32_t>(movementSchemes.size());
+    if(inputChecker.CheckKeyPress(VisorUserAction::NEXT_MOVEMENT))
+    {
+        movementIndex++;
+        movementIndex = MathFunctions::Roll(movementIndex, 0, movementCount);
+    }
+    else if(inputChecker.CheckKeyPress(VisorUserAction::PREV_MOVEMENT))
+    {
+        movementIndex--;
+        movementIndex = MathFunctions::Roll(movementIndex, 0, movementCount);
+    }
+
     Optional<CameraTransform> result;
     static const ImGuiWindowFlags flags = (ImGuiWindowFlags_NoDecoration |
                                            ImGuiWindowFlags_NoMove |
@@ -354,38 +463,67 @@ Optional<CameraTransform> VisorGUI::ShowMainImage()
         //ImGui::Image(std::bit_cast<ImTextureID>(mainImage), {256.0f, 256.0f});
         if(ImGui::IsWindowFocused() && !camLocked)
         {
-            //result = MovementScheme.
+            result = CurrentMovement().Update(visorState);
         }
     }
     ImGui::End();
     return result;
 }
 
-VisorGUI::VisorGUI(const std::map<VisorUserAction, ImGuiKey>* km)
-    : keyMap((km) ? *km : DefaultKeyMap)
-    , statusBar(keyMap)
-{}
+MovementSchemeI& VisorGUI::CurrentMovement()
+{
+    return *movementSchemes[movementIndex];
+}
+
+VisorGUI::VisorGUI(const VisorKeyMap* km)
+    : inputChecker((km != nullptr) ? (*km) : DefaultKeyMap)
+    , statusBar(inputChecker)
+    , movementIndex(0)
+{
+    movementSchemes.emplace_back(std::make_unique<MovementSchemeFPS>(inputChecker));
+    //movementSchemes.emplace_back(std::make_unique<MovementSchemeMaya>(inputChecker));
+    //movementSchemes.emplace_back(std::make_unique<MovementSchemeImg>(inputChecker));
+    assert(!movementSchemes.empty());
+}
 
 GUIChanges VisorGUI::Render(ImFont* windowScaledFont, const VisorState& visorState)
 {
+    using enum VisorUserAction;
     GUIChanges guiChanges;
+    if(inputChecker.CheckKeyPress(CLOSE, false))
+    {
+        guiChanges.visorIsClosed = true;
+        return guiChanges;
+    }
+    guiChanges.hdrSaveTrigger = inputChecker.CheckKeyPress(SAVE_IMAGE_HDR, false);
+    guiChanges.sdrSaveTrigger = inputChecker.CheckKeyPress(SAVE_IMAGE, false);
+
 
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     ImGui::PushFont(windowScaledFont);
 
-    if(ImGui::IsKeyPressed(keyMap.at(VisorUserAction::TOGGLE_TOP_BAR)))
+    if(inputChecker.CheckKeyPress(TOGGLE_TOP_BAR))
         topBarOn = !topBarOn;
-    if(ImGui::IsKeyPressed(keyMap.at(VisorUserAction::TOGGLE_BOTTOM_BAR)))
+    if(inputChecker.CheckKeyPress(TOGGLE_BOTTOM_BAR))
         bottomBarOn = !bottomBarOn;
 
-    if(topBarOn) ShowTopMenu(visorState);
-    if(bottomBarOn)
+    if(inputChecker.CheckKeyPress(PRINT_CUSTOM_CAMERA))
     {
-        guiChanges.statusBarState = ShowStatusBar(visorState);
+        MRAY_LOG("\"gaze\"     : {},\n"
+                 "\"position\" : {},\n"
+                 "\"up\"       : {}",
+                 visorState.transform.gazePoint.AsArray(),
+                 visorState.transform.position.AsArray(),
+                 visorState.transform.up.AsArray());
     }
-    ShowMainImage();
+
+    if(topBarOn)
+        guiChanges.topBarChanges = ShowTopMenu(visorState);
+    if(bottomBarOn)
+        guiChanges.statusBarState = ShowStatusBar(visorState);
+    guiChanges.transform = ShowMainImage(visorState);
 
     ImGui::PopFont();
     ImGui::Render();

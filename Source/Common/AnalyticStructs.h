@@ -44,10 +44,13 @@ struct RendererAnalyticData
     std::string     workPerPixelSuffix;
     // Timings
     float           iterationTimeMS;
-
     // Image related
-    Vector2i            renderResolution;
+    Vector2ui           renderResolution;
     MRayColorSpaceEnum  outputColorSpace;
+
+    // Custom Input Related
+    uint32_t            customLogicSize0 = 0;
+    uint32_t            customLogicSize1 = 0;
 };
 
 struct SceneAnalyticData
