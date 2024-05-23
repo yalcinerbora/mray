@@ -5,9 +5,15 @@
 
 // Env Headers
 #if defined MRAY_WINDOWS
+
+    #define WIN32_LEAN_AND_MEAN
+    #include <windows.h>
     #include <strsafe.h>
+
 #elif defined MRAY_LINUX
+
     #include <dlfcn.h>
+
 #endif
 
 #if defined MRAY_WINDOWS

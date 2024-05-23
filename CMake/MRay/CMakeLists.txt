@@ -42,6 +42,7 @@ target_link_libraries(MRay PRIVATE
                       GFGConverter
                       TransientPool
                       cli11::cli11
+                      bs::thread_pool
                       mray::meta_compile_opts)
 
 # Not-linked but dependent targets

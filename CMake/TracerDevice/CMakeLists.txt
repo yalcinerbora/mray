@@ -33,6 +33,7 @@ target_compile_definitions(${TARGET_NAME}
 target_link_libraries(${TARGET_NAME}
                       PRIVATE
                       ${GEN_TRACER_TARGET_NAME}
+                      bs::thread_pool
                       CoreLib
                       TransientPool
                       mray::meta_compile_opts

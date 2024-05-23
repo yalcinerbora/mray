@@ -9,11 +9,6 @@
 #include "VulkanPipeline.h"
 #include "MainUniformBuffer.h"
 
-// TODO: Change this to a more generic way
-#ifdef MRAY_WINDOWS
-    #include <vulkan/vulkan_win32.h>
-#endif
-
 class AccumImageStage : UniformMemoryRequesterI
 {
     private:
@@ -35,8 +30,6 @@ class AccumImageStage : UniformMemoryRequesterI
 
     private:
     static PFN_vkGetMemoryHostPointerPropertiesEXT vkGetMemoryHostPointerProperties;
-    // TODO: Change this to a more generic way
-    static PFN_vkGetSemaphoreWin32HandleKHR vkGetSemaphoreWin32Handle;
 
     // Device memory backed stuff
     UniformBufferMemView    uniformBuffer           = {};

@@ -21,7 +21,8 @@ target_link_libraries(SceneLoaderMRay
                       MeshLoader
                       TransientPool
                       mray::meta_compile_opts
-                      nlohmann::json)
+                      nlohmann::json
+                      bs::thread_pool)
 
 target_compile_definitions(SceneLoaderMRay
                            PRIVATE

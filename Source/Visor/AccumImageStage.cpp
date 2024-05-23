@@ -2,11 +2,14 @@
 #include "VulkanAllocators.h"
 
 #ifdef MRAY_WINDOWS
+    #define WINDOWS_LEAN_AND_MEAN
+    #include <windows.h>
     #include <vulkan/vulkan_win32.h>
 #endif
 
 PFN_vkGetMemoryHostPointerPropertiesEXT AccumImageStage::vkGetMemoryHostPointerProperties = nullptr;
-PFN_vkGetSemaphoreWin32HandleKHR AccumImageStage::vkGetSemaphoreWin32Handle = nullptr;
+// Changing this to translation unit global, this will be used only here
+PFN_vkGetSemaphoreWin32HandleKHR vkGetSemaphoreWin32Handle = nullptr;
 
 AccumImageStage::AccumImageStage(const VulkanSystemView& handles)
     : handlesVk(&handles)

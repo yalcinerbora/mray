@@ -155,8 +155,11 @@ endfunction()
 add_library(json INTERFACE)
 target_compile_definitions(json INTERFACE JSON_DIAGNOSTICS=1)
 add_library(nlohmann::json ALIAS json)
+
 add_library(thread_pool INTERFACE)
+target_compile_definitions(thread_pool INTERFACE BS_THREAD_POOL_ENABLE_NATIVE_HANDLES=1)
 add_library(bs::thread_pool ALIAS thread_pool)
+
 add_library(cli11 INTERFACE)
 add_library(cli11::cli11 ALIAS cli11)
 

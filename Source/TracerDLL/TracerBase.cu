@@ -84,7 +84,21 @@ TracerBase::TracerBase(BS::thread_pool& tp,
     // Inject the CUDA "setDevice()" equavilent to the threads
     // to initialize GPU usage
     BS::concurrency_t threadCount = threadPool.get_thread_count();
-    threadPool.reset(threadCount, gpuSystem.GetThreadInitFunction());
+
+    threadPool.reset(threadCount, [gpuSystem = &this->gpuSystem]()
+    {
+        auto tp = BS::this_thread::get_pool().value();
+        std::vector<std::thread::native_handle_type> handles;
+        handles = tp->get_native_handles();
+
+        // Name the threads for debugging here
+        using namespace std::string_literals;
+        size_t i = BS::this_thread::get_index().value();
+        std::string name = "WorkerThread_"s + std::to_string(i);
+
+        RenameThread(handles[i], name);
+        gpuSystem->GetThreadInitFunction();
+    });
 }
 
 TypeNameList TracerBase::PrimitiveGroups() const

@@ -18,6 +18,8 @@
 #include <vulkan/vulkan_to_string.hpp>
 
 #ifdef MRAY_WINDOWS
+    #define WINDOWS_LEAN_AND_MEAN
+    #include <windows.h>
     #include <vulkan/vulkan_win32.h>
 #endif
 

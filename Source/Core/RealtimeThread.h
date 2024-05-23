@@ -17,6 +17,8 @@ User can define internal terminate condition where thread automatically ends
 #include <mutex>
 #include <condition_variable>
 
+#include "System.h"
+
 class RealtimeThread
 {
     private:
@@ -39,7 +41,7 @@ class RealtimeThread
                                 RealtimeThread();
     virtual                     ~RealtimeThread();
 
-    void                        Start();
+    void                        Start(const std::string& name);
     void                        Stop();
     void                        Pause(bool pause);
 
@@ -80,7 +82,7 @@ inline RealtimeThread::~RealtimeThread()
     Stop();
 }
 
-inline void RealtimeThread::Start()
+inline void RealtimeThread::Start(const std::string& name)
 {
     // If the system was previously paused
     // ignore that
@@ -88,6 +90,8 @@ inline void RealtimeThread::Start()
 
     // Launch a new thread
     thread = std::thread(&RealtimeThread::THRDEntry, this);
+    if(!name.empty())
+        RenameThread(thread.native_handle(), name);
 }
 
 inline void RealtimeThread::Stop()

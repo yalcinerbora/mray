@@ -2,42 +2,24 @@
 
 #include <memory>
 #include <string>
+#include <thread>
 
 std::string GetProcessPath();
+bool EnableVTMode();
+void RenameThread(std::thread::native_handle_type, const std::string& name);
 
 #ifdef MRAY_WINDOWS
 
     #define MRAY_DLL_IMPORT __declspec(dllimport)
     #define MRAY_DLL_EXPORT __declspec(dllexport)
 
-    #define WIN32_LEAN_AND_MEAN
-    #include <windows.h>
-
-    static inline bool EnableVTMode()
-    {
-        auto SetVT = [](DWORD outputHandle) -> bool
-        {
-            // Set output mode to handle virtual terminal sequences
-            HANDLE hOut = GetStdHandle(outputHandle);
-            if(hOut == INVALID_HANDLE_VALUE)
-                return false;
-
-            DWORD dwMode = 0;
-            if(!GetConsoleMode(hOut, &dwMode))
-                return false;
-
-            dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-            if(!SetConsoleMode(hOut, dwMode))
-                return false;
-            return true;
-        };
-
-        return (SetVT(STD_OUTPUT_HANDLE) &&
-                SetVT(STD_ERROR_HANDLE));
-    }
-
     static constexpr bool MRAY_IS_ON_WINDOWS    = true;
     static constexpr bool MRAY_IS_ON_LINUX      = false;
+
+    // TODO: Try to skip loading entire windows.h for the handle
+    // This is not good, but windows prob will not change the def
+    // of handle probably ever. :)
+    typedef void* HANDLE;
 
     using SystemSemaphoreHandle = HANDLE;
     using SystemMemoryHandle = HANDLE;
@@ -46,12 +28,6 @@ std::string GetProcessPath();
 
     #define MRAY_DLL_IMPORT
     #define MRAY_DLL_EXPORT
-
-    // Linux has already virtual terminal processing?
-    static inline bool EnableVTMode()
-    {
-        return true;
-    }
 
     static constexpr bool MRAY_IS_ON_WINDOWS    = false;
     static constexpr bool MRAY_IS_ON_LINUX      = true;

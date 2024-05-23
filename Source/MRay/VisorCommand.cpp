@@ -152,7 +152,7 @@ MRayError VisorCommand::Invoke()
     if(e) return e;
 
     // Start the tracer thread
-    tracerThread.Start();
+    tracerThread.Start("TracerThread");
 
     // Initially send the scene to tracer
     if(sceneFile)
