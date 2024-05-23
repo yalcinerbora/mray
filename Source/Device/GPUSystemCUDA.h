@@ -24,7 +24,12 @@
 
 #define MRAY_DEVICE_BLOCK_SYNC() __syncthreads()
 
-#define MRAY_GRID_CONSTANT __grid_constant__
+#if __CUDA_ARCH__ >= 700
+    #define MRAY_GRID_CONSTANT __grid_constant__
+#else
+    #define MRAY_GRID_CONSTANT
+#endif
+
 #define MRAY_SHARED_MEMORY __shared__
 
 static constexpr uint32_t WarpSize()
