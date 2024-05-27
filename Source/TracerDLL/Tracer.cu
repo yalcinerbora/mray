@@ -6,8 +6,8 @@
 #include "Tracer/MaterialsDefault.h"
 #include "Tracer/CamerasDefault.h"
 #include "Tracer/MediumsDefault.h"
-
 #include "Tracer/AcceleratorLinear.h"
+#include "Tracer/MetaLight.h"
 
 template <class BaseAccel, class AccelGTypes, class AccelWorkTypes>
 struct AccelTypePack

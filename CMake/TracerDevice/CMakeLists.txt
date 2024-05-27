@@ -6,7 +6,7 @@ set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/TracerDLL)
 
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/EntryPoint.h
-    ${CURRENT_SOURCE_DIR}/EntryPoint.cu
+    ${CURRENT_SOURCE_DIR}/EntryPoint.cpp
     ${CURRENT_SOURCE_DIR}/Tracer.h
     ${CURRENT_SOURCE_DIR}/Tracer.cu)
 
