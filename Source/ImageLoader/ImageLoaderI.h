@@ -91,7 +91,7 @@ requires(D == 2 || D == 3)
 struct Image
 {
     // This array is just to elide heap, so max 1Mx1M texture size
-    static constexpr size_t MAX_MIP_COUNT = 20;
+    static constexpr int32_t MAX_MIP_COUNT = 20;
     using MipMapArray = StaticVector<ImageMip<D>, MAX_MIP_COUNT>;
 
     ImageHeader<D>  header;

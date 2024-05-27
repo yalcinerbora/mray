@@ -38,7 +38,7 @@ class AccumImageStage : UniformMemoryRequesterI
     VkBuffer                foreignBuffer           = nullptr;
     VkSemaphore             timelineSemaphoreVk     = nullptr;
     // TODO: There is a type change here this will probably break on Linux?
-    SystemSemaphoreHandle   systemSemHandle         = (MRAY_IS_ON_WINDOWS) ? nullptr : 0;
+    SystemSemaphoreHandle   systemSemHandle         = 0;
     // Main system related stuff
     const VulkanSystemView* handlesVk       = nullptr;
     //

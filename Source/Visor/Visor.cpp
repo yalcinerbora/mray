@@ -66,11 +66,11 @@ MRayError VisorDebugSystem::Initialize(VkInstance inst)
 {
     instance = inst;
 
-    vkCreateDbgMessenger = (PFN_vkCreateDebugUtilsMessengerEXT)
-        vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+    vkCreateDbgMessenger = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>
+        (vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
 
-    vkDestroyDbgMessenger = (PFN_vkDestroyDebugUtilsMessengerEXT)
-        vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+    vkDestroyDbgMessenger = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>
+        (vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
 
     VkResult result = vkCreateDbgMessenger(instance,
                                            CreateInfo(),
@@ -316,16 +316,14 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
         VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME,
         VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME
     };
-    if constexpr(MRAY_IS_ON_WINDOWS)
-    {
+
+    #ifdef MRAY_WINDOWS
         RequiredExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
         RequiredExtensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME);
-    }
-    else if constexpr(MRAY_IS_ON_LINUX)
-    {
+    #elif defined MRAY_LINUX
         RequiredExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
         RequiredExtensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
-    }
+    #endif
 
     static constexpr size_t MAX_GPU = 32;
     struct DeviceParams
@@ -511,13 +509,13 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     // Show the memory of the device
     Span<const VkMemoryHeap> memHeapSpan(memProps.memoryHeaps,
                                          memProps.memoryHeapCount);
-    auto deviceHeap = std::find_if(memHeapSpan.cbegin(),
-                                   memHeapSpan.cend(),
+    auto deviceHeap = std::find_if(memHeapSpan.begin(),
+                                   memHeapSpan.end(),
                                    [](const auto& heap)
     {
         return heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT;
     });
-    assert(deviceHeap != memHeapSpan.cend());
+    assert(deviceHeap != memHeapSpan.end());
 
     // Determine the device local memory and host mapped memory
     Span<const VkMemoryType> memTypeSpan(memProps.memoryTypes,
@@ -537,14 +535,14 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     // This should be as fast as normal memory (speculation but, I mean come on)
     if(selectedDevice.type == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
     {
-        auto comboMemoryIt = std::find_if(memTypeSpan.cbegin(),
-                                          memTypeSpan.cend(),
+        auto comboMemoryIt = std::find_if(memTypeSpan.begin(),
+                                          memTypeSpan.end(),
                                           [](const auto& memType)
         {
             return ((memType.propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) &&
                     (memType.propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT));
         });
-        deviceLocalMemIndex = static_cast<uint32_t>(std::distance(memTypeSpan.cbegin(),
+        deviceLocalMemIndex = static_cast<uint32_t>(std::distance(memTypeSpan.begin(),
                                                                   comboMemoryIt));
         hostVisibleMemIndex = deviceLocalMemIndex;
     }
@@ -552,23 +550,23 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     // memory (In terms of CUDA) so images will not want to be reside there
     else
     {
-        auto deviceLocalIt = std::find_if(memTypeSpan.cbegin(),
-                                          memTypeSpan.cend(),
+        auto deviceLocalIt = std::find_if(memTypeSpan.begin(),
+                                          memTypeSpan.end(),
                                           [](const auto& memType)
         {
             return memType.propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
         });
         // This is guaranteed
-        deviceLocalMemIndex = static_cast<uint32_t>(std::distance(memTypeSpan.cbegin(),
+        deviceLocalMemIndex = static_cast<uint32_t>(std::distance(memTypeSpan.begin(),
                                                                   deviceLocalIt));
         // Host visible mem
-        auto hostVisibleIt = std::find_if(memTypeSpan.cbegin(),
-                                          memTypeSpan.cend(),
+        auto hostVisibleIt = std::find_if(memTypeSpan.begin(),
+                                          memTypeSpan.end(),
                                           [](const auto& memType)
         {
             return memType.propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
         });
-        hostVisibleMemIndex = static_cast<uint32_t>(std::distance(memTypeSpan.cbegin(),
+        hostVisibleMemIndex = static_cast<uint32_t>(std::distance(memTypeSpan.begin(),
                                                                   hostVisibleIt));
     }
     // Report the GPU

@@ -83,19 +83,19 @@ VulkanComputePipeline::DevourFile(const std::string& shaderName,
                                   const std::string& executablePath)
 {
     std::string fullPath = Filesystem::RelativePathToAbsolute(shaderName,
-                                                                executablePath);
+                                                              executablePath);
     std::streamoff size = std::ifstream(fullPath,
                                         std::ifstream::ate |
                                         std::ifstream::binary).tellg();
     assert(size == MathFunctions::NextMultiple(size, std::streamoff(4)));
-    std::vector<Byte> source(size, Byte(0));
+    std::vector<Byte> source(static_cast<size_t>(size), Byte(0));
     std::ifstream shaderFile = std::ifstream(fullPath, std::ios::binary);
 
     if(!shaderFile.is_open())
         return MRayError("Unable to open shader file \"{}\"",
                          fullPath);
     shaderFile.read(reinterpret_cast<char*>(source.data()),
-                    source.size());
+                    static_cast<std::streamsize>(source.size()));
 
     return source;
 }

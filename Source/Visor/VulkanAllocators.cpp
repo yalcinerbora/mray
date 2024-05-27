@@ -4,6 +4,10 @@
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_to_string.hpp>
 
+#ifdef MRAY_LINUX
+    #include <malloc.h>
+#endif
+
 void* VKAPI_CALL VulkanHostAllocator::Allocate(void*, size_t size, size_t align,
                                                VkSystemAllocationScope)
 {
@@ -27,6 +31,7 @@ void* VKAPI_CALL VulkanHostAllocator::Realloc(void*, void* ptr,
         auto oldSize = malloc_usable_size(ptr);
         std::memcpy(newPtr, ptr, oldSize);
         std::free(ptr);
+        return newPtr;
     }
     #endif
 }

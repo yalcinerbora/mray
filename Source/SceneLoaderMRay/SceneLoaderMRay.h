@@ -12,6 +12,16 @@
 class SceneLoaderMRay : public SceneLoaderI
 {
     public:
+    using TypeMappedNodes   = std::map<std::string, std::vector<JsonNode>>;
+    using TexMappedNodes    = std::vector<Tuple<NodeTexStruct, JsonNode, bool>>;
+
+    template <class Map>
+    struct MutexedMap
+    {
+        std::mutex  mutex;
+        Map         map;
+    };
+
     struct ExceptionList
     {
         private:
@@ -33,21 +43,12 @@ class SceneLoaderMRay : public SceneLoaderI
     using MediumIdMappings      = typename TracerIdPack::MediumIdMappings;
     using TextureIdMappings     = typename TracerIdPack::TextureIdMappings;
 
-    template <class Map>
-    struct MutexedMap
-    {
-        std::mutex  mutex;
-        Map         map;
-    };
-
     private:
     std::string         scenePath;
     nlohmann::json      sceneJson;
     BS::thread_pool&    threadPool;
 
     // Temporary Internal Data
-    using TypeMappedNodes   = std::map<std::string, std::vector<JsonNode>>;
-    using TexMappedNodes    = std::vector<Tuple<NodeTexStruct, JsonNode, bool>>;
     TypeMappedNodes     primNodes;
     TypeMappedNodes     cameraNodes;
     TypeMappedNodes     transformNodes;

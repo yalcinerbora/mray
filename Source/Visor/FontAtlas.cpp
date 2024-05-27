@@ -3,7 +3,7 @@
 #include <GLFW/glfw3.h>
 
 #include "Core/Filesystem.h"
-#include "../Resources/Fonts/IcomoonFontTable.h"
+#include "../Resources/Fonts/IcoMoonFontTable.h"
 
 FontAtlas::FontAtlas(std::string_view execPath)
     : executablePath(execPath)

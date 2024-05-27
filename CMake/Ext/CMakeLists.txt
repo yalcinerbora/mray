@@ -270,12 +270,11 @@ if(MSVC)
     set(SLANGC_SHA256_HASH "093A9D53BB5B44BF23446701F6BAEE47E08B6FE036E1A87A2155A8824AEAD786")
 elseif(UNIX AND NOT APPLE)
     set(SLANGC_PLATFORM_NAME "linux-x64")
-    set(SLANGC_ZIP_NAME "slang-2024.1.6-linux-x86_x64.tar.gz")
+    set(SLANGC_ZIP_NAME "slang-2024.1.6-linux-x86_64.tar.gz")
     set(SLANGC_SHA256_HASH "09E0A0443F142F6DB5ED9EAB2CC568EB3529461DDDE6426A02E75D1446B092E1")
 else()
     message(FATAL_ERROR "Unsupported platform for macos(?)")
 endif()
-
 FetchContent_Declare(slangc_ext
     URL "https://github.com/shader-slang/slang/releases/download/v2024.1.6/${SLANGC_ZIP_NAME}"
     URL_HASH "SHA256=${SLANGC_SHA256_HASH}")

@@ -110,7 +110,7 @@ template<size_t I, class... Tp>
 requires (I == sizeof...(Tp))
 inline void
 VulkanDeviceAllocator::AttachMemory(Tuple<Tp&...>&,
-                                    VkDeviceMemory mem,
+                                    VkDeviceMemory,
                                     const OffsetList<sizeof...(Tp)>&)
 {}
 

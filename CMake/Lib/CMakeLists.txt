@@ -172,8 +172,15 @@ gen_imported_target(NAME oiio::oiio SHARED DEBUG_TARGET OpenImageIOd RELEASE_TAR
 gen_imported_target(NAME oiio::oiio_util SHARED DEBUG_TARGET OpenImageIO_Utild RELEASE_TARGET OpenImageIO_Util)
 gen_imported_target(NAME spdlog::spdlog SHARED DEBUG_TARGET spdlogd RELEASE_TARGET spdlog)
 gen_imported_target(NAME imgui::imgui STATIC DEBUG_TARGET imguid RELEASE_TARGET imgui)
-gen_imported_target(NAME vulkan::vulkan STATIC DEBUG_TARGET vulkan-1d RELEASE_TARGET vulkan-1)
-gen_imported_target(NAME glfw3::glfw3 SHARED DEBUG_TARGET glfw3ddll RELEASE_TARGET glfw3dll)
+
+# Different names on different platforms
+if(MSVC)
+    gen_imported_target(NAME vulkan::vulkan SHARED DEBUG_TARGET vulkan-1d RELEASE_TARGET vulkan-1)
+    gen_imported_target(NAME glfw3::glfw3 SHARED DEBUG_TARGET glfw3ddll RELEASE_TARGET glfw3dll)
+else()
+    gen_imported_target(NAME vulkan::vulkan SHARED DEBUG_TARGET vulkand RELEASE_TARGET vulkan)
+    gen_imported_target(NAME glfw3::glfw3 SHARED DEBUG_TARGET glfwd RELEASE_TARGET glfw)
+endif()
 
 # gen_imported_target(NAME imgui::imgui_ti STATIC DEBUG_TARGET imgui_tex_inspectd RELEASE_TARGET imgui_tex_inspect)
 

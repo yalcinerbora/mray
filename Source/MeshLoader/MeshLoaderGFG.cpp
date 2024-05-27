@@ -223,7 +223,7 @@ TransientData MeshFileGFG::GetAttribute(PrimitiveAttributeLogic logic) const
             // TODO: Change this later
             loader.MeshIndexData(reinterpret_cast<uint8_t*>(span.data()),
                                  innerIndex);
-            return std::move(result);
+            return result;
 
         }, dataType);
     }
@@ -249,7 +249,7 @@ TransientData MeshFileGFG::GetAttribute(PrimitiveAttributeLogic logic) const
             loader.MeshVertexComponentDataGroup(reinterpret_cast<uint8_t*>(span.data()),
                                                 innerIndex, comp.logic);
 
-            return std::move(result);
+            return result;
         }, type);
     }
 }

@@ -125,7 +125,7 @@ typename TransformGroupSingle::DataSoA TransformGroupSingle::SoA() const
 
 TransformGroupMulti::TransformGroupMulti(uint32_t groupId,
                                          const GPUSystem& s)
-    : GenericGroupTransform<TransformGroupSingle>(groupId, s)
+    : GenericGroupTransform<TransformGroupMulti>(groupId, s)
 {}
 
 void TransformGroupMulti::CommitReservations()

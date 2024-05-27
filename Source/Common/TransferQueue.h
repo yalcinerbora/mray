@@ -157,8 +157,8 @@ inline TransferQueue::TransferQueue(size_t commandQueueSize,
                                     VisorTriggerCommand Trigger)
     : commands(commandQueueSize)
     , responses(respondQueueSize)
-    , visorView(*this)
     , tracerView(*this, std::move(Trigger))
+    , visorView(*this)
 {}
 
 inline TransferQueue::TracerView::TracerView(TransferQueue& t,

@@ -10,7 +10,7 @@
 
 struct VisorAnalyticData
 {
-    double  frameTime;
+    float   frameTime;
     double  usedGPUMemoryMiB;
 };
 

@@ -298,7 +298,7 @@ void VisorGUI::ShowFrameOverlay(bool& isOpen,
 
     if(ImGui::Begin("##VisorOverlay", &isOpen, window_flags))
     {
-        ImGui::Text("Frame  : %.2f ms", visorState.visor.frameTime);
+        ImGui::Text("Frame  : %.2f ms", static_cast<double>(visorState.visor.frameTime));
         ImGui::Text("Memory : %.2f MiB", visorState.visor.usedGPUMemoryMiB);
 
 
@@ -342,14 +342,14 @@ Optional<int32_t> VisorGUI::ShowRendererComboBox(const VisorState& visorState)
     {
         return ImGui::CalcTextSize((RENDERER_DASHED + s).c_str()).x;
     });
-    std::string prevName = RENDERER_DASHED + rTypes[curRIndex];
+    std::string prevName = RENDERER_DASHED + rTypes[static_cast<uint32_t>(curRIndex)];
     ImGui::SetNextItemWidth(maxSize + ImGui::GetStyle().FramePadding.x * 2.0f);
     if(ImGui::BeginCombo("##Renderers", prevName.c_str(),
                          ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_HeightSmall))
     {
         for(int32_t i = 0; i < rCount; i++)
         {
-            const auto& rendererName = visorState.tracer.rendererTypes[i];
+            const auto& rendererName = visorState.tracer.rendererTypes[static_cast<uint32_t>(i)];
             bool isSelected = (i == curRIndex);
             if(ImGui::Selectable(rendererName.c_str(), &isSelected) &&
                i != curRIndex)
@@ -431,7 +431,7 @@ StatusBarChanges VisorGUI::ShowStatusBar(const VisorState& visorState)
 
 Optional<CameraTransform> VisorGUI::ShowMainImage(const VisorState& visorState)
 {
-    int32_t movementCount = static_cast<uint32_t>(movementSchemes.size());
+    int32_t movementCount = static_cast<int32_t>(movementSchemes.size());
     if(inputChecker.CheckKeyPress(VisorUserAction::NEXT_MOVEMENT))
     {
         movementIndex++;
@@ -472,7 +472,7 @@ Optional<CameraTransform> VisorGUI::ShowMainImage(const VisorState& visorState)
 
 MovementSchemeI& VisorGUI::CurrentMovement()
 {
-    return *movementSchemes[movementIndex];
+    return *movementSchemes[static_cast<uint32_t>(movementIndex)];
 }
 
 VisorGUI::VisorGUI(const VisorKeyMap* km)

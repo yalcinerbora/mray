@@ -10,7 +10,7 @@ inline bool IsDashed(const nlohmann::json& n)
 inline TextureAccessLayout LoadTextureAccessLayout(const nlohmann::json& node)
 {
     using namespace std::literals;
-    std::string_view l = node;
+    std::string_view l = node.get<std::string_view>();
     if(l == "r"sv)  return TextureAccessLayout::R;
     if(l == "g"sv)  return TextureAccessLayout::G;
     if(l == "b"sv)  return TextureAccessLayout::B;
@@ -81,15 +81,15 @@ inline void from_json(const nlohmann::json& n, SurfaceStruct& s)
             auto alphaIt = n.find(NodeNames::ALPHA_MAP);
             // Technically "-" should be supported only but
             // check if it is string here actual type is object.
-            if(alphaIt != n.cend() && !alphaIt[i].is_string())
+            if(alphaIt != n.cend() && !(*alphaIt)[i].is_string())
                 s.alphaMaps[i] = (*alphaIt)[i].get<NodeTexStruct>();
 
             auto cullIt = n.find(NodeNames::CULL_FACE);
-            if(cullIt != n.cend() && !cullIt[i].is_string())
+            if(cullIt != n.cend() && !(*cullIt)[i].is_string())
                 s.doCullBackFace[i] = (*cullIt)[i].get<bool>();
 
         }
-        s.pairCount = static_cast<uint8_t>(matArray.size());
+        s.pairCount = static_cast<int8_t>(matArray.size());
     }
 }
 
@@ -182,12 +182,12 @@ inline const nlohmann::json& JsonNode::RawNode() const
 
 inline std::string_view JsonNode::Type() const
 {
-    return node->at(NodeNames::TYPE);
+    return node->at(NodeNames::TYPE).get<std::string_view>();
 }
 
 inline std::string_view JsonNode::Tag() const
 {
-    return node->at(NodeNames::TAG);
+    return node->at(NodeNames::TAG).get<std::string_view>();
 }
 
 inline uint32_t JsonNode::Id() const
@@ -214,7 +214,7 @@ TransientData JsonNode::CommonDataArray(std::string_view name) const
         T val = nodeArray[i].get<T>();
         input.Push(Span<const T>(&val, 1));
     }
-    return std::move(input);
+    return input;
 }
 
 inline size_t JsonNode::CheckDataArraySize(std::string_view name) const
@@ -264,7 +264,7 @@ TransientData JsonNode::AccessDataArray(std::string_view name) const
         T val = nodeArray[i].get<T>();
         input.Push(Span<const T>(&val, 1));
     }
-    return std::move(input);
+    return input;
 }
 // Optional Data
 template<class T>

@@ -11,9 +11,9 @@ TonemapStage::TonemapStage(const VulkanSystemView& view)
 {}
 
 TonemapStage::TonemapStage(TonemapStage&& other)
-    : sdrImage(std::move(other.sdrImage))
-    , uniformBuffer(std::move(other.uniformBuffer))
-    , tonemappers(std::move(tonemappers))
+    : uniformBuffer(std::move(other.uniformBuffer))
+    , sdrImage(std::move(other.sdrImage))
+    , tonemappers(std::move(other.tonemappers))
     , currentTonemapper(other.currentTonemapper)
     , handlesVk(other.handlesVk)
 {}
@@ -22,7 +22,7 @@ TonemapStage& TonemapStage::operator=(TonemapStage&& other)
 {
     assert(this != &other);
     uniformBuffer = std::move(other.uniformBuffer);
-    tonemappers = std::move(tonemappers);
+    tonemappers = std::move(other.tonemappers);
     currentTonemapper = other.currentTonemapper;
     handlesVk = other.handlesVk;
     return *this;

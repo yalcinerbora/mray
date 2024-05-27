@@ -195,7 +195,7 @@ TransientData JsonTriangle::GetAttribute(PrimitiveAttributeLogic attribLogic) co
         auto inSpan = t.AccessAs<T>();
         TransientData result(std::in_place_type_t<T>(), inSpan.size());
         result.Push(inSpan);
-        return std::move(result);
+        return result;
     };
 
     using enum PrimitiveAttributeLogic;
@@ -275,13 +275,13 @@ TransientData JsonSphere::GetAttribute(PrimitiveAttributeLogic attribLogic) cons
     {
         TransientData result(std::in_place_type_t<Vector3>{}, 1);
         result.Push(Span<const Vector3>(&position, 1));
-        return std::move(result);
+        return result;
     }
     else if(attribLogic == PrimitiveAttributeLogic::RADIUS)
     {
         TransientData result(std::in_place_type_t<Float>{}, 1);
         result.Push(Span<const Float>(&radius, 1));
-        return std::move(result);
+        return result;
     }
     else throw MRayError("Unknown attribute logic!");
 }

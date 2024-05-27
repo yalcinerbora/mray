@@ -9,8 +9,8 @@
 MeshFileAssimp::MeshFileAssimp(Assimp::Importer& imp,
                                const std::string& fPath,
                                uint32_t internalIndex)
-    : importer(imp)
-    , filePath(fPath)
+    : filePath(fPath)
+    , importer(imp)
     , scene(nullptr)
     , innerIndex(internalIndex)
 {
@@ -106,7 +106,7 @@ TransientData MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) 
                              mesh->mTextureCoords[texCoordIndex][i].y);
                     input.Push(Span<const T>(&uv, 1));
                 }
-                return std::move(input);
+                return input;
             }
             default: return TransientData(std::in_place_type_t<Byte>{}, 0);
         }
@@ -117,7 +117,7 @@ TransientData MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) 
         }
 
         input.Push(Span<const T>(attributePtr, localCount));
-        return std::move(input);
+        return input;
     };
 
     const auto& mesh = scene->mMeshes[innerIndex];
@@ -132,7 +132,7 @@ TransientData MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) 
                                   face.mIndices[2]);
             input.Push(Span<const Vector3ui>(&faceIndices, 1));
         };
-        return std::move(input);
+        return input;
     }
     else
     {

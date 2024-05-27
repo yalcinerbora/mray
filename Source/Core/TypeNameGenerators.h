@@ -27,9 +27,9 @@ namespace Detail
             return arr;
         }
         // Give the joined string static storage
-        static constexpr auto arr = impl();
+        static constexpr auto Arr = impl();
         // View as a std::string_view
-        static constexpr std::string_view value{arr.data(), arr.size() - 1};
+        static constexpr std::string_view value{Arr.data(), Arr.size() - 1};
     };
     // Helper to get the value out
     template <const std::string_view&... Strs>
