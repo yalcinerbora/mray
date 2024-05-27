@@ -22,7 +22,7 @@ AccumImageStage::AccumImageStage(AccumImageStage&& other)
     , foreignMemory(std::exchange(other.foreignMemory, nullptr))
     , foreignBuffer(std::exchange(other.foreignBuffer, nullptr))
     , timelineSemaphoreVk(std::exchange(other.timelineSemaphoreVk, nullptr))
-    , systemSemHandle(std::exchange(other.systemSemHandle, 0))
+    , systemSemHandle(std::exchange(other.systemSemHandle, SystemSemaphoreHandle(0)))
     , handlesVk(other.handlesVk)
     , pipeline(std::move(other.pipeline))
     , hdrImage(other.hdrImage)
@@ -37,7 +37,7 @@ AccumImageStage& AccumImageStage::operator=(AccumImageStage&& other)
     uniformBuffer = other.uniformBuffer;
     foreignMemory = std::exchange(other.foreignMemory, nullptr);
     foreignBuffer = std::exchange(other.foreignBuffer, nullptr);
-    systemSemHandle = std::exchange(other.systemSemHandle, 0);
+    systemSemHandle = std::exchange(other.systemSemHandle, SystemSemaphoreHandle(0));
     timelineSemaphoreVk = std::exchange(other.timelineSemaphoreVk, nullptr);
     handlesVk = other.handlesVk;
     pipeline = std::move(other.pipeline);
