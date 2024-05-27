@@ -19,7 +19,7 @@ namespace Detail
         {
             constexpr std::size_t len = (Strs.size() + ... + 0);
             std::array<char, len + 1> arr{};
-            auto append = [i = 0, &arr](auto const& s) mutable {
+            auto append = [i = 0u, &arr](auto const& s) mutable {
                 for(auto c : s) arr[i++] = c;
             };
             (append(Strs), ...);

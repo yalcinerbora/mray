@@ -80,16 +80,18 @@ class AcceleratorWorkI
 {
     private:
     protected:
-    virtual void CastLocalRays(// Output
-                               Span<HitKeyPack> dHitKeys,
-                               // I-O
-                               Span<BackupRNGState> rngStates,
-                               Span<RayGMem> dRays,
-                               // Input
-                               Span<const RayIndex> dRayIndices,
-                               Span<const CommonKey> dAccelIdPacks,
-                               // Constants
-                               const GPUQueue& queue) const = 0;
+    virtual void    CastLocalRays(// Output
+                                  Span<HitKeyPack> dHitKeys,
+                                  // I-O
+                                  Span<BackupRNGState> rngStates,
+                                  Span<RayGMem> dRays,
+                                  // Input
+                                  Span<const RayIndex> dRayIndices,
+                                  Span<const CommonKey> dAccelIdPacks,
+                                  // Constants
+                                  const GPUQueue& queue) const = 0;
+    public:
+    virtual         ~AcceleratorWorkI() = default;
 };
 
 template<AccelGroupC AcceleratorGroupType,

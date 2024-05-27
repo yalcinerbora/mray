@@ -449,10 +449,11 @@ void LightGroupSkysphere<CC>::HandlePrimBatches(const PrimBatchList&)
 template <CoordConverterC CC>
 std::string_view LightGroupSkysphere<CC>::TypeName()
 {
-    using namespace TypeNameGen::CompTime;
-    using namespace std::string_view_literals;
-    static constexpr auto Name = "Skysphere"sv;
-    return LightTypeName<Name>;
+    // using namespace TypeNameGen::CompTime;
+    // using namespace std::string_view_literals;
+    // static constexpr auto Name = "Skysphere"sv;
+    // return LightTypeName<Name>;
+    return "(L)Skysphere";
 }
 
 template <CoordConverterC CC>

@@ -36,6 +36,10 @@ target_sources(imgui PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
 )
 
+# Position independent code is required for static library on Linux (ld?)
+set_target_properties(imgui PROPERTIES
+                      POSITION_INDEPENDENT_CODE ON)
+
 # imgui backends directly include imgui.h
 # so we cannot add backends to backend folder directly install these
 set(IMGUI_BACKEND_HEADERS
