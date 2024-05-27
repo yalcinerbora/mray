@@ -77,7 +77,9 @@ function(gen_tracer_target)
     set(SRC_COMMON
         ${CMAKE_CURRENT_FUNCTION_LIST_FILE}
         ${CURRENT_SOURCE_DIR}/TracerTypes.h
-        ${CURRENT_SOURCE_DIR}/GenericGroup.h)
+        ${CURRENT_SOURCE_DIR}/GenericGroup.h
+        ${CURRENT_SOURCE_DIR}/TracerBase.h
+        ${CURRENT_SOURCE_DIR}/TracerBase.cu)
 
     set(SRC_ALL
         ${SRC_PRIMITIVES}
@@ -114,6 +116,7 @@ function(gen_tracer_target)
                           ${DEVICE_TARGET_FULL_NAME}
                           CoreLib
                           TransientPool
+                          bs::thread_pool
                           PRIVATE
                           mray::meta_compile_opts
                           mray::cuda_extra_compile_opts)

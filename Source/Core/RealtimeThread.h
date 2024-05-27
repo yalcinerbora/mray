@@ -1,16 +1,19 @@
 #pragma once
 /**
 
-Looping Thread Partial Interface
+RealtimeThread Thread Partial Interface
 
 used by threads that do same work over and over again
-like tracer thread and visor thread.
+(currently Tracer only, visor is GUI app so MT is better for it
+due to dear imgui's MT (more or less) requirement)
 
-Visor thread continuously renders stuff until terminated
-Tracer(s) continuously render stuff until terminated
+Extender can define internal terminate condition
+where thread automatically ends
 
-User can define internal terminate condition where thread automatically ends
-
+TODO:
+This was before jthread, (this has extra this has pause functionality)
+Probably jthread can be used instead. (We do not pause via this interface,
+instead we pause using the queue's condition variable)
 */
 
 #include <thread>
@@ -52,7 +55,7 @@ inline void RealtimeThread::THRDEntry()
 {
     InitialWork();
 
-    while(!InternallyTerminated() || stopSignal)
+    while(!InternallyTerminated() || !stopSignal)
     {
         LoopWork();
 
@@ -65,9 +68,6 @@ inline void RealtimeThread::THRDEntry()
                 return stopSignal || !pauseSignal;
             });
         }
-
-        // Break the thread loop and terminate
-        if(stopSignal) break;
     }
     FinalWork();
 }
