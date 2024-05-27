@@ -7,6 +7,7 @@
 #include "Tracer/PrimitiveDefaultTriangle.h"
 #include "Tracer/LightC.h"
 #include "Tracer/LightsDefault.h"
+#include "Tracer/MetaLight.h"
 
 #include "Core/Log.h"
 

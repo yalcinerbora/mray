@@ -44,7 +44,9 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/LightC.h
         ${CURRENT_SOURCE_DIR}/LightsDefault.h
         ${CURRENT_SOURCE_DIR}/LightsDefault.hpp
-        ${CURRENT_SOURCE_DIR}/LightsDefault.cu)
+        ${CURRENT_SOURCE_DIR}/LightsDefault.cu
+        ${CURRENT_SOURCE_DIR}/MetaLight.h
+        ${CURRENT_SOURCE_DIR}/MetaLight.hpp)
 
     set(SRC_ACCELLERATORS
         ${CURRENT_SOURCE_DIR}/AcceleratorC.h
@@ -79,7 +81,7 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/TracerTypes.h
         ${CURRENT_SOURCE_DIR}/GenericGroup.h
         ${CURRENT_SOURCE_DIR}/TracerBase.h
-        ${CURRENT_SOURCE_DIR}/TracerBase.cu)
+        ${CURRENT_SOURCE_DIR}/TracerBase.cpp)
 
     set(SRC_ALL
         ${SRC_PRIMITIVES}
