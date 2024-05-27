@@ -96,6 +96,7 @@ template <std::integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr T MathFunctions::DivideUp(T value, T divisor)
 {
+    assert(divisor != T(0));
     return (value + divisor - 1) / divisor;
 }
 

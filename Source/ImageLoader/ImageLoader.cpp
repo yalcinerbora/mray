@@ -398,7 +398,7 @@ Expected<Image<2>> ImageLoader::ReadImageSubChannel(const std::string&,
                                                     ImageChannelType,
                                                     ImageIOFlags flags) const
 {
-    return MRayError::OK;
+    return MRayError("Not implemented!");
 }
 
 Expected<ImageHeader<2>> ImageLoader::ReadImageHeader2D(const std::string& filePath,

@@ -752,7 +752,7 @@ MRayError VisorVulkan::MTInitialize(TransferQueue& transferQueue,
     if(r != VK_SUCCESS)
         return MRayError("Unable to create Vulkan Instance");
 
-    if(MRAY_IS_DEBUG && validationLayerFound)
+    if constexpr(MRAY_IS_DEBUG && validationLayerFound)
     {
         e = debugSystem.Initialize(instanceVk);
         if(e) return e;

@@ -80,6 +80,7 @@ void FontAtlas::AddMonitorFont(GLFWmonitor* monitor)
     static const ImWchar icon_ranges[] = {ICON_MIN_ICOMN, ICON_MAX_ICOMN, 0};
     std::string ofiTTFPath = Filesystem::RelativePathToAbsolute(ICON_FONT_PATH,
                                                                 executablePath);
+    [[maybe_unused]]
     ImFont* iconFont = io.Fonts->AddFontFromFileTTF(ofiTTFPath.c_str(),
                                                     scaledPixelSize,
                                                     &config, icon_ranges);
