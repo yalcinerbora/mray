@@ -897,6 +897,7 @@ template <unsigned int N, ArithmeticC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector<N, T> Vector<N, T>::OrthogonalVector(const Vector<N, T>& v) requires std::floating_point<T> && (N == 3)
 {
+    using namespace std;
     // PBRT Book
     // https://www.pbr-book.org/3ed-2018/Geometry_and_Transformations/Vectors#CoordinateSystem
     if(abs(v[0]) > abs(v[1]))

@@ -216,7 +216,7 @@ float FrameCounter::AvgFrame()
     if(queryData[3] != 0 && queryData[1] != 0)
     {
         double frameTimeMs = static_cast<double>(queryData[2] - queryData[0]);
-        frameTimeMs *= (timestampPeriod / 1000000.0);
+        frameTimeMs *= (static_cast<double>(timestampPeriod) / 1000000.0);
         float frameTimeMsF = static_cast<float>(frameTimeMs);
 
         if(firstFrame)
@@ -1008,7 +1008,7 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
 
     if(changes.topBarChanges.rendererIndex)
     {
-        uint32_t rIndex = changes.topBarChanges.rendererIndex.value();
+        int32_t rIndex = changes.topBarChanges.rendererIndex.value();
         visorState.currentRenderIndex = rIndex;
         transferQueue->Enqueue(VisorAction
         (
@@ -1019,7 +1019,7 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
 
     if(changes.topBarChanges.customLogicIndex0)
     {
-        uint32_t lIndex = changes.topBarChanges.customLogicIndex0.value();
+        int32_t lIndex = changes.topBarChanges.customLogicIndex0.value();
         visorState.currentRenderLogic0 = lIndex;
         transferQueue->Enqueue(VisorAction
         (
@@ -1029,7 +1029,7 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
     }
     if(changes.topBarChanges.customLogicIndex1)
     {
-        uint32_t lIndex = changes.topBarChanges.customLogicIndex1.value();
+        int32_t lIndex = changes.topBarChanges.customLogicIndex1.value();
         visorState.currentRenderLogic1 = lIndex;
         transferQueue->Enqueue(VisorAction
         (

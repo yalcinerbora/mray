@@ -251,7 +251,7 @@ constexpr Matrix<N, T> Matrix<N, T>::operator*(const Matrix& right) const
         }
         // Dot product with each row, write is strided again
         UNROLL_LOOP
-        for(int j = 0; j < N; j++)
+        for(unsigned int j = 0; j < N; j++)
         {
             auto leftRow = Vector<N, T>(Span<const T, N>(matrix.data() + j * N, N));
             m(i, j) = leftRow.Dot(col);
@@ -909,6 +909,7 @@ template<std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Matrix<4, T> TransformGen::Rotate(T angle, const Vector<3, T>& axis)
 {
+    using namespace std;
     //  r       r       r       0
     //  r       r       r       0
     //  r       r       r       0

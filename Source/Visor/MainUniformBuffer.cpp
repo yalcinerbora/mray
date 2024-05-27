@@ -2,8 +2,8 @@
 
 
 MainUniformBuffer::MainUniformBuffer(const VulkanSystemView& handles)
-    : handlesVk(&handles)
-    , mainUniformBuffer(handles)
+    : mainUniformBuffer(handles)
+    , handlesVk(&handles)
 {}
 
 MainUniformBuffer::MainUniformBuffer(MainUniformBuffer&& other)
@@ -53,11 +53,11 @@ void MainUniformBuffer::AllocateUniformBuffers(std::array<UniformMemoryRequester
         totalSize = MathFunctions::NextMultiple(totalSize, VULKAN_META_ALIGNMENT);
     }
     //
-    mainUniformBuffer = VulkanBuffer(handlesVk,
+    mainUniformBuffer = VulkanBuffer(*handlesVk,
                                      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                      totalSize);
-    mainMemory = VulkanDeviceAllocator::AllocateMultiObject(std::tie(mainUniformBuffer),
-                                                            VulkanDeviceAllocator::HOST_VISIBLE);
+    mainMemory = VulkanDeviceAllocator::Instance().AllocateMultiObject(std::tie(mainUniformBuffer),
+                                                                       VulkanDeviceAllocator::HOST_VISIBLE);
     void* hPtr;
     vkMapMemory(handlesVk->deviceVk, mainMemory, 0,
                 totalSize, 0, &hPtr);

@@ -30,8 +30,8 @@ RenderBufferInfo RenderImageBuffer::Resize(const Vector2ui& newResolution,
     samples = newSamples;
 
     Byte* mem = static_cast<Byte*>(memory);
-    pixStartOffset = std::distance(mem, reinterpret_cast<Byte*>(newPixels.data()));
-    sampleStartOffset = std::distance(mem, reinterpret_cast<Byte*>(newSamples.data()));
+    pixStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(newPixels.data())));
+    sampleStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(newSamples.data())));
     return RenderBufferInfo
     {
         .data = mem,

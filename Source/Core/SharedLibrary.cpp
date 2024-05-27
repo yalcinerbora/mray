@@ -2,6 +2,7 @@
 
 #include "SharedLibrary.h"
 #include "System.h"
+#include "Filesystem.h"
 
 // Env Headers
 #if defined MRAY_WINDOWS
@@ -67,7 +68,7 @@ static std::wstring ConvertWCharWin32(const std::string& unicodeStr)
 
 #endif
 
-const void* SharedLibrary::GetProcAdressInternal(const std::string& fName) const
+void* SharedLibrary::GetProcAdressInternal(const std::string& fName) const
 {
     #ifdef MRAY_WINDOWS
         FARPROC proc = GetProcAddress((HINSTANCE)libHandle, fName.c_str());
@@ -95,15 +96,15 @@ SharedLibrary::SharedLibrary(const std::string& libName)
         {
             potentialError = FormatErrorWin32();
         }
-    #elif defined METURAY_LINUX
+    #elif defined MRAY_LINUX
         libWithExt = "lib";
         libWithExt += libName;
         libWithExt += LinuxDLLExt;
 
         // On Linux Directly provide the path
         // TODO: Change this to a more generic solution
-        std::string execPath = Utility::CurrentExecPath();
-        libWithExt = Utility::MergeFileFolder(execPath, libWithExt);
+        std::string execPath = GetProcessPath();
+        libWithExt = Filesystem::RelativePathToAbsolute(execPath, libWithExt);
         libHandle = dlopen(libWithExt.c_str(), RTLD_NOW);
         if(libHandle == nullptr)
             potentialError = dlerror();

@@ -104,13 +104,15 @@ MRayError FramePool::Initialize(const VulkanSystemView& handlesVk)
 
 FramePack FramePool::AcquireNextFrame(Swapchain& swapchain)
 {
-    vkWaitForFences(deviceVk, 1, &fences[frameIndex],
+    assert(frameIndex >= 0 && frameIndex < FRAME_COUNT);
+    uint32_t frameIndexUInt = static_cast<uint32_t>(frameIndex);
+    vkWaitForFences(deviceVk, 1, &fences[frameIndexUInt],
                     VK_TRUE, std::numeric_limits<uint64_t>::max());
 
-    VkSemaphore imgAvailSem = semaphores[frameIndex].imageAvailableSignal;
+    VkSemaphore imgAvailSem = semaphores[frameIndexUInt].imageAvailableSignal;
     FramebufferPack fbPack = swapchain.NextFrame(imgAvailSem);
 
-    vkResetFences(deviceVk, 1, &fences[frameIndex]);
+    vkResetFences(deviceVk, 1, &fences[frameIndexUInt]);
 
     FramePack framePack = {};
     framePack.extent = fbPack.extent;
@@ -118,15 +120,17 @@ FramePack FramePool::AcquireNextFrame(Swapchain& swapchain)
     framePack.imgView = fbPack.imgView;
     framePack.fbo = fbPack.fbo;
     framePack.renderPass = fbPack.renderPass;
-    framePack.commandBuffer = cBuffers[frameIndex];
+    framePack.commandBuffer = cBuffers[frameIndexUInt];
     return framePack;
 }
 
 void FramePool::PresentThisFrame(Swapchain& swapchain,
                                  const Optional<SemaphoreVariant>& waitSemOverride)
 {
-    VkSemaphore imgAvailSem = semaphores[frameIndex].imageAvailableSignal;
-    VkSemaphore comRecordSem = semaphores[frameIndex].commandsRecordedSignal;
+    assert(frameIndex >= 0 && frameIndex < FRAME_COUNT);
+    uint32_t frameIndexUInt = static_cast<uint32_t>(frameIndex);
+    VkSemaphore imgAvailSem = semaphores[frameIndexUInt].imageAvailableSignal;
+    VkSemaphore comRecordSem = semaphores[frameIndexUInt].commandsRecordedSignal;
 
     // ============= //
     //   SUBMISSON   //
@@ -155,7 +159,7 @@ void FramePool::PresentThisFrame(Swapchain& swapchain,
     {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
         .pNext = nullptr,
-        .commandBuffer = cBuffers[frameIndex],
+        .commandBuffer = cBuffers[frameIndexUInt],
         .deviceMask = 0
 
     };
@@ -172,7 +176,7 @@ void FramePool::PresentThisFrame(Swapchain& swapchain,
         .pSignalSemaphoreInfos = &signalSemaphores
     };
     // Finally submit!
-    vkQueueSubmit2(mainQueueVk, 1, &submitInfo, fences[frameIndex]);
+    vkQueueSubmit2(mainQueueVk, 1, &submitInfo, fences[frameIndexUInt]);
 
     //VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     //VkSubmitInfo submitInfo =
@@ -211,5 +215,5 @@ VkCommandBuffer FramePool::AllocateCommandBuffer() const
 VkSemaphore FramePool::PrevFrameFinishSignal()
 {
     int32_t prevFrame = MathFunctions::Roll(frameIndex - 1, 0, FRAME_COUNT);
-    return semaphores[prevFrame].imageAvailableSignal;
+    return semaphores[static_cast<size_t>(prevFrame)].imageAvailableSignal;
 }

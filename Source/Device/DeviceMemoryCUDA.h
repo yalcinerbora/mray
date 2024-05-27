@@ -153,8 +153,8 @@ class DeviceMemoryCUDA
 class ExternalMemoryCUDA
 {
     private:
-    SystemMemoryHandle      memHandle;
-    SystemMemoryHandle      memSize;
+    // SystemMemoryHandle;//      memHandle;
+    // SystemMemoryHandle;//      memSize;
     public:
 };
 

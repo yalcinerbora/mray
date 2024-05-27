@@ -437,8 +437,6 @@ std::vector<TransientData> TransformAttributeLoad(const AttributeCountList& tota
 
             if(isArray)
             {
-                using OptionalVec3List = std::vector<Optional<Vector3>>;
-
                 Optional<TransientData> tL = n.AccessOptionalDataArray<Vector3>(TRANSLATE);
                 Optional<TransientData> rL = n.AccessOptionalDataArray<Vector3>(ROTATE);
                 Optional<TransientData> sL = n.AccessOptionalDataArray<Vector3>(SCALE);
@@ -681,7 +679,9 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
 
             bool barrierPassed = false;
             size_t localCount = end - start;
-            auto nodeRange = Span<const JsonNode>(nodes.cbegin() + start, localCount);
+            using ItDiff = decltype(nodes.cbegin())::difference_type;
+            auto startConv = static_cast<ItDiff>(start);
+            auto nodeRange = Span<const JsonNode>(nodes.cbegin() + startConv, localCount);
             IdList generatedIds;
             try
             {
@@ -1422,8 +1422,6 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     constexpr uint32_t INNER_INDEX = 1;
     using ItemLocation = Pair<uint32_t, uint32_t>;
     using ItemLocationMap = std::unordered_map<uint32_t, ItemLocation>;
-    using AnnotationFunction = std::string(&)(std::string_view);
-
 
     auto CreateHT = [](ItemLocationMap& result,
                        const nlohmann::json& definitions) -> void
@@ -1620,8 +1618,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
 
             uint32_t primListIndex = std::get<ARRAY_INDEX>(primLoc->second);
             std::string_view primTypeName = sceneJson[PRIMITIVE_LIST]
-                                                        [primListIndex]
-                                                        [TYPE];
+                                                     [primListIndex]
+                                                     [TYPE].get<std::string_view>();
             finalTypeName = CreatePrimBackedLightTypeName(primTypeName);
         }
         lightNodes[finalTypeName].emplace_back(std::move(node));
@@ -2029,8 +2027,8 @@ Expected<TracerIdPack> SceneLoaderMRay::LoadScene(TracerI& tracer,
 {
     Timer t; t.Start();
     MRayError e = MRayError::OK;
-    if(e = OpenFile(filePath)) return e;
-    if(e = LoadAll(tracer)) return e;
+    if((e = OpenFile(filePath))) return e;
+    if((e = LoadAll(tracer))) return e;
     t.Split();
 
     ClearIntermediateBuffers();
@@ -2042,8 +2040,8 @@ Expected<TracerIdPack> SceneLoaderMRay::LoadScene(TracerI& tracer,
 {
     Timer t; t.Start();
     MRayError e = MRayError::OK;
-    if(e = ReadStream(sceneData)) return e;
-    if(e = LoadAll(tracer)) return e;
+    if((e = ReadStream(sceneData))) return e;
+    if((e = LoadAll(tracer))) return e;
     t.Split();
 
     ClearIntermediateBuffers();

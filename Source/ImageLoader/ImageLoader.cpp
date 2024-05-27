@@ -207,12 +207,12 @@ Expected<std::string> ImageLoader::ColorSpaceToOIIO(const ColorSpacePack& pack)
     std::string prefix;
     switch(pack.second)
     {
-        case MRayColorSpaceEnum::MR_ACES2065_1: prefix = "ACES2065-1";  break;
-        case MRayColorSpaceEnum::MR_ACES_CG:    prefix = "ACEScg";      break;
-        case MRayColorSpaceEnum::MR_REC_709:    prefix = "Rec709";      break;
-        case MRayColorSpaceEnum::MR_REC_2020:   prefix = "Rec2020";
-        case MRayColorSpaceEnum::MR_DCI_P3:     prefix = "DCIP3";
-        case MRayColorSpaceEnum::MR_DEFAULT:    prefix = "scene_linear";
+        case MRayColorSpaceEnum::MR_ACES2065_1: prefix = "ACES2065-1";      break;
+        case MRayColorSpaceEnum::MR_ACES_CG:    prefix = "ACEScg";          break;
+        case MRayColorSpaceEnum::MR_REC_709:    prefix = "Rec709";          break;
+        case MRayColorSpaceEnum::MR_REC_2020:   prefix = "Rec2020";         break;
+        case MRayColorSpaceEnum::MR_DCI_P3:     prefix = "DCIP3";           break;
+        case MRayColorSpaceEnum::MR_DEFAULT:    prefix = "scene_linear";    break;
         default: return MRayError("Unable to convert color space type to OIIO type {}",
                                   MRayColorSpaceStringifier::ToString(type));
     }
@@ -367,18 +367,21 @@ Expected<Image<2>> ImageLoader::ReadImage2D(const std::string& filePath,
                                 flags[ImageFlagTypes::TRY_3C_4C_CONVERSION]);
         int nChannels = (doChannelExpand) ? (spec.nchannels + 1) : (spec.nchannels);
         OIIO::stride_t xStride = (doChannelExpand)
-                                    ? (nChannels * readFormat.size())
+                                    ? (nChannels * static_cast<OIIO::stride_t>(readFormat.size()))
                                     : (OIIO::AutoStride);
         // Change the final spec as well for color convert
         if(doChannelExpand) finalSpec.nchannels = nChannels;
 
         // Allocate the expanded (or non-expanded) buffer and directly load into it
-        TransientData pixels(std::in_place_type_t<Byte>{},
-                             spec.width* spec.height* nChannels* readFormat.size());
-        OIIO::stride_t scanLineSize = spec.width * nChannels * readFormat.size();
+        size_t scanLineSize = (static_cast<size_t>(spec.width) *
+                               static_cast<size_t>(nChannels) *
+                               readFormat.size());
+        size_t totalSize = scanLineSize * static_cast<size_t>(spec.height);
+        TransientData pixels(std::in_place_type_t<Byte>{}, totalSize);
         Byte* dataLastElement = pixels.AccessAs<Byte>().data() + (header.dimensions[1] - 1) * scanLineSize;
         // Now we can read the file directly flipped and with proper format etc. etc.
-        if(!inFile->read_image(readFormat, dataLastElement, xStride, -scanLineSize))
+        OIIO::stride_t oiioScanLineSize = static_cast<OIIO::stride_t>(scanLineSize);
+        if(!inFile->read_image(readFormat, dataLastElement, xStride, -oiioScanLineSize))
             return MRayError("OIIO Error ({})", inFile->geterror());
 
         // Re-adjust the pixelFormat (we may have done channel expand and sign convert
@@ -396,7 +399,7 @@ Expected<Image<2>> ImageLoader::ReadImage2D(const std::string& filePath,
 
 Expected<Image<2>> ImageLoader::ReadImageSubChannel(const std::string&,
                                                     ImageChannelType,
-                                                    ImageIOFlags flags) const
+                                                    ImageIOFlags) const
 {
     return MRayError("Not implemented!");
 }

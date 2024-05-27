@@ -5,11 +5,12 @@
     #define WINDOWS_LEAN_AND_MEAN
     #include <windows.h>
     #include <vulkan/vulkan_win32.h>
+
+    // Changing this to translation unit global, this will be used only here
+    PFN_vkGetSemaphoreWin32HandleKHR vkGetSemaphoreWin32Handle = nullptr;
 #endif
 
 PFN_vkGetMemoryHostPointerPropertiesEXT AccumImageStage::vkGetMemoryHostPointerProperties = nullptr;
-// Changing this to translation unit global, this will be used only here
-PFN_vkGetSemaphoreWin32HandleKHR vkGetSemaphoreWin32Handle = nullptr;
 
 AccumImageStage::AccumImageStage(const VulkanSystemView& handles)
     : handlesVk(&handles)
@@ -20,9 +21,8 @@ AccumImageStage::AccumImageStage(AccumImageStage&& other)
     : uniformBuffer(other.uniformBuffer)
     , foreignMemory(std::exchange(other.foreignMemory, nullptr))
     , foreignBuffer(std::exchange(other.foreignBuffer, nullptr))
-    , systemSemHandle(std::exchange(other.systemSemHandle,
-                                    (MRAY_IS_ON_WINDOWS) ? nullptr : 0))
     , timelineSemaphoreVk(std::exchange(other.timelineSemaphoreVk, nullptr))
+    , systemSemHandle(std::exchange(other.systemSemHandle, 0))
     , handlesVk(other.handlesVk)
     , pipeline(std::move(other.pipeline))
     , hdrImage(other.hdrImage)
@@ -37,8 +37,7 @@ AccumImageStage& AccumImageStage::operator=(AccumImageStage&& other)
     uniformBuffer = other.uniformBuffer;
     foreignMemory = std::exchange(other.foreignMemory, nullptr);
     foreignBuffer = std::exchange(other.foreignBuffer, nullptr);
-    systemSemHandle = std::exchange(other.systemSemHandle,
-                                    (MRAY_IS_ON_WINDOWS) ? nullptr : 0);
+    systemSemHandle = std::exchange(other.systemSemHandle, 0);
     timelineSemaphoreVk = std::exchange(other.timelineSemaphoreVk, nullptr);
     handlesVk = other.handlesVk;
     pipeline = std::move(other.pipeline);
@@ -62,12 +61,14 @@ MRayError AccumImageStage::Initialize(const std::string& execPath)
         vkGetMemoryHostPointerProperties = reinterpret_cast<PFN_vkGetMemoryHostPointerPropertiesEXT>(func);
     }
 
-    if(vkGetSemaphoreWin32Handle == nullptr)
-    {
-        auto func = vkGetDeviceProcAddr(handlesVk->deviceVk,
-                                        "vkGetSemaphoreWin32HandleKHR");
-        vkGetSemaphoreWin32Handle = reinterpret_cast<PFN_vkGetSemaphoreWin32HandleKHR>(func);
-    }
+    #ifdef MRAY_WINDOWS
+        if(vkGetSemaphoreWin32Handle == nullptr)
+        {
+            auto func = vkGetDeviceProcAddr(handlesVk->deviceVk,
+                                            "vkGetSemaphoreWin32HandleKHR");
+            vkGetSemaphoreWin32Handle = reinterpret_cast<PFN_vkGetSemaphoreWin32HandleKHR>(func);
+        }
+    #endif
 
     static constexpr auto ExternalSemType = (MRAY_IS_ON_WINDOWS)
         ? VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT
@@ -111,7 +112,7 @@ MRayError AccumImageStage::Initialize(const std::string& execPath)
     }
     #elif defined MRAY_LINUX
     {
-        #error "TODO: Implement!!"
+        //#error "TODO: Implement!!"
     }
     #endif
 
@@ -164,7 +165,7 @@ void AccumImageStage::Clear()
     }
     #elif defined MRAY_LINUX
     {
-        #error "TODO: Implement!!"
+        //#error "TODO: Implement!!"
         close(systemSemHandle);
     }
     #endif

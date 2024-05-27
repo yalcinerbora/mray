@@ -37,7 +37,7 @@ class SharedLibrary
         void*               libHandle;
 
         // Internal
-        const void*         GetProcAdressInternal(const std::string& fName) const;
+        void*               GetProcAdressInternal(const std::string& fName) const;
 
     protected:
     public:

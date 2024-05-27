@@ -10,7 +10,7 @@ bool CheckAllInList(ItL lBegin, ItL lEnd,
                     ItS sBegin, ItS sEnd,
                     BinaryOp&& op)
 {
-    size_t itemCount = std::distance(sBegin, sEnd);
+    size_t itemCount = static_cast<size_t>(std::distance(sBegin, sEnd));
     using ValueTypeS = typename std::iterator_traits<ItS>::value_type;
     using ValueTypeL = typename std::iterator_traits<ItL>::value_type;
 

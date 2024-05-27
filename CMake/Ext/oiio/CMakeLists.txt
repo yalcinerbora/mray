@@ -57,14 +57,16 @@ mray_build_ext_dependency_git(
 append_cmake_prefix_path(${ZLIB_INSTALL_LOC})
 
 # Copy zlib.dll to "Lib"
-ExternalProject_Add_Step(oiio_zlib_ext install_extra
-                WORKING_DIRECTORY ${ZLIB_INSTALL_LOC}/
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                        zlib$<$<CONFIG:Debug>:d>${CMAKE_SHARED_LIBRARY_SUFFIX}
-                        ${MRAY_CONFIG_LIB_DIRECTORY}
-                DEPENDEES install
-                COMMENT "Copy zlib to Lib folder"
-)
+if(MSVC)
+    ExternalProject_Add_Step(oiio_zlib_ext install_extra
+                    WORKING_DIRECTORY ${ZLIB_INSTALL_LOC}/
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                            zlib$<$<CONFIG:Debug>:d>${CMAKE_SHARED_LIBRARY_SUFFIX}
+                            ${MRAY_CONFIG_LIB_DIRECTORY}
+                    DEPENDEES install
+                    COMMENT "Copy zlib to Lib folder"
+    )
+endif()
 
 # OpenEXR & IMath
 set(IMATH_INSTALL_LOC ${OIIO_TMP_DIR}/imath)
