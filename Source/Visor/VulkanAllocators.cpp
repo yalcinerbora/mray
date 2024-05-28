@@ -14,7 +14,7 @@ void* VKAPI_CALL VulkanHostAllocator::Allocate(void*, size_t size, size_t align,
     #ifdef MRAY_WINDOWS
         return _aligned_malloc(size, align);
     #elif defined MRAY_LINUX
-        return aligned_alloc(size, align);
+        return std::aligned_alloc(align, size);
     #endif
 }
 
@@ -25,14 +25,14 @@ void* VKAPI_CALL VulkanHostAllocator::Realloc(void*, void* ptr,
     #ifdef MRAY_WINDOWS
         return _aligned_realloc(ptr, size, align);
     #elif defined MRAY_LINUX
-    {
+
         //https://stackoverflow.com/questions/64884745/is-there-a-linux-equivalent-of-aligned-realloc
-        auto newPtr = aligned_alloc(size, align);
+        auto newPtr = std::aligned_alloc(align, size);
         auto oldSize = malloc_usable_size(ptr);
         std::memcpy(newPtr, ptr, oldSize);
         std::free(ptr);
         return newPtr;
-    }
+
     #endif
 }
 
@@ -41,7 +41,7 @@ void VKAPI_CALL VulkanHostAllocator::Free(void*, void* ptr)
     #ifdef MRAY_WINDOWS
         _aligned_free(ptr);
     #elif defined MRAY_LINUX
-        free(ptr);
+        std::free(ptr);
     #endif
 }
 

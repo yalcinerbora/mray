@@ -160,7 +160,7 @@ template<std::unsigned_integral T>
 constexpr T BitFunctions::RequiredBitsToRepresent(T value)
 {
     constexpr T Bits = sizeof(T) * CHAR_BIT;
-    return (Bits - std::countl_zero(value));
+    return (Bits - T(std::countl_zero(value)));
 }
 
 template<size_t N>

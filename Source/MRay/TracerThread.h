@@ -41,9 +41,11 @@ class TracerThread final : public RealtimeThread
     public:
     // Constructors & Destructor
                 TracerThread(TransferQueue& queue,
-                             BS::thread_pool&);
+                             BS::thread_pool& tp);
                 ~TracerThread() = default;
 
     MRayError   MTInitialize(const std::string& tracerConfig);
     bool        InternallyTerminated() const override;
+    // Misc.
+    GPUThreadInitFunction GetThreadInitFunction() const;
 };

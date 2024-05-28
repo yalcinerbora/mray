@@ -28,10 +28,6 @@ Expected<VisorConfig> LoadVisorConfig(const std::string& configJsonPath)
 {
     using namespace std::literals;
 
-
-
-
-
     // Object keys
     static constexpr auto DLL_NAME          = "VisorDLL"sv;
     static constexpr auto OPTIONS_NAME      = "VisorOptions"sv;
@@ -135,12 +131,32 @@ MRayError VisorCommand::Invoke()
     // Thread pool, many things will need this
     // TODO: Change this to HW concurrency,
     // this is for debugging
-    BS::thread_pool threadPool(1);
+    uint32_t threadCount = std::thread::hardware_concurrency();
+    //uint32_t threadCount = 1;
+    BS::thread_pool threadPool(threadCount);
 
     // Get the tracer dll
     TracerThread tracerThread(transferQueue, threadPool);
     e = tracerThread.MTInitialize(tracerConfigFile);
     if(e) return e;
+
+    // Reset the thread pool and initialize the threads with GPU specific
+    // initialization routine, also change the name of the threads.
+    // We need to do this somewhere here, if we do it on tracer side
+    // due to passing between dll boundaries, it crash on destruction.
+    threadPool.reset(threadCount, [&tracerThread]()
+    {
+        auto GPUInit = tracerThread.GetThreadInitFunction();
+        GPUInit();
+    });
+    std::vector<std::thread::native_handle_type> handles;
+    handles = threadPool.get_native_handles();
+    for(size_t i = 0; i < handles.size(); i++)
+    {
+        using namespace std::string_literals;
+        std::string name = "WorkerThread_"s + std::to_string(i);
+        RenameThread(handles[i], name);
+    }
 
     // Actual initialization, process path should be called from here
     // In dll it may return .dll's path (on windows, I think)

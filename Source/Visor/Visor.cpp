@@ -690,7 +690,7 @@ MRayError VisorVulkan::MTInitialize(TransferQueue& transferQueue,
     instanceExtList.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     instanceExtList.push_back(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
 
-
+    glfwInitVulkanLoader(vkGetInstanceProcAddr);
     int err = glfwInit();
     if(err != GLFW_TRUE)
     {

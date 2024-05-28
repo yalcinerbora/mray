@@ -310,6 +310,8 @@ class TracerMock : public TracerI
     RendererOutput  DoRenderWork() override;
 
     void        ClearAll() override;
+    void                    SetThreadPool(BS::thread_pool& tp) override;
+    GPUThreadInitFunction   GetThreadInitFunction() const override;
 };
 
 inline TracerMock::TracerMock(bool pl)
@@ -1767,3 +1769,11 @@ inline RendererOutput TracerMock::DoRenderWork()
 
 inline void TracerMock::ClearAll()
 {}
+
+inline void TracerMock::SetThreadPool(BS::thread_pool&)
+{}
+
+inline GPUThreadInitFunction TracerMock::GetThreadInitFunction() const
+{
+    return nullptr;
+}

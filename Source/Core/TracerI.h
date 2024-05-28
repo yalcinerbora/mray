@@ -12,6 +12,9 @@
 
 #define MRAY_GENERIC_ID(NAME, TYPE) enum class NAME : TYPE {}
 
+using GPUThreadInitFunction = void(*)();
+namespace BS { class thread_pool; }
+
 struct RenderImageParams
 {
     Vector2ui               resolution;
@@ -523,7 +526,9 @@ class [[nodiscard]] TracerI
     //             Misc.              //
     //================================//
     virtual void    ClearAll() = 0;
+
+    virtual GPUThreadInitFunction   GetThreadInitFunction() const = 0;
+    virtual void                    SetThreadPool(BS::thread_pool&) = 0;
 };
 
-namespace BS { class thread_pool; }
-using TracerConstructorArgs = Tuple<BS::thread_pool&>;
+using TracerConstructorArgs = Tuple<>;

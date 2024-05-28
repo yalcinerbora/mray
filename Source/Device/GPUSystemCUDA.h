@@ -319,6 +319,10 @@ class GPUSystemCUDA
 
     // Simple & Slow System Synchronization
     void                    SyncAll() const;
+
+    // Thread Initialization Function, should be called for every thread
+    // that will run GPU code
+    [[nodiscard]]
     GPUThreadInitFunction   GetThreadInitFunction() const;
 };
 

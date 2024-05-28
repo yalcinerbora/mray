@@ -10,11 +10,9 @@
     #define MRAY_TRACER_DEVICE_ENTRYPOINT MRAY_DLL_IMPORT
 #endif
 
-namespace BS { class thread_pool; }
-
 // C Interface (Used when dynamically loading the DLL)
 extern "C" MRAY_TRACER_DEVICE_ENTRYPOINT
-TracerI* ConstructTracer(BS::thread_pool&);
+TracerI* ConstructTracer();
 
 extern "C" MRAY_TRACER_DEVICE_ENTRYPOINT
 void DestroyTracer(TracerI*);

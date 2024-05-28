@@ -37,19 +37,19 @@ void TracerBase::PopulateAttribInfoAndTypeLists()
     //
     InstantiateAndGetAttribInfo(primAttributeInfoMap,
                                 typeGenerators.primGenerator,
-                                0, gpuSystem);
+                                0u, gpuSystem);
     InstantiateAndGetAttribInfo(camAttributeInfoMap,
                                 typeGenerators.camGenerator,
-                                0, gpuSystem);
+                                0u, gpuSystem);
     InstantiateAndGetAttribInfo(medAttributeInfoMap,
                                 typeGenerators.medGenerator,
-                                0, gpuSystem, texViewMap);
+                                0u, gpuSystem, texViewMap);
     InstantiateAndGetAttribInfo(matAttributeInfoMap,
                                 typeGenerators.matGenerator,
-                                0, gpuSystem, texViewMap);
+                                0u, gpuSystem, texViewMap);
     InstantiateAndGetAttribInfo(transAttributeInfoMap,
                                 typeGenerators.transGenerator,
-                                0, gpuSystem);
+                                0u, gpuSystem);
     InstantiateAndGetAttribInfo(rendererAttributeInfoMap,
                                 typeGenerators.rendererGenerator,
                                 gpuSystem);
@@ -65,40 +65,23 @@ void TracerBase::PopulateAttribInfoAndTypeLists()
             size_t loc = kv.first.find(TracerConstants::PRIM_PREFIX);
             auto primType = kv.first.substr(loc);
             auto pg = typeGenerators.primGenerator.at(primType)(0, gpuSystem);
-            instance = kv.second(0, gpuSystem, texViewMap, *pg.get());
+            instance = kv.second(0u, gpuSystem, texViewMap, *pg.get());
         }
         else
         {
-            PrimGroupEmpty pg(0, gpuSystem);
-            instance = kv.second(0, gpuSystem, texViewMap, pg);
+            PrimGroupEmpty pg(0u, gpuSystem);
+            instance = kv.second(0u, gpuSystem, texViewMap, pg);
         }
         lightAttributeInfoMap.emplace(kv.first, instance->AttributeInfo());
     }
 }
 
-TracerBase::TracerBase(BS::thread_pool& tp,
-                       const TypeGeneratorPack& tGen)
-    : threadPool(tp)
+TracerBase::TracerBase(const TypeGeneratorPack& tGen)
+    : threadPool(nullptr)
     , typeGenerators(tGen)
 {
     // Inject the CUDA "setDevice()" equavilent to the threads
     // to initialize GPU usage
-    BS::concurrency_t threadCount = threadPool.get_thread_count();
-
-    threadPool.reset(threadCount, [gpuSystem = &this->gpuSystem]()
-    {
-        auto tp = BS::this_thread::get_pool().value();
-        std::vector<std::thread::native_handle_type> handles;
-        handles = tp->get_native_handles();
-
-        // Name the threads for debugging here
-        using namespace std::string_literals;
-        size_t i = BS::this_thread::get_index().value();
-        std::string name = "WorkerThread_"s + std::to_string(i);
-
-        RenameThread(handles[i], name);
-        gpuSystem->GetThreadInitFunction();
-    });
 }
 
 TypeNameList TracerBase::PrimitiveGroups() const
@@ -858,7 +841,7 @@ void TracerBase::CommitSurfaces(AcceleratorType type)
         return left.second.transformId < right.second.transformId;
     });
     // Send it!
-    accelerator = typeGenerators.baseAcceleratorGenerator.at(type)(threadPool, gpuSystem,
+    accelerator = typeGenerators.baseAcceleratorGenerator.at(type)(*threadPool, gpuSystem,
                                                                    typeGenerators.accelGeneratorMap.at(type),
                                                                    typeGenerators.accelWorkGeneratorMap.at(type));
     accelerator->Construct(BaseAccelConstructParams
@@ -944,4 +927,14 @@ void TracerBase::ClearAll()
     lightSurfaceCounter = 0;
     camSurfaceCounter = 0;
     textureCounter = 0;
+}
+
+GPUThreadInitFunction TracerBase::GetThreadInitFunction() const
+{
+    return gpuSystem.GetThreadInitFunction();
+}
+
+void TracerBase::SetThreadPool(BS::thread_pool& tp)
+{
+    threadPool = &tp;
 }

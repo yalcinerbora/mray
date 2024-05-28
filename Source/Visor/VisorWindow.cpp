@@ -1,5 +1,6 @@
 #include "VisorWindow.h"
 
+#include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
 #include <Imgui/imgui_impl_glfw.h>
 #include <Imgui/imgui_impl_vulkan.h>
@@ -100,6 +101,19 @@ static std::string VkPresentModeToString(VkPresentModeKHR presentMode)
         default:
             throw MRayError("Unable to convert VkPresentModeKHR to string!");
     }
+}
+
+static bool VkSurfaceFormatIsSRGB(VkFormat format)
+{
+    // TODO: Check if Vulkan has this kind of function
+    return (format == VK_FORMAT_R8_SRGB ||
+            format == VK_FORMAT_R8G8_SRGB ||
+            format == VK_FORMAT_R8G8B8_SRGB ||
+            format == VK_FORMAT_B8G8R8_SRGB ||
+            format == VK_FORMAT_R8G8B8A8_SRGB ||
+            format == VK_FORMAT_B8G8R8A8_SRGB ||
+            format == VK_FORMAT_A8B8G8R8_SRGB_PACK32);
+     // Other formats are Block compressed so these probably are not surface formats
 }
 
 // TODO: Refine these?
@@ -276,7 +290,7 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
                                 FormatListHDR.cbegin(), FormatListHDR.cend(),
                                 [](const VkSurfaceFormatKHR& sf, VkColorSpaceKHR cSpace)
         {
-            return sf.colorSpace == cSpace;
+            return sf.colorSpace == cSpace && !VkSurfaceFormatIsSRGB(sf.format);
         });
         if(loc == surfaceTypeList.cend() && isFirstFix)
             MRAY_WARNING_LOG("Unable to create HDR surface, falling back to SDR...");
@@ -287,7 +301,7 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
                                 FormatListSDR.cbegin(), FormatListSDR.cend(),
                                 [](const VkSurfaceFormatKHR& sf, VkColorSpaceKHR cSpace)
     {
-        return sf.colorSpace == cSpace;
+        return sf.colorSpace == cSpace && !VkSurfaceFormatIsSRGB(sf.format);
     });
     if(loc == surfaceTypeList.cend())
         return MRayError("Unable to find proper surface format!");
@@ -313,7 +327,7 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
                             capabilities.maxImageExtent.height);
 
 
-    //MRAY_LOG("=================\n"
+    // MRAY_LOG("=================\n"
     //         "New swapchain\n"
     //         "ColorSpace  : {}\n"
     //         "PresentMode : {}\n"
@@ -327,7 +341,8 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
 
     // Images
     uint32_t requestedImgCount = capabilities.minImageCount + 1;
-    requestedImgCount = std::min(requestedImgCount, capabilities.maxImageCount);
+    if(capabilities.maxImageCount != 0)
+        requestedImgCount = std::min(requestedImgCount, capabilities.maxImageCount);
 
     VkSwapchainCreateInfoKHR createInfo =
     {
@@ -666,7 +681,6 @@ void Swapchain::PresentFrame(VkSemaphore waitSingal)
     if(result == VK_ERROR_OUT_OF_DATE_KHR ||
        result == VK_SUBOPTIMAL_KHR || fboSizeChanged)
     {
-        //vkDeviceWaitIdle(handlesVk.deviceVk);
         fboSizeChanged = false;
         FixSwapchain();
     }
@@ -1175,6 +1189,7 @@ void VisorWindow::Render()
             newClearSignal.has_value(),
             newSaveInfo.has_value()
         };
+        [[maybe_unused]]
         int i = std::transform_reduce(predicates.cbegin(), predicates.cend(),
                                       0, std::plus{},
         [](bool v)

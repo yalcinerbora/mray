@@ -77,7 +77,17 @@ int main(int argc, const char* const argv[])
     });
     assert(appIt != appList.cend());
 
-    MRayError e = appIt->first->Invoke();
+    MRayError e;
+    try
+    {
+        e = appIt->first->Invoke();
+
+    }
+    catch(const MRayError& err)
+    {
+        e = err;
+    }
+
     if(e)
     {
         MRAY_ERROR_LOG("{}", e.GetError());

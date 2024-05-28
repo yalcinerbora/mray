@@ -426,11 +426,15 @@ void TracerThread::FinalWork()
 
 }
 
-TracerThread::TracerThread(TransferQueue& queue, BS::thread_pool& tp)
+TracerThread::TracerThread(TransferQueue& queue,
+                           BS::thread_pool& tp)
     : dllFile{nullptr}
     , tracer{nullptr, nullptr}
     , transferQueue(queue.GetTracerView())
     , threadPool(tp)
+{}
+
+MRayError TracerThread::MTInitialize(const std::string& tracerConfigFile)
 {
     using namespace std::string_literals;
     using namespace std::string_view_literals;
@@ -457,11 +461,8 @@ TracerThread::TracerThread(TransferQueue& queue, BS::thread_pool& tp)
         },
         threadPool
     );
-    if(e) throw e;
-}
+    if(e) return e;
 
-MRayError TracerThread::MTInitialize(const std::string& tracerConfigFile)
-{
     Expected<TracerConfig> tConfE = LoadTracerConfig(tracerConfigFile);
     if(tConfE.has_error()) return tConfE.error();
     const TracerConfig& tracerConfig = tConfE.value();
@@ -472,13 +473,19 @@ MRayError TracerThread::MTInitialize(const std::string& tracerConfigFile)
         tracerConfig.dllDeleteFuncName
     };
     dllFile = std::make_unique<SharedLibrary>(tracerConfig.dllName);
-    MRayError err = dllFile->GenerateObjectWithArgs<TracerConstructorArgs, TracerI>(tracer, args,
-                                                                                    threadPool);
+    MRayError err = dllFile->GenerateObjectWithArgs<TracerConstructorArgs, TracerI>(tracer, args);
     if(err) return err;
+
+    tracer->SetThreadPool(threadPool);
     return MRayError::OK;
 }
 
 bool TracerThread::InternallyTerminated() const
 {
     return isTerminated;
+}
+
+GPUThreadInitFunction TracerThread::GetThreadInitFunction() const
+{
+    return tracer->GetThreadInitFunction();
 }

@@ -512,8 +512,8 @@ void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<AccelGroupCon
                 auto tId = surf.second.transformId;
                 return (TransGroupIdFetcher()(tId) < value);
             });
-            size_t elemCount = std::distance(innerStart, loc);
-            size_t startDistance = std::distance(lSurfList.begin(), innerStart);
+            size_t elemCount = static_cast<size_t>(std::distance(innerStart, loc));
+            size_t startDistance = static_cast<size_t>(std::distance(lSurfList.begin(), innerStart));
             slot->tGroupLightSurfs.emplace_back(TransGroupId(tGroupId),
                                                 lSurfList.subspan(startDistance, elemCount));
             innerStart = loc;

@@ -145,7 +145,7 @@ class TracerBase : public TracerI
     bool                    globalTexCommit     = false;
 
     protected:
-    BS::thread_pool&    threadPool;
+    BS::thread_pool*    threadPool;
     GPUSystem           gpuSystem;
     TextureViewMap      texViewMap;
 
@@ -173,8 +173,7 @@ class TracerBase : public TracerI
     void PopulateAttribInfoAndTypeLists();
 
     public:
-                        TracerBase(BS::thread_pool&,
-                                   const TypeGeneratorPack&);
+                        TracerBase(const TypeGeneratorPack&);
 
     TypeNameList        PrimitiveGroups() const override;
     TypeNameList        MaterialGroups() const override;
@@ -331,6 +330,9 @@ class TracerBase : public TracerI
     RendererOutput  DoRenderWork() override;
 
     void            ClearAll() override;
+
+    GPUThreadInitFunction   GetThreadInitFunction() const override;
+    void                    SetThreadPool(BS::thread_pool&) override;
 };
 
 template<class K, class V>

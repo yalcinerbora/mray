@@ -1,5 +1,7 @@
 #include "FontAtlas.h"
 #include <Imgui/imgui.h>
+
+#include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
 
 #include "Core/Filesystem.h"
