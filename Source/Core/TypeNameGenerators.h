@@ -108,7 +108,7 @@ namespace Runtime
     }
 
     inline
-    std::string AddAddLightPrefix(std::string_view lightType)
+    std::string AddLightPrefix(std::string_view lightType)
     {
         return (std::string(TracerConstants::LIGHT_PREFIX) +
                 std::string(lightType));
@@ -146,9 +146,15 @@ namespace Runtime
     std::string CreatePrimBackedLightTypeName(std::string_view primType)
     {
         using namespace std::string_literals;
-        return (std::string(TracerConstants::LIGHT_PREFIX) + "Prim"s +
-                std::string(TracerConstants::PRIM_PREFIX) +
+        return ("Prim"s + std::string(TracerConstants::PRIM_PREFIX) +
                 std::string(primType));
+    }
+
+    inline
+    bool IsPrimBackedLightType(std::string_view lightTypeName)
+    {
+        using namespace std::string_view_literals;
+        return lightTypeName.find("(L)Prim"sv) != std::string_view::npos;
     }
 
     inline

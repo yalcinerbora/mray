@@ -17,14 +17,7 @@ class VulkanImage;
 struct VisorState;
 struct ImFont;
 
-enum class RunState
-{
-    RUNNING,
-    STOPPED,
-    PAUSED,
 
-    END
-};
 
 using namespace std::string_view_literals;
 
@@ -38,7 +31,7 @@ struct TopBarChanges
 
 struct StatusBarChanges
 {
-    Optional<RunState> runState;
+    Optional<TracerRunState> runState;
     Optional<int32_t> cameraIndex;
 };
 

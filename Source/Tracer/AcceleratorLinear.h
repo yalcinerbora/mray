@@ -133,6 +133,7 @@ class AcceleratorGroupLinear final : public AcceleratorGroupT<PrimitiveGroupType
                               const GPUQueue& queue) override;
 
     DataSoA     SoA() const;
+    size_t      GPUMemoryUsage() const override;
 };
 
 class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinear>
@@ -197,6 +198,7 @@ class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinea
                           const GPUSystem& s) override;
 
     void    AllocateForTraversal(size_t maxRayCount) override;
+    size_t  GPUMemoryUsage() const override;
 };
 
 inline

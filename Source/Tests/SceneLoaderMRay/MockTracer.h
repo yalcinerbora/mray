@@ -309,9 +309,12 @@ class TracerMock : public TracerI
     //
     RendererOutput  DoRenderWork() override;
 
-    void        ClearAll() override;
+    // Misc
+    void                    ClearAll() override;
     void                    SetThreadPool(BS::thread_pool& tp) override;
     GPUThreadInitFunction   GetThreadInitFunction() const override;
+    size_t                  TotalDeviceMemory() const override;
+    size_t                  UsedDeviceMemory() const override;
 };
 
 inline TracerMock::TracerMock(bool pl)
@@ -412,14 +415,14 @@ inline TracerMock::TracerMock(bool pl)
         },
         .name = "(L)Skysphere"
     };
-    lightMockPack["(L)Primitive(P)Triangle"] = LightMockPack
+    lightMockPack["(L)Prim(P)Triangle"] = LightMockPack
     {
         .attribInfo = LightAttributeInfoList
         {
             LightAttributeInfo("radiance", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
                                MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR)
         },
-        .name ="(L)Primitive(P)Triangle"
+        .name ="(L)Prim(P)Triangle"
     };
     lightMockPack["(L)Rectangle"] = LightMockPack
     {
@@ -1776,4 +1779,14 @@ inline void TracerMock::SetThreadPool(BS::thread_pool&)
 inline GPUThreadInitFunction TracerMock::GetThreadInitFunction() const
 {
     return nullptr;
+}
+
+inline size_t TracerMock::TotalDeviceMemory() const
+{
+    return 0u;
+}
+
+inline size_t TracerMock::UsedDeviceMemory() const
+{
+    return 0u;
 }

@@ -8,6 +8,15 @@
 //
 #include "Common/AnalyticStructs.h"
 
+enum class TracerRunState
+{
+    RUNNING,
+    STOPPED,
+    PAUSED,
+
+    END
+};
+
 struct VisorAnalyticData
 {
     float   frameTime;
@@ -23,6 +32,7 @@ struct VisorState
     RendererAnalyticData    renderer;
 
     // Internal state
+    TracerRunState          currentRendererState = TracerRunState::STOPPED;
     int32_t                 currentCameraIndex = 0;
     int32_t                 currentRenderIndex = 0;
     int32_t                 currentRenderLogic0 = 0;

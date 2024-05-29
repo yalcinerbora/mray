@@ -4,6 +4,12 @@
 #include <fstream>
 #include <filesystem>
 
+std::string GetTypeNameFromRenderConfig(const std::string&)
+{
+    //....
+    return std::string();
+}
+
 struct TracerConfig
 {
     std::string dllName;
@@ -60,10 +66,15 @@ Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
     }
 }
 
+void TracerThread::SetRendererParams(const std::string&)
+{
+
+}
+
 void TracerThread::LoopWork()
 {
     Optional<CameraTransform>       transform;
-    Optional<uint32_t>              rendererIndex;
+    Optional<std::string>           rendererName;
     Optional<uint32_t>              renderLogic0;
     Optional<uint32_t>              renderLogic1;
     Optional<uint32_t>              cameraIndex;
@@ -74,6 +85,7 @@ void TracerThread::LoopWork()
     Optional<bool>                  startStop;
     bool                            hdrSaveDemand = false;
     bool                            sdrSaveDemand = false;
+    Optional<std::string>           initialRenderConfig;
 
     auto ProcessCommand = [&](VisorAction command)
     {
@@ -85,7 +97,7 @@ void TracerThread::LoopWork()
             using enum ActionType;
             case CHANGE_CAMERA: cameraIndex = std::get<CHANGE_CAMERA>(command); break;
             case CHANGE_CAM_TRANSFORM: transform = std::get<CHANGE_CAM_TRANSFORM>(command); break;
-            case CHANGE_RENDERER: rendererIndex = std::get<CHANGE_RENDERER>(command); break;
+            case CHANGE_RENDERER: rendererName = std::get<CHANGE_RENDERER>(command); break;
             case CHANGE_RENDER_LOGIC0: renderLogic0 = std::get<CHANGE_RENDER_LOGIC0>(command); break;
             case CHANGE_RENDER_LOGIC1: renderLogic1 = std::get<CHANGE_RENDER_LOGIC1>(command); break;
             case CHANGE_TIME: time = std::get<CHANGE_TIME>(command); break;
@@ -93,6 +105,12 @@ void TracerThread::LoopWork()
             case SEND_SYNC_SEMAPHORE: syncSem = std::get<SEND_SYNC_SEMAPHORE>(command); break;
             case DEMAND_HDR_SAVE: hdrSaveDemand = true; break;
             case DEMAND_SDR_SAVE: sdrSaveDemand = true; break;
+            case KICKSTART_RENDER:
+            {
+                initialRenderConfig = std::get<KICKSTART_RENDER>(command);
+                stopConsuming = true;
+                break;
+            }
             case PAUSE_RENDER:
             {
                 pauseContinue = std::get<PAUSE_RENDER>(command);
@@ -123,307 +141,325 @@ void TracerThread::LoopWork()
         }
         return false;
     };
-
-    // If we are on sleep mode (not rendering probably)
-    // Do blocking wait
-    VisorAction command;
-    if(isInSleepMode)
+    try
     {
-        transferQueue.Dequeue(command);
-        if(CheckQueueAndExit()) return;
-        ProcessCommand(command);
-    }
-    // On every "frame", we will do the latest common commands
-    // Low latency commands should be transform commands probably
-    else while(transferQueue.TryDequeue(command))
-    {
-        // Technically this loop may not terminate,
-        // if stuff comes too fast. But we just setting some data so
-        // it should not be possible
-        bool stopConsuming = ProcessCommand(command);
-        if(stopConsuming) break;
-    }
+        // If we are on sleep mode (not rendering probably)
+        // Do blocking wait
+        VisorAction command;
+        if(isInSleepMode)
+        {
+            transferQueue.Dequeue(command);
+            if(CheckQueueAndExit()) return;
+            ProcessCommand(command);
+        }
+        // On every "frame", we will do the latest common commands
+        // Low latency commands should be transform commands probably
+        else while(transferQueue.TryDequeue(command))
+        {
+            // Technically this loop may not terminate,
+            // if stuff comes too fast. But we just setting some data so
+            // it should not be possible
+            bool stopConsuming = ProcessCommand(command);
+            if(stopConsuming) break;
+        }
 
-    // New scene!
-    if(scenePath)
-    {
-        MRAY_LOG("[Tracer]: NewScene {}", scenePath.value());
+        if(initialRenderConfig)
+        {
+            if(currentRenderer != std::numeric_limits<RendererId>::max())
+                tracer->DestroyRenderer(currentRenderer);
 
-        // When new scene is loaded, send the
-        // Initial cam transform
-        transferQueue.Enqueue(TracerResponse
-        (
-            std::in_place_index<TracerResponse::CAMERA_INIT_TRANSFORM>,
-            CameraTransform
-            {
-                .position = Vector3::Zero(),
-                .gazePoint = Vector3(0, 0, -1),
-                .up = Vector3(0, 1, 0)
-            }
-        ));
+            MRAY_LOG("[Tracer]: Initial render config {}", initialRenderConfig.value());
+            //std::string rName = GetTypeNameFromRenderConfig(initialRenderConfig.value());
+            //currentRenderer = tracer->CreateRenderer(rName);
+            //SetRendererParams(initialRenderConfig.value());
+            //tracer->CommitRendererReservations(currentRenderer);
+        }
 
-        // Scene Analytic Data
-        transferQueue.Enqueue(TracerResponse
-        (
-            std::in_place_index<TracerResponse::SCENE_ANALYTICS>,
-            SceneAnalyticData
-            {
-                .sceneName = scenePath.value(),
-                .sceneLoadTimeS = 10.0,
-                .mediumCount = 3,
-                .primCount = 5,
-                .textureCount = 7,
-                .surfaceCount = 9,
-                .cameraCount = 11,
-                .sceneExtent = AABB3(Vector3(0.0, 0.0, 0.0),
-                                     Vector3(10.0, 10.0, 10.0)),
-                .timeRange = Vector2(1, 10)
-            }
-        ));
+        // New scene!
+        if(scenePath)
+        {
+            MRAY_LOG("[Tracer]: NewScene {}", scenePath.value());
 
-        // Send Tracer Analytics
-        transferQueue.Enqueue(TracerResponse
-        (
-            std::in_place_index<TracerResponse::TRACER_ANALYTICS>,
-            TracerAnalyticData
-            {
-                .camTypes = {{"A", 1}},
-                .lightTypes = {{"B", 1}},
-                .primTypes = {{"C", 1}},
-                .mediumTypes = {{"D", 1}},
-                .materialTypes = {{"E", 1}},
-                .rendererTypes =
+            // When new scene is loaded, send the
+            // Initial cam transform
+            transferQueue.Enqueue(TracerResponse
+            (
+                std::in_place_index<TracerResponse::CAMERA_INIT_TRANSFORM>,
+                CameraTransform
                 {
-                    "TexDisplay",
-                    "DirectTracer",
-                    "PathTracer",
-                    "AOTracer",
-                    "PhotonMapper"
-                },
-                .tracerColorSpace = MRayColorSpaceEnum::MR_ACES_CG,
-                .totalGPUMemoryMiB = 8000.0,
-                .usedGPUMemoryMiB = 100.0
-            }
-        ));
+                    .position = Vector3::Zero(),
+                    .gazePoint = Vector3(0, 0, -1),
+                    .up = Vector3(0, 1, 0)
+                }
+            ));
 
-        //using namespace std::filesystem;
-        //tracer->ClearAll();
-        //// TODO: Single scene loading, change this later maybe
-        //// for tracer supporting multiple scenes
-        //if(currentScene) currentScene->ClearScene();
-        //std::string fileExt = path(scenePath.value()).extension().string();
-        //SceneLoaderI* loader = sceneLoaders.at(fileExt).get();
-        //currentScene = loader;
-        //currentScene->LoadScene(*tracer, scenePath.value());
+            // Scene Analytic Data
+            transferQueue.Enqueue(TracerResponse
+            (
+                std::in_place_index<TracerResponse::SCENE_ANALYTICS>,
+                SceneAnalyticData
+                {
+                    .sceneName = scenePath.value(),
+                    .sceneLoadTimeS = 10.0,
+                    .mediumCount = 3,
+                    .primCount = 5,
+                    .textureCount = 7,
+                    .surfaceCount = 9,
+                    .cameraCount = 11,
+                    .sceneExtent = AABB3(Vector3(0.0, 0.0, 0.0),
+                                         Vector3(10.0, 10.0, 10.0)),
+                    .timeRange = Vector2(1, 10)
+                }
+            ));
+
+            // Send Tracer Analytics
+            transferQueue.Enqueue(TracerResponse
+            (
+                std::in_place_index<TracerResponse::TRACER_ANALYTICS>,
+                TracerAnalyticData
+                {
+                    .camTypes = {{"A", 1}},
+                    .lightTypes = {{"B", 1}},
+                    .primTypes = {{"C", 1}},
+                    .mediumTypes = {{"D", 1}},
+                    .materialTypes = {{"E", 1}},
+                    .rendererTypes =
+                    {
+                        "TexDisplay",
+                        "DirectTracer",
+                        "PathTracer",
+                        "AOTracer",
+                        "PhotonMapper"
+                    },
+                    .tracerColorSpace = MRayColorSpaceEnum::MR_ACES_CG,
+                    .totalGPUMemoryBytes = tracer->TotalDeviceMemory(),
+                    .usedGPUMemoryBytes = tracer->UsedDeviceMemory()
+                }
+            ));
+
+            //using namespace std::filesystem;
+            //tracer->ClearAll();
+            //// TODO: Single scene loading, change this later maybe
+            //// for tracer supporting multiple scenes
+            //if(currentScene) currentScene->ClearScene();
+            //std::string fileExt = path(scenePath.value()).extension().string();
+            //SceneLoaderI* loader = sceneLoaders.at(fileExt).get();
+            //currentScene = loader;
+            //currentScene->LoadScene(*tracer, scenePath.value());
+        }
+
+        // New camera!
+        if(cameraIndex)
+        {
+            MRAY_LOG("[Tracer]: NewCamera {}", cameraIndex.value());
+
+            // When cam is changed send the initial transform
+            // Initial cam transform
+            transferQueue.Enqueue(TracerResponse
+            (
+                std::in_place_index<TracerResponse::CAMERA_INIT_TRANSFORM>,
+                CameraTransform
+                {
+                    .position = Vector3::Zero(),
+                    .gazePoint = Vector3(0, 0, -1),
+                    .up = Vector3(0, 1, 0)
+                }
+            ));
+
+            //// New Camera
+            //// Stop rendering
+            //tracer->StopRender();
+            ////transferQueue.Enqueue(...);
+
+            ////tracer->...
+            //// Change camera
+            //// send the initial transform
+            //transferQueue.Enqueue(CameraTransform
+            //{
+            //    .position = Vector3::Zero(),
+            //    .gazePoint = Vector3::Zero(),
+            //    .up = Vector3::Zero()
+            //});
+        }
+
+        // New transform!
+        if(transform)
+        {
+            const auto& t = transform.value();
+            MRAY_LOG("[Tracer]: NewTransform G{}, P{}, U{}",
+                     t.gazePoint,
+                     t.position,
+                     t.up);
+
+            //tracer->StopRender();
+            //tracer->StartRender(..., ..., ...);
+        }
+
+        // New renderer!
+        if(rendererName)
+        {
+            MRAY_LOG("[Tracer]: NewRenderer {}", rendererName.value());
+
+            //if(currentRenderer != std::numeric_limits<RendererId>::max())
+            //    tracer->DestroyRenderer(currentRenderer);
+            //currentRenderer = tracer->CreateRenderer(rendererName.value());
+            //tracer->CommitRendererReservations(currentRenderer);
+
+
+        }
+
+        if(renderLogic0)
+        {
+            MRAY_LOG("[Tracer]: NewRenderLogic0 {}", renderLogic0.value());
+        }
+
+        if(renderLogic1)
+        {
+            MRAY_LOG("[Tracer]: NewRenderLogic1 {}", renderLogic1.value());
+        }
+
+        if(hdrSaveDemand)
+        {
+            MRAY_LOG("[Tracer]: Delegate HDR save");
+            transferQueue.Enqueue(TracerResponse
+            (
+                std::in_place_index<TracerResponse::SAVE_AS_HDR>,
+                RenderImageSaveInfo
+                {
+                    .prefix = "exr",
+                    .time = 3.0f,
+                    .sample = 13
+                }
+            ));
+        }
+
+        if(sdrSaveDemand)
+        {
+            MRAY_LOG("[Tracer]: Delegate SDR save");
+            transferQueue.Enqueue(TracerResponse
+            (
+                std::in_place_index<TracerResponse::SAVE_AS_SDR>,
+                RenderImageSaveInfo
+                {
+                    .prefix = "png",
+                    .time = 3.0f,
+                    .sample = 13
+                }
+            ));
+        }
+
+        // New time!
+        if(time)
+        {
+            MRAY_LOG("[Tracer]: NewTime {}", time.value());
+            // TODO: Update scene etc...
+        }
+
+        // Pause/Continue!
+        if(pauseContinue)
+        {
+            isInSleepMode = pauseContinue.value();
+            MRAY_LOG("[Tracer]: Pause/Cont {}", pauseContinue.value());
+            isRendering = false;
+        }
+
+        // Start/Stop!
+        if(startStop)
+        {
+            isInSleepMode = !startStop.value();
+            isRendering = startStop.value();
+            MRAY_LOG("[Tracer]: Start/Stop {}", startStop.value());
+        }
+
+        if(syncSem)
+        {
+            MRAY_LOG("[Tracer]: NewSem {}", syncSem.value());
+        }
+
+        //static uint64_t i = 0;
+        //MRAY_LOG("[Tracer]: Loop {}", i);
+        //i++;
+
+        // If we are rendering continue...
+        if(isRendering)
+        {
+            RendererOutput renderOut; // = tracer->DoRenderWork();
+            // if(renderOut.analytics)
+            // if(renderOut.imageOut)
+
+            transferQueue.Enqueue(TracerResponse
+            (
+                std::in_place_index<TracerResponse::RENDERER_ANALYTICS>,
+                RendererAnalyticData
+                {
+                    .throughput = 3.32,
+                    .throughputSuffix = "M rays/sec",
+                    .workPerPixel = 512,
+                    .workPerPixelSuffix = "spp",
+                    .iterationTimeMS = 20,
+                    .renderResolution = Vector2ui(1920, 1080),
+                    .outputColorSpace = MRayColorSpaceEnum::MR_ACES_CG,
+                    .customLogicSize0 = 3,
+                    .customLogicSize1 = 10
+                }
+            ));
+
+            using namespace std::chrono_literals;
+            std::this_thread::sleep_for(3ms);
+        }
+
+        // Here check the queue's situation
+        // and do not iterate again if queues are closed
+        if(CheckQueueAndExit()) return;
     }
-
-    // New camera!
-    if(cameraIndex)
+    catch(const MRayError& e)
     {
-        MRAY_LOG("[Tracer]: NewCamera {}", cameraIndex.value());
-
-        // When cam is changed send the initial transform
-        // Initial cam transform
-        transferQueue.Enqueue(TracerResponse
-        (
-            std::in_place_index<TracerResponse::CAMERA_INIT_TRANSFORM>,
-            CameraTransform
-            {
-                .position = Vector3::Zero(),
-                .gazePoint = Vector3(0, 0, -1),
-                .up = Vector3(0, 1, 0)
-            }
-        ));
-
-        //// New Camera
-        //// Stop rendering
-        //tracer->StopRender();
-        ////transferQueue.Enqueue(...);
-
-        ////tracer->...
-        //// Change camera
-        //// send the initial transform
-        //transferQueue.Enqueue(CameraTransform
-        //{
-        //    .position = Vector3::Zero(),
-        //    .gazePoint = Vector3::Zero(),
-        //    .up = Vector3::Zero()
-        //});
+        MRAY_ERROR_LOG("[Tracer]: Fatal Error! \"{}\"", e.GetError());
+        isTerminated = true;
     }
-
-    // New transform!
-    if(transform)
+    catch(const std::exception& e)
     {
-        const auto& t = transform.value();
-        MRAY_LOG("[Tracer]: NewTransform G{}, P{}, U{}",
-                 t.gazePoint,
-                 t.position,
-                 t.up);
-
-        //tracer->StopRender();
-        //tracer->StartRender(..., ..., ...);
+        MRAY_ERROR_LOG("[Tracer]: Unkown Error! \"{}\"", e.what());
+        isTerminated = true;
     }
-
-    // New renderer!
-    if(rendererIndex)
-    {
-        MRAY_LOG("[Tracer]: NewRenderer {}", rendererIndex.value());
-        //// Initial cam transform
-        //transferQueue.Enqueue(TracerResponse
-        //(
-        //    std::in_place_index<TracerResponse::CAMERA_INIT_TRANSFORM>,
-        //    CameraTransform
-        //    {
-        //        .position = Vector3(1, 2, 3),
-        //        .gazePoint = Vector3(4, 5, 6),
-        //        .up = Vector3(7, 8, 9)
-        //    }
-        //));
-    }
-
-    if(renderLogic0)
-    {
-        MRAY_LOG("[Tracer]: NewRenderLogic0 {}", renderLogic0.value());
-    }
-
-    if(renderLogic1)
-    {
-        MRAY_LOG("[Tracer]: NewRenderLogic1 {}", renderLogic1.value());
-    }
-
-    if(hdrSaveDemand)
-    {
-        MRAY_LOG("[Tracer]: Delegate HDR save");
-        transferQueue.Enqueue(TracerResponse
-        (
-            std::in_place_index<TracerResponse::SAVE_AS_HDR>,
-            RenderImageSaveInfo
-            {
-                .prefix = "exr",
-                .time = 3.0f,
-                .sample = 13
-            }
-        ));
-    }
-
-    if(sdrSaveDemand)
-    {
-        MRAY_LOG("[Tracer]: Delegate SDR save");
-        transferQueue.Enqueue(TracerResponse
-        (
-            std::in_place_index<TracerResponse::SAVE_AS_SDR>,
-            RenderImageSaveInfo
-            {
-                .prefix = "png",
-                .time = 3.0f,
-                .sample = 13
-            }
-        ));
-    }
-
-    // New time!
-    if(time)
-    {
-        MRAY_LOG("[Tracer]: NewTime {}", time.value());
-        // Update stuff
-        //currentScene->UpdateScene();
-    }
-
-    // Pause/Continue!
-    if(pauseContinue)
-    {
-        isInSleepMode = pauseContinue.value();
-        MRAY_LOG("[Tracer]: Pause/Cont {}", pauseContinue.value());
-        isRendering = false;
-    }
-
-    // Start/Stop!
-    if(startStop)
-    {
-        isInSleepMode = !startStop.value();
-        isRendering = startStop.value();
-        MRAY_LOG("[Tracer]: Start/Stop {}", startStop.value());
-    }
-
-    if(syncSem)
-    {
-        MRAY_LOG("[Tracer]: NewSem {}", syncSem.value());
-    }
-
-    //static uint64_t i = 0;
-    //MRAY_LOG("[Tracer]: Loop {}", i);
-    //i++;
-
-    // If we are rendering continue...
-    if(isRendering)
-    {
-        RendererOutput renderOut; // = tracer->DoRenderWork();
-        // if(renderOut.analytics)
-        // if(renderOut.imageOut)
-
-        transferQueue.Enqueue(TracerResponse
-        (
-            std::in_place_index<TracerResponse::RENDERER_ANALYTICS>,
-            RendererAnalyticData
-            {
-                .throughput = 3.32,
-                .throughputSuffix = "M rays/sec",
-                .workPerPixel = 512,
-                .workPerPixelSuffix = "spp",
-                .iterationTimeMS = 20,
-                .renderResolution = Vector2ui(1920, 1080),
-                .outputColorSpace = MRayColorSpaceEnum::MR_ACES_CG,
-                .customLogicSize0 = 3,
-                .customLogicSize1 = 10
-            }
-        ));
-
-        using namespace std::chrono_literals;
-        std::this_thread::sleep_for(3ms);
-    }
-
-
-    // Here check the queue's situation
-    // and do not iterate again if queues are closed
-    if(CheckQueueAndExit()) return;
 }
 
 void TracerThread::InitialWork()
 {
-    // Do a handshake
+    // Send the renderers initially
     // Send the initial tracer state
+    auto rendererTypesSV = tracer->Renderers();
+    std::vector<std::string> rendererTypes(rendererTypesSV.size());
+    for(size_t i = 0; i < rendererTypes.size(); i++)
+    {
+        rendererTypes[i] = rendererTypesSV[i];
+    }
 
-    //tracer->
-    //transferQueue.Enqueue(TracerResponse
-    //(
-    //    std::in_place_index<TracerResponse::TRACER_ANALYTICS>,
-    //    TracerAnalyticData
-    //    {
-    //        .camTypes = {{"A", 1}},
-    //        .lightTypes = {{"B", 1}},
-    //        .primTypes = {{"C", 1}},
-    //        .mediumTypes = {{"D", 1}},
-    //        .materialTypes = {{"E", 1}},
-    //        .rendererTypes =
-    //        {
-    //            "TexDisplay",
-    //            "DirectTracer",
-    //            "PathTracer",
-    //            "AOTracer",
-    //            "PhotonMapper"
-    //        },
-    //        .tracerColorSpace = MRayColorSpaceEnum::MR_ACES_CG,
-    //        .totalGPUMemoryMiB = 8000.0,
-    //        .usedGPUMemoryMiB = 100.0
-    //    }
-    //));
-
+    transferQueue.Enqueue(TracerResponse
+    (
+        std::in_place_index<TracerResponse::TRACER_ANALYTICS>,
+        TracerAnalyticData
+        {
+            .camTypes = {},
+            .lightTypes = {},
+            .primTypes = {},
+            .mediumTypes = {},
+            .materialTypes = {},
+            .rendererTypes = rendererTypes,
+            .tracerColorSpace = MRayColorSpaceEnum::MR_ACES_CG,
+            .totalGPUMemoryBytes = tracer->TotalDeviceMemory(),
+            .usedGPUMemoryBytes = tracer->UsedDeviceMemory()
+        }
+    ));
 }
 
 void TracerThread::FinalWork()
 {
-    //if(fatalErrorOccured)
-
+    // Terminate the queue manually if we are crashing
+    if(isTerminated)
+    {
+        transferQueue.Terminate();
+    }
 }
 
 TracerThread::TracerThread(TransferQueue& queue,

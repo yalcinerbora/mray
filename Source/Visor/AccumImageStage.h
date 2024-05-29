@@ -67,8 +67,6 @@ class AccumImageStage : UniformMemoryRequesterI
                                         const VulkanImage* sampleImageIn);
     SemaphoreVariant        IssueAccumulation(VkSemaphore prevCmdSignal,
                                               const RenderImageSection&);
-    SystemSemaphoreHandle   ExportSemaphore(const RenderBufferInfo&);
-
     SystemSemaphoreHandle   GetSemaphoreOSHandle() const;
 
     //

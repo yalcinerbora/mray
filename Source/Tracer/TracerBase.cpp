@@ -938,3 +938,33 @@ void TracerBase::SetThreadPool(BS::thread_pool& tp)
 {
     threadPool = &tp;
 }
+
+size_t TracerBase::TotalDeviceMemory() const
+{
+    return gpuSystem.TotalMemory();
+}
+
+size_t TracerBase::UsedDeviceMemory() const
+{
+    auto FetchMemUsage = [](const auto& groupMap)
+    {
+        size_t mem = 0;
+        for(const auto& [_, group] : groupMap)
+        {
+            mem += group->GPUMemoryUsage();
+        }
+        return mem;
+    };
+
+    size_t totalMem = 0;
+    totalMem += FetchMemUsage(primGroups.Map());
+    totalMem += FetchMemUsage(camGroups.Map());
+    totalMem += FetchMemUsage(mediumGroups.Map());
+    totalMem += FetchMemUsage(matGroups.Map());
+    totalMem += FetchMemUsage(transGroups.Map());
+    totalMem += FetchMemUsage(lightGroups.Map());
+    totalMem += FetchMemUsage(renderers.Map());
+    if(accelerator)
+        totalMem += accelerator->GPUMemoryUsage();
+    return totalMem;
+}

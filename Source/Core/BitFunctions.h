@@ -20,6 +20,9 @@ namespace BitFunctions
 
     template<std::unsigned_integral T>
     constexpr T RequiredBitsToRepresent(T value);
+
+    template<std::unsigned_integral T>
+    constexpr T BitReverse(T value, T width = sizeof(T) * CHAR_BIT);
 }
 
 
@@ -161,6 +164,21 @@ constexpr T BitFunctions::RequiredBitsToRepresent(T value)
 {
     constexpr T Bits = sizeof(T) * CHAR_BIT;
     return (Bits - T(std::countl_zero(value)));
+}
+
+template<std::unsigned_integral T>
+constexpr T BitFunctions::BitReverse(T value, T width)
+{
+    // TODO: Is there a good way to do this than O(n)
+    // without lookup table, this may end up in GPU
+    T result = 0;
+    for(T i = 0; i < width; i++)
+    {
+        result |= value & 0b1;
+        result <<= 1;
+        value >>= 1;
+    }
+    return result;
 }
 
 template<size_t N>

@@ -178,10 +178,17 @@ MRayError VisorCommand::Invoke()
         transferQueue.GetVisorView().Enqueue(std::move(va));
     }
 
+    // Initially send the renderer to tracer
+    if(renderConfigFile)
+    {
+        visorSystem->MTInitiallyStartRender(renderConfigFile.value());
+    }
+
     // ====================== //
     //     Real-time Loop     //
     // ====================== //
-    while(!visorSystem->MTIsTerminated())
+    while(!visorSystem->MTIsTerminated() &&
+          !transferQueue.GetVisorView().IsTerminated())
     {
         visorSystem->MTWaitForInputs();
         visorSystem->MTRender();

@@ -234,7 +234,7 @@ TransientData MeshFileGFG::GetAttribute(PrimitiveAttributeLogic logic) const
             throw MRayError("GFG: File do not have attribute of {}, \"{}\"",
                             PrimAttributeStringifier::ToString(logic),
                             Name());
-        const auto comp = c.value();
+        const auto& comp = c.value();
         MRayDataTypeRT type = GFGDataTypeToMRayDataType(comp.dataType);
 
         return std::visit([&](auto&& v) -> TransientData
@@ -276,7 +276,7 @@ MRayDataTypeRT MeshFileGFG::AttributeLayout(PrimitiveAttributeLogic logic) const
                         PrimAttributeStringifier::ToString(logic),
                         Name());
 
-    const auto comp = c.value();
+    const auto& comp = c.value();
     return GFGDataTypeToMRayDataType(comp.dataType);
 }
 

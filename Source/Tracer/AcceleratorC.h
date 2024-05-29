@@ -157,6 +157,7 @@ class AcceleratorGroupI
     virtual void        WriteInstanceKeysAndAABBs(Span<AABB3> aabbWriteRegion,
                                                   Span<AcceleratorKey> keyWriteRegion) const = 0;
     virtual void        SetKeyOffset(uint32_t) = 0;
+    virtual size_t      GPUMemoryUsage() const = 0;
 
     virtual const GenericGroupPrimitiveT& PrimGroup() const = 0;
 };
@@ -324,6 +325,7 @@ class BaseAcceleratorI
     // Construction
     virtual void    Construct(BaseAccelConstructParams) = 0;
     virtual void    AllocateForTraversal(size_t maxRayCount) = 0;
+    virtual size_t  GPUMemoryUsage() const = 0;
 };
 
 using AccelGroupPtr = std::unique_ptr<AcceleratorGroupI>;

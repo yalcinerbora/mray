@@ -529,6 +529,8 @@ class [[nodiscard]] TracerI
 
     virtual GPUThreadInitFunction   GetThreadInitFunction() const = 0;
     virtual void                    SetThreadPool(BS::thread_pool&) = 0;
+    virtual size_t                  TotalDeviceMemory() const = 0;
+    virtual size_t                  UsedDeviceMemory() const = 0;
 };
 
 using TracerConstructorArgs = Tuple<>;

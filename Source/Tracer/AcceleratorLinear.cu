@@ -221,3 +221,13 @@ void BaseAcceleratorLinear::CastLocalRays(// Output
 {
 
 }
+
+size_t BaseAcceleratorLinear::GPUMemoryUsage() const
+{
+    size_t totalSize = accelMem.Size() + stackMem.Size();
+    for(const auto& [_, accelGroup] : this->generatedAccels)
+    {
+        totalSize += accelGroup->GPUMemoryUsage();
+    }
+    return totalSize;
+}

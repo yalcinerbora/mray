@@ -215,11 +215,18 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
     //Instantiate X
 
 }
+
 template<PrimitiveGroupC PG>
 typename AcceleratorGroupLinear<PG>::DataSoA
 AcceleratorGroupLinear<PG>::SoA() const
 {
     return data;
+}
+
+template<PrimitiveGroupC PG>
+size_t AcceleratorGroupLinear<PG>::GPUMemoryUsage() const
+{
+    return mem.Size();
 }
 
 template<PrimitiveGroupC PG>

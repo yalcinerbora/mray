@@ -560,11 +560,11 @@ void SceneLoaderMRay::DryRunLightsForPrim(std::vector<uint32_t>& primIds,
 {
     for(const auto& l : lightNodes)
     {
-        std::string annotatedType = AddAddLightPrefix(l.first);
+        std::string annotatedType = AddLightPrefix(l.first);
         LightAttributeInfoList lightAttributes = tracer.AttributeInfoLight(annotatedType);
-        // We already annotated primitive-backed light names with "(P)..."
-        // suffix, check if the first part is "Primitive"
-        if(l.first.find(NodeNames::LIGHT_TYPE_PRIMITIVE) == std::string::npos)
+        // We already annotated primitive-backed light names
+        // so check "(L)Prim" prefix
+        if(!IsPrimBackedLightType(annotatedType))
             continue;
         // Light Type is primitive, it has to have "primitive" field
         for(const auto& node : l.second)
@@ -1524,7 +1524,6 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     [&sceneJson = std::as_const(sceneJson)](TypeMappedNodes& typeMappings,
                                             const ItemLocationMap& map, uint32_t id,
                                             const std::string_view& listName,
-                                            //const AnnotationFunction& Annotate,
                                             bool skipUnknown = false)
     {
         const auto it = map.find(id);

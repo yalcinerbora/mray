@@ -53,7 +53,7 @@ struct VisorAction : public std::variant
 <
     CameraTransform,        // transform
     uint32_t,               // camera index
-    uint32_t,               // renderer index
+    std::string,            // renderer index
     uint32_t,               // renderer logic0 index
     uint32_t,               // renderer logic1 index
     std::string,            // scene name
@@ -62,13 +62,15 @@ struct VisorAction : public std::variant
     bool,                   // pause render
     SystemSemaphoreHandle,  // Synchronization semaphore
     bool,                   // Demand HDR save
-    bool                    // Demand SDR save
+    bool,                   // Demand SDR save
+    std::string             // Initial Render Config
 >
 {
     using Base = std::variant<CameraTransform, uint32_t,
-                              uint32_t, uint32_t, uint32_t, std::string,
+                              std::string, uint32_t, uint32_t, std::string,
                               float, bool, bool,
-                              SystemSemaphoreHandle, bool, bool>;
+                              SystemSemaphoreHandle, bool, bool,
+                              std::string>;
     enum Type
     {
         CHANGE_CAM_TRANSFORM = 0,   // Give new transform to the tracer
@@ -76,7 +78,7 @@ struct VisorAction : public std::variant
         CHANGE_CAMERA = 1,          // Change to a camera via an id.
                                     // Camera list is in "SceneAnalytics" structure
                                     // Tracer will respond via a camera initial transform.
-        CHANGE_RENDERER = 2,        // Change the renderer via an index. Tracer will respond
+        CHANGE_RENDERER = 2,        // Change the renderer via a name. Tracer will respond
                                     // with initial parametrization of the renderer.
                                     // renderer list is in "TracerAnalytics" structure.
         CHANGE_RENDER_LOGIC0 = 3,   // Change the renderer logic0 via an index.
@@ -94,6 +96,9 @@ struct VisorAction : public std::variant
         DEMAND_SDR_SAVE = 11,       // because tracer knows better when to exactly save.
                                     // Renderer will trigger a save when it is either on an ~spp
                                     // boundary (or closer)
+        KICKSTART_RENDER = 12       // Initial render kickstart, send renderer config
+                                    // Tracer initializes the renderer via this json file
+                                    // It does not start rendering though
     };
     using Base::Base;
 };
@@ -192,7 +197,11 @@ inline bool TransferQueue::TracerView::TryEnqueue(TracerResponse&& tr)
 
 inline void TransferQueue::TracerView::Terminate()
 {
+    // Terminate the queue
     tq.Terminate();
+    // Visor may be in interactive mode and wait on keyevents etc..
+    // trigger a refresh on window.
+    VisorTrigger();
 }
 inline bool TransferQueue::TracerView::IsTerminated() const
 {

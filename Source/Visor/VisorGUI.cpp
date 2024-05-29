@@ -10,6 +10,66 @@
 
 #include "../Resources/Fonts/IcoMoonFontTable.h"
 
+#include "Core/MemAlloc.h"
+#include "Core/BitFunctions.h"
+
+Pair<double, std::string_view> ConvertMemSizeToGUI(size_t size)
+{
+    // This function is overengineered for a GUI operation.
+    // This probably has better precision? (probably not)
+    // has high amount memory (TiB++ of memory).
+    Pair<double, std::string_view> result;
+    using namespace std::string_view_literals;
+    size_t shiftVal = 0;
+    if(size >= 1_TiB)
+    {
+        result.second = "TiB"sv;
+        shiftVal = 40;
+    }
+    else if(size >= 1_GiB)
+    {
+        result.second = "GiB"sv;
+        shiftVal = 30;
+    }
+    else if(size >= 1_MiB)
+    {
+        result.second = "MiB"sv;
+        shiftVal = 20;
+    }
+    else if(size >= 1_KiB)
+    {
+        result.second = "KiB"sv;
+        shiftVal = 10;
+    }
+    else
+    {
+        result.second = "Bytes"sv;
+        shiftVal = 0;
+    }
+
+    size_t mask = ((size_t(1) << shiftVal) - 1);
+    size_t integer = size >> shiftVal;
+    size_t decimal = mask & size;
+    // Sanity check
+    static_assert(std::numeric_limits<double>::is_iec559,
+                  "This overengineered function requires "
+                  "IEE 754 floats.");
+    static constexpr size_t DOUBLE_MANTISSA = 52;
+    static constexpr size_t MANTISSA_MASK = (size_t(1) << DOUBLE_MANTISSA) - 1;
+    size_t bitCount = BitFunctions::RequiredBitsToRepresent(decimal);
+    if(bitCount > DOUBLE_MANTISSA)
+        decimal >>= (bitCount - DOUBLE_MANTISSA);
+    else
+        decimal <<= (DOUBLE_MANTISSA - bitCount);
+
+
+    uint64_t dblFrac = std::bit_cast<uint64_t>(1.0);
+    dblFrac |= decimal & MANTISSA_MASK;
+    result.first = std::bit_cast<double>(dblFrac);
+    result.first += static_cast<double>(integer) - 1.0;
+    return result;
+}
+
 const VisorKeyMap VisorGUI::DefaultKeyMap =
 {
     { VisorUserAction::TOGGLE_TOP_BAR, ImGuiKey::ImGuiKey_M },
@@ -79,30 +139,29 @@ namespace ImGui
     }
 }
 
-RunState DetermineTracerState(bool stopToggle,
-                              bool,
-                              bool pauseToggle)
+TracerRunState DetermineTracerState(bool stopToggle,
+                                    bool pauseToggle)
 {
     if(stopToggle)
-        return RunState::STOPPED;
+        return TracerRunState::STOPPED;
     else if(pauseToggle)
-        return RunState::PAUSED;
-    return RunState::RUNNING;
+        return TracerRunState::PAUSED;
+    return TracerRunState::RUNNING;
 }
 
 void SetButtonState(bool& stopToggle,
                     bool& runToggle,
                     bool& pauseToggle,
-                    RunState rs)
+                    TracerRunState rs)
 {
     stopToggle = false;
     runToggle = false;
     pauseToggle = false;
     switch(rs)
     {
-        case RunState::PAUSED:  pauseToggle = true; break;
-        case RunState::RUNNING: runToggle = true; break;
-        case RunState::STOPPED: stopToggle = true; break;
+        case TracerRunState::PAUSED:  pauseToggle = true; break;
+        case TracerRunState::RUNNING: runToggle = true; break;
+        case TracerRunState::STOPPED: stopToggle = true; break;
         default: break;
     }
 }
@@ -117,6 +176,11 @@ MainStatusBar::MainStatusBar(const InputChecker& ic)
 StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
                                        bool camLocked)
 {
+    // This is here to align the GUI with programmatic changes to the
+    // tracer state
+    SetButtonState(stopped, running, paused,
+                   visorState.currentRendererState);
+
     bool isChanged = false;
     // Handle keyboard related inputs
     if(inputChecker.CheckKeyPress(VisorUserAction::START_STOP_TRACE))
@@ -159,10 +223,11 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
     {
         if(ImGui::BeginMenuBar())
         {
-            double usedGPUMemMiB = visorState.tracer.usedGPUMemoryMiB;
-            double totalGPUMemGiB = visorState.tracer.totalGPUMemoryMiB / 1024.0;
-            std::string memUsage = fmt::format("{:.1f}MiB / {:.1f}GiB",
-                                               usedGPUMemMiB, totalGPUMemGiB);
+            auto usedGPUMem = ConvertMemSizeToGUI(visorState.tracer.usedGPUMemoryBytes);
+            auto totalGPUMem = ConvertMemSizeToGUI(visorState.tracer.totalGPUMemoryBytes);
+            std::string memUsage = fmt::format("{:.1f}{:s} / {:.1f}{:s}",
+                                               usedGPUMem.first, usedGPUMem.second,
+                                               totalGPUMem.first, totalGPUMem.second);
 
             ImGui::Text("%s", memUsage.c_str());
             ImGui::Separator();
@@ -255,9 +320,9 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
 
 
 
-    RunState newRunState = DetermineTracerState(stopped, running, paused);
+    TracerRunState newRunState = DetermineTracerState(stopped, paused);
     auto runStateResult = (isChanged)
-                ? Optional<RunState>(newRunState)
+                ? Optional<TracerRunState>(newRunState)
                 : std::nullopt;
     auto camIndexResult = (camChange != 0)
                 ? Optional<uint32_t>(camChange)

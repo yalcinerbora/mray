@@ -142,6 +142,9 @@ class VisorWindow
     RenderImagePool renderImagePool = RenderImagePool(threadPool,
                                                       handlesVk);
     MainUniformBuffer uniformBuffer = MainUniformBuffer(handlesVk);
+    // Initial rendering
+    Optional<std::string_view>  initialTracerRenderConfigPath;
+    bool                        syncSempahoreIsSent = false;
 
     private:
     friend class VisorVulkan;
@@ -187,5 +190,6 @@ class VisorWindow
     void            PresentFrame(Optional<SemaphoreVariant> waitSemOverride);
     ImFont*         CurrentFont();
     void            Render();
+    void            SetInitialRenderConfig(std::string_view renderConfigPath);
 
 };

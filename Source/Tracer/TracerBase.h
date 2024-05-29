@@ -333,6 +333,8 @@ class TracerBase : public TracerI
 
     GPUThreadInitFunction   GetThreadInitFunction() const override;
     void                    SetThreadPool(BS::thread_pool&) override;
+    size_t                  TotalDeviceMemory() const override;
+    size_t                  UsedDeviceMemory() const override;
 };
 
 template<class K, class V>

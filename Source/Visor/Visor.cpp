@@ -822,3 +822,8 @@ void VisorVulkan::MTDestroy()
     // Terminal glfw system
     glfwTerminate();
 }
+
+void VisorVulkan::MTInitiallyStartRender(std::string_view renderConfigPath)
+{
+    window.SetInitialRenderConfig(renderConfigPath);
+}

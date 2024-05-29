@@ -116,4 +116,5 @@ class VisorVulkan : public VisorI
     void                MTRender() override;
     void                MTDestroy() override;
     void                TriggerEvent() override;
+    void                MTInitiallyStartRender(std::string_view renderConfigPath) override;
 };

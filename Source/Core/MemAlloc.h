@@ -6,6 +6,11 @@
 #include "MathFunctions.h"
 #include "Types.h"
 
+constexpr inline size_t operator ""_TiB(unsigned long long int s)
+{
+    return s << 40;
+}
+
 constexpr inline size_t operator ""_GiB(unsigned long long int s)
 {
     return s << 30;

@@ -182,6 +182,7 @@ class RendererI
     virtual void                StopRender() = 0;
 
     virtual std::string_view    Name() const = 0;
+    virtual size_t              GPUMemoryUsage() const = 0;
 };
 
 using RendererPtr = std::unique_ptr<RendererI>;

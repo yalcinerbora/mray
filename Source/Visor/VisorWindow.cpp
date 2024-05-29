@@ -959,10 +959,11 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
     // Check the run state
     if(changes.statusBarState.runState)
     {
-        RunState state = changes.statusBarState.runState.value();
+        visorState.currentRendererState = changes.statusBarState.runState.value();
+        TracerRunState state = changes.statusBarState.runState.value();
         switch(state)
         {
-            case RunState::RUNNING:
+            case TracerRunState::RUNNING:
             {
                 transferQueue->Enqueue(VisorAction
                 (
@@ -971,7 +972,7 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
                 ));
                 break;
             }
-            case RunState::STOPPED:
+            case TracerRunState::STOPPED:
             {
                 transferQueue->Enqueue(VisorAction
                 (
@@ -980,7 +981,7 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
                 ));
                 break;
             }
-            case RunState::PAUSED:
+            case TracerRunState::PAUSED:
             {
                 transferQueue->Enqueue(VisorAction
                 (
@@ -990,7 +991,7 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
                 break;
             }
             default:
-                MRAY_LOG("WRONG!");
+                MRAY_ERROR_LOG("[Visor]: Unkown run state is determined!");
                 break;
         }
     }
@@ -1027,7 +1028,7 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
         transferQueue->Enqueue(VisorAction
         (
             std::in_place_index<VisorAction::CHANGE_RENDERER>,
-            rIndex
+            visorState.tracer.rendererTypes[rIndex]
         ));
     }
 
@@ -1041,6 +1042,7 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
             lIndex
         ));
     }
+
     if(changes.topBarChanges.customLogicIndex1)
     {
         int32_t lIndex = changes.topBarChanges.customLogicIndex1.value();
@@ -1176,7 +1178,6 @@ void VisorWindow::Render()
         }
         if(stopConsuming) break;
     }
-
     // Current design dictates single operation over the
     // accumulate/save-hdr/save-sdr/renderbufferInfo/clearImage
     // commands. Assert it here, just to be sure
@@ -1214,7 +1215,6 @@ void VisorWindow::Render()
     Optional<SemaphoreVariant> waitSemOverride;
     if(newImageSection)
     {
-
         //auto& as = accumulateStage;
         //waitSemOverride = as.IssueAccumulation(framePool.PrevFrameFinishSignal(),
         //                                       newImageSection.value());
@@ -1271,7 +1271,6 @@ void VisorWindow::Render()
         //sampleImage.IssueClear(cmd, value);
     }
 
-
     // Do tonemap
     if(newClearSignal || newRenderBuffer)
     {
@@ -1303,8 +1302,6 @@ void VisorWindow::Render()
     StartRenderpass(frameHandle);
     GUIChanges guiChanges = gui.Render(CurrentFont(), visorState);
     HandleGUIChanges(guiChanges);
-
-
     // Draw the GUI
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
                                     frameHandle.commandBuffer);
@@ -1314,4 +1311,44 @@ void VisorWindow::Render()
     visorState.visor.frameTime = frameCounter.AvgFrame();
     vkEndCommandBuffer(frameHandle.commandBuffer);
     PresentFrame(waitSemOverride);
+
+    // Send Initial Renderer once
+    // This is sent here to start the rendering as well
+    if(initialTracerRenderConfigPath)
+    {
+        MRAY_LOG("[Visor]: Configuring Tracer via Initial Render Config");
+
+        transferQueue->Enqueue(VisorAction
+        (
+            std::in_place_index<VisorAction::KICKSTART_RENDER>,
+            initialTracerRenderConfigPath.value()
+        ));
+
+        // Launch the renderer
+        transferQueue->Enqueue(VisorAction
+        (
+            std::in_place_index<VisorAction::START_STOP_RENDER>,
+            true
+        ));
+        // Set the state internally, this will not trigger another send command
+        visorState.currentRendererState = TracerRunState::RUNNING;
+
+        initialTracerRenderConfigPath = std::nullopt;
+    }
+    // Initially, send the sync semaphore as well
+    if(!syncSempahoreIsSent)
+    {
+        SystemSemaphoreHandle h = accumulateStage.GetSemaphoreOSHandle();
+        transferQueue->Enqueue(VisorAction
+        (
+            std::in_place_index<VisorAction::SEND_SYNC_SEMAPHORE>,
+            h
+        ));
+        syncSempahoreIsSent = true;
+    }
+}
+
+void VisorWindow::SetInitialRenderConfig(std::string_view renderConfigPath)
+{
+    initialTracerRenderConfigPath = renderConfigPath;
 }

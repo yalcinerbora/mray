@@ -23,11 +23,14 @@ class TracerThread final : public RealtimeThread
     std::map<std::string_view, SceneLoaderPtr>  sceneLoaders;
     SceneLoaderI*                               currentScene = nullptr;
 
+    // Learned something new (Check the other compilers though only checked MSVC)
+    // You can use std::numeric_limits on user defined integral types, nice.
+    RendererId  currentRenderer = std::numeric_limits<RendererId>::max();
+
     bool        isTerminated    = false;
     // Should we do polling or blocking fetch from the queue
     // During rendering, system goes to poll mode to render as fast as possible
     bool        isInSleepMode   = true;
-
     // Some states
     // TODO: I'm pretty sure this will get complicated really fast
     // maybe change this to a state machine later
@@ -37,6 +40,8 @@ class TracerThread final : public RealtimeThread
     void        LoopWork() override;
     void        InitialWork() override;
     void        FinalWork() override;
+
+    void        SetRendererParams(const std::string& renderConfigFile);
 
     public:
     // Constructors & Destructor

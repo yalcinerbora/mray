@@ -92,4 +92,5 @@ class VisorI
     virtual void        MTRender()  = 0;
     virtual void        MTDestroy() = 0;
     virtual void        TriggerEvent() = 0;
+    virtual void        MTInitiallyStartRender(std::string_view renderConfigFile) = 0;
 };

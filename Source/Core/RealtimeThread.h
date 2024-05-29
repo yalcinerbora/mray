@@ -54,8 +54,7 @@ class RealtimeThread
 inline void RealtimeThread::THRDEntry()
 {
     InitialWork();
-
-    while(!InternallyTerminated() || !stopSignal)
+    while(!InternallyTerminated() && !stopSignal)
     {
         LoopWork();
 

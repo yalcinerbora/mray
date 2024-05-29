@@ -30,8 +30,8 @@ struct TracerAnalyticData
     MRayColorSpaceEnum  tracerColorSpace;
 
     // Memory Related
-    double      totalGPUMemoryMiB;
-    double      usedGPUMemoryMiB;
+    size_t      totalGPUMemoryBytes;
+    size_t      usedGPUMemoryBytes;
 };
 
 struct RendererAnalyticData
