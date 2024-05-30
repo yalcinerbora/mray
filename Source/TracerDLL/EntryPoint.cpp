@@ -2,9 +2,9 @@
 #include "Tracer.h"
 
 extern "C" MRAY_TRACER_DEVICE_ENTRYPOINT
-TracerI* ConstructTracer()
+TracerI* ConstructTracer(const TracerParameters& tp)
 {
-    return new Tracer();
+    return new Tracer(tp);
 }
 
 extern "C" MRAY_TRACER_DEVICE_ENTRYPOINT

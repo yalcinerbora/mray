@@ -44,7 +44,8 @@ struct TracerIdPack
     std::vector<CamSurfaceId>   camSurfaces;
     std::vector<LightSurfaceId> lightSurfaces;
 
-    double loadTimeMS = 0.0;
+    AABB3   sceneAABB;
+    double  loadTimeMS = 0.0;
 };
 
 class SceneLoaderI

@@ -22,11 +22,11 @@ class Tracer final : public TracerBase
     //static void AddRendererGenerators_2(std::map<std::string_view, PrimGenerator>&);
 
     public:
-    Tracer();
+    Tracer(const TracerParameters& tracerParams);
 };
 
-inline Tracer::Tracer()
-    : TracerBase(GLOBAL_TYPE_GEN)
+inline Tracer::Tracer(const TracerParameters& tracerParams)
+    : TracerBase(GLOBAL_TYPE_GEN, tracerParams)
 {
     // Types
     AddPrimGenerators(GLOBAL_TYPE_GEN.primGenerator);

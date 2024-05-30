@@ -56,16 +56,16 @@ struct RendererAnalyticData
 struct SceneAnalyticData
 {
     // Generic
-    std::string     sceneName       = "";
+    std::string sceneName       = "";
     // Timings
-    double          sceneLoadTimeS  = 0.0;
+    double      sceneLoadTimeS  = 0.0;
     // Amounts
-    uint32_t        mediumCount     = 0;
-    uint32_t        primCount       = 0;
-    uint32_t        textureCount    = 0;
-    uint32_t        surfaceCount    = 0;
-    uint32_t        cameraCount     = 0;
+    uint32_t    mediumCount     = 0;
+    uint32_t    primCount       = 0;
+    uint32_t    textureCount    = 0;
+    uint32_t    surfaceCount    = 0;
+    uint32_t    lightCount      = 0;
+    uint32_t    cameraCount     = 0;
     //
-    AABB3f          sceneExtent     = AABB3f::Negative();
-    Vector2         timeRange       = Vector2::Zero();
+    AABB3       sceneExtent     = AABB3::Negative();
 };

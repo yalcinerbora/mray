@@ -941,9 +941,9 @@ FramePack VisorWindow::NextFrame()
     return framePool.AcquireNextFrame(swapchain);
 }
 
-void VisorWindow::PresentFrame(Optional<SemaphoreVariant> waitSemOverride)
+void VisorWindow::PresentFrame(const SemaphoreVariant& waitSemaphore)
 {
-    return framePool.PresentThisFrame(swapchain, waitSemOverride);
+    return framePool.PresentThisFrame(swapchain, waitSemaphore);
 }
 
 ImFont* VisorWindow::CurrentFont()
@@ -1076,15 +1076,46 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
         glfwSetWindowShouldClose(window, 1);
 }
 
+void VisorWindow::DoInitialActions()
+{
+    // Send Initial Renderer once
+    // This is sent here to start the rendering as well
+    if(initialTracerRenderConfigPath)
+    {
+        MRAY_LOG("[Visor]: Configuring Tracer via Initial Render Config");
+
+        transferQueue->Enqueue(VisorAction
+        (
+            std::in_place_index<VisorAction::KICKSTART_RENDER>,
+            initialTracerRenderConfigPath.value()
+        ));
+
+        // Launch the renderer
+        transferQueue->Enqueue(VisorAction
+        (
+            std::in_place_index<VisorAction::START_STOP_RENDER>,
+            true
+        ));
+        // Set the state internally, this will not trigger another send command
+        visorState.currentRendererState = TracerRunState::RUNNING;
+
+        initialTracerRenderConfigPath = std::nullopt;
+    }
+    // Initially, send the sync semaphore as well
+    if(!syncSempahoreIsSent)
+    {
+        SystemSemaphoreHandle h = accumulateStage.GetSemaphoreOSHandle();
+        transferQueue->Enqueue(VisorAction
+        (
+            std::in_place_index<VisorAction::SEND_SYNC_SEMAPHORE>,
+            h
+        ));
+        syncSempahoreIsSent = true;
+    }
+}
+
 void VisorWindow::Render()
 {
-    if(stopPresenting) return;
-
-    //static uint64_t ijk = 0;
-    //MRAY_LOG("[Visor]: Loop {}", ijk);
-    //ijk++;
-
-    //
     Optional<RenderBufferInfo>      newRenderBuffer;
     Optional<RenderImageSection>    newImageSection;
     Optional<bool>                  newClearSignal;
@@ -1201,10 +1232,13 @@ void VisorWindow::Render()
     }
 
     //
-    Pair<VkSemaphore, uint64_t> saveSemaphore = {nullptr, 0};
+    SemaphoreVariant prevSemamphore =
+    {
+        .semHandle = framePool.PrevFrameFinishSignal(),
+    };
     if(newSaveInfo)
     {
-        //renderImagePool.SaveImage(framePool.PrevFrameFinishSignal(),
+        //prevSemamphore = renderImagePool.SaveImage(prevSemamphore,
         //                          isHDRSave, newSaveInfo.value());
 
         // Should we a need a pool
@@ -1212,20 +1246,12 @@ void VisorWindow::Render()
 
     // Before Command Start check if new image section is received
     // Issue an accumulation and override the main wait semaphore
-    Optional<SemaphoreVariant> waitSemOverride;
     if(newImageSection)
     {
         //auto& as = accumulateStage;
-        //waitSemOverride = as.IssueAccumulation(framePool.PrevFrameFinishSignal(),
+        //prevSemamphore = as.IssueAccumulation(prevSemamphore,
         //                                       newImageSection.value());
     }
-    // ================== //
-    //    Command Start   //
-    // ================== //
-    // Wait availablility of the command buffer
-    FramePack frameHandle = NextFrame();
-    StartCommandBuffer(frameHandle);
-    frameCounter.StartRecord(frameHandle.commandBuffer);
 
     // Entire image reset + img format change (new alloc maybe)
     if(newRenderBuffer)
@@ -1264,24 +1290,33 @@ void VisorWindow::Render()
     // Image clear
     else if(newClearSignal)
     {
-        //VkClearColorValue value = {};
-        //value.float32[0] = 0.0f; value.float32[1] = 0.0f;
-        //value.float32[2] = 0.0f; value.float32[3] = 0.0f;
-        //pixelImage.IssueClear(cmd, value);
-        //sampleImage.IssueClear(cmd, value);
+        //prevSemamphore = accumulateStage.IssueClear(prevSemamphore);
     }
 
     // Do tonemap
-    if(newClearSignal || newRenderBuffer)
+    if(newClearSignal || newRenderBuffer || newImageSection)
     {
-        //tonemapStage.TonemapImage(frameHandle.commandBuffer,
+        // prevSemamphore = tonemapStage.TonemapImage(prevSemamphore,
         //                          rendeImagePool.GetImage());
     }
 
+    // Initially send sync semaphore and initial render config
+    DoInitialActions();
+
+    // ================== //
+    //    Command Start   //
+    // ================== //
+    if(stopPresenting) return;
+    // Wait availablility of the command buffer
+    FramePack frameHandle = NextFrame();
+    StartCommandBuffer(frameHandle);
+    frameCounter.StartRecord(frameHandle.commandBuffer);
+
+
     // Linearize the compute event with imGui img reads
-    // ImGui has its shaders in binary, but I'm pretty sure they read images
-    // from fragment shader.
-    if(newRenderBuffer || newClearSignal || newRenderBuffer)
+    // This may not be needed since semaphores are
+    // utilized to create dependency
+    if(newRenderBuffer || newClearSignal || newImageSection)
     {
         VkMemoryBarrier barrier =
         {
@@ -1310,42 +1345,7 @@ void VisorWindow::Render()
     frameCounter.EndRecord(frameHandle.commandBuffer);
     visorState.visor.frameTime = frameCounter.AvgFrame();
     vkEndCommandBuffer(frameHandle.commandBuffer);
-    PresentFrame(waitSemOverride);
-
-    // Send Initial Renderer once
-    // This is sent here to start the rendering as well
-    if(initialTracerRenderConfigPath)
-    {
-        MRAY_LOG("[Visor]: Configuring Tracer via Initial Render Config");
-
-        transferQueue->Enqueue(VisorAction
-        (
-            std::in_place_index<VisorAction::KICKSTART_RENDER>,
-            initialTracerRenderConfigPath.value()
-        ));
-
-        // Launch the renderer
-        transferQueue->Enqueue(VisorAction
-        (
-            std::in_place_index<VisorAction::START_STOP_RENDER>,
-            true
-        ));
-        // Set the state internally, this will not trigger another send command
-        visorState.currentRendererState = TracerRunState::RUNNING;
-
-        initialTracerRenderConfigPath = std::nullopt;
-    }
-    // Initially, send the sync semaphore as well
-    if(!syncSempahoreIsSent)
-    {
-        SystemSemaphoreHandle h = accumulateStage.GetSemaphoreOSHandle();
-        transferQueue->Enqueue(VisorAction
-        (
-            std::in_place_index<VisorAction::SEND_SYNC_SEMAPHORE>,
-            h
-        ));
-        syncSempahoreIsSent = true;
-    }
+    PresentFrame(prevSemamphore);
 }
 
 void VisorWindow::SetInitialRenderConfig(std::string_view renderConfigPath)

@@ -125,29 +125,23 @@ FramePack FramePool::AcquireNextFrame(Swapchain& swapchain)
 }
 
 void FramePool::PresentThisFrame(Swapchain& swapchain,
-                                 const Optional<SemaphoreVariant>& waitSemOverride)
+                                 const SemaphoreVariant& waitSemaphore)
 {
     assert(frameIndex >= 0 && frameIndex < FRAME_COUNT);
     uint32_t frameIndexUInt = static_cast<uint32_t>(frameIndex);
-    VkSemaphore imgAvailSem = semaphores[frameIndexUInt].imageAvailableSignal;
+    //VkSemaphore imgAvailSem = semaphores[frameIndexUInt].imageAvailableSignal;
     VkSemaphore comRecordSem = semaphores[frameIndexUInt].commandsRecordedSignal;
 
     // ============= //
     //   SUBMISSON   //
     // ============= //
-    uint64_t waitCounter = 0;
-    if(waitSemOverride)
-        waitCounter = waitSemOverride.value().Value();
-
     VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     VkSemaphoreSubmitInfo waitSemaphores =
     {
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
         .pNext = nullptr,
-        .semaphore = (waitSemOverride)
-                        ? waitSemOverride.value().semHandle
-                        : imgAvailSem,
-        .value = waitCounter,
+        .semaphore = waitSemaphore.semHandle,
+        .value = waitSemaphore.Value(),
         // TODO change this to more fine-grained later maybe?
         .stageMask = waitStage,
         .deviceIndex = 0

@@ -76,13 +76,12 @@ void TracerBase::PopulateAttribInfoAndTypeLists()
     }
 }
 
-TracerBase::TracerBase(const TypeGeneratorPack& tGen)
+TracerBase::TracerBase(const TypeGeneratorPack& tGen,
+                       const TracerParameters& tParams)
     : threadPool(nullptr)
     , typeGenerators(tGen)
-{
-    // Inject the CUDA "setDevice()" equavilent to the threads
-    // to initialize GPU usage
-}
+    , tracerParams(tParams)
+{}
 
 TypeNameList TracerBase::PrimitiveGroups() const
 {
@@ -797,7 +796,7 @@ CamSurfaceId TracerBase::CreateCameraSurface(CameraSurfaceParams p)
     return CamSurfaceId(camSId);
 }
 
-void TracerBase::CommitSurfaces(AcceleratorType type)
+AABB3 TracerBase::CommitSurfaces()
 {
     // Pack the surfaces via transform / primitive
     //
@@ -841,6 +840,7 @@ void TracerBase::CommitSurfaces(AcceleratorType type)
         return left.second.transformId < right.second.transformId;
     });
     // Send it!
+    AcceleratorType type = tracerParams.accelMode;
     accelerator = typeGenerators.baseAcceleratorGenerator.at(type)(*threadPool, gpuSystem,
                                                                    typeGenerators.accelGeneratorMap.at(type),
                                                                    typeGenerators.accelWorkGeneratorMap.at(type));
@@ -854,6 +854,12 @@ void TracerBase::CommitSurfaces(AcceleratorType type)
         .lSurfList = Span<const LightSurfP>(lSurfList.begin(),
                                             lPartitionEnd)
     });
+    return accelerator->SceneAABB();
+}
+
+CameraTransform TracerBase::GetCamTransform(CamSurfaceId) const
+{
+    throw MRayError("Implement");
 }
 
 RendererId TracerBase::CreateRenderer(std::string typeName)
@@ -889,12 +895,13 @@ void TracerBase::PushRendererAttribute(RendererId rId,
                                      queue);
 }
 
-void TracerBase::StartRender(RendererId rId, CamSurfaceId cId,
-                             RenderImageParams params)
+RenderBufferInfo TracerBase::StartRender(RendererId rId, CamSurfaceId cId,
+                                         RenderImageParams params,
+                                         Optional<CameraTransform> optionalTransform)
 {
     currentRenderer = renderers.at(rId).get();
     auto camKey = CameraKey(static_cast<uint32_t>(cId));
-    currentRenderer->StartRender(params, camKey);
+    return currentRenderer->StartRender(params, camKey);
 }
 
 void TracerBase::StopRender()

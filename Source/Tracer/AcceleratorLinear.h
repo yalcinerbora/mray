@@ -153,7 +153,7 @@ class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinea
 
     protected:
     // Each leaf has a surface
-    void InternalConstruct(const std::vector<size_t>& instanceOffsets) override;
+    AABB3 InternalConstruct(const std::vector<size_t>& instanceOffsets) override;
 
     public:
     // Constructors & Destructor

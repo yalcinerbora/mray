@@ -25,15 +25,24 @@ class TracerThread final : public RealtimeThread
 
     // Learned something new (Check the other compilers though only checked MSVC)
     // You can use std::numeric_limits on user defined integral types, nice.
-    RendererId  currentRenderer = std::numeric_limits<RendererId>::max();
-
-    bool        isTerminated    = false;
-    // Should we do polling or blocking fetch from the queue
-    // During rendering, system goes to poll mode to render as fast as possible
-    bool        isInSleepMode   = true;
-    // Some states
+    Vector2ui   resolution;
+    Vector2ui   regionMin;
+    Vector2ui   regionMax;
+    // Current State
+    RendererId              currentRenderer;
+    size_t                  currentCamIndex;
+    SystemSemaphoreHandle   currentSem;
+    CameraTransform         currentCamTransform;
+    TracerIdPack            sceneIds;
+    // Flow states
     // TODO: I'm pretty sure this will get complicated really fast
     // maybe change this to a state machine later
+    // Tracer is terminated due to a fatal error
+    bool isTerminated    = false;
+    // Should we do polling or blocking fetch from the queue
+    // During rendering, system goes to poll mode to render as fast as possible
+    bool isInSleepMode   = true;
+    // Are we currently rendering
     bool isRendering = false;
 
     //
@@ -42,6 +51,7 @@ class TracerThread final : public RealtimeThread
     void        FinalWork() override;
 
     void        SetRendererParams(const std::string& renderConfigFile);
+    void        RestartRenderer();
 
     public:
     // Constructors & Destructor
@@ -51,6 +61,11 @@ class TracerThread final : public RealtimeThread
 
     MRayError   MTInitialize(const std::string& tracerConfig);
     bool        InternallyTerminated() const override;
+
+    void        SetInitialResolution(const Vector2ui& resolution,
+                                     const Vector2ui& regionMin,
+                                     const Vector2ui& regionMax);
+
     // Misc.
     GPUThreadInitFunction GetThreadInitFunction() const;
 };

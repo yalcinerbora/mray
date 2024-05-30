@@ -70,6 +70,6 @@ class FramePool
 
     FramePack       AcquireNextFrame(Swapchain& swapchain);
     void            PresentThisFrame(Swapchain& swapchain,
-                                     const Optional<SemaphoreVariant>& waitSemOverride);
+                                     const SemaphoreVariant& waitSemaphore);
     VkSemaphore     PrevFrameFinishSignal();
 };

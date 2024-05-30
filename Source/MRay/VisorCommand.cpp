@@ -167,6 +167,15 @@ MRayError VisorCommand::Invoke()
                                   processPath);
     if(e) return e;
 
+
+    if(imgRes)
+    {
+        Vector2ui resolution(imgRes.value()[0], imgRes.value()[1]);
+        tracerThread.SetInitialResolution(resolution,
+                                          Vector2ui::Zero(),
+                                          resolution);
+    }
+
     // Start the tracer thread
     tracerThread.Start("TracerThread");
 
@@ -232,14 +241,16 @@ CLI::App* VisorCommand::GenApp(CLI::App& mainApp)
     CLI::Option* sceneOption = visorApp->add_option("--scene, -s"s, sceneFile,
                                                     "Initial scene file (optional)."s)
         ->check(CLI::ExistingFile)
-        ->expected(1);
+        ->expected(1)
+        ->required();
 
     CLI::Option* rendOption = visorApp->add_option("--renderConf, --rConf"s, renderConfigFile,
                                                    "Initial renderer to be launched. "
                                                    "Requires a scene to be set (optional)."s)
         ->check(CLI::ExistingFile)
         ->needs(sceneOption)
-        ->expected(1);
+        ->expected(1)
+        ->required();
 
     // TODO: Change this to be a region maybe?
     visorApp->add_option("--resolution, -r"s, imgRes,

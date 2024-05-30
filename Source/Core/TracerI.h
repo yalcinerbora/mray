@@ -22,7 +22,7 @@ struct RenderImageParams
     Vector2ui               regionMax;
     //
     SystemSemaphoreHandle   semaphore;
-    uint64_t                initialCount;
+    uint64_t                initialSemCounter;
 };
 
 namespace TransientPoolDetail { class TransientData; }
@@ -60,11 +60,50 @@ namespace TracerConstants
     static constexpr std::string_view RENDERER_PREFIX   = "(R)";
 }
 
+// Accelerators are responsible for accelerating ray/surface interactions
+// This is abstracted away but exposed to the user for prototyping different
+// accelerators. This is less usefull due to hw-accelerated ray tracing.
+//
+// The old design supported mixing and matching "Base Accelerator"
+// (TLAS, IAS on other APIs) with bottom-level accelerators. This
+// design only enables the user to set a single accelerator type
+// for the entire scene. Hardware acceleration APIs, such asOptiX,
+// did not support it anyway so it is removed. Internally software stack
+// utilizes the old implementation for simulating two-level acceleration
+// hierarchy.
+//
+// Currently Accepted types are
+//
+//  -- SOFTWARE_NONE :  No acceleration, ray caster does a !LINEAR SEARCH! over the
+//                      primitives (Should not be used, it is for debugging, testing)
+//  -- SOFTWARE_BVH  :  Very basic midpoint BVH. Provided for completeness sake and
+//                      should not be used.
+//  -- HARDWARE      :  On CUDA, it utilizes OptiX for hardware acceleration.
 enum class AcceleratorType
 {
     SOFTWARE_NONE,
     SOFTWARE_BASIC_BVH,
     HARDWARE
+};
+
+enum class SamplerType
+{
+    INDEPENDENT
+};
+
+
+struct TracerParameters
+{
+    // Random Seed value, many samplers etc.
+    // will start via this seed if applicable
+    uint64_t        seed = 0;
+    // Accelerator move, software/hardware
+    AcceleratorType accelMode = AcceleratorType::HARDWARE;
+    // Item pool size, amount of "items" (paths/rays/etc) processed
+    // in parallel
+    uint32_t        itemPoolSize = 1 << 21; // 2^21
+    // Current sampler logic,
+    SamplerType     samplerType = SamplerType::INDEPENDENT;
 };
 
 enum class AttributeOptionality
@@ -468,29 +507,8 @@ class [[nodiscard]] TracerI
                                                 std::vector<TextureId> textures) = 0;
 
     //================================//
-    //     Accelerator & Surfaces     //
+    //            Surfaces            //
     //================================//
-    // Accelerators are responsible for accelerating ray/surface interactions
-    // This is abstracted away but exposed to the user for prototyping different
-    // accelerators. This is less usefull due to hw-accelerated ray tracing.
-    //
-    // The old design supported mixing and matching "Base Accelerator"
-    // (TLAS, IAS on other APIs) with bottom-level accelerators. This
-    // design only enables the user to set a single accelerator type
-    // for the entire scene. Hardware acceleration APIs, such asOptiX,
-    // did not support it anyway so it is removed. Internally software stack
-    // utilizes the old implementation for simulating two-level acceleration
-    // hierarchy.
-    //
-    // Currently Accepted types are
-    //
-    //  -- SOFTWARE_NONE :  No acceleration, ray caster does a !LINEAR SEARCH! over the
-    //                      primitives (Should not be used, it is for debugging, testing)
-    //  -- SOFTWARE_BVH  :  Very basic midpoint BVH. Provided for completeness sake and
-    //                      should not be used.
-    //  -- HARDWARE      :  On CUDA, it utilizes OptiX for hardware acceleration.
-    //
-    // Surfaces
     // Basic surface
     virtual SurfaceId       CreateSurface(SurfaceParams) = 0;
     // These may not be "surfaces" by nature but user must register them.
@@ -499,7 +517,8 @@ class [[nodiscard]] TracerI
     // Primitive-backed lights imply accelerator generation
     virtual LightSurfaceId  CreateLightSurface(LightSurfaceParams) = 0;
     virtual CamSurfaceId    CreateCameraSurface(CameraSurfaceParams) = 0;
-    virtual void            CommitSurfaces(AcceleratorType) = 0;
+    virtual AABB3           CommitSurfaces() = 0;
+    virtual CameraTransform GetCamTransform(CamSurfaceId) const = 0;
 
     //================================//
     //           Renderers            //
@@ -514,10 +533,10 @@ class [[nodiscard]] TracerI
     //================================//
     //           Rendering            //
     //================================//
-    virtual void        StartRender(RendererId, CamSurfaceId,
-                                    RenderImageParams) = 0;
-    virtual void        StopRender() = 0;
-
+    virtual RenderBufferInfo    StartRender(RendererId, CamSurfaceId,
+                                            RenderImageParams,
+                                            Optional<CameraTransform>) = 0;
+    virtual void                StopRender() = 0;
     // Renderer does a subsection of the img rendering
     // and returns an output
     virtual RendererOutput DoRenderWork() = 0;
@@ -533,4 +552,4 @@ class [[nodiscard]] TracerI
     virtual size_t                  UsedDeviceMemory() const = 0;
 };
 
-using TracerConstructorArgs = Tuple<>;
+using TracerConstructorArgs = Tuple<const TracerParameters&>;

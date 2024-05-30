@@ -173,6 +173,7 @@ class VisorWindow
     void        StartRenderpass(const FramePack& frameHandle);
     void        StartCommandBuffer(const FramePack& frameHandle);
     void        HandleGUIChanges(const GUIChanges&);
+    void        DoInitialActions();
 
     public:
     // Constructors & Destructor
@@ -187,7 +188,7 @@ class VisorWindow
     //
     bool            ShouldClose();
     FramePack       NextFrame();
-    void            PresentFrame(Optional<SemaphoreVariant> waitSemOverride);
+    void            PresentFrame(const SemaphoreVariant& waitSemaphore);
     ImFont*         CurrentFont();
     void            Render();
     void            SetInitialRenderConfig(std::string_view renderConfigPath);

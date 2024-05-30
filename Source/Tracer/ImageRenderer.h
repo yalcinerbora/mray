@@ -19,11 +19,6 @@
 //                                             GenericGroupLightT*,
 //                                             GPUSystem&>;
 
-enum class SamplerType : uint32_t
-{
-    INDEPENDENT
-};
-
 class ImageRenderer final : public RendererT<ImageRenderer>
 {
     public:

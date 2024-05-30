@@ -326,6 +326,7 @@ class BaseAcceleratorI
     virtual void    Construct(BaseAccelConstructParams) = 0;
     virtual void    AllocateForTraversal(size_t maxRayCount) = 0;
     virtual size_t  GPUMemoryUsage() const = 0;
+    virtual AABB3   SceneAABB() const = 0;
 };
 
 using AccelGroupPtr = std::unique_ptr<AcceleratorGroupI>;
@@ -349,13 +350,14 @@ class BaseAcceleratorT : public BaseAcceleratorI
     GPUSystem&          gpuSystem;
     uint32_t            idCounter           = 0;
     Vector2ui           maxBitsUsedOnKey    = Vector2ui::Zero();
+    AABB3               sceneAABB;
     const AccelGroupGenMap&                 accelGenerators;
     const AccelWorkGenMap&                  workGenGlobalMap;
     std::map<uint32_t, AccelGroupPtr>       generatedAccels;
     std::map<uint32_t, AcceleratorGroupI*>  accelInstances;
 
 
-    virtual void        InternalConstruct(const std::vector<size_t>& instanceOffsets) = 0;
+    virtual AABB3       InternalConstruct(const std::vector<size_t>& instanceOffsets) = 0;
 
     public:
     // Constructors & Destructor
@@ -365,6 +367,7 @@ class BaseAcceleratorT : public BaseAcceleratorI
 
     // ....
     void                Construct(BaseAccelConstructParams) override;
+    AABB3               SceneAABB() const override;
 };
 
 template<class KeyType>
@@ -596,7 +599,13 @@ void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
     // Internal construction routine,
     // we can not fetch the leaf data here because some accelerators are
     // constructed on CPU (due to laziness)
-    InternalConstruct(instanceOffsets);
+    sceneAABB = InternalConstruct(instanceOffsets);
+}
+
+template <class C>
+AABB3 BaseAcceleratorT<C>::SceneAABB() const
+{
+    return sceneAABB;
 }
 
 template <PrimitiveGroupC PG>

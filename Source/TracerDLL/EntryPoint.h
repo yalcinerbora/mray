@@ -12,7 +12,7 @@
 
 // C Interface (Used when dynamically loading the DLL)
 extern "C" MRAY_TRACER_DEVICE_ENTRYPOINT
-TracerI* ConstructTracer();
+TracerI* ConstructTracer(const TracerParameters&);
 
 extern "C" MRAY_TRACER_DEVICE_ENTRYPOINT
 void DestroyTracer(TracerI*);

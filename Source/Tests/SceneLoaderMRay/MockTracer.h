@@ -293,8 +293,8 @@ class TracerMock : public TracerI
     SurfaceId       CreateSurface(SurfaceParams) override;
     LightSurfaceId  CreateLightSurface(LightSurfaceParams) override;
     CamSurfaceId    CreateCameraSurface(CameraSurfaceParams) override;
-    void            CommitSurfaces(AcceleratorType) override;
-
+    AABB3           CommitSurfaces() override;
+    CameraTransform GetCamTransform(CamSurfaceId) const override;
 
     RendererId  CreateRenderer(std::string typeName) override;
     void        DestroyRenderer(RendererId) override;
@@ -303,11 +303,11 @@ class TracerMock : public TracerI
     void        PushRendererAttribute(RendererId, uint32_t attributeIndex,
                                       TransientData data) override;
 
-    void            StartRender(RendererId, CamSurfaceId,
-                                RenderImageParams) override;
-    void            StopRender() override;
-    //
-    RendererOutput  DoRenderWork() override;
+    RenderBufferInfo    StartRender(RendererId, CamSurfaceId,
+                                    RenderImageParams,
+                                    Optional<CameraTransform>) override;
+    void                StopRender() override;
+    RendererOutput      DoRenderWork() override;
 
     // Misc
     void                    ClearAll() override;
@@ -1712,20 +1712,24 @@ inline CamSurfaceId TracerMock::CreateCameraSurface(CameraSurfaceParams p)
     return CamSurfaceId(camSurfId);
 }
 
-inline void TracerMock::CommitSurfaces(AcceleratorType accelType)
+inline AABB3 TracerMock::CommitSurfaces()
 {
-    if(!print) return;
+    if(!print) return AABB3::Negative();
 
-    std::string accelTypeName;
-    using enum AcceleratorType;
-    switch(accelType)
+    MRAY_LOG("Committing surfaces");
+    return AABB3::Negative();
+}
+
+CameraTransform TracerMock::GetCamTransform(CamSurfaceId camSurfId) const
+{
+    MRAY_LOG("Returning transform of {}",
+             static_cast<uint32_t>(camSurfId));
+    return CameraTransform
     {
-        case SOFTWARE_NONE:         accelTypeName = "Software None";    break;
-        case SOFTWARE_BASIC_BVH:    accelTypeName = "Software BVH";     break;
-        case HARDWARE:              accelTypeName = "Hardware";         break;
-    }
-    MRAY_LOG("Committing surface with accelerator type: \"{}\"",
-             accelTypeName);
+        .position = Vector3::Zero(),
+        .gazePoint = Vector3(0, 0, -1),
+        .up = Vector3::YAxis()
+    };
 }
 
 inline RendererId TracerMock::CreateRenderer(std::string typeName)
@@ -1754,8 +1758,9 @@ inline void TracerMock::PushRendererAttribute(RendererId, uint32_t,
     throw MRayError("\"PushRendererAttribute\" is not implemented in mock tracer!");
 }
 
-inline void TracerMock::StartRender(RendererId, CamSurfaceId,
-                                    RenderImageParams)
+inline RenderBufferInfo TracerMock::StartRender(RendererId, CamSurfaceId,
+                                                RenderImageParams,
+                                                Optional<CameraTransform>)
 {
     throw MRayError("\"StartRender\" is not implemented in mock tracer!");
 }

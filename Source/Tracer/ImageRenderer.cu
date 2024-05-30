@@ -32,7 +32,7 @@ void ImageRenderer::PushAttribute(uint32_t attributeIndex,
 RenderBufferInfo ImageRenderer::StartRender(const RenderImageParams& params,
                                             const CameraKey&)
 {
-    renderBuffer.reset(new RenderImageBuffer(params.semaphore, params.initialCount,
+    renderBuffer.reset(new RenderImageBuffer(params.semaphore, params.initialSemCounter,
                                              gpuSystem));
     renderBuffer->Resize(params.resolution, params.regionMin,
                          params.regionMax, 1, MRayColorSpaceEnum::MR_ACES_CG);

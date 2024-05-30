@@ -1,4 +1,5 @@
 #include "AcceleratorLinear.h"
+#include "Device/GPUAlgorithms.h"
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCIntersectBaseLinear(// Output
@@ -40,6 +41,15 @@ void KCIntersectBaseLinear(// Output
     }
 }
 
+struct UnionAABB3
+{
+    MRAY_GPU MRAY_GPU_INLINE
+    AABB3 operator()(const AABB3& l, const AABB3& r) const
+    {
+        return l.Union(r);
+    }
+};
+
 std::string_view BaseAcceleratorLinear::TypeName()
 {
     using namespace TypeNameGen::CompTime;
@@ -48,7 +58,7 @@ std::string_view BaseAcceleratorLinear::TypeName()
     return BaseAccelTypeName<Name>;
 }
 
-void BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instanceOffsets)
+AABB3 BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instanceOffsets)
 {
     assert(instanceOffsets.size() == generatedAccels.size());
 
@@ -69,7 +79,27 @@ void BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instanc
         aGroup->WriteInstanceKeysAndAABBs(dAABBs, dLeafs);
         i++;
     }
+
+    // Reduce the given AABBs
+    // Cheeckly utilize stack mem as temp mem
+    size_t temMemSize = DeviceAlgorithms::ReduceTMSize<AABB3>(dAABBs.size());
+    Span<AABB3> dReducedAABB;
+    Span<Byte> dTemp;
+    MemAlloc::AllocateMultiData(std::tie(dTemp, dReducedAABB),
+                                stackMem, {temMemSize, 1});
+
+    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    DeviceAlgorithms::Reduce(Span<AABB3,1>(dReducedAABB), dTemp,
+                             ToConstSpan(dAABBs),
+                             AABB3::Negative(),
+                             queue, UnionAABB3());
+
+    AABB3 hAABB;
+    queue.MemcpyAsync(Span<AABB3>(&hAABB, 1), ToConstSpan(dReducedAABB));
+    queue.Barrier().Wait();
+
     // This is very simple "accelerator" so basically we are done
+    return hAABB;
 }
 
 void BaseAcceleratorLinear::AllocateForTraversal(size_t maxRayCount)

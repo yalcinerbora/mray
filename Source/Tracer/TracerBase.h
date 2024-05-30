@@ -161,6 +161,9 @@ class TracerBase : public TracerI
     // Type Generators
     const TypeGeneratorPack&   typeGenerators;
 
+    // Loaded Parameters
+    TracerParameters    tracerParams;
+
     // Current Types
     std::map<std::string_view, PrimAttributeInfoList>       primAttributeInfoMap;
     std::map<std::string_view, CamAttributeInfoList>        camAttributeInfoMap;
@@ -173,7 +176,8 @@ class TracerBase : public TracerI
     void PopulateAttribInfoAndTypeLists();
 
     public:
-                        TracerBase(const TypeGeneratorPack&);
+                        TracerBase(const TypeGeneratorPack&,
+                                   const TracerParameters& tracerParams);
 
     TypeNameList        PrimitiveGroups() const override;
     TypeNameList        MaterialGroups() const override;
@@ -314,7 +318,8 @@ class TracerBase : public TracerI
     SurfaceId       CreateSurface(SurfaceParams) override;
     LightSurfaceId  CreateLightSurface(LightSurfaceParams) override;
     CamSurfaceId    CreateCameraSurface(CameraSurfaceParams) override;
-    void            CommitSurfaces(AcceleratorType) override;
+    AABB3           CommitSurfaces() override;
+    CameraTransform GetCamTransform(CamSurfaceId) const override;
 
 
     RendererId  CreateRenderer(std::string typeName) override;
@@ -324,10 +329,11 @@ class TracerBase : public TracerI
     void        PushRendererAttribute(RendererId, uint32_t attributeIndex,
                                       TransientData data) override;
 
-    void            StartRender(RendererId, CamSurfaceId,
-                                RenderImageParams) override;
-    void            StopRender() override;
-    RendererOutput  DoRenderWork() override;
+    RenderBufferInfo    StartRender(RendererId, CamSurfaceId,
+                                    RenderImageParams,
+                                    Optional<CameraTransform>) override;
+    void                StopRender() override;
+    RendererOutput      DoRenderWork() override;
 
     void            ClearAll() override;
 

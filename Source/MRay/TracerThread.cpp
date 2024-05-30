@@ -15,6 +15,10 @@ struct TracerConfig
     std::string dllName;
     std::string dllCreateFuncName = "ConstructTracer";
     std::string dllDeleteFuncName = "DestroyTracer";
+
+    TracerParameters params;
+
+    //ImageFilterOpts;
 };
 
 
@@ -67,6 +71,11 @@ Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
 }
 
 void TracerThread::SetRendererParams(const std::string&)
+{
+
+}
+
+void TracerThread::RestartRenderer()
 {
 
 }
@@ -180,17 +189,40 @@ void TracerThread::LoopWork()
         {
             MRAY_LOG("[Tracer]: NewScene {}", scenePath.value());
 
+            using namespace std::filesystem;
+            tracer->ClearAll();
+            // TODO: Single scene loading, change this later maybe
+            // for tracer supporting multiple scenes
+            if(currentScene) currentScene->ClearScene();
+            std::string fileExt = path(scenePath.value()).extension().string();
+            SceneLoaderI* loader = sceneLoaders.at(fileExt).get();
+            currentScene = loader;
+            Expected<TracerIdPack> result = currentScene->LoadScene(*tracer, scenePath.value());
+            if(result.has_error())
+            {
+                MRAY_ERROR_LOG("[Tracer]: Failed to Load Scene\n{}",
+                               result.error().GetError());
+                isTerminated = true;
+                return;
+            }
+            else
+            {
+                sceneIds = std::move(result.value());
+                MRAY_LOG("[Tracer]: Scene \"{}\" loaded in {}ms",
+                         scenePath.value(),
+                         sceneIds.loadTimeMS);
+            }
+
+            currentCamIndex = 0;
+            CamSurfaceId camSurf = sceneIds.camSurfaces[currentCamIndex];
+            currentCamTransform = tracer->GetCamTransform(camSurf);
+
             // When new scene is loaded, send the
             // Initial cam transform
             transferQueue.Enqueue(TracerResponse
             (
                 std::in_place_index<TracerResponse::CAMERA_INIT_TRANSFORM>,
-                CameraTransform
-                {
-                    .position = Vector3::Zero(),
-                    .gazePoint = Vector3(0, 0, -1),
-                    .up = Vector3(0, 1, 0)
-                }
+                currentCamTransform
             ));
 
             // Scene Analytic Data
@@ -200,15 +232,14 @@ void TracerThread::LoopWork()
                 SceneAnalyticData
                 {
                     .sceneName = scenePath.value(),
-                    .sceneLoadTimeS = 10.0,
-                    .mediumCount = 3,
-                    .primCount = 5,
-                    .textureCount = 7,
-                    .surfaceCount = 9,
-                    .cameraCount = 11,
-                    .sceneExtent = AABB3(Vector3(0.0, 0.0, 0.0),
-                                         Vector3(10.0, 10.0, 10.0)),
-                    .timeRange = Vector2(1, 10)
+                    .sceneLoadTimeS = sceneIds.loadTimeMS,
+                    .mediumCount = static_cast<uint32_t>(sceneIds.mediums.size()),
+                    .primCount = static_cast<uint32_t>(sceneIds.prims.size()),
+                    .textureCount = static_cast<uint32_t>(sceneIds.textures.size()),
+                    .surfaceCount = static_cast<uint32_t>(sceneIds.surfaces.size()),
+                    .lightCount = static_cast<uint32_t>(sceneIds.lightSurfaces.size()),
+                    .cameraCount = static_cast<uint32_t>(sceneIds.camSurfaces.size()),
+                    .sceneExtent = sceneIds.sceneAABB
                 }
             ));
 
@@ -237,62 +268,39 @@ void TracerThread::LoopWork()
                 }
             ));
 
-            //using namespace std::filesystem;
-            //tracer->ClearAll();
-            //// TODO: Single scene loading, change this later maybe
-            //// for tracer supporting multiple scenes
-            //if(currentScene) currentScene->ClearScene();
-            //std::string fileExt = path(scenePath.value()).extension().string();
-            //SceneLoaderI* loader = sceneLoaders.at(fileExt).get();
-            //currentScene = loader;
-            //currentScene->LoadScene(*tracer, scenePath.value());
+
         }
 
         // New camera!
         if(cameraIndex)
         {
             MRAY_LOG("[Tracer]: NewCamera {}", cameraIndex.value());
+            currentCamIndex = cameraIndex.value();
+
+            CamSurfaceId camSurf = sceneIds.camSurfaces[currentCamIndex];
+            currentCamTransform = tracer->GetCamTransform(camSurf);
 
             // When cam is changed send the initial transform
-            // Initial cam transform
             transferQueue.Enqueue(TracerResponse
             (
                 std::in_place_index<TracerResponse::CAMERA_INIT_TRANSFORM>,
-                CameraTransform
-                {
-                    .position = Vector3::Zero(),
-                    .gazePoint = Vector3(0, 0, -1),
-                    .up = Vector3(0, 1, 0)
-                }
+                currentCamTransform
             ));
 
-            //// New Camera
-            //// Stop rendering
-            //tracer->StopRender();
-            ////transferQueue.Enqueue(...);
-
-            ////tracer->...
-            //// Change camera
-            //// send the initial transform
-            //transferQueue.Enqueue(CameraTransform
-            //{
-            //    .position = Vector3::Zero(),
-            //    .gazePoint = Vector3::Zero(),
-            //    .up = Vector3::Zero()
-            //});
+            RestartRenderer();
         }
 
         // New transform!
         if(transform)
         {
-            const auto& t = transform.value();
-            MRAY_LOG("[Tracer]: NewTransform G{}, P{}, U{}",
-                     t.gazePoint,
-                     t.position,
-                     t.up);
+            currentCamTransform = transform.value();
 
-            //tracer->StopRender();
-            //tracer->StartRender(..., ..., ...);
+            MRAY_LOG("[Tracer]: NewTransform G{}, P{}, U{}",
+                     currentCamTransform.gazePoint,
+                     currentCamTransform.position,
+                     currentCamTransform.up);
+
+            RestartRenderer();
         }
 
         // New renderer!
@@ -300,22 +308,11 @@ void TracerThread::LoopWork()
         {
             MRAY_LOG("[Tracer]: NewRenderer {}", rendererName.value());
 
-            //if(currentRenderer != std::numeric_limits<RendererId>::max())
-            //    tracer->DestroyRenderer(currentRenderer);
-            //currentRenderer = tracer->CreateRenderer(rendererName.value());
-            //tracer->CommitRendererReservations(currentRenderer);
+            if(currentRenderer != std::numeric_limits<RendererId>::max())
+                tracer->DestroyRenderer(currentRenderer);
+            currentRenderer = tracer->CreateRenderer(rendererName.value());
+            tracer->CommitRendererReservations(currentRenderer);
 
-
-        }
-
-        if(renderLogic0)
-        {
-            MRAY_LOG("[Tracer]: NewRenderLogic0 {}", renderLogic0.value());
-        }
-
-        if(renderLogic1)
-        {
-            MRAY_LOG("[Tracer]: NewRenderLogic1 {}", renderLogic1.value());
         }
 
         if(hdrSaveDemand)
@@ -348,6 +345,12 @@ void TracerThread::LoopWork()
             ));
         }
 
+        if(syncSem)
+        {
+            MRAY_LOG("[Tracer]: NewSem {}", syncSem.value());
+            currentSem = syncSem.value();
+        }
+
         // New time!
         if(time)
         {
@@ -363,49 +366,75 @@ void TracerThread::LoopWork()
             isRendering = false;
         }
 
+
+        if(renderLogic0)
+        {
+            MRAY_LOG("[Tracer]: NewRenderLogic0 {}", renderLogic0.value());
+        }
+
+        if(renderLogic1)
+        {
+            MRAY_LOG("[Tracer]: NewRenderLogic1 {}", renderLogic1.value());
+        }
+
         // Start/Stop!
         if(startStop)
         {
-            isInSleepMode = !startStop.value();
-            isRendering = startStop.value();
-            MRAY_LOG("[Tracer]: Start/Stop {}", startStop.value());
+            bool isStart = startStop.value();
+            isInSleepMode = !isStart;
+            isRendering = isStart;
+            MRAY_LOG("[Tracer]: Start/Stop {}", isStart);
+
+            if(isStart)
+            {
+                RenderImageParams rp =
+                {
+                    .resolution = resolution,
+                    .regionMin = regionMin,
+                    .regionMax = regionMax,
+                    .semaphore = currentSem,
+                    .initialSemCounter = 0
+                };
+                RenderBufferInfo rbi = tracer->StartRender(currentRenderer,
+                                                           sceneIds.camSurfaces[currentCamIndex],
+                                                           rp, currentCamTransform);
+
+                transferQueue.Enqueue(TracerResponse
+                (
+                    std::in_place_index<TracerResponse::RENDER_BUFFER_INFO>,
+                    rbi
+                ));
+            }
+            else
+            {
+                tracer->StopRender();
+            }
         }
 
-        if(syncSem)
-        {
-            MRAY_LOG("[Tracer]: NewSem {}", syncSem.value());
-        }
-
-        //static uint64_t i = 0;
-        //MRAY_LOG("[Tracer]: Loop {}", i);
-        //i++;
 
         // If we are rendering continue...
         if(isRendering)
         {
-            RendererOutput renderOut; // = tracer->DoRenderWork();
-            // if(renderOut.analytics)
-            // if(renderOut.imageOut)
+            RendererOutput renderOut = tracer->DoRenderWork();
+            if(renderOut.analytics)
+            {
+                transferQueue.Enqueue(TracerResponse
+                (
+                    std::in_place_index<TracerResponse::RENDERER_ANALYTICS>,
+                    renderOut.analytics.value()
+                ));
+            }
+            if(renderOut.imageOut)
+            {
+                transferQueue.Enqueue(TracerResponse
+                (
+                    std::in_place_index<TracerResponse::IMAGE_SECTION>,
+                    renderOut.imageOut.value()
+                ));
+            }
 
-            transferQueue.Enqueue(TracerResponse
-            (
-                std::in_place_index<TracerResponse::RENDERER_ANALYTICS>,
-                RendererAnalyticData
-                {
-                    .throughput = 3.32,
-                    .throughputSuffix = "M rays/sec",
-                    .workPerPixel = 512,
-                    .workPerPixelSuffix = "spp",
-                    .iterationTimeMS = 20,
-                    .renderResolution = Vector2ui(1920, 1080),
-                    .outputColorSpace = MRayColorSpaceEnum::MR_ACES_CG,
-                    .customLogicSize0 = 3,
-                    .customLogicSize1 = 10
-                }
-            ));
-
-            using namespace std::chrono_literals;
-            std::this_thread::sleep_for(3ms);
+            //using namespace std::chrono_literals;
+            //std::this_thread::sleep_for(3ms);
         }
 
         // Here check the queue's situation
@@ -509,7 +538,8 @@ MRayError TracerThread::MTInitialize(const std::string& tracerConfigFile)
         tracerConfig.dllDeleteFuncName
     };
     dllFile = std::make_unique<SharedLibrary>(tracerConfig.dllName);
-    MRayError err = dllFile->GenerateObjectWithArgs<TracerConstructorArgs, TracerI>(tracer, args);
+    MRayError err = dllFile->GenerateObjectWithArgs<TracerConstructorArgs, TracerI>(tracer, args,
+                                                                                    tracerConfig.params);
     if(err) return err;
 
     tracer->SetThreadPool(threadPool);
@@ -524,4 +554,13 @@ bool TracerThread::InternallyTerminated() const
 GPUThreadInitFunction TracerThread::GetThreadInitFunction() const
 {
     return tracer->GetThreadInitFunction();
+}
+
+void TracerThread::SetInitialResolution(const Vector2ui& res,
+                                        const Vector2ui& rMin,
+                                        const Vector2ui& rMax)
+{
+    resolution = res;
+    regionMin = rMin;
+    regionMax = rMax;
 }
