@@ -30,7 +30,7 @@ inline Tracer::Tracer(const TracerParameters& tracerParams)
 {
     // Types
     AddPrimGenerators(GLOBAL_TYPE_GEN.primGenerator);
-    AddCamGenerators(GLOBAL_TYPE_GEN.transGenerator);
+    AddCamGenerators(GLOBAL_TYPE_GEN.camGenerator);
     AddMediumGenerators(GLOBAL_TYPE_GEN.medGenerator);
     AddMaterialGenerators(GLOBAL_TYPE_GEN.matGenerator);
     AddTransformGenerators(GLOBAL_TYPE_GEN.transGenerator);

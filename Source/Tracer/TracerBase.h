@@ -81,9 +81,11 @@ class ThreadSafeMap
     public:
     template<class... Args>
     std::pair<Iterator, bool>   try_emplace(const K& k, Args&&... args);
-    const V&                    at(const K& k) const;
     void                        remove_at(const K&);
     void                        clear();
+
+    Optional<std::reference_wrapper<const V>>
+                                at(const K& k) const;
 
     const MapType&              Map() const;
     MapType&                    Map();
@@ -353,10 +355,13 @@ ThreadSafeMap<K, V>::try_emplace(const K& k, Args&&... args)
 }
 
 template<class K, class V>
-const V& ThreadSafeMap<K, V>::at(const K& k) const
+Optional<std::reference_wrapper<const V>> ThreadSafeMap<K, V>::at(const K& k) const
 {
     std::shared_lock<std::shared_mutex> l(mutex);
-    return map.at(k);
+    auto loc = map.find(k);
+    if(loc == map.cend())
+        return std::nullopt;
+    return loc->second;
 }
 
 template<class K, class V>
