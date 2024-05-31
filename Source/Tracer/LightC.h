@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Core/Definitions.h"
-#include <Core/Types.h>
+#include "Core/Types.h"
 
 #include "TracerTypes.h"
 #include "ParamVaryingData.h"
@@ -56,8 +56,8 @@ concept LightGroupC = requires(LGType lg)
     // SoA fashion light data. This will be used to access internal
     // of the light with a given an index
     typename LGType::DataSoA;
-    std::is_same_v<typename LGType::DataSoA,
-                   typename LGType::template Light<>::DataSoA>;
+    requires std::is_same_v<typename LGType::DataSoA,
+                            typename LGType::template Light<>::DataSoA>;
 
     // Acquire SoA struct of this primitive group
     {lg.SoA()} -> std::same_as<typename LGType::DataSoA>;
@@ -138,7 +138,6 @@ GenericGroupLightT::Reserve(const std::vector<AttributeCountList>&)
     throw MRayError("{}: Lights cannot be reserved via this function!",
                     Name());
 }
-
 
 inline typename GenericGroupLightT::IdList
 GenericGroupLightT::Reserve(const std::vector<AttributeCountList>& countArrayList,

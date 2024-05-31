@@ -1,12 +1,65 @@
 #pragma once
 
+#include "Core/Definitions.h"
+#include "Core/Types.h"
+#include "TracerTypes.h"
+
+#include "GenericGroup.h"
+
+struct RaySampleT
+{
+    Ray     ray;
+    Vector2 tMinMax;
+    Vector2 imgCoords;
+};
+using RaySample = SampleT<RaySampleT>;
+
+template<class CameraType>
+concept CameraC = requires(CameraType c,
+                           Vector2ui v2,
+                           RNGDispenser& rng)
+{
+    typename CameraType::DataSoA;
+
+    // API
+    CameraType(typename CameraType::DataSoA{}, CameraKey{});
+
+    {c.SampleRay(v2, v2, rng)} -> std::same_as<RaySample>;
+    {c.PdfRay(Ray())} -> std::same_as<Float>;
+
+    // Type traits
+    requires std::is_trivially_copyable_v<CameraType>;
+    requires std::is_trivially_destructible_v<CameraType>;
+    requires std::is_move_assignable_v<CameraType>;
+    requires std::is_move_constructible_v<CameraType>;
+};
+
+template<class CGType>
+concept CameraGroupC = requires(CGType cg)
+{
+    // Internal Camera type that satisfies its concept
+    typename CGType::Camera;
+    requires CameraC<typename CGType::Camera>;
+
+    // SoA fashion light data. This will be used to access internal
+    // of the light with a given an index
+    typename CGType::DataSoA;
+    requires std::is_same_v<typename CGType::DataSoA,
+                            typename CGType::Camera::DataSoA>;
+
+    // Acquire SoA struct of this primitive group
+    {cg.SoA()} -> std::same_as<typename CGType::DataSoA>;
+};
+
 class GenericGroupCameraT : public GenericGroupT<CameraKey, CamAttributeInfo>
 {
     private:
 
     public:
     GenericGroupCameraT(uint32_t groupId,
-                        const GPUSystem& sys);
+                        const GPUSystem& sys,
+                        size_t allocationGranularity = 2_MiB,
+                        size_t initialReservartionSize = 4_MiB);
 
     virtual CameraTransform AcquireCameraTransform(CameraKey) const = 0;
 };
@@ -18,20 +71,30 @@ class GenericGroupCamera : public GenericGroupCameraT
 {
     public:
                      GenericGroupCamera(uint32_t groupId,
-                                        const GPUSystem& sys);
+                                        const GPUSystem& sys,
+                                        size_t allocationGranularity = 2_MiB,
+                                        size_t initialReservartionSize = 4_MiB);
     std::string_view Name() const override;
 };
 
 inline
 GenericGroupCameraT::GenericGroupCameraT(uint32_t groupId,
-                                         const GPUSystem& sys)
-    :GenericGroupT<CameraKey, CamAttributeInfo>(groupId, sys)
+                                         const GPUSystem& sys,
+                                         size_t allocationGranularity,
+                                         size_t initialReservartionSize)
+    :GenericGroupT<CameraKey, CamAttributeInfo>(groupId, sys,
+                                                allocationGranularity,
+                                                initialReservartionSize)
 {}
 
 template <class C>
 GenericGroupCamera<C>::GenericGroupCamera(uint32_t groupId,
-                                          const GPUSystem& sys)
-    : GenericGroupCameraT(groupId, sys)
+                                          const GPUSystem& sys,
+                                          size_t allocationGranularity,
+                                          size_t initialReservartionSize)
+    : GenericGroupCameraT(groupId, sys,
+                          allocationGranularity,
+                          initialReservartionSize)
 {}
 
 template <class C>

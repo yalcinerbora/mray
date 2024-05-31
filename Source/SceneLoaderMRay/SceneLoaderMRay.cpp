@@ -397,8 +397,7 @@ std::vector<TransientData> TransformAttributeLoad(const AttributeCountList& tota
 
     // TODO: Change this as well, transform logic should not be in loader
     // I think we need to layer these kind of things in an intermediate
-    // system that sits between loader and tracer. (Which should be on GPU as well
-    // or it will be slow)
+    // system that sits between loader and tracer. (Which should be on GPU maybe)
     std::string_view type = nodes[0].CommonData<std::string_view>(NodeNames::TYPE);
     if(type != SINGLE_TRANSFORM_TYPE && type != MULTI_TRANSFORM_TYPE)
         return GenericAttributeLoad(totalCounts, list, nodes);
@@ -491,6 +490,75 @@ std::vector<TransientData> TransformAttributeLoad(const AttributeCountList& tota
         {
             throw MRayError("Unkown transform layout");
         }
+    }
+
+    return result;
+}
+
+std::vector<TransientData> CameraAttributeLoad(const AttributeCountList& totalCounts,
+                                               const GenericAttributeInfoList& list,
+                                               Span<const JsonNode> nodes)
+{
+    using namespace std::literals;
+    static constexpr auto PINHOLE_CAM_TYPE  = "Pinhole"sv;
+    static constexpr auto IS_FOV_X          = "isFovX"sv;
+    static constexpr auto FOV               = "fov"sv;
+    static constexpr auto ASPECT            = "aspect"sv;
+    static constexpr auto PLANES            = "planes"sv;
+    static constexpr auto GAZE              = "gaze"sv;
+    static constexpr auto POSITION          = "position"sv;
+    static constexpr auto UP                = "up"sv;
+
+    // TODO: Change this as well, camera logic should not be in loader
+    // I think we need to layer these kind of things in an intermediate
+    // system that sits between loader and tracer. (Which should be on GPU maybe)
+    std::string_view type = nodes[0].CommonData<std::string_view>(NodeNames::TYPE);
+    if(type != PINHOLE_CAM_TYPE)
+        return GenericAttributeLoad(totalCounts, list, nodes);
+    //
+    assert(list.size() == 1);
+    assert(totalCounts.size() == 1);
+    std::vector<TransientData> result;
+    result.push_back(TransientData(std::in_place_type_t<Vector4>{},
+                                   totalCounts[0]));
+    result.push_back(TransientData(std::in_place_type_t<Vector3>{},
+                                   totalCounts[1]));
+    result.push_back(TransientData(std::in_place_type_t<Vector3>{},
+                                   totalCounts[2]));
+    result.push_back(TransientData(std::in_place_type_t<Vector3>{},
+                                   totalCounts[3]));
+
+    const GenericAttributeInfo& info = list.front();
+    for(const auto& n : nodes)
+    {
+        bool isArray = (std::get<GenericAttributeInfo::IS_ARRAY_INDEX>(info) ==
+                        AttributeIsArray::IS_ARRAY);
+
+        bool isFovX = n.AccessData<bool>(IS_FOV_X);
+        Float fov = n.AccessData<Float>(FOV);
+        Float aspect = n.AccessData<Float>(ASPECT);
+        Vector2 planes = n.AccessData<Vector2>(PLANES);
+        Vector4 fnp = Vector4(fov, fov, planes[0], planes[1]);
+        if(isFovX)
+        {
+            fnp[0] *= MathConstants::DegToRadCoef<Float>();
+            fnp[1] = Float(2.0) * std::atan(std::tan(fnp[0] * Float(0.5)) * aspect);
+        }
+        else
+        {
+            fnp[1] *= MathConstants::DegToRadCoef<Float>();
+            fnp[0] = Float(2.0) * std::atan(std::tan(fnp[1] * Float(0.5)) / aspect);
+        }
+        result[0].Push(Span<const Vector4>(&fnp, 1));
+
+
+        // Load these directly
+        Vector3 gaze = n.AccessData<Vector3>(GAZE);
+        Vector3 position = n.AccessData<Vector3>(POSITION);
+        Vector3 up = n.AccessData<Vector3>(UP);
+        result[1].Push(Span<const Vector3>(&gaze, 1));
+        result[2].Push(Span<const Vector3>(&position, 1));
+        result[3].Push(Span<const Vector3>(&up, 1));
     }
 
     return result;
@@ -1290,9 +1358,9 @@ void SceneLoaderMRay::LoadCameras(TracerI& tracer, ExceptionList& exceptions)
                               Span<const JsonNode> nodes)
         {
             CamAttributeInfoList list = tracer.AttributeInfo(groupId);
-            auto dataOut = GenericAttributeLoad(totalCounts,
-                                                list,
-                                                nodes);
+            auto dataOut = CameraAttributeLoad(totalCounts,
+                                               list,
+                                               nodes);
             uint32_t attribIndex = 0;
             for(auto& data : dataOut)
             {

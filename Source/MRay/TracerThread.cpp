@@ -195,12 +195,13 @@ void TracerThread::LoopWork()
             // for tracer supporting multiple scenes
             if(currentScene) currentScene->ClearScene();
             std::string fileExt = path(scenePath.value()).extension().string();
+            fileExt = fileExt.substr(1);
             SceneLoaderI* loader = sceneLoaders.at(fileExt).get();
             currentScene = loader;
             Expected<TracerIdPack> result = currentScene->LoadScene(*tracer, scenePath.value());
             if(result.has_error())
             {
-                MRAY_ERROR_LOG("[Tracer]: Failed to Load Scene\n{}",
+                MRAY_ERROR_LOG("[Tracer]: Failed to Load Scene\n    {}",
                                result.error().GetError());
                 isTerminated = true;
                 return;

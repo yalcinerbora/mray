@@ -122,7 +122,7 @@ namespace LightDetail
         Float                   sceneDiameter;
 
         public:
-        MRAY_HYBRID         LightSkysphere(const typename SpectrumTransformer::Converter& sTransContext,
+        MRAY_HYBRID         LightSkysphere(const SpectrumConverter& sTransContext,
                                            const Primitive& p,
                                            const DataSoA& soa, LightKey);
 
@@ -152,6 +152,42 @@ namespace LightDetail
         MRAY_HYBRID bool    IsPrimitiveBackedLight() const;
     };
 
+    template <TransformContextC TContext = TransformContextIdentity,
+              class SpectrumTransformer = SpectrumConverterContextIdentity>
+    class LightNull
+    {
+        public:
+        using DataSoA           = EmptyType;
+        using SpectrumConverter = typename SpectrumTransformer::Converter;
+        using Primitive         = EmptyPrimitive<TContext>;
+
+        MRAY_HYBRID         LightNull(const SpectrumConverter& sTransContext,
+                                      const Primitive& p,
+                                      const DataSoA& soa, LightKey);
+
+        MRAY_HYBRID
+        SampleT<Vector3>    SampleSolidAngle(RNGDispenser&,
+                                             const Vector3&) const;
+        MRAY_HYBRID
+        Float               PdfSolidAngle(const typename Primitive::Hit&,
+                                          const Vector3&,
+                                          const Vector3&) const;
+        MRAY_HYBRID
+        uint32_t            SampleSolidAngleRNCount() const;
+        MRAY_HYBRID
+        SampleT<Ray>        SampleRay(RNGDispenser&) const;
+        MRAY_HYBRID
+        Float               PdfRay(const Ray&) const;
+        MRAY_HYBRID
+        uint32_t            SampleRayRNCount() const;
+        MRAY_HYBRID
+        Spectrum            EmitViaHit(const Vector3&,
+                                       const typename Primitive::Hit&) const;
+        MRAY_HYBRID
+        Spectrum            EmitViaSurfacePoint(const Vector3&,
+                                                const Vector3&) const;
+        MRAY_HYBRID bool    IsPrimitiveBackedLight() const;
+    };
 }
 
 template <PrimitiveGroupC PrimGroupT>
@@ -257,8 +293,6 @@ class LightGroupSkysphere final : public GenericGroupLight<LightGroupSkysphere<C
 
     public:
     static std::string_view TypeName();
-
-    public:
     //
                 LightGroupSkysphere(uint32_t groupId,
                                     const GPUSystem& system,
@@ -303,6 +337,68 @@ class LightGroupSkysphere final : public GenericGroupLight<LightGroupSkysphere<C
 
 };
 
+class LightGroupNull : public GenericGroupLight<LightGroupNull>
+{
+    public:
+    using PrimGroup = PrimGroupEmpty;
+    using DataSoA   = EmptyType;
+
+    template<class TContext = TransformContextIdentity>
+    using Primitive = EmptyPrimitive<TContext>;
+
+    template <class TContext = TransformContextIdentity,
+              class SpectrumTransformer = SpectrumConverterContextIdentity>
+    using Light = LightDetail::LightNull<TContext, SpectrumTransformer>;
+
+    private:
+    const PrimGroup& primGroup;
+    protected:
+    void            HandlePrimBatches(const PrimBatchList&) override;
+
+    public:
+    static std::string_view TypeName();
+
+    LightGroupNull(uint32_t groupId,
+                   const GPUSystem& system,
+                   const TextureViewMap&,
+                   const GenericGroupPrimitiveT&);
+
+    void                    CommitReservations() override;
+    LightAttributeInfoList  AttributeInfo() const override;
+
+    void            PushAttribute(LightKey,
+                                  uint32_t,
+                                  TransientData,
+                                  const GPUQueue&) override;
+    void            PushAttribute(LightKey,
+                                  uint32_t,
+                                  const Vector2ui&,
+                                  TransientData,
+                                  const GPUQueue&) override;
+    void            PushAttribute(LightKey, LightKey,
+                                  uint32_t,
+                                  TransientData,
+                                  const GPUQueue&) override;
+    void            PushTexAttribute(LightKey, LightKey,
+                                     uint32_t,
+                                     TransientData,
+                                     std::vector<Optional<TextureId>>,
+                                     const GPUQueue&) override;
+    void            PushTexAttribute(LightKey, LightKey,
+                                     uint32_t,
+                                     std::vector<Optional<TextureId>>,
+                                     const GPUQueue&) override;
+    void            PushTexAttribute(LightKey, LightKey,
+                                     uint32_t,
+                                     std::vector<TextureId>,
+                                     const GPUQueue&) override;
+
+    DataSoA                         SoA() const;
+    const PrimGroup&                PrimitiveGroup() const;
+    const GenericGroupPrimitiveT&   GenericPrimGroup() const override;
+    bool                            IsPrimitiveBacked() const override;
+};
+
 #include "LightsDefault.hpp"
 
 using CoOctoCoordConverter = LightDetail::CoOctoCoordConverter;
@@ -310,3 +406,7 @@ using SphericalCoordConverter = LightDetail::SphericalCoordConverter;
 
 extern template class LightGroupSkysphere<CoOctoCoordConverter>;
 extern template class LightGroupSkysphere<SphericalCoordConverter>;
+
+static_assert(LightGroupC<LightGroupSkysphere<CoOctoCoordConverter>>);
+static_assert(LightGroupC<LightGroupSkysphere<SphericalCoordConverter>>);
+static_assert(LightGroupC<LightGroupNull>);

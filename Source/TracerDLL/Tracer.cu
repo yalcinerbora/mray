@@ -51,6 +51,7 @@ using TransformGTypes = Tuple
 // ================= //
 using LightGTypes = Tuple
 <
+    LightGroupNull,
     LightGroupPrim<PrimGroupTriangle>,
     LightGroupSkysphere<CoOctoCoordConverter>
 >;

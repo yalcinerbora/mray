@@ -5,7 +5,7 @@ namespace LightDetail
 
 template<PrimitiveC P, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-LightPrim<P, SC>::LightPrim(const typename SC::Converter& specTransformer,
+LightPrim<P, SC>::LightPrim(const typename SpectrumConverter& specTransformer,
                             const P& p, const LightData& soa, LightKey key)
     : prim(p)
     , radiance(specTransformer, soa.dRadiances[key.FetchIndexPortion()])
@@ -201,7 +201,7 @@ Float CoOctoCoordConverter::ToSolidAnglePdf(Float pdf, const Vector2&)
 
 template<CoordConverterC CC, TransformContextC TC, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-LightSkysphere<CC, TC, SC>::LightSkysphere(const typename SC::Converter& specTransformer,
+LightSkysphere<CC, TC, SC>::LightSkysphere(const SpectrumConverter& specTransformer,
                                            const Primitive& p, const LightSkysphereData& soa, LightKey key)
     : prim(p)
     , radiance(specTransformer, soa.dRadiances[key.FetchIndexPortion()])
@@ -327,10 +327,99 @@ static_assert(LightC<LightSkysphere<CoOctoCoordConverter>>);
 
 }
 
+namespace LightDetail
+{
+
+    template<TransformContextC TC, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+LightNull<TC, SC>::LightNull(const SpectrumConverter&,
+                            const Primitive&,
+                            const DataSoA&, LightKey)
+{}
+
+template<TransformContextC TC, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+SampleT<Vector3> LightNull<TC, SC>::SampleSolidAngle(RNGDispenser&,
+                                             const Vector3&) const
+{
+    return SampleT<Vector3>
+    {
+        Vector3::Zero(),
+        Float(0.0)
+    };
+
+}
+
+template<TransformContextC TC, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float LightNull<TC, SC>::PdfSolidAngle(const typename Primitive::Hit&,
+                                       const Vector3&,
+                                       const Vector3&) const
+{
+    return Float(0.0);
+}
+
+template<TransformContextC TC, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+uint32_t LightNull<TC, SC>::SampleSolidAngleRNCount() const
+{
+    return 0;
+}
+
+template<TransformContextC TC, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+SampleT<Ray> LightNull<TC, SC>::SampleRay(RNGDispenser&) const
+{
+    return SampleT<Ray>
+    {
+        Ray(Vector3::Zero(), Vector3::Zero()),
+        Float(0.0)
+    };
+}
+
+template<TransformContextC TC, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float LightNull<TC, SC>::PdfRay(const Ray&) const
+{
+    return Float(0.0);
+}
+
+template<TransformContextC TC, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+uint32_t LightNull<TC, SC>::SampleRayRNCount() const
+{
+    return 0;
+}
+
+template<TransformContextC TC, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Spectrum LightNull<TC, SC>::EmitViaHit(const Vector3&,
+                                       const typename Primitive::Hit&) const
+{
+    return Spectrum::Zero();
+}
+
+template<TransformContextC TC, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Spectrum LightNull<TC, SC>::EmitViaSurfacePoint(const Vector3&,
+                                                const Vector3&) const
+{
+    return Spectrum::Zero();
+}
+
+template<TransformContextC TC, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool LightNull<TC, SC>::IsPrimitiveBackedLight() const
+{
+    return false;
+}
+
+}
+
 template <PrimitiveGroupC PG>
 void LightGroupPrim<PG>::HandlePrimBatches(const PrimBatchList&)
 {
-
+    throw MRayError("TODO: Implement");
 }
 
 template <PrimitiveGroupC PG>
