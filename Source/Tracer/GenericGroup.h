@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <map>
+#include <numeric>
 
 #include "Core/Types.h"
 #include "Core/MemAlloc.h"
@@ -123,7 +124,8 @@ class GenericGroupT : public GenericGroupI<IdTypeT, AttribInfoT>
     ItemCountMap        itemCounts;
 
     const GPUSystem&    gpuSystem;
-    bool                isCommitted;
+    std::atomic_bool    isCommitted;
+    std::mutex          mutex;
     IdInt               groupId;
     DeviceMemory        deviceMem;
 
@@ -232,8 +234,8 @@ Tuple<Span<Args>...> GenericGroupT<ID, AI>::GenericCommit(std::array<size_t, siz
     constexpr size_t TypeCount = sizeof...(Args);
     if(isCommitted)
     {
-        MRAY_WARNING_LOG("{:s} is in committed state, "
-                         " you cannot re-commit!", this->Name());
+        MRAY_WARNING_LOG("{:s}:{:d} is in committed state, "
+                         "you cannot re-commit!", this->Name(), groupId);
         return Tuple<Span<Args>...>{};
     }
     // Cacluate offsets
@@ -255,6 +257,13 @@ Tuple<Span<Args>...> GenericGroupT<ID, AI>::GenericCommit(std::array<size_t, siz
     }
     // Rename for clarity
     const auto& totalSize = offsets;
+    if(std::reduce(totalSize.cbegin(), totalSize.cend()) == 0)
+    {
+        MRAY_WARNING_LOG("{:s}:{:d} committing as empty, "
+                         "is this correct?", this->Name(), groupId);
+        isCommitted = true;
+        return Tuple<Span<Args>...>{};
+    }
 
     using namespace MemAlloc;
     Tuple<Span<Args>...> result;
@@ -332,12 +341,13 @@ template<class ID, class AI>
 typename GenericGroupT<ID, AI>::IdList
 GenericGroupT<ID, AI>::Reserve(const std::vector<AttributeCountList>& countArrayList)
 {
+    std::lock_guard<std::mutex> lock(mutex);
     assert(!countArrayList.empty());
     if(isCommitted)
     {
-        throw MRayError("{:s} is in committed state, "
-                        " you cannot change reservations!",
-                        this->Name());
+        throw MRayError("{:s}:{:d} is in committed state, "
+                        "you cannot change reservations!",
+                        this->Name(), groupId);
     }
     // Lets not use zero
     IdInt lastId = (itemCounts.empty()) ? 0 : std::prev(itemCounts.end())->first + 1;
@@ -382,9 +392,9 @@ GenericTexturedGroupT<I, A>::ConvertToView(std::vector<TextureId> texIds,
         const GenericTextureView& view = globalTextureViews.at(texId);
         if(!std::holds_alternative<ViewType>(view))
         {
-            MRAY_ERROR_LOG("{:s}: Given texture view does not have "
+            MRAY_ERROR_LOG("{:s}:{:d} Given texture view does not have "
                            "a correct type for, Attribute {:d}",
-                           this->Name(), attributeIndex);
+                           this->Name(), this->groupId, attributeIndex);
             return std::vector<Optional<TextureView<D, T>>>{};
         }
         result.push_back(std::get<ViewType>(view));

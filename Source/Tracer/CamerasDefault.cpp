@@ -54,44 +54,25 @@ void CameraGroupPinhole::PushAttribute(CameraKey camKey,
                                        TransientData data,
                                        const GPUQueue& queue)
 {
-    //switch(attributeIndex)
-    //{
-    //    case 0:
-    //    {
-    //        data.AccessAs<
-    //    }PushData(dPositions);     break;  // Position
-    //    case 1: PushData(dTBNRotations);  break;  // Normal
-    //    case 2: PushData(dUVs);           break;  // UVs
-    //    case 3: PushData(dIndexList);     break;  // Indices
-    //    default:
-    //    {
-    //        MRAY_ERROR_LOG("{:s}: Unknown Attribute Index {:d}",
-    //                       TypeName(), attributeIndex);
-    //        return;
-    //    }
-    //}
-
-
-    //auto PushData = [&]<class T>(const Span<T>&d)
-    //{
-    //    GenericPushData(d, camKey.FetchIndexPortion(),
-    //                    attributeIndex,
-    //                    std::move(data), queue);
-    //};
-
-    //switch(attributeIndex)
-    //{
-    //    case 0: PushData(dPositions);     break;  // Position
-    //    case 1: PushData(dTBNRotations);  break;  // Normal
-    //    case 2: PushData(dUVs);           break;  // UVs
-    //    case 3: PushData(dIndexList);     break;  // Indices
-    //    default:
-    //    {
-    //        MRAY_ERROR_LOG("{:s}: Unknown Attribute Index {:d}",
-    //                       TypeName(), attributeIndex);
-    //        return;
-    //    }
-    //}
+    auto PushData = [&]<class T>(const Span<T>&d)
+    {
+        GenericPushData(d, camKey.FetchIndexPortion(),
+                        attributeIndex,
+                        std::move(data), queue);
+    };
+    switch(attributeIndex)
+    {
+        case 0: PushData(dFovAndPlanes);    break;
+        case 1: PushData(dGazePoints);      break;
+        case 2: PushData(dPositions);       break;
+        case 3: PushData(dUpVectors);       break;
+        default:
+        {
+            MRAY_ERROR_LOG("{:s}: Unknown Attribute Index {:d}",
+                           TypeName(), attributeIndex);
+            return;
+        }
+    }
 }
 
 void CameraGroupPinhole::PushAttribute(CameraKey camKey,
@@ -100,7 +81,25 @@ void CameraGroupPinhole::PushAttribute(CameraKey camKey,
                                        TransientData data,
                                        const GPUQueue& queue)
 {
-
+    auto PushData = [&]<class T>(const Span<T>&d)
+    {
+        GenericPushData(d, camKey.FetchIndexPortion(),
+                        attributeIndex, subRange,
+                        std::move(data), queue);
+    };
+    switch(attributeIndex)
+    {
+        case 0: PushData(dFovAndPlanes);    break;
+        case 1: PushData(dGazePoints);      break;
+        case 2: PushData(dPositions);       break;
+        case 3: PushData(dUpVectors);       break;
+        default:
+        {
+            MRAY_ERROR_LOG("{:s}: Unknown Attribute Index {:d}",
+                           TypeName(), attributeIndex);
+            return;
+        }
+    }
 }
 
 void CameraGroupPinhole::PushAttribute(CameraKey idStart, CameraKey idEnd,
@@ -108,7 +107,32 @@ void CameraGroupPinhole::PushAttribute(CameraKey idStart, CameraKey idEnd,
                                        TransientData data,
                                        const GPUQueue& queue)
 {
+    auto PushData = [&]<class T>(const Span<T>&d)
+    {
+        auto idRange = Vector<2, IdInt>(idStart.FetchIndexPortion(),
+                                        idEnd.FetchIndexPortion());
+        GenericPushData(d, idRange,
+                        attributeIndex,
+                        std::move(data), queue);
+    };
+    switch(attributeIndex)
+    {
+        case 0: PushData(dFovAndPlanes);    break;
+        case 1: PushData(dGazePoints);      break;
+        case 2: PushData(dPositions);       break;
+        case 3: PushData(dUpVectors);       break;
+        default:
+        {
+            MRAY_ERROR_LOG("{:s}: Unknown Attribute Index {:d}",
+                           TypeName(), attributeIndex);
+            return;
+        }
+    }
+}
 
+CameraTransform CameraGroupPinhole::AcquireCameraTransform(CameraKey) const
+{
+    throw MRayError("TODO: Implement");
 }
 
 typename CameraGroupPinhole::DataSoA

@@ -149,8 +149,8 @@ template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr KeyT<T, BB, IB> KeyT<T, BB, IB>::CombinedKey(T batch, T id)
 {
-    assert(batch >= BatchMask);
-    assert(id >= IdMask);
+    assert(batch <= BatchMask);
+    assert(id <= IdMask);
     return KeyT((batch << IdBits) | (id & IdMask));
 }
 

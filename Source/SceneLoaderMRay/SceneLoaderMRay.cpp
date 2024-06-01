@@ -516,8 +516,8 @@ std::vector<TransientData> CameraAttributeLoad(const AttributeCountList& totalCo
     if(type != PINHOLE_CAM_TYPE)
         return GenericAttributeLoad(totalCounts, list, nodes);
     //
-    assert(list.size() == 1);
-    assert(totalCounts.size() == 1);
+    assert(list.size() == 4);
+    assert(totalCounts.size() == 4);
     std::vector<TransientData> result;
     result.push_back(TransientData(std::in_place_type_t<Vector4>{},
                                    totalCounts[0]));

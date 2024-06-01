@@ -16,7 +16,6 @@ using RaySample = SampleT<RaySampleT>;
 
 template<class CameraType>
 concept CameraC = requires(CameraType c,
-                           Vector2ui v2,
                            RNGDispenser& rng)
 {
     typename CameraType::DataSoA;
@@ -24,8 +23,14 @@ concept CameraC = requires(CameraType c,
     // API
     CameraType(typename CameraType::DataSoA{}, CameraKey{});
 
-    {c.SampleRay(v2, v2, rng)} -> std::same_as<RaySample>;
-    {c.PdfRay(Ray())} -> std::same_as<Float>;
+    {c.SampleRay(Vector2ui{}, Vector2ui{}, rng)
+    } -> std::same_as<RaySample>;
+    {c.PdfRay(Ray{})} -> std::same_as<Float>;
+    {c.SampleRayRNCount()} -> std::same_as<uint32_t>;
+    {c.CanBeSampled()} -> std::same_as<bool>;
+    {c.GetCameraTransform()} -> std::same_as<CameraTransform>;
+    {c.OverrideTransform(CameraTransform{})} -> std::same_as<void>;
+    {c.GenerateSubCamera(Vector2ui{}, Vector2ui{})} -> std::same_as<CameraType>;
 
     // Type traits
     requires std::is_trivially_copyable_v<CameraType>;

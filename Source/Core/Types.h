@@ -96,30 +96,26 @@ struct SampleT
     Float       pdf;
 };
 
-
-
-template<uint32_t I, class VariantT, class Func>
-requires(I < std::variant_size_v<std::remove_reference_t<VariantT>>)
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr auto detail::LoopAndInvoke(VariantT&& v, Func&& f) -> decltype(auto)
+// SoA style span
+// This may be usefull when DataSoA structures become too large
+// due to holding size_t for all spans. Currently not used.
+template<class... Args>
+struct SoASpan
 {
-    using CurrentType = decltype(std::get<I>(v));
+    private:
+    // TODO: Find a way to default initialize this.
+    // My template metaprogramming capabilities was not enough.
+    // We are setting size to zero at least.
+    Tuple<Args*...> ptrs;
+    size_t          size = 0;
 
-    if(I == v.index())
-        return std::invoke(f, std::forward<CurrentType>(std::get<I>(v)));
-    else if constexpr(I < std::variant_size_v<std::remove_reference_t<VariantT>> -1)
-        return LoopAndInvoke<I + 1>(std::forward<VariantT>(v), std::forward<Func>(f));
-    else
-    {
-        #ifdef __CUDA_ARCH__
-            if constexpr (MRAY_IS_DEBUG)
-                printf("Invalid variant access on device!\n");
-        __trap();
-        #else
-            throw MRayError("Invalid variant access on device!");
-        #endif
-    }
-}
+    public:
+    template<class... Spans>
+            SoASpan(const Spans&... args);
+
+    template<size_t I>
+    auto    Get() -> Span<std::tuple_element_t<I, Tuple<Args...>>>;
+};
 
 // std::expected is not in standart as of c++20 so rolling a simple
 // version of it, all errors in this codebase is MRayError
@@ -155,6 +151,28 @@ struct Expected : protected Variant<T, MRayError>
     constexpr T         value_or(const T&) const;
 };
 
+template<uint32_t I, class VariantT, class Func>
+requires(I < std::variant_size_v<std::remove_reference_t<VariantT>>)
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr auto detail::LoopAndInvoke(VariantT&& v, Func&& f) -> decltype(auto)
+{
+    using CurrentType = decltype(std::get<I>(v));
+
+    if(I == v.index())
+        return std::invoke(f, std::forward<CurrentType>(std::get<I>(v)));
+    else if constexpr(I < std::variant_size_v<std::remove_reference_t<VariantT>> -1)
+        return LoopAndInvoke<I + 1>(std::forward<VariantT>(v), std::forward<Func>(f));
+    else
+    {
+        #ifdef __CUDA_ARCH__
+            if constexpr (MRAY_IS_DEBUG)
+                printf("Invalid variant access on device!\n");
+        __trap();
+        #else
+            throw MRayError("Invalid variant access on device!");
+        #endif
+    }
+}
 
 template<class... Args, std::size_t... I>
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -199,6 +217,23 @@ constexpr bool IsSubspan(Span<T0, E0> checkedSpan, Span<T1, E1> bigSpan)
         return (ptrInRange && backInRange);
     }
     else return false;
+}
+
+template<class... Args>
+template<class... Spans>
+SoASpan<Args...>::SoASpan(const Spans&... args)
+    : ptrs(args.data()...)
+    , size(std::get<0>(Tuple<Spans...>(args...)).size())
+{
+    assert((args.size() == size) &&...);
+}
+
+template<class... Args>
+template<size_t I>
+auto SoASpan<Args...>::Get() -> Span<std::tuple_element_t<I, Tuple<Args...>>>
+{
+    using ResulT = Span<std::tuple_element_t<I, Tuple<Args...>>>;
+    return ResulT(std::get<I>(ptrs), size);
 }
 
 template <class T>

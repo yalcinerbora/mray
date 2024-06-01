@@ -49,6 +49,7 @@ MatAttributeInfoList MatGroupLambert::AttributeInfo() const
     };
     return LogicList;
 }
+
 void MatGroupLambert::PushAttribute(MaterialKey,
                                     uint32_t attributeIndex,
                                     TransientData,

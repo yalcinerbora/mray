@@ -1282,7 +1282,6 @@ CameraTransform TracerBase::GetCamTransform(CamSurfaceId camSurfId) const
                         static_cast<uint32_t>(camSurfId));
 
     CameraId id = loc->second.cameraId;
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
     using T = typename CameraKey::Type;
     auto key = CameraKey(static_cast<T>(id));
     auto gId = CameraGroupId(key.FetchBatchPortion());

@@ -78,6 +78,7 @@ Float CameraPinhole::PdfRay(const Ray&) const
     return Float(0.0);
 }
 
+MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t CameraPinhole::SampleRayRNCount() const
 {
     return 2;
@@ -125,8 +126,8 @@ void CameraPinhole::OverrideTransform(const CameraTransform& t)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-CameraPinhole CameraPinhole::GenerateSubCamera(const Vector2i& statumIndex,
-                                               const Vector2i& stataCount) const
+CameraPinhole CameraPinhole::GenerateSubCamera(const Vector2ui& statumIndex,
+                                               const Vector2ui& stataCount) const
 {
     // DX DY from stratified sample
     Vector2 delta = Vector2(planeSize[0] / static_cast<Float>(stataCount[0]),

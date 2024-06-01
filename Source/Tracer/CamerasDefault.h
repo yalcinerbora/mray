@@ -4,32 +4,6 @@
 #include "Random.h"
 #include "Core/GraphicsFunctions.h"
 
-template<class... Args>
-struct SoASpan
-{
-    private:
-    Tuple<Args*...> ptrs;
-    size_t          size;
-
-    public:
-    template<class... Spans>
-    SoASpan(const Spans&... args)
-        : ptrs(args.data()...)
-        , size(std::get<0>(Tuple<Spans...>(args...)).size())
-    {
-        assert((args.size() == size) &&...);
-    }
-
-    SoASpan() = default;
-
-    template<size_t I>
-    auto Get() -> Span<std::tuple_element_t<I, Tuple<Args...>>>
-    {
-        using ResulT = Span<std::tuple_element_t<I, Tuple<Args...>>>;
-        return ResulT(std::get<I>(ptrs), size);
-    }
-};
-
 namespace CameraDetail
 {
     struct alignas(64) CamPinholeData
@@ -77,12 +51,12 @@ namespace CameraDetail
         MRAY_HYBRID
         void            OverrideTransform(const CameraTransform&);
         MRAY_HYBRID
-        CameraPinhole   GenerateSubCamera(const Vector2i& regionId,
-                                          const Vector2i& regionCount) const;
+        CameraPinhole   GenerateSubCamera(const Vector2ui& regionId,
+                                          const Vector2ui& regionCount) const;
     };
 }
 
-class CameraGroupPinhole : GenericGroupCamera<CameraGroupPinhole>
+class CameraGroupPinhole : public GenericGroupCamera<CameraGroupPinhole>
 {
     public:
     using DataSoA   = CameraDetail::CamPinholeData;
@@ -119,6 +93,8 @@ class CameraGroupPinhole : GenericGroupCamera<CameraGroupPinhole>
                                           uint32_t attributeIndex,
                                           TransientData data,
                                           const GPUQueue& queue) override;
+    CameraTransform         AcquireCameraTransform(CameraKey) const override;
+
     DataSoA                 SoA() const;
 };
 

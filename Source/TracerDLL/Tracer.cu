@@ -91,7 +91,7 @@ using MatGTypes = Tuple
 // ================= //
 using CamGTypes = Tuple
 <
-    //CamGroupPinhole
+    CameraGroupPinhole
 >;
 
 // ================= //
@@ -99,7 +99,7 @@ using CamGTypes = Tuple
 // ================= //
 using MedGTypes = Tuple
 <
-    //MedGroupVacuum
+    MediumGroupVacuum
 >;
 
 // ================= //
