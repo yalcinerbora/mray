@@ -17,23 +17,62 @@ struct TracerConfig
     std::string dllDeleteFuncName = "DestroyTracer";
 
     TracerParameters params;
-
-    //ImageFilterOpts;
 };
 
+void from_json(const nlohmann::json& node, AcceleratorType& t)
+{
+    using namespace std::string_view_literals;
+    static constexpr std::array<std::string_view, 3> TYPES =
+    {
+        "Linear"sv,
+        "BVH"sv,
+        "Hardware"
+    };
+    auto loc = std::find(TYPES.cbegin(), TYPES.cend(),
+                         node.get<std::string_view>());
+    size_t result = std::distance(TYPES.cbegin(), loc);
+
+    if(result == TYPES.size())
+        throw MRayError("Unknown sample type name {}",
+                        node.get<std::string_view>());
+    t = static_cast<AcceleratorType>(result);
+}
+
+void from_json(const nlohmann::json& node, SamplerType& t)
+{
+    using namespace std::string_view_literals;
+    static constexpr std::array<std::string_view, 1> TYPES =
+    {
+        "Independent"sv
+    };
+    auto loc = std::find(TYPES.cbegin(), TYPES.cend(),
+                         node.get<std::string_view>());
+    size_t result = std::distance(TYPES.cbegin(), loc);
+
+    if(result == TYPES.size())
+        throw MRayError("Unknown sample type name {}",
+                        node.get<std::string_view>());
+    t = static_cast<SamplerType>(result);
+}
 
 Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
 {
     using namespace std::literals;
 
     // Object keys
-    static constexpr auto DLL_NAME          = "TracerDLL"sv;
-    static constexpr auto OPTIONS_NAME      = "TracerOptions"sv;
+    static constexpr auto DLL_NAME              = "TracerDLL"sv;
+    static constexpr auto PARAMETERS_NAME       = "Parameters"sv;
     // DLL entries
     static constexpr auto DLL_FILE_NAME         = "name"sv;
     static constexpr auto DLL_CONSTRUCT_NAME    = "construct"sv;
     static constexpr auto DLL_DESTRUCT_NAME     = "destruct"sv;
-    // Options
+    // Params
+    static constexpr auto SEED_NAME             = "seed"sv;
+    static constexpr auto ACCEL_TYPE_NAME       = "acceleratorType"sv;
+    static constexpr auto ITEM_POOL_NAME        = "itemPoolSize"sv;
+    static constexpr auto SAMPLER_TYPE_NAME     = "samplerType"sv;
+    static constexpr auto CLAMP_TEX_RES_NAME    = "clampTexRes"sv;
+    static constexpr auto PARTITION_LOGIC_NAME  = "partitionLogic"sv;
 
     nlohmann::json configJson;
     auto OptionalFetch = [](auto& outEntry, std::string_view NAME,
@@ -60,9 +99,23 @@ Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
         OptionalFetch(config.dllDeleteFuncName, DLL_DESTRUCT_NAME, dllJson);
 
         // TODO: Add option config reading
-        // ...
+        nlohmann::json paramsJson;
+        OptionalFetch(paramsJson, PARAMETERS_NAME, configJson);
+        if(paramsJson.empty()) return config;
+
+        OptionalFetch(config.params.seed, SEED_NAME, paramsJson);
+        OptionalFetch(config.params.accelMode, ACCEL_TYPE_NAME, paramsJson);
+        OptionalFetch(config.params.itemPoolSize, ITEM_POOL_NAME, paramsJson);
+        OptionalFetch(config.params.samplerType, SAMPLER_TYPE_NAME, paramsJson);
+        OptionalFetch(config.params.clampedTexRes, CLAMP_TEX_RES_NAME, paramsJson);
+        //OptionalFetch(config.params., PARTITION_LOGIC_NAME, paramsJson);
+
 
         return config;
+    }
+    catch(const MRayError& e)
+    {
+        return e;
     }
     catch(const nlohmann::json::exception& e)
     {

@@ -80,23 +80,20 @@ void PrimGroupTriangle::PushAttribute(PrimBatchKey batchKey,
 
     switch(attributeIndex)
     {
-        case 0  : PushData(dPositions);     break;  // Position
-        case 1  : PushData(dTBNRotations);  break;  // Normal
-        case 2  : PushData(dUVs);           break;  // UVs
-        case 3  : PushData(dIndexList);     break;  // Indices
-        default :
-        {
-            MRAY_ERROR_LOG("{:s}: Unknown Attribute Index {:d}",
-                           TypeName(), attributeIndex);
-            return;
-        }
+        case POSITION_ATTRIB_INDEX: PushData(dPositions);     break;
+        case NORMAL_ATTRIB_INDEX:   PushData(dTBNRotations);  break;
+        case UV_ATTRIB_INDEX:       PushData(dUVs);           break;
+        case INDICES_ATTRIB_INDEX:  PushData(dIndexList);     break;
+        default:
+            throw MRayError("{:s}:{:d}: Unknown Attribute Index {:d}",
+                            TypeName(), this->groupId, attributeIndex);
     }
 
-    if(attributeIndex != 3) return;
+    if(attributeIndex != INDICES_ATTRIB_INDEX) return;
 
     IdInt batch = batchKey.FetchIndexPortion();
     auto attributeStart = static_cast<uint32_t>(FindRange(batch)[0][0]);
-    auto range = FindRange(batch)[3];
+    auto range = FindRange(batch)[INDICES_ATTRIB_INDEX];
     size_t count = range[1] - range[0];
     Span<Vector3ui> batchSpan = dIndexList.subspan(range[0], count);
 
@@ -119,23 +116,20 @@ void PrimGroupTriangle::PushAttribute(PrimBatchKey batchKey,
 
     switch(attributeIndex)
     {
-        case 0  : PushData(dPositions);     break;  // Position
-        case 1  : PushData(dTBNRotations);  break;  // Normal
-        case 2  : PushData(dUVs);           break;  // UVs
-        case 3  : PushData(dIndexList);     break;  // Indices
-        default :
-        {
-            MRAY_ERROR_LOG("{:s}: Unknown Attribute Index {:d}",
-                           TypeName(), attributeIndex);
-            return;
-        }
+        case POSITION_ATTRIB_INDEX: PushData(dPositions);     break;
+        case NORMAL_ATTRIB_INDEX:   PushData(dTBNRotations);  break;
+        case UV_ATTRIB_INDEX:       PushData(dUVs);           break;
+        case INDICES_ATTRIB_INDEX:  PushData(dIndexList);     break;
+        default:
+            throw MRayError("{:s}:{:d}: Unknown Attribute Index {:d}",
+                            TypeName(), this->groupId, attributeIndex);
     }
 
-    if(attributeIndex != 3) return;
+    if(attributeIndex != INDICES_ATTRIB_INDEX) return;
 
     IdInt batch = batchKey.FetchIndexPortion();
-    auto attributeStart = static_cast<uint32_t>(FindRange(batch)[0][0]);
-    auto range = FindRange(batch)[3];
+    auto attributeStart = static_cast<uint32_t>(FindRange(batch)[POSITION_ATTRIB_INDEX][0]);
+    auto range = FindRange(batch)[INDICES_ATTRIB_INDEX];
     auto innerRange = Vector2ui(range[0] + subRange[0], subRange[1]);
     size_t count = innerRange[1] - innerRange[0];
     Span<Vector3ui> batchSpan = dIndexList.subspan(innerRange[0], count);
@@ -159,25 +153,22 @@ void PrimGroupTriangle::PushAttribute(PrimBatchKey idStart, PrimBatchKey idEnd,
 
     switch(attributeIndex)
     {
-        case 0  : PushData(dPositions);     break;  // Position
-        case 1  : PushData(dTBNRotations);  break;  // Normal
-        case 2  : PushData(dUVs);           break;  // UVs
-        case 3  : PushData(dIndexList);     break;  // Indices
+        case POSITION_ATTRIB_INDEX: PushData(dPositions);     break;
+        case NORMAL_ATTRIB_INDEX:   PushData(dTBNRotations);  break;
+        case UV_ATTRIB_INDEX:       PushData(dUVs);           break;
+        case INDICES_ATTRIB_INDEX:  PushData(dIndexList);     break;
         default:
-        {
-            MRAY_ERROR_LOG("{:s}: Unknown Attribute Index {:d}",
-                           TypeName(), attributeIndex);
-            return;
-        }
+            throw MRayError("{:s}:{:d}: Unknown Attribute Index {:d}",
+                            TypeName(), this->groupId, attributeIndex);
     }
 
-    if(attributeIndex != 3) return;
+    if(attributeIndex != INDICES_ATTRIB_INDEX) return;
     // Now here we need to do for loop
     for(auto i = idStart.FetchIndexPortion();
         i < idEnd.FetchIndexPortion(); i++)
     {
-        auto attributeStart = static_cast<uint32_t>(FindRange(i)[0][0]);
-        auto range = FindRange(i)[3];
+        auto attributeStart = static_cast<uint32_t>(FindRange(i)[POSITION_ATTRIB_INDEX][0]);
+        auto range = FindRange(i)[INDICES_ATTRIB_INDEX];
         size_t count = range[1] - range[0];
         Span<Vector3ui> batchSpan = dIndexList.subspan(range[0], count);
 
@@ -187,12 +178,25 @@ void PrimGroupTriangle::PushAttribute(PrimBatchKey idStart, PrimBatchKey idEnd,
 
 }
 
+inline
+void PrimGroupTriangle::CopyPrimIds(Span<PrimitiveKey>,
+                                         PrimBatchId,
+                                         const GPUQueue&) const
+{
+    throw MRayError("implement \"GenericGroupPrimitiveT::CopyPrimIds\"");
+}
+
+inline
+Vector2ui PrimGroupTriangle::BatchRange(PrimBatchId id) const
+{
+    auto range = FindRange(static_cast<CommonKey>(id))[INDICES_ATTRIB_INDEX];
+    return Vector2ui(range);
+}
+
 typename PrimGroupTriangle::DataSoA PrimGroupTriangle::SoA() const
 {
     return soa;
 }
-
-
 
 PrimGroupSkinnedTriangle::PrimGroupSkinnedTriangle(uint32_t primGroupId,
                                                    const GPUSystem& sys)
@@ -256,25 +260,22 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey, uint32_t att
 
     switch(attributeIndex)
     {
-        case 0  : PushData(dPositions);     break;  // Position
-        case 1  : PushData(dTBNRotations);  break;  // Normal
-        case 2  : PushData(dUVs);           break;  // UVs
-        case 3  : PushData(dSkinWeights);   break;  // Weights
-        case 4  : PushData(dSkinIndices);   break;  // Weights
-        case 5  : PushData(dIndexList);     break;  // Indices
-        default :
-        {
-            MRAY_ERROR_LOG("{:s}: Unknown Attribute Index {:d}",
-                           TypeName(), attributeIndex);
-            return;
-        }
+        case POSITION_ATTRIB_INDEX: PushData(dPositions);     break;
+        case NORMAL_ATTRIB_INDEX:   PushData(dTBNRotations);  break;
+        case UV_ATTRIB_INDEX:       PushData(dUVs);           break;
+        case SKIN_W_ATTRIB_INDEX:   PushData(dSkinWeights);   break;
+        case SKIN_I_ATTRIB_INDEX:   PushData(dSkinIndices);   break;
+        case INDICES_ATTRIB_INDEX:  PushData(dIndexList);     break;
+        default:
+            throw MRayError("{:s}:{:d}: Unknown Attribute Index {:d}",
+                            TypeName(), this->groupId, attributeIndex);
     }
 
-    if(attributeIndex != 3) return;
+    if(attributeIndex != INDICES_ATTRIB_INDEX) return;
 
     IdInt batch = batchKey.FetchIndexPortion();
-    auto attributeStart = static_cast<uint32_t>(FindRange(batch)[0][0]);
-    auto range = FindRange(batch)[3];
+    auto attributeStart = static_cast<uint32_t>(FindRange(batch)[POSITION_ATTRIB_INDEX][0]);
+    auto range = FindRange(batch)[INDICES_ATTRIB_INDEX];
     size_t count = range[1] - range[0];
     Span<Vector3ui> batchSpan = dIndexList.subspan(range[0], count);
 
@@ -296,24 +297,21 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey,
 
     switch(attributeIndex)
     {
-        case 0  : PushData(dPositions);     break;  // Position
-        case 1  : PushData(dTBNRotations);  break;  // Normal
-        case 2  : PushData(dUVs);           break;  // UVs
-        case 3  : PushData(dSkinWeights);   break;  // Weights
-        case 4  : PushData(dSkinIndices);   break;  // WeightIndices
-        case 5  : PushData(dIndexList);     break;  // Indices
-        default :
-        {
-            MRAY_ERROR_LOG("{:s}: Unknown Attribute Index {:d}",
-                           TypeName(), attributeIndex);
-            return;
-        }
+        case POSITION_ATTRIB_INDEX: PushData(dPositions);     break;
+        case NORMAL_ATTRIB_INDEX:   PushData(dTBNRotations);  break;
+        case UV_ATTRIB_INDEX:       PushData(dUVs);           break;
+        case SKIN_W_ATTRIB_INDEX:   PushData(dSkinWeights);   break;
+        case SKIN_I_ATTRIB_INDEX:   PushData(dSkinIndices);   break;
+        case INDICES_ATTRIB_INDEX:  PushData(dIndexList);     break;
+        default:
+            throw MRayError("{:s}:{:d}: Unknown Attribute Index {:d}",
+                            TypeName(), this->groupId, attributeIndex);
     }
 
-    if(attributeIndex != 3) return;
+    if(attributeIndex != INDICES_ATTRIB_INDEX) return;
 
     IdInt batch = batchKey.FetchIndexPortion();
-    auto attributeStart = static_cast<uint32_t>(FindRange(batch)[0][0]);
+    auto attributeStart = static_cast<uint32_t>(FindRange(batch)[POSITION_ATTRIB_INDEX][0]);
     auto range = FindRange(batch)[3];
     auto innerRange = Vector2ui(range[0] + subRange[0], subRange[1]);
     size_t count = innerRange[1] - innerRange[0];
@@ -338,33 +336,45 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey idStart, PrimBatchKey 
 
     switch(attributeIndex)
     {
-        case 0: PushData(dPositions);       break;  // Position
-        case 1: PushData(dTBNRotations);    break;  // Normal
-        case 2: PushData(dUVs);             break;  // UVs
-        case 3: PushData(dSkinWeights);     break;  // Weights
-        case 4: PushData(dSkinIndices);     break;  // WeightIndices
-        case 5: PushData(dIndexList);       break;  // Indices
-        default :
-        {
-            MRAY_ERROR_LOG("{:s}: Unknown Attribute Index {:d}",
-                           TypeName(), attributeIndex);
-            return;
-        }
+        case POSITION_ATTRIB_INDEX: PushData(dPositions);       break;
+        case NORMAL_ATTRIB_INDEX:   PushData(dTBNRotations);    break;
+        case UV_ATTRIB_INDEX:       PushData(dUVs);             break;
+        case SKIN_W_ATTRIB_INDEX:   PushData(dSkinWeights);     break;
+        case SKIN_I_ATTRIB_INDEX:   PushData(dSkinIndices);     break;
+        case INDICES_ATTRIB_INDEX:  PushData(dIndexList);       break;
+        default:
+            throw MRayError("{:s}:{:d}: Unknown Attribute Index {:d}",
+                            TypeName(), this->groupId, attributeIndex);
     }
 
-    if(attributeIndex != 3) return;
+    if(attributeIndex != INDICES_ATTRIB_INDEX) return;
     // Now here we need to do for loop
     for(auto i = idStart.FetchIndexPortion();
         i < idEnd.FetchIndexPortion(); i++)
     {
-        auto attributeStart = static_cast<uint32_t>(FindRange(i)[0][0]);
-        auto range = FindRange(i)[3];
+        auto attributeStart = static_cast<uint32_t>(FindRange(i)[POSITION_ATTRIB_INDEX][0]);
+        auto range = FindRange(i)[INDICES_ATTRIB_INDEX];
         size_t count = range[1] - range[0];
         Span<Vector3ui> batchSpan = dIndexList.subspan(range[0], count);
 
         DeviceAlgorithms::InPlaceTransform(batchSpan, queue,
                                            KCAdjustIndices<Vector3ui>(attributeStart));
     }
+}
+
+inline
+void PrimGroupSkinnedTriangle::CopyPrimIds(Span<PrimitiveKey>,
+                                           PrimBatchId,
+                                           const GPUQueue&) const
+{
+    throw MRayError("implement \"GenericGroupPrimitiveT::CopyPrimIds\"");
+}
+
+inline
+Vector2ui PrimGroupSkinnedTriangle::BatchRange(PrimBatchId id) const
+{
+    auto range = FindRange(static_cast<CommonKey>(id))[INDICES_ATTRIB_INDEX];
+    return Vector2ui(range);
 }
 
 typename PrimGroupSkinnedTriangle::DataSoA PrimGroupSkinnedTriangle::SoA() const

@@ -46,8 +46,11 @@ target_link_libraries(MRay PRIVATE
                       mray::meta_compile_opts)
 
 # Not-linked but dependent targets
+# Dynamically loaded DLLs
 add_dependencies(MRay
-                 Visor)
+                 Visor
+                 SceneLoaderMRay
+                 TracerDLL_CUDA)
 
 # Debug Parameters (For my own use case)
 if(MSVC)

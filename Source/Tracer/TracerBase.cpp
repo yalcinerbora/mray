@@ -831,24 +831,29 @@ LightIdList TracerBase::ReserveLights(LightGroupId id,
                                       std::vector<AttributeCountList> countList,
                                       std::vector<PrimBatchId> primBatches)
 {
-    auto lightGroup = lightGroups.at(id);
-    if(!lightGroup)
+    auto lightGroupOpt = lightGroups.at(id);
+    if(!lightGroupOpt)
     {
         throw MRayError("Unable to find LightGroup({})",
                         static_cast<uint32_t>(id));
     }
+    const LightGroupPtr& lightGroup = lightGroupOpt.value().get();
 
-    assert(primBatches.size() == countList.size());
     PrimBatchList primList;
-    primList.reserve(countList.size());
-    for(size_t i = 0; i < countList.size(); i++)
+    if(lightGroup->IsPrimitiveBacked())
     {
-        using PrimBatchKT = typename PrimBatchKey::Type;
-        primList.emplace_back(PrimBatchKey(static_cast<PrimBatchKT>(primBatches[i])));
+        assert(primBatches.size() == countList.size());
+
+        primList.reserve(countList.size());
+        for(size_t i = 0; i < countList.size(); i++)
+        {
+            using PrimBatchKT = typename PrimBatchKey::Type;
+            primList.emplace_back(PrimBatchKey(static_cast<PrimBatchKT>(primBatches[i])));
+        }
     }
 
     std::vector<LightKey> output;
-    output = lightGroup.value().get()->Reserve(countList, primList);
+    output = lightGroup->Reserve(countList, primList);
 
     LightIdList result;
     result.reserve(output.size());
@@ -1274,15 +1279,15 @@ AABB3 TracerBase::CommitSurfaces()
     // Send it!
     AcceleratorType type = tracerParams.accelMode;
     auto accelGenerator = typeGenerators.baseAcceleratorGenerator.at(type);
-    auto accelGGeneratorMap = typeGenerators.accelGeneratorMap.at(type); ;
+    auto accelGGeneratorMap = typeGenerators.accelGeneratorMap.at(type);
     auto accelWGeneratorMap = typeGenerators.accelWorkGeneratorMap.at(type);
     if(!accelGenerator ||
        !accelGGeneratorMap ||
        !accelWGeneratorMap)
     {
-        throw MRayError("Unable to find accelerator generators for type {}",
-                        static_cast<uint32_t>(type));
-    };
+        throw MRayError("Unable to find accelerator generators for type \"{}\"",
+                        type);
+    }
     accelerator = accelGenerator.value().get()(*threadPool, gpuSystem,
                                  accelGGeneratorMap.value().get(),
                                  accelWGeneratorMap.value().get());

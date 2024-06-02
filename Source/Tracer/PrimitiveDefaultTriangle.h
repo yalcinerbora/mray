@@ -213,6 +213,11 @@ namespace DefaultSkinnedTriangleDetail
 
 class PrimGroupTriangle final : public GenericGroupPrimitive<PrimGroupTriangle>
 {
+    static constexpr size_t POSITION_ATTRIB_INDEX   = 0;
+    static constexpr size_t NORMAL_ATTRIB_INDEX     = 1;
+    static constexpr size_t UV_ATTRIB_INDEX         = 2;
+    static constexpr size_t INDICES_ATTRIB_INDEX    = 3;
+
     public:
     using DataSoA       = DefaultTriangleDetail::TriangleData;
     using Hit           = typename DefaultTriangleDetail::TriHit;
@@ -261,11 +266,24 @@ class PrimGroupTriangle final : public GenericGroupPrimitive<PrimGroupTriangle>
                                           uint32_t attributeIndex,
                                           TransientData data,
                                           const GPUQueue& queue) override;
+
+    void                    CopyPrimIds(Span<PrimitiveKey>,
+                                        PrimBatchId,
+                                        const GPUQueue&) const override;
+    Vector2ui               BatchRange(PrimBatchId id) const override;
+
     DataSoA                 SoA() const;
 };
 
 class PrimGroupSkinnedTriangle final : public GenericGroupPrimitive<PrimGroupSkinnedTriangle>
 {
+    static constexpr size_t POSITION_ATTRIB_INDEX   = 0;
+    static constexpr size_t NORMAL_ATTRIB_INDEX     = 1;
+    static constexpr size_t UV_ATTRIB_INDEX         = 2;
+    static constexpr size_t SKIN_W_ATTRIB_INDEX     = 3;
+    static constexpr size_t SKIN_I_ATTRIB_INDEX     = 4;
+    static constexpr size_t INDICES_ATTRIB_INDEX    = 5;
+
     public:
     using DataSoA       = DefaultSkinnedTriangleDetail::SkinnedTriangleData;
     using Hit           = typename DefaultTriangleDetail::TriHit;
@@ -320,6 +338,12 @@ class PrimGroupSkinnedTriangle final : public GenericGroupPrimitive<PrimGroupSki
                                           uint32_t attributeIndex,
                                           TransientData data,
                                           const GPUQueue& queue) override;
+
+    void                    CopyPrimIds(Span<PrimitiveKey>,
+                                        PrimBatchId,
+                                        const GPUQueue&) const override;
+    Vector2ui               BatchRange(PrimBatchId id) const override;
+
     DataSoA                 SoA() const;
 };
 

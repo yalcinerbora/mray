@@ -554,8 +554,7 @@ void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
     {
         using namespace TypeNameGen::Runtime;
         using namespace std::string_view_literals;
-        std::string accelTypeName = CreateAcceleratorType(C::TypeName(),
-                                                          partition.primGroup->Name());
+        std::string accelTypeName = std::string(C::TypeName()) + std::string(partition.primGroup->Name());
         uint32_t aGroupId = idCounter++;
         auto accelGenerator = accelGenerators.at(accelTypeName);
         if(!accelGenerator)
@@ -853,6 +852,7 @@ LinearizedSurfaceData AcceleratorGroupT<PG>::LinearizeSurfaceData(const AccelGro
                 result.alphaMaps.back()[i] = std::get<AlphaMap>(view);
             }
             else result.alphaMaps.back()[i] = std::nullopt;
+
             result.cullFaceFlags.back()[i] = surf.cullFaceFlags[i];
             result.primRanges.back()[i] = pg.BatchRange(surf.primBatches[i]);
             MaterialKey mKey(static_cast<CommonKey>(surf.materials[i]));

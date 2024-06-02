@@ -207,9 +207,9 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
                 else if(optional == AttributeOptionality::MR_OPTIONAL)
                 {
                     Optional<NodeTexStruct> texStruct = node.AccessOptionalTexture(name);
-                    TextureId id = (texStruct.has_value())
-                                        ? texMappings.at(texStruct.value())
-                                        : TracerConstants::InvalidTexture;
+                    Optional<TextureId> id = (texStruct.has_value())
+                                            ? Optional<TextureId>(texMappings.at(texStruct.value()))
+                                            : std::nullopt;
                     result[i].textures.push_back(id);
                 }
             }

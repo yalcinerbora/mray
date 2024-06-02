@@ -212,11 +212,12 @@ class GenericGroupPrimitiveT : public GenericGroupT<PrimBatchKey, PrimAttributeI
                                        size_t allocationGranularity = 16_MiB,
                                        size_t initialReservartionSize = 64_MiB);
 
-    void        CopyPrimIds(Span<PrimitiveKey> dOutLocation,
-                            PrimBatchId primBatchId,
-                            const GPUQueue& queue);
-    Vector2ui   BatchRange(PrimBatchId) const;
+    virtual void        CopyPrimIds(Span<PrimitiveKey> dOutLocation,
+                                    PrimBatchId primBatchId,
+                                    const GPUQueue& queue) const = 0;
+    virtual Vector2ui   BatchRange(PrimBatchId) const = 0;
 };
+
 using PrimGroupPtr           = std::unique_ptr<GenericGroupPrimitiveT>;
 
 template<class Child>
@@ -264,7 +265,7 @@ class EmptyPrimitive
     const TransformContext& GetTransformContext() const;
 };
 
-class PrimGroupEmpty : public GenericGroupPrimitive<PrimGroupEmpty>
+class PrimGroupEmpty final : public GenericGroupPrimitive<PrimGroupEmpty>
 {
     public:
     using DataSoA       = EmptyType;
@@ -306,6 +307,12 @@ class PrimGroupEmpty : public GenericGroupPrimitive<PrimGroupEmpty>
                                           uint32_t attributeIndex,
                                           TransientData data,
                                           const GPUQueue&) override;
+
+    void                    CopyPrimIds(Span<PrimitiveKey> dOutLocation,
+                                        PrimBatchId primBatchId,
+                                        const GPUQueue& queue) const override;
+    Vector2ui               BatchRange(PrimBatchId) const override;
+
     DataSoA                 SoA() const;
 };
 
@@ -331,20 +338,6 @@ GenericGroupPrimitiveT::GenericGroupPrimitiveT(uint32_t groupId,
                                                      allocationGranularity,
                                                      initialReservartionSize)
 {}
-
-inline
-void GenericGroupPrimitiveT::CopyPrimIds(Span<PrimitiveKey>,
-                                         PrimBatchId,
-                                         const GPUQueue&)
-{
-    throw MRayError("implement");
-}
-
-inline
-Vector2ui GenericGroupPrimitiveT::BatchRange(PrimBatchId) const
-{
-    throw MRayError("implement");
-}
 
 template<class C>
 GenericGroupPrimitive<C>::GenericGroupPrimitive(uint32_t groupId,
@@ -485,6 +478,18 @@ inline
 void PrimGroupEmpty::PushAttribute(PrimBatchKey, PrimBatchKey,
                                    uint32_t, TransientData, const GPUQueue&)
 {}
+
+inline
+void PrimGroupEmpty::CopyPrimIds(Span<PrimitiveKey> dOutLocation,
+                                    PrimBatchId primBatchId,
+                                    const GPUQueue& queue) const
+{}
+
+inline
+Vector2ui PrimGroupEmpty::BatchRange(PrimBatchId) const
+{
+    return Vector2ui::Zero();
+}
 
 inline
 typename PrimGroupEmpty::DataSoA PrimGroupEmpty::SoA() const

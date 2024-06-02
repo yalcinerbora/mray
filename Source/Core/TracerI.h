@@ -104,6 +104,8 @@ struct TracerParameters
     uint32_t        itemPoolSize = 1 << 21; // 2^21
     // Current sampler logic,
     SamplerType     samplerType = SamplerType::INDEPENDENT;
+    //
+    uint32_t        clampedTexRes = std::numeric_limits<uint32_t>::max();
 };
 
 enum class AttributeOptionality
@@ -553,3 +555,17 @@ class [[nodiscard]] TracerI
 };
 
 using TracerConstructorArgs = Tuple<const TracerParameters&>;
+
+// formatter for AcceleratorType
+inline std::string_view format_as(AcceleratorType t)
+{
+    using namespace std::string_view_literals;
+    using enum AcceleratorType;
+    switch(t)
+    {
+        case SOFTWARE_NONE:         return "SOFTWARE_LINEAR"sv;
+        case SOFTWARE_BASIC_BVH:    return "SOFTWARE_BVH"sv;
+        case HARDWARE:              return "HARDWARE"sv;
+        default:                    return "UNKNOWN"sv;
+    }
+}

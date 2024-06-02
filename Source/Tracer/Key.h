@@ -213,9 +213,9 @@ template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr TriKeyT<T, FB, BB, IB> TriKeyT<T, FB, BB, IB>::CombinedKey(T flag, T batch, T id)
 {
-    assert(flag >= FlagMask);
-    assert(batch >= BatchMask);
-    assert(id >= IdMask);
+    assert(flag <= FlagMask);
+    assert(batch <= BatchMask);
+    assert(id <= IdMask);
     T flagPortion   = flag << (IdBits + BatchBits);
     T batchPortion  = batch << IdBits;
     T idPortion     = id;
