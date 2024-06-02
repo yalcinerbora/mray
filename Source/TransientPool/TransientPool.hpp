@@ -57,6 +57,11 @@ inline void TransientData::ReserveAll()
     usedBytes = ownedMem.size_bytes();
 }
 
+inline bool TransientData::IsEmpty() const
+{
+    return ownedMem.size() == 0;
+}
+
 template<ImplicitLifetimeC T>
 inline void TransientData::Push(Span<const T> data)
 {

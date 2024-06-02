@@ -1,17 +1,6 @@
 #include "TracerBase.h"
 #include <BS/BS_thread_pool.hpp>
 
-template<class K, class V, class ConvK>
-requires std::convertible_to<ConvK, K>
-Optional<std::reference_wrapper<const V>> OptionalMapFetch(const std::map<K, V>& map,
-                                                           const ConvK& key)
-{
-    auto loc = map.find(key);
-    if(loc == map.cend())
-        return std::nullopt;
-    return loc->second;
-}
-
 // TODO: This is not good, we need to instantiate
 // to get the virtual function, change this later
 // (change this with what though?)
@@ -67,21 +56,31 @@ void TracerBase::PopulateAttribInfoAndTypeLists()
 
     // Light is special so write it by hand
     // Find instantiate the prim again...
+    PrimGroupEmpty emptyPG(0u, gpuSystem);
     for(const auto& kv : typeGenerators.lightGenerator)
     {
         using namespace std::string_view_literals;
         LightGroupPtr instance = nullptr;
+        PrimGroupPtr pg = nullptr;
         if(kv.first.find("Prim"sv) != std::string_view::npos)
         {
             size_t loc = kv.first.find(TracerConstants::PRIM_PREFIX);
             auto primType = kv.first.substr(loc);
-            auto pg = typeGenerators.primGenerator.at(primType)(0, gpuSystem);
+            auto pgGen = typeGenerators.primGenerator.at(primType);
+            if(!pgGen)
+            {
+                throw MRayError("\"{}\" requires prim type \"{}\" but "
+                                "tracer does not support this prim type",
+                                kv.first, primType);
+            }
+            // TODO: This is dangling reference..
+            // We will not use pg, but this is UB so gg...
+            pg = pgGen.value()(0, gpuSystem);
             instance = kv.second(0u, gpuSystem, texViewMap, *pg.get());
         }
         else
         {
-            PrimGroupEmpty pg(0u, gpuSystem);
-            instance = kv.second(0u, gpuSystem, texViewMap, pg);
+            instance = kv.second(0u, gpuSystem, texViewMap, emptyPG);
         }
         lightAttributeInfoMap.emplace(kv.first, instance->AttributeInfo());
     }
@@ -208,67 +207,67 @@ RendererAttributeInfoList TracerBase::AttributeInfo(RendererId id) const
 
 PrimAttributeInfoList TracerBase::AttributeInfoPrim(std::string_view name) const
 {
-    auto rInfo = OptionalMapFetch(primAttributeInfoMap, name);
-    if(!rInfo)
+    auto pInfo = primAttributeInfoMap.at(name);
+    if(!pInfo)
     {
         throw MRayError("Unable to find type \"{}\"", name);
     }
-    return rInfo.value();
+    return pInfo.value();
 }
 
 CamAttributeInfoList TracerBase::AttributeInfoCam(std::string_view name) const
 {
-    auto rInfo = OptionalMapFetch(camAttributeInfoMap, name);
-    if(!rInfo)
+    auto cInfo = camAttributeInfoMap.at(name);
+    if(!cInfo)
     {
         throw MRayError("Unable to find type \"{}\"", name);
     }
-    return rInfo.value();
+    return cInfo.value();
 }
 
 MediumAttributeInfoList TracerBase::AttributeInfoMedium(std::string_view name) const
 {
-    auto rInfo = OptionalMapFetch(medAttributeInfoMap, name);
-    if(!rInfo)
+    auto mInfo = medAttributeInfoMap.at(name);
+    if(!mInfo)
     {
         throw MRayError("Unable to find type \"{}\"", name);
     }
-    return rInfo.value();
+    return mInfo.value();
 }
 
 MatAttributeInfoList TracerBase::AttributeInfoMat(std::string_view name) const
 {
-    auto rInfo = OptionalMapFetch(matAttributeInfoMap, name);
-    if(!rInfo)
+    auto mtInfo = matAttributeInfoMap.at(name);
+    if(!mtInfo)
     {
         throw MRayError("Unable to find type \"{}\"", name);
     }
-    return rInfo.value();
+    return mtInfo.value();
 }
 
 TransAttributeInfoList TracerBase::AttributeInfoTrans(std::string_view name) const
 {
-    auto rInfo = OptionalMapFetch(transAttributeInfoMap, name);
-    if(!rInfo)
+    auto tInfo = transAttributeInfoMap.at(name);
+    if(!tInfo)
     {
         throw MRayError("Unable to find type \"{}\"", name);
     }
-    return rInfo.value();
+    return tInfo.value();
 }
 
 LightAttributeInfoList TracerBase::AttributeInfoLight(std::string_view name) const
 {
-    auto rInfo = OptionalMapFetch(lightAttributeInfoMap, name);
-    if(!rInfo)
+    auto lInfo = lightAttributeInfoMap.at(name);
+    if(!lInfo)
     {
         throw MRayError("Unable to find type \"{}\"", name);
     }
-    return rInfo.value();
+    return lInfo.value();
 }
 
 RendererAttributeInfoList TracerBase::AttributeInfoRenderer(std::string_view name) const
 {
-    auto rInfo = OptionalMapFetch(rendererAttributeInfoMap, name);
+    auto rInfo = rendererAttributeInfoMap.at(name);
     if(!rInfo)
     {
         throw MRayError("Unable to find type \"{}\"", name);
@@ -355,8 +354,7 @@ std::string TracerBase::TypeName(RendererId id) const
 
 PrimGroupId TracerBase::CreatePrimitiveGroup(std::string name)
 {
-    auto genFunc = OptionalMapFetch(typeGenerators.primGenerator,
-                                    name);
+    auto genFunc = typeGenerators.primGenerator.at(name);
     if(!genFunc)
     {
         throw MRayError("Unable to find generator for {}",
@@ -482,8 +480,7 @@ void TracerBase::PushPrimAttribute(PrimGroupId gId,
 
 MatGroupId TracerBase::CreateMaterialGroup(std::string name)
 {
-    auto genFunc = OptionalMapFetch(typeGenerators.matGenerator,
-                                    name);
+    auto genFunc = typeGenerators.matGenerator.at(name);
     if(!genFunc)
     {
         throw MRayError("Unable to find generator for {}",
@@ -614,9 +611,17 @@ void TracerBase::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
     using T = typename MaterialKey::Type;
     auto keyStart = MaterialKey(static_cast<T>(matRange[0]));
     auto keyEnd = MaterialKey(static_cast<T>(matRange[1]));
-    matGroup.value().get()->PushTexAttribute(keyStart, keyEnd, attribIndex,
-                                             std::move(data),
-                                             std::move(textures), queue);
+    if(data.IsEmpty())
+    {
+        matGroup.value().get()->PushTexAttribute(keyStart, keyEnd, attribIndex,
+                                                 std::move(textures), queue);
+    }
+    else
+    {
+        matGroup.value().get()->PushTexAttribute(keyStart, keyEnd, attribIndex,
+                                                 std::move(data),
+                                                 std::move(textures), queue);
+    }
 }
 
 void TracerBase::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
@@ -674,8 +679,7 @@ void TracerBase::PushTextureData(TextureId, uint32_t,
 
 TransGroupId TracerBase::CreateTransformGroup(std::string name)
 {
-    auto genFunc = OptionalMapFetch(typeGenerators.transGenerator,
-                                    name);
+    auto genFunc = typeGenerators.transGenerator.at(name);
     if(!genFunc)
     {
         throw MRayError("Unable to find generator for {}",
@@ -775,8 +779,7 @@ void TracerBase::PushTransAttribute(TransGroupId gId, Vector2ui transRange,
 LightGroupId TracerBase::CreateLightGroup(std::string name,
                                           PrimGroupId primGId)
 {
-    auto genFunc = OptionalMapFetch(typeGenerators.lightGenerator,
-                                    name);
+    auto genFunc = typeGenerators.lightGenerator.at(name);
     if(!genFunc)
     {
         throw MRayError("Unable to find generator for {}",
@@ -913,9 +916,19 @@ void TracerBase::PushLightAttribute(LightGroupId gId, Vector2ui lightRange,
     using T = typename LightKey::Type;
     auto keyStart = LightKey(static_cast<T>(lightRange[0]));
     auto keyEnd = LightKey(static_cast<T>(lightRange[1]));
-    lightGroup.value().get()->PushTexAttribute(keyStart, keyEnd, attribIndex,
-                                               std::move(data), std::move(textures),
-                                               queue);
+
+    if(data.IsEmpty())
+    {
+        lightGroup.value().get()->PushTexAttribute(keyStart, keyEnd, attribIndex,
+                                                   std::move(textures), queue);
+    }
+    else
+    {
+
+        lightGroup.value().get()->PushTexAttribute(keyStart, keyEnd, attribIndex,
+                                                   std::move(data), std::move(textures),
+                                                   queue);
+    }
 }
 
 void TracerBase::PushLightAttribute(LightGroupId gId, Vector2ui lightRange,
@@ -939,8 +952,7 @@ void TracerBase::PushLightAttribute(LightGroupId gId, Vector2ui lightRange,
 
 CameraGroupId TracerBase::CreateCameraGroup(std::string name)
 {
-    auto genFunc = OptionalMapFetch(typeGenerators.camGenerator,
-                                    name);
+    auto genFunc = typeGenerators.camGenerator.at(name);
     if(!genFunc)
     {
         throw MRayError("Unable to find generator for {}",
@@ -1038,8 +1050,7 @@ void TracerBase::PushCamAttribute(CameraGroupId gId, Vector2ui camRange,
 
 MediumGroupId TracerBase::CreateMediumGroup(std::string name)
 {
-    auto genFunc = OptionalMapFetch(typeGenerators.medGenerator,
-                                    name);
+    auto genFunc = typeGenerators.medGenerator.at(name);
     if(!genFunc)
     {
         throw MRayError("Unable to find generator for {}",
@@ -1147,11 +1158,21 @@ void TracerBase::PushMediumAttribute(MediumGroupId gId, Vector2ui mediumRange,
         throw MRayError("Unable to find MediumGroup({})",
                         static_cast<uint32_t>(gId));
     }
-    medGroup.value().get()->PushTexAttribute(keyStart, keyEnd,
-                                             attribIndex,
-                                             std::move(data),
-                                             std::move(textures),
-                                             queue);
+    if(data.IsEmpty())
+    {
+        medGroup.value().get()->PushTexAttribute(keyStart, keyEnd,
+                                                 attribIndex,
+                                                 std::move(textures),
+                                                 queue);
+    }
+    else
+    {
+        medGroup.value().get()->PushTexAttribute(keyStart, keyEnd,
+                                                 attribIndex,
+                                                 std::move(data),
+                                                 std::move(textures),
+                                                 queue);
+    }
 }
 
 void TracerBase::PushMediumAttribute(MediumGroupId gId, Vector2ui mediumRange,
@@ -1238,7 +1259,7 @@ AABB3 TracerBase::CommitSurfaces()
         const auto& map = lightGroups.Map();
         LightKey lKey(static_cast<uint32_t>(lSurf.second.lightId));
         auto gId = LightGroupId(lKey.FetchBatchPortion());
-        return map.at(gId)->IsPrimitiveBacked();
+        return map.at(gId).value().get()->IsPrimitiveBacked();
     });
     std::stable_sort(lSurfList.begin(), lSurfList.end(),
     [](const LightSurfP& left, const LightSurfP& right)
@@ -1252,9 +1273,19 @@ AABB3 TracerBase::CommitSurfaces()
     });
     // Send it!
     AcceleratorType type = tracerParams.accelMode;
-    accelerator = typeGenerators.baseAcceleratorGenerator.at(type)(*threadPool, gpuSystem,
-                                                                   typeGenerators.accelGeneratorMap.at(type),
-                                                                   typeGenerators.accelWorkGeneratorMap.at(type));
+    auto accelGenerator = typeGenerators.baseAcceleratorGenerator.at(type);
+    auto accelGGeneratorMap = typeGenerators.accelGeneratorMap.at(type); ;
+    auto accelWGeneratorMap = typeGenerators.accelWorkGeneratorMap.at(type);
+    if(!accelGenerator ||
+       !accelGGeneratorMap ||
+       !accelWGeneratorMap)
+    {
+        throw MRayError("Unable to find accelerator generators for type {}",
+                        static_cast<uint32_t>(type));
+    };
+    accelerator = accelGenerator.value().get()(*threadPool, gpuSystem,
+                                 accelGGeneratorMap.value().get(),
+                                 accelWGeneratorMap.value().get());
     accelerator->Construct(BaseAccelConstructParams
     {
         .texViewMap = texViewMap,
@@ -1296,8 +1327,7 @@ CameraTransform TracerBase::GetCamTransform(CamSurfaceId camSurfId) const
 
 RendererId TracerBase::CreateRenderer(std::string typeName)
 {
-    auto rendererGen = OptionalMapFetch(typeGenerators.rendererGenerator,
-                                        typeName);
+    auto rendererGen = typeGenerators.rendererGenerator.at(typeName);
     if(!rendererGen)
     {
         throw MRayError("Unable to find generator for {}",

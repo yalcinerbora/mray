@@ -143,7 +143,7 @@ using DefaultLinearAccelTypePack = DefaultAccelTypePack<BaseAcceleratorLinear, A
 
 TypeGeneratorPack Tracer::GLOBAL_TYPE_GEN = {};
 
-void Tracer::AddPrimGenerators(std::map<std::string_view, PrimGenerator>& map)
+void Tracer::AddPrimGenerators(Map<std::string_view, PrimGenerator>& map)
 {
     using Args = Tuple<uint32_t, GPUSystem&>;
 
@@ -155,7 +155,7 @@ void Tracer::AddPrimGenerators(std::map<std::string_view, PrimGenerator>& map)
     );
 }
 
-void Tracer::AddTransformGenerators(std::map<std::string_view, TransGenerator>& map)
+void Tracer::AddTransformGenerators(Map<std::string_view, TransGenerator>& map)
 {
     using Args = Tuple<uint32_t, GPUSystem&>;
 
@@ -167,7 +167,7 @@ void Tracer::AddTransformGenerators(std::map<std::string_view, TransGenerator>& 
     );
 }
 
-void Tracer::AddLightGenerators(std::map<std::string_view, LightGenerator>& map)
+void Tracer::AddLightGenerators(Map<std::string_view, LightGenerator>& map)
 {
     using Args = Tuple<uint32_t, GPUSystem&, const TextureViewMap&,
                        GenericGroupPrimitiveT&>;
@@ -180,7 +180,7 @@ void Tracer::AddLightGenerators(std::map<std::string_view, LightGenerator>& map)
     );
 }
 
-void Tracer::AddCamGenerators(std::map<std::string_view, CamGenerator>& map)
+void Tracer::AddCamGenerators(Map<std::string_view, CamGenerator>& map)
 {
     using Args = Tuple<uint32_t, GPUSystem&>;
 
@@ -192,7 +192,7 @@ void Tracer::AddCamGenerators(std::map<std::string_view, CamGenerator>& map)
     );
 }
 
-void Tracer::AddMaterialGenerators(std::map<std::string_view, MatGenerator>& map)
+void Tracer::AddMaterialGenerators(Map<std::string_view, MatGenerator>& map)
 {
     using Args = Tuple<uint32_t, GPUSystem&,
                        const TextureViewMap&>;
@@ -205,7 +205,7 @@ void Tracer::AddMaterialGenerators(std::map<std::string_view, MatGenerator>& map
     );
 }
 
-void Tracer::AddMediumGenerators(std::map<std::string_view, MedGenerator>& map)
+void Tracer::AddMediumGenerators(Map<std::string_view, MedGenerator>& map)
 {
     using Args = Tuple<uint32_t, GPUSystem&,
                        const TextureViewMap&>;
@@ -219,9 +219,9 @@ void Tracer::AddMediumGenerators(std::map<std::string_view, MedGenerator>& map)
 }
 
 template<class AcceleratorPack>
-static void AddAccelGeneratorsGeneric(std::map<AcceleratorType, BaseAccelGenerator>& baseMap,
-                                      std::map<AcceleratorType, AccelGroupGenMap>& groupMap,
-                                      std::map<AcceleratorType, AccelWorkGenMap>& workMap,
+static void AddAccelGeneratorsGeneric(Map<AcceleratorType, BaseAccelGenerator>& baseMap,
+                                      Map<AcceleratorType, AccelGroupGenMap>& groupMap,
+                                      Map<AcceleratorType, AccelWorkGenMap>& workMap,
                                       AcceleratorType t)
 {
         // Base
@@ -260,9 +260,9 @@ static void AddAccelGeneratorsGeneric(std::map<AcceleratorType, BaseAccelGenerat
     );
 }
 
-void Tracer::AddAccelGenerators(std::map<AcceleratorType, BaseAccelGenerator>& baseMap,
-                                std::map<AcceleratorType, AccelGroupGenMap>& groupMap,
-                                std::map<AcceleratorType, AccelWorkGenMap>& workMap)
+void Tracer::AddAccelGenerators(Map<AcceleratorType, BaseAccelGenerator>& baseMap,
+                                Map<AcceleratorType, AccelGroupGenMap>& groupMap,
+                                Map<AcceleratorType, AccelWorkGenMap>& workMap)
 {
     using enum AcceleratorType;
     AddAccelGeneratorsGeneric<DefaultLinearAccelTypePack>

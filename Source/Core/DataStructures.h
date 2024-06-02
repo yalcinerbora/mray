@@ -206,7 +206,6 @@ class alignas(std::max(alignof(T), size_t(8))) StaticVector
     constexpr void          remove(T*);
 };
 
-
 // Flat set implementation (only MSVC has c++23 flat_map/set currently)
 // This is a basic impl prob not std compliant
 enum class IsSorted : size_t

@@ -116,8 +116,8 @@ void MatGroupLambert::PushTexAttribute(MaterialKey idStart, MaterialKey idEnd,
                                             std::move(texIds),
                                             queue);
     }
-    else MRAY_ERROR_LOG("{:s}: Attribute {:d} is not \"ParamVarying\", wrong "
-                        "function is called", TypeName(), attributeIndex);
+    else throw MRayError("{:s}: Attribute {:d} is not \"ParamVarying\", wrong "
+                         "function is called", TypeName(), attributeIndex);
 }
 
 void MatGroupLambert::PushTexAttribute(MaterialKey idStart, MaterialKey idEnd,
@@ -134,8 +134,8 @@ void MatGroupLambert::PushTexAttribute(MaterialKey idStart, MaterialKey idEnd,
                                             std::move(texIds),
                                             queue);
     }
-    else MRAY_ERROR_LOG("{:s}: Attribute {:d} is not \"Optional Texture\", wrong "
-                        "function is called", TypeName(), attributeIndex);
+    else throw MRayError("{:s}: Attribute {:d} is not \"Optional Texture\", wrong "
+                         "function is called", TypeName(), attributeIndex);
 }
 
 void MatGroupLambert::PushTexAttribute(MaterialKey, MaterialKey,
@@ -143,7 +143,7 @@ void MatGroupLambert::PushTexAttribute(MaterialKey, MaterialKey,
                                        std::vector<TextureId>,
                                        const GPUQueue&)
 {
-    MRAY_ERROR_LOG("{:s} do not have and mandatory textures!", TypeName());
+    throw MRayError("{:s} do not have and mandatory textures!", TypeName());
 }
 
 typename MatGroupLambert::DataSoA MatGroupLambert::SoA() const

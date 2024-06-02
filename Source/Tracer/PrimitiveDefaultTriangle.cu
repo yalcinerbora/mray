@@ -95,8 +95,8 @@ void PrimGroupTriangle::PushAttribute(PrimBatchKey batchKey,
     if(attributeIndex != 3) return;
 
     IdInt batch = batchKey.FetchIndexPortion();
-    auto attributeStart = static_cast<uint32_t>(this->itemRanges.at(batch)[0][0]);
-    auto range = this->itemRanges.at(batch)[3];
+    auto attributeStart = static_cast<uint32_t>(FindRange(batch)[0][0]);
+    auto range = FindRange(batch)[3];
     size_t count = range[1] - range[0];
     Span<Vector3ui> batchSpan = dIndexList.subspan(range[0], count);
 
@@ -134,8 +134,8 @@ void PrimGroupTriangle::PushAttribute(PrimBatchKey batchKey,
     if(attributeIndex != 3) return;
 
     IdInt batch = batchKey.FetchIndexPortion();
-    auto attributeStart = static_cast<uint32_t>(this->itemRanges.at(batch)[0][0]);
-    auto range = this->itemRanges.at(batch)[3];
+    auto attributeStart = static_cast<uint32_t>(FindRange(batch)[0][0]);
+    auto range = FindRange(batch)[3];
     auto innerRange = Vector2ui(range[0] + subRange[0], subRange[1]);
     size_t count = innerRange[1] - innerRange[0];
     Span<Vector3ui> batchSpan = dIndexList.subspan(innerRange[0], count);
@@ -176,8 +176,8 @@ void PrimGroupTriangle::PushAttribute(PrimBatchKey idStart, PrimBatchKey idEnd,
     for(auto i = idStart.FetchIndexPortion();
         i < idEnd.FetchIndexPortion(); i++)
     {
-        auto attributeStart = static_cast<uint32_t>(this->itemRanges.at(i)[0][0]);
-        auto range = this->itemRanges.at(i)[3];
+        auto attributeStart = static_cast<uint32_t>(FindRange(i)[0][0]);
+        auto range = FindRange(i)[3];
         size_t count = range[1] - range[0];
         Span<Vector3ui> batchSpan = dIndexList.subspan(range[0], count);
 
@@ -273,8 +273,8 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey, uint32_t att
     if(attributeIndex != 3) return;
 
     IdInt batch = batchKey.FetchIndexPortion();
-    auto attributeStart = static_cast<uint32_t>(this->itemRanges.at(batch)[0][0]);
-    auto range = this->itemRanges.at(batch)[3];
+    auto attributeStart = static_cast<uint32_t>(FindRange(batch)[0][0]);
+    auto range = FindRange(batch)[3];
     size_t count = range[1] - range[0];
     Span<Vector3ui> batchSpan = dIndexList.subspan(range[0], count);
 
@@ -313,8 +313,8 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey,
     if(attributeIndex != 3) return;
 
     IdInt batch = batchKey.FetchIndexPortion();
-    auto attributeStart = static_cast<uint32_t>(this->itemRanges.at(batch)[0][0]);
-    auto range = this->itemRanges.at(batch)[3];
+    auto attributeStart = static_cast<uint32_t>(FindRange(batch)[0][0]);
+    auto range = FindRange(batch)[3];
     auto innerRange = Vector2ui(range[0] + subRange[0], subRange[1]);
     size_t count = innerRange[1] - innerRange[0];
     Span<Vector3ui> batchSpan = dIndexList.subspan(innerRange[0], count);
@@ -357,8 +357,8 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey idStart, PrimBatchKey 
     for(auto i = idStart.FetchIndexPortion();
         i < idEnd.FetchIndexPortion(); i++)
     {
-        auto attributeStart = static_cast<uint32_t>(this->itemRanges.at(i)[0][0]);
-        auto range = this->itemRanges.at(i)[3];
+        auto attributeStart = static_cast<uint32_t>(FindRange(i)[0][0]);
+        auto range = FindRange(i)[3];
         size_t count = range[1] - range[0];
         Span<Vector3ui> batchSpan = dIndexList.subspan(range[0], count);
 

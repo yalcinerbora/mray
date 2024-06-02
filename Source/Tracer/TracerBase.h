@@ -1,10 +1,8 @@
 #pragma once
 
-#include <map>
-#include <shared_mutex>
-
 #include "Core/TracerI.h"
 #include "Core/TypeGenFunction.h"
+#include "Core/Map.h"
 
 #include "Tracer/PrimitiveC.h"
 #include "Tracer/MaterialC.h"
@@ -55,60 +53,16 @@ struct WorkBatchInfo
 
 struct TypeGeneratorPack
 {
-    std::map<std::string_view, PrimGenerator>       primGenerator;
-    std::map<std::string_view, CamGenerator>        camGenerator;
-    std::map<std::string_view, MedGenerator>        medGenerator;
-    std::map<std::string_view, MatGenerator>        matGenerator;
-    std::map<std::string_view, TransGenerator>      transGenerator;
-    std::map<std::string_view, LightGenerator>      lightGenerator;
-    std::map<std::string_view, RendererGenerator>   rendererGenerator;
-    std::map<AcceleratorType, BaseAccelGenerator>   baseAcceleratorGenerator;
-    std::map<AcceleratorType, AccelGroupGenMap>     accelGeneratorMap;
-    std::map<AcceleratorType, AccelWorkGenMap>      accelWorkGeneratorMap;
-};
-
-// TODO: Move these somewhere safe
-template<class K, class V>
-class ThreadSafeMap
-{
-    public:
-    using MapType   = std::map<K, V>;
-    using Iterator  = typename MapType::iterator;
-    private:
-    MapType                     map;
-    mutable std::shared_mutex   mutex;
-
-    public:
-    template<class... Args>
-    std::pair<Iterator, bool>   try_emplace(const K& k, Args&&... args);
-    void                        remove_at(const K&);
-    void                        clear();
-
-    Optional<std::reference_wrapper<const V>>
-                                at(const K& k) const;
-
-    const MapType&              Map() const;
-    MapType&                    Map();
-};
-
-template<class T>
-class ThreadSafeVector
-{
-    public:
-    using VecType = std::vector<T>;
-    using Iterator = typename VecType::iterator;
-    private:
-    VecType                     vector;
-    mutable std::shared_mutex   mutex;
-
-    public:
-    template<class... Args>
-    T&                          emplace_back(Args&&... args);
-    const T&                    at(size_t i) const;
-    void                        clear();
-
-    const VecType&              Vec() const;
-    VecType&                    Vec();
+    Map<std::string_view, PrimGenerator>       primGenerator;
+    Map<std::string_view, CamGenerator>        camGenerator;
+    Map<std::string_view, MedGenerator>        medGenerator;
+    Map<std::string_view, MatGenerator>        matGenerator;
+    Map<std::string_view, TransGenerator>      transGenerator;
+    Map<std::string_view, LightGenerator>      lightGenerator;
+    Map<std::string_view, RendererGenerator>   rendererGenerator;
+    Map<AcceleratorType, BaseAccelGenerator>   baseAcceleratorGenerator;
+    Map<AcceleratorType, AccelGroupGenMap>     accelGeneratorMap;
+    Map<AcceleratorType, AccelWorkGenMap>      accelWorkGeneratorMap;
 };
 
 class TracerBase : public TracerI
@@ -167,13 +121,13 @@ class TracerBase : public TracerI
     TracerParameters    tracerParams;
 
     // Current Types
-    std::map<std::string_view, PrimAttributeInfoList>       primAttributeInfoMap;
-    std::map<std::string_view, CamAttributeInfoList>        camAttributeInfoMap;
-    std::map<std::string_view, MediumAttributeInfoList>     medAttributeInfoMap;
-    std::map<std::string_view, MatAttributeInfoList>        matAttributeInfoMap;
-    std::map<std::string_view, TransAttributeInfoList>      transAttributeInfoMap;
-    std::map<std::string_view, LightAttributeInfoList>      lightAttributeInfoMap;
-    std::map<std::string_view, RendererAttributeInfoList>   rendererAttributeInfoMap;
+    Map<std::string_view, PrimAttributeInfoList>       primAttributeInfoMap;
+    Map<std::string_view, CamAttributeInfoList>        camAttributeInfoMap;
+    Map<std::string_view, MediumAttributeInfoList>     medAttributeInfoMap;
+    Map<std::string_view, MatAttributeInfoList>        matAttributeInfoMap;
+    Map<std::string_view, TransAttributeInfoList>      transAttributeInfoMap;
+    Map<std::string_view, LightAttributeInfoList>      lightAttributeInfoMap;
+    Map<std::string_view, RendererAttributeInfoList>   rendererAttributeInfoMap;
 
     void PopulateAttribInfoAndTypeLists();
 
@@ -344,86 +298,3 @@ class TracerBase : public TracerI
     size_t                  TotalDeviceMemory() const override;
     size_t                  UsedDeviceMemory() const override;
 };
-
-template<class K, class V>
-template<class... Args>
-std::pair<typename ThreadSafeMap<K, V>::Iterator, bool>
-ThreadSafeMap<K, V>::try_emplace(const K& k, Args&&... args)
-{
-    std::unique_lock<std::shared_mutex> l(mutex);
-    return map.try_emplace(k, std::forward<Args>(args)...);
-}
-
-template<class K, class V>
-Optional<std::reference_wrapper<const V>> ThreadSafeMap<K, V>::at(const K& k) const
-{
-    std::shared_lock<std::shared_mutex> l(mutex);
-    auto loc = map.find(k);
-    if(loc == map.cend())
-        return std::nullopt;
-    return loc->second;
-}
-
-template<class K, class V>
-void ThreadSafeMap<K, V>::remove_at(const K& k)
-{
-    std::unique_lock<std::shared_mutex> l(mutex);
-    map.erase(map.find(k));
-}
-
-template<class K, class V>
-void ThreadSafeMap<K, V>::clear()
-{
-    std::unique_lock<std::shared_mutex> l(mutex);
-    map.clear();
-}
-
-template<class K, class V>
-const typename ThreadSafeMap<K, V>::MapType&
-ThreadSafeMap<K, V>::Map() const
-{
-    return map;
-}
-
-template<class K, class V>
-typename ThreadSafeMap<K, V>::MapType&
-ThreadSafeMap<K, V>::Map()
-{
-    return map;
-}
-
-template<class T>
-template<class... Args>
-T& ThreadSafeVector<T>::emplace_back(Args&&... args)
-{
-    std::shared_lock<std::shared_mutex> l(mutex);
-    return vector.emplace_back(std::forward<Args>(args)...);
-}
-
-template <class T>
-const T& ThreadSafeVector<T>::at(size_t i) const
-{
-    std::shared_lock<std::shared_mutex> l(mutex);
-    return vector.at(i);
-}
-
-template <class T>
-void ThreadSafeVector<T>::clear()
-{
-    std::unique_lock<std::shared_mutex> l(mutex);
-    vector.clear();
-}
-
-template <class T>
-const typename ThreadSafeVector<T>::VecType&
-ThreadSafeVector<T>::Vec() const
-{
-    return vector;
-}
-
-template <class T>
-typename ThreadSafeVector<T>::VecType&
-ThreadSafeVector<T>::Vec()
-{
-    return vector;
-}

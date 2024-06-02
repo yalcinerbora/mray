@@ -42,7 +42,7 @@ void TransformGroupSingle::PushAttribute(TransformKey id , uint32_t attributeInd
                         attributeIndex,
                         std::move(data), queue);
 
-        auto range = itemRanges.at(id.FetchIndexPortion())[0];
+        auto range = FindRange(id.FetchIndexPortion())[0];
         size_t count = range[1] - range[0];
         Span<Matrix4x4> subTRange = transforms.subspan(range[0], count);
         Span<Matrix4x4> subInvTRange = invTransforms.subspan(range[0], count);
@@ -67,7 +67,7 @@ void TransformGroupSingle::PushAttribute(TransformKey id,
                         attributeIndex, subRange,
                         std::move(data), queue);
 
-        auto range = itemRanges.at(id.FetchIndexPortion())[0];
+        auto range = FindRange(id.FetchIndexPortion())[0];
         auto innerRange = Vector2ui(range[0] + subRange[0], subRange[1]);
         size_t count = innerRange[1] - innerRange[0];
 
@@ -92,8 +92,8 @@ void TransformGroupSingle::PushAttribute(TransformKey idStart, TransformKey idEn
         GenericPushData(transforms, idRange, attributeIndex,
                         std::move(data), queue);
 
-        auto rangeStart = itemRanges.at(idRange[0])[0];
-        auto rangeEnd = itemRanges.at(idRange[1])[1];
+        auto rangeStart = FindRange(idRange[0])[0];
+        auto rangeEnd = FindRange(idRange[1])[1];
         size_t count = rangeEnd[1] - rangeStart[0];
 
         Span<Matrix4x4> subTRange = transforms.subspan(rangeStart[0], count);
@@ -194,7 +194,7 @@ void TransformGroupMulti::PushAttribute(TransformKey id, uint32_t attributeIndex
         GenericPushData(transforms, id.FetchIndexPortion(), attributeIndex,
                         std::move(data), queue);
 
-        auto range = itemRanges.at(id.FetchIndexPortion())[0];
+        auto range = FindRange(id.FetchIndexPortion())[0];
         size_t count = range[1] - range[0];
         Span<Matrix4x4> subTRange = transforms.subspan(range[0], count);
         Span<Matrix4x4> subInvTRange = invTransforms.subspan(range[0], count);
@@ -218,7 +218,7 @@ void TransformGroupMulti::PushAttribute(TransformKey id,
                         attributeIndex, subRange,
                         std::move(data), queue);
 
-        auto range = itemRanges.at(id.FetchIndexPortion())[attributeIndex];
+        auto range = FindRange(id.FetchIndexPortion())[attributeIndex];
         auto innerRange = Vector2ui(range[0] + subRange[0], subRange[1]);
         size_t count = innerRange[1] - innerRange[0];
 
@@ -243,8 +243,8 @@ void TransformGroupMulti::PushAttribute(TransformKey idStart, TransformKey idEnd
         GenericPushData(transforms, idRange, attributeIndex,
                         std::move(data), queue);
 
-        auto rangeStart = (itemRanges.at(idRange[0]))[attributeIndex];
-        auto rangeEnd   = (itemRanges.at(idRange[1]))[attributeIndex];
+        auto rangeStart = (FindRange(idRange[0]))[attributeIndex];
+        auto rangeEnd   = (FindRange(idRange[1]))[attributeIndex];
         size_t count = rangeEnd[1] - rangeStart[0];
 
         Span<Matrix4x4> subTRange = transforms.subspan(rangeStart[0], count);

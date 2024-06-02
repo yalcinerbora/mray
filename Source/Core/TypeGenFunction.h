@@ -1,8 +1,8 @@
 #pragma once
 
 #include <memory>
-#include <map>
 
+#include "Core/Map.h"
 #include "Core/Types.h"
 
 template<class BaseType, class...Args>
@@ -16,7 +16,7 @@ std::unique_ptr<BaseType> GenerateType(Args&&... args)
 
 template<class GeneratorType, class BaseType,
          class... Args, class... Types>
-void GenerateMapping(std::map<std::string_view, GeneratorType>& map,
+void GenerateMapping(Map<std::string_view, GeneratorType>& map,
                      // These types are here for overload resolution,
                      // these will not be used directly
                      Tuple<Args...>*, Tuple<Types...>*)

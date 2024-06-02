@@ -5,10 +5,10 @@
 #include <vector>
 #include <algorithm>
 #include <cstdint>
-#include <map>
 #include <numeric>
 
 #include "Core/Types.h"
+#include "Core/Map.h"
 #include "Core/MemAlloc.h"
 #include "Core/DataStructures.h"
 #include "Core/TracerI.h"
@@ -33,7 +33,7 @@ using GenericTextureView = Variant
     TextureView<3, Vector3>,
     TextureView<3, Vector4>
 >;
-using TextureViewMap = std::map<TextureId, GenericTextureView>;
+using TextureViewMap = Map<TextureId, GenericTextureView>;
 
 using AttributeRanges = StaticVector<Vector<2, size_t>,
                                      TracerConstants::MaxAttributePerGroup>;
@@ -116,8 +116,8 @@ class GenericGroupT : public GenericGroupI<IdTypeT, AttribInfoT>
     using typename InterfaceType::AttribInfo;
     using typename InterfaceType::AttribInfoList;
 
-    using ItemRangeMap  = std::map<IdInt, AttributeRanges>;
-    using ItemCountMap  = std::map<IdInt, AttributeCountList>;
+    using ItemRangeMap  = Map<IdInt, AttributeRanges>;
+    using ItemCountMap  = Map<IdInt, AttributeCountList>;
 
     protected:
     ItemRangeMap        itemRanges;
@@ -128,6 +128,9 @@ class GenericGroupT : public GenericGroupI<IdTypeT, AttribInfoT>
     std::mutex          mutex;
     IdInt               groupId;
     DeviceMemory        deviceMem;
+
+
+    const AttributeRanges&      FindRange(IdInt) const;
 
     template <class... Args>
     Tuple<Span<Args>...>        GenericCommit(std::array<size_t, sizeof...(Args)> countLookup);
@@ -195,7 +198,6 @@ class GenericTexturedGroupT : public GenericGroupT<IdType, AttributeInfoType>
                                             uint32_t attributeIndex,
                                             std::vector<Optional<TextureId>>,
                                             const GPUQueue& queue);
-
     template<uint32_t D, class T>
     void            GenericPushTexAttribute(Span<TextureView<D, T>>,
                                             //
@@ -227,6 +229,19 @@ class GenericTexturedGroupT : public GenericGroupT<IdType, AttributeInfoType>
                                      const GPUQueue& queue) = 0;
 };
 
+
+template<class ID, class AI>
+const AttributeRanges& GenericGroupT<ID, AI>::FindRange(IdInt id) const
+{
+    auto range = itemRanges.at(id);
+    if(!range)
+    {
+        throw MRayError("{:s}:{:d}: Unkown key {}",
+                        this->Name(), this->groupId, id);
+    }
+    return range.value().get();
+}
+
 template<class ID, class AI>
 template <class... Args>
 Tuple<Span<Args>...> GenericGroupT<ID, AI>::GenericCommit(std::array<size_t, sizeof...(Args)> countLookup)
@@ -234,7 +249,7 @@ Tuple<Span<Args>...> GenericGroupT<ID, AI>::GenericCommit(std::array<size_t, siz
     constexpr size_t TypeCount = sizeof...(Args);
     if(isCommitted)
     {
-        MRAY_WARNING_LOG("{:s}:{:d} is in committed state, "
+        MRAY_WARNING_LOG("{:s}:{:d}: is in committed state, "
                          "you cannot re-commit!", this->Name(), groupId);
         return Tuple<Span<Args>...>{};
     }
@@ -259,7 +274,7 @@ Tuple<Span<Args>...> GenericGroupT<ID, AI>::GenericCommit(std::array<size_t, siz
     const auto& totalSize = offsets;
     if(std::reduce(totalSize.cbegin(), totalSize.cend()) == 0)
     {
-        MRAY_WARNING_LOG("{:s}:{:d} committing as empty, "
+        MRAY_WARNING_LOG("{:s}:{:d}: committing as empty, "
                          "is this correct?", this->Name(), groupId);
         isCommitted = true;
         return Tuple<Span<Args>...>{};
@@ -280,7 +295,7 @@ void GenericGroupT<ID, AI>::GenericPushData(const Span<T>& dAttributeRegion,
                                             TransientData data,
                                             const GPUQueue& deviceQueue) const
 {
-    auto range = itemRanges.at(id)[attribIndex];
+    auto range = FindRange(id)[attribIndex];
     size_t itemCount = range[1] - range[0];
     assert(data.Size<T>() == itemCount);
 
@@ -298,8 +313,8 @@ void GenericGroupT<ID, AI>::GenericPushData(const Span<T>& dAttributeRegion,
                                             TransientData data,
                                             const GPUQueue& deviceQueue) const
 {
-    auto rangeStart = itemRanges.at(idRange[0])[attribIndex];
-    auto rangeEnd   = itemRanges.at(idRange[1])[attribIndex];
+    auto rangeStart = FindRange(idRange[0])[attribIndex];
+    auto rangeEnd   = FindRange(idRange[1])[attribIndex];
     size_t itemCount = rangeEnd[1] - rangeStart[0];
     assert(data.Size<T>() == itemCount);
 
@@ -317,7 +332,7 @@ void GenericGroupT<ID, AI>::GenericPushData(const Span<T>& dAttributeRegion,
                                             TransientData data,
                                             const GPUQueue& deviceQueue) const
 {
-    auto range = itemRanges.at(id)[attribIndex];
+    auto range = FindRange(id)[attribIndex];
     size_t itemCount = subRange[1] - subRange[0];
     assert(data.Size<T>() <= itemCount);
 
@@ -345,7 +360,7 @@ GenericGroupT<ID, AI>::Reserve(const std::vector<AttributeCountList>& countArray
     assert(!countArrayList.empty());
     if(isCommitted)
     {
-        throw MRayError("{:s}:{:d} is in committed state, "
+        throw MRayError("{:s}:{:d}: is in committed state, "
                         "you cannot change reservations!",
                         this->Name(), groupId);
     }
@@ -389,12 +404,20 @@ GenericTexturedGroupT<I, A>::ConvertToView(std::vector<TextureId> texIds,
     result.reserve(texIds.size());
     for(const auto& texId : texIds)
     {
-        const GenericTextureView& view = globalTextureViews.at(texId);
+        auto optView = globalTextureViews.at(texId);
+        if(!optView)
+        {
+            throw MRayError("{:s}:{:d}: Given texture({:d}) is not found",
+                            this->Name(), this->groupId,
+                            static_cast<uint32_t>(texId));
+        }
+        const GenericTextureView& view = optView.value();
         if(!std::holds_alternative<ViewType>(view))
         {
-            MRAY_ERROR_LOG("{:s}:{:d} Given texture view does not have "
-                           "a correct type for, Attribute {:d}",
-                           this->Name(), this->groupId, attributeIndex);
+            throw MRayError("{:s}:{:d}: Given texture({:d}) does not have "
+                            "a correct type for, Attribute {:d}",
+                            this->Name(), this->groupId,
+                            static_cast<uint32_t>(texId), attributeIndex);
             return std::vector<Optional<TextureView<D, T>>>{};
         }
         result.push_back(std::get<ViewType>(view));
@@ -419,13 +442,21 @@ GenericTexturedGroupT<I, A>::ConvertToView(std::vector<Optional<TextureId>> texI
             result.push_back(std::nullopt);
             continue;
         }
-
-        const GenericTextureView& view = globalTextureViews.at(texId.value());
+        auto optView = globalTextureViews.at(texId.value());
+        if(!optView)
+        {
+            throw MRayError("{:s}:{:d}: Given texture({:d}) is not found",
+                            this->Name(), this->groupId,
+                            static_cast<uint32_t>(texId.value()));
+        }
+        const GenericTextureView& view = optView.value();
         if(!std::holds_alternative<ViewType>(view))
         {
-            MRAY_ERROR_LOG("{:s}: Given texture view does not have "
-                           "a correct type for, Attribute {:d}",
-                           this->Name(), attributeIndex);
+            throw MRayError("{:s}:{:d}: Given texture({:d}) does not have "
+                            "a correct type for, Attribute {:d}",
+                            this->Name(), this->groupId,
+                            static_cast<uint32_t>(texId.value()),
+                            attributeIndex);
             return std::vector<Optional<TextureView<D, T>>>{};
         }
         result.push_back(std::get<ViewType>(view));
@@ -459,8 +490,8 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<ParamVaryingData<
                                             attributeIndex);
 
     // Now we need to be careful
-    auto rangeStart = this->itemRanges.at(idStart.FetchIndexPortion())[attributeIndex];
-    auto rangeEnd = this->itemRanges.at(idEnd.FetchIndexPortion())[attributeIndex];
+    auto rangeStart = this->FindRange(idStart.FetchIndexPortion())[attributeIndex];
+    auto rangeEnd = this->FindRange(idEnd.FetchIndexPortion())[attributeIndex];
     size_t count = rangeEnd[1] - rangeStart[0];
     Span<ParamVaryingData<D, T>> dSubspan = dAttributeSpan.subspan(rangeStart[0], count);
 
@@ -499,8 +530,8 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<Optional<TextureV
                                             attributeIndex);
 
     // YOLO memcpy here! Hopefully it works
-    auto rangeStart = this->itemRanges.at(idStart.FetchIndexPortion())[attributeIndex];
-    auto rangeEnd = this->itemRanges.at(idEnd.FetchIndexPortion())[attributeIndex];
+    auto rangeStart = this->FindRange(idStart.FetchIndexPortion())[attributeIndex];
+    auto rangeEnd = this->FindRange(idEnd.FetchIndexPortion())[attributeIndex];
     size_t count = rangeEnd[1] - rangeStart[0];
     Span<Optional<TextureView<D, T>>> dSubspan = dAttributeSpan.subspan(rangeStart[0],
                                                                         count);
@@ -524,8 +555,8 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<TextureView<D, T>
                                          attributeIndex);
 
     // YOLO memcpy here! Hopefully it works
-    auto rangeStart = this->itemRanges.at(idStart.FetchIndexPortion())[attributeIndex];
-    auto rangeEnd = this->itemRanges.at(idEnd.FetchIndexPortion())[attributeIndex];
+    auto rangeStart = this->FindRange(idStart.FetchIndexPortion())[attributeIndex];
+    auto rangeEnd = this->FindRange(idEnd.FetchIndexPortion())[attributeIndex];
     size_t count = rangeEnd[1] - rangeStart[0];
     Span<TextureView<D, T>> dSubspan = dAttributeSpan.subspan(rangeStart[0],
                                                               count);

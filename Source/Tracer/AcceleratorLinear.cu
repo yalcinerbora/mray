@@ -201,10 +201,14 @@ void BaseAcceleratorLinear::CastRays(// Output
                 //....
                 Span<const RayIndex> dLocalIndices = ToConstSpan(dCurrentIndices.subspan(partitionStart,
                                                                                          localSize));
-
                 Span<const CommonKey> dLocalKeys = ToConstSpan(dCurrentKeys.subspan(partitionStart,
                                                                                     localSize));
-                AcceleratorGroupI* accelGroup = accelInstances.at(key.FetchBatchPortion());
+                auto accelGroupOpt = accelInstances.at(key.FetchBatchPortion());
+                if(!accelGroupOpt)
+                {
+                    throw MRayError("BaseAccelerator: Unknown accelerator key {}", key);
+                }
+                AcceleratorGroupI* accelGroup = accelGroupOpt.value().get();
                 accelGroup->CastLocalRays(// Output
                                           dHitIds,
                                           dHitParams,

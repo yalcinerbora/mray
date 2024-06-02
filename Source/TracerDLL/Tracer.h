@@ -7,19 +7,19 @@ class Tracer final : public TracerBase
     private:
     static TypeGeneratorPack GLOBAL_TYPE_GEN;
 
-    static void AddPrimGenerators(std::map<std::string_view, PrimGenerator>&);
-    static void AddTransformGenerators(std::map<std::string_view, TransGenerator>&);
-    static void AddLightGenerators(std::map<std::string_view, LightGenerator>&);
-    static void AddCamGenerators(std::map<std::string_view, CamGenerator>&);
-    static void AddMediumGenerators(std::map<std::string_view, MedGenerator>&);
-    static void AddMaterialGenerators(std::map<std::string_view, MatGenerator>&);
-    static void AddAccelGenerators(std::map<AcceleratorType, BaseAccelGenerator>&,
-                                   std::map<AcceleratorType, AccelGroupGenMap>&,
-                                   std::map<AcceleratorType, AccelWorkGenMap>&);
+    static void AddPrimGenerators(Map<std::string_view, PrimGenerator>&);
+    static void AddTransformGenerators(Map<std::string_view, TransGenerator>&);
+    static void AddLightGenerators(Map<std::string_view, LightGenerator>&);
+    static void AddCamGenerators(Map<std::string_view, CamGenerator>&);
+    static void AddMediumGenerators(Map<std::string_view, MedGenerator>&);
+    static void AddMaterialGenerators(Map<std::string_view, MatGenerator>&);
+    static void AddAccelGenerators(Map<AcceleratorType, BaseAccelGenerator>&,
+                                   Map<AcceleratorType, AccelGroupGenMap>&,
+                                   Map<AcceleratorType, AccelWorkGenMap>&);
 
     //
-    //static void AddRendererGenerators_1(std::map<std::string_view, PrimGenerator>&);
-    //static void AddRendererGenerators_2(std::map<std::string_view, PrimGenerator>&);
+    //static void AddRendererGenerators_1(Map<std::string_view, PrimGenerator>&);
+    //static void AddRendererGenerators_2(Map<std::string_view, PrimGenerator>&);
 
     public:
     Tracer(const TracerParameters& tracerParams);

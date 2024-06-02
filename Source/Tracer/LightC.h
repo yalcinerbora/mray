@@ -112,7 +112,8 @@ template <class Child>
 class GenericGroupLight : public GenericGroupLightT
 {
     protected:
-    std::map<LightId, PrimBatchId>  primMappings;
+    Map<LightId, PrimBatchId>  primMappings;
+
     public:
                         GenericGroupLight(uint32_t groupId, const GPUSystem&,
                                           const TextureViewMap&,
@@ -169,5 +170,12 @@ std::string_view GenericGroupLight<C>::Name() const
 template <class C>
 PrimBatchId GenericGroupLight<C>::LightPrimBatch(LightId lId) const
 {
-    return primMappings.at(lId);
+    auto pBatchId = primMappings.at(lId);
+    if(!pBatchId)
+    {
+        throw MRayError("{:s}:{:d}: Unkown light key {}",
+                        this->Name(), this->groupId,
+                        LightKey(static_cast<uint32_t>(lId)).FetchIndexPortion());
+    }
+    return pBatchId.value();
 }

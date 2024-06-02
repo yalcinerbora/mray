@@ -106,12 +106,12 @@ struct BaseAccelConstructParams
     using SurfPair = Pair<SurfaceId, SurfaceParams>;
     using LightSurfPair = Pair<LightSurfaceId, LightSurfaceParams>;
 
-    const TextureViewMap&                               texViewMap;
-    const std::map<PrimGroupId, PrimGroupPtr>&          primGroups;
-    const std::map<LightGroupId, LightGroupPtr>&        lightGroups;
-    const std::map<TransGroupId, TransformGroupPtr>&    transformGroups;
-    Span<const SurfPair>                                mSurfList;
-    Span<const LightSurfPair>                           lSurfList;
+    const TextureViewMap&                       texViewMap;
+    const Map<PrimGroupId, PrimGroupPtr>&       primGroups;
+    const Map<LightGroupId, LightGroupPtr>&     lightGroups;
+    const Map<TransGroupId, TransformGroupPtr>& transformGroups;
+    Span<const SurfPair>                        mSurfList;
+    Span<const LightSurfPair>                   lSurfList;
 };
 
 struct AccelGroupConstructParams
@@ -121,8 +121,8 @@ struct AccelGroupConstructParams
     using TGroupedSurfaces      = std::vector<Pair<TransGroupId, Span<const SurfPair>>>;
     using TGroupedLightSurfaces = std::vector<Pair<TransGroupId, Span<const LightSurfPair>>>;
 
-    const std::map<TransGroupId, TransformGroupPtr>* transformGroups;
-    const TextureViewMap*                            textureViews;
+    const Map<TransGroupId, TransformGroupPtr>* transformGroups;
+    const TextureViewMap*                       textureViews;
     const GenericGroupPrimitiveT*   primGroup;
     const GenericGroupLightT*       lightGroup;
     TGroupedSurfaces                tGroupSurfs;
@@ -193,14 +193,14 @@ struct LinearizedSurfaceData
 
 using AccelWorkGenerator = GeneratorFuncType<AcceleratorWorkI, AcceleratorGroupI&,
                                              GenericGroupTransformT&>;
-using AccelWorkGenMap = std::map<std::string_view, AccelWorkGenerator>;
+using AccelWorkGenMap = Map<std::string_view, AccelWorkGenerator>;
 
 using AccelGroupGenerator = GeneratorFuncType<AcceleratorGroupI, uint32_t,
                                               BS::thread_pool&, GPUSystem&,
                                               const GenericGroupPrimitiveT&,
                                               const AccelWorkGenMap&>;
 
-using AccelGroupGenMap = std::map<std::string_view, AccelGroupGenerator>;
+using AccelGroupGenMap = Map<std::string_view, AccelGroupGenerator>;
 
 
 // Generic find routine in an accelerator instance
@@ -247,9 +247,9 @@ class AcceleratorGroupT : public AcceleratorGroupI
     uint32_t                    instanceTypeCount  = 0;
 
     // Type Related
-    std::vector<uint32_t>               typeIds;
-    const AccelWorkGenMap&              accelWorkGenerators;
-    std::map<uint32_t, AccelWorkPtr>    workInstances;
+    std::vector<uint32_t>           typeIds;
+    const AccelWorkGenMap&          accelWorkGenerators;
+    Map<uint32_t, AccelWorkPtr>     workInstances;
 
     // Common functionality for ineriting types
     static uint32_t                 DetermineInstanceCount(const AccelGroupConstructParams& p);
@@ -338,12 +338,12 @@ class BaseAcceleratorT : public BaseAcceleratorI
     private:
     void PartitionSurfaces(std::vector<AccelGroupConstructParams>&,
                            Span<const typename BaseAccelConstructParams::SurfPair> surfList,
-                           const std::map<PrimGroupId, PrimGroupPtr>& primGroups,
-                           const std::map<TransGroupId, TransformGroupPtr>& transGroups,
+                           const Map<PrimGroupId, PrimGroupPtr>& primGroups,
+                           const Map<TransGroupId, TransformGroupPtr>& transGroups,
                            const TextureViewMap& textureViews);
     void AddLightSurfacesToPartitions(std::vector<AccelGroupConstructParams>& partitions,
                                       Span<const typename BaseAccelConstructParams::LightSurfPair> surfList,
-                                      const std::map<LightGroupId, LightGroupPtr>& lightGroups);
+                                      const Map<LightGroupId, LightGroupPtr>& lightGroups);
 
     protected:
     BS::thread_pool&    threadPool;
@@ -351,11 +351,11 @@ class BaseAcceleratorT : public BaseAcceleratorI
     uint32_t            idCounter           = 0;
     Vector2ui           maxBitsUsedOnKey    = Vector2ui::Zero();
     AABB3               sceneAABB;
-    const AccelGroupGenMap&                 accelGenerators;
-    const AccelWorkGenMap&                  workGenGlobalMap;
-    std::map<uint32_t, AccelGroupPtr>       generatedAccels;
-    std::map<uint32_t, AcceleratorGroupI*>  accelInstances;
-
+    //
+    const AccelGroupGenMap&             accelGenerators;
+    const AccelWorkGenMap&              workGenGlobalMap;
+    Map<uint32_t, AccelGroupPtr>        generatedAccels;
+    Map<uint32_t, AcceleratorGroupI*>   accelInstances;
 
     virtual AABB3       InternalConstruct(const std::vector<size_t>& instanceOffsets) = 0;
 
@@ -397,8 +397,8 @@ BaseAcceleratorT<C>::BaseAcceleratorT(BS::thread_pool& tp, GPUSystem& system,
 template <class C>
 void BaseAcceleratorT<C>::PartitionSurfaces(std::vector<AccelGroupConstructParams>& partitions,
                                             Span<const typename BaseAccelConstructParams::SurfPair> surfList,
-                                            const std::map<PrimGroupId, PrimGroupPtr>& primGroups,
-                                            const std::map<TransGroupId, TransformGroupPtr>& transGroups,
+                                            const Map<PrimGroupId, PrimGroupPtr>& primGroups,
+                                            const Map<TransGroupId, TransformGroupPtr>& transGroups,
                                             const TextureViewMap& textureViews)
 {
     using SurfParam = typename BaseAccelConstructParams::SurfPair;
@@ -430,7 +430,13 @@ void BaseAcceleratorT<C>::PartitionSurfaces(std::vector<AccelGroupConstructParam
         });
 
         partitions.emplace_back(AccelGroupConstructParams{});
-        partitions.back().primGroup = primGroups.at(PrimGroupId(pGroupId)).get();
+        auto pGroupOpt = primGroups.at(PrimGroupId(pGroupId));
+        if(!pGroupOpt)
+        {
+            throw MRayError("{:s}: Unable to find primitive group()",
+                            C::TypeName(), pGroupId);
+        }
+        partitions.back().primGroup = pGroupOpt.value().get().get();
         partitions.back().textureViews = &textureViews;
         partitions.back().transformGroups = &transGroups;
         auto innerStart = start;
@@ -456,7 +462,7 @@ void BaseAcceleratorT<C>::PartitionSurfaces(std::vector<AccelGroupConstructParam
 template <class C>
 void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<AccelGroupConstructParams>& partitions,
                                                        Span<const typename BaseAccelConstructParams::LightSurfPair> lSurfList,
-                                                       const std::map<LightGroupId, LightGroupPtr>& lightGroups)
+                                                       const Map<LightGroupId, LightGroupPtr>& lightGroups)
 {
     using LightSurfP = typename BaseAccelConstructParams::LightSurfPair;
     assert(std::is_sorted(lSurfList.begin(), lSurfList.end(),
@@ -484,7 +490,13 @@ void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<AccelGroupCon
 
         //
         auto groupId = LightGroupId(lGroupId);
-        const GenericGroupLightT* lGroup = lightGroups.at(groupId).get();
+        auto lGroupOpt = lightGroups.at(groupId);
+        if(!lGroupOpt)
+        {
+            throw MRayError("{:s}: Unable to find light group()",
+                            C::TypeName(), lGroupId);
+        }
+        const GenericGroupLightT* lGroup = lGroupOpt.value().get().get();
         const GenericGroupPrimitiveT* pGroup = &lGroup->GenericPrimGroup();
         auto slot = std::find_if(partitions.begin(), partitions.end(),
         [pGroup](const auto& partition)
@@ -545,10 +557,16 @@ void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
         std::string accelTypeName = CreateAcceleratorType(C::TypeName(),
                                                           partition.primGroup->Name());
         uint32_t aGroupId = idCounter++;
-        auto accelPtr = accelGenerators.at(accelTypeName)(std::move(aGroupId),
-                                                          threadPool, gpuSystem,
-                                                          *partition.primGroup,
-                                                          workGenGlobalMap);
+        auto accelGenerator = accelGenerators.at(accelTypeName);
+        if(!accelGenerator)
+        {
+            throw MRayError("{:s}: Unable to find generator for accelerator group \"{:s}\"",
+                            C::TypeName(), accelTypeName);
+        }
+        auto accelPtr = accelGenerator.value()(std::move(aGroupId),
+                                               threadPool, gpuSystem,
+                                               *partition.primGroup,
+                                               workGenGlobalMap);
         auto loc = generatedAccels.emplace(aGroupId, std::move(accelPtr));
         AcceleratorGroupI* acc = loc.first->second.get();
         acc->Construct(std::move(partition), queue);
@@ -824,7 +842,13 @@ LinearizedSurfaceData AcceleratorGroupT<PG>::LinearizeSurfaceData(const AccelGro
         {
             if(surf.alphaMaps[i].has_value())
             {
-                const GenericTextureView& view = p.textureViews->at(surf.alphaMaps[i].value());
+                auto optView = p.textureViews->at(surf.alphaMaps[i].value());
+                if(!optView)
+                {
+                    throw MRayError("Accelerator: Alpha map texture({:d}) is not found",
+                                    static_cast<uint32_t>(surf.alphaMaps[i].value()));
+                }
+                const GenericTextureView& view = optView.value();
                 assert(std::holds_alternative<AlphaMap>(view));
                 result.alphaMaps.back()[i] = std::get<AlphaMap>(view);
             }
