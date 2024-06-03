@@ -11,76 +11,80 @@
 // Add as you need
 namespace mray::cuda::algorithms
 {
-    template <bool IsAscending, class K, class V>
-    MRAY_HOST
-    size_t RadixSortTMSize(size_t elementCount);
 
-    template <bool IsAscending, class K, class V>
-    MRAY_HOST
-    uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
-                       Span<Span<V>, 2> dValueDoubleBuffer,
-                       Span<Byte> dTempMemory,
-                       const GPUQueueCUDA& queue,
-                       const Vector2ui& bitRange = Vector2ui(0, sizeof(K) * CHAR_BIT));
+template <bool IsAscending, class K, class V>
+MRAY_HOST
+size_t RadixSortTMSize(size_t elementCount);
+
+template <bool IsAscending, class K, class V>
+MRAY_HOST
+uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
+                    Span<Span<V>, 2> dValueDoubleBuffer,
+                    Span<Byte> dTempMemory,
+                    const GPUQueueCUDA& queue,
+                    const Vector2ui& bitRange = Vector2ui(0, sizeof(K) * CHAR_BIT));
+
 }
 
 namespace mray::cuda::algorithms
 {
-    template <bool IsAscending, class K, class V>
-    MRAY_HOST inline
-    size_t RadixSortTMSize(size_t elementCount)
-    {
-        using namespace cub;
 
-        cub::DoubleBuffer<K> keys(nullptr, nullptr);
-        cub::DoubleBuffer<V> values(nullptr, nullptr);
-        void* dTM = nullptr;
-        size_t result;
-        if constexpr(IsAscending)
-            CUDA_CHECK(DeviceRadixSort::SortPairs(dTM, result, keys,
-                                                  values, elementCount));
-        else
-            CUDA_CHECK(DeviceRadixSort::SortPairsDescending(dTM, result, keys,
-                                                            values, elementCount));
-        return result;
-    }
+template <bool IsAscending, class K, class V>
+MRAY_HOST inline
+size_t RadixSortTMSize(size_t elementCount)
+{
+    using namespace cub;
 
-    template <bool IsAscending, class K, class V>
-    MRAY_HOST inline
-    uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
-                       Span<Span<V>, 2> dValueDoubleBuffer,
-                       Span<Byte> dTempMemory,
-                       const GPUQueueCUDA& queue,
-                       const Vector2ui& bitRange)
-    {
-        using namespace cub;
-        using namespace std::literals;
-        static const NVTXKernelName kernelName = NVTXKernelName(queue.ProfilerDomain(), "KCRadixSort"sv);
-        NVTXAnnotate annotate = kernelName.Annotate();
+    cub::DoubleBuffer<K> keys(nullptr, nullptr);
+    cub::DoubleBuffer<V> values(nullptr, nullptr);
+    void* dTM = nullptr;
+    size_t result;
+    if constexpr(IsAscending)
+        CUDA_CHECK(DeviceRadixSort::SortPairs(dTM, result, keys,
+                                              values, elementCount));
+    else
+        CUDA_CHECK(DeviceRadixSort::SortPairsDescending(dTM, result, keys,
+                                                        values, elementCount));
+    return result;
+}
 
-        assert(dKeyDoubleBuffer[0].size() == dKeyDoubleBuffer[1].size());
-        assert(dValueDoubleBuffer[0].size() == dValueDoubleBuffer[1].size());
-        assert(dKeyDoubleBuffer[0].size() == dValueDoubleBuffer[0].size());
+template <bool IsAscending, class K, class V>
+MRAY_HOST inline
+uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
+                    Span<Span<V>, 2> dValueDoubleBuffer,
+                    Span<Byte> dTempMemory,
+                    const GPUQueueCUDA& queue,
+                    const Vector2ui& bitRange)
+{
+    using namespace cub;
+    using namespace std::literals;
+    static const NVTXKernelName kernelName = NVTXKernelName(queue.ProfilerDomain(), "KCRadixSort"sv);
+    NVTXAnnotate annotate = kernelName.Annotate();
 
-        DoubleBuffer<K> keys(dKeyDoubleBuffer[0].data(),
-                             dKeyDoubleBuffer[1].data());
-        DoubleBuffer<V> values(dValueDoubleBuffer[0].data(),
-                               dValueDoubleBuffer[1].data());
+    assert(dKeyDoubleBuffer[0].size() == dKeyDoubleBuffer[1].size());
+    assert(dValueDoubleBuffer[0].size() == dValueDoubleBuffer[1].size());
+    assert(dKeyDoubleBuffer[0].size() == dValueDoubleBuffer[0].size());
 
-        size_t size = dTempMemory.size();
-        if constexpr(IsAscending)
-            CUDA_CHECK(DeviceRadixSort::SortPairs(dTempMemory.data(), size, keys, values,
-                                                  dKeyDoubleBuffer[0].size(),
-                                                  bitRange[0],
-                                                  bitRange[1],
-                                                  ToHandleCUDA(queue)));
-        else
-            CUDA_CHECK(DeviceRadixSort::SortPairsDescending(dTempMemory.data(), size, keys, values,
-                                                            dKeyDoubleBuffer[0].size(),
-                                                            bitRange[0],
-                                                            bitRange[1],
-                                                            ToHandleCUDA(queue)));
+    DoubleBuffer<K> keys(dKeyDoubleBuffer[0].data(),
+                            dKeyDoubleBuffer[1].data());
+    DoubleBuffer<V> values(dValueDoubleBuffer[0].data(),
+                            dValueDoubleBuffer[1].data());
 
-        return (keys.Current() == dKeyDoubleBuffer[0].data()) ? 0 : 1;
-    }
+    size_t size = dTempMemory.size();
+    if constexpr(IsAscending)
+        CUDA_CHECK(DeviceRadixSort::SortPairs(dTempMemory.data(), size, keys, values,
+                                              dKeyDoubleBuffer[0].size(),
+                                              bitRange[0],
+                                              bitRange[1],
+                                              ToHandleCUDA(queue)));
+    else
+        CUDA_CHECK(DeviceRadixSort::SortPairsDescending(dTempMemory.data(), size, keys, values,
+                                                        dKeyDoubleBuffer[0].size(),
+                                                        bitRange[0],
+                                                        bitRange[1],
+                                                        ToHandleCUDA(queue)));
+
+    return (keys.Current() == dKeyDoubleBuffer[0].data()) ? 0 : 1;
+}
+
 }

@@ -100,11 +100,16 @@ class AcceleratorGroupLinear final : public AcceleratorGroupT<PrimitiveGroupType
     Span<CullFaceFlagArray>     dCullFaceFlags;
     Span<AlphaMapArray>         dAlphaMaps;
     Span<LightOrMatKeyArray>    dLightOrMatKeys;
-    Span<PrimRangeArray>        dPrimitiveRanges;
     Span<TransformKey>          dTransformKeys;
+    // These are duplicated since we will have only 8 prim batch per instance
+    Span<PrimRangeArray>        dPrimitiveRanges;
+    // These are not-duplicated, Instances have copy of the spans.
+    // spans may be the same
     Span<Span<PrimitiveKey>>    dLeafs;
-    // Global data, all accelerator leafs in
+    // Global data, all accelerator leafs are in here
     Span<PrimitiveKey>          dAllLeafs;
+
+    std::vector<Vector2ui>      hWorkInstanceRanges;
 
     public:
     // Constructors & Destructor
@@ -114,8 +119,9 @@ class AcceleratorGroupLinear final : public AcceleratorGroupT<PrimitiveGroupType
                                        const AccelWorkGenMap&);
     //
     void        Construct(AccelGroupConstructParams, const GPUQueue&) override;
-    void        WriteInstanceKeysAndAABBs(Span<AABB3> aabbWriteRegion,
-                                          Span<AcceleratorKey> keyWriteRegion) const override;
+    void        WriteInstanceKeysAndAABBs(Span<AABB3> dAABBWriteRegion,
+                                          Span<AcceleratorKey> dKeyWriteRegion,
+                                          const GPUQueue&) const override;
 
     // Functionality
     void        CastLocalRays(// Output

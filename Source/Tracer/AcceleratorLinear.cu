@@ -41,15 +41,6 @@ void KCIntersectBaseLinear(// Output
     }
 }
 
-struct UnionAABB3
-{
-    MRAY_GPU MRAY_GPU_INLINE
-    AABB3 operator()(const AABB3& l, const AABB3& r) const
-    {
-        return l.Union(r);
-    }
-};
-
 std::string_view BaseAcceleratorLinear::TypeName()
 {
     using namespace TypeNameGen::CompTime;
@@ -60,7 +51,7 @@ std::string_view BaseAcceleratorLinear::TypeName()
 
 AABB3 BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instanceOffsets)
 {
-    assert(instanceOffsets.size() == generatedAccels.size());
+    assert(instanceOffsets.size() == (generatedAccels.size() + 1));
 
     // Allocate
     size_t instanceCount = instanceOffsets.back();
@@ -69,6 +60,7 @@ AABB3 BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instan
                                 {instanceCount, instanceCount});
     // Write leafs and transformed aabbs to the array
     size_t i = 0;
+    GPUQueueIteratorRoundRobin qIt(gpuSystem);
     for(const auto& accGroup : generatedAccels)
     {
         AcceleratorGroupI* aGroup = accGroup.second.get();
@@ -76,8 +68,9 @@ AABB3 BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instan
         auto aabbRegion = dAABBs.subspan(instanceOffsets[i],
                                          localCount);
         auto leafRegions = dLeafs.subspan(instanceOffsets[i], localCount);
-        aGroup->WriteInstanceKeysAndAABBs(dAABBs, dLeafs);
+        aGroup->WriteInstanceKeysAndAABBs(dAABBs, dLeafs, qIt.Queue());
         i++;
+        qIt.Next();
     }
 
     // Reduce the given AABBs
@@ -92,7 +85,7 @@ AABB3 BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instan
     DeviceAlgorithms::Reduce(Span<AABB3,1>(dReducedAABB), dTemp,
                              ToConstSpan(dAABBs),
                              AABB3::Negative(),
-                             queue, UnionAABB3());
+                             queue, UnionAABB3Functor());
 
     AABB3 hAABB;
     queue.MemcpyAsync(Span<AABB3>(&hAABB, 1), ToConstSpan(dReducedAABB));

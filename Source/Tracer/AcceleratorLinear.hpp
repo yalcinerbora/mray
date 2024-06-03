@@ -164,23 +164,7 @@ template<PrimitiveGroupC PG>
 void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
                                            const GPUQueue& queue)
 {
-    assert(&this->pg == p.primGroup);
-    // Instance Types (determined by transform type)
-    this->instanceTypeCount = this->DetermineInstanceTypeCount(p);
-    this->typeIds.resize(this->instanceTypeCount);
-    std::iota(this->typeIds.begin(), this->typeIds.end(), 0);
-    // Total instance count (equavilently total surface count)
-    this->instanceCount = this->DetermineInstanceCount(p);
-    auto linSurfData = this->LinearizeSurfaceData(p, this->instanceCount, this->pg);
-    // Find out the concerete accel count and offsets
-    auto leafResult = this->DetermineConcereteAccelCount(std::move(linSurfData.instancePrimBatches),
-                                                         std::move(linSurfData.primRanges));
-    this->concreteAccelCount = static_cast<uint32_t>(leafResult.concereteAccelIndices.size());
-
-    // Generate offset spans
-    using PrimKeySpanList = std::vector<Span<PrimitiveKey>>;
-    PrimKeySpanList hInstanceLeafs = this->CreateLeafSubspans(dAllLeafs,
-                                                              leafResult.perInstanceLeafRanges);
+    LinearizedSurfaceData linearizedData = this->PreprocessConstructionParams(p);
 
     // Copy these host vectors to GPU
     // For linear accelerator we only need these at GPU memory
@@ -193,17 +177,22 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
                                          dLeafs,
                                          dAllLeafs),
                                 mem,
-                                {this->instanceCount, this->instanceCount,
-                                 this->instanceCount, this->instanceCount,
-                                 this->instanceCount, this->instanceCount,
-                                 leafResult.totalLeafCount});
+                                {this->InstanceCount(), this->InstanceCount(),
+                                 this->InstanceCount(), this->InstanceCount(),
+                                 this->InstanceCount(), this->InstanceCount(),
+                                 this->concreteLeafRanges.back()[1]});
+
+    // Generate offset spans
+    using PrimKeySpanList = std::vector<Span<PrimitiveKey>>;
+    PrimKeySpanList hInstanceLeafs = this->CreateLeafSubspans(dAllLeafs,
+                                                              this->instanceLeafRanges);
 
     // Actual memcpy
-    Span<CullFaceFlagArray>     hSpanCullFaceFlags(linSurfData.cullFaceFlags);
-    Span<AlphaMapArray>         hSpanAlphaMaps(linSurfData.alphaMaps);
-    Span<LightOrMatKeyArray>    hSpanLMKeys(linSurfData.lightOrMatKeys);
-    Span<PrimRangeArray>        hSpanPrimitiveRanges(linSurfData.primRanges);
-    Span<TransformKey>          hSpanTransformKeys(linSurfData.transformKeys);
+    Span<CullFaceFlagArray>     hSpanCullFaceFlags(linearizedData.cullFaceFlags);
+    Span<AlphaMapArray>         hSpanAlphaMaps(linearizedData.alphaMaps);
+    Span<LightOrMatKeyArray>    hSpanLMKeys(linearizedData.lightOrMatKeys);
+    Span<PrimRangeArray>        hSpanPrimitiveRanges(linearizedData.primRanges);
+    Span<TransformKey>          hSpanTransformKeys(linearizedData.transformKeys);
     Span<Span<PrimitiveKey>>    hSpanLeafs(hInstanceLeafs);
     queue.MemcpyAsync(dCullFaceFlags,   ToConstSpan(hSpanCullFaceFlags));
     queue.MemcpyAsync(dAlphaMaps,       ToConstSpan(hSpanAlphaMaps));
@@ -213,7 +202,7 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
     queue.MemcpyAsync(dLeafs,           ToConstSpan(hSpanLeafs));
 
     //Instantiate X
-
+    //
 }
 
 template<PrimitiveGroupC PG>
@@ -231,9 +220,28 @@ size_t AcceleratorGroupLinear<PG>::GPUMemoryUsage() const
 
 template<PrimitiveGroupC PG>
 void AcceleratorGroupLinear<PG>::WriteInstanceKeysAndAABBs(Span<AABB3> aabbWriteRegion,
-                                                           Span<AcceleratorKey> keyWriteRegion) const
+                                                           Span<AcceleratorKey> keyWriteRegion,
+                                                           const GPUQueue& queue) const
 {
+    //
+    using enum PrimTransformType;
+    if constexpr(PG::TransformLogic == PER_PRIMITIVE_TRANSFORM)
+    {
+        //for()
+        //{
 
+        //}
+
+    }
+    else
+    {
+
+    }
+
+    //for()
+    //DeviceAlgorithms::TransformReduceTMSize<AABB3, PrimitiveKey>(..);
+
+    //dLeafs
 
 }
 

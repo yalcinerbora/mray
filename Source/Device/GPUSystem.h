@@ -95,6 +95,41 @@ static_assert(DeviceLocalMemC<DeviceLocalMemory>,
               "Device local memory does not satisfy its concept!");
 
 
+class GPUQueueIteratorRoundRobin
+{
+    private:
+    const GPUSystem&    gpuSystem;
+    Vector2ui           indices = Vector2ui::Zero();
+
+    public:
+                        GPUQueueIteratorRoundRobin(const GPUSystem& s);
+    const GPUQueue&     Queue() const;
+    void                Next();
+};
+
+inline GPUQueueIteratorRoundRobin::GPUQueueIteratorRoundRobin(const GPUSystem& s)
+    : gpuSystem(s)
+{}
+
+inline const GPUQueue& GPUQueueIteratorRoundRobin::Queue() const
+{
+    return gpuSystem.AllGPUs()[indices[0]]->GetQueue(indices[1]);
+}
+
+inline void GPUQueueIteratorRoundRobin::Next()
+{
+    indices[1]++;
+    if(indices[1] == QueuePerDevice)
+    {
+        indices[1] = 0;
+        indices[0]++;
+        if(indices[0] == gpuSystem.AllGPUs().size())
+        {
+            indices[0] = 0;
+        }
+    }
+}
+
 namespace DeviceDebug
 {
 

@@ -326,6 +326,7 @@ class GPUSystemCUDA
     GPUThreadInitFunction   GetThreadInitFunction() const;
 };
 
+
 MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t KernelCallParamsCUDA::GlobalId() const
 {

@@ -44,12 +44,16 @@
     template<uint32_t D, class T>
     using Texture = mray::cuda::TextureCUDA<D, T>;
 
+
+
 //#elif defined MRAY_GPU_BACKEND_SYCL
 //    // TODO:
 //    //#include "GPUSystemSycl.h"
 #else
     #error Please define a GPU Backend!
 #endif
+
+class GPUQueueIteratorRoundRobin;
 
 namespace DeviceDebug
 {
