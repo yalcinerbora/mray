@@ -480,9 +480,9 @@ void PrimGroupEmpty::PushAttribute(PrimBatchKey, PrimBatchKey,
 {}
 
 inline
-void PrimGroupEmpty::CopyPrimIds(Span<PrimitiveKey> dOutLocation,
-                                    PrimBatchId primBatchId,
-                                    const GPUQueue& queue) const
+void PrimGroupEmpty::CopyPrimIds(Span<PrimitiveKey>,
+                                 PrimBatchId,
+                                 const GPUQueue&) const
 {}
 
 inline

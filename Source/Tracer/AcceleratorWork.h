@@ -1,3 +1,5 @@
+#pragma once
+
 #include "AcceleratorC.h"
 #include "TransformC.h"
 #include "PrimitiveC.h"
@@ -11,6 +13,7 @@ template<AccelGroupC AG, TransformGroupC TG>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static void KCLocalRayCast(// Output
                            MRAY_GRID_CONSTANT const Span<HitKeyPack> dHitIds,
+                           MRAY_GRID_CONSTANT const Span<MetaHit> dHitParams,
                            // I-O
                            MRAY_GRID_CONSTANT const Span<BackupRNGState> rngStates,
                            MRAY_GRID_CONSTANT const Span<RayGMem> dRays,
@@ -47,7 +50,8 @@ static void KCLocalRayCast(// Output
             // we can transform the ray and use it on iterations
             // Compile-time find the transform generator function and return type
             static constexpr
-                auto TContextGen = AcquireTransformContextGenerator<PG, TG>();
+            auto TContextGen = AcquireTransformContextGenerator<PG, TG>();
+
             constexpr auto TGenFunc = decltype(TContextGen)::Function;
             // Define the types
             // First, this kernel uses a transform context
@@ -62,26 +66,30 @@ static void KCLocalRayCast(// Output
         }
 
         // Actual ray cast!
-        OptionalHitR<PG> hit = acc.ClosestHit(rng, ray, tMM);
-        if(!hit) continue;
+        OptionalHitR<PG> hitOpt = acc.ClosestHit(rng, ray, tMM);
+        if(!hitOpt) continue;
 
+        const auto& hit = hitOpt.value();
         dHitIds[i] = HitKeyPack
         {
-            .primKey = hit.value().primitiveKey,
-            .lightOrMatKey = hit.value().lmKey,
+            .primKey = hit.primitiveKey,
+            .lightOrMatKey = hit.lmKey,
             .transKey = acc.TransformKey(),
             .accelKey = aId
         };
-        UpdateTMax(dRays, index, hit.value().t);
+        UpdateTMax(dRays, index, hit.t);
+        dHitParams[i] = hit.hit;
     }
 };
 
 class AcceleratorWorkI
 {
-    private:
-    protected:
+    public:
+    virtual         ~AcceleratorWorkI() = default;
+
     virtual void    CastLocalRays(// Output
                                   Span<HitKeyPack> dHitKeys,
+                                  Span<MetaHit> dHitParams,
                                   // I-O
                                   Span<BackupRNGState> rngStates,
                                   Span<RayGMem> dRays,
@@ -90,8 +98,6 @@ class AcceleratorWorkI
                                   Span<const CommonKey> dAccelIdPacks,
                                   // Constants
                                   const GPUQueue& queue) const = 0;
-    public:
-    virtual         ~AcceleratorWorkI() = default;
 };
 
 template<AccelGroupC AcceleratorGroupType,
@@ -117,6 +123,7 @@ class AcceleratorWork : public AcceleratorWorkI
     // Cast Local rays
     void CastLocalRays(// Output
                        Span<HitKeyPack> dHitKeys,
+                       Span<MetaHit> dHitParams,
                        // I-O
                        Span<BackupRNGState> rngStates,
                        Span<RayGMem> dRays,
@@ -139,6 +146,7 @@ AcceleratorWork<AG, TG>::AcceleratorWork(const AcceleratorGroupI& ag,
 template<AccelGroupC AG, TransformGroupC TG>
 void AcceleratorWork<AG, TG>::CastLocalRays(// Output
                                             Span<HitKeyPack> dHitIds,
+                                            Span<MetaHit> dHitParams,
                                             // I-O
                                             Span<BackupRNGState> rngStates,
                                             Span<RayGMem> dRays,
@@ -160,6 +168,7 @@ void AcceleratorWork<AG, TG>::CastLocalRays(// Output
         KernelIssueParams{.workCount = static_cast<uint32_t>(dRays.size())},
         //
         dHitIds,
+        dHitParams,
         rngStates,
         dRays,
         dRayIndices,

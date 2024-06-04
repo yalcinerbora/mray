@@ -6,6 +6,8 @@
 
 #include <cub/device/device_partition.cuh>
 
+#include <cub/device/device_select.cuh>
+
 // Direct wrappers over CUB at the moment
 // Probably be refactored later
 // Add as you need

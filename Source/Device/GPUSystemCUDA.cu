@@ -76,7 +76,7 @@ GPUDeviceCUDA::GPUDeviceCUDA(int deviceId, nvtxDomainHandle_t domain)
     CUDA_CHECK(cudaSetDevice(deviceId));
     for(uint32_t i = 0; i < QueuePerDevice; i++)
     {
-        queues.emplace_back(props.multiProcessorCount, domain);
+        queues.emplace_back(props.multiProcessorCount, domain, this);
     }
 }
 

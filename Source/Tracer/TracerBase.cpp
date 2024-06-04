@@ -133,7 +133,7 @@ PrimAttributeInfoList TracerBase::AttributeInfo(PrimGroupId id) const
     auto val = primGroups.at(id);
     if(!val)
     {
-        throw MRayError("Unable to find PrimitiveGroups({})",
+        throw MRayError("Unable to find PrimitiveGroup({})",
                         static_cast<uint32_t>(id));
     }
     return val.value().get()->AttributeInfo();

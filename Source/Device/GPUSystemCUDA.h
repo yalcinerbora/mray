@@ -111,11 +111,10 @@ class GPUQueueCUDA
     friend cudaStream_t ToHandleCUDA(const GPUQueueCUDA&);
 
     private:
-    cudaStream_t        stream;
-    uint32_t            multiprocessorCount;
-    nvtxDomainHandle_t  nvtxDomain;
-
-
+    cudaStream_t            stream;
+    uint32_t                multiprocessorCount;
+    nvtxDomainHandle_t      nvtxDomain;
+    const GPUDeviceCUDA*    myDevice = nullptr;
 
     MRAY_HYBRID
     uint32_t            DetermineGridStrideBlock(const void* kernelPtr,
@@ -125,9 +124,12 @@ class GPUQueueCUDA
 
     public:
     // Constructors & Destructor
-    MRAY_HYBRID                 GPUQueueCUDA(uint32_t multiprocessorCount,
+    MRAY_HOST                   GPUQueueCUDA(uint32_t multiprocessorCount,
                                              nvtxDomainHandle_t domain,
-                                             DeviceQueueType t = DeviceQueueType::NORMAL);
+                                             const GPUDeviceCUDA* device);
+    MRAY_GPU                    GPUQueueCUDA(uint32_t multiprocessorCount,
+                                             nvtxDomainHandle_t domain,
+                                             DeviceQueueType t);
                                 GPUQueueCUDA(const GPUQueueCUDA&) = delete;
     MRAY_HYBRID                 GPUQueueCUDA(GPUQueueCUDA&&) noexcept;
     GPUQueueCUDA&               operator=(const GPUQueueCUDA&) = delete;
@@ -232,7 +234,10 @@ class GPUQueueCUDA
                                                    uint32_t threadsPerBlock,
                                                    uint32_t sharedMemSize);
 
-    nvtxDomainHandle_t  ProfilerDomain() const;
+    MRAY_HOST
+    nvtxDomainHandle_t      ProfilerDomain() const;
+    MRAY_HOST
+    const GPUDeviceCUDA*    Device() const;
 };
 
 class GPUDeviceCUDA
@@ -383,25 +388,34 @@ void GPUFenceCUDA::Wait() const
     #endif
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_HOST inline
+GPUQueueCUDA::GPUQueueCUDA(uint32_t multiprocessorCount,
+                           nvtxDomainHandle_t domain,
+                           const GPUDeviceCUDA* device)
+    : multiprocessorCount(multiprocessorCount)
+    , nvtxDomain(domain)
+    , myDevice(device)
+{
+    CUDA_CHECK(cudaStreamCreateWithFlags(&stream,
+                                         cudaStreamNonBlocking));
+}
+
+MRAY_GPU MRAY_GPU_INLINE
 GPUQueueCUDA::GPUQueueCUDA(uint32_t multiprocessorCount,
                            nvtxDomainHandle_t domain,
                            DeviceQueueType t)
     : multiprocessorCount(multiprocessorCount)
     , nvtxDomain(domain)
+    , myDevice(nullptr)
 {
-
     switch(t)
     {
         case DeviceQueueType::NORMAL:
             CUDA_CHECK(cudaStreamCreateWithFlags(&stream,
                                                  cudaStreamNonBlocking));
             break;
-        default:
-            assert(false);
-            break;
 
-        // Only valid on device
+        // These are semantically valid only on device
         #ifdef __CUDA_ARCH__
             case DeviceQueueType::FIRE_AND_FORGET:
                 stream = cudaStreamFireAndForget;
@@ -409,6 +423,7 @@ GPUQueueCUDA::GPUQueueCUDA(uint32_t multiprocessorCount,
             case DeviceQueueType::TAIL_LAUNCH:
                 stream = cudaStreamTailLaunch;
                 break;
+            default: __trap(); break;
         #endif
     }
 }

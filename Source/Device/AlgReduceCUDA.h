@@ -67,14 +67,14 @@ size_t TransformReduceTMSize(size_t elementCount)
     using namespace cub;
 
     auto TFunc = [] MRAY_HYBRID(InT) -> OutT{ return OutT{}; };
-    using TransIt = cub::TransformInputIterator<InT, decltype(TFunc), OutT*>;
+    using TransIt = cub::TransformInputIterator<OutT, decltype(TFunc), InT*>;
     TransIt dIn = TransIt(nullptr, TFunc);
     OutT* dOut = nullptr;
     void* dTM = nullptr;
     size_t result;
     CUDA_CHECK(DeviceReduce::Reduce(dTM, result, dIn, dOut,
                                     static_cast<int>(elementCount),
-                                    [] MRAY_HYBRID(OutT, OutT)-> OutT{ return OutT{}; },
+                                    [] MRAY_HYBRID(OutT, OutT)-> OutT { return OutT{}; },
                                     OutT{}));
     return result;
 }
@@ -117,7 +117,7 @@ void TransformReduce(Span<OutT, 1> dReducedValue,
                                                             "KCTransformReduce"sv);
     NVTXAnnotate annotate = kernelName.Annotate();
 
-    using TransIt = cub::TransformInputIterator<InT, TransformOp, OutT*>;
+    using TransIt = cub::TransformInputIterator<OutT, TransformOp, InT*>;
     TransIt dIn = TransIt(dValues.data(), std::forward<TransformOp>(transformOp));
 
     size_t size = dTempMemory.size();

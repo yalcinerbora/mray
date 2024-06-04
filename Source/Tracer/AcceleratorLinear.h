@@ -4,6 +4,8 @@
 #include <bitset>
 
 #include "Core/Types.h"
+#include "Core/MemAlloc.h"
+#include "Core/AABB.h"
 
 #include "Device/GPUSystemForward.h"
 
@@ -80,8 +82,10 @@ namespace LinearAccelDetail
 }
 
 template<PrimitiveGroupC PrimitiveGroupType>
-class AcceleratorGroupLinear final : public AcceleratorGroupT<PrimitiveGroupType>
+class AcceleratorGroupLinear final : public AcceleratorGroupT<AcceleratorGroupLinear<PrimitiveGroupType>, PrimitiveGroupType>
 {
+    using Base = AcceleratorGroupT<AcceleratorGroupLinear<PrimitiveGroupType>, PrimitiveGroupType>;
+
     public:
     static std::string_view TypeName();
 
@@ -127,15 +131,14 @@ class AcceleratorGroupLinear final : public AcceleratorGroupT<PrimitiveGroupType
     void        CastLocalRays(// Output
                               Span<HitKeyPack> dHitIds,
                               Span<MetaHit> dHitParams,
-                              Span<SurfaceWorkKey> dWorkKeys,
                               // I-O
                               Span<BackupRNGState> rngStates,
+                              Span<RayGMem> dRays,
                               // Input
-                              Span<const RayGMem> dRays,
                               Span<const RayIndex> dRayIndices,
                               Span<const CommonKey> dAccelKeys,
                               // Constants
-                              uint32_t instanceId,
+                              uint32_t workId,
                               const GPUQueue& queue) override;
 
     DataSoA     SoA() const;
@@ -171,14 +174,11 @@ class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinea
     void    CastRays(// Output
                      Span<HitKeyPack> dHitIds,
                      Span<MetaHit> dHitParams,
-                     Span<SurfaceWorkKey> dWorkKeys,
                      // I-O
                      Span<BackupRNGState> rngStates,
+                     Span<RayGMem> dRays,
                      // Input
-                     Span<const RayGMem> dRays,
-                     Span<const RayIndex> dRayIndices,
-                     // Constants
-                     const GPUSystem& s) override;
+                     Span<const RayIndex> dRayIndices) override;
 
     void    CastShadowRays(// Output
                            Bitspan<uint32_t> dIsVisibleBuffer,
@@ -187,9 +187,7 @@ class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinea
                            Span<BackupRNGState> rngStates,
                            // Input
                            Span<const RayIndex> dRayIndices,
-                           Span<const RayGMem> dShadowRays,
-                           // Constants
-                           const GPUSystem& s) override;
+                           Span<const RayGMem> dShadowRays) override;
 
     void    CastLocalRays(// Output
                           Span<HitKeyPack> dHitIds,
@@ -199,9 +197,7 @@ class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinea
                           // Input
                           Span<const RayGMem> dRays,
                           Span<const RayIndex> dRayIndices,
-                          Span<const AcceleratorKey> dAccelIdPacks,
-                          // Constants
-                          const GPUSystem& s) override;
+                          Span<const AcceleratorKey> dAccelIdPacks) override;
 
     void    AllocateForTraversal(size_t maxRayCount) override;
     size_t  GPUMemoryUsage() const override;

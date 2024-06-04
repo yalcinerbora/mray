@@ -113,14 +113,11 @@ void BaseAcceleratorLinear::AllocateForTraversal(size_t maxRayCount)
 void BaseAcceleratorLinear::CastRays(// Output
                                      Span<HitKeyPack> dHitIds,
                                      Span<MetaHit> dHitParams,
-                                     Span<SurfaceWorkKey> dWorkKeys,
                                      // I-O
                                      Span<BackupRNGState> rngStates,
+                                     Span<RayGMem> dRays,
                                      // Input
-                                     Span<const RayGMem> dRays,
-                                     Span<const RayIndex> dRayIndices,
-                                     // Constants
-                                     const GPUSystem& s)
+                                     Span<const RayIndex> dRayIndices)
 {
     using namespace std::string_view_literals;
     const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
@@ -142,7 +139,7 @@ void BaseAcceleratorLinear::CastRays(// Output
         queue.IssueSaturatingKernel<KCIntersectBaseLinear>
         (
             "(A)LinearRayCast"sv,
-            KernelIssueParams{.workCount = 0},
+            KernelIssueParams{.workCount = static_cast<uint32_t>(dRayIndices.size())},
             // Output
             dCurrentKeys,
             // I-O
@@ -205,7 +202,6 @@ void BaseAcceleratorLinear::CastRays(// Output
                 accelGroup->CastLocalRays(// Output
                                           dHitIds,
                                           dHitParams,
-                                          dWorkKeys,
                                           // I-O
                                           rngStates,
                                           //
@@ -227,9 +223,7 @@ void BaseAcceleratorLinear::CastShadowRays(// Output
                                            Span<BackupRNGState> rngStates,
                                            // Input
                                            Span<const RayIndex> dRayIndices,
-                                           Span<const RayGMem> dShadowRays,
-                                           // Constants
-                                           const GPUSystem& s)
+                                           Span<const RayGMem> dShadowRays)
 {
 
 }
@@ -242,9 +236,7 @@ void BaseAcceleratorLinear::CastLocalRays(// Output
                                           // Input
                                           Span<const RayGMem> dRays,
                                           Span<const RayIndex> dRayIndices,
-                                          Span<const AcceleratorKey> dAccelIdPacks,
-                                          // Constants
-                                          const GPUSystem& s)
+                                          Span<const AcceleratorKey> dAccelIdPacks)
 {
 
 }

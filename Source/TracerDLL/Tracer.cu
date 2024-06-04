@@ -6,6 +6,7 @@
 #include "Tracer/MaterialsDefault.h"
 #include "Tracer/CamerasDefault.h"
 #include "Tracer/MediumsDefault.h"
+#include "Tracer/AcceleratorWork.h"
 #include "Tracer/AcceleratorLinear.h"
 #include "Tracer/MetaLight.h"
 
@@ -248,7 +249,7 @@ static void AddAccelGeneratorsGeneric(Map<AcceleratorType, BaseAccelGenerator>& 
 
     // Works
     auto& workMapGlobal = workMap.emplace(t, AccelWorkGenMap()).first->second;
-    using WorkGenArgs = Tuple<AcceleratorGroupI&, GenericGroupTransformT&>;
+    using WorkGenArgs = Tuple<const AcceleratorGroupI&, const GenericGroupTransformT&>;
     using AccelWTypes = typename AcceleratorPack::WorkTypes;
     WorkGenArgs* workResolver0 = nullptr;
     AccelWTypes* workResolver1 = nullptr;
@@ -272,5 +273,4 @@ void Tracer::AddAccelGenerators(Map<AcceleratorType, BaseAccelGenerator>& baseMa
         workMap,
         SOFTWARE_NONE
     );
-
 }

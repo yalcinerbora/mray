@@ -156,7 +156,7 @@ AcceleratorGroupLinear<PG>::AcceleratorGroupLinear(uint32_t accelGroupId,
                                                    BS::thread_pool& tp, GPUSystem& sys,
                                                    const GenericGroupPrimitiveT& pg,
                                                    const AccelWorkGenMap& globalWorkMap)
-    : AcceleratorGroupT<PG>(accelGroupId, tp, sys, pg, globalWorkMap)
+    : Base(accelGroupId, tp, sys, pg, globalWorkMap)
     , mem(sys.AllGPUs(), 2_MiB, 32_MiB)
 {}
 
@@ -184,8 +184,7 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
 
     // Generate offset spans
     using PrimKeySpanList = std::vector<Span<PrimitiveKey>>;
-    PrimKeySpanList hInstanceLeafs = this->CreateLeafSubspans(dAllLeafs,
-                                                              this->instanceLeafRanges);
+    PrimKeySpanList hInstanceLeafs = this->CreateInstanceLeafSubspans(dAllLeafs);
 
     // Actual memcpy
     Span<CullFaceFlagArray>     hSpanCullFaceFlags(linearizedData.cullFaceFlags);
@@ -223,15 +222,55 @@ void AcceleratorGroupLinear<PG>::WriteInstanceKeysAndAABBs(Span<AABB3> aabbWrite
                                                            Span<AcceleratorKey> keyWriteRegion,
                                                            const GPUQueue& queue) const
 {
-    //
+    // Sanity Checks
+    assert(aabbWriteRegion.size() == this->concreteIndicesOfInstances.size());
+    assert(keyWriteRegion.size() == this->concreteIndicesOfInstances.size());
+
+    size_t totalInstanceCount = this->concreteIndicesOfInstances.size();
+    size_t concreteAccelCount = this->concreteLeafRanges.size();
+
+    // We will use a temp memory here
+    // TODO: Add stream ordered memory allocator stuff to the
+    // Device abstraction side maybe?
+    DeviceLocalMemory tempMem(*queue.Device());
+
     using enum PrimTransformType;
     if constexpr(PG::TransformLogic == PER_PRIMITIVE_TRANSFORM)
     {
-        //for()
+        size_t maxReductionSize = std::transform_reduce(this->concreteLeafRanges.cbegin(),
+                                                        this->concreteLeafRanges.cend(),
+                                                        size_t(0),
+        [](size_t l, size_t r) -> size_t
+        {
+            return std::max(l, r);
+        },
+        [](const Vector2ui range)
+        {
+            return range[1] - range[0];
+        });
+
+        using namespace DeviceAlgorithms;
+        size_t tmSize = TransformReduceTMSize<AABB3, PrimitiveKey>(maxReductionSize);
+
+        Span<Byte> dTransformReduceTempMem;
+        Span<uint32_t> dConcreteIndicesOfInstances;
+        Span<uint32_t> dConcreteAABBs;
+        MemAlloc::AllocateMultiData(std::tie(dConcreteIndicesOfInstances,
+                                             dConcreteAABBs,
+                                             dTransformReduceTempMem),
+                                    tempMem,
+                                    {totalInstanceCount, concreteAccelCount,
+                                     tmSize});
+
+
+        ////queue.K
+
+        //// Find AABBs of the concerete instances only
+        //// Then transform it
+        //for(size_t i = 0; i < this->concreteLeafRanges.size())
         //{
 
         //}
-
     }
     else
     {
@@ -239,7 +278,7 @@ void AcceleratorGroupLinear<PG>::WriteInstanceKeysAndAABBs(Span<AABB3> aabbWrite
     }
 
     //for()
-    //DeviceAlgorithms::TransformReduceTMSize<AABB3, PrimitiveKey>(..);
+
 
     //dLeafs
 
@@ -249,16 +288,33 @@ template<PrimitiveGroupC PG>
 void AcceleratorGroupLinear<PG>::CastLocalRays(// Output
                                                Span<HitKeyPack> dHitIds,
                                                Span<MetaHit> dHitParams,
-                                               Span<SurfaceWorkKey> dWorkKeys,
                                                // I-O
                                                Span<BackupRNGState> rngStates,
+                                               Span<RayGMem> dRays,
                                                // Input
-                                               Span<const RayGMem> dRays,
                                                Span<const RayIndex> dRayIndices,
                                                Span<const CommonKey> dAccelKeys,
                                                // Constants
-                                               uint32_t instanceId,
+                                               uint32_t workId,
                                                const GPUQueue& queue)
 {
+    uint32_t localWorkId = workId - this->globalWorkIdToLocalOffset;
+    const auto& workOpt = this->workInstances.at(localWorkId);
 
+    if(!workOpt)
+        throw MRayError("{:s}:{:d}: Unable to find work for {:d}",
+                        TypeName(), this->accelGroupId, workId);
+
+    const auto& work = workOpt.value().get();
+    work->CastLocalRays(// Output
+                        dHitIds,
+                        dHitParams,
+                        // I-O
+                        rngStates,
+                        dRays,
+                        //Input
+                        dRayIndices,
+                        dAccelKeys,
+                        // Constants
+                        queue);
 }

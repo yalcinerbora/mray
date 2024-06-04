@@ -399,9 +399,16 @@ void GPUQueueCUDA::DeviceIssueExactLambda(std::string_view name,
     CUDA_KERNEL_CHECK();
 }
 
-inline nvtxDomainHandle_t GPUQueueCUDA::ProfilerDomain() const
+MRAY_HOST inline
+nvtxDomainHandle_t GPUQueueCUDA::ProfilerDomain() const
 {
     return nvtxDomain;
+}
+
+MRAY_HOST inline
+const GPUDeviceCUDA* GPUQueueCUDA::Device() const
+{
+    return myDevice;
 }
 
 }

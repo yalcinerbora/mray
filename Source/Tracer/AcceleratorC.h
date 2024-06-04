@@ -146,11 +146,10 @@ class AcceleratorGroupI
     virtual void    CastLocalRays(// Output
                                   Span<HitKeyPack> dHitIds,
                                   Span<MetaHit> dHitParams,
-                                  Span<SurfaceWorkKey> dWorkKeys,
                                   // I-O
                                   Span<BackupRNGState> rngStates,
+                                  Span<RayGMem> dRays,
                                   // Input
-                                  Span<const RayGMem> dRays,
                                   Span<const RayIndex> dRayIndices,
                                   Span<const CommonKey> dAccelKeys,
                                   // Constants
@@ -166,8 +165,9 @@ class AcceleratorGroupI
     virtual void        WriteInstanceKeysAndAABBs(Span<AABB3> dAABBWriteRegion,
                                                   Span<AcceleratorKey> dKeyWriteRegion,
                                                   const GPUQueue& queue) const = 0;
-    virtual void        SetKeyOffset(uint32_t) = 0;
-    virtual size_t      GPUMemoryUsage() const = 0;
+    virtual void                SetKeyOffset(uint32_t) = 0;
+    virtual size_t              GPUMemoryUsage() const = 0;
+    virtual std::string_view    Name() const = 0;
 
     virtual const GenericGroupPrimitiveT& PrimGroup() const = 0;
 };
@@ -196,11 +196,12 @@ struct AccelPartitionResult
 {
     struct IndexPack
     {
-        uint32_t    tSurfIndex;
-        uint32_t    tLightSurfIndex;
+        TransGroupId    tId;
+        uint32_t        tSurfIndex;
+        uint32_t        tLightSurfIndex;
     };
     std::vector<IndexPack>  packedIndices;
-    std::vector<uint32_t>   typePartitionOffsets;
+    std::vector<uint32_t>   workPartitionOffsets;
     uint32_t                totalInstanceCount;
 };
 
@@ -214,8 +215,9 @@ struct LinearizedSurfaceData
     std::vector<SurfacePrimList>    instancePrimBatches;
 };
 
-using AccelWorkGenerator = GeneratorFuncType<AcceleratorWorkI, AcceleratorGroupI&,
-                                             GenericGroupTransformT&>;
+using AccelWorkGenerator = GeneratorFuncType<AcceleratorWorkI,
+                                             const AcceleratorGroupI&,
+                                             const GenericGroupTransformT&>;
 using AccelWorkGenMap = Map<std::string_view, AccelWorkGenerator>;
 
 using AccelGroupGenerator = GeneratorFuncType<AcceleratorGroupI, uint32_t,
@@ -255,9 +257,10 @@ uint32_t FindPrimBatchIndex(const PrimRangeArray& primRanges, PrimitiveKey k)
     return std::numeric_limits<uint32_t>::max();
 }
 
-template <PrimitiveGroupC PrimitiveGroupType>
+template <class Child, PrimitiveGroupC PG>
 class AcceleratorGroupT : public AcceleratorGroupI
 {
+    using PrimitiveGroupType = PG;
     using AccelWorkPtr = std::unique_ptr<AcceleratorWorkI>;
     private:
     // Common functionality for ineriting types
@@ -266,7 +269,7 @@ class AcceleratorGroupT : public AcceleratorGroupI
                                                                 const std::vector<PrimRangeArray>& instancePrimRanges);
     static LinearizedSurfaceData    LinearizeSurfaceData(const AccelGroupConstructParams& p,
                                                          const AccelPartitionResult& partitions,
-                                                         const PrimitiveGroupType& pg);
+                                                         const typename PrimitiveGroupType& pg);
 
     protected:
     BS::thread_pool&            threadPool;
@@ -280,28 +283,29 @@ class AcceleratorGroupT : public AcceleratorGroupI
     // Offset list of instance/concrete leafs
     std::vector<Vector2ui>      concreteLeafRanges;
     std::vector<Vector2ui>      instanceLeafRanges;
+    std::vector<uint32_t>       workInstanceOffsets;
 
     // Type Related
-    std::vector<uint32_t>           typeIds;
-    const AccelWorkGenMap&          accelWorkGenerators;
-    Map<uint32_t, AccelWorkPtr>     workInstances;
+    uint32_t                    globalWorkIdToLocalOffset = std::numeric_limits<uint32_t>::max();
+    const AccelWorkGenMap&      accelWorkGenerators;
+    Map<uint32_t, AccelWorkPtr> workInstances;
 
-    LinearizedSurfaceData           PreprocessConstructionParams(const AccelGroupConstructParams& p);
+    LinearizedSurfaceData       PreprocessConstructionParams(const AccelGroupConstructParams& p);
     template<class T>
-    static std::vector<Span<T>>     CreateLeafSubspans(Span<T> fullRange,
-                                                       const std::vector<Vector2ui>& leafRanges);
+    std::vector<Span<T>>        CreateInstanceLeafSubspans(Span<T> fullRange);
 
     public:
     // Constructors & Destructor
-                AcceleratorGroupT(uint32_t accelGroupId,
-                                  BS::thread_pool&, GPUSystem&,
-                                  const GenericGroupPrimitiveT& pg,
-                                  const AccelWorkGenMap&);
+                        AcceleratorGroupT(uint32_t accelGroupId,
+                                          BS::thread_pool&, GPUSystem&,
+                                          const GenericGroupPrimitiveT& pg,
+                                          const AccelWorkGenMap&);
 
-    size_t      InstanceCount() const override;
-    uint32_t    InstanceTypeCount() const override;
-    uint32_t    UsedIdBitsInKey() const override;
-    void        SetKeyOffset(uint32_t) override;
+    size_t              InstanceCount() const override;
+    uint32_t            InstanceTypeCount() const override;
+    uint32_t            UsedIdBitsInKey() const override;
+    void                SetKeyOffset(uint32_t) override;
+    std::string_view    Name() const override;
 
     const GenericGroupPrimitiveT& PrimGroup() const override;
 };
@@ -316,14 +320,11 @@ class BaseAcceleratorI
     virtual void    CastRays(// Output
                              Span<HitKeyPack> dHitIds,
                              Span<MetaHit> dHitParams,
-                             Span<SurfaceWorkKey> dWorkKeys,
                              // I-O
                              Span<BackupRNGState> rngStates,
+                             Span<RayGMem> dRays,
                              // Input
-                             Span<const RayGMem> dRays,
-                             Span<const RayIndex> dRayIndices,
-                             // Constants
-                             const GPUSystem& s) = 0;
+                             Span<const RayIndex> dRayIndices) = 0;
     // Fully cast rays to entire scene return true/false
     // If it hits to a surface
     virtual void    CastShadowRays(// Output
@@ -333,9 +334,7 @@ class BaseAcceleratorI
                                    Span<BackupRNGState> rngStates,
                                    // Input
                                    Span<const RayIndex> dRayIndices,
-                                   Span<const RayGMem> dShadowRays,
-                                   // Constants
-                                   const GPUSystem& s) = 0;
+                                   Span<const RayGMem> dShadowRays) = 0;
     // Locally cast rays to a accelerator instances
     // This is multi-ray multi-accelerator instance
     virtual void    CastLocalRays(// Output
@@ -346,9 +345,7 @@ class BaseAcceleratorI
                                   // Input
                                   Span<const RayGMem> dRays,
                                   Span<const RayIndex> dRayIndices,
-                                  Span<const AcceleratorKey> dAccelIdPacks,
-                                  // Constants
-                                  const GPUSystem& s) = 0;
+                                  Span<const AcceleratorKey> dAccelIdPacks) = 0;
 
     // Construction
     virtual void    Construct(BaseAccelConstructParams) = 0;
@@ -411,21 +408,22 @@ using PrimGroupIdFetcher = GroupIdFetcher<PrimBatchKey>;
 using TransGroupIdFetcher = GroupIdFetcher<TransformKey>;
 using LightGroupIdFetcher = GroupIdFetcher<LightKey>;
 
-template <PrimitiveGroupC PG>
-AccelPartitionResult AcceleratorGroupT<PG>::PartitionParamsForWork(const AccelGroupConstructParams& p)
+template<class C, PrimitiveGroupC PG>
+AccelPartitionResult AcceleratorGroupT<C, PG>::PartitionParamsForWork(const AccelGroupConstructParams& p)
 {
     using IndexPack = typename AccelPartitionResult::IndexPack;
     AccelPartitionResult result = {};
-    result.typePartitionOffsets.reserve(p.tGroupSurfs.size() + p.tGroupLightSurfs.size() + 1);
+    result.workPartitionOffsets.reserve(p.tGroupSurfs.size() + p.tGroupLightSurfs.size() + 1);
     result.packedIndices.reserve(p.tGroupSurfs.size() + p.tGroupLightSurfs.size());
 
     // This is somewhat iota but we will add lights
     for(uint32_t tIndex = 0; tIndex < p.tGroupSurfs.size(); tIndex++)
     {
-        const auto& tSurfs = p.tGroupSurfs[tIndex];
+        const auto& groupedSurf = p.tGroupSurfs[tIndex];
         // Add this directly
         result.packedIndices.emplace_back(IndexPack
         {
+            .tId = groupedSurf.first,
             .tSurfIndex = tIndex,
             .tLightSurfIndex = std::numeric_limits<uint32_t>::max()
         });
@@ -435,11 +433,10 @@ AccelPartitionResult AcceleratorGroupT<PG>::PartitionParamsForWork(const AccelGr
     for(uint32_t ltIndex = 0; ltIndex < p.tGroupLightSurfs.size(); ltIndex++)
     {
         const auto& groupedLightSurf = p.tGroupLightSurfs[ltIndex];
-
         TransGroupId tId = groupedLightSurf.first;
         auto loc = std::find_if(p.tGroupSurfs.cbegin(),
                                 p.tGroupSurfs.cend(),
-                                [tId](const auto groupedSurf)
+                                [tId](const auto& groupedSurf)
         {
             return groupedSurf.first != tId;
         });
@@ -453,6 +450,7 @@ AccelPartitionResult AcceleratorGroupT<PG>::PartitionParamsForWork(const AccelGr
         {
             result.packedIndices.emplace_back(IndexPack
             {
+                .tId = groupedLightSurf.first,
                 .tSurfIndex = std::numeric_limits<uint32_t>::max(),
                 .tLightSurfIndex = ltIndex
             });
@@ -460,30 +458,36 @@ AccelPartitionResult AcceleratorGroupT<PG>::PartitionParamsForWork(const AccelGr
     }
 
     // Find the partitioned offsets
-    result.typePartitionOffsets.push_back(0);
-    std::transform_inclusive_scan(result.packedIndices.cbegin() + 1,
+    result.workPartitionOffsets.resize(result.packedIndices.size() + 1, 0);
+    std::transform_inclusive_scan(result.packedIndices.cbegin(),
                                   result.packedIndices.cend(),
-                                  result.typePartitionOffsets.begin(),
+                                  result.workPartitionOffsets.begin() + 1,
                                   std::plus{},
     [&p](const IndexPack& indexPack) -> uint32_t
     {
         uint32_t result = 0;
         if(indexPack.tSurfIndex != std::numeric_limits<uint32_t>::max())
-            result += p.tGroupSurfs[indexPack.tSurfIndex].second.size();
+        {
+            size_t size = p.tGroupSurfs[indexPack.tSurfIndex].second.size();
+            result += static_cast<uint32_t>(size);
+        }
         if(indexPack.tLightSurfIndex != std::numeric_limits<uint32_t>::max())
-            result += p.tGroupLightSurfs[indexPack.tLightSurfIndex].second.size();
+        {
+            size_t size = p.tGroupLightSurfs[indexPack.tLightSurfIndex].second.size();
+            result += static_cast<uint32_t>(size);
+        };
         return result;
     });
+    assert(result.packedIndices.size() + 1 == result.workPartitionOffsets.size());
+    result.totalInstanceCount = result.workPartitionOffsets.back();
 
-    result.totalInstanceCount = result.typePartitionOffsets.back();
-    result.typePartitionOffsets.pop_back();
     return result;
 
 };
 
-template <PrimitiveGroupC PG>
-AccelLeafResult AcceleratorGroupT<PG>::DetermineConcreteAccelCount(std::vector<SurfacePrimList> instancePrimBatches,
-                                                                   const std::vector<PrimRangeArray>& instancePrimRanges)
+template<class C, PrimitiveGroupC PG>
+AccelLeafResult AcceleratorGroupT<C, PG>::DetermineConcreteAccelCount(std::vector<SurfacePrimList> instancePrimBatches,
+                                                                      const std::vector<PrimRangeArray>& instancePrimRanges)
 {
     assert(instancePrimBatches.size() == instancePrimRanges.size());
 
@@ -613,14 +617,13 @@ AccelLeafResult AcceleratorGroupT<PG>::DetermineConcreteAccelCount(std::vector<S
     };
 }
 
-template <PrimitiveGroupC PG>
+template<class C, PrimitiveGroupC PG>
 template<class T>
 std::vector<Span<T>>
-AcceleratorGroupT<PG>::CreateLeafSubspans(Span<T> fullRange,
-                                          const std::vector<Vector2ui>& leafRanges)
+AcceleratorGroupT<C, PG>::CreateInstanceLeafSubspans(Span<T> fullRange)
 {
-    std::vector<Span<T>> instanceLeafData(leafRanges.size());
-    std::transform(leafRanges.cbegin(), leafRanges.cend(),
+    std::vector<Span<T>> instanceLeafData(instanceLeafRanges.size());
+    std::transform(instanceLeafRanges.cbegin(), instanceLeafRanges.cend(),
                    instanceLeafData.begin(),
                    [fullRange](const Vector2ui& offset)
     {
@@ -630,10 +633,10 @@ AcceleratorGroupT<PG>::CreateLeafSubspans(Span<T> fullRange,
     return instanceLeafData;
 }
 
-template <PrimitiveGroupC PG>
-LinearizedSurfaceData AcceleratorGroupT<PG>::LinearizeSurfaceData(const AccelGroupConstructParams& p,
-                                                                  const AccelPartitionResult& partitions,
-                                                                  const PG& pg)
+template<class C, PrimitiveGroupC PG>
+LinearizedSurfaceData AcceleratorGroupT<C, PG>::LinearizeSurfaceData(const AccelGroupConstructParams& p,
+                                                                     const AccelPartitionResult& partitions,
+                                                                     const typename PG& pg)
 {
     LinearizedSurfaceData result = {};
     result.primRanges.reserve(partitions.totalInstanceCount);
@@ -674,7 +677,8 @@ LinearizedSurfaceData AcceleratorGroupT<PG>::LinearizeSurfaceData(const AccelGro
                 auto optView = p.textureViews->at(surf.alphaMaps[i].value());
                 if(!optView)
                 {
-                    throw MRayError("Accelerator: Alpha map texture({:d}) is not found",
+                    throw MRayError("{:s}: Alpha map texture({:d}) is not found",
+                                    C::TypeName(),
                                     static_cast<uint32_t>(surf.alphaMaps[i].value()));
                 }
                 const GenericTextureView& view = optView.value();
@@ -730,24 +734,23 @@ LinearizedSurfaceData AcceleratorGroupT<PG>::LinearizeSurfaceData(const AccelGro
             }
         }
     }
-    assert(result.alphaMaps.size()              == partitions.totalInstanceCount);
-    assert(result.cullFaceFlags.size()          == partitions.totalInstanceCount);
-    assert(result.lightOrMatKeys.size()         == partitions.totalInstanceCount);
-    assert(result.primRanges.size()             == partitions.totalInstanceCount);
-    assert(result.transformKeys.size()          == partitions.totalInstanceCount);
-    assert(result.instancePrimBatches.size()    == partitions.totalInstanceCount);
+
+
+    assert(result.alphaMaps.size() == partitions.totalInstanceCount);
+    assert(result.cullFaceFlags.size() == partitions.totalInstanceCount);
+    assert(result.lightOrMatKeys.size() == partitions.totalInstanceCount);
+    assert(result.primRanges.size() == partitions.totalInstanceCount);
+    assert(result.transformKeys.size() == partitions.totalInstanceCount);
+    assert(result.instancePrimBatches.size() == partitions.totalInstanceCount);
     return result;
 }
 
-template <PrimitiveGroupC PG>
-LinearizedSurfaceData AcceleratorGroupT<PG>::PreprocessConstructionParams(const AccelGroupConstructParams& p)
+template<class C, PrimitiveGroupC PG>
+LinearizedSurfaceData AcceleratorGroupT<C, PG>::PreprocessConstructionParams(const AccelGroupConstructParams& p)
 {
     assert(&pg == p.primGroup);
     // Instance Types (determined by transform type)
     AccelPartitionResult partitions = PartitionParamsForWork(p);
-    size_t instanceTypeCount = partitions.packedIndices.size();
-    typeIds.resize(instanceTypeCount);
-    std::iota(typeIds.begin(), typeIds.end(), 0);
     // Total instance count (equavilently total surface count)
     auto linSurfData = LinearizeSurfaceData(p, partitions, pg);
     // Find out the concrete accel count and offsets
@@ -757,14 +760,43 @@ LinearizedSurfaceData AcceleratorGroupT<PG>::PreprocessConstructionParams(const 
     concreteIndicesOfInstances = std::move(leafResult.concreteIndicesOfInstances);
     instanceLeafRanges = std::move(leafResult.instanceLeafRanges);
     concreteLeafRanges = std::move(leafResult.concreteLeafRanges);
+
+    // Instantiate Works
+    workInstanceOffsets = std::move(partitions.workPartitionOffsets);
+    uint32_t i = 0;
+    for(const auto& indices : partitions.packedIndices)
+    {
+        auto tGroupOpt = p.transformGroups->at(indices.tId);
+        if(!tGroupOpt)
+        {
+            throw MRayError("{:s}:{:d}: Unable to find transform {:d}",
+                            C::TypeName(), accelGroupId,
+                            static_cast<uint32_t>(indices.tId));
+        }
+        const GenericGroupTransformT& tGroup = *tGroupOpt.value().get().get();
+
+        using namespace TypeNameGen::CompTime;
+        std::string workTypeName = AccelWorkTypeName(C::TypeName(),
+                                                     tGroup.Name());
+        auto workGenOpt = accelWorkGenerators.at(workTypeName);
+        if(!workGenOpt)
+        {
+            throw MRayError("{:s}:{:d}: Unable to find generator for work \"{:s}\"",
+                            C::TypeName(),
+                            accelGroupId, workTypeName);
+        }
+        const auto& workGen = workGenOpt.value().get();
+        workInstances.try_emplace(i, workGen(*this, tGroup));
+        i++;
+    }
     return linSurfData;
 }
 
-template <PrimitiveGroupC PG>
-AcceleratorGroupT<PG>::AcceleratorGroupT(uint32_t groupId,
-                                         BS::thread_pool& tp, GPUSystem& sys,
-                                         const GenericGroupPrimitiveT& pgIn,
-                                         const AccelWorkGenMap& workGenMap)
+template<class C, PrimitiveGroupC PG>
+AcceleratorGroupT<C, PG>::AcceleratorGroupT(uint32_t groupId,
+                                            BS::thread_pool& tp, GPUSystem& sys,
+                                            const GenericGroupPrimitiveT& pgIn,
+                                            const AccelWorkGenMap& workGenMap)
     : threadPool(tp)
     , gpuSystem(sys)
     , accelGroupId(groupId)
@@ -772,36 +804,40 @@ AcceleratorGroupT<PG>::AcceleratorGroupT(uint32_t groupId,
     , accelWorkGenerators(workGenMap)
 {}
 
-template<PrimitiveGroupC PG>
-size_t AcceleratorGroupT<PG>::InstanceCount() const
+template<class C, PrimitiveGroupC PG>
+size_t AcceleratorGroupT<C, PG>::InstanceCount() const
 {
     return instanceLeafRanges.size();
 }
 
-template<PrimitiveGroupC PG>
-uint32_t AcceleratorGroupT<PG>::InstanceTypeCount() const
+template<class C, PrimitiveGroupC PG>
+uint32_t AcceleratorGroupT<C, PG>::InstanceTypeCount() const
 {
-    return workInstances.size();
+    return static_cast<uint32_t>(workInstances.size());
 }
 
-template<PrimitiveGroupC PG>
-uint32_t AcceleratorGroupT<PG>::UsedIdBitsInKey() const
+template<class C, PrimitiveGroupC PG>
+uint32_t AcceleratorGroupT<C, PG>::UsedIdBitsInKey() const
 {
-    return BitFunctions::RequiredBitsToRepresent(workInstances.size());
+    using namespace BitFunctions;
+    size_t bitCount = RequiredBitsToRepresent(workInstances.size());
+    return static_cast<uint32_t>(bitCount);
 }
 
-template<PrimitiveGroupC PG>
-void AcceleratorGroupT<PG>::SetKeyOffset(uint32_t offset)
+template<class C, PrimitiveGroupC PG>
+void AcceleratorGroupT<C, PG>::SetKeyOffset(uint32_t offset)
 {
-    std::for_each(typeIds.begin(), typeIds.end(),
-    [offset](uint32_t& id)
-    {
-        id += offset;
-    });
+    globalWorkIdToLocalOffset = offset;
 }
 
-template<PrimitiveGroupC PG>
-const GenericGroupPrimitiveT& AcceleratorGroupT<PG>::PrimGroup() const
+template<class C, PrimitiveGroupC PG>
+std::string_view AcceleratorGroupT<C, PG>::Name() const
+{
+    return C::TypeName();
+}
+
+template<class C, PrimitiveGroupC PG>
+const GenericGroupPrimitiveT& AcceleratorGroupT<C, PG>::PrimGroup() const
 {
     return pg;
 }
