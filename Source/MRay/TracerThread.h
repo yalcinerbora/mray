@@ -33,6 +33,7 @@ class TracerThread final : public RealtimeThread
     size_t                  currentCamIndex;
     SystemSemaphoreHandle   currentSem;
     CameraTransform         currentCamTransform;
+    AABB3                   currentSceneAABB;
     TracerIdPack            sceneIds;
     // Flow states
     // TODO: I'm pretty sure this will get complicated really fast

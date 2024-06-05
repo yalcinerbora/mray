@@ -204,6 +204,15 @@ concept PrimitiveWithSurfaceC = requires(PrimType mg,
 template <PrimitiveGroupC PrimGroup, TransformGroupC TransGroup>
 constexpr auto AcquireTransformContextGenerator();
 
+// Alias some stuff to easily acquire the function and context type
+// Using macro instead of "static constexpr auto" since it make
+// GPU link errors
+#define MRAY_PRIM_TGEN_FUNCTION(PG, TG) \
+    decltype(AcquireTransformContextGenerator<typename PG, TG>())::Function
+
+template<PrimitiveGroupC PG, TransformGroupC TG>
+using PrimTransformContextType = typename decltype(AcquireTransformContextGenerator<PG, TG>())::ReturnType;
+
 class GenericGroupPrimitiveT : public GenericGroupT<PrimBatchKey, PrimAttributeInfo>
 {
     public:

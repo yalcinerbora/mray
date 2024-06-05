@@ -33,13 +33,13 @@ namespace LinearAccelDetail
     };
 
     template<PrimitiveGroupC PrimGroup,
-             TransformGroupC TransGroupType = TransformGroupIdentity>
+             TransformGroupC TransGroup = TransformGroupIdentity>
     class AcceleratorLinear
     {
         public:
         using PrimHit       = typename PrimGroup::Hit;
         using PrimDataSoA   = typename PrimGroup::DataSoA;
-        using TransDataSoA  = typename TransGroupType::DataSoA;
+        using TransDataSoA  = typename TransGroup::DataSoA;
         using HitResult     = HitResultT<PrimHit>;
         using DataSoA       = LinearAcceleratorSoA;
 
@@ -61,6 +61,7 @@ namespace LinearAccelDetail
         const TransDataSoA&         transformSoA;
         const PrimDataSoA&          primitiveSoA;
 
+        template<auto = MRAY_PRIM_TGEN_FUNCTION(PrimGroup, TransGroup)>
         MRAY_HYBRID
         Optional<HitResult>     IntersectionCheck(const Ray& ray,
                                                   const Vector2& tMinMax,

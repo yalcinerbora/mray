@@ -129,3 +129,161 @@ bool LambertMaterial<ST>::IsAllTexturesAreResident(const Surface& surface) const
 }
 
 }
+
+namespace ReflectMatDetail
+{
+
+template <class ST>
+MRAY_HYBRID MRAY_CGPU_INLINE
+ReflectMaterial<ST>::ReflectMaterial(const SpectrumConverter& sTransContext,
+                                     const DataSoA& soa, MaterialKey mk)
+    // TODO: Add medium here later
+{}
+
+template <class ST>
+MRAY_HYBRID MRAY_CGPU_INLINE
+SampleT<BxDFResult> ReflectMaterial<ST>::SampleBxDF(const Vector3& wI,
+                                                    const Surface& surface,
+                                                    RNGDispenser&) const
+{
+    // It is less operations to convert the normal to world space
+    // since we will need to put wI to local space then convert wO
+    // to world space.
+    // TODO: Maybe fast reflect (that assumes normal is ZAxis) maybe faster?
+    // Probably not.
+    Vector3 normal = Vector3::ZAxis();
+    Vector3 worldNormal = surface.shadingTBN.ApplyInvRotation(normal);
+    Vector3 wO = GraphicsFunctions::Reflect(worldNormal, wI);
+    // Directly delegate position, this is not a subsurface material
+    Ray wORay = Ray(wO, surface.position);
+    return SampleT<BxDFResult>
+    {
+        .sampledResult = BxDFResult
+        {
+            .wO = wORay,
+            .reflectance = Spectrum(1.0),
+            // TODO: Change this later
+            .mediumId = MediumKey::InvalidKey()
+        },
+        .pdf = Float(1.0)
+    };
+}
+
+template <class ST>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float ReflectMaterial<ST>::Pdf(const Ray& wI,
+                               const Ray& wO,
+                               const Surface& surface) const
+{
+    // We can not sample this
+    return Float(0.0);
+}
+
+template <class ST>
+MRAY_HYBRID MRAY_CGPU_INLINE
+uint32_t ReflectMaterial<ST>::SampleRNCount() const
+{
+    return 0;
+}
+
+template <class ST>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Spectrum ReflectMaterial<ST>::Evaluate(const Ray& wO,
+                                       const Vector3& wI,
+                                       const Surface& surface) const
+{
+    return Spectrum(1);
+}
+
+template <class ST>
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool ReflectMaterial<ST>::IsEmissive() const
+{
+    return false;
+}
+
+template <class ST>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Spectrum ReflectMaterial<ST>::Emit(const Vector3& wO,
+                                   const Surface& surf) const
+{
+    return Spectrum::Zero();
+}
+
+template <class ST>
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool ReflectMaterial<ST>::IsAllTexturesAreResident(const Surface& surface) const
+{
+    return true;
+}
+
+}
+
+namespace RefractMatDetail
+{
+
+template <class ST>
+MRAY_HYBRID MRAY_CGPU_INLINE
+RefractMaterial<ST>::RefractMaterial(const SpectrumConverter& sTransContext,
+                                     const DataSoA& soa, MaterialKey mk)
+    // TODO: Add medium here later
+{}
+
+template <class ST>
+MRAY_HYBRID MRAY_CGPU_INLINE
+SampleT<BxDFResult> RefractMaterial<ST>::SampleBxDF(const Vector3& wI,
+                                                    const Surface& surface,
+                                                    RNGDispenser&) const
+{
+
+}
+
+template <class ST>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float RefractMaterial<ST>::Pdf(const Ray& wI,
+                               const Ray& wO,
+                               const Surface& surface) const
+{
+    // We can not sample this
+    return Float(0.0);
+}
+
+template <class ST>
+MRAY_HYBRID MRAY_CGPU_INLINE
+uint32_t RefractMaterial<ST>::SampleRNCount() const
+{
+    return 0;
+}
+
+template <class ST>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Spectrum RefractMaterial<ST>::Evaluate(const Ray& wO,
+                                       const Vector3& wI,
+                                       const Surface& surface) const
+{
+    return Spectrum(1);
+}
+
+template <class ST>
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool RefractMaterial<ST>::IsEmissive() const
+{
+    return false;
+}
+
+template <class ST>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Spectrum RefractMaterial<ST>::Emit(const Vector3& wO,
+                                   const Surface& surf) const
+{
+    return Spectrum::Zero();
+}
+
+template <class ST>
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool RefractMaterial<ST>::IsAllTexturesAreResident(const Surface& surface) const
+{
+    return true;
+}
+
+}

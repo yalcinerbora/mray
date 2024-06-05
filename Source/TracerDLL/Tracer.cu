@@ -84,7 +84,9 @@ using MetaLightView = typename MetaLightList::MetaLightView<MetaHit>;
 using MatGTypes = Tuple
 <
     MatGroupLambert,
-    //MatGroupUnreal
+    MatGroupReflect,
+    MatGroupRefract,
+    MatGroupUnreal
 >;
 
 // ================= //

@@ -668,7 +668,8 @@ MRayDataTypeRT TracerBase::GetTexturePixelType(TextureId) const
 
 void TracerBase::CommitTextures()
 {
-    throw MRayError("Textures are not impl.");
+    //MRAY_ERROR_LOG("Textures are not impl.");
+    //std::exit(1);
 }
 
 void TracerBase::PushTextureData(TextureId, uint32_t,
@@ -1301,6 +1302,9 @@ AABB3 TracerBase::CommitSurfaces()
         .lSurfList = Span<const LightSurfP>(lSurfList.begin(),
                                             lPartitionEnd)
     });
+
+    // Synchronize All here, we may time this
+    gpuSystem.SyncAll();
     return accelerator->SceneAABB();
 }
 

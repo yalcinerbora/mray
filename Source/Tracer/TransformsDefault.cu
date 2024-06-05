@@ -46,10 +46,8 @@ void TransformGroupSingle::PushAttribute(TransformKey id , uint32_t attributeInd
         size_t count = range[1] - range[0];
         Span<Matrix4x4> subTRange = transforms.subspan(range[0], count);
         Span<Matrix4x4> subInvTRange = invTransforms.subspan(range[0], count);
-
         DeviceAlgorithms::Transform(subInvTRange, ToConstSpan(subTRange), queue,
                                     KCInvertTransforms());
-
     }
     else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
                          TypeName(), attributeIndex);
@@ -98,7 +96,6 @@ void TransformGroupSingle::PushAttribute(TransformKey idStart, TransformKey idEn
 
         Span<Matrix4x4> subTRange = transforms.subspan(rangeStart[0], count);
         Span<Matrix4x4> subInvTRange = invTransforms.subspan(rangeStart[0], count);
-
         DeviceAlgorithms::Transform(subInvTRange, ToConstSpan(subTRange), queue,
                                     KCInvertTransforms());
     }

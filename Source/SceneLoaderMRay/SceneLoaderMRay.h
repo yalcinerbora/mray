@@ -69,7 +69,6 @@ class SceneLoaderMRay : public SceneLoaderI
     std::vector<SurfaceId>          mRaySurfaces;
     std::vector<LightSurfaceId>     mRayLightSurfaces;
     std::vector<CamSurfaceId>       mRayCamSurfaces;
-    AABB3                           sceneAABB;
 
     static LightSurfaceStruct               LoadBoundary(const nlohmann::json&);
     static std::vector<SurfaceStruct>       LoadSurfaces(const nlohmann::json&);

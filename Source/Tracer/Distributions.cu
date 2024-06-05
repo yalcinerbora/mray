@@ -146,7 +146,7 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
     }
 
 #else
-    #error DistributionPwC2D kernels do not have generic implementation!
+    #error DistributionPwC2D kernels do not have generic implementation yet!
 #endif
 
 

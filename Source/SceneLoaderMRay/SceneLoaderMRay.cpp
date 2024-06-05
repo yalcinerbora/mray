@@ -2001,7 +2001,6 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
         CreateSurfaces(tracer, surfaces);
         CreateLightSurfaces(tracer, lightSurfs);
         CreateCamSurfaces(tracer, camSurfs);
-        sceneAABB = tracer.CommitSurfaces();
     }
     // MRay related errros
     catch(const MRayError& e)
@@ -2070,7 +2069,6 @@ TracerIdPack SceneLoaderMRay::MoveIdPack(double durationMS)
         .surfaces = std::move(mRaySurfaces),
         .camSurfaces = std::move(mRayCamSurfaces),
         .lightSurfaces = std::move(mRayLightSurfaces),
-        .sceneAABB = sceneAABB,
         .loadTimeMS = durationMS
     };
 }

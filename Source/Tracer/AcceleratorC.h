@@ -20,6 +20,8 @@ namespace BS { class thread_pool; }
 
 class AcceleratorWorkI;
 
+using AccelWorkPtr = std::unique_ptr<AcceleratorWorkI>;
+
 template<class HitType>
 struct HitResultT
 {
@@ -107,6 +109,15 @@ namespace TracerLimits
 {
     static constexpr size_t MaxPrimBatchPerSurface = 8;
 }
+
+// Alias some stuff to easily acquire the function and context type
+// Using macro instead of "static constexpr auto" since it make
+// GPU link errors
+#define MRAY_ACCEL_TGEN_FUNCTION(AG, TG) \
+    decltype(AcquireTransformContextGenerator<typename AG::PrimitiveGroup, TG>())::Function
+
+template<AccelGroupC AG, TransformGroupC TG>
+using AccTransformContextType = PrimTransformContextType<typename AG::PrimitiveGroup, TG>;
 
 using AlphaMap = TextureView<2, Float>;
 
@@ -261,7 +272,6 @@ template <class Child, PrimitiveGroupC PG>
 class AcceleratorGroupT : public AcceleratorGroupI
 {
     using PrimitiveGroupType = PG;
-    using AccelWorkPtr = std::unique_ptr<AcceleratorWorkI>;
     private:
     // Common functionality for ineriting types
     static AccelPartitionResult     PartitionParamsForWork(const AccelGroupConstructParams& p);

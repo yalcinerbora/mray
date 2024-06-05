@@ -4,6 +4,8 @@
 #include <fstream>
 #include <filesystem>
 
+#include <Core/Timer.h>
+
 std::string GetTypeNameFromRenderConfig(const std::string&)
 {
     //....
@@ -267,6 +269,19 @@ void TracerThread::LoopWork()
                          sceneIds.loadTimeMS);
             }
 
+            // Commit the surfaces
+            MRAY_LOG("[Tracer]: Committing Surfaces...");
+            Timer timer; timer.Start();
+            //
+            currentSceneAABB = tracer->CommitSurfaces();
+            //
+            timer.Split();
+            MRAY_LOG("[Tracer]: Surfaces (AABB{{{}, {}}}) committed in {}ms",
+                     currentSceneAABB.Min(),
+                     currentSceneAABB.Max(),
+                     timer.Elapsed<Millisecond>());
+
+
             currentCamIndex = 0;
             CamSurfaceId camSurf = sceneIds.camSurfaces[currentCamIndex];
             currentCamTransform = tracer->GetCamTransform(camSurf);
@@ -293,7 +308,7 @@ void TracerThread::LoopWork()
                     .surfaceCount = static_cast<uint32_t>(sceneIds.surfaces.size()),
                     .lightCount = static_cast<uint32_t>(sceneIds.lightSurfaces.size()),
                     .cameraCount = static_cast<uint32_t>(sceneIds.camSurfaces.size()),
-                    .sceneExtent = sceneIds.sceneAABB
+                    .sceneExtent = currentSceneAABB
                 }
             ));
 

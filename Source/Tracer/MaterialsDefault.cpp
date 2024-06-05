@@ -1,6 +1,10 @@
 #include "MaterialsDefault.h"
 #include "Core/TypeNameGenerators.h"
 
+
+//===============================//
+//       Lambert Material        //
+//===============================//
 std::string_view MatGroupLambert::TypeName()
 {
     using namespace TypeNameGen::CompTime;
@@ -147,6 +151,219 @@ void MatGroupLambert::PushTexAttribute(MaterialKey, MaterialKey,
 }
 
 typename MatGroupLambert::DataSoA MatGroupLambert::SoA() const
+{
+    return soa;
+}
+
+//===============================//
+//       Reflect Material        //
+//===============================//
+std::string_view MatGroupReflect::TypeName()
+{
+    using namespace TypeNameGen::CompTime;
+    using namespace std::string_view_literals;
+    static constexpr auto Name = "Reflect"sv;
+    return MaterialTypeName<Name>;
+}
+
+void MatGroupReflect::HandleMediums(const MediumKeyPairList& mediumList)
+{
+}
+
+MatGroupReflect::MatGroupReflect(uint32_t groupId,
+                                 const GPUSystem& s,
+                                 const TextureViewMap& map)
+    : GenericGroupMaterial<MatGroupReflect>(groupId, s, map)
+{}
+
+void MatGroupReflect::CommitReservations()
+{
+    isCommitted = true;
+}
+
+MatAttributeInfoList MatGroupReflect::AttributeInfo() const
+{
+    return MatAttributeInfoList{};
+}
+
+void MatGroupReflect::PushAttribute(MaterialKey,
+                                    uint32_t attributeIndex,
+                                    TransientData,
+                                    const GPUQueue&)
+{}
+
+void MatGroupReflect::PushAttribute(MaterialKey,
+                                    uint32_t, const Vector2ui&,
+                                    TransientData, const GPUQueue&)
+{}
+
+void MatGroupReflect::PushAttribute(MaterialKey, MaterialKey,
+                                    uint32_t, TransientData,
+                                    const GPUQueue&)
+{}
+
+
+void MatGroupReflect::PushTexAttribute(MaterialKey, MaterialKey,
+                                       uint32_t, TransientData,
+                                       std::vector<Optional<TextureId>>,
+                                       const GPUQueue&)
+{}
+
+void MatGroupReflect::PushTexAttribute(MaterialKey, MaterialKey,
+                                       uint32_t,
+                                       std::vector<Optional<TextureId>>,
+                                       const GPUQueue&)
+{}
+
+void MatGroupReflect::PushTexAttribute(MaterialKey, MaterialKey,
+                                       uint32_t,
+                                       std::vector<TextureId>,
+                                       const GPUQueue&)
+{}
+
+typename MatGroupReflect::DataSoA MatGroupReflect::SoA() const
+{
+    return soa;
+}
+
+//===============================//
+//       Refract Material        //
+//===============================//
+std::string_view MatGroupRefract::TypeName()
+{
+    using namespace TypeNameGen::CompTime;
+    using namespace std::string_view_literals;
+    static constexpr auto Name = "Refract"sv;
+    return MaterialTypeName<Name>;
+}
+
+void MatGroupRefract::HandleMediums(const MediumKeyPairList& mediumList)
+{
+}
+
+MatGroupRefract::MatGroupRefract(uint32_t groupId,
+                                 const GPUSystem& s,
+                                 const TextureViewMap& map)
+    : GenericGroupMaterial<MatGroupRefract>(groupId, s, map)
+{}
+
+void MatGroupRefract::CommitReservations()
+{
+    isCommitted = true;
+}
+
+MatAttributeInfoList MatGroupRefract::AttributeInfo() const
+{
+    return MatAttributeInfoList{};
+}
+
+void MatGroupRefract::PushAttribute(MaterialKey,
+                                    uint32_t attributeIndex,
+                                    TransientData,
+                                    const GPUQueue&)
+{}
+
+void MatGroupRefract::PushAttribute(MaterialKey,
+                                    uint32_t, const Vector2ui&,
+                                    TransientData, const GPUQueue&)
+{}
+
+void MatGroupRefract::PushAttribute(MaterialKey, MaterialKey,
+                                    uint32_t, TransientData,
+                                    const GPUQueue&)
+{}
+
+
+void MatGroupRefract::PushTexAttribute(MaterialKey, MaterialKey,
+                                       uint32_t, TransientData,
+                                       std::vector<Optional<TextureId>>,
+                                       const GPUQueue&)
+{}
+
+void MatGroupRefract::PushTexAttribute(MaterialKey, MaterialKey,
+                                       uint32_t,
+                                       std::vector<Optional<TextureId>>,
+                                       const GPUQueue&)
+{}
+
+void MatGroupRefract::PushTexAttribute(MaterialKey, MaterialKey,
+                                       uint32_t,
+                                       std::vector<TextureId>,
+                                       const GPUQueue&)
+{}
+
+typename MatGroupRefract::DataSoA MatGroupRefract::SoA() const
+{
+    return soa;
+}
+
+//===============================//
+//        Unreal Material        //
+//===============================//
+std::string_view MatGroupUnreal::TypeName()
+{
+    using namespace TypeNameGen::CompTime;
+    using namespace std::string_view_literals;
+    static constexpr auto Name = "Unreal"sv;
+    return MaterialTypeName<Name>;
+}
+
+void MatGroupUnreal::HandleMediums(const MediumKeyPairList& mediumList)
+{
+}
+
+MatGroupUnreal::MatGroupUnreal(uint32_t groupId,
+                               const GPUSystem& s,
+                               const TextureViewMap& map)
+    : GenericGroupMaterial<MatGroupUnreal>(groupId, s, map)
+{}
+
+void MatGroupUnreal::CommitReservations()
+{
+    isCommitted = true;
+}
+
+MatAttributeInfoList MatGroupUnreal::AttributeInfo() const
+{
+    return MatAttributeInfoList{};
+}
+
+void MatGroupUnreal::PushAttribute(MaterialKey,
+                                   uint32_t attributeIndex,
+                                   TransientData,
+                                   const GPUQueue&)
+{}
+
+void MatGroupUnreal::PushAttribute(MaterialKey,
+                                   uint32_t, const Vector2ui&,
+                                   TransientData, const GPUQueue&)
+{}
+
+void MatGroupUnreal::PushAttribute(MaterialKey, MaterialKey,
+                                   uint32_t, TransientData,
+                                   const GPUQueue&)
+{}
+
+
+void MatGroupUnreal::PushTexAttribute(MaterialKey, MaterialKey,
+                                      uint32_t, TransientData,
+                                      std::vector<Optional<TextureId>>,
+                                      const GPUQueue&)
+{}
+
+void MatGroupUnreal::PushTexAttribute(MaterialKey, MaterialKey,
+                                      uint32_t,
+                                      std::vector<Optional<TextureId>>,
+                                      const GPUQueue&)
+{}
+
+void MatGroupUnreal::PushTexAttribute(MaterialKey, MaterialKey,
+                                      uint32_t,
+                                      std::vector<TextureId>,
+                                      const GPUQueue&)
+{}
+
+typename MatGroupUnreal::DataSoA MatGroupUnreal::SoA() const
 {
     return soa;
 }

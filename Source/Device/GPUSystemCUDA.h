@@ -214,6 +214,9 @@ class GPUQueueCUDA
     template <class T>
     MRAY_HOST void      MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const;
     template <class T>
+    MRAY_HOST void      MemcpyAsyncStrided(Span<T> regionTo, size_t outputByteStride,
+                                           Span<const T> regionFrom, size_t inputByteStride) const;
+    template <class T>
     MRAY_HOST void      MemsetAsync(Span<T> region, uint8_t perByteValue) const;
 
     MRAY_HOST void      IssueBufferForDestruction(TransientData data) const;
@@ -433,6 +436,7 @@ GPUQueueCUDA::GPUQueueCUDA(GPUQueueCUDA&& other) noexcept
     : stream(other.stream)
     , multiprocessorCount(other.multiprocessorCount)
     , nvtxDomain(other.nvtxDomain)
+    , myDevice(other.myDevice)
 {
     other.stream = cudaStream_t(0);
 }
@@ -443,6 +447,7 @@ GPUQueueCUDA& GPUQueueCUDA::operator=(GPUQueueCUDA&& other) noexcept
     multiprocessorCount = other.multiprocessorCount;
     nvtxDomain = other.nvtxDomain;
     stream = other.stream;
+    myDevice = other.myDevice;
     other.stream = cudaStream_t(0);
     return *this;
 }
@@ -471,6 +476,28 @@ void GPUQueueCUDA::MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const
     CUDA_CHECK(cudaMemcpyAsync(regionTo.data(), regionFrom.data(),
                                regionFrom.size_bytes(),
                                cudaMemcpyDefault, stream));
+}
+
+template <class T>
+MRAY_HOST void GPUQueueCUDA::MemcpyAsyncStrided(Span<T> regionTo, size_t outputByteStride,
+                                                Span<const T> regionFrom, size_t inputByteStride) const
+{
+    // TODO: This may have performance implications maybe,
+    // test it. We utilize "1" width 2D copy to emulate strided memcpy.
+    size_t actualInStride = (inputByteStride == 0) ? sizeof(T) : inputByteStride;
+    size_t actualOutStride = (outputByteStride == 0) ? sizeof(T) : outputByteStride;
+
+    size_t elemCountIn = MathFunctions::DivideUp(regionFrom.size_bytes(), actualInStride);
+    size_t elemCountOut = MathFunctions::DivideUp(regionTo.size_bytes(), actualOutStride);
+    assert(elemCountIn == elemCountOut);
+
+    cudaMemcpy2DAsync(regionTo.data(),
+                      actualOutStride,
+                      regionFrom.data(),
+                      actualInStride,
+                      sizeof(T), elemCountIn,
+                      cudaMemcpyDefault,
+                      stream);
 }
 
 template <class T>

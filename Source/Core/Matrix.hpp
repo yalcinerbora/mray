@@ -254,7 +254,7 @@ constexpr Matrix<N, T> Matrix<N, T>::operator*(const Matrix& right) const
         for(unsigned int j = 0; j < N; j++)
         {
             auto leftRow = Vector<N, T>(Span<const T, N>(matrix.data() + j * N, N));
-            m(i, j) = leftRow.Dot(col);
+            m(j, i) = leftRow.Dot(col);
         }
     }
     return m;
@@ -473,7 +473,7 @@ template <unsigned int N, ArithmeticC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Matrix<N, T>& Matrix<N, T>::InverseSelf() requires std::floating_point<T>
 {
-    Matrix<N, T> m = Inverse(*this);
+    Matrix<N, T> m = Inverse();
     (*this) = m;
     return (*this);
 }
@@ -740,9 +740,9 @@ constexpr Matrix<N, T> Matrix<N, T>::Identity()
     for(unsigned int y = 0; y < N; y++)
     {
         UNROLL_LOOP
-        for(int x = 0; x < N; x++)
+        for(unsigned int  x = 0; x < N; x++)
         {
-            matrix[x] = (x == y) ? 1 : 0;
+            matrix[y * N + x] = (x == y) ? T{1} : T{0};
         }
     }
     return matrix;
@@ -784,10 +784,9 @@ constexpr AABB<M, T> Matrix<N, T>::TransformAABB(const AABB<M, T>& aabb) const r
         UNROLL_LOOP
         for(unsigned int j = 0; j < M; j ++)
         {
-            vertex[0] = ((i >> j) & 0b1) ? aabb.Max()[j] : aabb.Min()[j];
+            vertex[j] = ((i >> j) & 0b1) ? aabb.Max()[j] : aabb.Min()[j];
         }
         vertex[M] = T{1};
-
         vertex = (*this) * vertex;
 
         result.SetMax(Vector<M, T>::Max(result.Max(), Vector<M, T>(vertex)));

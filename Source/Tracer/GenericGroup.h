@@ -457,7 +457,6 @@ GenericTexturedGroupT<I, A>::ConvertToView(std::vector<Optional<TextureId>> texI
                             this->Name(), this->groupId,
                             static_cast<uint32_t>(texId.value()),
                             attributeIndex);
-            return std::vector<Optional<TextureView<D, T>>>{};
         }
         result.push_back(std::get<ViewType>(view));
     }
