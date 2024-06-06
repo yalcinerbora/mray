@@ -318,6 +318,21 @@ using MRayPixelTypeBase = Variant
     MRayPixelType<MRayPixelEnum::MR_BC7_UNORM>
 >;
 
+template<class T>
+static constexpr bool IsBlockCompressedType =
+(
+    std::is_same_v<T, MRayPixelType<MRayPixelEnum::MR_BC1_UNORM>> ||
+    std::is_same_v<T, MRayPixelType<MRayPixelEnum::MR_BC2_UNORM>> ||
+    std::is_same_v<T, MRayPixelType<MRayPixelEnum::MR_BC3_UNORM>> ||
+    std::is_same_v<T, MRayPixelType<MRayPixelEnum::MR_BC4_UNORM>> ||
+    std::is_same_v<T, MRayPixelType<MRayPixelEnum::MR_BC4_SNORM>> ||
+    std::is_same_v<T, MRayPixelType<MRayPixelEnum::MR_BC5_UNORM>> ||
+    std::is_same_v<T, MRayPixelType<MRayPixelEnum::MR_BC5_SNORM>> ||
+    std::is_same_v<T, MRayPixelType<MRayPixelEnum::MR_BC6H_UFLOAT>> ||
+    std::is_same_v<T, MRayPixelType<MRayPixelEnum::MR_BC6H_SFLOAT>> ||
+    std::is_same_v<T, MRayPixelType<MRayPixelEnum::MR_BC7_UNORM>>
+);
+
 struct MRayDataTypeRT : public MRayDataTypeBase
 {
     using enum MRayDataEnum;

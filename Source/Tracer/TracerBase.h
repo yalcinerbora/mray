@@ -4,14 +4,15 @@
 #include "Core/TypeGenFunction.h"
 #include "Core/Map.h"
 
-#include "Tracer/PrimitiveC.h"
-#include "Tracer/MaterialC.h"
-#include "Tracer/MediumC.h"
-#include "Tracer/CameraC.h"
-#include "Tracer/TransformC.h"
-#include "Tracer/LightC.h"
-#include "Tracer/RendererC.h"
-#include "Tracer/AcceleratorC.h"
+#include "PrimitiveC.h"
+#include "MaterialC.h"
+#include "MediumC.h"
+#include "CameraC.h"
+#include "TransformC.h"
+#include "LightC.h"
+#include "RendererC.h"
+#include "AcceleratorC.h"
+#include "TextureMemory.h"
 
 namespace BS { class thread_pool; }
 
@@ -119,6 +120,9 @@ class TracerBase : public TracerI
 
     // Loaded Parameters
     TracerParameters    tracerParams;
+
+    // Texture Related
+    TextureMemory       texMem;
 
     // Current Types
     Map<std::string_view, PrimAttributeInfoList>       primAttributeInfoMap;

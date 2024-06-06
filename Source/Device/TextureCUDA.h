@@ -50,16 +50,16 @@ template<uint32_t D, class T>
 class TextureCUDA
 {
     using UnderlyingType = T;
-    //using UnderlyingType = typename TextureInitParams<D, T>::UnderlyingType;
     using CudaType = typename decltype(VectorTypeToCUDA<T>())::MappedType;
     static constexpr uint32_t ChannelCount = VectorTypeToChannels<T>().Channels;
     static constexpr bool IsNormConvertible = IsNormConvertibleCUDA<T>();
 
-    // Sanity Checks
-    //static_assert(std::is_same_v<UnderlyingType, T>);
+    // Sanity Check
     static_assert(D >= 1 && D <= 3, "At most 3D textures are supported");
 
     public:
+    using Type = T;
+    static constexpr uint32_t Dims = D;
     using PaddedChannelType = PaddedChannel<ChannelCount, T>;
 
     private:
@@ -111,6 +111,25 @@ class TextureCUDA
                                           const TextureExtent<D>& size,
                                           Span<const PaddedChannelType> regionFrom);
 };
+
+//template<uint32_t D, class T>
+//class RWTextureCUDA
+//{
+//    private:
+//    cudaSurfaceObject_t surf;
+//
+//    public:
+//    // Constructors & Destructor
+//                    RWTextureCUDA(TextureCUDA<D, T>&);
+//                    RWTextureCUDA(const RWTextureCUDA&) = delete;
+//                    RWTextureCUDA(RWTextureCUDA&&);
+//    RWTextureCUDA&  operator=(const RWTextureCUDA&) = delete;
+//    RWTextureCUDA&  operator=(RWTextureCUDA&&);
+//                    ~RWTextureCUDA();
+//
+//    // ....
+//
+//};
 
 class TextureBackingMemoryCUDA
 {

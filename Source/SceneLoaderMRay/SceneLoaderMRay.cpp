@@ -718,9 +718,28 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
             auto loaderIn = loader;
 
             // When barrier completed
-            // Reserve the space for mappings
-            // Commit group reservations
-            loaderIn.CommitReservations(groupId);
+            // Barrier function can not throw by design
+            // So we need to catch any exceptions here
+            // and delegate to the exception list.
+
+            try
+            {
+                // Allocate the space for mappings
+                // Commit group reservations
+                loaderIn.CommitReservations(groupId);
+            }
+            // Only proper exception here is the out of memory by the GPU probably.
+            // So abrubtly terminate the proces.
+            catch(MRayError& e)
+            {
+                MRAY_ERROR_LOG("Fatal Error ({:s})", e.GetError());
+                std::exit(1);
+            }
+            catch(std::exception& e)
+            {
+                MRAY_ERROR_LOG("Unknown Error ({:s})", e.what());
+                std::exit(1);
+            }
         };
         // Determine the thread size
         uint32_t threadCount = std::min(threadPool.get_thread_count(),
@@ -826,7 +845,22 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
         // When barrier completed
         // Reserve the space for mappings
         // Commit textures greoups reservations
-        tracer.CommitTextures();
+        try
+        {
+            tracer.CommitTextures();
+        }
+        // Only proper exception here is the out of memory by the GPU probably.
+        // So abrubtly terminate the proces.
+        catch(MRayError& e)
+        {
+            MRAY_ERROR_LOG("Fatal Error ({:s})", e.GetError());
+            std::exit(1);
+        }
+        catch(std::exception& e)
+        {
+            MRAY_ERROR_LOG("Unknown Error ({:s})", e.what());
+            std::exit(1);
+        }
     };
 
     // Determine the thread size

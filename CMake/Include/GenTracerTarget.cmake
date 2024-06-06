@@ -10,6 +10,10 @@ function(gen_tracer_target)
 
     set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/Tracer)
 
+    set(SRC_TEXTURE
+        ${CURRENT_SOURCE_DIR}/TextureMemory.h
+        ${CURRENT_SOURCE_DIR}/TextureMemory.cpp)
+
     set(SRC_PRIMITIVES
         ${CURRENT_SOURCE_DIR}/PrimitiveC.h
         ${CURRENT_SOURCE_DIR}/PrimitiveDefaultTriangle.h
@@ -84,6 +88,7 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/TracerBase.cpp)
 
     set(SRC_ALL
+        ${SRC_TEXTURE}
         ${SRC_PRIMITIVES}
         ${SRC_MATERIALS}
         ${SRC_CAMERAS}
@@ -97,6 +102,7 @@ function(gen_tracer_target)
         ${SRC_COMMON})
 
     # IDE Filters
+    source_group("Texture" FILES ${SRC_TEXTURE})
     source_group("Primitives" FILES ${SRC_PRIMITIVES})
     source_group("Transforms" FILES ${SRC_TRANSFORMS})
     source_group("Materials" FILES ${SRC_MATERIALS})

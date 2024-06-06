@@ -91,6 +91,8 @@ TracerBase::TracerBase(const TypeGeneratorPack& tGen,
     : threadPool(nullptr)
     , typeGenerators(tGen)
     , tracerParams(tParams)
+    , texMem(gpuSystem)
+
 {}
 
 TypeNameList TracerBase::PrimitiveGroups() const
@@ -647,35 +649,36 @@ void TracerBase::CommitTexColorSpace(MRayColorSpaceEnum)
     throw MRayError("Textures are not impl.");
 }
 
-TextureId TracerBase::CreateTexture2D(Vector2ui, uint32_t,
-                                      MRayPixelEnum,
-                                      AttributeIsColor)
+TextureId TracerBase::CreateTexture2D(Vector2ui size, uint32_t mipLevel,
+                                      MRayPixelEnum pixType,
+                                      AttributeIsColor isColor)
 {
-    throw MRayError("Textures are not impl.");
+    MRayPixelTypeRT pixType2;
+    texMem.CreateTexture2D(size, mipLevel, pixType2, isColor);
+    throw MRayError("\"CreateTexture2D\" is not implemented.");
 }
 
 TextureId TracerBase::CreateTexture3D(Vector3ui, uint32_t,
                                       MRayPixelEnum,
                                       AttributeIsColor)
 {
-    throw MRayError("Textures are not impl.");
+    throw MRayError("\"CreateTexture3D\" is not implemented.");
 }
 
 MRayDataTypeRT TracerBase::GetTexturePixelType(TextureId) const
 {
-    throw MRayError("\"GetTexturePixelType\" is not implemented in mock tracer!");
+    throw MRayError("\"GetTexturePixelType\" is not implemented.");
 }
 
 void TracerBase::CommitTextures()
 {
-    //MRAY_ERROR_LOG("Textures are not impl.");
-    //std::exit(1);
+    throw MRayError("\"CommitTextures\" is not implemented.");
 }
 
 void TracerBase::PushTextureData(TextureId, uint32_t,
                                  TransientData)
 {
-    throw MRayError("Textures are not impl.");
+    throw MRayError("\"PushTextureData\" is not implemented.");
 }
 
 TransGroupId TracerBase::CreateTransformGroup(std::string name)

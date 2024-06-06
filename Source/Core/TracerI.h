@@ -91,7 +91,6 @@ enum class SamplerType
     INDEPENDENT
 };
 
-
 struct TracerParameters
 {
     // Random Seed value, many samplers etc.
