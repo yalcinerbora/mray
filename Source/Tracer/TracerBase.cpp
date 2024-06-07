@@ -644,41 +644,27 @@ void TracerBase::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
                                              std::move(textures), queue);
 }
 
-void TracerBase::CommitTexColorSpace(MRayColorSpaceEnum)
-{
-    throw MRayError("Textures are not impl.");
-}
-
 TextureId TracerBase::CreateTexture2D(Vector2ui size, uint32_t mipLevel,
-                                      MRayPixelEnum pixType,
-                                      AttributeIsColor isColor)
+                                      MRayTextureParameters p)
 {
-    MRayPixelTypeRT pixType2;
-    texMem.CreateTexture2D(size, mipLevel, pixType2, isColor);
-    throw MRayError("\"CreateTexture2D\" is not implemented.");
+    return texMem.CreateTexture2D(size, mipLevel, p);
 }
 
-TextureId TracerBase::CreateTexture3D(Vector3ui, uint32_t,
-                                      MRayPixelEnum,
-                                      AttributeIsColor)
+TextureId TracerBase::CreateTexture3D(Vector3ui size, uint32_t mipLevel,
+                                      MRayTextureParameters p)
 {
-    throw MRayError("\"CreateTexture3D\" is not implemented.");
-}
-
-MRayDataTypeRT TracerBase::GetTexturePixelType(TextureId) const
-{
-    throw MRayError("\"GetTexturePixelType\" is not implemented.");
+    return texMem.CreateTexture3D(size, mipLevel, p);
 }
 
 void TracerBase::CommitTextures()
 {
-    throw MRayError("\"CommitTextures\" is not implemented.");
+    texMem.CommitTextures();
 }
 
-void TracerBase::PushTextureData(TextureId, uint32_t,
-                                 TransientData)
+void TracerBase::PushTextureData(TextureId id, uint32_t mipLevel,
+                                 TransientData data)
 {
-    throw MRayError("\"PushTextureData\" is not implemented.");
+    texMem.PushTextureData(id, mipLevel, std::move(data));
 }
 
 TransGroupId TracerBase::CreateTransformGroup(std::string name)

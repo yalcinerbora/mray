@@ -22,7 +22,7 @@ template <class Query, uint32_t C>
 struct MappingInt
 {
     using KeyType = Query;
-    static constexpr uint32_t Channels = C;
+    static constexpr uint32_t Integer = C;
 };
 
 template<class T>
@@ -71,6 +71,29 @@ constexpr auto VectorTypeToCUDA()
     constexpr auto FList = CUDAToTexTypeMapping;
     return GetTupleElement<T>(FList);
 }
+
+template<class T>
+constexpr auto BCTypeToCUDA()
+{
+    constexpr auto BCToTexTypeMapping = std::make_tuple
+    (
+        // Unsigned Int
+        MappingInt<PixelBC1, cudaChannelFormatKindUnsignedBlockCompressed1>{},
+        MappingInt<PixelBC2, cudaChannelFormatKindUnsignedBlockCompressed2>{},
+        MappingInt<PixelBC3, cudaChannelFormatKindUnsignedBlockCompressed3>{},
+        MappingInt<PixelBC4U, cudaChannelFormatKindUnsignedBlockCompressed4>{},
+        MappingInt<PixelBC4S, cudaChannelFormatKindSignedBlockCompressed4>{},
+        MappingInt<PixelBC5U, cudaChannelFormatKindUnsignedBlockCompressed5>{},
+        MappingInt<PixelBC5S, cudaChannelFormatKindSignedBlockCompressed5>{},
+        MappingInt<PixelBC6U, cudaChannelFormatKindUnsignedBlockCompressed6H>{},
+        MappingInt<PixelBC6S, cudaChannelFormatKindSignedBlockCompressed6H>{},
+        MappingInt<PixelBC7, cudaChannelFormatKindUnsignedBlockCompressed7>{}
+    );
+    using namespace TypeFinder;
+    constexpr auto FList = BCToTexTypeMapping;
+    return GetTupleElement<T>(FList);
+}
+
 
 template<class T>
 static constexpr auto VectorTypeToChannels()
@@ -167,7 +190,7 @@ template<class T>
 class TextureViewCUDA<1, T>
 {
     public:
-    static constexpr uint32_t Channels = VectorTypeToChannels<T>().Channels;
+    static constexpr uint32_t Channels = VectorTypeToChannels<T>().Integer;
     private:
     using CudaType = typename decltype(VectorTypeToCUDA<T>())::MappedType;
     using ConvertType = CudaTexToMRayType<T, CudaType, Channels>;
@@ -194,7 +217,7 @@ template<class T>
 class TextureViewCUDA<2, T>
 {
     public:
-    static constexpr uint32_t Channels = VectorTypeToChannels<T>().Channels;
+    static constexpr uint32_t Channels = VectorTypeToChannels<T>().Integer;
     private:
     using CudaType = typename decltype(VectorTypeToCUDA<T>())::MappedType;
     using ConvertType = CudaTexToMRayType<T, CudaType, Channels>;
@@ -217,7 +240,7 @@ template<class T>
 class TextureViewCUDA<3, T>
 {
     public:
-    static constexpr uint32_t Channels = VectorTypeToChannels<T>().Channels;
+    static constexpr uint32_t Channels = VectorTypeToChannels<T>().Integer;
     private:
     using CudaType = typename decltype(VectorTypeToCUDA<T>())::MappedType;
     using ConvertType = CudaTexToMRayType<T, CudaType, Channels>;

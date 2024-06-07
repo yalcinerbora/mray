@@ -89,10 +89,8 @@ using Byte = std::byte;
 
 class EmptyType{};
 
-// Main data types that the system accepts
-// Type erasure stuff
-//namespace MRayDataDetail
-//{
+// Common enumerations that many
+// internal libraries require
 
 enum class MRayDataEnum : uint16_t
 {
@@ -216,7 +214,7 @@ enum class MRayPixelEnum : uint16_t
     MR_END
 };
 
-enum class MRayColorSpaceEnum : uint32_t
+enum class MRayColorSpaceEnum : uint8_t
 {
     // These are more or less mapped from OIIO/OCIO
     // https://opencolorio.readthedocs.io/en/latest/configurations/aces_1.0.3.html#colorspaces
@@ -238,10 +236,26 @@ enum class MRayColorSpaceEnum : uint32_t
     MR_END
 };
 
+// Texture Related
+enum class MRayTextureInterpEnum : uint8_t
+{
+    MR_NEAREST,
+    MR_LINEAR,
+    MR_END
+};
+
+enum class MRayTextureEdgeResolveEnum : uint8_t
+{
+    MR_WRAP,
+    MR_CLAMP,
+    MR_MIRROR,
+    MR_END
+};
+
 struct MRayDataTypeStringifier
 {
     using enum MRayDataEnum;
-    static constexpr std::array<std::string_view, static_cast<size_t>(MR_END)> Names =
+    static constexpr std::array<const std::string_view, static_cast<size_t>(MR_END)> Names =
     {
         "INT8",
         "VECTOR_2C",
@@ -297,7 +311,7 @@ struct MRayDataTypeStringifier
 struct MRayPixelTypeStringifier
 {
     using enum MRayPixelEnum;
-    static constexpr std::array<std::string_view, static_cast<size_t>(MR_END)> Names =
+    static constexpr std::array<const std::string_view, static_cast<size_t>(MR_END)> Names =
     {
         "MR_R8_UNORM",
         "MR_RG8_UNORM",
@@ -340,17 +354,91 @@ struct MRayPixelTypeStringifier
 struct MRayColorSpaceStringifier
 {
     using enum MRayColorSpaceEnum;
-    static constexpr std::array<std::string_view, static_cast<size_t>(MR_END)> Names =
+    static constexpr std::array<const std::string_view, static_cast<size_t>(MR_END)> Names =
     {
         "ACES2065_1",
         "ACES_CG",
         "REC_709",
         "REC_2020",
         "DCI_P3",
-        "DEFAULT",
+        "DEFAULT"
     };
-    static constexpr std::string_view ToString(MRayColorSpaceEnum e);
+    static constexpr std::string_view   ToString(MRayColorSpaceEnum e);
+    static constexpr MRayColorSpaceEnum FromString(std::string_view);
 };
+
+struct MRayTextrueInterpStringifier
+{
+    using enum MRayTextureInterpEnum;
+    static constexpr std::array<const std::string_view, static_cast<size_t>(MR_END)> Names =
+    {
+        "Nearest",
+        "Linear"
+    };
+    static constexpr std::string_view       ToString(MRayTextureInterpEnum e);
+    static constexpr MRayTextureInterpEnum  FromString(std::string_view);
+};
+
+struct MRayTextureEdgeResolveStringifier
+{
+    using enum MRayTextureEdgeResolveEnum;
+    static constexpr std::array<const std::string_view, static_cast<size_t>(MR_END)> Names =
+    {
+        "Wrap",
+        "Clamp",
+        "Mirror"
+    };
+    static constexpr std::string_view ToString(MRayTextureEdgeResolveEnum e);
+    static constexpr MRayTextureEdgeResolveEnum FromString(std::string_view);
+};
+
+// Block Compressed pixel "types"
+// These are aligned with Vector<> template to match the types
+// on templates
+// "Tag" is here to differ types
+template<unsigned int Channel, class T, unsigned int Tag = 0>
+struct BlockCompressedType
+{
+    using InnerType = T;
+    static constexpr size_t Dims = Channel;
+};
+
+using PixelBC1 = BlockCompressedType<4, uint8_t, 0>;
+using PixelBC2 = BlockCompressedType<4, uint8_t, 1>;
+using PixelBC3 = BlockCompressedType<4, uint8_t, 2>;
+using PixelBC4U = BlockCompressedType<1, uint8_t>;
+using PixelBC4S = BlockCompressedType<1, int8_t>;
+using PixelBC5U = BlockCompressedType<2, uint16_t>;
+using PixelBC5S = BlockCompressedType<2, int16_t>;
+using PixelBC6U = BlockCompressedType<3, uint16_t>;
+using PixelBC6S = BlockCompressedType<3, int16_t>;
+using PixelBC7 = BlockCompressedType<4, uint8_t, 3>;
+
+// Sanity check
+static_assert(std::is_same_v<PixelBC1, PixelBC2> == false);
+static_assert(std::is_same_v<PixelBC2, PixelBC3> == false);
+static_assert(std::is_same_v<PixelBC3, PixelBC7> == false);
+
+// Block compressed concepts
+template <class BCType>
+static constexpr bool IsBlockCompressedPixel = (std::is_same_v<BCType, PixelBC1> ||
+                                                std::is_same_v<BCType, PixelBC2> ||
+                                                std::is_same_v<BCType, PixelBC3> ||
+                                                std::is_same_v<BCType, PixelBC4U> ||
+                                                std::is_same_v<BCType, PixelBC4S> ||
+                                                std::is_same_v<BCType, PixelBC5U> ||
+                                                std::is_same_v<BCType, PixelBC5S> ||
+                                                std::is_same_v<BCType, PixelBC6U> ||
+                                                std::is_same_v<BCType, PixelBC6S> ||
+                                                std::is_same_v<BCType, PixelBC7>);
+
+template<class BCType>
+concept BlockCompressedPixelC = IsBlockCompressedPixel<BCType>;
+
+template<class BCType>
+concept NotBlockCompressedPixelC = !IsBlockCompressedPixel<BCType>;
+
+
 
 constexpr std::string_view MRayDataTypeStringifier::ToString(MRayDataEnum e)
 {
@@ -365,4 +453,32 @@ constexpr std::string_view MRayPixelTypeStringifier::ToString(MRayPixelEnum e)
 constexpr std::string_view MRayColorSpaceStringifier::ToString(MRayColorSpaceEnum e)
 {
     return Names[static_cast<uint32_t>(e)];
+}
+
+constexpr MRayColorSpaceEnum MRayColorSpaceStringifier::FromString(std::string_view sv)
+{
+    auto loc = std::find(Names.cbegin(), Names.cend(), sv);
+    return static_cast<MRayColorSpaceEnum>(std::distance(Names.cbegin(), loc));
+}
+
+constexpr std::string_view MRayTextrueInterpStringifier::ToString(MRayTextureInterpEnum e)
+{
+    return Names[static_cast<uint32_t>(e)];
+}
+
+constexpr MRayTextureInterpEnum MRayTextrueInterpStringifier::FromString(std::string_view sv)
+{
+    auto loc = std::find(Names.cbegin(), Names.cend(), sv);
+    return static_cast<MRayTextureInterpEnum>(std::distance(Names.cbegin(), loc));
+}
+
+constexpr std::string_view MRayTextureEdgeResolveStringifier::ToString(MRayTextureEdgeResolveEnum e)
+{
+    return Names[static_cast<uint32_t>(e)];
+}
+
+constexpr MRayTextureEdgeResolveEnum MRayTextureEdgeResolveStringifier::FromString(std::string_view sv)
+{
+    auto loc = std::find(Names.cbegin(), Names.cend(), sv);
+    return static_cast<MRayTextureEdgeResolveEnum>(std::distance(Names.cbegin(), loc));
 }

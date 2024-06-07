@@ -220,14 +220,10 @@ class TracerMock : public TracerI
                                      uint32_t attributeIndex,
                                      std::vector<TextureId>) override;
 
-    void            CommitTexColorSpace(MRayColorSpaceEnum = MRayColorSpaceEnum::MR_DEFAULT) override;
     TextureId       CreateTexture2D(Vector2ui size, uint32_t mipCount,
-                                    MRayPixelEnum pixelType,
-                                    AttributeIsColor) override;
+                                    MRayTextureParameters) override;
     TextureId       CreateTexture3D(Vector3ui size, uint32_t mipCount,
-                                    MRayPixelEnum pixelType,
-                                    AttributeIsColor) override;
-    MRayDataTypeRT  GetTexturePixelType(TextureId) const override;
+                                    MRayTextureParameters) override;
     void            CommitTextures() override;
     void            PushTextureData(TextureId, uint32_t mipLevel,
                                     TransientData data) override;
@@ -1003,45 +999,33 @@ inline void TracerMock::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
              matRange[0], matRange[1], textureIdString);
 }
 
-inline void TracerMock::CommitTexColorSpace(MRayColorSpaceEnum colorSpace)
-{
-    if(!print) return;
-
-    MRAY_LOG("Committing global texture space to {}",
-             MRayColorSpaceStringifier::ToString(colorSpace));
-}
-
 inline TextureId TracerMock::CreateTexture2D(Vector2ui dimensions, uint32_t mipCount,
-                                             MRayPixelEnum pixelType,
-                                             AttributeIsColor isColorTexture)
+                                             MRayTextureParameters p)
 {
     size_t texId = textureCounter.fetch_add(1);
     if(print)
         MRAY_LOG("Creating Texture2D({}) Dim: ({}, {}), "
-                 "Mip:{}, PixelType:{}, IsColor:{}",
+                 "Mip:{}, PixelType:{}, ColorSpace:{}, IsColor:{}",
                  static_cast<uint32_t>(texId), dimensions[0], dimensions[1],
-                 mipCount, MRayPixelTypeStringifier::ToString(pixelType),
-                 (isColorTexture == AttributeIsColor::IS_COLOR) ? true : false);
+                 mipCount, MRayPixelTypeStringifier::ToString(p.pixelType.Name()),
+                 MRayColorSpaceStringifier::ToString(p.colorSpace),
+                 (p.isColor == AttributeIsColor::IS_COLOR) ? true : false);
     return TextureId(texId);
 }
 
 inline TextureId TracerMock::CreateTexture3D(Vector3ui dimensions, uint32_t mipCount,
-                                             MRayPixelEnum pixelType,
-                                             AttributeIsColor isColorTexture)
+                                             MRayTextureParameters p)
 {
     size_t texId = textureCounter.fetch_add(1);
     if(print)
         MRAY_LOG("Creating Texture3D({}) Dim: ({}, {}, {}), "
-                 "Mip:{}, PixelType:{}, IsColor:{}",
+                 "Mip:{}, PixelType:{}, ColorSpace:{}, IsColor:{}",
                  static_cast<uint32_t>(texId), dimensions[0], dimensions[1],
-                 dimensions[2], mipCount, MRayPixelTypeStringifier::ToString(pixelType),
-                 (isColorTexture == AttributeIsColor::IS_COLOR) ? true : false);
+                 dimensions[2], mipCount,
+                 MRayPixelTypeStringifier::ToString(p.pixelType.Name()),
+                 MRayColorSpaceStringifier::ToString(p.colorSpace),
+                 (p.isColor == AttributeIsColor::IS_COLOR) ? true : false);
     return TextureId(texId);
-}
-
-inline MRayDataTypeRT TracerMock::GetTexturePixelType(TextureId) const
-{
-    throw MRayError("\"GetTexturePixelType\" is not implemented in mock tracer!");
 }
 
 inline void TracerMock::CommitTextures()

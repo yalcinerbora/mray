@@ -6,6 +6,8 @@
 #include "GPUSystemCUDA.h"
 #include "GPUTypes.h"
 
+#include "Core/Definitions.h"
+
 namespace mray::cuda
 {
 
@@ -46,54 +48,99 @@ constexpr bool IsNormConvertibleCUDA()
             std::is_same_v<T, Vector4c>);
 }
 
-template<uint32_t D, class T>
-class TextureCUDA
+template <class T>
+constexpr uint32_t BCTypeToChannels()
 {
-    using UnderlyingType = T;
-    using CudaType = typename decltype(VectorTypeToCUDA<T>())::MappedType;
-    static constexpr uint32_t ChannelCount = VectorTypeToChannels<T>().Channels;
+    // https://developer.nvidia.com/blog/revealing-new-features-in-the-cuda-11-5-toolkit/
+    if constexpr(std::is_same_v<T, PixelBC1> ||
+                 std::is_same_v<T, PixelBC2> ||
+                 std::is_same_v<T, PixelBC3> ||
+                 std::is_same_v<T, PixelBC7>)
+    {
+        return 4;
+    }
+    else if constexpr(std::is_same_v<T, PixelBC4U> ||
+                      std::is_same_v<T, PixelBC4S>)
+    {
+        return 1;
+    }
+    else if constexpr(std::is_same_v<T, PixelBC5U> ||
+                      std::is_same_v<T, PixelBC5S>)
+    {
+        return 2;
+    }
+    else if constexpr(std::is_same_v<T, PixelBC6U> ||
+                      std::is_same_v<T, PixelBC6S>)
+    {
+        return 3;
+    }
+    else static_assert(std::is_same_v<T, PixelBC1>,
+                       "Unknown Block Compressed Format!");
+}
+
+template<uint32_t DIM, class T>
+class TextureCUDA;
+
+// These two classes are due to bug on MSVC
+// https://stackoverflow.com/questions/68589314/how-to-define-a-specialized-class-method-outside-of-class-body-in-c
+// (Clang also had this, but fixed)
+// Issue here is that we cannot define the member functions outside of the
+// class body.
+// Instead of using enable_if, I've found the implementation above and used it.
+// New MSVC versions do accept forward declaration of the base body so I've changed it.
+//
+// We drop the D parameter for BC texture since we only support 2D.
+// (Is there event 3D file format that supports this?)
+//
+// TODO: In hindsight, %90 of the impl of BC and Normal Textures are the same.
+// Concept guarded constructor / View() function could've been enough.
+// so change it later.
+template<uint32_t D, class T>
+class TextureCUDA_Normal
+{
+    public:
+    static constexpr uint32_t ChannelCount  = VectorTypeToChannels<T>().Integer;
     static constexpr bool IsNormConvertible = IsNormConvertibleCUDA<T>();
+    static constexpr uint32_t Dims          = D;
+
+    using Type              = T;
+    using CudaType          = typename decltype(VectorTypeToCUDA<T>())::MappedType;
+    using PaddedChannelType = PaddedChannel<ChannelCount, T>;
 
     // Sanity Check
     static_assert(D >= 1 && D <= 3, "At most 3D textures are supported");
 
-    public:
-    using Type = T;
-    static constexpr uint32_t Dims = D;
-    using PaddedChannelType = PaddedChannel<ChannelCount, T>;
-
     private:
-    const GPUDeviceCUDA*        gpu;
-    cudaTextureObject_t         tex         = cudaTextureObject_t(0);
-    cudaMipmappedArray_t        data        = nullptr;
-    TextureInitParams<D>        texParams;
+    const GPUDeviceCUDA*    gpu;
+    cudaTextureObject_t     tex         = cudaTextureObject_t(0);
+    cudaMipmappedArray_t    data        = nullptr;
+    TextureInitParams<D>    texParams;
 
     // Allocation related
-    bool                        allocated   = false;
-    size_t                      size        = 0;
-    size_t                      alignment   = 0;
+    bool    allocated   = false;
+    size_t  size        = 0;
+    size_t  alignment   = 0;
 
     protected:
     public:
     // Constructors & Destructor
-                            TextureCUDA() = delete;
-                            TextureCUDA(const GPUDeviceCUDA& device,
-                                        const TextureInitParams<D>& p);
-                            TextureCUDA(const TextureCUDA&) = delete;
-                            TextureCUDA(TextureCUDA&&) noexcept;
-    TextureCUDA&            operator=(const TextureCUDA&) = delete;
-    TextureCUDA&            operator=(TextureCUDA&&) noexcept;
-                            ~TextureCUDA();
+                        TextureCUDA_Normal() = delete;
+                        TextureCUDA_Normal(const GPUDeviceCUDA& device,
+                                           const TextureInitParams<D>& p);
+                        TextureCUDA_Normal(const TextureCUDA_Normal&) = delete;
+                        TextureCUDA_Normal(TextureCUDA_Normal&&) noexcept;
+    TextureCUDA_Normal& operator=(const TextureCUDA_Normal&) = delete;
+    TextureCUDA_Normal& operator=(TextureCUDA_Normal&&) noexcept;
+                        ~TextureCUDA_Normal();
 
     // Direct view conversion (simple case)
-    template<class QT>
-    requires(std::is_same_v<QT, T>)
+    template<class QT> requires(std::is_same_v<QT, T>)
     TextureViewCUDA<D, QT>  View() const;
 
     template<class QT>
     requires(!std::is_same_v<QT, T> &&
-             (VectorTypeToChannels<T>().Channels ==
-              VectorTypeToChannels<QT>().Channels))
+             (VectorTypeToChannels<T>().Integer ==
+              VectorTypeToChannels<QT>().Integer))
     TextureViewCUDA<D, QT>  View() const;
 
     size_t                  Size() const;
@@ -101,6 +148,7 @@ class TextureCUDA
 
     TextureExtent<D>        Extents() const;
     uint32_t                MipCount() const;
+    const GPUDeviceCUDA&    Device() const;
 
     void                    CommitMemory(const GPUQueueCUDA& queue,
                                          const TextureBackingMemoryCUDA& deviceMem,
@@ -112,24 +160,102 @@ class TextureCUDA
                                           Span<const PaddedChannelType> regionFrom);
 };
 
-//template<uint32_t D, class T>
-//class RWTextureCUDA
-//{
-//    private:
-//    cudaSurfaceObject_t surf;
-//
-//    public:
-//    // Constructors & Destructor
-//                    RWTextureCUDA(TextureCUDA<D, T>&);
-//                    RWTextureCUDA(const RWTextureCUDA&) = delete;
-//                    RWTextureCUDA(RWTextureCUDA&&);
-//    RWTextureCUDA&  operator=(const RWTextureCUDA&) = delete;
-//    RWTextureCUDA&  operator=(RWTextureCUDA&&);
-//                    ~RWTextureCUDA();
-//
-//    // ....
-//
-//};
+template<class T>
+class TextureCUDA_BC
+{
+    static constexpr uint32_t BC_BLOCK_SIZE = 4;
+    public:
+    static constexpr uint32_t ChannelCount  = BCTypeToChannels<T>();
+    static constexpr bool IsNormConvertible = true;
+    static constexpr uint32_t Dims          = 2;
+    static constexpr auto CudaTypeEnum      = static_cast<cudaChannelFormatKind>(BCTypeToCUDA<T>().Integer);
+
+    using Type              = T;
+    using PaddedChannelType = Byte;
+
+    private:
+    const GPUDeviceCUDA*    gpu;
+    cudaTextureObject_t     tex         = cudaTextureObject_t(0);
+    cudaMipmappedArray_t    data        = nullptr;
+    TextureInitParams<2>    texParams;
+
+    // Allocation related
+    bool                    allocated   = false;
+    size_t                  size        = 0;
+    size_t                  alignment   = 0;
+
+    protected:
+    public:
+    // Constructors & Destructor
+                    TextureCUDA_BC() = delete;
+                    TextureCUDA_BC(const GPUDeviceCUDA& device,
+                                   const TextureInitParams<2>& p);
+                    TextureCUDA_BC(const TextureCUDA_BC&) = delete;
+                    TextureCUDA_BC(TextureCUDA_BC&&) noexcept;
+    TextureCUDA_BC& operator=(const TextureCUDA_BC&) = delete;
+    TextureCUDA_BC& operator=(TextureCUDA_BC&&) noexcept;
+                    ~TextureCUDA_BC();
+
+    // Only FloatX views are supported
+    template<class QT>
+    requires(!std::is_same_v<QT, T> &&
+             (BCTypeToChannels<T>() == VectorTypeToChannels<QT>().Integer))
+    TextureViewCUDA<2, QT>  View() const;
+
+    size_t                  Size() const;
+    size_t                  Alignment() const;
+
+    TextureExtent<2>        Extents() const;
+    uint32_t                MipCount() const;
+    const GPUDeviceCUDA&    Device() const;
+
+    void                    CommitMemory(const GPUQueueCUDA& queue,
+                                         const TextureBackingMemoryCUDA& deviceMem,
+                                         size_t offset);
+    void                    CopyFromAsync(const GPUQueueCUDA& queue,
+                                          uint32_t mipLevel,
+                                          const TextureExtent<2>& offset,
+                                          const TextureExtent<2>& size,
+                                          Span<const PaddedChannelType> regionFrom);
+};
+
+// This is the duplication part unfortunately
+template<uint32_t D, NotBlockCompressedPixelC T>
+class TextureCUDA<D, T> : public TextureCUDA_Normal<D, T>
+{
+    // Pull everything to this scope
+    using Base = TextureCUDA_Normal<D, T>;
+    public:
+    static constexpr uint32_t ChannelCount  = Base::ChannelCount;
+    static constexpr bool IsNormConvertible = Base::IsNormConvertible;
+    static constexpr uint32_t Dims          = Base::Dims;
+
+    using Type              = typename Base::Type;
+    using PaddedChannelType = typename Base::PaddedChannelType;
+
+    // Pull Constructor
+    using Base::Base;
+    // Functions were public so these are OK?
+};
+
+template<BlockCompressedPixelC T>
+class TextureCUDA<2, T> : public TextureCUDA_BC<T>
+{
+    // Pull everything to this scope
+    using Base = TextureCUDA_BC<T>;
+    public:
+    static constexpr uint32_t ChannelCount  = Base::ChannelCount;
+    static constexpr bool IsNormConvertible = Base::IsNormConvertible;
+    static constexpr uint32_t Dims          = Base::Dims;
+
+    using Type              = typename Base::Type;
+    using PaddedChannelType = typename Base::PaddedChannelType;
+
+    // Pull Constructor
+    using Base::Base;
+    // Functions were public so these are OK?
+};
+
 
 class TextureBackingMemoryCUDA
 {
@@ -143,7 +269,6 @@ class TextureBackingMemoryCUDA
     CUmemGenericAllocationHandle    memHandle;
 
     public:
-
     // Constructors & Destructor
                                 TextureBackingMemoryCUDA(const GPUDeviceCUDA& device);
                                 TextureBackingMemoryCUDA(const GPUDeviceCUDA& device, size_t sizeInBytes);

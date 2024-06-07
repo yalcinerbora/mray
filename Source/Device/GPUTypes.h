@@ -46,21 +46,6 @@ struct KernelExactIssueParams
     uint32_t sharedMemSize = 0;
 };
 
-// Texture Related
-enum class InterpolationType
-{
-    NEAREST,
-    LINEAR
-};
-
-enum class EdgeResolveType
-{
-    WRAP,
-    CLAMP,
-    MIRROR
-    // Border does not work properly
-};
-
 // Texture Size Type Metaprogramming
 template <uint32_t D, class = void> struct TextureExtentT;
 template <uint32_t D> requires(D == 1)
@@ -91,21 +76,20 @@ using UVType = typename UVTypeT<D>::type;
 template <uint32_t D>
 struct TextureInitParams
 {
-    bool                    normIntegers    = true;
-    bool                    normCoordinates = true;
-    bool                    convertSRGB     = false;
+    bool        normIntegers    = true;
+    bool        normCoordinates = true;
+    bool        convertSRGB     = false;
 
-    InterpolationType       interp      = InterpolationType::NEAREST;
-    EdgeResolveType         eResolve    = EdgeResolveType::WRAP;
+    uint32_t    maxAnisotropy   = 16;
+    Float       mipmapBias      = 0.0f;
+    Float       minMipmapClamp  = -100.0f;
+    Float       maxMipmapClamp  = 100.0f;
 
-    uint32_t                maxAnisotropy   = 16;
-    Float                   mipmapBias      = 0.0f;
-    Float                   minMipmapClamp  = -100.0f;
-    Float                   maxMipmapClamp  = 100.0f;
-
+    MRayTextureInterpEnum       interp      = MRayTextureInterpEnum::MR_NEAREST;
+    MRayTextureEdgeResolveEnum  eResolve    = MRayTextureEdgeResolveEnum::MR_WRAP;
     // Dimension Related (must be set)
-    TextureExtent<D>        size            = TextureExtent<D>(0);
-    uint32_t                mipCount        = 0;
+    uint32_t                    mipCount    = 0;
+    TextureExtent<D>            size        = TextureExtent<D>(0);
 };
 
 template<uint32_t D>

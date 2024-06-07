@@ -1,7 +1,13 @@
 #pragma once
 
+#include <bitset>
+
+#include "Core/TracerI.h"
+
 #include "Device/GPUSystemForward.h"
 #include "Device/GPUTypes.h"
+
+#include "TransientPool/TransientPool.h"
 
 #include "GenericGroup.h"
 
@@ -19,9 +25,11 @@ class CommonTextureI
     virtual void        CommitMemory(const GPUQueue& queue,
                                      const TextureBackingMemory& deviceMem,
                                      size_t offset) = 0;
-    virtual size_t      Size() const = 0;
-    virtual size_t      Alignment() const = 0;
-    virtual uint32_t    MipCount() const = 0;
+
+    virtual size_t              Size() const = 0;
+    virtual size_t              Alignment() const = 0;
+    virtual uint32_t            MipCount() const = 0;
+    virtual const GPUDevice&    Device() const = 0;
 
     // We can get away with dimension 3, and put INT32_MAX
     // to unused dimensions here
@@ -49,28 +57,135 @@ class CommonTextureI
     // And All Done!
 };
 
-template<size_t S, size_t A>
-class CommonTextureT;
+// Generic Texture type
+template<size_t StorageSize, size_t Alignment>
+class alignas(Alignment) CommonTextureT
+{
+    using MipIsLoadedBits = std::bitset<TracerConstants::MaxTextureMipCount>;
+    private:
+    std::array<Byte, StorageSize> storage;
+    // TODO: Could not cast the storate to the interface,
+    //
+    CommonTextureI*     impl;
+    MRayPixelTypeRT     pixelType;
+    MRayColorSpaceEnum  colorSpace;
+    AttributeIsColor    isColor;
+    MipIsLoadedBits     isMipLoaded;
 
-using CommonTexture = CommonTextureT<std::max(sizeof(Texture<3, Vector4>),
-                                              sizeof(Texture<2, Vector4>)),
-                                     std::max(alignof(Texture<3, Vector4>),
-                                              alignof(Texture<2, Vector4>))>;
+    CommonTextureI*         Impl();
+    const CommonTextureI*   Impl() const;
+
+    public:
+    template<class T, class... Args>
+                    CommonTextureT(std::in_place_type_t<T>,
+                                   MRayColorSpaceEnum, AttributeIsColor,
+                                   MRayPixelTypeRT,
+                                   Args&&...);
+    // TODO: Enable these later
+                    CommonTextureT(const CommonTextureT&) = delete;
+                    CommonTextureT(CommonTextureT&&) = delete;
+    CommonTextureT& operator=(const CommonTextureT&) = delete;
+    CommonTextureT& operator=(CommonTextureT&&) = delete;
+                    ~CommonTextureT();
+
+    void            CommitMemory(const GPUQueue& queue,
+                                 const TextureBackingMemory& deviceMem,
+                                 size_t offset);
+    size_t          Size() const;
+    size_t          Alignment() const;
+    uint32_t        MipCount() const;
+    //
+    TextureExtent<3>    Extents() const;
+    uint32_t            DimensionCount() const;
+    void                CopyFromAsync(const GPUQueue& queue,
+                                      uint32_t mipLevel,
+                                      const TextureExtent<3>& offset,
+                                      const TextureExtent<3>& size,
+                                      TransientData regionFrom);
+    GenericTextureView  View() const;
+    const GPUDevice&    Device() const;
+
+    // These are extra functionality that will be built on top of
+    MRayColorSpaceEnum  ColorSpace() const;
+    AttributeIsColor    IsColor() const;
+    MRayPixelTypeRT     PixelType() const;
+
+};
+
+namespace TexDetail
+{
+
+template <typename T>
+class Concept : public CommonTextureI
+{
+    private:
+    T tex;
+
+    public:
+    template<class... Args>
+                        Concept(Args&&...);
+
+    void                CommitMemory(const GPUQueue& queue,
+                                        const TextureBackingMemory& deviceMem,
+                                        size_t offset) override;
+    size_t              Size() const override;
+    size_t              Alignment() const override;
+    uint32_t            MipCount() const override;
+    const GPUDevice&    Device() const override;
+    //
+    TextureExtent<3>    Extents() const override;
+    uint32_t            DimensionCount() const;
+    void                CopyFromAsync(const GPUQueue& queue,
+                                      uint32_t mipLevel,
+                                      const TextureExtent<3>& offset,
+                                      const TextureExtent<3>& size,
+                                      TransientData regionFrom) override;
+    GenericTextureView  View() const override;
+};
+
+}
+
+using CommonTexture = CommonTextureT
+<
+    std::max(sizeof(TexDetail::Concept<Texture<3, Vector4>>),
+             sizeof(TexDetail::Concept<Texture<2, Vector4>>)),
+    std::max(alignof(TexDetail::Concept<Texture<3, Vector4>>),
+             alignof(TexDetail::Concept<Texture<2, Vector4>>))
+>;
 
 class TextureMemory
 {
-    private:
-    const GPUSystem&                gpuSystem;
-    std::atomic_uint32_t            texCounter;
-    //Map<TextureId, CommonTexture>   textures;
+    using GPUIterator       = GPUQueueIteratorRoundRobin;
+    using TextureMap        = ThreadSafeMap<TextureId, CommonTexture>;
+    using TextureMemList    = std::vector<TextureBackingMemory>;
 
+    private:
+    const GPUSystem&        gpuSystem;
+    TextureMemList          texMemList;
+    std::atomic_uint32_t    texCounter;
+    TextureMap              textures;
+    uint32_t                clampResolution;
+    //
+    std::atomic_uint32_t    gpuIndexCounter = 0;
+
+    template<uint32_t D>
+    TextureId CreateTexture(const Vector<D, uint32_t>& size, uint32_t mipCount,
+                            const MRayTextureParameters&);
 
     public:
     // Constructors & Destructor
-                TextureMemory(const GPUSystem&);
+                    TextureMemory(const GPUSystem&,
+                                  uint32_t clampResolution = std::numeric_limits<uint32_t>::max());
 
     //
-    TextureId   CreateTexture2D(Vector2ui size, uint32_t mipCount,
-                                MRayPixelTypeRT pixType,
-                                AttributeIsColor);
+    TextureId       CreateTexture2D(const Vector2ui& size, uint32_t mipCount,
+                                    const MRayTextureParameters&);
+    TextureId       CreateTexture3D(const Vector3ui& size, uint32_t mipCount,
+                                    const MRayTextureParameters&);
+
+    void            CommitTextures();
+    void            PushTextureData(TextureId, uint32_t mipLevel,
+                                    TransientData data);
+
+    MRayPixelTypeRT GetPixelType(TextureId) const;
 };

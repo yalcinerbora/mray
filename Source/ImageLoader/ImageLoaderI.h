@@ -10,6 +10,7 @@
 #include "Core/Vector.h"
 #include "Core/Flag.h"
 #include "Core/MRayDataType.h"
+#include "Core/TracerI.h"
 #include "TransientPool/TransientPool.h"
 
 enum class ImageType
@@ -90,8 +91,7 @@ template<uint32_t D>
 requires(D == 2 || D == 3)
 struct Image
 {
-    // This array is just to elide heap, so max 1Mx1M texture size
-    static constexpr int32_t MAX_MIP_COUNT = 20;
+    static constexpr int32_t MAX_MIP_COUNT = TracerConstants::MaxTextureMipCount;
     using MipMapArray = StaticVector<ImageMip<D>, MAX_MIP_COUNT>;
 
     ImageHeader<D>  header;

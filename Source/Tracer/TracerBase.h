@@ -205,18 +205,13 @@ class TracerBase : public TracerI
                                      uint32_t attributeIndex,
                                      std::vector<TextureId>) override;
 
-    void            CommitTexColorSpace(MRayColorSpaceEnum = MRayColorSpaceEnum::MR_DEFAULT) override;
     TextureId       CreateTexture2D(Vector2ui size, uint32_t mipCount,
-                                    MRayPixelEnum pixelType,
-                                    AttributeIsColor) override;
+                                    MRayTextureParameters) override;
     TextureId       CreateTexture3D(Vector3ui size, uint32_t mipCount,
-                                    MRayPixelEnum pixelType,
-                                    AttributeIsColor) override;
-    MRayDataTypeRT  GetTexturePixelType(TextureId) const override;
+                                    MRayTextureParameters) override;
     void            CommitTextures() override;
     void            PushTextureData(TextureId, uint32_t mipLevel,
                                     TransientData data) override;
-
 
     TransGroupId    CreateTransformGroup(std::string typeName) override;
     TransformId     ReserveTransformation(TransGroupId, AttributeCountList) override;
@@ -226,7 +221,6 @@ class TracerBase : public TracerI
     void            PushTransAttribute(TransGroupId, Vector2ui range,
                                        uint32_t attributeIndex,
                                        TransientData data) override;
-
 
     LightGroupId    CreateLightGroup(std::string typeName,
                                      PrimGroupId = TracerConstants::EmptyPrimitive) override;
@@ -247,7 +241,6 @@ class TracerBase : public TracerI
                                        uint32_t attributeIndex,
                                        std::vector<TextureId>) override;
 
-
     CameraGroupId   CreateCameraGroup(std::string typeName) override;
     CameraId        ReserveCamera(CameraGroupId, AttributeCountList) override;
     CameraIdList    ReserveCameras(CameraGroupId, std::vector<AttributeCountList>) override;
@@ -256,7 +249,6 @@ class TracerBase : public TracerI
     void            PushCamAttribute(CameraGroupId, Vector2ui range,
                                      uint32_t attributeIndex,
                                      TransientData data) override;
-
 
     MediumGroupId   CreateMediumGroup(std::string typeName) override;
     MediumId        ReserveMedium(MediumGroupId, AttributeCountList) override;
@@ -274,13 +266,11 @@ class TracerBase : public TracerI
                                         uint32_t attributeIndex,
                                         std::vector<TextureId> textures) override;
 
-
     SurfaceId       CreateSurface(SurfaceParams) override;
     LightSurfaceId  CreateLightSurface(LightSurfaceParams) override;
     CamSurfaceId    CreateCameraSurface(CameraSurfaceParams) override;
     AABB3           CommitSurfaces() override;
     CameraTransform GetCamTransform(CamSurfaceId) const override;
-
 
     RendererId  CreateRenderer(std::string typeName) override;
     void        DestroyRenderer(RendererId) override;
@@ -295,8 +285,7 @@ class TracerBase : public TracerI
     void                StopRender() override;
     RendererOutput      DoRenderWork() override;
 
-    void            ClearAll() override;
-
+    void                    ClearAll() override;
     GPUThreadInitFunction   GetThreadInitFunction() const override;
     void                    SetThreadPool(BS::thread_pool&) override;
     size_t                  TotalDeviceMemory() const override;

@@ -73,6 +73,8 @@ class ThreadSafeMap
 
     Optional<std::reference_wrapper<const V>>
     at(const K& k) const;
+    Optional<std::reference_wrapper<V>>
+    at(const K& k);
 
     const MapType& Map() const;
     MapType& Map();
@@ -91,12 +93,12 @@ class ThreadSafeVector
 
     public:
     template<class... Args>
-    T& emplace_back(Args&&... args);
-    const T& at(size_t i) const;
-    void                        clear();
+    T&          emplace_back(Args&&... args);
+    const T&    at(size_t i) const;
+    void        clear();
 
-    const VecType& Vec() const;
-    VecType& Vec();
+    const VecType&  Vec() const;
+    VecType&        Vec();
 };
 
 template<class K, class T, class C, class A>
@@ -132,6 +134,16 @@ ThreadSafeMap<K, V>::try_emplace(const K& k, Args&&... args)
 
 template<class K, class V>
 Optional<std::reference_wrapper<const V>> ThreadSafeMap<K, V>::at(const K& k) const
+{
+    std::shared_lock<std::shared_mutex> l(mutex);
+    auto loc = map.find(k);
+    if(loc == map.cend())
+        return std::nullopt;
+    return loc->second;
+}
+
+template<class K, class V>
+Optional<std::reference_wrapper<V>> ThreadSafeMap<K, V>::at(const K& k)
 {
     std::shared_lock<std::shared_mutex> l(mutex);
     auto loc = map.find(k);

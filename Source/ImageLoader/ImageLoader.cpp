@@ -34,6 +34,51 @@ Expected<MRayPixelTypeRT> ImageLoader::PixelFormatToMRay(const OIIO::ImageSpec& 
 {
     using ResultT = Expected<MRayPixelTypeRT>;
     using enum MRayPixelEnum;
+    using namespace std::string_view_literals;
+
+    // Compression LUT
+    // First time CTAD, yay!
+    // TODO: Do not ignore pre-multiplied alpha etc. here
+    static const std::array DDS_FORMATS =
+    {
+        Pair(OIIO::ustring("DXT1"sv),   MRayPixelTypeRT(MRayPixelType<MR_BC1_UNORM>{})),
+        Pair(OIIO::ustring("DXT2"sv),   MRayPixelTypeRT(MRayPixelType<MR_BC2_UNORM>{})),
+        Pair(OIIO::ustring("DXT3"sv),   MRayPixelTypeRT(MRayPixelType<MR_BC2_UNORM>{})),
+        Pair(OIIO::ustring("DXT4"sv),   MRayPixelTypeRT(MRayPixelType<MR_BC3_UNORM>{})),
+        Pair(OIIO::ustring("DXT5"sv),   MRayPixelTypeRT(MRayPixelType<MR_BC3_UNORM>{})),
+
+        // TODO: OIIO Does not give sign of the channel
+        // https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-block-compression#bc4
+        // Maybe DDS does not have that? I dunno check this later
+        Pair(OIIO::ustring("BC4"sv),    MRayPixelTypeRT(MRayPixelType<MR_BC4_UNORM>{})),
+        Pair(OIIO::ustring("BC4"sv),    MRayPixelTypeRT(MRayPixelType<MR_BC4_SNORM>{})),
+        // TODO: Same goes for BC5
+        // https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-block-compression#bc5
+        Pair(OIIO::ustring("BC5"sv),    MRayPixelTypeRT(MRayPixelType<MR_BC5_UNORM>{})),
+        Pair(OIIO::ustring("BC5"sv),    MRayPixelTypeRT(MRayPixelType<MR_BC5_SNORM>{})),
+
+        Pair(OIIO::ustring("BC6HU"sv),  MRayPixelTypeRT(MRayPixelType<MR_BC6H_UFLOAT>{})),
+        Pair(OIIO::ustring("BC6HS"sv),  MRayPixelTypeRT(MRayPixelType<MR_BC6H_SFLOAT>{})),
+        Pair(OIIO::ustring("BC7"sv),    MRayPixelTypeRT(MRayPixelType<MR_BC7_UNORM>{}))
+    };
+
+    OIIO::ustring compressionString;
+    bool isCompressedFormat = spec.getattribute("compression"sv,
+                                                OIIO::TypeString,
+                                                &compressionString);
+    if(isCompressedFormat)
+    {
+        auto loc = std::find_if(DDS_FORMATS.cbegin(), DDS_FORMATS.cend(),
+        [&compressionString, &spec](const auto& fmt)
+        {
+            return compressionString == fmt.first;
+        });
+        // We find the format, return
+        if(loc != DDS_FORMATS.cend()) return loc->second;
+        // If this function failed, then it is not DDS,
+        // let OIIO handle it
+    }
+
     switch(spec.format.basetype)
     {
         case OIIO::TypeDesc::UINT8:
@@ -282,17 +327,20 @@ Expected<ImageHeader<2>> ImageLoader::ReadImageHeaderInternal(const OIIO::ImageI
 
     // Determine color space
     OIIO::ustring colorSpaceOIIO;
-    spec.getattribute("oiio:ColorSpace", OIIO::TypeString,
-                      &colorSpaceOIIO);
+    bool hasColorSpace = spec.getattribute("oiio:ColorSpace", OIIO::TypeString,
+                                           &colorSpaceOIIO);
 
     Expected<ColorSpacePack> colorSpaceE = ColorSpaceToMRay(std::string(colorSpaceOIIO));
-    if(!colorSpaceE.has_value())
+    if(hasColorSpace && !colorSpaceE.has_value())
     {
         MRayError e = colorSpaceE.error();
         e.AppendInfo(MRAY_FORMAT("({})", filePath));
         return e;
     }
-    const auto& colorSpace = colorSpaceE.value();
+    // If "oiio:ColorSpace" query is push MR_DEFAULT color space with linear gamma
+    // SceneLoader may check user defined color space if applicable
+    const auto& colorSpace = colorSpaceE.value_or(Pair(Float(1),
+                                                       MRayColorSpaceEnum::MR_DEFAULT));
 
     // TODO: Support tiled images
     if(spec.tile_width != 0 || spec.tile_height != 0)
@@ -343,11 +391,11 @@ Expected<Image<2>> ImageLoader::ReadImage2D(const std::string& filePath,
 
     Image<2> result;
     result.header = header;
-    for(int32_t mipLevel = 0; inFile->seek_subimage(0, mipLevel); mipLevel++)
+    for(int32_t mipLevel = 0; mipLevel < header.mipCount; mipLevel++)
     {
         // Calculate the final spec according to the flags
         // channel expand and sign convert..
-        OIIO::ImageSpec spec = inFile->spec();
+        OIIO::ImageSpec spec = inFile->spec(0, mipLevel);
         OIIO::ImageSpec finalSpec = spec;
 
         // Check if sign convertible
@@ -381,7 +429,9 @@ Expected<Image<2>> ImageLoader::ReadImage2D(const std::string& filePath,
         Byte* dataLastElement = pixels.AccessAs<Byte>().data() + (header.dimensions[1] - 1) * scanLineSize;
         // Now we can read the file directly flipped and with proper format etc. etc.
         OIIO::stride_t oiioScanLineSize = static_cast<OIIO::stride_t>(scanLineSize);
-        if(!inFile->read_image(readFormat, dataLastElement, xStride, -oiioScanLineSize))
+
+        if(!inFile->read_image(0, mipLevel, readFormat,
+                               dataLastElement, xStride, -oiioScanLineSize))
             return MRayError("OIIO Error ({})", inFile->geterror());
 
         // Re-adjust the pixelFormat (we may have done channel expand and sign convert

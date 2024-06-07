@@ -883,10 +883,21 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
         {
             for(size_t i = start; i < end; i++)
             {
+                using namespace NodeNames;
                 const auto& [texStruct, jsonNode, is2D] = textureNodes[i];
-                auto fileName = jsonNode.AccessData<std::string>(NodeNames::TEX_NODE_FILE);
-                auto isColor = jsonNode.AccessOptionalData<bool>(NodeNames::TEX_NODE_IS_COLOR)
-                                .value_or(NodeNames::TEX_NODE_IS_COLOR_DEFAULT);
+                auto fileName = jsonNode.AccessData<std::string>(TEX_NODE_FILE);
+                auto isColor = jsonNode.AccessOptionalData<bool>(TEX_NODE_IS_COLOR)
+                                .value_or(TEX_NODE_IS_COLOR_DEFAULT);
+                auto edgeResolveString = jsonNode.AccessOptionalData<std::string_view>(TEX_NODE_EDGE_RESOLVE);
+                auto edgeResolve = (edgeResolveString)
+                                    ? MRayTextureEdgeResolveStringifier::FromString(edgeResolveString.value())
+                                    : MRayTextureEdgeResolveEnum::MR_WRAP;
+
+                auto interpString = jsonNode.AccessOptionalData<std::string_view>(TEX_NODE_INTERPOLATION);
+                auto interpolation = (interpString)
+                                        ? MRayTextrueInterpStringifier::FromString(interpString.value())
+                                        : MRayTextureInterpEnum::MR_NEAREST;
+
                 fileName = Filesystem::RelativePathToAbsolute(fileName, scenePath);
 
                 // Currently no flags are utilized on header load time
@@ -906,16 +917,22 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
                     headerE.value().pixelType = ImageLoaderI::TryExpandTo4CFormat(headerE.value().pixelType);
 
                     const auto& header = headerE.value();
+                    using enum AttributeIsColor;
+                    MRayTextureParameters params =
+                    {
+                        .pixelType = header.pixelType,
+                        .colorSpace = header.colorSpace,
+                        .isColor = (isColor) ? IS_COLOR : IS_PURE_DATA,
+                        .edgeResolve = edgeResolve,
+                        .interpolation = interpolation,
+                    };
                     tId = tracer.CreateTexture2D(header.dimensions,
                                                  header.mipCount,
-                                                 header.pixelType.Name(),
-                                                 isColor
-                                                    ? AttributeIsColor::IS_COLOR
-                                                    : AttributeIsColor::IS_PURE_DATA);
+                                                 params);
                 }
                 else
                 {
-                    exceptions.AddException(MRayError("3D Textures are not supported atm."));
+                    exceptions.AddException(MRayError("3D Textures are not supported yet."));
                     barrier->arrive_and_drop();
                     return;
                 }

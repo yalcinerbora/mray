@@ -28,7 +28,7 @@ struct RenderImageParams
 namespace TransientPoolDetail { class TransientData; }
 using TransientData = TransientPoolDetail::TransientData;
 
-enum class PrimitiveAttributeLogic
+enum class PrimitiveAttributeLogic : uint8_t
 {
     POSITION,
     INDEX,
@@ -46,6 +46,9 @@ enum class PrimitiveAttributeLogic
 
 namespace TracerConstants
 {
+    // This is utilized by static vectors to evade heap,
+    // this is currently "small" 65K x 65K textures are max
+    static constexpr size_t MaxTextureMipCount = 16;
     static constexpr size_t MaxPrimBatchPerSurface = 8;
     static constexpr size_t MaxAttributePerGroup = 16;
     static constexpr size_t MaxRendererAttributeCount = 32;
@@ -79,14 +82,14 @@ namespace TracerConstants
 //  -- SOFTWARE_BVH  :  Very basic midpoint BVH. Provided for completeness sake and
 //                      should not be used.
 //  -- HARDWARE      :  On CUDA, it utilizes OptiX for hardware acceleration.
-enum class AcceleratorType
+enum class AcceleratorType : uint8_t
 {
     SOFTWARE_NONE,
     SOFTWARE_BASIC_BVH,
     HARDWARE
 };
 
-enum class SamplerType
+enum class SamplerType : uint8_t
 {
     INDEPENDENT
 };
@@ -100,36 +103,47 @@ struct TracerParameters
     AcceleratorType accelMode = AcceleratorType::HARDWARE;
     // Item pool size, amount of "items" (paths/rays/etc) processed
     // in parallel
-    uint32_t        itemPoolSize = 1 << 21; // 2^21
+    uint32_t        itemPoolSize = 1 << 21; // 2^21 ~= 2M
     // Current sampler logic,
     SamplerType     samplerType = SamplerType::INDEPENDENT;
-    //
-    uint32_t        clampedTexRes = std::numeric_limits<uint32_t>::max();
+    // Texture Related
+    uint32_t            clampedTexRes = std::numeric_limits<uint32_t>::max();
+    MRayColorSpaceEnum  globalTextureColorSpace = MRayColorSpaceEnum::MR_ACES_CG;
 };
 
-enum class AttributeOptionality
+enum class AttributeOptionality : uint8_t
 {
     MR_MANDATORY,
     MR_OPTIONAL
 };
 
-enum class AttributeTexturable
+enum class AttributeTexturable : uint8_t
 {
     MR_CONSTANT_ONLY,
     MR_TEXTURE_OR_CONSTANT,
     MR_TEXTURE_ONLY
 };
 
-enum class AttributeIsColor
+enum class AttributeIsColor : uint8_t
 {
     IS_COLOR,
     IS_PURE_DATA
 };
 
-enum class AttributeIsArray
+enum class AttributeIsArray : uint8_t
 {
     IS_SCALAR,
     IS_ARRAY
+};
+
+// Generic Texture Input Parameters
+struct MRayTextureParameters
+{
+    MRayPixelTypeRT             pixelType;
+    MRayColorSpaceEnum          colorSpace = MRayColorSpaceEnum::MR_DEFAULT;
+    AttributeIsColor            isColor = AttributeIsColor::IS_COLOR;
+    MRayTextureEdgeResolveEnum  edgeResolve = MRayTextureEdgeResolveEnum::MR_WRAP;
+    MRayTextureInterpEnum       interpolation = MRayTextureInterpEnum::MR_NEAREST;
 };
 
 // Generic Attribute Info
@@ -416,24 +430,16 @@ class [[nodiscard]] TracerI
     //================================//
     //            Texture             //
     //================================//
-    // All textures must be defined on the same color space
-    virtual void        CommitTexColorSpace(MRayColorSpaceEnum = MRayColorSpaceEnum::MR_DEFAULT) = 0;
     // All textures are implicitly float convertible
     virtual TextureId   CreateTexture2D(Vector2ui size, uint32_t mipCount,
-                                        MRayPixelEnum pixelType,
-                                        AttributeIsColor isColorTexture) = 0;
+                                        MRayTextureParameters) = 0;
     virtual TextureId   CreateTexture3D(Vector3ui size, uint32_t mipCount,
-                                        MRayPixelEnum pixelType,
-                                        AttributeIsColor isColorTexture) = 0;
-    // Requested texture may be represented by a different type
-    // (float3 -> float4 due to padding)
-    virtual MRayDataTypeRT  GetTexturePixelType(TextureId) const = 0;
-    //
-    virtual void            CommitTextures() = 0;
+                                        MRayTextureParameters) = 0;
+    virtual void        CommitTextures() = 0;
     // Direct mip data
     // TODO: add more later (sub data etc)
-    virtual void            PushTextureData(TextureId, uint32_t mipLevel,
-                                            TransientData data) = 0;
+    virtual void        PushTextureData(TextureId, uint32_t mipLevel,
+                                        TransientData data) = 0;
     //================================//
     //          Transform             //
     //================================//

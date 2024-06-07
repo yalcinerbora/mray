@@ -82,11 +82,11 @@ TYPED_TEST(GPUTextureTest, Allocate)
 
     // Allocation
     TextureBackingMemory memory(system.BestDevice());
-    std::vector<size_t> offsets;
-    MemAlloc::AllocateTextureSpace(offsets, memory, sizes, alignments);
+    using namespace MemAlloc;
+    std::vector<size_t> offsets = AllocateTextureSpace(memory, sizes,
+                                                       alignments);
 
     // Committing memory
-    std::vector<Span<Byte>> textureAllocations;
     for(uint32_t i = 0; i < TOTAL_TEX_COUNT; i++)
     {
         const GPUQueue& queue = system.BestDevice().GetQueue(0);
@@ -94,9 +94,7 @@ TYPED_TEST(GPUTextureTest, Allocate)
     }
     // Commit is async so wait before destruction
     GPUFence fence = system.BestDevice().GetQueue(0).Barrier();
-
     fence.Wait();
-
 }
 
 
@@ -125,7 +123,7 @@ TYPED_TEST(GPUTextureTest, Copy)
     tParams.mipCount = 1;
     tParams.normIntegers = false;
     tParams.normCoordinates = false;
-    tParams.interp = InterpolationType::NEAREST;
+    tParams.interp = MRayTextureInterpEnum::MR_NEAREST;
     TexType tex(system.BestDevice(), tParams);
 
     // Allocation
@@ -180,7 +178,8 @@ TYPED_TEST(GPUTextureTest, Copy)
     system.BestDevice().GetQueue(0).Barrier().Wait();
 
     uint8_t anyFalse = std::reduce
-    (   hTrueFalseBuffer.cbegin(),
+    (
+        hTrueFalseBuffer.cbegin(),
         hTrueFalseBuffer.cend(),
         uint8_t{0x00},
         [](uint8_t lhs, uint8_t rhs)

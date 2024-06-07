@@ -10,33 +10,6 @@
 #include "Ray.h"
 #include "AABB.h"
 
-// Block Compressed pixel "types"
-// These are aligned with Vector<> template to match the types
-// on templates
-// "Tag" is here to differ types
-template<unsigned int Channel, class T, unsigned int Tag = 0>
-struct BlockCompressedType
-{
-    using InnerType = T;
-    static constexpr size_t Dims = Channel;
-};
-
-using PixelBC1  = BlockCompressedType<4, uint8_t, 0>;
-using PixelBC2  = BlockCompressedType<4, uint8_t, 1>;
-using PixelBC3  = BlockCompressedType<4, uint8_t, 2>;
-using PixelBC4U = BlockCompressedType<1, uint8_t>;
-using PixelBC4S = BlockCompressedType<1, int8_t>;
-using PixelBC5U = BlockCompressedType<2, uint16_t>;
-using PixelBC5S = BlockCompressedType<2, int16_t>;
-using PixelBC6U = BlockCompressedType<3, uint16_t>;
-using PixelBC6S = BlockCompressedType<3, int16_t>;
-using PixelBC7  = BlockCompressedType<4, uint8_t, 3>;
-
-// Sanity check
-static_assert(std::is_same_v<PixelBC1, PixelBC2> == false);
-static_assert(std::is_same_v<PixelBC2, PixelBC3> == false);
-static_assert(std::is_same_v<PixelBC3, PixelBC7> == false);
-
 namespace MRayDataDetail
 {
     using namespace TypeFinder;
@@ -317,21 +290,6 @@ using MRayPixelTypeBase = Variant
     MRayPixelType<MRayPixelEnum::MR_BC6H_SFLOAT>,
     MRayPixelType<MRayPixelEnum::MR_BC7_UNORM>
 >;
-
-template<class T>
-static constexpr bool IsBlockCompressedType =
-(
-    std::is_same_v<T, MRayPixelType<MRayPixelEnum::MR_BC1_UNORM>> ||
-    std::is_same_v<T, MRayPixelType<MRayPixelEnum::MR_BC2_UNORM>> ||
-    std::is_same_v<T, MRayPixelType<MRayPixelEnum::MR_BC3_UNORM>> ||
-    std::is_same_v<T, MRayPixelType<MRayPixelEnum::MR_BC4_UNORM>> ||
-    std::is_same_v<T, MRayPixelType<MRayPixelEnum::MR_BC4_SNORM>> ||
-    std::is_same_v<T, MRayPixelType<MRayPixelEnum::MR_BC5_UNORM>> ||
-    std::is_same_v<T, MRayPixelType<MRayPixelEnum::MR_BC5_SNORM>> ||
-    std::is_same_v<T, MRayPixelType<MRayPixelEnum::MR_BC6H_UFLOAT>> ||
-    std::is_same_v<T, MRayPixelType<MRayPixelEnum::MR_BC6H_SFLOAT>> ||
-    std::is_same_v<T, MRayPixelType<MRayPixelEnum::MR_BC7_UNORM>>
-);
 
 struct MRayDataTypeRT : public MRayDataTypeBase
 {

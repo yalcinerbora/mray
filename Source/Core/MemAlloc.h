@@ -52,10 +52,9 @@ Tuple<Span<Args>...> AllocateMultiData(Memory& memory,
 
 template <class Memory>
 requires requires(Memory m) { {m.ResizeBuffer(size_t{})} -> std::same_as<void>; }
-void AllocateTextureSpace(std::vector<size_t>& offsets,
-                          Memory& memory,
-                          const std::vector<size_t>& sizes,
-                          const std::vector<size_t>& alignments);
+std::vector<size_t> AllocateTextureSpace(Memory& memory,
+                                         const std::vector<size_t>& sizes,
+                                         const std::vector<size_t>& alignments);
 
 template <ImplicitLifetimeC Left, ImplicitLifetimeC Right>
 constexpr Span<Left> RepurposeAlloc(Span<Right> rhs);
@@ -167,13 +166,12 @@ Tuple<Span<Args>...> AllocateMultiData(Memory& memory,
 
 template <class Memory>
 requires requires(Memory m) { {m.ResizeBuffer(size_t{})} -> std::same_as<void>; }
-void AllocateTextureSpace(std::vector<size_t>& offsets,
-                          Memory& memory,
-                          const std::vector<size_t>& sizes,
-                          const std::vector<size_t>& alignments)
+std::vector<size_t> AllocateTextureSpace(Memory& memory,
+                                         const std::vector<size_t>& sizes,
+                                         const std::vector<size_t>& alignments)
 {
     assert(sizes.size() == alignments.size());
-    offsets.resize(sizes.size());
+    std::vector<size_t> offsets(sizes.size());
 
     size_t totalSize = 0;
     for(size_t i = 0; i < sizes.size(); i++)
@@ -185,6 +183,7 @@ void AllocateTextureSpace(std::vector<size_t>& offsets,
 
     // Allocate Memory
     memory.ResizeBuffer(totalSize);
+    return offsets;
 }
 
 
