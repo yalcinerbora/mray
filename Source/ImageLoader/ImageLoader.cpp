@@ -1,9 +1,11 @@
 #include "ImageLoader.h"
+#include "DDSLoader.h"
 #include "Core/MRayDataType.h"
 
 #include <execution>
 #include <algorithm>
 #include <array>
+#include <filesystem>
 
 #include <OpenImageIO/imageio.h>
 #include <OpenImageIO/imagebuf.h>
@@ -378,6 +380,20 @@ Expected<ImageHeader<2>> ImageLoader::ReadImageHeaderInternal(const OIIO::ImageI
     };
 }
 
+ImageLoader::ImageLoader(bool enableMT)
+{
+    if(!enableMT)
+    {
+        OIIO::attribute("threads", 1);
+        OIIO::attribute("exr_threads", 1);
+    }
+    // Do not use all readers (maybe imp. performance)
+    // also it is technically an error, user should be aware of
+    // these situations (maybe png file is a jpeg, and it is compressed
+    // user may pull their hair out to find the error on the rendering etc.)
+    OIIO::attribute("try_all_readers", 0);
+}
+
 Expected<Image<2>> ImageLoader::ReadImage2D(const std::string& filePath,
                                             ImageIOFlags flags) const
 {
@@ -391,7 +407,7 @@ Expected<Image<2>> ImageLoader::ReadImage2D(const std::string& filePath,
 
     Image<2> result;
     result.header = header;
-    for(int32_t mipLevel = 0; mipLevel < header.mipCount; mipLevel++)
+    for(uint32_t mipLevel = 0; mipLevel < header.mipCount; mipLevel++)
     {
         // Calculate the final spec according to the flags
         // channel expand and sign convert..
@@ -426,13 +442,27 @@ Expected<Image<2>> ImageLoader::ReadImage2D(const std::string& filePath,
                                readFormat.size());
         size_t totalSize = scanLineSize * static_cast<size_t>(spec.height);
         TransientData pixels(std::in_place_type_t<Byte>{}, totalSize);
-        Byte* dataLastElement = pixels.AccessAs<Byte>().data() + (header.dimensions[1] - 1) * scanLineSize;
+        Byte* dataLastElement = (pixels.AccessAs<Byte>().data() +
+                                 (spec.height - 1) * scanLineSize);
         // Now we can read the file directly flipped and with proper format etc. etc.
         OIIO::stride_t oiioScanLineSize = static_cast<OIIO::stride_t>(scanLineSize);
 
-        if(!inFile->read_image(0, mipLevel, readFormat,
-                               dataLastElement, xStride, -oiioScanLineSize))
-            return MRayError("OIIO Error ({})", inFile->geterror());
+        // Directly read the compressed data,
+        // OIIO uncompress DDS when anything is not auto stride
+        // This means we need to flip it manually (maybe attaching a view parameter)
+        bool isReadOK = false;
+        if(header.pixelType.IsBlockCompressed())
+        {
+            isReadOK = inFile->read_image(0, mipLevel, OIIO::TypeDesc::UNKNOWN,
+                                          dataLastElement);
+        }
+        else
+        {
+            isReadOK = inFile->read_image(0, mipLevel, readFormat,
+                                          dataLastElement, xStride,
+                                          -oiioScanLineSize);
+        }
+        if(!isReadOK) return MRayError("OIIO Error ({})", inFile->geterror());
 
         // Re-adjust the pixelFormat (we may have done channel expand and sign convert
         Expected<MRayPixelTypeRT> pixFormatFinalE = PixelFormatToMRay(finalSpec);
@@ -457,6 +487,19 @@ Expected<Image<2>> ImageLoader::ReadImageSubChannel(const std::string&,
 Expected<ImageHeader<2>> ImageLoader::ReadImageHeader2D(const std::string& filePath,
                                                         ImageIOFlags flags) const
 {
+    using namespace std::string_literals;
+
+    // If dds file first check compression.
+    // If compressed, utilize our custom reader
+    // If unknown or other fallback to OIIO decompression
+    if(std::filesystem::path(filePath).extension().string() == ".dds"s)
+    {
+        bool goodDDS = false;
+        auto headerE = ReadHeaderDDS(goodDDS, filePath);
+        if(headerE.has_error() || !goodDDS)
+            return headerE;
+        // Fallthrough towards OIIO path
+    }
     auto inFile = OIIO::ImageInput::open(filePath);
     if(!inFile) return MRayError("OIIO Error ({})", OIIO::geterror());
 

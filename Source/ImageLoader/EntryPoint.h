@@ -15,7 +15,7 @@
 namespace ImageLoaderDetail
 {
     extern "C" MRAY_IMAGEOADER_ENTRYPOINT
-    ImageLoaderI* ConstructImageLoader();
+    ImageLoaderI* ConstructImageLoader(bool enableMT = false);
 
     extern "C" MRAY_IMAGEOADER_ENTRYPOINT
     void DestroyImageLoader(ImageLoaderI*);
@@ -25,9 +25,9 @@ namespace ImageLoaderDetail
 // C++ Interface
 using ImageLoaderIPtr = std::unique_ptr<ImageLoaderI, decltype(&ImageLoaderDetail::DestroyImageLoader)>;
 
-inline ImageLoaderIPtr CreateImageLoader()
+inline ImageLoaderIPtr CreateImageLoader(bool enableMT = false)
 {
     using Ptr = std::unique_ptr<ImageLoaderI, decltype(&ImageLoaderDetail::DestroyImageLoader)>;
-    return Ptr(ImageLoaderDetail::ConstructImageLoader(),
+    return Ptr(ImageLoaderDetail::ConstructImageLoader(enableMT),
                &ImageLoaderDetail::DestroyImageLoader);
 }

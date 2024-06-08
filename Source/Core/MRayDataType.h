@@ -10,6 +10,16 @@
 #include "Ray.h"
 #include "AABB.h"
 
+// This implementation is quite taxing on compilation times.
+// It is used to "automatically" create switch/case statements
+// for the given Pixel/Data type.
+// Here is the generated code (Only copy pasted the Pixel portion)
+// https://godbolt.org/z/d99s1v7zP
+//
+// MSVC is slightly better at optimizing these
+// ; merges same case statements into one.
+// Clang/GCC does not do that (Maybe it does not worth it?)
+
 namespace MRayDataDetail
 {
     using namespace TypeFinder;
@@ -161,6 +171,7 @@ struct MRayPixelType
     using Type = typename decltype(MRayPixelDetail::PixelEnumToType<E>())::Result;
     static constexpr size_t ChannelCount = FindChannelCount<Type>();
     static constexpr MRayPixelEnum Name = E;
+    static constexpr bool IsBCPixel = IsBlockCompressedPixel<Type>;
 };
 
 template<MRayPixelEnum E>
@@ -306,6 +317,7 @@ struct MRayPixelTypeRT : public MRayPixelTypeBase
     using enum MRayPixelEnum;
     constexpr MRayPixelEnum     Name() const;
     constexpr size_t            ChannelCount() const;
+    constexpr bool              IsBlockCompressed() const;
 
     using MRayPixelTypeBase::MRayPixelTypeBase;
 };
@@ -347,5 +359,13 @@ inline constexpr size_t MRayPixelTypeRT::ChannelCount() const
     return std::visit([](auto&& d) -> size_t
     {
         return std::remove_cvref_t<decltype(d)>::ChannelCount;
+    }, *this);
+}
+
+inline constexpr bool MRayPixelTypeRT::IsBlockCompressed() const
+{
+    return std::visit([](auto&& d) -> bool
+    {
+        return std::remove_cvref_t<decltype(d)>::IsBCPixel;
     }, *this);
 }

@@ -33,7 +33,7 @@ class ImageLoader final : public ImageLoaderI
     protected:
     public:
         // Constructors & Destructor
-                            ImageLoader() = default;
+                            ImageLoader(bool enableMT = false);
                             ImageLoader(const ImageLoader&) = delete;
         ImageLoader&        operator=(const ImageLoader&) = delete;
                             ~ImageLoader() = default;

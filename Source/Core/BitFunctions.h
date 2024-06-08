@@ -23,6 +23,8 @@ namespace BitFunctions
 
     template<std::unsigned_integral T>
     constexpr T BitReverse(T value, T width = sizeof(T) * CHAR_BIT);
+
+    constexpr uint32_t GenerateFourCC(char byte0, char byte1, char byte2, char byte3);
 }
 
 
@@ -179,6 +181,21 @@ constexpr T BitFunctions::BitReverse(T value, T width)
         value >>= 1;
     }
     return result;
+}
+
+constexpr uint32_t BitFunctions::GenerateFourCC(char byte0, char byte1,
+                                                char byte2, char byte3)
+{
+    constexpr uint32_t p0 = CHAR_BIT * 0;
+    constexpr uint32_t p1 = CHAR_BIT * 1;
+    constexpr uint32_t p2 = CHAR_BIT * 2;
+    constexpr uint32_t p3 = CHAR_BIT * 3;
+    auto b0 = static_cast<uint32_t>(byte0);
+    auto b1 = static_cast<uint32_t>(byte1);
+    auto b2 = static_cast<uint32_t>(byte2);
+    auto b3 = static_cast<uint32_t>(byte3);
+    return ((b0 << p0) | (b1 << p1) |
+            (b2 << p2) | (b3 << p3));
 }
 
 template<size_t N>

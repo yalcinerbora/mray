@@ -3,9 +3,9 @@
 #include "ImageLoader.h"
 
 extern "C" MRAY_IMAGEOADER_ENTRYPOINT
-ImageLoaderI* ImageLoaderDetail::ConstructImageLoader()
+ImageLoaderI* ImageLoaderDetail::ConstructImageLoader(bool enableMT)
 {
-    return new ImageLoader();
+    return new ImageLoader(enableMT);
 }
 
 extern "C" MRAY_IMAGEOADER_ENTRYPOINT
