@@ -6,18 +6,12 @@
 #include "Types.h"
 #include "TracerI.h"
 
-enum class TextureAccessLayout
-{
-    R, G, B, A,
-    RG, GB, BA,
-    RGB, GBA,
-    RGBA
-};
+#include "ImageLoader/ImageLoaderI.h"
 
 struct NodeTexStruct
 {
     uint32_t            texId;
-    TextureAccessLayout channelLayout;
+    ImageSubChannelType channelLayout;
 
     auto operator<=>(const NodeTexStruct& rhs) const = default;
 };

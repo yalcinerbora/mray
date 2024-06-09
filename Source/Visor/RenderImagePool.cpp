@@ -273,15 +273,14 @@ void RenderImagePool::SaveImage(VkSemaphore prevCmdSignal,
             ? Float(1.0)
             : initInfo.sdrColorSpace.second;
         //
-        WriteImage<2> imgInfo =
+        WriteImageParams imgInfo =
         {
             .header =
             {
-                .dimensions = Vector2ui(initInfo.extent),
+                .dimensions = Vector3ui(initInfo.extent, 1u),
                 .mipCount = 1,
                 .pixelType = pixelType,
-                .colorSpace = colorSpace,
-                .gamma = gamma
+                .colorSpace = Pair(gamma, colorSpace)
             },
             .depth = initInfo.depth,
             .pixels = Span<const Byte>(hStagePtr, imgTightSize)
@@ -292,8 +291,8 @@ void RenderImagePool::SaveImage(VkSemaphore prevCmdSignal,
                                 std::to_string(fileOutInfo.sample) + "spp"s +
                                 std::to_string(fileOutInfo.time) + "sec"s);
 
-        MRayError e = imgLoader->WriteImage2D(imgInfo, filePath,
-                                              imgFileType);
+        MRayError e = imgLoader->WriteImage(imgInfo, filePath,
+                                            imgFileType);
 
         // Signal ready for next command
         VkSemaphoreSignalInfo signalInfo =

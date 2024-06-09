@@ -232,7 +232,8 @@ using AccelWorkGenerator = GeneratorFuncType<AcceleratorWorkI,
 using AccelWorkGenMap = Map<std::string_view, AccelWorkGenerator>;
 
 using AccelGroupGenerator = GeneratorFuncType<AcceleratorGroupI, uint32_t,
-                                              BS::thread_pool&, GPUSystem&,
+                                              BS::thread_pool&,
+                                              const GPUSystem&,
                                               const GenericGroupPrimitiveT&,
                                               const AccelWorkGenMap&>;
 
@@ -283,7 +284,7 @@ class AcceleratorGroupT : public AcceleratorGroupI
 
     protected:
     BS::thread_pool&            threadPool;
-    GPUSystem&                  gpuSystem;
+    const GPUSystem&            gpuSystem;
     const PrimitiveGroupType&   pg;
     uint32_t                    accelGroupId = 0;
 
@@ -307,7 +308,8 @@ class AcceleratorGroupT : public AcceleratorGroupI
     public:
     // Constructors & Destructor
                         AcceleratorGroupT(uint32_t accelGroupId,
-                                          BS::thread_pool&, GPUSystem&,
+                                          BS::thread_pool&,
+                                          const GPUSystem&,
                                           const GenericGroupPrimitiveT& pg,
                                           const AccelWorkGenMap&);
 
@@ -381,7 +383,7 @@ class BaseAcceleratorT : public BaseAcceleratorI
 
     protected:
     BS::thread_pool&    threadPool;
-    GPUSystem&          gpuSystem;
+    const GPUSystem&    gpuSystem;
     uint32_t            idCounter           = 0;
     Vector2ui           maxBitsUsedOnKey    = Vector2ui::Zero();
     AABB3               sceneAABB;
@@ -395,7 +397,8 @@ class BaseAcceleratorT : public BaseAcceleratorI
 
     public:
     // Constructors & Destructor
-                        BaseAcceleratorT(BS::thread_pool&, GPUSystem&,
+                        BaseAcceleratorT(BS::thread_pool&,
+                                         const GPUSystem&,
                                          const AccelGroupGenMap&,
                                          const AccelWorkGenMap&);
 
@@ -804,7 +807,7 @@ LinearizedSurfaceData AcceleratorGroupT<C, PG>::PreprocessConstructionParams(con
 
 template<class C, PrimitiveGroupC PG>
 AcceleratorGroupT<C, PG>::AcceleratorGroupT(uint32_t groupId,
-                                            BS::thread_pool& tp, GPUSystem& sys,
+                                            BS::thread_pool& tp, const GPUSystem& sys,
                                             const GenericGroupPrimitiveT& pgIn,
                                             const AccelWorkGenMap& workGenMap)
     : threadPool(tp)
@@ -853,7 +856,8 @@ const GenericGroupPrimitiveT& AcceleratorGroupT<C, PG>::PrimGroup() const
 }
 
 template <class C>
-BaseAcceleratorT<C>::BaseAcceleratorT(BS::thread_pool& tp, GPUSystem& system,
+BaseAcceleratorT<C>::BaseAcceleratorT(BS::thread_pool& tp,
+                                      const GPUSystem& system,
                                       const AccelGroupGenMap& aGen,
                                       const AccelWorkGenMap& globalWorkMap)
     : threadPool(tp)
@@ -1029,10 +1033,11 @@ void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
             throw MRayError("{:s}: Unable to find generator for accelerator group \"{:s}\"",
                             C::TypeName(), accelTypeName);
         }
-        auto accelPtr = accelGenerator.value()(std::move(aGroupId),
-                                               threadPool, gpuSystem,
-                                               *partition.primGroup,
-                                               workGenGlobalMap);
+        auto GenerateAccelGroup = accelGenerator.value().get();
+        auto accelPtr = GenerateAccelGroup(std::move(aGroupId),
+                                           threadPool, gpuSystem,
+                                           *partition.primGroup,
+                                           workGenGlobalMap);
         auto loc = generatedAccels.emplace(aGroupId, std::move(accelPtr));
         AcceleratorGroupI* acc = loc.first->second.get();
         acc->Construct(std::move(partition), qIt.Queue());

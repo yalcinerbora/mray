@@ -528,12 +528,8 @@ std::vector<TransientData> CameraAttributeLoad(const AttributeCountList& totalCo
     result.push_back(TransientData(std::in_place_type_t<Vector3>{},
                                    totalCounts[3]));
 
-    const GenericAttributeInfo& info = list.front();
     for(const auto& n : nodes)
     {
-        bool isArray = (std::get<GenericAttributeInfo::IS_ARRAY_INDEX>(info) ==
-                        AttributeIsArray::IS_ARRAY);
-
         bool isFovX = n.AccessData<bool>(IS_FOV_X);
         Float fov = n.AccessData<Float>(FOV);
         Float aspect = n.AccessData<Float>(ASPECT);
@@ -879,6 +875,8 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
         // We are opening here to determining size/format
         // and on the other iteration we actual memcpy it
         bool barrierPassed = false;
+        std::vector<ImageFilePtr> localTexFiles;
+        localTexFiles.reserve(end - start);
         try
         {
             for(size_t i = start; i < end; i++)
@@ -888,6 +886,8 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
                 auto fileName = jsonNode.AccessData<std::string>(TEX_NODE_FILE);
                 auto isColor = jsonNode.AccessOptionalData<bool>(TEX_NODE_IS_COLOR)
                                 .value_or(TEX_NODE_IS_COLOR_DEFAULT);
+                bool loadAsSigned = jsonNode.AccessOptionalData<bool>(NodeNames::TEX_NODE_AS_SIGNED)
+                                        .value_or(NodeNames::TEX_NODE_AS_SIGNED_DEFAULT);
                 auto edgeResolveString = jsonNode.AccessOptionalData<std::string_view>(TEX_NODE_EDGE_RESOLVE);
                 auto edgeResolve = (edgeResolveString)
                                     ? MRayTextureEdgeResolveStringifier::FromString(edgeResolveString.value())
@@ -900,41 +900,55 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
 
                 fileName = Filesystem::RelativePathToAbsolute(fileName, scenePath);
 
-                // Currently no flags are utilized on header load time
-                // TODO: Check here if this fails
-                TextureId tId;
-                if(is2D)
+                using enum ImageIOFlags::F;
+                ImageIOFlags flags;
+                flags[DISREGARD_COLOR_SPACE] = !isColor;
+                flags[LOAD_AS_SIGNED] = loadAsSigned;
+                // Always do channel expand (HW limitation)
+                flags[TRY_3C_4C_CONVERSION] = true;
+
+                auto imgFileE = imgLoader->OpenFile(fileName,
+                                                    texStruct.channelLayout,
+                                                    flags);
+                if(imgFileE.has_error())
                 {
-                    Expected<ImageHeader<2>> headerE = imgLoader->ReadImageHeader2D(fileName);
-                    if(!headerE.has_value())
-                    {
-                        exceptions.AddException(std::move(headerE.error()));
-                        barrier->arrive_and_drop();
-                        return;
-                    }
+                    exceptions.AddException(std::move(imgFileE.error()));
+                    barrier->arrive_and_drop();
+                    return;
+                }
+                localTexFiles.emplace_back(std::move(imgFileE.value()));
 
-                    // Always expand to 4 channel due to HW limitation
-                    headerE.value().pixelType = ImageLoaderI::TryExpandTo4CFormat(headerE.value().pixelType);
+                Expected<ImageHeader> headerE = localTexFiles.back()->ReadHeader();
+                if(!headerE.has_value())
+                {
+                    exceptions.AddException(std::move(headerE.error()));
+                    barrier->arrive_and_drop();
+                    return;
+                }
 
-                    const auto& header = headerE.value();
-                    using enum AttributeIsColor;
-                    MRayTextureParameters params =
-                    {
-                        .pixelType = header.pixelType,
-                        .colorSpace = header.colorSpace,
-                        .isColor = (isColor) ? IS_COLOR : IS_PURE_DATA,
-                        .edgeResolve = edgeResolve,
-                        .interpolation = interpolation,
-                    };
-                    tId = tracer.CreateTexture2D(header.dimensions,
+                const auto& header = headerE.value();
+                using enum AttributeIsColor;
+                MRayTextureParameters params =
+                {
+                    .pixelType = header.pixelType,
+                    .colorSpace = header.colorSpace.second,
+                    .isColor = (isColor) ? IS_COLOR : IS_PURE_DATA,
+                    .edgeResolve = edgeResolve,
+                    .interpolation = interpolation
+                };
+
+                TextureId tId;
+                if(header.Is2D())
+                {
+                    tId = tracer.CreateTexture2D(Vector2ui(header.dimensions),
                                                  header.mipCount,
                                                  params);
                 }
                 else
                 {
-                    exceptions.AddException(MRayError("3D Textures are not supported yet."));
-                    barrier->arrive_and_drop();
-                    return;
+                    tId = tracer.CreateTexture3D(header.dimensions,
+                                                 header.mipCount,
+                                                 params);
                 }
 
                 auto& texIdList = *texIdListPtr;
@@ -947,43 +961,19 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
 
             for(size_t i = start; i < end; i++)
             {
-                const auto& [texStruct, jsonNode, is2D] = textureNodes[i];
-                bool loadAsSigned = jsonNode.AccessOptionalData<bool>(NodeNames::TEX_NODE_AS_SIGNED)
-                                        .value_or(NodeNames::TEX_NODE_AS_SIGNED_DEFAULT);
-                auto isColor = jsonNode.AccessOptionalData<bool>(NodeNames::TEX_NODE_IS_COLOR)
-                                        .value_or(NodeNames::TEX_NODE_IS_COLOR_DEFAULT);
-                auto fileName = jsonNode.AccessData<std::string>(NodeNames::TEX_NODE_FILE);
-                fileName = Filesystem::RelativePathToAbsolute(fileName, scenePath);
-
-                using enum ImageIOFlags::F;
-                ImageIOFlags flags;
-                flags[DISREGARD_COLOR_SPACE] = !isColor;
-                flags[LOAD_AS_SIGNED] = loadAsSigned;
-                flags[TRY_3C_4C_CONVERSION] = true;     // Always do channel expand (HW limitation)
-
-                if(is2D)
+                Expected<Image> imgE = localTexFiles[i]->ReadImage();
+                if(!imgE.has_value())
                 {
-                    Expected<Image<2>> imgE = imgLoader->ReadImage2D(fileName, flags);
-                    if(!imgE.has_value())
-                    {
-                        exceptions.AddException(std::move(imgE.error()));
-                        return;
-                    }
-
-                    auto& img = imgE.value();
-                    // Send data mip by mip
-                    for(uint32_t j = 0; j < img.header.mipCount; j++)
-                    {
-                        auto& texIdList = *texIdListPtr;
-                        tracer.PushTextureData(texIdList[i].second, j,
-                                               std::move(img.imgData[j].pixels));
-                    }
-                }
-                else
-                {
-                    exceptions.AddException(MRayError("3D Textures are not supported atm."));
-                    barrier->arrive_and_drop();
+                    exceptions.AddException(std::move(imgE.error()));
                     return;
+                }
+                auto& img = imgE.value();
+                // Send data mip by mip
+                for(uint32_t j = 0; j < img.header.mipCount; j++)
+                {
+                    auto& texIdList = *texIdListPtr;
+                    tracer.PushTextureData(texIdList[i].second, j,
+                                           std::move(img.imgData[j].pixels));
                 }
             }
         }

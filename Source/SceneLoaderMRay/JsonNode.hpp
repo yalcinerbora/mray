@@ -7,25 +7,25 @@ inline bool IsDashed(const nlohmann::json& n)
     return (n.is_string() && n.get<std::string_view>() == DASH);
 }
 
-inline TextureAccessLayout LoadTextureAccessLayout(const nlohmann::json& node)
+inline ImageSubChannelType LoadTextureAccessLayout(const nlohmann::json& node)
 {
     using namespace std::literals;
     std::string_view l = node.get<std::string_view>();
-    if(l == "r"sv)  return TextureAccessLayout::R;
-    if(l == "g"sv)  return TextureAccessLayout::G;
-    if(l == "b"sv)  return TextureAccessLayout::B;
-    if(l == "a"sv)  return TextureAccessLayout::A;
+    if(l == "r"sv)  return ImageSubChannelType::R;
+    if(l == "g"sv)  return ImageSubChannelType::G;
+    if(l == "b"sv)  return ImageSubChannelType::B;
+    if(l == "a"sv)  return ImageSubChannelType::A;
     //
-    if(l == "rg"sv)  return TextureAccessLayout::RG;
-    if(l == "gb"sv)  return TextureAccessLayout::GB;
-    if(l == "ba"sv)  return TextureAccessLayout::BA;
+    if(l == "rg"sv)  return ImageSubChannelType::RG;
+    if(l == "gb"sv)  return ImageSubChannelType::GB;
+    if(l == "ba"sv)  return ImageSubChannelType::BA;
     //
-    if(l == "rgb"sv)  return TextureAccessLayout::RGB;
-    if(l == "gba"sv)  return TextureAccessLayout::GBA;
+    if(l == "rgb"sv)  return ImageSubChannelType::RGB;
+    if(l == "gba"sv)  return ImageSubChannelType::GBA;
     //
-    if(l == "rgba"sv)  return TextureAccessLayout::RGBA;
+    if(l == "rgba"sv)  return ImageSubChannelType::RGBA;
 
-    else throw MRayError("Unknown texture access layout");
+    throw MRayError("Unknown texture access layout");
 }
 
 inline void from_json(const nlohmann::json& n, NodeTexStruct& ts)

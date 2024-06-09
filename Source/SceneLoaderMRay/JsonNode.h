@@ -14,11 +14,6 @@
 static constexpr uint32_t EMPTY_TRANSFORM = std::numeric_limits<uint32_t>::max();
 static constexpr uint32_t EMPTY_MEDIUM = std::numeric_limits<uint32_t>::max();
 
-enum class TextureChannelType
-{
-    R, G, B, A
-};
-
 struct TracerSceneView
 {
     struct LightSurfaces
@@ -49,8 +44,6 @@ struct TracerSceneView
     std::vector<LightSurfaces>  lights;
     std::vector<Surfaces>       surfaces;
 };
-
-
 
 struct SurfaceStruct
 {
@@ -106,7 +99,7 @@ void from_json(const nlohmann::json&, AABB<3, T>&);
 template<std::floating_point T>
 void from_json(const nlohmann::json&, RayT<T>&);
 
-TextureAccessLayout LoadTextureAccessLayout(const nlohmann::json& node);
+ImageSubChannelType LoadTextureAccessLayout(const nlohmann::json& node);
 
 class JsonNode
 {

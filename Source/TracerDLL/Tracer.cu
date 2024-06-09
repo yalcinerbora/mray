@@ -148,7 +148,7 @@ TypeGeneratorPack Tracer::GLOBAL_TYPE_GEN = {};
 
 void Tracer::AddPrimGenerators(Map<std::string_view, PrimGenerator>& map)
 {
-    using Args = Tuple<uint32_t, GPUSystem&>;
+    using Args = Tuple<uint32_t, const GPUSystem&>;
 
     Args*           resolver0 = nullptr;
     PrimGTypes*     resolver1 = nullptr;
@@ -160,7 +160,7 @@ void Tracer::AddPrimGenerators(Map<std::string_view, PrimGenerator>& map)
 
 void Tracer::AddTransformGenerators(Map<std::string_view, TransGenerator>& map)
 {
-    using Args = Tuple<uint32_t, GPUSystem&>;
+    using Args = Tuple<uint32_t, const GPUSystem&>;
 
     Args*               resolver0 = nullptr;
     TransformGTypes*    resolver1 = nullptr;
@@ -172,7 +172,7 @@ void Tracer::AddTransformGenerators(Map<std::string_view, TransGenerator>& map)
 
 void Tracer::AddLightGenerators(Map<std::string_view, LightGenerator>& map)
 {
-    using Args = Tuple<uint32_t, GPUSystem&, const TextureViewMap&,
+    using Args = Tuple<uint32_t, const GPUSystem&, const TextureViewMap&,
                        GenericGroupPrimitiveT&>;
 
     Args*               resolver0 = nullptr;
@@ -185,7 +185,7 @@ void Tracer::AddLightGenerators(Map<std::string_view, LightGenerator>& map)
 
 void Tracer::AddCamGenerators(Map<std::string_view, CamGenerator>& map)
 {
-    using Args = Tuple<uint32_t, GPUSystem&>;
+    using Args = Tuple<uint32_t, const GPUSystem&>;
 
     Args*       resolver0 = nullptr;
     CamGTypes*  resolver1 = nullptr;
@@ -197,7 +197,7 @@ void Tracer::AddCamGenerators(Map<std::string_view, CamGenerator>& map)
 
 void Tracer::AddMaterialGenerators(Map<std::string_view, MatGenerator>& map)
 {
-    using Args = Tuple<uint32_t, GPUSystem&,
+    using Args = Tuple<uint32_t, const GPUSystem&,
                        const TextureViewMap&>;
 
     Args*       resolver0 = nullptr;
@@ -210,7 +210,7 @@ void Tracer::AddMaterialGenerators(Map<std::string_view, MatGenerator>& map)
 
 void Tracer::AddMediumGenerators(Map<std::string_view, MedGenerator>& map)
 {
-    using Args = Tuple<uint32_t, GPUSystem&,
+    using Args = Tuple<uint32_t, const GPUSystem&,
                        const TextureViewMap&>;
 
     Args*       resolver0 = nullptr;
@@ -231,11 +231,11 @@ static void AddAccelGeneratorsGeneric(Map<AcceleratorType, BaseAccelGenerator>& 
     using LinAccel = typename AcceleratorPack::BaseType;
 
     baseMap.emplace(t, &GenerateType<BaseAcceleratorI, LinAccel,
-                                     BS::thread_pool&, GPUSystem&,
+                                     BS::thread_pool&, const GPUSystem&,
                                      const AccelGroupGenMap&,
                                      const AccelWorkGenMap&>);
 
-    using GroupGenArgs = Tuple<uint32_t, BS::thread_pool&, GPUSystem&,
+    using GroupGenArgs = Tuple<uint32_t, BS::thread_pool&, const GPUSystem&,
                                const GenericGroupPrimitiveT&,
                                const AccelWorkGenMap&>;
     using AccelGTypes = typename AcceleratorPack::GroupTypes;

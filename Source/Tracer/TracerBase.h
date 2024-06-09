@@ -17,23 +17,24 @@
 namespace BS { class thread_pool; }
 
 using PrimGenerator     = GeneratorFuncType<GenericGroupPrimitiveT, uint32_t,
-                                            GPUSystem&>;
+                                            const GPUSystem&>;
 using CamGenerator      = GeneratorFuncType<GenericGroupCameraT, uint32_t,
-                                            GPUSystem&>;
+                                            const GPUSystem&>;
 using MedGenerator      = GeneratorFuncType<GenericGroupMediumT, uint32_t,
-                                            GPUSystem&, const TextureViewMap&>;
+                                            const GPUSystem&, const TextureViewMap&>;
 using MatGenerator      = GeneratorFuncType<GenericGroupMaterialT, uint32_t,
-                                            GPUSystem&, const TextureViewMap&>;
+                                            const GPUSystem&, const TextureViewMap&>;
 using TransGenerator    = GeneratorFuncType<GenericGroupTransformT, uint32_t,
-                                            GPUSystem&>;
+                                            const GPUSystem&>;
 using LightGenerator    = GeneratorFuncType<GenericGroupLightT, uint32_t,
-                                            GPUSystem&, const TextureViewMap&,
+                                            const GPUSystem&, const TextureViewMap&,
                                             GenericGroupPrimitiveT&>;
-using RendererGenerator = GeneratorFuncType<RendererI, GPUSystem&>;
+using RendererGenerator = GeneratorFuncType<RendererI, const GPUSystem&>;
 using BaseAccelGenerator = GeneratorFuncType<BaseAcceleratorI,
-                                            BS::thread_pool&, GPUSystem&,
-                                            const AccelGroupGenMap&,
-                                            const AccelWorkGenMap&>;
+                                             BS::thread_pool&,
+                                             const GPUSystem&,
+                                             const AccelGroupGenMap&,
+                                             const AccelWorkGenMap&>;
 
 // Type packed surfaces
 using MaterialWorkBatchInfo = std::tuple<GenericGroupTransformT*,

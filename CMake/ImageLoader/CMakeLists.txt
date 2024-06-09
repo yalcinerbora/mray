@@ -2,7 +2,8 @@ set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/ImageLoader)
 
 # SOURCES
 set(SRC_ALL
-    ${CURRENT_SOURCE_DIR}/DDSLoader.h
+    ${CURRENT_SOURCE_DIR}/OIIOLoader.cpp
+    ${CURRENT_SOURCE_DIR}/DDSLoader.cpp
     ${CURRENT_SOURCE_DIR}/ImageLoaderI.h
     ${CURRENT_SOURCE_DIR}/ImageLoader.h
     ${CURRENT_SOURCE_DIR}/ImageLoader.cpp

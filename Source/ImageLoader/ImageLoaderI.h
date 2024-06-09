@@ -22,12 +22,13 @@ enum class ImageType
     EXR
 };
 
-enum class ImageChannelType
+enum class ImageSubChannelType
 {
     R, G, B, A,
     RG, GB, BA,
     RGB, GBA,
-    RGBA
+    RGBA,
+    ALL
 };
 
 enum class ImageFlagTypes
@@ -59,6 +60,7 @@ enum class ImageFlagTypes
 };
 
 using ImageIOFlags = Flag<ImageFlagTypes>;
+using ColorSpacePack = Pair<Float, MRayColorSpaceEnum>;
 
 // TODO: Images are just as complex as the renderer itself...
 // (Too many conventions standarts etc..)
@@ -67,79 +69,91 @@ using ImageIOFlags = Flag<ImageFlagTypes>;
 // So we restrict the data to some basic formats
 //  - Deep images are ignored (or maybe only the 1st depth is read)
 //  - If image is tiled hopefully it is read via scanline methods
-template<uint32_t D>
-requires(D == 2 || D == 3)
 struct ImageHeader
 {
-    Vector<D, uint32_t>     dimensions;
-    uint32_t                mipCount;
-    MRayPixelTypeRT         pixelType;
+    Vector3ui           dimensions;
+    uint32_t            mipCount;
+    MRayPixelTypeRT     pixelType;
     //
-    MRayColorSpaceEnum      colorSpace;
-    Float                   gamma;
+    ColorSpacePack      colorSpace;
+    //
+    bool                Is2D() const;
 };
 
-template<uint32_t D>
-requires(D == 2 || D == 3)
 struct ImageMip
 {
-    Vector<D, uint32_t>     mipSize;
-    TransientData           pixels;
+    Vector3ui       mipSize;
+    TransientData   pixels;
 };
 
-template<uint32_t D>
-requires(D == 2 || D == 3)
 struct Image
 {
     static constexpr int32_t MAX_MIP_COUNT = TracerConstants::MaxTextureMipCount;
-    using MipMapArray = StaticVector<ImageMip<D>, MAX_MIP_COUNT>;
+    using MipMapArray = StaticVector<ImageMip, MAX_MIP_COUNT>;
 
-    ImageHeader<D>  header;
-    MipMapArray     imgData;
+    ImageHeader header;
+    MipMapArray imgData;
 };
 
-template<uint32_t D>
-requires(D == 2 || D == 3)
-struct WriteImage
+struct WriteImageParams
 {
-    ImageHeader<D>      header;
+    ImageHeader         header;
     uint32_t            depth;
     Span<const Byte>    pixels;
+};
+
+class ImageFileI
+{
+    public:
+    virtual                         ~ImageFileI() = default;
+    //
+    virtual Expected<ImageHeader>   ReadHeader() = 0;
+    virtual Expected<Image>         ReadImage() = 0;
+};
+
+using ImageFilePtr = std::unique_ptr<ImageFileI>;
+
+class ImageFileBase : public ImageFileI
+{
+    protected:
+    std::string         filePath;
+    ImageSubChannelType subChannels;
+    ImageIOFlags        flags;
+
+    public:
+    // Constructors & Destructor
+    ImageFileBase(const std::string& filePath,
+                  ImageSubChannelType subChannels,
+                  ImageIOFlags flags);
 };
 
 class ImageLoaderI
 {
     public:
-    static MRayPixelTypeRT      TryExpandTo4CFormat(MRayPixelTypeRT pf);
+    static MRayPixelTypeRT  TryExpandTo4CFormat(MRayPixelTypeRT);
+    static bool             IsSignConvertible(MRayPixelTypeRT);
 
     public:
         virtual                 ~ImageLoaderI() = default;
-
-        // Read Functions
-        // This will be expanded later
-        // (it will have a similar
-        // interface of OIIO)
-        virtual Expected<Image<2>>          ReadImage2D(const std::string& filePath,
-                                                        ImageIOFlags = ImageIOFlags()) const = 0;
-        // Read subportion of the image
-        // i.e., given RGBA image, you can read RG, portion as a 2 channel image
-        // Only contiguous channels are supported
-        virtual Expected<Image<2>>          ReadImageSubChannel(const std::string& filePath,
-                                                                ImageChannelType,
-                                                                ImageIOFlags = ImageIOFlags()) const = 0;
-
-        // Lightweight version (if OIIO supports), image files are read and only size/type
-        // information will be provided. Thus, tracer can preallocate the required memory.
-        virtual Expected<ImageHeader<2>>    ReadImageHeader2D(const std::string& filePath,
-                                                              ImageIOFlags = ImageIOFlags()) const = 0;
+        // Read is utilized via polymorphism
+        // We do not know the file type etc, so we delegate it to a class
+        virtual
+        Expected<ImageFilePtr>  OpenFile(const std::string& filePath,
+                                         ImageSubChannelType subChannels = ImageSubChannelType::ALL,
+                                         ImageIOFlags flags = ImageIOFlags()) const = 0;
         // Write Functions
-        virtual MRayError           WriteImage2D(const WriteImage<2>&,
-                                                 const std::string& filePath,
-                                                 ImageType extension,
-                                                 ImageIOFlags = ImageIOFlags()) const = 0;
-        // TODO: Add 3D variants
-
+        // This do not have class (yet), we know the data layout etc.
+        // So no need for extra complexity.
+        virtual MRayError       WriteImage(const WriteImageParams&,
+                                           const std::string& filePath,
+                                           ImageType extension,
+                                           ImageIOFlags = ImageIOFlags()) const = 0;
 };
+
+inline bool ImageHeader::Is2D() const
+{
+    return dimensions[2] == 1;
+}
 
 inline MRayPixelTypeRT ImageLoaderI::TryExpandTo4CFormat(MRayPixelTypeRT pt)
 {
@@ -156,6 +170,34 @@ inline MRayPixelTypeRT ImageLoaderI::TryExpandTo4CFormat(MRayPixelTypeRT pt)
         default:                return pt;
     }
 }
+
+inline bool ImageLoaderI::IsSignConvertible(MRayPixelTypeRT pf)
+{
+    MRayPixelEnum pixType = pf.Name();
+    switch(pixType)
+    {
+        using enum MRayPixelEnum;
+        case MR_R8_UNORM:
+        case MR_RG8_UNORM:
+        case MR_RGB8_UNORM:
+        case MR_RGBA8_UNORM:
+        case MR_R16_UNORM:
+        case MR_RG16_UNORM:
+        case MR_RGB16_UNORM:
+        case MR_RGBA16_UNORM:
+            return true;
+        default:
+            return false;
+    }
+}
+
+inline ImageFileBase::ImageFileBase(const std::string& fp,
+                                    ImageSubChannelType sc,
+                                    ImageIOFlags f)
+    : filePath(fp)
+    , subChannels(sc)
+    , flags(f)
+{}
 
 //inline int8_t ImageLoaderI::ChannelTypeToChannelIndex(ImageChannelType channel)
 //{

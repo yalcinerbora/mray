@@ -1,10 +1,8 @@
-#include "ImageLoaderI.h"
+#include "ImageLoader.h"
 
 #include "Core/BitFunctions.h"
 #include "Core/Flag.h"
 #include "Core/DataStructures.h"
-
-#include <OpenImageIO/imageio.h>
 
 #include <filesystem>
 
@@ -13,9 +11,6 @@
 // Subset only, only compressed formats
 // Rest will be delegated to the OIIO
 // https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dx-graphics-dds-pguide
-
-namespace DDSLoader
-{
 
 enum class FormatDXGI : uint32_t
 {
@@ -228,41 +223,58 @@ static constexpr uint32_t DDS_FOURCC = BitFunctions::GenerateFourCC('D', 'D', 'S
 static constexpr uint32_t DX10_FOURCC = BitFunctions::GenerateFourCC('D', 'X', '1', '0');
 static constexpr uint32_t NON_NATIVE_DDS_FOURCC = BitFunctions::GenerateFourCC('_', 'S', 'D', 'D');
 
-size_t MipSizeToLinearByteSize(MRayPixelTypeRT pf, const Vector2ui& mipSize)
+size_t MipSizeToLinearByteSize(MRayPixelTypeRT pf, const Vector3ui& mipSize)
 {
     return 512;
 }
 
-Expected<ImageHeader<2>> ReadHeaderInternal(bool& isGoodDDS, std::ifstream& ddsFile,
-                                            size_t fileSize, const std::string& filePath)
-{
-    isGoodDDS = false;
-    // Now we can load the header
-    HeaderBase header;
-    char* headerPtr = reinterpret_cast<char*>(&header);
-    ddsFile.read(headerPtr, sizeof(header));
+ImageFileDDS::ImageFileDDS(const std::string& filePath,
+                           ImageSubChannelType subChannels,
+                           ImageIOFlags flags)
+    : ImageFileBase(filePath, subChannels, flags)
+{}
 
-    if(header.fourcc != DDS_FOURCC)
+Expected<ImageHeader> ImageFileDDS::ReadHeader()
+{
+    if(headerIsRead) return header;
+
+    size_t fileSize = std::filesystem::file_size(std::filesystem::path(filePath));
+    if(fileSize < sizeof(HeaderBase))
+        return MRayError("File \"{}\" is too small to "
+                         "be a DDS file!", filePath);
+
+    ddsFile = std::ifstream(filePath, std::ios::binary);
+    if(!ddsFile.is_open())
+        return MRayError("File \"{}\" is not found",
+                         filePath);
+
+    // Now we can load the header
+    HeaderBase ddsHeader;
+    char* headerPtr = reinterpret_cast<char*>(&ddsHeader);
+    if(!ddsFile.read(headerPtr, sizeof(HeaderBase)))
+        return MRayError("File \"{}\" read error!", filePath);
+
+    if(ddsHeader.fourcc != DDS_FOURCC)
         return MRayError("File \"{}\" is not a DDS file!", filePath);
     // Try these and inform the user
-    if(header.fourcc == NON_NATIVE_DDS_FOURCC)
+    if(ddsHeader.fourcc == NON_NATIVE_DDS_FOURCC)
         return MRayError("WRONG FOURCC: File \"{}\" has filpped fourcc code. "
                          "It may be saved in different endian platform maybe?",
                          filePath);
-    if(header.ddspf.dwFourCC != DX10_FOURCC)
+    if(ddsHeader.ddspf.dwFourCC != DX10_FOURCC)
         return MRayError("File \"{}\" is not a DX10-DDS "
                          "file, old DDS files are not supported!", filePath);
 
 
-    ImageHeader<2> outputHeader = {};
-
+    ImageHeader outputHeader = {};
     HeaderExtended headerDX10;
     if(fileSize < sizeof(HeaderExtended) + sizeof(HeaderBase))
         return MRayError("File \"{}\" is too small to "
                             "be a DX10-DDS file!", filePath);
 
     char* headerPtrDX10 = reinterpret_cast<char*>(&headerDX10);
-    ddsFile.read(headerPtrDX10, sizeof(HeaderExtended));
+    if(!ddsFile.read(headerPtrDX10, sizeof(HeaderExtended)))
+        return MRayError("File \"{}\" read error!", filePath);
 
     MiscFlagsDX10 miscFlags = static_cast<MiscFlagBitsDX10>(headerDX10.miscFlag);
 
@@ -285,9 +297,9 @@ Expected<ImageHeader<2>> ReadHeaderInternal(bool& isGoodDDS, std::ifstream& ddsF
     }
 
     // All fine go!
-    outputHeader.mipCount = std::max(header.dwMipMapCount, 1u);
-    outputHeader.dimensions = Vector2ui(header.dwWidth,
-                                        header.dwHeight);
+    outputHeader.mipCount = std::max(ddsHeader.dwMipMapCount, 1u);
+    outputHeader.dimensions = Vector3ui(ddsHeader.dwWidth,
+                                        ddsHeader.dwHeight, 1u);
     using enum FormatDXGI;
     using enum MRayPixelEnum;
     // Check Format
@@ -356,10 +368,11 @@ Expected<ImageHeader<2>> ReadHeaderInternal(bool& isGoodDDS, std::ifstream& ddsF
         }
         default:
         {
-            // Probably good DDS texture
+            // Probably good DDS texture,
             // let OIIO handle it.
-            isGoodDDS = true;
-            return ImageHeader<2>{};
+            // ** Return an OK error **
+            // This is a protocol
+            return MRayError::OK;
         }
     }
     // Check Color Space
@@ -370,65 +383,35 @@ Expected<ImageHeader<2>> ReadHeaderInternal(bool& isGoodDDS, std::ifstream& ddsF
         case BC3_UNORM_SRGB:
         case BC7_UNORM_SRGB:
         {
-            outputHeader.colorSpace = MRayColorSpaceEnum::MR_DEFAULT;
-            outputHeader.gamma = Float(2.2);
+            outputHeader.colorSpace = Pair(Float(2.2),
+                                           MRayColorSpaceEnum::MR_DEFAULT);
             break;
         }
         default:
         {
-            outputHeader.colorSpace = MRayColorSpaceEnum::MR_DEFAULT;
-            outputHeader.gamma = Float(1);
+            outputHeader.colorSpace = Pair(Float(1),
+                                           MRayColorSpaceEnum::MR_DEFAULT);
             break;
         }
     }
-    return outputHeader;
+
+    headerIsRead = true;
+    header = outputHeader;
+    return header;
 }
 
-}
-
-Expected<ImageHeader<2>> ReadHeaderDDS(bool& isGoodDDS,
-                                       const std::string& filePath)
+Expected<Image> ImageFileDDS::ReadImage()
 {
-    using namespace DDSLoader;
-    size_t fileSize = std::filesystem::file_size(std::filesystem::path(filePath));
-    if(fileSize < sizeof(HeaderBase))
-        return MRayError("File \"{}\" is too small to "
-                         "be a DDS file!", filePath);
-
-    std::ifstream ddsFile = std::ifstream(filePath, std::ios::binary);
-    if(!ddsFile.is_open())
-        return MRayError("File \"{}\" is not found",
-                         filePath);
-
-    return ReadHeaderInternal(isGoodDDS, ddsFile, fileSize, filePath);
-}
-
-Expected<Image<2>> ReadImageDDS(const std::string& filePath)
-{
-    using namespace DDSLoader;
-    size_t fileSize = std::filesystem::file_size(std::filesystem::path(filePath));
-    if(fileSize < sizeof(HeaderBase))
-        return MRayError("File \"{}\" is too small to "
-                         "be a DDS file!", filePath);
-
-    std::ifstream ddsFile = std::ifstream(filePath, std::ios::binary);
-    if(!ddsFile.is_open())
-        return MRayError("File \"{}\" is not found",
-                         filePath);
-
-    Image<2> result = {};
-    bool isGoodDDS;
-    auto headerE = ReadHeaderInternal(isGoodDDS, ddsFile, fileSize, filePath);
-    if(headerE.has_error())
-        return headerE.error();
-
-    result.header = headerE.value();
+    Image result;
+    result.header = header;
     for(uint32_t i = 0; i < result.header.mipCount; i++)
     {
-        Vector2ui mipSize = Vector2ui(result.header.dimensions[0] >> i,
-                                      result.header.dimensions[1] >> i);
-        mipSize = Vector2ui::Max(mipSize, Vector2ui(1));
-        size_t mipByteSize = MipSizeToLinearByteSize(result.header.pixelType, mipSize);
+        Vector3ui mipSize = Vector3ui(result.header.dimensions[0] >> i,
+                                      result.header.dimensions[1] >> i,
+                                      result.header.dimensions[2] >> i);
+        mipSize = Vector3ui::Max(mipSize, Vector3ui(1));
+        size_t mipByteSize = MipSizeToLinearByteSize(result.header.pixelType,
+                                                     mipSize);
 
         TransientData data(std::in_place_type_t<Byte>{}, mipByteSize);
         auto dataSpan = data.AccessAs<Byte>();
