@@ -464,10 +464,11 @@ Expected<ImageHeader> ImageFileOIIO::ReadHeader()
     // Check sign conversion only uint types can be converted to signed
     // This is usefull for normal maps, we can directly utilize SNORM conversion
     // of the hardware instead of doing "r * 2 - 1" (where r is [0, 1))
-    bool isSignConvertible = (spec.format == OIIO::TypeDesc::INT16 ||
-                              spec.format == OIIO::TypeDesc::INT8);
+    bool isSignConvertible = (spec.format == OIIO::TypeDesc::UINT16 ||
+                              spec.format == OIIO::TypeDesc::UINT8);
     if(flags[ImageFlagTypes::LOAD_AS_SIGNED] && !isSignConvertible)
-        return MRayError("Image type is not sign convertible.({})", filePath);
+        return MRayError("Image type (OIIO \"{}\") is not sign convertible.({})",
+                         spec.format, filePath);
     else if(flags[ImageFlagTypes::LOAD_AS_SIGNED])
     {
         spec.format = (spec.format == OIIO::TypeDesc::UINT16)

@@ -961,7 +961,7 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
 
             for(size_t i = start; i < end; i++)
             {
-                Expected<Image> imgE = localTexFiles[i]->ReadImage();
+                Expected<Image> imgE = localTexFiles[i - start]->ReadImage();
                 if(!imgE.has_value())
                 {
                     exceptions.AddException(std::move(imgE.error()));
