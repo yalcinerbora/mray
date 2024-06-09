@@ -105,7 +105,6 @@ class TracerBase : public TracerI
     protected:
     BS::thread_pool*    threadPool;
     GPUSystem           gpuSystem;
-    TextureViewMap      texViewMap;
 
     // Supported Types
     TypeNameList        primTypes;

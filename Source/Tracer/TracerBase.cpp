@@ -43,10 +43,10 @@ void TracerBase::PopulateAttribInfoAndTypeLists()
                                 0u, gpuSystem);
     InstantiateAndGetAttribInfo(medAttributeInfoMap,
                                 typeGenerators.medGenerator,
-                                0u, gpuSystem, texViewMap);
+                                0u, gpuSystem, TextureViewMap{});
     InstantiateAndGetAttribInfo(matAttributeInfoMap,
                                 typeGenerators.matGenerator,
-                                0u, gpuSystem, texViewMap);
+                                0u, gpuSystem, TextureViewMap{});
     InstantiateAndGetAttribInfo(transAttributeInfoMap,
                                 typeGenerators.transGenerator,
                                 0u, gpuSystem);
@@ -76,11 +76,15 @@ void TracerBase::PopulateAttribInfoAndTypeLists()
             // TODO: This is dangling reference..
             // We will not use pg, but this is UB so gg...
             pg = pgGen.value()(0, gpuSystem);
-            instance = kv.second(0u, gpuSystem, texViewMap, *pg.get());
+            instance = kv.second(0u, gpuSystem,
+                                 TextureViewMap{},
+                                 *pg.get());
         }
         else
         {
-            instance = kv.second(0u, gpuSystem, texViewMap, emptyPG);
+            instance = kv.second(0u, gpuSystem,
+                                 TextureViewMap{},
+                                 emptyPG);
         }
         lightAttributeInfoMap.emplace(kv.first, instance->AttributeInfo());
     }
@@ -491,7 +495,8 @@ MatGroupId TracerBase::CreateMaterialGroup(std::string name)
     uint32_t idInt = matGroupCounter.fetch_add(1);
     MatGroupId id = static_cast<MatGroupId>(idInt);
     matGroups.try_emplace(id, genFunc.value()(static_cast<uint32_t>(id),
-                                              gpuSystem, texViewMap));
+                                              gpuSystem,
+                                              texMem.TextureViews()));
     return id;
 }
 
@@ -785,7 +790,8 @@ LightGroupId TracerBase::CreateLightGroup(std::string name,
     LightGroupId id = static_cast<LightGroupId>(idInt);
     GenericGroupPrimitiveT& primGroupPtr = *primGroup.value().get().get();
     lightGroups.try_emplace(id, genFunc.value()(static_cast<uint32_t>(id), gpuSystem,
-                                                texViewMap, primGroupPtr));
+                                                texMem.TextureViews(),
+                                                primGroupPtr));
     return id;
 }
 
@@ -1053,7 +1059,9 @@ MediumGroupId TracerBase::CreateMediumGroup(std::string name)
     }
     uint32_t idInt = mediumGroupCounter.fetch_add(1);
     MediumGroupId id = static_cast<MediumGroupId>(idInt);
-    mediumGroups.try_emplace(id, genFunc.value()(static_cast<uint32_t>(id), gpuSystem, texViewMap));
+    mediumGroups.try_emplace(id, genFunc.value()(static_cast<uint32_t>(id),
+                                                 gpuSystem,
+                                                 texMem.TextureViews()));
     return id;
 }
 
@@ -1283,7 +1291,7 @@ AABB3 TracerBase::CommitSurfaces()
                                  accelWGeneratorMap.value().get());
     accelerator->Construct(BaseAccelConstructParams
     {
-        .texViewMap = texViewMap,
+        .texViewMap = texMem.TextureViews(),
         .primGroups = primGroups.Map(),
         .lightGroups = lightGroups.Map(),
         .transformGroups = transGroups.Map(),
@@ -1306,7 +1314,7 @@ CameraTransform TracerBase::GetCamTransform(CamSurfaceId camSurfId) const
     {
         return camSurfId == p.first;
     });
-    if(loc == cameraSurfaces.Vec().cbegin())
+    if(loc == cameraSurfaces.Vec().cend())
         throw MRayError("Unable to find Camera Surface ({})",
                         static_cast<uint32_t>(camSurfId));
 

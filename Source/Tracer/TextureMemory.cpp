@@ -255,10 +255,12 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
         if constexpr(D != 3 || !IsBlockCompressedPixel<Type>)
         {
             TextureId id = TextureId(texCounter.fetch_add(1));
-            textures.try_emplace(id, std::in_place_type_t<Texture<D, Type>>{},
-                                 inputParams.colorSpace, inputParams.isColor,
-                                 MRayPixelTypeRT(v),
-                                 device, p);
+            auto loc = textures.try_emplace(id, std::in_place_type_t<Texture<D, Type>>{},
+                                            inputParams.colorSpace, inputParams.isColor,
+                                            MRayPixelTypeRT(v),
+                                            device, p);
+
+            textureViews.try_emplace(id, loc.first->second.View());
             return id;
         }
         else throw MRayError("3D Block compressed textures are not supported!");
@@ -347,6 +349,7 @@ void TextureMemory::CommitTextures()
         queueIndex++;
         queueIndex %= TotalQueuePerDevice();
     }
+    isCommitted = true;
 }
 void TextureMemory::PushTextureData(TextureId id, uint32_t mipLevel,
                                     TransientData data)
@@ -379,4 +382,10 @@ MRayPixelTypeRT TextureMemory::GetPixelType(TextureId id) const
     }
     const CommonTexture& tex = loc.value().get();
     return tex.PixelType();
+}
+
+const TextureViewMap& TextureMemory::TextureViews() const
+{
+    assert(isCommitted);
+    return textureViews.Map();
 }

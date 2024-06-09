@@ -566,6 +566,7 @@ TracerThread::TracerThread(TransferQueue& queue,
     , tracer{nullptr, nullptr}
     , transferQueue(queue.GetTracerView())
     , threadPool(tp)
+    , currentRenderer(std::numeric_limits<RendererId>::max())
 {}
 
 MRayError TracerThread::MTInitialize(const std::string& tracerConfigFile)

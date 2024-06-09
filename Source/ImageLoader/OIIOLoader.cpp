@@ -485,7 +485,6 @@ Expected<ImageHeader> ImageFileOIIO::ReadHeader()
     if(convPixFormatE.has_error()) return convPixFormatE.error();
     const MRayPixelTypeRT& convPixFormat = convPixFormatE.value();
 
-
     // Determine dimension
     auto dimension = Vector3ui(spec.width, spec.height, spec.depth);
 
@@ -565,11 +564,14 @@ Expected<Image> ImageFileOIIO::ReadImage()
     bool doChannelExpand = (flags[ImageFlagTypes::TRY_3C_4C_CONVERSION] &&
                             readChannelCount == 3u);
     readChannelCount = (doChannelExpand) ? (readChannelCount + 1) : readChannelCount;
+    MRayPixelTypeRT dataPixelType = (doChannelExpand)
+                                        ? ImageLoaderI::TryExpandTo4CFormat(header.pixelType)
+                                        : header.pixelType;
 
     // Finally find the channel range
     Vector2i channelRange = ImageLoaderI::CalculateChannelRange(subChannels);
-    // Put [0,0) when it is the exact pixel read, OIIO may have different path
-    // for this
+    // Put [0,0) when it is the exact pixel read,
+    // OIIO may have different (optimized) path for this
     channelRange = (header.pixelType == originalPixType)
                     ? Vector2i(0)
                     : channelRange;
@@ -598,7 +600,7 @@ Expected<Image> ImageFileOIIO::ReadImage()
         {
             using T = std::remove_cvref_t<decltype(v)>::Type;
             return TransientData(std::in_place_type_t<T>{}, totalSize);
-        }, header.pixelType);
+        }, dataPixelType);
 
         // Read inverted, OIIO has DirectX
         // (or most image processing literature) style
@@ -614,7 +616,6 @@ Expected<Image> ImageFileOIIO::ReadImage()
                                  readFormat, lastScanlinePtr,
                                  xStride, -oiioScanLineSize))
             return MRayError("OIIO Error ({})", oiioFile->geterror());
-
 
         // Push the mip data to vector
         result.imgData.emplace_back(ImageMip

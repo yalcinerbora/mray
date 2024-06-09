@@ -130,9 +130,21 @@ void CameraGroupPinhole::PushAttribute(CameraKey idStart, CameraKey idEnd,
     }
 }
 
-CameraTransform CameraGroupPinhole::AcquireCameraTransform(CameraKey) const
+CameraTransform CameraGroupPinhole::AcquireCameraTransform(CameraKey k) const
 {
-    throw MRayError("TODO: Implement");
+    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    CommonKey kIndex = k.FetchIndexPortion();
+
+    CameraTransform result;
+    queue.MemcpyAsync(Span<Vector3>(&result.gazePoint, 1),
+                      ToConstSpan(dGazePoints.subspan(kIndex, 1)));
+    queue.MemcpyAsync(Span<Vector3>(&result.position, 1),
+                      ToConstSpan(dPositions.subspan(kIndex, 1)));
+    queue.MemcpyAsync(Span<Vector3>(&result.up, 1),
+                      ToConstSpan(dUpVectors.subspan(kIndex, 1)));
+    queue.Barrier().Wait();
+
+    return result;
 }
 
 typename CameraGroupPinhole::DataSoA

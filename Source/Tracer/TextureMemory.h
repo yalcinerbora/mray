@@ -158,8 +158,12 @@ class TextureMemory
     using GPUIterator       = GPUQueueIteratorRoundRobin;
     using TextureMap        = ThreadSafeMap<TextureId, CommonTexture>;
     using TextureMemList    = std::vector<TextureBackingMemory>;
+    using TSTextureViewMap  = ThreadSafeMap<TextureId, GenericTextureView>;
+
+
 
     private:
+    bool                    isCommitted = false;
     const GPUSystem&        gpuSystem;
     TextureMemList          texMemList;
     std::atomic_uint32_t    texCounter;
@@ -167,6 +171,9 @@ class TextureMemory
     uint32_t                clampResolution;
     //
     std::atomic_uint32_t    gpuIndexCounter = 0;
+
+    // The view map
+    TSTextureViewMap        textureViews;
 
     template<uint32_t D>
     TextureId CreateTexture(const Vector<D, uint32_t>& size, uint32_t mipCount,
@@ -187,5 +194,6 @@ class TextureMemory
     void            PushTextureData(TextureId, uint32_t mipLevel,
                                     TransientData data);
 
-    MRayPixelTypeRT GetPixelType(TextureId) const;
+    MRayPixelTypeRT         GetPixelType(TextureId) const;
+    const TextureViewMap&   TextureViews() const;
 };
