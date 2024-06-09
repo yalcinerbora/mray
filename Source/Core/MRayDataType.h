@@ -174,6 +174,13 @@ struct MRayPixelType
     static constexpr bool IsBCPixel = IsBlockCompressedPixel<Type>;
 };
 
+template<MRayDataEnum L, MRayDataEnum R>
+constexpr bool operator==(MRayDataType<L>,
+                          MRayDataType<R>)
+{
+    return L == R;
+}
+
 template<MRayPixelEnum E>
 template<class T>
 requires (std::is_integral_v<T> || std::is_floating_point_v<T>)
@@ -189,6 +196,14 @@ constexpr size_t MRayPixelType<E>::FindChannelCount()
 {
     return Type::Dims;
 }
+
+template<MRayPixelEnum L, MRayPixelEnum R>
+constexpr bool operator==(MRayPixelType<L>,
+                          MRayPixelType<R>)
+{
+    return L == R;
+}
+
 
 // Lets see how good are the compilers are
 // This is used to generate switch/case code

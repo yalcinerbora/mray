@@ -227,6 +227,228 @@ Expected<ColorSpacePack> ImageFileOIIO::ColorSpaceToMRay(const std::string& oiio
 
 }
 
+Expected<MRayPixelTypeRT> ImageFileOIIO::ConvertFormatToRequested(MRayPixelTypeRT pixFormat,
+                                                                  ImageSubChannelType subChannels)
+{
+    if(subChannels == ImageSubChannelType::ALL) return pixFormat;
+
+    MRayPixelEnum e = pixFormat.Name();
+    bool compatibleChannels = false;
+    switch(e)
+    {
+        using enum MRayPixelEnum;
+        // We can slice RGBA to any type
+        case MR_RGBA8_UNORM:
+        case MR_RGBA16_UNORM:
+        case MR_RGBA8_SNORM:
+        case MR_RGBA16_SNORM:
+        case MR_RGBA_HALF:
+        case MR_RGBA_FLOAT:
+            compatibleChannels = true;
+            break;
+
+        // Only without A
+        case MR_RGB8_UNORM:
+        case MR_RGB16_UNORM:
+        case MR_RGB8_SNORM:
+        case MR_RGB16_SNORM:
+        case MR_RGB_HALF:
+        case MR_RGB_FLOAT:
+            compatibleChannels = !(subChannels == ImageSubChannelType::A   ||
+                                   subChannels == ImageSubChannelType::BA  ||
+                                   subChannels == ImageSubChannelType::GBA ||
+                                   subChannels == ImageSubChannelType::RGBA);
+            break;
+
+        // Only RG
+        case MR_RG8_UNORM:
+        case MR_RG16_UNORM:
+        case MR_RG8_SNORM:
+        case MR_RG16_SNORM:
+        case MR_RG_HALF:
+        case MR_RG_FLOAT:
+            compatibleChannels = (subChannels == ImageSubChannelType::R ||
+                                  subChannels == ImageSubChannelType::G ||
+                                  subChannels == ImageSubChannelType::RG);
+            break;
+
+        // Only R
+        case MR_R8_UNORM:
+        case MR_R16_UNORM:
+        case MR_R8_SNORM:
+        case MR_R16_SNORM:
+        case MR_R_HALF:
+        case MR_R_FLOAT:
+            compatibleChannels = (subChannels == ImageSubChannelType::R);
+            break;
+
+        // Probably compressed which should not be here
+        default:
+            compatibleChannels = false;
+            break;
+    }
+
+    // TODO: maybe more verbose error
+    if(!compatibleChannels)
+        return MRayError("Unable to convert image channels to "
+                         "requested channels");
+
+    // Now the actual convertion.
+    // There is a pattern here (we can abuse the enum order etc.)
+    // but it will be hard to maintain so just yolo switch here
+    switch(e)
+    {
+        using enum MRayPixelEnum;
+        case MR_R8_UNORM:
+        case MR_RG8_UNORM:
+        case MR_RGB8_UNORM:
+        case MR_RGBA8_UNORM:
+        switch(subChannels)
+        {
+            using enum ImageSubChannelType;
+            case R:     return MRayPixelTypeRT(MRayPixelType<MR_R8_UNORM>{});
+            case G:     return MRayPixelTypeRT(MRayPixelType<MR_R8_UNORM>{});
+            case B:     return MRayPixelTypeRT(MRayPixelType<MR_R8_UNORM>{});
+            case A:     return MRayPixelTypeRT(MRayPixelType<MR_R8_UNORM>{});
+
+            case RG:    return MRayPixelTypeRT(MRayPixelType<MR_RG8_UNORM>{});
+            case GB:    return MRayPixelTypeRT(MRayPixelType<MR_RG8_UNORM>{});
+            case BA:    return MRayPixelTypeRT(MRayPixelType<MR_RG8_UNORM>{});
+
+            case RGB:   return MRayPixelTypeRT(MRayPixelType<MR_RGB8_UNORM>{});
+            case GBA:   return MRayPixelTypeRT(MRayPixelType<MR_RGB8_UNORM>{});
+
+            case RGBA:  return MRayPixelTypeRT(MRayPixelType<MR_RGBA8_UNORM>{});
+            default:    break;
+        }
+        break;
+        //
+        case MR_R16_UNORM:
+        case MR_RG16_UNORM:
+        case MR_RGB16_UNORM:
+        case MR_RGBA16_UNORM:
+        switch(subChannels)
+        {
+            using enum ImageSubChannelType;
+            case R:     return MRayPixelTypeRT(MRayPixelType<MR_R16_UNORM>{});
+            case G:     return MRayPixelTypeRT(MRayPixelType<MR_R16_UNORM>{});
+            case B:     return MRayPixelTypeRT(MRayPixelType<MR_R16_UNORM>{});
+            case A:     return MRayPixelTypeRT(MRayPixelType<MR_R16_UNORM>{});
+
+            case RG:    return MRayPixelTypeRT(MRayPixelType<MR_RG16_UNORM>{});
+            case GB:    return MRayPixelTypeRT(MRayPixelType<MR_RG16_UNORM>{});
+            case BA:    return MRayPixelTypeRT(MRayPixelType<MR_RG16_UNORM>{});
+
+            case RGB:   return MRayPixelTypeRT(MRayPixelType<MR_RGB16_UNORM>{});
+            case GBA:   return MRayPixelTypeRT(MRayPixelType<MR_RGB16_UNORM>{});
+
+            case RGBA:  return MRayPixelTypeRT(MRayPixelType<MR_RGBA16_UNORM>{});
+            default:    break;
+        }
+        break;
+        //
+        case MR_R8_SNORM:
+        case MR_RG8_SNORM:
+        case MR_RGB8_SNORM:
+        case MR_RGBA8_SNORM:
+        switch(subChannels)
+        {
+            using enum ImageSubChannelType;
+            case R:     return MRayPixelTypeRT(MRayPixelType<MR_R8_SNORM>{});
+            case G:     return MRayPixelTypeRT(MRayPixelType<MR_R8_SNORM>{});
+            case B:     return MRayPixelTypeRT(MRayPixelType<MR_R8_SNORM>{});
+            case A:     return MRayPixelTypeRT(MRayPixelType<MR_R8_SNORM>{});
+
+            case RG:    return MRayPixelTypeRT(MRayPixelType<MR_RG8_SNORM>{});
+            case GB:    return MRayPixelTypeRT(MRayPixelType<MR_RG8_SNORM>{});
+            case BA:    return MRayPixelTypeRT(MRayPixelType<MR_RG8_SNORM>{});
+
+            case RGB:   return MRayPixelTypeRT(MRayPixelType<MR_RGB8_SNORM>{});
+            case GBA:   return MRayPixelTypeRT(MRayPixelType<MR_RGB8_SNORM>{});
+
+            case RGBA:  return MRayPixelTypeRT(MRayPixelType<MR_RGBA8_SNORM>{});
+            default:    break;
+        }
+        break;
+        //
+        case MR_R16_SNORM:
+        case MR_RG16_SNORM:
+        case MR_RGB16_SNORM:
+        case MR_RGBA16_SNORM:
+        switch(subChannels)
+        {
+            using enum ImageSubChannelType;
+            case R:     return MRayPixelTypeRT(MRayPixelType<MR_R16_SNORM>{});
+            case G:     return MRayPixelTypeRT(MRayPixelType<MR_R16_SNORM>{});
+            case B:     return MRayPixelTypeRT(MRayPixelType<MR_R16_SNORM>{});
+            case A:     return MRayPixelTypeRT(MRayPixelType<MR_R16_SNORM>{});
+
+            case RG:    return MRayPixelTypeRT(MRayPixelType<MR_RG16_SNORM>{});
+            case GB:    return MRayPixelTypeRT(MRayPixelType<MR_RG16_SNORM>{});
+            case BA:    return MRayPixelTypeRT(MRayPixelType<MR_RG16_SNORM>{});
+
+            case RGB:   return MRayPixelTypeRT(MRayPixelType<MR_RGB16_SNORM>{});
+            case GBA:   return MRayPixelTypeRT(MRayPixelType<MR_RGB16_SNORM>{});
+
+            case RGBA:  return MRayPixelTypeRT(MRayPixelType<MR_RGBA16_SNORM>{});
+            default:    break;
+        }
+        break;
+        //
+        case MR_R_HALF:
+        case MR_RG_HALF:
+        case MR_RGB_HALF:
+        case MR_RGBA_HALF:
+        switch(subChannels)
+        {
+            using enum ImageSubChannelType;
+            case R:     return MRayPixelTypeRT(MRayPixelType<MR_R_HALF>{});
+            case G:     return MRayPixelTypeRT(MRayPixelType<MR_R_HALF>{});
+            case B:     return MRayPixelTypeRT(MRayPixelType<MR_R_HALF>{});
+            case A:     return MRayPixelTypeRT(MRayPixelType<MR_R_HALF>{});
+
+            case RG:    return MRayPixelTypeRT(MRayPixelType<MR_RG_HALF>{});
+            case GB:    return MRayPixelTypeRT(MRayPixelType<MR_RG_HALF>{});
+            case BA:    return MRayPixelTypeRT(MRayPixelType<MR_RG_HALF>{});
+
+            case RGB:   return MRayPixelTypeRT(MRayPixelType<MR_RGB_HALF>{});
+            case GBA:   return MRayPixelTypeRT(MRayPixelType<MR_RGB_HALF>{});
+
+            case RGBA:  return MRayPixelTypeRT(MRayPixelType<MR_RGBA_HALF>{});
+            default:    break;
+        }
+        break;
+        //
+        case MRayPixelEnum::MR_R_FLOAT:
+        case MRayPixelEnum::MR_RG_FLOAT:
+        case MRayPixelEnum::MR_RGB_FLOAT:
+        case MRayPixelEnum::MR_RGBA_FLOAT:
+        switch(subChannels)
+        {
+            using enum ImageSubChannelType;
+            case R:     return MRayPixelTypeRT(MRayPixelType<MR_R_HALF>{});
+            case G:     return MRayPixelTypeRT(MRayPixelType<MR_R_HALF>{});
+            case B:     return MRayPixelTypeRT(MRayPixelType<MR_R_HALF>{});
+            case A:     return MRayPixelTypeRT(MRayPixelType<MR_R_HALF>{});
+
+            case RG:    return MRayPixelTypeRT(MRayPixelType<MR_RG_HALF>{});
+            case GB:    return MRayPixelTypeRT(MRayPixelType<MR_RG_HALF>{});
+            case BA:    return MRayPixelTypeRT(MRayPixelType<MR_RG_HALF>{});
+
+            case RGB:   return MRayPixelTypeRT(MRayPixelType<MR_RGB_HALF>{});
+            case GBA:   return MRayPixelTypeRT(MRayPixelType<MR_RGB_HALF>{});
+
+            case RGBA:  return MRayPixelTypeRT(MRayPixelType<MR_RGBA_HALF>{});
+            default:    break;
+        }
+        break;
+        default: break;
+    }
+    // Code should not come here
+    return MRayError("Unable to convert image channels to "
+                     "requested channels");
+}
+
 ImageFileOIIO::ImageFileOIIO(const std::string& filePath,
               ImageSubChannelType subChannels,
               ImageIOFlags flags)
@@ -238,12 +460,31 @@ Expected<ImageHeader> ImageFileOIIO::ReadHeader()
     oiioFile = OIIO::ImageInput::open(filePath);
     if(!oiioFile) return MRayError("OIIO Error ({})", OIIO::geterror());
 
-    const OIIO::ImageSpec& spec = oiioFile->spec();
+    OIIO::ImageSpec spec = oiioFile->spec();
+    // Check sign conversion only uint types can be converted to signed
+    // This is usefull for normal maps, we can directly utilize SNORM conversion
+    // of the hardware instead of doing "r * 2 - 1" (where r is [0, 1))
+    bool isSignConvertible = (spec.format == OIIO::TypeDesc::INT16 ||
+                              spec.format == OIIO::TypeDesc::INT8);
+    if(flags[ImageFlagTypes::LOAD_AS_SIGNED] && !isSignConvertible)
+        return MRayError("Image type is not sign convertible.({})", filePath);
+    else if(flags[ImageFlagTypes::LOAD_AS_SIGNED])
+    {
+        spec.format = (spec.format == OIIO::TypeDesc::UINT16)
+                        ? OIIO::TypeDesc::INT16
+                        : OIIO::TypeDesc::INT8;
+    }
 
-    // Determine color space
+    // Determine pixel format
     Expected<MRayPixelTypeRT> pixFormatE = PixelFormatToMRay(spec);
-    if(!pixFormatE.has_value()) return pixFormatE.error();
+    if(pixFormatE.has_error()) return pixFormatE.error();
     const MRayPixelTypeRT& pixFormat = pixFormatE.value();
+    originalPixType = pixFormat;
+
+    Expected<MRayPixelTypeRT> convPixFormatE = ConvertFormatToRequested(pixFormat, subChannels);
+    if(convPixFormatE.has_error()) return convPixFormatE.error();
+    const MRayPixelTypeRT& convPixFormat = convPixFormatE.value();
+
 
     // Determine dimension
     auto dimension = Vector3ui(spec.width, spec.height, spec.depth);
@@ -262,8 +503,8 @@ Expected<ImageHeader> ImageFileOIIO::ReadHeader()
     }
     // If "oiio:ColorSpace" query is push MR_DEFAULT color space with linear gamma
     // SceneLoader may check user defined color space if applicable
-    const auto& colorSpace = colorSpaceE.value_or(Pair(Float(1),
-                                                       MRayColorSpaceEnum::MR_DEFAULT));
+    Pair defaultColorSpace = Pair(Float(1), MRayColorSpaceEnum::MR_DEFAULT);
+    const auto& colorSpace = colorSpaceE.value_or(defaultColorSpace);
 
     // TODO: Support tiled images
     if(spec.tile_width != 0 || spec.tile_height != 0)
@@ -274,8 +515,8 @@ Expected<ImageHeader> ImageFileOIIO::ReadHeader()
     if(!spec.channelformats.empty())
         return MRayError("Channel-specific formats are not supported ({}).",
                          filePath);
-    // Is this for deep images??
-    // Or mip
+
+    // We do not support texture arrays
     if(spec.format.is_array())
         return MRayError("Arrayed per-pixel formats are not supported ({}).",
                          filePath);
@@ -291,75 +532,94 @@ Expected<ImageHeader> ImageFileOIIO::ReadHeader()
 
     bool isDefaultColorSpace = flags[ImageFlagTypes::DISREGARD_COLOR_SPACE];
     using enum MRayColorSpaceEnum;
-    return ImageHeader
+    header = ImageHeader
     {
         .dimensions = dimension,
         .mipCount = static_cast<uint32_t>(mipCount),
-        .pixelType = pixFormat,
+        .pixelType = convPixFormat,
         .colorSpace = Pair((isDefaultColorSpace) ? Float(1) : colorSpace.first,
                            (isDefaultColorSpace) ? MR_DEFAULT : colorSpace.second)
     };
+    return header;
 }
 
 Expected<Image> ImageFileOIIO::ReadImage()
 {
     Image result;
     result.header = header;
+
+    // Pre-check the spec
+    const OIIO::ImageSpec& spec = oiioFile->spec(0, 0);
+
+    // Again determine the read format
+    OIIO::TypeDesc readFormat = spec.format;
+    if(flags[ImageFlagTypes::LOAD_AS_SIGNED])
+    {
+        readFormat = (readFormat == OIIO::TypeDesc::UINT16)
+                        ? OIIO::TypeDesc::INT16
+                        : OIIO::TypeDesc::INT8;
+    }
+
+    // Calculate read channel count according to channel expansion
+    size_t readChannelCount = header.pixelType.ChannelCount();
+    bool doChannelExpand = (flags[ImageFlagTypes::TRY_3C_4C_CONVERSION] &&
+                            readChannelCount == 3u);
+    readChannelCount = (doChannelExpand) ? (readChannelCount + 1) : readChannelCount;
+
+    // Finally find the channel range
+    Vector2i channelRange = ImageLoaderI::CalculateChannelRange(subChannels);
+    // Put [0,0) when it is the exact pixel read, OIIO may have different path
+    // for this
+    channelRange = (header.pixelType == originalPixType)
+                    ? Vector2i(0)
+                    : channelRange;
+
+    // Read mip by mip
     for(uint32_t mipLevel = 0; mipLevel < header.mipCount; mipLevel++)
     {
-        // Calculate the final spec according to the flags
-        // channel expand and sign convert..
-        OIIO::ImageSpec spec = oiioFile->spec(0, mipLevel);
-        OIIO::ImageSpec finalSpec = spec;
+        OIIO::ImageSpec mipSpec = oiioFile->spec(0, mipLevel);
+        assert(mipSpec.format == spec.format);
 
-        // Check if sign convertible
-        OIIO::TypeDesc readFormat = spec.format;
-        if(flags[ImageFlagTypes::LOAD_AS_SIGNED] && !ImageLoaderI::IsSignConvertible(header.pixelType))
-            return MRayError("Image type is not sign convertible.({})", filePath);
-        else if(flags[ImageFlagTypes::LOAD_AS_SIGNED])
-        {
-            readFormat = (spec.format == OIIO::TypeDesc::UINT16)
-                            ? OIIO::TypeDesc::INT16
-                            : OIIO::TypeDesc::INT8;
-            finalSpec.format = readFormat;
-        }
-
-        // Find the x stride to do a channel expand
-        bool doChannelExpand = (header.pixelType.ChannelCount() == 3 &&
-                                flags[ImageFlagTypes::TRY_3C_4C_CONVERSION]);
-        int nChannels = (doChannelExpand) ? (spec.nchannels + 1) : (spec.nchannels);
+        // Calculate the read buffer stride
+        auto channelSize = static_cast<OIIO::stride_t>(mipSpec.channel_bytes());
         OIIO::stride_t xStride = (doChannelExpand)
-                                    ? (nChannels * static_cast<OIIO::stride_t>(readFormat.size()))
-                                    : (OIIO::AutoStride);
-        // Change the final spec as well for color convert
-        if(doChannelExpand) finalSpec.nchannels = nChannels;
+                                    ? (4 * channelSize)
+                                    : OIIO::AutoStride;
 
         // Allocate the expanded (or non-expanded) buffer and directly load into it
-        size_t scanLineSize = (static_cast<size_t>(spec.width) *
-                               static_cast<size_t>(nChannels) *
-                               readFormat.size());
+        size_t scanLineSize = (static_cast<size_t>(mipSpec.width) *
+                               readChannelCount * mipSpec.channel_bytes());
         size_t totalSize = scanLineSize * static_cast<size_t>(spec.height);
-        TransientData pixels(std::in_place_type_t<Byte>{}, totalSize);
-        Byte* dataLastElement = (pixels.AccessAs<Byte>().data() +
+
+        // Due to type safety we need to construct pixels using the formatted
+        // type, we need to "visit" the variant to correctly construct the
+        // type-ereased transient data
+        TransientData pixels = std::visit([totalSize](auto&& v)
+        {
+            using T = std::remove_cvref_t<decltype(v)>::Type;
+            return TransientData(std::in_place_type_t<T>{}, totalSize);
+        }, header.pixelType);
+
+        // Read inverted, OIIO has DirectX
+        // (or most image processing literature) style
+        // Point towards the last scanline, and put stride as negative
+        Byte* lastScanlinePtr = (pixels.AccessAs<Byte>().data() +
                                  (spec.height - 1) * scanLineSize);
         // Now we can read the file directly flipped and with proper format etc. etc.
         OIIO::stride_t oiioScanLineSize = static_cast<OIIO::stride_t>(scanLineSize);
 
-        // Directly read the compressed data,
-        // OIIO uncompress DDS when anything is not auto stride
-        // This means we need to flip it manually (maybe attaching a view parameter)
-        if(!oiioFile->read_image(0, mipLevel, readFormat,
-                                 dataLastElement, xStride,
-                                 -oiioScanLineSize))
+        // Directly read the data
+        if(!oiioFile->read_image(0, mipLevel,
+                                 channelRange[0], channelRange[1],
+                                 readFormat, lastScanlinePtr,
+                                 xStride, -oiioScanLineSize))
             return MRayError("OIIO Error ({})", oiioFile->geterror());
 
-        // Re-adjust the pixelFormat (we may have done channel expand and sign convert
-        Expected<MRayPixelTypeRT> pixFormatFinalE = PixelFormatToMRay(finalSpec);
-        if(!pixFormatFinalE.has_value()) return pixFormatFinalE.error();
 
+        // Push the mip data to vector
         result.imgData.emplace_back(ImageMip
         {
-            .mipSize = Vector3ui(spec.width, spec.height, spec.depth),
+            .mipSize = Vector3ui(mipSpec.width, mipSpec.height, mipSpec.depth),
             .pixels = std::move(pixels)
         });
     };

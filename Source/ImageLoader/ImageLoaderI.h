@@ -132,6 +132,7 @@ class ImageLoaderI
     public:
     static MRayPixelTypeRT  TryExpandTo4CFormat(MRayPixelTypeRT);
     static bool             IsSignConvertible(MRayPixelTypeRT);
+    static Vector2i         CalculateChannelRange(ImageSubChannelType);
 
     public:
         virtual                 ~ImageLoaderI() = default;
@@ -188,6 +189,33 @@ inline bool ImageLoaderI::IsSignConvertible(MRayPixelTypeRT pf)
             return true;
         default:
             return false;
+    }
+}
+
+inline Vector2i ImageLoaderI::CalculateChannelRange(ImageSubChannelType subChannels)
+{
+    switch(subChannels)
+    {
+        using enum ImageSubChannelType;
+        case R: return Vector2i(0, 1);
+        case G: return Vector2i(1, 2);
+        case B: return Vector2i(2, 3);
+        case A: return Vector2i(3, 4);
+
+        case RG: return Vector2i(0, 2);
+        case GB: return Vector2i(1, 3);
+        case BA: return Vector2i(2, 4);
+
+        case RGB: return Vector2i(0, 3);
+        case GBA: return Vector2i(1, 4);
+
+        case RGBA: return Vector2i(0, 4);
+
+        // This value is only good for OIIO.
+        // Make this robust later
+        case ALL:   return Vector2i(0, 0);
+        default:    return Vector2i(-1, -1);
+
     }
 }
 

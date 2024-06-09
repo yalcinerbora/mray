@@ -17,6 +17,7 @@ class ImageFileOIIO : public ImageFileBase
     private:
     OIIO::ImageInput::unique_ptr        oiioFile;
     ImageHeader                         header;
+    MRayPixelTypeRT                     originalPixType;
 
     public:
     // Conversion Enums
@@ -25,6 +26,8 @@ class ImageFileOIIO : public ImageFileBase
 
     static Expected<std::string>        ColorSpaceToOIIO(const ColorSpacePack&);
     static Expected<ColorSpacePack>     ColorSpaceToMRay(const std::string&);
+    static Expected<MRayPixelTypeRT>    ConvertFormatToRequested(MRayPixelTypeRT pixFormat,
+                                                                 ImageSubChannelType subChannels);
 
     public:
     // Constructors & Destructor

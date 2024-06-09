@@ -228,6 +228,84 @@ size_t MipSizeToLinearByteSize(MRayPixelTypeRT pf, const Vector3ui& mipSize)
     return 512;
 }
 
+bool IsPlausibleChannelLayout(MRayPixelTypeRT pixType,
+                              ImageSubChannelType type)
+{
+    if(type == ImageSubChannelType::ALL) return true;
+
+    // Check if channels are exactly match by the request.
+    // MRay currently duplicates the textures when:
+    //  (Given TexA has RGB channels)
+    // -- A material only uses TexA channel B (i.e. this is roughness param)
+    // -- same or another material also uses TexA channel G
+    // -- other material uses TexA RGB fully.
+    //
+    // Texture will be duplicated 3 times
+    // -- 1st texture will be 1 channel (which will have B channel)
+    // -- 2nd texture will be 1 channel as well with G channel
+    // -- 3rd texture will be 4 channel (last channel is HW limitation
+    //    we pad the last channel because of that) and it will contain all RGB
+    //    channels.
+    //
+    // We can not split channels from the block compressed format.
+    // So 1st and 2nd textures will be delegated to the OIIO
+    // which will decompress the image and split channels accordingly.
+    //
+    // However for some cases we will let it duplicate the BC format
+    // when it has similar size. When RGBA compressed texture is requested
+    // as RGB, we will let it slide.
+    // One of the reasons for it is that some BC formats have single bit alpha
+    // which will result as 4 channel type.
+    // Lastly MRay does not support swizlling on textures, so shifted types will be delegated
+    // directly. (On RGB texture requesting GB will result in OIIO delegation)
+
+    // Checking the layouts from here
+    // https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-block-compression
+    switch(type)
+    {
+        using enum MRayPixelEnum;
+
+        // These are the important cases
+        case ImageSubChannelType::RGBA:
+        case ImageSubChannelType::RGB:
+            return (pixType.Name() == MR_BC1_UNORM   ||
+                    pixType.Name() == MR_BC2_UNORM   ||
+                    pixType.Name() == MR_BC3_UNORM   ||
+                    pixType.Name() == MR_BC6H_UFLOAT ||
+                    pixType.Name() == MR_BC6H_SFLOAT ||
+                    pixType.Name() == MR_BC7_UNORM);
+        // BC5, but we let the BC1-2-7 also slide here
+        case ImageSubChannelType::RG:
+            return (pixType.Name() == MR_BC1_UNORM   ||
+                    pixType.Name() == MR_BC2_UNORM   ||
+                    pixType.Name() == MR_BC3_UNORM   ||
+                    pixType.Name() == MR_BC6H_UFLOAT ||
+                    pixType.Name() == MR_BC6H_SFLOAT ||
+                    pixType.Name() == MR_BC7_UNORM   ||
+                    // Extra
+                    pixType.Name() == MR_BC5_UNORM   ||
+                    pixType.Name() == MR_BC5_SNORM);
+            break;
+
+        // Only BC4, but we let BC5 slide (only for R)
+        case ImageSubChannelType::R:
+            return (pixType.Name() == MR_BC5_UNORM ||
+                    pixType.Name() == MR_BC5_SNORM ||
+                    pixType.Name() == MR_BC4_UNORM ||
+                    pixType.Name() == MR_BC4_SNORM);
+
+        // These are types will be delegated to OIIO.
+        case ImageSubChannelType::G:
+        case ImageSubChannelType::B:
+        case ImageSubChannelType::A:
+        case ImageSubChannelType::GB:
+        case ImageSubChannelType::BA:
+        case ImageSubChannelType::GBA:
+        default:
+            return false;
+    }
+}
+
 ImageFileDDS::ImageFileDDS(const std::string& filePath,
                            ImageSubChannelType subChannels,
                            ImageIOFlags flags)
@@ -394,6 +472,10 @@ Expected<ImageHeader> ImageFileDDS::ReadHeader()
             break;
         }
     }
+
+    // Delegate to OIIO if not plausible
+    if(!IsPlausibleChannelLayout(outputHeader.pixelType, subChannels))
+        return MRayError::OK;
 
     headerIsRead = true;
     header = outputHeader;
