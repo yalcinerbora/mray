@@ -20,12 +20,18 @@ namespace MathFunctions
     template <std::signed_integral T>
     MRAY_HYBRID constexpr T Roll(T, T minVal, T maxVal);
 
-    // This pattern comes out to0 many times due to
-    // numeric calculations. It just prevents a to be negative.
+    // This pattern comes out too many times in
+    // numeric calculations. Due to precision errors,
+    // sometimes mathematicall correct square roots
+    // may result in NaN.
     // Basically "sqrt(max(0, a))".
     template <std::floating_point T>
     MRAY_HYBRID  T              SqrtMax(T a);
 
+    // Trigonometry
+    template <std::floating_point T>
+    MRAY_HYBRID
+    constexpr std::array<T, 2>  SinCos(T);
 
     template <std::integral T>
     MRAY_HYBRID constexpr T     DivideUp(T value, T alignment);
@@ -90,6 +96,27 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 T MathFunctions::SqrtMax(T a)
 {
     return std::sqrt(std::max(Float{0}, a));
+}
+
+template <std::floating_point T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr std::array<T, 2> MathFunctions::SinCos(T v)
+{
+    std::array<T, 2> result;
+    #if defined(MRAY_GPU_BACKEND_CUDA) && defined(__CUDA_ARCH__)
+
+        if constexpr(std::is_same_v<T, float>)
+            sincosf(v, result.data() + 0, result.data() + 1);
+        else
+            sincos (v, result.data() + 0, result.data() + 1);
+    #else
+
+        result[0] = std::sin(v);
+        result[1] = SqrtMax(Float(1) - result[0] * result[0]);
+
+    #endif
+
+    return result;
 }
 
 template <std::integral T>

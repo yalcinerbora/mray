@@ -54,6 +54,13 @@ constexpr Vector<N, T>::Vector(const Vector<N - sizeof...(Args), T>& v,
 template <unsigned int N, ArithmeticC T>
 template<std::convertible_to<T> C>
 MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Vector<N, T>::Vector(std::array<C, N>&& data)
+    : vector(data)
+{}
+
+template <unsigned int N, ArithmeticC T>
+template<std::convertible_to<T> C>
+MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector<N, T>::Vector(const Vector<N, C>& other)
 {
     UNROLL_LOOP

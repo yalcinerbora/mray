@@ -30,9 +30,10 @@ class ParamVaryingData
 };
 
 template <class C>
-concept SpectrumConverterC = requires(C c)
+concept SpectrumConverterC = requires(const C c)
 {
     {c.Convert(Optional<Vector3>{})} -> std::same_as<Optional<Spectrum>>;
+    {c.Waves()} -> std::same_as<SpectrumWaves>;
 };
 
 template <class C>
@@ -95,6 +96,13 @@ struct SpectrumConverterContext
 struct SpectrumConverterIdentity
 {
     MRAY_HYBRID Optional<Spectrum> Convert(const Optional<Vector3>& c) const;
+    // Adding this for IoR conversion (dispersion)
+    // We could've added ConvertIoR function, but the input arguments
+    // may change depending on the medium (unless we dictate a protocol)
+    // This is little bit more scalable but for Identity converter this does not
+    // makes sense. Medium logic should be careful to incorporate these
+    MRAY_HYBRID SpectrumWaves Waves() const;
+
 };
 
 using SpectrumConverterContextIdentity = SpectrumConverterContext<SpectrumConverterIdentity>;
@@ -199,4 +207,10 @@ Optional<Spectrum> SpectrumConverterIdentity::Convert(const Optional<Vector3>& c
 {
     if(!c.has_value()) return std::nullopt;
     return Spectrum(c.value(), Float(0));
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+SpectrumWaves SpectrumConverterIdentity::Waves() const
+{
+    return SpectrumWaves::Zero();
 }

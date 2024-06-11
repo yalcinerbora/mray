@@ -102,7 +102,8 @@ using CamGTypes = Tuple
 // ================= //
 using MedGTypes = Tuple
 <
-    MediumGroupVacuum
+    MediumGroupVacuum,
+    MediumGroupHomogeneous
 >;
 
 // ================= //

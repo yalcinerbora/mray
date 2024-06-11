@@ -25,6 +25,25 @@ concept MediumC = requires(MediumType md,
     // API
     MediumType(sc, typename MediumType::DataSoA{}, MediumKey{});
 
+    // TODO: Designing this requires paper reading
+    // Currently I've no/minimal information about this topic.
+    // We need to do a ray marching style approach probably.
+    // Instead of doing a single thread per scatter,
+    // We can do single warp (or even block?, prob too much)
+    // per ray.
+    //
+    // I've checked the PBRT book/code, it does similar but code
+    // is hard to track.
+    //
+    // All in all,
+    // Medium generates an iterator, (for homogeneous it is the full ray)
+    // for spatially varying media it is dense grid and does DDA march over it.
+    //
+    // Iterator calls a callback function that does the actual work,
+    // It can prematurely terminate the iteration due to scattering/absrobtion etc.
+    // March logic should not be here it will be the renderer's responsibility
+    // Phase function should be here so we need a scatter function
+    // that creates a ray.
     {md.SampleScattering(Vector3{}, rng)} -> std::same_as<ScatterSample>;
     {md.PdfScattering(Vector3{}, Vector3{})} -> std::same_as<Float>;
     {md.SampleScatteringRNCount()} -> std::same_as<uint32_t>;
@@ -32,6 +51,10 @@ concept MediumC = requires(MediumType md,
     {md.SigmaA(Vector3{})} -> std::same_as<Spectrum>;
     {md.SigmaS(Vector3{})} -> std::same_as<Spectrum>;
     {md.Emission(Vector3{})} -> std::same_as<Spectrum>;
+
+    // TODO:
+    // We need to expose the iterator in a different way here, because we may
+    // dedicate a warp to handle a single ray, so code should abstract it away
 
     // Type traits
     requires std::is_trivially_copyable_v<MediumType>;

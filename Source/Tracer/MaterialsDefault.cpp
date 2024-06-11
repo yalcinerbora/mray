@@ -147,7 +147,7 @@ void MatGroupLambert::PushTexAttribute(MaterialKey, MaterialKey,
                                        std::vector<TextureId>,
                                        const GPUQueue&)
 {
-    throw MRayError("{:s} do not have and mandatory textures!", TypeName());
+    throw MRayError("{:s} do not have any mandatory textures!", TypeName());
 }
 
 typename MatGroupLambert::DataSoA MatGroupLambert::SoA() const
@@ -258,7 +258,7 @@ MatAttributeInfoList MatGroupRefract::AttributeInfo() const
 }
 
 void MatGroupRefract::PushAttribute(MaterialKey,
-                                    uint32_t attributeIndex,
+                                    uint32_t,
                                     TransientData,
                                     const GPUQueue&)
 {}
@@ -329,7 +329,7 @@ MatAttributeInfoList MatGroupUnreal::AttributeInfo() const
 }
 
 void MatGroupUnreal::PushAttribute(MaterialKey,
-                                   uint32_t attributeIndex,
+                                   uint32_t,
                                    TransientData,
                                    const GPUQueue&)
 {}

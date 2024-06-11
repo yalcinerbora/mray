@@ -69,7 +69,7 @@ namespace GraphicsFunctions
     MRAY_HYBRID Vector3     CartesianToSpherical(const Vector3&);
     MRAY_HYBRID Vector3     UnitSphericalToCartesian(const Vector2&);
     MRAY_HYBRID Vector3     UnitSphericalToCartesian(const Vector2& sinCosTheta,
-                                                 const Vector2& sinCosPhi);
+                                                     const Vector2& sinCosPhi);
     MRAY_HYBRID Vector2     CartesianToUnitSpherical(const Vector3&);
 
     //
@@ -91,8 +91,8 @@ namespace GraphicsFunctions
                                                          const Vector3& y);
     MRAY_HYBRID
     constexpr Pair<Vector3, Vector3>    GSOrthonormalize(const Vector3& x,
-                                                        const Vector3& y,
-                                                        const Vector3& z);
+                                                         const Vector3& y,
+                                                         const Vector3& z);
 
     MRAY_HYBRID constexpr Vector2       UVToSphericalAngles(const Vector2& uv);
     MRAY_HYBRID constexpr Vector2       SphericalAnglesToUV(const Vector2& thetaPhi);
@@ -457,7 +457,6 @@ constexpr Vector2 SphericalAnglesToUV(const Vector2& thetaPhi)
     Float v = 1 - (thetaPhi[1] * InvPi<Float>());
     return Vector2(u, v);
 }
-
 
 namespace MortonCode
 {

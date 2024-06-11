@@ -102,19 +102,25 @@ struct SampleT
 template<class... Args>
 struct SoASpan
 {
+    constexpr Tuple<Args*...> NullifyPtrs();
+
     private:
     // TODO: Find a way to default initialize this.
     // My template metaprogramming capabilities was not enough.
     // We are setting size to zero at least.
-    Tuple<Args*...> ptrs;
+    Tuple<Args*...> ptrs = NullifyPtrs();
     size_t          size = 0;
 
     public:
+            SoASpan() = default;
     template<class... Spans>
             SoASpan(const Spans&... args);
 
     template<size_t I>
     auto    Get() -> Span<std::tuple_element_t<I, Tuple<Args...>>>;
+
+    template<size_t I>
+    auto    Get() const -> Span<std::tuple_element_t<I, Tuple<const Args...>>>;
 };
 
 // std::expected is not in standart as of c++20 so rolling a simple
@@ -220,6 +226,17 @@ constexpr bool IsSubspan(Span<T0, E0> checkedSpan, Span<T1, E1> bigSpan)
 }
 
 template<class... Args>
+constexpr Tuple<Args*...> SoASpan<Args...>::NullifyPtrs()
+{
+    Tuple<Args*...> result;
+    std::apply([](auto&&... args)
+    {
+        ((args = nullptr), ...);
+    }, result);
+    return result;
+}
+
+template<class... Args>
 template<class... Spans>
 SoASpan<Args...>::SoASpan(const Spans&... args)
     : ptrs(args.data()...)
@@ -233,6 +250,14 @@ template<size_t I>
 auto SoASpan<Args...>::Get() -> Span<std::tuple_element_t<I, Tuple<Args...>>>
 {
     using ResulT = Span<std::tuple_element_t<I, Tuple<Args...>>>;
+    return ResulT(std::get<I>(ptrs), size);
+}
+
+template<class... Args>
+template<size_t I>
+auto SoASpan<Args...>::Get() const -> Span<std::tuple_element_t<I, Tuple<const Args...>>>
+{
+    using ResulT = Span<std::tuple_element_t<I, Tuple<const Args...>>>;
     return ResulT(std::get<I>(ptrs), size);
 }
 

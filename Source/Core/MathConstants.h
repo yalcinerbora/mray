@@ -9,7 +9,8 @@ namespace MathConstants
     MRAY_FPSC T Pi()            { return T(3.1415926535897932384626433); }
     MRAY_FPSC T PiSqr()         { return Pi<T>() * Pi<T>(); }
     MRAY_FPSC T InvPi()         { return T(1) / Pi<T>(); }
-    MRAY_FPSC T InvPiHalf()     { return T(0.5) / Pi<T>(); }
+    MRAY_FPSC T Inv2Pi()        { return T(0.5) / Pi<T>(); }
+    MRAY_FPSC T Inv4Pi()        { return T(0.25) / Pi<T>(); }
     MRAY_FPSC T InvPiSqr()      { return T{1} / (Pi<T>() * Pi<T>()); }
     MRAY_FPSC T SqrtPi()        { return T(1.772453850905516027298167); }
     MRAY_FPSC T Sqrt2()         { return T(1.4142135623730950488016887); }

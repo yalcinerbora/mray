@@ -60,14 +60,13 @@ class VulkanDeviceAllocator
     VulkanDeviceAllocator() = default;
     VulkanDeviceAllocator(VkDevice, uint32_t, uint32_t);
 
-    template<size_t I = 0, class... Tp>
-    requires (I == sizeof...(Tp))
+    template<size_t... Is, class... Tp>
     void AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>&,
-                                  const Tuple<Tp&...>&);
-    template<std::size_t I = 0, class... Tp>
-    requires (I < sizeof...(Tp))
+                                  const Tuple<Tp&...>&,
+                                  std::index_sequence<Is...>);
+    template<class... Tp>
     void AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>& sizeAlignmentList,
-                                  const Tuple<Tp&...>& inOutObjects);
+                                  const Tuple<Tp&...>& memObjects);
     //
     template<size_t I = 0, class... Tp>
     requires (I == sizeof...(Tp))
@@ -90,20 +89,23 @@ class VulkanDeviceAllocator
     VkDeviceMemory AllocateMultiObject(Tuple<Args&...> inOutObjects, Location location);
 };
 
-template<size_t I, class... Tp>
-requires (I == sizeof...(Tp))
+template<size_t... Is, class... Tp>
+//requires (I == sizeof...(Tp))
 inline void
-VulkanDeviceAllocator::AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>&,
-                                                const Tuple<Tp&...>&)
-{}
+VulkanDeviceAllocator::AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>& sizeAndAlignmentList,
+                                                const Tuple<Tp&...>& tp,
+                                                std::index_sequence<Is...>)
+{
+    (static_cast<void>(sizeAndAlignmentList[Is] = std::get<Is>(tp).MemRequirements()), ...);
+}
 
-template<std::size_t I, class... Tp>
-requires (I < sizeof...(Tp))
+template<class... Tp>
 inline void
 VulkanDeviceAllocator::AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>& sizeAlignmentList,
-                                                const Tuple<Tp&...>& inOutObjects)
+                                                const Tuple<Tp&...>& memObjects)
 {
-    sizeAlignmentList[I] = std::get<I>(inOutObjects).MemRequirements();
+    return AcquireSizeAndAlignments(sizeAlignmentList, memObjects,
+                                    std::index_sequence_for<Tp...>{});
 }
 
 template<size_t I, class... Tp>
