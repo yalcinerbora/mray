@@ -219,8 +219,7 @@ TransientData MeshFileGFG::GetAttribute(PrimitiveAttributeLogic logic) const
             size_t count = loader.MeshIndexDataSize(innerIndex) / v.Size;
             TransientData result(std::in_place_type_t<T>{}, count);
             result.ReserveAll();
-            Span<Byte> span = result.AccessAs<Byte>();
-            // TODO: Change this later
+            Span<T> span = result.AccessAs<T>();
             loader.MeshIndexData(reinterpret_cast<uint8_t*>(span.data()),
                                  innerIndex);
             return result;

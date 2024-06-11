@@ -263,7 +263,8 @@ MRayError THRDProcessMesh(Span<const MeshGroup> meshes,
 
             Span<Vector3ui> indices;
             MemAlloc::AllocateMultiData(std::tie(indices), indexMem,
-                                        {meshIn->mNumFaces}, 1u);
+                                        {meshIn->mNumFaces},
+                                        alignof(Vector3ui));
 
 
             Span<Vector3> positions;
@@ -275,9 +276,9 @@ MRayError THRDProcessMesh(Span<const MeshGroup> meshes,
 
             if(flags[NORMAL_AS_QUATERNION])
             {
-                size_t alignment = std::max(std::max(sizeof(Vector3),
-                                                     sizeof(Vector2)),
-                                            sizeof(Quaternion));
+                size_t alignment = std::max(std::max(alignof(Vector3),
+                                                     alignof(Vector2)),
+                                            alignof(Quaternion));
                 MemAlloc::AllocateMultiData(std::tie(positions, uvs,
                                                      normalsQuat),
                                             meshMem,
@@ -287,15 +288,15 @@ MRayError THRDProcessMesh(Span<const MeshGroup> meshes,
             }
             else
             {
-                size_t alignment = std::max(sizeof(Vector3),
-                                            sizeof(Vector2));
-                                            MemAlloc::AllocateMultiData(std::tie(positions, uvs,
-                                                                                 normals, tangents, bitangents),
-                                                                        meshMem,
-                                                                        {vertexCount, vertexCount,
-                                                                        vertexCount, vertexCount,
-                                                                        vertexCount},
-                                                                        alignment);
+                size_t alignment = std::max(alignof(Vector3),
+                                            alignof(Vector2));
+                MemAlloc::AllocateMultiData(std::tie(positions, uvs,
+                                                     normals, tangents, bitangents),
+                                            meshMem,
+                                            {vertexCount, vertexCount,
+                                            vertexCount, vertexCount,
+                                            vertexCount},
+                                            alignment);
             }
 
 

@@ -131,8 +131,8 @@ MRayError VisorCommand::Invoke()
     // Thread pool, many things will need this
     // TODO: Change this to HW concurrency,
     // this is for debugging
-    //uint32_t threadCount = std::thread::hardware_concurrency();
-    uint32_t threadCount = 1;
+    uint32_t threadCount = std::thread::hardware_concurrency();
+    //uint32_t threadCount = 1;
     BS::thread_pool threadPool(threadCount);
 
     // Get the tracer dll
@@ -221,8 +221,8 @@ MRayError VisorCommand::Invoke()
 CLI::App* VisorCommand::GenApp(CLI::App& mainApp)
 {
     using namespace MRayCLI::VisorNames;
-    CLI::App* visorApp = mainApp.add_subcommand("", std::string(Description))
-        ->alias(std::string(Name));
+    CLI::App* visorApp = mainApp.add_subcommand(std::string(Name), std::string(Description));
+        //->alias(std::string(Name));
 
     // Input
     visorApp->add_option("--tracerConf, --tConf"s, tracerConfigFile,

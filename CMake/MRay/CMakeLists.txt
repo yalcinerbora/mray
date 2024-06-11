@@ -55,6 +55,7 @@ add_dependencies(MRay
 # Debug Parameters (For my own use case)
 if(MSVC)
     set(DEBUG_ARGS "")
+    string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "visor ")
     string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "-r 640x360 ")
     string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "-s Scenes/helloTriangle.json ")
     string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "--tConf tracerConfig.json ")
