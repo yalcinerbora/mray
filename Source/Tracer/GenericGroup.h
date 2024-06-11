@@ -172,13 +172,13 @@ class GenericTexturedGroupT : public GenericGroupT<IdType, AttributeInfoType>
 
     template<uint32_t D, class T>
     std::vector<TextureView<D, T>>
-        ConvertToView(std::vector<TextureId> texIds,
-                      uint32_t attributeIndex) const;
+            ConvertToView(std::vector<TextureId> texIds,
+                          uint32_t attributeIndex) const;
 
     template<uint32_t D, class T>
     std::vector<Optional<TextureView<D, T>>>
-        ConvertToView(std::vector<Optional<TextureId>> texIds,
-                      uint32_t attributeIndex) const;
+            ConvertToView(std::vector<Optional<TextureId>> texIds,
+                          uint32_t attributeIndex) const;
 
     protected:
     const TextureViewMap& globalTextureViews;
@@ -233,7 +233,7 @@ class GenericTexturedGroupT : public GenericGroupT<IdType, AttributeInfoType>
 template<class ID, class AI>
 const AttributeRanges& GenericGroupT<ID, AI>::FindRange(IdInt id) const
 {
-    auto range = itemRanges.at(id);
+    auto range = itemRanges.at(ID(id).FetchIndexPortion());
     if(!range)
     {
         throw MRayError("{:s}:{:d}: Unkown key {}",

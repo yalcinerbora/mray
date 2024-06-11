@@ -187,7 +187,7 @@ MatAttributeInfoList MatGroupReflect::AttributeInfo() const
 }
 
 void MatGroupReflect::PushAttribute(MaterialKey,
-                                    uint32_t attributeIndex,
+                                    uint32_t,
                                     TransientData,
                                     const GPUQueue&)
 {}

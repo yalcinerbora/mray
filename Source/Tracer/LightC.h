@@ -85,7 +85,7 @@ class GenericGroupLightT : public GenericTexturedGroupT<LightKey, LightAttribute
     using typename Parent::IdList;
 
     protected:
-    virtual void    HandlePrimBatches(const PrimBatchList&) = 0;
+    Map<LightKey, PrimBatchKey>  primMappings;
 
     public:
     // Constructors & Destructor
@@ -103,7 +103,7 @@ class GenericGroupLightT : public GenericTexturedGroupT<LightKey, LightAttribute
     //
     virtual bool                            IsPrimitiveBacked() const = 0;
     virtual const GenericGroupPrimitiveT&   GenericPrimGroup() const = 0;
-    virtual PrimBatchId                     LightPrimBatch(LightId) const = 0;
+    PrimBatchKey                            LightPrimBatch(LightKey) const;
 };
 
 using LightGroupPtr = std::unique_ptr<GenericGroupLightT>;
@@ -111,16 +111,13 @@ using LightGroupPtr = std::unique_ptr<GenericGroupLightT>;
 template <class Child>
 class GenericGroupLight : public GenericGroupLightT
 {
-    protected:
-    Map<LightId, PrimBatchId>  primMappings;
-
     public:
                         GenericGroupLight(uint32_t groupId, const GPUSystem&,
                                           const TextureViewMap&,
                                           size_t allocationGranularity = 2_MiB,
                                           size_t initialReservartionSize = 4_MiB);
     std::string_view    Name() const override;
-    PrimBatchId         LightPrimBatch(LightId) const override;
+
 };
 
 inline
@@ -147,8 +144,26 @@ GenericGroupLightT::Reserve(const std::vector<AttributeCountList>& countArrayLis
     // We blocked the virutal chain, but we should be able to use it here
     // We will do the same here anyways migh as well use it.
     auto result = Parent::Reserve(countArrayList);
-    HandlePrimBatches(primBatches);
+    if(!IsPrimitiveBacked()) return result;
+
+    assert(result.size() == primBatches.size());
+    for(size_t i = 0; i < primBatches.size(); i++)
+    {
+        primMappings.try_emplace(result[i], primBatches[i]);
+    }
     return result;
+}
+
+inline PrimBatchKey GenericGroupLightT::LightPrimBatch(LightKey lKey) const
+{
+    auto pBatchId = primMappings.at(lKey);
+    if(!pBatchId)
+    {
+        throw MRayError("{:s}:{:d}: Unkown light key {}",
+                        this->Name(), this->groupId,
+                        lKey.FetchIndexPortion());
+    }
+    return pBatchId.value();
 }
 
 template <class C>
@@ -165,17 +180,4 @@ template <class C>
 std::string_view GenericGroupLight<C>::Name() const
 {
     return C::TypeName();
-}
-
-template <class C>
-PrimBatchId GenericGroupLight<C>::LightPrimBatch(LightId lId) const
-{
-    auto pBatchId = primMappings.at(lId);
-    if(!pBatchId)
-    {
-        throw MRayError("{:s}:{:d}: Unkown light key {}",
-                        this->Name(), this->groupId,
-                        LightKey(static_cast<uint32_t>(lId)).FetchIndexPortion());
-    }
-    return pBatchId.value();
 }

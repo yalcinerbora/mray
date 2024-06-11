@@ -18,6 +18,7 @@ namespace LightDetail
     {
         Span<const ParamVaryingData<2, Vector3>>    dRadiances;
         Span<const MediumId>                        dMediumIds;
+        Span<const Vector2ui>                       dPrimRanges;
         Bitspan<const uint32_t>                     dIsTwoSidedFlags;
     };
 
@@ -208,14 +209,12 @@ class LightGroupPrim final : public GenericGroupLight<LightGroupPrim<PrimGroupT>
     using Light = typename LightDetail::LightPrim<Primitive<TransformContext>, SpectrumConverterContext>;
 
     private:
-    const PrimGroup&    primGroup;
+    const PrimGroup&                    primGroup;
     Span<ParamVaryingData<2, Vector3>>  dRadiances;
     Span<MediumKey>                     dMediumIds;
+    Span<Vector2ui>                     dPrimRanges;
     Bitspan<uint32_t>                   dIsTwoSidedFlags;
     DataSoA                             soa;
-
-    protected:
-    void        HandlePrimBatches(const PrimBatchList&) override;
 
     public:
     static std::string_view TypeName();
@@ -288,9 +287,6 @@ class LightGroupSkysphere final : public GenericGroupLight<LightGroupSkysphere<C
     Float                               sceneDiameter;
     DataSoA                             soa;
 
-    protected:
-    void                    HandlePrimBatches(const PrimBatchList&) override;
-
     public:
     static std::string_view TypeName();
     //
@@ -352,8 +348,6 @@ class LightGroupNull : public GenericGroupLight<LightGroupNull>
 
     private:
     const PrimGroup& primGroup;
-    protected:
-    void            HandlePrimBatches(const PrimBatchList&) override;
 
     public:
     static std::string_view TypeName();

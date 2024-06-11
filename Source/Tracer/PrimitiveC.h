@@ -222,9 +222,9 @@ class GenericGroupPrimitiveT : public GenericGroupT<PrimBatchKey, PrimAttributeI
                                        size_t initialReservartionSize = 64_MiB);
 
     virtual void        CopyPrimIds(Span<PrimitiveKey> dOutLocation,
-                                    PrimBatchId primBatchId,
+                                    PrimBatchKey primBatchKey,
                                     const GPUQueue& queue) const = 0;
-    virtual Vector2ui   BatchRange(PrimBatchId) const = 0;
+    virtual Vector2ui   BatchRange(PrimBatchKey) const = 0;
 };
 
 using PrimGroupPtr           = std::unique_ptr<GenericGroupPrimitiveT>;
@@ -318,9 +318,9 @@ class PrimGroupEmpty final : public GenericGroupPrimitive<PrimGroupEmpty>
                                           const GPUQueue&) override;
 
     void                    CopyPrimIds(Span<PrimitiveKey> dOutLocation,
-                                        PrimBatchId primBatchId,
+                                        PrimBatchKey primBatchId,
                                         const GPUQueue& queue) const override;
-    Vector2ui               BatchRange(PrimBatchId) const override;
+    Vector2ui               BatchRange(PrimBatchKey) const override;
 
     DataSoA                 SoA() const;
 };
@@ -490,12 +490,12 @@ void PrimGroupEmpty::PushAttribute(PrimBatchKey, PrimBatchKey,
 
 inline
 void PrimGroupEmpty::CopyPrimIds(Span<PrimitiveKey>,
-                                 PrimBatchId,
+                                 PrimBatchKey,
                                  const GPUQueue&) const
 {}
 
 inline
-Vector2ui PrimGroupEmpty::BatchRange(PrimBatchId) const
+Vector2ui PrimGroupEmpty::BatchRange(PrimBatchKey) const
 {
     return Vector2ui::Zero();
 }

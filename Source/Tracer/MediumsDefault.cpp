@@ -118,7 +118,7 @@ MediumAttributeInfoList MediumGroupHomogeneous::AttributeInfo() const
         MatAttributeInfo("ior", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
                          MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA),
         MatAttributeInfo("hgPhase", MRayDataType<MR_FLOAT>(), IS_SCALAR,
-                         MR_OPTIONAL, MR_TEXTURE_ONLY, IS_PURE_DATA)
+                         MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA)
     };
     return LogicList;
 }

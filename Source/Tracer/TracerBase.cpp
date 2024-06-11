@@ -1199,16 +1199,16 @@ void TracerBase::PushMediumAttribute(MediumGroupId gId, Vector2ui mediumRange,
 SurfaceId TracerBase::CreateSurface(SurfaceParams p)
 {
     // Validate that all batches are in the same group
-    uint32_t groupId = 0;
-    uint32_t groupIdFirst = 0;
-    for(size_t i = 0; i < p.primBatches.size(); i++)
+    auto loc = std::adjacent_find(p.primBatches.cbegin(),
+                                  p.primBatches.cend(),
+    [](PrimBatchId lhs, PrimBatchId rhs)
     {
-        PrimBatchKey key(static_cast<uint32_t>(p.primBatches[i]));
-        uint32_t currId = key.FetchBatchPortion();
-        if(i == 0) groupIdFirst = currId;
-        else groupId |= currId;
-    }
-    if(groupIdFirst != groupId)
+        PrimBatchKey keyL(static_cast<uint32_t>(lhs));
+        PrimBatchKey keyR(static_cast<uint32_t>(rhs));
+        return keyL.FetchBatchPortion() != keyR.FetchBatchPortion();
+    });
+
+    if(loc != p.primBatches.cend())
         throw MRayError("PrimitiveIds of a surface must "
                         "be the same type!");
 
@@ -1433,6 +1433,9 @@ void TracerBase::ClearAll()
     lightSurfaceCounter = 0;
     camSurfaceCounter = 0;
     textureCounter = 0;
+
+    // GroupId 0 is reserved for empty primitive
+    CreatePrimitiveGroup(std::string(TracerConstants::EmptyPrimName));
 }
 
 GPUThreadInitFunction TracerBase::GetThreadInitFunction() const

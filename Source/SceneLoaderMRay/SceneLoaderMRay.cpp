@@ -156,12 +156,17 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
 
     for(size_t i = 0; i < totalCounts.size(); i++)
     {
+        auto texturability = std::get<TexturedAttributeInfo::TEXTURABLE_INDEX>(list[i]);
         std::visit([&](auto&& dataType)
         {
             using T = std::remove_cvref_t<decltype(dataType)>::Type;
+            using enum AttributeTexturable;
             auto initData = TexturedAttributeData
             {
-                .data = TransientData(std::in_place_type_t<T>{}, totalCounts[i]),
+                .data = TransientData(std::in_place_type_t<T>{},
+                                      (texturability == MR_TEXTURE_ONLY)
+                                        ? 0
+                                        : totalCounts[i]),
                 .textures = std::vector<Optional<TextureId>>()
             };
             result.push_back(std::move(initData));
@@ -687,7 +692,7 @@ void SceneLoaderMRay::DryRunNodesForTex(std::vector<NodeTexStruct>& textureIds,
     }
 }
 
-template<class Loader, class GroupIdType, class IdType>
+template<bool FeedFirstNode, class Loader, class GroupIdType, class IdType>
 void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, Pair<GroupIdType, IdType>>>& outputMappings,
                        typename SceneLoaderMRay::ExceptionList& exceptions,
                        const typename SceneLoaderMRay::TypeMappedNodes& nodeLists,
@@ -703,7 +708,14 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
         const uint32_t groupEntityCount = static_cast<uint32_t>(nodes.size());
         auto groupEntityList = std::make_shared<PerGroupList>(groupEntityCount);
 
-        GroupIdType groupId = loader.CreateGroup(typeName);
+        // TODO: Dirty fix to feed LightLoader the first node
+        // so that it fetches primGroupId from it.
+        // Change this later.
+        GroupIdType groupId;
+        if constexpr(FeedFirstNode)
+            groupId = loader.CreateGroup(typeName, nodes.front());
+        else
+            groupId = loader.CreateGroup(typeName);
 
         // Construct Barrier
         auto BarrierFunc = [groupId, loader]() noexcept
@@ -1010,8 +1022,13 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
     {
         // Wait other tasks to complere
         future->wait();
+
+        // If no textures are loaded, commit the tracer
+        // texture system. So it will let mapping to be accessed
+        if(texIdListPtr->empty())
+            tracer.CommitTextures();
         // Thread Generated Textures are finalized
-        for(const auto& pair : (*texIdListPtr))
+        else for(const auto& pair : (*texIdListPtr))
             texMappings.emplace(pair.first, pair.second);
     });
     // All important data is in shared_ptrs we can safely exit scope.
@@ -1061,23 +1078,29 @@ void SceneLoaderMRay::LoadMediums(TracerI& tracer, ExceptionList& exceptions)
         {
             MediumAttributeInfoList list = tracer.AttributeInfo(groupId);
             auto dataOut = TexturableAttributeLoad(totalCounts, list, nodes, texMappings);
-            uint32_t attribIndex = 0;
-            for(auto& data : dataOut)
+            for(uint32_t attribIndex = 0;  attribIndex < dataOut.size();
+                attribIndex++)
             {
+                using enum AttributeTexturable;
+                const auto IS_TEX_INDEX = TexturedAttributeInfo::TEXTURABLE_INDEX;
+                auto& data = dataOut[attribIndex];
                 MediumId idStart = ids.front();
-                MediumId idEnd = ids.front();
+                MediumId idEnd = ids.back();
                 auto range = Vector2ui(static_cast<uint32_t>(idStart),
                                        static_cast<uint32_t>(idEnd));
-                tracer.PushMediumAttribute(groupId, range, attribIndex,
-                                           std::move(data.data),
-                                           std::move(data.textures));
-                attribIndex++;
+                if(std::get<IS_TEX_INDEX>(list[attribIndex]) == MR_CONSTANT_ONLY)
+                    tracer.PushMediumAttribute(groupId, range, attribIndex,
+                                               std::move(data.data));
+                else
+                    tracer.PushMediumAttribute(groupId, range, attribIndex,
+                                               std::move(data.data),
+                                               std::move(data.textures));
             }
         }
     };
-    GenericLoadGroups(mediumMappings, exceptions,
-                      mediumNodes, threadPool,
-                      MediumLoader(tracer, texMappings));
+    GenericLoadGroups<false>(mediumMappings, exceptions,
+                             mediumNodes, threadPool,
+                             MediumLoader(tracer, texMappings));
 }
 
 void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
@@ -1145,25 +1168,31 @@ void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
         {
             MatAttributeInfoList list = tracer.AttributeInfo(groupId);
             auto dataOut = TexturableAttributeLoad(totalCounts, list, nodes, texMappings);
-            uint32_t attribIndex = 0;
-            for(auto& data : dataOut)
+            for(uint32_t attribIndex = 0; attribIndex < dataOut.size();
+                attribIndex++)
             {
+                using enum AttributeTexturable;
+                const auto IS_TEX_INDEX = TexturedAttributeInfo::TEXTURABLE_INDEX;
+                auto& data = dataOut[attribIndex];
                 MaterialId idStart = ids.front();
-                MaterialId idEnd = ids.front();
+                MaterialId idEnd = ids.back();
                 auto range = Vector2ui(static_cast<uint32_t>(idStart),
                                        static_cast<uint32_t>(idEnd));
-                tracer.PushMatAttribute(groupId, range, attribIndex,
-                                        std::move(data.data),
-                                        std::move(data.textures));
-                attribIndex++;
+                if(std::get<IS_TEX_INDEX>(list[attribIndex]) == MR_CONSTANT_ONLY)
+                    tracer.PushMatAttribute(groupId, range, attribIndex,
+                                            std::move(data.data));
+                else
+                    tracer.PushMatAttribute(groupId, range, attribIndex,
+                                            std::move(data.data),
+                                            std::move(data.textures));
             }
         }
     };
 
-    GenericLoadGroups(matMappings, exceptions,
-                      materialNodes, threadPool,
-                      MaterialLoader(tracer, boundaryMediumId,
-                                     texMappings, mediumMappings.map));
+    GenericLoadGroups<false>(matMappings, exceptions,
+                             materialNodes, threadPool,
+                             MaterialLoader(tracer, boundaryMediumId,
+                                            texMappings, mediumMappings.map));
 }
 
 void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ExceptionList& exceptions)
@@ -1212,7 +1241,7 @@ void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ExceptionList& exceptions)
             for(auto& data : dataOut)
             {
                 TransformId idStart = ids.front();
-                TransformId idEnd = ids.front();
+                TransformId idEnd = ids.back();
                 auto range = Vector2ui(static_cast<uint32_t>(idStart),
                                        static_cast<uint32_t>(idEnd));
                 tracer.PushTransAttribute(groupId, range, attribIndex,
@@ -1222,9 +1251,9 @@ void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ExceptionList& exceptions)
         }
     };
 
-    GenericLoadGroups(transformMappings, exceptions,
-                      transformNodes, threadPool,
-                      TransformLoader(tracer));
+    GenericLoadGroups<false>(transformMappings, exceptions,
+                             transformNodes, threadPool,
+                             TransformLoader(tracer));
 }
 
 void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
@@ -1358,10 +1387,10 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
         }
     };
 
-    GenericLoadGroups(primMappings, exceptions,
-                      primNodes, threadPool,
-                      PrimitiveLoader(tracer, scenePath,
-                                      meshLoaderPool));
+    GenericLoadGroups<false>(primMappings, exceptions,
+                             primNodes, threadPool,
+                             PrimitiveLoader(tracer, scenePath,
+                                             meshLoaderPool));
 }
 
 void SceneLoaderMRay::LoadCameras(TracerI& tracer, ExceptionList& exceptions)
@@ -1406,7 +1435,7 @@ void SceneLoaderMRay::LoadCameras(TracerI& tracer, ExceptionList& exceptions)
             for(auto& data : dataOut)
             {
                 CameraId idStart = ids.front();
-                CameraId idEnd = ids.front();
+                CameraId idEnd = ids.back();
                 auto range = Vector2ui(static_cast<uint32_t>(idStart),
                                        static_cast<uint32_t>(idEnd));
                 tracer.PushCamAttribute(groupId, range, attribIndex,
@@ -1416,9 +1445,9 @@ void SceneLoaderMRay::LoadCameras(TracerI& tracer, ExceptionList& exceptions)
         }
     };
 
-    GenericLoadGroups(camMappings, exceptions,
-                      cameraNodes, threadPool,
-                      CameraLoader(tracer));
+    GenericLoadGroups<false>(camMappings, exceptions,
+                             cameraNodes, threadPool,
+                             CameraLoader(tracer));
 }
 
 void SceneLoaderMRay::LoadLights(TracerI& tracer, ExceptionList& exceptions)
@@ -1439,9 +1468,16 @@ void SceneLoaderMRay::LoadLights(TracerI& tracer, ExceptionList& exceptions)
             , primMappings(primMappings)
         {}
 
-        LightGroupId CreateGroup(std::string gn)
+        LightGroupId CreateGroup(std::string gn, const JsonNode& firstNode)
         {
             gn = std::string(TracerConstants::LIGHT_PREFIX) + gn;
+            using namespace NodeNames;
+            auto primId = firstNode.AccessOptionalData<uint32_t>(PRIMITIVE);
+            if(primId.has_value())
+            {
+                PrimGroupId groupId = primMappings.at(primId.value()).first;
+                return tracer.CreateLightGroup(std::move(gn), groupId);
+            }
             return tracer.CreateLightGroup(std::move(gn));
         }
 
@@ -1491,25 +1527,31 @@ void SceneLoaderMRay::LoadLights(TracerI& tracer, ExceptionList& exceptions)
         {
             LightAttributeInfoList list = tracer.AttributeInfo(groupId);
             auto dataOut = TexturableAttributeLoad(totalCounts, list, nodes, texMappings);
-            uint32_t attribIndex = 0;
-            for(auto& data : dataOut)
+            for(uint32_t attribIndex = 0; attribIndex < dataOut.size();
+                attribIndex++)
             {
+                using enum AttributeTexturable;
+                const auto IS_TEX_INDEX = TexturedAttributeInfo::TEXTURABLE_INDEX;
+                auto& data = dataOut[attribIndex];
                 LightId idStart = ids.front();
-                LightId idEnd = ids.front();
+                LightId idEnd = ids.back();
                 auto range = Vector2ui(static_cast<uint32_t>(idStart),
                                        static_cast<uint32_t>(idEnd));
-                tracer.PushLightAttribute(groupId, range, attribIndex,
-                                          std::move(data.data),
-                                          std::move(data.textures));
-                attribIndex++;
+                if(std::get<IS_TEX_INDEX>(list[attribIndex]) == MR_CONSTANT_ONLY)
+                    tracer.PushLightAttribute(groupId, range, attribIndex,
+                                              std::move(data.data));
+                else
+                    tracer.PushLightAttribute(groupId, range, attribIndex,
+                                              std::move(data.data),
+                                              std::move(data.textures));
             }
         }
     };
 
-    GenericLoadGroups(lightMappings, exceptions,
-                      lightNodes, threadPool,
-                      LightLoader(tracer, texMappings,
-                                  primMappings.map));
+    GenericLoadGroups<true>(lightMappings, exceptions,
+                            lightNodes, threadPool,
+                            LightLoader(tracer, texMappings,
+                                        primMappings.map));
 }
 
 void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,

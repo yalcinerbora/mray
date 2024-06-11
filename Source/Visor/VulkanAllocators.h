@@ -68,13 +68,12 @@ class VulkanDeviceAllocator
     void AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>& sizeAlignmentList,
                                   const Tuple<Tp&...>& memObjects);
     //
-    template<size_t I = 0, class... Tp>
-    requires (I == sizeof...(Tp))
+    template<size_t... Is, class... Tp>
     void AttachMemory(Tuple<Tp&...>&,
                       VkDeviceMemory,
-                      const OffsetList<sizeof...(Tp)>&);
-    template<std::size_t I = 0, class... Tp>
-    requires (I < sizeof...(Tp))
+                      const OffsetList<sizeof...(Tp)>&,
+                      std::index_sequence<Is...>);
+    template<class... Tp>
     void AttachMemory(Tuple<Tp&...>& inOutObjects,
                       VkDeviceMemory mem,
                       const OffsetList<sizeof...(Tp)>& offsets);
@@ -90,12 +89,14 @@ class VulkanDeviceAllocator
 };
 
 template<size_t... Is, class... Tp>
-//requires (I == sizeof...(Tp))
 inline void
 VulkanDeviceAllocator::AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>& sizeAndAlignmentList,
                                                 const Tuple<Tp&...>& tp,
                                                 std::index_sequence<Is...>)
 {
+    // Another comma operator expansion related trick
+    // static_cast<void> is to drop the reference from the operator= I think?
+    // https://stackoverflow.com/questions/32460653/call-function-for-each-tuple-element-on-one-object-without-recursion
     (static_cast<void>(sizeAndAlignmentList[Is] = std::get<Is>(tp).MemRequirements()), ...);
 }
 
@@ -108,22 +109,23 @@ VulkanDeviceAllocator::AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>
                                     std::index_sequence_for<Tp...>{});
 }
 
-template<size_t I, class... Tp>
-requires (I == sizeof...(Tp))
+template<size_t... Is, class... Tp>
 inline void
-VulkanDeviceAllocator::AttachMemory(Tuple<Tp&...>&,
-                                    VkDeviceMemory,
-                                    const OffsetList<sizeof...(Tp)>&)
-{}
+VulkanDeviceAllocator::AttachMemory(Tuple<Tp&...>& inOutObjects,
+                                    VkDeviceMemory mem,
+                                    const OffsetList<sizeof...(Tp)>& offsets,
+                                    std::index_sequence<Is...>)
+{
+    ((std::get<Is>(inOutObjects).AttachMemory(mem, offsets[Is])), ...);
+}
 
-template<std::size_t I, class... Tp>
-requires (I < sizeof...(Tp))
+template<class... Tp>
 inline void
 VulkanDeviceAllocator::AttachMemory(Tuple<Tp&...>& inOutObjects,
                                     VkDeviceMemory mem,
                                     const OffsetList<sizeof...(Tp)>& offsets)
 {
-    std::get<I>(inOutObjects).AttachMemory(mem, offsets[I]);
+    AttachMemory(inOutObjects, mem, offsets, std::index_sequence_for<Tp...>{});
 }
 
 template<VulkanMemObjectC... Args>

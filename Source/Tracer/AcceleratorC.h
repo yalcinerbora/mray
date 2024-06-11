@@ -701,7 +701,8 @@ LinearizedSurfaceData AcceleratorGroupT<C, PG>::LinearizeSurfaceData(const Accel
             else result.alphaMaps.back()[i] = std::nullopt;
 
             result.cullFaceFlags.back()[i] = surf.cullFaceFlags[i];
-            result.primRanges.back()[i] = pg.BatchRange(surf.primBatches[i]);
+            PrimBatchKey pBatchKey = PrimBatchKey(static_cast<uint32_t>(surf.primBatches[i]));
+            result.primRanges.back()[i] = pg.BatchRange(pBatchKey);
             MaterialKey mKey(static_cast<CommonKey>(surf.materials[i]));
             result.lightOrMatKeys.back()[i] = LightOrMatKey::CombinedKey(IS_MAT_KEY_FLAG,
                                                                          mKey.FetchBatchPortion(),
@@ -716,17 +717,20 @@ LinearizedSurfaceData AcceleratorGroupT<C, PG>::LinearizeSurfaceData(const Accel
         result.cullFaceFlags.emplace_back();
         result.lightOrMatKeys.emplace_back();
         result.primRanges.emplace_back();
-
+        result.instancePrimBatches.emplace_back();
+        result.transformKeys.emplace_back();
         InitRest(0);
-        PrimBatchId primBatchId = p.lightGroup->LightPrimBatch(lSurf.lightId);
-        result.primRanges.back().front() = pg.BatchRange(primBatchId);
-        result.transformKeys.back() = TransformKey(static_cast<uint32_t>(lSurf.transformId));
-        result.instancePrimBatches.back().front() = primBatchId;
 
-        LightKey lKey(static_cast<CommonKey>(lSurf.lightId));
+        LightKey lKey = LightKey(static_cast<uint32_t>(lSurf.lightId));
+        PrimBatchKey primBatchKey = p.lightGroup->LightPrimBatch(lKey);
+        result.primRanges.back().front() = pg.BatchRange(primBatchKey);
         result.lightOrMatKeys.back().front() = LightOrMatKey::CombinedKey(IS_LIGHT_KEY_FLAG,
                                                                           lKey.FetchBatchPortion(),
                                                                           lKey.FetchIndexPortion());
+
+        PrimBatchId primBatchId = PrimBatchId(static_cast<uint32_t>(primBatchKey));
+        result.transformKeys.back() = TransformKey(static_cast<uint32_t>(lSurf.transformId));
+        result.instancePrimBatches.back().push_back(primBatchId);
     };
 
     for(const auto& pIndices : partitions.packedIndices)
@@ -987,7 +991,7 @@ void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<AccelGroupCon
             });
             slot = partitions.end() - 1;
         }
-        else if(slot->lightGroup) slot->lightGroup = lGroup;
+        else if(slot->lightGroup == nullptr) slot->lightGroup = lGroup;
 
         // Sub-partition wrt. transform
         auto innerStart = start;
@@ -995,18 +999,19 @@ void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<AccelGroupCon
         {
             TransformId tId = innerStart->second.transformId;
             uint32_t tGroupId = TransGroupIdFetcher()(tId);
-            auto loc = std::upper_bound(innerStart, end, tGroupId,
+            auto innerEnd = std::upper_bound(innerStart, end, tGroupId,
             [](uint32_t value, const LightSurfP& surf) -> bool
             {
                 auto tId = surf.second.transformId;
                 return (value < TransGroupIdFetcher()(tId));
             });
-            size_t elemCount = static_cast<size_t>(std::distance(innerStart, loc));
+            size_t elemCount = static_cast<size_t>(std::distance(innerStart, innerEnd));
             size_t startDistance = static_cast<size_t>(std::distance(lSurfList.begin(), innerStart));
             slot->tGroupLightSurfs.emplace_back(TransGroupId(tGroupId),
                                                 lSurfList.subspan(startDistance, elemCount));
-            innerStart = loc;
+            innerStart = innerEnd;
         }
+        start = end;
     }
 }
 

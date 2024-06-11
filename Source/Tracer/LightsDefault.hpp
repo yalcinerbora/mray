@@ -417,12 +417,6 @@ bool LightNull<TC, SC>::IsPrimitiveBackedLight() const
 }
 
 template <PrimitiveGroupC PG>
-void LightGroupPrim<PG>::HandlePrimBatches(const PrimBatchList&)
-{
-    throw MRayError("TODO: Implement");
-}
-
-template <PrimitiveGroupC PG>
 std::string_view LightGroupPrim<PG>::TypeName()
 {
     using namespace TypeNameGen::CompTime;
@@ -442,7 +436,6 @@ LightGroupPrim<PG>::LightGroupPrim(uint32_t groupId,
 template <PrimitiveGroupC PG>
 void LightGroupPrim<PG>::CommitReservations()
 {
-
 }
 
 template <PrimitiveGroupC PG>
@@ -530,10 +523,6 @@ bool LightGroupPrim<PG>::IsPrimitiveBacked() const
 {
     return true;
 }
-
-template <CoordConverterC CC>
-void LightGroupSkysphere<CC>::HandlePrimBatches(const PrimBatchList&)
-{}
 
 template <CoordConverterC CC>
 std::string_view LightGroupSkysphere<CC>::TypeName()

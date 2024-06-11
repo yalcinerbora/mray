@@ -1,9 +1,6 @@
 #include "LightsDefault.h"
 #include "PrimitiveDefaultTriangle.h"
 
-void LightGroupNull::HandlePrimBatches(const PrimBatchList&)
-{}
-
 std::string_view LightGroupNull::TypeName()
 {
     using namespace TypeNameGen::CompTime;

@@ -39,8 +39,9 @@ inline Tracer::Tracer(const TracerParameters& tracerParams)
                        GLOBAL_TYPE_GEN.accelGeneratorMap,
                        GLOBAL_TYPE_GEN.accelWorkGeneratorMap);
     // Related Types
-
-
     // Finally Populate the lists
     PopulateAttribInfoAndTypeLists();
+
+    // GroupId 0 is reserved for empty primitive
+    CreatePrimitiveGroup(std::string(TracerConstants::EmptyPrimName));
 }

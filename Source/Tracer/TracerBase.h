@@ -136,16 +136,23 @@ class TracerBase : public TracerI
     void PopulateAttribInfoAndTypeLists();
 
     public:
-                        TracerBase(const TypeGeneratorPack&,
-                                   const TracerParameters& tracerParams);
+    // Constructors & Destructor
+                    TracerBase(const TypeGeneratorPack&,
+                               const TracerParameters& tracerParams);
+                    TracerBase(const TracerBase&) = delete;
+                    TracerBase(TracerBase&&) = delete;
+    TracerBase&     operator=(const TracerBase&) = delete;
+    TracerBase&     operator=(TracerBase&&) = delete;
+                    ~TracerBase() = default;
 
-    TypeNameList        PrimitiveGroups() const override;
-    TypeNameList        MaterialGroups() const override;
-    TypeNameList        TransformGroups() const override;
-    TypeNameList        CameraGroups() const override;
-    TypeNameList        MediumGroups() const override;
-    TypeNameList        LightGroups() const override;
-    TypeNameList        Renderers() const override;
+
+    TypeNameList    PrimitiveGroups() const override;
+    TypeNameList    MaterialGroups() const override;
+    TypeNameList    TransformGroups() const override;
+    TypeNameList    CameraGroups() const override;
+    TypeNameList    MediumGroups() const override;
+    TypeNameList    LightGroups() const override;
+    TypeNameList    Renderers() const override;
 
     PrimAttributeInfoList       AttributeInfo(PrimGroupId) const override;
     CamAttributeInfoList        AttributeInfo(CameraGroupId) const override;

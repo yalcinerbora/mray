@@ -53,6 +53,7 @@ namespace TracerConstants
     static constexpr size_t MaxAttributePerGroup = 16;
     static constexpr size_t MaxRendererAttributeCount = 32;
 
+    static constexpr std::string_view EmptyPrimName     = "(P)Empty";
     static constexpr std::string_view LIGHT_PREFIX      = "(L)";
     static constexpr std::string_view TRANSFORM_PREFIX  = "(T)";
     static constexpr std::string_view PRIM_PREFIX       = "(P)";

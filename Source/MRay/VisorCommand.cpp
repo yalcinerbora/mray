@@ -131,8 +131,8 @@ MRayError VisorCommand::Invoke()
     // Thread pool, many things will need this
     // TODO: Change this to HW concurrency,
     // this is for debugging
-    uint32_t threadCount = std::thread::hardware_concurrency();
-    //uint32_t threadCount = 1;
+    //uint32_t threadCount = std::thread::hardware_concurrency();
+    uint32_t threadCount = 1;
     BS::thread_pool threadPool(threadCount);
 
     // Get the tracer dll

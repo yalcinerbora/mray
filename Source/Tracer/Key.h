@@ -38,6 +38,7 @@ class alignas(sizeof(T)) KeyT
     MRAY_HYBRID explicit constexpr  operator T&();
 
     MRAY_HYBRID bool                operator==(const KeyT& rhs) const;
+    MRAY_HYBRID bool                operator<(const KeyT& rhs) const;
 
     // Access
     MRAY_HYBRID constexpr T         FetchBatchPortion() const;
@@ -85,6 +86,7 @@ class alignas(sizeof(T)) TriKeyT
     MRAY_HYBRID explicit constexpr  operator T&();
 
     MRAY_HYBRID bool                operator==(const TriKeyT& rhs) const;
+    MRAY_HYBRID bool                operator<(const TriKeyT& rhs) const;
 
     // Access
     MRAY_HYBRID constexpr T         FetchFlagPortion() const;
@@ -129,6 +131,13 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 bool KeyT<T, BB, IB>::operator==(const KeyT& rhs) const
 {
     return (value == rhs.value);
+}
+
+template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool KeyT<T, BB, IB>::operator<(const KeyT& rhs) const
+{
+    return (value < rhs.value);
 }
 
 template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
@@ -186,6 +195,13 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 bool TriKeyT<T, FB, BB, IB>::operator==(const TriKeyT& rhs) const
 {
     return (value == rhs.value);
+}
+
+template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool TriKeyT<T, FB, BB, IB>::operator<(const TriKeyT& rhs) const
+{
+    return (value < rhs.value);
 }
 
 template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
