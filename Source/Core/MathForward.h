@@ -168,10 +168,8 @@ auto format_as(const V& v) { return v.AsArray(); }
 template <unsigned int N, FloatingPointC T>
 auto format_as(const AABB<N, T>& v)
 {
-    std::array<T, N + N> result;
-    const auto minArr = v.Min().AsArray();
-    const auto maxArr = v.Max().AsArray();
-    std::copy(minArr.cbegin(), minArr.cend(), result.begin());
-    std::copy(maxArr.cbegin(), maxArr.cend(), result.begin() + N);
+    std::array<std::array<T, N>, 2> result;
+    result[0] = v.Min().AsArray();
+    result[1] = v.Max().AsArray();
     return result;
 }

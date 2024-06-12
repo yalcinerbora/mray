@@ -244,10 +244,18 @@ void TracerThread::LoopWork()
         {
             MRAY_LOG("[Tracer]: NewScene {}", scenePath.value());
 
-            using namespace std::filesystem;
+
+
+
+            for(int i = 0; i < 512; i++)
+            {
+            try
+            {
             tracer->ClearAll();
+
             // TODO: Single scene loading, change this later maybe
             // for tracer supporting multiple scenes
+            using namespace std::filesystem;
             if(currentScene) currentScene->ClearScene();
             std::string fileExt = path(scenePath.value()).extension().string();
             fileExt = fileExt.substr(1);
@@ -273,14 +281,23 @@ void TracerThread::LoopWork()
             MRAY_LOG("[Tracer]: Committing Surfaces...");
             Timer timer; timer.Start();
             //
-            currentSceneAABB = tracer->CommitSurfaces();
+            auto [currentSceneAABB, instanceCount,
+                  accelCount] = tracer->CommitSurfaces();
             //
             timer.Split();
-            MRAY_LOG("[Tracer]: Surfaces (AABB{{{}, {}}}) committed in {}ms",
-                     currentSceneAABB.Min(),
-                     currentSceneAABB.Max(),
-                     timer.Elapsed<Millisecond>());
-
+            MRAY_LOG("[Tracer]: Surfaces committed in {}ms\n"
+                     "AABB      : {}\n"
+                     "Instances : {}\n"
+                     "Accels    : {}",
+                     timer.Elapsed<Millisecond>(),
+                     currentSceneAABB,
+                     instanceCount, accelCount);
+            }
+            catch(const MRayError& e)
+            {
+                MRAY_ERROR_LOG("[Tracer]: Fatal Error! \"{}\"", e.GetError());
+            }
+            }
 
             currentCamIndex = 0;
             CamSurfaceId camSurf = sceneIds.camSurfaces[currentCamIndex];

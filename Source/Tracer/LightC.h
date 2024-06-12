@@ -159,6 +159,7 @@ inline PrimBatchKey GenericGroupLightT::LightPrimBatch(LightKey lKey) const
     auto pBatchId = primMappings.at(lKey);
     if(!pBatchId)
     {
+        __debugbreak();
         throw MRayError("{:s}:{:d}: Unkown light key {}",
                         this->Name(), this->groupId,
                         lKey.FetchIndexPortion());

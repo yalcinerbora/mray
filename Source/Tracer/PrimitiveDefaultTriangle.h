@@ -267,9 +267,6 @@ class PrimGroupTriangle final : public GenericGroupPrimitive<PrimGroupTriangle>
                                           TransientData data,
                                           const GPUQueue& queue) override;
 
-    void                    CopyPrimIds(Span<PrimitiveKey>,
-                                        PrimBatchKey,
-                                        const GPUQueue&) const override;
     Vector2ui               BatchRange(PrimBatchKey id) const override;
 
     DataSoA                 SoA() const;
@@ -339,9 +336,6 @@ class PrimGroupSkinnedTriangle final : public GenericGroupPrimitive<PrimGroupSki
                                           TransientData data,
                                           const GPUQueue& queue) override;
 
-    void                    CopyPrimIds(Span<PrimitiveKey>,
-                                        PrimBatchKey,
-                                        const GPUQueue&) const override;
     Vector2ui               BatchRange(PrimBatchKey id) const override;
 
     DataSoA                 SoA() const;

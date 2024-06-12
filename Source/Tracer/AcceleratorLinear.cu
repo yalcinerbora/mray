@@ -1,6 +1,58 @@
 #include "AcceleratorLinear.h"
 #include "Device/GPUAlgorithms.h"
 
+// Generic PrimitiveKey copy kernel
+// TODO: find a way to put this somewhere proper
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCGeneratePrimitiveKeys(Span<PrimitiveKey> dAllLeafs,
+                             //
+                             Span<const PrimRangeArray> dConcretePrimRanges,
+                             Span<const Vector2ui> dConcreteLeafRanges,
+                             uint32_t groupId)
+{
+    constexpr Vector2ui INVALID_BATCH = Vector2ui(std::numeric_limits<uint32_t>::max());
+
+    KernelCallParams kp;
+    uint32_t totalRanges = static_cast<uint32_t>(dConcreteLeafRanges.size());
+
+    // Block-stride Loop
+    for(uint32_t blockId = kp.blockId; blockId < totalRanges;
+        blockId += kp.gridSize)
+    {
+        using namespace TracerConstants;
+        uint32_t localTid = kp.threadId;
+        MRAY_SHARED_MEMORY PrimRangeArray sPrimRanges;
+        MRAY_SHARED_MEMORY Vector2ui sConcreteLeafRange;
+        if(localTid < MaxPrimBatchPerSurface)
+            sPrimRanges[localTid] = dConcretePrimRanges[blockId][localTid];
+        if(localTid < Vector2ui::Dims)
+            sConcreteLeafRange[localTid] = dConcreteLeafRanges[blockId][localTid];
+        MRAY_DEVICE_BLOCK_SYNC();
+
+        // Do batch by batch
+        // Glorified iota..
+        uint32_t offset = 0;
+        for(uint32_t i = 0; i < MaxPrimBatchPerSurface; i++)
+        {
+            if(sPrimRanges[i] == INVALID_BATCH) break;
+
+            Vector2ui currentRange = sPrimRanges[i];
+            uint32_t count = currentRange[1] - currentRange[0];
+            for(uint32_t j = localTid; j < count; j += kp.blockSize)
+            {
+                uint32_t writeIndex = sConcreteLeafRange[0] + offset + j;
+                uint32_t keyIndexPortion = currentRange[0] + j;
+                auto key = PrimitiveKey::CombinedKey(groupId, keyIndexPortion);
+                dAllLeafs[writeIndex] = key;
+            }
+            offset += count;
+        }
+        assert(offset == sConcreteLeafRange[1] - sConcreteLeafRange[0]);
+        // Before writing new shared memory values wait all threads to end
+        MRAY_DEVICE_BLOCK_SYNC();
+    }
+}
+
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCIntersectBaseLinear(// Output
                            MRAY_GRID_CONSTANT const Span<CommonKey> dAccelKeys,

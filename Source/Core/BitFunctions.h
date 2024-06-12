@@ -209,8 +209,10 @@ template<size_t N>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Bitset<N>::BitRef& Bitset<N>::BitRef::operator=(bool b)
 {
-    Type boolExp = static_cast<Type>(b);
-    reference.bits &= (boolExp << index);
+    Type mask = (Type(1) << index);
+    reference.bits = (b)
+            ? reference.bits | mask
+            : reference.bits & (~mask);
     return *this;
 }
 
@@ -218,7 +220,7 @@ template<size_t N>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr bool Bitset<N>::BitRef::operator~() const
 {
-    return static_cast<bool>((reference.bits >> index) & 0x1);
+    return static_cast<bool>((reference.bits >> index) ^ 0x1) & 0x1;
 }
 
 template<size_t N>
@@ -320,7 +322,7 @@ template<size_t N>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Bitset<N>& Bitset<N>::Set()
 {
-    bits = std::numeric_limits<Type>();
+    bits = std::numeric_limits<Type>::max();
     return *this;
 }
 

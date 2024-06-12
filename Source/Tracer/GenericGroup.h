@@ -99,6 +99,7 @@ class GenericGroupI
     virtual size_t              GPUMemoryUsage() const = 0;
     virtual AttribInfoList      AttributeInfo() const = 0;
     virtual std::string_view    Name() const = 0;
+    virtual IdInt               GroupId() const = 0;
 };
 
 // Implementation of the common parts
@@ -133,36 +134,37 @@ class GenericGroupT : public GenericGroupI<IdTypeT, AttribInfoT>
     const AttributeRanges&      FindRange(IdInt) const;
 
     template <class... Args>
-    Tuple<Span<Args>...>        GenericCommit(std::array<size_t, sizeof...(Args)> countLookup);
+    Tuple<Span<Args>...>    GenericCommit(std::array<size_t, sizeof...(Args)> countLookup);
 
     template <class T>
-    void                        GenericPushData(const Span<T>& dAttributeRegion,
-                                                //
-                                                IdInt id, uint32_t attribIndex,
-                                                TransientData data,
-                                                const GPUQueue& deviceQueue) const;
+    void GenericPushData(const Span<T>& dAttributeRegion,
+                         //
+                         IdInt id, uint32_t attribIndex,
+                         TransientData data,
+                         const GPUQueue& deviceQueue) const;
     template <class T>
-    void                        GenericPushData(const Span<T>& dAttributeRegion,
-                                                //
-                                                Vector<2, IdInt> idRange,
-                                                uint32_t attribIndex,
-                                                TransientData data,
-                                                const GPUQueue& deviceQueue) const;
+    void GenericPushData(const Span<T>& dAttributeRegion,
+                         //
+                         Vector<2, IdInt> idRange,
+                         uint32_t attribIndex,
+                         TransientData data,
+                         const GPUQueue& deviceQueue) const;
     template <class T>
-    void                        GenericPushData(const Span<T>& dAttributeRegion,
-                                                //
-                                                IdInt id, uint32_t attribIndex,
-                                                const Vector2ui& subRange,
-                                                TransientData data,
-                                                const GPUQueue& deviceQueue) const;
+    void GenericPushData(const Span<T>& dAttributeRegion,
+                         //
+                         IdInt id, uint32_t attribIndex,
+                         const Vector2ui& subRange,
+                         TransientData data,
+                         const GPUQueue& deviceQueue) const;
 
     public:
-                                GenericGroupT(uint32_t groupId, const GPUSystem&,
-                                              size_t allocationGranularity = 2_MiB,
-                                              size_t initialReservartionSize = 4_MiB);
-    IdList                      Reserve(const std::vector<AttributeCountList>&) override;
-    virtual bool                IsInCommitState() const override;
-    virtual size_t              GPUMemoryUsage() const override;
+            GenericGroupT(uint32_t groupId, const GPUSystem&,
+                          size_t allocationGranularity = 2_MiB,
+                          size_t initialReservartionSize = 4_MiB);
+    IdList  Reserve(const std::vector<AttributeCountList>&) override;
+    bool    IsInCommitState() const override;
+    size_t  GPUMemoryUsage() const override;
+    IdInt   GroupId() const override;
 };
 
 template<class IdType, class AttributeInfoType>
@@ -391,6 +393,13 @@ template<class ID, class AI>
 size_t GenericGroupT<ID, AI>::GPUMemoryUsage() const
 {
     return deviceMem.Size();
+}
+
+template<class ID, class AI>
+typename GenericGroupT<ID, AI>::IdInt
+GenericGroupT<ID, AI>::GroupId() const
+{
+    return groupId;
 }
 
 template<class I, class A>

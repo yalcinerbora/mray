@@ -286,11 +286,11 @@ class TracerMock : public TracerI
                                         std::vector<TextureId> textures) override;
 
 
-    SurfaceId       CreateSurface(SurfaceParams) override;
-    LightSurfaceId  CreateLightSurface(LightSurfaceParams) override;
-    CamSurfaceId    CreateCameraSurface(CameraSurfaceParams) override;
-    AABB3           CommitSurfaces() override;
-    CameraTransform GetCamTransform(CamSurfaceId) const override;
+    SurfaceId           CreateSurface(SurfaceParams) override;
+    LightSurfaceId      CreateLightSurface(LightSurfaceParams) override;
+    CamSurfaceId        CreateCameraSurface(CameraSurfaceParams) override;
+    SurfaceCommitResult CommitSurfaces() override;
+    CameraTransform     GetCamTransform(CamSurfaceId) const override;
 
     RendererId  CreateRenderer(std::string typeName) override;
     void        DestroyRenderer(RendererId) override;
@@ -1696,12 +1696,12 @@ inline CamSurfaceId TracerMock::CreateCameraSurface(CameraSurfaceParams p)
     return CamSurfaceId(camSurfId);
 }
 
-inline AABB3 TracerMock::CommitSurfaces()
+inline SurfaceCommitResult TracerMock::CommitSurfaces()
 {
-    if(!print) return AABB3::Negative();
+    if(!print) return SurfaceCommitResult{};
 
     MRAY_LOG("Committing surfaces");
-    return AABB3::Negative();
+    return SurfaceCommitResult{};
 }
 
 CameraTransform TracerMock::GetCamTransform(CamSurfaceId camSurfId) const

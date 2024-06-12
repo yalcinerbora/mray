@@ -235,6 +235,14 @@ struct RendererOptionPack
     AttributeList               attributes;
 };
 
+// For surface commit analytic information
+struct SurfaceCommitResult
+{
+    AABB3 aabb;
+    size_t instanceCount;
+    size_t acceleratorCount;
+};
+
 // Prim related
 MRAY_GENERIC_ID(PrimGroupId, uint32_t);
 MRAY_GENERIC_ID(PrimBatchId, uint32_t);
@@ -523,10 +531,10 @@ class [[nodiscard]] TracerI
     // Renderer will only use the cameras/lights registered here
     // Same goes for other surfaces as well
     // Primitive-backed lights imply accelerator generation
-    virtual LightSurfaceId  CreateLightSurface(LightSurfaceParams) = 0;
-    virtual CamSurfaceId    CreateCameraSurface(CameraSurfaceParams) = 0;
-    virtual AABB3           CommitSurfaces() = 0;
-    virtual CameraTransform GetCamTransform(CamSurfaceId) const = 0;
+    virtual LightSurfaceId      CreateLightSurface(LightSurfaceParams) = 0;
+    virtual CamSurfaceId        CreateCameraSurface(CameraSurfaceParams) = 0;
+    virtual SurfaceCommitResult CommitSurfaces() = 0;
+    virtual CameraTransform     GetCamTransform(CamSurfaceId) const = 0;
 
     //================================//
     //           Renderers            //

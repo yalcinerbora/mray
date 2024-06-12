@@ -221,9 +221,6 @@ class GenericGroupPrimitiveT : public GenericGroupT<PrimBatchKey, PrimAttributeI
                                        size_t allocationGranularity = 16_MiB,
                                        size_t initialReservartionSize = 64_MiB);
 
-    virtual void        CopyPrimIds(Span<PrimitiveKey> dOutLocation,
-                                    PrimBatchKey primBatchKey,
-                                    const GPUQueue& queue) const = 0;
     virtual Vector2ui   BatchRange(PrimBatchKey) const = 0;
 };
 
@@ -317,9 +314,6 @@ class PrimGroupEmpty final : public GenericGroupPrimitive<PrimGroupEmpty>
                                           TransientData data,
                                           const GPUQueue&) override;
 
-    void                    CopyPrimIds(Span<PrimitiveKey> dOutLocation,
-                                        PrimBatchKey primBatchId,
-                                        const GPUQueue& queue) const override;
     Vector2ui               BatchRange(PrimBatchKey) const override;
 
     DataSoA                 SoA() const;
@@ -486,12 +480,6 @@ void PrimGroupEmpty::PushAttribute(PrimBatchKey, uint32_t,
 inline
 void PrimGroupEmpty::PushAttribute(PrimBatchKey, PrimBatchKey,
                                    uint32_t, TransientData, const GPUQueue&)
-{}
-
-inline
-void PrimGroupEmpty::CopyPrimIds(Span<PrimitiveKey>,
-                                 PrimBatchKey,
-                                 const GPUQueue&) const
 {}
 
 inline

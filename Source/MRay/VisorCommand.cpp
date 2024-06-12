@@ -94,7 +94,7 @@ namespace MRayCLI::VisorNames
     using namespace std::literals;
     static constexpr auto Name = "visor"sv;
     static constexpr auto Description = "enables the visor system for interactive "
-                                        "rendering (default)"sv;
+                                        "rendering"sv;
 };
 
 MRayError VisorCommand::Invoke()
@@ -132,7 +132,7 @@ MRayError VisorCommand::Invoke()
     // TODO: Change this to HW concurrency,
     // this is for debugging
     uint32_t threadCount = std::thread::hardware_concurrency();
-    //uint32_t threadCount = 1;
+    //uint32_t threadCount = 2;
     BS::thread_pool threadPool(threadCount);
 
     // Get the tracer dll

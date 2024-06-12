@@ -172,6 +172,7 @@ class AcceleratorGroupI
 
     virtual size_t      InstanceCount() const = 0;
     virtual uint32_t    InstanceTypeCount() const = 0;
+    virtual uint32_t    AcceleratorCount() const = 0;
     virtual uint32_t    UsedIdBitsInKey() const = 0;
     virtual void        WriteInstanceKeysAndAABBs(Span<AABB3> dAABBWriteRegion,
                                                   Span<AcceleratorKey> dKeyWriteRegion,
@@ -201,6 +202,9 @@ struct AccelLeafResult
     std::vector<Vector2ui>  instanceLeafRanges;
     // Leaf [start,end) of only concrete accelerators
     std::vector<Vector2ui>  concreteLeafRanges;
+    // PrimRange {[start,end)_0, ... [start,end)_8}
+    // of only concrete accelerators
+    std::vector<PrimRangeArray>  concretePrimRanges;
 };
 
 struct AccelPartitionResult
@@ -224,6 +228,12 @@ struct LinearizedSurfaceData
     std::vector<CullFaceFlagArray>  cullFaceFlags;
     std::vector<TransformKey>       transformKeys;
     std::vector<SurfacePrimList>    instancePrimBatches;
+};
+
+struct PreprocessResult
+{
+    LinearizedSurfaceData       surfData;
+    std::vector<PrimRangeArray> concretePrimRanges;
 };
 
 using AccelWorkGenerator = GeneratorFuncType<AcceleratorWorkI,
@@ -301,7 +311,7 @@ class AcceleratorGroupT : public AcceleratorGroupI
     const AccelWorkGenMap&      accelWorkGenerators;
     Map<uint32_t, AccelWorkPtr> workInstances;
 
-    LinearizedSurfaceData       PreprocessConstructionParams(const AccelGroupConstructParams& p);
+    PreprocessResult            PreprocessConstructionParams(const AccelGroupConstructParams& p);
     template<class T>
     std::vector<Span<T>>        CreateInstanceLeafSubspans(Span<T> fullRange);
 
@@ -315,6 +325,7 @@ class AcceleratorGroupT : public AcceleratorGroupI
 
     size_t              InstanceCount() const override;
     uint32_t            InstanceTypeCount() const override;
+    uint32_t            AcceleratorCount() const override;
     uint32_t            UsedIdBitsInKey() const override;
     void                SetKeyOffset(uint32_t) override;
     std::string_view    Name() const override;
@@ -364,6 +375,8 @@ class BaseAcceleratorI
     virtual void    AllocateForTraversal(size_t maxRayCount) = 0;
     virtual size_t  GPUMemoryUsage() const = 0;
     virtual AABB3   SceneAABB() const = 0;
+    virtual size_t  TotalAccelCount() const = 0;
+    virtual size_t  TotalInstanceCount() const = 0;
 };
 
 using AcceleratorPtr = std::unique_ptr<BaseAcceleratorI>;
@@ -405,6 +418,8 @@ class BaseAcceleratorT : public BaseAcceleratorI
     // ....
     void                Construct(BaseAccelConstructParams) override;
     AABB3               SceneAABB() const override;
+    size_t              TotalAccelCount() const override;
+    size_t              TotalInstanceCount() const override;
 };
 
 template<class KeyType>
@@ -451,7 +466,7 @@ AccelPartitionResult AcceleratorGroupT<C, PG>::PartitionParamsForWork(const Acce
                                 p.tGroupSurfs.cend(),
                                 [tId](const auto& groupedSurf)
         {
-            return groupedSurf.first != tId;
+            return groupedSurf.first == tId;
         });
 
         if(loc != p.tGroupSurfs.cend())
@@ -553,7 +568,9 @@ AccelLeafResult AcceleratorGroupT<C, PG>::DetermineConcreteAccelCount(std::vecto
             return std::is_eq(result);
         });
         uniqueIndices.erase(endLoc, uniqueIndices.end());
+
         // Do an inverted search your id on unique indices
+        std::iota(nonUniqueIndices.begin(), nonUniqueIndices.end(), 0);
         for(uint32_t& index : nonUniqueIndices)
         {
             auto loc = std::lower_bound(uniqueIndices.begin(), uniqueIndices.end(), index,
@@ -614,11 +631,15 @@ AccelLeafResult AcceleratorGroupT<C, PG>::DetermineConcreteAccelCount(std::vecto
 
     // Find leaf of unique indices
     std::vector<Vector2ui> concreteLeafRangeList;
+    std::vector<PrimRangeArray> concretePrimRangeList;
     concreteLeafRangeList.reserve(uniqueIndices.size());
-    for(uint32_t index : uniqueIndices)
+    concretePrimRangeList.reserve(uniqueIndices.size());
+    for(size_t index = 0; index < uniqueIndices.size(); index++)
     {
         concreteLeafRangeList.push_back(Vector2ui(uniquePrimOffsets[index],
                                                   uniquePrimOffsets[index + 1]));
+        uint32_t lookupIndex = uniqueIndices[index];
+        concretePrimRangeList.push_back(instancePrimRanges[lookupIndex]);
     }
 
     // All done!
@@ -626,7 +647,8 @@ AccelLeafResult AcceleratorGroupT<C, PG>::DetermineConcreteAccelCount(std::vecto
     {
         .concreteIndicesOfInstances = std::move(acceleratorIndices),
         .instanceLeafRanges = std::move(instanceLeafRangeList),
-        .concreteLeafRanges = std::move(concreteLeafRangeList)
+        .concreteLeafRanges = std::move(concreteLeafRangeList),
+        .concretePrimRanges = std::move(concretePrimRangeList)
     };
 }
 
@@ -763,7 +785,7 @@ LinearizedSurfaceData AcceleratorGroupT<C, PG>::LinearizeSurfaceData(const Accel
 }
 
 template<class C, PrimitiveGroupC PG>
-LinearizedSurfaceData AcceleratorGroupT<C, PG>::PreprocessConstructionParams(const AccelGroupConstructParams& p)
+PreprocessResult AcceleratorGroupT<C, PG>::PreprocessConstructionParams(const AccelGroupConstructParams& p)
 {
     assert(&pg == p.primGroup);
     // Instance Types (determined by transform type)
@@ -806,7 +828,11 @@ LinearizedSurfaceData AcceleratorGroupT<C, PG>::PreprocessConstructionParams(con
         workInstances.try_emplace(i, workGen(*this, tGroup));
         i++;
     }
-    return linSurfData;
+    return PreprocessResult
+    {
+        .surfData = std::move(linSurfData),
+        .concretePrimRanges = std::move(leafResult.concretePrimRanges)
+    };
 }
 
 template<class C, PrimitiveGroupC PG>
@@ -834,10 +860,16 @@ uint32_t AcceleratorGroupT<C, PG>::InstanceTypeCount() const
 }
 
 template<class C, PrimitiveGroupC PG>
+uint32_t AcceleratorGroupT<C, PG>::AcceleratorCount() const
+{
+    return static_cast<uint32_t>(concreteLeafRanges.size());
+}
+
+template<class C, PrimitiveGroupC PG>
 uint32_t AcceleratorGroupT<C, PG>::UsedIdBitsInKey() const
 {
     using namespace BitFunctions;
-    size_t bitCount = RequiredBitsToRepresent(workInstances.size());
+    size_t bitCount = RequiredBitsToRepresent(InstanceCount());
     return static_cast<uint32_t>(bitCount);
 }
 
@@ -1017,7 +1049,7 @@ void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
 
     // Generate the accelerators
     GPUQueueIteratorRoundRobin qIt(gpuSystem);
-    for(const auto& partition : partitions)
+    for(auto&& partition : partitions)
     {
         using namespace TypeNameGen::Runtime;
         using namespace std::string_view_literals;
@@ -1093,3 +1125,34 @@ AABB3 BaseAcceleratorT<C>::SceneAABB() const
 {
     return sceneAABB;
 }
+
+template <class C>
+size_t BaseAcceleratorT<C>::TotalAccelCount() const
+{
+    size_t result = 0;
+    for(const auto& kv : generatedAccels)
+        result += kv.second->AcceleratorCount();
+
+    return result;
+}
+
+template <class C>
+size_t BaseAcceleratorT<C>::TotalInstanceCount() const
+{
+    size_t result = 0;
+    for(const auto& kv : generatedAccels)
+        result += kv.second->InstanceCount();
+
+    return result;
+}
+
+// Generic PrimitiveKey copy kernel
+// Extern it here, define it in a .cu file
+// TODO: If I remember correctly extern __global__ was not allowed?
+// Is this changed recently? Check this if it is undefined behaviour
+extern MRAY_KERNEL
+void KCGeneratePrimitiveKeys(Span<PrimitiveKey> dAllLeafs,
+                             //
+                             Span<const PrimRangeArray> dConcretePrimRanges,
+                             Span<const Vector2ui> dConcreteLeafRanges,
+                             uint32_t groupId);

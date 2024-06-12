@@ -155,7 +155,21 @@ template<PrimitiveGroupC PG>
 void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
                                            const GPUQueue& queue)
 {
-    LinearizedSurfaceData linearizedData = this->PreprocessConstructionParams(p);
+    PreprocessResult ppResult = this->PreprocessConstructionParams(p);
+    // Before the allocation hickup, allocate the temp
+    // memory as well.
+    DeviceLocalMemory tempMem(*queue.Device());
+    // Allocate concrete leaf ranges for processing
+    // Copy device
+    Span<Vector2ui> dConcreteLeafRanges;
+    Span<PrimRangeArray> dConcretePrimRanges;
+    MemAlloc::AllocateMultiData(std::tie(dConcreteLeafRanges,
+                                         dConcretePrimRanges),
+                                mem,
+                                {this->concreteLeafRanges.size(),
+                                 ppResult.concretePrimRanges.size()});
+    assert(ppResult.concretePrimRanges.size() ==
+           this->concreteLeafRanges.size());
 
     // Copy these host vectors to GPU
     // For linear accelerator we only need these at GPU memory
@@ -178,11 +192,11 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
     PrimKeySpanList hInstanceLeafs = this->CreateInstanceLeafSubspans(dAllLeafs);
 
     // Actual memcpy
-    Span<CullFaceFlagArray>     hSpanCullFaceFlags(linearizedData.cullFaceFlags);
-    Span<AlphaMapArray>         hSpanAlphaMaps(linearizedData.alphaMaps);
-    Span<LightOrMatKeyArray>    hSpanLMKeys(linearizedData.lightOrMatKeys);
-    Span<PrimRangeArray>        hSpanPrimitiveRanges(linearizedData.primRanges);
-    Span<TransformKey>          hSpanTransformKeys(linearizedData.transformKeys);
+    Span<CullFaceFlagArray>     hSpanCullFaceFlags(ppResult.surfData.cullFaceFlags);
+    Span<AlphaMapArray>         hSpanAlphaMaps(ppResult.surfData.alphaMaps);
+    Span<LightOrMatKeyArray>    hSpanLMKeys(ppResult.surfData.lightOrMatKeys);
+    Span<PrimRangeArray>        hSpanPrimitiveRanges(ppResult.surfData.primRanges);
+    Span<TransformKey>          hSpanTransformKeys(ppResult.surfData.transformKeys);
     Span<Span<PrimitiveKey>>    hSpanLeafs(hInstanceLeafs);
     queue.MemcpyAsync(dCullFaceFlags,   ToConstSpan(hSpanCullFaceFlags));
     queue.MemcpyAsync(dAlphaMaps,       ToConstSpan(hSpanAlphaMaps));
@@ -191,8 +205,41 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
     queue.MemcpyAsync(dTransformKeys,   ToConstSpan(hSpanTransformKeys));
     queue.MemcpyAsync(dLeafs,           ToConstSpan(hSpanLeafs));
 
-    //Instantiate X
-    //
+
+    // Copy Ids to the leaf buffer
+    auto hConcreteLeafRanges = Span<const Vector2ui>(this->concreteLeafRanges.begin(),
+                                                     this->concreteLeafRanges.end());
+    auto hConcretePrimRanges = Span<const PrimRangeArray>(ppResult.concretePrimRanges.cbegin(),
+                                                          ppResult.concretePrimRanges.cend());
+    queue.MemcpyAsync(dConcreteLeafRanges, hConcreteLeafRanges);
+    queue.MemcpyAsync(dConcretePrimRanges, hConcretePrimRanges);
+
+    // Dedicate a block for each
+    // concrete accelerator for copy
+    uint32_t blockCount = queue.SMCount() *
+        GPUQueue::RecommendedBlockCountPerSM(&KCGeneratePrimitiveKeys,
+                                             StaticThreadPerBlock1D(),
+                                             0);
+    using namespace std::string_view_literals;
+    queue.IssueExactKernel<KCGeneratePrimitiveKeys>
+    (
+        "KCGeneratePrimitiveKeys"sv,
+        KernelExactIssueParams
+        {
+            .gridSize = blockCount,
+            .blockSize = StaticThreadPerBlock1D()
+        },
+        // Output
+        dAllLeafs,
+        // Input
+        dConcretePrimRanges,
+        dConcreteLeafRanges,
+        // Constant
+        this->pg.GroupId()
+    );
+    // We have temp memory + async memcopies
+    // we need to wait here.
+    queue.Barrier().Wait();
 }
 
 template<PrimitiveGroupC PG>
@@ -305,7 +352,8 @@ void AcceleratorGroupLinear<PG>::WriteInstanceKeysAndAABBs(Span<AABB3> aabbWrite
     }
     else
     {
-
+        throw MRayError("{}: PER_PRIM_TRANSFORM Accel Construct not yet implemented",
+                        TypeName());
     }
 }
 

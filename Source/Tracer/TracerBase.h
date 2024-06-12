@@ -273,11 +273,11 @@ class TracerBase : public TracerI
                                         uint32_t attributeIndex,
                                         std::vector<TextureId> textures) override;
 
-    SurfaceId       CreateSurface(SurfaceParams) override;
-    LightSurfaceId  CreateLightSurface(LightSurfaceParams) override;
-    CamSurfaceId    CreateCameraSurface(CameraSurfaceParams) override;
-    AABB3           CommitSurfaces() override;
-    CameraTransform GetCamTransform(CamSurfaceId) const override;
+    SurfaceId           CreateSurface(SurfaceParams) override;
+    LightSurfaceId      CreateLightSurface(LightSurfaceParams) override;
+    CamSurfaceId        CreateCameraSurface(CameraSurfaceParams) override;
+    SurfaceCommitResult CommitSurfaces() override;
+    CameraTransform     GetCamTransform(CamSurfaceId) const override;
 
     RendererId  CreateRenderer(std::string typeName) override;
     void        DestroyRenderer(RendererId) override;

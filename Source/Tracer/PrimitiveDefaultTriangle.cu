@@ -179,14 +179,6 @@ void PrimGroupTriangle::PushAttribute(PrimBatchKey idStart, PrimBatchKey idEnd,
 }
 
 inline
-void PrimGroupTriangle::CopyPrimIds(Span<PrimitiveKey>,
-                                         PrimBatchKey,
-                                         const GPUQueue&) const
-{
-    throw MRayError("implement \"GenericGroupPrimitiveT::CopyPrimIds\"");
-}
-
-inline
 Vector2ui PrimGroupTriangle::BatchRange(PrimBatchKey key) const
 {
     auto range = FindRange(static_cast<CommonKey>(key))[INDICES_ATTRIB_INDEX];
@@ -360,14 +352,6 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey idStart, PrimBatchKey 
         DeviceAlgorithms::InPlaceTransform(batchSpan, queue,
                                            KCAdjustIndices<Vector3ui>(attributeStart));
     }
-}
-
-inline
-void PrimGroupSkinnedTriangle::CopyPrimIds(Span<PrimitiveKey>,
-                                           PrimBatchKey,
-                                           const GPUQueue&) const
-{
-    throw MRayError("implement \"GenericGroupPrimitiveT::CopyPrimIds\"");
 }
 
 inline

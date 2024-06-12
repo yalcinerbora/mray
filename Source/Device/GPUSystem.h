@@ -162,11 +162,14 @@ static void DumpGPUMemToFile(const std::string& fName,
 }
 
 template<class T>
-static void DumpGPUMemToStdOut(Span<const T> data,
+static void DumpGPUMemToStdOut(std::string_view header,
+                               Span<const T> data,
                                const GPUQueue& queue,
                                std::string_view seperator)
 {
+    if(!header.empty()) MRAY_DEBUG_LOG("{}", header);
     DumpGPUMemToStream(std::cout, data, queue, seperator);
+    if(!header.empty()) MRAY_DEBUG_LOG("-------------");
 }
 
 }

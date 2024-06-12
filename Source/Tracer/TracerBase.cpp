@@ -1231,7 +1231,7 @@ CamSurfaceId TracerBase::CreateCameraSurface(CameraSurfaceParams p)
     return CamSurfaceId(camSId);
 }
 
-AABB3 TracerBase::CommitSurfaces()
+SurfaceCommitResult TracerBase::CommitSurfaces()
 {
     // Pack the surfaces via transform / primitive
     //
@@ -1294,7 +1294,12 @@ AABB3 TracerBase::CommitSurfaces()
 
     // Synchronize All here, we may time this
     gpuSystem.SyncAll();
-    return accelerator->SceneAABB();
+    return SurfaceCommitResult
+    {
+        .aabb = accelerator->SceneAABB(),
+        .instanceCount = accelerator->TotalInstanceCount(),
+        .acceleratorCount = accelerator->TotalAccelCount()
+    };
 }
 
 CameraTransform TracerBase::GetCamTransform(CamSurfaceId camSurfId) const
@@ -1414,6 +1419,12 @@ void TracerBase::ClearAll()
     transGroups.clear();
     lightGroups.clear();
     renderers.clear();
+
+    accelerator.reset(nullptr);
+    surfaces.clear();
+    lightSurfaces.clear();
+    cameraSurfaces.clear();
+
     //
     primGroupCounter = 0;
     camGroupCounter = 0;

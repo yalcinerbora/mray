@@ -73,7 +73,8 @@ static void DumpGPUMemToFile(const std::string& fName,
                              std::string_view seperator = "\n"sv);
 
 template<class T>
-static void DumpGPUMemToStdOut(Span<const T> data,
+static void DumpGPUMemToStdOut(std::string_view header,
+                               Span<const T> data,
                                const GPUQueue& queue,
                                std::string_view seperator = "\n"sv);
 

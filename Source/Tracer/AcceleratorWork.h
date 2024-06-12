@@ -40,7 +40,7 @@ static void KCTransformLocallyConstantAABBs(// Output
         TransContext tContext = GenerateTransformContext(tSoA, pSoA, tKey,
                                                          PrimitiveKey::InvalidKey());
         // Finally transform and write
-        AABB3 worldAABB = tContext.InvApply(cAABB);
+        AABB3 worldAABB = tContext.Apply(cAABB);
         dInstanceAABBs[globalId] = worldAABB;
     }
 }
