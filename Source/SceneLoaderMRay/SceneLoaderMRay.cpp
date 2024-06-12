@@ -2099,6 +2099,8 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
         threadPool.wait();
         return MRayError("Json Error ({})", std::string(e.what()));
     }
+
+    threadPool.wait();
     return MRayError::OK;
 }
 

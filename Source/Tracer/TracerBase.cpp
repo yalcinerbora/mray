@@ -1241,18 +1241,13 @@ AABB3 TracerBase::CommitSurfaces()
     // PG TG {S0,...,SN}   -> AccelGroup
     auto& surfList = surfaces.Vec();
     using SurfP = Pair<SurfaceId, SurfaceParams>;
-    std::stable_sort(surfList.begin(), surfList.end(),
-                     [](const SurfP& left, const SurfP& right) -> bool
+    std::sort(surfList.begin(), surfList.end(),
+              [](const SurfP& left, const SurfP& right) -> bool
     {
-        return (left.second.primBatches.front() <
-                right.second.primBatches.front());
+        return (Tuple(left.second.primBatches.front(), left.second.transformId) <
+                Tuple(right.second.primBatches.front(), right.second.transformId));
     });
-    //
-    std::stable_sort(surfList.begin(), surfList.end(),
-                     [](const SurfP& left, const SurfP& right) -> bool
-    {
-        return (left.second.transformId < right.second.transformId);
-    });
+
     // Do the same thing for lights
     using LightSurfP = Pair<LightSurfaceId, LightSurfaceParams>;
     auto& lSurfList = lightSurfaces.Vec();
@@ -1264,16 +1259,13 @@ AABB3 TracerBase::CommitSurfaces()
         auto gId = LightGroupId(lKey.FetchBatchPortion());
         return map.at(gId).value().get()->IsPrimitiveBacked();
     });
-    std::stable_sort(lSurfList.begin(), lSurfList.end(),
+    std::sort(lSurfList.begin(), lSurfList.end(),
     [](const LightSurfP& left, const LightSurfP& right)
     {
-        return left.second.lightId < right.second.lightId;
+        return (Tuple(left.second.lightId, left.second.transformId) <
+                Tuple(right.second.lightId, right.second.transformId));
     });
-    std::stable_sort(lSurfList.begin(), lSurfList.end(),
-    [](const LightSurfP& left, const LightSurfP& right)
-    {
-        return left.second.transformId < right.second.transformId;
-    });
+
     // Send it!
     AcceleratorType type = tracerParams.accelMode;
     auto accelGenerator = typeGenerators.baseAcceleratorGenerator.at(type);
