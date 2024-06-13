@@ -58,7 +58,13 @@ GPUDeviceCUDA::GPUDeviceCUDA(int deviceId, nvtxDomainHandle_t domain)
     if((flags & cudaDeviceSyncMemops) == 0)
     {
         throw MRayError("Unable to set \"cudaDevice"
-                        "SyncMemops\" flag on device!({:s})", props.name);
+                        "SyncMemops\" flag on the device! ({:s})", props.name);
+    }
+    if((flags & cudaDeviceMapHost) == 0)
+    {
+        throw MRayError("The device does not  support \"cudaDeviceMapHost\""
+                        "flag! ({:s}:{})",
+                        props.name, deviceId);
     }
 
     // Check VMM support (entire system requires this functionality)
@@ -68,7 +74,8 @@ GPUDeviceCUDA::GPUDeviceCUDA(int deviceId, nvtxDomainHandle_t domain)
     if(vmmEnabled == 0)
     {
         throw MRayError("The device do not have virtual memory "
-                        "management support!({:s})", props.name);
+                        "management support!  ({:s}:{})",
+                        props.name, deviceId);
     }
 
     // All Seems Fine Allocate Queues
