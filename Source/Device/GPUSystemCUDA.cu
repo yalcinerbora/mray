@@ -164,6 +164,7 @@ GPUSystemCUDA::~GPUSystemCUDA()
         CUDA_CHECK(cudaSetDevice(device.DeviceId()));
         CUDA_CHECK(cudaDeviceSynchronize());
     }
+    systemGPUs.clear();
     CUDA_CHECK(cudaDeviceReset());
 }
 

@@ -69,6 +69,9 @@ struct TypeGeneratorPack
 
 class TracerBase : public TracerI
 {
+    protected:
+    GPUSystem gpuSystem;
+
     private:
     // Instantiated Types
     ThreadSafeMap<PrimGroupId, PrimGroupPtr>         primGroups;
@@ -101,7 +104,6 @@ class TracerBase : public TracerI
 
     protected:
     BS::thread_pool*    threadPool;
-    GPUSystem           gpuSystem;
 
     // Supported Types
     TypeNameList        primTypes;

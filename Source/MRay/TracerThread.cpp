@@ -247,7 +247,7 @@ void TracerThread::LoopWork()
 
 
 
-            for(int i = 0; i < 512; i++)
+            for(int i = 0; i < 2; i++)
             {
             try
             {
