@@ -42,14 +42,17 @@ class RayT
     MRAY_HYBRID constexpr bool     IntersectsAABB(Vector<2, T>& tOut,
                                                   const Vector<3, T>& aabbMin,
                                                   const Vector<3, T>& aabbMax,
-                                                  const Vector<2, T>& tMinMax = Vector<2, T>(-INFINITY, INFINITY)) const;
+                                                  const Vector<2, T>& tMinMax = Vector<2, T>(-std::numeric_limits<T>::infinity(),
+                                                                                             std::numeric_limits<T>::infinity())) const;
     MRAY_HYBRID constexpr bool     IntersectsAABB(const Vector<3, T>& min,
                                                   const Vector<3, T>& max,
-                                                  const Vector<2, T>& tMinMax = Vector<2, T>(-INFINITY, INFINITY)) const;
+                                                  const Vector<2, T>& tMinMax = Vector<2, T>(-std::numeric_limits<T>::infinity(),
+                                                                                             std::numeric_limits<T>::infinity())) const;
     MRAY_HYBRID constexpr bool     IntersectsAABB(Vector<3, T>& pos, T& t,
                                                   const Vector<3, T>& min,
                                                   const Vector<3, T>& max,
-                                                  const Vector<2, T>& tMinMax = Vector<2, T>(-INFINITY, INFINITY)) const;
+                                                  const Vector<2, T>& tMinMax = Vector<2, T>(-std::numeric_limits<T>::infinity(),
+                                                                                             std::numeric_limits<T>::infinity())) const;
 
     NO_DISCARD MRAY_HYBRID constexpr RayT           NormalizeDir() const;
                MRAY_HYBRID constexpr RayT&          NormalizeDirSelf();

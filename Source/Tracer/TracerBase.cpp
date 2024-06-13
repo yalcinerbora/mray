@@ -1435,7 +1435,8 @@ void TracerBase::ClearAll()
     surfaceCounter = 0;
     lightSurfaceCounter = 0;
     camSurfaceCounter = 0;
-    textureCounter = 0;
+
+    texMem.Clear();
 
     // GroupId 0 is reserved for empty primitive
     CreatePrimitiveGroup(std::string(TracerConstants::EmptyPrimName));

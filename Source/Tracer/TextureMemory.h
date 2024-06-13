@@ -196,4 +196,5 @@ class TextureMemory
 
     MRayPixelTypeRT         GetPixelType(TextureId) const;
     const TextureViewMap&   TextureViews() const;
+    void                    Clear();
 };

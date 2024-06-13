@@ -170,7 +170,6 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
                                  ppResult.concretePrimRanges.size()});
     assert(ppResult.concretePrimRanges.size() ==
            this->concreteLeafRanges.size());
-
     // Copy these host vectors to GPU
     // For linear accelerator we only need these at GPU memory
     // additionally we will create instance's globalAABB
@@ -186,7 +185,6 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
                                  this->InstanceCount(), this->InstanceCount(),
                                  this->InstanceCount(), this->InstanceCount(),
                                  this->concreteLeafRanges.back()[1]});
-
     // Generate offset spans
     using PrimKeySpanList = std::vector<Span<PrimitiveKey>>;
     PrimKeySpanList hInstanceLeafs = this->CreateInstanceLeafSubspans(dAllLeafs);
@@ -278,7 +276,6 @@ void AcceleratorGroupLinear<PG>::WriteInstanceKeysAndAABBs(Span<AABB3> aabbWrite
 
         using namespace DeviceAlgorithms;
         size_t tmSize = SegmentedTransformReduceTMSize<AABB3, PrimitiveKey>(this->concreteLeafRanges.size());
-
         Span<uint32_t> dConcreteIndicesOfInstances;
         Span<AABB3> dConcreteAABBs;
         Span<uint32_t> dConcreteLeafOffsets;
@@ -349,12 +346,15 @@ void AcceleratorGroupLinear<PG>::WriteInstanceKeysAndAABBs(Span<AABB3> aabbWrite
                                                    dLocalTKeys,
                                                    queue);
         }
+        //  Don't forget to wait for temp memory!
+        queue.Barrier().Wait();
     }
     else
     {
         throw MRayError("{}: PER_PRIM_TRANSFORM Accel Construct not yet implemented",
                         TypeName());
     }
+
 }
 
 template<PrimitiveGroupC PG>

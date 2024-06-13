@@ -98,9 +98,6 @@ class TracerBase : public TracerI
     std::atomic_uint32_t    surfaceCounter      = 0;
     std::atomic_uint32_t    lightSurfaceCounter = 0;
     std::atomic_uint32_t    camSurfaceCounter   = 0;
-    // Texture Related
-    std::atomic_uint32_t    textureCounter      = 0;
-    bool                    globalTexCommit     = false;
 
     protected:
     BS::thread_pool*    threadPool;

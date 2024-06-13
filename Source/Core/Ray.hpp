@@ -176,7 +176,7 @@ constexpr bool RayT<T>::IntersectsPlane(Vector<3, T>& intersectPos, T& t,
     // Nearly parallel
     if(abs(nDotD) <= Epsilon<T>)
     {
-        t = INFINITY;
+        t = std::numeric_limits<T>::infinity();
         return false;
     }
     t = (planePos - position).Dot(normal) / nDotD;

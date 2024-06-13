@@ -158,6 +158,10 @@ GPUSystemCUDA::GPUSystemCUDA()
 GPUSystemCUDA::~GPUSystemCUDA()
 {
     nvtxDomainDestroy(nvtxDomain);
+
+    for(const auto& device : systemGPUs)
+        CUDA_CHECK(cudaDeviceSynchronize());
+    CUDA_CHECK(cudaDeviceReset());
 }
 
 std::vector<size_t> GPUSystemCUDA::SplitWorkToMultipleGPU(uint32_t workCount,

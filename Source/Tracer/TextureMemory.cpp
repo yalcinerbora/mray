@@ -389,3 +389,17 @@ const TextureViewMap& TextureMemory::TextureViews() const
     assert(isCommitted);
     return textureViews.Map();
 }
+
+void TextureMemory::Clear()
+{
+    texCounter = 0;
+    gpuIndexCounter = 0;
+    isCommitted = false;
+    texMemList.clear();
+    textures.clear();
+    textureViews.clear();
+
+    // Create texture memory for each device (not allocated yet)
+    for(const GPUDevice& device : gpuSystem.SystemDevices())
+        texMemList.emplace_back(device);
+}
