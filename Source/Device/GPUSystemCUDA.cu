@@ -160,7 +160,10 @@ GPUSystemCUDA::~GPUSystemCUDA()
     nvtxDomainDestroy(nvtxDomain);
 
     for(const auto& device : systemGPUs)
+    {
+        CUDA_CHECK(cudaSetDevice(device.DeviceId()));
         CUDA_CHECK(cudaDeviceSynchronize());
+    }
     CUDA_CHECK(cudaDeviceReset());
 }
 
