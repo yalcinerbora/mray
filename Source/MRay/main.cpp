@@ -87,10 +87,14 @@ int main(int argc, const char* const argv[])
     {
         e = err;
     }
+    catch(const std::exception& err)
+    {
+        e = MRayError("{}", err.what());
+    }
 
     if(e)
     {
-        MRAY_ERROR_LOG("{}", e.GetError());
+        MRAY_ERROR_LOG("[Visor]: {}", e.GetError());
         return 1;
     }
     return 0;

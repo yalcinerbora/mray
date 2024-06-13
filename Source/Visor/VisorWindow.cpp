@@ -293,7 +293,7 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
             return sf.colorSpace == cSpace && !VkSurfaceFormatIsSRGB(sf.format);
         });
         if(loc == surfaceTypeList.cend() && isFirstFix)
-            MRAY_WARNING_LOG("Unable to create HDR surface, falling back to SDR...");
+            MRAY_WARNING_LOG("[Visor]: Unable to create HDR surface, falling back to SDR...");
     }
     //
     if(loc == surfaceTypeList.cend())

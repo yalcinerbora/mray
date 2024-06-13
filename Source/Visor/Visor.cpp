@@ -402,7 +402,7 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     if(loc == goodDevices.cend())
     {
         using namespace std::string_view_literals;
-        MRAY_WARNING_LOG("\"EnforceIGPU\" is {} but couldn't find {} GPU! "
+        MRAY_WARNING_LOG("[Visor]: \"EnforceIGPU\" is {} but couldn't find {} GPU! "
                          "Continuing with first capable gpu",
                          (visorConfig.enforceIGPU) ? "on"sv : "off"sv,
                          (visorConfig.enforceIGPU) ? "integrated"sv : "discrete"sv);
