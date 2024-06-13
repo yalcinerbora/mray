@@ -1233,6 +1233,24 @@ CamSurfaceId TracerBase::CreateCameraSurface(CameraSurfaceParams p)
 
 SurfaceCommitResult TracerBase::CommitSurfaces()
 {
+    // Finalize the group operations
+    // Some groups require post-processing
+    // namely triangles (which adjust the local index values
+    // to global one) and tranforms (which invert the transforms and store)
+    GPUQueueIteratorRoundRobin queueIt(gpuSystem);
+    for(auto& g : primGroups.Map())
+    { g.second->Finalize(queueIt.Queue()); queueIt.Next(); }
+    for(auto& g : camGroups.Map())
+    { g.second->Finalize(queueIt.Queue()); queueIt.Next(); }
+    for(auto& g : mediumGroups.Map())
+    { g.second->Finalize(queueIt.Queue()); queueIt.Next(); }
+    for(auto& g : matGroups.Map())
+    { g.second->Finalize(queueIt.Queue()); queueIt.Next(); }
+    for(auto& g : transGroups.Map())
+    { g.second->Finalize(queueIt.Queue()); queueIt.Next(); }
+    for(auto& g : lightGroups.Map())
+    { g.second->Finalize(queueIt.Queue()); queueIt.Next(); }
+
     // Pack the surfaces via transform / primitive
     //
     // PG TG {S0,...,SN},  -> AccelGroup (One AccelInstance per S)

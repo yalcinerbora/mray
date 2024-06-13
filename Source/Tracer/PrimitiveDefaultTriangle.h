@@ -266,6 +266,7 @@ class PrimGroupTriangle final : public GenericGroupPrimitive<PrimGroupTriangle>
                                           uint32_t attributeIndex,
                                           TransientData data,
                                           const GPUQueue& queue) override;
+    void                    Finalize(const GPUQueue& queue) override;
 
     Vector2ui               BatchRange(PrimBatchKey id) const override;
 
@@ -335,10 +336,12 @@ class PrimGroupSkinnedTriangle final : public GenericGroupPrimitive<PrimGroupSki
                                           uint32_t attributeIndex,
                                           TransientData data,
                                           const GPUQueue& queue) override;
+    void                    Finalize(const GPUQueue& queue) override;
 
     Vector2ui               BatchRange(PrimBatchKey id) const override;
 
     DataSoA                 SoA() const;
+
 };
 
 inline std::string_view PrimGroupTriangle::TypeName()

@@ -95,7 +95,10 @@ class GenericGroupI
                                           uint32_t attributeIndex,
                                           TransientData data,
                                           const GPUQueue& queue) = 0;
-
+    // Finalize functionality,
+    // This will be called just before commit surfaces, once.
+    virtual void                Finalize(const GPUQueue&) = 0;
+    //
     virtual size_t              GPUMemoryUsage() const = 0;
     virtual AttribInfoList      AttributeInfo() const = 0;
     virtual std::string_view    Name() const = 0;
@@ -165,6 +168,8 @@ class GenericGroupT : public GenericGroupI<IdTypeT, AttribInfoT>
     bool    IsInCommitState() const override;
     size_t  GPUMemoryUsage() const override;
     IdInt   GroupId() const override;
+    // Finalize is usefull on rare occasions so we default it to empty
+    void    Finalize(const GPUQueue&) override {};
 };
 
 template<class IdType, class AttributeInfoType>

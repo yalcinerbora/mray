@@ -73,6 +73,7 @@ class TransformGroupSingle final : public GenericGroupTransform<TransformGroupSi
                                   uint32_t attributeIndex,
                                   TransientData data,
                                   const GPUQueue& queue) override;
+    void            Finalize(const GPUQueue& queue) override;
 
     DataSoA         SoA() const;
 };
@@ -105,6 +106,7 @@ class TransformGroupMulti final : public GenericGroupTransform<TransformGroupMul
                                   uint32_t attributeIndex,
                                   TransientData data,
                                   const GPUQueue& queue) override;
+    void            Finalize(const GPUQueue& queue) override;
 
     DataSoA         SoA() const;
 };

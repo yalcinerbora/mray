@@ -33,6 +33,18 @@ void TransformGroupSingle::CommitReservations()
     soa.invTransforms = ToConstSpan(invTransforms);
 }
 
+TransAttributeInfoList TransformGroupSingle::AttributeInfo() const
+{
+    using enum MRayDataEnum;
+    using enum AttributeOptionality;
+    using enum AttributeIsArray;
+    static const TransAttributeInfoList LogicList =
+    {
+        TransAttributeInfo("Transform", MRayDataType<MR_MATRIX_4x4>(), IS_SCALAR, MR_MANDATORY)
+    };
+    return LogicList;
+}
+
 void TransformGroupSingle::PushAttribute(TransformKey id , uint32_t attributeIndex,
                                          TransientData data, const GPUQueue& queue)
 {
@@ -41,13 +53,6 @@ void TransformGroupSingle::PushAttribute(TransformKey id , uint32_t attributeInd
         GenericPushData(transforms, id.FetchIndexPortion(),
                         attributeIndex,
                         std::move(data), queue);
-
-        auto range = FindRange(id.FetchIndexPortion())[0];
-        size_t count = range[1] - range[0];
-        Span<Matrix4x4> subTRange = transforms.subspan(range[0], count);
-        Span<Matrix4x4> subInvTRange = invTransforms.subspan(range[0], count);
-        DeviceAlgorithms::Transform(subInvTRange, ToConstSpan(subTRange), queue,
-                                    KCInvertTransforms());
     }
     else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
                          TypeName(), attributeIndex);
@@ -64,16 +69,6 @@ void TransformGroupSingle::PushAttribute(TransformKey id,
         GenericPushData(transforms, id.FetchIndexPortion(),
                         attributeIndex, subRange,
                         std::move(data), queue);
-
-        auto range = FindRange(id.FetchIndexPortion())[0];
-        auto innerRange = Vector2ui(range[0] + subRange[0], subRange[1]);
-        size_t count = innerRange[1] - innerRange[0];
-
-        Span<Matrix4x4> subTRange = transforms.subspan(innerRange[0], count);
-        Span<Matrix4x4> subInvTRange = invTransforms.subspan(innerRange[0], count);
-
-        DeviceAlgorithms::Transform(subInvTRange, ToConstSpan(subTRange), queue,
-                                    KCInvertTransforms());
     }
     else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
                          TypeName(), attributeIndex);
@@ -89,30 +84,15 @@ void TransformGroupSingle::PushAttribute(TransformKey idStart, TransformKey idEn
                                         idEnd.FetchIndexPortion());
         GenericPushData(transforms, idRange, attributeIndex,
                         std::move(data), queue);
-
-        auto rangeStart = FindRange(idRange[0])[0];
-        auto rangeEnd = FindRange(idRange[1])[1];
-        size_t count = rangeEnd[1] - rangeStart[0];
-
-        Span<Matrix4x4> subTRange = transforms.subspan(rangeStart[0], count);
-        Span<Matrix4x4> subInvTRange = invTransforms.subspan(rangeStart[0], count);
-        DeviceAlgorithms::Transform(subInvTRange, ToConstSpan(subTRange), queue,
-                                    KCInvertTransforms());
     }
     else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
                          TypeName(), attributeIndex);
 }
 
-TransAttributeInfoList TransformGroupSingle::AttributeInfo() const
+void TransformGroupSingle::Finalize(const GPUQueue& queue)
 {
-    using enum MRayDataEnum;
-    using enum AttributeOptionality;
-    using enum AttributeIsArray;
-    static const TransAttributeInfoList LogicList =
-    {
-        TransAttributeInfo("Transform", MRayDataType<MR_MATRIX_4x4>(), IS_SCALAR, MR_MANDATORY)
-    };
-    return LogicList;
+    DeviceAlgorithms::Transform(invTransforms, ToConstSpan(transforms), queue,
+                                KCInvertTransforms());
 }
 
 typename TransformGroupSingle::DataSoA TransformGroupSingle::SoA() const
@@ -183,6 +163,18 @@ void TransformGroupMulti::CommitReservations()
     queue.Barrier().Wait();
 }
 
+TransAttributeInfoList TransformGroupMulti::AttributeInfo() const
+{
+    using enum MRayDataEnum;
+    using enum AttributeOptionality;
+    using enum AttributeIsArray;
+    static const TransAttributeInfoList LogicList =
+    {
+        TransAttributeInfo("Transform", MRayDataType<MR_MATRIX_4x4>(), IS_ARRAY, MR_MANDATORY)
+    };
+    return LogicList;
+}
+
 void TransformGroupMulti::PushAttribute(TransformKey id, uint32_t attributeIndex,
                                         TransientData data, const GPUQueue& queue)
 {
@@ -190,14 +182,6 @@ void TransformGroupMulti::PushAttribute(TransformKey id, uint32_t attributeIndex
     {
         GenericPushData(transforms, id.FetchIndexPortion(), attributeIndex,
                         std::move(data), queue);
-
-        auto range = FindRange(id.FetchIndexPortion())[0];
-        size_t count = range[1] - range[0];
-        Span<Matrix4x4> subTRange = transforms.subspan(range[0], count);
-        Span<Matrix4x4> subInvTRange = invTransforms.subspan(range[0], count);
-
-        DeviceAlgorithms::Transform(subInvTRange, ToConstSpan(subTRange), queue,
-                                    KCInvertTransforms());
     }
     else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
                          TypeName(), attributeIndex);
@@ -214,16 +198,6 @@ void TransformGroupMulti::PushAttribute(TransformKey id,
         GenericPushData(transforms, id.FetchIndexPortion(),
                         attributeIndex, subRange,
                         std::move(data), queue);
-
-        auto range = FindRange(id.FetchIndexPortion())[attributeIndex];
-        auto innerRange = Vector2ui(range[0] + subRange[0], subRange[1]);
-        size_t count = innerRange[1] - innerRange[0];
-
-        Span<Matrix4x4> subTRange = transforms.subspan(innerRange[0], count);
-        Span<Matrix4x4> subInvTRange = invTransforms.subspan(innerRange[0], count);
-
-        DeviceAlgorithms::Transform(subInvTRange, ToConstSpan(subTRange), queue,
-                                    KCInvertTransforms());
     }
     else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
                          TypeName(), attributeIndex);
@@ -239,31 +213,19 @@ void TransformGroupMulti::PushAttribute(TransformKey idStart, TransformKey idEnd
                                         idEnd.FetchIndexPortion());
         GenericPushData(transforms, idRange, attributeIndex,
                         std::move(data), queue);
-
-        auto rangeStart = (FindRange(idRange[0]))[attributeIndex];
-        auto rangeEnd   = (FindRange(idRange[1]))[attributeIndex];
-        size_t count = rangeEnd[1] - rangeStart[0];
-
-        Span<Matrix4x4> subTRange = transforms.subspan(rangeStart[0], count);
-        Span<Matrix4x4> subInvTRange = invTransforms.subspan(rangeStart[0], count);
-
-        DeviceAlgorithms::Transform(subInvTRange, ToConstSpan(subTRange), queue,
-                                    KCInvertTransforms());
     }
     else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
                          TypeName(), attributeIndex);
 }
 
-TransAttributeInfoList TransformGroupMulti::AttributeInfo() const
+void TransformGroupMulti::Finalize(const GPUQueue& queue)
 {
-    using enum MRayDataEnum;
-    using enum AttributeOptionality;
-    using enum AttributeIsArray;
-    static const TransAttributeInfoList LogicList =
-    {
-        TransAttributeInfo("Transform", MRayDataType<MR_MATRIX_4x4>(), IS_ARRAY, MR_MANDATORY)
-    };
-    return LogicList;
+    // Altough Multi tranform has non-regular arrayed transformations
+    // We can directly convert each transform individually
+    // since each transform is independent from each other.
+    // So a single invert call should suffice
+    DeviceAlgorithms::Transform(invTransforms, ToConstSpan(transforms), queue,
+                                KCInvertTransforms());
 }
 
 typename TransformGroupMulti::DataSoA TransformGroupMulti::SoA() const

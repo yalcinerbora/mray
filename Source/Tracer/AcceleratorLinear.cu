@@ -4,11 +4,11 @@
 // Generic PrimitiveKey copy kernel
 // TODO: find a way to put this somewhere proper
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCGeneratePrimitiveKeys(Span<PrimitiveKey> dAllLeafs,
+void KCGeneratePrimitiveKeys(MRAY_GRID_CONSTANT const Span<PrimitiveKey> dAllLeafs,
                              //
-                             Span<const PrimRangeArray> dConcretePrimRanges,
-                             Span<const Vector2ui> dConcreteLeafRanges,
-                             uint32_t groupId)
+                             MRAY_GRID_CONSTANT const Span<const PrimRangeArray> dConcretePrimRanges,
+                             MRAY_GRID_CONSTANT const Span<const Vector2ui> dConcreteLeafRanges,
+                             MRAY_GRID_CONSTANT const uint32_t groupId)
 {
     constexpr Vector2ui INVALID_BATCH = Vector2ui(std::numeric_limits<uint32_t>::max());
 

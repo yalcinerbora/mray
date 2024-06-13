@@ -1151,8 +1151,8 @@ size_t BaseAcceleratorT<C>::TotalInstanceCount() const
 // TODO: If I remember correctly extern __global__ was not allowed?
 // Is this changed recently? Check this if it is undefined behaviour
 extern MRAY_KERNEL
-void KCGeneratePrimitiveKeys(Span<PrimitiveKey> dAllLeafs,
+void KCGeneratePrimitiveKeys(MRAY_GRID_CONSTANT const Span<PrimitiveKey> dAllLeafs,
                              //
-                             Span<const PrimRangeArray> dConcretePrimRanges,
-                             Span<const Vector2ui> dConcreteLeafRanges,
-                             uint32_t groupId);
+                             MRAY_GRID_CONSTANT const Span<const PrimRangeArray> dConcretePrimRanges,
+                             MRAY_GRID_CONSTANT const Span<const Vector2ui> dConcreteLeafRanges,
+                             MRAY_GRID_CONSTANT const uint32_t groupId);

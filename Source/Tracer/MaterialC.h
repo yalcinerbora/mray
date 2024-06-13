@@ -140,6 +140,8 @@ GenericGroupMaterialT::Reserve(const std::vector<AttributeCountList>& countArray
     // We blocked the virutal chain, but we should be able to use it here
     // We will do the same here anyways migh as well use it.
     auto result = Parent::Reserve(countArrayList);
+
+    std::lock_guard lock(mutex);
     HandleMediums(mediumPairs);
     return result;
 }

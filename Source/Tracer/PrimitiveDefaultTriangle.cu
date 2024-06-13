@@ -1,27 +1,52 @@
 #include "PrimitiveDefaultTriangle.h"
 #include "Device/GPUAlgorithms.h"
 
-template<class I>
-struct KCAdjustIndices
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCAdjustIndices(// I-O
+                     MRAY_GRID_CONSTANT const Span<Vector3ui> dIndicesInOut,
+                     // Input
+                     MRAY_GRID_CONSTANT const Span<const Vector4ui> dVertexIndexRanges)
 {
-    private:
-    uint32_t attributeOffset;
-    public:
-    MRAY_HYBRID     KCAdjustIndices(uint32_t attributeOffset);
-    MRAY_HYBRID I   operator()(const I& t) const;
-};
+    KernelCallParams kp;
+    uint32_t totalRanges = static_cast<uint32_t>(dVertexIndexRanges.size());
 
-template<class I>
-MRAY_HYBRID MRAY_CGPU_INLINE
-KCAdjustIndices<I>::KCAdjustIndices(uint32_t attributeOffset)
-    : attributeOffset(attributeOffset)
-{}
+    // TODO: Check if this is undefined behaviour,
+    // We technically do an out of bounds access over the "std::array<uint32_t, 3>"
+    // Sanity check, if there is a padding (it should not but just to be sure)
+    static_assert(sizeof(std::array<Vector3ui, 2>) == sizeof(Vector3ui) * 2);
+    Span<uint32_t> dVertexIndices = Span<uint32_t>(dIndicesInOut.data()->AsArray().data(),
+                                                   dIndicesInOut.size() * Vector3ui::Dims);
 
-template<class I>
-MRAY_HYBRID MRAY_CGPU_INLINE
-I KCAdjustIndices<I>::operator()(const I& t) const
-{
-    return t + attributeOffset;
+    // Block-stride Loop
+    for(uint32_t blockId = kp.blockId; blockId < totalRanges;
+        blockId += kp.gridSize)
+    {
+        using namespace TracerConstants;
+        uint32_t localTid = kp.threadId;
+        MRAY_SHARED_MEMORY Vector4ui sVertexIndexRange;
+        if(localTid < Vector4ui::Dims)
+            sVertexIndexRange[localTid] = dVertexIndexRanges[blockId][localTid];
+        MRAY_DEVICE_BLOCK_SYNC();
+
+        Vector2ui indexRange = Vector2ui(sVertexIndexRange[2],
+                                         sVertexIndexRange[3]);
+        uint32_t primIndexCount = indexRange[1] - indexRange[0];
+        uint32_t vICount = primIndexCount * Vector3ui::Dims;
+        uint32_t vIStart = indexRange[0] * Vector3ui::Dims;
+        uint32_t vStart = sVertexIndexRange[0];
+
+        // Hand unroll some here (slightly improved performance)
+        auto& dVI = dVertexIndices;
+        for(uint32_t j = localTid; j < vICount;)
+        {
+                            dVI[vIStart + j] += vStart; j += kp.blockSize;
+            if(j < vICount) dVI[vIStart + j] += vStart; j += kp.blockSize;
+            if(j < vICount) dVI[vIStart + j] += vStart; j += kp.blockSize;
+            if(j < vICount) dVI[vIStart + j] += vStart; j += kp.blockSize;
+        }
+        // Before writing new shared memory values wait all threads to end
+        MRAY_DEVICE_BLOCK_SYNC();
+    }
 }
 
 PrimGroupTriangle::PrimGroupTriangle(uint32_t primGroupId,
@@ -88,17 +113,6 @@ void PrimGroupTriangle::PushAttribute(PrimBatchKey batchKey,
             throw MRayError("{:s}:{:d}: Unknown Attribute Index {:d}",
                             TypeName(), this->groupId, attributeIndex);
     }
-
-    if(attributeIndex != INDICES_ATTRIB_INDEX) return;
-
-    IdInt batch = batchKey.FetchIndexPortion();
-    auto attributeStart = static_cast<uint32_t>(FindRange(batch)[0][0]);
-    auto range = FindRange(batch)[INDICES_ATTRIB_INDEX];
-    size_t count = range[1] - range[0];
-    Span<Vector3ui> batchSpan = dIndexList.subspan(range[0], count);
-
-    DeviceAlgorithms::InPlaceTransform(batchSpan, queue,
-                                        KCAdjustIndices<Vector3ui>(attributeStart));
 }
 
 void PrimGroupTriangle::PushAttribute(PrimBatchKey batchKey,
@@ -124,18 +138,6 @@ void PrimGroupTriangle::PushAttribute(PrimBatchKey batchKey,
             throw MRayError("{:s}:{:d}: Unknown Attribute Index {:d}",
                             TypeName(), this->groupId, attributeIndex);
     }
-
-    if(attributeIndex != INDICES_ATTRIB_INDEX) return;
-
-    IdInt batch = batchKey.FetchIndexPortion();
-    auto attributeStart = static_cast<uint32_t>(FindRange(batch)[POSITION_ATTRIB_INDEX][0]);
-    auto range = FindRange(batch)[INDICES_ATTRIB_INDEX];
-    auto innerRange = Vector2ui(range[0] + subRange[0], subRange[1]);
-    size_t count = innerRange[1] - innerRange[0];
-    Span<Vector3ui> batchSpan = dIndexList.subspan(innerRange[0], count);
-
-    DeviceAlgorithms::InPlaceTransform(batchSpan, queue,
-                                       KCAdjustIndices<Vector3ui>(attributeStart));
 }
 
 void PrimGroupTriangle::PushAttribute(PrimBatchKey idStart, PrimBatchKey idEnd,
@@ -161,24 +163,63 @@ void PrimGroupTriangle::PushAttribute(PrimBatchKey idStart, PrimBatchKey idEnd,
             throw MRayError("{:s}:{:d}: Unknown Attribute Index {:d}",
                             TypeName(), this->groupId, attributeIndex);
     }
-
-    if(attributeIndex != INDICES_ATTRIB_INDEX) return;
-    // Now here we need to do for loop
-    for(auto i = idStart.FetchIndexPortion();
-        i < idEnd.FetchIndexPortion(); i++)
-    {
-        auto attributeStart = static_cast<uint32_t>(FindRange(i)[POSITION_ATTRIB_INDEX][0]);
-        auto range = FindRange(i)[INDICES_ATTRIB_INDEX];
-        size_t count = range[1] - range[0];
-        Span<Vector3ui> batchSpan = dIndexList.subspan(range[0], count);
-
-        DeviceAlgorithms::InPlaceTransform(batchSpan, queue,
-                                           KCAdjustIndices<Vector3ui>(attributeStart));
-    }
-
 }
 
-inline
+void PrimGroupTriangle::Finalize(const GPUQueue& queue)
+{
+    size_t batchCount = this->itemRanges.size();
+    std::vector<Vector4ui> hVertexIndexRanges;
+    hVertexIndexRanges.reserve(batchCount);
+
+    DeviceLocalMemory tempMem(*queue.Device());
+    Span<Vector4ui> dVertexIndexRanges;
+    MemAlloc::AllocateMultiData(std::tie(dVertexIndexRanges),
+                                tempMem,
+                                {batchCount});
+
+
+
+    for(const auto& kv : this->itemRanges)
+    {
+        const AttributeRanges& ranges = kv.second;
+        hVertexIndexRanges.emplace_back(Vector4ui(ranges[POSITION_ATTRIB_INDEX][0],
+                                                  ranges[POSITION_ATTRIB_INDEX][1],
+                                                  ranges[INDICES_ATTRIB_INDEX][0],
+                                                  ranges[INDICES_ATTRIB_INDEX][1]));
+    }
+    queue.MemcpyAsync(dVertexIndexRanges,
+                      Span<const Vector4ui>(hVertexIndexRanges.cbegin(),
+                                            hVertexIndexRanges.end()));
+
+    uint32_t blockCount = queue.SMCount() *
+        GPUQueue::RecommendedBlockCountPerSM(&KCAdjustIndices,
+                                             StaticThreadPerBlock1D(),
+                                             0);
+
+    //DeviceDebug::DumpGPUMemToFile("dIndicesBefore",
+    //                              ToConstSpan(dIndexList),
+    //                              queue);
+
+    using namespace std::string_view_literals;
+    queue.IssueExactKernel<KCAdjustIndices>
+    (
+        "KCAdjustIndices"sv,
+        KernelExactIssueParams
+        {
+            .gridSize = blockCount,
+            .blockSize = StaticThreadPerBlock1D()
+        },
+        // I-O
+        dIndexList,
+        dVertexIndexRanges
+    );
+    queue.Barrier().Wait();
+
+    //DeviceDebug::DumpGPUMemToFile("dIndicesAfter",
+    //                              ToConstSpan(dIndexList),
+    //                              queue);
+}
+
 Vector2ui PrimGroupTriangle::BatchRange(PrimBatchKey key) const
 {
     auto range = FindRange(static_cast<CommonKey>(key))[INDICES_ATTRIB_INDEX];
@@ -240,8 +281,7 @@ PrimAttributeInfoList PrimGroupSkinnedTriangle::AttributeInfo() const
 }
 
 void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey, uint32_t attributeIndex,
-                                             TransientData data,
-                                             const GPUQueue& queue)
+                                             TransientData data, const GPUQueue& queue)
 {
     auto PushData = [&]<class T>(const Span<T>& d)
     {
@@ -262,17 +302,6 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey, uint32_t att
             throw MRayError("{:s}:{:d}: Unknown Attribute Index {:d}",
                             TypeName(), this->groupId, attributeIndex);
     }
-
-    if(attributeIndex != INDICES_ATTRIB_INDEX) return;
-
-    IdInt batch = batchKey.FetchIndexPortion();
-    auto attributeStart = static_cast<uint32_t>(FindRange(batch)[POSITION_ATTRIB_INDEX][0]);
-    auto range = FindRange(batch)[INDICES_ATTRIB_INDEX];
-    size_t count = range[1] - range[0];
-    Span<Vector3ui> batchSpan = dIndexList.subspan(range[0], count);
-
-    DeviceAlgorithms::InPlaceTransform(batchSpan, queue,
-                                       KCAdjustIndices<Vector3ui>(attributeStart));
 }
 
 void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey,
@@ -299,18 +328,6 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey batchKey,
             throw MRayError("{:s}:{:d}: Unknown Attribute Index {:d}",
                             TypeName(), this->groupId, attributeIndex);
     }
-
-    if(attributeIndex != INDICES_ATTRIB_INDEX) return;
-
-    IdInt batch = batchKey.FetchIndexPortion();
-    auto attributeStart = static_cast<uint32_t>(FindRange(batch)[POSITION_ATTRIB_INDEX][0]);
-    auto range = FindRange(batch)[3];
-    auto innerRange = Vector2ui(range[0] + subRange[0], subRange[1]);
-    size_t count = innerRange[1] - innerRange[0];
-    Span<Vector3ui> batchSpan = dIndexList.subspan(innerRange[0], count);
-
-    DeviceAlgorithms::InPlaceTransform(batchSpan, queue,
-                                       KCAdjustIndices<Vector3ui>(attributeStart));
 }
 
 void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey idStart, PrimBatchKey idEnd,
@@ -338,20 +355,50 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey idStart, PrimBatchKey 
             throw MRayError("{:s}:{:d}: Unknown Attribute Index {:d}",
                             TypeName(), this->groupId, attributeIndex);
     }
+}
 
-    if(attributeIndex != INDICES_ATTRIB_INDEX) return;
-    // Now here we need to do for loop
-    for(auto i = idStart.FetchIndexPortion();
-        i < idEnd.FetchIndexPortion(); i++)
+void PrimGroupSkinnedTriangle::Finalize(const GPUQueue& queue)
+{
+        size_t batchCount = this->itemRanges.size();
+    std::vector<Vector4ui> hVertexIndexRanges;
+    hVertexIndexRanges.reserve(batchCount);
+
+    DeviceLocalMemory tempMem(*queue.Device());
+    Span<Vector4ui> dVertexIndexRanges;
+    MemAlloc::AllocateMultiData(std::tie(dVertexIndexRanges),
+                                tempMem,
+                                {batchCount});
+
+    for(const auto& kv : this->itemRanges)
     {
-        auto attributeStart = static_cast<uint32_t>(FindRange(i)[POSITION_ATTRIB_INDEX][0]);
-        auto range = FindRange(i)[INDICES_ATTRIB_INDEX];
-        size_t count = range[1] - range[0];
-        Span<Vector3ui> batchSpan = dIndexList.subspan(range[0], count);
-
-        DeviceAlgorithms::InPlaceTransform(batchSpan, queue,
-                                           KCAdjustIndices<Vector3ui>(attributeStart));
+        const AttributeRanges& ranges = kv.second;
+        hVertexIndexRanges.emplace_back(Vector4ui(ranges[POSITION_ATTRIB_INDEX][0],
+                                                  ranges[POSITION_ATTRIB_INDEX][1],
+                                                  ranges[INDICES_ATTRIB_INDEX][0],
+                                                  ranges[INDICES_ATTRIB_INDEX][1]));
     }
+    queue.MemcpyAsync(dVertexIndexRanges,
+                      Span<const Vector4ui>(hVertexIndexRanges.cbegin(),
+                                            hVertexIndexRanges.end()));
+
+    uint32_t blockCount = queue.SMCount() *
+        GPUQueue::RecommendedBlockCountPerSM(&KCAdjustIndices,
+                                             StaticThreadPerBlock1D(),
+                                             0);
+    using namespace std::string_view_literals;
+    queue.IssueExactKernel<KCAdjustIndices>
+    (
+        "KCAdjustIndices"sv,
+        KernelExactIssueParams
+        {
+            .gridSize = blockCount,
+            .blockSize = StaticThreadPerBlock1D()
+        },
+        // I-O
+        dIndexList,
+        dVertexIndexRanges
+    );
+    queue.Barrier().Wait();
 }
 
 inline
