@@ -150,11 +150,7 @@ GenericGroupLightT::Reserve(const std::vector<AttributeCountList>& countArrayLis
     std::lock_guard lock{mutex};
     assert(result.size() == primBatches.size());
     for(size_t i = 0; i < primBatches.size(); i++)
-    {
-        MRAY_LOG("Adding {}-{}",
-                 result[i], primBatches[i]);
         primMappings.try_emplace(result[i], primBatches[i]);
-    }
     return result;
 }
 
@@ -163,19 +159,6 @@ inline PrimBatchKey GenericGroupLightT::LightPrimBatch(LightKey lKey) const
     auto pBatchId = primMappings.at(lKey);
     if(!pBatchId)
     {
-        std::map<int, int> test;
-
-        auto PB0 = primMappings.begin()->first;
-        auto LK0 = primMappings.begin()->second;
-        auto PB1 = (++primMappings.begin())->first;
-        auto LK1 = (++primMappings.begin())->second;
-
-        MRAY_LOG("lKey{}, PM({}) [{}:{}, {}:{}]",
-                 lKey, primMappings.size(),
-                 PB0, LK0,
-                 PB1, LK1);
-
-        __debugbreak();
         throw MRayError("{:s}:{:d}: Unkown light key {}",
                         this->Name(), this->groupId,
                         lKey.FetchIndexPortion());

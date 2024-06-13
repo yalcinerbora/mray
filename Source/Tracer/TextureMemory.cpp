@@ -403,3 +403,13 @@ void TextureMemory::Clear()
     for(const GPUDevice& device : gpuSystem.SystemDevices())
         texMemList.emplace_back(device);
 }
+
+size_t TextureMemory::GPUMemoryUsage() const
+{
+    size_t total = 0;
+    for(const auto& mem : texMemList)
+    {
+        total += mem.Size();
+    }
+    return total;
+}

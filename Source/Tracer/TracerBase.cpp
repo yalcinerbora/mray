@@ -1495,6 +1495,7 @@ size_t TracerBase::UsedDeviceMemory() const
     totalMem += FetchMemUsage(transGroups.Map());
     totalMem += FetchMemUsage(lightGroups.Map());
     totalMem += FetchMemUsage(renderers.Map());
+    totalMem += texMem.GPUMemoryUsage();
     if(accelerator)
         totalMem += accelerator->GPUMemoryUsage();
     return totalMem;

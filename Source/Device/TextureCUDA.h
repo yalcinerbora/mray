@@ -280,6 +280,7 @@ class TextureBackingMemoryCUDA
 
     void                        ResizeBuffer(size_t newSize);
     const GPUDeviceCUDA&        Device() const;
+    size_t                      Size() const;
 };
 
 inline CUmemGenericAllocationHandle ToHandleCUDA(const TextureBackingMemoryCUDA& mem)

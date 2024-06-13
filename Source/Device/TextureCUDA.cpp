@@ -78,6 +78,11 @@ const GPUDeviceCUDA& TextureBackingMemoryCUDA::Device() const
     return *gpu;
 }
 
+size_t TextureBackingMemoryCUDA::Size() const
+{
+    return size;
+}
+
 }
 
 template class mray::cuda::TextureCUDA<2, Float>;

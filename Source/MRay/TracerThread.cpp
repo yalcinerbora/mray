@@ -4,8 +4,6 @@
 #include <fstream>
 #include <filesystem>
 
-#include <random>
-
 #include <Core/Timer.h>
 
 std::string GetTypeNameFromRenderConfig(const std::string&)
@@ -245,18 +243,6 @@ void TracerThread::LoopWork()
         if(scenePath)
         {
             MRAY_LOG("[Tracer]: NewScene {}", scenePath.value());
-
-
-            std::mt19937 rng;
-            using namespace std::chrono_literals;
-            std::uniform_int_distribution<> d(0, 1000);
-
-            for(int i = 0; i < 4096; i++)
-            {
-            try
-            {
-
-            std::this_thread::sleep_for(std::chrono::microseconds(d(rng)));
             tracer->ClearAll();
 
             // TODO: Single scene loading, change this later maybe
@@ -292,21 +278,13 @@ void TracerThread::LoopWork()
             //
             timer.Split();
             MRAY_LOG("[Tracer]: Surfaces committed in {}ms\n"
-                     "AABB      : {}\n"
-                     "Instances : {}\n"
-                     "Accels    : {}",
+                     "    AABB      : {}\n"
+                     "    Instances : {}\n"
+                     "    Accels    : {}",
                      timer.Elapsed<Millisecond>(),
                      currentSceneAABB,
                      instanceCount, accelCount);
-
-            MRAY_LOG("DevMem {}", tracer->UsedDeviceMemory());
-
-            }
-            catch(const MRayError& e)
-            {
-                MRAY_ERROR_LOG("[Tracer]: Fatal Error! \"{}\"", e.GetError());
-            }
-            }
+            MRAY_LOG("DevMem {}MiB", tracer->UsedDeviceMemory() >> 20);
 
             currentCamIndex = 0;
             CamSurfaceId camSurf = sceneIds.camSurfaces[currentCamIndex];
