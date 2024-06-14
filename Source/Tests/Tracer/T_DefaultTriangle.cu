@@ -276,6 +276,8 @@ TEST(DefaultTriangle, LoadMulti)
     // maybe return a ticket (barrier to the user)
     system.SyncAll();
     const GPUQueue& queue = system.BestDevice().GetQueue(0);
+    // Finalize the indices
+    triGroup.Finalize(queue);
 
     using DataSoA = typename PrimGroupTriangle::DataSoA;
     DataSoA triGroupSoA = triGroup.SoA();

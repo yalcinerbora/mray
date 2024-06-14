@@ -114,7 +114,7 @@ namespace TracerLimits
 // Using macro instead of "static constexpr auto" since it make
 // GPU link errors
 #define MRAY_ACCEL_TGEN_FUNCTION(AG, TG) \
-    decltype(AcquireTransformContextGenerator<typename AG::PrimitiveGroup, TG>())::Function
+    AcquireTransformContextGenerator<typename AG::PrimitiveGroup, TG>()
 
 template<AccelGroupC AG, TransformGroupC TG>
 using AccTransformContextType = PrimTransformContextType<typename AG::PrimitiveGroup, TG>;

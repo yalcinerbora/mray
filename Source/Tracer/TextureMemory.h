@@ -163,7 +163,6 @@ class TextureMemory
 
 
     private:
-    bool                    isCommitted = false;
     const GPUSystem&        gpuSystem;
     TextureMemList          texMemList;
     std::atomic_uint32_t    texCounter;

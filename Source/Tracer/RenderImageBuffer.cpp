@@ -1,53 +1,37 @@
 #include "RenderImageBuffer.h"
+#include "Core/TracerI.h"
 
-RenderImageBuffer::RenderImageBuffer(SystemSemaphoreHandle systemSem,
-                                     uint64_t initialCount,
-                                     const GPUSystem& gpuSystem)
-    : memory(gpuSystem, true)
-    , sem(systemSem)
-    , semCounter(initialCount)
-{}
-
-RenderBufferInfo RenderImageBuffer::Resize(const Vector2ui& newResolution,
-                                           const Vector2ui& newPixelMin,
-                                           const Vector2ui& newPixelMax,
-                                           uint32_t newDepth,
-                                           MRayColorSpaceEnum newColorSpace)
+RenderImage::RenderImage(const RenderImageParams& p,
+                         uint32_t depth, MRayColorSpaceEnum colorSpace,
+                         const GPUSystem& gpuSystem)
+    : memory(gpuSystem)
+    , sem(p.semaphore)
+    , semCounter(p.initialSemCounter)
+    , depth(depth)
+    , colorSpace(colorSpace)
+    , resolution(p.resolution)
+    , pixelMin(p.regionMin)
+    , pixelMax(p.regionMax)
 {
-    resolution  = newResolution;
-    pixelMin    = newPixelMin;
-    pixelMax    = newPixelMax;
-    depth       = newDepth;
-    colorSpace  = newColorSpace;
+    uint32_t totalPixCount = (pixelMax - pixelMin).Multiply() * depth;
+    static constexpr uint32_t channelCount = Vector3::Dims;
 
-    uint32_t totalPixCount = (pixelMax - pixelMin).Multiply();
-    Span<Float> newPixels;
-    Span<Float> newSamples;
-    MemAlloc::AllocateMultiData(std::tie(newPixels, newSamples),
+    MemAlloc::AllocateMultiData(std::tie(pixels, samples),
                                 memory,
-                                {totalPixCount * 3, totalPixCount});
-    pixels = newPixels;
-    samples = newSamples;
+                                {totalPixCount * channelCount,
+                                 totalPixCount});
 
     Byte* mem = static_cast<Byte*>(memory);
-    pixStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(newPixels.data())));
-    sampleStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(newSamples.data())));
-    return RenderBufferInfo
-    {
-        .data = mem,
-        .totalSize = memory.Size(),
-        .renderColorSpace = colorSpace,
-        .resolution = resolution,
-        .depth = depth
-    };
+    pixStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(pixels.data())));
+    sampleStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(samples.data())));
 }
 
-void RenderImageBuffer::AcquireImage(const GPUQueue& queue)
+void RenderImage::AcquireImage(const GPUQueue& queue)
 {
     queue.IssueSemaphoreWait(sem, semCounter);
 }
 
-RenderImageSection RenderImageBuffer::ReleaseImage(const GPUQueue& queue)
+RenderImageSection RenderImage::ReleaseImage(const GPUQueue& queue)
 {
     semCounter++;
     queue.IssueSemaphoreSignal(sem, semCounter);
@@ -63,8 +47,20 @@ RenderImageSection RenderImageBuffer::ReleaseImage(const GPUQueue& queue)
     };
 }
 
-void RenderImageBuffer::ClearImage(const GPUQueue& queue)
+void RenderImage::ClearImage(const GPUQueue& queue)
 {
     queue.MemsetAsync(pixels, 0x00);
     queue.MemsetAsync(samples, 0x00);
+}
+
+RenderBufferInfo RenderImage::GetBufferInfo()
+{
+    return RenderBufferInfo
+    {
+        .data = static_cast<Byte*>(memory),
+        .totalSize = memory.Size(),
+        .renderColorSpace = colorSpace,
+        .resolution = resolution,
+        .depth = depth
+    };
 }

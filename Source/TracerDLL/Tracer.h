@@ -18,8 +18,9 @@ class Tracer final : public TracerBase
                                    Map<AcceleratorType, AccelWorkGenMap>&);
 
     //
-    //static void AddRendererGenerators_1(Map<std::string_view, PrimGenerator>&);
-    //static void AddRendererGenerators_2(Map<std::string_view, PrimGenerator>&);
+    static void AddRendererGenerators_0(Map<std::string_view, RendererGenerator>&);
+    static void AddRendererGenerators_1(Map<std::string_view, RendererGenerator>&);
+    static void AddRendererGenerators_2(Map<std::string_view, RendererGenerator>&);
 
     public:
     Tracer(const TracerParameters& tracerParams);
@@ -38,6 +39,9 @@ inline Tracer::Tracer(const TracerParameters& tracerParams)
     AddAccelGenerators(GLOBAL_TYPE_GEN.baseAcceleratorGenerator,
                        GLOBAL_TYPE_GEN.accelGeneratorMap,
                        GLOBAL_TYPE_GEN.accelWorkGeneratorMap);
+    AddRendererGenerators_0(GLOBAL_TYPE_GEN.rendererGenerator);
+    AddRendererGenerators_1(GLOBAL_TYPE_GEN.rendererGenerator);
+    AddRendererGenerators_2(GLOBAL_TYPE_GEN.rendererGenerator);
     // Related Types
     // Finally Populate the lists
     PopulateAttribInfoAndTypeLists();

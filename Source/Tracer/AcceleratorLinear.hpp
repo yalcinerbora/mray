@@ -28,7 +28,7 @@ OptionalHitR<PG> AcceleratorLinear<PG, TG>::IntersectionCheck(const Ray& ray,
         // Primitive has per primitive transform (skinned mesh maybe).
         // we need to transform using primitive's data
         // Create transform context and transform the ray.
-        using TransContext = PrimTransformContextType<PG, TG>;
+        using TransContext = typename PrimTransformContextType<PG, TG>::Result;
         TransContext tContext = GenerateTransformContext(transformSoA, primitiveSoA,
                                                          transformKey, primKey);
         transformedRay = tContext.InvApply(ray);

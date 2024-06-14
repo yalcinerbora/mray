@@ -19,15 +19,16 @@ struct TracerResponse : public std::variant
     RenderBufferInfo,       // render output information
     bool,
     RenderImageSection,     // image section;
-    RenderImageSaveInfo,
-    RenderImageSaveInfo
+    RenderImageSaveInfo,    // hdr save
+    RenderImageSaveInfo,    // sdr save
+    uint64_t                // memory usage
 >
 {
     using Base = std::variant<CameraTransform, SceneAnalyticData,
                               TracerAnalyticData, RendererAnalyticData,
                               RendererOptionPack, RenderBufferInfo,
                               bool, RenderImageSection, RenderImageSaveInfo,
-                              RenderImageSaveInfo>;
+                              RenderImageSaveInfo, uint64_t>;
     enum Type
     {
         CAMERA_INIT_TRANSFORM = 0,  // Return a camera initial transform when
@@ -45,6 +46,7 @@ struct TracerResponse : public std::variant
                                     // continiously.
         SAVE_AS_HDR = 8,            // Save the image to the disk
         SAVE_AS_SDR = 9,            // HDR or SDR (Tonemapped)
+        MEMORY_USAGE = 10           // Current memory usage
     };
     using Base::Base;
 };

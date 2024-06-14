@@ -169,7 +169,7 @@ concept PrimitiveGroupC = requires(PGType pg, TransientData input)
     // This is a limitation but the entire system is complex as it is so...
     //
     // You can write completely new primitive type for that generation.
-    PGType::TransContextGeneratorList;
+    typename PGType::TransContextGeneratorList;
 
     // Compile-time constant of transform logic
     PGType::TransformLogic;
@@ -208,10 +208,18 @@ constexpr auto AcquireTransformContextGenerator();
 // Using macro instead of "static constexpr auto" since it make
 // GPU link errors
 #define MRAY_PRIM_TGEN_FUNCTION(PG, TG) \
-    decltype(AcquireTransformContextGenerator<typename PG, TG>())::Function
+    AcquireTransformContextGenerator<PG, TG>()
 
 template<PrimitiveGroupC PG, TransformGroupC TG>
-using PrimTransformContextType = typename decltype(AcquireTransformContextGenerator<PG, TG>())::ReturnType;
+struct PrimTransformContextType
+{
+    static constexpr auto Func = AcquireTransformContextGenerator<PG, TG>();
+    using Result = std::invoke_result_t<decltype(*Func),
+                                        const typename TG::DataSoA&,
+                                        const typename PG::DataSoA&,
+                                        TransformKey, PrimitiveKey>;
+
+};
 
 class GenericGroupPrimitiveT : public GenericGroupT<PrimBatchKey, PrimAttributeInfo>
 {
@@ -281,15 +289,13 @@ class PrimGroupEmpty final : public GenericGroupPrimitive<PrimGroupEmpty>
     using Primitive = EmptyPrimitive<TContext>;
 
     // Transform Context Generators
-    static constexpr auto TransContextGeneratorList = std::make_tuple
-    (
-        TypeFinder::KeyTFuncPair<TransformGroupIdentity,
-                                 TransformContextIdentity,
-                                 &GenTContextIdentity<DataSoA>>{},
-        TypeFinder::KeyTFuncPair<TransformGroupSingle,
-                                 TransformContextSingle,
-                                 &GenTContextSingle<DataSoA>>{}
-    );
+    using TransContextGeneratorList = TypeFinder::T_VMapper:: template Map
+    <
+        TypeFinder::T_VMapper::TVPair<TransformGroupIdentity,
+                                      &GenTContextIdentity<DataSoA>>,
+        TypeFinder::T_VMapper::TVPair<TransformGroupSingle,
+                                      &GenTContextSingle<DataSoA>>
+    >;
 
     // The actual name of the type
     static std::string_view TypeName();
@@ -327,9 +333,9 @@ static_assert(PrimitiveGroupC<PrimGroupEmpty>,
 template <PrimitiveGroupC PrimGroup, TransformGroupC TransGroup>
 constexpr auto AcquireTransformContextGenerator()
 {
-    using namespace TypeFinder;
-    constexpr auto FList = PrimGroup::TransContextGeneratorList;
-    return GetTupleElement<TransGroup>(std::forward<decltype(FList)>(FList));
+    using FList = typename PrimGroup::TransContextGeneratorList;
+    constexpr auto Func = FList::template Find<TransGroup>;
+    return Func;
 }
 
 inline

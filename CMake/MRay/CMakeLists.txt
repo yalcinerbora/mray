@@ -22,7 +22,8 @@ set(SRC_COMMON
 set(SRC_COMMON_GLOBAL
     ${MRAY_SOURCE_DIRECTORY}/Common/RenderImageStructs.h
     ${MRAY_SOURCE_DIRECTORY}/Common/AnalyticStructs.h
-    ${MRAY_SOURCE_DIRECTORY}/Common/TransferQueue.h)
+    ${MRAY_SOURCE_DIRECTORY}/Common/TransferQueue.h
+    ${MRAY_SOURCE_DIRECTORY}/Common/JsonCommon.h)
 
 source_group("Tracer" FILES ${SRC_TRACER})
 source_group("Subcommands" FILES ${SRC_SUBCOMMAND})
@@ -44,6 +45,8 @@ target_link_libraries(MRay PRIVATE
                       cli11::cli11
                       bs::thread_pool
                       mray::meta_compile_opts)
+
+add_precompiled_headers(TARGET MRay)
 
 # Not-linked but dependent targets
 # Dynamically loaded DLLs

@@ -52,6 +52,8 @@ void TracerBase::PopulateAttribInfoAndTypeLists()
                                 0u, gpuSystem);
     InstantiateAndGetAttribInfo(rendererAttributeInfoMap,
                                 typeGenerators.rendererGenerator,
+                                RenderImagePtr(),
+                                GenerateTracerView(),
                                 gpuSystem);
 
     // Light is special so write it by hand
@@ -90,11 +92,29 @@ void TracerBase::PopulateAttribInfoAndTypeLists()
     }
 }
 
+TracerView TracerBase::GenerateTracerView()
+{
+    return TracerView
+    {
+        .primGroups = primGroups.Map(),
+        .camGroups = camGroups.Map(),
+        .mediumGroups = mediumGroups.Map(),
+        .matGroups = matGroups.Map(),
+        .transGroups = transGroups.Map(),
+        .lightGroups = lightGroups.Map(),
+        .textureViews = texMem.TextureViews(),
+        .tracerParams = params,
+        .surfs = surfaces.Vec(),
+        .lightSurfs = lightSurfaces.Vec(),
+        .camSurfs = cameraSurfaces.Vec()
+    };
+}
+
 TracerBase::TracerBase(const TypeGeneratorPack& tGen,
                        const TracerParameters& tParams)
     : threadPool(nullptr)
     , typeGenerators(tGen)
-    , tracerParams(tParams)
+    , params(tParams)
     , texMem(gpuSystem)
 
 {}
@@ -1285,7 +1305,7 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     });
 
     // Send it!
-    AcceleratorType type = tracerParams.accelMode;
+    AcceleratorType type = params.accelMode;
     auto accelGenerator = typeGenerators.baseAcceleratorGenerator.at(type);
     auto accelGGeneratorMap = typeGenerators.accelGeneratorMap.at(type);
     auto accelWGeneratorMap = typeGenerators.accelWorkGeneratorMap.at(type);
@@ -1354,7 +1374,13 @@ RendererId TracerBase::CreateRenderer(std::string typeName)
         throw MRayError("Unable to find generator for {}",
                         typeName);
     }
-    auto renderer = rendererGen.value()(gpuSystem);
+
+    auto renderer = rendererGen.value()
+    (
+        RenderImagePtr(renderImage),
+        GenerateTracerView(),
+        gpuSystem
+    );
     uint32_t rId = redererCounter.fetch_add(1u);
     renderers.try_emplace(RendererId(rId), std::move(renderer));
     return RendererId(rId);
@@ -1363,28 +1389,6 @@ RendererId TracerBase::CreateRenderer(std::string typeName)
 void TracerBase::DestroyRenderer(RendererId rId)
 {
     renderers.remove_at(rId);
-}
-
-void TracerBase::CommitRendererReservations(RendererId rId)
-{
-    auto renderer = renderers.at(rId);
-    if(!renderer)
-    {
-        throw MRayError("Unable to find Renderer({})",
-                        static_cast<uint32_t>(rId));
-    }
-    renderer.value().get()->Commit();
-}
-
-bool TracerBase::IsRendererCommitted(RendererId rId) const
-{
-    auto renderer = renderers.at(rId);
-    if(!renderer)
-    {
-        throw MRayError("Unable to find Renderer({})",
-                        static_cast<uint32_t>(rId));
-    }
-    return renderer.value().get()->IsInCommitState();
 }
 
 void TracerBase::PushRendererAttribute(RendererId rId,
@@ -1404,7 +1408,7 @@ void TracerBase::PushRendererAttribute(RendererId rId,
 }
 
 RenderBufferInfo TracerBase::StartRender(RendererId rId, CamSurfaceId cId,
-                                         RenderImageParams params,
+                                         RenderImageParams rIParams,
                                          Optional<CameraTransform> optionalTransform)
 {
     auto renderer = renderers.at(rId);
@@ -1415,7 +1419,7 @@ RenderBufferInfo TracerBase::StartRender(RendererId rId, CamSurfaceId cId,
     }
     currentRenderer = renderer.value().get().get();
     auto camKey = CameraKey(static_cast<uint32_t>(cId));
-    return currentRenderer->StartRender(params, camKey);
+    return currentRenderer->StartRender(rIParams, camKey);
 }
 
 void TracerBase::StopRender()
@@ -1499,4 +1503,9 @@ size_t TracerBase::UsedDeviceMemory() const
     if(accelerator)
         totalMem += accelerator->GPUMemoryUsage();
     return totalMem;
+}
+
+const TracerParameters& TracerBase::Parameters() const
+{
+    return params;
 }

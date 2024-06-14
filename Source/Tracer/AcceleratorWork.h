@@ -36,7 +36,7 @@ static void KCTransformLocallyConstantAABBs(// Output
         uint32_t index = dConcreteIndicesOfInstances[globalId];
         AABB3 cAABB = dConcreteAABBs[index];
         // Acquire Transform Context Generator & Type
-        using TransContext = AccTransformContextType<AG, TG>;
+        using TransContext = typename AccTransformContextType<AG, TG>::Result;
         TransContext tContext = GenerateTransformContext(tSoA, pSoA, tKey,
                                                          PrimitiveKey::InvalidKey());
         // Finally transform and write
@@ -87,7 +87,7 @@ static void KCLocalRayCast(// Output
             // we can transform the ray and use it on iterations.
             // Since this prim "supports locally constant transforms"
             // Prim key does mean nothing, so set it to invalid and call the generator
-            using TransContext = AccTransformContextType<AG, TG>;
+            using TransContext = typename AccTransformContextType<AG, TG>::Result;
             TransContext tContext = GenerateTransformContext(tSoA, pSoA, acc.TransformKey(),
                                                              PrimitiveKey::InvalidKey());
             ray = tContext.InvApply(ray);

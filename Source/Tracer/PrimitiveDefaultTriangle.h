@@ -219,22 +219,21 @@ class PrimGroupTriangle final : public GenericGroupPrimitive<PrimGroupTriangle>
     static constexpr size_t INDICES_ATTRIB_INDEX    = 3;
 
     public:
-    using DataSoA       = DefaultTriangleDetail::TriangleData;
-    using Hit           = typename DefaultTriangleDetail::TriHit;
+    using DataSoA   = DefaultTriangleDetail::TriangleData;
+    using Hit       = typename DefaultTriangleDetail::TriHit;
 
     template <TransformContextC TContext = TransformContextIdentity>
     using Primitive = DefaultTriangleDetail:: template Triangle<TContext>;
 
     // Transform Context Generators
-    static constexpr auto TransContextGeneratorList = std::make_tuple
-    (
-        TypeFinder::KeyTFuncPair<TransformGroupIdentity,
-                                 TransformContextIdentity,
-                                 &GenTContextIdentity<DataSoA>>{},
-        TypeFinder::KeyTFuncPair<TransformGroupSingle,
-                                 TransformContextSingle,
-                                 &GenTContextSingle<DataSoA>>{}
-    );
+    using TransContextGeneratorList = TypeFinder::T_VMapper:: template Map
+    <
+        TypeFinder::T_VMapper::template TVPair<TransformGroupIdentity,
+                                               &GenTContextIdentity<DataSoA>>,
+        TypeFinder::T_VMapper::template TVPair<TransformGroupSingle,
+                                               &GenTContextSingle<DataSoA>>
+    >;
+
     // The actual name of the type
     static std::string_view TypeName();
     static constexpr size_t AttributeCount = 4;
@@ -283,25 +282,22 @@ class PrimGroupSkinnedTriangle final : public GenericGroupPrimitive<PrimGroupSki
     static constexpr size_t INDICES_ATTRIB_INDEX    = 5;
 
     public:
-    using DataSoA       = DefaultSkinnedTriangleDetail::SkinnedTriangleData;
-    using Hit           = typename DefaultTriangleDetail::TriHit;
+    using DataSoA   = DefaultSkinnedTriangleDetail::SkinnedTriangleData;
+    using Hit       = typename DefaultTriangleDetail::TriHit;
 
     template <class TContext = TransformContextIdentity>
-    using Primitive     = DefaultTriangleDetail:: template Triangle<TContext>;
+    using Primitive = DefaultTriangleDetail:: template Triangle<TContext>;
 
     // Transform Context Generators
-    static constexpr auto TransContextGeneratorList = std::make_tuple
-    (
-        TypeFinder::KeyTFuncPair<TransformGroupIdentity,
-                                 TransformContextIdentity,
-                                 &GenTContextIdentity<DataSoA>>{},
-        TypeFinder::KeyTFuncPair<TransformGroupSingle,
-                                 TransformContextSingle,
-                                 &GenTContextSingle<DataSoA>>{},
-        TypeFinder::KeyTFuncPair<TransformGroupMulti,
-                                 DefaultSkinnedTriangleDetail::TransformContextSkinned,
-                                 &DefaultSkinnedTriangleDetail::GenTContextSkinned>{}
-    );
+    using TransContextGeneratorList = TypeFinder::T_VMapper:: template Map
+    <
+        TypeFinder::T_VMapper::template TVPair<TransformGroupIdentity,
+                                               &GenTContextIdentity<DataSoA>>,
+        TypeFinder::T_VMapper::template TVPair<TransformGroupSingle,
+                                               &GenTContextSingle<DataSoA>>,
+        TypeFinder::T_VMapper::template TVPair<TransformGroupMulti,
+                                               &DefaultSkinnedTriangleDetail::GenTContextSkinned>
+    >;
     // Actual Name of the Type
     static std::string_view TypeName();
     static constexpr size_t AttributeCount = 6;

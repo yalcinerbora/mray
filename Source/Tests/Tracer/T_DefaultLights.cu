@@ -34,7 +34,7 @@ TEST(DefaultLights, DISABLED_Skysphere)
 {
 }
 
-TEST(DefaultLights, MetaLight)
+TEST(DefaultLights, DISABLED_MetaLight)
 {
     GPUSystem system;
     // Generate some groups

@@ -15,7 +15,6 @@ namespace mray::cuda
                                         std::string("CUDA Failure")),
                             cudaGetErrorString(code), file, line);
             assert(false);
-            __debugbreak();
         #else
             if(code == cudaSuccess) return;
 

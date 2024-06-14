@@ -25,6 +25,8 @@ target_link_libraries(ImageLoader PRIVATE
                       oiio::oiio
                       oiio::oiio_util)
 
+add_precompiled_headers(TARGET ImageLoader)
+
 # Copy DLLS
 if(MSVC)
     add_custom_command(TARGET ImageLoader POST_BUILD

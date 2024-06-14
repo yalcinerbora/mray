@@ -1,6 +1,8 @@
 #include "GPUSystem.h"
 #include "DeviceMemoryCUDA.h"
+
 #include <cuda.h>
+#include <nvtx3/nvToolsExt.h>
 
 namespace mray::cuda
 {
@@ -42,7 +44,7 @@ GPUSemaphoreCUDA::~GPUSemaphoreCUDA()
     if(semCUDA) cudaDestroyExternalSemaphore(semCUDA);
 }
 
-GPUDeviceCUDA::GPUDeviceCUDA(int deviceId, nvtxDomainHandle_t domain)
+GPUDeviceCUDA::GPUDeviceCUDA(int deviceId, AnnotationHandle domain)
     : deviceId(deviceId)
 {
     // Enforce non-async functions to explicitly synchronize
@@ -164,7 +166,7 @@ GPUSystemCUDA::GPUSystemCUDA()
 
 GPUSystemCUDA::~GPUSystemCUDA()
 {
-    nvtxDomainDestroy(nvtxDomain);
+    nvtxDomainDestroy(static_cast<nvtxDomainHandle_t>(nvtxDomain));
 
     for(const auto& device : systemGPUs)
     {
@@ -173,6 +175,8 @@ GPUSystemCUDA::~GPUSystemCUDA()
     }
     systemGPUs.clear();
     CUDA_CHECK(cudaDeviceReset());
+
+    globalGPUListPtr = nullptr;
 }
 
 std::vector<size_t> GPUSystemCUDA::SplitWorkToMultipleGPU(uint32_t workCount,

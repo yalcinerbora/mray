@@ -7,8 +7,12 @@ set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/TracerDLL)
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/EntryPoint.h
     ${CURRENT_SOURCE_DIR}/EntryPoint.cpp
+    ${CURRENT_SOURCE_DIR}/RequestedTypes.h
     ${CURRENT_SOURCE_DIR}/Tracer.h
-    ${CURRENT_SOURCE_DIR}/Tracer.cu)
+    ${CURRENT_SOURCE_DIR}/Tracer.cu
+    ${CURRENT_SOURCE_DIR}/Renderers_0.cu
+    ${CURRENT_SOURCE_DIR}/Renderers_1.cu
+    ${CURRENT_SOURCE_DIR}/Renderers_2.cu)
 
 set(SRC_ALL
     ${SRC_COMMON})
@@ -40,6 +44,8 @@ set_target_properties(${TARGET_NAME} PROPERTIES
                       POSITION_INDEPENDENT_CODE ON
                       CUDA_SEPARABLE_COMPILATION ON
                       CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+
+add_precompiled_headers(TARGET ${TARGET_NAME})
 
 set_target_properties(${TARGET_NAME} PROPERTIES FOLDER ${MRAY_GPU_PLATFORM_NAME})
 set_target_properties(${GEN_TRACER_TARGET_NAME} PROPERTIES FOLDER ${MRAY_GPU_PLATFORM_NAME})

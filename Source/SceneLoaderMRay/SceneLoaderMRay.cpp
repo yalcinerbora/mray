@@ -506,13 +506,13 @@ std::vector<TransientData> CameraAttributeLoad(const AttributeCountList& totalCo
 {
     using namespace std::literals;
     static constexpr auto PINHOLE_CAM_TYPE  = "Pinhole"sv;
-    static constexpr auto IS_FOV_X          = "isFovX"sv;
-    static constexpr auto FOV               = "fov"sv;
-    static constexpr auto ASPECT            = "aspect"sv;
-    static constexpr auto PLANES            = "planes"sv;
-    static constexpr auto GAZE              = "gaze"sv;
-    static constexpr auto POSITION          = "position"sv;
-    static constexpr auto UP                = "up"sv;
+    static constexpr auto IS_FOV_X_NAME     = "isFovX"sv;
+    static constexpr auto FOV_NAME          = "fov"sv;
+    static constexpr auto ASPECT_NAME       = "aspect"sv;
+    static constexpr auto PLANES_NAME       = "planes"sv;
+    static constexpr auto GAZE_NAME         = "gaze"sv;
+    static constexpr auto POSITION_NAME     = "position"sv;
+    static constexpr auto UP_NAME           = "up"sv;
 
     // TODO: Change this as well, camera logic should not be in loader
     // I think we need to layer these kind of things in an intermediate
@@ -535,10 +535,10 @@ std::vector<TransientData> CameraAttributeLoad(const AttributeCountList& totalCo
 
     for(const auto& n : nodes)
     {
-        bool isFovX = n.AccessData<bool>(IS_FOV_X);
-        Float fov = n.AccessData<Float>(FOV);
-        Float aspect = n.AccessData<Float>(ASPECT);
-        Vector2 planes = n.AccessData<Vector2>(PLANES);
+        bool isFovX = n.AccessData<bool>(IS_FOV_X_NAME);
+        Float fov = n.AccessData<Float>(FOV_NAME);
+        Float aspect = n.AccessData<Float>(ASPECT_NAME);
+        Vector2 planes = n.AccessData<Vector2>(PLANES_NAME);
         Vector4 fnp = Vector4(fov, fov, planes[0], planes[1]);
         if(isFovX)
         {
@@ -554,9 +554,9 @@ std::vector<TransientData> CameraAttributeLoad(const AttributeCountList& totalCo
 
 
         // Load these directly
-        Vector3 gaze = n.AccessData<Vector3>(GAZE);
-        Vector3 position = n.AccessData<Vector3>(POSITION);
-        Vector3 up = n.AccessData<Vector3>(UP);
+        Vector3 gaze = n.AccessData<Vector3>(GAZE_NAME);
+        Vector3 position = n.AccessData<Vector3>(POSITION_NAME);
+        Vector3 up = n.AccessData<Vector3>(UP_NAME);
         result[1].Push(Span<const Vector3>(&gaze, 1));
         result[2].Push(Span<const Vector3>(&position, 1));
         result[3].Push(Span<const Vector3>(&up, 1));

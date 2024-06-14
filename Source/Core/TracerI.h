@@ -225,16 +225,6 @@ constexpr PrimitiveAttributeLogic PrimAttributeStringifier::FromString(std::stri
     return PrimitiveAttributeLogic(END);
 }
 
-// For transfer of options
-struct RendererOptionPack
-{
-    using AttributeList = StaticVector<TransientData,
-                                       TracerConstants::MaxRendererAttributeCount>;
-    //
-    GenericAttributeInfoList    paramTypes;
-    AttributeList               attributes;
-};
-
 // For surface commit analytic information
 struct SurfaceCommitResult
 {
@@ -313,6 +303,16 @@ using LightIdList       = std::vector<LightId>;
 using CameraIdList      = std::vector<CameraId>;
 
 using AttributeCountList = StaticVector<size_t, TracerConstants::MaxAttributePerGroup>;
+
+// For transfer of options
+struct RendererOptionPack
+{
+    using AttributeList = StaticVector<TransientData,
+        TracerConstants::MaxRendererAttributeCount>;
+    //
+    RendererAttributeInfoList   paramTypes;
+    AttributeList               attributes;
+};
 
 namespace TracerConstants
 {
@@ -541,9 +541,6 @@ class [[nodiscard]] TracerI
     //================================//
     virtual RendererId  CreateRenderer(std::string typeName) = 0;
     virtual void        DestroyRenderer(RendererId) = 0;
-    //
-    virtual void        CommitRendererReservations(RendererId) = 0;
-    virtual bool        IsRendererCommitted(RendererId) const = 0;
     virtual void        PushRendererAttribute(RendererId, uint32_t attributeIndex,
                                               TransientData data) = 0;
     //================================//
@@ -566,6 +563,7 @@ class [[nodiscard]] TracerI
     virtual void                    SetThreadPool(BS::thread_pool&) = 0;
     virtual size_t                  TotalDeviceMemory() const = 0;
     virtual size_t                  UsedDeviceMemory() const = 0;
+    virtual const TracerParameters& Parameters() const = 0;
 };
 
 using TracerConstructorArgs = Tuple<const TracerParameters&>;

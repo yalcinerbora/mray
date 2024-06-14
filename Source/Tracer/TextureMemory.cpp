@@ -349,7 +349,6 @@ void TextureMemory::CommitTextures()
         queueIndex++;
         queueIndex %= TotalQueuePerDevice();
     }
-    isCommitted = true;
 }
 void TextureMemory::PushTextureData(TextureId id, uint32_t mipLevel,
                                     TransientData data)
@@ -386,7 +385,6 @@ MRayPixelTypeRT TextureMemory::GetPixelType(TextureId id) const
 
 const TextureViewMap& TextureMemory::TextureViews() const
 {
-    assert(isCommitted);
     return textureViews.Map();
 }
 
@@ -394,7 +392,6 @@ void TextureMemory::Clear()
 {
     texCounter = 0;
     gpuIndexCounter = 0;
-    isCommitted = false;
     texMemList.clear();
     textures.clear();
     textureViews.clear();

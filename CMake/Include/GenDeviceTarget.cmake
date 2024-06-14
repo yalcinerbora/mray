@@ -80,6 +80,8 @@ function(gen_device_target)
                           CUDA_SEPARABLE_COMPILATION ON
                           CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
+    add_precompiled_headers(TARGET ${TARGET_FULL_NAME})
+
     set(GEN_DEVICE_TARGET_NAME ${TARGET_FULL_NAME} PARENT_SCOPE)
 
 

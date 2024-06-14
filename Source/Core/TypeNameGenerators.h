@@ -143,6 +143,13 @@ namespace Runtime
     }
 
     inline
+    std::string AddRendererPrefix(std::string_view rendererType)
+    {
+        return (std::string(TracerConstants::RENDERER_PREFIX) +
+                std::string(rendererType));
+    }
+
+    inline
     std::string CreatePrimBackedLightTypeName(std::string_view primType)
     {
         using namespace std::string_literals;

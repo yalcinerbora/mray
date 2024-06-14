@@ -19,6 +19,7 @@ class TracerThread final : public RealtimeThread
     TransferQueue::TracerView       transferQueue;
     BS::thread_pool&                threadPool;
 
+    //
     std::map<std::string_view, SharedLibrary>   sceneLoaderDLLs;
     std::map<std::string_view, SceneLoaderPtr>  sceneLoaders;
     SceneLoaderI*                               currentScene = nullptr;
@@ -51,7 +52,7 @@ class TracerThread final : public RealtimeThread
     void        InitialWork() override;
     void        FinalWork() override;
 
-    void        SetRendererParams(const std::string& renderConfigFile);
+    MRayError   CreateRendererFromConfig(const std::string& configJsonPath);
     void        RestartRenderer();
 
     public:

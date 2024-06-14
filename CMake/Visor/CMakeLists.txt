@@ -76,6 +76,8 @@ target_compile_definitions(Visor
                            PRIVATE
                            MRAY_VISOR_SHARED_EXPORT)
 
+add_precompiled_headers(TARGET Visor)
+
 add_custom_command(TARGET Visor POST_BUILD
                    COMMENT "Copying fonts.."
                    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different

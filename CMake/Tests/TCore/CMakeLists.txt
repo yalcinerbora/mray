@@ -29,6 +29,8 @@ set_target_properties(TCore PROPERTIES
                       CUDA_SEPARABLE_COMPILATION ON
                       CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
+add_precompiled_headers(TARGET TCore)
+
 if(MSVC)
     add_custom_command(TARGET TCore PRE_BUILD
                         COMMAND ${CMAKE_COMMAND} -E copy_if_different

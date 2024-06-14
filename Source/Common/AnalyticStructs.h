@@ -19,19 +19,15 @@ struct TracerAnalyticData
 {
     using TypeCountPair = Pair<std::string, uint32_t>;
 
-    std::vector<TypeCountPair> camTypes;
-    std::vector<TypeCountPair> lightTypes;
-    std::vector<TypeCountPair> primTypes;
-    std::vector<TypeCountPair> mediumTypes;
-    std::vector<TypeCountPair> materialTypes;
-
+    std::vector<std::string> camTypes;
+    std::vector<std::string> lightTypes;
+    std::vector<std::string> primTypes;
+    std::vector<std::string> mediumTypes;
+    std::vector<std::string> materialTypes;
     std::vector<std::string> rendererTypes;
 
     MRayColorSpaceEnum  tracerColorSpace;
-
-    // Memory Related
-    size_t      totalGPUMemoryBytes;
-    size_t      usedGPUMemoryBytes;
+    size_t              totalGPUMemoryBytes;
 };
 
 struct RendererAnalyticData

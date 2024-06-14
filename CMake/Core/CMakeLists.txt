@@ -54,11 +54,12 @@ set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/MPMCQueue.h
     ${CURRENT_SOURCE_DIR}/Filesystem.h)
 
-set(SRC_COMMON
-    ${CURRENT_SOURCE_DIR}/Definitions.h
+set(SRC_DATA_TYPES
     ${CURRENT_SOURCE_DIR}/MRayDataType.h
-    ${CURRENT_SOURCE_DIR}/MRayDataType.cpp
-)
+    ${CURRENT_SOURCE_DIR}/MRayDataType.cpp)
+
+set(SRC_COMMON
+    ${CURRENT_SOURCE_DIR}/Definitions.h)
 
 set(SRC_ALL
     ${SRC_SYSTEM}
@@ -66,6 +67,7 @@ set(SRC_ALL
     ${SRC_CONTAINERS}
     ${SRC_MATH}
     ${SRC_UTILITY}
+    ${SRC_DATA_TYPES}
     ${SRC_COMMON})
 
 # IDE Filters
@@ -74,6 +76,7 @@ source_group("Interfaces" FILES ${SRC_INTERFACES})
 source_group("Containers" FILES ${SRC_CONTAINERS})
 source_group("Math" FILES ${SRC_MATH})
 source_group("Utility" FILES ${SRC_UTILITY})
+source_group("DataTypes" FILES ${SRC_DATA_TYPES})
 source_group("" FILES ${SRC_COMMON})
 
 # DLL File
@@ -83,3 +86,5 @@ target_link_libraries(CoreLib
                       PUBLIC
                       fmt::fmt
                       PRIVATE mray::meta_compile_opts)
+
+add_precompiled_headers(TARGET CoreLib)

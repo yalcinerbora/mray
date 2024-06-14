@@ -223,7 +223,7 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
     {
         if(ImGui::BeginMenuBar())
         {
-            auto usedGPUMem = ConvertMemSizeToGUI(visorState.tracer.usedGPUMemoryBytes);
+            auto usedGPUMem = ConvertMemSizeToGUI(visorState.usedGPUMemoryBytes);
             auto totalGPUMem = ConvertMemSizeToGUI(visorState.tracer.totalGPUMemoryBytes);
             std::string memUsage = fmt::format("{:.1f}{:s} / {:.1f}{:s}",
                                                usedGPUMem.first, usedGPUMem.second,

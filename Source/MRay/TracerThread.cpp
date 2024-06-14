@@ -1,16 +1,15 @@
 #include "TracerThread.h"
-#include <BS/BS_thread_pool.hpp>
-#include <nlohmann/json.hpp>
+
 #include <fstream>
 #include <filesystem>
 
-#include <Core/Timer.h>
+#include <BS/BS_thread_pool.hpp>
+#include <nlohmann/json.hpp>
 
-std::string GetTypeNameFromRenderConfig(const std::string&)
-{
-    //....
-    return std::string();
-}
+#include "Core/Timer.h"
+#include "Core/TypeNameGenerators.h"
+
+#include "Common/JsonCommon.h"
 
 struct TracerConfig
 {
@@ -62,19 +61,19 @@ Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
     using namespace std::literals;
 
     // Object keys
-    static constexpr auto DLL_NAME              = "TracerDLL"sv;
-    static constexpr auto PARAMETERS_NAME       = "Parameters"sv;
+    static constexpr auto DLL_NAME = "TracerDLL"sv;
+    static constexpr auto PARAMETERS_NAME = "Parameters"sv;
     // DLL entries
-    static constexpr auto DLL_FILE_NAME         = "name"sv;
-    static constexpr auto DLL_CONSTRUCT_NAME    = "construct"sv;
-    static constexpr auto DLL_DESTRUCT_NAME     = "destruct"sv;
+    static constexpr auto DLL_FILE_NAME = "name"sv;
+    static constexpr auto DLL_CONSTRUCT_NAME = "construct"sv;
+    static constexpr auto DLL_DESTRUCT_NAME = "destruct"sv;
     // Params
-    static constexpr auto SEED_NAME             = "seed"sv;
-    static constexpr auto ACCEL_TYPE_NAME       = "acceleratorType"sv;
-    static constexpr auto ITEM_POOL_NAME        = "itemPoolSize"sv;
-    static constexpr auto SAMPLER_TYPE_NAME     = "samplerType"sv;
-    static constexpr auto CLAMP_TEX_RES_NAME    = "clampTexRes"sv;
-    static constexpr auto PARTITION_LOGIC_NAME  = "partitionLogic"sv;
+    static constexpr auto SEED_NAME = "seed"sv;
+    static constexpr auto ACCEL_TYPE_NAME = "acceleratorType"sv;
+    static constexpr auto ITEM_POOL_NAME = "itemPoolSize"sv;
+    static constexpr auto SAMPLER_TYPE_NAME = "samplerType"sv;
+    static constexpr auto CLAMP_TEX_RES_NAME = "clampTexRes"sv;
+    static constexpr auto PARTITION_LOGIC_NAME = "partitionLogic"sv;
 
     nlohmann::json configJson;
     auto OptionalFetch = [](auto& outEntry, std::string_view NAME,
@@ -110,9 +109,6 @@ Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
         OptionalFetch(config.params.itemPoolSize, ITEM_POOL_NAME, paramsJson);
         OptionalFetch(config.params.samplerType, SAMPLER_TYPE_NAME, paramsJson);
         OptionalFetch(config.params.clampedTexRes, CLAMP_TEX_RES_NAME, paramsJson);
-        //OptionalFetch(config.params., PARTITION_LOGIC_NAME, paramsJson);
-
-
         return config;
     }
     catch(const MRayError& e)
@@ -125,13 +121,88 @@ Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
     }
 }
 
-void TracerThread::SetRendererParams(const std::string&)
+MRayError TracerThread::CreateRendererFromConfig(const std::string& configJsonPath)
 {
+    using namespace TypeNameGen::Runtime;
+    using namespace std::literals;
+    static constexpr auto INITIAL_NAME = "initialName"sv;
+    static constexpr auto RENDERER_LIST_NAME = "Renderers"sv;
 
+    TracerConfig config;
+    nlohmann::json configJson;
+    try
+    {
+        std::ifstream file(configJsonPath);
+        if(!file.is_open())
+            return MRayError("Renderer config file \"{}\" is not found",
+                             configJsonPath);
+        configJson = nlohmann::json::parse(file, nullptr, true, true);
+
+
+        const nlohmann::json& renderers = configJson.at(RENDERER_LIST_NAME);
+        const nlohmann::json& rendererName = configJson.at(INITIAL_NAME);
+        std::string rName = AddRendererPrefix(rendererName.get<std::string_view>());
+
+        const nlohmann::json& rendererNode = renderers.at(rendererName);
+
+        if(currentRenderer != std::numeric_limits<RendererId>::max())
+            tracer->DestroyRenderer(currentRenderer);
+
+        currentRenderer = tracer->CreateRenderer(rName);
+        RendererAttributeInfoList attributes;
+
+        uint32_t attribIndex = 0;
+        for(const auto& attrib : attributes)
+        {
+            using enum GenericAttributeInfo::E;
+            using enum AttributeIsArray;
+            if(std::get<IS_ARRAY_INDEX>(attrib) == IS_ARRAY)
+                return MRayError("Config read \"{}\": Array renderer attributes "
+                                 "are not supported yet",
+                                 configJsonPath);
+
+            AttributeOptionality optionality = std::get<OPTIONALITY_INDEX>(attrib);
+            std::string_view name = std::get<LOGIC_INDEX>(attrib);
+            MRayDataTypeRT type = std::get<LAYOUT_INDEX>(attrib);
+
+            MRayError e = std::visit([&, this](auto&& t) -> MRayError
+            {
+                using enum AttributeOptionality;
+                using T = std::remove_cvref_t<decltype(t)>::Type;
+                auto loc = rendererNode.find(name);
+
+                if(optionality != MR_OPTIONAL && loc == rendererNode.end())
+                    return MRayError("Config read \"{}\": Mandatory variable \"{}\" "
+                                     "for \"{}\" is not found in config file",
+                                     configJsonPath, name, rName);
+                if(loc == rendererNode.end()) return MRayError::OK;
+
+                T in = loc->get<T>();
+                TransientData data(std::in_place_type_t<T>{}, 1);
+                data.Push(Span<const T>(&in, 1));
+                tracer->PushRendererAttribute(currentRenderer, attribIndex,
+                                              std::move(data));
+                return MRayError::OK;
+            }, type);
+
+            if(e) return e;
+            attribIndex++;
+        }
+    }
+    catch(const MRayError& e)
+    {
+        return e;
+    }
+    catch(const nlohmann::json::exception& e)
+    {
+        return MRayError("Json Error ({})", std::string(e.what()));
+    }
+    return MRayError::OK;
 }
 
 void TracerThread::RestartRenderer()
 {
+
 
 }
 
@@ -233,6 +304,13 @@ void TracerThread::LoopWork()
                 tracer->DestroyRenderer(currentRenderer);
 
             MRAY_LOG("[Tracer]: Initial render config {}", initialRenderConfig.value());
+            if(MRayError e = CreateRendererFromConfig(initialRenderConfig.value()))
+            {
+                MRAY_ERROR_LOG("[Tracer]: Failed to Load Render Config\n"
+                               "    {}", e.GetError());
+                isTerminated = true;
+                return;
+            }
             //std::string rName = GetTypeNameFromRenderConfig(initialRenderConfig.value());
             //currentRenderer = tracer->CreateRenderer(rName);
             //SetRendererParams(initialRenderConfig.value());
@@ -316,32 +394,12 @@ void TracerThread::LoopWork()
                 }
             ));
 
-            // Send Tracer Analytics
+            // send used memory
             transferQueue.Enqueue(TracerResponse
             (
-                std::in_place_index<TracerResponse::TRACER_ANALYTICS>,
-                TracerAnalyticData
-                {
-                    .camTypes = {{"A", 1}},
-                    .lightTypes = {{"B", 1}},
-                    .primTypes = {{"C", 1}},
-                    .mediumTypes = {{"D", 1}},
-                    .materialTypes = {{"E", 1}},
-                    .rendererTypes =
-                    {
-                        "TexDisplay",
-                        "DirectTracer",
-                        "PathTracer",
-                        "AOTracer",
-                        "PhotonMapper"
-                    },
-                    .tracerColorSpace = MRayColorSpaceEnum::MR_ACES_CG,
-                    .totalGPUMemoryBytes = tracer->TotalDeviceMemory(),
-                    .usedGPUMemoryBytes = tracer->UsedDeviceMemory()
-                }
+                std::in_place_index<TracerResponse::MEMORY_USAGE>,
+                tracer->UsedDeviceMemory()
             ));
-
-
         }
 
         // New camera!
@@ -384,7 +442,6 @@ void TracerThread::LoopWork()
             if(currentRenderer != std::numeric_limits<RendererId>::max())
                 tracer->DestroyRenderer(currentRenderer);
             currentRenderer = tracer->CreateRenderer(rendererName.value());
-            tracer->CommitRendererReservations(currentRenderer);
 
         }
 
@@ -532,29 +589,29 @@ void TracerThread::InitialWork()
     auto InitDeviceContext = tracer->GetThreadInitFunction();
     InitDeviceContext();
 
-    // Send the renderers initially
-    // Send the initial tracer state
-    auto rendererTypesSV = tracer->Renderers();
-    std::vector<std::string> rendererTypes(rendererTypesSV.size());
-    for(size_t i = 0; i < rendererTypes.size(); i++)
+    // Vector of string_view to string conversion
+    auto Convert = [](auto&& svVec)
     {
-        rendererTypes[i] = rendererTypesSV[i];
-    }
+        std::vector<std::string> result(svVec.size());
+        for(size_t i = 0; i < svVec.size(); i++)
+            result[i] = svVec[i];
+        return result;
+    };
 
+    // Send all types
     transferQueue.Enqueue(TracerResponse
     (
         std::in_place_index<TracerResponse::TRACER_ANALYTICS>,
         TracerAnalyticData
         {
-            .camTypes = {},
-            .lightTypes = {},
-            .primTypes = {},
-            .mediumTypes = {},
-            .materialTypes = {},
-            .rendererTypes = rendererTypes,
-            .tracerColorSpace = MRayColorSpaceEnum::MR_ACES_CG,
-            .totalGPUMemoryBytes = tracer->TotalDeviceMemory(),
-            .usedGPUMemoryBytes = tracer->UsedDeviceMemory()
+            .camTypes = Convert(tracer->CameraGroups()),
+            .lightTypes = Convert(tracer->LightGroups()),
+            .primTypes = Convert(tracer->PrimitiveGroups()),
+            .mediumTypes = Convert(tracer->MediumGroups()),
+            .materialTypes = Convert(tracer->MaterialGroups()),
+            .rendererTypes = Convert(tracer->Renderers()),
+            .tracerColorSpace = tracer->Parameters().globalTextureColorSpace,
+            .totalGPUMemoryBytes = tracer->TotalDeviceMemory()
         }
     ));
 }

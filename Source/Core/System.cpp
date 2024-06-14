@@ -6,7 +6,6 @@
 
 #ifdef MRAY_WINDOWS
 
-    #define WIN32_LEAN_AND_MEAN
     #include <windows.h>
 
 #elif defined MRAY_LINUX

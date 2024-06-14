@@ -15,3 +15,5 @@ target_link_libraries(TransientPool PRIVATE
 target_compile_definitions(TransientPool
                            PRIVATE
                            MRAY_TRANSIENT_POOL_SHARED_EXPORT)
+
+add_precompiled_headers(TARGET TransientPool)

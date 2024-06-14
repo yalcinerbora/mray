@@ -27,3 +27,5 @@ target_link_libraries(SceneLoaderMRay
 target_compile_definitions(SceneLoaderMRay
                            PRIVATE
                            MRAY_SCENELOADER_MRAY_SHARED_EXPORT)
+
+add_precompiled_headers(TARGET SceneLoaderMRay)

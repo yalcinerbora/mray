@@ -141,12 +141,12 @@ void MetaLightArray<Variant<TC...>, Variant<L...>>::AddBatch(const LightGroup& l
             // Determine types, transform context primitive etc.
             // Compile-time find the transform generator function and return type
             using PrimGroup = typename LightGroup::PrimGroup;
-            constexpr auto TContextGen = AcquireTransformContextGenerator<PrimGroup, TransformGroup>();
-            constexpr auto TGenFunc = decltype(TContextGen)::Function;
+
+            constexpr auto GenerateTContext = AcquireTransformContextGenerator<PrimGroup, TransformGroup>();
             // Define the types
             // First, this kernel uses a transform context
             // that this primitive group provides to generate a surface
-            using TContextType = typename decltype(TContextGen)::ReturnType;
+            using TContextType = typename PrimTransformContextType<PrimGroup, TransformGroup>::Result;
             // Assert that this context is either single-transform or identity-transform
             // Currently, each light can only be transformed via
             // single or or identity transform (no skinned meshes :/)
@@ -168,9 +168,9 @@ void MetaLightArray<Variant<TC...>, Variant<L...>>::AddBatch(const LightGroup& l
 
             // Primitives do not own the transform contexts,
             // save it to global memory.
-            dTContextList[index] = TGenFunc(tgData, pgData,
-                                            transformKeys[i],
-                                            primitiveKeys[i]);
+            dTContextList[index] = GenerateTContext(tgData, pgData,
+                                                    transformKeys[i],
+                                                    primitiveKeys[i]);
             // Now construct the primitive, it refers to the tc on global memory
             auto& p = dLightPrimitiveList[index];
             p.template emplace<Primitive>(std::get<TContextType>(dTContextList[index]),

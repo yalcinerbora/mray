@@ -1,12 +1,12 @@
 #pragma once
 
 #include "Core/Types.h"
-#include "Device/GPUSystem.h"
 #include "Common/RenderImageStructs.h"
+#include "Device/GPUSystem.h"
 
-#include <memory>
+struct RenderImageParams;
 
-class RenderImageBuffer
+class RenderImage
 {
     private:
     // Mem related
@@ -26,19 +26,14 @@ class RenderImageBuffer
 
     public:
     // Constructors & Destructor
-                        RenderImageBuffer(SystemSemaphoreHandle sem,
-                                          uint64_t initialCount,
-                                          const GPUSystem& gpuSystem);
-                        RenderImageBuffer(const RenderImageBuffer&) = delete;
-    RenderImageBuffer&  operator=(const RenderImageBuffer&) = delete;
-                        ~RenderImageBuffer() = default;
+                        RenderImage(const RenderImageParams&,
+                                    uint32_t depth, MRayColorSpaceEnum,
+                                    const GPUSystem& gpuSystem);
+                        RenderImage(const RenderImage&) = delete;
+    RenderImage&        operator=(const RenderImage&) = delete;
+                        ~RenderImage() = default;
 
-    // Members
-    RenderBufferInfo    Resize(const Vector2ui& resolution,
-                               const Vector2ui& pixelMin,
-                               const Vector2ui& pixelMax,
-                               uint32_t depth,
-                               MRayColorSpaceEnum colorSpace);
+    // Members;
     // Access
     Span<Float>         Pixels();
     Span<Float>         Samples();
@@ -46,16 +41,17 @@ class RenderImageBuffer
     void                ClearImage(const GPUQueue& queue);
     void                AcquireImage(const GPUQueue& queue);
     RenderImageSection  ReleaseImage(const GPUQueue& queue);
+    RenderBufferInfo    GetBufferInfo();
 };
 
 inline
-Span<Float> RenderImageBuffer::Pixels()
+Span<Float> RenderImage::Pixels()
 {
     return pixels;
 }
 
 inline
-Span<Float> RenderImageBuffer::Samples()
+Span<Float> RenderImage::Samples()
 {
     return samples;
 }

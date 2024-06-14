@@ -11,6 +11,21 @@
 namespace mray::cuda
 {
 
+using BCEnumFinder = TypeFinder::T_VMapper:: template Map
+<
+    // Unsigned Int
+    TypeFinder::T_VMapper::template TVPair<PixelBC1,  cudaChannelFormatKindUnsignedBlockCompressed1>,
+    TypeFinder::T_VMapper::template TVPair<PixelBC2,  cudaChannelFormatKindUnsignedBlockCompressed2>,
+    TypeFinder::T_VMapper::template TVPair<PixelBC3,  cudaChannelFormatKindUnsignedBlockCompressed3>,
+    TypeFinder::T_VMapper::template TVPair<PixelBC4U, cudaChannelFormatKindUnsignedBlockCompressed4>,
+    TypeFinder::T_VMapper::template TVPair<PixelBC4S, cudaChannelFormatKindSignedBlockCompressed4>,
+    TypeFinder::T_VMapper::template TVPair<PixelBC5U, cudaChannelFormatKindUnsignedBlockCompressed5>,
+    TypeFinder::T_VMapper::template TVPair<PixelBC5S, cudaChannelFormatKindSignedBlockCompressed5>,
+    TypeFinder::T_VMapper::template TVPair<PixelBC6U, cudaChannelFormatKindUnsignedBlockCompressed6H>,
+    TypeFinder::T_VMapper::template TVPair<PixelBC6S, cudaChannelFormatKindSignedBlockCompressed6H>,
+    TypeFinder::T_VMapper::template TVPair<PixelBC7,  cudaChannelFormatKindUnsignedBlockCompressed7>
+>;
+
 class TextureBackingMemoryCUDA;
 
 template <class T>
@@ -99,12 +114,12 @@ template<uint32_t D, class T>
 class TextureCUDA_Normal
 {
     public:
-    static constexpr uint32_t ChannelCount  = VectorTypeToChannels<T>().Integer;
+    static constexpr uint32_t ChannelCount = VectorTypeToChannels::Find<T>;
     static constexpr bool IsNormConvertible = IsNormConvertibleCUDA<T>();
     static constexpr uint32_t Dims          = D;
 
     using Type              = T;
-    using CudaType          = typename decltype(VectorTypeToCUDA<T>())::MappedType;
+    using CudaType          = typename VectorTypeToCUDA::template Find<T>;
     using PaddedChannelType = PaddedChannel<ChannelCount, T>;
 
     // Sanity Check
@@ -139,8 +154,8 @@ class TextureCUDA_Normal
 
     template<class QT>
     requires(!std::is_same_v<QT, T> &&
-             (VectorTypeToChannels<T>().Integer ==
-              VectorTypeToChannels<QT>().Integer))
+             (VectorTypeToChannels::Find<T> ==
+              VectorTypeToChannels::Find<QT>))
     TextureViewCUDA<D, QT>  View() const;
 
     size_t                  Size() const;
@@ -168,7 +183,7 @@ class TextureCUDA_BC
     static constexpr uint32_t ChannelCount  = BCTypeToChannels<T>();
     static constexpr bool IsNormConvertible = true;
     static constexpr uint32_t Dims          = 2;
-    static constexpr auto CudaTypeEnum      = static_cast<cudaChannelFormatKind>(BCTypeToCUDA<T>().Integer);
+    static constexpr auto CudaTypeEnum      = static_cast<cudaChannelFormatKind>(BCEnumFinder::Find<T>);
 
     using Type              = T;
     using PaddedChannelType = Byte;
@@ -199,7 +214,7 @@ class TextureCUDA_BC
     // Only FloatX views are supported
     template<class QT>
     requires(!std::is_same_v<QT, T> &&
-             (BCTypeToChannels<T>() == VectorTypeToChannels<QT>().Integer))
+             (BCTypeToChannels<T>() == VectorTypeToChannels::Find<QT>))
     TextureViewCUDA<2, QT>  View() const;
 
     size_t                  Size() const;

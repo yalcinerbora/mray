@@ -35,6 +35,8 @@ function(gen_tracer_test)
                           CUDA_SEPARABLE_COMPILATION ON
                           CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
+    add_precompiled_headers(TARGET ${TARGET_FULL_NAME})
+
     if(MSVC)
         add_custom_command(TARGET ${TARGET_FULL_NAME} PRE_BUILD
                            COMMAND ${CMAKE_COMMAND} -E copy_if_different

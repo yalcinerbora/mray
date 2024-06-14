@@ -188,8 +188,8 @@ TextureViewCUDA<D, QT> TextureCUDA_Normal<D, T>::View() const
 template<uint32_t D, class T>
 template<class QT>
 requires(!std::is_same_v<QT, T> &&
-         (VectorTypeToChannels<T>().Integer ==
-          VectorTypeToChannels<QT>().Integer))
+         (VectorTypeToChannels::Find<T> ==
+          VectorTypeToChannels::Find<QT>))
 TextureViewCUDA<D, QT> TextureCUDA_Normal<D, T>::View() const
 {
     constexpr bool IsFloatType = (std::is_same_v<QT, Float> ||
@@ -413,7 +413,7 @@ TextureCUDA_BC<T>::~TextureCUDA_BC()
 template<class T>
 template<class QT>
 requires(!std::is_same_v<QT, T> &&
-         (BCTypeToChannels<T>() == VectorTypeToChannels<QT>().Integer))
+         (BCTypeToChannels<T>() == VectorTypeToChannels::Find<QT>))
 TextureViewCUDA<2, QT> TextureCUDA_BC<T>::View() const
 {
     constexpr bool IsFloatType = (std::is_same_v<QT, Float> ||

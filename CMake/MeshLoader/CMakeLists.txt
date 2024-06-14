@@ -24,6 +24,8 @@ target_compile_definitions(MeshLoader
                            PRIVATE
                            MRAY_MESHLOADER_SHARED_EXPORT)
 
+add_precompiled_headers(TARGET MeshLoader)
+
 # Copy DLLS
 if(MSVC)
 add_custom_command(TARGET MeshLoader POST_BUILD

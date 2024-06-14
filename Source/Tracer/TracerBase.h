@@ -29,7 +29,10 @@ using TransGenerator    = GeneratorFuncType<GenericGroupTransformT, uint32_t,
 using LightGenerator    = GeneratorFuncType<GenericGroupLightT, uint32_t,
                                             const GPUSystem&, const TextureViewMap&,
                                             GenericGroupPrimitiveT&>;
-using RendererGenerator = GeneratorFuncType<RendererI, const GPUSystem&>;
+using RendererGenerator = GeneratorFuncType<RendererI,
+                                            RenderImagePtr,
+                                            TracerView,
+                                            const GPUSystem&>;
 using BaseAccelGenerator = GeneratorFuncType<BaseAcceleratorI,
                                              BS::thread_pool&,
                                              const GPUSystem&,
@@ -116,12 +119,12 @@ class TracerBase : public TracerI
 
     // Type Generators
     const TypeGeneratorPack&   typeGenerators;
-
     // Loaded Parameters
-    TracerParameters    tracerParams;
-
+    TracerParameters    params;
     // Texture Related
     TextureMemory       texMem;
+    // Render Framebuffer
+    RenderImagePtr      renderImage;
 
     // Current Types
     Map<std::string_view, PrimAttributeInfoList>       primAttributeInfoMap;
@@ -132,8 +135,8 @@ class TracerBase : public TracerI
     Map<std::string_view, LightAttributeInfoList>      lightAttributeInfoMap;
     Map<std::string_view, RendererAttributeInfoList>   rendererAttributeInfoMap;
 
-    void PopulateAttribInfoAndTypeLists();
-
+    void            PopulateAttribInfoAndTypeLists();
+    TracerView      GenerateTracerView();
     public:
     // Constructors & Destructor
                     TracerBase(const TypeGeneratorPack&,
@@ -280,8 +283,6 @@ class TracerBase : public TracerI
 
     RendererId  CreateRenderer(std::string typeName) override;
     void        DestroyRenderer(RendererId) override;
-    void        CommitRendererReservations(RendererId) override;
-    bool        IsRendererCommitted(RendererId) const override;
     void        PushRendererAttribute(RendererId, uint32_t attributeIndex,
                                       TransientData data) override;
 
@@ -296,4 +297,5 @@ class TracerBase : public TracerI
     void                    SetThreadPool(BS::thread_pool&) override;
     size_t                  TotalDeviceMemory() const override;
     size_t                  UsedDeviceMemory() const override;
+    const TracerParameters& Parameters() const override;
 };

@@ -3,11 +3,44 @@
 
 #include "TracerTypes.h"
 #include "RenderImageBuffer.h"
+#include "GenericGroup.h"
+
+#include "Core/TracerI.h"
+#include "Core/DataStructures.h"
 
 #include "TransientPool/TransientPool.h"
-#include "Device/GPUSystem.h"
-#include "Core/TracerI.h"
+
 #include "Common/RenderImageStructs.h"
+
+// A nasty forward declaration
+class GenericGroupPrimitiveT;
+class GenericGroupCameraT;
+class GenericGroupLightT;
+class GenericGroupMaterialT;
+template<class, class> class GenericGroupT;
+template<class, class> class GenericTexturedGroupT;
+using GenericGroupTransformT    = GenericGroupT<TransformKey, TransAttributeInfo>;
+using GenericGroupMediumT       = GenericTexturedGroupT<MediumKey, MediumAttributeInfo>;
+
+struct TracerView
+{
+    template<class K, class V>
+    using IdPtrMap = Map<K, std::unique_ptr<V>>;
+
+    const IdPtrMap<PrimGroupId, GenericGroupPrimitiveT>&    primGroups;
+    const IdPtrMap<CameraGroupId, GenericGroupCameraT>&     camGroups;
+    const IdPtrMap<MediumGroupId, GenericGroupMediumT>&     mediumGroups;
+    const IdPtrMap<MatGroupId, GenericGroupMaterialT>&      matGroups;
+    const IdPtrMap<TransGroupId, GenericGroupTransformT>&   transGroups;
+    const IdPtrMap<LightGroupId, GenericGroupLightT>&       lightGroups;
+    const TextureViewMap&                                   textureViews;
+    const TracerParameters&                                 tracerParams;
+    const std::vector<Pair<SurfaceId, SurfaceParams>>&              surfs;
+    const std::vector<Pair<LightSurfaceId, LightSurfaceParams>>&    lightSurfs;
+    const std::vector<Pair<CamSurfaceId, CameraSurfaceParams>>&     camSurfs;
+};
+
+using RenderImagePtr = std::shared_ptr<RenderImage>;
 
 template<class RendererType>
 concept RendererC = requires(RendererType rt,
@@ -43,6 +76,7 @@ concept RendererC = requires(RendererType rt,
     {rt.Name()} -> std::same_as<std::string_view>;
     {RendererType::TypeName()} -> std::same_as<std::string_view>;
 };
+
 
 // Render work of camera
 template <class CamGroup>
@@ -169,7 +203,6 @@ class RendererI
 
     // Interface
     virtual MRayError       Commit() = 0;
-    virtual bool            IsInCommitState() const = 0;
     virtual AttribInfoList  AttributeInfo() const = 0;
     virtual void            PushAttribute(uint32_t attributeIndex,
                                           TransientData data,
@@ -191,21 +224,27 @@ template <class Child>
 class RendererT : public RendererI
 {
     public:
-    using AttribInfoList        = typename RendererI::AttribInfoList;
+    using AttribInfoList = typename RendererI::AttribInfoList;
     private:
     protected:
-    const GPUSystem&                    gpuSystem;
-    std::unique_ptr<RenderImageBuffer>  renderBuffer;
-    bool                                rendering = false;
+    const GPUSystem&    gpuSystem;
+    TracerView          tracerView;
+    RenderImagePtr      renderBuffer;
+    bool                rendering = false;
 
     public:
-                        RendererT(const GPUSystem& s);
+                        RendererT(RenderImagePtr, TracerView,
+                                  const GPUSystem&);
     std::string_view    Name() const override;
 };
 
 template <class C>
-RendererT<C>::RendererT(const GPUSystem& s)
+RendererT<C>::RendererT(RenderImagePtr rb,
+                        TracerView tv,
+                        const GPUSystem& s)
     : gpuSystem(s)
+    , tracerView(tv)
+    , renderBuffer(rb)
 {}
 
 template <class C>

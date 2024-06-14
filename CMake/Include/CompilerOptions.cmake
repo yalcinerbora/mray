@@ -176,6 +176,7 @@ if(MSVC)
         -DUNICODE
         -DNOMINMAX
         -DMRAY_MSVC
+        -DWIN32_LEAN_AND_MEAN
         $<$<CONFIG:SanitizeR>:_DISABLE_VECTOR_ANNOTATION>
         $<$<CONFIG:SanitizeR>:_DISABLE_STRING_ANNOTATION>
         )

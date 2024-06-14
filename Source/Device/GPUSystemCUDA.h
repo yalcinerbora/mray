@@ -4,10 +4,6 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <vector>
-#include <mutex>
-#include <list>
-
-#include <nvtx3/nvToolsExt.h>
 
 #include "Core/Types.h"
 #include "Core/MathFunctions.h"
@@ -51,6 +47,8 @@ static constexpr uint32_t TotalQueuePerDevice()
 
 namespace mray::cuda
 {
+
+using AnnotationHandle = void*;
 
 class GPUQueueCUDA;
 class GPUDeviceCUDA;
@@ -113,7 +111,7 @@ class GPUQueueCUDA
     private:
     cudaStream_t            stream;
     uint32_t                multiprocessorCount;
-    nvtxDomainHandle_t      nvtxDomain;
+    AnnotationHandle        nvtxDomain;
     const GPUDeviceCUDA*    myDevice = nullptr;
 
     MRAY_HYBRID
@@ -125,10 +123,10 @@ class GPUQueueCUDA
     public:
     // Constructors & Destructor
     MRAY_HOST                   GPUQueueCUDA(uint32_t multiprocessorCount,
-                                             nvtxDomainHandle_t domain,
+                                             AnnotationHandle domain,
                                              const GPUDeviceCUDA* device);
     MRAY_GPU                    GPUQueueCUDA(uint32_t multiprocessorCount,
-                                             nvtxDomainHandle_t domain,
+                                             AnnotationHandle domain,
                                              DeviceQueueType t);
                                 GPUQueueCUDA(const GPUQueueCUDA&) = delete;
     MRAY_HYBRID                 GPUQueueCUDA(GPUQueueCUDA&&) noexcept;
@@ -238,7 +236,7 @@ class GPUQueueCUDA
                                                    uint32_t sharedMemSize);
 
     MRAY_HOST
-    nvtxDomainHandle_t      ProfilerDomain() const;
+    AnnotationHandle        ProfilerDomain() const;
     MRAY_HOST
     const GPUDeviceCUDA*    Device() const;
 };
@@ -255,7 +253,7 @@ class GPUDeviceCUDA
     protected:
     public:
     // Constructors & Destructor
-    explicit                GPUDeviceCUDA(int deviceId, nvtxDomainHandle_t);
+    explicit                GPUDeviceCUDA(int deviceId, AnnotationHandle);
                             GPUDeviceCUDA(const GPUDeviceCUDA&) = delete;
                             GPUDeviceCUDA(GPUDeviceCUDA&&) noexcept = default;
     GPUDeviceCUDA&          operator=(const GPUDeviceCUDA&) = delete;
@@ -282,31 +280,31 @@ class GPUSystemCUDA
     using GPUPtrList = std::vector<const GPUDeviceCUDA*>;
 
     private:
-    GPUList                 systemGPUs;
-    GPUPtrList              systemGPUPtrs;
-    nvtxDomainHandle_t      nvtxDomain;
+    GPUList             systemGPUs;
+    GPUPtrList          systemGPUPtrs;
+    AnnotationHandle    nvtxDomain;
 
     // TODO: Check designs for this, this made the GPUSystem global
     // which is fine
-    static GPUList*         globalGPUListPtr;
-    static void             ThreadInitFunction();
+    static GPUList*     globalGPUListPtr;
+    static void         ThreadInitFunction();
 
     protected:
     public:
     // Constructors & Destructor
-                            GPUSystemCUDA();
-                            GPUSystemCUDA(const GPUSystemCUDA&) = delete;
-                            GPUSystemCUDA(GPUSystemCUDA&&) = delete;
-    GPUSystemCUDA&          operator=(const GPUSystemCUDA&) = delete;
-    GPUSystemCUDA&          operator=(GPUSystemCUDA&&) = delete;
-                            ~GPUSystemCUDA();
+                        GPUSystemCUDA();
+                        GPUSystemCUDA(const GPUSystemCUDA&) = delete;
+                        GPUSystemCUDA(GPUSystemCUDA&&) = delete;
+    GPUSystemCUDA&      operator=(const GPUSystemCUDA&) = delete;
+    GPUSystemCUDA&      operator=(GPUSystemCUDA&&) = delete;
+                        ~GPUSystemCUDA();
 
     // Multi-Device Splittable Smart GPU Calls
     // Automatic device split and stream split on devices
-    std::vector<size_t>     SplitWorkToMultipleGPU(uint32_t workCount,
-                                                   uint32_t threadCount,
-                                                   uint32_t sharedMemSize,
-                                                   void* f) const;
+    std::vector<size_t> SplitWorkToMultipleGPU(uint32_t workCount,
+                                               uint32_t threadCount,
+                                               uint32_t sharedMemSize,
+                                               void* f) const;
 
     // Misc
     const GPUList&          SystemDevices() const;
@@ -393,7 +391,7 @@ void GPUFenceCUDA::Wait() const
 
 MRAY_HOST inline
 GPUQueueCUDA::GPUQueueCUDA(uint32_t multiprocessorCount,
-                           nvtxDomainHandle_t domain,
+                           AnnotationHandle domain,
                            const GPUDeviceCUDA* device)
     : multiprocessorCount(multiprocessorCount)
     , nvtxDomain(domain)
@@ -405,7 +403,7 @@ GPUQueueCUDA::GPUQueueCUDA(uint32_t multiprocessorCount,
 
 MRAY_GPU MRAY_GPU_INLINE
 GPUQueueCUDA::GPUQueueCUDA(uint32_t multiprocessorCount,
-                           nvtxDomainHandle_t domain,
+                           AnnotationHandle domain,
                            DeviceQueueType t)
     : multiprocessorCount(multiprocessorCount)
     , nvtxDomain(domain)

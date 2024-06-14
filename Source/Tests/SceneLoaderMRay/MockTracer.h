@@ -148,6 +148,8 @@ class TracerMock : public TracerI
     mutable std::mutex tGLock;
     mutable std::mutex lGLock;
 
+    TracerParameters params = {};
+
     // Properties
     bool                print;
 
@@ -294,8 +296,6 @@ class TracerMock : public TracerI
 
     RendererId  CreateRenderer(std::string typeName) override;
     void        DestroyRenderer(RendererId) override;
-    void        CommitRendererReservations(RendererId) override;
-    bool        IsRendererCommitted(RendererId) const override;
     void        PushRendererAttribute(RendererId, uint32_t attributeIndex,
                                       TransientData data) override;
 
@@ -311,6 +311,7 @@ class TracerMock : public TracerI
     GPUThreadInitFunction   GetThreadInitFunction() const override;
     size_t                  TotalDeviceMemory() const override;
     size_t                  UsedDeviceMemory() const override;
+    const TracerParameters& Parameters() const override;
 };
 
 inline TracerMock::TracerMock(bool pl)
@@ -1726,16 +1727,6 @@ inline void TracerMock::DestroyRenderer(RendererId)
     throw MRayError("\"DestroyRenderer\" is not implemented in mock tracer!");
 }
 
-inline void TracerMock::CommitRendererReservations(RendererId)
-{
-    throw MRayError("\"CommitRendererReservations\" is not implemented in mock tracer!");
-}
-
-inline bool TracerMock::IsRendererCommitted(RendererId) const
-{
-    return false;
-}
-
 inline void TracerMock::PushRendererAttribute(RendererId, uint32_t,
                                               TransientData)
 {
@@ -1778,4 +1769,9 @@ inline size_t TracerMock::TotalDeviceMemory() const
 inline size_t TracerMock::UsedDeviceMemory() const
 {
     return 0u;
+}
+
+inline const TracerParameters& TracerMock::Parameters() const
+{
+    return params;
 }

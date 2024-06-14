@@ -6,6 +6,8 @@
 #include "Core/TracerI.h"
 #include "Core/SceneLoaderI.h"
 
+#include "Common/JsonCommon.h"
+
 #include <nlohmann/json.hpp>
 #include <functional>
 
@@ -89,15 +91,6 @@ void from_json(const nlohmann::json&, NodeTexStruct&);
 void from_json(const nlohmann::json&, SurfaceStruct&);
 void from_json(const nlohmann::json&, LightSurfaceStruct&);
 void from_json(const nlohmann::json&, CameraSurfaceStruct&);
-
-template<ArrayLikeC T>
-void from_json(const nlohmann::json&, T&);
-template<std::floating_point T>
-void from_json(const nlohmann::json&, Quat<T>&);
-template<std::floating_point T>
-void from_json(const nlohmann::json&, AABB<3, T>&);
-template<std::floating_point T>
-void from_json(const nlohmann::json&, RayT<T>&);
 
 ImageSubChannelType LoadTextureAccessLayout(const nlohmann::json& node);
 

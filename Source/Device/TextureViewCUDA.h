@@ -11,137 +11,86 @@
 namespace mray::cuda
 {
 
-template <class Query, class Mapped>
-struct TexTypeMapping
-{
-    using KeyType = Query;
-    using MappedType = Mapped;
-};
-
-template <class Query, uint32_t C>
-struct MappingInt
-{
-    using KeyType = Query;
-    static constexpr uint32_t Integer = C;
-};
-
-template<class T>
-constexpr auto VectorTypeToCUDA()
-{
-    constexpr auto CUDAToTexTypeMapping = std::make_tuple
-    (
-        // Unsigned Int
-        TexTypeMapping<uint32_t,    uint32_t>{},
-        TexTypeMapping<Vector2ui,   uint2>{},
-        TexTypeMapping<Vector3ui,   uint4>{},
-        TexTypeMapping<Vector4ui,   uint4>{},
-        // Int
-        TexTypeMapping<int32_t,     int32_t>{},
-        TexTypeMapping<Vector2i,    int2>{},
-        TexTypeMapping<Vector3i,    int4>{},
-        TexTypeMapping<Vector4i,    int4>{},
-        // Unsigned Short
-        TexTypeMapping<uint16_t,    uint16_t>{},
-        TexTypeMapping<Vector2us,   ushort2>{},
-        TexTypeMapping<Vector3us,   ushort4>{},
-        TexTypeMapping<Vector4us,   ushort4>{},
-        // Short
-        TexTypeMapping<int16_t,     int16_t>{},
-        TexTypeMapping<Vector2s,    short2>{},
-        TexTypeMapping<Vector3s,    short4>{},
-        TexTypeMapping<Vector4s,    short4>{},
-        // Unsigned Char
-        TexTypeMapping<uint8_t,     uint8_t>{},
-        TexTypeMapping<Vector2uc,   uchar2>{},
-        TexTypeMapping<Vector3uc,   uchar4>{},
-        TexTypeMapping<Vector4uc,   uchar4>{},
-        // Char
-        TexTypeMapping<int8_t,      int8_t>{},
-        TexTypeMapping<Vector2c,    char2>{},
-        TexTypeMapping<Vector3c,    char4>{},
-        TexTypeMapping<Vector4c,    char4>{},
-        // Float
-        TexTypeMapping<float,       float>{},
-        TexTypeMapping<Vector2f,    float2>{},
-        TexTypeMapping<Vector3f,    float4>{},
-        TexTypeMapping<Vector4f,    float4>{}
-    );
-
-    using namespace TypeFinder;
-    constexpr auto FList = CUDAToTexTypeMapping;
-    return GetTupleElement<T>(FList);
-}
-
-template<class T>
-constexpr auto BCTypeToCUDA()
-{
-    constexpr auto BCToTexTypeMapping = std::make_tuple
-    (
-        // Unsigned Int
-        MappingInt<PixelBC1, cudaChannelFormatKindUnsignedBlockCompressed1>{},
-        MappingInt<PixelBC2, cudaChannelFormatKindUnsignedBlockCompressed2>{},
-        MappingInt<PixelBC3, cudaChannelFormatKindUnsignedBlockCompressed3>{},
-        MappingInt<PixelBC4U, cudaChannelFormatKindUnsignedBlockCompressed4>{},
-        MappingInt<PixelBC4S, cudaChannelFormatKindSignedBlockCompressed4>{},
-        MappingInt<PixelBC5U, cudaChannelFormatKindUnsignedBlockCompressed5>{},
-        MappingInt<PixelBC5S, cudaChannelFormatKindSignedBlockCompressed5>{},
-        MappingInt<PixelBC6U, cudaChannelFormatKindUnsignedBlockCompressed6H>{},
-        MappingInt<PixelBC6S, cudaChannelFormatKindSignedBlockCompressed6H>{},
-        MappingInt<PixelBC7, cudaChannelFormatKindUnsignedBlockCompressed7>{}
-    );
-    using namespace TypeFinder;
-    constexpr auto FList = BCToTexTypeMapping;
-    return GetTupleElement<T>(FList);
-}
+using VectorTypeToCUDA = TypeFinder::T_TMapper:: template Map
+<
+    // Unsigned Int
+    TypeFinder::T_TMapper::template TTPair<uint32_t,    uint32_t>,
+    TypeFinder::T_TMapper::template TTPair<Vector2ui,   uint2>,
+    TypeFinder::T_TMapper::template TTPair<Vector3ui,   uint4>,
+    TypeFinder::T_TMapper::template TTPair<Vector4ui,   uint4>,
+    // Int
+    TypeFinder::T_TMapper::template TTPair<int32_t,     int32_t>,
+    TypeFinder::T_TMapper::template TTPair<Vector2i,    int2>,
+    TypeFinder::T_TMapper::template TTPair<Vector3i,    int4>,
+    TypeFinder::T_TMapper::template TTPair<Vector4i,    int4>,
+    // Unsigned Short
+    TypeFinder::T_TMapper::template TTPair<uint16_t,    uint16_t>,
+    TypeFinder::T_TMapper::template TTPair<Vector2us,   ushort2>,
+    TypeFinder::T_TMapper::template TTPair<Vector3us,   ushort4>,
+    TypeFinder::T_TMapper::template TTPair<Vector4us,   ushort4>,
+    // Short
+    TypeFinder::T_TMapper::template TTPair<int16_t,     int16_t>,
+    TypeFinder::T_TMapper::template TTPair<Vector2s,    short2>,
+    TypeFinder::T_TMapper::template TTPair<Vector3s,    short4>,
+    TypeFinder::T_TMapper::template TTPair<Vector4s,    short4>,
+    // Unsigned Char
+    TypeFinder::T_TMapper::template TTPair<uint8_t,     uint8_t>,
+    TypeFinder::T_TMapper::template TTPair<Vector2uc,   uchar2>,
+    TypeFinder::T_TMapper::template TTPair<Vector3uc,   uchar4>,
+    TypeFinder::T_TMapper::template TTPair<Vector4uc,   uchar4>,
+    // Char
+    TypeFinder::T_TMapper::template TTPair<int8_t,      int8_t>,
+    TypeFinder::T_TMapper::template TTPair<Vector2c,    char2>,
+    TypeFinder::T_TMapper::template TTPair<Vector3c,    char4>,
+    TypeFinder::T_TMapper::template TTPair<Vector4c,    char4>,
+    // Float
+    TypeFinder::T_TMapper::template TTPair<float,       float>,
+    TypeFinder::T_TMapper::template TTPair<Vector2f,    float2>,
+    TypeFinder::T_TMapper::template TTPair<Vector3f,    float4>,
+    TypeFinder::T_TMapper::template TTPair<Vector4f,    float4>
+>;
 
 
-template<class T>
-static constexpr auto VectorTypeToChannels()
-{
-    constexpr auto CUDAToChannelCountMapping = std::make_tuple
-    (
-        // 1 Channel
-        // Unsigned Int
-        MappingInt<uint32_t,    1>{},
-        MappingInt<Vector2ui,   2>{},
-        MappingInt<Vector3ui,   3>{},
-        MappingInt<Vector4ui,   4>{},
-        // Int
-        MappingInt<int32_t,     1>{},
-        MappingInt<Vector2i,    2>{},
-        MappingInt<Vector3i,    3>{},
-        MappingInt<Vector4i,    4>{},
-        // Unsigned Short
-        MappingInt<uint16_t,    1>{},
-        MappingInt<Vector2us,   2>{},
-        MappingInt<Vector3us,   3>{},
-        MappingInt<Vector4us,   4>{},
-        // Short
-        MappingInt<int16_t,     1>{},
-        MappingInt<Vector2s,    2>{},
-        MappingInt<Vector3s,    3>{},
-        MappingInt<Vector4s,    4>{},
-        // Unsigned Char
-        MappingInt<uint8_t,     1>{},
-        MappingInt<Vector2uc,   2>{},
-        MappingInt<Vector3uc,   3>{},
-        MappingInt<Vector4uc,   4>{},
-        // Char
-        MappingInt<int8_t,      1>{},
-        MappingInt<Vector2c,    2>{},
-        MappingInt<Vector3c,    3>{},
-        MappingInt<Vector4c,    4>{},
-        // Float
-        MappingInt<float,       1>{},
-        MappingInt<Vector2f,    2>{},
-        MappingInt<Vector3f,    3>{},
-        MappingInt<Vector4f,    4>{}
-    );
+using VectorTypeToChannels = TypeFinder::T_VMapper:: template Map
+<
+    // 1 Channel
+    // Unsigned Int
+    TypeFinder::T_VMapper::template TVPair<uint32_t,    1>,
+    TypeFinder::T_VMapper::template TVPair<Vector2ui,   2>,
+    TypeFinder::T_VMapper::template TVPair<Vector3ui,   3>,
+    TypeFinder::T_VMapper::template TVPair<Vector4ui,   4>,
+    // Int
+    TypeFinder::T_VMapper::template TVPair<int32_t,     1>,
+    TypeFinder::T_VMapper::template TVPair<Vector2i,    2>,
+    TypeFinder::T_VMapper::template TVPair<Vector3i,    3>,
+    TypeFinder::T_VMapper::template TVPair<Vector4i,    4>,
+    // Unsigned Short
+    TypeFinder::T_VMapper::template TVPair<uint16_t,    1>,
+    TypeFinder::T_VMapper::template TVPair<Vector2us,   2>,
+    TypeFinder::T_VMapper::template TVPair<Vector3us,   3>,
+    TypeFinder::T_VMapper::template TVPair<Vector4us,   4>,
+    // Short
+    TypeFinder::T_VMapper::template TVPair<int16_t,     1>,
+    TypeFinder::T_VMapper::template TVPair<Vector2s,    2>,
+    TypeFinder::T_VMapper::template TVPair<Vector3s,    3>,
+    TypeFinder::T_VMapper::template TVPair<Vector4s,    4>,
+    // Unsigned Char
+    TypeFinder::T_VMapper::template TVPair<uint8_t,     1>,
+    TypeFinder::T_VMapper::template TVPair<Vector2uc,   2>,
+    TypeFinder::T_VMapper::template TVPair<Vector3uc,   3>,
+    TypeFinder::T_VMapper::template TVPair<Vector4uc,   4>,
+    // Char
+    TypeFinder::T_VMapper::template TVPair<int8_t,      1>,
+    TypeFinder::T_VMapper::template TVPair<Vector2c,    2>,
+    TypeFinder::T_VMapper::template TVPair<Vector3c,    3>,
+    TypeFinder::T_VMapper::template TVPair<Vector4c,    4>,
+    // Float
+    TypeFinder::T_VMapper::template TVPair<float,       1>,
+    TypeFinder::T_VMapper::template TVPair<Vector2f,    2>,
+    TypeFinder::T_VMapper::template TVPair<Vector3f,    3>,
+    TypeFinder::T_VMapper::template TVPair<Vector4f,    4>
+>;
 
-    using namespace TypeFinder;
-    constexpr auto FList = CUDAToChannelCountMapping;
-    return GetTupleElement<T>(FList);
-}
 
 template <class MRayType, class CudaType, uint32_t Channels>
 struct CudaTexToMRayType {};
@@ -190,9 +139,9 @@ template<class T>
 class TextureViewCUDA<1, T>
 {
     public:
-    static constexpr uint32_t Channels = VectorTypeToChannels<T>().Integer;
+    static constexpr uint32_t Channels = VectorTypeToChannels::Find<T>;
     private:
-    using CudaType = typename decltype(VectorTypeToCUDA<T>())::MappedType;
+    using CudaType = typename VectorTypeToCUDA::Find<T>;
     using ConvertType = CudaTexToMRayType<T, CudaType, Channels>;
 
     private:
@@ -217,9 +166,9 @@ template<class T>
 class TextureViewCUDA<2, T>
 {
     public:
-    static constexpr uint32_t Channels = VectorTypeToChannels<T>().Integer;
+    static constexpr uint32_t Channels = VectorTypeToChannels::Find<T>;
     private:
-    using CudaType = typename decltype(VectorTypeToCUDA<T>())::MappedType;
+    using CudaType = typename VectorTypeToCUDA::Find<T>;
     using ConvertType = CudaTexToMRayType<T, CudaType, Channels>;
 
     private:
@@ -240,9 +189,9 @@ template<class T>
 class TextureViewCUDA<3, T>
 {
     public:
-    static constexpr uint32_t Channels = VectorTypeToChannels<T>().Integer;
+    static constexpr uint32_t Channels = VectorTypeToChannels::Find<T>;
     private:
-    using CudaType = typename decltype(VectorTypeToCUDA<T>())::MappedType;
+    using CudaType = typename VectorTypeToCUDA::Find<T>;
     using ConvertType = CudaTexToMRayType<T, CudaType, Channels>;
 
     private:

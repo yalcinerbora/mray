@@ -19,3 +19,5 @@ target_link_libraries(GFGConverter
 target_compile_definitions(GFGConverter
                            PRIVATE
                            MRAY_GFGCONVERTER_SHARED_EXPORT)
+
+add_precompiled_headers(TARGET GFGConverter)

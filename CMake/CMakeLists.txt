@@ -32,6 +32,7 @@ set_property(CACHE MRAY_DEVICE_BACKEND
 option(MRAY_USE_OPTIX "Try to find and use OptiX" OFF)
 option(MRAY_BUILD_TESTS "Build Tests" ON)
 option(MRAY_EXPORT_COMPILE_COMMANDS "Export compile commands for IWYU" ON)
+option(MRAY_ENABLE_PCH "Enable precompiled headers functionality" OFF)
 
 # Globals Common for All Projects
 # TODO: Align CUDA Standard with CXX Standard
@@ -74,6 +75,7 @@ project(${MRAY_PROJECT_NAME}
 )
 
 include("Macros")
+include("AddPCH")
 # CMAKE Project Definitions and Source, Library Folders are separate
 # Directories
 set(MRAY_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
@@ -140,6 +142,9 @@ endif()
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE FASLE)
 #set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_DEBUG FALSE)
+
+# PCH
+add_subdirectory(PrecompiledHeaders)
 
 # External Libs
 add_subdirectory(Lib)

@@ -1,5 +1,5 @@
 #include "PrimitiveDefaultTriangle.h"
-#include "Device/GPUAlgorithms.h"
+#include "Device/GPUSystem.hpp"
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCAdjustIndices(// I-O
@@ -196,10 +196,6 @@ void PrimGroupTriangle::Finalize(const GPUQueue& queue)
                                              StaticThreadPerBlock1D(),
                                              0);
 
-    //DeviceDebug::DumpGPUMemToFile("dIndicesBefore",
-    //                              ToConstSpan(dIndexList),
-    //                              queue);
-
     using namespace std::string_view_literals;
     queue.IssueExactKernel<KCAdjustIndices>
     (
@@ -214,10 +210,6 @@ void PrimGroupTriangle::Finalize(const GPUQueue& queue)
         dVertexIndexRanges
     );
     queue.Barrier().Wait();
-
-    //DeviceDebug::DumpGPUMemToFile("dIndicesAfter",
-    //                              ToConstSpan(dIndexList),
-    //                              queue);
 }
 
 Vector2ui PrimGroupTriangle::BatchRange(PrimBatchKey key) const

@@ -26,28 +26,29 @@ class ImageRenderer final : public RendererT<ImageRenderer>
 
     struct Options
     {
-        SamplerType samplerType = SamplerType ::INDEPENDENT;
+        uint32_t totalSPP = 32;
     };
 
     private:
-    Options                 currentOptions = {};
-    Options                 newOptions = {};
+    Options         currentOptions = {};
+    Options         newOptions = {};
 
     public:
     // Constructors & Destructor
-                            ImageRenderer(const GPUSystem& s);
-                            ImageRenderer(const ImageRenderer&) = delete;
-                            ImageRenderer(ImageRenderer&&) = delete;
-    ImageRenderer&          operator=(const ImageRenderer&) = delete;
-    ImageRenderer&          operator=(ImageRenderer&&) = delete;
+                    ImageRenderer(RenderImagePtr, TracerView,
+                                  const GPUSystem&);
+                    ImageRenderer(const ImageRenderer&) = delete;
+                    ImageRenderer(ImageRenderer&&) = delete;
+    ImageRenderer&  operator=(const ImageRenderer&) = delete;
+    ImageRenderer&  operator=(ImageRenderer&&) = delete;
 
     //
-    MRayError       Commit() override;
-    bool            IsInCommitState() const override;
-    AttribInfoList  AttributeInfo() const override;
-    void            PushAttribute(uint32_t attributeIndex,
-                                  TransientData data,
-                                  const GPUQueue& q) override;
+    MRayError           Commit() override;
+    AttribInfoList      AttributeInfo() const override;
+    RendererOptionPack  CurrentAttributes() const override;
+    void                PushAttribute(uint32_t attributeIndex,
+                                      TransientData data,
+                                      const GPUQueue& q) override;
     //
 
 
@@ -55,6 +56,8 @@ class ImageRenderer final : public RendererT<ImageRenderer>
     RenderBufferInfo    StartRender(const RenderImageParams&,
                                     const CameraKey&) override;
     RendererOutput      DoRender() override;
+    void                StopRender() override;
+    size_t              GPUMemoryUsage() const override;
 };
 
 inline
@@ -64,4 +67,10 @@ std::string_view ImageRenderer::TypeName()
     using namespace TypeNameGen::CompTime;
     static constexpr auto Name = "Image"sv;
     return RendererTypeName<Name>;
+}
+
+inline
+size_t ImageRenderer::GPUMemoryUsage() const
+{
+    return 0;
 }

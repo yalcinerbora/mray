@@ -29,6 +29,8 @@ set_target_properties(TSceneLoaderMRay PROPERTIES FOLDER ${MRAY_TEST_TARGETS_FOL
 set_target_properties(TSceneLoaderMRay PROPERTIES
                       POSITION_INDEPENDENT_CODE ON)
 
+add_precompiled_headers(TARGET TSceneLoaderMRay)
+
 if(MSVC)
     add_custom_command(TARGET TSceneLoaderMRay PRE_BUILD
                         COMMAND ${CMAKE_COMMAND} -E copy_if_different
