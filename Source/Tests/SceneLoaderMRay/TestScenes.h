@@ -5,6 +5,9 @@
 static constexpr std::string_view EmptyScene = std::string_view
 {R"({})"};
 
+// Overall Camera
+
+
 static constexpr std::string_view MinimalValidScene = std::string_view
 {R"(
 {
@@ -13,13 +16,15 @@ static constexpr std::string_view MinimalValidScene = std::string_view
 	"Transforms":[{"id": 0, "type": "Identity"}],
 	"Cameras":
 	[{
-		"id": 0, "type": "Pinhole",
-		"fov": 0,
-		"isFovX": true,
-		"planes": [0,0],
-		"gaze": [0,0,0],
-		"position": [0,0,0],
-		"up": [0,0,0]
+		"id"       : 0,
+		"type"     : "Pinhole",
+		"isFovX"   : true,
+		"fov"      : 33.75,
+		"aspect"   : 1.7777,
+		"planes"   : [0.0, 0.0],
+		"gaze"     : [0.0, 0.0, 0.0],
+		"position" : [0.0, 0.0, 0.0],
+		"up"       : [0.0, 0.0, 0.0]
 	}],
 
 	//
@@ -39,13 +44,15 @@ static constexpr std::string_view BasicScene = std::string_view
 {
 	"Cameras":
 	[{
-		"id": 0, "type": "Pinhole",
-		"fov": 0,
-		"isFovX": true,
-		"planes": [0,0],
-		"gaze": [0,0,0],
-		"position": [0,0,0],
-		"up": [0,0,0]
+		"id"       : 0,
+		"type"     : "Pinhole",
+		"isFovX"   : true,
+		"fov"      : 33.75,
+		"aspect"   : 1.7777,
+		"planes"   : [0.0, 0.0],
+		"gaze"     : [0.0, 0.0, 0.0],
+		"position" : [0.0, 0.0, 0.0],
+		"up"       : [0.0, 0.0, 0.0]
 	}],
 	"Lights": [{ "id" : 0, "type" : "Null"}],
 	"Mediums": [{ "id" : 0, "type" : "Vacuum"}],

@@ -444,12 +444,10 @@ inline TracerMock::TracerMock(bool pl)
     {
         .attribInfo = CamAttributeInfoList
         {
-            CamAttributeInfo("fov", MRayDataType<MR_FLOAT>(), IS_SCALAR, MR_MANDATORY),
-            CamAttributeInfo("isFovX", MRayDataType<MR_BOOL>(), IS_SCALAR, MR_MANDATORY),
-            CamAttributeInfo("planes", MRayDataType<MR_VECTOR_2>(), IS_SCALAR, MR_MANDATORY),
-            CamAttributeInfo("gaze", MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY),
-            CamAttributeInfo("position", MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY),
-            CamAttributeInfo("up", MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY)
+            CamAttributeInfo("FovAndPlanes", MRayDataType<MR_VECTOR_4>(), IS_SCALAR, MR_MANDATORY),
+            CamAttributeInfo("gaze",         MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY),
+            CamAttributeInfo("position",     MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY),
+            CamAttributeInfo("up",           MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY)
         },
         .name = "(C)Pinhole"
     };
@@ -491,12 +489,16 @@ inline TracerMock::TracerMock(bool pl)
     {
         .attribInfo = TexturedAttributeInfoList
         {
-            MediumAttributeInfo("absorbtion", MRayDataType<MR_VECTOR_3>(),
-                                IS_SCALAR, MR_MANDATORY,
-                                MR_CONSTANT_ONLY, IS_PURE_DATA),
-            MediumAttributeInfo("ior", MRayDataType<MR_FLOAT>(),
-                                IS_SCALAR, MR_MANDATORY,
-                                MR_CONSTANT_ONLY, IS_PURE_DATA)
+            MatAttributeInfo("sigmaA", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+                             MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
+            MatAttributeInfo("sigmaS", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+                             MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
+            MatAttributeInfo("emission", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+                             MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
+            MatAttributeInfo("ior", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+                             MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA),
+            MatAttributeInfo("hgPhase", MRayDataType<MR_FLOAT>(), IS_SCALAR,
+                             MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA)
         },
         .name = "(Md)Homogeneous"
     };

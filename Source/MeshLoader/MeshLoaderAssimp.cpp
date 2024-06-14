@@ -80,6 +80,10 @@ TransientData MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) 
         size_t localCount = mesh->mNumVertices;
         TransientData input(std::in_place_type_t<T>{}, localCount);
 
+        // Sanity check (check if aiVector3D has no padding)
+        static_assert(sizeof(std::array<aiVector3D, 2>) ==
+                      sizeof(Float) * 3 * 2);
+
         const T* attributePtr;
         using enum PrimitiveAttributeLogic;
         switch(attribLogic)
@@ -110,12 +114,6 @@ TransientData MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) 
             }
             default: return TransientData(std::in_place_type_t<Byte>{}, 0);
         }
-
-        if constexpr(std::is_same_v<Float, double>)
-        {
-
-        }
-
         input.Push(Span<const T>(attributePtr, localCount));
         return input;
     };
