@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.26)
 
 # Deduplicate archivies when linking
-cmake_policy(SET CMP0156 NEW)
+cmake_policy(VERSION 3.26)
 
 # Some things that will be fed to both CMAKE and C++
 set(MRAY_PROJECT_NAME "MRay")
