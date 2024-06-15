@@ -4,7 +4,8 @@
 #include "TextureViewCUDA.h"
 #include "DefinitionsCUDA.h"
 #include "GPUSystemCUDA.h"
-#include "GPUTypes.h"
+
+#include "../GPUTypes.h"
 
 #include "Core/Definitions.h"
 

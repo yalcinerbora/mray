@@ -3,7 +3,7 @@
 // This header hides the triple chevron calls
 // from non "*.cu" files
 #ifdef MRAY_GPU_BACKEND_CUDA
-    #include "GPUSystemCUDA.hpp"
+    #include "CUDA/GPUSystemCUDA.hpp"
 
 
 //#elif defined MRAY_GPU_BACKEND_SYCL

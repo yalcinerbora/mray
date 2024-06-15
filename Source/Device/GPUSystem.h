@@ -8,9 +8,9 @@
 #include "GPUSystemForward.h"
 
 #ifdef MRAY_GPU_BACKEND_CUDA
-    #include "GPUSystemCUDA.h"
-    #include "TextureCUDA.h"
-    #include "DeviceMemoryCUDA.h"
+    #include "CUDA/GPUSystemCUDA.h"
+    #include "CUDA/TextureCUDA.h"
+    #include "CUDA/DeviceMemoryCUDA.h"
 
     // Alias the types
     using KernelCallParams      = mray::cuda::KernelCallParamsCUDA;

@@ -2,7 +2,7 @@
 
 #ifdef MRAY_GPU_BACKEND_CUDA
 
-    #include "AlgBinarySearchCUDA.h"
+    #include "CUDA/AlgBinarySearchCUDA.h"
 
     namespace DeviceAlgorithms
     {

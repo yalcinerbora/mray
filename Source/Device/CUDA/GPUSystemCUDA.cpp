@@ -1,4 +1,4 @@
-#include "GPUSystem.h"
+#include "GPUSystemCUDA.h"
 #include "DeviceMemoryCUDA.h"
 
 #include <cuda.h>
@@ -124,7 +124,7 @@ uint32_t GPUDeviceCUDA::MaxActiveBlockPerSM(uint32_t threadsPerBlock) const
     return static_cast<uint32_t>(props.maxThreadsPerMultiProcessor) / threadsPerBlock;
 }
 
-const GPUQueue& GPUDeviceCUDA::GetQueue(uint32_t index) const
+const GPUQueueCUDA& GPUDeviceCUDA::GetQueue(uint32_t index) const
 {
     return queues[index];
 }

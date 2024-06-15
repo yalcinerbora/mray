@@ -2,7 +2,7 @@
 
 #ifdef MRAY_GPU_BACKEND_CUDA
 
-    #include "AlgBinaryPartitionCUDA.h"
+    #include "CUDA/AlgBinaryPartitionCUDA.h"
 
     namespace DeviceAlgorithms
     {

@@ -26,8 +26,6 @@ TODO: should we interface these?
 #include "Core/Definitions.h"
 #include "Core/MemAlloc.h"
 
-#include "GPUTypes.h"
-
 namespace mray::cuda
 {
 

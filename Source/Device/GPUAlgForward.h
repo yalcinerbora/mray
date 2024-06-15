@@ -2,7 +2,7 @@
 
 #ifdef MRAY_GPU_BACKEND_CUDA
 
-    #include "AlgForwardCUDA.h"
+    #include "CUDA/AlgForwardCUDA.h"
 
     namespace DeviceAlgorithms
     {

@@ -8,7 +8,8 @@
 #include "Core/Types.h"
 #include "Core/MathFunctions.h"
 #include "DefinitionsCUDA.h"
-#include "GPUTypes.h"
+
+#include "../GPUTypes.h"
 
 // Cuda Kernel Optimization Hints
 // Since we call all of the kernels in a static manner

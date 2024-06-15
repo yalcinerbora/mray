@@ -2,7 +2,6 @@
 
 #include "Device/GPUSystem.h"
 #include "Device/GPUSystem.hpp"
-#include "Device/TextureCUDA.h"
 #include "Core/Log.h"
 
 #include "T_TextureTypes.h"

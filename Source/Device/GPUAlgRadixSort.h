@@ -3,7 +3,7 @@
 
 #ifdef MRAY_GPU_BACKEND_CUDA
 
-    #include "AlgRadixSortCUDA.h"
+    #include "CUDA/AlgRadixSortCUDA.h"
 
     namespace DeviceAlgorithms
     {

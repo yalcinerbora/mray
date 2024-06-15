@@ -14,27 +14,27 @@ function(gen_device_target)
 
     # SOURCES
     set(SRC_CUDA_MEMORY
-        ${CURRENT_SOURCE_DIR}/DeviceMemoryCUDA.h
-        ${CURRENT_SOURCE_DIR}/DeviceMemoryCUDA.cpp
-        ${CURRENT_SOURCE_DIR}/TextureCUDA.h
-        ${CURRENT_SOURCE_DIR}/TextureCUDA.hpp
-        ${CURRENT_SOURCE_DIR}/TextureCUDA.cpp
-        ${CURRENT_SOURCE_DIR}/TextureViewCUDA.h)
+        ${CURRENT_SOURCE_DIR}/CUDA/DeviceMemoryCUDA.h
+        ${CURRENT_SOURCE_DIR}/CUDA/DeviceMemoryCUDA.cpp
+        ${CURRENT_SOURCE_DIR}/CUDA/TextureCUDA.h
+        ${CURRENT_SOURCE_DIR}/CUDA/TextureCUDA.hpp
+        ${CURRENT_SOURCE_DIR}/CUDA/TextureCUDA.cpp
+        ${CURRENT_SOURCE_DIR}/CUDA/TextureViewCUDA.h)
 
     set(SRC_CUDA
-        ${CURRENT_SOURCE_DIR}/NVTXAnnotate.h
-        ${CURRENT_SOURCE_DIR}/GPUSystemCUDA.h
-        ${CURRENT_SOURCE_DIR}/GPUSystemCUDA.hpp
-        ${CURRENT_SOURCE_DIR}/GPUSystemCUDA.cu
-        ${CURRENT_SOURCE_DIR}/DefinitionsCUDA.h)
+        ${CURRENT_SOURCE_DIR}/CUDA/NVTXAnnotate.h
+        ${CURRENT_SOURCE_DIR}/CUDA/GPUSystemCUDA.h
+        ${CURRENT_SOURCE_DIR}/CUDA/GPUSystemCUDA.hpp
+        ${CURRENT_SOURCE_DIR}/CUDA/GPUSystemCUDA.cpp
+        ${CURRENT_SOURCE_DIR}/CUDA/DefinitionsCUDA.h)
 
     set(SRC_CUDA_ALGS
-        ${CURRENT_SOURCE_DIR}/AlgForwardCUDA.h
-        ${CURRENT_SOURCE_DIR}/AlgReduceCUDA.h
-        ${CURRENT_SOURCE_DIR}/AlgScanCUDA.h
-        ${CURRENT_SOURCE_DIR}/AlgRadixSortCUDA.h
-        ${CURRENT_SOURCE_DIR}/AlgBinaryPartitionCUDA.h
-        ${CURRENT_SOURCE_DIR}/AlgBinarySearchCUDA.h)
+        ${CURRENT_SOURCE_DIR}/CUDA/AlgForwardCUDA.h
+        ${CURRENT_SOURCE_DIR}/CUDA/AlgReduceCUDA.h
+        ${CURRENT_SOURCE_DIR}/CUDA/AlgScanCUDA.h
+        ${CURRENT_SOURCE_DIR}/CUDA/AlgRadixSortCUDA.h
+        ${CURRENT_SOURCE_DIR}/CUDA/AlgBinaryPartitionCUDA.h
+        ${CURRENT_SOURCE_DIR}/CUDA/AlgBinarySearchCUDA.h)
 
     set(SRC_ALGS
         ${CURRENT_SOURCE_DIR}/GPUAlgForward.h
