@@ -3,6 +3,7 @@
 #include "Core/System.h"
 #include "Core/Flag.h"
 #include "Core/Types.h"
+#include "Core/Expected.h"
 
 #ifdef MRAY_GFGCONVERTER_SHARED_EXPORT
 #define MRAY_GFGCONVERTER_ENTRYPOINT MRAY_DLL_EXPORT

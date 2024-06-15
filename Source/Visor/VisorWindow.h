@@ -3,7 +3,6 @@
 #include <string>
 #include <vulkan/vulkan.h>
 
-#include "Core/Error.h"
 #include "Core/DataStructures.h"
 
 #include "Common/TransferQueue.h"
@@ -19,6 +18,7 @@
 struct ImFont;
 struct GLFWwindow;
 struct VisorConfig;
+struct MRayError;
 
 namespace BS { class thread_pool; }
 

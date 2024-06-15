@@ -79,7 +79,8 @@ function(gen_device_target)
 
     # Make it public here, tracer will use this as well
     target_compile_definitions(${TARGET_FULL_NAME}
-                               PUBLIC ${GEN_DEVICE_TARGET_MACRO})
+                               PUBLIC
+                               ${GEN_DEVICE_TARGET_MACRO})
 
     target_link_libraries(${TARGET_FULL_NAME}
                           PUBLIC

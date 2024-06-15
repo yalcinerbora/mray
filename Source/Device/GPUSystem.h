@@ -2,7 +2,7 @@
 
 
 #include "Core/Definitions.h"
-#include "Core/Error.h"
+#include "Core/Log.h"
 
 #include "GPUTypes.h"
 #include "GPUSystemForward.h"

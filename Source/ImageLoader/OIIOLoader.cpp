@@ -1,5 +1,7 @@
 #include "ImageLoader.h"
 
+#include "Core/Expected.h"
+
 #include <OpenImageIO/imageio.h>
 #include <OpenImageIO/imagebuf.h>
 #include <OpenImageIO/imagebufalgo.h>

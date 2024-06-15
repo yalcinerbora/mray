@@ -3,6 +3,7 @@
 #include "Core/DataStructures.h"
 #include "Core/Error.h"
 #include "Core/Filesystem.h"
+#include "Core/Expected.h"
 
 #include "VulkanAllocators.h"
 #include "VulkanTypes.h"

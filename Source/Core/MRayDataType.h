@@ -2,7 +2,6 @@
 
 #include "TypeFinder.h"
 #include "Definitions.h"
-#include "Error.h"
 #include "Vector.h"
 #include "Matrix.h"
 #include "Quaternion.h"

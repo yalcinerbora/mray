@@ -137,7 +137,7 @@ void KCFindSplits(//Output
         gMarks[0] = 0;
 }
 
-#endif // MRAY_GPU_BACKEND_CUDA
+#endif
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCFindBinMatIds(// Output

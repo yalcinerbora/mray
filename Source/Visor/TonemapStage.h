@@ -5,9 +5,11 @@
 #include <memory>
 #include <string>
 #include "Core/Definitions.h"
-#include "Core/Error.h"
 #include "Core/Types.h"
+#include "Core/Expected.h"
 #include "VulkanTypes.h"
+
+struct MRayError;
 
 class GUITonemapperI
 {

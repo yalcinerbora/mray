@@ -11,6 +11,7 @@
 
 #include <vulkan/vulkan.h>
 #include <map>
+#include <memory>
 
 class GUITonemapperI;
 class VulkanImage;

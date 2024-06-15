@@ -22,7 +22,9 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Create a project..
-project(MRayExternal DESCRIPTION "MRay dependency downloader/compiler")
+project(MRayExternal
+        LANGUAGES CXX
+        DESCRIPTION "MRay dependency downloader/compiler")
 
 option(MRAY_BUILD_TESTS "Build Tests" ON)
 

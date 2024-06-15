@@ -5,6 +5,7 @@
 #include <array>
 
 #include "Core/Types.h"
+#include "Core/MathFunctions.h"
 
 using SizeAlignPair = Pair<VkDeviceSize, VkDeviceSize>;
 

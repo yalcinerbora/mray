@@ -45,6 +45,7 @@ set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/NormTypes.h
     ${CURRENT_SOURCE_DIR}/Log.h
     ${CURRENT_SOURCE_DIR}/Error.h
+    ${CURRENT_SOURCE_DIR}/Expected.h
     ${CURRENT_SOURCE_DIR}/Types.h
     ${CURRENT_SOURCE_DIR}/Flag.h
     ${CURRENT_SOURCE_DIR}/GraphicsFunctions.h
@@ -85,6 +86,7 @@ add_library(CoreLib STATIC ${SRC_ALL})
 target_link_libraries(CoreLib
                       PUBLIC
                       fmt::fmt
-                      PRIVATE mray::meta_compile_opts)
+                      PRIVATE
+                      mray::meta_compile_opts)
 
 add_precompiled_headers(TARGET CoreLib)

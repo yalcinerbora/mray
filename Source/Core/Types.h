@@ -6,8 +6,7 @@
 #include <vector>
 #include <functional>
 
-#include "MathFunctions.h"
-#include "Error.h"
+#include "Definitions.h"
 
 // Rename the std::optional, gpu may not like it
 // most(all after c++20) of optional is constexpr
@@ -39,13 +38,8 @@ using Ref = std::reference_wrapper<T>;
 // Some basic implementation of std::visit (recursive invocation)
 // (Above link shows the compiled down result, it decays to nothing when all variables
 // are known at compile time.)
-namespace detail
+namespace TupleRefDetail
 {
-    template<uint32_t I, class VariantT, class Func>
-    requires(I < std::variant_size_v<std::remove_reference_t<VariantT>>)
-    MRAY_HYBRID
-    constexpr auto LoopAndInvoke(VariantT&& v, Func&& f) -> decltype(auto);
-
     template<class... Args, std::size_t... I>
     MRAY_HYBRID
     constexpr Tuple<Args&...> ToTupleRef(Tuple<Args...>&t,
@@ -123,83 +117,19 @@ struct SoASpan
     auto    Get() const -> Span<std::tuple_element_t<I, Tuple<const Args...>>>;
 };
 
-// std::expected is not in standart as of c++20 so rolling a simple
-// version of it, all errors in this codebase is MRayError
-// so no template for it.
-//
-// Piggybacking variant here for most of the construction stuff
-template<class T>
-struct Expected : protected Variant<T, MRayError>
-{
-    private:
-    using Base = Variant<T, MRayError>;
-
-    public:
-    using Base::Base;
-
-    // Provide semantically the same API,
-    // we may switch this to actual std::excpected later
-    // (for better move semantics etc)
-    // Utilize bare minimum subset of the API so refactoring will be easier
-    explicit
-    constexpr operator  bool() const noexcept;
-    constexpr bool      has_value() const noexcept;
-    constexpr bool      has_error() const noexcept;
-
-    constexpr const T&  value() const;
-    constexpr T&        value();
-
-    constexpr const MRayError&  error() const noexcept;
-    constexpr MRayError&        error() noexcept;
-
-    // This is not technically 1 to 1
-    // but it is more restictive so ok
-    constexpr T         value_or(const T&) const;
-};
-
-template<uint32_t I, class VariantT, class Func>
-requires(I < std::variant_size_v<std::remove_reference_t<VariantT>>)
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr auto detail::LoopAndInvoke(VariantT&& v, Func&& f) -> decltype(auto)
-{
-    using CurrentType = decltype(std::get<I>(v));
-
-    if(I == v.index())
-        return std::invoke(f, std::forward<CurrentType>(std::get<I>(v)));
-    else if constexpr(I < std::variant_size_v<std::remove_reference_t<VariantT>> -1)
-        return LoopAndInvoke<I + 1>(std::forward<VariantT>(v), std::forward<Func>(f));
-    else
-    {
-        #ifdef __CUDA_ARCH__
-            if constexpr (MRAY_IS_DEBUG)
-                printf("Invalid variant access on device!\n");
-        __trap();
-        #else
-            throw MRayError("Invalid variant access on device!");
-        #endif
-    }
-}
-
 template<class... Args, std::size_t... I>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Tuple<Args&...> detail::ToTupleRef(Tuple<Args...>&t,
-                                             std::index_sequence<I...>)
+constexpr Tuple<Args&...> TupleRefDetail::ToTupleRef(Tuple<Args...>&t,
+                                                     std::index_sequence<I...>)
 {
     return std::tie(std::get<I>(t)...);
-};
-
-template<class VariantT, class Func>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr auto DeviceVisit(VariantT&& v, Func&& f) -> decltype(auto)
-{
-    return detail::LoopAndInvoke<0>(std::forward<VariantT>(v), std::forward<Func>(f));
 }
 
 template<class... Args, typename Indices>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Tuple<Args&...> ToTupleRef(Tuple<Args...>& t)
 {
-    return detail::ToTupleRef(t, Indices{});
+    return TupleRefDetail::ToTupleRef(t, Indices{});
 }
 
 template<class T, std::size_t Extent>
@@ -259,55 +189,4 @@ auto SoASpan<Args...>::Get() const -> Span<std::tuple_element_t<I, Tuple<const A
 {
     using ResulT = Span<std::tuple_element_t<I, Tuple<const Args...>>>;
     return ResulT(std::get<I>(ptrs), size);
-}
-
-template <class T>
-constexpr Expected<T>::operator bool() const noexcept
-{
-    return has_error();
-}
-
-template <class T>
-constexpr bool Expected<T>::has_value() const noexcept
-{
-    return !std::holds_alternative<MRayError>(*this);
-}
-
-template <class T>
-constexpr bool Expected<T>::has_error() const noexcept
-{
-    return !has_value();
-}
-
-template <class T>
-constexpr const T& Expected<T>::value() const
-{
-    return std::get<T>(*this);
-}
-
-template <class T>
-constexpr T& Expected<T>::value()
-{
-    return std::get<T>(*this);
-}
-
-template <class T>
-constexpr const MRayError& Expected<T>::error() const noexcept
-{
-    return std::get<MRayError>(*this);
-}
-
-template <class T>
-constexpr MRayError& Expected<T>::error() noexcept
-{
-    return std::get<MRayError>(*this);
-}
-
-template <class T>
-constexpr T Expected<T>::value_or(const T& t) const
-{
-    if(std::holds_alternative<MRayError>(*this))
-        return t;
-    else
-        return std::get<T>(*this);
 }

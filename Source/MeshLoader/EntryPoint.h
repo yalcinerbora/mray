@@ -4,7 +4,6 @@
 #include <string>
 #include <memory>
 
-#include "Core/Error.h"
 #include "Core/MRayDataType.h"
 #include "Core/TracerI.h"
 
@@ -16,6 +15,8 @@
 #else
     #define MRAY_MESHLOADER_ENTRYPOINT MRAY_DLL_IMPORT
 #endif
+
+struct MRayError;
 
 using InnerIdList = const std::vector<uint32_t>;
 

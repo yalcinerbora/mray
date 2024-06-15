@@ -33,8 +33,7 @@
     constexpr bool MRAY_IS_DEBUG = true;
 #else
     constexpr bool MRAY_IS_DEBUG = false;
-#endif // MRAY_
-
+#endif
 
 // We are on Device Compiler
 #ifdef __CUDA_ARCH__
@@ -437,8 +436,6 @@ concept BlockCompressedPixelC = IsBlockCompressedPixel<BCType>;
 
 template<class BCType>
 concept NotBlockCompressedPixelC = !IsBlockCompressedPixel<BCType>;
-
-
 
 constexpr std::string_view MRayDataTypeStringifier::ToString(MRayDataEnum e)
 {

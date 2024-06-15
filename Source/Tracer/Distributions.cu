@@ -7,13 +7,6 @@
 #include <algorithm>
 #include <numeric>
 
-//#ifdef MRAY_GPU_BACKEND_CUDA
-//    #include <cub/block/block_scan.cuh>
-//    #include <cub/block/block_load.cuh>
-//    #include <cub/block/block_store.cuh>
-//#endif
-
-
 namespace Distributions
 {
 

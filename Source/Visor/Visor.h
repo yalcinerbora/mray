@@ -5,9 +5,10 @@
 #include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
 
-#include "Core/Error.h"
 #include "Core/DataStructures.h"
 #include "VisorWindow.h"
+
+struct MRayError;
 
 // We gonna use this alot I think
 template<size_t N>

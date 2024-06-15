@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.26)
 
+# Deduplicate archivies when linking
+cmake_policy(SET CMP0156 NEW)
+
 # Some things that will be fed to both CMAKE and C++
 set(MRAY_PROJECT_NAME "MRay")
 set(MRAY_PROJECT_DESCRIPTION "GPU-based rendering framework / renderer.")
@@ -86,7 +89,6 @@ populate_mray_directory_variables(${MRAY_DIRECTORY})
 
 # Use currently selected compiler for CUDA
 # TODO: Check why this is not set?
-
 if(MSVC)
     set(CMAKE_CUDA_HOST_COMPILER ${CMAKE_CXX_COMPILER})
 else()

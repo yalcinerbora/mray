@@ -2,6 +2,7 @@
 #include "Core/Types.h"
 #include "Core/MRayDescriptions.h"
 #include "Core/DataStructures.h"
+#include "Core/Error.h"
 
 #include <CLI/CLI.hpp>
 #include <string_view>

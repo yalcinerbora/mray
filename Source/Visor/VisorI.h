@@ -8,6 +8,8 @@ using namespace std::string_literals;
 class TransferQueue;
 namespace BS { class thread_pool; }
 
+struct MRayError;
+
 // This is basically ImGui stuff
 using VisorInputType = int;
 

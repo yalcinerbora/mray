@@ -1,5 +1,6 @@
 #include "VulkanTypes.h"
 #include "Core/Definitions.h"
+#include "Core/Error.h"
 
 Pair<MRayColorSpaceEnum, Float>
 VkConversions::VkToMRayColorSpace(VkColorSpaceKHR cSpace)

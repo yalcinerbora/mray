@@ -7,7 +7,7 @@
 
 #ifdef MRAY_HETEROGENEOUS
     #include <cuda/half.h>
-#endif // MRAY_HETEROGENEOUS
+#endif
 
 // Floating point type extension for half precision if avial
 #ifdef MRAY_HETEROGENEOUS
@@ -20,7 +20,7 @@
     template<typename T>
     concept FloatingPointC = std::floating_point<T>;
 
-#endif // MRAY_HETEROGENEOUS
+#endif
 
 template<typename T>
 concept ArithmeticC = std::integral<T> || FloatingPointC<T>;

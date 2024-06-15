@@ -8,7 +8,7 @@
 #include "Core/MemAlloc.h"
 #include "Core/TypeFinder.h"
 
-#include "Device/GPUSystem.h"
+#include "Device/GPUSystemForward.h"
 
 #include "TracerTypes.h"
 #include "TransformsDefault.h"

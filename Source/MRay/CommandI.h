@@ -2,6 +2,8 @@
 
 #include <Core/DataStructures.h>
 
+struct MRayError;
+
 namespace CLI { class App; }
 
 enum class CommandType

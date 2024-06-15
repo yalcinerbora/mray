@@ -11,6 +11,8 @@
 #include "Core/Flag.h"
 #include "Core/MRayDataType.h"
 #include "Core/TracerI.h"
+#include "Core/Expected.h"
+
 #include "TransientPool/TransientPool.h"
 
 enum class ImageType
