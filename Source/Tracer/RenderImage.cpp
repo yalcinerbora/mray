@@ -1,4 +1,4 @@
-#include "RenderImageBuffer.h"
+#include "RenderImage.h"
 #include "Core/TracerI.h"
 
 RenderImage::RenderImage(const RenderImageParams& p,

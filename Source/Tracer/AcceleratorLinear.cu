@@ -1,5 +1,6 @@
 #include "AcceleratorLinear.h"
-#include "Device/GPUAlgorithms.h"
+#include "Device/GPUAlgReduce.h"
+#include "Device/GPUSystemCUDA.hpp"
 
 // Generic PrimitiveKey copy kernel
 // TODO: find a way to put this somewhere proper

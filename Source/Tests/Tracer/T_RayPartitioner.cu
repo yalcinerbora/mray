@@ -4,6 +4,7 @@
 
 #include "Tracer/RayPartitioner.h"
 #include "Tracer/Key.h"
+#include "Device/GPUAlgGeneric.h"
 
 void SimulateBasicPathTracer()
 {

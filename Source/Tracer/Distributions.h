@@ -5,7 +5,9 @@
 
 #include "Core/Types.h"
 #include "TracerTypes.h"
-#include "Device/GPUAlgorithms.h"
+
+#include "Device/GPUAlgBinarySearch.h"
+#include "Device/GPUSystem.h"
 
 namespace Distributions
 {

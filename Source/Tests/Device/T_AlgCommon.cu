@@ -4,7 +4,7 @@
 
 #include "Device/GPUSystem.h"
 #include "Device/GPUSystem.hpp"
-#include "Device/GPUAlgorithms.h"
+#include "Device/GPUAlgGeneric.h"
 
 #include "T_AlgTypes.h"
 

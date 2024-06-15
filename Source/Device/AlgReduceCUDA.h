@@ -3,6 +3,7 @@
 #include "Core/Definitions.h"
 #include "Core/Types.h"
 #include "GPUSystemCUDA.h"
+#include "NVTXAnnotate.h"
 
 #include <cub/device/device_reduce.cuh>
 #include <cub/device/device_segmented_reduce.cuh>
@@ -47,7 +48,7 @@ void TransformReduce(Span<OutT, 1> dReducedValue,
 
 template <class OutT, class InT, class BinaryOp, class TransformOp>
 MRAY_HOST
-void SegmentedTransformReduce(Span<OutT, 1> dReducedValue,
+void SegmentedTransformReduce(Span<OutT> dReducedValue,
                               Span<Byte> dTempMemory,
                               Span<const InT> dValues,
                               Span<const uint32_t> dSegmentRanges,

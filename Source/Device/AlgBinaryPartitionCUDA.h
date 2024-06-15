@@ -3,9 +3,9 @@
 #include "Core/Definitions.h"
 #include "Core/Types.h"
 #include "GPUSystemCUDA.h"
+#include "NVTXAnnotate.h"
 
 #include <cub/device/device_partition.cuh>
-
 #include <cub/device/device_select.cuh>
 
 // Direct wrappers over CUB at the moment

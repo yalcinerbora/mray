@@ -2,7 +2,7 @@
 
 
 #include "TracerTypes.h"
-#include "RenderImageBuffer.h"
+#include "RenderImage.h"
 #include "GenericGroup.h"
 
 #include "Core/TracerI.h"

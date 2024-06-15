@@ -151,7 +151,6 @@ using AABB4d = AABB<4, double>;
     using AABB4h = AABB<4, half>;
 #endif
 
-
 template<class T>
 concept ArrayLikeC = requires(T t, Span<const typename T::InnerType, T::Dims> span)
 {
@@ -162,6 +161,7 @@ concept ArrayLikeC = requires(T t, Span<const typename T::InnerType, T::Dims> sp
     { std::as_const(t).AsArray() } -> std::same_as<const std::array<typename T::InnerType, T::Dims>&>;
 };
 
+// Vector, AABB print helpers
 template <ArrayLikeC V>
 auto format_as(const V& v) { return v.AsArray(); }
 

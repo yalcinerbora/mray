@@ -22,40 +22,55 @@ function(gen_device_target)
         ${CURRENT_SOURCE_DIR}/TextureViewCUDA.h)
 
     set(SRC_CUDA
+        ${CURRENT_SOURCE_DIR}/NVTXAnnotate.h
         ${CURRENT_SOURCE_DIR}/GPUSystemCUDA.h
         ${CURRENT_SOURCE_DIR}/GPUSystemCUDA.hpp
         ${CURRENT_SOURCE_DIR}/GPUSystemCUDA.cu
         ${CURRENT_SOURCE_DIR}/DefinitionsCUDA.h)
 
     set(SRC_CUDA_ALGS
+        ${CURRENT_SOURCE_DIR}/AlgForwardCUDA.h
         ${CURRENT_SOURCE_DIR}/AlgReduceCUDA.h
         ${CURRENT_SOURCE_DIR}/AlgScanCUDA.h
         ${CURRENT_SOURCE_DIR}/AlgRadixSortCUDA.h
         ${CURRENT_SOURCE_DIR}/AlgBinaryPartitionCUDA.h
         ${CURRENT_SOURCE_DIR}/AlgBinarySearchCUDA.h)
 
+    set(SRC_ALGS
+        ${CURRENT_SOURCE_DIR}/GPUAlgForward.h
+        ${CURRENT_SOURCE_DIR}/GPUAlgGeneric.h
+        ${CURRENT_SOURCE_DIR}/GPUAlgReduce.h
+        ${CURRENT_SOURCE_DIR}/GPUAlgScan.h
+        ${CURRENT_SOURCE_DIR}/GPUAlgRadixSort.h
+        ${CURRENT_SOURCE_DIR}/GPUAlgBinaryPartition.h
+        ${CURRENT_SOURCE_DIR}/GPUAlgBinarySearch.h)
+
     set(SRC_COMMON
         ${CMAKE_CURRENT_FUNCTION_LIST_FILE}
-        ${CURRENT_SOURCE_DIR}/GPUAlgorithms.h
         ${CURRENT_SOURCE_DIR}/GPUSystemForward.h
         ${CURRENT_SOURCE_DIR}/GPUSystem.h
         ${CURRENT_SOURCE_DIR}/GPUSystem.hpp
         ${CURRENT_SOURCE_DIR}/GPUTypes.h)
 
-    set(SRC_ALL ${SRC_COMMON})
+    set(SRC_ALL
+        ${SRC_COMMON}
+        ${SRC_ALGS})
+
     if(${GEN_DEVICE_TARGET_MACRO} STREQUAL "MRAY_GPU_BACKEND_CUDA")
         set(SRC_ALL ${SRC_ALL}
             ${SRC_CUDA_MEMORY}
             ${SRC_CUDA}
             ${SRC_CUDA_ALGS})
+
+        source_group("CUDA/Memory" FILES ${SRC_CUDA_MEMORY})
+        source_group("CUDA" FILES ${SRC_CUDA})
+        source_group("CUDA/Algorithms" FILES ${SRC_CUDA_ALGS})
     else()
         message(FATAL_ERROR "Unsupported Device Macro")
     endif()
 
-    # IDE Filters
-    source_group("CUDA/Memory" FILES ${SRC_CUDA_MEMORY})
-    source_group("CUDA" FILES ${SRC_CUDA})
-    source_group("CUDA/Algorithms" FILES ${SRC_CUDA_ALGS})
+    # Common IDE Filters
+    source_group("Algorithms" FILES ${SRC_ALGS})
     source_group("" FILES ${SRC_COMMON})
 
     # Lib File

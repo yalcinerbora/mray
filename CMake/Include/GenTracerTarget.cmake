@@ -61,8 +61,8 @@ function(gen_tracer_target)
 
     set(SRC_RENDERERS
         ${CURRENT_SOURCE_DIR}/RendererC.h
-        ${CURRENT_SOURCE_DIR}/RenderImageBuffer.cpp
-        ${CURRENT_SOURCE_DIR}/RenderImageBuffer.h
+        ${CURRENT_SOURCE_DIR}/RenderImage.cpp
+        ${CURRENT_SOURCE_DIR}/RenderImage.h
         ${CURRENT_SOURCE_DIR}/ImageRenderer.h
         ${CURRENT_SOURCE_DIR}/ImageRenderer.hpp
         ${CURRENT_SOURCE_DIR}/ImageRenderer.cu)

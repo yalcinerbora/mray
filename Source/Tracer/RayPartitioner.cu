@@ -3,6 +3,8 @@
 #include <limits>
 
 #include "Core/BitFunctions.h"
+#include "Device/GPUAlgRadixSort.h"
+#include "Device/GPUSystem.hpp"
 
 #define INVALID_LOCATION std::numeric_limits<uint32_t>::max()
 #define FIND_SPLITS_TPB 512

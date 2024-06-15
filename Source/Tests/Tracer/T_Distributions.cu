@@ -7,6 +7,8 @@
 #include "Tracer/Distributions.h"
 #include "GTestWrappers.h"
 
+#include "Device/GPUSystem.hpp"
+
 // Put it as a template for future tests (PwL maybe?)
 template<class Dist2D>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT

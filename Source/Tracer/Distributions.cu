@@ -1,9 +1,8 @@
 #include "Distributions.h"
 #include "Core/MemAlloc.h"
 
-#include "Device/GPUSystem.h"
 #include "Device/GPUSystem.hpp"
-#include "Device/GPUAlgorithms.h"
+#include "Device/GPUAlgScan.h"
 
 #include <algorithm>
 #include <numeric>

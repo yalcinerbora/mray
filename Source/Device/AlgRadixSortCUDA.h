@@ -3,6 +3,7 @@
 #include "Core/Definitions.h"
 #include "Core/Types.h"
 #include "GPUSystemCUDA.h"
+#include "NVTXAnnotate.h"
 
 #include <cub/device/device_radix_sort.cuh>
 
@@ -19,10 +20,10 @@ size_t RadixSortTMSize(size_t elementCount);
 template <bool IsAscending, class K, class V>
 MRAY_HOST
 uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
-                    Span<Span<V>, 2> dValueDoubleBuffer,
-                    Span<Byte> dTempMemory,
-                    const GPUQueueCUDA& queue,
-                    const Vector2ui& bitRange = Vector2ui(0, sizeof(K) * CHAR_BIT));
+                   Span<Span<V>, 2> dValueDoubleBuffer,
+                   Span<Byte> dTempMemory,
+                   const GPUQueueCUDA& queue,
+                   const Vector2ui& bitRange = Vector2ui(0, sizeof(K) * CHAR_BIT));
 
 }
 

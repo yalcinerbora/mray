@@ -3,6 +3,7 @@
 #include "Core/Definitions.h"
 #include "Core/Types.h"
 #include "GPUSystemCUDA.h"
+#include "NVTXAnnotate.h"
 
 #include <cub/block/block_scan.cuh>
 #include <cub/block/block_load.cuh>

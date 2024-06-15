@@ -7,7 +7,7 @@
 #include "Core/MemAlloc.h"
 #include "Core/AABB.h"
 
-#include "Device/GPUSystemForward.h"
+#include "Device/GPUAlgForward.h"
 
 #include "TracerTypes.h"
 #include "ParamVaryingData.h"

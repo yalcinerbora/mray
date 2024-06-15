@@ -104,23 +104,7 @@ namespace mray::algorithms
     }
 }
 
-#ifdef MRAY_GPU_BACKEND_CUDA
-
-    #include "AlgScanCUDA.h"
-    #include "AlgReduceCUDA.h"
-    #include "AlgRadixSortCUDA.h"
-    #include "AlgBinaryPartitionCUDA.h"
-    #include "AlgBinarySearchCUDA.h"
-
-    namespace DeviceAlgorithms
-    {
-        inline namespace DeviceSpecific{ using namespace ::mray::cuda::algorithms; }
-        inline namespace DeviceAgnostic{ using namespace ::mray::algorithms; }
-    }
-
-//#elif defined MRAY_GPU_BACKEND_SYCL
-//    // TODO:
-//    //#include "GPUSystemSycl.hpp"
-#else
-    #error Please define a GPU Backend!
-#endif
+namespace DeviceAlgorithms
+{
+    inline namespace DeviceAgnostic{ using namespace ::mray::algorithms; }
+}

@@ -21,8 +21,6 @@
     inline constexpr void MRAY_DEBUG_LOG(Args&&...) {}
 #endif
 
-
-
 template<class... Args>
 inline void MRAY_LOG(fmt::format_string<Args...> fstr, Args&&... args)
 {
