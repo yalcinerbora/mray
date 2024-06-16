@@ -5,6 +5,7 @@
 #include <filesystem>
 
 #include "TransientPool/TransientPool.h"
+#include "Core/Error.hpp"
 
 MeshFileAssimp::MeshFileAssimp(Assimp::Importer& imp,
                                const std::string& fPath,

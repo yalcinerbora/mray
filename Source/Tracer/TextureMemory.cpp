@@ -1,4 +1,5 @@
 #include "TextureMemory.h"
+#include "Core/Error.hpp"
 
 namespace TexDetail
 {

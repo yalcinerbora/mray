@@ -45,6 +45,7 @@ set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/NormTypes.h
     ${CURRENT_SOURCE_DIR}/Log.h
     ${CURRENT_SOURCE_DIR}/Error.h
+    ${CURRENT_SOURCE_DIR}/Error.hpp
     ${CURRENT_SOURCE_DIR}/Expected.h
     ${CURRENT_SOURCE_DIR}/Types.h
     ${CURRENT_SOURCE_DIR}/Flag.h
@@ -52,6 +53,7 @@ set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/TypeGenFunction.h
     ${CURRENT_SOURCE_DIR}/ShapeFunctions.h
     ${CURRENT_SOURCE_DIR}/Timer.h
+    ${CURRENT_SOURCE_DIR}/Timer.cpp
     ${CURRENT_SOURCE_DIR}/MPMCQueue.h
     ${CURRENT_SOURCE_DIR}/Filesystem.h)
 

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Core/MPMCQueue.h"
-#include "Core/RealtimeThread.h"
 #include "Core/TracerI.h"
 
 #include "TransientPool/TransientPool.h"

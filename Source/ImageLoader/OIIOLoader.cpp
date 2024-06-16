@@ -1,11 +1,10 @@
 #include "ImageLoader.h"
 
 #include "Core/Expected.h"
+#include "Core/Log.h"
+#include "Core/Error.hpp"
 
 #include <OpenImageIO/imageio.h>
-#include <OpenImageIO/imagebuf.h>
-#include <OpenImageIO/imagebufalgo.h>
-#include <OpenImageIO/deepdata.h>
 
 Expected<MRayPixelTypeRT> ImageFileOIIO::PixelFormatToMRay(const OIIO::ImageSpec& spec)
 {

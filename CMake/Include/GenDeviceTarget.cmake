@@ -50,6 +50,7 @@ function(gen_device_target)
         ${CURRENT_SOURCE_DIR}/GPUSystemForward.h
         ${CURRENT_SOURCE_DIR}/GPUSystem.h
         ${CURRENT_SOURCE_DIR}/GPUSystem.hpp
+        ${CURRENT_SOURCE_DIR}/GPUDebug.h
         ${CURRENT_SOURCE_DIR}/GPUTypes.h)
 
     set(SRC_ALL

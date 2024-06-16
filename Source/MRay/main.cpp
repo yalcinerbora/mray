@@ -3,6 +3,7 @@
 #include "Core/MRayDescriptions.h"
 #include "Core/DataStructures.h"
 #include "Core/Error.h"
+#include "Core/Error.hpp"
 
 #include <CLI/CLI.hpp>
 #include <string_view>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <chrono>
+#include <ratio>
 
 using Nanosecond    = std::nano;
 using Microsecond   = std::micro;
@@ -10,13 +10,14 @@ using Minue         = std::ratio<60>;
 
 class Timer
 {
-    using Clock     = std::chrono::high_resolution_clock;
-    using TimePoint = std::chrono::time_point<Clock>;
-    using Duration  = TimePoint::duration;
+
 
     private:
-    Duration    elapsed;
-    TimePoint   start;
+    uint64_t    elapsed;
+    uint64_t    start;
+
+    //Duration    elapsed;
+    //TimePoint   start;
 
     public:
     // Utility
@@ -27,26 +28,10 @@ class Timer
     double      Elapsed();
 };
 
-inline void Timer::Start()
-{
-    start = Clock::now();
-}
 
-inline void Timer::Split()
-{
-    TimePoint end = Clock::now();
-    elapsed = end - start;
-}
 
-inline void Timer::Lap()
-{
-    TimePoint end = Clock::now();
-    elapsed = end - start;
-    start = end;
-}
-
-template <class Time>
-double Timer::Elapsed()
-{
-    return std::chrono::duration<double, Time>(elapsed).count();
-}
+//template <class Time>
+//double Timer::Elapsed()
+//{
+//    return std::chrono::duration<double, Time>(elapsed).count();
+//}

@@ -14,11 +14,6 @@ TODO: should we interface these?
 
 */
 #include <cuda_runtime.h>
-
-#include <limits>
-#include <fstream>
-#include <iostream>
-#include <tuple>
 #include <cassert>
 #include <vector>
 #include <cuda.h>

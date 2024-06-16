@@ -1,4 +1,6 @@
 #include "RenderImagePool.h"
+#include "Core/Log.h"
+
 #include <BS/BS_thread_pool.hpp>
 #include <array>
 

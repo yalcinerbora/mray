@@ -1,8 +1,9 @@
 #include "AccumImageStage.h"
 #include "VulkanAllocators.h"
 
+#include "Core/Error.hpp"
+
 #ifdef MRAY_WINDOWS
-    #define WINDOWS_LEAN_AND_MEAN
     #include <windows.h>
     #include <vulkan/vulkan_win32.h>
 

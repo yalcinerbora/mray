@@ -3,12 +3,19 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <fstream>
 
 #include "ImageLoaderI.h"
 
 #include "TransientPool/TransientPool.h"
 
 #include "Core/TypeGenFunction.h"
+
+// We need to add our own fmt header here
+// so that linker does not link with the OIIO's
+// included fmt (we already set BUILD_MISSING_FMT=OFF,
+// but still it clashes I think)
+#include "Core/Error.hpp"
 
 #include <OpenImageIO/imageio.h>
 

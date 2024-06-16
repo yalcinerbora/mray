@@ -1,6 +1,6 @@
 #include "MaterialsDefault.h"
 #include "Core/TypeNameGenerators.h"
-
+#include "Core/Error.hpp"
 
 //===============================//
 //       Lambert Material        //

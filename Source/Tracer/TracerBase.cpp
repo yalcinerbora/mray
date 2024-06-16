@@ -1,6 +1,8 @@
 #include "TracerBase.h"
 #include <BS/BS_thread_pool.hpp>
 
+#include "Core/Error.hpp"
+
 // TODO: This is not good, we need to instantiate
 // to get the virtual function, change this later
 // (change this with what though?)

@@ -1,5 +1,7 @@
 #include "ConvertCommand.h"
+
 #include "GFGConverter/GFGConverter.h"
+#include "Core/Log.h"
 
 #include <CLI/CLI.hpp>
 #include <string_view>

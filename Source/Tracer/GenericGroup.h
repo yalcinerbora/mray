@@ -12,10 +12,11 @@
 #include "Core/MemAlloc.h"
 #include "Core/DataStructures.h"
 #include "Core/TracerI.h"
+#include "Core/Error.h"
 
 #include "TransientPool/TransientPool.h"
 
-#include "Device/GPUSystem.h"
+#include "Device/GPUSystemForward.h"
 
 #include "TracerTypes.h"
 #include "ParamVaryingData.h"
@@ -235,7 +236,6 @@ class GenericTexturedGroupT : public GenericGroupT<IdType, AttributeInfoType>
                                      std::vector<TextureId>,
                                      const GPUQueue& queue) = 0;
 };
-
 
 template<class ID, class AI>
 const AttributeRanges& GenericGroupT<ID, AI>::FindRange(IdInt id) const

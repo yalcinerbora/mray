@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/TracerI.h"
+#include "Core/Log.h"
 #include "TransientPool/TransientPool.h"
 
 #include <map>

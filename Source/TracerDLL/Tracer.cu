@@ -1,6 +1,7 @@
 #include "Tracer.h"
 #include "RequestedTypes.h"
 #include "Device/GPUAlgReduce.h"
+#include "Core/Error.hpp"
 
 TypeGeneratorPack Tracer::GLOBAL_TYPE_GEN = {};
 

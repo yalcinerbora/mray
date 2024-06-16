@@ -8,6 +8,7 @@
 #include "Core/Types.h"
 #include "Core/SharedLibrary.h"
 #include "Core/SceneLoaderI.h"
+#include "Core/Error.hpp"
 
 #include "MockTracer.h"
 #include "TestScenes.h"

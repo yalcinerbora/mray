@@ -4,6 +4,9 @@
 #include "Core/DataStructures.h"
 #include "Core/MemAlloc.h"
 #include "Core/System.h"
+#include "Core/Log.h"
+#include "Core/Error.h"
+#include "Core/Error.hpp"
 
 #include <Imgui/imgui.h>
 #include <Imgui/imgui_impl_glfw.h>
@@ -18,9 +21,10 @@
 #include <vulkan/vulkan_to_string.hpp>
 
 #ifdef MRAY_WINDOWS
-    #define WINDOWS_LEAN_AND_MEAN
+
     #include <windows.h>
     #include <vulkan/vulkan_win32.h>
+
 #endif
 
 VKAPI_ATTR VkBool32 VKAPI_CALL

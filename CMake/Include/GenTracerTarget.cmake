@@ -79,6 +79,7 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/ShapeFunctions.h
         ${CURRENT_SOURCE_DIR}/DistributionFunctions.h
         ${CURRENT_SOURCE_DIR}/Key.h
+        ${CURRENT_SOURCE_DIR}/KeyFormat.h
         ${CURRENT_SOURCE_DIR}/Hit.h)
 
     set(SRC_COMMON

@@ -2,11 +2,6 @@
 
 #include <memory>
 #include <string>
-#include <thread>
-
-std::string GetProcessPath();
-bool EnableVTMode();
-void RenameThread(std::thread::native_handle_type, const std::string& name);
 
 #ifdef MRAY_WINDOWS
 
@@ -23,6 +18,7 @@ void RenameThread(std::thread::native_handle_type, const std::string& name);
 
     using SystemSemaphoreHandle = HANDLE;
     using SystemMemoryHandle = HANDLE;
+    using SystemThreadHandle = HANDLE;
 
 #elif defined MRAY_LINUX
 
@@ -39,13 +35,18 @@ void RenameThread(std::thread::native_handle_type, const std::string& name);
     #error System preprocessor definition is not set properly! (CMake should have handled this)
 #endif
 
+std::string GetProcessPath();
+bool        EnableVTMode();
+void        RenameThread(SystemThreadHandle,
+                         const std::string& name);
+
+
 // Loaded class from a shared library
 // Destructor may be from the other side of DLL boundary.
 //
 // So it is just aliased unique_ptr
 //template <class T>
 //using ObjGeneratorFunc = T* (*)();
-
 template <class T, class... Args>
 using ObjGeneratorFuncArgs = T* (*)(Args...);
 

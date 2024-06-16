@@ -1,6 +1,8 @@
 #include "GPUSystemCUDA.h"
 #include "DeviceMemoryCUDA.h"
 
+#include "Core/Error.hpp"
+
 #include <cuda.h>
 #include <nvtx3/nvToolsExt.h>
 

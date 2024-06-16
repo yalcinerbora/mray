@@ -7,7 +7,9 @@
 #include <cassert>
 #include <numeric>
 
+#include "Core/Log.h"
 #include "Core/Error.h"
+#include "Core/Error.hpp"
 #include "Core/MemAlloc.h"
 
 #include "VisorI.h"

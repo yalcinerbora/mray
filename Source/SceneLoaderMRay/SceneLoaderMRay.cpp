@@ -6,6 +6,7 @@
 #include "Core/NormTypes.h"
 #include "Core/Filesystem.h"
 #include "Core/TypeNameGenerators.h"
+#include "Core/Error.hpp"
 
 #include "MeshLoader/EntryPoint.h"
 #include "MeshLoaderJson.h"

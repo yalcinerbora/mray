@@ -18,6 +18,7 @@
 #include "Core/Vector.h"
 #include "Core/Quaternion.h"
 #include "Core/Filesystem.h"
+#include "Core/Error.hpp"
 
 // TODO: Type leak change it? (This functionaly is
 // highly intrusive, probably needs a redesign?)

@@ -8,6 +8,8 @@
 
 #include "Core/SharedLibrary.h"
 #include "Core/System.h"
+#include "Core/Error.h"
+#include "Core/Error.hpp"
 
 #include "TracerThread.h"
 

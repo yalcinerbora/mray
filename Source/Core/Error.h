@@ -1,7 +1,18 @@
 #pragma once
 
 #include <string>
-#include "Log.h"
+
+namespace fmt { inline namespace v10
+{
+    template <typename T> struct type_identity;
+    template <typename T> using type_identity_t = typename type_identity<T>::type;
+
+    template <typename Char, typename... Args> class basic_format_string;
+
+    template <typename... Args>
+    using format_string = basic_format_string<char, type_identity_t<Args>...>;
+
+}}
 
 // Very generic error
 // Throw it return it, stick in a stew
@@ -21,7 +32,8 @@ struct MRayError
     public:
     // Constructors & Destructor
                 MRayError(Type = Type::OK);
-    // This pattern emerges, so added as a template
+                MRayError(std::string_view);
+    // This pattern emerges a lot, so added as a template
     template<class... Args>
                 MRayError(fmt::format_string<Args...> fstr, Args&&... args);
                 MRayError(const MRayError&)     = default;
@@ -40,10 +52,9 @@ inline MRayError::MRayError(Type t)
     : type(t)
 {}
 
-template<class... Args>
-inline MRayError::MRayError(fmt::format_string<Args...> fstr, Args&&... args)
+inline MRayError::MRayError(std::string_view sv)
     : type(MRayError::HAS_ERROR)
-    , customInfo(MRAY_FORMAT(fstr, std::forward<Args>(args)...))
+    , customInfo(sv)
 {}
 
 inline MRayError::operator bool()
@@ -54,12 +65,4 @@ inline MRayError::operator bool()
 inline std::string MRayError::GetError() const
 {
     return customInfo;
-}
-
-inline void MRayError::AppendInfo(const std::string& s)
-{
-    if(customInfo.empty())
-        customInfo = MRAY_FORMAT("{:s}", s);
-    else
-        customInfo += MRAY_FORMAT("|| {:s}", s);
 }

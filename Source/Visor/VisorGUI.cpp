@@ -12,6 +12,7 @@
 
 #include "Core/MemAlloc.h"
 #include "Core/BitFunctions.h"
+#include "Core/Log.h"
 
 Pair<double, std::string_view> ConvertMemSizeToGUI(size_t size)
 {
@@ -225,7 +226,7 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
         {
             auto usedGPUMem = ConvertMemSizeToGUI(visorState.usedGPUMemoryBytes);
             auto totalGPUMem = ConvertMemSizeToGUI(visorState.tracer.totalGPUMemoryBytes);
-            std::string memUsage = fmt::format("{:.1f}{:s} / {:.1f}{:s}",
+            std::string memUsage = MRAY_FORMAT("{:.1f}{:s} / {:.1f}{:s}",
                                                usedGPUMem.first, usedGPUMem.second,
                                                totalGPUMem.first, totalGPUMem.second);
 
@@ -234,13 +235,13 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
             ImGui::Text("%s", (std::to_string(visorState.renderer.renderResolution[0]) + "x" +
                                std::to_string(visorState.renderer.renderResolution[1])).c_str());
             ImGui::Separator();
-            ImGui::Text("%s", fmt::format("{:>7.3f}{:s}",
+            ImGui::Text("%s", MRAY_FORMAT("{:>7.3f}{:s}",
                                           visorState.renderer.throughput,
                                           visorState.renderer.throughputSuffix).c_str());
             ImGui::Separator();
-            ImGui::Text("%s", (fmt::format("{:>6.0f}{:s}",
-                                           visorState.renderer.workPerPixel,
-                                           visorState.renderer.workPerPixelSuffix).c_str()));
+            ImGui::Text("%s", MRAY_FORMAT("{:>6.0f}{:s}",
+                                          visorState.renderer.workPerPixel,
+                                          visorState.renderer.workPerPixelSuffix).c_str());
             ImGui::Separator();
 
             std::string prefix = std::string(RENDERING_NAME);

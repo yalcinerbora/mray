@@ -28,6 +28,7 @@ set(SRC_VISOR
 
 set(SRC_VULKAN
     ${CURRENT_SOURCE_DIR}/VulkanPipeline.h
+    ${CURRENT_SOURCE_DIR}/VulkanPipeline.cpp
     ${CURRENT_SOURCE_DIR}/VulkanTypes.cpp
     ${CURRENT_SOURCE_DIR}/VulkanTypes.h
     ${CURRENT_SOURCE_DIR}/VulkanAllocators.cpp

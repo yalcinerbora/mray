@@ -8,6 +8,8 @@
 
 #include "Core/Timer.h"
 #include "Core/TypeNameGenerators.h"
+#include "Core/Error.h"
+#include "Core/Error.hpp"
 
 #include "Common/JsonCommon.h"
 

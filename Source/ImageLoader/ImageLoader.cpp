@@ -1,15 +1,11 @@
 #include "ImageLoader.h"
-#include "Core/MRayDataType.h"
 
 #include <execution>
 #include <algorithm>
 #include <array>
 #include <filesystem>
 
-#include <OpenImageIO/imageio.h>
-#include <OpenImageIO/imagebuf.h>
-#include <OpenImageIO/imagebufalgo.h>
-#include <OpenImageIO/deepdata.h>
+#include "Core/MRayDataType.h"
 
 Expected<std::string_view> ImageLoader::ImageTypeToExtension(ImageType type)
 {
@@ -39,11 +35,15 @@ ImageLoader::ImageLoader(bool enableMT)
     OIIO::attribute("try_all_readers", 0);
 
     using namespace std::string_view_literals;
-    genMap.emplace(".dds"sv, &GenerateType<ImageFileI, ImageFileDDS,
-                                           const std::string&, ImageSubChannelType, ImageIOFlags>);
-    auto loc =
-    genMap.emplace("default"sv, &GenerateType<ImageFileI, ImageFileOIIO,
-                                              const std::string&, ImageSubChannelType, ImageIOFlags>).first;
+    constexpr auto DDSGenFunction = &GenerateType<ImageFileI, ImageFileDDS,
+                                                  const std::string&, ImageSubChannelType,
+                                                  ImageIOFlags>;
+    genMap.emplace(".dds"sv, DDSGenFunction);
+
+    constexpr auto OIIOGenFunction = &GenerateType<ImageFileI, ImageFileOIIO,
+                                                   const std::string&, ImageSubChannelType,
+                                                   ImageIOFlags>;
+    auto loc = genMap.emplace("default"sv, OIIOGenFunction).first;
     defaultGenerator = loc->second;
 }
 

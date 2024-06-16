@@ -3,6 +3,7 @@
 #include "SharedLibrary.h"
 #include "System.h"
 #include "Filesystem.h"
+#include "Error.hpp"
 
 // Env Headers
 #if defined MRAY_WINDOWS

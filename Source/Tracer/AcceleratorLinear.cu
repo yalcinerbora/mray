@@ -1,6 +1,11 @@
 #include "AcceleratorLinear.h"
+
 #include "Device/GPUAlgReduce.h"
 #include "Device/GPUSystem.hpp"
+
+#include "Core/Error.hpp"
+
+#include "KeyFormat.h"
 
 // Generic PrimitiveKey copy kernel
 // TODO: find a way to put this somewhere proper
