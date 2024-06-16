@@ -29,29 +29,29 @@ void Timer::Lap()
 template <>
 double Timer::Elapsed<Nanosecond>()
 {
-    return std::chrono::duration<double, Nanosecond>(elapsed).count();
+    return std::chrono::duration<double, Nanosecond>(std::bit_cast<Duration>(elapsed)).count();
 }
 
 template <>
 double Timer::Elapsed<Microsecond>()
 {
-    return std::chrono::duration<double, Microsecond>(elapsed).count();
+    return std::chrono::duration<double, Microsecond>(std::bit_cast<Duration>(elapsed)).count();
 }
 
 template <>
 double Timer::Elapsed<Millisecond>()
 {
-    return std::chrono::duration<double, Millisecond>(elapsed).count();
+    return std::chrono::duration<double, Millisecond>(std::bit_cast<Duration>(elapsed)).count();
 }
 
 template <>
 double Timer::Elapsed<Second>()
 {
-    return std::chrono::duration<double, Second>(elapsed).count();
+    return std::chrono::duration<double, Second>(std::bit_cast<Duration>(elapsed)).count();
 }
 
 template <>
 double Timer::Elapsed<Minue>()
 {
-    return std::chrono::duration<double, Minue>(elapsed).count();
+    return std::chrono::duration<double, Minue>(std::bit_cast<Duration>(elapsed)).count();
 }
