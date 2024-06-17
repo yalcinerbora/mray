@@ -64,7 +64,7 @@ class DeviceLocalMemoryCUDA
 class HostLocalMemoryCUDA
 {
     private:
-    const GPUSystemCUDA&    system;
+    const GPUSystemCUDA*    system;
     void*                   hPtr;
     void*                   dPtr;
     size_t                  size;

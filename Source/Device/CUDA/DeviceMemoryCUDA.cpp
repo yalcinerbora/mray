@@ -148,7 +148,7 @@ void DeviceLocalMemoryCUDA::MigrateToOtherDevice(const GPUDeviceCUDA& deviceTo)
 
 HostLocalMemoryCUDA::HostLocalMemoryCUDA(const GPUSystemCUDA& system,
                                          bool neverDecrease)
-    : system(system)
+    : system(&system)
     , hPtr(nullptr)
     , dPtr(nullptr)
     , size(0)
@@ -164,11 +164,11 @@ HostLocalMemoryCUDA::HostLocalMemoryCUDA(const GPUSystemCUDA& system,
     // TODO: change this to virtual memory calls as well
     CUDA_MEM_THROW(cudaHostAlloc(&hPtr, sizeInBytes, cudaHostAllocMapped));
     CUDA_CHECK(cudaHostGetDevicePointer(&dPtr, hPtr, 0));
-
+    size = sizeInBytes;
 }
 
 HostLocalMemoryCUDA::HostLocalMemoryCUDA(const HostLocalMemoryCUDA& other)
-    : HostLocalMemoryCUDA(other.system, other.size, other.neverDecrease)
+    : HostLocalMemoryCUDA(*other.system, other.size, other.neverDecrease)
 {
     std::memcpy(hPtr, other.hPtr, size);
 }
@@ -232,7 +232,7 @@ void HostLocalMemoryCUDA::ResizeBuffer(size_t newSize)
 {
     if(neverDecrease && newSize <= size) return;
 
-    HostLocalMemoryCUDA newMem(system, newSize);
+    HostLocalMemoryCUDA newMem(*system, newSize);
     std::memcpy(newMem.hPtr, hPtr, size);
     *this = std::move(newMem);
 }

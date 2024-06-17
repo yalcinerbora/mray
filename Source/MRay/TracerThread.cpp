@@ -547,6 +547,7 @@ void TracerThread::LoopWork()
         // If we are rendering continue...
         if(isRendering)
         {
+            //RendererOutput renderOut = {};
             RendererOutput renderOut = tracer->DoRenderWork();
             if(renderOut.analytics)
             {

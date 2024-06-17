@@ -15,6 +15,7 @@ namespace VkConversions
     VkToMRayColorSpace(VkColorSpaceKHR);
 }
 
+
 struct SemaphoreVariant
 {
     uint64_t    value = std::numeric_limits<uint64_t>::max();
@@ -42,6 +43,7 @@ class VulkanImage
 {
     private:
     VkImage         imgVk       = nullptr;
+    VkFormat        formatVk    = VK_FORMAT_UNDEFINED;
     VkImageView     viewVk      = nullptr;
     VkSampler       samplerVk   = nullptr;
     Vector2ui       extent      = Vector2ui::Zero();
@@ -53,6 +55,7 @@ class VulkanImage
                     VulkanImage(const VulkanSystemView&);
                     VulkanImage(const VulkanSystemView&,
                                 VkFormat format,
+                                VkImageUsageFlags usage,
                                 Vector2ui pixRes, uint32_t depth = 1);
                     VulkanImage(const VulkanImage&) = delete;
                     VulkanImage(VulkanImage&&);
@@ -63,11 +66,12 @@ class VulkanImage
     SizeAlignPair   MemRequirements() const;
     void            AttachMemory(VkDeviceMemory, VkDeviceSize);
     void            IssueClear(VkCommandBuffer, VkClearColorValue);
+    void            CreateView();
 
     VkImage         Image() const;
-    VkImageView     View() const;
     VkSampler       Sampler() const;
     Vector2ui       Extent() const;
+    VkImageView     View() const;
 
     //
     VkBufferImageCopy FullCopyParams() const;
@@ -104,9 +108,9 @@ inline VkImage VulkanImage::Image() const
 {
     return imgVk;
 }
-
 inline VkImageView VulkanImage::View() const
 {
+    assert(viewVk != nullptr);
     return viewVk;
 }
 

@@ -198,11 +198,23 @@ MRayError VisorCommand::Invoke()
     // ====================== //
     //     Real-time Loop     //
     // ====================== //
-    while(!visorSystem->MTIsTerminated() &&
-          !transferQueue.GetVisorView().IsTerminated())
+    e = MRayError::OK;
+    try
     {
-        visorSystem->MTWaitForInputs();
-        visorSystem->MTRender();
+        while(!visorSystem->MTIsTerminated() &&
+              !transferQueue.GetVisorView().IsTerminated())
+        {
+            visorSystem->MTWaitForInputs();
+            visorSystem->MTRender();
+        }
+    }
+    catch(const MRayError& err)
+    {
+        e = err;
+    }
+    catch(const std::exception& err)
+    {
+        e = MRayError("Unkown Error: {}", err.what());
     }
 
     // Order is important here
@@ -217,7 +229,7 @@ MRayError VisorCommand::Invoke()
     // Now we can destory the tracer
     visorSystem->MTDestroy();
     // All Done!
-    return MRayError::OK;
+    return e;
 }
 
 CLI::App* VisorCommand::GenApp(CLI::App& mainApp)

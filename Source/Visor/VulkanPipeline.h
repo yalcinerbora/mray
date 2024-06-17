@@ -53,7 +53,6 @@ class VulkanComputePipeline
 
     void Clear();
     public:
-                            VulkanComputePipeline() = default;
                             VulkanComputePipeline(VkDevice deviceVk);
                             VulkanComputePipeline(const VulkanComputePipeline&) = delete;
                             VulkanComputePipeline(VulkanComputePipeline&&);

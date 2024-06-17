@@ -18,6 +18,24 @@ concept VulkanMemObjectC = requires(const T constT, T t)
     } -> std::same_as<void>;
 };
 
+class VulkanDeviceMemory
+{
+    private:
+    VkDeviceMemory      memoryVk = nullptr;
+    VkDevice            deviceVk = nullptr;
+    public:
+                        VulkanDeviceMemory(VkDevice);
+                        VulkanDeviceMemory(VkDevice, size_t totalSize,
+                                           uint32_t memIndex);
+                        VulkanDeviceMemory(const VulkanDeviceMemory&) = delete;
+                        VulkanDeviceMemory(VulkanDeviceMemory&&);
+    VulkanDeviceMemory& operator=(const VulkanDeviceMemory&) = delete;
+    VulkanDeviceMemory& operator=(VulkanDeviceMemory&&);
+                        ~VulkanDeviceMemory();
+
+    VkDeviceMemory      Memory() const;
+};
+
 class VulkanHostAllocator
 {
     private:
@@ -86,7 +104,8 @@ class VulkanDeviceAllocator
     // The alloaction
     template<VulkanMemObjectC... Args>
     [[nodiscard]]
-    VkDeviceMemory AllocateMultiObject(Tuple<Args&...> inOutObjects, Location location);
+    VulkanDeviceMemory AllocateMultiObject(Tuple<Args&...> inOutObjects,
+                                           Location location);
 };
 
 template<size_t... Is, class... Tp>
@@ -130,7 +149,7 @@ VulkanDeviceAllocator::AttachMemory(Tuple<Tp&...>& inOutObjects,
 }
 
 template<VulkanMemObjectC... Args>
-inline VkDeviceMemory
+inline VulkanDeviceMemory
 VulkanDeviceAllocator::AllocateMultiObject(Tuple<Args&...> inOutObjects,
                                            Location location)
 {
@@ -143,25 +162,71 @@ VulkanDeviceAllocator::AllocateMultiObject(Tuple<Args&...> inOutObjects,
     for(size_t i = 0; i < N; i++)
     {
         offsets[i] = totalSize;
-        totalSize = MathFunctions::DivideUp(totalSize,
-                                            sizeAndAlignments[i].second);
-        totalSize += sizeAndAlignments[i].first;
+        totalSize += MathFunctions::NextMultiple(sizeAndAlignments[i].second,
+                                                 sizeAndAlignments[i].first);
     }
 
+    uint32_t memIndex = (location == HOST_VISIBLE)
+                            ? hostVisibleMemIndex
+                            : deviceMemIndex;
+    VulkanDeviceMemory result(deviceVk, totalSize, memIndex);
+
+    // Attach the allocated memory to the objects
+    AttachMemory(inOutObjects, result.Memory(), offsets);
+    return result;
+}
+
+inline
+VulkanDeviceMemory::VulkanDeviceMemory(VkDevice d)
+    : deviceVk(d)
+{}
+
+inline
+VulkanDeviceMemory::VulkanDeviceMemory(VkDevice d,
+                                       size_t totalSize, uint32_t memIndex)
+    : deviceVk(d)
+{
     VkMemoryAllocateInfo allocInfo =
     {
-        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO,
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         .pNext = nullptr,
         .allocationSize = totalSize,
-        .memoryTypeIndex = (location == DEVICE) ? deviceMemIndex
-                                                : hostVisibleMemIndex
+        .memoryTypeIndex = memIndex
     };
     VkDeviceMemory result;
     vkAllocateMemory(deviceVk, &allocInfo,
                      VulkanHostAllocator::Functions(),
                      &result);
+}
 
-    // Attach the allocated memory to the objects
-    AttachMemory(inOutObjects, result, offsets);
-    return result;
+inline
+VulkanDeviceMemory::VulkanDeviceMemory(VulkanDeviceMemory&& other)
+    : deviceVk(other.deviceVk)
+    , memoryVk(std::exchange(other.memoryVk, nullptr))
+{}
+
+inline
+VulkanDeviceMemory& VulkanDeviceMemory::operator=(VulkanDeviceMemory&& other)
+{
+    assert(this != &other);
+    if(memoryVk)
+        vkFreeMemory(deviceVk, memoryVk,
+                     VulkanHostAllocator::Functions());
+
+    deviceVk = other.deviceVk;
+    memoryVk = std::exchange(other.memoryVk, nullptr);
+    return *this;
+}
+
+inline
+VulkanDeviceMemory::~VulkanDeviceMemory()
+{
+    vkFreeMemory(deviceVk, memoryVk,
+                 VulkanHostAllocator::Functions());
+}
+
+inline
+VkDeviceMemory VulkanDeviceMemory::Memory() const
+{
+    return memoryVk;
 }

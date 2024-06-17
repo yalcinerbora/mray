@@ -26,6 +26,7 @@ AccumImageStage::AccumImageStage(AccumImageStage&& other)
     , systemSemHandle(std::exchange(other.systemSemHandle, SystemSemaphoreHandle(0)))
     , handlesVk(other.handlesVk)
     , pipeline(std::move(other.pipeline))
+    , descriptorSets(std::move(other.descriptorSets))
     , hdrImage(other.hdrImage)
     , sampleImage(other.sampleImage)
     , accumulateCommand(std::exchange(other.accumulateCommand, nullptr))
@@ -42,6 +43,7 @@ AccumImageStage& AccumImageStage::operator=(AccumImageStage&& other)
     timelineSemaphoreVk = std::exchange(other.timelineSemaphoreVk, nullptr);
     handlesVk = other.handlesVk;
     pipeline = std::move(other.pipeline);
+    descriptorSets = std::move(other.descriptorSets);
     hdrImage = other.hdrImage;
     sampleImage = other.sampleImage;
     accumulateCommand = std::exchange(other.accumulateCommand, nullptr);
@@ -243,7 +245,7 @@ void AccumImageStage::ChangeImage(const VulkanImage* hdrImageIn,
     hdrImage = hdrImageIn;
     sampleImage = sampleImageIn;
 
-    std::array< VkWriteDescriptorSet, 2> writeInfo;
+    std::array<VkWriteDescriptorSet, 2> writeInfo;
     VkDescriptorImageInfo hdrImgInfo =
     {
         .sampler = hdrImageIn->Sampler(),
@@ -256,7 +258,7 @@ void AccumImageStage::ChangeImage(const VulkanImage* hdrImageIn,
         .pNext = nullptr,
         .dstSet = descriptorSets[0],
         .dstBinding = HDR_IMAGE_BIND_INDEX,
-        .dstArrayElement = 1,
+        .dstArrayElement = 0,
         .descriptorCount = 1,
         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
         .pImageInfo = &hdrImgInfo,

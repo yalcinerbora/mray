@@ -6,7 +6,7 @@
 
 void RenderImagePool::Clear()
 {
-    if(!imgMemory) return;
+    if(!imgMemory.Memory()) return;
 
     // Now there may be a save process happening when a new
     // Image is requested, we need to wait it to finish.
@@ -25,11 +25,9 @@ void RenderImagePool::Clear()
 
 
     // Now we can unmap and free memory
-    vkUnmapMemory(handlesVk->deviceVk, stageMemory);
-    vkFreeMemory(handlesVk->deviceVk, imgMemory,
-                 VulkanHostAllocator::Functions());
-    vkFreeMemory(handlesVk->deviceVk, stageMemory,
-                 VulkanHostAllocator::Functions());
+    vkUnmapMemory(handlesVk->deviceVk, stageMemory.Memory());
+    imgMemory = VulkanDeviceMemory(handlesVk->deviceVk);
+    stageMemory = VulkanDeviceMemory(handlesVk->deviceVk);
 
     vkDestroySemaphore(handlesVk->deviceVk, saveSemaphore.semHandle,
                        VulkanHostAllocator::Functions());
@@ -45,6 +43,8 @@ RenderImagePool::RenderImagePool(BS::thread_pool* threadPool,
     , hdrSampleImage(handles)
     , sdrImage(handles)
     , outStageBuffer(handles)
+    , stageMemory(handles.deviceVk)
+    , imgMemory(handles.deviceVk)
     , handlesVk(&handles)
     , threadPool(threadPool)
     , imgLoader(CreateImageLoader())
@@ -60,18 +60,24 @@ RenderImagePool::RenderImagePool(BS::thread_pool* threadPool,
     // TODO: Reduce floating point usage, currently formats are
     // technically a protocol between tracer and
     // visor, (we assume it is always XXX_FLOAT).
+    auto sdrImgUsageFlags = (VK_IMAGE_USAGE_SAMPLED_BIT |
+                             VK_IMAGE_USAGE_STORAGE_BIT |
+                             VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    auto hdrImgUsageFlags = (sdrImgUsageFlags |
+                             VK_IMAGE_USAGE_TRANSFER_DST_BIT);
     hdrImage = (initInfo.isSpectralPack)
         ? VulkanImage(*handlesVk, VK_FORMAT_R32_SFLOAT,
+                      hdrImgUsageFlags,
                       initInfo.extent, initInfo.depth)
-        : VulkanImage(*handlesVk, VK_FORMAT_R32G32B32_SFLOAT,
-                      initInfo.extent);
+        : VulkanImage(*handlesVk, VK_FORMAT_R32G32B32A32_SFLOAT,
+                      hdrImgUsageFlags, initInfo.extent);
     hdrSampleImage = VulkanImage(*handlesVk, VK_FORMAT_R32_SFLOAT,
-                                 initInfo.extent);
-    sdrImage = VulkanImage(*handlesVk, VK_FORMAT_R32G32B32_SFLOAT,
-                           initInfo.extent);
+                                 hdrImgUsageFlags, initInfo.extent);
+    sdrImage = VulkanImage(*handlesVk, VK_FORMAT_R32G32B32A32_SFLOAT,
+                           sdrImgUsageFlags, initInfo.extent);
 
-    size_t outBufferSize = std::max(hdrImage.MemRequirements().first,
-                                    sdrImage.MemRequirements().first);
+    size_t outBufferSize = std::max(hdrImage.MemRequirements().second,
+                                    sdrImage.MemRequirements().second);
     outStageBuffer = VulkanBuffer(*handlesVk,
                                   VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                                   outBufferSize);
@@ -81,15 +87,17 @@ RenderImagePool::RenderImagePool(BS::thread_pool* threadPool,
                                                              sdrImage,
                                                              hdrSampleImage),
                                                     VulkanDeviceAllocator::DEVICE);
+    hdrImage.CreateView();
+    sdrImage.CreateView();
+    hdrSampleImage.CreateView();
 
     stageMemory = deviceAllocator.AllocateMultiObject(std::tie(outStageBuffer),
                                                       VulkanDeviceAllocator::HOST_VISIBLE);
 
     void* ptr;
-    vkMapMemory(handlesVk->deviceVk, stageMemory, 0, VK_WHOLE_SIZE, 0,
-                &ptr);
+    vkMapMemory(handlesVk->deviceVk, stageMemory.Memory(),
+                0, VK_WHOLE_SIZE, 0, &ptr);
     hStagePtr = static_cast<Byte*>(ptr);
-
 
     VkCommandBufferAllocateInfo cBuffAllocInfo =
     {
@@ -154,14 +162,16 @@ RenderImagePool::RenderImagePool(RenderImagePool&& other)
     , hdrSampleImage(std::move(other.hdrSampleImage))
     , sdrImage(std::move(other.sdrImage))
     , outStageBuffer(std::move(other.outStageBuffer))
-    , stageMemory(std::exchange(other.stageMemory, nullptr))
-    , imgMemory(std::exchange(other.imgMemory, nullptr))
+    , stageMemory(std::move(other.stageMemory))
+    , imgMemory(std::move(other.imgMemory))
     , handlesVk(other.handlesVk)
     , hStagePtr(other.hStagePtr)
     , hdrCopyCommand(std::exchange(other.hdrCopyCommand, nullptr))
     , sdrCopyCommand(std::exchange(other.sdrCopyCommand, nullptr))
     , threadPool(other.threadPool)
     , imgLoader(std::move(other.imgLoader))
+    , saveSemaphore(std::exchange(other.saveSemaphore, {}))
+    , initInfo(other.initInfo)
 {}
 
 RenderImagePool& RenderImagePool::operator=(RenderImagePool&& other)
@@ -173,9 +183,16 @@ RenderImagePool& RenderImagePool::operator=(RenderImagePool&& other)
     hdrSampleImage = std::move(other.hdrSampleImage);
     sdrImage = std::move(other.sdrImage);
     outStageBuffer = std::move(other.outStageBuffer);
-    stageMemory = std::exchange(other.stageMemory, nullptr);
-    imgMemory = std::exchange(other.imgMemory, nullptr);
+    stageMemory = std::move(other.stageMemory);
+    imgMemory = std::move(other.imgMemory);
     handlesVk = other.handlesVk;
+    hStagePtr = other.hStagePtr;
+    hdrCopyCommand = std::exchange(other.hdrCopyCommand, nullptr);
+    sdrCopyCommand = std::exchange(other.sdrCopyCommand, nullptr);
+    threadPool = other.threadPool;
+    imgLoader = std::move(other.imgLoader);
+    saveSemaphore = std::exchange(other.saveSemaphore, {});
+    initInfo = other.initInfo;
     return *this;
 }
 

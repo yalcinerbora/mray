@@ -46,8 +46,8 @@ VulkanImage::VulkanImage(const VulkanSystemView& handles)
 {}
 
 VulkanImage::VulkanImage(const VulkanSystemView& handles,
-                         VkFormat format, Vector2ui extentIn,
-                         uint32_t depthIn)
+                         VkFormat format, VkImageUsageFlags usage,
+                         Vector2ui extentIn, uint32_t depthIn)
     : extent(extentIn)
     , depth(depthIn)
     , handlesVk(&handles)
@@ -69,54 +69,28 @@ VulkanImage::VulkanImage(const VulkanSystemView& handles,
         .arrayLayers = depth,
         .samples = VK_SAMPLE_COUNT_1_BIT,
         .tiling = VK_IMAGE_TILING_OPTIMAL,
+        .usage = usage,
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .queueFamilyIndexCount = 1,
         .pQueueFamilyIndices = &handlesVk->queueIndex,
-        .initialLayout = VK_IMAGE_LAYOUT_GENERAL
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
     };
     vkCreateImage(handlesVk->deviceVk, &imgCInfo,
                   VulkanHostAllocator::Functions(),
                   &imgVk);
 
-    VkImageViewCreateInfo imgViewCInfo =
-    {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .image = imgVk,
-        .viewType = (depth == 1)
-                        ? VK_IMAGE_VIEW_TYPE_2D
-                        : VK_IMAGE_VIEW_TYPE_2D_ARRAY,
-        .format = format,
-        .components =
-        {
-            .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-            .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-            .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-            .a = VK_COMPONENT_SWIZZLE_IDENTITY
-        },
-        .subresourceRange =
-        {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = depth
-        }
-    };
-    vkCreateImageView(handlesVk->deviceVk, &imgViewCInfo,
-                      VulkanHostAllocator::Functions(),
-                      &viewVk);
+    formatVk = format;
 }
 
 VulkanImage::VulkanImage(VulkanImage&& other)
-    : imgVk(other.imgVk)
-    , viewVk(other.viewVk)
+    : imgVk(std::exchange(other.imgVk, nullptr))
+    , formatVk(other.formatVk)
+    , viewVk(std::exchange(other.viewVk, nullptr))
+    , samplerVk(std::exchange(other.samplerVk, nullptr))
+    , extent(other.extent)
+    , depth(other.depth)
     , handlesVk(other.handlesVk)
-{
-    other.imgVk = nullptr;
-    other.viewVk = nullptr;
-}
+{}
 
 VulkanImage& VulkanImage::operator=(VulkanImage&& other)
 {
@@ -126,9 +100,14 @@ VulkanImage& VulkanImage::operator=(VulkanImage&& other)
     vkDestroyImageView(handlesVk->deviceVk, viewVk,
                        VulkanHostAllocator::Functions());
 
-    handlesVk = other.handlesVk;
+
     imgVk = std::exchange(other.imgVk, nullptr);
+    formatVk = other.formatVk;
     viewVk = std::exchange(other.viewVk, nullptr);
+    samplerVk = std::exchange(other.samplerVk, nullptr);
+    extent = other.extent;
+    depth = other.depth;
+    handlesVk = other.handlesVk;
     return *this;
 }
 
@@ -185,6 +164,39 @@ VkBufferImageCopy VulkanImage::FullCopyParams() const
     };
 }
 
+void VulkanImage::CreateView()
+{
+    VkImageViewCreateInfo imgViewCInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .image = imgVk,
+        .viewType = (depth == 1)
+                        ? VK_IMAGE_VIEW_TYPE_2D
+                        : VK_IMAGE_VIEW_TYPE_2D_ARRAY,
+        .format = formatVk,
+        .components =
+        {
+            .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+            .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+            .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+            .a = VK_COMPONENT_SWIZZLE_IDENTITY
+        },
+        .subresourceRange =
+        {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = depth
+        }
+    };
+    vkCreateImageView(handlesVk->deviceVk, &imgViewCInfo,
+                      VulkanHostAllocator::Functions(),
+                      &viewVk);
+}
+
 VulkanBuffer::VulkanBuffer(const VulkanSystemView& handles)
     : handlesVk(&handles)
 {}
@@ -222,6 +234,10 @@ VulkanBuffer::VulkanBuffer(VulkanBuffer&& other)
 VulkanBuffer& VulkanBuffer::operator=(VulkanBuffer&& other)
 {
     assert(this != &other);
+    if(bufferVk)
+        vkDestroyBuffer(handlesVk->deviceVk, bufferVk,
+                        VulkanHostAllocator::Functions());
+
     handlesVk = other.handlesVk;
     bufferVk = std::exchange(other.bufferVk, nullptr);
     return *this;

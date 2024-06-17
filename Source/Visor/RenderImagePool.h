@@ -28,8 +28,8 @@ class RenderImagePool
     VulkanImage             hdrSampleImage;
     VulkanImage             sdrImage;
     VulkanBuffer            outStageBuffer;
-    VkDeviceMemory          stageMemory     = nullptr;
-    VkDeviceMemory          imgMemory       = nullptr;
+    VulkanDeviceMemory      stageMemory;
+    VulkanDeviceMemory      imgMemory;
     const VulkanSystemView* handlesVk       = nullptr;
     Byte*                   hStagePtr       = nullptr;
     // Command related

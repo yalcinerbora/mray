@@ -79,21 +79,7 @@ int main(int argc, const char* const argv[])
     });
     assert(appIt != appList.cend());
 
-    MRayError e;
-    try
-    {
-        e = appIt->first->Invoke();
-
-    }
-    catch(const MRayError& err)
-    {
-        e = err;
-    }
-    catch(const std::exception& err)
-    {
-        e = MRayError("{}", err.what());
-    }
-
+    MRayError e = appIt->first->Invoke();
     if(e)
     {
         MRAY_ERROR_LOG("[Visor]: {}", e.GetError());

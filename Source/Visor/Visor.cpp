@@ -525,15 +525,15 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     Span<const VkMemoryType> memTypeSpan(memProps.memoryTypes,
                                          memProps.memoryTypeCount);
     // TODO: Remove this when we are confident about memories
-    //if constexpr(MRAY_IS_DEBUG)
-    //{
-    //    for(size_t i = 0; i < memProps.memoryTypeCount; i++)
-    //    {
-    //        const VkMemoryType& memType = memProps.memoryTypes[i];
-    //        std::string s = vk::to_string(vk::MemoryPropertyFlags(memType.propertyFlags));
-    //        MRAY_DEBUG_LOG("Mem type: {}, HeapIndex: {}", s, memType.heapIndex);
-    //    }
-    //}
+    if constexpr(MRAY_IS_DEBUG)
+    {
+        for(size_t i = 0; i < memProps.memoryTypeCount; i++)
+        {
+            const VkMemoryType& memType = memProps.memoryTypes[i];
+            std::string s = vk::to_string(vk::MemoryPropertyFlags(memType.propertyFlags));
+            MRAY_DEBUG_LOG("Mem type: {}, HeapIndex: {}", s, memType.heapIndex);
+        }
+    }
 
     // If device is iGPU, get the combo memory,
     // This should be as fast as normal memory (speculation but, I mean come on)

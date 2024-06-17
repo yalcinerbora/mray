@@ -44,12 +44,14 @@ struct MaxAndAvg
 struct TonemapParameters
 {
     typedef Tonemapper.TMParams TMParams;
+    typedef ColorConverterOut::GammaParams GammaParams;
 
+    TMParams                        tonemapParams;
+    GammaParams                     outGammaParams;
     Texture2D<float3>               inputTex;
     RWTexture2D<float3>             outputTex;
-    TMParams                        tonemapParams;
     RWStructuredBuffer<MaxAndAvg>   maxAndAvg;
-    ColorConverterOut::GammaParams  outGammaParams;
+
 }
 
 ParameterBlock<TonemapParameters> params;
@@ -91,7 +93,7 @@ float BlockLocalReduction<T : IBinaryOp>(in float value, in uint localId, in T o
     return sReduceBuffer[localId];
 }
 
-void AtomicFloatOp<T : IBinaryOp>(inout uint outLoc, float val, in T)
+void AtomicFloatOp<T : IBinaryOp>(in uint outLoc, float val, in T)
 {
     // CAS Atomic operation for Atomic Max for floats
     // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#atomic-functions
@@ -105,8 +107,18 @@ void AtomicFloatOp<T : IBinaryOp>(inout uint outLoc, float val, in T)
         float assumedF = asfloat(assumed);
         float newValF = T::op(assumedF, val);
         uint newVal = asuint(newValF);
-        InterlockedCompareExchange(outLoc, assumed, newVal, old);
-
+        // TODO: outLoc was directly refers to the params.maxAndAvg[0]...
+        // but slang couldn't (o I did something wrong) compile it
+        // in a way that atomic compare and exachange actions on the
+        // "outLoc" local variable (at least Vulkan validatior said so)
+        // So we directly refer the SSBO variables here via a literal
+        // Old version!
+        // InterlockedCompareExchange(outLoc, assumed, newVal, old);
+        //
+        if(outLoc == 0) InterlockedCompareExchange(params.maxAndAvg[0].maxLum,
+                                                   assumed, newVal, old);
+        if(outLoc == 1) InterlockedCompareExchange(params.maxAndAvg[0].avgLum,
+                                                   assumed, newVal, old);
     } while(assumed != old);
 }
 
@@ -139,8 +151,9 @@ void KCFindAvgMaxLum(uint3 globalId: SV_DispatchThreadID,
         float old;
         float totalRecip = 1.0f / float(dim.x + dim.y);
         localAvg *= totalRecip;
-        AtomicFloatOp(params.maxAndAvg[0].avgLum, localAvg, AddOp());
-        AtomicFloatOp(params.maxAndAvg[0].maxLum, localAvg, MaxOp());
+
+        AtomicFloatOp(0, localMax, MaxOp());
+        AtomicFloatOp(1, localAvg, AddOp());
     }
 }
 

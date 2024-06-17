@@ -210,7 +210,7 @@ VulkanComputePipeline::GenerateDescriptorSets(VkDescriptorPool pool)
 }
 
 void VulkanComputePipeline::BindSetData(VkDescriptorSet descriptorSet,
-                                               const DescriptorBindList<ShaderBindingData>& bindingDataList)
+                                        const DescriptorBindList<ShaderBindingData>& bindingDataList)
 {
     // TODO: This function does not refer to any members of "VulkanComputePipeline"
     // change to free function.

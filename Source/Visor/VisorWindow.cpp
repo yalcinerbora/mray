@@ -899,6 +899,7 @@ VisorWindow& VisorWindow::operator=(VisorWindow&& other)
     swapchain = std::move(other.swapchain);
     accumulateStage = std::move(other.accumulateStage);
     tonemapStage = std::move(other.tonemapStage);
+    renderImagePool = std::move(other.renderImagePool);
     frameCounter = std::move(other.frameCounter);
     uniformBuffer = std::move(other.uniformBuffer);
     transferQueue = other.transferQueue;
