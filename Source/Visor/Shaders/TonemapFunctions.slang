@@ -10,7 +10,7 @@ public interface ITonemapper
     public static float3 ToneMap(in float3 hdrColor,
                                  in ColorConverterIn,
                                  in ColorConverterOut,
-                                 in ColorConverterOut::GammaParams gammaParams,
+                                 in ColorConverterOut.GammaParams gammaParams,
                                  in TMParams tmParams,
                                  in float maxLuminance,
                                  in float avgLuminance);
@@ -30,7 +30,7 @@ public struct Reinhard2002 : ITonemapper
     public static float3 ToneMap(in float3 hdrColor,
                                  in ColorConverterIn inConv,
                                  in ColorConverterOut outConv,
-                                 in ColorConverterOut::GammaParams gammaParams,
+                                 in ColorConverterOut.GammaParams gammaParams,
                                  in TMParamsReinhard tmParams,
                                  in float maxLuminance,
                                  in float avgLuminance)
@@ -57,16 +57,13 @@ public struct Reinhard2002 : ITonemapper
 
 public struct EmptyTonemapper : ITonemapper
 {
-    // TODO: I'm pretty sure this will fail, check this
-    public struct EmptyParams {}
-
-    public typedef EmptyParams TMParams;
+    public typedef uint TMParams;
 
     public static float3 ToneMap(in float3 hdrColor,
                                  in ColorConverterIn inConv,
                                  in ColorConverterOut outConv,
                                  in ColorConverterOut::GammaParams gammaParams,
-                                 in EmptyParams,
+                                 in uint,
                                  in float maxLuminance,
                                  in float avgLuminance)
     {

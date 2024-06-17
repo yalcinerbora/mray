@@ -44,14 +44,12 @@ struct MaxAndAvg
 struct TonemapParameters
 {
     typedef Tonemapper.TMParams TMParams;
-    typedef ColorConverterOut::GammaParams GammaParams;
-
-    TMParams                        tonemapParams;
-    GammaParams                     outGammaParams;
+    typedef ColorConverterOut.GammaParams GammaParams;
+    StructuredBuffer<TMParams>      tonemapParams;
+    StructuredBuffer<GammaParams>   outGammaParams;
     Texture2D<float3>               inputTex;
     RWTexture2D<float3>             outputTex;
     RWStructuredBuffer<MaxAndAvg>   maxAndAvg;
-
 }
 
 ParameterBlock<TonemapParameters> params;
@@ -175,8 +173,8 @@ void KCTonemapImage(uint3 globalId : SV_DispatchThreadID)
     ColorConverterOut outColorSpace;
     float3 outColorSDR = Tonemapper.ToneMap(inColorHDR,
                                             inColorSpace, outColorSpace,
-                                            params.outGammaParams,
-                                            params.tonemapParams,
+                                            params.outGammaParams[0],
+                                            params.tonemapParams[0],
                                             params.maxAndAvg[0].ReadAvgLum(),
                                             params.maxAndAvg[0].ReadMaxLum());
 
