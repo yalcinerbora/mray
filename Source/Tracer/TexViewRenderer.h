@@ -19,7 +19,7 @@
 //                                             GenericGroupLightT*,
 //                                             GPUSystem&>;
 
-class ImageRenderer final : public RendererT<ImageRenderer>
+class TexViewRenderer final : public RendererT<TexViewRenderer>
 {
     public:
     static std::string_view TypeName();
@@ -35,12 +35,12 @@ class ImageRenderer final : public RendererT<ImageRenderer>
 
     public:
     // Constructors & Destructor
-                    ImageRenderer(RenderImagePtr, TracerView,
+                    TexViewRenderer(RenderImagePtr, TracerView,
                                   const GPUSystem&);
-                    ImageRenderer(const ImageRenderer&) = delete;
-                    ImageRenderer(ImageRenderer&&) = delete;
-    ImageRenderer&  operator=(const ImageRenderer&) = delete;
-    ImageRenderer&  operator=(ImageRenderer&&) = delete;
+                    TexViewRenderer(const TexViewRenderer&) = delete;
+                    TexViewRenderer(TexViewRenderer&&) = delete;
+    TexViewRenderer&  operator=(const TexViewRenderer&) = delete;
+    TexViewRenderer&  operator=(TexViewRenderer&&) = delete;
 
     //
     MRayError           Commit() override;
@@ -61,16 +61,16 @@ class ImageRenderer final : public RendererT<ImageRenderer>
 };
 
 inline
-std::string_view ImageRenderer::TypeName()
+std::string_view TexViewRenderer::TypeName()
 {
     using namespace std::string_view_literals;
     using namespace TypeNameGen::CompTime;
-    static constexpr auto Name = "Image"sv;
+    static constexpr auto Name = "TexView"sv;
     return RendererTypeName<Name>;
 }
 
 inline
-size_t ImageRenderer::GPUMemoryUsage() const
+size_t TexViewRenderer::GPUMemoryUsage() const
 {
     return 0;
 }

@@ -1,14 +1,14 @@
 #include "Tracer.h"
 #include "RequestedTypes.h"
 
-#include "Tracer/ImageRenderer.h"
+#include "Tracer/TexViewRenderer.h"
 
 // ================= //
 //     Renderers     //
 // ================= //
 using RendererTypes_0 = Tuple
 <
-    ImageRenderer
+    TexViewRenderer
 >;
 
 void Tracer::AddRendererGenerators_0(Map<std::string_view, RendererGenerator>& map)

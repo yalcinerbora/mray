@@ -1,20 +1,20 @@
-#include "ImageRenderer.h"
+#include "TexViewRenderer.h"
 #include "TracerBase.h"
 
-ImageRenderer::ImageRenderer(RenderImagePtr rb, TracerView tv,
+TexViewRenderer::TexViewRenderer(RenderImagePtr rb, TracerView tv,
                              const GPUSystem& s)
     : RendererT(rb, tv, s)
 {}
 
-MRayError ImageRenderer::Commit()
+MRayError TexViewRenderer::Commit()
 {
     if(rendering)
     currentOptions = newOptions;
     return MRayError::OK;
 }
 
-typename ImageRenderer::AttribInfoList
-ImageRenderer::AttributeInfo() const
+typename TexViewRenderer::AttribInfoList
+TexViewRenderer::AttributeInfo() const
 {
     using enum MRayDataEnum;
     using enum AttributeIsArray;
@@ -25,7 +25,7 @@ ImageRenderer::AttributeInfo() const
     };
 }
 
-RendererOptionPack ImageRenderer::CurrentAttributes() const
+RendererOptionPack TexViewRenderer::CurrentAttributes() const
 {
     RendererOptionPack result;
     result.paramTypes = AttributeInfo();
@@ -35,7 +35,7 @@ RendererOptionPack ImageRenderer::CurrentAttributes() const
     return result;
 }
 
-void ImageRenderer::PushAttribute(uint32_t attributeIndex,
+void TexViewRenderer::PushAttribute(uint32_t attributeIndex,
                                   TransientData data,
                                   const GPUQueue& q)
 {
@@ -45,7 +45,7 @@ void ImageRenderer::PushAttribute(uint32_t attributeIndex,
     newOptions.totalSPP = data.AccessAs<uint32_t>()[0];
 }
 
-RenderBufferInfo ImageRenderer::StartRender(const RenderImageParams& params,
+RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams& params,
                                             const CameraKey&)
 {
     // Reset renderbuffer
@@ -57,10 +57,10 @@ RenderBufferInfo ImageRenderer::StartRender(const RenderImageParams& params,
     return renderBuffer->GetBufferInfo();
 }
 
-RendererOutput ImageRenderer::DoRender()
+RendererOutput TexViewRenderer::DoRender()
 {
     return RendererOutput{};
 }
 
-void ImageRenderer::StopRender()
+void TexViewRenderer::StopRender()
 {}

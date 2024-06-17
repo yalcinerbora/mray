@@ -63,9 +63,9 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/RendererC.h
         ${CURRENT_SOURCE_DIR}/RenderImage.cpp
         ${CURRENT_SOURCE_DIR}/RenderImage.h
-        ${CURRENT_SOURCE_DIR}/ImageRenderer.h
-        ${CURRENT_SOURCE_DIR}/ImageRenderer.hpp
-        ${CURRENT_SOURCE_DIR}/ImageRenderer.cu)
+        ${CURRENT_SOURCE_DIR}/TexViewRenderer.h
+        ${CURRENT_SOURCE_DIR}/TexViewRenderer.hpp
+        ${CURRENT_SOURCE_DIR}/TexViewRenderer.cu)
 
     set(SRC_RANDOM
         ${CURRENT_SOURCE_DIR}/Random.h
