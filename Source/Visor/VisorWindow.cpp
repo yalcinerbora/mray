@@ -18,6 +18,16 @@
 #include "FontAtlas.h"
 #include "Visor.h"
 
+#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_to_string.hpp>
+
+void ImguiCallback(VkResult vkResult)
+{
+    if(vkResult == VK_SUCCESS) return;
+    MRAY_ERROR_LOG("Imgui VK: {}",
+                   vk::to_string(vk::Result(vkResult)));
+}
+
 //static constexpr std::array<VkColorSpaceKHR, 16> Colorspaces =
 //{
 //    VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
@@ -517,7 +527,7 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
         .PipelineRenderingCreateInfo = {},
         //
         .Allocator = VulkanHostAllocator::Functions(),
-        .CheckVkResultFn = nullptr,
+        .CheckVkResultFn = &ImguiCallback,
         .MinAllocationSize = 1_MiB
         //
     };
@@ -561,13 +571,13 @@ MRayError Swapchain::Initialize(VulkanSystemView handles,
 
     static const StaticVector<VkDescriptorPoolSize, 1> imguiPoolSizes =
     {
-        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8 },
+        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 16 },
     };
     VkDescriptorPoolCreateInfo descPoolInfo =
     {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
-        .maxSets = 1,
+        .maxSets = 16,
         .poolSizeCount = static_cast<uint32_t>(imguiPoolSizes.size()),
         .pPoolSizes = imguiPoolSizes.data()
     };

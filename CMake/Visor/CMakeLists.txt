@@ -107,7 +107,9 @@ set(SLANG_GEN_SPIRV_OUTPUT_LIST "")
 # ============ #
 slang_gen_module(OUTPUT "Tonemap"
                  SOURCES
-                 ${SHADER_SOURCE_DIR}/Tonemap.slang)
+                 ${SHADER_SOURCE_DIR}/Tonemap.slang
+                 DEPENDS
+                 ${SHADER_SOURCE_DIR}/TonemapFunctions.slang)
 slang_gen_module(OUTPUT "ColorFunctions"
                  SOURCES
                  ${SHADER_SOURCE_DIR}/ColorFunctions.slang)

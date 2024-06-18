@@ -23,7 +23,6 @@ class VisorDebugSystem
              const VkDebugUtilsMessengerCallbackDataEXT*,
              void*);
 
-
     PFN_vkCreateDebugUtilsMessengerEXT vkCreateDbgMessenger = nullptr;
     PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDbgMessenger = nullptr;
     VkInstance instance = nullptr;
@@ -40,7 +39,6 @@ class VisorDebugSystem
                         CreateInfo();
 
     MRayError           Initialize(VkInstance);
-
 };
 
 class VisorVulkan : public VisorI

@@ -13,7 +13,7 @@ set(MRAY_SPIRV_ASM_EXTENSION ".spv-asm")
 #   EXTRA_OPTIONS <option1> <option2> ... : additional options for the compiler
 function(slang_gen_module)
     set(oneValueArgs OUTPUT)
-    set(multiValueArgs EXTRA_OPTIONS SOURCES INCLUDES)
+    set(multiValueArgs EXTRA_OPTIONS SOURCES INCLUDES DEPENDS)
     cmake_parse_arguments(SLANG_GEN_MODULE "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
     list(TRANSFORM SLANG_GEN_MODULE_INCLUDES PREPEND "-I")
@@ -35,7 +35,7 @@ function(slang_gen_module)
     add_custom_command(
         OUTPUT  ${MODULE_OUTPUT_PATH}
         COMMENT "[SHADER] Building slang-module \"${MODULE_NAME}\""
-        DEPENDS ${SLANG_GEN_MODULE_SOURCES}
+        DEPENDS ${SLANG_GEN_MODULE_SOURCES} ${SLANG_GEN_MODULE_DEPENDS}
         # Sometimes this command is the very first command, and slang do not create directories I think
         COMMAND ${CMAKE_COMMAND} -E make_directory ${MRAY_SHADER_MODULE_OUT_DIRECTORY}
         COMMAND ${MRAY_SLANG_COMPILER} ${SLANG_COMPILE_OPTIONS}

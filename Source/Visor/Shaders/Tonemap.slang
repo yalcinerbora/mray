@@ -45,6 +45,10 @@ struct TonemapParameters
 {
     typedef Tonemapper.TMParams TMParams;
     typedef ColorConverterOut.GammaParams GammaParams;
+
+    // We could not utilize multi-binding here
+    // I think it is because you cannot have
+    // generic (templated) UBO's?
     StructuredBuffer<TMParams>      tonemapParams;
     StructuredBuffer<GammaParams>   outGammaParams;
     Texture2D<float3>               inputTex;

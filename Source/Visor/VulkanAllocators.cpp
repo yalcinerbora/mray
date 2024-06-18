@@ -87,3 +87,52 @@ VulkanDeviceAllocator& VulkanDeviceAllocator::Instance(VkDevice deviceVk,
     }
     return allocator;
 }
+
+VulkanDeviceMemory::VulkanDeviceMemory(VkDevice d)
+    : deviceVk(d)
+{}
+
+VulkanDeviceMemory::VulkanDeviceMemory(VkDevice d,
+                                       size_t totalSize, uint32_t memIndex)
+    : deviceVk(d)
+{
+    VkMemoryAllocateInfo allocInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .pNext = nullptr,
+        .allocationSize = totalSize,
+        .memoryTypeIndex = memIndex
+    };
+    vkAllocateMemory(deviceVk, &allocInfo,
+                     VulkanHostAllocator::Functions(),
+                     &memoryVk);
+}
+
+VulkanDeviceMemory::VulkanDeviceMemory(VulkanDeviceMemory&& other)
+    : deviceVk(other.deviceVk)
+    , memoryVk(std::exchange(other.memoryVk, nullptr))
+{}
+
+VulkanDeviceMemory& VulkanDeviceMemory::operator=(VulkanDeviceMemory&& other)
+{
+    assert(this != &other);
+    if(memoryVk)
+        vkFreeMemory(deviceVk, memoryVk,
+                     VulkanHostAllocator::Functions());
+
+    deviceVk = other.deviceVk;
+    memoryVk = std::exchange(other.memoryVk, nullptr);
+    return *this;
+}
+
+VulkanDeviceMemory::~VulkanDeviceMemory()
+{
+    if(memoryVk)
+        vkFreeMemory(deviceVk, memoryVk,
+                     VulkanHostAllocator::Functions());
+}
+
+VkDeviceMemory VulkanDeviceMemory::Memory() const
+{
+    return memoryVk;
+}

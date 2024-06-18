@@ -15,17 +15,22 @@
 #include "Core/Error.hpp"
 
 // Common descriptor set indices of tonemappers
-static constexpr uint32_t HDR_IMAGE_INDEX = 0;
-static constexpr uint32_t SDR_IMAGE_INDEX = 1;
-static constexpr uint32_t TONEMAP_UNIFORM_INDEX = 2;
-static constexpr uint32_t STAGING_BUFFER_INDEX = 3;
-static constexpr uint32_t GAMMA_UNIFORM_BUFFER_INDEX = 4;
+static constexpr uint32_t TONEMAP_UNIFORM_BUFF_INDEX = 0;
+static constexpr uint32_t GAMMA_UNIFORM_BUFF_INDEX = 1;
+static constexpr uint32_t HDR_IMAGE_INDEX = 2;
+static constexpr uint32_t SDR_IMAGE_INDEX = 3;
+static constexpr uint32_t STAGING_BUFFER_INDEX = 4;
 
 struct MaxAvgStageBuffer
 {
     static_assert(sizeof(uint32_t) == sizeof(float));
     uint32_t maxLum;
     uint32_t avgLum;
+};
+
+struct GammaBuffer
+{
+    float gamma;
 };
 
 MRayError GenericCreatePipeline(VulkanComputePipeline& tonemapPipeline,
@@ -41,26 +46,25 @@ MRayError GenericCreatePipeline(VulkanComputePipeline& tonemapPipeline,
     MRayError e = tonemapPipeline.Initialize(
     {
         {
-            {HDR_IMAGE_INDEX,               VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
+            {TONEMAP_UNIFORM_BUFF_INDEX,    VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+            {GAMMA_UNIFORM_BUFF_INDEX,      VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+            {HDR_IMAGE_INDEX,               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
             {SDR_IMAGE_INDEX,               VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
-            {TONEMAP_UNIFORM_INDEX,         VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
-            {STAGING_BUFFER_INDEX,          VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
-            {GAMMA_UNIFORM_BUFFER_INDEX,    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}
+            {STAGING_BUFFER_INDEX,          VK_DESCRIPTOR_TYPE_STORAGE_BUFFER}
         }
     },
     moduleName, execPath, tmEntryName);
     if(e) return e;
     tonemapDescriptorSets = tonemapPipeline.GenerateDescriptorSets(handlesVk.mainDescPool);
-
     using namespace std::string_literals;
     e = reducePipeline.Initialize(
     {
         {
-            {HDR_IMAGE_INDEX,               VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
+            {TONEMAP_UNIFORM_BUFF_INDEX,    VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+            {GAMMA_UNIFORM_BUFF_INDEX,      VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+            {HDR_IMAGE_INDEX,               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
             {SDR_IMAGE_INDEX,               VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
-            {TONEMAP_UNIFORM_INDEX,         VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
-            {STAGING_BUFFER_INDEX,          VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
-            {GAMMA_UNIFORM_BUFFER_INDEX,    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}
+            {STAGING_BUFFER_INDEX,          VK_DESCRIPTOR_TYPE_STORAGE_BUFFER}
         }
     },
     moduleName, execPath, reduceEntryName);
@@ -126,6 +130,7 @@ class Tonemapper_Empty_AcesCG_To_HDR10 : public TonemapperI
     private:
     const VulkanSystemView* handlesVk = nullptr;
     StagingBufferMemView    stagingBuffer = {};
+    UniformBufferMemView    uniformBuffer = {};
     VulkanComputePipeline   tonemapPipeline;
     VulkanComputePipeline   reducePipeline;
     float                   outGammaVal;
@@ -197,12 +202,39 @@ VkColorSpaceKHR Tonemapper_Reinhard_AcesCG_To_SRGB::OutputColorspace() const
 
 size_t Tonemapper_Reinhard_AcesCG_To_SRGB::UniformBufferSize() const
 {
-    return sizeof(UniformBuffer);
+    return sizeof(UniformBuffer) + sizeof(GammaBuffer);
 }
 
 void Tonemapper_Reinhard_AcesCG_To_SRGB::SetUniformBufferView(const UniformBufferMemView& uniformBufferView)
 {
     uniformBuffer = uniformBufferView;
+
+    // TODO: ALIGNMENT!!!!
+    DescriptorBindList<ShaderBindingData> bindList =
+    {
+        {
+            TONEMAP_UNIFORM_BUFF_INDEX,
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            VkDescriptorBufferInfo
+            {
+                .buffer = uniformBuffer.bufferHandle,
+                .offset = uniformBuffer.offset,
+                .range = sizeof(UniformBuffer)
+            },
+        },
+        {
+            GAMMA_UNIFORM_BUFF_INDEX,
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            VkDescriptorBufferInfo
+            {
+                .buffer = uniformBuffer.bufferHandle,
+                .offset = uniformBuffer.offset + sizeof(UniformBuffer),
+                .range = sizeof(GammaBuffer)
+            },
+        }
+    };
+    tonemapPipeline.BindSetData(tonemapDescriptorSets[0], bindList);
+    reducePipeline.BindSetData(tonemapDescriptorSets[0], bindList);
 }
 
 size_t Tonemapper_Reinhard_AcesCG_To_SRGB::StagingBufferSize() const
@@ -259,11 +291,38 @@ VkColorSpaceKHR Tonemapper_Empty_AcesCG_To_HDR10::OutputColorspace() const
 
 size_t Tonemapper_Empty_AcesCG_To_HDR10::UniformBufferSize() const
 {
-    return sizeof(EmptyType);
+    return sizeof(uint32_t) + sizeof(GammaBuffer);
 }
 
-void Tonemapper_Empty_AcesCG_To_HDR10::SetUniformBufferView(const UniformBufferMemView&)
-{}
+void Tonemapper_Empty_AcesCG_To_HDR10::SetUniformBufferView(const UniformBufferMemView& ubo)
+{
+    uniformBuffer = ubo;
+    DescriptorBindList<ShaderBindingData> bindList =
+    {
+        {
+            GAMMA_UNIFORM_BUFF_INDEX,
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            VkDescriptorBufferInfo
+            {
+                .buffer = uniformBuffer.bufferHandle,
+                .offset = uniformBuffer.offset,
+                .range = sizeof(GammaBuffer)
+            },
+        },
+        {
+            TONEMAP_UNIFORM_BUFF_INDEX,
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            VkDescriptorBufferInfo
+            {
+                .buffer = uniformBuffer.bufferHandle,
+                .offset = uniformBuffer.offset + sizeof(GammaBuffer),
+                .range = sizeof(uint32_t)
+            },
+        }
+    };
+    tonemapPipeline.BindSetData(tonemapDescriptorSets[0], bindList);
+    reducePipeline.BindSetData(tonemapDescriptorSets[0], bindList);
+}
 
 size_t Tonemapper_Empty_AcesCG_To_HDR10::StagingBufferSize() const
 {
@@ -321,11 +380,6 @@ MRayError TonemapStage::Initialize(const std::string& execPath)
     e = tm1->Initialize(execPath);
     if(e) return e;
 
-    tonemappers.try_emplace({tm0->InputColorspace(), tm0->OutputColorspace()},
-                            std::move(tm0));
-    tonemappers.try_emplace({tm1->InputColorspace(), tm1->OutputColorspace()},
-                            std::move(tm1));
-
     size_t stagingBufferSize = std::max(tm0->StagingBufferSize(),
                                         tm1->StagingBufferSize());
     stagingBuffer = VulkanBuffer(*handlesVk, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -346,6 +400,12 @@ MRayError TonemapStage::Initialize(const std::string& execPath)
                                   .offset = 0,
                                   .size = tm1->StagingBufferSize()
                               });
+
+
+    tonemappers.try_emplace({tm0->InputColorspace(), tm0->OutputColorspace()},
+                            std::move(tm0));
+    tonemappers.try_emplace({tm1->InputColorspace(), tm1->OutputColorspace()},
+                            std::move(tm1));
     return MRayError::OK;
 }
 

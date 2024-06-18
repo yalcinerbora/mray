@@ -245,45 +245,36 @@ void AccumImageStage::ChangeImage(const VulkanImage* hdrImageIn,
     hdrImage = hdrImageIn;
     sampleImage = sampleImageIn;
 
-    std::array<VkWriteDescriptorSet, 2> writeInfo;
-    VkDescriptorImageInfo hdrImgInfo =
+    DescriptorBindList<ShaderBindingData> bindList =
     {
-        .sampler = hdrImageIn->Sampler(),
-        .imageView = hdrImageIn->View(),
-        .imageLayout = VK_IMAGE_LAYOUT_GENERAL
+        {
+            HDR_IMAGE_BIND_INDEX,
+            VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            VkDescriptorImageInfo
+            {
+                .sampler = hdrImage->Sampler(),
+                .imageView = hdrImage->View(),
+                .imageLayout = VK_IMAGE_LAYOUT_GENERAL
+            },
+        },
+        {
+            SAMPLE_IMAGE_BIND_INDEX,
+            VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            VkDescriptorImageInfo
+            {
+                .sampler = sampleImage->Sampler(),
+                .imageView = sampleImage->View(),
+                .imageLayout = VK_IMAGE_LAYOUT_GENERAL
+            }
+        }
     };
-    writeInfo[0] = VkWriteDescriptorSet
-    {
-        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-        .pNext = nullptr,
-        .dstSet = descriptorSets[0],
-        .dstBinding = HDR_IMAGE_BIND_INDEX,
-        .dstArrayElement = 0,
-        .descriptorCount = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-        .pImageInfo = &hdrImgInfo,
-        .pBufferInfo = nullptr,
-        .pTexelBufferView = nullptr
-    };
-    //
-    VkDescriptorImageInfo sampleImgInfo =
-    {
-        .sampler = hdrImageIn->Sampler(),
-        .imageView = hdrImageIn->View(),
-        .imageLayout = VK_IMAGE_LAYOUT_GENERAL
-    };
-    writeInfo[1] = writeInfo[0];
-    writeInfo[1].dstBinding = SAMPLE_IMAGE_BIND_INDEX;
-    writeInfo[1].pImageInfo = &sampleImgInfo;
-
-    vkUpdateDescriptorSets(handlesVk->deviceVk,
-                           2, writeInfo.data(), 0, nullptr);
-
+    pipeline.BindSetData(descriptorSets[0], bindList);
 }
 
 SemaphoreVariant AccumImageStage::IssueAccumulation(VkSemaphore prevCmdSignal,
                                                     const RenderImageSection& section)
 {
+    // Pre-memcopy the buffer
     UniformBuffer buffer =
     {
         .imgResolution = hdrImage->Extent(),
@@ -293,41 +284,32 @@ SemaphoreVariant AccumImageStage::IssueAccumulation(VkSemaphore prevCmdSignal,
     };
     std::memcpy(uniformBuffer.hostPtr, &buffer, sizeof(UniformBuffer));
 
-    std::array<VkWriteDescriptorSet, 2> writeInfo;
-    VkDescriptorBufferInfo pixBuffInfo =
-    {
-        .buffer = foreignBuffer,
-        .offset = section.pixelStartOffset,
-        // TODO: Check aliasing
-        .range = VK_WHOLE_SIZE
-    };
-    writeInfo[0] = VkWriteDescriptorSet
-    {
-        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-        .pNext = nullptr,
-        .dstSet = descriptorSets[0],
-        .dstBinding = IN_PIXEL_BUFF_BIND_INDEX,
-        .dstArrayElement = 1,
-        .descriptorCount = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-        .pImageInfo = nullptr,
-        .pBufferInfo = &pixBuffInfo,
-        .pTexelBufferView = nullptr
-    };
-    //
-    VkDescriptorBufferInfo sampleBuffInfo =
-    {
-        .buffer = foreignBuffer,
-        .offset = section.sampleStartOffset,
-        // TODO: Check aliasing
-        .range = VK_WHOLE_SIZE
-    };
-    writeInfo[1] = writeInfo[0];
-    writeInfo[1].dstBinding = IN_SAMPLE_BUFF_BIND_INDEX;
-    writeInfo[1].pBufferInfo = &sampleBuffInfo;
 
-    vkUpdateDescriptorSets(handlesVk->deviceVk,
-                           2, writeInfo.data(), 0, nullptr);
+    // TODO: Check if overlapping is allowed
+    DescriptorBindList<ShaderBindingData> bindList =
+    {
+        {
+            IN_PIXEL_BUFF_BIND_INDEX,
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            VkDescriptorBufferInfo
+            {
+                .buffer = foreignBuffer,
+                .offset = section.pixelStartOffset,
+                .range = VK_WHOLE_SIZE
+            },
+        },
+        {
+            IN_SAMPLE_BUFF_BIND_INDEX,
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            VkDescriptorBufferInfo
+            {
+                .buffer = foreignBuffer,
+                .offset = section.sampleStartOffset,
+                .range = VK_WHOLE_SIZE
+            },
+        }
+    };
+    pipeline.BindSetData(descriptorSets[0], bindList);
 
     // ============= //
     //    DISPATCH   //
@@ -415,4 +397,18 @@ size_t AccumImageStage::UniformBufferSize() const
 void AccumImageStage::SetUniformBufferView(const UniformBufferMemView& ubo)
 {
     uniformBuffer = ubo;
+    DescriptorBindList<ShaderBindingData> bindList =
+    {
+        {
+            UNIFORM_BIND_INDEX,
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            VkDescriptorBufferInfo
+            {
+                .buffer = ubo.bufferHandle,
+                .offset = ubo.offset,
+                .range = ubo.size
+            },
+        }
+    };
+    pipeline.BindSetData(descriptorSets[0], bindList);
 }
