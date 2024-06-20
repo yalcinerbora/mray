@@ -160,12 +160,15 @@ MRayError VisorCommand::Invoke()
         RenameThread(handles[i], name);
     }
 
+    // The "timeline semaphore" (CPU emulation)
+    // This will be used to synchronize between MRay and Visor
+    TimelineSemaphore sem(0);
+
     // Actual initialization, process path should be called from here
     // In dll it may return .dll's path (on windows, I think)
     std::string processPath = GetProcessPath();
-    e = visorSystem->MTInitialize(transferQueue,
-                                  &threadPool,
-                                  visorConfig,
+    e = visorSystem->MTInitialize(transferQueue, &sem,
+                                  &threadPool, visorConfig,
                                   processPath);
     if(e) return e;
 
@@ -181,19 +184,9 @@ MRayError VisorCommand::Invoke()
     // Start the tracer thread
     tracerThread.Start("TracerThread");
 
-    // Initially send the scene to tracer
-    if(sceneFile)
-    {
-        using enum VisorAction::Type;
-        VisorAction va(std::in_place_index<LOAD_SCENE>, sceneFile.value());
-        transferQueue.GetVisorView().Enqueue(std::move(va));
-    }
-
-    // Initially send the renderer to tracer
-    if(renderConfigFile)
-    {
-        visorSystem->MTInitiallyStartRender(renderConfigFile.value());
-    }
+    // Initially send the kickstart parameters to tracer (if avail)
+    visorSystem->MTInitiallyStartRender(renderConfigFile,
+                                        sceneFile);
 
     // ====================== //
     //     Real-time Loop     //

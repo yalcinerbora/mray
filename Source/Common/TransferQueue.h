@@ -2,6 +2,7 @@
 
 #include "Core/MPMCQueue.h"
 #include "Core/TracerI.h"
+#include "Core/TimelineSemaphore.h"
 
 #include "TransientPool/TransientPool.h"
 
@@ -61,7 +62,7 @@ struct VisorAction : public std::variant
     float,                  // scene time
     bool,                   // start/stop render
     bool,                   // pause render
-    SystemSemaphoreHandle,  // Synchronization semaphore
+    TimelineSemaphore*,     // Synchronization semaphore
     bool,                   // Demand HDR save
     bool,                   // Demand SDR save
     std::string             // Initial Render Config
@@ -70,7 +71,7 @@ struct VisorAction : public std::variant
     using Base = std::variant<CameraTransform, uint32_t,
                               std::string, uint32_t, uint32_t, std::string,
                               float, bool, bool,
-                              SystemSemaphoreHandle, bool, bool,
+                              TimelineSemaphore*, bool, bool,
                               std::string>;
     enum Type
     {

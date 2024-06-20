@@ -2,6 +2,7 @@
 #include "DeviceMemoryCUDA.h"
 
 #include "Core/Error.hpp"
+#include "Core/TimelineSemaphore.h"
 
 #include <cuda.h>
 #include <nvtx3/nvToolsExt.h>
@@ -9,41 +10,28 @@
 namespace mray::cuda
 {
 
-GPUSemaphoreCUDA::GPUSemaphoreCUDA(SystemSemaphoreHandle sem)
-    : semSystem(sem)
-{
-    cudaExternalSemaphoreHandleDesc desc = {};
-    desc.flags = 0;
-    desc.type = (MRAY_IS_ON_WINDOWS)
-        ? cudaExternalSemaphoreHandleTypeTimelineSemaphoreWin32
-        : cudaExternalSemaphoreHandleTypeTimelineSemaphoreFd;
-
-    #ifdef MRAY_WINDOWS
-        desc.handle.win32.handle = std::bit_cast<HANDLE>(sem);
-    #else
-        desc.handle.fd = std::bit_cast<int>(sem);
-    #endif
-    CUDA_CHECK(cudaImportExternalSemaphore(&semCUDA, &desc));
-}
-
-GPUSemaphoreCUDA::GPUSemaphoreCUDA(GPUSemaphoreCUDA&& other)
-    : semSystem(other.semSystem)
-    , semCUDA(std::exchange(other.semCUDA, nullptr))
+GPUSemaphoreViewCUDA::GPUSemaphoreViewCUDA(TimelineSemaphore* sem,
+                                           uint64_t av)
+    : externalSemaphore(sem)
+    , acquireValue(av)
 {}
 
-GPUSemaphoreCUDA& GPUSemaphoreCUDA::operator=(GPUSemaphoreCUDA&& other)
+void GPUSemaphoreViewCUDA::HostAcquire()
 {
-    assert(this != &other);
-    if(semCUDA) cudaDestroyExternalSemaphore(semCUDA);
-
-    semSystem = other.semSystem;
-    semCUDA = std::exchange(other.semCUDA, nullptr);
-    return *this;
+    externalSemaphore->Acquire(acquireValue);
 }
 
-GPUSemaphoreCUDA::~GPUSemaphoreCUDA()
+void GPUSemaphoreViewCUDA::HostRelease()
 {
-    if(semCUDA) cudaDestroyExternalSemaphore(semCUDA);
+    externalSemaphore->Release();
+    // Set the next acquisition
+    NextAcquisition();
+}
+
+uint64_t GPUSemaphoreViewCUDA::NextAcquisition()
+{
+    acquireValue++;
+    return acquireValue;
 }
 
 GPUDeviceCUDA::GPUDeviceCUDA(int deviceId, AnnotationHandle domain)
@@ -294,6 +282,19 @@ void GPUSystemCUDA::ThreadInitFunction()
 GPUThreadInitFunction GPUSystemCUDA::GetThreadInitFunction() const
 {
     return &GPUSystemCUDA::ThreadInitFunction;
+}
+
+// Semaphore related namespace global functions
+void TimelineSemAcquireInternal(void* params)
+{
+    GPUSemaphoreViewCUDA* ts = static_cast<GPUSemaphoreViewCUDA*>(params);
+    ts->HostAcquire();
+}
+
+void TimelineSemReleaseInternal(void* params)
+{
+    GPUSemaphoreViewCUDA* ts = static_cast<GPUSemaphoreViewCUDA*>(params);
+    ts->HostRelease();
 }
 
 }

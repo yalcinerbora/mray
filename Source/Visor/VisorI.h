@@ -9,6 +9,7 @@ class TransferQueue;
 namespace BS { class thread_pool; }
 
 struct MRayError;
+class TimelineSemaphore;
 
 // This is basically ImGui stuff
 using VisorInputType = int;
@@ -86,13 +87,14 @@ class VisorI
     virtual             ~VisorI() = default;
     //
     virtual MRayError   MTInitialize(TransferQueue& transferQueue,
-                                     BS::thread_pool*,
-                                     const VisorConfig&,
+                                     TimelineSemaphore* syncSem,
+                                     BS::thread_pool*, const VisorConfig&,
                                      const std::string& processPath) = 0;
     virtual bool        MTIsTerminated() = 0;
     virtual void        MTWaitForInputs() = 0;
     virtual void        MTRender()  = 0;
     virtual void        MTDestroy() = 0;
     virtual void        TriggerEvent() = 0;
-    virtual void        MTInitiallyStartRender(std::string_view renderConfigFile) = 0;
+    virtual void        MTInitiallyStartRender(const Optional<std::string_view>& renderConfigPath,
+                                               const Optional<std::string_view>& sceneFile) = 0;
 };

@@ -54,6 +54,7 @@ set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/ShapeFunctions.h
     ${CURRENT_SOURCE_DIR}/Timer.h
     ${CURRENT_SOURCE_DIR}/Timer.cpp
+    ${CURRENT_SOURCE_DIR}/TimelineSemaphore.h
     ${CURRENT_SOURCE_DIR}/MPMCQueue.h
     ${CURRENT_SOURCE_DIR}/Filesystem.h)
 

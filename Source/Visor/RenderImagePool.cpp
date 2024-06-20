@@ -66,14 +66,17 @@ RenderImagePool::RenderImagePool(BS::thread_pool* threadPool,
     auto hdrImgUsageFlags = (sdrImgUsageFlags |
                              VK_IMAGE_USAGE_TRANSFER_DST_BIT);
     hdrImage = (initInfo.isSpectralPack)
-        ? VulkanImage(*handlesVk, VK_FORMAT_R32_SFLOAT,
-                      hdrImgUsageFlags,
+        ? VulkanImage(*handlesVk, VulkanSamplerMode::NEAREST,
+                      VK_FORMAT_R32_SFLOAT, hdrImgUsageFlags,
                       initInfo.extent, initInfo.depth)
-        : VulkanImage(*handlesVk, VK_FORMAT_R32G32B32A32_SFLOAT,
+        : VulkanImage(*handlesVk, VulkanSamplerMode::NEAREST,
+                      VK_FORMAT_R32G32B32A32_SFLOAT,
                       hdrImgUsageFlags, initInfo.extent);
-    hdrSampleImage = VulkanImage(*handlesVk, VK_FORMAT_R32_SFLOAT,
+    hdrSampleImage = VulkanImage(*handlesVk, VulkanSamplerMode::NEAREST,
+                                 VK_FORMAT_R32_SFLOAT,
                                  hdrImgUsageFlags, initInfo.extent);
-    sdrImage = VulkanImage(*handlesVk, VK_FORMAT_R32G32B32A32_SFLOAT,
+    sdrImage = VulkanImage(*handlesVk, VulkanSamplerMode::NEAREST,
+                           VK_FORMAT_R32G32B32A32_SFLOAT,
                            sdrImgUsageFlags, initInfo.extent);
 
     size_t outBufferSize = std::max(hdrImage.MemRequirements().second,

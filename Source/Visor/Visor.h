@@ -81,7 +81,8 @@ class VisorVulkan : public VisorI
     uint32_t            queueFamilyIndex    = std::numeric_limits<uint32_t>::max();
     uint32_t            deviceLocalMemIndex = std::numeric_limits<uint32_t>::max();
     uint32_t            hostVisibleMemIndex = std::numeric_limits<uint32_t>::max();
-
+    VkSampler           llnSampler          = nullptr;
+    VkSampler           nnnSampler          = nullptr;
 
     VisorDebugSystem    debugSystem;
     std::string         processPath;
@@ -93,7 +94,7 @@ class VisorVulkan : public VisorI
     bool                    EnableValidation(VkInstanceCreateInfo&);
     MRayError               QueryAndPickPhysicalDevice(const VisorConfig&);
     Expected<VisorWindow>   GenerateWindow(TransferQueue::VisorView&,
-                                           BS::thread_pool*,
+                                           TimelineSemaphore* syncSem, BS::thread_pool*,
                                            const VisorConfig&);
     MRayError               InitImGui();
 
@@ -107,6 +108,7 @@ class VisorVulkan : public VisorI
                         ~VisorVulkan() = default;
     //
     MRayError           MTInitialize(TransferQueue& transferQueue,
+                                     TimelineSemaphore* syncSem,
                                      BS::thread_pool*,
                                      const VisorConfig&,
                                      const std::string& processPath) override;
@@ -115,5 +117,6 @@ class VisorVulkan : public VisorI
     void                MTRender() override;
     void                MTDestroy() override;
     void                TriggerEvent() override;
-    void                MTInitiallyStartRender(std::string_view renderConfigPath) override;
+    void                MTInitiallyStartRender(const Optional<std::string_view>& renderConfigPath,
+                                               const Optional<std::string_view>& sceneFile) override;
 };

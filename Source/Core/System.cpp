@@ -112,3 +112,4 @@ bool EnableVTMode()
 #else
 #error System preprocessor definition is not set properly! (CMake should have handled this)
 #endif
+

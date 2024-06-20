@@ -35,11 +35,11 @@
     #error System preprocessor definition is not set properly! (CMake should have handled this)
 #endif
 
+
 std::string GetProcessPath();
 bool        EnableVTMode();
 void        RenameThread(SystemThreadHandle,
                          const std::string& name);
-
 
 // Loaded class from a shared library
 // Destructor may be from the other side of DLL boundary.

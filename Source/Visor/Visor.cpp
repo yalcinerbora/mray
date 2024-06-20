@@ -20,12 +20,12 @@
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_to_string.hpp>
 
-#ifdef MRAY_WINDOWS
-
-    #include <windows.h>
-    #include <vulkan/vulkan_win32.h>
-
-#endif
+//#ifdef MRAY_WINDOWS
+//
+//    #include <windows.h>
+//    #include <vulkan/vulkan_win32.h>
+//
+//#endif
 
 VKAPI_ATTR VkBool32 VKAPI_CALL
 VisorDebugSystem::Callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -315,19 +315,19 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
         VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME,
         VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
         VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
-        VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME,
+        //VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME,
         VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
         VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME,
         VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME
     };
 
-    #ifdef MRAY_WINDOWS
-        RequiredExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
-        RequiredExtensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME);
-    #elif defined MRAY_LINUX
-        RequiredExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
-        RequiredExtensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
-    #endif
+    //#ifdef MRAY_WINDOWS
+    //    RequiredExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
+    //    RequiredExtensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME);
+    //#elif defined MRAY_LINUX
+    //    RequiredExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
+    //    RequiredExtensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
+    //#endif
 
     static constexpr size_t MAX_GPU = 32;
     struct DeviceParams
@@ -416,7 +416,7 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     // All should be fine, add extensions
     // Continue creating logical device
     for(const auto& extName : RequiredExtensions)
-    deviceExtList.push_back(extName);
+        deviceExtList.push_back(extName);
 
     DeviceParams selectedDevice = *loc;
 
@@ -626,10 +626,45 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     VulkanDeviceAllocator::Instance(deviceVk,
                                     deviceLocalMemIndex,
                                     hostVisibleMemIndex);
+
+    // Create the common samplers
+    //  Min  / Mag  /  Mip
+    // Linear/Linear/Nearest sampler
+    VkSamplerCreateInfo llnSamplerCreateInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .magFilter = VK_FILTER_LINEAR,
+        .minFilter = VK_FILTER_LINEAR,
+        .mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+        .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .mipLodBias = 1.0f,
+        .anisotropyEnable = false,
+        .maxAnisotropy = 1.0f,
+        .minLod = 0,
+        .maxLod = 0,
+        .borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
+        .unnormalizedCoordinates = false
+    };
+    vkCreateSampler(deviceVk, &llnSamplerCreateInfo,
+                    VulkanHostAllocator::Functions(),
+                    &llnSampler);
+    //   Min  /  Mag  /  Mip
+    // Nearest/Nearest/Nearest sampler
+    VkSamplerCreateInfo nnnSamplerCreateInfo = llnSamplerCreateInfo;
+    nnnSamplerCreateInfo.magFilter = VK_FILTER_NEAREST;
+    nnnSamplerCreateInfo.minFilter = VK_FILTER_NEAREST;
+    vkCreateSampler(deviceVk, &nnnSamplerCreateInfo,
+                    VulkanHostAllocator::Functions(),
+                    &nnnSampler);
     return MRayError::OK;
 }
 
 Expected<VisorWindow> VisorVulkan::GenerateWindow(TransferQueue::VisorView& transferQueue,
+                                                  TimelineSemaphore* syncSem,
                                                   BS::thread_pool* tp,
                                                   const VisorConfig& vConfig)
 {
@@ -642,11 +677,13 @@ Expected<VisorWindow> VisorVulkan::GenerateWindow(TransferQueue::VisorView& tran
         .queueIndex         = queueFamilyIndex,
         .mainQueueVk        = mainQueueVk,
         .mainCommandPool    = mainCommandPool,
-        .mainDescPool       = mainDescPool
+        .mainDescPool       = mainDescPool,
+        .llnSampler         = llnSampler,
+        .nnnSampler         = nnnSampler
     };
     MRayError e = w.Initialize(transferQueue, handlesVk,
-                               tp, WindowTitle, vConfig,
-                               processPath);
+                               syncSem, tp, WindowTitle,
+                               vConfig, processPath);
     if(e) return e;
     return w;
 }
@@ -679,6 +716,7 @@ MRayError VisorVulkan::InitImGui()
 }
 
 MRayError VisorVulkan::MTInitialize(TransferQueue& transferQueue,
+                                    TimelineSemaphore* syncSem,
                                     BS::thread_pool* tp,
                                     const VisorConfig& visorConfig,
                                     const std::string& pPath)
@@ -771,7 +809,7 @@ MRayError VisorVulkan::MTInitialize(TransferQueue& transferQueue,
 
     // Main window
     auto windowE = GenerateWindow(transferQueue.GetVisorView(),
-                                  tp, visorConfig);
+                                  syncSem, tp, visorConfig);
     if(windowE.has_error())
         return windowE.error();
     window = std::move(windowE.value());
@@ -811,6 +849,13 @@ void VisorVulkan::MTDestroy()
     // Destroy Imgui
     FontAtlas::Instance().ClearFonts();
     ImGui::DestroyContext();
+
+    // Samplers
+    vkDestroySampler(deviceVk, llnSampler,
+                    VulkanHostAllocator::Functions());
+    vkDestroySampler(deviceVk, nnnSampler,
+                     VulkanHostAllocator::Functions());
+
     // Destroy vulkan etc..
     vkDestroyCommandPool(deviceVk, mainCommandPool,
                          VulkanHostAllocator::Functions());
@@ -828,7 +873,8 @@ void VisorVulkan::MTDestroy()
     glfwTerminate();
 }
 
-void VisorVulkan::MTInitiallyStartRender(std::string_view renderConfigPath)
+void VisorVulkan::MTInitiallyStartRender(const Optional<std::string_view>& renderConfigPath,
+                                         const Optional<std::string_view>& sceneFile)
 {
-    window.SetInitialRenderConfig(renderConfigPath);
+    window.SetKickstartParameters(renderConfigPath, sceneFile);
 }

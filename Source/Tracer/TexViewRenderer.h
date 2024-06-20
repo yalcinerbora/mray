@@ -33,6 +33,9 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     Options         currentOptions = {};
     Options         newOptions = {};
 
+    // TEST
+    uint32_t        pixelIndex = 0;
+
     public:
     // Constructors & Destructor
                     TexViewRenderer(RenderImagePtr, TracerView,

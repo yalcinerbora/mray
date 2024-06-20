@@ -10,13 +10,12 @@ class RenderImage
 {
     private:
     // Mem related
-    Span<Float>     pixels;
-    Span<Float>     samples;
-    size_t          pixStartOffset      = 0;
-    size_t          sampleStartOffset   = 0;
-    HostLocalMemory memory;
-    GPUSemaphore    sem;
-    uint64_t        semCounter = 0;
+    Span<Float>         pixels;
+    Span<Float>         samples;
+    size_t              pixStartOffset      = 0;
+    size_t              sampleStartOffset   = 0;
+    HostLocalMemory     memory;
+    GPUSemaphoreView    sem;
     //
     uint32_t            depth       = 0;
     MRayColorSpaceEnum  colorSpace  = MRayColorSpaceEnum::MR_RAW;

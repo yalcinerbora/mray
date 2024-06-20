@@ -37,26 +37,34 @@ struct VulkanSystemView
     VkQueue             mainQueueVk         = nullptr;
     VkCommandPool       mainCommandPool     = nullptr;
     VkDescriptorPool    mainDescPool        = nullptr;
+    VkSampler           llnSampler          = nullptr;
+    VkSampler           nnnSampler          = nullptr;
+};
+
+enum class VulkanSamplerMode
+{
+    NEAREST,
+    LINEAR
 };
 
 class VulkanImage
 {
     private:
+    const VulkanSystemView* handlesVk = nullptr;
     VkImage         imgVk       = nullptr;
     VkFormat        formatVk    = VK_FORMAT_UNDEFINED;
     VkImageView     viewVk      = nullptr;
     VkSampler       samplerVk   = nullptr;
     Vector2ui       extent      = Vector2ui::Zero();
     uint32_t        depth       = 0;
-    const VulkanSystemView* handlesVk = nullptr;
 
     public:
     // Constructors & Destructor
                     VulkanImage(const VulkanSystemView&);
                     VulkanImage(const VulkanSystemView&,
-                                VkFormat format,
-                                VkImageUsageFlags usage,
-                                Vector2ui pixRes, uint32_t depth = 1);
+                                VulkanSamplerMode, VkFormat,
+                                VkImageUsageFlags, Vector2ui pixRes,
+                                uint32_t depth = 1);
                     VulkanImage(const VulkanImage&) = delete;
                     VulkanImage(VulkanImage&&);
     VulkanImage&    operator=(const VulkanImage&) = delete;
@@ -80,8 +88,8 @@ class VulkanImage
 class VulkanBuffer
 {
     private:
-    VkBuffer                bufferVk    = nullptr;
     const VulkanSystemView* handlesVk   = nullptr;
+    VkBuffer                bufferVk    = nullptr;
 
     public:
     // Constructors & Destructor

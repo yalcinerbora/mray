@@ -32,7 +32,7 @@ class TracerThread final : public RealtimeThread
     // Current State
     RendererId              currentRenderer;
     size_t                  currentCamIndex;
-    SystemSemaphoreHandle   currentSem;
+    TimelineSemaphore*      currentSem;
     CameraTransform         currentCamTransform;
     AABB3                   currentSceneAABB;
     TracerIdPack            sceneIds;

@@ -1,12 +1,13 @@
 #include "RenderImage.h"
 #include "Core/TracerI.h"
 
+#include "winternl.h"
+
 RenderImage::RenderImage(const RenderImageParams& p,
                          uint32_t depth, MRayColorSpaceEnum colorSpace,
                          const GPUSystem& gpuSystem)
     : memory(gpuSystem)
-    , sem(p.semaphore)
-    , semCounter(p.initialSemCounter)
+    , sem(p.semaphore, p.initialSemCounter)
     , depth(depth)
     , colorSpace(colorSpace)
     , resolution(p.resolution)
@@ -26,22 +27,29 @@ RenderImage::RenderImage(const RenderImageParams& p,
     sampleStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(samples.data())));
 }
 
-void RenderImage::AcquireImage(const GPUQueue& queue)
+void RenderImage::AcquireImage(const GPUQueue&)
 {
-    queue.IssueSemaphoreWait(sem, semCounter);
+    // Let's not wait on the host function here
+    // Host functions seems slow, wait on issue
+    // (instead of execution).
+    sem.HostAcquire();
 }
 
 RenderImageSection RenderImage::ReleaseImage(const GPUQueue& queue)
 {
-    semCounter++;
-    queue.IssueSemaphoreSignal(sem, semCounter);
+    // Here we can not do that (We can but it will mean
+    // CUDA sync device etc so it is better to wait over
+    // on GPU side.
+    queue.IssueSemaphoreSignal(sem);
+    // We should preset the next acquisition value here
+    uint64_t nextVal = sem.NextAcquisition();
 
     return RenderImageSection
     {
         .pixelMin           = pixelMin,
         .pixelMax           = pixelMax,
         .globalWeight       = 0.0f,
-        .waitCounter        = semCounter,
+        .waitCounter        = nextVal,
         .pixelStartOffset   = pixStartOffset,
         .sampleStartOffset  = sampleStartOffset
     };

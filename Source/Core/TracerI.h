@@ -12,6 +12,8 @@
 
 #define MRAY_GENERIC_ID(NAME, TYPE) enum class NAME : TYPE {}
 
+class TimelineSemaphore;
+
 using GPUThreadInitFunction = void(*)();
 namespace BS { class thread_pool; }
 
@@ -21,7 +23,7 @@ struct RenderImageParams
     Vector2ui               regionMin;
     Vector2ui               regionMax;
     //
-    SystemSemaphoreHandle   semaphore;
+    TimelineSemaphore*      semaphore;
     uint64_t                initialSemCounter;
 };
 

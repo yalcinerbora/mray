@@ -9,7 +9,7 @@
     namespace mray::cuda
     {
         struct KernelCallParamsCUDA;
-        class GPUSemaphoreCUDA;
+        class GPUSemaphoreViewCUDA;
         class GPUDeviceCUDA;
         class GPUQueueCUDA;
         class GPUFenceCUDA;
@@ -28,7 +28,7 @@
 
     // Alias the types
     using KernelCallParams      = mray::cuda::KernelCallParamsCUDA;
-    using GPUSemaphore          = mray::cuda::GPUSemaphoreCUDA;
+    using GPUSemaphore          = mray::cuda::GPUSemaphoreViewCUDA;
     using GPUDevice             = mray::cuda::GPUDeviceCUDA;
     using GPUQueue              = mray::cuda::GPUQueueCUDA;
     using GPUFence              = mray::cuda::GPUFenceCUDA;

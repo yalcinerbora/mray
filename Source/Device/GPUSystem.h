@@ -14,7 +14,7 @@
 
     // Alias the types
     using KernelCallParams      = mray::cuda::KernelCallParamsCUDA;
-    using GPUSemaphore          = mray::cuda::GPUSemaphoreCUDA;
+    using GPUSemaphoreView      = mray::cuda::GPUSemaphoreViewCUDA;
     using GPUDevice             = mray::cuda::GPUDeviceCUDA;
     using GPUQueue              = mray::cuda::GPUQueueCUDA;
     using GPUFence              = mray::cuda::GPUFenceCUDA;

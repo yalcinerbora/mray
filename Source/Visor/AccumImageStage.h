@@ -9,6 +9,8 @@
 #include "VulkanPipeline.h"
 #include "MainUniformBuffer.h"
 
+class TimelineSemaphore;
+
 class AccumImageStage : UniformMemoryRequesterI
 {
     private:
@@ -37,9 +39,9 @@ class AccumImageStage : UniformMemoryRequesterI
     VkDeviceMemory          foreignMemory           = nullptr;
     VkBuffer                foreignBuffer           = nullptr;
     VkSemaphore             timelineSemaphoreVk     = nullptr;
-    // TODO: There is a type change here this will probably break on Linux?
-    SystemSemaphoreHandle   systemSemHandle         = 0;
     // Main system related stuff
+    TimelineSemaphore*      syncSemaphore   = nullptr;
+
     const VulkanSystemView* handlesVk       = nullptr;
     //
     VulkanComputePipeline   pipeline;
@@ -61,13 +63,14 @@ class AccumImageStage : UniformMemoryRequesterI
                         ~AccumImageStage();
 
     //
-    MRayError               Initialize(const std::string& execPath);
+    MRayError               Initialize(TimelineSemaphore* ts,
+                                       const std::string& execPath);
     void                    ImportExternalHandles(const RenderBufferInfo&);
     void                    ChangeImage(const VulkanImage* hdrImageIn,
                                         const VulkanImage* sampleImageIn);
     SemaphoreVariant        IssueAccumulation(VkSemaphore prevCmdSignal,
                                               const RenderImageSection&);
-    SystemSemaphoreHandle   GetSemaphoreOSHandle() const;
+    //SystemSemaphoreHandle   GetSemaphoreOSHandle() const;
 
     //
     size_t                  UniformBufferSize() const override;

@@ -46,11 +46,16 @@ VulkanImage::VulkanImage(const VulkanSystemView& handles)
 {}
 
 VulkanImage::VulkanImage(const VulkanSystemView& handles,
+                         VulkanSamplerMode samplerMode,
                          VkFormat format, VkImageUsageFlags usage,
                          Vector2ui extentIn, uint32_t depthIn)
-    : extent(extentIn)
+    : handlesVk(&handles)
+    , formatVk(format)
+    , samplerVk((samplerMode == VulkanSamplerMode::NEAREST)
+                        ? handles.nnnSampler
+                        : handles.llnSampler)
+    , extent(extentIn)
     , depth(depthIn)
-    , handlesVk(&handles)
 {
     VkImageCreateInfo imgCInfo =
     {
@@ -86,7 +91,7 @@ VulkanImage::VulkanImage(VulkanImage&& other)
     : imgVk(std::exchange(other.imgVk, nullptr))
     , formatVk(other.formatVk)
     , viewVk(std::exchange(other.viewVk, nullptr))
-    , samplerVk(std::exchange(other.samplerVk, nullptr))
+    , samplerVk(other.samplerVk)
     , extent(other.extent)
     , depth(other.depth)
     , handlesVk(other.handlesVk)
@@ -104,7 +109,7 @@ VulkanImage& VulkanImage::operator=(VulkanImage&& other)
     imgVk = std::exchange(other.imgVk, nullptr);
     formatVk = other.formatVk;
     viewVk = std::exchange(other.viewVk, nullptr);
-    samplerVk = std::exchange(other.samplerVk, nullptr);
+    samplerVk = other.samplerVk;
     extent = other.extent;
     depth = other.depth;
     handlesVk = other.handlesVk;

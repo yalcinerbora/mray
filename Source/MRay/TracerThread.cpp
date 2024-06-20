@@ -216,7 +216,7 @@ void TracerThread::LoopWork()
     Optional<uint32_t>              renderLogic1;
     Optional<uint32_t>              cameraIndex;
     Optional<std::string>           scenePath;
-    Optional<SystemSemaphoreHandle> syncSem;
+    Optional<TimelineSemaphore*>    syncSem;
     Optional<Float>                 time;
     Optional<bool>                  pauseContinue;
     Optional<bool>                  startStop;
@@ -313,10 +313,6 @@ void TracerThread::LoopWork()
                 isTerminated = true;
                 return;
             }
-            //std::string rName = GetTypeNameFromRenderConfig(initialRenderConfig.value());
-            //currentRenderer = tracer->CreateRenderer(rName);
-            //SetRendererParams(initialRenderConfig.value());
-            //tracer->CommitRendererReservations(currentRenderer);
         }
 
         // New scene!
@@ -479,8 +475,9 @@ void TracerThread::LoopWork()
 
         if(syncSem)
         {
-            MRAY_LOG("[Tracer]: NewSem {}", syncSem.value());
             currentSem = syncSem.value();
+            MRAY_LOG("[Tracer]: NewSem {:p}", static_cast<void*>(currentSem));
+
         }
 
         // New time!
@@ -547,7 +544,6 @@ void TracerThread::LoopWork()
         // If we are rendering continue...
         if(isRendering)
         {
-            //RendererOutput renderOut = {};
             RendererOutput renderOut = tracer->DoRenderWork();
             if(renderOut.analytics)
             {
@@ -565,9 +561,6 @@ void TracerThread::LoopWork()
                     renderOut.imageOut.value()
                 ));
             }
-
-            //using namespace std::chrono_literals;
-            //std::this_thread::sleep_for(3ms);
         }
 
         // Here check the queue's situation

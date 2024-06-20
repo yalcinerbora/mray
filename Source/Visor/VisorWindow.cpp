@@ -788,11 +788,15 @@ void VisorWindow::PathDropped(int count, const char** paths)
 
 MRayError VisorWindow::Initialize(TransferQueue::VisorView& transferQueueIn,
                                   const VulkanSystemView& handles,
+                                  TimelineSemaphore* syncSem,
                                   BS::thread_pool* tp,
                                   const std::string& windowTitle,
                                   const VisorConfig& config,
                                   const std::string& processPath)
 {
+    assert(syncSem != nullptr);
+    assert(tp != nullptr);
+
     transferQueue = &transferQueueIn;
     handlesVk = handles;
     hdrRequested = config.displayHDR;
@@ -835,12 +839,20 @@ MRayError VisorWindow::Initialize(TransferQueue::VisorView& transferQueueIn,
     // move assignment etc, change the entire vulkan object system
     // this impl. is patch after patch
     accumulateStage = AccumImageStage(handlesVk);
-    e = accumulateStage.Initialize(processPath);
+    e = accumulateStage.Initialize(syncSem, processPath);
     if(e) return e;
 
     tonemapStage = TonemapStage(handlesVk);
     e = tonemapStage.Initialize(processPath);
     if(e) return e;
+
+    // Initially, send the sync semaphore as a very first action
+    MRAY_LOG("[Visor]: Sending sync semaphore...");
+    transferQueue->Enqueue(VisorAction
+    (
+        std::in_place_index<VisorAction::SEND_SYNC_SEMAPHORE>,
+        syncSem
+    ));
 
     glfwShowWindow(window);
     return MRayError::OK;
@@ -1091,11 +1103,22 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
 
 void VisorWindow::DoInitialActions()
 {
-    // Send Initial Renderer once
+    if(initialSceneFile)
+    {
+        MRAY_LOG("[Visor]: Sending initial scene...");
+        transferQueue->Enqueue(VisorAction
+        (
+            std::in_place_index<VisorAction::LOAD_SCENE>,
+            initialSceneFile.value()
+        ));
+        initialSceneFile = std::nullopt;
+    }
+
+    // Send Initial Renderer once as well
     // This is sent here to start the rendering as well
     if(initialTracerRenderConfigPath)
     {
-        MRAY_LOG("[Visor]: Configuring Tracer via Initial Render Config");
+        MRAY_LOG("[Visor]: Configuring Tracer via initial render config...");
 
         transferQueue->Enqueue(VisorAction
         (
@@ -1113,17 +1136,6 @@ void VisorWindow::DoInitialActions()
         visorState.currentRendererState = TracerRunState::RUNNING;
 
         initialTracerRenderConfigPath = std::nullopt;
-    }
-    // Initially, send the sync semaphore as well
-    if(!syncSempahoreIsSent)
-    {
-        SystemSemaphoreHandle h = accumulateStage.GetSemaphoreOSHandle();
-        transferQueue->Enqueue(VisorAction
-        (
-            std::in_place_index<VisorAction::SEND_SYNC_SEMAPHORE>,
-            h
-        ));
-        syncSempahoreIsSent = true;
     }
 }
 
@@ -1267,6 +1279,7 @@ void VisorWindow::Render()
     // Issue an accumulation and override the main wait semaphore
     if(newImageSection)
     {
+        MRAY_LOG("Section!");
         //auto& as = accumulateStage;
         //prevSemamphore = as.IssueAccumulation(prevSemamphore,
         //                                       newImageSection.value());
@@ -1367,7 +1380,9 @@ void VisorWindow::Render()
     PresentFrame(prevSemamphore);
 }
 
-void VisorWindow::SetInitialRenderConfig(std::string_view renderConfigPath)
+void VisorWindow::SetKickstartParameters(const Optional<std::string_view>& renderConfigPath,
+                                         const Optional<std::string_view>& sceneFile)
 {
     initialTracerRenderConfigPath = renderConfigPath;
+    initialSceneFile = sceneFile;
 }

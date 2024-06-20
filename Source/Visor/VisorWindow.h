@@ -143,8 +143,8 @@ class VisorWindow
                                                       handlesVk);
     MainUniformBuffer uniformBuffer = MainUniformBuffer(handlesVk);
     // Initial rendering
-    Optional<std::string_view>  initialTracerRenderConfigPath;
-    bool                        syncSempahoreIsSent = false;
+    Optional<std::string_view>      initialSceneFile;
+    Optional<std::string_view>      initialTracerRenderConfigPath;
 
     private:
     friend class VisorVulkan;
@@ -165,6 +165,7 @@ class VisorWindow
     // Thus, only visor can initialize windows
     MRayError   Initialize(TransferQueue::VisorView& transferQueue,
                            const VulkanSystemView& handlesVk,
+                           TimelineSemaphore* syncSem,
                            BS::thread_pool* threadPool,
                            const std::string& windowTitle,
                            const VisorConfig& config,
@@ -191,6 +192,7 @@ class VisorWindow
     void            PresentFrame(const SemaphoreVariant& waitSemaphore);
     ImFont*         CurrentFont();
     void            Render();
-    void            SetInitialRenderConfig(std::string_view renderConfigPath);
+    void            SetKickstartParameters(const Optional<std::string_view>& renderConfigPath,
+                                           const Optional<std::string_view>& sceneFile);
 
 };

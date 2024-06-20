@@ -11,6 +11,8 @@
 
 #include "../GPUTypes.h"
 
+class TimelineSemaphore;
+
 // Cuda Kernel Optimization Hints
 // Since we call all of the kernels in a static manner
 // (in case of Block Size) hint the compiler
@@ -54,6 +56,10 @@ using AnnotationHandle = void*;
 class GPUQueueCUDA;
 class GPUDeviceCUDA;
 
+// Semaphore related namespace global functions
+void TimelineSemAcquireInternal(void*);
+void TimelineSemReleaseInternal(void*);
+
 // Generic Call Parameters
 struct KernelCallParamsCUDA
 {
@@ -67,22 +73,19 @@ struct KernelCallParamsCUDA
     MRAY_HYBRID uint32_t    TotalSize() const;
 };
 
-class GPUSemaphoreCUDA
+class GPUSemaphoreViewCUDA
 {
-    friend class GPUQueueCUDA;
-
     private:
-    cudaExternalSemaphore_t semCUDA;
-    SystemSemaphoreHandle   semSystem;
+    TimelineSemaphore*  externalSemaphore;
+    uint64_t            acquireValue;
 
     public:
     // Constructors & Destructor
-                        GPUSemaphoreCUDA(SystemSemaphoreHandle sem);
-                        GPUSemaphoreCUDA(const GPUSemaphoreCUDA&) = delete;
-                        GPUSemaphoreCUDA(GPUSemaphoreCUDA&&);
-    GPUSemaphoreCUDA&   operator=(const GPUSemaphoreCUDA&) = delete;
-    GPUSemaphoreCUDA&   operator=(GPUSemaphoreCUDA&&);
-                        ~GPUSemaphoreCUDA();
+                GPUSemaphoreViewCUDA(TimelineSemaphore* sem,
+                                     uint64_t acqValue);
+    uint64_t    NextAcquisition();
+    void        HostAcquire();
+    void        HostRelease();
 };
 
 class GPUFenceCUDA
@@ -224,9 +227,9 @@ class GPUQueueCUDA
     MRAY_HYBRID
     GPUFenceCUDA        Barrier() const;
     MRAY_HOST
-    void                IssueSemaphoreWait(GPUSemaphoreCUDA&, uint64_t waitValue) const;
+    void                IssueSemaphoreWait(GPUSemaphoreViewCUDA&) const;
     MRAY_HOST
-    void                IssueSemaphoreSignal(GPUSemaphoreCUDA&, uint64_t signalValue) const;
+    void                IssueSemaphoreSignal(GPUSemaphoreViewCUDA&) const;
 
     MRAY_HYBRID
     uint32_t            SMCount() const;
@@ -521,21 +524,15 @@ GPUFenceCUDA GPUQueueCUDA::Barrier() const
 }
 
 MRAY_HOST inline
-void GPUQueueCUDA::IssueSemaphoreWait(GPUSemaphoreCUDA& sem, uint64_t waitValue) const
+void GPUQueueCUDA::IssueSemaphoreWait(GPUSemaphoreViewCUDA& sem) const
 {
-    cudaExternalSemaphoreWaitParams waitParams = {};
-    waitParams.params.fence.value = waitValue;
-    CUDA_CHECK(cudaWaitExternalSemaphoresAsync(&sem.semCUDA, &waitParams,
-                                               1, stream));
+    cudaLaunchHostFunc(stream, &TimelineSemAcquireInternal, &sem);
 }
 
 MRAY_HOST inline
-void GPUQueueCUDA::IssueSemaphoreSignal(GPUSemaphoreCUDA& sem, uint64_t signalValue) const
+void GPUQueueCUDA::IssueSemaphoreSignal(GPUSemaphoreViewCUDA& sem) const
 {
-    cudaExternalSemaphoreSignalParams signalParams = {};
-    signalParams.params.fence.value = signalValue;
-    CUDA_CHECK(cudaSignalExternalSemaphoresAsync(&sem.semCUDA, &signalParams,
-                                                 1, stream));
+    cudaLaunchHostFunc(stream, &TimelineSemReleaseInternal, &sem);
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
