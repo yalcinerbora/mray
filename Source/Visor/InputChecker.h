@@ -6,7 +6,7 @@
 class InputChecker
 {
     private:
-    const VisorKeyMap& keyMap;
+    const VisorKeyMap* keyMap;
 
     public:
     // Constructors & DestructorInputChecker
@@ -18,17 +18,17 @@ class InputChecker
 };
 
 inline InputChecker::InputChecker(const VisorKeyMap& km)
-    : keyMap(km)
+    : keyMap(&km)
 {}
 
 inline bool InputChecker::CheckKeyPress(VisorUserAction a, bool repeat) const
 {
-    return ImGui::IsKeyPressed(ImGuiKey(keyMap.at(a)), repeat);
+    return ImGui::IsKeyPressed(ImGuiKey(keyMap->at(a)), repeat);
 }
 
 inline bool InputChecker::CheckMouseDrag(VisorUserAction a) const
 {
-    return ImGui::IsMouseDragging(keyMap.at(a));
+    return ImGui::IsMouseDragging(keyMap->at(a));
 }
 
 inline Vector2 InputChecker::GetMousePos() const

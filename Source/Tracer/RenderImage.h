@@ -10,11 +10,19 @@ class RenderImage
 {
     private:
     // Mem related
-    Span<Float>         pixels;
-    Span<Float>         samples;
+    // According to the profiling this staging style
+    // transfer was the most performant
+    DeviceMemory        deviceMemory;
+    Span<Float>         dPixels;
+    Span<Float>         dSamples;
+    //
+    HostLocalMemory     stagingMemory;
+    Span<Float>         hPixels;
+    Span<Float>         hSamples;
+    //
     size_t              pixStartOffset      = 0;
     size_t              sampleStartOffset   = 0;
-    HostLocalMemory     memory;
+
     GPUSemaphoreView    sem;
     //
     uint32_t            depth       = 0;
@@ -32,10 +40,12 @@ class RenderImage
     RenderImage&        operator=(const RenderImage&) = delete;
                         ~RenderImage() = default;
 
-    // Members;
+    // Members
     // Access
     Span<Float>         Pixels();
     Span<Float>         Samples();
+    //
+    Vector2ui           Resolution() const;
     //
     void                ClearImage(const GPUQueue& queue);
     void                AcquireImage(const GPUQueue& queue);
@@ -46,11 +56,11 @@ class RenderImage
 inline
 Span<Float> RenderImage::Pixels()
 {
-    return pixels;
+    return dPixels;
 }
 
 inline
 Span<Float> RenderImage::Samples()
 {
-    return samples;
+    return dSamples;
 }

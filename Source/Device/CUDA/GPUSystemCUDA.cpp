@@ -7,6 +7,8 @@
 #include <cuda.h>
 #include <nvtx3/nvToolsExt.h>
 
+#include "Core/Timer.h"
+
 namespace mray::cuda
 {
 
@@ -14,24 +16,27 @@ GPUSemaphoreViewCUDA::GPUSemaphoreViewCUDA(TimelineSemaphore* sem,
                                            uint64_t av)
     : externalSemaphore(sem)
     , acquireValue(av)
-{}
+{
+    externalSemaphore->Reset();
+}
+
+uint64_t GPUSemaphoreViewCUDA::ChangeToNextState()
+{
+    acquireValue += 2;
+    return acquireValue - 1;
+}
 
 void GPUSemaphoreViewCUDA::HostAcquire()
 {
     externalSemaphore->Acquire(acquireValue);
+    MRAY_LOG("[Tracer] Acquired Img {}", acquireValue);
 }
 
 void GPUSemaphoreViewCUDA::HostRelease()
 {
+    MRAY_LOG("[Tracer] Released Img\n"
+             "----------------------");
     externalSemaphore->Release();
-    // Set the next acquisition
-    NextAcquisition();
-}
-
-uint64_t GPUSemaphoreViewCUDA::NextAcquisition()
-{
-    acquireValue++;
-    return acquireValue;
 }
 
 GPUDeviceCUDA::GPUDeviceCUDA(int deviceId, AnnotationHandle domain)

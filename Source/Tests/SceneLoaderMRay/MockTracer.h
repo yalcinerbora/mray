@@ -302,6 +302,8 @@ class TracerMock : public TracerI
 
     RenderBufferInfo    StartRender(RendererId, CamSurfaceId,
                                     RenderImageParams,
+                                    Optional<uint32_t>,
+                                    Optional<uint32_t>,
                                     Optional<CameraTransform>) override;
     void                StopRender() override;
     RendererOutput      DoRenderWork() override;
@@ -1738,6 +1740,8 @@ inline void TracerMock::PushRendererAttribute(RendererId, uint32_t,
 
 inline RenderBufferInfo TracerMock::StartRender(RendererId, CamSurfaceId,
                                                 RenderImageParams,
+                                                Optional<uint32_t>,
+                                                Optional<uint32_t>,
                                                 Optional<CameraTransform>)
 {
     throw MRayError("\"StartRender\" is not implemented in mock tracer!");

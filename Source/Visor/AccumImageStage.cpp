@@ -2,14 +2,8 @@
 #include "VulkanAllocators.h"
 
 #include "Core/Error.hpp"
-
-//#ifdef MRAY_WINDOWS
-//    #include <windows.h>
-//    #include <vulkan/vulkan_win32.h>
-//
-//    // Changing this to translation unit global, this will be used only here
-//    PFN_vkGetSemaphoreWin32HandleKHR vkGetSemaphoreWin32Handle = nullptr;
-//#endif
+#include "Core/TimelineSemaphore.h"
+#include <BS/BS_thread_pool.hpp>
 
 PFN_vkGetMemoryHostPointerPropertiesEXT AccumImageStage::vkGetMemoryHostPointerProperties = nullptr;
 
@@ -23,7 +17,9 @@ AccumImageStage::AccumImageStage(AccumImageStage&& other)
     , foreignMemory(std::exchange(other.foreignMemory, nullptr))
     , foreignBuffer(std::exchange(other.foreignBuffer, nullptr))
     , timelineSemaphoreVk(std::exchange(other.timelineSemaphoreVk, nullptr))
+    , accumCompleteFence(std::exchange(other.accumCompleteFence, nullptr))
     , syncSemaphore(other.syncSemaphore)
+    , threadPool(other.threadPool)
     , handlesVk(other.handlesVk)
     , pipeline(std::move(other.pipeline))
     , descriptorSets(std::move(other.descriptorSets))
@@ -39,7 +35,9 @@ AccumImageStage& AccumImageStage::operator=(AccumImageStage&& other)
     uniformBuffer = other.uniformBuffer;
     foreignMemory = std::exchange(other.foreignMemory, nullptr);
     foreignBuffer = std::exchange(other.foreignBuffer, nullptr);
+    accumCompleteFence = std::exchange(other.accumCompleteFence, nullptr);
     syncSemaphore = other.syncSemaphore;
+    threadPool = other.threadPool;
     timelineSemaphoreVk = std::exchange(other.timelineSemaphoreVk, nullptr);
     handlesVk = other.handlesVk;
     pipeline = std::move(other.pipeline);
@@ -56,9 +54,12 @@ AccumImageStage::~AccumImageStage()
 }
 
 MRayError AccumImageStage::Initialize(TimelineSemaphore* ts,
+                                      BS::thread_pool* tp,
                                       const std::string& execPath)
 {
     syncSemaphore = ts;
+    threadPool = tp;
+
     if(vkGetMemoryHostPointerProperties == nullptr)
     {
         auto func = vkGetDeviceProcAddr(handlesVk->deviceVk,
@@ -66,29 +67,10 @@ MRayError AccumImageStage::Initialize(TimelineSemaphore* ts,
         vkGetMemoryHostPointerProperties = reinterpret_cast<PFN_vkGetMemoryHostPointerPropertiesEXT>(func);
     }
 
-    //#ifdef MRAY_WINDOWS
-    //    if(vkGetSemaphoreWin32Handle == nullptr)
-    //    {
-    //        auto func = vkGetDeviceProcAddr(handlesVk->deviceVk,
-    //                                        "vkGetSemaphoreWin32HandleKHR");
-    //        vkGetSemaphoreWin32Handle = reinterpret_cast<PFN_vkGetSemaphoreWin32HandleKHR>(func);
-    //    }
-    //#endif
-
-    //static constexpr auto ExternalSemType = (MRAY_IS_ON_WINDOWS)
-    //    ? VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT
-    //    : VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
-
-    //VkExportSemaphoreCreateInfoKHR exportInfo =
-    //{
-    //    .sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO_KHR,
-    //    .pNext = nullptr,
-    //    .handleTypes = ExternalSemType
-    //};
     VkSemaphoreTypeCreateInfo semTypeCInfo =
     {
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
-        .pNext = nullptr, //&exportInfo,
+        .pNext = nullptr,
         .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
         .initialValue = 0
     };
@@ -101,25 +83,6 @@ MRayError AccumImageStage::Initialize(TimelineSemaphore* ts,
     vkCreateSemaphore(handlesVk->deviceVk, &semCInfo,
                       VulkanHostAllocator::Functions(),
                       &timelineSemaphoreVk);
-
-    //#ifdef MRAY_WINDOWS
-    //{
-    //    if(systemSemHandle) CloseHandle(systemSemHandle);
-    //    VkSemaphoreGetWin32HandleInfoKHR win32SemInfo =
-    //    {
-    //        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_WIN32_HANDLE_INFO_KHR,
-    //        .pNext = nullptr,
-    //        .semaphore = timelineSemaphoreVk,
-    //        .handleType = ExternalSemType
-    //    };
-    //    vkGetSemaphoreWin32Handle(handlesVk->deviceVk, &win32SemInfo,
-    //                              &systemSemHandle);
-    //}
-    //#elif defined MRAY_LINUX
-    //{
-    //    //#error "TODO: Implement!!"
-    //}
-    //#endif
 
     using namespace std::string_literals;
     MRayError e = pipeline.Initialize(
@@ -164,21 +127,13 @@ void AccumImageStage::Clear()
     }
     if(!timelineSemaphoreVk) return;
 
-    //#ifdef MRAY_WINDOWS
-    //{
-    //    CloseHandle(systemSemHandle);
-    //}
-    //#elif defined MRAY_LINUX
-    //{
-    //    //#error "TODO: Implement!!"
-    //    close(systemSemHandle);
-    //}
-    //#endif
     vkDestroySemaphore(handlesVk->deviceVk, timelineSemaphoreVk,
                        VulkanHostAllocator::Functions());
     vkFreeCommandBuffers(handlesVk->deviceVk,
                          handlesVk->mainCommandPool, 1,
                          &accumulateCommand);
+    vkDestroyFence(handlesVk->deviceVk, accumCompleteFence,
+                   VulkanHostAllocator::Functions());
 }
 
 void AccumImageStage::ImportExternalHandles(const RenderBufferInfo& rbI)
@@ -273,9 +228,18 @@ void AccumImageStage::ChangeImage(const VulkanImage* hdrImageIn,
     pipeline.BindSetData(descriptorSets[0], bindList);
 }
 
-SemaphoreVariant AccumImageStage::IssueAccumulation(VkSemaphore prevCmdSignal,
+SemaphoreVariant AccumImageStage::IssueAccumulation(SemaphoreVariant prevCmdSignal,
                                                     const RenderImageSection& section)
 {
+    syncSemaphore->Acquire(section.waitCounter);
+    MRAY_LOG("[Visor] Acquired Img {}", section.waitCounter);
+    threadPool->detach_task([sem = syncSemaphore]()
+    {
+        MRAY_LOG("[Visor] Released Img\n----------------------");
+        sem->Release();
+    });
+    return prevCmdSignal;
+
     // Pre-memcopy the buffer
     UniformBuffer buffer =
     {
@@ -285,7 +249,7 @@ SemaphoreVariant AccumImageStage::IssueAccumulation(VkSemaphore prevCmdSignal,
         .globalSampleWeight = section.globalWeight
     };
     std::memcpy(uniformBuffer.hostPtr, &buffer, sizeof(UniformBuffer));
-
+    uniformBuffer.FlushRange(handlesVk->deviceVk);
 
     // TODO: Check if overlapping is allowed
     DescriptorBindList<ShaderBindingData> bindList =
@@ -339,22 +303,12 @@ SemaphoreVariant AccumImageStage::IssueAccumulation(VkSemaphore prevCmdSignal,
     uint64_t signalCounter = section.waitCounter + 1;
     std::array<VkSemaphoreSubmitInfo, 1> waitSemaphores =
     {
-        //VkSemaphoreSubmitInfo
-        //{
-        //    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-        //    .pNext = nullptr,
-        //    .semaphore = timelineSemaphoreVk,
-        //    .value = waitCounter,
-        //    // TODO change this to more fine-grained later maybe?
-        //    .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-        //    .deviceIndex = 0
-        //},
         VkSemaphoreSubmitInfo
         {
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
             .pNext = nullptr,
-            .semaphore = prevCmdSignal,
-            .value = 0,
+            .semaphore = prevCmdSignal.semHandle,
+            .value = prevCmdSignal.value,
             // TODO change this to more fine-grained later maybe?
             .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
             .deviceIndex = 0
@@ -381,8 +335,30 @@ SemaphoreVariant AccumImageStage::IssueAccumulation(VkSemaphore prevCmdSignal,
         .signalSemaphoreInfoCount = 1,
         .pSignalSemaphoreInfos = &signalSemaphores
     };
+
+    // We need to wait the section to be ready.
+    // Again we are waiting from host since not inter GPU
+    // synch is available (Except on Linux I think using the SYNC_FD
+    syncSemaphore->Acquire(section.waitCounter);
     // Finally submit!
-    vkQueueSubmit2(handlesVk->mainQueueVk, 1, &submitInfo, nullptr);
+    vkQueueSubmit2(handlesVk->mainQueueVk, 1, &submitInfo, accumCompleteFence);
+
+    // Launch a wait and reset task for this fence
+    threadPool->detach_task([fence = this->accumCompleteFence,
+                             sem = this->syncSemaphore,
+                             device = this->handlesVk->deviceVk]()
+    {
+        // Wait over the fence
+        // Thread pool is only used for saving the image and
+        // doing this operation so it should be pretty fast (hopefully)
+        vkWaitForFences(device, 1, &fence, VK_TRUE,
+                        std::numeric_limits<uint64_t>::max());
+        // Signal the MRay renderer that
+        // this memory is available now.
+        sem->Release();
+        // Reset for the next issue
+        vkResetFences(device, 1, &fence);
+    });
     return SemaphoreVariant{signalCounter, timelineSemaphoreVk};
 }
 

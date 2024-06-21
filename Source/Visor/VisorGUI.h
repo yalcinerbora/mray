@@ -53,7 +53,7 @@ class MainStatusBar
     static constexpr auto PAUSED_NAME    = "PAUSED"sv;
     static constexpr auto STOPPED_NAME   = "STOPPED"sv;
 
-    const InputChecker& inputChecker;
+    const InputChecker* inputChecker;
 
     bool    paused;
     bool    running;
@@ -111,7 +111,9 @@ class VisorGUI
                     ShowStatusBar(const VisorState&);
 
     public:
-    VisorGUI(const VisorKeyMap* = nullptr);
+                    VisorGUI(const VisorKeyMap* = nullptr);
+                    VisorGUI(VisorGUI&&);
+    VisorGUI&       operator=(VisorGUI&&);
 
     [[nodiscard]]
     GUIChanges      Render(ImFont* windowScaledFont,

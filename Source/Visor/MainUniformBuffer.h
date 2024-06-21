@@ -7,8 +7,11 @@ struct UniformBufferMemView
 {
     Byte*           hostPtr;
     VkBuffer        bufferHandle;
+    VkDeviceMemory  memoryHandle;
     VkDeviceSize    offset;
     VkDeviceSize    size;
+
+    void            FlushRange(VkDevice deviceVk);
 };
 
 class UniformMemoryRequesterI
@@ -25,11 +28,11 @@ class MainUniformBuffer
     static constexpr size_t VULKAN_META_ALIGNMENT = 256;
 
     private:
-    VulkanBuffer    mainUniformBuffer;
-    size_t          totalSize           = 0;
-    Byte*           alwaysMappedPtr     = nullptr;
-    VkDeviceMemory  mainMemory          = nullptr;
-    const VulkanSystemView* handlesVk   = nullptr;
+    VulkanBuffer            mainUniformBuffer;
+    size_t                  totalSize       = 0;
+    Byte*                   alwaysMappedPtr = nullptr;
+    VulkanDeviceMemory      mainMemory      = nullptr;
+    const VulkanSystemView* handlesVk       = nullptr;
 
     public:
     // Constructors & Destructor

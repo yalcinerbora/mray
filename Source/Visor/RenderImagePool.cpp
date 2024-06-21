@@ -204,8 +204,8 @@ RenderImagePool::~RenderImagePool()
     Clear();
 }
 
-void RenderImagePool::SaveImage(VkSemaphore prevCmdSignal,
-                                IsHDRImage t, const RenderImageSaveInfo& fileOutInfo)
+SemaphoreVariant RenderImagePool::SaveImage(SemaphoreVariant prevCmdSignal,
+                                            IsHDRImage t, const RenderImageSaveInfo& fileOutInfo)
 
 {
     // ============= //
@@ -219,8 +219,8 @@ void RenderImagePool::SaveImage(VkSemaphore prevCmdSignal,
         {
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
             .pNext = nullptr,
-            .semaphore = prevCmdSignal,
-            .value = 0,
+            .semaphore = prevCmdSignal.semHandle,
+            .value = prevCmdSignal.value,
             // TODO change this to more fine-grained later maybe?
             .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
             .deviceIndex = 0
@@ -334,4 +334,8 @@ void RenderImagePool::SaveImage(VkSemaphore prevCmdSignal,
     // Our next wait will be twice as high from prev
     // Increment once more
     saveSemaphore.value++;
+
+    // However next command (probably render) should only wait for the
+    // memory transfer from device memory to host memory
+    return SemaphoreVariant{saveSemaphore.value - 1, saveSemaphore.semHandle};
 }

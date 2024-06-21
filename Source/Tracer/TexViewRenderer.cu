@@ -48,49 +48,73 @@ void TexViewRenderer::PushAttribute(uint32_t attributeIndex,
 }
 
 RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams& params,
-                                            const CameraKey&)
+                                              const CameraKey&)
 {
     // Reset renderbuffer
+
     using enum MRayColorSpaceEnum;
     renderBuffer = std::make_shared<RenderImage>(params, 1,
                                                  MR_ACES_CG,
                                                  gpuSystem);
-
     return renderBuffer->GetBufferInfo();
+}
+
+MRAY_KERNEL
+void TestWrite(MRAY_GRID_CONSTANT const Span<Float> pixels,
+               MRAY_GRID_CONSTANT const Span<Float> samples,
+               MRAY_GRID_CONSTANT const uint32_t colorIndex)
+{
+    KernelCallParams kp;
+    uint32_t pixelChannels = static_cast<uint32_t>(pixels.size());
+    for(uint32_t i = kp.GlobalId(); i < pixelChannels; i += kp.TotalSize())
+    {
+        if(i < samples.size())
+            samples[i] = 1.0;
+        pixels[i] = (colorIndex % 2 == 0) ? 1.0f : 0.0f;
+    }
 }
 
 RendererOutput TexViewRenderer::DoRender()
 {
     using namespace std::literals;
-    std::this_thread::sleep_for(500ms);
+    //std::this_thread::sleep_for(200ms);
 
     const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
-
-    renderBuffer->AcquireImage(queue);
     Span<Float> pixels = renderBuffer->Pixels();
     Span<Float> samples = renderBuffer->Samples();
     uint32_t colorIndex = pixelIndex;
 
-    queue.IssueSaturatingLambda
+
+    renderBuffer->AcquireImage(queue);
+    queue.IssueSaturatingKernel<TestWrite>
     (
         "TexTest"sv,
         KernelIssueParams{.workCount = static_cast<uint32_t>(pixels.size())},
-        [pixels, samples, colorIndex] MRAY_HYBRID (KernelCallParams kp)
-    {
-        uint32_t pixelChannels = static_cast<uint32_t>(pixels.size());
-        for(uint32_t i = kp.GlobalId(); i < pixelChannels; i += kp.TotalSize())
-        {
-            if(i < samples.size())
-                samples[i] = 1.0;
-            pixels[i] = (colorIndex % 2 == 0) ? 1.0f : 0.0f;
-        }
-    });
+        //
+        pixels,
+        samples,
+        colorIndex
+    );
     RenderImageSection renderOut = renderBuffer->ReleaseImage(queue);
+
+    //queue.Barrier().Wait();
+
+    //t.Split();
+    //MRAY_LOG("MEMCPY {}", t.Elapsed<Millisecond>());
 
     pixelIndex++;
     return RendererOutput
     {
-        .analytics = std::nullopt,
+        .analytics = RendererAnalyticData
+        {
+            3.2,
+            "M paths/s",
+            0.0,
+            "spp",
+            0.0,
+            renderBuffer->Resolution(),
+            MRayColorSpaceEnum::MR_ACES_CG
+        },
         .imageOut = renderOut
     };
 }

@@ -13,6 +13,8 @@
 
 #include "Common/JsonCommon.h"
 
+static constexpr RendererId INVALID_RENDERER_ID = RendererId(std::numeric_limits<uint32_t>::max());
+
 struct TracerConfig
 {
     std::string dllName;
@@ -144,12 +146,11 @@ MRayError TracerThread::CreateRendererFromConfig(const std::string& configJsonPa
         const nlohmann::json& renderers = configJson.at(RENDERER_LIST_NAME);
         const nlohmann::json& rendererName = configJson.at(INITIAL_NAME);
         std::string rName = AddRendererPrefix(rendererName.get<std::string_view>());
+        currentRendererName = rName;
 
         const nlohmann::json& rendererNode = renderers.at(rendererName);
 
-        if(currentRenderer != std::numeric_limits<RendererId>::max())
-            tracer->DestroyRenderer(currentRenderer);
-
+        assert(currentRenderer == INVALID_RENDERER_ID);
         currentRenderer = tracer->CreateRenderer(rName);
         RendererAttributeInfoList attributes;
 
@@ -204,8 +205,198 @@ MRayError TracerThread::CreateRendererFromConfig(const std::string& configJsonPa
 
 void TracerThread::RestartRenderer()
 {
+    // Nothing to restart
+    if(currentRenderer == INVALID_RENDERER_ID)
+        return;
 
+    tracer->StopRender();
 
+    RenderImageParams rp =
+    {
+        .resolution = resolution,
+        .regionMin = regionMin,
+        .regionMax = regionMax,
+        .semaphore = currentSem,
+        .initialSemCounter = 0
+    };
+    RenderBufferInfo rbi = tracer->StartRender(currentRenderer,
+                                               sceneIds.camSurfaces[currentCamIndex],
+                                               rp,
+                                               currentRenderLogic0,
+                                               currentRenderLogic1,
+                                               currentCamTransform);
+
+    transferQueue.Enqueue(TracerResponse
+    (
+        std::in_place_index<TracerResponse::RENDER_BUFFER_INFO>,
+        rbi
+    ));
+    // Clear the image section as well
+    transferQueue.Enqueue(TracerResponse
+    (
+        std::in_place_index<TracerResponse::CLEAR_IMAGE_SECTION>,
+        true
+    ));
+}
+
+void TracerThread::HandleRendering()
+{
+    RendererOutput renderOut = tracer->DoRenderWork();
+    if(renderOut.analytics)
+    {
+        transferQueue.Enqueue(TracerResponse
+        (
+            std::in_place_index<TracerResponse::RENDERER_ANALYTICS>,
+            renderOut.analytics.value()
+        ));
+    }
+    if(renderOut.imageOut)
+    {
+        transferQueue.Enqueue(TracerResponse
+        (
+            std::in_place_index<TracerResponse::IMAGE_SECTION>,
+            renderOut.imageOut.value()
+        ));
+    }
+}
+
+void TracerThread::HandleStartStop(bool newStartStopSignal)
+{
+    MRAY_LOG("[Tracer]: Start/Stop {}", newStartStopSignal);
+
+    bool isStart = newStartStopSignal;
+    isInSleepMode = !isStart;
+    isRendering = isStart;
+    // If we are previously paused
+    // Just continue
+    if(isPaused && isStart)
+    {
+        isPaused = false;
+    }
+    // If not paused, but start is issued
+    // Restart the renderer
+    else if(isStart)
+    {
+        RestartRenderer();
+    }
+    // We are stopped stop rendering
+    else
+    {
+        isPaused = false;
+        tracer->StopRender();
+    }
+
+}
+
+void TracerThread::HandlePause()
+{
+    MRAY_LOG("[Tracer]: Pause");
+    isInSleepMode = true;
+    isRendering = false;
+    isPaused = true;
+}
+
+void TracerThread::HandleSceneChange(const std::string& newScene)
+{
+    MRAY_LOG("[Tracer]: NewScene {}", newScene);
+    tracer->ClearAll();
+    currentRenderer = INVALID_RENDERER_ID;
+
+    // TODO: Single scene loading, change this later maybe
+    // for tracer supporting multiple scenes
+    using namespace std::filesystem;
+    if(currentScene) currentScene->ClearScene();
+    std::string fileExt = path(newScene).extension().string();
+    fileExt = fileExt.substr(1);
+    SceneLoaderI* loader = sceneLoaders.at(fileExt).get();
+    currentScene = loader;
+    Expected<TracerIdPack> result = currentScene->LoadScene(*tracer, newScene);
+    if(result.has_error())
+    {
+        MRAY_ERROR_LOG("[Tracer]: Failed to Load Scene\n    {}",
+                       result.error().GetError());
+        isTerminated = true;
+        return;
+    }
+    else
+    {
+        sceneIds = std::move(result.value());
+        MRAY_LOG("[Tracer]: Scene \"{}\" loaded in {}ms",
+                 newScene, sceneIds.loadTimeMS);
+    }
+
+    // Commit the surfaces
+    MRAY_LOG("[Tracer]: Committing Surfaces...");
+    Timer timer; timer.Start();
+    //
+    auto [sceneAABB, instanceCount,
+        accelCount] = tracer->CommitSurfaces();
+    currentSceneAABB = sceneAABB;
+    //
+    timer.Split();
+    MRAY_LOG("[Tracer]: Surfaces committed in {}ms\n"
+             "    AABB      : {}\n"
+             "    Instances : {}\n"
+             "    Accels    : {}",
+             timer.Elapsed<Millisecond>(),
+             currentSceneAABB,
+             instanceCount, accelCount);
+
+    currentCamIndex = 0;
+    CamSurfaceId camSurf = sceneIds.camSurfaces[currentCamIndex];
+    currentCamTransform = tracer->GetCamTransform(camSurf);
+
+    // When new scene is loaded, send the
+    // Initial cam transform
+    transferQueue.Enqueue(TracerResponse
+    (
+        std::in_place_index<TracerResponse::CAMERA_INIT_TRANSFORM>,
+        currentCamTransform
+    ));
+
+    // Scene Analytic Data
+    transferQueue.Enqueue(TracerResponse
+    (
+        std::in_place_index<TracerResponse::SCENE_ANALYTICS>,
+        SceneAnalyticData
+        {
+            .sceneName = newScene,
+            .sceneLoadTimeS = sceneIds.loadTimeMS,
+            .mediumCount = static_cast<uint32_t>(sceneIds.mediums.size()),
+            .primCount = static_cast<uint32_t>(sceneIds.prims.size()),
+            .textureCount = static_cast<uint32_t>(sceneIds.textures.size()),
+            .surfaceCount = static_cast<uint32_t>(sceneIds.surfaces.size()),
+            .lightCount = static_cast<uint32_t>(sceneIds.lightSurfaces.size()),
+            .cameraCount = static_cast<uint32_t>(sceneIds.camSurfaces.size()),
+            .sceneExtent = currentSceneAABB
+        }
+    ));
+    // Send Used Memory
+    transferQueue.Enqueue(TracerResponse
+    (
+        std::in_place_index<TracerResponse::MEMORY_USAGE>,
+        tracer->UsedDeviceMemory()
+    ));
+
+    // Recreate the renderer
+    if(!currentRendererName.empty())
+        currentRenderer = tracer->CreateRenderer(currentRendererName);
+
+    // Restart the renderer
+    RestartRenderer();
+}
+
+void TracerThread::HandleRendererChange(const std::string& rendererName)
+{
+    MRAY_LOG("[Tracer]: NewRenderer {}", rendererName);
+    currentRendererName = rendererName;
+    currentRenderLogic0 = 0;
+    currentRenderLogic1 = 0;
+    if(currentRenderer != INVALID_RENDERER_ID)
+        tracer->DestroyRenderer(currentRenderer);
+    currentRenderer = tracer->CreateRenderer(currentRendererName);
+
+    RestartRenderer();
 }
 
 void TracerThread::LoopWork()
@@ -300,149 +491,6 @@ void TracerThread::LoopWork()
             if(stopConsuming) break;
         }
 
-        if(initialRenderConfig)
-        {
-            if(currentRenderer != std::numeric_limits<RendererId>::max())
-                tracer->DestroyRenderer(currentRenderer);
-
-            MRAY_LOG("[Tracer]: Initial render config {}", initialRenderConfig.value());
-            if(MRayError e = CreateRendererFromConfig(initialRenderConfig.value()))
-            {
-                MRAY_ERROR_LOG("[Tracer]: Failed to Load Render Config\n"
-                               "    {}", e.GetError());
-                isTerminated = true;
-                return;
-            }
-        }
-
-        // New scene!
-        if(scenePath)
-        {
-            MRAY_LOG("[Tracer]: NewScene {}", scenePath.value());
-            tracer->ClearAll();
-
-            // TODO: Single scene loading, change this later maybe
-            // for tracer supporting multiple scenes
-            using namespace std::filesystem;
-            if(currentScene) currentScene->ClearScene();
-            std::string fileExt = path(scenePath.value()).extension().string();
-            fileExt = fileExt.substr(1);
-            SceneLoaderI* loader = sceneLoaders.at(fileExt).get();
-            currentScene = loader;
-            Expected<TracerIdPack> result = currentScene->LoadScene(*tracer, scenePath.value());
-            if(result.has_error())
-            {
-                MRAY_ERROR_LOG("[Tracer]: Failed to Load Scene\n    {}",
-                               result.error().GetError());
-                isTerminated = true;
-                return;
-            }
-            else
-            {
-                sceneIds = std::move(result.value());
-                MRAY_LOG("[Tracer]: Scene \"{}\" loaded in {}ms",
-                         scenePath.value(),
-                         sceneIds.loadTimeMS);
-            }
-
-            // Commit the surfaces
-            MRAY_LOG("[Tracer]: Committing Surfaces...");
-            Timer timer; timer.Start();
-            //
-            auto [currentSceneAABB, instanceCount,
-                  accelCount] = tracer->CommitSurfaces();
-            //
-            timer.Split();
-            MRAY_LOG("[Tracer]: Surfaces committed in {}ms\n"
-                     "    AABB      : {}\n"
-                     "    Instances : {}\n"
-                     "    Accels    : {}",
-                     timer.Elapsed<Millisecond>(),
-                     currentSceneAABB,
-                     instanceCount, accelCount);
-            MRAY_LOG("DevMem {}MiB", tracer->UsedDeviceMemory() >> 20);
-
-            currentCamIndex = 0;
-            CamSurfaceId camSurf = sceneIds.camSurfaces[currentCamIndex];
-            currentCamTransform = tracer->GetCamTransform(camSurf);
-
-            // When new scene is loaded, send the
-            // Initial cam transform
-            transferQueue.Enqueue(TracerResponse
-            (
-                std::in_place_index<TracerResponse::CAMERA_INIT_TRANSFORM>,
-                currentCamTransform
-            ));
-
-            // Scene Analytic Data
-            transferQueue.Enqueue(TracerResponse
-            (
-                std::in_place_index<TracerResponse::SCENE_ANALYTICS>,
-                SceneAnalyticData
-                {
-                    .sceneName = scenePath.value(),
-                    .sceneLoadTimeS = sceneIds.loadTimeMS,
-                    .mediumCount = static_cast<uint32_t>(sceneIds.mediums.size()),
-                    .primCount = static_cast<uint32_t>(sceneIds.prims.size()),
-                    .textureCount = static_cast<uint32_t>(sceneIds.textures.size()),
-                    .surfaceCount = static_cast<uint32_t>(sceneIds.surfaces.size()),
-                    .lightCount = static_cast<uint32_t>(sceneIds.lightSurfaces.size()),
-                    .cameraCount = static_cast<uint32_t>(sceneIds.camSurfaces.size()),
-                    .sceneExtent = currentSceneAABB
-                }
-            ));
-
-            // send used memory
-            transferQueue.Enqueue(TracerResponse
-            (
-                std::in_place_index<TracerResponse::MEMORY_USAGE>,
-                tracer->UsedDeviceMemory()
-            ));
-        }
-
-        // New camera!
-        if(cameraIndex)
-        {
-            MRAY_LOG("[Tracer]: NewCamera {}", cameraIndex.value());
-            currentCamIndex = cameraIndex.value();
-
-            CamSurfaceId camSurf = sceneIds.camSurfaces[currentCamIndex];
-            currentCamTransform = tracer->GetCamTransform(camSurf);
-
-            // When cam is changed send the initial transform
-            transferQueue.Enqueue(TracerResponse
-            (
-                std::in_place_index<TracerResponse::CAMERA_INIT_TRANSFORM>,
-                currentCamTransform
-            ));
-
-            RestartRenderer();
-        }
-
-        // New transform!
-        if(transform)
-        {
-            currentCamTransform = transform.value();
-
-            MRAY_LOG("[Tracer]: NewTransform G{}, P{}, U{}",
-                     currentCamTransform.gazePoint,
-                     currentCamTransform.position,
-                     currentCamTransform.up);
-
-            RestartRenderer();
-        }
-
-        // New renderer!
-        if(rendererName)
-        {
-            MRAY_LOG("[Tracer]: NewRenderer {}", rendererName.value());
-
-            if(currentRenderer != std::numeric_limits<RendererId>::max())
-                tracer->DestroyRenderer(currentRenderer);
-            currentRenderer = tracer->CreateRenderer(rendererName.value());
-
-        }
-
         if(hdrSaveDemand)
         {
             MRAY_LOG("[Tracer]: Delegate HDR save");
@@ -473,96 +521,82 @@ void TracerThread::LoopWork()
             ));
         }
 
+
+
+        // Initial render config
+        if(initialRenderConfig)
+        {
+            MRAY_LOG("[Tracer]: Initial render config {}", initialRenderConfig.value());
+            if(MRayError e = CreateRendererFromConfig(initialRenderConfig.value()))
+            {
+                MRAY_ERROR_LOG("[Tracer]: Failed to Load Render Config\n"
+                               "    {}", e.GetError());
+                isTerminated = true;
+                return;
+            }
+        }
+        // New camera!
+        if(cameraIndex)
+        {
+            MRAY_LOG("[Tracer]: NewCamera {}", cameraIndex.value());
+            currentCamIndex = cameraIndex.value();
+
+            CamSurfaceId camSurf = sceneIds.camSurfaces[currentCamIndex];
+            currentCamTransform = tracer->GetCamTransform(camSurf);
+
+            // When cam is changed send the initial transform
+            transferQueue.Enqueue(TracerResponse
+            (
+                std::in_place_index<TracerResponse::CAMERA_INIT_TRANSFORM>,
+                currentCamTransform
+            ));
+
+            RestartRenderer();
+        }
+        // New transform
+        if(transform)
+        {
+            currentCamTransform = transform.value();
+
+            MRAY_LOG("[Tracer]: NewTransform G{}, P{}, U{}",
+                     currentCamTransform.gazePoint,
+                     currentCamTransform.position,
+                     currentCamTransform.up);
+
+            RestartRenderer();
+        }
+        // New renderer
+        if(rendererName) HandleRendererChange(rendererName.value());
+        // New semaphore
         if(syncSem)
         {
+            MRAY_LOG("[Tracer]: NewSem {:p}", static_cast<void*>(syncSem.value()));
             currentSem = syncSem.value();
-            MRAY_LOG("[Tracer]: NewSem {:p}", static_cast<void*>(currentSem));
-
         }
-
-        // New time!
-        if(time)
-        {
-            MRAY_LOG("[Tracer]: NewTime {}", time.value());
-            // TODO: Update scene etc...
-        }
-
-        // Pause/Continue!
-        if(pauseContinue)
-        {
-            isInSleepMode = pauseContinue.value();
-            MRAY_LOG("[Tracer]: Pause/Cont {}", pauseContinue.value());
-            isRendering = false;
-        }
-
-
+        // New scene
+        if(scenePath) HandleSceneChange(scenePath.value());
+        // Start/Stop
+        if(startStop) HandleStartStop(startStop.value());
+        // Pause/Continue
+        if(pauseContinue) HandlePause();
+        // If we are rendering continue...
+        if(isRendering) HandleRendering();
+        // TODO: Support scene time change
+        if(time) MRAY_WARNING_LOG("[Tracer]: Scene time change is not supported!");
+        // Render logic changes
         if(renderLogic0)
         {
             MRAY_LOG("[Tracer]: NewRenderLogic0 {}", renderLogic0.value());
-        }
+            currentRenderLogic0 = renderLogic0.value();
+            RestartRenderer();
 
+        }
         if(renderLogic1)
         {
             MRAY_LOG("[Tracer]: NewRenderLogic1 {}", renderLogic1.value());
+            currentRenderLogic1 = renderLogic1.value();
+            RestartRenderer();
         }
-
-        // Start/Stop!
-        if(startStop)
-        {
-            bool isStart = startStop.value();
-            isInSleepMode = !isStart;
-            isRendering = isStart;
-            MRAY_LOG("[Tracer]: Start/Stop {}", isStart);
-
-            if(isStart)
-            {
-                RenderImageParams rp =
-                {
-                    .resolution = resolution,
-                    .regionMin = regionMin,
-                    .regionMax = regionMax,
-                    .semaphore = currentSem,
-                    .initialSemCounter = 0
-                };
-                RenderBufferInfo rbi = tracer->StartRender(currentRenderer,
-                                                           sceneIds.camSurfaces[currentCamIndex],
-                                                           rp, currentCamTransform);
-
-                transferQueue.Enqueue(TracerResponse
-                (
-                    std::in_place_index<TracerResponse::RENDER_BUFFER_INFO>,
-                    rbi
-                ));
-            }
-            else
-            {
-                tracer->StopRender();
-            }
-        }
-
-
-        // If we are rendering continue...
-        if(isRendering)
-        {
-            RendererOutput renderOut = tracer->DoRenderWork();
-            if(renderOut.analytics)
-            {
-                transferQueue.Enqueue(TracerResponse
-                (
-                    std::in_place_index<TracerResponse::RENDERER_ANALYTICS>,
-                    renderOut.analytics.value()
-                ));
-            }
-            if(renderOut.imageOut)
-            {
-                transferQueue.Enqueue(TracerResponse
-                (
-                    std::in_place_index<TracerResponse::IMAGE_SECTION>,
-                    renderOut.imageOut.value()
-                ));
-            }
-        }
-
         // Here check the queue's situation
         // and do not iterate again if queues are closed
         if(CheckQueueAndExit()) return;
@@ -627,7 +661,7 @@ TracerThread::TracerThread(TransferQueue& queue,
     , tracer{nullptr, nullptr}
     , transferQueue(queue.GetTracerView())
     , threadPool(tp)
-    , currentRenderer(std::numeric_limits<RendererId>::max())
+    , currentRenderer(INVALID_RENDERER_ID)
 {}
 
 MRayError TracerThread::MTInitialize(const std::string& tracerConfigFile)

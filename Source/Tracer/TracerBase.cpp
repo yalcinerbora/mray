@@ -1390,7 +1390,9 @@ RendererId TracerBase::CreateRenderer(std::string typeName)
 
 void TracerBase::DestroyRenderer(RendererId rId)
 {
-    renderers.remove_at(rId);
+    if(!renderers.remove_at(rId))
+        throw MRayError("Unable to find renderer ({})",
+                        static_cast<uint32_t>(rId));
 }
 
 void TracerBase::PushRendererAttribute(RendererId rId,
@@ -1411,6 +1413,8 @@ void TracerBase::PushRendererAttribute(RendererId rId,
 
 RenderBufferInfo TracerBase::StartRender(RendererId rId, CamSurfaceId cId,
                                          RenderImageParams rIParams,
+                                         Optional<uint32_t> renderLogic0,
+                                         Optional<uint32_t> renderLogic1,
                                          Optional<CameraTransform> optionalTransform)
 {
     auto renderer = renderers.at(rId);
@@ -1426,7 +1430,8 @@ RenderBufferInfo TracerBase::StartRender(RendererId rId, CamSurfaceId cId,
 
 void TracerBase::StopRender()
 {
-    currentRenderer->StopRender();
+    if(currentRenderer)
+        currentRenderer->StopRender();
 }
 
 RendererOutput TracerBase::DoRenderWork()

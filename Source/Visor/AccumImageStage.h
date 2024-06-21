@@ -10,6 +10,7 @@
 #include "MainUniformBuffer.h"
 
 class TimelineSemaphore;
+namespace BS { class thread_pool; }
 
 class AccumImageStage : UniformMemoryRequesterI
 {
@@ -39,8 +40,10 @@ class AccumImageStage : UniformMemoryRequesterI
     VkDeviceMemory          foreignMemory           = nullptr;
     VkBuffer                foreignBuffer           = nullptr;
     VkSemaphore             timelineSemaphoreVk     = nullptr;
+    VkFence                 accumCompleteFence      = nullptr;
     // Main system related stuff
     TimelineSemaphore*      syncSemaphore   = nullptr;
+    BS::thread_pool*        threadPool      = nullptr;
 
     const VulkanSystemView* handlesVk       = nullptr;
     //
@@ -64,14 +67,13 @@ class AccumImageStage : UniformMemoryRequesterI
 
     //
     MRayError               Initialize(TimelineSemaphore* ts,
+                                       BS::thread_pool* threadPool,
                                        const std::string& execPath);
     void                    ImportExternalHandles(const RenderBufferInfo&);
     void                    ChangeImage(const VulkanImage* hdrImageIn,
                                         const VulkanImage* sampleImageIn);
-    SemaphoreVariant        IssueAccumulation(VkSemaphore prevCmdSignal,
+    SemaphoreVariant        IssueAccumulation(SemaphoreVariant prevCmdSignal,
                                               const RenderImageSection&);
-    //SystemSemaphoreHandle   GetSemaphoreOSHandle() const;
-
     //
     size_t                  UniformBufferSize() const override;
     void                    SetUniformBufferView(const UniformBufferMemView& uniformBufferPtr) override;

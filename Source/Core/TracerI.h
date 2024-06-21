@@ -550,6 +550,8 @@ class [[nodiscard]] TracerI
     //================================//
     virtual RenderBufferInfo    StartRender(RendererId, CamSurfaceId,
                                             RenderImageParams,
+                                            Optional<uint32_t>,
+                                            Optional<uint32_t>,
                                             Optional<CameraTransform>) = 0;
     virtual void                StopRender() = 0;
     // Renderer does a subsection of the img rendering

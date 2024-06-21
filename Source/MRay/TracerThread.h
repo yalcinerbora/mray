@@ -30,6 +30,9 @@ class TracerThread final : public RealtimeThread
     Vector2ui   regionMin;
     Vector2ui   regionMax;
     // Current State
+    std::string             currentRendererName;
+    uint32_t                currentRenderLogic0;
+    uint32_t                currentRenderLogic1;
     RendererId              currentRenderer;
     size_t                  currentCamIndex;
     TimelineSemaphore*      currentSem;
@@ -46,6 +49,8 @@ class TracerThread final : public RealtimeThread
     bool isInSleepMode   = true;
     // Are we currently rendering
     bool isRendering = false;
+    // Are we paused
+    bool isPaused = false;
 
     //
     void        LoopWork() override;
@@ -54,6 +59,12 @@ class TracerThread final : public RealtimeThread
 
     MRayError   CreateRendererFromConfig(const std::string& configJsonPath);
     void        RestartRenderer();
+
+    void        HandleRendering();
+    void        HandleStartStop(bool newStartStopSignal);
+    void        HandlePause();
+    void        HandleSceneChange(const std::string&);
+    void        HandleRendererChange(const std::string&);
 
     public:
     // Constructors & Destructor

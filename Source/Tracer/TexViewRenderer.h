@@ -38,12 +38,12 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
 
     public:
     // Constructors & Destructor
-                    TexViewRenderer(RenderImagePtr, TracerView,
-                                  const GPUSystem&);
-                    TexViewRenderer(const TexViewRenderer&) = delete;
-                    TexViewRenderer(TexViewRenderer&&) = delete;
-    TexViewRenderer&  operator=(const TexViewRenderer&) = delete;
-    TexViewRenderer&  operator=(TexViewRenderer&&) = delete;
+                        TexViewRenderer(RenderImagePtr, TracerView,
+                                        const GPUSystem&);
+                        TexViewRenderer(const TexViewRenderer&) = delete;
+                        TexViewRenderer(TexViewRenderer&&) = delete;
+    TexViewRenderer&    operator=(const TexViewRenderer&) = delete;
+    TexViewRenderer&    operator=(TexViewRenderer&&) = delete;
 
     //
     MRayError           Commit() override;

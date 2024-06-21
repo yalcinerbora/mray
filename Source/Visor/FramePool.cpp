@@ -129,7 +129,6 @@ void FramePool::PresentThisFrame(Swapchain& swapchain,
 {
     assert(frameIndex >= 0 && frameIndex < FRAME_COUNT);
     uint32_t frameIndexUInt = static_cast<uint32_t>(frameIndex);
-    //VkSemaphore imgAvailSem = semaphores[frameIndexUInt].imageAvailableSignal;
     VkSemaphore comRecordSem = semaphores[frameIndexUInt].commandsRecordedSignal;
 
     // ============= //
@@ -171,22 +170,6 @@ void FramePool::PresentThisFrame(Swapchain& swapchain,
     };
     // Finally submit!
     vkQueueSubmit2(mainQueueVk, 1, &submitInfo, fences[frameIndexUInt]);
-
-    //VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    //VkSubmitInfo submitInfo =
-    //{
-    //    .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-    //    .pNext = nullptr,
-    //    .waitSemaphoreCount = 1,
-    //    .pWaitSemaphores = &imgAvailSem,
-    //    .pWaitDstStageMask = &waitStage,
-    //    .commandBufferCount = 1,
-    //    .pCommandBuffers = &cBuffers[frameIndex],
-    //    .signalSemaphoreCount = 1,
-    //    .pSignalSemaphores = &comRecordSem,
-    //};
-    //vkQueueSubmit(mainQueueVk, 1, &submitInfo, fences[frameIndex]);
-
     swapchain.PresentFrame(comRecordSem);
     frameIndex = (frameIndex + 1) % FRAME_COUNT;
 }

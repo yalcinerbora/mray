@@ -839,7 +839,7 @@ MRayError VisorWindow::Initialize(TransferQueue::VisorView& transferQueueIn,
     // move assignment etc, change the entire vulkan object system
     // this impl. is patch after patch
     accumulateStage = AccumImageStage(handlesVk);
-    e = accumulateStage.Initialize(syncSem, processPath);
+    e = accumulateStage.Initialize(syncSem, threadPool, processPath);
     if(e) return e;
 
     tonemapStage = TonemapStage(handlesVk);
@@ -853,7 +853,6 @@ MRayError VisorWindow::Initialize(TransferQueue::VisorView& transferQueueIn,
         std::in_place_index<VisorAction::SEND_SYNC_SEMAPHORE>,
         syncSem
     ));
-
     glfwShowWindow(window);
     return MRayError::OK;
 }
@@ -904,12 +903,18 @@ VisorWindow::VisorWindow(VisorWindow&& other)
     , surfaceVk(std::exchange(other.surfaceVk, nullptr))
     , window(std::exchange(other.window, nullptr))
     , hdrRequested(other.hdrRequested)
+    , stopPresenting(other.stopPresenting)
+    , threadPool(other.threadPool)
+    , gui(std::move(other.gui))
     , visorState(other.visorState)
     , frameCounter(std::move(other.frameCounter))
     , transferQueue(other.transferQueue)
     , accumulateStage(std::move(other.accumulateStage))
     , tonemapStage(std::move(other.tonemapStage))
+    , renderImagePool(std::move(other.renderImagePool))
     , uniformBuffer(std::move(other.uniformBuffer))
+    , initialSceneFile(other.initialSceneFile)
+    , initialTracerRenderConfigPath(other.initialTracerRenderConfigPath)
 {
     glfwSetWindowUserPointer(window, this);
 }
@@ -917,15 +922,7 @@ VisorWindow::VisorWindow(VisorWindow&& other)
 VisorWindow& VisorWindow::operator=(VisorWindow&& other)
 {
     assert(this != &other);
-    framePool = std::move(other.framePool);
     swapchain = std::move(other.swapchain);
-    accumulateStage = std::move(other.accumulateStage);
-    tonemapStage = std::move(other.tonemapStage);
-    renderImagePool = std::move(other.renderImagePool);
-    frameCounter = std::move(other.frameCounter);
-    uniformBuffer = std::move(other.uniformBuffer);
-    transferQueue = other.transferQueue;
-
     if(window)
     {
         ImGui_ImplGlfw_Shutdown();
@@ -933,11 +930,23 @@ VisorWindow& VisorWindow::operator=(VisorWindow&& other)
                             VulkanHostAllocator::Functions());
         glfwDestroyWindow(window);
     }
-    window = std::exchange(other.window, nullptr);
+
+    framePool = std::move(other.framePool);
     surfaceVk = std::exchange(other.surfaceVk, nullptr);
-    // Tehcnically we do not need to set this
-    // by definition, vulkan handles should be the same
+    window = std::exchange(other.window, nullptr);
+    hdrRequested = other.hdrRequested;
+    stopPresenting = other.stopPresenting;
+    threadPool = other.threadPool;
+    gui = std::move(other.gui);
     visorState = other.visorState;
+    frameCounter = std::move(other.frameCounter);
+    transferQueue = other.transferQueue;
+    accumulateStage = std::move(other.accumulateStage);
+    tonemapStage = std::move(other.tonemapStage);
+    renderImagePool = std::move(other.renderImagePool);
+    uniformBuffer = std::move(other.uniformBuffer);
+    initialSceneFile = other.initialSceneFile;
+    initialTracerRenderConfigPath = other.initialTracerRenderConfigPath;
 
     // Move window user pointer as well
     if(window) glfwSetWindowUserPointer(window, this);
@@ -1209,7 +1218,7 @@ void VisorWindow::Render()
             }
             case IMAGE_SECTION:
             {
-                MRAY_LOG("[Visor]: Image section received");
+                //MRAY_LOG("[Visor]: Image section received");
                 newImageSection = std::get<IMAGE_SECTION>(response);
                 stopConsuming = true;
                 break;
@@ -1269,20 +1278,22 @@ void VisorWindow::Render()
     };
     if(newSaveInfo)
     {
-        //prevSemamphore = renderImagePool.SaveImage(prevSemamphore,
-        //                          isHDRSave, newSaveInfo.value());
-
-        // Should we a need a pool
+        auto& rp = renderImagePool;
+        // TODO: Technicaly this semaphore should be fed
+        // to next accumulate stage but we feed it to
+        // framebuffer rendering which accumulation indirectly
+        // depends on. This is dirty fix and should be changed later.
+        prevSemamphore = rp.SaveImage(prevSemamphore, isHDRSave,
+                                      newSaveInfo.value());
     }
 
     // Before Command Start check if new image section is received
     // Issue an accumulation and override the main wait semaphore
     if(newImageSection)
     {
-        MRAY_LOG("Section!");
-        //auto& as = accumulateStage;
-        //prevSemamphore = as.IssueAccumulation(prevSemamphore,
-        //                                       newImageSection.value());
+        auto& as = accumulateStage;
+        prevSemamphore = as.IssueAccumulation(prevSemamphore,
+                                              newImageSection.value());
     }
 
     // Entire image reset + img format change (new alloc maybe)

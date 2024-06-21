@@ -1,5 +1,17 @@
 #include "MainUniformBuffer.h"
 
+void UniformBufferMemView::FlushRange(VkDevice deviceVk)
+{
+    VkMappedMemoryRange mRange =
+    {
+        .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
+        .pNext = nullptr,
+        .memory = memoryHandle,
+        .offset = offset,
+        .size = size
+    };
+    vkFlushMappedMemoryRanges(deviceVk, 1, &mRange);
+}
 
 MainUniformBuffer::MainUniformBuffer(const VulkanSystemView& handles)
     : mainUniformBuffer(handles)
@@ -10,7 +22,7 @@ MainUniformBuffer::MainUniformBuffer(MainUniformBuffer&& other)
     : mainUniformBuffer(std::move(other.mainUniformBuffer))
     , totalSize(other.totalSize)
     , alwaysMappedPtr(other.alwaysMappedPtr)
-    , mainMemory(std::exchange(other.mainMemory, nullptr))
+    , mainMemory(std::move(other.mainMemory))
     , handlesVk(other.handlesVk)
 {}
 
@@ -18,14 +30,14 @@ MainUniformBuffer& MainUniformBuffer::operator=(MainUniformBuffer&& other)
 {
     assert(this != &other);
 
-    if(mainMemory)
-        vkFreeMemory(handlesVk->deviceVk, mainMemory,
-                     VulkanHostAllocator::Functions());
+    if(mainMemory.Memory())
+        vkUnmapMemory(handlesVk->deviceVk,
+                      mainMemory.Memory());
 
     mainUniformBuffer = std::move(other.mainUniformBuffer);
     totalSize = other.totalSize;
     alwaysMappedPtr = other.alwaysMappedPtr;
-    mainMemory = std::exchange(other.mainMemory, nullptr);
+    mainMemory = std::move(other.mainMemory);
     handlesVk = other.handlesVk;
 
     return *this;
@@ -33,12 +45,9 @@ MainUniformBuffer& MainUniformBuffer::operator=(MainUniformBuffer&& other)
 
 MainUniformBuffer::~MainUniformBuffer()
 {
-    if(mainMemory)
-    {
-        vkUnmapMemory(handlesVk->deviceVk, mainMemory);
-        vkFreeMemory(handlesVk->deviceVk, mainMemory,
-                     VulkanHostAllocator::Functions());
-    }
+    if(mainMemory.Memory())
+        vkUnmapMemory(handlesVk->deviceVk,
+                      mainMemory.Memory());
 }
 
 template<size_t N>
@@ -59,7 +68,7 @@ void MainUniformBuffer::AllocateUniformBuffers(std::array<UniformMemoryRequester
     mainMemory = VulkanDeviceAllocator::Instance().AllocateMultiObject(std::tie(mainUniformBuffer),
                                                                        VulkanDeviceAllocator::HOST_VISIBLE);
     void* hPtr;
-    vkMapMemory(handlesVk->deviceVk, mainMemory, 0,
+    vkMapMemory(handlesVk->deviceVk, mainMemory.Memory(), 0,
                 totalSize, 0, &hPtr);
     alwaysMappedPtr = reinterpret_cast<Byte*>(hPtr);
 
@@ -69,6 +78,7 @@ void MainUniformBuffer::AllocateUniformBuffers(std::array<UniformMemoryRequester
         {
             .hostPtr = alwaysMappedPtr + offsets[i],
             .bufferHandle = mainUniformBuffer.Buffer(),
+            .memoryHandle = mainMemory.Memory(),
             .offset = offsets[i],
             .size = totalSize
         };
@@ -95,7 +105,7 @@ void MainUniformBuffer::FlushBuffer(VkCommandBuffer cmd)
     {
         .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
         .pNext = nullptr,
-        .memory = mainMemory,
+        .memory = mainMemory.Memory(),
         .offset = 0,
         .size = totalSize
     };

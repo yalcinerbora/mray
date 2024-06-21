@@ -83,7 +83,10 @@ class GPUSemaphoreViewCUDA
     // Constructors & Destructor
                 GPUSemaphoreViewCUDA(TimelineSemaphore* sem,
                                      uint64_t acqValue);
-    uint64_t    NextAcquisition();
+
+    // Change to next acquisition state (acquireValue + 2)
+    // return the Visor's wait state (acquireValue + 1)
+    uint64_t    ChangeToNextState();
     void        HostAcquire();
     void        HostRelease();
 };

@@ -168,7 +168,7 @@ void SetButtonState(bool& stopToggle,
 }
 
 MainStatusBar::MainStatusBar(const InputChecker& ic)
-    : inputChecker(ic)
+    : inputChecker(&ic)
     , paused(false)
     , running(false)
     , stopped(true)
@@ -184,7 +184,7 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
 
     bool isChanged = false;
     // Handle keyboard related inputs
-    if(inputChecker.CheckKeyPress(VisorUserAction::START_STOP_TRACE))
+    if(inputChecker->CheckKeyPress(VisorUserAction::START_STOP_TRACE))
     {
         if(!paused)
         {
@@ -200,7 +200,7 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
             running = false;
         }
     }
-    if(inputChecker.CheckKeyPress(VisorUserAction::PAUSE_CONT_RENDER))
+    if(inputChecker->CheckKeyPress(VisorUserAction::PAUSE_CONT_RENDER))
     {
         if(!stopped)
         {
@@ -262,7 +262,7 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
             ImGui::Separator();
             if(camLocked) ImGui::BeginDisabled();
             if(ImGui::Button(ICON_ICOMN_ARROW_LEFT) ||
-               (!camLocked && inputChecker.CheckKeyPress(VisorUserAction::PREV_CAM)))
+               (!camLocked && inputChecker->CheckKeyPress(VisorUserAction::PREV_CAM)))
             {
                 camChange--;
             }
@@ -274,7 +274,7 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
             }
 
             if(ImGui::Button(ICON_ICOMN_ARROW_RIGHT) ||
-               (!camLocked && inputChecker.CheckKeyPress(VisorUserAction::NEXT_CAM)))
+               (!camLocked && inputChecker->CheckKeyPress(VisorUserAction::NEXT_CAM)))
             {
                 camChange++;
             }
@@ -550,6 +550,36 @@ VisorGUI::VisorGUI(const VisorKeyMap* km)
     //movementSchemes.emplace_back(std::make_unique<MovementSchemeMaya>(inputChecker));
     //movementSchemes.emplace_back(std::make_unique<MovementSchemeImg>(inputChecker));
     assert(!movementSchemes.empty());
+}
+
+VisorGUI::VisorGUI(VisorGUI&& other)
+    : inputChecker(std::move(other.inputChecker))
+    , statusBar(inputChecker)
+    , fpsInfoOn(other.fpsInfoOn)
+    , bottomBarOn(other.bottomBarOn)
+    , camLocked(other.camLocked)
+    , tonemapperGUI(other.tonemapperGUI)
+    , mainImage(other.mainImage)
+    , imgSize(other.imgSize)
+    , movementSchemes(std::exchange(other.movementSchemes, MovementSchemeList()))
+    , movementIndex(other.movementIndex)
+{}
+
+VisorGUI& VisorGUI::operator=(VisorGUI&& other)
+{
+    assert(this != &other);
+    inputChecker = std::move(other.inputChecker);
+    statusBar = inputChecker;
+    fpsInfoOn = other.fpsInfoOn;
+    bottomBarOn = other.bottomBarOn;
+    camLocked = other.camLocked;
+    tonemapperGUI = other.tonemapperGUI;
+    mainImage = other.mainImage;
+    imgSize = other.imgSize;
+    movementSchemes = std::exchange(other.movementSchemes, MovementSchemeList());
+    movementIndex = other.movementIndex;
+
+    return *this;
 }
 
 GUIChanges VisorGUI::Render(ImFont* windowScaledFont, const VisorState& visorState)
