@@ -1,14 +1,13 @@
 #include "RenderImage.h"
 #include "Core/TracerI.h"
 
-#include "winternl.h"
-
 RenderImage::RenderImage(const RenderImageParams& p,
                          uint32_t depth, MRayColorSpaceEnum colorSpace,
                          const GPUSystem& gpuSystem)
     : stagingMemory(gpuSystem)
     , deviceMemory(gpuSystem.AllGPUs(), 16_MiB, 128_MiB)
     , sem(p.semaphore, p.initialSemCounter)
+    , processCompleteFence(gpuSystem.BestDevice().GetQueue(0))
     , depth(depth)
     , colorSpace(colorSpace)
     , resolution(p.resolution)
@@ -33,25 +32,27 @@ RenderImage::RenderImage(const RenderImageParams& p,
     sampleStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(dSamples.data())));
 }
 
-void RenderImage::AcquireImage(const GPUQueue&)
+RenderImageSection RenderImage::GetHostView(const GPUQueue& processQueue,
+                                            const GPUQueue& transferQueue)
 {
-    // Let's not wait on the host function here
-    // Host functions seems slow, wait on issue
-    // (instead of execution).
+    // Let's not wait on the driver here
+    // So host does not runaway from CUDA
+    // (I don't know if this is even an issue)
+    // Host functions seems to have high variance
+    // on execution so thats another reason.
     sem.HostAcquire();
-}
-
-RenderImageSection RenderImage::ReleaseImage(const GPUQueue& queue)
-{
-    // Copy to staging buffers
-    queue.MemcpyAsync(hPixels, ToConstSpan(dPixels));
-    queue.MemcpyAsync(hSamples, ToConstSpan(dSamples));
-
-    // Here we can not do that (We can but it will mean
-    // CUDA sync device etc so it is better to wait over
-    // on GPU side.
-    queue.IssueSemaphoreSignal(sem);
-    // We should preset the next acquisition value here
+    // Barrier the process queue
+    processCompleteFence = processQueue.Barrier();
+    // Wait the process queue to finish on the transfer queue
+    transferQueue.IssueWait(processCompleteFence);
+    // Copy to staging buffers when the data is ready
+    transferQueue.MemcpyAsync(hPixels, ToConstSpan(dPixels));
+    transferQueue.MemcpyAsync(hSamples, ToConstSpan(dSamples));
+    // Here we can not wait on host here, (or we sync)
+    // so we Issue the release of the semaphore as host launch
+    transferQueue.IssueSemaphoreSignal(sem);
+    // We should preset the next acquisition state he
+    // and find the other threads wait value.
     uint64_t nextVal = sem.ChangeToNextState();
 
     return RenderImageSection

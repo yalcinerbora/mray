@@ -26,7 +26,8 @@ function(gen_device_target)
         ${CURRENT_SOURCE_DIR}/CUDA/GPUSystemCUDA.h
         ${CURRENT_SOURCE_DIR}/CUDA/GPUSystemCUDA.hpp
         ${CURRENT_SOURCE_DIR}/CUDA/GPUSystemCUDA.cpp
-        ${CURRENT_SOURCE_DIR}/CUDA/DefinitionsCUDA.h)
+        ${CURRENT_SOURCE_DIR}/CUDA/DefinitionsCUDA.h
+        ${CURRENT_SOURCE_DIR}/CUDA/GPUAtomicCUDA.h)
 
     set(SRC_CUDA_ALGS
         ${CURRENT_SOURCE_DIR}/CUDA/AlgForwardCUDA.h
@@ -51,7 +52,8 @@ function(gen_device_target)
         ${CURRENT_SOURCE_DIR}/GPUSystem.h
         ${CURRENT_SOURCE_DIR}/GPUSystem.hpp
         ${CURRENT_SOURCE_DIR}/GPUDebug.h
-        ${CURRENT_SOURCE_DIR}/GPUTypes.h)
+        ${CURRENT_SOURCE_DIR}/GPUTypes.h
+        ${CURRENT_SOURCE_DIR}/GPUAtomic.h)
 
     set(SRC_ALL
         ${SRC_COMMON}

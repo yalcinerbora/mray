@@ -3,6 +3,94 @@
 
 #include "Device/GPUSystem.hpp"
 
+#include "Device/GPUAtomic.h"
+class SubImageSpan
+{
+    private:
+    Span<Float> dPixels;
+    Span<Float> dSamples;
+
+    Vector2ui min;
+    Vector2ui max;
+    Vector2ui resolution;
+
+    template<uint32_t C>
+    MRAY_GPU uint32_t           LinearIndex(const Vector2ui& xy) const;
+    MRAY_GPU Float              FetchSample(const Vector2ui& xy) const;
+    template<uint32_t C>
+    MRAY_GPU Vector<C, Float>   FetchPixel(const Vector2ui& xy) const;
+    template<uint32_t C>
+    MRAY_GPU void               StorePixel(const Vector<C, Float>& val,
+                                           const Vector2ui& xy);
+    template<uint32_t C>
+    MRAY_GPU Vector<C, Float>   AddToPixelAtomic(const Vector<C, Float>& val,
+                                                 const Vector2ui& xy);
+    MRAY_GPU Float              AddToSampleAtomic(Float val, const Vector2ui& xy);
+};
+
+template<uint32_t C>
+MRAY_GPU MRAY_GPU_INLINE
+uint32_t SubImageSpan::LinearIndex(const Vector2ui& xy) const
+{
+    uint32_t yGlobal = (min[1] + xy[1]);
+    uint32_t xGlobal = (min[0] + xy[0]);
+    uint32_t linear = (yGlobal * resolution[1] + xGlobal) * C;
+    return linear;
+}
+
+MRAY_GPU MRAY_GPU_INLINE
+Float SubImageSpan::FetchSample(const Vector2ui& xy) const
+{
+    uint32_t i = LinearIndex<1>(xy);
+    return dSamples[i];
+}
+
+template<uint32_t C>
+MRAY_GPU MRAY_GPU_INLINE
+Vector<C, Float> SubImageSpan::FetchPixel(const Vector2ui& xy) const
+{
+    uint32_t index = LinearIndex<C>(xy);
+    Vector<C, Float> r;
+    UNROLL_LOOP
+    for(uint32_t i = 0; i < C; i++)
+        r[i] = dPixels[index + i];
+    return r;
+}
+
+template<uint32_t C>
+MRAY_GPU MRAY_GPU_INLINE
+void SubImageSpan::StorePixel(const Vector<C, Float>& val,
+                              const Vector2ui& xy)
+{
+    uint32_t index = LinearIndex<C>(xy);
+    UNROLL_LOOP
+    for(uint32_t i = 0; i < C; i++)
+        dPixels[index + i] = val[i];
+}
+
+template<uint32_t C>
+MRAY_GPU MRAY_GPU_INLINE
+Vector<C, Float> SubImageSpan::AddToPixelAtomic(const Vector<C, Float>& val,
+                                                const Vector2ui& xy)
+{
+    Vector<C, Float> result;
+    uint32_t index = LinearIndex<C>(xy);
+    UNROLL_LOOP
+    for(uint32_t i = 0; i < C; i++)
+    {
+        result[i] = DeviceAtomic::AtomicAdd(dPixels[index + i], val[i]);
+    }
+    return result;
+}
+
+MRAY_GPU MRAY_GPU_INLINE
+Float SubImageSpan::AddToSampleAtomic(Float val, const Vector2ui& xy)
+{
+    uint32_t index = LinearIndex<0>(xy);
+    return DeviceAtomic::AtomicAdd(dPixels[index], val);
+}
+
+
 TexViewRenderer::TexViewRenderer(RenderImagePtr rb, TracerView tv,
                              const GPUSystem& s)
     : RendererT(rb, tv, s)
@@ -38,8 +126,7 @@ RendererOptionPack TexViewRenderer::CurrentAttributes() const
 }
 
 void TexViewRenderer::PushAttribute(uint32_t attributeIndex,
-                                  TransientData data,
-                                  const GPUQueue& q)
+                                    TransientData data, const GPUQueue&)
 {
     if(attributeIndex != 0)
         throw MRayError("{} Unkown attribute index {}",
@@ -76,17 +163,14 @@ void TestWrite(MRAY_GRID_CONSTANT const Span<Float> pixels,
 
 RendererOutput TexViewRenderer::DoRender()
 {
-    using namespace std::literals;
-    //std::this_thread::sleep_for(200ms);
+    using namespace std::string_view_literals;
 
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& processQueue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& transferQueue = gpuSystem.BestDevice().GetQueue(QueuePerDevice - 1);
     Span<Float> pixels = renderBuffer->Pixels();
     Span<Float> samples = renderBuffer->Samples();
     uint32_t colorIndex = pixelIndex;
-
-
-    renderBuffer->AcquireImage(queue);
-    queue.IssueSaturatingKernel<TestWrite>
+    processQueue.IssueSaturatingKernel<TestWrite>
     (
         "TexTest"sv,
         KernelIssueParams{.workCount = static_cast<uint32_t>(pixels.size())},
@@ -95,12 +179,9 @@ RendererOutput TexViewRenderer::DoRender()
         samples,
         colorIndex
     );
-    RenderImageSection renderOut = renderBuffer->ReleaseImage(queue);
 
-    //queue.Barrier().Wait();
-
-    //t.Split();
-    //MRAY_LOG("MEMCPY {}", t.Elapsed<Millisecond>());
+    RenderImageSection renderOut = renderBuffer->GetHostView(processQueue,
+                                                             transferQueue);
 
     pixelIndex++;
     return RendererOutput

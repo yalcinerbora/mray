@@ -24,6 +24,7 @@ class RenderImage
     size_t              sampleStartOffset   = 0;
 
     GPUSemaphoreView    sem;
+    GPUFence            processCompleteFence;
     //
     uint32_t            depth       = 0;
     MRayColorSpaceEnum  colorSpace  = MRayColorSpaceEnum::MR_RAW;
@@ -48,9 +49,11 @@ class RenderImage
     Vector2ui           Resolution() const;
     //
     void                ClearImage(const GPUQueue& queue);
-    void                AcquireImage(const GPUQueue& queue);
-    RenderImageSection  ReleaseImage(const GPUQueue& queue);
     RenderBufferInfo    GetBufferInfo();
+
+    // Synchronized Host access
+    RenderImageSection  GetHostView(const GPUQueue& processQueue,
+                                    const GPUQueue& transferQueue);
 };
 
 inline

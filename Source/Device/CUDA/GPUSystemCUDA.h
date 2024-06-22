@@ -224,6 +224,7 @@ class GPUQueueCUDA
     template <class T>
     MRAY_HOST void      MemsetAsync(Span<T> region, uint8_t perByteValue) const;
 
+    // Misc
     MRAY_HOST void      IssueBufferForDestruction(TransientData data) const;
 
     // Synchronization
@@ -233,6 +234,8 @@ class GPUQueueCUDA
     void                IssueSemaphoreWait(GPUSemaphoreViewCUDA&) const;
     MRAY_HOST
     void                IssueSemaphoreSignal(GPUSemaphoreViewCUDA&) const;
+    MRAY_HOST
+    void                IssueWait(const GPUFenceCUDA&) const;
 
     MRAY_HYBRID
     uint32_t            SMCount() const;
@@ -529,13 +532,20 @@ GPUFenceCUDA GPUQueueCUDA::Barrier() const
 MRAY_HOST inline
 void GPUQueueCUDA::IssueSemaphoreWait(GPUSemaphoreViewCUDA& sem) const
 {
-    cudaLaunchHostFunc(stream, &TimelineSemAcquireInternal, &sem);
+    CUDA_CHECK(cudaLaunchHostFunc(stream, &TimelineSemAcquireInternal, &sem));
 }
 
 MRAY_HOST inline
 void GPUQueueCUDA::IssueSemaphoreSignal(GPUSemaphoreViewCUDA& sem) const
 {
-    cudaLaunchHostFunc(stream, &TimelineSemReleaseInternal, &sem);
+    CUDA_CHECK(cudaLaunchHostFunc(stream, &TimelineSemReleaseInternal, &sem));
+}
+
+MRAY_HOST inline
+void GPUQueueCUDA::IssueWait(const GPUFenceCUDA& barrier) const
+{
+    CUDA_CHECK(cudaStreamWaitEvent(stream, ToHandleCUDA(barrier),
+                                   cudaEventWaitDefault));
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
