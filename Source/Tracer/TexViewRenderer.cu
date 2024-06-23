@@ -134,10 +134,64 @@ void TexViewRenderer::PushAttribute(uint32_t attributeIndex,
     newOptions.totalSPP = data.AccessAs<uint32_t>()[0];
 }
 
+MRAY_HYBRID MRAY_CGPU_INLINE
+uint32_t FilterRadiusToPixelWH(Float filterRadius)
+{
+    // At every 0.5 increment conservative pixel estimate is increasing
+    // [0]          = Single Pixel (Special Case)
+    // (0, 0.5]     = 2x2
+    // (0.5, 1]     = 3x3
+    // (1, 1.5]     = 4x4
+    // (1.5, 2]     = 5x5
+    // etc...
+    if(filterRadius == Float(0)) return 1;
+    // Do division
+    uint32_t quot = static_cast<uint32_t>(filterRadius / Float(0.5));
+    float remainder = std::fmod(filterRadius, Float(0.5));
+    // Exact divisions reside on previous segment
+    if(remainder == Float(0)) quot -= 1;
+    uint32_t result = quot + 2;
+    return result;
+}
+
+uint32_t FindOptimumTile(uint32_t regionSize,
+                         uint32_t tileSize)
+{
+    // Find optimal tile size that evenly divides the image
+    // This may not happen (width or height is prime)
+    // then expand the tile size to pass the edge barely.
+    if(regionSize < tileSize) return regionSize;
+
+    // Divide and find a tileCount
+    uint32_t tCount = MathFunctions::DivideUp(regionSize, tileSize);
+    uint32_t result = regionSize / tCount;
+    uint32_t residual = regionSize % tCount;
+    // All file no pixel is left.
+    if(residual == 0) return result;
+
+    // Not evenly divisible now expand the tile
+    residual = MathFunctions::DivideUp(residual, tCount);
+    result += residual;
+    return result;
+}
+
 RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams& params,
                                               const CameraKey&)
 {
-    // Reset renderbuffer
+    // Calculate tile size according to the parallelization hint
+    uint32_t parallelHint = 1 << 21;
+    uint32_t tileHint = static_cast<int32_t>(std::round(std::sqrt(parallelHint)));
+    Vector2ui imgRegion = params.regionMax - params.regionMin;
+    // Add some tolerance (%30)
+    tileHint = uint32_t(Float(0.3) * Float(tileHint));
+    Vector2ui tileSize = Vector2ui(FindOptimumTile(imgRegion[0], tileHint),
+                                   FindOptimumTile(imgRegion[1], tileHint));
+
+    //Vector2ui extraPixels = FilterSize;
+
+
+    // Tiled Render Buffer
+    // Access tile
 
     using enum MRayColorSpaceEnum;
     renderBuffer = std::make_shared<RenderImage>(params, 1,

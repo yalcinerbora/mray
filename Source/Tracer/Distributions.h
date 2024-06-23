@@ -139,7 +139,7 @@ SampleT<Float> DistributionPwC<1>::SampleIndex(Float xi) const
     Float t = (xi - prevCDF) / (myCDF - prevCDF);
 
     Float indexF = static_cast<Float>(index) + t;
-    indexF = (indexF < 1.0) ? indexF : nextafter(indexF, Float{-1});
+    indexF = (indexF < 1.0) ? indexF : MathFunctions::PrevFloat(indexF);
     assert(indexF < static_cast<Float>(dCDF.size()));
 
     Float pdf = (myCDF - prevCDF) * static_cast<Float>(dCDF.size());

@@ -15,6 +15,11 @@ namespace MathFunctions
     template <std::floating_point T>
     MRAY_HYBRID constexpr T Smoothstep(T a, T b, T t);
 
+    template <std::floating_point T>
+    MRAY_HYBRID T NextFloat(T a);
+    template <std::floating_point T>
+    MRAY_HYBRID T PrevFloat(T a);
+
     // TODO: Although not math, put it here
     // Similar to clamp but rolls
     template <std::signed_integral T>
@@ -76,6 +81,19 @@ constexpr T MathFunctions::Smoothstep(T a, T b, T t)
     // https://en.wikipedia.org/wiki/Smoothstep
     t = Clamp((t - a) / (b - a), T{0}, T{1});
     return t * t * (T{3} - T{2} * t);
+}
+
+template <std::floating_point T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+T MathFunctions::NextFloat(T a)
+{
+    return std::nextafter(a, std::numeric_limits<T>::max());
+}
+template <std::floating_point T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+T MathFunctions::PrevFloat(T a)
+{
+    return std::nextafter(a, -std::numeric_limits<T>::max());
 }
 
 template <std::signed_integral T>
