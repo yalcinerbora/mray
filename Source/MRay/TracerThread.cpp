@@ -74,7 +74,7 @@ Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
     // Params
     static constexpr auto SEED_NAME = "seed"sv;
     static constexpr auto ACCEL_TYPE_NAME = "acceleratorType"sv;
-    static constexpr auto ITEM_POOL_NAME = "itemPoolSize"sv;
+    static constexpr auto PAR_HINT_NAME = "parallelHint"sv;
     static constexpr auto SAMPLER_TYPE_NAME = "samplerType"sv;
     static constexpr auto CLAMP_TEX_RES_NAME = "clampTexRes"sv;
     static constexpr auto PARTITION_LOGIC_NAME = "partitionLogic"sv;
@@ -110,7 +110,7 @@ Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
 
         OptionalFetch(config.params.seed, SEED_NAME, paramsJson);
         OptionalFetch(config.params.accelMode, ACCEL_TYPE_NAME, paramsJson);
-        OptionalFetch(config.params.itemPoolSize, ITEM_POOL_NAME, paramsJson);
+        OptionalFetch(config.params.parallelizationHint, PAR_HINT_NAME, paramsJson);
         OptionalFetch(config.params.samplerType, SAMPLER_TYPE_NAME, paramsJson);
         OptionalFetch(config.params.clampedTexRes, CLAMP_TEX_RES_NAME, paramsJson);
         return config;

@@ -37,10 +37,7 @@ template<class T, class Func>
 MRAY_GPU MRAY_GPU_INLINE
 T EmulateAtomicOp(T* address, T val, Func&& F)
 {
-
     using I = typename IntegralOf<T>::type;
-    static_assert(std::is_same_v<I, uint64_t>, "YAY");
-
     // Classic CAS wrapper for the operation
     // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#atomic-functions
     I* integralAddress = std::launder(reinterpret_cast<I*>(address));

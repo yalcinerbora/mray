@@ -106,9 +106,9 @@ struct TracerParameters
     AcceleratorType accelMode = AcceleratorType::HARDWARE;
     // Item pool size, amount of "items" (paths/rays/etc) processed
     // in parallel
-    uint32_t        itemPoolSize = 1 << 21; // 2^21 ~= 2M
+    uint32_t    parallelizationHint = 1 << 21; // 2^21 ~= 2M
     // Current sampler logic,
-    SamplerType     samplerType = SamplerType::INDEPENDENT;
+    SamplerType samplerType = SamplerType::INDEPENDENT;
     // Texture Related
     uint32_t            clampedTexRes = std::numeric_limits<uint32_t>::max();
     MRayColorSpaceEnum  globalTextureColorSpace = MRayColorSpaceEnum::MR_ACES_CG;
