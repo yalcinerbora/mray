@@ -94,6 +94,30 @@ constexpr uint32_t BCTypeToChannels()
                        "Unknown Block Compressed Format!");
 }
 
+template<uint32_t D, class T>
+class TextureCUDA_Normal;
+
+// RAII wrapper for the surface object
+template<uint32_t D, class T>
+class RWTextureRefCUDA
+{
+    friend class TextureCUDA_Normal<D, T>;
+
+    private:
+    cudaSurfaceObject_t     s = cudaSurfaceObject_t(0);
+    // Hide this, only texture class can create
+                            RWTextureRefCUDA(cudaSurfaceObject_t);
+    public:
+    // Constructors & Destructor
+                            RWTextureRefCUDA(const RWTextureRefCUDA&) = delete;
+                            RWTextureRefCUDA(RWTextureRefCUDA&&);
+    RWTextureRefCUDA&       operator=(const RWTextureRefCUDA&) = delete;
+    RWTextureRefCUDA&       operator=(RWTextureRefCUDA&&);
+                            ~RWTextureRefCUDA();
+    //
+    RWTextureViewCUDA<D, T> View() const;
+};
+
 template<uint32_t DIM, class T>
 class TextureCUDA;
 
@@ -158,6 +182,8 @@ class TextureCUDA_Normal
              (VectorTypeToChannels::Find<T> ==
               VectorTypeToChannels::Find<QT>))
     TextureViewCUDA<D, QT>  View() const;
+
+    RWTextureRefCUDA<D, T> GenerateRWRef(uint32_t mipLevel);
 
     size_t                  Size() const;
     size_t                  Alignment() const;

@@ -66,6 +66,37 @@ inline cudaTextureFilterMode DetermineFilterMode(MRayTextureInterpEnum i)
     }
 }
 
+
+template <uint32_t D, class T>
+RWTextureRefCUDA<D, T>::RWTextureRefCUDA(cudaSurfaceObject_t sIn)
+    : s(sIn)
+{}
+
+template <uint32_t D, class T>
+RWTextureRefCUDA<D, T>::RWTextureRefCUDA(RWTextureRefCUDA&& other)
+    : s(std::exchange(s, other.s, cudaSurfaceObject_t(0)))
+{}
+
+template <uint32_t D, class T>
+RWTextureRefCUDA<D, T>& RWTextureRefCUDA<D, T>::operator=(RWTextureRefCUDA&& other)
+{
+    assert(this != &other);
+    CUDA_CHECK(cudaDestroySurfaceObject(s));
+    std::exchange(s, other.s, cudaSurfaceObject_t(0));
+}
+
+template <uint32_t D, class T>
+RWTextureRefCUDA<D, T>::~RWTextureRefCUDA()
+{
+    CUDA_CHECK(cudaDestroySurfaceObject(s));
+}
+
+template <uint32_t D, class T>
+RWTextureViewCUDA<D, T> RWTextureRefCUDA<D, T>::View() const
+{
+    return RWTextureViewCUDA<D, T>(s);
+}
+
 template<uint32_t D, class T>
 TextureCUDA_Normal<D, T>::TextureCUDA_Normal(const GPUDeviceCUDA& device,
                                              const TextureInitParams<D>& p)
@@ -214,6 +245,27 @@ TextureViewCUDA<D, QT> TextureCUDA_Normal<D, T>::View() const
                         "Any type conversion (narrowing or expanding) is not supported on textures."
                         " This function should only be called for normalized integers with \"Float\" types");
     }
+}
+
+template<uint32_t D, class T>
+RWTextureRefCUDA<D, T> TextureCUDA_Normal<D, T>::GenerateRWRef(uint32_t mipLevel)
+{
+    if(mipLevel >= texParams.mipCount)
+        throw MRayError("Requested out of bounds mip level!");
+
+    // TODO: Check if we are owning this cudaArray_t.
+    // Since it is a "get" function we do not own this I guess
+    cudaArray_t mipLevelArray;
+    CUDA_CHECK(cudaGetMipmappedArrayLevel(&mipLevelArray, data,
+                                          static_cast<int>(mipLevel)));
+
+    cudaSurfaceObject_t surf;
+    cudaResourceDesc desc = {};
+    desc.resType = cudaResourceTypeArray;
+    desc.res.array.array = mipLevelArray;
+    CUDA_CHECK(cudaCreateSurfaceObject(&surf, &desc));
+
+    return RWTextureRefCUDA(surf);
 }
 
 template<uint32_t D, class T>

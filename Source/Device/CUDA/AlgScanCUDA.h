@@ -89,7 +89,7 @@ void KCInclusiveMultiScan(Span<T> dOut,
                 BlockStore().Store(dSubBlockOut.data(), dataRegisters, validItems);
 
             processedItemsSoFar += validItems;
-            MRAY_DEVICE_BLOCK_SYNC();
+            BlockSynchronize();
         }
         aggregate = identityElement;
     }

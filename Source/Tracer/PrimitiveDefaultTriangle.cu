@@ -26,7 +26,7 @@ void KCAdjustIndices(// I-O
         MRAY_SHARED_MEMORY Vector4ui sVertexIndexRange;
         if(localTid < Vector4ui::Dims)
             sVertexIndexRange[localTid] = dVertexIndexRanges[blockId][localTid];
-        MRAY_DEVICE_BLOCK_SYNC();
+        BlockSynchronize();
 
         Vector2ui indexRange = Vector2ui(sVertexIndexRange[2],
                                          sVertexIndexRange[3]);
@@ -45,7 +45,7 @@ void KCAdjustIndices(// I-O
             if(j < vICount) dVI[vIStart + j] += vStart; j += kp.blockSize;
         }
         // Before writing new shared memory values wait all threads to end
-        MRAY_DEVICE_BLOCK_SYNC();
+        BlockSynchronize();
     }
 }
 

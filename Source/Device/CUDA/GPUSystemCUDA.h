@@ -21,8 +21,6 @@ class TimelineSemaphore;
 #define MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT \
         MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(StaticThreadPerBlock1D())
 
-#define MRAY_DEVICE_BLOCK_SYNC() __syncthreads()
-
 #if __CUDA_ARCH__ >= 700
     #define MRAY_GRID_CONSTANT __grid_constant__
 #else
@@ -34,6 +32,37 @@ class TimelineSemaphore;
 static constexpr uint32_t WarpSize()
 {
     return 32u;
+}
+
+template<uint32_t LOGICAL_WARP_SIZE = WarpSize()>
+MRAY_GPU MRAY_GPU_INLINE
+static void WarpSynchronize()
+{
+    // Dirty fix to make host side happy
+    #ifdef __CUDA_ARCH__
+
+    constexpr uint32_t MASK = LOGICAL_WARP_SIZE - 1;
+    static_assert(LOGICAL_WARP_SIZE == 1 ||
+                  LOGICAL_WARP_SIZE == 2 ||
+                  LOGICAL_WARP_SIZE == 4 ||
+                  LOGICAL_WARP_SIZE == 8 ||
+                  LOGICAL_WARP_SIZE == 16 ||
+                  LOGICAL_WARP_SIZE == 32,
+                  "Logical warps must be power of 2 and \"<32\"");
+    uint32_t localWarpId = threadIdx.x / LOGICAL_WARP_SIZE;
+    uint32_t localMask = MASK << localWarpId;
+
+    __syncwrap(localMask);
+    #endif
+}
+
+MRAY_GPU MRAY_GPU_INLINE
+static void BlockSynchronize()
+{
+    // Dirty fix to make host side happy
+    #ifdef __CUDA_ARCH__
+    __syncthreads();
+    #endif
 }
 
 // A Good guess for TPB

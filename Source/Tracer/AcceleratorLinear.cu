@@ -33,7 +33,7 @@ void KCGeneratePrimitiveKeys(MRAY_GRID_CONSTANT const Span<PrimitiveKey> dAllLea
             sPrimRanges[localTid] = dConcretePrimRanges[blockId][localTid];
         if(localTid < Vector2ui::Dims)
             sConcreteLeafRange[localTid] = dConcreteLeafRanges[blockId][localTid];
-        MRAY_DEVICE_BLOCK_SYNC();
+        BlockSynchronize();
 
         // Do batch by batch
         // Glorified iota..
@@ -55,7 +55,7 @@ void KCGeneratePrimitiveKeys(MRAY_GRID_CONSTANT const Span<PrimitiveKey> dAllLea
         }
         assert(offset == sConcreteLeafRange[1] - sConcreteLeafRange[0]);
         // Before writing new shared memory values wait all threads to end
-        MRAY_DEVICE_BLOCK_SYNC();
+        BlockSynchronize();
     }
 }
 

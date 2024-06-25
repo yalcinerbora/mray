@@ -6,6 +6,7 @@
 #include "Core/TypeFinder.h"
 #include "Core/Vector.h"
 #include "Core/Types.h"
+#include "Device/GPUTypes.h"
 #include <cuda.h>
 
 namespace mray::cuda
@@ -131,6 +132,45 @@ struct CudaTexToMRayType<MRayType, CudaType, 4>
     }
 };
 
+template <class MRayType, class CudaType, uint32_t Channels>
+struct MRayToCudaTexType {};
+
+template <class MRayType, class CudaType>
+struct MRayToCudaTexType<MRayType, CudaType, 1>
+{
+    static constexpr CudaType Convert(MRayType scalar)
+    {
+        return scalar;
+    }
+};
+
+template <class MRayType, class CudaType>
+struct MRayToCudaTexType<MRayType, CudaType, 2>
+{
+    static constexpr CudaType Convert(MRayType vec)
+    {
+        return MRayType{.x = vec[0], .y = vec[1]};
+    }
+};
+
+template <class MRayType, class CudaType>
+struct MRayToCudaTexType<MRayType, CudaType, 3>
+{
+    static constexpr CudaType Convert(MRayType vec)
+    {
+        return MRayType{.x = vec[0], .y = vec[1], .z = vec[2]};
+    }
+};
+
+template <class MRayType, class CudaType>
+struct MRayToCudaTexType<MRayType, CudaType, 4>
+{
+    static constexpr CudaType Convert(MRayType vec)
+    {
+        return MRayType{.x = vec[0], .y = vec[1], .z = vec[2], .w = vec[3]};
+    }
+};
+
 template<uint32_t DIM, class T>
 class TextureViewCUDA;
 
@@ -151,14 +191,13 @@ class TextureViewCUDA<1, T>
     // Full Texture object access
     MRAY_HOST               TextureViewCUDA(cudaTextureObject_t t) : texHandle(t) {}
 
-
     // Base Access
-    MRAY_HYBRID Optional<T> operator()(Float uv) const;
+    MRAY_GPU Optional<T>    operator()(Float uv) const;
     // Gradient Access
-    MRAY_HYBRID Optional<T> operator()(Float uv, Float dpdx,
+    MRAY_GPU Optional<T>    operator()(Float uv, Float dpdx,
                                        Float dpdy) const;
     // Direct Mip Access
-    MRAY_HYBRID Optional<T> operator()(Float uv, Float mipLevel) const;
+    MRAY_GPU Optional<T>    operator()(Float uv, Float mipLevel) const;
 };
 
 // Specializiations of 123D for CUDA
@@ -177,12 +216,12 @@ class TextureViewCUDA<2, T>
     public:
     MRAY_HOST               TextureViewCUDA(cudaTextureObject_t t) : texHandle(t) {}
     // Base Access
-    MRAY_HYBRID Optional<T> operator()(Vector2 uv) const;
+    MRAY_GPU Optional<T>    operator()(Vector2 uv) const;
     // Gradient Access
-    MRAY_HYBRID Optional<T> operator()(Vector2 uv, Vector2 dpdx,
+    MRAY_GPU Optional<T>    operator()(Vector2 uv, Vector2 dpdx,
                                        Vector2 dpdy) const;
     // Direct Mip Access
-    MRAY_HYBRID Optional<T> operator()(Vector2 uv, Float mipLevel) const;
+    MRAY_GPU Optional<T>    operator()(Vector2 uv, Float mipLevel) const;
 };
 
 template<class T>
@@ -200,16 +239,56 @@ class TextureViewCUDA<3, T>
     public:
     MRAY_HOST               TextureViewCUDA(cudaTextureObject_t t) : texHandle(t) {}
     // Base Access
-    MRAY_HYBRID Optional<T> operator()(Vector3 uv) const;
+    MRAY_GPU Optional<T>    operator()(Vector3 uv) const;
     // Gradient Access
-    MRAY_HYBRID Optional<T> operator()(Vector3 uv, Vector3 dpdx,
+    MRAY_GPU Optional<T>    operator()(Vector3 uv, Vector3 dpdx,
                                        Vector3 dpdy) const;
     // Direct Mip Access
-    MRAY_HYBRID Optional<T> operator()(Vector3 uv, Float mipLevel) const;
+    MRAY_GPU Optional<T>    operator()(Vector3 uv, Float mipLevel) const;
+};
+
+// Writable texture views (disregards normalization etc)
+template<uint32_t DIM, class T>
+class RWTextureViewCUDA
+{
+    public:
+    class PixRef
+    {
+        // Texture channels
+        static constexpr uint32_t Channels = VectorTypeToChannels::Find<T>;
+        // Read channels (3Channel textures are actual 4 channel)
+        using PaddedChannelType = PaddedChannel<Channels, T>;
+        using PaddedCudaType = typename VectorTypeToCUDA::template Find<PaddedChannelType>;
+        using WriteConvertType = MRayToCudaTexType<T, PaddedCudaType, Channels>;
+
+        private:
+        cudaSurfaceObject_t surfHandle;
+        TextureExtent<DIM>  ij;
+        // Constructor
+        MRAY_GPU            PixRef(cudaSurfaceObject_t s,
+                                   TextureExtent<DIM> ij);
+        public:
+        MRAY_GPU PixRef&    operator=(const T&);
+    };
+
+    private:
+    using ReadConvertType = CudaTexToMRayType<T, typename PixRef::PaddedCudaType,
+                                              PixRef::Channels>;
+
+    private:
+    cudaSurfaceObject_t     surfHandle;
+
+    public:
+    // Full Texture object access
+    MRAY_HOST               RWTextureViewCUDA(cudaSurfaceObject_t t) : surfHandle(t) {}
+    // Write
+    MRAY_GPU PixRef         operator()(TextureExtent<DIM>);
+    // Read
+    MRAY_GPU Optional<T>    operator()(TextureExtent<DIM>) const;
 };
 
 template<class T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Optional<T> TextureViewCUDA<1, T>::operator()(Float uv) const
 {
     CudaType t = tex1D<CudaType>(texHandle, uv);
@@ -217,7 +296,7 @@ Optional<T> TextureViewCUDA<1, T>::operator()(Float uv) const
 }
 
 template<class T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Optional<T> TextureViewCUDA<1, T>::operator()(Float uv, Float dpdx,
                                               Float dpdy) const
 {
@@ -227,7 +306,7 @@ Optional<T> TextureViewCUDA<1, T>::operator()(Float uv, Float dpdx,
 }
 
 template<class T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Optional<T> TextureViewCUDA<1, T>::operator()(Float uv, Float mipLevel) const
 {
     CudaType t = tex1DLod<CudaType>(texHandle, uv, mipLevel);
@@ -235,7 +314,7 @@ Optional<T> TextureViewCUDA<1, T>::operator()(Float uv, Float mipLevel) const
 }
 
 template<class T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Optional<T> TextureViewCUDA<2, T>::operator()(Vector2 uv) const
 {
     bool isResident = false;
@@ -245,7 +324,7 @@ Optional<T> TextureViewCUDA<2, T>::operator()(Vector2 uv) const
 }
 
 template<class T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Optional<T> TextureViewCUDA<2, T>::operator()(Vector2 uv, Vector2 dpdx,
                                               Vector2 dpdy) const
 {
@@ -258,7 +337,7 @@ Optional<T> TextureViewCUDA<2, T>::operator()(Vector2 uv, Vector2 dpdx,
 }
 
 template<class T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Optional<T> TextureViewCUDA<2, T>::operator()(Vector2 uv, Float mipLevel) const
 {
     bool isResident = false;
@@ -269,7 +348,7 @@ Optional<T> TextureViewCUDA<2, T>::operator()(Vector2 uv, Float mipLevel) const
 }
 
 template<class T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Optional<T> TextureViewCUDA<3, T>::operator()(Vector3 uv) const
 {
     bool isResident = false;
@@ -281,7 +360,7 @@ Optional<T> TextureViewCUDA<3, T>::operator()(Vector3 uv) const
 }
 
 template<class T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Optional<T> TextureViewCUDA<3, T>::operator()(Vector3 uv, Vector3 dpdx,
                                               Vector3 dpdy) const
 {
@@ -296,7 +375,7 @@ Optional<T> TextureViewCUDA<3, T>::operator()(Vector3 uv, Vector3 dpdx,
 }
 
 template<class T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Optional<T> TextureViewCUDA<3, T>::operator()(Vector3 uv, Float mipLevel) const
 {
     bool isResident = false;
@@ -306,6 +385,111 @@ Optional<T> TextureViewCUDA<3, T>::operator()(Vector3 uv, Float mipLevel) const
                                     &isResident);
     if(isResident) return ConvertType::Convert(t);
     return std::nullopt;
+}
+
+template<uint32_t D, class T>
+MRAY_GPU MRAY_GPU_INLINE
+RWTextureViewCUDA<D, T>::PixRef::PixRef(cudaSurfaceObject_t s,
+                                        TextureExtent<D> in)
+    : surfHandle(s)
+    , ij(in)
+{}
+
+template<uint32_t D, class T>
+MRAY_GPU MRAY_GPU_INLINE
+typename RWTextureViewCUDA<D, T>::PixRef&
+RWTextureViewCUDA<D, T>::PixRef::operator=(const T& val)
+{
+    // Do some sanity check
+    static_assert(sizeof(PaddedChannelType) == sizeof(PaddedCudaType));
+    constexpr int size = sizeof(PaddedChannelType);
+    // We will read 4 channel data if texture is 3 channel
+    PaddedCudaType t;
+    // Easy path just do an assignment
+    if constexpr(std::is_same_v<PaddedChannelType, T>)
+        t = WriteConvertType::Convert(val);
+    else
+    {
+        // Somewhat hard part. All padded types are 3 channel types,
+        // so manually assign it to the type T (float3, ushort3 etc..)
+        // Again some sanity
+        static_assert(VectorC<T> && T::Dims == 3);
+        t = {val[0], val[1], val[2], typename T::InnerType(0)};
+    }
+
+    if constexpr(D == 1)
+    {
+        surf1DWrite<PaddedCudaType>
+        (
+            t, surfHandle,
+            static_cast<int>(ij) * size
+        );
+    }
+    else if constexpr(D == 2)
+    {
+        surf2DWrite<PaddedCudaType>
+        (
+            t, surfHandle,
+            static_cast<int>(ij[0]) * size,
+            ij[1]
+        );
+    }
+    else if constexpr(D == 3)
+    {
+        surf3DWrite<PaddedCudaType>
+        (
+            t, surfHandle,
+            static_cast<int>(ij[0]) * size,
+            ij[1], ij[2]
+        );
+    }
+    static_assert(D >= 1 && D <= 3, "At most 3D textures are supported");
+}
+
+template<uint32_t D, class T>
+MRAY_GPU MRAY_GPU_INLINE
+typename RWTextureViewCUDA<D, T>::PixRef
+RWTextureViewCUDA<D, T>::operator()(TextureExtent<D> ij)
+{
+    return PixRef(*this, ij);
+}
+
+template<uint32_t D, class T>
+MRAY_GPU MRAY_GPU_INLINE
+Optional<T> RWTextureViewCUDA<D, T>::operator()(TextureExtent<D> ij) const
+{
+    using PaddedCudaType = typename PixRef::PaddedCudaType;
+    constexpr int size = sizeof(PaddedCudaType);
+
+    PaddedCudaType t;
+    if constexpr(D == 1)
+    {
+        t = surf1DRead<PaddedCudaType>
+        (
+            surfHandle,
+            static_cast<int>(ij) * size
+        );
+    }
+    else if constexpr(D == 2)
+    {
+        t = surf2DWrite<PaddedCudaType>
+        (
+            surfHandle,
+            static_cast<int>(ij[0]) * size,
+            ij[1]
+        );
+    }
+    else if constexpr(D == 3)
+    {
+        t = surf3DWrite<PaddedCudaType>
+        (
+            surfHandle,
+            static_cast<int>(ij[0]) * size,
+            ij[1], ij[2]
+        );
+    }
+    else static_assert(D >= 1 && D <= 3, "At most 3D textures are supported");
+    return T(ReadConvertType::Convert(t));
 }
 
 }

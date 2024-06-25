@@ -155,6 +155,6 @@ constexpr T MathFunctions::NextMultiple(T value, T divisor)
 template <std::integral T>
 MRAY_HYBRID constexpr T MathFunctions::NextPowerOfTwo(T value)
 {
-    return std::bit_floor<T>(value);
+    return std::bit_ceil<T>(value);
 }
 

@@ -70,7 +70,7 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
 
 
             processedItemsSoFar += validItems;
-            MRAY_DEVICE_BLOCK_SYNC();
+            BlockSynchronize();
         }
     };
 
@@ -91,7 +91,7 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
             uint32_t rowCount = static_cast<uint32_t>(rowData.size());
 
             if(kp.threadId == 0) sTotalRecip = Float(1) / rowData[rowCount - 1];
-            MRAY_DEVICE_BLOCK_SYNC();
+            BlockSynchronize();
 
             uint32_t processedItemsSoFar = 0;
             while(processedItemsSoFar != rowCount)
@@ -122,7 +122,7 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
                 processedItemsSoFar += validItems;
             }
 
-            MRAY_DEVICE_BLOCK_SYNC();
+            BlockSynchronize();
         };
 
         // Block-stride loop (one block for each row)
@@ -278,7 +278,7 @@ void DistributionGroupPwC2D::Construct(uint32_t index,
             {
                 d.dDistsX[i] = Distribution1D(ToConstSpan(d.dCDFsX.subspan(i * xCount, xCount)));
             }
-            MRAY_DEVICE_BLOCK_SYNC();
+            BlockSynchronize();
 
             if(kp.GlobalId() == 0)
             {

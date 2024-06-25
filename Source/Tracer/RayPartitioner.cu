@@ -99,14 +99,14 @@ void KCFindSplits(//Output
             BlockStore().Store(blockLocalMarks, marks, validItems);
         }
         // Barrier here for shared memory
-        MRAY_DEVICE_BLOCK_SYNC();
+        BlockSynchronize();
     }
 }
 
 #else
 
 template<int TPB>
-MRAY_KERNEL //MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
 void KCFindSplits(//Output
                   const Span<uint32_t> gMarks,
                   // Input

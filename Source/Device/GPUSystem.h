@@ -30,6 +30,12 @@
     template<uint32_t DIM, class T>
     using Texture = mray::cuda::TextureCUDA<DIM, T>;
 
+    template<uint32_t DIM, class T>
+    using RWTextureView = mray::cuda::RWTextureViewCUDA<DIM, T>;
+
+    template<uint32_t DIM, class T>
+    using RWTextureRef = mray::cuda::RWTextureRefCUDA<DIM, T>;
+
 //#elif defined MRAY_GPU_BACKEND_SYCL
 //    // TODO:
 //    //#include "GPUSystemSycl.h"
@@ -53,10 +59,6 @@
 
 #ifndef MRAY_GRID_CONSTANT
     #error "MRAY_GRID_CONSTANT" is not defined!
-#endif
-
-#ifndef MRAY_DEVICE_BLOCK_SYNC
-    #error "MRAY_DEVICE_BLOCK_SYNC" is not defined!
 #endif
 
 #ifndef MRAY_SHARED_MEMORY
