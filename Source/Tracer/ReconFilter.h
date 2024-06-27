@@ -5,6 +5,10 @@
 
 #include "Device/GPUSystem.h"
 
+#include "RenderImage.h"
+
+class RayPartitioner;
+
 using TexMipBitSet = Bitset<TracerConstants::MaxTextureMipCount>;
 
 template<class T>
@@ -15,7 +19,6 @@ using MipArray = std::array<T, TracerConstants::MaxTextureMipCount>;
 // Check later.
 using SurfViewVariant = Variant
 <
-    std::monostate,
     RWTextureView<2, Float>,
     RWTextureView<2, Vector2>,
     RWTextureView<2, Vector3>,
@@ -40,7 +43,6 @@ using SurfViewVariant = Variant
 
 using SurfRefVariant = Variant
 <
-    std::monostate,
     RWTextureRef<2, Float>,
     RWTextureRef<2, Vector2>,
     RWTextureRef<2, Vector3>,
@@ -72,18 +74,48 @@ class ReconstructionFilterI
     public:
     virtual         ~ReconstructionFilterI() = default;
     // Interface
-    virtual void    GenerateMips(const std::vector<MipArray<SurfRefVariant>>&) = 0;
+    virtual void    GenerateMips(const std::vector<MipArray<SurfRefVariant>>&,
+                                 uint32_t seed) const = 0;
 
-    virtual uint32_t    FilterGridSize() const = 0;
-    virtual void        ReconstructionFilter(// Output
-                                             const Span<Float>& outWeights,
-                                             const Span<Vector3>& outValues,
-                                             // Input
-                                             const Span<const Vector3>& inValues,
-                                             const Span<const Vector2>& imgCoords,
-                                             // Constants
-                                             const Vector2ui& regionMin,
-                                             const Vector2ui& regionMax,
-                                             const Vector2ui& resolution) = 0;
+    //virtual uint32_t    FilterGridSize() const = 0;
+    virtual void    ReconstructionFilterRGB(// Output
+                                            const SubImageSpan<3>& img,
+                                            // I-O
+                                            RayPartitioner& partitioner,
+                                            // Input
+                                            const Span<const Vector3>& dValues,
+                                            const Span<const Vector2>& dImgCoords,
+                                            // Constants
+                                            uint32_t parallelHint,
+                                            Float scalarWeightMultiplier) const = 0;
+};
 
+class ReconstructionFilterBox : public ReconstructionFilterI
+{
+    private:
+    const GPUSystem&    gpuSystem;
+    Float               filterRadius;
+
+    public:
+    static std::string_view TypeName();
+    // Constructors & Destructor
+            ReconstructionFilterBox(const GPUSystem&,
+                                    Float filterRadius);
+    //
+    void    GenerateMips(const std::vector<MipArray<SurfRefVariant>>&,
+                         uint32_t seed) const override;
+    void    ReconstructionFilterRGB(// Output
+                                    const SubImageSpan<3>& img,
+                                    // I-O
+                                    RayPartitioner& partitioner,
+                                    // Input
+                                    const Span<const Vector3>& dValues,
+                                    const Span<const Vector2>& dImgCoords,
+                                    // Constants
+                                    uint32_t parallelHint,
+                                    Float scalarWeightMultiplier) const override;
+
+    //GenericAttribInfoList  AttributeInfo() const;
+    //void                   SetAttribute(uint32_t attributeIndex,
+    //                                    TransientData data);
 };

@@ -46,9 +46,9 @@ namespace TupleRefDetail
                                          std::index_sequence<I...>);
 }
 
-template<class VariantT, class Func>
-MRAY_HYBRID
-constexpr auto DeviceVisit(VariantT&& v, Func&& f) -> decltype(auto);
+//template<class VariantT, class Func>
+//MRAY_HYBRID
+//constexpr auto DeviceVisit(VariantT&& v, Func&& f) -> decltype(auto);
 
 template<class... Args, typename Indices = std::index_sequence_for<Args...>>
 MRAY_HYBRID

@@ -38,5 +38,5 @@ template<class VariantT, class Func>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr auto DeviceVisit(VariantT&& v, Func&& f) -> decltype(auto)
 {
-    return detail::LoopAndInvoke<0>(std::forward<VariantT>(v), std::forward<Func>(f));
+    return DeviceVisitDetail::LoopAndInvoke<0>(std::forward<VariantT>(v), std::forward<Func>(f));
 }

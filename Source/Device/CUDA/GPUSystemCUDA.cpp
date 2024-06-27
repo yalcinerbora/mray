@@ -184,9 +184,9 @@ std::vector<size_t> GPUSystemCUDA::SplitWorkToMultipleGPU(uint32_t workCount,
     uint32_t totalAvailBlocks = 0;
     for(const GPUDeviceCUDA& g : systemGPUs)
     {
-        uint32_t blockPerSM = GPUQueueCUDA::RecommendedBlockCountPerSM(kernelPtr,
-                                                                       threadCount,
-                                                                       sharedMemSize);
+        uint32_t blockPerSM = GPUQueueCUDA::RecommendedBlockCountSM(kernelPtr,
+                                                                    threadCount,
+                                                                    sharedMemSize);
         uint32_t blockGPU = blockPerSM * g.SMCount();
         workPerGPU.push_back(blockGPU);
         totalAvailBlocks += blockGPU;

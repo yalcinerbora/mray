@@ -191,10 +191,9 @@ void PrimGroupTriangle::Finalize(const GPUQueue& queue)
                       Span<const Vector4ui>(hVertexIndexRanges.cbegin(),
                                             hVertexIndexRanges.end()));
 
-    uint32_t blockCount = queue.SMCount() *
-        GPUQueue::RecommendedBlockCountPerSM(&KCAdjustIndices,
-                                             StaticThreadPerBlock1D(),
-                                             0);
+    uint32_t blockCount = queue.RecommendedBlockCountDevice(&KCAdjustIndices,
+                                                            StaticThreadPerBlock1D(),
+                                                            0);
 
     using namespace std::string_view_literals;
     queue.IssueExactKernel<KCAdjustIndices>
@@ -373,10 +372,9 @@ void PrimGroupSkinnedTriangle::Finalize(const GPUQueue& queue)
                       Span<const Vector4ui>(hVertexIndexRanges.cbegin(),
                                             hVertexIndexRanges.end()));
 
-    uint32_t blockCount = queue.SMCount() *
-        GPUQueue::RecommendedBlockCountPerSM(&KCAdjustIndices,
-                                             StaticThreadPerBlock1D(),
-                                             0);
+    uint32_t blockCount = queue.RecommendedBlockCountDevice(&KCAdjustIndices,
+                                                            StaticThreadPerBlock1D(),
+                                                            0);
     using namespace std::string_view_literals;
     queue.IssueExactKernel<KCAdjustIndices>
     (

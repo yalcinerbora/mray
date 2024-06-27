@@ -127,9 +127,12 @@ void SimulateBasicPathTracer()
     // =================== //
     auto
     [
-        hMatPartitionOffsets,
         hMatPartitionCount,
+        //
+        isHostVisible,
+        hMatPartitionOffsets,
         hMatPartitionKeys,
+        //
         dMatPartitionIndices,
         dMatPartitionKeys
     ] = partitioner.MultiPartition(dInitialKeys,
@@ -137,6 +140,7 @@ void SimulateBasicPathTracer()
                                    materialDataRange,
                                    materialBatchRange,
                                    queue);
+    assert(isHostVisible == true);
     // We need to wait for the host buffers to be filled
     queue.Barrier().Wait();
     for(uint32_t partitionsI = 0;

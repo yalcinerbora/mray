@@ -145,7 +145,7 @@ void KCFindBinMatIds(// Output
                      // I-O
                      Span<uint32_t> gBinRanges,
                      // Input
-                     Span<const uint32_t> dDenseSplitIndices,
+                     Span<const uint32_t> gDenseSplitIndices,
                      Span<const CommonKey> gSortedHitKeys,
                      Span<const uint32_t, 1> gPartitionCount,
                      // Constants
@@ -158,9 +158,9 @@ void KCFindBinMatIds(// Output
         globalId < partitionCount;
         globalId += kp.TotalSize())
     {
-        uint32_t index = dDenseSplitIndices[globalId];
-        gBinRanges[globalId] = dDenseSplitIndices[globalId];
+        uint32_t index = gDenseSplitIndices[globalId];
         gBinKeys[globalId] = gSortedHitKeys[index];
+        gBinRanges[globalId] = index;
     }
 
     if(kp.GlobalId() == 0)
@@ -192,11 +192,9 @@ RayPartitioner::RayPartitioner(const GPUSystem& system)
     : system(system)
     , deviceMem(system.AllGPUs(), 2_MiB, 2_MiB)
     , hostMem(system, 1_KiB)
-    // TODO: Change this, we should use MemAlloc::AllocateMultiData(...) function
-    // to allocate this, but static span mandates value so...
-    , hPartitionCount(reinterpret_cast<uint32_t*>(static_cast<Byte*>(hostMem)), 1)
     , rayCount(0)
     , maxPartitionCount(0)
+    , isResultsInHostVisible(true)
 {}
 
 RayPartitioner::RayPartitioner(const GPUSystem& system,
@@ -250,8 +248,11 @@ RayPartitioner& RayPartitioner::operator=(RayPartitioner&& other)
 }
 
 RayPartitioner::InitialBuffers RayPartitioner::Start(uint32_t rayCountIn,
-                                                     uint32_t maxPartitionCountIn)
+                                                     uint32_t maxPartitionCountIn,
+                                                     bool isHostVisible)
 {
+    isResultsInHostVisible = isHostVisible;
+
     rayCount = rayCountIn;
     maxPartitionCount = maxPartitionCountIn;
 
@@ -259,30 +260,44 @@ RayPartitioner::InitialBuffers RayPartitioner::Start(uint32_t rayCountIn,
     size_t tempMemSizeSort = DeviceAlgorithms::RadixSortTMSize<false, CommonKey, CommonIndex>(rayCount);
     size_t totalTempMemSize = std::max(tempMemSizeIf, tempMemSizeSort);
 
-    MemAlloc::AllocateMultiData(std::tie(dKeys[0], dKeys[1],
-                                            dIndices[0], dIndices[1],
-                                            dTempMemory),
-                                deviceMem,
-                                {rayCount, rayCount,
-                                rayCount, rayCount,
-                                totalTempMemSize});
+    if(isResultsInHostVisible)
+    {
+        MemAlloc::AllocateMultiData(std::tie(dKeys[0], dKeys[1],
+                                             dIndices[0], dIndices[1],
+                                             dTempMemory),
+                                    deviceMem,
+                                    {rayCount, rayCount,
+                                     rayCount, rayCount,
+                                     totalTempMemSize});
+
+        MemAlloc::AllocateMultiData(std::tie(hPartitionCount,
+                                             hPartitionKeys,
+                                             hPartitionStartOffsets),
+                                    hostMem,
+                                    {1, maxPartitionCount,
+                                    maxPartitionCount + 1});
+    }
+    else
+    {
+        MemAlloc::AllocateMultiData(std::tie(dKeys[0], dKeys[1],
+                                             dIndices[0], dIndices[1],
+                                             dTempMemory, dPartitionKeys,
+                                             dPartitionStartOffsets),
+                                    deviceMem,
+                                    {rayCount, rayCount,
+                                     rayCount, rayCount,
+                                     totalTempMemSize,
+                                     maxPartitionCount,
+                                     maxPartitionCount + 1});
+
+        MemAlloc::AllocateMultiData(std::tie(hPartitionCount),
+                                    hostMem, {1});
+    }
+
     dKeys[0] = dKeys[0].subspan(0, rayCount);
     dKeys[1] = dKeys[1].subspan(0, rayCount);
     dIndices[0] = dIndices[0].subspan(0, rayCount);
     dIndices[1] = dIndices[1].subspan(0, rayCount);
-
-    Span<uint32_t> hPartCount;
-    MemAlloc::AllocateMultiData(std::tie(hPartitionStartOffsets,
-                                         hPartitionKeys,
-                                         hPartCount),
-                                hostMem,
-                                {maxPartitionCount + 1,
-                                 maxPartitionCount,
-                                 1});
-
-    hPartitionStartOffsets = hPartitionStartOffsets.subspan(0, maxPartitionCount + 1);
-    hPartitionKeys = hPartitionKeys.subspan(0, maxPartitionCount);
-    hPartitionCount = Span<uint32_t, 1>(hPartCount.subspan(0, 1));
 
     return InitialBuffers
     {
@@ -302,7 +317,6 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
     using namespace MemAlloc;
     static_assert(sizeof(uint32_t) <= sizeof(CommonIndex));
 
-    assert(keyDataBitRange[0] != keyDataBitRange[1]);
     assert(keyBatchBitRange[0] != keyBatchBitRange[1]);
     assert(dKeysIn.size() == dIndicesIn.size());
 
@@ -314,18 +328,17 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
     Span<CommonIndex> dIndicesDB[2] = {dIndicesIn, dIndicesOut};
     if(!onlySortForBatches)
     {
+        assert(keyDataBitRange[0] != keyDataBitRange[1]);
         uint32_t outIndex = RadixSort<false>(Span<Span<CommonKey>, 2>(dKeysDB),
                                              Span<Span<CommonIndex>, 2>(dIndicesDB),
-                                             dTempMemory,
-                                             queue,
+                                             dTempMemory, queue,
                                              keyDataBitRange);
         if(outIndex == 1) std::swap(dKeysDB[0], dKeysDB[1]);
     }
     // Then sort batch portion
     uint32_t outIndex = RadixSort<false>(Span<Span<CommonKey>, 2>(dKeysDB),
                                          Span<Span<CommonIndex>, 2>(dIndicesDB),
-                                         dTempMemory,
-                                         queue,
+                                         dTempMemory, queue,
                                          keyBatchBitRange);
     if(outIndex == 1) std::swap(dKeysDB[0], dKeysDB[1]);
 
@@ -337,9 +350,8 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
     Span<uint32_t> dDenseSplitIndices = RepurposeAlloc<uint32_t>(dKeys[1]).subspan(0, partitionedRayCount);
 
     // Mark the split positions
-    const void* KCFindSplitsPtr = reinterpret_cast<const void*>(&KCFindSplits<FIND_SPLITS_TPB>);
-    uint32_t blockCount = (queue.RecommendedBlockCountPerSM(KCFindSplitsPtr, FIND_SPLITS_TPB, 0) *
-                           queue.SMCount());
+    uint32_t blockCount = queue.RecommendedBlockCountDevice(&KCFindSplits<FIND_SPLITS_TPB>,
+                                                            FIND_SPLITS_TPB, 0);
     queue.IssueExactKernel<KCFindSplits<FIND_SPLITS_TPB>>
     (
         "KCFindSplits",
@@ -351,11 +363,11 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
     );
 
     // Partition to host visible buffer
+    auto hPartCountStatic = Span<uint32_t, 1>(hPartitionCount.data(), 1);
     DeviceAlgorithms::BinaryPartition
     (
-        //hPartitionStartOffsets,
         dDenseSplitIndices,
-        hPartitionCount,
+        hPartCountStatic,
         dTempMemory,
         ToConstSpan(dSparseSplitIndices),
         queue,
@@ -365,28 +377,32 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
         }
     );
 
+    Span<uint32_t> hdPartitionStartOffsets = (isResultsInHostVisible) ? hPartitionStartOffsets : dPartitionStartOffsets;
+    Span<uint32_t> hdPartitionKeys = (isResultsInHostVisible) ? hPartitionKeys : dPartitionKeys;
+
     // Mark the split positions
     queue.IssueKernel<KCFindBinMatIds>
     (
         "KCFindBinMatIds",
         KernelIssueParams{.workCount = maxPartitionCount},
         //
-        hPartitionKeys,
-        hPartitionStartOffsets,
+        hdPartitionKeys,
+        hdPartitionStartOffsets,
         ToConstSpan(dDenseSplitIndices),
         ToConstSpan(dSortedKeys),
-        ToConstSpan(hPartitionCount),
+        ToConstSpan(hPartCountStatic),
         partitionedRayCount
     );
 
     return MultiPartitionOutput
     {
-        hPartitionStartOffsets,
-        hPartitionCount,
-        hPartitionKeys,
+        hPartCountStatic,
+        //
+        isResultsInHostVisible,
+        hdPartitionStartOffsets,
+        hdPartitionKeys,
+        //
         dSortedRayIndices,
         dSortedKeys
     };
-
-
 }

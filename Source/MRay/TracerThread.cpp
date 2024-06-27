@@ -15,6 +15,76 @@
 
 static constexpr RendererId INVALID_RENDERER_ID = RendererId(std::numeric_limits<uint32_t>::max());
 
+enum class FilterType
+{
+    BOX,
+    TENT,
+    GAUSSIAN,
+    MITCHELL_NETRAVALI
+};
+
+struct BoxParams        { Float radius; };
+struct TentParams       { Float radius; };
+struct GaussParams      { Float radius; Float alpha; };
+struct MitchellParams   { Float radius; Float b; Float c; };
+
+class FilterParameters : public Variant<BoxParams, TentParams,
+                                        GaussParams, MitchellParams>
+{
+    using Base = Variant<BoxParams, TentParams,
+                         GaussParams, MitchellParams>;
+
+    public:
+    enum E
+    {
+        BOX,
+        TENT,
+        GAUSSIAN,
+        MITCHELL_NETRAVALI,
+        END
+    };
+
+    static constexpr auto TYPE_NAME = "type";
+    static constexpr auto RADIUS_NAME = "radius";
+    static constexpr auto GAUSS_ALPHA_NAME = "alpha";
+    static constexpr auto MN_B_NAME = "b";
+    static constexpr auto MN_C_NAME = "b";
+
+    private:
+    static constexpr std::array<std::string_view, static_cast<size_t>(END)> Names =
+    {
+        "Box",
+        "Tent",
+        "Gaussian",
+        "Mitchell-Netravali"
+    };
+
+
+    public:
+    using Base::Base;
+
+    static constexpr std::string_view   ToString(E e);
+    static constexpr E                  FromString(std::string_view e);
+};
+
+constexpr std::string_view FilterParameters::ToString(E e)
+{
+    return Names[static_cast<uint32_t>(e)];
+}
+
+constexpr typename FilterParameters::E
+FilterParameters::FromString(std::string_view sv)
+{
+    using IntType = std::underlying_type_t<E>;
+    IntType i = 0;
+    for(const std::string_view& checkSV : Names)
+    {
+        if(checkSV == sv) return E(i);
+        i++;
+    }
+    return END;
+}
+
 struct TracerConfig
 {
     std::string dllName;

@@ -214,10 +214,9 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
 
     // Dedicate a block for each
     // concrete accelerator for copy
-    uint32_t blockCount = queue.SMCount() *
-        GPUQueue::RecommendedBlockCountPerSM(&KCGeneratePrimitiveKeys,
-                                             StaticThreadPerBlock1D(),
-                                             0);
+    uint32_t blockCount = queue.RecommendedBlockCountDevice(&KCGeneratePrimitiveKeys,
+                                                            StaticThreadPerBlock1D(),
+                                                            0);
     using namespace std::string_view_literals;
     queue.IssueExactKernel<KCGeneratePrimitiveKeys>
     (

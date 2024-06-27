@@ -45,6 +45,8 @@ namespace MathFunctions
 
     template <std::integral T>
     MRAY_HYBRID constexpr T     NextPowerOfTwo(T value);
+    template <std::integral T>
+    MRAY_HYBRID constexpr T     PrevPowerOfTwo(T value);
 }
 
 template <std::integral T>
@@ -158,3 +160,8 @@ MRAY_HYBRID constexpr T MathFunctions::NextPowerOfTwo(T value)
     return std::bit_ceil<T>(value);
 }
 
+template <std::integral T>
+MRAY_HYBRID constexpr T MathFunctions::PrevPowerOfTwo(T value)
+{
+    return std::bit_floor<T>(value);
+}

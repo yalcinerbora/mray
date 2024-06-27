@@ -216,9 +216,12 @@ void BaseAcceleratorLinear::CastRays(// Output
         auto idRange = Vector2ui(IdBits, IdBits + maxBitsUsedOnKey[1]);
         auto
         [
-            hPartitionOffsets,
             hPartitionCount,
+            //
+            isHostVisible,
+            hPartitionOffsets,
             hKeys,
+            //
             dIndices,
             dKeys
         ] = rayPartitioner.MultiPartition(dCurrentKeys,
@@ -226,6 +229,7 @@ void BaseAcceleratorLinear::CastRays(// Output
                                           idRange,
                                           batchRange,
                                           queue, false);
+        assert(isHostVisible == true);
         queue.Barrier().Wait();
         for(uint32_t pIndex = 0; pIndex < hPartitionCount[0]; pIndex++)
         {

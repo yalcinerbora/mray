@@ -42,17 +42,14 @@ static void WarpSynchronize()
     #ifdef __CUDA_ARCH__
 
     constexpr uint32_t MASK = LOGICAL_WARP_SIZE - 1;
-    static_assert(LOGICAL_WARP_SIZE == 1 ||
-                  LOGICAL_WARP_SIZE == 2 ||
-                  LOGICAL_WARP_SIZE == 4 ||
-                  LOGICAL_WARP_SIZE == 8 ||
-                  LOGICAL_WARP_SIZE == 16 ||
-                  LOGICAL_WARP_SIZE == 32,
+    static_assert(LOGICAL_WARP_SIZE ==  1 || LOGICAL_WARP_SIZE ==  2 ||
+                  LOGICAL_WARP_SIZE ==  4 || LOGICAL_WARP_SIZE ==  8 ||
+                  LOGICAL_WARP_SIZE == 16 || LOGICAL_WARP_SIZE == 32,
                   "Logical warps must be power of 2 and \"<32\"");
-    uint32_t localWarpId = threadIdx.x / LOGICAL_WARP_SIZE;
-    uint32_t localMask = MASK << localWarpId;
-
-    __syncwrap(localMask);
+    uint32_t localWarpId = threadIdx.x % WarpSize();
+    localWarpId /= LOGICAL_WARP_SIZE;
+    uint32_t localMask = MASK << (localWarpId * LOGICAL_WARP_SIZE);
+    __syncwarp(localMask);
     #endif
 }
 
@@ -270,9 +267,14 @@ class GPUQueueCUDA
     uint32_t            SMCount() const;
 
     MRAY_HYBRID
-    static uint32_t     RecommendedBlockCountPerSM(const void* kernelPtr,
-                                                   uint32_t threadsPerBlock,
-                                                   uint32_t sharedMemSize);
+    uint32_t            RecommendedBlockCountDevice(const void* kernelPtr,
+                                                    uint32_t threadsPerBlock,
+                                                    uint32_t sharedMemSize) const;
+
+    MRAY_HYBRID
+    static uint32_t     RecommendedBlockCountSM(const void* kernelPtr,
+                                                uint32_t threadsPerBlock,
+                                                uint32_t sharedMemSize);
 
     MRAY_HOST
     AnnotationHandle        ProfilerDomain() const;
@@ -584,9 +586,9 @@ uint32_t GPUQueueCUDA::SMCount() const
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t GPUQueueCUDA::RecommendedBlockCountPerSM(const void* kernelPtr,
-                                                  uint32_t threadsPerBlock,
-                                                  uint32_t sharedMemSize)
+uint32_t GPUQueueCUDA::RecommendedBlockCountSM(const void* kernelPtr,
+                                               uint32_t threadsPerBlock,
+                                               uint32_t sharedMemSize)
 {
     int numBlocks = 0;
     CUDA_CHECK(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&numBlocks,
@@ -597,13 +599,23 @@ uint32_t GPUQueueCUDA::RecommendedBlockCountPerSM(const void* kernelPtr,
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
+uint32_t GPUQueueCUDA::RecommendedBlockCountDevice(const void* kernelPtr,
+                                                      uint32_t threadsPerBlock,
+                                                      uint32_t sharedMemSize) const
+{
+    uint32_t blockPerSM = RecommendedBlockCountSM(kernelPtr, threadsPerBlock,
+                                                  sharedMemSize);
+    return multiprocessorCount* blockPerSM;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t GPUQueueCUDA::DetermineGridStrideBlock(const void* kernelPtr,
                                                 uint32_t sharedMemSize,
                                                 uint32_t threadCount,
                                                 uint32_t workCount) const
 {
     // TODO: Make better SM determination
-    uint32_t blockPerSM = RecommendedBlockCountPerSM(kernelPtr, threadCount, sharedMemSize);
+    uint32_t blockPerSM = RecommendedBlockCountSM(kernelPtr, threadCount, sharedMemSize);
     // Only call enough SM
     uint32_t totalRequiredBlocks = MathFunctions::DivideUp(workCount, threadCount);
     uint32_t requiredSMCount = (totalRequiredBlocks + blockPerSM - 1) / blockPerSM;

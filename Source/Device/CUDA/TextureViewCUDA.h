@@ -149,7 +149,7 @@ struct MRayToCudaTexType<MRayType, CudaType, 2>
 {
     static constexpr CudaType Convert(MRayType vec)
     {
-        return MRayType{.x = vec[0], .y = vec[1]};
+        return CudaType{.x = vec[0], .y = vec[1]};
     }
 };
 
@@ -158,7 +158,7 @@ struct MRayToCudaTexType<MRayType, CudaType, 3>
 {
     static constexpr CudaType Convert(MRayType vec)
     {
-        return MRayType{.x = vec[0], .y = vec[1], .z = vec[2]};
+        return CudaType{.x = vec[0], .y = vec[1], .z = vec[2]};
     }
 };
 
@@ -167,7 +167,7 @@ struct MRayToCudaTexType<MRayType, CudaType, 4>
 {
     static constexpr CudaType Convert(MRayType vec)
     {
-        return MRayType{.x = vec[0], .y = vec[1], .z = vec[2], .w = vec[3]};
+        return CudaType{.x = vec[0], .y = vec[1], .z = vec[2], .w = vec[3]};
     }
 };
 
@@ -254,6 +254,8 @@ class RWTextureViewCUDA
     public:
     class PixRef
     {
+        friend class RWTextureViewCUDA<DIM, T>;
+        public:
         // Texture channels
         static constexpr uint32_t Channels = VectorTypeToChannels::Find<T>;
         // Read channels (3Channel textures are actual 4 channel)
@@ -271,20 +273,21 @@ class RWTextureViewCUDA
         MRAY_GPU PixRef&    operator=(const T&);
     };
 
-    private:
+    static constexpr uint32_t Channels = PixRef::Channels;
+    using Type = T;
     using ReadConvertType = CudaTexToMRayType<T, typename PixRef::PaddedCudaType,
-                                              PixRef::Channels>;
+                                              Channels>;
 
     private:
-    cudaSurfaceObject_t     surfHandle;
+    cudaSurfaceObject_t surfHandle;
 
     public:
     // Full Texture object access
-    MRAY_HOST               RWTextureViewCUDA(cudaSurfaceObject_t t) : surfHandle(t) {}
+    MRAY_HOST       RWTextureViewCUDA(cudaSurfaceObject_t t) : surfHandle(t) {}
     // Write
-    MRAY_GPU PixRef         operator()(TextureExtent<DIM>);
+    MRAY_GPU PixRef operator()(TextureExtent<DIM>);
     // Read
-    MRAY_GPU Optional<T>    operator()(TextureExtent<DIM>) const;
+    MRAY_GPU T      operator()(TextureExtent<DIM>) const;
 };
 
 template<class T>
@@ -400,6 +403,8 @@ MRAY_GPU MRAY_GPU_INLINE
 typename RWTextureViewCUDA<D, T>::PixRef&
 RWTextureViewCUDA<D, T>::PixRef::operator=(const T& val)
 {
+    static_assert(D >= 1 && D <= 3, "At most 3D textures are supported");
+
     // Do some sanity check
     static_assert(sizeof(PaddedChannelType) == sizeof(PaddedCudaType));
     constexpr int size = sizeof(PaddedChannelType);
@@ -419,7 +424,7 @@ RWTextureViewCUDA<D, T>::PixRef::operator=(const T& val)
 
     if constexpr(D == 1)
     {
-        surf1DWrite<PaddedCudaType>
+        surf1Dwrite<PaddedCudaType>
         (
             t, surfHandle,
             static_cast<int>(ij) * size
@@ -427,7 +432,7 @@ RWTextureViewCUDA<D, T>::PixRef::operator=(const T& val)
     }
     else if constexpr(D == 2)
     {
-        surf2DWrite<PaddedCudaType>
+        surf2Dwrite<PaddedCudaType>
         (
             t, surfHandle,
             static_cast<int>(ij[0]) * size,
@@ -436,14 +441,14 @@ RWTextureViewCUDA<D, T>::PixRef::operator=(const T& val)
     }
     else if constexpr(D == 3)
     {
-        surf3DWrite<PaddedCudaType>
+        surf3Dwrite<PaddedCudaType>
         (
             t, surfHandle,
             static_cast<int>(ij[0]) * size,
             ij[1], ij[2]
         );
     }
-    static_assert(D >= 1 && D <= 3, "At most 3D textures are supported");
+    return *this;
 }
 
 template<uint32_t D, class T>
@@ -451,12 +456,12 @@ MRAY_GPU MRAY_GPU_INLINE
 typename RWTextureViewCUDA<D, T>::PixRef
 RWTextureViewCUDA<D, T>::operator()(TextureExtent<D> ij)
 {
-    return PixRef(*this, ij);
+    return PixRef(surfHandle, ij);
 }
 
 template<uint32_t D, class T>
 MRAY_GPU MRAY_GPU_INLINE
-Optional<T> RWTextureViewCUDA<D, T>::operator()(TextureExtent<D> ij) const
+T RWTextureViewCUDA<D, T>::operator()(TextureExtent<D> ij) const
 {
     using PaddedCudaType = typename PixRef::PaddedCudaType;
     constexpr int size = sizeof(PaddedCudaType);
@@ -472,7 +477,7 @@ Optional<T> RWTextureViewCUDA<D, T>::operator()(TextureExtent<D> ij) const
     }
     else if constexpr(D == 2)
     {
-        t = surf2DWrite<PaddedCudaType>
+        t = surf2Dread<PaddedCudaType>
         (
             surfHandle,
             static_cast<int>(ij[0]) * size,
@@ -481,7 +486,7 @@ Optional<T> RWTextureViewCUDA<D, T>::operator()(TextureExtent<D> ij) const
     }
     else if constexpr(D == 3)
     {
-        t = surf3DWrite<PaddedCudaType>
+        t = surf3Dread<PaddedCudaType>
         (
             surfHandle,
             static_cast<int>(ij[0]) * size,
