@@ -5,6 +5,8 @@
 #include <numeric>
 
 #include "Tracer/Distributions.h"
+#include "Tracer/DistributionFunctions.h"
+
 #include "GTestWrappers.h"
 
 #include "Device/GPUSystem.hpp"
@@ -204,5 +206,43 @@ TEST(PiecewiseConstant2D, ZeroVariance)
     static constexpr Float SAMPLE_COUNT_RECIP = Float(1) / SAMPLE_COUNT;
     monteCarlo *= SAMPLE_COUNT_RECIP;
     EXPECT_NEAR(monteCarlo, integralExpected, GiganticEpsilon);
+}
 
+TEST(Linear, ZeroVariance)
+{
+    static constexpr uint32_t SAMPLE_COUNT = 128;
+    static constexpr uint32_t FUNCTION_COUNT = 16;
+    // Function overall min/max
+    static constexpr Float FUNCTION_MIN = -10;
+    static constexpr Float FUNCTION_MAX = 10;
+
+    std::mt19937 rng(332);
+    using UniformDist = std::uniform_real_distribution<Float>;
+
+    UniformDist dist01;
+    UniformDist distCD(FUNCTION_MIN, FUNCTION_MAX);
+    for(uint32_t f = 0; f < FUNCTION_COUNT; f++)
+    {
+        Float c = distCD(rng);
+        Float d = distCD(rng);
+        const Float trapz = (c + d) * Float(0.5);
+
+        Float estimateTotal = 0;
+        for(uint32_t i = 0; i < SAMPLE_COUNT; i++)
+        {
+            Float xi = dist01(rng);
+
+            auto result = Distributions::SampleLine(xi, c, d);
+            // Evaluate the function
+            Float eval = MathFunctions::Lerp(c, d, result.sampledResult);
+            Float estimate = eval / result.pdf;
+            // Since this is zero variance estimate,
+            // the estimate should exactly match
+            // actual integral
+            EXPECT_FLOAT_EQ(trapz, estimate);
+            estimateTotal += estimate;
+        }
+        Float total = estimateTotal / Float(SAMPLE_COUNT);
+        EXPECT_NEAR(trapz, total, MathConstants::LargeEpsilon<Float>());
+    }
 }

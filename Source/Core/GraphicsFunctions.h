@@ -72,7 +72,12 @@ namespace GraphicsFunctions
                                                      const Vector2& sinCosPhi);
     MRAY_HYBRID Vector2     CartesianToUnitSpherical(const Vector3&);
 
-    //
+    // 2D Vairant of spherical coordinates
+    MRAY_HYBRID Vector2     PolarToCartesian(const Vector2&);
+    MRAY_HYBRID Vector2     CartesianToPolar(const Vector2&);
+    MRAY_HYBRID Vector2     UnitPolarToCartesian(Float);
+    MRAY_HYBRID Float       CartesianToUnitPolar(const Vector2&);
+
     // Cocentric Octohedral Mapping
     // https://fileadmin.cs.lth.se/graphics/research/papers/2008/simdmapping/clarberg_simdmapping08_preprint.pdf
     MRAY_HYBRID Vector2     DirectionToCocentricOctohedral(const Vector3&);
@@ -293,6 +298,36 @@ Vector2 CartesianToUnitSpherical(const Vector3& xyz)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
+Vector2 PolarToCartesian(const Vector2& polarRT)
+{
+    const auto& [r, theta] = polarRT.AsArray();
+    Float x = r * std::cos(theta);
+    Float y = r * std::sin(theta);
+    return Vector2(x, y);
+}
+MRAY_HYBRID MRAY_CGPU_INLINE
+Vector2 CartesianToPolar(const Vector2& xy)
+{
+    Float r = xy.Length();
+    Float theta = std::atan2(xy[1], xy[0]);
+    return Vector2(r, theta);
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Vector2 UnitPolarToCartesian(Float theta)
+{
+    Float x = std::cos(theta);
+    Float y = std::sin(theta);
+    return Vector2(x, y);
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float CartesianToUnitPolar(const Vector2& xy)
+{
+    return std::atan2(xy[1], xy[0]);
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
 Vector2 DirectionToCocentricOctohedral(const Vector3& dir)
 {
     using namespace MathConstants;
@@ -337,7 +372,7 @@ Vector3 CocentricOctohedralToDirection(const Vector2& st)
 
     // Clang signbit definition is only on std namespace
     // this is a crappy workaround
-    #ifndef __CUDA_ARCH__
+    #ifndef MRAY_DEVICE_CODE_PATH
         using namespace std;
     #endif
 

@@ -299,7 +299,6 @@ SemaphoreVariant AccumImageStage::IssueAccumulation(SemaphoreVariant prevCmdSign
     // ============= //
     //   SUBMISSON   //
     // ============= //
-    uint64_t waitCounter = section.waitCounter;
     uint64_t signalCounter = section.waitCounter + 1;
     std::array<VkSemaphoreSubmitInfo, 1> waitSemaphores =
     {

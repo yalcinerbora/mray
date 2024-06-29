@@ -451,7 +451,7 @@ Quat<T> TransformGen::ToSpaceQuat(const Vector<3, T>& xIn,
     //// https://stackoverflow.com/questions/63734840/how-to-convert-rotation-matrix-to-quaternion
     //// Clang min definition is only on std namespace
     //// this is a crappy workaround
-    //#ifndef __CUDA_ARCH__
+    //#ifndef MRAY_DEVICE_CODE_PATH
     //    using namespace std;
     //#endif
     //// Our sign is one (according to the above link)

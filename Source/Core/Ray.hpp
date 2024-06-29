@@ -23,7 +23,7 @@ constexpr bool RayT<T>::IntersectsSphere(Vector<3, T>& intersectPos, T& t,
 {
     // Clang min definition is only on std namespace
     // this is a crappy workaround
-    #ifndef __CUDA_ARCH__
+    #ifndef MRAY_DEVICE_CODE_PATH
     using namespace std;
     #endif
 
@@ -192,7 +192,7 @@ constexpr bool RayT<T>::IntersectsAABB(Vector<2, T>& tOut,
                                        const Vector<2, T>& tMinMax) const
 {
     // CPU code max/min is on std namespace but CUDA has its global namespace
-    #ifndef __CUDA_ARCH__
+    #ifndef MRAY_DEVICE_CODE_PATH
     using namespace std;
     #endif
 
@@ -308,7 +308,7 @@ RayT<float> RayT<float>::Nudge(const Vector3f& dir) const
                             INT_SCALE * dir[2]);
 
     Vector3f pointI;
-    #ifdef __CUDA_ARCH__
+    #ifdef MRAY_DEVICE_CODE_PATH_CUDA
         pointI[0] = __int_as_float(__float_as_int(p[0]) + ((p[0] < 0) ? -ofi[0] : ofi[0]));
         pointI[1] = __int_as_float(__float_as_int(p[1]) + ((p[1] < 0) ? -ofi[1] : ofi[1]));
         pointI[2] = __int_as_float(__float_as_int(p[2]) + ((p[2] < 0) ? -ofi[2] : ofi[2]));

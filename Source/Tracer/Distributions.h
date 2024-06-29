@@ -4,6 +4,7 @@
 #include <type_traits>
 
 #include "Core/Types.h"
+
 #include "TracerTypes.h"
 
 #include "Device/GPUAlgBinarySearch.h"

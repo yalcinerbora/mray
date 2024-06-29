@@ -1,6 +1,7 @@
 #include "ReconFilter.h"
 #include "RayPartitioner.h"
 #include "Random.h"
+#include "DistributionFunctions.h"
 
 #include "Device/GPUSystem.hpp"
 #include "Device/GPUAlgBinaryPartition.h"
@@ -13,29 +14,32 @@
 
 #ifdef MRAY_GPU_BACKEND_CUDA
 
-#include <cub/block/block_reduce.cuh>
+    #include <cub/block/block_reduce.cuh>
 
 #else
-#error "Only CUDA Version of Reconstruction filter is implemented"
+
+    #error "Only CUDA Version of Reconstruction filter is implemented"
+
 #endif
 
-class BoxFilterFunctor
+class BoxFilter
 {
     private:
     Float   radius;
 
     public:
     // Constructors & Destructor
-    MRAY_HOST
-    BoxFilterFunctor(Float radius);
+    MRAY_HOST           BoxFilter(Float radius);
     //
     MRAY_HYBRID
-    Float operator()(const Vector2& duv) const;
+    Float               Evaluate(const Vector2& duv) const;
     MRAY_HYBRID
-    SampleT<Vector2> Sample(const Vector2& xi) const;
+    SampleT<Vector2>    Sample(const Vector2& xi) const;
+    MRAY_HYBRID
+    Float               Pdf(const Vector2& duv) const;
 };
 
-class TentFilterFunctor
+class TentFilter
 {
     private:
     Float radius;
@@ -43,110 +47,180 @@ class TentFilterFunctor
 
     public:
     // Constructors & Destructor
-    MRAY_HOST
-    TentFilterFunctor(Float radius);
+    MRAY_HOST           TentFilter(Float radius);
     //
     MRAY_HYBRID
-    Float operator()(const Vector2& duv) const;
+    Float               Evaluate(const Vector2& duv) const;
+    MRAY_HYBRID
+    SampleT<Vector2>    Sample(const Vector2& xi) const;
+    MRAY_HYBRID
+    Float               Pdf(const Vector2& duv) const;
 };
 
-class GaussianFilterFunctor
+class GaussianFilter
 {
     private:
     Float radius;
-    Float negAlpha;
-    Float exponent;
+    Float sigma;
 
     public:
     // Constructors & Destructor
-    MRAY_HOST
-    GaussianFilterFunctor(Float radius, Float alpha);
+    MRAY_HOST           GaussianFilter(Float radius);
     //
     MRAY_HYBRID
-    Float operator()(const Vector2& duv) const;
+    Float               Evaluate(const Vector2& duv) const;
+    MRAY_HYBRID
+    SampleT<Vector2>    Sample(const Vector2& xi) const;
+    MRAY_HYBRID
+    Float               Pdf(const Vector2& duv) const;
 };
 
-class MitchellNetravaliFilterFunctor
+class MitchellNetravaliFilter
 {
+    static constexpr auto MIS_MID       = Float(0.97619047619);
+    static constexpr auto MIS_SIDES     = Float(0.0119047619048);
+    static constexpr auto SIDE_MEAN     = Float(1.429);
+    static constexpr auto SIDE_STD_DEV  = Float(0.4);
+    static constexpr auto MID_STD_DEV   = Float(0.15);
+    // Wow this works, compile time float comparison
+    static_assert((MIS_MID + 2 * MIS_SIDES) == 1, "Weights are not normalized!");
+
     private:
     Float   radius;
     Float   radiusRecip;
     Vector4 coeffs01;
     Vector4 coeffs12;
+    // Modified values via radius
+    Float   midSigma;
+    Float   sideSigma;
+    Float   sideMean;
 
     public:
     // Constructors & Destructor
-    MRAY_HOST
-    MitchellNetravaliFilterFunctor(Float radius, Float b, Float c);
+    MRAY_HOST           MitchellNetravaliFilter(Float radius, Float b, Float c);
     //
     MRAY_HYBRID
-    Float operator()(const Vector2& duv) const;
-
-    //MRAY_HYBRID
-    //SampleT<Vector2> Sample(const Vector2& xi) const;
+    Float               Evaluate(const Vector2& duv) const;
+    MRAY_HYBRID
+    SampleT<Vector2>    Sample(const Vector2& xi) const;
+    MRAY_HYBRID
+    Float               Pdf(const Vector2& duv) const;
 };
 
 MRAY_HOST inline
-BoxFilterFunctor::BoxFilterFunctor(Float r)
+BoxFilter::BoxFilter(Float r)
     : radius(r)
 {}
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float BoxFilterFunctor::operator()(const Vector2& duv) const
+Float BoxFilter::Evaluate(const Vector2& duv) const
 {
     Vector2 t = duv.Abs();
     return (t[0] <= radius || t[1] <= radius) ? Float(1) : Float(0);
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<Vector2> BoxFilterFunctor::Sample(const Vector2& xi) const
+SampleT<Vector2> BoxFilter::Sample(const Vector2& xi) const
 {
-    Vector2 range = (xi * Float(2) - Float(1)) * radius;
+    using namespace Distributions;
+    auto r0 = SampleUniformRange(xi[0], -radius, radius);
+    auto r1 = SampleUniformRange(xi[1], -radius, radius);
     return SampleT<Vector2>
     {
-        .sampledResult = range,
-        .pdf = Float(1)
+        .sampledResult = Vector2(r0.sampledResult, r1.sampledResult),
+        .pdf = r0.pdf * r1.pdf
     };
 }
 
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float BoxFilter::Pdf(const Vector2& duv) const
+{
+    using namespace Distributions;
+    return (PDFUniformRange(duv[0], -radius, radius) *
+            PDFUniformRange(duv[1], -radius, radius));
+}
+
 MRAY_HOST inline
-TentFilterFunctor::TentFilterFunctor(Float r)
+TentFilter::TentFilter(Float r)
     : radius(r)
     , recipRadius(1.0f / radius)
 {}
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float TentFilterFunctor::operator()(const Vector2& duv) const
+Float TentFilter::Evaluate(const Vector2& duv) const
 {
-    Vector2 t = Vector2(radius) - duv.Abs();
-    t *= recipRadius;
-    return t.Multiply();
+    using namespace MathFunctions;
+    Vector2 t = (duv * recipRadius).Abs();
+    Float x = Lerp<Float>(1, 0, t[0]);
+    Float y = Lerp<Float>(1, 0, t[1]);
+    return x * y;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+SampleT<Vector2> TentFilter::Sample(const Vector2& xi) const
+{
+    using namespace Distributions;
+    auto s0 = SampleTent(xi[0], -radius, radius);
+    auto s1 = SampleTent(xi[1], -radius, radius);
+    return SampleT<Vector2>
+    {
+        .sampledResult = Vector2(s0.sampledResult, s1.sampledResult),
+        .pdf = s0.pdf * s1.pdf
+    };
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float TentFilter::Pdf(const Vector2& duv) const
+{
+    using namespace Distributions;
+    Float x = PDFTent(duv[0], -radius, radius);
+    Float y = PDFTent(duv[0], -radius, radius);
+    return x * y;
 }
 
 MRAY_HOST inline
-GaussianFilterFunctor::GaussianFilterFunctor(Float r, Float alpha)
-    : radius(radius)
-    , negAlpha(-alpha)
-    , exponent(std::exp(negAlpha * r * r))
+GaussianFilter::GaussianFilter(Float r)
+    : radius(r)
+    // ~%95 of samples lies between [-r,r]
+    , sigma(r * Float(0.5))
 {}
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float GaussianFilterFunctor::operator()(const Vector2& duv) const
+Float GaussianFilter::Evaluate(const Vector2& duv) const
 {
-    auto Gauss1D = [this](Float x)
+    return (MathFunctions::Gaussian(duv[0], sigma) *
+            MathFunctions::Gaussian(duv[1], sigma));
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+SampleT<Vector2> GaussianFilter::Sample(const Vector2& xi) const
+{
+    using namespace Distributions;
+    auto r0 = SampleGaussian(xi[0], sigma);
+    auto r1 = SampleGaussian(xi[1], sigma);
+    return SampleT<Vector2>
     {
-        return std::exp(negAlpha * x * x);
+        .sampledResult = Vector2(r0.sampledResult,
+                                 r1.sampledResult),
+        .pdf = r0.pdf * r1.pdf
     };
-    Vector2 gauss2D = Vector2(Gauss1D(duv[0]) - exponent,
-                              Gauss1D(duv[1]) - exponent);
-    gauss2D = Vector2::Max(gauss2D, Float(0));
-    return gauss2D.Multiply();
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float GaussianFilter::Pdf(const Vector2& duv) const
+{
+    using namespace Distributions;
+    return (PDFGaussian(duv[0], sigma) *
+            PDFGaussian(duv[1], sigma));
 }
 
 MRAY_HOST inline
-MitchellNetravaliFilterFunctor::MitchellNetravaliFilterFunctor(Float r, Float b, Float c)
+MitchellNetravaliFilter::MitchellNetravaliFilter(Float r, Float b, Float c)
     : radius(r)
     , radiusRecip(Float(1) / radius)
+    , midSigma(MID_STD_DEV * radiusRecip * Float(2))
+    , sideSigma(SIDE_STD_DEV * radiusRecip* Float(2))
+    , sideMean(SIDE_MEAN * radiusRecip * Float(2))
 {
     static constexpr Float F = Float(1) / Float(6);
     coeffs01[0] = F * (Float(12) - Float(9) * b - Float(6) * c);
@@ -161,7 +235,7 @@ MitchellNetravaliFilterFunctor::MitchellNetravaliFilterFunctor(Float r, Float b,
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float MitchellNetravaliFilterFunctor::operator()(const Vector2& duv) const
+Float MitchellNetravaliFilter::Evaluate(const Vector2& duv) const
 {
     auto Mitchell1D = [this](Float x)
     {
@@ -182,6 +256,89 @@ Float MitchellNetravaliFilterFunctor::operator()(const Vector2& duv) const
     };
     Vector2 mitchell2D = Vector2(Mitchell1D(duv[0]), Mitchell1D(duv[1]));
     return mitchell2D.Multiply();
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+SampleT<Vector2> MitchellNetravaliFilter::Sample(const Vector2& xi) const
+{
+    // And here we go
+    // Couldn't find a sampling routine for M-N filter.
+    // Easy to calculate derivative for CDF, but dunno how to invert that thing.
+    // Instead, I'll do a MIS sampling with 3 gaussians. (We could do a uniform
+    // sampling and call it a day but w/e)
+    //
+    // Hand crafted two gaussians, one for the middle part and other for the negative
+    // this is only usable for b = 0.333, c = 0.333. It may get worse when b/c changes.
+    // I don't know how long desmos links stay, but here is the calculation.
+    // https://www.desmos.com/calculator/ijr8qi2dcy
+
+    // Sampling is somewhat costly here, instead of doing MIS for each dimension,
+    // sample in spherical coordinates (disk)
+    using namespace Distributions;
+    auto thetaSample = SampleUniformRange(xi[0], 0, MathConstants::Pi<Float>());
+
+    std::array<Float, 3> weights{MIS_SIDES, MIS_MID, MIS_SIDES};
+    auto bisected = BisectSample(xi[1], Span<Float, 3>(weights.data(), 3), true);
+    std::array<Float, 3> pdfs;
+    Float radiusSample;
+    switch(bisected.first)
+    {
+        case 0:
+        {
+            auto r = SampleGaussian(bisected.second, sideSigma, -sideMean);
+            pdfs[0] = r.pdf;
+            pdfs[1] = PDFGaussian(r.sampledResult, midSigma);
+            pdfs[2] = PDFGaussian(r.sampledResult, sideSigma, sideMean);
+            radiusSample = r.sampledResult;
+            break;
+        }
+        case 1:
+        {
+            auto r = SampleGaussian(bisected.second, midSigma);
+            pdfs[0] = PDFGaussian(r.sampledResult, sideSigma, -sideMean);
+            pdfs[1] = r.pdf;
+            pdfs[2] = PDFGaussian(r.sampledResult, sideSigma, sideMean);
+            radiusSample = r.sampledResult;
+            break;
+        }
+        case 2:
+        {
+            auto r = SampleGaussian(bisected.second, sideSigma, sideMean);
+            pdfs[0] = PDFGaussian(r.sampledResult, sideSigma, -sideMean);
+            pdfs[1] = PDFGaussian(r.sampledResult, midSigma);
+            pdfs[2] = r.pdf;
+            radiusSample = r.sampledResult;
+            break;
+        }
+        default: assert(false);
+    }
+    Float misWeight = MIS::BalanceCancelled(Span<Float, 3>(pdfs.data(), 3),
+                                            Span<Float, 3>(weights.data(), 3));
+
+    // Convert
+    using namespace GraphicsFunctions;
+    Vector2 xy = PolarToCartesian(Vector2(radiusSample, thetaSample.sampledResult));
+    return SampleT<Vector2>
+    {
+        .sampledResult = xy,
+        .pdf = misWeight
+    };
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float MitchellNetravaliFilter::Pdf(const Vector2& duv) const
+{
+    using namespace Distributions;
+    Float x = duv.Length();
+    std::array<Float, 3> weights{MIS_SIDES, MIS_MID, MIS_SIDES};
+    std::array<Float, 3> pdfs
+    {
+        PDFGaussian(x, sideSigma, -sideMean),
+        PDFGaussian(x, midSigma),
+        PDFGaussian(x, sideSigma, sideMean)
+    };
+    return MIS::BalanceCancelled(Span<Float, 3>(pdfs.data(), 3),
+                                 Span<Float, 3>(weights.data(), 3));
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -212,7 +369,6 @@ Vector2i FilterRadiusPixelRange(int32_t wh)
     Vector2i range(-(wh - 1) / 2, (wh + 2) / 2);
     return range;
 }
-
 
 // TODO: Should we dedicate a warp per pixel?
 //template <uint32_t TPB, uint32_t LOGICAL_WARP_SIZE, class Filter>
@@ -423,7 +579,7 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const SubImageSpan<3> img,
                           MRAY_GRID_CONSTANT const Span<const Vector2> dImgCoords,
                           // Constants
                           MRAY_GRID_CONSTANT const Float scalarWeightMultiplier,
-                          MRAY_GRID_CONSTANT const Filter FilterFunc)
+                          MRAY_GRID_CONSTANT const Filter filter)
 {
     KernelCallParams kp;
     assert(dStartOffsets.size() == dPixelIds.size());
@@ -479,9 +635,9 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const SubImageSpan<3> img,
                 uint32_t readIndex = dIndices[sampleIndex];
                 Vector3 sampleVal = dValues[readIndex];
                 Vector2 sampleCoord = dImgCoords[readIndex];
-                Float filter = FilterFunc(pixCoords - sampleCoord) * scalarWeightMultiplier;
-                sampleVal *= filter;
-                value = Vector4(sampleVal, filter);
+                Float weight = filter.Evaluate(pixCoords - sampleCoord) * scalarWeightMultiplier;
+                sampleVal *= weight;
+                value = Vector4(sampleVal, weight);
             }
 
             totalValue += WarpReduceVec4(sReduceMem[localWarpId]).Sum(value);
@@ -514,11 +670,11 @@ void ReconFilterGenericRGB(// Output
                            // Constants
                            Float scalarWeightMultiplier,
                            Float filterRadius,
-                           Filter FilterFuncDevice,
+                           Filter filter,
                            const GPUSystem& gpuSystem)
 {
     // Get algo temp buffers
-    assert(inValues.size() == imgCoords.size());
+    assert(dValues.size() == dImgCoords.size());
     uint32_t elementCount = static_cast<uint32_t>(dValues.size());
 
     uint32_t wh = FilterRadiusToPixelWH(filterRadius);
@@ -548,7 +704,8 @@ void ReconFilterGenericRGB(// Output
         img.Resolution()
     );
 
-    Vector2ui sortRange = Vector2ui(0, BitFunctions::RequiredBitsToRepresent(maxPartitionCount));
+    using namespace BitFunctions;
+    Vector2ui sortRange = Vector2ui(0, RequiredBitsToRepresent(maxPartitionCount));
     auto
     [
         hPartitionCount,
@@ -609,11 +766,9 @@ void ReconFilterGenericRGB(// Output
             dPartitionIndices,
             // Inputs Accessed by SampleId
             dX, dY,
-            //dValues,
-            //dImgCoords,
             // Constants
             scalarWeightMultiplier,
-            FilterFuncDevice
+            filter
         );
     };
     constexpr std::array WK =
@@ -650,7 +805,7 @@ void MultiPassReconFilterGenericRGB(// Output
                                     uint32_t parallelHint,
                                     Float scalarWeightMultiplier,
                                     Float filterRadius,
-                                    Filter FilterFunc,
+                                    Filter filter,
                                     const GPUSystem& gpuSystem)
 {
     // This partition-based design uses too much memory
@@ -686,14 +841,14 @@ void MultiPassReconFilterGenericRGB(// Output
         ReconFilterGenericRGB(img, partitioner,
                               dLocalValues, dLocalImgCoords,
                               scalarWeightMultiplier, filterRadius,
-                              FilterFunc, gpuSystem);
+                              filter, gpuSystem);
     }
 }
 
 template<class Filter>
 void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
                          uint32_t seed, const GPUSystem& gpuSystem,
-                         Filter FilterFunc)
+                         Filter filter)
 {
     // TODO: Textures should be partitioned with respect to
     // devices, so that we can launch kernel from those devices
@@ -719,7 +874,7 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
 
     // Find maximum block count for state allocation
     static constexpr uint32_t SPP = 64;
-    uint32_t blockCount = queue.RecommendedBlockCountDevice(&KCGenerateMipmaps<BoxFilterFunctor>,
+    uint32_t blockCount = queue.RecommendedBlockCountDevice(&KCGenerateMipmaps<Filter>,
                                                             THREAD_PER_BLOCK, 0);
     uint32_t stateCount = blockCount * StaticThreadPerBlock1D();
 
@@ -741,27 +896,26 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
         state[0] = hostSeeder();
         state[1] = hostSeeder();
     }
-    Span<RNGState> hRNGSates(rngStates);
-    queue.MemcpyAsync(dRNGStates, ToConstSpan(hRNGSates));
 
     using namespace std::string_view_literals;
-    queue.IssueExactKernel<KCGenerateMipmaps<BoxFilterFunctor>>
-        (
-            "KCGenerateMipmaps<Box>"sv,
-            KernelExactIssueParams
-            {
-                .gridSize = blockCount,
-                .blockSize = THREAD_PER_BLOCK
-            },
-            dSufViews,
-            dResolutions,
-            dRNGStates,
-            SPP,
-            FilterFunc
-        );
+    Span<RNGState> hRNGSates(rngStates);
+    queue.MemcpyAsync(dRNGStates, ToConstSpan(hRNGSates));
+    queue.IssueExactKernel<KCGenerateMipmaps<Filter>>
+    (
+        "KCGenerateMipmaps"sv,
+        KernelExactIssueParams
+        {
+            .gridSize = blockCount,
+            .blockSize = THREAD_PER_BLOCK
+        },
+        dSufViews,
+        dResolutions,
+        dRNGStates,
+        SPP,
+        filter
+    );
     queue.Barrier().Wait();
 }
-
 
 std::string_view ReconstructionFilterBox::TypeName()
 {
@@ -778,7 +932,7 @@ ReconstructionFilterBox::ReconstructionFilterBox(const GPUSystem& system,
 void ReconstructionFilterBox::GenerateMips(const std::vector<MipArray<SurfRefVariant>>& textures,
                                            uint32_t seed) const
 {
-    GenerateMipsGeneric(textures, seed, gpuSystem, BoxFilterFunctor(filterRadius));
+    GenerateMipsGeneric(textures, seed, gpuSystem, BoxFilter(filterRadius));
 }
 
 void ReconstructionFilterBox::ReconstructionFilterRGB(// Output
@@ -794,6 +948,30 @@ void ReconstructionFilterBox::ReconstructionFilterRGB(// Output
 {
     MultiPassReconFilterGenericRGB(img, partitioner, dValues, dImgCoords,
                                    parallelHint, scalarWeightMultiplier,
-                                   filterRadius, BoxFilterFunctor(filterRadius),
+                                   filterRadius, BoxFilter(filterRadius),
+                                   gpuSystem);
+}
+
+void ReconstructionFilterMitchell::GenerateMips(const std::vector<MipArray<SurfRefVariant>>& textures,
+                                                uint32_t seed) const
+{
+    GenerateMipsGeneric(textures, seed, gpuSystem,
+                        MitchellNetravaliFilter(filterRadius, b, c));
+}
+
+void ReconstructionFilterMitchell::ReconstructionFilterRGB(// Output
+                                                           const SubImageSpan<3>& img,
+                                                           // I-O
+                                                           RayPartitioner& partitioner,
+                                                           // Input
+                                                           const Span<const Vector3>& dValues,
+                                                           const Span<const Vector2>& dImgCoords,
+                                                           // Constants
+                                                           uint32_t parallelHint,
+                                                           Float scalarWeightMultiplier) const
+{
+    MultiPassReconFilterGenericRGB(img, partitioner, dValues, dImgCoords,
+                                   parallelHint, scalarWeightMultiplier,
+                                   filterRadius, MitchellNetravaliFilter(filterRadius, b, c),
                                    gpuSystem);
 }

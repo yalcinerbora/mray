@@ -17,6 +17,11 @@
 
     #define MRAY_GPU_INLINE __forceinline__
 
+    #ifdef __CUDA_ARCH__
+        #define MRAY_DEVICE_CODE_PATH
+        #define MRAY_DEVICE_CODE_PATH_CUDA
+    #endif
+
 #else
 
     #define MRAY_GPU_INLINE inline
@@ -36,7 +41,7 @@
 #endif
 
 // We are on Device Compiler
-#ifdef __CUDA_ARCH__
+#ifdef MRAY_DEVICE_CODE_PATH
     #define UNROLL_LOOP _Pragma("unroll")
     #define UNROLL_LOOP_COUNT(count) _Pragma("unroll")(count)
 

@@ -143,7 +143,7 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
     // Clang signbit definition is only on std namespace
     // this is a crappy workaround, since this is only a device function
     // but clang gives an error
-    #ifndef __CUDA_ARCH__
+    #ifndef MRAY_DEVICE_CODE_PATH
     using namespace std;
     #endif
 

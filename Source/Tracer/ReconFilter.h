@@ -114,8 +114,33 @@ class ReconstructionFilterBox : public ReconstructionFilterI
                                     // Constants
                                     uint32_t parallelHint,
                                     Float scalarWeightMultiplier) const override;
+};
 
-    //GenericAttribInfoList  AttributeInfo() const;
-    //void                   SetAttribute(uint32_t attributeIndex,
-    //                                    TransientData data);
+class ReconstructionFilterMitchell : public ReconstructionFilterI
+{
+    private:
+    const GPUSystem&    gpuSystem;
+    Float               filterRadius;
+    Float               b;
+    Float               c;
+
+    public:
+    static std::string_view TypeName();
+    // Constructors & Destructor
+    ReconstructionFilterMitchell(const GPUSystem&,
+                                 Float filterRadius,
+                                 Float b, Float c);
+    //
+    void    GenerateMips(const std::vector<MipArray<SurfRefVariant>>&,
+                         uint32_t seed) const override;
+    void    ReconstructionFilterRGB(// Output
+                                    const SubImageSpan<3>& img,
+                                    // I-O
+                                    RayPartitioner& partitioner,
+                                    // Input
+                                    const Span<const Vector3>& dValues,
+                                    const Span<const Vector2>& dImgCoords,
+                                    // Constants
+                                    uint32_t parallelHint,
+                                    Float scalarWeightMultiplier) const override;
 };
