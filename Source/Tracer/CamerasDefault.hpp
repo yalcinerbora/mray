@@ -61,7 +61,7 @@ RaySample CameraPinhole::SampleRay(// Input
     // Initialize Ray
     return RaySample
     {
-        .sampledResult =
+        .value =
         {
             .ray = Ray(rayDir, position),
             .tMinMax = nearFar,

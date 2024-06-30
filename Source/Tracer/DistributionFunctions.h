@@ -165,7 +165,7 @@ SampleT<Float> Common::SampleGaussian(Float xi, Float sigma, Float mu)
 
     return SampleT<Float>
     {
-        .sampledResult = x,
+        .value = x,
         .pdf = PDFGaussian(x, sigma, mu)
     };
 }
@@ -192,7 +192,7 @@ SampleT<Float> Common::SampleLine(Float xi, Float c, Float d)
     Float x = (c + d) * xi / denom;
     return SampleT<Float>
     {
-        .sampledResult = x,
+        .value = x,
         .pdf = normVal * Lerp(c, d, x)
     };
 }
@@ -217,7 +217,7 @@ SampleT<Float> Common::SampleTent(Float xi, Float a, Float b)
     auto [index, localXi] = BisectSample2(xi, Vector2(-a, b), false);
     localXi = (index == 0) ? (PrevFloat<Float>(1) - localXi) : localXi;
     SampleT<Float> result = SampleLine(localXi, 1, 0);
-    Float& x = result.sampledResult;
+    Float& x = result.value;
     x = (index == 0) ? (x * a) : (x * b);
     result.pdf /= (b - a);
     return result;
@@ -236,7 +236,7 @@ SampleT<Float> Common::SampleUniformRange(Float xi, Float a, Float b)
 {
     return SampleT<Float>
     {
-        .sampledResult = xi * (b - a) + a,
+        .value = xi * (b - a) + a,
         .pdf = Float(1) / (b - a)
     };
 }
@@ -269,7 +269,7 @@ SampleT<Vector3> Common::SampleCosDirection(const Vector2& xi)
     // Finally the result!
     return SampleT<Vector3>
     {
-        .sampledResult = dir,
+        .value = dir,
         .pdf = pdf
     };
 }
@@ -299,7 +299,7 @@ SampleT<Vector3> Common::SampleUniformDirection(const Vector2& xi)
     constexpr Float pdf = InvPi<Float>() * Float{0.5};
     return SampleT<Vector3>
     {
-        .sampledResult = dir,
+        .value = dir,
         .pdf = pdf
     };
 }
@@ -402,7 +402,7 @@ SampleT<Vector3> SampleHenyeyGreensteinPhase(const Vector3& wO, Float g,
 
     return SampleT<Vector3>
     {
-        .sampledResult = wI,
+        .value = wI,
         .pdf = HenyeyGreensteinPhase(cosTheta, g)
     };
 }

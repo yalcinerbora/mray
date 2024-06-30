@@ -146,7 +146,7 @@ SampleT<Float> DistributionPwC<1>::SampleIndex(Float xi) const
     Float pdf = (myCDF - prevCDF) * static_cast<Float>(dCDF.size());
     return SampleT<Float>
     {
-        .sampledResult = indexF,
+        .value = indexF,
         .pdf = pdf
     };
 }
@@ -155,7 +155,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Float> DistributionPwC<1>::SampleUV(Float xi) const
 {
     SampleT<Float> s = SampleIndex(xi);
-    s.sampledResult *= sizeRecip;
+    s.value *= sizeRecip;
     return s;
 }
 
@@ -203,7 +203,7 @@ SampleT<Vector<D,Float>> DistributionPwC<D>::SampleIndex(const VectorT& xi) cons
 {
     using NextIndexT = std::conditional_t<(D - 1) == 1, Float, Vector<D - 1, Float>>;
     SampleT<Float> r = dCurrentDistribution.SampleIndex(xi[D - 1]);
-    uint32_t index = static_cast<uint32_t>(r.sampledResult);
+    uint32_t index = static_cast<uint32_t>(r.value);
 
     // Dist<1> asks for Float since there is no Vector<1, T> type
     // Compile time change the statement if "D == 2" (2D Distribution)
@@ -215,7 +215,7 @@ SampleT<Vector<D,Float>> DistributionPwC<D>::SampleIndex(const VectorT& xi) cons
 
     return SampleT<VectorT>
     {
-        .sampledResult = VectorT(rN.sampledResult, r.sampledResult),
+        .value = VectorT(rN.value, r.value),
         .pdf = r.pdf * rN.pdf
     };
 }
@@ -227,15 +227,15 @@ SampleT<Vector<D, Float>> DistributionPwC<D>::SampleUV(const VectorT& xi) const
     using NextVecT = Vector<D - 1, Float>;
 
     SampleT<Float> r = dCurrentDistribution.SampleIndex(xi[D - 1]);
-    uint32_t index = uint32_t{r.sampledResult};
+    uint32_t index = uint32_t{r.value};
     SampleT<NextVecT> rN = dNextDistributions[index];
 
-    VectorT result(rN.sampledResult, r.sampledResult);
+    VectorT result(rN.value, r.value);
     result *= SizeRecip();
 
     return SampleT<VectorT>
     {
-        .sampledResult = result,
+        .value = result,
         .pdf = r.pdf * rN.pdf
     };
 }

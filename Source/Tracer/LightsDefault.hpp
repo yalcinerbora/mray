@@ -19,9 +19,9 @@ SampleT<Vector3> LightPrim<P, SC>::SampleSolidAngle(RNGDispenser& rng,
                                                     const Vector3& distantPoint) const
 {
     SampleT<BasicSurface> surfaceSample = prim.SampleSurface(rng);
-    Vector3 sampledDir = (surfaceSample.sampledResult.position - distantPoint);
+    Vector3 sampledDir = (surfaceSample.value.position - distantPoint);
 
-    Float NdL = surfaceSample.sampledResult.normal.Dot(-sampledDir.Normalize());
+    Float NdL = surfaceSample.value.normal.Dot(-sampledDir.Normalize());
     NdL = (isTwoSided) ? abs(NdL) : max(Float{0}, NdL);
     // Get projected area
     Float pdf = (NdL == 0) ? Float{0.0} : surfaceSample.pdf / NdL;
@@ -29,7 +29,7 @@ SampleT<Vector3> LightPrim<P, SC>::SampleSolidAngle(RNGDispenser& rng,
 
     return SampleT<Vector3>
     {
-        .sampledResult = surfaceSample.sampledResult.position,
+        .value = surfaceSample.value.position,
         .pdf = pdf
     };
 }
@@ -217,8 +217,8 @@ SampleT<Vector3> LightSkysphere<CC, TC, SC>::SampleSolidAngle(RNGDispenser& rng,
 {
     Vector2 xi = rng.NextFloat2D<0>();
     SampleT<Vector2> sampledUV = dist2D.SampleUV(xi);
-    Vector3 dirYUp = CC::UVToDir(sampledUV.sampledResult);
-    Float pdf = CC::ToSolidAnglePDF(sampledUV.pdf, sampledUV.sampledResult);
+    Vector3 dirYUp = CC::UVToDir(sampledUV.value);
+    Float pdf = CC::ToSolidAnglePDF(sampledUV.pdf, sampledUV.value);
     // Transform Direction to World Space
     Vector3 worldDir = prim.get().GetTransformContext().InvApplyV(dirYUp);
 
@@ -226,7 +226,7 @@ SampleT<Vector3> LightSkysphere<CC, TC, SC>::SampleSolidAngle(RNGDispenser& rng,
     Vector3 sampledPoint = distantPoint + worldDir * sceneDiameter;
     return SampleT<Vector3>
     {
-        .sampledResult = sampledPoint,
+        .value = sampledPoint,
         .pdf = pdf
     };
 }
@@ -258,8 +258,8 @@ SampleT<Ray> LightSkysphere<CC, TC, SC>::SampleRay(RNGDispenser& rng) const
     // What is the probability?
     Vector2 xi = rng.NextFloat2D<0>();
     SampleT<Vector2> sampledUV = dist2D.SampleUV(xi);
-    Vector3 dirYUp = CC::UVToDir(sampledUV.sampledResult);
-    Float pdf = CC::ToSolidAnglePDF(sampledUV.pdf, sampledUV.sampledResult);
+    Vector3 dirYUp = CC::UVToDir(sampledUV.value);
+    Float pdf = CC::ToSolidAnglePDF(sampledUV.pdf, sampledUV.value);
 
     // Transform Direction to World Space
     Vector3 worldDir = prim.get().GetTransformContext().InvApplyV(dirYUp);
@@ -268,7 +268,7 @@ SampleT<Ray> LightSkysphere<CC, TC, SC>::SampleRay(RNGDispenser& rng) const
     Vector3 sampledPoint = worldDir * sceneDiameter;
     return SampleT<Ray>
     {
-        .sampledResult = Ray(-worldDir, sampledPoint),
+        .value = Ray(-worldDir, sampledPoint),
         .pdf = pdf
     };
 }

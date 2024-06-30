@@ -122,7 +122,7 @@ TEST(Dist_PiecewiseConstant2D, Uniform)
         // On uniform function, random numberss should match to the
         // sampled index
         Vector2 indexExpected = hRandomNumbers[i] * Vector2(SIZE);
-        EXPECT_EQUAL_MRAY(s.sampledResult, indexExpected,
+        EXPECT_EQUAL_MRAY(s.value, indexExpected,
                           VeryLargeEpsilon<Float>());
         i++;
     }
@@ -190,7 +190,7 @@ TEST(Dist_PiecewiseConstant2D, ZeroVariance)
     using namespace MathConstants;
     for(const auto& s : hOutSamples)
     {
-        Vector2ui functionIndex = Vector2ui(s.sampledResult);
+        Vector2ui functionIndex = Vector2ui(s.value);
         uint32_t indexLinear = functionIndex[1] * SIZE[0] + functionIndex[0];
         ASSERT_LT(indexLinear, SIZE_LINEAR);
         Float f = hFunction[indexLinear];
@@ -247,10 +247,10 @@ TEST(Dist_Linear, ZeroVariance)
 
             using namespace Distributions;
             auto result = Common::SampleLine(xi, c, d);
-            EXPECT_GE(result.sampledResult, 0);
-            EXPECT_LE(result.sampledResult, 1);
+            EXPECT_GE(result.value, 0);
+            EXPECT_LT(result.value, 1);
             // Evaluate the function
-            Float eval = MathFunctions::Lerp(c, d, result.sampledResult);
+            Float eval = MathFunctions::Lerp(c, d, result.value);
             Float estimate = eval / result.pdf;
             // Since this is zero variance estimate,
             // the estimate should exactly match
@@ -300,7 +300,7 @@ TEST(Dist_Gaussian, ZeroVariance)
             using namespace Distributions;
             auto result = Common::SampleGaussian(xi, sigma, mean);
             // Evaluate the function
-            Float eval = MathFunctions::Gaussian(result.sampledResult,
+            Float eval = MathFunctions::Gaussian(result.value,
                                                  sigma, mean);
             Float estimate = eval / result.pdf;
             // Since this is zero variance estimate,
@@ -358,10 +358,10 @@ TEST(Dist_Tent, ZeroVariance)
 
             using namespace Distributions;
             auto result = Common::SampleTent(xi, a, b);
-            EXPECT_GT(result.sampledResult, a);
-            EXPECT_LT(result.sampledResult, b);
+            EXPECT_GT(result.value, a);
+            EXPECT_LT(result.value, b);
             // Evaluate the function
-            Float x = result.sampledResult;
+            Float x = result.value;
             Float t = (x < 0) ? (x / -a) : (x / b);
             t = (x < 0) ? (x / a) : (x / b);
             t = std::abs(t);
@@ -418,7 +418,7 @@ TEST(Dist_UniformHemisphere, Sample)
             Vector2 xi(dist0(rng0), dist1(rng1));
             SampleT<Vector3> sample = SampleUniformDirection(xi);
             // Integral of cos(theta) d(omega)
-            double functionVal = static_cast<double>(sample.sampledResult.Dot(Vector3::ZAxis()));
+            double functionVal = static_cast<double>(sample.value.Dot(Vector3::ZAxis()));
             functionVal *= MathConstants::InvPi<double>();
             total += (functionVal / static_cast<double>(sample.pdf));
         }
@@ -473,7 +473,7 @@ TEST(Dist_CosineHemisphere, Sample)
             Vector2 xi(dist0(rng0), dist1(rng1));
             SampleT<Vector3> sample = SampleCosDirection(xi);
             // Integral of cos(theta) d(omega)
-            double functionVal = static_cast<double>(sample.sampledResult.Dot(Vector3::ZAxis()));
+            double functionVal = static_cast<double>(sample.value.Dot(Vector3::ZAxis()));
             functionVal *= MathConstants::InvPi<double>();
             total += (functionVal / static_cast<double>(sample.pdf));
         }

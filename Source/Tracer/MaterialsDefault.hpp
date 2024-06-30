@@ -49,7 +49,7 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
 
     return SampleT<BxDFResult>
     {
-        .sampledResult = BxDFResult
+        .value = BxDFResult
         {
             .wO = wORay,
             .reflectance = reflectance,
@@ -158,7 +158,7 @@ SampleT<BxDFResult> ReflectMaterial<ST>::SampleBxDF(const Vector3& wI,
     Ray wORay = Ray(wO, surface.position);
     return SampleT<BxDFResult>
     {
-        .sampledResult = BxDFResult
+        .value = BxDFResult
         {
             .wO = wORay,
             .reflectance = Spectrum(1.0),

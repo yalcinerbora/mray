@@ -76,7 +76,7 @@ SampleT<BasicSurface> Triangle<T>::SampleSurface(RNGDispenser& rng) const
     using ShapeFunctions::Triangle::Normal;
     return SampleT<BasicSurface>
     {
-        .sampledResult = BasicSurface
+        .value = BasicSurface
         {
             .position = position,
             .normal = normal

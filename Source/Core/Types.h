@@ -86,7 +86,7 @@ using UniqueVariant = typename UniqueVariantDetail::Unique<Variant<>, Ts...>::ty
 template <class T>
 struct SampleT
 {
-    T           sampledResult;
+    T           value;
     Float       pdf;
 };
 

@@ -127,7 +127,7 @@ SampleT<Vector2> BoxFilter::Sample(const Vector2& xi) const
     auto r1 = Common::SampleUniformRange(xi[1], -radius, radius);
     return SampleT<Vector2>
     {
-        .sampledResult = Vector2(r0.sampledResult, r1.sampledResult),
+        .value = Vector2(r0.value, r1.value),
         .pdf = r0.pdf * r1.pdf
     };
 }
@@ -164,7 +164,7 @@ SampleT<Vector2> TentFilter::Sample(const Vector2& xi) const
     auto s1 = Common::SampleTent(xi[1], -radius, radius);
     return SampleT<Vector2>
     {
-        .sampledResult = Vector2(s0.sampledResult, s1.sampledResult),
+        .value = Vector2(s0.value, s1.value),
         .pdf = s0.pdf * s1.pdf
     };
 }
@@ -200,8 +200,8 @@ SampleT<Vector2> GaussianFilter::Sample(const Vector2& xi) const
     auto r1 = Common::SampleGaussian(xi[1], sigma);
     return SampleT<Vector2>
     {
-        .sampledResult = Vector2(r0.sampledResult,
-                                 r1.sampledResult),
+        .value = Vector2(r0.value,
+                                 r1.value),
         .pdf = r0.pdf * r1.pdf
     };
 }
@@ -287,27 +287,27 @@ SampleT<Vector2> MitchellNetravaliFilter::Sample(const Vector2& xi) const
         {
             auto r = SampleGaussian(bisected.second, sideSigma, -sideMean);
             pdfs[0] = r.pdf;
-            pdfs[1] = PDFGaussian(r.sampledResult, midSigma);
-            pdfs[2] = PDFGaussian(r.sampledResult, sideSigma, sideMean);
-            radiusSample = r.sampledResult;
+            pdfs[1] = PDFGaussian(r.value, midSigma);
+            pdfs[2] = PDFGaussian(r.value, sideSigma, sideMean);
+            radiusSample = r.value;
             break;
         }
         case 1:
         {
             auto r = SampleGaussian(bisected.second, midSigma);
-            pdfs[0] = PDFGaussian(r.sampledResult, sideSigma, -sideMean);
+            pdfs[0] = PDFGaussian(r.value, sideSigma, -sideMean);
             pdfs[1] = r.pdf;
-            pdfs[2] = PDFGaussian(r.sampledResult, sideSigma, sideMean);
-            radiusSample = r.sampledResult;
+            pdfs[2] = PDFGaussian(r.value, sideSigma, sideMean);
+            radiusSample = r.value;
             break;
         }
         case 2:
         {
             auto r = SampleGaussian(bisected.second, sideSigma, sideMean);
-            pdfs[0] = PDFGaussian(r.sampledResult, sideSigma, -sideMean);
-            pdfs[1] = PDFGaussian(r.sampledResult, midSigma);
+            pdfs[0] = PDFGaussian(r.value, sideSigma, -sideMean);
+            pdfs[1] = PDFGaussian(r.value, midSigma);
             pdfs[2] = r.pdf;
-            radiusSample = r.sampledResult;
+            radiusSample = r.value;
             break;
         }
         default: assert(false);
@@ -318,10 +318,10 @@ SampleT<Vector2> MitchellNetravaliFilter::Sample(const Vector2& xi) const
 
     // Convert
     using namespace GraphicsFunctions;
-    Vector2 xy = PolarToCartesian(Vector2(radiusSample, thetaSample.sampledResult));
+    Vector2 xy = PolarToCartesian(Vector2(radiusSample, thetaSample.value));
     return SampleT<Vector2>
     {
-        .sampledResult = xy,
+        .value = xy,
         .pdf = misWeight
     };
 }
@@ -427,7 +427,7 @@ void KCGenerateMipmaps(// I-O
                     Vector2 xi = Vector2(rng.NextFloat(), rng.NextFloat());
                     SampleT<Vector2> sample = FilterFunc.Sample(xi);
                     // Find the upper leve coordinate
-                    Vector2 readPixCoord = (pixCoord + sample.sampledResult).RoundSelf();
+                    Vector2 readPixCoord = (pixCoord + sample.value).RoundSelf();
                     readPixCoord.Clamp(Vector2::Zero(), Vector2(mipRes));
                     readPixCoord *= Vector2(2);
                     Vector2ui readPixCoordInt = Vector2ui(readPixCoord);

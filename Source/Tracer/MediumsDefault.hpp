@@ -16,7 +16,7 @@ ScatterSample MediumVacuum::SampleScattering(const Vector3&, RNGDispenser&) cons
 {
     return ScatterSample
     {
-        .sampledResult =
+        .value =
         {
             .wI = Vector3::Zero(),
             .phaseVal = Float(0.0)
@@ -100,9 +100,9 @@ ScatterSample MediumHomogeneous<ST>::SampleScattering(const Vector3& wO,
     auto hgSample = SampleHenyeyGreensteinPhase(wO, g, xi);
     return ScatterSample
     {
-        .sampledResult =
+        .value =
         {
-            .wI = hgSample.sampledResult,
+            .wI = hgSample.value,
             .phaseVal = hgSample.pdf
         },
         .pdf = hgSample.pdf
