@@ -381,6 +381,70 @@ TEST(Dist_Tent, ZeroVariance)
     }
 }
 
+TEST(Dist_Uniform, ZeroVariance)
+{
+    static constexpr uint32_t SAMPLE_COUNT = 128;
+    static constexpr uint32_t FUNCTION_COUNT = 16;
+    // Function overall min/max
+    static constexpr Float FUNCTION_MIN = -5;
+    static constexpr Float FUNCTION_MAX = 5;
+
+    std::mt19937 rng(332);
+    using UniformDist = std::uniform_real_distribution<Float>;
+
+    UniformDist dist01;
+    UniformDist distA(FUNCTION_MIN, 0);
+    UniformDist distB(0, FUNCTION_MAX);
+    for(uint32_t f = 0; f < FUNCTION_COUNT; f++)
+    {
+        Float a, b;
+        if(f == 0)
+        {
+            a = -MathConstants::Epsilon<Float>();
+            b = MathConstants::Epsilon<Float>();
+        }
+        else
+        {
+            a = distA(rng);
+            b = distB(rng);
+        }
+        const Float integral = (b - a);
+
+        Float estimateTotal = 0;
+        for(uint32_t i = 0; i < SAMPLE_COUNT; i++)
+        {
+            // Put some edge cases to first two samples
+            static_assert(SAMPLE_COUNT >= 2,
+                          "At least two samples should be checked!");
+            Float xi;
+            if(i == 0) xi = Float(0);
+            else if(i == 1) xi = MathFunctions::PrevFloat<Float>(1);
+            else xi = dist01(rng);
+
+            using namespace Distributions;
+            auto result = Common::SampleUniformRange(xi, a, b);
+            EXPECT_GE(result.value, a);
+            EXPECT_LT(result.value, b);
+            // Evaluate the function
+            Float x = result.value;
+            Float t = (x < 0) ? (x / -a) : (x / b);
+            t = (x < 0) ? (x / a) : (x / b);
+            t = std::abs(t);
+
+            Float eval = Float(1);
+            Float estimate = eval / result.pdf;
+            // Since this is zero variance estimate,
+            // the estimate should exactly match
+            // actual integral.
+            EXPECT_FLOAT_EQ(integral, estimate);
+            estimateTotal += estimate;
+        }
+        Float total = estimateTotal / Float(SAMPLE_COUNT);
+        EXPECT_NEAR(integral, total, MathConstants::LargeEpsilon<Float>());
+    }
+}
+
+
 TEST(Dist_UniformHemisphere, Sample)
 {
     using Distributions::Common::SampleUniformDirection;
