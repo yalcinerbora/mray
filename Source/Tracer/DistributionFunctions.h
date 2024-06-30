@@ -151,6 +151,15 @@ SampleT<Float> Common::SampleGaussian(Float xi, Float sigma, Float mu)
     Float x = MathConstants::Sqrt2<Float>() * sigma;
     Float e = MathFunctions::InvErrFunc(Float(2) * xi - Float(1));
     x = x * e + mu;
+
+    // Erf can be -+inf, when xi is near zero or one
+    // Just clamp to %99.95 estimate of the actual integral
+    if(MathFunctions::IsInf(e))
+    {
+        Float minMax = Float(3.5) * sigma;
+        x = MathFunctions::Clamp(x, -minMax, minMax);
+    }
+
     return SampleT<Float>
     {
         .sampledResult = x,
@@ -170,12 +179,13 @@ SampleT<Float> Common::SampleLine(Float xi, Float c, Float d)
     // https://www.pbr-book.org/4ed/Monte_Carlo_Integration/Sampling_Using_the_Inversion_Method#SampleLinear
     Float normVal = Float(2) / (c + d);
     // Avoid divide by zero
-    if(xi == 0)
+    if(c == 0 && xi == 0)
     {
+        Float epsilon = MathFunctions::NextFloat<Float>(0);
         return SampleT<Float>
         {
-            .sampledResult = 0,
-            .pdf = normVal * c
+            .sampledResult = epsilon,
+            .pdf = normVal * epsilon
         };
     }
     Float denom = MathFunctions::Lerp(c * c, d * d, xi);
@@ -199,17 +209,16 @@ Float Common::PDFLine(Float x, Float c, Float d)
 MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Float> Common::SampleTent(Float xi, Float a, Float b)
 {
-    assert(a <= b);
-    Float mid = (b - a) * Float(0.5);
-    auto [index, localXi] = BisectSample2(xi, Vector2(0.5));
-    SampleT<Float> result = (index == 0)
-        ? SampleLine(localXi, 0, 1)
-        : SampleLine(localXi, 1, 0);
-    Float offset = (index == 0) ? a : mid;
-
+    using MathFunctions::PrevFloat;
+    assert(a < 0 && b > 0);
+    auto [index, localXi] = BisectSample2(xi, Vector2(-a, b), false);
+    // Technically doing MIS here
+    localXi = (index == 1) ? (PrevFloat(1) - localXi) : localXi;
+    SampleT<Float> result = SampleLine(localXi, 1, 0);
     Float& x = result.sampledResult;
-    x = x * mid + offset;
-    result.pdf *= Float(0.5);
+    x = (index == 0) ? (x * a) : (x * b);
+    Float pmf = (index == 0) ? -a : b;
+    result.pdf *= pmf / (b - a);
     return result;
 }
 

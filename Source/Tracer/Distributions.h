@@ -97,26 +97,26 @@ class DistributionGroupPwC2D
     };
 
     private:
-        const GPUSystem&            system;
-        DeviceMemory                memory;
-        Span<Distribution>          dDistributions;
-        std::vector<DistData>       distData;
-        std::vector<Vector2ui>      sizes;
+    const GPUSystem&            system;
+    DeviceMemory                memory;
+    Span<Distribution>          dDistributions;
+    std::vector<DistData>       distData;
+    std::vector<Vector2ui>      sizes;
 
     protected:
     public:
-                                    DistributionGroupPwC2D(const GPUSystem&);
+                                DistributionGroupPwC2D(const GPUSystem&);
 
-        uint32_t                    Reserve(Vector2ui size);
-        void                        Commit();
-        void                        Construct(uint32_t index,
-                                              const Span<const Float>& function);
+    uint32_t                    Reserve(Vector2ui size);
+    void                        Commit();
+    void                        Construct(uint32_t index,
+                                          const Span<const Float>& function);
 
-        Span<const Distribution>    DeviceDistributions() const;
+    Span<const Distribution>    DeviceDistributions() const;
 
-        size_t                      GPUMemoryUsage() const;
-        // For testing
-        DistDataConst               DistMemory(uint32_t index) const;
+    size_t                      GPUMemoryUsage() const;
+    // For testing
+    DistDataConst               DistMemory(uint32_t index) const;
 };
 
 }

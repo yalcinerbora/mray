@@ -89,7 +89,7 @@ struct DistTester2D
     }
 };
 
-TEST(PiecewiseConstant2D, Uniform)
+TEST(Dist_PiecewiseConstant2D, Uniform)
 {
     static constexpr uint32_t SAMPLE_COUNT = 4096;
     // Testing with a 4k image (average case?)
@@ -128,7 +128,7 @@ TEST(PiecewiseConstant2D, Uniform)
     }
 }
 
-TEST(PiecewiseConstant2D, ZeroVariance)
+TEST(Dist_PiecewiseConstant2D, ZeroVariance)
 {
     static constexpr uint32_t SAMPLE_COUNT = 4096 * 4;
     // Testing with a 4k image (average case?)
@@ -208,7 +208,7 @@ TEST(PiecewiseConstant2D, ZeroVariance)
     EXPECT_NEAR(monteCarlo, integralExpected, GiganticEpsilon);
 }
 
-TEST(Linear, ZeroVariance)
+TEST(Dist_Linear, ZeroVariance)
 {
     static constexpr uint32_t SAMPLE_COUNT = 128;
     static constexpr uint32_t FUNCTION_COUNT = 16;
@@ -223,17 +223,32 @@ TEST(Linear, ZeroVariance)
     UniformDist distCD(FUNCTION_MIN, FUNCTION_MAX);
     for(uint32_t f = 0; f < FUNCTION_COUNT; f++)
     {
-        Float c = distCD(rng);
-        Float d = distCD(rng);
+        Float c = 0;
+        Float d = 1;
+        if(f == 1)
+            std::swap(c, d);
+        else if(c > 1)
+        {
+            c = distCD(rng);
+            d = distCD(rng);
+        }
         const Float trapz = (c + d) * Float(0.5);
 
         Float estimateTotal = 0;
         for(uint32_t i = 0; i < SAMPLE_COUNT; i++)
         {
-            Float xi = dist01(rng);
+            // Put some edge cases to first two samples
+            static_assert(SAMPLE_COUNT >= 2,
+                          "At least two samples should be checked!");
+            Float xi;
+            if(i == 0) xi = Float(0);
+            else if(i == 1) xi = MathFunctions::PrevFloat<Float>(1);
+            else xi = dist01(rng);
 
             using namespace Distributions;
             auto result = Common::SampleLine(xi, c, d);
+            EXPECT_GE(result.sampledResult, 0);
+            EXPECT_LE(result.sampledResult, 1);
             // Evaluate the function
             Float eval = MathFunctions::Lerp(c, d, result.sampledResult);
             Float estimate = eval / result.pdf;
@@ -248,7 +263,123 @@ TEST(Linear, ZeroVariance)
     }
 }
 
-TEST(UniformHemisphere, Sample)
+TEST(Dist_Gaussian, ZeroVariance)
+{
+    static constexpr uint32_t SAMPLE_COUNT = 128;
+    static constexpr uint32_t FUNCTION_COUNT = 16;
+    // Function overall min/max
+    static constexpr Float FUNCTION_MIN = -10;
+    static constexpr Float FUNCTION_MAX = 10;
+
+    std::mt19937 rng(332);
+    using UniformDist = std::uniform_real_distribution<Float>;
+
+    UniformDist dist01;
+    UniformDist distMean(FUNCTION_MIN, FUNCTION_MAX);
+    UniformDist distSigma(0, FUNCTION_MAX);
+    for(uint32_t f = 0; f < FUNCTION_COUNT; f++)
+    {
+        Float mean = distMean(rng);
+        Float sigma = distSigma(rng);
+        const Float integral = Float(1);
+
+        Float estimateTotal = 0;
+        for(uint32_t i = 0; i < SAMPLE_COUNT; i++)
+        {
+            // Put some edge cases to first two samples
+            static_assert(SAMPLE_COUNT >= 2,
+                          "At least two samples should be checked!");
+            Float xi;
+            if(i == 0) xi = Float(0);
+            else if(i == 1) xi = MathFunctions::PrevFloat<Float>(1);
+            else xi = dist01(rng);
+
+            Float denom = (Float(3.543889200) *
+                           std::numeric_limits<Float>::infinity());
+            denom += Float(3.543889200);
+
+            using namespace Distributions;
+            auto result = Common::SampleGaussian(xi, sigma, mean);
+            // Evaluate the function
+            Float eval = MathFunctions::Gaussian(result.sampledResult,
+                                                 sigma, mean);
+            Float estimate = eval / result.pdf;
+            // Since this is zero variance estimate,
+            // the estimate should exactly match
+            // actual integral.
+            // For gaussian it will require EXPECT_NEAR
+            // though since it is numerically comples
+            EXPECT_FLOAT_EQ(integral, estimate);
+            estimateTotal += estimate;
+        }
+        Float total = estimateTotal / Float(SAMPLE_COUNT);
+        EXPECT_NEAR(integral, total, MathConstants::LargeEpsilon<Float>());
+    }
+}
+
+TEST(Dist_Tent, ZeroVariance)
+{
+    static constexpr uint32_t SAMPLE_COUNT = 128;
+    static constexpr uint32_t FUNCTION_COUNT = 16;
+    // Function overall min/max
+    static constexpr Float FUNCTION_MIN = -10;
+    static constexpr Float FUNCTION_MAX = 10;
+
+    std::mt19937 rng(332);
+    using UniformDist = std::uniform_real_distribution<Float>;
+
+    UniformDist dist01;
+    UniformDist distA(FUNCTION_MIN, 0);
+    UniformDist distB(0, FUNCTION_MAX);
+    for(uint32_t f = 0; f < FUNCTION_COUNT; f++)
+    {
+        Float a, b;
+        if(f == 0)
+        {
+            a = -MathFunctions::NextFloat<Float>(0);
+            b = MathFunctions::NextFloat<Float>(0);
+        }
+        else
+        {
+           a = distA(rng);
+           b = distB(rng);
+        }
+        const Float integral = (b - a) * Float(0.5);
+
+        Float estimateTotal = 0;
+        for(uint32_t i = 0; i < SAMPLE_COUNT; i++)
+        {
+            // Put some edge cases to first two samples
+            static_assert(SAMPLE_COUNT >= 2,
+                          "At least two samples should be checked!");
+            Float xi;
+            if(i == 0) xi = Float(0);
+            else if(i == 1) xi = MathFunctions::PrevFloat<Float>(1);
+            else xi = dist01(rng);
+
+            using namespace Distributions;
+            auto result = Common::SampleTent(xi, a, b);
+            EXPECT_GE(result.sampledResult, a);
+            EXPECT_LE(result.sampledResult, b);
+            // Evaluate the function
+            Float t = (result.sampledResult - a) / (b - a);
+            t = Float(2) * t - Float(1);
+            t = std::abs(t);
+
+            Float eval = MathFunctions::Lerp<Float>(1, 0, t);
+            Float estimate = eval / result.pdf;
+            // Since this is zero variance estimate,
+            // the estimate should exactly match
+            // actual integral
+            EXPECT_FLOAT_EQ(integral, estimate);
+            estimateTotal += estimate;
+        }
+        Float total = estimateTotal / Float(SAMPLE_COUNT);
+        EXPECT_NEAR(integral, total, MathConstants::LargeEpsilon<Float>());
+    }
+}
+
+TEST(Dist_UniformHemisphere, Sample)
 {
     using Distributions::Common::SampleUniformDirection;
     static constexpr uint32_t Iterations = 50'000;
@@ -295,7 +426,7 @@ TEST(UniformHemisphere, Sample)
     }
 }
 
-TEST(UniformHemisphere, PDF)
+TEST(Dist_UniformHemisphere, PDF)
 {
     using Distributions::Common::PDFUniformDirection;
     // As simple as it gets
@@ -304,7 +435,7 @@ TEST(UniformHemisphere, PDF)
     EXPECT_EQ(PDFUniformDirection(), expected);
 }
 
-TEST(CosineHemisphere, Sample)
+TEST(Dist_CosineHemisphere, Sample)
 {
     using namespace Distributions::Common;
     static constexpr uint32_t Iterations = 50'000;
@@ -350,7 +481,7 @@ TEST(CosineHemisphere, Sample)
     }
 }
 
-TEST(CosineHemisphere, PDF)
+TEST(Dist_CosineHemisphere, PDF)
 {
     using Distributions::Common::PDFCosDirection;
     // As simple as it gets

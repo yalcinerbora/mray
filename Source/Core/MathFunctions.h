@@ -52,6 +52,14 @@ namespace MathFunctions
     template <std::integral T>
     MRAY_HYBRID constexpr T     NextMultiple(T value, T alignment);
 
+    // isinf, isnan are not constexpr
+    // and CUDA does not swap to its own functions like other math
+    // functions (sin, cos whatnot) So implementing
+    template <std::floating_point T>
+    MRAY_HYBRID bool    IsInf(T);
+    template <std::floating_point T>
+    MRAY_HYBRID bool    IsNan(T);
+
     // Misc
     template <std::integral T>
     MRAY_HYBRID constexpr T     NextPowerOfTwo(T value);
@@ -125,6 +133,7 @@ template <std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 T MathFunctions::Gaussian(T x, T sigma, T mu)
 {
+    assert(sigma > 0);
     static constexpr T InvSqrtPi = T(1) / MathConstants::SqrtPi<Float>();
     T sigmaInv = T(1) / sigma;
     T result = InvSqrtPi * sigmaInv;
@@ -186,7 +195,11 @@ T MathFunctions::InvErrFunc(T x)
             result = c[3]   * y + c[2];
             result = result * y + c[1];
             result = result * y + c[0];
-            Float denom = d[2] * y + d[1];
+
+            // Do not continue if estimate is already inf
+            if(MathFunctions::IsInf(result)) return result;
+
+            Float denom = d[1] * y + d[0];
             denom = denom * y + Float(1);
             result /= denom;
         }
@@ -240,6 +253,27 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr T MathFunctions::NextMultiple(T value, T divisor)
 {
     return DivideUp(value, divisor) * divisor;
+}
+
+template <std::floating_point T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool MathFunctions::IsInf(T f)
+{
+    #ifndef MRAY_DEVICE_CODE_PATH_CUDA
+        using namespace std;
+    #endif
+
+    return isinf(f);
+}
+
+template <std::floating_point T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool MathFunctions::IsNan(T f)
+{
+    #ifndef MRAY_DEVICE_CODE_PATH_CUDA
+        using namespace std;
+    #endif
+    return isnan(f);
 }
 
 template <std::integral T>
