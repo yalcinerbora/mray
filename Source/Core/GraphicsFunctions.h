@@ -44,17 +44,6 @@ namespace GraphicsFunctions
     MRAY_HYBRID
     constexpr Vector3   Orient(const Vector3& v, const Vector3& n);
 
-    // Simple Sampling Functions
-    // Sample cosine weighted direction from unit hemisphere
-    // Unit hemisphere's normal is implicitly +Z
-    MRAY_HYBRID SampleT<Vector3>    SampleCosDirection(const Vector2& xi);
-    MRAY_HYBRID constexpr Float     PDFCosDirection(const Vector3& v,
-                                                    const Vector3& n = Vector3::ZAxis());
-    // Sample uniform direction from unit hemisphere
-    // Unit hemisphere's normal is implicitly +Z
-    MRAY_HYBRID SampleT<Vector3>    SampleUniformDirection(const Vector2& xi);
-    MRAY_HYBRID constexpr Float     PDFUniformDirection();
-
     // Coordinate Conversions
     // Spherical <-> Cartesian
     // Naming are in **physical** notation/convention,
@@ -175,68 +164,6 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector3 Orient(const Vector3& v, const Vector3& n)
 {
     return v.Dot(n) >= Float{0} ? v : (-v);
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<Vector3> SampleCosDirection(const Vector2& xi)
-{
-    using namespace MathConstants;
-    using MathFunctions::SqrtMax;
-
-    // Generated direction is on unit space (+Z oriented hemisphere)
-    Float xi1Angle = Float{2} * Pi<Float>() * xi[1];
-    Float xi0Sqrt = std::sqrt(xi[0]);
-
-    Vector3 dir;
-    dir[0] = xi0Sqrt * std::cos(xi1Angle);
-    dir[1] = xi0Sqrt * std::sin(xi1Angle);
-    dir[2] = SqrtMax(Float{1} - Vector2(dir).Dot(Vector2(dir)));
-
-    // Fast tangent space dot product and domain constant
-    Float pdf = dir[2] * InvPi<Float>();
-
-    // Finally the result!
-    return SampleT<Vector3>
-    {
-        .sampledResult = dir,
-        .pdf = pdf
-    };
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Float PDFCosDirection(const Vector3& v, const Vector3& n)
-{
-    Float pdf = n.Dot(v) * MathConstants::InvPi<Float>();
-    return pdf;
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<Vector3> SampleUniformDirection(const Vector2& xi)
-{
-    using namespace MathConstants;
-    using MathFunctions::SqrtMax;
-
-    Float xi0Sqrt = SqrtMax(Float{1} - xi[0] * xi[0]);
-    Float xi1Angle = 2 * Pi<Float>() * xi[1];
-
-    Vector3 dir;
-    dir[0] = xi0Sqrt * std::cos(xi1Angle);
-    dir[1] = xi0Sqrt * std::sin(xi1Angle);
-    dir[2] = xi[0];
-
-    // Uniform pdf is invariant
-    constexpr Float pdf = InvPi<Float>() * Float{0.5};
-    return SampleT<Vector3>
-    {
-        .sampledResult = dir,
-        .pdf = pdf
-    };
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Float PDFUniformDirection()
-{
-    return MathConstants::InvPi<Float>() * Float{0.5};
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE

@@ -71,6 +71,7 @@ function(gen_tracer_target)
 
     set(SRC_RANDOM
         ${CURRENT_SOURCE_DIR}/Random.h
+        ${CURRENT_SOURCE_DIR}/DistributionFunctions.h
         ${CURRENT_SOURCE_DIR}/Distributions.h
         ${CURRENT_SOURCE_DIR}/Distributions.cu)
 
@@ -79,7 +80,6 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/RayPartitioner.cu
         ${CURRENT_SOURCE_DIR}/ParamVaryingData.h
         ${CURRENT_SOURCE_DIR}/ShapeFunctions.h
-        ${CURRENT_SOURCE_DIR}/DistributionFunctions.h
         ${CURRENT_SOURCE_DIR}/Key.h
         ${CURRENT_SOURCE_DIR}/KeyFormat.h
         ${CURRENT_SOURCE_DIR}/Hit.h)

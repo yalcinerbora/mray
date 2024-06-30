@@ -18,7 +18,7 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
                                                    const Surface& surface,
                                                    RNGDispenser& dispenser) const
 {
-    using GraphicsFunctions::SampleCosDirection;
+    using Distributions::Common::SampleCosDirection;
     // Sampling a vector from cosine weighted hemispherical distribution
     Vector2 xi = dispenser.NextFloat2D<0>();
     auto [wO, pdf] = SampleCosDirection(xi);
@@ -65,7 +65,7 @@ Float LambertMaterial<ST>::Pdf(const Ray&,
                                const Ray& wO,
                                const Surface& surface) const
 {
-    using GraphicsFunctions::PDFCosDirection;
+    using Distributions::Common::PDFCosDirection;
 
     Vector3 normal = (normalMapTex) ? (*normalMapTex)(surface.uv).value()
                                     : Vector3::ZAxis();

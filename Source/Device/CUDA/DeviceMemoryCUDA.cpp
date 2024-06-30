@@ -232,8 +232,9 @@ void HostLocalMemoryCUDA::ResizeBuffer(size_t newSize)
 {
     if(neverDecrease && newSize <= size) return;
 
+    size_t copySize = std::min(newSize, size);
     HostLocalMemoryCUDA newMem(*system, newSize);
-    std::memcpy(newMem.hPtr, hPtr, size);
+    std::memcpy(newMem.hPtr, hPtr, copySize);
     *this = std::move(newMem);
 }
 

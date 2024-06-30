@@ -5,12 +5,12 @@
 #include "Core/MathFunctions.h"
 #include "TracerTypes.h"
 
-namespace BxDFFunctions
+namespace Distributions::BxDF
 {
 
 }
 
-namespace MediumFunctions
+namespace Distributions::Medium
 {
     MRAY_HYBRID
     constexpr Spectrum  WavesToSpectrumCauchy(const SpectrumWaves& waves,
@@ -23,7 +23,7 @@ namespace MediumFunctions
                                                     const Vector2& xi);
 }
 
-namespace Distributions
+namespace Distributions::Common
 {
     MRAY_HYBRID
     Pair<uint32_t, Float>   BisectSample1(Float xi, Float weight);
@@ -56,6 +56,16 @@ namespace Distributions
     SampleT<Float>  SampleUniformRange(Float xi, Float a, Float b);
     MRAY_HYBRID
     Float           PDFUniformRange(Float x, Float a, Float b);
+    //
+    MRAY_HYBRID
+    SampleT<Vector3>    SampleCosDirection(const Vector2& xi);
+    MRAY_HYBRID
+    constexpr Float     PDFCosDirection(const Vector3& v,
+                                        const Vector3& n = Vector3::ZAxis());
+    MRAY_HYBRID
+    SampleT<Vector3>    SampleUniformDirection(const Vector2& xi);
+    MRAY_HYBRID
+    constexpr Float     PDFUniformDirection();
 }
 
 namespace Distributions::MIS
@@ -72,23 +82,18 @@ namespace Distributions::MIS
                   const Span<Float, N>& weights);
 }
 
-namespace BxDFFunctions
-{
-
-}
-
 namespace Distributions
 {
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Pair<uint32_t, Float> BisectSample1(Float xi, Float)
+Pair<uint32_t, Float> Common::BisectSample1(Float xi, Float)
 {
     return {0, xi};
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Pair<uint32_t, Float> BisectSample2(Float xi, Vector2 weights,
-                                    bool isAlreadyNorm)
+Pair<uint32_t, Float> Common::BisectSample2(Float xi, Vector2 weights,
+                                            bool isAlreadyNorm)
 {
     if(!isAlreadyNorm) weights[0] /= weights.Sum();
     //
@@ -105,8 +110,8 @@ Pair<uint32_t, Float> BisectSample2(Float xi, Vector2 weights,
 
 template<uint32_t N>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Pair<uint32_t, Float> BisectSample(Float xi, const Span<Float, N>& weights,
-                                   bool isAlreadyNorm)
+Pair<uint32_t, Float> Common::BisectSample(Float xi, const Span<Float, N>& weights,
+                                           bool isAlreadyNorm)
 {
     auto Reduce = [weights]() -> Float
     {
@@ -141,7 +146,7 @@ Pair<uint32_t, Float> BisectSample(Float xi, const Span<Float, N>& weights,
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<Float> SampleGaussian(Float xi, Float sigma, Float mu)
+SampleT<Float> Common::SampleGaussian(Float xi, Float sigma, Float mu)
 {
     Float x = MathConstants::Sqrt2<Float>() * sigma;
     Float e = MathFunctions::InvErrFunc(Float(2) * xi - Float(1));
@@ -154,13 +159,13 @@ SampleT<Float> SampleGaussian(Float xi, Float sigma, Float mu)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float PDFGaussian(Float x, Float sigma, Float mu)
+Float Common::PDFGaussian(Float x, Float sigma, Float mu)
 {
     return MathFunctions::Gaussian(x, sigma, mu);
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<Float> SampleLine(Float xi, Float c, Float d)
+SampleT<Float> Common::SampleLine(Float xi, Float c, Float d)
 {
     // https://www.pbr-book.org/4ed/Monte_Carlo_Integration/Sampling_Using_the_Inversion_Method#SampleLinear
     Float normVal = Float(2) / (c + d);
@@ -184,7 +189,7 @@ SampleT<Float> SampleLine(Float xi, Float c, Float d)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float PDFLine(Float x, Float c, Float d)
+Float Common::PDFLine(Float x, Float c, Float d)
 {
     if(x < 0 && x > 1) return Float(0);
     Float normVal = Float(2) / (c + d);
@@ -192,7 +197,7 @@ Float PDFLine(Float x, Float c, Float d)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<Float> SampleTent(Float xi, Float a, Float b)
+SampleT<Float> Common::SampleTent(Float xi, Float a, Float b)
 {
     assert(a <= b);
     Float mid = (b - a) * Float(0.5);
@@ -209,7 +214,7 @@ SampleT<Float> SampleTent(Float xi, Float a, Float b)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float PDFTent(Float x, Float a, Float b)
+Float Common::PDFTent(Float x, Float a, Float b)
 {
     Float mid = (b - a) * Float(0.5);
     Float x01 = std::abs(x - mid);
@@ -217,7 +222,7 @@ Float PDFTent(Float x, Float a, Float b)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<Float> SampleUniformRange(Float xi, Float a, Float b)
+SampleT<Float> Common::SampleUniformRange(Float xi, Float a, Float b)
 {
     return SampleT<Float>
     {
@@ -227,10 +232,72 @@ SampleT<Float> SampleUniformRange(Float xi, Float a, Float b)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float PDFUniformRange(Float x, Float a, Float b)
+Float Common::PDFUniformRange(Float x, Float a, Float b)
 {
     if(x < a && x > b) return 0;
     return 1;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+SampleT<Vector3> Common::SampleCosDirection(const Vector2& xi)
+{
+    using namespace MathConstants;
+    using MathFunctions::SqrtMax;
+
+    // Generated direction is on unit space (+Z oriented hemisphere)
+    Float xi1Angle = Float{2} * Pi<Float>() * xi[1];
+    Float xi0Sqrt = std::sqrt(xi[0]);
+
+    Vector3 dir;
+    dir[0] = xi0Sqrt * std::cos(xi1Angle);
+    dir[1] = xi0Sqrt * std::sin(xi1Angle);
+    dir[2] = SqrtMax(Float{1} - Vector2(dir).Dot(Vector2(dir)));
+
+    // Fast tangent space dot product and domain constant
+    Float pdf = dir[2] * InvPi<Float>();
+
+    // Finally the result!
+    return SampleT<Vector3>
+    {
+        .sampledResult = dir,
+        .pdf = pdf
+    };
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Float Common::PDFCosDirection(const Vector3& v, const Vector3& n)
+{
+    Float pdf = n.Dot(v) * MathConstants::InvPi<Float>();
+    return pdf;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+SampleT<Vector3> Common::SampleUniformDirection(const Vector2& xi)
+{
+    using namespace MathConstants;
+    using MathFunctions::SqrtMax;
+
+    Float xi0Sqrt = SqrtMax(Float{1} - xi[0] * xi[0]);
+    Float xi1Angle = 2 * Pi<Float>() * xi[1];
+
+    Vector3 dir;
+    dir[0] = xi0Sqrt * std::cos(xi1Angle);
+    dir[1] = xi0Sqrt * std::sin(xi1Angle);
+    dir[2] = xi[0];
+
+    // Uniform pdf is invariant
+    constexpr Float pdf = InvPi<Float>() * Float{0.5};
+    return SampleT<Vector3>
+    {
+        .sampledResult = dir,
+        .pdf = pdf
+    };
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Float Common::PDFUniformDirection()
+{
+    return MathConstants::InvPi<Float>() * Float{0.5};
 }
 
 template<uint32_t N>

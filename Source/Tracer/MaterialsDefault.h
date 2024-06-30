@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/GraphicsFunctions.h"
+#include "DistributionFunctions.h"
 
 #include "MaterialC.h"
 #include "ParamVaryingData.h"

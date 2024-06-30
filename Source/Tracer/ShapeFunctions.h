@@ -4,10 +4,9 @@
 #include "Core/Types.h"
 #include "Core/GraphicsFunctions.h"
 
-namespace ShapeFunctions
+namespace ShapeFunctions::Triangle
 {
-namespace Triangle
-{
+
     static constexpr uint32_t TRI_VERTEX_COUNT = 3;
 
     MRAY_HYBRID AABB3   BoundingBox(Span<const Vector3, TRI_VERTEX_COUNT> positions);
@@ -17,7 +16,6 @@ namespace Triangle
                                 const Vector3& point);
     MRAY_HYBRID Vector3 PointToBarycentrics(Span<const Vector3, TRI_VERTEX_COUNT> positions,
                                             const Vector3& point);
-}
 }
 
 namespace ShapeFunctions

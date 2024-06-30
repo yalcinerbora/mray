@@ -232,7 +232,8 @@ TEST(Linear, ZeroVariance)
         {
             Float xi = dist01(rng);
 
-            auto result = Distributions::SampleLine(xi, c, d);
+            using namespace Distributions;
+            auto result = Common::SampleLine(xi, c, d);
             // Evaluate the function
             Float eval = MathFunctions::Lerp(c, d, result.sampledResult);
             Float estimate = eval / result.pdf;
@@ -245,4 +246,116 @@ TEST(Linear, ZeroVariance)
         Float total = estimateTotal / Float(SAMPLE_COUNT);
         EXPECT_NEAR(trapz, total, MathConstants::LargeEpsilon<Float>());
     }
+}
+
+TEST(UniformHemisphere, Sample)
+{
+    using Distributions::Common::SampleUniformDirection;
+    static constexpr uint32_t Iterations = 50'000;
+
+    {
+        std::mt19937 rng0(123), rng1(321);
+        std::uniform_real_distribution<Float> dist0;
+        std::uniform_real_distribution<Float> dist1;
+
+        // Estimate Surface area
+        double total = double{0};
+        for(uint32_t i = 0; i < Iterations; i++)
+        {
+            Vector2 xi(dist0(rng0), dist1(rng1));
+            SampleT<Vector3> sample = SampleUniformDirection(xi);
+            // Integral of sin(theta) d(omega)
+            total += static_cast<double>((1 / sample.pdf));
+        }
+
+        double result = total / double{Iterations};
+        constexpr double expected = MathConstants::Pi<double>() * 2.0;
+        EXPECT_NEAR(result, expected, MathConstants::LargeEpsilon<double>());
+    }
+
+    {
+        std::mt19937 rng0(123), rng1(321);
+        std::uniform_real_distribution<Float> dist0;
+        std::uniform_real_distribution<Float> dist1;
+
+        // Furnace test
+        double total = double{0};
+        for(uint32_t i = 0; i < Iterations; i++)
+        {
+            Vector2 xi(dist0(rng0), dist1(rng1));
+            SampleT<Vector3> sample = SampleUniformDirection(xi);
+            // Integral of cos(theta) d(omega)
+            double functionVal = static_cast<double>(sample.sampledResult.Dot(Vector3::ZAxis()));
+            functionVal *= MathConstants::InvPi<double>();
+            total += (functionVal / static_cast<double>(sample.pdf));
+        }
+
+        double result = total / double{Iterations};
+        EXPECT_NEAR(result, 1.0, MathConstants::HugeEpsilon<double>());
+    }
+}
+
+TEST(UniformHemisphere, PDF)
+{
+    using Distributions::Common::PDFUniformDirection;
+    // As simple as it gets
+    // Provided for completeness
+    constexpr Float expected = MathConstants::InvPi<Float>() * Float{ 0.5 };
+    EXPECT_EQ(PDFUniformDirection(), expected);
+}
+
+TEST(CosineHemisphere, Sample)
+{
+    using namespace Distributions::Common;
+    static constexpr uint32_t Iterations = 50'000;
+    {
+        std::mt19937 rng0(123), rng1(321);
+        std::uniform_real_distribution<Float> dist0;
+        std::uniform_real_distribution<Float> dist1;
+
+        // Estimate Surface area
+        double total = double{0};
+        for(uint32_t i = 0; i < Iterations; i++)
+        {
+            Vector2 xi(dist0(rng0), dist1(rng1));
+            SampleT<Vector3> sample = SampleUniformDirection(xi);
+            // Integral of sin(theta) d(omega)
+            total += static_cast<double>(1 / sample.pdf);
+        }
+
+        double result = total / double{Iterations};
+        constexpr double expected = MathConstants::Pi<double>() * 2.0;
+        EXPECT_NEAR(result, expected, MathConstants::LargeEpsilon<double>());
+    }
+
+    {
+        std::mt19937 rng0(123), rng1(321);
+        std::uniform_real_distribution<Float> dist0;
+        std::uniform_real_distribution<Float> dist1;
+
+        // Furnace test
+        double total = double{0};
+        for(uint32_t i = 0; i < Iterations; i++)
+        {
+            Vector2 xi(dist0(rng0), dist1(rng1));
+            SampleT<Vector3> sample = SampleCosDirection(xi);
+            // Integral of cos(theta) d(omega)
+            double functionVal = static_cast<double>(sample.sampledResult.Dot(Vector3::ZAxis()));
+            functionVal *= MathConstants::InvPi<double>();
+            total += (functionVal / static_cast<double>(sample.pdf));
+        }
+
+        double result = total / double{Iterations};
+        EXPECT_NEAR(result, 1.0, MathConstants::Epsilon<double>());
+    }
+}
+
+TEST(CosineHemisphere, PDF)
+{
+    using Distributions::Common::PDFCosDirection;
+    // As simple as it gets
+    // Provided for completeness
+    Vector3 v = Vector3(1, 2, 3).Normalize();
+    Float expected = MathConstants::InvPi<Float>() * v.Dot(Vector3::ZAxis());
+    EXPECT_EQ(PDFCosDirection(v), expected);
 }
