@@ -5,6 +5,8 @@
 #include "Core/MathFunctions.h"
 #include "TracerTypes.h"
 
+#include "Core/Log.h"
+
 namespace Distributions::BxDF
 {
 
@@ -95,24 +97,25 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Pair<uint32_t, Float> Common::BisectSample2(Float xi, Vector2 weights,
                                             bool isAlreadyNorm)
 {
+    using MathFunctions::PrevFloat;
     if(!isAlreadyNorm) weights[0] /= weights.Sum();
     //
     Float w = weights[0];
-    return Pair<uint32_t, Float>
-    {
-        (xi < w) ? 0 : 1,
-        //
-        (xi < w) ? xi       / w
-                 : (xi - w) / (Float(1) - w)
-    };
+    uint32_t i = (xi < w) ? 0 : 1;
+    Float localXi = (xi < w)
+            ? xi / w
+            : (xi - w) / (Float(1) - w);
+    localXi = std::min(localXi, PrevFloat<Float>(1));
+    assert(localXi >= 0 && localXi < 1);
+    return Pair(i, localXi);
 }
-
 
 template<uint32_t N>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Pair<uint32_t, Float> Common::BisectSample(Float xi, const Span<Float, N>& weights,
                                            bool isAlreadyNorm)
 {
+    using MathFunctions::PrevFloat;
     auto Reduce = [weights]() -> Float
     {
         Float r = 0;
@@ -139,10 +142,10 @@ Pair<uint32_t, Float> Common::BisectSample(Float xi, const Span<Float, N>& weigh
     Float xiScaled = xi * Float(1) / sum;
     uint32_t i = Find(xiScaled);
     assert(i != N);
-    return Pair<uint32_t, Float>
-    {
-        i, (xiScaled - weights[i]) / (weights[i + 1] - weights[i])
-    };
+    Float localXi = (xiScaled - weights[i]) / (weights[i + 1] - weights[i]);
+    localXi = std::min(localXi, PrevFloat<Float>(1));
+    assert(localXi >= 0 && localXi < 1);
+    return Pair(i, localXi);
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -176,25 +179,21 @@ Float Common::PDFGaussian(Float x, Float sigma, Float mu)
 MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Float> Common::SampleLine(Float xi, Float c, Float d)
 {
+    using namespace MathFunctions;
     // https://www.pbr-book.org/4ed/Monte_Carlo_Integration/Sampling_Using_the_Inversion_Method#SampleLinear
     Float normVal = Float(2) / (c + d);
     // Avoid divide by zero
+    const Float epsilon = NextFloat<Float>(0);
     if(c == 0 && xi == 0)
-    {
-        Float epsilon = MathFunctions::NextFloat<Float>(0);
-        return SampleT<Float>
-        {
-            .sampledResult = epsilon,
-            .pdf = normVal * epsilon
-        };
-    }
-    Float denom = MathFunctions::Lerp(c * c, d * d, xi);
+        return SampleT{epsilon, normVal * epsilon};
+
+    Float denom = Lerp(c * c, d * d, xi);
     denom = c + std::sqrt(denom);
     Float x = (c + d) * xi / denom;
     return SampleT<Float>
     {
         .sampledResult = x,
-        .pdf = normVal * MathFunctions::Lerp(c, d, x)
+        .pdf = normVal * Lerp(c, d, x)
     };
 }
 
@@ -209,16 +208,18 @@ Float Common::PDFLine(Float x, Float c, Float d)
 MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Float> Common::SampleTent(Float xi, Float a, Float b)
 {
+    // Dirac delta like, return as if dirac delta
+    if(b - a < MathConstants::Epsilon<Float>())
+        return {Float(0), Float(1) / (b - a)};
+
     using MathFunctions::PrevFloat;
     assert(a < 0 && b > 0);
     auto [index, localXi] = BisectSample2(xi, Vector2(-a, b), false);
-    // Technically doing MIS here
-    localXi = (index == 1) ? (PrevFloat(1) - localXi) : localXi;
+    localXi = (index == 0) ? (PrevFloat<Float>(1) - localXi) : localXi;
     SampleT<Float> result = SampleLine(localXi, 1, 0);
     Float& x = result.sampledResult;
     x = (index == 0) ? (x * a) : (x * b);
-    Float pmf = (index == 0) ? -a : b;
-    result.pdf *= pmf / (b - a);
+    result.pdf /= (b - a);
     return result;
 }
 
