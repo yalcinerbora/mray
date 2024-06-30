@@ -444,7 +444,6 @@ TEST(Dist_Uniform, ZeroVariance)
     }
 }
 
-
 TEST(Dist_UniformHemisphere, Sample)
 {
     using Distributions::Common::SampleUniformDirection;

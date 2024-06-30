@@ -11,6 +11,7 @@ function(gen_tracer_test)
 
     set(SRC_COMMON
         ${CMAKE_CURRENT_FUNCTION_LIST_FILE}
+        ${CURRENT_SOURCE_DIR}/T_Filters.cu
         ${CURRENT_SOURCE_DIR}/T_RayPartitioner.cu
         ${CURRENT_SOURCE_DIR}/T_DefaultTriangle.cu
         ${CURRENT_SOURCE_DIR}/T_DefaultLights.cu

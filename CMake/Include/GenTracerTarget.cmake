@@ -12,9 +12,7 @@ function(gen_tracer_target)
 
     set(SRC_TEXTURE
         ${CURRENT_SOURCE_DIR}/TextureMemory.h
-        ${CURRENT_SOURCE_DIR}/TextureMemory.cpp
-        ${CURRENT_SOURCE_DIR}/ReconFilter.h
-        ${CURRENT_SOURCE_DIR}/ReconFilter.cu)
+        ${CURRENT_SOURCE_DIR}/TextureMemory.cpp)
 
     set(SRC_PRIMITIVES
         ${CURRENT_SOURCE_DIR}/PrimitiveC.h
@@ -82,7 +80,10 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/ShapeFunctions.h
         ${CURRENT_SOURCE_DIR}/Key.h
         ${CURRENT_SOURCE_DIR}/KeyFormat.h
-        ${CURRENT_SOURCE_DIR}/Hit.h)
+        ${CURRENT_SOURCE_DIR}/Hit.h
+        ${CURRENT_SOURCE_DIR}/ReconFilter.h
+        ${CURRENT_SOURCE_DIR}/ReconFilter.cu
+        ${CURRENT_SOURCE_DIR}/Filters.h)
 
     set(SRC_COMMON
         ${CMAKE_CURRENT_FUNCTION_LIST_FILE}
