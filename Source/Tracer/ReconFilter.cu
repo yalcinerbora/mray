@@ -58,7 +58,7 @@ void KCGenerateMipmaps(// I-O
                        MRAY_GRID_CONSTANT const Span<MipArray<SurfViewVariant>> dSurfaces,
                        // Inputs
                        MRAY_GRID_CONSTANT const Span<const Vector2ui> dMipZeroResolutions,
-                       MRAY_GRID_CONSTANT const Span<const typename Xoroshiro64::State> dRNGStates,
+                       MRAY_GRID_CONSTANT const Span<const typename BackupRNGState> dRNGStates,
                        // Constants
                        MRAY_GRID_CONSTANT const uint32_t spp,
                        MRAY_GRID_CONSTANT const Filter FilterFunc)
@@ -70,8 +70,8 @@ void KCGenerateMipmaps(// I-O
     assert(dSurfaces.size() == dMipZeroResolutions.size());
     assert(dRNGStates.size() == kp.TotalSize());
     // Load the RNG
-    typename Xoroshiro64::State state = dRNGStates[kp.GlobalId()];
-    Xoroshiro64 rng = Xoroshiro64(state);
+    typename BackupRNGState state = dRNGStates[kp.GlobalId()];
+    BackupRNG rng = BackupRNG(state);
 
     // Block-stride loop
     uint32_t textureCount = static_cast<uint32_t>(dSurfaces.size());
@@ -558,7 +558,7 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
 
     // We can temporarily allocate here since this will be done at
     // initialization time.
-    using RNGState = Xoroshiro64::State;
+    using RNGState = BackupRNGState;
     DeviceLocalMemory mem(gpuSystem.BestDevice());
     Span<RNGState> dRNGStates;
     Span<MipArray<SurfViewVariant>> dSufViews;
@@ -570,10 +570,7 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
     std::vector<RNGState> rngStates(dRNGStates.size());
     std::mt19937 hostSeeder(seed);
     for(RNGState& state : rngStates)
-    {
-        state[0] = hostSeeder();
-        state[1] = hostSeeder();
-    }
+        state = hostSeeder();
 
     using namespace std::string_view_literals;
     Span<RNGState> hRNGSates(rngStates);

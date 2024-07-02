@@ -134,7 +134,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 T MathFunctions::Gaussian(T x, T sigma, T mu)
 {
     assert(sigma > 0);
-    static constexpr T InvSqrtPi = T(1) / MathConstants::SqrtPi<Float>();
+    static constexpr T InvSqrtPi = T(1) / MathConstants::SqrtPi<T>();
     T sigmaInv = T(1) / sigma;
     T result = InvSqrtPi * sigmaInv;
     T pow = (x - mu) * sigmaInv;

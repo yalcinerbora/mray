@@ -316,6 +316,63 @@ TEST(Dist_Gaussian, ZeroVariance)
     }
 }
 
+TEST(Dist_Gaussian2D, ZeroVariance)
+{
+    static constexpr uint32_t SAMPLE_COUNT = 128;
+    static constexpr uint32_t FUNCTION_COUNT = 16;
+    // Function overall min/max
+    static constexpr Float FUNCTION_MIN = -10;
+    static constexpr Float FUNCTION_MAX = 10;
+
+    std::mt19937 rng(332);
+    using UniformDist = std::uniform_real_distribution<Float>;
+
+    UniformDist dist01;
+    UniformDist distMean(FUNCTION_MIN, FUNCTION_MAX);
+    UniformDist distSigma(0, FUNCTION_MAX);
+    for(uint32_t f = 0; f < FUNCTION_COUNT; f++)
+    {
+        Vector2 mean = (f == 0)
+                        ? Vector2::Zero()
+                        : Vector2(distMean(rng),
+                                  distMean(rng));
+        Float sigma = (f == 0)
+                        ? MathConstants::Epsilon<Float>()
+                        : distSigma(rng);
+
+        const Float integral = Float(1);
+
+        Float estimateTotal = 0;
+        for(uint32_t i = 0; i < SAMPLE_COUNT; i++)
+        {
+            // Put some edge cases to first two samples
+            static_assert(SAMPLE_COUNT >= 2,
+                          "At least two samples should be checked!");
+            Vector2 xi;
+            if(i == 0) xi = Vector2::Zero();
+            else if(i == 1) xi = Vector2(MathFunctions::PrevFloat<Float>(1));
+            else xi = Vector2(dist01(rng), dist01(rng));
+
+            using namespace Distributions;
+            auto result = Common::SampleGaussian2D(xi, sigma, mean);
+            // Evaluate the function
+            using MathFunctions::Gaussian;
+            Float eval = (Gaussian(result.value[0], sigma, mean[0]) *
+                          Gaussian(result.value[1], sigma, mean[1]));
+            Float estimate = eval / result.pdf;
+            // Since this is zero variance estimate,
+            // the estimate should exactly match
+            // actual integral.
+            // For gaussian it will require EXPECT_NEAR
+            // though since it is numerically comples
+            EXPECT_FLOAT_EQ(integral, estimate);
+            estimateTotal += estimate;
+        }
+        Float total = estimateTotal / Float(SAMPLE_COUNT);
+        EXPECT_NEAR(integral, total, MathConstants::LargeEpsilon<Float>());
+    }
+}
+
 TEST(Dist_Tent, ZeroVariance)
 {
     static constexpr uint32_t SAMPLE_COUNT = 128;

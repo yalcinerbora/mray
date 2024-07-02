@@ -44,6 +44,16 @@ namespace Distributions::Common
     Float           PDFGaussian(Float x, Float sigma = Float(1),
                                 Float mu = Float(0));
 
+    // TODO: Only providing isotropic version
+    // here, anisotropic version may not be useful
+    // We may provide a spherical version later.
+    MRAY_HYBRID
+    SampleT<Vector2>    SampleGaussian2D(Vector2 xi, Float sigma = Float(1),
+                                         Vector2 mu = Vector2::Zero());
+    MRAY_HYBRID
+    Float               PDFGaussian2D(Vector2 xy, Float sigma = Float(1),
+                                      Vector2 mu = Vector2::Zero());
+
     MRAY_HYBRID
     SampleT<Float>  SampleLine(Float xi, Float c, Float d);
     MRAY_HYBRID
@@ -174,6 +184,37 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Float Common::PDFGaussian(Float x, Float sigma, Float mu)
 {
     return MathFunctions::Gaussian(x, sigma, mu);
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+SampleT<Vector2> Common::SampleGaussian2D(Vector2 xi, Float sigma,
+                                          Vector2 mu)
+{
+    using namespace MathConstants;
+    using MathFunctions::SinCos;
+    // Instead of doing two gauss inverse sampling,
+    // doing Box-Muller transform
+    Float scalar = std::sqrt(Float(-2) * std::log(xi[0]));
+    auto[s, c] = SinCos(Pi<Float>() * Float(2) * xi[1]);
+
+    // Since rng is [0, 1) it can get zero then above function
+    // If scalar is inf, we are at outer ring (infinitely long)
+    // clamp similar to %99.5 of the range
+    if(MathFunctions::IsInf(scalar)) scalar = Float(3.5);
+
+    Vector2 xy = Vector2(scalar * s, scalar * c);
+    xy =  (xy * sigma) + mu;
+    Float pdf = PDFGaussian2D(xy, sigma, mu);
+    return { xy, pdf };
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float Common::PDFGaussian2D(Vector2 xy, Float sigma,
+                            Vector2 mu)
+{
+
+    return (MathFunctions::Gaussian(xy[0], sigma, mu[0]) *
+            MathFunctions::Gaussian(xy[1], sigma, mu[1]));
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE

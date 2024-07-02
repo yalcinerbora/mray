@@ -106,15 +106,15 @@ struct SoASpan
     size_t          size = 0;
 
     public:
-            SoASpan() = default;
+                    SoASpan() = default;
     template<class... Spans>
-            SoASpan(const Spans&... args);
+    constexpr       SoASpan(const Spans&... args);
 
     template<size_t I>
-    auto    Get() -> Span<std::tuple_element_t<I, Tuple<Args...>>>;
+    constexpr auto  Get() -> Span<std::tuple_element_t<I, Tuple<Args...>>>;
 
     template<size_t I>
-    auto    Get() const -> Span<std::tuple_element_t<I, Tuple<const Args...>>>;
+    constexpr auto  Get() const -> Span<std::tuple_element_t<I, Tuple<const Args...>>>;
 };
 
 template<class... Args, std::size_t... I>
@@ -168,7 +168,7 @@ constexpr Tuple<Args*...> SoASpan<Args...>::NullifyPtrs()
 
 template<class... Args>
 template<class... Spans>
-SoASpan<Args...>::SoASpan(const Spans&... args)
+constexpr SoASpan<Args...>::SoASpan(const Spans&... args)
     : ptrs(args.data()...)
     , size(std::get<0>(Tuple<Spans...>(args...)).size())
 {
@@ -177,7 +177,7 @@ SoASpan<Args...>::SoASpan(const Spans&... args)
 
 template<class... Args>
 template<size_t I>
-auto SoASpan<Args...>::Get() -> Span<std::tuple_element_t<I, Tuple<Args...>>>
+constexpr auto SoASpan<Args...>::Get() -> Span<std::tuple_element_t<I, Tuple<Args...>>>
 {
     using ResulT = Span<std::tuple_element_t<I, Tuple<Args...>>>;
     return ResulT(std::get<I>(ptrs), size);
@@ -185,7 +185,7 @@ auto SoASpan<Args...>::Get() -> Span<std::tuple_element_t<I, Tuple<Args...>>>
 
 template<class... Args>
 template<size_t I>
-auto SoASpan<Args...>::Get() const -> Span<std::tuple_element_t<I, Tuple<const Args...>>>
+constexpr auto SoASpan<Args...>::Get() const -> Span<std::tuple_element_t<I, Tuple<const Args...>>>
 {
     using ResulT = Span<std::tuple_element_t<I, Tuple<const Args...>>>;
     return ResulT(std::get<I>(ptrs), size);
