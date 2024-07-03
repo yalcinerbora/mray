@@ -198,8 +198,12 @@ MRayError VisorCommand::Invoke()
               !transferQueue.GetVisorView().IsTerminated())
         {
             visorSystem->MTWaitForInputs();
-            visorSystem->MTRender();
+            // Render, but terminate when image semaphore is invalidated
+            // by the tracer (tracer crash)
+            if(!visorSystem->MTRender())
+                break;
         }
+        MRAY_LOG("[Visor]: Terminating!");
     }
     catch(const MRayError& err)
     {
@@ -209,13 +213,16 @@ MRayError VisorCommand::Invoke()
     {
         e = MRayError("Unkown Error: {}", err.what());
     }
-
     // Order is important here
     // First wait the thread pool
     threadPool.wait();
     // Destroy the transfer queue
     // So that the tracer can drop from queue wait
     transferQueue.Terminate();
+    // Invalidate the semaphore,
+    // If tracer waits to issue next image section
+    // it can terminate
+    sem.Invalidate();
     // First stop the tracer, since tracer commands
     // submit glfw "empty event" to trigger visor rendering
     tracerThread.Stop();

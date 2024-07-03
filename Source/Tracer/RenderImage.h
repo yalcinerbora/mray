@@ -101,7 +101,8 @@ class RenderImage
     RenderBufferInfo    GetBufferInfo();
 
     // Synchronized Host access
-    RenderImageSection  GetHostView(const GPUQueue& processQueue,
+    Optional<RenderImageSection>
+                        GetHostView(const GPUQueue& processQueue,
                                     const GPUQueue& transferQueue);
 };
 

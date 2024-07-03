@@ -834,9 +834,9 @@ void VisorVulkan::MTWaitForInputs()
         glfwWaitEvents();
 }
 
-void VisorVulkan::MTRender()
+bool VisorVulkan::MTRender()
 {
-    window.Render();
+    return window.Render();
 }
 
 void VisorVulkan::MTDestroy()

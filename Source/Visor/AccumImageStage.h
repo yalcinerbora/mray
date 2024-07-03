@@ -72,7 +72,9 @@ class AccumImageStage : UniformMemoryRequesterI
     void                    ImportExternalHandles(const RenderBufferInfo&);
     void                    ChangeImage(const VulkanImage* hdrImageIn,
                                         const VulkanImage* sampleImageIn);
-    SemaphoreVariant        IssueAccumulation(SemaphoreVariant prevCmdSignal,
+
+    Optional<SemaphoreVariant>
+                            IssueAccumulation(SemaphoreVariant prevCmdSignal,
                                               const RenderImageSection&);
     //
     size_t                  UniformBufferSize() const override;

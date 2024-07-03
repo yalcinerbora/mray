@@ -532,12 +532,15 @@ void TracerThread::LoopWork()
 
     auto CheckQueueAndExit = [this]()
     {
-        if(transferQueue.IsTerminated())
-        {
-            isTerminated = true;
-            return true;
-        }
-        return false;
+        bool semaphoreDropped = (currentSem && currentSem->IsInvalidated());
+        bool queueDropped = transferQueue.IsTerminated();
+        isTerminated = (semaphoreDropped || queueDropped);
+
+        if(semaphoreDropped) transferQueue.Terminate();
+        if(queueDropped && currentSem) currentSem->Invalidate();
+
+        if(isTerminated) MRAY_LOG("[Tracer]: Terminating!");
+        return isTerminated;
     };
     try
     {

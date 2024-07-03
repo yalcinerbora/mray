@@ -35,10 +35,10 @@ class TracerThread final : public RealtimeThread
     uint32_t                currentRenderLogic1;
     RendererId              currentRenderer;
     size_t                  currentCamIndex;
-    TimelineSemaphore*      currentSem;
     CameraTransform         currentCamTransform;
     AABB3                   currentSceneAABB;
     TracerIdPack            sceneIds;
+    TimelineSemaphore*      currentSem = nullptr;
     // Flow states
     // TODO: I'm pretty sure this will get complicated really fast
     // maybe change this to a state machine later

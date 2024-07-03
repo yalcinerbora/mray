@@ -113,7 +113,9 @@ class GPUSemaphoreViewCUDA
     // Change to next acquisition state (acquireValue + 2)
     // return the Visor's wait state (acquireValue + 1)
     uint64_t    ChangeToNextState();
-    void        HostAcquire();
+
+    [[nodiscard]]
+    bool        HostAcquire();
     void        HostRelease();
 };
 

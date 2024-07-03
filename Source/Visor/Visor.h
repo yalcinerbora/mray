@@ -114,7 +114,7 @@ class VisorVulkan : public VisorI
                                      const std::string& processPath) override;
     bool                MTIsTerminated() override;
     void                MTWaitForInputs() override;
-    void                MTRender() override;
+    bool                MTRender() override;
     void                MTDestroy() override;
     void                TriggerEvent() override;
     void                MTInitiallyStartRender(const Optional<std::string_view>& renderConfigPath,

@@ -146,8 +146,8 @@ RendererOutput TexViewRenderer::DoRender()
         colorIndex
     );
 
-    RenderImageSection renderOut = renderBuffer->GetHostView(processQueue,
-                                                             transferQueue);
+    Optional<RenderImageSection> renderOut = renderBuffer->GetHostView(processQueue,
+                                                                       transferQueue);
 
     pixelIndex++;
     return RendererOutput

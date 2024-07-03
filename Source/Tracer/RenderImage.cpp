@@ -32,15 +32,20 @@ RenderImage::RenderImage(const RenderImageParams& p,
     sampleStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(dSamples.data())));
 }
 
-RenderImageSection RenderImage::GetHostView(const GPUQueue& processQueue,
-                                            const GPUQueue& transferQueue)
+Optional<RenderImageSection> RenderImage::GetHostView(const GPUQueue& processQueue,
+                                                      const GPUQueue& transferQueue)
 {
     // Let's not wait on the driver here
     // So host does not runaway from CUDA
     // (I don't know if this is even an issue)
     // Host functions seems to have high variance
     // on execution so thats another reason.
-    sem.HostAcquire();
+    //
+    // If we could not acquire the semaphore,
+    // this means Visor is closing (either user dit it, or an error)
+    // return nothing so that renderer do not send it etc.
+    if(!sem.HostAcquire()) return std::nullopt;
+
     // Barrier the process queue
     processCompleteFence = processQueue.Barrier();
     // Wait the process queue to finish on the transfer queue

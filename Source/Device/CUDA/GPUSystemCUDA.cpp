@@ -26,10 +26,11 @@ uint64_t GPUSemaphoreViewCUDA::ChangeToNextState()
     return acquireValue - 1;
 }
 
-void GPUSemaphoreViewCUDA::HostAcquire()
+bool GPUSemaphoreViewCUDA::HostAcquire()
 {
-    externalSemaphore->Acquire(acquireValue);
+    bool acquired = externalSemaphore->Acquire(acquireValue);
     MRAY_LOG("[Tracer] Acquired Img {}", acquireValue);
+    return acquired;
 }
 
 void GPUSemaphoreViewCUDA::HostRelease()
@@ -293,7 +294,11 @@ GPUThreadInitFunction GPUSystemCUDA::GetThreadInitFunction() const
 void TimelineSemAcquireInternal(void* params)
 {
     GPUSemaphoreViewCUDA* ts = static_cast<GPUSemaphoreViewCUDA*>(params);
-    ts->HostAcquire();
+    // Device side acquision, we cant do much here,
+    // because this is async, so we drop the result and on text iteration
+    // GPU driving code may check the semaphore before sending an
+    // acquisition code to GPU (a host launch)
+    std::ignore = ts->HostAcquire();
 }
 
 void TimelineSemReleaseInternal(void* params)

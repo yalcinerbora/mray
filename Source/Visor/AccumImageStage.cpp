@@ -228,10 +228,11 @@ void AccumImageStage::ChangeImage(const VulkanImage* hdrImageIn,
     pipeline.BindSetData(descriptorSets[0], bindList);
 }
 
-SemaphoreVariant AccumImageStage::IssueAccumulation(SemaphoreVariant prevCmdSignal,
-                                                    const RenderImageSection& section)
+Optional<SemaphoreVariant> AccumImageStage::IssueAccumulation(SemaphoreVariant prevCmdSignal,
+                                                              const RenderImageSection& section)
 {
-    syncSemaphore->Acquire(section.waitCounter);
+    if(!syncSemaphore->Acquire(section.waitCounter))
+        return std::nullopt;
     MRAY_LOG("[Visor] Acquired Img {}", section.waitCounter);
     threadPool->detach_task([sem = syncSemaphore]()
     {
@@ -296,6 +297,17 @@ SemaphoreVariant AccumImageStage::IssueAccumulation(SemaphoreVariant prevCmdSign
     vkCmdDispatch(accumulateCommand, groupSize[0], groupSize[1], 1);
     vkEndCommandBuffer(accumulateCommand);
 
+    // We need to wait the section to be ready.
+    // Again we are waiting from host since not inter GPU
+    // synch is available (Except on Linux I think, using the SYNC_FD
+    // functionality)
+    //
+    // Tracer may abruptly terminated (crash probably),
+    // so do not issue anything, return nullopt and
+    // let the main render loop to terminate
+    if(!syncSemaphore->Acquire(section.waitCounter))
+        return std::nullopt;
+
     // ============= //
     //   SUBMISSON   //
     // ============= //
@@ -335,10 +347,6 @@ SemaphoreVariant AccumImageStage::IssueAccumulation(SemaphoreVariant prevCmdSign
         .pSignalSemaphoreInfos = &signalSemaphores
     };
 
-    // We need to wait the section to be ready.
-    // Again we are waiting from host since not inter GPU
-    // synch is available (Except on Linux I think using the SYNC_FD
-    syncSemaphore->Acquire(section.waitCounter);
     // Finally submit!
     vkQueueSubmit2(handlesVk->mainQueueVk, 1, &submitInfo, accumCompleteFence);
 

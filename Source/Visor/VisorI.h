@@ -92,7 +92,7 @@ class VisorI
                                      const std::string& processPath) = 0;
     virtual bool        MTIsTerminated() = 0;
     virtual void        MTWaitForInputs() = 0;
-    virtual void        MTRender()  = 0;
+    virtual bool        MTRender()  = 0;
     virtual void        MTDestroy() = 0;
     virtual void        TriggerEvent() = 0;
     virtual void        MTInitiallyStartRender(const Optional<std::string_view>& renderConfigPath,

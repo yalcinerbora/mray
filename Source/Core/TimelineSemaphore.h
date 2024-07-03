@@ -31,32 +31,42 @@ class TimelineSemaphore
     uint64_t                value;
     std::mutex              mutex;
     std::condition_variable cVar;
+    bool                    invalid;
+
     public:
     // Constructors & Destructor
          TimelineSemaphore(uint64_t initialValue);
     //
-    void Acquire(uint64_t);
+    [[nodiscard]]
+    bool Acquire(uint64_t);
     void Release();
+
     void Reset();
+    void Invalidate();
+
+    [[nodiscard]]
+     bool IsInvalidated();
 };
 
 inline
 TimelineSemaphore::TimelineSemaphore(uint64_t init)
     : value(init)
+    , invalid(false)
 {}
 
 inline
-void TimelineSemaphore::Acquire(uint64_t waitVal)
+bool TimelineSemaphore::Acquire(uint64_t waitVal)
 {
-    // First wait is "free" we assume it is signalled
-    if(waitVal == 0) return;
+    // First wait is "free", we assume it is signalled
+    if(waitVal == 0) return true;
 
     std::unique_lock lock(mutex);
     cVar.wait(lock, [this, waitVal]()
     {
         // Wait untill value is exactly the wait value
-        return value == waitVal;
+        return value == waitVal || invalid;
     });
+    return !invalid;
 }
 
 inline
@@ -73,4 +83,19 @@ void TimelineSemaphore::Reset()
     std::unique_lock lock(mutex);
     value = 0;
     cVar.notify_all();
+}
+
+inline
+void TimelineSemaphore::Invalidate()
+{
+    std::unique_lock lock(mutex);
+    invalid = true;
+    cVar.notify_all();
+}
+
+inline
+bool TimelineSemaphore::IsInvalidated()
+{
+    std::unique_lock lock(mutex);
+    return invalid;
 }

@@ -1148,7 +1148,7 @@ void VisorWindow::DoInitialActions()
     }
 }
 
-void VisorWindow::Render()
+bool VisorWindow::Render()
 {
     Optional<RenderBufferInfo>      newRenderBuffer;
     Optional<RenderImageSection>    newImageSection;
@@ -1292,8 +1292,12 @@ void VisorWindow::Render()
     if(newImageSection)
     {
         auto& as = accumulateStage;
-        prevSemamphore = as.IssueAccumulation(prevSemamphore,
-                                              newImageSection.value());
+        auto result = as.IssueAccumulation(prevSemamphore,
+                                           newImageSection.value());
+        // TODO: Abruptly returning here, any synchronization
+        // considerations should be checked?
+        if(!result) return false;
+        prevSemamphore = result.value();
     }
 
     // Entire image reset + img format change (new alloc maybe)
@@ -1349,7 +1353,7 @@ void VisorWindow::Render()
     // ================== //
     //    Command Start   //
     // ================== //
-    if(stopPresenting) return;
+    if(stopPresenting) return true;
     // Wait availablility of the command buffer
     FramePack frameHandle = NextFrame();
     StartCommandBuffer(frameHandle);
@@ -1389,6 +1393,7 @@ void VisorWindow::Render()
     visorState.visor.frameTime = frameCounter.AvgFrame();
     vkEndCommandBuffer(frameHandle.commandBuffer);
     PresentFrame(prevSemamphore);
+    return true;
 }
 
 void VisorWindow::SetKickstartParameters(const Optional<std::string_view>& renderConfigPath,
