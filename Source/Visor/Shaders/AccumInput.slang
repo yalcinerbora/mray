@@ -40,8 +40,10 @@ void KCAccumulateInputs(uint3 globalId: SV_DispatchThreadID,
 
     // Reads
     int pixLinear = pixIn[1] * pixCount.x + pixIn[0];
-    float3 colorIn = params.inPixels[pixLinear].xyz;
-    float sampleIn = params.inSamples[pixLinear];
+    // float3 colorIn = params.inPixels[pixLinear].xyz;
+    // float sampleIn = params.inSamples[pixLinear];
+    float3 colorIn = float3(1.f, 0.f, 0.f);
+    float sampleIn = 1.f;
     //
     float3 colorOut = params.outPixels.Load(pixOut);
     float sampleOut = params.outSamples.Load(pixOut);

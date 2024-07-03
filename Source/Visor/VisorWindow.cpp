@@ -1337,16 +1337,8 @@ bool VisorWindow::Render()
     // Image clear
     else if(newClearSignal)
     {
-        //prevSemamphore = accumulateStage.IssueClear(prevSemamphore);
+        prevSemamphore = renderImagePool.IssueClear(prevSemamphore);
     }
-
-    // Do tonemap
-    if(newClearSignal || newRenderBuffer || newImageSection)
-    {
-        // prevSemamphore = tonemapStage.TonemapImage(prevSemamphore,
-        //                          rendeImagePool.GetImage());
-    }
-
     // Initially send sync semaphore and initial render config
     DoInitialActions();
 
@@ -1359,6 +1351,12 @@ bool VisorWindow::Render()
     StartCommandBuffer(frameHandle);
     frameCounter.StartRecord(frameHandle.commandBuffer);
 
+    // Do tonemap via the frame's command buffer
+    if(newClearSignal || newRenderBuffer || newImageSection)
+    {
+        auto& tm = tonemapStage;
+        tm.IssueTonemap(frameHandle.commandBuffer);
+    }
 
     // Linearize the compute event with imGui img reads
     // This may not be needed since semaphores are

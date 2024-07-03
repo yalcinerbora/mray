@@ -67,7 +67,7 @@ class VulkanComputePipeline
     DescriptorSets          GenerateDescriptorSets(VkDescriptorPool pool);
     void                    BindSetData(VkDescriptorSet descriptorSet,
                                         const DescriptorBindList<ShaderBindingData>& bindingDataList);
-    void                    BindSet(VkCommandBuffer cmd,
-                                    uint32_t setIndex,
+    void                    BindSet(VkCommandBuffer cmd, uint32_t setIndex,
                                     VkDescriptorSet set);
+    void                    BindPipeline(VkCommandBuffer cmd);
 };

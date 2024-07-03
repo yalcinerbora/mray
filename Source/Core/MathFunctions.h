@@ -2,6 +2,7 @@
 
 #include "Definitions.h"
 #include "MathConstants.h"
+#include "MathForward.h"
 
 #include <cmath>
 #include <bit>
@@ -49,8 +50,15 @@ namespace MathFunctions
     // Simple Divisions
     template <std::integral T>
     MRAY_HYBRID constexpr T     DivideUp(T value, T alignment);
+    template <uint32_t N, std::integral T>
+    MRAY_HYBRID
+    constexpr Vector<N, T>      DivideUp(Vector<N, T> value, Vector<N, T> divisor);
+
     template <std::integral T>
     MRAY_HYBRID constexpr T     NextMultiple(T value, T alignment);
+    template <uint32_t N, std::integral T>
+    MRAY_HYBRID
+    constexpr Vector<N, T>      NextMultiple(Vector<N, T> value, Vector<N, T> divisor);
 
     // isinf, isnan are not constexpr
     // and CUDA does not swap to its own functions like other math
@@ -248,9 +256,29 @@ constexpr T MathFunctions::DivideUp(T value, T divisor)
     return (value + divisor - 1) / divisor;
 }
 
+template <uint32_t N, std::integral T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Vector<N, T> MathFunctions::DivideUp(Vector<N, T> value, Vector<N, T> divisor)
+{
+    // This do not work
+    //assert(divisor != Vector<N, T>::Zero());
+    // But this works? (MSVC, or CUDA?)
+    // probably need "template" token somewhere
+    using V = Vector<N, T>;
+    assert(divisor != V::Zero());
+    return (value + divisor - 1) / divisor;
+}
+
 template <std::integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr T MathFunctions::NextMultiple(T value, T divisor)
+{
+    return DivideUp(value, divisor) * divisor;
+}
+
+template <uint32_t N, std::integral T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Vector<N, T> MathFunctions::NextMultiple(Vector<N, T> value, Vector<N, T> divisor)
 {
     return DivideUp(value, divisor) * divisor;
 }

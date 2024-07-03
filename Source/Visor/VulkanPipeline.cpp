@@ -241,9 +241,14 @@ void VulkanComputePipeline::BindSetData(VkDescriptorSet descriptorSet,
 }
 
 void VulkanComputePipeline::BindSet(VkCommandBuffer cmd, uint32_t setIndex,
-                                           VkDescriptorSet set)
+                                    VkDescriptorSet set)
 {
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
                             pipelineLayout, setIndex, 1,
                             &set, 0, nullptr);
+}
+
+void VulkanComputePipeline::BindPipeline(VkCommandBuffer cmd)
+{
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
 }

@@ -231,16 +231,6 @@ void AccumImageStage::ChangeImage(const VulkanImage* hdrImageIn,
 Optional<SemaphoreVariant> AccumImageStage::IssueAccumulation(SemaphoreVariant prevCmdSignal,
                                                               const RenderImageSection& section)
 {
-    if(!syncSemaphore->Acquire(section.waitCounter))
-        return std::nullopt;
-    MRAY_LOG("[Visor] Acquired Img {}", section.waitCounter);
-    threadPool->detach_task([sem = syncSemaphore]()
-    {
-        MRAY_LOG("[Visor] Released Img\n----------------------");
-        sem->Release();
-    });
-    return prevCmdSignal;
-
     // Pre-memcopy the buffer
     UniformBuffer buffer =
     {
@@ -293,7 +283,8 @@ Optional<SemaphoreVariant> AccumImageStage::IssueAccumulation(SemaphoreVariant p
     Vector2ui totalPix = section.pixelMax - section.pixelMin;
     Vector2ui TPB = Vector2ui(VulkanComputePipeline::TPB_2D_X,
                               VulkanComputePipeline::TPB_2D_Y);
-    Vector2ui groupSize = (totalPix + TPB - Vector2ui(1)) / TPB;
+    Vector2ui groupSize = MathFunctions::DivideUp(totalPix, TPB);
+    pipeline.BindPipeline(accumulateCommand);
     vkCmdDispatch(accumulateCommand, groupSize[0], groupSize[1], 1);
     vkEndCommandBuffer(accumulateCommand);
 

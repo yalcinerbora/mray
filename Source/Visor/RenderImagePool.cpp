@@ -31,10 +31,11 @@ void RenderImagePool::Clear()
 
     vkDestroySemaphore(handlesVk->deviceVk, saveSemaphore.semHandle,
                        VulkanHostAllocator::Functions());
-    vkFreeCommandBuffers(handlesVk->deviceVk, handlesVk->mainCommandPool, 1,
-                         &hdrCopyCommand);
-    vkFreeCommandBuffers(handlesVk->deviceVk, handlesVk->mainCommandPool, 1,
-                         &sdrCopyCommand);
+
+    using CList = std::array<VkCommandBuffer, 3>;
+    CList commands = { hdrCopyCommand, sdrCopyCommand, clearCommand };
+    vkFreeCommandBuffers(handlesVk->deviceVk, handlesVk->mainCommandPool, 3,
+                         commands.data());
 }
 
 RenderImagePool::RenderImagePool(BS::thread_pool* threadPool,
@@ -102,18 +103,22 @@ RenderImagePool::RenderImagePool(BS::thread_pool* threadPool,
                 0, VK_WHOLE_SIZE, 0, &ptr);
     hStagePtr = static_cast<Byte*>(ptr);
 
+    std::array<VkCommandBuffer, 3>  commands;
     VkCommandBufferAllocateInfo cBuffAllocInfo =
     {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .pNext = nullptr,
         .commandPool = handlesVk->mainCommandPool,
         .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = 1
+        .commandBufferCount = 3
     };
     vkAllocateCommandBuffers(handlesVk->deviceVk, &cBuffAllocInfo,
-                             &hdrCopyCommand);
+                             commands.data());
     vkAllocateCommandBuffers(handlesVk->deviceVk, &cBuffAllocInfo,
                              &sdrCopyCommand);
+    hdrCopyCommand = commands[0];
+    sdrCopyCommand = commands[1];
+    clearCommand = commands[2];
 
     VkCommandBufferBeginInfo cBuffBeginInfo =
     {
@@ -122,7 +127,6 @@ RenderImagePool::RenderImagePool(BS::thread_pool* threadPool,
         .flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT,
         .pInheritanceInfo = nullptr
     };
-
     // HDR
     vkBeginCommandBuffer(hdrCopyCommand, &cBuffBeginInfo);
     VkBufferImageCopy hdrCopyParams = hdrImage.FullCopyParams();
@@ -140,6 +144,31 @@ RenderImagePool::RenderImagePool(BS::thread_pool* threadPool,
                            outStageBuffer.Buffer(), 1,
                            &sdrCopyParams);
     vkEndCommandBuffer(sdrCopyCommand);
+
+    // Clear
+    VkImageSubresourceRange clearRange
+    {
+        .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+        .baseMipLevel   = 0u,
+        .levelCount     = 1u,
+        .baseArrayLayer = 0u,
+        .layerCount     = 1u
+    };
+    VkClearColorValue clearColorValue = {};
+    vkBeginCommandBuffer(clearCommand, &cBuffBeginInfo);
+    vkCmdClearColorImage(clearCommand, hdrImage.Image(),
+                         VK_IMAGE_LAYOUT_GENERAL,
+                         &clearColorValue, 1u,
+                         &clearRange);
+    vkCmdClearColorImage(clearCommand, sdrImage.Image(),
+                         VK_IMAGE_LAYOUT_GENERAL,
+                         &clearColorValue, 1u,
+                         &clearRange);
+    vkCmdClearColorImage(clearCommand, hdrSampleImage.Image(),
+                         VK_IMAGE_LAYOUT_GENERAL,
+                         &clearColorValue, 1u,
+                         &clearRange);
+    vkEndCommandBuffer(clearCommand);
 
     // Semaphore
     VkSemaphoreTypeCreateInfo semTypeCInfo =
@@ -171,6 +200,7 @@ RenderImagePool::RenderImagePool(RenderImagePool&& other)
     , hStagePtr(other.hStagePtr)
     , hdrCopyCommand(std::exchange(other.hdrCopyCommand, nullptr))
     , sdrCopyCommand(std::exchange(other.sdrCopyCommand, nullptr))
+    , clearCommand(std::exchange(other.clearCommand, nullptr))
     , threadPool(other.threadPool)
     , imgLoader(std::move(other.imgLoader))
     , saveSemaphore(std::exchange(other.saveSemaphore, {}))
@@ -192,6 +222,7 @@ RenderImagePool& RenderImagePool::operator=(RenderImagePool&& other)
     hStagePtr = other.hStagePtr;
     hdrCopyCommand = std::exchange(other.hdrCopyCommand, nullptr);
     sdrCopyCommand = std::exchange(other.sdrCopyCommand, nullptr);
+    clearCommand = std::exchange(other.clearCommand, nullptr);
     threadPool = other.threadPool;
     imgLoader = std::move(other.imgLoader);
     saveSemaphore = std::exchange(other.saveSemaphore, {});
@@ -338,4 +369,55 @@ SemaphoreVariant RenderImagePool::SaveImage(SemaphoreVariant prevCmdSignal,
     // However next command (probably render) should only wait for the
     // memory transfer from device memory to host memory
     return SemaphoreVariant{saveSemaphore.value - 1, saveSemaphore.semHandle};
+}
+
+SemaphoreVariant RenderImagePool::IssueClear(SemaphoreVariant prevCmdSignal)
+{
+    // ============= //
+    //   SUBMISSON   //
+    // ============= //
+    VkSemaphoreSubmitInfo waitSemaphore =
+    {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+        .pNext = nullptr,
+        .semaphore = prevCmdSignal.semHandle,
+        .value = prevCmdSignal.value,
+        // TODO change this to more fine-grained later maybe?
+        .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+        .deviceIndex = 0
+    };
+    VkSemaphoreSubmitInfo signalSemaphore =
+    {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+        .pNext = nullptr,
+        .semaphore = clearSemaphore.semHandle,
+        .value = clearSemaphore.value + 1,
+        // TODO change this to more fine-grained later maybe?
+        .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+        .deviceIndex = 0
+    };
+    VkCommandBufferSubmitInfo commandSubmitInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+        .pNext = nullptr,
+        .commandBuffer = clearCommand,
+        .deviceMask = 0
+    };
+    VkSubmitInfo2 submitInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+        .pNext = nullptr,
+        .flags = 0,
+        .waitSemaphoreInfoCount = 1,
+        .pWaitSemaphoreInfos = &waitSemaphore,
+        .commandBufferInfoCount = 1,
+        .pCommandBufferInfos = &commandSubmitInfo,
+        .signalSemaphoreInfoCount = 1,
+        .pSignalSemaphoreInfos = &signalSemaphore
+    };
+    // Finally submit!
+    vkQueueSubmit2(handlesVk->mainQueueVk, 1, &submitInfo, nullptr);
+
+    clearSemaphore.value++;
+    return clearSemaphore;
 }

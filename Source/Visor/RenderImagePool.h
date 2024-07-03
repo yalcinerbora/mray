@@ -35,9 +35,11 @@ class RenderImagePool
     // Command related
     VkCommandBuffer         hdrCopyCommand  = nullptr;
     VkCommandBuffer         sdrCopyCommand  = nullptr;
+    VkCommandBuffer         clearCommand    = nullptr;
     BS::thread_pool*        threadPool      = nullptr;
     ImageLoaderIPtr         imgLoader;
     SemaphoreVariant        saveSemaphore   = {0, nullptr};
+    SemaphoreVariant        clearSemaphore  = {0, nullptr};
     //
     RenderImageInitInfo     initInfo;
 
@@ -58,6 +60,8 @@ class RenderImagePool
     //
     SemaphoreVariant    SaveImage(SemaphoreVariant prevCmdSignal, IsHDRImage,
                                   const RenderImageSaveInfo& fileOutInfo);
+    SemaphoreVariant    IssueClear(SemaphoreVariant prevCmdSignal);
+
     const VulkanImage&  GetHDRImage() const;
     const VulkanImage&  GetSampleImage() const;
     const VulkanImage&  GetSDRImage() const;

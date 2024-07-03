@@ -10,6 +10,7 @@
 
 #include "VulkanTypes.h"
 #include "MainUniformBuffer.h"
+
 struct MRayError;
 
 struct StagingBufferMemView
@@ -27,7 +28,6 @@ class StagingMemoryRequesterI
     virtual size_t  StagingBufferSize() const = 0;
     virtual void    SetStagingBufferView(const StagingBufferMemView& stagingBufferView) = 0;
 };
-
 
 class GUITonemapperI
 {
@@ -47,6 +47,9 @@ class TonemapperI : public UniformMemoryRequesterI
     virtual void            TonemapImage(VkCommandBuffer cmd,
                                          const VulkanImage& hdrImg,
                                          const VulkanImage& sdrImg) = 0;
+    virtual void            BindImages(const VulkanImage& hdrImg,
+                                       const VulkanImage& sdrImg) = 0;
+
     //
     virtual MRayColorSpaceEnum  InputColorspace() const = 0;
     virtual VkColorSpaceKHR     OutputColorspace() const = 0;
