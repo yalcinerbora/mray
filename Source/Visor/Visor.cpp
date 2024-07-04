@@ -434,7 +434,6 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     // devices on the same PC, we may need this functionality
     //
     // Now actually create the device and queue
-
     // TODO: Get the dedicated DMA queue maybe?
     float priority = 1.0f;
     VkDeviceQueueCreateInfo queueCI =
@@ -535,6 +534,11 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
         }
     }
 
+    // Find the common alignment
+    const auto& limits = selectedDeviceProps.limits;
+    deviceAlignment = uint32_t(std::max(limits.minStorageBufferOffsetAlignment,
+                                        limits.minUniformBufferOffsetAlignment));
+
     // If device is iGPU, get the combo memory,
     // This should be as fast as normal memory (speculation but, I mean come on)
     if(selectedDevice.type == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
@@ -614,7 +618,7 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
-        .maxSets = 1,
+        .maxSets = 32,
         .poolSizeCount = static_cast<uint32_t>(imguiPoolSizes.size()),
         .pPoolSizes = imguiPoolSizes.data()
     };
@@ -625,7 +629,8 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     // Initialize the memory allocator
     VulkanDeviceAllocator::Instance(deviceVk,
                                     deviceLocalMemIndex,
-                                    hostVisibleMemIndex);
+                                    hostVisibleMemIndex,
+                                    deviceAlignment);
 
     // Create the common samplers
     //  Min  / Mag  /  Mip

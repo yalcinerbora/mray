@@ -83,6 +83,7 @@ class VisorGUI
     bool            topBarOn        = true;
     bool            bottomBarOn     = true;
     bool            camLocked       = true;
+    bool            tmWindowOn      = false;
     //
     GUITonemapperI* tonemapperGUI   = nullptr;
     //

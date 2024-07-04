@@ -58,9 +58,8 @@ class RenderImagePool
                         ~RenderImagePool();
 
     //
-    SemaphoreVariant    SaveImage(SemaphoreVariant prevCmdSignal, IsHDRImage,
-                                  const RenderImageSaveInfo& fileOutInfo);
-    SemaphoreVariant    IssueClear(SemaphoreVariant prevCmdSignal);
+    SemaphoreVariant    SaveImage(IsHDRImage, const RenderImageSaveInfo& fileOutInfo);
+    SemaphoreVariant    IssueClear();
 
     const VulkanImage&  GetHDRImage() const;
     const VulkanImage&  GetSampleImage() const;

@@ -16,7 +16,7 @@ AccumImageStage::AccumImageStage(AccumImageStage&& other)
     : uniformBuffer(other.uniformBuffer)
     , foreignMemory(std::exchange(other.foreignMemory, nullptr))
     , foreignBuffer(std::exchange(other.foreignBuffer, nullptr))
-    , timelineSemaphoreVk(std::exchange(other.timelineSemaphoreVk, nullptr))
+    , timelineSemaphoreVk(std::exchange(other.timelineSemaphoreVk, {0, nullptr}))
     , accumCompleteFence(std::exchange(other.accumCompleteFence, nullptr))
     , syncSemaphore(other.syncSemaphore)
     , threadPool(other.threadPool)
@@ -38,7 +38,7 @@ AccumImageStage& AccumImageStage::operator=(AccumImageStage&& other)
     accumCompleteFence = std::exchange(other.accumCompleteFence, nullptr);
     syncSemaphore = other.syncSemaphore;
     threadPool = other.threadPool;
-    timelineSemaphoreVk = std::exchange(other.timelineSemaphoreVk, nullptr);
+    timelineSemaphoreVk = std::exchange(other.timelineSemaphoreVk, {0, nullptr});
     handlesVk = other.handlesVk;
     pipeline = std::move(other.pipeline);
     descriptorSets = std::move(other.descriptorSets);
@@ -72,7 +72,7 @@ MRayError AccumImageStage::Initialize(TimelineSemaphore* ts,
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
         .pNext = nullptr,
         .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
-        .initialValue = 0
+        .initialValue = timelineSemaphoreVk.Value()
     };
     VkSemaphoreCreateInfo semCInfo =
     {
@@ -82,7 +82,7 @@ MRayError AccumImageStage::Initialize(TimelineSemaphore* ts,
     };
     vkCreateSemaphore(handlesVk->deviceVk, &semCInfo,
                       VulkanHostAllocator::Functions(),
-                      &timelineSemaphoreVk);
+                      &timelineSemaphoreVk.semHandle);
 
     using namespace std::string_literals;
     MRayError e = pipeline.Initialize(
@@ -125,9 +125,9 @@ void AccumImageStage::Clear()
         vkDestroyBuffer(handlesVk->deviceVk, foreignBuffer,
                         VulkanHostAllocator::Functions());
     }
-    if(!timelineSemaphoreVk) return;
+    if(!timelineSemaphoreVk.semHandle) return;
 
-    vkDestroySemaphore(handlesVk->deviceVk, timelineSemaphoreVk,
+    vkDestroySemaphore(handlesVk->deviceVk, timelineSemaphoreVk.semHandle,
                        VulkanHostAllocator::Functions());
     vkFreeCommandBuffers(handlesVk->deviceVk,
                          handlesVk->mainCommandPool, 1,
@@ -228,8 +228,8 @@ void AccumImageStage::ChangeImage(const VulkanImage* hdrImageIn,
     pipeline.BindSetData(descriptorSets[0], bindList);
 }
 
-Optional<SemaphoreVariant> AccumImageStage::IssueAccumulation(SemaphoreVariant prevCmdSignal,
-                                                              const RenderImageSection& section)
+Optional<SemaphoreVariant>
+AccumImageStage::IssueAccumulation(const RenderImageSection& section)
 {
     // Pre-memcopy the buffer
     UniformBuffer buffer =
@@ -280,6 +280,35 @@ Optional<SemaphoreVariant> AccumImageStage::IssueAccumulation(SemaphoreVariant p
         .pInheritanceInfo = nullptr
     };
     vkBeginCommandBuffer(accumulateCommand, &bInfo);
+
+    // Change the HDR image state to writable
+    VkImageMemoryBarrier imgBarrierInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .pNext = nullptr,
+        .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
+        .dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+        .oldLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL,
+        .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+        .srcQueueFamilyIndex = handlesVk->queueIndex,
+        .dstQueueFamilyIndex = handlesVk->queueIndex,
+        .image = hdrImage->Image(),
+        .subresourceRange = VkImageSubresourceRange
+        {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1
+        },
+    };
+    vkCmdPipelineBarrier(accumulateCommand,
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0,
+                         0, nullptr,
+                         0, nullptr,
+                         1, &imgBarrierInfo);
+
     Vector2ui totalPix = section.pixelMax - section.pixelMin;
     Vector2ui TPB = Vector2ui(VulkanComputePipeline::TPB_2D_X,
                               VulkanComputePipeline::TPB_2D_Y);
@@ -289,8 +318,8 @@ Optional<SemaphoreVariant> AccumImageStage::IssueAccumulation(SemaphoreVariant p
     vkEndCommandBuffer(accumulateCommand);
 
     // We need to wait the section to be ready.
-    // Again we are waiting from host since not inter GPU
-    // synch is available (Except on Linux I think, using the SYNC_FD
+    // Again we are waiting from host since inter GPU
+    // synch is not available (Except on Linux I think, using the SYNC_FD
     // functionality)
     //
     // Tracer may abruptly terminated (crash probably),
@@ -302,22 +331,19 @@ Optional<SemaphoreVariant> AccumImageStage::IssueAccumulation(SemaphoreVariant p
     // ============= //
     //   SUBMISSON   //
     // ============= //
-    uint64_t signalCounter = section.waitCounter + 1;
-    std::array<VkSemaphoreSubmitInfo, 1> waitSemaphores =
+    //uint64_t signalCounter = section.waitCounter + 1;
+    VkSemaphoreSubmitInfo waitSemaphore =
     {
-        VkSemaphoreSubmitInfo
-        {
-            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-            .pNext = nullptr,
-            .semaphore = prevCmdSignal.semHandle,
-            .value = prevCmdSignal.value,
-            // TODO change this to more fine-grained later maybe?
-            .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-            .deviceIndex = 0
-        },
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+        .pNext = nullptr,
+        .semaphore = timelineSemaphoreVk.semHandle,
+        .value = timelineSemaphoreVk.Value(),
+        // TODO change this to more fine-grained later maybe?
+        .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+        .deviceIndex = 0
     };
-    VkSemaphoreSubmitInfo signalSemaphores = waitSemaphores[0];
-    signalSemaphores.value = signalCounter;
+    VkSemaphoreSubmitInfo signalSemaphores = waitSemaphore;
+    signalSemaphores.value = timelineSemaphoreVk.Value() + 1;
     VkCommandBufferSubmitInfo commandSubmitInfo =
     {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
@@ -330,8 +356,8 @@ Optional<SemaphoreVariant> AccumImageStage::IssueAccumulation(SemaphoreVariant p
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
         .pNext = nullptr,
         .flags = 0,
-        .waitSemaphoreInfoCount = 2,
-        .pWaitSemaphoreInfos = waitSemaphores.data(),
+        .waitSemaphoreInfoCount = 1,
+        .pWaitSemaphoreInfos = &waitSemaphore,
         .commandBufferInfoCount = 1,
         .pCommandBufferInfos = &commandSubmitInfo,
         .signalSemaphoreInfoCount = 1,
@@ -357,13 +383,10 @@ Optional<SemaphoreVariant> AccumImageStage::IssueAccumulation(SemaphoreVariant p
         // Reset for the next issue
         vkResetFences(device, 1, &fence);
     });
-    return SemaphoreVariant{signalCounter, timelineSemaphoreVk};
-}
 
-//SystemSemaphoreHandle AccumImageStage::GetSemaphoreOSHandle() const
-//{
-//    return systemSemHandle;
-//}
+    timelineSemaphoreVk.value += 2;
+    return timelineSemaphoreVk;
+}
 
 size_t AccumImageStage::UniformBufferSize() const
 {

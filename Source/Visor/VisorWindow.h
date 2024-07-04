@@ -189,7 +189,7 @@ class VisorWindow
     //
     bool            ShouldClose();
     FramePack       NextFrame();
-    void            PresentFrame(const SemaphoreVariant& waitSemaphore);
+    void            PresentFrame(const Optional<SemaphoreVariant>& waitSemaphore);
     ImFont*         CurrentFont();
     bool            Render();
     void            SetKickstartParameters(const Optional<std::string_view>& renderConfigPath,

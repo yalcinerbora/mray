@@ -74,10 +74,11 @@ class VulkanDeviceAllocator
     VkDevice deviceVk               = nullptr;
     uint32_t deviceMemIndex         = std::numeric_limits<uint32_t>::max();
     uint32_t hostVisibleMemIndex    = std::numeric_limits<uint32_t>::max();
+    uint32_t deviceCommonAlignment  = std::numeric_limits<uint32_t>::max();
 
     // Constructors & Destructor
     VulkanDeviceAllocator() = default;
-    VulkanDeviceAllocator(VkDevice, uint32_t, uint32_t);
+    VulkanDeviceAllocator(VkDevice, uint32_t, uint32_t, uint32_t);
 
     template<size_t... Is, class... Tp>
     void AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>&,
@@ -100,7 +101,8 @@ class VulkanDeviceAllocator
     public:
     static VulkanDeviceAllocator& Instance(VkDevice deviceVk = nullptr,
                                            uint32_t deviceMemIndex = std::numeric_limits<uint32_t>::max(),
-                                           uint32_t hostVisibleMemIndex = std::numeric_limits<uint32_t>::max());
+                                           uint32_t hostVisibleMemIndex = std::numeric_limits<uint32_t>::max(),
+                                           uint32_t deviceCommonAlignment = std::numeric_limits<uint32_t>::max());
     // The alloaction
     template<VulkanMemObjectC... Args>
     [[nodiscard]]
@@ -114,10 +116,19 @@ VulkanDeviceAllocator::AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>
                                                 const Tuple<Tp&...>& tp,
                                                 std::index_sequence<Is...>)
 {
+    auto Align = [alignment = this->deviceCommonAlignment](SizeAlignPair sizeAlign)
+    {
+        return SizeAlignPair
+        {
+            sizeAlign.first,
+            std::max(VkDeviceSize(alignment), sizeAlign.second)
+        };
+    };
+
     // Another comma operator expansion related trick
     // static_cast<void> is to drop the reference from the operator= I think?
     // https://stackoverflow.com/questions/32460653/call-function-for-each-tuple-element-on-one-object-without-recursion
-    (static_cast<void>(sizeAndAlignmentList[Is] = std::get<Is>(tp).MemRequirements()), ...);
+    (static_cast<void>(sizeAndAlignmentList[Is] = Align(std::get<Is>(tp).MemRequirements())), ...);
 }
 
 template<class... Tp>

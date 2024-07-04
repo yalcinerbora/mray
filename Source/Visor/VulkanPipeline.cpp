@@ -77,9 +77,9 @@ VulkanComputePipeline::~VulkanComputePipeline()
 }
 
 MRayError VulkanComputePipeline::Initialize(const Descriptor2DList<ShaderBindingInfo>& bindingInfoList,
-                                                   const std::string& shaderName,
-                                                   const std::string& execName,
-                                                   const std::string& entryPointName)
+                                            const std::string& shaderName,
+                                            const std::string& execName,
+                                            const std::string& entryPointName)
 {
     auto sourceE = DevourFile(shaderName, execName);
     if(sourceE.has_error()) return sourceE.error();

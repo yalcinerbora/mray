@@ -270,7 +270,7 @@ constexpr uint64_t HashPCG64::Hash(Args&&... args)
     // This may improve compilation times when sizeof...(Args) is large?
     uint64_t v = 0;
     (
-        (void)(v = Hash(std::bit_cast<uintX_t<Args>>(args) + v)),
+        static_cast<void>(v = Hash(std::bit_cast<uintX_t<Args>>(args) + v)),
         ...
     );
     return v;

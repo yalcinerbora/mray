@@ -3,6 +3,7 @@
 #include "VulkanTypes.h"
 #include "VulkanAllocators.h"
 #include "Core/Error.h"
+#include "Core/DataStructures.h"
 
 void FramePool::Clear()
 {
@@ -14,7 +15,7 @@ void FramePool::Clear()
                        VulkanHostAllocator::Functions());
         vkDestroySemaphore(deviceVk, semaphores[i].imageAvailableSignal,
                            VulkanHostAllocator::Functions());
-        vkDestroySemaphore(deviceVk, semaphores[i].commandsRecordedSignal,
+        vkDestroySemaphore(deviceVk, semaphores[i].commandsExecutedSignal,
                            VulkanHostAllocator::Functions());
     }
 }
@@ -94,7 +95,7 @@ MRayError FramePool::Initialize(const VulkanSystemView& handlesVk)
                           &semaphores[i].imageAvailableSignal);
         vkCreateSemaphore(handlesVk.deviceVk, &semCreateInfo,
                           VulkanHostAllocator::Functions(),
-                          &semaphores[i].commandsRecordedSignal);
+                          &semaphores[i].commandsExecutedSignal);
         vkCreateFence(handlesVk.deviceVk, &fenceCreateInfo,
                       VulkanHostAllocator::Functions(),
                       &fences[i]);
@@ -125,29 +126,42 @@ FramePack FramePool::AcquireNextFrame(Swapchain& swapchain)
 }
 
 void FramePool::PresentThisFrame(Swapchain& swapchain,
-                                 const SemaphoreVariant& waitSemaphore)
+                                 const Optional<SemaphoreVariant>& extraWaitSem)
 {
     assert(frameIndex >= 0 && frameIndex < FRAME_COUNT);
     uint32_t frameIndexUInt = static_cast<uint32_t>(frameIndex);
-    VkSemaphore comRecordSem = semaphores[frameIndexUInt].commandsRecordedSignal;
+    VkSemaphore comExecSem = semaphores[frameIndexUInt].commandsExecutedSignal;
+    VkSemaphore imgReadySem = semaphores[frameIndexUInt].imageAvailableSignal;
 
     // ============= //
     //   SUBMISSON   //
     // ============= //
     VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    VkSemaphoreSubmitInfo waitSemaphores =
+    StaticVector<VkSemaphoreSubmitInfo, 2> waitSemaphores;
+    waitSemaphores.push_back(VkSemaphoreSubmitInfo
     {
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
         .pNext = nullptr,
-        .semaphore = waitSemaphore.semHandle,
-        .value = waitSemaphore.Value(),
+        .semaphore = imgReadySem,
+        .value = 0,
         // TODO change this to more fine-grained later maybe?
         .stageMask = waitStage,
         .deviceIndex = 0
-    };
-    VkSemaphoreSubmitInfo signalSemaphores = waitSemaphores;
-    signalSemaphores.value = 0;
-    signalSemaphores.semaphore = comRecordSem;
+    });
+    if(extraWaitSem)
+    {
+        waitSemaphores.push_back(waitSemaphores.back());
+        waitSemaphores.back().value = extraWaitSem.value().Value();
+        waitSemaphores.back().semaphore = extraWaitSem.value().semHandle;
+    }
+    StaticVector<VkSemaphoreSubmitInfo, 2> signalSemaphores = waitSemaphores;
+    signalSemaphores[0].value = 0;
+    signalSemaphores[0].semaphore = comExecSem;
+    if(extraWaitSem)
+    {
+        signalSemaphores[1].value = extraWaitSem.value().Value() + 1;
+    }
+
     VkCommandBufferSubmitInfo commandSubmitInfo =
     {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
@@ -161,16 +175,16 @@ void FramePool::PresentThisFrame(Swapchain& swapchain,
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
         .pNext = nullptr,
         .flags = 0,
-        .waitSemaphoreInfoCount = 1,
-        .pWaitSemaphoreInfos = &waitSemaphores,
+        .waitSemaphoreInfoCount = static_cast<uint32_t>(waitSemaphores.size()),
+        .pWaitSemaphoreInfos = waitSemaphores.data(),
         .commandBufferInfoCount = 1,
         .pCommandBufferInfos = &commandSubmitInfo,
-        .signalSemaphoreInfoCount = 1,
-        .pSignalSemaphoreInfos = &signalSemaphores
+        .signalSemaphoreInfoCount = static_cast<uint32_t>(signalSemaphores.size()),
+        .pSignalSemaphoreInfos = signalSemaphores.data()
     };
     // Finally submit!
     vkQueueSubmit2(mainQueueVk, 1, &submitInfo, fences[frameIndexUInt]);
-    swapchain.PresentFrame(comRecordSem);
+    swapchain.PresentFrame(comExecSem);
     frameIndex = (frameIndex + 1) % FRAME_COUNT;
 }
 

@@ -31,6 +31,8 @@ void RenderImagePool::Clear()
 
     vkDestroySemaphore(handlesVk->deviceVk, saveSemaphore.semHandle,
                        VulkanHostAllocator::Functions());
+    vkDestroySemaphore(handlesVk->deviceVk, clearSemaphore.semHandle,
+                       VulkanHostAllocator::Functions());
 
     using CList = std::array<VkCommandBuffer, 3>;
     CList commands = { hdrCopyCommand, sdrCopyCommand, clearCommand };
@@ -63,9 +65,10 @@ RenderImagePool::RenderImagePool(BS::thread_pool* threadPool,
     // visor, (we assume it is always XXX_FLOAT).
     auto sdrImgUsageFlags = (VK_IMAGE_USAGE_SAMPLED_BIT |
                              VK_IMAGE_USAGE_STORAGE_BIT |
-                             VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
-    auto hdrImgUsageFlags = (sdrImgUsageFlags |
+                             VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                              VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    auto hdrImgUsageFlags = sdrImgUsageFlags;
+
     hdrImage = (initInfo.isSpectralPack)
         ? VulkanImage(*handlesVk, VulkanSamplerMode::NEAREST,
                       VK_FORMAT_R32_SFLOAT, hdrImgUsageFlags,
@@ -91,6 +94,8 @@ RenderImagePool::RenderImagePool(BS::thread_pool* threadPool,
                                                              sdrImage,
                                                              hdrSampleImage),
                                                     VulkanDeviceAllocator::DEVICE);
+    // If we create view before attaching memory,
+    // validation layer whines. So creating views after allocation.
     hdrImage.CreateView();
     sdrImage.CreateView();
     hdrSampleImage.CreateView();
@@ -156,6 +161,39 @@ RenderImagePool::RenderImagePool(BS::thread_pool* threadPool,
     };
     VkClearColorValue clearColorValue = {};
     vkBeginCommandBuffer(clearCommand, &cBuffBeginInfo);
+    // Change the HDR image state to writable
+    std::array<VkImageMemoryBarrier, 3> imgBarrierInfo = {};
+    imgBarrierInfo[0] =
+    {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .pNext = nullptr,
+        .srcAccessMask = VK_ACCESS_NONE,
+        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+        .srcQueueFamilyIndex = handlesVk->queueIndex,
+        .dstQueueFamilyIndex = handlesVk->queueIndex,
+        .image = hdrImage.Image(),
+        .subresourceRange = VkImageSubresourceRange
+        {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1
+        },
+    };
+    imgBarrierInfo[1] = imgBarrierInfo[0];
+    imgBarrierInfo[1].image = sdrImage.Image();
+    imgBarrierInfo[2] = imgBarrierInfo[0];
+    imgBarrierInfo[2].image = hdrSampleImage.Image();
+    vkCmdPipelineBarrier(clearCommand,
+                         VK_PIPELINE_STAGE_NONE,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                         0, nullptr,
+                         0, nullptr,
+                         3, imgBarrierInfo.data());
+
     vkCmdClearColorImage(clearCommand, hdrImage.Image(),
                          VK_IMAGE_LAYOUT_GENERAL,
                          &clearColorValue, 1u,
@@ -187,6 +225,10 @@ RenderImagePool::RenderImagePool(BS::thread_pool* threadPool,
     vkCreateSemaphore(handlesVk->deviceVk, &semCInfo,
                       VulkanHostAllocator::Functions(),
                       &saveSemaphore.semHandle);
+    semTypeCInfo.initialValue = clearSemaphore.value;
+    vkCreateSemaphore(handlesVk->deviceVk, &semCInfo,
+                      VulkanHostAllocator::Functions(),
+                      &clearSemaphore.semHandle);
 }
 
 RenderImagePool::RenderImagePool(RenderImagePool&& other)
@@ -204,6 +246,7 @@ RenderImagePool::RenderImagePool(RenderImagePool&& other)
     , threadPool(other.threadPool)
     , imgLoader(std::move(other.imgLoader))
     , saveSemaphore(std::exchange(other.saveSemaphore, {}))
+    , clearSemaphore(std::exchange(other.clearSemaphore, {}))
     , initInfo(other.initInfo)
 {}
 
@@ -226,6 +269,7 @@ RenderImagePool& RenderImagePool::operator=(RenderImagePool&& other)
     threadPool = other.threadPool;
     imgLoader = std::move(other.imgLoader);
     saveSemaphore = std::exchange(other.saveSemaphore, {});
+    clearSemaphore = std::exchange(other.clearSemaphore, {});
     initInfo = other.initInfo;
     return *this;
 }
@@ -235,40 +279,23 @@ RenderImagePool::~RenderImagePool()
     Clear();
 }
 
-SemaphoreVariant RenderImagePool::SaveImage(SemaphoreVariant prevCmdSignal,
-                                            IsHDRImage t, const RenderImageSaveInfo& fileOutInfo)
-
+SemaphoreVariant RenderImagePool::SaveImage(IsHDRImage t, const RenderImageSaveInfo& fileOutInfo)
 {
     // ============= //
     //   SUBMISSON   //
     // ============= //
-    uint64_t waitCounter = saveSemaphore.value;
-    uint64_t signalCounter = waitCounter + 1;
-    std::array<VkSemaphoreSubmitInfo, 2> waitSemaphores =
+    VkSemaphoreSubmitInfo waitSemaphore =
     {
-        VkSemaphoreSubmitInfo
-        {
-            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-            .pNext = nullptr,
-            .semaphore = prevCmdSignal.semHandle,
-            .value = prevCmdSignal.value,
-            // TODO change this to more fine-grained later maybe?
-            .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-            .deviceIndex = 0
-        },
-        VkSemaphoreSubmitInfo
-        {
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
             .pNext = nullptr,
             .semaphore = saveSemaphore.semHandle,
-            .value = waitCounter,
+            .value = saveSemaphore.Value(),
             // TODO change this to more fine-grained later maybe?
             .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
             .deviceIndex = 0
-        }
     };
-    VkSemaphoreSubmitInfo signalSemaphores = waitSemaphores[1];
-    signalSemaphores.value = signalCounter;
+    VkSemaphoreSubmitInfo signalSemaphore = waitSemaphore;
+    signalSemaphore.value = saveSemaphore.Value() + 1;
     VkCommandBufferSubmitInfo commandSubmitInfo =
     {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
@@ -281,22 +308,23 @@ SemaphoreVariant RenderImagePool::SaveImage(SemaphoreVariant prevCmdSignal,
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
         .pNext = nullptr,
         .flags = 0,
-        .waitSemaphoreInfoCount = 2,
-        .pWaitSemaphoreInfos = waitSemaphores.data(),
+        .waitSemaphoreInfoCount = 1,
+        .pWaitSemaphoreInfos = &waitSemaphore,
         .commandBufferInfoCount = 1,
         .pCommandBufferInfos = &commandSubmitInfo,
         .signalSemaphoreInfoCount = 1,
-        .pSignalSemaphoreInfos = &signalSemaphores
+        .pSignalSemaphoreInfos = &signalSemaphore
     };
     // Finally submit!
     vkQueueSubmit2(handlesVk->mainQueueVk, 1, &submitInfo, nullptr);
-    saveSemaphore.value++;
 
     // Copy everything on the stack.
     // Also copy semaphore and its value
     // Now during this thread's process we may encounter
     threadPool->detach_task([this, fileOutInfo, t, sem = saveSemaphore]()
     {
+        // Wait for the copy to staging buffer to finish
+        uint64_t waitValue = sem.Value() + 1;
         VkSemaphoreWaitInfo waitInfo =
         {
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
@@ -304,7 +332,7 @@ SemaphoreVariant RenderImagePool::SaveImage(SemaphoreVariant prevCmdSignal,
             .flags = 0,
             .semaphoreCount = 1,
             .pSemaphores = &sem.semHandle,
-            .pValues = &sem.value
+            .pValues = &waitValue
         };
         vkWaitSemaphores(handlesVk->deviceVk, &waitInfo,
                          std::numeric_limits<uint64_t>::max());
@@ -353,7 +381,7 @@ SemaphoreVariant RenderImagePool::SaveImage(SemaphoreVariant prevCmdSignal,
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO,
             .pNext = nullptr,
             .semaphore = sem.semHandle,
-            .value = sem.value + 1
+            .value = sem.Value() + 2
         };
         // Signal the next save state, even if there is an error
         vkSignalSemaphore(handlesVk->deviceVk, &signalInfo);
@@ -362,16 +390,23 @@ SemaphoreVariant RenderImagePool::SaveImage(SemaphoreVariant prevCmdSignal,
         if(e) MRAY_ERROR_LOG("{}", e.GetError());
     });
 
-    // Our next wait will be twice as high from prev
-    // Increment once more
-    saveSemaphore.value++;
+    // Our next wait cycle will start from +3.
+    // - Copy to staging buffer (signalled +1)
+    // - Main command buffer executed (signalled +2)
+    // - Copy thread write finished signal (signalled +3)
 
+    // Main command buffer signals us because I'm lazy
+    //  to make an indirect synchronization
+
+    //  will be twice as high from prev
+    // Increment once more
+    saveSemaphore.value += 3;
     // However next command (probably render) should only wait for the
     // memory transfer from device memory to host memory
-    return SemaphoreVariant{saveSemaphore.value - 1, saveSemaphore.semHandle};
+    return SemaphoreVariant{saveSemaphore.value + 1, saveSemaphore.semHandle};
 }
 
-SemaphoreVariant RenderImagePool::IssueClear(SemaphoreVariant prevCmdSignal)
+SemaphoreVariant RenderImagePool::IssueClear()
 {
     // ============= //
     //   SUBMISSON   //
@@ -380,8 +415,8 @@ SemaphoreVariant RenderImagePool::IssueClear(SemaphoreVariant prevCmdSignal)
     {
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
         .pNext = nullptr,
-        .semaphore = prevCmdSignal.semHandle,
-        .value = prevCmdSignal.value,
+        .semaphore = clearSemaphore.semHandle,
+        .value = clearSemaphore.Value(),
         // TODO change this to more fine-grained later maybe?
         .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
         .deviceIndex = 0
@@ -391,7 +426,7 @@ SemaphoreVariant RenderImagePool::IssueClear(SemaphoreVariant prevCmdSignal)
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
         .pNext = nullptr,
         .semaphore = clearSemaphore.semHandle,
-        .value = clearSemaphore.value + 1,
+        .value = clearSemaphore.Value() + 1,
         // TODO change this to more fine-grained later maybe?
         .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
         .deviceIndex = 0
@@ -418,6 +453,6 @@ SemaphoreVariant RenderImagePool::IssueClear(SemaphoreVariant prevCmdSignal)
     // Finally submit!
     vkQueueSubmit2(handlesVk->mainQueueVk, 1, &submitInfo, nullptr);
 
-    clearSemaphore.value++;
+    clearSemaphore.value += 2;
     return clearSemaphore;
 }

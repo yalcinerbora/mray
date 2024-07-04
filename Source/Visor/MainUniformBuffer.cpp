@@ -50,42 +50,6 @@ MainUniformBuffer::~MainUniformBuffer()
                       mainMemory.Memory());
 }
 
-template<size_t N>
-void MainUniformBuffer::AllocateUniformBuffers(std::array<UniformMemoryRequesterI*, N>& bufferRequesters)
-{
-    std::array<size_t, N> offsets = {};
-    for(size_t i = 0 ; i < N; i++)
-    {
-        const auto* requester = bufferRequesters[i];
-        offsets[i] = totalSize;
-        totalSize += requester->UniformBufferSize();
-        totalSize = MathFunctions::NextMultiple(totalSize, VULKAN_META_ALIGNMENT);
-    }
-    //
-    mainUniformBuffer = VulkanBuffer(*handlesVk,
-                                     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                                     totalSize);
-    mainMemory = VulkanDeviceAllocator::Instance().AllocateMultiObject(std::tie(mainUniformBuffer),
-                                                                       VulkanDeviceAllocator::HOST_VISIBLE);
-    void* hPtr;
-    vkMapMemory(handlesVk->deviceVk, mainMemory.Memory(), 0,
-                totalSize, 0, &hPtr);
-    alwaysMappedPtr = reinterpret_cast<Byte*>(hPtr);
-
-    for(size_t i = 0; i < N; i++)
-    {
-        UniformBufferMemView v =
-        {
-            .hostPtr = alwaysMappedPtr + offsets[i],
-            .bufferHandle = mainUniformBuffer.Buffer(),
-            .memoryHandle = mainMemory.Memory(),
-            .offset = offsets[i],
-            .size = totalSize
-        };
-        bufferRequesters[i].SetUniformBufferView(v);
-    }
-}
-
 void MainUniformBuffer::FlushBuffer(VkCommandBuffer cmd)
 {
     VkMemoryBarrier memBarrier
@@ -93,12 +57,12 @@ void MainUniformBuffer::FlushBuffer(VkCommandBuffer cmd)
         .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
         .pNext = nullptr,
         .srcAccessMask = VK_ACCESS_HOST_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_HOST_READ_BIT
+        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT
     };
     vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                         0,
-                         1, &memBarrier, 0, nullptr,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0,
+                         1, &memBarrier,
+                         0, nullptr,
                          0, nullptr);
 
     VkMappedMemoryRange memRange =

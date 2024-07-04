@@ -16,7 +16,7 @@ struct AccumulateUniforms
 struct AccumulateParameters
 {
     AccumulateUniforms          U;
-    RWTexture2D<float3>         outPixels;
+    RWTexture2D<float4>         outPixels;
     RWTexture2D<float>          outSamples;
     // Input from host-backed memory
     StructuredBuffer<float3>    inPixels;
@@ -45,7 +45,7 @@ void KCAccumulateInputs(uint3 globalId: SV_DispatchThreadID,
     float3 colorIn = float3(1.f, 0.f, 0.f);
     float sampleIn = 1.f;
     //
-    float3 colorOut = params.outPixels.Load(pixOut);
+    float3 colorOut = params.outPixels.Load(pixOut).xyz;
     float sampleOut = params.outSamples.Load(pixOut);
 
     // Accumulation
@@ -55,18 +55,6 @@ void KCAccumulateInputs(uint3 globalId: SV_DispatchThreadID,
     newColor = newColor / totalSample;
 
     // Write
-    params.outPixels[pixOut] = newColor;
+    params.outPixels[pixOut] = float4(newColor, 0.0f);
     params.outSamples[pixOut] = totalSample;
 }
-
-//StructuredBuffer<float> buffer0;
-//StructuredBuffer<float> buffer1;
-//RWStructuredBuffer<float> result;
-
-//[shader("compute")]
-//[numthreads(1, 1, 1)]
-//void KCAccumulateInputs(uint3 threadId: SV_DispatchThreadID)
-//{
-//    uint index = threadId.x;
-//    result[index] = buffer0[index] + buffer1[index];
-//}

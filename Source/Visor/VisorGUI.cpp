@@ -466,7 +466,10 @@ TopBarChanges VisorGUI::ShowTopMenu(const VisorState& visorState)
     if(ImGui::BeginMainMenuBar())
     {
         ImGui::Text(" ");
-        if(tonemapperGUI) tonemapperGUI->Render();
+        if(tonemapperGUI && ImGui::ToggleButton("Tonemap", tmWindowOn))
+        {
+            tonemapperGUI->Render();
+        }
         ImGui::Separator();
 
         result.rendererIndex = ShowRendererComboBox(visorState);

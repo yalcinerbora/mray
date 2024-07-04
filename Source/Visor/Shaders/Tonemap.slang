@@ -51,8 +51,8 @@ struct TonemapParameters
     // generic (templated) UBO's?
     StructuredBuffer<TMParams>      tonemapParams;
     StructuredBuffer<GammaParams>   outGammaParams;
-    Texture2D<float3>               inputTex;
-    RWTexture2D<float3>             outputTex;
+    Texture2D<float4>               inputTex;
+    RWTexture2D<float4>             outputTex;
     RWStructuredBuffer<MaxAndAvg>   maxAndAvg;
 }
 
@@ -137,7 +137,7 @@ void KCFindAvgMaxLum(uint3 globalId: SV_DispatchThreadID,
     uint2 pixId = uint2(globalId.x % dim.x,
                         globalId.x / dim.x);
 
-    float3 inColor = params.inputTex.Load(uint3(pixId, 0), int2(0, 0));
+    float3 inColor = params.inputTex.Load(uint3(pixId, 0), int2(0, 0)).xyz;
     float luminance = ColorConverterIn::ToYxy(inColor)[0];
 
     // The reduction
@@ -171,7 +171,7 @@ void KCTonemapImage(uint3 globalId : SV_DispatchThreadID)
     uint2 pixId = uint2(globalId.x % dim.x,
                         globalId.x / dim.x);
     //
-    float3 inColorHDR = params.inputTex.Load(uint3(pixId, 0), int2(0, 0));
+    float3 inColorHDR = params.inputTex.Load(uint3(pixId, 0), int2(0, 0)).xyz;
 
     ColorConverterIn  inColorSpace;
     ColorConverterOut outColorSpace;
@@ -181,6 +181,5 @@ void KCTonemapImage(uint3 globalId : SV_DispatchThreadID)
                                             params.tonemapParams[0],
                                             params.maxAndAvg[0].ReadAvgLum(),
                                             params.maxAndAvg[0].ReadMaxLum());
-
-    params.outputTex[pixId] = outColorSDR;
+    params.outputTex[pixId] = float4(outColorSDR, 0.0f);
 }

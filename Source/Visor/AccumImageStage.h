@@ -12,7 +12,7 @@
 class TimelineSemaphore;
 namespace BS { class thread_pool; }
 
-class AccumImageStage : UniformMemoryRequesterI
+class AccumImageStage : public UniformMemoryRequesterI
 {
     private:
     struct UniformBuffer
@@ -39,7 +39,7 @@ class AccumImageStage : UniformMemoryRequesterI
     // Host memory backed stuff
     VkDeviceMemory          foreignMemory           = nullptr;
     VkBuffer                foreignBuffer           = nullptr;
-    VkSemaphore             timelineSemaphoreVk     = nullptr;
+    SemaphoreVariant        timelineSemaphoreVk     = {0, nullptr};
     VkFence                 accumCompleteFence      = nullptr;
     // Main system related stuff
     TimelineSemaphore*      syncSemaphore   = nullptr;
@@ -74,8 +74,7 @@ class AccumImageStage : UniformMemoryRequesterI
                                         const VulkanImage* sampleImageIn);
 
     Optional<SemaphoreVariant>
-                            IssueAccumulation(SemaphoreVariant prevCmdSignal,
-                                              const RenderImageSection&);
+                            IssueAccumulation(const RenderImageSection&);
     //
     size_t                  UniformBufferSize() const override;
     void                    SetUniformBufferView(const UniformBufferMemView& uniformBufferPtr) override;

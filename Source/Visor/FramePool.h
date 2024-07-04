@@ -21,7 +21,7 @@ struct FramebufferPack
 struct FrameSemaphorePair
 {
     VkSemaphore imageAvailableSignal    = nullptr;
-    VkSemaphore commandsRecordedSignal  = nullptr;
+    VkSemaphore commandsExecutedSignal  = nullptr;
 };
 
 struct FramePack : public FramebufferPack
@@ -70,6 +70,6 @@ class FramePool
 
     FramePack       AcquireNextFrame(Swapchain& swapchain);
     void            PresentThisFrame(Swapchain& swapchain,
-                                     const SemaphoreVariant& waitSemaphore);
+                                     const Optional<SemaphoreVariant>& waitSemaphore);
     VkSemaphore     PrevFrameFinishSignal();
 };

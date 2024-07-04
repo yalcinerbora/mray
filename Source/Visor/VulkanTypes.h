@@ -21,9 +21,9 @@ struct SemaphoreVariant
     uint64_t    value = std::numeric_limits<uint64_t>::max();
     VkSemaphore semHandle = nullptr;
     //
-    bool Value() const
+    uint64_t Value() const
     {
-        return (value != std::numeric_limits<uint64_t>::max()) ? value : 0;
+        return (value != std::numeric_limits<uint64_t>::max()) ? value : 0u;
     }
 };
 

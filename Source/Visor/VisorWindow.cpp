@@ -846,6 +846,11 @@ MRayError VisorWindow::Initialize(TransferQueue::VisorView& transferQueueIn,
     e = tonemapStage.Initialize(processPath);
     if(e) return e;
 
+    // Allocate uniform buffers
+    using ReqUBO = UniformMemoryRequesterI;
+    auto uboRequesters = std::array<ReqUBO*, 2>{&tonemapStage, &accumulateStage};
+    uniformBuffer.AllocateUniformBuffers(uboRequesters);
+
     // Initially, send the sync semaphore as a very first action
     MRAY_LOG("[Visor]: Sending sync semaphore...");
     transferQueue->Enqueue(VisorAction
@@ -975,7 +980,7 @@ FramePack VisorWindow::NextFrame()
     return framePool.AcquireNextFrame(swapchain);
 }
 
-void VisorWindow::PresentFrame(const SemaphoreVariant& waitSemaphore)
+void VisorWindow::PresentFrame(const Optional<SemaphoreVariant>& waitSemaphore)
 {
     return framePool.PresentThisFrame(swapchain, waitSemaphore);
 }
@@ -1272,10 +1277,7 @@ bool VisorWindow::Render()
     }
 
     //
-    SemaphoreVariant prevSemamphore =
-    {
-        .semHandle = framePool.PrevFrameFinishSignal(),
-    };
+    Optional<SemaphoreVariant> extraSemaphore;
     if(newSaveInfo)
     {
         auto& rp = renderImagePool;
@@ -1283,8 +1285,7 @@ bool VisorWindow::Render()
         // to next accumulate stage but we feed it to
         // framebuffer rendering which accumulation indirectly
         // depends on. This is dirty fix and should be changed later.
-        prevSemamphore = rp.SaveImage(prevSemamphore, isHDRSave,
-                                      newSaveInfo.value());
+        extraSemaphore = rp.SaveImage(isHDRSave, newSaveInfo.value());
     }
 
     // Before Command Start check if new image section is received
@@ -1292,12 +1293,11 @@ bool VisorWindow::Render()
     if(newImageSection)
     {
         auto& as = accumulateStage;
-        auto result = as.IssueAccumulation(prevSemamphore,
-                                           newImageSection.value());
+        auto result = as.IssueAccumulation(newImageSection.value());
         // TODO: Abruptly returning here, any synchronization
         // considerations should be checked?
         if(!result) return false;
-        prevSemamphore = result.value();
+        extraSemaphore = result.value();
     }
 
     // Entire image reset + img format change (new alloc maybe)
@@ -1335,9 +1335,9 @@ bool VisorWindow::Render()
         gui.ChangeTonemapperGUI(tonemapperGUI.value());
     }
     // Image clear
-    else if(newClearSignal)
+    if(newClearSignal || newRenderBuffer)
     {
-        prevSemamphore = renderImagePool.IssueClear(prevSemamphore);
+        extraSemaphore = renderImagePool.IssueClear();
     }
     // Initially send sync semaphore and initial render config
     DoInitialActions();
@@ -1358,24 +1358,6 @@ bool VisorWindow::Render()
         tm.IssueTonemap(frameHandle.commandBuffer);
     }
 
-    // Linearize the compute event with imGui img reads
-    // This may not be needed since semaphores are
-    // utilized to create dependency
-    if(newRenderBuffer || newClearSignal || newImageSection)
-    {
-        VkMemoryBarrier barrier =
-        {
-            .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
-            .pNext = nullptr,
-            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT
-        };
-        vkCmdPipelineBarrier(frameHandle.commandBuffer,
-                             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                             0, 1, &barrier, 0, nullptr, 0, nullptr);
-    }
-
     // ================== //
     //     GUI RENDER     //
     // ================== //
@@ -1390,7 +1372,7 @@ bool VisorWindow::Render()
     frameCounter.EndRecord(frameHandle.commandBuffer);
     visorState.visor.frameTime = frameCounter.AvgFrame();
     vkEndCommandBuffer(frameHandle.commandBuffer);
-    PresentFrame(prevSemamphore);
+    PresentFrame(extraSemaphore);
     return true;
 }
 

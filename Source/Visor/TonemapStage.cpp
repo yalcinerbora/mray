@@ -6,6 +6,8 @@
 #include <map>
 #include <filesystem>
 
+#include <Imgui/imgui.h>
+
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_to_string.hpp>
 
@@ -13,6 +15,7 @@
 #include "VulkanPipeline.h"
 
 #include "Core/Error.hpp"
+#include "Core/MemAlloc.h"
 
 // Common descriptor set indices of tonemappers
 static constexpr uint32_t TONEMAP_UNIFORM_BUFF_INDEX = 0;
@@ -46,10 +49,11 @@ class TonemapperBase : public TonemapperI
     StagingBufferMemView    stagingBuffer = {};
     DescriptorSets          tonemapDescriptorSets;
     DescriptorSets          reduceDescriptorSets;
-    float                   outGammaValue;
     size_t                  uniformBufferSize;
+    size_t                  gammaBufferStartOffset;
 
     protected:
+    float                   outGammaValue;
     UniformBufferMemView    uniformBuffer = {};
     const VulkanSystemView* handlesVk = nullptr;
     virtual void            UpdateUniformData() = 0;
@@ -98,11 +102,12 @@ class Tonemapper_Reinhard_AcesCG_To_SRGB : public TonemapperBase
     class GUI : public GUITonemapperI
     {
         private:
-        Uniforms&   tmParameters;
+        Uniforms&   opts;
+        float&      gamma;
         bool        paramsChanged;
 
         public:
-                    GUI(Uniforms&);
+                    GUI(Uniforms&, float& gamma);
         void        Render() override;
         bool        IsParamsChanged() const;
     };
@@ -130,7 +135,21 @@ class Tonemapper_Empty_AcesCG_To_HDR10 : public TonemapperBase
     static constexpr VkColorSpaceKHR OUT_CS = VkColorSpaceKHR::VK_COLORSPACE_SRGB_NONLINEAR_KHR;
     static constexpr MRayColorSpaceEnum IN_CS = MRayColorSpaceEnum::MR_ACES_CG;
 
+    class GUI : public GUITonemapperI
+    {
+        private:
+        float&      gamma;
+        bool        paramsChanged;
+
+        public:
+                    GUI(float& gamma);
+        void        Render() override;
+        bool        IsParamsChanged() const;
+    };
+
     private:
+    GUI             gui;
+
     protected:
     void            UpdateUniformData() override {};
 
@@ -152,9 +171,17 @@ TonemapperBase::TonemapperBase(const VulkanSystemView& sys,
     , handlesVk(&sys)
     , tonemapPipeline(sys.deviceVk)
     , reducePipeline(sys.deviceVk)
-    , outGammaValue(2.2f)
     , uniformBufferSize(uboSize)
-{}
+    , outGammaValue(2.2f)
+{
+    // Design fails here we do not have two different uniform buffer
+    // requesters. User our giga alignment to be sure
+    // We need to change this later
+    using MemAlloc::DefaultSystemAlignment;
+    using MathFunctions::NextMultiple;
+    gammaBufferStartOffset = NextMultiple(uniformBufferSize,
+                                          DefaultSystemAlignment());
+}
 
 MRayError TonemapperBase::Initialize(const std::string& execPath)
 {
@@ -195,6 +222,46 @@ void TonemapperBase::TonemapImage(VkCommandBuffer cmd,
                                   const VulkanImage& hdrImg,
                                   const VulkanImage& sdrImg)
 {
+    std::array<VkImageMemoryBarrier, 2> imgBarrierInfo = {};
+    // Change the HDR image state to read-only optimal
+    imgBarrierInfo[0] =
+    {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .pNext = nullptr,
+        .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+        .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+        .newLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL,
+        .srcQueueFamilyIndex = handlesVk->queueIndex,
+        .dstQueueFamilyIndex = handlesVk->queueIndex,
+        .image = hdrImg.Image(),
+        .subresourceRange = VkImageSubresourceRange
+        {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1
+        },
+    };
+    // Change the SDR image writable
+    imgBarrierInfo[1] = imgBarrierInfo[0];
+    std::swap(imgBarrierInfo[1].srcAccessMask,
+              imgBarrierInfo[1].dstAccessMask);
+    std::swap(imgBarrierInfo[1].oldLayout,
+              imgBarrierInfo[1].newLayout);
+    imgBarrierInfo[1].image = sdrImg.Image();
+
+    vkCmdPipelineBarrier(cmd,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0,
+                         0, nullptr,
+                         0, nullptr,
+                         2, imgBarrierInfo.data());
+
+
+    // Load uniforms if changed
     UpdateUniformData();
 
     assert(hdrImg.Extent() == sdrImg.Extent());
@@ -235,29 +302,19 @@ void TonemapperBase::TonemapImage(VkCommandBuffer cmd,
     tonemapPipeline.BindSet(cmd, 0, tonemapDescriptorSets[0]);
     vkCmdDispatch(cmd, groupSize[0], groupSize[1], 1);
 
-    VkImageMemoryBarrier imgMemBarrierInfo =
-    {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-        .pNext = nullptr,
-        .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-        .srcQueueFamilyIndex = handlesVk->queueIndex,
-        .dstQueueFamilyIndex = handlesVk->queueIndex,
-        .image = sdrImg.Image(),
-        .subresourceRange = VkImageSubresourceRange
-        {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1
-        }
-    };
-    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0,
+    // Change the SDR image to fragment-shader readable
+    imgBarrierInfo[1].srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    imgBarrierInfo[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    imgBarrierInfo[1].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imgBarrierInfo[1].newLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+    imgBarrierInfo[1].image = sdrImg.Image();
+
+    vkCmdPipelineBarrier(cmd,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
                          0, nullptr,
                          0, nullptr,
-                         1, &imgMemBarrierInfo);
+                         1, imgBarrierInfo.data());
 }
 
 void TonemapperBase::BindImages(const VulkanImage& hdrImg,
@@ -292,8 +349,7 @@ void TonemapperBase::BindImages(const VulkanImage& hdrImg,
 
 size_t TonemapperBase::UniformBufferSize() const
 {
-    // TODO: Alignment
-    return sizeof(uniformBufferSize) + sizeof(GammaBuffer);
+    return gammaBufferStartOffset + sizeof(GammaBuffer);
 }
 
 void TonemapperBase::SetUniformBufferView(const UniformBufferMemView& ubo)
@@ -318,13 +374,13 @@ void TonemapperBase::SetUniformBufferView(const UniformBufferMemView& ubo)
             VkDescriptorBufferInfo
             {
                 .buffer = uniformBuffer.bufferHandle,
-                .offset = uniformBuffer.offset + sizeof(uniformBufferSize),
+                .offset = uniformBuffer.offset + gammaBufferStartOffset,
                 .range = sizeof(GammaBuffer)
             },
         }
     };
     tonemapPipeline.BindSetData(tonemapDescriptorSets[0], bindList);
-    reducePipeline.BindSetData(tonemapDescriptorSets[0], bindList);
+    reducePipeline.BindSetData(reduceDescriptorSets[0], bindList);
 }
 
 size_t TonemapperBase::StagingBufferSize() const
@@ -362,14 +418,30 @@ VkColorSpaceKHR TonemapperBase::OutputColorspace() const
     return outColorSpace;
 }
 
-Tonemapper_Reinhard_AcesCG_To_SRGB::GUI::GUI(Uniforms& ubo)
-    : tmParameters(ubo)
+Tonemapper_Reinhard_AcesCG_To_SRGB::GUI::GUI(Uniforms& ubo, float& gammaIn)
+    : opts(ubo)
+    , gamma(gammaIn)
 {}
 
 void Tonemapper_Reinhard_AcesCG_To_SRGB::GUI::Render()
 {
     paramsChanged = false;
-    // GO Full imgui here
+    // Key Adjust enable
+    bool b = static_cast<uint32_t>(opts.doKeyAdjust);
+    paramsChanged |= ImGui::Checkbox("Key Adjust", &b);
+    opts.doKeyAdjust = static_cast<uint32_t>(b);
+    // Key
+    ImGui::Text("Key       ");
+    ImGui::SameLine();
+    paramsChanged |= ImGui::InputFloat("##Key", &opts.key, 0.01f, 0.30f);
+    // Burn Ratio
+    ImGui::Text("Burn Ratio");
+    ImGui::SameLine();
+    paramsChanged |= ImGui::SliderFloat("##Burn", &opts.burnRatio, 0.5f, 2.0f);
+    // Gamma
+    ImGui::Text("Gamma     ");
+    ImGui::SameLine();
+    paramsChanged |= ImGui::SliderFloat("##GammaSlider", &gamma, 0.1f, 4.0f, "%0.3f");
 }
 
 bool Tonemapper_Reinhard_AcesCG_To_SRGB::GUI::IsParamsChanged() const
@@ -388,7 +460,7 @@ void Tonemapper_Reinhard_AcesCG_To_SRGB::UpdateUniformData()
 
 Tonemapper_Reinhard_AcesCG_To_SRGB::Tonemapper_Reinhard_AcesCG_To_SRGB(const VulkanSystemView& sys)
     : TonemapperBase(sys, MODULE_NAME, IN_CS, OUT_CS, sizeof(Uniforms))
-    , gui(tmParameters)
+    , gui(tmParameters, outGammaValue)
 {}
 
 GUITonemapperI* Tonemapper_Reinhard_AcesCG_To_SRGB::AcquireGUI()
@@ -396,13 +468,32 @@ GUITonemapperI* Tonemapper_Reinhard_AcesCG_To_SRGB::AcquireGUI()
     return &gui;
 }
 
+Tonemapper_Empty_AcesCG_To_HDR10::GUI::GUI(float& gammaIn)
+    : gamma(gammaIn)
+{}
+
+void Tonemapper_Empty_AcesCG_To_HDR10::GUI::Render()
+{
+    paramsChanged = false;
+    // Gamma
+    ImGui::Text("Gamma");
+    ImGui::SameLine();
+    paramsChanged |= ImGui::SliderFloat("##GammaS", &gamma, 0.1f, 4.0f, "%0.3f");
+}
+
+bool Tonemapper_Empty_AcesCG_To_HDR10::GUI::IsParamsChanged() const
+{
+    return paramsChanged;
+}
+
 Tonemapper_Empty_AcesCG_To_HDR10::Tonemapper_Empty_AcesCG_To_HDR10(const VulkanSystemView& sys)
     : TonemapperBase(sys, MODULE_NAME, IN_CS, OUT_CS, sizeof(EmptyType))
+    , gui(outGammaValue)
 {}
 
 GUITonemapperI* Tonemapper_Empty_AcesCG_To_HDR10::AcquireGUI()
 {
-    return nullptr;
+    return &gui;
 }
 
 //======================//
@@ -460,8 +551,14 @@ MRayError TonemapStage::Initialize(const std::string& execPath)
 void TonemapStage::ChangeImage(const VulkanImage* hdrImageIn,
                                const VulkanImage* sdrImageIn)
 {
+    assert(hdrImageIn != nullptr);
+    assert(sdrImageIn != nullptr);
     hdrImage = hdrImageIn;
     sdrImage = sdrImageIn;
+    for(auto& [_, tm] : tonemappers)
+    {
+        tm->BindImages(*hdrImageIn, *sdrImageIn);
+    }
 }
 
 Expected<GUITonemapperI*>
