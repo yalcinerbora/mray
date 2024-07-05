@@ -28,11 +28,11 @@ class MainUniformBuffer
     static constexpr size_t VULKAN_META_ALIGNMENT = 256;
 
     private:
+    const VulkanSystemView* handlesVk = nullptr;
     VulkanBuffer            mainUniformBuffer;
+    VulkanDeviceMemory      mainMemory;
     size_t                  totalSize       = 0;
     Byte*                   alwaysMappedPtr = nullptr;
-    VulkanDeviceMemory      mainMemory      = nullptr;
-    const VulkanSystemView* handlesVk       = nullptr;
 
     public:
     // Constructors & Destructor

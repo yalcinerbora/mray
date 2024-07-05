@@ -6,6 +6,9 @@
 
 #include "Core/Types.h"
 #include "Core/MathFunctions.h"
+#include "Core/DataStructures.h"
+
+class VulkanBuffer;
 
 using SizeAlignPair = Pair<VkDeviceSize, VkDeviceSize>;
 
@@ -20,13 +23,20 @@ concept VulkanMemObjectC = requires(const T constT, T t)
 
 class VulkanDeviceMemory
 {
+    friend class VulkanDeviceAllocator;
+
     private:
-    VkDeviceMemory      memoryVk = nullptr;
     VkDevice            deviceVk = nullptr;
+    VkDeviceMemory      memoryVk = nullptr;
+
+    private:
+    VulkanDeviceMemory(VkDevice, size_t totalSize,
+                       uint32_t memIndex);
+    VulkanDeviceMemory(VkDevice, const VkMemoryAllocateInfo&);
+
     public:
-                        VulkanDeviceMemory(VkDevice);
-                        VulkanDeviceMemory(VkDevice, size_t totalSize,
-                                           uint32_t memIndex);
+    // Constructors & Destructor
+                        VulkanDeviceMemory() = default;
                         VulkanDeviceMemory(const VulkanDeviceMemory&) = delete;
                         VulkanDeviceMemory(VulkanDeviceMemory&&);
     VulkanDeviceMemory& operator=(const VulkanDeviceMemory&) = delete;
@@ -71,14 +81,17 @@ class VulkanDeviceAllocator
     using OffsetList = std::array<VkDeviceSize, N>;
 
     private:
-    VkDevice deviceVk               = nullptr;
-    uint32_t deviceMemIndex         = std::numeric_limits<uint32_t>::max();
-    uint32_t hostVisibleMemIndex    = std::numeric_limits<uint32_t>::max();
-    uint32_t deviceCommonAlignment  = std::numeric_limits<uint32_t>::max();
+    VkDevice deviceVk = nullptr;
+    StaticVector<VkMemoryType, 32>      memoryList;
+    uint32_t defaultDeviceMemIndex      = std::numeric_limits<uint32_t>::max();
+    uint32_t defaultHostVisibleMemIndex = std::numeric_limits<uint32_t>::max();
+    uint32_t deviceCommonAlignment      = std::numeric_limits<uint32_t>::max();
 
     // Constructors & Destructor
     VulkanDeviceAllocator() = default;
-    VulkanDeviceAllocator(VkDevice, uint32_t, uint32_t, uint32_t);
+    VulkanDeviceAllocator(VkDevice, uint32_t,
+                          Span<const VkMemoryType>,
+                          VkPhysicalDeviceType);
 
     template<size_t... Is, class... Tp>
     void AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>&,
@@ -99,15 +112,21 @@ class VulkanDeviceAllocator
                       const OffsetList<sizeof...(Tp)>& offsets);
 
     public:
-    static VulkanDeviceAllocator& Instance(VkDevice deviceVk = nullptr,
-                                           uint32_t deviceMemIndex = std::numeric_limits<uint32_t>::max(),
-                                           uint32_t hostVisibleMemIndex = std::numeric_limits<uint32_t>::max(),
-                                           uint32_t deviceCommonAlignment = std::numeric_limits<uint32_t>::max());
+    static VulkanDeviceAllocator& Instance(VkDevice deviceVk        = nullptr,
+                                           uint32_t deviceAlignment = std::numeric_limits<uint32_t>::max(),
+                                           Span<const VkMemoryType> = Span<const VkMemoryType>(),
+                                           VkPhysicalDeviceType deviceType = VK_PHYSICAL_DEVICE_TYPE_MAX_ENUM);
+
     // The alloaction
     template<VulkanMemObjectC... Args>
     [[nodiscard]]
     VulkanDeviceMemory AllocateMultiObject(Tuple<Args&...> inOutObjects,
                                            Location location);
+    [[nodiscard]]
+    VulkanDeviceMemory AllocateForeignObject(VulkanBuffer& buffer,
+                                             void* foreignPtr,
+                                             size_t totalSize,
+                                             uint32_t memTypeBits);
 };
 
 template<size_t... Is, class... Tp>
@@ -178,8 +197,8 @@ VulkanDeviceAllocator::AllocateMultiObject(Tuple<Args&...> inOutObjects,
     }
 
     uint32_t memIndex = (location == HOST_VISIBLE)
-                            ? hostVisibleMemIndex
-                            : deviceMemIndex;
+                            ? defaultHostVisibleMemIndex
+                            : defaultDeviceMemIndex;
     VulkanDeviceMemory result(deviceVk, totalSize, memIndex);
 
     // Attach the allocated memory to the objects

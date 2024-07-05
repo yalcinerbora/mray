@@ -159,6 +159,8 @@ const std::array<VkPresentModeKHR, 3> Swapchain::PresentModes =
 FrameCounter::FrameCounter(VkDevice device, VkPhysicalDevice pDevice)
     : deviceVk(device)
 {
+    std::fill(queryData.begin(), queryData.end(), 0u);
+
     VkQueryPoolCreateInfo createInfo =
     {
         .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
@@ -217,16 +219,20 @@ FrameCounter::~FrameCounter()
 
 void FrameCounter::StartRecord(VkCommandBuffer cmd)
 {
-    vkCmdResetQueryPool(cmd, queryPool, 0, 2);
-    if(queryData[1] == 0) return;
+    // Data is still not filled so do not issue another
+    // query
+    if(queryData[1] != 0 || queryData[3] != 0) return;
 
+    vkCmdResetQueryPool(cmd, queryPool, 0, 2);
     vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                         queryPool, 0);
 }
 
 void FrameCounter::EndRecord(VkCommandBuffer cmd)
 {
-    if(queryData[3] == 0) return;
+    // Same as above
+    if(queryData[1] != 0 || queryData[3] != 0) return;
+
     vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                         queryPool, 1);
 }
@@ -238,8 +244,7 @@ float FrameCounter::AvgFrame()
                           queryData.data(), 2 * sizeof(uint64_t),
                           VK_QUERY_RESULT_64_BIT |
                           VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
-
-    if(queryData[3] != 0 && queryData[1] != 0)
+    if(queryData[1] != 0 && queryData[3] != 0)
     {
         double frameTimeMs = static_cast<double>(queryData[2] - queryData[0]);
         frameTimeMs *= (static_cast<double>(timestampPeriod) / 1000000.0);
@@ -254,8 +259,10 @@ float FrameCounter::AvgFrame()
         else
         {
             frameCountList[fillIndex] = frameTimeMsF;
-            fillIndex = (fillIndex + 1) % AVG_FRAME_COUNT;
+            fillIndex = MathFunctions::Roll<int32_t>(fillIndex, 0, AVG_FRAME_COUNT);
         }
+        // Reset the query availablility
+        queryData[1] = queryData[3] = 0;
     }
     float result = std::reduce(frameCountList.begin(),
                                frameCountList.end(),
@@ -652,12 +659,13 @@ Swapchain::~Swapchain()
     }
 }
 
-FramebufferPack Swapchain::NextFrame(VkSemaphore imgAvailSem)
+FramebufferPack Swapchain::NextFrame(const VulkanBinarySemaphore& imgAvailSem)
 {
     uint32_t nextImageIndex;
     VkResult result = vkAcquireNextImageKHR(handlesVk.deviceVk, swapChainVk,
                                             std::numeric_limits<uint64_t>::max(),
-                                            imgAvailSem, VK_NULL_HANDLE, &nextImageIndex);
+                                            imgAvailSem.Handle(),
+                                            VK_NULL_HANDLE, &nextImageIndex);
     if(result == VK_ERROR_OUT_OF_DATE_KHR)
     {
         FixSwapchain();
@@ -676,14 +684,15 @@ FramebufferPack Swapchain::NextFrame(VkSemaphore imgAvailSem)
     };
 }
 
-void Swapchain::PresentFrame(VkSemaphore waitSingal)
+void Swapchain::PresentFrame(const VulkanBinarySemaphore& waitSingal)
 {
+    VkSemaphore waitSemHandle = waitSingal.Handle();
     VkPresentInfoKHR presentInfo =
     {
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
         .pNext = nullptr,
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &waitSingal,
+        .pWaitSemaphores = &waitSemHandle,
         .swapchainCount = 1,
         .pSwapchains = &swapChainVk,
         .pImageIndices = &currentImgIndex,
@@ -830,21 +839,20 @@ MRayError VisorWindow::Initialize(TransferQueue::VisorView& transferQueueIn,
     MRayError e = swapchain.Initialize(handlesVk, surfaceVk, hdrRequested);
     if(e) return e;
 
+
     e = framePool.Initialize(handlesVk);
     if(e) return e;
 
     frameCounter = FrameCounter(handlesVk.deviceVk, handlesVk.pDeviceVk);
 
-    // TODO: we go down to the rabbit hole of
-    // move assignment etc, change the entire vulkan object system
-    // this impl. is patch after patch
-    accumulateStage = AccumImageStage(handlesVk);
-    e = accumulateStage.Initialize(syncSem, threadPool, processPath);
+    // Init Accumulation stage
+    e = accumulateStage.Initialize(handlesVk, syncSem, threadPool, processPath);
     if(e) return e;
-
-    tonemapStage = TonemapStage(handlesVk);
-    e = tonemapStage.Initialize(processPath);
+    // and the Tonemap stage
+    e = tonemapStage.Initialize(handlesVk, processPath);
     if(e) return e;
+    // Initialize the main semaphore
+    imgWriteSem = VulkanTimelineSemaphore(handlesVk);
 
     // Allocate uniform buffers
     using ReqUBO = UniformMemoryRequesterI;
@@ -918,6 +926,7 @@ VisorWindow::VisorWindow(VisorWindow&& other)
     , tonemapStage(std::move(other.tonemapStage))
     , renderImagePool(std::move(other.renderImagePool))
     , uniformBuffer(std::move(other.uniformBuffer))
+    , imgWriteSem(std::move(other.imgWriteSem))
     , initialSceneFile(other.initialSceneFile)
     , initialTracerRenderConfigPath(other.initialTracerRenderConfigPath)
 {
@@ -950,6 +959,7 @@ VisorWindow& VisorWindow::operator=(VisorWindow&& other)
     tonemapStage = std::move(other.tonemapStage);
     renderImagePool = std::move(other.renderImagePool);
     uniformBuffer = std::move(other.uniformBuffer);
+    imgWriteSem = std::move(other.imgWriteSem);
     initialSceneFile = other.initialSceneFile;
     initialTracerRenderConfigPath = other.initialTracerRenderConfigPath;
 
@@ -980,9 +990,9 @@ FramePack VisorWindow::NextFrame()
     return framePool.AcquireNextFrame(swapchain);
 }
 
-void VisorWindow::PresentFrame(const Optional<SemaphoreVariant>& waitSemaphore)
+void VisorWindow::PresentFrame(const VulkanTimelineSemaphore* extraWaitSemaphore)
 {
-    return framePool.PresentThisFrame(swapchain, waitSemaphore);
+    return framePool.PresentThisFrame(swapchain, extraWaitSemaphore);
 }
 
 ImFont* VisorWindow::CurrentFont()
@@ -1198,7 +1208,7 @@ bool VisorWindow::Render()
             }
             case RENDERER_ANALYTICS:
             {
-                MRAY_LOG("[Visor]: Render Info received");
+                //MRAY_LOG("[Visor]: Render Info received");
                 visorState.renderer = std::get<RENDERER_ANALYTICS>(response);
                 break;
             }
@@ -1276,30 +1286,6 @@ bool VisorWindow::Render()
         assert(i <= 1);
     }
 
-    //
-    Optional<SemaphoreVariant> extraSemaphore;
-    if(newSaveInfo)
-    {
-        auto& rp = renderImagePool;
-        // TODO: Technicaly this semaphore should be fed
-        // to next accumulate stage but we feed it to
-        // framebuffer rendering which accumulation indirectly
-        // depends on. This is dirty fix and should be changed later.
-        extraSemaphore = rp.SaveImage(isHDRSave, newSaveInfo.value());
-    }
-
-    // Before Command Start check if new image section is received
-    // Issue an accumulation and override the main wait semaphore
-    if(newImageSection)
-    {
-        auto& as = accumulateStage;
-        auto result = as.IssueAccumulation(newImageSection.value());
-        // TODO: Abruptly returning here, any synchronization
-        // considerations should be checked?
-        if(!result) return false;
-        extraSemaphore = result.value();
-    }
-
     // Entire image reset + img format change (new alloc maybe)
     if(newRenderBuffer)
     {
@@ -1321,11 +1307,13 @@ bool VisorWindow::Render()
         // Change the images, reset descriptor sets
         accumulateStage.ChangeImage(&renderImagePool.GetHDRImage(),
                                     &renderImagePool.GetSampleImage());
+        accumulateStage.ImportExternalHandles(newRB);
+
         tonemapStage.ChangeImage(&renderImagePool.GetHDRImage(),
                                  &renderImagePool.GetSDRImage());
 
         // Change the tonemapper if it is new
-        auto tonemapperGUI = tonemapStage.ChangeTonemapper(newRenderBuffer.value().renderColorSpace,
+        auto tonemapperGUI = tonemapStage.ChangeTonemapper(newRB.renderColorSpace,
                                                            swapchain.ColorSpaceVk());
         // A fatal error for visor, we can't tonemap image
         if(tonemapperGUI) throw tonemapperGUI.error();
@@ -1334,45 +1322,71 @@ bool VisorWindow::Render()
         gui.ChangeDisplayImage(renderImagePool.GetSDRImage());
         gui.ChangeTonemapperGUI(tonemapperGUI.value());
     }
+    if(newSaveInfo)
+    {
+        auto& rp = renderImagePool;
+        rp.SaveImage(isHDRSave, newSaveInfo.value(),
+                     imgWriteSem);
+        imgWriteSem.ChangeNextWait(2);
+    }
+    // Before Command Start check if new image section is received
+    // Issue an accumulation and override the main wait semaphore
+    if(newImageSection)
+    {
+        auto& as = accumulateStage;
+        bool validSubmission = as.IssueAccumulation(newImageSection.value(),
+                                                    imgWriteSem);
+        // TODO: Abruptly returning here, any synchronization
+        // considerations should be checked?
+        if(!validSubmission) return false;
+
+        imgWriteSem.ChangeNextWait(1);
+    }
     // Image clear
     if(newClearSignal || newRenderBuffer)
     {
-        extraSemaphore = renderImagePool.IssueClear();
+        renderImagePool.IssueClear(imgWriteSem);
+        imgWriteSem.ChangeNextWait(1);
+    }
+
+    // Before tonemap issue check if TM parameters
+    // are changed by the user
+    GUIChanges guiChanges = gui.Render(CurrentFont(), visorState);
+    HandleGUIChanges(guiChanges);
+
+    // Do tonemap via the frame's command buffer
+    const VulkanTimelineSemaphore* extraWaitSem = nullptr;
+    if(newClearSignal || newRenderBuffer ||
+       newImageSection || guiChanges.topBarChanges.newTMParams)
+    {
+        auto& tm = tonemapStage;
+        tm.IssueTonemap(imgWriteSem);
+        imgWriteSem.ChangeNextWait(1);
+        extraWaitSem = &imgWriteSem;
     }
     // Initially send sync semaphore and initial render config
     DoInitialActions();
-
-    // ================== //
-    //    Command Start   //
-    // ================== //
+    // ============================== //
+    //    GUI RENDER/ Command Start   //
+    // ============================== //
     if(stopPresenting) return true;
     // Wait availablility of the command buffer
     FramePack frameHandle = NextFrame();
     StartCommandBuffer(frameHandle);
     frameCounter.StartRecord(frameHandle.commandBuffer);
-
-    // Do tonemap via the frame's command buffer
-    if(newClearSignal || newRenderBuffer || newImageSection)
-    {
-        auto& tm = tonemapStage;
-        tm.IssueTonemap(frameHandle.commandBuffer);
-    }
-
     // ================== //
     //     GUI RENDER     //
     // ================== //
     StartRenderpass(frameHandle);
-    GUIChanges guiChanges = gui.Render(CurrentFont(), visorState);
-    HandleGUIChanges(guiChanges);
-    // Draw the GUI
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
                                     frameHandle.commandBuffer);
     vkCmdEndRenderPass(frameHandle.commandBuffer);
-
     frameCounter.EndRecord(frameHandle.commandBuffer);
     visorState.visor.frameTime = frameCounter.AvgFrame();
     vkEndCommandBuffer(frameHandle.commandBuffer);
-    PresentFrame(extraSemaphore);
+    PresentFrame(extraWaitSem);
+    // Change the timelines next wait, if we used the sem
+    if(extraWaitSem) imgWriteSem.ChangeNextWait(1);
     return true;
 }
 

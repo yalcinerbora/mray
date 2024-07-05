@@ -35,7 +35,7 @@ VulkanComputePipeline::DevourFile(const std::string& shaderName,
 
 void VulkanComputePipeline::Clear()
 {
-    if(!computePipeline) return;
+    if(!computePipeline || !deviceVk) return;
 
     for(auto& setLayout : setLayouts)
     {
@@ -48,10 +48,6 @@ void VulkanComputePipeline::Clear()
     vkDestroyPipeline(deviceVk, computePipeline,
                       VulkanHostAllocator::Functions());
 }
-
-VulkanComputePipeline::VulkanComputePipeline(VkDevice deviceVk)
-    : deviceVk(deviceVk)
-{}
 
 VulkanComputePipeline::VulkanComputePipeline(VulkanComputePipeline&& other)
     : deviceVk(other.deviceVk)
@@ -76,11 +72,13 @@ VulkanComputePipeline::~VulkanComputePipeline()
     Clear();
 }
 
-MRayError VulkanComputePipeline::Initialize(const Descriptor2DList<ShaderBindingInfo>& bindingInfoList,
+MRayError VulkanComputePipeline::Initialize(VkDevice dev,
+                                            const Descriptor2DList<ShaderBindingInfo>& bindingInfoList,
                                             const std::string& shaderName,
                                             const std::string& execName,
                                             const std::string& entryPointName)
 {
+    deviceVk = dev;
     auto sourceE = DevourFile(shaderName, execName);
     if(sourceE.has_error()) return sourceE.error();
     const auto& source = sourceE.value();

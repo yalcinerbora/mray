@@ -25,9 +25,10 @@ using namespace std::string_view_literals;
 
 struct TopBarChanges
 {
-    Optional<int32_t> rendererIndex;
-    Optional<int32_t> customLogicIndex0;
-    Optional<int32_t> customLogicIndex1;
+    Optional<int32_t>   rendererIndex;
+    Optional<int32_t>   customLogicIndex0;
+    Optional<int32_t>   customLogicIndex1;
+    bool                newTMParams = false;
 };
 
 struct StatusBarChanges
@@ -88,7 +89,7 @@ class VisorGUI
     GUITonemapperI* tonemapperGUI   = nullptr;
     //
     VkDescriptorSet mainImage       = nullptr;
-    Vector2i        imgSize         = Vector2i::Zero();
+    Vector2         imgSize         = Vector2::Zero();
     //
     MovementSchemeList  movementSchemes;
     int32_t             movementIndex;

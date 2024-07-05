@@ -7,58 +7,16 @@
 
 PFN_vkGetMemoryHostPointerPropertiesEXT AccumImageStage::vkGetMemoryHostPointerProperties = nullptr;
 
-AccumImageStage::AccumImageStage(const VulkanSystemView& handles)
-    : handlesVk(&handles)
-    , pipeline(handles.deviceVk)
-{}
-
-AccumImageStage::AccumImageStage(AccumImageStage&& other)
-    : uniformBuffer(other.uniformBuffer)
-    , foreignMemory(std::exchange(other.foreignMemory, nullptr))
-    , foreignBuffer(std::exchange(other.foreignBuffer, nullptr))
-    , timelineSemaphoreVk(std::exchange(other.timelineSemaphoreVk, {0, nullptr}))
-    , accumCompleteFence(std::exchange(other.accumCompleteFence, nullptr))
-    , syncSemaphore(other.syncSemaphore)
-    , threadPool(other.threadPool)
-    , handlesVk(other.handlesVk)
-    , pipeline(std::move(other.pipeline))
-    , descriptorSets(std::move(other.descriptorSets))
-    , hdrImage(other.hdrImage)
-    , sampleImage(other.sampleImage)
-    , accumulateCommand(std::exchange(other.accumulateCommand, nullptr))
-{}
-
-AccumImageStage& AccumImageStage::operator=(AccumImageStage&& other)
-{
-    assert(this != &other);
-    Clear();
-    uniformBuffer = other.uniformBuffer;
-    foreignMemory = std::exchange(other.foreignMemory, nullptr);
-    foreignBuffer = std::exchange(other.foreignBuffer, nullptr);
-    accumCompleteFence = std::exchange(other.accumCompleteFence, nullptr);
-    syncSemaphore = other.syncSemaphore;
-    threadPool = other.threadPool;
-    timelineSemaphoreVk = std::exchange(other.timelineSemaphoreVk, {0, nullptr});
-    handlesVk = other.handlesVk;
-    pipeline = std::move(other.pipeline);
-    descriptorSets = std::move(other.descriptorSets);
-    hdrImage = other.hdrImage;
-    sampleImage = other.sampleImage;
-    accumulateCommand = std::exchange(other.accumulateCommand, nullptr);
-    return *this;
-}
-
-AccumImageStage::~AccumImageStage()
-{
-    Clear();
-}
-
-MRayError AccumImageStage::Initialize(TimelineSemaphore* ts,
+MRayError AccumImageStage::Initialize(const VulkanSystemView& handles,
+                                      TimelineSemaphore* ts,
                                       BS::thread_pool* tp,
                                       const std::string& execPath)
 {
+    handlesVk = &handles;
     syncSemaphore = ts;
     threadPool = tp;
+    accumulateCommand = VulkanCommandBuffer(*handlesVk);
+    accumCompleteFence = VulkanFence(*handlesVk, false);
 
     if(vkGetMemoryHostPointerProperties == nullptr)
     {
@@ -67,25 +25,8 @@ MRayError AccumImageStage::Initialize(TimelineSemaphore* ts,
         vkGetMemoryHostPointerProperties = reinterpret_cast<PFN_vkGetMemoryHostPointerPropertiesEXT>(func);
     }
 
-    VkSemaphoreTypeCreateInfo semTypeCInfo =
-    {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
-        .pNext = nullptr,
-        .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
-        .initialValue = timelineSemaphoreVk.Value()
-    };
-    VkSemaphoreCreateInfo semCInfo =
-    {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-        .pNext = &semTypeCInfo,
-        .flags = 0
-    };
-    vkCreateSemaphore(handlesVk->deviceVk, &semCInfo,
-                      VulkanHostAllocator::Functions(),
-                      &timelineSemaphoreVk.semHandle);
-
     using namespace std::string_literals;
-    MRayError e = pipeline.Initialize(
+    MRayError e = pipeline.Initialize(handlesVk->deviceVk,
     {
         {
             {UNIFORM_BIND_INDEX,        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
@@ -99,101 +40,25 @@ MRayError AccumImageStage::Initialize(TimelineSemaphore* ts,
     if(e) return e;
 
     descriptorSets = pipeline.GenerateDescriptorSets(handlesVk->mainDescPool);
-
-    // Allocate Command buffer
-    VkCommandBufferAllocateInfo cBuffAllocInfo =
-    {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .pNext = nullptr,
-        .commandPool = handlesVk->mainCommandPool,
-        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = 1
-    };
-    vkAllocateCommandBuffers(handlesVk->deviceVk, &cBuffAllocInfo,
-                             &accumulateCommand);
-
     return MRayError::OK;
-}
-
-void AccumImageStage::Clear()
-{
-    if(foreignBuffer)
-    {
-
-        vkFreeMemory(handlesVk->deviceVk, foreignMemory,
-                     VulkanHostAllocator::Functions());
-        vkDestroyBuffer(handlesVk->deviceVk, foreignBuffer,
-                        VulkanHostAllocator::Functions());
-    }
-    if(!timelineSemaphoreVk.semHandle) return;
-
-    vkDestroySemaphore(handlesVk->deviceVk, timelineSemaphoreVk.semHandle,
-                       VulkanHostAllocator::Functions());
-    vkFreeCommandBuffers(handlesVk->deviceVk,
-                         handlesVk->mainCommandPool, 1,
-                         &accumulateCommand);
-    vkDestroyFence(handlesVk->deviceVk, accumCompleteFence,
-                   VulkanHostAllocator::Functions());
 }
 
 void AccumImageStage::ImportExternalHandles(const RenderBufferInfo& rbI)
 {
-    // Clear old
-    if(foreignMemory)
-    {
-        vkFreeMemory(handlesVk->deviceVk, foreignMemory,
-                     VulkanHostAllocator::Functions());
-        vkDestroyBuffer(handlesVk->deviceVk, foreignBuffer,
-                        VulkanHostAllocator::Functions());
-    }
-
-    static constexpr auto ForeignHostBit = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_MAPPED_FOREIGN_MEMORY_BIT_EXT;
-    static const VkExternalMemoryBufferCreateInfo EXT_BUFF_INFO =
-    {
-        .sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO,
-        .pNext = nullptr,
-        .handleTypes = ForeignHostBit
-    };
-    VkBufferCreateInfo buffInfo =
-    {
-        .sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO,
-        .pNext = &EXT_BUFF_INFO,
-        .flags = 0,
-        .size = rbI.totalSize,
-        .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        .sharingMode = VK_SHARING_MODE_CONCURRENT,
-        .queueFamilyIndexCount = 1,
-        .pQueueFamilyIndices = &handlesVk->queueIndex,
-    };
-    vkCreateBuffer(handlesVk->deviceVk, &buffInfo,
-                   VulkanHostAllocator::Functions(),
-                   &foreignBuffer);
+    foreignBuffer = VulkanBuffer(*handlesVk,
+                                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                 rbI.totalSize, true);
 
     VkMemoryHostPointerPropertiesEXT hostProps = {};
+    hostProps.sType = VK_STRUCTURE_TYPE_MEMORY_HOST_POINTER_PROPERTIES_EXT;
     vkGetMemoryHostPointerProperties(handlesVk->deviceVk,
-                                     ForeignHostBit,
+                                     VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT,
                                      rbI.data, &hostProps);
 
-    // Allocation
-    VkImportMemoryHostPointerInfoEXT hostImportInfo =
-    {
-        .sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT,
-        .pNext = nullptr,
-        .handleType = ForeignHostBit,
-        .pHostPointer = rbI.data,
-    };
-    VkMemoryAllocateInfo memAllocInfo = {
-        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .pNext = &hostImportInfo,
-        .allocationSize = rbI.totalSize,
-        .memoryTypeIndex = hostProps.memoryTypeBits
-    };
-    vkAllocateMemory(handlesVk->deviceVk, &memAllocInfo,
-                     VulkanHostAllocator::Functions(),
-                     &foreignMemory);
-    // Binding
-    vkBindBufferMemory(handlesVk->deviceVk, foreignBuffer, foreignMemory, 0);
-
+    auto& dAllocator = VulkanDeviceAllocator::Instance();
+    foreignMemory = dAllocator.AllocateForeignObject(foreignBuffer, rbI.data,
+                                                     rbI.totalSize,
+                                                     hostProps.memoryTypeBits);
 }
 
 void AccumImageStage::ChangeImage(const VulkanImage* hdrImageIn,
@@ -228,8 +93,8 @@ void AccumImageStage::ChangeImage(const VulkanImage* hdrImageIn,
     pipeline.BindSetData(descriptorSets[0], bindList);
 }
 
-Optional<SemaphoreVariant>
-AccumImageStage::IssueAccumulation(const RenderImageSection& section)
+bool AccumImageStage::IssueAccumulation(const RenderImageSection& section,
+                                        const VulkanTimelineSemaphore& imgWriteSemaphore)
 {
     // Pre-memcopy the buffer
     UniformBuffer buffer =
@@ -247,20 +112,20 @@ AccumImageStage::IssueAccumulation(const RenderImageSection& section)
     {
         {
             IN_PIXEL_BUFF_BIND_INDEX,
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             VkDescriptorBufferInfo
             {
-                .buffer = foreignBuffer,
+                .buffer = foreignBuffer.Buffer(),
                 .offset = section.pixelStartOffset,
                 .range = VK_WHOLE_SIZE
             },
         },
         {
             IN_SAMPLE_BUFF_BIND_INDEX,
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             VkDescriptorBufferInfo
             {
-                .buffer = foreignBuffer,
+                .buffer = foreignBuffer.Buffer(),
                 .offset = section.sampleStartOffset,
                 .range = VK_WHOLE_SIZE
             },
@@ -281,39 +146,12 @@ AccumImageStage::IssueAccumulation(const RenderImageSection& section)
     };
     vkBeginCommandBuffer(accumulateCommand, &bInfo);
 
-    // Change the HDR image state to writable
-    VkImageMemoryBarrier imgBarrierInfo =
-    {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .pNext = nullptr,
-        .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
-        .dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-        .oldLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL,
-        .newLayout = VK_IMAGE_LAYOUT_GENERAL,
-        .srcQueueFamilyIndex = handlesVk->queueIndex,
-        .dstQueueFamilyIndex = handlesVk->queueIndex,
-        .image = hdrImage->Image(),
-        .subresourceRange = VkImageSubresourceRange
-        {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1
-        },
-    };
-    vkCmdPipelineBarrier(accumulateCommand,
-                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0,
-                         0, nullptr,
-                         0, nullptr,
-                         1, &imgBarrierInfo);
-
     Vector2ui totalPix = section.pixelMax - section.pixelMin;
     Vector2ui TPB = Vector2ui(VulkanComputePipeline::TPB_2D_X,
                               VulkanComputePipeline::TPB_2D_Y);
     Vector2ui groupSize = MathFunctions::DivideUp(totalPix, TPB);
     pipeline.BindPipeline(accumulateCommand);
+    pipeline.BindSet(accumulateCommand, 0, descriptorSets[0]);
     vkCmdDispatch(accumulateCommand, groupSize[0], groupSize[1], 1);
     vkEndCommandBuffer(accumulateCommand);
 
@@ -326,24 +164,16 @@ AccumImageStage::IssueAccumulation(const RenderImageSection& section)
     // so do not issue anything, return nullopt and
     // let the main render loop to terminate
     if(!syncSemaphore->Acquire(section.waitCounter))
-        return std::nullopt;
+        return false;
+
+    MRAY_LOG("[Visor] AcquiredImg {}", section.waitCounter);
 
     // ============= //
     //   SUBMISSON   //
     // ============= //
-    //uint64_t signalCounter = section.waitCounter + 1;
-    VkSemaphoreSubmitInfo waitSemaphore =
-    {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-        .pNext = nullptr,
-        .semaphore = timelineSemaphoreVk.semHandle,
-        .value = timelineSemaphoreVk.Value(),
-        // TODO change this to more fine-grained later maybe?
-        .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-        .deviceIndex = 0
-    };
-    VkSemaphoreSubmitInfo signalSemaphores = waitSemaphore;
-    signalSemaphores.value = timelineSemaphoreVk.Value() + 1;
+    auto allStages = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    VkSemaphoreSubmitInfo waitSemaphore = imgWriteSemaphore.WaitInfo(allStages);
+    VkSemaphoreSubmitInfo signalSemaphores = imgWriteSemaphore.SignalInfo(allStages, 1);
     VkCommandBufferSubmitInfo commandSubmitInfo =
     {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
@@ -368,24 +198,25 @@ AccumImageStage::IssueAccumulation(const RenderImageSection& section)
     vkQueueSubmit2(handlesVk->mainQueueVk, 1, &submitInfo, accumCompleteFence);
 
     // Launch a wait and reset task for this fence
-    threadPool->detach_task([fence = this->accumCompleteFence,
+    threadPool->detach_task([fence = &this->accumCompleteFence,
                              sem = this->syncSemaphore,
                              device = this->handlesVk->deviceVk]()
     {
+        VkFence fenceHandle = *fence;
         // Wait over the fence
         // Thread pool is only used for saving the image and
         // doing this operation so it should be pretty fast (hopefully)
-        vkWaitForFences(device, 1, &fence, VK_TRUE,
+        vkWaitForFences(device, 1, &fenceHandle, VK_TRUE,
                         std::numeric_limits<uint64_t>::max());
+        MRAY_LOG("[Visor] Released Img\n"
+                 "----------------------");
         // Signal the MRay renderer that
         // this memory is available now.
         sem->Release();
         // Reset for the next issue
-        vkResetFences(device, 1, &fence);
+        vkResetFences(device, 1, &fenceHandle);
     });
-
-    timelineSemaphoreVk.value += 2;
-    return timelineSemaphoreVk;
+    return true;
 }
 
 size_t AccumImageStage::UniformBufferSize() const

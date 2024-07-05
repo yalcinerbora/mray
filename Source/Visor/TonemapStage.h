@@ -33,7 +33,7 @@ class GUITonemapperI
 {
     public:
     virtual         ~GUITonemapperI() = default;
-    virtual void    Render() = 0;
+    virtual bool    Render() = 0;
 };
 
 class TonemapperI : public UniformMemoryRequesterI
@@ -42,11 +42,13 @@ class TonemapperI : public UniformMemoryRequesterI
     public:
     virtual ~TonemapperI() = default;
     //
-    virtual MRayError       Initialize(const std::string& execPath) = 0;
+    virtual MRayError       Initialize(const VulkanSystemView& sys,
+                                       const std::string& execPath) = 0;
     virtual GUITonemapperI* AcquireGUI() = 0;
-    virtual void            TonemapImage(VkCommandBuffer cmd,
-                                         const VulkanImage& hdrImg,
-                                         const VulkanImage& sdrImg) = 0;
+    virtual void            RecordTonemap(VkCommandBuffer cmd,
+                                          const VulkanImage& hdrImg,
+                                          const VulkanImage& sdrImg) = 0;
+    virtual void            UpdateUniforms() = 0;
     virtual void            BindImages(const VulkanImage& hdrImg,
                                        const VulkanImage& sdrImg) = 0;
 
@@ -61,32 +63,29 @@ class TonemapStage : public UniformMemoryRequesterI
     using TonemapperMap = std::map<ShaderKey, std::unique_ptr<TonemapperI>>;
 
     private:
+    const VulkanSystemView* handlesVk = nullptr;
     UniformBufferMemView    uniformBuffer = {};
     const VulkanImage*      sdrImage = nullptr;
     const VulkanImage*      hdrImage = nullptr;
     VulkanBuffer            stagingBuffer;
     VulkanDeviceMemory      memory;
+    VulkanCommandBuffer     tmCommand;
     //
     TonemapperMap           tonemappers;
     TonemapperI*            currentTonemapper = nullptr;
-    const VulkanSystemView* handlesVk;
 
     public:
     // Constructors & Destructor
-                        TonemapStage(const VulkanSystemView&);
-                        TonemapStage(const TonemapStage&) = delete;
-                        TonemapStage(TonemapStage&&) = default;
-    TonemapStage&       operator=(const TonemapStage&) = delete;
-    TonemapStage&       operator=(TonemapStage&&) = default;
-                        ~TonemapStage() = default;
+                                TonemapStage() = default;
     //
-    MRayError                   Initialize(const std::string& execPath);
+    MRayError                   Initialize(const VulkanSystemView&,
+                                           const std::string& execPath);
     void                        ChangeImage(const VulkanImage* hdrImageIn,
                                             const VulkanImage* sdrImageIn);
     Expected<GUITonemapperI*>   ChangeTonemapper(MRayColorSpaceEnum renderColorSpace,
                                                  VkColorSpaceKHR swapchainColorSpace);
     // Actions
-    void                        IssueTonemap(VkCommandBuffer);
+    void                        IssueTonemap(const VulkanTimelineSemaphore&);
 
     // A common uniform buffer allocation related
     size_t                      UniformBufferSize() const override;

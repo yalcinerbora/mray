@@ -33,49 +33,42 @@ class AccumImageStage : public UniformMemoryRequesterI
 
     private:
     static PFN_vkGetMemoryHostPointerPropertiesEXT vkGetMemoryHostPointerProperties;
-
+    //
+    const VulkanSystemView* handlesVk = nullptr;
     // Device memory backed stuff
     UniformBufferMemView    uniformBuffer           = {};
     // Host memory backed stuff
-    VkDeviceMemory          foreignMemory           = nullptr;
-    VkBuffer                foreignBuffer           = nullptr;
-    SemaphoreVariant        timelineSemaphoreVk     = {0, nullptr};
-    VkFence                 accumCompleteFence      = nullptr;
+    VulkanDeviceMemory      foreignMemory;
+    VulkanBuffer            foreignBuffer;
+    VulkanFence             accumCompleteFence;
+    // Pre-recorded command
+    VulkanCommandBuffer     accumulateCommand;
     // Main system related stuff
     TimelineSemaphore*      syncSemaphore   = nullptr;
     BS::thread_pool*        threadPool      = nullptr;
-
-    const VulkanSystemView* handlesVk       = nullptr;
     //
     VulkanComputePipeline   pipeline;
     DescriptorSets          descriptorSets;
     //
     const VulkanImage*      hdrImage            = nullptr;
     const VulkanImage*      sampleImage         = nullptr;
-    // Pre-recorded command
-    VkCommandBuffer         accumulateCommand   = nullptr;
     void                    Clear();
 
     public:
     // Constructor & Destructor
-                        AccumImageStage(const VulkanSystemView&);
-                        AccumImageStage(const AccumImageStage&) = delete;
-                        AccumImageStage(AccumImageStage&&);
-    AccumImageStage&    operator=(const AccumImageStage&) = delete;
-    AccumImageStage&    operator=(AccumImageStage&&);
-                        ~AccumImageStage();
-
+                AccumImageStage() = default;
     //
-    MRayError               Initialize(TimelineSemaphore* ts,
-                                       BS::thread_pool* threadPool,
-                                       const std::string& execPath);
-    void                    ImportExternalHandles(const RenderBufferInfo&);
-    void                    ChangeImage(const VulkanImage* hdrImageIn,
-                                        const VulkanImage* sampleImageIn);
+    MRayError   Initialize(const VulkanSystemView& handlesVk,
+                           TimelineSemaphore* ts,
+                           BS::thread_pool* threadPool,
+                           const std::string& execPath);
+    void        ImportExternalHandles(const RenderBufferInfo&);
+    void        ChangeImage(const VulkanImage* hdrImageIn,
+                            const VulkanImage* sampleImageIn);
 
-    Optional<SemaphoreVariant>
-                            IssueAccumulation(const RenderImageSection&);
+    bool        IssueAccumulation(const RenderImageSection&,
+                                  const VulkanTimelineSemaphore&);
     //
-    size_t                  UniformBufferSize() const override;
-    void                    SetUniformBufferView(const UniformBufferMemView& uniformBufferPtr) override;
+    size_t      UniformBufferSize() const override;
+    void        SetUniformBufferView(const UniformBufferMemView& uniformBufferPtr) override;
 };

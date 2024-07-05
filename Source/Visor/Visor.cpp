@@ -17,8 +17,6 @@
 #include "VulkanCapabilityFinder.h"
 #include "FontAtlas.h"
 
-#include <vulkan/vulkan.hpp>
-#include <vulkan/vulkan_to_string.hpp>
 
 //#ifdef MRAY_WINDOWS
 //
@@ -520,63 +518,6 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     });
     assert(deviceHeap != memHeapSpan.end());
 
-    // Determine the device local memory and host mapped memory
-    Span<const VkMemoryType> memTypeSpan(memProps.memoryTypes,
-                                         memProps.memoryTypeCount);
-    // TODO: Remove this when we are confident about memories
-    if constexpr(MRAY_IS_DEBUG)
-    {
-        for(size_t i = 0; i < memProps.memoryTypeCount; i++)
-        {
-            const VkMemoryType& memType = memProps.memoryTypes[i];
-            std::string s = vk::to_string(vk::MemoryPropertyFlags(memType.propertyFlags));
-            MRAY_DEBUG_LOG("Mem type: {}, HeapIndex: {}", s, memType.heapIndex);
-        }
-    }
-
-    // Find the common alignment
-    const auto& limits = selectedDeviceProps.limits;
-    deviceAlignment = uint32_t(std::max(limits.minStorageBufferOffsetAlignment,
-                                        limits.minUniformBufferOffsetAlignment));
-
-    // If device is iGPU, get the combo memory,
-    // This should be as fast as normal memory (speculation but, I mean come on)
-    if(selectedDevice.type == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
-    {
-        auto comboMemoryIt = std::find_if(memTypeSpan.begin(),
-                                          memTypeSpan.end(),
-                                          [](const auto& memType)
-        {
-            return ((memType.propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) &&
-                    (memType.propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT));
-        });
-        deviceLocalMemIndex = static_cast<uint32_t>(std::distance(memTypeSpan.begin(),
-                                                                  comboMemoryIt));
-        hostVisibleMemIndex = deviceLocalMemIndex;
-    }
-    // For dGPU's, select two different memories, because it probably be a host pinned
-    // memory (In terms of CUDA) so images will not want to be reside there
-    else
-    {
-        auto deviceLocalIt = std::find_if(memTypeSpan.begin(),
-                                          memTypeSpan.end(),
-                                          [](const auto& memType)
-        {
-            return memType.propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-        });
-        // This is guaranteed
-        deviceLocalMemIndex = static_cast<uint32_t>(std::distance(memTypeSpan.begin(),
-                                                                  deviceLocalIt));
-        // Host visible mem
-        auto hostVisibleIt = std::find_if(memTypeSpan.begin(),
-                                          memTypeSpan.end(),
-                                          [](const auto& memType)
-        {
-            return memType.propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-        });
-        hostVisibleMemIndex = static_cast<uint32_t>(std::distance(memTypeSpan.begin(),
-                                                                  hostVisibleIt));
-    }
     // Report the GPU
     MRAY_LOG("----Visor-GPU----\n"
              "Name      : {}\n"
@@ -627,10 +568,16 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
                            &mainDescPool);
 
     // Initialize the memory allocator
+    // Find the common alignment
+    const auto& limits = selectedDeviceProps.limits;
+    deviceAlignment = uint32_t(std::max(limits.minStorageBufferOffsetAlignment,
+                                        limits.minUniformBufferOffsetAlignment));
+    Span<const VkMemoryType> memTypeSpan(memProps.memoryTypes,
+                                         memProps.memoryTypeCount);
     VulkanDeviceAllocator::Instance(deviceVk,
-                                    deviceLocalMemIndex,
-                                    hostVisibleMemIndex,
-                                    deviceAlignment);
+                                    deviceAlignment,
+                                    memTypeSpan,
+                                    selectedDevice.type);
 
     // Create the common samplers
     //  Min  / Mag  /  Mip

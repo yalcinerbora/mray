@@ -41,9 +41,97 @@ VkConversions::VkToMRayColorSpace(VkColorSpaceKHR cSpace)
     }
 }
 
-VulkanImage::VulkanImage(const VulkanSystemView& handles)
-    : handlesVk(&handles)
+// Constructors & Destructor
+VulkanFence::VulkanFence(const VulkanSystemView& view,
+                         bool isSignalled)
+    : handlesVk(&view)
+{
+    VkFenceCreateInfo fenceCreateInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = (isSignalled) ? VK_FENCE_CREATE_SIGNALED_BIT : 0u
+    };
+    vkCreateFence(handlesVk->deviceVk, &fenceCreateInfo,
+                  VulkanHostAllocator::Functions(),
+                  &handle);
+}
+
+VulkanFence::VulkanFence(VulkanFence&& other)
+    : handlesVk(other.handlesVk)
+    , handle(std::exchange(other.handle, nullptr))
 {}
+
+VulkanFence& VulkanFence::operator=(VulkanFence&& other)
+{
+    assert(this != &other);
+    if(handlesVk)
+    {
+        vkDestroyFence(handlesVk->deviceVk, handle,
+                       VulkanHostAllocator::Functions());
+    }
+    handlesVk = std::exchange(other.handlesVk, nullptr);
+    handle = std::exchange(other.handle, nullptr);
+    return *this;
+}
+
+VulkanFence::~VulkanFence()
+{
+    if(!handlesVk) return;
+    vkDestroyFence(handlesVk->deviceVk, handle,
+                   VulkanHostAllocator::Functions());
+}
+
+VulkanFence::operator VkFence()
+{
+    return handle;
+}
+
+VulkanCommandBuffer::VulkanCommandBuffer(const VulkanSystemView& handles)
+    : handlesVk(&handles)
+{
+    VkCommandBufferAllocateInfo cBuffAllocInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .pNext = nullptr,
+        .commandPool = handlesVk->mainCommandPool,
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        .commandBufferCount = 1
+    };
+    vkAllocateCommandBuffers(handlesVk->deviceVk, &cBuffAllocInfo,
+                             &commandBuff);
+}
+
+VulkanCommandBuffer::VulkanCommandBuffer(VulkanCommandBuffer&& other)
+    : handlesVk(std::exchange(other.handlesVk, nullptr))
+    , commandBuff(std::exchange(other.commandBuff, nullptr))
+{}
+
+VulkanCommandBuffer& VulkanCommandBuffer::operator=(VulkanCommandBuffer&& other)
+{
+    assert(this != &other);
+    if(handlesVk)
+        vkFreeCommandBuffers(handlesVk->deviceVk,
+                             handlesVk->mainCommandPool, 1,
+                             &commandBuff);
+    handlesVk = std::exchange(other.handlesVk, nullptr);
+    commandBuff = std::exchange(other.commandBuff, nullptr);
+    return *this;
+}
+
+VulkanCommandBuffer::~VulkanCommandBuffer()
+{
+    if(!handlesVk) return;
+
+    vkFreeCommandBuffers(handlesVk->deviceVk,
+                         handlesVk->mainCommandPool, 1,
+                         &commandBuff);
+}
+
+VulkanCommandBuffer::operator VkCommandBuffer()
+{
+    return commandBuff;
+}
 
 VulkanImage::VulkanImage(const VulkanSystemView& handles,
                          VulkanSamplerMode samplerMode,
@@ -88,37 +176,40 @@ VulkanImage::VulkanImage(const VulkanSystemView& handles,
 }
 
 VulkanImage::VulkanImage(VulkanImage&& other)
-    : imgVk(std::exchange(other.imgVk, nullptr))
+    : handlesVk(std::exchange(other.handlesVk, nullptr))
+    , imgVk(std::exchange(other.imgVk, nullptr))
     , formatVk(other.formatVk)
     , viewVk(std::exchange(other.viewVk, nullptr))
     , samplerVk(other.samplerVk)
     , extent(other.extent)
     , depth(other.depth)
-    , handlesVk(other.handlesVk)
 {}
 
 VulkanImage& VulkanImage::operator=(VulkanImage&& other)
 {
     assert(this != &other);
-    vkDestroyImage(handlesVk->deviceVk, imgVk,
-                   VulkanHostAllocator::Functions());
-    vkDestroyImageView(handlesVk->deviceVk, viewVk,
+    if(handlesVk)
+    {
+        vkDestroyImage(handlesVk->deviceVk, imgVk,
                        VulkanHostAllocator::Functions());
+        vkDestroyImageView(handlesVk->deviceVk, viewVk,
+                           VulkanHostAllocator::Functions());
+    }
 
-
+    handlesVk = std::exchange(other.handlesVk, nullptr);
     imgVk = std::exchange(other.imgVk, nullptr);
     formatVk = other.formatVk;
     viewVk = std::exchange(other.viewVk, nullptr);
     samplerVk = other.samplerVk;
     extent = other.extent;
     depth = other.depth;
-    handlesVk = other.handlesVk;
+
     return *this;
 }
 
 VulkanImage::~VulkanImage()
 {
-    if(!imgVk) return;
+    if(!handlesVk) return;
 
     vkDestroyImage(handlesVk->deviceVk, imgVk,
                    VulkanHostAllocator::Functions());
@@ -202,22 +293,43 @@ void VulkanImage::CreateView()
                       &viewVk);
 }
 
-VulkanBuffer::VulkanBuffer(const VulkanSystemView& handles)
-    : handlesVk(&handles)
-{}
-
 VulkanBuffer::VulkanBuffer(const VulkanSystemView& handles,
                            VkBufferUsageFlags usageFlags,
-                           size_t size)
+                           size_t size, bool isForeign)
     : handlesVk(&handles)
 {
-    size_t totalSize = size;
+    if(isForeign)
+    {
+        VkExternalBufferProperties extBufferProps = {};
+        extBufferProps.sType = VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES;
+        VkPhysicalDeviceExternalBufferInfo extBufferInfo =
+        {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .usage = usageFlags,
+            .handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT
+        };
+        vkGetPhysicalDeviceExternalBufferProperties(handlesVk->pDeviceVk,
+                                                    &extBufferInfo,
+                                                    &extBufferProps);
+        auto features = extBufferProps.externalMemoryProperties.externalMemoryFeatures;
+        if((features & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT) == 0)
+            throw MRayError("[Visor] External memory is not importable to Vulkan!");
+    }
+
+    static constexpr VkExternalMemoryBufferCreateInfo EXT_BUFF_INFO =
+    {
+        .sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO,
+        .pNext = nullptr,
+        .handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT
+    };
     VkBufferCreateInfo buffCInfo =
     {
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-        .pNext = 0,
+        .pNext = (isForeign) ? &EXT_BUFF_INFO : nullptr,
         .flags = 0,
-        .size = totalSize,
+        .size = size,
         .usage = usageFlags,
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .queueFamilyIndexCount = 1,
@@ -230,8 +342,8 @@ VulkanBuffer::VulkanBuffer(const VulkanSystemView& handles,
 }
 
 VulkanBuffer::VulkanBuffer(VulkanBuffer&& other)
-    : bufferVk(other.bufferVk)
-    , handlesVk(other.handlesVk)
+    : handlesVk(std::exchange(other.handlesVk, nullptr))
+    , bufferVk(other.bufferVk)
 {
     other.bufferVk = nullptr;
 }
@@ -239,18 +351,17 @@ VulkanBuffer::VulkanBuffer(VulkanBuffer&& other)
 VulkanBuffer& VulkanBuffer::operator=(VulkanBuffer&& other)
 {
     assert(this != &other);
-    if(bufferVk)
+    if(handlesVk)
         vkDestroyBuffer(handlesVk->deviceVk, bufferVk,
                         VulkanHostAllocator::Functions());
-
-    handlesVk = other.handlesVk;
+    handlesVk = std::exchange(other.handlesVk, nullptr);
     bufferVk = std::exchange(other.bufferVk, nullptr);
     return *this;
 }
 
 VulkanBuffer::~VulkanBuffer()
 {
-    if(!bufferVk) return;
+    if(!handlesVk) return;
     vkDestroyBuffer(handlesVk->deviceVk, bufferVk,
                     VulkanHostAllocator::Functions());
 }

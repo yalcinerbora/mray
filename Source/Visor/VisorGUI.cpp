@@ -14,6 +14,31 @@
 #include "Core/BitFunctions.h"
 #include "Core/Log.h"
 
+Pair<Vector2, Vector2> GenAspectCorrectVP(const Vector2& fbSize,
+                                          const Vector2& imgSize)
+{
+    Vector2 vpSize = Vector2::Zero();
+    Vector2 vpOffset = Vector2::Zero();
+    // Determine view-port by checking aspect ratio
+    Float imgAspect = imgSize[0] / imgSize[1];
+    Float screenAspect = fbSize[0] / fbSize[1];
+    if(imgAspect > screenAspect)
+    {
+        Float ySize = std::round(fbSize[1] * screenAspect / imgAspect);
+        Float yOffset = std::round((fbSize[1] - ySize) * Float(0.5));
+        vpSize = Vector2(fbSize[0], ySize);
+        vpOffset = Vector2(0, yOffset);
+    }
+    else
+    {
+        Float xSize = std::round(fbSize[0] * imgAspect / screenAspect);
+        float xOffset = std::round((fbSize[0] - xSize) * Float(0.5));
+        vpSize = Vector2(xSize, fbSize[1]);
+        vpOffset = Vector2(xOffset, 0);
+    }
+    return {vpSize, vpOffset};
+}
+
 Pair<double, std::string_view> ConvertMemSizeToGUI(size_t size)
 {
     // This function is overengineered for a GUI operation.
@@ -468,7 +493,7 @@ TopBarChanges VisorGUI::ShowTopMenu(const VisorState& visorState)
         ImGui::Text(" ");
         if(tonemapperGUI && ImGui::ToggleButton("Tonemap", tmWindowOn))
         {
-            tonemapperGUI->Render();
+            result.newTMParams = tonemapperGUI->Render();
         }
         ImGui::Separator();
 
@@ -520,21 +545,28 @@ Optional<CameraTransform> VisorGUI::ShowMainImage(const VisorState& visorState)
                                            ImGuiWindowFlags_NoTitleBar |
                                            ImGuiWindowFlags_NoScrollbar |
                                            ImGuiWindowFlags_NoCollapse);
-
-    // We demonstrate using the full viewport area or the work area"
-    // (without menu-bars, task-bars etc.)
-    // Based on your use case you may want one or the other.
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2());
     if(ImGui::Begin("MainWindow", nullptr, flags))
     {
-        //ImGui::Image(std::bit_cast<ImTextureID>(mainImage), {256.0f, 256.0f});
+        if(mainImage)
+        {
+            Vector2 vpSize = Vector2(viewport->WorkSize.x,
+                                     viewport->WorkSize.y);
+            auto [size, offset] = GenAspectCorrectVP(vpSize, imgSize);
+
+            ImGui::SetCursorPos({offset[0], offset[1]});
+            ImGui::Image(std::bit_cast<ImTextureID>(mainImage),
+                         {size[0], size[1]});
+        }
         if(ImGui::IsWindowFocused() && !camLocked)
         {
             result = CurrentMovement().Update(visorState);
         }
     }
+    ImGui::PopStyleVar();
     ImGui::End();
     return result;
 }
@@ -633,7 +665,8 @@ GUIChanges VisorGUI::Render(ImFont* windowScaledFont, const VisorState& visorSta
 void VisorGUI::ChangeDisplayImage(const VulkanImage& img)
 {
     if(mainImage) ImGui_ImplVulkan_RemoveTexture(mainImage);
-    //
+
+    imgSize = Vector2(img.Extent());
     mainImage = ImGui_ImplVulkan_AddTexture(img.Sampler(), img.View(),
                                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }

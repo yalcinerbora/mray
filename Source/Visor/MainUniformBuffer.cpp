@@ -14,8 +14,7 @@ void UniformBufferMemView::FlushRange(VkDevice deviceVk)
 }
 
 MainUniformBuffer::MainUniformBuffer(const VulkanSystemView& handles)
-    : mainUniformBuffer(handles)
-    , handlesVk(&handles)
+    : handlesVk(&handles)
 {}
 
 MainUniformBuffer::MainUniformBuffer(MainUniformBuffer&& other)

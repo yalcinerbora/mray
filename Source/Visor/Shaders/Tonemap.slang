@@ -132,31 +132,31 @@ void AtomicFloatOp<T : IBinaryOp>(in uint outLoc, float val, in T)
 void KCFindAvgMaxLum(uint3 globalId: SV_DispatchThreadID,
                      uint3 localId: SV_GroupThreadID)
 {
-    uint2 dim;
-    params.inputTex.GetDimensions(dim[0], dim[1]);
-    uint2 pixId = uint2(globalId.x % dim.x,
-                        globalId.x / dim.x);
+    //uint2 dim;
+    //params.inputTex.GetDimensions(dim[0], dim[1]);
+    //uint2 pixId = uint2(globalId.x % dim.x,
+    //                    globalId.x / dim.x);
 
-    float3 inColor = params.inputTex.Load(uint3(pixId, 0), int2(0, 0)).xyz;
-    float luminance = ColorConverterIn::ToYxy(inColor)[0];
+    //float3 inColor = params.inputTex.Load(uint3(pixId, 0), int2(0, 0)).xyz;
+    //float luminance = ColorConverterIn::ToYxy(inColor)[0];
 
-    // The reduction
-    float localAvg = BlockLocalReduction(luminance, localId.x, AddOp());
-    float localMax = BlockLocalReduction(luminance, localId.x, MaxOp());
+    //// The reduction
+    //float localAvg = BlockLocalReduction(luminance, localId.x, AddOp());
+    //float localMax = BlockLocalReduction(luminance, localId.x, MaxOp());
 
-    // Now atomics, (still we need to do comp-sawp idiom for floats...)
-    // TODO: If have free time, check the full down reduction
-    // (one extra call for this compute shader on an intermediate buffer, not the texture)
-    // is faster or slower (probably faster but setting that up is a hassle)
-    if(localId.x == 0)
-    {
-        float old;
-        float totalRecip = 1.0f / float(dim.x + dim.y);
-        localAvg *= totalRecip;
+    //// Now atomics, (still we need to do comp-sawp idiom for floats...)
+    //// TODO: If have free time, check the full down reduction
+    //// (one extra call for this compute shader on an intermediate buffer, not the texture)
+    //// is faster or slower (probably faster but setting that up is a hassle)
+    //if(localId.x == 0)
+    //{
+    //    float old;
+    //    float totalRecip = 1.0f / float(dim.x + dim.y);
+    //    localAvg *= totalRecip;
 
-        AtomicFloatOp(0, localMax, MaxOp());
-        AtomicFloatOp(1, localAvg, AddOp());
-    }
+    //    AtomicFloatOp(0, localMax, MaxOp());
+    //    AtomicFloatOp(1, localAvg, AddOp());
+    //}
 }
 
 //======================================//
@@ -166,20 +166,20 @@ void KCFindAvgMaxLum(uint3 globalId: SV_DispatchThreadID,
 [numthreads(STATIC_THREAD_PER_BLOCK_1D, 1, 1)]
 void KCTonemapImage(uint3 globalId : SV_DispatchThreadID)
 {
-    uint2 dim;
-    params.inputTex.GetDimensions(dim[0], dim[1]);
-    uint2 pixId = uint2(globalId.x % dim.x,
-                        globalId.x / dim.x);
-    //
-    float3 inColorHDR = params.inputTex.Load(uint3(pixId, 0), int2(0, 0)).xyz;
+    //uint2 dim;
+    //params.inputTex.GetDimensions(dim[0], dim[1]);
+    //uint2 pixId = uint2(globalId.x % dim.x,
+    //                    globalId.x / dim.x);
+    ////
+    //float3 inColorHDR = params.inputTex.Load(uint3(pixId, 0), int2(0, 0)).xyz;
 
-    ColorConverterIn  inColorSpace;
-    ColorConverterOut outColorSpace;
-    float3 outColorSDR = Tonemapper.ToneMap(inColorHDR,
-                                            inColorSpace, outColorSpace,
-                                            params.outGammaParams[0],
-                                            params.tonemapParams[0],
-                                            params.maxAndAvg[0].ReadAvgLum(),
-                                            params.maxAndAvg[0].ReadMaxLum());
-    params.outputTex[pixId] = float4(outColorSDR, 0.0f);
+    //ColorConverterIn  inColorSpace;
+    //ColorConverterOut outColorSpace;
+    //float3 outColorSDR = Tonemapper.ToneMap(inColorHDR,
+    //                                        inColorSpace, outColorSpace,
+    //                                        params.outGammaParams[0],
+    //                                        params.tonemapParams[0],
+    //                                        params.maxAndAvg[0].ReadAvgLum(),
+    //                                        params.maxAndAvg[0].ReadMaxLum());
+    //params.outputTex[pixId] = float4(outColorSDR, 0.0f);
 }

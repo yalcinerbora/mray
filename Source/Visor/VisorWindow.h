@@ -111,8 +111,8 @@ class Swapchain
                                    VkSurfaceKHR surface,
                                    bool tryHDR);
 
-    FramebufferPack                 NextFrame(VkSemaphore imgAvailSignal);
-    void                            PresentFrame(VkSemaphore waitSignal);
+    FramebufferPack                 NextFrame(const VulkanBinarySemaphore& imgAvailSignal);
+    void                            PresentFrame(const VulkanBinarySemaphore& waitSingal);
     void                            FBOSizeChanged(Vector2ui newSize);
     Pair<MRayColorSpaceEnum, Float> ColorSpace() const;
     VkColorSpaceKHR                 ColorSpaceVk() const;
@@ -137,11 +137,11 @@ class VisorWindow
     FrameCounter                frameCounter;
     TransferQueue::VisorView*   transferQueue   = nullptr;
     // Rendering Stages
-    AccumImageStage accumulateStage = AccumImageStage(handlesVk);
-    TonemapStage    tonemapStage    = TonemapStage(handlesVk);
-    RenderImagePool renderImagePool = RenderImagePool(threadPool,
-                                                      handlesVk);
-    MainUniformBuffer uniformBuffer = MainUniformBuffer(handlesVk);
+    AccumImageStage         accumulateStage;
+    TonemapStage            tonemapStage;
+    RenderImagePool         renderImagePool;
+    MainUniformBuffer       uniformBuffer = MainUniformBuffer(handlesVk);
+    VulkanTimelineSemaphore imgWriteSem;
     // Initial rendering
     Optional<std::string_view>      initialSceneFile;
     Optional<std::string_view>      initialTracerRenderConfigPath;
@@ -189,7 +189,7 @@ class VisorWindow
     //
     bool            ShouldClose();
     FramePack       NextFrame();
-    void            PresentFrame(const Optional<SemaphoreVariant>& waitSemaphore);
+    void            PresentFrame(const VulkanTimelineSemaphore* extraWaitSemaphore);
     ImFont*         CurrentFont();
     bool            Render();
     void            SetKickstartParameters(const Optional<std::string_view>& renderConfigPath,

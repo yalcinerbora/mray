@@ -23,6 +23,7 @@ class RenderImagePool
     enum IsHDRImage { HDR, SDR };
 
     private:
+    const VulkanSystemView* handlesVk = nullptr;
     // Data related
     VulkanImage             hdrImage;
     VulkanImage             hdrSampleImage;
@@ -30,36 +31,33 @@ class RenderImagePool
     VulkanBuffer            outStageBuffer;
     VulkanDeviceMemory      stageMemory;
     VulkanDeviceMemory      imgMemory;
-    const VulkanSystemView* handlesVk       = nullptr;
     Byte*                   hStagePtr       = nullptr;
     // Command related
-    VkCommandBuffer         hdrCopyCommand  = nullptr;
-    VkCommandBuffer         sdrCopyCommand  = nullptr;
-    VkCommandBuffer         clearCommand    = nullptr;
+    VulkanCommandBuffer     hdrCopyCommand;
+    VulkanCommandBuffer     sdrCopyCommand;
+    VulkanCommandBuffer     clearCommand;
     BS::thread_pool*        threadPool      = nullptr;
     ImageLoaderIPtr         imgLoader;
-    SemaphoreVariant        saveSemaphore   = {0, nullptr};
-    SemaphoreVariant        clearSemaphore  = {0, nullptr};
     //
     RenderImageInitInfo     initInfo;
 
-    void                    Clear();
+    //void                    Clear();
     public:
     // Constructors & Destructor
-                        RenderImagePool(BS::thread_pool*,
-                                        const VulkanSystemView&);
+                        RenderImagePool();
                         RenderImagePool(BS::thread_pool*,
                                         const VulkanSystemView&,
                                         const RenderImageInitInfo&);
                         RenderImagePool(const RenderImagePool&) = delete;
-                        RenderImagePool(RenderImagePool&&);
+                        RenderImagePool(RenderImagePool&&) = default;
     RenderImagePool&    operator=(const RenderImagePool&) = delete;
-    RenderImagePool&    operator=(RenderImagePool&&);
-                        ~RenderImagePool();
+    RenderImagePool&    operator=(RenderImagePool&&) = default;
+                        ~RenderImagePool() = default;
 
     //
-    SemaphoreVariant    SaveImage(IsHDRImage, const RenderImageSaveInfo& fileOutInfo);
-    SemaphoreVariant    IssueClear();
+    void                SaveImage(IsHDRImage, const RenderImageSaveInfo& fileOutInfo,
+                                  const VulkanTimelineSemaphore&);
+    void                IssueClear(const VulkanTimelineSemaphore&);
 
     const VulkanImage&  GetHDRImage() const;
     const VulkanImage&  GetSampleImage() const;

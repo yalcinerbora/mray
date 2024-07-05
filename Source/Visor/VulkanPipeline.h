@@ -51,16 +51,17 @@ class VulkanComputePipeline
     static Expected<std::vector<Byte>> DevourFile(const std::string& shaderName,
                                                   const std::string& executablePath);
 
-    void Clear();
+    void                    Clear();
     public:
-                            VulkanComputePipeline(VkDevice deviceVk);
+                            VulkanComputePipeline() = default;
                             VulkanComputePipeline(const VulkanComputePipeline&) = delete;
                             VulkanComputePipeline(VulkanComputePipeline&&);
     VulkanComputePipeline&  operator=(const VulkanComputePipeline&) = delete;
     VulkanComputePipeline&  operator=(VulkanComputePipeline&&);
                             ~VulkanComputePipeline();
 
-    MRayError               Initialize(const Descriptor2DList<ShaderBindingInfo>& bindingInfo,
+    MRayError               Initialize(VkDevice deviceVk,
+                                       const Descriptor2DList<ShaderBindingInfo>& bindingInfo,
                                        const std::string& shaderName,
                                        const std::string& executablePath,
                                        const std::string& entryPointName);
