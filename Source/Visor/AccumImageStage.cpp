@@ -146,10 +146,10 @@ bool AccumImageStage::IssueAccumulation(const RenderImageSection& section,
     };
     vkBeginCommandBuffer(accumulateCommand, &bInfo);
 
+    using MathFunctions::DivideUp;
     Vector2ui totalPix = section.pixelMax - section.pixelMin;
-    Vector2ui TPB = Vector2ui(VulkanComputePipeline::TPB_2D_X,
-                              VulkanComputePipeline::TPB_2D_Y);
-    Vector2ui groupSize = MathFunctions::DivideUp(totalPix, TPB);
+    Vector2ui groupSize = DivideUp(totalPix,
+                                   VulkanComputePipeline::TPB_2D);
     pipeline.BindPipeline(accumulateCommand);
     pipeline.BindSet(accumulateCommand, 0, descriptorSets[0]);
     vkCmdDispatch(accumulateCommand, groupSize[0], groupSize[1], 1);

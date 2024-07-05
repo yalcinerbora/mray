@@ -3,6 +3,8 @@ module Tonemap;
 __include "TonemapFunctions";
 
 static const uint32_t STATIC_THREAD_PER_BLOCK_1D = 256;
+static const uint32_t STATIC_THREAD_PER_BLOCK_2D_X = 16;
+static const uint32_t STATIC_THREAD_PER_BLOCK_2D_Y = 16;
 
 extern struct Tonemapper : ITonemapper;
 
@@ -70,7 +72,7 @@ float BlockLocalReduction<T : IBinaryOp>(in float value, in uint localId, in T o
     // so hand unrolling
     //static const uint START = (STATIC_THREAD_PER_BLOCK_1D >> 1);
     //[ForceUnroll]
-    // for (uint i = START; i != 0; i >> 1)
+    //for(uint i = START; i != 0; i >> 1)
     //{
     //    if (localId < i) sReduceBuffer[localId] = T::op(sReduceBuffer[localId], sReduceBuffer[localId + i]);
     //    AllMemoryBarrierWithGroupSync();
@@ -132,54 +134,60 @@ void AtomicFloatOp<T : IBinaryOp>(in uint outLoc, float val, in T)
 void KCFindAvgMaxLum(uint3 globalId: SV_DispatchThreadID,
                      uint3 localId: SV_GroupThreadID)
 {
-    //uint2 dim;
-    //params.inputTex.GetDimensions(dim[0], dim[1]);
-    //uint2 pixId = uint2(globalId.x % dim.x,
-    //                    globalId.x / dim.x);
+    printf("My float is %u, %u\n", globalId.xy);
 
-    //float3 inColor = params.inputTex.Load(uint3(pixId, 0), int2(0, 0)).xyz;
-    //float luminance = ColorConverterIn::ToYxy(inColor)[0];
+    uint2 dim;
+    params.inputTex.GetDimensions(dim[0], dim[1]);
+    uint2 pixId = uint2(globalId.x % dim.x,
+                        globalId.x / dim.x);
 
-    //// The reduction
-    //float localAvg = BlockLocalReduction(luminance, localId.x, AddOp());
-    //float localMax = BlockLocalReduction(luminance, localId.x, MaxOp());
+    float3 inColor = params.inputTex.Load(uint3(pixId, 0), int2(0, 0)).xyz;
+    float luminance = ColorConverterIn::ToYxy(inColor)[0];
 
-    //// Now atomics, (still we need to do comp-sawp idiom for floats...)
-    //// TODO: If have free time, check the full down reduction
-    //// (one extra call for this compute shader on an intermediate buffer, not the texture)
-    //// is faster or slower (probably faster but setting that up is a hassle)
-    //if(localId.x == 0)
-    //{
-    //    float old;
-    //    float totalRecip = 1.0f / float(dim.x + dim.y);
-    //    localAvg *= totalRecip;
+    // The reduction
+    float localAvg = BlockLocalReduction(luminance, localId.x, AddOp());
+    float localMax = BlockLocalReduction(luminance, localId.x, MaxOp());
 
-    //    AtomicFloatOp(0, localMax, MaxOp());
-    //    AtomicFloatOp(1, localAvg, AddOp());
-    //}
+    // Now atomics, (still we need to do comp-sawp idiom for floats...)
+    // TODO: If have free time, check the full down reduction
+    // (one extra call for this compute shader on an intermediate buffer, not the texture)
+    // is faster or slower (probably faster but setting that up is a hassle)
+    if(localId.x == 0)
+    {
+        float old;
+        float totalRecip = 1.0f / float(dim.x * dim.y);
+        localAvg *= totalRecip;
+
+        AtomicFloatOp(0, localMax, MaxOp());
+        AtomicFloatOp(1, localAvg, AddOp());
+    }
 }
 
 //======================================//
 //           TONEMAP SHADER             //
 //======================================//
 [shader("compute")]
-[numthreads(STATIC_THREAD_PER_BLOCK_1D, 1, 1)]
-void KCTonemapImage(uint3 globalId : SV_DispatchThreadID)
+[numthreads(STATIC_THREAD_PER_BLOCK_2D_X,
+            STATIC_THREAD_PER_BLOCK_2D_Y, 1)]
+void KCTonemapImage(uint3 globalId: SV_DispatchThreadID)
 {
-    //uint2 dim;
-    //params.inputTex.GetDimensions(dim[0], dim[1]);
-    //uint2 pixId = uint2(globalId.x % dim.x,
-    //                    globalId.x / dim.x);
-    ////
-    //float3 inColorHDR = params.inputTex.Load(uint3(pixId, 0), int2(0, 0)).xyz;
+    // Get dimensions from the texture
+    // TODO: Is this faster or slower compared to
+    // uniform buffer fetch
+    uint2 dim = uint2(0);
+    params.inputTex.GetDimensions(dim[0], dim[1]);
 
-    //ColorConverterIn  inColorSpace;
-    //ColorConverterOut outColorSpace;
-    //float3 outColorSDR = Tonemapper.ToneMap(inColorHDR,
-    //                                        inColorSpace, outColorSpace,
-    //                                        params.outGammaParams[0],
-    //                                        params.tonemapParams[0],
-    //                                        params.maxAndAvg[0].ReadAvgLum(),
-    //                                        params.maxAndAvg[0].ReadMaxLum());
-    //params.outputTex[pixId] = float4(outColorSDR, 0.0f);
+    if(any(globalId.xy >= dim)) return;
+    uint2 pixId = globalId.xy;
+
+    float3 inColorHDR = params.inputTex.Load(uint3(pixId, 0), int2(0, 0)).xyz;
+    ColorConverterIn  inColorSpace;
+    ColorConverterOut outColorSpace;
+    float3 outColorSDR = Tonemapper.ToneMap(inColorHDR,
+                                            inColorSpace, outColorSpace,
+                                            params.outGammaParams[0],
+                                            params.tonemapParams[0],
+                                            params.maxAndAvg[0].ReadAvgLum(),
+                                            params.maxAndAvg[0].ReadMaxLum());
+    params.outputTex[pixId] = float4(outColorSDR, 1.0f);
 }

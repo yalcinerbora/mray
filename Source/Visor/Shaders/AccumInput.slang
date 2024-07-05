@@ -31,6 +31,8 @@ ParameterBlock<AccumulateParameters> params;
 void KCAccumulateInputs(uint3 globalId: SV_DispatchThreadID,
                         uint3 localId: SV_GroupThreadID)
 {
+
+    printf("My float is %u, %u\n", globalId.xy);
     //int2 pixIn = int2(globalId.xy);
     //int2 pixOut = int2(globalId.xy) + params.U.pixStart;
     //int2 pixCount = params.U.pixEnd - params.U.pixStart;

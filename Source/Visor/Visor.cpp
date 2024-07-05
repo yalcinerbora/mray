@@ -113,6 +113,7 @@ const VkDebugUtilsMessengerCreateInfoEXT* VisorDebugSystem::CreateInfo()
         .pNext = nullptr,
         .flags = 0,
         .messageSeverity = (VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                            //VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT  |
                             VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
                             VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT),
         .messageType = (VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |

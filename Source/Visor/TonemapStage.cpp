@@ -59,10 +59,10 @@ class TonemapperBase : public TonemapperI
 
     public:
     // Constructors & Destructor
-                 TonemapperBase(std::string_view moduleName,
-                                MRayColorSpaceEnum inColorSpace,
-                                VkColorSpaceKHR outColorSpace,
-                                size_t uniformBufferSize);
+                TonemapperBase(std::string_view moduleName,
+                               MRayColorSpaceEnum inColorSpace,
+                               VkColorSpaceKHR outColorSpace,
+                               size_t uniformBufferSize);
 
     MRayError   Initialize(const VulkanSystemView& sys,
                            const std::string& execPath) override;
@@ -88,7 +88,7 @@ class TonemapperBase : public TonemapperI
 class Tonemapper_Reinhard_AcesCG_To_SRGB : public TonemapperBase
 {
     static constexpr std::string_view MODULE_NAME = "Shaders/Tonemap-MRAY_TONEMAP_REINHARD_ACES_CG_TO_SRGB.spv";
-    static constexpr VkColorSpaceKHR OUT_CS = VkColorSpaceKHR::VK_COLOR_SPACE_HDR10_ST2084_EXT;
+    static constexpr VkColorSpaceKHR OUT_CS = VkColorSpaceKHR::VK_COLORSPACE_SRGB_NONLINEAR_KHR;
     static constexpr MRayColorSpaceEnum IN_CS = MRayColorSpaceEnum::MR_ACES_CG;
 
     struct Uniforms
@@ -128,7 +128,7 @@ class Tonemapper_Reinhard_AcesCG_To_SRGB : public TonemapperBase
 class Tonemapper_Empty_AcesCG_To_HDR10 : public TonemapperBase
 {
     static constexpr std::string_view MODULE_NAME = "Shaders/Tonemap-MRAY_TONEMAP_EMPTY_ACES_CG_TO_HDR10.spv";
-    static constexpr VkColorSpaceKHR OUT_CS = VkColorSpaceKHR::VK_COLORSPACE_SRGB_NONLINEAR_KHR;
+    static constexpr VkColorSpaceKHR OUT_CS = VkColorSpaceKHR::VK_COLOR_SPACE_HDR10_ST2084_EXT;
     static constexpr MRayColorSpaceEnum IN_CS = MRayColorSpaceEnum::MR_ACES_CG;
 
     class GUI : public GUITonemapperI
@@ -177,9 +177,9 @@ MRayError TonemapperBase::Initialize(const VulkanSystemView& sys,
 {
     handlesVk = &sys;
     using namespace std::string_literals;
-    static const std::string tmEntryName = "KCTonemapImage"s;
-    static const std::string reduceEntryName = "KCFindAvgMaxLum"s;
-    static const std::string moduleNameString = std::string(moduleName);
+    const std::string tmEntryName = "KCTonemapImage"s;
+    const std::string reduceEntryName = "KCFindAvgMaxLum"s;
+    const std::string moduleNameString = std::string(moduleName);
     MRayError e = tonemapPipeline.Initialize(handlesVk->deviceVk,
     {
         {
@@ -213,6 +213,8 @@ void TonemapperBase::RecordTonemap(VkCommandBuffer cmd,
                                   const VulkanImage& hdrImg,
                                   const VulkanImage& sdrImg)
 {
+    using MathFunctions::DivideUp;
+
     VkCommandBufferBeginInfo beginInfo =
     {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -251,7 +253,6 @@ void TonemapperBase::RecordTonemap(VkCommandBuffer cmd,
     std::swap(imgBarrierInfo[1].oldLayout,
               imgBarrierInfo[1].newLayout);
     imgBarrierInfo[1].image = sdrImg.Image();
-
     vkCmdPipelineBarrier(cmd,
                          (VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
@@ -261,24 +262,17 @@ void TonemapperBase::RecordTonemap(VkCommandBuffer cmd,
                          0, nullptr,
                          2, imgBarrierInfo.data());
 
-    assert(hdrImg.Extent() == sdrImg.Extent());
-    Vector2ui totalPix = sdrImg.Extent();
-    Vector2ui TPB = Vector2ui(VulkanComputePipeline::TPB_2D_X,
-                              VulkanComputePipeline::TPB_2D_Y);
-    Vector2ui groupSize = MathFunctions::DivideUp(totalPix, TPB);
-
-    // ============= //
-    //    DISPATCH   //
-    // ============= //
-    reducePipeline.BindSet(cmd, 0, reduceDescriptorSets[0]);
-    reducePipeline.BindPipeline(cmd);
-    vkCmdDispatch(cmd, groupSize[0], groupSize[1], 1);
+    // ================= //
+    //   CLEAR STAGING   //
+    // ================= //
+    vkCmdFillBuffer(cmd, stagingBuffer.bufferHandle, stagingBuffer.offset,
+                    stagingBuffer.size, 0x00);
 
     VkBufferMemoryBarrier buffMemBarrierInfo =
     {
         .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
         .pNext = nullptr,
-        .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
         .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
         .srcQueueFamilyIndex = handlesVk->queueIndex,
         .dstQueueFamilyIndex = handlesVk->queueIndex,
@@ -286,6 +280,26 @@ void TonemapperBase::RecordTonemap(VkCommandBuffer cmd,
         .offset = stagingBuffer.offset,
         .size = stagingBuffer.size
     };
+    vkCmdPipelineBarrier(cmd,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0,
+                         0, nullptr,
+                         1, &buffMemBarrierInfo,
+                         0, nullptr);
+
+    // ============= //
+    //    DISPATCH   //
+    // ============= //
+    assert(hdrImg.Extent() == sdrImg.Extent());
+    uint32_t totalPix = sdrImg.Extent().Multiply();
+    uint32_t reduceGroupSize = DivideUp(totalPix,
+                                        VulkanComputePipeline::TPB_1D);
+    reducePipeline.BindSet(cmd, 0, reduceDescriptorSets[0]);
+    reducePipeline.BindPipeline(cmd);
+    vkCmdDispatch(cmd, reduceGroupSize, 1, 1);
+
+    buffMemBarrierInfo.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    buffMemBarrierInfo.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0,
                          0, nullptr,
@@ -295,9 +309,11 @@ void TonemapperBase::RecordTonemap(VkCommandBuffer cmd,
     // ============= //
     //    DISPATCH   //
     // ============= //
+    Vector2ui tmGroupSize = DivideUp(sdrImg.Extent(),
+                                     VulkanComputePipeline::TPB_2D);
     tonemapPipeline.BindPipeline(cmd);
     tonemapPipeline.BindSet(cmd, 0, tonemapDescriptorSets[0]);
-    vkCmdDispatch(cmd, groupSize[0], groupSize[1], 1);
+    vkCmdDispatch(cmd, tmGroupSize[0], tmGroupSize[1], 1);
 
     // Change the SDR image to fragment-shader readable
     imgBarrierInfo[0].srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
@@ -362,7 +378,6 @@ size_t TonemapperBase::UniformBufferSize() const
 void TonemapperBase::SetUniformBufferView(const UniformBufferMemView& ubo)
 {
     uniformBuffer = ubo;
-    // TODO: ALIGNMENT!!!!
     DescriptorBindList<ShaderBindingData> bindList =
     {
         {
@@ -412,7 +427,7 @@ void TonemapperBase::SetStagingBufferView(const StagingBufferMemView& ssbo)
         },
     };
     tonemapPipeline.BindSetData(tonemapDescriptorSets[0], bindList);
-    reducePipeline.BindSetData(tonemapDescriptorSets[0], bindList);
+    reducePipeline.BindSetData(reduceDescriptorSets[0], bindList);
 }
 
 MRayColorSpaceEnum TonemapperBase::InputColorspace() const
@@ -541,20 +556,23 @@ MRayError TonemapStage::Initialize(const VulkanSystemView& view,
     e = tm1->Initialize(*handlesVk, execPath);
     if(e) return e;
 
-    size_t stagingBufferSize = std::max(tm0->StagingBufferSize(),
-                                        tm1->StagingBufferSize());
-    stagingBuffer = VulkanBuffer(*handlesVk, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+    //size_t stagingBufferSize = std::max(tm0->StagingBufferSize(),
+    //                                    tm1->StagingBufferSize());
+    size_t stagingBufferSize = tm1->StagingBufferSize();
+    stagingBuffer = VulkanBuffer(*handlesVk,
+                                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                                 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                  stagingBufferSize);
 
     auto deviceAllocator = VulkanDeviceAllocator::Instance();
     memory = deviceAllocator.AllocateMultiObject(std::tie(stagingBuffer),
                                                  VulkanDeviceAllocator::DEVICE);
-    tm0->SetStagingBufferView(StagingBufferMemView
-                              {
-                                  .bufferHandle = stagingBuffer.Buffer(),
-                                  .offset = 0,
-                                  .size = tm0->StagingBufferSize()
-                              });
+    //tm0->SetStagingBufferView(StagingBufferMemView
+    //                          {
+    //                              .bufferHandle = stagingBuffer.Buffer(),
+    //                              .offset = 0,
+    //                              .size = tm0->StagingBufferSize()
+    //                          });
     tm1->SetStagingBufferView(StagingBufferMemView
                               {
                                   .bufferHandle = stagingBuffer.Buffer(),
@@ -563,8 +581,8 @@ MRayError TonemapStage::Initialize(const VulkanSystemView& view,
                               });
 
 
-    tonemappers.try_emplace({tm0->InputColorspace(), tm0->OutputColorspace()},
-                            std::move(tm0));
+    //tonemappers.try_emplace({tm0->InputColorspace(), tm0->OutputColorspace()},
+    //                        std::move(tm0));
     tonemappers.try_emplace({tm1->InputColorspace(), tm1->OutputColorspace()},
                             std::move(tm1));
     return MRayError::OK;

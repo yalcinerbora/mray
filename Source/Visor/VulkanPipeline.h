@@ -38,9 +38,8 @@ class VulkanComputePipeline
     using SetLayouts        = DescriptorSetList<VkDescriptorSetLayout>;
     using DescriptorSets    = DescriptorSetList<VkDescriptorSet>;
 
-    static constexpr uint32_t TPB_1D_X = 256;
-    static constexpr uint32_t TPB_2D_X = 16;
-    static constexpr uint32_t TPB_2D_Y = 16;
+    static constexpr uint32_t   TPB_1D = 256;
+    static constexpr auto       TPB_2D = Vector2ui(16, 16);
 
     private:
     VkDevice            deviceVk        = nullptr;
