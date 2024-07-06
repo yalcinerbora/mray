@@ -390,8 +390,9 @@ void VisorGUI::ShowFrameOverlay(bool& isOpen,
     if(ImGui::Begin("##VisorOverlay", &isOpen, window_flags))
     {
         ImGui::Text("Frame  : %.2f ms", static_cast<double>(visorState.visor.frameTime));
-        ImGui::Text("Memory : %.2f MiB", visorState.visor.usedGPUMemoryMiB);
-
+        auto [sz, suffix] = ConvertMemSizeToGUI(visorState.visor.usedGPUMemory);
+        std::string memUsage = MRAY_FORMAT("{:.1f}{:s}", sz, suffix);
+        ImGui::Text("Memory : %s", memUsage.c_str());
 
         if(ImGui::BeginPopupContextWindow())
         {
@@ -491,10 +492,9 @@ TopBarChanges VisorGUI::ShowTopMenu(const VisorState& visorState)
     if(ImGui::BeginMainMenuBar())
     {
         ImGui::Text(" ");
-        if(tonemapperGUI && ImGui::ToggleButton("Tonemap", tmWindowOn))
-        {
-            result.newTMParams = tonemapperGUI->Render();
-        }
+        ImGui::ToggleButton("Tonemap", tmWindowOn);
+        if(tmWindowOn && tonemapperGUI)
+            result.newTMParams = tonemapperGUI->Render(tmWindowOn);
         ImGui::Separator();
 
         result.rendererIndex = ShowRendererComboBox(visorState);
@@ -542,6 +542,7 @@ Optional<CameraTransform> VisorGUI::ShowMainImage(const VisorState& visorState)
                                            ImGuiWindowFlags_NoMove |
                                            ImGuiWindowFlags_NoSavedSettings |
                                            ImGuiWindowFlags_NoBackground |
+                                           ImGuiWindowFlags_NoBringToFrontOnFocus |
                                            ImGuiWindowFlags_NoTitleBar |
                                            ImGuiWindowFlags_NoScrollbar |
                                            ImGuiWindowFlags_NoCollapse);

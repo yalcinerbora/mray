@@ -31,24 +31,26 @@ struct FrameCounter
     using QueryData = std::array<uint64_t, 4>;
 
     private:
+    const VulkanSystemView* handlesVk = nullptr;
+    VkQueryPool             queryPool = nullptr;
+    VulkanCommandBuffer     startCommand;
+    //
     QueryData   queryData;
     FrameList   frameCountList;
     bool        firstFrame      = true;
     uint32_t    fillIndex       = 0;
-    VkQueryPool queryPool       = nullptr;
-    VkDevice    deviceVk        = nullptr;
     float       timestampPeriod = 0;
 
     public:
                     FrameCounter() = default;
-                    FrameCounter(VkDevice device, VkPhysicalDevice pDevice);
+                    FrameCounter(const VulkanSystemView& handlesVk);
                     FrameCounter(const FrameCounter&) = delete;
                     FrameCounter(FrameCounter&&);
     FrameCounter&   operator=(const FrameCounter&) = delete;
     FrameCounter&   operator=(FrameCounter&&);
                     ~FrameCounter();
 
-    void        StartRecord(VkCommandBuffer cmd);
+    bool        StartRecord(const VulkanTimelineSemaphore& sem);
     void        EndRecord(VkCommandBuffer cmd);
     float       AvgFrame();
 
@@ -175,6 +177,7 @@ class VisorWindow
     void        StartCommandBuffer(const FramePack& frameHandle);
     void        HandleGUIChanges(const GUIChanges&);
     void        DoInitialActions();
+    size_t      QueryTotalGPUMemory() const;
 
     public:
     // Constructors & Destructor

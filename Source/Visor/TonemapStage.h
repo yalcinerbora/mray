@@ -33,7 +33,7 @@ class GUITonemapperI
 {
     public:
     virtual         ~GUITonemapperI() = default;
-    virtual bool    Render() = 0;
+    virtual bool    Render(bool& onOff) = 0;
 };
 
 class TonemapperI : public UniformMemoryRequesterI
@@ -68,7 +68,7 @@ class TonemapStage : public UniformMemoryRequesterI
     const VulkanImage*      sdrImage = nullptr;
     const VulkanImage*      hdrImage = nullptr;
     VulkanBuffer            stagingBuffer;
-    VulkanDeviceMemory      memory;
+    VulkanDeviceMemory      stagingMemory;
     VulkanCommandBuffer     tmCommand;
     //
     TonemapperMap           tonemappers;
@@ -90,7 +90,7 @@ class TonemapStage : public UniformMemoryRequesterI
     // A common uniform buffer allocation related
     size_t                      UniformBufferSize() const override;
     void                        SetUniformBufferView(const UniformBufferMemView& uniformBufferPtr) override;
-
+    size_t                      UsedGPUMemBytes() const;
     // Device Memory Related
     SizeAlignPair   MemRequirements() const;
     void            AttachMemory(VkDeviceMemory, VkDeviceSize);

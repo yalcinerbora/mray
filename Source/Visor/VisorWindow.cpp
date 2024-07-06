@@ -156,8 +156,8 @@ const std::array<VkPresentModeKHR, 3> Swapchain::PresentModes =
     VK_PRESENT_MODE_FIFO_KHR
 };
 
-FrameCounter::FrameCounter(VkDevice device, VkPhysicalDevice pDevice)
-    : deviceVk(device)
+FrameCounter::FrameCounter(const VulkanSystemView& sys)
+    : handlesVk(&sys)
 {
     std::fill(queryData.begin(), queryData.end(), 0u);
 
@@ -170,22 +170,41 @@ FrameCounter::FrameCounter(VkDevice device, VkPhysicalDevice pDevice)
         .queryCount = 2,
         .pipelineStatistics = 0
     };
-    vkCreateQueryPool(deviceVk, &createInfo,
+    vkCreateQueryPool(handlesVk->deviceVk, &createInfo,
                       VulkanHostAllocator::Functions(), &queryPool);
-    vkResetQueryPool(deviceVk, queryPool, 0, 2);
+    vkResetQueryPool(handlesVk->deviceVk, queryPool, 0, 2);
 
     VkPhysicalDeviceProperties props;
-    vkGetPhysicalDeviceProperties(pDevice, &props);
+    vkGetPhysicalDeviceProperties(handlesVk->pDeviceVk, &props);
     timestampPeriod = props.limits.timestampPeriod;
+
+    startCommand = VulkanCommandBuffer(*handlesVk);
+    // Since we do not know what will happen in every frame
+    // (we have pre-recorded commands for tonemap, accumulate etc.)
+    // we also pre-record this and start the frame with this
+    VkCommandBufferBeginInfo bI =
+    {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .pNext = nullptr,
+        .flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT,
+        .pInheritanceInfo = nullptr
+    };
+    vkBeginCommandBuffer(startCommand, &bI);
+    vkCmdResetQueryPool(startCommand, queryPool, 0, 2);
+    vkCmdWriteTimestamp(startCommand,
+                        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                        queryPool, 0);
+    vkEndCommandBuffer(startCommand);
 }
 
 FrameCounter::FrameCounter(FrameCounter&& other)
-    : queryData(std::exchange(other.queryData, {}))
+    : handlesVk(other.handlesVk)
+    , queryPool(std::exchange(other.queryPool, nullptr))
+    , startCommand(std::move(other.startCommand))
+    , queryData(std::exchange(other.queryData, {}))
     , frameCountList(std::exchange(other.frameCountList, {}))
     , firstFrame(other.firstFrame)
     , fillIndex(other.fillIndex)
-    , queryPool(std::exchange(other.queryPool, nullptr))
-    , deviceVk(other.deviceVk)
     , timestampPeriod(other.timestampPeriod)
 {}
 
@@ -193,39 +212,59 @@ FrameCounter& FrameCounter::operator=(FrameCounter&& other)
 {
     assert(this != &other);
 
-    if(deviceVk)
+    if(handlesVk)
     {
-        vkDestroyQueryPool(deviceVk, queryPool,
+        vkDestroyQueryPool(handlesVk->deviceVk, queryPool,
                            VulkanHostAllocator::Functions());
     }
-
+    handlesVk = other.handlesVk;
+    queryPool = std::exchange(other.queryPool, nullptr);
+    startCommand = std::move(other.startCommand);
     queryData = std::exchange(other.queryData, {});
     frameCountList = std::exchange(other.frameCountList, {});
     firstFrame = other.firstFrame;
     fillIndex = other.fillIndex;
-    queryPool = std::exchange(other.queryPool, nullptr);
-    deviceVk = other.deviceVk;
     timestampPeriod = other.timestampPeriod;
-
     return *this;
 }
 
 FrameCounter::~FrameCounter()
 {
-    if(!deviceVk) return;
-    vkDestroyQueryPool(deviceVk, queryPool,
+    if(!handlesVk) return;
+    vkDestroyQueryPool(handlesVk->deviceVk, queryPool,
                        VulkanHostAllocator::Functions());
 }
 
-void FrameCounter::StartRecord(VkCommandBuffer cmd)
+bool FrameCounter::StartRecord(const VulkanTimelineSemaphore& sem)
 {
-    // Data is still not filled so do not issue another
-    // query
-    if(queryData[1] != 0 || queryData[3] != 0) return;
+    // Data is still not filled
+    // so do not issue another query
+    if(queryData[1] != 0 || queryData[3] != 0) return false;
 
-    vkCmdResetQueryPool(cmd, queryPool, 0, 2);
-    vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                        queryPool, 0);
+    auto allStages = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    VkSemaphoreSubmitInfo waitSemaphore = sem.WaitInfo(allStages);
+    VkSemaphoreSubmitInfo signalSemaphores = sem.SignalInfo(allStages, 1);
+    VkCommandBufferSubmitInfo commandSubmitInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+        .pNext = nullptr,
+        .commandBuffer = startCommand,
+        .deviceMask = 0
+    };
+    VkSubmitInfo2 submitInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+        .pNext = nullptr,
+        .flags = 0,
+        .waitSemaphoreInfoCount = 1,
+        .pWaitSemaphoreInfos = &waitSemaphore,
+        .commandBufferInfoCount = 1,
+        .pCommandBufferInfos = &commandSubmitInfo,
+        .signalSemaphoreInfoCount = 1,
+        .pSignalSemaphoreInfos = &signalSemaphores
+    };
+    vkQueueSubmit2(handlesVk->mainQueueVk, 1, &submitInfo, nullptr);
+    return true;
 }
 
 void FrameCounter::EndRecord(VkCommandBuffer cmd)
@@ -239,7 +278,7 @@ void FrameCounter::EndRecord(VkCommandBuffer cmd)
 
 float FrameCounter::AvgFrame()
 {
-    vkGetQueryPoolResults(deviceVk, queryPool,
+    vkGetQueryPoolResults(handlesVk->deviceVk, queryPool,
                           0, 2, 4 * sizeof(uint64_t),
                           queryData.data(), 2 * sizeof(uint64_t),
                           VK_QUERY_RESULT_64_BIT |
@@ -259,13 +298,14 @@ float FrameCounter::AvgFrame()
         else
         {
             frameCountList[fillIndex] = frameTimeMsF;
-            fillIndex = MathFunctions::Roll<int32_t>(fillIndex, 0, AVG_FRAME_COUNT);
+            fillIndex = MathFunctions::Roll<int32_t>(fillIndex + 1, 0, AVG_FRAME_COUNT);
         }
         // Reset the query availablility
         queryData[1] = queryData[3] = 0;
+        vkResetQueryPool(handlesVk->deviceVk, queryPool, 0, 2);
     }
-    float result = std::reduce(frameCountList.begin(),
-                               frameCountList.end(),
+    float result = std::reduce(frameCountList.cbegin(),
+                               frameCountList.cend(),
                                0.0f);
     result *= FRAME_COUNT_RECIP;
     return result;
@@ -839,11 +879,10 @@ MRayError VisorWindow::Initialize(TransferQueue::VisorView& transferQueueIn,
     MRayError e = swapchain.Initialize(handlesVk, surfaceVk, hdrRequested);
     if(e) return e;
 
-
     e = framePool.Initialize(handlesVk);
     if(e) return e;
 
-    frameCounter = FrameCounter(handlesVk.deviceVk, handlesVk.pDeviceVk);
+    frameCounter = FrameCounter(handlesVk);
 
     // Init Accumulation stage
     e = accumulateStage.Initialize(handlesVk, syncSem, threadPool, processPath);
@@ -1163,6 +1202,16 @@ void VisorWindow::DoInitialActions()
     }
 }
 
+size_t VisorWindow::QueryTotalGPUMemory() const
+{
+    size_t total = 0;
+    total += renderImagePool.UsedGPUMemBytes();
+    total += tonemapStage.UsedGPUMemBytes();
+    total += accumulateStage.UsedGPUMemBytes();
+    // Specifically do not add uniform memory since it is "host"
+    return total;
+}
+
 bool VisorWindow::Render()
 {
     Optional<RenderBufferInfo>      newRenderBuffer;
@@ -1286,6 +1335,14 @@ bool VisorWindow::Render()
         assert(i <= 1);
     }
 
+    // Issue frame timer first
+    const VulkanTimelineSemaphore* extraWaitSem = nullptr;
+    if(!stopPresenting && frameCounter.StartRecord(imgWriteSem))
+    {
+        imgWriteSem.ChangeNextWait(1);
+        extraWaitSem = &imgWriteSem;
+    }
+
     // Entire image reset + img format change (new alloc maybe)
     if(newRenderBuffer)
     {
@@ -1354,8 +1411,7 @@ bool VisorWindow::Render()
     GUIChanges guiChanges = gui.Render(CurrentFont(), visorState);
     HandleGUIChanges(guiChanges);
 
-    // Do tonemap via the frame's command buffer
-    const VulkanTimelineSemaphore* extraWaitSem = nullptr;
+    // Do tonemap
     if(newClearSignal || newRenderBuffer ||
        newImageSection || guiChanges.topBarChanges.newTMParams)
     {
@@ -1373,7 +1429,6 @@ bool VisorWindow::Render()
     // Wait availablility of the command buffer
     FramePack frameHandle = NextFrame();
     StartCommandBuffer(frameHandle);
-    frameCounter.StartRecord(frameHandle.commandBuffer);
     // ================== //
     //     GUI RENDER     //
     // ================== //
@@ -1383,6 +1438,7 @@ bool VisorWindow::Render()
     vkCmdEndRenderPass(frameHandle.commandBuffer);
     frameCounter.EndRecord(frameHandle.commandBuffer);
     visorState.visor.frameTime = frameCounter.AvgFrame();
+    visorState.visor.usedGPUMemory = QueryTotalGPUMemory();
     vkEndCommandBuffer(frameHandle.commandBuffer);
     PresentFrame(extraWaitSem);
     // Change the timelines next wait, if we used the sem

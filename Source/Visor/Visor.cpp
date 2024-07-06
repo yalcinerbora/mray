@@ -17,14 +17,6 @@
 #include "VulkanCapabilityFinder.h"
 #include "FontAtlas.h"
 
-
-//#ifdef MRAY_WINDOWS
-//
-//    #include <windows.h>
-//    #include <vulkan/vulkan_win32.h>
-//
-//#endif
-
 VKAPI_ATTR VkBool32 VKAPI_CALL
 VisorDebugSystem::Callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
                            VkDebugUtilsMessageTypeFlagsEXT messageType,

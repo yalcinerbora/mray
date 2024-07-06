@@ -71,4 +71,5 @@ class AccumImageStage : public UniformMemoryRequesterI
     //
     size_t      UniformBufferSize() const override;
     void        SetUniformBufferView(const UniformBufferMemView& uniformBufferPtr) override;
+    size_t      UsedGPUMemBytes() const;
 };

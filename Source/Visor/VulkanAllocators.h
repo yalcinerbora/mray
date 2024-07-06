@@ -28,6 +28,7 @@ class VulkanDeviceMemory
     private:
     VkDevice            deviceVk = nullptr;
     VkDeviceMemory      memoryVk = nullptr;
+    size_t              size = 0;
 
     private:
     VulkanDeviceMemory(VkDevice, size_t totalSize,
@@ -44,6 +45,7 @@ class VulkanDeviceMemory
                         ~VulkanDeviceMemory();
 
     VkDeviceMemory      Memory() const;
+    size_t              SizeBytes() const;
 };
 
 class VulkanHostAllocator

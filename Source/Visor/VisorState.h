@@ -20,7 +20,7 @@ enum class TracerRunState
 struct VisorAnalyticData
 {
     float   frameTime;
-    double  usedGPUMemoryMiB;
+    size_t  usedGPUMemory;
 };
 
 struct VisorState

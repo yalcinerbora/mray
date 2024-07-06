@@ -152,6 +152,7 @@ VulkanDeviceAllocator& VulkanDeviceAllocator::Instance(VkDevice deviceVk,
 VulkanDeviceMemory::VulkanDeviceMemory(VkDevice d, size_t totalSize,
                                        uint32_t memIndex)
     : deviceVk(d)
+    , size(totalSize)
 {
     VkMemoryAllocateInfo allocInfo =
     {
@@ -168,6 +169,7 @@ VulkanDeviceMemory::VulkanDeviceMemory(VkDevice d, size_t totalSize,
 VulkanDeviceMemory::VulkanDeviceMemory(VkDevice d,
                                        const VkMemoryAllocateInfo& allocInfo)
     : deviceVk(d)
+    , size(allocInfo.allocationSize)
 {
     vkAllocateMemory(deviceVk, &allocInfo,
                      VulkanHostAllocator::Functions(),
@@ -177,6 +179,7 @@ VulkanDeviceMemory::VulkanDeviceMemory(VkDevice d,
 VulkanDeviceMemory::VulkanDeviceMemory(VulkanDeviceMemory&& other)
     : deviceVk(std::exchange(other.deviceVk, nullptr))
     , memoryVk(std::exchange(other.memoryVk, nullptr))
+    , size(other.size)
 {}
 
 VulkanDeviceMemory& VulkanDeviceMemory::operator=(VulkanDeviceMemory&& other)
@@ -188,6 +191,7 @@ VulkanDeviceMemory& VulkanDeviceMemory::operator=(VulkanDeviceMemory&& other)
 
     deviceVk = std::exchange(other.deviceVk, nullptr);
     memoryVk = std::exchange(other.memoryVk, nullptr);
+    size = other.size;
     return *this;
 }
 
@@ -201,6 +205,11 @@ VulkanDeviceMemory::~VulkanDeviceMemory()
 VkDeviceMemory VulkanDeviceMemory::Memory() const
 {
     return memoryVk;
+}
+
+size_t VulkanDeviceMemory::SizeBytes() const
+{
+    return size;
 }
 
 VulkanDeviceMemory

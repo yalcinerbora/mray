@@ -62,6 +62,7 @@ class RenderImagePool
     const VulkanImage&  GetHDRImage() const;
     const VulkanImage&  GetSampleImage() const;
     const VulkanImage&  GetSDRImage() const;
+    size_t              UsedGPUMemBytes() const;
 };
 
 inline const VulkanImage& RenderImagePool::GetHDRImage() const

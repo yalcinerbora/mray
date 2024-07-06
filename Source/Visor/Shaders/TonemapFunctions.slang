@@ -38,7 +38,6 @@ public struct Reinhard2002 : ITonemapper
         // In is assumed to be in linear space
         float3 hdrYxy = inConv.ToYxy(hdrColor);
         float L = hdrYxy[0];
-
         // Equation 2
         if(tmParams.doKeyAdjust)
             L *= (tmParams.key / avgLuminance);
@@ -69,8 +68,12 @@ public struct EmptyTonemapper : ITonemapper
     {
         // In is assumed to be in linear space
         float3 hdrYxy = inConv.ToYxy(hdrColor);
+        // Straight up divide here
+        // HDR10 will handle it? (TODO: Check this?)
+        hdrYxy[0] /= maxLuminance;
+        //
         float3 sdrColor = outConv.FromYxy(hdrYxy);
         float3 finalColor = outConv.FromLinear(sdrColor, gammaParams);
-        return finalColor;
+        return sdrColor;
     }
 }

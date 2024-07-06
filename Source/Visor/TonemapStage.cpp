@@ -31,11 +31,6 @@ struct MaxAvgStageBuffer
     uint32_t avgLum;
 };
 
-struct GammaBuffer
-{
-    float gamma;
-};
-
 class TonemapperBase : public TonemapperI
 {
     using DescriptorSets = typename VulkanComputePipeline::DescriptorSets;
@@ -50,19 +45,20 @@ class TonemapperBase : public TonemapperI
     DescriptorSets          tonemapDescriptorSets;
     DescriptorSets          reduceDescriptorSets;
     size_t                  uniformBufferSize;
+    size_t                  eotfBufferSize;
 
     protected:
     const VulkanSystemView* handlesVk = nullptr;
-    size_t                  gammaBufferStartOffset;
-    float                   outGammaValue;
     UniformBufferMemView    uniformBuffer = {};
+    UniformBufferMemView    eotfBuffer = {};
 
     public:
     // Constructors & Destructor
                 TonemapperBase(std::string_view moduleName,
                                MRayColorSpaceEnum inColorSpace,
                                VkColorSpaceKHR outColorSpace,
-                               size_t uniformBufferSize);
+                               size_t uniformBufferSize,
+                               size_t eotfBufferSize);
 
     MRayError   Initialize(const VulkanSystemView& sys,
                            const std::string& execPath) override;
@@ -103,16 +99,17 @@ class Tonemapper_Reinhard_AcesCG_To_SRGB : public TonemapperBase
         private:
         Uniforms&   opts;
         float&      gamma;
-        bool        paramsChanged;
+        bool        paramsChanged = true;
 
         public:
                     GUI(Uniforms&, float& gamma);
-        bool        Render() override;
+        bool        Render(bool& onOff) override;
         bool        IsParamsChanged() const;
     };
 
     private:
     Uniforms        tmParameters;
+    float           gamma = 2.2f;
     GUI             gui;
 
     public:
@@ -134,17 +131,18 @@ class Tonemapper_Empty_AcesCG_To_HDR10 : public TonemapperBase
     class GUI : public GUITonemapperI
     {
         private:
-        float&      gamma;
-        bool        paramsChanged;
+        float&      displayNits;
+        bool        paramsChanged = true;
 
         public:
-                    GUI(float& gamma);
-        bool        Render() override;
+                    GUI(float& displayNits);
+        bool        Render(bool& onOff) override;
         bool        IsParamsChanged() const;
     };
 
     private:
     GUI             gui;
+    float           peakBrightness = 400.0f;
 
     public:
     Tonemapper_Empty_AcesCG_To_HDR10();
@@ -156,21 +154,14 @@ class Tonemapper_Empty_AcesCG_To_HDR10 : public TonemapperBase
 TonemapperBase::TonemapperBase(std::string_view mName,
                                MRayColorSpaceEnum iColor,
                                VkColorSpaceKHR oColor,
-                               size_t uboSize)
+                               size_t uboSize,
+                               size_t eotfSize)
     : moduleName(mName)
     , inColorSpace(iColor)
     , outColorSpace(oColor)
     , uniformBufferSize(uboSize)
-    , outGammaValue(2.2f)
-{
-    // Design fails here we do not have two different uniform buffer
-    // requesters. User our giga alignment to be sure
-    // We need to change this later
-    using MemAlloc::DefaultSystemAlignment;
-    using MathFunctions::NextMultiple;
-    gammaBufferStartOffset = NextMultiple(uniformBufferSize,
-                                          DefaultSystemAlignment());
-}
+    , eotfBufferSize(eotfSize)
+{}
 
 MRayError TonemapperBase::Initialize(const VulkanSystemView& sys,
                                      const std::string& execPath)
@@ -372,12 +363,32 @@ void TonemapperBase::BindImages(const VulkanImage& hdrImg,
 
 size_t TonemapperBase::UniformBufferSize() const
 {
-    return gammaBufferStartOffset + sizeof(GammaBuffer);
+    // Design fails here we do not have two different uniform buffer
+    // requesters. User our giga alignment to be sure
+    // We need to change this later
+    using MemAlloc::DefaultSystemAlignment;
+    using MathFunctions::NextMultiple;
+    size_t uniformSize = NextMultiple(uniformBufferSize,
+                                      DefaultSystemAlignment());
+    size_t gammaSize = NextMultiple(eotfBufferSize,
+                                    DefaultSystemAlignment());
+    return uniformSize + gammaSize;
 }
 
 void TonemapperBase::SetUniformBufferView(const UniformBufferMemView& ubo)
 {
+    using MemAlloc::DefaultSystemAlignment;
+    using MathFunctions::NextMultiple;
+    size_t uSize = NextMultiple(uniformBufferSize,
+                                DefaultSystemAlignment());
+    size_t gSize = NextMultiple(eotfBufferSize,
+                                DefaultSystemAlignment());
     uniformBuffer = ubo;
+    uniformBuffer.size = uSize;
+    eotfBuffer = ubo;
+    eotfBuffer.size = gSize;
+    eotfBuffer.offset += uSize;
+
     DescriptorBindList<ShaderBindingData> bindList =
     {
         {
@@ -387,7 +398,7 @@ void TonemapperBase::SetUniformBufferView(const UniformBufferMemView& ubo)
             {
                 .buffer = uniformBuffer.bufferHandle,
                 .offset = uniformBuffer.offset,
-                .range = sizeof(uniformBufferSize)
+                .range = uniformBuffer.size
             },
         },
         {
@@ -395,9 +406,9 @@ void TonemapperBase::SetUniformBufferView(const UniformBufferMemView& ubo)
             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             VkDescriptorBufferInfo
             {
-                .buffer = uniformBuffer.bufferHandle,
-                .offset = uniformBuffer.offset + gammaBufferStartOffset,
-                .range = sizeof(GammaBuffer)
+                .buffer = eotfBuffer.bufferHandle,
+                .offset = eotfBuffer.offset,
+                .range = eotfBuffer.size
             },
         }
     };
@@ -445,25 +456,32 @@ Tonemapper_Reinhard_AcesCG_To_SRGB::GUI::GUI(Uniforms& ubo, float& gammaIn)
     , gamma(gammaIn)
 {}
 
-bool Tonemapper_Reinhard_AcesCG_To_SRGB::GUI::Render()
+bool Tonemapper_Reinhard_AcesCG_To_SRGB::GUI::Render(bool& onOff)
 {
     paramsChanged = false;
-    // Key Adjust enable
-    bool b = static_cast<uint32_t>(opts.doKeyAdjust);
-    paramsChanged |= ImGui::Checkbox("Key Adjust", &b);
-    opts.doKeyAdjust = static_cast<uint32_t>(b);
-    // Key
-    ImGui::Text("Key       ");
-    ImGui::SameLine();
-    paramsChanged |= ImGui::InputFloat("##Key", &opts.key, 0.01f, 0.30f);
-    // Burn Ratio
-    ImGui::Text("Burn Ratio");
-    ImGui::SameLine();
-    paramsChanged |= ImGui::SliderFloat("##Burn", &opts.burnRatio, 0.5f, 2.0f);
-    // Gamma
-    ImGui::Text("Gamma     ");
-    ImGui::SameLine();
-    paramsChanged |= ImGui::SliderFloat("##GammaSlider", &gamma, 0.1f, 4.0f, "%0.3f");
+    if(ImGui::Begin("AcesCG -> sRGB", &onOff,
+                    ImGuiWindowFlags_NoResize |
+                    ImGuiWindowFlags_NoScrollbar |
+                    ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        // Key Adjust enable
+        bool b = static_cast<uint32_t>(opts.doKeyAdjust);
+        paramsChanged |= ImGui::Checkbox("Key Adjust", &b);
+        opts.doKeyAdjust = static_cast<uint32_t>(b);
+        // Key
+        ImGui::Text("Key       ");
+        ImGui::SameLine();
+        paramsChanged |= ImGui::InputFloat("##Key", &opts.key, 0.01f, 0.30f);
+        // Burn Ratio
+        ImGui::Text("Burn Ratio");
+        ImGui::SameLine();
+        paramsChanged |= ImGui::SliderFloat("##Burn", &opts.burnRatio, 0.5f, 2.0f);
+        // Gamma
+        ImGui::Text("Gamma     ");
+        ImGui::SameLine();
+        paramsChanged |= ImGui::SliderFloat("##GammaSlider", &gamma, 0.1f, 4.0f, "%0.3f");
+    }
+    ImGui::End();
     return paramsChanged;
 }
 
@@ -473,8 +491,8 @@ bool Tonemapper_Reinhard_AcesCG_To_SRGB::GUI::IsParamsChanged() const
 }
 
 Tonemapper_Reinhard_AcesCG_To_SRGB::Tonemapper_Reinhard_AcesCG_To_SRGB()
-    : TonemapperBase(MODULE_NAME, IN_CS, OUT_CS, sizeof(Uniforms))
-    , gui(tmParameters, outGammaValue)
+    : TonemapperBase(MODULE_NAME, IN_CS, OUT_CS, sizeof(Uniforms), sizeof(float))
+    , gui(tmParameters, gamma)
 {}
 
 GUITonemapperI* Tonemapper_Reinhard_AcesCG_To_SRGB::AcquireGUI()
@@ -486,26 +504,36 @@ void Tonemapper_Reinhard_AcesCG_To_SRGB::UpdateUniforms()
 {
     if(gui.IsParamsChanged())
     {
-        Byte* dBufferStart = uniformBuffer.hostPtr + uniformBuffer.offset;
-        std::memcpy(dBufferStart + 0,
+        std::memcpy(uniformBuffer.hostPtr + uniformBuffer.offset,
                     &tmParameters, sizeof(Uniforms));
-        std::memcpy(dBufferStart + gammaBufferStartOffset,
-                    &outGammaValue, sizeof(GammaBuffer));
+        std::memcpy(eotfBuffer.hostPtr + eotfBuffer.offset,
+                    &gamma, sizeof(float));
         uniformBuffer.FlushRange(handlesVk->deviceVk);
     }
 }
 
-Tonemapper_Empty_AcesCG_To_HDR10::GUI::GUI(float& gammaIn)
-    : gamma(gammaIn)
+Tonemapper_Empty_AcesCG_To_HDR10::GUI::GUI(float& nitsIn)
+    : displayNits(nitsIn)
 {}
 
-bool Tonemapper_Empty_AcesCG_To_HDR10::GUI::Render()
+bool Tonemapper_Empty_AcesCG_To_HDR10::GUI::Render(bool& onOff)
 {
+    //ImGui::ShowDemoWindow(&onOff);
+
     paramsChanged = false;
-    // Gamma
-    ImGui::Text("Gamma");
-    ImGui::SameLine();
-    paramsChanged |= ImGui::SliderFloat("##GammaS", &gamma, 0.1f, 4.0f, "%0.3f");
+    //ImGui::PushStyleVar(ImGuiStyleVar_)
+    if(ImGui::Begin("AcesCG -> HDR10", &onOff,
+                    ImGuiWindowFlags_NoResize |
+                    ImGuiWindowFlags_NoScrollbar |
+                    ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::Text("Display Brightness");
+        ImGui::SameLine();
+        paramsChanged |= ImGui::DragFloat("##Brightness", &displayNits,
+                                          4.0f, 100.0f, 2000.0f,
+                                          "%.1f nits");
+    }
+    ImGui::End();
     return paramsChanged;
 }
 
@@ -515,8 +543,8 @@ bool Tonemapper_Empty_AcesCG_To_HDR10::GUI::IsParamsChanged() const
 }
 
 Tonemapper_Empty_AcesCG_To_HDR10::Tonemapper_Empty_AcesCG_To_HDR10()
-    : TonemapperBase(MODULE_NAME, IN_CS, OUT_CS, sizeof(EmptyType))
-    , gui(outGammaValue)
+    : TonemapperBase(MODULE_NAME, IN_CS, OUT_CS, sizeof(EmptyType), sizeof(float))
+    , gui(peakBrightness)
 {}
 
 GUITonemapperI* Tonemapper_Empty_AcesCG_To_HDR10::AcquireGUI()
@@ -528,9 +556,8 @@ void Tonemapper_Empty_AcesCG_To_HDR10::UpdateUniforms()
 {
     if(gui.IsParamsChanged())
     {
-        Byte* dBufferStart = uniformBuffer.hostPtr + uniformBuffer.offset;
-        std::memcpy(dBufferStart + gammaBufferStartOffset,
-                    &outGammaValue, sizeof(GammaBuffer));
+        Byte* dBufferStart = eotfBuffer.hostPtr + eotfBuffer.offset;
+        std::memcpy(dBufferStart, &peakBrightness, sizeof(float));
         uniformBuffer.FlushRange(handlesVk->deviceVk);
     }
 }
@@ -556,23 +583,22 @@ MRayError TonemapStage::Initialize(const VulkanSystemView& view,
     e = tm1->Initialize(*handlesVk, execPath);
     if(e) return e;
 
-    //size_t stagingBufferSize = std::max(tm0->StagingBufferSize(),
-    //                                    tm1->StagingBufferSize());
-    size_t stagingBufferSize = tm1->StagingBufferSize();
+    size_t stagingBufferSize = std::max(tm0->StagingBufferSize(),
+                                        tm1->StagingBufferSize());
     stagingBuffer = VulkanBuffer(*handlesVk,
                                  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                                  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                  stagingBufferSize);
 
     auto deviceAllocator = VulkanDeviceAllocator::Instance();
-    memory = deviceAllocator.AllocateMultiObject(std::tie(stagingBuffer),
-                                                 VulkanDeviceAllocator::DEVICE);
-    //tm0->SetStagingBufferView(StagingBufferMemView
-    //                          {
-    //                              .bufferHandle = stagingBuffer.Buffer(),
-    //                              .offset = 0,
-    //                              .size = tm0->StagingBufferSize()
-    //                          });
+    stagingMemory = deviceAllocator.AllocateMultiObject(std::tie(stagingBuffer),
+                                                        VulkanDeviceAllocator::DEVICE);
+    tm0->SetStagingBufferView(StagingBufferMemView
+                              {
+                                  .bufferHandle = stagingBuffer.Buffer(),
+                                  .offset = 0,
+                                  .size = tm0->StagingBufferSize()
+                              });
     tm1->SetStagingBufferView(StagingBufferMemView
                               {
                                   .bufferHandle = stagingBuffer.Buffer(),
@@ -581,8 +607,8 @@ MRayError TonemapStage::Initialize(const VulkanSystemView& view,
                               });
 
 
-    //tonemappers.try_emplace({tm0->InputColorspace(), tm0->OutputColorspace()},
-    //                        std::move(tm0));
+    tonemappers.try_emplace({tm0->InputColorspace(), tm0->OutputColorspace()},
+                            std::move(tm0));
     tonemappers.try_emplace({tm1->InputColorspace(), tm1->OutputColorspace()},
                             std::move(tm1));
     return MRayError::OK;
@@ -667,4 +693,9 @@ void TonemapStage::SetUniformBufferView(const UniformBufferMemView& uniformBuffe
     {
         kv.second->SetUniformBufferView(uniformBufferPtr);
     });
+}
+
+size_t TonemapStage::UsedGPUMemBytes() const
+{
+    return stagingMemory.SizeBytes();
 }

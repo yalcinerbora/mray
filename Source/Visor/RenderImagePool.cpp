@@ -352,3 +352,9 @@ void RenderImagePool::IssueClear(const VulkanTimelineSemaphore& imgSem)
     // Finally submit!
     vkQueueSubmit2(handlesVk->mainQueueVk, 1, &submitInfo, nullptr);
 }
+
+size_t RenderImagePool::UsedGPUMemBytes() const
+{
+    // Only show the device's memory here, skip staging memory
+    return imgMemory.SizeBytes();
+}

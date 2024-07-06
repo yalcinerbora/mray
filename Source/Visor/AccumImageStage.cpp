@@ -242,3 +242,9 @@ void AccumImageStage::SetUniformBufferView(const UniformBufferMemView& ubo)
     };
     pipeline.BindSetData(descriptorSets[0], bindList);
 }
+
+size_t AccumImageStage::UsedGPUMemBytes() const
+{
+    // Skip foreign memory
+    return 0u;
+}
