@@ -149,6 +149,58 @@ VulkanDeviceAllocator& VulkanDeviceAllocator::Instance(VkDevice deviceVk,
     return allocator;
 }
 
+VulkanDeviceMemory
+VulkanDeviceAllocator::AllocateForeignObject(VulkanBuffer& buffer,
+                                             void* foreignPtr,
+                                             size_t totalSize,
+                                             uint32_t memTypeBits)
+{
+    std::string s = vk::to_string(vk::MemoryPropertyFlags(memTypeBits));
+    MRAY_DEBUG_LOG("Forign Mem Flags: {}", s);
+
+    auto loc = std::find_if(memoryList.cbegin(), memoryList.cend(),
+                            [memTypeBits](const VkMemoryType& memType)
+    {
+        // Use the first memory that any one of the bits match
+        return (memType.propertyFlags & memTypeBits) != 0;
+    });
+
+    uint32_t memIndex = std::numeric_limits<uint32_t>::max();
+    if(loc == memoryList.cend())
+    {
+        // Ony my GTX1080, vulkan driver returns 0x300 as property flag?
+        // But there is no memory type that supports it.
+        //
+        // But if I set it to default host visible mem index it works.
+        // So put a warning and try it, if it crashes so be it. Current design
+        // mandates importing memory so...
+        MRAY_WARNING_LOG("[Visor]: Unable to find memory index for the imported host memory "
+                         "VkDevice's memory system.\n"
+                         "         Trying default selected host visible index [{}].",
+                         defaultHostVisibleMemIndex);
+        memIndex = defaultHostVisibleMemIndex;
+    }
+    else memIndex = static_cast<uint32_t>(std::distance(memoryList.cbegin(), loc));
+
+    VkImportMemoryHostPointerInfoEXT hostImportInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT,
+        .pNext = nullptr,
+        .handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT,
+        .pHostPointer = foreignPtr,
+    };
+    VkMemoryAllocateInfo memAllocInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .pNext = &hostImportInfo,
+        .allocationSize = totalSize,
+        .memoryTypeIndex = memIndex
+    };
+    VulkanDeviceMemory result(deviceVk, memAllocInfo);
+    buffer.AttachMemory(result.Memory(), 0);
+    return result;
+}
+
 VulkanDeviceMemory::VulkanDeviceMemory(VkDevice d, size_t totalSize,
                                        uint32_t memIndex)
     : deviceVk(d)
@@ -210,44 +262,4 @@ VkDeviceMemory VulkanDeviceMemory::Memory() const
 size_t VulkanDeviceMemory::SizeBytes() const
 {
     return size;
-}
-
-VulkanDeviceMemory
-VulkanDeviceAllocator::AllocateForeignObject(VulkanBuffer& buffer,
-                                             void* foreignPtr,
-                                             size_t totalSize,
-                                             uint32_t memTypeBits)
-{
-    std::string s = vk::to_string(vk::MemoryPropertyFlags(memTypeBits));
-    MRAY_DEBUG_LOG("Forign Mem Flags: {}", s);
-
-    auto loc = std::find_if(memoryList.cbegin(), memoryList.cend(),
-                            [memTypeBits](const VkMemoryType& memType)
-    {
-        // Use the first memory that any one of the bits match
-        return (memType.propertyFlags & memTypeBits) != 0;
-    });
-
-    if(loc == memoryList.cend())
-        throw MRayError("[Visor]: Unable to fit host memory to "
-                        "VkDevice's memory system");
-    uint32_t memIndex = static_cast<uint32_t>(std::distance(memoryList.cbegin(), loc));
-
-    VkImportMemoryHostPointerInfoEXT hostImportInfo =
-    {
-        .sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT,
-        .pNext = nullptr,
-        .handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT,
-        .pHostPointer = foreignPtr,
-    };
-    VkMemoryAllocateInfo memAllocInfo =
-    {
-        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .pNext = &hostImportInfo,
-        .allocationSize = totalSize,
-        .memoryTypeIndex = memIndex
-    };
-    VulkanDeviceMemory result(deviceVk, memAllocInfo);
-    buffer.AttachMemory(result.Memory(), 0);
-    return result;
 }
