@@ -1384,7 +1384,7 @@ bool VisorWindow::Render()
         auto& rp = renderImagePool;
         rp.SaveImage(isHDRSave, newSaveInfo.value(),
                      imgWriteSem);
-        imgWriteSem.ChangeNextWait(2);
+        imgWriteSem.ChangeNextWait(1);
     }
     // Before Command Start check if new image section is received
     // Issue an accumulation and override the main wait semaphore

@@ -31,6 +31,7 @@ class RenderImagePool
     VulkanBuffer            outStageBuffer;
     VulkanDeviceMemory      stageMemory;
     VulkanDeviceMemory      imgMemory;
+    //VulkanTimelineSemaphore
     Byte*                   hStagePtr       = nullptr;
     // Command related
     VulkanCommandBuffer     hdrCopyCommand;
@@ -41,7 +42,9 @@ class RenderImagePool
     //
     RenderImageInitInfo     initInfo;
 
-    //void                    Clear();
+    void                    GenerateSDRCopyCommand();
+    void                    GenerateHDRCopyCommand();
+    void                    GenerateClearCommand();
     public:
     // Constructors & Destructor
                         RenderImagePool();

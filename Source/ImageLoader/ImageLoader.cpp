@@ -84,7 +84,7 @@ MRayError ImageLoader::WriteImage(const WriteImageParams& imgIn,
                                   ImageIOFlags) const
 {
     // TODO: Implement deep writing
-    if(imgIn.depth >= 1)
+    if(imgIn.depth > 1)
         return MRayError("Deep image writing is currently not implemented");
 
     const auto& extE = ImageTypeToExtension(extension);
@@ -94,19 +94,23 @@ MRayError ImageLoader::WriteImage(const WriteImageParams& imgIn,
     std::string fullPath = filePath + std::string(ext);
     auto out = OIIO::ImageOutput::create(fullPath);
 
-    Expected<OIIO::ImageSpec> specE = ImageFileOIIO::PixelFormatToOIIO(imgIn.header);
-    if(!specE.has_value()) return specE.error();
-    const OIIO::ImageSpec& spec = specE.value();
+    Expected<OIIO::ImageSpec> outSpecE = ImageFileOIIO::PixelFormatToOIIO(imgIn.header);
+    if(!outSpecE.has_value()) return outSpecE.error();
+    const OIIO::ImageSpec& outSpec = outSpecE.value();
 
-    OIIO::stride_t scanLineSize = static_cast<OIIO::stride_t>(spec.scanline_bytes());
+    bool sameType = (imgIn.header.pixelType == imgIn.inputType);
+    OIIO::stride_t xStride = (sameType) ? OIIO::AutoStride : imgIn.inputType.PixelSize();
+    OIIO::stride_t scanLineSize = (sameType)
+        ? static_cast<OIIO::stride_t>(outSpec.scanline_bytes())
+        : (imgIn.inputType.PixelSize() * imgIn.header.dimensions[0]);
 
     const Byte* dataLastElement = imgIn.pixels.data();
     dataLastElement += (imgIn.header.dimensions[1] - 1) * scanLineSize;
 
     // TODO: properly write an error check/out code for these.
-    if(!out->open(fullPath, spec))
+    if(!out->open(fullPath, outSpec))
         return MRayError("OIIO Error ({})", out->geterror());
-    if(!out->write_image(spec.format, dataLastElement, OIIO::AutoStride, -scanLineSize))
+    if(!out->write_image(outSpec.format, dataLastElement, xStride, -scanLineSize))
         return MRayError("OIIO Error ({})", out->geterror());
     if(!out->close())
         return MRayError("OIIO Error ({})", out->geterror());

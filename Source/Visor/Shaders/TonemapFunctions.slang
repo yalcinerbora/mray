@@ -35,7 +35,7 @@ public struct Reinhard2002 : ITonemapper
                                  in float maxLuminance,
                                  in float avgLuminance)
     {
-        // In is assumed to be in linear space
+        // Image is assumed to be in linear space
         float3 hdrYxy = inConv.ToYxy(hdrColor);
         float L = hdrYxy[0];
         // Equation 2
@@ -74,6 +74,6 @@ public struct EmptyTonemapper : ITonemapper
         //
         float3 sdrColor = outConv.FromYxy(hdrYxy);
         float3 finalColor = outConv.FromLinear(sdrColor, gammaParams);
-        return sdrColor;
+        return finalColor;
     }
 }

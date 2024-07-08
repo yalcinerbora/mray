@@ -1,18 +1,20 @@
 module ColorFunctions;
 
-// The interface assumes all of the color is in
-// and *absolute* color space (no-white point etc.)
-// Only non-linear space conversion happens when
-// the image goes to the monitor, then correct gamma
-// should be called (when swap chain is non-linear)
-
-float3 XYZToYxy(in float3 XYZ)
+// The [To/From]Yxy interface assumes all of the color is in
+// a linear D65 color space.
+// [To/From]Linear is responsible for EOTF conversion.
+// Currently only ACES-cg has non D65 whitepoint,
+// so we include Bradford chromacity adaptation
+// matrix to convert the whitepoints.
+// Implementation is from here
+// https://www.color.org/specification/icc1v43_2010-12.pdf
+float3 XYZToYxy(in float3 xyz)
 {
-    let invSum = 1 / (XYZ.x + XYZ.y + XYZ.z);
-    // this has slightly better precision maybe?
-    let x = 1 - (XYZ.y + XYZ.z) * invSum;
-    let y = 1 - (XYZ.x + XYZ.z) * invSum;
-    return float3(XYZ.y, x, y);
+    let invSum = 1 / (xyz.x + xyz.y + xyz.z);
+    // This has slightly better precision maybe?
+    let x = 1 - (xyz.y + xyz.z) * invSum;
+    let y = 1 - (xyz.x + xyz.z) * invSum;
+    return float3(xyz.y, x, y);
 }
 
 float3 YxyToXYZ(in float3 Yxy)
@@ -25,6 +27,41 @@ float3 YxyToXYZ(in float3 Yxy)
     float z = (1 - Yxy.g - Yxy.b) * yy;
     float3 xyz = float3(x, y, z);
     return xyz;
+}
+
+// TODO: Hand constexpr these for default whitepoints.
+static const float3x3 BradfordMatrix = float3x3
+(
+     0.8951f,  0.2664f, -0.1614f,
+    -0.7502f,  1.7135f,  0.0367f,
+     0.0389f, -0.0685f,  1.0296f
+);
+
+static const float3x3 InvBradfordMatrix = float3x3
+(
+     0.9869929f, -0.1470543f, 0.1599627f,
+     0.4323053f,  0.5183603f, 0.0492912f,
+    -0.0085287f,  0.0400428f, 0.9684867f
+);
+
+// https://en.wikipedia.org/wiki/Standard_illuminant
+static const float3 D65WhiteXYZ = float3(0.95047f, 1.0f, 1.08883f);
+// Hand calculated from the xy whitepoint of D60
+static const float3 D60WhiteXYZ = float3(0.95265f, 1.0f, 1.00883f);
+
+float3 ChangeWhitePoint(in float3 outWhitePoint,
+                        in float3 inWhitePoint,
+                        in float3 xyz)
+{
+    float3 coneRespIn = mul(BradfordMatrix, inWhitePoint);
+    float3 coneRespOut = mul(BradfordMatrix, outWhitePoint);
+    float3 d = coneRespOut / coneRespIn;
+    //float3 d = coneRespIn / coneRespOut;
+    float3x3 scaleMatrix = float3x3(d[0],    0,    0,
+                                       0, d[1],    0,
+                                       0,    0, d[2]);
+    float3x3 matrix = mul(InvBradfordMatrix, mul(scaleMatrix, BradfordMatrix));
+    return mul(matrix, xyz);
 }
 
 public interface IColorConv
@@ -54,26 +91,30 @@ public struct SRGBColorConv : IColorConv
 
     public static float3 ToYxy(in float3 color)
     {
-        // https://github.com/ampas/aces-dev/blob/master/transforms/ctl/README-MATRIX.md
-        let mat = float3x3(0.412390798f, 0.357584357f, 0.180480793f,
-                           0.212639004f, 0.715168715f, 0.072192319f,
-                           0.019330820f, 0.119194776f, 0.950532079f);
-
+        // https://observablehq.com/@danburzo/color-matrix-calculator
+        let mat = float3x3
+        (
+            0.4123907992659593f, 0.3575843393838780f, 0.1804807884018343f,
+            0.2126390058715102f, 0.7151686787677560f, 0.0721923153607337f,
+            0.0193308187155918f, 0.1191947797946260f, 0.9505321522496607f
+        );
         let xyz = mul(mat, color);
         return XYZToYxy(xyz);
     }
 
     public static float3 FromYxy(in float3 color)
     {
-        float3 xyz = YxyToXYZ(color);
-        // https://github.com/ampas/aces-dev/blob/master/transforms/ctl/README-MATRIX.md
+        let xyz = YxyToXYZ(color);
+        // https://observablehq.com/@danburzo/color-matrix-calculator
         // XYZ to RGB linear
-        let mat = float3x3( 3.2409699419f, -1.5373831776f, -0.4986107603f,
-                           -0.9692436363f,  1.8759675015f,  0.0415550574f,
-                            0.0556300797f, -0.2039769589f,  1.0569715142f);
+        let mat = float3x3
+        (
+           3.2409699419045226f, -1.5373831775700939f, -0.4986107602930034f,
+          -0.9692436362808796f,  1.8759675015077204f,  0.0415550574071756f,
+           0.0556300796969936f, -0.2039769588889765f,  1.0569715142428784f
+        );
         let srgb = mul(mat, xyz);
-        // return srgb;
-        return xyz;
+        return srgb;
     }
 }
 
@@ -83,7 +124,7 @@ public struct AcesCGColorConv : IColorConv
 
     public static float3 ToLinear(in float3 color, in float gamma)
     {
-        float v = float(1.0) / gamma;
+        let v = float(1.0) / gamma;
         return pow(color, gamma);
     }
 
@@ -95,21 +136,32 @@ public struct AcesCGColorConv : IColorConv
     public static float3 ToYxy(in float3 color)
     {
         // https://github.com/ampas/aces-dev/blob/master/transforms/ctl/README-MATRIX.md
-        let mat = float3x3( 0.6624541811f, 0.1340042065f, 0.1561876870f,
-                            0.2722287168f, 0.6740817658f, 0.0536895174f,
-                           -0.0055746495f, 0.0040607335f, 1.0103391003f);
-        let xyz = mul(mat, color);
+        let mat = float3x3
+        (
+             0.6624541811f, 0.1340042065f, 0.1561876870f,
+             0.2722287168f, 0.6740817658f, 0.0536895174f,
+            -0.0055746495f, 0.0040607335f, 1.0103391003f
+        );
+        float3 xyz = mul(mat, color);
+        // Input color is at D65, change to D60
+        xyz = ChangeWhitePoint(D65WhiteXYZ, D60WhiteXYZ, xyz);
+
         return XYZToYxy(xyz);
     }
 
     public static float3 FromYxy(in float3 color)
     {
         float3 xyz = YxyToXYZ(color);
-        // https://en.wikipedia.org/wiki/SRGB
+        // Input color is at D60, change to D65
+        xyz = ChangeWhitePoint(D60WhiteXYZ, D65WhiteXYZ, xyz);
+        // https://github.com/ampas/aces-dev/blob/master/transforms/ctl/README-MATRIX.md
         // XYZ to RGB linear
-        let mat = float3x3( 1.6410233797f, -0.3248032942f, -0.2364246952f,
-                           -0.6636628587f,  1.6153315917f,  0.0167563477f,
-                            0.0117218943f, -0.0082844420f,  0.9883948585f);
+        let mat = float3x3
+        (
+             1.6410233797f, -0.3248032942f, -0.2364246952f,
+            -0.6636628587f,  1.6153315917f,  0.0167563477f,
+             0.0117218943f, -0.0082844420f,  0.9883948585f
+        );
         return mul(mat, xyz);
     }
 }
@@ -159,20 +211,26 @@ public struct HDR10ColorConv : IColorConv
     public static float3 ToYxy(in float3 color)
     {
         // https://observablehq.com/@danburzo/color-matrix-calculator
-        float3x3 mat = float3x3(0.6369535f, 0.1446192f, 0.1688559f,
-                                0.2626983f, 0.6780088f, 0.0592920f,
-                                0.0000000f, 0.0280731f, 1.0608272f);
+        float3x3 mat = float3x3
+        (
+            0.63695804830f, 0.14461690350f, 0.16888097516f,
+            0.26270021201f, 0.67799807152f, 0.05930171647f,
+            0.00000000000f, 0.02807269305f, 1.060985057711f
+        );
         float3 xyz = mul(mat, color);
         return XYZToYxy(xyz);
     }
 
     public static float3 FromYxy(in float3 color)
     {
-        // https://observablehq.com/@danburzo/color-matrix-calculator
+        // https://github.com/ampas/aces-dev/blob/master/transforms/ctl/README-MATRIX.md
         float3 XYZ = YxyToXYZ(color);
-        float3x3 mat = float3x3( 1.7166634f, -0.3556733f, -0.2533681f,
-                                -0.6666738f,  1.6164557f,  0.01576823f,
-                                 0.0176425f, -0.0427770f,  0.9422433f);
+        float3x3 mat = float3x3
+        (
+             1.7166511880f, -0.3556707838f, -0.2533662814f,
+            -0.6666843518f,  1.6164812366f,  0.0157685458f,
+             0.0176398574f, -0.0427706133f,  0.9421031212f
+        );
         return mul(mat, XYZ);
     }
 }

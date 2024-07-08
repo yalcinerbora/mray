@@ -4,19 +4,210 @@
 #include <BS/BS_thread_pool.hpp>
 #include <array>
 
-//void RenderImagePool::Clear()
-//{
-//    if(!imgMemory.Memory()) return;
-//    // Now we can unmap and free memory
-//    vkUnmapMemory(handlesVk->deviceVk, stageMemory.Memory());
-//    imgMemory = VulkanDeviceMemory(handlesVk->deviceVk);
-//    stageMemory = VulkanDeviceMemory(handlesVk->deviceVk);
-//
-//    using CList = std::array<VkCommandBuffer, 3>;
-//    CList commands = { hdrCopyCommand, sdrCopyCommand, clearCommand };
-//    vkFreeCommandBuffers(handlesVk->deviceVk, handlesVk->mainCommandPool, 3,
-//                         commands.data());
-//}
+constexpr VkImageMemoryBarrier GENERIC_IMG_MEM_BARRIER =
+{
+    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+    .pNext = nullptr,
+    .srcAccessMask = VK_ACCESS_NONE,
+    .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+    .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+    .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+    .srcQueueFamilyIndex = 0,
+    .dstQueueFamilyIndex = 0,
+    .image = nullptr,
+    .subresourceRange = VkImageSubresourceRange
+    {
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .baseMipLevel = 0,
+        .levelCount = 1,
+        .baseArrayLayer = 0,
+        .layerCount = 1
+    },
+};
+
+void RenderImagePool::GenerateSDRCopyCommand()
+{
+    // SDR image should be in read only optimal
+    // from the fragment shader
+    VkImageMemoryBarrier imgBarrierInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .pNext = nullptr,
+        .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
+        .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+        .oldLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL,
+        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        .srcQueueFamilyIndex = handlesVk->queueIndex,
+        .dstQueueFamilyIndex = handlesVk->queueIndex,
+        .image = sdrImage.Image(),
+        .subresourceRange = VkImageSubresourceRange
+        {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1
+        }
+    };
+    vkCmdPipelineBarrier(sdrCopyCommand,
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                         0, nullptr,
+                         0, nullptr,
+                         1, &imgBarrierInfo);
+
+    VkBufferImageCopy sdrCopyParams = hdrImage.FullCopyParams();
+    vkCmdCopyImageToBuffer(sdrCopyCommand, sdrImage.Image(),
+                           VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                           outStageBuffer.Buffer(), 1,
+                           &sdrCopyParams);
+
+    // Convert it back
+    std::swap(imgBarrierInfo.srcAccessMask,
+              imgBarrierInfo.dstAccessMask);
+    std::swap(imgBarrierInfo.oldLayout,
+              imgBarrierInfo.newLayout);
+    vkCmdPipelineBarrier(sdrCopyCommand,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
+                         0, nullptr,
+                         0, nullptr,
+                         1, &imgBarrierInfo);
+}
+
+void RenderImagePool::GenerateHDRCopyCommand()
+{
+    // HDR image should be in general format
+    // from a compute shader
+    VkImageMemoryBarrier imgBarrierInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .pNext = nullptr,
+        .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+        .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        .srcQueueFamilyIndex = handlesVk->queueIndex,
+        .dstQueueFamilyIndex = handlesVk->queueIndex,
+        .image = hdrImage.Image(),
+        .subresourceRange = VkImageSubresourceRange
+        {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1
+        }
+    };
+    vkCmdPipelineBarrier(hdrCopyCommand,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                         0, nullptr,
+                         0, nullptr,
+                         1, &imgBarrierInfo);
+
+    VkBufferImageCopy hdrCopyParams = hdrImage.FullCopyParams();
+    vkCmdCopyImageToBuffer(hdrCopyCommand, hdrImage.Image(),
+                           VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                           outStageBuffer.Buffer(), 1,
+                           &hdrCopyParams);
+
+    // Convert it back
+    std::swap(imgBarrierInfo.srcAccessMask,
+              imgBarrierInfo.dstAccessMask);
+    std::swap(imgBarrierInfo.oldLayout,
+              imgBarrierInfo.newLayout);
+    vkCmdPipelineBarrier(hdrCopyCommand,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0,
+                         0, nullptr,
+                         0, nullptr,
+                         1, &imgBarrierInfo);
+}
+
+void RenderImagePool::GenerateClearCommand()
+{
+    // Clear
+    VkImageSubresourceRange clearRange
+    {
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .baseMipLevel = 0u,
+        .levelCount = 1u,
+        .baseArrayLayer = 0u,
+        .layerCount = 1u
+    };
+    VkClearColorValue clearColorValue = {};
+    clearColorValue.float32[0] = 1;
+    clearColorValue.float32[1] = 1;
+    clearColorValue.float32[2] = 1;
+    clearColorValue.float32[3] = 1;
+
+    // Change the HDR image state to writable
+    std::array<VkImageMemoryBarrier, 3> imgBarrierInfoList = {};
+    imgBarrierInfoList[0] =
+    {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .pNext = nullptr,
+        .srcAccessMask = VK_ACCESS_NONE,
+        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+        .srcQueueFamilyIndex = handlesVk->queueIndex,
+        .dstQueueFamilyIndex = handlesVk->queueIndex,
+        .image = hdrImage.Image(),
+        .subresourceRange = VkImageSubresourceRange
+        {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1
+        }
+    };
+    // For sample count image make it writable as well
+    imgBarrierInfoList[1] = imgBarrierInfoList[0];
+    imgBarrierInfoList[1].image = hdrSampleImage.Image();
+    // And for the sdr image
+    imgBarrierInfoList[2] = imgBarrierInfoList[0];
+    imgBarrierInfoList[2].image = sdrImage.Image();
+    // Finally the barrier
+    vkCmdPipelineBarrier(clearCommand,
+                         VK_PIPELINE_STAGE_NONE,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                         0, nullptr,
+                         0, nullptr,
+                         3, imgBarrierInfoList.data());
+
+    vkCmdClearColorImage(clearCommand, hdrImage.Image(),
+                         VK_IMAGE_LAYOUT_GENERAL,
+                         &clearColorValue, 1u,
+                         &clearRange);
+    vkCmdClearColorImage(clearCommand, hdrSampleImage.Image(),
+                         VK_IMAGE_LAYOUT_GENERAL,
+                         &clearColorValue, 1u,
+                         &clearRange);
+    vkCmdClearColorImage(clearCommand, sdrImage.Image(),
+                         VK_IMAGE_LAYOUT_GENERAL,
+                         &clearColorValue, 1u,
+                         &clearRange);
+
+    // Make SDR image read optimal, since tonemap stage
+    // expects the image to be previously read optimal.
+    imgBarrierInfoList[0].image = sdrImage.Image();
+    imgBarrierInfoList[0].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    imgBarrierInfoList[0].dstAccessMask = (VK_ACCESS_SHADER_READ_BIT |
+                                           VK_ACCESS_SHADER_WRITE_BIT);
+    imgBarrierInfoList[0].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imgBarrierInfoList[0].newLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+    // Finally the barrier
+    vkCmdPipelineBarrier(clearCommand,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         (VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT), 0,
+                         0, nullptr,
+                         0, nullptr,
+                         1, imgBarrierInfoList.data());
+}
 
 RenderImagePool::RenderImagePool()
     : imgLoader(nullptr, nullptr)
@@ -30,6 +221,10 @@ RenderImagePool::RenderImagePool(BS::thread_pool* tp,
     , imgLoader(CreateImageLoader())
     , initInfo(initInfoIn)
 {
+    VkImageMemoryBarrier imgBarrierInfo = GENERIC_IMG_MEM_BARRIER;
+    imgBarrierInfo.srcQueueFamilyIndex = handlesVk->queueIndex;
+    imgBarrierInfo.dstQueueFamilyIndex = handlesVk->queueIndex;
+
     // Work with floating point
     // TODO: Reduce floating point usage, currently formats are
     // technically a protocol between tracer and
@@ -51,7 +246,7 @@ RenderImagePool::RenderImagePool(BS::thread_pool* tp,
                                  VK_FORMAT_R32_SFLOAT,
                                  hdrImgUsageFlags, initInfo.extent);
     sdrImage = VulkanImage(*handlesVk, VulkanSamplerMode::NEAREST,
-                           VK_FORMAT_R32G32B32A32_SFLOAT,
+                           VK_FORMAT_R16G16B16A16_UNORM,
                            sdrImgUsageFlags, initInfo.extent);
 
     size_t outBufferSize = std::max(hdrImage.MemRequirements().second,
@@ -93,150 +288,19 @@ RenderImagePool::RenderImagePool(BS::thread_pool* tp,
     };
     // HDR
     vkBeginCommandBuffer(hdrCopyCommand, &cBuffBeginInfo);
-    VkBufferImageCopy hdrCopyParams = hdrImage.FullCopyParams();
-    vkCmdCopyImageToBuffer(hdrCopyCommand, hdrImage.Image(),
-                           VK_IMAGE_LAYOUT_GENERAL,
-                           outStageBuffer.Buffer(), 1,
-                           &hdrCopyParams);
+    GenerateHDRCopyCommand();
     vkEndCommandBuffer(hdrCopyCommand);
 
     // SDR
     vkBeginCommandBuffer(sdrCopyCommand, &cBuffBeginInfo);
-    VkBufferImageCopy sdrCopyParams = hdrImage.FullCopyParams();
-    vkCmdCopyImageToBuffer(sdrCopyCommand, sdrImage.Image(),
-                           VK_IMAGE_LAYOUT_GENERAL,
-                           outStageBuffer.Buffer(), 1,
-                           &sdrCopyParams);
+    GenerateSDRCopyCommand();
     vkEndCommandBuffer(sdrCopyCommand);
 
     // Clear
-    VkImageSubresourceRange clearRange
-    {
-        .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-        .baseMipLevel   = 0u,
-        .levelCount     = 1u,
-        .baseArrayLayer = 0u,
-        .layerCount     = 1u
-    };
-    VkClearColorValue clearColorValue = {};
-    clearColorValue.float32[0] = 1;
-    clearColorValue.float32[1] = 1;
-    clearColorValue.float32[2] = 1;
-    clearColorValue.float32[3] = 1;
-
     vkBeginCommandBuffer(clearCommand, &cBuffBeginInfo);
-    // Change the HDR image state to writable
-    std::array<VkImageMemoryBarrier, 3> imgBarrierInfo = {};
-    imgBarrierInfo[0] =
-    {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .pNext = nullptr,
-        .srcAccessMask = VK_ACCESS_NONE,
-        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .newLayout = VK_IMAGE_LAYOUT_GENERAL,
-        .srcQueueFamilyIndex = handlesVk->queueIndex,
-        .dstQueueFamilyIndex = handlesVk->queueIndex,
-        .image = hdrImage.Image(),
-        .subresourceRange = VkImageSubresourceRange
-        {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1
-        },
-    };
-    // For sample count image make it writable as well
-    imgBarrierInfo[1] = imgBarrierInfo[0];
-    imgBarrierInfo[1].image = hdrSampleImage.Image();
-    // And for the sdr image
-    imgBarrierInfo[2] = imgBarrierInfo[0];
-    imgBarrierInfo[2].image = sdrImage.Image();
-    // Finally the barrier
-    vkCmdPipelineBarrier(clearCommand,
-                         VK_PIPELINE_STAGE_NONE,
-                         VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
-                         0, nullptr,
-                         0, nullptr,
-                         3, imgBarrierInfo.data());
-
-    vkCmdClearColorImage(clearCommand, hdrImage.Image(),
-                         VK_IMAGE_LAYOUT_GENERAL,
-                         &clearColorValue, 1u,
-                         &clearRange);
-    vkCmdClearColorImage(clearCommand, hdrSampleImage.Image(),
-                         VK_IMAGE_LAYOUT_GENERAL,
-                         &clearColorValue, 1u,
-                         &clearRange);
-    vkCmdClearColorImage(clearCommand, sdrImage.Image(),
-                         VK_IMAGE_LAYOUT_GENERAL,
-                         &clearColorValue, 1u,
-                         &clearRange);
-
-    // Make SDR image read optimal, since tonemap stage
-    // expects the image to be previously read optimal.
-    imgBarrierInfo[0].image = sdrImage.Image();
-    imgBarrierInfo[0].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    imgBarrierInfo[0].dstAccessMask = (VK_ACCESS_SHADER_READ_BIT |
-                                       VK_ACCESS_SHADER_WRITE_BIT);
-    imgBarrierInfo[0].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-    imgBarrierInfo[0].newLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
-    // Finally the barrier
-    vkCmdPipelineBarrier(clearCommand,
-                         VK_PIPELINE_STAGE_TRANSFER_BIT,
-                         (VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT), 0,
-                         0, nullptr,
-                         0, nullptr,
-                         1, imgBarrierInfo.data());
-
+    GenerateClearCommand();
     vkEndCommandBuffer(clearCommand);
 }
-
-//RenderImagePool::RenderImagePool(RenderImagePool&& other)
-//    : hdrImage(std::move(other.hdrImage))
-//    , hdrSampleImage(std::move(other.hdrSampleImage))
-//    , sdrImage(std::move(other.sdrImage))
-//    , outStageBuffer(std::move(other.outStageBuffer))
-//    , stageMemory(std::move(other.stageMemory))
-//    , imgMemory(std::move(other.imgMemory))
-//    , handlesVk(other.handlesVk)
-//    , hStagePtr(other.hStagePtr)
-//    , hdrCopyCommand(std::move(other.hdrCopyCommand))
-//    , sdrCopyCommand(std::move(other.sdrCopyCommand))
-//    , clearCommand(std::move(other.clearCommand))
-//    , threadPool(other.threadPool)
-//    , imgLoader(std::move(other.imgLoader))
-//    , initInfo(other.initInfo)
-//{}
-//
-//RenderImagePool& RenderImagePool::operator=(RenderImagePool&& other)
-//{
-//    assert(this != &other);
-//    Clear();
-//
-//    hdrImage = std::move(other.hdrImage);
-//    hdrSampleImage = std::move(other.hdrSampleImage);
-//    sdrImage = std::move(other.sdrImage);
-//    outStageBuffer = std::move(other.outStageBuffer);
-//    stageMemory = std::move(other.stageMemory);
-//    imgMemory = std::move(other.imgMemory);
-//    handlesVk = other.handlesVk;
-//    hStagePtr = other.hStagePtr;
-//    hdrCopyCommand = std::move(other.hdrCopyCommand);
-//    sdrCopyCommand = std::move(other.sdrCopyCommand);
-//    clearCommand = std::move(other.clearCommand);
-//    threadPool = other.threadPool;
-//    imgLoader = std::move(other.imgLoader);
-//    initInfo = other.initInfo;
-//    return *this;
-//}
-//
-//RenderImagePool::~RenderImagePool()
-//{
-//    Clear();
-//}
 
 void RenderImagePool::SaveImage(IsHDRImage t, const RenderImageSaveInfo& fileOutInfo,
                                 const VulkanTimelineSemaphore& imgSem)
@@ -278,11 +342,14 @@ void RenderImagePool::SaveImage(IsHDRImage t, const RenderImageSaveInfo& fileOut
         imgSem.HostWait(1);
         // TODO: Find the proper tight size
         using enum MRayPixelEnum;
-        size_t imgTightSize = 0;
-        auto pixelType = (t == HDR) ? ((initInfo.isSpectralPack)
+        auto outPixelType = (t == HDR) ? ((initInfo.isSpectralPack)
             ? MRayPixelTypeRT(MRayPixelType<MR_R_FLOAT>{})
             : MRayPixelTypeRT(MRayPixelType<MR_RGB_FLOAT>{}))
             : MRayPixelTypeRT(MRayPixelType<MR_RGB16_UNORM>{});
+        auto inPixelType = (t == HDR) ? ((initInfo.isSpectralPack)
+            ? MRayPixelTypeRT(MRayPixelType<MR_R_FLOAT>{})
+            : MRayPixelTypeRT(MRayPixelType<MR_RGBA_FLOAT>{}))
+            : MRayPixelTypeRT(MRayPixelType<MR_RGBA16_UNORM>{});
         auto imgFileType = (t == HDR)
             ? ImageType::EXR
             : ImageType::PNG;
@@ -292,6 +359,7 @@ void RenderImagePool::SaveImage(IsHDRImage t, const RenderImageSaveInfo& fileOut
         Float gamma = (initInfo.isSpectralPack || t == HDR)
             ? Float(1.0)
             : initInfo.sdrColorSpace.second;
+        size_t paddedImageSize = outPixelType.PixelSize() * initInfo.extent.Multiply();
         //
         WriteImageParams imgInfo =
         {
@@ -299,23 +367,24 @@ void RenderImagePool::SaveImage(IsHDRImage t, const RenderImageSaveInfo& fileOut
             {
                 .dimensions = Vector3ui(initInfo.extent, 1u),
                 .mipCount = 1,
-                .pixelType = pixelType,
+                .pixelType = outPixelType,
                 .colorSpace = Pair(gamma, colorSpace)
             },
             .depth = initInfo.depth,
-            .pixels = Span<const Byte>(hStagePtr, imgTightSize)
+            .inputType = inPixelType,
+            .pixels = Span<const Byte>(hStagePtr, paddedImageSize)
         };
 
         using namespace std::string_literals;
-        std::string filePath = (fileOutInfo.prefix + "_"s +
-                                std::to_string(fileOutInfo.sample) + "spp"s +
-                                std::to_string(fileOutInfo.time) + "sec"s);
-
+        std::string filePath = MRAY_FORMAT("{:s}_{:f}spp_{:f}sec",
+                                           fileOutInfo.prefix,
+                                           fileOutInfo.sample,
+                                           fileOutInfo.time);
         MRayError e = imgLoader->WriteImage(imgInfo, filePath,
                                             imgFileType);
 
         // Signal ready for next command
-        imgSem.HostSignal(2);
+        //imgSem.HostSignal(2);
 
         // Log the error
         if(e) MRAY_ERROR_LOG("{}", e.GetError());
