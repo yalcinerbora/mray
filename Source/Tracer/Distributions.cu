@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <numeric>
 
-namespace Distributions
+namespace Distribution
 {
 
 static constexpr uint32_t TPB = StaticThreadPerBlock1D();
@@ -283,7 +283,7 @@ void DistributionGroupPwC2D::Construct(uint32_t index,
             if(kp.GlobalId() == 0)
             {
                 d.dDistY[0] = Distribution1D(d.dCDFsY);
-                dDist[0] = Distribution(ToConstSpan(d.dDistsX), d.dDistY[0]);
+                dDist[0] = Distribution2D(ToConstSpan(d.dDistsX), d.dDistY[0]);
             }
         }
     );

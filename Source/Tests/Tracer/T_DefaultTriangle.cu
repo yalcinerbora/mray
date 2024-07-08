@@ -70,7 +70,7 @@ MRAY_KERNEL void KCAccessFirstTriangle(Span<uint8_t> dIsValid,
                                        const std::array<Quaternion, 3> normalsQuat,
                                        const std::array<Vector2, 3> uvs)
 {
-    static constexpr uint32_t TRI_VERTEX_COUNT = ShapeFunctions::Triangle::TRI_VERTEX_COUNT;
+    static constexpr uint32_t TRI_VERTEX_COUNT = Shape::Triangle::TRI_VERTEX_COUNT;
     assert(dIsValid.size() == primKeys.size());
 
     KernelCallParams kp;

@@ -226,7 +226,7 @@ void KCExpandSamplesToPixels(// Outputs
             assert(stride != maxPixelPerSample);
             constexpr uint32_t INVALID_INT = std::numeric_limits<uint32_t>::max();
 
-            namespace Morton = GraphicsFunctions::MortonCode;
+            namespace Morton = Graphics::MortonCode;
             uint32_t pixelLinearId = Morton::Compose2D<uint32_t>(Vector2ui(globalPixCoord[1]));
             pixelLinearId = (!doWrite) ? INVALID_INT : pixelLinearId;
             uint32_t index = (!doWrite) ? INVALID_INT : sampleIndex;
@@ -290,7 +290,7 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const SubImageSpan<3> img,
         WarpSynchronize<LOGICAL_WARP_SIZE>();
 
         // Locally compute the coordinates
-        namespace Morton = GraphicsFunctions::MortonCode;
+        namespace Morton = Graphics::MortonCode;
         Vector2i pixCoordsInt = Vector2i(Morton::Decompose2D(sResonsiblePixel[localWarpId]));
         Vector2 pixCoords = Vector2(pixCoordsInt) + Float(0.5);
 

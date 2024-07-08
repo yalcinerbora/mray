@@ -4,7 +4,7 @@
 #include "Types.h"
 #include "Quaternion.h"
 
-namespace GraphicsFunctions
+namespace Graphics
 {
     // Convention of wi (v) and normal is as follows
     //        normal
@@ -108,7 +108,7 @@ namespace GraphicsFunctions
     }
 }
 
-namespace GraphicsFunctions
+namespace Graphics
 {
 
 MRAY_HYBRID MRAY_CGPU_INLINE

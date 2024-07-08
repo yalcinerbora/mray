@@ -174,7 +174,7 @@ uint32_t MeshFileGFG::MeshPrimitiveCount() const
 {
     const GFGMeshHeader& m = loader.Header().meshes[innerIndex];
     return (static_cast<uint32_t>(m.headerCore.indexCount) /
-            ShapeFunctions::Triangle::TRI_VERTEX_COUNT);
+            Shape::Triangle::TRI_VERTEX_COUNT);
 }
 
 uint32_t MeshFileGFG::MeshAttributeCount() const

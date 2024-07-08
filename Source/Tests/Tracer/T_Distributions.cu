@@ -29,7 +29,7 @@ void KCSampleDist(Span<SampleT<Vector2>> dOutSamples,
 
 struct DistTester2D
 {
-    using Dist2D = typename DistributionGroupPwC2D::Distribution;
+    using Dist2D = typename DistributionGroupPwC2D::Distribution2D;
     using DistData = typename DistributionGroupPwC2D::DistDataConst;
 
     GPUSystem system;
@@ -245,7 +245,7 @@ TEST(Dist_Linear, ZeroVariance)
             else if(i == 1) xi = MathFunctions::PrevFloat<Float>(1);
             else xi = dist01(rng);
 
-            using namespace Distributions;
+            using namespace Distribution;
             auto result = Common::SampleLine(xi, c, d);
             EXPECT_GE(result.value, 0);
             EXPECT_LT(result.value, 1);
@@ -297,7 +297,7 @@ TEST(Dist_Gaussian, ZeroVariance)
             else if(i == 1) xi = MathFunctions::PrevFloat<Float>(1);
             else xi = dist01(rng);
 
-            using namespace Distributions;
+            using namespace Distribution;
             auto result = Common::SampleGaussian(xi, sigma, mean);
             // Evaluate the function
             Float eval = MathFunctions::Gaussian(result.value,
@@ -353,7 +353,7 @@ TEST(Dist_Gaussian2D, ZeroVariance)
             else if(i == 1) xi = Vector2(MathFunctions::PrevFloat<Float>(1));
             else xi = Vector2(dist01(rng), dist01(rng));
 
-            using namespace Distributions;
+            using namespace Distribution;
             auto result = Common::SampleGaussian2D(xi, sigma, mean);
             // Evaluate the function
             using MathFunctions::Gaussian;
@@ -413,7 +413,7 @@ TEST(Dist_Tent, ZeroVariance)
             else if(i == 1) xi = MathFunctions::PrevFloat<Float>(1);
             else xi = dist01(rng);
 
-            using namespace Distributions;
+            using namespace Distribution;
             auto result = Common::SampleTent(xi, a, b);
             EXPECT_GT(result.value, a);
             EXPECT_LT(result.value, b);
@@ -478,7 +478,7 @@ TEST(Dist_Uniform, ZeroVariance)
             else if(i == 1) xi = MathFunctions::PrevFloat<Float>(1);
             else xi = dist01(rng);
 
-            using namespace Distributions;
+            using namespace Distribution;
             auto result = Common::SampleUniformRange(xi, a, b);
             EXPECT_GE(result.value, a);
             EXPECT_LT(result.value, b);
@@ -503,7 +503,7 @@ TEST(Dist_Uniform, ZeroVariance)
 
 TEST(Dist_UniformHemisphere, Sample)
 {
-    using Distributions::Common::SampleUniformDirection;
+    using Distribution::Common::SampleUniformDirection;
     static constexpr uint32_t Iterations = 50'000;
 
     {
@@ -550,7 +550,7 @@ TEST(Dist_UniformHemisphere, Sample)
 
 TEST(Dist_UniformHemisphere, PDF)
 {
-    using Distributions::Common::PDFUniformDirection;
+    using Distribution::Common::PDFUniformDirection;
     // As simple as it gets
     // Provided for completeness
     constexpr Float expected = MathConstants::InvPi<Float>() * Float{ 0.5 };
@@ -559,7 +559,7 @@ TEST(Dist_UniformHemisphere, PDF)
 
 TEST(Dist_CosineHemisphere, Sample)
 {
-    using namespace Distributions::Common;
+    using namespace Distribution::Common;
     static constexpr uint32_t Iterations = 50'000;
     {
         std::mt19937 rng0(123), rng1(321);
@@ -605,7 +605,7 @@ TEST(Dist_CosineHemisphere, Sample)
 
 TEST(Dist_CosineHemisphere, PDF)
 {
-    using Distributions::Common::PDFCosDirection;
+    using Distribution::Common::PDFCosDirection;
     // As simple as it gets
     // Provided for completeness
     Vector3 v = Vector3(1, 2, 3).Normalize();

@@ -10,7 +10,7 @@
 
 TEST(GraphicsFunctionsTest, Reflect)
 {
-    using namespace GraphicsFunctions;
+    using namespace Graphics;
 
     {
         // Simple 2D Test
@@ -31,7 +31,7 @@ TEST(GraphicsFunctionsTest, Reflect)
 
 TEST(GraphicsFunctionsTest, Refract)
 {
-    using namespace GraphicsFunctions;
+    using namespace Graphics;
     {
         // Simple Test
         Vector3 normal = Vector3::YAxis();
@@ -67,7 +67,7 @@ TEST(GraphicsFunctionsTest, Refract)
 
 TEST(GraphicsFunctionsTest, Orient)
 {
-    using namespace GraphicsFunctions;
+    using namespace Graphics;
     {
         // Basic Test / No Change
         Vector3 normal = Vector3::YAxis();
@@ -99,7 +99,7 @@ TEST(GraphicsFunctionsTest, GSOrthonormalize2D)
 {
     {
         // Correction-like
-        using namespace GraphicsFunctions;
+        using namespace Graphics;
         Vector3 x = Vector3::XAxis();
         Vector3 y = Vector3::YAxis();
         y += Vector3::XAxis() * MathConstants::LargeEpsilon<Float>();
@@ -110,7 +110,7 @@ TEST(GraphicsFunctionsTest, GSOrthonormalize2D)
 
     {
         // Big difference
-        using namespace GraphicsFunctions;
+        using namespace Graphics;
         Vector3 x = Vector3::XAxis();
         Vector3 y = Vector3(0.5, 0.5, 0.0).Normalize();
         // Renormalize Y
@@ -123,7 +123,7 @@ TEST(GraphicsFunctionsTest, GSOrthonormalize3D)
 {
     {
         // Correction-like
-        using namespace GraphicsFunctions;
+        using namespace Graphics;
         Vector3 x = Vector3::XAxis();
         Vector3 y = Vector3::YAxis();
         Vector3 z = Vector3::ZAxis();
@@ -137,7 +137,7 @@ TEST(GraphicsFunctionsTest, GSOrthonormalize3D)
 
     {
         // Big difference
-        using namespace GraphicsFunctions;
+        using namespace Graphics;
         Vector3 x = Vector3::XAxis();
         Vector3 y = Vector3(0.0, 0.5, 0.5).Normalize();
         Vector3 z = Vector3::ZAxis();
@@ -150,7 +150,7 @@ TEST(GraphicsFunctionsTest, GSOrthonormalize3D)
 
 TEST(GraphicsFunctionsTest, ComposeMorton2D_32Bit)
 {
-    using namespace GraphicsFunctions;
+    using namespace Graphics;
 
     {
         Vector2ui val = Vector2ui(0b1111111111, 0b0);
@@ -167,7 +167,7 @@ TEST(GraphicsFunctionsTest, ComposeMorton2D_32Bit)
 
 TEST(GraphicsFunctionsTest, DecomposeMorton2D_32Bit)
 {
-    using namespace GraphicsFunctions;
+    using namespace Graphics;
 
     {
         uint32_t val = 0b01010101010101010101;
@@ -185,7 +185,7 @@ TEST(GraphicsFunctionsTest, DecomposeMorton2D_32Bit)
 
 TEST(GraphicsFunctionsTest, ComposeMorton3D_32Bit)
 {
-    using namespace GraphicsFunctions;
+    using namespace Graphics;
 
     {
         Vector3ui val = Vector3ui(0b1111111111, 0b0, 0b0);
@@ -208,7 +208,7 @@ TEST(GraphicsFunctionsTest, ComposeMorton3D_32Bit)
 
 TEST(GraphicsFunctionsTest, DecomposeMorton3D_32Bit)
 {
-    using namespace GraphicsFunctions;
+    using namespace Graphics;
 
     {
         uint32_t val = 0b001001001001001001001001001001;
@@ -231,7 +231,7 @@ TEST(GraphicsFunctionsTest, DecomposeMorton3D_32Bit)
 
 TEST(GraphicsFunctionsTest, ComposeMorton2D_64Bit)
 {
-    using namespace GraphicsFunctions;
+    using namespace Graphics;
 
     {
         Vector2ui val = Vector2ui(0b11111111111111111111, 0b0);
@@ -248,7 +248,7 @@ TEST(GraphicsFunctionsTest, ComposeMorton2D_64Bit)
 
 TEST(GraphicsFunctionsTest, DecomposeMorton2D_64Bit)
 {
-    using namespace GraphicsFunctions;
+    using namespace Graphics;
 
     {
         uint64_t val = 0b0101010101010101010101010101010101010101;
@@ -266,7 +266,7 @@ TEST(GraphicsFunctionsTest, DecomposeMorton2D_64Bit)
 
 TEST(GraphicsFunctionsTest, ComposeMorton3D_64Bit)
 {
-    using namespace GraphicsFunctions;
+    using namespace Graphics;
 
     {
         Vector3ui val = Vector3ui(0b11111111111111111111, 0b0, 0b0);
@@ -289,7 +289,7 @@ TEST(GraphicsFunctionsTest, ComposeMorton3D_64Bit)
 
 TEST(GraphicsFunctionsTest, DecomposeMorton3D_64Bit)
 {
-    using namespace GraphicsFunctions;
+    using namespace Graphics;
 
     {
         uint64_t val = 0x249249249249249;

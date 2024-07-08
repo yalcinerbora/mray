@@ -73,7 +73,7 @@ SampleT<BasicSurface> Triangle<T>::SampleSurface(RNGDispenser& rng) const
     Quaternion tbn = Quaternion::BarySLerp(q0, q1, q2, a, b);
     Vector3 normal = tbn.Conjugate().ApplyRotation(Vector3::ZAxis());
 
-    using ShapeFunctions::Triangle::Normal;
+    using Shape::Triangle::Normal;
     return SampleT<BasicSurface>
     {
         .value = BasicSurface
@@ -110,14 +110,14 @@ template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float Triangle<T>::GetSurfaceArea() const
 {
-    return ShapeFunctions::Triangle::Area(positions);
+    return Shape::Triangle::Area(positions);
 }
 
 template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 AABB3 Triangle<T>::GetAABB() const
 {
-    return ShapeFunctions::Triangle::BoundingBox(positions);
+    return Shape::Triangle::BoundingBox(positions);
 }
 
 template<TransformContextC T>
@@ -138,7 +138,7 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
                                const VoxelizationParameters& voxelParams) const
 {
     using namespace MathConstants;
-    using namespace GraphicsFunctions;
+    using namespace Graphics;
 
     // Clang signbit definition is only on std namespace
     // this is a crappy workaround, since this is only a device function
@@ -148,7 +148,7 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
     #endif
 
     // World Space Normal (Will be used to determine best projection plane)
-    Vector3 normal = ShapeFunctions::Triangle::Normal(positions);
+    Vector3 normal = Shape::Triangle::Normal(positions);
     normal = transformContext.ApplyN(normal);
     // Find the best projection plane (XY, YZ, XZ)
     int domAxis = normal.Abs().Maximum();
@@ -156,7 +156,7 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
     float domSign = hasNegSign ? Float{-1} : Float{1};
 
     // Calculate Spherical UV Coordinates of the normal
-    Vector2 sphrCoords = GraphicsFunctions::CartesianToUnitSpherical(normal);
+    Vector2 sphrCoords = Graphics::CartesianToUnitSpherical(normal);
     sphrCoords[0] = (sphrCoords[0] + Pi<Float>()) * InvPi<Float>() * Float{0.5};
     sphrCoords[1] = sphrCoords[1] * InvPi<Float>();
     // Due to numerical error this could slightly exceed [0, 65535]
@@ -367,7 +367,7 @@ template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Optional<TriHit> Triangle<T>::ProjectedHit(const Vector3& point) const
 {
-    using namespace ShapeFunctions::Triangle;
+    using namespace Shape::Triangle;
     Vector3 projPoint = Project(positions, point);
     Vector3 baryCoords = PointToBarycentrics(positions, projPoint);
     return Hit(baryCoords);
@@ -423,7 +423,7 @@ void Triangle<T>::GenerateSurface(BasicSurface& result,
                    positions[1] * b +
                    positions[2] * c);
     // Position should be in world space
-    using ShapeFunctions::Triangle::Normal;
+    using Shape::Triangle::Normal;
     Vector3 geoNormal = Normal(positions);
 
     bool backSide = (geoNormal.Dot(ray.Dir()) > 0.0f);
@@ -477,7 +477,7 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
                    positions[1] * b +
                    positions[2] * c);
     // Position should be in world space
-    Vector3 geoNormal = ShapeFunctions::Triangle::Normal(positions);
+    Vector3 geoNormal = Shape::Triangle::Normal(positions);
 
     Vector3ui index = data.get().indexList[key.FetchIndexPortion()];
     // Tangent Space Rotation Query

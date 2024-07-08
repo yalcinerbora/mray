@@ -79,7 +79,7 @@ MediumHomogeneous<ST>::MediumHomogeneous(const SpectrumConverter& sc,
     // First parameter of IoR input is middle IoR (550nm)
     // Last two parameters are Cauchy coefficients (only first two A and B)
     Vector3 iorIn = soa.Get<IOR>()[k.FetchIndexPortion()];
-    using namespace GraphicsFunctions;
+    using namespace Graphics;
     if constexpr(std::is_same_v<ST, SpectrumConverterContextIdentity>)
         ior = Spectrum(iorIn[0]);
     else

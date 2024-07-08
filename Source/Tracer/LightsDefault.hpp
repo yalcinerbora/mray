@@ -127,16 +127,16 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Vector2 SphericalCoordConverter::DirToUV(const Vector3& dirYUp)
 {
     Vector3 dirZUp = TransformGen::YUpToZUp(dirYUp);
-    Vector2 thetaPhi = GraphicsFunctions::CartesianToUnitSpherical(dirZUp);
-    Vector2 uv = GraphicsFunctions::SphericalAnglesToUV(thetaPhi);
+    Vector2 thetaPhi = Graphics::CartesianToUnitSpherical(dirZUp);
+    Vector2 uv = Graphics::SphericalAnglesToUV(thetaPhi);
     return uv;
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 Vector3 SphericalCoordConverter::UVToDir(const Vector2& uv)
 {
-    Vector2 thetaPhi = GraphicsFunctions::UVToSphericalAngles(uv);
-    Vector3 dirZUp = GraphicsFunctions::UnitSphericalToCartesian(thetaPhi);
+    Vector2 thetaPhi = Graphics::UVToSphericalAngles(uv);
+    Vector3 dirZUp = Graphics::UnitSphericalToCartesian(thetaPhi);
     Vector3 dirYUp = TransformGen::ZUpToYUp(dirZUp);
     return dirYUp;
 }
@@ -147,7 +147,7 @@ Float SphericalCoordConverter::ToSolidAnglePdf(Float pdf, const Vector3& dirYUp)
     using namespace MathConstants;
     // There is code duplication here hopefully this will optimized out
     Vector3 dirZUp = TransformGen::YUpToZUp(dirYUp);
-    Vector2 thetaPhi = GraphicsFunctions::CartesianToUnitSpherical(dirZUp);
+    Vector2 thetaPhi = Graphics::CartesianToUnitSpherical(dirZUp);
 
     // Convert to solid angle pdf
     // http://www.pbr-book.org/3ed-2018/Light_Transport_I_Surface_Reflection/Sampling_Light_Sources.html
@@ -161,7 +161,7 @@ Float SphericalCoordConverter::ToSolidAnglePdf(Float pdf, const Vector2& uv)
 {
     using namespace MathConstants;
     // Similar to the direction version, code duplication here
-    Vector2 thetaPhi = GraphicsFunctions::UVToSphericalAngles(uv);
+    Vector2 thetaPhi = Graphics::UVToSphericalAngles(uv);
     // Convert to solid angle pdf
     // http://www.pbr-book.org/3ed-2018/Light_Transport_I_Surface_Reflection/Sampling_Light_Sources.html
     Float sinPhi = sin(thetaPhi[1]);
@@ -173,14 +173,14 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Vector2 CoOctoCoordConverter::DirToUV(const Vector3& dirYUp)
 {
     Vector3 dirZUp = TransformGen::YUpToZUp(dirYUp);
-    Vector2 uv = GraphicsFunctions::DirectionToCocentricOctohedral(dirZUp);
+    Vector2 uv = Graphics::DirectionToCocentricOctohedral(dirZUp);
     return uv;
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 Vector3 CoOctoCoordConverter::UVToDir(const Vector2& uv)
 {
-    Vector3 dirZUp = GraphicsFunctions::CocentricOctohedralToDirection(uv);
+    Vector3 dirZUp = Graphics::CocentricOctohedralToDirection(uv);
     Vector3 dirYUp = TransformGen::ZUpToYUp(dirZUp);
     return dirYUp;
 }

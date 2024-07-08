@@ -3,7 +3,9 @@
 #include "Vector.h"
 #include "Types.h"
 
-namespace ShapeFunctions
+#include "Core/GraphicsFunctions.h"
+
+namespace Shape
 {
 namespace Triangle
 {
@@ -14,10 +16,14 @@ namespace Triangle
     MRAY_HYBRID Vector3 Normal(Span<const Vector3, TRI_VERTEX_COUNT> positions);
     MRAY_HYBRID Vector3 CalculateTangent(const Vector3& p0, const Vector3& p1, const Vector3& p2,
                                          const Vector2& uv0, const Vector2& uv1, const Vector2& uv2);
+    MRAY_HYBRID Vector3 Project(Span<const Vector3, TRI_VERTEX_COUNT> positions,
+                                const Vector3& point);
+    MRAY_HYBRID Vector3 PointToBarycentrics(Span<const Vector3, TRI_VERTEX_COUNT> positions,
+                                            const Vector3& point);
 }
 }
 
-namespace ShapeFunctions
+namespace Shape
 {
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -70,6 +76,37 @@ Vector3 Triangle::CalculateTangent(const Vector3& p0, const Vector3& p1, const V
     // Check if the tangent, bi-tangent determine
     // a right handed coordinate system
     return (t < 0) ? -tangent : tangent;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Vector3 Triangle::Project(Span<const Vector3, TRI_VERTEX_COUNT> positions,
+                          const Vector3& point)
+{
+    Vector3 n = Normal(positions);
+    Vector3 dir = point - positions[0];
+    n = Graphics::Orient(n, dir);
+    return point - dir.Dot(n) * n;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Vector3 Triangle::PointToBarycentrics(Span<const Vector3, TRI_VERTEX_COUNT> positions,
+                                      const Vector3& point)
+{
+    // https://gamedev.stackexchange.com/questions/23743/whats-the-most-efficient-way-to-find-barycentric-coordinates
+    Vector3 e0 = positions[1] - positions[0];
+    Vector3 e1 = positions[2] - positions[0];
+    Vector3 v = point - positions[0];
+
+    Float d00 = e0.Dot(e0);
+    Float d01 = e0.Dot(e1);
+    Float d11 = e1.Dot(e1);
+    Float d20 = v.Dot(e0);
+    Float d21 = v.Dot(e1);
+    Float denom = 1.0f / (d00 * d11 - d01 * d01);
+    Float a = (d11 * d20 - d01 * d21) * denom;
+    Float b = (d00 * d21 - d01 * d20) * denom;
+    Float c = 1.0f - a - b;
+    return Vector3(a, b, c);
 }
 
 }

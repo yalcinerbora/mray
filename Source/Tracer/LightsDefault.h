@@ -12,7 +12,7 @@
 
 namespace LightDetail
 {
-    using DistributionPwC2D = typename DistributionGroupPwC2D::Distribution;
+    using DistributionPwC2D = typename DistributionGroupPwC2D::Distribution2D;
 
     struct alignas(32) LightData
     {
@@ -266,7 +266,7 @@ template <CoordConverterC CoordConverter>
 class LightGroupSkysphere final : public GenericGroupLight<LightGroupSkysphere<CoordConverter>>
 {
     using Parent            = GenericGroupLight<LightGroupSkysphere<CoordConverter>>;
-    using DistributionPwC2D = typename DistributionGroupPwC2D::Distribution;
+    using DistributionPwC2D = typename DistributionGroupPwC2D::Distribution2D;
     public:
     using PrimGroup     = PrimGroupEmpty;
     using DataSoA       = typename LightDetail::LightSkysphereData;

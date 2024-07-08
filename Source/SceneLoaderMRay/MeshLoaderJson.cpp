@@ -10,7 +10,7 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
                 ? jn.AccessDataArray<Vector3ui>(JsonMeshNames::NODE_INDEX)
                 : TransientData(std::in_place_type_t<Vector3ui>(),
                                 positions.AccessAs<Vector3>().size() /
-                                ShapeFunctions::Triangle::TRI_VERTEX_COUNT))
+                                Shape::Triangle::TRI_VERTEX_COUNT))
     , normals(jn.AccessOptionalDataArray<Vector3>(JsonMeshNames::NODE_NORMAL))
     , uvs(jn.AccessOptionalDataArray<Vector2>(JsonMeshNames::NODE_UV))
 {
@@ -18,7 +18,7 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
     if(!isIndexed)
     {
         size_t pc = (positions.AccessAs<Vector3>().size() /
-                     ShapeFunctions::Triangle::TRI_VERTEX_COUNT);
+                     Shape::Triangle::TRI_VERTEX_COUNT);
         uint32_t primCount = static_cast<uint32_t>(pc);
         Vector3ui initialIndex = Vector3ui(0, 1, 2);
         for(uint32_t i = 0; i < primCount; i++)
@@ -49,7 +49,7 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
         {
             Vector3ui index = iSpan[i];
 
-            using namespace ShapeFunctions::Triangle;
+            using namespace Shape::Triangle;
             std::array<Vector3, TRI_VERTEX_COUNT> p =
             {
                 pSpan[index[0]],
@@ -89,7 +89,7 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
         {
             Vector3ui index = iSpan[i];
 
-            using namespace ShapeFunctions::Triangle;
+            using namespace Shape::Triangle;
             Vector3 n0 = nSpan[index[0]];
             Vector3 n1 = nSpan[index[1]];
             Vector3 n2 = nSpan[index[2]];

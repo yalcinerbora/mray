@@ -13,9 +13,9 @@
 #include "Core/DataStructures.h"
 #include "Core/GraphicsFunctions.h"
 #include "Core/TypeNameGenerators.h"
+#include "Core/ShapeFunctions.h"
 
 #include "PrimitiveC.h"
-#include "ShapeFunctions.h"
 #include "TransformsDefault.h"
 #include "Random.h"
 
@@ -53,7 +53,7 @@ namespace DefaultTriangleDetail
         Ref<const TriangleData>     data;
         Ref<const TransContextType> transformContext;
         PrimitiveKey                key;
-        Vector3                     positions[ShapeFunctions::Triangle::TRI_VERTEX_COUNT];
+        Vector3                     positions[Shape::Triangle::TRI_VERTEX_COUNT];
 
         public:
         MRAY_HYBRID             Triangle(const TransContextType& transform,

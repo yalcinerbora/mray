@@ -7,12 +7,12 @@
 
 #include "Core/Log.h"
 
-namespace Distributions::BxDF
+namespace Distribution::BxDF
 {
 
 }
 
-namespace Distributions::Medium
+namespace Distribution::Medium
 {
     MRAY_HYBRID
     constexpr Spectrum  WavesToSpectrumCauchy(const SpectrumWaves& waves,
@@ -25,7 +25,7 @@ namespace Distributions::Medium
                                                     const Vector2& xi);
 }
 
-namespace Distributions::Common
+namespace Distribution::Common
 {
     MRAY_HYBRID
     Pair<uint32_t, Float>   BisectSample1(Float xi, Float weight);
@@ -80,7 +80,7 @@ namespace Distributions::Common
     constexpr Float     PDFUniformDirection();
 }
 
-namespace Distributions::MIS
+namespace Distribution::MIS
 {
     template<uint32_t N>
     MRAY_HYBRID
@@ -94,7 +94,7 @@ namespace Distributions::MIS
                   const Span<Float, N>& weights);
 }
 
-namespace Distributions
+namespace Distribution
 {
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -437,7 +437,7 @@ SampleT<Vector3> SampleHenyeyGreensteinPhase(const Vector3& wO, Float g,
 
     // This is in unit space, convert to wO's space
     // TODO: Check this
-    Vector3 wI = GraphicsFunctions::UnitSphericalToCartesian(sinCosPhi, sinCosTheta);
+    Vector3 wI = Graphics::UnitSphericalToCartesian(sinCosPhi, sinCosTheta);
     Quaternion rot = Quaternion::RotationBetweenZAxis(wO);
     wI = rot.ApplyRotation(wI);
 

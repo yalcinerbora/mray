@@ -104,7 +104,7 @@ Float BoxFilter::Evaluate(const Vector2& duv) const
 MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Vector2> BoxFilter::Sample(const Vector2& xi) const
 {
-    using namespace Distributions;
+    using namespace Distribution;
     auto r0 = Common::SampleUniformRange(xi[0], -radius, radius);
     auto r1 = Common::SampleUniformRange(xi[1], -radius, radius);
     return SampleT<Vector2>
@@ -117,7 +117,7 @@ SampleT<Vector2> BoxFilter::Sample(const Vector2& xi) const
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float BoxFilter::Pdf(const Vector2& duv) const
 {
-    using namespace Distributions;
+    using namespace Distribution;
     return (Common::PDFUniformRange(duv[0], -radius, radius) *
             Common::PDFUniformRange(duv[1], -radius, radius));
 }
@@ -141,7 +141,7 @@ Float TentFilter::Evaluate(const Vector2& duv) const
 MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Vector2> TentFilter::Sample(const Vector2& xi) const
 {
-    using namespace Distributions;
+    using namespace Distribution;
     auto s0 = Common::SampleTent(xi[0], -radius, radius);
     auto s1 = Common::SampleTent(xi[1], -radius, radius);
     return SampleT<Vector2>
@@ -154,7 +154,7 @@ SampleT<Vector2> TentFilter::Sample(const Vector2& xi) const
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float TentFilter::Pdf(const Vector2& duv) const
 {
-    using namespace Distributions;
+    using namespace Distribution;
     Float x = Common::PDFTent(duv[0], -radius, radius);
     Float y = Common::PDFTent(duv[0], -radius, radius);
     return x * y;
@@ -177,7 +177,7 @@ Float GaussianFilter::Evaluate(const Vector2& duv) const
 MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Vector2> GaussianFilter::Sample(const Vector2& xi) const
 {
-    using namespace Distributions;
+    using namespace Distribution;
     auto r0 = Common::SampleGaussian(xi[0], sigma);
     auto r1 = Common::SampleGaussian(xi[1], sigma);
     return SampleT<Vector2>
@@ -191,7 +191,7 @@ SampleT<Vector2> GaussianFilter::Sample(const Vector2& xi) const
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float GaussianFilter::Pdf(const Vector2& duv) const
 {
-    using namespace Distributions;
+    using namespace Distribution;
     return (Common::PDFGaussian(duv[0], sigma) *
             Common::PDFGaussian(duv[1], sigma));
 }
@@ -256,7 +256,7 @@ SampleT<Vector2> MitchellNetravaliFilter::Sample(const Vector2& xi) const
 
     // Sampling is somewhat costly here, instead of doing MIS for each dimension,
     // sample in spherical coordinates (disk)
-    using namespace Distributions::Common;
+    using namespace Distribution::Common;
     auto thetaSample = SampleUniformRange(xi[0], 0, MathConstants::Pi<Float>());
 
     std::array<Float, 3> weights{MIS_SIDES, MIS_MID, MIS_SIDES};
@@ -294,12 +294,12 @@ SampleT<Vector2> MitchellNetravaliFilter::Sample(const Vector2& xi) const
         }
         default: assert(false);
     }
-    using namespace Distributions;
+    using namespace Distribution;
     Float misWeight = MIS::BalanceCancelled(Span<Float, 3>(pdfs.data(), 3),
                                             Span<Float, 3>(weights.data(), 3));
 
     // Convert
-    using namespace GraphicsFunctions;
+    using namespace Graphics;
     Vector2 xy = PolarToCartesian(Vector2(radiusSample, thetaSample.value));
     return SampleT<Vector2>
     {
@@ -311,7 +311,7 @@ SampleT<Vector2> MitchellNetravaliFilter::Sample(const Vector2& xi) const
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float MitchellNetravaliFilter::Pdf(const Vector2& duv) const
 {
-    using namespace Distributions;
+    using namespace Distribution;
     Float x = duv.Length();
     std::array<Float, 3> weights{MIS_SIDES, MIS_MID, MIS_SIDES};
     std::array<Float, 3> pdfs

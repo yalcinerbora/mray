@@ -10,7 +10,7 @@
 #include "Device/GPUAlgBinarySearch.h"
 #include "Device/GPUSystem.h"
 
-namespace Distributions
+namespace Distribution
 {
 // TODO: Maybe move data to textures?
 template <uint32_t DIMS>
@@ -77,8 +77,8 @@ static_assert(std::is_move_assignable_v<DistributionPwC<2>>);
 class DistributionGroupPwC2D
 {
     public:
-    using Distribution      = Distributions::DistributionPwC<2>;
-    using Distribution1D    = Distributions::DistributionPwC<1>;
+    using Distribution2D    = Distribution::DistributionPwC<2>;
+    using Distribution1D    = Distribution::DistributionPwC<1>;
 
     struct DistData
     {
@@ -99,7 +99,7 @@ class DistributionGroupPwC2D
     private:
     const GPUSystem&            system;
     DeviceMemory                memory;
-    Span<Distribution>          dDistributions;
+    Span<Distribution2D>        dDistributions;
     std::vector<DistData>       distData;
     std::vector<Vector2ui>      sizes;
 
@@ -112,7 +112,7 @@ class DistributionGroupPwC2D
     void                        Construct(uint32_t index,
                                           const Span<const Float>& function);
 
-    Span<const Distribution>    DeviceDistributions() const;
+    Span<const Distribution2D>  DeviceDistributions() const;
 
     size_t                      GPUMemoryUsage() const;
     // For testing
@@ -121,7 +121,7 @@ class DistributionGroupPwC2D
 
 }
 
-namespace Distributions
+namespace Distribution
 {
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -279,4 +279,4 @@ Vector<D, Float> DistributionPwC<D>::SizeRecip() const
 
 }
 
-using DistributionGroupPwC2D = Distributions::DistributionGroupPwC2D;
+using DistributionGroupPwC2D = Distribution::DistributionGroupPwC2D;

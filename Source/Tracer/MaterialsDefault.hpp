@@ -18,7 +18,7 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
                                                    const Surface& surface,
                                                    RNGDispenser& dispenser) const
 {
-    using Distributions::Common::SampleCosDirection;
+    using Distribution::Common::SampleCosDirection;
     // Sampling a vector from cosine weighted hemispherical distribution
     Vector2 xi = dispenser.NextFloat2D<0>();
     auto [wO, pdf] = SampleCosDirection(xi);
@@ -65,7 +65,7 @@ Float LambertMaterial<ST>::Pdf(const Ray&,
                                const Ray& wO,
                                const Surface& surface) const
 {
-    using Distributions::Common::PDFCosDirection;
+    using Distribution::Common::PDFCosDirection;
 
     Vector3 normal = (normalMapTex) ? (*normalMapTex)(surface.uv).value()
                                     : Vector3::ZAxis();
@@ -153,7 +153,7 @@ SampleT<BxDFResult> ReflectMaterial<ST>::SampleBxDF(const Vector3& wI,
     // Probably not.
     Vector3 normal = Vector3::ZAxis();
     Vector3 worldNormal = surface.shadingTBN.ApplyInvRotation(normal);
-    Vector3 wO = GraphicsFunctions::Reflect(worldNormal, wI);
+    Vector3 wO = Graphics::Reflect(worldNormal, wI);
     // Directly delegate position, this is not a subsurface material
     Ray wORay = Ray(wO, surface.position);
     return SampleT<BxDFResult>
