@@ -168,6 +168,7 @@ class VisorWindow
     MRayError   Initialize(TransferQueue::VisorView& transferQueue,
                            const VulkanSystemView& handlesVk,
                            TimelineSemaphore* syncSem,
+                           uint32_t hostImportAlignment,
                            BS::thread_pool* threadPool,
                            const std::string& windowTitle,
                            const VisorConfig& config,

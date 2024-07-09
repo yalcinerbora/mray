@@ -1368,6 +1368,15 @@ CameraTransform TracerBase::GetCamTransform(CamSurfaceId camSurfId) const
     return camGroup.value().get()->AcquireCameraTransform(key);
 }
 
+void TracerBase::SetupRenderEnv(TimelineSemaphore* semaphore,
+                                uint32_t importAlignment,
+                                uint64_t initialAcquireValue)
+{
+    renderImage = std::make_unique<RenderImage>(semaphore, importAlignment,
+                                                initialAcquireValue,
+                                                gpuSystem);
+}
+
 RendererId TracerBase::CreateRenderer(std::string typeName)
 {
     auto rendererGen = typeGenerators.rendererGenerator.at(typeName);
@@ -1379,7 +1388,7 @@ RendererId TracerBase::CreateRenderer(std::string typeName)
 
     auto renderer = rendererGen.value()
     (
-        RenderImagePtr(renderImage),
+        renderImage,
         GenerateTracerView(),
         gpuSystem
     );
@@ -1390,9 +1399,19 @@ RendererId TracerBase::CreateRenderer(std::string typeName)
 
 void TracerBase::DestroyRenderer(RendererId rId)
 {
+    if(currentRendererId == rId)
+    {
+        currentRendererId = std::numeric_limits<RendererId>::max();
+        currentRenderer = nullptr;
+    }
+
+    // Remove the current renderer
     if(!renderers.remove_at(rId))
+    {
         throw MRayError("Unable to find renderer ({})",
                         static_cast<uint32_t>(rId));
+    }
+
 }
 
 void TracerBase::PushRendererAttribute(RendererId rId,
@@ -1417,6 +1436,11 @@ RenderBufferInfo TracerBase::StartRender(RendererId rId, CamSurfaceId cId,
                                          Optional<uint32_t> renderLogic1,
                                          Optional<CameraTransform> optionalTransform)
 {
+    // Check render image is setup properly
+    if(renderImage.get() == nullptr)
+        throw MRayError("Render environment is not set properly! "
+                        "Please provive a semaphore to the tracer.");
+
     auto renderer = renderers.at(rId);
     if(!renderer)
     {
@@ -1424,6 +1448,7 @@ RenderBufferInfo TracerBase::StartRender(RendererId rId, CamSurfaceId cId,
                         static_cast<uint32_t>(rId));
     }
     currentRenderer = renderer.value().get().get();
+    currentRendererId = rId;
     auto camKey = CameraKey(static_cast<uint32_t>(cId));
     return currentRenderer->StartRender(rIParams, camKey);
 }
@@ -1436,7 +1461,9 @@ void TracerBase::StopRender()
 
 RendererOutput TracerBase::DoRenderWork()
 {
-    return currentRenderer->DoRender();
+    if(currentRenderer)
+        return currentRenderer->DoRender();
+    return {};
 }
 
 void TracerBase::ClearAll()
@@ -1466,6 +1493,9 @@ void TracerBase::ClearAll()
     camSurfaceCounter = 0;
 
     texMem.Clear();
+
+    currentRenderer = nullptr;
+    currentRendererId = std::numeric_limits<RendererId>::max();
 
     // GroupId 0 is reserved for empty primitive
     CreatePrimitiveGroup(std::string(TracerConstants::EmptyPrimName));

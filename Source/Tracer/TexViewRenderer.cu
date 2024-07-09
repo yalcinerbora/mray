@@ -3,7 +3,7 @@
 
 #include "Device/GPUSystem.hpp"
 
-TexViewRenderer::TexViewRenderer(RenderImagePtr rb, TracerView tv,
+TexViewRenderer::TexViewRenderer(const RenderImagePtr& rb, TracerView tv,
                              const GPUSystem& s)
     : RendererT(rb, tv, s)
 {}
@@ -98,18 +98,15 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams& params,
     tileHint = uint32_t(Float(0.3) * Float(tileHint));
     Vector2ui tileSize = Vector2ui(FindOptimumTile(imgRegion[0], tileHint),
                                    FindOptimumTile(imgRegion[1], tileHint));
+    renderBuffer->Resize(tileSize, 1);
 
-    //Vector2ui extraPixels = FilterSize;
+    curColorSpace = MRayColorSpaceEnum::MR_ACES_CG;
+    curFramebufferSize = params.resolution;
+    curFBMin = params.regionMin;
+    curFBMax = params.regionMax;
 
-
-    // Tiled Render Buffer
-    // Access tile
-
-    using enum MRayColorSpaceEnum;
-    renderBuffer = std::make_shared<RenderImage>(params, 1,
-                                                 MR_ACES_CG,
-                                                 gpuSystem);
-    return renderBuffer->GetBufferInfo();
+    return renderBuffer->GetBufferInfo(curColorSpace,
+                                       curFramebufferSize, 1);
 }
 
 MRAY_KERNEL
@@ -149,6 +146,12 @@ RendererOutput TexViewRenderer::DoRender()
     Optional<RenderImageSection> renderOut = renderBuffer->GetHostView(processQueue,
                                                                        transferQueue);
 
+    if(renderOut)
+    {
+        renderOut.value().pixelMin += curFBMin;
+        renderOut.value().pixelMax += curFBMin;
+    }
+
     pixelIndex++;
     return RendererOutput
     {
@@ -159,7 +162,7 @@ RendererOutput TexViewRenderer::DoRender()
             0.0,
             "spp",
             0.0,
-            renderBuffer->Resolution(),
+            curFramebufferSize,
             MRayColorSpaceEnum::MR_ACES_CG
         },
         .imageOut = renderOut

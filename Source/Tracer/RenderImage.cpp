@@ -1,39 +1,20 @@
 #include "RenderImage.h"
 #include "Core/TracerI.h"
 
-RenderImage::RenderImage(const RenderImageParams& p,
-                         uint32_t depth, MRayColorSpaceEnum colorSpace,
-                         const GPUSystem& gpuSystem)
-    : stagingMemory(gpuSystem)
-    , deviceMemory(gpuSystem.AllGPUs(), 16_MiB, 128_MiB)
-    , sem(p.semaphore, p.initialSemCounter)
+RenderImage::RenderImage(TimelineSemaphore* semaphore,
+                         uint32_t importAlignmentIn,
+                         uint64_t initialSemCounter,
+                         const GPUSystem& sys)
+    : gpuSystem(sys)
+    , importAlignment(importAlignmentIn)
+    , deviceMemory(gpuSystem.AllGPUs(), 16_MiB, 256_MiB)
+    , stagingMemory(gpuSystem, true)
+    , sem(semaphore, initialSemCounter)
     , processCompleteFence(gpuSystem.BestDevice().GetQueue(0))
-    , depth(depth)
-    , colorSpace(colorSpace)
-    , resolution(p.resolution)
-    , pixelMin(p.regionMin)
-    , pixelMax(p.regionMax)
-{
-    uint32_t totalPixCount = (pixelMax - pixelMin).Multiply() * depth;
-    static constexpr uint32_t channelCount = Vector3::Dims;
-
-    MemAlloc::AllocateMultiData(std::tie(dPixels, dSamples),
-                                deviceMemory,
-                                {totalPixCount * channelCount,
-                                 totalPixCount});
-    MemAlloc::AllocateMultiData(std::tie(hPixels, hSamples),
-                                stagingMemory,
-                                {totalPixCount * channelCount,
-                                 totalPixCount});
-
-    // Calculate offsets, (common between buffers)
-    Byte* mem = static_cast<Byte*>(deviceMemory);
-    pixStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(dPixels.data())));
-    sampleStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(dSamples.data())));
-}
+{}
 
 Optional<RenderImageSection> RenderImage::GetHostView(const GPUQueue& processQueue,
-                                                      const GPUQueue& transferQueue)
+                                                      const GPUQueue& copyQueue)
 {
     // Let's not wait on the driver here
     // So host does not runaway from CUDA
@@ -49,21 +30,21 @@ Optional<RenderImageSection> RenderImage::GetHostView(const GPUQueue& processQue
     // Barrier the process queue
     processCompleteFence = processQueue.Barrier();
     // Wait the process queue to finish on the transfer queue
-    transferQueue.IssueWait(processCompleteFence);
+    copyQueue.IssueWait(processCompleteFence);
     // Copy to staging buffers when the data is ready
-    transferQueue.MemcpyAsync(hPixels, ToConstSpan(dPixels));
-    transferQueue.MemcpyAsync(hSamples, ToConstSpan(dSamples));
+    copyQueue.MemcpyAsync(hPixels, ToConstSpan(dPixels));
+    copyQueue.MemcpyAsync(hSamples, ToConstSpan(dSamples));
     // Here we can not wait on host here, (or we sync)
     // so we Issue the release of the semaphore as host launch
-    transferQueue.IssueSemaphoreSignal(sem);
+    copyQueue.IssueSemaphoreSignal(sem);
     // We should preset the next acquisition state he
     // and find the other threads wait value.
     uint64_t nextVal = sem.ChangeToNextState();
 
     return RenderImageSection
     {
-        .pixelMin           = pixelMin,
-        .pixelMax           = pixelMax,
+        .pixelMin           = Vector2ui::Zero(),
+        .pixelMax           = extent,
         .globalWeight       = 0.0f,
         .waitCounter        = nextVal,
         .pixelStartOffset   = pixStartOffset,
@@ -71,9 +52,9 @@ Optional<RenderImageSection> RenderImage::GetHostView(const GPUQueue& processQue
     };
 }
 
-Vector2ui RenderImage::Resolution() const
+Vector2ui RenderImage::Extents() const
 {
-    return resolution;
+    return extent;
 }
 
 void RenderImage::ClearImage(const GPUQueue& queue)
@@ -82,14 +63,57 @@ void RenderImage::ClearImage(const GPUQueue& queue)
     queue.MemsetAsync(dSamples, 0x00);
 }
 
-RenderBufferInfo RenderImage::GetBufferInfo()
+RenderBufferInfo RenderImage::GetBufferInfo(MRayColorSpaceEnum colorspace,
+                                            const Vector2ui& resolution,
+                                            uint32_t totalDepth)
 {
     return RenderBufferInfo
     {
         .data = static_cast<Byte*>(stagingMemory),
-        .totalSize = stagingMemory.Size(),
-        .renderColorSpace = colorSpace,
+        .totalSize = hostAllocTotalSize,
+        .renderColorSpace = colorspace,
         .resolution = resolution,
-        .depth = depth
+        .depth = totalDepth
     };
+}
+
+bool RenderImage::Resize(const Vector2ui& extentIn,
+                         uint32_t depthIn)
+{
+    // Acquire the memory, we may delete it
+    if(!sem.HostAcquire()) return false;
+    extent = extentIn;
+    depth = depthIn;
+
+    uint32_t totalPixCount = extent.Multiply() * depth;
+    MemAlloc::AllocateMultiData(std::tie(dPixels, dSamples),
+                                deviceMemory,
+                                {totalPixCount * channelCount,
+                                 totalPixCount});
+
+    // For host pixels allocate by hand first,
+    // because vulkan etc needs exact multiple of the
+    // import alignment
+    size_t hSize = totalPixCount * channelCount * sizeof(Float);
+    hSize = MathFunctions::NextMultiple(hSize, MemAlloc::DefaultSystemAlignment());
+    hSize += totalPixCount * sizeof(Float);
+    hSize = MathFunctions::NextMultiple<size_t>(hSize, importAlignment);
+    hostAllocTotalSize = hSize;
+    stagingMemory.ResizeBuffer(hostAllocTotalSize);
+    // Since we construct host allocation as "never decrease"
+    // this should not reallocate
+    MemAlloc::AllocateMultiData(std::tie(hPixels, hSamples),
+                                stagingMemory,
+                                {totalPixCount * channelCount,
+                                 totalPixCount});
+    assert(hostAllocTotalSize >= stagingMemory.Size());
+
+    // Calculate offsets
+    Byte* mem = static_cast<Byte*>(deviceMemory);
+    pixStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(dPixels.data())));
+    sampleStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(dSamples.data())));
+
+    sem.HostRelease();
+    sem.SkipAState();
+    return true;
 }

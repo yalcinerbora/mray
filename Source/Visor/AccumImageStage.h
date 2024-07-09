@@ -12,6 +12,13 @@
 class TimelineSemaphore;
 namespace BS { class thread_pool; }
 
+enum class AccumulateStatus
+{
+    OK,
+    TIMELINE_FAILED,
+    DROPPING_FRAME
+};
+
 class AccumImageStage : public UniformMemoryRequesterI
 {
     private:
@@ -63,10 +70,12 @@ class AccumImageStage : public UniformMemoryRequesterI
                            BS::thread_pool* threadPool,
                            const std::string& execPath);
     void        ImportExternalHandles(const RenderBufferInfo&);
+    void        DropExternalHandles(const VulkanTimelineSemaphore&);
     void        ChangeImage(const VulkanImage* hdrImageIn,
                             const VulkanImage* sampleImageIn);
 
-    bool        IssueAccumulation(const RenderImageSection&,
+    AccumulateStatus
+                IssueAccumulation(const RenderImageSection&,
                                   const VulkanTimelineSemaphore&);
     //
     size_t      UniformBufferSize() const override;

@@ -49,6 +49,7 @@ void AccumImageStage::ImportExternalHandles(const RenderBufferInfo& rbI)
                                  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                  rbI.totalSize, true);
 
+
     VkMemoryHostPointerPropertiesEXT hostProps = {};
     hostProps.sType = VK_STRUCTURE_TYPE_MEMORY_HOST_POINTER_PROPERTIES_EXT;
     vkGetMemoryHostPointerProperties(handlesVk->deviceVk,
@@ -59,6 +60,18 @@ void AccumImageStage::ImportExternalHandles(const RenderBufferInfo& rbI)
     foreignMemory = dAllocator.AllocateForeignObject(foreignBuffer, rbI.data,
                                                      rbI.totalSize,
                                                      hostProps.memoryTypeBits);
+}
+
+void AccumImageStage::DropExternalHandles(const VulkanTimelineSemaphore& s)
+{
+    // Wait the usage if any
+    // TODO: this is not exact we wait framebuffer write here
+    // we should wait -1/-2, but not always. So we wait for covering case
+    // Check if there is a better way
+    s.HostWait(0);
+    // Drop the memories
+    foreignBuffer = VulkanBuffer();
+    foreignMemory = VulkanDeviceMemory();
 }
 
 void AccumImageStage::ChangeImage(const VulkanImage* hdrImageIn,
@@ -93,9 +106,32 @@ void AccumImageStage::ChangeImage(const VulkanImage* hdrImageIn,
     pipeline.BindSetData(descriptorSets[0], bindList);
 }
 
-bool AccumImageStage::IssueAccumulation(const RenderImageSection& section,
-                                        const VulkanTimelineSemaphore& imgWriteSemaphore)
+AccumulateStatus AccumImageStage::IssueAccumulation(const RenderImageSection& section,
+                                                    const VulkanTimelineSemaphore& imgWriteSemaphore)
 {
+    // We need to wait the section to be ready.
+    // Again we are waiting from host since inter GPU
+    // synch is not available (Except on Linux I think, using the SYNC_FD
+    // functionality)
+    //
+    // Tracer may abruptly terminated (crash probably),
+    // so do not issue anything, return nullopt and
+    // let the main render loop to terminate
+    if(!syncSemaphore->Acquire(section.waitCounter))
+        return AccumulateStatus::TIMELINE_FAILED;
+    MRAY_LOG("[Visor] AcquiredImg {}", section.waitCounter);
+
+    if(foreignMemory.SizeBytes() == 0)
+    {
+        // Drop the frames we prematurely deallocated the buffers
+        // since Vulkan does not allow memory to be pulled under its feet.
+        // (Eventhough we do not use it explicitly)
+        MRAY_LOG("[Visor] Released Img - DROP!!!\n"
+                 "----------------------");
+        syncSemaphore->Release();
+        return AccumulateStatus::DROPPING_FRAME;
+    }
+
     // Pre-memcopy the buffer
     UniformBuffer buffer =
     {
@@ -155,19 +191,6 @@ bool AccumImageStage::IssueAccumulation(const RenderImageSection& section,
     vkCmdDispatch(accumulateCommand, groupSize[0], groupSize[1], 1);
     vkEndCommandBuffer(accumulateCommand);
 
-    // We need to wait the section to be ready.
-    // Again we are waiting from host since inter GPU
-    // synch is not available (Except on Linux I think, using the SYNC_FD
-    // functionality)
-    //
-    // Tracer may abruptly terminated (crash probably),
-    // so do not issue anything, return nullopt and
-    // let the main render loop to terminate
-    if(!syncSemaphore->Acquire(section.waitCounter))
-        return false;
-
-    MRAY_LOG("[Visor] AcquiredImg {}", section.waitCounter);
-
     // ============= //
     //   SUBMISSON   //
     // ============= //
@@ -216,7 +239,7 @@ bool AccumImageStage::IssueAccumulation(const RenderImageSection& section,
         // Reset for the next issue
         vkResetFences(device, 1, &fenceHandle);
     });
-    return true;
+    return AccumulateStatus::OK;
 }
 
 size_t AccumImageStage::UniformBufferSize() const

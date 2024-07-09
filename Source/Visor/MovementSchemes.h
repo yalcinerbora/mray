@@ -16,7 +16,8 @@ class MovementSchemeI
     public:
     virtual                             ~MovementSchemeI() = default;
     // Interface
-    virtual Optional<CameraTransform>   Update(const VisorState&) = 0;
+    virtual Optional<CameraTransform>   Update(const InputChecker&,
+                                               const VisorState&) = 0;
 };
 
 class MovementSchemeFPS : public MovementSchemeI
@@ -27,22 +28,16 @@ class MovementSchemeFPS : public MovementSchemeI
     static constexpr Float  MovementRatio = Float(1.0 / 20.0);
     static constexpr Float  MoveRatioModifier = Float(1.5);
     //
-    const InputChecker&     inputChecker;
     Vector2                 prevMouse = Vector2::Zero();
 
     public:
-    // Constructors & Destructor
-    MovementSchemeFPS(const InputChecker&);
-
     // Members
-    Optional<CameraTransform>   Update(const VisorState&) override;
+    Optional<CameraTransform>   Update(const InputChecker&,
+                                       const VisorState&) override;
 };
 
-inline MovementSchemeFPS::MovementSchemeFPS(const InputChecker& ic)
-    : inputChecker(ic)
-{}
-
-inline Optional<CameraTransform> MovementSchemeFPS::Update(const VisorState& state)
+inline Optional<CameraTransform> MovementSchemeFPS::Update(const InputChecker& inputChecker,
+                                                           const VisorState& state)
 {
     Optional<CameraTransform> result;
 

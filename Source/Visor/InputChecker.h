@@ -9,7 +9,7 @@ class InputChecker
     const VisorKeyMap* keyMap;
 
     public:
-    // Constructors & DestructorInputChecker
+    // Constructors & Destructor
                 InputChecker(const VisorKeyMap& keyMap);
     //
     bool        CheckKeyPress(VisorUserAction, bool repeat = true) const;

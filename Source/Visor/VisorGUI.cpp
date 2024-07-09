@@ -14,6 +14,33 @@
 #include "Core/BitFunctions.h"
 #include "Core/Log.h"
 
+enum class WindowLocationType
+{
+    TOP_LEFT = 0,
+    TOP_RIGHT = 1,
+    BOTTOM_LEFT = 2,
+    BOTTOM_RIGHT = 3
+};
+
+Pair<ImVec2, ImVec2> CalculateInitialWindowLocation(WindowLocationType windowLocation)
+{
+    uint32_t location = static_cast<uint32_t>(windowLocation);
+    static constexpr float PADDING = 10.0f;
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImVec2 work_pos = viewport->WorkPos; // Use work area to avoid menu-bar/task-bar, if any!
+    ImVec2 work_size = viewport->WorkSize;
+    ImVec2 window_pos, window_pos_pivot;
+    window_pos.x = (location & 1)
+        ? (work_pos.x + work_size.x - PADDING)
+        : (work_pos.x + PADDING);
+    window_pos.y = (location & 2)
+        ? (work_pos.y + work_size.y - PADDING)
+        : (work_pos.y + PADDING);
+    window_pos_pivot.x = (location & 1) ? 1.0f : 0.0f;
+    window_pos_pivot.y = (location & 2) ? 1.0f : 0.0f;
+    return {window_pos, window_pos_pivot};
+}
+
 Pair<Vector2, Vector2> GenAspectCorrectVP(const Vector2& fbSize,
                                           const Vector2& imgSize)
 {
@@ -348,11 +375,11 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
 
     TracerRunState newRunState = DetermineTracerState(stopped, paused);
     auto runStateResult = (isChanged)
-                ? Optional<TracerRunState>(newRunState)
-                : std::nullopt;
+        ? Optional<TracerRunState>(newRunState)
+        : std::nullopt;
     auto camIndexResult = (camChange != 0)
-                ? Optional<uint32_t>(camChange)
-                : std::nullopt;
+        ? Optional<uint32_t>(camChange)
+        : std::nullopt;
     return StatusBarChanges
     {
        .runState = runStateResult,
@@ -371,19 +398,7 @@ void VisorGUI::ShowFrameOverlay(bool& isOpen,
                                      ImGuiWindowFlags_NoNav |
                                      ImGuiWindowFlags_NoMove);
 
-    const float PADDING = 10.0f;
-    const ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImVec2 work_pos = viewport->WorkPos; // Use work area to avoid menu-bar/task-bar, if any!
-    ImVec2 work_size = viewport->WorkSize;
-    ImVec2 window_pos, window_pos_pivot;
-    window_pos.x = (location & 1)
-                        ? (work_pos.x + work_size.x - PADDING)
-                        : (work_pos.x + PADDING);
-    window_pos.y = (location & 2)
-                        ? (work_pos.y + work_size.y - PADDING)
-                        : (work_pos.y + PADDING);
-    window_pos_pivot.x = (location & 1) ? 1.0f : 0.0f;
-    window_pos_pivot.y = (location & 2) ? 1.0f : 0.0f;
+    auto [window_pos, window_pos_pivot] = CalculateInitialWindowLocation(WindowLocationType::TOP_RIGHT);
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, window_pos_pivot);
     ImGui::SetNextWindowBgAlpha(0.33f); // Transparent background
 
@@ -494,7 +509,12 @@ TopBarChanges VisorGUI::ShowTopMenu(const VisorState& visorState)
         ImGui::Text(" ");
         ImGui::ToggleButton("Tonemap", tmWindowOn);
         if(tmWindowOn && tonemapperGUI)
+        {
+            auto [wPos, wPivot] = CalculateInitialWindowLocation(WindowLocationType::TOP_LEFT);
+            ImGui::SetNextWindowPos(wPos, ImGuiCond_Appearing, wPivot);
             result.newTMParams = tonemapperGUI->Render(tmWindowOn);
+        }
+
         ImGui::Separator();
 
         result.rendererIndex = ShowRendererComboBox(visorState);
@@ -564,7 +584,7 @@ Optional<CameraTransform> VisorGUI::ShowMainImage(const VisorState& visorState)
         }
         if(ImGui::IsWindowFocused() && !camLocked)
         {
-            result = CurrentMovement().Update(visorState);
+            result = CurrentMovement().Update(inputChecker, visorState);
         }
     }
     ImGui::PopStyleVar();
@@ -582,9 +602,9 @@ VisorGUI::VisorGUI(const VisorKeyMap* km)
     , statusBar(inputChecker)
     , movementIndex(0)
 {
-    movementSchemes.emplace_back(std::make_unique<MovementSchemeFPS>(inputChecker));
-    //movementSchemes.emplace_back(std::make_unique<MovementSchemeMaya>(inputChecker));
-    //movementSchemes.emplace_back(std::make_unique<MovementSchemeImg>(inputChecker));
+    movementSchemes.emplace_back(std::make_unique<MovementSchemeFPS>());
+    //movementSchemes.emplace_back(std::make_unique<MovementSchemeMaya>());
+    //movementSchemes.emplace_back(std::make_unique<MovementSchemeImg>());
     assert(!movementSchemes.empty());
 }
 

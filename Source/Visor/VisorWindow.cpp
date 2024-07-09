@@ -838,6 +838,7 @@ void VisorWindow::PathDropped(int count, const char** paths)
 MRayError VisorWindow::Initialize(TransferQueue::VisorView& transferQueueIn,
                                   const VulkanSystemView& handles,
                                   TimelineSemaphore* syncSem,
+                                  uint32_t hostImportAlignment,
                                   BS::thread_pool* tp,
                                   const std::string& windowTitle,
                                   const VisorConfig& config,
@@ -900,10 +901,11 @@ MRayError VisorWindow::Initialize(TransferQueue::VisorView& transferQueueIn,
 
     // Initially, send the sync semaphore as a very first action
     MRAY_LOG("[Visor]: Sending sync semaphore...");
+
     transferQueue->Enqueue(VisorAction
     (
         std::in_place_index<VisorAction::SEND_SYNC_SEMAPHORE>,
-        syncSem
+        SemaphoreInfo{syncSem, hostImportAlignment}
     ));
     glfwShowWindow(window);
     return MRayError::OK;
@@ -1062,6 +1064,9 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
             }
             case TracerRunState::STOPPED:
             {
+                // We need to drop memory here,
+                // new renderer may give new memory
+                accumulateStage.DropExternalHandles(imgWriteSem);
                 transferQueue->Enqueue(VisorAction
                 (
                     std::in_place_index<VisorAction::START_STOP_RENDER>,
@@ -1092,6 +1097,12 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
         newCamIndex = MathFunctions::Roll(newCamIndex, 0, camCount);
         visorState.currentCameraIndex = newCamIndex;
 
+        // New camera means new framebuffer
+        // so again prematurely drop the memory
+        // Vulkan dictates memory must be valid if it is imported.
+        // We may add synchronization but this is simpler.
+        accumulateStage.DropExternalHandles(imgWriteSem);
+
         transferQueue->Enqueue(VisorAction
         (
             std::in_place_index<VisorAction::CHANGE_CAMERA>,
@@ -1101,6 +1112,10 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
 
     if(changes.transform)
     {
+        // New transform should not mean new framebuffer.
+        // However conservatively we do drop the memory
+        accumulateStage.DropExternalHandles(imgWriteSem);
+
         visorState.transform = changes.transform.value();
         transferQueue->Enqueue(VisorAction
         (
@@ -1111,6 +1126,10 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
 
     if(changes.topBarChanges.rendererIndex)
     {
+        // New renderer means new framebuffer
+        // so again prematurely drop the memory.
+        accumulateStage.DropExternalHandles(imgWriteSem);
+
         int32_t rIndex = changes.topBarChanges.rendererIndex.value();
         visorState.currentRenderIndex = rIndex;
         transferQueue->Enqueue(VisorAction
@@ -1122,6 +1141,10 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
 
     if(changes.topBarChanges.customLogicIndex0)
     {
+        // Custom logic may or may not mean new framebuffer.
+        // Conservatively we drop the memory.
+        accumulateStage.DropExternalHandles(imgWriteSem);
+
         int32_t lIndex = changes.topBarChanges.customLogicIndex0.value();
         visorState.currentRenderLogic0 = lIndex;
         transferQueue->Enqueue(VisorAction
@@ -1133,6 +1156,9 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
 
     if(changes.topBarChanges.customLogicIndex1)
     {
+        // Same as above
+        accumulateStage.DropExternalHandles(imgWriteSem);
+
         int32_t lIndex = changes.topBarChanges.customLogicIndex1.value();
         visorState.currentRenderLogic1 = lIndex;
         transferQueue->Enqueue(VisorAction
@@ -1219,7 +1245,6 @@ bool VisorWindow::Render()
     Optional<bool>                  newClearSignal;
     Optional<RenderImageSaveInfo>   newSaveInfo;
     RenderImagePool::IsHDRImage     isHDRSave = RenderImagePool::SDR;
-
     TracerResponse response;
     while(transferQueue->TryDequeue(response))
     {
@@ -1379,6 +1404,13 @@ bool VisorWindow::Render()
         gui.ChangeDisplayImage(renderImagePool.GetSDRImage());
         gui.ChangeTonemapperGUI(tonemapperGUI.value());
     }
+
+    // After potential reallocation, check the GUI stuff.
+    // We may not issue accumulation maybe
+    GUIChanges guiChanges = gui.Render(CurrentFont(), visorState);
+    HandleGUIChanges(guiChanges);
+
+
     if(newSaveInfo)
     {
         auto& rp = renderImagePool;
@@ -1391,13 +1423,31 @@ bool VisorWindow::Render()
     if(newImageSection)
     {
         auto& as = accumulateStage;
-        bool validSubmission = as.IssueAccumulation(newImageSection.value(),
-                                                    imgWriteSem);
+        auto status = as.IssueAccumulation(newImageSection.value(),
+                                           imgWriteSem);
+        // 3 states can occur here
+        // (1) Success       : All is fine, accumulation is issued via the
+        //                     given external buffer
+        // (2) Frame Drop    : User distrupted the Visor-Tracer dance,
+        //                     (via scene, camera, or renderer change)
+        //                     we prematurely dropped the memory so that
+        //                     tracer can clean and give a new one.
+        //                     We ignore image sections on the transfer queue
+        // (3) Semaphore Fail: Tracer crashed, so we terminate as well.
+        using enum AccumulateStatus;
         // TODO: Abruptly returning here, any synchronization
         // considerations should be checked?
-        if(!validSubmission) return false;
-
-        imgWriteSem.ChangeNextWait(1);
+        switch(status)
+        {
+            case TIMELINE_FAILED:   return false;
+            case DROPPING_FRAME:    newImageSection = std::nullopt; break;
+            case OK:                imgWriteSem.ChangeNextWait(1); break;
+            default:
+            {
+                MRAY_ERROR_LOG("[Visor] Unknown status from Accumulate Stage");
+                return false;
+            }
+        }
     }
     // Image clear
     if(newClearSignal || newRenderBuffer)
@@ -1405,11 +1455,6 @@ bool VisorWindow::Render()
         renderImagePool.IssueClear(imgWriteSem);
         imgWriteSem.ChangeNextWait(1);
     }
-
-    // Before tonemap issue check if TM parameters
-    // are changed by the user
-    GUIChanges guiChanges = gui.Render(CurrentFont(), visorState);
-    HandleGUIChanges(guiChanges);
 
     // Do tonemap
     if(newClearSignal || newRenderBuffer ||

@@ -40,7 +40,7 @@ struct TracerView
     const std::vector<Pair<CamSurfaceId, CameraSurfaceParams>>&     camSurfs;
 };
 
-using RenderImagePtr = std::shared_ptr<RenderImage>;
+using RenderImagePtr = std::unique_ptr<RenderImage>;
 
 template<class RendererType>
 concept RendererC = requires(RendererType rt,
@@ -227,21 +227,26 @@ class RendererT : public RendererI
     using AttribInfoList = typename RendererI::AttribInfoList;
     private:
     protected:
-    const GPUSystem&    gpuSystem;
-    TracerView          tracerView;
-    RenderImagePtr      renderBuffer;
-    bool                rendering = false;
+    const GPUSystem&        gpuSystem;
+    TracerView              tracerView;
+    const RenderImagePtr&   renderBuffer;
+    bool                    rendering = false;
+
+    // Current Canvas info
+    MRayColorSpaceEnum      curColorSpace;
+    Vector2ui               curFramebufferSize;
+    Vector2ui               curFBMin;
+    Vector2ui               curFBMax;
 
     public:
-                        RendererT(RenderImagePtr, TracerView,
-                                  const GPUSystem&);
+                        RendererT(const RenderImagePtr&,
+                                  TracerView, const GPUSystem&);
     std::string_view    Name() const override;
 };
 
 template <class C>
-RendererT<C>::RendererT(RenderImagePtr rb,
-                        TracerView tv,
-                        const GPUSystem& s)
+RendererT<C>::RendererT(const RenderImagePtr& rb,
+                        TracerView tv, const GPUSystem& s)
     : gpuSystem(s)
     , tracerView(tv)
     , renderBuffer(rb)

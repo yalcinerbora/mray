@@ -30,7 +30,7 @@ using LightGenerator    = GeneratorFuncType<GenericGroupLightT, uint32_t,
                                             const GPUSystem&, const TextureViewMap&,
                                             GenericGroupPrimitiveT&>;
 using RendererGenerator = GeneratorFuncType<RendererI,
-                                            RenderImagePtr,
+                                            const RenderImagePtr&,
                                             TracerView,
                                             const GPUSystem&>;
 using BaseAccelGenerator = GeneratorFuncType<BaseAcceleratorI,
@@ -92,6 +92,7 @@ class TracerBase : public TracerI
     //
     AcceleratorPtr          accelerator;
     RendererI*              currentRenderer = nullptr;
+    RendererId              currentRendererId = std::numeric_limits<RendererId>::max();
 
     std::atomic_uint32_t    primGroupCounter    = 0;
     std::atomic_uint32_t    camGroupCounter     = 0;
@@ -285,6 +286,10 @@ class TracerBase : public TracerI
     void        DestroyRenderer(RendererId) override;
     void        PushRendererAttribute(RendererId, uint32_t attributeIndex,
                                       TransientData data) override;
+
+    void                SetupRenderEnv(TimelineSemaphore* semaphore,
+                                       uint32_t importAlignment,
+                                       uint64_t initialAcquireValue) override;
 
     RenderBufferInfo    StartRender(RendererId, CamSurfaceId,
                                     RenderImageParams,

@@ -300,6 +300,9 @@ class TracerMock : public TracerI
     void        PushRendererAttribute(RendererId, uint32_t attributeIndex,
                                       TransientData data) override;
 
+    void                SetupRenderEnv(TimelineSemaphore* semaphore,
+                                       uint32_t importAlignment,
+                                       uint64_t initialAcquireValue) override;
     RenderBufferInfo    StartRender(RendererId, CamSurfaceId,
                                     RenderImageParams,
                                     Optional<uint32_t>,
@@ -1736,6 +1739,12 @@ inline void TracerMock::PushRendererAttribute(RendererId, uint32_t,
                                               TransientData)
 {
     throw MRayError("\"PushRendererAttribute\" is not implemented in mock tracer!");
+}
+
+inline void TracerMock::SetupRenderEnv(TimelineSemaphore*,
+                                       uint32_t, uint64_t)
+{
+    throw MRayError("\"SetupRenderEnv\" is not implemented in mock tracer!");
 }
 
 inline RenderBufferInfo TracerMock::StartRender(RendererId, CamSurfaceId,

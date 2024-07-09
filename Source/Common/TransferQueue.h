@@ -9,6 +9,12 @@
 #include "AnalyticStructs.h"
 #include "RenderImageStructs.h"
 
+struct SemaphoreInfo
+{
+    TimelineSemaphore*  semaphore           = nullptr;
+    uint32_t            importMemAlignment  = 0;
+};
+
 struct TracerResponse : public std::variant
 <
     CameraTransform,        // initial cam transform
@@ -62,7 +68,7 @@ struct VisorAction : public std::variant
     float,                  // scene time
     bool,                   // start/stop render
     bool,                   // pause render
-    TimelineSemaphore*,     // Synchronization semaphore
+    SemaphoreInfo,          // Synchronization semaphore
     bool,                   // Demand HDR save
     bool,                   // Demand SDR save
     std::string             // Initial Render Config
@@ -71,7 +77,7 @@ struct VisorAction : public std::variant
     using Base = std::variant<CameraTransform, uint32_t,
                               std::string, uint32_t, uint32_t, std::string,
                               float, bool, bool,
-                              TimelineSemaphore*, bool, bool,
+                              SemaphoreInfo, bool, bool,
                               std::string>;
     enum Type
     {

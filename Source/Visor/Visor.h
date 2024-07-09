@@ -82,6 +82,7 @@ class VisorVulkan : public VisorI
     uint32_t            deviceLocalMemIndex = std::numeric_limits<uint32_t>::max();
     uint32_t            hostVisibleMemIndex = std::numeric_limits<uint32_t>::max();
     uint32_t            deviceAlignment     = std::numeric_limits<uint32_t>::max();
+    uint32_t            hostImportAlignment = std::numeric_limits<uint32_t>::max();
     VkSampler           llnSampler          = nullptr;
     VkSampler           nnnSampler          = nullptr;
 

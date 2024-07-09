@@ -30,15 +30,14 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     };
 
     private:
-    Options         currentOptions = {};
-    Options         newOptions = {};
-
+    Options     currentOptions = {};
+    Options     newOptions = {};
     // TEST
-    uint32_t        pixelIndex = 0;
+    uint32_t    pixelIndex = 0;
 
     public:
     // Constructors & Destructor
-                        TexViewRenderer(RenderImagePtr, TracerView,
+                        TexViewRenderer(const RenderImagePtr&, TracerView,
                                         const GPUSystem&);
                         TexViewRenderer(const TexViewRenderer&) = delete;
                         TexViewRenderer(TexViewRenderer&&) = delete;

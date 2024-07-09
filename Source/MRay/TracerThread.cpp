@@ -286,8 +286,6 @@ void TracerThread::RestartRenderer()
         .resolution = resolution,
         .regionMin = regionMin,
         .regionMax = regionMax,
-        .semaphore = currentSem,
-        .initialSemCounter = 0
     };
     RenderBufferInfo rbi = tracer->StartRender(currentRenderer,
                                                sceneIds.camSurfaces[currentCamIndex],
@@ -300,12 +298,6 @@ void TracerThread::RestartRenderer()
     (
         std::in_place_index<TracerResponse::RENDER_BUFFER_INFO>,
         rbi
-    ));
-    // Clear the image section as well
-    transferQueue.Enqueue(TracerResponse
-    (
-        std::in_place_index<TracerResponse::CLEAR_IMAGE_SECTION>,
-        true
     ));
 }
 
@@ -477,7 +469,7 @@ void TracerThread::LoopWork()
     Optional<uint32_t>              renderLogic1;
     Optional<uint32_t>              cameraIndex;
     Optional<std::string>           scenePath;
-    Optional<TimelineSemaphore*>    syncSem;
+    Optional<SemaphoreInfo>         syncSem;
     Optional<Float>                 time;
     Optional<bool>                  pauseContinue;
     Optional<bool>                  startStop;
@@ -532,12 +524,13 @@ void TracerThread::LoopWork()
 
     auto CheckQueueAndExit = [this]()
     {
-        bool semaphoreDropped = (currentSem && currentSem->IsInvalidated());
+        bool semaphoreDropped = (currentSem.semaphore &&
+                                 currentSem.semaphore->IsInvalidated());
         bool queueDropped = transferQueue.IsTerminated();
         isTerminated = (semaphoreDropped || queueDropped);
 
         if(semaphoreDropped) transferQueue.Terminate();
-        if(queueDropped && currentSem) currentSem->Invalidate();
+        if(queueDropped && currentSem.semaphore) currentSem.semaphore->Invalidate();
 
         if(isTerminated) MRAY_LOG("[Tracer]: Terminating!");
         return isTerminated;
@@ -593,9 +586,6 @@ void TracerThread::LoopWork()
                 }
             ));
         }
-
-
-
         // Initial render config
         if(initialRenderConfig)
         {
@@ -643,8 +633,12 @@ void TracerThread::LoopWork()
         // New semaphore
         if(syncSem)
         {
-            MRAY_LOG("[Tracer]: NewSem {:p}", static_cast<void*>(syncSem.value()));
+            MRAY_LOG("[Tracer]: NewSem {:p} - {:d}",
+                     static_cast<void*>(syncSem.value().semaphore),
+                     syncSem.value().importMemAlignment);
             currentSem = syncSem.value();
+            tracer->SetupRenderEnv(currentSem.semaphore,
+                                   currentSem.importMemAlignment, 0);
         }
         // New scene
         if(scenePath) HandleSceneChange(scenePath.value());
@@ -652,8 +646,6 @@ void TracerThread::LoopWork()
         if(startStop) HandleStartStop(startStop.value());
         // Pause/Continue
         if(pauseContinue) HandlePause();
-        // If we are rendering continue...
-        if(isRendering) HandleRendering();
         // TODO: Support scene time change
         if(time) MRAY_WARNING_LOG("[Tracer]: Scene time change is not supported!");
         // Render logic changes
@@ -670,6 +662,12 @@ void TracerThread::LoopWork()
             currentRenderLogic1 = renderLogic1.value();
             RestartRenderer();
         }
+
+        // After handling other things do rendering
+        // and continue
+        // If we are rendering continue...
+        if(isRendering) HandleRendering();
+
         // Here check the queue's situation
         // and do not iterate again if queues are closed
         if(CheckQueueAndExit()) return;

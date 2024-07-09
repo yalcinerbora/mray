@@ -51,7 +51,7 @@ VisorDebugSystem::Callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverit
     else
         type = "UNKNOWN"sv;
 
-    MRAY_LOG("[Vulkan]:[{}]:[{}]: {}",
+    MRAY_LOG("[Vulkan]:[{}]:[{}]\n{}",
              severity, type, pCallbackData->pMessage);
     return VK_FALSE;
 }
@@ -312,14 +312,6 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
         VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME
     };
 
-    //#ifdef MRAY_WINDOWS
-    //    RequiredExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
-    //    RequiredExtensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME);
-    //#elif defined MRAY_LINUX
-    //    RequiredExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
-    //    RequiredExtensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
-    //#endif
-
     static constexpr size_t MAX_GPU = 32;
     struct DeviceParams
     {
@@ -412,8 +404,23 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     DeviceParams selectedDevice = *loc;
 
     // Re-acquire props
-    VkPhysicalDeviceProperties selectedDeviceProps;
-    vkGetPhysicalDeviceProperties(selectedDevice.pDevice, &selectedDeviceProps);
+    VkPhysicalDeviceExternalMemoryHostPropertiesEXT extMemProps =
+    {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_HOST_PROPERTIES_EXT,
+        .pNext = nullptr,
+        .minImportedHostPointerAlignment = 0
+    };
+
+    VkPhysicalDeviceProperties2 selectedDeviceProps
+    {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+        .pNext = &extMemProps,
+        .properties = {}
+    };
+    vkGetPhysicalDeviceProperties2(selectedDevice.pDevice, &selectedDeviceProps);
+
+    // Get the host import alignment
+    hostImportAlignment = static_cast<uint32_t>(extMemProps.minImportedHostPointerAlignment);
 
     // The first device that matches the conditions
     // is deemed enough.
@@ -487,7 +494,7 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
                       &deviceVk))
     {
         return MRayError("Unable to create logical device on \"{}\"!",
-                         selectedDeviceProps.deviceName);
+                         selectedDeviceProps.properties.deviceName);
     };
     // Store the selected physical device
     pDeviceVk = selectedDevice.pDevice;
@@ -517,9 +524,9 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
              "Max Tex2D : [{}, {}]\n"
              "Memory    : {:.3f}GiB\n"
              "-----------------\n",
-             selectedDeviceProps.deviceName,
-             selectedDeviceProps.limits.maxImageDimension2D,
-             selectedDeviceProps.limits.maxImageDimension2D,
+             selectedDeviceProps.properties.deviceName,
+             selectedDeviceProps.properties.limits.maxImageDimension2D,
+             selectedDeviceProps.properties.limits.maxImageDimension2D,
              static_cast<double>(deviceHeap->size) / (1024.0 * 1024.0 * 1024.0));
 
     // Get the queue
@@ -562,7 +569,7 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
 
     // Initialize the memory allocator
     // Find the common alignment
-    const auto& limits = selectedDeviceProps.limits;
+    const auto& limits = selectedDeviceProps.properties.limits;
     deviceAlignment = uint32_t(std::max(limits.minStorageBufferOffsetAlignment,
                                         limits.minUniformBufferOffsetAlignment));
     Span<const VkMemoryType> memTypeSpan(memProps.memoryTypes,
@@ -627,7 +634,8 @@ Expected<VisorWindow> VisorVulkan::GenerateWindow(TransferQueue::VisorView& tran
         .nnnSampler         = nnnSampler
     };
     MRayError e = w.Initialize(transferQueue, handlesVk,
-                               syncSem, tp, WindowTitle,
+                               syncSem, hostImportAlignment,
+                               tp, WindowTitle,
                                vConfig, processPath);
     if(e) return e;
     return w;

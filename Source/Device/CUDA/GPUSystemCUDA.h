@@ -110,6 +110,10 @@ class GPUSemaphoreViewCUDA
                 GPUSemaphoreViewCUDA(TimelineSemaphore* sem,
                                      uint64_t acqValue);
 
+    // Change to next acquisition state (acquireValue + 1)
+    // we will not send anything to visor.
+    // This is used to acquire the image for memory realloc
+    void        SkipAState();
     // Change to next acquisition state (acquireValue + 2)
     // return the Visor's wait state (acquireValue + 1)
     uint64_t    ChangeToNextState();

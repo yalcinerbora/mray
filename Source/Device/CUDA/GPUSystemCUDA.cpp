@@ -16,8 +16,11 @@ GPUSemaphoreViewCUDA::GPUSemaphoreViewCUDA(TimelineSemaphore* sem,
                                            uint64_t av)
     : externalSemaphore(sem)
     , acquireValue(av)
+{}
+
+void GPUSemaphoreViewCUDA::SkipAState()
 {
-    externalSemaphore->Reset();
+    acquireValue += 1;
 }
 
 uint64_t GPUSemaphoreViewCUDA::ChangeToNextState()

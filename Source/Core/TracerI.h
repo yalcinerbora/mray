@@ -22,9 +22,6 @@ struct RenderImageParams
     Vector2ui               resolution;
     Vector2ui               regionMin;
     Vector2ui               regionMax;
-    //
-    TimelineSemaphore*      semaphore;
-    uint64_t                initialSemCounter;
 };
 
 namespace TransientPoolDetail { class TransientData; }
@@ -548,6 +545,9 @@ class [[nodiscard]] TracerI
     //================================//
     //           Rendering            //
     //================================//
+    virtual void                SetupRenderEnv(TimelineSemaphore* semaphore,
+                                               uint32_t importAlignment,
+                                               uint64_t initialAcquireValue) = 0;
     virtual RenderBufferInfo    StartRender(RendererId, CamSurfaceId,
                                             RenderImageParams,
                                             Optional<uint32_t>,

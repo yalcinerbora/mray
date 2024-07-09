@@ -58,6 +58,8 @@ class SubImageSpan
 class RenderImage
 {
     private:
+    const GPUSystem&    gpuSystem;
+    uint32_t            importAlignment;
     // Mem related
     // According to the profiling this staging style
     // transfer was the most performant
@@ -68,6 +70,7 @@ class RenderImage
     HostLocalMemory     stagingMemory;
     Span<Float>         hPixels;
     Span<Float>         hSamples;
+    size_t              hostAllocTotalSize;
     //
     size_t              pixStartOffset      = 0;
     size_t              sampleStartOffset   = 0;
@@ -75,16 +78,15 @@ class RenderImage
     GPUSemaphoreView    sem;
     GPUFence            processCompleteFence;
     //
-    uint32_t            depth       = 0;
-    MRayColorSpaceEnum  colorSpace  = MRayColorSpaceEnum::MR_RAW;
-    Vector2ui           resolution  = Vector2ui::Zero();
-    Vector2ui           pixelMin    = Vector2ui::Zero();
-    Vector2ui           pixelMax    = Vector2ui::Zero();
+    uint32_t            channelCount    = 3;
+    Vector2ui           extent          = Vector2ui::Zero();
+    uint32_t            depth           = 0;
 
     public:
     // Constructors & Destructor
-                        RenderImage(const RenderImageParams&,
-                                    uint32_t depth, MRayColorSpaceEnum,
+                        RenderImage(TimelineSemaphore* semaphore,
+                                    uint32_t importAlignment,
+                                    uint64_t initialSemCounter,
                                     const GPUSystem& gpuSystem);
                         RenderImage(const RenderImage&) = delete;
     RenderImage&        operator=(const RenderImage&) = delete;
@@ -95,15 +97,19 @@ class RenderImage
     Span<Float>         Pixels();
     Span<Float>         Samples();
     //
-    Vector2ui           Resolution() const;
+    Vector2ui           Extents() const;
     //
     void                ClearImage(const GPUQueue& queue);
-    RenderBufferInfo    GetBufferInfo();
+    RenderBufferInfo    GetBufferInfo(MRayColorSpaceEnum colorspace,
+                                      const Vector2ui& resolution,
+                                      uint32_t depth);
+    bool                Resize(const Vector2ui& extent,
+                               uint32_t depth);
 
     // Synchronized Host access
     Optional<RenderImageSection>
                         GetHostView(const GPUQueue& processQueue,
-                                    const GPUQueue& transferQueue);
+                                    const GPUQueue& copyQueue);
 };
 
 template<int32_t C>

@@ -518,10 +518,7 @@ Tonemapper_Empty_AcesCG_To_HDR10::GUI::GUI(float& nitsIn)
 
 bool Tonemapper_Empty_AcesCG_To_HDR10::GUI::Render(bool& onOff)
 {
-    //ImGui::ShowDemoWindow(&onOff);
-
     paramsChanged = false;
-    //ImGui::PushStyleVar(ImGuiStyleVar_)
     if(ImGui::Begin("AcesCG -> HDR10", &onOff,
                     ImGuiWindowFlags_NoResize |
                     ImGuiWindowFlags_NoScrollbar |

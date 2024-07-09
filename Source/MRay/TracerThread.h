@@ -30,15 +30,15 @@ class TracerThread final : public RealtimeThread
     Vector2ui   regionMin;
     Vector2ui   regionMax;
     // Current State
-    std::string             currentRendererName;
-    uint32_t                currentRenderLogic0;
-    uint32_t                currentRenderLogic1;
-    RendererId              currentRenderer;
-    size_t                  currentCamIndex;
-    CameraTransform         currentCamTransform;
-    AABB3                   currentSceneAABB;
-    TracerIdPack            sceneIds;
-    TimelineSemaphore*      currentSem = nullptr;
+    std::string         currentRendererName;
+    uint32_t            currentRenderLogic0;
+    uint32_t            currentRenderLogic1;
+    RendererId          currentRenderer;
+    size_t              currentCamIndex;
+    CameraTransform     currentCamTransform;
+    AABB3               currentSceneAABB;
+    TracerIdPack        sceneIds;
+    SemaphoreInfo       currentSem = {};
     // Flow states
     // TODO: I'm pretty sure this will get complicated really fast
     // maybe change this to a state machine later
