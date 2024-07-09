@@ -31,6 +31,7 @@ using LightGenerator    = GeneratorFuncType<GenericGroupLightT, uint32_t,
                                             GenericGroupPrimitiveT&>;
 using RendererGenerator = GeneratorFuncType<RendererI,
                                             const RenderImagePtr&,
+                                            const TracerParameters&,
                                             TracerView,
                                             const GPUSystem&>;
 using BaseAccelGenerator = GeneratorFuncType<BaseAcceleratorI,

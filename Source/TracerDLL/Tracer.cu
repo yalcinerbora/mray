@@ -126,12 +126,12 @@ void Tracer::AddAccelGenerators(Map<AcceleratorType, BaseAccelGenerator>& baseMa
                                 Map<AcceleratorType, AccelGroupGenMap>& groupMap,
                                 Map<AcceleratorType, AccelWorkGenMap>& workMap)
 {
-    using enum AcceleratorType;
+    using enum AcceleratorType::E;
     AddAccelGeneratorsGeneric<DefaultLinearAccelTypePack>
     (
         baseMap,
         groupMap,
         workMap,
-        SOFTWARE_NONE
+        AcceleratorType{ SOFTWARE_NONE }
     );
 }

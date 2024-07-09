@@ -82,16 +82,90 @@ namespace TracerConstants
 //  -- SOFTWARE_BVH  :  Very basic midpoint BVH. Provided for completeness sake and
 //                      should not be used.
 //  -- HARDWARE      :  On CUDA, it utilizes OptiX for hardware acceleration.
-enum class AcceleratorType : uint8_t
+class AcceleratorType
 {
-    SOFTWARE_NONE,
-    SOFTWARE_BASIC_BVH,
-    HARDWARE
+    public:
+    enum E
+    {
+        SOFTWARE_NONE,
+        SOFTWARE_BASIC_BVH,
+        HARDWARE,
+
+        END
+    };
+
+    private:
+    static constexpr std::array<std::string_view, static_cast<size_t>(END)> Names =
+    {
+        "Linear",
+        "BVH",
+        "Hardware"
+    };
+
+    public:
+    E type;
+
+    // We use this on a map, so overload less
+    bool operator<(AcceleratorType t) const;
+
+    static constexpr std::string_view   ToString(E e);
+    static constexpr E                  FromString(std::string_view e);
 };
 
-enum class SamplerType : uint8_t
+class SamplerType
 {
-    INDEPENDENT
+    public:
+    enum E
+    {
+        INDEPENDENT,
+
+        END
+    };
+
+    private:
+    static constexpr std::array<std::string_view, static_cast<size_t>(END)> Names =
+    {
+        "Independent"
+    };
+
+    public:
+    E type;
+
+    static constexpr std::string_view   ToString(E e);
+    static constexpr E                  FromString(std::string_view e);
+};
+
+class FilterType
+{
+    public:
+    enum E
+    {
+        BOX,
+        TENT,
+        GAUSSIAN,
+        MITCHELL_NETRAVALI,
+
+        END
+    };
+
+    private:
+    static constexpr std::array<std::string_view, static_cast<size_t>(END)> Names =
+    {
+        "Box",
+        "Tent",
+        "Gaussian",
+        "Mitchell-Netravali"
+    };
+
+    public:
+    E       type;
+    Float   radius;
+
+    static constexpr auto TYPE_NAME = "type";
+    static constexpr auto RADIUS_NAME = "radius";
+
+    static constexpr std::string_view   ToString(E e);
+    static constexpr E                  FromString(std::string_view e);
 };
 
 struct TracerParameters
@@ -100,15 +174,20 @@ struct TracerParameters
     // will start via this seed if applicable
     uint64_t        seed = 0;
     // Accelerator move, software/hardware
-    AcceleratorType accelMode = AcceleratorType::HARDWARE;
+    AcceleratorType accelMode = AcceleratorType{ AcceleratorType::HARDWARE };
     // Item pool size, amount of "items" (paths/rays/etc) processed
     // in parallel
     uint32_t    parallelizationHint = 1 << 21; // 2^21 ~= 2M
     // Current sampler logic,
-    SamplerType samplerType = SamplerType::INDEPENDENT;
+    SamplerType samplerType = SamplerType{ SamplerType::INDEPENDENT };
+
     // Texture Related
     uint32_t            clampedTexRes = std::numeric_limits<uint32_t>::max();
+    FilterType          mipGenFilter = FilterType{ FilterType::GAUSSIAN, 2.0f };
     MRayColorSpaceEnum  globalTextureColorSpace = MRayColorSpaceEnum::MR_ACES_CG;
+
+    // Film Related
+    FilterType          filmFilter = FilterType{FilterType::GAUSSIAN, 1.0f};
 };
 
 enum class AttributeOptionality : uint8_t
@@ -206,23 +285,6 @@ struct PrimAttributeStringifier
     static constexpr std::string_view           ToString(PrimitiveAttributeLogic e);
     static constexpr PrimitiveAttributeLogic    FromString(std::string_view e);
 };
-
-constexpr std::string_view PrimAttributeStringifier::ToString(PrimitiveAttributeLogic e)
-{
-    return Names[static_cast<uint32_t>(e)];
-}
-
-constexpr PrimitiveAttributeLogic PrimAttributeStringifier::FromString(std::string_view sv)
-{
-    using IntType = std::underlying_type_t<PrimitiveAttributeLogic>;
-    IntType i = 0;
-    for(const std::string_view& checkSV : Names)
-    {
-        if(checkSV == sv) return PrimitiveAttributeLogic(i);
-        i++;
-    }
-    return PrimitiveAttributeLogic(END);
-}
 
 // For surface commit analytic information
 struct SurfaceCommitResult
@@ -572,12 +634,89 @@ class [[nodiscard]] TracerI
 
 using TracerConstructorArgs = Tuple<const TracerParameters&>;
 
+// We use this on a map, so overload less
+inline bool AcceleratorType::operator<(AcceleratorType t) const
+{
+    return type < t.type;
+}
+
+constexpr std::string_view AcceleratorType::ToString(AcceleratorType::E e)
+{
+    return Names[static_cast<uint32_t>(e)];
+}
+
+constexpr typename AcceleratorType::E
+AcceleratorType::FromString(std::string_view sv)
+{
+    using IntType = std::underlying_type_t<typename AcceleratorType::E>;
+    IntType i = 0;
+    for(const std::string_view& checkSV : Names)
+    {
+        if(checkSV == sv) return AcceleratorType::E(i);
+        i++;
+    }
+    return END;
+}
+
+constexpr std::string_view SamplerType::ToString(typename SamplerType::E e)
+{
+    return Names[static_cast<uint32_t>(e)];
+}
+
+constexpr typename SamplerType::E
+SamplerType::FromString(std::string_view sv)
+{
+    using IntType = std::underlying_type_t<typename SamplerType::E>;
+    IntType i = 0;
+    for(const std::string_view& checkSV : Names)
+    {
+        if(checkSV == sv) return SamplerType::E(i);
+        i++;
+    }
+    return END;
+}
+
+constexpr std::string_view FilterType::ToString(typename FilterType::E e)
+{
+    return Names[static_cast<uint32_t>(e)];
+}
+
+constexpr typename FilterType::E
+FilterType::FromString(std::string_view sv)
+{
+    using IntType = std::underlying_type_t<typename FilterType::E>;
+    IntType i = 0;
+    for(const std::string_view& checkSV : Names)
+    {
+        if(checkSV == sv) return FilterType::E(i);
+        i++;
+    }
+    return END;
+}
+
+constexpr std::string_view PrimAttributeStringifier::ToString(PrimitiveAttributeLogic e)
+{
+    return Names[static_cast<uint32_t>(e)];
+}
+
+constexpr PrimitiveAttributeLogic PrimAttributeStringifier::FromString(std::string_view sv)
+{
+    using IntType = std::underlying_type_t<PrimitiveAttributeLogic>;
+    IntType i = 0;
+    for(const std::string_view& checkSV : Names)
+    {
+        if(checkSV == sv) return PrimitiveAttributeLogic(i);
+        i++;
+    }
+    return PrimitiveAttributeLogic(END);
+}
+
 // formatter for AcceleratorType
 inline std::string_view format_as(AcceleratorType t)
 {
     using namespace std::string_view_literals;
-    using enum AcceleratorType;
-    switch(t)
+    using enum AcceleratorType::E;
+    switch(t.type)
     {
         case SOFTWARE_NONE:         return "SOFTWARE_LINEAR"sv;
         case SOFTWARE_BASIC_BVH:    return "SOFTWARE_BVH"sv;

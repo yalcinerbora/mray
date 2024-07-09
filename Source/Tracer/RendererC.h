@@ -230,6 +230,7 @@ class RendererT : public RendererI
     const GPUSystem&        gpuSystem;
     TracerView              tracerView;
     const RenderImagePtr&   renderBuffer;
+    const TracerParameters& tracerParams;
     bool                    rendering = false;
 
     // Current Canvas info
@@ -240,16 +241,19 @@ class RendererT : public RendererI
 
     public:
                         RendererT(const RenderImagePtr&,
+                                  const TracerParameters&,
                                   TracerView, const GPUSystem&);
     std::string_view    Name() const override;
 };
 
 template <class C>
 RendererT<C>::RendererT(const RenderImagePtr& rb,
+                        const TracerParameters& tP,
                         TracerView tv, const GPUSystem& s)
     : gpuSystem(s)
     , tracerView(tv)
     , renderBuffer(rb)
+    , tracerParams(tP)
 {}
 
 template <class C>

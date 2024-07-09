@@ -55,6 +55,7 @@ void TracerBase::PopulateAttribInfoAndTypeLists()
     InstantiateAndGetAttribInfo(rendererAttributeInfoMap,
                                 typeGenerators.rendererGenerator,
                                 RenderImagePtr(),
+                                TracerParameters{},
                                 GenerateTracerView(),
                                 gpuSystem);
 
@@ -1389,6 +1390,7 @@ RendererId TracerBase::CreateRenderer(std::string typeName)
     auto renderer = rendererGen.value()
     (
         renderImage,
+        params,
         GenerateTracerView(),
         gpuSystem
     );

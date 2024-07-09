@@ -37,8 +37,9 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
 
     public:
     // Constructors & Destructor
-                        TexViewRenderer(const RenderImagePtr&, TracerView,
-                                        const GPUSystem&);
+                        TexViewRenderer(const RenderImagePtr&,
+                                        const TracerParameters&,
+                                        TracerView, const GPUSystem&);
                         TexViewRenderer(const TexViewRenderer&) = delete;
                         TexViewRenderer(TexViewRenderer&&) = delete;
     TexViewRenderer&    operator=(const TexViewRenderer&) = delete;

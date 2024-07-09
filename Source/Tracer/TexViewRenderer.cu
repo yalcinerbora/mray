@@ -3,9 +3,10 @@
 
 #include "Device/GPUSystem.hpp"
 
-TexViewRenderer::TexViewRenderer(const RenderImagePtr& rb, TracerView tv,
-                             const GPUSystem& s)
-    : RendererT(rb, tv, s)
+TexViewRenderer::TexViewRenderer(const RenderImagePtr& rb,
+                                 const TracerParameters& tP,
+                                 TracerView tv, const GPUSystem& s)
+    : RendererT(rb, tP, tv, s)
 {}
 
 MRayError TexViewRenderer::Commit()
@@ -44,26 +45,6 @@ void TexViewRenderer::PushAttribute(uint32_t attributeIndex,
         throw MRayError("{} Unkown attribute index {}",
                         TypeName(), attributeIndex);
     newOptions.totalSPP = data.AccessAs<uint32_t>()[0];
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t FilterRadiusToPixelWH(Float filterRadius)
-{
-    // At every 0.5 increment conservative pixel estimate is increasing
-    // [0]          = Single Pixel (Special Case)
-    // (0, 0.5]     = 2x2
-    // (0.5, 1]     = 3x3
-    // (1, 1.5]     = 4x4
-    // (1.5, 2]     = 5x5
-    // etc...
-    if(filterRadius == Float(0)) return 1;
-    // Do division
-    uint32_t quot = static_cast<uint32_t>(filterRadius / Float(0.5));
-    float remainder = std::fmod(filterRadius, Float(0.5));
-    // Exact divisions reside on previous segment
-    if(remainder == Float(0)) quot -= 1;
-    uint32_t result = quot + 2;
-    return result;
 }
 
 uint32_t FindOptimumTile(uint32_t regionSize,

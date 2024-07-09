@@ -15,76 +15,6 @@
 
 static constexpr RendererId INVALID_RENDERER_ID = RendererId(std::numeric_limits<uint32_t>::max());
 
-enum class FilterType
-{
-    BOX,
-    TENT,
-    GAUSSIAN,
-    MITCHELL_NETRAVALI
-};
-
-struct BoxParams        { Float radius; };
-struct TentParams       { Float radius; };
-struct GaussParams      { Float radius; Float alpha; };
-struct MitchellParams   { Float radius; Float b; Float c; };
-
-class FilterParameters : public Variant<BoxParams, TentParams,
-                                        GaussParams, MitchellParams>
-{
-    using Base = Variant<BoxParams, TentParams,
-                         GaussParams, MitchellParams>;
-
-    public:
-    enum E
-    {
-        BOX,
-        TENT,
-        GAUSSIAN,
-        MITCHELL_NETRAVALI,
-        END
-    };
-
-    static constexpr auto TYPE_NAME = "type";
-    static constexpr auto RADIUS_NAME = "radius";
-    static constexpr auto GAUSS_ALPHA_NAME = "alpha";
-    static constexpr auto MN_B_NAME = "b";
-    static constexpr auto MN_C_NAME = "b";
-
-    private:
-    static constexpr std::array<std::string_view, static_cast<size_t>(END)> Names =
-    {
-        "Box",
-        "Tent",
-        "Gaussian",
-        "Mitchell-Netravali"
-    };
-
-
-    public:
-    using Base::Base;
-
-    static constexpr std::string_view   ToString(E e);
-    static constexpr E                  FromString(std::string_view e);
-};
-
-constexpr std::string_view FilterParameters::ToString(E e)
-{
-    return Names[static_cast<uint32_t>(e)];
-}
-
-constexpr typename FilterParameters::E
-FilterParameters::FromString(std::string_view sv)
-{
-    using IntType = std::underlying_type_t<E>;
-    IntType i = 0;
-    for(const std::string_view& checkSV : Names)
-    {
-        if(checkSV == sv) return E(i);
-        i++;
-    }
-    return END;
-}
-
 struct TracerConfig
 {
     std::string dllName;
@@ -94,40 +24,36 @@ struct TracerConfig
     TracerParameters params;
 };
 
+void from_json(const nlohmann::json& node, FilterType& t)
+{
+    auto name = node.at(FilterType::TYPE_NAME).get<std::string_view>();
+    auto radius = node.at(FilterType::RADIUS_NAME).get<Float>();
+
+    FilterType::E type = FilterType::FromString(name);
+    if(type == FilterType::END)
+        throw MRayError("Unknown accelerator type name {}",
+                        name);
+    t = FilterType{type, radius};
+}
+
 void from_json(const nlohmann::json& node, AcceleratorType& t)
 {
-    using namespace std::string_view_literals;
-    static constexpr std::array<std::string_view, 3> TYPES =
-    {
-        "Linear"sv,
-        "BVH"sv,
-        "Hardware"
-    };
-    auto loc = std::find(TYPES.cbegin(), TYPES.cend(),
-                         node.get<std::string_view>());
-    size_t result = std::distance(TYPES.cbegin(), loc);
-
-    if(result == TYPES.size())
-        throw MRayError("Unknown sample type name {}",
-                        node.get<std::string_view>());
-    t = static_cast<AcceleratorType>(result);
+    auto name = node.get<std::string_view>();
+    AcceleratorType::E type = AcceleratorType::FromString(name);
+    if(type == AcceleratorType::END)
+        throw MRayError("Unknown accelerator type name {}",
+                        name);
+    t = AcceleratorType{type};
 }
 
 void from_json(const nlohmann::json& node, SamplerType& t)
 {
-    using namespace std::string_view_literals;
-    static constexpr std::array<std::string_view, 1> TYPES =
-    {
-        "Independent"sv
-    };
-    auto loc = std::find(TYPES.cbegin(), TYPES.cend(),
-                         node.get<std::string_view>());
-    size_t result = std::distance(TYPES.cbegin(), loc);
-
-    if(result == TYPES.size())
-        throw MRayError("Unknown sample type name {}",
-                        node.get<std::string_view>());
-    t = static_cast<SamplerType>(result);
+    auto name = node.get<std::string_view>();
+    SamplerType::E type = SamplerType::FromString(name);
+    if(type == SamplerType::END)
+        throw MRayError("Unknown sampler type name {}",
+                        name);
+    t = SamplerType{type};
 }
 
 Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
