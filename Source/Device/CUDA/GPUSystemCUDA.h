@@ -148,10 +148,10 @@ class GPUQueueCUDA
     friend cudaStream_t ToHandleCUDA(const GPUQueueCUDA&);
 
     private:
-    cudaStream_t            stream;
-    uint32_t                multiprocessorCount;
-    AnnotationHandle        nvtxDomain;
-    const GPUDeviceCUDA*    myDevice = nullptr;
+    cudaStream_t            stream              = nullptr;
+    uint32_t                multiprocessorCount = 0;
+    AnnotationHandle        nvtxDomain          = nullptr;
+    const GPUDeviceCUDA*    myDevice            = nullptr;
 
     MRAY_HYBRID
     uint32_t            DetermineGridStrideBlock(const void* kernelPtr,
@@ -161,6 +161,7 @@ class GPUQueueCUDA
 
     public:
     // Constructors & Destructor
+                                GPUQueueCUDA() = default;
     MRAY_HOST                   GPUQueueCUDA(uint32_t multiprocessorCount,
                                              AnnotationHandle domain,
                                              const GPUDeviceCUDA* device);
@@ -296,6 +297,7 @@ class GPUDeviceCUDA
     int                     deviceId;
     cudaDeviceProp          props;
     DeviceQueues            queues;
+    GPUQueueCUDA            transferQueue;
 
     protected:
     public:
@@ -317,7 +319,9 @@ class GPUDeviceCUDA
     uint32_t                SMCount() const;
     uint32_t                MaxActiveBlockPerSM(uint32_t threadsPerBlock = StaticThreadPerBlock1D()) const;
 
-    const GPUQueueCUDA&     GetQueue(uint32_t index) const;
+    const GPUQueueCUDA&     GetComputeQueue(uint32_t index) const;
+    const GPUQueueCUDA&     GetTransferQueue() const;
+
 };
 
 class GPUSystemCUDA

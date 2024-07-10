@@ -88,11 +88,11 @@ TYPED_TEST(GPUTextureTest, Allocate)
     // Committing memory
     for(uint32_t i = 0; i < TOTAL_TEX_COUNT; i++)
     {
-        const GPUQueue& queue = system.BestDevice().GetQueue(0);
+        const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
         textures[i].CommitMemory(queue, memory, offsets[i]);
     }
     // Commit is async so wait before destruction
-    GPUFence fence = system.BestDevice().GetQueue(0).Barrier();
+    GPUFence fence = system.BestDevice().GetComputeQueue(0).Barrier();
     fence.Wait();
 }
 
@@ -129,11 +129,11 @@ TYPED_TEST(GPUTextureTest, Copy)
     TextureBackingMemory memory(system.BestDevice());
     memory.ResizeBuffer(tex.Size());
 
-    const GPUQueue& queue = system.BestDevice().GetQueue(0);
+    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
     tex.CommitMemory(queue, memory, 0);
 
     // Get a fence and calculate a checkerboard pattern
-    GPUFence afterAllocFence = system.BestDevice().GetQueue(0).Barrier();
+    GPUFence afterAllocFence = system.BestDevice().GetComputeQueue(0).Barrier();
 
     uint32_t total;
     if constexpr (D == 1)
@@ -174,7 +174,7 @@ TYPED_TEST(GPUTextureTest, Copy)
     queue.MemcpyAsync(Span<uint8_t>(hTrueFalseBuffer),
                       ToConstSpan(dTrueFalseBuffer));
     // Wait the copy
-    system.BestDevice().GetQueue(0).Barrier().Wait();
+    system.BestDevice().GetComputeQueue(0).Barrier().Wait();
 
     uint8_t anyFalse = std::reduce
     (

@@ -4,6 +4,7 @@
 #include "TracerTypes.h"
 #include "RenderImage.h"
 #include "GenericGroup.h"
+#include "TextureMemory.h"
 
 #include "Core/TracerI.h"
 #include "Core/DataStructures.h"
@@ -33,6 +34,7 @@ struct TracerView
     const IdPtrMap<MatGroupId, GenericGroupMaterialT>&      matGroups;
     const IdPtrMap<TransGroupId, GenericGroupTransformT>&   transGroups;
     const IdPtrMap<LightGroupId, GenericGroupLightT>&       lightGroups;
+    const TextureMap&                                       textures;
     const TextureViewMap&                                   textureViews;
     const TracerParameters&                                 tracerParams;
     const std::vector<Pair<SurfaceId, SurfaceParams>>&              surfs;
@@ -76,7 +78,6 @@ concept RendererC = requires(RendererType rt,
     {rt.Name()} -> std::same_as<std::string_view>;
     {RendererType::TypeName()} -> std::same_as<std::string_view>;
 };
-
 
 // Render work of camera
 template <class CamGroup>
@@ -210,7 +211,9 @@ class RendererI
     virtual RendererOptionPack  CurrentAttributes() const = 0;
     // ...
     virtual RenderBufferInfo    StartRender(const RenderImageParams&,
-                                            const CameraKey&) = 0;
+                                            const CameraKey&,
+                                            uint32_t customLogicIndex0 = 0,
+                                            uint32_t customLogicIndex1 = 0) = 0;
     virtual RendererOutput      DoRender() = 0;
     virtual void                StopRender() = 0;
 
@@ -230,7 +233,6 @@ class RendererT : public RendererI
     const GPUSystem&        gpuSystem;
     TracerView              tracerView;
     const RenderImagePtr&   renderBuffer;
-    const TracerParameters& tracerParams;
     bool                    rendering = false;
 
     // Current Canvas info
@@ -241,23 +243,41 @@ class RendererT : public RendererI
 
     public:
                         RendererT(const RenderImagePtr&,
-                                  const TracerParameters&,
                                   TracerView, const GPUSystem&);
     std::string_view    Name() const override;
 };
 
 template <class C>
 RendererT<C>::RendererT(const RenderImagePtr& rb,
-                        const TracerParameters& tP,
                         TracerView tv, const GPUSystem& s)
     : gpuSystem(s)
     , tracerView(tv)
     , renderBuffer(rb)
-    , tracerParams(tP)
 {}
 
 template <class C>
 std::string_view RendererT<C>::Name() const
 {
     return C::TypeName();
+}
+
+inline uint32_t FindOptimumTile(uint32_t regionSize,
+                                uint32_t tileSize)
+{
+    // Find optimal tile size that evenly divides the image
+    // This may not happen (i.e., width or height is prime)
+    // then expand the tile size to pass the edge barely.
+    if(regionSize < tileSize) return regionSize;
+
+    // Divide and find a tileCount
+    uint32_t tCount = MathFunctions::DivideUp(regionSize, tileSize);
+    uint32_t result = regionSize / tCount;
+    uint32_t residual = regionSize % tCount;
+    // All file no pixel is left.
+    if(residual == 0) return result;
+
+    // Not evenly divisible now expand the tile
+    residual = MathFunctions::DivideUp(residual, tCount);
+    result += residual;
+    return result;
 }

@@ -78,7 +78,7 @@ class RenderImage
     GPUSemaphoreView    sem;
     GPUFence            processCompleteFence;
     //
-    uint32_t            channelCount    = 3;
+    uint32_t            channelCount    = 0;
     Vector2ui           extent          = Vector2ui::Zero();
     uint32_t            depth           = 0;
 
@@ -98,18 +98,21 @@ class RenderImage
     Span<Float>         Samples();
     //
     Vector2ui           Extents() const;
+    uint32_t            Depth() const;
+    uint32_t            ChannelCount() const;
     //
     void                ClearImage(const GPUQueue& queue);
     RenderBufferInfo    GetBufferInfo(MRayColorSpaceEnum colorspace,
                                       const Vector2ui& resolution,
                                       uint32_t depth);
     bool                Resize(const Vector2ui& extent,
-                               uint32_t depth);
+                               uint32_t depth,
+                               uint32_t channelCount);
 
     // Synchronized Host access
     Optional<RenderImageSection>
-                        GetHostView(const GPUQueue& processQueue,
-                                    const GPUQueue& copyQueue);
+                        TransferToHost(const GPUQueue& processQueue,
+                                       const GPUQueue& copyQueue);
 };
 
 template<int32_t C>

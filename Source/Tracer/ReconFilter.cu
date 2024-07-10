@@ -366,7 +366,7 @@ void ReconFilterGenericRGB(// Output
     auto [dIndices, dKeys] = partitioner.Start(totalPPS, maxPartitionCount, false);
 
     using namespace std::string_view_literals;
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     queue.IssueSaturatingKernel<KCExpandSamplesToPixels>
     (
         "KCExpandSamplesToPixels"sv,
@@ -531,7 +531,7 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
     // TODO: Textures should be partitioned with respect to
     // devices, so that we can launch kernel from those devices
     const GPUDevice& bestDevice = gpuSystem.BestDevice();
-    const GPUQueue& queue = bestDevice.GetQueue(0);
+    const GPUQueue& queue = bestDevice.GetComputeQueue(0);
 
     // TODO: First we need RNG, we are generating multiple mipmaps of multiple
     // textures in bulk so quality RNG will be too costly. Currently

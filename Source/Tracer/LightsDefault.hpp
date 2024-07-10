@@ -531,7 +531,13 @@ std::string_view LightGroupSkysphere<CC>::TypeName()
     // using namespace std::string_view_literals;
     // static constexpr auto Name = "Skysphere"sv;
     // return LightTypeName<Name>;
-    return "(L)Skysphere";
+    if constexpr(std::is_same_v<CC, LightDetail::CoOctoCoordConverter>)
+        return "(L)Skysphere_CoOcto";
+
+    if constexpr(std::is_same_v<CC, LightDetail::SphericalCoordConverter>)
+        return "(L)Skysphere_Spherical";
+    else
+        return "(L)Skysphere";
 }
 
 template <CoordConverterC CC>
@@ -552,7 +558,17 @@ void LightGroupSkysphere<CC>::CommitReservations()
 template <CoordConverterC CC>
 LightAttributeInfoList LightGroupSkysphere<CC>::AttributeInfo() const
 {
-    return LightAttributeInfoList{};
+    using enum MRayDataEnum;
+    using enum AttributeOptionality;
+    using enum AttributeTexturable;
+    using enum AttributeIsArray;
+    using enum AttributeIsColor;
+    static const MatAttributeInfoList LogicList =
+    {
+        MatAttributeInfo("radiance", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+                         MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR)
+    };
+    return LogicList;
 }
 
 template <CoordConverterC CC>

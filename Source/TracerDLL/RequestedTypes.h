@@ -54,7 +54,8 @@ using LightGTypes = Tuple
 <
     LightGroupNull,
     LightGroupPrim<PrimGroupTriangle>,
-    LightGroupSkysphere<CoOctoCoordConverter>
+    LightGroupSkysphere<CoOctoCoordConverter>,
+    LightGroupSkysphere<SphericalCoordConverter>
 >;
 
 using MetaLightList = MetaLightArray

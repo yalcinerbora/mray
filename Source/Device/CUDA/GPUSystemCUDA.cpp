@@ -82,10 +82,11 @@ GPUDeviceCUDA::GPUDeviceCUDA(int deviceId, AnnotationHandle domain)
     // All Seems Fine Allocate Queues
     //
     CUDA_CHECK(cudaSetDevice(deviceId));
-    for(uint32_t i = 0; i < QueuePerDevice; i++)
+    for(uint32_t i = 0; i < ComputeQueuePerDevice; i++)
     {
         queues.emplace_back(props.multiProcessorCount, domain, this);
     }
+    transferQueue = GPUQueueCUDA(props.multiProcessorCount, domain, this);
 }
 
 bool GPUDeviceCUDA::operator==(const GPUDeviceCUDA& other) const
@@ -123,9 +124,15 @@ uint32_t GPUDeviceCUDA::MaxActiveBlockPerSM(uint32_t threadsPerBlock) const
     return static_cast<uint32_t>(props.maxThreadsPerMultiProcessor) / threadsPerBlock;
 }
 
-const GPUQueueCUDA& GPUDeviceCUDA::GetQueue(uint32_t index) const
+const GPUQueueCUDA& GPUDeviceCUDA::GetComputeQueue(uint32_t index) const
 {
+    assert(index < ComputeQueuePerDevice);
     return queues[index];
+}
+
+const GPUQueueCUDA& GPUDeviceCUDA::GetTransferQueue() const
+{
+    return transferQueue;
 }
 
 GPUSystemCUDA::GPUSystemCUDA()

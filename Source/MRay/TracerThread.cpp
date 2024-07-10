@@ -56,24 +56,36 @@ void from_json(const nlohmann::json& node, SamplerType& t)
     t = SamplerType{type};
 }
 
+void from_json(const nlohmann::json& node, MRayColorSpaceEnum& t)
+{
+    auto name = node.get<std::string_view>();
+    MRayColorSpaceEnum e = MRayColorSpaceStringifier::FromString(name);
+    if(e == MRayColorSpaceEnum::MR_END)
+        throw MRayError("Unknown color space name {}", name);
+    t = e;
+}
+
 Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
 {
     using namespace std::literals;
 
     // Object keys
-    static constexpr auto DLL_NAME = "TracerDLL"sv;
-    static constexpr auto PARAMETERS_NAME = "Parameters"sv;
+    static constexpr auto DLL_NAME              = "TracerDLL"sv;
+    static constexpr auto PARAMETERS_NAME       = "Parameters"sv;
     // DLL entries
-    static constexpr auto DLL_FILE_NAME = "name"sv;
-    static constexpr auto DLL_CONSTRUCT_NAME = "construct"sv;
-    static constexpr auto DLL_DESTRUCT_NAME = "destruct"sv;
+    static constexpr auto DLL_FILE_NAME         = "name"sv;
+    static constexpr auto DLL_CONSTRUCT_NAME    = "construct"sv;
+    static constexpr auto DLL_DESTRUCT_NAME     = "destruct"sv;
     // Params
-    static constexpr auto SEED_NAME = "seed"sv;
-    static constexpr auto ACCEL_TYPE_NAME = "acceleratorType"sv;
-    static constexpr auto PAR_HINT_NAME = "parallelHint"sv;
-    static constexpr auto SAMPLER_TYPE_NAME = "samplerType"sv;
-    static constexpr auto CLAMP_TEX_RES_NAME = "clampTexRes"sv;
-    static constexpr auto PARTITION_LOGIC_NAME = "partitionLogic"sv;
+    static constexpr auto SEED_NAME             = "seed"sv;
+    static constexpr auto ACCEL_TYPE_NAME       = "acceleratorType"sv;
+    static constexpr auto PAR_HINT_NAME         = "parallelHint"sv;
+    static constexpr auto SAMPLER_TYPE_NAME     = "samplerType"sv;
+    static constexpr auto CLAMP_TEX_RES_NAME    = "clampTexRes"sv;
+    static constexpr auto TEX_COLOR_SPACE_NAME  = "globalTexColorSpace"sv;
+    static constexpr auto MIP_GEN_FILTER_NAME   = "mipGenFilter"sv;
+    static constexpr auto FILM_FILTER_NAME      = "filmFilter"sv;
+    static constexpr auto PARTITION_LOGIC_NAME  = "partitionLogic"sv;
 
     nlohmann::json configJson;
     auto OptionalFetch = [](auto& outEntry, std::string_view NAME,
@@ -99,7 +111,7 @@ Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
         OptionalFetch(config.dllCreateFuncName, DLL_CONSTRUCT_NAME, dllJson);
         OptionalFetch(config.dllDeleteFuncName, DLL_DESTRUCT_NAME, dllJson);
 
-        // TODO: Add option config reading
+        // TODO: Add optional config reading
         nlohmann::json paramsJson;
         OptionalFetch(paramsJson, PARAMETERS_NAME, configJson);
         if(paramsJson.empty()) return config;
@@ -109,6 +121,11 @@ Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
         OptionalFetch(config.params.parallelizationHint, PAR_HINT_NAME, paramsJson);
         OptionalFetch(config.params.samplerType, SAMPLER_TYPE_NAME, paramsJson);
         OptionalFetch(config.params.clampedTexRes, CLAMP_TEX_RES_NAME, paramsJson);
+        OptionalFetch(config.params.globalTextureColorSpace, TEX_COLOR_SPACE_NAME, paramsJson);
+        OptionalFetch(config.params.mipGenFilter, MIP_GEN_FILTER_NAME, paramsJson);
+        OptionalFetch(config.params.filmFilter, FILM_FILTER_NAME, paramsJson);
+        // TODO: Add this later
+        //OptionalFetch(config.params.partitionLogic, PARTITION_LOGIC_NAME, paramsJson);
         return config;
     }
     catch(const MRayError& e)
@@ -301,10 +318,8 @@ void TracerThread::HandleSceneChange(const std::string& newScene)
     Expected<TracerIdPack> result = currentScene->LoadScene(*tracer, newScene);
     if(result.has_error())
     {
-        MRAY_ERROR_LOG("[Tracer]: Failed to Load Scene\n    {}",
-                       result.error().GetError());
-        isTerminated = true;
-        return;
+        throw MRayError("Failed to Load Scene\n    {}",
+                        result.error().GetError());
     }
     else
     {

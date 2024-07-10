@@ -1,5 +1,6 @@
 #include "TextureMemory.h"
 #include "Core/Error.hpp"
+#include "CommonTexture.hpp"
 
 namespace TexDetail
 {
@@ -104,135 +105,6 @@ GenericTextureView Concept<T>::View() const
 
 }
 
-template<size_t S, size_t A>
-inline
-CommonTextureI* CommonTextureT<S,A>::Impl()
-{
-    // TODO: Are these correct?
-    CommonTextureI* ptr = reinterpret_cast<CommonTextureI*>(storage.data());
-    return std::launder(ptr);
-}
-
-template<size_t S, size_t A>
-inline
-const CommonTextureI* CommonTextureT<S, A>::Impl() const
-{
-    // TODO: Are these correct?
-    const CommonTextureI* ptr = reinterpret_cast<const CommonTextureI*>(storage.data());
-    return std::launder(ptr);
-}
-
-template<size_t S, size_t A>
-template<class T, class... Args>
-inline
-CommonTextureT<S, A>::CommonTextureT(std::in_place_type_t<T>,
-                                     MRayColorSpaceEnum cs, AttributeIsColor col,
-                                     MRayPixelTypeRT pt,
-                                     Args&&... args)
-    : colorSpace(cs)
-    , isColor(col)
-    , pixelType(pt)
-{
-    using ConceptType = TexDetail::Concept<T>;
-    static_assert(sizeof(ConceptType) <= S, "Unable construct type over storage!");
-    ConceptType* ptr = reinterpret_cast<ConceptType*>(storage.data());
-    impl = std::construct_at(ptr, std::forward<Args>(args)...);
-}
-
-template<size_t S, size_t A>
-CommonTextureT<S, A>::~CommonTextureT()
-{
-    std::destroy_at(Impl());
-}
-
-template<size_t S, size_t A>
-inline
-void CommonTextureT<S, A>::CommitMemory(const GPUQueue& queue,
-                                       const TextureBackingMemory& deviceMem,
-                                       size_t offset)
-{
-    Impl()->CommitMemory(queue, deviceMem, offset);
-}
-
-template<size_t S, size_t A>
-inline
-size_t CommonTextureT<S, A>::Size() const
-{
-    return Impl()->Size();
-}
-
-template<size_t S, size_t A>
-inline
-size_t CommonTextureT<S, A>::Alignment() const
-{
-    return Impl()->Alignment();
-}
-
-template<size_t S, size_t A>
-inline
-uint32_t CommonTextureT<S, A>::MipCount() const
-{
-    return Impl()->Size();
-}
-
-template<size_t S, size_t A>
-inline
-TextureExtent<3> CommonTextureT<S, A>::Extents() const
-{
-    Impl()->Size();
-}
-
-template<size_t S, size_t A>
-inline
-uint32_t CommonTextureT<S, A>::DimensionCount() const
-{
-    Impl()->DimensionCount();
-}
-
-template<size_t S, size_t A>
-inline
-void CommonTextureT<S, A>::CopyFromAsync(const GPUQueue& queue,
-                                        uint32_t mipLevel,
-                                        const TextureExtent<3>& offset,
-                                        const TextureExtent<3>& size,
-                                        TransientData regionFrom)
-{
-    Impl()->CopyFromAsync(queue, mipLevel,
-                          offset, size,
-                          std::move(regionFrom));
-}
-
-template<size_t S, size_t A>
-inline
-GenericTextureView CommonTextureT<S, A>::View() const
-{
-    return Impl()->View();
-}
-
-template<size_t S, size_t A>
-const GPUDevice& CommonTextureT<S, A>::Device() const
-{
-    return Impl()->Device();
-}
-
-template<size_t S, size_t A>
-MRayColorSpaceEnum CommonTextureT<S, A>::ColorSpace() const
-{
-    return colorSpace;
-}
-
-template<size_t S, size_t A>
-AttributeIsColor CommonTextureT<S, A>::IsColor() const
-{
-    return isColor;
-}
-
-template<size_t S, size_t A>
-MRayPixelTypeRT CommonTextureT<S, A>::PixelType() const
-{
-    return pixelType;
-}
-
 template<uint32_t D>
 TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t mipCount,
                                        const MRayTextureParameters& inputParams)
@@ -288,6 +160,7 @@ TextureId TextureMemory::CreateTexture2D(const Vector2ui& size, uint32_t mipCoun
 {
     return CreateTexture(size, mipCount, p);
 }
+
 TextureId TextureMemory::CreateTexture3D(const Vector3ui& size, uint32_t mipCount,
                                          const MRayTextureParameters& p)
 {
@@ -344,7 +217,7 @@ void TextureMemory::CommitTextures()
         uint32_t queueIndex = 0;
         for(size_t j = 0; j < texSizes[i].size(); j++)
         {
-            const GPUQueue& queue = currentDevice.GetQueue(queueIndex);
+            const GPUQueue& queue = currentDevice.GetComputeQueue(queueIndex);
             texPtrs[i][j]->CommitMemory(queue, texMemList[i], offsets[i][j]);
         }
         queueIndex++;
@@ -363,7 +236,7 @@ void TextureMemory::PushTextureData(TextureId id, uint32_t mipLevel,
     CommonTexture& tex = loc.value().get();
 
     // TODO: Again multi-gpu/queue management
-    const GPUQueue& queue = tex.Device().GetQueue(0);
+    const GPUQueue& queue = tex.Device().GetComputeQueue(0);
     tex.CopyFromAsync(queue,
                       mipLevel,
                       Vector3ui::Zero(),
@@ -387,6 +260,11 @@ MRayPixelTypeRT TextureMemory::GetPixelType(TextureId id) const
 const TextureViewMap& TextureMemory::TextureViews() const
 {
     return textureViews.Map();
+}
+
+const TextureMap& TextureMemory::Textures() const
+{
+    return textures.Map();
 }
 
 void TextureMemory::Clear()

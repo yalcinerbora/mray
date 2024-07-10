@@ -63,7 +63,7 @@ TEST(Hash, Constexpr)
     //                            {TOTAL_THREADS, TOTAL_THREADS,
     //                             TOTAL_THREADS, TOTAL_THREADS,
     //                             TOTAL_THREADS});
-    //const GPUQueue& q = s.BestDevice().GetQueue(0);
+    //const GPUQueue& q = s.BestDevice().GetComputeQueue(0);
     //using namespace std::string_view_literals;
     //q.IssueSaturatingKernel<KCHashStatic>
     //(

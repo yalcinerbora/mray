@@ -12,7 +12,8 @@ function(gen_tracer_target)
 
     set(SRC_TEXTURE
         ${CURRENT_SOURCE_DIR}/TextureMemory.h
-        ${CURRENT_SOURCE_DIR}/TextureMemory.cpp)
+        ${CURRENT_SOURCE_DIR}/TextureMemory.cpp
+        ${CURRENT_SOURCE_DIR}/CommonTexture.hpp)
 
     set(SRC_PRIMITIVES
         ${CURRENT_SOURCE_DIR}/PrimitiveC.h

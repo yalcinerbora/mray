@@ -228,13 +228,14 @@ enum class MRayColorSpaceEnum : uint8_t
     // TODO: check D60 variants
     // TODO: Color spaces are overwheling... Reiterate over these
     // Luminance linearity are not covered by this enum, a seperate enum (or float)
-    // will define if the color space is log or linear
+    // will define if the color space is log or linear.
+    // TODO: There are different eotfs etc. make a better approach
     MR_ACES2065_1,
     MR_ACES_CG,
     MR_REC_709,
     MR_REC_2020,
     MR_DCI_P3,
-    MR_RAW,
+    MR_ADOBE_RGB,
     MR_DEFAULT,         // Use it "as is" disregard everything about color spaces
     //MR_SPECTRAL_PACK,   // Discrete spectral samples
     MR_END
@@ -365,6 +366,7 @@ struct MRayColorSpaceStringifier
         "REC_709",
         "REC_2020",
         "DCI_P3",
+        "ADOBE_RGB",
         "DEFAULT"
     };
     static constexpr std::string_view   ToString(MRayColorSpaceEnum e);

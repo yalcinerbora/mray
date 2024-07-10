@@ -235,7 +235,7 @@ void DistributionGroupPwC2D::Construct(uint32_t index,
     assert(index < distData.size());
 
     // TODO: select a device?
-    const GPUQueue& queue = system.BestDevice().GetQueue(0);
+    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
     const DistData& d = distData[index];
 
     // Directly scan to cdf array

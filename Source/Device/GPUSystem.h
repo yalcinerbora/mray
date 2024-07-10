@@ -115,13 +115,13 @@ inline GPUQueueIteratorRoundRobin::GPUQueueIteratorRoundRobin(const GPUSystem& s
 
 inline const GPUQueue& GPUQueueIteratorRoundRobin::Queue() const
 {
-    return gpuSystem.AllGPUs()[indices[0]]->GetQueue(indices[1]);
+    return gpuSystem.AllGPUs()[indices[0]]->GetComputeQueue(indices[1]);
 }
 
 inline void GPUQueueIteratorRoundRobin::Next()
 {
     indices[1]++;
-    if(indices[1] == QueuePerDevice)
+    if(indices[1] == ComputeQueuePerDevice)
     {
         indices[1] = 0;
         indices[0]++;

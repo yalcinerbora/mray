@@ -55,7 +55,6 @@ void TracerBase::PopulateAttribInfoAndTypeLists()
     InstantiateAndGetAttribInfo(rendererAttributeInfoMap,
                                 typeGenerators.rendererGenerator,
                                 RenderImagePtr(),
-                                TracerParameters{},
                                 GenerateTracerView(),
                                 gpuSystem);
 
@@ -105,6 +104,7 @@ TracerView TracerBase::GenerateTracerView()
         .matGroups = matGroups.Map(),
         .transGroups = transGroups.Map(),
         .lightGroups = lightGroups.Map(),
+        .textures = texMem.Textures(),
         .textureViews = texMem.TextureViews(),
         .tracerParams = params,
         .surfs = surfaces.Vec(),
@@ -476,7 +476,7 @@ void TracerBase::PushPrimAttribute(PrimGroupId gId,
     }
 
     // TODO: Change this to utilize muti-gpu/queue
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
 
     PrimBatchKey key(static_cast<uint32_t>(batchId));
     primGroup.value().get()->PushAttribute(key, attribIndex,
@@ -498,7 +498,7 @@ void TracerBase::PushPrimAttribute(PrimGroupId gId,
     }
 
     // TODO: Change this to utilize muti-gpu/queue
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
 
     PrimBatchKey key(static_cast<uint32_t>(batchId));
     primGroup.value().get()->PushAttribute(key, attribIndex,
@@ -619,7 +619,7 @@ void TracerBase::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
                         static_cast<uint32_t>(gId));
     }
     // TODO: Change this to utilize muti-gpu/queue
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     using T = typename MaterialKey::Type;
     auto keyStart = MaterialKey(static_cast<T>(matRange[0]));
     auto keyEnd = MaterialKey(static_cast<T>(matRange[1]));
@@ -637,7 +637,7 @@ void TracerBase::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
         throw MRayError("Unable to find MaterialGroup({})",
                         static_cast<uint32_t>(gId));
     }
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     using T = typename MaterialKey::Type;
     auto keyStart = MaterialKey(static_cast<T>(matRange[0]));
     auto keyEnd = MaterialKey(static_cast<T>(matRange[1]));
@@ -664,7 +664,7 @@ void TracerBase::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
         throw MRayError("Unable to find MaterialGroup({})",
                         static_cast<uint32_t>(gId));
     }
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     using T = typename MaterialKey::Type;
     auto keyStart = MaterialKey(static_cast<T>(matRange[0]));
     auto keyEnd = MaterialKey(static_cast<T>(matRange[1]));
@@ -786,7 +786,7 @@ void TracerBase::PushTransAttribute(TransGroupId gId, Vector2ui transRange,
                         static_cast<uint32_t>(gId));
     }
 
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     using T = typename TransformKey::Type;
     auto keyStart = TransformKey(static_cast<T>(transRange[0]));
     auto keyEnd = TransformKey(static_cast<T>(transRange[1]));
@@ -917,7 +917,7 @@ void TracerBase::PushLightAttribute(LightGroupId gId, Vector2ui lightRange,
         throw MRayError("Unable to find LightGroup({})",
                         static_cast<uint32_t>(gId));
     }
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     using T = typename LightKey::Type;
     auto keyStart = LightKey(static_cast<T>(lightRange[0]));
     auto keyEnd = LightKey(static_cast<T>(lightRange[1]));
@@ -936,7 +936,7 @@ void TracerBase::PushLightAttribute(LightGroupId gId, Vector2ui lightRange,
         throw MRayError("Unable to find LightGroup({})",
                         static_cast<uint32_t>(gId));
     }
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     using T = typename LightKey::Type;
     auto keyStart = LightKey(static_cast<T>(lightRange[0]));
     auto keyEnd = LightKey(static_cast<T>(lightRange[1]));
@@ -966,7 +966,7 @@ void TracerBase::PushLightAttribute(LightGroupId gId, Vector2ui lightRange,
                         static_cast<uint32_t>(gId));
     }
 
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     using T = typename LightKey::Type;
     auto keyStart = LightKey(static_cast<T>(lightRange[0]));
     auto keyEnd = LightKey(static_cast<T>(lightRange[1]));
@@ -1064,7 +1064,7 @@ void TracerBase::PushCamAttribute(CameraGroupId gId, Vector2ui camRange,
         throw MRayError("Unable to find CameraGroup({})",
                         static_cast<uint32_t>(gId));
     }
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     using T = typename CameraKey::Type;
     auto keyStart = CameraKey(static_cast<T>(camRange[0]));
     auto keyEnd = CameraKey(static_cast<T>(camRange[1]));
@@ -1155,7 +1155,7 @@ void TracerBase::PushMediumAttribute(MediumGroupId gId, Vector2ui mediumRange,
                                      uint32_t attribIndex,
                                      TransientData data)
 {
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     using T = typename MediumKey::Type;
     auto keyStart = MediumKey(static_cast<T>(mediumRange[0]));
     auto keyEnd = MediumKey(static_cast<T>(mediumRange[1]));
@@ -1174,7 +1174,7 @@ void TracerBase::PushMediumAttribute(MediumGroupId gId, Vector2ui mediumRange,
                                      TransientData data,
                                      std::vector<Optional<TextureId>> textures)
 {
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     using T = typename MediumKey::Type;
     auto keyStart = MediumKey(static_cast<T>(mediumRange[0]));
     auto keyEnd = MediumKey(static_cast<T>(mediumRange[1]));
@@ -1205,7 +1205,7 @@ void TracerBase::PushMediumAttribute(MediumGroupId gId, Vector2ui mediumRange,
                                      uint32_t attribIndex,
                                      std::vector<TextureId> textures)
 {
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     using T = typename MediumKey::Type;
     auto keyStart = MediumKey(static_cast<T>(mediumRange[0]));
     auto keyEnd = MediumKey(static_cast<T>(mediumRange[1]));
@@ -1390,7 +1390,6 @@ RendererId TracerBase::CreateRenderer(std::string typeName)
     auto renderer = rendererGen.value()
     (
         renderImage,
-        params,
         GenerateTracerView(),
         gpuSystem
     );
@@ -1427,7 +1426,7 @@ void TracerBase::PushRendererAttribute(RendererId rId,
                         static_cast<uint32_t>(rId));
     }
     // TODO: Change this
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     renderer.value().get()->PushAttribute(attribIndex, std::move(data),
                                           queue);
 }
@@ -1452,7 +1451,9 @@ RenderBufferInfo TracerBase::StartRender(RendererId rId, CamSurfaceId cId,
     currentRenderer = renderer.value().get().get();
     currentRendererId = rId;
     auto camKey = CameraKey(static_cast<uint32_t>(cId));
-    return currentRenderer->StartRender(rIParams, camKey);
+    return currentRenderer->StartRender(rIParams, camKey,
+                                        renderLogic0.value_or(0),
+                                        renderLogic1.value_or(0));
 }
 
 void TracerBase::StopRender()

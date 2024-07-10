@@ -40,7 +40,7 @@ void BinPartitionTest(const GPUSystem& system)
         v = (rng() % 2 == 0) ? Value(0) : Value(1);
     }
 
-    const GPUQueue& queue = system.BestDevice().GetQueue(0);
+    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
     queue.MemcpyAsync(dInputs, Span<const Value>(hInputs.begin(), hInputs.end()));
 
     DeviceAlgorithms::BinaryPartition(dOutputs, Span<uint32_t, 1>(dOffset),

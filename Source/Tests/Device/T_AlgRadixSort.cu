@@ -41,7 +41,7 @@ void RadixSortTest(const GPUSystem& system)
     std::iota(hValues.begin(), hValues.end(), Value(0));
     hOldKeys = hKeys;
 
-    const GPUQueue& queue = system.BestDevice().GetQueue(0);
+    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
     queue.MemcpyAsync(dKeys[0], Span<const Key>(hKeys.begin(), hKeys.end()));
     queue.MemcpyAsync(dValues[0], Span<const Value>(hValues.begin(), hValues.end()));
 

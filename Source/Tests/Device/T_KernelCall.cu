@@ -63,7 +63,7 @@ void KernelCallFreeFunctionTester(const GPUSystem& system)
     static constexpr uint32_t HostInitValue = 999;
     uint32_t totalThreads = 32;
     uint32_t hReferenceTest = 512;
-    const GPUQueue& queue = system.BestDevice().GetQueue(0);
+    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
 
     DeviceLocalMemory mem(system.BestDevice());
     Span<uint32_t> dWriteSpan;
@@ -141,7 +141,7 @@ void KernelCallLambdaTester(const GPUSystem& system)
     static constexpr uint32_t HostInitValue = 999;
     uint32_t totalThreads = 32;
     uint32_t hReferenceTest = 512;
-    const GPUQueue& queue = system.BestDevice().GetQueue(0);
+    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
 
     DeviceLocalMemory mem(system.BestDevice());
     Span<uint32_t> dWriteSpan;
@@ -227,7 +227,7 @@ void KernelCallNestedTester(const GPUSystem& system)
     static constexpr uint32_t HostInitValue = 999;
     uint32_t totalThreads = 32;
     uint32_t hReferenceTest = 512;
-    const GPUQueue& queue = system.BestDevice().GetQueue(0);
+    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
 
     DeviceLocalMemory mem(system.BestDevice());
     Span<uint32_t> dWriteSpan;

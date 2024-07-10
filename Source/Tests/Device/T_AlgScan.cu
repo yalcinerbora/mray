@@ -33,7 +33,7 @@ void MultiScanTest(const GPUSystem& system)
     std::vector<Value> hInputs(ElementCount, Value(0));
     std::iota(hInputs.begin(), hInputs.end(), Value(0));
 
-    const GPUQueue& queue = system.BestDevice().GetQueue(0);
+    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
     queue.MemcpyAsync(dInputs, Span<const Value>(hInputs.begin(), hInputs.end()));
 
     DeviceAlgorithms::InclusiveMultiScan(dOutputs, ToConstSpan(dInputs),

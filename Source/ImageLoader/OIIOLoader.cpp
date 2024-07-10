@@ -200,7 +200,17 @@ Expected<ColorSpacePack> ImageFileOIIO::ColorSpaceToMRay(const std::string& oiio
     using namespace std::literals;
     using enum MRayColorSpaceEnum;
     using MapType = std::tuple<std::string_view, MRayColorSpaceEnum, Float>;
-    using ArrayType = std::array<MapType, 6>;
+    constexpr uint32_t TableSize = uint32_t(MRayColorSpaceEnum::MR_END) + 1;
+    using ArrayType = std::array<MapType, TableSize>;
+
+    // TODO: unicode utf8 etc...
+    std::string lowercaseStr(oiioString.size(), '\n');
+    std::transform(oiioString.cbegin(), oiioString.cend(),
+                   lowercaseStr.begin(),
+    [](char c) -> char
+    {
+        return static_cast<char>(std::tolower(c));
+    });
 
     // TODO: Not complete, add later
     static constexpr ArrayType LookupList =
@@ -210,13 +220,14 @@ Expected<ColorSpacePack> ImageFileOIIO::ColorSpaceToMRay(const std::string& oiio
         MapType{"Rec709"sv,         MR_REC_709,     Float(2.222)},
         MapType{"sRGB"sv,           MR_REC_709,     Float(2.2)},
         MapType{"lin_srgb"sv,       MR_REC_709,     Float(1)},
-        MapType{"adobeRGB"sv,       MR_REC_709,     Float(2.19922)},
+        MapType{"adobeRGB"sv,       MR_ADOBE_RGB,   Float(2.222)},
+        MapType{"linear"sv,         MR_DEFAULT,     Float(1)},
+        MapType{"scene_linear"sv,   MR_DEFAULT,     Float(1)}
     };
 
     for(const auto& checkType : LookupList)
     {
-        if(std::get<0>(checkType) != oiioString) continue;
-
+        if(std::get<0>(checkType) != lowercaseStr) continue;
         return ColorSpacePack
         {
             std::get<2>(checkType),
@@ -502,10 +513,11 @@ Expected<ImageHeader> ImageFileOIIO::ReadHeader()
         e.AppendInfo(MRAY_FORMAT("({})", filePath));
         return e;
     }
-    // If "oiio:ColorSpace" query is push MR_DEFAULT color space with linear gamma
-    // SceneLoader may check user defined color space if applicable
-    Pair defaultColorSpace = Pair(Float(1), MRayColorSpaceEnum::MR_DEFAULT);
-    const auto& colorSpace = colorSpaceE.value_or(defaultColorSpace);
+    if(colorSpaceE.value().second == MRayColorSpaceEnum::MR_DEFAULT)
+        MRAY_WARNING_LOG("Texture \"{}\" has linear colorspace. "
+                         "Assuming it is on tracer's global texture color space.",
+                         filePath);
+    const auto& colorSpace = colorSpaceE.value();
 
     // TODO: Support tiled images
     if(spec.tile_width != 0 || spec.tile_height != 0)

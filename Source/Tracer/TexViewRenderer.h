@@ -30,15 +30,19 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     };
 
     private:
-    Options     currentOptions = {};
-    Options     newOptions = {};
-    // TEST
-    uint32_t    pixelIndex = 0;
+    Options     currentOptions  = {};
+    Options     newOptions      = {};
+    // State
+    uint32_t    curTileIndex    = 0;
+    uint32_t    textureIndex    = 0;
+    uint32_t    mipIndex        = 0;
+    Vector2ui   tileCount       = Vector2ui::Zero();
+    //
+    std::vector<const CommonTexture*> textures;
 
     public:
     // Constructors & Destructor
                         TexViewRenderer(const RenderImagePtr&,
-                                        const TracerParameters&,
                                         TracerView, const GPUSystem&);
                         TexViewRenderer(const TexViewRenderer&) = delete;
                         TexViewRenderer(TexViewRenderer&&) = delete;
@@ -57,7 +61,9 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
 
     //
     RenderBufferInfo    StartRender(const RenderImageParams&,
-                                    const CameraKey&) override;
+                                    const CameraKey&,
+                                    uint32_t customLogicIndex0 = 0,
+                                    uint32_t customLogicIndex1 = 0) override;
     RendererOutput      DoRender() override;
     void                StopRender() override;
     size_t              GPUMemoryUsage() const override;

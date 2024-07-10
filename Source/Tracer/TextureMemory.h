@@ -153,20 +153,20 @@ using CommonTexture = CommonTextureT
              alignof(TexDetail::Concept<Texture<2, Vector4>>))
 >;
 
+using TextureMap = Map<TextureId, CommonTexture>;
+
 class TextureMemory
 {
     using GPUIterator       = GPUQueueIteratorRoundRobin;
-    using TextureMap        = ThreadSafeMap<TextureId, CommonTexture>;
     using TextureMemList    = std::vector<TextureBackingMemory>;
+    using TSTextureMap      = ThreadSafeMap<TextureId, CommonTexture>;
     using TSTextureViewMap  = ThreadSafeMap<TextureId, GenericTextureView>;
-
-
 
     private:
     const GPUSystem&        gpuSystem;
     TextureMemList          texMemList;
     std::atomic_uint32_t    texCounter;
-    TextureMap              textures;
+    TSTextureMap            textures;
     uint32_t                clampResolution;
     //
     std::atomic_uint32_t    gpuIndexCounter = 0;
@@ -193,8 +193,10 @@ class TextureMemory
     void            PushTextureData(TextureId, uint32_t mipLevel,
                                     TransientData data);
 
-    MRayPixelTypeRT         GetPixelType(TextureId) const;
     const TextureViewMap&   TextureViews() const;
+    const TextureMap&       Textures() const;
+
+    MRayPixelTypeRT         GetPixelType(TextureId) const;
     void                    Clear();
     size_t                  GPUMemoryUsage() const;
 };

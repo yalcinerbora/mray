@@ -184,7 +184,7 @@ TEST(DefaultTriangle, Load)
     inputUV.Push<Vector2>(uvs);
 
     // Fire and forget style load
-    const GPUQueue& queue = system.BestDevice().GetQueue(0);
+    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
     triGroup.PushAttribute(batch.front(), 3, std::move(inputIndex), queue);
     triGroup.PushAttribute(batch.front(), 0, std::move(inputPos), queue);
     triGroup.PushAttribute(batch.front(), 1, std::move(inputNormal), queue);
@@ -263,7 +263,7 @@ TEST(DefaultTriangle, LoadMulti)
         inputUV.Push<Vector2>(uvs);
 
         // Fire and forget style load
-        const GPUQueue& queue = system.BestDevice().GetQueue(queueIndex);
+        const GPUQueue& queue = system.BestDevice().GetComputeQueue(queueIndex);
         triGroup.PushAttribute(batch, 3, std::move(inputIndex), queue);
         triGroup.PushAttribute(batch, 0, std::move(inputPos), queue);
         triGroup.PushAttribute(batch, 1, std::move(inputNormal), queue);
@@ -275,7 +275,7 @@ TEST(DefaultTriangle, LoadMulti)
     // TODO: This is not a good design? User have to sync everything
     // maybe return a ticket (barrier to the user)
     system.SyncAll();
-    const GPUQueue& queue = system.BestDevice().GetQueue(0);
+    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
     // Finalize the indices
     triGroup.Finalize(queue);
 

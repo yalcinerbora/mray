@@ -1369,7 +1369,7 @@ bool VisorWindow::Render()
     }
 
     // Entire image reset + img format change (new alloc maybe)
-    if(newRenderBuffer)
+    if(newRenderBuffer && newRenderBuffer->data != nullptr)
     {
         // Flush the device, we will need to reallocate
         vkDeviceWaitIdle(handlesVk.deviceVk);
@@ -1404,6 +1404,9 @@ bool VisorWindow::Render()
         gui.ChangeDisplayImage(renderImagePool.GetSDRImage());
         gui.ChangeTonemapperGUI(tonemapperGUI.value());
     }
+    // Skip other operations if import render buffer is invalid
+    if(newRenderBuffer && newRenderBuffer->data == nullptr)
+        newRenderBuffer = std::nullopt;
 
     // After potential reallocation, check the GUI stuff.
     // We may not issue accumulation maybe

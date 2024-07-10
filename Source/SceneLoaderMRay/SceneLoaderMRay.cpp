@@ -1800,6 +1800,9 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     DryRunNodesForTex(textureIds, mediumNodes, tracer,
                       &AddMediumPrefix,
                       &TracerI::AttributeInfoMedium);
+    DryRunNodesForTex(textureIds, lightNodes, tracer,
+                      &AddLightPrefix,
+                      &TracerI::AttributeInfoLight);
 
     // And finally, materials can define in/out mediums
     for(const auto& nodes : materialNodes)

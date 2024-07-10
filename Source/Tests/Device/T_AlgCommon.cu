@@ -21,7 +21,7 @@ struct Transformer
 template<class Value>
 void IotaTest(const GPUSystem& system)
 {
-    const GPUQueue& queue = system.BestDevice().GetQueue(0);
+    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
     static constexpr size_t ElementCount = 1'000;
     DeviceMemory mem({&system.BestDevice()}, 1_MiB, 8_MiB);
 
@@ -49,7 +49,7 @@ void IotaTest(const GPUSystem& system)
 template<class Value>
 void TransformTest(const GPUSystem& system)
 {
-    const GPUQueue& queue = system.BestDevice().GetQueue(0);
+    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
     static constexpr size_t ElementCount = 1'000;
     DeviceMemory mem({&system.BestDevice()}, 1_MiB, 8_MiB);
 

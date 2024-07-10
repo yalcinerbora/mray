@@ -9,7 +9,7 @@
 void SimulateBasicPathTracer()
 {
     GPUSystem system;
-    const GPUQueue& queue = system.BestDevice().GetQueue(0);
+    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
 
     static constexpr size_t RayCount = 500'000;
     // This is calculated via combining

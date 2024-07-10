@@ -122,7 +122,7 @@ void TransformGroupMulti::CommitReservations()
 
     // TODO: Improve this?
     // Locally creating buffers ...
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     DeviceLocalMemory tempMemory(gpuSystem.BestDevice());
     Span<Vector<2, size_t>> dFlattenedRanges;
     MemAlloc::AllocateMultiData(std::tie(dFlattenedRanges),

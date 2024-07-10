@@ -10,11 +10,11 @@ RenderImage::RenderImage(TimelineSemaphore* semaphore,
     , deviceMemory(gpuSystem.AllGPUs(), 16_MiB, 256_MiB)
     , stagingMemory(gpuSystem, true)
     , sem(semaphore, initialSemCounter)
-    , processCompleteFence(gpuSystem.BestDevice().GetQueue(0))
+    , processCompleteFence(gpuSystem.BestDevice().GetComputeQueue(0))
 {}
 
-Optional<RenderImageSection> RenderImage::GetHostView(const GPUQueue& processQueue,
-                                                      const GPUQueue& copyQueue)
+Optional<RenderImageSection> RenderImage::TransferToHost(const GPUQueue& processQueue,
+                                                         const GPUQueue& copyQueue)
 {
     // Let's not wait on the driver here
     // So host does not runaway from CUDA
@@ -57,6 +57,16 @@ Vector2ui RenderImage::Extents() const
     return extent;
 }
 
+uint32_t RenderImage::Depth() const
+{
+    return depth;
+}
+
+uint32_t RenderImage::ChannelCount() const
+{
+    return channelCount;
+}
+
 void RenderImage::ClearImage(const GPUQueue& queue)
 {
     queue.MemsetAsync(dPixels, 0x00);
@@ -78,12 +88,14 @@ RenderBufferInfo RenderImage::GetBufferInfo(MRayColorSpaceEnum colorspace,
 }
 
 bool RenderImage::Resize(const Vector2ui& extentIn,
-                         uint32_t depthIn)
+                         uint32_t depthIn,
+                         uint32_t channelCountIn)
 {
     // Acquire the memory, we may delete it
     if(!sem.HostAcquire()) return false;
     extent = extentIn;
     depth = depthIn;
+    channelCount = channelCountIn;
 
     uint32_t totalPixCount = extent.Multiply() * depth;
     MemAlloc::AllocateMultiData(std::tie(dPixels, dSamples),

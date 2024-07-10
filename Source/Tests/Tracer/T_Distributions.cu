@@ -43,7 +43,7 @@ struct DistTester2D
                     const std::vector<Vector2>& hRandomNumbers)
     {
         using namespace std::literals;
-        const GPUQueue& queue = system.BestDevice().GetQueue(0);
+        const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
 
         uint32_t sampleCount = static_cast<uint32_t>(hRandomNumbers.size());
         uint32_t sizeLinear = size.Multiply();

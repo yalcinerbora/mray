@@ -12,9 +12,10 @@ static constexpr uint32_t WarpSize();
 static constexpr uint32_t StaticThreadPerBlock1D();
 static constexpr uint32_t TotalQueuePerDevice();
 
-static constexpr uint32_t QueuePerDevice = 4;
-
-static_assert(QueuePerDevice > 0, "At least one queue must be present on a Device!");
+static constexpr uint32_t ComputeQueuePerDevice = 4;
+static_assert(ComputeQueuePerDevice > 0,
+              "At least one compute queue must "
+              "be present on a Device!");
 
 enum class DeviceQueueType
 {

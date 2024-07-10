@@ -119,7 +119,7 @@ void MetaLightArray<Variant<TC...>, Variant<L...>>::AddBatch(const LightGroup& l
                                                              const Span<const TransformKey>& transformKeys,
                                                              const Vector2ui& batchRange)
 {
-    const GPUQueue& queue = system.BestDevice().GetQueue(0);
+    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
 
     using TGSoA = typename TransformGroup::DataSoA;
     using LGSoA = typename LightGroup::DataSoA;

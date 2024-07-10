@@ -139,7 +139,7 @@ AABB3 BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instan
     MemAlloc::AllocateMultiData(std::tie(dTemp, dReducedAABB),
                                 stackMem, {temMemSize, 1});
 
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     DeviceAlgorithms::Reduce(Span<AABB3,1>(dReducedAABB), dTemp,
                              ToConstSpan(dAABBs),
                              AABB3::Negative(),
@@ -178,7 +178,7 @@ void BaseAcceleratorLinear::CastRays(// Output
                                      Span<const RayIndex> dRayIndices)
 {
     using namespace std::string_view_literals;
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     queue.MemsetAsync(dTraversalStack, 0x00);
 
     // Initialize the ray partitioner

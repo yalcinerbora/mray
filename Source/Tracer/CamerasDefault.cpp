@@ -132,7 +132,7 @@ void CameraGroupPinhole::PushAttribute(CameraKey idStart, CameraKey idEnd,
 
 CameraTransform CameraGroupPinhole::AcquireCameraTransform(CameraKey k) const
 {
-    const GPUQueue& queue = gpuSystem.BestDevice().GetQueue(0);
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     CommonKey kIndex = k.FetchIndexPortion();
 
     CameraTransform result;
