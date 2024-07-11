@@ -98,10 +98,11 @@ Expected<MRayPixelTypeRT> ImageFileOIIO::PixelFormatToMRay(const OIIO::ImageSpec
     return MRayError("Uknown image pixel type");
 }
 
-Expected<OIIO::ImageSpec> ImageFileOIIO::PixelFormatToOIIO(const ImageHeader& header)
+Expected<OIIO::ImageSpec> ImageFileOIIO::PixelFormatToOIIO(const MRayPixelTypeRT& pixelType,
+                                                           const Vector2ui& resolution)
 {
-    MRayPixelEnum pixType = header.pixelType.Name();
-    int nChannels = static_cast<int>(header.pixelType.ChannelCount());
+    MRayPixelEnum pixType = pixelType.Name();
+    int nChannels = static_cast<int>(pixelType.ChannelCount());
 
     OIIO::TypeDesc td;
     switch(pixType)
@@ -169,8 +170,8 @@ Expected<OIIO::ImageSpec> ImageFileOIIO::PixelFormatToOIIO(const ImageHeader& he
             return MRayError("Unable to convert pixel type to OIIO type {}",
                              MRayPixelTypeStringifier::ToString(pixType));
     }
-    return OIIO::ImageSpec(static_cast<int32_t>(header.dimensions[0]),
-                           static_cast<int32_t>(header.dimensions[1]),
+    return OIIO::ImageSpec(static_cast<int32_t>(resolution[0]),
+                           static_cast<int32_t>(resolution[1]),
                            nChannels, td);
 }
 

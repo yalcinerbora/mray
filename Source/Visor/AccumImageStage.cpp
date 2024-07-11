@@ -153,7 +153,7 @@ AccumulateStatus AccumImageStage::IssueAccumulation(const RenderImageSection& se
             {
                 .buffer = foreignBuffer.Buffer(),
                 .offset = section.pixelStartOffset,
-                .range = VK_WHOLE_SIZE
+                .range = section.sampleStartOffset,
             },
         },
         {
@@ -190,7 +190,6 @@ AccumulateStatus AccumImageStage::IssueAccumulation(const RenderImageSection& se
     pipeline.BindSet(accumulateCommand, 0, descriptorSets[0]);
     vkCmdDispatch(accumulateCommand, groupSize[0], groupSize[1], 1);
     vkEndCommandBuffer(accumulateCommand);
-
     // ============= //
     //   SUBMISSON   //
     // ============= //

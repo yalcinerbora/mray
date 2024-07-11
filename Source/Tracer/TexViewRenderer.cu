@@ -7,6 +7,8 @@
 
 #include "Core/Timer.h"
 
+#include "Device/GPUAlgGeneric.h"
+
 
 MRAY_KERNEL
 void KCColorTiles(MRAY_GRID_CONSTANT const Span<Float> pixels,
@@ -19,14 +21,15 @@ void KCColorTiles(MRAY_GRID_CONSTANT const Span<Float> pixels,
 
     uint32_t totalPix = resolution.Multiply();
     assert(totalPix * channelCount <= pixels.size());
-    assert(totalPix * channelCount <= samples.size());
+    assert(totalPix <= samples.size());
 
     for(uint32_t i = kp.GlobalId(); i < totalPix; i += kp.TotalSize())
     {
         uint32_t pixIndex = i * channelCount;
+        uint32_t sampIndex = i;
         Vector3 color = Color::RandomColorRGB(colorIndex);
 
-        samples[pixIndex] = Float(1);
+        samples[sampIndex] = Float(1);
         pixels[pixIndex + 0] = color[0];
         pixels[pixIndex + 1] = color[1];
         pixels[pixIndex + 2] = color[2];
@@ -46,11 +49,6 @@ TexViewRenderer::TexViewRenderer(const RenderImagePtr& rb,
         if(tex.second.DimensionCount() != 2) continue;
 
         textures.push_back(&tex.second);
-    }
-    if(textures.empty())
-    {
-        MRAY_WARNING_LOG("[(R)TexView] No textures are present "
-                         "in the tracer. Rendering nothing!");
     }
 }
 
@@ -98,14 +96,19 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
                                               uint32_t customLogicIndex1)
 {
     // Skip if nothing to show
-    if(textures.empty()) return RenderBufferInfo
+    if(textures.empty())
     {
-        .data = nullptr,
-        .totalSize = 0,
-        .renderColorSpace = tracerView.tracerParams.globalTextureColorSpace,
-        .resolution = Vector2ui::Zero(),
-        .depth = 0
-    };
+        MRAY_WARNING_LOG("[(R)TexView] No textures are present "
+                         "in the tracer. Rendering nothing!");
+        return RenderBufferInfo
+        {
+            .data = nullptr,
+            .totalSize = 0,
+            .renderColorSpace = tracerView.tracerParams.globalTextureColorSpace,
+            .resolution = Vector2ui::Zero(),
+            .depth = 0
+        };
+    }
 
     // Find the texture index
     using MathFunctions::Roll;
@@ -115,14 +118,13 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
     mipIndex = Roll(int32_t(customLogicIndex1), 0,
                     int32_t(t->MipCount()));
 
+    // Initialize tile index
+    curTileIndex = 0;
+
     // Calculate tile size according to the parallelization hint
     uint32_t parallelHint = tracerView.tracerParams.parallelizationHint;
-    uint32_t tileHint = static_cast<int32_t>(std::round(std::sqrt(parallelHint)));
     Vector2ui imgRegion = Vector2ui(t->Extents());
-    // Add some tolerance (%30)
-    tileHint = uint32_t(Float(0.3) * Float(tileHint));
-    Vector2ui tileSize = Vector2ui(FindOptimumTile(imgRegion[0], tileHint),
-                                   FindOptimumTile(imgRegion[1], tileHint));
+    Vector2ui tileSize = FindOptimumTile(imgRegion, parallelHint);
     renderBuffer->Resize(tileSize, 1, 3);
     tileCount = MathFunctions::DivideUp(imgRegion, tileSize);
 
@@ -152,27 +154,34 @@ RendererOutput TexViewRenderer::DoRender()
     Vector2ui tileIndex2D = Vector2ui(tileIndex % tileCount[0],
                                       tileIndex / tileCount[0]);
     Vector2ui regionMin = tileIndex2D * renderBuffer->Extents();
-    Vector2ui regionMax = (regionMin + 1) * renderBuffer->Extents();
+    Vector2ui regionMax = (tileIndex2D + 1) * renderBuffer->Extents();
     regionMax.Clamp(Vector2ui::Zero(), curFramebufferSize);
 
     using namespace std::string_view_literals;
     const GPUQueue& processQueue = device.GetComputeQueue(0);
-    Span<Float> pixels = renderBuffer->Pixels();
-    Span<Float> samples = renderBuffer->Samples();
-
     Vector2ui curPixelCount2D = regionMax - regionMin;
     uint32_t curPixelCount = curPixelCount2D.Multiply();
+
+    // Do not start writing to device side untill copy is complete
+    // (device buffer is read fully)
+    processQueue.IssueWait(renderBuffer->PrevCopyCompleteFence());
     processQueue.IssueSaturatingKernel<KCColorTiles>
     (
         "KCColorTiles"sv,
         KernelIssueParams{.workCount = curPixelCount},
         //
-        pixels,
-        samples,
+        renderBuffer->Pixels(),
+        renderBuffer->Samples(),
         tileIndex,
         curPixelCount2D,
         renderBuffer->ChannelCount()
     );
+
+    //DeviceAlgorithms::InPlaceTransform(renderBuffer->Pixels(), processQueue,
+    //                                   [] MRAY_HYBRID (Float) -> Float
+    //{
+    //    return Float(1);
+    //});
 
     // Send the resulting image to host (Acquire synchronization prims)
     const GPUQueue& transferQueue = device.GetTransferQueue();
@@ -198,7 +207,7 @@ RendererOutput TexViewRenderer::DoRender()
     double samplePerSec = static_cast<double>(curPixelCount) / timeSec;
     samplePerSec /= 1'000'000;
 
-    double spp = double(curTileIndex) / double(tileCount.Multiply());
+    double spp = double(curTileIndex + 1) / double(tileCount.Multiply());
     const CommonTexture* curTex = textures[textureIndex];
 
     curTileIndex++;

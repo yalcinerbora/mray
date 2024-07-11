@@ -137,11 +137,6 @@ void RenderImagePool::GenerateClearCommand()
         .layerCount = 1u
     };
     VkClearColorValue clearColorValue = {};
-    clearColorValue.float32[0] = 1;
-    clearColorValue.float32[1] = 1;
-    clearColorValue.float32[2] = 1;
-    clearColorValue.float32[3] = 1;
-
     // Change the HDR image state to writable
     std::array<VkImageMemoryBarrier, 3> imgBarrierInfoList = {};
     imgBarrierInfoList[0] =
@@ -359,7 +354,7 @@ void RenderImagePool::SaveImage(IsHDRImage t, const RenderImageSaveInfo& fileOut
         Float gamma = (initInfo.isSpectralPack || t == HDR)
             ? Float(1.0)
             : initInfo.sdrColorSpace.second;
-        size_t paddedImageSize = outPixelType.PixelSize() * initInfo.extent.Multiply();
+        size_t paddedImageSize = inPixelType.PixelSize() * initInfo.extent.Multiply();
         //
         WriteImageParams imgInfo =
         {

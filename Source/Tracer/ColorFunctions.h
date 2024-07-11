@@ -56,7 +56,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Vector3 Color::RandomColorRGB(uint32_t index)
 {
     // https://martin.ankerl.com/2009/12/09/how-to-create-random-colors-programmatically/
-    constexpr Float SATURATION = Float(0.65);
+    constexpr Float SATURATION = Float(0.75);
     constexpr Float VALUE = Float(0.95);
     constexpr Float GOLDEN_RATIO_CONJ = Float(0.618033988749895);
     // For large numbers use double arithmetic here

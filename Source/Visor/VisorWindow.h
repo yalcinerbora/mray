@@ -88,10 +88,7 @@ class Swapchain
     bool                        fboSizeChanged  = false;
     uint32_t                    currentImgIndex = 0;
 
-    VkPresentModeKHR            presentMode     = VK_PRESENT_MODE_FIFO_KHR;
-    VkColorSpaceKHR             colorSpace      = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-    VkFormat                    format          = VK_FORMAT_UNDEFINED;
-    VkExtent2D                  extent          = VkExtent2D{0, 0};
+    SwapchainInfo               swapchainInfo   = {};
 
     // Imgui Related
     VkDescriptorPool            imguiDescPool   = nullptr;
@@ -118,6 +115,8 @@ class Swapchain
     void                            FBOSizeChanged(Vector2ui newSize);
     Pair<MRayColorSpaceEnum, Float> ColorSpace() const;
     VkColorSpaceKHR                 ColorSpaceVk() const;
+    SwapchainInfo                   GetSwapchainInfo() const;
+
 };
 
 class VisorWindow

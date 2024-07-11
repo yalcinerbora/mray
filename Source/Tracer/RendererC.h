@@ -261,23 +261,37 @@ std::string_view RendererT<C>::Name() const
     return C::TypeName();
 }
 
-inline uint32_t FindOptimumTile(uint32_t regionSize,
-                                uint32_t tileSize)
+inline Vector2ui FindOptimumTile(Vector2ui fbSize,
+                                 uint32_t parallelizationHint)
 {
+    using namespace MathFunctions;
+    // Start with an ~ aspect ratio tile
+    // and adjust it
+    Float aspectRatio = Float(fbSize[0]) / Float(fbSize[1]);
+    Float factor = std::sqrt(Float(parallelizationHint) / aspectRatio);
+    Vector2ui tileHint(std::round(aspectRatio * factor), std::roundf(factor));
+
     // Find optimal tile size that evenly divides the image
     // This may not happen (i.e., width or height is prime)
     // then expand the tile size to pass the edge barely.
-    if(regionSize < tileSize) return regionSize;
+    auto Adjust = [&](uint32_t i)
+    {
+        // If w/h is small use the full fb w/h
+        if(fbSize[i] < tileHint[i]) return fbSize[i];
 
-    // Divide and find a tileCount
-    uint32_t tCount = MathFunctions::DivideUp(regionSize, tileSize);
-    uint32_t result = regionSize / tCount;
-    uint32_t residual = regionSize % tCount;
-    // All file no pixel is left.
-    if(residual == 0) return result;
+        // Divide down to get an agressive (lower) count,
+        // but on second pass do a conservative divide
+        Float tileCountF = Float(fbSize[i]) / Float(tileHint[i]);
+        uint32_t tileCount = uint32_t(std::round(tileCountF));
+        // Try to minimize residuals so that
+        // GPU does consistent work
+        uint32_t result = fbSize[i] / tileCount;
+        uint32_t residual = fbSize[i] % tileCount;
+        residual = DivideUp(residual, tileCount);
+        result += residual;
+        return result;
+    };
 
-    // Not evenly divisible now expand the tile
-    residual = MathFunctions::DivideUp(residual, tCount);
-    result += residual;
+    Vector2ui result = Vector2ui(Adjust(0), Adjust(1));
     return result;
 }

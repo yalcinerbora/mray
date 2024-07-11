@@ -94,23 +94,29 @@ MRayError ImageLoader::WriteImage(const WriteImageParams& imgIn,
     std::string fullPath = filePath + std::string(ext);
     auto out = OIIO::ImageOutput::create(fullPath);
 
-    Expected<OIIO::ImageSpec> outSpecE = ImageFileOIIO::PixelFormatToOIIO(imgIn.header);
+    // Output spec
+    Expected<OIIO::ImageSpec> outSpecE =
+        ImageFileOIIO::PixelFormatToOIIO(imgIn.header.pixelType,
+                                         Vector2ui(imgIn.header.dimensions));
     if(!outSpecE.has_value()) return outSpecE.error();
     const OIIO::ImageSpec& outSpec = outSpecE.value();
 
-    bool sameType = (imgIn.header.pixelType == imgIn.inputType);
-    OIIO::stride_t xStride = (sameType) ? OIIO::AutoStride : imgIn.inputType.PixelSize();
-    OIIO::stride_t scanLineSize = (sameType)
-        ? static_cast<OIIO::stride_t>(outSpec.scanline_bytes())
-        : (imgIn.inputType.PixelSize() * imgIn.header.dimensions[0]);
+    // Input spec
+    Expected<OIIO::ImageSpec> inSpecE =
+        ImageFileOIIO::PixelFormatToOIIO(imgIn.inputType,
+                                         Vector2ui(imgIn.header.dimensions));
+    if(!inSpecE.has_value()) return inSpecE.error();
+    const OIIO::ImageSpec& inSpec = inSpecE.value();
 
+    OIIO::stride_t inScanLineSize = static_cast<OIIO::stride_t>(inSpec.scanline_bytes());
     const Byte* dataLastElement = imgIn.pixels.data();
-    dataLastElement += (imgIn.header.dimensions[1] - 1) * scanLineSize;
+    dataLastElement += (imgIn.header.dimensions[1] - 1) * inScanLineSize;
 
     // TODO: properly write an error check/out code for these.
     if(!out->open(fullPath, outSpec))
         return MRayError("OIIO Error ({})", out->geterror());
-    if(!out->write_image(outSpec.format, dataLastElement, xStride, -scanLineSize))
+    if(!out->write_image(outSpec.format, dataLastElement,
+                         imgIn.inputType.PixelSize(), -inScanLineSize))
         return MRayError("OIIO Error ({})", out->geterror());
     if(!out->close())
         return MRayError("OIIO Error ({})", out->geterror());

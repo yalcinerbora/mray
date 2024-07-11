@@ -29,7 +29,8 @@ class ImageFileOIIO : public ImageFileBase
     public:
     // Conversion Enums
     static Expected<MRayPixelTypeRT>    PixelFormatToMRay(const OIIO::ImageSpec&);
-    static Expected<OIIO::ImageSpec>    PixelFormatToOIIO(const ImageHeader& header);
+    static Expected<OIIO::ImageSpec>    PixelFormatToOIIO(const MRayPixelTypeRT& pixelType,
+                                                          const Vector2ui& resolution);
 
     static Expected<std::string>        ColorSpaceToOIIO(const ColorSpacePack&);
     static Expected<ColorSpacePack>     ColorSpaceToMRay(const std::string&);

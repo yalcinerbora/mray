@@ -184,18 +184,6 @@ public struct HDR10ColorConv : IColorConv
     public static float3 ToLinear(in float3 color, in float displayPeak)
     {
         float3 Yxy = ToYxy(color);
-        float Y = Yxy[0] / displayPeak;
-        float yPow = pow(Y, m1);
-        float top = c1 + c2 * yPow;
-        float denom = 1.0f + c3 * yPow;
-        float ECap = top / denom;
-        Yxy[0] = pow(ECap, m2);
-        return FromYxy(Yxy);
-    }
-
-    public static float3 FromLinear(in float3 color, in float displayPeak)
-    {
-        float3 Yxy = ToYxy(color);
         // TODO: Should we clamp or normalize?
         // currently normalizing
         float eCap = Yxy[0];
@@ -204,6 +192,17 @@ public struct HDR10ColorConv : IColorConv
         float denom = c2 - c3 * ePow;
         float Y = pow(top / denom, m1Inv);
         Yxy[0] = Y;
+        return FromYxy(Yxy);
+    }
+
+    public static float3 FromLinear(in float3 color, in float displayPeak)
+    {
+        float3 Yxy = ToYxy(color);
+        float yPow = pow(Yxy[0], m1);
+        float top = c1 + c2 * yPow;
+        float denom = 1.0f + c3 * yPow;
+        float eCap = top / denom;
+        Yxy[0] = pow(eCap, m2);
         return FromYxy(Yxy);
     }
 

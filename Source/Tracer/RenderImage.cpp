@@ -11,6 +11,7 @@ RenderImage::RenderImage(TimelineSemaphore* semaphore,
     , stagingMemory(gpuSystem, true)
     , sem(semaphore, initialSemCounter)
     , processCompleteFence(gpuSystem.BestDevice().GetComputeQueue(0))
+    , previousCopyCompleteFence(gpuSystem.BestDevice().GetComputeQueue(0))
 {}
 
 Optional<RenderImageSection> RenderImage::TransferToHost(const GPUQueue& processQueue,
@@ -33,10 +34,13 @@ Optional<RenderImageSection> RenderImage::TransferToHost(const GPUQueue& process
     copyQueue.IssueWait(processCompleteFence);
     // Copy to staging buffers when the data is ready
     copyQueue.MemcpyAsync(hPixels, ToConstSpan(dPixels));
-    copyQueue.MemcpyAsync(hSamples, ToConstSpan(dSamples));
+    // Do not overwrite untill memcpy finishes
+    previousCopyCompleteFence = copyQueue.Barrier();
+    //copyQueue.MemcpyAsync(hSamples, ToConstSpan(dSamples));
     // Here we can not wait on host here, (or we sync)
     // so we Issue the release of the semaphore as host launch
     copyQueue.IssueSemaphoreSignal(sem);
+
     // We should preset the next acquisition state he
     // and find the other threads wait value.
     uint64_t nextVal = sem.ChangeToNextState();

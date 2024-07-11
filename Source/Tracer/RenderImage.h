@@ -77,6 +77,7 @@ class RenderImage
 
     GPUSemaphoreView    sem;
     GPUFence            processCompleteFence;
+    GPUFence            previousCopyCompleteFence;
     //
     uint32_t            channelCount    = 0;
     Vector2ui           extent          = Vector2ui::Zero();
@@ -108,6 +109,7 @@ class RenderImage
     bool                Resize(const Vector2ui& extent,
                                uint32_t depth,
                                uint32_t channelCount);
+    const GPUFence&     PrevCopyCompleteFence() const;
 
     // Synchronized Host access
     Optional<RenderImageSection>
@@ -257,4 +259,10 @@ inline
 Span<Float> RenderImage::Samples()
 {
     return dSamples;
+}
+
+inline
+const GPUFence& RenderImage::PrevCopyCompleteFence() const
+{
+    return previousCopyCompleteFence;
 }

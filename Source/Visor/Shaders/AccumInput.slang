@@ -19,7 +19,7 @@ struct AccumulateParameters
     RWTexture2D<float4>         outPixels;
     RWTexture2D<float>          outSamples;
     // Input from host-backed memory
-    StructuredBuffer<float3>    inPixels;
+    StructuredBuffer<float>     inPixels;
     StructuredBuffer<float>     inSamples;
 }
 
@@ -31,32 +31,29 @@ ParameterBlock<AccumulateParameters> params;
 void KCAccumulateInputs(uint3 globalId: SV_DispatchThreadID,
                         uint3 localId: SV_GroupThreadID)
 {
+    int2 pixCount = params.U.pixEnd - params.U.pixStart;
+    int2 pixIn = int2(globalId.xy);
+    int2 pixOut = int2(globalId.xy) + params.U.pixStart;
 
-    printf("My float is %u, %u\n", globalId.xy);
-    //int2 pixIn = int2(globalId.xy);
-    //int2 pixOut = int2(globalId.xy) + params.U.pixStart;
-    //int2 pixCount = params.U.pixEnd - params.U.pixStart;
+    // Cull threads that is out of range due to block size
+    if(any(pixIn >= pixCount)) return;
 
-    //// Cull threads that is out of range due to block size
-    //if(any(pixIn >= pixCount)) return;
+    // Reads
+    int pixLinear = pixIn[1] * pixCount.x + pixIn[0];
+    float3 colorIn = float3(params.inPixels[pixLinear * 3 + 0],
+                            params.inPixels[pixLinear * 3 + 1],
+                            params.inPixels[pixLinear * 3 + 2]);
+    float sampleIn = params.inSamples[pixLinear];
+    //
+    float3 colorOut = params.outPixels.Load(pixOut).xyz;
+    float sampleOut = params.outSamples.Load(pixOut);
 
-    //// Reads
-    //int pixLinear = pixIn[1] * pixCount.x + pixIn[0];
-    //// float3 colorIn = params.inPixels[pixLinear].xyz;
-    //// float sampleIn = params.inSamples[pixLinear];
-    //float3 colorIn = float3(1.f, 0.f, 0.f);
-    //float sampleIn = 1.f;
-    ////
-    //float3 colorOut = params.outPixels.Load(pixOut).xyz;
-    //float sampleOut = params.outSamples.Load(pixOut);
+    // Accumulation
+    float inWeight = params.U.globalSampleWeight;
+    float totalSample = sampleIn + sampleOut;
+    float3 newColor = (sampleOut * colorOut + inWeight * colorIn);
+    newColor = newColor / totalSample;
 
-    //// Accumulation
-    //float inWeight = params.U.globalSampleWeight;
-    //float totalSample = sampleIn + sampleOut;
-    //float3 newColor = (sampleOut * colorOut + inWeight * colorIn);
-    //newColor = newColor / totalSample;
-
-    //// Write
-    //params.outPixels[pixOut] = float4(newColor, 0.0f);
-    //params.outSamples[pixOut] = totalSample;
+    // Write
+    params.outPixels[pixOut] = float4(colorIn, 1.0f);
 }

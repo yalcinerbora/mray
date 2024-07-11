@@ -364,8 +364,8 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
     });
     if(loc == surfaceTypeList.cend())
         return MRayError("Unable to find proper surface format!");
-    format = loc->format;
-    colorSpace = loc->colorSpace;
+    swapchainInfo.format = loc->format;
+    swapchainInfo.colorSpace = loc->colorSpace;
 
     // Present Mode
     auto pMode = std::find_first_of(presentModeTypeList.cbegin(),
@@ -374,29 +374,18 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
                                     PresentModes.cend());
     if(pMode == presentModeTypeList.cend())
         return MRayError("Unable to find proper present mode!");
-    presentMode = *pMode;
+    swapchainInfo.presentMode = *pMode;
 
     // Extent
     bool useApiSize = (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max());
-    extent = (useApiSize) ? capabilities.currentExtent
-                          : VkExtent2D{fboSize[0], fboSize[0]};
-    extent.width = std::clamp(extent.width, capabilities.minImageExtent.width,
-                            capabilities.maxImageExtent.width);
-    extent.height = std::clamp(extent.height, capabilities.minImageExtent.height,
-                            capabilities.maxImageExtent.height);
-
-
-    // MRAY_LOG("=================\n"
-    //         "New swapchain\n"
-    //         "ColorSpace  : {}\n"
-    //         "PresentMode : {}\n"
-    //         "Extent      : [{}, {}]\n"
-    //         "Format Enum : {}\n"
-    //         "=================\n",
-    //         VkColorSpaceToString(colorSpace),
-    //         VkPresentModeToString(presentMode),
-    //         extent.width, extent.height,
-    //         static_cast<VkFlags>(format));
+    swapchainInfo.extent = (useApiSize) ? capabilities.currentExtent
+                                        : VkExtent2D{fboSize[0], fboSize[0]};
+    swapchainInfo.extent.width = std::clamp(swapchainInfo.extent.width,
+                                            capabilities.minImageExtent.width,
+                                            capabilities.maxImageExtent.width);
+    swapchainInfo.extent.height = std::clamp(swapchainInfo.extent.height,
+                                             capabilities.minImageExtent.height,
+                                             capabilities.maxImageExtent.height);
 
     // Images
     uint32_t requestedImgCount = capabilities.minImageCount + 1;
@@ -410,9 +399,9 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
         .flags = 0,
         .surface = surface,
         .minImageCount = requestedImgCount ,
-        .imageFormat = format,
-        .imageColorSpace = colorSpace,
-        .imageExtent = extent,
+        .imageFormat = swapchainInfo.format,
+        .imageColorSpace = swapchainInfo.colorSpace,
+        .imageExtent = swapchainInfo.extent,
         .imageArrayLayers = 1,
         .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
         .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
@@ -449,7 +438,7 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
         .flags = 0,
         .image = nullptr, // <--- loop will change this
         .viewType = VK_IMAGE_VIEW_TYPE_2D,
-        .format = format,
+        .format = swapchainInfo.format,
         .components = VkComponentMapping
         {
             .r = VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -480,7 +469,7 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
     VkAttachmentDescription colorAttachment =
     {
         .flags = 0,
-        .format = format,
+        .format = swapchainInfo.format,
         .samples = VK_SAMPLE_COUNT_1_BIT,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -534,8 +523,8 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
         .renderPass = renderPass,
         .attachmentCount = 1,
         .pAttachments = nullptr,
-        .width = extent.width,
-        .height = extent.height,
+        .width = swapchainInfo.extent.width,
+        .height = swapchainInfo.extent.height,
         .layers = 1
     };
     framebuffers.resize(images.size());
@@ -647,10 +636,7 @@ Swapchain::Swapchain(Swapchain&& other)
     , fboSize(other.fboSize)
     , fboSizeChanged(other.fboSizeChanged)
     , currentImgIndex(other.currentImgIndex)
-    , presentMode(other.presentMode)
-    , colorSpace(other.colorSpace)
-    , format(other.format)
-    , extent(other.extent)
+    , swapchainInfo(other.swapchainInfo)
     , imguiDescPool(std::exchange(other.imguiDescPool, nullptr))
 {}
 
@@ -681,10 +667,7 @@ Swapchain& Swapchain::operator=(Swapchain&& other)
     fboSize = other.fboSize;
     fboSizeChanged = other.fboSizeChanged;
     currentImgIndex = other.currentImgIndex;
-    presentMode = other.presentMode;
-    colorSpace = other.colorSpace;
-    format = other.format;
-    extent = other.extent;
+    swapchainInfo = other.swapchainInfo;
 
     return *this;
 }
@@ -716,7 +699,7 @@ FramebufferPack Swapchain::NextFrame(const VulkanBinarySemaphore& imgAvailSem)
     currentImgIndex = nextImageIndex % images.size();
     return FramebufferPack
     {
-        .extent = extent,
+        .extent = swapchainInfo.extent,
         .img = images[currentImgIndex],
         .imgView = imageViews[currentImgIndex],
         .fbo = framebuffers[currentImgIndex],
@@ -757,12 +740,17 @@ void Swapchain::FBOSizeChanged(Vector2ui newSize)
 
 Pair<MRayColorSpaceEnum, Float> Swapchain::ColorSpace() const
 {
-    return VkConversions::VkToMRayColorSpace(colorSpace);
+    return VkConversions::VkToMRayColorSpace(swapchainInfo.colorSpace);
 }
 
 VkColorSpaceKHR Swapchain::ColorSpaceVk() const
 {
-    return colorSpace;
+    return swapchainInfo.colorSpace;
+}
+
+SwapchainInfo Swapchain::GetSwapchainInfo() const
+{
+    return swapchainInfo;
 }
 
 VulkanSystemView VisorWindow::handlesVk = {};
@@ -1487,6 +1475,7 @@ bool VisorWindow::Render()
     frameCounter.EndRecord(frameHandle.commandBuffer);
     visorState.visor.frameTime = frameCounter.AvgFrame();
     visorState.visor.usedGPUMemory = QueryTotalGPUMemory();
+    visorState.visor.swapchainInfo = swapchain.GetSwapchainInfo();
     vkEndCommandBuffer(frameHandle.commandBuffer);
     PresentFrame(extraWaitSem);
     // Change the timelines next wait, if we used the sem

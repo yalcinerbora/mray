@@ -14,6 +14,8 @@
 #include "Core/BitFunctions.h"
 #include "Core/Log.h"
 
+#include <vulkan/vulkan.hpp>
+
 enum class WindowLocationType
 {
     TOP_LEFT = 0,
@@ -291,7 +293,7 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
                                           visorState.renderer.throughput,
                                           visorState.renderer.throughputSuffix).c_str());
             ImGui::Separator();
-            ImGui::Text("%s", MRAY_FORMAT("{:>6.0f}{:s}",
+            ImGui::Text("%s", MRAY_FORMAT("{:>6.1f}{:s}",
                                           visorState.renderer.workPerPixel,
                                           visorState.renderer.workPerPixelSuffix).c_str());
             ImGui::Separator();
@@ -404,10 +406,19 @@ void VisorGUI::ShowFrameOverlay(bool& isOpen,
 
     if(ImGui::Begin("##VisorOverlay", &isOpen, window_flags))
     {
-        ImGui::Text("Frame  : %.2f ms", static_cast<double>(visorState.visor.frameTime));
+        ImGui::Text("Frame       : %.2f ms", static_cast<double>(visorState.visor.frameTime));
         auto [sz, suffix] = ConvertMemSizeToGUI(visorState.visor.usedGPUMemory);
         std::string memUsage = MRAY_FORMAT("{:.1f}{:s}", sz, suffix);
-        ImGui::Text("Memory : %s", memUsage.c_str());
+        ImGui::Text("Memory      : %s", memUsage.c_str());
+
+        const auto& sc = visorState.visor.swapchainInfo;
+        ImGui::Separator();
+        ImGui::Text("--Swapchain--");
+        ImGui::Text("ColorSpace  : %s", vk::to_string(vk::ColorSpaceKHR(sc.colorSpace)).c_str());
+        ImGui::Text("PresentMode : %s", vk::to_string(vk::PresentModeKHR(sc.presentMode)).c_str());
+        ImGui::Text("Format      : %s", vk::to_string(vk::Format(sc.format)).c_str());
+        ImGui::Text("Extent      : [%u, %u]", sc.extent.width, sc.extent.height);
+
 
         if(ImGui::BeginPopupContextWindow())
         {

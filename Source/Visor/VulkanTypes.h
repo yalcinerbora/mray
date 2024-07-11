@@ -181,6 +181,7 @@ inline VkImage VulkanImage::Image() const
 {
     return imgVk;
 }
+
 inline VkImageView VulkanImage::View() const
 {
     assert(viewVk != nullptr);
