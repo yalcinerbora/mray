@@ -12,11 +12,11 @@ extern struct Tonemapper : ITonemapper;
 //              FUNCTORS                //
 //======================================//
 
-interface IBinaryOp { static float op(float v0, float v1); }
+interface IBinaryOp { static float op(in float v0, in float v1); }
 
 struct AddOp : IBinaryOp
 {
-    static float op(float v0, float v1)
+    static float op(in float v0, in float v1)
     {
         return v0 + v1;
     }
@@ -24,9 +24,17 @@ struct AddOp : IBinaryOp
 
 struct MaxOp : IBinaryOp
 {
-    static float op(float v0, float v1)
+    static float op(in float v0, in float v1)
     {
         return max(v0, v1);
+    }
+}
+
+struct MinOp : IBinaryOp
+{
+    static float op(in float v0, in float v1)
+    {
+        return min(v0, v1);
     }
 }
 
@@ -34,11 +42,13 @@ struct MaxOp : IBinaryOp
 //      SHADER STORAGE BUFFERS          //
 //======================================//
 
-struct MaxAndAvg
+struct MinMaxAndAvg
 {
+    uint minLum;
     uint maxLum;
     uint avgLum;
 
+    float ReadMinLum() { return asfloat(minLum);}
     float ReadMaxLum() { return asfloat(maxLum);}
     float ReadAvgLum() { return asfloat(avgLum);}
 }
@@ -51,11 +61,11 @@ struct TonemapParameters
     // We could not utilize multi-binding here
     // I think it is because you cannot have
     // generic (templated) UBO's?
-    StructuredBuffer<TMParams>      tonemapParams;
-    StructuredBuffer<GammaParams>   outGammaParams;
-    Texture2D<float4>               inputTex;
-    RWTexture2D<float4>             outputTex;
-    RWStructuredBuffer<MaxAndAvg>   maxAndAvg;
+    StructuredBuffer<TMParams>          tonemapParams;
+    StructuredBuffer<GammaParams>       outGammaParams;
+    Texture2D<float4>                   inputTex;
+    RWTexture2D<float4>                 outputTex;
+    RWStructuredBuffer<MinMaxAndAvg>    maxAndAvg;
 }
 
 ParameterBlock<TonemapParameters> params;
@@ -119,9 +129,11 @@ void AtomicFloatOp<T : IBinaryOp>(in uint outLoc, float val, in T)
         // Old version!
         // InterlockedCompareExchange(outLoc, assumed, newVal, old);
         //
-        if(outLoc == 0) InterlockedCompareExchange(params.maxAndAvg[0].maxLum,
+        if(outLoc == 0) InterlockedCompareExchange(params.maxAndAvg[0].minLum,
                                                    assumed, newVal, old);
-        if(outLoc == 1) InterlockedCompareExchange(params.maxAndAvg[0].avgLum,
+        if(outLoc == 1) InterlockedCompareExchange(params.maxAndAvg[0].maxLum,
+                                                   assumed, newVal, old);
+        if(outLoc == 2) InterlockedCompareExchange(params.maxAndAvg[0].avgLum,
                                                    assumed, newVal, old);
     } while(assumed != old);
 }
@@ -134,8 +146,6 @@ void AtomicFloatOp<T : IBinaryOp>(in uint outLoc, float val, in T)
 void KCFindAvgMaxLum(uint3 globalId: SV_DispatchThreadID,
                      uint3 localId: SV_GroupThreadID)
 {
-    printf("My float is %u, %u\n", globalId.xy);
-
     uint2 dim;
     params.inputTex.GetDimensions(dim[0], dim[1]);
     uint2 pixId = uint2(globalId.x % dim.x,
@@ -143,10 +153,12 @@ void KCFindAvgMaxLum(uint3 globalId: SV_DispatchThreadID,
 
     float3 inColor = params.inputTex.Load(uint3(pixId, 0), int2(0, 0)).xyz;
     float luminance = ColorConverterIn::ToYxy(inColor)[0];
+    float logLuminance = log(luminance  + 1e-3f);
 
     // The reduction
-    float localAvg = BlockLocalReduction(luminance, localId.x, AddOp());
+    float localMin = BlockLocalReduction(luminance, localId.x, MinOp());
     float localMax = BlockLocalReduction(luminance, localId.x, MaxOp());
+    float localAvg = BlockLocalReduction(logLuminance, localId.x, AddOp());
 
     // Now atomics, (still we need to do comp-sawp idiom for floats...)
     // TODO: If have free time, check the full down reduction
@@ -154,12 +166,11 @@ void KCFindAvgMaxLum(uint3 globalId: SV_DispatchThreadID,
     // is faster or slower (probably faster but setting that up is a hassle)
     if(localId.x == 0)
     {
-        float old;
-        float totalRecip = 1.0f / float(dim.x * dim.y);
-        localAvg *= totalRecip;
+        localAvg /= float(dim.x * dim.y);
 
-        AtomicFloatOp(0, localMax, MaxOp());
-        AtomicFloatOp(1, localAvg, AddOp());
+        AtomicFloatOp(0, localMin, MinOp());
+        AtomicFloatOp(1, localMax, MaxOp());
+        AtomicFloatOp(2, localAvg, AddOp());
     }
 }
 
@@ -180,14 +191,19 @@ void KCTonemapImage(uint3 globalId: SV_DispatchThreadID)
     if(any(globalId.xy >= dim)) return;
     uint2 pixId = globalId.xy;
 
+    float2 minmaxLuminance = float2(params.maxAndAvg[0].ReadMinLum(),
+                                    params.maxAndAvg[0].ReadMaxLum());
+    float logAvgLuminance = exp(params.maxAndAvg[0].ReadAvgLum());
+
     float3 inColorHDR = params.inputTex.Load(uint3(pixId, 0), int2(0, 0)).xyz;
     ColorConverterIn  inColorSpace;
     ColorConverterOut outColorSpace;
     float3 outColorSDR = Tonemapper.ToneMap(inColorHDR,
-                                            inColorSpace, outColorSpace,
+                                            inColorSpace,
+                                            outColorSpace,
                                             params.outGammaParams[0],
                                             params.tonemapParams[0],
-                                            params.maxAndAvg[0].ReadAvgLum(),
-                                            params.maxAndAvg[0].ReadMaxLum());
+                                            minmaxLuminance,
+                                            logAvgLuminance);
     params.outputTex[pixId] = float4(outColorSDR, 1.0f);
 }

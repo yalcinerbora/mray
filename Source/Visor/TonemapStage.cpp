@@ -24,9 +24,10 @@ static constexpr uint32_t HDR_IMAGE_INDEX = 2;
 static constexpr uint32_t SDR_IMAGE_INDEX = 3;
 static constexpr uint32_t STAGING_BUFFER_INDEX = 4;
 
-struct MaxAvgStageBuffer
+struct MinMaxAvgStageBuffer
 {
     static_assert(sizeof(uint32_t) == sizeof(float));
+    uint32_t minLum;
     uint32_t maxLum;
     uint32_t avgLum;
 };
@@ -418,7 +419,7 @@ void TonemapperBase::SetUniformBufferView(const UniformBufferMemView& ubo)
 
 size_t TonemapperBase::StagingBufferSize() const
 {
-    return sizeof(MaxAvgStageBuffer);
+    return sizeof(MinMaxAvgStageBuffer);
 }
 
 void TonemapperBase::SetStagingBufferView(const StagingBufferMemView& ssbo)
@@ -475,7 +476,7 @@ bool Tonemapper_Reinhard_AcesCG_To_SRGB::GUI::Render(bool& onOff)
         // Burn Ratio
         ImGui::Text("Burn Ratio");
         ImGui::SameLine();
-        paramsChanged |= ImGui::SliderFloat("##Burn", &opts.burnRatio, 0.5f, 2.0f);
+        paramsChanged |= ImGui::SliderFloat("##Burn", &opts.burnRatio, 0.0f, 2.0f);
         // Gamma
         ImGui::Text("Gamma     ");
         ImGui::SameLine();

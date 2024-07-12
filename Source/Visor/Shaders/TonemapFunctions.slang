@@ -12,8 +12,8 @@ public interface ITonemapper
                                  in ColorConverterOut,
                                  in ColorConverterOut.GammaParams gammaParams,
                                  in TMParams tmParams,
-                                 in float maxLuminance,
-                                 in float avgLuminance);
+                                 in float2 minMaxLuminance,
+                                 in float logAvgLuminance);
 }
 
 public struct Reinhard2002 : ITonemapper
@@ -30,20 +30,24 @@ public struct Reinhard2002 : ITonemapper
     public static float3 ToneMap(in float3 hdrColor,
                                  in ColorConverterIn inConv,
                                  in ColorConverterOut outConv,
-                                 in ColorConverterOut.GammaParams gammaParams,
+                                 in ColorConverterOut::GammaParams gammaParams,
                                  in TMParamsReinhard tmParams,
-                                 in float maxLuminance,
-                                 in float avgLuminance)
+                                 in float2 minMaxLuminance,
+                                 in float logAvgLuminance)
     {
         // Image is assumed to be in linear space
         float3 hdrYxy = inConv.ToYxy(hdrColor);
         float L = hdrYxy[0];
         // Equation 2
-        if(tmParams.doKeyAdjust)
-            L *= (tmParams.key / avgLuminance);
+        if (tmParams.doKeyAdjust)
+        {
+            L /= logAvgLuminance;
+            L *= tmParams.key;
+        }
 
         // Equation 4
-        float white = maxLuminance * tmParams.burnRatio;
+        float white = lerp(minMaxLuminance[0], minMaxLuminance[1],
+                           tmParams.burnRatio * 0.5f);
         float whiteSqr = white * white;
         float sdrL = L * (1 + (L / whiteSqr)) / (1 + L);
         hdrYxy[0] = sdrL;
@@ -63,14 +67,14 @@ public struct EmptyTonemapper : ITonemapper
                                  in ColorConverterOut outConv,
                                  in ColorConverterOut::GammaParams gammaParams,
                                  in uint,
-                                 in float maxLuminance,
-                                 in float avgLuminance)
+                                 in float2 minMaxLuminance,
+                                 in float)
     {
         // In is assumed to be in linear space
         float3 hdrYxy = inConv.ToYxy(hdrColor);
         // Straight up divide here
         // HDR10 will handle it? (TODO: Check this?)
-        hdrYxy[0] /= maxLuminance;
+        hdrYxy[0] /= minMaxLuminance[1];
         //
         float3 sdrColor = outConv.FromYxy(hdrYxy);
         float3 finalColor = outConv.FromLinear(sdrColor, gammaParams);
