@@ -1,6 +1,8 @@
 #include "TextureMemory.h"
-#include "Core/Error.hpp"
 #include "CommonTexture.hpp"
+
+#include "Core/Error.hpp"
+#include "Core/GraphicsFunctions.h"
 
 namespace TexDetail
 {
@@ -35,6 +37,12 @@ template<class T>
 uint32_t Concept<T>::MipCount() const
 {
     return tex.MipCount();
+}
+
+template<class T>
+uint32_t Concept<T>::ChannelCount() const
+{
+    return T::ChannelCount;
 }
 
 template<class T>
@@ -74,8 +82,8 @@ void Concept<T>::CopyFromAsync(const GPUQueue& queue,
     auto ext = tex.Extents();
     if constexpr(T::Dims == 1)
     {
-        offsetIn = ExtType(offset);
-        sizeIn = ExtType(size);
+        offsetIn = ExtType(offset[0]);
+        sizeIn = ExtType(size[0]);
     }
     else
     {
@@ -237,12 +245,12 @@ void TextureMemory::PushTextureData(TextureId id, uint32_t mipLevel,
 
     // TODO: Again multi-gpu/queue management
     const GPUQueue& queue = tex.Device().GetComputeQueue(0);
+    Vector3ui mipSize = Graphics::TextureMipSize(tex.Extents(), mipLevel);
     tex.CopyFromAsync(queue,
                       mipLevel,
                       Vector3ui::Zero(),
-                      Vector3ui::Zero(),
+                      mipSize,
                       std::move(data));
-
 }
 
 MRayPixelTypeRT TextureMemory::GetPixelType(TextureId id) const

@@ -24,9 +24,15 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     public:
     static std::string_view TypeName();
 
+    enum Mode
+    {
+        SHOW_TILING,
+        SHOW_TEXTURES
+    };
     struct Options
     {
-        uint32_t totalSPP = 32;
+        uint32_t totalSPP   = 32;
+        Mode     mode       = SHOW_TEXTURES;
     };
 
     private:

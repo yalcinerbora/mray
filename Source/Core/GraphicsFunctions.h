@@ -91,6 +91,11 @@ namespace Graphics
     MRAY_HYBRID constexpr Vector2       UVToSphericalAngles(const Vector2& uv);
     MRAY_HYBRID constexpr Vector2       SphericalAnglesToUV(const Vector2& thetaPhi);
 
+    template<uint32_t C>
+    MRAY_HYBRID constexpr
+    Vector<C, uint32_t>                 TextureMipSize(Vector<C, uint32_t> resolution,
+                                                       uint32_t mipLevel);
+
     namespace MortonCode
     {
         template <class T>
@@ -509,7 +514,7 @@ namespace MortonCode
 
     template <>
     MRAY_HYBRID MRAY_CGPU_INLINE
-    constexpr uint32_t Compose2D(const Vector2ui& val)
+        constexpr uint32_t Compose2D(const Vector2ui& val)
     {
         auto Expand2D = [](uint32_t val) -> uint32_t
         {
@@ -529,7 +534,7 @@ namespace MortonCode
 
     template <>
     MRAY_HYBRID MRAY_CGPU_INLINE
-    constexpr uint64_t Compose2D(const Vector2ui& val)
+        constexpr uint64_t Compose2D(const Vector2ui& val)
     {
         auto Expand2D = [](uint32_t val) -> uint64_t
         {
@@ -550,7 +555,7 @@ namespace MortonCode
 
     template <>
     MRAY_HYBRID MRAY_CGPU_INLINE
-    constexpr Vector2ui Decompose2D(uint32_t code)
+        constexpr Vector2ui Decompose2D(uint32_t code)
     {
         auto Shrink2D = [](uint32_t x)
         {
@@ -568,7 +573,7 @@ namespace MortonCode
 
     template <>
     MRAY_HYBRID MRAY_CGPU_INLINE
-    constexpr Vector2ui Decompose2D(uint64_t code)
+        constexpr Vector2ui Decompose2D(uint64_t code)
     {
         auto Shrink2D = [](uint64_t x)
         {
@@ -585,6 +590,21 @@ namespace MortonCode
         uint32_t y = Shrink2D(code >> 1);
         return Vector2ui(x, y);
     }
+}
+
+template<uint32_t C>
+MRAY_HYBRID constexpr
+Vector<C, uint32_t> TextureMipSize(Vector<C, uint32_t> resolution,
+                                   uint32_t mipLevel)
+{
+    using VecXui = Vector<C, uint32_t>;
+    VecXui mipRes;
+
+    UNROLL_LOOP
+    for(uint32_t i = 0; i < C; i++)
+        mipRes[i] = resolution[i] >> mipLevel;
+
+    return VecXui::Max(mipRes, VecXui(1));
 }
 
 }

@@ -51,12 +51,22 @@ enum class ImageFlagTypes
     LOAD_AS_SIGNED = 0,
     // Due to HW limitations (CUDA does not directly support 3 channel textures),
     // We might need to pad a 4th channel to the image.
-    // This enables that
+    // This flag enables that functionality.
     TRY_3C_4C_CONVERSION = 1,
     // Data is probably encoded exactly and/or raw data
     // (probably normal map, roughness etc.)
     // Do not try to convert to the system defined common renderer color space
     DISREGARD_COLOR_SPACE = 2,
+    // Due to convention differences, image's origin coordinate (0, 0) can be
+    // either top left or bottom left.
+    //
+    // MRay uses bottom left origin coordinates. Vulkan and OIIO assumes otherwise.
+    // These discrapencies are automatically handled by the system. (Utilizing this flag)
+    // User should not set this flag unless it literally wants to flip the Y coordinate.
+    //
+    // After loading by these functions, the resulting image will be in MRay's coordinate
+    // system or for writing it expects the image on that coordinate system.
+    FLIP_Y_COORDINATE,
 
     END
 };

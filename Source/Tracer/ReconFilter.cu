@@ -84,8 +84,7 @@ void KCGenerateMipmaps(// I-O
             SurfViewVariant prevT = dSurfaces[tI][mipI - 1];
             Vector2ui texRes = dMipZeroResolutions[tI];
             //
-            Vector2ui mipRes = Vector2ui(texRes[0] >> mipI, texRes[1] >> mipI);
-            mipRes = Vector2ui::Max(mipRes, Vector2ui(1));
+            Vector2ui mipRes = Graphics::TextureMipSize(texRes, mipI);
             uint32_t totalPix = mipRes.Multiply();
 
             // Loop over the pixel by block

@@ -34,6 +34,7 @@ Optional<RenderImageSection> RenderImage::TransferToHost(const GPUQueue& process
     copyQueue.IssueWait(processCompleteFence);
     // Copy to staging buffers when the data is ready
     copyQueue.MemcpyAsync(hPixels, ToConstSpan(dPixels));
+    copyQueue.MemcpyAsync(hSamples, ToConstSpan(dSamples));
     // Do not overwrite untill memcpy finishes
     previousCopyCompleteFence = copyQueue.Barrier();
     //copyQueue.MemcpyAsync(hSamples, ToConstSpan(dSamples));

@@ -29,6 +29,7 @@ class CommonTextureI
     virtual size_t              Size() const = 0;
     virtual size_t              Alignment() const = 0;
     virtual uint32_t            MipCount() const = 0;
+    virtual uint32_t            ChannelCount() const = 0;
     virtual const GPUDevice&    Device() const = 0;
 
     // We can get away with dimension 3, and put INT32_MAX
@@ -94,6 +95,8 @@ class alignas(Alignment) CommonTextureT
     size_t          Size() const;
     size_t          Alignment() const;
     uint32_t        MipCount() const;
+    uint32_t        ChannelCount() const;
+
     //
     TextureExtent<3>    Extents() const;
     uint32_t            DimensionCount() const;
@@ -131,6 +134,7 @@ class Concept : public CommonTextureI
     size_t              Size() const override;
     size_t              Alignment() const override;
     uint32_t            MipCount() const override;
+    uint32_t            ChannelCount() const override;
     const GPUDevice&    Device() const override;
     //
     TextureExtent<3>    Extents() const override;

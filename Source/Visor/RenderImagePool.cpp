@@ -375,8 +375,11 @@ void RenderImagePool::SaveImage(IsHDRImage t, const RenderImageSaveInfo& fileOut
                                            fileOutInfo.prefix,
                                            fileOutInfo.sample,
                                            fileOutInfo.time);
+        // Vulkan images have top left starting coords,
+        // so flip image while writing
         MRayError e = imgLoader->WriteImage(imgInfo, filePath,
-                                            imgFileType);
+                                            imgFileType,
+                                            ImageFlagTypes::FLIP_Y_COORDINATE);
 
         // Signal ready for next command
         //imgSem.HostSignal(2);

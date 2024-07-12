@@ -439,19 +439,19 @@ Expected<MRayPixelTypeRT> ImageFileOIIO::ConvertFormatToRequested(MRayPixelTypeR
         switch(subChannels)
         {
             using enum ImageSubChannelType;
-            case R:     return MRayPixelTypeRT(MRayPixelType<MR_R_HALF>{});
-            case G:     return MRayPixelTypeRT(MRayPixelType<MR_R_HALF>{});
-            case B:     return MRayPixelTypeRT(MRayPixelType<MR_R_HALF>{});
-            case A:     return MRayPixelTypeRT(MRayPixelType<MR_R_HALF>{});
+            case R:     return MRayPixelTypeRT(MRayPixelType<MR_R_FLOAT>{});
+            case G:     return MRayPixelTypeRT(MRayPixelType<MR_R_FLOAT>{});
+            case B:     return MRayPixelTypeRT(MRayPixelType<MR_R_FLOAT>{});
+            case A:     return MRayPixelTypeRT(MRayPixelType<MR_R_FLOAT>{});
 
-            case RG:    return MRayPixelTypeRT(MRayPixelType<MR_RG_HALF>{});
-            case GB:    return MRayPixelTypeRT(MRayPixelType<MR_RG_HALF>{});
-            case BA:    return MRayPixelTypeRT(MRayPixelType<MR_RG_HALF>{});
+            case RG:    return MRayPixelTypeRT(MRayPixelType<MR_RG_FLOAT>{});
+            case GB:    return MRayPixelTypeRT(MRayPixelType<MR_RG_FLOAT>{});
+            case BA:    return MRayPixelTypeRT(MRayPixelType<MR_RG_FLOAT>{});
 
-            case RGB:   return MRayPixelTypeRT(MRayPixelType<MR_RGB_HALF>{});
-            case GBA:   return MRayPixelTypeRT(MRayPixelType<MR_RGB_HALF>{});
+            case RGB:   return MRayPixelTypeRT(MRayPixelType<MR_RGB_FLOAT>{});
+            case GBA:   return MRayPixelTypeRT(MRayPixelType<MR_RGB_FLOAT>{});
 
-            case RGBA:  return MRayPixelTypeRT(MRayPixelType<MR_RGBA_HALF>{});
+            case RGBA:  return MRayPixelTypeRT(MRayPixelType<MR_RGBA_FLOAT>{});
             default:    break;
         }
         break;
@@ -606,22 +606,22 @@ Expected<Image> ImageFileOIIO::ReadImage()
         // Allocate the expanded (or non-expanded) buffer and directly load into it
         size_t scanLineSize = (static_cast<size_t>(mipSpec.width) *
                                readChannelCount * mipSpec.channel_bytes());
-        size_t totalSize = scanLineSize * static_cast<size_t>(spec.height);
+        size_t totalPixels = static_cast<size_t>(mipSpec.height * mipSpec.width);
 
         // Due to type safety we need to construct pixels using the formatted
         // type, we need to "visit" the variant to correctly construct the
         // type-ereased transient data
-        TransientData pixels = std::visit([totalSize](auto&& v)
+        TransientData pixels = std::visit([totalPixels](auto&& v)
         {
             using T = std::remove_cvref_t<decltype(v)>::Type;
-            return TransientData(std::in_place_type_t<T>{}, totalSize);
+            return TransientData(std::in_place_type_t<T>{}, totalPixels);
         }, dataPixelType);
 
         // Read inverted, OIIO has DirectX
         // (or most image processing literature) style
         // Point towards the last scanline, and put stride as negative
         Byte* lastScanlinePtr = (pixels.AccessAs<Byte>().data() +
-                                 (spec.height - 1) * scanLineSize);
+                                 (mipSpec.height - 1) * scanLineSize);
         // Now we can read the file directly flipped and with proper format etc. etc.
         OIIO::stride_t oiioScanLineSize = static_cast<OIIO::stride_t>(scanLineSize);
 

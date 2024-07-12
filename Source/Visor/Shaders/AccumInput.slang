@@ -35,6 +35,16 @@ void KCAccumulateInputs(uint3 globalId: SV_DispatchThreadID,
     int2 pixIn = int2(globalId.xy);
     int2 pixOut = int2(globalId.xy) + params.U.pixStart;
 
+    // MRay has bottom-left coordinate system (uv),
+    // but Vulkan has top-left.
+    // (OpenGL has bottom-left, how does GLSL or Slang
+    // handle these)
+    uint2 resolution;
+    params.outPixels.GetDimensions(resolution[0], resolution[1]);
+    pixOut.y = resolution.y - 1 - pixOut.y;
+
+
+
     // Cull threads that is out of range due to block size
     if(any(pixIn >= pixCount)) return;
 
@@ -43,17 +53,19 @@ void KCAccumulateInputs(uint3 globalId: SV_DispatchThreadID,
     float3 colorIn = float3(params.inPixels[pixLinear * 3 + 0],
                             params.inPixels[pixLinear * 3 + 1],
                             params.inPixels[pixLinear * 3 + 2]);
-    float sampleIn = params.inSamples[pixLinear];
+    float sampleIn = (params.inSamples[pixLinear] *
+                      params.U.globalSampleWeight);
     //
-    float3 colorOut = params.outPixels.Load(pixOut).xyz;
+    float3 colorOut = params.outPixels.Load(pixOut).rgb;
     float sampleOut = params.outSamples.Load(pixOut);
 
     // Accumulation
-    float inWeight = params.U.globalSampleWeight;
-    float totalSample = sampleIn + sampleOut;
-    float3 newColor = (sampleOut * colorOut + inWeight * colorIn);
+    float totalSample = sampleOut + sampleIn;
+    float3 newColor = (sampleOut * colorOut +
+                       sampleIn  * colorIn);
     newColor = newColor / totalSample;
 
     // Write
-    params.outPixels[pixOut] = float4(colorIn, 1.0f);
+    params.outPixels[pixOut] = float4(newColor, 1.0f);
+    params.outSamples[pixOut] = totalSample;
 }

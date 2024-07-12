@@ -114,6 +114,13 @@ const GPUDevice& CommonTextureT<S, A>::Device() const
 
 template<size_t S, size_t A>
 inline
+uint32_t CommonTextureT<S, A>::ChannelCount() const
+{
+    return Impl()->ChannelCount();
+}
+
+template<size_t S, size_t A>
+inline
 MRayColorSpaceEnum CommonTextureT<S, A>::ColorSpace() const
 {
     return colorSpace;

@@ -6,13 +6,13 @@
 #include "Device/GPUSystem.hpp"
 
 #include "Core/Timer.h"
+#include "Core/DeviceVisit.h"
 
 #include "Device/GPUAlgGeneric.h"
 
-
 MRAY_KERNEL
-void KCColorTiles(MRAY_GRID_CONSTANT const Span<Float> pixels,
-                  MRAY_GRID_CONSTANT const Span<Float> samples,
+void KCColorTiles(MRAY_GRID_CONSTANT const Span<Float> dPixels,
+                  MRAY_GRID_CONSTANT const Span<Float> dSamples,
                   MRAY_GRID_CONSTANT const uint32_t colorIndex,
                   MRAY_GRID_CONSTANT const Vector2ui resolution,
                   MRAY_GRID_CONSTANT const uint32_t channelCount)
@@ -20,19 +20,80 @@ void KCColorTiles(MRAY_GRID_CONSTANT const Span<Float> pixels,
     KernelCallParams kp;
 
     uint32_t totalPix = resolution.Multiply();
-    assert(totalPix * channelCount <= pixels.size());
-    assert(totalPix <= samples.size());
+    assert(totalPix * channelCount <= dPixels.size());
+    assert(totalPix <= dSamples.size());
 
     for(uint32_t i = kp.GlobalId(); i < totalPix; i += kp.TotalSize())
     {
         uint32_t pixIndex = i * channelCount;
-        uint32_t sampIndex = i;
+        uint32_t sampleIndex = i;
         Vector3 color = Color::RandomColorRGB(colorIndex);
 
-        samples[sampIndex] = Float(1);
-        pixels[pixIndex + 0] = color[0];
-        pixels[pixIndex + 1] = color[1];
-        pixels[pixIndex + 2] = color[2];
+        dSamples[sampleIndex] = Float(1);
+        dPixels[pixIndex + 0] = color[0];
+        dPixels[pixIndex + 1] = color[1];
+        dPixels[pixIndex + 2] = color[2];
+    }
+}
+
+template<uint32_t C>
+MRAY_KERNEL
+void KCShowTexture(MRAY_GRID_CONSTANT const Span<Float> dPixels,
+                   MRAY_GRID_CONSTANT const Span<Float> dSamples,
+                   MRAY_GRID_CONSTANT const Vector2ui regionMin,
+                   MRAY_GRID_CONSTANT const Vector2ui regionMax,
+                   MRAY_GRID_CONSTANT const Vector2ui resolution,
+                   MRAY_GRID_CONSTANT const uint32_t mipIndex,
+                   MRAY_GRID_CONSTANT const GenericTextureView texView)
+{
+    KernelCallParams kp;
+
+    Vector2ui regionSize = regionMax - regionMin;
+    uint32_t totalPix = regionSize.Multiply();
+    assert(totalPix * C <= dPixels.size());
+    assert(totalPix <= dSamples.size());
+
+    for(uint32_t wIndexLinear = kp.GlobalId(); wIndexLinear < totalPix;
+        wIndexLinear += kp.TotalSize())
+    {
+        // Calculate uv coords
+        Vector2 wIndex2D = Vector2(wIndexLinear % regionSize[0],
+                                   wIndexLinear / regionSize[0]);
+        Vector2 rIndex2D = Vector2(regionMin) + wIndex2D + Vector2(0.5);
+        Vector2 uv = rIndex2D / Vector2(resolution);
+
+        Vector3 result;
+        if constexpr(C == 1)
+        {
+            const auto& view = std::get<TextureView<2, Float>>(texView);
+            result = Vector3(view(uv, Float(mipIndex)).value(), 0, 0);
+        }
+        else if constexpr(C == 2)
+        {
+            const auto& view = std::get<TextureView<2, Vector<C, Float>>>(texView);
+            result = Vector3(view(uv, Float(mipIndex)).value(), 0);
+        }
+        else if constexpr(C == 3)
+        {
+            const auto& view = std::get<TextureView<2, Vector<C, Float>>>(texView);
+            //result = Vector3(view(uv, Float(mipIndex)).value());
+            result = Vector3(view(uv).value());
+        }
+        else if constexpr(C == 4)
+        {
+            // Drop the last pixel
+            // TODO: change this to something else,
+            // We drop the last pixel since it will be considered as alpha
+            // if we send it to visor
+            const auto& view = std::get<TextureView<2, Vector<C, Float>>>(texView);
+            result = Vector3(view(uv, Float(mipIndex)).value());
+        }
+
+        uint32_t wIndexFloat = wIndexLinear * 3;
+        dSamples[wIndexLinear] = Float(1);
+        dPixels[wIndexFloat + 0] = result[0];
+        dPixels[wIndexFloat + 1] = result[1];
+        dPixels[wIndexFloat + 2] = result[2];
     }
 }
 
@@ -165,23 +226,56 @@ RendererOutput TexViewRenderer::DoRender()
     // Do not start writing to device side untill copy is complete
     // (device buffer is read fully)
     processQueue.IssueWait(renderBuffer->PrevCopyCompleteFence());
-    processQueue.IssueSaturatingKernel<KCColorTiles>
-    (
-        "KCColorTiles"sv,
-        KernelIssueParams{.workCount = curPixelCount},
-        //
-        renderBuffer->Pixels(),
-        renderBuffer->Samples(),
-        tileIndex,
-        curPixelCount2D,
-        renderBuffer->ChannelCount()
-    );
-
-    //DeviceAlgorithms::InPlaceTransform(renderBuffer->Pixels(), processQueue,
-    //                                   [] MRAY_HYBRID (Float) -> Float
-    //{
-    //    return Float(1);
-    //});
+    switch(currentOptions.mode)
+    {
+        case Mode::SHOW_TILING:
+        {
+            processQueue.IssueSaturatingKernel<KCColorTiles>
+            (
+                "KCColorTiles"sv,
+                KernelIssueParams{.workCount = curPixelCount},
+                //
+                renderBuffer->Pixels(),
+                renderBuffer->Samples(),
+                tileIndex,
+                curPixelCount2D,
+                renderBuffer->ChannelCount()
+            );
+            break;
+        }
+        case Mode::SHOW_TEXTURES:
+        {
+            const auto& curTex = textures[textureIndex];
+            uint32_t channelCount = curTex->ChannelCount();
+            Vector2ui resolution = Vector2ui(curTex->Extents());
+            auto KernelCall = [&, this]<uint32_t C>()
+            {
+                // Do not start writing to device side untill copy is complete
+                // (device buffer is read fully)
+                processQueue.IssueSaturatingKernel<KCShowTexture<C>>
+                (
+                    "KCShowTexture"sv,
+                    KernelIssueParams{.workCount = curPixelCount},
+                    //
+                    renderBuffer->Pixels(),
+                    renderBuffer->Samples(),
+                    regionMin,
+                    regionMax,
+                    resolution,
+                    mipIndex,
+                    curTex->View()
+                );
+            };
+            switch(channelCount)
+            {
+                case 1: KernelCall.template operator()<1>(); break;
+                case 2: KernelCall.template operator()<2>(); break;
+                case 3: KernelCall.template operator()<3>(); break;
+                case 4: KernelCall.template operator()<4>(); break;
+            }
+            break;
+        }
+    }
 
     // Send the resulting image to host (Acquire synchronization prims)
     const GPUQueue& transferQueue = device.GetTransferQueue();

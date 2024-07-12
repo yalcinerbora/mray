@@ -180,6 +180,8 @@ class TextureViewCUDA<1, T>
 {
     public:
     static constexpr uint32_t Channels = VectorTypeToChannels::Find<T>;
+    static constexpr uint32_t Dimensions = 3;
+
     private:
     using CudaType = typename VectorTypeToCUDA::Find<T>;
     using ConvertType = CudaTexToMRayType<T, CudaType, Channels>;
@@ -206,6 +208,8 @@ class TextureViewCUDA<2, T>
 {
     public:
     static constexpr uint32_t Channels = VectorTypeToChannels::Find<T>;
+    static constexpr uint32_t Dimensions = 2;
+
     private:
     using CudaType = typename VectorTypeToCUDA::Find<T>;
     using ConvertType = CudaTexToMRayType<T, CudaType, Channels>;
@@ -229,6 +233,8 @@ class TextureViewCUDA<3, T>
 {
     public:
     static constexpr uint32_t Channels = VectorTypeToChannels::Find<T>;
+    static constexpr uint32_t Dimensions = 3;
+
     private:
     using CudaType = typename VectorTypeToCUDA::Find<T>;
     using ConvertType = CudaTexToMRayType<T, CudaType, Channels>;

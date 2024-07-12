@@ -81,8 +81,9 @@ Expected<ImageFilePtr> ImageLoader::OpenFile(const std::string& filePath,
 MRayError ImageLoader::WriteImage(const WriteImageParams& imgIn,
                                   const std::string& filePath,
                                   ImageType extension,
-                                  ImageIOFlags) const
+                                  ImageIOFlags flags) const
 {
+    using enum ImageIOFlags::F;
     // TODO: Implement deep writing
     if(imgIn.depth > 1)
         return MRayError("Deep image writing is currently not implemented");
@@ -108,15 +109,19 @@ MRayError ImageLoader::WriteImage(const WriteImageParams& imgIn,
     if(!inSpecE.has_value()) return inSpecE.error();
     const OIIO::ImageSpec& inSpec = inSpecE.value();
 
-    OIIO::stride_t inScanLineSize = static_cast<OIIO::stride_t>(inSpec.scanline_bytes());
-    const Byte* dataLastElement = imgIn.pixels.data();
-    dataLastElement += (imgIn.header.dimensions[1] - 1) * inScanLineSize;
+    OIIO::stride_t xStride = static_cast<OIIO::stride_t>(imgIn.inputType.PixelSize());
+    OIIO::stride_t yStride = static_cast<OIIO::stride_t>(inSpec.scanline_bytes());
+    const Byte* dataStart = imgIn.pixels.data();
+    if(!flags[FLIP_Y_COORDINATE])
+    {
+        yStride = -yStride;
+        dataStart += (imgIn.header.dimensions[1] - 1) * inSpec.scanline_bytes();
+    }
 
     // TODO: properly write an error check/out code for these.
     if(!out->open(fullPath, outSpec))
         return MRayError("OIIO Error ({})", out->geterror());
-    if(!out->write_image(outSpec.format, dataLastElement,
-                         imgIn.inputType.PixelSize(), -inScanLineSize))
+    if(!out->write_image(outSpec.format, dataStart, xStride, yStride))
         return MRayError("OIIO Error ({})", out->geterror());
     if(!out->close())
         return MRayError("OIIO Error ({})", out->geterror());

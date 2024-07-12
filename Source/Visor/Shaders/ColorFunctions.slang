@@ -80,13 +80,13 @@ public struct SRGBColorConv : IColorConv
 
     public static float3 ToLinear(in float3 color, in float gamma)
     {
-        float v = float(1.0) / gamma;
         return pow(color, gamma);
     }
 
     public static float3 FromLinear(in float3 color, in float gamma)
     {
-        return pow(color, gamma);
+        float v = float(1.0) / gamma;
+        return pow(color, v);
     }
 
     public static float3 ToYxy(in float3 color)
