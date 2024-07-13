@@ -159,6 +159,7 @@ class VulkanBuffer
     private:
     const VulkanSystemView* handlesVk   = nullptr;
     VkBuffer                bufferVk    = nullptr;
+    size_t                  size        = 0;
 
     public:
     // Constructors & Destructor
@@ -175,6 +176,7 @@ class VulkanBuffer
     SizeAlignPair   MemRequirements() const;
     void            AttachMemory(VkDeviceMemory, VkDeviceSize);
     VkBuffer        Buffer() const;
+    size_t          Size() const;
 };
 
 inline VkImage VulkanImage::Image() const
@@ -201,6 +203,11 @@ inline Vector2ui VulkanImage::Extent() const
 inline VkBuffer VulkanBuffer::Buffer() const
 {
     return bufferVk;
+}
+
+inline size_t VulkanBuffer::Size() const
+{
+    return size;
 }
 
 static_assert(VulkanMemObjectC<VulkanImage>);

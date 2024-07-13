@@ -25,7 +25,7 @@ class StagingMemoryRequesterI
     public:
     virtual         ~StagingMemoryRequesterI() = default;
     //
-    virtual size_t  StagingBufferSize() const = 0;
+    virtual size_t  StagingBufferSize(const Vector2ui& inputImgSize) const = 0;
     virtual void    SetStagingBufferView(const StagingBufferMemView& stagingBufferView) = 0;
 };
 

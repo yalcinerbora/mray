@@ -295,8 +295,9 @@ void VulkanImage::CreateView()
 
 VulkanBuffer::VulkanBuffer(const VulkanSystemView& handles,
                            VkBufferUsageFlags usageFlags,
-                           size_t size, bool isForeign)
+                           size_t sizeIn, bool isForeign)
     : handlesVk(&handles)
+    , size(sizeIn)
 {
     if(isForeign)
     {
@@ -344,6 +345,7 @@ VulkanBuffer::VulkanBuffer(const VulkanSystemView& handles,
 VulkanBuffer::VulkanBuffer(VulkanBuffer&& other)
     : handlesVk(std::exchange(other.handlesVk, nullptr))
     , bufferVk(other.bufferVk)
+    , size(other.size)
 {
     other.bufferVk = nullptr;
 }
@@ -356,6 +358,7 @@ VulkanBuffer& VulkanBuffer::operator=(VulkanBuffer&& other)
                         VulkanHostAllocator::Functions());
     handlesVk = std::exchange(other.handlesVk, nullptr);
     bufferVk = std::exchange(other.bufferVk, nullptr);
+    size = other.size;
     return *this;
 }
 

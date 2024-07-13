@@ -82,8 +82,9 @@ function(slang_gen_spriv)
     else()
         set(OUTPUT_NAME "${SLANG_GEN_SPIRV_OUTPUT_PREFIX}-${SLANG_GEN_SPIRV_TYPEGEN_MACRO}")
         slang_gen_module(OUTPUT "${OUTPUT_NAME}"
-                     SOURCES ${SLANG_GEN_SPIRV_TYPEGEN_SHADER_FILE}
-                     EXTRA_OPTIONS "-D${SLANG_GEN_SPIRV_TYPEGEN_MACRO}")
+                         SOURCES ${SLANG_GEN_SPIRV_TYPEGEN_SHADER_FILE}
+                         DEPENDS ${SLANG_GEN_SPIRV_MODULES}
+                         EXTRA_OPTIONS "-D${SLANG_GEN_SPIRV_TYPEGEN_MACRO}")
         set(TYPE_MODULE "${MRAY_SHADER_MODULE_OUT_DIRECTORY}/${OUTPUT_NAME}.slang-module")
     endif()
 

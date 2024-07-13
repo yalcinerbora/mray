@@ -63,11 +63,27 @@ class VulkanComputePipeline
                                        const Descriptor2DList<ShaderBindingInfo>& bindingInfo,
                                        const std::string& shaderName,
                                        const std::string& executablePath,
-                                       const std::string& entryPointName);
+                                       const std::string& entryPointName,
+                                       uint32_t pushConstantSize = 0);
     DescriptorSets          GenerateDescriptorSets(VkDescriptorPool pool);
     void                    BindSetData(VkDescriptorSet descriptorSet,
                                         const DescriptorBindList<ShaderBindingData>& bindingDataList);
     void                    BindSet(VkCommandBuffer cmd, uint32_t setIndex,
                                     VkDescriptorSet set);
     void                    BindPipeline(VkCommandBuffer cmd);
+
+    template<class T>
+    void                    PushConstant(VkCommandBuffer cmd, const T&);
 };
+
+
+template<class T>
+inline
+void VulkanComputePipeline::PushConstant(VkCommandBuffer cmd, const T& data)
+{
+    using MathFunctions::NextMultiple;
+    uint32_t size = NextMultiple(uint32_t(sizeof(T)), 4u);
+    vkCmdPushConstants(cmd, pipelineLayout,
+                       VK_SHADER_STAGE_COMPUTE_BIT,
+                       0u, size, &data);
+}

@@ -13,7 +13,7 @@ public interface ITonemapper
                                  in ColorConverterOut.GammaParams gammaParams,
                                  in TMParams tmParams,
                                  in float2 minMaxLuminance,
-                                 in float logAvgLuminance);
+                                 in float2 avgLuminance);
 }
 
 public struct Reinhard2002 : ITonemapper
@@ -33,7 +33,7 @@ public struct Reinhard2002 : ITonemapper
                                  in ColorConverterOut::GammaParams gammaParams,
                                  in TMParamsReinhard tmParams,
                                  in float2 minMaxLuminance,
-                                 in float logAvgLuminance)
+                                 in float2 avgLuminance)
     {
         // Image is assumed to be in linear space
         float3 hdrYxy = inConv.ToYxy(hdrColor);
@@ -41,13 +41,21 @@ public struct Reinhard2002 : ITonemapper
         // Equation 2
         if (tmParams.doKeyAdjust)
         {
-            L /= logAvgLuminance;
+            L /= avgLuminance[0];
             L *= tmParams.key;
         }
 
         // Equation 4
-        float white = lerp(minMaxLuminance[0], minMaxLuminance[1],
+        // To incorporate a burn ratio, we lerp between
+        // 2x maxLuminance <-> minLuminance
+        // we do logarithmic interpolation to make
+        // GUI slider to be smooth when there is a sun in the
+        // frame
+        float white = lerp(log(minMaxLuminance[0]),
+                           log(2.0f * minMaxLuminance[1]),
                            tmParams.burnRatio * 0.5f);
+        white = exp(white);
+
         float whiteSqr = white * white;
         float sdrL = L * (1 + (L / whiteSqr)) / (1 + L);
         hdrYxy[0] = sdrL;
@@ -68,7 +76,7 @@ public struct EmptyTonemapper : ITonemapper
                                  in ColorConverterOut::GammaParams gammaParams,
                                  in uint,
                                  in float2 minMaxLuminance,
-                                 in float)
+                                 in float2)
     {
         // In is assumed to be in linear space
         float3 hdrYxy = inConv.ToYxy(hdrColor);

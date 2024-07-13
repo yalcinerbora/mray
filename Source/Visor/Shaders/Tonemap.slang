@@ -44,13 +44,15 @@ struct MinOp : IBinaryOp
 
 struct MinMaxAndAvg
 {
-    uint minLum;
-    uint maxLum;
-    uint avgLum;
+    float minLum;
+    float maxLum;
+    float avgLum;
+    float logAvgLum;
 
-    float ReadMinLum() { return asfloat(minLum);}
-    float ReadMaxLum() { return asfloat(maxLum);}
-    float ReadAvgLum() { return asfloat(avgLum);}
+    float ReadMinLum() { return minLum;}
+    float ReadMaxLum() { return maxLum;}
+    float ReadAvgLum(uint size) { return exp(avgLum / size);}
+    float ReadLogAvgLum(uint size) { return exp(logAvgLum / size);}
 }
 
 struct TonemapParameters
@@ -70,6 +72,10 @@ struct TonemapParameters
 
 ParameterBlock<TonemapParameters> params;
 
+[[vk::push_constant]]
+uint reduceCount;
+
+
 groupshared float sReduceBuffer[STATIC_THREAD_PER_BLOCK_1D];
 
 float BlockLocalReduction<T : IBinaryOp>(in float value, in uint localId, in T op)
@@ -78,73 +84,61 @@ float BlockLocalReduction<T : IBinaryOp>(in float value, in uint localId, in T o
     sReduceBuffer[localId] = value;
     AllMemoryBarrierWithGroupSync();
 
-    // This failed due to exceeding a threshold
-    // so hand unrolling
-    //static const uint START = (STATIC_THREAD_PER_BLOCK_1D >> 1);
-    //[ForceUnroll]
-    //for(uint i = START; i != 0; i >> 1)
-    //{
-    //    if (localId < i) sReduceBuffer[localId] = T::op(sReduceBuffer[localId], sReduceBuffer[localId + i]);
-    //    AllMemoryBarrierWithGroupSync();
-    //}
-    if (localId < 128) sReduceBuffer[localId] = T::op(sReduceBuffer[localId], sReduceBuffer[localId + 128]);
-    AllMemoryBarrierWithGroupSync();
-    if (localId < 64) sReduceBuffer[localId] = T::op(sReduceBuffer[localId], sReduceBuffer[localId + 64]);
-    AllMemoryBarrierWithGroupSync();
-    if (localId < 32) sReduceBuffer[localId] = T::op(sReduceBuffer[localId], sReduceBuffer[localId + 32]);
-    AllMemoryBarrierWithGroupSync();
-    if (localId < 16) sReduceBuffer[localId] = T::op(sReduceBuffer[localId], sReduceBuffer[localId + 16]);
-    AllMemoryBarrierWithGroupSync();
-    if (localId <  8) sReduceBuffer[localId] = T::op(sReduceBuffer[localId], sReduceBuffer[localId + 8]);
-    AllMemoryBarrierWithGroupSync();
-    if (localId <  4) sReduceBuffer[localId] = T::op(sReduceBuffer[localId], sReduceBuffer[localId + 4]);
-    AllMemoryBarrierWithGroupSync();
-    if (localId <  2) sReduceBuffer[localId] = T::op(sReduceBuffer[localId], sReduceBuffer[localId + 2]);
-    AllMemoryBarrierWithGroupSync();
-    if (localId <  1) sReduceBuffer[localId] = T::op(sReduceBuffer[localId], sReduceBuffer[localId + 1]);
-    AllMemoryBarrierWithGroupSync();
-
+    // Hierarhical decay of block local reduction using shared memory
+    // This is a more generic approach then warp local intrinsics.
+    static const uint START = (STATIC_THREAD_PER_BLOCK_1D >> 1);
+    [ForceUnroll]
+    for(uint i = START; i != 0; i >>= 1)
+    {
+        if (localId < i) sReduceBuffer[localId] = T::op(sReduceBuffer[localId], sReduceBuffer[localId + i]);
+        AllMemoryBarrierWithGroupSync();
+    }
     return sReduceBuffer[localId];
 }
 
-void AtomicFloatOp<T : IBinaryOp>(in uint outLoc, float val, in T)
-{
-    // CAS Atomic operation for Atomic Max for floats
-    // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#atomic-functions
-    uint assumed;
-    uint old = outLoc;
+// We dropped using this, this was simpler but slower
+// (both on Intel and NVIDIA). Commented this for future use.
+//void AtomicFloatOp<T : IBinaryOp>(in uint outLoc, float val, in T)
+//{
+//    // CAS Atomic operation for Atomic Max for floats
+//    // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#atomic-functions
+//    uint assumed;
+//    uint old = outLoc;
 
-    [allow_uav_condition]
-    do
-    {
-        assumed = old;
-        float assumedF = asfloat(assumed);
-        float newValF = T::op(assumedF, val);
-        uint newVal = asuint(newValF);
-        // TODO: outLoc was directly refers to the params.maxAndAvg[0]...
-        // but slang couldn't (o I did something wrong) compile it
-        // in a way that atomic compare and exachange actions on the
-        // "outLoc" local variable (at least Vulkan validatior said so)
-        // So we directly refer the SSBO variables here via a literal
-        // Old version!
-        // InterlockedCompareExchange(outLoc, assumed, newVal, old);
-        //
-        if(outLoc == 0) InterlockedCompareExchange(params.maxAndAvg[0].minLum,
-                                                   assumed, newVal, old);
-        if(outLoc == 1) InterlockedCompareExchange(params.maxAndAvg[0].maxLum,
-                                                   assumed, newVal, old);
-        if(outLoc == 2) InterlockedCompareExchange(params.maxAndAvg[0].avgLum,
-                                                   assumed, newVal, old);
-    } while(assumed != old);
-}
+//    [allow_uav_condition]
+//    do
+//    {
+//        assumed = old;
+//        float assumedF = asfloat(assumed);
+//        float newValF = T::op(assumedF, val);
+//        uint newVal = asuint(newValF);
+//        // TODO: outLoc was directly refers to the params.maxAndAvg[0]...
+//        // but slang couldn't (or I did something wrong) compile it
+//        // in a way that atomic compare and exachange actions on the
+//        // "outLoc" local variable (at least Vulkan validatior said so)
+//        // So we directly refer the SSBO variables here via a literal
+//        // Old version!
+//        // InterlockedCompareExchange(outLoc, assumed, newVal, old);
+//        //
+//        if(outLoc == 0) InterlockedCompareExchange(params.maxAndAvg[0].minLum,
+//                                                   assumed, newVal, old);
+//        if(outLoc == 1) InterlockedCompareExchange(params.maxAndAvg[0].maxLum,
+//                                                   assumed, newVal, old);
+//        if(outLoc == 2) InterlockedCompareExchange(params.maxAndAvg[0].logAvgLum,
+//                                                   assumed, newVal, old);
+//        if(outLoc == 3) InterlockedCompareExchange(params.maxAndAvg[0].avgLum,
+//                                                   assumed, newVal, old);
+//    } while(assumed != old);
+//}
 
 //======================================//
 //     LUMINANCE REDUCTION SHADER       //
 //======================================//
 [shader("compute")]
 [numthreads(STATIC_THREAD_PER_BLOCK_1D, 1, 1)]
-void KCFindAvgMaxLum(uint3 globalId: SV_DispatchThreadID,
-                     uint3 localId: SV_GroupThreadID)
+void KCFindAvgMaxLumTex(uint3 globalId: SV_DispatchThreadID,
+                        uint3 blockId: SV_GroupID,
+                        uint3 localId: SV_GroupThreadID)
 {
     uint2 dim;
     params.inputTex.GetDimensions(dim[0], dim[1]);
@@ -158,19 +152,54 @@ void KCFindAvgMaxLum(uint3 globalId: SV_DispatchThreadID,
     // The reduction
     float localMin = BlockLocalReduction(luminance, localId.x, MinOp());
     float localMax = BlockLocalReduction(luminance, localId.x, MaxOp());
-    float localAvg = BlockLocalReduction(logLuminance, localId.x, AddOp());
+    float localLogAvg = BlockLocalReduction(logLuminance, localId.x, AddOp());
+    float localAvg = BlockLocalReduction(luminance, localId.x, AddOp());
 
-    // Now atomics, (still we need to do comp-sawp idiom for floats...)
-    // TODO: If have free time, check the full down reduction
-    // (one extra call for this compute shader on an intermediate buffer, not the texture)
-    // is faster or slower (probably faster but setting that up is a hassle)
     if(localId.x == 0)
     {
-        localAvg /= float(dim.x * dim.y);
+        params.maxAndAvg[blockId.x].minLum = localMin;
+        params.maxAndAvg[blockId.x].maxLum = localMax;
+        params.maxAndAvg[blockId.x].avgLum = localAvg;
+        params.maxAndAvg[blockId.x].logAvgLum = localLogAvg;
+    }
+}
 
-        AtomicFloatOp(0, localMin, MinOp());
-        AtomicFloatOp(1, localMax, MaxOp());
-        AtomicFloatOp(2, localAvg, AddOp());
+[shader("compute")]
+[numthreads(STATIC_THREAD_PER_BLOCK_1D, 1, 1)]
+void KCFindAvgMaxLumBuff(uint3 globalId: SV_DispatchThreadID,
+                         uint3 blockId: SV_GroupID,
+                         uint3 localId: SV_GroupThreadID)
+{
+    float readMin, readMax, readAvg, readLogAvg;
+    if(globalId.x >= reduceCount)
+    {
+        // Put operation invariants here
+        // we can't cull threads since we will use block synchronization
+        readMin = 1e20f;
+        readMax = -1e20f;
+        readAvg = 0.0f;
+        readLogAvg = 0.0f;
+    }
+    else
+    {
+        readMin = params.maxAndAvg[globalId.x].minLum;
+        readMax = params.maxAndAvg[globalId.x].maxLum;
+        readAvg = params.maxAndAvg[globalId.x].avgLum;
+        readLogAvg = params.maxAndAvg[globalId.x].logAvgLum;
+    }
+
+    // The reduction
+    float localMin = BlockLocalReduction(readMin, localId.x, MinOp());
+    float localMax = BlockLocalReduction(readMax, localId.x, MaxOp());
+    float localAvg = BlockLocalReduction(readAvg, localId.x, AddOp());
+    float localLogAvg = BlockLocalReduction(readLogAvg, localId.x, AddOp());
+
+    if(localId.x == 0)
+    {
+        params.maxAndAvg[blockId.x].minLum = localMin;
+        params.maxAndAvg[blockId.x].maxLum = localMax;
+        params.maxAndAvg[blockId.x].avgLum = localAvg;
+        params.maxAndAvg[blockId.x].logAvgLum = localLogAvg;
     }
 }
 
@@ -187,13 +216,15 @@ void KCTonemapImage(uint3 globalId: SV_DispatchThreadID)
     // uniform buffer fetch
     uint2 dim = uint2(0);
     params.inputTex.GetDimensions(dim[0], dim[1]);
+    uint pixCount = dim[0] * dim[1];
 
     if(any(globalId.xy >= dim)) return;
     uint2 pixId = globalId.xy;
 
     float2 minmaxLuminance = float2(params.maxAndAvg[0].ReadMinLum(),
                                     params.maxAndAvg[0].ReadMaxLum());
-    float logAvgLuminance = exp(params.maxAndAvg[0].ReadAvgLum());
+    float2 avgLuminance = float2(exp(params.maxAndAvg[0].ReadLogAvgLum(pixCount)),
+                                 params.maxAndAvg[0].ReadAvgLum(pixCount));
 
     float3 inColorHDR = params.inputTex.Load(uint3(pixId, 0), int2(0, 0)).xyz;
     ColorConverterIn  inColorSpace;
@@ -204,6 +235,6 @@ void KCTonemapImage(uint3 globalId: SV_DispatchThreadID)
                                             params.outGammaParams[0],
                                             params.tonemapParams[0],
                                             minmaxLuminance,
-                                            logAvgLuminance);
+                                            avgLuminance);
     params.outputTex[pixId] = float4(outColorSDR, 1.0f);
 }

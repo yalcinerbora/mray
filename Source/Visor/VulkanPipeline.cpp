@@ -76,7 +76,8 @@ MRayError VulkanComputePipeline::Initialize(VkDevice dev,
                                             const Descriptor2DList<ShaderBindingInfo>& bindingInfoList,
                                             const std::string& shaderName,
                                             const std::string& execName,
-                                            const std::string& entryPointName)
+                                            const std::string& entryPointName,
+                                            uint32_t pushConstantSize)
 {
     deviceVk = dev;
     auto sourceE = DevourFile(shaderName, execName);
@@ -135,6 +136,16 @@ MRayError VulkanComputePipeline::Initialize(VkDevice dev,
                                     &setLayout);
         setLayouts.push_back(setLayout);
     }
+    // ==================== //
+    // Push Constant Ranges //
+    // ==================== //
+    using MathFunctions::NextMultiple;
+    VkPushConstantRange pcRange =
+    {
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .offset = 0,
+        .size = NextMultiple(pushConstantSize, 4u)
+    };
 
     // ================= //
     //  Pipeline Layout  //
@@ -143,10 +154,11 @@ MRayError VulkanComputePipeline::Initialize(VkDevice dev,
     {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .pNext = nullptr,
+        .flags = 0,
         .setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
         .pSetLayouts = setLayouts.data(),
-        .pushConstantRangeCount = 0,
-        .pPushConstantRanges = nullptr
+        .pushConstantRangeCount = (pushConstantSize == 0) ? 0u : 1u,
+        .pPushConstantRanges = (pushConstantSize == 0) ? nullptr : &pcRange
     };
     vkCreatePipelineLayout(deviceVk, &pInfo,
                            VulkanHostAllocator::Functions(),
