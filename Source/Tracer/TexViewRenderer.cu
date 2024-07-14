@@ -76,8 +76,7 @@ void KCShowTexture(MRAY_GRID_CONSTANT const Span<Float> dPixels,
         else if constexpr(C == 3)
         {
             const auto& view = std::get<TextureView<2, Vector<C, Float>>>(texView);
-            //result = Vector3(view(uv, Float(mipIndex)).value());
-            result = Vector3(view(uv).value());
+            result = Vector3(view(uv, Float(mipIndex)).value());
         }
         else if constexpr(C == 4)
         {
@@ -176,21 +175,23 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
     textureIndex = Roll(int32_t(customLogicIndex0), 0,
                         int32_t(textures.size()));
     const CommonTexture* t = textures[textureIndex];
+    // Mip Index
     mipIndex = Roll(int32_t(customLogicIndex1), 0,
                     int32_t(t->MipCount()));
-
+    // And mip size
+    mipSize = Graphics::TextureMipSize(Vector2ui(t->Extents()), mipIndex);
     // Initialize tile index
     curTileIndex = 0;
 
     // Calculate tile size according to the parallelization hint
     uint32_t parallelHint = tracerView.tracerParams.parallelizationHint;
-    Vector2ui imgRegion = Vector2ui(t->Extents());
+    Vector2ui imgRegion = mipSize;
     Vector2ui tileSize = FindOptimumTile(imgRegion, parallelHint);
     renderBuffer->Resize(tileSize, 1, 3);
     tileCount = MathFunctions::DivideUp(imgRegion, tileSize);
 
     curColorSpace = tracerView.tracerParams.globalTextureColorSpace;
-    curFramebufferSize = Vector2ui(t->Extents());
+    curFramebufferSize = mipSize;
     curFBMin = Vector2ui::Zero();
     curFBMax = curFramebufferSize;
 
@@ -247,7 +248,7 @@ RendererOutput TexViewRenderer::DoRender()
         {
             const auto& curTex = textures[textureIndex];
             uint32_t channelCount = curTex->ChannelCount();
-            Vector2ui resolution = Vector2ui(curTex->Extents());
+            Vector2ui resolution = mipSize;
             auto KernelCall = [&, this]<uint32_t C>()
             {
                 // Do not start writing to device side untill copy is complete
@@ -314,7 +315,7 @@ RendererOutput TexViewRenderer::DoRender()
             spp,
             "spp",
             float(timer.Elapsed<Millisecond>()),
-            Vector2ui(curTex->Extents()),
+            mipSize,
             MRayColorSpaceEnum::MR_ACES_CG,
             static_cast<uint32_t>(textures.size()),
             static_cast<uint32_t>(curTex->MipCount())

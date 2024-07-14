@@ -67,10 +67,9 @@ class RenderImage
     Span<Float>         dPixels;
     Span<Float>         dSamples;
     //
-    HostLocalMemory     stagingMemory;
-    Span<Float>         hPixels;
-    Span<Float>         hSamples;
-    size_t              hostAllocTotalSize;
+    HostLocalAlignedMemory  stagingMemory;
+    Span<Float>             hPixels;
+    Span<Float>             hSamples;
     //
     size_t              pixStartOffset      = 0;
     size_t              sampleStartOffset   = 0;

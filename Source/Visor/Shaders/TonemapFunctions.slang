@@ -51,10 +51,10 @@ public struct Reinhard2002 : ITonemapper
         // we do logarithmic interpolation to make
         // GUI slider to be smooth when there is a sun in the
         // frame
-        float white = lerp(log(minMaxLuminance[0]),
-                           log(2.0f * minMaxLuminance[1]),
-                           tmParams.burnRatio * 0.5f);
-        white = exp(white);
+        float t = tmParams.burnRatio * 0.5f;
+        float white = lerp(minMaxLuminance[0],
+                           2.0f * minMaxLuminance[1],
+                           t);
 
         float whiteSqr = white * white;
         float sdrL = L * (1 + (L / whiteSqr)) / (1 + L);
@@ -80,9 +80,12 @@ public struct EmptyTonemapper : ITonemapper
     {
         // In is assumed to be in linear space
         float3 hdrYxy = inConv.ToYxy(hdrColor);
-        // Straight up divide here
-        // HDR10 will handle it? (TODO: Check this?)
-        hdrYxy[0] /= minMaxLuminance[1];
+        // TODO: Straight up divide here?
+        // HDR10 will handle it?
+        //hdrYxy[0] /= minMaxLuminance[1];
+        // Or do basic tonemap?
+        hdrYxy[0] /= (1 + hdrYxy[0]);
+
         //
         float3 sdrColor = outConv.FromYxy(hdrYxy);
         float3 finalColor = outConv.FromLinear(sdrColor, gammaParams);

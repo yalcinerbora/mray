@@ -79,7 +79,9 @@ class MitchellNetravaliFilter
 
     public:
     // Constructors & Destructor
-    MRAY_HOST           MitchellNetravaliFilter(Float radius, Float b, Float c);
+    MRAY_HOST           MitchellNetravaliFilter(Float radius,
+                                                Float b = Float(0.33333),
+                                                Float c = Float(0.33333));
     //
     MRAY_HYBRID
     Float               Evaluate(const Vector2& duv) const;

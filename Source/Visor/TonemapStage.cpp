@@ -29,8 +29,8 @@ struct MinMaxAvgStageBuffer
     static_assert(sizeof(uint32_t) == sizeof(float));
     float minLum;
     float maxLum;
-    float logAvgLum;
     float avgLum;
+    float logAvgLum;
 };
 
 class TonemapperBase : public TonemapperI
@@ -508,7 +508,11 @@ bool Tonemapper_Reinhard_AcesCG_To_SRGB::GUI::Render(bool& onOff)
         // Key
         ImGui::Text("Key       ");
         ImGui::SameLine();
-        paramsChanged |= ImGui::InputFloat("##Key", &opts.key, 0.01f, 0.30f);
+        //paramsChanged |= ImGui::InputFloat("##Key", &opts.key, 0.01f, 0.30f);
+        paramsChanged |= ImGui::DragFloat("##Key", &opts.key,
+                                          0.005f, 0.005f, 50.0f,
+                                          "%.3f");
+
         // Burn Ratio
         ImGui::Text("Burn Ratio");
         ImGui::SameLine();

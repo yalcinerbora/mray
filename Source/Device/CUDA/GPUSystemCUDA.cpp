@@ -67,6 +67,12 @@ GPUDeviceCUDA::GPUDeviceCUDA(int deviceId, AnnotationHandle domain)
                         "flag! ({:s}:{})",
                         props.name, deviceId);
     }
+    if(props.hostRegisterSupported == 0)
+    {
+        throw MRayError("The device does not support registering an "
+                        "arbitrary host pointer! ({:s}:{})",
+                        props.name, deviceId);
+    }
 
     // Check VMM support (entire system requires this functionality)
     int vmmEnabled = 0;

@@ -3,6 +3,7 @@
 #include "Vector.h"
 #include "Types.h"
 #include "Quaternion.h"
+#include "BitFunctions.h"
 
 namespace Graphics
 {
@@ -93,8 +94,11 @@ namespace Graphics
 
     template<uint32_t C>
     MRAY_HYBRID constexpr
-    Vector<C, uint32_t>                 TextureMipSize(Vector<C, uint32_t> resolution,
-                                                       uint32_t mipLevel);
+    Vector<C, uint32_t>     TextureMipSize(Vector<C, uint32_t> resolution,
+                                           uint32_t mipLevel);
+    template<uint32_t C>
+    MRAY_HYBRID constexpr
+    uint32_t                TextureMipCount(Vector<C, uint32_t> resolution);
 
     namespace MortonCode
     {
@@ -605,6 +609,14 @@ Vector<C, uint32_t> TextureMipSize(Vector<C, uint32_t> resolution,
         mipRes[i] = resolution[i] >> mipLevel;
 
     return VecXui::Max(mipRes, VecXui(1));
+}
+
+template<uint32_t C>
+MRAY_HYBRID constexpr
+uint32_t TextureMipCount(Vector<C, uint32_t> resolution)
+{
+    uint32_t maxDim = resolution[resolution.Maximum()];
+    return BitFunctions::RequiredBitsToRepresent(maxDim);
 }
 
 }

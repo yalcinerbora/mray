@@ -183,6 +183,7 @@ struct TracerParameters
 
     // Texture Related
     uint32_t            clampedTexRes = std::numeric_limits<uint32_t>::max();
+    bool                genMips = false;
     FilterType          mipGenFilter = FilterType{ FilterType::GAUSSIAN, 2.0f };
     MRayColorSpaceEnum  globalTextureColorSpace = MRayColorSpaceEnum::MR_ACES_CG;
 

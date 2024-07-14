@@ -44,9 +44,9 @@ class DeviceLocalMemoryCUDA
                             DeviceLocalMemoryCUDA(const GPUDeviceCUDA& gpu, size_t sizeInBytes);
                             DeviceLocalMemoryCUDA(const DeviceLocalMemoryCUDA&);
                             DeviceLocalMemoryCUDA(DeviceLocalMemoryCUDA&&) noexcept;
-                            ~DeviceLocalMemoryCUDA();
     DeviceLocalMemoryCUDA&  operator=(const DeviceLocalMemoryCUDA&);
     DeviceLocalMemoryCUDA&  operator=(DeviceLocalMemoryCUDA&&) noexcept;
+                            ~DeviceLocalMemoryCUDA();
 
     // Access
     explicit                operator Byte* ();
@@ -71,6 +71,7 @@ class HostLocalMemoryCUDA
     bool                    neverDecrease = false;
 
     public:
+    // Constructors & Destructor
                             HostLocalMemoryCUDA(const GPUSystemCUDA& system,
                                                 bool neverDecrease = false);
                             HostLocalMemoryCUDA(const GPUSystemCUDA& system,
@@ -78,9 +79,44 @@ class HostLocalMemoryCUDA
                                                 bool neverDecrease = false);
                             HostLocalMemoryCUDA(const HostLocalMemoryCUDA&);
                             HostLocalMemoryCUDA(HostLocalMemoryCUDA&&) noexcept;
-                            ~HostLocalMemoryCUDA();
     HostLocalMemoryCUDA&    operator=(const HostLocalMemoryCUDA&);
     HostLocalMemoryCUDA&    operator=(HostLocalMemoryCUDA&&) noexcept;
+                            ~HostLocalMemoryCUDA();
+    // Access
+    explicit                operator Byte* ();
+    explicit                operator const Byte* () const;
+    Byte*                   DevicePtr();
+    const Byte*             DevicePtr() const;
+
+    // Misc
+    void                    ResizeBuffer(size_t newSize);
+    size_t                  Size() const;
+};
+
+class HostLocalAlignedMemoryCUDA
+{
+    private:
+    const GPUSystemCUDA*    system;
+    void*                   hPtr;
+    void*                   dPtr;
+    size_t                  size;
+    size_t                  allocSize;
+    size_t                  alignment;
+    bool                    neverDecrease = false;
+
+    public:
+    // Constructors & Destructor
+                                HostLocalAlignedMemoryCUDA(const GPUSystemCUDA& system,
+                                                           size_t alignment,
+                                                           bool neverDecrease = false);
+                                HostLocalAlignedMemoryCUDA(const GPUSystemCUDA& system,
+                                                           size_t sizeInBytes, size_t alignment,
+                                                           bool neverDecrease = false);
+                                HostLocalAlignedMemoryCUDA(const HostLocalAlignedMemoryCUDA&);
+                                HostLocalAlignedMemoryCUDA(HostLocalAlignedMemoryCUDA&&) noexcept;
+    HostLocalAlignedMemoryCUDA& operator=(const HostLocalAlignedMemoryCUDA&);
+    HostLocalAlignedMemoryCUDA& operator=(HostLocalAlignedMemoryCUDA&&) noexcept;
+                                ~HostLocalAlignedMemoryCUDA();
 
     // Access
     explicit                operator Byte* ();
@@ -91,6 +127,7 @@ class HostLocalMemoryCUDA
     // Misc
     void                    ResizeBuffer(size_t newSize);
     size_t                  Size() const;
+    size_t                  AllocSize() const;
 };
 
 // Generic Device Memory (most of the cases this should be used)
@@ -124,31 +161,23 @@ class DeviceMemoryCUDA
     size_t                      NextDeviceIndex();
 
     public:
-        // Constructors & Destructor
-                                DeviceMemoryCUDA(const std::vector<const GPUDeviceCUDA*>& devices,
-                                                 size_t allocationGranularity,
-                                                 size_t preReserveSize,
-                                                 bool neverDecrease = false);
-                                DeviceMemoryCUDA(const DeviceMemoryCUDA&) = delete;
-                                DeviceMemoryCUDA(DeviceMemoryCUDA&&) noexcept = default;
-                                ~DeviceMemoryCUDA();
-        DeviceMemoryCUDA&       operator=(const DeviceMemoryCUDA&) = delete;
-        DeviceMemoryCUDA&       operator=(DeviceMemoryCUDA&&) noexcept = default;
+    // Constructors & Destructor
+                            DeviceMemoryCUDA(const std::vector<const GPUDeviceCUDA*>& devices,
+                                                size_t allocationGranularity,
+                                                size_t preReserveSize,
+                                                bool neverDecrease = false);
+                            DeviceMemoryCUDA(const DeviceMemoryCUDA&) = delete;
+                            DeviceMemoryCUDA(DeviceMemoryCUDA&&) noexcept = default;
+    DeviceMemoryCUDA&       operator=(const DeviceMemoryCUDA&) = delete;
+    DeviceMemoryCUDA&       operator=(DeviceMemoryCUDA&&) noexcept = default;
+                            ~DeviceMemoryCUDA();
 
-        // Access
-        explicit                operator Byte*();
-        explicit                operator const Byte*() const;
-        // Misc
-        void                    ResizeBuffer(size_t newSize);
-        size_t                  Size() const;
-};
-
-class ExternalMemoryCUDA
-{
-    private:
-    // SystemMemoryHandle;//      memHandle;
-    // SystemMemoryHandle;//      memSize;
-    public:
+    // Access
+    explicit                operator Byte*();
+    explicit                operator const Byte*() const;
+    // Misc
+    void                    ResizeBuffer(size_t newSize);
+    size_t                  Size() const;
 };
 
 inline const GPUDeviceCUDA& DeviceLocalMemoryCUDA::Device() const
@@ -176,6 +205,16 @@ inline HostLocalMemoryCUDA::operator const Byte*() const
     return reinterpret_cast<const Byte*>(hPtr);
 }
 
+inline HostLocalAlignedMemoryCUDA::operator Byte* ()
+{
+    return reinterpret_cast<Byte*>(hPtr);
+}
+
+inline HostLocalAlignedMemoryCUDA::operator const Byte* () const
+{
+    return reinterpret_cast<const Byte*>(hPtr);
+}
+
 inline DeviceMemoryCUDA::operator Byte*()
 {
     return std::bit_cast<Byte*>(mPtr);
@@ -190,6 +229,8 @@ static_assert(MemoryC<DeviceLocalMemoryCUDA>,
               "\"DeviceLocalMemoryCUDA\" does not satisfy memory concept.");
 static_assert(MemoryC<HostLocalMemoryCUDA>,
               "\"HostLocalMemoryCUDA\" does not satisfy memory concept.");
+static_assert(MemoryC<HostLocalAlignedMemoryCUDA>,
+              "\"HostLocalAlignedMemoryCUDA\" does not satisfy memory concept.");
 static_assert(MemoryC<DeviceMemoryCUDA>,
               "\"DeviceMemoryCUDA\" does not satisfy memory concept.");
 

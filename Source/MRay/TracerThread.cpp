@@ -82,6 +82,7 @@ Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
     static constexpr auto PAR_HINT_NAME         = "parallelHint"sv;
     static constexpr auto SAMPLER_TYPE_NAME     = "samplerType"sv;
     static constexpr auto CLAMP_TEX_RES_NAME    = "clampTexRes"sv;
+    static constexpr auto GEN_MIP_NAME          = "genMipmaps"sv;
     static constexpr auto TEX_COLOR_SPACE_NAME  = "globalTexColorSpace"sv;
     static constexpr auto MIP_GEN_FILTER_NAME   = "mipGenFilter"sv;
     static constexpr auto FILM_FILTER_NAME      = "filmFilter"sv;
@@ -121,6 +122,7 @@ Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
         OptionalFetch(config.params.parallelizationHint, PAR_HINT_NAME, paramsJson);
         OptionalFetch(config.params.samplerType, SAMPLER_TYPE_NAME, paramsJson);
         OptionalFetch(config.params.clampedTexRes, CLAMP_TEX_RES_NAME, paramsJson);
+        OptionalFetch(config.params.genMips, GEN_MIP_NAME, paramsJson);
         OptionalFetch(config.params.globalTextureColorSpace, TEX_COLOR_SPACE_NAME, paramsJson);
         OptionalFetch(config.params.mipGenFilter, MIP_GEN_FILTER_NAME, paramsJson);
         OptionalFetch(config.params.filmFilter, FILM_FILTER_NAME, paramsJson);
@@ -715,8 +717,20 @@ MRayError TracerThread::MTInitialize(const std::string& tracerConfigFile)
         tracerConfig.dllDeleteFuncName
     };
     dllFile = std::make_unique<SharedLibrary>(tracerConfig.dllName);
-    MRayError err = dllFile->GenerateObjectWithArgs<TracerConstructorArgs, TracerI>(tracer, args,
-                                                                                    tracerConfig.params);
+    MRayError err = MRayError::OK;
+    // GPU System may fail to construct which thorws an exception
+    try
+    {
+        err = dllFile->GenerateObjectWithArgs<TracerConstructorArgs, TracerI>
+        (
+            tracer, args,
+            tracerConfig.params
+        );
+    }
+    catch(const MRayError& e)
+    {
+        err = e;
+    }
     if(err) return err;
 
     tracer->SetThreadPool(threadPool);

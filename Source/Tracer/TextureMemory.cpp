@@ -3,6 +3,7 @@
 
 #include "Core/Error.hpp"
 #include "Core/GraphicsFunctions.h"
+#include "Core/Timer.h"
 
 namespace TexDetail
 {
@@ -111,6 +112,74 @@ GenericTextureView Concept<T>::View() const
         return tex.View<Vector4>();
 }
 
+template<class T>
+bool Concept<T>::HasRWView() const
+{
+    // Only 2D and non block compressed formats are supported
+    return T::Dims == 2 && !T::IsBlockCompressed;
+}
+
+template<class T>
+SurfRefVariant Concept<T>::RWView(uint32_t mipLevel)
+{
+    // If non supported texture's view is requested return
+    // monostate
+    if constexpr(T::Dims != 2 || T::IsBlockCompressed)
+        return std::monostate{};
+    else
+    {
+        return tex.GenerateRWRef(mipLevel);
+    }
+}
+
+}
+
+void TextureMemory::ConvertColorspaces()
+{
+
+}
+
+void TextureMemory::GenerateMipmaps()
+{
+    using TextureFilterPtr = std::unique_ptr<TextureFilterI>;
+    FilterType::E filterType = tracerParams.mipGenFilter.type;
+    auto fGen = filterGenMap.at(filterType);
+    if(!fGen.has_value())
+    {
+        throw MRayError("Unable to find a filter for type {}",
+                        FilterType::ToString(filterType));
+    }
+    Float radius = tracerParams.mipGenFilter.radius;
+    TextureFilterPtr texFilter = fGen.value().get()(gpuSystem, std::move(radius));
+
+    std::vector<MipArray<SurfRefVariant>> texSurfs;
+    std::vector<MipGenParams> mipGenParams;
+    texSurfs.reserve(textures.Map().size());
+    mipGenParams.reserve(textures.Map().size());
+    // Load to linear memory
+    for(auto& [_, t] : textures.Map())
+    {
+        if(!t.HasRWView()) continue;
+
+        MipGenParams p =
+        {
+            .validMips = t.ValidMips(),
+            .mipCount = static_cast<uint16_t>(t.MipCount()),
+            .mipZeroRes = Vector2ui(t.Extents())
+        };
+        mipGenParams.push_back(p);
+
+        MipArray<SurfRefVariant> mips;
+        for(uint16_t i = 0; i < p.mipCount; i++)
+            mips[i] = t.RWView(i);
+
+        texSurfs.push_back(std::move(mips));
+
+        t.SetAllMipsToLoaded();
+    }
+
+    // Finally call the kernel
+    texFilter->GenerateMips(texSurfs, mipGenParams);
 }
 
 template<uint32_t D>
@@ -122,6 +191,10 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
     uint32_t gpuIndex = gpuIndexCounter.fetch_add(1);
     gpuIndex %= 1;// gpuSystem.SystemDevices().size();
     const GPUDevice& device = gpuSystem.SystemDevices()[gpuIndex];
+
+    // Expand mip count if generate mipmaps is requested
+    if(tracerParams.genMips)
+        mipCount = Graphics::TextureMipCount(size);
 
     TextureInitParams<D> p;
     p.size = size;
@@ -151,9 +224,11 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
 }
 
 TextureMemory::TextureMemory(const GPUSystem& sys,
-                             uint32_t cr)
+                             const TracerParameters& tParams,
+                             const FilterGeneratorMap& fGenMap)
     : gpuSystem(sys)
-    , clampResolution(cr)
+    , tracerParams(tParams)
+    , filterGenMap(fGenMap)
 {
     if(gpuSystem.SystemDevices().size() != 1)
         MRAY_WARNING_LOG("Textures will be loaded on to single GPU!");
@@ -263,6 +338,26 @@ MRayPixelTypeRT TextureMemory::GetPixelType(TextureId id) const
     }
     const CommonTexture& tex = loc.value().get();
     return tex.PixelType();
+}
+
+void TextureMemory::Finalize()
+{
+    Timer t;
+    t.Start();
+    MRAY_LOG("[Tracer] Converting textures to global color space ...");
+
+    t.Lap();
+    MRAY_LOG("[Tracer] Texture color conversion took {}ms.",
+             t.Elapsed<Millisecond>());
+
+    if(tracerParams.genMips)
+    {
+        MRAY_LOG("[Tracer] Generating texture mipmaps...");
+        GenerateMipmaps();
+        t.Split();
+        MRAY_LOG("[Tracer] Texture mipmap generation took {}ms.",
+                 t.Elapsed<Millisecond>());
+    }
 }
 
 const TextureViewMap& TextureMemory::TextureViews() const

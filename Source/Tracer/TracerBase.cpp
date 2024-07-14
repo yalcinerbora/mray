@@ -118,9 +118,20 @@ TracerBase::TracerBase(const TypeGeneratorPack& tGen,
     : threadPool(nullptr)
     , typeGenerators(tGen)
     , params(tParams)
-    , texMem(gpuSystem)
+    , texMem(gpuSystem, params, filterGenMap)
+{
+    auto EmplaceFilterGen = [this]<class T>()
+    {
+        filterGenMap.emplace(T::TypeName,
+                             &GenerateType<TextureFilterI, T,
+                             const GPUSystem&, Float>);
+    };
 
-{}
+    EmplaceFilterGen.operator()<TextureFilterBox>();
+    EmplaceFilterGen.operator()<TextureFilterTent>();
+    EmplaceFilterGen.operator()<TextureFilterGaussian>();
+    EmplaceFilterGen.operator()<TextureFilterMitchellNetravali>();
+}
 
 TypeNameList TracerBase::PrimitiveGroups() const
 {
@@ -1273,6 +1284,8 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     { g.second->Finalize(queueIt.Queue()); queueIt.Next(); }
     for(auto& g : lightGroups.Map())
     { g.second->Finalize(queueIt.Queue()); queueIt.Next(); }
+    // Finalize the texture operations
+    texMem.Finalize();
 
     // Pack the surfaces via transform / primitive
     //

@@ -271,7 +271,7 @@ class TextureCUDA<D, T> : public TextureCUDA_Normal<D, T>
     static constexpr uint32_t ChannelCount  = Base::ChannelCount;
     static constexpr bool IsNormConvertible = Base::IsNormConvertible;
     static constexpr uint32_t Dims          = Base::Dims;
-
+    static constexpr bool IsBlockCompressed = false;
     using Type              = typename Base::Type;
     using PaddedChannelType = typename Base::PaddedChannelType;
 
@@ -289,6 +289,7 @@ class TextureCUDA<2, T> : public TextureCUDA_BC<T>
     static constexpr uint32_t ChannelCount  = Base::ChannelCount;
     static constexpr bool IsNormConvertible = Base::IsNormConvertible;
     static constexpr uint32_t Dims          = Base::Dims;
+    static constexpr bool IsBlockCompressed = true;
 
     using Type              = typename Base::Type;
     using PaddedChannelType = typename Base::PaddedChannelType;

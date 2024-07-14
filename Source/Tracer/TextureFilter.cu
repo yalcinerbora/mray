@@ -1,6 +1,5 @@
-#include "ReconFilter.h"
+#include "TextureFilter.h"
 #include "RayPartitioner.h"
-#include "Random.h"
 #include "DistributionFunctions.h"
 #include "Filters.h"
 
@@ -11,13 +10,14 @@
 #include "Core/DeviceVisit.h"
 #include "Core/GraphicsFunctions.h"
 
-#include <random>
-
 #ifdef MRAY_GPU_BACKEND_CUDA
     #include <cub/block/block_reduce.cuh>
 #else
     #error "Only CUDA Version of Reconstruction filter is implemented"
 #endif
+
+
+#include "ColorFunctions.h"
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 int32_t FilterRadiusToPixelWH(Float filterRadius)
@@ -57,64 +57,87 @@ MRAY_KERNEL //MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCGenerateMipmaps(// I-O
                        MRAY_GRID_CONSTANT const Span<MipArray<SurfViewVariant>> dSurfaces,
                        // Inputs
-                       MRAY_GRID_CONSTANT const Span<const Vector2ui> dMipZeroResolutions,
-                       MRAY_GRID_CONSTANT const Span<const typename BackupRNGState> dRNGStates,
+                       MRAY_GRID_CONSTANT const Span<const MipGenParams> dMipGenParamsList,
                        // Constants
-                       MRAY_GRID_CONSTANT const uint32_t spp,
+                       MRAY_GRID_CONSTANT const uint32_t currentMipLevel,
+                       MRAY_GRID_CONSTANT const Vector2ui spp,
                        MRAY_GRID_CONSTANT const Filter FilterFunc)
 {
-    static constexpr uint32_t MAX_MIPS = TracerConstants::MaxTextureMipCount;
-    Float recipSPP = Float(1) / Float(spp);
+    assert(dSurfaces.size() == dMipGenParamsList.size());
+    Vector2 dXY = Vector2(1) / Vector2(spp);
 
     KernelCallParams kp;
-    assert(dSurfaces.size() == dMipZeroResolutions.size());
-    assert(dRNGStates.size() == kp.TotalSize());
-    // Load the RNG
-    typename BackupRNGState state = dRNGStates[kp.GlobalId()];
-    BackupRNG rng = BackupRNG(state);
-
+    MRAY_SHARED_MEMORY MipGenParams curParams;
+    MRAY_SHARED_MEMORY SurfViewVariant curSurfs[2];
     // Block-stride loop
     uint32_t textureCount = static_cast<uint32_t>(dSurfaces.size());
     for(uint32_t tI = kp.blockId; tI < textureCount; tI += kp.gridSize)
     {
-        // Top to bottom mipmap generation
-        for(uint32_t mipI = 1; mipI < MAX_MIPS; mipI++)
-        {
-            SurfViewVariant curT = dSurfaces[tI][mipI];
-            SurfViewVariant prevT = dSurfaces[tI][mipI - 1];
-            Vector2ui texRes = dMipZeroResolutions[tI];
-            //
-            Vector2ui mipRes = Graphics::TextureMipSize(texRes, mipI);
-            uint32_t totalPix = mipRes.Multiply();
+        if(kp.threadId == 0) curParams.validMips = dMipGenParamsList[tI].validMips;
+        if(kp.threadId == 1) curParams.mipCount = dMipGenParamsList[tI].mipCount;
+        if(kp.threadId == 2) curParams.mipZeroRes[0] = dMipGenParamsList[tI].mipZeroRes[0];
+        if(kp.threadId == 3) curParams.mipZeroRes[1] = dMipGenParamsList[tI].mipZeroRes[1];
+        // Load the surfaces to shared memory (maybe faster to access?)
+        if(kp.threadId == 4) curSurfs[0] = dSurfaces[tI][currentMipLevel];
+        if(kp.threadId == 5) curSurfs[1] = dSurfaces[tI][currentMipLevel - 1];
 
-            // Loop over the pixel by block
-            for(uint32_t pixI = kp.threadId; pixI < totalPix; pixI += kp.blockSize)
+        BlockSynchronize();
+
+        SurfViewVariant curT = curSurfs[0];
+        SurfViewVariant prevT = curSurfs[1];
+        Vector2ui mipRes = Graphics::TextureMipSize(curParams.mipZeroRes,
+                                                    currentMipLevel);
+        Vector2ui parentRes = Graphics::TextureMipSize(curParams.mipZeroRes,
+                                                       currentMipLevel - 1);
+        uint32_t totalPix = mipRes.Multiply();
+
+        // Skip this mip if it is already loaded.
+        // This may happen when a texture has up to x amount of mips
+        // but it can support log2(floor(max(res))) amount so we generate
+        // these mipmaps.
+        // Since we issue mip generation in bulk (meaning for all of the textures
+        // mip generate level X will be called regardless of that texture has a valid
+        // mip). We need to early exit for a texture that can not support that level of mip.
+        // If variant is in monostate we skip this mip level generation
+        if(curParams.validMips[currentMipLevel] ||
+           std::holds_alternative<std::monostate>(curT)) continue;
+
+        // Loop over the pixel by block
+        for(uint32_t pixI = kp.threadId; pixI < totalPix; pixI += kp.blockSize)
+        {
+            Vector2ui pixCoordInt = Vector2ui(pixI % mipRes[0], pixI / mipRes[0]);
+            Vector2 pixCoord = (Vector2(pixCoordInt[0], pixCoordInt[1]) +
+                                Vector2(0.5));
+            // We use float as a catch-all type
+            // It is allocated as a max channel
+            Vector4 writePix = Vector4::Zero();
+            // Stochastically sample the up level via the filter
+            // Mini Monte Carlo..
+            for(uint32_t sppY = 0; sppY < spp[1]; sppY++)
+            for(uint32_t sppX = 0; sppX < spp[0]; sppX++)
             {
-                Vector2ui pixCoordInt = Vector2ui(pixI % mipRes[0], pixI / mipRes[0]);
-                Vector2 pixCoord = (Vector2(pixCoordInt[0], pixCoordInt[1]) +
-                                    Vector2(0.5));
-                // We use float as a catch-all type
-                // It is allocated as a max channel
-                Vector4 writePix = Vector4::Zero();
-                // Stochastically sample the up level via the filter
-                // Mini Monte Carlo..
-                for(uint32_t sppI = 0; sppI < spp; sppI++)
+                // Create a quasi sampler by perfectly stratifying the
+                // sample space
+                Vector2 xi = dXY * Vector2(sppX, sppY);
+                SampleT<Vector2> sample = FilterFunc.Sample(xi);
+                //SampleT<Vector2> sample = {Vector2::Zero(), Float(1)};
+                // Find the upper level coordinate
+                Vector2 readPixCoord = (pixCoord + sample.value).RoundSelf();
+                readPixCoord *= Vector2(2);
+                readPixCoord.ClampSelf(Vector2::Zero(), Vector2(parentRes - 1));
+                Vector2ui readPixCoordInt = Vector2ui(readPixCoord);
+                Vector4 localPix = DeviceVisit(std::as_const(prevT),
+                [readPixCoordInt](auto&& readSurf) -> Vector4
                 {
-                    Vector2 xi = Vector2(rng.NextFloat(), rng.NextFloat());
-                    SampleT<Vector2> sample = FilterFunc.Sample(xi);
-                    // Find the upper leve coordinate
-                    Vector2 readPixCoord = (pixCoord + sample.value).RoundSelf();
-                    readPixCoord.Clamp(Vector2::Zero(), Vector2(mipRes));
-                    readPixCoord *= Vector2(2);
-                    Vector2ui readPixCoordInt = Vector2ui(readPixCoord);
-                    Vector4 localPix = DeviceVisit(std::as_const(prevT),
-                    [readPixCoordInt](auto&& readSurf) -> Vector4
+                    Vector4 result = Vector4::Zero();
+                    using VariantType = std::remove_cvref_t<decltype(readSurf)>;
+                    if constexpr(!std::is_same_v<VariantType, std::monostate>)
                     {
-                        using VariantType = std::remove_cvref_t<decltype(readSurf)>;
                         using ReadType = typename VariantType::Type;
                         constexpr uint32_t C = VariantType::Channels;
                         ReadType rPix = readSurf(readPixCoordInt);
-                        Vector4 result = Vector4::Zero();
+                        //ReadType rPix = readSurf(pixCoordInt);
+
                         // We need to manually loop over the channels here
                         if constexpr(C != 1)
                         {
@@ -123,20 +146,24 @@ void KCGenerateMipmaps(// I-O
                                 result[c] = static_cast<Float>(rPix[c]);
                         }
                         else result[0] = static_cast<Float>(rPix);
+                    }
+                    return result;
+                });
+                writePix += localPix / sample.pdf;
+            }
+            // Divide by the sample count
+            writePix *= dXY.Multiply();
+
+            //writePix = Vector4(Color::RandomColorRGB(pixI), 1);
 
 
-                        return result;
-                    });
-                    writePix += localPix / sample.pdf;
-                }
-                // Divide by the sample count
-                writePix *= recipSPP;
-
-                // Finally write the pixel
-                DeviceVisit(curT,
-                [writePix, pixCoordInt](auto&& writeSurf) -> void
+            // Finally write the pixel
+            DeviceVisit(curT,
+            [writePix, pixCoordInt](auto&& writeSurf) -> void
+            {
+                using VariantType = std::remove_cvref_t<decltype(writeSurf)>;
+                if constexpr(!std::is_same_v<VariantType, std::monostate>)
                 {
-                    using VariantType = std::remove_cvref_t<decltype(writeSurf)>;
                     using WriteType = typename VariantType::Type;
                     constexpr uint32_t C = VariantType::Channels;
                     WriteType writeVal;
@@ -149,9 +176,12 @@ void KCGenerateMipmaps(// I-O
                     }
                     else writeVal = static_cast<WriteType>(writePix[0]);
                     writeSurf(pixCoordInt) = writeVal;
-                });
-            }
+                }
+            });
         }
+        // Wait for next issue,
+        // This block synchronization is about surface data dependency
+        BlockSynchronize();
     }
 }
 
@@ -524,9 +554,10 @@ void MultiPassReconFilterGenericRGB(// Output
 
 template<class Filter>
 void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
-                         uint32_t seed, const GPUSystem& gpuSystem,
-                         Filter filter)
+                         const std::vector<MipGenParams>& mipGenParams,
+                         const GPUSystem& gpuSystem, Filter filter)
 {
+    assert(textures.size() == mipGenParams.size());
     // TODO: Textures should be partitioned with respect to
     // devices, so that we can launch kernel from those devices
     const GPUDevice& bestDevice = gpuSystem.BestDevice();
@@ -541,7 +572,7 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
     // The reason for large texture is to allocate a single block on an SM,
     // and provide the entire L1 cache (L1 caches are per SM afaik) to the
     // block. We assume the mip generation is a memory bound operation.
-    constexpr uint32_t THREAD_PER_BLOCK = 1024;
+    constexpr uint32_t THREAD_PER_BLOCK = 512;
     // To combine the both, we will dedicate a single RNG per thread.
     // This is why space-filling RNG (Sobol etc.) are not used because
     // those will not make sense when each thread will be responsible for
@@ -550,102 +581,119 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
     // (for a single number 32xLUT).
 
     // Find maximum block count for state allocation
-    static constexpr uint32_t SPP = 64;
+    static constexpr Vector2ui SPP = Vector2ui(8, 8);
     uint32_t blockCount = queue.RecommendedBlockCountDevice(&KCGenerateMipmaps<Filter>,
                                                             THREAD_PER_BLOCK, 0);
-    uint32_t stateCount = blockCount * StaticThreadPerBlock1D();
-
     // We can temporarily allocate here since this will be done at
     // initialization time.
-    using RNGState = BackupRNGState;
     DeviceLocalMemory mem(gpuSystem.BestDevice());
-    Span<RNGState> dRNGStates;
     Span<MipArray<SurfViewVariant>> dSufViews;
-    Span<Vector2ui> dResolutions;
-    MemAlloc::AllocateMultiData(std::tie(dRNGStates, dSufViews, dResolutions),
-                                mem,
-                                {stateCount, textures.size(), textures.size()});
+    Span<MipGenParams> dMipGenParams;
+    MemAlloc::AllocateMultiData(std::tie(dSufViews, dMipGenParams),
+                                mem, {textures.size(), textures.size()});
 
-    std::vector<RNGState> rngStates(dRNGStates.size());
-    std::mt19937 hostSeeder(seed);
-    for(RNGState& state : rngStates)
-        state = hostSeeder();
-
-    using namespace std::string_view_literals;
-    Span<RNGState> hRNGSates(rngStates);
-    queue.MemcpyAsync(dRNGStates, ToConstSpan(hRNGSates));
-    queue.IssueExactKernel<KCGenerateMipmaps<Filter>>
-    (
-        "KCGenerateMipmaps"sv,
-        KernelExactIssueParams
+    // Copy references
+    std::vector<MipArray<SurfViewVariant>> hSurfViews;
+    hSurfViews.reserve(textures.size());
+    for(const MipArray<SurfRefVariant>& surfRefs : textures)
+    {
+        MipArray<SurfViewVariant> mipViews;
+        for(size_t i = 0; i < TracerConstants::MaxTextureMipCount; i++)
         {
-            .gridSize = blockCount,
-            .blockSize = THREAD_PER_BLOCK
-        },
-        dSufViews,
-        dResolutions,
-        dRNGStates,
-        SPP,
-        filter
-    );
+            const SurfRefVariant& surf = surfRefs[i];
+             mipViews[i] = std::visit([](auto&& v) -> SurfViewVariant
+             {
+                 using T = std::remove_cvref_t<decltype(v)>;
+                 if constexpr(std::is_same_v<T, std::monostate>)
+                     return std::monostate{};
+                 else return v.View();
+
+             }, surf);
+        }
+        hSurfViews.push_back(mipViews);
+    }
+
+    auto hSurfViewSpan = Span<MipArray<SurfViewVariant>>(hSurfViews.begin(),
+                                                         hSurfViews.end());
+    auto hMipGenParams = Span<const MipGenParams>(mipGenParams.cbegin(),
+                                                  mipGenParams.cend());
+    queue.MemcpyAsync(dSufViews, ToConstSpan(hSurfViewSpan));
+    queue.MemcpyAsync(dMipGenParams, hMipGenParams);
+
+    // Since texture writes are not coherent,
+    // we need to call one kernel for each level of mips
+    uint16_t maxMipCount = std::transform_reduce(mipGenParams.cbegin(),
+                                                 mipGenParams.cend(),
+                                                 std::numeric_limits<uint16_t>::min(),
+    [](uint16_t l, uint16_t r)
+    {
+        return std::max(l, r);
+    },
+    [](const MipGenParams& p) -> uint16_t
+    {
+        return p.mipCount;
+    });
+
+    // Start from 1, we assume miplevel zero is already available
+    for(uint16_t i = 1; i < maxMipCount; i++)
+    {
+        using namespace std::string_view_literals;
+        queue.IssueExactKernel<KCGenerateMipmaps<Filter>>
+        (
+            "KCGenerateMipmaps"sv,
+            KernelExactIssueParams
+            {
+                .gridSize = blockCount,
+                .blockSize = THREAD_PER_BLOCK
+            },
+            // I-O
+            dSufViews,
+            // Inputs
+            dMipGenParams,
+            // Constants
+            i,
+            SPP,
+            filter
+        );
+        //break;
+    }
     queue.Barrier().Wait();
 }
 
-std::string_view ReconstructionFilterBox::TypeName()
-{
-    using namespace std::string_view_literals;
-    return "Box"sv;
-}
 
-ReconstructionFilterBox::ReconstructionFilterBox(const GPUSystem& system,
-                                                 Float fr)
+template<FilterType::E E, class FF>
+TextureFilterT<E, FF>::TextureFilterT(const GPUSystem& system,
+                                      Float fR)
     : gpuSystem(system)
-    , filterRadius(fr)
+    , filterRadius(fR)
 {}
 
-void ReconstructionFilterBox::GenerateMips(const std::vector<MipArray<SurfRefVariant>>& textures,
-                                           uint32_t seed) const
+template<FilterType::E E, class FF>
+void TextureFilterT<E, FF>::GenerateMips(const std::vector<MipArray<SurfRefVariant>>& textures,
+                                         const std::vector<MipGenParams>& params) const
 {
-    GenerateMipsGeneric(textures, seed, gpuSystem, BoxFilter(filterRadius));
+    GenerateMipsGeneric(textures, params, gpuSystem, FF(filterRadius));
 }
 
-void ReconstructionFilterBox::ReconstructionFilterRGB(// Output
-                                                      const SubImageSpan<3>& img,
-                                                      // I-O
-                                                      RayPartitioner& partitioner,
-                                                      // Input
-                                                      const Span<const Vector3>& dValues,
-                                                      const Span<const Vector2>& dImgCoords,
-                                                      // Constants
-                                                      uint32_t parallelHint,
-                                                      Float scalarWeightMultiplier) const
+template<FilterType::E E, class FF>
+void TextureFilterT<E, FF>::ReconstructionFilterRGB(// Output
+                                                    const SubImageSpan<3>& img,
+                                                    // I-O
+                                                    RayPartitioner& partitioner,
+                                                    // Input
+                                                    const Span<const Vector3>& dValues,
+                                                    const Span<const Vector2>& dImgCoords,
+                                                    // Constants
+                                                    uint32_t parallelHint,
+                                                    Float scalarWeightMultiplier) const
 {
     MultiPassReconFilterGenericRGB(img, partitioner, dValues, dImgCoords,
                                    parallelHint, scalarWeightMultiplier,
-                                   filterRadius, BoxFilter(filterRadius),
+                                   filterRadius, FF(filterRadius),
                                    gpuSystem);
 }
 
-void ReconstructionFilterMitchell::GenerateMips(const std::vector<MipArray<SurfRefVariant>>& textures,
-                                                uint32_t seed) const
-{
-    GenerateMipsGeneric(textures, seed, gpuSystem,
-                        MitchellNetravaliFilter(filterRadius, b, c));
-}
-
-void ReconstructionFilterMitchell::ReconstructionFilterRGB(// Output
-                                                           const SubImageSpan<3>& img,
-                                                           // I-O
-                                                           RayPartitioner& partitioner,
-                                                           // Input
-                                                           const Span<const Vector3>& dValues,
-                                                           const Span<const Vector2>& dImgCoords,
-                                                           // Constants
-                                                           uint32_t parallelHint,
-                                                           Float scalarWeightMultiplier) const
-{
-    MultiPassReconFilterGenericRGB(img, partitioner, dValues, dImgCoords,
-                                   parallelHint, scalarWeightMultiplier,
-                                   filterRadius, MitchellNetravaliFilter(filterRadius, b, c),
-                                   gpuSystem);
-}
+template TextureFilterT<FilterType::BOX, BoxFilter>;
+template TextureFilterT<FilterType::TENT, TentFilter>;
+template TextureFilterT<FilterType::GAUSSIAN, GaussianFilter>;
+template TextureFilterT<FilterType::MITCHELL_NETRAVALI, MitchellNetravaliFilter>;

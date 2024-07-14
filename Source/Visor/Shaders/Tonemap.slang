@@ -75,7 +75,6 @@ ParameterBlock<TonemapParameters> params;
 [[vk::push_constant]]
 uint reduceCount;
 
-
 groupshared float sReduceBuffer[STATIC_THREAD_PER_BLOCK_1D];
 
 float BlockLocalReduction<T : IBinaryOp>(in float value, in uint localId, in T op)
@@ -144,16 +143,30 @@ void KCFindAvgMaxLumTex(uint3 globalId: SV_DispatchThreadID,
     params.inputTex.GetDimensions(dim[0], dim[1]);
     uint2 pixId = uint2(globalId.x % dim.x,
                         globalId.x / dim.x);
-
-    float3 inColor = params.inputTex.Load(uint3(pixId, 0), int2(0, 0)).xyz;
-    float luminance = ColorConverterIn::ToYxy(inColor)[0];
-    float logLuminance = log(luminance  + 1e-3f);
-
+    float readMin, readMax, readAvg, readLogAvg;
+    if(globalId.x < (dim[0] * dim[1]))
+    {
+        float3 inColor = params.inputTex.Load(uint3(pixId, 0)).xyz;
+        float luminance = ColorConverterIn::ToYxy(inColor)[0];
+        readMin = luminance;
+        readMax = luminance;
+        readAvg = luminance;
+        readLogAvg = log(luminance + 1e-3f);
+    }
+    else
+    {
+        // Put operation invariants here
+        // we can't cull threads since we will use block synchronization
+        readMin = 1e20f;
+        readMax = -1e20f;
+        readAvg = 0.0f;
+        readLogAvg = 0.0f;
+    }
     // The reduction
-    float localMin = BlockLocalReduction(luminance, localId.x, MinOp());
-    float localMax = BlockLocalReduction(luminance, localId.x, MaxOp());
-    float localLogAvg = BlockLocalReduction(logLuminance, localId.x, AddOp());
-    float localAvg = BlockLocalReduction(luminance, localId.x, AddOp());
+    float localMin = BlockLocalReduction(readMin, localId.x, MinOp());
+    float localMax = BlockLocalReduction(readMax, localId.x, MaxOp());
+    float localAvg = BlockLocalReduction(readAvg, localId.x, AddOp());
+    float localLogAvg = BlockLocalReduction(readLogAvg, localId.x, AddOp());
 
     if(localId.x == 0)
     {
@@ -226,7 +239,7 @@ void KCTonemapImage(uint3 globalId: SV_DispatchThreadID)
     float2 avgLuminance = float2(exp(params.maxAndAvg[0].ReadLogAvgLum(pixCount)),
                                  params.maxAndAvg[0].ReadAvgLum(pixCount));
 
-    float3 inColorHDR = params.inputTex.Load(uint3(pixId, 0), int2(0, 0)).xyz;
+    float3 inColorHDR = params.inputTex.Load(uint3(pixId, 0)).xyz;
     ColorConverterIn  inColorSpace;
     ColorConverterOut outColorSpace;
     float3 outColorSDR = Tonemapper.ToneMap(inColorHDR,

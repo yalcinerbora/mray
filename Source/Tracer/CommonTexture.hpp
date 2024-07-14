@@ -29,6 +29,7 @@ CommonTextureT<S, A>::CommonTextureT(std::in_place_type_t<T>,
     , isColor(col)
     , pixelType(pt)
 {
+    isMipLoaded.Reset();
     using ConceptType = TexDetail::Concept<T>;
     static_assert(sizeof(ConceptType) <= S, "Unable construct type over storage!");
     ConceptType* ptr = reinterpret_cast<ConceptType*>(storage.data());
@@ -93,6 +94,7 @@ void CommonTextureT<S, A>::CopyFromAsync(const GPUQueue& queue,
                                         const TextureExtent<3>& size,
                                         TransientData regionFrom)
 {
+    isMipLoaded[mipLevel] = true;
     Impl()->CopyFromAsync(queue, mipLevel,
                           offset, size,
                           std::move(regionFrom));
@@ -107,6 +109,20 @@ GenericTextureView CommonTextureT<S, A>::View() const
 
 template<size_t S, size_t A>
 inline
+bool CommonTextureT<S, A>::HasRWView() const
+{
+    return Impl()->HasRWView();
+}
+
+template<size_t S, size_t A>
+inline
+SurfRefVariant CommonTextureT<S, A>::RWView(uint32_t mipLevel)
+{
+    return Impl()->RWView(mipLevel);
+}
+
+template<size_t S, size_t A>
+inline
 const GPUDevice& CommonTextureT<S, A>::Device() const
 {
     return Impl()->Device();
@@ -117,6 +133,13 @@ inline
 uint32_t CommonTextureT<S, A>::ChannelCount() const
 {
     return Impl()->ChannelCount();
+}
+
+template<size_t S, size_t A>
+inline typename CommonTextureT<S, A>::MipIsLoadedBits
+CommonTextureT<S, A>::ValidMips() const
+{
+    return isMipLoaded;
 }
 
 template<size_t S, size_t A>
@@ -138,4 +161,11 @@ inline
 MRayPixelTypeRT CommonTextureT<S, A>::PixelType() const
 {
     return pixelType;
+}
+
+template<size_t S, size_t A>
+inline
+void CommonTextureT<S, A>::SetAllMipsToLoaded()
+{
+    isMipLoaded.Set();
 }

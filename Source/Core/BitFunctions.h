@@ -60,6 +60,7 @@ class Bitset
         public:
         MRAY_HYBRID constexpr BitRef&   operator=(bool);
         MRAY_HYBRID constexpr bool      operator~() const;
+        MRAY_HYBRID constexpr           operator bool() const;
     };
 
     private:
@@ -220,7 +221,14 @@ template<size_t N>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr bool Bitset<N>::BitRef::operator~() const
 {
-    return static_cast<bool>((reference.bits >> index) ^ 0x1) & 0x1;
+    return static_cast<bool>(((reference.bits >> index) ^ 0x1) & 0x1);
+}
+
+template<size_t N>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Bitset<N>::BitRef::operator bool() const
+{
+    return static_cast<bool>((reference.bits >> index) & 0x1);
 }
 
 template<size_t N>
@@ -341,6 +349,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Bitset<N>& Bitset<N>::Reset()
 {
     bits = 0x0;
+    return *this;
 }
 
 template<size_t N>

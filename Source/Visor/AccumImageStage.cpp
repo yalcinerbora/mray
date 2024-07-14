@@ -232,11 +232,12 @@ AccumulateStatus AccumImageStage::IssueAccumulation(const RenderImageSection& se
                         std::numeric_limits<uint64_t>::max());
         MRAY_LOG("[Visor] Released Img\n"
                  "----------------------");
+        // Reset for the next issue
+        vkResetFences(device, 1, &fenceHandle);
         // Signal the MRay renderer that
         // this memory is available now.
         sem->Release();
-        // Reset for the next issue
-        vkResetFences(device, 1, &fenceHandle);
+
     });
     return AccumulateStatus::OK;
 }

@@ -74,7 +74,7 @@ RWTextureRefCUDA<D, T>::RWTextureRefCUDA(cudaSurfaceObject_t sIn)
 
 template <uint32_t D, class T>
 RWTextureRefCUDA<D, T>::RWTextureRefCUDA(RWTextureRefCUDA&& other)
-    : s(std::exchange(s, other.s, cudaSurfaceObject_t(0)))
+    : s(std::exchange(other.s, cudaSurfaceObject_t(0)))
 {}
 
 template <uint32_t D, class T>
@@ -82,7 +82,8 @@ RWTextureRefCUDA<D, T>& RWTextureRefCUDA<D, T>::operator=(RWTextureRefCUDA&& oth
 {
     assert(this != &other);
     CUDA_CHECK(cudaDestroySurfaceObject(s));
-    std::exchange(s, other.s, cudaSurfaceObject_t(0));
+    s = std::exchange(other.s, cudaSurfaceObject_t(0));
+    return *this;
 }
 
 template <uint32_t D, class T>
@@ -116,7 +117,8 @@ TextureCUDA_Normal<D, T>::TextureCUDA_Normal(const GPUDeviceCUDA& device,
     cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<CudaType>();
     CUDA_CHECK(cudaSetDevice(gpu->DeviceId()));
     CUDA_MEM_THROW(cudaMallocMipmappedArray(&data, &channelDesc, extent, p.mipCount,
-                                            cudaArrayDeferredMapping));
+                                            cudaArrayDeferredMapping |
+                                            cudaArraySurfaceLoadStore));
 
     cudaArrayMemoryRequirements memReq;
     CUDA_CHECK(cudaMipmappedArrayGetMemoryRequirements(&memReq, data, gpu->DeviceId()));
@@ -135,7 +137,7 @@ TextureCUDA_Normal<D, T>::TextureCUDA_Normal(const GPUDeviceCUDA& device,
     tDesc.filterMode = DetermineFilterMode(texParams.interp);
     tDesc.mipmapFilterMode = DetermineFilterMode(texParams.interp);
     tDesc.readMode = (texParams.normIntegers) ? cudaReadModeNormalizedFloat
-                                                : cudaReadModeElementType;
+                                              : cudaReadModeElementType;
     tDesc.sRGB = texParams.convertSRGB;
     // Border color can only be zero?
     tDesc.borderColor[0] = 0.0f;
@@ -265,7 +267,7 @@ RWTextureRefCUDA<D, T> TextureCUDA_Normal<D, T>::GenerateRWRef(uint32_t mipLevel
     desc.res.array.array = mipLevelArray;
     CUDA_CHECK(cudaCreateSurfaceObject(&surf, &desc));
 
-    return RWTextureRefCUDA(surf);
+    return RWTextureRefCUDA<D, T>(surf);
 }
 
 template<uint32_t D, class T>

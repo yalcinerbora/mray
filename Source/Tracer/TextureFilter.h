@@ -2,10 +2,12 @@
 
 #include "Core/BitFunctions.h"
 #include "Core/TracerI.h"
+#include "Core/TypeGenFunction.h"
 
 #include "Device/GPUSystem.h"
 
 #include "RenderImage.h"
+#include "Filters.h"
 
 class RayPartitioner;
 
@@ -14,11 +16,19 @@ using TexMipBitSet = Bitset<TracerConstants::MaxTextureMipCount>;
 template<class T>
 using MipArray = std::array<T, TracerConstants::MaxTextureMipCount>;
 
+struct MipGenParams
+{
+    TexMipBitSet validMips;
+    uint16_t     mipCount;
+    Vector2ui    mipZeroRes;
+};
+
 // TODO: YOLO variant is simplest implementation
 // hopefully compile times do not increase as much.
 // Check later.
 using SurfViewVariant = Variant
 <
+    std::monostate,
     RWTextureView<2, Float>,
     RWTextureView<2, Vector2>,
     RWTextureView<2, Vector3>,
@@ -43,6 +53,7 @@ using SurfViewVariant = Variant
 
 using SurfRefVariant = Variant
 <
+    std::monostate,
     RWTextureRef<2, Float>,
     RWTextureRef<2, Vector2>,
     RWTextureRef<2, Vector3>,
@@ -65,19 +76,13 @@ using SurfRefVariant = Variant
     RWTextureRef<2, Vector4s>
 >;
 
-struct GenMipInput
-{
-};
-
-class ReconstructionFilterI
+class TextureFilterI
 {
     public:
-    virtual         ~ReconstructionFilterI() = default;
+    virtual         ~TextureFilterI() = default;
     // Interface
     virtual void    GenerateMips(const std::vector<MipArray<SurfRefVariant>>&,
-                                 uint32_t seed) const = 0;
-
-    //virtual uint32_t    FilterGridSize() const = 0;
+                                 const std::vector<MipGenParams>&) const = 0;
     virtual void    ReconstructionFilterRGB(// Output
                                             const SubImageSpan<3>& img,
                                             // I-O
@@ -90,20 +95,24 @@ class ReconstructionFilterI
                                             Float scalarWeightMultiplier) const = 0;
 };
 
-class ReconstructionFilterBox : public ReconstructionFilterI
+using TexFilterGenerator = GeneratorFuncType<TextureFilterI, const GPUSystem&, float>;
+
+template<FilterType::E E, class FilterFunctor>
+class TextureFilterT : public TextureFilterI
 {
+    public:
+    static constexpr FilterType::E TypeName = E;
+
     private:
     const GPUSystem&    gpuSystem;
     Float               filterRadius;
 
     public:
-    static std::string_view TypeName();
     // Constructors & Destructor
-            ReconstructionFilterBox(const GPUSystem&,
-                                    Float filterRadius);
+            TextureFilterT(const GPUSystem&, Float filterRadius);
     //
     void    GenerateMips(const std::vector<MipArray<SurfRefVariant>>&,
-                         uint32_t seed) const override;
+                         const std::vector<MipGenParams>&) const override;
     void    ReconstructionFilterRGB(// Output
                                     const SubImageSpan<3>& img,
                                     // I-O
@@ -116,31 +125,12 @@ class ReconstructionFilterBox : public ReconstructionFilterI
                                     Float scalarWeightMultiplier) const override;
 };
 
-class ReconstructionFilterMitchell : public ReconstructionFilterI
-{
-    private:
-    const GPUSystem&    gpuSystem;
-    Float               filterRadius;
-    Float               b;
-    Float               c;
+extern template TextureFilterT<FilterType::BOX, BoxFilter>;
+extern template TextureFilterT<FilterType::TENT, TentFilter>;
+extern template TextureFilterT<FilterType::GAUSSIAN, GaussianFilter>;
+extern template TextureFilterT<FilterType::MITCHELL_NETRAVALI, MitchellNetravaliFilter>;
 
-    public:
-    static std::string_view TypeName();
-    // Constructors & Destructor
-    ReconstructionFilterMitchell(const GPUSystem&,
-                                 Float filterRadius,
-                                 Float b, Float c);
-    //
-    void    GenerateMips(const std::vector<MipArray<SurfRefVariant>>&,
-                         uint32_t seed) const override;
-    void    ReconstructionFilterRGB(// Output
-                                    const SubImageSpan<3>& img,
-                                    // I-O
-                                    RayPartitioner& partitioner,
-                                    // Input
-                                    const Span<const Vector3>& dValues,
-                                    const Span<const Vector2>& dImgCoords,
-                                    // Constants
-                                    uint32_t parallelHint,
-                                    Float scalarWeightMultiplier) const override;
-};
+using TextureFilterBox = TextureFilterT<FilterType::BOX, BoxFilter>;
+using TextureFilterTent = TextureFilterT<FilterType::TENT, TentFilter>;
+using TextureFilterGaussian = TextureFilterT<FilterType::GAUSSIAN, GaussianFilter>;
+using TextureFilterMitchellNetravali = TextureFilterT<FilterType::MITCHELL_NETRAVALI, MitchellNetravaliFilter>;

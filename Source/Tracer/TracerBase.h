@@ -13,6 +13,7 @@
 #include "RendererC.h"
 #include "AcceleratorC.h"
 #include "TextureMemory.h"
+#include "TextureFilter.h"
 
 namespace BS { class thread_pool; }
 
@@ -119,6 +120,8 @@ class TracerBase : public TracerI
 
     // Type Generators
     const TypeGeneratorPack&   typeGenerators;
+    // This is common type generator so this is seperate
+    FilterGeneratorMap  filterGenMap;
     // Loaded Parameters
     TracerParameters    params;
     // Texture Related

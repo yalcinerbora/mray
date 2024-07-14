@@ -42,6 +42,7 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     uint32_t    curTileIndex    = 0;
     uint32_t    textureIndex    = 0;
     uint32_t    mipIndex        = 0;
+    Vector2ui   mipSize         = Vector2ui::Zero();
     Vector2ui   tileCount       = Vector2ui::Zero();
     //
     std::vector<const CommonTexture*> textures;

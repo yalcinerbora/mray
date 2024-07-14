@@ -69,17 +69,6 @@ DeviceLocalMemoryCUDA::DeviceLocalMemoryCUDA(DeviceLocalMemoryCUDA&& other) noex
     other.memHandle = 0;
 }
 
-DeviceLocalMemoryCUDA::~DeviceLocalMemoryCUDA()
-{
-    CUdeviceptr driverPtr = std::bit_cast<CUdeviceptr>(dPtr);
-    if(allocSize != 0)
-    {
-        CUDA_DRIVER_CHECK(cuMemUnmap(driverPtr, allocSize));
-        CUDA_DRIVER_CHECK(cuMemRelease(memHandle));
-        CUDA_DRIVER_CHECK(cuMemAddressFree(driverPtr, allocSize));
-    }
-}
-
 DeviceLocalMemoryCUDA& DeviceLocalMemoryCUDA::operator=(const DeviceLocalMemoryCUDA& other)
 {
     assert(this != &other);
@@ -116,6 +105,17 @@ DeviceLocalMemoryCUDA& DeviceLocalMemoryCUDA::operator=(DeviceLocalMemoryCUDA&& 
 
 
     return *this;
+}
+
+DeviceLocalMemoryCUDA::~DeviceLocalMemoryCUDA()
+{
+    CUdeviceptr driverPtr = std::bit_cast<CUdeviceptr>(dPtr);
+    if(allocSize != 0)
+    {
+        CUDA_DRIVER_CHECK(cuMemUnmap(driverPtr, allocSize));
+        CUDA_DRIVER_CHECK(cuMemRelease(memHandle));
+        CUDA_DRIVER_CHECK(cuMemAddressFree(driverPtr, allocSize));
+    }
 }
 
 void DeviceLocalMemoryCUDA::ResizeBuffer(size_t newSize)
@@ -186,11 +186,6 @@ HostLocalMemoryCUDA::HostLocalMemoryCUDA(HostLocalMemoryCUDA&& other) noexcept
     other.size = 0;
 }
 
-HostLocalMemoryCUDA::~HostLocalMemoryCUDA()
-{
-    CUDA_CHECK(cudaFreeHost(hPtr));
-}
-
 HostLocalMemoryCUDA& HostLocalMemoryCUDA::operator=(const HostLocalMemoryCUDA& other)
 {
     assert(this != &other);
@@ -218,6 +213,11 @@ HostLocalMemoryCUDA& HostLocalMemoryCUDA::operator=(HostLocalMemoryCUDA&& other)
     return *this;
 }
 
+HostLocalMemoryCUDA::~HostLocalMemoryCUDA()
+{
+    CUDA_CHECK(cudaFreeHost(hPtr));
+}
+
 Byte* HostLocalMemoryCUDA::DevicePtr()
 {
     return reinterpret_cast<Byte*>(dPtr);
@@ -233,7 +233,7 @@ void HostLocalMemoryCUDA::ResizeBuffer(size_t newSize)
     if(neverDecrease && newSize <= size) return;
 
     size_t copySize = std::min(newSize, size);
-    HostLocalMemoryCUDA newMem(*system, newSize);
+    HostLocalMemoryCUDA newMem(*system, newSize, neverDecrease);
     std::memcpy(newMem.hPtr, hPtr, copySize);
     *this = std::move(newMem);
 }
@@ -241,6 +241,129 @@ void HostLocalMemoryCUDA::ResizeBuffer(size_t newSize)
 size_t HostLocalMemoryCUDA::Size() const
 {
     return size;
+}
+
+// Constructors & Destructor
+HostLocalAlignedMemoryCUDA::HostLocalAlignedMemoryCUDA(const GPUSystemCUDA& systemIn,
+                                                       size_t alignIn, bool ndIn)
+    : system(&systemIn)
+    , hPtr(nullptr)
+    , dPtr(nullptr)
+    , size(0)
+    , allocSize(0)
+    , alignment(alignIn)
+    , neverDecrease(ndIn)
+{}
+
+HostLocalAlignedMemoryCUDA::HostLocalAlignedMemoryCUDA(const GPUSystemCUDA& systemIn,
+                                                       size_t sizeInBytes, size_t alignIn,
+                                                       bool ndIn)
+    : HostLocalAlignedMemoryCUDA(systemIn, alignIn, ndIn)
+{
+    size = sizeInBytes;
+    allocSize = MathFunctions::NextMultiple(sizeInBytes, alignment);
+    alignment = alignIn;
+
+    // Windows is hipster as always
+    // does not have "std::aligned_alloc"
+    // but have its own "_aligned_malloc" so using it.
+    // To confuse it is also has its parameters swapped :)
+    #ifdef MRAY_WINDOWS
+        hPtr = _aligned_malloc(allocSize, alignment);
+    #elif defined MRAY_LINUX
+        hPtr = std::aligned_alloc(alignment, allocSize);
+    #endif
+
+    CUDA_CHECK(cudaHostRegister(hPtr, size, cudaHostRegisterMapped));
+    CUDA_CHECK(cudaHostGetDevicePointer(&dPtr, hPtr, 0));
+}
+
+HostLocalAlignedMemoryCUDA::HostLocalAlignedMemoryCUDA(const HostLocalAlignedMemoryCUDA& other)
+    : HostLocalAlignedMemoryCUDA(*other.system,
+                                 other.size, other.alignment,
+                                 other.neverDecrease)
+{
+    std::memcpy(hPtr, other.hPtr, size);
+}
+
+HostLocalAlignedMemoryCUDA::HostLocalAlignedMemoryCUDA(HostLocalAlignedMemoryCUDA&& other) noexcept
+    : system(other.system)
+    , hPtr(std::exchange(other.hPtr, nullptr))
+    , dPtr(std::exchange(other.dPtr, nullptr))
+    , size(other.size)
+    , allocSize(other.allocSize)
+    , alignment(other.alignment)
+    , neverDecrease(other.neverDecrease)
+{}
+
+HostLocalAlignedMemoryCUDA& HostLocalAlignedMemoryCUDA::operator=(const HostLocalAlignedMemoryCUDA& other)
+{
+    // Utilize copy constructor + move assignment operator
+    *this = HostLocalAlignedMemoryCUDA(other);
+    return *this;
+}
+
+HostLocalAlignedMemoryCUDA& HostLocalAlignedMemoryCUDA::operator=(HostLocalAlignedMemoryCUDA&& other) noexcept
+{
+    assert(this != &other);
+    if(size != 0)
+    {
+        CUDA_CHECK(cudaHostUnregister(hPtr));
+        #ifdef MRAY_WINDOWS
+            _aligned_free(hPtr);
+        #elif defined MRAY_LINUX
+            std::free(hPtr);
+        #endif
+    }
+
+    system = other.system;
+    hPtr = std::exchange(other.hPtr, nullptr);
+    dPtr = std::exchange(other.dPtr, nullptr);
+    size = other.size;
+    allocSize = other.allocSize;
+    alignment = other.alignment;
+    neverDecrease = other.neverDecrease;
+    return *this;
+}
+
+HostLocalAlignedMemoryCUDA::~HostLocalAlignedMemoryCUDA()
+{
+    if(hPtr != 0) CUDA_CHECK(cudaHostUnregister(hPtr));
+    #ifdef MRAY_WINDOWS
+        _aligned_free(hPtr);
+    #elif defined MRAY_LINUX
+        std::free(hPtr);
+    #endif
+}
+
+Byte* HostLocalAlignedMemoryCUDA::DevicePtr()
+{
+    return static_cast<Byte*>(dPtr);
+}
+
+const Byte* HostLocalAlignedMemoryCUDA::DevicePtr() const
+{
+    return static_cast<const Byte*>(dPtr);
+}
+
+void HostLocalAlignedMemoryCUDA::ResizeBuffer(size_t newSize)
+{
+    if(neverDecrease && newSize <= size) return;
+
+    size_t copySize = std::min(newSize, size);
+    HostLocalAlignedMemoryCUDA newMem(*system, newSize, alignment, neverDecrease);
+    std::memcpy(newMem.hPtr, hPtr, copySize);
+    *this = std::move(newMem);
+}
+
+size_t HostLocalAlignedMemoryCUDA::Size() const
+{
+    return size;
+}
+
+size_t HostLocalAlignedMemoryCUDA::AllocSize() const
+{
+    return allocSize;
 }
 
 size_t DeviceMemoryCUDA::FindCommonGranularity() const

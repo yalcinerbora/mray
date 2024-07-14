@@ -8,7 +8,7 @@ RenderImage::RenderImage(TimelineSemaphore* semaphore,
     : gpuSystem(sys)
     , importAlignment(importAlignmentIn)
     , deviceMemory(gpuSystem.AllGPUs(), 16_MiB, 256_MiB)
-    , stagingMemory(gpuSystem, true)
+    , stagingMemory(gpuSystem, importAlignment, true)
     , sem(semaphore, initialSemCounter)
     , processCompleteFence(gpuSystem.BestDevice().GetComputeQueue(0))
     , previousCopyCompleteFence(gpuSystem.BestDevice().GetComputeQueue(0))
@@ -85,7 +85,7 @@ RenderBufferInfo RenderImage::GetBufferInfo(MRayColorSpaceEnum colorspace,
     return RenderBufferInfo
     {
         .data = static_cast<Byte*>(stagingMemory),
-        .totalSize = hostAllocTotalSize,
+        .totalSize = stagingMemory.AllocSize(),
         .renderColorSpace = colorspace,
         .resolution = resolution,
         .depth = totalDepth
@@ -107,23 +107,11 @@ bool RenderImage::Resize(const Vector2ui& extentIn,
                                 deviceMemory,
                                 {totalPixCount * channelCount,
                                  totalPixCount});
-
-    // For host pixels allocate by hand first,
-    // because vulkan etc needs exact multiple of the
-    // import alignment
-    size_t hSize = totalPixCount * channelCount * sizeof(Float);
-    hSize = MathFunctions::NextMultiple(hSize, MemAlloc::DefaultSystemAlignment());
-    hSize += totalPixCount * sizeof(Float);
-    hSize = MathFunctions::NextMultiple<size_t>(hSize, importAlignment);
-    hostAllocTotalSize = hSize;
-    stagingMemory.ResizeBuffer(hostAllocTotalSize);
-    // Since we construct host allocation as "never decrease"
-    // this should not reallocate
+    // Reallocate host buffer
     MemAlloc::AllocateMultiData(std::tie(hPixels, hSamples),
                                 stagingMemory,
                                 {totalPixCount * channelCount,
                                  totalPixCount});
-    assert(hostAllocTotalSize >= stagingMemory.Size());
 
     // Calculate offsets
     Byte* mem = static_cast<Byte*>(deviceMemory);

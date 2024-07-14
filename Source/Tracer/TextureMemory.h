@@ -10,9 +10,9 @@
 #include "TransientPool/TransientPool.h"
 
 #include "GenericGroup.h"
+#include "TextureFilter.h"
 
-//template<Texture T>
-//using Texture2D = Texture<2, T>;
+using FilterGeneratorMap = Map<FilterType::E, TexFilterGenerator>;
 
 // Lets use type erasure on the host side
 // unlike texture views, there are too many texture types
@@ -55,6 +55,11 @@ class CommonTextureI
     // TODO: This may be a limitation for rare cases maybe later?
     virtual GenericTextureView  View() const = 0;
 
+    // Writable view only used for mipmap generation,
+    // Only 2D and not block-compressed textures are supported
+    virtual bool            HasRWView() const = 0;
+    virtual SurfRefVariant  RWView(uint32_t mipLevel) = 0;
+
     // And All Done!
 };
 
@@ -62,7 +67,7 @@ class CommonTextureI
 template<size_t StorageSize, size_t Alignment>
 class alignas(Alignment) CommonTextureT
 {
-    using MipIsLoadedBits = std::bitset<TracerConstants::MaxTextureMipCount>;
+    using MipIsLoadedBits = Bitset<TracerConstants::MaxTextureMipCount>;
     private:
     std::array<Byte, StorageSize> storage;
     // TODO: Could not cast the storate to the interface,
@@ -96,6 +101,7 @@ class alignas(Alignment) CommonTextureT
     size_t          Alignment() const;
     uint32_t        MipCount() const;
     uint32_t        ChannelCount() const;
+    MipIsLoadedBits ValidMips() const;
 
     //
     TextureExtent<3>    Extents() const;
@@ -106,12 +112,17 @@ class alignas(Alignment) CommonTextureT
                                       const TextureExtent<3>& size,
                                       TransientData regionFrom);
     GenericTextureView  View() const;
+    bool                HasRWView() const;
+    SurfRefVariant      RWView(uint32_t mipLevel);
+
     const GPUDevice&    Device() const;
 
     // These are extra functionality that will be built on top of
     MRayColorSpaceEnum  ColorSpace() const;
     AttributeIsColor    IsColor() const;
     MRayPixelTypeRT     PixelType() const;
+
+    void                SetAllMipsToLoaded();
 
 };
 
@@ -129,8 +140,8 @@ class Concept : public CommonTextureI
                         Concept(Args&&...);
 
     void                CommitMemory(const GPUQueue& queue,
-                                        const TextureBackingMemory& deviceMem,
-                                        size_t offset) override;
+                                     const TextureBackingMemory& deviceMem,
+                                     size_t offset) override;
     size_t              Size() const override;
     size_t              Alignment() const override;
     uint32_t            MipCount() const override;
@@ -145,6 +156,8 @@ class Concept : public CommonTextureI
                                       const TextureExtent<3>& size,
                                       TransientData regionFrom) override;
     GenericTextureView  View() const override;
+    bool                HasRWView() const override;
+    SurfRefVariant      RWView(uint32_t mipLevel) override;
 };
 
 }
@@ -167,25 +180,32 @@ class TextureMemory
     using TSTextureViewMap  = ThreadSafeMap<TextureId, GenericTextureView>;
 
     private:
-    const GPUSystem&        gpuSystem;
+    const GPUSystem&            gpuSystem;
+    const TracerParameters&     tracerParams;
+    const FilterGeneratorMap&   filterGenMap;
+    // State
     TextureMemList          texMemList;
     std::atomic_uint32_t    texCounter;
     TSTextureMap            textures;
     uint32_t                clampResolution;
     //
     std::atomic_uint32_t    gpuIndexCounter = 0;
-
     // The view map
     TSTextureViewMap        textureViews;
 
+    // Impl functions
+    void            GenerateMipmaps();
+    void            ConvertColorspaces();
     template<uint32_t D>
-    TextureId CreateTexture(const Vector<D, uint32_t>& size, uint32_t mipCount,
-                            const MRayTextureParameters&);
+    TextureId       CreateTexture(const Vector<D, uint32_t>& size,
+                                  uint32_t mipCount,
+                                  const MRayTextureParameters&);
 
     public:
     // Constructors & Destructor
                     TextureMemory(const GPUSystem&,
-                                  uint32_t clampResolution = std::numeric_limits<uint32_t>::max());
+                                  const TracerParameters&,
+                                  const FilterGeneratorMap&);
 
     //
     TextureId       CreateTexture2D(const Vector2ui& size, uint32_t mipCount,
@@ -196,6 +216,7 @@ class TextureMemory
     void            CommitTextures();
     void            PushTextureData(TextureId, uint32_t mipLevel,
                                     TransientData data);
+    void            Finalize();
 
     const TextureViewMap&   TextureViews() const;
     const TextureMap&       Textures() const;
