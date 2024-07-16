@@ -16,7 +16,7 @@ using TexMipBitSet = Bitset<TracerConstants::MaxTextureMipCount>;
 template<class T>
 using MipArray = std::array<T, TracerConstants::MaxTextureMipCount>;
 
-struct MipGenParams
+struct alignas(Vector4ui) MipGenParams
 {
     TexMipBitSet validMips;
     uint16_t     mipCount;

@@ -59,15 +59,8 @@ void MatGroupLambert::PushAttribute(MaterialKey,
                                     TransientData,
                                     const GPUQueue&)
 {
-    //switch(attributeIndex)
-    //{
-    //    case 0: GenericPushData(id, dAlbedo, std::move(data), true); break;
-    //    case 1: GenericPushData(id, dNormalMaps, std::move(data), true); break;
-    //    default: throw MRayError(MRAY_FORMAT("{:s}: Unkown AttributeIndex {:d}",
-    //                                         TypeName(), attributeIndex));
-    //}
-    throw MRayError("{:s}: Unkown AttributeIndex {:d}",
-                    TypeName(), attributeIndex);
+    throw MRayError("{:s}: Attribute {:d} is \"ConstantOnly\", wrong "
+                    "function is called", TypeName(), attributeIndex);
 }
 
 void MatGroupLambert::PushAttribute(MaterialKey,
@@ -76,15 +69,8 @@ void MatGroupLambert::PushAttribute(MaterialKey,
                                     TransientData,
                                     const GPUQueue&)
 {
-    //switch(attributeIndex)
-    //{
-    //    case 0: GenericPushData(id, subRange, dAlbedo, std::move(data), true); break;
-    //    case 1: GenericPushData(id, subRange, dNormalMaps, std::move(data), true); break;
-    //    default: throw MRayError(MRAY_FORMAT("{:s}: Unkown AttributeIndex {:d}",
-    //                                         TypeName(), attributeIndex));
-    //}
-    throw MRayError("{:s}: Unkown AttributeIndex {:d}",
-                    TypeName(), attributeIndex);
+    throw MRayError("{:s}: Attribute {:d} is \"ConstantOnly\", wrong "
+                    "function is called", TypeName(), attributeIndex);
 }
 
 void MatGroupLambert::PushAttribute(MaterialKey, MaterialKey,
@@ -92,15 +78,8 @@ void MatGroupLambert::PushAttribute(MaterialKey, MaterialKey,
                                     TransientData,
                                     const GPUQueue&)
 {
-    //switch(attributeIndex)
-    //{
-    //    case 0: GenericPushData(idRange, dAlbedo, std::move(data), true, true); break;
-    //    case 1: GenericPushData(idRange, dNormalMaps, std::move(data), true, true); break;
-    //    default: throw MRayError(MRAY_FORMAT("{:s}: Unkown AttributeIndex {:d}",
-    //                                         TypeName(), attributeIndex));
-    //}
-    throw MRayError("{:s}: Unkown AttributeIndex {:d}",
-                    TypeName(), attributeIndex);
+    throw MRayError("{:s}: Attribute {:d} is \"ConstantOnly\", wrong "
+                    "function is called", TypeName(), attributeIndex);
 }
 
 
@@ -325,31 +304,62 @@ void MatGroupUnreal::CommitReservations()
 
 MatAttributeInfoList MatGroupUnreal::AttributeInfo() const
 {
-    return MatAttributeInfoList{};
+    using enum MRayDataEnum;
+    using enum AttributeOptionality;
+    using enum AttributeTexturable;
+    using enum AttributeIsArray;
+    using enum AttributeIsColor;
+    static const MatAttributeInfoList LogicList =
+    {
+        MatAttributeInfo("albedo", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+                         MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR),
+        MatAttributeInfo("metallic", MRayDataType<MR_FLOAT>(), IS_SCALAR,
+                         MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_PURE_DATA),
+        MatAttributeInfo("specular", MRayDataType<MR_FLOAT>(), IS_SCALAR,
+                         MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_PURE_DATA),
+        MatAttributeInfo("roughness", MRayDataType<MR_FLOAT>(), IS_SCALAR,
+                         MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_PURE_DATA),
+        MatAttributeInfo("normalMap", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+                         MR_OPTIONAL, MR_TEXTURE_ONLY, IS_PURE_DATA)
+    };
+    return LogicList;
 }
 
 void MatGroupUnreal::PushAttribute(MaterialKey,
-                                   uint32_t,
+                                   uint32_t attributeIndex,
                                    TransientData,
                                    const GPUQueue&)
-{}
+{
+    throw MRayError("{:s}: Attribute {:d} is \"ConstantOnly\", wrong "
+                    "function is called", TypeName(), attributeIndex);
+}
 
 void MatGroupUnreal::PushAttribute(MaterialKey,
-                                   uint32_t, const Vector2ui&,
+                                   uint32_t attributeIndex,
+                                   const Vector2ui&,
                                    TransientData, const GPUQueue&)
-{}
+{
+    throw MRayError("{:s}: Attribute {:d} is \"ConstantOnly\", wrong "
+                    "function is called", TypeName(), attributeIndex);
+}
 
 void MatGroupUnreal::PushAttribute(MaterialKey, MaterialKey,
-                                   uint32_t, TransientData,
+                                   uint32_t attributeIndex,
+                                   TransientData,
                                    const GPUQueue&)
-{}
+{
+    throw MRayError("{:s}: Attribute {:d} is not \"ConstantOnly\", wrong "
+                    "function is called", TypeName(), attributeIndex);
+}
 
 
 void MatGroupUnreal::PushTexAttribute(MaterialKey, MaterialKey,
                                       uint32_t, TransientData,
                                       std::vector<Optional<TextureId>>,
                                       const GPUQueue&)
-{}
+{
+
+}
 
 void MatGroupUnreal::PushTexAttribute(MaterialKey, MaterialKey,
                                       uint32_t,

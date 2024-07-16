@@ -100,7 +100,8 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Float BoxFilter::Evaluate(const Vector2& duv) const
 {
     Vector2 t = duv.Abs();
-    return (t[0] <= radius || t[1] <= radius) ? Float(1) : Float(0);
+    Float rr = Float(1) / radius;
+    return (t[0] <= radius || t[1] <= radius) ? (Float(0.25) * rr * rr) : Float(0);
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -135,8 +136,12 @@ Float TentFilter::Evaluate(const Vector2& duv) const
 {
     using namespace MathFunctions;
     Vector2 t = (duv * recipRadius).Abs();
-    Float x = Lerp<Float>(1, 0, t[0]);
-    Float y = Lerp<Float>(1, 0, t[1]);
+    Float capSqrt = Float(1) / radius;
+    // TODO: This seems wrong? Pyramdi cap (height)
+    // should be 3/(4 * r^2) ?
+    Float cap = capSqrt;
+    Float x = Lerp<Float>(cap, 0, t[0]);
+    Float y = Lerp<Float>(cap, 0, t[1]);
     return x * y;
 }
 

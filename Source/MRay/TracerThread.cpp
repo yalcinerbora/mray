@@ -31,7 +31,7 @@ void from_json(const nlohmann::json& node, FilterType& t)
 
     FilterType::E type = FilterType::FromString(name);
     if(type == FilterType::END)
-        throw MRayError("Unknown accelerator type name {}",
+        throw MRayError("Unknown filter type name \"{}\"",
                         name);
     t = FilterType{type, radius};
 }
@@ -41,7 +41,7 @@ void from_json(const nlohmann::json& node, AcceleratorType& t)
     auto name = node.get<std::string_view>();
     AcceleratorType::E type = AcceleratorType::FromString(name);
     if(type == AcceleratorType::END)
-        throw MRayError("Unknown accelerator type name {}",
+        throw MRayError("Unknown accelerator type name \"{}\"",
                         name);
     t = AcceleratorType{type};
 }
@@ -51,7 +51,7 @@ void from_json(const nlohmann::json& node, SamplerType& t)
     auto name = node.get<std::string_view>();
     SamplerType::E type = SamplerType::FromString(name);
     if(type == SamplerType::END)
-        throw MRayError("Unknown sampler type name {}",
+        throw MRayError("Unknown sampler type name \"{}\"",
                         name);
     t = SamplerType{type};
 }
@@ -61,7 +61,7 @@ void from_json(const nlohmann::json& node, MRayColorSpaceEnum& t)
     auto name = node.get<std::string_view>();
     MRayColorSpaceEnum e = MRayColorSpaceStringifier::FromString(name);
     if(e == MRayColorSpaceEnum::MR_END)
-        throw MRayError("Unknown color space name {}", name);
+        throw MRayError("Unknown color space \"{}\"", name);
     t = e;
 }
 

@@ -240,6 +240,7 @@ void KCTonemapImage(uint3 globalId: SV_DispatchThreadID)
                                  params.maxAndAvg[0].ReadAvgLum(pixCount));
 
     float3 inColorHDR = params.inputTex.Load(uint3(pixId, 0)).xyz;
+
     ColorConverterIn  inColorSpace;
     ColorConverterOut outColorSpace;
     float3 outColorSDR = Tonemapper.ToneMap(inColorHDR,
@@ -250,4 +251,7 @@ void KCTonemapImage(uint3 globalId: SV_DispatchThreadID)
                                             minmaxLuminance,
                                             avgLuminance);
     params.outputTex[pixId] = float4(outColorSDR, 1.0f);
+
+    //float3 inColorHDR = params.inputTex.Load(uint3(pixId, 0)).xyz;
+    //params.outputTex[pixId] = float4(inColorHDR, 1.0f);
 }

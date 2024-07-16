@@ -216,12 +216,12 @@ Expected<ColorSpacePack> ImageFileOIIO::ColorSpaceToMRay(const std::string& oiio
     // TODO: Not complete, add later
     static constexpr ArrayType LookupList =
     {
-        MapType{"ACES2065-1"sv,     MR_ACES2065_1,  Float(1)},
-        MapType{"ACEScg"sv,         MR_ACES_CG,     Float(1)},
-        MapType{"Rec709"sv,         MR_REC_709,     Float(2.222)},
-        MapType{"sRGB"sv,           MR_REC_709,     Float(2.2)},
+        MapType{"aces2065-1"sv,     MR_ACES2065_1,  Float(1)},
+        MapType{"acescg"sv,         MR_ACES_CG,     Float(1)},
+        MapType{"rec709"sv,         MR_REC_709,     Float(2.222)},
+        MapType{"srgb"sv,           MR_REC_709,     Float(2.2)},
         MapType{"lin_srgb"sv,       MR_REC_709,     Float(1)},
-        MapType{"adobeRGB"sv,       MR_ADOBE_RGB,   Float(2.222)},
+        MapType{"adobergb"sv,       MR_ADOBE_RGB,   Float(2.222)},
         MapType{"linear"sv,         MR_DEFAULT,     Float(1)},
         MapType{"scene_linear"sv,   MR_DEFAULT,     Float(1)}
     };
@@ -235,7 +235,7 @@ Expected<ColorSpacePack> ImageFileOIIO::ColorSpaceToMRay(const std::string& oiio
             std::get<1>(checkType)
         };
     }
-    return MRayError("Unable to convert OIIO type to color space type \"{}\"",
+    return MRayError("Unable to convert OIIO type (\"{}\") to MRay color space type",
                      oiioString);
 
 }
@@ -585,10 +585,10 @@ Expected<Image> ImageFileOIIO::ReadImage()
 
     // Finally find the channel range
     Vector2i channelRange = ImageLoaderI::CalculateChannelRange(subChannels);
-    // Put [0,0) when it is the exact pixel read,
+    // Put [0,-1) when it is the exact pixel read,
     // OIIO may have different (optimized) path for this
     channelRange = (header.pixelType == originalPixType)
-                    ? Vector2i(0)
+                    ? Vector2i(0, -1)
                     : channelRange;
 
     // Read mip by mip

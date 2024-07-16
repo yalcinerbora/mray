@@ -375,6 +375,7 @@ TEST(Dist_Gaussian2D, ZeroVariance)
 
 TEST(Dist_Tent, ZeroVariance)
 {
+    using namespace MathConstants;
     static constexpr uint32_t SAMPLE_COUNT = 128;
     static constexpr uint32_t FUNCTION_COUNT = 16;
     // Function overall min/max
@@ -397,8 +398,8 @@ TEST(Dist_Tent, ZeroVariance)
         }
         else
         {
-           a = distA(rng);
-           b = distB(rng);
+            a = distA(rng);
+            b = distB(rng);
         }
         const Float integral = (b - a) * Float(0.5);
 
@@ -415,13 +416,15 @@ TEST(Dist_Tent, ZeroVariance)
 
             using namespace Distribution;
             auto result = Common::SampleTent(xi, a, b);
+            // Check pdf from the function
+            float pdfFromFunc = Common::PDFTent(result.value, a, b);
+            EXPECT_NEAR(pdfFromFunc, result.pdf, VeryLargeEpsilon<Float>());
+
             EXPECT_GT(result.value, a);
             EXPECT_LT(result.value, b);
             // Evaluate the function
             Float x = result.value;
-            Float t = (x < 0) ? (x / -a) : (x / b);
-            t = (x < 0) ? (x / a) : (x / b);
-            t = std::abs(t);
+            Float t = (x < 0) ? (x / a) : (x / b);
 
             Float eval = MathFunctions::Lerp<Float>(1, 0, t);
             Float estimate = eval / result.pdf;
@@ -430,11 +433,11 @@ TEST(Dist_Tent, ZeroVariance)
             // actual integral.
             // TODO: This is somewhat bad we can only get
             // 10^-3 level of precision? (Is something wrong?)
-            EXPECT_NEAR(integral, estimate, MathConstants::VeryLargeEpsilon<Float>());
+            EXPECT_NEAR(integral, estimate, VeryLargeEpsilon<Float>());
             estimateTotal += estimate;
         }
         Float total = estimateTotal / Float(SAMPLE_COUNT);
-        EXPECT_NEAR(integral, total, MathConstants::LargeEpsilon<Float>());
+        EXPECT_NEAR(integral, total, LargeEpsilon<Float>());
     }
 }
 

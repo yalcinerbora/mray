@@ -250,26 +250,37 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Float> Common::SampleTent(Float xi, Float a, Float b)
 {
     // Dirac delta like, return as if dirac delta
-    if(b - a < MathConstants::Epsilon<Float>())
+    if(b - a < MathConstants::LargeEpsilon<Float>())
         return {Float(0), Float(1) / (b - a)};
 
     using MathFunctions::PrevFloat;
-    assert(a < 0 && b > 0);
+    assert(a <= 0 && b >= 0);
     auto [index, localXi] = BisectSample2(xi, Vector2(-a, b), false);
     localXi = (index == 0) ? (PrevFloat<Float>(1) - localXi) : localXi;
     SampleT<Float> result = SampleLine(localXi, 1, 0);
     Float& x = result.value;
     x = (index == 0) ? (x * a) : (x * b);
-    result.pdf /= (b - a);
-    return result;
+    return SampleT<Float>
+    {
+        result.value,
+        result.pdf * Float(1) / (b - a)
+    };
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float Common::PDFTent(Float x, Float a, Float b)
 {
-    Float mid = (b - a) * Float(0.5);
-    Float x01 = std::abs(x - mid);
-    return PDFLine(x01, 1, 0) * Float(0.5);
+    assert(a <= x && b >= x);
+    if((b - a) < MathConstants::LargeEpsilon<Float>())
+        return Float(1) / (b - a);
+
+    //Float mid = a + (b - a) * Float(0.5);
+    Float x01 = std::abs(1 - x);
+    x01 = (x < 0) ? (x / a) : (x / b);
+    //Float pdf = (x < 0) ? (-a) : b;
+    Float pdf = Float(1) / (b - a);
+    pdf *= PDFLine(x01, 1, 0);
+    return pdf;
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE

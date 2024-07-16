@@ -48,12 +48,96 @@ Vector2i FilterRadiusPixelRange(int32_t wh)
     return range;
 }
 
-// TODO: Should we dedicate a warp per pixel?
-//template <uint32_t TPB, uint32_t LOGICAL_WARP_SIZE, class Filter>
-//MRAY_KERNEL //MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
+MRAY_GPU MRAY_GPU_INLINE
+Vector4 GenericRead(const Vector2ui& pixCoords,
+                    const SurfViewVariant& surf)
+{
+    Vector4 v = DeviceVisit
+    (
+        std::as_const(surf),
+        // Visitor
+        [pixCoords](auto&& readSurf) -> Vector4
+        {
+            Vector4 result = Vector4::Zero();
+            using VariantType = std::remove_cvref_t<decltype(readSurf)>;
+            if constexpr(!std::is_same_v<VariantType, std::monostate>)
+            {
+                using ReadType = typename VariantType::Type;
+                constexpr uint32_t C = VariantType::Channels;
+                ReadType rPix = readSurf(pixCoords);
+                // We need to manually loop over the channels here
+                if constexpr(C != 1)
+                {
+                    UNROLL_LOOP
+                        for(uint32_t c = 0; c < C; c++)
+                            result[c] = static_cast<Float>(rPix[c]);
+                }
+                else result[0] = static_cast<Float>(rPix);
+            }
+            return result;
+        }
+    );
+    return v;
+}
 
-template<class Filter>
-MRAY_KERNEL //MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+MRAY_GPU MRAY_GPU_INLINE
+void GenericWrite(SurfViewVariant& surf,
+                  const Vector4& value,
+                  const Vector2ui& pixCoords)
+{
+    DeviceVisit
+    (
+        surf,
+        // Visitor
+        [value, pixCoords](auto&& writeSurf) -> void
+        {
+            using VariantType = std::remove_cvref_t<decltype(writeSurf)>;
+            if constexpr(!std::is_same_v<VariantType, std::monostate>)
+            {
+                using WriteType = typename VariantType::Type;
+                constexpr uint32_t C = VariantType::Channels;
+                WriteType writeVal;
+                if constexpr(C != 1)
+                {
+                    using InnerT = typename WriteType::InnerType;
+                    UNROLL_LOOP
+                    for(uint32_t c = 0; c < C; c++)
+                    {
+                        Float v = value[c];
+                        if constexpr(std::is_integral_v<InnerT>)
+                        {
+                            using MathFunctions::Clamp;
+                            v = Clamp(std::round(v),
+                                      Float(std::numeric_limits<InnerT>::min()),
+                                      Float(std::numeric_limits<InnerT>::max()));
+
+                        }
+                        writeVal[c] = static_cast<InnerT>(v);
+                    }
+
+                }
+                else
+                {
+                    Float v = value[0];
+                    if constexpr(std::is_integral_v<WriteType>)
+                    {
+                        using MathFunctions::Clamp;
+                        v = Clamp(std::round(v),
+                                  Float(std::numeric_limits<WriteType>::min()),
+                                  Float(std::numeric_limits<WriteType>::max()));
+
+                    }
+                    writeVal = static_cast<WriteType>(v);
+                }
+                writeSurf(pixCoords) = writeVal;
+            }
+        }
+    );
+}
+
+// TODO: Should we dedicate a warp per pixel?
+template<uint32_t TPB, class Filter>
+MRAY_KERNEL //MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
 void KCGenerateMipmaps(// I-O
                        MRAY_GRID_CONSTANT const Span<MipArray<SurfViewVariant>> dSurfaces,
                        // Inputs
@@ -61,36 +145,27 @@ void KCGenerateMipmaps(// I-O
                        // Constants
                        MRAY_GRID_CONSTANT const uint32_t currentMipLevel,
                        MRAY_GRID_CONSTANT const Vector2ui spp,
+                       MRAY_GRID_CONSTANT const uint32_t blockPerTexture,
                        MRAY_GRID_CONSTANT const Filter FilterFunc)
 {
     assert(dSurfaces.size() == dMipGenParamsList.size());
-    Vector2 dXY = Vector2(1) / Vector2(spp);
-
-    KernelCallParams kp;
-    MRAY_SHARED_MEMORY MipGenParams curParams;
-    MRAY_SHARED_MEMORY SurfViewVariant curSurfs[2];
     // Block-stride loop
+    KernelCallParams kp;
     uint32_t textureCount = static_cast<uint32_t>(dSurfaces.size());
-    for(uint32_t tI = kp.blockId; tI < textureCount; tI += kp.gridSize)
+    uint32_t blockCount = blockPerTexture * textureCount;
+    for(uint32_t bI = kp.blockId; bI < blockCount; bI += kp.gridSize)
     {
-        if(kp.threadId == 0) curParams.validMips = dMipGenParamsList[tI].validMips;
-        if(kp.threadId == 1) curParams.mipCount = dMipGenParamsList[tI].mipCount;
-        if(kp.threadId == 2) curParams.mipZeroRes[0] = dMipGenParamsList[tI].mipZeroRes[0];
-        if(kp.threadId == 3) curParams.mipZeroRes[1] = dMipGenParamsList[tI].mipZeroRes[1];
-        // Load the surfaces to shared memory (maybe faster to access?)
-        if(kp.threadId == 4) curSurfs[0] = dSurfaces[tI][currentMipLevel];
-        if(kp.threadId == 5) curSurfs[1] = dSurfaces[tI][currentMipLevel - 1];
-
-        BlockSynchronize();
-
-        SurfViewVariant curT = curSurfs[0];
-        SurfViewVariant prevT = curSurfs[1];
+        uint32_t tI = bI / blockPerTexture;
+        uint32_t localBI = bI % blockPerTexture;
+        // Load to local space
+        MipGenParams curParams = dMipGenParamsList[tI];
+        SurfViewVariant sWriteSurf = dSurfaces[tI][currentMipLevel];
+        const SurfViewVariant sReadSurf = dSurfaces[tI][currentMipLevel - 1];
+        //
         Vector2ui mipRes = Graphics::TextureMipSize(curParams.mipZeroRes,
                                                     currentMipLevel);
         Vector2ui parentRes = Graphics::TextureMipSize(curParams.mipZeroRes,
                                                        currentMipLevel - 1);
-        uint32_t totalPix = mipRes.Multiply();
-
         // Skip this mip if it is already loaded.
         // This may happen when a texture has up to x amount of mips
         // but it can support log2(floor(max(res))) amount so we generate
@@ -100,88 +175,52 @@ void KCGenerateMipmaps(// I-O
         // mip). We need to early exit for a texture that can not support that level of mip.
         // If variant is in monostate we skip this mip level generation
         if(curParams.validMips[currentMipLevel] ||
-           std::holds_alternative<std::monostate>(curT)) continue;
+           std::holds_alternative<std::monostate>(sWriteSurf)) continue;
 
-        // Loop over the pixel by block
-        for(uint32_t pixI = kp.threadId; pixI < totalPix; pixI += kp.blockSize)
+        // Loop over the blocks for this tex
+        static constexpr Vector2ui TILE_SIZE = Vector2ui(32, 16);
+        static_assert(TILE_SIZE.Multiply() == TPB);
+        Vector2ui totalTiles = MathFunctions::DivideUp(mipRes, TILE_SIZE);
+        for(uint32_t tileI = localBI; tileI < totalTiles.Multiply();
+            tileI += blockPerTexture)
         {
-            Vector2ui pixCoordInt = Vector2ui(pixI % mipRes[0], pixI / mipRes[0]);
-            Vector2 pixCoord = (Vector2(pixCoordInt[0], pixCoordInt[1]) +
-                                Vector2(0.5));
+            Vector2ui localPI = Vector2ui(kp.threadId % TILE_SIZE[0],
+                                          kp.threadId / TILE_SIZE[0]);
+            Vector2ui tile2D = Vector2ui(tileI % totalTiles[0],
+                                         tileI / totalTiles[0]);
+            Vector2ui wPixCoordInt = tile2D * TILE_SIZE + localPI;
+
+            if(wPixCoordInt[0] >= mipRes[0] ||
+               wPixCoordInt[1] >= mipRes[1]) continue;
+
+            Vector2 wPixCoord = Vector2(wPixCoordInt) + Vector2(0.5);
             // We use float as a catch-all type
             // It is allocated as a max channel
             Vector4 writePix = Vector4::Zero();
+            Float weightSum = Float(0);
             // Stochastically sample the up level via the filter
             // Mini Monte Carlo..
             for(uint32_t sppY = 0; sppY < spp[1]; sppY++)
             for(uint32_t sppX = 0; sppX < spp[0]; sppX++)
             {
+                Vector2 dXY = Vector2(1) / Vector2(spp);
                 // Create a quasi sampler by perfectly stratifying the
                 // sample space
-                Vector2 xi = dXY * Vector2(sppX, sppY);
+                Vector2 xi = dXY * Float(0.5) + dXY * Vector2(sppX, sppY);
                 SampleT<Vector2> sample = FilterFunc.Sample(xi);
-                //SampleT<Vector2> sample = {Vector2::Zero(), Float(1)};
+                Float weight = FilterFunc.Evaluate(sample.value);
                 // Find the upper level coordinate
-                Vector2 readPixCoord = (pixCoord + sample.value).RoundSelf();
-                readPixCoord *= Vector2(2);
-                readPixCoord.ClampSelf(Vector2::Zero(), Vector2(parentRes - 1));
-                Vector2ui readPixCoordInt = Vector2ui(readPixCoord);
-                Vector4 localPix = DeviceVisit(std::as_const(prevT),
-                [readPixCoordInt](auto&& readSurf) -> Vector4
-                {
-                    Vector4 result = Vector4::Zero();
-                    using VariantType = std::remove_cvref_t<decltype(readSurf)>;
-                    if constexpr(!std::is_same_v<VariantType, std::monostate>)
-                    {
-                        using ReadType = typename VariantType::Type;
-                        constexpr uint32_t C = VariantType::Channels;
-                        ReadType rPix = readSurf(readPixCoordInt);
-                        //ReadType rPix = readSurf(pixCoordInt);
-
-                        // We need to manually loop over the channels here
-                        if constexpr(C != 1)
-                        {
-                            UNROLL_LOOP
-                            for(uint32_t c = 0; c < C; c++)
-                                result[c] = static_cast<Float>(rPix[c]);
-                        }
-                        else result[0] = static_cast<Float>(rPix);
-                    }
-                    return result;
-                });
-                writePix += localPix / sample.pdf;
+                Vector2 rPixCoord = (wPixCoord + sample.value).RoundSelf();
+                rPixCoord *= Vector2(2);
+                rPixCoord.ClampSelf(Vector2::Zero(), Vector2(parentRes - 1));
+                Vector4 localPix = GenericRead(Vector2ui(rPixCoord), sReadSurf);
+                // Actual calculation
+                writePix += weight * localPix * dXY.Multiply() / sample.pdf;
+                weightSum += weight;
             }
-            // Divide by the sample count
-            writePix *= dXY.Multiply();
-
-            //writePix = Vector4(Color::RandomColorRGB(pixI), 1);
-
-
             // Finally write the pixel
-            DeviceVisit(curT,
-            [writePix, pixCoordInt](auto&& writeSurf) -> void
-            {
-                using VariantType = std::remove_cvref_t<decltype(writeSurf)>;
-                if constexpr(!std::is_same_v<VariantType, std::monostate>)
-                {
-                    using WriteType = typename VariantType::Type;
-                    constexpr uint32_t C = VariantType::Channels;
-                    WriteType writeVal;
-                    if constexpr(C != 1)
-                    {
-                        using InnerT = typename WriteType::InnerType;
-                        UNROLL_LOOP
-                        for(uint32_t c = 0; c < C; c++)
-                            writeVal[c] = static_cast<InnerT>(writePix[c]);
-                    }
-                    else writeVal = static_cast<WriteType>(writePix[0]);
-                    writeSurf(pixCoordInt) = writeVal;
-                }
-            });
+            GenericWrite(sWriteSurf, writePix, wPixCoordInt);
         }
-        // Wait for next issue,
-        // This block synchronization is about surface data dependency
-        BlockSynchronize();
     }
 }
 
@@ -563,16 +602,11 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
     const GPUDevice& bestDevice = gpuSystem.BestDevice();
     const GPUQueue& queue = bestDevice.GetComputeQueue(0);
 
-    // TODO: First we need RNG, we are generating multiple mipmaps of multiple
-    // textures in bulk so quality RNG will be too costly. Currently
-    // this is initialization time tool, when we provide this as cmd app
-    // we need to change this.
-    //
-    // We will dedicate a single large block(1024) for each texture.
-    // The reason for large texture is to allocate a single block on an SM,
-    // and provide the entire L1 cache (L1 caches are per SM afaik) to the
-    // block. We assume the mip generation is a memory bound operation.
-    constexpr uint32_t THREAD_PER_BLOCK = 512;
+
+    // We will dedicate N blocks for each texture.
+    static constexpr uint32_t THREAD_PER_BLOCK = 512;
+    static constexpr uint32_t BLOCK_PER_TEXTURE = 256;
+    static constexpr auto Kernel = KCGenerateMipmaps<THREAD_PER_BLOCK, Filter>;
     // To combine the both, we will dedicate a single RNG per thread.
     // This is why space-filling RNG (Sobol etc.) are not used because
     // those will not make sense when each thread will be responsible for
@@ -582,8 +616,9 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
 
     // Find maximum block count for state allocation
     static constexpr Vector2ui SPP = Vector2ui(8, 8);
-    uint32_t blockCount = queue.RecommendedBlockCountDevice(&KCGenerateMipmaps<Filter>,
+    uint32_t blockCount = queue.RecommendedBlockCountDevice(Kernel,
                                                             THREAD_PER_BLOCK, 0);
+
     // We can temporarily allocate here since this will be done at
     // initialization time.
     DeviceLocalMemory mem(gpuSystem.BestDevice());
@@ -591,6 +626,7 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
     Span<MipGenParams> dMipGenParams;
     MemAlloc::AllocateMultiData(std::tie(dSufViews, dMipGenParams),
                                 mem, {textures.size(), textures.size()});
+
 
     // Copy references
     std::vector<MipArray<SurfViewVariant>> hSurfViews;
@@ -637,8 +673,9 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
     // Start from 1, we assume miplevel zero is already available
     for(uint16_t i = 1; i < maxMipCount; i++)
     {
+        uint32_t BlockPerTexture = std::max(1u, BLOCK_PER_TEXTURE >> 1);
         using namespace std::string_view_literals;
-        queue.IssueExactKernel<KCGenerateMipmaps<Filter>>
+        queue.IssueExactKernel<Kernel>
         (
             "KCGenerateMipmaps"sv,
             KernelExactIssueParams
@@ -653,9 +690,9 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
             // Constants
             i,
             SPP,
+            BlockPerTexture,
             filter
         );
-        //break;
     }
     queue.Barrier().Wait();
 }
