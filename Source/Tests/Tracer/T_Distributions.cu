@@ -417,7 +417,7 @@ TEST(Dist_Tent, ZeroVariance)
             using namespace Distribution;
             auto result = Common::SampleTent(xi, a, b);
             // Check pdf from the function
-            float pdfFromFunc = Common::PDFTent(result.value, a, b);
+            Float pdfFromFunc = Common::PDFTent(result.value, a, b);
             EXPECT_NEAR(pdfFromFunc, result.pdf, VeryLargeEpsilon<Float>());
 
             EXPECT_GT(result.value, a);

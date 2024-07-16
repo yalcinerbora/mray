@@ -241,7 +241,7 @@ Float MitchellNetravaliFilter::Evaluate(const Vector2& duv) const
                         coeffs[1] * x2 +
                         coeffs[2] * x +
                         coeffs[3]);
-        return result;
+        return result * Float(0.166666) * radius;
     };
     Vector2 mitchell2D = Vector2(Mitchell1D(duv[0]), Mitchell1D(duv[1]));
     return mitchell2D.Multiply();
@@ -263,55 +263,112 @@ SampleT<Vector2> MitchellNetravaliFilter::Sample(const Vector2& xi) const
 
     // Sampling is somewhat costly here, instead of doing MIS for each dimension,
     // sample in spherical coordinates (disk)
-    using namespace Distribution::Common;
-    auto thetaSample = SampleUniformRange(xi[0], 0, MathConstants::Pi<Float>());
+    //using namespace Distribution::Common;
+    //auto thetaSample = SampleUniformRange(xi[0], 0, MathConstants::Pi<Float>());
+    //std::array<Float, 3> weights{MIS_SIDES, MIS_MID, MIS_SIDES};
+    //auto [index, localXi] = BisectSample(xi[1], Span<Float, 3>(weights.data(), 3), true);
+    //std::array<Float, 3> pdfs;
+    //Float radiusSample;
+    //switch(index)
+    //{
+    //    case 0:
+    //    {
+    //        auto r = SampleGaussian(localXi, sideSigma, -sideMean);
+    //        pdfs[0] = r.pdf;
+    //        pdfs[1] = PDFGaussian(r.value, midSigma);
+    //        pdfs[2] = PDFGaussian(r.value, sideSigma, sideMean);
+    //        radiusSample = r.value;
+    //        break;
+    //    }
+    //    case 1:
+    //    {
+    //        auto r = SampleGaussian(localXi, midSigma);
+    //        pdfs[0] = PDFGaussian(r.value, sideSigma, -sideMean);
+    //        pdfs[1] = r.pdf;
+    //        pdfs[2] = PDFGaussian(r.value, sideSigma, sideMean);
+    //        radiusSample = r.value;
+    //        break;
+    //    }
+    //    case 2:
+    //    {
+    //        auto r = SampleGaussian(localXi, sideSigma, sideMean);
+    //        pdfs[0] = PDFGaussian(r.value, sideSigma, -sideMean);
+    //        pdfs[1] = PDFGaussian(r.value, midSigma);
+    //        pdfs[2] = r.pdf;
+    //        radiusSample = r.value;
+    //        break;
+    //    }
+    //    default: assert(false);
+    //}
+    //using namespace Distribution;
+    //Float misWeight = MIS::BalanceCancelled(Span<Float, 3>(pdfs.data(), 3),
+    //                                        Span<Float, 3>(weights.data(), 3));
 
-    std::array<Float, 3> weights{MIS_SIDES, MIS_MID, MIS_SIDES};
-    auto bisected = BisectSample(xi[1], Span<Float, 3>(weights.data(), 3), true);
-    std::array<Float, 3> pdfs;
-    Float radiusSample;
-    switch(bisected.first)
+    //// Convert
+    //using namespace Graphics;
+    //Vector2 xy = PolarToCartesian(Vector2(radiusSample, thetaSample.value));
+    //return SampleT<Vector2>
+    //{
+    //    .value = xy,
+    //    .pdf = misWeight
+    //};
+
+    // Sample X
+    auto SampleDim = [this](Float xi)
     {
-        case 0:
-        {
-            auto r = SampleGaussian(bisected.second, sideSigma, -sideMean);
-            pdfs[0] = r.pdf;
-            pdfs[1] = PDFGaussian(r.value, midSigma);
-            pdfs[2] = PDFGaussian(r.value, sideSigma, sideMean);
-            radiusSample = r.value;
-            break;
-        }
-        case 1:
-        {
-            auto r = SampleGaussian(bisected.second, midSigma);
-            pdfs[0] = PDFGaussian(r.value, sideSigma, -sideMean);
-            pdfs[1] = r.pdf;
-            pdfs[2] = PDFGaussian(r.value, sideSigma, sideMean);
-            radiusSample = r.value;
-            break;
-        }
-        case 2:
-        {
-            auto r = SampleGaussian(bisected.second, sideSigma, sideMean);
-            pdfs[0] = PDFGaussian(r.value, sideSigma, -sideMean);
-            pdfs[1] = PDFGaussian(r.value, midSigma);
-            pdfs[2] = r.pdf;
-            radiusSample = r.value;
-            break;
-        }
-        default: assert(false);
-    }
-    using namespace Distribution;
-    Float misWeight = MIS::BalanceCancelled(Span<Float, 3>(pdfs.data(), 3),
-                                            Span<Float, 3>(weights.data(), 3));
+        using namespace Distribution::Common;
+        std::array<Float, 3> weights{MIS_SIDES, MIS_MID, MIS_SIDES};
+        auto [index, localXi] = BisectSample(xi, Span<Float, 3>(weights.data(), 3), true);
 
-    // Convert
-    using namespace Graphics;
-    Vector2 xy = PolarToCartesian(Vector2(radiusSample, thetaSample.value));
+        Float sampleVal;
+        std::array<Float, 3> pdfs;
+        switch(index)
+        {
+            case 0:
+            {
+                auto r = SampleGaussian(localXi, sideSigma, -sideMean);
+                pdfs[0] = r.pdf;
+                pdfs[1] = PDFGaussian(r.value, midSigma);
+                pdfs[2] = PDFGaussian(r.value, sideSigma, sideMean);
+                sampleVal = r.value;
+                break;
+            }
+            case 1:
+            {
+                auto r = SampleGaussian(localXi, midSigma);
+                pdfs[0] = PDFGaussian(r.value, sideSigma, -sideMean);
+                pdfs[1] = r.pdf;
+                pdfs[2] = PDFGaussian(r.value, sideSigma, sideMean);
+                sampleVal = r.value;
+                break;
+            }
+            case 2:
+            {
+                auto r = SampleGaussian(localXi, sideSigma, sideMean);
+                pdfs[0] = PDFGaussian(r.value, sideSigma, -sideMean);
+                pdfs[1] = PDFGaussian(r.value, midSigma);
+                pdfs[2] = r.pdf;
+                sampleVal = r.value;
+                break;
+            }
+            default: assert(false);
+        }
+        using namespace Distribution;
+        Float misWeight = MIS::BalanceCancelled(Span<Float, 3>(pdfs.data(), 3),
+                                                Span<Float, 3>(weights.data(), 3));
+        return SampleT<Float>
+        {
+            .value = sampleVal,
+            .pdf = misWeight
+        };
+    };
+
+    auto s0 = SampleDim(xi[0]);
+    auto s1 = SampleDim(xi[1]);
     return SampleT<Vector2>
     {
-        .value = xy,
-        .pdf = misWeight
+        .value = Vector2(s0.value, s1.value),
+        .pdf = s0.pdf * s1.pdf
     };
 }
 
