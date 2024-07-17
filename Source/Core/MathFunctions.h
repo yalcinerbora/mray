@@ -142,11 +142,12 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 T MathFunctions::Gaussian(T x, T sigma, T mu)
 {
     assert(sigma > 0);
-    static constexpr T InvSqrtPi = T(1) / MathConstants::SqrtPi<T>();
+    using namespace MathConstants;
+    static constexpr T InvSqrt2Pi = (T(1) / Sqrt2<T>()) *  (T(1) / SqrtPi<T>());
     T sigmaInv = T(1) / sigma;
-    T result = InvSqrtPi * sigmaInv;
+    T result = InvSqrt2Pi * sigmaInv;
     T pow = (x - mu) * sigmaInv;
-    result *= std::expf(T(-0.5) * pow * pow);
+    result *= std::exp(T(-0.5) * pow * pow);
     return result;
 }
 
@@ -163,60 +164,44 @@ T MathFunctions::InvErrFunc(T x)
     #else
         // Checked the pbrt-v4, it has similar impl
         // of this (From a stackoverflow post).
+        // https://stackoverflow.com/questions/27229371/inverse-error-function-in-c
+        //
         // https://people.maths.ox.ac.uk/gilesm/codes/erfinv/gems.pdf
         // I've checked other sites and find this
         // http://www.mimirgames.com/articles/programming/approximations-of-the-inverse-error-function
-        // since this is on CPU, let's do Newton-Raphson refinement
-
-        using V4 = std::array<T, 4>;
-        using V2 = std::array<T, 4>;
-        T result;
-        if(std::abs(x) <= T(0.7))
+        // However could not implement it properly (numerical precision errors)
+        // Using the stackoverflow one
+        //
+        Float t = std::fma(x, Float(0.0) - x, Float(1.0));
+        t = std::log(t);
+        Float p;
+        if(std::abs(t) > Float(6.125))
         {
-            static constexpr
-            V4 a = {Float(0.886226899), Float(-1.645349621),
-                    Float(0.914624893), Float(-0.140543331)};
-            static constexpr
-            V4 b = {Float(-2.118377725), Float(1.442710462),
-                    Float(-0.329097515), Float(0.012229801)};
-
-            Float xSqr = x * x;
-            result = a[3] * xSqr + a[2];
-            result = result * xSqr + a[1];
-            result = result * xSqr + a[0];
-            Float denom = b[3] * xSqr + b[2];
-            denom = denom * xSqr + b[1];
-            denom = denom * xSqr + b[0];
-            denom = denom * xSqr + Float(1);
-            result /= denom;
+            p = Float(3.03697567e-10);
+            p = std::fma(p, t, Float(2.93243101e-8));
+            p = std::fma(p, t, Float(1.22150334e-6));
+            p = std::fma(p, t, Float(2.84108955e-5));
+            p = std::fma(p, t, Float(3.93552968e-4));
+            p = std::fma(p, t, Float(3.02698812e-3));
+            p = std::fma(p, t, Float(4.83185798e-3));
+            p = std::fma(p, t, Float(-2.64646143e-1));
+            p = std::fma(p, t, Float(8.40016484e-1));
         }
         else
         {
-            static constexpr
-            V4 c = {Float(-1.970840454), Float(-1.62490649),
-                    Float(3.429567803), Float(1.641345311)};
-            static constexpr
-            V2 d = {Float(3.543889200), Float(1.637067800)};
-
-            Float z = std::abs(x);
-            Float y = std::sqrt((-std::log(1 - z) * Float(0.5)));
-            result = c[3]   * y + c[2];
-            result = result * y + c[1];
-            result = result * y + c[0];
-
-            // Do not continue if estimate is already inf
-            if(MathFunctions::IsInf(result)) return result;
-
-            Float denom = d[1] * y + d[0];
-            denom = denom * y + Float(1);
-            result /= denom;
+            p = Float(5.43877832e-9);
+            p = std::fma(p, t, Float(1.43285448e-7));
+            p = std::fma(p, t, Float(1.22774793e-6));
+            p = std::fma(p, t, Float(1.12963626e-7));
+            p = std::fma(p, t, Float(-5.61530760e-5));
+            p = std::fma(p, t, Float(-1.47697632e-4));
+            p = std::fma(p, t, Float(2.31468678e-3));
+            p = std::fma(p, t, Float(1.15392581e-2));
+            p = std::fma(p, t, Float(-2.32015476e-1));
+            p = std::fma(p, t, Float(8.86226892e-1));
         }
-        result = std::copysign(result, x);
-
-        static constexpr T C = T(2) / MathConstants::SqrtPi<T>();
-        result -= (std::erf(result) - x) / (C * std::exp(-result * result));
-        result -= (std::erf(result) - x) / (C * std::exp(-result * result));
-        return result;
+        Float r = x * p;
+        return r;
     #endif
 }
 

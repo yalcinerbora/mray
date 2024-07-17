@@ -152,7 +152,11 @@ Pair<uint32_t, Float> Common::BisectSample(Float xi, const Span<Float, N>& weigh
     Float xiScaled = xi * Float(1) / sum;
     uint32_t i = Find(xiScaled);
     assert(i != N);
-    Float localXi = (xiScaled - weights[i]) / (weights[i + 1] - weights[i]);
+    Float diff = Float(0);
+    if(i > 0) diff += weights[0];
+    if(i > 1) diff += weights[1];
+    Float localXi = (xiScaled - diff) / weights[i];
+    localXi = (isAlreadyNorm) ? localXi : localXi * sum;
     localXi = std::min(localXi, PrevFloat<Float>(1));
     assert(localXi >= 0 && localXi < 1);
     return Pair(i, localXi);
@@ -231,9 +235,10 @@ SampleT<Float> Common::SampleLine(Float xi, Float c, Float d)
     Float denom = Lerp(c * c, d * d, xi);
     denom = c + std::sqrt(denom);
     Float x = (c + d) * xi / denom;
+    using MathFunctions::PrevFloat;
     return SampleT<Float>
     {
-        .value = x,
+        .value = std::min(x, PrevFloat<Float>(1)),
         .pdf = normVal * Lerp(c, d, x)
     };
 }
@@ -297,7 +302,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Float Common::PDFUniformRange(Float x, Float a, Float b)
 {
     if(x < a && x > b) return 0;
-    return 1;
+    return Float(1) / (b - a);
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE

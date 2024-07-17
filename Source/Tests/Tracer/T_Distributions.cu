@@ -210,6 +210,7 @@ TEST(Dist_PiecewiseConstant2D, ZeroVariance)
 
 TEST(Dist_Linear, ZeroVariance)
 {
+    using namespace MathConstants;
     static constexpr uint32_t SAMPLE_COUNT = 128;
     static constexpr uint32_t FUNCTION_COUNT = 16;
     // Function overall min/max
@@ -247,6 +248,9 @@ TEST(Dist_Linear, ZeroVariance)
 
             using namespace Distribution;
             auto result = Common::SampleLine(xi, c, d);
+            // Check pdf from the function
+            Float pdfFromFunc = Common::PDFLine(result.value, c, d);
+            EXPECT_NEAR(pdfFromFunc, result.pdf, VeryLargeEpsilon<Float>());
             EXPECT_GE(result.value, 0);
             EXPECT_LT(result.value, 1);
             // Evaluate the function
@@ -259,12 +263,13 @@ TEST(Dist_Linear, ZeroVariance)
             estimateTotal += estimate;
         }
         Float total = estimateTotal / Float(SAMPLE_COUNT);
-        EXPECT_NEAR(trapz, total, MathConstants::LargeEpsilon<Float>());
+        EXPECT_NEAR(trapz, total, LargeEpsilon<Float>());
     }
 }
 
 TEST(Dist_Gaussian, ZeroVariance)
 {
+    using namespace MathConstants;
     static constexpr uint32_t SAMPLE_COUNT = 128;
     static constexpr uint32_t FUNCTION_COUNT = 16;
     // Function overall min/max
@@ -281,7 +286,7 @@ TEST(Dist_Gaussian, ZeroVariance)
     {
         Float mean = (f == 0) ? Float(0) : distMean(rng);
         Float sigma = (f == 0)
-                        ? MathConstants::Epsilon<Float>()
+                        ? Epsilon<Float>()
                         : distSigma(rng);
 
         const Float integral = Float(1);
@@ -299,6 +304,9 @@ TEST(Dist_Gaussian, ZeroVariance)
 
             using namespace Distribution;
             auto result = Common::SampleGaussian(xi, sigma, mean);
+            // Check pdf from the function
+            Float pdfFromFunc = Common::PDFGaussian(result.value, sigma, mean);
+            EXPECT_NEAR(pdfFromFunc, result.pdf, VeryLargeEpsilon<Float>());
             // Evaluate the function
             Float eval = MathFunctions::Gaussian(result.value,
                                                  sigma, mean);
@@ -312,12 +320,13 @@ TEST(Dist_Gaussian, ZeroVariance)
             estimateTotal += estimate;
         }
         Float total = estimateTotal / Float(SAMPLE_COUNT);
-        EXPECT_NEAR(integral, total, MathConstants::LargeEpsilon<Float>());
+        EXPECT_NEAR(integral, total, LargeEpsilon<Float>());
     }
 }
 
 TEST(Dist_Gaussian2D, ZeroVariance)
 {
+    using namespace MathConstants;
     static constexpr uint32_t SAMPLE_COUNT = 128;
     static constexpr uint32_t FUNCTION_COUNT = 16;
     // Function overall min/max
@@ -337,7 +346,7 @@ TEST(Dist_Gaussian2D, ZeroVariance)
                         : Vector2(distMean(rng),
                                   distMean(rng));
         Float sigma = (f == 0)
-                        ? MathConstants::Epsilon<Float>()
+                        ? Epsilon<Float>()
                         : distSigma(rng);
 
         const Float integral = Float(1);
@@ -355,6 +364,9 @@ TEST(Dist_Gaussian2D, ZeroVariance)
 
             using namespace Distribution;
             auto result = Common::SampleGaussian2D(xi, sigma, mean);
+            // Check pdf from the function
+            Float pdfFromFunc = Common::PDFGaussian2D(result.value, sigma, mean);
+            EXPECT_NEAR(pdfFromFunc, result.pdf, VeryLargeEpsilon<Float>());
             // Evaluate the function
             using MathFunctions::Gaussian;
             Float eval = (Gaussian(result.value[0], sigma, mean[0]) *
@@ -369,7 +381,7 @@ TEST(Dist_Gaussian2D, ZeroVariance)
             estimateTotal += estimate;
         }
         Float total = estimateTotal / Float(SAMPLE_COUNT);
-        EXPECT_NEAR(integral, total, MathConstants::LargeEpsilon<Float>());
+        EXPECT_NEAR(integral, total, LargeEpsilon<Float>());
     }
 }
 
@@ -393,8 +405,8 @@ TEST(Dist_Tent, ZeroVariance)
         Float a, b;
         if(f == 0)
         {
-            a = -MathConstants::Epsilon<Float>();
-            b = MathConstants::Epsilon<Float>();
+            a = -Epsilon<Float>();
+            b = Epsilon<Float>();
         }
         else
         {

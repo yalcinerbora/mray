@@ -2,6 +2,7 @@
 #include "RayPartitioner.h"
 #include "DistributionFunctions.h"
 #include "Filters.h"
+#include "ColorFunctions.h"
 
 #include "Device/GPUSystem.hpp"
 #include "Device/GPUAlgBinaryPartition.h"
@@ -16,8 +17,11 @@
     #error "Only CUDA Version of Reconstruction filter is implemented"
 #endif
 
-
-#include "ColorFunctions.h"
+enum class FilterMode
+{
+    SAMPLING,
+    ACCUMULATE
+};
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 int32_t FilterRadiusToPixelWH(Float filterRadius)
@@ -146,6 +150,7 @@ void KCGenerateMipmaps(// I-O
                        MRAY_GRID_CONSTANT const uint32_t currentMipLevel,
                        MRAY_GRID_CONSTANT const Vector2ui spp,
                        MRAY_GRID_CONSTANT const uint32_t blockPerTexture,
+                       MRAY_GRID_CONSTANT const FilterMode filterMode,
                        MRAY_GRID_CONSTANT const Filter FilterFunc)
 {
     assert(dSurfaces.size() == dMipGenParamsList.size());
@@ -207,17 +212,36 @@ void KCGenerateMipmaps(// I-O
                 // Create a quasi sampler by perfectly stratifying the
                 // sample space
                 Vector2 xi = dXY * Float(0.5) + dXY * Vector2(sppX, sppY);
-                SampleT<Vector2> sample = FilterFunc.Sample(xi);
-                Float weight = FilterFunc.Evaluate(sample.value);
+
+                Vector2 xy;
+                Float pdf, totalSampleInv;
+                if(filterMode == FilterMode::ACCUMULATE)
+                {
+                    xy = xi * Float(2) * FilterFunc.Radius() - FilterFunc.Radius();
+                    pdf = totalSampleInv = Float(1);
+                }
+                else
+                {
+                    auto sample = FilterFunc.Sample(xi);
+                    xy = sample.value;
+                    pdf = sample.pdf;
+                    totalSampleInv = dXY.Multiply();
+                }
+
+                // Eval the weight
+                Float weight = FilterFunc.Evaluate(xy);
                 // Find the upper level coordinate
-                Vector2 rPixCoord = (wPixCoord + sample.value).RoundSelf();
+                Vector2 rPixCoord = (wPixCoord + xy).RoundSelf();
                 rPixCoord *= Vector2(2);
                 rPixCoord.ClampSelf(Vector2::Zero(), Vector2(parentRes - 1));
                 Vector4 localPix = GenericRead(Vector2ui(rPixCoord), sReadSurf);
                 // Actual calculation
-                writePix += weight * localPix * dXY.Multiply() / sample.pdf;
-                weightSum += weight;
+                writePix += weight * localPix * totalSampleInv / pdf;
+                // Do the ingegration seperately as well
+                // we need to compansate
+                weightSum += weight * totalSampleInv / pdf;
             }
+            writePix /= weightSum;
             // Finally write the pixel
             GenericWrite(sWriteSurf, writePix, wPixCoordInt);
         }
@@ -602,31 +626,25 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
     const GPUDevice& bestDevice = gpuSystem.BestDevice();
     const GPUQueue& queue = bestDevice.GetComputeQueue(0);
 
-
     // We will dedicate N blocks for each texture.
     static constexpr uint32_t THREAD_PER_BLOCK = 512;
     static constexpr uint32_t BLOCK_PER_TEXTURE = 256;
     static constexpr auto Kernel = KCGenerateMipmaps<THREAD_PER_BLOCK, Filter>;
-    // To combine the both, we will dedicate a single RNG per thread.
-    // This is why space-filling RNG (Sobol etc.) are not used because
-    // those will not make sense when each thread will be responsible for
-    // multiple pixels. We can reset use multiple dimensions whatnot but
-    // even still generating a sobol sample is costly
-    // (for a single number 32xLUT).
 
     // Find maximum block count for state allocation
+    // TODO: Change this so that it is relative to the
+    // filter radius.
     static constexpr Vector2ui SPP = Vector2ui(8, 8);
     uint32_t blockCount = queue.RecommendedBlockCountDevice(Kernel,
                                                             THREAD_PER_BLOCK, 0);
 
-    // We can temporarily allocate here since this will be done at
+    // We can temporarily allocate here. This will be done at
     // initialization time.
     DeviceLocalMemory mem(gpuSystem.BestDevice());
     Span<MipArray<SurfViewVariant>> dSufViews;
     Span<MipGenParams> dMipGenParams;
     MemAlloc::AllocateMultiData(std::tie(dSufViews, dMipGenParams),
                                 mem, {textures.size(), textures.size()});
-
 
     // Copy references
     std::vector<MipArray<SurfViewVariant>> hSurfViews;
@@ -691,12 +709,12 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
             i,
             SPP,
             BlockPerTexture,
+            FilterMode::SAMPLING,
             filter
         );
     }
     queue.Barrier().Wait();
 }
-
 
 template<FilterType::E E, class FF>
 TextureFilterT<E, FF>::TextureFilterT(const GPUSystem& system,

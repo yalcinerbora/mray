@@ -19,6 +19,8 @@ class BoxFilter
     SampleT<Vector2>    Sample(const Vector2& xi) const;
     MRAY_HYBRID
     Float               Pdf(const Vector2& duv) const;
+    MRAY_HYBRID
+    Float               Radius() const;
 };
 
 class TentFilter
@@ -37,6 +39,8 @@ class TentFilter
     SampleT<Vector2>    Sample(const Vector2& xi) const;
     MRAY_HYBRID
     Float               Pdf(const Vector2& duv) const;
+    MRAY_HYBRID
+    Float               Radius() const;
 };
 
 class GaussianFilter
@@ -55,15 +59,20 @@ class GaussianFilter
     SampleT<Vector2>    Sample(const Vector2& xi) const;
     MRAY_HYBRID
     Float               Pdf(const Vector2& duv) const;
+    MRAY_HYBRID
+    Float               Radius() const;
 };
 
 class MitchellNetravaliFilter
 {
-    static constexpr auto MIS_MID       = Float(0.97619047619);
-    static constexpr auto MIS_SIDES     = Float(0.0119047619048);
-    static constexpr auto SIDE_MEAN     = Float(1.429);
-    static constexpr auto SIDE_STD_DEV  = Float(0.4);
-    static constexpr auto MID_STD_DEV   = Float(0.15);
+    // Ratios are calculated like this
+    // https://www.desmos.com/calculator/vkyenthaiq
+    static constexpr auto MIS_MID       = Float(0.960566188838);
+    static constexpr auto MIS_SIDES     = Float(0.0197169055809);
+
+    static constexpr auto SIDE_MEAN     = Float(1.3);
+    static constexpr auto SIDE_STD_DEV  = Float(0.2);
+    static constexpr auto MID_STD_DEV   = Float(0.528);
     // Wow this works, compile time float comparison
     static_assert((MIS_MID + 2 * MIS_SIDES) == 1, "Weights are not normalized!");
 
@@ -89,6 +98,8 @@ class MitchellNetravaliFilter
     SampleT<Vector2>    Sample(const Vector2& xi) const;
     MRAY_HYBRID
     Float               Pdf(const Vector2& duv) const;
+    MRAY_HYBRID
+    Float               Radius() const;
 };
 
 MRAY_HOST inline
@@ -101,7 +112,9 @@ Float BoxFilter::Evaluate(const Vector2& duv) const
 {
     Vector2 t = duv.Abs();
     Float rr = Float(1) / radius;
-    return (t[0] <= radius || t[1] <= radius) ? (Float(0.25) * rr * rr) : Float(0);
+    return (t[0] <= radius || t[1] <= radius)
+                ? (Float(0.25) * rr * rr)
+                : Float(0);
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -123,6 +136,12 @@ Float BoxFilter::Pdf(const Vector2& duv) const
     using namespace Distribution;
     return (Common::PDFUniformRange(duv[0], -radius, radius) *
             Common::PDFUniformRange(duv[1], -radius, radius));
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float BoxFilter::Radius() const
+{
+    return radius;
 }
 
 MRAY_HOST inline
@@ -163,15 +182,21 @@ Float TentFilter::Pdf(const Vector2& duv) const
 {
     using namespace Distribution;
     Float x = Common::PDFTent(duv[0], -radius, radius);
-    Float y = Common::PDFTent(duv[0], -radius, radius);
+    Float y = Common::PDFTent(duv[1], -radius, radius);
     return x * y;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float TentFilter::Radius() const
+{
+    return radius;
 }
 
 MRAY_HOST inline
 GaussianFilter::GaussianFilter(Float r)
     : radius(r)
-    // ~%95 of samples lies between [-r,r]
-    , sigma(r * Float(0.5))
+    // ~%99.5 of samples lies between [-r,r]
+    , sigma(r * Float(0.285714))
 {}
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -189,8 +214,7 @@ SampleT<Vector2> GaussianFilter::Sample(const Vector2& xi) const
     auto r1 = Common::SampleGaussian(xi[1], sigma);
     return SampleT<Vector2>
     {
-        .value = Vector2(r0.value,
-                                 r1.value),
+        .value = Vector2(r0.value, r1.value),
         .pdf = r0.pdf * r1.pdf
     };
 }
@@ -203,15 +227,22 @@ Float GaussianFilter::Pdf(const Vector2& duv) const
             Common::PDFGaussian(duv[1], sigma));
 }
 
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float GaussianFilter::Radius() const
+{
+    return radius;
+}
+
 MRAY_HOST inline
 MitchellNetravaliFilter::MitchellNetravaliFilter(Float r, Float b, Float c)
     : radius(r)
     , radiusRecip(Float(1) / radius)
-    , midSigma(MID_STD_DEV * radiusRecip * Float(2))
-    , sideSigma(SIDE_STD_DEV * radiusRecip* Float(2))
-    , sideMean(SIDE_MEAN * radiusRecip * Float(2))
+    , midSigma(MID_STD_DEV * r * Float(0.5))
+    , sideSigma(SIDE_STD_DEV * r * Float(0.5))
+    , sideMean(SIDE_MEAN * r * Float(0.5))
 {
     static constexpr Float F = Float(1) / Float(6);
+    // This gives the exact integral to be 1
     coeffs01[0] = F * (Float(12) - Float(9) * b - Float(6) * c);
     coeffs01[1] = F * (Float(-18) + Float(12) * b + Float(6) * c);
     coeffs01[2] = Float(0);
@@ -241,7 +272,7 @@ Float MitchellNetravaliFilter::Evaluate(const Vector2& duv) const
                         coeffs[1] * x2 +
                         coeffs[2] * x +
                         coeffs[3]);
-        return result * Float(0.166666) * radius;
+        return result * Float(2) * radiusRecip;
     };
     Vector2 mitchell2D = Vector2(Mitchell1D(duv[0]), Mitchell1D(duv[1]));
     return mitchell2D.Multiply();
@@ -259,69 +290,17 @@ SampleT<Vector2> MitchellNetravaliFilter::Sample(const Vector2& xi) const
     // Hand crafted two gaussians, one for the middle part and other for the negative
     // this is only usable for b = 0.333, c = 0.333. It may get worse when b/c changes.
     // I don't know how long desmos links stay, but here is the calculation.
-    // https://www.desmos.com/calculator/ijr8qi2dcy
-
-    // Sampling is somewhat costly here, instead of doing MIS for each dimension,
-    // sample in spherical coordinates (disk)
-    //using namespace Distribution::Common;
-    //auto thetaSample = SampleUniformRange(xi[0], 0, MathConstants::Pi<Float>());
-    //std::array<Float, 3> weights{MIS_SIDES, MIS_MID, MIS_SIDES};
-    //auto [index, localXi] = BisectSample(xi[1], Span<Float, 3>(weights.data(), 3), true);
-    //std::array<Float, 3> pdfs;
-    //Float radiusSample;
-    //switch(index)
-    //{
-    //    case 0:
-    //    {
-    //        auto r = SampleGaussian(localXi, sideSigma, -sideMean);
-    //        pdfs[0] = r.pdf;
-    //        pdfs[1] = PDFGaussian(r.value, midSigma);
-    //        pdfs[2] = PDFGaussian(r.value, sideSigma, sideMean);
-    //        radiusSample = r.value;
-    //        break;
-    //    }
-    //    case 1:
-    //    {
-    //        auto r = SampleGaussian(localXi, midSigma);
-    //        pdfs[0] = PDFGaussian(r.value, sideSigma, -sideMean);
-    //        pdfs[1] = r.pdf;
-    //        pdfs[2] = PDFGaussian(r.value, sideSigma, sideMean);
-    //        radiusSample = r.value;
-    //        break;
-    //    }
-    //    case 2:
-    //    {
-    //        auto r = SampleGaussian(localXi, sideSigma, sideMean);
-    //        pdfs[0] = PDFGaussian(r.value, sideSigma, -sideMean);
-    //        pdfs[1] = PDFGaussian(r.value, midSigma);
-    //        pdfs[2] = r.pdf;
-    //        radiusSample = r.value;
-    //        break;
-    //    }
-    //    default: assert(false);
-    //}
-    //using namespace Distribution;
-    //Float misWeight = MIS::BalanceCancelled(Span<Float, 3>(pdfs.data(), 3),
-    //                                        Span<Float, 3>(weights.data(), 3));
-
-    //// Convert
-    //using namespace Graphics;
-    //Vector2 xy = PolarToCartesian(Vector2(radiusSample, thetaSample.value));
-    //return SampleT<Vector2>
-    //{
-    //    .value = xy,
-    //    .pdf = misWeight
-    //};
-
-    // Sample X
+    // https://www.desmos.com/calculator/vkyenthaiq
+    // Sample X or Y
     auto SampleDim = [this](Float xi)
     {
         using namespace Distribution::Common;
         std::array<Float, 3> weights{MIS_SIDES, MIS_MID, MIS_SIDES};
         auto [index, localXi] = BisectSample(xi, Span<Float, 3>(weights.data(), 3), true);
 
-        Float sampleVal;
+        Float sampleVal = Float(0);
         std::array<Float, 3> pdfs;
+        assert(index <= 2);
         switch(index)
         {
             case 0:
@@ -376,14 +355,28 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Float MitchellNetravaliFilter::Pdf(const Vector2& duv) const
 {
     using namespace Distribution;
-    Float x = duv.Length();
     std::array<Float, 3> weights{MIS_SIDES, MIS_MID, MIS_SIDES};
-    std::array<Float, 3> pdfs
+    std::array<Float, 3> pdfs0
     {
-        Common::PDFGaussian(x, sideSigma, -sideMean),
-        Common::PDFGaussian(x, midSigma),
-        Common::PDFGaussian(x, sideSigma, sideMean)
+        Common::PDFGaussian(duv[0], sideSigma, -sideMean),
+        Common::PDFGaussian(duv[0], midSigma),
+        Common::PDFGaussian(duv[0], sideSigma, sideMean)
     };
-    return MIS::BalanceCancelled(Span<Float, 3>(pdfs.data(), 3),
-                                 Span<Float, 3>(weights.data(), 3));
+    std::array<Float, 3> pdfs1
+    {
+        Common::PDFGaussian(duv[1], sideSigma, -sideMean),
+        Common::PDFGaussian(duv[1], midSigma),
+        Common::PDFGaussian(duv[1], sideSigma, sideMean)
+    };
+    Float mis0 = MIS::BalanceCancelled(Span<Float, 3>(pdfs0.data(), 3),
+                                       Span<Float, 3>(weights.data(), 3));
+    Float mis1 = MIS::BalanceCancelled(Span<Float, 3>(pdfs1.data(), 3),
+                                       Span<Float, 3>(weights.data(), 3));
+    return mis0 * mis1;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float MitchellNetravaliFilter::Radius() const
+{
+    return radius;
 }
