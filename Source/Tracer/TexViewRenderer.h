@@ -45,7 +45,7 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     Vector2ui   mipSize         = Vector2ui::Zero();
     Vector2ui   tileCount       = Vector2ui::Zero();
     //
-    std::vector<const CommonTexture*> textures;
+    std::vector<const GenericTexture*> textures;
 
     public:
     // Constructors & Destructor

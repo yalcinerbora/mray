@@ -16,10 +16,10 @@ using FilterGeneratorMap = Map<FilterType::E, TexFilterGenerator>;
 
 // Lets use type erasure on the host side
 // unlike texture views, there are too many texture types
-class CommonTextureI
+class GenericTextureI
 {
     public:
-    virtual ~CommonTextureI() = default;
+    virtual ~GenericTextureI() = default;
 
     // These are fine, no special types here
     virtual void        CommitMemory(const GPUQueue& queue,
@@ -65,35 +65,35 @@ class CommonTextureI
 
 // Generic Texture type
 template<size_t StorageSize, size_t Alignment>
-class alignas(Alignment) CommonTextureT
+class alignas(Alignment) GenericTextureT
 {
     using MipIsLoadedBits = Bitset<TracerConstants::MaxTextureMipCount>;
     private:
     std::array<Byte, StorageSize> storage;
     // TODO: Could not cast the storate to the interface,
     //
-    CommonTextureI*     impl;
+    GenericTextureI*     impl;
     MRayPixelTypeRT     pixelType;
     MRayColorSpaceEnum  colorSpace;
     Float               gamma;
     AttributeIsColor    isColor;
     MipIsLoadedBits     isMipLoaded;
 
-    CommonTextureI*         Impl();
-    const CommonTextureI*   Impl() const;
+    GenericTextureI*         Impl();
+    const GenericTextureI*   Impl() const;
 
     public:
     template<class T, class... Args>
-                    CommonTextureT(std::in_place_type_t<T>,
+                    GenericTextureT(std::in_place_type_t<T>,
                                    MRayColorSpaceEnum, Float,
                                    AttributeIsColor, MRayPixelTypeRT,
                                    Args&&...);
     // TODO: Enable these later
-                    CommonTextureT(const CommonTextureT&) = delete;
-                    CommonTextureT(CommonTextureT&&) = delete;
-    CommonTextureT& operator=(const CommonTextureT&) = delete;
-    CommonTextureT& operator=(CommonTextureT&&) = delete;
-                    ~CommonTextureT();
+                    GenericTextureT(const GenericTextureT&) = delete;
+                    GenericTextureT(GenericTextureT&&) = delete;
+    GenericTextureT& operator=(const GenericTextureT&) = delete;
+    GenericTextureT& operator=(GenericTextureT&&) = delete;
+                    ~GenericTextureT();
 
     void            CommitMemory(const GPUQueue& queue,
                                  const TextureBackingMemory& deviceMem,
@@ -132,7 +132,7 @@ namespace TexDetail
 {
 
 template <typename T>
-class Concept : public CommonTextureI
+class Concept : public GenericTextureI
 {
     private:
     T tex;
@@ -164,7 +164,7 @@ class Concept : public CommonTextureI
 
 }
 
-using CommonTexture = CommonTextureT
+using GenericTexture = GenericTextureT
 <
     std::max(sizeof(TexDetail::Concept<Texture<3, Vector4>>),
              sizeof(TexDetail::Concept<Texture<2, Vector4>>)),
@@ -172,13 +172,13 @@ using CommonTexture = CommonTextureT
              alignof(TexDetail::Concept<Texture<2, Vector4>>))
 >;
 
-using TextureMap = Map<TextureId, CommonTexture>;
+using TextureMap = Map<TextureId, GenericTexture>;
 
 class TextureMemory
 {
     using GPUIterator       = GPUQueueIteratorRoundRobin;
     using TextureMemList    = std::vector<TextureBackingMemory>;
-    using TSTextureMap      = ThreadSafeMap<TextureId, CommonTexture>;
+    using TSTextureMap      = ThreadSafeMap<TextureId, GenericTexture>;
     using TSTextureViewMap  = ThreadSafeMap<TextureId, GenericTextureView>;
 
     private:

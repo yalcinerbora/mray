@@ -13,7 +13,7 @@ function(gen_tracer_target)
     set(SRC_TEXTURE
         ${CURRENT_SOURCE_DIR}/TextureMemory.h
         ${CURRENT_SOURCE_DIR}/TextureMemory.cpp
-        ${CURRENT_SOURCE_DIR}/CommonTexture.hpp
+        ${CURRENT_SOURCE_DIR}/GenericTexture.hpp
         ${CURRENT_SOURCE_DIR}/ColorConverter.h
         ${CURRENT_SOURCE_DIR}/ColorConverter.cu
         ${CURRENT_SOURCE_DIR}/TextureCommon.h

@@ -1,6 +1,6 @@
 #include "TextureMemory.h"
-#include "CommonTexture.hpp"
 #include "ColorConverter.h"
+#include "GenericTexture.hpp"
 
 #include "Core/Error.hpp"
 #include "Core/GraphicsFunctions.h"
@@ -290,7 +290,7 @@ void TextureMemory::CommitTextures()
 
     std::vector<std::vector<size_t>> texSizes(gpuCount);
     std::vector<std::vector<size_t>> texAlignments(gpuCount);
-    std::vector< std::vector<CommonTexture*>> texPtrs(gpuCount);
+    std::vector< std::vector<GenericTexture*>> texPtrs(gpuCount);
     assert(texMemList.size() == gpuCount);
     // Reserve for worst case
     for(size_t i = 0; i < gpuCount; i++)
@@ -303,7 +303,7 @@ void TextureMemory::CommitTextures()
     // Linearize the values for allocation
     for(auto& kv : texMap)
     {
-        CommonTexture& tex = kv.second;
+        GenericTexture& tex = kv.second;
         size_t gpuIndex = std::distance(gpuSystem.SystemDevices().data(),
                                         &tex.Device());
         texPtrs[gpuIndex].push_back(&tex);
@@ -347,7 +347,7 @@ void TextureMemory::PushTextureData(TextureId id, uint32_t mipLevel,
         throw MRayError("Unable to find texture(id)",
                         static_cast<uint32_t>(id));
     }
-    CommonTexture& tex = loc.value().get();
+    GenericTexture& tex = loc.value().get();
 
     // TODO: Again multi-gpu/queue management
     const GPUQueue& queue = tex.Device().GetComputeQueue(0);
@@ -367,7 +367,7 @@ MRayPixelTypeRT TextureMemory::GetPixelType(TextureId id) const
         throw MRayError("Unable to find texture(id)",
                         static_cast<uint32_t>(id));
     }
-    const CommonTexture& tex = loc.value().get();
+    const GenericTexture& tex = loc.value().get();
     return tex.PixelType();
 }
 

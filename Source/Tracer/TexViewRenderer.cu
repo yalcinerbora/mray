@@ -1,6 +1,6 @@
 #include "TexViewRenderer.h"
 #include "TracerBase.h"
-#include "CommonTexture.hpp"
+#include "GenericTexture.hpp"
 
 #include "Device/GPUSystem.hpp"
 
@@ -174,7 +174,7 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
     using MathFunctions::Roll;
     textureIndex = Roll(int32_t(customLogicIndex0), 0,
                         int32_t(textures.size()));
-    const CommonTexture* t = textures[textureIndex];
+    const GenericTexture* t = textures[textureIndex];
     // Mip Index
     mipIndex = Roll(int32_t(customLogicIndex1), 0,
                     int32_t(t->MipCount()));
@@ -303,7 +303,7 @@ RendererOutput TexViewRenderer::DoRender()
     samplePerSec /= 1'000'000;
 
     double spp = double(curTileIndex + 1) / double(tileCount.Multiply());
-    const CommonTexture* curTex = textures[textureIndex];
+    const GenericTexture* curTex = textures[textureIndex];
 
     curTileIndex++;
     return RendererOutput

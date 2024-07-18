@@ -2,26 +2,26 @@
 
 template<size_t S, size_t A>
 inline
-CommonTextureI* CommonTextureT<S,A>::Impl()
+GenericTextureI* GenericTextureT<S,A>::Impl()
 {
     // TODO: Are these correct?
-    CommonTextureI* ptr = reinterpret_cast<CommonTextureI*>(storage.data());
+    GenericTextureI* ptr = reinterpret_cast<GenericTextureI*>(storage.data());
     return std::launder(ptr);
 }
 
 template<size_t S, size_t A>
 inline
-const CommonTextureI* CommonTextureT<S, A>::Impl() const
+const GenericTextureI* GenericTextureT<S, A>::Impl() const
 {
     // TODO: Are these correct?
-    const CommonTextureI* ptr = reinterpret_cast<const CommonTextureI*>(storage.data());
+    const GenericTextureI* ptr = reinterpret_cast<const GenericTextureI*>(storage.data());
     return std::launder(ptr);
 }
 
 template<size_t S, size_t A>
 template<class T, class... Args>
 inline
-CommonTextureT<S, A>::CommonTextureT(std::in_place_type_t<T>,
+GenericTextureT<S, A>::GenericTextureT(std::in_place_type_t<T>,
                                      MRayColorSpaceEnum cs, Float gammaIn,
                                      AttributeIsColor col, MRayPixelTypeRT pt,
                                      Args&&... args)
@@ -38,14 +38,14 @@ CommonTextureT<S, A>::CommonTextureT(std::in_place_type_t<T>,
 }
 
 template<size_t S, size_t A>
-CommonTextureT<S, A>::~CommonTextureT()
+GenericTextureT<S, A>::~GenericTextureT()
 {
     std::destroy_at(Impl());
 }
 
 template<size_t S, size_t A>
 inline
-void CommonTextureT<S, A>::CommitMemory(const GPUQueue& queue,
+void GenericTextureT<S, A>::CommitMemory(const GPUQueue& queue,
                                        const TextureBackingMemory& deviceMem,
                                        size_t offset)
 {
@@ -54,42 +54,42 @@ void CommonTextureT<S, A>::CommitMemory(const GPUQueue& queue,
 
 template<size_t S, size_t A>
 inline
-size_t CommonTextureT<S, A>::Size() const
+size_t GenericTextureT<S, A>::Size() const
 {
     return Impl()->Size();
 }
 
 template<size_t S, size_t A>
 inline
-size_t CommonTextureT<S, A>::Alignment() const
+size_t GenericTextureT<S, A>::Alignment() const
 {
     return Impl()->Alignment();
 }
 
 template<size_t S, size_t A>
 inline
-uint32_t CommonTextureT<S, A>::MipCount() const
+uint32_t GenericTextureT<S, A>::MipCount() const
 {
     return Impl()->MipCount();
 }
 
 template<size_t S, size_t A>
 inline
-TextureExtent<3> CommonTextureT<S, A>::Extents() const
+TextureExtent<3> GenericTextureT<S, A>::Extents() const
 {
     return Impl()->Extents();
 }
 
 template<size_t S, size_t A>
 inline
-uint32_t CommonTextureT<S, A>::DimensionCount() const
+uint32_t GenericTextureT<S, A>::DimensionCount() const
 {
     return Impl()->DimensionCount();
 }
 
 template<size_t S, size_t A>
 inline
-void CommonTextureT<S, A>::CopyFromAsync(const GPUQueue& queue,
+void GenericTextureT<S, A>::CopyFromAsync(const GPUQueue& queue,
                                         uint32_t mipLevel,
                                         const TextureExtent<3>& offset,
                                         const TextureExtent<3>& size,
@@ -103,84 +103,84 @@ void CommonTextureT<S, A>::CopyFromAsync(const GPUQueue& queue,
 
 template<size_t S, size_t A>
 inline
-GenericTextureView CommonTextureT<S, A>::View() const
+GenericTextureView GenericTextureT<S, A>::View() const
 {
     return Impl()->View();
 }
 
 template<size_t S, size_t A>
 inline
-bool CommonTextureT<S, A>::HasRWView() const
+bool GenericTextureT<S, A>::HasRWView() const
 {
     return Impl()->HasRWView();
 }
 
 template<size_t S, size_t A>
 inline
-SurfRefVariant CommonTextureT<S, A>::RWView(uint32_t mipLevel)
+SurfRefVariant GenericTextureT<S, A>::RWView(uint32_t mipLevel)
 {
     return Impl()->RWView(mipLevel);
 }
 
 template<size_t S, size_t A>
 inline
-const GPUDevice& CommonTextureT<S, A>::Device() const
+const GPUDevice& GenericTextureT<S, A>::Device() const
 {
     return Impl()->Device();
 }
 
 template<size_t S, size_t A>
 inline
-uint32_t CommonTextureT<S, A>::ChannelCount() const
+uint32_t GenericTextureT<S, A>::ChannelCount() const
 {
     return Impl()->ChannelCount();
 }
 
 template<size_t S, size_t A>
-inline typename CommonTextureT<S, A>::MipIsLoadedBits
-CommonTextureT<S, A>::ValidMips() const
+inline typename GenericTextureT<S, A>::MipIsLoadedBits
+GenericTextureT<S, A>::ValidMips() const
 {
     return isMipLoaded;
 }
 
 template<size_t S, size_t A>
 inline
-MRayColorSpaceEnum CommonTextureT<S, A>::ColorSpace() const
+MRayColorSpaceEnum GenericTextureT<S, A>::ColorSpace() const
 {
     return colorSpace;
 }
 
 template<size_t S, size_t A>
 inline
-Float CommonTextureT<S, A>::Gamma() const
+Float GenericTextureT<S, A>::Gamma() const
 {
     return gamma;
 }
 
 template<size_t S, size_t A>
 inline
-AttributeIsColor CommonTextureT<S, A>::IsColor() const
+AttributeIsColor GenericTextureT<S, A>::IsColor() const
 {
     return isColor;
 }
 
 template<size_t S, size_t A>
 inline
-MRayPixelTypeRT CommonTextureT<S, A>::PixelType() const
+MRayPixelTypeRT GenericTextureT<S, A>::PixelType() const
 {
     return pixelType;
 }
 
 template<size_t S, size_t A>
 inline
-void CommonTextureT<S, A>::SetAllMipsToLoaded()
+void GenericTextureT<S, A>::SetAllMipsToLoaded()
 {
     isMipLoaded.Set();
 }
 
 template<size_t S, size_t A>
 inline
-void CommonTextureT<S, A>::SetColorSpace(MRayColorSpaceEnum e, Float gammaIn)
+void GenericTextureT<S, A>::SetColorSpace(MRayColorSpaceEnum e, Float gammaIn)
 {
     colorSpace = e;
     gamma = gammaIn;
