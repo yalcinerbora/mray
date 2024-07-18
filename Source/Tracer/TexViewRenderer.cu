@@ -1,12 +1,12 @@
 #include "TexViewRenderer.h"
 #include "TracerBase.h"
-#include "ColorFunctions.h"
 #include "CommonTexture.hpp"
 
 #include "Device/GPUSystem.hpp"
 
 #include "Core/Timer.h"
 #include "Core/DeviceVisit.h"
+#include "Core/ColorFunctions.h"
 
 #include "Device/GPUAlgGeneric.h"
 

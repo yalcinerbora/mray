@@ -4,6 +4,18 @@
 #include <gmock/gmock-matchers.h>
 
 template<ArrayLikeC T>
+requires(std::is_floating_point_v<typename T::InnerType>)
+static void EXPECT_NEAR_MRAY(const T& result, const T& expected,
+                             typename T::InnerType epsilon = MathConstants::SmallEpsilon<Float>())
+{
+    using ::testing::Pointwise;
+    using ::testing::FloatNear;
+    using ::testing::Eq;
+    EXPECT_THAT(result.AsArray(),
+                Pointwise(FloatNear(epsilon), expected.AsArray()));
+}
+
+template<ArrayLikeC T>
 static void EXPECT_EQUAL_MRAY(const T& result, const T& expected)
 {
     using ::testing::Pointwise;

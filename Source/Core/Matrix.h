@@ -26,8 +26,11 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Matrix
     template<std::convertible_to<T> C>
     MRAY_HYBRID constexpr explicit  Matrix(Span<const C, N*N> data);
     template <class... Args>
-    MRAY_HYBRID constexpr explicit  Matrix(const Args... dataList) requires (std::convertible_to<Args, T> && ...) && (sizeof...(Args) == N*N);
-    MRAY_HYBRID constexpr explicit  Matrix(const Vector<N, T> rows[N]);
+    MRAY_HYBRID constexpr explicit  Matrix(const Args... dataList) requires (std::convertible_to<Args, T> && ...) &&
+                                                                            (sizeof...(Args) == N*N);
+    template <class... Rows>
+    MRAY_HYBRID constexpr explicit  Matrix(const Rows&... rows) requires (std::is_same_v<Rows, Vector<N, T>> && ...) &&
+                                                                         (sizeof...(Rows) == N);
     template <unsigned int M>
     MRAY_HYBRID constexpr explicit  Matrix(const Matrix<M, T>&) requires (M > N);
 

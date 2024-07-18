@@ -2,12 +2,12 @@
 #include "RayPartitioner.h"
 #include "DistributionFunctions.h"
 #include "Filters.h"
-#include "ColorFunctions.h"
 
 #include "Device/GPUSystem.hpp"
 #include "Device/GPUAlgBinaryPartition.h"
 #include "Device/GPUAlgRadixSort.h"
 
+#include "Core/ColorFunctions.h"
 #include "Core/DeviceVisit.h"
 #include "Core/GraphicsFunctions.h"
 

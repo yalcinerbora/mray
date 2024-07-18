@@ -32,18 +32,33 @@ constexpr Matrix<N, T>::Matrix(const Args... dataList) requires (std::convertibl
 {}
 
 template <unsigned int N, ArithmeticC T>
+template <class... Rows>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T>::Matrix(const Vector<N, T> rows[N])
+constexpr Matrix<N, T>::Matrix(const Rows&... rows) requires (std::is_same_v<Rows, Vector<N, T>> && ...) && (sizeof...(Rows) == N)
 {
-    UNROLL_LOOP
-    for(unsigned int i = 0; i < N; i++)
+    auto Write = [this](const Vector3& v, unsigned int row) -> void
     {
         UNROLL_LOOP
         for(unsigned int j = 0; j < N; j++)
         {
-            matrix[i * N + j] = rows[i][j];
+            matrix[row * N + j] = v[j];
         }
-    }
+    };
+    auto GenSequence = [Write]<unsigned int... I>
+    (
+        std::integer_sequence<unsigned int, I...>,
+        Tuple<const Rows&...> tuple
+    ) -> void
+    {
+        // Parameter pack expansion
+        (
+            (Write(std::get<I>(tuple), I)),
+            ...
+        );
+    };
+    // Utilize "std::get" via tuple
+    GenSequence(std::make_integer_sequence<unsigned int, sizeof...(Rows)>{},
+                Tuple(rows...));
 }
 
 template <unsigned int N, ArithmeticC T>
