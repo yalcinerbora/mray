@@ -75,6 +75,7 @@ class alignas(Alignment) CommonTextureT
     CommonTextureI*     impl;
     MRayPixelTypeRT     pixelType;
     MRayColorSpaceEnum  colorSpace;
+    Float               gamma;
     AttributeIsColor    isColor;
     MipIsLoadedBits     isMipLoaded;
 
@@ -84,8 +85,8 @@ class alignas(Alignment) CommonTextureT
     public:
     template<class T, class... Args>
                     CommonTextureT(std::in_place_type_t<T>,
-                                   MRayColorSpaceEnum, AttributeIsColor,
-                                   MRayPixelTypeRT,
+                                   MRayColorSpaceEnum, Float,
+                                   AttributeIsColor, MRayPixelTypeRT,
                                    Args&&...);
     // TODO: Enable these later
                     CommonTextureT(const CommonTextureT&) = delete;
@@ -119,11 +120,12 @@ class alignas(Alignment) CommonTextureT
 
     // These are extra functionality that will be built on top of
     MRayColorSpaceEnum  ColorSpace() const;
+    Float               Gamma() const;
     AttributeIsColor    IsColor() const;
     MRayPixelTypeRT     PixelType() const;
 
     void                SetAllMipsToLoaded();
-
+    void                SetColorSpace(MRayColorSpaceEnum, Float = Float(1));
 };
 
 namespace TexDetail

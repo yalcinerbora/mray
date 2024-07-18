@@ -114,11 +114,9 @@ void GenericWrite(SurfViewVariant& surf,
                             v = Clamp(std::round(v),
                                       Float(std::numeric_limits<InnerT>::min()),
                                       Float(std::numeric_limits<InnerT>::max()));
-
                         }
                         writeVal[c] = static_cast<InnerT>(v);
                     }
-
                 }
                 else
                 {
@@ -129,7 +127,6 @@ void GenericWrite(SurfViewVariant& surf,
                         v = Clamp(std::round(v),
                                   Float(std::numeric_limits<WriteType>::min()),
                                   Float(std::numeric_limits<WriteType>::max()));
-
                     }
                     writeVal = static_cast<WriteType>(v);
                 }
@@ -141,7 +138,7 @@ void GenericWrite(SurfViewVariant& surf,
 
 // TODO: Should we dedicate a warp per pixel?
 template<uint32_t TPB, class Filter>
-MRAY_KERNEL //MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
 void KCGenerateMipmaps(// I-O
                        MRAY_GRID_CONSTANT const Span<MipArray<SurfViewVariant>> dSurfaces,
                        // Inputs
@@ -249,7 +246,7 @@ void KCGenerateMipmaps(// I-O
 }
 
 
-MRAY_KERNEL //MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCExpandSamplesToPixels(// Outputs
                              MRAY_GRID_CONSTANT const Span<uint32_t> dPixelIds,
                              MRAY_GRID_CONSTANT const Span<uint32_t> dIndices,
@@ -337,7 +334,7 @@ void KCExpandSamplesToPixels(// Outputs
 }
 
 template <uint32_t TPB, uint32_t LOGICAL_WARP_SIZE, class Filter>
-MRAY_KERNEL //MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
 void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const SubImageSpan<3> img,
                           // Inputs per segment
                           MRAY_GRID_CONSTANT const Span<const uint32_t> dStartOffsets,

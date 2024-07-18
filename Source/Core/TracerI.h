@@ -220,10 +220,11 @@ enum class AttributeIsArray : uint8_t
 struct MRayTextureParameters
 {
     MRayPixelTypeRT             pixelType;
-    MRayColorSpaceEnum          colorSpace = MRayColorSpaceEnum::MR_DEFAULT;
-    AttributeIsColor            isColor = AttributeIsColor::IS_COLOR;
-    MRayTextureEdgeResolveEnum  edgeResolve = MRayTextureEdgeResolveEnum::MR_WRAP;
-    MRayTextureInterpEnum       interpolation = MRayTextureInterpEnum::MR_NEAREST;
+    MRayColorSpaceEnum          colorSpace      = MRayColorSpaceEnum::MR_DEFAULT;
+    Float                       gamma           = Float(1);
+    AttributeIsColor            isColor         = AttributeIsColor::IS_COLOR;
+    MRayTextureEdgeResolveEnum  edgeResolve     = MRayTextureEdgeResolveEnum::MR_WRAP;
+    MRayTextureInterpEnum       interpolation   = MRayTextureInterpEnum::MR_LINEAR;
 };
 
 // Generic Attribute Info

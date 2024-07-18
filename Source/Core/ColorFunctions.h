@@ -86,10 +86,10 @@ namespace Color
         Colorspace() = default;
 
         MRAY_HYBRID
-        constexpr Vector3 ToXYZ(const Vector3&);
+        constexpr Vector3 ToXYZ(const Vector3&) const;
 
         MRAY_HYBRID
-        constexpr Vector3 FromXYZ(const Vector3&);
+        constexpr Vector3 FromXYZ(const Vector3&) const;
     };
 
     template <MRayColorSpaceEnum FromE, MRayColorSpaceEnum ToE>
@@ -107,10 +107,31 @@ namespace Color
         ColorspaceTransfer() = default;
 
         MRAY_HYBRID
-        constexpr Vector3 Convert(const Vector3& rgb);
+        constexpr Vector3 Convert(const Vector3& rgb) const;
+    };
+
+    // EOTF/OETF (Gamma) Related Conversions
+    // Only basic gamma currently
+    class OpticalTransferGamma
+    {
+        private:
+        Float               gamma;
+
+        public:
+        // Constructors & Destructor
+        MRAY_HYBRID         OpticalTransferGamma(Float gamma);
+
+        // Only providing "To" function here since renderer works in
+        // linear space. "From" function is on Visor
+        MRAY_HYBRID Vector3 ToLinear(const Vector3& color) const;
+    };
+
+    class OpticalTransferIdentity
+    {
+        public:
+        MRAY_HYBRID Vector3 ToLinear(const Vector3& color) const;
     };
 }
-
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 Vector3 Color::HSVToRGB(const Vector3& hsv)
@@ -379,21 +400,41 @@ constexpr Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E)
 
 template <MRayColorSpaceEnum E>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector3 Color::Colorspace<E>::ToXYZ(const Vector3& rgb)
+constexpr Vector3 Color::Colorspace<E>::ToXYZ(const Vector3& rgb) const
 {
     return ToXYZMatrix * rgb;
 }
 
 template <MRayColorSpaceEnum E>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector3 Color::Colorspace<E>::FromXYZ(const Vector3& xyz)
+constexpr Vector3 Color::Colorspace<E>::FromXYZ(const Vector3& xyz) const
 {
     return FromXYZMatrix * xyz;
 }
 
 template <MRayColorSpaceEnum F, MRayColorSpaceEnum T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector3 Color::ColorspaceTransfer<F, T>::Convert(const Vector3& rgb)
+constexpr Vector3 Color::ColorspaceTransfer<F, T>::Convert(const Vector3& rgb) const
 {
     return RGBToRGBMatrix * rgb;
+}
+
+// Constructors & Destructor
+MRAY_HYBRID MRAY_CGPU_INLINE
+Color::OpticalTransferGamma::OpticalTransferGamma(Float g)
+    : gamma(g)
+{}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Vector3 Color::OpticalTransferGamma::ToLinear(const Vector3& color) const
+{
+    return Vector3(std::pow(color[0], gamma),
+                   std::pow(color[1], gamma),
+                   std::pow(color[2], gamma));
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Vector3 Color::OpticalTransferIdentity::ToLinear(const Vector3& color) const
+{
+    return color;
 }

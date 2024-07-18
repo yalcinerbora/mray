@@ -23,6 +23,12 @@
         class TextureViewCUDA;
 
         template<uint32_t DIM, class T>
+        class RWTextureViewCUDA;
+
+        template<uint32_t DIM, class T>
+        class RWTextureRefCUDA;
+
+        template<uint32_t DIM, class T>
         class TextureCUDA;
     }
 
@@ -40,6 +46,10 @@
 
     template<uint32_t D, class T>
     using TextureView = mray::cuda::TextureViewCUDA<D, T>;
+    template<uint32_t D, class T>
+    using RWTextureView = mray::cuda::RWTextureViewCUDA<D, T>;
+    template<uint32_t D, class T>
+    using RWTextureRef = mray::cuda::RWTextureRefCUDA<D, T>;
 
     template<uint32_t D, class T>
     using Texture = mray::cuda::TextureCUDA<D, T>;

@@ -62,13 +62,8 @@ namespace NodeNames
     static constexpr bool TEX_NODE_IS_COLOR_DEFAULT     = true;
     static constexpr string_view TEX_NODE_EDGE_RESOLVE  = "edgeResolve"sv;
     static constexpr string_view TEX_NODE_INTERPOLATION = "interpolation"sv;
-
-    //static constexpr string_view TEXTURE_IS_CACHED  = "isCached"sv;
-    //static constexpr string_view TEXTURE_FILTER     = "filter"sv;
-    //static constexpr string_view TEXTURE_FILE       = "file"sv;
-    //static constexpr string_view TEXTURE_SIGNED     = "signed"sv;
-    //static constexpr string_view TEXTURE_MIPMAP     = "generateMipmaps"sv;
-
+    static constexpr string_view TEX_NODE_COLOR_SPACE   = "colorSpace"sv;
+    static constexpr string_view TEX_NODE_GAMMA         = "gamma"sv;
 
     //// Identity Transform Type Name
     //static constexpr string_view TRANSFORM_IDENTITY     = "Identity"sv;

@@ -1,5 +1,6 @@
 #include "TextureMemory.h"
 #include "CommonTexture.hpp"
+#include "ColorConverter.h"
 
 #include "Core/Error.hpp"
 #include "Core/GraphicsFunctions.h"
@@ -136,7 +137,37 @@ SurfRefVariant Concept<T>::RWView(uint32_t mipLevel)
 
 void TextureMemory::ConvertColorspaces()
 {
+    ColorConverter colorConv(gpuSystem);
+    std::vector<MipArray<SurfRefVariant>> texSurfs;
+    std::vector<ColorConvParams> colorConvParams;
+    texSurfs.reserve(textures.Map().size());
+    colorConvParams.reserve(textures.Map().size());
+    // Load to linear memory
+    for(auto& [_, t] : textures.Map())
+    {
+        if(!t.HasRWView()) continue;
 
+        ColorConvParams p =
+        {
+            .validMips = t.ValidMips(),
+            .mipCount = static_cast<uint8_t>(t.MipCount()),
+            .fromColorSpace = t.ColorSpace(),
+            .gamma = t.Gamma()
+        };
+        colorConvParams.push_back(p);
+
+        MipArray<SurfRefVariant> mips;
+        for(uint16_t i = 0; i < p.mipCount; i++)
+            mips[i] = t.RWView(i);
+
+        texSurfs.push_back(std::move(mips));
+
+        t.SetAllMipsToLoaded();
+    }
+
+    // Finally call the kernel
+    colorConv.ConvertColor(texSurfs, colorConvParams,
+                           tracerParams.globalTextureColorSpace);
 }
 
 void TextureMemory::GenerateMipmaps()
@@ -210,9 +241,9 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
         {
             TextureId id = TextureId(texCounter.fetch_add(1));
             auto loc = textures.try_emplace(id, std::in_place_type_t<Texture<D, Type>>{},
-                                            inputParams.colorSpace, inputParams.isColor,
-                                            MRayPixelTypeRT(v),
-                                            device, p);
+                                            inputParams.colorSpace, inputParams.gamma,
+                                            inputParams.isColor,
+                                            MRayPixelTypeRT(v), device, p);
 
             textureViews.try_emplace(id, loc.first->second.View());
             return id;

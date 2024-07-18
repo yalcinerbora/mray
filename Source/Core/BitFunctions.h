@@ -38,8 +38,8 @@ namespace BitFunctions
 template<size_t N>
 class Bitset
 {
-    using Type = std::conditional_t<(N<= 8),    uint8_t,
-                 std::conditional_t<(N <= 16),  uint32_t,
+    using Type = std::conditional_t<(N <= 8),   uint8_t,
+                 std::conditional_t<(N <= 16),  uint16_t,
                  std::conditional_t<(N <= 32),  uint32_t,
                  std::conditional_t<(N <= 64),  uint64_t,
                  void>>>>;

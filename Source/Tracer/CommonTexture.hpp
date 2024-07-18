@@ -22,10 +22,11 @@ template<size_t S, size_t A>
 template<class T, class... Args>
 inline
 CommonTextureT<S, A>::CommonTextureT(std::in_place_type_t<T>,
-                                     MRayColorSpaceEnum cs, AttributeIsColor col,
-                                     MRayPixelTypeRT pt,
+                                     MRayColorSpaceEnum cs, Float gammaIn,
+                                     AttributeIsColor col, MRayPixelTypeRT pt,
                                      Args&&... args)
     : colorSpace(cs)
+    , gamma(gammaIn)
     , isColor(col)
     , pixelType(pt)
 {
@@ -151,6 +152,13 @@ MRayColorSpaceEnum CommonTextureT<S, A>::ColorSpace() const
 
 template<size_t S, size_t A>
 inline
+Float CommonTextureT<S, A>::Gamma() const
+{
+    return gamma;
+}
+
+template<size_t S, size_t A>
+inline
 AttributeIsColor CommonTextureT<S, A>::IsColor() const
 {
     return isColor;
@@ -168,4 +176,12 @@ inline
 void CommonTextureT<S, A>::SetAllMipsToLoaded()
 {
     isMipLoaded.Set();
+}
+
+template<size_t S, size_t A>
+inline
+void CommonTextureT<S, A>::SetColorSpace(MRayColorSpaceEnum e, Float gammaIn)
+{
+    colorSpace = e;
+    gamma = gammaIn;
 }

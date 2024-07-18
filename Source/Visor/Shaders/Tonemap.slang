@@ -41,7 +41,6 @@ struct MinOp : IBinaryOp
 //======================================//
 //      SHADER STORAGE BUFFERS          //
 //======================================//
-
 struct MinMaxAndAvg
 {
     float minLum;

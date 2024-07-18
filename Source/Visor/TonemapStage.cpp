@@ -93,6 +93,7 @@ class Tonemapper_Reinhard_AcesCG_To_SRGB : public TonemapperBase
 
     struct Uniforms
     {
+        uint32_t enable = true;
         uint32_t doKeyAdjust = false;
         float    burnRatio = 1.0f;
         float    key = 0.18f;
@@ -132,21 +133,28 @@ class Tonemapper_Empty_AcesCG_To_HDR10 : public TonemapperBase
     static constexpr VkColorSpaceKHR OUT_CS = VkColorSpaceKHR::VK_COLOR_SPACE_HDR10_ST2084_EXT;
     static constexpr MRayColorSpaceEnum IN_CS = MRayColorSpaceEnum::MR_ACES_CG;
 
+    struct Uniforms
+    {
+        uint32_t enable = true;
+    };
+
     class GUI : public GUITonemapperI
     {
         private:
+        Uniforms&   opts;
         float&      displayNits;
         bool        paramsChanged = true;
 
         public:
-                    GUI(float& displayNits);
+                    GUI(Uniforms&, float& displayNits);
         bool        Render(bool& onOff) override;
         bool        IsParamsChanged() const;
     };
 
     private:
-    GUI             gui;
+    Uniforms        tmParameters;
     float           peakBrightness = 400.0f;
+    GUI             gui;
 
     public:
     Tonemapper_Empty_AcesCG_To_HDR10();
@@ -501,10 +509,15 @@ bool Tonemapper_Reinhard_AcesCG_To_SRGB::GUI::Render(bool& onOff)
                     ImGuiWindowFlags_NoScrollbar |
                     ImGuiWindowFlags_AlwaysAutoResize))
     {
+        // Enable box
+        bool bEnable = static_cast<uint32_t>(opts.enable);
+        paramsChanged |= ImGui::Checkbox("Enable", &bEnable);
+        opts.enable = static_cast<uint32_t>(bEnable);
+
         // Key Adjust enable
-        bool b = static_cast<uint32_t>(opts.doKeyAdjust);
-        paramsChanged |= ImGui::Checkbox("Key Adjust", &b);
-        opts.doKeyAdjust = static_cast<uint32_t>(b);
+        bool bKeyAdj = static_cast<uint32_t>(opts.doKeyAdjust);
+        paramsChanged |= ImGui::Checkbox("Key Adjust", &bKeyAdj);
+        opts.doKeyAdjust = static_cast<uint32_t>(bKeyAdj);
         // Key
         ImGui::Text("Key       ");
         ImGui::SameLine();
@@ -553,8 +566,9 @@ void Tonemapper_Reinhard_AcesCG_To_SRGB::UpdateUniforms()
     }
 }
 
-Tonemapper_Empty_AcesCG_To_HDR10::GUI::GUI(float& nitsIn)
-    : displayNits(nitsIn)
+Tonemapper_Empty_AcesCG_To_HDR10::GUI::GUI(Uniforms& ubo, float& nitsIn)
+    : opts(ubo)
+    , displayNits(nitsIn)
 {}
 
 bool Tonemapper_Empty_AcesCG_To_HDR10::GUI::Render(bool& onOff)
@@ -565,6 +579,11 @@ bool Tonemapper_Empty_AcesCG_To_HDR10::GUI::Render(bool& onOff)
                     ImGuiWindowFlags_NoScrollbar |
                     ImGuiWindowFlags_AlwaysAutoResize))
     {
+        // Enable box
+        bool bEnable = static_cast<uint32_t>(opts.enable);
+        paramsChanged |= ImGui::Checkbox("Enable", &bEnable);
+        opts.enable = static_cast<uint32_t>(bEnable);
+
         ImGui::Text("Display Brightness");
         ImGui::SameLine();
         paramsChanged |= ImGui::DragFloat("##Brightness", &displayNits,
@@ -581,8 +600,8 @@ bool Tonemapper_Empty_AcesCG_To_HDR10::GUI::IsParamsChanged() const
 }
 
 Tonemapper_Empty_AcesCG_To_HDR10::Tonemapper_Empty_AcesCG_To_HDR10()
-    : TonemapperBase(MODULE_NAME, IN_CS, OUT_CS, sizeof(EmptyType), sizeof(float))
-    , gui(peakBrightness)
+    : TonemapperBase(MODULE_NAME, IN_CS, OUT_CS, sizeof(Uniforms), sizeof(float))
+    , gui(tmParameters, peakBrightness)
 {}
 
 GUITonemapperI* Tonemapper_Empty_AcesCG_To_HDR10::AcquireGUI()
@@ -594,8 +613,10 @@ void Tonemapper_Empty_AcesCG_To_HDR10::UpdateUniforms()
 {
     if(gui.IsParamsChanged())
     {
-        Byte* dBufferStart = eotfBuffer.hostPtr + eotfBuffer.offset;
-        std::memcpy(dBufferStart, &peakBrightness, sizeof(float));
+        std::memcpy(uniformBuffer.hostPtr + uniformBuffer.offset,
+                    &tmParameters, sizeof(Uniforms));
+        std::memcpy(eotfBuffer.hostPtr + eotfBuffer.offset,
+                    &peakBrightness, sizeof(float));
         uniformBuffer.FlushRange(handlesVk->deviceVk);
     }
 }

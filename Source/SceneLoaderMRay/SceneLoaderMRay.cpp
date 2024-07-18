@@ -902,14 +902,9 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
                 bool loadAsSigned = jsonNode.AccessOptionalData<bool>(NodeNames::TEX_NODE_AS_SIGNED)
                                         .value_or(NodeNames::TEX_NODE_AS_SIGNED_DEFAULT);
                 auto edgeResolveString = jsonNode.AccessOptionalData<std::string_view>(TEX_NODE_EDGE_RESOLVE);
-                auto edgeResolve = (edgeResolveString)
-                                    ? MRayTextureEdgeResolveStringifier::FromString(edgeResolveString.value())
-                                    : MRayTextureEdgeResolveEnum::MR_WRAP;
-
                 auto interpString = jsonNode.AccessOptionalData<std::string_view>(TEX_NODE_INTERPOLATION);
-                auto interpolation = (interpString)
-                                        ? MRayTextrueInterpStringifier::FromString(interpString.value())
-                                        : MRayTextureInterpEnum::MR_NEAREST;
+                auto colorSpaceString = jsonNode.AccessOptionalData<std::string_view>(TEX_NODE_COLOR_SPACE);
+                auto gamma = jsonNode.AccessOptionalData<bool>(TEX_NODE_GAMMA);
 
                 fileName = Filesystem::RelativePathToAbsolute(fileName, scenePath);
 
@@ -945,10 +940,17 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
                 {
                     .pixelType = header.pixelType,
                     .colorSpace = header.colorSpace.second,
-                    .isColor = (isColor) ? IS_COLOR : IS_PURE_DATA,
-                    .edgeResolve = edgeResolve,
-                    .interpolation = interpolation
+                    .gamma = header.colorSpace.first
                 };
+                if(edgeResolveString.has_value())
+                    params.edgeResolve = MRayTextureEdgeResolveStringifier::FromString(edgeResolveString.value());
+                if(interpString.has_value())
+                    params.interpolation = MRayTextrueInterpStringifier::FromString(interpString.value());
+                // Overwrite color space related info, user has precedence.
+                if(colorSpaceString.has_value())
+                    params.colorSpace = MRayColorSpaceStringifier::FromString(colorSpaceString.value());
+                if(gamma.has_value())
+                    params.gamma = gamma.value();
 
                 TextureId tId;
                 if(header.Is2D())

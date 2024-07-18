@@ -17,9 +17,19 @@ class TimelineSemaphore;
 // Since we call all of the kernels in a static manner
 // (in case of Block Size) hint the compiler
 // using __launch_bounds__ expression
-#define MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(X) __launch_bounds__(X)
+//
+// MSVC Intellisense (realtime compiler) goes insane
+// when it sees this macro so providing it as empty
+#ifdef __INTELLISENSE__
+    #define MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(X)
+#else
+    #define MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(X) __launch_bounds__(X)
+#endif
+
+// Simplified version for default configuration
 #define MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT \
-        MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(StaticThreadPerBlock1D())
+            MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(StaticThreadPerBlock1D())
+
 
 #if __CUDA_ARCH__ >= 700
     #define MRAY_GRID_CONSTANT __grid_constant__
@@ -50,6 +60,7 @@ static void WarpSynchronize()
     localWarpId /= LOGICAL_WARP_SIZE;
     uint32_t localMask = MASK << (localWarpId * LOGICAL_WARP_SIZE);
     __syncwarp(localMask);
+
     #endif
 }
 
