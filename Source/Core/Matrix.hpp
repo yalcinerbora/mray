@@ -397,7 +397,7 @@ constexpr Matrix<N, T> Matrix<N, T>::Inverse() const requires std::floating_poin
 {
     // Do not use determinant function here hand craft it
     // Some data is used on the matrix itself
-    auto Det2x2 = [](T m00, T m01, T m10, T m11)
+    constexpr auto Det2x2 = [](T m00, T m01, T m10, T m11)
     {
         return m00 * m11 - m01 * m10;
     };
@@ -434,7 +434,7 @@ constexpr Matrix<N, T> Matrix<N, T>::Inverse() const requires std::floating_poin
     // https://www.geometrictools.com/Documentation/LaplaceExpansionTheorem.pdf
     // I did not know you can expand non-row/column way.
     // Implementation of Equation 15.
-    auto Det2x2 = [](T m00, T m01, T m10, T m11)
+    constexpr auto Det2x2 = [](T m00, T m01, T m10, T m11)
     {
         return m00 * m11 - m01 * m10;
     };

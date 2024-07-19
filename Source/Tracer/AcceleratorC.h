@@ -868,7 +868,7 @@ uint32_t AcceleratorGroupT<C, PG>::AcceleratorCount() const
 template<class C, PrimitiveGroupC PG>
 uint32_t AcceleratorGroupT<C, PG>::UsedIdBitsInKey() const
 {
-    using namespace BitFunctions;
+    using namespace Bit;
     size_t bitCount = RequiredBitsToRepresent(InstanceCount());
     return static_cast<uint32_t>(bitCount);
 }
@@ -1110,7 +1110,7 @@ void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
     {
         return pair.second->UsedIdBitsInKey();
     });
-    using namespace BitFunctions;
+    using namespace Bit;
     maxBitsUsedOnKey = Vector2ui(RequiredBitsToRepresent(keyBatchPortionMax),
                                  RequiredBitsToRepresent(keyIdPortionMax));
 

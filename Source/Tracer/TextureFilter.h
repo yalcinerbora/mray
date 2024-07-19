@@ -19,8 +19,6 @@ struct alignas(Vector4ui) MipGenParams
     Vector2ui    mipZeroRes;
 };
 
-
-
 class TextureFilterI
 {
     public:

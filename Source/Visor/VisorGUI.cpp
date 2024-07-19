@@ -111,7 +111,7 @@ Pair<double, std::string_view> ConvertMemSizeToGUI(size_t size)
                   "IEE 754 floats.");
     static constexpr size_t DOUBLE_MANTISSA = 52;
     static constexpr size_t MANTISSA_MASK = (size_t(1) << DOUBLE_MANTISSA) - 1;
-    size_t bitCount = BitFunctions::RequiredBitsToRepresent(decimal);
+    size_t bitCount = Bit::RequiredBitsToRepresent(decimal);
     if(bitCount > DOUBLE_MANTISSA)
         decimal >>= (bitCount - DOUBLE_MANTISSA);
     else

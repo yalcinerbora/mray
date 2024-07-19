@@ -2,8 +2,6 @@
 
 #include "Device/GPUSystemForward.h"
 
-#include "Core/ColorFunctions.h"
-
 #include "TextureCommon.h"
 
 struct ColorConvParams
@@ -12,6 +10,7 @@ struct ColorConvParams
     uint8_t             mipCount;
     MRayColorSpaceEnum  fromColorSpace;
     Float               gamma;
+    Vector2ui           mipZeroRes;
 };
 
 class ColorConverter

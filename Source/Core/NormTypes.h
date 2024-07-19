@@ -4,6 +4,7 @@
 #include <limits>
 
 #include "MathForward.h"
+#include "BitFunctions.h"
 
 static consteval unsigned int ChooseNormAlignment(unsigned int totalSize)
 {
@@ -42,6 +43,8 @@ class alignas(ChooseNormAlignment(N * sizeof(T))) UNorm
     constexpr                       UNorm() = default;
     template<std::convertible_to<T> C>
     MRAY_HYBRID constexpr explicit  UNorm(Span<const C, N> data);
+    template<std::floating_point F>
+    MRAY_HYBRID constexpr explicit  UNorm(Vector<N, F>);
     // TODO:
     MRAY_HYBRID constexpr const T&  operator[](unsigned int) const;
     MRAY_HYBRID constexpr T&        operator[](unsigned int);
@@ -71,6 +74,8 @@ class alignas(ChooseNormAlignment(N * sizeof(T))) SNorm
     constexpr                       SNorm() = default;
     template<std::convertible_to<T> C>
     MRAY_HYBRID constexpr explicit  SNorm(Span<const C, N> data);
+    template<std::floating_point F>
+    MRAY_HYBRID constexpr explicit  SNorm(Vector<N, F>);
     // TODO:
     MRAY_HYBRID constexpr const T&  operator[](unsigned int) const;
     MRAY_HYBRID constexpr T&        operator[](unsigned int);
@@ -92,6 +97,19 @@ constexpr UNorm<N, T>::UNorm(Span<const C, N> data)
     for(unsigned int i = 0; i < N; i++)
     {
         v[i] = static_cast<T>(data[i]);
+    }
+}
+
+template <unsigned int N, std::unsigned_integral T>
+template<std::floating_point F>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr UNorm<N, T>::UNorm(Vector<N, F> data)
+{
+    UNROLL_LOOP
+    for(unsigned int i = 0; i < N; i++)
+    {
+        using Bit::NormConversion::ToUNorm;
+        v[i] = ToUNorm<T>(data[i]);
     }
 }
 
@@ -147,6 +165,19 @@ constexpr SNorm<N, T>::SNorm(Span<const C, N> data)
     for(unsigned int i = 0; i < N; i++)
     {
         v[i] = static_cast<T>(data[i]);
+    }
+}
+
+template <unsigned int N, std::signed_integral T>
+template<std::floating_point F>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr SNorm<N, T>::SNorm(Vector<N, F> data)
+{
+    UNROLL_LOOP
+    for(unsigned int i = 0; i < N; i++)
+    {
+        using Bit::NormConversion::ToSNorm;
+        v[i] = ToSNorm<T>(data[i]);
     }
 }
 

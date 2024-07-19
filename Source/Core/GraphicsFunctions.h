@@ -241,6 +241,7 @@ Vector2 PolarToCartesian(const Vector2& polarRT)
     Float y = r * std::sin(theta);
     return Vector2(x, y);
 }
+
 MRAY_HYBRID MRAY_CGPU_INLINE
 Vector2 CartesianToPolar(const Vector2& xy)
 {
@@ -429,171 +430,25 @@ constexpr Vector2 SphericalAnglesToUV(const Vector2& thetaPhi)
     return Vector2(u, v);
 }
 
-namespace MortonCode
+template <>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr uint32_t MortonCode::Compose3D(const Vector3ui& val)
 {
-    template <>
-    MRAY_HYBRID MRAY_CGPU_INLINE
-    constexpr uint32_t Compose3D(const Vector3ui& val)
+    auto Expand3D = [](uint32_t x) -> uint32_t
     {
-        auto Expand3D = [](uint32_t x) -> uint32_t
-        {
-            // https://fgiesen.wordpress.com/2009/12/13/decoding-morton-codes/
-            x &= 0x000003ff;
-            x = (x ^ (x << 16)) & 0xff0000ff;
-            x = (x ^ (x << 8)) & 0x0300f00f;
-            x = (x ^ (x << 4)) & 0x030c30c3;
-            x = (x ^ (x << 2)) & 0x09249249;
-            return x;
-        };
+        // https://fgiesen.wordpress.com/2009/12/13/decoding-morton-codes/
+        x &= 0x000003ff;
+        x = (x ^ (x << 16)) & 0xff0000ff;
+        x = (x ^ (x << 8)) & 0x0300f00f;
+        x = (x ^ (x << 4)) & 0x030c30c3;
+        x = (x ^ (x << 2)) & 0x09249249;
+        return x;
+    };
 
-        uint32_t x = Expand3D(val[0]);
-        uint32_t y = Expand3D(val[1]);
-        uint32_t z = Expand3D(val[2]);
-        return ((x << 0) | (y << 1) | (z << 2));
-    }
-
-    template <>
-    MRAY_HYBRID MRAY_CGPU_INLINE
-    constexpr uint64_t Compose3D(const Vector3ui& val)
-    {
-        auto Expand3D = [](uint32_t v) -> uint64_t
-        {
-            // https://stackoverflow.com/questions/18529057/produce-interleaving-bit-patterns-morton-keys-for-32-bit-64-bit-and-128bit
-            uint64_t x = v;
-            x &= 0x1fffff;
-            x = (x | x << 32) & 0x001f00000000ffff;
-            x = (x | x << 16) & 0x001f0000ff0000ff;
-            x = (x | x << 8) & 0x100f00f00f00f00f;
-            x = (x | x << 4) & 0x10c30c30c30c30c3;
-            x = (x | x << 2) & 0x1249249249249249;
-            return x;
-        };
-
-        uint64_t x = Expand3D(val[0]);
-        uint64_t y = Expand3D(val[1]);
-        uint64_t z = Expand3D(val[2]);
-        return ((x << 0) | (y << 1) | (z << 2));
-    }
-
-    template <>
-    MRAY_HYBRID MRAY_CGPU_INLINE
-    constexpr Vector3ui Decompose3D(uint32_t code)
-    {
-        auto Shrink3D = [](uint32_t x) -> uint32_t
-        {
-            x &= 0x09249249;
-            x = (x ^ (x >> 2)) & 0x030c30c3;
-            x = (x ^ (x >> 4)) & 0x0300f00f;
-            x = (x ^ (x >> 8)) & 0xff0000ff;
-            x = (x ^ (x >> 16)) & 0x000003ff;
-            return x;
-        };
-
-        uint32_t x = Shrink3D(code >> 0);
-        uint32_t y = Shrink3D(code >> 1);
-        uint32_t z = Shrink3D(code >> 2);
-        return Vector3ui(x, y, z);
-    }
-
-    template <>
-    MRAY_HYBRID MRAY_CGPU_INLINE
-    constexpr Vector3ui Decompose3D(uint64_t code)
-    {
-        auto Shrink3D = [](uint64_t x) -> uint32_t
-        {
-            x &= 0x1249249249249249;
-            x = (x ^ (x >> 2)) & 0x30c30c30c30c30c3;
-            x = (x ^ (x >> 4)) & 0xf00f00f00f00f00f;
-            x = (x ^ (x >> 8)) & 0x00ff0000ff0000ff;
-            x = (x ^ (x >> 16)) & 0x00ff00000000ffff;
-            x = (x ^ (x >> 32)) & 0x00000000001fffff;
-            return static_cast<uint32_t>(x);
-        };
-
-        uint32_t x = Shrink3D(code >> 0);
-        uint32_t y = Shrink3D(code >> 1);
-        uint32_t z = Shrink3D(code >> 2);
-        return Vector3ui(x, y, z);
-    }
-
-    template <>
-    MRAY_HYBRID MRAY_CGPU_INLINE
-        constexpr uint32_t Compose2D(const Vector2ui& val)
-    {
-        auto Expand2D = [](uint32_t val) -> uint32_t
-        {
-            // https://fgiesen.wordpress.com/2009/12/13/decoding-morton-codes/
-            uint32_t x = val;
-            x &= 0x0000ffff;
-            x = (x ^ (x << 8)) & 0x00ff00ff;
-            x = (x ^ (x << 4)) & 0x0f0f0f0f;
-            x = (x ^ (x << 2)) & 0x33333333;
-            x = (x ^ (x << 1)) & 0x55555555;
-            return x;
-        };
-        uint32_t x = Expand2D(val[0]);
-        uint32_t y = Expand2D(val[1]);
-        return ((x << 0) | (y << 1));
-    }
-
-    template <>
-    MRAY_HYBRID MRAY_CGPU_INLINE
-        constexpr uint64_t Compose2D(const Vector2ui& val)
-    {
-        auto Expand2D = [](uint32_t val) -> uint64_t
-        {
-            // https://stackoverflow.com/questions/30539347/2d-morton-code-encode-decode-64bits
-            uint64_t x = val;
-            x = (x | (x << 16)) & 0x0000FFFF0000FFFF;
-            x = (x | (x << 8)) & 0x00FF00FF00FF00FF;
-            x = (x | (x << 4)) & 0x0F0F0F0F0F0F0F0F;
-            x = (x | (x << 2)) & 0x3333333333333333;
-            x = (x | (x << 1)) & 0x5555555555555555;
-            return x;
-        };
-        uint64_t x = Expand2D(val[0]);
-        uint64_t y = Expand2D(val[1]);
-        return ((x << 0) | (y << 1));
-
-    }
-
-    template <>
-    MRAY_HYBRID MRAY_CGPU_INLINE
-        constexpr Vector2ui Decompose2D(uint32_t code)
-    {
-        auto Shrink2D = [](uint32_t x)
-        {
-            x &= 0x55555555;
-            x = (x ^ (x >> 1)) & 0x33333333;
-            x = (x ^ (x >> 2)) & 0x0f0f0f0f;
-            x = (x ^ (x >> 4)) & 0x00ff00ff;
-            x = (x ^ (x >> 8)) & 0x0000ffff;
-            return x;
-        };
-        uint32_t x = Shrink2D(code >> 0);
-        uint32_t y = Shrink2D(code >> 1);
-        return Vector2ui(x, y);
-    }
-
-    template <>
-    MRAY_HYBRID MRAY_CGPU_INLINE
-        constexpr Vector2ui Decompose2D(uint64_t code)
-    {
-        auto Shrink2D = [](uint64_t x)
-        {
-            // https://stackoverflow.com/questions/30539347/2d-morton-code-encode-decode-64bits
-            x = x & 0x5555555555555555;
-            x = (x | (x >> 1)) & 0x3333333333333333;
-            x = (x | (x >> 2)) & 0x0F0F0F0F0F0F0F0F;
-            x = (x | (x >> 4)) & 0x00FF00FF00FF00FF;
-            x = (x | (x >> 8)) & 0x0000FFFF0000FFFF;
-            x = (x | (x >> 16)) & 0x00000000FFFFFFFF;
-            return static_cast<uint32_t>(x);
-        };
-        uint32_t x = Shrink2D(code >> 0);
-        uint32_t y = Shrink2D(code >> 1);
-        return Vector2ui(x, y);
-    }
+    uint32_t x = Expand3D(val[0]);
+    uint32_t y = Expand3D(val[1]);
+    uint32_t z = Expand3D(val[2]);
+    return ((x << 0) | (y << 1) | (z << 2));
 }
 
 template<uint32_t C>
@@ -616,7 +471,150 @@ MRAY_HYBRID constexpr
 uint32_t TextureMipCount(Vector<C, uint32_t> resolution)
 {
     uint32_t maxDim = resolution[resolution.Maximum()];
-    return BitFunctions::RequiredBitsToRepresent(maxDim);
+    return Bit::RequiredBitsToRepresent(maxDim);
+}
+
+template <>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr uint64_t MortonCode::Compose3D(const Vector3ui& val)
+{
+    auto Expand3D = [](uint32_t v) -> uint64_t
+    {
+        // https://stackoverflow.com/questions/18529057/produce-interleaving-bit-patterns-morton-keys-for-32-bit-64-bit-and-128bit
+        uint64_t x = v;
+        x &= 0x1fffff;
+        x = (x | x << 32) & 0x001f00000000ffff;
+        x = (x | x << 16) & 0x001f0000ff0000ff;
+        x = (x | x << 8) & 0x100f00f00f00f00f;
+        x = (x | x << 4) & 0x10c30c30c30c30c3;
+        x = (x | x << 2) & 0x1249249249249249;
+        return x;
+    };
+
+    uint64_t x = Expand3D(val[0]);
+    uint64_t y = Expand3D(val[1]);
+    uint64_t z = Expand3D(val[2]);
+    return ((x << 0) | (y << 1) | (z << 2));
+}
+
+template <>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Vector3ui MortonCode::Decompose3D(uint32_t code)
+{
+    auto Shrink3D = [](uint32_t x) -> uint32_t
+    {
+        x &= 0x09249249;
+        x = (x ^ (x >> 2)) & 0x030c30c3;
+        x = (x ^ (x >> 4)) & 0x0300f00f;
+        x = (x ^ (x >> 8)) & 0xff0000ff;
+        x = (x ^ (x >> 16)) & 0x000003ff;
+        return x;
+    };
+
+    uint32_t x = Shrink3D(code >> 0);
+    uint32_t y = Shrink3D(code >> 1);
+    uint32_t z = Shrink3D(code >> 2);
+    return Vector3ui(x, y, z);
+}
+
+template <>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Vector3ui MortonCode::Decompose3D(uint64_t code)
+{
+    auto Shrink3D = [](uint64_t x) -> uint32_t
+    {
+        x &= 0x1249249249249249;
+        x = (x ^ (x >> 2)) & 0x30c30c30c30c30c3;
+        x = (x ^ (x >> 4)) & 0xf00f00f00f00f00f;
+        x = (x ^ (x >> 8)) & 0x00ff0000ff0000ff;
+        x = (x ^ (x >> 16)) & 0x00ff00000000ffff;
+        x = (x ^ (x >> 32)) & 0x00000000001fffff;
+        return static_cast<uint32_t>(x);
+    };
+
+    uint32_t x = Shrink3D(code >> 0);
+    uint32_t y = Shrink3D(code >> 1);
+    uint32_t z = Shrink3D(code >> 2);
+    return Vector3ui(x, y, z);
+}
+
+template <>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr uint32_t MortonCode::Compose2D(const Vector2ui& val)
+{
+    auto Expand2D = [](uint32_t val) -> uint32_t
+    {
+        // https://fgiesen.wordpress.com/2009/12/13/decoding-morton-codes/
+        uint32_t x = val;
+        x &= 0x0000ffff;
+        x = (x ^ (x << 8)) & 0x00ff00ff;
+        x = (x ^ (x << 4)) & 0x0f0f0f0f;
+        x = (x ^ (x << 2)) & 0x33333333;
+        x = (x ^ (x << 1)) & 0x55555555;
+        return x;
+    };
+    uint32_t x = Expand2D(val[0]);
+    uint32_t y = Expand2D(val[1]);
+    return ((x << 0) | (y << 1));
+}
+
+template <>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr uint64_t MortonCode::Compose2D(const Vector2ui& val)
+{
+    auto Expand2D = [](uint32_t val) -> uint64_t
+    {
+        // https://stackoverflow.com/questions/30539347/2d-morton-code-encode-decode-64bits
+        uint64_t x = val;
+        x = (x | (x << 16)) & 0x0000FFFF0000FFFF;
+        x = (x | (x << 8)) & 0x00FF00FF00FF00FF;
+        x = (x | (x << 4)) & 0x0F0F0F0F0F0F0F0F;
+        x = (x | (x << 2)) & 0x3333333333333333;
+        x = (x | (x << 1)) & 0x5555555555555555;
+        return x;
+    };
+    uint64_t x = Expand2D(val[0]);
+    uint64_t y = Expand2D(val[1]);
+    return ((x << 0) | (y << 1));
+
+}
+
+template <>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Vector2ui MortonCode::Decompose2D(uint32_t code)
+{
+    auto Shrink2D = [](uint32_t x)
+    {
+        x &= 0x55555555;
+        x = (x ^ (x >> 1)) & 0x33333333;
+        x = (x ^ (x >> 2)) & 0x0f0f0f0f;
+        x = (x ^ (x >> 4)) & 0x00ff00ff;
+        x = (x ^ (x >> 8)) & 0x0000ffff;
+        return x;
+    };
+    uint32_t x = Shrink2D(code >> 0);
+    uint32_t y = Shrink2D(code >> 1);
+    return Vector2ui(x, y);
+}
+
+template <>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Vector2ui MortonCode::Decompose2D(uint64_t code)
+{
+    auto Shrink2D = [](uint64_t x)
+    {
+        // https://stackoverflow.com/questions/30539347/2d-morton-code-encode-decode-64bits
+        x = x & 0x5555555555555555;
+        x = (x | (x >> 1)) & 0x3333333333333333;
+        x = (x | (x >> 2)) & 0x0F0F0F0F0F0F0F0F;
+        x = (x | (x >> 4)) & 0x00FF00FF00FF00FF;
+        x = (x | (x >> 8)) & 0x0000FFFF0000FFFF;
+        x = (x | (x >> 16)) & 0x00000000FFFFFFFF;
+        return static_cast<uint32_t>(x);
+    };
+    uint32_t x = Shrink2D(code >> 0);
+    uint32_t y = Shrink2D(code >> 1);
+    return Vector2ui(x, y);
 }
 
 }

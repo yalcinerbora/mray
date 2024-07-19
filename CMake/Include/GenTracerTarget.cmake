@@ -14,6 +14,7 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/TextureMemory.h
         ${CURRENT_SOURCE_DIR}/TextureMemory.cpp
         ${CURRENT_SOURCE_DIR}/GenericTexture.hpp
+        ${CURRENT_SOURCE_DIR}/GenericTextureRW.h
         ${CURRENT_SOURCE_DIR}/ColorConverter.h
         ${CURRENT_SOURCE_DIR}/ColorConverter.cu
         ${CURRENT_SOURCE_DIR}/TextureCommon.h

@@ -2,6 +2,13 @@
 
 #include "Types.h"
 
+// First failure related to the concerns described above
+// nvcc did not like it (see: https://godbolt.org/z/fM811b4cx)
+// Thankfully it was not the actual variant implementation, I dunno how to
+// implement it :(
+// Some basic implementation of std::visit (recursive invocation)
+// (Above link shows the compiled down result, it decays to nothing when all variables
+// are known at compile time.)
 namespace DeviceVisitDetail
 {
     template<uint32_t I, class VariantT, class Func>

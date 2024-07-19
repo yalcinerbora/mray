@@ -31,28 +31,31 @@ using Tuple = std::tuple<Args...>;
 template <class T>
 using Ref = std::reference_wrapper<T>;
 
-// First failure related to the concerns described above
-// nvcc did not like it (see: https://godbolt.org/z/fM811b4cx)
-// Thankfully it was not the actual variant implementation, I dunno how to
-// implement it :(
-// Some basic implementation of std::visit (recursive invocation)
-// (Above link shows the compiled down result, it decays to nothing when all variables
-// are known at compile time.)
-namespace TupleRefDetail
+namespace TupleDetail
 {
     template<class... Args, std::size_t... I>
     MRAY_HYBRID
     constexpr Tuple<Args&...> ToTupleRef(Tuple<Args...>&t,
                                          std::index_sequence<I...>);
-}
 
-//template<class VariantT, class Func>
-//MRAY_HYBRID
-//constexpr auto DeviceVisit(VariantT&& v, Func&& f) -> decltype(auto);
+    template<typename Func, class... Args, size_t... Is>
+    MRAY_HYBRID
+    constexpr bool InvokeAt(size_t idx, const Tuple<Args...>& t, Func&& F,
+                            std::index_sequence<Is...>);
+}
 
 template<class... Args, typename Indices = std::index_sequence_for<Args...>>
 MRAY_HYBRID
 constexpr Tuple<Args&...> ToTupleRef(Tuple<Args...>& t);
+
+// https://stackoverflow.com/questions/28997271/c11-way-to-index-tuple-at-runtime-without-using-switch
+// From here, recursive expansion of if(i == I) F(std::get<I>(tuple));
+// returning bool here to show out of bounds access (so not function is called)
+// Predicate function must return bool to abuse short circuiting.
+template<class Func, class... Args>
+requires(std::is_same_v<std::invoke_result_t<Func, Args>, bool> && ...)
+MRAY_HYBRID
+constexpr bool InvokeAt(uint32_t index, const Tuple<Args...>& t, Func&& F);
 
 // Some span wrappers for convenience
 template<class T, std::size_t Extent = std::dynamic_extent>
@@ -119,17 +122,43 @@ struct SoASpan
 
 template<class... Args, std::size_t... I>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Tuple<Args&...> TupleRefDetail::ToTupleRef(Tuple<Args...>&t,
-                                                     std::index_sequence<I...>)
+constexpr Tuple<Args&...> TupleDetail::ToTupleRef(Tuple<Args...>& t,
+                                                  std::index_sequence<I...>)
 {
     return std::tie(std::get<I>(t)...);
+}
+
+template<typename Func, class... Args, size_t... Is>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr bool TupleDetail::InvokeAt(size_t idx, const Tuple<Args...>& t, Func&& F,
+                                     std::index_sequence<Is...>)
+{
+    // Parameter pack expansion (comma seperator abuse)
+    bool r = false;
+    (
+        // Abusing short circuit of "&&"
+        static_cast<void>(r |= (Is == idx) && F(std::get<Is>(t))),
+        // And expand
+        ...
+    );
+    return r;
 }
 
 template<class... Args, typename Indices>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Tuple<Args&...> ToTupleRef(Tuple<Args...>& t)
 {
-    return TupleRefDetail::ToTupleRef(t, Indices{});
+    return TupleDetail::ToTupleRef(t, Indices{});
+}
+
+template<class Func, class... Args>
+requires(std::is_same_v<std::invoke_result_t<Func, Args>, bool> && ...)
+MRAY_HYBRID
+constexpr bool InvokeAt(uint32_t index, const Tuple<Args...>& t, Func&& F)
+{
+    return TupleDetail::InvokeAt(index, t,
+                                 std::forward<Func>(F),
+                                 std::make_index_sequence<sizeof...(Args)>{});
 }
 
 template<class T, std::size_t Extent>

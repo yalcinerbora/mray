@@ -5,12 +5,12 @@
 #include <bit>
 #include <type_traits>
 
-#include "Vector.h"
+#include "MathFunctions.h"
 
-namespace BitFunctions
+namespace Bit
 {
     template<std::integral T>
-    constexpr T FetchSubPortion(T value, Vector<2, T> bitRange);
+    constexpr T FetchSubPortion(T value, std::array<T, 2> bitRange);
 
     template<std::unsigned_integral T>
     constexpr T RotateLeft(T value, T shiftAmount);
@@ -25,8 +25,26 @@ namespace BitFunctions
     constexpr T BitReverse(T value, T width = sizeof(T) * CHAR_BIT);
 
     constexpr uint32_t GenerateFourCC(char byte0, char byte1, char byte2, char byte3);
-}
 
+    namespace NormConversion
+    {
+        template<std::floating_point R, std::unsigned_integral T>
+        MRAY_HYBRID
+        constexpr R FromUNorm(T in);
+
+        template<std::unsigned_integral T, std::floating_point R>
+        MRAY_HYBRID
+        constexpr T ToUNorm(R in);
+
+        template<std::floating_point R, std::signed_integral T>
+        MRAY_HYBRID
+        constexpr R FromSNorm(T in);
+
+        template<std::signed_integral T, std::floating_point R>
+        MRAY_HYBRID
+        constexpr T ToSNorm(R in);
+    }
+}
 
 // Bitset is constexpr in c++23, we should not rely on it on CUDA
 // Moreover it "wastes" space in terms of GPU programming
@@ -136,7 +154,7 @@ class Bitspan
 };
 
 template<std::integral T>
-constexpr T BitFunctions::FetchSubPortion(T value, Vector<2, T> bitRange)
+constexpr T Bit::FetchSubPortion(T value, std::array<T, 2> bitRange)
 {
     assert(bitRange[0] < bitRange[1]);
     T bitCount = bitRange[1] - bitRange[0];
@@ -145,7 +163,7 @@ constexpr T BitFunctions::FetchSubPortion(T value, Vector<2, T> bitRange)
 }
 
 template<std::unsigned_integral T>
-constexpr T BitFunctions::RotateLeft(T value, T shiftAmount)
+constexpr T Bit::RotateLeft(T value, T shiftAmount)
 {
     constexpr T Bits = sizeof(T) * CHAR_BIT;
     T result = (value << shiftAmount);
@@ -154,7 +172,7 @@ constexpr T BitFunctions::RotateLeft(T value, T shiftAmount)
 }
 
 template<std::unsigned_integral T>
-constexpr T BitFunctions::RotateRight(T value, T shiftAmount)
+constexpr T Bit::RotateRight(T value, T shiftAmount)
 {
     constexpr T Bits = sizeof(T) * CHAR_BIT;
     T result = (value >> shiftAmount);
@@ -163,14 +181,14 @@ constexpr T BitFunctions::RotateRight(T value, T shiftAmount)
 }
 
 template<std::unsigned_integral T>
-constexpr T BitFunctions::RequiredBitsToRepresent(T value)
+constexpr T Bit::RequiredBitsToRepresent(T value)
 {
     constexpr T Bits = sizeof(T) * CHAR_BIT;
     return (Bits - T(std::countl_zero(value)));
 }
 
 template<std::unsigned_integral T>
-constexpr T BitFunctions::BitReverse(T value, T width)
+constexpr T Bit::BitReverse(T value, T width)
 {
     // TODO: Is there a good way to do this than O(n)
     // without lookup table, this may end up in GPU
@@ -184,7 +202,7 @@ constexpr T BitFunctions::BitReverse(T value, T width)
     return result;
 }
 
-constexpr uint32_t BitFunctions::GenerateFourCC(char byte0, char byte1,
+constexpr uint32_t Bit::GenerateFourCC(char byte0, char byte1,
                                                 char byte2, char byte3)
 {
     constexpr uint32_t p0 = CHAR_BIT * 0;
@@ -197,6 +215,88 @@ constexpr uint32_t BitFunctions::GenerateFourCC(char byte0, char byte1,
     auto b3 = static_cast<uint32_t>(byte3);
     return ((b0 << p0) | (b1 << p1) |
             (b2 << p2) | (b3 << p3));
+}
+
+template<std::floating_point R, std::unsigned_integral T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr R Bit::NormConversion::FromUNorm(T in)
+{
+    constexpr R MAX = R(std::numeric_limits<T>::max());
+    constexpr R MIN = R(std::numeric_limits<T>::min());
+    constexpr R DELTA = 1 / (MAX - MIN);
+    // TODO: Specialize using intrinsics maybe?
+    // For GPU (GPUs should have these?)
+    // Also check more precise way to do this (if available?)
+    R result = MIN + static_cast<R>(in) * DELTA;
+    return result;
+}
+
+template<std::unsigned_integral T, std::floating_point R>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr T Bit::NormConversion::ToUNorm(R in)
+{
+    #ifdef MRAY_DEVICE_CODE_PATH
+        using std::round;
+    #endif
+
+    assert(in >= R(0) && in <= R(1));
+    constexpr R MAX = R(std::numeric_limits<T>::max());
+    constexpr R MIN = R(std::numeric_limits<T>::min());
+    constexpr R DIFF = (MAX - MIN);
+
+    in *= DIFF;
+    in = round(in);
+    return T(in);
+}
+
+template<std::floating_point R, std::signed_integral T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr R Bit::NormConversion::FromSNorm(T in)
+{
+    // Math representation (assuming T is char)
+    // [-128, ..., 0, ..., 127]
+    // However due to 2's complement, bit to data layout is
+    // [0, ..., 127, -128, ..., -1]
+    // DirectX representation is
+    // [0, ..., 127, -127, -127, ..., -1]
+    //               ----^-----
+    //               notice the two -127's
+    // https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-data-conversion
+    // we will use classic 2's complement representation for this conversion
+    // so negative numbers will have +1 integer
+    //
+    // TODO: Check if this is not OK
+    // (non-uniform negative/positive may be an issue)
+    constexpr R MIN = R(std::numeric_limits<T>::min());
+    constexpr R MAX = R(std::numeric_limits<T>::max());
+    constexpr R NEG_DELTA = R(1) / (R(0) - MIN);
+    constexpr R POS_DELTA = R(1) / (MAX - R(0));
+
+    R delta = (in < 0) ? NEG_DELTA : POS_DELTA;
+    R result = R(in) * delta;
+    return T(result);
+}
+
+template<std::signed_integral T, std::floating_point R>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr T Bit::NormConversion::ToSNorm(R in)
+{
+    #ifdef MRAY_DEVICE_CODE_PATH
+        using std::round;
+    #endif
+
+    assert(in >= R(-1) && in <= R(1));
+    // Check "FromSNorm" for more info
+    //
+    constexpr R MIN = R(std::numeric_limits<T>::min());
+    constexpr R MAX = R(std::numeric_limits<T>::max());
+    constexpr R NEG_DIFF = (R(0) - MIN);
+    constexpr R POS_DIFF = (MAX - R(0));
+
+    R diff = (in < 0) ? NEG_DIFF : POS_DIFF;
+    in *= diff;
+    in = round(in);
+    return T(in);
 }
 
 template<size_t N>

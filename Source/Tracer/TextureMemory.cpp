@@ -142,17 +142,27 @@ void TextureMemory::ConvertColorspaces()
     std::vector<ColorConvParams> colorConvParams;
     texSurfs.reserve(textures.Map().size());
     colorConvParams.reserve(textures.Map().size());
+    bool warnBlockCompressed = false;
     // Load to linear memory
     for(auto& [_, t] : textures.Map())
     {
-        if(!t.HasRWView()) continue;
+        bool isWritable = t.HasRWView();
+        bool isColor = (t.IsColor() == AttributeIsColor::IS_COLOR);
+        bool requiresConversion = isColor;
+        requiresConversion &= (t.ColorSpace() != MRayColorSpaceEnum::MR_DEFAULT ||
+                               t.ColorSpace() != tracerParams.globalTextureColorSpace ||
+                               t.Gamma() != Float(1));
+        warnBlockCompressed = (!isWritable && requiresConversion);
+        // Skip if not color or writable
+        if(!isWritable || !isColor) continue;
 
         ColorConvParams p =
         {
             .validMips = t.ValidMips(),
             .mipCount = static_cast<uint8_t>(t.MipCount()),
             .fromColorSpace = t.ColorSpace(),
-            .gamma = t.Gamma()
+            .gamma = t.Gamma(),
+            .mipZeroRes = Vector2ui(t.Extents())
         };
         colorConvParams.push_back(p);
 
@@ -161,9 +171,14 @@ void TextureMemory::ConvertColorspaces()
             mips[i] = t.RWView(i);
 
         texSurfs.push_back(std::move(mips));
-
-        t.SetAllMipsToLoaded();
+        t.SetColorSpace(tracerParams.globalTextureColorSpace);
     }
+
+    if(warnBlockCompressed)
+        MRAY_WARNING_LOG("[Tracer]: Some textures are block-compressed (read only) "
+                         "But requires colorspace conversion. These textures will be treated "
+                         "as in Tracer's color space (which is (Linear/{}))",
+                         MRayColorSpaceStringifier::ToString(tracerParams.globalTextureColorSpace));
 
     // Finally call the kernel
     colorConv.ConvertColor(texSurfs, colorConvParams,
@@ -376,7 +391,7 @@ void TextureMemory::Finalize()
     Timer t;
     t.Start();
     MRAY_LOG("[Tracer] Converting textures to global color space ...");
-
+    ConvertColorspaces();
     t.Lap();
     MRAY_LOG("[Tracer] Texture color conversion took {}ms.",
              t.Elapsed<Millisecond>());

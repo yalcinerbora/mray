@@ -21,6 +21,7 @@ N should be 2, 3 or 4 at most.
 #include "MathFunctions.h"
 #include "NormTypes.h"
 #include "Types.h"
+#include "BitFunctions.h"
 
 static consteval unsigned int ChooseVectorAlignment(unsigned int totalSize)
 {

@@ -2,6 +2,7 @@
 #include "RayPartitioner.h"
 #include "DistributionFunctions.h"
 #include "Filters.h"
+#include "GenericTextureRW.h"
 
 #include "Device/GPUSystem.hpp"
 #include "Device/GPUAlgBinaryPartition.h"
@@ -52,90 +53,6 @@ Vector2i FilterRadiusPixelRange(int32_t wh)
     return range;
 }
 
-MRAY_GPU MRAY_GPU_INLINE
-Vector4 GenericRead(const Vector2ui& pixCoords,
-                    const SurfViewVariant& surf)
-{
-    Vector4 v = DeviceVisit
-    (
-        std::as_const(surf),
-        // Visitor
-        [pixCoords](auto&& readSurf) -> Vector4
-        {
-            Vector4 result = Vector4::Zero();
-            using VariantType = std::remove_cvref_t<decltype(readSurf)>;
-            if constexpr(!std::is_same_v<VariantType, std::monostate>)
-            {
-                using ReadType = typename VariantType::Type;
-                constexpr uint32_t C = VariantType::Channels;
-                ReadType rPix = readSurf(pixCoords);
-                // We need to manually loop over the channels here
-                if constexpr(C != 1)
-                {
-                    UNROLL_LOOP
-                        for(uint32_t c = 0; c < C; c++)
-                            result[c] = static_cast<Float>(rPix[c]);
-                }
-                else result[0] = static_cast<Float>(rPix);
-            }
-            return result;
-        }
-    );
-    return v;
-}
-
-MRAY_GPU MRAY_GPU_INLINE
-void GenericWrite(SurfViewVariant& surf,
-                  const Vector4& value,
-                  const Vector2ui& pixCoords)
-{
-    DeviceVisit
-    (
-        surf,
-        // Visitor
-        [value, pixCoords](auto&& writeSurf) -> void
-        {
-            using VariantType = std::remove_cvref_t<decltype(writeSurf)>;
-            if constexpr(!std::is_same_v<VariantType, std::monostate>)
-            {
-                using WriteType = typename VariantType::Type;
-                constexpr uint32_t C = VariantType::Channels;
-                WriteType writeVal;
-                if constexpr(C != 1)
-                {
-                    using InnerT = typename WriteType::InnerType;
-                    UNROLL_LOOP
-                    for(uint32_t c = 0; c < C; c++)
-                    {
-                        Float v = value[c];
-                        if constexpr(std::is_integral_v<InnerT>)
-                        {
-                            using MathFunctions::Clamp;
-                            v = Clamp(std::round(v),
-                                      Float(std::numeric_limits<InnerT>::min()),
-                                      Float(std::numeric_limits<InnerT>::max()));
-                        }
-                        writeVal[c] = static_cast<InnerT>(v);
-                    }
-                }
-                else
-                {
-                    Float v = value[0];
-                    if constexpr(std::is_integral_v<WriteType>)
-                    {
-                        using MathFunctions::Clamp;
-                        v = Clamp(std::round(v),
-                                  Float(std::numeric_limits<WriteType>::min()),
-                                  Float(std::numeric_limits<WriteType>::max()));
-                    }
-                    writeVal = static_cast<WriteType>(v);
-                }
-                writeSurf(pixCoords) = writeVal;
-            }
-        }
-    );
-}
-
 // TODO: Should we dedicate a warp per pixel?
 template<uint32_t TPB, class Filter>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
@@ -161,8 +78,8 @@ void KCGenerateMipmaps(// I-O
         uint32_t localBI = bI % blockPerTexture;
         // Load to local space
         MipGenParams curParams = dMipGenParamsList[tI];
-        SurfViewVariant sWriteSurf = dSurfaces[tI][currentMipLevel];
-        const SurfViewVariant sReadSurf = dSurfaces[tI][currentMipLevel - 1];
+        SurfViewVariant writeSurf = dSurfaces[tI][currentMipLevel];
+        const SurfViewVariant readSurf = dSurfaces[tI][currentMipLevel - 1];
         //
         Vector2ui mipRes = Graphics::TextureMipSize(curParams.mipZeroRes,
                                                     currentMipLevel);
@@ -177,7 +94,7 @@ void KCGenerateMipmaps(// I-O
         // mip). We need to early exit for a texture that can not support that level of mip.
         // If variant is in monostate we skip this mip level generation
         if(curParams.validMips[currentMipLevel] ||
-           std::holds_alternative<std::monostate>(sWriteSurf)) continue;
+           std::holds_alternative<std::monostate>(writeSurf)) continue;
 
         // Loop over the blocks for this tex
         static constexpr Vector2ui TILE_SIZE = Vector2ui(32, 16);
@@ -231,7 +148,7 @@ void KCGenerateMipmaps(// I-O
                 Vector2 rPixCoord = (wPixCoord + xy).RoundSelf();
                 rPixCoord *= Vector2(2);
                 rPixCoord.ClampSelf(Vector2::Zero(), Vector2(parentRes - 1));
-                Vector4 localPix = GenericRead(Vector2ui(rPixCoord), sReadSurf);
+                Vector4 localPix = GenericRead(Vector2ui(rPixCoord), readSurf);
                 // Actual calculation
                 writePix += weight * localPix * totalSampleInv / pdf;
                 // Do the ingegration seperately as well
@@ -240,7 +157,7 @@ void KCGenerateMipmaps(// I-O
             }
             writePix /= weightSum;
             // Finally write the pixel
-            GenericWrite(sWriteSurf, writePix, wPixCoordInt);
+            GenericWrite(writeSurf, writePix, wPixCoordInt);
         }
     }
 }
@@ -471,7 +388,7 @@ void ReconFilterGenericRGB(// Output
         img.Resolution()
     );
 
-    using namespace BitFunctions;
+    using namespace Bit;
     Vector2ui sortRange = Vector2ui(0, RequiredBitsToRepresent(maxPartitionCount));
     auto
     [

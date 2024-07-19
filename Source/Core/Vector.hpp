@@ -87,17 +87,11 @@ template <std::unsigned_integral IT>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector<N, T>::Vector(const UNorm<N, IT>& unorm)  requires (std::floating_point<T>)
 {
-    constexpr float MAX = static_cast<float>(UNorm<N, IT>::Max());
-    constexpr float MIN = static_cast<float>(UNorm<N, IT>::Min());
-    constexpr float DELTA = 1 / (MAX - MIN);
-    // TODO: Specialize using intrinsics maybe?
-    // Also check more precise way to do this (if available?)
     UNROLL_LOOP
     for(unsigned int i = 0; i < N; i++)
     {
-        IT it = unorm[i];
-        T result = MIN + static_cast<float>(it) * DELTA;
-        vector[i] = result;
+        using Bit::NormConversion::FromUNorm;
+        vector[i] = FromUNorm<T>(unorm[i]);
     }
 }
 
@@ -106,33 +100,11 @@ template <std::signed_integral IT>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector<N, T>::Vector(const SNorm<N, IT>& snorm)  requires (std::floating_point<T>)
 {
-    // Math representation (assuming T is char)
-    // [-128, ..., 0, ..., 127]
-    // However due to 2's complement, bit to data layout is
-    // [0, ..., 127, -128, ..., -1]
-    // DirectX representation is
-    // [0, ..., 127, -127, -127, ..., -1]
-    //               ----^-----
-    //               notice the two -127's
-    // https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-data-conversion
-    // we will use classic 2's complement representation for this conversion
-    // so negative numbers will have **higher** precision
-    //
-    // TODO: check if this is not OK
-    constexpr T MIN = static_cast<T>(UNorm<N, IT>::Min());
-    constexpr T MAX = static_cast<T>(UNorm<N, IT>::Max());
-    constexpr T NEG_DELTA = 1 / (0 - MIN);
-    constexpr T POS_DELTA = 1 / (MAX - 0);
-    // Sanity check
-    static_assert(MIN < 0 && MAX > 0, "For snorm types; zero should be between \"min-max\"");
-
     UNROLL_LOOP
     for(unsigned int i = 0; i < N; i++)
     {
-        IT it = snorm[i];
-        T delta = (it < 0) ? NEG_DELTA : POS_DELTA;
-        T result = static_cast<float>(it) * delta;
-        vector[i] = result;
+        using Bit::NormConversion::FromSNorm;
+        vector[i] = FromSNorm<T>(snorm[i]);
     }
 }
 
@@ -665,7 +637,7 @@ constexpr bool Vector<N, T>::HasNaN() const requires std::floating_point<T>
                    (vector[i] != vector[i]) ||
                    (vector[i] == std::numeric_limits<T>::infinity()) ||
                    (vector[i] == -std::numeric_limits<T>::infinity()));
-        
+
     }
     return hasNan;
 }

@@ -220,9 +220,9 @@ struct HeaderExtended
 static_assert(sizeof(HeaderBase) == 128, "DDS Header size is wrong!");
 static_assert(sizeof(HeaderExtended) == 20, "DDS Header size is wrong!");
 
-static constexpr uint32_t DDS_FOURCC = BitFunctions::GenerateFourCC('D', 'D', 'S', ' ');
-static constexpr uint32_t DX10_FOURCC = BitFunctions::GenerateFourCC('D', 'X', '1', '0');
-static constexpr uint32_t NON_NATIVE_DDS_FOURCC = BitFunctions::GenerateFourCC('_', 'S', 'D', 'D');
+static constexpr uint32_t DDS_FOURCC = Bit::GenerateFourCC('D', 'D', 'S', ' ');
+static constexpr uint32_t DX10_FOURCC = Bit::GenerateFourCC('D', 'X', '1', '0');
+static constexpr uint32_t NON_NATIVE_DDS_FOURCC = Bit::GenerateFourCC('_', 'S', 'D', 'D');
 
 size_t MipSizeToLinearByteSize(MRayPixelTypeRT pf, const Vector3ui& mipSize)
 {

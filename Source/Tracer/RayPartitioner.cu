@@ -45,8 +45,8 @@ void KCFindSplits(//Output
     // DifferenceOp for Adjacentdifference
     auto FindMark = [&batchBitRange](KVPair current, KVPair prev) -> uint32_t
     {
-        bool foundSplit = (BitFunctions::FetchSubPortion(current.key, batchBitRange) !=
-                           BitFunctions::FetchSubPortion(prev.key, batchBitRange));
+        bool foundSplit = (Bit::FetchSubPortion(current.key, batchBitRange.AsArray()) !=
+                           Bit::FetchSubPortion(prev.key, batchBitRange.AsArray()));
         foundSplit |= (current.value == 0);
 
         uint32_t mark = (foundSplit) ? current.value : INVALID_LOCATION;

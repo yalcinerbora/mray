@@ -74,11 +74,9 @@ namespace Color
 
         // Expose these for testing
         public:
-        static constexpr Matrix3x3 ToXYZMatrix =
-        (
-            GenWhitepointMatrix(Prims.xyWhite, D65Whitepoint) *
-            GenRGBToXYZ(Prims)
-        );
+        static constexpr Matrix3x3 ToXYZMatrix = (E == MRayColorSpaceEnum::MR_DEFAULT)
+            ? Matrix3x3::Identity()
+            : (GenWhitepointMatrix(Prims.xyWhite, D65Whitepoint) * GenRGBToXYZ(Prims));
 
         static constexpr Matrix3x3 FromXYZMatrix = ToXYZMatrix.Inverse();
 
@@ -97,11 +95,9 @@ namespace Color
     {
         // Expose these for testing
         public:
-        static constexpr Matrix3x3 RGBToRGBMatrix =
-        (
-            Colorspace<ToE>::FromXYZMatrix *
-            Colorspace<FromE>::ToXYZMatrix
-        );
+        static constexpr Matrix3x3 RGBToRGBMatrix = (FromE == ToE)
+            ? Matrix3x3::Identity()
+            : (Colorspace<ToE>::FromXYZMatrix * Colorspace<FromE>::ToXYZMatrix);
 
         public:
         ColorspaceTransfer() = default;
@@ -190,7 +186,8 @@ Vector3 Color::RandomColorRGB(uint32_t index)
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector3 Color::XYZToYxy(const Vector3& xyz)
 {
-    Float invSum = Float(1) / (xyz[0] + xyz[1] + xyz[2]);
+    Float sum = (xyz[0] + xyz[1] + xyz[2]);
+    Float invSum = (sum == Float(0)) ? Float(0) : Float(1) / sum;
     // This has slightly better precision maybe?
     Float x = Float(1) - (xyz[1] + xyz[2]) * invSum;
     Float y = Float(1) - (xyz[0] + xyz[2]) * invSum;
@@ -201,7 +198,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector3 Color::YxyToXYZ(const Vector3& yXY)
 {
     // https://www.easyrgb.com/en/math.php
-    Float yy = (yXY[0] / yXY[2]);
+    Float yy = (yXY[2] == Float(0)) ? Float(0) : (yXY[0] / yXY[2]);
     Float x = yXY[1] * yy;
     Float y = yXY[0];
     Float z = (Float(1) - yXY[1] - yXY[2]) * yy;
@@ -345,24 +342,14 @@ constexpr Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E)
             MR_DEFAULT,
             Primaries
             {
-                .xyRed      = Vector2::Zero(),
-                .xyGreen    = Vector2::Zero(),
-                .xyBlue     = Vector2::Zero(),
-                .xyWhite    = Vector2::Zero()
+                // This will create divide by zero if we set it to
+                // set it to something else
+                .xyRed      = Vector2(1, 0),
+                .xyGreen    = Vector2(0, 1),
+                .xyBlue     = Vector2(0, 0),
+                .xyWhite    = Vector2(0.5)
             }
         }
-        //,
-        //Pair<MRayColorSpaceEnum, Primaries>
-        //{
-        //    MR_SPECTRAL_PACK,
-        //    Primaries
-        //    {
-        //        .xyRed      = Vector2::Zero(),
-        //        .xyGreen    = Vector2::Zero(),
-        //        .xyBlue     = Vector2::Zero(),
-        //        .xyWhite    = Vector2::Zero()
-        //    }
-        //}
     };
 
     auto loc = std::find_if(PRIM_LIST.cbegin(), PRIM_LIST.cend(),
@@ -402,21 +389,27 @@ template <MRayColorSpaceEnum E>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector3 Color::Colorspace<E>::ToXYZ(const Vector3& rgb) const
 {
-    return ToXYZMatrix * rgb;
+    // Assing matrix to local space (GPU does not like static constexpr variables)
+    constexpr auto Mat = ToXYZMatrix;
+    return Mat * rgb;
 }
 
 template <MRayColorSpaceEnum E>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector3 Color::Colorspace<E>::FromXYZ(const Vector3& xyz) const
 {
-    return FromXYZMatrix * xyz;
+    // Assing matrix to local space (GPU does not like static constexpr variables)
+    constexpr auto Mat = FromXYZMatrix;
+    return Mat * xyz;
 }
 
 template <MRayColorSpaceEnum F, MRayColorSpaceEnum T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector3 Color::ColorspaceTransfer<F, T>::Convert(const Vector3& rgb) const
 {
-    return RGBToRGBMatrix * rgb;
+    // Assing matrix to local space (GPU does not like static constexpr variables)
+    constexpr auto Mat = RGBToRGBMatrix;
+    return Mat * rgb;
 }
 
 // Constructors & Destructor
