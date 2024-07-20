@@ -3,6 +3,25 @@
 
 #include "Core/Error.hpp"
 
+template<class T>
+static constexpr auto FilterGenFuncPack = Pair
+<
+    const FilterType::E,
+    TexFilterGenerator
+>
+{
+    T::TypeName,
+    &GenerateType<TextureFilterI, T, const GPUSystem&, Float>
+};
+
+static constexpr const std::initializer_list FilterGenFuncList =
+{
+    FilterGenFuncPack<TextureFilterBox>,
+    FilterGenFuncPack<TextureFilterTent>,
+    FilterGenFuncPack<TextureFilterGaussian>,
+    FilterGenFuncPack<TextureFilterMitchellNetravali>
+};
+
 // TODO: This is not good, we need to instantiate
 // to get the virtual function, change this later
 // (change this with what though?)
@@ -118,6 +137,7 @@ TracerBase::TracerBase(const TypeGeneratorPack& tGen,
     : threadPool(nullptr)
     , typeGenerators(tGen)
     , params(tParams)
+    , filterGenMap(FilterGenFuncList)
     , texMem(gpuSystem, params, filterGenMap)
 {
     auto EmplaceFilterGen = [this]<class T>()

@@ -14,6 +14,16 @@
 
 using FilterGeneratorMap = Map<FilterType::E, TexFilterGenerator>;
 
+struct TexClampParameters
+{
+    Vector2ui       inputMaxRes;
+    uint16_t        filteredMipLevel;
+    uint16_t        ignoredMipCount;
+    bool            willBeFiltered = false;
+    // Utilize this struct to extent the lifetime of the surface
+    SurfRefVariant  surface;
+};
+
 // Lets use type erasure on the host side
 // unlike texture views, there are too many texture types
 class GenericTextureI
@@ -50,6 +60,14 @@ class GenericTextureI
                                   const TextureExtent<3>& size,
                                   TransientData regionFrom) = 0;
 
+    // "Any" buffer version, this will be used to copy data from device
+    // memory
+    virtual void    CopyFromAsync(const GPUQueue& queue,
+                                  uint32_t mipLevel,
+                                  const TextureExtent<3>& offset,
+                                  const TextureExtent<3>& size,
+                                  Span<const Byte> regionFrom) = 0;
+
     // Another hard part, We can close the types here.
     // Only float convertible views are supported
     // TODO: This may be a limitation for rare cases maybe later?
@@ -72,7 +90,7 @@ class alignas(Alignment) GenericTextureT
     std::array<Byte, StorageSize> storage;
     // TODO: Could not cast the storate to the interface,
     //
-    GenericTextureI*     impl;
+    GenericTextureI*    impl;
     MRayPixelTypeRT     pixelType;
     MRayColorSpaceEnum  colorSpace;
     Float               gamma;
@@ -112,6 +130,12 @@ class alignas(Alignment) GenericTextureT
                                       const TextureExtent<3>& offset,
                                       const TextureExtent<3>& size,
                                       TransientData regionFrom);
+    void                CopyFromAsync(const GPUQueue& queue,
+                                      uint32_t mipLevel,
+                                      const TextureExtent<3>& offset,
+                                      const TextureExtent<3>& size,
+                                      Span<const Byte> regionFrom);
+    //
     GenericTextureView  View() const;
     bool                HasRWView() const;
     SurfRefVariant      RWView(uint32_t mipLevel);
@@ -135,8 +159,7 @@ template <typename T>
 class Concept : public GenericTextureI
 {
     private:
-    T tex;
-
+    T                   tex;
     public:
     template<class... Args>
                         Concept(Args&&...);
@@ -157,6 +180,11 @@ class Concept : public GenericTextureI
                                       const TextureExtent<3>& offset,
                                       const TextureExtent<3>& size,
                                       TransientData regionFrom) override;
+    void                CopyFromAsync(const GPUQueue& queue,
+                                      uint32_t mipLevel,
+                                      const TextureExtent<3>& offset,
+                                      const TextureExtent<3>& size,
+                                      Span<const Byte> regionFrom) override;
     GenericTextureView  View() const override;
     bool                HasRWView() const override;
     SurfRefVariant      RWView(uint32_t mipLevel) override;
@@ -178,22 +206,29 @@ class TextureMemory
 {
     using GPUIterator       = GPUQueueIteratorRoundRobin;
     using TextureMemList    = std::vector<TextureBackingMemory>;
+    using TSClampMap        = ThreadSafeMap<TextureId, TexClampParameters>;
     using TSTextureMap      = ThreadSafeMap<TextureId, GenericTexture>;
     using TSTextureViewMap  = ThreadSafeMap<TextureId, GenericTextureView>;
+    using TextureFilterPtr = std::unique_ptr<TextureFilterI>;
+
 
     private:
     const GPUSystem&            gpuSystem;
     const TracerParameters&     tracerParams;
-    const FilterGeneratorMap&   filterGenMap;
+    TextureFilterPtr            mipGenFilter;
     // State
     TextureMemList          texMemList;
     std::atomic_uint32_t    texCounter;
     TSTextureMap            textures;
-    uint32_t                clampResolution;
+    // Texture clamp related
+    TSClampMap              texClampParams;
     //
     std::atomic_uint32_t    gpuIndexCounter = 0;
     // The view map
     TSTextureViewMap        textureViews;
+    // Sizeof Temporary filterbuffer
+    size_t                  texClampBufferSize = 0;
+    DeviceLocalMemory       texClampBuffer;
 
     // Impl functions
     void            GenerateMipmaps();
@@ -208,7 +243,6 @@ class TextureMemory
                     TextureMemory(const GPUSystem&,
                                   const TracerParameters&,
                                   const FilterGeneratorMap&);
-
     //
     TextureId       CreateTexture2D(const Vector2ui& size, uint32_t mipCount,
                                     const MRayTextureParameters&);

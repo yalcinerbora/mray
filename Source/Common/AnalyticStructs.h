@@ -10,9 +10,9 @@
 // TODO: Move this
 struct CameraTransform
 {
-    Vector3 position;
-    Vector3 gazePoint;
-    Vector3 up;
+    Vector3 position    = Vector3::Zero();
+    Vector3 gazePoint   = Vector3(0, 0, -1);
+    Vector3 up          = Vector3::YAxis();
 };
 
 struct TracerAnalyticData

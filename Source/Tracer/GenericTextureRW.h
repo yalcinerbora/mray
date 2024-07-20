@@ -37,6 +37,40 @@ Vector4 GenericRead(const Vector2ui& pixCoords,
 }
 
 MRAY_GPU MRAY_GPU_INLINE
+Vector4 GenericReadFromBuffer(const Span<const Byte>& dBufferImage,
+                              const SurfViewVariant& surfToVisit,
+                              uint32_t pixCoordLinear)
+{
+    return DeviceVisit(surfToVisit,
+    [pixCoordLinear, dBufferImage](auto&& s) -> Vector4
+    {
+        Vector4 out = Vector4::Zero();
+        using VariantType = std::remove_cvref_t<decltype(s)>;
+        // Skip monostate
+        if constexpr(!std::is_same_v<VariantType, std::monostate>)
+        {
+            // Data is in padded channel type
+            using ReadType = typename VariantType::PaddedChannelType;
+            const ReadType* dPtr = reinterpret_cast<const ReadType*>(dBufferImage.data());
+            dPtr = std::launder(dPtr);
+            constexpr uint32_t C = VariantType::Channels;
+            if constexpr(C != 1)
+            {
+                // Somewhat hard part, first read the data
+                // then convert
+                ReadType data = dPtr[pixCoordLinear];
+                UNROLL_LOOP
+                for(uint32_t c = 0; c < C; c++)
+                    out[c] = static_cast<Float>(data[c]);
+            }
+            // Easy, directly subscript the pointer and cast
+            else out[0] = static_cast<Float>(dPtr[pixCoordLinear]);
+        }
+        return out;
+    });
+}
+
+MRAY_GPU MRAY_GPU_INLINE
 void GenericWrite(SurfViewVariant& surf,
                   const Vector4& value,
                   const Vector2ui& pixCoords)

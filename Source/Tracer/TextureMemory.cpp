@@ -96,6 +96,37 @@ void Concept<T>::CopyFromAsync(const GPUQueue& queue,
     using PaddedChannelType = typename T::PaddedChannelType;
     auto input = regionFrom.AccessAs<const PaddedChannelType>();
     tex.CopyFromAsync(queue, mipLevel, offsetIn, sizeIn, input);
+    queue.IssueBufferForDestruction(std::move(regionFrom));
+}
+
+template<class T>
+void Concept<T>::CopyFromAsync(const GPUQueue& queue,
+                               uint32_t mipLevel,
+                               const TextureExtent<3>& offset,
+                               const TextureExtent<3>& size,
+                               Span<const Byte> regionFrom)
+{
+    using ExtType = TextureExtent<T::Dims>;
+    ExtType offsetIn;
+    ExtType sizeIn;
+
+    auto ext = tex.Extents();
+    if constexpr(T::Dims == 1)
+    {
+        offsetIn = ExtType(offset[0]);
+        sizeIn = ExtType(size[0]);
+    }
+    else
+    {
+        offsetIn = ExtType(offset);
+        sizeIn = ExtType(size);
+    }
+
+    using PaddedChannelType = typename T::PaddedChannelType;
+    assert(regionFrom.size_bytes() % sizeof(PaddedChannelType) == 0);
+    auto d = reinterpret_cast<const PaddedChannelType*>(regionFrom.data());
+    auto input = Span<const PaddedChannelType>(d, regionFrom.size_bytes() / sizeof(PaddedChannelType));
+    tex.CopyFromAsync(queue, mipLevel, offsetIn, sizeIn, input);
 }
 
 template<class T>
@@ -128,9 +159,7 @@ SurfRefVariant Concept<T>::RWView(uint32_t mipLevel)
     if constexpr(T::Dims != 2 || T::IsBlockCompressed)
         return std::monostate{};
     else
-    {
         return tex.GenerateRWRef(mipLevel);
-    }
 }
 
 }
@@ -187,17 +216,6 @@ void TextureMemory::ConvertColorspaces()
 
 void TextureMemory::GenerateMipmaps()
 {
-    using TextureFilterPtr = std::unique_ptr<TextureFilterI>;
-    FilterType::E filterType = tracerParams.mipGenFilter.type;
-    auto fGen = filterGenMap.at(filterType);
-    if(!fGen.has_value())
-    {
-        throw MRayError("Unable to find a filter for type {}",
-                        FilterType::ToString(filterType));
-    }
-    Float radius = tracerParams.mipGenFilter.radius;
-    TextureFilterPtr texFilter = fGen.value().get()(gpuSystem, std::move(radius));
-
     std::vector<MipArray<SurfRefVariant>> texSurfs;
     std::vector<MipGenParams> mipGenParams;
     texSurfs.reserve(textures.Map().size());
@@ -223,28 +241,84 @@ void TextureMemory::GenerateMipmaps()
 
         t.SetAllMipsToLoaded();
     }
-
     // Finally call the kernel
-    texFilter->GenerateMips(texSurfs, mipGenParams);
+    mipGenFilter->GenerateMips(texSurfs, mipGenParams);
 }
 
 template<uint32_t D>
 TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t mipCount,
                                        const MRayTextureParameters& inputParams)
 {
+    // BC textures can not be written efficiently (or at all?).
+    // Since it requires function minimization etc. So some functionality
+    // will be skipped for BC textures. For example, clamping texture
+    // resolutions will only happen if there is a mip available for that level
+    // if not one level higher (untill a valid mip is reached) will be used.
+    bool isBlockCompressed = inputParams.pixelType.IsBlockCompressed();
+
     // Round robin deploy textures
     // TODO: Only load to single GPU currently
     uint32_t gpuIndex = gpuIndexCounter.fetch_add(1);
     gpuIndex %= 1;// gpuSystem.SystemDevices().size();
     const GPUDevice& device = gpuSystem.SystemDevices()[gpuIndex];
 
-    // Expand mip count if generate mipmaps is requested
-    if(tracerParams.genMips)
-        mipCount = Graphics::TextureMipCount(size);
+    TexClampParameters tClampParams = {Vector2ui(size), 0, 0, false};
+    uint32_t newMipCount = mipCount;
+    Vector<D, uint32_t> newSize = size;
+    if constexpr(D == 2)
+    {
+
+        // Here we need to clamp the resolution of the texture
+        // if requested.
+        uint32_t maxDim = size[size.Maximum()];
+        uint32_t clampRes = std::min(tracerParams.clampedTexRes, maxDim);
+        uint32_t ratio = MathFunctions::DivideUp(maxDim, clampRes);
+        int32_t mipReduceAmount = int32_t(std::ceil(std::log2(ratio)));
+        // We will have atleast one mip
+        int32_t mipCountI = std::max(1, int32_t(mipCount) - mipReduceAmount);
+
+        // For BC textures, find highest available mip level
+        // (We can not generate these)
+        // For other textures we can generate mips,
+        // so directly generate these
+        mipReduceAmount = (isBlockCompressed)
+            ? std::min(mipCountI - 1, mipReduceAmount)
+            : mipReduceAmount;
+
+        // Finally the new size
+        newSize = Graphics::TextureMipSize(size, uint32_t(mipReduceAmount));
+        //
+        uint32_t ignoredMipCount = uint32_t(mipReduceAmount);
+        uint32_t filteredMip = std::min(ignoredMipCount, mipCount - 1);
+        bool willBeFiltered = (ignoredMipCount > (mipCount - 1));
+        // Store the ignored mips (we will use this to determine when to call
+        // filtering during runtime
+        if(willBeFiltered)
+        {
+            auto filterInPixCount = Graphics::TextureMipSize(size, uint32_t(filteredMip));
+            size_t total = filterInPixCount.Multiply() * inputParams.pixelType.PixelSize();
+            texClampBufferSize = std::max(texClampBufferSize, total);
+        }
+        // Create the clamp params
+        tClampParams = TexClampParameters
+        {
+            .inputMaxRes = size,
+            .filteredMipLevel = uint16_t(filteredMip),
+            .ignoredMipCount = uint16_t(ignoredMipCount),
+            .willBeFiltered = willBeFiltered
+        };
+        newMipCount = uint32_t(mipCountI);
+
+        // Expand mip count if generate mipmaps is requested
+        if(tracerParams.genMips && !isBlockCompressed)
+        {
+            newMipCount = Graphics::TextureMipCount(newSize);
+        }
+    }
 
     TextureInitParams<D> p;
-    p.size = size;
-    p.mipCount = mipCount;
+    p.size = newSize;
+    p.mipCount = newMipCount;
     p.eResolve = inputParams.edgeResolve;
     p.interp = inputParams.interpolation;
     TextureId texId = std::visit([&](auto&& v) -> TextureId
@@ -261,6 +335,9 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
                                             MRayPixelTypeRT(v), device, p);
 
             textureViews.try_emplace(id, loc.first->second.View());
+            // Save the clamp parameters as well
+            texClampParams.try_emplace(id, std::move(tClampParams));
+
             return id;
         }
         else throw MRayError("3D Block compressed textures are not supported!");
@@ -274,7 +351,7 @@ TextureMemory::TextureMemory(const GPUSystem& sys,
                              const FilterGeneratorMap& fGenMap)
     : gpuSystem(sys)
     , tracerParams(tParams)
-    , filterGenMap(fGenMap)
+    , texClampBuffer(gpuSystem.BestDevice())
 {
     if(gpuSystem.SystemDevices().size() != 1)
         MRAY_WARNING_LOG("Textures will be loaded on to single GPU!");
@@ -282,6 +359,16 @@ TextureMemory::TextureMemory(const GPUSystem& sys,
     // Create texture memory for each device (not allocated yet)
     for(const GPUDevice& device : gpuSystem.SystemDevices())
         texMemList.emplace_back(device);
+
+    FilterType::E filterType = tracerParams.mipGenFilter.type;
+    auto fGen = fGenMap.at(filterType);
+    if(!fGen.has_value())
+    {
+        throw MRayError("Unable to find a filter for type {}",
+                        FilterType::ToString(filterType));
+    }
+    Float radius = tracerParams.mipGenFilter.radius;
+    mipGenFilter = fGen.value().get()(gpuSystem, std::move(radius));
 }
 
 TextureId TextureMemory::CreateTexture2D(const Vector2ui& size, uint32_t mipCount,
@@ -352,26 +439,71 @@ void TextureMemory::CommitTextures()
         queueIndex++;
         queueIndex %= TotalQueuePerDevice();
     }
+
+
+    // Allocate the filter buffer now, texture data will come
+    // now
+    if(texClampBufferSize)
+        texClampBuffer.ResizeBuffer(texClampBufferSize);
+
 }
+
 void TextureMemory::PushTextureData(TextureId id, uint32_t mipLevel,
                                     TransientData data)
 {
-    auto loc = textures.at(id);
-    if(!loc)
+    auto texLoc = textures.at(id);
+    if(!texLoc)
     {
         throw MRayError("Unable to find texture(id)",
                         static_cast<uint32_t>(id));
     }
-    GenericTexture& tex = loc.value().get();
+    GenericTexture& tex = texLoc.value().get();
+    auto clampLoc = texClampParams.at(id);
+    TexClampParameters& clampParams = clampLoc.value().get();
 
     // TODO: Again multi-gpu/queue management
-    const GPUQueue& queue = tex.Device().GetComputeQueue(0);
-    Vector3ui mipSize = Graphics::TextureMipSize(tex.Extents(), mipLevel);
-    tex.CopyFromAsync(queue,
-                      mipLevel,
-                      Vector3ui::Zero(),
-                      mipSize,
-                      std::move(data));
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
+    const GPUQueue& texQueue = tex.Device().GetComputeQueue(0);
+
+    // If texture mip level
+    assert((clampParams.willBeFiltered && (mipLevel <= clampParams.filteredMipLevel))
+           || (!clampParams.willBeFiltered));
+
+    if(clampParams.willBeFiltered &&
+       mipLevel < clampParams.filteredMipLevel) return;
+
+    if(clampParams.willBeFiltered &&
+       mipLevel == clampParams.filteredMipLevel)
+    {
+        Vector2ui size = Graphics::TextureMipSize(clampParams.inputMaxRes, mipLevel);
+        auto texClampBufferSpan = Span(static_cast<Byte*>(texClampBuffer), texClampBuffer.Size());
+        auto dataSpan = ToConstSpan(data.AccessAs<Byte>());
+
+        // Utilize the TexClampParamters
+        clampParams.surface = tex.RWView(0);
+
+        // Fist copy to staging device buffer
+        queue.MemcpyAsync(texClampBufferSpan, dataSpan);
+        // Issue the filter
+        mipGenFilter->ClampImageFromBuffer(clampParams.surface,
+                                           ToConstSpan(texClampBufferSpan),
+                                           Vector2ui(tex.Extents()), size,
+                                           queue);
+        // Defer delete the transient host buffer
+        queue.IssueBufferForDestruction(std::move(data));
+        // We dont have the wait the queue here since we always issue to the same queue
+        // so device queue semantics will handle the buffer usage
+    }
+    else
+    {
+        // Nothing fancy just copy the data to buffer
+        Vector3ui mipSize = Graphics::TextureMipSize(tex.Extents(), mipLevel);
+        tex.CopyFromAsync(texQueue,
+                          mipLevel,
+                          Vector3ui::Zero(),
+                          mipSize,
+                          std::move(data));
+    }
 }
 
 MRayPixelTypeRT TextureMemory::GetPixelType(TextureId id) const
@@ -388,6 +520,13 @@ MRayPixelTypeRT TextureMemory::GetPixelType(TextureId id) const
 
 void TextureMemory::Finalize()
 {
+    // Clear the clamp buffer
+    if(texClampBufferSize > 0)
+        texClampBuffer = DeviceLocalMemory(gpuSystem.BestDevice());
+    // Destroy the surface objects due to clamping op
+    for(auto&[_, cp] : texClampParams.Map())
+        cp.surface = SurfRefVariant();
+
     Timer t;
     t.Start();
     MRAY_LOG("[Tracer] Converting textures to global color space ...");

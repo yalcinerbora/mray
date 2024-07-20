@@ -1362,6 +1362,9 @@ bool VisorWindow::Render()
         // Flush the device, we will need to reallocate
         vkDeviceWaitIdle(handlesVk.deviceVk);
 
+        visorState.currentRenderLogic0 = newRenderBuffer->curRenderLogic0;
+        visorState.currentRenderLogic1 = newRenderBuffer->curRenderLogic1;
+
         const auto& newRB = newRenderBuffer.value();
         RenderImageInitInfo renderImageInitParams =
         {

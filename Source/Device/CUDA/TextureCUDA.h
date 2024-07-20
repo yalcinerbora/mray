@@ -97,6 +97,9 @@ constexpr uint32_t BCTypeToChannels()
 template<uint32_t D, class T>
 class TextureCUDA_Normal;
 
+template<uint32_t D, class T>
+class TextureCUDA;
+
 // RAII wrapper for the surface object
 template<uint32_t D, class T>
 class RWTextureRefCUDA
@@ -117,9 +120,6 @@ class RWTextureRefCUDA
     //
     RWTextureViewCUDA<D, T> View() const;
 };
-
-template<uint32_t DIM, class T>
-class TextureCUDA;
 
 // These two classes are due to bug on MSVC
 // https://stackoverflow.com/questions/68589314/how-to-define-a-specialized-class-method-outside-of-class-body-in-c
@@ -298,7 +298,6 @@ class TextureCUDA<2, T> : public TextureCUDA_BC<T>
     using Base::Base;
     // Functions were public so these are OK?
 };
-
 
 class TextureBackingMemoryCUDA
 {

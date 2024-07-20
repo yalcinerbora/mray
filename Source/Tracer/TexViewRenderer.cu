@@ -172,12 +172,16 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
 
     // Find the texture index
     using MathFunctions::Roll;
-    textureIndex = Roll(int32_t(customLogicIndex0), 0,
-                        int32_t(textures.size()));
-    const GenericTexture* t = textures[textureIndex];
+    uint32_t newTextureIndex = uint32_t(Roll(int32_t(customLogicIndex0), 0,
+                                             int32_t(textures.size())));
+    const GenericTexture* t = textures[newTextureIndex];
     // Mip Index
-    mipIndex = Roll(int32_t(customLogicIndex1), 0,
-                    int32_t(t->MipCount()));
+    // Change to zero if texture is changed
+    mipIndex = (newTextureIndex == textureIndex)
+                ? uint32_t(Roll(int32_t(customLogicIndex1), 0,
+                                int32_t(t->MipCount())))
+                : 0;
+    textureIndex = newTextureIndex;
     // And mip size
     mipSize = Graphics::TextureMipSize(Vector2ui(t->Extents()), mipIndex);
     // Initialize tile index
@@ -195,8 +199,11 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
     curFBMin = Vector2ui::Zero();
     curFBMax = curFramebufferSize;
 
-    return renderBuffer->GetBufferInfo(curColorSpace,
-                                       curFramebufferSize, 1);
+    RenderBufferInfo rbI = renderBuffer->GetBufferInfo(curColorSpace,
+                                                       curFramebufferSize, 1);
+    rbI.curRenderLogic0 = textureIndex;
+    rbI.curRenderLogic1 = mipIndex;
+    return rbI;
 }
 
 RendererOutput TexViewRenderer::DoRender()

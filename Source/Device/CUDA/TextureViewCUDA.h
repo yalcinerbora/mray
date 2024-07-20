@@ -283,6 +283,7 @@ class RWTextureViewCUDA
     using Type = T;
     using ReadConvertType = CudaTexToMRayType<T, typename PixRef::PaddedCudaType,
                                               Channels>;
+    using PaddedChannelType = typename PixRef::PaddedChannelType;
 
     private:
     cudaSurfaceObject_t surfHandle;

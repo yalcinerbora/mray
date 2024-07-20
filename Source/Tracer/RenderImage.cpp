@@ -88,7 +88,9 @@ RenderBufferInfo RenderImage::GetBufferInfo(MRayColorSpaceEnum colorspace,
         .totalSize = stagingMemory.AllocSize(),
         .renderColorSpace = colorspace,
         .resolution = resolution,
-        .depth = totalDepth
+        .depth = totalDepth,
+        .curRenderLogic0 = std::numeric_limits<uint32_t>::max(),
+        .curRenderLogic1 = std::numeric_limits<uint32_t>::max()
     };
 }
 

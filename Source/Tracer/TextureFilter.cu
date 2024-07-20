@@ -53,6 +53,61 @@ Vector2i FilterRadiusPixelRange(int32_t wh)
     return range;
 }
 
+template<class Filter, class DataFetcher>
+MRAY_GPU MRAY_GPU_INLINE
+Vector4 FilterPixel(const Vector2ui& pixelCoord,
+                    //
+                    const Vector2ui& spp,
+                    FilterMode filterMode,
+                    const Filter& FilterFunc,
+                    const DataFetcher& FetchData)
+{
+    Vector2ui oddSPP = Vector2ui((spp[0] & 1u) == 0 ? spp[0] - 1 : spp[0],
+                                 (spp[1] & 1u) == 0 ? spp[1] - 1 : spp[1]);
+
+    Vector2 wPixCoord = Vector2(pixelCoord);
+    // We use float as a catch-all type
+    // It is allocated as a max channel
+    Vector4 writePix = Vector4::Zero();
+    Float weightSum = Float(0);
+    // Stochastically sample the up level via the filter
+    // Mini Monte Carlo..
+    for(uint32_t sppY = 0; sppY < oddSPP[1]; sppY++)
+    for(uint32_t sppX = 0; sppX < oddSPP[0]; sppX++)
+    {
+        Vector2 dXY = Vector2(1) / Vector2(oddSPP);
+        // Create a quasi sampler by perfectly stratifying the
+        // sample space
+        Vector2 xi = dXY * Float(0.5) + dXY * Vector2(sppX, sppY);
+
+        Vector2 xy;
+        Float pdf, totalSampleInv;
+        if(filterMode == FilterMode::ACCUMULATE)
+        {
+            xy = xi * Float(2) * FilterFunc.Radius() - FilterFunc.Radius();
+            pdf = totalSampleInv = Float(1);
+        }
+        else
+        {
+            auto sample = FilterFunc.Sample(xi);
+            xy = sample.value;
+            pdf = sample.pdf;
+            totalSampleInv = dXY.Multiply();
+        }
+
+        // Eval the weight
+        Float weight = FilterFunc.Evaluate(xy);
+        Vector4 localPix = FetchData(wPixCoord + xy);
+        // Actual calculation
+        writePix += weight * localPix * totalSampleInv / pdf;
+        // Do the ingegration seperately as well
+        // we need to compansate
+        weightSum += weight * totalSampleInv / pdf;
+    }
+    writePix /= weightSum;
+    return writePix;
+}
+
 // TODO: Should we dedicate a warp per pixel?
 template<uint32_t TPB, class Filter>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
@@ -67,7 +122,10 @@ void KCGenerateMipmaps(// I-O
                        MRAY_GRID_CONSTANT const FilterMode filterMode,
                        MRAY_GRID_CONSTANT const Filter FilterFunc)
 {
+    static constexpr Vector2ui TILE_SIZE = Vector2ui(32, 16);
+    static_assert(TILE_SIZE.Multiply() == TPB);
     assert(dSurfaces.size() == dMipGenParamsList.size());
+
     // Block-stride loop
     KernelCallParams kp;
     uint32_t textureCount = static_cast<uint32_t>(dSurfaces.size());
@@ -85,6 +143,7 @@ void KCGenerateMipmaps(// I-O
                                                     currentMipLevel);
         Vector2ui parentRes = Graphics::TextureMipSize(curParams.mipZeroRes,
                                                        currentMipLevel - 1);
+        Vector2 uvRatio = Vector2(parentRes) / Vector2(mipRes);
         // Skip this mip if it is already loaded.
         // This may happen when a texture has up to x amount of mips
         // but it can support log2(floor(max(res))) amount so we generate
@@ -97,8 +156,6 @@ void KCGenerateMipmaps(// I-O
            std::holds_alternative<std::monostate>(writeSurf)) continue;
 
         // Loop over the blocks for this tex
-        static constexpr Vector2ui TILE_SIZE = Vector2ui(32, 16);
-        static_assert(TILE_SIZE.Multiply() == TPB);
         Vector2ui totalTiles = MathFunctions::DivideUp(mipRes, TILE_SIZE);
         for(uint32_t tileI = localBI; tileI < totalTiles.Multiply();
             tileI += blockPerTexture)
@@ -108,60 +165,87 @@ void KCGenerateMipmaps(// I-O
             Vector2ui tile2D = Vector2ui(tileI % totalTiles[0],
                                          tileI / totalTiles[0]);
             Vector2ui wPixCoordInt = tile2D * TILE_SIZE + localPI;
+            if(wPixCoordInt[0] >= mipRes[0] || wPixCoordInt[1] >= mipRes[1])
+                continue;
 
-            if(wPixCoordInt[0] >= mipRes[0] ||
-               wPixCoordInt[1] >= mipRes[1]) continue;
-
-            Vector2 wPixCoord = Vector2(wPixCoordInt) + Vector2(0.5);
-            // We use float as a catch-all type
-            // It is allocated as a max channel
-            Vector4 writePix = Vector4::Zero();
-            Float weightSum = Float(0);
-            // Stochastically sample the up level via the filter
-            // Mini Monte Carlo..
-            for(uint32_t sppY = 0; sppY < spp[1]; sppY++)
-            for(uint32_t sppX = 0; sppX < spp[0]; sppX++)
+            // Generic filter, reader can be defined via lambda
+            Vector4 writePix = FilterPixel(wPixCoordInt, spp,
+                                           filterMode, FilterFunc,
+            [&](Vector2 rPixCoord) -> Vector4
             {
-                Vector2 dXY = Vector2(1) / Vector2(spp);
-                // Create a quasi sampler by perfectly stratifying the
-                // sample space
-                Vector2 xi = dXY * Float(0.5) + dXY * Vector2(sppX, sppY);
-
-                Vector2 xy;
-                Float pdf, totalSampleInv;
-                if(filterMode == FilterMode::ACCUMULATE)
-                {
-                    xy = xi * Float(2) * FilterFunc.Radius() - FilterFunc.Radius();
-                    pdf = totalSampleInv = Float(1);
-                }
-                else
-                {
-                    auto sample = FilterFunc.Sample(xi);
-                    xy = sample.value;
-                    pdf = sample.pdf;
-                    totalSampleInv = dXY.Multiply();
-                }
-
-                // Eval the weight
-                Float weight = FilterFunc.Evaluate(xy);
                 // Find the upper level coordinate
-                Vector2 rPixCoord = (wPixCoord + xy).RoundSelf();
-                rPixCoord *= Vector2(2);
+                rPixCoord = (rPixCoord + Float(0.5)) * uvRatio;
                 rPixCoord.ClampSelf(Vector2::Zero(), Vector2(parentRes - 1));
-                Vector4 localPix = GenericRead(Vector2ui(rPixCoord), readSurf);
-                // Actual calculation
-                writePix += weight * localPix * totalSampleInv / pdf;
-                // Do the ingegration seperately as well
-                // we need to compansate
-                weightSum += weight * totalSampleInv / pdf;
-            }
-            writePix /= weightSum;
+                Vector2ui rPixCoordInt = Vector2ui(rPixCoord.RoundSelf());
+                return GenericRead(rPixCoordInt, readSurf);
+            });
             // Finally write the pixel
             GenericWrite(writeSurf, writePix, wPixCoordInt);
         }
     }
 }
 
+// TODO: Should we dedicate a warp per pixel?
+template<uint32_t TPB, class Filter>
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
+void KCClampImage(// Output
+                  MRAY_GRID_CONSTANT const SurfViewVariant surfaceOut,
+                  // Inputs
+                  MRAY_GRID_CONSTANT const Span<const Byte> dBufferImage,
+                  // Constants
+                  MRAY_GRID_CONSTANT const Vector2ui surfaceImageRes,
+                  MRAY_GRID_CONSTANT const Vector2ui bufferImageRes,
+                  MRAY_GRID_CONSTANT const Vector2ui spp,
+                  MRAY_GRID_CONSTANT const FilterMode filterMode,
+                  MRAY_GRID_CONSTANT const Filter FilterFunc)
+{
+    static constexpr Vector2ui TILE_SIZE = Vector2ui(32, 16);
+    static_assert(TILE_SIZE.Multiply() == TPB);
+
+    // Pre-calculation, calculate uv ratio
+    Vector2 uvRatio = Vector2(bufferImageRes) / Vector2(surfaceImageRes);
+
+    KernelCallParams kp;
+    // Loop over the tiles for this tex, each block is dedicated to a tile
+    // (32, 16) pixels
+    Vector2ui totalTiles = MathFunctions::DivideUp(surfaceImageRes, TILE_SIZE);
+    for(uint32_t tileI = kp.blockId; tileI < totalTiles.Multiply();
+        tileI += kp.gridSize)
+    {
+        Vector2ui localPI = Vector2ui(kp.threadId % TILE_SIZE[0],
+                                      kp.threadId / TILE_SIZE[0]);
+        Vector2ui tile2D = Vector2ui(tileI % totalTiles[0],
+                                     tileI / totalTiles[0]);
+        Vector2ui wPixCoordInt = tile2D * TILE_SIZE + localPI;
+        //
+        if(wPixCoordInt[0] >= surfaceImageRes[0] ||
+           wPixCoordInt[1] >= surfaceImageRes[1])
+            continue;
+
+        // Generic filter, reader can be defined via lambda
+        Vector4 writePix = FilterPixel(wPixCoordInt, spp,
+                                       filterMode, FilterFunc,
+        [&](Vector2 rPixCoord) -> Vector4
+        {
+            // Find the upper level coordinate
+            rPixCoord = (rPixCoord + Float(0.5)) * uvRatio;
+            rPixCoord.ClampSelf(Vector2::Zero(), Vector2(bufferImageRes - 1));
+            Vector2ui rPixCoordInt = Vector2ui(rPixCoord.RoundSelf());
+            // Data is tightly packed, we can directly find the lienar index
+            uint32_t pixCoordLinear = (rPixCoordInt[1] * bufferImageRes[0] +
+                                       rPixCoordInt[0]);
+
+            // Now the type fetch part, utilize surface variant to
+            // find the type
+            Vector4 outData = GenericReadFromBuffer(dBufferImage, surfaceOut,
+                                                    pixCoordLinear);
+            return outData;
+        });
+        // Finally write the pixel
+        SurfViewVariant sOut = surfaceOut;
+        GenericWrite(sOut, writePix, wPixCoordInt);
+    }
+}
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCExpandSamplesToPixels(// Outputs
@@ -569,14 +653,13 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
         for(size_t i = 0; i < TracerConstants::MaxTextureMipCount; i++)
         {
             const SurfRefVariant& surf = surfRefs[i];
-             mipViews[i] = std::visit([](auto&& v) -> SurfViewVariant
-             {
-                 using T = std::remove_cvref_t<decltype(v)>;
-                 if constexpr(std::is_same_v<T, std::monostate>)
-                     return std::monostate{};
-                 else return v.View();
-
-             }, surf);
+            mipViews[i] = std::visit([](auto&& v) -> SurfViewVariant
+            {
+                using T = std::remove_cvref_t<decltype(v)>;
+                if constexpr(std::is_same_v<T, std::monostate>)
+                    return std::monostate{};
+                else return v.View();
+            }, surf);
         }
         hSurfViews.push_back(mipViews);
     }
@@ -630,6 +713,61 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
     queue.Barrier().Wait();
 }
 
+template<class Filter>
+void ClampImageFromBufferGeneric(// Output
+                                 const SurfRefVariant& surf,
+                                 // Input
+                                 const Span<const Byte>& dDataBuffer,
+                                 // Constants
+                                 const Vector2ui& surfImageDims,
+                                 const Vector2ui& bufferImageDims,
+                                 Filter filter,
+                                 const GPUQueue& queue)
+{
+    using MathFunctions::DivideUp;
+    static constexpr Vector2ui TILE_SIZE = Vector2ui(32, 16);
+    static constexpr uint32_t THREAD_PER_BLOCK = TILE_SIZE.Multiply();
+    static constexpr auto Kernel = KCClampImage<THREAD_PER_BLOCK, Filter>;
+    // Find maximum block count for state allocation
+    // TODO: Change this so that it is relative to the
+    // filter radius.
+    static constexpr Vector2ui SPP = Vector2ui(8, 8);
+    uint32_t blockCount = queue.RecommendedBlockCountDevice(Kernel, THREAD_PER_BLOCK, 0);
+    uint32_t blockPerTexture = DivideUp(surfImageDims, TILE_SIZE).Multiply();
+    blockCount = std::min(blockPerTexture, blockCount);
+
+    SurfViewVariant surfRef = std::visit([](auto&& v) -> SurfViewVariant
+    {
+        using T = std::remove_cvref_t<decltype(v)>;
+        if constexpr(std::is_same_v<T, std::monostate>)
+            return std::monostate{};
+        else return v.View();
+    }, surf);
+
+    using namespace std::string_view_literals;
+    queue.IssueExactKernel<Kernel>
+    (
+        "KCClampImage"sv,
+        KernelExactIssueParams
+        {
+            .gridSize = blockCount,
+            .blockSize = THREAD_PER_BLOCK
+        },
+        // Output
+        surfRef,
+        // Inputs
+        dDataBuffer,
+        // Constants
+        surfImageDims,
+        bufferImageDims,
+        SPP,
+        // Use sampling here, quality is not that important
+        // (We are clamping textures)
+        FilterMode::ACCUMULATE,
+        filter
+    );
+}
+
 template<FilterType::E E, class FF>
 TextureFilterT<E, FF>::TextureFilterT(const GPUSystem& system,
                                       Float fR)
@@ -642,6 +780,21 @@ void TextureFilterT<E, FF>::GenerateMips(const std::vector<MipArray<SurfRefVaria
                                          const std::vector<MipGenParams>& params) const
 {
     GenerateMipsGeneric(textures, params, gpuSystem, FF(filterRadius));
+}
+
+template<FilterType::E E, class FF>
+void TextureFilterT<E, FF>::ClampImageFromBuffer(// Output
+                                                 const SurfRefVariant& surf,
+                                                 // Input
+                                                 const Span<const Byte>& dDataBuffer,
+                                                 // Constants
+                                                 const Vector2ui& surfImageDims,
+                                                 const Vector2ui& bufferImageDims,
+                                                 const GPUQueue& queue) const
+{
+    ClampImageFromBufferGeneric(surf, dDataBuffer,
+                                surfImageDims, bufferImageDims,
+                                FF(filterRadius), queue);
 }
 
 template<FilterType::E E, class FF>

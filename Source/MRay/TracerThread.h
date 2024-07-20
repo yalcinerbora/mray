@@ -31,26 +31,26 @@ class TracerThread final : public RealtimeThread
     Vector2ui   regionMax;
     // Current State
     std::string         currentRendererName;
-    uint32_t            currentRenderLogic0;
-    uint32_t            currentRenderLogic1;
-    RendererId          currentRenderer;
-    size_t              currentCamIndex;
+    uint32_t            currentRenderLogic0     = 0;
+    uint32_t            currentRenderLogic1     = 0;
+    RendererId          currentRenderer         = std::numeric_limits<RendererId>::max();
+    size_t              currentCamIndex         = 0;
     CameraTransform     currentCamTransform;
-    AABB3               currentSceneAABB;
+    AABB3               currentSceneAABB        = AABB3::Zero();
     TracerIdPack        sceneIds;
     SemaphoreInfo       currentSem = {};
     // Flow states
     // TODO: I'm pretty sure this will get complicated really fast
     // maybe change this to a state machine later
     // Tracer is terminated due to a fatal error
-    bool isTerminated    = false;
+    bool isTerminated   = false;
     // Should we do polling or blocking fetch from the queue
     // During rendering, system goes to poll mode to render as fast as possible
-    bool isInSleepMode   = true;
+    bool isInSleepMode  = true;
     // Are we currently rendering
-    bool isRendering = false;
+    bool isRendering    = false;
     // Are we paused
-    bool isPaused = false;
+    bool isPaused       = false;
 
     //
     void        LoopWork() override;

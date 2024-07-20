@@ -16,6 +16,11 @@ struct RenderBufferInfo
     // Render output may be spectral data then this represents
     // amount of spectral samples (equally distributed)
     uint32_t            depth;
+    // Given render logic's may be morphed
+    // according to the internals of the renderer
+    // these indices should be set by the visior
+    uint32_t            curRenderLogic0;
+    uint32_t            curRenderLogic1;
 };
 
 struct RenderImageSection

@@ -103,6 +103,20 @@ void GenericTextureT<S, A>::CopyFromAsync(const GPUQueue& queue,
 
 template<size_t S, size_t A>
 inline
+void GenericTextureT<S, A>::CopyFromAsync(const GPUQueue& queue,
+                                          uint32_t mipLevel,
+                                          const TextureExtent<3>& offset,
+                                          const TextureExtent<3>& size,
+                                          Span<const Byte> regionFrom)
+{
+    isMipLoaded[mipLevel] = true;
+    Impl()->CopyFromAsync(queue, mipLevel,
+                          offset, size,
+                          regionFrom);
+}
+
+template<size_t S, size_t A>
+inline
 GenericTextureView GenericTextureT<S, A>::View() const
 {
     return Impl()->View();

@@ -26,6 +26,14 @@ class TextureFilterI
     // Interface
     virtual void    GenerateMips(const std::vector<MipArray<SurfRefVariant>>&,
                                  const std::vector<MipGenParams>&) const = 0;
+    virtual void    ClampImageFromBuffer(// Output
+                                         const SurfRefVariant& surf,
+                                         // Input
+                                         const Span<const Byte>& dDataBuffer,
+                                         // Constants
+                                         const Vector2ui& surfImageDims,
+                                         const Vector2ui& bufferImageDims,
+                                         const GPUQueue& queue) const = 0;
     virtual void    ReconstructionFilterRGB(// Output
                                             const SubImageSpan<3>& img,
                                             // I-O
@@ -56,6 +64,15 @@ class TextureFilterT : public TextureFilterI
     //
     void    GenerateMips(const std::vector<MipArray<SurfRefVariant>>&,
                          const std::vector<MipGenParams>&) const override;
+    void    ClampImageFromBuffer(// Output
+                                 const SurfRefVariant& surf,
+                                 // Input
+                                 const Span<const Byte>& dDataBuffer,
+                                 // Constants
+                                 const Vector2ui& surfImageDims,
+                                 const Vector2ui& bufferImageDims,
+                                 const GPUQueue& queue) const override;
+
     void    ReconstructionFilterRGB(// Output
                                     const SubImageSpan<3>& img,
                                     // I-O

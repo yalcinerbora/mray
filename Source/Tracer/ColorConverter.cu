@@ -329,8 +329,6 @@ void ColorConverter::ConvertColor(const std::vector<MipArray<SurfRefVariant>>& t
                 return true;
             }
         );
-
-        break;
     }
     queue.Barrier().Wait();
 }
