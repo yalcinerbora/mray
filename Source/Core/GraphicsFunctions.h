@@ -94,11 +94,17 @@ namespace Graphics
 
     template<uint32_t C>
     MRAY_HYBRID constexpr
-    Vector<C, uint32_t>     TextureMipSize(Vector<C, uint32_t> resolution,
+    Vector<C, uint32_t>     TextureMipSize(const Vector<C, uint32_t>& resolution,
                                            uint32_t mipLevel);
     template<uint32_t C>
     MRAY_HYBRID constexpr
-    uint32_t                TextureMipCount(Vector<C, uint32_t> resolution);
+    uint32_t                TextureMipCount(const Vector<C, uint32_t>& resolution);
+
+    template<uint32_t C>
+    MRAY_HYBRID constexpr
+    Vector<C, Float>        ConvertPixelIndices(const Vector<C, Float>& inputIndex,
+                                                const Vector<C, Float>& toResolution,
+                                                const Vector<C, Float>& fromResolution);
 
     namespace MortonCode
     {
@@ -453,7 +459,7 @@ constexpr uint32_t MortonCode::Compose3D(const Vector3ui& val)
 
 template<uint32_t C>
 MRAY_HYBRID constexpr
-Vector<C, uint32_t> TextureMipSize(Vector<C, uint32_t> resolution,
+Vector<C, uint32_t> TextureMipSize(const Vector<C, uint32_t>& resolution,
                                    uint32_t mipLevel)
 {
     using VecXui = Vector<C, uint32_t>;
@@ -468,10 +474,23 @@ Vector<C, uint32_t> TextureMipSize(Vector<C, uint32_t> resolution,
 
 template<uint32_t C>
 MRAY_HYBRID constexpr
-uint32_t TextureMipCount(Vector<C, uint32_t> resolution)
+uint32_t TextureMipCount(const Vector<C, uint32_t>& resolution)
 {
     uint32_t maxDim = resolution[resolution.Maximum()];
     return Bit::RequiredBitsToRepresent(maxDim);
+}
+
+template<uint32_t C>
+MRAY_HYBRID constexpr
+Vector<C, Float> ConvertPixelIndices(const Vector<C, Float>& inputIndex,
+                                     const Vector<C, Float>& toResolution,
+                                     const Vector<C, Float>& fromResolution)
+{
+    Vector<C, Float> result;
+    Vector<C, Float> uvRatio = toResolution / fromResolution;
+    result = (inputIndex + Float(0.5)) * uvRatio - Float(0.5);
+    result.ClampSelf(Vector2::Zero(), toResolution - Vector2(1));
+    return result;
 }
 
 template <>

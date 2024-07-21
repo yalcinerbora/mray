@@ -291,12 +291,12 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
         uint32_t ignoredMipCount = uint32_t(mipReduceAmount);
         uint32_t filteredMip = std::min(ignoredMipCount, mipCount - 1);
         bool willBeFiltered = (ignoredMipCount > (mipCount - 1));
-        // Store the ignored mips (we will use this to determine when to call
-        // filtering during runtime
+        // Store the last ignored mip (we will use this to
+        // filtering during load time).
         if(willBeFiltered)
         {
             auto filterInPixCount = Graphics::TextureMipSize(size, uint32_t(filteredMip));
-            size_t total = filterInPixCount.Multiply() * inputParams.pixelType.PixelSize();
+            size_t total = filterInPixCount.Multiply() * inputParams.pixelType.PaddedPixelSize();
             texClampBufferSize = std::max(texClampBufferSize, total);
         }
         // Create the clamp params
@@ -440,7 +440,6 @@ void TextureMemory::CommitTextures()
         queueIndex %= TotalQueuePerDevice();
     }
 
-
     // Allocate the filter buffer now, texture data will come
     // now
     if(texClampBufferSize)
@@ -481,6 +480,11 @@ void TextureMemory::PushTextureData(TextureId id, uint32_t mipLevel,
 
         // Utilize the TexClampParamters
         clampParams.surface = tex.RWView(0);
+
+        // Order is important here
+        // Multiple threads can call this function
+        // So we need to lock the queue issue
+        std::lock_guard _{texClampMutex};
 
         // Fist copy to staging device buffer
         queue.MemcpyAsync(texClampBufferSpan, dataSpan);

@@ -229,6 +229,7 @@ class TextureMemory
     // Sizeof Temporary filterbuffer
     size_t                  texClampBufferSize = 0;
     DeviceLocalMemory       texClampBuffer;
+    std::mutex              texClampMutex;
 
     // Impl functions
     void            GenerateMipmaps();

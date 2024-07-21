@@ -62,8 +62,10 @@ Vector4 FilterPixel(const Vector2ui& pixelCoord,
                     const Filter& FilterFunc,
                     const DataFetcher& FetchData)
 {
-    Vector2ui oddSPP = Vector2ui((spp[0] & 1u) == 0 ? spp[0] - 1 : spp[0],
-                                 (spp[1] & 1u) == 0 ? spp[1] - 1 : spp[1]);
+    // We should sample "the peak" of the filter (so we need odd samples
+    //Vector2ui oddSPP = Vector2ui((spp[0] & 1u) == 0 ? spp[0] - 1 : spp[0],
+    //                             (spp[1] & 1u) == 0 ? spp[1] - 1 : spp[1]);
+    Vector2ui oddSPP = spp;
 
     Vector2 wPixCoord = Vector2(pixelCoord);
     // We use float as a catch-all type
@@ -174,8 +176,10 @@ void KCGenerateMipmaps(// I-O
             [&](Vector2 rPixCoord) -> Vector4
             {
                 // Find the upper level coordinate
-                rPixCoord = (rPixCoord + Float(0.5)) * uvRatio;
-                rPixCoord.ClampSelf(Vector2::Zero(), Vector2(parentRes - 1));
+                using Graphics::ConvertPixelIndices;
+                rPixCoord = ConvertPixelIndices(rPixCoord,
+                                                Vector2(parentRes),
+                                                Vector2(mipRes));
                 Vector2ui rPixCoordInt = Vector2ui(rPixCoord.RoundSelf());
                 return GenericRead(rPixCoordInt, readSurf);
             });
@@ -228,8 +232,10 @@ void KCClampImage(// Output
         [&](Vector2 rPixCoord) -> Vector4
         {
             // Find the upper level coordinate
-            rPixCoord = (rPixCoord + Float(0.5)) * uvRatio;
-            rPixCoord.ClampSelf(Vector2::Zero(), Vector2(bufferImageRes - 1));
+            using Graphics::ConvertPixelIndices;
+            rPixCoord = ConvertPixelIndices(rPixCoord,
+                                            Vector2(bufferImageRes),
+                                            Vector2(surfaceImageRes));
             Vector2ui rPixCoordInt = Vector2ui(rPixCoord.RoundSelf());
             // Data is tightly packed, we can directly find the lienar index
             uint32_t pixCoordLinear = (rPixCoordInt[1] * bufferImageRes[0] +
@@ -706,7 +712,7 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
             i,
             SPP,
             BlockPerTexture,
-            FilterMode::SAMPLING,
+            FilterMode::ACCUMULATE,
             filter
         );
     }

@@ -169,6 +169,9 @@ struct MRayPixelType
     static constexpr MRayPixelEnum Name = E;
     static constexpr bool IsBCPixel = IsBlockCompressedPixel<Type>;
     static constexpr size_t PixelSize = sizeof(Type);
+    static constexpr size_t PaddedPixelSize = (ChannelCount != 3)
+                                                ? PixelSize
+                                                : PixelSize / 3 * 4;
 };
 
 template<MRayDataEnum L, MRayDataEnum R>
@@ -331,6 +334,7 @@ struct MRayPixelTypeRT : public MRayPixelTypeBase
     size_t            ChannelCount() const;
     bool              IsBlockCompressed() const;
     size_t            PixelSize() const;
+    size_t            PaddedPixelSize() const;
 
     using MRayPixelTypeBase::MRayPixelTypeBase;
 };
