@@ -13,7 +13,7 @@ inline TransientData::TransientData(std::in_place_type_t<T>, size_t count)
 {
     if constexpr(EnableTypeCheck)
     {
-        typeHash = typeid(T).hash_code();
+        typeHash = typeid(std::remove_const_t<T>).hash_code();
     }
     Byte* ptr = (count == 0)
                     ? nullptr
@@ -62,12 +62,17 @@ inline bool TransientData::IsEmpty() const
     return ownedMem.size() == 0;
 }
 
+inline bool TransientData::IsFull() const
+{
+    return usedBytes == ownedMem.size_bytes();
+}
+
 template<ImplicitLifetimeC T>
 inline void TransientData::Push(Span<const T> data)
 {
     if constexpr(EnableTypeCheck)
     {
-        if(typeHash != typeid(T).hash_code())
+        if(typeHash != typeid(std::remove_const_t<T>).hash_code())
             throw MRayError("TransientData(Push): Object did constructed with this type!");
     }
 
@@ -85,7 +90,7 @@ inline Span<const T> TransientData::AccessAs() const
 {
     if constexpr(EnableTypeCheck)
     {
-        if(typeHash != typeid(T).hash_code())
+        if(typeHash != typeid(std::remove_const_t<T>).hash_code())
             throw MRayError("TransientData(AccessAs): Object did constructed with this type!");
     }
     return Span<const T>(std::launder(reinterpret_cast<T*>(ownedMem.data())),
@@ -97,7 +102,7 @@ inline Span<T> TransientData::AccessAs()
 {
     if constexpr(EnableTypeCheck)
     {
-        if(typeHash != typeid(T).hash_code())
+        if(typeHash != typeid(std::remove_const_t<T>).hash_code())
             throw MRayError("TransientData(AccessAs): Object did constructed with this type!");
     }
     return Span<T>(std::launder(reinterpret_cast<T*>(ownedMem.data())),
@@ -109,7 +114,7 @@ size_t TransientData::Size() const
 {
     if constexpr(EnableTypeCheck)
     {
-        if(typeHash != typeid(T).hash_code())
+        if(typeHash != typeid(std::remove_const_t<T>).hash_code())
             throw MRayError("TransientData(Size): Object did constructed with this type!");
     }
     return usedBytes / sizeof(T);

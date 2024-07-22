@@ -321,22 +321,22 @@ TEST(GraphicsFunctionsTest, DISABLED_CartesianToSpherical)
 
 }
 
-TEST(GraphicsFunctionsTest, DISABLED_DirectionToCoOcto)
+TEST(GraphicsFunctionsTest, DISABLED_DirectionToCoOcta)
 {
 
 }
 
-TEST(GraphicsFunctionsTest, DISABLED_CoOctoToDirection)
+TEST(GraphicsFunctionsTest, DISABLED_CoOctaToDirection)
 {
 
 }
 
-TEST(GraphicsFunctionsTest, DISABLED_CoOctoWrap)
+TEST(GraphicsFunctionsTest, DISABLED_CoOctaWrap)
 {
 
 }
 
-TEST(GraphicsFunctionsTest, DISABLED_CoOctoWrapInt)
+TEST(GraphicsFunctionsTest, DISABLED_CoOctaWrapInt)
 {
 
 }

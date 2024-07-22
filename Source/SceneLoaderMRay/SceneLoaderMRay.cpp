@@ -143,6 +143,11 @@ std::vector<TransientData> GenericAttributeLoad(const AttributeCountList& totalC
             i++;
         }
     }
+    if constexpr(MRAY_IS_DEBUG)
+    {
+        for(const auto& r : result)
+            assert(r.IsFull());
+    }
     return result;
 }
 
@@ -219,7 +224,6 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
                     result[i].textures.push_back(id);
                 }
             }
-
             // Same as GenericAttributeInfo
             // TODO: Share functionality,  this is copy pase code
             if(texturability == AttributeTexturable::MR_CONSTANT_ONLY)
@@ -255,6 +259,7 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
                     }
                 },
                 std::get<LAYOUT_INDEX>(l));
+                assert(result[i].data.IsFull());
             }
             //  Now the hairy part
             if(texturability == AttributeTexturable::MR_TEXTURE_OR_CONSTANT)
@@ -277,6 +282,27 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
                     }
                 },
                 std::get<LAYOUT_INDEX>(l));
+            }
+            i++;
+        }
+    }
+
+    // Sanity check
+    if constexpr(MRAY_IS_DEBUG)
+    {
+        uint32_t i = 0;
+        for(const auto& l : list)
+        {
+            using enum TexturedAttributeInfo::E;
+            AttributeTexturable texturability = std::get<TEXTURABLE_INDEX>(l);
+            if(texturability == AttributeTexturable::MR_TEXTURE_ONLY)
+            {
+                assert(result[i].data.IsEmpty());
+            }
+            else if(texturability == AttributeTexturable::MR_TEXTURE_OR_CONSTANT ||
+                    texturability == AttributeTexturable::MR_CONSTANT_ONLY)
+            {
+                assert(result[i].data.IsFull());
             }
             i++;
         }
@@ -364,6 +390,7 @@ void LoadPrimitive(TracerI& tracer,
                                                          normals[i]);
                 quats.Push(Span<const Quaternion>(&q, 1));
             }
+            assert(quats.IsFull());
             tracer.PushPrimAttribute(groupId, batchId, attribIndex,
                                      std::move(quats));
         }
@@ -498,6 +525,11 @@ std::vector<TransientData> TransformAttributeLoad(const AttributeCountList& tota
         }
     }
 
+    if constexpr(MRAY_IS_DEBUG)
+    {
+        for(const auto& d : result)
+            assert(d.IsFull());
+    }
     return result;
 }
 
@@ -562,7 +594,11 @@ std::vector<TransientData> CameraAttributeLoad(const AttributeCountList& totalCo
         result[2].Push(Span<const Vector3>(&position, 1));
         result[3].Push(Span<const Vector3>(&up, 1));
     }
-
+    if constexpr(MRAY_IS_DEBUG)
+    {
+        for(const auto& r : result)
+            assert(r.IsFull());
+    }
     return result;
 }
 

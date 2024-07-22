@@ -65,17 +65,17 @@ void KCShowTexture(MRAY_GRID_CONSTANT const Span<Float> dPixels,
         Vector3 result;
         if constexpr(C == 1)
         {
-            const auto& view = std::get<TextureView<2, Float>>(texView);
+            const auto& view = std::get<TracerTexView<2, Float>>(texView);
             result = Vector3(view(uv, Float(mipIndex)).value(), 0, 0);
         }
         else if constexpr(C == 2)
         {
-            const auto& view = std::get<TextureView<2, Vector<C, Float>>>(texView);
+            const auto& view = std::get<TracerTexView<2, Vector<C, Float>>>(texView);
             result = Vector3(view(uv, Float(mipIndex)).value(), 0);
         }
         else if constexpr(C == 3)
         {
-            const auto& view = std::get<TextureView<2, Vector<C, Float>>>(texView);
+            const auto& view = std::get<TracerTexView<2, Vector<C, Float>>>(texView);
             result = Vector3(view(uv, Float(mipIndex)).value());
         }
         else if constexpr(C == 4)
@@ -84,7 +84,7 @@ void KCShowTexture(MRAY_GRID_CONSTANT const Span<Float> dPixels,
             // TODO: change this to something else,
             // We drop the last pixel since it will be considered as alpha
             // if we send it to visor
-            const auto& view = std::get<TextureView<2, Vector<C, Float>>>(texView);
+            const auto& view = std::get<TracerTexView<2, Vector<C, Float>>>(texView);
             result = Vector3(view(uv, Float(mipIndex)).value());
         }
 
@@ -138,6 +138,12 @@ RendererOptionPack TexViewRenderer::CurrentAttributes() const
 
     result.attributes.push_back(TransientData(std::in_place_type_t<uint32_t>{}, 1));
     result.attributes.back().Push(Span<const uint32_t>(&currentOptions.totalSPP, 1));
+
+    if constexpr(MRAY_IS_DEBUG)
+    {
+        for(const auto& d: result.attributes)
+            assert(d.IsFull());
+    }
     return result;
 }
 
@@ -271,7 +277,7 @@ RendererOutput TexViewRenderer::DoRender()
                     regionMax,
                     resolution,
                     mipIndex,
-                    curTex->View()
+                    curTex->View(TextureReadMode::DIRECT)
                 );
             };
             switch(channelCount)

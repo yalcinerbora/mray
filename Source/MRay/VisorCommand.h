@@ -11,8 +11,9 @@ class VisorCommand : public CommandI
     Optional<std::string>   sceneFile           = std::nullopt;
     Optional<std::string>   renderConfigFile    = std::nullopt;
     OptionalRes             imgRes              = std::array<uint32_t, 2>{0, 0};
+    uint32_t                threadCount;
 
-    private:            VisorCommand() = default;
+    private:            VisorCommand();
     public:
     static CommandI&    Instance();
 

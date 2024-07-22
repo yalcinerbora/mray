@@ -12,15 +12,15 @@
 #include "Core/Log.h"
 
 // Meta Light Test Types
-using LightGroupSkysphereCoOcto = LightGroupSkysphere<CoOctoCoordConverter>;
+using LightGroupSkysphereCoOcta = LightGroupSkysphere<CoOctaCoordConverter>;
 using LightGroupSkysphereSpherical = LightGroupSkysphere<SphericalCoordConverter>;
 
 using TContextVariant = Variant<TransformContextIdentity,
                                 TransformContextSingle>;
 using LightVariantIn = Variant
 <
-    typename LightGroupSkysphereCoOcto:: template Light<TransformContextSingle>,
-    typename LightGroupSkysphereCoOcto:: template Light<TransformContextIdentity>,
+    typename LightGroupSkysphereCoOcta:: template Light<TransformContextSingle>,
+    typename LightGroupSkysphereCoOcta:: template Light<TransformContextIdentity>,
     typename LightGroupPrim<PrimGroupTriangle>:: template Light<TransformContextSingle>,
     typename LightGroupPrim<PrimGroupTriangle>:: template Light<TransformContextIdentity>
 >;
@@ -46,7 +46,7 @@ TEST(DefaultLights, DISABLED_MetaLight)
     TransformGroupSingle singleTG(1u, system);
     // LGs
     LightGroupPrim<PrimGroupTriangle> triangleLightGroup(0u, system, {}, triangleGroup);
-    LightGroupSkysphereCoOcto skysphereCOLightGroup(0u, system, {}, emptyPrimGroup);
+    LightGroupSkysphereCoOcta skysphereCOLightGroup(0u, system, {}, emptyPrimGroup);
 
     // Add ids
 

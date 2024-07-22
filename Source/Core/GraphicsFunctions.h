@@ -70,9 +70,9 @@ namespace Graphics
 
     // Cocentric Octohedral Mapping
     // https://fileadmin.cs.lth.se/graphics/research/papers/2008/simdmapping/clarberg_simdmapping08_preprint.pdf
-    MRAY_HYBRID Vector2     DirectionToCocentricOctohedral(const Vector3&);
-    MRAY_HYBRID Vector3     CocentricOctohedralToDirection(const Vector2&);
-    MRAY_HYBRID Vector2     CocentricOctohedralWrap(const Vector2&);
+    MRAY_HYBRID Vector2     DirectionToCocentricOctahedral(const Vector3&);
+    MRAY_HYBRID Vector3     CocentricOctahedralToDirection(const Vector2&);
+    MRAY_HYBRID Vector2     CocentricOctahedralWrap(const Vector2&);
 
     template<std::integral T>
     MRAY_HYBRID
@@ -271,7 +271,7 @@ Float CartesianToUnitPolar(const Vector2& xy)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Vector2 DirectionToCocentricOctohedral(const Vector3& dir)
+Vector2 DirectionToCocentricOctahedral(const Vector3& dir)
 {
     using namespace MathConstants;
     constexpr Float TwoOvrPi = InvPi<Float>() * Float{2};
@@ -308,7 +308,7 @@ Vector2 DirectionToCocentricOctohedral(const Vector3& dir)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 CocentricOctohedralToDirection(const Vector2& st)
+Vector3 CocentricOctahedralToDirection(const Vector2& st)
 {
     using namespace MathConstants;
     constexpr Float PiOvr4 = Pi<Float>() * Float{0.25};
@@ -343,7 +343,7 @@ Vector3 CocentricOctohedralToDirection(const Vector2& st)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Vector2 CocentricOctohedralWrap(const Vector2& st)
+Vector2 CocentricOctahedralWrap(const Vector2& st)
 {
     // Get a good signed int candidate according to the "Float" type
     using IntType = typename std::conditional_t<std::is_same_v<Float, double>, int64_t, int32_t>;

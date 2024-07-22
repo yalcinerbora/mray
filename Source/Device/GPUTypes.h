@@ -56,14 +56,16 @@ struct TextureExtentT<D> { using type = Vector<D, uint32_t>; };
 template <uint32_t D>
 using TextureExtent = typename TextureExtentT<D>::type;
 
+// Padded channel type metaprogramming
 template <uint32_t C, class T, class = void> struct PaddedChannelT;
-template <uint32_t C, class T> requires(C != 3)
+template <uint32_t C, class T> requires(C != 3u)
 struct PaddedChannelT<C, T> { using type = T; };
-template <uint32_t C, class T> requires(C == 3)
+template <uint32_t C, class T> requires(C == 3u)
 struct PaddedChannelT<C, T> { using type = Vector<C + 1, typename T::InnerType>; };
 template <uint32_t C, class T>
 using PaddedChannel = typename PaddedChannelT<C, T>::type;
 
+// UV type metaprogramming
 template <uint32_t D, class = void> struct UVTypeT;
 template <uint32_t D> requires(D == 1)
 struct UVTypeT<D> { using type = Float; };
@@ -71,6 +73,52 @@ template <uint32_t D> requires(D > 1 && D < 4)
 struct UVTypeT<D> { using type = Vector<D, Float>; };
 template <uint32_t D>
 using UVType = typename UVTypeT<D>::type;
+
+// Find channel count
+template<class T>
+requires (std::integral<T> || std::floating_point<T> || VectorC<T>)
+constexpr uint32_t VectorTypeToChannels()
+{
+    if constexpr(std::is_integral_v<T>||
+                 std::is_floating_point_v<T>)
+    {
+        return 1u;
+    }
+    else
+    {
+        return T::Dims;
+    }
+}
+
+template <class T>
+constexpr uint32_t BCTypeToChannels()
+{
+    // https://developer.nvidia.com/blog/revealing-new-features-in-the-cuda-11-5-toolkit/
+    if constexpr(std::is_same_v<T, PixelBC1> ||
+                 std::is_same_v<T, PixelBC2> ||
+                 std::is_same_v<T, PixelBC3> ||
+                 std::is_same_v<T, PixelBC7>)
+    {
+        return 4;
+    }
+    else if constexpr(std::is_same_v<T, PixelBC4U> ||
+                      std::is_same_v<T, PixelBC4S>)
+    {
+        return 1;
+    }
+    else if constexpr(std::is_same_v<T, PixelBC5U> ||
+                      std::is_same_v<T, PixelBC5S>)
+    {
+        return 2;
+    }
+    else if constexpr(std::is_same_v<T, PixelBC6U> ||
+                      std::is_same_v<T, PixelBC6S>)
+    {
+        return 3;
+    }
+    else static_assert(std::is_same_v<T, PixelBC1>,
+                       "Unknown Block Compressed Format!");
+}
 
 // Texture initialization parameters
 // Defaults are for x -> normalized float conversion
@@ -96,7 +144,7 @@ struct TextureInitParams
 template<uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
 UVType<D> LinearToFloatIndex(const TextureExtent<D>& extents,
-                             uint32_t linearIndex)
+                                uint32_t linearIndex)
 {
     if constexpr(D == 1)
         return linearIndex;

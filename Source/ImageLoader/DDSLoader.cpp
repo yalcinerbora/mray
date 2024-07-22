@@ -4,6 +4,7 @@
 #include "Core/Flag.h"
 #include "Core/DataStructures.h"
 #include "Core/Expected.h"
+#include "Core/GraphicsFunctions.h"
 
 #include <filesystem>
 
@@ -172,8 +173,24 @@ enum class MiscFlagBitsDX10 : uint32_t
     SHARED_EXCLUSIVE_WRITER,
     END
 };
-
 using MiscFlagsDX10 = Flag<MiscFlagBitsDX10>;
+
+enum class FlagBitsDX9 : uint32_t
+{
+    DDSD_CAPS           = 0,
+    DDSD_HEIGHT         = 1,
+    DDSD_WIDTH          = 2,
+    DDSD_PITCH          = 3,
+    // Weird flags here fetch from Microsoft docs.
+    // Calculate via |_log2(x)_|
+    // (so no counting mistake)
+    DDSD_PIXELFORMAT    = Bit::RequiredBitsToRepresent(0x1000u) - 1,
+    DDSD_MIPMAPCOUNT    = Bit::RequiredBitsToRepresent(0x20000u) - 1,
+    DDSD_LINEARSIZE	    = Bit::RequiredBitsToRepresent(0x80000u) - 1,
+    DDSD_DEPTH          = Bit::RequiredBitsToRepresent(0x800000u) - 1,
+    END
+};
+using FlagsDX9 = Flag<FlagBitsDX9>;
 
 struct PixFormat
 {
@@ -222,11 +239,157 @@ static_assert(sizeof(HeaderExtended) == 20, "DDS Header size is wrong!");
 
 static constexpr uint32_t DDS_FOURCC = Bit::GenerateFourCC('D', 'D', 'S', ' ');
 static constexpr uint32_t DX10_FOURCC = Bit::GenerateFourCC('D', 'X', '1', '0');
-static constexpr uint32_t NON_NATIVE_DDS_FOURCC = Bit::GenerateFourCC('_', 'S', 'D', 'D');
+static constexpr uint32_t NON_NATIVE_DDS_FOURCC = Bit::GenerateFourCC(' ', 'S', 'D', 'D');
 
-size_t MipSizeToLinearByteSize(MRayPixelTypeRT pf, const Vector3ui& mipSize)
+Expected<Pair<ColorSpacePack, MRayPixelTypeRT>> ReadPixelTypeDDS_DX10(const HeaderExtended& headerDX10)
 {
-    return 512;
+    using enum FormatDXGI;
+    Pair<ColorSpacePack, MRayPixelTypeRT> result;
+    // Check Format
+    switch(headerDX10.dxgiFormat)
+    {
+        using enum MRayPixelEnum;
+        // BC1
+        case BC1_TYPELESS:
+        case BC1_UNORM:
+        case BC1_UNORM_SRGB: result.second = MRayPixelType<MR_BC1_UNORM>{}; break;
+        // BC2
+        case BC2_TYPELESS:
+        case BC2_UNORM:
+        case BC2_UNORM_SRGB: result.second = MRayPixelType<MR_BC2_UNORM>{}; break;
+        // BC3
+        case BC3_TYPELESS:
+        case BC3_UNORM:
+        case BC3_UNORM_SRGB: result.second = MRayPixelType<MR_BC3_UNORM>{}; break;
+        // BC4
+        case BC4_TYPELESS:
+        case BC4_UNORM:      result.second = MRayPixelType<MR_BC4_UNORM>{}; break;
+        case BC4_SNORM:      result.second = MRayPixelType<MR_BC4_SNORM>{}; break;
+        // BC5
+        case BC5_TYPELESS:
+        case BC5_UNORM:      result.second = MRayPixelType<MR_BC5_UNORM>{}; break;
+        case BC5_SNORM:      result.second = MRayPixelType<MR_BC5_SNORM>{}; break;
+        // BC6
+        case BC6H_TYPELESS:
+        case BC6H_UF16:      result.second = MRayPixelType<MR_BC6H_UFLOAT>{}; break;
+        case BC6H_SF16:      result.second = MRayPixelType<MR_BC6H_SFLOAT>{}; break;
+        // BC7
+        case BC7_TYPELESS:
+        case BC7_UNORM:
+        case BC7_UNORM_SRGB: result.second = MRayPixelType<MR_BC7_UNORM>{}; break;
+        // Technically not an error yet (we will delegate to the OIIO
+        // then it will fail if format is not supported)
+        default: return MRayError::OK;
+    }
+    // Check Color Space
+    switch(headerDX10.dxgiFormat)
+    {
+        using enum MRayColorSpaceEnum;
+        case BC1_UNORM_SRGB:
+        case BC2_UNORM_SRGB:
+        case BC3_UNORM_SRGB:
+        case BC7_UNORM_SRGB: result.first = ColorSpacePack(Float(2.2), MR_REC_709); break;
+        default:             result.first = ColorSpacePack(Float(1), MR_DEFAULT); break;
+    }
+    return result;
+}
+
+Expected<Pair<ColorSpacePack, MRayPixelTypeRT>> ReadPixelTypeDDS_DX9(const HeaderBase& headerDX9)
+{
+    // Some from here
+    // https://learn.microsoft.com/en-us/windows/win32/direct3d11/texture-block-compression-in-direct3d-11
+    // Some here
+    // https://github.com/microsoft/DirectXTex/blob/main/DirectXTex/DDS.h
+    // TODO: Check if we missed any
+    // BC1
+    constexpr uint32_t BC1_FOURCC    = Bit::GenerateFourCC('D', 'X', 'T', '1');
+    // BC2
+    constexpr uint32_t BC2_FOURCC_0  = Bit::GenerateFourCC('D', 'X', 'T', '2');
+    constexpr uint32_t BC2_FOURCC_1  = Bit::GenerateFourCC('D', 'X', 'T', '3');
+    // BC3
+    constexpr uint32_t BC3_FOURCC_0  = Bit::GenerateFourCC('D', 'X', 'T', '4');
+    constexpr uint32_t BC3_FOURCC_1  = Bit::GenerateFourCC('D', 'X', 'T', '5');
+    // BC4
+    constexpr uint32_t BC4U_FOURCC_0 = Bit::GenerateFourCC('A', 'T', 'I', '1');
+    constexpr uint32_t BC4U_FOURCC_1 = Bit::GenerateFourCC('B', 'C', '4', 'U');
+    constexpr uint32_t BC4S_FOURCC   = Bit::GenerateFourCC('B', 'C', '4', 'S');
+    // BC5
+    constexpr uint32_t BC5U_FOURCC_0 = Bit::GenerateFourCC('A', 'T', 'I', '2');
+    constexpr uint32_t BC5U_FOURCC_1 = Bit::GenerateFourCC('B', 'C', '5', 'U');
+    constexpr uint32_t BC5S_FOURCC   = Bit::GenerateFourCC('B', 'C', '5', 'S');
+    constexpr uint32_t DDPF_FOURCC = 0x4;
+
+    // Delegate to the OIIO if not block compressed
+    if((headerDX9.ddspf.dwFlags & DDPF_FOURCC) == 0)
+        return MRayError::OK;
+
+    Pair<ColorSpacePack, MRayPixelTypeRT> result;
+    switch(headerDX9.ddspf.dwFourCC)
+    {
+        using enum MRayPixelEnum;
+        // BC1
+        case BC1_FOURCC:    result.second = MRayPixelType<MR_BC1_UNORM>{}; break;
+        // BC2
+        case BC2_FOURCC_0:
+        case BC2_FOURCC_1:  result.second = MRayPixelType<MR_BC2_UNORM>{}; break;
+        // BC3
+        case BC3_FOURCC_0:
+        case BC3_FOURCC_1:  result.second = MRayPixelType<MR_BC2_UNORM>{}; break;
+        // BC3
+        case BC4U_FOURCC_0:
+        case BC4U_FOURCC_1: result.second = MRayPixelType<MR_BC4_UNORM>{}; break;
+        case BC4S_FOURCC:   result.second = MRayPixelType<MR_BC4_SNORM>{}; break;
+        // BC3
+        case BC5U_FOURCC_0:
+        case BC5U_FOURCC_1: result.second = MRayPixelType<MR_BC5_UNORM>{}; break;
+        case BC5S_FOURCC:   result.second = MRayPixelType<MR_BC5_SNORM>{}; break;
+        // For other fancy types (Yuv etc.) delegate to OIIO
+        default: return MRayError::OK;
+    };
+
+    // Dx9 does not expose srgb etc.
+    result.first = {Float(1), MRayColorSpaceEnum::MR_DEFAULT};
+    return result;
+}
+
+template<MRayPixelEnum E>
+constexpr uint32_t CalculateBCBytesPerBlock()
+{
+    switch(E)
+    {
+        case MRayPixelEnum::MR_BC1_UNORM:
+        case MRayPixelEnum::MR_BC4_UNORM:
+        case MRayPixelEnum::MR_BC4_SNORM:
+            return 8;
+        case MRayPixelEnum::MR_BC2_UNORM:
+        case MRayPixelEnum::MR_BC3_UNORM:
+        case MRayPixelEnum::MR_BC5_UNORM:
+        case MRayPixelEnum::MR_BC5_SNORM:
+        case MRayPixelEnum::MR_BC6H_UFLOAT:
+        case MRayPixelEnum::MR_BC6H_SFLOAT:
+        case MRayPixelEnum::MR_BC7_UNORM:
+            return 16;
+        default:
+            return 0;
+    }
+}
+
+Pair<Vector2ui, uint32_t> MipSizeToBlockSize(MRayPixelTypeRT pf, const Vector2ui& mipSize)
+{
+    static constexpr uint32_t BLOCK_SIZE = 4;
+
+    // From here
+    // https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dx-graphics-dds-pguide
+    // 8 bytes or 16 bytes
+    uint32_t bytesPerBlock = std::visit([](auto&& p) -> uint32_t
+    {
+        return CalculateBCBytesPerBlock<p.Name>();
+    }, pf);
+
+    Pair<Vector2ui, uint32_t> result;
+    result.first = MathFunctions::DivideUp(mipSize, Vector2ui(BLOCK_SIZE));
+    result.second = bytesPerBlock;
+    return result;
 }
 
 bool IsPlausibleChannelLayout(MRayPixelTypeRT pixType,
@@ -340,171 +503,115 @@ Expected<ImageHeader> ImageFileDDS::ReadHeader()
         return MRayError("WRONG FOURCC: File \"{}\" has filpped fourcc code. "
                          "It may be saved in different endian platform maybe?",
                          filePath);
-    if(ddsHeader.ddspf.dwFourCC != DX10_FOURCC)
-        return MRayError("File \"{}\" is not a DX10-DDS "
-                         "file, old DDS files are not supported!", filePath);
-
 
     ImageHeader outputHeader = {};
-    HeaderExtended headerDX10;
-    if(fileSize < sizeof(HeaderExtended) + sizeof(HeaderBase))
-        return MRayError("File \"{}\" is too small to "
-                            "be a DX10-DDS file!", filePath);
-
-    char* headerPtrDX10 = reinterpret_cast<char*>(&headerDX10);
-    if(!ddsFile.read(headerPtrDX10, sizeof(HeaderExtended)))
-        return MRayError("File \"{}\" read error!", filePath);
-
-    MiscFlagsDX10 miscFlags = static_cast<MiscFlagBitsDX10>(headerDX10.miscFlag);
-
-    if(headerDX10.arraySize != 1)
+    Optional<HeaderExtended> headerDX10;
+    if((ddsHeader.ddspf.dwFourCC == DX10_FOURCC))
     {
-        return MRayError("File \"{}\" has array textures, it is not "
-                            "supported yet!", filePath);
+        if(fileSize < sizeof(HeaderExtended) + sizeof(HeaderBase))
+            return MRayError("File \"{}\" is too small to "
+                             "be a DX10-DDS file!", filePath);
+
+        headerDX10 = HeaderExtended{};
+        char* headerPtrDX10 = reinterpret_cast<char*>(&headerDX10.value());
+        if(!ddsFile.read(headerPtrDX10, sizeof(HeaderExtended)))
+            return MRayError("File \"{}\" read error!", filePath);
     }
 
-    if(headerDX10.resourceDimension != ResourceType::TEXTURE2D)
+    if(headerDX10)
     {
-        return MRayError("File \"{}\" has non-2D texture, it is not "
-                            "supported yet!", filePath);
-    }
+        if(headerDX10->arraySize != 1)
+        {
+            return MRayError("File \"{}\" has array textures, it is not "
+                             "supported yet!", filePath);
+        }
 
-    if(miscFlags[MiscFlagsDX10::F::TEXTURECUBE])
+        if(headerDX10->resourceDimension != ResourceType::TEXTURE2D)
+        {
+            return MRayError("File \"{}\" has non-2D texture, it is not "
+                             "supported yet!", filePath);
+        }
+
+        using enum MiscFlagsDX10::F;
+        MiscFlagsDX10 miscFlags = std::bit_cast<MiscFlagBitsDX10>(headerDX10->miscFlag);
+        if(miscFlags[TEXTURECUBE])
+        {
+            return MRayError("File \"{}\" has cube texture, it is not "
+                             "supported yet!", filePath);
+        }
+    }
+    else
     {
-        return MRayError("File \"{}\" has cube texture, it is not "
-                            "supported yet!", filePath);
+        using enum FlagsDX9::F;
+        FlagsDX9 dx9Flags = std::bit_cast<FlagsDX9>(ddsHeader.dwFlags);
+        if(dx9Flags[DDSD_DEPTH])
+        {
+            return MRayError("File \"{}\" has cube texture, it is not "
+                             "supported yet!", filePath);
+        }
+        if(!(dx9Flags[DDSD_CAPS] && dx9Flags[DDSD_HEIGHT] &&
+             dx9Flags[DDSD_WIDTH] && dx9Flags[DDSD_PIXELFORMAT]))
+        {
+            return MRayError("File \"{}\" has non-2D texture, it is not "
+                             "supported yet!", filePath);
+        }
     }
-
     // All fine go!
     outputHeader.mipCount = std::max(ddsHeader.dwMipMapCount, 1u);
     outputHeader.dimensions = Vector3ui(ddsHeader.dwWidth,
                                         ddsHeader.dwHeight, 1u);
-    using enum FormatDXGI;
-    using enum MRayPixelEnum;
-    // Check Format
-    switch(headerDX10.dxgiFormat)
-    {
-        case BC1_TYPELESS:
-        case BC1_UNORM:
-        case BC1_UNORM_SRGB:
-        {
-            outputHeader.pixelType = MRayPixelType<MR_BC1_UNORM>{};
-            break;
-        }
-        case BC2_TYPELESS:
-        case BC2_UNORM:
-        case BC2_UNORM_SRGB:
-        {
-            outputHeader.pixelType = MRayPixelType<MR_BC2_UNORM>{};
-            break;
-        }
-        case BC3_TYPELESS:
-        case BC3_UNORM:
-        case BC3_UNORM_SRGB:
-        {
-            outputHeader.pixelType = MRayPixelType<MR_BC3_UNORM>{};
-            break;
-        }
-        case BC4_TYPELESS:
-        case BC4_UNORM:
-        {
-            outputHeader.pixelType = MRayPixelType<MR_BC4_UNORM>{};
-            break;
-        }
-        case BC4_SNORM:
-        {
-            outputHeader.pixelType = MRayPixelType<MR_BC4_SNORM>{};
-            break;
-        }
-        case BC5_TYPELESS:
-        case BC5_UNORM:
-        {
-            outputHeader.pixelType = MRayPixelType<MR_BC5_UNORM>{};
-            break;
-        }
-        case BC5_SNORM:
-        {
-            outputHeader.pixelType = MRayPixelType<MR_BC5_SNORM>{};
-            break;
-        }
-        case BC6H_TYPELESS:
-        case BC6H_UF16:
-        {
-            outputHeader.pixelType = MRayPixelType<MR_BC6H_UFLOAT>{};
-            break;
-        }
-        case BC6H_SF16:
-        {
-            outputHeader.pixelType = MRayPixelType<MR_BC6H_SFLOAT>{};
-            break;
-        }
-        case BC7_TYPELESS:
-        case BC7_UNORM:
-        case BC7_UNORM_SRGB:
-        {
-            outputHeader.pixelType = MRayPixelType<MR_BC7_UNORM>{};
-            break;
-        }
-        default:
-        {
-            // Probably good DDS texture,
-            // let OIIO handle it.
-            // ** Return an OK error **
-            // This is a protocol
-            return MRayError::OK;
-        }
-    }
-    // Check Color Space
-    switch(headerDX10.dxgiFormat)
-    {
-        case BC1_UNORM_SRGB:
-        case BC2_UNORM_SRGB:
-        case BC3_UNORM_SRGB:
-        case BC7_UNORM_SRGB:
-        {
-            outputHeader.colorSpace = Pair(Float(2.2),
-                                           MRayColorSpaceEnum::MR_DEFAULT);
-            break;
-        }
-        default:
-        {
-            outputHeader.colorSpace = Pair(Float(1),
-                                           MRayColorSpaceEnum::MR_DEFAULT);
-            break;
-        }
-    }
 
-    // Delegate to OIIO if not plausible
+    // Calculate the color space and pixel
+    Expected<Pair<ColorSpacePack, MRayPixelTypeRT>> r;
+    r = (headerDX10)
+            ? ReadPixelTypeDDS_DX10(*headerDX10)
+            : ReadPixelTypeDDS_DX9(ddsHeader);
+    // Delegate to the OIIO
+    if(r.has_error()) return r.error();
+
+    outputHeader.pixelType = r.value().second;
+    outputHeader.colorSpace = r.value().first;
+    // Delegate to OIIO if it is not plausible to load it as DDS
     if(!IsPlausibleChannelLayout(outputHeader.pixelType, subChannels))
         return MRayError::OK;
 
     headerIsRead = true;
     header = outputHeader;
-    return header;
+    return std::move(header);
 }
 
 Expected<Image> ImageFileDDS::ReadImage()
 {
+    assert(header.dimensions[2] == 1);
+
     Image result;
     result.header = header;
     for(uint32_t i = 0; i < result.header.mipCount; i++)
     {
-        Vector3ui mipSize = Vector3ui(result.header.dimensions[0] >> i,
-                                      result.header.dimensions[1] >> i,
-                                      result.header.dimensions[2] >> i);
-        mipSize = Vector3ui::Max(mipSize, Vector3ui(1));
-        size_t mipByteSize = MipSizeToLinearByteSize(result.header.pixelType,
-                                                     mipSize);
+        Vector2ui mipSize = Graphics::TextureMipSize<2>(Vector2ui(header.dimensions), i);
+        auto
+        [
+            blockCount,
+            bytePerBlock
+        ] = MipSizeToBlockSize(header.pixelType, mipSize);
 
-        TransientData data(std::in_place_type_t<Byte>{}, mipByteSize);
+        TransientData data = std::visit([&](auto&& p) -> TransientData
+        {
+            uint32_t blockTotal = blockCount.Multiply();
+            if constexpr(p.IsBCPixel)
+                return TransientData(std::in_place_type_t<Byte[CalculateBCBytesPerBlock<p.Name>()]>{}, blockTotal);
+            else
+                return TransientData(std::in_place_type_t<Byte>{}, 0);
+        }, header.pixelType);
+        data.ReserveAll();
         auto dataSpan = data.AccessAs<Byte>();
         ddsFile.read(reinterpret_cast<char*>(dataSpan.data()),
                      dataSpan.size_bytes());
         if(!ddsFile)
             return MRayError("File \"{}\" does not have enough data to "
                              "fulfill its header!", filePath);
-        result.imgData.emplace_back(mipSize, std::move(data));
+        result.imgData.emplace_back(Vector3ui(mipSize, 1), std::move(data));
 
     }
-    return result;
+    return std::move(result);
 }

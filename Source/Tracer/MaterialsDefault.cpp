@@ -26,7 +26,7 @@ MatGroupLambert::MatGroupLambert(uint32_t groupId,
 void MatGroupLambert::CommitReservations()
 {
     auto [a, nm, mIds] = GenericCommit<ParamVaryingData<2, Vector3>,
-                                       Optional<TextureView<2, Vector3>>,
+                                       Optional<TracerTexView<2, Vector3>>,
                                        MediumKey>({0, 0, 0});
     dAlbedo = a;
     dNormalMaps = nm;

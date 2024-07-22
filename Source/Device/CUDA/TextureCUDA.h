@@ -32,18 +32,11 @@ class TextureBackingMemoryCUDA;
 template <class T>
 constexpr bool IsNormConvertibleCUDA()
 {
+    // 32-bit types are not norm convertible,
+    // so removed these from this function
+    //
     // YOLO
-    return (std::is_same_v<T, uint32_t>     ||
-            std::is_same_v<T, Vector2ui>    ||
-            std::is_same_v<T, Vector3ui>    ||
-            std::is_same_v<T, Vector4ui>    ||
-
-            std::is_same_v<T, int32_t>      ||
-            std::is_same_v<T, Vector2i>     ||
-            std::is_same_v<T, Vector3i>     ||
-            std::is_same_v<T, Vector4i>     ||
-
-            std::is_same_v<T, uint16_t>     ||
+    return (std::is_same_v<T, uint16_t>     ||
             std::is_same_v<T, Vector2us>    ||
             std::is_same_v<T, Vector3us>    ||
             std::is_same_v<T, Vector4us>    ||
@@ -65,30 +58,24 @@ constexpr bool IsNormConvertibleCUDA()
 }
 
 template <class T>
-constexpr uint32_t BCTypeToChannels()
+constexpr uint32_t BCTypeToBlockSize()
 {
     // https://developer.nvidia.com/blog/revealing-new-features-in-the-cuda-11-5-toolkit/
-    if constexpr(std::is_same_v<T, PixelBC1> ||
-                 std::is_same_v<T, PixelBC2> ||
-                 std::is_same_v<T, PixelBC3> ||
-                 std::is_same_v<T, PixelBC7>)
+    if constexpr(std::is_same_v<T, PixelBC1>  ||
+                 std::is_same_v<T, PixelBC4U> ||
+                 std::is_same_v<T, PixelBC4S>)
     {
-        return 4;
+        return 8;
     }
-    else if constexpr(std::is_same_v<T, PixelBC4U> ||
-                      std::is_same_v<T, PixelBC4S>)
+    else if constexpr(std::is_same_v<T, PixelBC2>  ||
+                      std::is_same_v<T, PixelBC3>  ||
+                      std::is_same_v<T, PixelBC5U> ||
+                      std::is_same_v<T, PixelBC5S> ||
+                      std::is_same_v<T, PixelBC6U> ||
+                      std::is_same_v<T, PixelBC6S> ||
+                      std::is_same_v<T, PixelBC7>)
     {
-        return 1;
-    }
-    else if constexpr(std::is_same_v<T, PixelBC5U> ||
-                      std::is_same_v<T, PixelBC5S>)
-    {
-        return 2;
-    }
-    else if constexpr(std::is_same_v<T, PixelBC6U> ||
-                      std::is_same_v<T, PixelBC6S>)
-    {
-        return 3;
+        return 16;
     }
     else static_assert(std::is_same_v<T, PixelBC1>,
                        "Unknown Block Compressed Format!");
@@ -139,7 +126,7 @@ template<uint32_t D, class T>
 class TextureCUDA_Normal
 {
     public:
-    static constexpr uint32_t ChannelCount = VectorTypeToChannels::Find<T>;
+    static constexpr uint32_t ChannelCount = VectorTypeToChannels<T>();
     static constexpr bool IsNormConvertible = IsNormConvertibleCUDA<T>();
     static constexpr uint32_t Dims          = D;
 
@@ -179,8 +166,8 @@ class TextureCUDA_Normal
 
     template<class QT>
     requires(!std::is_same_v<QT, T> &&
-             (VectorTypeToChannels::Find<T> ==
-              VectorTypeToChannels::Find<QT>))
+             (VectorTypeToChannels<T>() ==
+              VectorTypeToChannels<QT>()))
     TextureViewCUDA<D, QT>  View() const;
 
     RWTextureRefCUDA<D, T> GenerateRWRef(uint32_t mipLevel);
@@ -213,7 +200,7 @@ class TextureCUDA_BC
     static constexpr auto CudaTypeEnum      = static_cast<cudaChannelFormatKind>(BCEnumFinder::Find<T>);
 
     using Type              = T;
-    using PaddedChannelType = Byte;
+    using PaddedChannelType = Byte[BCTypeToBlockSize<T>()];
 
     private:
     const GPUDeviceCUDA*    gpu;
@@ -241,7 +228,7 @@ class TextureCUDA_BC
     // Only FloatX views are supported
     template<class QT>
     requires(!std::is_same_v<QT, T> &&
-             (BCTypeToChannels<T>() == VectorTypeToChannels::Find<QT>))
+             (BCTypeToChannels<T>() == VectorTypeToChannels<QT>()))
     TextureViewCUDA<2, QT>  View() const;
 
     size_t                  Size() const;
@@ -359,3 +346,14 @@ extern template class mray::cuda::TextureCUDA<2, int16_t>;
 extern template class mray::cuda::TextureCUDA<2, Vector2s>;
 extern template class mray::cuda::TextureCUDA<2, Vector3s>;
 extern template class mray::cuda::TextureCUDA<2, Vector4s>;
+
+extern template class mray::cuda::TextureCUDA<2, PixelBC1>;
+extern template class mray::cuda::TextureCUDA<2, PixelBC2>;
+extern template class mray::cuda::TextureCUDA<2, PixelBC3>;
+extern template class mray::cuda::TextureCUDA<2, PixelBC4U>;
+extern template class mray::cuda::TextureCUDA<2, PixelBC4S>;
+extern template class mray::cuda::TextureCUDA<2, PixelBC5U>;
+extern template class mray::cuda::TextureCUDA<2, PixelBC5S>;
+extern template class mray::cuda::TextureCUDA<2, PixelBC6U>;
+extern template class mray::cuda::TextureCUDA<2, PixelBC6S>;
+extern template class mray::cuda::TextureCUDA<2, PixelBC7>;

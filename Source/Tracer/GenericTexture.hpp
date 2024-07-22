@@ -117,9 +117,9 @@ void GenericTextureT<S, A>::CopyFromAsync(const GPUQueue& queue,
 
 template<size_t S, size_t A>
 inline
-GenericTextureView GenericTextureT<S, A>::View() const
+GenericTextureView GenericTextureT<S, A>::View(TextureReadMode mode) const
 {
-    return Impl()->View();
+    return Impl()->View(mode);
 }
 
 template<size_t S, size_t A>

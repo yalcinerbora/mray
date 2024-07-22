@@ -15,6 +15,7 @@
 #include "GenericGroup.h"
 #include "PrimitiveC.h"
 #include "LightC.h"
+#include "TextureView.h"
 
 namespace BS { class thread_pool; }
 
@@ -119,7 +120,7 @@ namespace TracerLimits
 template<AccelGroupC AG, TransformGroupC TG>
 using AccTransformContextType = PrimTransformContextType<typename AG::PrimitiveGroup, TG>;
 
-using AlphaMap = TextureView<2, Float>;
+using AlphaMap = TracerTexView<2, Float>;
 
 struct BaseAccelConstructParams
 {

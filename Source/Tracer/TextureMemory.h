@@ -71,7 +71,7 @@ class GenericTextureI
     // Another hard part, We can close the types here.
     // Only float convertible views are supported
     // TODO: This may be a limitation for rare cases maybe later?
-    virtual GenericTextureView  View() const = 0;
+    virtual GenericTextureView  View(TextureReadMode mode) const = 0;
 
     // Writable view only used for mipmap generation,
     // Only 2D and not block-compressed textures are supported
@@ -136,7 +136,7 @@ class alignas(Alignment) GenericTextureT
                                       const TextureExtent<3>& size,
                                       Span<const Byte> regionFrom);
     //
-    GenericTextureView  View() const;
+    GenericTextureView  View(TextureReadMode mode) const;
     bool                HasRWView() const;
     SurfRefVariant      RWView(uint32_t mipLevel);
 
@@ -185,7 +185,7 @@ class Concept : public GenericTextureI
                                       const TextureExtent<3>& offset,
                                       const TextureExtent<3>& size,
                                       Span<const Byte> regionFrom) override;
-    GenericTextureView  View() const override;
+    GenericTextureView  View(TextureReadMode mode) const override;
     bool                HasRWView() const override;
     SurfRefVariant      RWView(uint32_t mipLevel) override;
 };

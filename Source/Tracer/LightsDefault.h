@@ -42,7 +42,7 @@ namespace LightDetail
         static Float    ToSolidAnglePdf(Float pdf, const Vector2& uv);
     };
 
-    struct CoOctoCoordConverter
+    struct CoOctaCoordConverter
     {
         MRAY_HYBRID
         static Vector2  DirToUV(const Vector3& dirYUp);
@@ -395,12 +395,12 @@ class LightGroupNull : public GenericGroupLight<LightGroupNull>
 
 #include "LightsDefault.hpp"
 
-using CoOctoCoordConverter = LightDetail::CoOctoCoordConverter;
+using CoOctaCoordConverter = LightDetail::CoOctaCoordConverter;
 using SphericalCoordConverter = LightDetail::SphericalCoordConverter;
 
-extern template class LightGroupSkysphere<CoOctoCoordConverter>;
+extern template class LightGroupSkysphere<CoOctaCoordConverter>;
 extern template class LightGroupSkysphere<SphericalCoordConverter>;
 
-static_assert(LightGroupC<LightGroupSkysphere<CoOctoCoordConverter>>);
+static_assert(LightGroupC<LightGroupSkysphere<CoOctaCoordConverter>>);
 static_assert(LightGroupC<LightGroupSkysphere<SphericalCoordConverter>>);
 static_assert(LightGroupC<LightGroupNull>);

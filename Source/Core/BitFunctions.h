@@ -203,7 +203,7 @@ constexpr T Bit::BitReverse(T value, T width)
 }
 
 constexpr uint32_t Bit::GenerateFourCC(char byte0, char byte1,
-                                                char byte2, char byte3)
+                                       char byte2, char byte3)
 {
     constexpr uint32_t p0 = CHAR_BIT * 0;
     constexpr uint32_t p1 = CHAR_BIT * 1;

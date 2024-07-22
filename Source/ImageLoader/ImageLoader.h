@@ -53,6 +53,7 @@ class ImageFileDDS : public ImageFileBase
     std::ifstream           ddsFile;
     ImageHeader             header;
     bool                    headerIsRead = false;
+    bool                    isDX10File;
 
     public:
     // Constructors & Destructor

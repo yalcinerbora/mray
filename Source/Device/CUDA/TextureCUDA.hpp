@@ -66,7 +66,6 @@ inline cudaTextureFilterMode DetermineFilterMode(MRayTextureInterpEnum i)
     }
 }
 
-
 template <uint32_t D, class T>
 RWTextureRefCUDA<D, T>::RWTextureRefCUDA(cudaSurfaceObject_t sIn)
     : s(sIn)
@@ -109,7 +108,7 @@ TextureCUDA_Normal<D, T>::TextureCUDA_Normal(const GPUDeviceCUDA& device,
     if(texParams.normIntegers && !IsNormConvertible)
     {
         MRAY_WARNING_LOG("Requested channel type cannot be converted to normalized form."
-                            " Setting \"unormIntegers\" to false");
+                         " Setting \"unormIntegers\" to false");
         texParams.normIntegers = false;
     };
 
@@ -221,8 +220,8 @@ TextureViewCUDA<D, QT> TextureCUDA_Normal<D, T>::View() const
 template<uint32_t D, class T>
 template<class QT>
 requires(!std::is_same_v<QT, T> &&
-         (VectorTypeToChannels::Find<T> ==
-          VectorTypeToChannels::Find<QT>))
+         (VectorTypeToChannels<T>() ==
+          VectorTypeToChannels<QT>()))
 TextureViewCUDA<D, QT> TextureCUDA_Normal<D, T>::View() const
 {
     constexpr bool IsFloatType = (std::is_same_v<QT, Float> ||
@@ -394,8 +393,24 @@ TextureCUDA_BC<T>::TextureCUDA_BC(const GPUDeviceCUDA& device,
     tDesc.addressMode[2] = DetermineAddressMode(texParams.eResolve);
     tDesc.filterMode = DetermineFilterMode(texParams.interp);
     tDesc.mipmapFilterMode = DetermineFilterMode(texParams.interp);
-    // Always normalized float for block compressed texture
-    tDesc.readMode = cudaReadModeNormalizedFloat;
+    // Warnings
+    bool isBC6 = (std::is_same_v<T, PixelBC6U> || std::is_same_v<T, PixelBC6S>);
+    if(isBC6 && texParams.normIntegers == true)
+    {
+        MRAY_WARNING_LOG("BC6 textures must be read as \"unnormalized\"."
+                         " Setting \"unormIntegers\" to false");
+    }
+    else if(!isBC6 && texParams.normIntegers == false)
+    {
+        MRAY_WARNING_LOG("Non-BC6 Block compressed textures must be read as \"normalized\"."
+                         " Setting \"unormIntegers\" to true");
+    }
+    // BC6 requires element type
+    // Other BC formats require normalized float
+    // Which is "element mode" for these
+    tDesc.readMode = (isBC6)
+                        ? cudaReadModeElementType
+                        : cudaReadModeNormalizedFloat;
     // Never utilize srgb conversion
     tDesc.sRGB = false;
     // Border color can only be zero?
@@ -467,7 +482,7 @@ TextureCUDA_BC<T>::~TextureCUDA_BC()
 template<class T>
 template<class QT>
 requires(!std::is_same_v<QT, T> &&
-         (BCTypeToChannels<T>() == VectorTypeToChannels::Find<QT>))
+         (BCTypeToChannels<T>() == VectorTypeToChannels<QT>()))
 TextureViewCUDA<2, QT> TextureCUDA_BC<T>::View() const
 {
     constexpr bool IsFloatType = (std::is_same_v<QT, Float> ||

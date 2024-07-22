@@ -130,18 +130,20 @@ void Concept<T>::CopyFromAsync(const GPUQueue& queue,
 }
 
 template<class T>
-GenericTextureView Concept<T>::View() const
+GenericTextureView Concept<T>::View(TextureReadMode mode) const
 {
-    static constexpr uint32_t ChannelCount = T::ChannelCount;
+    using enum TextureReadMode;
+    static constexpr uint32_t C = T::ChannelCount;
+    static constexpr uint32_t D = T::Dims;
 
-    if constexpr(ChannelCount == 1)
-        return tex.View<Float>();
-    else if constexpr(ChannelCount == 2)
-        return tex.View<Vector2>();
-    else if constexpr(ChannelCount == 3)
-        return tex.View<Vector3>();
+    if constexpr(C == 1)
+        return TracerTexView<D, Float>(tex.View<Float>(), mode);
+    else if constexpr(C == 2)
+        return TracerTexView<D, Vector2>(tex.View<Vector2>(), mode);
+    else if constexpr(C == 3)
+        return TracerTexView<D, Vector3>(tex.View<Vector3>(), mode);
     else
-        return tex.View<Vector4>();
+        return TracerTexView<D, Vector4>(tex.View<Vector4>(), mode);
 }
 
 template<class T>
@@ -334,7 +336,7 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
                                             inputParams.isColor,
                                             MRayPixelTypeRT(v), device, p);
 
-            textureViews.try_emplace(id, loc.first->second.View());
+            textureViews.try_emplace(id, loc.first->second.View(TextureReadMode::DIRECT));
             // Save the clamp parameters as well
             texClampParams.try_emplace(id, std::move(tClampParams));
 
@@ -450,6 +452,7 @@ void TextureMemory::CommitTextures()
 void TextureMemory::PushTextureData(TextureId id, uint32_t mipLevel,
                                     TransientData data)
 {
+    assert(data.IsFull());
     auto texLoc = textures.at(id);
     if(!texLoc)
     {

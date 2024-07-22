@@ -20,21 +20,7 @@
 
 #include "TracerTypes.h"
 #include "ParamVaryingData.h"
-
-// Texture Related types
-using GenericTextureView = Variant
-<
-    TextureView<2, Float>,
-    TextureView<2, Vector2>,
-    TextureView<2, Vector3>,
-    TextureView<2, Vector4>,
-    //
-    TextureView<3, Float>,
-    TextureView<3, Vector2>,
-    TextureView<3, Vector3>,
-    TextureView<3, Vector4>
->;
-using TextureViewMap = Map<TextureId, GenericTextureView>;
+#include "TextureView.h"
 
 using AttributeRanges = StaticVector<Vector<2, size_t>,
                                      TracerConstants::MaxAttributePerGroup>;
@@ -179,12 +165,12 @@ class GenericTexturedGroupT : public GenericGroupT<IdType, AttributeInfoType>
     using Parent = GenericGroupT<IdType, AttributeInfoType>;
 
     template<uint32_t D, class T>
-    std::vector<TextureView<D, T>>
+    std::vector<TracerTexView<D, T>>
             ConvertToView(std::vector<TextureId> texIds,
                           uint32_t attributeIndex) const;
 
     template<uint32_t D, class T>
-    std::vector<Optional<TextureView<D, T>>>
+    std::vector<Optional<TracerTexView<D, T>>>
             ConvertToView(std::vector<Optional<TextureId>> texIds,
                           uint32_t attributeIndex) const;
 
@@ -200,14 +186,14 @@ class GenericTexturedGroupT : public GenericGroupT<IdType, AttributeInfoType>
                                             std::vector<Optional<TextureId>>,
                                             const GPUQueue& queue);
     template<uint32_t D, class T>
-    void            GenericPushTexAttribute(Span<Optional<TextureView<D, T>>>,
+    void            GenericPushTexAttribute(Span<Optional<TracerTexView<D, T>>>,
                                             //
                                             IdType idStart, IdType idEnd,
                                             uint32_t attributeIndex,
                                             std::vector<Optional<TextureId>>,
                                             const GPUQueue& queue);
     template<uint32_t D, class T>
-    void            GenericPushTexAttribute(Span<TextureView<D, T>>,
+    void            GenericPushTexAttribute(Span<TracerTexView<D, T>>,
                                             //
                                             IdType idStart, IdType idEnd,
                                             uint32_t attributeIndex,
@@ -302,6 +288,7 @@ void GenericGroupT<ID, AI>::GenericPushData(const Span<T>& dAttributeRegion,
                                             TransientData data,
                                             const GPUQueue& deviceQueue) const
 {
+    assert(data.IsFull());
     auto range = FindRange(id)[attribIndex];
     size_t itemCount = range[1] - range[0];
     assert(data.Size<T>() == itemCount);
@@ -320,6 +307,7 @@ void GenericGroupT<ID, AI>::GenericPushData(const Span<T>& dAttributeRegion,
                                             TransientData data,
                                             const GPUQueue& deviceQueue) const
 {
+    assert(data.IsFull());
     auto rangeStart = FindRange(idRange[0])[attribIndex];
     auto rangeEnd   = FindRange(idRange[1])[attribIndex];
     size_t itemCount = rangeEnd[1] - rangeStart[0];
@@ -339,6 +327,7 @@ void GenericGroupT<ID, AI>::GenericPushData(const Span<T>& dAttributeRegion,
                                             TransientData data,
                                             const GPUQueue& deviceQueue) const
 {
+    assert(data.IsFull());
     auto range = FindRange(id)[attribIndex];
     size_t itemCount = subRange[1] - subRange[0];
     assert(data.Size<T>() <= itemCount);
@@ -409,11 +398,11 @@ GenericGroupT<ID, AI>::GroupId() const
 
 template<class I, class A>
 template<uint32_t D, class T>
-std::vector<TextureView<D, T>>
+std::vector<TracerTexView<D, T>>
 GenericTexturedGroupT<I, A>::ConvertToView(std::vector<TextureId> texIds,
                                            uint32_t attributeIndex) const
 {
-    using ViewType = TextureView<D, T>;
+    using ViewType = TracerTexView<D, T>;
     std::vector<ViewType> result;
     result.reserve(texIds.size());
     for(const auto& texId : texIds)
@@ -432,7 +421,7 @@ GenericTexturedGroupT<I, A>::ConvertToView(std::vector<TextureId> texIds,
                             "a correct type for, Attribute {:d}",
                             this->Name(), this->groupId,
                             static_cast<uint32_t>(texId), attributeIndex);
-            return std::vector<Optional<TextureView<D, T>>>{};
+            return std::vector<Optional<TracerTexView<D, T>>>{};
         }
         result.push_back(std::get<ViewType>(view));
     }
@@ -441,11 +430,11 @@ GenericTexturedGroupT<I, A>::ConvertToView(std::vector<TextureId> texIds,
 
 template<class I, class A>
 template<uint32_t D, class T>
-std::vector<Optional<TextureView<D, T>>>
+std::vector<Optional<TracerTexView<D, T>>>
 GenericTexturedGroupT<I, A>::ConvertToView(std::vector<Optional<TextureId>> texIds,
                                            uint32_t attributeIndex) const
 {
-    using ViewType = TextureView<D, T>;
+    using ViewType = TracerTexView<D, T>;
 
     std::vector<Optional<ViewType>> result;
     result.reserve(texIds.size());
@@ -499,6 +488,7 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<ParamVaryingData<
                                                           std::vector<Optional<TextureId>> optionalTexIds,
                                                           const GPUQueue& queue)
 {
+    assert(hData.IsFull());
     auto hOptTexViews = ConvertToView<D, T>(std::move(optionalTexIds),
                                             attributeIndex);
 
@@ -532,7 +522,7 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<ParamVaryingData<
 
 template<class I, class A>
 template<uint32_t D, class T>
-void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<Optional<TextureView<D, T>>> dAttributeSpan,
+void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<Optional<TracerTexView<D, T>>> dAttributeSpan,
                                                           //
                                                           I idStart, I idEnd,
                                                           uint32_t attributeIndex,
@@ -546,9 +536,9 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<Optional<TextureV
     auto rangeStart = this->FindRange(idStart.FetchIndexPortion())[attributeIndex];
     auto rangeEnd = this->FindRange(idEnd.FetchIndexPortion())[attributeIndex];
     size_t count = rangeEnd[1] - rangeStart[0];
-    Span<Optional<TextureView<D, T>>> dSubspan = dAttributeSpan.subspan(rangeStart[0],
+    Span<Optional<TracerTexView<D, T>>> dSubspan = dAttributeSpan.subspan(rangeStart[0],
                                                                         count);
-    Span<Optional<TextureView<D, T>>> hSpan(hOptTexViews.begin(), hOptTexViews.end());
+    Span<Optional<TracerTexView<D, T>>> hSpan(hOptTexViews.begin(), hOptTexViews.end());
     assert(hSpan.size() == dSubspan.size());
     queue.MemcpyAsync(dSubspan, ToConstSpan(hSpan));
     // TODO: Try to find a way to remove this wait
@@ -557,7 +547,7 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<Optional<TextureV
 
 template<class I, class A>
 template<uint32_t D, class T>
-void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<TextureView<D, T>> dAttributeSpan,
+void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<TracerTexView<D, T>> dAttributeSpan,
                                                           //
                                                           I idStart, I idEnd,
                                                           uint32_t attributeIndex,
@@ -571,9 +561,9 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<TextureView<D, T>
     auto rangeStart = this->FindRange(idStart.FetchIndexPortion())[attributeIndex];
     auto rangeEnd = this->FindRange(idEnd.FetchIndexPortion())[attributeIndex];
     size_t count = rangeEnd[1] - rangeStart[0];
-    Span<TextureView<D, T>> dSubspan = dAttributeSpan.subspan(rangeStart[0],
+    Span<TracerTexView<D, T>> dSubspan = dAttributeSpan.subspan(rangeStart[0],
                                                               count);
-    Span<TextureView<D, T>> hSpan(hTexViews.cbegin(), hTexViews.cend());
+    Span<TracerTexView<D, T>> hSpan(hTexViews.cbegin(), hTexViews.cend());
     assert(hSpan.size() == dSubspan.size());
     queue.MemcpyAsync(dSubspan, ToConstSpan(hSpan));
     // TODO: Try to find a way to remove this wait

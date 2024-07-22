@@ -176,12 +176,16 @@ TEST(DefaultTriangle, Load)
 
     TransientData inputIndex(std::in_place_type<Vector3ui>, IndexCount);
     inputIndex.Push<Vector3ui>(indices);
+    assert(inputIndex.IsFull());
     TransientData inputPos(std::in_place_type<Vector3>, VertexCount);
     inputPos.Push<Vector3>(positions);
+    assert(inputPos.IsFull());
     TransientData inputNormal(std::in_place_type<Quaternion>, VertexCount);
     inputNormal.Push<Quaternion>(normalsQuat);
+    assert(inputNormal.IsFull());
     TransientData inputUV(std::in_place_type<Vector2>, VertexCount);
     inputUV.Push<Vector2>(uvs);
+    assert(inputUV.IsFull());
 
     // Fire and forget style load
     const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
@@ -255,12 +259,16 @@ TEST(DefaultTriangle, LoadMulti)
         // Convert input to transient data
         TransientData inputIndex(std::in_place_type<Vector3ui>, IndexCount);
         inputIndex.Push<Vector3ui>(indices);
+        assert(inputIndex.IsFull());
         TransientData inputPos(std::in_place_type<Vector3>, VertexCount);
         inputPos.Push<Vector3>(positions);
+        assert(inputPos.IsFull());
         TransientData inputNormal(std::in_place_type<Quaternion>, VertexCount);
         inputNormal.Push<Quaternion>(normalsQuat);
+        assert(inputNormal.IsFull());
         TransientData inputUV(std::in_place_type<Vector2>, VertexCount);
         inputUV.Push<Vector2>(uvs);
+        assert(inputUV.IsFull());
 
         // Fire and forget style load
         const GPUQueue& queue = system.BestDevice().GetComputeQueue(queueIndex);

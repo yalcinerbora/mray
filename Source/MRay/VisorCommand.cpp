@@ -99,6 +99,10 @@ namespace MRayCLI::VisorNames
                                         "rendering"sv;
 };
 
+VisorCommand::VisorCommand()
+    : threadCount(std::thread::hardware_concurrency())
+{}
+
 MRayError VisorCommand::Invoke()
 {
     // Load the config here, instead of delegating to the
@@ -131,10 +135,6 @@ MRayError VisorCommand::Invoke()
     });
 
     // Thread pool, many things will need this
-    // TODO: Change this to HW concurrency,
-    // this is for debugging
-    uint32_t threadCount = std::thread::hardware_concurrency();
-    //uint32_t threadCount = 1;
     BS::thread_pool threadPool(threadCount);
 
     // Get the tracer dll
@@ -250,6 +250,10 @@ CLI::App* VisorCommand::GenApp(CLI::App& mainApp)
                          "Visor configuration file."s)
         ->check(CLI::ExistingFile)
         ->required()
+        ->expected(1);
+
+    visorApp->add_option("--threads, -t"s, threadCount,
+                         "Thread pool's thread count."s)
         ->expected(1);
 
     CLI::Option* sceneOption = visorApp->add_option("--scene, -s"s, sceneFile,

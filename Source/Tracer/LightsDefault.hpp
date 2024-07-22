@@ -170,30 +170,30 @@ Float SphericalCoordConverter::ToSolidAnglePdf(Float pdf, const Vector2& uv)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Vector2 CoOctoCoordConverter::DirToUV(const Vector3& dirYUp)
+Vector2 CoOctaCoordConverter::DirToUV(const Vector3& dirYUp)
 {
     Vector3 dirZUp = TransformGen::YUpToZUp(dirYUp);
-    Vector2 uv = Graphics::DirectionToCocentricOctohedral(dirZUp);
+    Vector2 uv = Graphics::DirectionToCocentricOctahedral(dirZUp);
     return uv;
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 CoOctoCoordConverter::UVToDir(const Vector2& uv)
+Vector3 CoOctaCoordConverter::UVToDir(const Vector2& uv)
 {
-    Vector3 dirZUp = Graphics::CocentricOctohedralToDirection(uv);
+    Vector3 dirZUp = Graphics::CocentricOctahedralToDirection(uv);
     Vector3 dirYUp = TransformGen::ZUpToYUp(dirZUp);
     return dirYUp;
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float CoOctoCoordConverter::ToSolidAnglePdf(Float pdf, const Vector3&)
+Float CoOctaCoordConverter::ToSolidAnglePdf(Float pdf, const Vector3&)
 {
     using namespace MathConstants;
     return pdf * Float(0.25) * InvPi<Float>();
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float CoOctoCoordConverter::ToSolidAnglePdf(Float pdf, const Vector2&)
+Float CoOctaCoordConverter::ToSolidAnglePdf(Float pdf, const Vector2&)
 {
     using namespace MathConstants;
     return pdf * Float(0.25) * InvPi<Float>();
@@ -323,7 +323,7 @@ bool LightSkysphere<CC, TC, SC>::IsPrimitiveBackedLight() const
 }
 
 static_assert(LightC<LightSkysphere<SphericalCoordConverter>>);
-static_assert(LightC<LightSkysphere<CoOctoCoordConverter>>);
+static_assert(LightC<LightSkysphere<CoOctaCoordConverter>>);
 
 }
 
@@ -531,8 +531,8 @@ std::string_view LightGroupSkysphere<CC>::TypeName()
     // using namespace std::string_view_literals;
     // static constexpr auto Name = "Skysphere"sv;
     // return LightTypeName<Name>;
-    if constexpr(std::is_same_v<CC, LightDetail::CoOctoCoordConverter>)
-        return "(L)Skysphere_CoOcto";
+    if constexpr(std::is_same_v<CC, LightDetail::CoOctaCoordConverter>)
+        return "(L)Skysphere_CoOcta";
     else if constexpr(std::is_same_v<CC, LightDetail::SphericalCoordConverter>)
         return "(L)Skysphere_Spherical";
     else 

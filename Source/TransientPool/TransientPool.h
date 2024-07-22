@@ -56,6 +56,7 @@ class TransientData
                     ~TransientData();
 
     bool            IsEmpty() const;
+    bool            IsFull() const;
     void            ReserveAll();
     template<ImplicitLifetimeC T>
     void            Push(Span<const T>);

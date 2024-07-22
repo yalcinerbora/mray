@@ -54,7 +54,7 @@ using LightGTypes = Tuple
 <
     LightGroupNull,
     LightGroupPrim<PrimGroupTriangle>,
-    LightGroupSkysphere<CoOctoCoordConverter>,
+    LightGroupSkysphere<CoOctaCoordConverter>,
     LightGroupSkysphere<SphericalCoordConverter>
 >;
 
@@ -69,8 +69,8 @@ using MetaLightList = MetaLightArray
     // Lights
     Variant
     <
-        typename LightGroupSkysphere<CoOctoCoordConverter>:: template Light<TransformContextSingle>,
-        typename LightGroupSkysphere<CoOctoCoordConverter>:: template Light<TransformContextIdentity>,
+        typename LightGroupSkysphere<CoOctaCoordConverter>:: template Light<TransformContextSingle>,
+        typename LightGroupSkysphere<CoOctaCoordConverter>:: template Light<TransformContextIdentity>,
         typename LightGroupPrim<PrimGroupTriangle>:: template Light<TransformContextSingle>,
         typename LightGroupPrim<PrimGroupTriangle>:: template Light<TransformContextIdentity>
     >

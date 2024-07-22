@@ -2,6 +2,7 @@
 
 #include "Device/GPUSystem.h"
 #include "TracerTypes.h"
+#include "TextureView.h"
 
 // Meta Texture Type
 template <uint32_t DIMS, class T>
@@ -9,7 +10,7 @@ class ParamVaryingData
 {
     static_assert(DIMS == 1 || DIMS == 2 || DIMS == 3,
                   "Surface varying data at most have 3 dimensions");
-    using Texture = TextureView<DIMS, T>;
+    using Texture = TracerTexView<DIMS, T>;
 
     private:
     Variant<Texture, T>         t;

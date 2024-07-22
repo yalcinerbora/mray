@@ -616,6 +616,8 @@ Expected<Image> ImageFileOIIO::ReadImage()
             using T = std::remove_cvref_t<decltype(v)>::Type;
             return TransientData(std::in_place_type_t<T>{}, totalPixels);
         }, dataPixelType);
+        pixels.ReserveAll();
+
 
         // Read inverted, OIIO has DirectX
         // (or most image processing literature) style

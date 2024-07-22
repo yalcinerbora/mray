@@ -139,6 +139,13 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
             bSpan[i] = b;
         }
     }
+
+
+    assert(positions.IsFull());
+    assert(indices.IsFull());
+    assert(normals && normals->IsFull());
+    assert(tangents && tangents->IsFull());
+    assert(bitangents && bitangents->IsFull());
 }
 
 AABB3 JsonTriangle::AABB() const
@@ -275,12 +282,14 @@ TransientData JsonSphere::GetAttribute(PrimitiveAttributeLogic attribLogic) cons
     {
         TransientData result(std::in_place_type_t<Vector3>{}, 1);
         result.Push(Span<const Vector3>(&position, 1));
+        assert(result.IsFull());
         return result;
     }
     else if(attribLogic == PrimitiveAttributeLogic::RADIUS)
     {
         TransientData result(std::in_place_type_t<Float>{}, 1);
         result.Push(Span<const Float>(&radius, 1));
+        assert(result.IsFull());
         return result;
     }
     else throw MRayError("Unknown attribute logic!");

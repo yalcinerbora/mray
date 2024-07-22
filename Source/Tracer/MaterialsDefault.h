@@ -10,8 +10,8 @@ namespace LambertMatDetail
 {
     struct alignas(32) LambertMatData
     {
-        Span<const ParamVaryingData<2, Vector3>>       dAlbedo;
-        Span<const Optional<TextureView<2, Vector3>>>   dNormalMaps;
+        Span<const ParamVaryingData<2, Vector3>>        dAlbedo;
+        Span<const Optional<TracerTexView<2, Vector3>>> dNormalMaps;
         Span<const MediumKey>                           dMediumIds;
     };
 
@@ -19,7 +19,7 @@ namespace LambertMatDetail
     struct LambertMaterial
     {
         using Surface           = DefaultSurface;
-        using OptionalNormalMap = Optional<TextureView<2, Vector3>>;
+        using OptionalNormalMap = Optional<TracerTexView<2, Vector3>>;
         using AlbedoMap         = typename SpectrumTransformer:: template RendererParamVaryingData<2>;
         using SpectrumConverter = typename SpectrumTransformer::Converter;
         using DataSoA           = LambertMatData;
@@ -135,10 +135,10 @@ class MatGroupLambert final : public GenericGroupMaterial<MatGroupLambert>
     using Surface   = typename Material<>::Surface;
 
     private:
-    Span<ParamVaryingData<2, Vector3>>      dAlbedo;
-    Span<Optional<TextureView<2, Vector3>>> dNormalMaps;
-    Span<MediumKey>                         dMediumIds;
-    DataSoA                                 soa;
+    Span<ParamVaryingData<2, Vector3>>          dAlbedo;
+    Span<Optional<TracerTexView<2, Vector3>>>   dNormalMaps;
+    Span<MediumKey>                             dMediumIds;
+    DataSoA                                     soa;
 
     protected:
     void            HandleMediums(const MediumKeyPairList&) override;

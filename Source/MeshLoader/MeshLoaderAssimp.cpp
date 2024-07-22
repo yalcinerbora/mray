@@ -116,6 +116,7 @@ TransientData MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) 
             default: return TransientData(std::in_place_type_t<Byte>{}, 0);
         }
         input.Push(Span<const T>(attributePtr, localCount));
+        assert(input.IsFull());
         return input;
     };
 
@@ -131,6 +132,7 @@ TransientData MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) 
                                   face.mIndices[2]);
             input.Push(Span<const Vector3ui>(&faceIndices, 1));
         };
+        assert(input.IsFull());
         return input;
     }
     else
