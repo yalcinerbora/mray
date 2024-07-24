@@ -2,6 +2,8 @@
 #include <random>
 
 #include "Device/GPUSystem.h"
+#include "Device/GPUMemory.h"
+
 #include "Core/MemAlloc.h"
 #include "Core/Log.h"
 #include "Core/Vector.h"

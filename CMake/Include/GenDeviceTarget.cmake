@@ -48,6 +48,9 @@ function(gen_device_target)
 
     set(SRC_COMMON
         ${CMAKE_CURRENT_FUNCTION_LIST_FILE}
+        ${CURRENT_SOURCE_DIR}/GPUTexture.h
+        ${CURRENT_SOURCE_DIR}/GPUTextureView.h
+        ${CURRENT_SOURCE_DIR}/GPUMemory.h
         ${CURRENT_SOURCE_DIR}/GPUSystemForward.h
         ${CURRENT_SOURCE_DIR}/GPUSystem.h
         ${CURRENT_SOURCE_DIR}/GPUSystem.hpp

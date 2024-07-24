@@ -3,6 +3,7 @@
 #include "Core/Types.h"
 #include "Common/RenderImageStructs.h"
 #include "Device/GPUSystem.h"
+#include "Device/GPUMemory.h"
 #include "Device/GPUAtomic.h"
 
 struct RenderImageParams;

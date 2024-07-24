@@ -1,9 +1,10 @@
 #pragma once
 
-#include "Device/GPUSystem.h"
 #include "Core/Map.h"
 #include "Core/DeviceVisit.h"
 #include "Core/TracerI.h"
+
+#include "Device/GPUTextureView.h"
 
 // Wrapper around the texture view of the
 // hardware. These views have postprocess

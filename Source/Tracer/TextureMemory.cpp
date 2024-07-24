@@ -1,14 +1,58 @@
 #include "TextureMemory.h"
 #include "ColorConverter.h"
-#include "GenericTexture.hpp"
 
 #include "Core/Error.hpp"
 #include "Core/GraphicsFunctions.h"
 #include "Core/Timer.h"
 #include "Core/Vector.h"
 
+#include "Device/GPUTexture.h"
+#include "Device/GPUTextureView.h"
+
 namespace TexDetail
 {
+
+template <typename T>
+class Concept : public GenericTextureI
+{
+    private:
+    T                   tex;
+    public:
+    template<class... Args>
+                        Concept(Args&&...);
+
+    void                CommitMemory(const GPUQueue& queue,
+                                     const TextureBackingMemory& deviceMem,
+                                     size_t offset) override;
+    size_t              Size() const override;
+    size_t              Alignment() const override;
+    uint32_t            MipCount() const override;
+    uint32_t            ChannelCount() const override;
+    const GPUDevice&    Device() const override;
+    //
+    TextureExtent<3>    Extents() const override;
+    uint32_t            DimensionCount() const;
+    void                CopyFromAsync(const GPUQueue& queue,
+                                      uint32_t mipLevel,
+                                      const TextureExtent<3>& offset,
+                                      const TextureExtent<3>& size,
+                                      TransientData regionFrom) override;
+    void                CopyFromAsync(const GPUQueue& queue,
+                                      uint32_t mipLevel,
+                                      const TextureExtent<3>& offset,
+                                      const TextureExtent<3>& size,
+                                      Span<const Byte> regionFrom) override;
+    GenericTextureView  View(TextureReadMode mode) const override;
+    bool                HasRWView() const override;
+    SurfRefVariant      RWView(uint32_t mipLevel) override;
+};
+
+static_assert(GenericTexture::BuffSize == std::max(sizeof(Concept<Texture<3, Vector4>>),
+                                                   sizeof(Concept<Texture<2, Vector4>>)),
+              "Size of GenericTexture does not match, please chane it to the exact value");
+static_assert(GenericTexture::BuffAlignment == std::max(alignof(Concept<Texture<3, Vector4>>),
+                                                        alignof(Concept<Texture<2, Vector4>>)),
+              "Alignment of GenericTexture does not match, please chane it to the exact value");
 
 template<class T>
 template<class... Args>
@@ -199,6 +243,25 @@ SurfRefVariant Concept<T>::RWView(uint32_t mipLevel)
         return tex.GenerateRWRef(mipLevel);
 }
 
+}
+
+template<class T, class... Args>
+inline
+GenericTextureT::GenericTextureT(std::in_place_type_t<T>,
+                                 MRayColorSpaceEnum cs, Float gammaIn,
+                                 AttributeIsColor col, MRayPixelTypeRT pt,
+                                 Args&&... args)
+    : colorSpace(cs)
+    , gamma(gammaIn)
+    , isColor(col)
+    , pixelType(pt)
+{
+    isMipLoaded.Reset();
+    using ConceptType = TexDetail::Concept<T>;
+    static_assert(sizeof(ConceptType) <= BuffSize,
+                  "Unable construct type over storage!");
+    ConceptType* ptr = reinterpret_cast<ConceptType*>(storage.data());
+    impl = std::construct_at(ptr, std::forward<Args>(args)...);
 }
 
 TextureReadMode DetermineReadMode(MRayPixelTypeRT pixelType,

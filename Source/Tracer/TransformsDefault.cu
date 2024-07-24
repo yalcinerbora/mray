@@ -1,7 +1,9 @@
 #include "TransformsDefault.h"
+
 #include "Device/GPUSystem.h"
 #include "Device/GPUSystem.hpp"
 #include "Device/GPUAlgGeneric.h"
+#include "Device/GPUMemory.h"
 
 struct KCInvertTransforms
 {

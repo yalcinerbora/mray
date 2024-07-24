@@ -82,12 +82,16 @@ class GenericTextureI
 };
 
 // Generic Texture type
-template<size_t StorageSize, size_t Alignment>
-class alignas(Alignment) GenericTextureT
+class alignas(8u) GenericTextureT
 {
+    public:
+    static constexpr size_t BuffSize        = 96u;
+    static constexpr size_t BuffAlignment   = 8u;
+
+    private:
     using MipIsLoadedBits = Bitset<TracerConstants::MaxTextureMipCount>;
     private:
-    std::array<Byte, StorageSize> storage;
+    std::array<Byte, BuffSize> storage;
     // TODO: Could not cast the storate to the interface,
     //
     GenericTextureI*    impl;
@@ -152,54 +156,9 @@ class alignas(Alignment) GenericTextureT
     void                SetColorSpace(MRayColorSpaceEnum, Float = Float(1));
 };
 
-namespace TexDetail
-{
-
-template <typename T>
-class Concept : public GenericTextureI
-{
-    private:
-    T                   tex;
-    public:
-    template<class... Args>
-                        Concept(Args&&...);
-
-    void                CommitMemory(const GPUQueue& queue,
-                                     const TextureBackingMemory& deviceMem,
-                                     size_t offset) override;
-    size_t              Size() const override;
-    size_t              Alignment() const override;
-    uint32_t            MipCount() const override;
-    uint32_t            ChannelCount() const override;
-    const GPUDevice&    Device() const override;
-    //
-    TextureExtent<3>    Extents() const override;
-    uint32_t            DimensionCount() const;
-    void                CopyFromAsync(const GPUQueue& queue,
-                                      uint32_t mipLevel,
-                                      const TextureExtent<3>& offset,
-                                      const TextureExtent<3>& size,
-                                      TransientData regionFrom) override;
-    void                CopyFromAsync(const GPUQueue& queue,
-                                      uint32_t mipLevel,
-                                      const TextureExtent<3>& offset,
-                                      const TextureExtent<3>& size,
-                                      Span<const Byte> regionFrom) override;
-    GenericTextureView  View(TextureReadMode mode) const override;
-    bool                HasRWView() const override;
-    SurfRefVariant      RWView(uint32_t mipLevel) override;
-};
-
-}
-
-using GenericTexture = GenericTextureT
-<
-    std::max(sizeof(TexDetail::Concept<Texture<3, Vector4>>),
-             sizeof(TexDetail::Concept<Texture<2, Vector4>>)),
-    std::max(alignof(TexDetail::Concept<Texture<3, Vector4>>),
-             alignof(TexDetail::Concept<Texture<2, Vector4>>))
->;
-
+// In order to prevent type leak we hand set these values
+// It is statically checked on the cpp file.
+using GenericTexture = GenericTextureT;
 using TextureMap = Map<TextureId, GenericTexture>;
 
 class TextureMemory

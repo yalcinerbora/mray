@@ -3,6 +3,9 @@
 #include <numeric>
 
 #include "Device/GPUSystem.h"
+#include "Device/GPUTexture.h"
+#include "Device/GPUTextureView.h"
+#include "Device/GPUMemory.h"
 #include "Device/GPUSystem.hpp"
 
 #include "T_TextureTypes.h"

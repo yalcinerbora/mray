@@ -321,6 +321,122 @@ inline CUmemGenericAllocationHandle ToHandleCUDA(const TextureBackingMemoryCUDA&
 
 #include "TextureCUDA.hpp"
 
+// Common Textures 1D
+extern template class mray::cuda::TextureCUDA_Normal<1, Float>;
+extern template class mray::cuda::TextureCUDA_Normal<1, Vector2>;
+extern template class mray::cuda::TextureCUDA_Normal<1, Vector3>;
+extern template class mray::cuda::TextureCUDA_Normal<1, Vector4>;
+
+extern template class mray::cuda::TextureCUDA_Normal<1, uint8_t>;
+extern template class mray::cuda::TextureCUDA_Normal<1, Vector2uc>;
+extern template class mray::cuda::TextureCUDA_Normal<1, Vector3uc>;
+extern template class mray::cuda::TextureCUDA_Normal<1, Vector4uc>;
+
+extern template class mray::cuda::TextureCUDA_Normal<1, int8_t>;
+extern template class mray::cuda::TextureCUDA_Normal<1, Vector2c>;
+extern template class mray::cuda::TextureCUDA_Normal<1, Vector3c>;
+extern template class mray::cuda::TextureCUDA_Normal<1, Vector4c>;
+
+extern template class mray::cuda::TextureCUDA_Normal<1, uint16_t>;
+extern template class mray::cuda::TextureCUDA_Normal<1, Vector2us>;
+extern template class mray::cuda::TextureCUDA_Normal<1, Vector3us>;
+extern template class mray::cuda::TextureCUDA_Normal<1, Vector4us>;
+
+extern template class mray::cuda::TextureCUDA_Normal<1, int16_t>;
+extern template class mray::cuda::TextureCUDA_Normal<1, Vector2s>;
+extern template class mray::cuda::TextureCUDA_Normal<1, Vector3s>;
+extern template class mray::cuda::TextureCUDA_Normal<1, Vector4s>;
+
+// Common Textures 2D
+extern template class mray::cuda::TextureCUDA_Normal<2, Float>;
+extern template class mray::cuda::TextureCUDA_Normal<2, Vector2>;
+extern template class mray::cuda::TextureCUDA_Normal<2, Vector3>;
+extern template class mray::cuda::TextureCUDA_Normal<2, Vector4>;
+
+extern template class mray::cuda::TextureCUDA_Normal<2, uint8_t>;
+extern template class mray::cuda::TextureCUDA_Normal<2, Vector2uc>;
+extern template class mray::cuda::TextureCUDA_Normal<2, Vector3uc>;
+extern template class mray::cuda::TextureCUDA_Normal<2, Vector4uc>;
+
+extern template class mray::cuda::TextureCUDA_Normal<2, int8_t>;
+extern template class mray::cuda::TextureCUDA_Normal<2, Vector2c>;
+extern template class mray::cuda::TextureCUDA_Normal<2, Vector3c>;
+extern template class mray::cuda::TextureCUDA_Normal<2, Vector4c>;
+
+extern template class mray::cuda::TextureCUDA_Normal<2, uint16_t>;
+extern template class mray::cuda::TextureCUDA_Normal<2, Vector2us>;
+extern template class mray::cuda::TextureCUDA_Normal<2, Vector3us>;
+extern template class mray::cuda::TextureCUDA_Normal<2, Vector4us>;
+
+extern template class mray::cuda::TextureCUDA_Normal<2, int16_t>;
+extern template class mray::cuda::TextureCUDA_Normal<2, Vector2s>;
+extern template class mray::cuda::TextureCUDA_Normal<2, Vector3s>;
+extern template class mray::cuda::TextureCUDA_Normal<2, Vector4s>;
+
+extern template class mray::cuda::TextureCUDA_BC<PixelBC1>;
+extern template class mray::cuda::TextureCUDA_BC<PixelBC2>;
+extern template class mray::cuda::TextureCUDA_BC<PixelBC3>;
+extern template class mray::cuda::TextureCUDA_BC<PixelBC4U>;
+extern template class mray::cuda::TextureCUDA_BC<PixelBC4S>;
+extern template class mray::cuda::TextureCUDA_BC<PixelBC5U>;
+extern template class mray::cuda::TextureCUDA_BC<PixelBC5S>;
+extern template class mray::cuda::TextureCUDA_BC<PixelBC6U>;
+extern template class mray::cuda::TextureCUDA_BC<PixelBC6S>;
+extern template class mray::cuda::TextureCUDA_BC<PixelBC7>;
+
+// Common Textures 3D
+extern template class mray::cuda::TextureCUDA_Normal<3, Float>;
+extern template class mray::cuda::TextureCUDA_Normal<3, Vector2>;
+extern template class mray::cuda::TextureCUDA_Normal<3, Vector3>;
+extern template class mray::cuda::TextureCUDA_Normal<3, Vector4>;
+
+extern template class mray::cuda::TextureCUDA_Normal<3, uint8_t>;
+extern template class mray::cuda::TextureCUDA_Normal<3, Vector2uc>;
+extern template class mray::cuda::TextureCUDA_Normal<3, Vector3uc>;
+extern template class mray::cuda::TextureCUDA_Normal<3, Vector4uc>;
+
+extern template class mray::cuda::TextureCUDA_Normal<3, int8_t>;
+extern template class mray::cuda::TextureCUDA_Normal<3, Vector2c>;
+extern template class mray::cuda::TextureCUDA_Normal<3, Vector3c>;
+extern template class mray::cuda::TextureCUDA_Normal<3, Vector4c>;
+
+extern template class mray::cuda::TextureCUDA_Normal<3, uint16_t>;
+extern template class mray::cuda::TextureCUDA_Normal<3, Vector2us>;
+extern template class mray::cuda::TextureCUDA_Normal<3, Vector3us>;
+extern template class mray::cuda::TextureCUDA_Normal<3, Vector4us>;
+
+extern template class mray::cuda::TextureCUDA_Normal<3, int16_t>;
+extern template class mray::cuda::TextureCUDA_Normal<3, Vector2s>;
+extern template class mray::cuda::TextureCUDA_Normal<3, Vector3s>;
+extern template class mray::cuda::TextureCUDA_Normal<3, Vector4s>;
+
+
+// Common Textures 1D
+extern template class mray::cuda::TextureCUDA<1, Float>;
+extern template class mray::cuda::TextureCUDA<1, Vector2>;
+extern template class mray::cuda::TextureCUDA<1, Vector3>;
+extern template class mray::cuda::TextureCUDA<1, Vector4>;
+
+extern template class mray::cuda::TextureCUDA<1, uint8_t>;
+extern template class mray::cuda::TextureCUDA<1, Vector2uc>;
+extern template class mray::cuda::TextureCUDA<1, Vector3uc>;
+extern template class mray::cuda::TextureCUDA<1, Vector4uc>;
+
+extern template class mray::cuda::TextureCUDA<1, int8_t>;
+extern template class mray::cuda::TextureCUDA<1, Vector2c>;
+extern template class mray::cuda::TextureCUDA<1, Vector3c>;
+extern template class mray::cuda::TextureCUDA<1, Vector4c>;
+
+extern template class mray::cuda::TextureCUDA<1, uint16_t>;
+extern template class mray::cuda::TextureCUDA<1, Vector2us>;
+extern template class mray::cuda::TextureCUDA<1, Vector3us>;
+extern template class mray::cuda::TextureCUDA<1, Vector4us>;
+
+extern template class mray::cuda::TextureCUDA<1, int16_t>;
+extern template class mray::cuda::TextureCUDA<1, Vector2s>;
+extern template class mray::cuda::TextureCUDA<1, Vector3s>;
+extern template class mray::cuda::TextureCUDA<1, Vector4s>;
+
 // Common Textures 2D
 extern template class mray::cuda::TextureCUDA<2, Float>;
 extern template class mray::cuda::TextureCUDA<2, Vector2>;
@@ -357,3 +473,29 @@ extern template class mray::cuda::TextureCUDA<2, PixelBC5S>;
 extern template class mray::cuda::TextureCUDA<2, PixelBC6U>;
 extern template class mray::cuda::TextureCUDA<2, PixelBC6S>;
 extern template class mray::cuda::TextureCUDA<2, PixelBC7>;
+
+// Common Textures 3D
+extern template class mray::cuda::TextureCUDA<3, Float>;
+extern template class mray::cuda::TextureCUDA<3, Vector2>;
+extern template class mray::cuda::TextureCUDA<3, Vector3>;
+extern template class mray::cuda::TextureCUDA<3, Vector4>;
+
+extern template class mray::cuda::TextureCUDA<3, uint8_t>;
+extern template class mray::cuda::TextureCUDA<3, Vector2uc>;
+extern template class mray::cuda::TextureCUDA<3, Vector3uc>;
+extern template class mray::cuda::TextureCUDA<3, Vector4uc>;
+
+extern template class mray::cuda::TextureCUDA<3, int8_t>;
+extern template class mray::cuda::TextureCUDA<3, Vector2c>;
+extern template class mray::cuda::TextureCUDA<3, Vector3c>;
+extern template class mray::cuda::TextureCUDA<3, Vector4c>;
+
+extern template class mray::cuda::TextureCUDA<3, uint16_t>;
+extern template class mray::cuda::TextureCUDA<3, Vector2us>;
+extern template class mray::cuda::TextureCUDA<3, Vector3us>;
+extern template class mray::cuda::TextureCUDA<3, Vector4us>;
+
+extern template class mray::cuda::TextureCUDA<3, int16_t>;
+extern template class mray::cuda::TextureCUDA<3, Vector2s>;
+extern template class mray::cuda::TextureCUDA<3, Vector3s>;
+extern template class mray::cuda::TextureCUDA<3, Vector4s>;

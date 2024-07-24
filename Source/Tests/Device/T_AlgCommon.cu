@@ -3,6 +3,7 @@
 #include <random>
 
 #include "Device/GPUSystem.h"
+#include "Device/GPUMemory.h"
 #include "Device/GPUSystem.hpp"
 #include "Device/GPUAlgGeneric.h"
 

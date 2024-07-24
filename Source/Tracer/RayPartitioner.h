@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Device/GPUSystem.h"
+#include "Device/GPUMemory.h"
 #include "Device/GPUAlgBinaryPartition.h"
 
 #include "TracerTypes.h"

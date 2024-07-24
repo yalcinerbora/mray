@@ -9,6 +9,7 @@
 
 #include "Device/GPUAlgBinarySearch.h"
 #include "Device/GPUSystem.h"
+#include "Device/GPUMemory.h"
 
 namespace Distribution
 {

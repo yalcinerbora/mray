@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Device/GPUSystem.h"
+#include "Device/GPUTextureView.h"
 #include "Core/DeviceVisit.h"
 #include "TextureCommon.h"
 

@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Device/GPUSystemForward.h"
+#include "Device/GPUTexture.h"
+#include "Device/GPUTextureView.h"
 
 #include "Core/BitFunctions.h"
 #include "Core/Types.h"

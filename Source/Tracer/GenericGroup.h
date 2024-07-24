@@ -17,6 +17,7 @@
 #include "TransientPool/TransientPool.h"
 
 #include "Device/GPUSystemForward.h"
+#include "Device/GPUMemory.h"
 
 #include "TracerTypes.h"
 #include "ParamVaryingData.h"

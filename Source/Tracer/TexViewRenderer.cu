@@ -1,6 +1,5 @@
 #include "TexViewRenderer.h"
 #include "TracerBase.h"
-#include "GenericTexture.hpp"
 
 #include "Device/GPUSystem.hpp"
 

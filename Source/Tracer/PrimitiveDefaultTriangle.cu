@@ -1,5 +1,6 @@
 #include "PrimitiveDefaultTriangle.h"
 #include "Device/GPUSystem.hpp"
+#include "Device/GPUMemory.h"
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCAdjustIndices(// I-O

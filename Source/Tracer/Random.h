@@ -3,7 +3,10 @@
 #include <cstdint>
 #include "Core/Vector.h"
 #include "Core/BitFunctions.h"
+
 #include "Device/GPUSystem.h"
+#include "Device/GPUMemory.h"
+
 
 namespace RNGFunctions::HashPCG64
 {

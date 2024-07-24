@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "Device/GPUSystem.h"
+#include "Device/GPUMemory.h"
 #include "Device/GPUSystem.hpp"
 #include "Core/Log.h"
 

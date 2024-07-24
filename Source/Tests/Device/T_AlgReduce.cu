@@ -4,6 +4,7 @@
 
 #include "Device/GPUSystem.h"
 #include "Device/GPUSystem.hpp"
+#include "Device/GPUMemory.h"
 #include "Device/GPUAlgReduce.h"
 
 #include "T_AlgTypes.h"

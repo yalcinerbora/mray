@@ -2,6 +2,7 @@
 
 #include "Device/GPUAlgReduce.h"
 #include "Device/GPUSystem.hpp"
+#include "Device/GPUMemory.h"
 
 #include "Core/Error.hpp"
 
