@@ -8,13 +8,7 @@
 
 #include "ImageLoader/ImageLoaderI.h"
 
-struct NodeTexStruct
-{
-    uint32_t            texId;
-    ImageSubChannelType channelLayout;
-
-    auto operator<=>(const NodeTexStruct& rhs) const = default;
-};
+enum class SceneTexId : uint32_t {};
 
 struct TracerIdPack
 {
@@ -24,7 +18,7 @@ struct TracerIdPack
     using TransformIdMappings   = std::map<uint32_t, Pair<TransGroupId, TransformId>>;
     using MaterialIdMappings    = std::map<uint32_t, Pair<MatGroupId, MaterialId>>;
     using MediumIdMappings      = std::map<uint32_t, Pair<MediumGroupId, MediumId>>;
-    using TextureIdMappings     = std::map<NodeTexStruct, TextureId>;
+    using TextureIdMappings     = std::map<SceneTexId, TextureId>;
 
     PrimIdMappings      prims;
     CamIdMappings       cams;

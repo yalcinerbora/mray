@@ -225,6 +225,7 @@ struct MRayTextureParameters
     AttributeIsColor            isColor         = AttributeIsColor::IS_COLOR;
     MRayTextureEdgeResolveEnum  edgeResolve     = MRayTextureEdgeResolveEnum::MR_WRAP;
     MRayTextureInterpEnum       interpolation   = MRayTextureInterpEnum::MR_LINEAR;
+    MRayTextureReadMode         readMode        = MRayTextureReadMode::MR_PASSTHROUGH;
 };
 
 // Generic Attribute Info

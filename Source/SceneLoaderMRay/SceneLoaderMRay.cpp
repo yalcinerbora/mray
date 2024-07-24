@@ -32,6 +32,40 @@ struct TexturedAttributeData
     std::vector<Optional<TextureId>>    textures;
 };
 
+Expected<MRayTextureReadMode>
+DetermineTextureReadMode(MRayTextureReadMode imageReadMode,
+                         Optional<MRayTextureReadMode> userReadModeRequest,
+                         const MRayPixelTypeRT& pixelType,
+                         const std::string& filePath)
+{
+    if(!userReadModeRequest) return imageReadMode;
+
+    using enum MRayTextureReadMode;
+    const auto& userRM = *userReadModeRequest;
+    // User don't care return the image's read mode
+    if(userRM == MR_PASSTHROUGH) return imageReadMode;
+    //
+    else if(userRM == MR_AS_3C_TS_NORMAL_BASIC ||
+            userRM == MR_AS_3C_TS_NORMAL_COOCTA)
+    {
+        if(pixelType.ChannelCount() != 2)
+            return std::move(MRayError("A non 2-channel texture requested "
+                                       "to be converted to normal \"{}\"",
+                                       filePath));
+        // Image wants to drop the channels,
+        // but user wants to expand it back to 3-channel
+        // This is not allowed
+        if(imageReadMode == MR_DROP_1 || imageReadMode == MR_DROP_2)
+            return std::move(MRayError("A compressed texture with pixel type {} requested to be read as "
+                                       "2 channels but also requested to be read as 3 channel normal. "
+                                       "This is not allowed. \"{}\"",
+                                       MRayPixelTypeStringifier::ToString(pixelType.Name()),
+                                       filePath));
+        else return userRM;
+    }
+    else return imageReadMode;
+}
+
 template<class AttributeInfoList>
 AttributeCountList GenericFindAttributeCounts(std::vector<AttributeCountList>& attributeCounts,
                                               const AttributeInfoList& list,
@@ -212,12 +246,12 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
             {
                 if(optional == AttributeOptionality::MR_MANDATORY)
                 {
-                    NodeTexStruct texStruct = node.AccessTexture(name);
+                    SceneTexId texStruct = node.AccessTexture(name);
                     result[i].textures.push_back(texMappings.at(texStruct));
                 }
                 else if(optional == AttributeOptionality::MR_OPTIONAL)
                 {
-                    Optional<NodeTexStruct> texStruct = node.AccessOptionalTexture(name);
+                    Optional<SceneTexId> texStruct = node.AccessOptionalTexture(name);
                     Optional<TextureId> id = (texStruct.has_value())
                                             ? Optional<TextureId>(texMappings.at(texStruct.value()))
                                             : std::nullopt;
@@ -267,10 +301,10 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
                 std::visit([&](auto&& dataType)
                 {
                     using T = std::remove_cvref_t<decltype(dataType)>::Type;
-                    Variant<NodeTexStruct, T> texturable = node.AccessTexturableData<T>(name);
-                    if(std::holds_alternative<NodeTexStruct>(texturable))
+                    Variant<SceneTexId, T> texturable = node.AccessTexturableData<T>(name);
+                    if(std::holds_alternative<SceneTexId>(texturable))
                     {
-                        TextureId id = texMappings.at(std::get<NodeTexStruct>(texturable));
+                        TextureId id = texMappings.at(std::get<SceneTexId>(texturable));
                         result[i].textures.emplace_back(id);
                         T phony;
                         result[i].data.Push(Span<const T>(&phony, 1));
@@ -682,7 +716,7 @@ void SceneLoaderMRay::DryRunLightsForPrim(std::vector<uint32_t>& primIds,
 }
 
 template <class TracerInterfaceFunc, class AnnotateFunc>
-void SceneLoaderMRay::DryRunNodesForTex(std::vector<NodeTexStruct>& textureIds,
+void SceneLoaderMRay::DryRunNodesForTex(std::vector<SceneTexId>& textureIds,
                                         const TypeMappedNodes& nodes,
                                         const TracerI& tracer,
                                         AnnotateFunc&& Annotate,
@@ -705,12 +739,12 @@ void SceneLoaderMRay::DryRunNodesForTex(std::vector<NodeTexStruct>& textureIds,
             {
                 if(optional == AttributeOptionality::MR_OPTIONAL)
                 {
-                    auto ts = node.AccessOptionalData<NodeTexStruct>(name);
+                    auto ts = node.AccessOptionalData<SceneTexId>(name);
                     if(ts.has_value()) textureIds.push_back(ts.value());
                 }
                 else
                 {
-                    auto ts = node.AccessData<NodeTexStruct>(name);
+                    auto ts = node.AccessData<SceneTexId>(name);
                     textureIds.push_back(ts);
                 }
             }
@@ -721,8 +755,8 @@ void SceneLoaderMRay::DryRunNodesForTex(std::vector<NodeTexStruct>& textureIds,
                 {
                     using T = std::remove_cvref_t<decltype(dataType)>::Type;
                     auto value = node.AccessTexturableData<T>(name);
-                    if(std::holds_alternative<NodeTexStruct>(value))
-                        textureIds.push_back(std::get<NodeTexStruct>(value));
+                    if(std::holds_alternative<SceneTexId>(value))
+                        textureIds.push_back(std::get<SceneTexId>(value));
                 }, dataType);
             }
         }
@@ -878,7 +912,7 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
 
 void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
 {
-    using TextureIdList = std::vector<std::pair<NodeTexStruct, TextureId>>;
+    using TextureIdList = std::vector<std::pair<SceneTexId, TextureId>>;
 
     // Construct Image Loader
     std::shared_ptr<ImageLoaderI> imgLoader = CreateImageLoader();
@@ -920,7 +954,7 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
     // Copy the shared pointers, capture by reference the rest
     const auto TextureLoadTask = [&, texIdListPtr, imgLoader, barrier](size_t start, size_t end)
     {
-        // TODO: check if we twice opening is bottleneck?
+        // TODO: check if the twice opening is a bottleneck?
         // We are opening here to determining size/format
         // and on the other iteration we actual memcpy it
         bool barrierPassed = false;
@@ -931,17 +965,21 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
             for(size_t i = start; i < end; i++)
             {
                 using namespace NodeNames;
-                const auto& [texStruct, jsonNode, is2D] = textureNodes[i];
+                const auto& [sceneTexId, jsonNode] = textureNodes[i];
                 auto fileName = jsonNode.AccessData<std::string>(TEX_NODE_FILE);
                 auto isColor = jsonNode.AccessOptionalData<bool>(TEX_NODE_IS_COLOR)
                                 .value_or(TEX_NODE_IS_COLOR_DEFAULT);
                 bool loadAsSigned = jsonNode.AccessOptionalData<bool>(NodeNames::TEX_NODE_AS_SIGNED)
-                                        .value_or(NodeNames::TEX_NODE_AS_SIGNED_DEFAULT);
-                auto edgeResolveString = jsonNode.AccessOptionalData<std::string_view>(TEX_NODE_EDGE_RESOLVE);
-                auto interpString = jsonNode.AccessOptionalData<std::string_view>(TEX_NODE_INTERPOLATION);
-                auto colorSpaceString = jsonNode.AccessOptionalData<std::string_view>(TEX_NODE_COLOR_SPACE);
+                                    .value_or(NodeNames::TEX_NODE_AS_SIGNED_DEFAULT);
+                auto edgeResolve = jsonNode.AccessOptionalData<MRayTextureEdgeResolveEnum>(TEX_NODE_EDGE_RESOLVE);
+                auto interp = jsonNode.AccessOptionalData<MRayTextureInterpEnum>(TEX_NODE_INTERPOLATION);
+                auto colorSpace= jsonNode.AccessOptionalData<MRayColorSpaceEnum>(TEX_NODE_COLOR_SPACE);
                 auto gamma = jsonNode.AccessOptionalData<bool>(TEX_NODE_GAMMA);
-
+                auto userReadMode = jsonNode.AccessOptionalData<MRayTextureReadMode>(TEX_NODE_READ_MODE);
+                //auto is3D = jsonNode.AccessOptionalData<bool>(TEX_NODE_IS_3D)
+                //            .value_or(TEX_NODE_IS_3D_DEFAULT);
+                auto channelLayout = jsonNode.AccessOptionalData<ImageSubChannelType>(TEX_NODE_CHANNELS)
+                                                .value_or(ImageSubChannelType::ALL);
                 fileName = Filesystem::RelativePathToAbsolute(fileName, scenePath);
 
                 using enum ImageIOFlags::F;
@@ -952,7 +990,7 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
                 flags[TRY_3C_4C_CONVERSION] = true;
 
                 auto imgFileE = imgLoader->OpenFile(fileName,
-                                                    texStruct.channelLayout,
+                                                    channelLayout,
                                                     flags);
                 if(imgFileE.has_error())
                 {
@@ -978,15 +1016,23 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
                     .colorSpace = header.colorSpace.second,
                     .gamma = header.colorSpace.first
                 };
-                if(edgeResolveString.has_value())
-                    params.edgeResolve = MRayTextureEdgeResolveStringifier::FromString(edgeResolveString.value());
-                if(interpString.has_value())
-                    params.interpolation = MRayTextrueInterpStringifier::FromString(interpString.value());
+                // Check and add user params
+                if(edgeResolve.has_value()) params.edgeResolve = *edgeResolve;
+                if(interp.has_value()) params.interpolation = *interp;
                 // Overwrite color space related info, user has precedence.
-                if(colorSpaceString.has_value())
-                    params.colorSpace = MRayColorSpaceStringifier::FromString(colorSpaceString.value());
-                if(gamma.has_value())
-                    params.gamma = gamma.value();
+                if(colorSpace.has_value()) params.colorSpace = *colorSpace;
+                if(gamma.has_value()) params.gamma = *gamma;
+                // Check user request of read mode
+                // and the loader returned read mode to find the readmode
+                auto readModeE = DetermineTextureReadMode(header.readMode, userReadMode,
+                                                          header.pixelType, fileName);
+                if(!readModeE.has_value())
+                {
+                    exceptions.AddException(std::move(headerE.error()));
+                    barrier->arrive_and_drop();
+                    return;
+                }
+                params.readMode = readModeE.value();
 
                 TextureId tId;
                 if(header.Is2D())
@@ -1003,7 +1049,7 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
                 }
 
                 auto& texIdList = *texIdListPtr;
-                texIdList[i] = std::make_pair(texStruct, tId);
+                texIdList[i] = std::make_pair(sceneTexId, tId);
             }
 
             // Barrier code is invoked, and all textures are allocated
@@ -1746,7 +1792,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     matHTReady.wait();
     primHTReady.wait();
 
-    std::vector<NodeTexStruct> textureIds;
+    std::vector<SceneTexId> textureIds;
     textureIds.reserve(surfaces.size() * 2);
     for(const auto& s : surfaces)
     {
@@ -1860,17 +1906,17 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     textureHTReady.wait();
     for(const auto& t : textureIds)
     {
-        const auto& it = textureHT.find(t.texId);
+        const auto& it = textureHT.find(uint32_t(t));
         if(it == textureHT.end())
             throw MRayError("Id({:d}) could not be "
                             "located in {:s}",
-                            t.texId, TEXTURE_LIST);
+                            uint32_t(t), TEXTURE_LIST);
         const auto& location = it->second;
         uint32_t arrayIndex = std::get<ARRAY_INDEX>(location);
         uint32_t innerIndex = std::get<INNER_INDEX>(location);
         auto node = JsonNode(sceneJson[TEXTURE_LIST][arrayIndex], innerIndex);
         // TODO: Add support for 3D texs.
-        textureNodes.emplace_back(t, std::move(node), true);
+        textureNodes.emplace_back(t, std::move(node));
     }
 
     // Eliminate the duplicates

@@ -162,12 +162,19 @@ struct MRayPixelType
     template<class T>
     requires (!std::is_integral_v<T> && !std::is_floating_point_v<T>)
     static constexpr size_t FindChannelCount();
+    template<class T>
+    requires (std::is_integral_v<T> || std::is_floating_point_v<T>)
+    static constexpr bool FindIsSigned();
+    template<class T>
+    requires (!std::is_integral_v<T> && !std::is_floating_point_v<T>)
+    static constexpr bool FindIsSigned();
 
     public:
     using Type = MRayPixelDetail::Type<E>;
     static constexpr size_t ChannelCount = FindChannelCount<Type>();
     static constexpr MRayPixelEnum Name = E;
     static constexpr bool IsBCPixel = IsBlockCompressedPixel<Type>;
+    static constexpr bool IsSigned = FindIsSigned<Type>();
     static constexpr size_t PixelSize = sizeof(Type);
     static constexpr size_t PaddedPixelSize = (ChannelCount != 3)
                                                 ? PixelSize
@@ -197,13 +204,28 @@ constexpr size_t MRayPixelType<E>::FindChannelCount()
     return Type::Dims;
 }
 
+template<MRayPixelEnum E>
+template<class T>
+requires (std::is_integral_v<T> || std::is_floating_point_v<T>)
+constexpr bool MRayPixelType<E>::FindIsSigned()
+{
+    return std::is_signed_v<T>;
+}
+
+template<MRayPixelEnum E>
+template<class T>
+requires (!std::is_integral_v<T> && !std::is_floating_point_v<T>)
+constexpr bool MRayPixelType<E>::FindIsSigned()
+{
+    return std::is_signed_v<typename T::InnerType>;
+}
+
 template<MRayPixelEnum L, MRayPixelEnum R>
 constexpr bool operator==(MRayPixelType<L>,
                           MRayPixelType<R>)
 {
     return L == R;
 }
-
 
 // Lets see how good are the compilers are
 // This is used to generate switch/case code
@@ -333,6 +355,7 @@ struct MRayPixelTypeRT : public MRayPixelTypeBase
     MRayPixelEnum     Name() const;
     size_t            ChannelCount() const;
     bool              IsBlockCompressed() const;
+    bool              IsSigned() const;
     size_t            PixelSize() const;
     size_t            PaddedPixelSize() const;
 

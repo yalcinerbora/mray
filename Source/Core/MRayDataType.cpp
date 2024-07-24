@@ -48,6 +48,14 @@ bool MRayPixelTypeRT::IsBlockCompressed() const
     }, *this);
 }
 
+bool MRayPixelTypeRT::IsSigned() const
+{
+    return std::visit([](auto&& d) -> bool
+    {
+        return std::remove_cvref_t<decltype(d)>::IsSigned;
+    }, *this);
+}
+
 size_t MRayPixelTypeRT::PixelSize() const
 {
     return std::visit([](auto&& d) -> size_t

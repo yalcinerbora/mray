@@ -371,6 +371,7 @@ TextureCUDA_BC<T>::TextureCUDA_BC(const GPUDeviceCUDA& device,
         MRAY_WARNING_LOG("BC texture size is not multiple of {}! "
                          "Texture may be skewed!", BC_BLOCK_SIZE);
     }
+    //paddedSize = DivideUp(paddedSize, Vector2ui(BC_BLOCK_SIZE));
     cudaExtent extent = MakeCudaExtent<2, 0u>(paddedSize);
     cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<CudaTypeEnum>();
     CUDA_CHECK(cudaSetDevice(gpu->DeviceId()));
@@ -562,6 +563,11 @@ void TextureCUDA_BC<T>::CopyFromAsync(const GPUQueueCUDA& queue,
     p.kind = cudaMemcpyDefault;
     p.extent = MakeCudaExtent<2, 1>(sizes);
 
+
+    p.extent.height = 8;
+
+
+
     p.dstArray = levelArray;
     p.dstPos = MakeCudaPos<2, 0>(offset);
 
@@ -570,7 +576,7 @@ void TextureCUDA_BC<T>::CopyFromAsync(const GPUQueueCUDA& queue,
     void* ptr = const_cast<Byte*>(reinterpret_cast<const Byte*>(regionFrom.data()));
     p.srcPtr = make_cudaPitchedPtr(ptr,
                                    p.extent.width * sizeof(PaddedChannelType),
-                                   p.extent.width, p.extent.height);
+                                   p.extent.width, 8);
     CUDA_CHECK(cudaMemcpy3DAsync(&p, ToHandleCUDA(queue)));
 }
 

@@ -64,6 +64,10 @@ namespace NodeNames
     static constexpr string_view TEX_NODE_INTERPOLATION = "interpolation"sv;
     static constexpr string_view TEX_NODE_COLOR_SPACE   = "colorSpace"sv;
     static constexpr string_view TEX_NODE_GAMMA         = "gamma"sv;
+    static constexpr string_view TEX_NODE_READ_MODE     = "readMode";
+    static constexpr string_view TEX_NODE_IS_3D         = "is3D";
+    static constexpr bool TEX_NODE_IS_3D_DEFAULT        = false;
+    static constexpr string_view TEX_NODE_CHANNELS      = "channels";
 
     //// Identity Transform Type Name
     //static constexpr string_view TRANSFORM_IDENTITY     = "Identity"sv;

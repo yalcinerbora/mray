@@ -5,6 +5,7 @@
 #include "Core/Error.hpp"
 #include "Core/GraphicsFunctions.h"
 #include "Core/Timer.h"
+#include "Core/Vector.h"
 
 namespace TexDetail
 {
@@ -135,15 +136,49 @@ GenericTextureView Concept<T>::View(TextureReadMode mode) const
     using enum TextureReadMode;
     static constexpr uint32_t C = T::ChannelCount;
     static constexpr uint32_t D = T::Dims;
+    auto GenView = [this]<class T>(TextureReadMode mode,
+                                   // For overload resolution
+                                   std::in_place_type_t<T>)
+    {
+        if constexpr(C == 1)
+            return TracerTexView<D, T>(tex.View<Float>(), mode);
+        else if constexpr(C == 2)
+            return TracerTexView<D, T>(tex.View<Vector2>(), mode);
+        else if constexpr(C == 3)
+            return TracerTexView<D, T>(tex.View<Vector3>(), mode);
+        else
+            return TracerTexView<D, T>(tex.View<Vector4>(), mode);
+    };
 
-    if constexpr(C == 1)
-        return TracerTexView<D, Float>(tex.View<Float>(), mode);
-    else if constexpr(C == 2)
-        return TracerTexView<D, Vector2>(tex.View<Vector2>(), mode);
-    else if constexpr(C == 3)
-        return TracerTexView<D, Vector3>(tex.View<Vector3>(), mode);
-    else
-        return TracerTexView<D, Vector4>(tex.View<Vector4>(), mode);
+    using enum TextureReadMode;
+    switch(mode)
+    {
+        case TO_3C_BASIC_NORMAL_FROM_SIGNED_2C:
+        case TO_3C_OCTA_NORMAL_FROM_SIGNED_2C:
+        case TO_3C_BASIC_NORMAL_FROM_UNSIGNED_2C:
+        case TO_3C_OCTA_NORMAL_FROM_UNSIGNED_2C:
+        case TO_3C_FROM_4C:
+            return GenView(mode, std::in_place_type_t<Vector3>{});
+        case TO_2C_FROM_4C:
+        case TO_2C_FROM_3C:
+            return GenView(mode, std::in_place_type_t<Vector2>{});
+        case TO_1C_FROM_4C:
+        case TO_1C_FROM_3C:
+        case TO_1C_FROM_2C:
+            return GenView(mode, std::in_place_type_t<Float>{});
+        case DIRECT:
+        default:
+        {
+            if constexpr(C == 1)
+                return TracerTexView<D, Float>(tex.View<Float>(), mode);
+            else if constexpr(C == 2)
+                return TracerTexView<D, Vector2>(tex.View<Vector2>(), mode);
+            else if constexpr(C == 3)
+                return TracerTexView<D, Vector3>(tex.View<Vector3>(), mode);
+            else
+                return TracerTexView<D, Vector4>(tex.View<Vector4>(), mode);
+        }
+    }
 }
 
 template<class T>
@@ -164,6 +199,92 @@ SurfRefVariant Concept<T>::RWView(uint32_t mipLevel)
         return tex.GenerateRWRef(mipLevel);
 }
 
+}
+
+TextureReadMode DetermineReadMode(MRayPixelTypeRT pixelType,
+                                  MRayTextureReadMode rm)
+{
+    size_t channelCount = pixelType.ChannelCount();
+    bool isSigned = pixelType.ChannelCount();
+    using enum MRayTextureReadMode;
+    switch(rm)
+    {
+        case MR_PASSTHROUGH: return TextureReadMode::DIRECT;
+        //
+        case MR_AS_3C_TS_NORMAL_BASIC:
+        {
+            if(channelCount != 2)
+            {
+                throw MRayError("Non 2-channel texture cannot be used "
+                                "for normal expansion");
+            }
+            if(isSigned)
+                return TextureReadMode::TO_3C_BASIC_NORMAL_FROM_SIGNED_2C;
+            else
+                return TextureReadMode::TO_3C_BASIC_NORMAL_FROM_UNSIGNED_2C;
+        }
+        case MR_AS_3C_TS_NORMAL_COOCTA:
+        {
+            if(channelCount != 2)
+            {
+                throw MRayError("Non 2-channel texture cannot be used "
+                                "for normal expansion");
+            }
+            if(isSigned)
+                return TextureReadMode::TO_3C_OCTA_NORMAL_FROM_SIGNED_2C;
+            else
+                return TextureReadMode::TO_3C_OCTA_NORMAL_FROM_UNSIGNED_2C;
+        }
+        case MR_DROP_1:
+        {
+            if(channelCount <= 1)
+                throw MRayError("Not enough channels to drop 1 channel");
+            else if(channelCount == 2)
+                return TextureReadMode::TO_1C_FROM_2C;
+            else if(channelCount == 3)
+                return TextureReadMode::TO_2C_FROM_3C;
+            else if(channelCount == 4)
+                return TextureReadMode::TO_3C_FROM_4C;
+        }
+        case MR_DROP_2:
+        {
+            if(channelCount <= 2)
+                throw MRayError("Not enough channels to drop 2 channels");
+            else if(channelCount == 3)
+                return TextureReadMode::TO_1C_FROM_3C;
+            else if(channelCount == 4)
+                return TextureReadMode::TO_2C_FROM_4C;
+        }
+        case MR_DROP_3:
+        {
+            if(channelCount <= 3)
+                throw MRayError("Not enough channels to drop 3 channels");
+            else if(channelCount == 4)
+                return TextureReadMode::TO_1C_FROM_4C;
+        }
+        default: break;
+    }
+    return TextureReadMode::DIRECT;
+}
+
+bool FindNormIntegers(MRayPixelTypeRT pixelType)
+{
+    return std::visit([](auto&& v) -> bool
+    {
+        using VisitedType = std::remove_cvref_t<decltype(v)>;
+        constexpr auto Enum = VisitedType::Name;
+        using PixType = typename VisitedType::Type;
+        using enum MRayPixelEnum;
+        if constexpr(Enum == MRayPixelEnum::MR_BC6H_SFLOAT ||
+                     Enum == MRayPixelEnum::MR_BC6H_UFLOAT)
+            return false;
+        else if constexpr(VisitedType::IsBCPixel)
+            return true;
+        else if constexpr(VectorC<PixType>)
+            return std::is_integral_v<typename PixType::InnerType>;
+        else
+            return std::is_integral_v<PixType>;
+    }, pixelType);
 }
 
 void TextureMemory::ConvertColorspaces()
@@ -207,13 +328,14 @@ void TextureMemory::ConvertColorspaces()
 
     if(warnBlockCompressed)
         MRAY_WARNING_LOG("[Tracer]: Some textures are block-compressed (read only) "
-                         "But requires colorspace conversion. These textures will be treated "
-                         "as in Tracer's color space (which is (Linear/{}))",
+                         "But requires color space conversion. These textures will be treated "
+                         "as in Tracer's color space (which is \"Linear/{}\")",
                          MRayColorSpaceStringifier::ToString(tracerParams.globalTextureColorSpace));
 
     // Finally call the kernel
-    colorConv.ConvertColor(texSurfs, colorConvParams,
-                           tracerParams.globalTextureColorSpace);
+    if(!texSurfs.empty())
+        colorConv.ConvertColor(texSurfs, colorConvParams,
+                               tracerParams.globalTextureColorSpace);
 }
 
 void TextureMemory::GenerateMipmaps()
@@ -244,7 +366,8 @@ void TextureMemory::GenerateMipmaps()
         t.SetAllMipsToLoaded();
     }
     // Finally call the kernel
-    mipGenFilter->GenerateMips(texSurfs, mipGenParams);
+    if(!texSurfs.empty())
+        mipGenFilter->GenerateMips(texSurfs, mipGenParams);
 }
 
 template<uint32_t D>
@@ -323,6 +446,7 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
     p.mipCount = newMipCount;
     p.eResolve = inputParams.edgeResolve;
     p.interp = inputParams.interpolation;
+    p.normIntegers = FindNormIntegers(inputParams.pixelType);
     TextureId texId = std::visit([&](auto&& v) -> TextureId
     {
         using enum MRayPixelEnum;
@@ -334,9 +458,11 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
             auto loc = textures.try_emplace(id, std::in_place_type_t<Texture<D, Type>>{},
                                             inputParams.colorSpace, inputParams.gamma,
                                             inputParams.isColor,
-                                            MRayPixelTypeRT(v), device, p);
+                                            inputParams.pixelType, device, p);
 
-            textureViews.try_emplace(id, loc.first->second.View(TextureReadMode::DIRECT));
+            TextureReadMode rm = DetermineReadMode(inputParams.pixelType,
+                                                   inputParams.readMode);
+            textureViews.try_emplace(id, loc.first->second.View(rm));
             // Save the clamp parameters as well
             texClampParams.try_emplace(id, std::move(tClampParams));
 

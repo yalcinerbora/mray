@@ -257,6 +257,32 @@ enum class MRayTextureEdgeResolveEnum : uint8_t
     MR_END
 };
 
+enum class MRayTextureReadMode : uint8_t
+{
+    // Directly read the texture
+    MR_PASSTHROUGH,
+    // Drop 1/2/3 Channels
+    // i.e, 2channel pixel will be 1 channel when
+    // MR_DROP_1 is stated
+    // It is an error when MR_DROP_X (X >= channels)
+    MR_DROP_1,
+    MR_DROP_2,
+    MR_DROP_3,
+    // Special 2C->3C expansion for normals.
+    // Basic mapping given Signed/Unsigned 2Channel type
+    // For unsigned textures "[0, 1] -> [-1, 1]"
+    // conversion will be applied (which is r/g * 2 - 1);
+    // Find tangent space normal sqrt(1 - r^2 - g^2)
+    MR_AS_3C_TS_NORMAL_BASIC,
+    // Find tangent space normal via cocentric octahedral
+    // mapping of hemisphere (The two channels will be
+    // used as uv coordinates of the mapping [-1, 1]
+    // unsigned->signed conversion will be applied similarly.
+    MR_AS_3C_TS_NORMAL_COOCTA,
+    //
+    MR_END
+};
+
 struct MRayDataTypeStringifier
 {
     using enum MRayDataEnum;
@@ -373,7 +399,7 @@ struct MRayColorSpaceStringifier
     static constexpr MRayColorSpaceEnum FromString(std::string_view);
 };
 
-struct MRayTextrueInterpStringifier
+struct MRayTextureInterpStringifier
 {
     using enum MRayTextureInterpEnum;
     static constexpr std::array<const std::string_view, static_cast<size_t>(MR_END)> Names =
@@ -381,8 +407,9 @@ struct MRayTextrueInterpStringifier
         "Nearest",
         "Linear"
     };
-    static constexpr std::string_view       ToString(MRayTextureInterpEnum e);
-    static constexpr MRayTextureInterpEnum  FromString(std::string_view);
+    static constexpr std::string_view   ToString(MRayTextureInterpEnum e);
+    static constexpr
+    MRayTextureInterpEnum               FromString(std::string_view);
 };
 
 struct MRayTextureEdgeResolveStringifier
@@ -394,8 +421,26 @@ struct MRayTextureEdgeResolveStringifier
         "Clamp",
         "Mirror"
     };
-    static constexpr std::string_view ToString(MRayTextureEdgeResolveEnum e);
-    static constexpr MRayTextureEdgeResolveEnum FromString(std::string_view);
+    static constexpr std::string_view   ToString(MRayTextureEdgeResolveEnum e);
+    static constexpr
+    MRayTextureEdgeResolveEnum          FromString(std::string_view);
+};
+
+struct MRayTextureReadModeStringifier
+{
+    using enum MRayTextureReadMode;
+    static constexpr std::array<const std::string_view, static_cast<size_t>(MR_END)> Names =
+    {
+        "Passthrough",
+        "Drop1",
+        "Drop2",
+        "Drop3",
+        "To3C_TsNormalBasic",
+        "To3C_TsNormalCoOcta"
+    };
+    static constexpr std::string_view   ToString(MRayTextureReadMode e);
+    static constexpr
+    MRayTextureReadMode                 FromString(std::string_view);
 };
 
 // Block Compressed pixel "types"
@@ -446,31 +491,37 @@ concept NotBlockCompressedPixelC = !IsBlockCompressedPixel<BCType>;
 
 constexpr std::string_view MRayDataTypeStringifier::ToString(MRayDataEnum e)
 {
+    assert(e < MRayDataEnum::MR_END);
     return Names[static_cast<uint32_t>(e)];
 }
 
 constexpr std::string_view MRayPixelTypeStringifier::ToString(MRayPixelEnum e)
 {
+    assert(e < MRayPixelEnum::MR_END);
     return Names[static_cast<uint32_t>(e)];
 }
 
 constexpr std::string_view MRayColorSpaceStringifier::ToString(MRayColorSpaceEnum e)
 {
+    assert(e < MRayColorSpaceEnum::MR_END);
     return Names[static_cast<uint32_t>(e)];
 }
 
-constexpr MRayColorSpaceEnum MRayColorSpaceStringifier::FromString(std::string_view sv)
+constexpr MRayColorSpaceEnum
+MRayColorSpaceStringifier::FromString(std::string_view sv)
 {
     auto loc = std::find(Names.cbegin(), Names.cend(), sv);
     return static_cast<MRayColorSpaceEnum>(std::distance(Names.cbegin(), loc));
 }
 
-constexpr std::string_view MRayTextrueInterpStringifier::ToString(MRayTextureInterpEnum e)
+constexpr std::string_view MRayTextureInterpStringifier::ToString(MRayTextureInterpEnum e)
 {
+    assert(e < MRayTextureInterpEnum::MR_END);
     return Names[static_cast<uint32_t>(e)];
 }
 
-constexpr MRayTextureInterpEnum MRayTextrueInterpStringifier::FromString(std::string_view sv)
+constexpr MRayTextureInterpEnum
+MRayTextureInterpStringifier::FromString(std::string_view sv)
 {
     auto loc = std::find(Names.cbegin(), Names.cend(), sv);
     return static_cast<MRayTextureInterpEnum>(std::distance(Names.cbegin(), loc));
@@ -478,11 +529,27 @@ constexpr MRayTextureInterpEnum MRayTextrueInterpStringifier::FromString(std::st
 
 constexpr std::string_view MRayTextureEdgeResolveStringifier::ToString(MRayTextureEdgeResolveEnum e)
 {
+    assert(e < MRayTextureEdgeResolveEnum::MR_END);
     return Names[static_cast<uint32_t>(e)];
 }
 
-constexpr MRayTextureEdgeResolveEnum MRayTextureEdgeResolveStringifier::FromString(std::string_view sv)
+constexpr MRayTextureEdgeResolveEnum
+MRayTextureEdgeResolveStringifier::FromString(std::string_view sv)
 {
     auto loc = std::find(Names.cbegin(), Names.cend(), sv);
     return static_cast<MRayTextureEdgeResolveEnum>(std::distance(Names.cbegin(), loc));
+}
+
+constexpr std::string_view
+MRayTextureReadModeStringifier::ToString(MRayTextureReadMode e)
+{
+    assert(e < MRayTextureReadMode::MR_END);
+    return Names[static_cast<uint32_t>(e)];
+}
+
+constexpr MRayTextureReadMode
+MRayTextureReadModeStringifier::FromString(std::string_view sv)
+{
+    auto loc = std::find(Names.cbegin(), Names.cend(), sv);
+    return static_cast<MRayTextureReadMode>(std::distance(Names.cbegin(), loc));
 }

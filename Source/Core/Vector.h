@@ -193,39 +193,36 @@ static_assert(sizeof(Vector4) == 16, "Vector4 should be tightly packed");
 // Vector Concept
 // TODO: Check a better way to do this
 template<class T>
-concept VectorC = requires()
-{
-    std::is_same_v<T, Vector2>    ||
-    std::is_same_v<T, Vector3>    ||
-    std::is_same_v<T, Vector4>    ||
-    std::is_same_v<T, Vector2f>   ||
-    std::is_same_v<T, Vector3f>   ||
-    std::is_same_v<T, Vector4f>   ||
-    std::is_same_v<T, Vector2d>   ||
-    std::is_same_v<T, Vector3d>   ||
-    std::is_same_v<T, Vector4d>   ||
-    std::is_same_v<T, Vector2i>   ||
-    std::is_same_v<T, Vector3i>   ||
-    std::is_same_v<T, Vector4i>   ||
-    std::is_same_v<T, Vector2ui>  ||
-    std::is_same_v<T, Vector3ui>  ||
-    std::is_same_v<T, Vector4ui>  ||
-    std::is_same_v<T, Vector2l>   ||
-    std::is_same_v<T, Vector2ul>  ||
-    std::is_same_v<T, Vector3ul>  ||
-    std::is_same_v<T, Vector2s>   ||
-    std::is_same_v<T, Vector2us>  ||
-    std::is_same_v<T, Vector3s>   ||
-    std::is_same_v<T, Vector3us>  ||
-    std::is_same_v<T, Vector4s>   ||
-    std::is_same_v<T, Vector4us>  ||
-    std::is_same_v<T, Vector2c>   ||
-    std::is_same_v<T, Vector2uc>  ||
-    std::is_same_v<T, Vector3c>   ||
-    std::is_same_v<T, Vector3uc>  ||
-    std::is_same_v<T, Vector4c>   ||
-    std::is_same_v<T, Vector4uc>;
-};
+concept VectorC = (std::is_same_v<T, Vector2>   ||
+                   std::is_same_v<T, Vector3>   ||
+                   std::is_same_v<T, Vector4>   ||
+                   std::is_same_v<T, Vector2f>  ||
+                   std::is_same_v<T, Vector3f>  ||
+                   std::is_same_v<T, Vector4f>  ||
+                   std::is_same_v<T, Vector2d>  ||
+                   std::is_same_v<T, Vector3d>  ||
+                   std::is_same_v<T, Vector4d>  ||
+                   std::is_same_v<T, Vector2i>  ||
+                   std::is_same_v<T, Vector3i>  ||
+                   std::is_same_v<T, Vector4i>  ||
+                   std::is_same_v<T, Vector2ui> ||
+                   std::is_same_v<T, Vector3ui> ||
+                   std::is_same_v<T, Vector4ui> ||
+                   std::is_same_v<T, Vector2l>  ||
+                   std::is_same_v<T, Vector2ul> ||
+                   std::is_same_v<T, Vector3ul> ||
+                   std::is_same_v<T, Vector2s>  ||
+                   std::is_same_v<T, Vector2us> ||
+                   std::is_same_v<T, Vector3s>  ||
+                   std::is_same_v<T, Vector3us> ||
+                   std::is_same_v<T, Vector4s>  ||
+                   std::is_same_v<T, Vector4us> ||
+                   std::is_same_v<T, Vector2c>  ||
+                   std::is_same_v<T, Vector2uc> ||
+                   std::is_same_v<T, Vector3c>  ||
+                   std::is_same_v<T, Vector3uc> ||
+                   std::is_same_v<T, Vector4c>  ||
+                   std::is_same_v<T, Vector4uc>);
 
 // TODO: Add more?
 static_assert(ArrayLikeC<Vector2>, "Vec2 is not ArrayLike!");

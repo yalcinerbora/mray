@@ -10,6 +10,14 @@
 
 #include "Device/GPUAlgGeneric.h"
 
+uint32_t FindTexViewChannelCount(const GenericTextureView& genericTexView)
+{
+    return std::visit([](auto&& v)
+    {
+        return std::remove_cvref_t<decltype(v)>::Channels;
+    }, genericTexView);
+}
+
 MRAY_KERNEL
 void KCColorTiles(MRAY_GRID_CONSTANT const Span<Float> dPixels,
                   MRAY_GRID_CONSTANT const Span<Float> dSamples,
@@ -50,7 +58,7 @@ void KCShowTexture(MRAY_GRID_CONSTANT const Span<Float> dPixels,
 
     Vector2ui regionSize = regionMax - regionMin;
     uint32_t totalPix = regionSize.Multiply();
-    assert(totalPix * C <= dPixels.size());
+    assert(totalPix * 3 <= dPixels.size());
     assert(totalPix <= dSamples.size());
 
     for(uint32_t wIndexLinear = kp.GlobalId(); wIndexLinear < totalPix;
@@ -102,13 +110,17 @@ TexViewRenderer::TexViewRenderer(const RenderImagePtr& rb,
 {
     // Pre-generate list
     textures.clear();
+    textureViews.clear();
+    //
     textures.reserve(tracerView.textures.size());
-    for(const auto& tex : tracerView.textures)
+    textureViews.reserve(tracerView.textures.size());
+    for(const auto& [texId, tex] : tracerView.textures)
     {
         // Skip 1D/3D textures we can not render those
-        if(tex.second.DimensionCount() != 2) continue;
-
-        textures.push_back(&tex.second);
+        if(tex.DimensionCount() != 2) continue;
+        textures.push_back(&tex);
+        const auto& tView = tracerView.textureViews.at(texId).value().get();
+        textureViews.push_back(&tView);
     }
 }
 
@@ -259,8 +271,8 @@ RendererOutput TexViewRenderer::DoRender()
         }
         case Mode::SHOW_TEXTURES:
         {
-            const auto& curTex = textures[textureIndex];
-            uint32_t channelCount = curTex->ChannelCount();
+            auto texView = *textureViews[textureIndex];
+            uint32_t texChannelCount = FindTexViewChannelCount(texView);
             Vector2ui resolution = mipSize;
             auto KernelCall = [&, this]<uint32_t C>()
             {
@@ -277,10 +289,10 @@ RendererOutput TexViewRenderer::DoRender()
                     regionMax,
                     resolution,
                     mipIndex,
-                    curTex->View(TextureReadMode::DIRECT)
+                    texView
                 );
             };
-            switch(channelCount)
+            switch(texChannelCount)
             {
                 case 1: KernelCall.template operator()<1>(); break;
                 case 2: KernelCall.template operator()<2>(); break;

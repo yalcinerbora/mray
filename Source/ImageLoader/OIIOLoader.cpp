@@ -552,7 +552,9 @@ Expected<ImageHeader> ImageFileOIIO::ReadHeader()
         .mipCount = static_cast<uint32_t>(mipCount),
         .pixelType = convPixFormat,
         .colorSpace = Pair((isDefaultColorSpace) ? Float(1) : colorSpace.first,
-                           (isDefaultColorSpace) ? MR_DEFAULT : colorSpace.second)
+                           (isDefaultColorSpace) ? MR_DEFAULT : colorSpace.second),
+        // OIIO provides loading adjacent subchannels so this is always passthrough
+        .readMode = MRayTextureReadMode::MR_PASSTHROUGH
     };
     return header;
 }

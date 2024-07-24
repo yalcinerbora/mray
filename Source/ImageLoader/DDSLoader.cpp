@@ -334,7 +334,7 @@ Expected<Pair<ColorSpacePack, MRayPixelTypeRT>> ReadPixelTypeDDS_DX9(const Heade
         case BC2_FOURCC_1:  result.second = MRayPixelType<MR_BC2_UNORM>{}; break;
         // BC3
         case BC3_FOURCC_0:
-        case BC3_FOURCC_1:  result.second = MRayPixelType<MR_BC2_UNORM>{}; break;
+        case BC3_FOURCC_1:  result.second = MRayPixelType<MR_BC3_UNORM>{}; break;
         // BC3
         case BC4U_FOURCC_0:
         case BC4U_FOURCC_1: result.second = MRayPixelType<MR_BC4_UNORM>{}; break;
@@ -350,6 +350,19 @@ Expected<Pair<ColorSpacePack, MRayPixelTypeRT>> ReadPixelTypeDDS_DX9(const Heade
     // Dx9 does not expose srgb etc.
     result.first = {Float(1), MRayColorSpaceEnum::MR_DEFAULT};
     return result;
+}
+
+MRayPixelTypeRT ConvertToSigned(MRayPixelTypeRT pt)
+{
+    MRayPixelEnum e = pt.Name();
+    switch(e)
+    {
+        using enum MRayPixelEnum;
+        case MR_BC4_UNORM:      return MRayPixelType<MR_BC4_SNORM>{};
+        case MR_BC5_UNORM:      return MRayPixelType<MR_BC5_SNORM>{};
+        case MR_BC6H_UFLOAT:    return MRayPixelType<MR_BC6H_SFLOAT>{};
+        default:                return pt;
+    }
 }
 
 template<MRayPixelEnum E>
@@ -392,10 +405,11 @@ Pair<Vector2ui, uint32_t> MipSizeToBlockSize(MRayPixelTypeRT pf, const Vector2ui
     return result;
 }
 
-bool IsPlausibleChannelLayout(MRayPixelTypeRT pixType,
-                              ImageSubChannelType type)
+Pair<MRayTextureReadMode, bool> IsPlausibleChannelLayout(MRayPixelTypeRT pixType,
+                                                         ImageSubChannelType type)
 {
-    if(type == ImageSubChannelType::ALL) return true;
+    using enum MRayTextureReadMode;
+    if(type == ImageSubChannelType::ALL) return {MR_PASSTHROUGH, true};
 
     // Check if channels are exactly match by the request.
     // MRay currently duplicates the textures when:
@@ -423,41 +437,49 @@ bool IsPlausibleChannelLayout(MRayPixelTypeRT pixType,
     // Lastly MRay does not support swizlling on textures, so shifted types will be delegated
     // directly. (On RGB texture requesting GB will result in OIIO delegation)
 
+    MRayPixelEnum pt = pixType.Name();
     // Checking the layouts from here
     // https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-block-compression
     switch(type)
     {
         using enum MRayPixelEnum;
-
         // These are the important cases
         case ImageSubChannelType::RGBA:
+        {
+            if(pt == MR_BC1_UNORM || pt == MR_BC2_UNORM ||
+               pt == MR_BC3_UNORM || pt == MR_BC7_UNORM)
+                return {MR_PASSTHROUGH, true};
+            break;
+        }
         case ImageSubChannelType::RGB:
-            return (pixType.Name() == MR_BC1_UNORM   ||
-                    pixType.Name() == MR_BC2_UNORM   ||
-                    pixType.Name() == MR_BC3_UNORM   ||
-                    pixType.Name() == MR_BC6H_UFLOAT ||
-                    pixType.Name() == MR_BC6H_SFLOAT ||
-                    pixType.Name() == MR_BC7_UNORM);
+        {
+            if(pt == MR_BC1_UNORM || pt == MR_BC2_UNORM ||
+               pt == MR_BC3_UNORM || pt == MR_BC7_UNORM)
+                return {MR_DROP_1, true};
+            else if(pt == MR_BC6H_UFLOAT || pt == MR_BC6H_SFLOAT)
+                return {MR_PASSTHROUGH, true};
+            break;
+        }
         // BC5, but we let the BC1-2-7 also slide here
         case ImageSubChannelType::RG:
-            return (pixType.Name() == MR_BC1_UNORM   ||
-                    pixType.Name() == MR_BC2_UNORM   ||
-                    pixType.Name() == MR_BC3_UNORM   ||
-                    pixType.Name() == MR_BC6H_UFLOAT ||
-                    pixType.Name() == MR_BC6H_SFLOAT ||
-                    pixType.Name() == MR_BC7_UNORM   ||
-                    // Extra
-                    pixType.Name() == MR_BC5_UNORM   ||
-                    pixType.Name() == MR_BC5_SNORM);
+        {
+            if(pt == MR_BC1_UNORM || pt == MR_BC2_UNORM ||
+               pt == MR_BC3_UNORM || pt == MR_BC7_UNORM)
+                return {MR_DROP_2, true};
+            else if(pt == MR_BC6H_UFLOAT || pt == MR_BC6H_SFLOAT)
+                return {MR_DROP_1, true};
+            else if(pt == MR_BC5_UNORM || pt == MR_BC5_SNORM)
+                return {MR_PASSTHROUGH, true};
             break;
-
+        }
         // Only BC4, but we let BC5 slide (only for R)
         case ImageSubChannelType::R:
-            return (pixType.Name() == MR_BC5_UNORM ||
-                    pixType.Name() == MR_BC5_SNORM ||
-                    pixType.Name() == MR_BC4_UNORM ||
-                    pixType.Name() == MR_BC4_SNORM);
-
+            {
+            if (pt == MR_BC5_UNORM || pt == MR_BC5_SNORM)
+                return {MR_DROP_1, true};
+            else if(pt == MR_BC4_UNORM || pt == MR_BC4_SNORM)
+                return {MR_PASSTHROUGH, true};
+        }
         // These are types will be delegated to OIIO.
         case ImageSubChannelType::G:
         case ImageSubChannelType::B:
@@ -465,9 +487,9 @@ bool IsPlausibleChannelLayout(MRayPixelTypeRT pixType,
         case ImageSubChannelType::GB:
         case ImageSubChannelType::BA:
         case ImageSubChannelType::GBA:
-        default:
-            return false;
+        default: break;
     }
+    return {MR_PASSTHROUGH, false};
 }
 
 ImageFileDDS::ImageFileDDS(const std::string& filePath,
@@ -571,9 +593,18 @@ Expected<ImageHeader> ImageFileDDS::ReadHeader()
 
     outputHeader.pixelType = r.value().second;
     outputHeader.colorSpace = r.value().first;
+
+    // We can load the entire texture and use subchannels of the image
+    // only fors some configurations try to find it
+    auto [readMode, isPlausible] = IsPlausibleChannelLayout(outputHeader.pixelType, subChannels);
+    outputHeader.readMode = readMode;
+
     // Delegate to OIIO if it is not plausible to load it as DDS
-    if(!IsPlausibleChannelLayout(outputHeader.pixelType, subChannels))
+    if(!isPlausible)
         return MRayError::OK;
+
+    if(flags[ImageFlagTypes::LOAD_AS_SIGNED])
+        outputHeader.pixelType = ConvertToSigned(outputHeader.pixelType);
 
     headerIsRead = true;
     header = outputHeader;

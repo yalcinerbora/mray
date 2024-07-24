@@ -18,18 +18,18 @@ enum class TextureReadMode
     // Given 2-channel **Signed** format,
     // calculate Z channel,
     // abuse |N| = 1. (Usefull for BC5s)
-    TO_3C_SIGNED_BASIC_NORMAL_FROM_2C,
+    TO_3C_BASIC_NORMAL_FROM_SIGNED_2C,
     // Given 2-channel **signed** format,
     // calculate Z channel,
     // assume x/y = [0,1] and
     // do cocentric octrahedral mapping
     // to find xyz
-    TO_3C_SIGNED_OCTA_NORMAL_FROM_2C,
+    TO_3C_OCTA_NORMAL_FROM_SIGNED_2C,
     // Similar to the above but before the conversion
     // (x * 2 - 1) is applied to each channel to convert
     // [0, 1] to [-1, 1].
-    TO_3C_UNSIGNED_BASIC_NORMAL_FROM_2C,
-    TO_3C_UNSIGNED_OCTA_NORMAL_FROM_2C,
+    TO_3C_BASIC_NORMAL_FROM_UNSIGNED_2C,
+    TO_3C_OCTA_NORMAL_FROM_UNSIGNED_2C,
     // Channel dropping (only most significand
     // channels are dropped, no swizzling)
     TO_3C_FROM_4C,
@@ -126,24 +126,24 @@ Optional<T> TracerTexView<D, T>::Postprocess(Optional<ReadType>&& t) const
         switch(mode)
         {
             using enum TextureReadMode;
-            case TO_3C_UNSIGNED_BASIC_NORMAL_FROM_2C:
+            case TO_3C_BASIC_NORMAL_FROM_UNSIGNED_2C:
             {
                 val = val * Vector2(2) - Vector2(1);
             }
             [[fallthrough]];
-            case TO_3C_SIGNED_BASIC_NORMAL_FROM_2C:
+            case TO_3C_BASIC_NORMAL_FROM_SIGNED_2C:
             {
                 Float z = MathFunctions::SqrtMax(Float(1) - val[0] * val[0] - val[1] * val[1]);
                 return Vector3(val[0], val[1], z);
             }
             // Octahedral mapping
             // From https://jcgt.org/published/0003/02/01/paper.pdf
-            case TO_3C_UNSIGNED_OCTA_NORMAL_FROM_2C:
+            case TO_3C_OCTA_NORMAL_FROM_UNSIGNED_2C:
             {
                 val = val * Vector2(2) - Vector2(1);
             }
             [[fallthrough]];
-            case TO_3C_SIGNED_OCTA_NORMAL_FROM_2C:
+            case TO_3C_OCTA_NORMAL_FROM_SIGNED_2C:
             {
                 val = Vector2(val[0] + val[1], val[0] - val[1]) * Float(0.5);
                 return Vector3(val, Float(1) - val.Abs().Sum());
@@ -206,16 +206,4 @@ using GenericTextureView = Variant
     TracerTexView<3, Vector3>,
     TracerTexView<3, Vector4>
 >;
-//using GenericTextureView = Variant
-//<
-//    TextureView<2, Float>,
-//    TextureView<2, Vector2>,
-//    TextureView<2, Vector3>,
-//    TextureView<2, Vector4>,
-//
-//    TextureView<3, Float>,
-//    TextureView<3, Vector2>,
-//    TextureView<3, Vector3>,
-//    TextureView<3, Vector4>
-//>;
 using TextureViewMap = Map<TextureId, GenericTextureView>;

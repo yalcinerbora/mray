@@ -56,7 +56,7 @@ struct SurfaceStruct
     static constexpr size_t PRIM_INDEX = 1;
     using IdPair        = Tuple<uint32_t, uint32_t>;
     using IdPairList    = std::array<IdPair, PPS>;
-    using TextureList   = std::array<Optional<NodeTexStruct>, PPS>;
+    using TextureList   = std::array<Optional<SceneTexId>, PPS>;
     using CullList      = std::array<bool, PPS>;
 
     //
@@ -87,12 +87,15 @@ struct CameraSurfaceStruct : public EndpointSurfaceStruct
 using SceneCamSurfList = std::vector<CameraSurfaceStruct>;
 
 // Json converters
-void from_json(const nlohmann::json&, NodeTexStruct&);
+void from_json(const nlohmann::json&, SceneTexId&);
 void from_json(const nlohmann::json&, SurfaceStruct&);
 void from_json(const nlohmann::json&, LightSurfaceStruct&);
 void from_json(const nlohmann::json&, CameraSurfaceStruct&);
-
-ImageSubChannelType LoadTextureAccessLayout(const nlohmann::json& node);
+void from_json(const nlohmann::json&, MRayTextureEdgeResolveEnum&);
+void from_json(const nlohmann::json&, MRayTextureInterpEnum&);
+void from_json(const nlohmann::json&, MRayColorSpaceEnum&);
+void from_json(const nlohmann::json&, MRayTextureReadMode&);
+void from_json(const nlohmann::json&, ImageSubChannelType&);
 
 class JsonNode
 {
@@ -135,9 +138,9 @@ class JsonNode
     Optional<TransientData> AccessOptionalDataArray(std::string_view name) const;
     // Texturable (either data T, or texture struct)
     template<class T>
-    Variant<NodeTexStruct, T>   AccessTexturableData(std::string_view name) const;
-    NodeTexStruct               AccessTexture(std::string_view name) const;
-    Optional<NodeTexStruct>     AccessOptionalTexture(std::string_view name) const;
+    Variant<SceneTexId, T>   AccessTexturableData(std::string_view name) const;
+    SceneTexId               AccessTexture(std::string_view name) const;
+    Optional<SceneTexId>     AccessOptionalTexture(std::string_view name) const;
 };
 
 #include "JsonNode.hpp"

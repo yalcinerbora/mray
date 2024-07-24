@@ -7,32 +7,10 @@ inline bool IsDashed(const nlohmann::json& n)
     return (n.is_string() && n.get<std::string_view>() == DASH);
 }
 
-inline ImageSubChannelType LoadTextureAccessLayout(const nlohmann::json& node)
-{
-    using namespace std::literals;
-    std::string_view l = node.get<std::string_view>();
-    if(l == "r"sv)  return ImageSubChannelType::R;
-    if(l == "g"sv)  return ImageSubChannelType::G;
-    if(l == "b"sv)  return ImageSubChannelType::B;
-    if(l == "a"sv)  return ImageSubChannelType::A;
-    //
-    if(l == "rg"sv)  return ImageSubChannelType::RG;
-    if(l == "gb"sv)  return ImageSubChannelType::GB;
-    if(l == "ba"sv)  return ImageSubChannelType::BA;
-    //
-    if(l == "rgb"sv)  return ImageSubChannelType::RGB;
-    if(l == "gba"sv)  return ImageSubChannelType::GBA;
-    //
-    if(l == "rgba"sv)  return ImageSubChannelType::RGBA;
-
-    throw MRayError("Unknown texture access layout");
-}
-
-inline void from_json(const nlohmann::json& n, NodeTexStruct& ts)
+inline void from_json(const nlohmann::json& n, SceneTexId& ts)
 {
     using namespace NodeNames;
-    ts.texId = n.at(TEXTURE_NAME);
-    ts.channelLayout = LoadTextureAccessLayout(n.at(TEXTURE_CHANNEL));
+    ts = SceneTexId(n.at(TEXTURE_NAME).get<std::underlying_type_t<SceneTexId>>());
 }
 
 inline void from_json(const nlohmann::json& n, SurfaceStruct& s)
@@ -63,7 +41,7 @@ inline void from_json(const nlohmann::json& n, SurfaceStruct& s)
 
         auto alphaIt = n.find(NodeNames::ALPHA_MAP);
         if(alphaIt != n.cend())
-            s.alphaMaps[0] = (*alphaIt).get<NodeTexStruct>();
+            s.alphaMaps[0] = (*alphaIt).get<SceneTexId>();
 
         auto cullIt = n.find(NodeNames::CULL_FACE);
         if(cullIt != n.cend())
@@ -82,7 +60,7 @@ inline void from_json(const nlohmann::json& n, SurfaceStruct& s)
             // Technically "-" should be supported only but
             // check if it is string here actual type is object.
             if(alphaIt != n.cend() && !(*alphaIt)[i].is_string())
-                s.alphaMaps[i] = (*alphaIt)[i].get<NodeTexStruct>();
+                s.alphaMaps[i] = (*alphaIt)[i].get<SceneTexId>();
 
             auto cullIt = n.find(NodeNames::CULL_FACE);
             if(cullIt != n.cend() && !(*cullIt)[i].is_string())
@@ -119,6 +97,66 @@ inline void from_json(const nlohmann::json& n, CameraSurfaceStruct& s)
                     : itM->get<uint32_t>();
 
     s.cameraId = n.at(NodeNames::CAMERA);
+}
+
+inline void from_json(const nlohmann::json& node, MRayTextureEdgeResolveEnum& t)
+{
+    auto name = node.get<std::string_view>();
+    MRayTextureEdgeResolveEnum e = MRayTextureEdgeResolveStringifier::FromString(name);
+    if(e == MRayTextureEdgeResolveEnum::MR_END)
+        throw MRayError("Unknown edge resolve \"{}\"", name);
+    t = e;
+}
+
+inline void from_json(const nlohmann::json& node, MRayTextureInterpEnum& t)
+{
+    auto name = node.get<std::string_view>();
+    MRayTextureInterpEnum e = MRayTextureInterpStringifier::FromString(name);
+    if(e == MRayTextureInterpEnum::MR_END)
+        throw MRayError("Unknown texture interp \"{}\"", name);
+    t = e;
+}
+
+inline void from_json(const nlohmann::json& node, MRayColorSpaceEnum& t)
+{
+    auto name = node.get<std::string_view>();
+    MRayColorSpaceEnum e = MRayColorSpaceStringifier::FromString(name);
+    if(e == MRayColorSpaceEnum::MR_END)
+        throw MRayError("Unknown color space \"{}\"", name);
+    t = e;
+}
+
+inline void from_json(const nlohmann::json& node, MRayTextureReadMode& t)
+{
+    auto name = node.get<std::string_view>();
+    MRayTextureReadMode e = MRayTextureReadModeStringifier::FromString(name);
+    // "drop" read modes are reserved for internal use
+    if(e == MRayTextureReadMode::MR_END    ||
+       e == MRayTextureReadMode::MR_DROP_1 ||
+       e == MRayTextureReadMode::MR_DROP_2 ||
+       e == MRayTextureReadMode::MR_DROP_3)
+        throw MRayError("Unknown read mode \"{}\"", name);
+    t = e;
+}
+
+inline void from_json(const nlohmann::json& node, ImageSubChannelType& t)
+{
+    using namespace std::literals;
+    std::string_view l = node.get<std::string_view>();
+         if(l == "r"sv) t = ImageSubChannelType::R;
+    else if(l == "g"sv) t = ImageSubChannelType::G;
+    else if(l == "b"sv) t = ImageSubChannelType::B;
+    else if(l == "a"sv) t = ImageSubChannelType::A;
+    //
+    else if(l == "rg"sv) t = ImageSubChannelType::RG;
+    else if(l == "gb"sv) t = ImageSubChannelType::GB;
+    else if(l == "ba"sv) t = ImageSubChannelType::BA;
+    //
+    else if(l == "rgb"sv) t = ImageSubChannelType::RGB;
+    else if(l == "gba"sv) t = ImageSubChannelType::GBA;
+    //
+    else if(l == "rgba"sv) t = ImageSubChannelType::RGBA;
+    else throw MRayError("Unknown texture access layout");
 }
 
 inline JsonNode::JsonNode(const nlohmann::json& n, uint32_t innerIndex)
@@ -271,23 +309,23 @@ Optional<TransientData> JsonNode::AccessOptionalDataArray(std::string_view name)
 
 // Texturable (either data T, or texture struct)
 template<class T>
-Variant<NodeTexStruct, T> JsonNode::AccessTexturableData(std::string_view name) const
+Variant<SceneTexId, T> JsonNode::AccessTexturableData(std::string_view name) const
 {
-    using V = Variant<NodeTexStruct, T>;
+    using V = Variant<SceneTexId, T>;
     const auto& n = (isMultiNode) ? node->at(name).at(innerIndex)
                                   : node->at(name);
-    return (n.is_object()) ? V(n.get<NodeTexStruct>())
+    return (n.is_object()) ? V(n.get<SceneTexId>())
                            : V(n.get<T>());
 }
 
-inline NodeTexStruct JsonNode::AccessTexture(std::string_view name) const
+inline SceneTexId JsonNode::AccessTexture(std::string_view name) const
 {
     const auto& n = (isMultiNode) ? node->at(name).at(innerIndex)
                                   : node->at(name);
-    return n.get<NodeTexStruct>();
+    return n.get<SceneTexId>();
 }
 
-inline Optional<NodeTexStruct> JsonNode::AccessOptionalTexture(std::string_view name) const
+inline Optional<SceneTexId> JsonNode::AccessOptionalTexture(std::string_view name) const
 {
     // Entire entry is missing (which is not defined all items on this node)
     if(node->find(name) == node->cend()) return std::nullopt;
@@ -295,5 +333,5 @@ inline Optional<NodeTexStruct> JsonNode::AccessOptionalTexture(std::string_view 
     const auto& n = (isMultiNode) ? node->at(name).at(innerIndex)
                                   : node->at(name);
     if(IsDashed(n)) return std::nullopt;
-    else            return n.get<NodeTexStruct>();
+    else            return n.get<SceneTexId>();
 }

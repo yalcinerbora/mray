@@ -88,6 +88,7 @@ struct ImageHeader
     MRayPixelTypeRT     pixelType;
     //
     ColorSpacePack      colorSpace;
+    MRayTextureReadMode readMode;
     //
     bool                Is2D() const;
 };

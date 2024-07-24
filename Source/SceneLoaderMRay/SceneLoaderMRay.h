@@ -14,7 +14,7 @@ class SceneLoaderMRay : public SceneLoaderI
 {
     public:
     using TypeMappedNodes   = std::map<std::string, std::vector<JsonNode>>;
-    using TexMappedNodes    = std::vector<Tuple<NodeTexStruct, JsonNode, bool>>;
+    using TexMappedNodes    = std::vector<Pair<SceneTexId, JsonNode>>;
 
     template <class Map>
     struct MutexedMap
@@ -80,7 +80,7 @@ class SceneLoaderMRay : public SceneLoaderI
                                     const TypeMappedNodes&,
                                     const TracerI&);
     template <class TracerInterfaceFunc, class AnnotateFunc>
-    static void DryRunNodesForTex(std::vector<NodeTexStruct>&,
+    static void DryRunNodesForTex(std::vector<SceneTexId>&,
                                   const TypeMappedNodes&,
                                   const TracerI&,
                                   AnnotateFunc&&,
