@@ -1,5 +1,6 @@
 #include "ColorConverter.h"
 #include "GenericTextureRW.h"
+#include "BCColorIO.h"
 
 #include "Device/GPUSystem.h"
 #include "Device/GPUSystem.hpp"

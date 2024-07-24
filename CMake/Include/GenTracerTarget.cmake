@@ -11,6 +11,7 @@ function(gen_tracer_target)
     set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/Tracer)
 
     set(SRC_TEXTURE
+        ${CURRENT_SOURCE_DIR}/BCColorIO.h
         ${CURRENT_SOURCE_DIR}/TextureMemory.h
         ${CURRENT_SOURCE_DIR}/TextureMemory.cpp
         ${CURRENT_SOURCE_DIR}/GenericTexture.cpp

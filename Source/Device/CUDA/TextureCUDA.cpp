@@ -290,19 +290,21 @@ TextureCUDA_BC<T>::TextureCUDA_BC(const GPUDeviceCUDA& device,
     };
 
     using namespace MathFunctions;
-    Vector2ui paddedSize = Vector2ui(NextMultiple(p.size[0], BC_BLOCK_SIZE),
-                                     NextMultiple(p.size[1], BC_BLOCK_SIZE));
+    // TODO: We we do not need this?
+    //Vector2ui paddedSize = Vector2ui(NextMultiple(p.size[0], BC_BLOCK_SIZE),
+    //                                 NextMultiple(p.size[1], BC_BLOCK_SIZE));
+    Vector2ui paddedSize = p.size;
     if(paddedSize != p.size)
     {
         MRAY_WARNING_LOG("BC texture size is not multiple of {}! "
                          "Texture may be skewed!", BC_BLOCK_SIZE);
     }
-    //paddedSize = DivideUp(paddedSize, Vector2ui(BC_BLOCK_SIZE));
     cudaExtent extent = MakeCudaExtent<2, 0u>(paddedSize);
     cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<CudaTypeEnum>();
     CUDA_CHECK(cudaSetDevice(gpu->DeviceId()));
     CUDA_MEM_THROW(cudaMallocMipmappedArray(&data, &channelDesc, extent, p.mipCount,
-                                            cudaArrayDeferredMapping));
+                                            cudaArrayDeferredMapping |
+                                            cudaArraySurfaceLoadStore));
 
     cudaArrayMemoryRequirements memReq;
     CUDA_CHECK(cudaMipmappedArrayGetMemoryRequirements(&memReq, data, gpu->DeviceId()));
@@ -406,6 +408,27 @@ TextureCUDA_BC<T>::~TextureCUDA_BC()
 }
 
 template<class T>
+RWTextureRefCUDA<2, T> TextureCUDA_BC<T>::GenerateRWRef(uint32_t mipLevel)
+{
+    if(mipLevel >= texParams.mipCount)
+        throw MRayError("Requested out of bounds mip level!");
+
+    // TODO: Check if we are owning this cudaArray_t.
+    // Since it is a "get" function we do not own this I guess
+    cudaArray_t mipLevelArray;
+    CUDA_CHECK(cudaGetMipmappedArrayLevel(&mipLevelArray, data,
+                                          static_cast<int>(mipLevel)));
+
+    cudaSurfaceObject_t surf;
+    cudaResourceDesc desc = {};
+    desc.resType = cudaResourceTypeArray;
+    desc.res.array.array = mipLevelArray;
+    CUDA_CHECK(cudaCreateSurfaceObject(&surf, &desc));
+
+    return RWTextureRefCUDA<2, T>(surf);
+}
+
+template<class T>
 size_t TextureCUDA_BC<T>::Size() const
 {
     return size;
@@ -469,29 +492,19 @@ void TextureCUDA_BC<T>::CopyFromAsync(const GPUQueueCUDA& queue,
     cudaArray_t levelArray;
     CUDA_CHECK(cudaGetMipmappedArrayLevel(&levelArray, data, mipLevel));
     void* ptr = const_cast<Byte*>(reinterpret_cast<const Byte*>(regionFrom.data()));
+    auto srcWH = MathFunctions::DivideUp(sizes, Vector2ui(BC_BLOCK_SIZE));
+    auto dstWH = MathFunctions::NextMultiple(sizes, Vector2ui(BC_BLOCK_SIZE));
+        //Vector2ui(sizes[0] / BC_BLOCK_SIZE, sizes[1] / BC_BLOCK_SIZE);
+    size_t srcPitch = srcWH[0] * sizeof(PaddedChannelType);
 
-    size_t w = sizes[0] / BC_BLOCK_SIZE * sizeof(PaddedChannelType);
-    size_t h = sizes[1];
-    size_t pitch = w;
-    CUDA_CHECK(cudaMemcpy2DToArrayAsync(levelArray, 0, 0,
-                                        ptr, pitch, w, h,
-                                        cudaMemcpyDefault,
-                                        ToHandleCUDA(queue)));
-
-    /*cudaMemcpy3DParms p = {};
+    cudaMemcpy3DParms p = {};
     p.kind = cudaMemcpyDefault;
-    p.extent = MakeCudaExtent<2, 1>(sizes);
-    p.extent.height = 8;
+    p.extent = MakeCudaExtent<2, 1>(dstWH);
     p.dstArray = levelArray;
-    p.dstPos = MakeCudaPos<2, 0>(offset);*/
-
-    //p.srcPos = make_cudaPos(0, 0, 0);
-    ////
-    ///*void* ptr = const_cast<Byte*>(reinterpret_cast<const Byte*>(regionFrom.data()));*/
-    //p.srcPtr = make_cudaPitchedPtr(ptr,
-    //                               p.extent.width * sizeof(PaddedChannelType),
-    //                               p.extent.width, p.extent.height);
-    //CUDA_CHECK(cudaMemcpy3DAsync(&p, ToHandleCUDA(queue)));
+    p.dstPos = MakeCudaPos<2, 0>(offset);
+    p.srcPos = make_cudaPos(0, 0, 0);
+    p.srcPtr = make_cudaPitchedPtr(ptr, srcPitch, srcWH[0], srcWH[1]);
+    CUDA_CHECK(cudaMemcpy3DAsync(&p, ToHandleCUDA(queue)));
 }
 
 

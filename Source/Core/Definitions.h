@@ -447,28 +447,44 @@ struct MRayTextureReadModeStringifier
 // These are aligned with Vector<> template to match the types
 // on templates
 // "Tag" is here to differ types
-template<unsigned int Channel, class T, unsigned int Tag = 0>
+template<unsigned int Channels,
+         class PixelType,
+         unsigned int BLOCK_SIZE,
+         unsigned int TILE_SIZE,
+         unsigned int Tag = 0>
 struct BlockCompressedType
 {
-    using InnerType = T;
-    static constexpr size_t Dims = Channel;
+    using InnerType = PixelType;
+    // This is "Dims" because this class emulates
+    // Vector2/3/4 member constexpr variable "Dims".
+    static constexpr size_t Dims = Channels;
+    // Specific to block compression
+    static constexpr size_t BlockSize = BLOCK_SIZE;
+    static constexpr size_t TileSize = TILE_SIZE;
 };
 
-using PixelBC1 = BlockCompressedType<4, uint8_t, 0>;
-using PixelBC2 = BlockCompressedType<4, uint8_t, 1>;
-using PixelBC3 = BlockCompressedType<4, uint8_t, 2>;
-using PixelBC4U = BlockCompressedType<1, uint8_t>;
-using PixelBC4S = BlockCompressedType<1, int8_t>;
-using PixelBC5U = BlockCompressedType<2, uint16_t>;
-using PixelBC5S = BlockCompressedType<2, int16_t>;
-using PixelBC6U = BlockCompressedType<3, uint16_t>;
-using PixelBC6S = BlockCompressedType<3, int16_t>;
-using PixelBC7 = BlockCompressedType<4, uint8_t, 3>;
+using PixelBC1  = BlockCompressedType<4, uint8_t,  8, 4, 0>;
+using PixelBC2  = BlockCompressedType<4, uint8_t, 16, 4, 1>;
+using PixelBC3  = BlockCompressedType<4, uint8_t, 16, 4, 3>;
+using PixelBC4U = BlockCompressedType<1, uint8_t,  8, 4, 4>;
+using PixelBC4S = BlockCompressedType<1, int8_t ,  8, 4, 5>;
+using PixelBC5U = BlockCompressedType<2, uint8_t, 16, 4, 6>;
+using PixelBC5S = BlockCompressedType<2, int8_t , 16, 4, 7>;
+// We do not have half so put uint16_t
+using PixelBC6U = BlockCompressedType<3, uint16_t, 16, 4, 8>;
+using PixelBC6S = BlockCompressedType<3, int16_t , 16, 4, 9>;
+using PixelBC7  = BlockCompressedType<4, uint8_t , 16, 4, 10>;
 
 // Sanity check
-static_assert(std::is_same_v<PixelBC1, PixelBC2> == false);
-static_assert(std::is_same_v<PixelBC2, PixelBC3> == false);
-static_assert(std::is_same_v<PixelBC3, PixelBC7> == false);
+static_assert(std::is_same_v<PixelBC1, PixelBC2>    == false);
+static_assert(std::is_same_v<PixelBC2, PixelBC3>    == false);
+static_assert(std::is_same_v<PixelBC3, PixelBC4U>   == false);
+static_assert(std::is_same_v<PixelBC4U, PixelBC4S>  == false);
+static_assert(std::is_same_v<PixelBC4S, PixelBC5U>  == false);
+static_assert(std::is_same_v<PixelBC5U, PixelBC5S>  == false);
+static_assert(std::is_same_v<PixelBC5S, PixelBC6U>  == false);
+static_assert(std::is_same_v<PixelBC6U, PixelBC6S>  == false);
+static_assert(std::is_same_v<PixelBC6S, PixelBC7>   == false);
 
 // Block compressed concepts
 template <class BCType>

@@ -12,6 +12,11 @@ namespace Bit
     template<std::integral T>
     constexpr T FetchSubPortion(T value, std::array<T, 2> bitRange);
 
+    template<size_t... Is, std::unsigned_integral... Ts>
+    requires(sizeof...(Is) == sizeof...(Ts))
+    constexpr std::tuple_element_t<0, Tuple<Ts...>>
+    Compose(Ts... values);
+
     template<std::unsigned_integral T>
     constexpr T RotateLeft(T value, T shiftAmount);
 
@@ -32,9 +37,24 @@ namespace Bit
         MRAY_HYBRID
         constexpr R FromUNorm(T in);
 
+        template<std::floating_point R, uint32_t Bits,
+                 std::unsigned_integral T>
+        MRAY_HYBRID
+        constexpr R FromUNormVaryingInsane(T value);
+
+        template<std::floating_point R, uint32_t Bits,
+                 std::unsigned_integral T>
+        MRAY_HYBRID
+        constexpr R FromUNormVarying(T in);
+
         template<std::unsigned_integral T, std::floating_point R>
         MRAY_HYBRID
         constexpr T ToUNorm(R in);
+
+        template<std::unsigned_integral T, uint32_t Bits,
+                 std::floating_point R>
+        MRAY_HYBRID
+        constexpr T ToUNormVarying(R in);
 
         template<std::floating_point R, std::signed_integral T>
         MRAY_HYBRID
@@ -162,6 +182,32 @@ constexpr T Bit::FetchSubPortion(T value, std::array<T, 2> bitRange)
     return (value >> bitRange[0]) & mask;
 }
 
+template<size_t... Is, std::unsigned_integral... Ts>
+requires(sizeof...(Is) == sizeof...(Ts))
+constexpr std::tuple_element_t<0, Tuple<Ts...>>
+Bit::Compose(Ts... values)
+{
+    constexpr uint32_t E = sizeof...(Is);
+    using RetT = std::tuple_element_t<0, Tuple<Ts...>>;
+    // Compile time check the bits
+    static_assert((Is + ...) <= sizeof(RetT) * CHAR_BIT,
+                  "Template Is must not exceed the entire bit range");
+    // Convert the index sequence to runtime
+    std::array<size_t, E + 1> offsets = {0, Is...};
+    // Fast scan
+    UNROLL_LOOP
+    for(uint32_t i = 1; i < E - 1; i++)
+        offsets[i] += offsets[i-1];
+
+    uint32_t i = 0;
+    RetT result = 0;
+    (
+        ((void)(result |= (values << offsets[i++]))),
+        ...
+    );
+    return result;
+}
+
 template<std::unsigned_integral T>
 constexpr T Bit::RotateLeft(T value, T shiftAmount)
 {
@@ -231,6 +277,69 @@ constexpr R Bit::NormConversion::FromUNorm(T in)
     return result;
 }
 
+template<std::floating_point R, uint32_t BITS,
+         std::unsigned_integral T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr R Bit::NormConversion::FromUNormVaryingInsane(T value)
+{
+    // We can do divide an all, but we get our hands dirty for
+    // bisecting BC compressions for color conversion
+    // So lets do a cool version of unorm generation directly
+    // embedding to the matissa of the float
+     // Directly embed these to mantissa
+    static_assert(std::numeric_limits<Float>::is_iec559,
+                  "IEEE-754 floats are required for this function");
+    using IntT = std::conditional_t<(std::is_same_v<Float, float>),
+                                    uint32_t,
+                                    uint64_t>;
+    constexpr IntT MANTISSA_SIZE = std::is_same_v<Float, float>
+                                    ? 23u
+                                    : 52u;
+    static_assert(BITS <= MANTISSA_SIZE, "Bit count exceeds mantissa");
+    assert(value >> BITS == 0);
+    // Set the exponent side via the compiler
+    // lets not get fancy (thanks to bit_cast)
+    IntT rBits = std::bit_cast<IntT>(R(1));
+    IntT input = value;
+    input <<= (MANTISSA_SIZE - BITS);
+    // Here is the fancy part we copy the value to the mantissa
+    // starting from MSB of the mantissa
+    constexpr IntT StampCount = MathFunctions::DivideUp(MANTISSA_SIZE, BITS);
+    UNROLL_LOOP
+    for(IntT i = 0; i < StampCount; i++)
+    {
+        rBits |= input;
+        input >>= BITS;
+    }
+    // All this work makes sense when Float is 1.0, extract 1.
+    //
+    // Is this worth it? Definately no.
+    // NVCC recommends to not mix float -> int conversions, we did that
+    // a classical approach
+    // R(input) / R((1 << bitSize) - 1) also have type conversions
+    // so we did not gained anything
+    // Furthermore, this is value not compatible with this approach.
+    //
+    // But no floating point division so its performant even with a loop?
+    // porbably not. So do not do this :)
+    return R(1) - std::bit_cast<R>(rBits);
+}
+
+template<std::floating_point R, uint32_t Bits,
+         std::unsigned_integral T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr R Bit::NormConversion::FromUNormVarying(T in)
+{
+    constexpr R MAX = R((T(1) << Bits) - T(1));
+    constexpr R MIN = R(std::numeric_limits<T>::min());
+    constexpr R DELTA = 1 / (MAX - MIN);
+    // TODO: Specialize using intrinsics maybe?
+    // For GPU (GPUs should have these?)
+    // Also check more precise way to do this (if available?)
+    R result = MIN + static_cast<R>(in) * DELTA;
+    return result;
+}
+
 template<std::unsigned_integral T, std::floating_point R>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr T Bit::NormConversion::ToUNorm(R in)
@@ -241,6 +350,25 @@ constexpr T Bit::NormConversion::ToUNorm(R in)
 
     assert(in >= R(0) && in <= R(1));
     constexpr R MAX = R(std::numeric_limits<T>::max());
+    constexpr R MIN = R(std::numeric_limits<T>::min());
+    constexpr R DIFF = (MAX - MIN);
+
+    in *= DIFF;
+    in = round(in);
+    return T(in);
+}
+
+template<std::unsigned_integral T, uint32_t Bits,
+         std::floating_point R>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr T Bit::NormConversion::ToUNormVarying(R in)
+{
+    #ifdef MRAY_DEVICE_CODE_PATH
+        using std::round;
+    #endif
+
+    assert(in >= R(0) && in <= R(1));
+    constexpr R MAX = R((T(1) << Bits) - T(1));
     constexpr R MIN = R(std::numeric_limits<T>::min());
     constexpr R DIFF = (MAX - MIN);
 

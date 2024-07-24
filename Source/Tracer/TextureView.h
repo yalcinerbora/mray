@@ -12,7 +12,7 @@
 // statically compile (no dynamic polymorphism),
 // everything is in switch/case statements.
 // So it is not that extensible.
-enum class TextureReadMode
+enum class TextureReadMode : uint8_t
 {
     // Directly read whatever the type is
     DIRECT,
@@ -60,8 +60,21 @@ class TracerTexView
     using UV = UVType<DIM>;
 
     private:
-    HWTextureView<DIM>      hwView;
+    // TODO: We are wasting 8 bytes of memory when this is
+    // variant (padding etc. issues)
+    // This struct is 16 bytes when we do C unions.
+    // Because of this we need to define our constructors
+    union
+    {
+        TextureView<DIM, Float>     tF;
+        TextureView<DIM, Vector2>   tV2;
+        TextureView<DIM, Vector3>   tV3;
+        TextureView<DIM, Vector4>   tV4;
+    };
+    //HWTextureView<DIM>      hwView;
+    uint8_t                 index;
     TextureReadMode         mode;
+    bool                    flipY = false;
 
     template<class ReadType>
     MRAY_GPU Optional<T>    Postprocess(Optional<ReadType>&&) const;
@@ -69,7 +82,8 @@ class TracerTexView
     public:
     // Constructors & Desructor
     MRAY_HOST               TracerTexView(HWTextureView<DIM> hwView,
-                                          TextureReadMode mode);
+                                          TextureReadMode mode,
+                                          bool flipY = false);
     // Base Access
     MRAY_GPU Optional<T>    operator()(UV uv) const;
     // Gradient Access
@@ -79,6 +93,9 @@ class TracerTexView
     // Direct Mip Access
     MRAY_GPU Optional<T>    operator()(UV uv, Float mipLevel) const;
 };
+
+
+static constexpr size_t A = sizeof(TracerTexView<3, Vector4>);
 
 
 template<uint32_t D, class T>
@@ -157,19 +174,35 @@ Optional<T> TracerTexView<D, T>::Postprocess(Optional<ReadType>&& t) const
 template<uint32_t D, class T>
 MRAY_HOST
 TracerTexView<D, T>::TracerTexView(HWTextureView<D> hw,
-                                   TextureReadMode m)
-    : hwView(hw)
-    , mode(m)
-{}
+                                   TextureReadMode m,
+                                   bool flipYIn)
+    : mode(m)
+    , flipY(flipYIn)
+    , index(static_cast<uint8_t>(hw.index()))
+{
+    static_assert(std::variant_size_v<HWTextureView<D>> == 4);
+    switch(index)
+    {
+        case 0: tF  = std::get<0>(hw); break;
+        case 1: tV2 = std::get<1>(hw); break;
+        case 2: tV3 = std::get<2>(hw); break;
+        case 3: tV4 = std::get<3>(hw); break;
+    }
+}
 
 template<uint32_t D, class T>
 MRAY_GPU MRAY_GPU_INLINE
 Optional<T> TracerTexView<D, T>::operator()(UV uv) const
 {
-    return DeviceVisit(hwView, [&](auto&& view) -> Optional<T>
+    if(flipY) uv[1] = Float(1) - uv[1];
+    switch(index)
     {
-        return Postprocess(view(uv));
-    });
+        case 0: return Postprocess(tF (uv));
+        case 1: return Postprocess(tV2(uv));
+        case 2: return Postprocess(tV3(uv));
+        case 3: return Postprocess(tV4(uv));
+    }
+    return std::nullopt;
 }
 
 template<uint32_t D, class T>
@@ -178,20 +211,30 @@ Optional<T> TracerTexView<D, T>::operator()(UV uv,
                                             UV dpdx,
                                             UV dpdy) const
 {
-    return DeviceVisit(hwView, [&](auto&& view) -> Optional<T>
+    if(flipY) uv[1] = Float(1) - uv[1];
+    switch(index)
     {
-        return Postprocess(view(uv, dpdx, dpdy));
-    });
+        case 0: return Postprocess(tF (uv, dpdx, dpdy));
+        case 1: return Postprocess(tV2(uv, dpdx, dpdy));
+        case 2: return Postprocess(tV3(uv, dpdx, dpdy));
+        case 3: return Postprocess(tV4(uv, dpdx, dpdy));
+    }
+    return std::nullopt;
 }
 
 template<uint32_t D, class T>
 MRAY_GPU MRAY_GPU_INLINE
 Optional<T> TracerTexView<D, T>::operator()(UV uv, Float mipLevel) const
 {
-    return DeviceVisit(hwView, [&](auto&& view) -> Optional<T>
+    if(flipY) uv[1] = Float(1) - uv[1];
+    switch(index)
     {
-        return Postprocess(view(uv, mipLevel));
-    });
+        case 0: return Postprocess(tF (uv, mipLevel));
+        case 1: return Postprocess(tV2(uv, mipLevel));
+        case 2: return Postprocess(tV3(uv, mipLevel));
+        case 3: return Postprocess(tV4(uv, mipLevel));
+    }
+    return std::nullopt;
 }
 
 // Texture Related types

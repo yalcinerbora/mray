@@ -180,18 +180,19 @@ GenericTextureView Concept<T>::View(TextureReadMode mode) const
     using enum TextureReadMode;
     static constexpr uint32_t C = T::ChannelCount;
     static constexpr uint32_t D = T::Dims;
+    static constexpr bool IsBC = T::IsBlockCompressed;
     auto GenView = [this]<class T>(TextureReadMode mode,
                                    // For overload resolution
                                    std::in_place_type_t<T>)
     {
         if constexpr(C == 1)
-            return TracerTexView<D, T>(tex.View<Float>(), mode);
+            return TracerTexView<D, T>(tex.View<Float>(), mode, IsBC);
         else if constexpr(C == 2)
-            return TracerTexView<D, T>(tex.View<Vector2>(), mode);
+            return TracerTexView<D, T>(tex.View<Vector2>(), mode, IsBC);
         else if constexpr(C == 3)
-            return TracerTexView<D, T>(tex.View<Vector3>(), mode);
+            return TracerTexView<D, T>(tex.View<Vector3>(), mode, IsBC);
         else
-            return TracerTexView<D, T>(tex.View<Vector4>(), mode);
+            return TracerTexView<D, T>(tex.View<Vector4>(), mode, IsBC);
     };
 
     using enum TextureReadMode;
@@ -214,13 +215,13 @@ GenericTextureView Concept<T>::View(TextureReadMode mode) const
         default:
         {
             if constexpr(C == 1)
-                return TracerTexView<D, Float>(tex.View<Float>(), mode);
+                return TracerTexView<D, Float>(tex.View<Float>(), mode, IsBC);
             else if constexpr(C == 2)
-                return TracerTexView<D, Vector2>(tex.View<Vector2>(), mode);
+                return TracerTexView<D, Vector2>(tex.View<Vector2>(), mode, IsBC);
             else if constexpr(C == 3)
-                return TracerTexView<D, Vector3>(tex.View<Vector3>(), mode);
+                return TracerTexView<D, Vector3>(tex.View<Vector3>(), mode, IsBC);
             else
-                return TracerTexView<D, Vector4>(tex.View<Vector4>(), mode);
+                return TracerTexView<D, Vector4>(tex.View<Vector4>(), mode, IsBC);
         }
     }
 }

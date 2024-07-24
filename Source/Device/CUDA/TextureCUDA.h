@@ -84,6 +84,9 @@ constexpr uint32_t BCTypeToBlockSize()
 template<uint32_t D, class T>
 class TextureCUDA_Normal;
 
+template<class T>
+class TextureCUDA_BC;
+
 template<uint32_t D, class T>
 class TextureCUDA;
 
@@ -92,6 +95,7 @@ template<uint32_t D, class T>
 class RWTextureRefCUDA
 {
     friend class TextureCUDA_Normal<D, T>;
+    friend class TextureCUDA_BC<T>;
 
     private:
     cudaSurfaceObject_t     s = cudaSurfaceObject_t(0);
@@ -230,6 +234,8 @@ class TextureCUDA_BC
     requires(!std::is_same_v<QT, T> &&
              (BCTypeToChannels<T>() == VectorTypeToChannels<QT>()))
     TextureViewCUDA<2, QT>  View() const;
+
+    RWTextureRefCUDA<2, T>  GenerateRWRef(uint32_t mipLevel);
 
     size_t                  Size() const;
     size_t                  Alignment() const;
