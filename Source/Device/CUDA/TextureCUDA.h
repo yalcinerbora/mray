@@ -94,8 +94,23 @@ class TextureCUDA;
 template<uint32_t D, class T>
 class RWTextureRefCUDA
 {
+    //using BCFriend =
+
     friend class TextureCUDA_Normal<D, T>;
-    friend class TextureCUDA_BC<T>;
+    // My c++ knowledge failed here,
+    // so copy pasting friends here. Probably making constructor
+    // public is a better choice
+    friend std::conditional_t<std::is_same_v<T, Vector2ui>, TextureCUDA_BC<PixelBC1>,   EmptyType>;
+    friend std::conditional_t<std::is_same_v<T, Vector2ui>, TextureCUDA_BC<PixelBC4U>,  EmptyType>;
+    friend std::conditional_t<std::is_same_v<T, Vector2ui>, TextureCUDA_BC<PixelBC4S>,  EmptyType>;
+    //
+    friend std::conditional_t<std::is_same_v<T, Vector4ui>, TextureCUDA_BC<PixelBC2>,   EmptyType>;
+    friend std::conditional_t<std::is_same_v<T, Vector4ui>, TextureCUDA_BC<PixelBC3>,   EmptyType>;
+    friend std::conditional_t<std::is_same_v<T, Vector4ui>, TextureCUDA_BC<PixelBC5U>,  EmptyType>;
+    friend std::conditional_t<std::is_same_v<T, Vector4ui>, TextureCUDA_BC<PixelBC5S>,  EmptyType>;
+    friend std::conditional_t<std::is_same_v<T, Vector4ui>, TextureCUDA_BC<PixelBC6U>,  EmptyType>;
+    friend std::conditional_t<std::is_same_v<T, Vector4ui>, TextureCUDA_BC<PixelBC6S>,  EmptyType>;
+    friend std::conditional_t<std::is_same_v<T, Vector4ui>, TextureCUDA_BC<PixelBC7>,   EmptyType>;
 
     private:
     cudaSurfaceObject_t     s = cudaSurfaceObject_t(0);
@@ -148,9 +163,9 @@ class TextureCUDA_Normal
     TextureInitParams<D>    texParams;
 
     // Allocation related
-    bool    allocated   = false;
     size_t  size        = 0;
     size_t  alignment   = 0;
+    bool    allocated   = false;
 
     protected:
     public:
@@ -196,26 +211,36 @@ class TextureCUDA_Normal
 template<class T>
 class TextureCUDA_BC
 {
-    static constexpr uint32_t BC_BLOCK_SIZE = 4;
+    static constexpr uint32_t BC_TILE_SIZE = 4;
     public:
     static constexpr uint32_t ChannelCount  = BCTypeToChannels<T>();
     static constexpr bool IsNormConvertible = true;
     static constexpr uint32_t Dims          = 2;
     static constexpr auto CudaTypeEnum      = static_cast<cudaChannelFormatKind>(BCEnumFinder::Find<T>);
+    static constexpr auto BlockSize         = BCTypeToBlockSize<T>();
 
     using Type              = T;
-    using PaddedChannelType = Byte[BCTypeToBlockSize<T>()];
+    using RWType            = std::conditional_t<BlockSize == 8, Vector2ui, Vector4ui>;
+    using PaddedChannelType = Byte[BlockSize];
 
     private:
     const GPUDeviceCUDA*    gpu;
     cudaTextureObject_t     tex         = cudaTextureObject_t(0);
     cudaMipmappedArray_t    data        = nullptr;
     TextureInitParams<2>    texParams;
-
+    // We will do some trickery, to alias the memory
+    // Since all of our texture allocations are deferred,
+    // we can create another CUDA array over that memory,
+    // and create a surface object.
+    // (uint2 for 64-bit BC textures, uint4 for 128-bit)
+    // And use it to read/write to memory.
+    // This functionality is hacky and hopefully it is not
+    // UB (in terms of CUDA)
+    cudaMipmappedArray_t    aliasData = nullptr;
     // Allocation related
-    bool                    allocated   = false;
-    size_t                  size        = 0;
-    size_t                  alignment   = 0;
+    size_t  size        = 0;
+    size_t  alignment   = 0;
+    bool    allocated = false;
 
     protected:
     public:
@@ -233,9 +258,9 @@ class TextureCUDA_BC
     template<class QT>
     requires(!std::is_same_v<QT, T> &&
              (BCTypeToChannels<T>() == VectorTypeToChannels<QT>()))
-    TextureViewCUDA<2, QT>  View() const;
+    TextureViewCUDA<2, QT>      View() const;
 
-    RWTextureRefCUDA<2, T>  GenerateRWRef(uint32_t mipLevel);
+    RWTextureRefCUDA<2, RWType> GenerateRWRef(uint32_t mipLevel);
 
     size_t                  Size() const;
     size_t                  Alignment() const;

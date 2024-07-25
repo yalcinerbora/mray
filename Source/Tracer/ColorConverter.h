@@ -13,6 +13,13 @@ struct ColorConvParams
     Vector2ui           mipZeroRes;
 };
 
+struct BCColorConvParams : public ColorConvParams
+{
+    MRayPixelEnum       pixelEnum;
+    uint32_t            blockSize;
+    uint32_t            tileSize;
+};
+
 class ColorConverter
 {
     private:
@@ -24,5 +31,7 @@ class ColorConverter
 
     void    ConvertColor(const std::vector<MipArray<SurfRefVariant>>& textures,
                          const std::vector<ColorConvParams>& params,
+                         const std::vector<MipArray<SurfRefVariant>>& bcTextures,
+                         const std::vector<BCColorConvParams>& bcColorConvParams,
                          MRayColorSpaceEnum globalColorSpace) const;
 };

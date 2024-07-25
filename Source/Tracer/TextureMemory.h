@@ -85,7 +85,7 @@ class GenericTextureI
 class alignas(8u) GenericTextureT
 {
     public:
-    static constexpr size_t BuffSize        = 96u;
+    static constexpr size_t BuffSize        = 104u;
     static constexpr size_t BuffAlignment   = 8u;
 
     private:

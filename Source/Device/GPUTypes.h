@@ -125,20 +125,19 @@ constexpr uint32_t BCTypeToChannels()
 template <uint32_t D>
 struct TextureInitParams
 {
-    bool        normIntegers    = true;
-    bool        normCoordinates = true;
-    bool        convertSRGB     = false;
-
     uint32_t    maxAnisotropy   = 16;
     Float       mipmapBias      = 0.0f;
     Float       minMipmapClamp  = -100.0f;
     Float       maxMipmapClamp  = 100.0f;
-
+    // Dimension Related (must be set)
+    uint32_t            mipCount        = 0;
+    TextureExtent<D>    size            = TextureExtent<D>(0);
+    bool                normIntegers    = true;
+    bool                normCoordinates = true;
+    bool                convertSRGB     = false;
+    //
     MRayTextureInterpEnum       interp      = MRayTextureInterpEnum::MR_NEAREST;
     MRayTextureEdgeResolveEnum  eResolve    = MRayTextureEdgeResolveEnum::MR_WRAP;
-    // Dimension Related (must be set)
-    uint32_t                    mipCount    = 0;
-    TextureExtent<D>            size        = TextureExtent<D>(0);
 };
 
 template<uint32_t D>

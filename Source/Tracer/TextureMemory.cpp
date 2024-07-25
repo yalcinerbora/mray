@@ -47,12 +47,14 @@ class Concept : public GenericTextureI
     SurfRefVariant      RWView(uint32_t mipLevel) override;
 };
 
-static_assert(GenericTexture::BuffSize == std::max(sizeof(Concept<Texture<3, Vector4>>),
-                                                   sizeof(Concept<Texture<2, Vector4>>)),
-              "Size of GenericTexture does not match, please chane it to the exact value");
-static_assert(GenericTexture::BuffAlignment == std::max(alignof(Concept<Texture<3, Vector4>>),
-                                                        alignof(Concept<Texture<2, Vector4>>)),
-              "Alignment of GenericTexture does not match, please chane it to the exact value");
+static_assert(GenericTexture::BuffSize == std::max({sizeof(Concept<Texture<3, Vector4>>),
+                                                    sizeof(Concept<Texture<2, Vector4>>),
+                                                    sizeof(Concept<Texture<2, PixelBC1>>)}),
+              "Size of GenericTexture does not match, please change it to the exact value");
+static_assert(GenericTexture::BuffAlignment == std::max({alignof(Concept<Texture<3, Vector4>>),
+                                                         alignof(Concept<Texture<2, Vector4>>),
+                                                         alignof(Concept<Texture<2, PixelBC1>>)}),
+              "Alignment of GenericTexture does not match, please change it to the exact value");
 
 template<class T>
 template<class... Args>
@@ -399,6 +401,7 @@ void TextureMemory::ConvertColorspaces()
     // Finally call the kernel
     if(!texSurfs.empty())
         colorConv.ConvertColor(texSurfs, colorConvParams,
+                               {}, {},
                                tracerParams.globalTextureColorSpace);
 }
 
