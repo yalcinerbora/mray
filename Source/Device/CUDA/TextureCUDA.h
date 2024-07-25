@@ -145,7 +145,7 @@ template<uint32_t D, class T>
 class TextureCUDA_Normal
 {
     public:
-    static constexpr uint32_t ChannelCount = VectorTypeToChannels<T>();
+    static constexpr uint32_t ChannelCount  = VectorTypeToChannels<T>();
     static constexpr bool IsNormConvertible = IsNormConvertibleCUDA<T>();
     static constexpr uint32_t Dims          = D;
 
