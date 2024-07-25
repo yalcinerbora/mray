@@ -352,18 +352,11 @@ TextureCUDA_BC<T>::TextureCUDA_BC(const GPUDeviceCUDA& device,
     CUDA_CHECK(cudaCreateTextureObject(&tex, &rDesc, &tDesc, nullptr));
 
     // Alias the memory for RW textures
-    using ChannelType = std::conditional_t
-    <
-        std::is_same_v<T, PixelBC1>  ||
-        std::is_same_v<T, PixelBC4U> ||
-        std::is_same_v<T, PixelBC4S>,
-        uint2,
-        uint4
-    >;
+    using AliasType = typename VectorTypeToCUDA::template Find<RWType>;
     using namespace MathFunctions;
     Vector2ui tileCount = DivideUp(texParams.size, Vector2ui(BC_TILE_SIZE));
     cudaExtent aliasExtent = MakeCudaExtent<2, 0u>(tileCount);
-    cudaChannelFormatDesc aliasChannelDesc = cudaCreateChannelDesc<ChannelType>();
+    cudaChannelFormatDesc aliasChannelDesc = cudaCreateChannelDesc<AliasType>();
     CUDA_CHECK(cudaSetDevice(gpu->DeviceId()));
 
     CUDA_MEM_THROW(cudaMallocMipmappedArray(&aliasData, &aliasChannelDesc,
