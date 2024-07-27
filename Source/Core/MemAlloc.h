@@ -38,6 +38,13 @@ concept MemoryC = requires(MemT m, const MemT cm)
 namespace MemAlloc
 {
 
+template<ImplicitLifetimeC Left, ImplicitLifetimeC Right>
+static constexpr bool RepurposeAllocRequirements =
+(
+    !std::is_same_v<std::remove_cvref_t<Right>, Byte> && (alignof(Right) >= alignof(Left)) ||
+    std::is_same_v<std::remove_cvref_t<Right>, Byte>
+);
+
 constexpr size_t DefaultSystemAlignment();
 
 template <MemoryC Memory, ImplicitLifetimeC... Args>
@@ -57,6 +64,7 @@ std::vector<size_t> AllocateTextureSpace(Memory& memory,
                                          const std::vector<size_t>& alignments);
 
 template <ImplicitLifetimeC Left, ImplicitLifetimeC Right>
+requires RepurposeAllocRequirements<Left, Right>
 constexpr Span<Left> RepurposeAlloc(Span<Right> rhs);
 
 }
@@ -188,13 +196,13 @@ std::vector<size_t> AllocateTextureSpace(Memory& memory,
 
 
 template <ImplicitLifetimeC Left, ImplicitLifetimeC Right>
+requires RepurposeAllocRequirements<Left, Right>
 constexpr Span<Left> RepurposeAlloc(Span<Right> rhs)
 {
-    static_assert(alignof(Right) == alignof(Left));
+    using ByteT = std::conditional_t<std::is_const_v<Right>, const Byte, Byte>;
     size_t elementCount = rhs.size_bytes() / sizeof(Left);
-
     // TODO: Check if this is UB (probably is)
-    Byte* rawPtr = reinterpret_cast<Byte*>(rhs.data());
+    ByteT* rawPtr = reinterpret_cast<ByteT*>(rhs.data());
     Left* leftPtr = std::launder(reinterpret_cast<Left*>(rawPtr));
     return Span<Left>(leftPtr, elementCount);
 }

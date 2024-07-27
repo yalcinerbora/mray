@@ -194,10 +194,25 @@ Bit::Compose(Ts... values)
                   "Template Is must not exceed the entire bit range");
     // Convert the index sequence to runtime
     std::array<size_t, E + 1> offsets = {0, Is...};
-    // Fast scan
+
+    // Check the data validity
+    if constexpr(MRAY_IS_DEBUG)
+    {
+        [[maybe_unused]]
+        uint32_t i = 1;
+        assert
+        (
+            (values < (RetT(1) << offsets[i++])) &&
+            ...
+        );
+    }
+
+    // Do scan
     UNROLL_LOOP
-    for(uint32_t i = 1; i < E - 1; i++)
-        offsets[i] += offsets[i-1];
+    for(uint32_t i = 1; i < E; i++)
+    {
+        offsets[i] += offsets[i - 1];
+    }
 
     uint32_t i = 0;
     RetT result = 0;

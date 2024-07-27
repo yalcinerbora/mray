@@ -535,7 +535,7 @@ std::string_view LightGroupSkysphere<CC>::TypeName()
         return "(L)Skysphere_CoOcta";
     else if constexpr(std::is_same_v<CC, LightDetail::SphericalCoordConverter>)
         return "(L)Skysphere_Spherical";
-    else 
+    else
         return "(L)Skysphere";
 }
 

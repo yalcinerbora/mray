@@ -1,4 +1,5 @@
 #include "TextureCUDA.h"
+#include "Core/GraphicsFunctions.h"
 
 namespace mray::cuda
 {
@@ -182,7 +183,7 @@ RWTextureRefCUDA<D, T> TextureCUDA_Normal<D, T>::GenerateRWRef(uint32_t mipLevel
 
     // TODO: Check if we are owning this cudaArray_t.
     // Since it is a "get" function we do not own this I guess
-    cudaArray_t mipLevelArray;
+    cudaArray_t mipLevelArray = nullptr;
     CUDA_CHECK(cudaGetMipmappedArrayLevel(&mipLevelArray, data,
                                           static_cast<int>(mipLevel)));
 
@@ -255,7 +256,7 @@ void TextureCUDA_Normal<D, T>::CopyFromAsync(const GPUQueueCUDA& queue,
                                              const TextureExtent<D>& sizes,
                                              Span<const PaddedChannelType> regionFrom)
 {
-    cudaArray_t levelArray;
+    cudaArray_t levelArray = nullptr;
     CUDA_CHECK(cudaGetMipmappedArrayLevel(&levelArray, data, mipLevel));
 
     cudaMemcpy3DParms p = {};
@@ -289,16 +290,11 @@ TextureCUDA_BC<T>::TextureCUDA_BC(const GPUDeviceCUDA& device,
         texParams.normIntegers = false;
     };
 
-    Vector2ui paddedSize = p.size;
-    if(paddedSize != p.size)
-    {
-        MRAY_WARNING_LOG("BC texture size is not multiple of {}! "
-                         "Texture may be skewed!", BC_TILE_SIZE);
-    }
-    cudaExtent extent = MakeCudaExtent<2, 0u>(paddedSize);
+    cudaExtent extent = MakeCudaExtent<2, 0u>(texParams.size);
     cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<CudaTypeEnum>();
     CUDA_CHECK(cudaSetDevice(gpu->DeviceId()));
-    CUDA_MEM_THROW(cudaMallocMipmappedArray(&data, &channelDesc, extent, p.mipCount,
+    CUDA_MEM_THROW(cudaMallocMipmappedArray(&data, &channelDesc, extent,
+                                            texParams.mipCount,
                                             cudaArrayDeferredMapping));
 
     cudaArrayMemoryRequirements memReq;
@@ -348,27 +344,7 @@ TextureCUDA_BC<T>::TextureCUDA_BC(const GPUDeviceCUDA& device,
     tDesc.mipmapLevelBias = texParams.mipmapBias;
     tDesc.minMipmapLevelClamp = texParams.minMipmapClamp;
     tDesc.maxMipmapLevelClamp = texParams.maxMipmapClamp;
-
     CUDA_CHECK(cudaCreateTextureObject(&tex, &rDesc, &tDesc, nullptr));
-
-    // Alias the memory for RW textures
-    using AliasType = typename VectorTypeToCUDA::template Find<RWType>;
-    using namespace MathFunctions;
-    Vector2ui tileCount = DivideUp(texParams.size, Vector2ui(BC_TILE_SIZE));
-    cudaExtent aliasExtent = MakeCudaExtent<2, 0u>(tileCount);
-    cudaChannelFormatDesc aliasChannelDesc = cudaCreateChannelDesc<AliasType>();
-    CUDA_CHECK(cudaSetDevice(gpu->DeviceId()));
-
-    CUDA_MEM_THROW(cudaMallocMipmappedArray(&aliasData, &aliasChannelDesc,
-                                            aliasExtent, p.mipCount,
-                                            cudaArrayDeferredMapping |
-                                            cudaArraySurfaceLoadStore));
-    cudaArrayMemoryRequirements aliasMemReq;
-    CUDA_CHECK(cudaMipmappedArrayGetMemoryRequirements(&aliasMemReq, aliasData,
-                                                       gpu->DeviceId()));
-    assert(alignment == aliasMemReq.alignment);
-    assert(size, aliasMemReq.size);
-
 }
 
 template<class T>
@@ -377,14 +353,12 @@ TextureCUDA_BC<T>::TextureCUDA_BC(TextureCUDA_BC&& other) noexcept
     , tex(other.tex)
     , data(other.data)
     , texParams(other.texParams)
-    , aliasData (other.aliasData)
     , allocated(other.allocated)
     , size(other.size)
     , alignment(other.alignment)
 
 {
     other.data = nullptr;
-    other.aliasData = nullptr;
     other.tex = cudaTextureObject_t(0);
 }
 
@@ -397,20 +371,17 @@ TextureCUDA_BC<T>& TextureCUDA_BC<T>::operator=(TextureCUDA_BC&& other) noexcept
         CUDA_CHECK(cudaSetDevice(gpu->DeviceId()));
         CUDA_CHECK(cudaDestroyTextureObject(tex));
         CUDA_CHECK(cudaFreeMipmappedArray(data));
-        CUDA_CHECK(cudaFreeMipmappedArray(aliasData));
     }
 
     gpu = other.gpu;
     tex = other.tex;
     data = other.data;
-    aliasData = other.aliasData;
     texParams = other.texParams;
     allocated = other.allocated;
     size = other.size;
     alignment = other.alignment;
 
     other.data = nullptr;
-    other.aliasData = nullptr;
     other.tex = cudaTextureObject_t(0);
     return *this;
 }
@@ -423,30 +394,7 @@ TextureCUDA_BC<T>::~TextureCUDA_BC()
         CUDA_CHECK(cudaSetDevice(gpu->DeviceId()));
         CUDA_CHECK(cudaDestroyTextureObject(tex));
         CUDA_CHECK(cudaFreeMipmappedArray(data));
-        CUDA_CHECK(cudaFreeMipmappedArray(aliasData));
     }
-}
-
-template<class T>
-RWTextureRefCUDA<2, typename TextureCUDA_BC<T>::RWType>
-TextureCUDA_BC<T>::GenerateRWRef(uint32_t mipLevel)
-{
-    if(mipLevel >= texParams.mipCount)
-        throw MRayError("Requested out of bounds mip level!");
-
-    // TODO: Check if we are owning this cudaArray_t.
-    // Since it is a "get" function we do not own this I guess
-    cudaArray_t mipLevelArray;
-    CUDA_CHECK(cudaGetMipmappedArrayLevel(&mipLevelArray, aliasData,
-                                          static_cast<int>(mipLevel)));
-
-    cudaSurfaceObject_t surf;
-    cudaResourceDesc desc = {};
-    desc.resType = cudaResourceTypeArray;
-    desc.res.array.array = mipLevelArray;
-    CUDA_CHECK(cudaCreateSurfaceObject(&surf, &desc));
-
-    return RWTextureRefCUDA<2, RWType>(surf);
 }
 
 template<class T>
@@ -501,9 +449,6 @@ void TextureCUDA_BC<T>::CommitMemory(const GPUQueueCUDA& queue,
     mappingInfo.deviceBitMask = (1 << gpu->DeviceId());
 
     CUDA_DRIVER_CHECK(cuMemMapArrayAsync(&mappingInfo, 1, ToHandleCUDA(queue)));
-
-    mappingInfo.resource.mipmap = std::bit_cast<CUmipmappedArray>(aliasData);
-    CUDA_DRIVER_CHECK(cuMemMapArrayAsync(&mappingInfo, 1, ToHandleCUDA(queue)));
 }
 
 template<class T>
@@ -513,7 +458,11 @@ void TextureCUDA_BC<T>::CopyFromAsync(const GPUQueueCUDA& queue,
                                       const TextureExtent<2>& sizes,
                                       Span<const PaddedChannelType> regionFrom)
 {
-    cudaArray_t levelArray;
+    // Silently ignore the mip if out of bounds
+    if(mipLevel >= texParams.mipCount)
+        throw MRayError("Out of bounds mip level is requested!");
+
+    cudaArray_t levelArray = nullptr;
     CUDA_CHECK(cudaGetMipmappedArrayLevel(&levelArray, data, mipLevel));
     void* ptr = const_cast<Byte*>(reinterpret_cast<const Byte*>(regionFrom.data()));
     auto srcWH = MathFunctions::DivideUp(sizes, Vector2ui(BC_TILE_SIZE));
@@ -529,6 +478,35 @@ void TextureCUDA_BC<T>::CopyFromAsync(const GPUQueueCUDA& queue,
     p.srcPtr = make_cudaPitchedPtr(ptr, srcPitch, srcWH[0], srcWH[1]);
     CUDA_CHECK(cudaMemcpy3DAsync(&p, ToHandleCUDA(queue)));
 }
+
+template<class T>
+void TextureCUDA_BC<T>::CopyToAsync(Span<PaddedChannelType> regionFrom,
+                                    const GPUQueueCUDA& queue,
+                                    uint32_t mipLevel,
+                                    const TextureExtent<2>& offset,
+                                    const TextureExtent<2>& sizes) const
+{
+    // Silently ignore the mip if out of bounds
+    if(mipLevel >= texParams.mipCount)
+        throw MRayError("Out of bounds mip level is requested!");
+
+    cudaArray_t levelArray = nullptr;
+    CUDA_CHECK(cudaGetMipmappedArrayLevel(&levelArray, data, mipLevel));
+    void* ptr = reinterpret_cast<Byte*>(regionFrom.data());
+    auto srcWH = MathFunctions::NextMultiple(sizes, Vector2ui(BC_TILE_SIZE));
+    auto dstWH = MathFunctions::DivideUp(sizes, Vector2ui(BC_TILE_SIZE));
+    size_t dstPitch = dstWH[0] * sizeof(PaddedChannelType);
+
+    cudaMemcpy3DParms p = {};
+    p.kind = cudaMemcpyDefault;
+    p.extent = MakeCudaExtent<2, 1>(srcWH);
+    p.srcArray = levelArray;
+    p.srcPos = MakeCudaPos<2, 0>(offset);
+    p.dstPos = make_cudaPos(0, 0, 0);
+    p.dstPtr = make_cudaPitchedPtr(ptr, dstPitch, dstWH[0], dstWH[1]);
+    CUDA_CHECK(cudaMemcpy3DAsync(&p, ToHandleCUDA(queue)));
+}
+
 
 
 TextureBackingMemoryCUDA::TextureBackingMemoryCUDA(const GPUDeviceCUDA& gpu)

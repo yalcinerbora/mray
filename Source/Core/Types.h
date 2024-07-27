@@ -34,18 +34,15 @@ using Ref = std::reference_wrapper<T>;
 namespace TupleDetail
 {
     template<class... Args, std::size_t... I>
-    MRAY_HYBRID
     constexpr Tuple<Args&...> ToTupleRef(Tuple<Args...>&t,
                                          std::index_sequence<I...>);
 
     template<typename Func, class... Args, size_t... Is>
-    MRAY_HYBRID
     constexpr bool InvokeAt(size_t idx, const Tuple<Args...>& t, Func&& F,
                             std::index_sequence<Is...>);
 }
 
 template<class... Args, typename Indices = std::index_sequence_for<Args...>>
-MRAY_HYBRID
 constexpr Tuple<Args&...> ToTupleRef(Tuple<Args...>& t);
 
 // https://stackoverflow.com/questions/28997271/c11-way-to-index-tuple-at-runtime-without-using-switch
@@ -54,7 +51,6 @@ constexpr Tuple<Args&...> ToTupleRef(Tuple<Args...>& t);
 // Predicate function must return bool to abuse short circuiting.
 template<class Func, class... Args>
 requires(std::is_same_v<std::invoke_result_t<Func, Args>, bool> && ...)
-MRAY_HYBRID
 constexpr bool InvokeAt(uint32_t index, const Tuple<Args...>& t, Func&& F);
 
 // Some span wrappers for convenience
@@ -121,7 +117,6 @@ struct SoASpan
 };
 
 template<class... Args, std::size_t... I>
-MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Tuple<Args&...> TupleDetail::ToTupleRef(Tuple<Args...>& t,
                                                   std::index_sequence<I...>)
 {
@@ -129,7 +124,6 @@ constexpr Tuple<Args&...> TupleDetail::ToTupleRef(Tuple<Args...>& t,
 }
 
 template<typename Func, class... Args, size_t... Is>
-MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr bool TupleDetail::InvokeAt(size_t idx, const Tuple<Args...>& t, Func&& F,
                                      std::index_sequence<Is...>)
 {
@@ -145,7 +139,6 @@ constexpr bool TupleDetail::InvokeAt(size_t idx, const Tuple<Args...>& t, Func&&
 }
 
 template<class... Args, typename Indices>
-MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Tuple<Args&...> ToTupleRef(Tuple<Args...>& t)
 {
     return TupleDetail::ToTupleRef(t, Indices{});
@@ -153,7 +146,6 @@ constexpr Tuple<Args&...> ToTupleRef(Tuple<Args...>& t)
 
 template<class Func, class... Args>
 requires(std::is_same_v<std::invoke_result_t<Func, Args>, bool> && ...)
-MRAY_HYBRID
 constexpr bool InvokeAt(uint32_t index, const Tuple<Args...>& t, Func&& F)
 {
     return TupleDetail::InvokeAt(index, t,

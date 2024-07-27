@@ -395,6 +395,7 @@ struct MRayColorSpaceStringifier
         "ADOBE_RGB",
         "DEFAULT"
     };
+
     static constexpr std::string_view   ToString(MRayColorSpaceEnum e);
     static constexpr MRayColorSpaceEnum FromString(std::string_view);
 };

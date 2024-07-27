@@ -18,8 +18,6 @@
 // MSVC is slightly better at optimizing these
 // ; merges same case statements into one.
 // Clang/GCC does not do that (Maybe it does not worth it?)
-
-
 namespace MRayDataDetail
 {
     using M = TypeFinder::E_TMapper<MRayDataEnum>;

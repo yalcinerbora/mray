@@ -974,7 +974,7 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
                 auto edgeResolve = jsonNode.AccessOptionalData<MRayTextureEdgeResolveEnum>(TEX_NODE_EDGE_RESOLVE);
                 auto interp = jsonNode.AccessOptionalData<MRayTextureInterpEnum>(TEX_NODE_INTERPOLATION);
                 auto colorSpace= jsonNode.AccessOptionalData<MRayColorSpaceEnum>(TEX_NODE_COLOR_SPACE);
-                auto gamma = jsonNode.AccessOptionalData<bool>(TEX_NODE_GAMMA);
+                auto gamma = jsonNode.AccessOptionalData<Float>(TEX_NODE_GAMMA);
                 auto userReadMode = jsonNode.AccessOptionalData<MRayTextureReadMode>(TEX_NODE_READ_MODE);
                 //auto is3D = jsonNode.AccessOptionalData<bool>(TEX_NODE_IS_3D)
                 //            .value_or(TEX_NODE_IS_3D_DEFAULT);

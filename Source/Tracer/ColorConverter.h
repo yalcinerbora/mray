@@ -4,6 +4,8 @@
 
 #include "TextureCommon.h"
 
+class GenericTexture;
+
 struct ColorConvParams
 {
     TexMipBitSet        validMips;
@@ -11,13 +13,6 @@ struct ColorConvParams
     MRayColorSpaceEnum  fromColorSpace;
     Float               gamma;
     Vector2ui           mipZeroRes;
-};
-
-struct BCColorConvParams : public ColorConvParams
-{
-    MRayPixelEnum       pixelEnum;
-    uint32_t            blockSize;
-    uint32_t            tileSize;
 };
 
 class ColorConverter
@@ -29,9 +24,8 @@ class ColorConverter
     // Constructors & Destructor
             ColorConverter(const GPUSystem&);
 
-    void    ConvertColor(const std::vector<MipArray<SurfRefVariant>>& textures,
-                         const std::vector<ColorConvParams>& params,
-                         const std::vector<MipArray<SurfRefVariant>>& bcTextures,
-                         const std::vector<BCColorConvParams>& bcColorConvParams,
+    void    ConvertColor(std::vector<MipArray<SurfRefVariant>> textures,
+                         std::vector<ColorConvParams> params,
+                         std::vector<GenericTexture*> bcTextures,
                          MRayColorSpaceEnum globalColorSpace) const;
 };

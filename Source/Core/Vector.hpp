@@ -637,7 +637,6 @@ constexpr bool Vector<N, T>::HasNaN() const requires std::floating_point<T>
                    (vector[i] != vector[i]) ||
                    (vector[i] == std::numeric_limits<T>::infinity()) ||
                    (vector[i] == -std::numeric_limits<T>::infinity()));
-
     }
     return hasNan;
 }

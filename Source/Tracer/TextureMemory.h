@@ -67,6 +67,12 @@ class GenericTextureI
                                   const TextureExtent<3>& offset,
                                   const TextureExtent<3>& size,
                                   Span<const Byte> regionFrom) = 0;
+    // Opposite version, only for BC textures atm
+    virtual void    CopyToAsync(Span<Byte> regionTo,
+                                const GPUQueue& queue,
+                                uint32_t mipLevel,
+                                const TextureExtent<3>& offset,
+                                const TextureExtent<3>& size) const = 0;
 
     // Another hard part, We can close the types here.
     // Only float convertible views are supported
@@ -77,15 +83,16 @@ class GenericTextureI
     // Only 2D and not block-compressed textures are supported
     virtual bool            HasRWView() const = 0;
     virtual SurfRefVariant  RWView(uint32_t mipLevel) = 0;
+    virtual bool            IsBlockCompressed() const = 0;
 
     // And All Done!
 };
 
 // Generic Texture type
-class alignas(8u) GenericTextureT
+class alignas(8u) GenericTexture
 {
     public:
-    static constexpr size_t BuffSize        = 104u;
+    static constexpr size_t BuffSize        = 96u;
     static constexpr size_t BuffAlignment   = 8u;
 
     private:
@@ -106,16 +113,16 @@ class alignas(8u) GenericTextureT
 
     public:
     template<class T, class... Args>
-                    GenericTextureT(std::in_place_type_t<T>,
+                    GenericTexture(std::in_place_type_t<T>,
                                    MRayColorSpaceEnum, Float,
                                    AttributeIsColor, MRayPixelTypeRT,
                                    Args&&...);
     // TODO: Enable these later
-                    GenericTextureT(const GenericTextureT&) = delete;
-                    GenericTextureT(GenericTextureT&&) = delete;
-    GenericTextureT& operator=(const GenericTextureT&) = delete;
-    GenericTextureT& operator=(GenericTextureT&&) = delete;
-                    ~GenericTextureT();
+                    GenericTexture(const GenericTexture&) = delete;
+                    GenericTexture(GenericTexture&&) = delete;
+    GenericTexture& operator=(const GenericTexture&) = delete;
+    GenericTexture& operator=(GenericTexture&&) = delete;
+                    ~GenericTexture();
 
     void            CommitMemory(const GPUQueue& queue,
                                  const TextureBackingMemory& deviceMem,
@@ -139,10 +146,16 @@ class alignas(8u) GenericTextureT
                                       const TextureExtent<3>& offset,
                                       const TextureExtent<3>& size,
                                       Span<const Byte> regionFrom);
+    void                CopyToAsync(Span<Byte> regionTo,
+                                    const GPUQueue& queue,
+                                    uint32_t mipLevel,
+                                    const TextureExtent<3>& offset,
+                                    const TextureExtent<3>& size) const;
     //
     GenericTextureView  View(TextureReadMode mode) const;
     bool                HasRWView() const;
     SurfRefVariant      RWView(uint32_t mipLevel);
+    bool                IsBlockCompressed() const;
 
     const GPUDevice&    Device() const;
 
@@ -158,7 +171,6 @@ class alignas(8u) GenericTextureT
 
 // In order to prevent type leak we hand set these values
 // It is statically checked on the cpp file.
-using GenericTexture = GenericTextureT;
 using TextureMap = Map<TextureId, GenericTexture>;
 
 class TextureMemory

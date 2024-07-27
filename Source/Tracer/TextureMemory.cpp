@@ -42,9 +42,15 @@ class Concept : public GenericTextureI
                                       const TextureExtent<3>& offset,
                                       const TextureExtent<3>& size,
                                       Span<const Byte> regionFrom) override;
+    void                CopyToAsync(Span<Byte> regionTo,
+                                    const GPUQueue& queue,
+                                    uint32_t mipLevel,
+                                    const TextureExtent<3>& offset,
+                                    const TextureExtent<3>& size) const override;
     GenericTextureView  View(TextureReadMode mode) const override;
     bool                HasRWView() const override;
     SurfRefVariant      RWView(uint32_t mipLevel) override;
+    bool                IsBlockCompressed() const override;
 };
 
 static_assert(GenericTexture::BuffSize == std::max({sizeof(Concept<Texture<3, Vector4>>),
@@ -171,9 +177,44 @@ void Concept<T>::CopyFromAsync(const GPUQueue& queue,
 
     using PaddedChannelType = typename T::PaddedChannelType;
     assert(regionFrom.size_bytes() % sizeof(PaddedChannelType) == 0);
-    auto d = reinterpret_cast<const PaddedChannelType*>(regionFrom.data());
-    auto input = Span<const PaddedChannelType>(d, regionFrom.size_bytes() / sizeof(PaddedChannelType));
+    using MemAlloc::RepurposeAlloc;
+    auto input = RepurposeAlloc<const PaddedChannelType>(regionFrom);
     tex.CopyFromAsync(queue, mipLevel, offsetIn, sizeIn, input);
+}
+
+template<class T>
+void Concept<T>::CopyToAsync(Span<Byte> regionTo,
+                             const GPUQueue& queue,
+                             uint32_t mipLevel,
+                             const TextureExtent<3>& offset,
+                             const TextureExtent<3>& size) const
+{
+    // TODO: Change this later, only BC textures have this functionality
+    if constexpr(T::IsBlockCompressed)
+    {
+        using ExtType = TextureExtent<T::Dims>;
+        ExtType offsetIn;
+        ExtType sizeIn;
+
+        auto ext = tex.Extents();
+        if constexpr(T::Dims == 1)
+        {
+            offsetIn = ExtType(offset[0]);
+            sizeIn = ExtType(size[0]);
+        }
+        else
+        {
+            offsetIn = ExtType(offset);
+            sizeIn = ExtType(size);
+        }
+
+        using PaddedChannelType = typename T::PaddedChannelType;
+        assert(regionTo.size_bytes() % sizeof(PaddedChannelType) == 0);
+        using MemAlloc::RepurposeAlloc;
+        Span<PaddedChannelType> output = RepurposeAlloc<PaddedChannelType>(regionTo);
+        tex.CopyToAsync(output, queue, mipLevel, offsetIn, sizeIn);
+    }
+    else throw MRayError("Non-bc texture's data cannot be copied!");
 }
 
 template<class T>
@@ -229,17 +270,25 @@ GenericTextureView Concept<T>::View(TextureReadMode mode) const
 }
 
 template<class T>
+bool Concept<T>::IsBlockCompressed() const
+{
+    // Only 2D textures that are not block
+    // compressed are supported
+    return T::IsBlockCompressed;
+}
+
+template<class T>
 bool Concept<T>::HasRWView() const
 {
-    // Only 2D and non block compressed formats are supported
+    // Only 2D textures that are not block
+    // compressed are supported
     return T::Dims == 2 && !T::IsBlockCompressed;
 }
 
 template<class T>
 SurfRefVariant Concept<T>::RWView(uint32_t mipLevel)
 {
-    // If non supported texture's view is requested return
-    // monostate
+    // If not supported return monostate
     if constexpr(T::Dims != 2 || T::IsBlockCompressed)
         return std::monostate{};
     else
@@ -250,7 +299,7 @@ SurfRefVariant Concept<T>::RWView(uint32_t mipLevel)
 
 template<class T, class... Args>
 inline
-GenericTextureT::GenericTextureT(std::in_place_type_t<T>,
+GenericTexture::GenericTexture(std::in_place_type_t<T>,
                                  MRayColorSpaceEnum cs, Float gammaIn,
                                  AttributeIsColor col, MRayPixelTypeRT pt,
                                  Args&&... args)
@@ -355,53 +404,62 @@ bool FindNormIntegers(MRayPixelTypeRT pixelType)
 
 void TextureMemory::ConvertColorspaces()
 {
+    bool warnReadOnly = false;
     ColorConverter colorConv(gpuSystem);
     std::vector<MipArray<SurfRefVariant>> texSurfs;
     std::vector<ColorConvParams> colorConvParams;
+    std::vector<GenericTexture*> bcTextures;
+
+    bcTextures.reserve(textures.Map().size());
     texSurfs.reserve(textures.Map().size());
     colorConvParams.reserve(textures.Map().size());
-    bool warnBlockCompressed = false;
     // Load to linear memory
     for(auto& [_, t] : textures.Map())
     {
-        bool isWritable = t.HasRWView();
+        MRayPixelTypeRT pt = t.PixelType();
         bool isColor = (t.IsColor() == AttributeIsColor::IS_COLOR);
         bool requiresConversion = isColor;
-        requiresConversion &= (t.ColorSpace() != MRayColorSpaceEnum::MR_DEFAULT ||
-                               t.ColorSpace() != tracerParams.globalTextureColorSpace ||
-                               t.Gamma() != Float(1));
-        warnBlockCompressed = (!isWritable && requiresConversion);
+        bool rq = ((t.ColorSpace() != MRayColorSpaceEnum::MR_DEFAULT &&
+                    t.ColorSpace() != tracerParams.globalTextureColorSpace) ||
+                   t.Gamma() != Float(1));
+        requiresConversion &= rq;
+        warnReadOnly |= (requiresConversion && !t.HasRWView());
         // Skip if not color or writable
-        if(!isWritable || !isColor) continue;
+        if(!requiresConversion) continue;
 
-        ColorConvParams p =
+        if(!t.IsBlockCompressed())
         {
-            .validMips = t.ValidMips(),
-            .mipCount = static_cast<uint8_t>(t.MipCount()),
-            .fromColorSpace = t.ColorSpace(),
-            .gamma = t.Gamma(),
-            .mipZeroRes = Vector2ui(t.Extents())
-        };
-        colorConvParams.push_back(p);
+            uint8_t mipCount = static_cast<uint8_t>(t.MipCount());
+            ColorConvParams p =
+            {
+                .validMips = t.ValidMips(),
+                .mipCount = mipCount,
+                .fromColorSpace = t.ColorSpace(),
+                .gamma = t.Gamma(),
+                .mipZeroRes = Vector2ui(t.Extents())
+            };
+            colorConvParams.push_back(p);
 
-        MipArray<SurfRefVariant> mips;
-        for(uint16_t i = 0; i < p.mipCount; i++)
-            mips[i] = t.RWView(i);
+            MipArray<SurfRefVariant> mips;
+            for(uint8_t i = 0; i < p.mipCount; i++)
+                mips[i] = t.RWView(i);
 
-        texSurfs.push_back(std::move(mips));
+            texSurfs.push_back(std::move(mips));
+        }
+        else bcTextures.push_back(&t);
         t.SetColorSpace(tracerParams.globalTextureColorSpace);
     }
 
-    if(warnBlockCompressed)
-        MRAY_WARNING_LOG("[Tracer]: Some textures are block-compressed (read only) "
-                         "But requires color space conversion. These textures will be treated "
+    if(warnReadOnly)
+        MRAY_WARNING_LOG("[Tracer]: Some textures are read only "
+                         "but require color space conversion. These textures will be treated "
                          "as in Tracer's color space (which is \"Linear/{}\")",
                          MRayColorSpaceStringifier::ToString(tracerParams.globalTextureColorSpace));
 
     // Finally call the kernel
-    if(!texSurfs.empty())
-        colorConv.ConvertColor(texSurfs, colorConvParams,
-                               {}, {},
+    if(!texSurfs.empty() || !bcTextures.empty())
+        colorConv.ConvertColor(std::move(texSurfs), std::move(colorConvParams),
+                               std::move(bcTextures),
                                tracerParams.globalTextureColorSpace);
 }
 
@@ -694,7 +752,7 @@ void TextureMemory::PushTextureData(TextureId id, uint32_t mipLevel,
         // We dont have the wait the queue here since we always issue to the same queue
         // so device queue semantics will handle the buffer usage
     }
-    else
+    else if(mipLevel < tex.MipCount())
     {
         // Nothing fancy just copy the data to buffer
         Vector3ui mipSize = Graphics::TextureMipSize(tex.Extents(), mipLevel);

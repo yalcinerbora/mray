@@ -1,57 +1,57 @@
 #include "TextureMemory.h"
 
-GenericTextureI* GenericTextureT::Impl()
+GenericTextureI* GenericTexture::Impl()
 {
     // TODO: Are these correct?
     GenericTextureI* ptr = reinterpret_cast<GenericTextureI*>(storage.data());
     return std::launder(ptr);
 }
 
-const GenericTextureI* GenericTextureT::Impl() const
+const GenericTextureI* GenericTexture::Impl() const
 {
     // TODO: Are these correct?
     const GenericTextureI* ptr = reinterpret_cast<const GenericTextureI*>(storage.data());
     return std::launder(ptr);
 }
 
-GenericTextureT::~GenericTextureT()
+GenericTexture::~GenericTexture()
 {
     std::destroy_at(Impl());
 }
 
-void GenericTextureT::CommitMemory(const GPUQueue& queue,
+void GenericTexture::CommitMemory(const GPUQueue& queue,
                                    const TextureBackingMemory& deviceMem,
                                    size_t offset)
 {
     Impl()->CommitMemory(queue, deviceMem, offset);
 }
 
-size_t GenericTextureT::Size() const
+size_t GenericTexture::Size() const
 {
     return Impl()->Size();
 }
 
-size_t GenericTextureT::Alignment() const
+size_t GenericTexture::Alignment() const
 {
     return Impl()->Alignment();
 }
 
-uint32_t GenericTextureT::MipCount() const
+uint32_t GenericTexture::MipCount() const
 {
     return Impl()->MipCount();
 }
 
-TextureExtent<3> GenericTextureT::Extents() const
+TextureExtent<3> GenericTexture::Extents() const
 {
     return Impl()->Extents();
 }
 
-uint32_t GenericTextureT::DimensionCount() const
+uint32_t GenericTexture::DimensionCount() const
 {
     return Impl()->DimensionCount();
 }
 
-void GenericTextureT::CopyFromAsync(const GPUQueue& queue,
+void GenericTexture::CopyFromAsync(const GPUQueue& queue,
                                     uint32_t mipLevel,
                                     const TextureExtent<3>& offset,
                                     const TextureExtent<3>& size,
@@ -63,7 +63,7 @@ void GenericTextureT::CopyFromAsync(const GPUQueue& queue,
                           std::move(regionFrom));
 }
 
-void GenericTextureT::CopyFromAsync(const GPUQueue& queue,
+void GenericTexture::CopyFromAsync(const GPUQueue& queue,
                                           uint32_t mipLevel,
                                           const TextureExtent<3>& offset,
                                           const TextureExtent<3>& size,
@@ -75,64 +75,79 @@ void GenericTextureT::CopyFromAsync(const GPUQueue& queue,
                           regionFrom);
 }
 
-GenericTextureView GenericTextureT::View(TextureReadMode mode) const
+void GenericTexture::CopyToAsync(Span<Byte> regionTo,
+                                 const GPUQueue& queue,
+                                 uint32_t mipLevel,
+                                 const TextureExtent<3>& offset,
+                                 const TextureExtent<3>& size) const
+{
+    Impl()->CopyToAsync(regionTo, queue, mipLevel,
+                          offset, size);
+}
+
+GenericTextureView GenericTexture::View(TextureReadMode mode) const
 {
     return Impl()->View(mode);
 }
 
-bool GenericTextureT::HasRWView() const
+bool GenericTexture::HasRWView() const
 {
     return Impl()->HasRWView();
 }
 
-SurfRefVariant GenericTextureT::RWView(uint32_t mipLevel)
+bool GenericTexture::IsBlockCompressed() const
+{
+    return Impl()->IsBlockCompressed();
+}
+
+SurfRefVariant GenericTexture::RWView(uint32_t mipLevel)
 {
     return Impl()->RWView(mipLevel);
 }
 
-const GPUDevice& GenericTextureT::Device() const
+const GPUDevice& GenericTexture::Device() const
 {
     return Impl()->Device();
 }
 
-uint32_t GenericTextureT::ChannelCount() const
+uint32_t GenericTexture::ChannelCount() const
 {
     return Impl()->ChannelCount();
 }
 
 
-typename GenericTextureT::MipIsLoadedBits
-GenericTextureT::ValidMips() const
+typename GenericTexture::MipIsLoadedBits
+GenericTexture::ValidMips() const
 {
     return isMipLoaded;
 }
 
-MRayColorSpaceEnum GenericTextureT::ColorSpace() const
+MRayColorSpaceEnum GenericTexture::ColorSpace() const
 {
     return colorSpace;
 }
 
-Float GenericTextureT::Gamma() const
+Float GenericTexture::Gamma() const
 {
     return gamma;
 }
 
-AttributeIsColor GenericTextureT::IsColor() const
+AttributeIsColor GenericTexture::IsColor() const
 {
     return isColor;
 }
 
-MRayPixelTypeRT GenericTextureT::PixelType() const
+MRayPixelTypeRT GenericTexture::PixelType() const
 {
     return pixelType;
 }
 
-void GenericTextureT::SetAllMipsToLoaded()
+void GenericTexture::SetAllMipsToLoaded()
 {
     isMipLoaded.Set();
 }
 
-void GenericTextureT::SetColorSpace(MRayColorSpaceEnum e, Float gammaIn)
+void GenericTexture::SetColorSpace(MRayColorSpaceEnum e, Float gammaIn)
 {
     colorSpace = e;
     gamma = gammaIn;
