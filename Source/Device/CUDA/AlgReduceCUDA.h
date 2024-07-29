@@ -3,7 +3,6 @@
 #include "Core/Definitions.h"
 #include "Core/Types.h"
 #include "GPUSystemCUDA.h"
-#include "NVTXAnnotate.h"
 
 #include <cub/device/device_reduce.cuh>
 #include <cub/device/device_segmented_reduce.cuh>
@@ -129,8 +128,8 @@ void Reduce(Span<T, 1> dReducedValue,
 {
     using namespace cub;
     using namespace std::literals;
-    static const NVTXKernelName kernelName = NVTXKernelName(queue.ProfilerDomain(), "KCReduce"sv);
-    NVTXAnnotate annotate = kernelName.Annotate();
+    static const auto annotation = queue.CreateAnnotation("KCReduce"sv);
+    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
 
     size_t size = dTempMemory.size();
     CUDA_CHECK(DeviceReduce::Reduce(dTempMemory.data(), size,
@@ -152,9 +151,8 @@ void TransformReduce(Span<OutT, 1> dReducedValue,
 {
     using namespace cub;
     using namespace std::literals;
-    static const NVTXKernelName kernelName = NVTXKernelName(queue.ProfilerDomain(),
-                                                            "KCTransformReduce"sv);
-    NVTXAnnotate annotate = kernelName.Annotate();
+    static const auto annotation = queue.CreateAnnotation("KCTransformReduce"sv);
+    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
 
     using TransIt = TransformInputIterator<OutT, TransformOp, const InT*>;
     TransIt dIn = TransIt(dValues.data(), std::forward<TransformOp>(transformOp));
@@ -180,9 +178,8 @@ void SegmentedTransformReduce(Span<OutT> dReducedValues,
 {
     using namespace cub;
     using namespace std::literals;
-    static const NVTXKernelName kernelName = NVTXKernelName(queue.ProfilerDomain(),
-                                                            "KCSegmentedTransformReduce"sv);
-    NVTXAnnotate annotate = kernelName.Annotate();
+    static const auto annotation = queue.CreateAnnotation("KCSegmentedTransformReduce"sv);
+    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
     using TransIt = TransformInputIterator<OutT, TransformOp, const InT*>;
     TransIt dIn = TransIt(dValues.data(), std::forward<TransformOp>(transformOp));
 

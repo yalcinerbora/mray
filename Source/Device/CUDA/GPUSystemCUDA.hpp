@@ -2,7 +2,6 @@
 
 #include "GPUSystemCUDA.h"
 #include "GPUSystem.h"
-#include "NVTXAnnotate.h"
 
 namespace CudaKernelCalls
 {
@@ -33,10 +32,8 @@ void GPUQueueCUDA::IssueKernel(std::string_view name,
                                KernelIssueParams p,
                                Args&&... fArgs) const
 {
-    #ifndef __CUDA_ARCH__
-        static const NVTXKernelName kernelName = NVTXKernelName(nvtxDomain, name);
-        NVTXAnnotate annotate = kernelName.Annotate();
-    #endif
+    static const GPUAnnotationCUDA annotation = GPUAnnotationCUDA(nvtxDomain, name);
+    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
 
     assert(p.workCount != 0);
     using namespace CudaKernelCalls;
@@ -57,8 +54,8 @@ void GPUQueueCUDA::IssueLambda(std::string_view name,
                                //
                                Lambda&& func) const
 {
-    static const NVTXKernelName kernelName = NVTXKernelName(nvtxDomain, name);
-    NVTXAnnotate annotate = kernelName.Annotate();
+    static const GPUAnnotationCUDA annotation = GPUAnnotationCUDA(nvtxDomain, name);
+    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
 
     assert(p.workCount != 0);
     static_assert(std::is_rvalue_reference_v<decltype(func)>,
@@ -83,8 +80,8 @@ void GPUQueueCUDA::IssueSaturatingKernel(std::string_view name,
                                          //
                                          Args&&... fArgs) const
 {
-    static const NVTXKernelName kernelName = NVTXKernelName(nvtxDomain, name);
-    NVTXAnnotate annotate = kernelName.Annotate();
+    static const GPUAnnotationCUDA annotation = GPUAnnotationCUDA(nvtxDomain, name);
+    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
 
     assert(p.workCount != 0);
     using namespace CudaKernelCalls;
@@ -110,8 +107,8 @@ void GPUQueueCUDA::IssueSaturatingLambda(std::string_view name,
                                          //
                                          Lambda&& func) const
 {
-    static const NVTXKernelName kernelName = NVTXKernelName(nvtxDomain, name);
-    NVTXAnnotate annotate = kernelName.Annotate();
+    static const GPUAnnotationCUDA annotation = GPUAnnotationCUDA(nvtxDomain, name);
+    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
 
     assert(p.workCount != 0);
     static_assert(std::is_rvalue_reference_v<decltype(func)>,
@@ -141,8 +138,8 @@ void GPUQueueCUDA::IssueExactKernel(std::string_view name,
                                     //
                                     Args&&... fArgs) const
 {
-    static const NVTXKernelName kernelName = NVTXKernelName(nvtxDomain, name);
-    NVTXAnnotate annotate = kernelName.Annotate();
+    static const GPUAnnotationCUDA annotation = GPUAnnotationCUDA(nvtxDomain, name);
+    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
 
     assert(p.gridSize != 0);
     using namespace CudaKernelCalls;
@@ -160,8 +157,8 @@ void GPUQueueCUDA::IssueExactLambda(std::string_view name,
                                     //
                                     Lambda&& func) const
 {
-    static const NVTXKernelName kernelName = NVTXKernelName(nvtxDomain, name);
-    NVTXAnnotate annotate = kernelName.Annotate();
+    static const GPUAnnotationCUDA annotation = GPUAnnotationCUDA(nvtxDomain, name);
+    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
 
     assert(p.gridSize != 0);
     static_assert(std::is_rvalue_reference_v<decltype(func)>,
@@ -305,18 +302,6 @@ void GPUQueueCUDA::DeviceIssueExactLambda(std::string_view name,
         std::forward<Lambda>(func)
     );
     CUDA_KERNEL_CHECK();
-}
-
-MRAY_HOST inline
-AnnotationHandle GPUQueueCUDA::ProfilerDomain() const
-{
-    return nvtxDomain;
-}
-
-MRAY_HOST inline
-const GPUDeviceCUDA* GPUQueueCUDA::Device() const
-{
-    return myDevice;
 }
 
 }

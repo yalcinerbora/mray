@@ -527,6 +527,10 @@ void DeviceMemoryCUDA::ResizeBuffer(size_t newSize)
         assert(offset == newSize);
         allocSize = newSize;
     }
+
+    // Nothing to set access to
+    if(allocSize == 0) return;
+
     // Set the newly mapped range accessor
     std::vector<CUmemAccessDesc> accessDescriptions(deviceIds.size(),
                                                     CUmemAccessDesc{});

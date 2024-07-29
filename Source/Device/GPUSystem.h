@@ -6,12 +6,13 @@
     #include "CUDA/GPUSystemCUDA.h"
 
     // Alias the types
-    using KernelCallParams          = mray::cuda::KernelCallParamsCUDA;
-    using GPUSemaphoreView          = mray::cuda::GPUSemaphoreViewCUDA;
-    using GPUDevice                 = mray::cuda::GPUDeviceCUDA;
-    using GPUQueue                  = mray::cuda::GPUQueueCUDA;
-    using GPUFence                  = mray::cuda::GPUFenceCUDA;
-    using GPUSystem                 = mray::cuda::GPUSystemCUDA;
+    using KernelCallParams  = mray::cuda::KernelCallParamsCUDA;
+    using GPUSemaphoreView  = mray::cuda::GPUSemaphoreViewCUDA;
+    using GPUDevice         = mray::cuda::GPUDeviceCUDA;
+    using GPUQueue          = mray::cuda::GPUQueueCUDA;
+    using GPUFence          = mray::cuda::GPUFenceCUDA;
+    using GPUSystem         = mray::cuda::GPUSystemCUDA;
+    using GPUAnnotation     = mray::cuda::GPUAnnotationCUDA;
 
 #elif defined GPU_BACKEND_HOST
     #error Not yet!

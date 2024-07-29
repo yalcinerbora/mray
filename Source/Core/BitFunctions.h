@@ -405,19 +405,18 @@ constexpr R Bit::NormConversion::FromSNorm(T in)
     //               ----^-----
     //               notice the two -127's
     // https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-data-conversion
-    // we will use classic 2's complement representation for this conversion
-    // so negative numbers will have +1 integer
-    //
-    // TODO: Check if this is not OK
-    // (non-uniform negative/positive may be an issue)
-    constexpr R MIN = R(std::numeric_limits<T>::min());
+    // we will use DX version since these will be used to
+    // fetch BC textures.
+    static_assert(std::numeric_limits<T>::max() +
+                  std::numeric_limits<T>::min() == -1,
+                  "Not two's complement int type?");
+    constexpr T MIN = std::numeric_limits<T>::max();
     constexpr R MAX = R(std::numeric_limits<T>::max());
-    constexpr R NEG_DELTA = R(1) / (R(0) - MIN);
-    constexpr R POS_DELTA = R(1) / (MAX - R(0));
+    constexpr R DELTA = R(1) / (MAX - R(0));
 
-    R delta = (in < 0) ? NEG_DELTA : POS_DELTA;
-    R result = R(in) * delta;
-    return T(result);
+    in = (in == MIN) ? (in + 1) : in;
+    R result = R(in) * DELTA;
+    return result;
 }
 
 template<std::signed_integral T, std::floating_point R>
@@ -431,13 +430,13 @@ constexpr T Bit::NormConversion::ToSNorm(R in)
     assert(in >= R(-1) && in <= R(1));
     // Check "FromSNorm" for more info
     //
-    constexpr R MIN = R(std::numeric_limits<T>::min());
+    static_assert(std::numeric_limits<T>::max() +
+                  std::numeric_limits<T>::min() == -1,
+                  "Not two's complement int type?");
     constexpr R MAX = R(std::numeric_limits<T>::max());
-    constexpr R NEG_DIFF = (R(0) - MIN);
-    constexpr R POS_DIFF = (MAX - R(0));
+    constexpr R DIFF = (MAX - R(0));
 
-    R diff = (in < 0) ? NEG_DIFF : POS_DIFF;
-    in *= diff;
+    in *= DIFF;
     in = round(in);
     return T(in);
 }

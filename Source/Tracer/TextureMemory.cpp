@@ -445,9 +445,10 @@ void TextureMemory::ConvertColorspaces()
                 mips[i] = t.RWView(i);
 
             texSurfs.push_back(std::move(mips));
+            t.SetColorSpace(tracerParams.globalTextureColorSpace);
         }
         else bcTextures.push_back(&t);
-        t.SetColorSpace(tracerParams.globalTextureColorSpace);
+
     }
 
     if(warnReadOnly)

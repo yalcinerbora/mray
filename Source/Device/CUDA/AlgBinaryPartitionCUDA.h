@@ -3,7 +3,6 @@
 #include "Core/Definitions.h"
 #include "Core/Types.h"
 #include "GPUSystemCUDA.h"
-#include "NVTXAnnotate.h"
 
 #include <cub/device/device_partition.cuh>
 #include <cub/device/device_select.cuh>
@@ -60,11 +59,9 @@ void BinaryPartition(Span<T> dOutput,
 {
     using namespace cub;
     using namespace std::literals;
-    static const NVTXKernelName kernelName = NVTXKernelName(queue.ProfilerDomain(), "KCBinaryPartition"sv);
-    NVTXAnnotate annotate = kernelName.Annotate();
-
+    static const auto annotation = queue.CreateAnnotation("KCBinaryPartition"sv);
+    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
     assert(dInput.size() == dOutput.size());
-
 
     size_t size = dTempMemory.size();
     CUDA_CHECK(DevicePartition::If(dTempMemory.data(), size,

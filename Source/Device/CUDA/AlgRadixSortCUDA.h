@@ -3,7 +3,6 @@
 #include "Core/Definitions.h"
 #include "Core/Types.h"
 #include "GPUSystemCUDA.h"
-#include "NVTXAnnotate.h"
 
 #include <cub/device/device_radix_sort.cuh>
 
@@ -59,8 +58,8 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
 {
     using namespace cub;
     using namespace std::literals;
-    static const NVTXKernelName kernelName = NVTXKernelName(queue.ProfilerDomain(), "KCRadixSort"sv);
-    NVTXAnnotate annotate = kernelName.Annotate();
+    static const auto annotation = queue.CreateAnnotation("KCRadixSort"sv);
+    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
 
     assert(dKeyDoubleBuffer[0].size() == dKeyDoubleBuffer[1].size());
     assert(dValueDoubleBuffer[0].size() == dValueDoubleBuffer[1].size());

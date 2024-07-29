@@ -110,6 +110,49 @@ struct KernelCallParamsCUDA
     MRAY_HYBRID uint32_t    TotalSize() const;
 };
 
+using AnnotationHandle = void*;
+using AnnotationStringHandle = void*;
+
+class GPUAnnotationCUDA
+{
+    public:
+    friend class GPUSystemCUDA;
+    friend class GPUQueueCUDA;
+
+    class Scope
+    {
+        friend GPUAnnotationCUDA;
+
+        private:
+        AnnotationHandle domain;
+
+        Scope(AnnotationHandle);
+        public:
+        // Constructors & Destructor
+                Scope(const Scope&) = delete;
+                Scope(Scope&&) = delete;
+        Scope&  operator=(const Scope&) = delete;
+        Scope&  operator=(Scope&&) = delete;
+                ~Scope();
+    };
+
+    private:
+    AnnotationHandle        domainHandle;
+    AnnotationStringHandle  stringHandle;
+
+    GPUAnnotationCUDA(AnnotationHandle, std::string_view name);
+
+    public:
+    // Constructors & Destructor
+                        GPUAnnotationCUDA(const GPUAnnotationCUDA&) = delete;
+                        GPUAnnotationCUDA(GPUAnnotationCUDA&&) = delete;
+    GPUAnnotationCUDA&  operator=(const GPUAnnotationCUDA&) = delete;
+    GPUAnnotationCUDA&  operator=(GPUAnnotationCUDA&&) = delete;
+
+    [[nodiscard]]
+    Scope               AnnotateScope() const;
+};
+
 class GPUSemaphoreViewCUDA
 {
     private:
@@ -294,8 +337,10 @@ class GPUQueueCUDA
                                                 uint32_t threadsPerBlock,
                                                 uint32_t sharedMemSize);
 
+    // Annotation for profiling etc. (uses NVTX)
     MRAY_HOST
-    AnnotationHandle        ProfilerDomain() const;
+    GPUAnnotationCUDA       CreateAnnotation(std::string_view) const;
+
     MRAY_HOST
     const GPUDeviceCUDA*    Device() const;
 };
@@ -392,6 +437,9 @@ class GPUSystemCUDA
     // that will run GPU code
     [[nodiscard]]
     GPUThreadInitFunction   GetThreadInitFunction() const;
+
+    // Annotation for profiling etc. (uses NVTX)
+    GPUAnnotationCUDA       CreateAnnotation(std::string_view) const;
 };
 
 
@@ -643,6 +691,18 @@ uint32_t GPUQueueCUDA::DetermineGridStrideBlock(const void* kernelPtr,
     uint32_t smCount = std::min(multiprocessorCount, requiredSMCount);
     uint32_t blockCount = std::min(requiredSMCount, smCount * blockPerSM);
     return blockCount;
+}
+
+MRAY_HOST inline
+GPUAnnotationCUDA GPUQueueCUDA::CreateAnnotation(std::string_view name) const
+{
+    return GPUAnnotationCUDA(nvtxDomain, name);
+}
+
+MRAY_HOST inline
+const GPUDeviceCUDA* GPUQueueCUDA::Device() const
+{
+    return myDevice;
 }
 
 template <class T>

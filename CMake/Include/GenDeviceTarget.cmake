@@ -22,7 +22,6 @@ function(gen_device_target)
         ${CURRENT_SOURCE_DIR}/CUDA/TextureViewCUDA.h)
 
     set(SRC_CUDA
-        ${CURRENT_SOURCE_DIR}/CUDA/NVTXAnnotate.h
         ${CURRENT_SOURCE_DIR}/CUDA/GPUSystemCUDA.h
         ${CURRENT_SOURCE_DIR}/CUDA/GPUSystemCUDA.hpp
         ${CURRENT_SOURCE_DIR}/CUDA/GPUSystemCUDA.cpp

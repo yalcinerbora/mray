@@ -9,6 +9,8 @@
 #include "Core/ColorFunctions.h"
 #include "Core/GraphicsFunctions.h"
 
+using MipBlockCountList = StaticVector<uint64_t, TracerConstants::MaxTextureMipCount>;
+
 static constexpr uint32_t BC_TEX_PER_BATCH = 16;
 struct BCColorConvParams
 {
@@ -65,22 +67,6 @@ void KCConvertColorBC(// I-O
                       MRAY_GRID_CONSTANT const uint32_t,
                       MRAY_GRID_CONSTANT const MRayColorSpaceEnum,
                       MRAY_GRID_CONSTANT const uint32_t);
-
-//// Order is important here
-//template<class R>
-//constexpr auto CreateBCKernelList()
-//{
-//    using enum MRayColorSpaceEnum;
-//    return Tuple
-//    {
-//        KCConvertColorBC<BC_CONV_TPB, R, ConverterList<MR_ACES2065_1>>,
-//        KCConvertColorBC<BC_CONV_TPB, R, ConverterList<MR_ACES_CG>>,
-//        KCConvertColorBC<BC_CONV_TPB, R, ConverterList<MR_REC_709>>,
-//        KCConvertColorBC<BC_CONV_TPB, R, ConverterList<MR_REC_2020>>,
-//        KCConvertColorBC<BC_CONV_TPB, R, ConverterList<MR_DCI_P3>>,
-//        KCConvertColorBC<BC_CONV_TPB, R, ConverterList<MR_ADOBE_RGB>>
-//    };
-//}
 
 MRAY_GPU MRAY_GPU_INLINE
 Vector3 GenericFromNorm(const Vector3& t, const SurfViewVariant& surfView)
@@ -181,42 +167,6 @@ Vector3 GenericToNorm(const Vector3& t, const SurfViewVariant& surfView)
     });
 }
 
-//MRAY_GPU MRAY_GPU_INLINE
-//Vector4ui ReadBlock(const SurfViewVariant& surfView, const Vector2ui& tileCoord)
-//{
-//    return DeviceVisit(surfView, [&](auto&& v)
-//    {
-//        using T = std::remove_cvref_t<decltype(v)>;
-//        if constexpr(std::is_same_v<RWTextureView<2, Vector2ui>, T>)
-//        {
-//            return Vector4ui(v(tileCoord), 0, 0);
-//        }
-//        else if constexpr(std::is_same_v<RWTextureView<2, Vector4ui>, T>)
-//        {
-//            return v(tileCoord);
-//        }
-//        else return Vector4ui::Zero();
-//    });
-//}
-//
-//MRAY_GPU MRAY_GPU_INLINE
-//void WriteBlock(SurfViewVariant& surfView,
-//                const Vector4ui& block,
-//                const Vector2ui& tileCoord)
-//{
-//    DeviceVisit(surfView, [&](auto&& v)
-//    {
-//        using T = std::remove_cvref_t<decltype(v)>;
-//        if constexpr(std::is_same_v<RWTextureView<2, Vector2ui>, T>)
-//        {
-//            v(tileCoord) = Vector2ui(block[0], block[1]);
-//        }
-//        else if constexpr(std::is_same_v<RWTextureView<2, Vector4ui>, T>)
-//        {
-//            v(tileCoord) = block;
-//        }
-//    });
-//}
 
 template<uint32_t TPB, class ConverterTuple>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
@@ -334,9 +284,9 @@ void KCConvertColorBC(// I-O
     for(uint32_t procI = kp.blockId; procI < blockCount; procI += kp.gridSize)
     {
         uint32_t texI = procI / processorPerTexture;
-        uint32_t localPI = procI % processorPerTexture;
+        uint32_t localProcI = procI % processorPerTexture;
         // Load to local space
-        BCColorConvParams curParams = dTexConvParams[texI];
+        const BCColorConvParams& curParams = dTexConvParams[texI];
         uint32_t tileCount = curParams.blockRange[1] - curParams.blockRange[0];
 
         // Skip this mip if it is not available.
@@ -348,7 +298,9 @@ void KCConvertColorBC(// I-O
         if(noGammaConvert && noColorConvert) continue;
 
         // Loop over the blocks for this tex
-        for(uint32_t tileI = localPI; tileI < tileCount; tileI += processorPerTexture)
+        uint32_t tileStart = localProcI * kp.blockSize + kp.threadId;
+        uint32_t tileIncrement = processorPerTexture * kp.blockSize;
+        for(uint32_t tileI = tileStart; tileI < tileCount; tileI += tileIncrement)
         {
             using BlockType = typename BCReader::BlockType;
             using ColorPack = typename BCReader::ColorPack;
@@ -370,7 +322,7 @@ void KCConvertColorBC(// I-O
                 {
                     uint32_t i = static_cast<uint32_t>(curParams.fromColorSpace);
                     [[maybe_unused]]
-                    bool invoked = InvokeAt(i, converterList, [i, &localPixRGB](auto&& tupleElem)
+                    bool invoked = InvokeAt(i, converterList, [&](auto&& tupleElem)
                     {
                         localPixRGB = tupleElem.Convert(localPixRGB);
                         return true;
@@ -397,11 +349,15 @@ class BCColorConverter
     std::vector<Vector2ui> PartitionRange(It first, It last, Compare&& cmp);
 
     template<MRayPixelEnum E>
-    void CallKernelForType(Span<Byte> dScratchBuffer,
-                           // Constants
-                           const Vector2ui& range,
-                           MRayColorSpaceEnum globalColorSpace,
-                           const GPUQueue& queue) const;
+    Pair<MipBlockCountList, uint64_t>
+            FindTotalTilesOf(const GenericTexture* t) const;
+    //
+    template<MRayPixelEnum E>
+    void    CallKernelForType(Span<Byte> dScratchBuffer,
+                              // Constants
+                              const Vector2ui& range,
+                              MRayColorSpaceEnum globalColorSpace,
+                              const GPUQueue& queue);
 
     public:
     // Constructors & Destructor
@@ -410,7 +366,7 @@ class BCColorConverter
     size_t  ScratchBufferSize() const;
     void    CallBCColorConvertKernels(Span<Byte> dScratchBuffer,
                                       MRayColorSpaceEnum globalColorSpace,
-                                     const GPUQueue& queue) const;
+                                     const GPUQueue& queue);
 };
 
 template <std::contiguous_iterator It, class Compare>
@@ -422,12 +378,158 @@ std::vector<Vector2ui> BCColorConverter::PartitionRange(It first, It last, Compa
     while(start != last)
     {
         It end = std::upper_bound(start, last, *start, cmp);
-        Vector2ui r(std::distance(start, end),
-                    std::distance(first, start));
+        Vector2ui r(std::distance(first, start),
+                    std::distance(first, end));
         result.push_back(r);
         start = end;
     }
     return result;
+}
+
+template<MRayPixelEnum E>
+Pair<MipBlockCountList, uint64_t>
+BCColorConverter::FindTotalTilesOf(const GenericTexture* t) const
+{
+    static_assert(MRayPixelType<E>::IsBCPixel,
+                  "This function can only be generated for BC types");
+    using PixType = MRayPixelType<E>::Type;
+    static constexpr uint32_t TILE_SIZE = PixType::TileSize;
+
+    using MathFunctions::DivideUp;
+    uint64_t total = 0;
+    MipBlockCountList result;
+    for(uint32_t i = 0; i < t->MipCount(); i++)
+    {
+        Vector3ui mipSize = Graphics::TextureMipSize(t->Extents(), i);
+        Vector3ui blockCount = Vector3ui(DivideUp(Vector2ui(mipSize),
+                                                  Vector2ui(TILE_SIZE)),
+                                         mipSize[2]);
+        uint64_t mipBlockCount = blockCount.Multiply();
+        result.push_back(mipBlockCount);
+        total += mipBlockCount;
+    }
+    return {result, total};
+}
+
+template<MRayPixelEnum E>
+void BCColorConverter::CallKernelForType(Span<Byte> dScratchBuffer,
+                                         // Constants
+                                         const Vector2ui& range,
+                                         MRayColorSpaceEnum globalColorSpace,
+                                         const GPUQueue& queue)
+{
+
+    using BCReaderType = typename BCReaderFinder::template Find<E>;
+    using BlockT = typename BCReaderType::BlockType;
+    Span<BlockT> dBlocks = MemAlloc::RepurposeAlloc<BlockT>(dScratchBuffer);
+
+    // Process batch by batch
+    auto textureRange = Span<GenericTexture*>(bcTextures.begin() + range[0],
+                                              bcTextures.begin() + range[1]);
+
+    uint32_t localTexCount = uint32_t(range[1] - range[0]);
+    uint32_t batchCount = MathFunctions::DivideUp(localTexCount, BC_TEX_PER_BATCH);
+    for(uint32_t batchIndex = 0; batchIndex < batchCount; batchIndex++)
+    {
+        uint32_t  start = batchIndex * BC_TEX_PER_BATCH;
+        uint32_t  end = std::min((batchIndex + 1) * BC_TEX_PER_BATCH, localTexCount);
+        auto localTextures = textureRange.subspan(start, uint32_t(end - start));
+        //
+        uint64_t texBlockOffset = 0;
+        BCColorConvParamList paramsList;
+        for(size_t tI = 0; tI < localTextures.size(); tI++)
+        {
+            const auto* t = localTextures[tI];
+            auto [mipBlocks, totalBlocks] = FindTotalTilesOf<E>(t);
+            assert(mipBlocks.size() == t->MipCount());
+            paramsList[tI] = BCColorConvParams
+            {
+                .blockRange = Vector2ul(texBlockOffset, totalBlocks),
+                .gamma = t->Gamma(),
+                .fromColorSpace = t->ColorSpace()
+            };
+
+            // While calculating other stuff, issue memcpy of
+            // this texture
+            uint64_t mipBlockOffset = texBlockOffset;
+            for(uint32_t mipLevel = 0; mipLevel < t->MipCount(); mipLevel++)
+            {
+                uint64_t mipBlockSize = mipBlocks[mipLevel];
+                Vector3ui mipSize = Graphics::TextureMipSize(t->Extents(), mipLevel);
+                Span<Byte> copyRegion = dScratchBuffer.subspan(mipBlockOffset * sizeof(BlockT),
+                                                               mipBlockSize * sizeof(BlockT));
+                t->CopyToAsync(copyRegion, queue, mipLevel,
+                               Vector3ui::Zero(), mipSize);
+                mipBlockOffset += mipBlockSize;
+            }
+            // Advance the to the next texture
+            texBlockOffset += totalBlocks;
+        }
+
+        //================//
+        //  Kernel Call!  //
+        //================//
+        uint32_t colorSpaceI = static_cast<uint32_t>(globalColorSpace);
+        InvokeAt(colorSpaceI, ConverterLists,
+        [&](auto ConvList) -> bool
+        {
+            static constexpr uint32_t PROCESSOR_PER_TEXTURE = 256;
+            static constexpr uint32_t THREAD_PER_BLOCK = 512;
+            // Get Compile Time Type
+            using ConvListType = std::remove_cvref_t<decltype(ConvList)>;
+            static constexpr auto Kernel = KCConvertColorBC<THREAD_PER_BLOCK, BCReaderType,
+                                                            ConvListType>;
+            // Find maximum block count for state allocation
+            uint32_t blockCount = queue.RecommendedBlockCountDevice(Kernel,
+                                                                    THREAD_PER_BLOCK, 0);
+
+            using namespace std::string_literals;
+            static const std::string KernelName = ("KCConvertColorspaceBC"s +
+                                                   std::string(MRayPixelTypeStringifier::ToString(E)));
+            queue.IssueExactKernel<Kernel>
+            (
+                KernelName,
+                KernelExactIssueParams
+                {
+                    .gridSize = blockCount,
+                    .blockSize = THREAD_PER_BLOCK
+                },
+                // I-O
+                dBlocks,
+                // Inputs
+                paramsList,
+                // Constants
+                uint32_t(localTextures.size()),
+                globalColorSpace,
+                PROCESSOR_PER_TEXTURE
+            );
+            return true;
+        });
+
+        texBlockOffset = 0;
+        for(size_t tI = 0; tI < localTextures.size(); tI++)
+        {
+            auto* t = localTextures[tI];
+            auto [mipBlocks, totalBlocks] = FindTotalTilesOf<E>(t);
+            assert(mipBlocks.size() == t->MipCount());
+            size_t mipBlockOffset = texBlockOffset;
+            for(uint32_t mipLevel = 0; mipLevel < t->MipCount(); mipLevel++)
+            {
+                uint64_t mipBlockSize = mipBlocks[mipLevel];
+                Vector3ui mipSize = Graphics::TextureMipSize(t->Extents(), mipLevel);
+                Span<Byte> copyRegion = dScratchBuffer.subspan(mipBlockOffset * sizeof(BlockT),
+                                                               mipBlockSize * sizeof(BlockT));
+                t->CopyFromAsync(queue, mipLevel, Vector3ui::Zero(),
+                                 mipSize, ToConstSpan(copyRegion));
+                mipBlockOffset += mipBlockSize;
+            }
+            // Advance the to the next texture
+            texBlockOffset += totalBlocks;
+            // Texture is converted (or in process of)
+            // so set its color space
+            t->SetColorSpace(globalColorSpace);
+        }
+    }
 }
 
 BCColorConverter::BCColorConverter(std::vector<GenericTexture*>&& bcTex)
@@ -445,7 +547,6 @@ BCColorConverter::BCColorConverter(std::vector<GenericTexture*>&& bcTex)
     // Find the partitions (Per BC texture type)
     partitions = PartitionRange(bcTextures.begin(), bcTextures.end(),
                                                        PixTypeComp);
-
     // Find the memory
     for(Vector2ui& range : partitions)
     {
@@ -473,108 +574,13 @@ size_t BCColorConverter::ScratchBufferSize() const
     return bufferSize;
 }
 
-template<MRayPixelEnum E>
-void BCColorConverter::CallKernelForType(Span<Byte> dScratchBuffer,
-                                         // Constants
-                                         const Vector2ui& range,
-                                         MRayColorSpaceEnum globalColorSpace,
-                                         const GPUQueue& queue) const
-{
-
-    using BCReaderType = typename BCReaderFinder::template Find<E>;
-    //static constexpr auto KernelList = FindBCConvKernelList<E>();
-    using BlockT = typename BCReaderType::BlockType;
-    Span<BlockT> dBlocks = MemAlloc::RepurposeAlloc<BlockT>(dScratchBuffer);
-
-    // Process batch by batch
-    uint32_t localTexCount = uint32_t(range[1] - range[0]);
-    uint32_t iterCount = MathFunctions::DivideUp(localTexCount, BC_TEX_PER_BATCH);
-    for(uint32_t i = 0; i < iterCount; i++)
-    {
-        uint32_t  start = range[0] + i * BC_TEX_PER_BATCH;
-        uint32_t  end = range[0] + (i + 1) * BC_TEX_PER_BATCH;
-        end = std::min(end, localTexCount);
-        uint32_t validTexCount = uint32_t(end - start);
-        // "Size()" gives the aligned size (mutiple of 64k in CUDA)
-        // so unnecessarily large maybe?
-        // TODO: Profile and check this later
-        //size_t offset = 0;
-        BCColorConvParamList paramsList;
-        for(uint32_t j = start; j < end; j++)
-        {
-            const auto* t = bcTextures[j];
-            //uint32_t localI = j - start;
-
-            //paramsList[localI] = BCColorConvParams
-            //{
-            //    .blockRange = Vector2ul(offset, t->Size()),
-            //    .gamma = t->Gamma(),
-            //    .fromColorSpace = t->ColorSpace()
-            //};
-            //offset += t->Size();
-
-            // While calculating issue memcpy
-            for(uint32_t mipLevel = 0; mipLevel < t->MipCount(); mipLevel++)
-            {
-                //t->CopyToAsync( queue);
-            }
-        }
-
-        //================//
-        //  Kernel Call!  //
-        //================//
-        //uint32_t colorSpaceI = static_cast<uint32_t>(globalColorSpace);
-        //InvokeAt(colorSpaceI, ConverterLists,
-        //[&](auto ConvList) -> bool
-        //{
-        //    static constexpr uint32_t PROCESSOR_PER_TEXTURE = 256;
-        //    static constexpr uint32_t THREAD_PER_BLOCK = 512;
-        //    // Get Compile Time Type
-        //    using ConvListType = std::remove_cvref_t<decltype(ConvList)>;
-        //    static constexpr auto Kernel = KCConvertColorBC<THREAD_PER_BLOCK, BCReaderType,
-        //                                                    ConvListType>;
-        //    // Find maximum block count for state allocation
-        //    uint32_t blockCount = queue.RecommendedBlockCountDevice(Kernel,
-        //                                                            THREAD_PER_BLOCK, 0);
-
-        //    using namespace std::string_view_literals;
-        //    queue.IssueExactKernel<Kernel>
-        //    (
-        //        "KCConvertColorspaceBC"sv,
-        //        KernelExactIssueParams
-        //        {
-        //            .gridSize = blockCount,
-        //            .blockSize = THREAD_PER_BLOCK
-        //        },
-        //        // I-O
-        //        dBlocks,
-        //        // Inputs
-        //        paramsList,
-        //        // Constants
-        //        validTexCount,
-        //        globalColorSpace,
-        //        PROCESSOR_PER_TEXTURE
-        //    );
-        //    return true;
-        //});
-
-        //for(uint32_t j = start; j < end; j++)
-        //{
-        //    // While calculating issue memcpy
-        //    for(uint32_t mipLevel = 0; mipLevel < t->MipCount(); mipLevel++)
-        //    {
-        //        //t->CopyFromAsync( queue);
-        //    }
-        //}
-
-    }
-}
-
 void BCColorConverter::CallBCColorConvertKernels(Span<Byte> dScratchBuffer,
                                                  // Constants
                                                  MRayColorSpaceEnum globalColorSpace,
-                                                 const GPUQueue& queue) const
+                                                 const GPUQueue& queue)
 {
+    if(bcTextures.empty()) return;
+
     for(size_t pIndex = 0; pIndex < partitions.size(); pIndex++)
     {
         const Vector2ui& range = partitions[pIndex];
@@ -649,6 +655,14 @@ void ColorConverter::ConvertColor(std::vector<MipArray<SurfRefVariant>> textures
                                   std::vector<GenericTexture*> bcTextures,
                                   MRayColorSpaceEnum globalColorSpace) const
 {
+    // TODO: Report bug on NVCC, "NVCC Language Frontend"
+    // hangs (inf loop) when these literals are changed to "..."sv
+    //using namespace std::string_view_literals;
+    static const auto mainA = gpuSystem.CreateAnnotation("ConvertColor");
+    static const auto normA = gpuSystem.CreateAnnotation("ConvertColor_N");
+    static const auto bcA   = gpuSystem.CreateAnnotation("ConvertColor_BC");
+    const auto _ = mainA.AnnotateScope();
+
     assert(textures.size() == colorConvParams.size());
     // TODO: Textures should be partitioned with respect to
     // devices, so that we can launch kernel from those devices
@@ -674,6 +688,9 @@ void ColorConverter::ConvertColor(std::vector<MipArray<SurfRefVariant>> textures
     //==============================//
     if(!textures.empty())
     {
+        [[maybe_unused]]
+        const auto normAnnotation = normA.AnnotateScope();
+
         // Copy references
         std::vector<MipArray<SurfViewVariant>> hSurfViews;
         hSurfViews.reserve(textures.size());
@@ -720,81 +737,13 @@ void ColorConverter::ConvertColor(std::vector<MipArray<SurfRefVariant>> textures
     //==============================//
     //       BC TEXTURES            //
     //==============================//
-    if(!bcTextures.empty())
     {
+        [[maybe_unused]]
+        const auto bcAnnotation = bcA.AnnotateScope();
+
         Span<Byte> dBCScratchBuffer = Span<Byte>(static_cast<Byte*>(mem), mem.Size());
         bcColorConverter.CallBCColorConvertKernels(dBCScratchBuffer, globalColorSpace, queue);
     }
     // Wait for deallocation
     queue.Barrier().Wait();
 }
-
-//    std::vector<MipArray<SurfViewVariant>> hBCSurfViews;
-//    hBCSurfViews.reserve(textures.size());
-//    for(const MipArray<SurfRefVariant>& bcSurfRefs : bcTextures)
-//    {
-//        MipArray<SurfViewVariant> mipViews;
-//        for(size_t i = 0; i < TracerConstants::MaxTextureMipCount; i++)
-//        {
-//            const SurfRefVariant& surf = bcSurfRefs[i];
-//            mipViews[i] = std::visit([](auto&& v) -> SurfViewVariant
-//            {
-//                using T = std::remove_cvref_t<decltype(v)>;
-//                if constexpr(std::is_same_v<T, std::monostate>)
-//                    return std::monostate{};
-//                else return v.View();
-//            }, surf);
-//        }
-//        hBCSurfViews.push_back(mipViews);
-//    }
-//    //
-//    auto hBCSurfViewSpan = Span<MipArray<SurfViewVariant>>(hBCSurfViews.begin(),
-//                                                           hBCSurfViews.end());
-//    auto hBCColorConvParams = Span<const BCColorConvParams>(bcColorConvParams.cbegin(),
-//                                                            bcColorConvParams.cend());
-//    queue.MemcpyAsync(dBCSufViews, ToConstSpan(hBCSurfViewSpan));
-//    queue.MemcpyAsync(dBCColorConvParams, hBCColorConvParams);
-
-//    uint8_t bcMaxMipCount = std::transform_reduce(bcColorConvParams.cbegin(),
-//                                             bcColorConvParams.cend(),
-//                                             std::numeric_limits<uint8_t>::min(),
-//    [](uint8_t l, uint8_t r)
-//    {
-//        return std::max(l, r);
-//    },
-//    [](const ColorConvParams& p) -> uint8_t
-//    {
-//        return p.mipCount;
-//    });
-
-
-//if(isBlockCompressed)
-//{
-//    bcTextures.push_back();
-//
-//    auto [blockSize, tileSize] = std::visit
-//    (
-//        [](auto&& v) -> Pair<uint32_t, uint32_t>
-//    {
-//        using T = std::remove_cvref_t<decltype(v)>;
-//        using Type = typename T::Type;
-//        if constexpr(T::IsBCPixel)
-//            return {uint32_t(Type::BlockSize), uint32_t(Type::TileSize)};
-//        else return {0, 0};
-//    }, pt
-//    );
-//    assert(blockSize != 0 && tileSize != 0);
-//
-//    BCColorConvParams bcP;
-//    bcP.validMips = p.validMips;
-//    bcP.mipCount = p.mipCount;
-//    bcP.fromColorSpace = p.fromColorSpace;
-//    bcP.gamma = p.gamma;
-//    bcP.mipZeroRes = p.mipZeroRes;
-//    //
-//    bcP.pixelEnum = pt.Name();
-//    bcP.blockSize = blockSize;
-//    bcP.tileSize = tileSize;
-//    bcColorConvParams.push_back(bcP);
-//}
-//else

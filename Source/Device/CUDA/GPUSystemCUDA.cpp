@@ -12,6 +12,39 @@
 namespace mray::cuda
 {
 
+GPUAnnotationCUDA::Scope::Scope(AnnotationHandle d)
+    : domain(d)
+{}
+
+GPUAnnotationCUDA::Scope::~Scope()
+{
+    nvtxDomainRangePop(std::bit_cast<nvtxDomainHandle_t>(domain));
+}
+
+GPUAnnotationCUDA::GPUAnnotationCUDA(AnnotationHandle h,
+                                     std::string_view name)
+    : domainHandle(h)
+    , stringHandle(nullptr)
+{
+    nvtxDomainHandle_t nvtxDomain = std::bit_cast<nvtxDomainHandle_t>(h);
+    stringHandle = nvtxDomainRegisterStringA(nvtxDomain, name.data());
+
+}
+
+GPUAnnotationCUDA::Scope GPUAnnotationCUDA::AnnotateScope() const
+{
+    nvtxDomainHandle_t nvtxDomain = std::bit_cast<nvtxDomainHandle_t>(domainHandle);
+    nvtxEventAttributes_t attrib = {};
+    attrib.version = NVTX_VERSION;
+    attrib.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE;
+    //NVTX_MESSAGE_TYPE_ASCII;
+    attrib.messageType = NVTX_MESSAGE_TYPE_REGISTERED;
+    attrib.message.registered = std::bit_cast<nvtxStringHandle_t>(stringHandle);
+
+    nvtxDomainRangePushEx(nvtxDomain, &attrib);
+    return Scope(domainHandle);
+}
+
 GPUSemaphoreViewCUDA::GPUSemaphoreViewCUDA(TimelineSemaphore* sem,
                                            uint64_t av)
     : externalSemaphore(sem)
@@ -299,6 +332,11 @@ void GPUSystemCUDA::ThreadInitFunction()
     // Set all the devices on the thread, should be enough?
     for(const auto& device : (*globalGPUListPtr))
         CUDA_CHECK(cudaSetDevice(device.DeviceId()));
+}
+
+GPUAnnotationCUDA GPUSystemCUDA::CreateAnnotation(std::string_view name) const
+{
+    return GPUAnnotationCUDA(nvtxDomain, name);
 }
 
 GPUThreadInitFunction GPUSystemCUDA::GetThreadInitFunction() const

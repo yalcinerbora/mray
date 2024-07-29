@@ -31,7 +31,7 @@ namespace BlockCompressedIO
         static ColorPack   ExtractColors(Vector2ui block);
         MRAY_HYBRID
         static Vector2ui   InjectColors(Vector2ui block, const ColorPack& colorIn,
-                                        bool skip1BitAlpha = false);
+                                        bool skipAlpha = false);
     };
 
     struct BC2
@@ -345,7 +345,7 @@ BC1::ExtractColors(Vector2ui block)
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 Vector2ui BC1::InjectColors(Vector2ui block, const ColorPack& colorIn,
-                            bool skip1BitAlpha)
+                            bool skipAlpha)
 {
     auto ComposeColor565 = [](Vector3 color) -> uint32_t
     {
@@ -361,27 +361,36 @@ Vector2ui BC1::InjectColors(Vector2ui block, const ColorPack& colorIn,
     uint32_t color1 = ComposeColor565(colorIn[1]);
     // 1-bit alpha mode
     // https://learn.microsoft.com/en-us/windows/uwp/graphics-concepts/opaque-and-1-bit-alpha-textures
-    // We assume BC1 has ) 3 cases (BC1 is
     uint32_t c0 = Bit::FetchSubPortion(block[0], {0, 16});
     uint32_t c1 = Bit::FetchSubPortion(block[0], {16, 32});
-    bool bitAlphaMode = (c0 <= c1);
-
-    // Due to conversion new color's magnitudes are changed
+    bool opaqueMode = (c0 > c1);
+    bool alphaMode = !opaqueMode;
+    // Due to conversion, new color's magnitudes are changed
     // obey the actual mode
-    if(skip1BitAlpha)
+    if(!skipAlpha)
     {
-        if(bitAlphaMode && color0 > color1)
+        // Was alpha mode, new colors
+        // seem opaque mode. Just swap the colors
+        // c_2 is middle of c_0 c_1 and c_3 is black
+        if(alphaMode && color0 > color1)
             std::swap(color0, color1);
-        // Opposite case, it was not bit alpha mode but now
-        // it seems so so swap
-        else if(!bitAlphaMode && color0 < color1)
-            std::swap(color0, color1);
-        else if(!bitAlphaMode && color0 == color1)
+
+        // Opposite case, was opaque now alpha
+        else if(opaqueMode && color0 == color1)
+            // For equal case we can set lookup
+            // table to zero.
+            block[1] = 0x0000;
+        else if(opaqueMode && color0 < color1)
         {
-            // Here we can not get away with swapping
-            // somehow colors are same now, so
-            // every pixel uses the color0 now.
-            block[1] = 0x0;
+            // Hard part we can not do swap etc. here
+            // (We can swap but we need to swap the lookup
+            // table as well.
+            // So what do we do? Swap
+            // This is not correct, but we assume colors are
+            // closeby.
+            // TODO: Change this later
+            std::swap(color0, color1);
+
         }
     }
     uint32_t block0Out = Bit::Compose<16u, 16u>(color0, color1);
@@ -400,7 +409,7 @@ Vector4ui BC2::InjectColors(Vector4ui block, const ColorPack& colorIn)
 {
     auto b0 = BC1::InjectColors(Vector2ui(block[2], block[3]), colorIn,
                                 true);
-    return Vector4ui(block[0], block[1], b0[0], block[1]);
+    return Vector4ui(block[0], block[1], b0[0], block[3]);
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -415,7 +424,7 @@ Vector4ui BC3::InjectColors(Vector4ui block, const ColorPack& colorIn)
 {
     auto b0 = BC1::InjectColors(Vector2ui(block[2], block[3]), colorIn,
                                 true);
-    return Vector4ui(block[0], block[1], b0[0], block[1]);
+    return Vector4ui(block[0], block[1], b0[0], block[3]);
 }
 
 template <bool IsSigned>
@@ -424,20 +433,20 @@ typename BC4<IsSigned>::ColorPack
 BC4<IsSigned>::ExtractColors(Vector2ui block)
 {
     using namespace Bit;
+    using namespace NormConversion;
     uint8_t color0 = uint8_t(FetchSubPortion(block[0], {0, 8}));
     uint8_t color1 = uint8_t(FetchSubPortion(block[0], {8, 16}));
 
     Float c0, c1;
     if constexpr(IsSigned)
     {
-        c0 = NormConversion::FromUNorm<Float>(color0);
-        c1 = NormConversion::FromUNorm<Float>(color1);
+        c0 = FromSNorm<Float>(std::bit_cast<int8_t>(color0));
+        c1 = FromSNorm<Float>(std::bit_cast<int8_t>(color1));
     }
     else
     {
-        using namespace NormConversion;
-        c0 = FromSNorm<Float>(std::bit_cast<int8_t>(color0));
-        c1 = FromSNorm<Float>(std::bit_cast<int8_t>(color1));
+        c0 = FromUNorm<Float>(color0);
+        c1 = FromUNorm<Float>(color1);
     }
     return {Vector3(c0, 0, 0), Vector3(c1, 0, 0)};
 }
@@ -447,39 +456,54 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Vector2ui BC4<IsSigned>::InjectColors(Vector2ui block, const ColorPack& colorIn)
 {
     using namespace Bit;
-    uint32_t color0 = FetchSubPortion(block[0], {0, 8});
-    uint32_t color1 = FetchSubPortion(block[0], {8, 16});
+    using namespace NormConversion;
+    using MathFunctions::Clamp;
+
+    uint32_t c0 = FetchSubPortion(block[0], {0, 8});
+    uint32_t c1 = FetchSubPortion(block[0], {8, 16});
     // Due to conversion new color's magnitudes
     // may have changed. Obey the actual mode.
-    bool alphaMode = (color0 > color1);
+    bool opaqueMode = (c0 > c1);
+    bool alphaMode = !opaqueMode;
 
-    uint32_t c0, c1;
-    Float r0 = MathFunctions::Clamp<Float>(colorIn[0][0], 0, 1);
-    Float r1 = MathFunctions::Clamp<Float>(colorIn[1][0], 0, 1);
+    uint32_t color0, color1;
     if constexpr(IsSigned)
     {
-        c0 = NormConversion::ToUNorm<uint8_t>(r0);
-        c1 = NormConversion::ToUNorm<uint8_t>(r1);
+        Float r0 = Clamp<Float>(colorIn[0][0], -1, 1);
+        Float r1 = Clamp<Float>(colorIn[1][0], -1, 1);
+        color0 = std::bit_cast<uint8_t>(ToSNorm<int8_t>(r0));
+        color1 = std::bit_cast<uint8_t>(ToSNorm<int8_t>(r1));
     }
     else
     {
-        using namespace NormConversion;
-        c0 = std::bit_cast<uint8_t>(ToSNorm<int8_t>(r0));
-        c1 = std::bit_cast<uint8_t>(ToSNorm<int8_t>(r1));
+        Float r0 = Clamp<Float>(colorIn[0][0], 0, 1);
+        Float r1 = Clamp<Float>(colorIn[1][0], 0, 1);
+        color0 = ToUNorm<uint8_t>(r0);
+        color1 = ToUNorm<uint8_t>(r1);
     }
+
     // If mode is changed, try to convert back to mode
-    // Here color's should be similar but it may not be
-    // We can swap the colors, but we need to change the lookup table
-    // so what to do?
-    if(alphaMode && c0 <= c1)
+    // It was alpha (4 color) mode now it is (6 color)
+    if(alphaMode && color0 > color1)
     {
-        //c0--;
+        // Unlike BC1 we can not swap here?
+        // TODO: Change this
+        std::swap(color0, color1);
     }
-    else if(!alphaMode && c0 > c1)
+    else if(opaqueMode && color0 == color1)
     {
-        //c0--;
+        // This is somewhat easy.
+        // Either decrement or increment
+        if(color0 != 0) color0--;
+        else color1++;
     }
-    uint32_t block0 = Compose<8, 8, 16>(c0, c1, FetchSubPortion(block[0], {0, 16}));
+    if(opaqueMode && color0 < color1)
+    {
+        // Unlike BC1 we can not swap here?
+        // TODO: Change this
+        std::swap(color0, color1);
+    }
+    uint32_t block0 = Compose<8, 8, 16>(c0, c1, FetchSubPortion(block[0], {16, 32}));
     return Vector2ui(block0, block[1]);
 }
 
@@ -502,7 +526,7 @@ Vector4ui BC5<IsSigned>::InjectColors(Vector4ui block, const ColorPack& colorIn)
     BC4ColorPack r = {Vector3(colorIn[0][0], 0 ,0), Vector3(colorIn[1][0], 0 ,0)};
     BC4ColorPack g = {Vector3(colorIn[0][1], 0 ,0), Vector3(colorIn[1][1], 0 ,0)};
     auto b0 = BC4<IsSigned>::InjectColors(Vector2ui(block[0], block[1]), r);
-    auto b1 = BC4<IsSigned>::InjectColors(Vector2ui(block[0], block[1]), g);
+    auto b1 = BC4<IsSigned>::InjectColors(Vector2ui(block[2], block[3]), g);
     return Vector4ui(b0[0], b0[1], b1[0], b1[1]);
 }
 

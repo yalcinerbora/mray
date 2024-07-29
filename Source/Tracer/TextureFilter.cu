@@ -785,6 +785,11 @@ template<FilterType::E E, class FF>
 void TextureFilterT<E, FF>::GenerateMips(const std::vector<MipArray<SurfRefVariant>>& textures,
                                          const std::vector<MipGenParams>& params) const
 {
+    using namespace std::string_literals;
+    static const std::string Name = ("ConvertColor"s + std::string(FilterType::ToString(E)));
+    static const auto annotation = gpuSystem.CreateAnnotation(Name);
+    const auto _ = annotation.AnnotateScope();
+
     GenerateMipsGeneric(textures, params, gpuSystem, FF(filterRadius));
 }
 
