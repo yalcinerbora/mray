@@ -12,6 +12,11 @@ namespace Bit
     template<std::integral T>
     constexpr T FetchSubPortion(T value, std::array<T, 2> bitRange);
 
+    template<std::integral T, std::integral C>
+    requires (std::convertible_to<C, T>)
+    [[nodiscard]]
+    constexpr T SetSubPortion(T value, C in, std::array<T, 2> bitRange);
+
     template<size_t... Is, std::unsigned_integral... Ts>
     requires(sizeof...(Is) == sizeof...(Ts))
     constexpr std::tuple_element_t<0, Tuple<Ts...>>
@@ -28,6 +33,21 @@ namespace Bit
 
     template<std::unsigned_integral T>
     constexpr T BitReverse(T value, T width = sizeof(T) * CHAR_BIT);
+
+    template<std::unsigned_integral T>
+    constexpr T CountLZero(T value);
+
+    template<std::unsigned_integral T>
+    constexpr T CountTZero(T value);
+
+    template<std::unsigned_integral T>
+    constexpr T CountLOne(T value);
+
+    template<std::unsigned_integral T>
+    constexpr T CountTOne(T value);
+
+    template<std::unsigned_integral T>
+    constexpr T PopC(T value);
 
     constexpr uint32_t GenerateFourCC(char byte0, char byte1, char byte2, char byte3);
 
@@ -182,6 +202,18 @@ constexpr T Bit::FetchSubPortion(T value, std::array<T, 2> bitRange)
     return (value >> bitRange[0]) & mask;
 }
 
+template<std::integral T, std::integral C>
+requires (std::convertible_to<C, T>)
+constexpr T Bit::SetSubPortion(T value, C in, std::array<T, 2> bitRange)
+{
+    assert(bitRange[0] < bitRange[1]);
+    T inT = T(in);
+    T bitCount = bitRange[1] - bitRange[0];
+    T mask0 = (1 << bitCount) - 1;
+    T mask1 = ~(mask0 << bitRange[0]);
+    return (value & mask1) | ((inT & mask0) << bitRange[0]);
+}
+
 template<size_t... Is, std::unsigned_integral... Ts>
 requires(sizeof...(Is) == sizeof...(Ts))
 constexpr std::tuple_element_t<0, Tuple<Ts...>>
@@ -193,8 +225,8 @@ Bit::Compose(Ts... values)
     static_assert((Is + ...) <= sizeof(RetT) * CHAR_BIT,
                   "Template Is must not exceed the entire bit range");
     // Convert the index sequence to runtime
-    std::array<size_t, E + 1> offsets = {0, Is...};
-
+    // TODO: Can we "scan" in comptime via expansion?
+    std::array<RetT, E + 1> offsets = {0, Is...};
     // Check the data validity
     if constexpr(MRAY_IS_DEBUG)
     {
@@ -202,11 +234,10 @@ Bit::Compose(Ts... values)
         uint32_t i = 1;
         assert
         (
-            (values < (RetT(1) << offsets[i++])) &&
+            (RetT(values) < (RetT(1) << offsets[i++])) &&
             ...
         );
     }
-
     // Do scan
     UNROLL_LOOP
     for(uint32_t i = 1; i < E; i++)
@@ -217,7 +248,7 @@ Bit::Compose(Ts... values)
     uint32_t i = 0;
     RetT result = 0;
     (
-        ((void)(result |= (values << offsets[i++]))),
+        ((void)(result |= (RetT(values) << offsets[i++]))),
         ...
     );
     return result;
@@ -245,22 +276,95 @@ template<std::unsigned_integral T>
 constexpr T Bit::RequiredBitsToRepresent(T value)
 {
     constexpr T Bits = sizeof(T) * CHAR_BIT;
-    return (Bits - T(std::countl_zero(value)));
+    return (Bits - CountLZero(value));
 }
 
 template<std::unsigned_integral T>
 constexpr T Bit::BitReverse(T value, T width)
 {
-    // TODO: Is there a good way to do this than O(n)
-    // without lookup table, this may end up in GPU
-    T result = 0;
-    for(T i = 0; i < width; i++)
+    #ifdef MRAY_DEVICE_CODE_PATH_CUDA
     {
-        result |= value & 0b1;
-        result <<= 1;
-        value >>= 1;
+        if constexpr(std::is_same_v<T, uint64_t>)
+            return T(__brevll(value));
+        else
+            return T(__brev(uint32_t(value)));
     }
-    return result;
+    #else
+    {
+        // TODO: Is there a good way to do this
+        // other than O(n)
+        T result = 0;
+        for(T i = 0; i < width; i++)
+        {
+            result |= value & 0b1;
+            result <<= 1;
+            value >>= 1;
+        }
+        return result;
+    }
+    #endif
+}
+
+template<std::unsigned_integral T>
+constexpr T Bit::CountLZero(T value)
+{
+    #ifdef MRAY_DEVICE_CODE_PATH_CUDA
+        if constexpr(std::is_same_v<T, uint64_t>)
+            return T(__clzll(std::bit_cast<long long int>(value)));
+        else if constexpr(std::is_same_v<T, uint32_t>)
+            return std::bit_cast<T>(__clz(std::bit_cast<int>(value)));
+        else
+            return T(__clz(int(value)));
+    #else
+        return std::countl_zero<T>(value);
+    #endif
+}
+
+template<std::unsigned_integral T>
+constexpr T Bit::CountTZero(T value)
+{
+    #ifdef MRAY_DEVICE_CODE_PATH_CUDA
+        // This is intrinsic so its fine
+        T vR = BitReverse(value);
+        return CountLZero(vR);
+    #else
+        return std::countr_zero<T>(value);
+    #endif
+}
+
+template<std::unsigned_integral T>
+constexpr T Bit::CountLOne(T value)
+{
+    #ifdef MRAY_DEVICE_CODE_PATH_CUDA
+        T vR = ~value;
+        return CountLZero(vR);
+    #else
+        return std::countl_one<T>(value);
+    #endif
+}
+
+template<std::unsigned_integral T>
+constexpr T Bit::CountTOne(T value)
+{
+    #ifdef MRAY_DEVICE_CODE_PATH_CUDA
+        T vR = ~value;
+        return CountTZero(vR);
+    #else
+        return std::countr_one<T>(value);
+    #endif
+}
+
+template<std::unsigned_integral T>
+constexpr T Bit::PopC(T value)
+{
+    #ifdef MRAY_DEVICE_CODE_PATH_CUDA
+        if constexpr(std::is_same_v<T, uint64_t>)
+            return T(__popcll(value));
+        else
+            return T(__popc(uint32_t(value)));
+    #else
+        return std::popcount<T>(value);
+    #endif
 }
 
 constexpr uint32_t Bit::GenerateFourCC(char byte0, char byte1,

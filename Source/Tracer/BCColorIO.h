@@ -28,10 +28,10 @@ namespace BlockCompressedIO
         using BlockType = Vector2ui;
 
         MRAY_HYBRID
-        static ColorPack   ExtractColors(Vector2ui block);
+        static ColorPack    ExtractColors(Vector2ui block);
         MRAY_HYBRID
-        static Vector2ui   InjectColors(Vector2ui block, const ColorPack& colorIn,
-                                        bool skipAlpha = false);
+        static Vector2ui    InjectColors(Vector2ui block, const ColorPack& colorIn,
+                                         bool skipAlpha = false);
     };
 
     struct BC2
@@ -40,9 +40,9 @@ namespace BlockCompressedIO
         using BlockType = Vector4ui;
 
         MRAY_HYBRID
-        static ColorPack   ExtractColors(Vector4ui block);
+        static ColorPack    ExtractColors(Vector4ui block);
         MRAY_HYBRID
-        static Vector4ui   InjectColors(Vector4ui block, const ColorPack& colorIn);
+        static Vector4ui    InjectColors(Vector4ui block, const ColorPack& colorIn);
     };
 
     struct BC3
@@ -63,9 +63,9 @@ namespace BlockCompressedIO
         using BlockType = Vector2ui;
 
         MRAY_HYBRID
-        static ColorPack   ExtractColors(Vector2ui block);
+        static ColorPack    ExtractColors(Vector2ui block);
         MRAY_HYBRID
-        static Vector2ui   InjectColors(Vector2ui block, const ColorPack& colorIn);
+        static Vector2ui    InjectColors(Vector2ui block, const ColorPack& colorIn);
     };
 
     template<bool IsSigned>
@@ -75,9 +75,9 @@ namespace BlockCompressedIO
         using BlockType = Vector4ui;
 
         MRAY_HYBRID
-        static ColorPack   ExtractColors(Vector4ui block);
+        static ColorPack    ExtractColors(Vector4ui block);
         MRAY_HYBRID
-        static Vector4ui   InjectColors(Vector4ui block, const ColorPack& colorIn);
+        static Vector4ui    InjectColors(Vector4ui block, const ColorPack& colorIn);
     };
 
     template<bool IsSigned>
@@ -87,238 +87,43 @@ namespace BlockCompressedIO
         using BlockType = Vector4ui;
 
         MRAY_HYBRID
-        static ColorPack   ExtractColors(Vector4ui block);
+        static ColorPack    ExtractColors(Vector4ui block);
         MRAY_HYBRID
-        static Vector4ui   InjectColors(Vector4ui block, const ColorPack& colorIn);
+        static Vector4ui    InjectColors(Vector4ui block, const ColorPack& colorIn);
     };
 
     struct BC7
     {
-        using ColorPack = std::array<Vector3, 6>;
+        public:
         using BlockType = Vector4ui;
 
+        private:
         MRAY_HYBRID
-        static ColorPack   ExtractColors(Vector4ui block);
+        uint32_t    Mode() const;
+        //
+        Vector2ul   block;
+
+        //template<uint32_t B>
+        //MRAY_HYBRID
+        //UNorm4x8     ExpandTo8Bit(UNorm4x8 c);
+        //template<uint32_t B>
+        //MRAY_HYBRID
+        //UNorm4x8     ShrinkFrom8Bit(UNorm4x8 c);
+
+        public:
+        MRAY_HYBRID BC7(const Vector4ui block);
+
         MRAY_HYBRID
-        static Vector4ui   InjectColors(Vector4ui block, const ColorPack& colorIn);
+        Vector4ui   Block() const;
+
+        MRAY_HYBRID
+        Vector3     ExtractColor(uint32_t i) const;
+        MRAY_HYBRID
+        void        InjectColor(uint32_t i, const Vector3& colorIn);
+        MRAY_HYBRID
+        uint32_t    ColorCount() const;
     };
-
 }
-
-//class ModeLookup
-//{
-//    private:
-//    static constexpr std::array<uint32_t, 14> MODE_TABLE =
-//    {
-//        0b00000, 0b00001, 0b00010, 0b00110,
-//        0b01010, 0b01110, 0b10010, 0b10110,
-//        0b11010, 0b11110, 0b00011, 0b00111,
-//        0b01011, 0b01111
-//    };
-//    uint32_t mode;
-
-//    public:
-//    ModeLookup(uint32_t m) : mode(m) {}
-//    template<unsigned int... I>
-//    bool IsMode()
-//    {
-//        return ((mode == MODE_TABLE[I - 1]) || ...);
-//    }
-//};
-
-//// Alias a function because it will be used a lot..
-//uint32_t FSB(uint32_t v, uint32_t start, uint32_t end)
-//{
-//    using namespace Bit;
-//    return FetchSubPortion<uint32_t>(v, {start, end});
-//};
-
-
-//// Found a pattern for w part
-//// but the other part (xyz parts)
-//// are quite scrambled
-//template<uint32_t O>
-//MRAY_GPU MRAY_GPU_INLINE
-//uint32_t BisectWhite(uint64_t low, ModeLookup m)
-//{
-//    static_assert(O == 0 || O == 10 || O == 20, "Wrong offset");
-//    constexpr bool IsRed    = (O == 0);
-//    constexpr bool IsGreen  = (O == 10);
-//    constexpr bool IsBlue   = (O == 20);
-
-//    uint32_t w = FSB(low, 5 + O, 15 + O);
-//    w = (m.IsMode<2>())         ? (w & 0x003F) : w;
-//    w = (m.IsMode<6>())         ? (w & 0x00FF) : w;
-//    w = (m.IsMode<10>())        ? (w & 0x001F) : w;
-//    w = (m.IsMode<7, 8, 9>())   ? (w & 0x007F) : w;
-//    // Extra bits Middle
-//    if constexpr(IsRed)
-//    {
-//        w = (m.IsMode<4, 5>())  ? (w |= FSB(block[0], 39 + O, 40 + O) << 10u) : w;
-//        w = (m.IsMode<3>())     ? (w |= FSB(block[0], 40 + O, 41 + O) << 10u) : w;
-//    }
-//    else if constexpr(IsGreen)
-//    {
-//        w = (m.IsMode<3, 5>())  ? (w |= FSB(block[0], 39 + O, 40 + O) << 10u) : w;
-//        w = (m.IsMode<4>())     ? (w |= FSB(block[0], 40 + O, 41 + O) << 10u) : w;
-//    }
-//    else
-//    {
-//        w = (m.IsMode<3, 4>())  ? (w |= FSB(block[0], 39 + O, 50 + O) << 10u) : w;
-//        w = (m.IsMode<5>())     ? (w |= FSB(block[0], 40 + O, 41 + O) << 10u) : w;
-//    }
-//    // Extra bits End
-//    w = (m.IsMode<12, 13, 14>())    ? (w |= FSB(block[0], 44 + O, 45 + O) << 10u) : w;
-//    // Mode 13 and 14 are hipsters, bits are reversed
-//    w = (m.IsMode<13, 14>())        ? (w |= FSB(block[0], 43 + O, 44 + O) << 11u) : w;
-//    // 4 bit left, just read bit by bit
-//    // TODO: check "Bit twiddling hacks" for a cooler way maybe?
-//    w = (m.IsMode<14>())    ? (w |= FSB(block[0], 42 + O, 43 + O) << 12u) : w;
-//    w = (m.IsMode<14>())    ? (w |= FSB(block[0], 41 + O, 42 + O) << 13u) : w;
-//    w = (m.IsMode<14>())    ? (w |= FSB(block[0], 40 + O, 41 + O) << 14u) : w;
-//    w = (m.IsMode<14>())    ? (w |= FSB(block[0], 39 + O, 40 + O) << 15u) : w;
-//    return w;
-//}
-
-//template<uint32_t O>
-//MRAY_GPU MRAY_GPU_INLINE
-//uint32_t BisectX(uint64_t low, ModeLookup m)
-//{
-//    static_assert(O == 0 || O == 10 || O == 20, "Wrong offset");
-//    constexpr bool IsRed = (O == 0);
-//    constexpr bool IsGreen = (O == 10);
-//    constexpr bool IsBlue = (O == 20);
-
-//    uint32_t x = FSB(low, 35 + O, 44 + O);
-//    x = (m.IsMode<1, 6, 8, 9>())    ? (x & 0x001F) : x;
-//    x = (m.IsMode<2, 7, 10>())      ? (x & 0x003F) : x;
-//    x = (m.IsMode<14>())            ? (x & 0x000F) : x;
-//    x = (m.IsMode<13>())            ? (x & 0x00FF) : x;
-//    // Permuted modes
-//    if constexpr(IsRed)
-//    {
-//        x = (m.IsMode<3>())     ? (x & 0x001F) : x;
-//        x = (m.IsMode<4, 5>())  ? (x & 0x000F) : x;
-//    }
-//    else if constexpr(IsGreen)
-//    {
-//        x = (m.IsMode<4>())     ? (x & 0x001F) : x;
-//        x = (m.IsMode<3, 5>())  ? (x & 0x000F) : x;
-//    }
-//    else
-//    {
-//        x = (m.IsMode<5>())     ? (x & 0x001F) : x;
-//        x = (m.IsMode<3, 4>())  ? (x & 0x000F) : x;
-//    }
-//    return x;
-//}
-
-//template<uint32_t O>
-//MRAY_GPU MRAY_GPU_INLINE
-//uint32_t BisectRYZ(Vector2ul block, ModeLookup m)
-//{
-//    static_assert(O == 0 || O == 6, "Wrong offset");
-//    uint32_t yz = FSB(block[1], 0 + O, 6 + O);
-//    yz = (m.IsMode<1, 3, 6, 8, 9>())    ? (yz & 0x001F) : yz;
-//    yz = (m.IsMode<4, 5>())             ? (yz & 0x000F) : yz;
-//    // No ry or rz
-//    yz = (m.IsMode<11, 12, 13, 14>())   ? 0 : yz;
-//    return yz;
-//};
-
-//MRAY_GPU MRAY_GPU_INLINE
-//uint32_t BisectGY(Vector2ul block, ModeLookup m)
-//{
-//    if(m.IsMode<11, 12, 13, 14>()) return 0;
-
-//    uint32_t gy = FSB(block[0], 41, 45);
-//    // Extra bits
-//    gy = (m.IsMode<2,6,7,8,9,10>()) ? (gy |= FSB(block[0], 24, 25) << 4u) : gy;
-//    gy = (m.IsMode<1>())            ? (gy |= FSB(block[0],  2,  3) << 4u) : gy;
-//    gy = (m.IsMode<2>())            ? (gy |= FSB(block[0],  2,  3) << 5u) : gy;
-//    gy = (m.IsMode<4>())            ? (gy |= FSB(block[1], 14, 15) << 5u) : gy;
-//    return gy;
-//};
-
-//MRAY_GPU MRAY_GPU_INLINE
-//uint32_t BisectGZ(Vector2ul block, ModeLookup m)
-//{
-//    if (m.IsMode<11, 12, 13, 14>()) return 0;
-
-//    uint32_t gz = FSB(block[0], 51, 55);
-//    // Extra bits
-//    gz = (m.IsMode<1, 4, 6, 8, 9>())    ? (gz |= FSB(block[0], 40, 41) << 4u) : gz;
-//    gz = (m.IsMode<2>())                ? (gz |= FSB(block[0],  3,  5) << 4u) : gz;
-//    gz = (m.IsMode<7>())                ? (gz |= FSB(block[0], 13, 14) << 4u) : gz;
-//    gz = (m.IsMode<10>())               ? (gz |= FSB(block[0], 10, 11) << 4u) : gz;
-//    return gz;
-//};
-
-//MRAY_GPU MRAY_GPU_INLINE
-//uint32_t BisectBY(Vector2ul block, ModeLookup m)
-//{
-//    if(m.IsMode<11, 12, 13, 14>()) return 0;
-
-//    uint32_t by = FSB(block[0], 61, 64);
-//    // Extra bits
-//    by = (m.IsMode<2,6,7,8,9,10>()) ? (by |= FSB(block[0], 14, 15) << 4u) : by;
-//    by = (m.IsMode<1>())            ? (by |= FSB(block[0],  3,  4) << 4u) : by;
-//    by = (m.IsMode<2, 10>())        ? (by |= FSB(block[0], 22, 23) << 5u) : by;
-//    return by;
-//};
-
-//MRAY_GPU MRAY_GPU_INLINE
-//uint32_t BisectBZ(Vector2ul block, ModeLookup m)
-//{
-//    if (m.IsMode<11, 12, 13, 14>()) return 0;
-
-//    uint32_t bz = FSB(block[0], 51, 55);
-//    // Extra bits
-//    bz = (m.IsMode<1, 4, 6, 8, 9>())    ? (bz |= FSB(block[0], 40, 41) << 4u) : bz;
-//    bz = (m.IsMode<2>())                ? (bz |= FSB(block[0],  3,  5) << 4u) : bz;
-//    bz = (m.IsMode<7>())                ? (bz |= FSB(block[0], 13, 14) << 4u) : bz;
-//    bz = (m.IsMode<10>())               ? (bz |= FSB(block[0], 10, 11) << 4u) : bz;
-//    return bz;
-//};
-
-//MRAY_GPU MRAY_GPU_INLINE
-//Pair<Vector3, Vector3> ExtractColorsBC1(Vector4ui block4C)
-//{
-//    Vector2ul block;
-//    block[0] = Bit::Compose<32, 32>(uint64_t(block4C[0]), uint64_t(block4C[1]));
-//    block[1] = Bit::Compose<32, 32>(uint64_t(block4C[2]), uint64_t(block4C[3]));
-
-//    // One of the complex ones
-//    // Lets start with mode
-//    // mode can be either 2 or 5 bits
-//    uint32_t mode = FSB(block[0], 0, 2);
-//    mode = (mode < 2) ? mode : FSB(block[0], 0, 5);
-//    ModeLookup m(mode);
-
-//    // When looking at the table, this probably
-//    // optimized via some chip wire routing optimizer
-//    // **then** made it into a standard (prob Microsoft
-//    // for a XBOX maybe?)
-//    //
-//    // There should be some pattern to abuse but
-//    // lets write it to check.
-//    uint32_t rw = BisectWhite< 0>(block[0], m);
-//    uint32_t gw = BisectWhite<10>(block[0], m);
-//    uint32_t bw = BisectWhite<20>(block[0], m);
-//    //
-//    uint32_t rx = BisectX< 0>(block[0], m);
-//    uint32_t gx = BisectX<10>(block[0], m);
-//    uint32_t bx = BisectX<20>(block[0], m);
-//    //
-//    uint32_t ry = BisectRYZ<0>(block, m);
-//    uint32_t rz = BisectRYZ<6>(block, m);
-//    //
-//    uint32_t gy = BisectGY(block, m);
-//    uint32_t gz = BisectGZ(block, m);
-//    //
-//    uint32_t by = BisectBY(block, m);
-//    uint32_t bz = BisectBZ(block, m);
-//}
 
 namespace BlockCompressedIO
 {
@@ -545,17 +350,421 @@ Vector4ui BC6H<IsSigned>::InjectColors(Vector4ui block, const ColorPack& colorIn
     return Vector4ui::Zero();
 }
 
+
 MRAY_HYBRID MRAY_CGPU_INLINE
-typename BC7::ColorPack
-BC7::ExtractColors(Vector4ui)
+BC7::BC7(const Vector4ui b)
+    : block(Bit::Compose<32, 32>(uint64_t(b[0]), b[1]),
+            Bit::Compose<32, 32>(uint64_t(b[2]), b[3]))
+{}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+uint32_t BC7::Mode() const
 {
-    return {};
+    uint32_t mode = Bit::CountTZero(uint32_t(block[0]));
+    return std::min(mode, 8u);
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Vector4ui BC7::InjectColors(Vector4ui, const ColorPack&)
+Vector4ui BC7::Block() const
 {
-    return Vector4ui::Zero();
+    return Vector4ui(block[0] & 0xFFFFFFFF, block[0] >> 32,
+                     block[1] & 0xFFFFFFFF, block[1] >> 32);
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Vector3 BC7::ExtractColor(uint32_t i) const
+{
+    auto InjectPBits = [](Vector3uc color, uint8_t bit)
+    {
+        assert(bit <= 1);
+        return Vector3uc((color[0] << 1u) | bit,
+                         (color[1] << 1u) | bit,
+                         (color[2] << 1u) | bit);
+    };
+
+    switch(Mode())
+    {
+        using Bit::FetchSubPortion;
+        using namespace Bit::NormConversion;
+        // 6-color modes
+        case 0:
+        {
+            static constexpr uint32_t B = 4;
+            // To create a pattern,
+            // shift the bits to single 64-bit variable;
+            constexpr uint64_t BITS_64 = sizeof(uint64_t) * CHAR_BIT;
+            uint32_t shiftAmount = i * B + 5u;
+            uint64_t b0 = block[0] >> shiftAmount;
+            b0 |= block[1] << (BITS_64 - shiftAmount);
+
+            Vector3uc result;
+            result[0] = uint8_t(FetchSubPortion(b0, {0, 4}));
+            result[1] = uint8_t(FetchSubPortion(b0, {24, 28}));
+            result[2] = uint8_t(FetchSubPortion(b0, {48, 52}));
+
+            uint8_t p = uint8_t(FetchSubPortion(block[1], {13 + i, 14 + i}));
+            result = InjectPBits(result, p);
+            return Vector3(FromUNormVarying<Float, B + 1>(result[0]),
+                           FromUNormVarying<Float, B + 1>(result[1]),
+                           FromUNormVarying<Float, B + 1>(result[2]));
+        }
+        case 2:
+        {
+            static constexpr uint32_t B = 5;
+            uint32_t o = B * i;
+            Vector3uc result;
+            result[0] = uint8_t(FetchSubPortion(block[0], { 9 + o, 14 + o}));
+            result[1] = uint8_t(FetchSubPortion(block[0], {41 + o, 46 + o}));
+            result[2] = uint8_t(FetchSubPortion(block[1], { 5 + o, 10 + o}));
+
+            return Vector3(FromUNormVarying<Float, B>(result[0]),
+                           FromUNormVarying<Float, B>(result[1]),
+                           FromUNormVarying<Float, B>(result[2]));
+        }
+        // 4-color modes
+        case 1:
+        {
+        }
+        case 3:
+        {
+        }
+        case 4:
+        {
+        }
+        case 5:
+        {
+        }
+        case 6:
+        {
+        }
+        case 7:
+        {
+        }
+        default: return Vector3::Zero();
+
+    };
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+void BC7::InjectColor(uint32_t i, const Vector3& colorIn)
+{
+    auto PackColor = [](Vector3uc c) -> Vector4uc
+    {
+        // P-bit is on c[3]
+        // TODO: Rounding up here?
+        uint8_t p = (c[0] & 0x1) + (c[1] & 0x1) + (c[2] & 0x1);
+        assert(p == 0 || p == 3);
+        p = (p + 2) / 4;
+        return Vector4uc(c[0] >> 1u, c[1] >> 1u, c[2] >> 1u, p);
+    };
+
+    switch(Mode())
+    {
+        //
+        using Bit::FetchSubPortion;
+        using Bit::SetSubPortion;
+        using namespace Bit::NormConversion;
+        // 6-color modes
+        case 0:
+        {
+            static constexpr uint32_t B = 4;
+            auto c = Vector3uc(ToUNormVarying<uint8_t, B + 1>(colorIn[0]),
+                               ToUNormVarying<uint8_t, B + 1>(colorIn[1]),
+                               ToUNormVarying<uint8_t, B + 1>(colorIn[2]));
+            Vector4uc cp = PackColor(c);
+            // Set the p bit
+            block[1] = SetSubPortion(block[1], cp[3], {13 + i, 14 + i});
+            // Set the color
+            uint32_t o = i * B;
+            block[0] = SetSubPortion(block[0], cp[0], { 5 + o,  9 + o});
+            block[0] = SetSubPortion(block[0], cp[1], {29 + o, 33 + o});
+            // Double word boundaries clash here so manual set
+            if(i < 2)
+                block[0] = SetSubPortion(block[0], cp[2], {53 + o, 57 + o});
+            else if(i == 2)
+            {
+                block[0] = SetSubPortion(block[0], cp[2] >> 0u, {61, 64});
+                block[1] = SetSubPortion(block[1], cp[2] >> 3u, {0, 1});
+            }
+            else
+            {
+                o = (i - 3) * B;
+                block[1] = SetSubPortion(block[1], cp[2], {1 + o, 5 + o});
+            }
+            break;
+        }
+        case 2:
+        {
+            static constexpr uint32_t B = 5;
+            auto c = Vector3uc(ToUNormVarying<uint8_t, B>(colorIn[0]),
+                               ToUNormVarying<uint8_t, B>(colorIn[1]),
+                               ToUNormVarying<uint8_t, B>(colorIn[2]));
+            uint32_t o = i * B;
+            block[0] = SetSubPortion(block[0], c[0], { 9 + o, 14 + o});
+            block[0] = SetSubPortion(block[0], c[1], {41 + o, 46 + o});
+            block[1] = SetSubPortion(block[1], c[2], { 5 + o, 10 + o});
+            break;
+        }
+        // 4-color modes
+        case 1:
+        {
+        }
+        case 3:
+        {
+        }
+        case 4:
+        {
+        }
+        case 5:
+        {
+        }
+        case 6:
+        {
+        }
+        case 7:
+        {
+        }
+        default:
+        {
+            block[0] = block[1] = 0x00;
+            break;
+        }
+    }
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+uint32_t BC7::ColorCount() const
+{
+    switch(Mode())
+    {
+        case 0:
+        case 2: return 6;
+        //
+        case 1:
+        case 3:
+        case 7: return 4;
+        //
+        case 4:
+        case 5:
+        case 6: return 2;
+        //
+        default: return 0;
+    }
 }
 
 }
+
+//class ModeLookup
+//{
+//    private:
+//    static constexpr std::array<uint32_t, 14> MODE_TABLE =
+//    {
+//        0b00000, 0b00001, 0b00010, 0b00110,
+//        0b01010, 0b01110, 0b10010, 0b10110,
+//        0b11010, 0b11110, 0b00011, 0b00111,
+//        0b01011, 0b01111
+//    };
+//    uint32_t mode;
+
+//    public:
+//    ModeLookup(uint32_t m) : mode(m) {}
+//    template<unsigned int... I>
+//    bool IsMode()
+//    {
+//        return ((mode == MODE_TABLE[I - 1]) || ...);
+//    }
+//};
+
+//// Alias a function because it will be used a lot..
+//uint32_t FSB(uint32_t v, uint32_t start, uint32_t end)
+//{
+//    using namespace Bit;
+//    return FetchSubPortion<uint32_t>(v, {start, end});
+//};
+
+
+//// Found a pattern for w part
+//// but the other part (xyz parts)
+//// are quite scrambled
+//template<uint32_t O>
+//MRAY_GPU MRAY_GPU_INLINE
+//uint32_t BisectWhite(uint64_t low, ModeLookup m)
+//{
+//    static_assert(O == 0 || O == 10 || O == 20, "Wrong offset");
+//    constexpr bool IsRed    = (O == 0);
+//    constexpr bool IsGreen  = (O == 10);
+//    constexpr bool IsBlue   = (O == 20);
+
+//    uint32_t w = FSB(low, 5 + O, 15 + O);
+//    w = (m.IsMode<2>())         ? (w & 0x003F) : w;
+//    w = (m.IsMode<6>())         ? (w & 0x00FF) : w;
+//    w = (m.IsMode<10>())        ? (w & 0x001F) : w;
+//    w = (m.IsMode<7, 8, 9>())   ? (w & 0x007F) : w;
+//    // Extra bits Middle
+//    if constexpr(IsRed)
+//    {
+//        w = (m.IsMode<4, 5>())  ? (w |= FSB(block[0], 39 + O, 40 + O) << 10u) : w;
+//        w = (m.IsMode<3>())     ? (w |= FSB(block[0], 40 + O, 41 + O) << 10u) : w;
+//    }
+//    else if constexpr(IsGreen)
+//    {
+//        w = (m.IsMode<3, 5>())  ? (w |= FSB(block[0], 39 + O, 40 + O) << 10u) : w;
+//        w = (m.IsMode<4>())     ? (w |= FSB(block[0], 40 + O, 41 + O) << 10u) : w;
+//    }
+//    else
+//    {
+//        w = (m.IsMode<3, 4>())  ? (w |= FSB(block[0], 39 + O, 50 + O) << 10u) : w;
+//        w = (m.IsMode<5>())     ? (w |= FSB(block[0], 40 + O, 41 + O) << 10u) : w;
+//    }
+//    // Extra bits End
+//    w = (m.IsMode<12, 13, 14>())    ? (w |= FSB(block[0], 44 + O, 45 + O) << 10u) : w;
+//    // Mode 13 and 14 are hipsters, bits are reversed
+//    w = (m.IsMode<13, 14>())        ? (w |= FSB(block[0], 43 + O, 44 + O) << 11u) : w;
+//    // 4 bit left, just read bit by bit
+//    // TODO: check "Bit twiddling hacks" for a cooler way maybe?
+//    w = (m.IsMode<14>())    ? (w |= FSB(block[0], 42 + O, 43 + O) << 12u) : w;
+//    w = (m.IsMode<14>())    ? (w |= FSB(block[0], 41 + O, 42 + O) << 13u) : w;
+//    w = (m.IsMode<14>())    ? (w |= FSB(block[0], 40 + O, 41 + O) << 14u) : w;
+//    w = (m.IsMode<14>())    ? (w |= FSB(block[0], 39 + O, 40 + O) << 15u) : w;
+//    return w;
+//}
+
+//template<uint32_t O>
+//MRAY_GPU MRAY_GPU_INLINE
+//uint32_t BisectX(uint64_t low, ModeLookup m)
+//{
+//    static_assert(O == 0 || O == 10 || O == 20, "Wrong offset");
+//    constexpr bool IsRed = (O == 0);
+//    constexpr bool IsGreen = (O == 10);
+//    constexpr bool IsBlue = (O == 20);
+
+//    uint32_t x = FSB(low, 35 + O, 44 + O);
+//    x = (m.IsMode<1, 6, 8, 9>())    ? (x & 0x001F) : x;
+//    x = (m.IsMode<2, 7, 10>())      ? (x & 0x003F) : x;
+//    x = (m.IsMode<14>())            ? (x & 0x000F) : x;
+//    x = (m.IsMode<13>())            ? (x & 0x00FF) : x;
+//    // Permuted modes
+//    if constexpr(IsRed)
+//    {
+//        x = (m.IsMode<3>())     ? (x & 0x001F) : x;
+//        x = (m.IsMode<4, 5>())  ? (x & 0x000F) : x;
+//    }
+//    else if constexpr(IsGreen)
+//    {
+//        x = (m.IsMode<4>())     ? (x & 0x001F) : x;
+//        x = (m.IsMode<3, 5>())  ? (x & 0x000F) : x;
+//    }
+//    else
+//    {
+//        x = (m.IsMode<5>())     ? (x & 0x001F) : x;
+//        x = (m.IsMode<3, 4>())  ? (x & 0x000F) : x;
+//    }
+//    return x;
+//}
+
+//template<uint32_t O>
+//MRAY_GPU MRAY_GPU_INLINE
+//uint32_t BisectRYZ(Vector2ul block, ModeLookup m)
+//{
+//    static_assert(O == 0 || O == 6, "Wrong offset");
+//    uint32_t yz = FSB(block[1], 0 + O, 6 + O);
+//    yz = (m.IsMode<1, 3, 6, 8, 9>())    ? (yz & 0x001F) : yz;
+//    yz = (m.IsMode<4, 5>())             ? (yz & 0x000F) : yz;
+//    // No ry or rz
+//    yz = (m.IsMode<11, 12, 13, 14>())   ? 0 : yz;
+//    return yz;
+//};
+
+//MRAY_GPU MRAY_GPU_INLINE
+//uint32_t BisectGY(Vector2ul block, ModeLookup m)
+//{
+//    if(m.IsMode<11, 12, 13, 14>()) return 0;
+
+//    uint32_t gy = FSB(block[0], 41, 45);
+//    // Extra bits
+//    gy = (m.IsMode<2,6,7,8,9,10>()) ? (gy |= FSB(block[0], 24, 25) << 4u) : gy;
+//    gy = (m.IsMode<1>())            ? (gy |= FSB(block[0],  2,  3) << 4u) : gy;
+//    gy = (m.IsMode<2>())            ? (gy |= FSB(block[0],  2,  3) << 5u) : gy;
+//    gy = (m.IsMode<4>())            ? (gy |= FSB(block[1], 14, 15) << 5u) : gy;
+//    return gy;
+//};
+
+//MRAY_GPU MRAY_GPU_INLINE
+//uint32_t BisectGZ(Vector2ul block, ModeLookup m)
+//{
+//    if (m.IsMode<11, 12, 13, 14>()) return 0;
+
+//    uint32_t gz = FSB(block[0], 51, 55);
+//    // Extra bits
+//    gz = (m.IsMode<1, 4, 6, 8, 9>())    ? (gz |= FSB(block[0], 40, 41) << 4u) : gz;
+//    gz = (m.IsMode<2>())                ? (gz |= FSB(block[0],  3,  5) << 4u) : gz;
+//    gz = (m.IsMode<7>())                ? (gz |= FSB(block[0], 13, 14) << 4u) : gz;
+//    gz = (m.IsMode<10>())               ? (gz |= FSB(block[0], 10, 11) << 4u) : gz;
+//    return gz;
+//};
+
+//MRAY_GPU MRAY_GPU_INLINE
+//uint32_t BisectBY(Vector2ul block, ModeLookup m)
+//{
+//    if(m.IsMode<11, 12, 13, 14>()) return 0;
+
+//    uint32_t by = FSB(block[0], 61, 64);
+//    // Extra bits
+//    by = (m.IsMode<2,6,7,8,9,10>()) ? (by |= FSB(block[0], 14, 15) << 4u) : by;
+//    by = (m.IsMode<1>())            ? (by |= FSB(block[0],  3,  4) << 4u) : by;
+//    by = (m.IsMode<2, 10>())        ? (by |= FSB(block[0], 22, 23) << 5u) : by;
+//    return by;
+//};
+
+//MRAY_GPU MRAY_GPU_INLINE
+//uint32_t BisectBZ(Vector2ul block, ModeLookup m)
+//{
+//    if (m.IsMode<11, 12, 13, 14>()) return 0;
+
+//    uint32_t bz = FSB(block[0], 51, 55);
+//    // Extra bits
+//    bz = (m.IsMode<1, 4, 6, 8, 9>())    ? (bz |= FSB(block[0], 40, 41) << 4u) : bz;
+//    bz = (m.IsMode<2>())                ? (bz |= FSB(block[0],  3,  5) << 4u) : bz;
+//    bz = (m.IsMode<7>())                ? (bz |= FSB(block[0], 13, 14) << 4u) : bz;
+//    bz = (m.IsMode<10>())               ? (bz |= FSB(block[0], 10, 11) << 4u) : bz;
+//    return bz;
+//};
+
+//MRAY_GPU MRAY_GPU_INLINE
+//Pair<Vector3, Vector3> ExtractColorsBC1(Vector4ui block4C)
+//{
+//    Vector2ul block;
+//    block[0] = Bit::Compose<32, 32>(uint64_t(block4C[0]), uint64_t(block4C[1]));
+//    block[1] = Bit::Compose<32, 32>(uint64_t(block4C[2]), uint64_t(block4C[3]));
+
+//    // One of the complex ones
+//    // Lets start with mode
+//    // mode can be either 2 or 5 bits
+//    uint32_t mode = FSB(block[0], 0, 2);
+//    mode = (mode < 2) ? mode : FSB(block[0], 0, 5);
+//    ModeLookup m(mode);
+
+//    // When looking at the table, this probably
+//    // optimized via some chip wire routing optimizer
+//    // **then** made it into a standard (prob Microsoft
+//    // for a XBOX maybe?)
+//    //
+//    // There should be some pattern to abuse but
+//    // lets write it to check.
+//    uint32_t rw = BisectWhite< 0>(block[0], m);
+//    uint32_t gw = BisectWhite<10>(block[0], m);
+//    uint32_t bw = BisectWhite<20>(block[0], m);
+//    //
+//    uint32_t rx = BisectX< 0>(block[0], m);
+//    uint32_t gx = BisectX<10>(block[0], m);
+//    uint32_t bx = BisectX<20>(block[0], m);
+//    //
+//    uint32_t ry = BisectRYZ<0>(block, m);
+//    uint32_t rz = BisectRYZ<6>(block, m);
+//    //
+//    uint32_t gy = BisectGY(block, m);
+//    uint32_t gz = BisectGZ(block, m);
+//    //
+//    uint32_t by = BisectBY(block, m);
+//    uint32_t bz = BisectBZ(block, m);
+//}

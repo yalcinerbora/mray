@@ -43,6 +43,8 @@ class alignas(ChooseNormAlignment(N * sizeof(T))) UNorm
     constexpr                       UNorm() = default;
     template<std::convertible_to<T> C>
     MRAY_HYBRID constexpr explicit  UNorm(Span<const C, N> data);
+    template<std::unsigned_integral... C>
+    MRAY_HYBRID constexpr explicit  UNorm(C... vals) requires(sizeof...(C) == N);
     template<std::floating_point F>
     MRAY_HYBRID constexpr explicit  UNorm(Vector<N, F>);
     // TODO:
@@ -112,6 +114,14 @@ constexpr UNorm<N, T>::UNorm(Vector<N, F> data)
         v[i] = ToUNorm<T>(data[i]);
     }
 }
+
+template <unsigned int N, std::unsigned_integral T>
+template<std::unsigned_integral... C>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr UNorm<N, T>::UNorm(C... vals)
+requires(sizeof...(C) == N)
+    : v{static_cast<T>(vals)...}
+{}
 
 template <unsigned int N, std::unsigned_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE

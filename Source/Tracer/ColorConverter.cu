@@ -288,14 +288,39 @@ void KCConvertColorBC(// I-O
         // Load to local space
         const BCColorConvParams& curParams = dTexConvParams[texI];
         uint32_t tileCount = curParams.blockRange[1] - curParams.blockRange[0];
+        if(texI >= validTexCount) continue;
+
 
         // Skip this mip if it is not available.
         // Mips may be partially available so we check all mips.
         bool noColorConvert = (curParams.fromColorSpace == MRayColorSpaceEnum::MR_DEFAULT ||
                                curParams.fromColorSpace == globalColorSpace);
-        bool noGammaConvert = curParams.gamma == Float(1);
-
+        bool noGammaConvert = (curParams.gamma == Float(1));
         if(noGammaConvert && noColorConvert) continue;
+
+        // Convert color routine, this wrapped to a lambda due to
+        // different compress decompress systems
+        auto ConvColor = [&](Vector3 color)
+        {
+            using namespace Color;
+            // First do gamma correction
+            if(!noGammaConvert)
+                color = OpticalTransferGamma(curParams.gamma).ToLinear(color);
+
+            // Then color
+            if(!noColorConvert)
+            {
+                uint32_t i = static_cast<uint32_t>(curParams.fromColorSpace);
+                [[maybe_unused]]
+                bool invoked = InvokeAt(i, converterList, [&](auto&& tupleElem)
+                {
+                    color = tupleElem.Convert(color);
+                    return true;
+                });
+                assert(invoked);
+            }
+            return color;
+        };
 
         // Loop over the blocks for this tex
         uint32_t tileStart = localProcI * kp.blockSize + kp.threadId;
@@ -303,36 +328,39 @@ void KCConvertColorBC(// I-O
         for(uint32_t tileI = tileStart; tileI < tileCount; tileI += tileIncrement)
         {
             using BlockType = typename BCReader::BlockType;
-            using ColorPack = typename BCReader::ColorPack;
             BlockType block = dBCBlocks[curParams.blockRange[0] + tileI];
-            ColorPack localPixels = BCReader::ExtractColors(block);
 
-            // Convert each color one by one
-            // TODO: This entire operation maybe
-            // dedicated to a warp? then a thread maybe
-            for(auto& localPixRGB : localPixels)
+            // YOLO constexpr here,
+            // BC7 has too many colors, register spill galore.
+            // For BC7 we do streaming architecture
+            // so that we do not have to store the all colors.
+            //
+            // BC(1-5) has small inter color dependency
+            // (i.e. color0 > color1 switches to alpha mode etc.)
+            // For these we could not do streaming.
+            // Thus; this constexpr if statement
+            static constexpr bool IsBC7 = std::is_same_v<BCReader, BlockCompressedIO::BC7>;
+            if constexpr(IsBC7)
             {
-                using namespace Color;
-                // First do gamma correction
-                if(!noGammaConvert)
-                    localPixRGB = OpticalTransferGamma(curParams.gamma).ToLinear(localPixRGB);
-
-                // Then color
-                if(!noColorConvert)
+                BCReader bcIO(block);
+                for(uint32_t i = 0; i < bcIO.ColorCount(); i++)
                 {
-                    uint32_t i = static_cast<uint32_t>(curParams.fromColorSpace);
-                    [[maybe_unused]]
-                    bool invoked = InvokeAt(i, converterList, [&](auto&& tupleElem)
-                    {
-                        localPixRGB = tupleElem.Convert(localPixRGB);
-                        return true;
-                    });
-                    assert(invoked);
+                    Vector3 c = bcIO.ExtractColor(i);
+                    //c = ConvColor(c);
+                    bcIO.InjectColor(i, c);
                 }
+                block = bcIO.Block();
+            }
+            else
+            {
+                using ColorPack = typename BCReader::ColorPack;
+                ColorPack localPixels = BCReader::ExtractColors(block);
+                for(auto& localPixRGB : localPixels)
+                    localPixRGB = ConvColor(localPixRGB);
+                block = BCReader::InjectColors(block, localPixels);
             }
 
-            // Write back
-            block = BCReader::InjectColors(block, localPixels);
+            // Finally, Write back
             dBCBlocks[curParams.blockRange[0] + tileI] = block;
         }
     }
@@ -655,6 +683,43 @@ void ColorConverter::ConvertColor(std::vector<MipArray<SurfRefVariant>> textures
                                   std::vector<GenericTexture*> bcTextures,
                                   MRayColorSpaceEnum globalColorSpace) const
 {
+    //static constexpr
+    //auto block = Vector4ui(0x37777991, 0xAEF0F115,
+    //                      0xE47DC88C, 0xA4A89924);
+    //BlockCompressedIO::BC7 bcIO(block);
+    //auto a = bcIO.ExtractColor(0);
+    //bcIO.InjectColor(0, a);
+    //auto b0 = bcIO.Block();
+    //assert(b0 == block);
+    ////
+    //auto b = bcIO.ExtractColor(1);
+    //bcIO.InjectColor(1, b);
+    //auto b1 = bcIO.Block();
+    //assert(b1 == block);
+
+    //auto c = bcIO.ExtractColor(2);
+    //bcIO.InjectColor(2, c);
+    //auto b2 = bcIO.Block();
+    //assert(b2 == block);
+
+    //auto d = bcIO.ExtractColor(3);
+    //bcIO.InjectColor(3, d);
+    //auto b3 = bcIO.Block();
+    //assert(b3 == block);
+
+    //auto e = bcIO.ExtractColor(4);
+    //bcIO.InjectColor(4, e);
+    //auto b4 = bcIO.Block();
+    //assert(b4 == block);
+
+    //auto f = bcIO.ExtractColor(5);
+    //bcIO.InjectColor(5, f);
+    //auto b5 = bcIO.Block();
+    //assert(b5 == block);
+
+
+
+
     // TODO: Report bug on NVCC, "NVCC Language Frontend"
     // hangs (inf loop) when these literals are changed to "..."sv
     //using namespace std::string_view_literals;
