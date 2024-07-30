@@ -575,7 +575,7 @@ BCColorConverter::BCColorConverter(std::vector<GenericTexture*>&& bcTex)
     std::sort(bcTextures.begin(), bcTextures.end(), PixTypeComp);
     // Find the partitions (Per BC texture type)
     partitions = PartitionRange(bcTextures.begin(), bcTextures.end(),
-                                                       PixTypeComp);
+                                PixTypeComp);
     // Find the memory
     for(Vector2ui& range : partitions)
     {
@@ -585,13 +585,13 @@ BCColorConverter::BCColorConverter(std::vector<GenericTexture*>&& bcTex)
         {
             uint32_t  start = range[0] + i * BC_TEX_PER_BATCH;
             uint32_t  end = range[0] + (i + 1) * BC_TEX_PER_BATCH;
-            end = std::min(end, localTexCount);
+            end = std::min(end, range[0] + localTexCount);
             // "Size()" gives the aligned size (mutiple of 64k in CUDA)
             // so unnecessarily large maybe?
             // TODO: Profile and check this later
             size_t localSize = 0;
             for(uint32_t j = start; j < end; j++)
-                localSize += bcTextures[i]->Size();
+                localSize += bcTextures[j]->Size();
 
             bufferSize = std::max(bufferSize, localSize);
         }
