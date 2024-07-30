@@ -346,7 +346,7 @@ void KCConvertColorBC(// I-O
                 for(uint32_t i = 0; i < bcIO.ColorCount(); i++)
                 {
                     Vector3 c = bcIO.ExtractColor(i);
-                    //c = ConvColor(c);
+                    c = ConvColor(c);
                     bcIO.InjectColor(i, c);
                 }
                 block = bcIO.Block();
@@ -683,6 +683,47 @@ void ColorConverter::ConvertColor(std::vector<MipArray<SurfRefVariant>> textures
                                   std::vector<GenericTexture*> bcTextures,
                                   MRayColorSpaceEnum globalColorSpace) const
 {
+    constexpr std::array A =
+    {
+        Vector4ui(0x47b22940, 0xfffe9d83, 0x56624343, 0xfc992220),
+        Vector4ui(0x47b22940, 0xfffe9d83, 0x12235535, 0xcadf2112),
+        Vector4ui(0xe6d4e540, 0xfffec54b, 0x7bddc86f, 0x78507dec),
+        Vector4ui(0xe6d525c0, 0xfffebd23, 0x45126603, 0xbced9bcd),
+        Vector4ui(0x27526840, 0xfffe894b, 0xefc85533, 0x14439b61),
+        Vector4ui(0xa69425c0, 0xfffea51b, 0x7da70c91, 0xddcd8943),
+        Vector4ui(0xa6342440, 0xfffea903, 0x5996067f, 0x9dfd7cca),
+        Vector4ui(0x8613a440, 0xfffea0fb, 0x69a387d, 0xffee58bc),
+        Vector4ui(0x85d3a240, 0xfffe9ceb, 0x9301a639, 0xfb9bfcad),
+        Vector4ui(0x6d1e6c0, 0xfffe8133, 0x6bc7578d, 0x2561bfd3),
+        Vector4ui(0xf6d1a640, 0xfffe7d32, 0xcc852631, 0x8656fb75),
+        Vector4ui(0x6f1e740, 0xfffe7d3b, 0xb66ba401, 0xfdccebcf),
+        Vector4ui(0x66332440, 0xfffe950b, 0x204b9b9d, 0xd424e229),
+        Vector4ui(0x8653e4c0, 0xfffe9d0b, 0x22003, 0xeddd039d),
+        Vector4ui(0x961423c0, 0xfffea103, 0x56609973, 0xecbc7776),
+        Vector4ui(0x277268c0, 0xfffe8553, 0xcedd5309, 0x7510ffb9),
+        Vector4ui(0x36f26740, 0xfffe893b, 0xfb9c136d, 0x4884f989),
+        Vector4ui(0x6f1e6c0, 0xfffe853b, 0xffdc8651, 0x2a899dbc),
+        Vector4ui(0xf6b0e4c0, 0xfffe813a, 0x6fd88839, 0x81289889),
+        Vector4ui(0x6652e340, 0xfffe9d1b, 0x28ee8963, 0x10001698),
+        Vector4ui(0x66136340, 0xfffe9cfb, 0x86877301, 0x669e4499),
+        Vector4ui(0x763363c0, 0xfffe9d0b, 0xffdb3a7b, 0x3068e9ba)
+    };
+
+    //for(uint32_t i = 0; i < A.size(); i++)
+    //{
+    //    BlockCompressedIO::BC7 bcIO(A[i]);
+    //    auto a = bcIO.ExtractColor(0);
+    //    bcIO.InjectColor(0, a);
+    //    auto b0 = bcIO.Block();
+    //    assert(b0 == A[i]);
+    //    //
+    //    auto b = bcIO.ExtractColor(1);
+    //    bcIO.InjectColor(1, b);
+    //    auto b1 = bcIO.Block();
+    //    assert(b1 == A[i]);
+    //}
+
+
     //static constexpr
     //auto block = Vector4ui(0x37777991, 0xAEF0F115,
     //                      0xE47DC88C, 0xA4A89924);

@@ -9,13 +9,16 @@
 
 namespace Bit
 {
+    template <class T>
+    using TPair = std::array<T, 2>;
+
     template<std::integral T>
-    constexpr T FetchSubPortion(T value, std::array<T, 2> bitRange);
+    constexpr T FetchSubPortion(T value, TPair<T> bitRange);
 
     template<std::integral T, std::integral C>
     requires (std::convertible_to<C, T>)
     [[nodiscard]]
-    constexpr T SetSubPortion(T value, C in, std::array<T, 2> bitRange);
+    constexpr T SetSubPortion(T value, C in, TPair<T> bitRange);
 
     template<size_t... Is, std::unsigned_integral... Ts>
     requires(sizeof...(Is) == sizeof...(Ts))
@@ -23,33 +26,43 @@ namespace Bit
     Compose(Ts... values);
 
     template<std::unsigned_integral T>
-    constexpr T RotateLeft(T value, T shiftAmount);
+    constexpr T     RotateLeft(T value, T shiftAmount);
 
     template<std::unsigned_integral T>
-    constexpr T RotateRight(T value, T shiftAmount);
+    constexpr T     RotateRight(T value, T shiftAmount);
+
+    // 128-bit variant (used for BC stuff)
+    constexpr
+    TPair<uint64_t> RotateLeft(TPair<uint64_t> value, uint32_t shiftAmount);
+
+    constexpr
+    TPair<uint64_t> RotateRight(TPair<uint64_t> value, uint32_t shiftAmount);
 
     template<std::unsigned_integral T>
-    constexpr T RequiredBitsToRepresent(T value);
+    constexpr T     RequiredBitsToRepresent(T value);
 
     template<std::unsigned_integral T>
-    constexpr T BitReverse(T value, T width = sizeof(T) * CHAR_BIT);
+    constexpr T     BitReverse(T value,
+                               T width = sizeof(T) * CHAR_BIT);
 
     template<std::unsigned_integral T>
-    constexpr T CountLZero(T value);
+    constexpr T     CountLZero(T value);
 
     template<std::unsigned_integral T>
-    constexpr T CountTZero(T value);
+    constexpr T     CountTZero(T value);
 
     template<std::unsigned_integral T>
-    constexpr T CountLOne(T value);
+    constexpr T     CountLOne(T value);
 
     template<std::unsigned_integral T>
-    constexpr T CountTOne(T value);
+    constexpr T     CountTOne(T value);
 
     template<std::unsigned_integral T>
-    constexpr T PopC(T value);
+    constexpr T     PopC(T value);
 
-    constexpr uint32_t GenerateFourCC(char byte0, char byte1, char byte2, char byte3);
+    constexpr
+    uint32_t        GenerateFourCC(char byte0, char byte1,
+                                   char byte2, char byte3);
 
     namespace NormConversion
     {
@@ -62,19 +75,17 @@ namespace Bit
         MRAY_HYBRID
         constexpr R FromUNormVaryingInsane(T value);
 
-        template<std::floating_point R, uint32_t Bits,
-                 std::unsigned_integral T>
+        template<std::floating_point R, std::unsigned_integral T>
         MRAY_HYBRID
-        constexpr R FromUNormVarying(T in);
+        constexpr R FromUNormVarying(T in, T bits);
 
         template<std::unsigned_integral T, std::floating_point R>
         MRAY_HYBRID
         constexpr T ToUNorm(R in);
 
-        template<std::unsigned_integral T, uint32_t Bits,
-                 std::floating_point R>
+        template<std::unsigned_integral T, std::floating_point R>
         MRAY_HYBRID
-        constexpr T ToUNormVarying(R in);
+        constexpr T ToUNormVarying(R in, T bits);
 
         template<std::floating_point R, std::signed_integral T>
         MRAY_HYBRID
@@ -258,6 +269,9 @@ template<std::unsigned_integral T>
 constexpr T Bit::RotateLeft(T value, T shiftAmount)
 {
     constexpr T Bits = sizeof(T) * CHAR_BIT;
+    assert(shiftAmount < Bits);
+    if(shiftAmount == 0) return value;
+
     T result = (value << shiftAmount);
     result |= (value >> (Bits - shiftAmount));
     return result;
@@ -267,11 +281,57 @@ template<std::unsigned_integral T>
 constexpr T Bit::RotateRight(T value, T shiftAmount)
 {
     constexpr T Bits = sizeof(T) * CHAR_BIT;
+    assert(shiftAmount < Bits);
+    if(shiftAmount == 0) return value;
+
     T result = (value >> shiftAmount);
     result |= (value << (Bits - shiftAmount));
     return result;
 }
 
+constexpr inline
+typename Bit::TPair<uint64_t>
+Bit::RotateLeft(TPair<uint64_t> value, uint32_t shift)
+{
+    constexpr uint64_t Bits = sizeof(uint64_t) * CHAR_BIT;
+    assert(shift < Bits * 2);
+    if(shift >= Bits)
+    {
+        shift -= Bits;
+        std::swap(value[0], value[1]);
+    }
+    if(shift == 0) return value;
+
+    uint64_t invShift = Bits - shift;
+    TPair<uint64_t> result;
+    result[1] = (value[1] << shift);
+    result[1] |= (value[0] >> invShift);
+    result[0] = (value[0] << shift);
+    result[0] |= (value[1] >> invShift);
+    return result;
+}
+
+constexpr inline
+typename Bit::TPair<uint64_t>
+Bit::RotateRight(TPair<uint64_t> value, uint32_t shift)
+{
+    constexpr uint64_t Bits = sizeof(uint64_t) * CHAR_BIT;
+    assert(shift < Bits * 2);
+    if(shift >= Bits)
+    {
+        shift -= Bits;
+        std::swap(value[0], value[1]);
+    }
+    if(shift == 0) return value;
+
+    uint64_t invShift = Bits - shift;
+    TPair<uint64_t> result;
+    result[0] = (value[0] >> shift);
+    result[0] |= (value[1] << invShift);
+    result[1] = (value[1] >> shift);
+    result[1] |= (value[0] << invShift);
+    return result;
+}
 template<std::unsigned_integral T>
 constexpr T Bit::RequiredBitsToRepresent(T value)
 {
@@ -444,18 +504,17 @@ constexpr R Bit::NormConversion::FromUNormVaryingInsane(T value)
     return R(1) - std::bit_cast<R>(rBits);
 }
 
-template<std::floating_point R, uint32_t Bits,
-         std::unsigned_integral T>
+template<std::floating_point R, std::unsigned_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr R Bit::NormConversion::FromUNormVarying(T in)
+constexpr R Bit::NormConversion::FromUNormVarying(T in,T bits)
 {
-    constexpr R MAX = R((T(1) << Bits) - T(1));
-    constexpr R MIN = R(std::numeric_limits<T>::min());
-    constexpr R DELTA = 1 / (MAX - MIN);
+    R max = R((T(1) << bits) - T(1));
+    R min = R(std::numeric_limits<T>::min());
+    R delta = 1 / (max - min);
     // TODO: Specialize using intrinsics maybe?
     // For GPU (GPUs should have these?)
     // Also check more precise way to do this (if available?)
-    R result = MIN + static_cast<R>(in) * DELTA;
+    R result = min + static_cast<R>(in) * delta;
     return result;
 }
 
@@ -477,21 +536,20 @@ constexpr T Bit::NormConversion::ToUNorm(R in)
     return T(in);
 }
 
-template<std::unsigned_integral T, uint32_t Bits,
-         std::floating_point R>
+template<std::unsigned_integral T, std::floating_point R>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T Bit::NormConversion::ToUNormVarying(R in)
+constexpr T Bit::NormConversion::ToUNormVarying(R in, T bits)
 {
     #ifdef MRAY_DEVICE_CODE_PATH
         using std::round;
     #endif
 
     assert(in >= R(0) && in <= R(1));
-    constexpr R MAX = R((T(1) << Bits) - T(1));
-    constexpr R MIN = R(std::numeric_limits<T>::min());
-    constexpr R DIFF = (MAX - MIN);
+    R max = R((T(1) << bits) - T(1));
+    R min = R(std::numeric_limits<T>::min());
+    R diff = (max - min);
 
-    in *= DIFF;
+    in *= diff;
     in = round(in);
     return T(in);
 }

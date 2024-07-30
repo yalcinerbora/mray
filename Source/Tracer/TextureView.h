@@ -94,10 +94,6 @@ class TracerTexView
     MRAY_GPU Optional<T>    operator()(UV uv, Float mipLevel) const;
 };
 
-
-static constexpr size_t A = sizeof(TracerTexView<3, Vector4>);
-
-
 template<uint32_t D, class T>
 template<class ReadType>
 MRAY_GPU MRAY_GPU_INLINE
