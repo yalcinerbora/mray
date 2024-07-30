@@ -343,7 +343,8 @@ void KCConvertColorBC(// I-O
             if constexpr(IsBC7)
             {
                 BCReader bcIO(block);
-                for(uint32_t i = 0; i < bcIO.ColorCount(); i++)
+                //for(uint32_t i = 0; i < bcIO.ColorCount(); i++)
+                for(uint32_t i = 0; i < 6; i++)
                 {
                     Vector3 c = bcIO.ExtractColor(i);
                     c = ConvColor(c);

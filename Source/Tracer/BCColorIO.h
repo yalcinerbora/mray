@@ -97,21 +97,19 @@ namespace BlockCompressedIO
         public:
         using BlockType = Vector4ui;
 
-        struct ModeInfo
-        {
-            uint32_t    colorCount;
-            uint32_t    colorBits;
-            uint32_t    colorStart;
-            bool        hasUniquePBits;
-        };
-
         private:
         Vector2ul   block;
 
         MRAY_HYBRID
         uint32_t    Mode() const;
         MRAY_HYBRID
-        ModeInfo    GenModeInfo() const;
+        uint32_t    ColorStartOffset(uint32_t mode) const;
+        MRAY_HYBRID
+        uint32_t    ColorBits(uint32_t mode) const;
+        MRAY_HYBRID
+        uint32_t    ColorCount(uint32_t mode) const;
+        MRAY_HYBRID
+        bool        HasUniquePBits(uint32_t mode) const;
 
         public:
         MRAY_HYBRID BC7(const Vector4ui block);
@@ -367,21 +365,47 @@ uint32_t BC7::Mode() const
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-typename BC7::ModeInfo BC7::GenModeInfo() const
+uint32_t BC7::ColorStartOffset(uint32_t mode) const
 {
-    static constexpr std::array MODE_LIST =
-    {
-        ModeInfo{ 6, 4, 1 + 4, true },
-        ModeInfo{ 4, 6, 2 + 6, false },
-        ModeInfo{ 6, 5, 3 + 6, false },
-        ModeInfo{ 4, 7, 4 + 6, true },
-        ModeInfo{ 2, 5, 5 + 3, false },
-        ModeInfo{ 2, 7, 6 + 2, false },
-        ModeInfo{ 2, 7, 7 + 0, true },
-        ModeInfo{ 4, 5, 8 + 6, true }
-    };
-    assert(Mode() < 8);
-    return MODE_LIST[Mode()];
+    if(mode == 0)       return 1 + 4;
+    else if(mode == 1)  return 2 + 6;
+    else if(mode == 2)  return 3 + 6;
+    else if(mode == 3)  return 4 + 6;
+    else if(mode == 4)  return 5 + 3;
+    else if(mode == 5)  return 6 + 2;
+    else if(mode == 6)  return 7 + 0;
+    else                return 8 + 6;
+
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+uint32_t BC7::ColorBits(uint32_t mode) const
+{
+    if(mode == 0)
+        return 4;
+    else if(mode == 1)
+        return 6;
+    else if(mode == 2 || mode == 4 || mode == 7)
+        return 5;
+    else
+        return 7;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+uint32_t BC7::ColorCount(uint32_t mode) const
+{
+    if(mode == 0 || mode == 2)
+        return 6;
+    else if(mode == 1 || mode == 3 || mode == 7)
+        return 4;
+    else
+        return 2;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool BC7::HasUniquePBits(uint32_t mode) const
+{
+    return (mode == 0 || mode == 3 || mode == 6 || mode == 7);
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -414,25 +438,26 @@ Vector3 BC7::ExtractColor(uint32_t i) const
     };
 
     uint32_t mode = Mode();
-    auto modeInfo = GenModeInfo();
+    if(i >= ColorCount(mode)) return Vector3::Zero();
+
     // Rotation bits (only valid for mode 4 and 5)
     uint32_t rotation = uint32_t(Bit::FetchSubPortion(block[0], {mode + 1, mode + 3}));
     bool hasRotation = (mode == 5 || mode == 4) && (rotation != 0);
 
     // Cycle through bits and read
-    const uint32_t CC = modeInfo.colorCount;
-    const uint32_t B = modeInfo.colorBits;
+    const uint32_t CC = ColorCount(mode);
+    const uint32_t B = ColorBits(mode);
     const uint32_t O = B * i;
     using Bit::FetchSubPortion;
     using Bit::RotateRight;
-    auto b = RotateRight(block.AsArray(), modeInfo.colorStart);
+    auto b = RotateRight(block.AsArray(), ColorStartOffset(mode));
 
     // R,G,B
     Vector3ui c = Vector3ui::Zero();
     UNROLL_LOOP
     for(uint32_t idx = 0; idx < 3; idx++)
     {
-        if(!(hasRotation && rotation == (idx + 1)))
+        //if(!(hasRotation && rotation == (idx + 1)))
             c[idx] = uint32_t(FetchSubPortion(b[0], {O, O + B}));
         b = RotateRight(b, CC * B);
     }
@@ -440,7 +465,7 @@ Vector3 BC7::ExtractColor(uint32_t i) const
     if(mode == 6 || mode == 7)
         b = RotateRight(b, CC * B);
     // If has unique p-bits
-    if(modeInfo.hasUniquePBits)
+    if(HasUniquePBits(mode))
     {
         uint32_t p = uint32_t(FetchSubPortion(b[0], {i, i + 1}));
         c = InjectPBits(c, p);
@@ -462,17 +487,15 @@ Vector3 BC7::ExtractColor(uint32_t i) const
         c[rotation - 1] = uint32_t(FetchSubPortion(b[0], {o, o + B + 1}));
         // This is little bit different than the generic
         // case migh as well return here
-        uint32_t cBits = modeInfo.colorBits;
-        uint32_t rb = (rotation == 1) ? (cBits + 1) : cBits;
-        uint32_t gb = (rotation == 2) ? (cBits + 1) : cBits;
-        uint32_t bb = (rotation == 3) ? (cBits + 1) : cBits;
+        uint32_t rb = (rotation == 1) ? (B + 1) : B;
+        uint32_t gb = (rotation == 2) ? (B + 1) : B;
+        uint32_t bb = (rotation == 3) ? (B + 1) : B;
         cBitCount = Vector3ui(rb, gb, bb);
     }
     else
     {
-        bool expandChannel = (modeInfo.hasUniquePBits || mode == 1);
-        uint32_t cBits = modeInfo.colorBits;
-        cBits = expandChannel ? (cBits + 1) : cBits;
+        bool expandChannel = (HasUniquePBits(mode) || mode == 1);
+        uint32_t cBits = expandChannel ? (B + 1) : B;
         cBitCount = Vector3ui(cBits);
     }
 
@@ -509,17 +532,21 @@ void BC7::InjectColor(uint32_t i, const Vector3& colorIn)
     };
 
     uint32_t mode = Mode();
-    auto modeInfo = GenModeInfo();
+    if(i >= ColorCount(mode)) return;
+
+    const uint32_t CC = ColorCount(mode);
+    const uint32_t B = ColorBits(mode);
+    const uint32_t O = B * i;
     // Rotation bits (only valid for mode 4 and 5)
     uint32_t rotation = uint32_t(Bit::FetchSubPortion(block[0], {mode + 1, mode + 3}));
     bool hasRotation = (mode == 5 || mode == 4) && (rotation != 0);
-    bool hasPBits = (modeInfo.hasUniquePBits || (mode == 1));
+    bool hasPBits = (HasUniquePBits(mode) || (mode == 1));
 
     Vector3ui cBitCount = Vector3ui::Zero();
     if(mode == 5 || mode == 4)
     {
         using namespace Bit::NormConversion;
-        uint32_t colorBits = modeInfo.colorBits;
+        uint32_t colorBits = B;
         uint32_t rb = (rotation == 1) ? colorBits + 1 : colorBits;
         uint32_t gb = (rotation == 2) ? colorBits + 1 : colorBits;
         uint32_t bb = (rotation == 3) ? colorBits + 1 : colorBits;
@@ -527,8 +554,7 @@ void BC7::InjectColor(uint32_t i, const Vector3& colorIn)
     }
     else
     {
-        uint32_t colorBits = uint32_t(modeInfo.colorBits);
-        if(hasPBits) colorBits++;
+        uint32_t colorBits = (hasPBits) ? B + 1 : B;
         cBitCount = Vector3ui(colorBits);
     }
     // Convert back to full 8-bit
@@ -544,12 +570,9 @@ void BC7::InjectColor(uint32_t i, const Vector3& colorIn)
     if(hasPBits) c = GetPBitAndPack(pBit, c);
 
     // Cycle through bits and write
-    const uint32_t CC = modeInfo.colorCount;
-    const uint32_t B = modeInfo.colorBits;
-    const uint32_t O = B * i;
     using Bit::SetSubPortion;
     using Bit::RotateRight;
-    auto b  = RotateRight(block.AsArray(), modeInfo.colorStart);
+    auto b  = RotateRight(block.AsArray(), ColorStartOffset(mode));
 
     // R,G,B
     UNROLL_LOOP
@@ -565,7 +588,7 @@ void BC7::InjectColor(uint32_t i, const Vector3& colorIn)
         b = RotateRight(b, CC * B);
 
     // If has unique p-bits
-    if(modeInfo.hasUniquePBits)
+    if(HasUniquePBits(mode))
         b[0] = SetSubPortion(b[0], pBit, {i, i + 1});
 
     // Shared P-bits
@@ -588,37 +611,17 @@ void BC7::InjectColor(uint32_t i, const Vector3& colorIn)
     }
     // Rotate the bits back to the proper location
     uint32_t ccbCount = (mode == 6 || mode == 7) ? 4 : 3;
-    uint32_t rBack = (CC * B * ccbCount) + modeInfo.colorStart;
+    uint32_t rBack = (CC * B * ccbCount) + ColorStartOffset(mode);
     b = Bit::RotateRight(b, 128u - rBack);
     block = Vector2ul(b[0], b[1]);
 }
 
+
+
 MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t BC7::ColorCount() const
 {
-    static constexpr std::array MODE_LIST =
-    {
-        6u, 4u, 6u, 4u,
-        2u, 2u, 2u, 4u
-    };
-    assert(Mode() < 8);
-    return MODE_LIST[Mode()];
-
-    //switch(Mode())
-    //{
-    //    case 0:
-    //    case 2: return 6;
-    //    //
-    //    case 1:
-    //    case 3:
-    //    case 7: return 4;
-    //    //
-    //    case 4:
-    //    case 5:
-    //    case 6: return 2;
-    //    //
-    //    default: return 0;
-    //}
+    return ColorCount(Mode());
 }
 
 }
