@@ -418,38 +418,20 @@ Vector4ui BC7::Block() const
 MRAY_HYBRID MRAY_CGPU_INLINE
 Vector3 BC7::ExtractColor(uint32_t i) const
 {
-    auto InjectPBits = [](Vector3ui color, uint32_t bit) -> Vector3ui
-    {
-        assert(bit <= 1);
-        return Vector3ui((color[0] << 1u) | bit,
-                         (color[1] << 1u) | bit,
-                         (color[2] << 1u) | bit);
-    };
-
-    auto ExpandAndRepeat = [](Vector3ui color, Vector3ui colorBits) -> Vector3ui
-    {
-        Vector3ui result(color[0] << (8u - colorBits[0]),
-                         color[1] << (8u - colorBits[1]),
-                         color[2] << (8u - colorBits[2]));
-        result[0] |= (result[0] >> colorBits[0]);
-        result[1] |= (result[1] >> colorBits[1]);
-        result[2] |= (result[2] >> colorBits[2]);
-        return result;
-    };
-
+    using Bit::FetchSubPortion;
+    using Bit::RotateRight;
     uint32_t mode = Mode();
     if(i >= ColorCount(mode)) return Vector3::Zero();
 
     // Rotation bits (only valid for mode 4 and 5)
-    uint32_t rotation = uint32_t(Bit::FetchSubPortion(block[0], {mode + 1, mode + 3}));
+    uint32_t rotation = uint32_t(FetchSubPortion(block[0], {mode + 1, mode + 3}));
     bool hasRotation = (mode == 5 || mode == 4) && (rotation != 0);
+    bool hasPBits = (HasUniquePBits(mode) || (mode == 1));
 
     // Cycle through bits and read
     const uint32_t CC = ColorCount(mode);
     const uint32_t B = ColorBits(mode);
     const uint32_t O = B * i;
-    using Bit::FetchSubPortion;
-    using Bit::RotateRight;
     auto b = RotateRight(block.AsArray(), ColorStartOffset(mode));
 
     // R,G,B
@@ -457,26 +439,22 @@ Vector3 BC7::ExtractColor(uint32_t i) const
     UNROLL_LOOP
     for(uint32_t idx = 0; idx < 3; idx++)
     {
-        //if(!(hasRotation && rotation == (idx + 1)))
-            c[idx] = uint32_t(FetchSubPortion(b[0], {O, O + B}));
+        c[idx] = uint32_t(FetchSubPortion(b[0], {O, O + B}));
         b = RotateRight(b, CC * B);
     }
     // Skip alpha row for mode 6 & 7
     if(mode == 6 || mode == 7)
         b = RotateRight(b, CC * B);
     // If has unique p-bits
-    if(HasUniquePBits(mode))
+    if(hasPBits)
     {
-        uint32_t p = uint32_t(FetchSubPortion(b[0], {i, i + 1}));
-        c = InjectPBits(c, p);
-    }
-    // Shared P-bits
-    if(mode == 1)
-    {
-        // Every to color shares a single bit
-        uint32_t o = i >> 1;
+        // Shared P-bits (first 2 color use one p-bit etc.)
+        uint32_t o = (mode == 1) ? i >> 1 : i;
         uint32_t p = uint32_t(FetchSubPortion(b[0], {o, o + 1}));
-        c = InjectPBits(c, p);
+        assert(p <= 1);
+        c[0] = (c[0] << 1u) | p;
+        c[1] = (c[1] << 1u) | p;
+        c[2] = (c[2] << 1u) | p;
     }
     // Has rotation we need to update alpha with color
     Vector3ui cBitCount = Vector3ui::Zero();
@@ -500,7 +478,12 @@ Vector3 BC7::ExtractColor(uint32_t i) const
     }
 
     // Expand the bits and repeat MSB over LSB
-    c = ExpandAndRepeat(c, cBitCount);
+    c[0] <<= (8u - cBitCount[0]);
+    c[1] <<= (8u - cBitCount[1]);
+    c[2] <<= (8u - cBitCount[2]);
+    c[0] |= (c[0] >> cBitCount[0]);
+    c[1] |= (c[1] >> cBitCount[1]);
+    c[2] |= (c[2] >> cBitCount[2]);
     using namespace Bit::NormConversion;
     return Vector3(FromUNorm<Float>(uint8_t(c[0])),
                    FromUNorm<Float>(uint8_t(c[1])),
@@ -510,27 +493,6 @@ Vector3 BC7::ExtractColor(uint32_t i) const
 MRAY_HYBRID MRAY_CGPU_INLINE
 void BC7::InjectColor(uint32_t i, const Vector3& colorIn)
 {
-    auto GetPBitAndPack = [](uint32_t& p, Vector3ui c) -> Vector3ui
-    {
-        // P-bit is on c[3]
-        // TODO: Rounding up here?
-        p = (c[0] & 0x1) + (c[1] & 0x1) + (c[2] & 0x1);
-        p = (p + 2) / 4;
-        return Vector3ui(c[0] >> 1u, c[1] >> 1u, c[2] >> 1u);
-    };
-
-    auto RoundAndPack = [](Vector3ui c, Vector3ui cBits) -> Vector3ui
-    {
-        // Round the value
-        c[0] = std::min(c[0] + (1u << (8u - cBits[0])) - 1, 255u);
-        c[1] = std::min(c[1] + (1u << (8u - cBits[1])) - 1, 255u);
-        c[2] = std::min(c[2] + (1u << (8u - cBits[2])) - 1, 255u);
-        // Get the MSB portion
-        return Vector3ui(c[0] >> (8u - cBits[0]),
-                         c[1] >> (8u - cBits[1]),
-                         c[2] >> (8u - cBits[2]));
-    };
-
     uint32_t mode = Mode();
     if(i >= ColorCount(mode)) return;
 
@@ -563,11 +525,30 @@ void BC7::InjectColor(uint32_t i, const Vector3& colorIn)
                             ToUNorm<uint8_t>(colorIn[1]),
                             ToUNorm<uint8_t>(colorIn[2]));
     // Round the lower bits and pack to the specified bit width
-    c = RoundAndPack(c, cBitCount);
-
-    // Fetch pBit from the data
+    // Round the value & Get the MSB portion
+    // There is a UB when 8-bit color is given "1 << 7u - cBits[0]"
+    // so we shift one and shift back one more to prevent an if
+    c[0] <<= 1;
+    c[0] = std::min(c[0] + (1u << (8u - cBitCount[0])), 255u);
+    c[0] >>= (9u - cBitCount[0]);
+    c[1] <<= 1;
+    c[1] = std::min(c[1] + (1u << (8u - cBitCount[1])), 255u);
+    c[1] >>= (9u - cBitCount[1]);
+    c[2] <<= 1;
+    c[2] = std::min(c[2] + (1u << (8u - cBitCount[2])), 255u);
+    c[2] >>= (9u - cBitCount[2]);
+    // Fetch pBit from the color
     uint32_t pBit = 0;
-    if(hasPBits) c = GetPBitAndPack(pBit, c);
+    if(hasPBits)
+    {
+        // Get p-bit and pack
+        // TODO: Rounding up here?
+        pBit = (c[0] & 0x1) + (c[1] & 0x1) + (c[2] & 0x1);
+        pBit = (pBit + 2) / 4;
+        c[0] >>= 1u;
+        c[1] >>= 1u;
+        c[2] >>= 1u;
+    }
 
     // Cycle through bits and write
     using Bit::SetSubPortion;
@@ -615,8 +596,6 @@ void BC7::InjectColor(uint32_t i, const Vector3& colorIn)
     b = Bit::RotateRight(b, 128u - rBack);
     block = Vector2ul(b[0], b[1]);
 }
-
-
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t BC7::ColorCount() const

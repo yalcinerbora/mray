@@ -302,22 +302,23 @@ Expected<Pair<ColorSpacePack, MRayPixelTypeRT>> ReadPixelTypeDDS_DX9(const Heade
     // https://github.com/microsoft/DirectXTex/blob/main/DirectXTex/DDS.h
     // TODO: Check if we missed any
     // BC1
-    constexpr uint32_t BC1_FOURCC    = Bit::GenerateFourCC('D', 'X', 'T', '1');
+    using Bit::GenerateFourCC;
+    static constexpr uint32_t BC1_FOURCC    = GenerateFourCC('D', 'X', 'T', '1');
     // BC2
-    constexpr uint32_t BC2_FOURCC_0  = Bit::GenerateFourCC('D', 'X', 'T', '2');
-    constexpr uint32_t BC2_FOURCC_1  = Bit::GenerateFourCC('D', 'X', 'T', '3');
+    static constexpr uint32_t BC2_FOURCC_0  = GenerateFourCC('D', 'X', 'T', '2');
+    static constexpr uint32_t BC2_FOURCC_1  = GenerateFourCC('D', 'X', 'T', '3');
     // BC3
-    constexpr uint32_t BC3_FOURCC_0  = Bit::GenerateFourCC('D', 'X', 'T', '4');
-    constexpr uint32_t BC3_FOURCC_1  = Bit::GenerateFourCC('D', 'X', 'T', '5');
+    static constexpr uint32_t BC3_FOURCC_0  = GenerateFourCC('D', 'X', 'T', '4');
+    static constexpr uint32_t BC3_FOURCC_1  = GenerateFourCC('D', 'X', 'T', '5');
     // BC4
-    constexpr uint32_t BC4U_FOURCC_0 = Bit::GenerateFourCC('A', 'T', 'I', '1');
-    constexpr uint32_t BC4U_FOURCC_1 = Bit::GenerateFourCC('B', 'C', '4', 'U');
-    constexpr uint32_t BC4S_FOURCC   = Bit::GenerateFourCC('B', 'C', '4', 'S');
+    static constexpr uint32_t BC4U_FOURCC_0 = GenerateFourCC('A', 'T', 'I', '1');
+    static constexpr uint32_t BC4U_FOURCC_1 = GenerateFourCC('B', 'C', '4', 'U');
+    static constexpr uint32_t BC4S_FOURCC   = GenerateFourCC('B', 'C', '4', 'S');
     // BC5
-    constexpr uint32_t BC5U_FOURCC_0 = Bit::GenerateFourCC('A', 'T', 'I', '2');
-    constexpr uint32_t BC5U_FOURCC_1 = Bit::GenerateFourCC('B', 'C', '5', 'U');
-    constexpr uint32_t BC5S_FOURCC   = Bit::GenerateFourCC('B', 'C', '5', 'S');
-    constexpr uint32_t DDPF_FOURCC = 0x4;
+    static constexpr uint32_t BC5U_FOURCC_0 = GenerateFourCC('A', 'T', 'I', '2');
+    static constexpr uint32_t BC5U_FOURCC_1 = GenerateFourCC('B', 'C', '5', 'U');
+    static constexpr uint32_t BC5S_FOURCC   = GenerateFourCC('B', 'C', '5', 'S');
+    static constexpr uint32_t DDPF_FOURCC   = 0x4;
 
     // Delegate to the OIIO if not block compressed
     if((headerDX9.ddspf.dwFlags & DDPF_FOURCC) == 0)

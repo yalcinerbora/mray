@@ -514,11 +514,11 @@ Expected<ImageHeader> ImageFileOIIO::ReadHeader()
         e.AppendInfo(MRAY_FORMAT("({})", filePath));
         return e;
     }
-    if(colorSpaceE.value().second == MRayColorSpaceEnum::MR_DEFAULT)
+    if(hasColorSpace && colorSpaceE.value().second == MRayColorSpaceEnum::MR_DEFAULT)
         MRAY_WARNING_LOG("Texture \"{}\" has linear colorspace. "
                          "Assuming it is on tracer's global texture color space.",
                          filePath);
-    const auto& colorSpace = colorSpaceE.value();
+    ColorSpacePack colorSpace = colorSpaceE.value_or({Float(1), MRayColorSpaceEnum::MR_DEFAULT});
 
     // TODO: Support tiled images
     if(spec.tile_width != 0 || spec.tile_height != 0)

@@ -68,9 +68,9 @@ Expected<ImageFilePtr> ImageLoader::OpenFile(const std::string& filePath,
     auto headerE = filePtr->ReadHeader();
     // If DDS file is OK but uncompressed delegate to OIIO
     if(headerE.has_error() && !headerE.error())
-        return generator(filePath,
-                         std::move(subChannels),
-                         std::move(flags));
+        return defaultGenerator(filePath,
+                                std::move(subChannels),
+                                std::move(flags));
     // DDS has errors return it here
     else if(headerE.has_error())
         return headerE.error();
