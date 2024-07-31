@@ -404,7 +404,6 @@ bool FindNormIntegers(MRayPixelTypeRT pixelType)
 
 void TextureMemory::ConvertColorspaces()
 {
-    bool warnReadOnly = false;
     ColorConverter colorConv(gpuSystem);
     std::vector<MipArray<SurfRefVariant>> texSurfs;
     std::vector<ColorConvParams> colorConvParams;
@@ -423,7 +422,6 @@ void TextureMemory::ConvertColorspaces()
                     t.ColorSpace() != tracerParams.globalTextureColorSpace) ||
                    t.Gamma() != Float(1));
         requiresConversion &= rq;
-        warnReadOnly |= (requiresConversion && !t.HasRWView());
         // Skip if not color or writable
         if(!requiresConversion) continue;
 
@@ -450,12 +448,6 @@ void TextureMemory::ConvertColorspaces()
         else bcTextures.push_back(&t);
 
     }
-
-    if(warnReadOnly)
-        MRAY_WARNING_LOG("[Tracer]: Some textures are read only "
-                         "but require color space conversion. These textures will be treated "
-                         "as in Tracer's color space (which is \"Linear/{}\")",
-                         MRayColorSpaceStringifier::ToString(tracerParams.globalTextureColorSpace));
 
     // Finally call the kernel
     if(!texSurfs.empty() || !bcTextures.empty())
