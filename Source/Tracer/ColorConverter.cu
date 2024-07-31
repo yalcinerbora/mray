@@ -453,11 +453,9 @@ BCColorConverter::FindTotalTilesOf(const GenericTexture* t) const
 template<MRayPixelEnum E>
 requires(E == MRayPixelEnum::MR_BC6H_UFLOAT ||
          E == MRayPixelEnum::MR_BC6H_SFLOAT)
-void BCColorConverter::CallKernelForType(Span<Byte> dScratchBuffer,
-                                         // Constants
-                                         const Vector2ui& range,
+void BCColorConverter::CallKernelForType(Span<Byte>, const Vector2ui&,
                                          MRayColorSpaceEnum globalColorSpace,
-                                         const GPUQueue& queue)
+                                         const GPUQueue&)
 {
     MRAY_WARNING_LOG("[Tracer]: Scene has BC6H textures with a non \"MR_DEFAULT\" "
                      "color space. BC6H color space conversion is not supported."
