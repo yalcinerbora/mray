@@ -313,6 +313,7 @@ class TracerMock : public TracerI
 
     // Misc
     void                    ClearAll() override;
+    void                    Flush() const override;
     void                    SetThreadPool(BS::thread_pool& tp) override;
     GPUThreadInitFunction   GetThreadInitFunction() const override;
     size_t                  TotalDeviceMemory() const override;
@@ -1767,6 +1768,9 @@ inline RendererOutput TracerMock::DoRenderWork()
 }
 
 inline void TracerMock::ClearAll()
+{}
+
+inline void TracerMock::Flush() const
 {}
 
 inline void TracerMock::SetThreadPool(BS::thread_pool&)

@@ -305,14 +305,16 @@ void TracerThread::HandlePause()
 
 void TracerThread::HandleSceneChange(const std::string& newScene)
 {
-    MRAY_LOG("[Tracer]: NewScene {}", newScene);
+
+    // Flush the GPU before freeing memory
+    tracer->Flush();
     tracer->ClearAll();
     currentRenderer = INVALID_RENDERER_ID;
-
     // TODO: Single scene loading, change this later maybe
     // for tracer supporting multiple scenes
     using namespace std::filesystem;
     if(currentScene) currentScene->ClearScene();
+
     std::string fileExt = path(newScene).extension().string();
     fileExt = fileExt.substr(1);
     SceneLoaderI* loader = sceneLoaders.at(fileExt).get();
@@ -327,17 +329,19 @@ void TracerThread::HandleSceneChange(const std::string& newScene)
     {
         sceneIds = std::move(result.value());
         MRAY_LOG("[Tracer]: Scene \"{}\" loaded in {}ms",
-                 newScene, sceneIds.loadTimeMS);
+                    newScene, sceneIds.loadTimeMS);
     }
-
     // Commit the surfaces
     MRAY_LOG("[Tracer]: Committing Surfaces...");
     Timer timer; timer.Start();
     //
     auto [sceneAABB, instanceCount,
-        accelCount] = tracer->CommitSurfaces();
+          accelCount] = tracer->CommitSurfaces();
     currentSceneAABB = sceneAABB;
-    //
+    // We need to flush the Tracer to time.
+    // Commit surfaces may be hybrid process (GPU/CPU combo)
+    // so we can't directly measure from GPU.
+    tracer->Flush();
     timer.Split();
     MRAY_LOG("[Tracer]: Surfaces committed in {}ms\n"
              "    AABB      : {}\n"

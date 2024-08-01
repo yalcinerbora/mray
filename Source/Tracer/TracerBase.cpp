@@ -1287,6 +1287,11 @@ CamSurfaceId TracerBase::CreateCameraSurface(CameraSurfaceParams p)
 
 SurfaceCommitResult TracerBase::CommitSurfaces()
 {
+    // Synchronize all here, probably scene load is issued
+    // previously. CPU side is sycnhronized but async calls to GPU may not
+    // have finished yet. Wait before finalizing groups
+    gpuSystem.SyncAll();
+
     // Finalize the group operations
     // Some groups require post-processing
     // namely triangles (which adjust the local index values
@@ -1355,6 +1360,12 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     accelerator = accelGenerator.value().get()(*threadPool, gpuSystem,
                                  accelGGeneratorMap.value().get(),
                                  accelWGeneratorMap.value().get());
+
+    // Currently none of the groups have a finalize that affect the
+    // construction of accelerator(s). However; in future it may be.
+    // So again wait the "Finalize" calls of the groups and the texture.
+    gpuSystem.SyncAll();
+
     accelerator->Construct(BaseAccelConstructParams
     {
         .texViewMap = texMem.TextureViews(),
@@ -1366,8 +1377,8 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
                                             lPartitionEnd)
     });
 
-    // Synchronize All here, we may time this
-    gpuSystem.SyncAll();
+    // Rendering will start just after, and it is renderer's responsibility to wait
+    // the commit process.
     return SurfaceCommitResult
     {
         .aabb = accelerator->SceneAABB(),
@@ -1535,6 +1546,11 @@ void TracerBase::ClearAll()
 
     // GroupId 0 is reserved for empty primitive
     CreatePrimitiveGroup(std::string(TracerConstants::EmptyPrimName));
+}
+
+void TracerBase::Flush() const
+{
+    gpuSystem.SyncAll();
 }
 
 GPUThreadInitFunction TracerBase::GetThreadInitFunction() const

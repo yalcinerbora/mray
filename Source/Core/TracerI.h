@@ -627,6 +627,7 @@ class [[nodiscard]] TracerI
     //             Misc.              //
     //================================//
     virtual void    ClearAll() = 0;
+    virtual void    Flush() const = 0;
 
     virtual GPUThreadInitFunction   GetThreadInitFunction() const = 0;
     virtual void                    SetThreadPool(BS::thread_pool&) = 0;

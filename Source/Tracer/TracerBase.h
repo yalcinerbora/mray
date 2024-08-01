@@ -302,6 +302,7 @@ class TracerBase : public TracerI
     RendererOutput      DoRenderWork() override;
 
     void                    ClearAll() override;
+    void                    Flush() const override;
     GPUThreadInitFunction   GetThreadInitFunction() const override;
     void                    SetThreadPool(BS::thread_pool&) override;
     size_t                  TotalDeviceMemory() const override;

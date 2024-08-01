@@ -163,7 +163,7 @@ template<int32_t C>
 MRAY_GPU MRAY_GPU_INLINE
 Vector2i SubImageSpan<C>::LinearIndexTo2D(uint32_t linearIndex) const
 {
-    Vector2i result(linearIndex & resolution[0],
+    Vector2i result(linearIndex % resolution[0],
                     linearIndex / resolution[0]);
     return result;
 }
