@@ -89,6 +89,8 @@ class TracerBase : public TracerI
     ThreadSafeVector<Pair<SurfaceId, SurfaceParams>>            surfaces;
     ThreadSafeVector<Pair<LightSurfaceId, LightSurfaceParams>>  lightSurfaces;
     ThreadSafeVector<Pair<CamSurfaceId, CameraSurfaceParams>>   cameraSurfaces;
+    // Flattened Surface
+    std::vector<FlatSurfParams>                                 flattenedSurfaces;
     //
     AcceleratorPtr          accelerator;
     RendererI*              currentRenderer = nullptr;

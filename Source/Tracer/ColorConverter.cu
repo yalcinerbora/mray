@@ -8,6 +8,7 @@
 
 #include "Core/ColorFunctions.h"
 #include "Core/GraphicsFunctions.h"
+#include "Core/Algorithm.h"
 
 using MipBlockCountList = StaticVector<uint64_t, TracerConstants::MaxTextureMipCount>;
 
@@ -370,11 +371,8 @@ class BCColorConverter
 {
     private:
     std::vector<GenericTexture*>    bcTextures;
-    std::vector<Vector2ui>          partitions;
+    std::vector<Vector2ul>          partitions;
     size_t                          bufferSize;
-
-    template <std::contiguous_iterator It, class Compare>
-    std::vector<Vector2ui> PartitionRange(It first, It last, Compare&& cmp);
 
     template<MRayPixelEnum E>
     Pair<MipBlockCountList, uint64_t>
@@ -407,23 +405,6 @@ class BCColorConverter
                                       MRayColorSpaceEnum globalColorSpace,
                                      const GPUQueue& queue);
 };
-
-template <std::contiguous_iterator It, class Compare>
-std::vector<Vector2ui> BCColorConverter::PartitionRange(It first, It last, Compare&& cmp)
-{
-    assert(std::is_sorted(first, last, cmp));
-    std::vector<Vector2ui> result;
-    It start = first;
-    while(start != last)
-    {
-        It end = std::upper_bound(start, last, *start, cmp);
-        Vector2ui r(std::distance(first, start),
-                    std::distance(first, end));
-        result.push_back(r);
-        start = end;
-    }
-    return result;
-}
 
 template<MRayPixelEnum E>
 Pair<MipBlockCountList, uint64_t>
@@ -600,18 +581,18 @@ BCColorConverter::BCColorConverter(std::vector<GenericTexture*>&& bcTex)
     };
     std::sort(bcTextures.begin(), bcTextures.end(), PixTypeComp);
     // Find the partitions (Per BC texture type)
-    partitions = PartitionRange(bcTextures.begin(), bcTextures.end(),
-                                PixTypeComp);
+    partitions = Algo::PartitionRange(bcTextures.begin(), bcTextures.end(),
+                                      PixTypeComp);
     // Find the memory
-    for(Vector2ui& range : partitions)
+    for(const Vector2ul& range : partitions)
     {
         uint32_t localTexCount = uint32_t(range[1] - range[0]);
         uint32_t iterCount = MathFunctions::DivideUp(localTexCount, BC_TEX_PER_BATCH);
         for(uint32_t i = 0; i < iterCount; i++)
         {
-            uint32_t  start = range[0] + i * BC_TEX_PER_BATCH;
-            uint32_t  end = range[0] + (i + 1) * BC_TEX_PER_BATCH;
-            end = std::min(end, range[0] + localTexCount);
+            uint32_t  start = uint32_t(range[0]) + i * BC_TEX_PER_BATCH;
+            uint32_t  end = uint32_t(range[0]) + (i + 1) * BC_TEX_PER_BATCH;
+            end = std::min(end, uint32_t(range[0]) + localTexCount);
             // "Size()" gives the aligned size (mutiple of 64k in CUDA)
             // so unnecessarily large maybe?
             // TODO: Profile and check this later
@@ -638,14 +619,15 @@ void BCColorConverter::CallBCColorConvertKernels(Span<Byte> dScratchBuffer,
 
     for(size_t pIndex = 0; pIndex < partitions.size(); pIndex++)
     {
-        const Vector2ui& range = partitions[pIndex];
+        const Vector2ul& range = partitions[pIndex];
         std::visit([&, this](auto&& v)
         {
             using PT = std::_Remove_cvref_t<decltype(v)>;
             constexpr MRayPixelEnum E = PT::Name;
             if constexpr(PT::IsBCPixel)
             {
-                CallKernelForType<E>(dScratchBuffer, range,
+                Vector2ui rangeI32(range[0], range[1]);
+                CallKernelForType<E>(dScratchBuffer, rangeI32,
                                      globalColorSpace, queue);
             }
         }, bcTextures[range[0]]->PixelType());

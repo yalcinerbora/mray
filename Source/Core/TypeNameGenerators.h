@@ -72,7 +72,7 @@ namespace CompTime
     static constexpr
     std::string_view LightTypeName = Detail::ct_str_join_v<LIGHT_PREFIX, Name>;
 
-    // Hard to make these two constexpr
+    // Hard to make these constexpr
     static std::string PrimLightTypeName(std::string_view PrimName)
     {
         return (std::string(LIGHT_PREFIX) +
@@ -94,6 +94,17 @@ namespace CompTime
                                          const std::string_view& TransformName)
     {
         return std::string(AccelGroupName) + std::string(TransformName);
+    }
+
+    static std::string WorkTypeName(std::string_view matType,
+                                    std::string_view primType,
+                                    std::string_view transType)
+    {
+        using namespace std::string_literals;
+        return (std::string(TracerConstants::WORK_PREFIX) +
+                std::string(matType) +
+                std::string(primType) +
+                std::string(transType));
     }
 }
 
@@ -185,5 +196,36 @@ namespace Runtime
                 std::string(transType));
     }
 
+    inline
+    std::string CreateRenderWorkType(std::string_view matType,
+                                     std::string_view primType,
+                                     std::string_view transType)
+    {
+        using namespace std::string_literals;
+        return (std::string(TracerConstants::WORK_PREFIX) +
+                std::string(matType) +
+                std::string(primType) +
+                std::string(transType));
+    }
+
+    inline
+    std::string CreateRenderLightWorkType(std::string_view lightType,
+                                          std::string_view transType)
+    {
+        using namespace std::string_literals;
+        return (std::string(TracerConstants::WORK_PREFIX) +
+                std::string(lightType) +
+                std::string(transType));
+    }
+
+    inline
+    std::string CreateRenderCameraWorkType(std::string_view camType,
+                                           std::string_view transType)
+    {
+        using namespace std::string_literals;
+        return (std::string(TracerConstants::WORK_PREFIX) +
+                std::string(camType) +
+                std::string(transType));
+    }
 }
 }

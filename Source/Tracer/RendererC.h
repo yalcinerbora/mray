@@ -6,8 +6,15 @@
 #include "GenericGroup.h"
 #include "TextureMemory.h"
 
+#include "MaterialC.h"
+#include "PrimitiveC.h"
+#include "CameraC.h"
+#include "TransformC.h"
+#include "LightC.h"
+
 #include "Core/TracerI.h"
 #include "Core/DataStructures.h"
+#include "Core/Algorithm.h"
 
 #include "TransientPool/TransientPool.h"
 
@@ -22,6 +29,16 @@ template<class, class> class GenericGroupT;
 template<class, class> class GenericTexturedGroupT;
 using GenericGroupTransformT    = GenericGroupT<TransformKey, TransAttributeInfo>;
 using GenericGroupMediumT       = GenericTexturedGroupT<MediumKey, MediumAttributeInfo>;
+
+struct FlatSurfParams
+{
+    // For lookup maybe?
+    SurfaceId   surfId;
+    MaterialId  mId;
+    TransformId tId;
+    PrimBatchId pId;
+    bool        operator<(const FlatSurfParams& right) const;
+};
 
 struct TracerView
 {
@@ -40,6 +57,7 @@ struct TracerView
     const std::vector<Pair<SurfaceId, SurfaceParams>>&              surfs;
     const std::vector<Pair<LightSurfaceId, LightSurfaceParams>>&    lightSurfs;
     const std::vector<Pair<CamSurfaceId, CameraSurfaceParams>>&     camSurfs;
+    const std::vector<FlatSurfParams>&                              flattenedSurfaces;
 };
 
 using RenderImagePtr = std::unique_ptr<RenderImage>;
@@ -63,7 +81,11 @@ concept RendererC = requires(RendererType rt,
     typename RendererType::IdInt;
     typename RendererType::AttribInfoList;
 
-    //
+    // GPU Side
+    { RendererType::InitRayState(RaySample{})
+    } -> std::same_as<typename RendererType::RayState>;
+
+    // CPU Side
     {rt.Commit()} -> std::same_as<void>;
     {rt.IsInCommitState()} -> std::same_as<bool>;
     {rt.AttributeInfo()
@@ -79,12 +101,25 @@ concept RendererC = requires(RendererType rt,
     {RendererType::TypeName()} -> std::same_as<std::string_view>;
 };
 
-// Render work of camera
-template <class CamGroup>
-class RenderBoundaryWork
+class RenderWorkI
 {};
 
-//// Boundary work of light group
+class RenderCameraWorkI
+{};
+
+class RenderLightWorkI
+{};
+
+using RenderWorkPtr = std::unique_ptr<RenderWorkI>;
+using RenderCameraWorkPtr = std::unique_ptr<RenderCameraWorkI>;
+using RenderLightWorkPtr = std::unique_ptr<RenderLightWorkI>;
+
+// Render work of camera
+//template <class CamGroup>
+//class RenderBoundaryWork
+//{};
+
+// Boundary work of light group
 //template <class LightGroup>
 //class RenderBoundaryWork
 //{};
@@ -192,7 +227,30 @@ class RenderBoundaryWork
 //        Work(prim, m, input, output, rng,);
 //    }
 //};
-//
+
+
+using RenderWorkGenerator = GeneratorFuncType<RenderWorkI,
+                                              GenericGroupMaterialT*,
+                                              GenericGroupPrimitiveT*,
+                                              GenericGroupTransformT*,
+                                              const GPUSystem&>;
+using RenderLightWorkGenerator = GeneratorFuncType<RenderLightWorkI,
+                                                   GenericGroupLightT*,
+                                                   GenericGroupTransformT*,
+                                                   const GPUSystem&>;
+using RenderCameraWorkGenerator = GeneratorFuncType<RenderCameraWorkI,
+                                                    GenericGroupCameraT*,
+                                                    GenericGroupTransformT*,
+                                                    const GPUSystem&>;
+
+using WorkGenMap = Map<std::string_view, RenderWorkGenerator>;
+using LightWorkGenMap = Map<std::string_view, RenderLightWorkGenerator>;
+using CamWorkGenMap = Map<std::string_view, RenderCameraWorkGenerator>;
+
+using WorkPack = Tuple<WorkGenMap, LightWorkGenMap, CamWorkGenMap>;
+using WorkMap = std::map<Tuple<MatGroupId, PrimGroupId, TransGroupId>, RenderWorkPtr>;
+using LightWorkMap = std::map<Pair<LightGroupId, TransGroupId>, RenderLightWorkPtr>;
+using CameraWorkMap = std::map<Pair<CameraGroupId, TransGroupId>, RenderCameraWorkPtr>;
 
 class RendererI
 {
@@ -211,7 +269,8 @@ class RendererI
     virtual RendererOptionPack  CurrentAttributes() const = 0;
     // ...
     virtual RenderBufferInfo    StartRender(const RenderImageParams&,
-                                            const CameraKey&,
+                                            CamSurfaceId camSurfId,
+                                            Optional<CameraTransform>,
                                             uint32_t customLogicIndex0 = 0,
                                             uint32_t customLogicIndex1 = 0) = 0;
     virtual RendererOutput      DoRender() = 0;
@@ -227,13 +286,22 @@ template <class Child>
 class RendererT : public RendererI
 {
     public:
+    static constexpr uint32_t MaxWorkPacks = 16;
+
     using AttribInfoList = typename RendererI::AttribInfoList;
+    using WorkPacks = StaticVector<WorkPack, MaxWorkPacks>;
+
     private:
     protected:
     const GPUSystem&        gpuSystem;
     TracerView              tracerView;
     const RenderImagePtr&   renderBuffer;
     bool                    rendering = false;
+    WorkPacks               workPacks;
+    //
+    WorkMap                 currentWorks;
+    LightWorkMap            currentLightWorks;
+    CameraWorkMap           currentCameraWorks;
 
     // Current Canvas info
     MRayColorSpaceEnum      curColorSpace;
@@ -241,11 +309,160 @@ class RendererT : public RendererI
     Vector2ui               curFBMin;
     Vector2ui               curFBMax;
 
+    void                    GenerateWorkMappings(uint32_t packIndex);
+    void                    GenerateLightWorkMappings(uint32_t packIndex);
+    void                    GenerateCameraWorkMappings(uint32_t packIndex);
+
     public:
                         RendererT(const RenderImagePtr&,
                                   TracerView, const GPUSystem&);
+                        RendererT(const RenderImagePtr&,
+                                  const WorkPacks& workPacks,
+                                  TracerView, const GPUSystem&);
     std::string_view    Name() const override;
 };
+
+inline bool FlatSurfParams::operator<(const FlatSurfParams& right) const
+{
+    return (Tuple(mId, tId, pId) <
+            Tuple(right.mId, right.tId, right.pId));
+}
+
+template <class C>
+void RendererT<C>::GenerateWorkMappings(uint32_t packIndex)
+{
+    WorkPack workPack = workPacks[packIndex];
+    using Algo::PartitionRange;
+    const auto& flatSurfs = tracerView.flattenedSurfaces;
+    assert(std::is_sorted(tracerView.flattenedSurfaces.cbegin(),
+                          tracerView.flattenedSurfaces.cend()));
+    auto partitions = Algo::PartitionRange(flatSurfs.cbegin(),
+                                           flatSurfs.cend());
+    for(const auto& p : partitions)
+    {
+        size_t i = p[0];
+        MatGroupId mgId{MaterialKey(uint32_t(flatSurfs[i].mId)).FetchBatchPortion()};
+        PrimGroupId pgId{PrimBatchKey(uint32_t(flatSurfs[i].mId)).FetchBatchPortion()};
+        TransGroupId tgId{TransformKey(uint32_t(flatSurfs[i].tId)).FetchBatchPortion()};
+        // These should be checked beforehand, while actually creating
+        // the surface
+        const MaterialGroupPtr& mg = tracerView.matGroups.at(mgId).value();
+        const PrimGroupPtr& pg = tracerView.primGroups.at(pgId).value();
+        const TransformGroupPtr& tg = tracerView.transGroups.at(tgId).value();
+        std::string_view mgName = mg->Name();
+        std::string_view pgName = pg->Name();
+        std::string_view tgName = tg->Name();
+
+        using TypeNameGen::Runtime::CreateRenderWorkType;
+        std::string workName = CreateRenderWorkType(mgName, pgName, tgName);
+
+        auto loc = std::get<0>(workPack).at(workName);
+        if(!loc.has_value())
+        {
+            throw MRayError("[{}]: Could not find a renderer \"work\" for Mat/Prim/Transform "
+                            "triplet of \"{}/{}/{}\"",
+                            C::TypeName(), mgName, pgName, tgName);
+        }
+        RenderWorkGenerator generator = loc->get();
+        RenderWorkPtr ptr = generator(mg.get(), pg.get(), tg.get(), gpuSystem);
+        // Put this ptr somewhere... safe
+        currentWorks.try_emplace(Tuple(mgId, pgId, tgId), std::move(ptr));
+    }
+}
+
+template <class C>
+void RendererT<C>::GenerateLightWorkMappings(uint32_t packIndex)
+{
+    WorkPack workPack = workPacks[packIndex];
+
+    using Algo::PartitionRange;
+    const auto& lightSurfs = tracerView.lightSurfs;
+    using LightSurfP = Pair<LightSurfaceId, LightSurfaceParams>;
+    auto LightSurfIsLess = [](const LightSurfP& left, const LightSurfP& right)
+    {
+        return (Tuple(left.second.lightId, left.second.transformId) <
+                Tuple(right.second.lightId, right.second.transformId));
+    };
+    assert(std::is_sorted(lightSurfs.cbegin(), lightSurfs.cend(),
+                          LightSurfIsLess));
+
+    auto partitions = Algo::PartitionRange(lightSurfs.cbegin(), lightSurfs.cend(),
+                                           LightSurfIsLess);
+    for(const auto& p : partitions)
+    {
+        size_t i = p[0];
+        LightGroupId lgId{LightKey(uint32_t(lightSurfs[i].second.lightId)).FetchBatchPortion()};
+        TransGroupId tgId{TransformKey(uint32_t(lightSurfs[i].second.transformId)).FetchBatchPortion()};
+        // These should be checked beforehand, while actually creating
+        // the surface
+        const LightGroupPtr& lg = tracerView.lightGroups.at(lgId).value();
+        const TransformGroupPtr& tg = tracerView.transGroups.at(tgId).value();
+        std::string_view lgName = lg->Name();
+        std::string_view tgName = tg->Name();
+
+        using TypeNameGen::Runtime::CreateRenderLightWorkType;
+        std::string workName = CreateRenderLightWorkType(lgName, tgName);
+
+        auto loc = std::get<1>(workPack).at(workName);
+        if(!loc.has_value())
+        {
+            throw MRayError("[{}]: Could not find a renderer \"work\" for Light/Transform "
+                            "pair of \"{}/{}\"",
+                            C::TypeName(), lgName, tgName);
+        }
+        RenderLightWorkGenerator generator = loc->get();
+        RenderLightWorkPtr ptr = generator(lg.get(), tg.get(), gpuSystem);
+        // Put this ptr somewhere... safe
+        currentLightWorks.try_emplace(Pair(lgId, tgId), std::move(ptr));
+    }
+}
+
+template <class C>
+void RendererT<C>::GenerateCameraWorkMappings(uint32_t packIndex)
+{
+    WorkPack workPack = workPacks[packIndex];
+    const auto& camSurfs = tracerView.camSurfs;
+
+    using CamSurfP = Pair<CamSurfaceId, CameraSurfaceParams>;
+    auto CamSurfIsLess = [](const CamSurfP& left, const CamSurfP& right)
+    {
+        return (Tuple(left.second.cameraId, left.second.transformId) <
+                Tuple(right.second.cameraId, right.second.transformId));
+    };
+    assert(std::is_sorted(camSurfs.cbegin(), camSurfs.cend(),
+                          CamSurfIsLess));
+
+    auto partitions = Algo::PartitionRange(camSurfs.cbegin(), camSurfs.cend(),
+                                           CamSurfIsLess);
+    for(const auto& p : partitions)
+    {
+        size_t i = p[0];
+        CameraGroupId cgId{CameraKey(uint32_t(camSurfs[i].second.cameraId)).FetchBatchPortion()};
+        TransGroupId tgId{TransformKey(uint32_t(camSurfs[i].second.transformId)).FetchBatchPortion()};
+        // These should be checked beforehand, while actually creating
+        // the surface
+        const CameraGroupPtr& cg = tracerView.camGroups.at(cgId).value();
+        const TransformGroupPtr& tg = tracerView.transGroups.at(tgId).value();
+        std::string_view cgName = cg->Name();
+        std::string_view tgName = tg->Name();
+
+        using TypeNameGen::Runtime::CreateRenderCameraWorkType;
+        std::string workName = CreateRenderCameraWorkType(cgName, tgName);
+
+        auto loc = std::get<2>(workPack).at(workName);
+        if(!loc.has_value())
+        {
+            throw MRayError("[{}]: Could not find a renderer \"work\" for Camera/Transform "
+                            "pair of \"{}/{}\"",
+                            C::TypeName(), cgName, tgName);
+        }
+        RenderCameraWorkGenerator generator = loc->get();
+        RenderCameraWorkPtr ptr = generator(cg.get(), tg.get(), gpuSystem);
+        // Put this ptr somewhere... safe
+        currentCameraWorks.try_emplace(Pair(cgId, tgId), std::move(ptr));
+
+    }
+}
 
 template <class C>
 RendererT<C>::RendererT(const RenderImagePtr& rb,
@@ -253,6 +470,16 @@ RendererT<C>::RendererT(const RenderImagePtr& rb,
     : gpuSystem(s)
     , tracerView(tv)
     , renderBuffer(rb)
+{}
+
+template <class C>
+RendererT<C>::RendererT(const RenderImagePtr& rb,
+                        const WorkPacks& wp,
+                        TracerView tv, const GPUSystem& s)
+    : gpuSystem(s)
+    , tracerView(tv)
+    , renderBuffer(rb)
+    , workPacks(wp)
 {}
 
 template <class C>

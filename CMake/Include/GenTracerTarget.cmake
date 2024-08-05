@@ -72,9 +72,17 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/RendererC.h
         ${CURRENT_SOURCE_DIR}/RenderImage.cpp
         ${CURRENT_SOURCE_DIR}/RenderImage.h
+        ${CURRENT_SOURCE_DIR}/RayGenKernels.h)
+
+    set(SRC_RENDERERS_TEX_VIEW
         ${CURRENT_SOURCE_DIR}/TexViewRenderer.h
         ${CURRENT_SOURCE_DIR}/TexViewRenderer.hpp
         ${CURRENT_SOURCE_DIR}/TexViewRenderer.cu)
+
+    set(SRC_RENDERERS_SURFACE
+        ${CURRENT_SOURCE_DIR}/SurfaceRenderer.h
+        ${CURRENT_SOURCE_DIR}/SurfaceRenderer.hpp
+        ${CURRENT_SOURCE_DIR}/SurfaceRenderer.cu)
 
     set(SRC_RANDOM
         ${CURRENT_SOURCE_DIR}/Random.h
@@ -108,6 +116,8 @@ function(gen_tracer_target)
         ${SRC_TRANSFORMS}
         ${SRC_ACCELLERATORS}
         ${SRC_RENDERERS}
+        ${SRC_RENDERERS_TEX_VIEW}
+        ${SRC_RENDERERS_SURFACE}
         ${SRC_RANDOM}
         ${SRC_UTILITY}
         ${SRC_COMMON})
@@ -123,6 +133,8 @@ function(gen_tracer_target)
     source_group("Lights" FILES ${SRC_LIGHTS})
     source_group("Random" FILES ${SRC_RANDOM})
     source_group("Renderers" FILES ${SRC_RENDERERS})
+    source_group("Renderers/Surface" FILES ${SRC_RENDERERS_SURFACE})
+    source_group("Renderers/TexView" FILES ${SRC_RENDERERS_TEX_VIEW})
     source_group("Utility" FILES ${SRC_UTILITY})
     source_group("" FILES ${SRC_COMMON})
 

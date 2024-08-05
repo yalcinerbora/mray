@@ -61,6 +61,7 @@ namespace TracerConstants
     static constexpr std::string_view MEDIUM_PREFIX     = "(Md)";
     static constexpr std::string_view ACCEL_PREFIX      = "(A)";
     static constexpr std::string_view RENDERER_PREFIX   = "(R)";
+    static constexpr std::string_view WORK_PREFIX       = "(W)";
 }
 
 // Accelerators are responsible for accelerating ray/surface interactions

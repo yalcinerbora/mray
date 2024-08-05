@@ -1,46 +1,48 @@
 #pragma once
 
 #include "RendererC.h"
-#include "Core/TypeGenFunction.h"
 #include "Core/TypeNameGenerators.h"
 
-class TexViewRenderer final : public RendererT<TexViewRenderer>
+class SurfaceRenderer final : public RendererT<SurfaceRenderer>
 {
     public:
     static std::string_view TypeName();
 
     enum Mode
     {
-        SHOW_TILING,
-        SHOW_TEXTURES
+        FURNACE,
+        WORLD_NORMAL,
+        WORLD_POSITION,
+        AO,
+        //
+        END
     };
     struct Options
     {
         uint32_t totalSPP   = 32;
-        Mode     mode       = SHOW_TEXTURES;
+        Mode     mode       = FURNACE;
     };
 
     private:
     Options     currentOptions  = {};
     Options     newOptions      = {};
-    // State
+    //
     uint32_t    curTileIndex    = 0;
-    uint32_t    textureIndex    = 0;
-    uint32_t    mipIndex        = 0;
-    Vector2ui   mipSize         = Vector2ui::Zero();
     Vector2ui   tileCount       = Vector2ui::Zero();
     //
-    std::vector<const GenericTexture*> textures;
-    std::vector<const GenericTextureView*> textureViews;
+    RenderImageParams           rIParams  = {};
+    Optional<CameraTransform>   transOverride = {};
+    CamSurfaceId                curCamSurfaceId = CamSurfaceId(0);
+    //
 
     public:
     // Constructors & Destructor
-                        TexViewRenderer(const RenderImagePtr&,
+                        SurfaceRenderer(const RenderImagePtr&,
                                         TracerView, const GPUSystem&);
-                        TexViewRenderer(const TexViewRenderer&) = delete;
-                        TexViewRenderer(TexViewRenderer&&) = delete;
-    TexViewRenderer&    operator=(const TexViewRenderer&) = delete;
-    TexViewRenderer&    operator=(TexViewRenderer&&) = delete;
+                        SurfaceRenderer(const SurfaceRenderer&) = delete;
+                        SurfaceRenderer(SurfaceRenderer&&) = delete;
+    SurfaceRenderer&    operator=(const SurfaceRenderer&) = delete;
+    SurfaceRenderer&    operator=(SurfaceRenderer&&) = delete;
 
     //
     MRayError           Commit() override;
@@ -61,16 +63,16 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
 };
 
 inline
-std::string_view TexViewRenderer::TypeName()
+std::string_view SurfaceRenderer::TypeName()
 {
     using namespace std::string_view_literals;
     using namespace TypeNameGen::CompTime;
-    static constexpr auto Name = "TexView"sv;
+    static constexpr auto Name = "Surface"sv;
     return RendererTypeName<Name>;
 }
 
 inline
-size_t TexViewRenderer::GPUMemoryUsage() const
+size_t SurfaceRenderer::GPUMemoryUsage() const
 {
     return 0;
 }

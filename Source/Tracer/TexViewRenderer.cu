@@ -125,8 +125,9 @@ TexViewRenderer::TexViewRenderer(const RenderImagePtr& rb,
 
 MRayError TexViewRenderer::Commit()
 {
-    if(rendering)
-    currentOptions = newOptions;
+    // TODO: Do Error later
+    if(!rendering)
+        currentOptions = newOptions;
     return MRayError::OK;
 }
 
@@ -168,14 +169,15 @@ void TexViewRenderer::PushAttribute(uint32_t attributeIndex,
 }
 
 RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
-                                              const CameraKey&,
+                                              CamSurfaceId,
+                                              Optional<CameraTransform>,
                                               uint32_t customLogicIndex0,
                                               uint32_t customLogicIndex1)
 {
     // Skip if nothing to show
     if(textures.empty())
     {
-        MRAY_WARNING_LOG("[(R)TexView] No textures are present "
+        MRAY_WARNING_LOG("[(R)TexView]: No textures are present "
                          "in the tracer. Rendering nothing!");
         return RenderBufferInfo
         {

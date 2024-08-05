@@ -128,7 +128,8 @@ TracerView TracerBase::GenerateTracerView()
         .tracerParams = params,
         .surfs = surfaces.Vec(),
         .lightSurfs = lightSurfaces.Vec(),
-        .camSurfs = cameraSurfaces.Vec()
+        .camSurfs = cameraSurfaces.Vec(),
+        .flattenedSurfaces = flattenedSurfaces
     };
 }
 
@@ -1345,21 +1346,57 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
                 Tuple(right.second.lightId, right.second.transformId));
     });
 
+    // And finally for the cameras as well
+    auto& camSurfList = cameraSurfaces.Vec();
+    using CamSurfP = Pair<CamSurfaceId, CameraSurfaceParams>;
+    std::sort(camSurfList.begin(), camSurfList.end(),
+              [](const CamSurfP& left, const CamSurfP& right) -> bool
+    {
+        return (Tuple(left.second.cameraId, left.second.transformId) <
+                Tuple(right.second.cameraId, right.second.transformId));
+    });
+
     // Send it!
     AcceleratorType type = params.accelMode;
     auto accelGenerator = typeGenerators.baseAcceleratorGenerator.at(type);
     auto accelGGeneratorMap = typeGenerators.accelGeneratorMap.at(type);
     auto accelWGeneratorMap = typeGenerators.accelWorkGeneratorMap.at(type);
-    if(!accelGenerator ||
-       !accelGGeneratorMap ||
-       !accelWGeneratorMap)
+    if(!accelGenerator || !accelGGeneratorMap || !accelWGeneratorMap)
     {
         throw MRayError("Unable to find accelerator generators for type \"{}\"",
                         type);
     }
-    accelerator = accelGenerator.value().get()(*threadPool, gpuSystem,
-                                 accelGGeneratorMap.value().get(),
-                                 accelWGeneratorMap.value().get());
+    accelerator = accelGenerator.value().get()
+    (
+        *threadPool, gpuSystem,
+        accelGGeneratorMap.value().get(),
+        accelWGeneratorMap.value().get()
+    );
+
+    // Now partition wrt. Material/Primitive/Transform triplets
+    // Almost all of the renderers will require such partitioning.
+    // We can give up on the intra surface grouping which was required
+    // for accelerators. Material evaluation will only require linear triplets.
+    //
+    // Flatten the "SurfaceParams"
+    // Renderer's will use this to generate "work"
+    flattenedSurfaces.reserve(surfaces.Vec().size() *
+                              TracerLimits::MaxPrimBatchPerSurface);
+    for(const auto& s : surfaces.Vec())
+    {
+        FlatSurfParams surf = {};
+        surf.surfId = s.first;
+        surf.tId = s.second.transformId;
+
+        for(uint32_t i = 0; i < s.second.primBatches.size(); i++)
+        {
+            auto sOut = surf;
+            sOut.pId = s.second.primBatches[i];
+            sOut.mId = s.second.materials[i];
+            flattenedSurfaces.push_back(sOut);
+        }
+    }
+    std::sort(flattenedSurfaces.begin(), flattenedSurfaces.end());
 
     // Currently none of the groups have a finalize that affect the
     // construction of accelerator(s). However; in future it may be.
@@ -1484,7 +1521,7 @@ RenderBufferInfo TracerBase::StartRender(RendererId rId, CamSurfaceId cId,
     // Check render image is setup properly
     if(renderImage.get() == nullptr)
         throw MRayError("Render environment is not set properly! "
-                        "Please provive a semaphore to the tracer.");
+                        "Please provide a semaphore to the tracer.");
 
     auto renderer = renderers.at(rId);
     if(!renderer)
@@ -1494,8 +1531,11 @@ RenderBufferInfo TracerBase::StartRender(RendererId rId, CamSurfaceId cId,
     }
     currentRenderer = renderer.value().get().get();
     currentRendererId = rId;
+
     auto camKey = CameraKey(static_cast<uint32_t>(cId));
-    return currentRenderer->StartRender(rIParams, camKey,
+    return currentRenderer->StartRender(rIParams,
+                                        cId,
+                                        optionalTransform,
                                         renderLogic0.value_or(0),
                                         renderLogic1.value_or(0));
 }

@@ -38,6 +38,7 @@ set(SRC_MATH
 )
 
 set(SRC_UTILITY
+    ${CURRENT_SOURCE_DIR}/Algorithm.h
     ${CURRENT_SOURCE_DIR}/ColorFunctions.h
     ${CURRENT_SOURCE_DIR}/TypeNameGenerators.h
     ${CURRENT_SOURCE_DIR}/BitFunctions.h
