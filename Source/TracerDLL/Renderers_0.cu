@@ -12,7 +12,10 @@ using RendererTypes_0 = Tuple
 >;
 
 // Currently empty
-using RendererWorkTypes_0 = Tuple<>;
+using RendererWorkTypes_0 = Tuple
+<
+    EmptyRendererWorkTypes<TexViewRenderer>
+>;
 
 void Tracer::AddRendererGenerators_0(Map<std::string_view, RendererGenerator>& map,
                                      Map<std::string_view, RenderWorkPack>& workMap)

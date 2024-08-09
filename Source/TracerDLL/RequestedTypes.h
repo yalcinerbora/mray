@@ -122,6 +122,13 @@ using DefaultLinearAccelTypePack = DefaultAccelTypePack<BaseAcceleratorLinear, A
 // ================= //
 //     Renderers     //
 // ================= //
+
+template <class Renderer>
+using EmptyRendererWorkTypes = RenderWorkTypePack
+<
+    Renderer, Tuple<>, Tuple<>, Tuple<>
+>;
+
 template <class Renderer,
           template<class, class, class> class RenderWorkT,
           template<class, class> class RenderLightWorkT,
