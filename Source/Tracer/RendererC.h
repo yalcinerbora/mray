@@ -223,8 +223,21 @@ class RendererT : public RendererI
 
 inline bool FlatSurfParams::operator<(const FlatSurfParams& right) const
 {
-    return (Tuple(mId, tId, pId) <
-            Tuple(right.mId, right.tId, right.pId));
+    auto GetMG = [](MaterialId id) -> CommonKey
+    {
+        return MaterialKey(static_cast<uint32_t>(id)).FetchBatchPortion();
+    };
+    auto GetPG = [](PrimBatchId id) -> CommonKey
+    {
+        return PrimBatchKey(static_cast<uint32_t>(id)).FetchBatchPortion();
+    };
+    auto GetTG = [](TransformId id) -> CommonKey
+    {
+        return TransformKey(static_cast<uint32_t>(id)).FetchBatchPortion();
+    };
+
+    return (Tuple(GetMG(mId), GetTG(tId), GetPG(pId)) <
+            Tuple(GetMG(right.mId), GetTG(right.tId), GetPG(right.pId)));
 }
 
 template <class C>
@@ -240,7 +253,7 @@ void RendererT<C>::GenerateWorkMappings()
     {
         size_t i = p[0];
         MatGroupId mgId{MaterialKey(uint32_t(flatSurfs[i].mId)).FetchBatchPortion()};
-        PrimGroupId pgId{PrimBatchKey(uint32_t(flatSurfs[i].mId)).FetchBatchPortion()};
+        PrimGroupId pgId{PrimBatchKey(uint32_t(flatSurfs[i].pId)).FetchBatchPortion()};
         TransGroupId tgId{TransformKey(uint32_t(flatSurfs[i].tId)).FetchBatchPortion()};
         // These should be checked beforehand, while actually creating
         // the surface
@@ -276,8 +289,17 @@ void RendererT<C>::GenerateLightWorkMappings()
     using LightSurfP = Pair<LightSurfaceId, LightSurfaceParams>;
     auto LightSurfIsLess = [](const LightSurfP& left, const LightSurfP& right)
     {
-        return (Tuple(left.second.lightId, left.second.transformId) <
-                Tuple(right.second.lightId, right.second.transformId));
+        auto GetLG = [](LightId id) -> CommonKey
+        {
+            return LightKey(static_cast<uint32_t>(id)).FetchBatchPortion();
+        };
+        auto GetTG = [](TransformId id) -> CommonKey
+        {
+            return TransformKey(static_cast<uint32_t>(id)).FetchBatchPortion();
+        };
+
+        return (Tuple(GetLG(left.second.lightId), GetTG(left.second.transformId)) <
+                Tuple(GetLG(right.second.lightId), GetTG(right.second.transformId)));
     };
     assert(std::is_sorted(lightSurfs.cbegin(), lightSurfs.cend(),
                           LightSurfIsLess));
@@ -320,8 +342,16 @@ void RendererT<C>::GenerateCameraWorkMappings()
     using CamSurfP = Pair<CamSurfaceId, CameraSurfaceParams>;
     auto CamSurfIsLess = [](const CamSurfP& left, const CamSurfP& right)
     {
-        return (Tuple(left.second.cameraId, left.second.transformId) <
-                Tuple(right.second.cameraId, right.second.transformId));
+        auto GetCG = [](CameraId id) -> CommonKey
+        {
+            return CameraKey(static_cast<uint32_t>(id)).FetchBatchPortion();
+        };
+        auto GetTG = [](TransformId id) -> CommonKey
+        {
+            return TransformKey(static_cast<uint32_t>(id)).FetchBatchPortion();
+        };
+        return (Tuple(GetCG(left.second.cameraId), GetTG(left.second.transformId)) <
+                Tuple(GetCG(right.second.cameraId), GetTG(right.second.transformId)));
     };
     assert(std::is_sorted(camSurfs.cbegin(), camSurfs.cend(),
                           CamSurfIsLess));
@@ -354,7 +384,6 @@ void RendererT<C>::GenerateCameraWorkMappings()
         RenderCameraWorkPtr ptr = generator(*cg.get(), *tg.get(), gpuSystem);
         // Put this ptr somewhere... safe
         currentCameraWorks.try_emplace(Pair(cgId, tgId), std::move(ptr));
-
     }
 }
 
