@@ -18,6 +18,7 @@ namespace CameraDetail
     {
         public:
         using DataSoA = CamPinholeData;
+        static constexpr uint32_t SampleRayRNCount = 2;
 
         private:
         Vector3 position;
@@ -41,8 +42,6 @@ namespace CameraDetail
                               RNGDispenser&) const;
         MRAY_HYBRID
         Float       PdfRay(const Ray&) const;
-        MRAY_HYBRID
-        uint32_t    SampleRayRNCount() const;
         // Misc
         MRAY_HYBRID
         bool        CanBeSampled() const;

@@ -28,13 +28,16 @@ concept LightC = requires(LightType l,
     // API
     {l.SampleSolidAngle(rng, Vector3{})} -> std::same_as<SampleT<Vector3>>;
     {l.PdfSolidAngle(hit, Vector3{}, Vector3{})} -> std::same_as<Float>;
-    {l.SampleSolidAngleRNCount()} -> std::same_as<uint32_t>;
     {l.SampleRay(rng)} -> std::same_as<SampleT<Ray>>;
     {l.PdfRay(Ray{})} -> std::same_as<Float>;
-    {l.SampleRayRNCount()} -> std::same_as<uint32_t>;
     {l.EmitViaHit(Vector3{}, hit)} -> std::same_as<Spectrum>;
     {l.EmitViaSurfacePoint(Vector3{}, Vector3{})} -> std::same_as<Spectrum>;
     {l.IsPrimitiveBackedLight()} -> std::same_as<bool>;
+    // Sample RN counts
+    LightType::SampleRayRNCount;
+    requires std::is_same_v<decltype(LightType::SampleRayRNCount), const uint32_t>;
+    LightType::SampleSolidAngleRNCount;
+    requires std::is_same_v<decltype(LightType::SampleSolidAngleRNCount), const uint32_t>;
 
     // Type traits
     requires std::is_trivially_copyable_v<LightType>;

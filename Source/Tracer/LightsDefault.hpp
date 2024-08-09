@@ -57,13 +57,6 @@ Float LightPrim<P, SC>::PdfSolidAngle(const typename P::Hit& hit,
 
 template<PrimitiveC P, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t LightPrim<P, SC>::SampleSolidAngleRNCount() const
-{
-    return prim.SampleRNCount();
-}
-
-template<PrimitiveC P, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Ray> LightPrim<P, SC>::SampleRay(RNGDispenser& rng) const
 {
     // What is the probability?
@@ -75,13 +68,6 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Float LightPrim<P, SC>::PdfRay(const Ray&) const
 {
     //return 0;
-}
-
-template<PrimitiveC P, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t LightPrim<P, SC>::SampleRayRNCount() const
-{
-    return 4;
 }
 
 template<PrimitiveC P, class SC>
@@ -246,13 +232,6 @@ Float LightSkysphere<CC, TC, SC>::PdfSolidAngle(const typename EmptyPrimitive<TC
 
 template<CoordConverterC CC, TransformContextC TC, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t LightSkysphere<CC, TC, SC>::SampleSolidAngleRNCount() const
-{
-    return 2;
-}
-
-template<CoordConverterC CC, TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Ray> LightSkysphere<CC, TC, SC>::SampleRay(RNGDispenser& rng) const
 {
     // What is the probability?
@@ -282,13 +261,6 @@ Float LightSkysphere<CC, TC, SC>::PdfRay(const Ray& ray) const
     Float pdf = dist2D.PdfUV(uv);
     pdf = CC::ToSolidAnglePDF(pdf, uv);
     return pdf;
-}
-
-template<CoordConverterC CC, TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t LightSkysphere<CC, TC, SC>::SampleRayRNCount() const
-{
-    return 2;
 }
 
 template<CoordConverterC CC, TransformContextC TC, class SC>
@@ -361,13 +333,6 @@ Float LightNull<TC, SC>::PdfSolidAngle(const typename Primitive::Hit&,
 
 template<TransformContextC TC, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t LightNull<TC, SC>::SampleSolidAngleRNCount() const
-{
-    return 0;
-}
-
-template<TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Ray> LightNull<TC, SC>::SampleRay(RNGDispenser&) const
 {
     return SampleT<Ray>
@@ -382,13 +347,6 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Float LightNull<TC, SC>::PdfRay(const Ray&) const
 {
     return Float(0.0);
-}
-
-template<TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t LightNull<TC, SC>::SampleRayRNCount() const
-{
-    return 0;
 }
 
 template<TransformContextC TC, class SC>

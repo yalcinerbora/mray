@@ -74,6 +74,7 @@ void TracerBase::PopulateAttribInfoAndTypeLists()
     InstantiateAndGetAttribInfo(rendererAttributeInfoMap,
                                 typeGenerators.rendererGenerator,
                                 RenderImagePtr(),
+                                RenderWorkPack(),
                                 GenerateTracerView(),
                                 gpuSystem);
 
@@ -117,6 +118,7 @@ TracerView TracerBase::GenerateTracerView()
 {
     return TracerView
     {
+        .baseAccelerator = *accelerator,
         .primGroups = primGroups.Map(),
         .camGroups = camGroups.Map(),
         .mediumGroups = mediumGroups.Map(),
@@ -1467,10 +1469,17 @@ RendererId TracerBase::CreateRenderer(std::string typeName)
         throw MRayError("Unable to find generator for {}",
                         typeName);
     }
+    auto rendererWorkPack = typeGenerators.renderWorkGenerator.at(typeName);
+    if(!rendererWorkPack)
+    {
+        throw MRayError("Unable to find work pack generator for {}",
+                        typeName);
+    }
 
     auto renderer = rendererGen.value()
     (
         renderImage,
+        rendererWorkPack.value(),
         GenerateTracerView(),
         gpuSystem
     );

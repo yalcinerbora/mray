@@ -11,9 +11,14 @@ using RendererTypes_0 = Tuple
     TexViewRenderer
 >;
 
-void Tracer::AddRendererGenerators_0(Map<std::string_view, RendererGenerator>& map)
+// Currently empty
+using RendererWorkTypes_0 = Tuple<>;
+
+void Tracer::AddRendererGenerators_0(Map<std::string_view, RendererGenerator>& map,
+                                     Map<std::string_view, RenderWorkPack>& workMap)
 {
     using Args = Tuple<const RenderImagePtr&,
+                       const RenderWorkPack&,
                        TracerView, const GPUSystem&>;
 
     Args* resolver0 = nullptr;
@@ -22,4 +27,8 @@ void Tracer::AddRendererGenerators_0(Map<std::string_view, RendererGenerator>& m
     (
         map, resolver0, resolver1
     );
+
+    // Work portion
+    RendererWorkTypes_0* resolver2 = nullptr;
+    AddRenderWorks(workMap, resolver2);
 }

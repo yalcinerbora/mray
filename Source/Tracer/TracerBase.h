@@ -32,6 +32,7 @@ using LightGenerator    = GeneratorFuncType<GenericGroupLightT, uint32_t,
                                             GenericGroupPrimitiveT&>;
 using RendererGenerator = GeneratorFuncType<RendererI,
                                             const RenderImagePtr&,
+                                            const RenderWorkPack&,
                                             TracerView, const GPUSystem&>;
 using BaseAccelGenerator = GeneratorFuncType<BaseAcceleratorI,
                                              BS::thread_pool&,
@@ -58,16 +59,18 @@ struct WorkBatchInfo
 
 struct TypeGeneratorPack
 {
-    Map<std::string_view, PrimGenerator>       primGenerator;
-    Map<std::string_view, CamGenerator>        camGenerator;
-    Map<std::string_view, MedGenerator>        medGenerator;
-    Map<std::string_view, MatGenerator>        matGenerator;
-    Map<std::string_view, TransGenerator>      transGenerator;
-    Map<std::string_view, LightGenerator>      lightGenerator;
-    Map<std::string_view, RendererGenerator>   rendererGenerator;
-    Map<AcceleratorType, BaseAccelGenerator>   baseAcceleratorGenerator;
-    Map<AcceleratorType, AccelGroupGenMap>     accelGeneratorMap;
-    Map<AcceleratorType, AccelWorkGenMap>      accelWorkGeneratorMap;
+    Map<std::string_view, PrimGenerator>        primGenerator;
+    Map<std::string_view, CamGenerator>         camGenerator;
+    Map<std::string_view, MedGenerator>         medGenerator;
+    Map<std::string_view, MatGenerator>         matGenerator;
+    Map<std::string_view, TransGenerator>       transGenerator;
+    Map<std::string_view, LightGenerator>       lightGenerator;
+    Map<std::string_view, RendererGenerator>    rendererGenerator;
+    Map<std::string_view, RenderWorkPack>      renderWorkGenerator;
+
+    Map<AcceleratorType, BaseAccelGenerator>    baseAcceleratorGenerator;
+    Map<AcceleratorType, AccelGroupGenMap>      accelGeneratorMap;
+    Map<AcceleratorType, AccelWorkGenMap>       accelWorkGeneratorMap;
 };
 
 class TracerBase : public TracerI

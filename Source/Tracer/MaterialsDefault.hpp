@@ -75,13 +75,6 @@ Float LambertMaterial<ST>::Pdf(const Ray&,
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t LambertMaterial<ST>::SampleRNCount() const
-{
-    return 2;
-}
-
-template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum LambertMaterial<ST>::Evaluate(const Ray& wO,
                                        const Vector3&,
                                        const Surface& surface) const
@@ -181,13 +174,6 @@ Float ReflectMaterial<ST>::Pdf(const Ray& wI,
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t ReflectMaterial<ST>::SampleRNCount() const
-{
-    return 0;
-}
-
-template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum ReflectMaterial<ST>::Evaluate(const Ray& wO,
                                        const Vector3& wI,
                                        const Surface& surface) const
@@ -246,13 +232,6 @@ Float RefractMaterial<ST>::Pdf(const Ray& wI,
 {
     // We can not sample this
     return Float(0.0);
-}
-
-template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t RefractMaterial<ST>::SampleRNCount() const
-{
-    return 0;
 }
 
 template <class ST>

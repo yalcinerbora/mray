@@ -48,7 +48,8 @@ class TransformContextSingle
 class TransformGroupSingle final : public GenericGroupTransform<TransformGroupSingle>
 {
     public:
-    using DataSoA = typename TransformDetail::SingleTransformSoA;
+    using DefaultContext        = TransformContextSingle;
+    using DataSoA               = typename TransformDetail::SingleTransformSoA;
     static std::string_view     TypeName();
 
     private:
@@ -81,8 +82,9 @@ class TransformGroupSingle final : public GenericGroupTransform<TransformGroupSi
 class TransformGroupMulti final : public GenericGroupTransform<TransformGroupMulti>
 {
     public:
-    using DataSoA = typename TransformDetail::MultiTransformSoA;
-    static std::string_view TypeName();
+    using DefaultContext        = void;
+    using DataSoA               = typename TransformDetail::MultiTransformSoA;
+    static std::string_view     TypeName();
 
     private:
     Span<Matrix4x4> transforms;

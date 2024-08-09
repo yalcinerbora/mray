@@ -69,6 +69,7 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/AcceleratorLinear.hpp)
 
     set(SRC_RENDERERS
+        ${CURRENT_SOURCE_DIR}/RenderWork.h
         ${CURRENT_SOURCE_DIR}/RendererC.h
         ${CURRENT_SOURCE_DIR}/RenderImage.cpp
         ${CURRENT_SOURCE_DIR}/RenderImage.h

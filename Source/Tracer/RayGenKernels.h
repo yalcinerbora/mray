@@ -5,53 +5,64 @@
 #include "Random.h"
 
 
-template<CameraC Camera>
+template<CameraGroupC CameraG, TransformGroupC TransG>
 // Camera must be implicit lifetime type.
 // If some dynamic polymorphism kicksin somewhere in the code
 // we will need to construct the camera via inplace new to create
 // proper virtual function pointers (that refers the device code)
-requires(ImplicitLifetimeC<Camera>)
+requires(ImplicitLifetimeC<typename CameraG::Camera>)
 MRAY_KERNEL
-void KCGenerateSubCamera(// I-O
-                         MRAY_GRID_CONSTANT const Camera* dCam,
-                         //
-                         MRAY_GRID_CONSTANT const typename Camera::DataSoA camSoA,
+void KCGenerateSubCamera(// Output
+                         MRAY_GRID_CONSTANT
+                         typename CameraG::Camera* const dCam,
+                         // Constants
                          MRAY_GRID_CONSTANT const CameraKey camKey,
+                         MRAY_GRID_CONSTANT const typename CameraG::DataSoA camSoA,
                          MRAY_GRID_CONSTANT const Optional<CameraTransform> camTransform,
                          MRAY_GRID_CONSTANT const Vector2ui stratumIndex,
                          MRAY_GRID_CONSTANT const Vector2ui stratumCount)
 {
+    using Camera = typename CameraG::Camera;
+    KernelCallParams kp;
     if(kp.GlobalId() != 0) return;
     // Construction
-    dCam = Camera(camSoA, camKey);
+    Camera cam = Camera(camSoA, camKey);
     if(camTransform.has_value())
-        dCam = dCam.OverrideTransform(camTransform.value());
+        cam = cam.OverrideTransform(camTransform.value());
     // Generate sub camera for rendered regions
-    dCam = dCam.GenerateSubCamera(stratumIndex,
-                                stratumCount);
+    *dCam = cam.GenerateSubCamera(stratumIndex,
+                                  stratumCount);
 }
 
-template<CameraC Camera, RendererC Renderer>
+template<auto RayStateInitFunc, class RayPayload,
+         CameraC Camera, TransformGroupC TransG>
 MRAY_KERNEL
 void KCGenerateCamRays(// Output (Only dOutIndices pointed data should be written)
+                       MRAY_GRID_CONSTANT const Span<RayDiff> dRayDiffs,
                        MRAY_GRID_CONSTANT const Span<RayGMem> dRays,
-                       MRAY_GRID_CONSTANT const Span<typename Renderer::RayState> dRayState,
+                       MRAY_GRID_CONSTANT const RayPayload dPayloads,
                        // Input
-                       MRAY_GRID_CONSTANT const Span<const uint32_t> dOutIndices,
+                       MRAY_GRID_CONSTANT const Span<const uint32_t> dRayIndices,
                        MRAY_GRID_CONSTANT const Span<const uint32_t> dRandomNums,
                        // Constants
-                       MRAY_GRID_CONSTANT const Camera* dCamera,
-                       MRAY_GRID_CONSTANT const uint64_t globalPixelIndex,
+                       MRAY_GRID_CONSTANT const Camera* const dCamera,
+                       MRAY_GRID_CONSTANT const TransformKey transformKey,
+                       MRAY_GRID_CONSTANT const typename TransG::DataSoA transSoA,
+                       MRAY_GRID_CONSTANT const uint64_t globalRegionIndex,
                        MRAY_GRID_CONSTANT const Vector2ui regionCount)
 {
-    assert(dOutIndices.size() * dCamera->SampleRayRNCount() <= dRandomNums.size())
+    assert(dRayIndices.size() * Camera::SampleRayRNCount == dRandomNums.size());
     KernelCallParams kp;
     const Camera& dCam = *dCamera;
 
-    uint32_t rayCount = static_cast<uint32_t>(dOutIndices.size());
+    // Get the transform
+    using TransformContext = TransG::DefaultContext;
+    TransformContext transform(transSoA, transformKey);
+
+    uint32_t rayCount = static_cast<uint32_t>(dRayIndices.size());
     for(uint32_t globalId = kp.GlobalId(); globalId < rayCount; globalId += kp.TotalSize())
     {
-        RNGDispenser rng(numbers, kp.GlobalId(), globalId);
+        RNGDispenser rng(dRandomNums, kp.GlobalId(), globalId);
         //
         uint64_t regionIndex = globalRegionIndex + globalId;
         uint64_t totalRegions = regionCount.Multiply();
@@ -62,17 +73,24 @@ void KCGenerateCamRays(// Output (Only dOutIndices pointed data should be writte
         Vector2ui regionIndex2D = Vector2ui(regionIndex % regionCount[0],
                                             regionIndex / regionCount[0]);
         // Generate the sample
-        RaySample raySample = sCam.SampleRay(regionIndex2D, regionCount, rng);
+        RaySample raySample = dCam.SampleRay(regionIndex2D, regionCount, rng);
+        // TODO: Should we normalize and push the length to tminmax
+        // (Because of a scale?)
+        raySample.value.ray = transform.Apply(raySample.value.ray);
         // Ray part is easy, just write
-        uint32_t writeIndex = dOutIndices[globalId];
+        uint32_t writeIndex = dRayIndices[globalId];
         RayToGMem(dRays, writeIndex,
                   raySample.value.ray,
                   raySample.value.tMinMax);
+
+        // Write the differentials
+        dRayDiffs[writeIndex] = raySample.value.rayDifferentials;
+
         // Now we have stratification index (img coords if
         // stratification is 1 pixel) and pdf,
         // we pass it to the renderer .
         // For example;
         // A path tracer will save them directly and set the throughput to the pdf maybe
-        dRayStates[writeIndex] = Renderer::InitRayState(raySample);
+        RayStateInitFunc(dPayloads, writeIndex, raySample);
     }
 }

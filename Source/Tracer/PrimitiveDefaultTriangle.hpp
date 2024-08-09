@@ -101,13 +101,6 @@ Float Triangle<T>::PdfSurface(const Hit& hit) const
 
 template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t Triangle<T>::SampleRNCount() const
-{
-    return 2;
-}
-
-template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
 Float Triangle<T>::GetSurfaceArea() const
 {
     return Shape::Triangle::Area(positions);
@@ -403,7 +396,7 @@ void Triangle<T>::GenerateSurface(EmptySurface&,
                                   // Inputs
                                   const Hit& baryCoords,
                                   const Ray& ray,
-                                  const DiffRay& differentials) const
+                                  const RayDiff& differentials) const
 {}
 
 template<TransformContextC T>
@@ -412,7 +405,7 @@ void Triangle<T>::GenerateSurface(BasicSurface& result,
                                   // Inputs
                                   const Hit& baryCoords,
                                   const Ray& ray,
-                                  const DiffRay& differentials) const
+                                  const RayDiff& differentials) const
 {
     Float a = baryCoords[0];
     Float b = baryCoords[1];
@@ -442,7 +435,7 @@ void Triangle<T>::GenerateSurface(BarycentricSurface& result,
                                   // Inputs
                                   const Hit& baryCoords,
                                   const Ray& ray,
-                                  const DiffRay& differentials) const
+                                  const RayDiff& differentials) const
 {
     Float a = baryCoords[0];
     Float b = baryCoords[1];
@@ -466,7 +459,7 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
                                   // Inputs
                                   const Hit& baryCoords,
                                   const Ray& ray,
-                                  const DiffRay& differentials) const
+                                  const RayDiff& differentials) const
 {
     Float a = baryCoords[0];
     Float b = baryCoords[1];

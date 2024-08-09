@@ -94,6 +94,8 @@ class RayPartitioner
                                            const Vector2ui& keyBatchBitRange,
                                            const GPUQueue& queue,
                                            bool onlySortForBatches = false) const;
+
+    size_t                  UsedGPUMemory() const;
 };
 
 template<class T>
@@ -138,4 +140,9 @@ BinaryPartitionOutput RayPartitioner::BinaryPartition(Span<const CommonIndex> dI
         .hPartitionStartOffsets = Span<uint32_t, 3>(hPartitionStartOffsets.subspan(0, 3)),
         .dPartitionIndices = dOutput
     };
+}
+
+inline size_t RayPartitioner::UsedGPUMemory() const
+{
+    return deviceMem.Size();
 }

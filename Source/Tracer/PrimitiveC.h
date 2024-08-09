@@ -37,7 +37,7 @@ enum class PrimTransformType : uint8_t
 
 template<class Surface, class Prim, class Hit>
 using SurfaceGenFunc = Surface(Prim::*)(const Hit&,
-                                        const DiffRay&,
+                                        const RayDiff&,
                                         const Ray&);
 
 template<class TransformContext, class PrimData, class TransformData>
@@ -77,8 +77,9 @@ concept PrimitiveC = requires(PrimType pt,
     {pt.PdfSurface(typename PrimType::Hit{})
     } -> std::same_as<Float>;
 
-    {pt.SampleRNCount()
-    } -> std::same_as<uint32_t>;
+    // Primitive surface sample RN count
+    PrimType::SampleRNCount;
+    requires std::is_same_v<decltype(PrimType::SampleRNCount), const uint32_t>;
 
     // Total surface area
     {pt.GetSurfaceArea()
@@ -195,7 +196,7 @@ concept PrimitiveWithSurfaceC = requires(PrimType mg,
     {mg.GenerateSurface(surface,
                         typename PrimType::Hit{},
                         Ray{},
-                        DiffRay{})
+                        RayDiff{})
     } -> std::same_as<void>;
 
 };
@@ -253,6 +254,8 @@ class EmptyPrimitive
     using Hit               = EmptyType;
     using Intersection      = Optional<IntersectionT<EmptyType>>;
     using TransformContext  = TransContextType;
+    //
+    static constexpr uint32_t SampleRNCount = 0;
 
     private:
     Ref<const TransformContext> transformContext;
@@ -264,7 +267,6 @@ class EmptyPrimitive
     constexpr
     SampleT<BasicSurface>   SampleSurface(const RNGDispenser&) const;
     constexpr Float         PdfSurface(const Hit& hit) const;
-    constexpr uint32_t      SampleRNCount() const;
     constexpr Float         GetSurfaceArea() const;
     constexpr AABB3         GetAABB() const;
     constexpr Vector3       GetCenter() const;
@@ -385,12 +387,6 @@ template<TransformContextC TC>
 constexpr Float EmptyPrimitive<TC>::PdfSurface(const Hit& hit) const
 {
     return Float{std::numeric_limits<Float>::signaling_NaN()};
-}
-
-template<TransformContextC TC>
-constexpr uint32_t EmptyPrimitive<TC>::SampleRNCount() const
-{
-    return 0;
 }
 
 template<TransformContextC TC>

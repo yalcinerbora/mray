@@ -96,15 +96,31 @@ namespace CompTime
         return std::string(AccelGroupName) + std::string(TransformName);
     }
 
-    static std::string WorkTypeName(std::string_view matType,
-                                    std::string_view primType,
-                                    std::string_view transType)
+    static std::string RenderWorkTypeName(std::string_view matType,
+                                          std::string_view primType,
+                                          std::string_view transType)
     {
         using namespace std::string_literals;
         return (std::string(TracerConstants::WORK_PREFIX) +
                 std::string(matType) +
                 std::string(primType) +
                 std::string(transType));
+    }
+
+    static std::string RenderLightWorkTypeName(std::string_view lightType,
+                                               std::string_view transType)
+    {
+        using namespace std::string_literals;
+        return (std::string(TracerConstants::WORK_PREFIX) +
+                std::string(lightType) + std::string(transType));
+    }
+
+    static std::string RenderCameraWorkTypeName(std::string_view camType,
+                                                std::string_view transType)
+    {
+        using namespace std::string_literals;
+        return (std::string(TracerConstants::WORK_PREFIX) +
+                std::string(camType) + std::string(transType));
     }
 }
 

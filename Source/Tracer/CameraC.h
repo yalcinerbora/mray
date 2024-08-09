@@ -11,6 +11,8 @@ struct RaySampleT
     Ray     ray;
     Vector2 tMinMax;
     Vector2 imgCoords;
+    // Ray Diff?
+    RayDiff rayDifferentials;
 };
 using RaySample = SampleT<RaySampleT>;
 
@@ -23,10 +25,13 @@ concept CameraC = requires(CameraType c,
     // API
     CameraType(typename CameraType::DataSoA{}, CameraKey{});
 
+    // RN Count
+    CameraType::SampleRayRNCount;
+    requires std::is_same_v<decltype(CameraType::SampleRayRNCount), const uint32_t>;
+
     {c.SampleRay(Vector2ui{}, Vector2ui{}, rng)
     } -> std::same_as<RaySample>;
     {c.PdfRay(Ray{})} -> std::same_as<Float>;
-    {c.SampleRayRNCount()} -> std::same_as<uint32_t>;
     {c.CanBeSampled()} -> std::same_as<bool>;
     {c.GetCameraTransform()} -> std::same_as<CameraTransform>;
     {c.OverrideTransform(CameraTransform{})} -> std::same_as<void>;

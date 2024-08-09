@@ -79,12 +79,6 @@ Float CameraPinhole::PdfRay(const Ray&) const
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t CameraPinhole::SampleRayRNCount() const
-{
-    return 2;
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
 bool CameraPinhole::CanBeSampled() const
 {
     return false;

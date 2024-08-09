@@ -48,6 +48,8 @@ namespace DefaultTriangleDetail
         using Hit               = TriHit;
         using Intersection      = Optional<TriIntersection>;
         using TransformContext  = TransContextType;
+        //
+        static constexpr uint32_t SampleRNCount = 2;
 
         private:
         Ref<const TriangleData>     data;
@@ -63,7 +65,6 @@ namespace DefaultTriangleDetail
         MRAY_HYBRID
         SampleT<BasicSurface>   SampleSurface(RNGDispenser& rng) const;
         MRAY_HYBRID Float       PdfSurface(const Hit& hit) const;
-        MRAY_HYBRID uint32_t    SampleRNCount() const;
         MRAY_HYBRID Float       GetSurfaceArea() const;
         MRAY_HYBRID AABB3       GetAABB() const;
         MRAY_HYBRID Vector3     GetCenter() const;
@@ -84,25 +85,25 @@ namespace DefaultTriangleDetail
                                                 // Inputs
                                                 const Hit&,
                                                 const Ray&,
-                                                const DiffRay&) const;
+                                                const RayDiff&) const;
 
         MRAY_HYBRID void        GenerateSurface(BasicSurface&,
                                                 // Inputs
                                                 const Hit&,
                                                 const Ray&,
-                                                const DiffRay&) const;
+                                                const RayDiff&) const;
 
         MRAY_HYBRID void        GenerateSurface(BarycentricSurface&,
                                                 // Inputs
                                                 const Hit&,
                                                 const Ray&,
-                                                const DiffRay&) const;
+                                                const RayDiff&) const;
 
         MRAY_HYBRID void        GenerateSurface(DefaultSurface&,
                                                 // Inputs
                                                 const Hit&,
                                                 const Ray&,
-                                                const DiffRay&) const;
+                                                const RayDiff&) const;
     };
 
 }

@@ -64,6 +64,9 @@ namespace LightDetail
         using DataSoA           = LightData;
         using SpectrumConverter = typename SpectrumTransformer::Converter;
         using Primitive         = PrimitiveT;
+        //
+        static constexpr uint32_t SampleSolidAngleRNCount   = Primitive::SampleRNCount;
+        static constexpr uint32_t SampleRayRNCount          = Primitive::SampleRNCount + 2;
 
         private:
         Ref<const Primitive>    prim;
@@ -84,14 +87,9 @@ namespace LightDetail
                                           const Vector3& distantPoint,
                                           const Vector3& dir) const;
         MRAY_HYBRID
-        uint32_t            SampleSolidAngleRNCount() const;
-        MRAY_HYBRID
         SampleT<Ray>        SampleRay(RNGDispenser& rng) const;
         MRAY_HYBRID
         Float               PdfRay(const Ray&) const;
-        MRAY_HYBRID
-        uint32_t            SampleRayRNCount() const;
-
         MRAY_HYBRID
         Spectrum            EmitViaHit(const Vector3& wO,
                                        const typename Primitive::Hit& hit) const;
@@ -114,6 +112,9 @@ namespace LightDetail
         using DataSoA           = LightSkysphereData;
         using SpectrumConverter = typename SpectrumTransformer::Converter;
         using Primitive         = EmptyPrimitive<TContext>;
+        //
+        static constexpr uint32_t SampleRayRNCount = 2;
+        static constexpr uint32_t SampleSolidAngleRNCount = 2;
 
         private:
         Ref<const Primitive>    prim;
@@ -135,14 +136,9 @@ namespace LightDetail
                                           const Vector3& distantPoint,
                                           const Vector3& dir) const;
         MRAY_HYBRID
-        uint32_t            SampleSolidAngleRNCount() const;
-        MRAY_HYBRID
         SampleT<Ray>        SampleRay(RNGDispenser& dispenser) const;
         MRAY_HYBRID
         Float               PdfRay(const Ray&) const;
-        MRAY_HYBRID
-        uint32_t            SampleRayRNCount() const;
-
         MRAY_HYBRID
         Spectrum            EmitViaHit(const Vector3& wO,
                                        const typename Primitive::Hit& hit) const;
@@ -161,6 +157,9 @@ namespace LightDetail
         using DataSoA           = EmptyType;
         using SpectrumConverter = typename SpectrumTransformer::Converter;
         using Primitive         = EmptyPrimitive<TContext>;
+        //
+        static constexpr uint32_t SampleSolidAngleRNCount   = 0;
+        static constexpr uint32_t SampleRayRNCount          = 0;
 
         MRAY_HYBRID         LightNull(const SpectrumConverter& sTransContext,
                                       const Primitive& p,
@@ -174,13 +173,9 @@ namespace LightDetail
                                           const Vector3&,
                                           const Vector3&) const;
         MRAY_HYBRID
-        uint32_t            SampleSolidAngleRNCount() const;
-        MRAY_HYBRID
         SampleT<Ray>        SampleRay(RNGDispenser&) const;
         MRAY_HYBRID
         Float               PdfRay(const Ray&) const;
-        MRAY_HYBRID
-        uint32_t            SampleRayRNCount() const;
         MRAY_HYBRID
         Spectrum            EmitViaHit(const Vector3&,
                                        const typename Primitive::Hit&) const;

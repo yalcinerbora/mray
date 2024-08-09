@@ -402,8 +402,19 @@ void PermutedCG32::Advance(uint32_t delta)
 using BackupRNG = PermutedCG32;
 using BackupRNGState = typename PermutedCG32::State;
 
+class RNGeneratorI
+{
+    public:
+    virtual ~RNGeneratorI() = default;
+
+    virtual void GenerateNumbers(Span<uint32_t> numbersOut) = 0;
+    virtual size_t UsedGPUMemory() const = 0;
+};
+
+using RNGeneratorPtr = std::unique_ptr<RNGeneratorI>;
+
 template <class MainRNGType>
-class RNGeneratorGroup
+class RNGeneratorGroup : public RNGeneratorI
 {
     public:
     using MainRNG           = MainRNGType;
@@ -415,12 +426,28 @@ class RNGeneratorGroup
     Span<MainRNGState>      mainStates;
 
     public:
-    RNGeneratorGroup(size_t generatorCount, uint32_t seed);
+    // Constructors & Destructor
+            RNGeneratorGroup(size_t generatorCount,
+                             uint32_t seed);
 
 
-    //State
-
-
-
-    //RNGDispenser();
+    void    GenerateNumbers(Span<uint32_t> numbersOut) override;
+    size_t  UsedGPUMemory() const override;
 };
+
+template <class RNG>
+RNGeneratorGroup<RNG>::RNGeneratorGroup(size_t generatorCount,
+                                        uint32_t seed)
+{}
+
+template <class RNG>
+void RNGeneratorGroup<RNG>::GenerateNumbers(Span<uint32_t> numbersOut)
+{
+
+}
+
+template <class RNG>
+size_t RNGeneratorGroup<RNG>::UsedGPUMemory() const
+{
+    return memory.Size();
+}

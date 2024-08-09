@@ -11,6 +11,8 @@
 #include "CameraC.h"
 #include "TransformC.h"
 #include "LightC.h"
+#include "TracerTypes.h"
+#include "AcceleratorC.h"
 
 #include "Core/TracerI.h"
 #include "Core/DataStructures.h"
@@ -45,6 +47,9 @@ struct TracerView
     template<class K, class V>
     using IdPtrMap = Map<K, std::unique_ptr<V>>;
 
+    // Base accelerator may change its state due to ray casting
+    BaseAcceleratorI& baseAccelerator;
+
     const IdPtrMap<PrimGroupId, GenericGroupPrimitiveT>&    primGroups;
     const IdPtrMap<CameraGroupId, GenericGroupCameraT>&     camGroups;
     const IdPtrMap<MediumGroupId, GenericGroupMediumT>&     mediumGroups;
@@ -60,11 +65,57 @@ struct TracerView
     const std::vector<FlatSurfParams>&                              flattenedSurfaces;
 };
 
+class RenderWorkI
+{
+    public:
+    virtual ~RenderWorkI() = default;
+
+    virtual std::string_view Name() = 0;
+};
+
+class RenderCameraWorkI
+{
+    public:
+    virtual ~RenderCameraWorkI() = default;
+
+    virtual std::string_view Name() = 0;
+};
+
+class RenderLightWorkI
+{
+    public:
+    virtual ~RenderLightWorkI() = default;
+
+    virtual std::string_view Name() = 0;
+};
+
 using RenderImagePtr = std::unique_ptr<RenderImage>;
+using RenderWorkGenerator = GeneratorFuncType<RenderWorkI,
+                                              const GenericGroupMaterialT&,
+                                              const GenericGroupPrimitiveT&,
+                                              const GenericGroupTransformT&,
+                                              const GPUSystem&>;
+using RenderLightWorkGenerator = GeneratorFuncType<RenderLightWorkI,
+                                                   const GenericGroupLightT&,
+                                                   const GenericGroupTransformT&,
+                                                   const GPUSystem&>;
+using RenderCameraWorkGenerator = GeneratorFuncType<RenderCameraWorkI,
+                                                    const GenericGroupCameraT&,
+                                                    const GenericGroupTransformT&,
+                                                    const GPUSystem&>;
+
+// Work generator related
+using RenderWorkGenMap = Map<std::string_view, RenderWorkGenerator>;
+using RenderLightWorkGenMap = Map<std::string_view, RenderLightWorkGenerator>;
+using RenderCamWorkGenMap = Map<std::string_view, RenderCameraWorkGenerator>;
+using RenderWorkPack = Tuple<RenderWorkGenMap, RenderLightWorkGenMap, RenderCamWorkGenMap>;
 
 template<class RendererType>
 concept RendererC = requires(RendererType rt,
+                             const TracerView& tv,
+                             const typename RendererType::RayPayload& rPayload,
                              TransientData input,
+                             const GPUSystem& gpuSystem,
                              const GPUQueue& q)
 {
     // Global State
@@ -72,185 +123,38 @@ concept RendererC = requires(RendererType rt,
     typename RendererType::GlobalState;
     // These parameters are work related.
     // (Not used but exposed for future use maybe?)
-    typename RendererType::LocalState;
     typename RendererType::RayState;
     typename RendererType::RayPayload;
-
+    typename RendererType::SpectrumConverterContext;
+    typename RendererType::MetaHit;
     // Host side things
-    typename RendererType::Id;
-    typename RendererType::IdInt;
     typename RendererType::AttribInfoList;
 
-    // GPU Side
-    { RendererType::InitRayState(RaySample{})
-    } -> std::same_as<typename RendererType::RayState>;
-
     // CPU Side
-    {rt.Commit()} -> std::same_as<void>;
-    {rt.IsInCommitState()} -> std::same_as<bool>;
+    RendererType(RenderImagePtr{}, RenderWorkPack{}, tv, gpuSystem);
     {rt.AttributeInfo()
     } -> std::same_as<typename RendererType::AttribInfoList>;
     {rt.PushAttribute(uint32_t{}, std::move(input), q)
     } -> std::same_as<void>;
-    {rt.StartRender(CamSurfaceId{}, RenderImageParams{})
-    } ->std::same_as<void>;
-    {rt.StopRender()} ->std::same_as<void>;
+    {rt.StartRender(RenderImageParams{}, CamSurfaceId{},
+                    Optional<CameraTransform>{}, uint32_t{}, uint32_t{})
+    } ->std::same_as<RenderBufferInfo>;
+    {rt.StopRender()} -> std::same_as<void>;
+    {rt.DoRender()} -> std::same_as<RendererOutput>;
+    {rt.GPUMemoryUsage()} -> std::same_as<size_t>;
 
     // Can query the type
     {rt.Name()} -> std::same_as<std::string_view>;
     {RendererType::TypeName()} -> std::same_as<std::string_view>;
 };
 
-class RenderWorkI
-{};
-
-class RenderCameraWorkI
-{};
-
-class RenderLightWorkI
-{};
-
 using RenderWorkPtr = std::unique_ptr<RenderWorkI>;
 using RenderCameraWorkPtr = std::unique_ptr<RenderCameraWorkI>;
 using RenderLightWorkPtr = std::unique_ptr<RenderLightWorkI>;
 
-// Render work of camera
-//template <class CamGroup>
-//class RenderBoundaryWork
-//{};
-
-// Boundary work of light group
-//template <class LightGroup>
-//class RenderBoundaryWork
-//{};
-
-//// Render work of surfaces
-//template <class Renderer, class PrimGroup,
-//          class MatGroup, class TransGroup,
-//          auto WorkFunction>
-//class RendererWork
-//{
-//    using RayPayload    = typename Renderer::RayPayload;
-//    using GlobalState   = typename Renderer::GlobalState;
-//    using LocalState    = typename Renderer::LocalState;
-//    using RayState      = typename Renderer::RayState;
-//
-//    using PrimSoA       = typename PrimGroup::DataSoA;
-//    using MatSoA        = typename MatGroup::DataSoA;
-//    using TransSoA      = typename TransGroup::DataSoA;
-//
-//    using SpectrumConv  = typename Renderer::SpectrumConverterContext;
-//
-//    struct Outputs
-//    {
-//        WorkId*         gWorkIds;
-//        RayGMem*        gRays;
-//        RayPayload      gPayload;
-//        uint32_t        outSize;
-//        //
-//
-//    };
-//
-//    struct Inputs
-//    {
-//        // Sorted
-//        const RayIndex*     gRayInIndices;
-//        // Unsorte;
-//        const RayGMem*      gRaysIn;
-//        const HitIdPack*    gRayIds;
-//        const MetaHitPtr    gHitParams;
-//        const RayPayload&   payloadIn;
-//        uint32_t            inSize;
-//    };
-//
-//    private:
-//    Span<Outputs, 1>    gInputSoA;
-//    Span<Inputs, 1>     gOutputSoA;
-//
-//    // Host
-//    const RNGDispenser* gRNGDispenser;
-//    LocalState          perWorkLocalState;
-//    GlobalState         renererGlobalState;
-//
-//    MRAY_HYBRID
-//    void operator()(KernelCallParams kcParams) const
-//    {
-//        // Compile-time find the transform generator function and return type
-//        constexpr auto TContextGen = AcquireTransformContextGenerator<PrimGroup, TransGroup>();
-//        constexpr auto TGenFunc = decltype(TContextGen)::Function;
-//        // Define the types
-//        // First, this kernel uses a transform context
-//        // that this primitive group provides to generate a surface
-//        using TContextType = typename decltype(TContextGen)::ReturnType;
-//        // And this material that converts the spectrum type to the renderer
-//        // required spectrum type
-//        using Material = typename MatGroup:: template Material<SpectrumConv>;
-//        // And this primitive, that accepts the generated transform context
-//        // to generate a surface in tangent space
-//        using Primitive = typename PrimGroup:: template Primitive<TContextType>;
-//        // And finally, the material acts on this surface
-//        using Surface = Material::Surface;
-//        // Compile-time check that this primitive supports this surface
-//        static_assert(PrimWithSurfaceC<Primitive, PrimGroup, Surface>,
-//                      "This primitive does not support the surface required by a material");
-//        // The hit type of this specific primitive
-//        using Hit = typename Primitive::Hit;
-//        // Get instantiation of converter
-//        typename SpectrumConv::Converter specConverter;
-//
-//        // Actual mock work
-//        // Assume i is different per thread
-//        uint32_t i = kcParams.GlobalID();
-//
-//        // Actually load per-work data
-//        // Indices (Ids)
-//        PrimitiveKey pId         = std::get<0>(gRayIds[i]);
-//        MaterialKey  matId       = std::get<1>(gRayIds[i]);
-//        TransformKey tId         = std::get<2>(gRayIds[i]);
-//        MediumKey    mediumId    = std::get<3>(gRayIds[i]);
-//        // Ray & "Ray Hit"
-//        RayReg  rayReg(gRaysIn, gRayInIndices[i]);
-//        Hit hit = gHitParams.Ref<Hit>(i);
-//        // The transform context
-//        TContextType transformContext = TGenFunc(transformSoA, primSoA, tId, pId);
-//        // Convert ray to tangent space
-//        rayReg.r = transformContext.InvApply(rayReg.r);
-//        // Construct Primitive
-//        Primitive prim(transformContext, primSoA, pId);
-//        // Generate the surface
-//        Surface s;
-//        prim.GenerateSurface(s, hit, rayReg.r, DiffRay{});
-//        // Generate the material
-//        Material m(specConverter, matSoA, matId);
-//
-//        // Call the function
-//        Work(prim, m, input, output, rng,);
-//    }
-//};
-
-
-using RenderWorkGenerator = GeneratorFuncType<RenderWorkI,
-                                              GenericGroupMaterialT*,
-                                              GenericGroupPrimitiveT*,
-                                              GenericGroupTransformT*,
-                                              const GPUSystem&>;
-using RenderLightWorkGenerator = GeneratorFuncType<RenderLightWorkI,
-                                                   GenericGroupLightT*,
-                                                   GenericGroupTransformT*,
-                                                   const GPUSystem&>;
-using RenderCameraWorkGenerator = GeneratorFuncType<RenderCameraWorkI,
-                                                    GenericGroupCameraT*,
-                                                    GenericGroupTransformT*,
-                                                    const GPUSystem&>;
-
-using WorkGenMap = Map<std::string_view, RenderWorkGenerator>;
-using LightWorkGenMap = Map<std::string_view, RenderLightWorkGenerator>;
-using CamWorkGenMap = Map<std::string_view, RenderCameraWorkGenerator>;
-
-using WorkPack = Tuple<WorkGenMap, LightWorkGenMap, CamWorkGenMap>;
-using WorkMap = std::map<Tuple<MatGroupId, PrimGroupId, TransGroupId>, RenderWorkPtr>;
-using LightWorkMap = std::map<Pair<LightGroupId, TransGroupId>, RenderLightWorkPtr>;
-using CameraWorkMap = std::map<Pair<CameraGroupId, TransGroupId>, RenderCameraWorkPtr>;
+using RenderWorkMap = std::map<Tuple<MatGroupId, PrimGroupId, TransGroupId>, RenderWorkPtr>;
+using RenderLightWorkMap = std::map<Pair<LightGroupId, TransGroupId>, RenderLightWorkPtr>;
+using RenderCameraWorkMap = std::map<Pair<CameraGroupId, TransGroupId>, RenderCameraWorkPtr>;
 
 class RendererI
 {
@@ -261,7 +165,6 @@ class RendererI
     virtual     ~RendererI() = default;
 
     // Interface
-    virtual MRayError       Commit() = 0;
     virtual AttribInfoList  AttributeInfo() const = 0;
     virtual void            PushAttribute(uint32_t attributeIndex,
                                           TransientData data,
@@ -286,10 +189,8 @@ template <class Child>
 class RendererT : public RendererI
 {
     public:
-    static constexpr uint32_t MaxWorkPacks = 16;
-
-    using AttribInfoList = typename RendererI::AttribInfoList;
-    using WorkPacks = StaticVector<WorkPack, MaxWorkPacks>;
+    using AttribInfoList    = typename RendererI::AttribInfoList;
+    using MetaHit           = MetaHitT<TracerConstants::MaxHitFloatCount>;
 
     private:
     protected:
@@ -297,11 +198,11 @@ class RendererT : public RendererI
     TracerView              tracerView;
     const RenderImagePtr&   renderBuffer;
     bool                    rendering = false;
-    WorkPacks               workPacks;
+    RenderWorkPack          workPack;
     //
-    WorkMap                 currentWorks;
-    LightWorkMap            currentLightWorks;
-    CameraWorkMap           currentCameraWorks;
+    RenderWorkMap           currentWorks;
+    RenderLightWorkMap      currentLightWorks;
+    RenderCameraWorkMap     currentCameraWorks;
 
     // Current Canvas info
     MRayColorSpaceEnum      curColorSpace;
@@ -309,15 +210,13 @@ class RendererT : public RendererI
     Vector2ui               curFBMin;
     Vector2ui               curFBMax;
 
-    void                    GenerateWorkMappings(uint32_t packIndex);
-    void                    GenerateLightWorkMappings(uint32_t packIndex);
-    void                    GenerateCameraWorkMappings(uint32_t packIndex);
+    void                    GenerateWorkMappings();
+    void                    GenerateLightWorkMappings();
+    void                    GenerateCameraWorkMappings();
 
     public:
                         RendererT(const RenderImagePtr&,
-                                  TracerView, const GPUSystem&);
-                        RendererT(const RenderImagePtr&,
-                                  const WorkPacks& workPacks,
+                                  const RenderWorkPack& workPacks,
                                   TracerView, const GPUSystem&);
     std::string_view    Name() const override;
 };
@@ -329,9 +228,8 @@ inline bool FlatSurfParams::operator<(const FlatSurfParams& right) const
 }
 
 template <class C>
-void RendererT<C>::GenerateWorkMappings(uint32_t packIndex)
+void RendererT<C>::GenerateWorkMappings()
 {
-    WorkPack workPack = workPacks[packIndex];
     using Algo::PartitionRange;
     const auto& flatSurfs = tracerView.flattenedSurfaces;
     assert(std::is_sorted(tracerView.flattenedSurfaces.cbegin(),
@@ -364,17 +262,15 @@ void RendererT<C>::GenerateWorkMappings(uint32_t packIndex)
                             C::TypeName(), mgName, pgName, tgName);
         }
         RenderWorkGenerator generator = loc->get();
-        RenderWorkPtr ptr = generator(mg.get(), pg.get(), tg.get(), gpuSystem);
+        RenderWorkPtr ptr = generator(*mg.get(), *pg.get(), *tg.get(), gpuSystem);
         // Put this ptr somewhere... safe
         currentWorks.try_emplace(Tuple(mgId, pgId, tgId), std::move(ptr));
     }
 }
 
 template <class C>
-void RendererT<C>::GenerateLightWorkMappings(uint32_t packIndex)
+void RendererT<C>::GenerateLightWorkMappings()
 {
-    WorkPack workPack = workPacks[packIndex];
-
     using Algo::PartitionRange;
     const auto& lightSurfs = tracerView.lightSurfs;
     using LightSurfP = Pair<LightSurfaceId, LightSurfaceParams>;
@@ -411,18 +307,16 @@ void RendererT<C>::GenerateLightWorkMappings(uint32_t packIndex)
                             C::TypeName(), lgName, tgName);
         }
         RenderLightWorkGenerator generator = loc->get();
-        RenderLightWorkPtr ptr = generator(lg.get(), tg.get(), gpuSystem);
+        RenderLightWorkPtr ptr = generator(*lg.get(), *tg.get(), gpuSystem);
         // Put this ptr somewhere... safe
         currentLightWorks.try_emplace(Pair(lgId, tgId), std::move(ptr));
     }
 }
 
 template <class C>
-void RendererT<C>::GenerateCameraWorkMappings(uint32_t packIndex)
+void RendererT<C>::GenerateCameraWorkMappings()
 {
-    WorkPack workPack = workPacks[packIndex];
     const auto& camSurfs = tracerView.camSurfs;
-
     using CamSurfP = Pair<CamSurfaceId, CameraSurfaceParams>;
     auto CamSurfIsLess = [](const CamSurfP& left, const CamSurfP& right)
     {
@@ -457,7 +351,7 @@ void RendererT<C>::GenerateCameraWorkMappings(uint32_t packIndex)
                             C::TypeName(), cgName, tgName);
         }
         RenderCameraWorkGenerator generator = loc->get();
-        RenderCameraWorkPtr ptr = generator(cg.get(), tg.get(), gpuSystem);
+        RenderCameraWorkPtr ptr = generator(*cg.get(), *tg.get(), gpuSystem);
         // Put this ptr somewhere... safe
         currentCameraWorks.try_emplace(Pair(cgId, tgId), std::move(ptr));
 
@@ -466,20 +360,12 @@ void RendererT<C>::GenerateCameraWorkMappings(uint32_t packIndex)
 
 template <class C>
 RendererT<C>::RendererT(const RenderImagePtr& rb,
+                        const RenderWorkPack& wp,
                         TracerView tv, const GPUSystem& s)
     : gpuSystem(s)
     , tracerView(tv)
     , renderBuffer(rb)
-{}
-
-template <class C>
-RendererT<C>::RendererT(const RenderImagePtr& rb,
-                        const WorkPacks& wp,
-                        TracerView tv, const GPUSystem& s)
-    : gpuSystem(s)
-    , tracerView(tv)
-    , renderBuffer(rb)
-    , workPacks(wp)
+    , workPack(wp)
 {}
 
 template <class C>
@@ -521,4 +407,94 @@ inline Vector2ui FindOptimumTile(Vector2ui fbSize,
 
     Vector2ui result = Vector2ui(Adjust(0), Adjust(1));
     return result;
+}
+
+//=======================================//
+// Helper functions to instantiate works //
+//=======================================//
+// TODO: Maybe add these on a namespace
+template<class R, class Works, class LWorks, class CWorks>
+struct RenderWorkTypePack
+{
+    using RendererType      = R;
+    using WorkTypes         = Works;
+    using LightWorkTypes    = LWorks;
+    using CameraWorkTypes   = CWorks;
+};
+
+template <class RenderWorkTypePackT>
+inline void AddSingleRenderWork(Map<std::string_view, RenderWorkPack>& workMap,
+                                RenderWorkTypePackT*)
+{
+    using RendererType      = typename RenderWorkTypePackT::RendererType;
+    using WorkTypes         = typename RenderWorkTypePackT::WorkTypes;
+    using LightWorkTypes    = typename RenderWorkTypePackT::LightWorkTypes;
+    using CameraWorkTypes   = typename RenderWorkTypePackT::CameraWorkTypes;
+
+    RenderWorkPack& workPack = workMap.emplace(RendererType::TypeName(),
+                                               RenderWorkPack()).first->second;
+
+    //================//
+    // Material Works //
+    //================//
+    using WorkGenArgs = Tuple<const GenericGroupMaterialT&,
+                              const GenericGroupPrimitiveT&,
+                              const GenericGroupTransformT&,
+                              const GPUSystem&>;
+    WorkGenArgs* workArgsResolver = nullptr;
+    WorkTypes* workTypesResolver = nullptr;
+    GenerateMapping<RenderWorkGenerator, RenderWorkI>
+    (
+        std::get<0>(workPack),
+        workArgsResolver,
+        workTypesResolver
+    );
+    //================//
+    //   Light Works  //
+    //================//
+    using LightWorkGenArgs = Tuple<const GenericGroupLightT&,
+                                   const GenericGroupTransformT&,
+                                   const GPUSystem&>;
+    LightWorkGenArgs* lightWorkArgsResolver = nullptr;
+    LightWorkTypes* lightWorkTypesResolver = nullptr;
+    GenerateMapping<RenderLightWorkGenerator, RenderLightWorkI>
+    (
+        std::get<1>(workPack),
+        lightWorkArgsResolver,
+        lightWorkTypesResolver
+    );
+    //================//
+    //  Camera Works  //
+    //================//
+    using CameraWorkGenArgs = Tuple<const GenericGroupCameraT&,
+                                    const GenericGroupTransformT&,
+                                    const GPUSystem&>;
+    CameraWorkGenArgs* cameraWorkArgsResolver = nullptr;
+    CameraWorkTypes* cameraWorkTypesResolver = nullptr;
+    GenerateMapping<RenderCameraWorkGenerator, RenderCameraWorkI>
+    (
+        std::get<2>(workPack),
+        cameraWorkArgsResolver,
+        cameraWorkTypesResolver
+    );
+}
+
+template <class... Args>
+void AddRenderWorks(Map<std::string_view, RenderWorkPack>& workMap,
+                    Tuple<Args...>* list)
+{
+    auto AddRenderWorksInternal =
+    []<class... Args, size_t... Is>(Map<std::string_view, RenderWorkPack>&workMap,
+                                    Tuple<Args...>* list,
+                                    std::index_sequence<Is...>)
+    {
+        // Param pack expansion over the index sequence
+        (
+            (AddSingleRenderWork(workMap, &std::get<Is>(*list))),
+            ...
+        );
+    };
+
+    AddRenderWorksInternal(workMap, list,
+                           std::index_sequence_for<Args...>{});
 }

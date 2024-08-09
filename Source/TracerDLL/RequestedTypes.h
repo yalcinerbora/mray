@@ -10,22 +10,6 @@
 #include "Tracer/AcceleratorLinear.h"
 #include "Tracer/MetaLight.h"
 
-template <class BaseAccel, class AccelGTypes, class AccelWorkTypes>
-struct AccelTypePack
-{
-    using BaseType      = BaseAccel;
-    using GroupTypes    = AccelGTypes;
-    using WorkTypes     = AccelWorkTypes;
-};
-
-template <class PG, class MG, class TG>
-struct RenderTriplet
-{
-    using PrimitiveGType    = PG;
-    using MaterialGType     = MG;
-    using TransformGType    = TG;
-};
-
 // ================= //
 //     Primitives    //
 // ================= //
@@ -135,13 +119,55 @@ using DefaultLinearAccelTypePack = DefaultAccelTypePack<BaseAcceleratorLinear, A
 //using DefaultBVHAccelTypePack = DefaultAccelTypePack<BaseAcceleratorBVH, AcceleratorGroupBVH>;
 //using DefaultDeviceAccelTypePack = DefaultAccelTypePack<BaseAcceleratorDevice, AcceleratorGroupDevice>;
 
-// Mat-Prim-Transform Triplets
-// We will enable this when renderers need the types
-//
-//using RenderTypeTriplets = Tuple
-//<
-//    RenderTriplet<PrimGroupTriangle, MatGroupLambert, TransformGroupIdentity>,
-//    RenderTriplet<PrimGroupTriangle, MatGroupLambert, TransformGroupSingle>,
-//    RenderTriplet<PrimGroupTriangle, MatGroupLambert, TransformGroupSingle>,
-//    RenderTriplet<PrimGroupSkinnedTriangle, MatGroupLambert, TransformGroupMulti>
-//>;
+// ================= //
+//     Renderers     //
+// ================= //
+template <class Renderer,
+          template<class, class, class> class RenderWorkT,
+          template<class, class> class RenderLightWorkT,
+          template<class, class> class RenderCameraWorkT>
+using RendererWorkTypes = RenderWorkTypePack
+<
+    Renderer,
+    // RenderWork
+    Tuple
+    <
+        // Triangle
+        RenderWorkT<PrimGroupTriangle, MatGroupLambert, TransformGroupIdentity>,
+        RenderWorkT<PrimGroupTriangle, MatGroupReflect, TransformGroupIdentity>,
+        RenderWorkT<PrimGroupTriangle, MatGroupRefract, TransformGroupIdentity>,
+        RenderWorkT<PrimGroupTriangle, MatGroupUnreal, TransformGroupIdentity>,
+
+        RenderWorkT<PrimGroupTriangle, MatGroupLambert, TransformGroupSingle>,
+        RenderWorkT<PrimGroupTriangle, MatGroupReflect, TransformGroupSingle>,
+        RenderWorkT<PrimGroupTriangle, MatGroupRefract, TransformGroupSingle>,
+        RenderWorkT<PrimGroupTriangle, MatGroupUnreal, TransformGroupSingle>,
+
+        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupLambert, TransformGroupMulti>,
+        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupReflect, TransformGroupMulti>,
+        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupRefract, TransformGroupMulti>,
+        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupUnreal, TransformGroupMulti>
+
+        // Sphere
+        // ...
+    >,
+    // Lights
+    Tuple
+    <
+        RenderLightWorkT<LightGroupNull, TransformGroupIdentity>,
+        //
+        RenderLightWorkT<LightGroupPrim<PrimGroupTriangle>, TransformGroupIdentity>,
+        RenderLightWorkT<LightGroupPrim<PrimGroupTriangle>, TransformGroupSingle>,
+        //
+        RenderLightWorkT<LightGroupSkysphere<CoOctaCoordConverter>, TransformGroupIdentity>,
+        RenderLightWorkT<LightGroupSkysphere<CoOctaCoordConverter>, TransformGroupSingle>,
+        //
+        RenderLightWorkT<LightGroupSkysphere<SphericalCoordConverter>, TransformGroupIdentity>,
+        RenderLightWorkT<LightGroupSkysphere<SphericalCoordConverter>, TransformGroupSingle>
+    >,
+    // And finally Camera
+    Tuple
+    <
+        RenderCameraWorkT<CameraGroupPinhole, TransformGroupIdentity>
+    >
+>;

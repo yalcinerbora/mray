@@ -35,6 +35,7 @@ concept TransformContextC = requires(const TContext& t,
 template <class TGType>
 concept TransformGroupC = requires(TGType tg)
 {
+    typename TGType::DefaultContext;
     typename TGType::DataSoA;
     // Can request DataSoA
     {tg.SoA()}-> std::same_as<typename TGType::DataSoA>;
@@ -59,6 +60,10 @@ class GenericGroupTransform : public GenericGroupTransformT
 class TransformContextIdentity
 {
     public:
+    // Constructors & Destructor
+                        TransformContextIdentity() = default;
+    MRAY_HYBRID         TransformContextIdentity(const EmptyType&, TransformKey) {}
+    //
     MRAY_HYBRID Vector3 ApplyP(const Vector3& point) const;
     MRAY_HYBRID Vector3 ApplyV(const Vector3& vec) const;
     MRAY_HYBRID Vector3 ApplyN(const Vector3& norm) const;
@@ -75,7 +80,8 @@ class TransformContextIdentity
 class TransformGroupIdentity final : public GenericGroupTransform<TransformGroupIdentity>
 {
     public:
-    using DataSoA = EmptyType;
+    using DefaultContext    = TransformContextIdentity;
+    using DataSoA           = EmptyType;
     static std::string_view TypeName();
 
     public:

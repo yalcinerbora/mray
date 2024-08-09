@@ -23,6 +23,8 @@ namespace LambertMatDetail
         using AlbedoMap         = typename SpectrumTransformer:: template RendererParamVaryingData<2>;
         using SpectrumConverter = typename SpectrumTransformer::Converter;
         using DataSoA           = LambertMatData;
+        //
+        static constexpr uint32_t SampleRNCount = 2;
 
         private:
         const AlbedoMap             albedoTex;
@@ -41,7 +43,6 @@ namespace LambertMatDetail
         MRAY_HYBRID Float       Pdf(const Ray& wI,
                                 const Ray& wO,
                                 const Surface& surface) const;
-        MRAY_HYBRID uint32_t    SampleRNCount() const;
         MRAY_HYBRID Spectrum    Evaluate(const Ray& wO,
                                          const Vector3& wI,
                                          const Surface& surface) const;
@@ -61,6 +62,8 @@ namespace ReflectMatDetail
         using Surface           = DefaultSurface;
         using SpectrumConverter = typename SpectrumTransformer::Converter;
         using DataSoA           = EmptyType;
+        //
+        static constexpr uint32_t SampleRNCount = 0;
 
         public:
         MRAY_HYBRID
@@ -74,7 +77,6 @@ namespace ReflectMatDetail
         MRAY_HYBRID Float       Pdf(const Ray& wI,
                                 const Ray& wO,
                                 const Surface& surface) const;
-        MRAY_HYBRID uint32_t    SampleRNCount() const;
         MRAY_HYBRID Spectrum    Evaluate(const Ray& wO,
                                          const Vector3& wI,
                                          const Surface& surface) const;
@@ -98,6 +100,8 @@ namespace RefractMatDetail
         using Surface           = DefaultSurface;
         using SpectrumConverter = typename SpectrumTransformer::Converter;
         using DataSoA           = RefractMatData;
+        //
+        static constexpr uint32_t SampleRNCount = 0;
 
         private:
         MediumKey mKeyIn;
@@ -115,7 +119,6 @@ namespace RefractMatDetail
         MRAY_HYBRID Float       Pdf(const Ray& wI,
                                 const Ray& wO,
                                 const Surface& surface) const;
-        MRAY_HYBRID uint32_t    SampleRNCount() const;
         MRAY_HYBRID Spectrum    Evaluate(const Ray& wO,
                                          const Vector3& wI,
                                          const Surface& surface) const;

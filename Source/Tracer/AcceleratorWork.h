@@ -6,9 +6,16 @@
 #include "Random.h"
 #include "TracerTypes.h"
 
+template <class BaseAccel, class AccelGTypes, class AccelWorkTypes>
+struct AccelTypePack
+{
+    using BaseType      = BaseAccel;
+    using GroupTypes    = AccelGTypes;
+    using WorkTypes     = AccelWorkTypes;
+};
+
 template<PrimitiveGroupC PG>
 using OptionalHitR = Optional<HitResultT<typename PG::Hit>>;
-
 
 template<AccelGroupC AG, TransformGroupC TG,
          auto GenerateTransformContext = MRAY_ACCEL_TGEN_FUNCTION(AG, TG)>

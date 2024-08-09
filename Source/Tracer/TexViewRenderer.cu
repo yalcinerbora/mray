@@ -104,8 +104,9 @@ void KCShowTexture(MRAY_GRID_CONSTANT const Span<Float> dPixels,
 }
 
 TexViewRenderer::TexViewRenderer(const RenderImagePtr& rb,
+                                 const RenderWorkPack& wp,
                                  TracerView tv, const GPUSystem& s)
-    : RendererT(rb, tv, s)
+    : RendererT(rb, wp, tv, s)
 {
     // Pre-generate list
     textures.clear();
@@ -121,14 +122,6 @@ TexViewRenderer::TexViewRenderer(const RenderImagePtr& rb,
         const auto& tView = tracerView.textureViews.at(texId).value().get();
         textureViews.push_back(&tView);
     }
-}
-
-MRayError TexViewRenderer::Commit()
-{
-    // TODO: Do Error later
-    if(!rendering)
-        currentOptions = newOptions;
-    return MRayError::OK;
 }
 
 typename TexViewRenderer::AttribInfoList
@@ -174,6 +167,12 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
                                               uint32_t customLogicIndex0,
                                               uint32_t customLogicIndex1)
 {
+    // TODO: This is common assignment, every renderer
+    // does this move to a templated intermediate class
+    // on the inheritance chain
+    if(!rendering)
+        currentOptions = newOptions;
+
     // Skip if nothing to show
     if(textures.empty())
     {

@@ -9,6 +9,11 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     public:
     static std::string_view TypeName();
 
+    using GlobalState   = EmptyType;
+    using RayState      = EmptyType;
+    using RayPayload    = EmptyType;
+    using SpectrumConverterContext = SpectrumConverterContextIdentity;
+
     enum Mode
     {
         SHOW_TILING,
@@ -36,6 +41,7 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     public:
     // Constructors & Destructor
                         TexViewRenderer(const RenderImagePtr&,
+                                        const RenderWorkPack&,
                                         TracerView, const GPUSystem&);
                         TexViewRenderer(const TexViewRenderer&) = delete;
                         TexViewRenderer(TexViewRenderer&&) = delete;
@@ -43,7 +49,6 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     TexViewRenderer&    operator=(TexViewRenderer&&) = delete;
 
     //
-    MRayError           Commit() override;
     AttribInfoList      AttributeInfo() const override;
     RendererOptionPack  CurrentAttributes() const override;
     void                PushAttribute(uint32_t attributeIndex,
@@ -60,6 +65,9 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     size_t              GPUMemoryUsage() const override;
 };
 
+static_assert(RendererC<TexViewRenderer>, "\"TexViewRenderer\" does not "
+              "satisfy renderer concept.");
+
 inline
 std::string_view TexViewRenderer::TypeName()
 {
@@ -74,3 +82,4 @@ size_t TexViewRenderer::GPUMemoryUsage() const
 {
     return 0;
 }
+

@@ -17,7 +17,7 @@ using RNGDispenser = RNGDispenserT<uint32_t>;
 using MetaHit = MetaHitT<2>;
 
 // Differential portion of a ray
-class DiffRay{};
+class RayDiff{};
 
 // Spectral Samples or RGB color etc.
 // For spectrum we need wavelengths as well,

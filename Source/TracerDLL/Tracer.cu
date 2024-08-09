@@ -86,9 +86,8 @@ static void AddAccelGeneratorsGeneric(Map<AcceleratorType, BaseAccelGenerator>& 
                                       Map<AcceleratorType, AccelWorkGenMap>& workMap,
                                       AcceleratorType t)
 {
-        // Base
+    // Base
     using LinAccel = typename AcceleratorPack::BaseType;
-
     baseMap.emplace(t, &GenerateType<BaseAcceleratorI, LinAccel,
                                      BS::thread_pool&, const GPUSystem&,
                                      const AccelGroupGenMap&,
