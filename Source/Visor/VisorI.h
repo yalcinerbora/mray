@@ -1,9 +1,9 @@
 #pragma once
 
 #include "Core/Vector.h"
-#include <map>
 
-using namespace std::string_literals;
+#include <map>
+#include <string>
 
 class TransferQueue;
 namespace BS { class thread_pool; }
@@ -66,8 +66,8 @@ struct VisorConfig
 {
     // DLL Related
     std::string dllName;
-    std::string dllCreateFuncName = "ConstructVisor"s;
-    std::string dllDeleteFuncName = "DestroyVisor"s;
+    std::string dllCreateFuncName = "ConstructVisor";
+    std::string dllDeleteFuncName = "DestroyVisor";
     // Window Related
     bool        enforceIGPU = true;
     bool        displayHDR  = true;

@@ -9,6 +9,7 @@
 #include "Core/BitFunctions.h"
 
 #include "Device/GPUSystemForward.h"
+#include "Device/GPUAlgForward.h"
 
 #include "Random.h"
 
@@ -55,6 +56,46 @@ struct UnionAABB3Functor
     AABB3 operator()(const AABB3& l, const AABB3& r) const
     {
         return l.Union(r);
+    }
+};
+
+template<PrimitiveGroupC PG>
+class AABBFetchFunctor
+{
+    typename PG::DataSoA pData;
+
+    public:
+    AABBFetchFunctor(typename PG::DataSoA pd)
+        : pData(pd)
+    {}
+
+    MRAY_HYBRID MRAY_CGPU_INLINE
+    AABB3 operator()(PrimitiveKey k) const
+    {
+        using Prim = typename PG:: template Primitive<>;
+        Prim prim(TransformContextIdentity{}, pData, k);
+        AABB3 aabb = prim.GetAABB();
+        return aabb;
+    }
+};
+
+class KeyGeneratorFunctor
+{
+
+    uint32_t accelBatchId;
+    Span<AcceleratorKey> dLocalKeyWriteRegion;
+
+    public:
+    KeyGeneratorFunctor(uint32_t b, Span<AcceleratorKey> kw)
+        : accelBatchId(b)
+        , dLocalKeyWriteRegion(kw)
+    {}
+
+    MRAY_HYBRID MRAY_CGPU_INLINE
+    void operator()(KernelCallParams kp)
+    {
+        dLocalKeyWriteRegion[kp.GlobalId()] =
+            AcceleratorKey::CombinedKey(accelBatchId, kp.GlobalId());
     }
 };
 
@@ -315,6 +356,13 @@ class AcceleratorGroupT : public AcceleratorGroupI
     PreprocessResult            PreprocessConstructionParams(const AccelGroupConstructParams& p);
     template<class T>
     std::vector<Span<T>>        CreateInstanceLeafSubspans(Span<T> fullRange);
+    void                        WriteInstanceKeysAndAABBsInternal(Span<AABB3> aabbWriteRegion,
+                                                                  Span<AcceleratorKey> keyWriteRegion,
+                                                                  // Input
+                                                                  Span<const PrimitiveKey> dAllLeafs,
+                                                                  Span<const TransformKey> dTransformKeys,
+                                                                  // Constants
+                                                                  const GPUQueue& queue) const;
 
     public:
     // Constructors & Destructor
@@ -849,6 +897,127 @@ AcceleratorGroupT<C, PG>::AcceleratorGroupT(uint32_t groupId,
 {}
 
 template<class C, PrimitiveGroupC PG>
+void AcceleratorGroupT<C, PG>::WriteInstanceKeysAndAABBsInternal(Span<AABB3> aabbWriteRegion,
+                                                                 Span<AcceleratorKey> keyWriteRegion,
+                                                                 // Input
+                                                                 Span<const PrimitiveKey> dAllLeafs,
+                                                                 Span<const TransformKey> dTransformKeys,
+                                                                 // Constants
+                                                                 const GPUQueue& queue) const
+{
+    // Sanity Checks
+    assert(aabbWriteRegion.size() == concreteIndicesOfInstances.size());
+    assert(keyWriteRegion.size() == concreteIndicesOfInstances.size());
+
+    size_t totalInstanceCount = concreteIndicesOfInstances.size();
+    size_t concreteAccelCount = concreteLeafRanges.size();
+
+    // We will use a temp memory here
+    // TODO: Add stream ordered memory allocator stuff to the
+    // Device abstraction side maybe?
+    DeviceLocalMemory tempMem(*queue.Device());
+
+    using enum PrimTransformType;
+    if constexpr(PG::TransformLogic == LOCALLY_CONSTANT_TRANSFORM)
+    {
+        using namespace DeviceAlgorithms;
+        size_t tmSize = SegmentedTransformReduceTMSize<AABB3, PrimitiveKey>(concreteLeafRanges.size());
+        Span<uint32_t> dConcreteIndicesOfInstances;
+        Span<AABB3> dConcreteAABBs;
+        Span<uint32_t> dConcreteLeafOffsets;
+        Span<Byte> dTransformSegReduceTM;
+        MemAlloc::AllocateMultiData(std::tie(dConcreteIndicesOfInstances,
+                                             dConcreteAABBs,
+                                             dConcreteLeafOffsets,
+                                             dTransformSegReduceTM),
+                                    tempMem,
+                                    {totalInstanceCount, concreteAccelCount,
+                                     concreteAccelCount + 1,
+                                     tmSize});
+        Span<const uint32_t> hConcreteIndicesOfInstances(concreteIndicesOfInstances.data(),
+                                                         concreteIndicesOfInstances.size());
+        Span<const Vector2ui> hConcreteLeafRanges(concreteLeafRanges.data(),
+                                                  concreteLeafRanges.size());
+        // Normal copy to GPU
+        queue.MemcpyAsync(dConcreteIndicesOfInstances, hConcreteIndicesOfInstances);
+
+        // We need to copy the Vector2ui [(0, n_0), [n_0, n_1), ..., [n_{m-1}, n_m)]
+        // As [n_0, n_1, ..., n_{m-1}, n_m]
+        // This is technically UB maybe?
+        // But it is hard to recognize by the compiler maybe? Dunno
+        // Do a sanity check at least...
+        static_assert(sizeof(Vector2ui) == 2 * sizeof(typename Vector2ui::InnerType));
+        Span<const uint32_t> hConcreteLeafRangesInt(hConcreteLeafRanges.data()->AsArray().data(),
+                                                    hConcreteLeafRanges.size() * Vector2ui::Dims);
+
+        // Memset the first element to zero
+        queue.MemsetAsync(dConcreteLeafOffsets.subspan(0, 1), 0x00);
+        queue.MemcpyAsyncStrided(dConcreteLeafOffsets.subspan(1), 0,
+                                 hConcreteLeafRangesInt.subspan(1), sizeof(Vector2ui));
+
+        SegmentedTransformReduce<AABB3, PrimitiveKey>
+        (
+            dConcreteAABBs,
+            dTransformSegReduceTM,
+            ToConstSpan(dAllLeafs),
+            dConcreteLeafOffsets,
+            AABB3::Negative(),
+            queue,
+            UnionAABB3Functor(),
+            AABBFetchFunctor<PG>(pg.SoA())
+        );
+        // Now, copy (and transform) concreteAABBs (which are on local space)
+        // to actual accelerator instance aabb's (after transform these will be
+        // in world space)
+        for(const auto& kv : workInstances)
+        {
+            uint32_t index = kv.first;
+            const AccelWorkPtr& workPtr = kv.second;
+            size_t size = (workInstanceOffsets[index + 1] -
+                           workInstanceOffsets[index]);
+            Span<const uint32_t> dLocalIndices = dConcreteIndicesOfInstances.subspan(workInstanceOffsets[index], size);
+            Span<const TransformKey> dLocalTKeys = dTransformKeys.subspan(workInstanceOffsets[index], size);
+            Span<AABB3> dLocalAABBWriteRegion = aabbWriteRegion.subspan(workInstanceOffsets[index], size);
+
+            workPtr->TransformLocallyConstantAABBs(dLocalAABBWriteRegion,
+                                                   dConcreteAABBs,
+                                                   dLocalIndices,
+                                                   dLocalTKeys,
+                                                   queue);
+        }
+    }
+    else
+    {
+        throw MRayError("{}: PER_PRIM_TRANSFORM Accel Construct not yet implemented",
+                        C::TypeName());
+    }
+
+    // Now, copy (and transform) concreteAABBs (which are on local space)
+    // to actual accelerator instance aabb's (after transform these will be
+    // in world space)
+    for(const auto& kv : workInstances)
+    {
+        uint32_t index = kv.first;
+        size_t size = (workInstanceOffsets[index + 1] -
+                       workInstanceOffsets[index]);
+        // Copy the keys as well
+        Span<AcceleratorKey> dLocalKeyWriteRegion = keyWriteRegion.subspan(workInstanceOffsets[index], size);
+        uint32_t accelBatchId = globalWorkIdToLocalOffset + index;
+        using namespace std::string_literals;
+        static const auto KernelName = "KCCopyLocalAccelKeys-"s + std::string(C::TypeName());
+
+        queue.IssueSaturatingLambda
+        (
+            KernelName,
+            KernelIssueParams{.workCount = static_cast<uint32_t>(size)},
+            KeyGeneratorFunctor(accelBatchId, dLocalKeyWriteRegion)
+        );
+    }
+    //  Don't forget to wait for temp memory!
+    queue.Barrier().Wait();
+}
+
+template<class C, PrimitiveGroupC PG>
 size_t AcceleratorGroupT<C, PG>::InstanceCount() const
 {
     return instanceLeafRanges.size();
@@ -1151,6 +1320,9 @@ size_t BaseAcceleratorT<C>::TotalInstanceCount() const
 // Extern it here, define it in a .cu file
 // TODO: If I remember correctly extern __global__ was not allowed?
 // Is this changed recently? Check this if it is undefined behaviour
+//
+// This kernel is shared by the all accelerators, but the body
+// is in "AcceleratorLinear.cu" file
 extern MRAY_KERNEL
 void KCGeneratePrimitiveKeys(MRAY_GRID_CONSTANT const Span<PrimitiveKey> dAllLeafs,
                              //

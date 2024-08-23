@@ -66,7 +66,10 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/AcceleratorWork.h
         ${CURRENT_SOURCE_DIR}/AcceleratorLinear.cu
         ${CURRENT_SOURCE_DIR}/AcceleratorLinear.h
-        ${CURRENT_SOURCE_DIR}/AcceleratorLinear.hpp)
+        ${CURRENT_SOURCE_DIR}/AcceleratorLinear.hpp
+        ${CURRENT_SOURCE_DIR}/AcceleratorLBVH.cu
+        ${CURRENT_SOURCE_DIR}/AcceleratorLBVH.h
+        ${CURRENT_SOURCE_DIR}/AcceleratorLBVH.hpp)
 
     set(SRC_RENDERERS
         ${CURRENT_SOURCE_DIR}/RenderWork.h

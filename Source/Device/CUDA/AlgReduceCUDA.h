@@ -8,55 +8,6 @@
 #include <cub/device/device_segmented_reduce.cuh>
 #include <cub/iterator/transform_input_iterator.cuh>
 
-// Direct wrappers over CUB at the moment
-// Probably be refactored later
-// Add as you need
-namespace mray::cuda::algorithms
-{
-
-template <class T>
-MRAY_HOST
-size_t ReduceTMSize(size_t elementCount);
-
-template <class OutT, class InT>
-MRAY_HOST
-size_t TransformReduceTMSize(size_t elementCount);
-
-template <class OutT, class InT>
-MRAY_HOST
-size_t SegmentedTransformReduceTMSize(size_t numSegments);
-
-template <class T, class BinaryOp>
-MRAY_HOST
-void Reduce(Span<T, 1> dReducedValue,
-            Span<Byte> dTempMemory,
-            Span<const T> dValues,
-            const T& initialValue,
-            const GPUQueueCUDA& queue,
-            BinaryOp&&);
-
-template <class OutT, class InT, class BinaryOp, class TransformOp>
-MRAY_HOST
-void TransformReduce(Span<OutT, 1> dReducedValue,
-                     Span<Byte> dTempMemory,
-                     Span<const InT> dValues,
-                     const OutT& initialValue,
-                     const GPUQueueCUDA& queue,
-                     BinaryOp&&,
-                     TransformOp&&);
-
-template <class OutT, class InT, class BinaryOp, class TransformOp>
-MRAY_HOST
-void SegmentedTransformReduce(Span<OutT> dReducedValue,
-                              Span<Byte> dTempMemory,
-                              Span<const InT> dValues,
-                              Span<const uint32_t> dSegmentRanges,
-                              const OutT& initialValue,
-                              const GPUQueueCUDA& queue,
-                              BinaryOp&&,
-                              TransformOp&&);
-}
-
 namespace mray::cuda::algorithms
 {
 

@@ -9,6 +9,8 @@
 #include "Ray.h"
 #include "AABB.h"
 
+#include <string>
+
 // This implementation is quite taxing on compilation times.
 // It is used to "automatically" create switch/case statements
 // for the given Pixel/Data type.

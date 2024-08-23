@@ -2,6 +2,8 @@
 
 #include "CommandI.h"
 
+#include <string>
+
 class ConvertCommand : public CommandI
 {
     private:

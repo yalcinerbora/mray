@@ -7,26 +7,6 @@
 #include <cub/device/device_partition.cuh>
 #include <cub/device/device_select.cuh>
 
-// Direct wrappers over CUB at the moment
-// Probably be refactored later
-// Add as you need
-namespace mray::cuda::algorithms
-{
-
-template <class T>
-MRAY_HOST
-size_t BinPartitionTMSize(size_t elementCount);
-
-template <class T, class UnaryOp>
-MRAY_HOST
-void BinaryPartition(Span<T> dOutput,
-                     Span<uint32_t, 1> dEndOffset,
-                     Span<Byte> dTempMemory,
-                     Span<const T> dInput,
-                     const GPUQueueCUDA& queue,
-                     UnaryOp&&);
-}
-
 namespace mray::cuda::algorithms
 {
 

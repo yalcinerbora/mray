@@ -5,29 +5,35 @@
 #include "GPUSystemCUDA.h"
 
 #include <cub/device/device_radix_sort.cuh>
+#include <cub/device/device_segmented_radix_sort.cuh>
 
-// Direct wrappers over CUB at the moment
-// Probably be refactored later
-// Add as you need
 namespace mray::cuda::algorithms
 {
 
 template <bool IsAscending, class K, class V>
-MRAY_HOST
-size_t RadixSortTMSize(size_t elementCount);
+MRAY_HOST inline
+size_t SegmentedRadixSortTMSize(size_t totalElementCount,
+                                size_t totalSegments)
+{
+    using namespace cub;
 
-template <bool IsAscending, class K, class V>
-MRAY_HOST
-uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
-                   Span<Span<V>, 2> dValueDoubleBuffer,
-                   Span<Byte> dTempMemory,
-                   const GPUQueueCUDA& queue,
-                   const Vector2ui& bitRange = Vector2ui(0, sizeof(K) * CHAR_BIT));
-
+    cub::DoubleBuffer<K> keys(nullptr, nullptr);
+    cub::DoubleBuffer<V> values(nullptr, nullptr);
+    void* dTM = nullptr;
+    uint32_t* dStartOffsets = nullptr;
+    uint32_t* dEndOffsets = nullptr;
+    size_t result;
+    if constexpr(IsAscending)
+        CUDA_CHECK(DeviceSegmentedRadixSort::SortPairs(dTM, result,
+                                                       keys, values,
+                                                       totalElementCount, totalSegments,
+                                                       dStartOffsets, dEndOffsets));
+    else
+        CUDA_CHECK(DeviceRadixSort::SortPairsDescending(dTM, result,
+                                                        keys, values,
+                                                        totalElementCount, totalSegments,                                                        dStartOffsets, dEndOffsets));
+    return result;
 }
-
-namespace mray::cuda::algorithms
-{
 
 template <bool IsAscending, class K, class V>
 MRAY_HOST inline
@@ -85,6 +91,18 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
                                                         ToHandleCUDA(queue)));
 
     return (keys.Current() == dKeyDoubleBuffer[0].data()) ? 0 : 1;
+}
+
+
+template <bool IsAscending, class K, class V>
+MRAY_HOST inline
+size_t SegmentedRadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
+                          Span<Span<V>, 2> dValueDoubleBuffer,
+                          Span<Byte> dTempMemory,
+                          Span<const uint32_t> dSegmentRanges,
+                          const GPUQueueCUDA& queue,
+                          const Vector2ui& bitRange)
+{
 }
 
 }

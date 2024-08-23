@@ -453,6 +453,7 @@ Optional<int32_t> VisorGUI::ShowRendererComboBox(const VisorState& visorState)
                                     ? result.value()
                                     : visorState.currentRenderIndex;
 
+    using namespace std::string_literals;
     static const std::string RENDERER_DASHED = "Renderer-"s;
     float maxSize = std::transform_reduce(rTypes.cbegin(), rTypes.cend(), 0.0f,
     [](float a, float b) { return std::max(a, b); },

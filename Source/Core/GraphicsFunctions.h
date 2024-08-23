@@ -110,10 +110,17 @@ namespace Graphics
     {
         template <class T>
         MRAY_HYBRID
+        constexpr T         MaxBits3D();
+        template <class T>
+        MRAY_HYBRID
         constexpr T         Compose3D(const Vector3ui&);
         template <class T>
         MRAY_HYBRID
         constexpr Vector3ui Decompose3D(T code);
+        //
+        template <class T>
+        MRAY_HYBRID
+        constexpr T         MaxBits2D();
         template <class T>
         MRAY_HYBRID
         constexpr T         Compose2D(const Vector2ui&);
@@ -435,28 +442,6 @@ constexpr Vector2 SphericalAnglesToUV(const Vector2& thetaPhi)
     Float v = 1 - (thetaPhi[1] * InvPi<Float>());
     return Vector2(u, v);
 }
-
-template <>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr uint32_t MortonCode::Compose3D(const Vector3ui& val)
-{
-    auto Expand3D = [](uint32_t x) -> uint32_t
-    {
-        // https://fgiesen.wordpress.com/2009/12/13/decoding-morton-codes/
-        x &= 0x000003ff;
-        x = (x ^ (x << 16)) & 0xff0000ff;
-        x = (x ^ (x << 8)) & 0x0300f00f;
-        x = (x ^ (x << 4)) & 0x030c30c3;
-        x = (x ^ (x << 2)) & 0x09249249;
-        return x;
-    };
-
-    uint32_t x = Expand3D(val[0]);
-    uint32_t y = Expand3D(val[1]);
-    uint32_t z = Expand3D(val[2]);
-    return ((x << 0) | (y << 1) | (z << 2));
-}
-
 template<uint32_t C>
 MRAY_HYBRID constexpr
 Vector<C, uint32_t> TextureMipSize(const Vector<C, uint32_t>& resolution,
@@ -491,6 +476,41 @@ Vector<C, Float> ConvertPixelIndices(const Vector<C, Float>& inputIndex,
     result = (inputIndex + Float(0.5)) * uvRatio - Float(0.5);
     result.ClampSelf(Vector2::Zero(), toResolution - Vector2(1));
     return result;
+}
+
+template <>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr uint32_t MortonCode::MaxBits3D()
+{
+    return 10u;
+}
+
+template <>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr uint64_t MortonCode::MaxBits3D()
+{
+    return 21u;
+}
+
+template <>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr uint32_t MortonCode::Compose3D(const Vector3ui& val)
+{
+    auto Expand3D = [](uint32_t x) -> uint32_t
+    {
+        // https://fgiesen.wordpress.com/2009/12/13/decoding-morton-codes/
+        x &= 0x000003ff;
+        x = (x ^ (x << 16)) & 0xff0000ff;
+        x = (x ^ (x << 8)) & 0x0300f00f;
+        x = (x ^ (x << 4)) & 0x030c30c3;
+        x = (x ^ (x << 2)) & 0x09249249;
+        return x;
+    };
+
+    uint32_t x = Expand3D(val[0]);
+    uint32_t y = Expand3D(val[1]);
+    uint32_t z = Expand3D(val[2]);
+    return ((x << 0) | (y << 1) | (z << 2));
 }
 
 template <>
@@ -555,6 +575,20 @@ constexpr Vector3ui MortonCode::Decompose3D(uint64_t code)
     uint32_t y = Shrink3D(code >> 1);
     uint32_t z = Shrink3D(code >> 2);
     return Vector3ui(x, y, z);
+}
+
+template <>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr uint32_t MortonCode::MaxBits2D()
+{
+    return 16u;
+}
+
+template <>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr uint64_t MortonCode::MaxBits2D()
+{
+    return 32u;
 }
 
 template <>

@@ -1,11 +1,15 @@
 #pragma once
 
+#pragma once
+
 #include <algorithm>
 #include <bitset>
 
 #include "Core/Types.h"
 #include "Core/MemAlloc.h"
 #include "Core/AABB.h"
+
+#include "Device/GPUAlgForward.h"
 
 #include "TracerTypes.h"
 #include "ParamVaryingData.h"
@@ -16,10 +20,52 @@
 #include "RayPartitioner.h"
 #include "AcceleratorWork.h"
 
-namespace LinearAccelDetail
+namespace LBVHAccelDetail
 {
+    class BitStack
+    {
+        public:
+        static constexpr uint32_t MAX_DEPTH = sizeof(uint32_t) * CHAR_BIT;
+
+        enum TraverseState
+        {
+            FIRST_ENTRY = 0b00,
+            U_TURN      = 0b01
+        };
+
+        private:
+        uint32_t    stack;
+        uint32_t    depth;
+
+        public:
+        MRAY_GPU            BitStack(uint32_t state = 0,
+                                     uint32_t depth = MAX_DEPTH);
+
+        MRAY_GPU void           WipeLowerBits();
+        MRAY_GPU TraverseState  CurrentState() const;
+        MRAY_GPU void           MarkAsTraversed();
+        MRAY_GPU void           Descend();
+        MRAY_GPU void           Ascend();
+        // Access
+        MRAY_GPU uint32_t       Depth() const;
+        template<uint32_t SBits, uint32_t DBits>
+        MRAY_GPU uint32_t       CompressState() const;
+    };
+
+    // Utilize "Key" type here to use the MSB as a flag
+    using ChildIndex = KeyT<uint32_t, 1, 31>;
+    static constexpr uint32_t IS_LEAF = 1;
+
+    struct LBVHNode
+    {
+        AABB3       aabb;
+        ChildIndex  leftIndex;
+        ChildIndex  rightIndex;
+        uint32_t    parentIndex;
+    };
+
     // SoA data of triangle group
-    struct LinearAcceleratorSoA
+    struct LBVHAcceleratorSoA
     {
         // Per accelerator instance stuff
         Span<const CullFaceFlagArray>           dCullFace;
@@ -27,19 +73,21 @@ namespace LinearAccelDetail
         Span<const LightOrMatKeyArray>          dLightOrMatKeys;
         Span<const PrimRangeArray>              dPrimitiveRanges;
         Span<const TransformKey>                dInstanceTransforms;
+        Span<const uint32_t>                    dInstanceRootNodeIndices;
         Span<const Span<const PrimitiveKey>>    dLeafs;
+        Span<const Span<const LBVHNode>>        dNodes;
     };
 
     template<PrimitiveGroupC PrimGroup,
              TransformGroupC TransGroup = TransformGroupIdentity>
-    class AcceleratorLinear
+    class AcceleratorLBVH
     {
         public:
         using PrimHit       = typename PrimGroup::Hit;
         using PrimDataSoA   = typename PrimGroup::DataSoA;
         using TransDataSoA  = typename TransGroup::DataSoA;
         using HitResult     = HitResultT<PrimHit>;
-        using DataSoA       = LinearAcceleratorSoA;
+        using DataSoA       = LBVHAcceleratorSoA;
 
         private:
         // Accel Related
@@ -54,7 +102,9 @@ namespace LinearAccelDetail
         const AlphaMapArray&        alphaMaps;
         const LightOrMatKeyArray&   lmKeys;
         Span<const PrimitiveKey>    leafs;
+        Span<const LBVHNode>        nodes;
         // Primitive Related
+        uint32_t                    rootNodeIndex;
         TransformKey                transformKey;
         const TransDataSoA&         transformSoA;
         const PrimDataSoA&          primitiveSoA;
@@ -67,10 +117,10 @@ namespace LinearAccelDetail
                                                   const PrimitiveKey& primKey) const;
         public:
         // Constructors & Destructor
-        MRAY_GPU                AcceleratorLinear(const TransDataSoA& tSoA,
-                                                  const PrimDataSoA& pSoA,
-                                                  const DataSoA& dataSoA,
-                                                  AcceleratorKey aId);
+        MRAY_GPU                AcceleratorLBVH(const TransDataSoA& tSoA,
+                                                const PrimDataSoA& pSoA,
+                                                const DataSoA& dataSoA,
+                                                AcceleratorKey aId);
         MRAY_GPU
         TransformKey            TransformKey() const;
         MRAY_GPU
@@ -81,18 +131,19 @@ namespace LinearAccelDetail
 }
 
 template<PrimitiveGroupC PrimitiveGroupType>
-class AcceleratorGroupLinear final : public AcceleratorGroupT<AcceleratorGroupLinear<PrimitiveGroupType>, PrimitiveGroupType>
+class AcceleratorGroupLBVH final : public AcceleratorGroupT<AcceleratorGroupLBVH<PrimitiveGroupType>, PrimitiveGroupType>
 {
-    using Base = AcceleratorGroupT<AcceleratorGroupLinear<PrimitiveGroupType>, PrimitiveGroupType>;
+    using Base = AcceleratorGroupT<AcceleratorGroupLBVH<PrimitiveGroupType>, PrimitiveGroupType>;
 
     public:
     static std::string_view TypeName();
 
     using PrimitiveGroup    = PrimitiveGroupType;
-    using DataSoA           = LinearAccelDetail::LinearAcceleratorSoA;
+    using DataSoA           = LBVHAccelDetail::LBVHAcceleratorSoA;
+    using LBVHNode          = LBVHAccelDetail::LBVHNode;
 
     template<class TG = TransformGroupIdentity>
-    using Accelerator = LinearAccelDetail::AcceleratorLinear<PrimitiveGroup, TG>;
+    using Accelerator = LBVHAccelDetail::AcceleratorLBVH<PrimitiveGroup, TG>;
 
     static constexpr auto TransformLogic = PrimitiveGroup::TransformLogic;
 
@@ -109,16 +160,19 @@ class AcceleratorGroupLinear final : public AcceleratorGroupT<AcceleratorGroupLi
     // These are not-duplicated, Instances have copy of the spans.
     // spans may be the same
     Span<Span<PrimitiveKey>>    dLeafs;
+    Span<Span<LBVHNode>>        dNodes;
+    Span<uint32_t>              dRootNodeIndices;
     // Global data, all accelerator leafs are in here
     Span<PrimitiveKey>          dAllLeafs;
+    Span<LBVHNode>              dAllNodes;
 
     public:
     // Constructors & Destructor
-            AcceleratorGroupLinear(uint32_t accelGroupId,
-                                   BS::thread_pool&,
-                                   const GPUSystem&,
-                                   const GenericGroupPrimitiveT& pg,
-                                   const AccelWorkGenMap&);
+    AcceleratorGroupLBVH(uint32_t accelGroupId,
+                         BS::thread_pool&,
+                                 const GPUSystem&,
+                                 const GenericGroupPrimitiveT& pg,
+                                 const AccelWorkGenMap&);
     //
     void    Construct(AccelGroupConstructParams, const GPUQueue&) override;
     void    WriteInstanceKeysAndAABBs(Span<AABB3> dAABBWriteRegion,
@@ -143,15 +197,21 @@ class AcceleratorGroupLinear final : public AcceleratorGroupT<AcceleratorGroupLi
     size_t  GPUMemoryUsage() const override;
 };
 
-class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinear>
+class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
 {
     public:
     static std::string_view TypeName();
+    using LBVHNode          = LBVHAccelDetail::LBVHNode;
+    static constexpr uint32_t DepthBitCount = 7;
+    static constexpr uint32_t StackBitCount = 25;
+    static_assert(DepthBitCount + StackBitCount == sizeof(uint32_t) * CHAR_BIT);
+
 
     private:
     DeviceMemory            accelMem;
-    Span<AcceleratorKey>    dLeafs;
-    Span<AABB3>             dAABBs;
+    Span<AcceleratorKey>    dLeafKeys;
+    Span<AABB3>             dLeafAABBs;
+    Span<LBVHNode>          dNodes;
     //
     DeviceMemory            stackMem;
     Span<uint32_t>          dTraversalStack;
@@ -163,9 +223,9 @@ class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinea
 
     public:
     // Constructors & Destructor
-    BaseAcceleratorLinear(BS::thread_pool&, const GPUSystem&,
-                          const AccelGroupGenMap&,
-                          const AccelWorkGenMap&);
+    BaseAcceleratorLBVH(BS::thread_pool&, const GPUSystem&,
+                        const AccelGroupGenMap&,
+                        const AccelWorkGenMap&);
 
     //
     void    CastRays(// Output
@@ -201,14 +261,21 @@ class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinea
 };
 
 inline
-BaseAcceleratorLinear::BaseAcceleratorLinear(BS::thread_pool& tp, const GPUSystem& sys,
-                                             const AccelGroupGenMap& aGen,
-                                             const AccelWorkGenMap& globalWorkMap)
-    : BaseAcceleratorT<BaseAcceleratorLinear>(tp, sys, aGen, globalWorkMap)
+BaseAcceleratorLBVH::BaseAcceleratorLBVH(BS::thread_pool& tp, const GPUSystem& sys,
+                                         const AccelGroupGenMap& aGen,
+                                         const AccelWorkGenMap& globalWorkMap)
+    : BaseAcceleratorT<BaseAcceleratorLBVH>(tp, sys, aGen, globalWorkMap)
     , accelMem(sys.AllGPUs(), 8_MiB, 32_MiB, false)
     , stackMem(sys.AllGPUs(), 8_MiB, 32_MiB, false)
     , rayPartitioner(sys)
     , maxPartitionCount(0)
 {}
 
-#include "AcceleratorLinear.hpp"
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+extern void KCGenMortonCode(MRAY_GRID_CONSTANT const Span<uint64_t> dMortonCodes,
+                            // Inputs
+                            MRAY_GRID_CONSTANT const Span<const Vector3> dPrimCenters,
+                            // Constants
+                            MRAY_GRID_CONSTANT const Span<const AABB3, 1> dSceneAABB);
+
+#include "AcceleratorLBVH.hpp"

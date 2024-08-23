@@ -8,23 +8,6 @@
 #include <cub/block/block_load.cuh>
 #include <cub/block/block_store.cuh>
 
-// Direct wrappers over CUB at the moment
-// Probably be refactored later
-// Add as you need
-namespace mray::cuda::algorithms
-{
-
-template <class T, class BinaryOp>
-MRAY_HOST
-void InclusiveMultiScan(Span<T> dScannedValues,
-                        Span<const T> dValues,
-                        uint32_t segmentSize,
-                        const T& identityElement,
-                        const GPUQueueCUDA& queue,
-                        BinaryOp&& op);
-
-}
-
 namespace mray::cuda::algorithms
 {
 

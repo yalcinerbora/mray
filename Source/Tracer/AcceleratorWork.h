@@ -31,8 +31,8 @@ static void KCTransformLocallyConstantAABBs(// Output
                                             MRAY_GRID_CONSTANT const typename AG::PrimitiveGroup::DataSoA pSoA)
 {
     using PG = typename AG::PrimitiveGroup;
-    // This kernel only works for LOCALLY_CONSTANT_TRANSFORM typed prims
-    static_assert(PG::TransformLogic == PrimTransformType::LOCALLY_CONSTANT_TRANSFORM);
+    static_assert(PG::TransformLogic == PrimTransformType::LOCALLY_CONSTANT_TRANSFORM,
+                  "This kernel only works for LOCALLY_CONSTANT_TRANSFORM typed prims");
 
     KernelCallParams kp;
     for(uint32_t globalId = kp.GlobalId();
@@ -247,9 +247,10 @@ void AcceleratorWork<AG, TG>::TransformLocallyConstantAABBs(// Output
         assert(dConcreteIndicesOfInstances.size() == dInstanceTransformKeys.size());
 
         using namespace std::string_literals;
+        static const auto KernelName = "KCTransformLocallyConstantAABBs-"s + std::string(TypeName());
         queue.IssueSaturatingKernel<KCTransformLocallyConstantAABBs<AG, TG>>
         (
-            "KCTransformLocallyConstantAABBs-"s + std::string(TypeName()),
+            KernelName,
             KernelIssueParams{.workCount = static_cast<uint32_t>(dConcreteIndicesOfInstances.size())},
             //
             dInstanceAABBs,

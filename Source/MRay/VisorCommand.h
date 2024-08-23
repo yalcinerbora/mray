@@ -2,6 +2,8 @@
 
 #include "CommandI.h"
 
+#include <string>
+
 class VisorCommand : public CommandI
 {
     using OptionalRes = Optional<std::array<uint32_t, 2>>;

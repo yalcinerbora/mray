@@ -5,6 +5,7 @@
 #include "Device/GPUSystem.h"
 #include "Device/GPUSystem.hpp"
 #include "Device/GPUMemory.h"
+#include "Device/GPUAlgForward.h"
 #include "Device/GPUAlgRadixSort.h"
 
 #include "T_AlgTypes.h"

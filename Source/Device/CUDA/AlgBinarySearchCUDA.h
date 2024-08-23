@@ -10,15 +10,6 @@ namespace mray::cuda::algorithms
 {
 
 template <class T>
-MRAY_HYBRID
-size_t LowerBound(Span<const T>, const T& value);
-
-}
-
-namespace mray::cuda::algorithms
-{
-
-template <class T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 size_t LowerBound(Span<const T> range, const T& value)
 {

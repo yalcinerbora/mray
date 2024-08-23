@@ -3,8 +3,6 @@
 namespace LinearAccelDetail
 {
 
-
-
 template<PrimitiveGroupC PG, TransformGroupC TG>
 template<auto GenerateTransformContext>
 MRAY_GPU MRAY_GPU_INLINE
@@ -165,7 +163,7 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
     Span<PrimRangeArray> dConcretePrimRanges;
     MemAlloc::AllocateMultiData(std::tie(dConcreteLeafRanges,
                                          dConcretePrimRanges),
-                                mem,
+                                tempMem,
                                 {this->concreteLeafRanges.size(),
                                  ppResult.concretePrimRanges.size()});
     assert(ppResult.concretePrimRanges.size() ==
@@ -203,7 +201,6 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
     queue.MemcpyAsync(dTransformKeys,   ToConstSpan(hSpanTransformKeys));
     queue.MemcpyAsync(dLeafs,           ToConstSpan(hSpanLeafs));
 
-
     // Copy Ids to the leaf buffer
     auto hConcreteLeafRanges = Span<const Vector2ui>(this->concreteLeafRanges.begin(),
                                                      this->concreteLeafRanges.end());
@@ -217,10 +214,11 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
     uint32_t blockCount = queue.RecommendedBlockCountDevice(&KCGeneratePrimitiveKeys,
                                                             StaticThreadPerBlock1D(),
                                                             0);
-    using namespace std::string_view_literals;
+    using namespace std::string_literals;
+    static const auto KernelName = "KCGeneratePrimitiveKeys-"s + std::string(TypeName());
     queue.IssueExactKernel<KCGeneratePrimitiveKeys>
     (
-        "KCGeneratePrimitiveKeys"sv,
+        KernelName,
         KernelExactIssueParams
         {
             .gridSize = blockCount,
@@ -234,7 +232,7 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
         // Constant
         this->pg.GroupId()
     );
-    // We have temp memory + async memcopies
+    // We have temp memory + async memcopies,
     // we need to wait here.
     queue.Barrier().Wait();
 }
@@ -253,107 +251,15 @@ size_t AcceleratorGroupLinear<PG>::GPUMemoryUsage() const
 }
 
 template<PrimitiveGroupC PG>
-void AcceleratorGroupLinear<PG>::WriteInstanceKeysAndAABBs(Span<AABB3> aabbWriteRegion,
-                                                           Span<AcceleratorKey> keyWriteRegion,
+void AcceleratorGroupLinear<PG>::WriteInstanceKeysAndAABBs(Span<AABB3> dAABBWriteRegion,
+                                                           Span<AcceleratorKey> dKeyWriteRegion,
                                                            const GPUQueue& queue) const
 {
-    // Sanity Checks
-    assert(aabbWriteRegion.size() == this->concreteIndicesOfInstances.size());
-    assert(keyWriteRegion.size() == this->concreteIndicesOfInstances.size());
-
-    size_t totalInstanceCount = this->concreteIndicesOfInstances.size();
-    size_t concreteAccelCount = this->concreteLeafRanges.size();
-
-    // We will use a temp memory here
-    // TODO: Add stream ordered memory allocator stuff to the
-    // Device abstraction side maybe?
-    DeviceLocalMemory tempMem(*queue.Device());
-
-    using enum PrimTransformType;
-    if constexpr(PG::TransformLogic == LOCALLY_CONSTANT_TRANSFORM)
-    {
-
-        using namespace DeviceAlgorithms;
-        size_t tmSize = SegmentedTransformReduceTMSize<AABB3, PrimitiveKey>(this->concreteLeafRanges.size());
-        Span<uint32_t> dConcreteIndicesOfInstances;
-        Span<AABB3> dConcreteAABBs;
-        Span<uint32_t> dConcreteLeafOffsets;
-        Span<Byte> dTransformSegReduceTM;
-        MemAlloc::AllocateMultiData(std::tie(dConcreteIndicesOfInstances,
-                                             dConcreteAABBs,
-                                             dConcreteLeafOffsets,
-                                             dTransformSegReduceTM),
-                                    tempMem,
-                                    {totalInstanceCount, concreteAccelCount,
-                                     concreteAccelCount + 1,
-                                     tmSize});
-        Span<const uint32_t> hConcreteIndicesOfInstances(this->concreteIndicesOfInstances.data(),
-                                                         this->concreteIndicesOfInstances.size());
-        Span<const Vector2ui> hConcreteLeafRanges(this->concreteLeafRanges.data(),
-                                                  this->concreteLeafRanges.size());
-        // Normal copy to GPU
-        queue.MemcpyAsync(dConcreteIndicesOfInstances, hConcreteIndicesOfInstances);
-
-        // We need to copy the Vector2ui [(0, n_0), [n_0, n_1), ..., [n_{m-1}, n_m)]
-        // As [n_0, n_1, ..., n_{m-1}, n_m]
-        // This is technically UB maybe?
-        // But it is hard to recognize by the compiler maybe? Dunno
-        // Do a sanity check at least...
-        static_assert(sizeof(Vector2ui) == 2 * sizeof(typename Vector2ui::InnerType));
-        Span<const uint32_t> hConcreteLeafRangesInt(hConcreteLeafRanges.data()->AsArray().data(),
-                                                    hConcreteLeafRanges.size() * Vector2ui::Dims);
-
-        // Memset the first element to zero
-        queue.MemsetAsync(dConcreteLeafOffsets.subspan(0, 1), 0x00);
-        queue.MemcpyAsyncStrided(dConcreteLeafOffsets.subspan(1), 0,
-                                 hConcreteLeafRangesInt.subspan(1), sizeof(Vector2ui));
-
-        typename PrimitiveGroup::DataSoA pData = this->pg.SoA();
-        SegmentedTransformReduce<AABB3, PrimitiveKey>
-        (
-            dConcreteAABBs,
-            dTransformSegReduceTM,
-            ToConstSpan(dAllLeafs),
-            dConcreteLeafOffsets,
-            AABB3::Negative(),
-            queue,
-            UnionAABB3Functor(),
-            [pData] MRAY_HYBRID(PrimitiveKey k)
-            {
-                using Prim = typename PrimitiveGroup:: template Primitive<>;
-                Prim prim(TransformContextIdentity{}, pData, k);
-                AABB3 aabb = prim.GetAABB();
-                return aabb;
-            }
-        );
-        // Now, copy (and transform) concreteAABBs (which are on local space)
-        // to actual accelerator instance aabb's (after transform these will be
-        // in world space)
-        for(const auto& kv : this->workInstances)
-        {
-            uint32_t index = kv.first;
-            const AccelWorkPtr& workPtr = kv.second;
-            size_t size = (this->workInstanceOffsets[index + 1] -
-                           this->workInstanceOffsets[index]);
-            Span<const uint32_t> dLocalIndices = dConcreteIndicesOfInstances.subspan(this->workInstanceOffsets[index], size);
-            Span<const TransformKey> dLocalTKeys = dTransformKeys.subspan(this->workInstanceOffsets[index], size);
-            Span<AABB3> dLocalWriteRegion = aabbWriteRegion.subspan(this->workInstanceOffsets[index], size);
-
-            workPtr->TransformLocallyConstantAABBs(dLocalWriteRegion,
-                                                   dConcreteAABBs,
-                                                   dLocalIndices,
-                                                   dLocalTKeys,
-                                                   queue);
-        }
-        //  Don't forget to wait for temp memory!
-        queue.Barrier().Wait();
-    }
-    else
-    {
-        throw MRayError("{}: PER_PRIM_TRANSFORM Accel Construct not yet implemented",
-                        TypeName());
-    }
-
+    this->WriteInstanceKeysAndAABBsInternal(dAABBWriteRegion,
+                                            dKeyWriteRegion,
+                                            dAllLeafs,
+                                            dTransformKeys,
+                                            queue);
 }
 
 template<PrimitiveGroupC PG>

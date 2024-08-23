@@ -2,6 +2,8 @@
 
 #include "Core/DataStructures.h"
 
+#include <string>
+
 struct GLFWmonitor;
 struct ImFont;
 

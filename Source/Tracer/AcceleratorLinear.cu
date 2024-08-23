@@ -124,21 +124,21 @@ AABB3 BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instan
     {
         AcceleratorGroupI* aGroup = accGroup.second.get();
         size_t localCount = instanceOffsets[i + 1] - instanceOffsets[i];
-        auto aabbRegion = dAABBs.subspan(instanceOffsets[i],
+        auto dAABBRegion = dAABBs.subspan(instanceOffsets[i],
                                          localCount);
-        auto leafRegions = dLeafs.subspan(instanceOffsets[i], localCount);
-        aGroup->WriteInstanceKeysAndAABBs(dAABBs, dLeafs, qIt.Queue());
+        auto dLeafRegion = dLeafs.subspan(instanceOffsets[i], localCount);
+        aGroup->WriteInstanceKeysAndAABBs(dAABBRegion, dLeafRegion, qIt.Queue());
         i++;
         qIt.Next();
     }
 
     // Reduce the given AABBs
     // Cheeckly utilize stack mem as temp mem
-    size_t temMemSize = DeviceAlgorithms::ReduceTMSize<AABB3>(dAABBs.size());
+    size_t tempMemSize = DeviceAlgorithms::ReduceTMSize<AABB3>(dAABBs.size());
     Span<AABB3> dReducedAABB;
     Span<Byte> dTemp;
     MemAlloc::AllocateMultiData(std::tie(dTemp, dReducedAABB),
-                                stackMem, {temMemSize, 1});
+                                stackMem, {tempMemSize, 1});
 
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     DeviceAlgorithms::Reduce(Span<AABB3,1>(dReducedAABB), dTemp,
