@@ -55,10 +55,10 @@ struct RenderWorkParams
     using Inputs        = RenderWorkInputs<Renderer>;
     using Outputs       = RenderWorkOutputs<Renderer>;
     //
-    Inputs      in;
     Outputs     out;
-    GlobalState globalState;
     RayState    rayState;
+    Inputs      in;
+    GlobalState globalState;
     PrimSoA     primSoA;
     MatSoA      matSoA;
     TransSoA    transSoA;
@@ -78,9 +78,9 @@ struct RenderLightWorkParams
     using Inputs        = RenderWorkInputs<Renderer>;
     using Outputs       = RenderWorkOutputs<Renderer>;
     //
+    RayState    rayState;
     Inputs      in;
     GlobalState globalState;
-    RayState    rayState;
     PrimSoA     primSoA;
     LightSoA    lightSoA;
     TransSoA    transSoA;
@@ -100,17 +100,17 @@ struct RenderCameraWorkParams
     using Inputs = RenderWorkInputs<Renderer>;
     using Outputs = RenderWorkOutputs<Renderer>;
     //
-    Inputs      in;
     Outputs     out;
-    GlobalState globalState;
     RayState    rayState;
+    Inputs      in;
+    GlobalState globalState;
     CamSoA      camsSoA;
     TransSoA    transSoA;
 };
 
 template<RendererC R, PrimitiveGroupC PG,
          MaterialGroupC MG, TransformGroupC TG>
-class RenderWork : public RenderWorkI
+class RenderWork : public RenderWorkT<R>
 {
     public:
     static std::string_view TypeName();
@@ -121,41 +121,42 @@ class RenderWork : public RenderWorkI
     const TG&           tg;
     const GPUSystem&    gpuSystem;
 
+    template<uint32_t I>
+    void DoWorkInternal(// Output
+                        Span<RayDiff> dRayDiffsOut,
+                        Span<RayGMem> dRaysOut,
+                        // Payload itself should be SoA, so no span
+                        const typename R::RayPayload& dPayloadsOut,
+                        // I-O
+                        const typename R::RayState& dRayStates,
+                        // Input
+                        // Contiguous
+                        Span<const RayIndex> dRayIndicesIn,
+                        Span<const RandomNumber> dRandomNumbers,
+                        // Accessed by index
+                        Span<const RayDiff> dRayDiffsIn,
+                        Span<const RayGMem> dRaysIn,
+                        Span<const MetaHit> dHitsIn,
+                        Span<const HitKeyPack> dKeysIn,
+                        const typename R::RayPayload& dPayloadsIn,
+                        // Constants
+                        const typename R::GlobalState& globalState,
+                        const GPUQueue& queue) const;
+
     public:
     // Constructors & Destructor
-                    RenderWork(const GenericGroupMaterialT&,
-                               const GenericGroupPrimitiveT&,
-                               const GenericGroupTransformT&,
-                               const GPUSystem&);
+            RenderWork(const GenericGroupMaterialT&,
+                       const GenericGroupPrimitiveT&,
+                       const GenericGroupTransformT&,
+                       const GPUSystem&);
     //
-    template<auto WorkFunc>
-    void            DoWork(// Output
-                           Span<RayDiff> dRayDiffsOut,
-                           Span<RayGMem> dRaysOut,
-                           // Payload itself should be SoA, so no span
-                           const typename R::RayPayload& dPayloadsOut,
-                           // I-O
-                           const typename R::RayState& dRayStates,
-                           // Input
-                           // Contiguous
-                           Span<const RayIndex> dRayIndicesIn,
-                           Span<const uint32_t> dRandomNumbers,
-                           // Accessed by index
-                           Span<const RayDiff> dRayDiffsIn,
-                           Span<const RayGMem> dRaysIn,
-                           Span<const MetaHit> dHitsIn,
-                           Span<const HitKeyPack> dKeysIn,
-                           const typename R::RayPayload& dPayloadsIn,
-                           // Constants
-                           const typename R::GlobalState& globalState,
-                           const typename R::RayState& rayState,
-                           const GPUQueue& queue);
+    MRAY_RENDER_DO_WORK_DEF(0)
 
-    std::string_view Name() override;
+    std::string_view Name() const override;
 };
 
 template<RendererC R, LightGroupC LG, TransformGroupC TG>
-class RenderLightWork : public RenderLightWorkI
+class RenderLightWork : public RenderLightWorkT<R>
 {
     public:
     static std::string_view TypeName();
@@ -165,31 +166,32 @@ class RenderLightWork : public RenderLightWorkI
     const TG&           tg;
     const GPUSystem&    gpuSystem;
 
+    template<uint32_t I>
+    void    DoBoundaryWorkInternal(// I-O
+                                   const typename R::RayState& dRayStates,
+                                   // Input
+                                   // Contiguous
+                                   Span<const RayIndex> dRayIndicesIn,
+                                   Span<const uint32_t> dRandomNumbers,
+                                   // Accessed by index
+                                   Span<const RayDiff> dRayDiffsIn,
+                                   Span<const RayGMem> dRaysIn,
+                                   Span<const MetaHit> dHitsIn,
+                                   Span<const HitKeyPack> dKeysIn,
+                                   const typename R::RayPayload& dPayloadsIn,
+                                   // Constants
+                                   const typename R::GlobalState& globalState,
+                                   const GPUQueue& queue) const;
+
     public:
     // Constructors & Destructor
             RenderLightWork(const GenericGroupLightT&,
                             const GenericGroupTransformT&,
                             const GPUSystem&);
-
-    template<auto WorkFunc>
-    void    DoBoundaryWork(// I-O
-                           const typename R::RayState& dRayStates,
-                           // Input
-                           // Contiguous
-                           Span<const RayIndex> dRayIndicesIn,
-                           Span<const uint32_t> dRandomNumbers,
-                           // Accessed by index
-                           Span<const RayDiff> dRayDiffsIn,
-                           Span<const RayGMem> dRaysIn,
-                           Span<const MetaHit> dHitsIn,
-                           Span<const HitKeyPack> dKeysIn,
-                           const typename R::RayPayload& dPayloadsIn,
-                           // Constants
-                           const typename R::GlobalState& globalState,
-                           const typename R::RayState& rayState,
-                           const GPUQueue& queue);
     //
-    std::string_view    Name() override;
+    MRAY_RENDER_DO_LIGHT_WORK_DEF(0)
+
+    std::string_view    Name() const override;
 };
 
 template<RendererC R, CameraGroupC CG, TransformGroupC TG>
@@ -202,6 +204,22 @@ class RenderCameraWork : public RenderCameraWorkI
     const CG&           cg;
     const TG&           tg;
     const GPUSystem&    gpuSystem;
+
+    template<auto RayStateInitFunc>
+    void    GenerateRaysInternal(// Output
+                                 const Span<RayDiff>& dRayDiffsOut,
+                                 const Span<RayGMem>& dRaysOut,
+                                 const typename R::RayPayload& dPayloadsOut,
+                                 // Input
+                                 const Span<const uint32_t>& dRayIndices,
+                                 const Span<const uint32_t>& dRandomNums,
+                                 // Type erased buffer
+                                 Span<const Byte> dCamBuffer,
+                                 TransformKey transKey,
+                                 // Constants
+                                 uint64_t globalPixelIndex,
+                                 const Vector2ui regionCount,
+                                 const GPUQueue& queue) const;
 
     public:
     // Constructors & Destructor
@@ -216,7 +234,8 @@ class RenderCameraWork : public RenderCameraWorkI
                               Optional<CameraTransform> camTransform,
                               Vector2ui stratumIndex,
                               Vector2ui stratumCount,
-                              const GPUQueue& queue);
+                              const GPUQueue& queue) const;
+
     template<auto RayStateInitFunc>
     void    GenerateRays(// Output
                          const Span<RayDiff>& dRayDiffsOut,
@@ -231,9 +250,24 @@ class RenderCameraWork : public RenderCameraWorkI
                          // Constants
                          uint64_t globalPixelIndex,
                          const Vector2ui regionCount,
-                         const GPUQueue& queue);
+                         const GPUQueue& queue) const;
+    //void    DoBoundaryWork(// I-O
+    //                       const typename R::RayState& dRayStates,
+    //                       // Input
+    //                       // Contiguous
+    //                       Span<const RayIndex> dRayIndicesIn,
+    //                       Span<const uint32_t> dRandomNumbers,
+    //                       // Accessed by index
+    //                       Span<const RayDiff> dRayDiffsIn,
+    //                       Span<const RayGMem> dRaysIn,
+    //                       Span<const MetaHit> dHitsIn,
+    //                       Span<const HitKeyPack> dKeysIn,
+    //                       const typename R::RayPayload& dPayloadsIn,
+    //                       // Constants
+    //                       const typename R::GlobalState& globalState,
+    //                       const GPUQueue& queue) const override;
 
-    std::string_view    Name() override;
+    std::string_view    Name() const override;
 };
 
 template<RendererC R, PrimitiveGroupC PG,
@@ -245,15 +279,15 @@ static void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParams<R, PG, MG, TG
 
 template<RendererC R, LightGroupC LG, TransformGroupC TG,
          auto WorkFunction,
-         auto GenerateTransformContext = MRAY_PRIM_TGEN_FUNCTION(typename LG::PG, TG)>
+         auto GenerateTransformContext = MRAY_PRIM_TGEN_FUNCTION(typename LG::PrimGroup, TG)>
 MRAY_KERNEL
 static void KCRenderLightWork(MRAY_GRID_CONSTANT const RenderLightWorkParams<R, LG, TG> params);
 
-//template<RendererC R, PrimitiveGroupC PG,
-//         CameraGroupC CG, TransformGroupC TG,
-//         auto WorkFunction>
-//MRAY_KERNEL
-//static void KCRenderCameraWork(MRAY_GRID_CONSTANT const RenderCameraWorkParams<R, CG, TG> params);
+template<RendererC R, PrimitiveGroupC PG,
+         CameraGroupC CG, TransformGroupC TG,
+         auto WorkFunction>
+MRAY_KERNEL
+static void KCRenderCameraWork(MRAY_GRID_CONSTANT const RenderCameraWorkParams<R, CG, TG> params);
 
 template<RendererC R, PrimitiveGroupC PG,
          MaterialGroupC MG, TransformGroupC TG>
@@ -280,69 +314,84 @@ RenderWork<R, P, M, T>::RenderWork(const GenericGroupMaterialT& mgIn,
 
 template<RendererC R, PrimitiveGroupC PG,
          MaterialGroupC MG, TransformGroupC TG>
-template<auto WorkFunc>
-void RenderWork<R, PG, MG, TG>::DoWork(// Output
-                                       Span<RayDiff> dRayDiffsOut,
-                                       Span<RayGMem> dRaysOut,
-                                       // Payload itself should be SoA, so no span
-                                       const typename R::RayPayload& dPayloadsOut,
-                                       // I-O
-                                       const typename R::RayState& dRayStates,
-                                       // Input
-                                       // Contiguous
-                                       Span<const RayIndex> dRayIndicesIn,
-                                       Span<const uint32_t> dRandomNumbers,
-                                       // Accessed by index
-                                       Span<const RayDiff> dRayDiffsIn,
-                                       Span<const RayGMem> dRaysIn,
-                                       Span<const MetaHit> dHitsIn,
-                                       Span<const HitKeyPack> dKeysIn,
-                                       const typename R::RayPayload& dPayloadsIn,
-                                       // Constants
-                                       const typename R::GlobalState& globalState,
-                                       const typename R::RayState& rayState,
-                                       const GPUQueue& queue)
+template<uint32_t I>
+void RenderWork<R, PG, MG, TG>::DoWorkInternal(// Output
+                                               Span<RayDiff> dRayDiffsOut,
+                                               Span<RayGMem> dRaysOut,
+                                               // Payload itself should be SoA, so no span
+                                               const typename R::RayPayload& dPayloadsOut,
+                                               // I-O
+                                               const typename R::RayState& dRayStates,
+                                               // Input
+                                               // Contiguous
+                                               Span<const RayIndex> dRayIndicesIn,
+                                               Span<const RandomNumber> dRandomNumbers,
+                                               // Accessed by index
+                                               Span<const RayDiff> dRayDiffsIn,
+                                               Span<const RayGMem> dRaysIn,
+                                               Span<const MetaHit> dHitsIn,
+                                               Span<const HitKeyPack> dKeysIn,
+                                               const typename R::RayPayload& dPayloadsIn,
+                                               // Constants
+                                               const typename R::GlobalState& globalState,
+                                               const GPUQueue& queue) const
 {
-    const RenderWorkParams<R, PG, MG, TG> params =
-    {
-        .in =
-        {
-            .dRayIndices    = dRayIndicesIn,
-            .dRandomNumbers = dRandomNumbers,
-            .dRayDiffs      = dRayDiffsIn,
-            .dRays          = dRaysIn,
-            .dHits          = dHitsIn,
-            .dPayloads      = dPayloadsIn,
-            .dKeys          = dKeysIn
-        },
-        .out =
-        {
-            .dRayDiffs  = dRayDiffsOut,
-            .dRays      = dRaysOut,
-            .dPayloads  = dPayloadsOut
-        },
-        .globalState    = globalState,
-        .rayState       = rayState,
-        .primSoA        = pg.SoA(),
-        .matSoA         = mg.SoA(),
-        .transSoA       = tg.SoA()
-    };
+    // Please check the kernel for details
+    using TC = typename PrimTransformContextType<PG, TG>::Result;
+    using M = typename MG:: template Material<typename R::SpectrumConverterContext>;
+    using P = typename PG:: template Primitive<TC>;
+    using S = typename M::Surface;
+    static constexpr auto WF = R::template WorkFunctions<P, M, S, PG, MG, TG>;
 
-    uint32_t rayCount = static_cast<uint32_t>(params.in.dRayIndices.size());
-    using namespace std::string_literals;
-    static const std::string KernelName = std::string(TypeName()) + "-Work"s;
-    static constexpr auto Kernel = KCRenderWork<R, PG, MG, TG, WorkFunc>;
-    queue.IssueSaturatingKernel<Kernel>
-    (
-        KernelName,
-        KernelIssueParams{.workCount = rayCount},
-        params
-    );
+    if constexpr(I >= std::tuple_size_v<decltype(WF)>)
+    {
+        throw MRayError("[{}]: Runtime call to \"DoWork_{}\" which does not have a kernel "
+                        "associated with it!");
+    }
+    else
+    {
+        const RenderWorkParams<R, PG, MG, TG> params =
+        {
+            .out =
+            {
+                .dRayDiffs  = dRayDiffsOut,
+                .dRays      = dRaysOut,
+                .dPayloads  = dPayloadsOut
+            },
+            .rayState = dRayStates,
+            .in =
+            {
+                .dRayIndices    = dRayIndicesIn,
+                .dRandomNumbers = dRandomNumbers,
+                .dRayDiffs      = dRayDiffsIn,
+                .dRays          = dRaysIn,
+                .dHits          = dHitsIn,
+                .dPayloads      = dPayloadsIn,
+                .dKeys          = dKeysIn
+            },
+            .globalState = globalState,
+            .primSoA        = pg.SoA(),
+            .matSoA         = mg.SoA(),
+            .transSoA       = tg.SoA()
+        };
+
+        uint32_t rayCount = static_cast<uint32_t>(params.in.dRayIndices.size());
+        using namespace std::string_literals;
+        static const std::string KernelName = std::string(TypeName()) + "-Work"s;
+        static constexpr auto WorkFunc = std::get<I>(WF);
+        static constexpr auto Kernel = KCRenderWork<R, PG, MG, TG, WorkFunc>;
+        queue.IssueSaturatingKernel<Kernel>
+        (
+            KernelName,
+            KernelIssueParams{.workCount = rayCount},
+            params
+        );
+    }
 }
 
 template<RendererC R, PrimitiveGroupC P,
          MaterialGroupC M, TransformGroupC T>
-std::string_view RenderWork<R, P, M, T>::Name()
+std::string_view RenderWork<R, P, M, T>::Name() const
 {
     return TypeName();
 }
@@ -365,60 +414,73 @@ RenderLightWork<R, L, T>::RenderLightWork(const GenericGroupLightT& l,
     , gpuSystem(sys)
 {}
 
-template<RendererC R, LightGroupC L, TransformGroupC T>
-template<auto WorkFunc>
-void RenderLightWork<R, L, T>::DoBoundaryWork(// I-O
-                                              const typename R::RayState& dRayStates,
-                                              // Input
-                                              // Contiguous
-                                              Span<const RayIndex> dRayIndicesIn,
-                                              Span<const uint32_t> dRandomNumbers,
-                                              // Accessed by index
-                                              Span<const RayDiff> dRayDiffsIn,
-                                              Span<const RayGMem> dRaysIn,
-                                              Span<const MetaHit> dHitsIn,
-                                              Span<const HitKeyPack> dKeysIn,
-                                              const typename R::RayPayload& dPayloadsIn,
-                                              // Constants
-                                              const typename R::GlobalState& globalState,
-                                              const typename R::RayState& rayState,
-                                              const GPUQueue& queue)
+template<RendererC R, LightGroupC LG, TransformGroupC TG>
+template<uint32_t I>
+void RenderLightWork<R, LG, TG>::DoBoundaryWorkInternal(// I-O
+                                                      const typename R::RayState& dRayStates,
+                                                      // Input
+                                                      // Contiguous
+                                                      Span<const RayIndex> dRayIndicesIn,
+                                                      Span<const uint32_t> dRandomNumbers,
+                                                      // Accessed by index
+                                                      Span<const RayDiff> dRayDiffsIn,
+                                                      Span<const RayGMem> dRaysIn,
+                                                      Span<const MetaHit> dHitsIn,
+                                                      Span<const HitKeyPack> dKeysIn,
+                                                      const typename R::RayPayload& dPayloadsIn,
+                                                      // Constants
+                                                      const typename R::GlobalState& globalState,
+                                                      const GPUQueue& queue) const
 {
-    const auto& pg = lg.PrimitiveGroup();
+    // Please check the kernel for details
+    using PG    = typename LG::PrimGroup;
+    using TC    = typename PrimTransformContextType<PG, TG>::Result;
+    using L     = typename LG::Light<TC, typename R::SpectrumConverterContext>;
+    static constexpr auto WF = R:: template LightWorkFunctions<L, LG, TG>;
 
-    const RenderLightWorkParams<R, L, T> params =
+    if constexpr(I >= std::tuple_size_v<decltype(WF)>)
     {
-        .in =
+        throw MRayError("[{}]: Runtime call to \"DoBoundaryWork_{}\" which does not have a kernel "
+                        "associated with it!");
+    }
+    else
+    {
+        const auto& pg = lg.PrimitiveGroup();
+        const RenderLightWorkParams<R, LG, TG> params =
         {
-            .dRayIndices    = dRayIndicesIn,
-            .dRandomNumbers = dRandomNumbers,
-            .dRayDiffs      = dRayDiffsIn,
-            .dRays          = dRaysIn,
-            .dHits          = dHitsIn,
-            .dPayloads      = dPayloadsIn,
-            .dKeys          = dKeysIn
-        },
-        .globalState    = globalState,
-        .rayState       = rayState,
-        .primSoA        = pg.SoA(),
-        .lightSoA       = lg.SoA(),
-        .transSoA       = tg.SoA()
-    };
+            .rayState = dRayStates,
+            .in =
+            {
+                .dRayIndices    = dRayIndicesIn,
+                .dRandomNumbers = dRandomNumbers,
+                .dRayDiffs      = dRayDiffsIn,
+                .dRays          = dRaysIn,
+                .dHits          = dHitsIn,
+                .dPayloads      = dPayloadsIn,
+                .dKeys          = dKeysIn
+            },
+            .globalState    = globalState,
+            .primSoA        = pg.SoA(),
+            .lightSoA       = lg.SoA(),
+            .transSoA       = tg.SoA()
+        };
 
-    uint32_t rayCount = static_cast<uint32_t>(params.in.dRayIndices.size());
-    using namespace std::string_literals;
-    static const std::string KernelName = std::string(TypeName()) + "-BoundaryWork"s;
-    static constexpr auto Kernel = KCRenderLightWork<R, L, T, WorkFunc>;
-    queue.IssueSaturatingKernel<Kernel>
-    (
-        TypeName(),
-        KernelIssueParams{.workCount = rayCount},
-        params
-    );
+        uint32_t rayCount = static_cast<uint32_t>(params.in.dRayIndices.size());
+        using namespace std::string_literals;
+        static const std::string KernelName = std::string(TypeName()) + "-BoundaryWork"s;
+        static constexpr auto WorkFunc = std::get<I>(WF);
+        static constexpr auto Kernel = KCRenderLightWork<R, LG, TG, WorkFunc>;
+        queue.IssueSaturatingKernel<Kernel>
+        (
+            TypeName(),
+            KernelIssueParams{.workCount = rayCount},
+            params
+        );
+    }
 }
 
 template<RendererC R, LightGroupC L, TransformGroupC T>
-std::string_view RenderLightWork<R, L, T>::Name()
+std::string_view RenderLightWork<R, L, T>::Name() const
 {
     return TypeName();
 }
@@ -449,7 +511,7 @@ void RenderCameraWork<R, C, T>::GenerateSubCamera(// Output
                                                   Optional<CameraTransform> camTransform,
                                                   Vector2ui stratumIndex,
                                                   Vector2ui stratumCount,
-                                                  const GPUQueue& queue)
+                                                  const GPUQueue& queue) const
 {
     using Camera = typename C::Camera;
     assert(dCamBuffer.size_bytes() <= sizeof(Camera));
@@ -491,7 +553,7 @@ void RenderCameraWork<R, C, T>::GenerateRays(// Output
                                              // Constants
                                              uint64_t globalPixelIndex,
                                              const Vector2ui regionCount,
-                                             const GPUQueue& queue)
+                                             const GPUQueue& queue) const
 {
     using RayPayload = typename R::RayPayload;
     using Camera = typename C::Camera;
@@ -527,7 +589,7 @@ void RenderCameraWork<R, C, T>::GenerateRays(// Output
 }
 
 template<RendererC R, CameraGroupC C, TransformGroupC T>
-std::string_view RenderCameraWork<R, C, T>::Name()
+std::string_view RenderCameraWork<R, C, T>::Name() const
 {
     return TypeName();
 }
@@ -556,7 +618,7 @@ static void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParams<R, PG, MG, TG
     using Primitive = typename PG:: template Primitive<TransContext>;
     // And finally, the the definition of the surface that is dictated
     // by the material group
-    using Surface = Material::Surface;
+    using Surface = typename Material::Surface;
     // We need to compile-time check that this primitive supports such a surface
     static_assert(PrimitiveWithSurfaceC<Primitive, PG, Surface>,
                   "This primitive does not support the surface "
@@ -565,7 +627,7 @@ static void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParams<R, PG, MG, TG
     using Hit = typename Primitive::Hit;
 
     // Runtime check of rn count
-    assert(params.in.dRayIndices.size() * Material::SampleRayRNCount ==
+    assert(params.in.dRayIndices.size() * Material::SampleRNCount ==
            params.in.dRandomNumbers.size());
 
     // Now finally we can start the runtime stuff
@@ -604,17 +666,17 @@ static void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParams<R, PG, MG, TG
         // Convert ray to local space instead of other way around
         ray = tContext.InvApply(ray);
         // Construct Primitive (with identity transform)
-        auto primitive = Primitive(TransformContextIdentity{},
-                                   params.primSoA,
-                                   keys.primKey);
+        //auto primitive = Primitive(TransformContextIdentity{},
+        //                           params.primSoA,
+        //                           keys.primKey);
         // Generate the surface
-        Surface surface;
-        primitive.GenerateSurface(surface, hit, ray, RayDiff{});
-        // Generate the material
-        auto material = Material(specConverter, params.matSoA,
-                                 MaterialKey(static_cast<CommonKey>(keys.lightOrMatKey)));
+        //Surface surface;
+        //primitive.GenerateSurface(surface, hit, ray, RayDiff{});
+        //// Generate the material
+        //auto material = Material(specConverter, params.matSoA,
+        //                         MaterialKey(static_cast<CommonKey>(keys.lightOrMatKey)));
         // Call the function
-        WorkFunction(primitive, material, surface, rng, params);
+        //WorkFunction(primitive, material, surface, rng, params);
         // All Done!
     }
 }

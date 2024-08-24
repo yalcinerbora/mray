@@ -43,7 +43,7 @@ void KCGenerateCamRays(// Output (Only dOutIndices pointed data should be writte
                        MRAY_GRID_CONSTANT const RayPayload dPayloads,
                        // Input
                        MRAY_GRID_CONSTANT const Span<const uint32_t> dRayIndices,
-                       MRAY_GRID_CONSTANT const Span<const uint32_t> dRandomNums,
+                       MRAY_GRID_CONSTANT const Span<const RandomNumber> dRandomNums,
                        // Constants
                        MRAY_GRID_CONSTANT const Camera* const dCamera,
                        MRAY_GRID_CONSTANT const TransformKey transformKey,

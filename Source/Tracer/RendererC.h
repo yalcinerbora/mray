@@ -70,7 +70,7 @@ class RenderWorkI
     public:
     virtual ~RenderWorkI() = default;
 
-    virtual std::string_view Name() = 0;
+    virtual std::string_view Name() const = 0;
 };
 
 class RenderCameraWorkI
@@ -78,7 +78,7 @@ class RenderCameraWorkI
     public:
     virtual ~RenderCameraWorkI() = default;
 
-    virtual std::string_view Name() = 0;
+    virtual std::string_view Name() const = 0;
 };
 
 class RenderLightWorkI
@@ -86,7 +86,7 @@ class RenderLightWorkI
     public:
     virtual ~RenderLightWorkI() = default;
 
-    virtual std::string_view Name() = 0;
+    virtual std::string_view Name() const = 0;
 };
 
 using RenderImagePtr = std::unique_ptr<RenderImage>;
@@ -219,6 +219,95 @@ class RendererT : public RendererI
                                   const RenderWorkPack& workPacks,
                                   TracerView, const GPUSystem&);
     std::string_view    Name() const override;
+};
+
+// Intermediate type to cast via the renderer
+#define MRAY_RENDER_DO_WORK_DECL(tag)           \
+void DoWork_##tag                               \
+(                                               \
+    Span<RayDiff> dRayDiffsOut,                 \
+    Span<RayGMem> dRaysOut,                     \
+    const typename R::RayPayload& dPayloadsOut, \
+    const typename R::RayState& dRayStates,     \
+    Span<const RayIndex> dRayIndicesIn,         \
+    Span<const RandomNumber> dRandomNumbers,    \
+    Span<const RayDiff> dRayDiffsIn,            \
+    Span<const RayGMem> dRaysIn,                \
+    Span<const MetaHit> dHitsIn,                \
+    Span<const HitKeyPack> dKeysIn,             \
+    const typename R::RayPayload& dPayloadsIn,  \
+    const typename R::GlobalState& globalState, \
+    const GPUQueue& queue                       \
+) const
+
+#define MRAY_RENDER_DO_WORK_DEF(tag)            \
+void DoWork_##tag                               \
+(                                               \
+    Span<RayDiff> a,                            \
+    Span<RayGMem> b,                            \
+    const typename R::RayPayload& c,            \
+    const typename R::RayState& d,              \
+    Span<const RayIndex> e,                     \
+    Span<const RandomNumber> f,                 \
+    Span<const RayDiff> g,                      \
+    Span<const RayGMem> h,                      \
+    Span<const MetaHit> i,                      \
+    Span<const HitKeyPack> j,                   \
+    const typename R::RayPayload& k,            \
+    const typename R::GlobalState& l,           \
+    const GPUQueue& m                           \
+) const override                                \
+{                                               \
+    DoWorkInternal<tag>(a, b, c, d, e, f, g,    \
+                        h, i, j, k, l, m);      \
+}                                               \
+
+#define MRAY_RENDER_DO_LIGHT_WORK_DECL(tag)     \
+void DoBoundaryWork                             \
+(                                               \
+    const typename R::RayState& dRayStates,     \
+    Span<const RayIndex> dRayIndicesIn,         \
+    Span<const uint32_t> dRandomNumbers,        \
+    Span<const RayDiff> dRayDiffsIn,            \
+    Span<const RayGMem> dRaysIn,                \
+    Span<const MetaHit> dHitsIn,                \
+    Span<const HitKeyPack> dKeysIn,             \
+    const typename R::RayPayload& dPayloadsIn,  \
+    const typename R::GlobalState& globalState, \
+    const GPUQueue& queue                       \
+) const
+
+#define MRAY_RENDER_DO_LIGHT_WORK_DEF(tag)      \
+void DoBoundaryWork                             \
+(                                               \
+    const typename R::RayState& a,              \
+    Span<const RayIndex> b,                     \
+    Span<const uint32_t> c,                     \
+    Span<const RayDiff> d,                      \
+    Span<const RayGMem> e,                      \
+    Span<const MetaHit> f,                      \
+    Span<const HitKeyPack> g,                   \
+    const typename R::RayPayload& h,            \
+    const typename R::GlobalState& i,           \
+    const GPUQueue& j                           \
+) const override                                \
+{                                               \
+    DoBoundaryWorkInternal<tag>(a, b, c, d, e,  \
+                                f, g, h, i, j); \
+}
+
+template<RendererC R>
+class RenderWorkT : public RenderWorkI
+{
+    public:
+    virtual MRAY_RENDER_DO_WORK_DECL(0) = 0;
+};
+
+template<RendererC R>
+class RenderLightWorkT : public RenderLightWorkI
+{
+    public:
+    virtual MRAY_RENDER_DO_LIGHT_WORK_DECL(0) = 0;
 };
 
 inline bool FlatSurfParams::operator<(const FlatSurfParams& right) const

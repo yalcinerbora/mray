@@ -6,6 +6,8 @@
 
 #include "Core/TypeNameGenerators.h"
 
+class SurfaceRenderer;
+
 enum class RayType : uint8_t
 {
     NEE_RAY,
@@ -75,6 +77,22 @@ namespace SurfRDetail
     // No payload (this is incident renderer so
     // everything is on ray state)
     using RayPayload = EmptyType;
+
+    template<PrimitiveC Prim, MaterialC Material, class Surface,
+             PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
+    MRAY_HYBRID
+    void SurfaceRendWorkFunction(const Prim& prim, const Material& mat, const Surface& surf,
+                                 const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params);
+
+    template<LightC Light, LightGroupC LG, TransformGroupC TG>
+    MRAY_HYBRID
+    void SurfaceRendLightWorkFunction(const Light& light,
+                                      const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params);
+
+    template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
+    MRAY_HYBRID
+    void SurfaceRendCameraWorkFunction(const Camera&,
+                                       const RenderCameraWorkParams<SurfaceRenderer, CG, TG>&);
 }
 
 class SurfaceRenderer final : public RendererT<SurfaceRenderer>
@@ -86,6 +104,21 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     using RayState      = SurfRDetail::RayState;
     using RayPayload    = SurfRDetail::RayPayload;
     using SpectrumConverterContext = SpectrumConverterContextIdentity;
+    // Work Functions
+    template<PrimitiveC P, MaterialC M, class S,
+             PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
+    static constexpr Tuple WorkFunctions = Tuple
+    {
+        SurfRDetail::SurfaceRendWorkFunction<P, M, S, PG, MG, TG>
+    };
+    template<LightC L, LightGroupC LG, TransformGroupC TG>
+    static constexpr auto LightWorkFunctions = Tuple
+    {
+        SurfRDetail::SurfaceRendLightWorkFunction<L, LG, TG>
+    };
+    template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
+    static constexpr auto CamWorkFunctions = Tuple{};
+
     //
     struct Options
     {
@@ -102,8 +135,10 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     //
     RenderImageParams           rIParams  = {};
     Optional<CameraTransform>   transOverride = {};
-    CamSurfaceId                curCamSurfaceId = CamSurfaceId(0);
-    const CameraGroupPtr*       currentCamera;
+    CameraSurfaceParams         curCamSurfaceParams;
+    TransformKey                curCamTransformKey;
+    CameraKey                   curCamKey;
+    const RenderCameraWorkPtr*  curCamWork;
     //
     RayPartitioner              rayPartitioner;
     RNGeneratorPtr              rngGenerator;
@@ -112,7 +147,11 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     Span<MetaHit>               dHits;
     Span<HitKeyPack>            dHitKeys;
     Span<RayGMem>               dRays;
+    Span<RayDiff>               dRayDifferentials;
     Span<Byte>                  dSubCameraBuffer;
+    RayState                    dRayState;
+
+
 
     public:
     // Constructors & Destructor

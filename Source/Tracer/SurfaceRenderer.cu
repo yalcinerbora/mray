@@ -1,12 +1,38 @@
 #include "SurfaceRenderer.h"
-#include "Core/Error.hpp"
 #include "RayGenKernels.h"
+
+#include "Core/Error.hpp"
+
+#include "Device/GPUSystem.hpp"
 
 MRAY_HYBRID
 void SurfRendererInitRayPayload(const typename SurfaceRenderer::RayPayload&,
                                 uint32_t writeIndex, const RaySample&)
 {
     // TODO: ....
+}
+
+struct WorkHash
+{
+    MRAY_HYBRID CommonKey operator()(HitKeyPack keyPack) const
+    {
+        return 0u;
+    }
+};
+
+template<class WorkHasher>
+MRAY_KERNEL
+void KCGenerateWorkKeys(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
+                        MRAY_GRID_CONSTANT const Span<const HitKeyPack> dInputKeys,
+                        MRAY_GRID_CONSTANT const WorkHasher WorkHash)
+{
+    assert(dWorkKey.size() == dInputKeys.size());
+    uint32_t keyCount = static_cast<uint32_t>(dInputKeys.size());
+    KernelCallParams kp;
+    for(uint32_t i = kp.GlobalId(); i < keyCount; i += kp.TotalSize())
+    {
+        dWorkKey[i] = WorkHash(dInputKeys[i]);
+    }
 }
 
 SurfaceRenderer::SurfaceRenderer(const RenderImagePtr& rb,
@@ -67,7 +93,6 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
     // on the inheritance chain
     currentOptions = newOptions;
     transOverride = optTransform;
-    curCamSurfaceId = camSurfId;
     rIParams = rip;
     //
     // Find the texture index
@@ -76,13 +101,13 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
                                              int32_t(Mode::END)));
     currentOptions.mode = Mode(newMode);
 
+
     // Calculate tile size according to the parallelization hint
     uint32_t parallelHint = tracerView.tracerParams.parallelizationHint;
     Vector2ui imgRegion = rIParams.regionMax - rIParams.regionMin;
     Vector2ui tileSize = FindOptimumTile(imgRegion, parallelHint);
     renderBuffer->Resize(tileSize, 1, 3);
     tileCount = MathFunctions::DivideUp(imgRegion, tileSize);
-
     curColorSpace = tracerView.tracerParams.globalTextureColorSpace;
     curFramebufferSize = rIParams.resolution;
     curFBMin = rIParams.regionMin;
@@ -91,28 +116,39 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
                                                        curFramebufferSize, 1);
     rbI.curRenderLogic0 = newMode;
     rbI.curRenderLogic1 = 0;
+    curTileIndex = 0;
 
-    // Generate works per Material/Primitive/Transform
-    // triplet
-    Mode m = currentOptions.mode;
-    if(m >= Mode::END)
-        throw MRayError("[(R)Surface]: Unkown render mode \"{}\"");
-
+    // Generate works per
+    // Material/Primitive/Transform triplet
     GenerateWorkMappings();
     GenerateLightWorkMappings();
     GenerateCameraWorkMappings();
 
     // Initialize ray partitioner with worst case scenario,
-    // All work types are used. (We do not use camera work)
+    // All work types are used. (We do not use camera work
+    // for this type of renderer)
     uint32_t maxWorkCount = uint32_t(currentWorks.size() +
                                      currentLightWorks.size());
     rayPartitioner = RayPartitioner(gpuSystem, tileCount.Multiply(),
                                     maxWorkCount);
 
-    //// Find the camera
-    //// Should we make the camera class to handle this?
-    //tracerView.;
-    //TracerConstants
+    // Get the surface params
+    auto loc = std::find_if(tracerView.camSurfs.cbegin(),
+                 tracerView.camSurfs.cend(),
+                 [camSurfId](const auto& pair)
+    {
+        return pair.first == camSurfId;
+    });
+    if(loc == tracerView.camSurfs.cend())
+        throw MRayError("[{:s}]: Unkown camera surface id ({:d})",
+                        TypeName(), uint32_t(camSurfId));
+    curCamSurfaceParams = loc->second;
+    // Find the transform/camera work for this specific surface
+    CameraKey curCamKey = CameraKey(static_cast<CommonKey>(curCamSurfaceParams.cameraId));
+    curCamTransformKey = TransformKey(static_cast<CommonKey>(curCamSurfaceParams.transformId));
+    CameraGroupId camGroupId = CameraGroupId(curCamKey.FetchBatchPortion());
+    TransGroupId transGroupId = TransGroupId(curCamTransformKey.FetchBatchPortion());
+    curCamWork = &currentCameraWorks.at(Pair{camGroupId, transGroupId});
 
     return rbI;
 
@@ -121,41 +157,130 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
 RendererOutput SurfaceRenderer::DoRender()
 {
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
+    // Find the ray count (1spp)
+    uint32_t rayCount = renderBuffer->Extents().Multiply();
+    MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys, dRays,
+                                         dRayDifferentials, dSubCameraBuffer),
+                                rayStateMem,
+                                {});
 
     // Each iteration do one tile fully,
     // so we can send it directly
-    uint32_t rayCount = renderBuffer->Extents().Multiply();
-    uint32_t maxWorkCount = uint32_t(currentWorks.size() +
-                                     currentLightWorks.size());
+    // Generate subcamera of this specific tile
+    Vector2ui curTile2D = Vector2ui(curTileIndex % tileCount[0],
+                                    curTileIndex / tileCount[0]);
+    curTileIndex = MathFunctions::Roll(int32_t(curTileIndex) + 1, 0,
+                                       int32_t(tileCount.Multiply()));
+    //(*curCamWork)->GenerateSubCamera(dSubCameraBuffer,
+    //                                 curCamKey, transOverride,
+    //                                 curTile2D, tileCount,
+    //                                 queue);
 
-    // Start partitioning
-    auto[dIndices, dKeys] = rayPartitioner.Start(rayCount, maxWorkCount);
+    // Allocate the ray state/payload etc.
+
+
+    // Start partitioning, again worst case work count
+    uint32_t maxWorkCount = uint32_t(currentWorks.size() + currentLightWorks.size());
+    auto[dIndices, dKeys] = rayPartitioner.Start(rayCount, maxWorkCount, true);
+
+    // Do Full photon mapping
+    //workMap.(key);
+
+    // Do path tracing
+
+    // Combine?
+
 
     // Generate rays
+    //(*curCamWork)->GenerateRays<>(dRayDiffOut, ....);
+    // Cast rays
+    Span<uint32_t> dBackupRNGStates;
+    tracerView.baseAccelerator.CastRays(dHitKeys, dHits, dBackupRNGStates,
+                                        dRays, dIndices);
+    // Generate work keys
+    using namespace std::string_literals;
+    static const std::string GenWorkKernelName = std::string(TypeName()) + "-KCGenerateWorkKeys"s;
+    queue.IssueSaturatingKernel<KCGenerateWorkKeys<WorkHash>>
+    (
+        GenWorkKernelName,
+        KernelIssueParams{.workCount = static_cast<uint32_t>(dHitKeys.size())},
+        dKeys,
+        ToConstSpan(dHitKeys),
+        WorkHash()
+    );
+
+    // Partition
+    auto
+    [
+        hPartitionCount,
+        isHostVisible,
+        hPartitionStartOffsets,
+        hPartitionKeys,
+        dPartitionIndices,
+        dPartitionKeys
+    ] = rayPartitioner.MultiPartition(dKeys, dIndices,
+                                      Vector2ui::Zero(),
+                                      Vector2ui::Zero(),
+                                      queue, false);
+    assert(isHostVisible);
+    // Wait for results to be available in host buffers
+    queue.Barrier().Wait();
+
+    // Find out maximum RN count for the given work
+    //work->
+    Span<RandomNumber> dRandomNumbers;
 
 
+    for(uint32_t i = 0; i < hPartitionCount[0]; i++)
+    {
+        uint32_t partitionStart = hPartitionStartOffsets[i];
+        uint32_t partitionSize = (hPartitionStartOffsets[i + 1] -
+                                  hPartitionStartOffsets[i]);
 
-    //using namespace std::string_view_literals;
-    //queue.IssueSaturatingKernel<KCGenerateSubCamera>
-    //(
-    //    "(R)Surface-KCGenSubCamera"sv,
-    //    KernelIssueParams{.workCount = rayCount},
-
-
-    //)
-    ////
-    ////
+        auto dLocalIndices = dPartitionIndices.subspan(partitionStart,
+                                                       partitionSize);
 
 
+        //SurfaceWorkKey surfKey = SurfaceWorkKey(hPartitionKeys[i]);
+        //uint32_t bactchId = surfKey.FetchBatchPortion();
+        //const auto* work = globalWorkMap.at(batchId);
 
-    //// Cast rays
-    //BaseAcceleratorI& baseAccel = tracerView.baseAccelerator;
-    //baseAccel.CastRays(dHitKeys, dHits, ..., dRays, dIndices)
-    //// Select work
+        //// Another phase(photon phase)
+        //const auto* work = globalWorkMap2.at(batchId);
 
+        //// RTTI?
 
+        //if()
+        //{
 
+        //}
+        //else
+        //{
 
+        //}
+
+        //// We do not bounce rays so output can be empty
+        //work->DoWork(// Input
+        //             Span<RayDiff>(),
+        //             Span<RayGMem>(),
+        //             RayPayload{},
+        //             // I-O
+        //             dRayState,
+        //             // Input
+        //             dLocalIndices,
+        //             dRandomNumbers,
+        //             // Index-relative
+        //             dRayDifferentials,
+        //             dRays,
+        //             dHits,
+        //             RayPayload{},
+        //             // Constants
+        //             GlobalState{},
+        //             queue);
+    }
+
+    // Filter the samples
+    // Send the FBO
 
 
     ////...

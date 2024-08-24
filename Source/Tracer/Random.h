@@ -92,84 +92,6 @@ namespace RNGFunctions
         float rngFloat = static_cast<float>(v >> 8);
         return  rngFloat * 0x1p-24f;
     }
-
-
-
-    //MRAY_HYBRID
-    //constexpr uint64_t MurmurHash2_32Bit(const Span<const Byte>& data, uint64_t seed)
-    //{
-    //    auto GetBlock = [](Span<const Byte, sizeof(uint32_t)> bytes) -> uint32_t
-    //    {
-    //        // Require an alignment, we will load 32-bit chunks (GPU will start
-    //        // shuffling the data assuming it is not aligned)
-    //        const Byte* data = std::assume_aligned<sizeof(uint32_t)>(bytes.data());
-    //        // We cant memcpy or reinterpret_cast due to constexpr
-    //        // Do an upcast (static_cast), then twiddle the bits.
-    //        // Let compiler to figure it out.
-    //        auto SC = [](Byte i) -> uint32_t {return static_cast<uint32_t>(i); };
-    //        return (SC(data[0]) << CHAR_BIT * 0u | SC(data[1]) << CHAR_BIT * 1u |
-    //                SC(data[2]) << CHAR_BIT * 2u | SC(data[3]) << CHAR_BIT * 3u);
-    //    };
-
-    //    constexpr uint32_t SZ_32 = sizeof(uint32_t);
-    //    constexpr uint32_t SZ_64 = sizeof(uint64_t);
-    //    constexpr uint32_t R = 24;
-    //    constexpr uint32_t M = 0x5bd1e995;
-
-    //    uint32_t length = static_cast<uint32_t>(data.size_bytes());
-    //    uint32_t h1 = uint32_t(seed) ^ length;
-    //    uint32_t h2 = uint32_t(seed >> SZ_32 * CHAR_BIT);
-
-    //    uint32_t iterations = length / sizeof(uint64_t);
-    //    for(uint32_t i = 0; i < iterations; i++)
-    //    {
-    //        Span<const Byte> sub = (data.subspan(i * SZ_64, SZ_64));
-    //        uint32_t k1 = GetBlock(sub.subspan<0, SZ_32>());
-    //        k1 *= M; k1 ^= k1 >> R; k1 *= M;
-    //        h1 *= M; h1 ^= k1;
-
-    //        uint32_t k2 = GetBlock(sub.subspan<SZ_32, SZ_32>());
-    //        k2 *= M; k2 ^= k2 >> R; k2 *= M;
-    //        h2 *= M; h2 ^= k2;
-    //    }
-
-    //    if((length & 0b111) >= 4)
-    //    {
-    //        Span<const Byte> sub = (data.subspan(iterations * sizeof(uint64_t), SZ_32));
-    //        uint32_t k1 = GetBlock(sub.subspan<0, SZ_32>());
-    //        k1 *= M; k1 ^= k1 >> R; k1 *= M;
-    //        h1 *= M; h1 ^= k1;
-    //    }
-
-    //    uint32_t leftBytes = length & 0b11;
-    //    auto finalRange = data.subspan(iterations * sizeof(uint64_t) + SZ_32, leftBytes);
-    //    for(uint32_t i = 0; i < leftBytes; i++)
-    //        h2 ^= static_cast<uint32_t>(finalRange[i]) << (i * CHAR_BIT);
-    //    if(leftBytes != 0) h2 *= M;
-
-    //    h1 ^= h2 >> 18; h1 *= M;
-    //    h2 ^= h1 >> 22; h2 *= M;
-    //    h1 ^= h2 >> 17; h1 *= M;
-    //    h2 ^= h1 >> 19; h2 *= M;
-
-    //    uint64_t h = h1;
-    //    return (h << 32) | h2;
-    //}
-
-    //MRAY_HYBRID
-    //template<class... Args>
-    //constexpr uint64_t MurmurHash2(Args&&... args)
-    //{
-    //    constexpr uint32_t TOTAL = (sizeof(Args) + ...);
-    //    alignas(sizeof(uint32_t)) std::array<Buffer, TOTAL> Buffer;
-
-    //    size_t offset = 0;
-    //    ((std::memcpy(Buffer.data() + offset), &args),
-    //     (void)(offset += sizeof(args))), ...);
-
-    //    return MurmurHas2_64Bit(Buffer, 0);
-
-    //}
 }
 
 template <std::unsigned_integral T>
@@ -191,7 +113,8 @@ struct RNGDispenserT
     MRAY_HYBRID Vector2 NextFloat2D();
 };
 
-using RNGDispenser = RNGDispenserT<uint32_t>;
+using RandomNumber = uint32_t;
+using RNGDispenser = RNGDispenserT<RandomNumber>;
 
 // PCG with 32bit state
 // https://www.pcg-random.org
@@ -242,6 +165,42 @@ class PermutedCG32
 
     MRAY_HYBRID
     void            Advance(uint32_t delta);
+};
+
+using BackupRNG = PermutedCG32;
+using BackupRNGState = typename PermutedCG32::State;
+
+class RNGeneratorI
+{
+    public:
+    virtual ~RNGeneratorI() = default;
+
+    virtual void GenerateNumbers(Span<uint32_t> numbersOut) = 0;
+    virtual size_t UsedGPUMemory() const = 0;
+};
+
+using RNGeneratorPtr = std::unique_ptr<RNGeneratorI>;
+
+template <class MainRNGType>
+class RNGeneratorGroup : public RNGeneratorI
+{
+    public:
+    using MainRNG           = MainRNGType;
+    using MainRNGState      = typename MainRNG::State;
+
+    private:
+    DeviceMemory            memory;
+    Span<BackupRNGState>    backupStates;
+    Span<MainRNGState>      mainStates;
+
+    public:
+    // Constructors & Destructor
+            RNGeneratorGroup(size_t generatorCount,
+                             uint32_t seed);
+
+
+    void    GenerateNumbers(Span<uint32_t> numbersOut) override;
+    size_t  UsedGPUMemory() const override;
 };
 
 namespace RNGFunctions
@@ -398,42 +357,6 @@ void PermutedCG32::Advance(uint32_t delta)
     }
     rState = accMult * rState + accPlus;
 }
-
-using BackupRNG = PermutedCG32;
-using BackupRNGState = typename PermutedCG32::State;
-
-class RNGeneratorI
-{
-    public:
-    virtual ~RNGeneratorI() = default;
-
-    virtual void GenerateNumbers(Span<uint32_t> numbersOut) = 0;
-    virtual size_t UsedGPUMemory() const = 0;
-};
-
-using RNGeneratorPtr = std::unique_ptr<RNGeneratorI>;
-
-template <class MainRNGType>
-class RNGeneratorGroup : public RNGeneratorI
-{
-    public:
-    using MainRNG           = MainRNGType;
-    using MainRNGState      = typename MainRNG::State;
-
-    private:
-    DeviceMemory            memory;
-    Span<BackupRNGState>    backupStates;
-    Span<MainRNGState>      mainStates;
-
-    public:
-    // Constructors & Destructor
-            RNGeneratorGroup(size_t generatorCount,
-                             uint32_t seed);
-
-
-    void    GenerateNumbers(Span<uint32_t> numbersOut) override;
-    size_t  UsedGPUMemory() const override;
-};
 
 template <class RNG>
 RNGeneratorGroup<RNG>::RNGeneratorGroup(size_t generatorCount,

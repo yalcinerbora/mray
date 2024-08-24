@@ -94,8 +94,10 @@ class KeyGeneratorFunctor
     MRAY_HYBRID MRAY_CGPU_INLINE
     void operator()(KernelCallParams kp)
     {
-        dLocalKeyWriteRegion[kp.GlobalId()] =
-            AcceleratorKey::CombinedKey(accelBatchId, kp.GlobalId());
+        uint32_t keyCount = static_cast<uint32_t>(dLocalKeyWriteRegion.size());
+        for(uint32_t i = kp.GlobalId(); i < keyCount; i += kp.TotalSize())
+            dLocalKeyWriteRegion[kp.GlobalId()] =
+                AcceleratorKey::CombinedKey(accelBatchId, kp.GlobalId());
     }
 };
 
