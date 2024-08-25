@@ -16,38 +16,6 @@ enum class RayType : uint8_t
     CAMERA_RAY
 };
 
-//namespace PathRendererDetail
-//{
-//    struct RayState
-//    {
-//        Span<Spectrum>  dRadiance;
-//        // Image coordinates of the path
-//        Span<Vector2>   dImageCoordinates;
-//        // Current path depth
-//        Span<uint32_t>  dDepth;
-//    };
-//
-//    struct RayPayload
-//    {
-//        // For NEE rays this is
-//        // pre-calculated throughput
-//        // as if the ray is hit to the light
-//        //
-//        // For path rays, this is normal throughput
-//        Span<Spectrum>  dThroughput;
-//
-//        // NEE Related
-//        // PDF of the material when ray goes
-//        // toward the light direction (used for MIS)
-//        Span<Float>     dMaterialPDF;
-//        //
-//        Span<RayType>   dRayType;
-//        // Path is currently on this medium
-//        Span<MediumKey> dCurrentMediumKeys;
-//
-//    };
-//}
-
 namespace SurfRDetail
 {
     enum Mode
@@ -93,6 +61,10 @@ namespace SurfRDetail
     MRAY_HYBRID
     void SurfaceRendCameraWorkFunction(const Camera&,
                                        const RenderCameraWorkParams<SurfaceRenderer, CG, TG>&);
+
+    MRAY_HYBRID
+    void SurfaceRendInitRayPayload(const RayPayload&,
+                                   uint32_t writeIndex, const RaySample&);
 }
 
 class SurfaceRenderer final : public RendererT<SurfaceRenderer>
@@ -118,6 +90,8 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     };
     template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
     static constexpr auto CamWorkFunctions = Tuple{};
+
+    static constexpr auto RayStateInitFunc = SurfRDetail::SurfaceRendInitRayPayload;
 
     //
     struct Options
@@ -150,8 +124,6 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     Span<RayDiff>               dRayDifferentials;
     Span<Byte>                  dSubCameraBuffer;
     RayState                    dRayState;
-
-
 
     public:
     // Constructors & Destructor
@@ -199,8 +171,8 @@ size_t SurfaceRenderer::GPUMemoryUsage() const
 template<PrimitiveC Prim, MaterialC Material, class Surface,
          PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
 MRAY_HYBRID
-void SurfaceRendWorkFunction(const Prim& prim, const Material& mat, const Surface& surf,
-                             const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params)
+void SurfRDetail::SurfaceRendWorkFunction(const Prim& prim, const Material& mat, const Surface& surf,
+                                          const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params)
 {
     //
 }
@@ -208,18 +180,25 @@ void SurfaceRendWorkFunction(const Prim& prim, const Material& mat, const Surfac
 template<LightC Light,
          LightGroupC LG, TransformGroupC TG>
 MRAY_HYBRID
-void SurfaceRendLightWorkFunction(const Light& light,
-                                  const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params)
+void SurfRDetail::SurfaceRendLightWorkFunction(const Light& light,
+                                               const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params)
 {
     //
 }
 
 template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
 MRAY_HYBRID
-void SurfaceRendCameraWorkFunction(const Camera&,
-                                   const RenderCameraWorkParams<SurfaceRenderer, CG, TG>&)
+void SurfRDetail::SurfaceRendCameraWorkFunction(const Camera&,
+                                                const RenderCameraWorkParams<SurfaceRenderer, CG, TG>&)
 {
     // Empty, no notion of ray hitting camera
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+void SurfRDetail::SurfaceRendInitRayPayload(const RayPayload&, uint32_t,
+                                            const RaySample&)
+{
+    // TODO: ....
 }
 
 template<PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>

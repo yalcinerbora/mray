@@ -5,33 +5,17 @@
 
 #include "Device/GPUSystem.hpp"
 
-MRAY_HYBRID
-void SurfRendererInitRayPayload(const typename SurfaceRenderer::RayPayload&,
-                                uint32_t writeIndex, const RaySample&)
-{
-    // TODO: ....
-}
-
-struct WorkHash
-{
-    MRAY_HYBRID CommonKey operator()(HitKeyPack keyPack) const
-    {
-        return 0u;
-    }
-};
-
-template<class WorkHasher>
 MRAY_KERNEL
 void KCGenerateWorkKeys(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
                         MRAY_GRID_CONSTANT const Span<const HitKeyPack> dInputKeys,
-                        MRAY_GRID_CONSTANT const WorkHasher WorkHash)
+                        MRAY_GRID_CONSTANT const RenderWorkHash workHasher)
 {
     assert(dWorkKey.size() == dInputKeys.size());
     uint32_t keyCount = static_cast<uint32_t>(dInputKeys.size());
     KernelCallParams kp;
     for(uint32_t i = kp.GlobalId(); i < keyCount; i += kp.TotalSize())
     {
-        dWorkKey[i] = WorkHash(dInputKeys[i]);
+        dWorkKey[i] = workHasher.GenerateWorkKeyGPU(dInputKeys[i]);
     }
 }
 
@@ -119,10 +103,13 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
     curTileIndex = 0;
 
     // Generate works per
-    // Material/Primitive/Transform triplet
-    GenerateWorkMappings();
-    GenerateLightWorkMappings();
-    GenerateCameraWorkMappings();
+    // Material1/Primitive/Transform triplet,
+    // Light/Transform pair,
+    // Camera/Transform pair
+    workCounter = 0;
+    workCounter = GenerateWorkMappings(workCounter);
+    workCounter = GenerateLightWorkMappings(workCounter);
+    workCounter = GenerateCameraWorkMappings(workCounter);
 
     // Initialize ray partitioner with worst case scenario,
     // All work types are used. (We do not use camera work
@@ -133,22 +120,27 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
                                     maxWorkCount);
 
     // Get the surface params
-    auto loc = std::find_if(tracerView.camSurfs.cbegin(),
-                 tracerView.camSurfs.cend(),
-                 [camSurfId](const auto& pair)
+    auto surfLoc = std::find_if(tracerView.camSurfs.cbegin(),
+                            tracerView.camSurfs.cend(),
+    [camSurfId](const auto& pair)
     {
         return pair.first == camSurfId;
     });
-    if(loc == tracerView.camSurfs.cend())
+    if(surfLoc == tracerView.camSurfs.cend())
         throw MRayError("[{:s}]: Unkown camera surface id ({:d})",
                         TypeName(), uint32_t(camSurfId));
-    curCamSurfaceParams = loc->second;
+    curCamSurfaceParams = surfLoc->second;
     // Find the transform/camera work for this specific surface
     CameraKey curCamKey = CameraKey(static_cast<CommonKey>(curCamSurfaceParams.cameraId));
     curCamTransformKey = TransformKey(static_cast<CommonKey>(curCamSurfaceParams.transformId));
     CameraGroupId camGroupId = CameraGroupId(curCamKey.FetchBatchPortion());
     TransGroupId transGroupId = TransGroupId(curCamTransformKey.FetchBatchPortion());
-    curCamWork = &currentCameraWorks.at(Pair{camGroupId, transGroupId});
+    auto packLoc = std::find_if(currentCameraWorks.cbegin(), currentCameraWorks.cend(),
+    [camGroupId, transGroupId](const auto& pack)
+    {
+        return pack.idPack == Pair(camGroupId, transGroupId);
+    });
+    curCamWork = &packLoc->workPtr;
 
     return rbI;
 
@@ -200,13 +192,13 @@ RendererOutput SurfaceRenderer::DoRender()
     // Generate work keys
     using namespace std::string_literals;
     static const std::string GenWorkKernelName = std::string(TypeName()) + "-KCGenerateWorkKeys"s;
-    queue.IssueSaturatingKernel<KCGenerateWorkKeys<WorkHash>>
+    queue.IssueSaturatingKernel<KCGenerateWorkKeys>
     (
         GenWorkKernelName,
         KernelIssueParams{.workCount = static_cast<uint32_t>(dHitKeys.size())},
         dKeys,
         ToConstSpan(dHitKeys),
-        WorkHash()
+        workHasher
     );
 
     // Partition

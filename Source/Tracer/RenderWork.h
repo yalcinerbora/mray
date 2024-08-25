@@ -195,7 +195,7 @@ class RenderLightWork : public RenderLightWorkT<R>
 };
 
 template<RendererC R, CameraGroupC CG, TransformGroupC TG>
-class RenderCameraWork : public RenderCameraWorkI
+class RenderCameraWork : public RenderCameraWorkT<R>
 {
     public:
     static std::string_view TypeName();
@@ -228,15 +228,14 @@ class RenderCameraWork : public RenderCameraWorkI
                              const GPUSystem&);
     //
     void    GenerateSubCamera(// Output
-                              Span<const Byte> dCamBuffer,
+                              Span<Byte> dCamBuffer,
                               // Constants
                               CameraKey camKey,
                               Optional<CameraTransform> camTransform,
                               Vector2ui stratumIndex,
                               Vector2ui stratumCount,
-                              const GPUQueue& queue) const;
+                              const GPUQueue& queue) const override;
 
-    template<auto RayStateInitFunc>
     void    GenerateRays(// Output
                          const Span<RayDiff>& dRayDiffsOut,
                          const Span<RayGMem>& dRaysOut,
@@ -251,21 +250,6 @@ class RenderCameraWork : public RenderCameraWorkI
                          uint64_t globalPixelIndex,
                          const Vector2ui regionCount,
                          const GPUQueue& queue) const;
-    //void    DoBoundaryWork(// I-O
-    //                       const typename R::RayState& dRayStates,
-    //                       // Input
-    //                       // Contiguous
-    //                       Span<const RayIndex> dRayIndicesIn,
-    //                       Span<const uint32_t> dRandomNumbers,
-    //                       // Accessed by index
-    //                       Span<const RayDiff> dRayDiffsIn,
-    //                       Span<const RayGMem> dRaysIn,
-    //                       Span<const MetaHit> dHitsIn,
-    //                       Span<const HitKeyPack> dKeysIn,
-    //                       const typename R::RayPayload& dPayloadsIn,
-    //                       // Constants
-    //                       const typename R::GlobalState& globalState,
-    //                       const GPUQueue& queue) const override;
 
     std::string_view    Name() const override;
 };
@@ -505,7 +489,7 @@ RenderCameraWork<R, C, T>::RenderCameraWork(const GenericGroupCameraT& c,
 
 template<RendererC R, CameraGroupC C, TransformGroupC T>
 void RenderCameraWork<R, C, T>::GenerateSubCamera(// Output
-                                                  Span<const Byte> dCamBuffer,
+                                                  Span<Byte> dCamBuffer,
                                                   // Constants
                                                   CameraKey camKey,
                                                   Optional<CameraTransform> camTransform,
@@ -516,9 +500,9 @@ void RenderCameraWork<R, C, T>::GenerateSubCamera(// Output
     using Camera = typename C::Camera;
     assert(dCamBuffer.size_bytes() <= sizeof(Camera));
     assert(uintptr_t(dCamBuffer.data()) % alignof(Camera) == 0);
-    const Camera* dCamera = reinterpret_cast<const Camera*>(dCamBuffer.data());
+    Camera* dCamera = reinterpret_cast<Camera*>(dCamBuffer.data());
 
-    static constexpr auto Kernel = KCGenerateSubCamera<Camera, T>;
+    static constexpr auto Kernel = KCGenerateSubCamera<C, T>;
     using namespace std::string_literals;
     static const std::string KernelName = std::string(TypeName()) + "-GenSubCam"s;
     //
@@ -539,7 +523,6 @@ void RenderCameraWork<R, C, T>::GenerateSubCamera(// Output
 }
 
 template<RendererC R, CameraGroupC C, TransformGroupC T>
-template<auto RayStateInitFunc>
 void RenderCameraWork<R, C, T>::GenerateRays(// Output
                                              const Span<RayDiff>& dRayDiffsOut,
                                              const Span<RayGMem>& dRaysOut,
@@ -563,7 +546,7 @@ void RenderCameraWork<R, C, T>::GenerateRays(// Output
     const Camera* dCamera = reinterpret_cast<const Camera*>(dCamBuffer.data());
 
     uint32_t rayCount = static_cast<uint32_t>(dRayIndices.size());
-    static constexpr auto Kernel = KCGenerateCamRays<RayStateInitFunc, RayPayload,
+    static constexpr auto Kernel = KCGenerateCamRays<R::RayStateInitFunc, RayPayload,
                                                      Camera, T>;
     using namespace std::string_literals;
     static const std::string KernelName = std::string(TypeName()) + "-GenRays"s;

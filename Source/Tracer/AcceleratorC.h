@@ -126,28 +126,30 @@ concept AccelGroupC = requires(AGType ag)
 };
 
 template <class BaseAccel>
-concept BaseAccelC = requires(BaseAccel ac,
-                              GPUSystem gpuSystem)
-{
-    {ac.CastRays(// Output
-                 Span<HitKeyPack>{},
-                 Span<MetaHit>{},
-                 Span<SurfaceWorkKey>{},
-                 // Input
-                 Span<const RayGMem>{},
-                 Span<const RayIndex>{},
-                 // Constants
-                 gpuSystem)} -> std::same_as<void>;
-
-    {ac.CastShadowRays(// Output
-                       Bitspan<uint32_t>{},
-                       Bitspan<uint32_t>{},
-                       // Input
-                       Span<const RayIndex>{},
-                       Span<const RayGMem>{},
-                       // Constants
-                       gpuSystem)} -> std::same_as<void>;
-};
+concept BaseAccelC = true;
+// TODO: Change these?
+// Do we really need this?
+//requires(BaseAccel ac, GPUSystem gpuSystem)
+//{
+//    {ac.CastRays(// Output
+//                 Span<HitKeyPack>{},
+//                 Span<MetaHit>{},
+//                 Span<SurfaceWorkKey>{},
+//                 // Input
+//                 Span<const RayGMem>{},
+//                 Span<const RayIndex>{},
+//                 // Constants
+//                 gpuSystem)} -> std::same_as<void>;
+//
+//    {ac.CastShadowRays(// Output
+//                       Bitspan<uint32_t>{},
+//                       Bitspan<uint32_t>{},
+//                       // Input
+//                       Span<const RayIndex>{},
+//                       Span<const RayGMem>{},
+//                       // Constants
+//                       gpuSystem)} -> std::same_as<void>;
+//};
 
 namespace TracerLimits
 {

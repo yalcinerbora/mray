@@ -63,7 +63,7 @@ using CommonIndex = uint32_t;
 // Work key when a ray hit an object
 // this key will be used to partition
 // rays with respect to materials
-using SurfaceWorkKey = TriKeyT<CommonKey, 1, 14, 17>;
+//using SurfaceWorkKey = TriKeyT<CommonKey, 1, 14, 17>;
 using AccelWorkKey = KeyT<CommonKey, 8, 24>;
 
 // Accelerator key
@@ -79,8 +79,8 @@ using LightOrMatKey     = TriKeyT<CommonKey, 1,
                                   LightKey::BatchBits - 1,
                                   LightKey::IdBits>;
 
-static constexpr CommonKey IS_MAT_KEY_FLAG = 0;
-static constexpr CommonKey IS_LIGHT_KEY_FLAG = 1;
+static constexpr CommonKey IS_MAT_KEY_FLAG = 0u;
+static constexpr CommonKey IS_LIGHT_KEY_FLAG = 1u;
 
 static_assert(std::is_same_v<LightKey, MaterialKey>,
               "Material and Light keys must match due to variant like usage");
