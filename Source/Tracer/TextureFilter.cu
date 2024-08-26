@@ -349,7 +349,7 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const SubImageSpan<3> img,
                           // Inputs per thread
                           MRAY_GRID_CONSTANT const Span<const uint32_t> dIndices,
                           // Inputs Accessed by SampleId
-                          MRAY_GRID_CONSTANT const Span<const Vector3> dValues,
+                          MRAY_GRID_CONSTANT const Span<const Spectrum> dValues,
                           MRAY_GRID_CONSTANT const Span<const Vector2> dImgCoords,
                           // Constants
                           MRAY_GRID_CONSTANT const Float scalarWeightMultiplier,
@@ -407,7 +407,7 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const SubImageSpan<3> img,
             if(warpI < sampleCount)
             {
                 uint32_t readIndex = dIndices[sampleIndex];
-                Vector3 sampleVal = dValues[readIndex];
+                Vector3 sampleVal = Vector3(dValues[readIndex]);
                 Vector2 sampleCoord = dImgCoords[readIndex];
                 Float weight = filter.Evaluate(pixCoords - sampleCoord) * scalarWeightMultiplier;
                 sampleVal *= weight;
@@ -439,7 +439,7 @@ void ReconFilterGenericRGB(// Output
                            // I-O
                            RayPartitioner& partitioner,
                            // Input
-                           const Span<const Vector3>& dValues,
+                           const Span<const Spectrum>& dValues,
                            const Span<const Vector2>& dImgCoords,
                            // Constants
                            Float scalarWeightMultiplier,
@@ -518,7 +518,7 @@ void ReconFilterGenericRGB(// Output
     // Some boilerplate to make the code more readable
     auto KernelCall = [&]<auto Kernel>(std::string_view Name)
     {
-        Span<const Vector3> dX = dValues;
+        Span<const Spectrum> dX = dValues;
         Span<const Vector2> dY = dImgCoords;
 
         uint32_t blockCount =
@@ -573,7 +573,7 @@ void MultiPassReconFilterGenericRGB(// Output
                                     // I-O
                                     RayPartitioner& partitioner,
                                     // Input
-                                    const Span<const Vector3>& dValues,
+                                    const Span<const Spectrum>& dValues,
                                     const Span<const Vector2>& dImgCoords,
                                     // Constants
                                     uint32_t parallelHint,
@@ -610,7 +610,7 @@ void MultiPassReconFilterGenericRGB(// Output
         uint32_t end = std::min(workPerIter * i + 1, totalWork);
         uint32_t count = end - start;
 
-        Span<const Vector3> dLocalValues = dValues.subspan(start, count);
+        Span<const Spectrum> dLocalValues = dValues.subspan(start, count);
         Span<const Vector2> dLocalImgCoords = dImgCoords.subspan(start, count);
         ReconFilterGenericRGB(img, partitioner,
                               dLocalValues, dLocalImgCoords,
@@ -814,7 +814,7 @@ void TextureFilterT<E, FF>::ReconstructionFilterRGB(// Output
                                                     // I-O
                                                     RayPartitioner& partitioner,
                                                     // Input
-                                                    const Span<const Vector3>& dValues,
+                                                    const Span<const Spectrum>& dValues,
                                                     const Span<const Vector2>& dImgCoords,
                                                     // Constants
                                                     uint32_t parallelHint,

@@ -228,9 +228,7 @@ RendererOutput TexViewRenderer::DoRender()
 {
     // Use CPU timer here
     // TODO: Implement a GPU timer later
-    Timer timer;
-    timer.Start();
-
+    Timer timer; timer.Start();
     const GPUDevice& device = gpuSystem.BestDevice();
 
     if(textures.empty()) return {};
@@ -326,7 +324,6 @@ RendererOutput TexViewRenderer::DoRender()
     double timeSec = timer.Elapsed<Second>();
     double samplePerSec = static_cast<double>(curPixelCount) / timeSec;
     samplePerSec /= 1'000'000;
-
     double spp = double(curTileIndex + 1) / double(tileCount.Multiply());
     const GenericTexture* curTex = textures[textureIndex];
 
@@ -336,9 +333,9 @@ RendererOutput TexViewRenderer::DoRender()
         .analytics = RendererAnalyticData
         {
             samplePerSec,
-            "M samples/s",
+            "M pixels/s",
             spp,
-            "spp",
+            "pix",
             float(timer.Elapsed<Millisecond>()),
             mipSize,
             MRayColorSpaceEnum::MR_ACES_CG,

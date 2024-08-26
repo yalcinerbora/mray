@@ -9,7 +9,13 @@
 #define UNROLL_LOOP_COUNT(count)
 #define NO_DISCARD
 #define MRAY_SPECTRA_PER_SPECTRUM
- 
+
+// Renderer virtual function macros
+#define MRAY_RENDER_DO_WORK_DECL(tag)
+#define MRAY_RENDER_DO_WORK_DEF(tag)
+#define MRAY_RENDER_DO_LIGHT_WORK_DECL(tag)
+#define MRAY_RENDER_DO_LIGHT_WORK_DEF(tag)
+
 // System Related
 #define MRAY_DLL_IMPORT
 #define MRAY_DLL_EXPORT

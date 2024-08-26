@@ -2,13 +2,14 @@
 #include "RayGenKernels.h"
 
 #include "Core/Error.hpp"
+#include "Core/Timer.h"
 
 #include "Device/GPUSystem.hpp"
 
 MRAY_KERNEL
 void KCGenerateWorkKeys(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
                         MRAY_GRID_CONSTANT const Span<const HitKeyPack> dInputKeys,
-                        MRAY_GRID_CONSTANT const RenderWorkHash workHasher)
+                        MRAY_GRID_CONSTANT const RenderWorkHasher workHasher)
 {
     assert(dWorkKey.size() == dInputKeys.size());
     uint32_t keyCount = static_cast<uint32_t>(dInputKeys.size());
@@ -24,7 +25,7 @@ SurfaceRenderer::SurfaceRenderer(const RenderImagePtr& rb,
                                  TracerView tv, const GPUSystem& s)
     : RendererT(rb, wp, tv, s)
     , rayPartitioner(s)
-    , rayStateMem(s.AllGPUs(), 32_MiB, 512_MiB)
+    , redererGlobalMem(s.AllGPUs(), 32_MiB, 512_MiB)
 {}
 
 typename SurfaceRenderer::AttribInfoList
@@ -71,26 +72,37 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
                                               uint32_t)
 {
     using namespace SurfRDetail;
-
-    // TODO: This is common assignment, every renderer
+    // TODO: These may be  common operations, every renderer
     // does this move to a templated intermediate class
     // on the inheritance chain
     currentOptions = newOptions;
     transOverride = optTransform;
     rIParams = rip;
-    //
-    // Find the texture index
+    curTileIndex = 0;
+    globalPixelIndex = 0;
+
+    // Generate the Filter
+    auto FilterGen = tracerView.filterGenerators.at(tracerView.tracerParams.filmFilter.type);
+    if(!FilterGen)
+        throw MRayError("[{}]: Unkown filter type {}.");
+    Float radius = tracerView.tracerParams.filmFilter.radius;
+    filmFilter = FilterGen->get()(gpuSystem, Float(radius));
+    Vector2ui filterPadSize;// = filmFilter->TexturePadding();
+
+    // Change the mode according to the render logic
     using MathFunctions::Roll;
     uint32_t newMode = uint32_t(Roll(int32_t(customLogicIndex0), 0,
                                              int32_t(Mode::END)));
     currentOptions.mode = Mode(newMode);
 
-
     // Calculate tile size according to the parallelization hint
     uint32_t parallelHint = tracerView.tracerParams.parallelizationHint;
     Vector2ui imgRegion = rIParams.regionMax - rIParams.regionMin;
-    Vector2ui tileSize = FindOptimumTile(imgRegion, parallelHint);
-    renderBuffer->Resize(tileSize, 1, 3);
+    tileSize = FindOptimumTile(imgRegion, parallelHint);
+
+    // Add filter padding to the tile size
+    // and allocate the image (Single depth, RGB)
+    renderBuffer->Resize(tileSize + filterPadSize, 1, 3);
     tileCount = MathFunctions::DivideUp(imgRegion, tileSize);
     curColorSpace = tracerView.tracerParams.globalTextureColorSpace;
     curFramebufferSize = rIParams.resolution;
@@ -100,28 +112,41 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
                                                        curFramebufferSize, 1);
     rbI.curRenderLogic0 = newMode;
     rbI.curRenderLogic1 = 0;
-    curTileIndex = 0;
 
-    // Generate works per
-    // Material1/Primitive/Transform triplet,
-    // Light/Transform pair,
-    // Camera/Transform pair
-    workCounter = 0;
-    workCounter = GenerateWorkMappings(workCounter);
-    workCounter = GenerateLightWorkMappings(workCounter);
-    workCounter = GenerateCameraWorkMappings(workCounter);
+    // Generate Works to get the total work count
+    // We will batch allocate
+    uint32_t totalWorkCount = GenerateWorks();
+
+    // Allocate the ray state buffers
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
+    // Find the ray count (1spp)
+    uint32_t rayCount = tileSize.Multiply();
+    MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys, dRays,
+                                         dRayDifferentials,
+                                         dRayState.dImageCoordinates,
+                                         dRayState.dOutputData,
+                                         dWorkHashes, dWorkBatchIds,
+                                         dSubCameraBuffer),
+                                redererGlobalMem,
+                                {rayCount, rayCount, rayCount,
+                                 rayCount, rayCount, rayCount,
+                                 totalWorkCount, totalWorkCount,
+                                 SUB_CAMERA_BUFFER_SIZE});
+    // And initialze the hashes
+    workHasher = InitializeHashes(dWorkHashes, dWorkBatchIds, queue);
 
     // Initialize ray partitioner with worst case scenario,
     // All work types are used. (We do not use camera work
     // for this type of renderer)
     uint32_t maxWorkCount = uint32_t(currentWorks.size() +
                                      currentLightWorks.size());
-    rayPartitioner = RayPartitioner(gpuSystem, tileCount.Multiply(),
+    rayPartitioner = RayPartitioner(gpuSystem, tileSize.Multiply(),
                                     maxWorkCount);
 
-    // Get the surface params
+    // Find camera surface and get keys work instance for that
+    // camera etc.
     auto surfLoc = std::find_if(tracerView.camSurfs.cbegin(),
-                            tracerView.camSurfs.cend(),
+                                tracerView.camSurfs.cend(),
     [camSurfId](const auto& pair)
     {
         return pair.first == camSurfId;
@@ -131,7 +156,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
                         TypeName(), uint32_t(camSurfId));
     curCamSurfaceParams = surfLoc->second;
     // Find the transform/camera work for this specific surface
-    CameraKey curCamKey = CameraKey(static_cast<CommonKey>(curCamSurfaceParams.cameraId));
+    curCamKey = CameraKey(static_cast<CommonKey>(curCamSurfaceParams.cameraId));
     curCamTransformKey = TransformKey(static_cast<CommonKey>(curCamSurfaceParams.transformId));
     CameraGroupId camGroupId = CameraGroupId(curCamKey.FetchBatchPortion());
     TransGroupId transGroupId = TransGroupId(curCamTransformKey.FetchBatchPortion());
@@ -148,51 +173,54 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
 
 RendererOutput SurfaceRenderer::DoRender()
 {
-    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
-    // Find the ray count (1spp)
-    uint32_t rayCount = renderBuffer->Extents().Multiply();
-    MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys, dRays,
-                                         dRayDifferentials, dSubCameraBuffer),
-                                rayStateMem,
-                                {});
+    // On each iteration do one tile fully,
+    // so we can send it directly.
+    // TODO: Like many places of this codebase
+    // we are using sinlge queue (thus single GPU)
+    // change this later
+    Timer timer; timer.Start();
+    const auto& cameraWork = (*curCamWork->get());
+    const GPUDevice& device = gpuSystem.BestDevice();
+    const GPUQueue& processQueue = device.GetComputeQueue(0);
 
-    // Each iteration do one tile fully,
-    // so we can send it directly
     // Generate subcamera of this specific tile
     Vector2ui curTile2D = Vector2ui(curTileIndex % tileCount[0],
                                     curTileIndex / tileCount[0]);
-    curTileIndex = MathFunctions::Roll(int32_t(curTileIndex) + 1, 0,
-                                       int32_t(tileCount.Multiply()));
-    //(*curCamWork)->GenerateSubCamera(dSubCameraBuffer,
-    //                                 curCamKey, transOverride,
-    //                                 curTile2D, tileCount,
-    //                                 queue);
 
-    // Allocate the ray state/payload etc.
+    cameraWork.GenerateSubCamera(dSubCameraBuffer,
+                                 curCamKey, transOverride,
+                                 curTile2D, tileCount,
+                                 processQueue);
 
+    // Find the ray count. Ray count is tile count
+    // but tile can exceed film boundaries so clamp,
+    uint32_t rayCount = tileSize.Multiply();
 
-    // Start partitioning, again worst case work count
+    // Start the partitioner, again worst case work count
+    // Get the K/V pair buffer
     uint32_t maxWorkCount = uint32_t(currentWorks.size() + currentLightWorks.size());
     auto[dIndices, dKeys] = rayPartitioner.Start(rayCount, maxWorkCount, true);
 
-    // Do Full photon mapping
-    //workMap.(key);
 
-    // Do path tracing
-
-    // Combine?
-
-
+    // Create RNG state for each ray
     // Generate rays
-    //(*curCamWork)->GenerateRays<>(dRayDiffOut, ....);
-    // Cast rays
+    Span<const RandomNumber> dRandomNumbers;
     Span<uint32_t> dBackupRNGStates;
+
+    cameraWork.GenerateRays(dRayDifferentials, dRays, EmptyType{},
+                            dIndices, dRandomNumbers, dSubCameraBuffer,
+                            curCamTransformKey, globalPixelIndex,
+                            tileSize, processQueue);
+    globalPixelIndex += rayCount;
+
+    // Cast rays
     tracerView.baseAccelerator.CastRays(dHitKeys, dHits, dBackupRNGStates,
                                         dRays, dIndices);
-    // Generate work keys
+
+    // Generate work keys from hit packs
     using namespace std::string_literals;
     static const std::string GenWorkKernelName = std::string(TypeName()) + "-KCGenerateWorkKeys"s;
-    queue.IssueSaturatingKernel<KCGenerateWorkKeys>
+    processQueue.IssueSaturatingKernel<KCGenerateWorkKeys>
     (
         GenWorkKernelName,
         KernelIssueParams{.workCount = static_cast<uint32_t>(dHitKeys.size())},
@@ -201,7 +229,7 @@ RendererOutput SurfaceRenderer::DoRender()
         workHasher
     );
 
-    // Partition
+    // Finally partition, using the generated keys
     auto
     [
         hPartitionCount,
@@ -213,16 +241,12 @@ RendererOutput SurfaceRenderer::DoRender()
     ] = rayPartitioner.MultiPartition(dKeys, dIndices,
                                       Vector2ui::Zero(),
                                       Vector2ui::Zero(),
-                                      queue, false);
+                                      processQueue, false);
     assert(isHostVisible);
     // Wait for results to be available in host buffers
-    queue.Barrier().Wait();
+    processQueue.Barrier().Wait();
 
-    // Find out maximum RN count for the given work
-    //work->
-    Span<RandomNumber> dRandomNumbers;
-
-
+    GlobalState globalState{currentOptions.mode};
     for(uint32_t i = 0; i < hPartitionCount[0]; i++)
     {
         uint32_t partitionStart = hPartitionStartOffsets[i];
@@ -231,68 +255,113 @@ RendererOutput SurfaceRenderer::DoRender()
 
         auto dLocalIndices = dPartitionIndices.subspan(partitionStart,
                                                        partitionSize);
-
-
-        //SurfaceWorkKey surfKey = SurfaceWorkKey(hPartitionKeys[i]);
-        //uint32_t bactchId = surfKey.FetchBatchPortion();
-        //const auto* work = globalWorkMap.at(batchId);
-
-        //// Another phase(photon phase)
-        //const auto* work = globalWorkMap2.at(batchId);
-
-        //// RTTI?
-
-        //if()
-        //{
-
-        //}
-        //else
-        //{
-
-        //}
-
-        //// We do not bounce rays so output can be empty
-        //work->DoWork(// Input
-        //             Span<RayDiff>(),
-        //             Span<RayGMem>(),
-        //             RayPayload{},
-        //             // I-O
-        //             dRayState,
-        //             // Input
-        //             dLocalIndices,
-        //             dRandomNumbers,
-        //             // Index-relative
-        //             dRayDifferentials,
-        //             dRays,
-        //             dHits,
-        //             RayPayload{},
-        //             // Constants
-        //             GlobalState{},
-        //             queue);
+        // Find the work
+        // TODO: Although work count should be small,
+        // doing a linear search here may not be performant.
+        CommonKey key = workHasher.BisectBatchPortion(hPartitionKeys[i]);
+        auto wLoc = std::find_if(currentWorks.cbegin(), currentWorks.cend(),
+        [key](const auto& workInfo)
+        {
+            return workInfo.workGroupId == key;
+        });
+        auto lightWLoc = std::find_if(currentLightWorks.cbegin(), currentLightWorks.cend(),
+        [key](const auto& workInfo)
+        {
+            return workInfo.workGroupId == key;
+        });
+        if(wLoc != currentWorks.cend())
+        {
+            const auto& workPtr = *wLoc->workPtr.get();
+            workPtr.DoWork_0(Span<RayDiff>{},
+                             Span<RayGMem>{},
+                             RayPayload{},
+                             dRayState,
+                             dLocalIndices,
+                             dRandomNumbers,
+                             dRayDifferentials,
+                             dRays,
+                             dHits,
+                             dHitKeys,
+                             RayPayload{},
+                             globalState,
+                             processQueue);
+        }
+        else if(lightWLoc != currentLightWorks.cend())
+        {
+            const auto& workPtr = *lightWLoc->workPtr.get();
+            workPtr.DoBoundaryWork_0(dRayState,
+                                     dLocalIndices,
+                                     dRandomNumbers,
+                                     dRayDifferentials,
+                                     dRays,
+                                     dHits,
+                                     dHitKeys,
+                                     RayPayload{},
+                                     globalState,
+                                     processQueue);
+        }
+        // If camera work, ignore
     }
 
+    //
+    //
+
     // Filter the samples
-    // Send the FBO
+    processQueue.IssueWait(renderBuffer->PrevCopyCompleteFence());
 
+    SubImageSpan<3> filmSpan = renderBuffer->AsSubspan<3>();
 
-    ////...
+    // Please note that ray partitioner will be invalidated here.
+    // In this case, we do not use the partitioner anymore
+    // so its fine.
+    filmFilter->ReconstructionFilterRGB(filmSpan, rayPartitioner,
+                                        ToConstSpan(dRayState.dOutputData),
+                                        ToConstSpan(dRayState.dImageCoordinates),
+                                        tracerView.tracerParams.parallelizationHint,
+                                        Float(1));
+    // Issue a send of the FBO to Visor
+    const GPUQueue& transferQueue = device.GetTransferQueue();
+    Optional<RenderImageSection>
+    renderOut = renderBuffer->TransferToHost(processQueue,
+                                             transferQueue);
+    // Semaphore is invalidated, visor is probably crashed
+    if(!renderOut.has_value())
+        return RendererOutput{};
 
+    // We do not need to wait here, but we time
+    // from CPU side so we need to wait
+    // TODO: In future we should do OpenGL, Vulkan
+    // style performance counters events etc. to
+    // query the timing (may be couple of frame before even)
+    // The timing is just a general performance indicator
+    // It should not be super accurate.
+    processQueue.Barrier().Wait();
+    timer.Split();
+
+    // Roll to the next tile
+    curTileIndex = MathFunctions::Roll(int32_t(curTileIndex) + 1, 0,
+                                       int32_t(tileCount.Multiply()));
+
+    double timeSec = timer.Elapsed<Second>();
+    double samplePerSec = static_cast<double>(rayCount) / timeSec;
+    samplePerSec /= 1'000'000;
+    double spp = double(curTileIndex + 1) / double(tileCount.Multiply());
 
     return RendererOutput
     {
-        //.analytics = RendererAnalyticData
-        //{
-        //    samplePerSec,
-        //    "M samples/s",
-        //    spp,
-        //    "spp",
-        //    float(timer.Elapsed<Millisecond>()),
-        //    mipSize,
-        //    MRayColorSpaceEnum::MR_ACES_CG,
-        //    static_cast<uint32_t>(textures.size()),
-        //    static_cast<uint32_t>(curTex->MipCount())
-        //},
-        //.imageOut = renderOut
+        .analytics = RendererAnalyticData
+        {
+            samplePerSec,
+            "M samples/s",
+            spp,
+            "spp",
+            float(timer.Elapsed<Millisecond>()),
+            rIParams.resolution,
+            MRayColorSpaceEnum::MR_ACES_CG,
+            static_cast<uint32_t>(SurfRDetail::Mode::END),
+            0
+        },
+        .imageOut = renderOut
     };
 }
 

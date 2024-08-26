@@ -218,6 +218,11 @@ Vector2ui PrimGroupTriangle::BatchRange(PrimBatchKey key) const
     return Vector2ui(range);
 }
 
+size_t PrimGroupTriangle::TotalPrimCount() const
+{
+    return this->TotalPrimCountImpl(INDICES_ATTRIB_INDEX);
+}
+
 typename PrimGroupTriangle::DataSoA PrimGroupTriangle::SoA() const
 {
     return soa;
@@ -397,6 +402,11 @@ Vector2ui PrimGroupSkinnedTriangle::BatchRange(PrimBatchKey key) const
 {
     auto range = FindRange(static_cast<CommonKey>(key))[INDICES_ATTRIB_INDEX];
     return Vector2ui(range);
+}
+
+size_t PrimGroupSkinnedTriangle::TotalPrimCount() const
+{
+    return this->TotalPrimCountImpl(INDICES_ATTRIB_INDEX);
 }
 
 typename PrimGroupSkinnedTriangle::DataSoA PrimGroupSkinnedTriangle::SoA() const

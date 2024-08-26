@@ -115,6 +115,9 @@ class RenderImage
     Optional<RenderImageSection>
                         TransferToHost(const GPUQueue& processQueue,
                                        const GPUQueue& copyQueue);
+
+    template<uint32_t C>
+    SubImageSpan<C>     AsSubspan();
 };
 
 template<int32_t C>
@@ -265,4 +268,18 @@ inline
 const GPUFence& RenderImage::PrevCopyCompleteFence() const
 {
     return previousCopyCompleteFence;
+}
+
+template<uint32_t C>
+SubImageSpan<C> RenderImage::AsSubspan()
+{
+    Vector2ui min, max;
+    Vector2ui resolution;
+
+    assert(C == depth);
+    // Alias the buffer
+    using PixelType = Span<Vector<C, Float>>;
+    PixelType dPixelSpan;// = MemAlloc::RepurposeAlloc<PixelType>(dPixels);
+
+    return SubImageSpan<C>(dPixelSpan, dSamples, min, max, resolution);
 }

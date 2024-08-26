@@ -224,6 +224,9 @@ struct PrimTransformContextType
 
 class GenericGroupPrimitiveT : public GenericGroupT<PrimBatchKey, PrimAttributeInfo>
 {
+    protected:
+    size_t      TotalPrimCountImpl(uint32_t attributeToCount) const;
+
     public:
                 GenericGroupPrimitiveT(uint32_t groupId,
                                        const GPUSystem& sys,
@@ -231,6 +234,7 @@ class GenericGroupPrimitiveT : public GenericGroupT<PrimBatchKey, PrimAttributeI
                                        size_t initialReservartionSize = 64_MiB);
 
     virtual Vector2ui   BatchRange(PrimBatchKey) const = 0;
+    virtual size_t      TotalPrimCount() const = 0;
 };
 
 using PrimGroupPtr           = std::unique_ptr<GenericGroupPrimitiveT>;
@@ -323,6 +327,7 @@ class PrimGroupEmpty final : public GenericGroupPrimitive<PrimGroupEmpty>
                                           const GPUQueue&) override;
 
     Vector2ui               BatchRange(PrimBatchKey) const override;
+    size_t                  TotalPrimCount() const override;
 
     DataSoA                 SoA() const;
 };
@@ -338,6 +343,19 @@ constexpr auto AcquireTransformContextGenerator()
     using FList = typename PrimGroup::TransContextGeneratorList;
     constexpr auto Func = FList::template Find<TransGroup>;
     return Func;
+}
+
+inline
+size_t GenericGroupPrimitiveT::TotalPrimCountImpl(uint32_t attributeToCount) const
+{
+    // TODO: Looping over the map per function call,
+    // cache this later
+    size_t result = 0;
+    for(const auto& itemCount : itemCounts)
+    {
+        result += itemCount.second[attributeToCount];
+    }
+    return result;
 }
 
 inline
@@ -488,6 +506,12 @@ inline
 Vector2ui PrimGroupEmpty::BatchRange(PrimBatchKey) const
 {
     return Vector2ui::Zero();
+}
+
+inline
+size_t PrimGroupEmpty::TotalPrimCount() const
+{
+    return 0u;
 }
 
 inline

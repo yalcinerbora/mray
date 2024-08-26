@@ -91,6 +91,7 @@ class GenericGroupI
     virtual AttribInfoList      AttributeInfo() const = 0;
     virtual std::string_view    Name() const = 0;
     virtual IdInt               GroupId() const = 0;
+    virtual size_t              TotalItemCount() const = 0;
 };
 
 // Implementation of the common parts
@@ -156,7 +157,8 @@ class GenericGroupT : public GenericGroupI<IdTypeT, AttribInfoT>
     bool    IsInCommitState() const override;
     size_t  GPUMemoryUsage() const override;
     IdInt   GroupId() const override;
-    // Finalize is usefull on rare occasions so we default it to empty
+    size_t  TotalItemCount() const override;
+    // Finalize is useful on rare occasions so we default it to empty
     void    Finalize(const GPUQueue&) override {};
 };
 
@@ -395,6 +397,13 @@ typename GenericGroupT<ID, AI>::IdInt
 GenericGroupT<ID, AI>::GroupId() const
 {
     return groupId;
+}
+
+template<class ID, class AI>
+size_t GenericGroupT<ID, AI>::TotalItemCount() const
+{
+    assert(itemCounts.size() == itemRanges.size());
+    return itemCounts.size();
 }
 
 template<class I, class A>

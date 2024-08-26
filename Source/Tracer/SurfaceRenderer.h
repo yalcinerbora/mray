@@ -3,6 +3,7 @@
 #include "RendererC.h"
 #include "RenderWork.h"
 #include "RayPartitioner.h"
+#include "TextureFilter.h"
 
 #include "Core/TypeNameGenerators.h"
 
@@ -69,6 +70,9 @@ namespace SurfRDetail
 
 class SurfaceRenderer final : public RendererT<SurfaceRenderer>
 {
+    using FilmFilterPtr = std::unique_ptr<TextureFilterI>;
+    using CameraWorkPtr = std::unique_ptr<RenderCameraWorkT<SurfaceRenderer>>;
+
     public:
     static std::string_view TypeName();
     //
@@ -106,24 +110,32 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     //
     uint32_t    curTileIndex    = 0;
     Vector2ui   tileCount       = Vector2ui::Zero();
+    Vector2ui   tileSize        = Vector2ui::Zero();
+    //
+    FilmFilterPtr               filmFilter;
+    RenderWorkHasher            workHasher;
     //
     RenderImageParams           rIParams  = {};
     Optional<CameraTransform>   transOverride = {};
     CameraSurfaceParams         curCamSurfaceParams;
     TransformKey                curCamTransformKey;
     CameraKey                   curCamKey;
-    const RenderCameraWorkPtr*  curCamWork;
+    const CameraWorkPtr*        curCamWork;
+    uint64_t                    globalPixelIndex = 0;
     //
     RayPartitioner              rayPartitioner;
     RNGeneratorPtr              rngGenerator;
     //
-    DeviceMemory                rayStateMem;
+    DeviceMemory                redererGlobalMem;
     Span<MetaHit>               dHits;
     Span<HitKeyPack>            dHitKeys;
     Span<RayGMem>               dRays;
     Span<RayDiff>               dRayDifferentials;
     Span<Byte>                  dSubCameraBuffer;
     RayState                    dRayState;
+    // Work Hash related
+    Span<uint32_t>              dWorkHashes;
+    Span<CommonKey>             dWorkBatchIds;
 
     public:
     // Constructors & Destructor
@@ -165,7 +177,7 @@ size_t SurfaceRenderer::GPUMemoryUsage() const
 {
     return (rayPartitioner.UsedGPUMemory() +
             rngGenerator->UsedGPUMemory() +
-            rayStateMem.Size());
+            redererGlobalMem.Size());
 }
 
 template<PrimitiveC Prim, MaterialC Material, class Surface,

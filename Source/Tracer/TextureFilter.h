@@ -39,7 +39,7 @@ class TextureFilterI
                                             // I-O
                                             RayPartitioner& partitioner,
                                             // Input
-                                            const Span<const Vector3>& dValues,
+                                            const Span<const Spectrum>& dValues,
                                             const Span<const Vector2>& dImgCoords,
                                             // Constants
                                             uint32_t parallelHint,
@@ -78,7 +78,7 @@ class TextureFilterT : public TextureFilterI
                                     // I-O
                                     RayPartitioner& partitioner,
                                     // Input
-                                    const Span<const Vector3>& dValues,
+                                    const Span<const Spectrum>& dValues,
                                     const Span<const Vector2>& dImgCoords,
                                     // Constants
                                     uint32_t parallelHint,

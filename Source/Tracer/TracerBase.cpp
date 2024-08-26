@@ -128,6 +128,7 @@ TracerView TracerBase::GenerateTracerView()
         .textures = texMem.Textures(),
         .textureViews = texMem.TextureViews(),
         .tracerParams = params,
+        .filterGenerators = filterGenMap,
         .surfs = surfaces.Vec(),
         .lightSurfs = lightSurfaces.Vec(),
         .camSurfs = cameraSurfaces.Vec(),

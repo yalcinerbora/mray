@@ -269,6 +269,7 @@ class PrimGroupTriangle final : public GenericGroupPrimitive<PrimGroupTriangle>
     void                    Finalize(const GPUQueue& queue) override;
 
     Vector2ui               BatchRange(PrimBatchKey id) const override;
+    size_t                  TotalPrimCount() const override;
 
     DataSoA                 SoA() const;
 };
@@ -336,6 +337,7 @@ class PrimGroupSkinnedTriangle final : public GenericGroupPrimitive<PrimGroupSki
     void                    Finalize(const GPUQueue& queue) override;
 
     Vector2ui               BatchRange(PrimBatchKey id) const override;
+    size_t                  TotalPrimCount() const override;
 
     DataSoA                 SoA() const;
 
