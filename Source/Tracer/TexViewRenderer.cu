@@ -90,7 +90,7 @@ void KCShowTexture(MRAY_GRID_CONSTANT const Span<Float> dPixels,
             // Drop the last pixel
             // TODO: change this to something else,
             // We drop the last pixel since it will be considered as alpha
-            // if we send it to visor
+            // if we send it to visor and it may be invisible
             const auto& view = std::get<TracerTexView<2, Vector<C, Float>>>(texView);
             result = Vector3(view(uv, Float(mipIndex)).value());
         }
@@ -201,27 +201,30 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
                 : 0;
     textureIndex = newTextureIndex;
     // And mip size
-    mipSize = Graphics::TextureMipSize(Vector2ui(t->Extents()), mipIndex);
-    // Initialize tile index
-    curTileIndex = 0;
+    Vector2ui mipSize = Graphics::TextureMipSize(Vector2ui(t->Extents()), mipIndex);
 
-    // Calculate tile size according to the parallelization hint
-    uint32_t parallelHint = tracerView.tracerParams.parallelizationHint;
-    Vector2ui imgRegion = mipSize;
-    Vector2ui tileSize = ImageTiler::FindOptimumTile(imgRegion, parallelHint);
-    renderBuffer->Resize(tileSize, 1, 3);
-    tileCount = MathFunctions::DivideUp(imgRegion, tileSize);
+    RenderImageParams rIParams
+    {
+        .resolution = mipSize,
+        .regionMin = Vector2ui::Zero(),
+        .regionMax = mipSize,
+    };
+    imageTiler = ImageTiler(renderBuffer.get(), rIParams,
+                            tracerView.tracerParams.parallelizationHint,
+                            Vector2ui::Zero(), 3u, 1u);
 
     curColorSpace = tracerView.tracerParams.globalTextureColorSpace;
-    curFramebufferSize = mipSize;
-    curFBMin = Vector2ui::Zero();
-    curFBMax = curFramebufferSize;
-
-    RenderBufferInfo rbI = renderBuffer->GetBufferInfo(curColorSpace,
-                                                       curFramebufferSize, 1);
-    rbI.curRenderLogic0 = textureIndex;
-    rbI.curRenderLogic1 = mipIndex;
-    return rbI;
+    auto bufferPtrAndSize = renderBuffer->SharedDataPtrAndSize();
+    return RenderBufferInfo
+    {
+        .data = bufferPtrAndSize.first,
+        .totalSize = bufferPtrAndSize.second,
+        .renderColorSpace = curColorSpace,
+        .resolution = imageTiler.FullResolution(),
+        .depth = renderBuffer->Depth(),
+        .curRenderLogic0 = textureIndex,
+        .curRenderLogic1 = std::numeric_limits<uint32_t>::max()
+    };
 }
 
 RendererOutput TexViewRenderer::DoRender()
@@ -233,20 +236,10 @@ RendererOutput TexViewRenderer::DoRender()
 
     if(textures.empty()) return {};
 
-    // Determine the current tile size
-    using MathFunctions::Roll;
-    uint32_t tileIndex = Roll<int32_t>(curTileIndex, 0,  tileCount.Multiply());
-    Vector2ui tileIndex2D = Vector2ui(tileIndex % tileCount[0],
-                                      tileIndex / tileCount[0]);
-    Vector2ui regionMin = tileIndex2D * renderBuffer->Extents();
-    Vector2ui regionMax = (tileIndex2D + 1) * renderBuffer->Extents();
-    regionMax.Clamp(Vector2ui::Zero(), curFramebufferSize);
-
     using namespace std::string_view_literals;
     const GPUQueue& processQueue = device.GetComputeQueue(0);
-    Vector2ui curPixelCount2D = regionMax - regionMin;
-    uint32_t curPixelCount = curPixelCount2D.Multiply();
 
+    uint32_t curPixelCount = imageTiler.CurrentTileSize().Multiply();
     // Do not start writing to device side untill copy is complete
     // (device buffer is read fully)
     processQueue.IssueWait(renderBuffer->PrevCopyCompleteFence());
@@ -261,8 +254,8 @@ RendererOutput TexViewRenderer::DoRender()
                 //
                 renderBuffer->Pixels(),
                 renderBuffer->Samples(),
-                tileIndex,
-                curPixelCount2D,
+                imageTiler.CurrentTileIndex().Multiply(),
+                imageTiler.CurrentTileSize(),
                 renderBuffer->ChannelCount()
             );
             break;
@@ -271,7 +264,6 @@ RendererOutput TexViewRenderer::DoRender()
         {
             auto texView = *textureViews[textureIndex];
             uint32_t texChannelCount = FindTexViewChannelCount(texView);
-            Vector2ui resolution = mipSize;
             auto KernelCall = [&, this]<uint32_t C>()
             {
                 // Do not start writing to device side untill copy is complete
@@ -283,9 +275,9 @@ RendererOutput TexViewRenderer::DoRender()
                     //
                     renderBuffer->Pixels(),
                     renderBuffer->Samples(),
-                    regionMin,
-                    regionMax,
-                    resolution,
+                    imageTiler.TileStart(),
+                    imageTiler.TileEnd(),
+                    imageTiler.FullResolution(),
                     mipIndex,
                     texView
                 );
@@ -312,9 +304,9 @@ RendererOutput TexViewRenderer::DoRender()
         return RendererOutput{};
 
     // Actually set the section parameters
-    renderOut.value().pixelMin = regionMin;
-    renderOut.value().pixelMax = regionMax;
-    renderOut.value().globalWeight = Float(1);
+    renderOut->pixelMin = imageTiler.TileStart();
+    renderOut->pixelMax = imageTiler.TileEnd();
+    renderOut->globalWeight = Float(1);
 
     // Now wait, and send the information about timing etc.
     processQueue.Barrier().Wait();
@@ -324,10 +316,11 @@ RendererOutput TexViewRenderer::DoRender()
     double timeSec = timer.Elapsed<Second>();
     double samplePerSec = static_cast<double>(curPixelCount) / timeSec;
     samplePerSec /= 1'000'000;
-    double spp = double(curTileIndex + 1) / double(tileCount.Multiply());
+    double spp = (double(imageTiler.CurrentTileIndex().Multiply() + 1) /
+                  double(imageTiler.TileCount().Multiply()));
     const GenericTexture* curTex = textures[textureIndex];
 
-    curTileIndex++;
+    imageTiler.NextTile();
     return RendererOutput
     {
         .analytics = RendererAnalyticData
@@ -337,7 +330,7 @@ RendererOutput TexViewRenderer::DoRender()
             spp,
             "pix",
             float(timer.Elapsed<Millisecond>()),
-            mipSize,
+            imageTiler.FullResolution(),
             MRayColorSpaceEnum::MR_ACES_CG,
             static_cast<uint32_t>(textures.size()),
             static_cast<uint32_t>(curTex->MipCount())

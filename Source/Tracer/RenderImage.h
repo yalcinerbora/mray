@@ -10,51 +10,31 @@ struct RenderImageParams;
 class RenderImage;
 
 template <int32_t C>
-class SubImageSpan
+class ImageSpan
 {
     private:
-    Span<Vector<C, Float>>  dPixels;
-    Span<Float>             dWeights;
-    Vector2i                min;
-    Vector2i                max;
-    Vector2i                resolution;
-
-    private:
-    static MRAY_GPU Vector2i
-    ChannelIndex(uint32_t channelLinear);
+    Span<Vector<C, Float>> dPixels;
+    Span<Float> dWeights;
+    Vector2i    extent;
 
     public:
-    MRAY_HOST   SubImageSpan(const Span<Vector<C, Float>>& dPixelsIn,
-                             const Span<Float>& dWeights,
-                             const Vector2ui& min,
-                             const Vector2ui& max,
-                             const Vector2ui& resolution);
+    MRAY_HOST   ImageSpan(const Span<Vector<C, Float>>& dPixelsIn,
+                          const Span<Float>& dWeights,
+                          const Vector2ui& extent);
     //
     MRAY_HYBRID Vector2i        Extent() const;
-    MRAY_HYBRID Vector2i        Resolution() const;
     MRAY_HYBRID uint32_t        LinearIndexFrom2D(const Vector2i& xy) const;
     MRAY_HYBRID Vector2i        LinearIndexTo2D(uint32_t pixelIndex) const;
     // Sample Related
     MRAY_GPU Float              FetchWeight(const Vector2i& xy) const;
     MRAY_GPU void               StoreWeight(Float val, const Vector2i& xy) const;
     MRAY_GPU Float              AddToWeightAtomic(Float val, const Vector2i& xy) const;
-
     // Pixel Related
-    MRAY_GPU Float              FetchPixelChannel(const Vector2i& xy,
-                                                  uint32_t channelIndex) const;
-    MRAY_GPU Vector<C, Float>   FetchPixelBulk(const Vector2i& xy) const;
-    //
-    MRAY_GPU void               StorePixelChannel(Float val,
-                                                  const Vector2i& xy,
-                                                  uint32_t channelIndex) const;
-    MRAY_GPU void               StorePixelBulk(const Vector<C, Float>& val,
+    MRAY_GPU Vector<C, Float>   FetchPixel(const Vector2i& xy) const;
+    MRAY_GPU void               StorePixel(const Vector<C, Float>& val,
                                                const Vector2i& xy) const;
-    //
-    MRAY_GPU Float              AddToPixelChannelAtomic(Float val,
-                                                        const Vector2i& xy,
-                                                        uint32_t channelIndex) const;
-    MRAY_GPU Vector<C, Float>   AddToPixelBulkAtomic(const Vector<C, Float>& val,
-                                                     const Vector2i& xy) const;
+    MRAY_GPU Vector<C, Float>   AddToPixelAtomic(const Vector<C, Float>& val,
+                                                 const Vector2i& xy) const;
 };
 
 class ImageTiler
@@ -74,8 +54,13 @@ class ImageTiler
     Range2D     imageRange      = {Vector2ui::Zero(), Vector2ui::Zero()};
     // Current tile count of the sub range defined above
     Vector2ui   tileCount           = Vector2ui::Zero();
+    // Conservative tile size of a single tile
     Vector2ui   coveringTileSize    = Vector2ui::Zero();
-    Vector2ui   renderBufferSize    = Vector2ui::Zero();
+    // Padded tile size (padding comes from the reconstruction filtering)
+    // of the image
+    Vector2ui   paddedTileSize      = Vector2ui::Zero();
+    // This class is a state machine (iterator of some sort as well)
+    // Initially the first tile is selected
     uint32_t    currentTile         = 0;
 
     Vector2ui ResponsibleSize() const;
@@ -89,13 +74,17 @@ class ImageTiler
                Vector2ui filterPadding = Vector2ui::Zero(),
                uint32_t channels = 3, uint32_t depth = 1);
 
-    Vector2ui   CurrentTileSize();
-    Vector2ui   CurrentTileIndex();
-    Vector2ui   TileCount();
+    Vector2ui   FullResolution() const;
+    //Vector2ui   CurrentPaddedTileSize() const;
+    Vector2ui   TileStart() const;
+    Vector2ui   TileEnd() const;
+    Vector2ui   CurrentTileSize() const;
+    Vector2ui   CurrentTileIndex() const;
+    Vector2ui   TileCount() const;
     void        NextTile();
 
     template<uint32_t C>
-    SubImageSpan<C>     AsSubspan();
+    ImageSpan<C>     GetTileSpan();
 
 };
 
@@ -147,9 +136,6 @@ class RenderImage
     uint32_t            ChannelCount() const;
     //
     void                ClearImage(const GPUQueue& queue);
-    RenderBufferInfo    GetBufferInfo(MRayColorSpaceEnum colorspace,
-                                      const Vector2ui& resolution,
-                                      uint32_t depth);
     bool                Resize(const Vector2ui& extent,
                                uint32_t depth,
                                uint32_t channelCount);
@@ -159,62 +145,46 @@ class RenderImage
     Optional<RenderImageSection>
                         TransferToHost(const GPUQueue& processQueue,
                                        const GPUQueue& copyQueue);
+
+    Pair<const Byte*, size_t> SharedDataPtrAndSize() const;
 };
 
 template<int32_t C>
-MRAY_GPU MRAY_GPU_INLINE
-Vector2i SubImageSpan<C>::ChannelIndex(uint32_t channelLinear)
-{
-    int32_t channel = static_cast<int32_t>(channelLinear);
-    return Vector2i(channel % C, channel / C);
-}
-
-template<int32_t C>
 MRAY_HOST inline
-SubImageSpan<C>::SubImageSpan(const Span<Vector<C, Float>>& dPixelsIn,
-                              const Span<Float>& dWeightsIn,
-                              const Vector2ui& minIn,
-                              const Vector2ui& maxIn,
-                              const Vector2ui& resolutionIn)
+ImageSpan<C>::ImageSpan(const Span<Vector<C, Float>>& dPixelsIn,
+                        const Span<Float>& dWeightsIn,
+                        const Vector2ui& extentIn)
     : dPixels(dPixelsIn)
     , dWeights(dWeightsIn)
-    , min(minIn[0], minIn[1])
-    , max(maxIn[0], maxIn[1])
-    , resolution(resolutionIn[0], resolutionIn[1])
+    , extent(extentIn[0], extentIn[1])
 {}
 
 template<int32_t C>
-MRAY_HYBRID Vector2i SubImageSpan<C>::Extent() const
+MRAY_HYBRID Vector2i ImageSpan<C>::Extent() const
 {
-    return max - min;
-}
-
-template<int32_t C>
-MRAY_HYBRID Vector2i SubImageSpan<C>::Resolution() const
-{
-    return resolution;
+    return extent;
 }
 
 template<int32_t C>
 MRAY_GPU MRAY_GPU_INLINE
-uint32_t SubImageSpan<C>::LinearIndexFrom2D(const Vector2i& xy) const
+uint32_t ImageSpan<C>::LinearIndexFrom2D(const Vector2i& xy) const
 {
-    int32_t linear = xy[1] * resolution[0] + xy[0];
+    int32_t linear = xy[1] * extent[0] + xy[0];
     return static_cast<uint32_t>(linear);
 }
 
 template<int32_t C>
 MRAY_GPU MRAY_GPU_INLINE
-Vector2i SubImageSpan<C>::LinearIndexTo2D(uint32_t linearIndex) const
+Vector2i ImageSpan<C>::LinearIndexTo2D(uint32_t linearIndex) const
 {
-    Vector2i result(linearIndex % resolution[0],
-                    linearIndex / resolution[0]);
+    Vector2i result(linearIndex % extent[0],
+                    linearIndex / extent[0]);
     return result;
 }
 
 template<int32_t C>
 MRAY_GPU MRAY_GPU_INLINE
-Float SubImageSpan<C>::FetchWeight(const Vector2i& xy) const
+Float ImageSpan<C>::FetchWeight(const Vector2i& xy) const
 {
     uint32_t i = LinearIndexFrom2D(xy);
     return dWeights[i];
@@ -222,7 +192,7 @@ Float SubImageSpan<C>::FetchWeight(const Vector2i& xy) const
 
 template<int32_t C>
 MRAY_GPU MRAY_GPU_INLINE
-void SubImageSpan<C>::StoreWeight(Float val, const Vector2i& xy) const
+void ImageSpan<C>::StoreWeight(Float val, const Vector2i& xy) const
 {
     uint32_t i = LinearIndexFrom2D(xy);
     dWeights[i] = val;
@@ -230,7 +200,7 @@ void SubImageSpan<C>::StoreWeight(Float val, const Vector2i& xy) const
 
 template<int32_t C>
 MRAY_GPU MRAY_GPU_INLINE
-Float SubImageSpan<C>::AddToWeightAtomic(Float val, const Vector2i& xy) const
+Float ImageSpan<C>::AddToWeightAtomic(Float val, const Vector2i& xy) const
 {
     uint32_t index = LinearIndexFrom2D(xy);
     return DeviceAtomic::AtomicAdd(dWeights[index], val);
@@ -238,17 +208,7 @@ Float SubImageSpan<C>::AddToWeightAtomic(Float val, const Vector2i& xy) const
 
 template<int32_t C>
 MRAY_GPU MRAY_GPU_INLINE
-Float SubImageSpan<C>::FetchPixelChannel(const Vector2i& xy,
-                                         uint32_t channelIndex) const
-{
-    Vector2i c = ChannelIndex(channelIndex);
-    uint32_t index = static_cast<int32_t>(LinearIndexFrom2D(xy));
-    return dPixels[index * c[1]][c[0]];
-}
-
-template<int32_t C>
-MRAY_GPU MRAY_GPU_INLINE
-Vector<C, Float> SubImageSpan<C>::FetchPixelBulk(const Vector2i& xy) const
+Vector<C, Float> ImageSpan<C>::FetchPixel(const Vector2i& xy) const
 {
     uint32_t index = LinearIndexFrom2D(xy);
     return dPixels[index];
@@ -256,18 +216,7 @@ Vector<C, Float> SubImageSpan<C>::FetchPixelBulk(const Vector2i& xy) const
 
 template<int32_t C>
 MRAY_GPU MRAY_GPU_INLINE
-void SubImageSpan<C>::StorePixelChannel(Float val,
-                                        const Vector2i& xy,
-                                        uint32_t channelIndex) const
-{
-    Vector2i c = ChannelIndex(channelIndex);
-    uint32_t index = static_cast<int32_t>(LinearIndexFrom2D(xy));
-    dPixels[index * c[1]][c[0]] = val;
-}
-
-template<int32_t C>
-MRAY_GPU MRAY_GPU_INLINE
-void SubImageSpan<C>::StorePixelBulk(const Vector<C, Float>& val,
+void ImageSpan<C>::StorePixel(const Vector<C, Float>& val,
                                      const Vector2i& xy) const
 {
     uint32_t index = LinearIndexFrom2D(xy);
@@ -276,18 +225,8 @@ void SubImageSpan<C>::StorePixelBulk(const Vector<C, Float>& val,
 
 template<int32_t C>
 MRAY_GPU MRAY_GPU_INLINE
-Float SubImageSpan<C>::AddToPixelChannelAtomic(Float val, const Vector2i& xy,
-                                               uint32_t channelIndex) const
-{
-    Vector2i c = ChannelIndex(channelIndex);
-    uint32_t index = static_cast<int32_t>(LinearIndexFrom2D(xy));
-    DeviceAtomic::AtomicAdd(dPixels[index * c[1]][c[0]], val);
-}
-
-template<int32_t C>
-MRAY_GPU MRAY_GPU_INLINE
-Vector<C, Float> SubImageSpan<C>::AddToPixelBulkAtomic(const Vector<C, Float>& val,
-                                                       const Vector2i& xy) const
+Vector<C, Float> ImageSpan<C>::AddToPixelAtomic(const Vector<C, Float>& val,
+                                                const Vector2i& xy) const
 {
     uint32_t index = LinearIndexFrom2D(xy);
     DeviceAtomic::AtomicAdd(dPixels[index], val);
@@ -309,15 +248,4 @@ inline
 const GPUFence& RenderImage::PrevCopyCompleteFence() const
 {
     return previousCopyCompleteFence;
-}
-
-template<uint32_t C>
-SubImageSpan<C> ImageTiler::AsSubspan()
-{
-    assert(C == renderBuffer->Depth());
-    // Alias the buffer
-    using PixelType = Span<Vector<C, Float>>;
-    PixelType dPixelSpan;// = MemAlloc::RepurposeAlloc<PixelType>(dPixels);
-
-    //return SubImageSpan<C>(dPixelSpan, dSamples, min, max, resolution);
 }

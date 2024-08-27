@@ -35,7 +35,7 @@ class TextureFilterI
                                          const Vector2ui& bufferImageDims,
                                          const GPUQueue& queue) const = 0;
     virtual void    ReconstructionFilterRGB(// Output
-                                            const SubImageSpan<3>& img,
+                                            const ImageSpan<3>& img,
                                             // I-O
                                             RayPartitioner& partitioner,
                                             // Input
@@ -74,7 +74,7 @@ class TextureFilterT : public TextureFilterI
                                  const GPUQueue& queue) const override;
 
     void    ReconstructionFilterRGB(// Output
-                                    const SubImageSpan<3>& img,
+                                    const ImageSpan<3>& img,
                                     // I-O
                                     RayPartitioner& partitioner,
                                     // Input

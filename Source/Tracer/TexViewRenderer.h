@@ -29,11 +29,8 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     Options     currentOptions  = {};
     Options     newOptions      = {};
     // State
-    uint32_t    curTileIndex    = 0;
     uint32_t    textureIndex    = 0;
     uint32_t    mipIndex        = 0;
-    Vector2ui   mipSize         = Vector2ui::Zero();
-    Vector2ui   tileCount       = Vector2ui::Zero();
     //
     std::vector<const GenericTexture*> textures;
     std::vector<const GenericTextureView*> textureViews;

@@ -91,6 +91,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
     // TODO: These may be  common operations, every renderer
     // does this move to a templated intermediate class
     // on the inheritance chain
+    curColorSpace = tracerView.tracerParams.globalTextureColorSpace;
     currentOptions = newOptions;
     transOverride = optTransform;
     rIParams = rip;
@@ -111,23 +112,9 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
                                              int32_t(Mode::END)));
     currentOptions.mode = Mode(newMode);
 
-    // Calculate tile size according to the parallelization hint
-    uint32_t parallelHint = tracerView.tracerParams.parallelizationHint;
-    Vector2ui imgRegion = rIParams.regionMax - rIParams.regionMin;
-    tileSize = ImageTiler::FindOptimumTile(imgRegion, parallelHint);
-
-    // Add filter padding to the tile size
-    // and allocate the image (Single depth, RGB)
-    renderBuffer->Resize(tileSize + filterPadSize, 1, 3);
-    tileCount = MathFunctions::DivideUp(imgRegion, tileSize);
-    curColorSpace = tracerView.tracerParams.globalTextureColorSpace;
-    curFramebufferSize = rIParams.resolution;
-    curFBMin = rIParams.regionMin;
-    curFBMax = rIParams.regionMax;
-    RenderBufferInfo rbI = renderBuffer->GetBufferInfo(curColorSpace,
-                                                       curFramebufferSize, 1);
-    rbI.curRenderLogic0 = newMode;
-    rbI.curRenderLogic1 = 0;
+    imageTiler = ImageTiler(renderBuffer.get(), rIParams,
+                            tracerView.tracerParams.parallelizationHint,
+                            Vector2ui::Zero(), 3, 1);
 
     // Generate Works to get the total work count
     // We will batch allocate
@@ -183,7 +170,17 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
     });
     curCamWork = &packLoc->workPtr;
 
-    return rbI;
+    auto bufferPtrAndSize = renderBuffer->SharedDataPtrAndSize();
+    return RenderBufferInfo
+    {
+        .data = bufferPtrAndSize.first,
+        .totalSize = bufferPtrAndSize.second,
+        .renderColorSpace = curColorSpace,
+        .resolution = imageTiler.FullResolution(),
+        .depth = renderBuffer->Depth(),
+        .curRenderLogic0 = newMode,
+        .curRenderLogic1 = std::numeric_limits<uint32_t>::max()
+    };;
 
 }
 

@@ -57,7 +57,12 @@ void AccumImageStage::ImportExternalHandles(const RenderBufferInfo& rbI)
                                      rbI.data, &hostProps);
 
     auto& dAllocator = VulkanDeviceAllocator::Instance();
-    foreignMemory = dAllocator.AllocateForeignObject(foreignBuffer, rbI.data,
+
+    // We will use this as read only,
+    // But we don't provide API for it (Vulkan does not provide it)
+    // Up untill here we carry the "const" not its time to let it go
+    Byte* dataPtr = const_cast<Byte*>(rbI.data);
+    foreignMemory = dAllocator.AllocateForeignObject(foreignBuffer, dataPtr,
                                                      rbI.totalSize,
                                                      hostProps.memoryTypeBits);
 }

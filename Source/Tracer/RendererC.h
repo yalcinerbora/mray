@@ -462,9 +462,7 @@ class RendererT : public RendererI
 
     // Current Canvas info
     MRayColorSpaceEnum      curColorSpace;
-    Vector2ui               curFramebufferSize;
-    Vector2ui               curFBMin;
-    Vector2ui               curFBMax;
+    ImageTiler              imageTiler;
 
     uint32_t                GenerateWorks();
     RenderWorkHasher        InitializeHashes(Span<uint32_t> dHashes,

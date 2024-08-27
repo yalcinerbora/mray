@@ -60,30 +60,58 @@ ImageTiler::ImageTiler(RenderImage* rI,
                                        parallelizationHint);
     // We conservatively add
     bool singleTracer = (fbSize == fullResolution);
-    renderBufferSize = coveringTileSize;
-    renderBufferSize += (singleTracer) ? (filterPadding * 2u) : Vector2ui::Zero();
-    renderBuffer->Resize(renderBufferSize, depth, channels);
+    paddedTileSize = coveringTileSize;
+    paddedTileSize += (singleTracer) ? (filterPadding * 2u) : Vector2ui::Zero();
+    renderBuffer->Resize(paddedTileSize, depth, channels);
 
     tileCount = MathFunctions::DivideUp(fbSize, coveringTileSize);
 }
 
-Vector2ui ImageTiler::CurrentTileSize()
+Vector2ui ImageTiler::FullResolution() const
+{
+    return fullResolution;
+}
+
+//Vector2ui ImageTiler::CurrentPaddedTileSize() const
+//{
+//    Vector2i tileIndex2D = Vector2i(CurrentTileIndex());
+//    Vector2i start = tileIndex2D * Vector2i(paddedTileSize);
+//    Vector2i end = (tileIndex2D + 1) * Vector2i(paddedTileSize);
+//    // Clamp the range
+//
+//    //end = Vector2i::Clamp(end, fullResolution[1]);
+//}
+
+Vector2ui ImageTiler::CurrentTileSize() const
 {
     Vector2ui tileIndex2D = CurrentTileIndex();
-    Vector2ui start = tileIndex2D * coveringTileSize;
-    // Clamp the range
-    Vector2ui end = (tileIndex2D + 1u) * coveringTileSize;
-    end = Vector2ui::Max(end, imageRange[1]);
+    auto start = TileStart();
+    auto end = TileEnd();
     return end - start;
 }
 
-Vector2ui ImageTiler::CurrentTileIndex()
+Vector2ui ImageTiler::CurrentTileIndex() const
 {
     return Vector2ui(currentTile % tileCount[0],
                      currentTile / tileCount[0]);
 }
 
-Vector2ui ImageTiler::TileCount()
+Vector2ui ImageTiler::TileStart() const
+{
+    Vector2ui tileIndex2D = CurrentTileIndex();
+    Vector2ui start = tileIndex2D * coveringTileSize;
+    return start;
+}
+
+Vector2ui ImageTiler::TileEnd() const
+{
+    Vector2ui tileIndex2D = CurrentTileIndex();
+    Vector2ui end = (tileIndex2D + 1u) * coveringTileSize;
+    end = Vector2ui::Max(end, imageRange[1]);
+    return end;
+}
+
+Vector2ui ImageTiler::TileCount() const
 {
     return tileCount;
 }
@@ -172,21 +200,17 @@ void RenderImage::ClearImage(const GPUQueue& queue)
     queue.MemsetAsync(dSamples, 0x00);
 }
 
-RenderBufferInfo RenderImage::GetBufferInfo(MRayColorSpaceEnum colorspace,
-                                            const Vector2ui& resolution,
-                                            uint32_t totalDepth)
+Pair<const Byte*, size_t> RenderImage::SharedDataPtrAndSize() const
 {
-    return RenderBufferInfo
-    {
-        .data = static_cast<Byte*>(stagingMemory),
-        .totalSize = stagingMemory.AllocSize(),
-        .renderColorSpace = colorspace,
-        .resolution = resolution,
-        .depth = totalDepth,
-        .curRenderLogic0 = std::numeric_limits<uint32_t>::max(),
-        .curRenderLogic1 = std::numeric_limits<uint32_t>::max()
-    };
+    auto constPtr = static_cast<const Byte*>(stagingMemory);
+    return {constPtr, stagingMemory.AllocSize()};
 }
+
+//RenderBufferInfo RenderImage::GetBufferInfo(MRayColorSpaceEnum colorspace,
+//                                            const Vector2ui& resolution)
+//{
+//
+//}
 
 bool RenderImage::Resize(const Vector2ui& extentIn,
                          uint32_t depthIn,

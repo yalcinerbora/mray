@@ -6,7 +6,7 @@
 struct RenderBufferInfo
 {
     // Buffer range
-    Byte*               data;
+    const Byte*         data;
     size_t              totalSize;
     // Data types of the render buffer
     // actual underlying data type is always float

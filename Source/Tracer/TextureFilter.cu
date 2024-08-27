@@ -262,7 +262,7 @@ void KCExpandSamplesToPixels(// Outputs
                              // Constants
                              MRAY_GRID_CONSTANT const Float filterRadius,
                              MRAY_GRID_CONSTANT const uint32_t maxPixelPerSample,
-                             MRAY_GRID_CONSTANT const Vector2i imgResolution)
+                             MRAY_GRID_CONSTANT const Vector2i extent)
 {
     int32_t filterWH = FilterRadiusToPixelWH(filterRadius);
     Vector2i range = FilterRadiusPixelRange(filterWH);
@@ -311,10 +311,10 @@ void KCExpandSamplesToPixels(// Outputs
             // Get ready for writing
             Vector2i globalPixCoord = Vector2i(imgCoords) + Vector2i(x, y);
 
-            bool pixOutside = (globalPixCoord[0] < 0 ||
-                               globalPixCoord[0] >= imgResolution[0] ||
-                               globalPixCoord[1] < 0 ||
-                               globalPixCoord[1] >= imgResolution[1]);
+            bool pixOutside = (globalPixCoord[0] < 0            ||
+                               globalPixCoord[0] >= extent[0]   ||
+                               globalPixCoord[1] < 0            ||
+                               globalPixCoord[1] >= extent[1]);
             // Do not write (obviously) if pixel is outside
             if(pixOutside) doWrite = false;
 
@@ -342,7 +342,7 @@ void KCExpandSamplesToPixels(// Outputs
 
 template <uint32_t TPB, uint32_t LOGICAL_WARP_SIZE, class Filter>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const SubImageSpan<3> img,
+void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan<3> img,
                           // Inputs per segment
                           MRAY_GRID_CONSTANT const Span<const uint32_t> dStartOffsets,
                           MRAY_GRID_CONSTANT const Span<const uint32_t> dPixelIds,
@@ -426,8 +426,8 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const SubImageSpan<3> img,
             Float weight = img.FetchWeight(pixCoordsInt);
             img.StoreWeight(weight + totalValue[0], pixCoordsInt);
 
-            Vector3 pixValue = img.FetchPixelBulk(pixCoordsInt);
-            img.StorePixelBulk(pixValue + Vector3(totalValue),
+            Vector3 pixValue = img.FetchPixel(pixCoordsInt);
+            img.StorePixel(pixValue + Vector3(totalValue),
                                pixCoordsInt);
         }
     }
@@ -435,7 +435,7 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const SubImageSpan<3> img,
 
 template<class Filter>
 void ReconFilterGenericRGB(// Output
-                           const SubImageSpan<3>& img,
+                           const ImageSpan<3>& img,
                            // I-O
                            RayPartitioner& partitioner,
                            // Input
@@ -475,7 +475,7 @@ void ReconFilterGenericRGB(// Output
         // Constants
         filterRadius,
         maxPixelPerSample,
-        img.Resolution()
+        img.Extent()
     );
 
     using namespace Bit;
@@ -569,7 +569,7 @@ void ReconFilterGenericRGB(// Output
 
 template<class Filter>
 void MultiPassReconFilterGenericRGB(// Output
-                                    const SubImageSpan<3>& img,
+                                    const ImageSpan<3>& img,
                                     // I-O
                                     RayPartitioner& partitioner,
                                     // Input
@@ -810,7 +810,7 @@ void TextureFilterT<E, FF>::ClampImageFromBuffer(// Output
 
 template<FilterType::E E, class FF>
 void TextureFilterT<E, FF>::ReconstructionFilterRGB(// Output
-                                                    const SubImageSpan<3>& img,
+                                                    const ImageSpan<3>& img,
                                                     // I-O
                                                     RayPartitioner& partitioner,
                                                     // Input
