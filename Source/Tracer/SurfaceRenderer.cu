@@ -20,6 +20,22 @@ void KCGenerateWorkKeys(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
     }
 }
 
+MRAY_KERNEL
+void KCGenerateWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
+                                MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
+                                MRAY_GRID_CONSTANT const Span<const HitKeyPack> dInputKeys,
+                                MRAY_GRID_CONSTANT const RenderWorkHasher workHasher)
+{
+    uint32_t keyCount = static_cast<uint32_t>(dIndices.size());
+    KernelCallParams kp;
+    for(uint32_t i = kp.GlobalId(); i < keyCount; i += kp.TotalSize())
+    {
+        RayIndex keyIndex = dIndices[i];
+        auto keyPack = dInputKeys[keyIndex];
+        dWorkKey[keyIndex] = workHasher.GenerateWorkKeyGPU(keyPack);
+    }
+}
+
 SurfaceRenderer::SurfaceRenderer(const RenderImagePtr& rb,
                                  const RenderWorkPack& wp,
                                  TracerView tv, const GPUSystem& s)
@@ -98,7 +114,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
     // Calculate tile size according to the parallelization hint
     uint32_t parallelHint = tracerView.tracerParams.parallelizationHint;
     Vector2ui imgRegion = rIParams.regionMax - rIParams.regionMin;
-    tileSize = FindOptimumTile(imgRegion, parallelHint);
+    tileSize = ImageTiler::FindOptimumTile(imgRegion, parallelHint);
 
     // Add filter padding to the tile size
     // and allocate the image (Single depth, RGB)
@@ -201,7 +217,6 @@ RendererOutput SurfaceRenderer::DoRender()
     uint32_t maxWorkCount = uint32_t(currentWorks.size() + currentLightWorks.size());
     auto[dIndices, dKeys] = rayPartitioner.Start(rayCount, maxWorkCount, true);
 
-
     // Create RNG state for each ray
     // Generate rays
     Span<const RandomNumber> dRandomNumbers;
@@ -230,6 +245,7 @@ RendererOutput SurfaceRenderer::DoRender()
     );
 
     // Finally partition, using the generated keys
+    // Fully partition here using single sort
     auto
     [
         hPartitionCount,
@@ -240,8 +256,8 @@ RendererOutput SurfaceRenderer::DoRender()
         dPartitionKeys
     ] = rayPartitioner.MultiPartition(dKeys, dIndices,
                                       Vector2ui::Zero(),
-                                      Vector2ui::Zero(),
-                                      processQueue, false);
+                                      Vector2ui(0, sizeof(CommonKey) * CHAR_BIT),
+                                      processQueue, true);
     assert(isHostVisible);
     // Wait for results to be available in host buffers
     processQueue.Barrier().Wait();
@@ -309,16 +325,16 @@ RendererOutput SurfaceRenderer::DoRender()
     // Filter the samples
     processQueue.IssueWait(renderBuffer->PrevCopyCompleteFence());
 
-    SubImageSpan<3> filmSpan = renderBuffer->AsSubspan<3>();
+//    SubImageSpan<3> filmSpan = renderBuffer->AsSubspan<3>();
 
     // Please note that ray partitioner will be invalidated here.
     // In this case, we do not use the partitioner anymore
     // so its fine.
-    filmFilter->ReconstructionFilterRGB(filmSpan, rayPartitioner,
-                                        ToConstSpan(dRayState.dOutputData),
-                                        ToConstSpan(dRayState.dImageCoordinates),
-                                        tracerView.tracerParams.parallelizationHint,
-                                        Float(1));
+    //filmFilter->ReconstructionFilterRGB(filmSpan, rayPartitioner,
+    //                                    ToConstSpan(dRayState.dOutputData),
+    //                                    ToConstSpan(dRayState.dImageCoordinates),
+    //                                    tracerView.tracerParams.parallelizationHint,
+    //                                    Float(1));
     // Issue a send of the FBO to Visor
     const GPUQueue& transferQueue = device.GetTransferQueue();
     Optional<RenderImageSection>

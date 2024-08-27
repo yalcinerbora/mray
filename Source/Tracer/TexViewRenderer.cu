@@ -208,7 +208,7 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
     // Calculate tile size according to the parallelization hint
     uint32_t parallelHint = tracerView.tracerParams.parallelizationHint;
     Vector2ui imgRegion = mipSize;
-    Vector2ui tileSize = FindOptimumTile(imgRegion, parallelHint);
+    Vector2ui tileSize = ImageTiler::FindOptimumTile(imgRegion, parallelHint);
     renderBuffer->Resize(tileSize, 1, 3);
     tileCount = MathFunctions::DivideUp(imgRegion, tileSize);
 

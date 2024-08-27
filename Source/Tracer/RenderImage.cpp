@@ -1,6 +1,100 @@
 #include "RenderImage.h"
 #include "Core/TracerI.h"
 
+Vector2ui ImageTiler::ResponsibleSize() const
+{
+    return imageRange[1] - imageRange[1];
+}
+
+Vector2ui ImageTiler::FindOptimumTile(const Vector2ui& fbSize,
+                                      uint32_t parallelizationHint)
+{
+    using namespace MathFunctions;
+    // Start with an ~ aspect ratio tile
+    // and adjust it
+    Float aspectRatio = Float(fbSize[0]) / Float(fbSize[1]);
+    Float factor = std::sqrt(Float(parallelizationHint) / aspectRatio);
+    Vector2ui tileHint(std::round(aspectRatio * factor), std::roundf(factor));
+
+    // Find optimal tile size that evenly divides the image
+    // This may not happen (i.e., width or height is prime)
+    // then expand the tile size to pass the edge barely.
+    auto Adjust = [&](uint32_t i)
+    {
+        // If w/h is small use the full fb w/h
+        if(fbSize[i] < tileHint[i]) return fbSize[i];
+
+        // Divide down to get an agressive (lower) count,
+        // but on second pass do a conservative divide
+        Float tileCountF = Float(fbSize[i]) / Float(tileHint[i]);
+        uint32_t tileCount = uint32_t(std::round(tileCountF));
+        // Try to minimize residuals so that
+        // GPU does consistent work
+        uint32_t result = fbSize[i] / tileCount;
+        uint32_t residual = fbSize[i] % tileCount;
+        residual = DivideUp(residual, tileCount);
+        result += residual;
+        return result;
+    };
+
+    Vector2ui result = Vector2ui(Adjust(0), Adjust(1));
+    return result;
+}
+
+ImageTiler::ImageTiler(RenderImage* rI,
+                       const RenderImageParams& rIParams,
+                       uint32_t parallelizationHint,
+                       Vector2ui filterPadding,
+                       uint32_t channels, uint32_t depth)
+    : renderBuffer(rI)
+    , fullResolution(rIParams.resolution)
+    , imageRange{rIParams.regionMin, rIParams.regionMax}
+{
+    // Since we partition the image into tiles
+    // some tiles can cover out of bound pixels
+    // This value is the largest tile size.
+    // In function call time this class will return
+    // the actual tile size depending on current tile
+    Vector2ui fbSize = ResponsibleSize();
+    coveringTileSize = FindOptimumTile(fbSize,
+                                       parallelizationHint);
+    // We conservatively add
+    bool singleTracer = (fbSize == fullResolution);
+    renderBufferSize = coveringTileSize;
+    renderBufferSize += (singleTracer) ? (filterPadding * 2u) : Vector2ui::Zero();
+    renderBuffer->Resize(renderBufferSize, depth, channels);
+
+    tileCount = MathFunctions::DivideUp(fbSize, coveringTileSize);
+}
+
+Vector2ui ImageTiler::CurrentTileSize()
+{
+    Vector2ui tileIndex2D = CurrentTileIndex();
+    Vector2ui start = tileIndex2D * coveringTileSize;
+    // Clamp the range
+    Vector2ui end = (tileIndex2D + 1u) * coveringTileSize;
+    end = Vector2ui::Max(end, imageRange[1]);
+    return end - start;
+}
+
+Vector2ui ImageTiler::CurrentTileIndex()
+{
+    return Vector2ui(currentTile % tileCount[0],
+                     currentTile / tileCount[0]);
+}
+
+Vector2ui ImageTiler::TileCount()
+{
+    return tileCount;
+}
+
+void ImageTiler::NextTile()
+{
+    using MathFunctions::Roll;
+    currentTile = Roll<int32_t>(currentTile + 1,
+                                0, int32_t(tileCount.Multiply()));
+}
+
 RenderImage::RenderImage(TimelineSemaphore* semaphore,
                          uint32_t importAlignmentIn,
                          uint64_t initialSemCounter,

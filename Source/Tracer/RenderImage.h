@@ -7,6 +7,7 @@
 #include "Device/GPUAtomic.h"
 
 struct RenderImageParams;
+class RenderImage;
 
 template <int32_t C>
 class SubImageSpan
@@ -56,18 +57,61 @@ class SubImageSpan
                                                      const Vector2i& xy) const;
 };
 
+class ImageTiler
+{
+    public:
+    using Range2D = std::array<Vector2ui, 2>;
+
+    static Vector2ui   FindOptimumTile(const Vector2ui& imageSize,
+                                       uint32_t parallelizationHint);
+
+    private:
+    RenderImage* renderBuffer = nullptr;
+
+    // Full image resolution, This single image may be generated
+    // by multiple tracers.
+    Vector2ui   fullResolution  = Vector2ui::Zero();
+    Range2D     imageRange      = {Vector2ui::Zero(), Vector2ui::Zero()};
+    // Current tile count of the sub range defined above
+    Vector2ui   tileCount           = Vector2ui::Zero();
+    Vector2ui   coveringTileSize    = Vector2ui::Zero();
+    Vector2ui   renderBufferSize    = Vector2ui::Zero();
+    uint32_t    currentTile         = 0;
+
+    Vector2ui ResponsibleSize() const;
+
+    public:
+    // Constructors & Destructor
+    ImageTiler() = default;
+    ImageTiler(RenderImage* renderImage,
+               const RenderImageParams& rIParams,
+               uint32_t parallelizationHint,
+               Vector2ui filterPadding = Vector2ui::Zero(),
+               uint32_t channels = 3, uint32_t depth = 1);
+
+    Vector2ui   CurrentTileSize();
+    Vector2ui   CurrentTileIndex();
+    Vector2ui   TileCount();
+    void        NextTile();
+
+    template<uint32_t C>
+    SubImageSpan<C>     AsSubspan();
+
+};
+
 class RenderImage
 {
     private:
     const GPUSystem&    gpuSystem;
     uint32_t            importAlignment;
     // Mem related
-    // According to the profiling this staging style
-    // transfer was the most performant
+    // According to the profiling this staging
+    // transfer style was the most performant
     DeviceMemory        deviceMemory;
     Span<Float>         dPixels;
     Span<Float>         dSamples;
-    //
+    // We use special "HostLocalAlignedMemory"
+    // type here just because of Vulkan.
     HostLocalAlignedMemory  stagingMemory;
     Span<Float>             hPixels;
     Span<Float>             hSamples;
@@ -115,9 +159,6 @@ class RenderImage
     Optional<RenderImageSection>
                         TransferToHost(const GPUQueue& processQueue,
                                        const GPUQueue& copyQueue);
-
-    template<uint32_t C>
-    SubImageSpan<C>     AsSubspan();
 };
 
 template<int32_t C>
@@ -271,15 +312,12 @@ const GPUFence& RenderImage::PrevCopyCompleteFence() const
 }
 
 template<uint32_t C>
-SubImageSpan<C> RenderImage::AsSubspan()
+SubImageSpan<C> ImageTiler::AsSubspan()
 {
-    Vector2ui min, max;
-    Vector2ui resolution;
-
-    assert(C == depth);
+    assert(C == renderBuffer->Depth());
     // Alias the buffer
     using PixelType = Span<Vector<C, Float>>;
     PixelType dPixelSpan;// = MemAlloc::RepurposeAlloc<PixelType>(dPixels);
 
-    return SubImageSpan<C>(dPixelSpan, dSamples, min, max, resolution);
+    //return SubImageSpan<C>(dPixelSpan, dSamples, min, max, resolution);
 }

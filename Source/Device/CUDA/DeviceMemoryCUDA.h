@@ -93,6 +93,12 @@ class HostLocalMemoryCUDA
     size_t                  Size() const;
 };
 
+// Vulkan foreign memory requires the mem to be
+// page-aligned (Well it returns 4096, so thats what
+// I inferred). On CUDA, cudaMallocHost returns 256 byte-aligned
+// memory so we cannot use that
+// So we utilize C's "aligned malloc" function and register that
+// memory to CUDA.
 class HostLocalAlignedMemoryCUDA
 {
     private:
