@@ -258,7 +258,7 @@ void KCExpandSamplesToPixels(// Outputs
                              MRAY_GRID_CONSTANT const Span<uint32_t> dPixelIds,
                              MRAY_GRID_CONSTANT const Span<uint32_t> dIndices,
                              // Inputs
-                             MRAY_GRID_CONSTANT const Span<const Vector2> dImgCoords,
+                             MRAY_GRID_CONSTANT const Span<const ImageCoordinate> dImgCoords,
                              // Constants
                              MRAY_GRID_CONSTANT const Float filterRadius,
                              MRAY_GRID_CONSTANT const uint32_t maxPixelPerSample,
@@ -276,7 +276,7 @@ void KCExpandSamplesToPixels(// Outputs
     for(uint32_t sampleIndex = kp.GlobalId(); sampleIndex < sampleCount;
         sampleIndex += kp.TotalSize())
     {
-        Vector2 imgCoords = dImgCoords[sampleIndex];
+        Vector2 imgCoords = dImgCoords[sampleIndex].GetPixelIndex();
         Vector2 relImgCoords;
         Vector2 fractions = Vector2(std::modf(imgCoords[0], &(relImgCoords[0])),
                                     std::modf(imgCoords[1], &(relImgCoords[1])));
@@ -350,7 +350,7 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan<3> img,
                           MRAY_GRID_CONSTANT const Span<const uint32_t> dIndices,
                           // Inputs Accessed by SampleId
                           MRAY_GRID_CONSTANT const Span<const Spectrum> dValues,
-                          MRAY_GRID_CONSTANT const Span<const Vector2> dImgCoords,
+                          MRAY_GRID_CONSTANT const Span<const ImageCoordinate> dImgCoords,
                           // Constants
                           MRAY_GRID_CONSTANT const Float scalarWeightMultiplier,
                           MRAY_GRID_CONSTANT const Filter filter)
@@ -408,7 +408,7 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan<3> img,
             {
                 uint32_t readIndex = dIndices[sampleIndex];
                 Vector3 sampleVal = Vector3(dValues[readIndex]);
-                Vector2 sampleCoord = dImgCoords[readIndex];
+                Vector2 sampleCoord = dImgCoords[readIndex].GetPixelIndex();
                 Float weight = filter.Evaluate(pixCoords - sampleCoord) * scalarWeightMultiplier;
                 sampleVal *= weight;
                 value = Vector4(sampleVal, weight);
@@ -440,7 +440,7 @@ void ReconFilterGenericRGB(// Output
                            RayPartitioner& partitioner,
                            // Input
                            const Span<const Spectrum>& dValues,
-                           const Span<const Vector2>& dImgCoords,
+                           const Span<const ImageCoordinate>& dImgCoords,
                            // Constants
                            Float scalarWeightMultiplier,
                            Float filterRadius,
@@ -518,8 +518,10 @@ void ReconFilterGenericRGB(// Output
     // Some boilerplate to make the code more readable
     auto KernelCall = [&]<auto Kernel>(std::string_view Name)
     {
-        Span<const Spectrum> dX = dValues;
-        Span<const Vector2> dY = dImgCoords;
+        // Forgot why this is here? But probably to capture by copy?
+        // TODO: Investigate
+        Span<const Spectrum> dValuesIn = dValues;
+        Span<const ImageCoordinate> dImgCoordsIn = dImgCoords;
 
         uint32_t blockCount =
             queue.RecommendedBlockCountDevice(Kernel,
@@ -539,7 +541,8 @@ void ReconFilterGenericRGB(// Output
             // Inputs per thread
             dPartitionIndices,
             // Inputs Accessed by SampleId
-            dX, dY,
+            dValuesIn,
+            dImgCoordsIn,
             // Constants
             scalarWeightMultiplier,
             filter
@@ -574,7 +577,7 @@ void MultiPassReconFilterGenericRGB(// Output
                                     RayPartitioner& partitioner,
                                     // Input
                                     const Span<const Spectrum>& dValues,
-                                    const Span<const Vector2>& dImgCoords,
+                                    const Span<const ImageCoordinate>& dImgCoords,
                                     // Constants
                                     uint32_t parallelHint,
                                     Float scalarWeightMultiplier,
@@ -611,7 +614,7 @@ void MultiPassReconFilterGenericRGB(// Output
         uint32_t count = end - start;
 
         Span<const Spectrum> dLocalValues = dValues.subspan(start, count);
-        Span<const Vector2> dLocalImgCoords = dImgCoords.subspan(start, count);
+        Span<const ImageCoordinate> dLocalImgCoords = dImgCoords.subspan(start, count);
         ReconFilterGenericRGB(img, partitioner,
                               dLocalValues, dLocalImgCoords,
                               scalarWeightMultiplier, filterRadius,
@@ -815,7 +818,7 @@ void TextureFilterT<E, FF>::ReconstructionFilterRGB(// Output
                                                     RayPartitioner& partitioner,
                                                     // Input
                                                     const Span<const Spectrum>& dValues,
-                                                    const Span<const Vector2>& dImgCoords,
+                                                    const Span<const ImageCoordinate>& dImgCoords,
                                                     // Constants
                                                     uint32_t parallelHint,
                                                     Float scalarWeightMultiplier) const

@@ -1,8 +1,28 @@
 #include "RunCommand.h"
 #include "GFGConverter/GFGConverter.h"
+#include "Core/Timer.h"
 
 #include <CLI/CLI.hpp>
 #include <string_view>
+
+using DurationMS = std::chrono::milliseconds;
+using LegolasLookupElem = Pair<std::string_view, DurationMS>;
+
+// Instead of pulling std::chorno_literals to global space (it is a single
+// translation unit but w/e), using constructors
+static constexpr auto AnimDurationLong = DurationMS(850);
+static constexpr auto AnimDurationShort = DurationMS(475);
+static constexpr std::array LegolasAnimSheet =
+{
+    LegolasLookupElem{"< 0 >\r", AnimDurationLong},
+    LegolasLookupElem{"<  0>\r", AnimDurationLong},
+    LegolasLookupElem{"< 0 >\r", AnimDurationLong},
+    LegolasLookupElem{"< _ >\r", AnimDurationShort},
+    LegolasLookupElem{"< 0 >\r", AnimDurationLong},
+    LegolasLookupElem{"<0  >\r", AnimDurationLong},
+    LegolasLookupElem{"< 0 >\r", AnimDurationLong},
+    LegolasLookupElem{"< _ >\r", AnimDurationShort}
+};
 
 namespace MRayCLI::RunNames
 {

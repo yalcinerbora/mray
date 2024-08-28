@@ -81,7 +81,7 @@ void SurfaceRenderer::PushAttribute(uint32_t attributeIndex,
     newOptions.totalSPP = data.AccessAs<uint32_t>()[0];
 }
 
-RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
+RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
                                               CamSurfaceId camSurfId,
                                               Optional<CameraTransform> optTransform,
                                               uint32_t customLogicIndex0,
@@ -94,8 +94,6 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
     curColorSpace = tracerView.tracerParams.globalTextureColorSpace;
     currentOptions = newOptions;
     transOverride = optTransform;
-    rIParams = rip;
-    curTileIndex = 0;
     globalPixelIndex = 0;
 
     // Generate the Filter
@@ -112,7 +110,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
                                              int32_t(Mode::END)));
     currentOptions.mode = Mode(newMode);
 
-    imageTiler = ImageTiler(renderBuffer.get(), rIParams,
+    imageTiler = ImageTiler(renderBuffer.get(), rIP,
                             tracerView.tracerParams.parallelizationHint,
                             Vector2ui::Zero(), 3, 1);
 
@@ -122,8 +120,8 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
 
     // Allocate the ray state buffers
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
-    // Find the ray count (1spp)
-    uint32_t rayCount = tileSize.Multiply();
+    // Find the ray count (1spp per tile)
+    uint32_t rayCount = imageTiler.ConservativeTileSize().Multiply();
     MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys, dRays,
                                          dRayDifferentials,
                                          dRayState.dImageCoordinates,
@@ -143,7 +141,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
     // for this type of renderer)
     uint32_t maxWorkCount = uint32_t(currentWorks.size() +
                                      currentLightWorks.size());
-    rayPartitioner = RayPartitioner(gpuSystem, tileSize.Multiply(),
+    rayPartitioner = RayPartitioner(gpuSystem, rayCount,
                                     maxWorkCount);
 
     // Find camera surface and get keys work instance for that
@@ -180,7 +178,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
         .depth = renderBuffer->Depth(),
         .curRenderLogic0 = newMode,
         .curRenderLogic1 = std::numeric_limits<uint32_t>::max()
-    };;
+    };
 
 }
 
@@ -197,17 +195,15 @@ RendererOutput SurfaceRenderer::DoRender()
     const GPUQueue& processQueue = device.GetComputeQueue(0);
 
     // Generate subcamera of this specific tile
-    Vector2ui curTile2D = Vector2ui(curTileIndex % tileCount[0],
-                                    curTileIndex / tileCount[0]);
-
     cameraWork.GenerateSubCamera(dSubCameraBuffer,
                                  curCamKey, transOverride,
-                                 curTile2D, tileCount,
+                                 imageTiler.CurrentTileIndex(),
+                                 imageTiler.TileCount(),
                                  processQueue);
 
     // Find the ray count. Ray count is tile count
     // but tile can exceed film boundaries so clamp,
-    uint32_t rayCount = tileSize.Multiply();
+    uint32_t rayCount = imageTiler.CurrentTileSize().Multiply();
 
     // Start the partitioner, again worst case work count
     // Get the K/V pair buffer
@@ -217,12 +213,13 @@ RendererOutput SurfaceRenderer::DoRender()
     // Create RNG state for each ray
     // Generate rays
     Span<const RandomNumber> dRandomNumbers;
-    Span<uint32_t> dBackupRNGStates;
+    Span<BackupRNGState> dBackupRNGStates;
 
     cameraWork.GenerateRays(dRayDifferentials, dRays, EmptyType{},
-                            dIndices, dRandomNumbers, dSubCameraBuffer,
-                            curCamTransformKey, globalPixelIndex,
-                            tileSize, processQueue);
+                            dRayState, dIndices, dRandomNumbers,
+                            dSubCameraBuffer, curCamTransformKey,
+                            globalPixelIndex, imageTiler.CurrentTileSize(),
+                            processQueue);
     globalPixelIndex += rayCount;
 
     // Cast rays
@@ -347,14 +344,14 @@ RendererOutput SurfaceRenderer::DoRender()
     processQueue.Barrier().Wait();
     timer.Split();
 
-    // Roll to the next tile
-    curTileIndex = MathFunctions::Roll(int32_t(curTileIndex) + 1, 0,
-                                       int32_t(tileCount.Multiply()));
-
     double timeSec = timer.Elapsed<Second>();
     double samplePerSec = static_cast<double>(rayCount) / timeSec;
     samplePerSec /= 1'000'000;
-    double spp = double(curTileIndex + 1) / double(tileCount.Multiply());
+    double spp = (double(imageTiler.CurrentTileIndex().Multiply() + 1) /
+                  double(imageTiler.TileCount().Multiply()));
+
+    // Roll to the next tile
+    imageTiler.NextTile();
 
     return RendererOutput
     {
@@ -365,7 +362,7 @@ RendererOutput SurfaceRenderer::DoRender()
             spp,
             "spp",
             float(timer.Elapsed<Millisecond>()),
-            rIParams.resolution,
+            imageTiler.FullResolution(),
             MRayColorSpaceEnum::MR_ACES_CG,
             static_cast<uint32_t>(SurfRDetail::Mode::END),
             0

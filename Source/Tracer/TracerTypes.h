@@ -17,7 +17,33 @@ using RNGDispenser = RNGDispenserT<uint32_t>;
 using MetaHit = MetaHitT<2>;
 
 // Differential portion of a ray
-class RayDiff{};
+struct RayDiff
+{
+    // TODO: Need to check the paper
+    // But in the end it should have
+    // dud{x,y,z}
+    // dvd{x,y,z}
+    // So 6 floats? (or 12?)
+    Vector3 dRdx;
+    Vector3 dRdy;
+};
+
+// Image coordinate is little bit special.
+// Instead of it being a Vector2 or something
+// The integer part and sub pixel part is seperated.
+//
+// This is due to future stochastic filtering (filtering after shading)
+// implementation. Some simple renderers may also find this usefull.
+// Path tracer; for example, will have a seperate RNG state for each pixel
+// So a kernel can directly access the state via the integer part.
+struct alignas(8) ImageCoordinate
+{
+    Vector2us   pixelIndex;
+    SNorm2x16   offset;
+
+    MRAY_HYBRID
+    Vector2 GetPixelIndex() const;
+};
 
 // Spectral Samples or RGB color etc.
 // For spectrum we need wavelengths as well,
@@ -103,14 +129,6 @@ struct alignas(HitKeyPackAlignment) HitKeyPack
     TransformKey    transKey;
     AcceleratorKey  accelKey;
 };
-
-//static constexpr size_t AccelIdPackAlignment = (sizeof(TransformKey) +
-//                                                sizeof(AcceleratorKey));
-//struct alignas (AccelIdPackAlignment) AcceleratorIdPack
-//{
-//    TransformKey    transId;
-//    AcceleratorKey  accelId;
-//};
 
 template <class HitType>
 struct IntersectionT
@@ -204,4 +222,12 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 void UpdateTMax(Span<RayGMem> gRays, RayIndex index, Float tMax)
 {
     gRays[index].tMax = tMax;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Vector2 ImageCoordinate::GetPixelIndex() const
+{
+    Vector2 result(pixelIndex);
+    result += Vector2(offset);
+    return result;
 }

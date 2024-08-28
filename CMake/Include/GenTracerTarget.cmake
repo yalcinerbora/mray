@@ -89,6 +89,7 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/SurfaceRenderer.cu)
 
     set(SRC_RANDOM
+        ${CURRENT_SOURCE_DIR}/Random.cu
         ${CURRENT_SOURCE_DIR}/Random.h
         ${CURRENT_SOURCE_DIR}/DistributionFunctions.h
         ${CURRENT_SOURCE_DIR}/Distributions.h

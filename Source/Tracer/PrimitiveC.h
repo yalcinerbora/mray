@@ -225,7 +225,7 @@ struct PrimTransformContextType
 class GenericGroupPrimitiveT : public GenericGroupT<PrimBatchKey, PrimAttributeInfo>
 {
     protected:
-    size_t      TotalPrimCountImpl(uint32_t attributeToCount) const;
+    size_t      TotalPrimCountImpl(uint32_t countIndex) const;
 
     public:
                 GenericGroupPrimitiveT(uint32_t groupId,
@@ -346,14 +346,14 @@ constexpr auto AcquireTransformContextGenerator()
 }
 
 inline
-size_t GenericGroupPrimitiveT::TotalPrimCountImpl(uint32_t attributeToCount) const
+size_t GenericGroupPrimitiveT::TotalPrimCountImpl(uint32_t countIndex) const
 {
     // TODO: Looping over the map per function call,
     // cache this later
     size_t result = 0;
     for(const auto& itemCount : itemCounts)
     {
-        result += itemCount.second[attributeToCount];
+        result += itemCount.second[countIndex];
     }
     return result;
 }

@@ -87,9 +87,8 @@ class ImageTiler
     Vector2ui   FullResolution() const;
     Vector2ui   LocalTileStart() const;
     Vector2ui   LocalTileEnd() const;
-    //Vector2ui   PaddedTileStart() const;
-    //Vector2ui   PaddedTileEnd() const;
 
+    Vector2ui   ConservativeTileSize() const;
     Vector2ui   CurrentTileSize() const;
     Vector2ui   CurrentTileIndex() const;
     Vector2ui   TileCount() const;

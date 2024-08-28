@@ -402,7 +402,6 @@ GenericGroupT<ID, AI>::GroupId() const
 template<class ID, class AI>
 size_t GenericGroupT<ID, AI>::TotalItemCount() const
 {
-    assert(itemCounts.size() == itemRanges.size());
     return itemCounts.size();
 }
 

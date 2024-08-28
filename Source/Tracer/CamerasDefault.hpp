@@ -43,21 +43,31 @@ RaySample CameraPinhole::SampleRay(// Input
     Vector2ui sampleId = generationIndex % stratumCount;
 
     // DX DY from stratified sample
-    Vector2 delta = Vector2(planeSize[0] / static_cast<float>(stratumCount[0]),
-                            planeSize[1] / static_cast<float>(stratumCount[1]));
+    Vector2 delta = Vector2(planeSize[0] / static_cast<Float>(stratumCount[0]),
+                            planeSize[1] / static_cast<Float>(stratumCount[1]));
 
     // Create random location over sample rectangle
     Vector2 xi = rng.NextFloat2D<0>();
+    Vector2 jitter = (xi * delta);
     Vector2 sampleDistance = Vector2(static_cast<float>(sampleId[0]),
                                      static_cast<float>(sampleId[1])) * delta;
-    sampleDistance += (xi * delta);
+    sampleDistance += jitter;
     Vector3 samplePoint = bottomLeft + ((sampleDistance[0] * right) +
                                         (sampleDistance[1] * up));
     Vector3 rayDir = (samplePoint - position).Normalize();
 
     // Local Coords
-    Vector2 imgCoords = (Vector2(sampleId) + xi) / Vector2(stratumCount);
+    // We are quantizing here, we probably have a validation
+    // of images no larger than 65536. But this is here just to
+    // be sure.
+    assert(sampleId[0] <= std::numeric_limits<uint16_t>::max() &&
+           sampleId[1] <= std::numeric_limits<uint16_t>::max());
 
+    ImageCoordinate imgCoords =
+    {
+        .pixelIndex = Vector2us(sampleId),
+        .offset = SNorm2x16(jitter - Vector2(0.5))
+    };
     // Initialize Ray
     return RaySample
     {
@@ -65,7 +75,8 @@ RaySample CameraPinhole::SampleRay(// Input
         {
             .ray = Ray(rayDir, position),
             .tMinMax = nearFar,
-            .imgCoords = imgCoords
+            .imgCoords = imgCoords,
+            .rayDifferentials = RayDiff{}
         },
         .pdf = Float(1.0)
     };

@@ -34,13 +34,15 @@ void KCGenerateSubCamera(// Output
                                   stratumCount);
 }
 
-template<auto RayStateInitFunc, class RayPayload,
+template<auto RayStateInitFunc,
+         class RayPayload, class RayState,
          CameraC Camera, TransformGroupC TransG>
 MRAY_KERNEL
 void KCGenerateCamRays(// Output (Only dOutIndices pointed data should be written)
                        MRAY_GRID_CONSTANT const Span<RayDiff> dRayDiffs,
                        MRAY_GRID_CONSTANT const Span<RayGMem> dRays,
-                       MRAY_GRID_CONSTANT const RayPayload dPayloads,
+                       MRAY_GRID_CONSTANT const RayPayload dRayPayloads,
+                       MRAY_GRID_CONSTANT const RayState dRayStates,
                        // Input
                        MRAY_GRID_CONSTANT const Span<const uint32_t> dRayIndices,
                        MRAY_GRID_CONSTANT const Span<const RandomNumber> dRandomNums,
@@ -91,6 +93,6 @@ void KCGenerateCamRays(// Output (Only dOutIndices pointed data should be writte
         // we pass it to the renderer .
         // For example;
         // A path tracer will save them directly and set the throughput to the pdf maybe
-        RayStateInitFunc(dPayloads, writeIndex, raySample);
+        RayStateInitFunc(dRayPayloads, dRayStates, writeIndex, raySample);
     }
 }

@@ -300,6 +300,7 @@ class RenderCameraWorkT : public RenderCameraWorkI
                               const Span<RayDiff>& dRayDiffsOut,
                               const Span<RayGMem>& dRaysOut,
                               const typename R::RayPayload& dPayloadsOut,
+                              const typename R::RayState& dStatesOut,
                               // Input
                               const Span<const uint32_t>& dRayIndices,
                               const Span<const uint32_t>& dRandomNums,

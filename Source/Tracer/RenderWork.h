@@ -205,22 +205,6 @@ class RenderCameraWork : public RenderCameraWorkT<R>
     const TG&           tg;
     const GPUSystem&    gpuSystem;
 
-    template<auto RayStateInitFunc>
-    void    GenerateRaysInternal(// Output
-                                 const Span<RayDiff>& dRayDiffsOut,
-                                 const Span<RayGMem>& dRaysOut,
-                                 const typename R::RayPayload& dPayloadsOut,
-                                 // Input
-                                 const Span<const uint32_t>& dRayIndices,
-                                 const Span<const uint32_t>& dRandomNums,
-                                 // Type erased buffer
-                                 Span<const Byte> dCamBuffer,
-                                 TransformKey transKey,
-                                 // Constants
-                                 uint64_t globalPixelIndex,
-                                 const Vector2ui regionCount,
-                                 const GPUQueue& queue) const;
-
     public:
     // Constructors & Destructor
             RenderCameraWork(const GenericGroupCameraT&,
@@ -240,6 +224,7 @@ class RenderCameraWork : public RenderCameraWorkT<R>
                          const Span<RayDiff>& dRayDiffsOut,
                          const Span<RayGMem>& dRaysOut,
                          const typename R::RayPayload& dPayloadsOut,
+                         const typename R::RayState& dStatesOut,
                          // Input
                          const Span<const uint32_t>& dRayIndices,
                          const Span<const uint32_t>& dRandomNums,
@@ -249,7 +234,7 @@ class RenderCameraWork : public RenderCameraWorkT<R>
                          // Constants
                          uint64_t globalPixelIndex,
                          const Vector2ui regionCount,
-                         const GPUQueue& queue) const;
+                         const GPUQueue& queue) const override;
 
     std::string_view    Name() const override;
 };
@@ -498,7 +483,7 @@ void RenderCameraWork<R, C, T>::GenerateSubCamera(// Output
                                                   const GPUQueue& queue) const
 {
     using Camera = typename C::Camera;
-    assert(dCamBuffer.size_bytes() <= sizeof(Camera));
+    assert(dCamBuffer.size_bytes() >= sizeof(Camera));
     assert(uintptr_t(dCamBuffer.data()) % alignof(Camera) == 0);
     Camera* dCamera = reinterpret_cast<Camera*>(dCamBuffer.data());
 
@@ -527,6 +512,7 @@ void RenderCameraWork<R, C, T>::GenerateRays(// Output
                                              const Span<RayDiff>& dRayDiffsOut,
                                              const Span<RayGMem>& dRaysOut,
                                              const typename R::RayPayload& dPayloadsOut,
+                                             const typename R::RayState& dStatesOut,
                                              // Input
                                              const Span<const uint32_t>& dRayIndices,
                                              const Span<const uint32_t>& dRandomNums,
@@ -539,6 +525,7 @@ void RenderCameraWork<R, C, T>::GenerateRays(// Output
                                              const GPUQueue& queue) const
 {
     using RayPayload = typename R::RayPayload;
+    using RayState = typename R::RayState;
     using Camera = typename C::Camera;
     assert(dRayIndices.size() == dRandomNums.size());
     assert(dCamBuffer.size_bytes() <= sizeof(Camera));
@@ -546,7 +533,8 @@ void RenderCameraWork<R, C, T>::GenerateRays(// Output
     const Camera* dCamera = reinterpret_cast<const Camera*>(dCamBuffer.data());
 
     uint32_t rayCount = static_cast<uint32_t>(dRayIndices.size());
-    static constexpr auto Kernel = KCGenerateCamRays<R::RayStateInitFunc, RayPayload,
+    static constexpr auto Kernel = KCGenerateCamRays<R::RayStateInitFunc,
+                                                     RayPayload, RayState,
                                                      Camera, T>;
     using namespace std::string_literals;
     static const std::string KernelName = std::string(TypeName()) + "-GenRays"s;
@@ -559,6 +547,7 @@ void RenderCameraWork<R, C, T>::GenerateRays(// Output
         dRayDiffsOut,
         dRaysOut,
         dPayloadsOut,
+        dStatesOut,
         // In
         dRayIndices,
         dRandomNums,

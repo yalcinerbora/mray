@@ -39,9 +39,8 @@ namespace SurfRDetail
     {
         // Can be position, furance radiance, normal
         // or a false color
-        Span<Spectrum>  dOutputData;
-        // Image coordinates of the path
-        Span<Vector2>   dImageCoordinates;
+        Span<Spectrum>          dOutputData;
+        Span<ImageCoordinate>   dImageCoordinates;
     };
     // No payload (this is incident renderer so
     // everything is on ray state)
@@ -50,22 +49,17 @@ namespace SurfRDetail
     template<PrimitiveC Prim, MaterialC Material, class Surface,
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     MRAY_HYBRID
-    void SurfaceRendWorkFunction(const Prim& prim, const Material& mat, const Surface& surf,
+    void WorkFunction(const Prim& prim, const Material& mat, const Surface& surf,
                                  const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params);
 
     template<LightC Light, LightGroupC LG, TransformGroupC TG>
     MRAY_HYBRID
-    void SurfaceRendLightWorkFunction(const Light& light,
+    void LightWorkFunction(const Light& light,
                                       const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params);
 
-    template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
     MRAY_HYBRID
-    void SurfaceRendCameraWorkFunction(const Camera&,
-                                       const RenderCameraWorkParams<SurfaceRenderer, CG, TG>&);
-
-    MRAY_HYBRID
-    void SurfaceRendInitRayPayload(const RayPayload&,
-                                   uint32_t writeIndex, const RaySample&);
+    void InitRayState(const RayPayload&, const RayState&,
+                      uint32_t writeIndex, const RaySample&);
 }
 
 class SurfaceRenderer final : public RendererT<SurfaceRenderer>
@@ -85,17 +79,17 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     static constexpr Tuple WorkFunctions = Tuple
     {
-        SurfRDetail::SurfaceRendWorkFunction<P, M, S, PG, MG, TG>
+        SurfRDetail::WorkFunction<P, M, S, PG, MG, TG>
     };
     template<LightC L, LightGroupC LG, TransformGroupC TG>
     static constexpr auto LightWorkFunctions = Tuple
     {
-        SurfRDetail::SurfaceRendLightWorkFunction<L, LG, TG>
+        SurfRDetail::LightWorkFunction<L, LG, TG>
     };
     template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
     static constexpr auto CamWorkFunctions = Tuple{};
 
-    static constexpr auto RayStateInitFunc = SurfRDetail::SurfaceRendInitRayPayload;
+    static constexpr auto RayStateInitFunc = SurfRDetail::InitRayState;
 
     //
     struct Options
@@ -108,14 +102,9 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     Options     currentOptions  = {};
     Options     newOptions      = {};
     //
-    uint32_t    curTileIndex    = 0;
-    Vector2ui   tileCount       = Vector2ui::Zero();
-    Vector2ui   tileSize        = Vector2ui::Zero();
-    //
     FilmFilterPtr               filmFilter;
     RenderWorkHasher            workHasher;
     //
-    RenderImageParams           rIParams  = {};
     Optional<CameraTransform>   transOverride = {};
     CameraSurfaceParams         curCamSurfaceParams;
     TransformKey                curCamTransformKey;
@@ -183,8 +172,8 @@ size_t SurfaceRenderer::GPUMemoryUsage() const
 template<PrimitiveC Prim, MaterialC Material, class Surface,
          PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
 MRAY_HYBRID
-void SurfRDetail::SurfaceRendWorkFunction(const Prim& prim, const Material& mat, const Surface& surf,
-                                          const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params)
+void SurfRDetail::WorkFunction(const Prim& prim, const Material& mat, const Surface& surf,
+                               const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params)
 {
     //
 }
@@ -192,25 +181,19 @@ void SurfRDetail::SurfaceRendWorkFunction(const Prim& prim, const Material& mat,
 template<LightC Light,
          LightGroupC LG, TransformGroupC TG>
 MRAY_HYBRID
-void SurfRDetail::SurfaceRendLightWorkFunction(const Light& light,
-                                               const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params)
+void SurfRDetail::LightWorkFunction(const Light& light,
+                                    const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params)
 {
     //
 }
 
-template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
-MRAY_HYBRID
-void SurfRDetail::SurfaceRendCameraWorkFunction(const Camera&,
-                                                const RenderCameraWorkParams<SurfaceRenderer, CG, TG>&)
-{
-    // Empty, no notion of ray hitting camera
-}
-
 MRAY_HYBRID MRAY_CGPU_INLINE
-void SurfRDetail::SurfaceRendInitRayPayload(const RayPayload&, uint32_t,
-                                            const RaySample&)
+void SurfRDetail::InitRayState(const RayPayload&,
+                               const RayState& dStates,
+                               uint32_t writeIndex,
+                               const RaySample& raySample)
 {
-    // TODO: ....
+    dStates.dImageCoordinates[writeIndex] = raySample.value.imgCoords;
 }
 
 template<PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>

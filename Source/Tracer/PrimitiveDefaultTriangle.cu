@@ -220,7 +220,7 @@ Vector2ui PrimGroupTriangle::BatchRange(PrimBatchKey key) const
 
 size_t PrimGroupTriangle::TotalPrimCount() const
 {
-    return this->TotalPrimCountImpl(INDICES_ATTRIB_INDEX);
+    return this->TotalPrimCountImpl(0);
 }
 
 typename PrimGroupTriangle::DataSoA PrimGroupTriangle::SoA() const
@@ -406,7 +406,7 @@ Vector2ui PrimGroupSkinnedTriangle::BatchRange(PrimBatchKey key) const
 
 size_t PrimGroupSkinnedTriangle::TotalPrimCount() const
 {
-    return this->TotalPrimCountImpl(INDICES_ATTRIB_INDEX);
+    return this->TotalPrimCountImpl(0);
 }
 
 typename PrimGroupSkinnedTriangle::DataSoA PrimGroupSkinnedTriangle::SoA() const

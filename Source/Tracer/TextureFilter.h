@@ -40,7 +40,7 @@ class TextureFilterI
                                             RayPartitioner& partitioner,
                                             // Input
                                             const Span<const Spectrum>& dValues,
-                                            const Span<const Vector2>& dImgCoords,
+                                            const Span<const ImageCoordinate>& dImgCoords,
                                             // Constants
                                             uint32_t parallelHint,
                                             Float scalarWeightMultiplier) const = 0;
@@ -80,7 +80,7 @@ class TextureFilterT : public TextureFilterI
                                     RayPartitioner& partitioner,
                                     // Input
                                     const Span<const Spectrum>& dValues,
-                                    const Span<const Vector2>& dImgCoords,
+                                    const Span<const ImageCoordinate>& dImgCoords,
                                     // Constants
                                     uint32_t parallelHint,
                                     Float scalarWeightMultiplier) const override;

@@ -8,11 +8,10 @@
 
 struct RaySampleT
 {
-    Ray     ray;
-    Vector2 tMinMax;
-    Vector2 imgCoords;
-    // Ray Diff?
-    RayDiff rayDifferentials;
+    Ray             ray;
+    Vector2         tMinMax;
+    ImageCoordinate imgCoords;
+    RayDiff         rayDifferentials;
 };
 using RaySample = SampleT<RaySampleT>;
 

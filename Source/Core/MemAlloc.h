@@ -203,6 +203,7 @@ constexpr Span<Left> RepurposeAlloc(Span<Right> rhs)
     size_t elementCount = rhs.size_bytes() / sizeof(Left);
     // TODO: Check if this is UB (probably is)
     ByteT* rawPtr = reinterpret_cast<ByteT*>(rhs.data());
+    assert(std::uintptr_t(rawPtr) % alignof(Left) == 0);
     Left* leftPtr = std::launder(reinterpret_cast<Left*>(rawPtr));
     return Span<Left>(leftPtr, elementCount);
 }

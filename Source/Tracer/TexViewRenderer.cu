@@ -221,8 +221,6 @@ RendererOutput TexViewRenderer::DoRender()
     using namespace std::string_view_literals;
     const GPUQueue& processQueue = device.GetComputeQueue(0);
 
-    MRAY_LOG("{}", mipIndex);
-
     uint32_t curPixelCount = imageTiler.CurrentTileSize().Multiply();
     // Do not start writing to device side untill copy is complete
     // (device buffer is read fully)

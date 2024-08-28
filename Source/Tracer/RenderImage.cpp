@@ -90,8 +90,8 @@ Vector2ui ImageTiler::LocalTileStart() const
 Vector2ui ImageTiler::LocalTileEnd() const
 {
     Vector2ui tileIndex2D = CurrentTileIndex();
-    Vector2ui end = (tileIndex2D + 1u) * ResponsibleSize();
-    end = Vector2ui::Max(end, ResponsibleSize());
+    Vector2ui end = (tileIndex2D + 1u) * coveringTileSize;
+    end = Vector2ui::Min(end, ResponsibleSize());
     return end;
 }
 
@@ -100,6 +100,11 @@ Vector2ui ImageTiler::CurrentTileSize() const
     auto start = GlobalTileStart();
     auto end = GlobalTileEnd();
     return end - start;
+}
+
+Vector2ui ImageTiler::ConservativeTileSize() const
+{
+    return coveringTileSize;
 }
 
 Vector2ui ImageTiler::CurrentTileIndex() const
@@ -130,6 +135,7 @@ ImageTiler::TransferToHost(const GPUQueue& processQueue,
 
     imageSection->pixelMin = GlobalTileStart();
     imageSection->pixelMax = GlobalTileEnd();
+    return imageSection;
 }
 
 RenderImage::RenderImage(TimelineSemaphore* semaphore,

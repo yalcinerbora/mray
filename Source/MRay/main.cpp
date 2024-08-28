@@ -4,6 +4,7 @@
 #include "Core/DataStructures.h"
 #include "Core/Error.h"
 #include "Core/Error.hpp"
+#include "Core/System.h"
 
 #include <CLI/CLI.hpp>
 #include <string_view>
@@ -24,6 +25,12 @@ InitializeCommands() noexcept
 
 int main(int argc, const char* const argv[])
 {
+    if(!EnableVTMode())
+    {
+        MRAY_WARNING_LOG("Unable to set virtual terminal processing! "
+                         "Log outputs may have invalid characters!");
+    }
+
     StaticVector<TypedCommand, MAX_SUBCOMMAND_COUNT> appList;
 
     CLI::App app{std::string(MRay::Description),

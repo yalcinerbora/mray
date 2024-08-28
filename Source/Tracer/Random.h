@@ -7,6 +7,8 @@
 #include "Device/GPUSystem.h"
 #include "Device/GPUMemory.h"
 
+#include "TracerTypes.h"
+
 
 namespace RNGFunctions::HashPCG64
 {
@@ -87,7 +89,7 @@ namespace RNGFunctions
         static_assert(std::numeric_limits<float>::is_iec559, "Non-standard floating point!");
         static_assert(sizeof(uint32_t) == sizeof(float), "float is not 32-bit!");
 
-        // This is simpler version also its 24-bit instead of 23-bit
+        // This is simpler version also it's 24-bit instead of 23-bit
         //https://marc-b-reynolds.github.io/distribution/2017/01/17/DenseFloat.html
         float rngFloat = static_cast<float>(v >> 8);
         return  rngFloat * 0x1p-24f;
@@ -116,6 +118,14 @@ struct RNGDispenserT
 using RandomNumber = uint32_t;
 using RNGDispenser = RNGDispenserT<RandomNumber>;
 
+//template<class RNG>
+//concept RNGeneratorC = requires()
+//{
+//    typename RNG::State;
+//    typename RNG::GlobalState;
+//    { RNG::GenerateState(uint32_t{}) } -> std::same_as<typename RNG::State>;
+//};
+
 // PCG with 32bit state
 // https://www.pcg-random.org
 // This RNG predominantly be used as a "backup" generator,
@@ -139,7 +149,7 @@ class PermutedCG32
     static constexpr uint32_t Increment = 2891336453u;
 
     public:
-    using State = uint32_t;
+    using State         = uint32_t;
 
     MRAY_HYBRID
     static State    GenerateState(uint32_t seed);
@@ -170,36 +180,52 @@ class PermutedCG32
 using BackupRNG = PermutedCG32;
 using BackupRNGState = typename PermutedCG32::State;
 
+//static_assert(RNGeneratorC<PermutedCG32>,
+//              "PermutedCG32 does not satisfy RNGenerator concept!");
+
 class RNGeneratorI
 {
     public:
     virtual ~RNGeneratorI() = default;
 
-    virtual void GenerateNumbers(Span<uint32_t> numbersOut) = 0;
+    virtual void GenerateNumbers(Span<RandomNumber> numbersOut,
+                                 Span<const ImageCoordinate> dPixelCoords,
+                                 Vector2ui tileStart,
+                                 Vector2ui tileEnd,
+                                 Vector2ui fullSize,
+                                 uint32_t dimensionCount,
+                                 const GPUQueue& queue) = 0;
     virtual size_t UsedGPUMemory() const = 0;
 };
 
 using RNGeneratorPtr = std::unique_ptr<RNGeneratorI>;
 
-template <class MainRNGType>
-class RNGeneratorGroup : public RNGeneratorI
+class RNGGroupIndependent : public RNGeneratorI
 {
     public:
-    using MainRNG           = MainRNGType;
-    using MainRNGState      = typename MainRNG::State;
+    using MainRNG       = PermutedCG32;
+    using MainRNGState  = typename MainRNG::State;
+    static std::string_view TypeName();
 
     private:
+    const GPUSystem&        gpuSystem;
     DeviceMemory            memory;
-    Span<BackupRNGState>    backupStates;
-    Span<MainRNGState>      mainStates;
+    Span<BackupRNGState>    dBackupStates;
+    Span<MainRNGState>      dMainStates;
 
     public:
     // Constructors & Destructor
-            RNGeneratorGroup(size_t generatorCount,
-                             uint32_t seed);
+            RNGGroupIndependent(size_t generatorCount,
+                                uint32_t seed,
+                                const GPUSystem& system);
 
-
-    void    GenerateNumbers(Span<uint32_t> numbersOut) override;
+    void    GenerateNumbers(Span<RandomNumber> numbersOut,
+                            Span<const ImageCoordinate> dPixelCoords,
+                            Vector2ui tileStart,
+                            Vector2ui tileEnd,
+                            Vector2ui fullSize,
+                            uint32_t dimensionCount,
+                            const GPUQueue& queue) override;
     size_t  UsedGPUMemory() const override;
 };
 
@@ -356,21 +382,4 @@ void PermutedCG32::Advance(uint32_t delta)
         delta /= 2;
     }
     rState = accMult * rState + accPlus;
-}
-
-template <class RNG>
-RNGeneratorGroup<RNG>::RNGeneratorGroup(size_t generatorCount,
-                                        uint32_t seed)
-{}
-
-template <class RNG>
-void RNGeneratorGroup<RNG>::GenerateNumbers(Span<uint32_t> numbersOut)
-{
-
-}
-
-template <class RNG>
-size_t RNGeneratorGroup<RNG>::UsedGPUMemory() const
-{
-    return memory.Size();
 }
