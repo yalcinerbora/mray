@@ -158,7 +158,7 @@ AccumulateStatus AccumImageStage::IssueAccumulation(const RenderImageSection& se
             {
                 .buffer = foreignBuffer.Buffer(),
                 .offset = section.pixelStartOffset,
-                .range = section.sampleStartOffset,
+                .range = section.weightStartOffset,
             },
         },
         {
@@ -167,7 +167,7 @@ AccumulateStatus AccumImageStage::IssueAccumulation(const RenderImageSection& se
             VkDescriptorBufferInfo
             {
                 .buffer = foreignBuffer.Buffer(),
-                .offset = section.sampleStartOffset,
+                .offset = section.weightStartOffset,
                 .range = VK_WHOLE_SIZE
             },
         }

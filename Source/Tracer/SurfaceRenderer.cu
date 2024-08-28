@@ -104,7 +104,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rip,
         throw MRayError("[{}]: Unkown filter type {}.");
     Float radius = tracerView.tracerParams.filmFilter.radius;
     filmFilter = FilterGen->get()(gpuSystem, Float(radius));
-    Vector2ui filterPadSize;// = filmFilter->TexturePadding();
+    Vector2ui filterPadSize = filmFilter->FilterExtent();
 
     // Change the mode according to the render logic
     using MathFunctions::Roll;
@@ -316,22 +316,18 @@ RendererOutput SurfaceRenderer::DoRender()
         // If camera work, ignore
     }
 
-    //
-    //
-
     // Filter the samples
+    // Wait for previous copy to finish
     processQueue.IssueWait(renderBuffer->PrevCopyCompleteFence());
-
-//    SubImageSpan<3> filmSpan = renderBuffer->AsSubspan<3>();
-
     // Please note that ray partitioner will be invalidated here.
     // In this case, we do not use the partitioner anymore
     // so its fine.
-    //filmFilter->ReconstructionFilterRGB(filmSpan, rayPartitioner,
-    //                                    ToConstSpan(dRayState.dOutputData),
-    //                                    ToConstSpan(dRayState.dImageCoordinates),
-    //                                    tracerView.tracerParams.parallelizationHint,
-    //                                    Float(1));
+    ImageSpan<3> filmSpan = imageTiler.GetTileSpan<3>();
+    filmFilter->ReconstructionFilterRGB(filmSpan, rayPartitioner,
+                                        ToConstSpan(dRayState.dOutputData),
+                                        ToConstSpan(dRayState.dImageCoordinates),
+                                        tracerView.tracerParams.parallelizationHint,
+                                        Float(1));
     // Issue a send of the FBO to Visor
     const GPUQueue& transferQueue = device.GetTransferQueue();
     Optional<RenderImageSection>

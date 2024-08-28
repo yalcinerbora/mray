@@ -3,11 +3,22 @@
 
 Vector2ui ImageTiler::ResponsibleSize() const
 {
-    return imageRange[1] - imageRange[1];
+    return range[1] - range[0];
 }
 
-Vector2ui ImageTiler::FindOptimumTile(const Vector2ui& fbSize,
-                                      uint32_t parallelizationHint)
+Vector2ui ImageTiler::GlobalTileStart() const
+{
+    return range[0] + LocalTileStart();
+}
+
+Vector2ui ImageTiler::GlobalTileEnd() const
+{
+
+    return range[0] + LocalTileEnd();
+}
+
+Vector2ui ImageTiler::FindOptimumTileSize(const Vector2ui& fbSize,
+                                          uint32_t parallelizationHint)
 {
     using namespace MathFunctions;
     // Start with an ~ aspect ratio tile
@@ -48,7 +59,7 @@ ImageTiler::ImageTiler(RenderImage* rI,
                        uint32_t channels, uint32_t depth)
     : renderBuffer(rI)
     , fullResolution(rIParams.resolution)
-    , imageRange{rIParams.regionMin, rIParams.regionMax}
+    , range{rIParams.regionMin, rIParams.regionMax}
 {
     // Since we partition the image into tiles
     // some tiles can cover out of bound pixels
@@ -56,14 +67,11 @@ ImageTiler::ImageTiler(RenderImage* rI,
     // In function call time this class will return
     // the actual tile size depending on current tile
     Vector2ui fbSize = ResponsibleSize();
-    coveringTileSize = FindOptimumTile(fbSize,
+    coveringTileSize = FindOptimumTileSize(fbSize,
                                        parallelizationHint);
-    // We conservatively add
-    bool singleTracer = (fbSize == fullResolution);
-    paddedTileSize = coveringTileSize;
-    paddedTileSize += (singleTracer) ? (filterPadding * 2u) : Vector2ui::Zero();
-    renderBuffer->Resize(paddedTileSize, depth, channels);
 
+    paddedTileSize = coveringTileSize + filterPadding * 2u;
+    renderBuffer->Resize(paddedTileSize, depth, channels);
     tileCount = MathFunctions::DivideUp(fbSize, coveringTileSize);
 }
 
@@ -72,21 +80,25 @@ Vector2ui ImageTiler::FullResolution() const
     return fullResolution;
 }
 
-//Vector2ui ImageTiler::CurrentPaddedTileSize() const
-//{
-//    Vector2i tileIndex2D = Vector2i(CurrentTileIndex());
-//    Vector2i start = tileIndex2D * Vector2i(paddedTileSize);
-//    Vector2i end = (tileIndex2D + 1) * Vector2i(paddedTileSize);
-//    // Clamp the range
-//
-//    //end = Vector2i::Clamp(end, fullResolution[1]);
-//}
+Vector2ui ImageTiler::LocalTileStart() const
+{
+    Vector2ui tileIndex2D = CurrentTileIndex();
+    Vector2ui start = tileIndex2D * coveringTileSize;
+    return start;
+}
+
+Vector2ui ImageTiler::LocalTileEnd() const
+{
+    Vector2ui tileIndex2D = CurrentTileIndex();
+    Vector2ui end = (tileIndex2D + 1u) * ResponsibleSize();
+    end = Vector2ui::Max(end, ResponsibleSize());
+    return end;
+}
 
 Vector2ui ImageTiler::CurrentTileSize() const
 {
-    Vector2ui tileIndex2D = CurrentTileIndex();
-    auto start = TileStart();
-    auto end = TileEnd();
+    auto start = GlobalTileStart();
+    auto end = GlobalTileEnd();
     return end - start;
 }
 
@@ -94,21 +106,6 @@ Vector2ui ImageTiler::CurrentTileIndex() const
 {
     return Vector2ui(currentTile % tileCount[0],
                      currentTile / tileCount[0]);
-}
-
-Vector2ui ImageTiler::TileStart() const
-{
-    Vector2ui tileIndex2D = CurrentTileIndex();
-    Vector2ui start = tileIndex2D * coveringTileSize;
-    return start;
-}
-
-Vector2ui ImageTiler::TileEnd() const
-{
-    Vector2ui tileIndex2D = CurrentTileIndex();
-    Vector2ui end = (tileIndex2D + 1u) * coveringTileSize;
-    end = Vector2ui::Max(end, imageRange[1]);
-    return end;
 }
 
 Vector2ui ImageTiler::TileCount() const
@@ -121,6 +118,18 @@ void ImageTiler::NextTile()
     using MathFunctions::Roll;
     currentTile = Roll<int32_t>(currentTile + 1,
                                 0, int32_t(tileCount.Multiply()));
+}
+
+Optional<RenderImageSection>
+ImageTiler::TransferToHost(const GPUQueue& processQueue,
+               const GPUQueue& transferQueue)
+{
+    auto imageSection = renderBuffer->TransferToHost(processQueue,
+                                                     transferQueue);
+    if(!imageSection.has_value()) return imageSection;
+
+    imageSection->pixelMin = GlobalTileStart();
+    imageSection->pixelMax = GlobalTileEnd();
 }
 
 RenderImage::RenderImage(TimelineSemaphore* semaphore,
@@ -156,7 +165,7 @@ Optional<RenderImageSection> RenderImage::TransferToHost(const GPUQueue& process
     copyQueue.IssueWait(processCompleteFence);
     // Copy to staging buffers when the data is ready
     copyQueue.MemcpyAsync(hPixels, ToConstSpan(dPixels));
-    copyQueue.MemcpyAsync(hSamples, ToConstSpan(dSamples));
+    copyQueue.MemcpyAsync(hWeights, ToConstSpan(dWeights));
     // Do not overwrite untill memcpy finishes
     previousCopyCompleteFence = copyQueue.Barrier();
     //copyQueue.MemcpyAsync(hSamples, ToConstSpan(dSamples));
@@ -175,7 +184,7 @@ Optional<RenderImageSection> RenderImage::TransferToHost(const GPUQueue& process
         .globalWeight       = 0.0f,
         .waitCounter        = nextVal,
         .pixelStartOffset   = pixStartOffset,
-        .sampleStartOffset  = sampleStartOffset
+        .weightStartOffset  = weightStartOffset
     };
 }
 
@@ -197,7 +206,7 @@ uint32_t RenderImage::ChannelCount() const
 void RenderImage::ClearImage(const GPUQueue& queue)
 {
     queue.MemsetAsync(dPixels, 0x00);
-    queue.MemsetAsync(dSamples, 0x00);
+    queue.MemsetAsync(dWeights, 0x00);
 }
 
 Pair<const Byte*, size_t> RenderImage::SharedDataPtrAndSize() const
@@ -205,12 +214,6 @@ Pair<const Byte*, size_t> RenderImage::SharedDataPtrAndSize() const
     auto constPtr = static_cast<const Byte*>(stagingMemory);
     return {constPtr, stagingMemory.AllocSize()};
 }
-
-//RenderBufferInfo RenderImage::GetBufferInfo(MRayColorSpaceEnum colorspace,
-//                                            const Vector2ui& resolution)
-//{
-//
-//}
 
 bool RenderImage::Resize(const Vector2ui& extentIn,
                          uint32_t depthIn,
@@ -223,12 +226,12 @@ bool RenderImage::Resize(const Vector2ui& extentIn,
     channelCount = channelCountIn;
 
     uint32_t totalPixCount = extent.Multiply() * depth;
-    MemAlloc::AllocateMultiData(std::tie(dPixels, dSamples),
+    MemAlloc::AllocateMultiData(std::tie(dPixels, dWeights),
                                 deviceMemory,
                                 {totalPixCount * channelCount,
                                  totalPixCount});
     // Reallocate host buffer
-    MemAlloc::AllocateMultiData(std::tie(hPixels, hSamples),
+    MemAlloc::AllocateMultiData(std::tie(hPixels, hWeights),
                                 stagingMemory,
                                 {totalPixCount * channelCount,
                                  totalPixCount});
@@ -236,7 +239,7 @@ bool RenderImage::Resize(const Vector2ui& extentIn,
     // Calculate offsets
     Byte* mem = static_cast<Byte*>(deviceMemory);
     pixStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(dPixels.data())));
-    sampleStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(dSamples.data())));
+    weightStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(dWeights.data())));
 
     sem.HostRelease();
     sem.SkipAState();

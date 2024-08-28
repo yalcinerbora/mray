@@ -18,56 +18,42 @@ uint32_t FindTexViewChannelCount(const GenericTextureView& genericTexView)
 }
 
 MRAY_KERNEL
-void KCColorTiles(MRAY_GRID_CONSTANT const Span<Float> dPixels,
-                  MRAY_GRID_CONSTANT const Span<Float> dSamples,
-                  MRAY_GRID_CONSTANT const uint32_t colorIndex,
-                  MRAY_GRID_CONSTANT const Vector2ui resolution,
-                  MRAY_GRID_CONSTANT const uint32_t channelCount)
+void KCColorTiles(MRAY_GRID_CONSTANT const ImageSpan<3> imgSpan,
+                  MRAY_GRID_CONSTANT const uint32_t colorIndex)
 {
     KernelCallParams kp;
 
-    uint32_t totalPix = resolution.Multiply();
-    assert(totalPix * channelCount <= dPixels.size());
-    assert(totalPix <= dSamples.size());
-
+    uint32_t totalPix = imgSpan.Extent().Multiply();
+    Vector3 color = Color::RandomColorRGB(colorIndex);
     for(uint32_t i = kp.GlobalId(); i < totalPix; i += kp.TotalSize())
     {
-        uint32_t pixIndex = i * channelCount;
-        uint32_t sampleIndex = i;
-        Vector3 color = Color::RandomColorRGB(colorIndex);
-
-        dSamples[sampleIndex] = Float(1);
-        dPixels[pixIndex + 0] = color[0];
-        dPixels[pixIndex + 1] = color[1];
-        dPixels[pixIndex + 2] = color[2];
+        Vector2i pixelIndex = imgSpan.LinearIndexTo2D(int32_t(i));
+        imgSpan.StorePixel(color, pixelIndex);
+        imgSpan.StoreWeight(Float(1), pixelIndex);
     }
 }
 
 template<uint32_t C>
 MRAY_KERNEL
-void KCShowTexture(MRAY_GRID_CONSTANT const Span<Float> dPixels,
-                   MRAY_GRID_CONSTANT const Span<Float> dSamples,
-                   MRAY_GRID_CONSTANT const Vector2ui regionMin,
-                   MRAY_GRID_CONSTANT const Vector2ui regionMax,
-                   MRAY_GRID_CONSTANT const Vector2ui resolution,
+void KCShowTexture(MRAY_GRID_CONSTANT const ImageSpan<3> imgSpan,
+                   MRAY_GRID_CONSTANT const Vector2ui tileStart,
+                   MRAY_GRID_CONSTANT const Vector2ui texResolution,
                    MRAY_GRID_CONSTANT const uint32_t mipIndex,
                    MRAY_GRID_CONSTANT const GenericTextureView texView)
 {
     KernelCallParams kp;
 
-    Vector2ui regionSize = regionMax - regionMin;
-    uint32_t totalPix = regionSize.Multiply();
-    assert(totalPix * 3 <= dPixels.size());
-    assert(totalPix <= dSamples.size());
-
-    for(uint32_t wIndexLinear = kp.GlobalId(); wIndexLinear < totalPix;
-        wIndexLinear += kp.TotalSize())
+    Vector2i regionSize = imgSpan.Extent();
+    int32_t totalPix = regionSize.Multiply();
+    // Loop over the output span
+    for(int32_t i = int32_t(kp.GlobalId());
+        i < totalPix; i += int32_t(kp.TotalSize()))
     {
         // Calculate uv coords
-        Vector2 wIndex2D = Vector2(wIndexLinear % regionSize[0],
-                                   wIndexLinear / regionSize[0]);
-        Vector2 rIndex2D = Vector2(regionMin) + wIndex2D + Vector2(0.5);
-        Vector2 uv = rIndex2D / Vector2(resolution);
+        Vector2i localIndexInt = imgSpan.LinearIndexTo2D(i);
+        Vector2 localIndex = Vector2(localIndexInt);
+        Vector2 globalIndex = Vector2(tileStart) + localIndex + Vector2(0.5);
+        Vector2 uv = globalIndex / Vector2(texResolution);
 
         Vector3 result;
         if constexpr(C == 1)
@@ -94,12 +80,8 @@ void KCShowTexture(MRAY_GRID_CONSTANT const Span<Float> dPixels,
             const auto& view = std::get<TracerTexView<2, Vector<C, Float>>>(texView);
             result = Vector3(view(uv, Float(mipIndex)).value());
         }
-
-        uint32_t wIndexFloat = wIndexLinear * 3;
-        dSamples[wIndexLinear] = Float(1);
-        dPixels[wIndexFloat + 0] = result[0];
-        dPixels[wIndexFloat + 1] = result[1];
-        dPixels[wIndexFloat + 2] = result[2];
+        imgSpan.StoreWeight(Float(1), localIndexInt);
+        imgSpan.StorePixel(result, localIndexInt);
     }
 }
 
@@ -223,7 +205,7 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
         .resolution = imageTiler.FullResolution(),
         .depth = renderBuffer->Depth(),
         .curRenderLogic0 = textureIndex,
-        .curRenderLogic1 = std::numeric_limits<uint32_t>::max()
+        .curRenderLogic1 = mipIndex
     };
 }
 
@@ -239,6 +221,8 @@ RendererOutput TexViewRenderer::DoRender()
     using namespace std::string_view_literals;
     const GPUQueue& processQueue = device.GetComputeQueue(0);
 
+    MRAY_LOG("{}", mipIndex);
+
     uint32_t curPixelCount = imageTiler.CurrentTileSize().Multiply();
     // Do not start writing to device side untill copy is complete
     // (device buffer is read fully)
@@ -252,11 +236,8 @@ RendererOutput TexViewRenderer::DoRender()
                 "KCColorTiles"sv,
                 KernelIssueParams{.workCount = curPixelCount},
                 //
-                renderBuffer->Pixels(),
-                renderBuffer->Samples(),
-                imageTiler.CurrentTileIndex().Multiply(),
-                imageTiler.CurrentTileSize(),
-                renderBuffer->ChannelCount()
+                imageTiler.GetTileSpan<3>(),
+                imageTiler.CurrentTileIndex().Multiply()
             );
             break;
         }
@@ -273,10 +254,8 @@ RendererOutput TexViewRenderer::DoRender()
                     "KCShowTexture"sv,
                     KernelIssueParams{.workCount = curPixelCount},
                     //
-                    renderBuffer->Pixels(),
-                    renderBuffer->Samples(),
-                    imageTiler.TileStart(),
-                    imageTiler.TileEnd(),
+                    imageTiler.GetTileSpan<3>(),
+                    imageTiler.LocalTileStart(),
                     imageTiler.FullResolution(),
                     mipIndex,
                     texView
@@ -296,18 +275,14 @@ RendererOutput TexViewRenderer::DoRender()
     // Send the resulting image to host (Acquire synchronization prims)
     const GPUQueue& transferQueue = device.GetTransferQueue();
     Optional<RenderImageSection>
-    renderOut = renderBuffer->TransferToHost(processQueue,
-                                             transferQueue);
-
+    renderOut = imageTiler.TransferToHost(processQueue,
+                                          transferQueue);
     // Semaphore is invalidated, visor is probably crashed
     if(!renderOut.has_value())
         return RendererOutput{};
 
     // Actually set the section parameters
-    renderOut->pixelMin = imageTiler.TileStart();
-    renderOut->pixelMax = imageTiler.TileEnd();
     renderOut->globalWeight = Float(1);
-
     // Now wait, and send the information about timing etc.
     processQueue.Barrier().Wait();
     timer.Split();

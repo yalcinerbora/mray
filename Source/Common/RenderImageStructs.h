@@ -35,8 +35,8 @@ struct RenderImageSection
     uint64_t    waitCounter;
     // Pixel data starts over this offset (this should be almost always zero)
     size_t      pixelStartOffset;
-    // SampleCount start offset over the buffer
-    size_t      sampleStartOffset;
+    // Pixel weights starts from this offset
+    size_t      weightStartOffset;
 };
 
 struct RenderImageSaveInfo

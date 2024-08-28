@@ -826,6 +826,12 @@ void TextureFilterT<E, FF>::ReconstructionFilterRGB(// Output
                                    gpuSystem);
 }
 
+template<FilterType::E E, class FF>
+Vector2ui TextureFilterT<E, FF>::FilterExtent() const
+{
+    return Vector2ui(FilterRadiusToPixelWH(filterRadius));
+}
+
 template TextureFilterT<FilterType::BOX, BoxFilter>;
 template TextureFilterT<FilterType::TENT, TentFilter>;
 template TextureFilterT<FilterType::GAUSSIAN, GaussianFilter>;

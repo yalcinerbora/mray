@@ -9,6 +9,7 @@
 struct RenderImageParams;
 class RenderImage;
 
+
 template <int32_t C>
 class ImageSpan
 {
@@ -16,13 +17,19 @@ class ImageSpan
     Span<Vector<C, Float>> dPixels;
     Span<Float> dWeights;
     Vector2i    extent;
+    Vector2i    rangeStart;
+    Vector2i    rangeEnd;
 
     public:
     MRAY_HOST   ImageSpan(const Span<Vector<C, Float>>& dPixelsIn,
                           const Span<Float>& dWeights,
-                          const Vector2ui& extent);
+                          const Vector2i& extent,
+                          const Vector2i& start,
+                          const Vector2i& end);
     //
     MRAY_HYBRID Vector2i        Extent() const;
+    MRAY_HYBRID Vector2i        Start() const;
+    MRAY_HYBRID Vector2i        End() const;
     MRAY_HYBRID uint32_t        LinearIndexFrom2D(const Vector2i& xy) const;
     MRAY_HYBRID Vector2i        LinearIndexTo2D(uint32_t pixelIndex) const;
     // Sample Related
@@ -42,8 +49,8 @@ class ImageTiler
     public:
     using Range2D = std::array<Vector2ui, 2>;
 
-    static Vector2ui   FindOptimumTile(const Vector2ui& imageSize,
-                                       uint32_t parallelizationHint);
+    static Vector2ui   FindOptimumTileSize(const Vector2ui& imageSize,
+                                           uint32_t parallelizationHint);
 
     private:
     RenderImage* renderBuffer = nullptr;
@@ -51,8 +58,10 @@ class ImageTiler
     // Full image resolution, This single image may be generated
     // by multiple tracers.
     Vector2ui   fullResolution  = Vector2ui::Zero();
-    Range2D     imageRange      = {Vector2ui::Zero(), Vector2ui::Zero()};
-    // Current tile count of the sub range defined above
+    // This is the Image tilers responsible range
+    // This range will be tiled
+    Range2D     range           = {Vector2ui::Zero(), Vector2ui::Zero()};
+    // Current tile count of the range defined above
     Vector2ui   tileCount           = Vector2ui::Zero();
     // Conservative tile size of a single tile
     Vector2ui   coveringTileSize    = Vector2ui::Zero();
@@ -63,8 +72,9 @@ class ImageTiler
     // Initially the first tile is selected
     uint32_t    currentTile         = 0;
 
-    Vector2ui ResponsibleSize() const;
-
+    Vector2ui   ResponsibleSize() const;
+    Vector2ui   GlobalTileStart() const;
+    Vector2ui   GlobalTileEnd() const;
     public:
     // Constructors & Destructor
     ImageTiler() = default;
@@ -75,9 +85,11 @@ class ImageTiler
                uint32_t channels = 3, uint32_t depth = 1);
 
     Vector2ui   FullResolution() const;
-    //Vector2ui   CurrentPaddedTileSize() const;
-    Vector2ui   TileStart() const;
-    Vector2ui   TileEnd() const;
+    Vector2ui   LocalTileStart() const;
+    Vector2ui   LocalTileEnd() const;
+    //Vector2ui   PaddedTileStart() const;
+    //Vector2ui   PaddedTileEnd() const;
+
     Vector2ui   CurrentTileSize() const;
     Vector2ui   CurrentTileIndex() const;
     Vector2ui   TileCount() const;
@@ -85,6 +97,10 @@ class ImageTiler
 
     template<uint32_t C>
     ImageSpan<C>     GetTileSpan();
+
+    Optional<RenderImageSection>
+    TransferToHost(const GPUQueue& processQueue,
+                   const GPUQueue& transferQueue);
 
 };
 
@@ -98,15 +114,15 @@ class RenderImage
     // transfer style was the most performant
     DeviceMemory        deviceMemory;
     Span<Float>         dPixels;
-    Span<Float>         dSamples;
+    Span<Float>         dWeights;
     // We use special "HostLocalAlignedMemory"
     // type here just because of Vulkan.
     HostLocalAlignedMemory  stagingMemory;
     Span<Float>             hPixels;
-    Span<Float>             hSamples;
+    Span<Float>             hWeights;
     //
     size_t              pixStartOffset      = 0;
-    size_t              sampleStartOffset   = 0;
+    size_t              weightStartOffset   = 0;
 
     GPUSemaphoreView    sem;
     GPUFence            processCompleteFence;
@@ -129,7 +145,7 @@ class RenderImage
     // Members
     // Access
     Span<Float>         Pixels();
-    Span<Float>         Samples();
+    Span<Float>         Weights();
     //
     Vector2ui           Extents() const;
     uint32_t            Depth() const;
@@ -149,20 +165,52 @@ class RenderImage
     Pair<const Byte*, size_t> SharedDataPtrAndSize() const;
 };
 
+template<uint32_t C>
+ImageSpan<C> ImageTiler::GetTileSpan()
+{
+    // TODO: Change this
+    Span<Byte> dPixels = Span<Byte>(reinterpret_cast<Byte*>(renderBuffer->Pixels().data()),
+                                   renderBuffer->Pixels().size_bytes());
+
+    auto dPixelsC = MemAlloc::RepurposeAlloc<Vector<C, Float>>(dPixels);
+    return ImageSpan<C>(dPixelsC,
+                        renderBuffer->Weights(),
+                        Vector2i(CurrentTileSize()),
+                        // TODO: Add padding
+                        Vector2i::Zero(),
+                        Vector2i(CurrentTileSize()));
+}
+
 template<int32_t C>
 MRAY_HOST inline
 ImageSpan<C>::ImageSpan(const Span<Vector<C, Float>>& dPixelsIn,
                         const Span<Float>& dWeightsIn,
-                        const Vector2ui& extentIn)
+                        const Vector2i& extentIn,
+                        const Vector2i& startIn,
+                        const Vector2i& endIn)
     : dPixels(dPixelsIn)
     , dWeights(dWeightsIn)
-    , extent(extentIn[0], extentIn[1])
+    , extent(extentIn)
+    , rangeStart(startIn)
+    , rangeEnd(endIn)
 {}
 
 template<int32_t C>
 MRAY_HYBRID Vector2i ImageSpan<C>::Extent() const
 {
     return extent;
+}
+
+template<int32_t C>
+MRAY_HYBRID Vector2i ImageSpan<C>::Start() const
+{
+    return rangeStart;
+}
+
+template<int32_t C>
+MRAY_HYBRID Vector2i ImageSpan<C>::End() const
+{
+    return rangeEnd;
 }
 
 template<int32_t C>
@@ -239,9 +287,9 @@ Span<Float> RenderImage::Pixels()
 }
 
 inline
-Span<Float> RenderImage::Samples()
+Span<Float> RenderImage::Weights()
 {
-    return dSamples;
+    return dWeights;
 }
 
 inline

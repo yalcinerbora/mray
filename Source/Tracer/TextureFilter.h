@@ -44,6 +44,7 @@ class TextureFilterI
                                             // Constants
                                             uint32_t parallelHint,
                                             Float scalarWeightMultiplier) const = 0;
+    virtual Vector2ui FilterExtent() const = 0;
 };
 
 using TexFilterGenerator = GeneratorFuncType<TextureFilterI, const GPUSystem&, float>;
@@ -83,6 +84,8 @@ class TextureFilterT : public TextureFilterI
                                     // Constants
                                     uint32_t parallelHint,
                                     Float scalarWeightMultiplier) const override;
+
+    Vector2ui FilterExtent() const override;
 };
 
 extern template TextureFilterT<FilterType::BOX, BoxFilter>;
