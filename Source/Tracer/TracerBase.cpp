@@ -22,6 +22,23 @@ static constexpr const std::initializer_list FilterGenFuncList =
     FilterGenFuncPack<TextureFilterMitchellNetravali>
 };
 
+template<class T>
+static constexpr auto RNGGenFuncPack = Pair
+<
+    const SamplerType::E,
+    RNGGenerator
+>
+{
+    T::TypeName,
+    &GenerateType<RNGeneratorGroupI, T, Vector2ui, uint32_t,
+                  const GPUSystem&, BS::thread_pool&>
+};
+
+static constexpr std::initializer_list RNGGenFuncList =
+{
+    RNGGenFuncPack<RNGGroupIndependent>
+};
+
 // TODO: This is not good, we need to instantiate
 // to get the virtual function, change this later
 // (change this with what though?)
@@ -74,9 +91,10 @@ void TracerBase::PopulateAttribInfoAndTypeLists()
     InstantiateAndGetAttribInfo(rendererAttributeInfoMap,
                                 typeGenerators.rendererGenerator,
                                 RenderImagePtr(),
-                                RenderWorkPack(),
                                 GenerateTracerView(),
-                                gpuSystem);
+                                *globalThreadPool,
+                                gpuSystem,
+                                RenderWorkPack());
 
     // Light is special so write it by hand
     // Find instantiate the prim again...
@@ -129,6 +147,7 @@ TracerView TracerBase::GenerateTracerView()
         .textureViews = texMem.TextureViews(),
         .tracerParams = params,
         .filterGenerators = filterGenMap,
+        .rngGenerators = rngGenMap,
         .surfs = surfaces.Vec(),
         .lightSurfs = lightSurfaces.Vec(),
         .camSurfs = cameraSurfaces.Vec(),
@@ -138,24 +157,13 @@ TracerView TracerBase::GenerateTracerView()
 
 TracerBase::TracerBase(const TypeGeneratorPack& tGen,
                        const TracerParameters& tParams)
-    : threadPool(nullptr)
+    : globalThreadPool(nullptr)
     , typeGenerators(tGen)
     , params(tParams)
     , filterGenMap(FilterGenFuncList)
+    , rngGenMap(RNGGenFuncList)
     , texMem(gpuSystem, params, filterGenMap)
-{
-    auto EmplaceFilterGen = [this]<class T>()
-    {
-        filterGenMap.emplace(T::TypeName,
-                             &GenerateType<TextureFilterI, T,
-                             const GPUSystem&, Float>);
-    };
-
-    EmplaceFilterGen.operator()<TextureFilterBox>();
-    EmplaceFilterGen.operator()<TextureFilterTent>();
-    EmplaceFilterGen.operator()<TextureFilterGaussian>();
-    EmplaceFilterGen.operator()<TextureFilterMitchellNetravali>();
-}
+{}
 
 TypeNameList TracerBase::PrimitiveGroups() const
 {
@@ -1371,7 +1379,7 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     }
     accelerator = accelGenerator.value().get()
     (
-        *threadPool, gpuSystem,
+        *globalThreadPool, gpuSystem,
         accelGGeneratorMap.value().get(),
         accelWGeneratorMap.value().get()
     );
@@ -1480,9 +1488,10 @@ RendererId TracerBase::CreateRenderer(std::string typeName)
     auto renderer = rendererGen.value()
     (
         renderImage,
-        rendererWorkPack.value(),
         GenerateTracerView(),
-        gpuSystem
+        *globalThreadPool,
+        gpuSystem,
+        rendererWorkPack.value()
     );
     uint32_t rId = redererCounter.fetch_add(1u);
     renderers.try_emplace(RendererId(rId), std::move(renderer));
@@ -1610,7 +1619,7 @@ GPUThreadInitFunction TracerBase::GetThreadInitFunction() const
 
 void TracerBase::SetThreadPool(BS::thread_pool& tp)
 {
-    threadPool = &tp;
+    globalThreadPool = &tp;
 }
 
 size_t TracerBase::TotalDeviceMemory() const

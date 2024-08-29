@@ -60,6 +60,7 @@ class CameraGroupPinhole : public GenericGroupCamera<CameraGroupPinhole>
     public:
     using DataSoA   = CameraDetail::CamPinholeData;
     using Camera    = CameraDetail::CameraPinhole;
+    static constexpr uint32_t SampleRayRNCount = Camera::SampleRayRNCount;
 
     private:
     Span<Vector4>   dFovAndPlanes;

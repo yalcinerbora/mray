@@ -22,6 +22,8 @@
 
 #include "Common/RenderImageStructs.h"
 
+namespace BS { class thread_pool; }
+
 // A nasty forward declaration
 class GenericGroupPrimitiveT;
 class GenericGroupCameraT;
@@ -56,10 +58,13 @@ struct TracerView
     const IdPtrMap<MatGroupId, GenericGroupMaterialT>&      matGroups;
     const IdPtrMap<TransGroupId, GenericGroupTransformT>&   transGroups;
     const IdPtrMap<LightGroupId, GenericGroupLightT>&       lightGroups;
-    const TextureMap&                                       textures;
-    const TextureViewMap&                                   textureViews;
-    const TracerParameters&                                 tracerParams;
-    const FilterGeneratorMap&                               filterGenerators;
+
+    const TextureMap&               textures;
+    const TextureViewMap&           textureViews;
+    const TracerParameters&         tracerParams;
+    const FilterGeneratorMap&       filterGenerators;
+    const RNGGeneratorMap&          rngGenerators;
+
     const std::vector<Pair<SurfaceId, SurfaceParams>>&              surfs;
     const std::vector<Pair<LightSurfaceId, LightSurfaceParams>>&    lightSurfs;
     const std::vector<Pair<CamSurfaceId, CameraSurfaceParams>>&     camSurfs;
@@ -79,7 +84,8 @@ class RenderCameraWorkI
     public:
     virtual ~RenderCameraWorkI() = default;
 
-    virtual std::string_view Name() const = 0;
+    virtual std::string_view    Name() const = 0;
+    virtual uint32_t            SampleRayRNCount() const = 0;
 };
 
 class RenderLightWorkI
@@ -116,6 +122,7 @@ concept RendererC = requires(RendererType rt,
                              const TracerView& tv,
                              const typename RendererType::RayPayload& rPayload,
                              TransientData input,
+                             BS::thread_pool& tp,
                              const GPUSystem& gpuSystem,
                              const GPUQueue& q)
 {
@@ -132,7 +139,7 @@ concept RendererC = requires(RendererType rt,
     typename RendererType::AttribInfoList;
 
     // CPU Side
-    RendererType(RenderImagePtr{}, RenderWorkPack{}, tv, gpuSystem);
+    RendererType(RenderImagePtr{}, tv, tp, gpuSystem, RenderWorkPack{});
     {rt.AttributeInfo()
     } -> std::same_as<typename RendererType::AttribInfoList>;
     {rt.PushAttribute(uint32_t{}, std::move(input), q)
@@ -452,6 +459,7 @@ class RendererT : public RendererI
     uint32_t                GenerateCameraWorkMappings(uint32_t workIdStart);
 
     protected:
+    BS::thread_pool&        globalThreadPool;
     const GPUSystem&        gpuSystem;
     TracerView              tracerView;
     const RenderImagePtr&   renderBuffer;
@@ -473,7 +481,8 @@ class RendererT : public RendererI
     public:
                         RendererT(const RenderImagePtr&,
                                   const RenderWorkPack& workPacks,
-                                  TracerView, const GPUSystem&);
+                                  TracerView, const GPUSystem&,
+                                  BS::thread_pool&);
     std::string_view    Name() const override;
 };
 
@@ -917,8 +926,10 @@ RenderWorkHasher RendererT<C>::InitializeHashes(Span<uint32_t> dHashes,
 template <class C>
 RendererT<C>::RendererT(const RenderImagePtr& rb,
                         const RenderWorkPack& wp,
-                        TracerView tv, const GPUSystem& s)
-    : gpuSystem(s)
+                        TracerView tv, const GPUSystem& s,
+                        BS::thread_pool& tp)
+    : globalThreadPool(tp)
+    , gpuSystem(s)
     , tracerView(tv)
     , renderBuffer(rb)
     , workPack(wp)

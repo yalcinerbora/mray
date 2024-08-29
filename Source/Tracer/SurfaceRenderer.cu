@@ -37,9 +37,11 @@ void KCGenerateWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKe
 }
 
 SurfaceRenderer::SurfaceRenderer(const RenderImagePtr& rb,
-                                 const RenderWorkPack& wp,
-                                 TracerView tv, const GPUSystem& s)
-    : RendererT(rb, wp, tv, s)
+                                 TracerView tv,
+                                 BS::thread_pool& tp,
+                                 const GPUSystem& s,
+                                 const RenderWorkPack& wp)
+    : RendererT(rb, wp, tv, s, tp)
     , rayPartitioner(s)
     , redererGlobalMem(s.AllGPUs(), 32_MiB, 512_MiB)
 {}
@@ -99,7 +101,9 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     // Generate the Filter
     auto FilterGen = tracerView.filterGenerators.at(tracerView.tracerParams.filmFilter.type);
     if(!FilterGen)
-        throw MRayError("[{}]: Unkown filter type {}.");
+        throw MRayError("[{}]: Unkown film filter type {}.",
+                        SurfaceRenderer::TypeName(),
+                        uint32_t(tracerView.tracerParams.filmFilter.type));
     Float radius = tracerView.tracerParams.filmFilter.radius;
     filmFilter = FilterGen->get()(gpuSystem, Float(radius));
     Vector2ui filterPadSize = filmFilter->FilterExtent();
@@ -117,32 +121,6 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     // Generate Works to get the total work count
     // We will batch allocate
     uint32_t totalWorkCount = GenerateWorks();
-
-    // Allocate the ray state buffers
-    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
-    // Find the ray count (1spp per tile)
-    uint32_t rayCount = imageTiler.ConservativeTileSize().Multiply();
-    MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys, dRays,
-                                         dRayDifferentials,
-                                         dRayState.dImageCoordinates,
-                                         dRayState.dOutputData,
-                                         dWorkHashes, dWorkBatchIds,
-                                         dSubCameraBuffer),
-                                redererGlobalMem,
-                                {rayCount, rayCount, rayCount,
-                                 rayCount, rayCount, rayCount,
-                                 totalWorkCount, totalWorkCount,
-                                 SUB_CAMERA_BUFFER_SIZE});
-    // And initialze the hashes
-    workHasher = InitializeHashes(dWorkHashes, dWorkBatchIds, queue);
-
-    // Initialize ray partitioner with worst case scenario,
-    // All work types are used. (We do not use camera work
-    // for this type of renderer)
-    uint32_t maxWorkCount = uint32_t(currentWorks.size() +
-                                     currentLightWorks.size());
-    rayPartitioner = RayPartitioner(gpuSystem, rayCount,
-                                    maxWorkCount);
 
     // Find camera surface and get keys work instance for that
     // camera etc.
@@ -167,6 +145,44 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
         return pack.idPack == Pair(camGroupId, transGroupId);
     });
     curCamWork = &packLoc->workPtr;
+
+    // Allocate the ray state buffers
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
+    // Find the ray count (1spp per tile)
+    uint32_t rayCount = imageTiler.ConservativeTileSize().Multiply();
+    MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys, dRays,
+                                         dRayDifferentials,
+                                         dRayState.dImageCoordinates,
+                                         dRayState.dOutputData,
+                                         dCamGenRandomNums,
+                                         dWorkHashes, dWorkBatchIds,
+                                         dSubCameraBuffer),
+                                redererGlobalMem,
+                                {rayCount, rayCount, rayCount,
+                                 rayCount, rayCount, rayCount,
+                                 rayCount * (*curCamWork)->SampleRayRNCount(),
+                                 totalWorkCount, totalWorkCount,
+                                 SUB_CAMERA_BUFFER_SIZE});
+    // And initialze the hashes
+    workHasher = InitializeHashes(dWorkHashes, dWorkBatchIds, queue);
+
+    // Initialize ray partitioner with worst case scenario,
+    // All work types are used. (We do not use camera work
+    // for this type of renderer)
+    uint32_t maxWorkCount = uint32_t(currentWorks.size() +
+                                     currentLightWorks.size());
+    rayPartitioner = RayPartitioner(gpuSystem, rayCount,
+                                    maxWorkCount);
+
+    // Finally generate RNG
+    auto RngGen = tracerView.rngGenerators.at(tracerView.tracerParams.samplerType.type);
+    if(!RngGen)
+        throw MRayError("[{}]: Unkown random number generator type {}.",
+                        SurfaceRenderer::TypeName(),
+                        uint32_t(tracerView.tracerParams.samplerType.type));
+    Vector2ui generatorCount = rIP.regionMax - rIP.regionMin;
+    rnGenerator = RngGen->get()(std::move(generatorCount), tracerView.tracerParams.seed,
+                                gpuSystem, globalThreadPool);
 
     auto bufferPtrAndSize = renderBuffer->SharedDataPtrAndSize();
     return RenderBufferInfo
@@ -212,17 +228,31 @@ RendererOutput SurfaceRenderer::DoRender()
 
     // Create RNG state for each ray
     // Generate rays
-    Span<const RandomNumber> dRandomNumbers;
-    Span<BackupRNGState> dBackupRNGStates;
+    //cameraWork.RNGCount();
+    rnGenerator->SetupDeviceRange(imageTiler.LocalTileStart(),
+                                  imageTiler.LocalTileEnd());
+
+    // TODO:
+    // -We need to allocate this
+    // -We need to programattical get the dimension count
+    // from the camera work
+    rnGenerator->CopyStatesToGPUAsync(processQueue);
+    rnGenerator->GenerateNumbers(dCamGenRandomNums,
+                                 (*curCamWork)->SampleRayRNCount(),
+                                 processQueue);
 
     cameraWork.GenerateRays(dRayDifferentials, dRays, EmptyType{},
-                            dRayState, dIndices, dRandomNumbers,
+                            dRayState, dIndices,
+                            ToConstSpan(dCamGenRandomNums),
                             dSubCameraBuffer, curCamTransformKey,
                             globalPixelIndex, imageTiler.CurrentTileSize(),
                             processQueue);
     globalPixelIndex += rayCount;
+    // Save the states back (we will issue next tile after on next iteration)
+    rnGenerator->CopyStatesFromGPUAsync(processQueue);
 
     // Cast rays
+    Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
     tracerView.baseAccelerator.CastRays(dHitKeys, dHits, dBackupRNGStates,
                                         dRays, dIndices);
 
@@ -287,7 +317,7 @@ RendererOutput SurfaceRenderer::DoRender()
                              RayPayload{},
                              dRayState,
                              dLocalIndices,
-                             dRandomNumbers,
+                             Span<const RandomNumber>{},
                              dRayDifferentials,
                              dRays,
                              dHits,
@@ -301,7 +331,7 @@ RendererOutput SurfaceRenderer::DoRender()
             const auto& workPtr = *lightWLoc->workPtr.get();
             workPtr.DoBoundaryWork_0(dRayState,
                                      dLocalIndices,
-                                     dRandomNumbers,
+                                     Span<const RandomNumber>{},
                                      dRayDifferentials,
                                      dRays,
                                      dHits,
@@ -310,7 +340,6 @@ RendererOutput SurfaceRenderer::DoRender()
                                      globalState,
                                      processQueue);
         }
-        // If camera work, ignore
     }
 
     // Filter the samples

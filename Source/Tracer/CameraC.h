@@ -49,9 +49,10 @@ concept CameraGroupC = requires(CGType cg)
     // Internal Camera type that satisfies its concept
     typename CGType::Camera;
     requires CameraC<typename CGType::Camera>;
+    CGType::SampleRayRNCount;
 
-    // SoA fashion light data. This will be used to access internal
-    // of the light with a given an index
+    // SoA fashion camera data. This will be used to access internal
+    // of the camera with a given an index
     typename CGType::DataSoA;
     requires std::is_same_v<typename CGType::DataSoA,
                             typename CGType::Camera::DataSoA>;

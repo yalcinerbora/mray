@@ -1,14 +1,18 @@
 #pragma once
 
 #include <cstdint>
+
 #include "Core/Vector.h"
 #include "Core/BitFunctions.h"
+#include "Core/TypeGenFunction.h"
+#include "Core/TracerI.h"
 
 #include "Device/GPUSystem.h"
 #include "Device/GPUMemory.h"
 
 #include "TracerTypes.h"
 
+namespace BS { class thread_pool; }
 
 namespace RNGFunctions::HashPCG64
 {
@@ -180,52 +184,86 @@ class PermutedCG32
 using BackupRNG = PermutedCG32;
 using BackupRNGState = typename PermutedCG32::State;
 
-//static_assert(RNGeneratorC<PermutedCG32>,
-//              "PermutedCG32 does not satisfy RNGenerator concept!");
-
-class RNGeneratorI
+class RNGeneratorGroupI
 {
     public:
-    virtual ~RNGeneratorI() = default;
+    virtual         ~RNGeneratorGroupI() = default;
 
-    virtual void GenerateNumbers(Span<RandomNumber> numbersOut,
-                                 Span<const ImageCoordinate> dPixelCoords,
-                                 Vector2ui tileStart,
-                                 Vector2ui tileEnd,
-                                 Vector2ui fullSize,
-                                 uint32_t dimensionCount,
-                                 const GPUQueue& queue) = 0;
+    virtual void    SetupDeviceRange(Vector2ui start, Vector2ui end) = 0;
+    virtual void    CopyStatesToGPUAsync(const GPUQueue& queue) = 0;
+    virtual void    CopyStatesFromGPUAsync(const GPUQueue& queue) = 0;
+
+    virtual void    GenerateNumbers(// Output
+                                    Span<RandomNumber> dNumbersOut,
+                                    // Constants
+                                    uint32_t dimensionCount,
+                                    const GPUQueue& queue) = 0;
+    virtual void    GenerateNumbersIndirect(// Output
+                                    Span<RandomNumber> dNumbersOut,
+                                    // Input
+                                    Span<const RayIndex> dIndices,
+                                    // Constants
+                                    uint32_t dimensionCount,
+                                    const GPUQueue& queue) = 0;
+
+    virtual Span<BackupRNGState> GetBackupStates() = 0;
     virtual size_t UsedGPUMemory() const = 0;
 };
 
-using RNGeneratorPtr = std::unique_ptr<RNGeneratorI>;
+using RNGGenerator = GeneratorFuncType<RNGeneratorGroupI, Vector2ui, uint32_t,
+                                       const GPUSystem&, BS::thread_pool&>;
+using RNGeneratorPtr = std::unique_ptr<RNGeneratorGroupI>;
+using RNGGeneratorMap = Map<typename SamplerType::E, RNGGenerator>;
 
-class RNGGroupIndependent : public RNGeneratorI
+class RNGGroupIndependent : public RNGeneratorGroupI
 {
     public:
     using MainRNG       = PermutedCG32;
     using MainRNGState  = typename MainRNG::State;
-    static std::string_view TypeName();
+    static constexpr typename SamplerType::E TypeName = SamplerType::INDEPENDENT;;
 
     private:
+    BS::thread_pool&        mainThreadPool;
     const GPUSystem&        gpuSystem;
-    DeviceMemory            memory;
+    // Due to tiling, we save the all state of the
+    // entire image in host side.
+    // This will copy the data to required HW side
+    HostLocalMemory         hostMemory;
+    Vector2ui               size2D;
+    Span<BackupRNGState>    hBackupStates;
+    Span<MainRNGState>      hMainStates;
+
+    DeviceMemory            deviceMemory;
     Span<BackupRNGState>    dBackupStates;
     Span<MainRNGState>      dMainStates;
+    Vector2ui               deviceRangeStart;
+    Vector2ui               deviceRangeEnd;
 
     public:
     // Constructors & Destructor
-            RNGGroupIndependent(size_t generatorCount,
+            RNGGroupIndependent(Vector2ui generatorCount2D,
                                 uint32_t seed,
-                                const GPUSystem& system);
+                                const GPUSystem& system,
+                                BS::thread_pool& mainThreadPool);
 
-    void    GenerateNumbers(Span<RandomNumber> numbersOut,
-                            Span<const ImageCoordinate> dPixelCoords,
-                            Vector2ui tileStart,
-                            Vector2ui tileEnd,
-                            Vector2ui fullSize,
+    void    SetupDeviceRange(Vector2ui start, Vector2ui end) override;
+    void    CopyStatesToGPUAsync(const GPUQueue& queue) override;
+    void    CopyStatesFromGPUAsync(const GPUQueue& queue) override;
+
+    void    GenerateNumbers(// Output
+                            Span<RandomNumber> dNumbersOut,
+                            // Constants
                             uint32_t dimensionCount,
                             const GPUQueue& queue) override;
+    void    GenerateNumbersIndirect(// Output
+                                    Span<RandomNumber> numbersOut,
+                                    // Input
+                                    Span<const RayIndex> dIndices,
+                                    // Constants
+                                    uint32_t dimensionCount,
+                                    const GPUQueue& queue) override;
+
+    Span<BackupRNGState> GetBackupStates() override;
     size_t  UsedGPUMemory() const override;
 };
 

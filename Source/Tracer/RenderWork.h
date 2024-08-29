@@ -237,6 +237,7 @@ class RenderCameraWork : public RenderCameraWorkT<R>
                          const GPUQueue& queue) const override;
 
     std::string_view    Name() const override;
+    uint32_t            SampleRayRNCount() const override;
 };
 
 template<RendererC R, PrimitiveGroupC PG,
@@ -564,6 +565,12 @@ template<RendererC R, CameraGroupC C, TransformGroupC T>
 std::string_view RenderCameraWork<R, C, T>::Name() const
 {
     return TypeName();
+}
+
+template<RendererC R, CameraGroupC C, TransformGroupC T>
+uint32_t RenderCameraWork<R, C, T>::SampleRayRNCount() const
+{
+    return C::SampleRayRNCount;
 }
 
 template<RendererC R, PrimitiveGroupC PG,

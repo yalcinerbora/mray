@@ -86,9 +86,11 @@ void KCShowTexture(MRAY_GRID_CONSTANT const ImageSpan<3> imgSpan,
 }
 
 TexViewRenderer::TexViewRenderer(const RenderImagePtr& rb,
-                                 const RenderWorkPack& wp,
-                                 TracerView tv, const GPUSystem& s)
-    : RendererT(rb, wp, tv, s)
+                                 TracerView tv,
+                                 BS::thread_pool& tp,
+                                 const GPUSystem& s,
+                                 const RenderWorkPack& wp)
+    : RendererT(rb, wp, tv, s, tp)
 {
     // Pre-generate list
     textures.clear();

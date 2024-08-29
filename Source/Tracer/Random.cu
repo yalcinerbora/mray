@@ -4,38 +4,28 @@
 
 #include "Device/GPUSystem.hpp"
 
+#include <BS/BS_thread_pool.hpp>
+
 MRAY_KERNEL
-void KCGenerateRandomNumbersPCG32(// Output
-                                  Span<RandomNumber> dNumbers,
-                                  // I-O
-                                  Span<typename PermutedCG32::State> dStates,
-                                  // Input
-                                  Span<const ImageCoordinate> dTileLocalPixelIds,
-                                  Vector2ui tileStart,
-                                  Vector2ui tileEnd,
-                                  Vector2ui fullSize,
-                                  uint32_t dimPerGenerator)
+void KCGenRandomNumbersPCG32(// Output
+                             Span<RandomNumber> dNumbers,
+                             // I-O
+                             Span<typename PermutedCG32::State> dStates,
+                             // Constants
+                             uint32_t dimPerGenerator)
 {
-    assert(dTileLocalPixelIds.size() * dimPerGenerator == dNumbers.size());
+    assert(dNumbers.size() == dStates.size() * dimPerGenerator);
     using State = typename PermutedCG32::State;
 
-    uint32_t generatorCount = uint32_t(dTileLocalPixelIds.size());
+    uint32_t generatorCount = uint32_t(dStates.size());
     KernelCallParams kp;
     for(uint32_t i = kp.GlobalId(); i < generatorCount;
         i += kp.TotalSize())
     {
         // Get the state
-        // This pixel index is relative to the tile
-        Vector2ui pixelIndex = Vector2ui(dTileLocalPixelIds[i].pixelIndex);
-        assert(pixelIndex < tileEnd);
-
-        Vector2ui globalIndex = tileStart + pixelIndex;
-        uint32_t globalLinearIndex = (globalIndex[1] * fullSize[0]
-                                      + globalIndex[0]);
-
         // Save the in register space so every generation do not pound the
         // global memory (Probably it will get optimized bu w/e).
-        State state = dStates[globalLinearIndex];
+        State state = dStates[i];
         PermutedCG32 rng(state);
         // PCG32 do not have concept of dimensionality (technically you can
         // hold a state for each dimension but for a path tracer it is infeasible).
@@ -51,68 +41,201 @@ void KCGenerateRandomNumbersPCG32(// Output
     }
 }
 
-std::string_view RNGGroupIndependent::TypeName()
+MRAY_KERNEL
+void KCGenRandomNumbersPCG32Indirect(// Output
+                                     Span<RandomNumber> dNumbers,
+                                     // I-O
+                                     Span<typename PermutedCG32::State> dStates,
+                                     // Input
+                                     Span<const RayIndex> dIndices,
+                                     // Constants
+                                     uint32_t dimPerGenerator)
 {
-    using namespace std::string_view_literals;
-    static constexpr auto Name = "Independent"sv;
-    return Name;
+    assert(dNumbers.size() == dIndices.size() * dimPerGenerator);
+    using State = typename PermutedCG32::State;
+
+    uint32_t generatorCount = uint32_t(dIndices.size());
+    KernelCallParams kp;
+    for(uint32_t i = kp.GlobalId(); i < generatorCount;
+        i += kp.TotalSize())
+    {
+        // Get the state
+        RayIndex index = dIndices[i];
+        // Save the in register space so every generation do not pound the
+        // global memory (Probably it will get optimized bu w/e).
+        assert(index < dStates.size());
+        State state = dStates[index];
+        PermutedCG32 rng(state);
+        // PCG32 do not have concept of dimensionality (technically you can
+        // hold a state for each dimension but for a path tracer it is infeasible).
+        //
+        // So we just generate numbers using a single state
+        for(uint32_t n = 0; n < dimPerGenerator; n++)
+        {
+            // Write in strided fashion to coalesce mem
+            dNumbers[i + dimPerGenerator * n] = rng.Next();
+        }
+        // Write the modified state
+        dStates[i] = state;
+    }
 }
 
-RNGGroupIndependent::RNGGroupIndependent(size_t generatorCount,
+RNGGroupIndependent::RNGGroupIndependent(Vector2ui generatorCount2D,
                                          uint32_t seed,
-                                         const GPUSystem& sys)
-    : gpuSystem(sys)
-    , memory(gpuSystem.AllGPUs(), 2_MiB, 64_MiB, false)
+                                         const GPUSystem& sys,
+                                         BS::thread_pool& tp)
+    : mainThreadPool(tp)
+    , gpuSystem(sys)
+    , hostMemory(gpuSystem, true)
+    , size2D(generatorCount2D)
+    , deviceMemory(gpuSystem.AllGPUs(), 2_MiB, 32_MiB)
 {
-    MemAlloc::AllocateMultiData(std::tie(dBackupStates, dMainStates),
-                                memory,
-                                {generatorCount, generatorCount});
+    size_t totalSize = size2D.Multiply();
 
-    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
+    MemAlloc::AllocateMultiData(std::tie(hBackupStates, hMainStates),
+                                hostMemory, {totalSize, totalSize});
 
-    std::mt19937 rng(seed);
-    std::vector<MainRNGState> hMainRNGStates(generatorCount);
+    // These are const to catch race conditions etc.
+    const std::mt19937 rng0(seed);
+    std::mt19937 rngTemp = rng0;
 
-    for(auto& state : hMainRNGStates)
-        state = MainRNG::GenerateState(rng());
-    Span<const MainRNGState> hMainRNGStateSpan(hMainRNGStates);
-    queue.MemcpyAsync(dMainStates, hMainRNGStateSpan);
+    auto future0 = tp.submit_blocks(size_t(0), totalSize,
+    [&rng0, this](size_t start, size_t end)
+    {
+        // Local copy to the stack
+        // (same functor will be run with different threads, so this
+        // prevents the race condition)
+        auto rngLocal = rng0;
+        rngLocal.discard(start);
+        for(size_t i = start; i < end; i++)
+        {
+            hMainStates[i] = MainRNG::GenerateState(rngLocal());
+        }
+    }, 4u);
 
-    std::vector<BackupRNGState> hBackupRNGStates(generatorCount);
-    for(auto& state : hBackupRNGStates)
-        state = BackupRNG::GenerateState(rng());
-    Span<const BackupRNGState> hBackupRNGStateSpan(hMainRNGStates);
-    queue.MemcpyAsync(dBackupStates, hBackupRNGStateSpan);
+    // Do discarding after issue (it should be logN for PRNGS)
+    rngTemp.discard(totalSize);
+    const std::mt19937 rng1 = rngTemp;
 
-    queue.Barrier().Wait();
+    auto future1 = tp.submit_blocks(size_t(0), totalSize,
+    [&rng1, this](size_t start, size_t end)
+    {
+        // Local copy to the stack
+        // (same functor will be run with different threads, so this
+        // prevents the race condition)
+        auto rngLocal = rng1;
+        rngLocal.discard(start);
+        for(size_t i = start; i < end; i++)
+        {
+            hMainStates[i] = MainRNG::GenerateState(rngLocal());
+        }
+    }, 4u);
+
+    future0.wait();
+    future1.wait();
 }
 
-void RNGGroupIndependent::GenerateNumbers(Span<RandomNumber> numbersOut,
-                                          Span<const ImageCoordinate> dPixelCoords,
-                                          Vector2ui tileStart,
-                                          Vector2ui tileEnd,
-                                          Vector2ui fullSize,
+void RNGGroupIndependent::SetupDeviceRange(Vector2ui start, Vector2ui end)
+{
+    deviceRangeStart = start;
+    deviceRangeEnd = end;
+    uint32_t totalSize = (deviceRangeEnd - deviceRangeStart).Multiply();
+    MemAlloc::AllocateMultiData(std::tie(dBackupStates,
+                                         dMainStates),
+                                deviceMemory,
+                                {totalSize, totalSize});
+}
+
+void RNGGroupIndependent::CopyStatesToGPUAsync(const GPUQueue& queue)
+{
+    Vector2ui range = deviceRangeEnd - deviceRangeStart;
+
+    size_t sourceStride = (size2D[1] - size2D[0]);
+    size_t destStride = range[0];
+    size_t sourceOffset = deviceRangeStart[0] + deviceRangeStart[1] * size2D[0];
+
+    auto hBackupStatesConst = ToConstSpan(hBackupStates);
+    auto hBackupStatesIn = hBackupStatesConst.subspan(sourceOffset, range.Multiply());
+
+    queue.MemcpyAsyncStrided(dBackupStates,
+                             destStride * sizeof(BackupRNGState),
+                             hBackupStatesIn,
+                             sourceStride * sizeof(BackupRNGState));
+
+    auto hMainStatesConst = ToConstSpan(hMainStates);
+    auto hMainStatesIn = hMainStatesConst.subspan(sourceOffset, range.Multiply());
+    queue.MemcpyAsyncStrided(dMainStates, destStride,
+                             hMainStatesIn, sourceStride);
+}
+
+void RNGGroupIndependent::CopyStatesFromGPUAsync(const GPUQueue& queue)
+{
+    Vector2ui range = deviceRangeEnd - deviceRangeStart;
+
+    size_t destStride = (size2D[1] - size2D[0]);
+    size_t sourceStride = range[0];
+    size_t destOffset = deviceRangeStart[0] + deviceRangeStart[1] * size2D[0];
+
+    auto hBackupStatesOut = hBackupStates.subspan(destOffset, range.Multiply());
+    queue.MemcpyAsyncStrided(hBackupStatesOut,
+                             sourceStride * sizeof(BackupRNGState),
+                             ToConstSpan(dBackupStates),
+                             destStride * sizeof(BackupRNGState));
+
+    auto hMainStatesOut = hMainStates.subspan(destOffset, range.Multiply());
+    queue.MemcpyAsyncStrided(hMainStatesOut,
+                             destStride * sizeof(MainRNGState),
+                             ToConstSpan(dMainStates),
+                             sourceStride * sizeof(MainRNGState));
+}
+
+void RNGGroupIndependent::GenerateNumbers(// Output
+                                          Span<RandomNumber> dNumbersOut,
+                                          // Constants
                                           uint32_t dimensionCount,
                                           const GPUQueue& queue)
 {
-    uint32_t generatorCount = uint32_t(dPixelCoords.size());
+    uint32_t generatorCount = uint32_t(dMainStates.size());
     using namespace std::string_view_literals;
-    queue.IssueSaturatingKernel<KCGenerateRandomNumbersPCG32>
+    queue.IssueSaturatingKernel<KCGenRandomNumbersPCG32>
     (
-        "KCGenerateRandomNumbersPCG32"sv,
+        "KCGenRandomNumbersPCG32"sv,
         KernelIssueParams{.workCount = generatorCount},
         //
-        numbersOut,
+        dNumbersOut,
         dMainStates,
-        dPixelCoords,
-        tileStart,
-        tileEnd,
-        fullSize,
         dimensionCount
     );
 }
 
+void RNGGroupIndependent::GenerateNumbersIndirect(// Output
+                                                  Span<RandomNumber> dNumbersOut,
+                                                  // Input
+                                                  Span<const RayIndex> dIndices,
+                                                  // Constants
+                                                  uint32_t dimensionCount,
+                                                  const GPUQueue& queue)
+{
+    uint32_t generatorCount = uint32_t(dMainStates.size());
+    using namespace std::string_view_literals;
+    queue.IssueSaturatingKernel<KCGenRandomNumbersPCG32Indirect>
+    (
+        "KCGenRandomNumbersPCG32Indirect"sv,
+        KernelIssueParams{.workCount = generatorCount},
+        //
+        dNumbersOut,
+        dMainStates,
+        dIndices,
+        dimensionCount
+    );
+}
+
+Span<BackupRNGState> RNGGroupIndependent::GetBackupStates()
+{
+    return dBackupStates;
+}
+
 size_t RNGGroupIndependent::UsedGPUMemory() const
 {
-    return memory.Size();
+    return deviceMemory.Size();
 }

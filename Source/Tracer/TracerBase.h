@@ -14,6 +14,7 @@
 #include "AcceleratorC.h"
 #include "TextureMemory.h"
 #include "TextureFilter.h"
+#include "Random.h"
 
 namespace BS { class thread_pool; }
 
@@ -32,8 +33,10 @@ using LightGenerator    = GeneratorFuncType<GenericGroupLightT, uint32_t,
                                             GenericGroupPrimitiveT&>;
 using RendererGenerator = GeneratorFuncType<RendererI,
                                             const RenderImagePtr&,
-                                            const RenderWorkPack&,
-                                            TracerView, const GPUSystem&>;
+                                            TracerView,
+                                            BS::thread_pool&,
+                                            const GPUSystem&,
+                                            const RenderWorkPack&>;
 using BaseAccelGenerator = GeneratorFuncType<BaseAcceleratorI,
                                              BS::thread_pool&,
                                              const GPUSystem&,
@@ -112,7 +115,7 @@ class TracerBase : public TracerI
     std::atomic_uint32_t    camSurfaceCounter   = 0;
 
     protected:
-    BS::thread_pool*    threadPool;
+    BS::thread_pool*    globalThreadPool;
 
     // Supported Types
     TypeNameList        primTypes;
@@ -127,6 +130,8 @@ class TracerBase : public TracerI
     const TypeGeneratorPack&   typeGenerators;
     // This is common type generator so this is seperate
     FilterGeneratorMap  filterGenMap;
+    //
+    RNGGeneratorMap     rngGenMap;
     // Loaded Parameters
     TracerParameters    params;
     // Texture Related

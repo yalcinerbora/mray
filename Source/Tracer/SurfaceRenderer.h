@@ -113,13 +113,14 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     uint64_t                    globalPixelIndex = 0;
     //
     RayPartitioner              rayPartitioner;
-    RNGeneratorPtr              rngGenerator;
+    RNGeneratorPtr              rnGenerator;
     //
     DeviceMemory                redererGlobalMem;
     Span<MetaHit>               dHits;
     Span<HitKeyPack>            dHitKeys;
     Span<RayGMem>               dRays;
     Span<RayDiff>               dRayDifferentials;
+    Span<RandomNumber>          dCamGenRandomNums;
     Span<Byte>                  dSubCameraBuffer;
     RayState                    dRayState;
     // Work Hash related
@@ -129,8 +130,10 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     public:
     // Constructors & Destructor
                         SurfaceRenderer(const RenderImagePtr&,
-                                        const RenderWorkPack& wp,
-                                        TracerView, const GPUSystem&);
+                                        TracerView,
+                                        BS::thread_pool&,
+                                        const GPUSystem&,
+                                        const RenderWorkPack&);
                         SurfaceRenderer(const SurfaceRenderer&) = delete;
                         SurfaceRenderer(SurfaceRenderer&&) = delete;
     SurfaceRenderer&    operator=(const SurfaceRenderer&) = delete;
@@ -165,7 +168,7 @@ inline
 size_t SurfaceRenderer::GPUMemoryUsage() const
 {
     return (rayPartitioner.UsedGPUMemory() +
-            rngGenerator->UsedGPUMemory() +
+            rnGenerator->UsedGPUMemory() +
             redererGlobalMem.Size());
 }
 
