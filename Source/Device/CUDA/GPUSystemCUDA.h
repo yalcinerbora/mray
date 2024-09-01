@@ -306,6 +306,10 @@ class GPUQueueCUDA
     template <class T>
     MRAY_HOST void      MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const;
     template <class T>
+    MRAY_HOST void      MemcpyAsync2D(Span<T> regionTo, size_t toStride,
+                                      Span<const T> regionFrom, size_t fromStride,
+                                      Vector2ui copySize) const;
+    template <class T>
     MRAY_HOST void      MemcpyAsyncStrided(Span<T> regionTo, size_t outputByteStride,
                                            Span<const T> regionFrom, size_t inputByteStride) const;
     template <class T>
@@ -587,8 +591,33 @@ void GPUQueueCUDA::MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const
 }
 
 template <class T>
-MRAY_HOST void GPUQueueCUDA::MemcpyAsyncStrided(Span<T> regionTo, size_t outputByteStride,
-                                                Span<const T> regionFrom, size_t inputByteStride) const
+MRAY_HOST
+void GPUQueueCUDA::MemcpyAsync2D(Span<T> regionTo, size_t toStride,
+                                 Span<const T> regionFrom, size_t fromStride,
+                                 Vector2ui copySize) const
+{
+    assert(toStride * copySize[1] <= regionTo.size());
+    assert(fromStride * copySize[1] <= regionFrom.size());
+    assert(toStride >= copySize[0]);
+    assert(fromStride >= copySize[0]);
+
+    size_t inStrideBytes = toStride * sizeof(T);
+    size_t outStrideBytes = fromStride * sizeof(T);
+    size_t copyWidthBytes = copySize[0] * sizeof(T);
+
+    cudaMemcpy2DAsync(regionTo.data(),
+                      inStrideBytes,
+                      regionFrom.data(),
+                      outStrideBytes,
+                      copyWidthBytes, copySize[1],
+                      cudaMemcpyDefault,
+                      stream);
+}
+
+template <class T>
+MRAY_HOST
+void GPUQueueCUDA::MemcpyAsyncStrided(Span<T> regionTo, size_t outputByteStride,
+                                      Span<const T> regionFrom, size_t inputByteStride) const
 {
     // TODO: This may have performance implications maybe,
     // test it. We utilize "1" width 2D copy to emulate strided memcpy.

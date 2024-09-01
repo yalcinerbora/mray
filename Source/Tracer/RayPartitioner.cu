@@ -259,7 +259,7 @@ RayPartitioner::InitialBuffers RayPartitioner::Start(uint32_t rayCountIn,
     maxPartitionCount = maxPartitionCountIn;
 
     size_t tempMemSizeIf = DeviceAlgorithms::BinPartitionTMSize<CommonKey>(rayCount);
-    size_t tempMemSizeSort = DeviceAlgorithms::RadixSortTMSize<false, CommonKey, CommonIndex>(rayCount);
+    size_t tempMemSizeSort = DeviceAlgorithms::RadixSortTMSize<true, CommonKey, CommonIndex>(rayCount);
     size_t totalTempMemSize = std::max(tempMemSizeIf, tempMemSizeSort);
 
     if(isResultsInHostVisible)
@@ -308,6 +308,8 @@ RayPartitioner::InitialBuffers RayPartitioner::Start(uint32_t rayCountIn,
     };
 }
 
+#include "Device/GPUDebug.h"
+
 MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
                                                     Span<CommonIndex> dIndicesIn,
                                                     const Vector2ui& keyDataBitRange,
@@ -331,17 +333,17 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
     if(!onlySortForBatches)
     {
         assert(keyDataBitRange[0] != keyDataBitRange[1]);
-        uint32_t outIndex = RadixSort<false>(Span<Span<CommonKey>, 2>(dKeysDB),
-                                             Span<Span<CommonIndex>, 2>(dIndicesDB),
-                                             dTempMemory, queue,
-                                             keyDataBitRange);
+        uint32_t outIndex = RadixSort<true>(Span<Span<CommonKey>, 2>(dKeysDB),
+                                            Span<Span<CommonIndex>, 2>(dIndicesDB),
+                                            dTempMemory, queue,
+                                            keyDataBitRange);
         if(outIndex == 1) std::swap(dKeysDB[0], dKeysDB[1]);
     }
     // Then sort batch portion
-    uint32_t outIndex = RadixSort<false>(Span<Span<CommonKey>, 2>(dKeysDB),
-                                         Span<Span<CommonIndex>, 2>(dIndicesDB),
-                                         dTempMemory, queue,
-                                         keyBatchBitRange);
+    uint32_t outIndex = RadixSort<true>(Span<Span<CommonKey>, 2>(dKeysDB),
+                                        Span<Span<CommonIndex>, 2>(dIndicesDB),
+                                        dTempMemory, queue,
+                                        keyBatchBitRange);
     if(outIndex == 1) std::swap(dKeysDB[0], dKeysDB[1]);
 
 
@@ -381,6 +383,33 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
 
     Span<uint32_t> hdPartitionStartOffsets = (isResultsInHostVisible) ? hPartitionStartOffsets : dPartitionStartOffsets;
     Span<uint32_t> hdPartitionKeys = (isResultsInHostVisible) ? hPartitionKeys : dPartitionKeys;
+
+    // Debug check to find if partition count
+    // found out is more than the set maximum.
+    // This is debug only since we need to sync with the GPU
+    //
+    if constexpr(MRAY_IS_DEBUG)
+    {
+        uint32_t foundPartitionCount;
+        if(!isResultsInHostVisible)
+        {
+            queue.MemcpyAsync(Span<uint32_t>(&foundPartitionCount, 1),
+                              Span<const uint32_t>(hPartCountStatic));
+            queue.Barrier().Wait();
+        }
+        else
+        {
+
+            queue.Barrier().Wait();
+            foundPartitionCount = hPartCountStatic[0];
+        }
+        assert(foundPartitionCount <= hdPartitionKeys.size());
+    }
+
+    //DeviceDebug::DumpGPUMemToFile("dSortedKeys",
+    //                              ToConstSpan(dSortedKeys), queue);
+    //DeviceDebug::DumpGPUMemToFile("dDenseSplitIndices", ToConstSpan(dDenseSplitIndices), queue);
+
 
     // Mark the split positions
     queue.IssueKernel<KCFindBinMatIds>

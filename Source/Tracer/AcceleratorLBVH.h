@@ -235,7 +235,8 @@ class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
                      Span<BackupRNGState> rngStates,
                      Span<RayGMem> dRays,
                      // Input
-                     Span<const RayIndex> dRayIndices) override;
+                     Span<const RayIndex> dRayIndices,
+                     const GPUQueue& queue) override;
 
     void    CastShadowRays(// Output
                            Bitspan<uint32_t> dIsVisibleBuffer,
@@ -244,7 +245,8 @@ class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
                            Span<BackupRNGState> rngStates,
                            // Input
                            Span<const RayIndex> dRayIndices,
-                           Span<const RayGMem> dShadowRays) override;
+                           Span<const RayGMem> dShadowRays,
+                           const GPUQueue& queue) override;
 
     void    CastLocalRays(// Output
                           Span<HitKeyPack> dHitIds,
@@ -254,7 +256,8 @@ class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
                           // Input
                           Span<const RayGMem> dRays,
                           Span<const RayIndex> dRayIndices,
-                          Span<const AcceleratorKey> dAccelIdPacks) override;
+                          Span<const AcceleratorKey> dAccelIdPacks,
+                          const GPUQueue& queue) override;
 
     void    AllocateForTraversal(size_t maxRayCount) override;
     size_t  GPUMemoryUsage() const override;

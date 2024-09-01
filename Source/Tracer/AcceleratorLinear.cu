@@ -6,7 +6,7 @@
 
 #include "Core/Error.hpp"
 
-#include "KeyFormat.h"
+#include "TypeFormat.h"
 
 // Generic PrimitiveKey copy kernel
 // TODO: find a way to put this somewhere proper
@@ -128,6 +128,7 @@ AABB3 BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instan
                                          localCount);
         auto dLeafRegion = dLeafs.subspan(instanceOffsets[i], localCount);
         aGroup->WriteInstanceKeysAndAABBs(dAABBRegion, dLeafRegion, qIt.Queue());
+
         i++;
         qIt.Next();
     }
@@ -163,11 +164,15 @@ void BaseAcceleratorLinear::AllocateForTraversal(size_t maxRayCount)
     {
         return pair.second->InstanceTypeCount();
     });
+    // We need one more potential partition which is "miss" partition
+    maxPartitionCount++;
 
     rayPartitioner = RayPartitioner(gpuSystem, static_cast<uint32_t>(maxRayCount),
                                     static_cast<uint32_t>(maxPartitionCount));
     MemAlloc::AllocateMultiData(std::tie(dTraversalStack), stackMem, {maxRayCount});
 }
+
+#include "Device/GPUDebug.h"
 
 void BaseAcceleratorLinear::CastRays(// Output
                                      Span<HitKeyPack> dHitIds,
@@ -176,11 +181,14 @@ void BaseAcceleratorLinear::CastRays(// Output
                                      Span<BackupRNGState> rngStates,
                                      Span<RayGMem> dRays,
                                      // Input
-                                     Span<const RayIndex> dRayIndices)
+                                     Span<const RayIndex> dRayIndices,
+                                     const GPUQueue& queue)
 {
+    assert(maxPartitionCount != 0);
     using namespace std::string_view_literals;
-    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     queue.MemsetAsync(dTraversalStack, 0x00);
+
+    //DeviceDebug::DumpGPUMemToFile("dRays", ToConstSpan(dRays), queue);
 
     // Initialize the ray partitioner
     uint32_t currentRayCount = static_cast<uint32_t>(dRays.size());
@@ -210,6 +218,9 @@ void BaseAcceleratorLinear::CastRays(// Output
             ToConstSpan(dLeafs),
             ToConstSpan(dAABBs)
         );
+
+        //DeviceDebug::DumpGPUMemToFile("dCurKeys", ToConstSpan(dCurrentKeys), queue);
+        //DeviceDebug::DumpGPUMemToFile("dStack", ToConstSpan(dTraversalStack), queue);
 
         static constexpr CommonKey IdBits = AcceleratorKey::IdBits;
         static constexpr CommonKey BatchBits = AcceleratorKey::IdBits;
@@ -259,7 +270,7 @@ void BaseAcceleratorLinear::CastRays(// Output
                 auto accelGroupOpt = accelInstances.at(key.FetchBatchPortion());
                 if(!accelGroupOpt)
                 {
-                    throw MRayError("BaseAccelerator: Unknown accelerator key {}", key);
+                    throw MRayError("BaseAccelerator: Unknown accelerator key {}", HexKeyT(key));
                 }
                 AcceleratorGroupI* accelGroup = accelGroupOpt.value().get();
                 accelGroup->CastLocalRays(// Output
@@ -286,7 +297,8 @@ void BaseAcceleratorLinear::CastShadowRays(// Output
                                            Span<BackupRNGState> rngStates,
                                            // Input
                                            Span<const RayIndex> dRayIndices,
-                                           Span<const RayGMem> dShadowRays)
+                                           Span<const RayGMem> dShadowRays,
+                                           const GPUQueue& queue)
 {
 
 }
@@ -299,7 +311,8 @@ void BaseAcceleratorLinear::CastLocalRays(// Output
                                           // Input
                                           Span<const RayGMem> dRays,
                                           Span<const RayIndex> dRayIndices,
-                                          Span<const AcceleratorKey> dAccelIdPacks)
+                                          Span<const AcceleratorKey> dAccelIdPacks,
+                                          const GPUQueue& queue)
 {
 
 }

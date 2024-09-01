@@ -16,7 +16,7 @@ CameraPinhole::CameraPinhole(const DataSoA& soa, CameraKey key)
 
     // Find world space window sizes
     float widthHalf = tanf(fov[0] * Float(0.5)) * nearFar[0];
-    float heightHalf = tanf(fov[1] * Float(0.5)) * nearFar[1];
+    float heightHalf = tanf(fov[1] * Float(0.5)) * nearFar[0];
 
     // Camera Vector Correction
     gazeDir = gaze - position;

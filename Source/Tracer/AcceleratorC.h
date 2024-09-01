@@ -359,7 +359,7 @@ class AcceleratorGroupT : public AcceleratorGroupI
 
     PreprocessResult            PreprocessConstructionParams(const AccelGroupConstructParams& p);
     template<class T>
-    std::vector<Span<T>>        CreateInstanceLeafSubspans(Span<T> fullRange);
+    std::vector<Span<const T>>  CreateInstanceLeafSubspansConst(Span<T> fullRange);
     void                        WriteInstanceKeysAndAABBsInternal(Span<AABB3> aabbWriteRegion,
                                                                   Span<AcceleratorKey> keyWriteRegion,
                                                                   // Input
@@ -400,7 +400,8 @@ class BaseAcceleratorI
                              Span<BackupRNGState> rngStates,
                              Span<RayGMem> dRays,
                              // Input
-                             Span<const RayIndex> dRayIndices) = 0;
+                             Span<const RayIndex> dRayIndices,
+                             const GPUQueue& queue) = 0;
     // Fully cast rays to entire scene return true/false
     // If it hits to a surface
     virtual void    CastShadowRays(// Output
@@ -410,7 +411,8 @@ class BaseAcceleratorI
                                    Span<BackupRNGState> rngStates,
                                    // Input
                                    Span<const RayIndex> dRayIndices,
-                                   Span<const RayGMem> dShadowRays) = 0;
+                                   Span<const RayGMem> dShadowRays,
+                                   const GPUQueue& queue) = 0;
     // Locally cast rays to a accelerator instances
     // This is multi-ray multi-accelerator instance
     virtual void    CastLocalRays(// Output
@@ -421,7 +423,8 @@ class BaseAcceleratorI
                                   // Input
                                   Span<const RayGMem> dRays,
                                   Span<const RayIndex> dRayIndices,
-                                  Span<const AcceleratorKey> dAccelIdPacks) = 0;
+                                  Span<const AcceleratorKey> dAccelIdPacks,
+                                  const GPUQueue& queue) = 0;
 
     // Construction
     virtual void    Construct(BaseAccelConstructParams) = 0;
@@ -457,7 +460,7 @@ class BaseAcceleratorT : public BaseAcceleratorI
     const AccelGroupGenMap&             accelGenerators;
     const AccelWorkGenMap&              workGenGlobalMap;
     Map<uint32_t, AccelGroupPtr>        generatedAccels;
-    Map<uint32_t, AcceleratorGroupI*>   accelInstances;
+    Map<CommonKey, AcceleratorGroupI*>  accelInstances;
 
     virtual AABB3       InternalConstruct(const std::vector<size_t>& instanceOffsets) = 0;
 
@@ -707,16 +710,16 @@ AccelLeafResult AcceleratorGroupT<C, PG>::DetermineConcreteAccelCount(std::vecto
 
 template<class C, PrimitiveGroupC PG>
 template<class T>
-std::vector<Span<T>>
-AcceleratorGroupT<C, PG>::CreateInstanceLeafSubspans(Span<T> fullRange)
+std::vector<Span<const T>>
+AcceleratorGroupT<C, PG>::CreateInstanceLeafSubspansConst(Span<T> fullRange)
 {
-    std::vector<Span<T>> instanceLeafData(instanceLeafRanges.size());
+    std::vector<Span<const T>> instanceLeafData(instanceLeafRanges.size());
     std::transform(instanceLeafRanges.cbegin(), instanceLeafRanges.cend(),
                    instanceLeafData.begin(),
                    [fullRange](const Vector2ui& offset)
     {
         uint32_t size = offset[1] - offset[0];
-        return fullRange.subspan(offset[0], size);
+        return ToConstSpan(fullRange.subspan(offset[0], size));
     });
     return instanceLeafData;
 }
@@ -989,36 +992,40 @@ void AcceleratorGroupT<C, PG>::WriteInstanceKeysAndAABBsInternal(Span<AABB3> aab
                                                    dLocalTKeys,
                                                    queue);
         }
+
+        // TODO: This is actually common part, but compiler gives unreachable code error
+        // due to below part is not yet implemented. So it is moved here untill that portion is
+        // implemented.
+        //
+        // Now, copy (and transform) concreteAABBs (which are on local space)
+        // to actual accelerator instance aabb's (after transform these will be
+        // in world space)
+        for(const auto& kv : workInstances)
+        {
+            uint32_t index = kv.first;
+            size_t size = (workInstanceOffsets[index + 1] -
+                           workInstanceOffsets[index]);
+            // Copy the keys as well
+            Span<AcceleratorKey> dLocalKeyWriteRegion = keyWriteRegion.subspan(workInstanceOffsets[index], size);
+            uint32_t accelBatchId = globalWorkIdToLocalOffset + index;
+            using namespace std::string_literals;
+            static const auto KernelName = "KCCopyLocalAccelKeys-"s + std::string(C::TypeName());
+
+            queue.IssueSaturatingLambda
+            (
+                KernelName,
+                KernelIssueParams{.workCount = static_cast<uint32_t>(size)},
+                KeyGeneratorFunctor(accelBatchId, dLocalKeyWriteRegion)
+            );
+        }
+        //  Don't forget to wait for temp memory!
+        queue.Barrier().Wait();
     }
     else
     {
         throw MRayError("{}: PER_PRIM_TRANSFORM Accel Construct not yet implemented",
                         C::TypeName());
     }
-
-    // Now, copy (and transform) concreteAABBs (which are on local space)
-    // to actual accelerator instance aabb's (after transform these will be
-    // in world space)
-    for(const auto& kv : workInstances)
-    {
-        uint32_t index = kv.first;
-        size_t size = (workInstanceOffsets[index + 1] -
-                       workInstanceOffsets[index]);
-        // Copy the keys as well
-        Span<AcceleratorKey> dLocalKeyWriteRegion = keyWriteRegion.subspan(workInstanceOffsets[index], size);
-        uint32_t accelBatchId = globalWorkIdToLocalOffset + index;
-        using namespace std::string_literals;
-        static const auto KernelName = "KCCopyLocalAccelKeys-"s + std::string(C::TypeName());
-
-        queue.IssueSaturatingLambda
-        (
-            KernelName,
-            KernelIssueParams{.workCount = static_cast<uint32_t>(size)},
-            KeyGeneratorFunctor(accelBatchId, dLocalKeyWriteRegion)
-        );
-    }
-    //  Don't forget to wait for temp memory!
-    queue.Barrier().Wait();
 }
 
 template<class C, PrimitiveGroupC PG>
@@ -1267,10 +1274,13 @@ void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
     uint32_t i = 0;
     for(auto& group : generatedAccels)
     {
-        group.second->SetKeyOffset(keyOffsets[i]);
+        AcceleratorGroupI* aGroup = group.second.get();
+        aGroup->SetKeyOffset(keyOffsets[i]);
+        for(uint32_t key = keyOffsets[i]; key < keyOffsets[i + 1]; key++)
+            accelInstances.emplace(key, aGroup);
+
         i++;
     }
-
     // Find the maximum bits used on key
     uint32_t keyBatchPortionMax = keyOffsets.back();
     uint32_t keyIdPortionMax = std::transform_reduce(generatedAccels.cbegin(),

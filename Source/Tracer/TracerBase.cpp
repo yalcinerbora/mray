@@ -30,7 +30,7 @@ static constexpr auto RNGGenFuncPack = Pair
 >
 {
     T::TypeName,
-    &GenerateType<RNGeneratorGroupI, T, Vector2ui, uint32_t,
+    &GenerateType<RNGeneratorGroupI, T, Vector2ui, uint64_t,
                   const GPUSystem&, BS::thread_pool&>
 };
 

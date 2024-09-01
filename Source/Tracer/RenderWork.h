@@ -528,14 +528,14 @@ void RenderCameraWork<R, C, T>::GenerateRays(// Output
     using RayPayload = typename R::RayPayload;
     using RayState = typename R::RayState;
     using Camera = typename C::Camera;
-    assert(dRayIndices.size() == dRandomNums.size());
-    assert(dCamBuffer.size_bytes() <= sizeof(Camera));
+    assert(dRayIndices.size() * Camera::SampleRayRNCount == dRandomNums.size());
+    assert(sizeof(Camera) <= dCamBuffer.size_bytes());
     assert(uintptr_t(dCamBuffer.data()) % alignof(Camera) == 0);
     const Camera* dCamera = reinterpret_cast<const Camera*>(dCamBuffer.data());
 
     uint32_t rayCount = static_cast<uint32_t>(dRayIndices.size());
-    static constexpr auto Kernel = KCGenerateCamRays<R::RayStateInitFunc,
-                                                     RayPayload, RayState,
+    static constexpr auto Kernel = KCGenerateCamRays<RayPayload, RayState,
+                                                     R::RayStateInitFunc,
                                                      Camera, T>;
     using namespace std::string_literals;
     static const std::string KernelName = std::string(TypeName()) + "-GenRays"s;

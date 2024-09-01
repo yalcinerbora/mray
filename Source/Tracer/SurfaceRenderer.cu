@@ -5,6 +5,10 @@
 #include "Core/Timer.h"
 
 #include "Device/GPUSystem.hpp"
+#include "Device/GPUAlgGeneric.h"
+
+// TODO: Remove later
+#include "TypeFormat.h"
 
 MRAY_KERNEL
 void KCGenerateWorkKeys(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
@@ -149,7 +153,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     // Allocate the ray state buffers
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     // Find the ray count (1spp per tile)
-    uint32_t rayCount = imageTiler.ConservativeTileSize().Multiply();
+    uint32_t maxRayCount = imageTiler.ConservativeTileSize().Multiply();
     MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys, dRays,
                                          dRayDifferentials,
                                          dRayState.dImageCoordinates,
@@ -158,9 +162,9 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
                                          dWorkHashes, dWorkBatchIds,
                                          dSubCameraBuffer),
                                 redererGlobalMem,
-                                {rayCount, rayCount, rayCount,
-                                 rayCount, rayCount, rayCount,
-                                 rayCount * (*curCamWork)->SampleRayRNCount(),
+                                {maxRayCount, maxRayCount, maxRayCount,
+                                 maxRayCount, maxRayCount, maxRayCount,
+                                 maxRayCount* (*curCamWork)->SampleRayRNCount(),
                                  totalWorkCount, totalWorkCount,
                                  SUB_CAMERA_BUFFER_SIZE});
     // And initialze the hashes
@@ -171,8 +175,12 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     // for this type of renderer)
     uint32_t maxWorkCount = uint32_t(currentWorks.size() +
                                      currentLightWorks.size());
-    rayPartitioner = RayPartitioner(gpuSystem, rayCount,
+    rayPartitioner = RayPartitioner(gpuSystem, maxRayCount,
                                     maxWorkCount);
+
+    // Also allocate for the partitioner inside the
+    // base accelerator (This should not allocate for HW accelerators)
+    tracerView.baseAccelerator.AllocateForTraversal(maxRayCount);
 
     // Finally generate RNG
     auto RngGen = tracerView.rngGenerators.at(tracerView.tracerParams.samplerType.type);
@@ -181,7 +189,9 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
                         SurfaceRenderer::TypeName(),
                         uint32_t(tracerView.tracerParams.samplerType.type));
     Vector2ui generatorCount = rIP.regionMax - rIP.regionMin;
-    rnGenerator = RngGen->get()(std::move(generatorCount), tracerView.tracerParams.seed,
+    uint64_t seed = tracerView.tracerParams.seed;
+    rnGenerator = RngGen->get()(std::move(generatorCount),
+                                std::move(seed),
                                 gpuSystem, globalThreadPool);
 
     auto bufferPtrAndSize = renderBuffer->SharedDataPtrAndSize();
@@ -195,8 +205,9 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
         .curRenderLogic0 = newMode,
         .curRenderLogic1 = std::numeric_limits<uint32_t>::max()
     };
-
 }
+
+#include "Device/GPUDebug.h"
 
 RendererOutput SurfaceRenderer::DoRender()
 {
@@ -226,16 +237,15 @@ RendererOutput SurfaceRenderer::DoRender()
     uint32_t maxWorkCount = uint32_t(currentWorks.size() + currentLightWorks.size());
     auto[dIndices, dKeys] = rayPartitioner.Start(rayCount, maxWorkCount, true);
 
+    // Iota the indices
+    DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
+
     // Create RNG state for each ray
     // Generate rays
-    //cameraWork.RNGCount();
     rnGenerator->SetupDeviceRange(imageTiler.LocalTileStart(),
                                   imageTiler.LocalTileEnd());
 
-    // TODO:
-    // -We need to allocate this
-    // -We need to programattical get the dimension count
-    // from the camera work
+    // Generate RN for camera rays
     rnGenerator->CopyStatesToGPUAsync(processQueue);
     rnGenerator->GenerateNumbers(dCamGenRandomNums,
                                  (*curCamWork)->SampleRayRNCount(),
@@ -254,7 +264,9 @@ RendererOutput SurfaceRenderer::DoRender()
     // Cast rays
     Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
     tracerView.baseAccelerator.CastRays(dHitKeys, dHits, dBackupRNGStates,
-                                        dRays, dIndices);
+                                        dRays, dIndices, processQueue);
+
+    DeviceDebug::DumpGPUMemToFile("dHitKeys", ToConstSpan(dHitKeys), processQueue);
 
     // Generate work keys from hit packs
     using namespace std::string_literals;

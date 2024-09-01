@@ -184,16 +184,16 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
                                  this->InstanceCount(), this->InstanceCount(),
                                  this->concreteLeafRanges.back()[1]});
     // Generate offset spans
-    using PrimKeySpanList = std::vector<Span<PrimitiveKey>>;
-    PrimKeySpanList hInstanceLeafs = this->CreateInstanceLeafSubspans(dAllLeafs);
+    using PrimKeySpanList = std::vector<Span<const PrimitiveKey>>;
+    PrimKeySpanList hInstanceLeafs = this->CreateInstanceLeafSubspansConst(dAllLeafs);
 
     // Actual memcpy
-    Span<CullFaceFlagArray>     hSpanCullFaceFlags(ppResult.surfData.cullFaceFlags);
-    Span<AlphaMapArray>         hSpanAlphaMaps(ppResult.surfData.alphaMaps);
-    Span<LightOrMatKeyArray>    hSpanLMKeys(ppResult.surfData.lightOrMatKeys);
-    Span<PrimRangeArray>        hSpanPrimitiveRanges(ppResult.surfData.primRanges);
-    Span<TransformKey>          hSpanTransformKeys(ppResult.surfData.transformKeys);
-    Span<Span<PrimitiveKey>>    hSpanLeafs(hInstanceLeafs);
+    Span<CullFaceFlagArray>         hSpanCullFaceFlags(ppResult.surfData.cullFaceFlags);
+    Span<AlphaMapArray>             hSpanAlphaMaps(ppResult.surfData.alphaMaps);
+    Span<LightOrMatKeyArray>        hSpanLMKeys(ppResult.surfData.lightOrMatKeys);
+    Span<PrimRangeArray>            hSpanPrimitiveRanges(ppResult.surfData.primRanges);
+    Span<TransformKey>              hSpanTransformKeys(ppResult.surfData.transformKeys);
+    Span<Span<const PrimitiveKey>>  hSpanLeafs(hInstanceLeafs);
     queue.MemcpyAsync(dCullFaceFlags,   ToConstSpan(hSpanCullFaceFlags));
     queue.MemcpyAsync(dAlphaMaps,       ToConstSpan(hSpanAlphaMaps));
     queue.MemcpyAsync(dLightOrMatKeys,  ToConstSpan(hSpanLMKeys));
@@ -232,6 +232,18 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
         // Constant
         this->pg.GroupId()
     );
+
+    data = DataSoA
+    {
+        .dCullFace              = ToConstSpan(dCullFaceFlags),
+        .dAlphaMaps             = ToConstSpan(dAlphaMaps),
+        .dLightOrMatKeys        = ToConstSpan(dLightOrMatKeys),
+        .dPrimitiveRanges       = ToConstSpan(dPrimitiveRanges),
+        .dInstanceTransforms    = ToConstSpan(dTransformKeys),
+        .dLeafs                 = ToConstSpan(dLeafs)
+    };
+
+
     // We have temp memory + async memcopies,
     // we need to wait here.
     queue.Barrier().Wait();

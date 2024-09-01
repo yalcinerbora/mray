@@ -210,7 +210,7 @@ class RNGeneratorGroupI
     virtual size_t UsedGPUMemory() const = 0;
 };
 
-using RNGGenerator = GeneratorFuncType<RNGeneratorGroupI, Vector2ui, uint32_t,
+using RNGGenerator = GeneratorFuncType<RNGeneratorGroupI, Vector2ui, uint64_t,
                                        const GPUSystem&, BS::thread_pool&>;
 using RNGeneratorPtr = std::unique_ptr<RNGeneratorGroupI>;
 using RNGGeneratorMap = Map<typename SamplerType::E, RNGGenerator>;
@@ -242,7 +242,7 @@ class RNGGroupIndependent : public RNGeneratorGroupI
     public:
     // Constructors & Destructor
             RNGGroupIndependent(Vector2ui generatorCount2D,
-                                uint32_t seed,
+                                uint64_t seed,
                                 const GPUSystem& system,
                                 BS::thread_pool& mainThreadPool);
 

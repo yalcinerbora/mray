@@ -59,7 +59,7 @@ namespace SurfRDetail
 
     MRAY_HYBRID
     void InitRayState(const RayPayload&, const RayState&,
-                      uint32_t writeIndex, const RaySample&);
+                      const RaySample&, uint32_t writeIndex);
 }
 
 class SurfaceRenderer final : public RendererT<SurfaceRenderer>
@@ -193,8 +193,8 @@ void SurfRDetail::LightWorkFunction(const Light& light,
 MRAY_HYBRID MRAY_CGPU_INLINE
 void SurfRDetail::InitRayState(const RayPayload&,
                                const RayState& dStates,
-                               uint32_t writeIndex,
-                               const RaySample& raySample)
+                               const RaySample& raySample,
+                               uint32_t writeIndex)
 {
     dStates.dImageCoordinates[writeIndex] = raySample.value.imgCoords;
 }

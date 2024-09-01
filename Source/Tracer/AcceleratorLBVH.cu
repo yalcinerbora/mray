@@ -9,7 +9,7 @@
 #include "Core/GraphicsFunctions.h"
 #include "Core/Error.hpp"
 
-#include "KeyFormat.h"
+#include "TypeFormat.h"
 
 struct MortonDiffFunctor
 {
@@ -173,10 +173,10 @@ void BaseAcceleratorLBVH::CastRays(// Output
                                    Span<BackupRNGState> rngStates,
                                    Span<RayGMem> dRays,
                                    // Input
-                                   Span<const RayIndex> dRayIndices)
+                                   Span<const RayIndex> dRayIndices,
+                                   const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
-    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     queue.MemsetAsync(dTraversalStack, 0x00);
 
     // Initialize the ray partitioner
@@ -256,7 +256,7 @@ void BaseAcceleratorLBVH::CastRays(// Output
                 auto accelGroupOpt = accelInstances.at(key.FetchBatchPortion());
                 if(!accelGroupOpt)
                 {
-                    throw MRayError("BaseAccelerator: Unknown accelerator key {}", key);
+                    throw MRayError("BaseAccelerator: Unknown accelerator key {}", HexKeyT(key));
                 }
                 AcceleratorGroupI* accelGroup = accelGroupOpt.value().get();
                 accelGroup->CastLocalRays(// Output
@@ -283,7 +283,8 @@ void BaseAcceleratorLBVH::CastShadowRays(// Output
                                          Span<BackupRNGState> rngStates,
                                          // Input
                                          Span<const RayIndex> dRayIndices,
-                                         Span<const RayGMem> dShadowRays)
+                                         Span<const RayGMem> dShadowRays,
+                                         const GPUQueue& queue)
 {
 
 }
@@ -296,7 +297,8 @@ void BaseAcceleratorLBVH::CastLocalRays(// Output
                                         // Input
                                         Span<const RayGMem> dRays,
                                         Span<const RayIndex> dRayIndices,
-                                        Span<const AcceleratorKey> dAccelIdPacks)
+                                        Span<const AcceleratorKey> dAccelIdPacks,
+                                        const GPUQueue& queue)
 {
 
 }

@@ -81,7 +81,7 @@ void KCGenRandomNumbersPCG32Indirect(// Output
 }
 
 RNGGroupIndependent::RNGGroupIndependent(Vector2ui generatorCount2D,
-                                         uint32_t seed,
+                                         uint64_t seed,
                                          const GPUSystem& sys,
                                          BS::thread_pool& tp)
     : mainThreadPool(tp)
@@ -96,7 +96,9 @@ RNGGroupIndependent::RNGGroupIndependent(Vector2ui generatorCount2D,
                                 hostMemory, {totalSize, totalSize});
 
     // These are const to catch race conditions etc.
-    const std::mt19937 rng0(seed);
+    // TODO: Change this later
+    uint32_t seed32 = static_cast<uint32_t>((seed >> 32) ^ (seed & 0xFFFFFFFF));
+    const std::mt19937 rng0(seed32);
     std::mt19937 rngTemp = rng0;
 
     auto future0 = tp.submit_blocks(size_t(0), totalSize,
@@ -127,7 +129,7 @@ RNGGroupIndependent::RNGGroupIndependent(Vector2ui generatorCount2D,
         rngLocal.discard(start);
         for(size_t i = start; i < end; i++)
         {
-            hMainStates[i] = MainRNG::GenerateState(rngLocal());
+            hBackupStates[i] = BackupRNG::GenerateState(rngLocal());
         }
     }, 4u);
 
@@ -149,44 +151,45 @@ void RNGGroupIndependent::SetupDeviceRange(Vector2ui start, Vector2ui end)
 void RNGGroupIndependent::CopyStatesToGPUAsync(const GPUQueue& queue)
 {
     Vector2ui range = deviceRangeEnd - deviceRangeStart;
+    size_t srcStride = size2D[0];
+    size_t dstStride = range[0];
+    size_t srcOffset = deviceRangeStart[0] + deviceRangeStart[1] * size2D[0];
+    size_t srcEnd = range[0] + (deviceRangeEnd[1] - 1) * size2D[0];
+    size_t srcSizeLinear = srcEnd - srcOffset;
 
-    size_t sourceStride = (size2D[1] - size2D[0]);
-    size_t destStride = range[0];
-    size_t sourceOffset = deviceRangeStart[0] + deviceRangeStart[1] * size2D[0];
+    auto dstBackupSpan = dBackupStates;
+    auto srcBackupSpan = hBackupStates.subspan(srcOffset, srcSizeLinear);
+    queue.MemcpyAsync2D(dstBackupSpan, dstStride,
+                        ToConstSpan(srcBackupSpan), srcStride,
+                        range);
 
-    auto hBackupStatesConst = ToConstSpan(hBackupStates);
-    auto hBackupStatesIn = hBackupStatesConst.subspan(sourceOffset, range.Multiply());
-
-    queue.MemcpyAsyncStrided(dBackupStates,
-                             destStride * sizeof(BackupRNGState),
-                             hBackupStatesIn,
-                             sourceStride * sizeof(BackupRNGState));
-
-    auto hMainStatesConst = ToConstSpan(hMainStates);
-    auto hMainStatesIn = hMainStatesConst.subspan(sourceOffset, range.Multiply());
-    queue.MemcpyAsyncStrided(dMainStates, destStride,
-                             hMainStatesIn, sourceStride);
+    auto dstMainSpan = dMainStates;
+    auto srcMainSpan = hMainStates.subspan(srcOffset, srcSizeLinear);
+    queue.MemcpyAsync2D(dstMainSpan , dstStride,
+                        ToConstSpan(srcMainSpan), srcStride,
+                        range);
 }
 
 void RNGGroupIndependent::CopyStatesFromGPUAsync(const GPUQueue& queue)
 {
     Vector2ui range = deviceRangeEnd - deviceRangeStart;
+    size_t dstStride = size2D[0];
+    size_t srcStride = range[0];
+    size_t dstOffset = deviceRangeStart[0] + deviceRangeStart[1] * size2D[0];
+    size_t dstEnd = range[0] + (deviceRangeEnd[1] - 1) * size2D[0];
+    size_t dstSizeLinear = dstEnd - dstOffset;
 
-    size_t destStride = (size2D[1] - size2D[0]);
-    size_t sourceStride = range[0];
-    size_t destOffset = deviceRangeStart[0] + deviceRangeStart[1] * size2D[0];
+    auto srcBackupSpan = dBackupStates;
+    auto dstBackupSpan = hBackupStates.subspan(dstOffset, dstSizeLinear);
+    queue.MemcpyAsync2D(dstBackupSpan, dstStride,
+                        ToConstSpan(srcBackupSpan), srcStride,
+                        range);
 
-    auto hBackupStatesOut = hBackupStates.subspan(destOffset, range.Multiply());
-    queue.MemcpyAsyncStrided(hBackupStatesOut,
-                             sourceStride * sizeof(BackupRNGState),
-                             ToConstSpan(dBackupStates),
-                             destStride * sizeof(BackupRNGState));
-
-    auto hMainStatesOut = hMainStates.subspan(destOffset, range.Multiply());
-    queue.MemcpyAsyncStrided(hMainStatesOut,
-                             destStride * sizeof(MainRNGState),
-                             ToConstSpan(dMainStates),
-                             sourceStride * sizeof(MainRNGState));
+    auto srcMainSpan = dMainStates;
+    auto dstMainSpan = hMainStates.subspan(dstOffset, dstSizeLinear);
+    queue.MemcpyAsync2D(dstMainSpan, dstStride,
+                        ToConstSpan(srcMainSpan), srcStride,
+                        range);
 }
 
 void RNGGroupIndependent::GenerateNumbers(// Output

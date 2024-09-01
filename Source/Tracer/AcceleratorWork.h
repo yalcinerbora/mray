@@ -208,9 +208,11 @@ void AcceleratorWork<AG, TG>::CastLocalRays(// Output
                                             // Constants
                                             const GPUQueue& queue) const
 {
-    assert(dRays.size() == dRayIndices.size());
+    assert(dHitIds.size() == dHitParams.size());
+    assert(dHitParams.size() == rngStates.size());
+    assert(rngStates.size() == dRays.size());
+    //
     assert(dRayIndices.size() == dAcceleratorKeys.size());
-    assert(dAcceleratorKeys.size() == dHitIds.size());
 
     using namespace std::string_literals;
     queue.IssueSaturatingKernel<KCLocalRayCast<AG, TG>>
