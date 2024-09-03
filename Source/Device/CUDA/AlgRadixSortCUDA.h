@@ -72,9 +72,9 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
     assert(dKeyDoubleBuffer[0].size() == dValueDoubleBuffer[0].size());
 
     DoubleBuffer<K> keys(dKeyDoubleBuffer[0].data(),
-                            dKeyDoubleBuffer[1].data());
+                         dKeyDoubleBuffer[1].data());
     DoubleBuffer<V> values(dValueDoubleBuffer[0].data(),
-                            dValueDoubleBuffer[1].data());
+                           dValueDoubleBuffer[1].data());
 
     size_t size = dTempMemory.size();
     if constexpr(IsAscending)
@@ -90,7 +90,9 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
                                                         bitRange[1],
                                                         ToHandleCUDA(queue)));
 
-    return (keys.Current() == dKeyDoubleBuffer[0].data()) ? 0 : 1;
+    uint32_t result = (keys.Current() == dKeyDoubleBuffer[0].data()) ? 0u : 1u;
+    assert(((values.Current() == dValueDoubleBuffer[0].data()) ? 0u : 1u) == result);
+    return result;
 }
 
 

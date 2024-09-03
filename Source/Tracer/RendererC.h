@@ -65,6 +65,7 @@ struct TracerView
     const FilterGeneratorMap&       filterGenerators;
     const RNGGeneratorMap&          rngGenerators;
 
+    const LightSurfaceParams&                                       boundarySurface;
     const std::vector<Pair<SurfaceId, SurfaceParams>>&              surfs;
     const std::vector<Pair<LightSurfaceId, LightSurfaceParams>>&    lightSurfs;
     const std::vector<Pair<CamSurfaceId, CameraSurfaceParams>>&     camSurfs;
@@ -429,6 +430,10 @@ class RenderWorkHasher
                                const GPUQueue& queue);
 
     MRAY_HYBRID
+    Vector2ui WorkBatchDataRange() const;
+    MRAY_HYBRID
+    Vector2ui WorkBatchBitRange() const;
+    MRAY_HYBRID
     uint32_t BisectBatchPortion(CommonKey key) const;
     MRAY_HYBRID
     uint32_t HashWorkBatchPortion(HitKeyPack p) const;
@@ -546,7 +551,7 @@ void RenderWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
                                              const GPUQueue& queue)
 {
     size_t totalWorkBatchCount = (curWorks.size() + curLightWorks.size() +
-                                    curCamWorks.size());
+                                  curCamWorks.size());
     std::vector<uint32_t> hHashes;
     std::vector<uint32_t> hBatchIds;
     hHashes.reserve(totalWorkBatchCount);
@@ -620,6 +625,18 @@ void RenderWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
+Vector2ui RenderWorkHasher::WorkBatchDataRange() const
+{
+    return Vector2ui(0, dataBits);
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Vector2ui RenderWorkHasher::WorkBatchBitRange() const
+{
+    return Vector2ui(dataBits, dataBits + batchBits);
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t RenderWorkHasher::BisectBatchPortion(CommonKey key) const
 {
     return Bit::FetchSubPortion(key, {dataBits, dataBits + batchBits});
@@ -629,14 +646,14 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t RenderWorkHasher::HashWorkBatchPortion(HitKeyPack p) const
 {
     static_assert(PrimitiveKey::BatchBits + LightOrMatKey::BatchBits +
-                    LightOrMatKey::FlagBits +
-                    TransformKey::BatchBits <= sizeof(uint32_t) * CHAR_BIT,
-                    "Unable to pack batch bits for hasing!");
+                  LightOrMatKey::FlagBits +
+                  TransformKey::BatchBits <= sizeof(uint32_t) * CHAR_BIT,
+                  "Unable to pack batch bits for hasing!");
     // In common case, compose the batch identifiers
     bool isLight = (p.lightOrMatKey.FetchFlagPortion() != IS_LIGHT_KEY_FLAG);
     uint32_t isLightInt = (isLight) ? 1 : 0;
     uint32_t r = Bit::Compose<LightOrMatKey::FlagBits, LightOrMatKey::BatchBits,
-                                PrimitiveKey::BatchBits, TransformKey::BatchBits>
+                              PrimitiveKey::BatchBits, TransformKey::BatchBits>
     (
         isLightInt,
         p.lightOrMatKey.FetchBatchPortion(),
@@ -791,11 +808,12 @@ uint32_t RendererT<C>::GenerateLightWorkMappings(uint32_t workStart)
 
     auto partitions = Algo::PartitionRange(lightSurfs.cbegin(), lightSurfs.cend(),
                                            LightSurfIsLess);
-    for(const auto& p : partitions)
+
+    auto AddWork = [&, this](const LightSurfaceParams& lSurf,
+                             bool checkBoundarySuitability)
     {
-        size_t i = p[0];
-        LightGroupId lgId{LightKey(uint32_t(lightSurfs[i].second.lightId)).FetchBatchPortion()};
-        TransGroupId tgId{TransformKey(uint32_t(lightSurfs[i].second.transformId)).FetchBatchPortion()};
+        LightGroupId lgId{LightKey(uint32_t(lSurf.lightId)).FetchBatchPortion()};
+        TransGroupId tgId{TransformKey(uint32_t(lSurf.transformId)).FetchBatchPortion()};
         // These should be checked beforehand, while actually creating
         // the surface
         const LightGroupPtr& lg = tracerView.lightGroups.at(lgId).value();
@@ -813,6 +831,32 @@ uint32_t RendererT<C>::GenerateLightWorkMappings(uint32_t workStart)
                             "pair of \"{}/{}\"",
                             C::TypeName(), lgName, tgName);
         }
+        if(checkBoundarySuitability)
+        {
+            bool isPrimBacked = lg.get()->IsPrimitiveBacked();
+            if(isPrimBacked)
+            {
+                throw MRayError("[{}]: Primitive-backed light ({}) is requested "
+                                "to be used as a boundary material!",
+                                C::TypeName(), lgName);
+            }
+            auto duplicateLoc = std::find_if(currentLightWorks.cbegin(),
+                                             currentLightWorks.cend(),
+                                             [&](const auto& workInfo)
+            {
+                return workInfo.idPack == Pair(lgId, tgId);
+            });
+            if(duplicateLoc != currentLightWorks.cend())
+            {
+                // TODO: This restriction does not make sense too much.
+                // Probably change later maybe?
+                throw MRayError("[{}]: Light/Transform group \"{}\"({}) / \"{}\"({}), is used "
+                                "as a non-boundary material. Boundary material should have its "
+                                "own unique group!", C::TypeName(),
+                                lgName, uint32_t(lgId), lgName, uint32_t(tgId));
+            }
+        }
+
         RenderLightWorkGenerator generator = loc->get();
         RenderLightWorkPtr ptr = generator(*lg.get(), *tg.get(), gpuSystem);
 
@@ -828,7 +872,15 @@ uint32_t RendererT<C>::GenerateLightWorkMappings(uint32_t workStart)
                 .workPtr = std::move(renderTypedPtr)
             }
         );
+    };
+
+    for(const Vector2ul& p : partitions)
+    {
+        const auto& lSurf = lightSurfs[p[0]].second;
+        AddWork(lSurf, false);
     }
+    AddWork(tracerView.boundarySurface, true);
+
     return workStart;
 }
 

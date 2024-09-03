@@ -51,6 +51,7 @@ inline Tracer::Tracer(const TracerParameters& tracerParams)
     // Finally Populate the lists
     PopulateAttribInfoAndTypeLists();
 
-    // GroupId 0 is reserved for empty primitive
-    CreatePrimitiveGroup(std::string(TracerConstants::EmptyPrimName));
+    // Default groups are "NullLight", "EmptyPrimitive", "IdentityTransform"
+    // and "VacuumMedium"
+    GenerateDefaultGroups();
 }

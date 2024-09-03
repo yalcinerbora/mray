@@ -75,7 +75,11 @@ namespace TracerConstants
     // this will be compile time checked.
     static constexpr size_t MaxCameraInstanceByteSize = 512;
 
+    static constexpr std::string_view IdentityTransName = "(T)Identity";
+    static constexpr std::string_view NullLightName     = "(L)Null";
     static constexpr std::string_view EmptyPrimName     = "(P)Empty";
+    static constexpr std::string_view VacuumMediumName  = "(Md)Vacuum";
+
     static constexpr std::string_view LIGHT_PREFIX      = "(L)";
     static constexpr std::string_view TRANSFORM_PREFIX  = "(T)";
     static constexpr std::string_view PRIM_PREFIX       = "(P)";
@@ -406,11 +410,18 @@ struct RendererOptionPack
 namespace TracerConstants
 {
     // Implicit Mediums that are always present on a tracer system
+    static constexpr MediumGroupId VacuumMediumGroupId  = MediumGroupId(0);
     static constexpr MediumId VacuumMediumId            = MediumId(0);
+
+    static constexpr LightGroupId NullLightGroupId      = LightGroupId(0);
     static constexpr LightId NullLightId                = LightId(0);
+
+    static constexpr TransGroupId IdentityTransGroupId  = TransGroupId(0);
     static constexpr TransformId IdentityTransformId    = TransformId(0);
-    static constexpr PrimGroupId EmptyPrimitive         = PrimGroupId{0};
-    static constexpr PrimBatchId EmptyPrimBatch         = PrimBatchId{0};
+
+    static constexpr PrimGroupId EmptyPrimGroupId       = PrimGroupId{0};
+    static constexpr PrimBatchId EmptyPrimBatchId       = PrimBatchId{0};
+
     static constexpr TextureId InvalidTexture           = TextureId{0};
     static constexpr MediumPair VacuumMediumPair        = std::make_pair(VacuumMediumId, VacuumMediumId);
 
@@ -556,9 +567,9 @@ class [[nodiscard]] TracerI
     //================================//
     // Analytical / Primitive-backed Lights
     virtual LightGroupId    CreateLightGroup(std::string typeName,
-                                             PrimGroupId = TracerConstants::EmptyPrimitive) = 0;
+                                             PrimGroupId = TracerConstants::EmptyPrimGroupId) = 0;
     virtual LightId         ReserveLight(LightGroupId, AttributeCountList,
-                                         PrimBatchId = TracerConstants::EmptyPrimBatch) = 0;
+                                         PrimBatchId = TracerConstants::EmptyPrimBatchId) = 0;
     virtual LightIdList     ReserveLights(LightGroupId,
                                           std::vector<AttributeCountList>,
                                           std::vector<PrimBatchId> = std::vector<PrimBatchId>{}) = 0;
@@ -620,6 +631,7 @@ class [[nodiscard]] TracerI
     // Renderer will only use the cameras/lights registered here
     // Same goes for other surfaces as well
     // Primitive-backed lights imply accelerator generation
+    virtual LightSurfaceId      SetBoundarySurface(LightSurfaceParams) = 0;
     virtual LightSurfaceId      CreateLightSurface(LightSurfaceParams) = 0;
     virtual CamSurfaceId        CreateCameraSurface(CameraSurfaceParams) = 0;
     virtual SurfaceCommitResult CommitSurfaces() = 0;

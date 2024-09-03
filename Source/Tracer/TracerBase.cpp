@@ -148,11 +148,46 @@ TracerView TracerBase::GenerateTracerView()
         .tracerParams = params,
         .filterGenerators = filterGenMap,
         .rngGenerators = rngGenMap,
+        .boundarySurface = boundarySurface.second,
         .surfs = surfaces.Vec(),
         .lightSurfs = lightSurfaces.Vec(),
         .camSurfs = cameraSurfaces.Vec(),
         .flattenedSurfaces = flattenedSurfaces
     };
+}
+
+void TracerBase::GenerateDefaultGroups()
+{
+
+    //PrimGroupId emptyPGId = CreatePrimitiveGroup(std::string(TracerConstants::EmptyPrimName));
+    auto genFuncP = typeGenerators.primGenerator.at(TracerConstants::EmptyPrimName);
+    uint32_t idInt = primGroupCounter.fetch_add(1);
+    PrimGroupId emptyPGId = static_cast<PrimGroupId>(idInt);
+    auto primGLoc = primGroups.try_emplace(emptyPGId,
+                                           genFuncP.value()(std::move(idInt), gpuSystem));
+    assert(emptyPGId == TracerConstants::EmptyPrimGroupId);
+    //
+    auto genFuncL = typeGenerators.lightGenerator.at(TracerConstants::NullLightName);
+    idInt = lightGroupCounter.fetch_add(1);
+    LightGroupId nullLGId = static_cast<LightGroupId>(idInt);
+    lightGroups.try_emplace(nullLGId,
+                            genFuncL.value()(std::move(idInt), gpuSystem,
+                                             texMem.TextureViews(),
+                                             *primGLoc.first->second));
+    assert(nullLGId == TracerConstants::NullLightGroupId);
+    //
+    auto genFuncT = typeGenerators.transGenerator.at(TracerConstants::IdentityTransName);
+    idInt = transGroupCounter.fetch_add(1);
+    TransGroupId identTransId = static_cast<TransGroupId>(idInt);
+    transGroups.try_emplace(identTransId, genFuncT.value()(std::move(idInt), gpuSystem));
+    assert(identTransId == TracerConstants::IdentityTransGroupId);
+    //
+    auto genFuncMd = typeGenerators.medGenerator.at(TracerConstants::VacuumMediumName);
+    idInt = mediumGroupCounter.fetch_add(1);
+    MediumGroupId vacuumMedId = static_cast<MediumGroupId>(idInt);
+    mediumGroups.try_emplace(vacuumMedId, genFuncMd.value()(std::move(idInt), gpuSystem,
+                                                            texMem.TextureViews()));
+    assert(vacuumMedId == TracerConstants::VacuumMediumGroupId);
 }
 
 TracerBase::TracerBase(const TypeGeneratorPack& tGen,
@@ -426,6 +461,9 @@ std::string TracerBase::TypeName(RendererId id) const
 
 PrimGroupId TracerBase::CreatePrimitiveGroup(std::string name)
 {
+    if(name == TracerConstants::EmptyPrimName)
+        return TracerConstants::EmptyPrimGroupId;
+
     auto genFunc = typeGenerators.primGenerator.at(name);
     if(!genFunc)
     {
@@ -442,6 +480,9 @@ PrimGroupId TracerBase::CreatePrimitiveGroup(std::string name)
 
 PrimBatchId TracerBase::ReservePrimitiveBatch(PrimGroupId id, PrimCount count)
 {
+    if(id == TracerConstants::EmptyPrimGroupId)
+        return TracerConstants::EmptyPrimBatchId;
+
     auto primGroup = primGroups.at(id);
     if(!primGroup)
     {
@@ -740,6 +781,9 @@ void TracerBase::PushTextureData(TextureId id, uint32_t mipLevel,
 
 TransGroupId TracerBase::CreateTransformGroup(std::string name)
 {
+    if(name == TracerConstants::IdentityTransName)
+        return TracerConstants::IdentityTransGroupId;
+
     auto genFunc = typeGenerators.transGenerator.at(name);
     if(!genFunc)
     {
@@ -754,6 +798,9 @@ TransGroupId TracerBase::CreateTransformGroup(std::string name)
 
 TransformId TracerBase::ReserveTransformation(TransGroupId id, AttributeCountList count)
 {
+    if(id == TracerConstants::IdentityTransGroupId)
+        return TracerConstants::IdentityTransformId;
+
     auto transGroup = transGroups.at(id);
     if(!transGroup)
     {
@@ -840,6 +887,9 @@ void TracerBase::PushTransAttribute(TransGroupId gId, Vector2ui transRange,
 LightGroupId TracerBase::CreateLightGroup(std::string name,
                                           PrimGroupId primGId)
 {
+    if(name == TracerConstants::NullLightName)
+        return TracerConstants::NullLightGroupId;
+
     auto genFunc = typeGenerators.lightGenerator.at(name);
     if(!genFunc)
     {
@@ -865,6 +915,9 @@ LightId TracerBase::ReserveLight(LightGroupId id,
                                  AttributeCountList count,
                                  PrimBatchId primId)
 {
+    if(id == TracerConstants::NullLightGroupId)
+        return TracerConstants::NullLightId;
+
     auto lightGroup = lightGroups.at(id);
     if(!lightGroup)
     {
@@ -1117,6 +1170,9 @@ void TracerBase::PushCamAttribute(CameraGroupId gId, Vector2ui camRange,
 
 MediumGroupId TracerBase::CreateMediumGroup(std::string name)
 {
+    if(name == TracerConstants::VacuumMediumName)
+        return TracerConstants::VacuumMediumGroupId;
+
     auto genFunc = typeGenerators.medGenerator.at(name);
     if(!genFunc)
     {
@@ -1133,6 +1189,9 @@ MediumGroupId TracerBase::CreateMediumGroup(std::string name)
 
 MediumId TracerBase::ReserveMedium(MediumGroupId id, AttributeCountList count)
 {
+    if(id == TracerConstants::VacuumMediumGroupId)
+        return TracerConstants::VacuumMediumId;
+
     auto medGroup = mediumGroups.at(id);
     if(!medGroup)
     {
@@ -1283,6 +1342,19 @@ SurfaceId TracerBase::CreateSurface(SurfaceParams p)
     return SurfaceId(sId);
 }
 
+LightSurfaceId TracerBase::SetBoundarySurface(LightSurfaceParams p)
+{
+    static constexpr auto InvalidSurfId = LightSurfaceId(std::numeric_limits<LightSurfaceId>::max());
+    LightSurfaceId lightSId;
+    if(boundarySurface.first == InvalidSurfId)
+        lightSId = LightSurfaceId(lightSurfaceCounter.fetch_add(1));
+    else
+        lightSId = boundarySurface.first;
+
+    boundarySurface = {lightSId, p};
+    return lightSId;
+}
+
 LightSurfaceId TracerBase::CreateLightSurface(LightSurfaceParams p)
 {
     uint32_t lightSId = lightSurfaceCounter.fetch_add(1);
@@ -1303,6 +1375,15 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     // previously. CPU side is sycnhronized but async calls to GPU may not
     // have finished yet. Wait before finalizing groups
     gpuSystem.SyncAll();
+
+    // Check the boundary surface
+    //
+    if(boundarySurface.first == std::numeric_limits<LightSurfaceId>::max())
+    {
+        MRAY_WARNING_LOG("No boundary surface is set! Setting a default one "
+                         "(NullLight, IdentityTransform, VacuumMedium).");
+        boundarySurface.second = LightSurfaceParams{};
+    }
 
     // Finalize the group operations
     // Some groups require post-processing
@@ -1374,7 +1455,7 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     auto accelWGeneratorMap = typeGenerators.accelWorkGeneratorMap.at(type);
     if(!accelGenerator || !accelGGeneratorMap || !accelWGeneratorMap)
     {
-        throw MRayError("Unable to find accelerator generators for type \"{}\"",
+        throw MRayError("[Tracer]: Unable to find accelerator generators for type \"{}\"",
                         type);
     }
     accelerator = accelGenerator.value().get()
@@ -1603,8 +1684,8 @@ void TracerBase::ClearAll()
     currentRenderer = nullptr;
     currentRendererId = std::numeric_limits<RendererId>::max();
 
-    // GroupId 0 is reserved for empty primitive
-    CreatePrimitiveGroup(std::string(TracerConstants::EmptyPrimName));
+    // GroupId 0 is reserved for some default types regen those
+    GenerateDefaultGroups();
 }
 
 void TracerBase::Flush() const

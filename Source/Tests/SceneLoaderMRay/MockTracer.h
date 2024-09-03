@@ -243,9 +243,9 @@ class TracerMock : public TracerI
 
 
     LightGroupId    CreateLightGroup(std::string typeName,
-                                     PrimGroupId = TracerConstants::EmptyPrimitive) override;
+                                     PrimGroupId = TracerConstants::EmptyPrimGroupId) override;
     LightId         ReserveLight(LightGroupId, AttributeCountList,
-                                 PrimBatchId = TracerConstants::EmptyPrimBatch) override;
+                                 PrimBatchId = TracerConstants::EmptyPrimBatchId) override;
     LightIdList     ReserveLights(LightGroupId, std::vector<AttributeCountList>,
                                   std::vector<PrimBatchId> = std::vector<PrimBatchId>{}) override;
     void            CommitLightReservations(LightGroupId) override;
@@ -290,6 +290,7 @@ class TracerMock : public TracerI
 
 
     SurfaceId           CreateSurface(SurfaceParams) override;
+    LightSurfaceId      SetBoundarySurface(LightSurfaceParams) override;
     LightSurfaceId      CreateLightSurface(LightSurfaceParams) override;
     CamSurfaceId        CreateCameraSurface(CameraSurfaceParams) override;
     SurfaceCommitResult CommitSurfaces() override;
@@ -1211,7 +1212,7 @@ inline LightId TracerMock::ReserveLight(LightGroupId id,
             attribCountString += MRAY_FORMAT("{}, ", c);
         }
         attribCountString += "]";
-        std::string batchString = (primId == TracerConstants::EmptyPrimBatch)
+        std::string batchString = (primId == TracerConstants::EmptyPrimBatchId)
             ? std::string("Empty")
             : MRAY_FORMAT("{}", static_cast<uint32_t>(primId));
 
@@ -1679,6 +1680,17 @@ inline SurfaceId TracerMock::CreateSurface(SurfaceParams p)
              surfId, static_cast<uint32_t>(p.transformId),
              primIdString, matIdString, alphaMapString, cullFaceString);
     return SurfaceId(surfId);
+}
+
+inline LightSurfaceId TracerMock::SetBoundarySurface(LightSurfaceParams p)
+{
+    size_t lightSurfId = lightSurfaceCounter.fetch_add(1);
+    if(!print) return LightSurfaceId(lightSurfId);
+
+    MRAY_LOG("Setting BoundarySurface({}): Light: {}, Trans: {}, Medium: {}",
+             lightSurfId, static_cast<uint32_t>(p.lightId),
+             static_cast<uint32_t>(p.transformId),
+             static_cast<uint32_t>(p.mediumId));
 }
 
 inline LightSurfaceId TracerMock::CreateLightSurface(LightSurfaceParams p)

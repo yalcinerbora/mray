@@ -2,6 +2,7 @@
 
 #include <string_view>
 #include <fstream>
+#include <iostream>
 #include "GPUSystemForward.h"
 
 #pragma message ("WARNING! \"GPUDebug.h\" is included, don't forget to remove when " \

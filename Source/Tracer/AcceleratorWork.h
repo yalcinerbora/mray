@@ -82,7 +82,7 @@ static void KCLocalRayCast(// Output
         BackupRNG rng(rngStates[index]);
 
         // Get ids
-        AcceleratorKey aId(dAcceleratorKeys[index]);
+        AcceleratorKey aId(dAcceleratorKeys[i]);
         // Construct the accelerator view
         Accelerator acc(tSoA, pSoA, aSoA, aId);
 
@@ -105,7 +105,7 @@ static void KCLocalRayCast(// Output
         if(!hitOpt) continue;
 
         const auto& hit = hitOpt.value();
-        dHitIds[i] = HitKeyPack
+        dHitIds[index] = HitKeyPack
         {
             .primKey = hit.primitiveKey,
             .lightOrMatKey = hit.lmKey,
@@ -113,7 +113,7 @@ static void KCLocalRayCast(// Output
             .accelKey = aId
         };
         UpdateTMax(dRays, index, hit.t);
-        dHitParams[i] = hit.hit;
+        dHitParams[index] = hit.hit;
     }
 };
 

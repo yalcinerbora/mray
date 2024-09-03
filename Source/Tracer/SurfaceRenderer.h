@@ -49,13 +49,13 @@ namespace SurfRDetail
     template<PrimitiveC Prim, MaterialC Material, class Surface,
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     MRAY_HYBRID
-    void WorkFunction(const Prim& prim, const Material& mat, const Surface& surf,
-                                 const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params);
+    void WorkFunction(const Prim&, const Material&, const Surface&, RNGDispenser&,
+                      const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params);
 
     template<LightC Light, LightGroupC LG, TransformGroupC TG>
     MRAY_HYBRID
-    void LightWorkFunction(const Light& light,
-                                      const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params);
+    void LightWorkFunction(const Light&, RNGDispenser&,
+                           const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params);
 
     MRAY_HYBRID
     void InitRayState(const RayPayload&, const RayState&,
@@ -175,7 +175,8 @@ size_t SurfaceRenderer::GPUMemoryUsage() const
 template<PrimitiveC Prim, MaterialC Material, class Surface,
          PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
 MRAY_HYBRID
-void SurfRDetail::WorkFunction(const Prim& prim, const Material& mat, const Surface& surf,
+void SurfRDetail::WorkFunction(const Prim& prim, const Material& mat,
+                               const Surface& surf, RNGDispenser& rng,
                                const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params)
 {
     //
@@ -184,7 +185,7 @@ void SurfRDetail::WorkFunction(const Prim& prim, const Material& mat, const Surf
 template<LightC Light,
          LightGroupC LG, TransformGroupC TG>
 MRAY_HYBRID
-void SurfRDetail::LightWorkFunction(const Light& light,
+void SurfRDetail::LightWorkFunction(const Light& light, RNGDispenser& rng,
                                     const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params)
 {
     //

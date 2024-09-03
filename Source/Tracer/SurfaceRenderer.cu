@@ -263,6 +263,7 @@ RendererOutput SurfaceRenderer::DoRender()
 
     // Cast rays
     Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
+    processQueue.MemsetAsync(dHitKeys, 0xFF);
     tracerView.baseAccelerator.CastRays(dHitKeys, dHits, dBackupRNGStates,
                                         dRays, dIndices, processQueue);
 
@@ -280,7 +281,10 @@ RendererOutput SurfaceRenderer::DoRender()
         workHasher
     );
 
-    // Finally partition, using the generated keys
+    DeviceDebug::DumpGPUMemToFile("dHashes", ToConstSpan(dKeys), processQueue);
+    DeviceDebug::DumpGPUMemToFile("dIndicesIn2", ToConstSpan(dIndices), processQueue);
+
+    // Finally, partition using the generated keys.
     // Fully partition here using single sort
     auto
     [
@@ -291,12 +295,16 @@ RendererOutput SurfaceRenderer::DoRender()
         dPartitionIndices,
         dPartitionKeys
     ] = rayPartitioner.MultiPartition(dKeys, dIndices,
-                                      Vector2ui::Zero(),
-                                      Vector2ui(0, sizeof(CommonKey) * CHAR_BIT),
-                                      processQueue, true);
+                                      workHasher.WorkBatchDataRange(),
+                                      workHasher.WorkBatchBitRange(),
+                                      processQueue, false);
     assert(isHostVisible);
     // Wait for results to be available in host buffers
     processQueue.Barrier().Wait();
+    DeviceDebug::DumpGPUMemToFile("dPartitionIndicesFull", ToConstSpan(dPartitionIndices), processQueue);
+    DeviceDebug::DumpGPUMemToFile("dPartitionKeysFull", ToConstSpan(dPartitionKeys), processQueue);
+    DeviceDebug::DumpGPUMemToFile("wtfKeys", ToConstSpan(dKeys), processQueue);
+    DeviceDebug::DumpGPUMemToFile("wtfIndices", ToConstSpan(dIndices), processQueue);
 
     GlobalState globalState{currentOptions.mode};
     for(uint32_t i = 0; i < hPartitionCount[0]; i++)
@@ -307,6 +315,9 @@ RendererOutput SurfaceRenderer::DoRender()
 
         auto dLocalIndices = dPartitionIndices.subspan(partitionStart,
                                                        partitionSize);
+
+        DeviceDebug::DumpGPUMemToFile(std::string("dPartitionIndicesLocal") + std::to_string(i),
+                                      ToConstSpan(dLocalIndices), processQueue);
         // Find the work
         // TODO: Although work count should be small,
         // doing a linear search here may not be performant.

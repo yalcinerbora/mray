@@ -84,19 +84,19 @@ void KCIntersectBaseLinear(// Output
         // Linear search the next instance
         uint32_t startIndex = dTraverseIndices[index];
         uint32_t instanceCount = static_cast<uint32_t>(dAABBs.size());
-        for(uint32_t i = startIndex; i < instanceCount; i++)
+        for(uint32_t j = startIndex; j < instanceCount; j++)
         {
-            AABB3 aabb = dAABBs[i];
+            AABB3 aabb = dAABBs[j];
             if(ray.IntersectsAABB(aabb.Min(), aabb.Max(), tMM))
             {
                 // Stop traversal delegate to the inner accelerator
-                foundKey = dLeafs[i];
+                foundKey = dLeafs[j];
                 // Save the iteration index
-                dTraverseIndices[index] = i + 1;
+                dTraverseIndices[index] = j + 1;
                 break;
             }
         }
-        dAccelKeys[index] = static_cast<CommonKey>(foundKey);
+        dAccelKeys[i] = static_cast<CommonKey>(foundKey);
     }
 }
 
@@ -172,8 +172,6 @@ void BaseAcceleratorLinear::AllocateForTraversal(size_t maxRayCount)
     MemAlloc::AllocateMultiData(std::tie(dTraversalStack), stackMem, {maxRayCount});
 }
 
-#include "Device/GPUDebug.h"
-
 void BaseAcceleratorLinear::CastRays(// Output
                                      Span<HitKeyPack> dHitIds,
                                      Span<MetaHit> dHitParams,
@@ -206,7 +204,7 @@ void BaseAcceleratorLinear::CastRays(// Output
         queue.IssueSaturatingKernel<KCIntersectBaseLinear>
         (
             "(A)LinearRayCast"sv,
-            KernelIssueParams{.workCount = static_cast<uint32_t>(dRayIndices.size())},
+            KernelIssueParams{.workCount = static_cast<uint32_t>(dCurrentIndices.size())},
             // Output
             dCurrentKeys,
             // I-O
@@ -219,11 +217,8 @@ void BaseAcceleratorLinear::CastRays(// Output
             ToConstSpan(dAABBs)
         );
 
-        //DeviceDebug::DumpGPUMemToFile("dCurKeys", ToConstSpan(dCurrentKeys), queue);
-        //DeviceDebug::DumpGPUMemToFile("dStack", ToConstSpan(dTraversalStack), queue);
-
         static constexpr CommonKey IdBits = AcceleratorKey::IdBits;
-        static constexpr CommonKey BatchBits = AcceleratorKey::IdBits;
+        static constexpr CommonKey BatchBits = AcceleratorKey::BatchBits;
         auto batchRange = Vector2ui(BatchBits, BatchBits + maxBitsUsedOnKey[0]);
         auto idRange = Vector2ui(IdBits, IdBits + maxBitsUsedOnKey[1]);
         auto
@@ -241,6 +236,9 @@ void BaseAcceleratorLinear::CastRays(// Output
                                           idRange,
                                           batchRange,
                                           queue, false);
+        dCurrentIndices = dIndices;
+        dCurrentKeys = dKeys;
+
         assert(isHostVisible == true);
         queue.Barrier().Wait();
         for(uint32_t pIndex = 0; pIndex < hPartitionCount[0]; pIndex++)
@@ -253,8 +251,8 @@ void BaseAcceleratorLinear::CastRays(// Output
                 // This should be the last item due to invalid key being INT_MAX
                 assert(pIndex == hPartitionCount[0] - 1);
                 currentRayCount = hPartitionOffsets[pIndex];
-                dCurrentKeys = dKeys.subspan(0, currentRayCount);
-                dCurrentIndices = dIndices.subspan(0, currentRayCount);
+                dCurrentKeys = dCurrentKeys.subspan(0, currentRayCount);
+                dCurrentIndices = dCurrentIndices.subspan(0, currentRayCount);
             }
             else
             {

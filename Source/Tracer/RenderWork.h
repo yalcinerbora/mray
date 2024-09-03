@@ -606,8 +606,11 @@ static void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParams<R, PG, MG, TG
     using Hit = typename Primitive::Hit;
 
     // Runtime check of rn count
-    assert(params.in.dRayIndices.size() * Material::SampleRNCount ==
-           params.in.dRandomNumbers.size());
+    // TODO: This makes sense only for sampling renderer (almost all renderers are
+    // in this current system). However for "SurfaceRenderer" it is not true
+    // Move this to other renderers
+    //assert(params.in.dRayIndices.size() * Material::SampleRNCount ==
+    //        params.in.dRandomNumbers.size());
 
     // Now finally we can start the runtime stuff
     uint32_t rayCount = static_cast<uint32_t>(params.in.dRayIndices.size());
@@ -643,19 +646,19 @@ static void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParams<R, PG, MG, TG
                                                          keys.transKey,
                                                          keys.primKey);
         // Convert ray to local space instead of other way around
-        ray = tContext.InvApply(ray);
+        //ray = tContext.InvApply(ray);
         // Construct Primitive (with identity transform)
-        //auto primitive = Primitive(TransformContextIdentity{},
-        //                           params.primSoA,
-        //                           keys.primKey);
+        auto primitive = Primitive(tContext,
+                                   params.primSoA,
+                                   keys.primKey);
         // Generate the surface
-        //Surface surface;
-        //primitive.GenerateSurface(surface, hit, ray, RayDiff{});
-        //// Generate the material
-        //auto material = Material(specConverter, params.matSoA,
-        //                         MaterialKey(static_cast<CommonKey>(keys.lightOrMatKey)));
+        Surface surface;
+        primitive.GenerateSurface(surface, hit, ray, RayDiff{});
+        // Generate the material
+        auto material = Material(specConverter, params.matSoA,
+                                 MaterialKey(static_cast<CommonKey>(keys.lightOrMatKey)));
         // Call the function
-        //WorkFunction(primitive, material, surface, rng, params);
+        WorkFunction(primitive, material, surface, rng, params);
         // All Done!
     }
 }

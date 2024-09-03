@@ -60,6 +60,12 @@ struct WorkBatchInfo
     std::vector<MaterialWorkBatchInfo>  matWorkBatches;
 };
 
+static constexpr Pair<LightSurfaceId, LightSurfaceParams> InvalidBoundarySurface =
+{
+    LightSurfaceId(std::numeric_limits<LightSurfaceId>::max()),
+    LightSurfaceParams{}
+};
+
 struct TypeGeneratorPack
 {
     Map<std::string_view, PrimGenerator>        primGenerator;
@@ -92,6 +98,7 @@ class TracerBase : public TracerI
     ThreadSafeMap<RendererId, RendererPtr>           renderers;
 
     // Surface
+    Pair<LightSurfaceId, LightSurfaceParams>                    boundarySurface = InvalidBoundarySurface;
     ThreadSafeVector<Pair<SurfaceId, SurfaceParams>>            surfaces;
     ThreadSafeVector<Pair<LightSurfaceId, LightSurfaceParams>>  lightSurfaces;
     ThreadSafeVector<Pair<CamSurfaceId, CameraSurfaceParams>>   cameraSurfaces;
@@ -150,6 +157,7 @@ class TracerBase : public TracerI
 
     void            PopulateAttribInfoAndTypeLists();
     TracerView      GenerateTracerView();
+    void            GenerateDefaultGroups();
     public:
     // Constructors & Destructor
                     TracerBase(const TypeGeneratorPack&,
@@ -245,9 +253,9 @@ class TracerBase : public TracerI
                                        TransientData data) override;
 
     LightGroupId    CreateLightGroup(std::string typeName,
-                                     PrimGroupId = TracerConstants::EmptyPrimitive) override;
+                                     PrimGroupId = TracerConstants::EmptyPrimGroupId) override;
     LightId         ReserveLight(LightGroupId, AttributeCountList,
-                                 PrimBatchId = TracerConstants::EmptyPrimBatch) override;
+                                 PrimBatchId = TracerConstants::EmptyPrimBatchId) override;
     LightIdList     ReserveLights(LightGroupId, std::vector<AttributeCountList>,
                                   std::vector<PrimBatchId> = std::vector<PrimBatchId>{}) override;
     void            CommitLightReservations(LightGroupId) override;
@@ -289,6 +297,7 @@ class TracerBase : public TracerI
                                         std::vector<TextureId> textures) override;
 
     SurfaceId           CreateSurface(SurfaceParams) override;
+    LightSurfaceId      SetBoundarySurface(LightSurfaceParams) override;
     LightSurfaceId      CreateLightSurface(LightSurfaceParams) override;
     CamSurfaceId        CreateCameraSurface(CameraSurfaceParams) override;
     SurfaceCommitResult CommitSurfaces() override;

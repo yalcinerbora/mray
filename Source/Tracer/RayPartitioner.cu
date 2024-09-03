@@ -330,6 +330,10 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
     // Sort Data portion if requested
     Span<CommonKey> dKeysDB[2] = {dKeysIn, dKeysOut};
     Span<CommonIndex> dIndicesDB[2] = {dIndicesIn, dIndicesOut};
+
+    // TODO: Why are we doing two seperate sorts? Keys almost always should be contiguous.
+    // If not we are wasting information space here.
+    // So a single pass should suffice maybe? Reason about this more later
     if(!onlySortForBatches)
     {
         assert(keyDataBitRange[0] != keyDataBitRange[1]);
@@ -337,21 +341,29 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
                                             Span<Span<CommonIndex>, 2>(dIndicesDB),
                                             dTempMemory, queue,
                                             keyDataBitRange);
-        if(outIndex == 1) std::swap(dKeysDB[0], dKeysDB[1]);
+        if(outIndex == 1)
+        {
+            std::swap(dKeysDB[0], dKeysDB[1]);
+            std::swap(dIndicesDB[0], dIndicesDB[1]);
+        }
     }
     // Then sort batch portion
     uint32_t outIndex = RadixSort<true>(Span<Span<CommonKey>, 2>(dKeysDB),
                                         Span<Span<CommonIndex>, 2>(dIndicesDB),
                                         dTempMemory, queue,
                                         keyBatchBitRange);
-    if(outIndex == 1) std::swap(dKeysDB[0], dKeysDB[1]);
+    if(outIndex == 1)
+    {
+        std::swap(dKeysDB[0], dKeysDB[1]);
+        std::swap(dIndicesDB[0], dIndicesDB[1]);
+    }
 
 
     // Rename/Repurpose buffers for readability
     Span<CommonIndex> dSortedRayIndices = dIndicesDB[0];
     Span<CommonKey> dSortedKeys = dKeysDB[0];
-    Span<uint32_t> dSparseSplitIndices = RepurposeAlloc<uint32_t>(dIndices[1]).subspan(0, partitionedRayCount);
-    Span<uint32_t> dDenseSplitIndices = RepurposeAlloc<uint32_t>(dKeys[1]).subspan(0, partitionedRayCount);
+    Span<uint32_t> dSparseSplitIndices = RepurposeAlloc<uint32_t>(dIndicesDB[1]).subspan(0, partitionedRayCount);
+    Span<uint32_t> dDenseSplitIndices = RepurposeAlloc<uint32_t>(dKeysDB[1]).subspan(0, partitionedRayCount);
 
     // Mark the split positions
     uint32_t blockCount = queue.RecommendedBlockCountDevice(&KCFindSplits<FIND_SPLITS_TPB>,
