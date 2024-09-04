@@ -468,15 +468,15 @@ class RendererT : public RendererI
     const GPUSystem&        gpuSystem;
     TracerView              tracerView;
     const RenderImagePtr&   renderBuffer;
-    bool                    rendering = false;
 
     WorkList                currentWorks;
     LightWorkList           currentLightWorks;
     CameraWorkList          currentCameraWorks;
-
+    HitKeyPack              boundaryMatKeyPack;
     // Current Canvas info
     MRayColorSpaceEnum      curColorSpace;
     ImageTiler              imageTiler;
+    uint64_t                totalIterationCount;
 
     uint32_t                GenerateWorks();
     RenderWorkHasher        InitializeHashes(Span<uint32_t> dHashes,
@@ -614,6 +614,12 @@ void RenderWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
         transMaxCount = std::max(transMaxCount, transformCount);
     }
     // TODO: Add camera hashes as well, it may require some redesign
+    // Currently we "FF..F" these since we do not support light tracing yet
+    for(const auto& work : curCamWorks)
+    {
+        hHashes.emplace_back(std::numeric_limits<uint32_t>::max());
+        hBatchIds.push_back(work.workGroupId);
+    }
 
     // Find bit count
     maxMatOrLightIdBits = Bit::RequiredBitsToRepresent(lmMaxCount);
@@ -650,15 +656,15 @@ uint32_t RenderWorkHasher::HashWorkBatchPortion(HitKeyPack p) const
                   TransformKey::BatchBits <= sizeof(uint32_t) * CHAR_BIT,
                   "Unable to pack batch bits for hasing!");
     // In common case, compose the batch identifiers
-    bool isLight = (p.lightOrMatKey.FetchFlagPortion() != IS_LIGHT_KEY_FLAG);
+    bool isLight = (p.lightOrMatKey.FetchFlagPortion() == IS_LIGHT_KEY_FLAG);
     uint32_t isLightInt = (isLight) ? 1 : 0;
-    uint32_t r = Bit::Compose<LightOrMatKey::FlagBits, LightOrMatKey::BatchBits,
-                              PrimitiveKey::BatchBits, TransformKey::BatchBits>
+    uint32_t r = Bit::Compose<TransformKey::BatchBits, PrimitiveKey::BatchBits,
+                              LightOrMatKey::BatchBits, LightOrMatKey::FlagBits>
     (
-        isLightInt,
-        p.lightOrMatKey.FetchBatchPortion(),
+        p.transKey.FetchBatchPortion(),
         p.primKey.FetchBatchPortion(),
-        p.transKey.FetchBatchPortion()
+        p.lightOrMatKey.FetchBatchPortion(),
+        isLightInt
     );
     return r;
 }
@@ -711,22 +717,22 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 CommonKey RenderWorkHasher::GenerateWorkKeyGPU(HitKeyPack p) const
 {
     CommonKey batchHash = HashWorkBatchPortion(p);
-    // Find the batch portion
-    // (Linear search)
+    // Find the batch portion (Linear search)
     uint32_t i = 0;
     CommonKey batchId = std::numeric_limits<CommonKey>::max();
     for(uint32_t checkHash : dWorkBatchHashes)
     {
         if(checkHash == batchHash)
         {
-            batchId = dWorkBatchHashes[i];
+            batchId = dWorkBatchIds[i];
             break;
         }
         i++;
     }
     // Compose the sort key
-    CommonKey result = Bit::SetSubPortion(HashWorkDataPortion(p), batchId,
-                                            {dataBits, dataBits + batchBits});
+    CommonKey hashLower = HashWorkDataPortion(p);
+    CommonKey result = Bit::SetSubPortion(hashLower, batchId,
+                                          {dataBits, dataBits + batchBits});
     return result;
 }
 
@@ -879,8 +885,22 @@ uint32_t RendererT<C>::GenerateLightWorkMappings(uint32_t workStart)
         const auto& lSurf = lightSurfs[p[0]].second;
         AddWork(lSurf, false);
     }
+
     AddWork(tracerView.boundarySurface, true);
 
+    // Set the boundary key pack here as well
+    auto lK = std::bit_cast<LightKey>(tracerView.boundarySurface.lightId);
+    auto lmK = LightOrMatKey::CombinedKey(IS_LIGHT_KEY_FLAG,
+                                          lK.FetchBatchPortion(),
+                                          lK.FetchIndexPortion());
+    auto tK = std::bit_cast<TransformKey>(tracerView.boundarySurface.transformId);
+    boundaryMatKeyPack = HitKeyPack
+    {
+        .primKey = PrimitiveKey::InvalidKey(),
+        .lightOrMatKey = lmK,
+        .transKey = tK,
+        .accelKey = AcceleratorKey::InvalidKey()
+    };
     return workStart;
 }
 

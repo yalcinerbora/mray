@@ -32,8 +32,8 @@ void GPUQueueCUDA::IssueKernel(std::string_view name,
                                KernelIssueParams p,
                                Args&&... fArgs) const
 {
-    static const GPUAnnotationCUDA annotation = GPUAnnotationCUDA(nvtxDomain, name);
-    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
+    static const auto annotation = GPUAnnotationCUDA(nvtxDomain, name);
+    const auto _ = annotation.AnnotateScope();
 
     assert(p.workCount != 0);
     using namespace CudaKernelCalls;
@@ -54,8 +54,8 @@ void GPUQueueCUDA::IssueLambda(std::string_view name,
                                //
                                Lambda&& func) const
 {
-    static const GPUAnnotationCUDA annotation = GPUAnnotationCUDA(nvtxDomain, name);
-    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
+    static const auto annotation = GPUAnnotationCUDA(nvtxDomain, name);
+    const auto _ = annotation.AnnotateScope();
 
     assert(p.workCount != 0);
     static_assert(std::is_rvalue_reference_v<decltype(func)>,
@@ -80,8 +80,8 @@ void GPUQueueCUDA::IssueSaturatingKernel(std::string_view name,
                                          //
                                          Args&&... fArgs) const
 {
-    static const GPUAnnotationCUDA annotation = GPUAnnotationCUDA(nvtxDomain, name);
-    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
+    static const auto annotation = GPUAnnotationCUDA(nvtxDomain, name);
+    const auto _ = annotation.AnnotateScope();
 
     assert(p.workCount != 0);
     using namespace CudaKernelCalls;
@@ -107,8 +107,8 @@ void GPUQueueCUDA::IssueSaturatingLambda(std::string_view name,
                                          //
                                          Lambda&& func) const
 {
-    static const GPUAnnotationCUDA annotation = GPUAnnotationCUDA(nvtxDomain, name);
-    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
+    static const auto annotation = GPUAnnotationCUDA(nvtxDomain, name);
+    const auto _ = annotation.AnnotateScope();
 
     assert(p.workCount != 0);
     static_assert(std::is_rvalue_reference_v<decltype(func)>,
@@ -138,8 +138,8 @@ void GPUQueueCUDA::IssueExactKernel(std::string_view name,
                                     //
                                     Args&&... fArgs) const
 {
-    static const GPUAnnotationCUDA annotation = GPUAnnotationCUDA(nvtxDomain, name);
-    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
+    static const auto annotation = GPUAnnotationCUDA(nvtxDomain, name);
+    const auto _ = annotation.AnnotateScope();
 
     assert(p.gridSize != 0);
     using namespace CudaKernelCalls;
@@ -157,8 +157,8 @@ void GPUQueueCUDA::IssueExactLambda(std::string_view name,
                                     //
                                     Lambda&& func) const
 {
-    static const GPUAnnotationCUDA annotation = GPUAnnotationCUDA(nvtxDomain, name);
-    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
+    static const auto annotation = GPUAnnotationCUDA(nvtxDomain, name);
+    const auto _ = annotation.AnnotateScope();
 
     assert(p.gridSize != 0);
     static_assert(std::is_rvalue_reference_v<decltype(func)>,

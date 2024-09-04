@@ -9,34 +9,62 @@
 
 // TODO: Remove later
 #include "TypeFormat.h"
+#include "Device/GPUDebug.h"
 
-MRAY_KERNEL
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCGenerateWorkKeys(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
                         MRAY_GRID_CONSTANT const Span<const HitKeyPack> dInputKeys,
                         MRAY_GRID_CONSTANT const RenderWorkHasher workHasher)
 {
     assert(dWorkKey.size() == dInputKeys.size());
-    uint32_t keyCount = static_cast<uint32_t>(dInputKeys.size());
+
     KernelCallParams kp;
+    uint32_t keyCount = static_cast<uint32_t>(dInputKeys.size());
     for(uint32_t i = kp.GlobalId(); i < keyCount; i += kp.TotalSize())
     {
         dWorkKey[i] = workHasher.GenerateWorkKeyGPU(dInputKeys[i]);
     }
 }
 
-MRAY_KERNEL
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCGenerateWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
                                 MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
                                 MRAY_GRID_CONSTANT const Span<const HitKeyPack> dInputKeys,
                                 MRAY_GRID_CONSTANT const RenderWorkHasher workHasher)
 {
-    uint32_t keyCount = static_cast<uint32_t>(dIndices.size());
     KernelCallParams kp;
+    uint32_t keyCount = static_cast<uint32_t>(dIndices.size());
     for(uint32_t i = kp.GlobalId(); i < keyCount; i += kp.TotalSize())
     {
         RayIndex keyIndex = dIndices[i];
         auto keyPack = dInputKeys[keyIndex];
         dWorkKey[keyIndex] = workHasher.GenerateWorkKeyGPU(keyPack);
+    }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCSetBoundaryWorkKeys(MRAY_GRID_CONSTANT const Span<HitKeyPack> dWorkKey,
+                           MRAY_GRID_CONSTANT const HitKeyPack boundaryWorkKey)
+{
+    KernelCallParams kp;
+    uint32_t keyCount = static_cast<uint32_t>(dWorkKey.size());
+    for(uint32_t i = kp.GlobalId(); i < keyCount; i += kp.TotalSize())
+    {
+        dWorkKey[i] = boundaryWorkKey;
+    }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCSetBoundaryWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<HitKeyPack> dWorkKey,
+                                   MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
+                                   MRAY_GRID_CONSTANT const HitKeyPack boundaryWorkKey)
+{
+    KernelCallParams kp;
+    uint32_t keyCount = static_cast<uint32_t>(dIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < keyCount; i += kp.TotalSize())
+    {
+        RayIndex keyIndex = dIndices[i];
+        dWorkKey[keyIndex] = boundaryWorkKey;
     }
 }
 
@@ -100,6 +128,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     curColorSpace = tracerView.tracerParams.globalTextureColorSpace;
     currentOptions = newOptions;
     transOverride = optTransform;
+    totalIterationCount = 0;
     globalPixelIndex = 0;
 
     // Generate the Filter
@@ -170,6 +199,9 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     // And initialze the hashes
     workHasher = InitializeHashes(dWorkHashes, dWorkBatchIds, queue);
 
+    //DeviceDebug::DumpGPUMemToStdOut("WorkHashes", ToConstSpan(dWorkHashes), queue);
+    //DeviceDebug::DumpGPUMemToStdOut("WorkBatchIds", ToConstSpan(dWorkBatchIds), queue);
+
     // Initialize ray partitioner with worst case scenario,
     // All work types are used. (We do not use camera work
     // for this type of renderer)
@@ -207,10 +239,11 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     };
 }
 
-#include "Device/GPUDebug.h"
-
 RendererOutput SurfaceRenderer::DoRender()
 {
+    static const auto annotation = gpuSystem.CreateAnnotation("Render Frame");
+    const auto _ = annotation.AnnotateScope();
+
     // On each iteration do one tile fully,
     // so we can send it directly.
     // TODO: Like many places of this codebase
@@ -262,12 +295,20 @@ RendererOutput SurfaceRenderer::DoRender()
     rnGenerator->CopyStatesFromGPUAsync(processQueue);
 
     // Cast rays
+    using namespace std::string_view_literals;
     Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
-    processQueue.MemsetAsync(dHitKeys, 0xFF);
+    processQueue.IssueSaturatingKernel<KCSetBoundaryWorkKeys>
+    (
+        "KCSetBoundaryWorkKeys"sv,
+        KernelIssueParams{.workCount = static_cast<uint32_t>(dHitKeys.size())},
+        dHitKeys,
+        boundaryMatKeyPack
+    );
+
     tracerView.baseAccelerator.CastRays(dHitKeys, dHits, dBackupRNGStates,
                                         dRays, dIndices, processQueue);
 
-    DeviceDebug::DumpGPUMemToFile("dHitKeys", ToConstSpan(dHitKeys), processQueue);
+    //DeviceDebug::DumpGPUMemToFile("dHitKeys", ToConstSpan(dHitKeys), processQueue);
 
     // Generate work keys from hit packs
     using namespace std::string_literals;
@@ -281,8 +322,8 @@ RendererOutput SurfaceRenderer::DoRender()
         workHasher
     );
 
-    DeviceDebug::DumpGPUMemToFile("dHashes", ToConstSpan(dKeys), processQueue);
-    DeviceDebug::DumpGPUMemToFile("dIndicesIn2", ToConstSpan(dIndices), processQueue);
+    //DeviceDebug::DumpGPUMemToFile("dHashes", ToConstSpan(dKeys), processQueue);
+    //DeviceDebug::DumpGPUMemToFile("dIndicesIn2", ToConstSpan(dIndices), processQueue);
 
     // Finally, partition using the generated keys.
     // Fully partition here using single sort
@@ -301,10 +342,8 @@ RendererOutput SurfaceRenderer::DoRender()
     assert(isHostVisible);
     // Wait for results to be available in host buffers
     processQueue.Barrier().Wait();
-    DeviceDebug::DumpGPUMemToFile("dPartitionIndicesFull", ToConstSpan(dPartitionIndices), processQueue);
-    DeviceDebug::DumpGPUMemToFile("dPartitionKeysFull", ToConstSpan(dPartitionKeys), processQueue);
-    DeviceDebug::DumpGPUMemToFile("wtfKeys", ToConstSpan(dKeys), processQueue);
-    DeviceDebug::DumpGPUMemToFile("wtfIndices", ToConstSpan(dIndices), processQueue);
+    //DeviceDebug::DumpGPUMemToFile("dPartitionIndicesFull", ToConstSpan(dPartitionIndices), processQueue);
+    //DeviceDebug::DumpGPUMemToFile("dPartitionKeysFull", ToConstSpan(dPartitionKeys), processQueue);
 
     GlobalState globalState{currentOptions.mode};
     for(uint32_t i = 0; i < hPartitionCount[0]; i++)
@@ -316,8 +355,8 @@ RendererOutput SurfaceRenderer::DoRender()
         auto dLocalIndices = dPartitionIndices.subspan(partitionStart,
                                                        partitionSize);
 
-        DeviceDebug::DumpGPUMemToFile(std::string("dPartitionIndicesLocal") + std::to_string(i),
-                                      ToConstSpan(dLocalIndices), processQueue);
+        //DeviceDebug::DumpGPUMemToFile(std::string("dPartitionIndicesLocal") + std::to_string(i),
+        //                              ToConstSpan(dLocalIndices), processQueue);
         // Find the work
         // TODO: Although work count should be small,
         // doing a linear search here may not be performant.
@@ -363,6 +402,9 @@ RendererOutput SurfaceRenderer::DoRender()
                                      globalState,
                                      processQueue);
         }
+        else throw MRayError("[{}]: Unkown work id is found ({}).",
+                             TypeName(), key);
+
     }
 
     // Filter the samples
@@ -376,12 +418,12 @@ RendererOutput SurfaceRenderer::DoRender()
                                         ToConstSpan(dRayState.dOutputData),
                                         ToConstSpan(dRayState.dImageCoordinates),
                                         tracerView.tracerParams.parallelizationHint,
-                                        Float(1));
+                                        Float(1), processQueue);
     // Issue a send of the FBO to Visor
     const GPUQueue& transferQueue = device.GetTransferQueue();
     Optional<RenderImageSection>
-    renderOut = renderBuffer->TransferToHost(processQueue,
-                                             transferQueue);
+    renderOut = imageTiler.TransferToHost(processQueue,
+                                          transferQueue);
     // Semaphore is invalidated, visor is probably crashed
     if(!renderOut.has_value())
         return RendererOutput{};
@@ -401,7 +443,8 @@ RendererOutput SurfaceRenderer::DoRender()
     samplePerSec /= 1'000'000;
     double spp = (double(imageTiler.CurrentTileIndex().Multiply() + 1) /
                   double(imageTiler.TileCount().Multiply()));
-
+    spp *= static_cast<double>(totalIterationCount);
+    totalIterationCount++;
     // Roll to the next tile
     imageTiler.NextTile();
 

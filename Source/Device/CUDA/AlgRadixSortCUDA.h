@@ -65,7 +65,7 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
     using namespace cub;
     using namespace std::literals;
     static const auto annotation = queue.CreateAnnotation("KCRadixSort"sv);
-    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
+    const auto _ = annotation.AnnotateScope();
 
     assert(dKeyDoubleBuffer[0].size() == dKeyDoubleBuffer[1].size());
     assert(dValueDoubleBuffer[0].size() == dValueDoubleBuffer[1].size());

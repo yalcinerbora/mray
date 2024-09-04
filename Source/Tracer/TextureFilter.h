@@ -43,7 +43,8 @@ class TextureFilterI
                                             const Span<const ImageCoordinate>& dImgCoords,
                                             // Constants
                                             uint32_t parallelHint,
-                                            Float scalarWeightMultiplier) const = 0;
+                                            Float scalarWeightMultiplier,
+                                            const GPUQueue& queue) const = 0;
     virtual Vector2ui FilterExtent() const = 0;
 };
 
@@ -83,7 +84,8 @@ class TextureFilterT : public TextureFilterI
                                     const Span<const ImageCoordinate>& dImgCoords,
                                     // Constants
                                     uint32_t parallelHint,
-                                    Float scalarWeightMultiplier) const override;
+                                    Float scalarWeightMultiplier,
+                                    const GPUQueue& queue) const override;
 
     Vector2ui FilterExtent() const override;
 };

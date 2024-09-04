@@ -121,6 +121,10 @@ BinaryPartitionOutput RayPartitioner::BinaryPartition(Span<const CommonIndex> dI
                                                       const GPUQueue& queue,
                                                       UnaryFunc&& UnaryF) const
 {
+    using namespace std::string_view_literals;
+    static const auto annotation = system.CreateAnnotation("Ray BinaryPartition"sv);
+    const auto _ = annotation.AnnotateScope();
+
     // Determine output buffer
     Span<CommonIndex> dOutput = DetermineOutputSpan(dIndices, dIndicesIn);
 

@@ -40,7 +40,7 @@ void BinaryPartition(Span<T> dOutput,
     using namespace cub;
     using namespace std::literals;
     static const auto annotation = queue.CreateAnnotation("KCBinaryPartition"sv);
-    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
+    const auto _ = annotation.AnnotateScope();
     assert(dInput.size() == dOutput.size());
 
     size_t size = dTempMemory.size();

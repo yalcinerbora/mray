@@ -14,7 +14,7 @@ void KCGenRandomNumbersPCG32(// Output
                              // Constants
                              uint32_t dimPerGenerator)
 {
-    assert(dNumbers.size() == dStates.size() * dimPerGenerator);
+    assert(dStates.size() * dimPerGenerator == dNumbers.size());
     using State = typename PermutedCG32::State;
 
     uint32_t generatorCount = uint32_t(dStates.size());
@@ -34,7 +34,7 @@ void KCGenRandomNumbersPCG32(// Output
         for(uint32_t n = 0; n < dimPerGenerator; n++)
         {
             // Write in strided fashion to coalesce mem
-            dNumbers[i + dimPerGenerator * n] = rng.Next();
+            dNumbers[i + generatorCount * n] = rng.Next();
         }
         // Write the modified state
         dStates[i] = state;

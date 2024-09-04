@@ -48,6 +48,7 @@ RaySample CameraPinhole::SampleRay(// Input
 
     // Create random location over sample rectangle
     Vector2 xi = rng.NextFloat2D<0>();
+
     Vector2 jitter = (xi * delta);
     Vector2 sampleDistance = Vector2(static_cast<float>(sampleId[0]),
                                      static_cast<float>(sampleId[1])) * delta;
@@ -63,10 +64,12 @@ RaySample CameraPinhole::SampleRay(// Input
     assert(sampleId[0] <= std::numeric_limits<uint16_t>::max() &&
            sampleId[1] <= std::numeric_limits<uint16_t>::max());
 
+    Vector2 localJitter = xi - Vector2(0.5);
+    Vector2 out = Vector2(SNorm2x16(localJitter));
     ImageCoordinate imgCoords =
     {
         .pixelIndex = Vector2us(sampleId),
-        .offset = SNorm2x16(jitter - Vector2(0.5))
+        .offset = SNorm2x16(localJitter)
     };
     // Initialize Ray
     return RaySample

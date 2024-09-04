@@ -154,8 +154,8 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
     // TODO: This is common assignment, every renderer
     // does this move to a templated intermediate class
     // on the inheritance chain
-    if(!rendering)
-        currentOptions = newOptions;
+    currentOptions = newOptions;
+    totalIterationCount = 0;
 
     // Skip if nothing to show
     if(textures.empty())
@@ -213,6 +213,9 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
 
 RendererOutput TexViewRenderer::DoRender()
 {
+    static const auto annotation = gpuSystem.CreateAnnotation("Render Frame");
+    const auto _ = annotation.AnnotateScope();
+
     // Use CPU timer here
     // TODO: Implement a GPU timer later
     Timer timer; timer.Start();
@@ -293,8 +296,9 @@ RendererOutput TexViewRenderer::DoRender()
     samplePerSec /= 1'000'000;
     double spp = (double(imageTiler.CurrentTileIndex().Multiply() + 1) /
                   double(imageTiler.TileCount().Multiply()));
-    const GenericTexture* curTex = textures[textureIndex];
-
+    spp *= static_cast<double>(totalIterationCount);
+    totalIterationCount++;
+    // Roll to the next tile
     imageTiler.NextTile();
     return RendererOutput
     {
@@ -308,7 +312,7 @@ RendererOutput TexViewRenderer::DoRender()
             imageTiler.FullResolution(),
             MRayColorSpaceEnum::MR_ACES_CG,
             static_cast<uint32_t>(textures.size()),
-            static_cast<uint32_t>(curTex->MipCount())
+            static_cast<uint32_t>(textures[textureIndex]->MipCount())
         },
         .imageOut = renderOut
     };

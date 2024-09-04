@@ -50,17 +50,26 @@ static void WarpSynchronize()
 {
     // Dirty fix to make host side happy
     #ifdef __CUDA_ARCH__
-
-    constexpr uint32_t MASK = LOGICAL_WARP_SIZE - 1;
-    static_assert(LOGICAL_WARP_SIZE ==  1 || LOGICAL_WARP_SIZE ==  2 ||
-                  LOGICAL_WARP_SIZE ==  4 || LOGICAL_WARP_SIZE ==  8 ||
+    static_assert(LOGICAL_WARP_SIZE == 1 || LOGICAL_WARP_SIZE == 2 ||
+                  LOGICAL_WARP_SIZE == 4 || LOGICAL_WARP_SIZE == 8 ||
                   LOGICAL_WARP_SIZE == 16 || LOGICAL_WARP_SIZE == 32,
                   "Logical warps must be power of 2 and \"<32\"");
-    uint32_t localWarpId = threadIdx.x % WarpSize();
-    localWarpId /= LOGICAL_WARP_SIZE;
-    uint32_t localMask = MASK << (localWarpId * LOGICAL_WARP_SIZE);
-    __syncwarp(localMask);
 
+    // Technically single-threaded logical warp is self synchronizing,
+    // so no need to do sync.
+    if constexpr(LOGICAL_WARP_SIZE != 1)
+    {
+        static constexpr uint32_t FULL_MASK = std::numeric_limits<uint32_t>::max();
+        // Creating all FF's is UB (when doint it via shift, is there any other way to do it)
+        // since we shift out of bounds so...
+        static constexpr uint32_t MASK = (LOGICAL_WARP_SIZE == 32)
+            ? FULL_MASK
+            : (1u << LOGICAL_WARP_SIZE) - 1u;
+        uint32_t localWarpId = threadIdx.x % WarpSize();
+        uint32_t logicalWarpId = localWarpId / LOGICAL_WARP_SIZE;
+        uint32_t localMask = MASK << (logicalWarpId * LOGICAL_WARP_SIZE);
+        __syncwarp(localMask);
+    }
     #endif
 }
 

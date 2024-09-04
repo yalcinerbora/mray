@@ -17,7 +17,7 @@ using RNGDispenser = RNGDispenserT<uint32_t>;
 using MetaHit = MetaHitT<2>;
 
 // Differential portion of a ray
-struct RayDiff
+struct alignas(16) RayDiff
 {
     // TODO: Need to check the paper
     // But in the end it should have

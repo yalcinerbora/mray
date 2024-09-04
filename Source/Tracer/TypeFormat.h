@@ -70,3 +70,12 @@ inline auto format_as(const RayGMem& r)
 {
     return Tuple(r.dir, r.pos, Vector2(r.tMin, r.tMax));
 }
+
+inline auto format_as(const ImageCoordinate& ic)
+{
+    Vector2 total = ic.GetPixelIndex();
+    Vector2 offset = Vector2(ic.offset);
+    std::string s = fmt::format("[{} | {} = {}]",
+                                ic.pixelIndex, offset, total);
+    return s;
+}

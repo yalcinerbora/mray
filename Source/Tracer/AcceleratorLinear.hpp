@@ -46,12 +46,6 @@ OptionalHitR<PG> AcceleratorLinear<PG, TG>::IntersectionCheck(const Ray& ray,
     // Actual intersection finally!
     Optional<Intersection> intersection = prim.Intersects(transformedRay,
                                                           cullFaceFlags[index]);
-
-    if(intersection)
-    {
-        printf("Intersect (%f, %f)\n", intersection->hit[0], intersection->hit[1]);
-    }
-
     // Intersection decisions
     if(!intersection) return std::nullopt;
     if(!IsInRange(intersection->t)) return std::nullopt;

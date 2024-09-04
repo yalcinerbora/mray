@@ -80,7 +80,7 @@ void Reduce(Span<T, 1> dReducedValue,
     using namespace cub;
     using namespace std::literals;
     static const auto annotation = queue.CreateAnnotation("KCReduce"sv);
-    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
+    const auto _ = annotation.AnnotateScope();
 
     size_t size = dTempMemory.size();
     CUDA_CHECK(DeviceReduce::Reduce(dTempMemory.data(), size,
@@ -103,7 +103,7 @@ void TransformReduce(Span<OutT, 1> dReducedValue,
     using namespace cub;
     using namespace std::literals;
     static const auto annotation = queue.CreateAnnotation("KCTransformReduce"sv);
-    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
+    const auto _ = annotation.AnnotateScope();
 
     using TransIt = TransformInputIterator<OutT, TransformOp, const InT*>;
     TransIt dIn = TransIt(dValues.data(), std::forward<TransformOp>(transformOp));
@@ -130,7 +130,7 @@ void SegmentedTransformReduce(Span<OutT> dReducedValues,
     using namespace cub;
     using namespace std::literals;
     static const auto annotation = queue.CreateAnnotation("KCSegmentedTransformReduce"sv);
-    GPUAnnotationCUDA::Scope _ = annotation.AnnotateScope();
+    const auto _ = annotation.AnnotateScope();
     using TransIt = TransformInputIterator<OutT, TransformOp, const InT*>;
     TransIt dIn = TransIt(dValues.data(), std::forward<TransformOp>(transformOp));
 

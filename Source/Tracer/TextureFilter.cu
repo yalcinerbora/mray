@@ -12,6 +12,10 @@
 #include "Core/DeviceVisit.h"
 #include "Core/GraphicsFunctions.h"
 
+#include "Device/GPUDebug.h"
+#include "TypeFormat.h"
+
+
 #ifdef MRAY_GPU_BACKEND_CUDA
     #include <cub/block/block_reduce.cuh>
 #else
@@ -23,6 +27,8 @@ enum class FilterMode
     SAMPLING,
     ACCUMULATE
 };
+
+static constexpr uint32_t INVALID_MORTON = std::numeric_limits<uint32_t>::max();
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 int32_t FilterRadiusToPixelWH(Float filterRadius)
@@ -277,6 +283,7 @@ void KCExpandSamplesToPixels(// Outputs
         sampleIndex += kp.TotalSize())
     {
         Vector2 imgCoords = dImgCoords[sampleIndex].GetPixelIndex();
+        imgCoords += Vector2(0.5);
         Vector2 relImgCoords;
         Vector2 fractions = Vector2(std::modf(imgCoords[0], &(relImgCoords[0])),
                                     std::modf(imgCoords[1], &(relImgCoords[1])));
@@ -287,14 +294,14 @@ void KCExpandSamplesToPixels(// Outputs
         Vector2i localRangeY = range;
         if(filterWH % 2 == 0)
         {
-            if(fractions[0] < 0.5f) localRangeX -= Vector2i(1);
-            if(fractions[1] < 0.5f) localRangeY -= Vector2i(1);
+            if(fractions[0] < Float(0.5)) localRangeX -= Vector2i(1);
+            if(fractions[1] < Float(0.5)) localRangeY -= Vector2i(1);
         }
 
         // Actual write
         int32_t stride = 0;
-        for(int32_t y = range[0]; y < range[1]; y++)
-        for(int32_t x = range[0]; x < range[1]; x++)
+        for(int32_t y = localRangeX[0]; y < localRangeX[1]; y++)
+        for(int32_t x = localRangeX[0]; x < localRangeX[1]; x++)
         {
             Vector2 pixCoord = relImgCoords + Vector2(x, y);
             Vector2 pixCenter = pixCoord + Float(0.5);
@@ -302,30 +309,49 @@ void KCExpandSamplesToPixels(// Outputs
             // which one is better?
             Float lengthSqr = (imgCoords - pixCenter).LengthSqr();
 
+
+            //printf("(%f, %f) + (%f, %f) = (%f, %f) |||| "
+            //        "PixCenter (%f, %f), PixCoord (%f, %f)\n",
+            //        relImgCoords[0], relImgCoords[1],
+            //        fractions[0], fractions[1],
+            //        imgCoords[0], imgCoords[1],
+            //        pixCenter[0], pixCenter[1],
+            //        pixCoord[0], pixCoord[1]);
+
             // Skip if this pixel is out of range,
             // Filter WH is a conservative estimate
             // so this can happen
             bool doWrite = true;
-            if(lengthSqr > radiusSqr) doWrite = false;
+            if(radiusSqr != Float(0) && lengthSqr > radiusSqr) doWrite = false;
 
             // Get ready for writing
             Vector2i globalPixCoord = Vector2i(imgCoords) + Vector2i(x, y);
-
             bool pixOutside = (globalPixCoord[0] < 0            ||
                                globalPixCoord[0] >= extent[0]   ||
                                globalPixCoord[1] < 0            ||
                                globalPixCoord[1] >= extent[1]);
+
+
+            //printf("(%d, %d) | Pix in on img?(%s) | Filter reach to pix? (%s)\n",
+            //        globalPixCoord[0], globalPixCoord[1],
+            //        (!pixOutside) ? "true" : "false",
+            //        doWrite ? "true" : "false");
+
             // Do not write (obviously) if pixel is outside
             if(pixOutside) doWrite = false;
 
-            // Now we can write
-            assert(stride != maxPixelPerSample);
-            constexpr uint32_t INVALID_INT = std::numeric_limits<uint32_t>::max();
+            //if(doWrite)
+            //{
+            //    printf("Writing this (%d, %d)\n",
+            //           globalPixCoord[0], globalPixCoord[1]);
+            //}
 
+            // Now we can write
+            assert(stride < maxPixelPerSample);
             namespace Morton = Graphics::MortonCode;
-            uint32_t pixelLinearId = Morton::Compose2D<uint32_t>(Vector2ui(globalPixCoord[1]));
-            pixelLinearId = (!doWrite) ? INVALID_INT : pixelLinearId;
-            uint32_t index = (!doWrite) ? INVALID_INT : sampleIndex;
+            uint32_t pixelLinearId = Morton::Compose2D<uint32_t>(Vector2ui(globalPixCoord));
+            pixelLinearId = (!doWrite) ? INVALID_MORTON : pixelLinearId;
+            uint32_t index = (!doWrite) ? INVALID_MORTON : sampleIndex;
 
             // Write windows, each sample has "maxPixelPerSample" amount of allocation
             // slots. These are available in a strided fashion, so writes can be coalesced
@@ -352,11 +378,12 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan<3> img,
                           MRAY_GRID_CONSTANT const Span<const Spectrum> dValues,
                           MRAY_GRID_CONSTANT const Span<const ImageCoordinate> dImgCoords,
                           // Constants
+                          MRAY_GRID_CONSTANT const Span<const uint32_t, 1u> hPartitionCount,
                           MRAY_GRID_CONSTANT const Float scalarWeightMultiplier,
                           MRAY_GRID_CONSTANT const Filter filter)
 {
     KernelCallParams kp;
-    assert(dStartOffsets.size() == dPixelIds.size());
+    assert(dStartOffsets.size() == (dPixelIds.size() + 1));
     static_assert(TPB % LOGICAL_WARP_SIZE == 0);
 
     // Some constants
@@ -374,16 +401,25 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan<3> img,
     MRAY_SHARED_MEMORY ReduceShMem  sReduceMem[WARP_PER_BLOCK];
 
     // Warp-stride loop
-    uint32_t segmentCount = static_cast<uint32_t>(dStartOffsets.size());
+    uint32_t segmentCount = hPartitionCount[0];
     for(uint32_t segmentIndex = globalWarpId; segmentIndex < segmentCount;
         segmentIndex += totalWarpCount)
     {
+        static constexpr uint32_t LOAD_0 = (0 % LOGICAL_WARP_SIZE);
+        static constexpr uint32_t LOAD_1 = (1 % LOGICAL_WARP_SIZE);
+        static constexpr uint32_t LOAD_2 = (2 % LOGICAL_WARP_SIZE);
+
         // Load items to warp level
-        if(laneId == 0) sSegmentRange[localWarpId][0] = dStartOffsets[segmentIndex + 0];
-        if(laneId == 1) sSegmentRange[localWarpId][1] = dStartOffsets[segmentIndex + 1];
-        if(laneId == 2) sResonsiblePixel[localWarpId] = dPixelIds[segmentIndex];
+        if(laneId == LOAD_0) sSegmentRange[localWarpId][0] = dStartOffsets[segmentIndex + 0];
+        if(laneId == LOAD_1) sSegmentRange[localWarpId][1] = dStartOffsets[segmentIndex + 1];
+        if(laneId == LOAD_2) sResonsiblePixel[localWarpId] = dPixelIds[segmentIndex];
         // Wait for these writes to be visible across warp
         WarpSynchronize<LOGICAL_WARP_SIZE>();
+
+        // This partition is residuals, we conservatively allocated but not every
+        // potential filter slot is not filled. Skip this partition
+        if(sResonsiblePixel[localWarpId] == INVALID_MORTON)
+            continue;
 
         // Locally compute the coordinates
         namespace Morton = Graphics::MortonCode;
@@ -445,8 +481,17 @@ void ReconFilterGenericRGB(// Output
                            Float scalarWeightMultiplier,
                            Float filterRadius,
                            Filter filter,
-                           const GPUSystem& gpuSystem)
+                           const GPUQueue& queue)
 {
+    // TODO:...............?????
+    queue.Barrier().Wait();
+
+    // We use 32-bit morton code but last value 0xFFF..FF is reserved.
+    // If image is 64k x 64k this system will not work (it will be rare but..)
+    // Throw it that is the case
+    if(img.Extent() == Vector2i(std::numeric_limits<uint16_t>::max()))
+        throw MRayError("Unable to filter image size of 64k x 64k");
+
     // Get algo temp buffers
     assert(dValues.size() == dImgCoords.size());
     uint32_t elementCount = static_cast<uint32_t>(dValues.size());
@@ -461,8 +506,9 @@ void ReconFilterGenericRGB(// Output
 
     auto [dIndices, dKeys] = partitioner.Start(totalPPS, maxPartitionCount, false);
 
+    //DeviceDebug::DumpGPUMemToFile("dImageCoords", ToConstSpan(dImgCoords), queue);
+
     using namespace std::string_view_literals;
-    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     queue.IssueSaturatingKernel<KCExpandSamplesToPixels>
     (
         "KCExpandSamplesToPixels"sv,
@@ -477,6 +523,10 @@ void ReconFilterGenericRGB(// Output
         maxPixelPerSample,
         img.Extent()
     );
+
+    using enum DeviceDebug::WriteMode;
+    //DeviceDebug::DumpGPUMemToFile<HEXEDECIMAL>("dFilterMorton", ToConstSpan(dKeys), queue);
+    //DeviceDebug::DumpGPUMemToFile("dFilterSampleIndices", ToConstSpan(dIndices), queue);
 
     using namespace Bit;
     Vector2ui sortRange = Vector2ui(0, RequiredBitsToRepresent(maxPartitionCount));
@@ -495,11 +545,19 @@ void ReconFilterGenericRGB(// Output
                                     sortRange, queue, true);
     assert(isHostVisible == false);
 
+    //DeviceDebug::DumpGPUMemToFile("dFilterPartOffsets", ToConstSpan(dPartitionStartOffsets), queue);
+    //DeviceDebug::DumpGPUMemToFile<HEXEDECIMAL>("dFilterPartPixelIds", ToConstSpan(dPartitionPixelIds), queue);
+
+    //DeviceDebug::DumpGPUMemToFile("dPartitionIndices", ToConstSpan(dPartitionIndices), queue);
+    //DeviceDebug::DumpGPUMemToFile<HEXEDECIMAL>("dPartitionKeys", ToConstSpan(dPartitionKeys), queue);
+
     // We've partitioned now determine the kernel with a basic
     // heuristic. Just find the average spp and use it.
     // This heuristic assumes samples are uniformly distributed
     // on the pixel range.
-    uint32_t averageSPP = elementCount / hPartitionCount[0];
+    // In order to not to wait the host result, we estimate SPP
+    // as PPS.
+    uint32_t averageSPP = maxPixelPerSample;
 
     // TODO: Currently, only warp-dedicated reduction.
     // If tracer pounds towards a specific region on the scene
@@ -507,7 +565,7 @@ void ReconFilterGenericRGB(// Output
     // amount of work to do. This is not optimal.
     // We need to create block and device variants of this reduction.
     //
-    // According to the simple test dedicating nearest amount of warps (rounded down)
+    // According to a simple test, dedicating nearest amount of warps (rounded down)
     // was slower. Interestingly, for a 5x5 kernel, logical warp size of 1
     // (a thread) was the fastest. So dividing spp with this.
     static constexpr uint32_t WORK_PER_THREAD = 16;
@@ -544,6 +602,7 @@ void ReconFilterGenericRGB(// Output
             dValuesIn,
             dImgCoordsIn,
             // Constants
+            Span<const uint32_t, 1>(hPartitionCount.data(), 1u),
             scalarWeightMultiplier,
             filter
         );
@@ -557,7 +616,7 @@ void ReconFilterGenericRGB(// Output
         KCFilterToImgWarpRGB<StaticThreadPerBlock1D(), 16, Filter>,
         KCFilterToImgWarpRGB<StaticThreadPerBlock1D(), 32, Filter>
     };
-    switch(logicalWarpSize)
+    switch(logicalWarpSize - 1)
     {
         case 0: KernelCall.template operator()<WK[0]>("KCFilterToImgWarpRGB<1>"sv); break;
         case 1: KernelCall.template operator()<WK[1]>("KCFilterToImgWarpRGB<2>"sv); break;
@@ -583,7 +642,7 @@ void MultiPassReconFilterGenericRGB(// Output
                                     Float scalarWeightMultiplier,
                                     Float filterRadius,
                                     Filter filter,
-                                    const GPUSystem& gpuSystem)
+                                    const GPUQueue& queue)
 {
     // This partition-based design uses too much memory
     // ~(filter_width * filter_height * sampleCount * 2 * sizeof(uint32_t))
@@ -606,11 +665,11 @@ void MultiPassReconFilterGenericRGB(// Output
     // Try to comply the parallelization hint
     // Divide the work equally
     uint32_t iterations = MathFunctions::DivideUp(totalPPS, parallelHint);
-    uint32_t workPerIter = MathFunctions::DivideUp(totalPPS, iterations);
+    uint32_t workPerIter = MathFunctions::DivideUp(totalWork, iterations);
     for(uint32_t i = 0; i < iterations; i++)
     {
         uint32_t start = workPerIter * i;
-        uint32_t end = std::min(workPerIter * i + 1, totalWork);
+        uint32_t end = std::min(workPerIter * (i + 1), totalWork);
         uint32_t count = end - start;
 
         Span<const Spectrum> dLocalValues = dValues.subspan(start, count);
@@ -618,7 +677,7 @@ void MultiPassReconFilterGenericRGB(// Output
         ReconFilterGenericRGB(img, partitioner,
                               dLocalValues, dLocalImgCoords,
                               scalarWeightMultiplier, filterRadius,
-                              filter, gpuSystem);
+                              filter, queue);
     }
 }
 
@@ -821,12 +880,16 @@ void TextureFilterT<E, FF>::ReconstructionFilterRGB(// Output
                                                     const Span<const ImageCoordinate>& dImgCoords,
                                                     // Constants
                                                     uint32_t parallelHint,
-                                                    Float scalarWeightMultiplier) const
+                                                    Float scalarWeightMultiplier,
+                                                    const GPUQueue& queue) const
 {
+    static const auto annotation = queue.CreateAnnotation("Reconstruction Filter");
+    const auto _ = annotation.AnnotateScope();
+
     MultiPassReconFilterGenericRGB(img, partitioner, dValues, dImgCoords,
                                    parallelHint, scalarWeightMultiplier,
                                    filterRadius, FF(filterRadius),
-                                   gpuSystem);
+                                   queue);
 }
 
 template<FilterType::E E, class FF>
