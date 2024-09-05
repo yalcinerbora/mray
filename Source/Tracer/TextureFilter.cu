@@ -484,7 +484,7 @@ void ReconFilterGenericRGB(// Output
                            const GPUQueue& queue)
 {
     // TODO:...............?????
-    queue.Barrier().Wait();
+    //queue.Barrier().Wait();
 
     // We use 32-bit morton code but last value 0xFFF..FF is reserved.
     // If image is 64k x 64k this system will not work (it will be rare but..)

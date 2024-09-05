@@ -279,7 +279,7 @@ RendererOutput SurfaceRenderer::DoRender()
                                   imageTiler.LocalTileEnd());
 
     // Generate RN for camera rays
-    rnGenerator->CopyStatesToGPUAsync(processQueue);
+    //rnGenerator->CopyStatesToGPUAsync(processQueue);
     rnGenerator->GenerateNumbers(dCamGenRandomNums,
                                  (*curCamWork)->SampleRayRNCount(),
                                  processQueue);
@@ -292,7 +292,7 @@ RendererOutput SurfaceRenderer::DoRender()
                             processQueue);
     globalPixelIndex += rayCount;
     // Save the states back (we will issue next tile after on next iteration)
-    rnGenerator->CopyStatesFromGPUAsync(processQueue);
+    //rnGenerator->CopyStatesFromGPUAsync(processQueue);
 
     // Cast rays
     using namespace std::string_view_literals;
@@ -459,6 +459,7 @@ RendererOutput SurfaceRenderer::DoRender()
             float(timer.Elapsed<Millisecond>()),
             imageTiler.FullResolution(),
             MRayColorSpaceEnum::MR_ACES_CG,
+            GPUMemoryUsage(),
             static_cast<uint32_t>(SurfRDetail::Mode::END),
             0
         },

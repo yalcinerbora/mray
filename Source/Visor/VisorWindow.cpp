@@ -1319,7 +1319,7 @@ bool VisorWindow::Render()
             case MEMORY_USAGE:
             {
                 MRAY_LOG("[Visor]: Memory usage received");
-                visorState.usedGPUMemoryBytes = std::get<MEMORY_USAGE>(response);
+                visorState.tracerUsedGPUMemBytes = std::get<MEMORY_USAGE>(response);
                 break;
             }
             default: MRAY_WARNING_LOG("[Visor] Unkown tracer response is ignored!"); break;

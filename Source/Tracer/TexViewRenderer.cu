@@ -311,6 +311,7 @@ RendererOutput TexViewRenderer::DoRender()
             float(timer.Elapsed<Millisecond>()),
             imageTiler.FullResolution(),
             MRayColorSpaceEnum::MR_ACES_CG,
+            GPUMemoryUsage(),
             static_cast<uint32_t>(textures.size()),
             static_cast<uint32_t>(textures[textureIndex]->MipCount())
         },

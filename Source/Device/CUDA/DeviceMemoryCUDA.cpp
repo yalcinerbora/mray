@@ -430,8 +430,22 @@ DeviceMemoryCUDA::~DeviceMemoryCUDA()
 
 void DeviceMemoryCUDA::ResizeBuffer(size_t newSize)
 {
+    auto HaltVisibleDevices = [this]()
+    {
+        int curDevice;
+        CUDA_CHECK(cudaGetDevice(&curDevice));
+        for(int deviceId : deviceIds)
+        {
+            CUDA_CHECK(cudaSetDevice(deviceId));
+            CUDA_CHECK(cudaDeviceSynchronize());
+        }
+        CUDA_CHECK(cudaSetDevice(curDevice));
+    };
+
     // Align the newSize
     newSize = MathFunctions::NextMultiple(newSize, allocationGranularity);
+    bool allocSizeChanged = false;
+    bool reservationRelocated = false;
 
     if(newSize > reservedSize)
     {
@@ -447,7 +461,11 @@ void DeviceMemoryCUDA::ResizeBuffer(size_t newSize)
         if((status != CUDA_SUCCESS) ||
            (newPtr != mPtr + reservedSize))
         {
-            //MRAY_LOG("Complete Remap");
+            // Do a complete halt of the GPU(s) usage
+            // we need to reallocate.
+            // TODO: should we restate the device?
+            HaltVisibleDevices();
+
             size_t offset = 0;
             // Realloc
             if(allocSize != 0) CUDA_DRIVER_CHECK(cuMemUnmap(mPtr, allocSize));
@@ -465,6 +483,7 @@ void DeviceMemoryCUDA::ResizeBuffer(size_t newSize)
             mPtr = newPtr;
             vaRanges.clear();
             vaRanges.emplace_back(mPtr, reservedSize);
+            reservationRelocated = true;
         }
         // We do manage to increase the reservation
         else
@@ -476,6 +495,12 @@ void DeviceMemoryCUDA::ResizeBuffer(size_t newSize)
     // Shrink the memory
     if(!neverDecrease && newSize < allocSize)
     {
+        // We need to shring the memory, meaning we will
+        // do an unmap, so halt all operations on the device
+        // TODO: If check is unecessary?
+        if(!reservationRelocated)
+            HaltVisibleDevices();
+
         size_t offset = allocSize;
         auto it = allocs.crbegin();
         for(; it != allocs.crend(); it++)
@@ -490,6 +515,7 @@ void DeviceMemoryCUDA::ResizeBuffer(size_t newSize)
         assert(std::distance(it, allocs.crend()) >= 0);
         allocs.resize(static_cast<size_t>(std::distance(it, allocs.crend())));
         allocSize = offset + allocationGranularity;
+        allocSizeChanged = true;
     }
     // Enlarge the memory
     else if(newSize > allocSize)
@@ -526,10 +552,11 @@ void DeviceMemoryCUDA::ResizeBuffer(size_t newSize)
         }
         assert(offset == newSize);
         allocSize = newSize;
+        allocSizeChanged = true;
     }
 
     // Nothing to set access to
-    if(allocSize == 0) return;
+    if(allocSize == 0 || !allocSizeChanged) return;
 
     // Set the newly mapped range accessor
     std::vector<CUmemAccessDesc> accessDescriptions(deviceIds.size(),

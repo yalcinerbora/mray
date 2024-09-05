@@ -41,7 +41,9 @@ struct VisorState
     TracerAnalyticData      tracer;
     VisorAnalyticData       visor;
     RendererAnalyticData    renderer;
-    uint64_t                usedGPUMemoryBytes;
+
+    // This comes after scene change
+    uint64_t                tracerUsedGPUMemBytes;
 
     // Internal state
     TracerRunState          currentRendererState = TracerRunState::STOPPED;

@@ -605,8 +605,10 @@ void GPUQueueCUDA::MemcpyAsync2D(Span<T> regionTo, size_t toStride,
                                  Span<const T> regionFrom, size_t fromStride,
                                  Vector2ui copySize) const
 {
-    assert(toStride * copySize[1] <= regionTo.size());
-    assert(fromStride * copySize[1] <= regionFrom.size());
+    assert(toStride * (copySize[1] - 1) + copySize[0] <=
+           regionTo.size());
+    assert(fromStride * (copySize[1] - 1) + copySize[0] <=
+           regionFrom.size());
     assert(toStride >= copySize[0]);
     assert(fromStride >= copySize[0]);
 

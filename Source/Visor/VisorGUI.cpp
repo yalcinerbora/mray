@@ -278,13 +278,29 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
     {
         if(ImGui::BeginMenuBar())
         {
-            auto usedGPUMem = ConvertMemSizeToGUI(visorState.usedGPUMemoryBytes);
+            uint64_t tracerUsedMem = visorState.tracerUsedGPUMemBytes;
+            uint64_t rendererUsedMem = visorState.renderer.usedGPUMemoryBytes;
+            uint64_t totalUsedMem = rendererUsedMem + tracerUsedMem;
+
+            auto usedGPUMem = ConvertMemSizeToGUI(totalUsedMem);
             auto totalGPUMem = ConvertMemSizeToGUI(visorState.tracer.totalGPUMemoryBytes);
             std::string memUsage = MRAY_FORMAT("{:.1f}{:s} / {:.1f}{:s}",
                                                usedGPUMem.first, usedGPUMem.second,
                                                totalGPUMem.first, totalGPUMem.second);
 
             ImGui::Text("%s", memUsage.c_str());
+            if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+            {
+                auto tFormatOut = ConvertMemSizeToGUI(tracerUsedMem);
+                auto rFormatOut = ConvertMemSizeToGUI(rendererUsedMem);
+                std::string detailMemUsage = MRAY_FORMAT("Scene: {:.1f}{:s} / Renderer: {:.1f}{:s}",
+                                                         tFormatOut.first, tFormatOut.second,
+                                                         rFormatOut.first, rFormatOut.second);
+                ImGui::BeginTooltip();
+                ImGui::Text("%s", detailMemUsage.c_str());
+                ImGui::EndTooltip();
+            }
+
             ImGui::Separator();
             ImGui::Text("%s", (std::to_string(visorState.renderer.renderResolution[0]) + "x" +
                                std::to_string(visorState.renderer.renderResolution[1])).c_str());

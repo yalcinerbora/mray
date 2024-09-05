@@ -154,17 +154,17 @@ void RNGGroupIndependent::CopyStatesToGPUAsync(const GPUQueue& queue)
     size_t srcStride = size2D[0];
     size_t dstStride = range[0];
     size_t srcOffset = deviceRangeStart[0] + deviceRangeStart[1] * size2D[0];
-    size_t srcEnd = range[0] + (deviceRangeEnd[1] - 1) * size2D[0];
-    size_t srcSizeLinear = srcEnd - srcOffset;
+    size_t srcSize = range[0] + (range[1] - 1) * size2D[0];
+    //size_t srcSizeLinear = srcEnd - srcOffset;
 
     auto dstBackupSpan = dBackupStates;
-    auto srcBackupSpan = hBackupStates.subspan(srcOffset, srcSizeLinear);
+    auto srcBackupSpan = hBackupStates.subspan(srcOffset, srcSize);
     queue.MemcpyAsync2D(dstBackupSpan, dstStride,
                         ToConstSpan(srcBackupSpan), srcStride,
                         range);
 
     auto dstMainSpan = dMainStates;
-    auto srcMainSpan = hMainStates.subspan(srcOffset, srcSizeLinear);
+    auto srcMainSpan = hMainStates.subspan(srcOffset, srcSize);
     queue.MemcpyAsync2D(dstMainSpan , dstStride,
                         ToConstSpan(srcMainSpan), srcStride,
                         range);
@@ -176,17 +176,17 @@ void RNGGroupIndependent::CopyStatesFromGPUAsync(const GPUQueue& queue)
     size_t dstStride = size2D[0];
     size_t srcStride = range[0];
     size_t dstOffset = deviceRangeStart[0] + deviceRangeStart[1] * size2D[0];
-    size_t dstEnd = range[0] + (deviceRangeEnd[1] - 1) * size2D[0];
-    size_t dstSizeLinear = dstEnd - dstOffset;
+    size_t dstSize = range[0] + (range[1] - 1) * size2D[0];
+    //size_t dstSizeLinear = dstEnd - dstOffset;
 
     auto srcBackupSpan = dBackupStates;
-    auto dstBackupSpan = hBackupStates.subspan(dstOffset, dstSizeLinear);
+    auto dstBackupSpan = hBackupStates.subspan(dstOffset, dstSize);
     queue.MemcpyAsync2D(dstBackupSpan, dstStride,
                         ToConstSpan(srcBackupSpan), srcStride,
                         range);
 
     auto srcMainSpan = dMainStates;
-    auto dstMainSpan = hMainStates.subspan(dstOffset, dstSizeLinear);
+    auto dstMainSpan = hMainStates.subspan(dstOffset, dstSize);
     queue.MemcpyAsync2D(dstMainSpan, dstStride,
                         ToConstSpan(srcMainSpan), srcStride,
                         range);

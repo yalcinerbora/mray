@@ -33,17 +33,18 @@ struct TracerAnalyticData
 struct RendererAnalyticData
 {
     // Performance
-    double          throughput;
-    std::string     throughputSuffix;
+    double              throughput;
+    std::string         throughputSuffix;
     //
-    double          workPerPixel;
-    std::string     workPerPixelSuffix;
+    double              workPerPixel;
+    std::string         workPerPixelSuffix;
     // Timings
-    float           iterationTimeMS;
+    float               iterationTimeMS;
     // Image related
     Vector2ui           renderResolution;
     MRayColorSpaceEnum  outputColorSpace;
-
+    // Memory
+    size_t              usedGPUMemoryBytes;
     // Custom Input Related
     uint32_t            customLogicSize0 = 0;
     uint32_t            customLogicSize1 = 0;
