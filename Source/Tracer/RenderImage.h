@@ -276,7 +276,7 @@ Vector<C, Float> ImageSpan<C>::AddToPixelAtomic(const Vector<C, Float>& val,
                                                 const Vector2i& xy) const
 {
     uint32_t index = LinearIndexFrom2D(xy);
-    DeviceAtomic::AtomicAdd(dPixels[index], val);
+    return DeviceAtomic::AtomicAdd(dPixels[index], val);
 }
 
 inline

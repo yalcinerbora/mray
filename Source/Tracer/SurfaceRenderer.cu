@@ -226,6 +226,15 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
                                 std::move(seed),
                                 gpuSystem, globalThreadPool);
 
+    // TODO: Change this later
+    gpuSystem.SyncAll();
+    const GPUQueue& q = gpuSystem.BestDevice().GetComputeQueue(0);
+    rnGenerator->SetupDeviceRange(imageTiler.LocalTileStart(),
+                                  imageTiler.LocalTileEnd());
+    rnGenerator->CopyStatesToGPUAsync(q);
+    q.Barrier().Wait();
+
+
     auto bufferPtrAndSize = renderBuffer->SharedDataPtrAndSize();
     return RenderBufferInfo
     {
@@ -279,7 +288,6 @@ RendererOutput SurfaceRenderer::DoRender()
                                   imageTiler.LocalTileEnd());
 
     // Generate RN for camera rays
-    //rnGenerator->CopyStatesToGPUAsync(processQueue);
     rnGenerator->GenerateNumbers(dCamGenRandomNums,
                                  (*curCamWork)->SampleRayRNCount(),
                                  processQueue);
@@ -413,12 +421,19 @@ RendererOutput SurfaceRenderer::DoRender()
     // Please note that ray partitioner will be invalidated here.
     // In this case, we do not use the partitioner anymore
     // so its fine.
+    renderBuffer->ClearImage(processQueue);
     ImageSpan<3> filmSpan = imageTiler.GetTileSpan<3>();
-    filmFilter->ReconstructionFilterRGB(filmSpan, rayPartitioner,
-                                        ToConstSpan(dRayState.dOutputData),
-                                        ToConstSpan(dRayState.dImageCoordinates),
-                                        tracerView.tracerParams.parallelizationHint,
-                                        Float(1), processQueue);
+    // Using atomic filter since the samples are uniformly distributed
+    filmFilter->ReconstructionFilterAtomicRGB(filmSpan,
+                                              ToConstSpan(dRayState.dOutputData),
+                                              ToConstSpan(dRayState.dImageCoordinates),
+                                              Float(1), processQueue);
+    //filmFilter->ReconstructionFilterRGB(filmSpan, rayPartitioner,
+    //                                    ToConstSpan(dRayState.dOutputData),
+    //                                    ToConstSpan(dRayState.dImageCoordinates),
+    //                                    tracerView.tracerParams.parallelizationHint,
+    //                                    Float(1), processQueue);
+
     // Issue a send of the FBO to Visor
     const GPUQueue& transferQueue = device.GetTransferQueue();
     Optional<RenderImageSection>
@@ -427,6 +442,8 @@ RendererOutput SurfaceRenderer::DoRender()
     // Semaphore is invalidated, visor is probably crashed
     if(!renderOut.has_value())
         return RendererOutput{};
+    // Actual global weight
+    renderOut->globalWeight = Float(1);
 
     // We do not need to wait here, but we time
     // from CPU side so we need to wait

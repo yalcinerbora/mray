@@ -182,6 +182,10 @@ void BaseAcceleratorLinear::CastRays(// Output
                                      Span<const RayIndex> dRayIndices,
                                      const GPUQueue& queue)
 {
+    using namespace std::string_view_literals;
+    const auto annotation = gpuSystem.CreateAnnotation("Ray Casting"sv);
+    const auto _ = annotation.AnnotateScope();
+
     assert(maxPartitionCount != 0);
     using namespace std::string_view_literals;
     queue.MemsetAsync(dTraversalStack, 0x00);

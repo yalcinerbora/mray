@@ -154,6 +154,9 @@ RenderImage::RenderImage(TimelineSemaphore* semaphore,
 Optional<RenderImageSection> RenderImage::TransferToHost(const GPUQueue& processQueue,
                                                          const GPUQueue& copyQueue)
 {
+    using namespace std::string_view_literals;
+    static const auto semWaitAnnotation = gpuSystem.CreateAnnotation("RB Semaphore Wait");
+
     // Let's not wait on the driver here
     // So host does not runaway from CUDA
     // (I don't know if this is even an issue)
@@ -163,8 +166,10 @@ Optional<RenderImageSection> RenderImage::TransferToHost(const GPUQueue& process
     // If we could not acquire the semaphore,
     // this means Visor is closing (either user dit it, or an error)
     // return nothing so that renderer do not send it etc.
-    if(!sem.HostAcquire()) return std::nullopt;
-
+    {
+        const auto _ = semWaitAnnotation.AnnotateScope();
+        if(!sem.HostAcquire()) return std::nullopt;
+    }
     // Barrier the process queue
     processCompleteFence = processQueue.Barrier();
     // Wait the process queue to finish on the transfer queue
@@ -172,6 +177,7 @@ Optional<RenderImageSection> RenderImage::TransferToHost(const GPUQueue& process
     // Copy to staging buffers when the data is ready
     copyQueue.MemcpyAsync(hPixels, ToConstSpan(dPixels));
     copyQueue.MemcpyAsync(hWeights, ToConstSpan(dWeights));
+
     // Do not overwrite untill memcpy finishes
     previousCopyCompleteFence = copyQueue.Barrier();
     //copyQueue.MemcpyAsync(hSamples, ToConstSpan(dSamples));

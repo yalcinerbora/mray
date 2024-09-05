@@ -658,7 +658,7 @@ static void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParams<R, PG, MG, TG
         auto material = Material(specConverter, params.matSoA,
                                  MaterialKey(static_cast<CommonKey>(keys.lightOrMatKey)));
         // Call the function
-        WorkFunction(primitive, material, surface, rng, params);
+        WorkFunction(primitive, material, surface, rng, params, rIndex);
         // All Done!
     }
 }

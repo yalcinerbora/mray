@@ -45,6 +45,15 @@ class TextureFilterI
                                             uint32_t parallelHint,
                                             Float scalarWeightMultiplier,
                                             const GPUQueue& queue) const = 0;
+
+    virtual void    ReconstructionFilterAtomicRGB(// Output
+                                                  const ImageSpan<3>& img,
+                                                  // Input
+                                                  const Span<const Spectrum>& dValues,
+                                                  const Span<const ImageCoordinate>& dImgCoords,
+                                                  // Constants
+                                                  Float scalarWeightMultiplier,
+                                                  const GPUQueue& queue) const = 0;
     virtual Vector2ui FilterExtent() const = 0;
 };
 
@@ -86,6 +95,15 @@ class TextureFilterT : public TextureFilterI
                                     uint32_t parallelHint,
                                     Float scalarWeightMultiplier,
                                     const GPUQueue& queue) const override;
+
+    void    ReconstructionFilterAtomicRGB(// Output
+                                          const ImageSpan<3>& img,
+                                          // Input
+                                          const Span<const Spectrum>& dValues,
+                                          const Span<const ImageCoordinate>& dImgCoords,
+                                          // Constants
+                                          Float scalarWeightMultiplier,
+                                          const GPUQueue& queue) const override;
 
     Vector2ui FilterExtent() const override;
 };

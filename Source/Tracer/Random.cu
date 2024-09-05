@@ -25,19 +25,18 @@ void KCGenRandomNumbersPCG32(// Output
         // Get the state
         // Save the in register space so every generation do not pound the
         // global memory (Probably it will get optimized bu w/e).
-        State state = dStates[i];
-        PermutedCG32 rng(state);
+        PermutedCG32 rng(dStates[i]);
         // PCG32 do not have concept of dimensionality (technically you can
         // hold a state for each dimension but for a path tracer it is infeasible).
         //
         // So we just generate numbers using a single state
+        RandomNumber rn[2];
         for(uint32_t n = 0; n < dimPerGenerator; n++)
         {
             // Write in strided fashion to coalesce mem
-            dNumbers[i + generatorCount * n] = rng.Next();
+            rn[n] = rng.Next();
+            dNumbers[i + generatorCount * n] = rn[n];
         }
-        // Write the modified state
-        dStates[i] = state;
     }
 }
 
@@ -155,7 +154,6 @@ void RNGGroupIndependent::CopyStatesToGPUAsync(const GPUQueue& queue)
     size_t dstStride = range[0];
     size_t srcOffset = deviceRangeStart[0] + deviceRangeStart[1] * size2D[0];
     size_t srcSize = range[0] + (range[1] - 1) * size2D[0];
-    //size_t srcSizeLinear = srcEnd - srcOffset;
 
     auto dstBackupSpan = dBackupStates;
     auto srcBackupSpan = hBackupStates.subspan(srcOffset, srcSize);
@@ -177,7 +175,6 @@ void RNGGroupIndependent::CopyStatesFromGPUAsync(const GPUQueue& queue)
     size_t srcStride = range[0];
     size_t dstOffset = deviceRangeStart[0] + deviceRangeStart[1] * size2D[0];
     size_t dstSize = range[0] + (range[1] - 1) * size2D[0];
-    //size_t dstSizeLinear = dstEnd - dstOffset;
 
     auto srcBackupSpan = dBackupStates;
     auto dstBackupSpan = hBackupStates.subspan(dstOffset, dstSize);

@@ -859,7 +859,7 @@ uint32_t RendererT<C>::GenerateLightWorkMappings(uint32_t workStart)
                 throw MRayError("[{}]: Light/Transform group \"{}\"({}) / \"{}\"({}), is used "
                                 "as a non-boundary material. Boundary material should have its "
                                 "own unique group!", C::TypeName(),
-                                lgName, uint32_t(lgId), lgName, uint32_t(tgId));
+                                lgName, uint32_t(lgId), tgName, uint32_t(tgId));
             }
         }
 

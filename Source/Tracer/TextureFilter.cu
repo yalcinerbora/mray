@@ -309,15 +309,6 @@ void KCExpandSamplesToPixels(// Outputs
             // which one is better?
             Float lengthSqr = (imgCoords - pixCenter).LengthSqr();
 
-
-            //printf("(%f, %f) + (%f, %f) = (%f, %f) |||| "
-            //        "PixCenter (%f, %f), PixCoord (%f, %f)\n",
-            //        relImgCoords[0], relImgCoords[1],
-            //        fractions[0], fractions[1],
-            //        imgCoords[0], imgCoords[1],
-            //        pixCenter[0], pixCenter[1],
-            //        pixCoord[0], pixCoord[1]);
-
             // Skip if this pixel is out of range,
             // Filter WH is a conservative estimate
             // so this can happen
@@ -330,21 +321,8 @@ void KCExpandSamplesToPixels(// Outputs
                                globalPixCoord[0] >= extent[0]   ||
                                globalPixCoord[1] < 0            ||
                                globalPixCoord[1] >= extent[1]);
-
-
-            //printf("(%d, %d) | Pix in on img?(%s) | Filter reach to pix? (%s)\n",
-            //        globalPixCoord[0], globalPixCoord[1],
-            //        (!pixOutside) ? "true" : "false",
-            //        doWrite ? "true" : "false");
-
             // Do not write (obviously) if pixel is outside
             if(pixOutside) doWrite = false;
-
-            //if(doWrite)
-            //{
-            //    printf("Writing this (%d, %d)\n",
-            //           globalPixCoord[0], globalPixCoord[1]);
-            //}
 
             // Now we can write
             assert(stride < maxPixelPerSample);
@@ -469,6 +447,83 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan<3> img,
     }
 }
 
+template <class Filter>
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCFilterToImgAtomicRGB(MRAY_GRID_CONSTANT const ImageSpan<3> img,
+                            // Input
+                            MRAY_GRID_CONSTANT const Span<const Spectrum> dValues,
+                            MRAY_GRID_CONSTANT const Span<const ImageCoordinate> dImgCoords,
+                            // Constants
+                            MRAY_GRID_CONSTANT const Float scalarWeightMultiplier,
+                            MRAY_GRID_CONSTANT const Filter filter)
+{
+    Float filterRadius = filter.Radius();
+    Vector2i extent = img.Extent();
+    int32_t filterWH = FilterRadiusToPixelWH(filterRadius);
+    Vector2i range = FilterRadiusPixelRange(filterWH);
+    // Don't use 1.0f exactly here
+    // pixel is [0,1)
+    Float pixelWidth = MathFunctions::PrevFloat<Float>(1);
+    Float radiusSqr = filterRadius * filterRadius;
+
+    assert(dValues.size() == dImgCoords.size());
+    uint32_t sampleCount = static_cast<uint32_t>(dImgCoords.size());
+
+    KernelCallParams kp;
+    for(uint32_t i = kp.GlobalId(); i < sampleCount; i += kp.TotalSize())
+    {
+        Vector2 imgCoords = dImgCoords[i].GetPixelIndex();
+        imgCoords += Vector2(0.5);
+        Vector2 relImgCoords;
+        Vector2 fractions = Vector2(std::modf(imgCoords[0], &(relImgCoords[0])),
+                                    std::modf(imgCoords[1], &(relImgCoords[1])));
+
+        // If fractions is on the left subpixel and radius is odd,
+        // shift the filter window
+        Vector2i localRangeX = range;
+        Vector2i localRangeY = range;
+        if(filterWH % 2 == 0)
+        {
+            if(fractions[0] < Float(0.5)) localRangeX -= Vector2i(1);
+            if(fractions[1] < Float(0.5)) localRangeY -= Vector2i(1);
+        }
+
+        // Actual write
+        for(int32_t y = localRangeX[0]; y < localRangeX[1]; y++)
+        for(int32_t x = localRangeX[0]; x < localRangeX[1]; x++)
+        {
+            Vector2 pixCoord = relImgCoords + Vector2(x, y);
+            Vector2 pixCenter = pixCoord + Float(0.5);
+            // TODO: Should we use pixCoord or center coord
+            // which one is better?
+            Float lengthSqr = (imgCoords - pixCenter).LengthSqr();
+
+            // Skip if this pixel is out of range,
+            // Filter WH is a conservative estimate
+            // so this can happen
+            if(radiusSqr != Float(0) && lengthSqr > radiusSqr)
+                continue;
+
+            // Get ready for writing
+            Vector2i globalPixCoord = Vector2i(imgCoords) + Vector2i(x, y);
+            bool pixOutside = (globalPixCoord[0] < 0            ||
+                               globalPixCoord[0] >= extent[0]   ||
+                               globalPixCoord[1] < 0            ||
+                               globalPixCoord[1] >= extent[1]);
+            // Do not write (obviously) if pixel is outside
+            if(pixOutside) continue;
+
+            // globalPixCoord is index
+            Float weight = filter.Evaluate(imgCoords - pixCenter) * scalarWeightMultiplier;
+            Vector3 value = Vector3(dValues[i]) * weight;
+
+            img.AddToPixelAtomic(value, globalPixCoord);
+            img.AddToWeightAtomic(weight, globalPixCoord);
+        }
+        // All Done!
+    }
+}
+
 template<class Filter>
 void ReconFilterGenericRGB(// Output
                            const ImageSpan<3>& img,
@@ -483,9 +538,6 @@ void ReconFilterGenericRGB(// Output
                            Filter filter,
                            const GPUQueue& queue)
 {
-    // TODO:...............?????
-    //queue.Barrier().Wait();
-
     // We use 32-bit morton code but last value 0xFFF..FF is reserved.
     // If image is 64k x 64k this system will not work (it will be rare but..)
     // Throw it that is the case
@@ -627,6 +679,34 @@ void ReconFilterGenericRGB(// Output
         default: throw MRayError("Unknown logical warp size!");
     }
     // All Done!
+}
+
+template<class Filter>
+void ReconFilterGenericRGBAtomic(// Output
+                                 const ImageSpan<3>& img,
+                                 // Input
+                                 const Span<const Spectrum>& dValues,
+                                 const Span<const ImageCoordinate>& dImgCoords,
+                                 // Constants
+                                 Float scalarWeightMultiplier,
+                                 Float filterRadius,
+                                 Filter filter,
+                                 const GPUQueue& queue)
+{
+    using namespace std::string_view_literals;
+    queue.IssueSaturatingKernel<KCFilterToImgAtomicRGB<Filter>>
+    (
+        "KCFilterToImgAtomicRGB"sv,
+        KernelIssueParams{.workCount = static_cast<uint32_t>(dValues.size())},
+        //
+        img,
+        //
+        dValues,
+        dImgCoords,
+        //
+        scalarWeightMultiplier,
+        filter
+    );
 }
 
 template<class Filter>
@@ -890,6 +970,25 @@ void TextureFilterT<E, FF>::ReconstructionFilterRGB(// Output
                                    parallelHint, scalarWeightMultiplier,
                                    filterRadius, FF(filterRadius),
                                    queue);
+}
+
+template<FilterType::E E, class FF>
+void TextureFilterT<E, FF>::ReconstructionFilterAtomicRGB(// Output
+                                                          const ImageSpan<3>& img,
+                                                          // Input
+                                                          const Span<const Spectrum>& dValues,
+                                                          const Span<const ImageCoordinate>& dImgCoords,
+                                                          // Constants
+                                                          Float scalarWeightMultiplier,
+                                                          const GPUQueue& queue) const
+{
+    static const auto annotation = queue.CreateAnnotation("Atomic Reconstruction Filter");
+    const auto _ = annotation.AnnotateScope();
+
+    ReconFilterGenericRGBAtomic(img, dValues, dImgCoords,
+                                scalarWeightMultiplier,
+                                filterRadius, FF(filterRadius),
+                                queue);
 }
 
 template<FilterType::E E, class FF>

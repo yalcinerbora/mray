@@ -50,12 +50,14 @@ namespace SurfRDetail
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     MRAY_HYBRID
     void WorkFunction(const Prim&, const Material&, const Surface&, RNGDispenser&,
-                      const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params);
+                      const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params,
+                      RayIndex rayIndex);
 
     template<LightC Light, LightGroupC LG, TransformGroupC TG>
     MRAY_HYBRID
     void LightWorkFunction(const Light&, RNGDispenser&,
-                           const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params);
+                           const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params,
+                           RayIndex rayIndex);
 
     MRAY_HYBRID
     void InitRayState(const RayPayload&, const RayState&,
@@ -177,16 +179,19 @@ template<PrimitiveC Prim, MaterialC Material, class Surface,
 MRAY_HYBRID
 void SurfRDetail::WorkFunction(const Prim& prim, const Material& mat,
                                const Surface& surf, RNGDispenser& rng,
-                               const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params)
+                               const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params,
+                               RayIndex rayIndex)
 {
     //
+    params.rayState.dOutputData[rayIndex] = Spectrum(1.0);
 }
 
 template<LightC Light,
          LightGroupC LG, TransformGroupC TG>
 MRAY_HYBRID
 void SurfRDetail::LightWorkFunction(const Light& light, RNGDispenser& rng,
-                                    const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params)
+                                    const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params,
+                                    RayIndex rayIndex)
 {
     //
 }

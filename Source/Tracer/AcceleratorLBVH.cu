@@ -177,6 +177,10 @@ void BaseAcceleratorLBVH::CastRays(// Output
                                    const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
+    const auto annotation = gpuSystem.CreateAnnotation("Ray Casting"sv);
+    const auto _ = annotation.AnnotateScope();
+
+    using namespace std::string_view_literals;
     queue.MemsetAsync(dTraversalStack, 0x00);
 
     // Initialize the ray partitioner

@@ -97,6 +97,21 @@ Vector2 AtomicAdd(Vector2& t, Vector2 v)
 
 template<>
 MRAY_GPU MRAY_GPU_INLINE
+Vector3 AtomicAdd(Vector3& t, Vector3 v)
+{
+    static_assert(std::is_same_v<Float, float>,
+                  "\"Float\" must be 32-bit for this function! (TODO)");
+
+    Vector3 r;
+    // Emulate with 3 atomics
+    r[0] = AtomicAdd(t[0], v[0]);
+    r[1] = AtomicAdd(t[1], v[1]);
+    r[2] = AtomicAdd(t[2], v[2]);
+    return r;
+}
+
+template<>
+MRAY_GPU MRAY_GPU_INLINE
 Vector4 AtomicAdd(Vector4& t, Vector4 v)
 {
     static_assert(std::is_same_v<Float, float>,
@@ -104,19 +119,19 @@ Vector4 AtomicAdd(Vector4& t, Vector4 v)
 
     Vector4 r;
     #if __CUDA_ARCH__ >= 900
-        auto* tp = reinterpret_cast<float4*>(&t);
-        auto vv = float4{v[0], v[1], v[2], v[3]};
-        float4 out = atomicAdd(tp, vv);
-        r[0] = out.x;
-        r[1] = out.y;
-        r[2] = out.z;
-        r[3] = out.w;
+    auto* tp = reinterpret_cast<float4*>(&t);
+    auto vv = float4{v[0], v[1], v[2], v[3]};
+    float4 out = atomicAdd(tp, vv);
+    r[0] = out.x;
+    r[1] = out.y;
+    r[2] = out.z;
+    r[3] = out.w;
     #else
-        // Emulate with 4 atomics
-        r[0] = AtomicAdd(t[0], v[0]);
-        r[1] = AtomicAdd(t[1], v[1]);
-        r[2] = AtomicAdd(t[2], v[2]);
-        r[3] = AtomicAdd(t[3], v[3]);
+    // Emulate with 4 atomics
+    r[0] = AtomicAdd(t[0], v[0]);
+    r[1] = AtomicAdd(t[1], v[1]);
+    r[2] = AtomicAdd(t[2], v[2]);
+    r[3] = AtomicAdd(t[3], v[3]);
     #endif
     return r;
 }
