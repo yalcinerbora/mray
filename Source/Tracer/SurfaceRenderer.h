@@ -41,6 +41,7 @@ namespace SurfRDetail
         // or a false color
         Span<Spectrum>          dOutputData;
         Span<ImageCoordinate>   dImageCoordinates;
+        Span<Float>             dFilmFilterWeights;
     };
     // No payload (this is incident renderer so
     // everything is on ray state)
@@ -193,7 +194,7 @@ void SurfRDetail::LightWorkFunction(const Light& light, RNGDispenser& rng,
                                     const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params,
                                     RayIndex rayIndex)
 {
-    //
+    params.rayState.dOutputData[rayIndex] = Spectrum(0.00);
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -203,6 +204,7 @@ void SurfRDetail::InitRayState(const RayPayload&,
                                uint32_t writeIndex)
 {
     dStates.dImageCoordinates[writeIndex] = raySample.value.imgCoords;
+    dStates.dFilmFilterWeights[writeIndex] = raySample.pdf;
 }
 
 template<PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>

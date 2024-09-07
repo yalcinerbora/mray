@@ -41,28 +41,23 @@ RaySample CameraPinhole::SampleRay(// Input
                                    RNGDispenser& rng) const
 {
     Vector2ui sampleId = generationIndex % stratumCount;
-
     // DX DY from stratified sample
-    Vector2 delta = Vector2(planeSize[0] / static_cast<Float>(stratumCount[0]),
-                            planeSize[1] / static_cast<Float>(stratumCount[1]));
-
-    // Create random location over sample rectangle
+    Vector2 stratumCountF = Vector2(stratumCount);
+    Vector2 delta = planeSize / stratumCountF;
+    //
     Vector2 xi = rng.NextFloat2D<0>();
-
     Vector2 jitter = (xi * delta);
-    Vector2 sampleDistance = Vector2(static_cast<float>(sampleId[0]),
-                                     static_cast<float>(sampleId[1])) * delta;
-    sampleDistance += jitter;
-    Vector3 samplePoint = bottomLeft + ((sampleDistance[0] * right) +
-                                        (sampleDistance[1] * up));
+    Vector2 sampleDistance = Vector2(sampleId) * delta + jitter;
+    Vector3 samplePoint = bottomLeft;
+    samplePoint += sampleDistance[0] * right;
+    samplePoint += sampleDistance[1] * up;
     Vector3 rayDir = (samplePoint - position).Normalize();
 
     // Local Coords
     // We are quantizing here, we probably have a validation
     // of images no larger than 65536. But this is here just to
     // be sure.
-    assert(sampleId[0] <= std::numeric_limits<uint16_t>::max() &&
-           sampleId[1] <= std::numeric_limits<uint16_t>::max());
+    assert(sampleId <= Vector2ui(std::numeric_limits<uint16_t>::max()));
 
     Vector2 localJitter = xi - Vector2(0.5);
     Vector2 out = Vector2(SNorm2x16(localJitter));
@@ -72,6 +67,51 @@ RaySample CameraPinhole::SampleRay(// Input
         .offset = SNorm2x16(localJitter)
     };
     // Initialize Ray
+    return RaySample
+    {
+        .value =
+        {
+            .ray = Ray(rayDir, position),
+            .tMinMax = nearFar,
+            .imgCoords = imgCoords,
+            .rayDifferentials = RayDiff{}
+        },
+        .pdf = Float(1.0)
+    };
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+RaySample CameraPinhole::EvaluateRay(const Vector2ui& generationIndex,
+                                     const Vector2ui& stratumCount,
+                                     const Vector2& stratumOffset,
+                                     const Vector2& stratumRange) const
+{
+    Vector2ui sampleId = generationIndex % stratumCount;
+    // DX DY from stratified sample
+    Vector2 stratumCountF = Vector2(stratumCount);
+    Vector2 delta = planeSize / stratumCountF;
+    //
+    Vector2 jitter = stratumOffset + Vector2(0.5);
+    Vector2 sampleDistance = (Vector2(sampleId) + jitter) * delta;
+    Vector3 samplePoint = bottomLeft;
+    samplePoint += sampleDistance[0] * right;
+    samplePoint += sampleDistance[1] * up;
+
+    Vector3 rayDir = (samplePoint - position).Normalize();
+
+    // Local Coords
+    // We are quantizing here, we probably have a validation
+    // of images no larger than 65536. But this is here just to
+    // be sure.
+    assert(sampleId <= Vector2ui(std::numeric_limits<uint16_t>::max()));
+
+    // Initialize Ray
+    Vector2 jitterNorm = stratumOffset / stratumRange;
+    ImageCoordinate imgCoords =
+    {
+        .pixelIndex = Vector2us(sampleId),
+        .offset = SNorm2x16(jitterNorm)
+    };
     return RaySample
     {
         .value =

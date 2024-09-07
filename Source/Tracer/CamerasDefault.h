@@ -41,6 +41,11 @@ namespace CameraDetail
                               // I-O
                               RNGDispenser&) const;
         MRAY_HYBRID
+        RaySample   EvaluateRay(const Vector2ui& generationIndex,
+                                const Vector2ui& stratumCount,
+                                const Vector2& stratumOffset,
+                                const Vector2& stratumRange) const;
+        MRAY_HYBRID
         Float       PdfRay(const Ray&) const;
         // Misc
         MRAY_HYBRID

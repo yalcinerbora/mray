@@ -30,6 +30,8 @@ concept CameraC = requires(CameraType c,
 
     {c.SampleRay(Vector2ui{}, Vector2ui{}, rng)
     } -> std::same_as<RaySample>;
+    {c.EvaluateRay(Vector2ui{}, Vector2ui{}, Vector2{}, Vector2{})
+    }->std::same_as<RaySample>;
     {c.PdfRay(Ray{})} -> std::same_as<Float>;
     {c.CanBeSampled()} -> std::same_as<bool>;
     {c.GetCameraTransform()} -> std::same_as<CameraTransform>;

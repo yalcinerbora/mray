@@ -87,6 +87,7 @@ class RenderCameraWorkI
 
     virtual std::string_view    Name() const = 0;
     virtual uint32_t            SampleRayRNCount() const = 0;
+    virtual uint32_t            StochasticFilterSampleRayRNCount() const = 0;
 };
 
 class RenderLightWorkI
@@ -319,6 +320,22 @@ class RenderCameraWorkT : public RenderCameraWorkI
                               uint64_t globalPixelIndex,
                               const Vector2ui regionCount,
                               const GPUQueue& queue) const = 0;
+    virtual void GenRaysStochasticFilter(// Output
+                                         const Span<RayDiff>& dRayDiffsOut,
+                                         const Span<RayGMem>& dRaysOut,
+                                         const typename R::RayPayload& dPayloadsOut,
+                                         const typename R::RayState& dStatesOut,
+                                         // Input
+                                         const Span<const uint32_t>& dRayIndices,
+                                         const Span<const uint32_t>& dRandomNums,
+                                         // Type erased buffer
+                                         Span<const Byte> dCamBuffer,
+                                         TransformKey transKey,
+                                         // Constants
+                                         uint64_t globalPixelIndex,
+                                         const Vector2ui regionCount,
+                                         FilterType filterType,
+                                         const GPUQueue& queue) const = 0;
 };
 
 // Renderer holds its work in a linear array.

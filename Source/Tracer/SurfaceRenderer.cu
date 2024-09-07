@@ -187,13 +187,15 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
                                          dRayDifferentials,
                                          dRayState.dImageCoordinates,
                                          dRayState.dOutputData,
+                                         dRayState.dFilmFilterWeights,
                                          dCamGenRandomNums,
                                          dWorkHashes, dWorkBatchIds,
                                          dSubCameraBuffer),
                                 redererGlobalMem,
                                 {maxRayCount, maxRayCount, maxRayCount,
                                  maxRayCount, maxRayCount, maxRayCount,
-                                 maxRayCount* (*curCamWork)->SampleRayRNCount(),
+                                 maxRayCount,
+                                 maxRayCount * (*curCamWork)->SampleRayRNCount(),
                                  totalWorkCount, totalWorkCount,
                                  SUB_CAMERA_BUFFER_SIZE});
     // And initialze the hashes
@@ -298,6 +300,17 @@ RendererOutput SurfaceRenderer::DoRender()
                             dSubCameraBuffer, curCamTransformKey,
                             globalPixelIndex, imageTiler.CurrentTileSize(),
                             processQueue);
+    //cameraWork.GenRaysStochasticFilter
+    //(
+    //    dRayDifferentials, dRays, EmptyType{},
+    //    dRayState, dIndices,
+    //    ToConstSpan(dCamGenRandomNums),
+    //    dSubCameraBuffer, curCamTransformKey,
+    //    globalPixelIndex, imageTiler.CurrentTileSize(),
+    //    tracerView.tracerParams.filmFilter,
+    //    processQueue
+    //);
+
     globalPixelIndex += rayCount;
     // Save the states back (we will issue next tile after on next iteration)
     //rnGenerator->CopyStatesFromGPUAsync(processQueue);
@@ -423,16 +436,22 @@ RendererOutput SurfaceRenderer::DoRender()
     // so its fine.
     renderBuffer->ClearImage(processQueue);
     ImageSpan<3> filmSpan = imageTiler.GetTileSpan<3>();
+    //SetImagePixels(filmSpan, ToConstSpan(dRayState.dOutputData),
+    //               ToConstSpan(dRayState.dFilmFilterWeights),
+    //               ToConstSpan(dRayState.dImageCoordinates),
+    //               Float(1), processQueue);
+
     // Using atomic filter since the samples are uniformly distributed
-    filmFilter->ReconstructionFilterAtomicRGB(filmSpan,
-                                              ToConstSpan(dRayState.dOutputData),
-                                              ToConstSpan(dRayState.dImageCoordinates),
-                                              Float(1), processQueue);
-    //filmFilter->ReconstructionFilterRGB(filmSpan, rayPartitioner,
-    //                                    ToConstSpan(dRayState.dOutputData),
-    //                                    ToConstSpan(dRayState.dImageCoordinates),
-    //                                    tracerView.tracerParams.parallelizationHint,
-    //                                    Float(1), processQueue);
+    //filmFilter->ReconstructionFilterAtomicRGB(filmSpan,
+    //                                          ToConstSpan(dRayState.dOutputData),
+    //                                          ToConstSpan(dRayState.dImageCoordinates),
+    //                                          Float(1), processQueue);
+    filmFilter->ReconstructionFilterRGB(filmSpan, rayPartitioner,
+                                        ToConstSpan(dRayState.dOutputData),
+                                        ToConstSpan(dRayState.dImageCoordinates),
+                                        tracerView.tracerParams.parallelizationHint,
+                                        Float(1), processQueue);
+
 
     // Issue a send of the FBO to Visor
     const GPUQueue& transferQueue = device.GetTransferQueue();

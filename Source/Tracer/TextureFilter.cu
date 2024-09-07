@@ -12,10 +12,6 @@
 #include "Core/DeviceVisit.h"
 #include "Core/GraphicsFunctions.h"
 
-#include "Device/GPUDebug.h"
-#include "TypeFormat.h"
-
-
 #ifdef MRAY_GPU_BACKEND_CUDA
     #include <cub/block/block_reduce.cuh>
 #else
@@ -438,7 +434,7 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan<3> img,
         if(laneId == 0)
         {
             Float weight = img.FetchWeight(pixCoordsInt);
-            img.StoreWeight(weight + totalValue[0], pixCoordsInt);
+            img.StoreWeight(weight + totalValue[3], pixCoordsInt);
 
             Vector3 pixValue = img.FetchPixel(pixCoordsInt);
             img.StorePixel(pixValue + Vector3(totalValue),
@@ -516,12 +512,65 @@ void KCFilterToImgAtomicRGB(MRAY_GRID_CONSTANT const ImageSpan<3> img,
             // globalPixCoord is index
             Float weight = filter.Evaluate(imgCoords - pixCenter) * scalarWeightMultiplier;
             Vector3 value = Vector3(dValues[i]) * weight;
+            if(std::abs(weight) < MathConstants::Epsilon<Float>()) continue;
 
             img.AddToPixelAtomic(value, globalPixCoord);
             img.AddToWeightAtomic(weight, globalPixCoord);
         }
         // All Done!
     }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCSetImagePixels(MRAY_GRID_CONSTANT const ImageSpan<3> img,
+                      // Input
+                      MRAY_GRID_CONSTANT const Span<const Spectrum> dValues,
+                      MRAY_GRID_CONSTANT const Span<const Float> dFilterWeights,
+                      MRAY_GRID_CONSTANT const Span<const ImageCoordinate> dImgCoords,
+                      // Constants
+                      MRAY_GRID_CONSTANT const Float scalarWeightMultiplier)
+{
+    uint32_t sampleCount = static_cast<uint32_t>(dImgCoords.size());
+
+    KernelCallParams kp;
+    for(uint32_t i = kp.GlobalId(); i < sampleCount; i += kp.TotalSize())
+    {
+        Vector2i pixCoords = Vector2i(dImgCoords[i].pixelIndex);
+
+        Vector3 val = img.FetchPixel(pixCoords);
+        Float weight = img.FetchWeight(pixCoords);
+
+        val += Vector3(dValues[i]) * dFilterWeights[i];
+        weight += Float(1);
+
+        img.StorePixel(val, pixCoords);
+        img.StoreWeight(weight, pixCoords);
+    }
+}
+
+void SetImagePixels(// Output
+                    const ImageSpan<3>& img,
+                    // Input
+                    const Span<const Spectrum>& dValues,
+                    const Span<const Float>& dFilterWeights,
+                    const Span<const ImageCoordinate>& dImgCoords,
+                    // Constants
+                    Float scalarWeightMultiplier,
+                    const GPUQueue& queue)
+{
+    assert(dValues.size() == dFilterWeights.size());
+    assert(dFilterWeights.size() == dImgCoords.size());
+    using namespace std::string_view_literals;
+    queue.IssueSaturatingKernel<KCSetImagePixels>
+    (
+        "KCSetImagePixels",
+        KernelIssueParams{.workCount = static_cast<uint32_t>(dValues.size())},
+        img,
+        dValues,
+        dFilterWeights,
+        dImgCoords,
+        scalarWeightMultiplier
+    );
 }
 
 template<class Filter>
@@ -558,8 +607,6 @@ void ReconFilterGenericRGB(// Output
 
     auto [dIndices, dKeys] = partitioner.Start(totalPPS, maxPartitionCount, false);
 
-    //DeviceDebug::DumpGPUMemToFile("dImageCoords", ToConstSpan(dImgCoords), queue);
-
     using namespace std::string_view_literals;
     queue.IssueSaturatingKernel<KCExpandSamplesToPixels>
     (
@@ -575,10 +622,6 @@ void ReconFilterGenericRGB(// Output
         maxPixelPerSample,
         img.Extent()
     );
-
-    using enum DeviceDebug::WriteMode;
-    //DeviceDebug::DumpGPUMemToFile<HEXEDECIMAL>("dFilterMorton", ToConstSpan(dKeys), queue);
-    //DeviceDebug::DumpGPUMemToFile("dFilterSampleIndices", ToConstSpan(dIndices), queue);
 
     using namespace Bit;
     Vector2ui sortRange = Vector2ui(0, RequiredBitsToRepresent(maxPartitionCount));
@@ -596,12 +639,6 @@ void ReconFilterGenericRGB(// Output
                                     Vector2ui::Zero(),
                                     sortRange, queue, true);
     assert(isHostVisible == false);
-
-    //DeviceDebug::DumpGPUMemToFile("dFilterPartOffsets", ToConstSpan(dPartitionStartOffsets), queue);
-    //DeviceDebug::DumpGPUMemToFile<HEXEDECIMAL>("dFilterPartPixelIds", ToConstSpan(dPartitionPixelIds), queue);
-
-    //DeviceDebug::DumpGPUMemToFile("dPartitionIndices", ToConstSpan(dPartitionIndices), queue);
-    //DeviceDebug::DumpGPUMemToFile<HEXEDECIMAL>("dPartitionKeys", ToConstSpan(dPartitionKeys), queue);
 
     // We've partitioned now determine the kernel with a basic
     // heuristic. Just find the average spp and use it.

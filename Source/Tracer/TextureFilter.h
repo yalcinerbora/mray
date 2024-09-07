@@ -19,6 +19,17 @@ struct alignas(Vector4ui) MipGenParams
     Vector2ui    mipZeroRes;
 };
 
+// TODO: Move this function somewhere proper
+void SetImagePixels(// Output
+                    const ImageSpan<3>& img,
+                    // Input
+                    const Span<const Spectrum>& dValues,
+                    const Span<const Float>& dFilterWeights,
+                    const Span<const ImageCoordinate>& dImgCoords,
+                    // Constants
+                    Float scalarWeightMultiplier,
+                    const GPUQueue& queue);
+
 class TextureFilterI
 {
     public:

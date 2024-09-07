@@ -9,6 +9,8 @@
 #include "Random.h"
 #include "RayGenKernels.h"
 
+#include "Core/TracerI.h"
+
 // Render work kernel parameters
 // There are too many parameters so these are
 // packed in structs
@@ -235,9 +237,26 @@ class RenderCameraWork : public RenderCameraWorkT<R>
                          uint64_t globalPixelIndex,
                          const Vector2ui regionCount,
                          const GPUQueue& queue) const override;
+    void    GenRaysStochasticFilter(// Output
+                                    const Span<RayDiff>& dRayDiffsOut,
+                                    const Span<RayGMem>& dRaysOut,
+                                    const typename R::RayPayload& dPayloadsOut,
+                                    const typename R::RayState& dStatesOut,
+                                    // Input
+                                    const Span<const uint32_t>& dRayIndices,
+                                    const Span<const uint32_t>& dRandomNums,
+                                    // Type erased buffer
+                                    Span<const Byte> dCamBuffer,
+                                    TransformKey transKey,
+                                    // Constants
+                                    uint64_t globalPixelIndex,
+                                    const Vector2ui regionCount,
+                                    FilterType filterType,
+                                    const GPUQueue& queue) const override;
 
     std::string_view    Name() const override;
     uint32_t            SampleRayRNCount() const override;
+    uint32_t            StochasticFilterSampleRayRNCount() const override;
 };
 
 template<RendererC R, PrimitiveGroupC PG,
@@ -562,6 +581,80 @@ void RenderCameraWork<R, C, T>::GenerateRays(// Output
 }
 
 template<RendererC R, CameraGroupC C, TransformGroupC T>
+void RenderCameraWork<R, C, T>::GenRaysStochasticFilter(// Output
+                                                        const Span<RayDiff>& dRayDiffsOut,
+                                                        const Span<RayGMem>& dRaysOut,
+                                                        const typename R::RayPayload& dPayloadsOut,
+                                                        const typename R::RayState& dStatesOut,
+                                                        // Input
+                                                        const Span<const uint32_t>& dRayIndices,
+                                                        const Span<const uint32_t>& dRandomNums,
+                                                        // The actual pair to be used
+                                                        Span<const Byte> dCamBuffer,
+                                                        TransformKey transKey,
+                                                        // Constants
+                                                        uint64_t globalPixelIndex,
+                                                        const Vector2ui regionCount,
+                                                        FilterType filterType,
+                                                        const GPUQueue& queue) const
+{
+    using RayPayload = typename R::RayPayload;
+    using RayState = typename R::RayState;
+    using Camera = typename C::Camera;
+    assert(dRayIndices.size() * StochasticFilterSampleRayRNCount() == dRandomNums.size());
+    assert(sizeof(Camera) <= dCamBuffer.size_bytes());
+    assert(uintptr_t(dCamBuffer.data()) % alignof(Camera) == 0);
+    const Camera* dCamera = reinterpret_cast<const Camera*>(dCamBuffer.data());
+    Float filterRadius = filterType.radius;
+
+    auto LaunchKernel = [&]<class Filter>(Filter&& filter)
+    {
+        uint32_t rayCount = static_cast<uint32_t>(dRayIndices.size());
+        static constexpr auto Kernel = KCGenerateCamRaysStochastic
+        <
+            RayPayload, RayState,
+            R::RayStateInitFunc,
+            Camera, T, Filter
+        >;
+        static const std::string KernelName = MRAY_FORMAT("{}-{}-GenRays",
+                                                          TypeName(),
+                                                          FilterType::ToString(filterType.type));
+        //
+        queue.IssueSaturatingKernel<Kernel>
+        (
+            KernelName,
+            KernelIssueParams{.workCount = rayCount},
+            // Out
+            dRayDiffsOut,
+            dRaysOut,
+            dPayloadsOut,
+            dStatesOut,
+            // In
+            dRayIndices,
+            dRandomNums,
+            // Constants
+            dCamera,
+            transKey,
+            tg.SoA(),
+            globalPixelIndex,
+            regionCount,
+            filter
+        );
+    };
+
+    switch(filterType.type)
+    {
+        using enum FilterType::E;
+        case BOX:       LaunchKernel(BoxFilter(filterRadius)); break;
+        case TENT:      LaunchKernel(TentFilter(filterRadius)); break;
+        case GAUSSIAN:  LaunchKernel(GaussianFilter(filterRadius)); break;
+        case MITCHELL_NETRAVALI:
+                        LaunchKernel(MitchellNetravaliFilter(filterRadius)); break;
+        default: throw MRayError("Unkown filter type!");
+    }
+}
+
+template<RendererC R, CameraGroupC C, TransformGroupC T>
 std::string_view RenderCameraWork<R, C, T>::Name() const
 {
     return TypeName();
@@ -573,6 +666,12 @@ uint32_t RenderCameraWork<R, C, T>::SampleRayRNCount() const
     return C::SampleRayRNCount;
 }
 
+template<RendererC R, CameraGroupC C, TransformGroupC T>
+uint32_t RenderCameraWork<R, C, T>::StochasticFilterSampleRayRNCount() const
+{
+    return 2u;
+}
+
 template<RendererC R, PrimitiveGroupC PG,
          MaterialGroupC MG, TransformGroupC TG,
          auto WorkFunction, auto GenerateTransformContext>
@@ -580,7 +679,6 @@ MRAY_KERNEL
 static void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParams<R, PG, MG, TG> params)
 {
     using SpectrumConv  = typename R::SpectrumConverterContext;
-
     // Define the types
     // First, this kernel uses a transform context.
     // Thil will be used to transform the primitive.
@@ -645,9 +743,7 @@ static void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParams<R, PG, MG, TG
                                                          params.primSoA,
                                                          keys.transKey,
                                                          keys.primKey);
-        // Convert ray to local space instead of other way around
-        //ray = tContext.InvApply(ray);
-        // Construct Primitive (with identity transform)
+        // Construct Primitive
         auto primitive = Primitive(tContext,
                                    params.primSoA,
                                    keys.primKey);
@@ -668,11 +764,54 @@ template<RendererC R, LightGroupC LG, TransformGroupC TG,
 MRAY_KERNEL
 static void KCRenderLightWork(MRAY_GRID_CONSTANT const RenderLightWorkParams<R, LG, TG> params)
 {
-    //using Light....
+    using SpectrumConv = typename R::SpectrumConverterContext;
+    //
+    using PG = typename LG::PrimGroup;
+    // Define the types
+    // First, this kernel uses a transform context.
+    // Thil will be used to transform the primitive.
+    // We may not be able act on the primitive without the primitive's data
+    // (For example skinned meshes, we need weights and transform indices)
+    // "TransformContext" abstraction handles these
+    using TransContext = typename PrimTransformContextType<PG, TG>::Result;
+    // Primitive is straightforward but we get a type with the proper
+    // transform context
+    using Primitive = typename PG:: template Primitive<TransContext>;
+    // Light
+    using Light = typename LG:: template Light<TransContext, SpectrumConv>;
+    // Now finally we can start the runtime stuff
+    uint32_t rayCount = static_cast<uint32_t>(params.in.dRayIndices.size());
+    KernelCallParams kp;
+    for(uint32_t globalId = kp.GlobalId();
+        globalId < rayCount; globalId += kp.TotalSize())
+    {
+        RNGDispenser rng = RNGDispenser(params.in.dRandomNumbers, globalId, kp.TotalSize());
+        RayIndex rIndex = params.in.dRayIndices[globalId];
+        // Keys
+        HitKeyPack keys = params.in.dKeys[rIndex];
+        LightKey lKey = LightKey::CombinedKey(keys.lightOrMatKey.FetchBatchPortion(),
+                                              keys.lightOrMatKey.FetchIndexPortion());
+        // Create transform context
+        TransContext tContext = GenerateTransformContext(params.transSoA,
+                                                         params.primSoA,
+                                                         keys.transKey,
+                                                         keys.primKey);
 
-    // Runtime check of rn count
-    //assert(params.in.dRayIndices.size() * Material::SampleRayRNCount ==
-    //       params.base.in.dRandomNumbers.size());
+        // Get instantiation of converter
+        // TODO: Add spectrum related stuff, this should not be
+        // default constructed
+        typename SpectrumConv::Converter specConverter;
+        // Construct Primitive
+        auto primitive = Primitive(tContext,
+                                   params.primSoA,
+                                   keys.primKey);
+        // Construct light
+        auto light = Light(specConverter, primitive, params.lightSoA, lKey);
+
+        // Call the function
+        WorkFunction(light, rng, params, rIndex);
+        // All Done!
+    }
 }
 
 template<RendererC R, CameraGroupC CG, TransformGroupC TG,

@@ -112,7 +112,7 @@ Float BoxFilter::Evaluate(const Vector2& duv) const
 {
     Vector2 t = duv.Abs();
     Float rr = Float(1) / radius;
-    return (t[0] <= radius || t[1] <= radius)
+    return (t[0] <= radius && t[1] <= radius)
                 ? (Float(0.25) * rr * rr)
                 : Float(0);
 }
