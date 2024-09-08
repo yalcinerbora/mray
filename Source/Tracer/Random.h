@@ -189,10 +189,7 @@ class RNGeneratorGroupI
     public:
     virtual         ~RNGeneratorGroupI() = default;
 
-    virtual void    SetupDeviceRange(Vector2ui start, Vector2ui end) = 0;
-    virtual void    CopyStatesToGPUAsync(const GPUQueue& queue) = 0;
-    virtual void    CopyStatesFromGPUAsync(const GPUQueue& queue) = 0;
-
+    virtual void    SetupRange(Vector2ui range) = 0;
     virtual void    GenerateNumbers(// Output
                                     Span<RandomNumber> dNumbersOut,
                                     // Constants
@@ -210,7 +207,7 @@ class RNGeneratorGroupI
     virtual size_t UsedGPUMemory() const = 0;
 };
 
-using RNGGenerator = GeneratorFuncType<RNGeneratorGroupI, Vector2ui, uint64_t,
+using RNGGenerator = GeneratorFuncType<RNGeneratorGroupI, uint32_t, uint64_t,
                                        const GPUSystem&, BS::thread_pool&>;
 using RNGeneratorPtr = std::unique_ptr<RNGeneratorGroupI>;
 using RNGGeneratorMap = Map<typename SamplerType::E, RNGGenerator>;
@@ -228,12 +225,11 @@ class RNGGroupIndependent : public RNGeneratorGroupI
     // Due to tiling, we save the all state of the
     // entire image in host side.
     // This will copy the data to required HW side
-    HostLocalMemory         hostMemory;
-    Vector2ui               size2D;
-    Span<BackupRNGState>    hBackupStates;
-    Span<MainRNGState>      hMainStates;
+    //HostLocalMemory         hostMemory;
+    uint32_t                generatorCount;
+    Vector2ui               currentRange;
 
-    DeviceMemory            deviceMemory;
+    DeviceMemory            deviceMem;
     Span<BackupRNGState>    dBackupStates;
     Span<MainRNGState>      dMainStates;
     Vector2ui               deviceRangeStart;
@@ -241,14 +237,12 @@ class RNGGroupIndependent : public RNGeneratorGroupI
 
     public:
     // Constructors & Destructor
-            RNGGroupIndependent(Vector2ui generatorCount2D,
+            RNGGroupIndependent(uint32_t generatorCount,
                                 uint64_t seed,
                                 const GPUSystem& system,
                                 BS::thread_pool& mainThreadPool);
 
-    void    SetupDeviceRange(Vector2ui start, Vector2ui end) override;
-    void    CopyStatesToGPUAsync(const GPUQueue& queue) override;
-    void    CopyStatesFromGPUAsync(const GPUQueue& queue) override;
+    void    SetupRange(Vector2ui range) override;
 
     void    GenerateNumbers(// Output
                             Span<RandomNumber> dNumbersOut,

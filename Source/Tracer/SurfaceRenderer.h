@@ -19,14 +19,55 @@ enum class RayType : uint8_t
 
 namespace SurfRDetail
 {
-    enum Mode
+
+    struct Mode
     {
-        FURNACE,
-        WORLD_NORMAL,
-        WORLD_POSITION,
-        AO,
+        public:
+        enum E
+        {
+            FURNACE,
+            WORLD_NORMAL,
+            WORLD_POSITION,
+            AO,
+            //
+            END
+        };
+
+        private:
+        static constexpr std::array Names =
+        {
+            "Furnace",
+            "WorldNormal",
+            "WorldPosition",
+            "AO"
+        };
+
+        public:
+        E e;
         //
-        END
+        static constexpr std::string_view ToString(E e)
+        {
+            assert(e < END);
+            return Names[e];
+        }
+
+        static constexpr E FromString(std::string_view sv)
+        {
+            auto loc = std::find_if(Names.cbegin(), Names.cend(),
+            [&](std::string_view r)
+            {
+                return sv == r;
+            });
+            assert(loc != Names.cend());
+            return E(std::distance(Names.cbegin(), loc));
+        }
+    };
+
+    struct Options
+    {
+        uint32_t    totalSPP            = 32;
+        Mode::E     mode                = Mode::FURNACE;
+        bool        doStochasticFilter  = true;
     };
 
     struct GlobalState
@@ -77,6 +118,7 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     using RayState      = SurfRDetail::RayState;
     using RayPayload    = SurfRDetail::RayPayload;
     using SpectrumConverterContext = SpectrumConverterContextIdentity;
+    using Options       = SurfRDetail::Options;
     // Work Functions
     template<PrimitiveC P, MaterialC M, class S,
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
@@ -91,15 +133,7 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     };
     template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
     static constexpr auto CamWorkFunctions = Tuple{};
-
     static constexpr auto RayStateInitFunc = SurfRDetail::InitRayState;
-
-    //
-    struct Options
-    {
-        uint32_t            totalSPP   = 32;
-        SurfRDetail::Mode   mode       = SurfRDetail::FURNACE;
-    };
 
     private:
     Options     currentOptions  = {};

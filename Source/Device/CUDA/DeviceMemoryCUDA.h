@@ -175,7 +175,7 @@ class DeviceMemoryCUDA
                             DeviceMemoryCUDA(const DeviceMemoryCUDA&) = delete;
                             DeviceMemoryCUDA(DeviceMemoryCUDA&&) noexcept = default;
     DeviceMemoryCUDA&       operator=(const DeviceMemoryCUDA&) = delete;
-    DeviceMemoryCUDA&       operator=(DeviceMemoryCUDA&&) noexcept = default;
+    DeviceMemoryCUDA&       operator=(DeviceMemoryCUDA&&) noexcept;
                             ~DeviceMemoryCUDA();
 
     // Access

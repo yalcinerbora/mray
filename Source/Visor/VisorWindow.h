@@ -25,21 +25,18 @@ namespace BS { class thread_pool; }
 struct FrameCounter
 {
     public:
-    static constexpr size_t AVG_FRAME_COUNT = 4;
-    static constexpr float FRAME_COUNT_RECIP = 1.0f / static_cast<float>(AVG_FRAME_COUNT);
-    using FrameList = std::array<float, AVG_FRAME_COUNT>;
+    static constexpr size_t AVG_FRAME_COUNT = 8;
     using QueryData = std::array<uint64_t, 4>;
+    using FrameTimeAvg = MathFunctions::MovingAverage<AVG_FRAME_COUNT>;
 
     private:
     const VulkanSystemView* handlesVk = nullptr;
     VkQueryPool             queryPool = nullptr;
     VulkanCommandBuffer     startCommand;
     //
-    QueryData   queryData;
-    FrameList   frameCountList;
-    bool        firstFrame      = true;
-    uint32_t    fillIndex       = 0;
-    float       timestampPeriod = 0;
+    QueryData       queryData;
+    float           timestampPeriod = 0;
+    FrameTimeAvg    avg;
 
     public:
                     FrameCounter() = default;

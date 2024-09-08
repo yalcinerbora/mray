@@ -42,6 +42,10 @@ struct VisorState
     VisorAnalyticData       visor;
     RendererAnalyticData    renderer;
 
+    // Throughput
+    using ThroughputAverage = MathFunctions::MovingAverage<16>;
+    ThroughputAverage       renderThroughputAverage;
+
     // This comes after scene change
     uint64_t                tracerUsedGPUMemBytes;
 

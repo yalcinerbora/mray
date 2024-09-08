@@ -71,6 +71,7 @@ class ImageTiler
     // This class is a state machine (iterator of some sort as well)
     // Initially the first tile is selected
     uint32_t    currentTile         = 0;
+    Vector2ui   pixel1DRange        = Vector2ui::Zero();
 
     Vector2ui   ResponsibleSize() const;
     Vector2ui   GlobalTileStart() const;
@@ -88,6 +89,7 @@ class ImageTiler
     Vector2ui   LocalTileStart() const;
     Vector2ui   LocalTileEnd() const;
 
+    Vector2ui   Tile1DRange() const;
     Vector2ui   ConservativeTileSize() const;
     Vector2ui   CurrentTileSize() const;
     Vector2ui   CurrentTileIndex() const;

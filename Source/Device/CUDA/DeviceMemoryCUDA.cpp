@@ -417,6 +417,33 @@ DeviceMemoryCUDA::DeviceMemoryCUDA(const std::vector<const GPUDeviceCUDA*>& devi
     vaRanges.emplace_back(mPtr, reservedSize);
 }
 
+DeviceMemoryCUDA& DeviceMemoryCUDA::operator=(DeviceMemoryCUDA&& other) noexcept
+{
+    assert(this != &other);
+    // Dealloc Memory
+    if(allocSize != 0) CUDA_DRIVER_CHECK(cuMemUnmap(mPtr, allocSize));
+    for(const Allocations& a : allocs)
+    {
+        CUDA_DRIVER_CHECK(cuMemRelease(a.handle));
+    }
+    for(const VARanges& vaRange : vaRanges)
+        CUDA_DRIVER_CHECK(cuMemAddressFree(vaRange.first, vaRange.second));
+
+    //
+    deviceIds = std::move(other.deviceIds);
+    allocs = std::move(other.allocs);
+    vaRanges = std::move(other.vaRanges);
+    curDeviceIndex = other.curDeviceIndex;
+    allocationGranularity = other.allocationGranularity;
+    reserveGranularity = other.reserveGranularity;
+    reservedSize = other.reservedSize;
+    mPtr = other.mPtr;
+    allocSize = other.allocSize;
+    neverDecrease = other.neverDecrease;
+
+    return *this;
+}
+
 DeviceMemoryCUDA::~DeviceMemoryCUDA()
 {
     if(allocSize != 0) CUDA_DRIVER_CHECK(cuMemUnmap(mPtr, allocSize));

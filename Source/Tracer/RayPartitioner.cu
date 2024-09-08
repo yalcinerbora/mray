@@ -177,6 +177,8 @@ size_t PartitionerDeviceBufferSize(size_t maxElementEstimate)
     size_t partitionTM = BinPartitionTMSize<CommonIndex>(maxElementEstimate);
     size_t totalTempMem = std::max(radixSortTM, partitionTM);
 
+    //static constexpr size_t Alignment = size_t = MemAlloc::DefaultSystemAlignment();
+
     size_t totalBytes = (maxElementEstimate * sizeof(CommonKey) * 2 +
                          maxElementEstimate * sizeof(CommonIndex) * 2 +
                          totalTempMem);

@@ -89,6 +89,9 @@ struct SampleT
     Float       pdf;
 };
 
+template<class E>
+using EnumNameArray = std::array<std::string_view, static_cast<uint32_t>(E::END)>;
+
 // SoA style span
 // This may be usefull when DataSoA structures become too large
 // due to holding size_t for all spans. Currently not used.

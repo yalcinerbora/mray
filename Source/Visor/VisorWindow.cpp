@@ -202,9 +202,7 @@ FrameCounter::FrameCounter(FrameCounter&& other)
     , queryPool(std::exchange(other.queryPool, nullptr))
     , startCommand(std::move(other.startCommand))
     , queryData(std::exchange(other.queryData, {}))
-    , frameCountList(std::exchange(other.frameCountList, {}))
-    , firstFrame(other.firstFrame)
-    , fillIndex(other.fillIndex)
+    , avg(other.avg)
     , timestampPeriod(other.timestampPeriod)
 {}
 
@@ -221,9 +219,7 @@ FrameCounter& FrameCounter::operator=(FrameCounter&& other)
     queryPool = std::exchange(other.queryPool, nullptr);
     startCommand = std::move(other.startCommand);
     queryData = std::exchange(other.queryData, {});
-    frameCountList = std::exchange(other.frameCountList, {});
-    firstFrame = other.firstFrame;
-    fillIndex = other.fillIndex;
+    avg = other.avg;
     timestampPeriod = other.timestampPeriod;
     return *this;
 }
@@ -289,26 +285,12 @@ float FrameCounter::AvgFrame()
         frameTimeMs *= (static_cast<double>(timestampPeriod) / 1000000.0);
         float frameTimeMsF = static_cast<float>(frameTimeMs);
 
-        if(firstFrame)
-        {
-            firstFrame = false;
-            std::fill(frameCountList.begin(), frameCountList.end(),
-                      static_cast<float>(frameTimeMs));
-        }
-        else
-        {
-            frameCountList[fillIndex] = frameTimeMsF;
-            fillIndex = MathFunctions::Roll<int32_t>(fillIndex + 1, 0, AVG_FRAME_COUNT);
-        }
+        avg.FeedValue(frameTimeMsF);
         // Reset the query availablility
         queryData[1] = queryData[3] = 0;
         vkResetQueryPool(handlesVk->deviceVk, queryPool, 0, 2);
     }
-    float result = std::reduce(frameCountList.cbegin(),
-                               frameCountList.cend(),
-                               0.0f);
-    result *= FRAME_COUNT_RECIP;
-    return result;
+    return avg.Average();
 }
 
 MRayError Swapchain::FixSwapchain(bool isFirstFix)
@@ -1272,6 +1254,7 @@ bool VisorWindow::Render()
             {
                 //MRAY_LOG("[Visor]: Render Info received");
                 visorState.renderer = std::get<RENDERER_ANALYTICS>(response);
+                visorState.renderThroughputAverage.FeedValue(Float(visorState.renderer.throughput));
                 break;
             }
             case RENDERER_OPTIONS:
@@ -1283,6 +1266,7 @@ bool VisorWindow::Render()
             {
                 MRAY_LOG("[Visor]: Render Buffer Info received");
                 newRenderBuffer = std::get<RENDER_BUFFER_INFO>(response);
+                visorState.renderThroughputAverage = typename VisorState::ThroughputAverage();
                 stopConsuming = true;
                 break;
             }

@@ -1691,6 +1691,7 @@ inline LightSurfaceId TracerMock::SetBoundarySurface(LightSurfaceParams p)
              lightSurfId, static_cast<uint32_t>(p.lightId),
              static_cast<uint32_t>(p.transformId),
              static_cast<uint32_t>(p.mediumId));
+    return LightSurfaceId(lightSurfId);
 }
 
 inline LightSurfaceId TracerMock::CreateLightSurface(LightSurfaceParams p)

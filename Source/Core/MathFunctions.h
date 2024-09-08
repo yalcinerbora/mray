@@ -6,9 +6,30 @@
 
 #include <cmath>
 #include <bit>
+#include <numeric>
 
 namespace MathFunctions
 {
+    template<uint32_t N>
+    class MovingAverage
+    {
+        private:
+        using DataList = std::array<Float, N>;
+        static constexpr Float AVG_MULTIPLIER = Float(1) / Float(N);
+
+        private:
+        DataList    values = {};
+        int32_t     index = 0;
+
+        public:
+        // Constructors & Destructor
+        MovingAverage() = default;
+        MovingAverage(Float initialVal);
+
+        void    FeedValue(Float);
+        Float   Average() const;
+    };
+
     template <std::integral T>
     MRAY_HYBRID constexpr T Clamp(T, T minVal, T maxVal);
     template <std::floating_point T>
@@ -73,6 +94,27 @@ namespace MathFunctions
     MRAY_HYBRID constexpr T     NextPowerOfTwo(T value);
     template <std::integral T>
     MRAY_HYBRID constexpr T     PrevPowerOfTwo(T value);
+}
+
+template<uint32_t N>
+MathFunctions::MovingAverage<N>::MovingAverage(Float initialVal)
+{
+    std::fill(values.cbegin(), values.cend(), initialVal);
+    index = Roll(index + 1, 0, int32_t(N));
+}
+
+template<uint32_t N>
+void MathFunctions::MovingAverage<N>::FeedValue(Float v)
+{
+    values[index] = v;
+    index = Roll(index + 1, 0, int32_t(N));
+}
+
+template<uint32_t N>
+Float MathFunctions::MovingAverage<N>::Average() const
+{
+    Float total = std::reduce(values.cbegin(), values.cend(), Float(0));
+    return total * AVG_MULTIPLIER;
 }
 
 template <std::integral T>

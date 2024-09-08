@@ -79,20 +79,19 @@ void KCGenRandomNumbersPCG32Indirect(// Output
     }
 }
 
-RNGGroupIndependent::RNGGroupIndependent(Vector2ui generatorCount2D,
+RNGGroupIndependent::RNGGroupIndependent(uint32_t genCount,
                                          uint64_t seed,
                                          const GPUSystem& sys,
                                          BS::thread_pool& tp)
     : mainThreadPool(tp)
     , gpuSystem(sys)
-    , hostMemory(gpuSystem, true)
-    , size2D(generatorCount2D)
-    , deviceMemory(gpuSystem.AllGPUs(), 2_MiB, 32_MiB)
+    , generatorCount(genCount)
+    , currentRange(0, generatorCount)
+    , deviceMem(gpuSystem.AllGPUs(), 2_MiB, 32_MiB)
 {
-    size_t totalSize = size2D.Multiply();
-
-    MemAlloc::AllocateMultiData(std::tie(hBackupStates, hMainStates),
-                                hostMemory, {totalSize, totalSize});
+    MemAlloc::AllocateMultiData(std::tie(dBackupStates, dMainStates),
+                                deviceMem,
+                                {generatorCount, generatorCount});
 
     // These are const to catch race conditions etc.
     // TODO: Change this later
@@ -100,8 +99,9 @@ RNGGroupIndependent::RNGGroupIndependent(Vector2ui generatorCount2D,
     const std::mt19937 rng0(seed32);
     std::mt19937 rngTemp = rng0;
 
-    auto future0 = tp.submit_blocks(size_t(0), totalSize,
-    [&rng0, this](size_t start, size_t end)
+    std::vector<MainRNGState> hMainStates(generatorCount);
+    auto future0 = tp.submit_blocks(size_t(0), size_t(generatorCount),
+    [&rng0, &hMainStates](size_t start, size_t end)
     {
         // Local copy to the stack
         // (same functor will be run with different threads, so this
@@ -115,11 +115,12 @@ RNGGroupIndependent::RNGGroupIndependent(Vector2ui generatorCount2D,
     }, 4u);
 
     // Do discarding after issue (it should be logN for PRNGS)
-    rngTemp.discard(totalSize);
+    rngTemp.discard(genCount);
     const std::mt19937 rng1 = rngTemp;
 
-    auto future1 = tp.submit_blocks(size_t(0), totalSize,
-    [&rng1, this](size_t start, size_t end)
+    std::vector<BackupRNGState> hBackupStates(generatorCount);
+    auto future1 = tp.submit_blocks(size_t(0), size_t(generatorCount),
+    [&rng1, &hBackupStates](size_t start, size_t end)
     {
         // Local copy to the stack
         // (same functor will be run with different threads, so this
@@ -131,63 +132,20 @@ RNGGroupIndependent::RNGGroupIndependent(Vector2ui generatorCount2D,
             hBackupStates[i] = BackupRNG::GenerateState(rngLocal());
         }
     }, 4u);
-
     future0.wait();
     future1.wait();
+
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
+    queue.MemcpyAsync(dBackupStates, Span<const BackupRNGState>(hBackupStates));
+    queue.MemcpyAsync(dMainStates, Span<const MainRNGState>(hMainStates));
+    queue.Barrier().Wait();
 }
 
-void RNGGroupIndependent::SetupDeviceRange(Vector2ui start, Vector2ui end)
+void RNGGroupIndependent::SetupRange(Vector2ui range)
 {
-    deviceRangeStart = start;
-    deviceRangeEnd = end;
-    uint32_t totalSize = (deviceRangeEnd - deviceRangeStart).Multiply();
-    MemAlloc::AllocateMultiData(std::tie(dBackupStates,
-                                         dMainStates),
-                                deviceMemory,
-                                {totalSize, totalSize});
+    currentRange = range;
 }
 
-void RNGGroupIndependent::CopyStatesToGPUAsync(const GPUQueue& queue)
-{
-    Vector2ui range = deviceRangeEnd - deviceRangeStart;
-    size_t srcStride = size2D[0];
-    size_t dstStride = range[0];
-    size_t srcOffset = deviceRangeStart[0] + deviceRangeStart[1] * size2D[0];
-    size_t srcSize = range[0] + (range[1] - 1) * size2D[0];
-
-    auto dstBackupSpan = dBackupStates;
-    auto srcBackupSpan = hBackupStates.subspan(srcOffset, srcSize);
-    queue.MemcpyAsync2D(dstBackupSpan, dstStride,
-                        ToConstSpan(srcBackupSpan), srcStride,
-                        range);
-
-    auto dstMainSpan = dMainStates;
-    auto srcMainSpan = hMainStates.subspan(srcOffset, srcSize);
-    queue.MemcpyAsync2D(dstMainSpan , dstStride,
-                        ToConstSpan(srcMainSpan), srcStride,
-                        range);
-}
-
-void RNGGroupIndependent::CopyStatesFromGPUAsync(const GPUQueue& queue)
-{
-    Vector2ui range = deviceRangeEnd - deviceRangeStart;
-    size_t dstStride = size2D[0];
-    size_t srcStride = range[0];
-    size_t dstOffset = deviceRangeStart[0] + deviceRangeStart[1] * size2D[0];
-    size_t dstSize = range[0] + (range[1] - 1) * size2D[0];
-
-    auto srcBackupSpan = dBackupStates;
-    auto dstBackupSpan = hBackupStates.subspan(dstOffset, dstSize);
-    queue.MemcpyAsync2D(dstBackupSpan, dstStride,
-                        ToConstSpan(srcBackupSpan), srcStride,
-                        range);
-
-    auto srcMainSpan = dMainStates;
-    auto dstMainSpan = hMainStates.subspan(dstOffset, dstSize);
-    queue.MemcpyAsync2D(dstMainSpan, dstStride,
-                        ToConstSpan(srcMainSpan), srcStride,
-                        range);
-}
 
 void RNGGroupIndependent::GenerateNumbers(// Output
                                           Span<RandomNumber> dNumbersOut,
@@ -203,7 +161,8 @@ void RNGGroupIndependent::GenerateNumbers(// Output
         KernelIssueParams{.workCount = generatorCount},
         //
         dNumbersOut,
-        dMainStates,
+        dMainStates.subspan(currentRange[0],
+                            currentRange[1] - currentRange[0]),
         dimensionCount
     );
 }
@@ -224,7 +183,8 @@ void RNGGroupIndependent::GenerateNumbersIndirect(// Output
         KernelIssueParams{.workCount = generatorCount},
         //
         dNumbersOut,
-        dMainStates,
+        dMainStates.subspan(currentRange[0],
+                            currentRange[1] - currentRange[0]),
         dIndices,
         dimensionCount
     );
@@ -232,10 +192,11 @@ void RNGGroupIndependent::GenerateNumbersIndirect(// Output
 
 Span<BackupRNGState> RNGGroupIndependent::GetBackupStates()
 {
-    return dBackupStates;
+    return dBackupStates.subspan(currentRange[0],
+                                 currentRange[1] - currentRange[0]);
 }
 
 size_t RNGGroupIndependent::UsedGPUMemory() const
 {
-    return deviceMemory.Size();
+    return deviceMem.Size();
 }

@@ -74,7 +74,7 @@ class TransientData
     void                Push(Span<const T, 1>);
 
     std::string_view    AccessAsString() const;
-    std::string_view    AccessAsString();
+    Span<char>          AccessAsString();
 };
 
 // I could not utilize, linked-list here

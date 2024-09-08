@@ -128,7 +128,7 @@ AccumulateStatus AccumImageStage::IssueAccumulation(const RenderImageSection& se
 
     if(foreignMemory.SizeBytes() == 0)
     {
-        // Drop the frames we prematurely deallocated the buffers
+        // Drop the frames. We prematurely deallocated the buffers
         // since Vulkan does not allow memory to be pulled under its feet.
         // (Eventhough we do not use it explicitly)
         MRAY_LOG("[Visor] Released Img - DROP!!!\n"

@@ -73,6 +73,8 @@ ImageTiler::ImageTiler(RenderImage* rI,
     paddedTileSize = coveringTileSize + filterPadding * 2u;
     renderBuffer->Resize(paddedTileSize, depth, channels);
     tileCount = MathFunctions::DivideUp(fbSize, coveringTileSize);
+
+    pixel1DRange = Vector2ui(0u, CurrentTileSize().Multiply());
 }
 
 Vector2ui ImageTiler::FullResolution() const
@@ -102,6 +104,11 @@ Vector2ui ImageTiler::CurrentTileSize() const
     return end - start;
 }
 
+Vector2ui ImageTiler::Tile1DRange() const
+{
+    return pixel1DRange;
+}
+
 Vector2ui ImageTiler::ConservativeTileSize() const
 {
     return coveringTileSize;
@@ -123,6 +130,13 @@ void ImageTiler::NextTile()
     using MathFunctions::Roll;
     currentTile = Roll<int32_t>(currentTile + 1,
                                 0, int32_t(tileCount.Multiply()));
+    //
+    pixel1DRange += Vector2ui(CurrentTileSize().Multiply());
+    if(currentTile == 0)
+    {
+        pixel1DRange -= Vector2ui((range[1] - range[0]).Multiply());
+        assert(pixel1DRange[0] == 0);
+    }
 }
 
 Optional<RenderImageSection>

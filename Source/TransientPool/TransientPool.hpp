@@ -195,7 +195,7 @@ inline std::string_view TransientData::AccessAsString() const
     return std::string_view(reinterpret_cast<char*>(ownedMem.data()), usedBytes);
 }
 
-inline std::string_view TransientData::AccessAsString()
+inline Span<char> TransientData::AccessAsString()
 {
     if constexpr(EnableTypeCheck)
     {
@@ -204,7 +204,7 @@ inline std::string_view TransientData::AccessAsString()
             throw MRayError("TransientData(AccessAsString): Object did constructed with "
                             "either std::string or std::string_view!");
     }
-    return std::string_view(reinterpret_cast<char*>(ownedMem.data()), usedBytes);
+    return Span<char>(reinterpret_cast<char*>(ownedMem.data()), usedBytes);
 }
 
 inline FreeListNode* FreeList::GetALocation(TransientData buffer)

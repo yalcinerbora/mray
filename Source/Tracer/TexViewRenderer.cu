@@ -294,10 +294,9 @@ RendererOutput TexViewRenderer::DoRender()
     double timeSec = timer.Elapsed<Second>();
     double samplePerSec = static_cast<double>(curPixelCount) / timeSec;
     samplePerSec /= 1'000'000;
-    double spp = (double(imageTiler.CurrentTileIndex().Multiply() + 1) /
-                  double(imageTiler.TileCount().Multiply()));
-    spp *= static_cast<double>(totalIterationCount);
+    double spp = double(1) / double(imageTiler.TileCount().Multiply());
     totalIterationCount++;
+    spp *= static_cast<double>(totalIterationCount);
     // Roll to the next tile
     imageTiler.NextTile();
     return RendererOutput

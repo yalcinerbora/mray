@@ -496,6 +496,7 @@ class RendererT : public RendererI
     uint64_t                totalIterationCount;
 
     uint32_t                GenerateWorks();
+    void                    ClearAllWorkMappings();
     RenderWorkHasher        InitializeHashes(Span<uint32_t> dHashes,
                                              Span<CommonKey> dWorkIds,
                                              const GPUQueue& queue);
@@ -983,6 +984,15 @@ uint32_t RendererT<C>::GenerateCameraWorkMappings(uint32_t workStart)
         );
     }
     return workStart;
+}
+
+template <class C>
+void RendererT<C>::ClearAllWorkMappings()
+{
+    currentCameraWorks.clear();
+    currentWorks.clear();
+    currentLightWorks.clear();
+    workCounter = 0;
 }
 
 template <class C>

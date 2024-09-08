@@ -306,7 +306,7 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
                                std::to_string(visorState.renderer.renderResolution[1])).c_str());
             ImGui::Separator();
             ImGui::Text("%s", MRAY_FORMAT("{:>7.3f}{:s}",
-                                          visorState.renderer.throughput,
+                                          visorState.renderThroughputAverage.Average(),
                                           visorState.renderer.throughputSuffix).c_str());
             ImGui::Separator();
             ImGui::Text("%s", MRAY_FORMAT("{:>6.1f}{:s}",

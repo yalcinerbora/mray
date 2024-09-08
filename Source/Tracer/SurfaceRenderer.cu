@@ -86,7 +86,9 @@ SurfaceRenderer::AttributeInfo() const
     using enum AttributeOptionality;
     return AttribInfoList
     {
-        {"totalSPP", MRayDataType<MR_UINT32>{}, IS_SCALAR, MR_MANDATORY}
+        {"totalSPP",            MRayDataType<MR_UINT32>{}, IS_SCALAR, MR_MANDATORY},
+        {"renderType",          MRayDataType<MR_STRING>{}, IS_SCALAR, MR_MANDATORY},
+        {"doStochasticFilter",  MRayDataType<MR_BOOL>{}, IS_SCALAR, MR_MANDATORY}
     };
 }
 
@@ -97,6 +99,16 @@ RendererOptionPack SurfaceRenderer::CurrentAttributes() const
 
     result.attributes.push_back(TransientData(std::in_place_type_t<uint32_t>{}, 1));
     result.attributes.back().Push(Span<const uint32_t>(&currentOptions.totalSPP, 1));
+
+    std::string_view curModeName = SurfRDetail::Mode::ToString(currentOptions.mode);
+    result.attributes.push_back(TransientData(std::in_place_type_t<std::string>{},
+                                              curModeName.size()));
+    auto svRead = result.attributes.back().AccessAsString();
+    assert(svRead.size() == curModeName.size());
+    std::copy(curModeName.cbegin(), curModeName.cend(), svRead.begin());
+
+    result.attributes.push_back(TransientData(std::in_place_type_t<bool>{}, 1));
+    result.attributes.back().Push(Span<const bool>(&currentOptions.doStochasticFilter, 1));
 
     if constexpr(MRAY_IS_DEBUG)
     {
@@ -109,10 +121,14 @@ RendererOptionPack SurfaceRenderer::CurrentAttributes() const
 void SurfaceRenderer::PushAttribute(uint32_t attributeIndex,
                                     TransientData data, const GPUQueue&)
 {
-    if(attributeIndex != 0)
-        throw MRayError("{} Unkown attribute index {}",
-                        TypeName(), attributeIndex);
-    newOptions.totalSPP = data.AccessAs<uint32_t>()[0];
+    switch(attributeIndex)
+    {
+        case 0: newOptions.totalSPP = data.AccessAs<uint32_t>()[0]; break;
+        case 1: newOptions.mode = SurfRDetail::Mode::FromString(std::as_const(data).AccessAsString()); break;
+        case 2: newOptions.doStochasticFilter = data.AccessAs<bool>()[0]; break;
+        default:
+            throw MRayError("{} Unkown attribute index {}", TypeName(), attributeIndex);
+    }
 }
 
 RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
@@ -145,7 +161,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     using MathFunctions::Roll;
     uint32_t newMode = uint32_t(Roll(int32_t(customLogicIndex0), 0,
                                              int32_t(Mode::END)));
-    currentOptions.mode = Mode(newMode);
+    currentOptions.mode = SurfRDetail::Mode::E(newMode);
 
     imageTiler = ImageTiler(renderBuffer.get(), rIP,
                             tracerView.tracerParams.parallelizationHint,
@@ -222,20 +238,11 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
         throw MRayError("[{}]: Unkown random number generator type {}.",
                         SurfaceRenderer::TypeName(),
                         uint32_t(tracerView.tracerParams.samplerType.type));
-    Vector2ui generatorCount = rIP.regionMax - rIP.regionMin;
+    uint32_t generatorCount = (rIP.regionMax - rIP.regionMin).Multiply();
     uint64_t seed = tracerView.tracerParams.seed;
     rnGenerator = RngGen->get()(std::move(generatorCount),
                                 std::move(seed),
                                 gpuSystem, globalThreadPool);
-
-    // TODO: Change this later
-    gpuSystem.SyncAll();
-    const GPUQueue& q = gpuSystem.BestDevice().GetComputeQueue(0);
-    rnGenerator->SetupDeviceRange(imageTiler.LocalTileStart(),
-                                  imageTiler.LocalTileEnd());
-    rnGenerator->CopyStatesToGPUAsync(q);
-    q.Barrier().Wait();
-
 
     auto bufferPtrAndSize = renderBuffer->SharedDataPtrAndSize();
     return RenderBufferInfo
@@ -286,34 +293,37 @@ RendererOutput SurfaceRenderer::DoRender()
 
     // Create RNG state for each ray
     // Generate rays
-    rnGenerator->SetupDeviceRange(imageTiler.LocalTileStart(),
-                                  imageTiler.LocalTileEnd());
-
+    rnGenerator->SetupRange(imageTiler.Tile1DRange());
     // Generate RN for camera rays
     rnGenerator->GenerateNumbers(dCamGenRandomNums,
                                  (*curCamWork)->SampleRayRNCount(),
                                  processQueue);
-
-    cameraWork.GenerateRays(dRayDifferentials, dRays, EmptyType{},
-                            dRayState, dIndices,
-                            ToConstSpan(dCamGenRandomNums),
-                            dSubCameraBuffer, curCamTransformKey,
-                            globalPixelIndex, imageTiler.CurrentTileSize(),
-                            processQueue);
-    //cameraWork.GenRaysStochasticFilter
-    //(
-    //    dRayDifferentials, dRays, EmptyType{},
-    //    dRayState, dIndices,
-    //    ToConstSpan(dCamGenRandomNums),
-    //    dSubCameraBuffer, curCamTransformKey,
-    //    globalPixelIndex, imageTiler.CurrentTileSize(),
-    //    tracerView.tracerParams.filmFilter,
-    //    processQueue
-    //);
-
+    if(currentOptions.doStochasticFilter)
+    {
+        cameraWork.GenRaysStochasticFilter
+        (
+            dRayDifferentials, dRays, EmptyType{},
+            dRayState, dIndices,
+            ToConstSpan(dCamGenRandomNums),
+            dSubCameraBuffer, curCamTransformKey,
+            globalPixelIndex, imageTiler.CurrentTileSize(),
+            tracerView.tracerParams.filmFilter,
+            processQueue
+        );
+    }
+    else
+    {
+        cameraWork.GenerateRays
+        (
+            dRayDifferentials, dRays, EmptyType{},
+            dRayState, dIndices,
+            ToConstSpan(dCamGenRandomNums),
+            dSubCameraBuffer, curCamTransformKey,
+            globalPixelIndex, imageTiler.CurrentTileSize(),
+            processQueue
+        );
+    }
     globalPixelIndex += rayCount;
-    // Save the states back (we will issue next tile after on next iteration)
-    //rnGenerator->CopyStatesFromGPUAsync(processQueue);
 
     // Cast rays
     using namespace std::string_view_literals;
@@ -436,23 +446,22 @@ RendererOutput SurfaceRenderer::DoRender()
     // so its fine.
     renderBuffer->ClearImage(processQueue);
     ImageSpan<3> filmSpan = imageTiler.GetTileSpan<3>();
-    //SetImagePixels(filmSpan, ToConstSpan(dRayState.dOutputData),
-    //               ToConstSpan(dRayState.dFilmFilterWeights),
-    //               ToConstSpan(dRayState.dImageCoordinates),
-    //               Float(1), processQueue);
-
-    // Using atomic filter since the samples are uniformly distributed
-    //filmFilter->ReconstructionFilterAtomicRGB(filmSpan,
-    //                                          ToConstSpan(dRayState.dOutputData),
-    //                                          ToConstSpan(dRayState.dImageCoordinates),
-    //                                          Float(1), processQueue);
-    filmFilter->ReconstructionFilterRGB(filmSpan, rayPartitioner,
-                                        ToConstSpan(dRayState.dOutputData),
-                                        ToConstSpan(dRayState.dImageCoordinates),
-                                        tracerView.tracerParams.parallelizationHint,
-                                        Float(1), processQueue);
-
-
+    if(currentOptions.doStochasticFilter)
+    {
+        SetImagePixels(filmSpan, ToConstSpan(dRayState.dOutputData),
+                       ToConstSpan(dRayState.dFilmFilterWeights),
+                       ToConstSpan(dRayState.dImageCoordinates),
+                       Float(1), processQueue);
+    }
+    else
+    {
+        // Using atomic filter since the samples are uniformly distributed
+        // And it is faster
+        filmFilter->ReconstructionFilterAtomicRGB(filmSpan,
+                                                  ToConstSpan(dRayState.dOutputData),
+                                                  ToConstSpan(dRayState.dImageCoordinates),
+                                                  Float(1), processQueue);
+    }
     // Issue a send of the FBO to Visor
     const GPUQueue& transferQueue = device.GetTransferQueue();
     Optional<RenderImageSection>
@@ -477,10 +486,9 @@ RendererOutput SurfaceRenderer::DoRender()
     double timeSec = timer.Elapsed<Second>();
     double samplePerSec = static_cast<double>(rayCount) / timeSec;
     samplePerSec /= 1'000'000;
-    double spp = (double(imageTiler.CurrentTileIndex().Multiply() + 1) /
-                  double(imageTiler.TileCount().Multiply()));
-    spp *= static_cast<double>(totalIterationCount);
+    double spp = double(1) / double(imageTiler.TileCount().Multiply());
     totalIterationCount++;
+    spp *= static_cast<double>(totalIterationCount);
     // Roll to the next tile
     imageTiler.NextTile();
 
@@ -504,4 +512,9 @@ RendererOutput SurfaceRenderer::DoRender()
 }
 
 void SurfaceRenderer::StopRender()
-{}
+{
+    ClearAllWorkMappings();
+    filmFilter = {};
+    rnGenerator = {};
+    globalPixelIndex = 0;
+}
