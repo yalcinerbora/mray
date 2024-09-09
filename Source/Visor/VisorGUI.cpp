@@ -308,6 +308,15 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
             ImGui::Text("%s", MRAY_FORMAT("{:>7.3f}{:s}",
                                           visorState.renderThroughputAverage.Average(),
                                           visorState.renderer.throughputSuffix).c_str());
+            if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+            {
+                std::string detailMemUsage = MRAY_FORMAT("Iteration Time: {:.1f}ms",
+                                                         visorState.iterationTimeAverage.Average());
+                ImGui::BeginTooltip();
+                ImGui::Text("%s", detailMemUsage.c_str());
+                ImGui::EndTooltip();
+            }
+
             ImGui::Separator();
             ImGui::Text("%s", MRAY_FORMAT("{:>6.1f}{:s}",
                                           visorState.renderer.workPerPixel,

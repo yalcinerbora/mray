@@ -46,6 +46,9 @@ struct VisorState
     using ThroughputAverage = Math::MovingAverage<16>;
     ThroughputAverage       renderThroughputAverage;
 
+    using TimeAverage       = Math::MovingAverage<8>;
+    TimeAverage             iterationTimeAverage;
+
     // This comes after scene change
     uint64_t                tracerUsedGPUMemBytes;
 

@@ -1253,6 +1253,7 @@ bool VisorWindow::Render()
                 //MRAY_LOG("[Visor]: Render Info received");
                 visorState.renderer = std::get<RENDERER_ANALYTICS>(response);
                 visorState.renderThroughputAverage.FeedValue(Float(visorState.renderer.throughput));
+                visorState.iterationTimeAverage.FeedValue(Float(visorState.renderer.iterationTimeMS));
                 break;
             }
             case RENDERER_OPTIONS:
