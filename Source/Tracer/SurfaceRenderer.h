@@ -142,6 +142,7 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     FilmFilterPtr               filmFilter;
     RenderWorkHasher            workHasher;
     //
+    Optional<CameraTransform>   curCamTransformOverride;
     CameraSurfaceParams         curCamSurfaceParams;
     TransformKey                curCamTransformKey;
     CameraKey                   curCamKey;

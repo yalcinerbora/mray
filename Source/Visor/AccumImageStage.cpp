@@ -124,15 +124,15 @@ AccumulateStatus AccumImageStage::IssueAccumulation(const RenderImageSection& se
     // let the main render loop to terminate
     if(!syncSemaphore->Acquire(section.waitCounter))
         return AccumulateStatus::TIMELINE_FAILED;
-    MRAY_LOG("[Visor] AcquiredImg {}", section.waitCounter);
+    //MRAY_LOG("[Visor] AcquiredImg {}", section.waitCounter);
 
     if(foreignMemory.SizeBytes() == 0)
     {
         // Drop the frames. We prematurely deallocated the buffers
         // since Vulkan does not allow memory to be pulled under its feet.
         // (Eventhough we do not use it explicitly)
-        MRAY_LOG("[Visor] Released Img - DROP!!!\n"
-                 "----------------------");
+        //MRAY_LOG("[Visor] Released Img - DROP!!!\n"
+        //         "----------------------");
         syncSemaphore->Release();
         return AccumulateStatus::DROPPING_FRAME;
     }
@@ -235,8 +235,8 @@ AccumulateStatus AccumImageStage::IssueAccumulation(const RenderImageSection& se
         // doing this operation so it should be pretty fast (hopefully)
         vkWaitForFences(device, 1, &fenceHandle, VK_TRUE,
                         std::numeric_limits<uint64_t>::max());
-        MRAY_LOG("[Visor] Released Img\n"
-                 "----------------------");
+        //MRAY_LOG("[Visor] Released Img\n"
+        //         "----------------------");
         // Reset for the next issue
         vkResetFences(device, 1, &fenceHandle);
         // Signal the MRay renderer that

@@ -1270,7 +1270,7 @@ bool VisorWindow::Render()
             }
             case CLEAR_IMAGE_SECTION:
             {
-                MRAY_LOG("[Visor]: Clear Image received");
+                //MRAY_LOG("[Visor]: Clear Image received");
                 newClearSignal = std::get<CLEAR_IMAGE_SECTION>(response);
                 stopConsuming = true;
                 break;

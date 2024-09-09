@@ -65,14 +65,14 @@ uint64_t GPUSemaphoreViewCUDA::ChangeToNextState()
 bool GPUSemaphoreViewCUDA::HostAcquire()
 {
     bool acquired = externalSemaphore->Acquire(acquireValue);
-    MRAY_LOG("[Tracer] Acquired Img {}", acquireValue);
+    //MRAY_LOG("[Tracer] Acquired Img {}", acquireValue);
     return acquired;
 }
 
 void GPUSemaphoreViewCUDA::HostRelease()
 {
-    MRAY_LOG("[Tracer] Released Img\n"
-             "----------------------");
+    //MRAY_LOG("[Tracer] Released Img\n"
+    //         "----------------------");
     externalSemaphore->Release();
 }
 

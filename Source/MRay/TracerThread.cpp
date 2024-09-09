@@ -255,6 +255,16 @@ void TracerThread::RestartRenderer()
         std::in_place_index<TracerResponse::RENDER_BUFFER_INFO>,
         rbi
     ));
+
+    // When new scene is loaded, send the
+    // Initial cam transform
+    CamSurfaceId camSurf = sceneIds.camSurfaces[currentCamIndex];
+    currentCamTransform = tracer->GetCamTransform(camSurf);
+    transferQueue.Enqueue(TracerResponse
+    (
+        std::in_place_index<TracerResponse::CAMERA_INIT_TRANSFORM>,
+        currentCamTransform
+    ));
 }
 
 void TracerThread::HandleRendering()
@@ -579,10 +589,10 @@ void TracerThread::LoopWork()
         {
             currentCamTransform = transform.value();
 
-            MRAY_LOG("[Tracer]: NewTransform G{}, P{}, U{}",
-                     currentCamTransform.gazePoint,
-                     currentCamTransform.position,
-                     currentCamTransform.up);
+            //MRAY_LOG("[Tracer]: NewTransform G{}, P{}, U{}",
+            //         currentCamTransform.gazePoint,
+            //         currentCamTransform.position,
+            //         currentCamTransform.up);
             // Transform change should be as real time as possible so
             tracer->SetCameraTransform(currentRenderer, currentCamTransform);
             transferQueue.Enqueue(TracerResponse

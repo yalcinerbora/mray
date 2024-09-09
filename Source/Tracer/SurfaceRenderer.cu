@@ -271,12 +271,22 @@ RendererOutput SurfaceRenderer::DoRender()
     const GPUDevice& device = gpuSystem.BestDevice();
     const GPUQueue& processQueue = device.GetComputeQueue(0);
 
+    if(cameraTransform.has_value())
+    {
+        totalIterationCount = 0;
+        curCamTransformOverride = cameraTransform;
+        cameraTransform = std::nullopt;
+    }
+
     // Generate subcamera of this specific tile
-    cameraWork.GenerateSubCamera(dSubCameraBuffer,
-                                 curCamKey, cameraTransform,
-                                 imageTiler.CurrentTileIndex(),
-                                 imageTiler.TileCount(),
-                                 processQueue);
+    cameraWork.GenerateSubCamera
+    (
+        dSubCameraBuffer,
+        curCamKey, curCamTransformOverride,
+        imageTiler.CurrentTileIndex(),
+        imageTiler.TileCount(),
+        processQueue
+    );
 
     // Find the ray count. Ray count is tile count
     // but tile can exceed film boundaries so clamp,
@@ -335,8 +345,12 @@ RendererOutput SurfaceRenderer::DoRender()
         boundaryMatKeyPack
     );
 
-    tracerView.baseAccelerator.CastRays(dHitKeys, dHits, dBackupRNGStates,
-                                        dRays, dIndices, processQueue);
+    // Ray Casting
+    tracerView.baseAccelerator.CastRays
+    (
+        dHitKeys, dHits, dBackupRNGStates,
+        dRays, dIndices, processQueue
+    );
 
     //DeviceDebug::DumpGPUMemToFile("dHitKeys", ToConstSpan(dHitKeys), processQueue);
 
@@ -381,12 +395,8 @@ RendererOutput SurfaceRenderer::DoRender()
         uint32_t partitionStart = hPartitionStartOffsets[i];
         uint32_t partitionSize = (hPartitionStartOffsets[i + 1] -
                                   hPartitionStartOffsets[i]);
-
         auto dLocalIndices = dPartitionIndices.subspan(partitionStart,
                                                        partitionSize);
-
-        //DeviceDebug::DumpGPUMemToFile(std::string("dPartitionIndicesLocal") + std::to_string(i),
-        //                              ToConstSpan(dLocalIndices), processQueue);
         // Find the work
         // TODO: Although work count should be small,
         // doing a linear search here may not be performant.
@@ -447,19 +457,25 @@ RendererOutput SurfaceRenderer::DoRender()
     ImageSpan<3> filmSpan = imageTiler.GetTileSpan<3>();
     if(currentOptions.doStochasticFilter)
     {
-        SetImagePixels(filmSpan, ToConstSpan(dRayState.dOutputData),
-                       ToConstSpan(dRayState.dFilmFilterWeights),
-                       ToConstSpan(dRayState.dImageCoordinates),
-                       Float(1), processQueue);
+        SetImagePixels
+        (
+            filmSpan, ToConstSpan(dRayState.dOutputData),
+            ToConstSpan(dRayState.dFilmFilterWeights),
+            ToConstSpan(dRayState.dImageCoordinates),
+            Float(1), processQueue
+        );
     }
     else
     {
         // Using atomic filter since the samples are uniformly distributed
         // And it is faster
-        filmFilter->ReconstructionFilterAtomicRGB(filmSpan,
-                                                  ToConstSpan(dRayState.dOutputData),
-                                                  ToConstSpan(dRayState.dImageCoordinates),
-                                                  Float(1), processQueue);
+        filmFilter->ReconstructionFilterAtomicRGB
+        (
+            filmSpan,
+            ToConstSpan(dRayState.dOutputData),
+            ToConstSpan(dRayState.dImageCoordinates),
+            Float(1), processQueue
+        );
     }
     // Issue a send of the FBO to Visor
     const GPUQueue& transferQueue = device.GetTransferQueue();
