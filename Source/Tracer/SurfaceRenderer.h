@@ -245,13 +245,13 @@ void SurfRDetail::WorkFunction(const Prim&, const Material&, const Surface& surf
             if constexpr(std::is_same_v<BasicSurface, Surface>)
             {
                 Vector3 normal = surf.normal;
-                normal *= (normal + Vector3(1)) * Vector3(0.5);
+                normal = (normal + Vector3(1)) * Vector3(0.5);
                 color = normal;
             }
             else
             {
                 Vector3 normal = surf.shadingTBN.ApplyInvRotation(Vector3::ZAxis());
-                normal *= (normal + Vector3(1)) * Vector3(0.5);
+                normal = (normal + Vector3(1)) * Vector3(0.5);
                 color = normal;
             }
             break;
@@ -261,13 +261,13 @@ void SurfRDetail::WorkFunction(const Prim&, const Material&, const Surface& surf
             if constexpr(std::is_same_v<BasicSurface, Surface>)
             {
                 Vector3 normal = surf.normal;
-                normal *= (normal + Vector3(1)) * Vector3(0.5);
+                normal = (normal + Vector3(1)) * Vector3(0.5);
                 color = normal;
             }
             else
             {
                 Vector3 normal = surf.geoNormal;
-                normal *= (normal + Vector3(1)) * Vector3(0.5);
+                normal = (normal + Vector3(1)) * Vector3(0.5);
                 color = normal;
             }
             break;

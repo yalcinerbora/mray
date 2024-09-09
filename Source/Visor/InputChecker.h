@@ -12,7 +12,8 @@ class InputChecker
     // Constructors & Destructor
                 InputChecker(const VisorKeyMap& keyMap);
     //
-    bool        CheckKeyPress(VisorUserAction, bool repeat = true) const;
+    bool        CheckKeyPress(VisorUserAction, bool repeat = false) const;
+    bool        CheckKeyRelease(VisorUserAction) const;
     bool        CheckMouseDrag(VisorUserAction) const;
     Vector2     GetMousePos() const;
 };
@@ -24,6 +25,11 @@ inline InputChecker::InputChecker(const VisorKeyMap& km)
 inline bool InputChecker::CheckKeyPress(VisorUserAction a, bool repeat) const
 {
     return ImGui::IsKeyPressed(ImGuiKey(keyMap->at(a)), repeat);
+}
+
+inline bool InputChecker::CheckKeyRelease(VisorUserAction a) const
+{
+    return ImGui::IsKeyReleased(ImGuiKey(keyMap->at(a)));
 }
 
 inline bool InputChecker::CheckMouseDrag(VisorUserAction a) const

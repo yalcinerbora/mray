@@ -29,6 +29,7 @@ class MovementSchemeFPS : public MovementSchemeI
     static constexpr Float  MoveRatioModifier = Float(1.5);
     //
     Vector2                 prevMouse = Vector2::Zero();
+    bool                    fastMove = false;
 
     public:
     // Members
@@ -72,12 +73,17 @@ inline Optional<CameraTransform> MovementSchemeFPS::Update(const InputChecker& i
     }
 
     // Key Related
+    if(inputChecker.CheckKeyPress(VisorUserAction::FAST_MOVE_MODIFIER))
+        fastMove = true;
+    if(inputChecker.CheckKeyRelease(VisorUserAction::FAST_MOVE_MODIFIER))
+        fastMove = false;
+
     const std::array<bool, 4> MovePresses =
     {
-        inputChecker.CheckKeyPress(VisorUserAction::MOVE_FORWARD),
-        inputChecker.CheckKeyPress(VisorUserAction::MOVE_BACKWARD),
-        inputChecker.CheckKeyPress(VisorUserAction::MOVE_LEFT),
-        inputChecker.CheckKeyPress(VisorUserAction::MOVE_RIGHT)
+        inputChecker.CheckKeyPress(VisorUserAction::MOVE_FORWARD, true),
+        inputChecker.CheckKeyPress(VisorUserAction::MOVE_BACKWARD, true),
+        inputChecker.CheckKeyPress(VisorUserAction::MOVE_LEFT, true),
+        inputChecker.CheckKeyPress(VisorUserAction::MOVE_RIGHT, true)
     };
     if(std::any_of(MovePresses.cbegin(), MovePresses.cend(),
                    [](auto a) { return a; }))
@@ -86,7 +92,7 @@ inline Optional<CameraTransform> MovementSchemeFPS::Update(const InputChecker& i
         uint32_t maxIndex = sceneSpan.Maximum();
         Float maxExtent = sceneSpan[maxIndex];
         Float movementRatio = maxExtent * MovementRatio;
-        if(inputChecker.CheckKeyPress(VisorUserAction::FAST_MOVE_MODIFIER))
+        if(fastMove)
             movementRatio *= MoveRatioModifier;
 
         if(!result) result = state.transform;
