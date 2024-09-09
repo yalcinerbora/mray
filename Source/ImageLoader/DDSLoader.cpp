@@ -401,7 +401,7 @@ Pair<Vector2ui, uint32_t> MipSizeToBlockSize(MRayPixelTypeRT pf, const Vector2ui
     }, pf);
 
     Pair<Vector2ui, uint32_t> result;
-    result.first = MathFunctions::DivideUp(mipSize, Vector2ui(BLOCK_SIZE));
+    result.first = Math::DivideUp(mipSize, Vector2ui(BLOCK_SIZE));
     result.second = bytesPerBlock;
     return result;
 }

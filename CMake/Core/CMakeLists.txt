@@ -34,7 +34,7 @@ set(SRC_MATH
     ${CURRENT_SOURCE_DIR}/Vector.h
     ${CURRENT_SOURCE_DIR}/Vector.hpp
     ${CURRENT_SOURCE_DIR}/MathForward.h
-    ${CURRENT_SOURCE_DIR}/MathFunctions.h
+    ${CURRENT_SOURCE_DIR}/Math.h
 )
 
 set(SRC_UTILITY

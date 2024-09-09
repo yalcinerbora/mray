@@ -59,7 +59,7 @@ void MainUniformBuffer::AllocateUniformBuffers(const std::array<UniformMemoryReq
         const auto* requester = bufferRequesters[i];
         offsets[i] = totalSize;
         totalSize += requester->UniformBufferSize();
-        totalSize = MathFunctions::NextMultiple(totalSize, VULKAN_META_ALIGNMENT);
+        totalSize = Math::NextMultiple(totalSize, VULKAN_META_ALIGNMENT);
     }
     offsets[N] = totalSize;
     //

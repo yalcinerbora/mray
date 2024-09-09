@@ -187,7 +187,7 @@ AccumulateStatus AccumImageStage::IssueAccumulation(const RenderImageSection& se
     };
     vkBeginCommandBuffer(accumulateCommand, &bInfo);
 
-    using MathFunctions::DivideUp;
+    using Math::DivideUp;
     Vector2ui totalPix = section.pixelMax - section.pixelMin;
     Vector2ui groupSize = DivideUp(totalPix,
                                    VulkanComputePipeline::TPB_2D);

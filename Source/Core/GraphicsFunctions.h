@@ -153,7 +153,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Optional<Vector3> Refract(const Vector3& normal,
                           const Vector3& v, Float etaFrom, Float etaTo)
 {
-    using MathFunctions::SqrtMax;
+    using Math::SqrtMax;
     // Convention of wi (v) and normal is as follows
     //          wo (out)
     //          ^
@@ -242,7 +242,7 @@ Vector2 CartesianToUnitSpherical(const Vector3& xyz)
     // range [0, pi]
     // Sometimes normalized cartesian coords may invoke NaN here
     // clamp it to the range
-    Float incl = std::acos(MathFunctions::Clamp<Float>(xyz[2], -1, 1));
+    Float incl = std::acos(Math::Clamp<Float>(xyz[2], -1, 1));
     return Vector2(azimuth, incl);
 }
 

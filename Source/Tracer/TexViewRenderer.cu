@@ -172,7 +172,7 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
     }
 
     // Find the texture index
-    using MathFunctions::Roll;
+    using Math::Roll;
     uint32_t newTextureIndex = uint32_t(Roll(int32_t(customLogicIndex0), 0,
                                              int32_t(textures.size())));
     const GenericTexture* t = textures[newTextureIndex];

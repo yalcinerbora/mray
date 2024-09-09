@@ -81,7 +81,7 @@ template<class T>
 inline
 void VulkanComputePipeline::PushConstant(VkCommandBuffer cmd, const T& data)
 {
-    using MathFunctions::NextMultiple;
+    using Math::NextMultiple;
     uint32_t size = NextMultiple(uint32_t(sizeof(T)), 4u);
     vkCmdPushConstants(cmd, pipelineLayout,
                        VK_SHADER_STAGE_COMPUTE_BIT,

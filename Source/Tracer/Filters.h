@@ -153,7 +153,7 @@ TentFilter::TentFilter(Float r)
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float TentFilter::Evaluate(const Vector2& duv) const
 {
-    using namespace MathFunctions;
+    using namespace Math;
     Vector2 t = (duv * recipRadius).Abs();
     Float capSqrt = Float(1) / radius;
     // TODO: This seems wrong? Pyramdi cap (height)
@@ -202,8 +202,8 @@ GaussianFilter::GaussianFilter(Float r)
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float GaussianFilter::Evaluate(const Vector2& duv) const
 {
-    return (MathFunctions::Gaussian(duv[0], sigma) *
-            MathFunctions::Gaussian(duv[1], sigma));
+    return (Math::Gaussian(duv[0], sigma) *
+            Math::Gaussian(duv[1], sigma));
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE

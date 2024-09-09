@@ -122,7 +122,7 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
     // Allocate persistent memory
     size_t instanceCount = instanceOffsets.back();
     // Assume a complete tree, and allocate conservatively
-    size_t conservativeNodeCount = MathFunctions::NextPowerOfTwo(instanceCount) << 1u;
+    size_t conservativeNodeCount = Math::NextPowerOfTwo(instanceCount) << 1u;
     conservativeNodeCount -= 1;
 
     MemAlloc::AllocateMultiData(std::tie(dLeafKeys, dLeafAABBs, dNodes),

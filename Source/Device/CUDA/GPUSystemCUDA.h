@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "Core/Types.h"
-#include "Core/MathFunctions.h"
+#include "Core/Math.h"
 #include "DefinitionsCUDA.h"
 
 #include "../GPUTypes.h"
@@ -635,8 +635,8 @@ void GPUQueueCUDA::MemcpyAsyncStrided(Span<T> regionTo, size_t outputByteStride,
     size_t actualInStride = (inputByteStride == 0) ? sizeof(T) : inputByteStride;
     size_t actualOutStride = (outputByteStride == 0) ? sizeof(T) : outputByteStride;
 
-    size_t elemCountIn = MathFunctions::DivideUp(regionFrom.size_bytes(), actualInStride);
-    assert(elemCountIn == MathFunctions::DivideUp(regionTo.size_bytes(), actualOutStride));
+    size_t elemCountIn = Math::DivideUp(regionFrom.size_bytes(), actualInStride);
+    assert(elemCountIn == Math::DivideUp(regionTo.size_bytes(), actualOutStride));
 
     cudaMemcpy2DAsync(regionTo.data(),
                       actualOutStride,
@@ -726,7 +726,7 @@ uint32_t GPUQueueCUDA::DetermineGridStrideBlock(const void* kernelPtr,
     // TODO: Make better SM determination
     uint32_t blockPerSM = RecommendedBlockCountSM(kernelPtr, threadCount, sharedMemSize);
     // Only call enough SM
-    uint32_t totalRequiredBlocks = MathFunctions::DivideUp(workCount, threadCount);
+    uint32_t totalRequiredBlocks = Math::DivideUp(workCount, threadCount);
     uint32_t requiredSMCount = (totalRequiredBlocks + blockPerSM - 1) / blockPerSM;
     uint32_t smCount = std::min(multiprocessorCount, requiredSMCount);
     uint32_t blockCount = std::min(requiredSMCount, smCount * blockPerSM);

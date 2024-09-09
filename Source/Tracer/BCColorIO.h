@@ -263,7 +263,7 @@ Vector2ui BC4<IsSigned>::InjectColors(Vector2ui block, const ColorPack& colorIn)
 {
     using namespace Bit;
     using namespace NormConversion;
-    using MathFunctions::Clamp;
+    using Math::Clamp;
 
     uint32_t c0 = FetchSubPortion(block[0], {0, 8});
     uint32_t c1 = FetchSubPortion(block[0], {8, 16});

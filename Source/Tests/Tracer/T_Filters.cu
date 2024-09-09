@@ -36,7 +36,7 @@ void TestFilter(bool checkZeroVariance)
                           "At least two samples should be checked!");
             Vector2 xi;
             if(i == 0) xi = Vector2(0);
-            else if(i == 1) xi = Vector2(MathFunctions::PrevFloat<Float>(1));
+            else if(i == 1) xi = Vector2(Math::PrevFloat<Float>(1));
             else xi = Vector2(dist01(rng), dist01(rng));
             // Sample
             auto result = filter.Sample(xi);

@@ -160,7 +160,7 @@ void KCGenerateMipmaps(// I-O
            std::holds_alternative<std::monostate>(writeSurf)) continue;
 
         // Loop over the blocks for this tex
-        Vector2ui totalTiles = MathFunctions::DivideUp(mipRes, TILE_SIZE);
+        Vector2ui totalTiles = Math::DivideUp(mipRes, TILE_SIZE);
         for(uint32_t tileI = localBI; tileI < totalTiles.Multiply();
             tileI += blockPerTexture)
         {
@@ -214,7 +214,7 @@ void KCClampImage(// Output
     KernelCallParams kp;
     // Loop over the tiles for this tex, each block is dedicated to a tile
     // (32, 16) pixels
-    Vector2ui totalTiles = MathFunctions::DivideUp(surfaceImageRes, TILE_SIZE);
+    Vector2ui totalTiles = Math::DivideUp(surfaceImageRes, TILE_SIZE);
     for(uint32_t tileI = kp.blockId; tileI < totalTiles.Multiply();
         tileI += kp.gridSize)
     {
@@ -270,7 +270,7 @@ void KCExpandSamplesToPixels(// Outputs
     Vector2i range = FilterRadiusPixelRange(filterWH);
     // Don't use 1.0f exactly here
     // pixel is [0,1)
-    Float pixelWidth = MathFunctions::PrevFloat<Float>(1);
+    Float pixelWidth = Math::PrevFloat<Float>(1);
     Float radiusSqr = filterRadius * filterRadius;
 
     KernelCallParams kp;
@@ -402,7 +402,7 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan<3> img,
 
         uint32_t sampleStart = sSegmentRange[localWarpId][0];
         uint32_t sampleCount = sSegmentRange[localWarpId][1] - sampleStart;
-        uint32_t iterationCount = MathFunctions::NextMultiple(sampleCount, LOGICAL_WARP_SIZE);
+        uint32_t iterationCount = Math::NextMultiple(sampleCount, LOGICAL_WARP_SIZE);
 
         Vector4 totalValue = Vector4::Zero();
         for(uint32_t i = 0; i < iterationCount; i++)
@@ -459,7 +459,7 @@ void KCFilterToImgAtomicRGB(MRAY_GRID_CONSTANT const ImageSpan<3> img,
     Vector2i range = FilterRadiusPixelRange(filterWH);
     // Don't use 1.0f exactly here
     // pixel is [0,1)
-    Float pixelWidth = MathFunctions::PrevFloat<Float>(1);
+    Float pixelWidth = Math::PrevFloat<Float>(1);
     Float radiusSqr = filterRadius * filterRadius;
 
     assert(dValues.size() == dImgCoords.size());
@@ -658,8 +658,8 @@ void ReconFilterGenericRGB(// Output
     // was slower. Interestingly, for a 5x5 kernel, logical warp size of 1
     // (a thread) was the fastest. So dividing spp with this.
     static constexpr uint32_t WORK_PER_THREAD = 16;
-    uint32_t logicalWarpSize = MathFunctions::DivideUp(averageSPP, WORK_PER_THREAD);
-    logicalWarpSize = MathFunctions::PrevPowerOfTwo(logicalWarpSize);
+    uint32_t logicalWarpSize = Math::DivideUp(averageSPP, WORK_PER_THREAD);
+    logicalWarpSize = Math::PrevPowerOfTwo(logicalWarpSize);
     logicalWarpSize = std::min(logicalWarpSize, WarpSize());
 
     // Some boilerplate to make the code more readable
@@ -781,8 +781,8 @@ void MultiPassReconFilterGenericRGB(// Output
 
     // Try to comply the parallelization hint
     // Divide the work equally
-    uint32_t iterations = MathFunctions::DivideUp(totalPPS, parallelHint);
-    uint32_t workPerIter = MathFunctions::DivideUp(totalWork, iterations);
+    uint32_t iterations = Math::DivideUp(totalPPS, parallelHint);
+    uint32_t workPerIter = Math::DivideUp(totalWork, iterations);
     for(uint32_t i = 0; i < iterations; i++)
     {
         uint32_t start = workPerIter * i;
@@ -909,7 +909,7 @@ void ClampImageFromBufferGeneric(// Output
                                  Filter filter,
                                  const GPUQueue& queue)
 {
-    using MathFunctions::DivideUp;
+    using Math::DivideUp;
     static constexpr Vector2ui TILE_SIZE = Vector2ui(32, 16);
     static constexpr uint32_t THREAD_PER_BLOCK = TILE_SIZE.Multiply();
     static constexpr auto Kernel = KCClampImage<THREAD_PER_BLOCK, Filter>;

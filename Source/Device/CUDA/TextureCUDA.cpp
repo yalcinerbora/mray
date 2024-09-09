@@ -465,8 +465,8 @@ void TextureCUDA_BC<T>::CopyFromAsync(const GPUQueueCUDA& queue,
     cudaArray_t levelArray = nullptr;
     CUDA_CHECK(cudaGetMipmappedArrayLevel(&levelArray, data, mipLevel));
     void* ptr = const_cast<Byte*>(reinterpret_cast<const Byte*>(regionFrom.data()));
-    auto srcWH = MathFunctions::DivideUp(sizes, Vector2ui(BC_TILE_SIZE));
-    auto dstWH = MathFunctions::NextMultiple(sizes, Vector2ui(BC_TILE_SIZE));
+    auto srcWH = Math::DivideUp(sizes, Vector2ui(BC_TILE_SIZE));
+    auto dstWH = Math::NextMultiple(sizes, Vector2ui(BC_TILE_SIZE));
     size_t srcPitch = srcWH[0] * sizeof(PaddedChannelType);
 
     cudaMemcpy3DParms p = {};
@@ -493,8 +493,8 @@ void TextureCUDA_BC<T>::CopyToAsync(Span<PaddedChannelType> regionFrom,
     cudaArray_t levelArray = nullptr;
     CUDA_CHECK(cudaGetMipmappedArrayLevel(&levelArray, data, mipLevel));
     void* ptr = reinterpret_cast<Byte*>(regionFrom.data());
-    auto srcWH = MathFunctions::NextMultiple(sizes, Vector2ui(BC_TILE_SIZE));
-    auto dstWH = MathFunctions::DivideUp(sizes, Vector2ui(BC_TILE_SIZE));
+    auto srcWH = Math::NextMultiple(sizes, Vector2ui(BC_TILE_SIZE));
+    auto dstWH = Math::DivideUp(sizes, Vector2ui(BC_TILE_SIZE));
     size_t dstPitch = dstWH[0] * sizeof(PaddedChannelType);
 
     cudaMemcpy3DParms p = {};
@@ -531,7 +531,7 @@ TextureBackingMemoryCUDA::TextureBackingMemoryCUDA(const GPUDeviceCUDA& device, 
     size_t granularity;
     CUDA_DRIVER_CHECK(cuMemGetAllocationGranularity(&granularity, &props,
                                                     CU_MEM_ALLOC_GRANULARITY_RECOMMENDED));
-    allocSize = MathFunctions::NextMultiple(size, granularity);
+    allocSize = Math::NextMultiple(size, granularity);
     CUDA_DRIVER_CHECK(cuMemCreate(&memHandle, allocSize, &props, 0));
 }
 

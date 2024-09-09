@@ -37,7 +37,7 @@ void GPUQueueCUDA::IssueKernel(std::string_view name,
 
     assert(p.workCount != 0);
     using namespace CudaKernelCalls;
-    uint32_t blockCount = MathFunctions::DivideUp(p.workCount, StaticThreadPerBlock1D());
+    uint32_t blockCount = Math::DivideUp(p.workCount, StaticThreadPerBlock1D());
     uint32_t blockSize = StaticThreadPerBlock1D();
 
     Kernel<<<blockCount, blockSize, p.sharedMemSize, stream>>>
@@ -62,7 +62,7 @@ void GPUQueueCUDA::IssueLambda(std::string_view name,
                   "Not passing Lambda as rvalue_reference. This kernel call "
                   "would've been failed in runtime!");
     using namespace CudaKernelCalls;
-    uint32_t blockCount = MathFunctions::DivideUp(p.workCount, StaticThreadPerBlock1D());
+    uint32_t blockCount = Math::DivideUp(p.workCount, StaticThreadPerBlock1D());
     uint32_t blockSize = StaticThreadPerBlock1D();
 
     KernelCallLambdaCUDA<Lambda>
@@ -182,7 +182,7 @@ void GPUQueueCUDA::DeviceIssueKernel(std::string_view name,
 {
     assert(p.workCount != 0);
     using namespace CudaKernelCalls;
-    uint32_t blockCount = MathFunctions::DivideUp(p.workCount, StaticThreadPerBlock1D());
+    uint32_t blockCount = Math::DivideUp(p.workCount, StaticThreadPerBlock1D());
     uint32_t blockSize = StaticThreadPerBlock1D();
 
     Kernel<<<blockCount, blockSize, p.sharedMemSize, stream>>>
@@ -204,7 +204,7 @@ void GPUQueueCUDA::DeviceIssueLambda(std::string_view name,
                   "Not passing Lambda as rvalue_reference. This kernel call "
                   "would've been failed in runtime!");
     using namespace CudaKernelCalls;
-    uint32_t blockCount = MathFunctions::DivideUp(p.workCount, StaticThreadPerBlock1D());
+    uint32_t blockCount = Math::DivideUp(p.workCount, StaticThreadPerBlock1D());
     uint32_t blockSize = StaticThreadPerBlock1D();
 
     KernelCallLambdaCUDA<Lambda>

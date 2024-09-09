@@ -5,7 +5,7 @@
 #include <array>
 
 #include "Core/Types.h"
-#include "Core/MathFunctions.h"
+#include "Core/Math.h"
 #include "Core/DataStructures.h"
 
 class VulkanBuffer;
@@ -194,7 +194,7 @@ VulkanDeviceAllocator::AllocateMultiObject(Tuple<Args&...> inOutObjects,
     for(size_t i = 0; i < N; i++)
     {
         offsets[i] = totalSize;
-        totalSize += MathFunctions::NextMultiple(sizeAndAlignments[i].second,
+        totalSize += Math::NextMultiple(sizeAndAlignments[i].second,
                                                  sizeAndAlignments[i].first);
     }
 

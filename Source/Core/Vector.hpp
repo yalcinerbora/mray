@@ -815,7 +815,7 @@ constexpr Vector<N, T> Vector<N, T>::Lerp(const Vector& v0, const Vector& v1, T 
     UNROLL_LOOP
     for(unsigned int i = 0; i < N; i++)
     {
-        v[i] = MathFunctions::Lerp(v0[i], v1[i], t);
+        v[i] = Math::Lerp(v0[i], v1[i], t);
     }
     return v;
 }
@@ -829,7 +829,7 @@ constexpr Vector<N, T> Vector<N, T>::Smoothstep(const Vector& v0, const Vector& 
     UNROLL_LOOP
     for(unsigned int i = 0; i < N; i++)
     {
-        v[i] = MathFunctions::Smoothstep(v0[i], v1[i], t);
+        v[i] = Math::Smoothstep(v0[i], v1[i], t);
     }
     return v;
 }

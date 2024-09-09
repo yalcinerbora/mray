@@ -2,7 +2,7 @@
 
 #include "Core/Vector.h"
 #include "Core/GraphicsFunctions.h"
-#include "Core/MathFunctions.h"
+#include "Core/Math.h"
 #include "TracerTypes.h"
 
 #include "Core/Log.h"
@@ -107,7 +107,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Pair<uint32_t, Float> Common::BisectSample2(Float xi, Vector2 weights,
                                             bool isAlreadyNorm)
 {
-    using MathFunctions::PrevFloat;
+    using Math::PrevFloat;
     if(!isAlreadyNorm) weights[0] /= weights.Sum();
     //
     Float w = weights[0];
@@ -125,7 +125,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Pair<uint32_t, Float> Common::BisectSample(Float xi, const Span<Float, N>& weights,
                                            bool isAlreadyNorm)
 {
-    using MathFunctions::PrevFloat;
+    using Math::PrevFloat;
     auto Reduce = [weights]() -> Float
     {
         Float r = 0;
@@ -166,15 +166,15 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Float> Common::SampleGaussian(Float xi, Float sigma, Float mu)
 {
     Float x = MathConstants::Sqrt2<Float>() * sigma;
-    Float e = MathFunctions::InvErrFunc(Float(2) * xi - Float(1));
+    Float e = Math::InvErrFunc(Float(2) * xi - Float(1));
     x = x * e + mu;
 
     // Erf can be -+inf, when xi is near zero or one
     // Just clamp to %99.95 estimate of the actual integral
-    if(MathFunctions::IsInf(e))
+    if(Math::IsInf(e))
     {
         Float minMax = Float(3.5) * sigma;
-        x = MathFunctions::Clamp(x, -minMax, minMax);
+        x = Math::Clamp(x, -minMax, minMax);
     }
 
     return SampleT<Float>
@@ -187,7 +187,7 @@ SampleT<Float> Common::SampleGaussian(Float xi, Float sigma, Float mu)
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float Common::PDFGaussian(Float x, Float sigma, Float mu)
 {
-    return MathFunctions::Gaussian(x, sigma, mu);
+    return Math::Gaussian(x, sigma, mu);
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -195,7 +195,7 @@ SampleT<Vector2> Common::SampleGaussian2D(Vector2 xi, Float sigma,
                                           Vector2 mu)
 {
     using namespace MathConstants;
-    using MathFunctions::SinCos;
+    using Math::SinCos;
     // Instead of doing two gauss inverse sampling,
     // doing Box-Muller transform
     Float scalar = std::sqrt(Float(-2) * std::log(xi[0]));
@@ -204,7 +204,7 @@ SampleT<Vector2> Common::SampleGaussian2D(Vector2 xi, Float sigma,
     // Since rng is [0, 1) it can get zero then above function
     // If scalar is inf, we are at outer ring (infinitely long)
     // clamp similar to %99.5 of the range
-    if(MathFunctions::IsInf(scalar)) scalar = Float(3.5);
+    if(Math::IsInf(scalar)) scalar = Float(3.5);
 
     Vector2 xy = Vector2(scalar * s, scalar * c);
     xy =  (xy * sigma) + mu;
@@ -217,14 +217,14 @@ Float Common::PDFGaussian2D(Vector2 xy, Float sigma,
                             Vector2 mu)
 {
 
-    return (MathFunctions::Gaussian(xy[0], sigma, mu[0]) *
-            MathFunctions::Gaussian(xy[1], sigma, mu[1]));
+    return (Math::Gaussian(xy[0], sigma, mu[0]) *
+            Math::Gaussian(xy[1], sigma, mu[1]));
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Float> Common::SampleLine(Float xi, Float c, Float d)
 {
-    using namespace MathFunctions;
+    using namespace Math;
     // https://www.pbr-book.org/4ed/Monte_Carlo_Integration/Sampling_Using_the_Inversion_Method#SampleLinear
     Float normVal = Float(2) / (c + d);
     // Avoid divide by zero
@@ -235,7 +235,7 @@ SampleT<Float> Common::SampleLine(Float xi, Float c, Float d)
     Float denom = Lerp(c * c, d * d, xi);
     denom = c + std::sqrt(denom);
     Float x = (c + d) * xi / denom;
-    using MathFunctions::PrevFloat;
+    using Math::PrevFloat;
     return SampleT<Float>
     {
         .value = std::min(x, PrevFloat<Float>(1)),
@@ -248,7 +248,7 @@ Float Common::PDFLine(Float x, Float c, Float d)
 {
     if(x < 0 && x > 1) return Float(0);
     Float normVal = Float(2) / (c + d);
-    return normVal * MathFunctions::Lerp(c, d, x);
+    return normVal * Math::Lerp(c, d, x);
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -258,7 +258,7 @@ SampleT<Float> Common::SampleTent(Float xi, Float a, Float b)
     if(b - a < MathConstants::LargeEpsilon<Float>())
         return {Float(0), Float(1) / (b - a)};
 
-    using MathFunctions::PrevFloat;
+    using Math::PrevFloat;
     assert(a <= 0 && b >= 0);
     auto [index, localXi] = BisectSample2(xi, Vector2(-a, b), false);
     localXi = (index == 0) ? (PrevFloat<Float>(1) - localXi) : localXi;
@@ -309,7 +309,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Vector3> Common::SampleCosDirection(const Vector2& xi)
 {
     using namespace MathConstants;
-    using MathFunctions::SqrtMax;
+    using Math::SqrtMax;
 
     // Generated direction is on unit space (+Z oriented hemisphere)
     Float xi1Angle = Float{2} * Pi<Float>() * xi[1];
@@ -342,7 +342,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Vector3> Common::SampleUniformDirection(const Vector2& xi)
 {
     using namespace MathConstants;
-    using MathFunctions::SqrtMax;
+    using Math::SqrtMax;
 
     Float xi0Sqrt = SqrtMax(Float{1} - xi[0] * xi[0]);
     Float xi1Angle = 2 * Pi<Float>() * xi[1];
@@ -419,7 +419,7 @@ Float HenyeyGreensteinPhase(Float cosTheta, Float g)
     // the sqrtIn is never technically zero
     // due to numerical errors it can be zero
     Float sqrtIn = Float(1) + gSqr + cosTheta;
-    Float denom = MathFunctions::SqrtMax(sqrtIn);
+    Float denom = Math::SqrtMax(sqrtIn);
     denom *= sqrtIn;
     return nom / denom;
 }
@@ -428,7 +428,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Vector3> SampleHenyeyGreensteinPhase(const Vector3& wO, Float g,
                                              const Vector2& xi)
 {
-    using namespace MathFunctions;
+    using namespace Math;
     // From the PBR book
     // https://pbr-book.org/4ed/Volume_Scattering/Phase_Functions#HenyeyGreenstein
     // Phi is easy

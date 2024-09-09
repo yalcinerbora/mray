@@ -8,7 +8,7 @@
 #include <bit>
 #include <numeric>
 
-namespace MathFunctions
+namespace Math
 {
     template<uint32_t N>
     class MovingAverage
@@ -97,21 +97,21 @@ namespace MathFunctions
 }
 
 template<uint32_t N>
-MathFunctions::MovingAverage<N>::MovingAverage(Float initialVal)
+Math::MovingAverage<N>::MovingAverage(Float initialVal)
 {
     std::fill(values.cbegin(), values.cend(), initialVal);
     index = Roll(index + 1, 0, int32_t(N));
 }
 
 template<uint32_t N>
-void MathFunctions::MovingAverage<N>::FeedValue(Float v)
+void Math::MovingAverage<N>::FeedValue(Float v)
 {
     values[index] = v;
     index = Roll(index + 1, 0, int32_t(N));
 }
 
 template<uint32_t N>
-Float MathFunctions::MovingAverage<N>::Average() const
+Float Math::MovingAverage<N>::Average() const
 {
     Float total = std::reduce(values.cbegin(), values.cend(), Float(0));
     return total * AVG_MULTIPLIER;
@@ -119,7 +119,7 @@ Float MathFunctions::MovingAverage<N>::Average() const
 
 template <std::integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T MathFunctions::Clamp(T v, T minVal, T maxVal)
+constexpr T Math::Clamp(T v, T minVal, T maxVal)
 {
     assert(minVal < maxVal);
     v = (v < minVal) ? minVal : v;
@@ -129,7 +129,7 @@ constexpr T MathFunctions::Clamp(T v, T minVal, T maxVal)
 
 template <std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-T MathFunctions::Clamp(T v, T minVal, T maxVal)
+T Math::Clamp(T v, T minVal, T maxVal)
 {
     assert(minVal < maxVal);
     return std::min(std::max(minVal, v), maxVal);
@@ -137,7 +137,7 @@ T MathFunctions::Clamp(T v, T minVal, T maxVal)
 
 template <std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T MathFunctions::Lerp(T a, T b, T t)
+constexpr T Math::Lerp(T a, T b, T t)
 {
     assert(t >= T(0) && t <= T(1));
     return a * (T{1} - t) + b * t;
@@ -145,7 +145,7 @@ constexpr T MathFunctions::Lerp(T a, T b, T t)
 
 template <std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T MathFunctions::Smoothstep(T a, T b, T t)
+constexpr T Math::Smoothstep(T a, T b, T t)
 {
     assert(t >= T(0) && t <= T(1));
     // https://en.wikipedia.org/wiki/Smoothstep
@@ -155,20 +155,20 @@ constexpr T MathFunctions::Smoothstep(T a, T b, T t)
 
 template <std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-T MathFunctions::NextFloat(T a)
+T Math::NextFloat(T a)
 {
     return std::nextafter(a, std::numeric_limits<T>::max());
 }
 template <std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-T MathFunctions::PrevFloat(T a)
+T Math::PrevFloat(T a)
 {
     return std::nextafter(a, -std::numeric_limits<T>::max());
 }
 
 template <std::signed_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T MathFunctions::Roll(T v, T min, T max)
+constexpr T Math::Roll(T v, T min, T max)
 {
     assert(min < max);
     T diff = max - min;
@@ -181,7 +181,7 @@ constexpr T MathFunctions::Roll(T v, T min, T max)
 
 template <std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-T MathFunctions::Gaussian(T x, T sigma, T mu)
+T Math::Gaussian(T x, T sigma, T mu)
 {
     assert(sigma > 0);
     using namespace MathConstants;
@@ -195,7 +195,7 @@ T MathFunctions::Gaussian(T x, T sigma, T mu)
 
 template <std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-T MathFunctions::InvErrFunc(T x)
+T Math::InvErrFunc(T x)
 {
     // Let CUDA handle inv error function
     #ifdef MRAY_DEVICE_CODE_PATH_CUDA
@@ -249,14 +249,14 @@ T MathFunctions::InvErrFunc(T x)
 
 template <std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-T MathFunctions::SqrtMax(T a)
+T Math::SqrtMax(T a)
 {
     return std::sqrt(std::max(T{0}, a));
 }
 
 template <std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr std::array<T, 2> MathFunctions::SinCos(T v)
+constexpr std::array<T, 2> Math::SinCos(T v)
 {
     std::array<T, 2> result;
     #ifdef MRAY_DEVICE_CODE_PATH_CUDA
@@ -277,7 +277,7 @@ constexpr std::array<T, 2> MathFunctions::SinCos(T v)
 
 template <std::integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T MathFunctions::DivideUp(T value, T divisor)
+constexpr T Math::DivideUp(T value, T divisor)
 {
     assert(divisor != T(0));
     return (value + divisor - 1) / divisor;
@@ -285,7 +285,7 @@ constexpr T MathFunctions::DivideUp(T value, T divisor)
 
 template <uint32_t N, std::integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<N, T> MathFunctions::DivideUp(Vector<N, T> value, Vector<N, T> divisor)
+constexpr Vector<N, T> Math::DivideUp(Vector<N, T> value, Vector<N, T> divisor)
 {
     // This do not work
     //assert(divisor != Vector<N, T>::Zero());
@@ -298,21 +298,21 @@ constexpr Vector<N, T> MathFunctions::DivideUp(Vector<N, T> value, Vector<N, T> 
 
 template <std::integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T MathFunctions::NextMultiple(T value, T divisor)
+constexpr T Math::NextMultiple(T value, T divisor)
 {
     return DivideUp(value, divisor) * divisor;
 }
 
 template <uint32_t N, std::integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<N, T> MathFunctions::NextMultiple(Vector<N, T> value, Vector<N, T> divisor)
+constexpr Vector<N, T> Math::NextMultiple(Vector<N, T> value, Vector<N, T> divisor)
 {
     return DivideUp(value, divisor) * divisor;
 }
 
 template <std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-bool MathFunctions::IsInf(T f)
+bool Math::IsInf(T f)
 {
     #ifndef MRAY_DEVICE_CODE_PATH_CUDA
         using namespace std;
@@ -323,7 +323,7 @@ bool MathFunctions::IsInf(T f)
 
 template <std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-bool MathFunctions::IsNan(T f)
+bool Math::IsNan(T f)
 {
     #ifndef MRAY_DEVICE_CODE_PATH_CUDA
         using namespace std;
@@ -332,13 +332,13 @@ bool MathFunctions::IsNan(T f)
 }
 
 template <std::integral T>
-MRAY_HYBRID constexpr T MathFunctions::NextPowerOfTwo(T value)
+MRAY_HYBRID constexpr T Math::NextPowerOfTwo(T value)
 {
     return std::bit_ceil<T>(value);
 }
 
 template <std::integral T>
-MRAY_HYBRID constexpr T MathFunctions::PrevPowerOfTwo(T value)
+MRAY_HYBRID constexpr T Math::PrevPowerOfTwo(T value)
 {
     return std::bit_floor<T>(value);
 }

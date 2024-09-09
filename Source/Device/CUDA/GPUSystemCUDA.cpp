@@ -244,7 +244,7 @@ std::vector<size_t> GPUSystemCUDA::SplitWorkToMultipleGPU(uint32_t workCount,
 
     // Total Threads
     uint32_t totalThreads = threadCount * totalAvailBlocks;
-    uint32_t iterationPerThread = MathFunctions::DivideUp(workCount, totalThreads);
+    uint32_t iterationPerThread = Math::DivideUp(workCount, totalThreads);
 
     size_t workDispatched = 0;
     for(size_t i = 0; i < systemGPUs.size(); i++)

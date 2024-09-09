@@ -43,7 +43,7 @@ struct VisorState
     RendererAnalyticData    renderer;
 
     // Throughput
-    using ThroughputAverage = MathFunctions::MovingAverage<16>;
+    using ThroughputAverage = Math::MovingAverage<16>;
     ThroughputAverage       renderThroughputAverage;
 
     // This comes after scene change

@@ -5,7 +5,7 @@
 #include <bit>
 #include <type_traits>
 
-#include "MathFunctions.h"
+#include "Math.h"
 
 namespace Bit
 {
@@ -483,7 +483,7 @@ constexpr R Bit::NormConversion::FromUNormVaryingInsane(T value)
     input <<= (MANTISSA_SIZE - BITS);
     // Here is the fancy part we copy the value to the mantissa
     // starting from MSB of the mantissa
-    constexpr IntT StampCount = MathFunctions::DivideUp(MANTISSA_SIZE, BITS);
+    constexpr IntT StampCount = Math::DivideUp(MANTISSA_SIZE, BITS);
     UNROLL_LOOP
     for(IntT i = 0; i < StampCount; i++)
     {
@@ -830,7 +830,7 @@ template <std::unsigned_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Bitspan<T>::Bitspan(Span<T> s)
     : data(s.data())
-    , size(MathFunctions::NextMultiple(s.size(), sizeof(T)))
+    , size(Math::NextMultiple(s.size(), sizeof(T)))
 {}
 
 template <std::unsigned_integral T>
@@ -871,5 +871,5 @@ template <std::unsigned_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr uint32_t Bitspan<T>::ByteSize() const
 {
-    return MathFunctions::NextMultiple<uint32_t>(size, static_cast<uint32_t>(sizeof(T)));
+    return Math::NextMultiple<uint32_t>(size, static_cast<uint32_t>(sizeof(T)));
 }

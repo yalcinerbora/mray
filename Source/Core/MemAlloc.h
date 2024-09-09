@@ -3,7 +3,7 @@
 #include <tuple>
 #include <concepts>
 
-#include "MathFunctions.h"
+#include "Math.h"
 #include "Types.h"
 
 constexpr inline size_t operator ""_TiB(unsigned long long int s)
@@ -87,7 +87,7 @@ namespace MemAlloc::Detail
                                       const std::array<size_t, sizeof...(Tp)>& countList,
                                       size_t alignment)
     {
-        using namespace MathFunctions;
+        using namespace Math;
         using CurrentType = typename std::tuple_element_t<I, Tuple<Tp...>>;
         size_t alignedSize = NextMultiple(sizeof(CurrentType) * countList[I], alignment);
         alignedSizeList[I] = alignedSize;
@@ -184,7 +184,7 @@ std::vector<size_t> AllocateTextureSpace(Memory& memory,
     size_t totalSize = 0;
     for(size_t i = 0; i < sizes.size(); i++)
     {
-        size_t alignedSize = MathFunctions::NextMultiple(sizes[i], alignments[i]);
+        size_t alignedSize = Math::NextMultiple(sizes[i], alignments[i]);
         offsets[i] = totalSize;
         totalSize += alignedSize;
     }

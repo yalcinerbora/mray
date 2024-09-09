@@ -1064,7 +1064,7 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
         int32_t camCount = static_cast<int32_t>(visorState.scene.cameraCount);
         int32_t camOffset = changes.statusBarState.cameraIndex.value();
         int32_t newCamIndex = visorState.currentCameraIndex + camOffset;
-        newCamIndex = MathFunctions::Roll(newCamIndex, 0, camCount);
+        newCamIndex = Math::Roll(newCamIndex, 0, camCount);
         visorState.currentCameraIndex = newCamIndex;
 
         // New camera means new framebuffer
@@ -1084,8 +1084,6 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
     {
         // New transform should not mean new framebuffer.
         // However conservatively we do drop the memory
-        //accumulateStage.DropExternalHandles(imgWriteSem);
-
         visorState.transform = changes.transform.value();
         transferQueue->Enqueue(VisorAction
         (

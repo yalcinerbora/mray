@@ -462,7 +462,7 @@ Optional<int32_t> VisorGUI::ShowRendererComboBox(const VisorState& visorState)
     {
         int32_t i = inputChecker.CheckKeyPress(VisorUserAction::PREV_RENDERER) ? -1 : 1;
         rIndex += i;
-        rIndex = MathFunctions::Roll(rIndex, 0, rCount);
+        rIndex = Math::Roll(rIndex, 0, rCount);
         result = rIndex;
     }
     const int32_t& curRIndex = (result.has_value())
@@ -512,7 +512,7 @@ TopBarChanges VisorGUI::ShowTopMenu(const VisorState& visorState)
         {
             int32_t i = inputChecker.CheckKeyPress(prevAction) ? -1 : 1;
             index += i;
-            index = MathFunctions::Roll(index, 0, count);
+            index = Math::Roll(index, 0, count);
             result = index;
         }
         return result;
@@ -577,12 +577,12 @@ Optional<CameraTransform> VisorGUI::ShowMainImage(const VisorState& visorState)
     if(inputChecker.CheckKeyPress(VisorUserAction::NEXT_MOVEMENT))
     {
         movementIndex++;
-        movementIndex = MathFunctions::Roll(movementIndex, 0, movementCount);
+        movementIndex = Math::Roll(movementIndex, 0, movementCount);
     }
     else if(inputChecker.CheckKeyPress(VisorUserAction::PREV_MOVEMENT))
     {
         movementIndex--;
-        movementIndex = MathFunctions::Roll(movementIndex, 0, movementCount);
+        movementIndex = Math::Roll(movementIndex, 0, movementCount);
     }
 
     Optional<CameraTransform> result;

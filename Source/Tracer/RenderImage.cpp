@@ -20,7 +20,7 @@ Vector2ui ImageTiler::GlobalTileEnd() const
 Vector2ui ImageTiler::FindOptimumTileSize(const Vector2ui& fbSize,
                                           uint32_t parallelizationHint)
 {
-    using namespace MathFunctions;
+    using namespace Math;
     // Start with an ~ aspect ratio tile
     // and adjust it
     Float aspectRatio = Float(fbSize[0]) / Float(fbSize[1]);
@@ -72,7 +72,7 @@ ImageTiler::ImageTiler(RenderImage* rI,
 
     paddedTileSize = coveringTileSize + filterPadding * 2u;
     renderBuffer->Resize(paddedTileSize, depth, channels);
-    tileCount = MathFunctions::DivideUp(fbSize, coveringTileSize);
+    tileCount = Math::DivideUp(fbSize, coveringTileSize);
 
     pixel1DRange = Vector2ui(0u, CurrentTileSize().Multiply());
 }
@@ -127,7 +127,7 @@ Vector2ui ImageTiler::TileCount() const
 
 void ImageTiler::NextTile()
 {
-    using MathFunctions::Roll;
+    using Math::Roll;
     currentTile = Roll<int32_t>(currentTile + 1,
                                 0, int32_t(tileCount.Multiply()));
     //

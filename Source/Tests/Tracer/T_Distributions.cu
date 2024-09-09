@@ -243,7 +243,7 @@ TEST(Dist_Linear, ZeroVariance)
                           "At least two samples should be checked!");
             Float xi;
             if(i == 0) xi = Float(0);
-            else if(i == 1) xi = MathFunctions::PrevFloat<Float>(1);
+            else if(i == 1) xi = Math::PrevFloat<Float>(1);
             else xi = dist01(rng);
 
             using namespace Distribution;
@@ -254,7 +254,7 @@ TEST(Dist_Linear, ZeroVariance)
             EXPECT_GE(result.value, 0);
             EXPECT_LT(result.value, 1);
             // Evaluate the function
-            Float eval = MathFunctions::Lerp(c, d, result.value);
+            Float eval = Math::Lerp(c, d, result.value);
             Float estimate = eval / result.pdf;
             // Since this is zero variance estimate,
             // the estimate should exactly match
@@ -299,7 +299,7 @@ TEST(Dist_Gaussian, ZeroVariance)
                           "At least two samples should be checked!");
             Float xi;
             if(i == 0) xi = Float(0);
-            else if(i == 1) xi = MathFunctions::PrevFloat<Float>(1);
+            else if(i == 1) xi = Math::PrevFloat<Float>(1);
             else xi = dist01(rng);
 
             using namespace Distribution;
@@ -308,7 +308,7 @@ TEST(Dist_Gaussian, ZeroVariance)
             Float pdfFromFunc = Common::PDFGaussian(result.value, sigma, mean);
             EXPECT_NEAR(pdfFromFunc, result.pdf, VeryLargeEpsilon<Float>());
             // Evaluate the function
-            Float eval = MathFunctions::Gaussian(result.value,
+            Float eval = Math::Gaussian(result.value,
                                                  sigma, mean);
             Float estimate = eval / result.pdf;
             // Since this is zero variance estimate,
@@ -359,7 +359,7 @@ TEST(Dist_Gaussian2D, ZeroVariance)
                           "At least two samples should be checked!");
             Vector2 xi;
             if(i == 0) xi = Vector2::Zero();
-            else if(i == 1) xi = Vector2(MathFunctions::PrevFloat<Float>(1));
+            else if(i == 1) xi = Vector2(Math::PrevFloat<Float>(1));
             else xi = Vector2(dist01(rng), dist01(rng));
 
             using namespace Distribution;
@@ -368,7 +368,7 @@ TEST(Dist_Gaussian2D, ZeroVariance)
             Float pdfFromFunc = Common::PDFGaussian2D(result.value, sigma, mean);
             EXPECT_NEAR(pdfFromFunc, result.pdf, VeryLargeEpsilon<Float>());
             // Evaluate the function
-            using MathFunctions::Gaussian;
+            using Math::Gaussian;
             Float eval = (Gaussian(result.value[0], sigma, mean[0]) *
                           Gaussian(result.value[1], sigma, mean[1]));
             Float estimate = eval / result.pdf;
@@ -423,7 +423,7 @@ TEST(Dist_Tent, ZeroVariance)
                           "At least two samples should be checked!");
             Float xi;
             if(i == 0) xi = Float(0);
-            else if(i == 1) xi = MathFunctions::PrevFloat<Float>(1);
+            else if(i == 1) xi = Math::PrevFloat<Float>(1);
             else xi = dist01(rng);
 
             using namespace Distribution;
@@ -438,7 +438,7 @@ TEST(Dist_Tent, ZeroVariance)
             Float x = result.value;
             Float t = (x < 0) ? (x / a) : (x / b);
 
-            Float eval = MathFunctions::Lerp<Float>(1, 0, t);
+            Float eval = Math::Lerp<Float>(1, 0, t);
             Float estimate = eval / result.pdf;
             // Since this is zero variance estimate,
             // the estimate should exactly match
@@ -490,7 +490,7 @@ TEST(Dist_Uniform, ZeroVariance)
                           "At least two samples should be checked!");
             Float xi;
             if(i == 0) xi = Float(0);
-            else if(i == 1) xi = MathFunctions::PrevFloat<Float>(1);
+            else if(i == 1) xi = Math::PrevFloat<Float>(1);
             else xi = dist01(rng);
 
             using namespace Distribution;

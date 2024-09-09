@@ -239,7 +239,7 @@ void TonemapperBase::RecordTonemap(VkCommandBuffer cmd,
                                   const VulkanImage& hdrImg,
                                   const VulkanImage& sdrImg)
 {
-    using MathFunctions::DivideUp;
+    using Math::DivideUp;
 
     VkCommandBufferBeginInfo beginInfo =
     {
@@ -292,7 +292,7 @@ void TonemapperBase::RecordTonemap(VkCommandBuffer cmd,
     //  REDUCTION DISPATCHES //
     // ===================== //
     assert(hdrImg.Extent() == sdrImg.Extent());
-    using MathFunctions::DivideUp;
+    using Math::DivideUp;
     static constexpr uint32_t TPB_1D = VulkanComputePipeline::TPB_1D;
     uint32_t pixelCount = hdrImg.Extent().Multiply();
     for(uint32_t totalPix = pixelCount; totalPix != 1;
@@ -405,7 +405,7 @@ size_t TonemapperBase::UniformBufferSize() const
     // requesters. User our giga alignment to be sure
     // We need to change this later
     using MemAlloc::DefaultSystemAlignment;
-    using MathFunctions::NextMultiple;
+    using Math::NextMultiple;
     size_t uniformSize = NextMultiple(uniformBufferSize,
                                       DefaultSystemAlignment());
     size_t gammaSize = NextMultiple(eotfBufferSize,
@@ -416,7 +416,7 @@ size_t TonemapperBase::UniformBufferSize() const
 void TonemapperBase::SetUniformBufferView(const UniformBufferMemView& ubo)
 {
     using MemAlloc::DefaultSystemAlignment;
-    using MathFunctions::NextMultiple;
+    using Math::NextMultiple;
     size_t uSize = NextMultiple(uniformBufferSize,
                                 DefaultSystemAlignment());
     size_t gSize = NextMultiple(eotfBufferSize,
@@ -457,7 +457,7 @@ void TonemapperBase::SetUniformBufferView(const UniformBufferMemView& ubo)
 
 size_t TonemapperBase::StagingBufferSize(const Vector2ui& inputImgSize) const
 {
-    using MathFunctions::DivideUp;
+    using Math::DivideUp;
 
     uint32_t linearSize = inputImgSize.Multiply();
     uint32_t transientElementCount = DivideUp(linearSize,

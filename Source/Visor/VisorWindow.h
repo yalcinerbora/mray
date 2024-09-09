@@ -27,7 +27,7 @@ struct FrameCounter
     public:
     static constexpr size_t AVG_FRAME_COUNT = 8;
     using QueryData = std::array<uint64_t, 4>;
-    using FrameTimeAvg = MathFunctions::MovingAverage<AVG_FRAME_COUNT>;
+    using FrameTimeAvg = Math::MovingAverage<AVG_FRAME_COUNT>;
 
     private:
     const VulkanSystemView* handlesVk = nullptr;

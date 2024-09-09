@@ -157,7 +157,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     Vector2ui filterPadSize = filmFilter->FilterExtent();
 
     // Change the mode according to the render logic
-    using MathFunctions::Roll;
+    using Math::Roll;
     uint32_t newMode = uint32_t(Roll(int32_t(customLogicIndex0), 0,
                                              int32_t(Mode::END)));
     currentOptions.mode = SurfRDetail::Mode::E(newMode);

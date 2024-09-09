@@ -515,7 +515,7 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
         // if requested.
         uint32_t maxDim = size[size.Maximum()];
         uint32_t clampRes = std::min(tracerParams.clampedTexRes, maxDim);
-        uint32_t ratio = MathFunctions::DivideUp(maxDim, clampRes);
+        uint32_t ratio = Math::DivideUp(maxDim, clampRes);
         int32_t mipReduceAmount = int32_t(std::ceil(std::log2(ratio)));
         // We will have atleast one mip
         int32_t mipCountI = std::max(1, int32_t(mipCount) - mipReduceAmount);

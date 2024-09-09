@@ -29,7 +29,7 @@ DeviceLocalMemoryCUDA::DeviceLocalMemoryCUDA(const GPUDeviceCUDA& device, size_t
     size_t granularity;
     CUDA_DRIVER_CHECK(cuMemGetAllocationGranularity(&granularity, &props,
                                                     CU_MEM_ALLOC_GRANULARITY_RECOMMENDED));
-    allocSize = MathFunctions::NextMultiple(size, granularity);
+    allocSize = Math::NextMultiple(size, granularity);
     CUDA_DRIVER_CHECK(cuMemCreate(&memHandle, allocSize, &props, 0));
 
     // Map to address space
@@ -261,7 +261,7 @@ HostLocalAlignedMemoryCUDA::HostLocalAlignedMemoryCUDA(const GPUSystemCUDA& syst
     : HostLocalAlignedMemoryCUDA(systemIn, alignIn, ndIn)
 {
     size = sizeInBytes;
-    allocSize = MathFunctions::NextMultiple(sizeInBytes, alignment);
+    allocSize = Math::NextMultiple(sizeInBytes, alignment);
     alignment = alignIn;
 
     // Windows is hipster as always
@@ -409,8 +409,8 @@ DeviceMemoryCUDA::DeviceMemoryCUDA(const std::vector<const GPUDeviceCUDA*>& devi
         deviceIds.push_back(dPtr->DeviceId());
 
     size_t commonGranularity = FindCommonGranularity();
-    allocationGranularity = MathFunctions::NextMultiple(allocGranularity, commonGranularity);
-    reserveGranularity = MathFunctions::NextMultiple(resGranularity, commonGranularity);
+    allocationGranularity = Math::NextMultiple(allocGranularity, commonGranularity);
+    reserveGranularity = Math::NextMultiple(resGranularity, commonGranularity);
 
     reservedSize = reserveGranularity;
     CUDA_DRIVER_MEM_THROW(cuMemAddressReserve(&mPtr, reservedSize, 0, 0, 0));
@@ -470,13 +470,13 @@ void DeviceMemoryCUDA::ResizeBuffer(size_t newSize)
     };
 
     // Align the newSize
-    newSize = MathFunctions::NextMultiple(newSize, allocationGranularity);
+    newSize = Math::NextMultiple(newSize, allocationGranularity);
     bool allocSizeChanged = false;
     bool reservationRelocated = false;
 
     if(newSize > reservedSize)
     {
-        size_t extraReserve = MathFunctions::NextMultiple(newSize, reserveGranularity);
+        size_t extraReserve = Math::NextMultiple(newSize, reserveGranularity);
         extraReserve -= reservedSize;
 
         // Try to allocate adjacent chunk
@@ -550,7 +550,7 @@ void DeviceMemoryCUDA::ResizeBuffer(size_t newSize)
         size_t offset = allocSize;
         // Now calculate extra allocation
         size_t extraSize = newSize - allocSize;
-        extraSize = MathFunctions::NextMultiple(extraSize, allocationGranularity);
+        extraSize = Math::NextMultiple(extraSize, allocationGranularity);
 
         assert((extraSize % allocationGranularity) == 0);
         size_t newAllocCount = extraSize / allocationGranularity;

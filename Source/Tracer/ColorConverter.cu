@@ -119,7 +119,7 @@ Vector3 GenericToNorm(const Vector3& t, const SurfViewVariant& surfView)
     // Utilize the surfView variant to get the type etc
     return DeviceVisit(surfView, [t](auto&& sv) -> Vector3
     {
-        using MathFunctions::Clamp;
+        using Math::Clamp;
         Vector3 result = t;
         using VariantType = std::remove_cvref_t<decltype(sv)>;
         if constexpr(!std::is_same_v<VariantType, std::monostate>)
@@ -212,7 +212,7 @@ void KCConvertColor(// I-O
         // Loop over the blocks for this tex
         static constexpr Vector2ui TILE_SIZE = Vector2ui(32, 16);
         static_assert(TILE_SIZE.Multiply() == TPB);
-        Vector2ui totalTiles = MathFunctions::DivideUp(mipRes, TILE_SIZE);
+        Vector2ui totalTiles = Math::DivideUp(mipRes, TILE_SIZE);
         for(uint32_t tileI = localBI; tileI < totalTiles.Multiply();
             tileI += blockPerTexture)
         {
@@ -415,7 +415,7 @@ BCColorConverter::FindTotalTilesOf(const GenericTexture* t) const
     using PixType = MRayPixelType<E>::Type;
     static constexpr uint32_t TILE_SIZE = PixType::TileSize;
 
-    using MathFunctions::DivideUp;
+    using Math::DivideUp;
     uint64_t total = 0;
     MipBlockCountList result;
     for(uint32_t i = 0; i < t->MipCount(); i++)
@@ -464,7 +464,7 @@ void BCColorConverter::CallKernelForType(Span<Byte> dScratchBuffer,
                                               bcTextures.begin() + range[1]);
 
     uint32_t localTexCount = uint32_t(range[1] - range[0]);
-    uint32_t batchCount = MathFunctions::DivideUp(localTexCount, BC_TEX_PER_BATCH);
+    uint32_t batchCount = Math::DivideUp(localTexCount, BC_TEX_PER_BATCH);
     for(uint32_t batchIndex = 0; batchIndex < batchCount; batchIndex++)
     {
         uint32_t  start = batchIndex * BC_TEX_PER_BATCH;
@@ -587,7 +587,7 @@ BCColorConverter::BCColorConverter(std::vector<GenericTexture*>&& bcTex)
     for(const Vector2ul& range : partitions)
     {
         uint32_t localTexCount = uint32_t(range[1] - range[0]);
-        uint32_t iterCount = MathFunctions::DivideUp(localTexCount, BC_TEX_PER_BATCH);
+        uint32_t iterCount = Math::DivideUp(localTexCount, BC_TEX_PER_BATCH);
         for(uint32_t i = 0; i < iterCount; i++)
         {
             uint32_t  start = uint32_t(range[0]) + i * BC_TEX_PER_BATCH;

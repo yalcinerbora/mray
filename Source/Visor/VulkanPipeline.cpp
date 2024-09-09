@@ -20,7 +20,7 @@ VulkanComputePipeline::DevourFile(const std::string& shaderName,
     std::streamoff size = std::ifstream(fullPath,
                                         std::ifstream::ate |
                                         std::ifstream::binary).tellg();
-    assert(size == MathFunctions::NextMultiple(size, std::streamoff(4)));
+    assert(size == Math::NextMultiple(size, std::streamoff(4)));
     std::vector<Byte> source(static_cast<size_t>(size), Byte(0));
     std::ifstream shaderFile = std::ifstream(fullPath, std::ios::binary);
 
@@ -139,7 +139,7 @@ MRayError VulkanComputePipeline::Initialize(VkDevice dev,
     // ==================== //
     // Push Constant Ranges //
     // ==================== //
-    using MathFunctions::NextMultiple;
+    using Math::NextMultiple;
     VkPushConstantRange pcRange =
     {
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,

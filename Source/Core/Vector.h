@@ -18,7 +18,7 @@ N should be 2, 3 or 4 at most.
 #include <array>
 
 #include "MathForward.h"
-#include "MathFunctions.h"
+#include "Math.h"
 #include "NormTypes.h"
 #include "Types.h"
 #include "BitFunctions.h"

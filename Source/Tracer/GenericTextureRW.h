@@ -96,7 +96,7 @@ void GenericWrite(SurfViewVariant& surf,
                         Float v = value[c];
                         if constexpr(std::is_integral_v<InnerT>)
                         {
-                            using MathFunctions::Clamp;
+                            using Math::Clamp;
                             v = Clamp(std::round(v),
                                       Float(std::numeric_limits<InnerT>::min()),
                                       Float(std::numeric_limits<InnerT>::max()));
@@ -109,7 +109,7 @@ void GenericWrite(SurfViewVariant& surf,
                     Float v = value[0];
                     if constexpr(std::is_integral_v<WriteType>)
                     {
-                        using MathFunctions::Clamp;
+                        using Math::Clamp;
                         v = Clamp(std::round(v),
                                   Float(std::numeric_limits<WriteType>::min()),
                                   Float(std::numeric_limits<WriteType>::max()));

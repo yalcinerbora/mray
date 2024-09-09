@@ -147,7 +147,7 @@ Optional<T> TracerTexView<D, T>::Postprocess(Optional<ReadType>&& t) const
             [[fallthrough]];
             case TO_3C_BASIC_NORMAL_FROM_SIGNED_2C:
             {
-                Float z = MathFunctions::SqrtMax(Float(1) - val[0] * val[0] - val[1] * val[1]);
+                Float z = Math::SqrtMax(Float(1) - val[0] * val[0] - val[1] * val[1]);
                 return Vector3(val[0], val[1], z);
             }
             // Octahedral mapping
