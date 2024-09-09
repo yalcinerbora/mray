@@ -41,8 +41,8 @@ namespace LambertMatDetail
                                            const Surface& surface,
                                            RNGDispenser& dispenser) const;
         MRAY_HYBRID Float       Pdf(const Ray& wI,
-                                const Ray& wO,
-                                const Surface& surface) const;
+                                    const Ray& wO,
+                                    const Surface& surface) const;
         MRAY_HYBRID Spectrum    Evaluate(const Ray& wO,
                                          const Vector3& wI,
                                          const Surface& surface) const;

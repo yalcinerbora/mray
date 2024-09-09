@@ -42,7 +42,7 @@ inline Optional<CameraTransform> MovementSchemeFPS::Update(const InputChecker& i
     Optional<CameraTransform> result;
 
     Vector2 currMouse = inputChecker.GetMousePos();
-    Vector2 diff = prevMouse - currMouse;
+    Vector2 diff = currMouse - prevMouse;
 
     // Mouse related
     if(inputChecker.CheckMouseDrag(VisorUserAction::MOUSE_ROTATE_MODIFIER) &&

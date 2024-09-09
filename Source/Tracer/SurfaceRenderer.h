@@ -332,7 +332,7 @@ void SurfRDetail::WorkFunction(const Prim&, const Material&, const Surface& surf
 template<LightC Light,
          LightGroupC LG, TransformGroupC TG>
 MRAY_HYBRID
-void SurfRDetail::LightWorkFunction(const Light& light, RNGDispenser& rng,
+void SurfRDetail::LightWorkFunction(const Light&, RNGDispenser&,
                                     const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params,
                                     RayIndex rayIndex)
 {

@@ -105,8 +105,12 @@ OptionalHitR<PG> AcceleratorLinear<PG, TG>::ClosestHit(BackupRNG& rng,
     OptionalHitR<PG> result = std::nullopt;
     for(const PrimitiveKey pKeys : leafs)
     {
-        result = IntersectionCheck(ray, tMM, rng.NextFloat(), pKeys);
-        if(result) tMM[1] = min(tMM[1], result->t);
+        auto check = IntersectionCheck(ray, tMM, rng.NextFloat(), pKeys);
+        if(check.has_value() && check->t < tMM[1])
+        {
+            result = check;
+            tMM[1] = check->t;
+        }
     }
     return result;
 }
