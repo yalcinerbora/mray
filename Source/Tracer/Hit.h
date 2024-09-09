@@ -23,12 +23,7 @@ class MetaHitT
     template<uint32_t M>
     requires(M <= N)
     MRAY_HYBRID constexpr
-    const Vector<M, Float>& AsVector() const;
-
-    template<uint32_t M>
-    requires(M <= N)
-    MRAY_HYBRID constexpr
-    Vector<M, Float>&       AsVector();
+    Vector<M, Float> AsVector() const;
 };
 
 template<uint32_t N>
@@ -48,18 +43,8 @@ template<uint32_t N>
 template<uint32_t M>
 requires(M <= N)
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr const Vector<M, Float>&
+constexpr Vector<M, Float>
 MetaHitT<N>::AsVector() const
-{
-    return vec;
-}
-
-template<uint32_t N>
-template<uint32_t M>
-requires(M <= N)
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<M, Float>&
-MetaHitT<N>::AsVector()
 {
     return vec;
 }

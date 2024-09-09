@@ -330,7 +330,7 @@ void RenderWork<R, PG, MG, TG>::DoWorkInternal(// Output
     using M = typename MG:: template Material<typename R::SpectrumConverterContext>;
     using P = typename PG:: template Primitive<TC>;
     using S = typename M::Surface;
-    static constexpr auto WF = R::template WorkFunctions<P, M, S, PG, MG, TG>;
+    static constexpr auto WF = R::template WorkFunctions<P, M, S, TC, PG, MG, TG>;
 
     if constexpr(I >= std::tuple_size_v<decltype(WF)>)
     {
@@ -754,7 +754,8 @@ static void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParams<R, PG, MG, TG
         auto material = Material(specConverter, params.matSoA,
                                  MaterialKey(static_cast<CommonKey>(keys.lightOrMatKey)));
         // Call the function
-        WorkFunction(primitive, material, surface, rng, params, rIndex);
+        WorkFunction(primitive, material, surface, tContext,
+                     rng, params, rIndex);
         // All Done!
     }
 }

@@ -75,6 +75,11 @@ using SpectrumWavesT = Vector<SPS, T>;
 using Spectrum      = SpectrumT<SpectraPerSpectrum, Float>;
 using SpectrumWaves = SpectrumWavesT<SpectraPerSpectrum, Float>;
 
+// Invalid spectrum, this will be set when some form of numerical
+// error occurs (i.e. a NaN is found). It is specifically oversaturated
+// to "pop out" on the image (tonemapper probably darken everything else etc)
+static constexpr Vector3 BIG_MAGENTA = Vector3(1e4, 0.0, 1e4);
+
 // Some key types
 // these are defined seperately for fine-tuning
 // for different use-cases.
@@ -167,11 +172,11 @@ struct BasicSurface
     Vector3 normal;
 };
 
-struct BarycentricSurface
-{
-    Vector3 position;
-    Vector3 baryCoords;
-};
+//struct BarycentricSurface
+//{
+//    Vector3 position;
+//    Vector3 baryCoords;
+//};
 
 struct DefaultSurface
 {

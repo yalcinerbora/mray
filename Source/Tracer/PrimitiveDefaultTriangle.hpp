@@ -431,30 +431,6 @@ void Triangle<T>::GenerateSurface(BasicSurface& result,
 
 template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-void Triangle<T>::GenerateSurface(BarycentricSurface& result,
-                                  // Inputs
-                                  const Hit& baryCoords,
-                                  const Ray& ray,
-                                  const RayDiff& differentials) const
-{
-    Float a = baryCoords[0];
-    Float b = baryCoords[1];
-    Float c = Float{1} - a - b;
-
-    // Get the position
-    Vector3 pos = (positions[0] * a +
-                   positions[1] * b +
-                   positions[2] * c);
-
-    result = BarycentricSurface
-    {
-        .position = pos,
-        .baryCoords = Vector3(a, b, c)
-    };
-}
-
-template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
 void Triangle<T>::GenerateSurface(DefaultSurface& result,
                                   // Inputs
                                   const Hit& baryCoords,
@@ -480,6 +456,12 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     Quaternion tbn = Quaternion::BarySLerp(q0, q1, q2, a, b);
     tbn.NormalizeSelf();
 
+    // UV
+    Vector2 uv0 = data.get().uvs[index[0]];
+    Vector2 uv1 = data.get().uvs[index[1]];
+    Vector2 uv2 = data.get().uvs[index[2]];
+    Vector2 uv = uv0 * a + uv1 * b + uv2 * c;
+
     // Flip the surface definitions (normal, geometric normal)
     bool backSide = (geoNormal.Dot(ray.Dir()) > 0.0f);
     if(backSide)
@@ -503,6 +485,7 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
         .position = pos,
         .geoNormal = geoNormal,
         .shadingTBN = tbn,
+        .uv = uv,
         .backSide = backSide
     };
 }

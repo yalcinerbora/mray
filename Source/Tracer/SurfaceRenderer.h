@@ -6,6 +6,7 @@
 #include "TextureFilter.h"
 
 #include "Core/TypeNameGenerators.h"
+#include "Core/ColorFunctions.h"
 
 class SurfaceRenderer;
 
@@ -25,10 +26,15 @@ namespace SurfRDetail
         public:
         enum E
         {
-            FURNACE,
             WORLD_NORMAL,
             WORLD_POSITION,
-            AO,
+            WORLD_GEO_NORMAL,
+            HIT_PARAMS,
+            MAT_ID,
+            PRIM_ID,
+            ACCEL_ID,
+            TRANSFORM_ID,
+            UV,
             //
             END
         };
@@ -36,11 +42,18 @@ namespace SurfRDetail
         private:
         static constexpr std::array Names =
         {
-            "Furnace",
             "WorldNormal",
             "WorldPosition",
-            "AO"
+            "WorldGeoNormal",
+            "HitParams",
+            "MaterialId",
+            "PrimitiveId",
+            "AcceleratorId",
+            "TransformId",
+            "UV"
         };
+        static_assert(Names.size() == static_cast<size_t>(END),
+                      "Not enough data on enum lookup table");
 
         public:
         E e;
@@ -66,7 +79,7 @@ namespace SurfRDetail
     struct Options
     {
         uint32_t    totalSPP            = 32;
-        Mode::E     mode                = Mode::FURNACE;
+        Mode::E     mode                = Mode::WORLD_NORMAL;
         bool        doStochasticFilter  = true;
     };
 
@@ -88,10 +101,12 @@ namespace SurfRDetail
     // everything is on ray state)
     using RayPayload = EmptyType;
 
-    template<PrimitiveC Prim, MaterialC Material, class Surface,
+    template<PrimitiveC Prim, MaterialC Material,
+             class Surface, class TContext,
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     MRAY_HYBRID
-    void WorkFunction(const Prim&, const Material&, const Surface&, RNGDispenser&,
+    void WorkFunction(const Prim&, const Material&, const Surface&,
+                      const TContext&, RNGDispenser&,
                       const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params,
                       RayIndex rayIndex);
 
@@ -120,11 +135,11 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     using SpectrumConverterContext = SpectrumConverterContextIdentity;
     using Options       = SurfRDetail::Options;
     // Work Functions
-    template<PrimitiveC P, MaterialC M, class S,
+    template<PrimitiveC P, MaterialC M, class S, class TContext,
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     static constexpr Tuple WorkFunctions = Tuple
     {
-        SurfRDetail::WorkFunction<P, M, S, PG, MG, TG>
+        SurfRDetail::WorkFunction<P, M, S, TContext, PG, MG, TG>
     };
     template<LightC L, LightGroupC LG, TransformGroupC TG>
     static constexpr auto LightWorkFunctions = Tuple
@@ -208,16 +223,110 @@ size_t SurfaceRenderer::GPUMemoryUsage() const
             redererGlobalMem.Size());
 }
 
-template<PrimitiveC Prim, MaterialC Material, class Surface,
+class PrimGroupTriangle;
+class PrimGroupSkinnedTriangle;
+
+template<PrimitiveC Prim, MaterialC Material,
+         class Surface, class TContext,
          PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
 MRAY_HYBRID
-void SurfRDetail::WorkFunction(const Prim& prim, const Material& mat,
-                               const Surface& surf, RNGDispenser& rng,
+void SurfRDetail::WorkFunction(const Prim&, const Material&, const Surface& surf,
+                               const TContext&, RNGDispenser&,
                                const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params,
                                RayIndex rayIndex)
 {
-    //
-    params.rayState.dOutputData[rayIndex] = Spectrum(1.0);
+    Vector3 color = Vector3::Zero();
+    Mode::E mode = params.globalState.mode.e;
+    switch(mode)
+    {
+        using enum Mode::E;
+        case WORLD_NORMAL:
+        {
+            if constexpr(std::is_same_v<BasicSurface, Surface>)
+            {
+                Vector3 normal = surf.normal;
+                normal *= (normal + Vector3(1)) * Vector3(0.5);
+                color = normal;
+            }
+            else
+            {
+                Vector3 normal = surf.shadingTBN.ApplyInvRotation(Vector3::ZAxis());
+                normal *= (normal + Vector3(1)) * Vector3(0.5);
+                color = normal;
+            }
+            break;
+        }
+        case WORLD_GEO_NORMAL:
+        {
+            if constexpr(std::is_same_v<BasicSurface, Surface>)
+            {
+                Vector3 normal = surf.normal;
+                normal *= (normal + Vector3(1)) * Vector3(0.5);
+                color = normal;
+            }
+            else
+            {
+                Vector3 normal = surf.geoNormal;
+                normal *= (normal + Vector3(1)) * Vector3(0.5);
+                color = normal;
+            }
+            break;
+        }
+        case WORLD_POSITION:
+        {
+            color = surf.position;
+            break;
+        }
+        case HIT_PARAMS:
+        {
+            MetaHit metaHit = params.in.dHits[rayIndex];
+            Vector3 hit = Vector3(metaHit.AsVector<2u>(), Float(0));
+            // We need to check the type here for triangles
+            if constexpr(std::is_same_v<PrimGroupTriangle, PG>  ||
+                         std::is_same_v<PrimGroupSkinnedTriangle, PG>)
+            {
+                hit[2] = Float(1) - hit[0] - hit[1];
+            }
+            color = hit;
+            break;
+        }
+        case MAT_ID:
+        {
+            LightOrMatKey lmKey = params.in.dKeys[rayIndex].lightOrMatKey;
+            MaterialKey mKey = MaterialKey::CombinedKey(lmKey.FetchBatchPortion(),
+                                                        lmKey.FetchIndexPortion());
+            color = Color::RandomColorRGB(static_cast<uint32_t>(mKey));
+            break;
+        }
+        case PRIM_ID:
+        {
+            PrimitiveKey pKey = params.in.dKeys[rayIndex].primKey;
+            color = Color::RandomColorRGB(static_cast<uint32_t>(pKey));
+            break;
+        }
+        case ACCEL_ID:
+        {
+            AcceleratorKey aKey = params.in.dKeys[rayIndex].accelKey;
+            color = Color::RandomColorRGB(static_cast<uint32_t>(aKey));
+            break;
+        }
+        case TRANSFORM_ID:
+        {
+            TransformKey tKey = params.in.dKeys[rayIndex].transKey;
+            color = Color::RandomColorRGB(static_cast<uint32_t>(tKey));
+            break;
+        }
+        case UV:
+        {
+            if constexpr(std::is_same_v<DefaultSurface, Surface>)
+            {
+                color = Vector3(surf.uv, Float(0));
+            }
+            break;
+        }
+        default: color = BIG_MAGENTA; break;
+    }
+    params.rayState.dOutputData[rayIndex] = Spectrum(color, Float(0));
 }
 
 template<LightC Light,

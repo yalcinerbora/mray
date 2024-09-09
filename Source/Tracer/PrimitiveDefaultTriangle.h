@@ -93,12 +93,6 @@ namespace DefaultTriangleDetail
                                                 const Ray&,
                                                 const RayDiff&) const;
 
-        MRAY_HYBRID void        GenerateSurface(BarycentricSurface&,
-                                                // Inputs
-                                                const Hit&,
-                                                const Ray&,
-                                                const RayDiff&) const;
-
         MRAY_HYBRID void        GenerateSurface(DefaultSurface&,
                                                 // Inputs
                                                 const Hit&,
