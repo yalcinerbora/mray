@@ -315,8 +315,8 @@ class TracerBase : public TracerI
     RenderBufferInfo    StartRender(RendererId, CamSurfaceId,
                                     RenderImageParams,
                                     Optional<uint32_t>,
-                                    Optional<uint32_t>,
-                                    Optional<CameraTransform>) override;
+                                    Optional<uint32_t>) override;
+    void                SetCameraTransform(RendererId, CameraTransform) override;
     void                StopRender() override;
     RendererOutput      DoRenderWork() override;
 

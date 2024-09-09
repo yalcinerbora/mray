@@ -133,7 +133,6 @@ void SurfaceRenderer::PushAttribute(uint32_t attributeIndex,
 
 RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
                                               CamSurfaceId camSurfId,
-                                              Optional<CameraTransform> optTransform,
                                               uint32_t customLogicIndex0,
                                               uint32_t)
 {
@@ -141,9 +140,9 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     // TODO: These may be  common operations, every renderer
     // does this move to a templated intermediate class
     // on the inheritance chain
+    cameraTransform = std::nullopt;
     curColorSpace = tracerView.tracerParams.globalTextureColorSpace;
     currentOptions = newOptions;
-    transOverride = optTransform;
     totalIterationCount = 0;
     globalPixelIndex = 0;
 
@@ -274,7 +273,7 @@ RendererOutput SurfaceRenderer::DoRender()
 
     // Generate subcamera of this specific tile
     cameraWork.GenerateSubCamera(dSubCameraBuffer,
-                                 curCamKey, transOverride,
+                                 curCamKey, cameraTransform,
                                  imageTiler.CurrentTileIndex(),
                                  imageTiler.TileCount(),
                                  processQueue);

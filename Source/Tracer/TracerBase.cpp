@@ -1615,8 +1615,7 @@ void TracerBase::PushRendererAttribute(RendererId rId,
 RenderBufferInfo TracerBase::StartRender(RendererId rId, CamSurfaceId cId,
                                          RenderImageParams rIParams,
                                          Optional<uint32_t> renderLogic0,
-                                         Optional<uint32_t> renderLogic1,
-                                         Optional<CameraTransform> optionalTransform)
+                                         Optional<uint32_t> renderLogic1)
 {
     // Check render image is setup properly
     if(renderImage.get() == nullptr)
@@ -1635,9 +1634,20 @@ RenderBufferInfo TracerBase::StartRender(RendererId rId, CamSurfaceId cId,
     auto camKey = CameraKey(static_cast<uint32_t>(cId));
     return currentRenderer->StartRender(rIParams,
                                         cId,
-                                        optionalTransform,
                                         renderLogic0.value_or(0),
                                         renderLogic1.value_or(0));
+}
+
+void TracerBase::SetCameraTransform(RendererId rId, CameraTransform transform)
+{
+    auto renderer = renderers.at(rId);
+    if(!renderer)
+    {
+        throw MRayError("Unable to find Renderer({})",
+                        static_cast<uint32_t>(rId));
+    }
+    RendererI* rendererPtr = renderer.value().get().get();
+    rendererPtr->SetCameraTransform(transform);
 }
 
 void TracerBase::StopRender()

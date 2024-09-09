@@ -307,8 +307,8 @@ class TracerMock : public TracerI
     RenderBufferInfo    StartRender(RendererId, CamSurfaceId,
                                     RenderImageParams,
                                     Optional<uint32_t>,
-                                    Optional<uint32_t>,
-                                    Optional<CameraTransform>) override;
+                                    Optional<uint32_t>) override;
+    void                SetCameraTransform(RendererId, CameraTransform) override;
     void                StopRender() override;
     RendererOutput      DoRenderWork() override;
 
@@ -1764,10 +1764,14 @@ inline void TracerMock::SetupRenderEnv(TimelineSemaphore*,
 inline RenderBufferInfo TracerMock::StartRender(RendererId, CamSurfaceId,
                                                 RenderImageParams,
                                                 Optional<uint32_t>,
-                                                Optional<uint32_t>,
-                                                Optional<CameraTransform>)
+                                                Optional<uint32_t>)
 {
     throw MRayError("\"StartRender\" is not implemented in mock tracer!");
+}
+
+void TracerMock::SetCameraTransform(RendererId, CameraTransform)
+{
+    throw MRayError("\"SetCameraTransform\" is not implemented in mock tracer!");
 }
 
 inline void TracerMock::StopRender()

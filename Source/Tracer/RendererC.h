@@ -147,7 +147,7 @@ concept RendererC = requires(RendererType rt,
     {rt.PushAttribute(uint32_t{}, std::move(input), q)
     } -> std::same_as<void>;
     {rt.StartRender(RenderImageParams{}, CamSurfaceId{},
-                    Optional<CameraTransform>{}, uint32_t{}, uint32_t{})
+                    uint32_t{}, uint32_t{})
     } ->std::same_as<RenderBufferInfo>;
     {rt.StopRender()} -> std::same_as<void>;
     {rt.DoRender()} -> std::same_as<RendererOutput>;
@@ -179,9 +179,9 @@ class RendererI
     // ...
     virtual RenderBufferInfo    StartRender(const RenderImageParams&,
                                             CamSurfaceId camSurfId,
-                                            Optional<CameraTransform>,
                                             uint32_t customLogicIndex0 = 0,
                                             uint32_t customLogicIndex1 = 0) = 0;
+    virtual void                SetCameraTransform(const CameraTransform&) = 0;
     virtual RendererOutput      DoRender() = 0;
     virtual void                StopRender() = 0;
 
@@ -481,31 +481,33 @@ class RendererT : public RendererI
     uint32_t                GenerateCameraWorkMappings(uint32_t workIdStart);
 
     protected:
-    BS::thread_pool&        globalThreadPool;
-    const GPUSystem&        gpuSystem;
-    TracerView              tracerView;
-    const RenderImagePtr&   renderBuffer;
+    BS::thread_pool&            globalThreadPool;
+    const GPUSystem&            gpuSystem;
+    TracerView                  tracerView;
+    const RenderImagePtr&       renderBuffer;
+    Optional<CameraTransform>   cameraTransform = {};
 
-    WorkList                currentWorks;
-    LightWorkList           currentLightWorks;
-    CameraWorkList          currentCameraWorks;
-    HitKeyPack              boundaryMatKeyPack;
+    WorkList                    currentWorks;
+    LightWorkList               currentLightWorks;
+    CameraWorkList              currentCameraWorks;
+    HitKeyPack                  boundaryMatKeyPack;
     // Current Canvas info
-    MRayColorSpaceEnum      curColorSpace;
-    ImageTiler              imageTiler;
-    uint64_t                totalIterationCount;
+    MRayColorSpaceEnum          curColorSpace;
+    ImageTiler                  imageTiler;
+    uint64_t                    totalIterationCount;
 
-    uint32_t                GenerateWorks();
-    void                    ClearAllWorkMappings();
-    RenderWorkHasher        InitializeHashes(Span<uint32_t> dHashes,
-                                             Span<CommonKey> dWorkIds,
-                                             const GPUQueue& queue);
+    uint32_t                    GenerateWorks();
+    void                        ClearAllWorkMappings();
+    RenderWorkHasher            InitializeHashes(Span<uint32_t> dHashes,
+                                                 Span<CommonKey> dWorkIds,
+                                                 const GPUQueue& queue);
 
     public:
                         RendererT(const RenderImagePtr&,
                                   const RenderWorkPack& workPacks,
                                   TracerView, const GPUSystem&,
                                   BS::thread_pool&);
+    void                SetCameraTransform(const CameraTransform&) override;
     std::string_view    Name() const override;
 };
 
@@ -1008,6 +1010,7 @@ uint32_t RendererT<C>::GenerateWorks()
     workCounter = GenerateCameraWorkMappings(workCounter);
     return workCounter;
 }
+
 template <class C>
 RenderWorkHasher RendererT<C>::InitializeHashes(Span<uint32_t> dHashes,
                                                 Span<CommonKey> dWorkIds,
@@ -1033,6 +1036,12 @@ RendererT<C>::RendererT(const RenderImagePtr& rb,
     , renderBuffer(rb)
     , workPack(wp)
 {}
+
+template <class C>
+void RendererT<C>::SetCameraTransform(const CameraTransform& ct)
+{
+    cameraTransform = ct;
+}
 
 template <class C>
 std::string_view RendererT<C>::Name() const

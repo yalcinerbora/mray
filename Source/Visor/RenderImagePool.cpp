@@ -173,18 +173,18 @@ void RenderImagePool::GenerateClearCommand()
                          0, nullptr,
                          3, imgBarrierInfoList.data());
 
-    vkCmdClearColorImage(clearCommand, hdrImage.Image(),
-                         VK_IMAGE_LAYOUT_GENERAL,
-                         &clearColorValue, 1u,
-                         &clearRange);
+    //vkCmdClearColorImage(clearCommand, hdrImage.Image(),
+    //                     VK_IMAGE_LAYOUT_GENERAL,
+    //                     &clearColorValue, 1u,
+    //                     &clearRange);
     vkCmdClearColorImage(clearCommand, hdrSampleImage.Image(),
                          VK_IMAGE_LAYOUT_GENERAL,
                          &clearColorValue, 1u,
                          &clearRange);
-    vkCmdClearColorImage(clearCommand, sdrImage.Image(),
-                         VK_IMAGE_LAYOUT_GENERAL,
-                         &clearColorValue, 1u,
-                         &clearRange);
+    //vkCmdClearColorImage(clearCommand, sdrImage.Image(),
+    //                     VK_IMAGE_LAYOUT_GENERAL,
+    //                     &clearColorValue, 1u,
+    //                     &clearRange);
 
     // Make SDR image read optimal, since tonemap stage
     // expects the image to be previously read optimal.

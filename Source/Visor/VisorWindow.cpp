@@ -1084,7 +1084,7 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
     {
         // New transform should not mean new framebuffer.
         // However conservatively we do drop the memory
-        accumulateStage.DropExternalHandles(imgWriteSem);
+        //accumulateStage.DropExternalHandles(imgWriteSem);
 
         visorState.transform = changes.transform.value();
         transferQueue->Enqueue(VisorAction

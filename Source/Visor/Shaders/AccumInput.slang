@@ -63,7 +63,10 @@ void KCAccumulateInputs(uint3 globalId: SV_DispatchThreadID,
     float totalSample = sampleOut + sampleIn;
     float3 newColor = (sampleOut * colorOut +
                        sampleIn  * colorIn);
-    newColor = newColor / totalSample;
+    if(totalSample == 0.0f)
+        newColor = float3(0.0f);
+    else
+        newColor = newColor / totalSample;
 
     // Write
     params.outPixels[pixOut] = float4(newColor, 1.0f);

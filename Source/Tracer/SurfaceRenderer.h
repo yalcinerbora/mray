@@ -142,7 +142,6 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     FilmFilterPtr               filmFilter;
     RenderWorkHasher            workHasher;
     //
-    Optional<CameraTransform>   transOverride = {};
     CameraSurfaceParams         curCamSurfaceParams;
     TransformKey                curCamTransformKey;
     CameraKey                   curCamKey;
@@ -184,7 +183,6 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     //
     RenderBufferInfo    StartRender(const RenderImageParams&,
                                     CamSurfaceId camSurfId,
-                                    Optional<CameraTransform>,
                                     uint32_t customLogicIndex0 = 0,
                                     uint32_t customLogicIndex1 = 0) override;
     RendererOutput      DoRender() override;

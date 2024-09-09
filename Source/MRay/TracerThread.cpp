@@ -248,8 +248,7 @@ void TracerThread::RestartRenderer()
                                                sceneIds.camSurfaces[currentCamIndex],
                                                rp,
                                                currentRenderLogic0,
-                                               currentRenderLogic1,
-                                               currentCamTransform);
+                                               currentRenderLogic1);
 
     transferQueue.Enqueue(TracerResponse
     (
@@ -584,8 +583,14 @@ void TracerThread::LoopWork()
                      currentCamTransform.gazePoint,
                      currentCamTransform.position,
                      currentCamTransform.up);
-
-            RestartRenderer();
+            // Transform change should be as real time as possible so
+            tracer->SetCameraTransform(currentRenderer, currentCamTransform);
+            transferQueue.Enqueue(TracerResponse
+            (
+                std::in_place_index<TracerResponse::CLEAR_IMAGE_SECTION>,
+                true
+            ));
+            //RestartRenderer();
         }
         // New renderer
         if(rendererName) HandleRendererChange(rendererName.value());

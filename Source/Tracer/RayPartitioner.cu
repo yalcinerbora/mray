@@ -177,19 +177,23 @@ size_t PartitionerDeviceBufferSize(size_t maxElementEstimate)
     size_t partitionTM = BinPartitionTMSize<CommonIndex>(maxElementEstimate);
     size_t totalTempMem = std::max(radixSortTM, partitionTM);
 
-    //static constexpr size_t Alignment = size_t = MemAlloc::DefaultSystemAlignment();
+    static constexpr size_t Alignment = MemAlloc::DefaultSystemAlignment();
+    using MathFunctions::NextMultiple;
 
-    size_t totalBytes = (maxElementEstimate * sizeof(CommonKey) * 2 +
-                         maxElementEstimate * sizeof(CommonIndex) * 2 +
-                         totalTempMem);
+    size_t totalBytes = (NextMultiple(maxElementEstimate * sizeof(CommonKey), Alignment) * 2 +
+                         NextMultiple(maxElementEstimate * sizeof(CommonIndex), Alignment) * 2 +
+                         NextMultiple(totalTempMem, Alignment));
     return totalBytes;
 }
 
 size_t PartitionerHostBufferSize(size_t maxPartitionEstimate)
 {
-    size_t totalBytes = ((maxPartitionEstimate + 1) * sizeof(uint32_t) +
-                         maxPartitionEstimate * sizeof(CommonKey) +
-                         sizeof(uint32_t));
+    static constexpr size_t Alignment = MemAlloc::DefaultSystemAlignment();
+    using MathFunctions::NextMultiple;
+
+    size_t totalBytes = (NextMultiple((maxPartitionEstimate + 1) * sizeof(uint32_t), Alignment) +
+                         NextMultiple(maxPartitionEstimate * sizeof(CommonKey), Alignment) +
+                         NextMultiple(sizeof(uint32_t), Alignment));
     return totalBytes;
 }
 

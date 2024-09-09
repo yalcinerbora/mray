@@ -147,7 +147,6 @@ void TexViewRenderer::PushAttribute(uint32_t attributeIndex,
 
 RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
                                               CamSurfaceId,
-                                              Optional<CameraTransform>,
                                               uint32_t customLogicIndex0,
                                               uint32_t customLogicIndex1)
 {
