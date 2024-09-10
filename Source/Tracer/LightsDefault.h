@@ -17,7 +17,7 @@ namespace LightDetail
     struct alignas(32) LightData
     {
         Span<const ParamVaryingData<2, Vector3>>    dRadiances;
-        Span<const MediumId>                        dMediumIds;
+        Span<const MediumKey>                       dMediumIds;
         Span<const Vector2ui>                       dPrimRanges;
         Bitspan<const uint32_t>                     dIsTwoSidedFlags;
     };
@@ -25,7 +25,7 @@ namespace LightDetail
     struct alignas(32) LightSkysphereData
     {
         Span<const ParamVaryingData<2, Vector3>>    dRadiances;
-        Span<const MediumId>                        dMediumIds;
+        Span<const MediumKey>                       dMediumIds;
         Span<const DistributionPwC2D>               dDistributions;
         Float                                       sceneDiameter;
     };
@@ -71,7 +71,7 @@ namespace LightDetail
         private:
         Ref<const Primitive>    prim;
         RadianceMap             radiance;
-        MediumId                initialMedium;
+        MediumKey               initialMedium;
         bool                    isTwoSided;
 
         public:
@@ -120,7 +120,7 @@ namespace LightDetail
         Ref<const Primitive>    prim;
         DistributionPwC2D       dist2D;
         RadianceMap             radiance;
-        MediumId                initialMedium;
+        MediumKey               initialMedium;
         Float                   sceneDiameter;
 
         public:

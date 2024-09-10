@@ -202,6 +202,11 @@ class Bitspan
     MRAY_HYBRID constexpr void      SetBit(uint32_t index, bool) requires (!std::is_const_v<T>);
     MRAY_HYBRID constexpr uint32_t  Size() const;
     MRAY_HYBRID constexpr uint32_t  ByteSize() const;
+
+    MRAY_HYBRID constexpr
+    uint32_t*                       Data();
+    MRAY_HYBRID constexpr
+    const uint32_t*                 Data() const;
 };
 
 template<std::integral T>
@@ -872,4 +877,18 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr uint32_t Bitspan<T>::ByteSize() const
 {
     return Math::NextMultiple<uint32_t>(size, static_cast<uint32_t>(sizeof(T)));
+}
+
+template <std::unsigned_integral T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr uint32_t* Bitspan<T>::Data()
+{
+    return data;
+}
+
+template <std::unsigned_integral T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr const uint32_t* Bitspan<T>::Data() const
+{
+    return data;
 }

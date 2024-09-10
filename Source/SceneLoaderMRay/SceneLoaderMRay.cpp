@@ -493,10 +493,11 @@ std::vector<TransientData> TransformAttributeLoad(const AttributeCountList& tota
                                           const Vector3& r,
                                           const Vector3& s)
             {
+                Vector3 rRadians = r * MathConstants::DegToRadCoef<Float>();
                 Matrix4x4 transform = TransformGen::Scale(s[0], s[1], s[2]);
-                transform = TransformGen::Rotate(r[0], Vector3::XAxis()) * transform;
-                transform = TransformGen::Rotate(r[1], Vector3::YAxis()) * transform;
-                transform = TransformGen::Rotate(r[2], Vector3::ZAxis()) * transform;
+                transform = TransformGen::Rotate(rRadians[0], Vector3::XAxis()) * transform;
+                transform = TransformGen::Rotate(rRadians[1], Vector3::YAxis()) * transform;
+                transform = TransformGen::Rotate(rRadians[2], Vector3::ZAxis()) * transform;
                 transform = TransformGen::Translate(t) * transform;
                 return transform;
             };

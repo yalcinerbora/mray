@@ -332,11 +332,14 @@ void SurfRDetail::WorkFunction(const Prim&, const Material&, const Surface& surf
 template<LightC Light,
          LightGroupC LG, TransformGroupC TG>
 MRAY_HYBRID
-void SurfRDetail::LightWorkFunction(const Light&, RNGDispenser&,
+void SurfRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
                                     const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params,
                                     RayIndex rayIndex)
 {
-    params.rayState.dOutputData[rayIndex] = Spectrum(0.00);
+    if(l.IsPrimitiveBackedLight())
+        params.rayState.dOutputData[rayIndex] = Spectrum(1, 0, 0, 0);
+    else
+        params.rayState.dOutputData[rayIndex] = Spectrum::Zero();
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE

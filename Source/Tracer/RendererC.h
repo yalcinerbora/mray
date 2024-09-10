@@ -490,7 +490,7 @@ class RendererT : public RendererI
     WorkList                    currentWorks;
     LightWorkList               currentLightWorks;
     CameraWorkList              currentCameraWorks;
-    HitKeyPack                  boundaryMatKeyPack;
+    HitKeyPack                  boundaryLightKeyPack;
     // Current Canvas info
     MRayColorSpaceEnum          curColorSpace;
     ImageTiler                  imageTiler;
@@ -614,13 +614,14 @@ void RenderWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
         TransGroupId transGroupId = std::get<1>(work.idPack);
         const auto& lightGroup = tracerView.lightGroups.at(lightGroupId)->get();
         const auto& transformGroup = tracerView.transGroups.at(transGroupId)->get();
+        CommonKey primGroupId = lightGroup->GenericPrimGroup().GroupId();
 
         auto lK = LightOrMatKey::CombinedKey(IS_LIGHT_KEY_FLAG, static_cast<CommonKey>(lightGroupId), 0u);
         auto tK = TransformKey::CombinedKey(static_cast<CommonKey>(transGroupId), 0u);
-
+        auto pK = PrimitiveKey::CombinedKey(primGroupId, 0u);
         HitKeyPack kp =
         {
-            .primKey = PrimitiveKey::InvalidKey(),
+            .primKey = pK,
             .lightOrMatKey = lK,
             .transKey = tK,
             .accelKey = AcceleratorKey::InvalidKey()
@@ -677,7 +678,7 @@ uint32_t RenderWorkHasher::HashWorkBatchPortion(HitKeyPack p) const
                   "Unable to pack batch bits for hasing!");
     // In common case, compose the batch identifiers
     bool isLight = (p.lightOrMatKey.FetchFlagPortion() == IS_LIGHT_KEY_FLAG);
-    uint32_t isLightInt = (isLight) ? 1 : 0;
+    uint32_t isLightInt = (isLight) ? 1u : 0u;
     uint32_t r = Bit::Compose<TransformKey::BatchBits, PrimitiveKey::BatchBits,
                               LightOrMatKey::BatchBits, LightOrMatKey::FlagBits>
     (
@@ -836,10 +837,10 @@ uint32_t RendererT<C>::GenerateLightWorkMappings(uint32_t workStart)
                                            LightSurfIsLess);
 
     auto AddWork = [&, this](const LightSurfaceParams& lSurf,
-                             bool checkBoundarySuitability)
+                             bool isBoundaryLight)
     {
-        LightGroupId lgId{LightKey(uint32_t(lSurf.lightId)).FetchBatchPortion()};
-        TransGroupId tgId{TransformKey(uint32_t(lSurf.transformId)).FetchBatchPortion()};
+        LightGroupId lgId{std::bit_cast<LightKey>(lSurf.lightId).FetchBatchPortion()};
+        TransGroupId tgId{std::bit_cast<TransformKey>(lSurf.transformId).FetchBatchPortion()};
         // These should be checked beforehand, while actually creating
         // the surface
         const LightGroupPtr& lg = tracerView.lightGroups.at(lgId).value();
@@ -857,30 +858,48 @@ uint32_t RendererT<C>::GenerateLightWorkMappings(uint32_t workStart)
                             "pair of \"{}/{}\"",
                             C::TypeName(), lgName, tgName);
         }
-        if(checkBoundarySuitability)
+        if(isBoundaryLight)
         {
             bool isPrimBacked = lg.get()->IsPrimitiveBacked();
             if(isPrimBacked)
             {
                 throw MRayError("[{}]: Primitive-backed light ({}) is requested "
-                                "to be used as a boundary material!",
+                                "as a boundary material!",
                                 C::TypeName(), lgName);
             }
-            auto duplicateLoc = std::find_if(currentLightWorks.cbegin(),
-                                             currentLightWorks.cend(),
-                                             [&](const auto& workInfo)
+            // Boundary material is not primitive-backed by definition
+            // we can set the index portion as zero
+            auto lK = std::bit_cast<LightKey>(lSurf.lightId);
+            auto lmK = LightOrMatKey::CombinedKey(IS_LIGHT_KEY_FLAG,
+                                                  lK.FetchBatchPortion(),
+                                                  lK.FetchIndexPortion());
+            auto tK = std::bit_cast<TransformKey>(lSurf.transformId);
+            CommonKey primGroupId = lg->GenericPrimGroup().GroupId();
+            auto pK = PrimitiveKey::CombinedKey(primGroupId, 0u);
+            boundaryLightKeyPack = HitKeyPack
             {
-                return workInfo.idPack == Pair(lgId, tgId);
-            });
-            if(duplicateLoc != currentLightWorks.cend())
-            {
-                // TODO: This restriction does not make sense too much.
-                // Probably change later maybe?
-                throw MRayError("[{}]: Light/Transform group \"{}\"({}) / \"{}\"({}), is used "
-                                "as a non-boundary material. Boundary material should have its "
-                                "own unique group!", C::TypeName(),
-                                lgName, uint32_t(lgId), tgName, uint32_t(tgId));
-            }
+                .primKey = pK,
+                .lightOrMatKey = lmK,
+                .transKey = tK,
+                .accelKey = AcceleratorKey::InvalidKey()
+            };
+            // TODO: This restriction does not make sense too much.
+            // Probably change later maybe? Reason about this.
+            // Commented out
+            //auto duplicateLoc = std::find_if(currentLightWorks.cbegin(),
+            //                                 currentLightWorks.cend(),
+            //                                 [&](const auto& workInfo)
+            //{
+            //    return workInfo.idPack == Pair(lgId, tgId);
+            //});
+            //if(duplicateLoc != currentLightWorks.cend())
+            //{
+
+            //    throw MRayError("[{}]: Light/Transform group \"{}\"({}) / \"{}\"({}), is used "
+            //                    "as a non-boundary material. Boundary material should have its "
+            //                    "own unique group!", C::TypeName(),
+            //                    lgName, uint32_t(lgId), tgName, uint32_t(tgId));
+            //}
         }
 
         RenderLightWorkGenerator generator = loc->get();
@@ -905,22 +924,9 @@ uint32_t RendererT<C>::GenerateLightWorkMappings(uint32_t workStart)
         const auto& lSurf = lightSurfs[p[0]].second;
         AddWork(lSurf, false);
     }
-
     AddWork(tracerView.boundarySurface, true);
 
-    // Set the boundary key pack here as well
-    auto lK = std::bit_cast<LightKey>(tracerView.boundarySurface.lightId);
-    auto lmK = LightOrMatKey::CombinedKey(IS_LIGHT_KEY_FLAG,
-                                          lK.FetchBatchPortion(),
-                                          lK.FetchIndexPortion());
-    auto tK = std::bit_cast<TransformKey>(tracerView.boundarySurface.transformId);
-    boundaryMatKeyPack = HitKeyPack
-    {
-        .primKey = PrimitiveKey::InvalidKey(),
-        .lightOrMatKey = lmK,
-        .transKey = tK,
-        .accelKey = AcceleratorKey::InvalidKey()
-    };
+
     return workStart;
 }
 

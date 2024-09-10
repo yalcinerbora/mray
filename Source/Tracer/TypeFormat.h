@@ -62,8 +62,8 @@ auto format_as(const HexTriKeyT<T, FB, BB, IB>& k)
 
 inline auto format_as(const HitKeyPack& hk)
 {
-    return Tuple(HexKeyT(hk.accelKey), HexTriKeyT(hk.lightOrMatKey),
-                 HexKeyT(hk.primKey), HexKeyT(hk.transKey));
+    return Tuple(HexKeyT(hk.primKey), HexTriKeyT(hk.lightOrMatKey),
+                 HexKeyT(hk.transKey), HexKeyT(hk.accelKey));
 }
 
 inline auto format_as(const RayGMem& r)

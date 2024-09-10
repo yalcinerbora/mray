@@ -394,12 +394,37 @@ LightGroupPrim<PG>::LightGroupPrim(uint32_t groupId,
 template <PrimitiveGroupC PG>
 void LightGroupPrim<PG>::CommitReservations()
 {
+    // TODO: Wasting 8x memory cost due to "Bit" is not a type
+    // Change this later
+    auto [rad, mIds, pRange, tSide]
+        = this->template GenericCommit<ParamVaryingData<2, Vector3>,
+                                       MediumKey, Vector2ui, uint32_t>({0, 0, 0, 0});
+
+    dRadiances = rad;
+    dMediumIds = mIds;
+    dPrimRanges = pRange;
+    dIsTwoSidedFlags = Bitspan<uint32_t>(tSide);
+
+    soa.dRadiances = ToConstSpan(dRadiances);
+    soa.dMediumIds = ToConstSpan(dMediumIds);
+    soa.dPrimRanges = ToConstSpan(dPrimRanges);
+    soa.dIsTwoSidedFlags = Bitspan<const uint32_t>(ToConstSpan(tSide));
 }
 
 template <PrimitiveGroupC PG>
 LightAttributeInfoList LightGroupPrim<PG>::AttributeInfo() const
 {
-    return LightAttributeInfoList{};
+    using enum MRayDataEnum;
+    using enum AttributeOptionality;
+    using enum AttributeTexturable;
+    using enum AttributeIsArray;
+    using enum AttributeIsColor;
+    static const LightAttributeInfoList LogicList =
+    {
+        LightAttributeInfo("radiance", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+                           MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR)
+    };
+    return LogicList;
 }
 
 template <PrimitiveGroupC PG>
@@ -446,7 +471,18 @@ void LightGroupPrim<PG>::PushTexAttribute(LightKey idStart, LightKey idEnd,
                                           std::vector<Optional<TextureId>>,
                                           const GPUQueue& queue)
 {
-
+    //if(attributeIndex == 0)
+    //{
+    //    GenericPushTexAttribute<2, Vector3>(dRadiances,
+    //                                        //
+    //                                        idStart, idEnd,
+    //                                        attributeIndex,
+    //                                        std::move(data),
+    //                                        std::move(texIds),
+    //                                        queue);
+    //}
+    //else throw MRayError("{:s}: Attribute {:d} is not \"ParamVarying\", wrong "
+    //                     "function is called", TypeName(), attributeIndex);
 }
 
 template <PrimitiveGroupC PG>

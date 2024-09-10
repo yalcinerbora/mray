@@ -173,14 +173,15 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Vector3 Color::RandomColorRGB(uint32_t index)
 {
     // https://martin.ankerl.com/2009/12/09/how-to-create-random-colors-programmatically/
-    constexpr Float SATURATION = Float(0.75);
-    constexpr Float VALUE = Float(0.95);
-    constexpr Float GOLDEN_RATIO_CONJ = Float(0.618033988749895);
+    // Specifically using double here to get some precision
+    constexpr double SATURATION = 0.75;
+    constexpr double VALUE = 0.95;
+    constexpr double GOLDEN_RATIO_CONJ = 0.618033988749895;
     // For large numbers use double arithmetic here
-    float hue = 0.1f + static_cast<float>(index) * GOLDEN_RATIO_CONJ;
-    hue = fmod(hue, 1.0f);
+    double hue = 0.1 + static_cast<double>(index) * GOLDEN_RATIO_CONJ;
+    hue -= std::floor(hue);
 
-    return HSVToRGB(Vector3f(hue, SATURATION, VALUE));
+    return HSVToRGB(Vector3(hue, SATURATION, VALUE));
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
