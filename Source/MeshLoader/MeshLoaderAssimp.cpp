@@ -7,69 +7,45 @@
 #include "TransientPool/TransientPool.h"
 #include "Core/Error.hpp"
 
-MeshFileAssimp::MeshFileAssimp(Assimp::Importer& imp,
-                               const std::string& fPath,
-                               uint32_t internalIndex)
-    : filePath(fPath)
-    , importer(imp)
-    , scene(nullptr)
-    , innerIndex(internalIndex)
+MeshViewAssimp::MeshViewAssimp(uint32_t innerIndexIn, const MeshFileAssimp& fileIn)
+    : innerIndex(innerIndexIn)
+    , assimpFile(fileIn)
 {
-    unsigned int flags = static_cast<unsigned int>
-    (
-        // Generate Bounding Boxes
-        aiProcess_GenBoundingBoxes |
-        // Generate Normals if not avail
-        aiProcess_GenNormals |
-        // Generate Tangent and Bi-tangents if not avail
-        aiProcess_CalcTangentSpace |
-        // Triangulate
-        aiProcess_Triangulate |
-        // Improve triangle order
-        aiProcess_ImproveCacheLocality |
-        // Reduce Vertex Count
-        aiProcess_JoinIdenticalVertices |
-        // Remove Degenerate triangles
-        aiProcess_FindDegenerates |
-        // Sort by primitive type
-        // (this guarantees a "mesh" has same types triangles)
-        aiProcess_SortByPType |
-        //
-        aiProcess_RemoveRedundantMaterials
-    );
-    const aiScene* sceneRaw = importer.ReadFile(filePath, flags);
-    if(!sceneRaw) throw MRayError("Assimp: Unable to read file \"{}\"", Name());
-    scene.reset(importer.GetOrphanedScene());
-
-    if(innerIndex >= scene->mNumMeshes)
-        throw MRayError("Inner index is out of range");
+    if(innerIndex >= assimpFile.scene->mNumMeshes)
+        throw MRayError("Assimp: Inner index is out of range in file \"{}\"",
+                        assimpFile.Name());
 }
 
-AABB3 MeshFileAssimp::AABB() const
+AABB3 MeshViewAssimp::AABB() const
 {
-    const auto& aabb = scene->mMeshes[innerIndex]->mAABB;
+    const auto& aabb = assimpFile.scene->mMeshes[innerIndex]->mAABB;
     return AABB3(Vector3(aabb.mMin.x, aabb.mMin.y, aabb.mMin.z),
                  Vector3(aabb.mMax.x, aabb.mMax.y, aabb.mMax.z));
 }
 
-uint32_t MeshFileAssimp::MeshPrimitiveCount() const
+uint32_t MeshViewAssimp::MeshPrimitiveCount() const
 {
-    const auto& mesh = scene->mMeshes[innerIndex];
+    const auto& mesh = assimpFile.scene->mMeshes[innerIndex];
     return mesh->mNumFaces;
 }
 
-uint32_t MeshFileAssimp::MeshAttributeCount() const
+uint32_t MeshViewAssimp::MeshAttributeCount() const
 {
-    const auto& mesh = scene->mMeshes[innerIndex];
+    const auto& mesh = assimpFile.scene->mMeshes[innerIndex];
     return mesh->mNumVertices;
 }
 
-std::string MeshFileAssimp::Name() const
+std::string MeshViewAssimp::Name() const
 {
-    return std::filesystem::path(filePath).filename().string();
+    return assimpFile.Name();
 }
 
-TransientData MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) const
+uint32_t MeshViewAssimp::InnerIndex() const
+{
+    return innerIndex;
+}
+
+TransientData MeshViewAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) const
 {
     static_assert(std::is_same_v<Float, float>,
                   "Currently \"MeshLoaderAssimp\" do not support double "
@@ -77,7 +53,7 @@ TransientData MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) 
 
     auto PushVertexAttribute = [&]<class T>() -> TransientData
     {
-        const auto& mesh = scene->mMeshes[innerIndex];
+        const auto& mesh = assimpFile.scene->mMeshes[innerIndex];
         size_t localCount = mesh->mNumVertices;
         TransientData input(std::in_place_type_t<T>{}, localCount);
 
@@ -120,7 +96,7 @@ TransientData MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) 
         return input;
     };
 
-    const auto& mesh = scene->mMeshes[innerIndex];
+    const auto& mesh = assimpFile.scene->mMeshes[innerIndex];
     if(attribLogic == PrimitiveAttributeLogic::INDEX)
     {
         TransientData input(std::in_place_type_t<Vector3ui>{}, mesh->mNumFaces);
@@ -151,9 +127,9 @@ TransientData MeshFileAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) 
     }
 }
 
-bool MeshFileAssimp::HasAttribute(PrimitiveAttributeLogic attribLogic) const
+bool MeshViewAssimp::HasAttribute(PrimitiveAttributeLogic attribLogic) const
 {
-    const auto& mesh = scene->mMeshes[innerIndex];
+    const auto& mesh = assimpFile.scene->mMeshes[innerIndex];
 
     using enum PrimitiveAttributeLogic;
     switch(attribLogic)
@@ -169,7 +145,7 @@ bool MeshFileAssimp::HasAttribute(PrimitiveAttributeLogic attribLogic) const
     }
 }
 
-MRayDataTypeRT MeshFileAssimp::AttributeLayout(PrimitiveAttributeLogic attribLogic) const
+MRayDataTypeRT MeshViewAssimp::AttributeLayout(PrimitiveAttributeLogic attribLogic) const
 {
     // Assimp always loads to Vector3/2's so no need to check per-inner item etc.
     using enum MRayDataEnum;
@@ -188,6 +164,50 @@ MRayDataTypeRT MeshFileAssimp::AttributeLayout(PrimitiveAttributeLogic attribLog
         throw MRayError("Unknown attribute logic!");
 }
 
+MeshFileAssimp::MeshFileAssimp(Assimp::Importer& imp,
+                               const std::string& fPath)
+    : filePath(fPath)
+    , importer(imp)
+    , scene(nullptr)
+{
+    unsigned int flags = static_cast<unsigned int>
+    (
+        // Generate Bounding Boxes
+        aiProcess_GenBoundingBoxes |
+        // Generate Normals if not avail
+        aiProcess_GenNormals |
+        // Generate Tangent and Bi-tangents if not avail
+        aiProcess_CalcTangentSpace |
+        // Triangulate
+        aiProcess_Triangulate |
+        // Improve triangle order
+        aiProcess_ImproveCacheLocality |
+        // Reduce Vertex Count
+        aiProcess_JoinIdenticalVertices |
+        // Remove Degenerate triangles
+        aiProcess_FindDegenerates |
+        // Sort by primitive type
+        // (this guarantees a "mesh" has same types triangles)
+        aiProcess_SortByPType |
+        //
+        aiProcess_RemoveRedundantMaterials
+    );
+    const aiScene* sceneRaw = importer.ReadFile(filePath, flags);
+    if(!sceneRaw) throw MRayError("Assimp: Unable to read file \"{}\"", Name());
+    scene.reset(importer.GetOrphanedScene());
+}
+
+std::unique_ptr<MeshFileViewI>
+MeshFileAssimp::ViewMesh(uint32_t innerIndex)
+{
+    return std::unique_ptr<MeshFileViewI>(new MeshViewAssimp(innerIndex, *this));
+}
+
+std::string MeshFileAssimp::Name() const
+{
+    return std::filesystem::path(filePath).filename().string();
+}
+
 MeshLoaderAssimp::MeshLoaderAssimp()
 {
     // TODO: Change this later to utilize skeletal meshes
@@ -199,8 +219,7 @@ MeshLoaderAssimp::MeshLoaderAssimp()
                                 aiComponent_COLORS);
 }
 
-std::unique_ptr<MeshFileI> MeshLoaderAssimp::OpenFile(std::string& filePath,
-                                                      uint32_t innerIndex)
+std::unique_ptr<MeshFileI> MeshLoaderAssimp::OpenFile(std::string& filePath)
 {
-    return std::unique_ptr<MeshFileI>(new MeshFileAssimp(importer, filePath, innerIndex));
+    return std::unique_ptr<MeshFileI>(new MeshFileAssimp(importer, filePath));
 }

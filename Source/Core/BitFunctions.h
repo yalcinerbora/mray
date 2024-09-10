@@ -239,7 +239,7 @@ Bit::Compose(Ts... values)
     using RetT = std::tuple_element_t<0, Tuple<Ts...>>;
     // Compile time check the bits
     static_assert((Is + ...) <= sizeof(RetT) * CHAR_BIT,
-                  "Template Is must not exceed the entire bit range");
+                  "Template \"Is\" must not exceed the entire bit range");
     // Convert the index sequence to runtime
     // TODO: Can we "scan" in comptime via expansion?
     std::array<RetT, E + 1> offsets = {0, Is...};

@@ -177,6 +177,16 @@ uint32_t JsonTriangle::MeshAttributeCount() const
     return static_cast<uint32_t>(positions.AccessAs<Vector3>().size());
 }
 
+std::string JsonTriangle::Name() const
+{
+    return std::string("Json Triangle") + std::to_string(id);
+}
+
+uint32_t JsonTriangle::InnerIndex() const
+{
+    return id;
+}
+
 bool JsonTriangle::HasAttribute(PrimitiveAttributeLogic attribLogic) const
 {
     using enum PrimitiveAttributeLogic;
@@ -234,11 +244,6 @@ MRayDataTypeRT JsonTriangle::AttributeLayout(PrimitiveAttributeLogic attribLogic
         throw MRayError("Unknown attribute logic!");
 }
 
-std::string JsonTriangle::Name() const
-{
-    return std::string("Json Triangle") + std::to_string(id);
-}
-
 //==============================================//
 //      Sphere                                  //
 //==============================================//
@@ -262,6 +267,17 @@ uint32_t JsonSphere::MeshPrimitiveCount() const
 uint32_t JsonSphere::MeshAttributeCount() const
 {
     return 1;
+}
+
+std::string JsonSphere::Name() const
+{
+    return std::string("Json Sphere") + std::to_string(id);
+}
+
+
+uint32_t JsonSphere::InnerIndex() const
+{
+    return id;
 }
 
 bool JsonSphere::HasAttribute(PrimitiveAttributeLogic attribLogic) const
@@ -305,9 +321,4 @@ MRayDataTypeRT JsonSphere::AttributeLayout(PrimitiveAttributeLogic attribLogic) 
         case RADIUS:    return MRayDataTypeRT(MRayDataType<MR_FLOAT>());
         default:        throw MRayError("Unknown attribute logic!");
     }
-}
-
-std::string JsonSphere::Name() const
-{
-    return std::string("Json Sphere") + std::to_string(id);
 }

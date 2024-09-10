@@ -20,31 +20,41 @@ struct MRayError;
 
 using InnerIdList = const std::vector<uint32_t>;
 
-class MeshFileI
+class MeshFileViewI
 {
     public:
-
-    virtual             ~MeshFileI() = default;
+    virtual             ~MeshFileViewI() = default;
 
     virtual AABB3       AABB() const = 0;
     virtual uint32_t    MeshPrimitiveCount() const = 0;
     virtual uint32_t    MeshAttributeCount() const = 0;
     virtual std::string Name() const = 0;
-
+    virtual uint32_t    InnerIndex() const = 0;
     // Entire Data Fetch
     virtual bool            HasAttribute(PrimitiveAttributeLogic) const = 0;
     virtual TransientData   GetAttribute(PrimitiveAttributeLogic) const = 0;
     virtual MRayDataTypeRT  AttributeLayout(PrimitiveAttributeLogic) const = 0;
 };
 
+class MeshFileI
+{
+    public:
+    virtual ~MeshFileI() = default;
+
+    virtual std::unique_ptr<MeshFileViewI>
+    ViewMesh(uint32_t innerIndex = 0) = 0;
+
+    virtual std::string Name() const = 0;
+};
+
 // This is per thread (that is why there is another abstraction (MeshFile))
 class MeshLoaderI
 {
     public:
-    virtual                             ~MeshLoaderI() = default;
+    virtual ~MeshLoaderI() = default;
 
-    virtual std::unique_ptr<MeshFileI>  OpenFile(std::string& filePath,
-                                                 uint32_t innerIndex = 0) = 0;
+    virtual std::unique_ptr<MeshFileI>
+    OpenFile(std::string& filePath) = 0;
 };
 
 // This is loaded once for the process

@@ -18,7 +18,7 @@ namespace JsonMeshNames
     static constexpr string_view NODE_RADIUS    = "radius"sv;
 }
 
-class JsonTriangle : public MeshFileI
+class JsonTriangle : public MeshFileViewI
 {
     private:
     uint32_t                id;
@@ -36,6 +36,7 @@ class JsonTriangle : public MeshFileI
     uint32_t        MeshPrimitiveCount() const override;
     uint32_t        MeshAttributeCount() const override;
     std::string     Name() const override;
+    uint32_t        InnerIndex() const override;
 
     // Entire Data Fetch
     bool            HasAttribute(PrimitiveAttributeLogic) const override;
@@ -43,7 +44,7 @@ class JsonTriangle : public MeshFileI
     MRayDataTypeRT  AttributeLayout(PrimitiveAttributeLogic) const override;
 };
 
-class JsonSphere : public MeshFileI
+class JsonSphere : public MeshFileViewI
 {
     private:
     uint32_t        id;
@@ -57,6 +58,7 @@ class JsonSphere : public MeshFileI
     uint32_t        MeshPrimitiveCount() const override;
     uint32_t        MeshAttributeCount() const override;
     std::string     Name() const override;
+    uint32_t        InnerIndex() const override;
 
     // Entire Data Fetch
     bool            HasAttribute(PrimitiveAttributeLogic) const override;

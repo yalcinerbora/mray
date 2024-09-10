@@ -347,8 +347,7 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
 void LoadPrimitive(TracerI& tracer,
                    PrimGroupId groupId,
                    PrimBatchId batchId,
-                   uint32_t meshInternalIndex,
-                   const MeshFileI* meshFile)
+                   const MeshFileViewI* meshFileView)
 {
     using enum MRayDataEnum;
     using enum PrimitiveAttributeLogic;
@@ -383,15 +382,15 @@ void LoadPrimitive(TracerI& tracer,
         PrimitiveAttributeLogic attribLogic = std::get<PrimAttributeInfo::LOGIC_INDEX>(attribute);
         AttributeOptionality optionality = std::get<PrimAttributeInfo::OPTIONALITY_INDEX>(attribute);
         MRayDataTypeRT groupsLayout = std::get<PrimAttributeInfo::LAYOUT_INDEX>(attribute);
-        MRayDataTypeRT filesLayout = meshFile->AttributeLayout(attribLogic);
+        MRayDataTypeRT filesLayout = meshFileView->AttributeLayout(attribLogic);
 
         // Is this data available?
-        if(!meshFile->HasAttribute(attribLogic) &&
+        if(!meshFileView->HasAttribute(attribLogic) &&
            optionality == AttributeOptionality::MR_MANDATORY)
         {
             throw MRayError("Mesh File{:s}:[{:d}] do not have \"{}\" "
                             "which is mandatory for {}",
-                            meshFile->Name(), meshInternalIndex,
+                            meshFileView->Name(), meshFileView->InnerIndex(),
                             PrimAttributeStringifier::ToString(attribLogic),
                             tracer.TypeName(groupId));
         }
@@ -401,17 +400,17 @@ void LoadPrimitive(TracerI& tracer,
         // normals are defined as to tangent space transformations
         // (shading tangent space that is)
         if(attribLogic == NORMAL && groupsLayout.Name() == MR_QUATERNION &&
-           meshFile->HasAttribute(TANGENT) && meshFile->HasAttribute(BITANGENT) &&
-           meshFile->AttributeLayout(TANGENT).Name() == MR_VECTOR_3 &&
-           meshFile->AttributeLayout(BITANGENT).Name() == MR_VECTOR_3 &&
-           meshFile->AttributeLayout(NORMAL).Name() == MR_VECTOR_3)
+           meshFileView->HasAttribute(TANGENT) && meshFileView->HasAttribute(BITANGENT) &&
+           meshFileView->AttributeLayout(TANGENT).Name() == MR_VECTOR_3 &&
+           meshFileView->AttributeLayout(BITANGENT).Name() == MR_VECTOR_3 &&
+           meshFileView->AttributeLayout(NORMAL).Name() == MR_VECTOR_3)
         {
-            size_t normalCount = meshFile->MeshAttributeCount();
+            size_t normalCount = meshFileView->MeshAttributeCount();
             TransientData quats(std::in_place_type_t<Quaternion>{}, normalCount);
             // Utilize TBN matrix directly
-            TransientData t = meshFile->GetAttribute(TANGENT);
-            TransientData b = meshFile->GetAttribute(BITANGENT);
-            TransientData n = meshFile->GetAttribute(attribLogic);
+            TransientData t = meshFileView->GetAttribute(TANGENT);
+            TransientData b = meshFileView->GetAttribute(BITANGENT);
+            TransientData n = meshFileView->GetAttribute(attribLogic);
 
             Span<const Vector3> tangents = t.AccessAs<const Vector3>();
             Span<const Vector3> bitangents = b.AccessAs<const Vector3>();
@@ -432,7 +431,7 @@ void LoadPrimitive(TracerI& tracer,
         else if(groupsLayout.Name() == filesLayout.Name())
         {
             tracer.PushPrimAttribute(groupId, batchId, attribIndex,
-                                     meshFile->GetAttribute(attribLogic));
+                                     meshFileView->GetAttribute(attribLogic));
 
         }
         // Data's layout does not match with the primitive group
@@ -442,7 +441,7 @@ void LoadPrimitive(TracerI& tracer,
             throw MRayError("Mesh File {:s}:[{:d}]'s data layout of \"{}\" "
                             "(has type {:s}) does not match the {}'s data layout "
                             "(which is {:s})",
-                            meshFile->Name(), meshInternalIndex,
+                            meshFileView->Name(), meshFileView->InnerIndex(),
                             PrimAttributeStringifier::ToString(attribLogic),
                             MRayDataTypeStringifier::ToString(filesLayout.Name()),
                             tracer.TypeName(groupId),
@@ -1346,6 +1345,12 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
 {
     std::shared_ptr<const MeshLoaderPoolI> meshLoaderPool = CreateMeshLoaderPool();
 
+    // Most of the shared pointers (except "meshLoaderPool")
+    // are shared_pointer because this struct will be copied to each thread.
+    // Default copy constructor of unique ptr does not exist so compiler does not
+    // let us use unique_ptr. We do only copy the empty instantiations, so we do not even
+    // properly use it. I could've mock create an empty copy constructor but
+    // shared pointer is better.
     struct PrimitiveLoader
     {
         private:
@@ -1372,7 +1377,7 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
         // This is here unfortunately as a limitation/functionality of the assimp.
         // Assimp can post process meshes crates tangents/optimization etc. This means
         // we cannot pre-determine the size of the vertices/indices just by looking a some
-        // form of header on the file. So we load the entire mesh and store before the commit
+        // form of header on the file. So we load the entire mesh and store it before the commit
         // of the primitive group.
         //
         // Key is the full path of the mesh file. For in node primitives,
@@ -1380,7 +1385,7 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
         std::map<std::string, std::shared_ptr<MeshFileI>> meshFiles;
         // Each mesh may have multiple submeshes so we don't wastefully open the same file
         // multiple times
-        std::vector<Pair<uint32_t, const MeshFileI*>> batchFiles;
+        std::vector<std::shared_ptr<MeshFileViewI>> meshViews;
 
         public:
         PrimitiveLoader(TracerI& t, const std::string& sp,
@@ -1403,7 +1408,7 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
         PrimBatchIdList THRDReserveEntities(PrimGroupId groupId,
                                             Span<const JsonNode> nodes)
         {
-            batchFiles.reserve(nodes.size());
+            meshViews.reserve(nodes.size());
             PrimBatchIdList idList;
             idList.reserve(nodes.size());
 
@@ -1411,29 +1416,25 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
             {
                 std::string tag = std::string(node.Tag());
 
-                uint32_t innerIndex = 0;
-                const MeshFileI* meshFile = nullptr;
+                //uint32_t innerIndex = 0;
+                std::unique_ptr<MeshFileViewI> meshFileView;
                 if(tag == NodeNames::NODE_PRIM_TRI ||
                    tag == NodeNames::NODE_PRIM_TRI_INDEXED)
                 {
                     using namespace NodeNames;
                     bool isIndexed = (tag == NODE_PRIM_TRI_INDEXED);
-                    auto meshFilePtr = std::make_unique<JsonTriangle>(node, isIndexed);
-                    meshFile = meshFiles.emplace(std::to_string(node.Id()),
-                                                 std::move(meshFilePtr)).first->second.get();
+                    meshFileView = std::make_unique<JsonTriangle>(node, isIndexed);
                 }
                 else if(tag == NodeNames::NODE_PRIM_SPHERE)
                 {
                     using namespace NodeNames;
-                    auto meshFilePtr = std::make_unique<JsonSphere>(node);
-                    meshFile = meshFiles.emplace(std::to_string(node.Id()),
-                                                 std::move(meshFilePtr)).first->second.get();
+                    meshFileView = std::make_unique<JsonSphere>(node);
                 }
                 else
                 {
                     std::string fileName = node.CommonData<std::string>(NodeNames::FILE);
                     fileName = Filesystem::RelativePathToAbsolute(fileName, scenePath);
-                    innerIndex = node.AccessData<uint32_t>(NodeNames::INNER_INDEX);
+                    uint32_t innerIndex = node.AccessData<uint32_t>(NodeNames::INNER_INDEX);
 
                     // Find a Loader
                     auto loaderIt = loaders.emplace(tag, nullptr);
@@ -1444,18 +1445,20 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
                     // Find mesh file
                     // TODO: this is slow probably due to long file name as key
                     auto fileIt = meshFiles.emplace(fileName, nullptr);
-                    if(fileIt.second) fileIt.first->second = meshLoader->OpenFile(fileName, innerIndex);
-                    meshFile = fileIt.first->second.get();
+                    if(fileIt.second) fileIt.first->second = meshLoader->OpenFile(fileName);
+                    auto meshFile = fileIt.first->second.get();
+
+                    meshFileView = meshFile->ViewMesh(innerIndex);
                 }
                 // Finally Reserve primitives
                 PrimCount pc
                 {
-                    .primCount = meshFile->MeshPrimitiveCount(),
-                    .attributeCount = meshFile->MeshAttributeCount()
+                    .primCount = meshFileView->MeshPrimitiveCount(),
+                    .attributeCount = meshFileView->MeshAttributeCount()
                 };
                 PrimBatchId tracerId = tracer.ReservePrimitiveBatch(groupId, pc);
                 idList.push_back(tracerId);
-                batchFiles.emplace_back(innerIndex, meshFile);
+                meshViews.emplace_back(std::move(meshFileView));
             }
             return idList;
         }
@@ -1466,9 +1469,8 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
         {
             for(size_t i = 0; i < nodes.size(); i++)
             {
-                const auto& [innerIndex, meshFile] = batchFiles[i];
                 LoadPrimitive(tracer, groupId, ids[i],
-                              innerIndex, meshFile);
+                              meshViews[i].get());
             }
         }
     };

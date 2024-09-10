@@ -3,10 +3,11 @@
 #include "Core/Error.hpp"
 
 #include <filesystem>
+#include <gfg/GFGFileExporter.h>
 
-Optional<GFGVertexComponent> MeshFileGFG::FindComponent(PrimitiveAttributeLogic l) const
+Optional<GFGVertexComponent> MeshViewGFG::FindComponent(PrimitiveAttributeLogic l) const
 {
-    for(const GFGVertexComponent& c : loader.Header().meshes[innerIndex].components)
+    for(const GFGVertexComponent& c : gfgFile.loader.Header().meshes[innerIndex].components)
     {
         using enum GFGVertexComponentLogic;
         bool eq = ((c.logic == POSITION && l == PrimitiveAttributeLogic::POSITION) ||
@@ -21,7 +22,7 @@ Optional<GFGVertexComponent> MeshFileGFG::FindComponent(PrimitiveAttributeLogic 
     return std::nullopt;
 }
 
-MRayDataTypeRT MeshFileGFG::GFGDataTypeToMRayDataType(GFGDataType t)
+MRayDataTypeRT MeshViewGFG::GFGDataTypeToMRayDataType(GFGDataType t)
 {
     static_assert(std::is_same_v<Float, float>,
                   "Currently \"MeshLoaderGFG\" do not support double "
@@ -132,65 +133,56 @@ MRayDataTypeRT MeshFileGFG::GFGDataTypeToMRayDataType(GFGDataType t)
     }
 }
 
-MeshFileGFG::MeshFileGFG(const std::string& filePath,
-                         uint32_t internalIndex)
-    : file(filePath, std::ofstream::binary)
-    , reader(file)
-    , loader(&reader)
-    , fileName(std::filesystem::path(filePath).filename().string())
-    , innerIndex(internalIndex)
+MeshViewGFG::MeshViewGFG(uint32_t innerIndexIn,
+                         const MeshFileGFG& gfgFileIn)
+    : innerIndex(innerIndexIn)
+    , gfgFile(gfgFileIn)
 {
-    if(!file.is_open())
-        throw MRayError("GFG: Unable to open file \"{}\"", Name());
-
-    GFGFileError err = loader.ValidateAndOpen();
-    if(err != GFGFileError::OK)
-    {
-        throw MRayError("GFG: Corrupted file \"{}\"", Name());
-    }
-
-    if(innerIndex >= loader.Header().meshes.size())
+    if(innerIndex >= gfgFile.loader.Header().meshes.size())
         throw MRayError("GFG: Inner index out of range  \"{}\"",
-                        Name());
+                        gfgFile.Name());
 
     // Analyse the mesh
-    for(const GFGVertexComponent& vc : loader.Header().meshes[innerIndex].components)
+    for(const GFGVertexComponent& vc : gfgFile.loader.Header().meshes[innerIndex].components)
     {
         if(vc.internalOffset != 0)
             throw MRayError("GFG: Vertex data types must be \"struct of arrays\" format \"{}\"",
-                            Name());
+                            gfgFile.Name());
     }
 }
 
-AABB3 MeshFileGFG::AABB() const
+AABB3 MeshViewGFG::AABB() const
 {
-    const GFGMeshHeader& m = loader.Header().meshes[innerIndex];
+    const GFGMeshHeader& m = gfgFile.loader.Header().meshes[innerIndex];
     AABB3 result(m.headerCore.aabb.min,
                  m.headerCore.aabb.max);
     return result;
 }
 
-uint32_t MeshFileGFG::MeshPrimitiveCount() const
+uint32_t MeshViewGFG::MeshPrimitiveCount() const
 {
-    const GFGMeshHeader& m = loader.Header().meshes[innerIndex];
+    const GFGMeshHeader& m = gfgFile.loader.Header().meshes[innerIndex];
     return (static_cast<uint32_t>(m.headerCore.indexCount) /
             Shape::Triangle::TRI_VERTEX_COUNT);
 }
 
-uint32_t MeshFileGFG::MeshAttributeCount() const
+uint32_t MeshViewGFG::MeshAttributeCount() const
 {
-    const GFGMeshHeader& m = loader.Header().meshes[innerIndex];
+    const GFGMeshHeader& m = gfgFile.loader.Header().meshes[innerIndex];
     return static_cast<uint32_t>(m.headerCore.vertexCount);
 }
 
-std::string MeshFileGFG::Name() const
+std::string MeshViewGFG::Name() const
 {
-    return fileName;
+    return gfgFile.Name();
 }
 
-#include <gfg/GFGFileExporter.h>
+uint32_t MeshViewGFG::InnerIndex() const
+{
+    return innerIndex;
+}
 
-bool MeshFileGFG::HasAttribute(PrimitiveAttributeLogic logic) const
+bool MeshViewGFG::HasAttribute(PrimitiveAttributeLogic logic) const
 {
     // By definition, GFG is indexed.
     if(logic == PrimitiveAttributeLogic::INDEX)
@@ -198,9 +190,9 @@ bool MeshFileGFG::HasAttribute(PrimitiveAttributeLogic logic) const
     return FindComponent(logic).has_value();
 }
 
-TransientData MeshFileGFG::GetAttribute(PrimitiveAttributeLogic logic) const
+TransientData MeshViewGFG::GetAttribute(PrimitiveAttributeLogic logic) const
 {
-    const auto& m = loader.Header().meshes[innerIndex];
+    const auto& m = gfgFile.loader.Header().meshes[innerIndex];
 
     if(logic == PrimitiveAttributeLogic::INDEX)
     {
@@ -212,17 +204,17 @@ TransientData MeshFileGFG::GetAttribute(PrimitiveAttributeLogic logic) const
             case 2: dataType = MRayDataTypeRT(MRayDataType<MR_VECTOR_3US>{}); break;
             case 4: dataType = MRayDataTypeRT(MRayDataType<MR_VECTOR_3UI>{}); break;
             case 8: dataType = MRayDataTypeRT(MRayDataType<MR_VECTOR_3UL>{}); break;
-            default: throw MRayError("GFG: Unkown index layout \"{}\"", Name());
+            default: throw MRayError("GFG: Unkown index layout \"{}\"", gfgFile.Name());
         }
         return std::visit([&](auto&& v) -> TransientData
         {
             using T = std::remove_cvref_t<decltype(v)>::Type;
-            size_t count = loader.MeshIndexDataSize(innerIndex) / v.Size;
+            size_t count = gfgFile.loader.MeshIndexDataSize(innerIndex) / v.Size;
             TransientData result(std::in_place_type_t<T>{}, count);
             result.ReserveAll();
             Span<T> span = result.AccessAs<T>();
-            loader.MeshIndexData(reinterpret_cast<uint8_t*>(span.data()),
-                                 innerIndex);
+            gfgFile.loader.MeshIndexData(reinterpret_cast<uint8_t*>(span.data()),
+                                         innerIndex);
             return result;
 
         }, dataType);
@@ -233,31 +225,31 @@ TransientData MeshFileGFG::GetAttribute(PrimitiveAttributeLogic logic) const
         if(!c.has_value())
             throw MRayError("GFG: File do not have attribute of {}, \"{}\"",
                             PrimAttributeStringifier::ToString(logic),
-                            Name());
+                            gfgFile.Name());
         const auto& comp = c.value();
         MRayDataTypeRT type = GFGDataTypeToMRayDataType(comp.dataType);
 
         return std::visit([&](auto&& v) -> TransientData
         {
             using T = std::remove_cvref_t<decltype(v)>::Type;
-            size_t count = loader.MeshVertexComponentDataGroupSize(innerIndex,
-                                                                   comp.logic) / v.Size;
+            size_t count = gfgFile.loader.MeshVertexComponentDataGroupSize(innerIndex,
+                                                                           comp.logic) / v.Size;
             TransientData result(std::in_place_type_t<T>{}, count);
             result.ReserveAll();
             Span<Byte> span = result.AccessAs<Byte>();
             // TODO: Change this later
-            loader.MeshVertexComponentDataGroup(reinterpret_cast<uint8_t*>(span.data()),
-                                                innerIndex, comp.logic);
+            gfgFile.loader.MeshVertexComponentDataGroup(reinterpret_cast<uint8_t*>(span.data()),
+                                                        innerIndex, comp.logic);
 
             return result;
         }, type);
     }
 }
 
-MRayDataTypeRT MeshFileGFG::AttributeLayout(PrimitiveAttributeLogic logic) const
+MRayDataTypeRT MeshViewGFG::AttributeLayout(PrimitiveAttributeLogic logic) const
 {
     using enum MRayDataEnum;
-    const GFGMeshHeader& m = loader.Header().meshes[innerIndex];
+    const GFGMeshHeader& m = gfgFile.loader.Header().meshes[innerIndex];
     if(logic == PrimitiveAttributeLogic::INDEX)
     {
         switch(m.headerCore.indexSize)
@@ -266,7 +258,7 @@ MRayDataTypeRT MeshFileGFG::AttributeLayout(PrimitiveAttributeLogic logic) const
             case 2: return MRayDataTypeRT(MRayDataType<MR_VECTOR_3US>{});
             case 4: return MRayDataTypeRT(MRayDataType<MR_VECTOR_3UI>{});
             case 8: return MRayDataTypeRT(MRayDataType<MR_VECTOR_3UL>{});
-            default: throw MRayError("GFG: Unkown index layout \"{}\"", Name());
+            default: throw MRayError("GFG: Unkown index layout \"{}\"", gfgFile.Name());
         }
     }
 
@@ -274,14 +266,40 @@ MRayDataTypeRT MeshFileGFG::AttributeLayout(PrimitiveAttributeLogic logic) const
     if(!c.has_value())
         throw MRayError("GFG: File do not have attribute of {}, \"{}\"",
                         PrimAttributeStringifier::ToString(logic),
-                        Name());
+                        gfgFile.Name());
 
     const auto& comp = c.value();
     return GFGDataTypeToMRayDataType(comp.dataType);
 }
 
-std::unique_ptr<MeshFileI> MeshLoaderGFG::OpenFile(std::string& filePath,
-                                                   uint32_t innerIndex = 0)
+MeshFileGFG::MeshFileGFG(const std::string& filePath)
+    : file(filePath, std::ofstream::binary)
+    , reader(file)
+    , loader(&reader)
+    , fileName(std::filesystem::path(filePath).filename().string())
 {
-    return std::unique_ptr<MeshFileI>(new MeshFileGFG(filePath, innerIndex));
+    if(!file.is_open())
+        throw MRayError("GFG: Unable to open file \"{}\"", Name());
+
+    GFGFileError err = loader.ValidateAndOpen();
+    if(err != GFGFileError::OK)
+    {
+        throw MRayError("GFG: Corrupted file \"{}\"", Name());
+    }
+}
+
+std::unique_ptr<MeshFileViewI>
+MeshFileGFG::ViewMesh(uint32_t innerIndex)
+{
+    return std::unique_ptr<MeshFileViewI>(new MeshViewGFG(innerIndex, *this));
+}
+
+std::string MeshFileGFG::Name() const
+{
+    return fileName;
+}
+
+std::unique_ptr<MeshFileI> MeshLoaderGFG::OpenFile(std::string& filePath)
+{
+    return std::unique_ptr<MeshFileI>(new MeshFileGFG(filePath));
 }
