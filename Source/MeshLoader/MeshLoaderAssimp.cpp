@@ -187,7 +187,7 @@ MeshFileAssimp::MeshFileAssimp(Assimp::Importer& imp,
         // Remove Degenerate triangles
         aiProcess_FindDegenerates |
         // Sort by primitive type
-        // (this guarantees a "mesh" has same types triangles)
+        // (this guarantees a "mesh" has same-type triangles)
         aiProcess_SortByPType |
         //
         aiProcess_RemoveRedundantMaterials

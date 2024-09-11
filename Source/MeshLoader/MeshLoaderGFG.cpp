@@ -237,10 +237,10 @@ TransientData MeshViewGFG::GetAttribute(PrimitiveAttributeLogic logic) const
             TransientData result(std::in_place_type_t<T>{}, count);
             result.ReserveAll();
             Span<Byte> span = result.AccessAs<Byte>();
+
             // TODO: Change this later
             gfgFile.loader.MeshVertexComponentDataGroup(reinterpret_cast<uint8_t*>(span.data()),
                                                         innerIndex, comp.logic);
-
             return result;
         }, type);
     }

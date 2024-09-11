@@ -5,6 +5,7 @@
 
 #include <CLI/CLI.hpp>
 #include <string_view>
+#include <thread>
 
 namespace MRayCLI::ConvertNames
 {
@@ -13,6 +14,10 @@ namespace MRayCLI::ConvertNames
     static constexpr auto Description = "Converts various scene types to MRay "
                                         "readable form"sv;
 };
+
+ConvertCommand::ConvertCommand()
+    : threadCount(std::thread::hardware_concurrency())
+{}
 
 MRayError ConvertCommand::Invoke()
 {
@@ -39,6 +44,7 @@ MRayError ConvertCommand::Invoke()
 
         Expected<double> result = MRayConvert::ConvertMeshesToGFG(outFileName,
                                                                   inFileName,
+                                                                  threadCount,
                                                                   flags);
 
         if(result.has_error())
@@ -73,6 +79,9 @@ CLI::App* ConvertCommand::GenApp(CLI::App& mainApp)
 
     converter->add_flag("--overwrite, -w"s, overwrite,
                         "Overwrite output files."s);
+    converter->add_option("--threads, -t"s, threadCount,
+                          "Thread pool's thread count."s)
+        ->expected(1);
 
     // To GFG Options (TODO: remove "required" when other conversions are implemented)
     CLI::Option* gfgOpt;

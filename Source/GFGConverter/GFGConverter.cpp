@@ -19,6 +19,7 @@
 #include "Core/Quaternion.h"
 #include "Core/Filesystem.h"
 #include "Core/Error.hpp"
+#include "Core/GraphicsFunctions.h"
 
 // TODO: Type leak change it? (This functionaly is
 // highly intrusive, probably needs a redesign?)
@@ -194,6 +195,10 @@ MRayError THRDProcessMesh(Span<const MeshGroup> meshes,
             header.topology = GFGTopology::TRIANGLE;
             header.vertexCount = vertexCount;
 
+            size_t alignment = std::max(alignof(Vector3), alignof(Vector2));
+            if(flags[NORMAL_AS_QUATERNION])
+                alignment = std::max(alignment, alignof(Quaternion));
+
             std::vector<GFGVertexComponent> components;
             components.reserve(header.componentCount);
             size_t offset = 0;
@@ -206,7 +211,7 @@ MRayError THRDProcessMesh(Span<const MeshGroup> meshes,
                                      .stride = sizeof(float) * 3
 
                                  });
-            offset += vertexCount * components.back().stride;
+            offset += Math::NextMultiple(vertexCount * components.back().stride, alignment);
             components.push_back(GFGVertexComponent
                                  {
                                      .dataType = GFGDataType::FLOAT_2,
@@ -215,7 +220,7 @@ MRayError THRDProcessMesh(Span<const MeshGroup> meshes,
                                      .internalOffset = 0,
                                      .stride = sizeof(float) * 2
                                  });
-            offset += vertexCount * components.back().stride;
+            offset += Math::NextMultiple(vertexCount * components.back().stride, alignment);
             if(flags[NORMAL_AS_QUATERNION])
             {
                 components.push_back(GFGVertexComponent
@@ -226,7 +231,7 @@ MRayError THRDProcessMesh(Span<const MeshGroup> meshes,
                                          .internalOffset = 0,
                                          .stride = sizeof(float) * 4
                                      });
-                offset += vertexCount * components.back().stride;
+                offset += Math::NextMultiple(vertexCount * components.back().stride, alignment);
             }
             else
             {
@@ -239,7 +244,7 @@ MRayError THRDProcessMesh(Span<const MeshGroup> meshes,
                                          .stride = sizeof(float) * 3
 
                                      });
-                offset += vertexCount * components.back().stride;
+                offset += Math::NextMultiple(vertexCount * components.back().stride, alignment);
                 components.push_back(GFGVertexComponent
                                      {
                                          .dataType = GFGDataType::FLOAT_3,
@@ -249,7 +254,7 @@ MRayError THRDProcessMesh(Span<const MeshGroup> meshes,
                                          .stride = sizeof(float) * 3
 
                                      });
-                offset += vertexCount * components.back().stride;
+                offset += Math::NextMultiple(vertexCount * components.back().stride, alignment);
                 components.push_back(GFGVertexComponent
                                      {
                                          .dataType = GFGDataType::FLOAT_3,
@@ -259,13 +264,11 @@ MRayError THRDProcessMesh(Span<const MeshGroup> meshes,
                                          .stride = sizeof(float) * 3
 
                                      });
-                offset += vertexCount * components.back().stride;
+                offset += Math::NextMultiple(vertexCount * components.back().stride, alignment);
             }
-
             Span<Vector3ui> indices;
             MemAlloc::AllocateMultiData(std::tie(indices), indexMem,
-                                        {meshIn->mNumFaces},
-                                        alignof(Vector3ui));
+                                        {meshIn->mNumFaces}, alignof(Vector3ui));
 
 
             Span<Vector3> positions;
@@ -274,23 +277,17 @@ MRayError THRDProcessMesh(Span<const MeshGroup> meshes,
             Span<Vector3> normals;
             Span<Vector3> tangents;
             Span<Vector3> bitangents;
-
             if(flags[NORMAL_AS_QUATERNION])
             {
-                size_t alignment = std::max(std::max(alignof(Vector3),
-                                                     alignof(Vector2)),
-                                            alignof(Quaternion));
                 MemAlloc::AllocateMultiData(std::tie(positions, uvs,
                                                      normalsQuat),
                                             meshMem,
                                             {vertexCount, vertexCount,
-                                            vertexCount},
+                                             vertexCount},
                                             alignment);
             }
             else
             {
-                size_t alignment = std::max(alignof(Vector3),
-                                            alignof(Vector2));
                 MemAlloc::AllocateMultiData(std::tie(positions, uvs,
                                                      normals, tangents, bitangents),
                                             meshMem,
@@ -299,7 +296,6 @@ MRayError THRDProcessMesh(Span<const MeshGroup> meshes,
                                             vertexCount},
                                             alignment);
             }
-
 
             // Indices
             for(unsigned int i = 0; i < meshIn->mNumFaces; i++)
@@ -341,8 +337,14 @@ MRayError THRDProcessMesh(Span<const MeshGroup> meshes,
                     Vector3 n(meshIn->mNormals[i].x,
                               meshIn->mNormals[i].y,
                               meshIn->mNormals[i].z);
-                    Quaternion quat = TransformGen::ToSpaceQuat(t, b, n);
-                    normalsQuat[i] = quat;
+
+                    // If the tangents are left-handed,
+                    // convert them to right-handed
+                    if(Vector3::Cross(t, b).Dot(n) < Float(0))
+                        t = -t;
+                    auto [newT, newB] = Graphics::GSOrthonormalize(t, b, n);
+                    Quaternion q = TransformGen::ToSpaceQuat(newT, newB, n);
+                    normalsQuat[i] = q;
                 }
             }
             else
@@ -354,7 +356,6 @@ MRayError THRDProcessMesh(Span<const MeshGroup> meshes,
                 std::memcpy(bitangents.data(), meshIn->mBitangents,
                             vertexCount * sizeof(Vector3));
             }
-
 
             // Laid out the data now add to the mesh
             // If global gfg is used, lock it.
@@ -432,10 +433,10 @@ MRayError ValidateOutputFiles(MRayConvert::ConversionFlags flags,
 MRAY_GFGCONVERTER_ENTRYPOINT
 Expected<double> MRayConvert::ConvertMeshesToGFG(const std::string& outFileName,
                                                  const std::string& inFileName,
+                                                 uint32_t threadCount,
                                                  ConversionFlags flags)
 {
-    BS::thread_pool threadPool;
-
+    BS::thread_pool threadPool(threadCount);
 
     using enum ConvFlagEnum;
     namespace fs = std::filesystem;
@@ -447,6 +448,7 @@ Expected<double> MRayConvert::ConvertMeshesToGFG(const std::string& outFileName,
     }
 
     std::string inScenePath = fs::path(inFileName).remove_filename().generic_string();
+    auto outputScenePathAbsolute = fs::absolute(fs::path(outFileName)).remove_filename();
 
     // Do the loading
     Timer timer; timer.Start();
@@ -540,11 +542,14 @@ Expected<double> MRayConvert::ConvertMeshesToGFG(const std::string& outFileName,
             // Add the rest as a single file
             nlohmann::json packedPrimNode;
             auto gfgPath = fs::path(outFileName).replace_extension(fs::path(GFG_TAG));
-            auto relGFG = fs::relative(gfgPath, fs::path(outFileName).remove_filename());
+            auto relGFG = fs::relative(gfgPath, outputScenePathAbsolute);
 
             packedPrimNode[NodeNames::FILE] = relGFG.generic_string();
             packedPrimNode[NodeNames::TAG] = GFG_TAG;
-            // TODO: Change this
+            // TODO: Change this, what if the prim type was something else?
+            // (User defined custom primitive etc.).
+            // We need to store the types and make multiple nodes
+            // etc. I did not bothered with it.
             packedPrimNode[NodeNames::TYPE] = "Triangle";
 
             uint32_t globalInnerIndexCounter = 0;
@@ -596,6 +601,14 @@ Expected<double> MRayConvert::ConvertMeshesToGFG(const std::string& outFileName,
         outJson[NodeNames::PRIMITIVE_LIST] = newPrimArray;
 
 
+        // TODO: Currently only primitives and textures have file-backed data.
+        // We already processed the primitives and only textures left.
+        // In future, we may have other types that will require path conversion.
+        //
+        // We can currently check if "NodeNames::FILE" exists for all types
+        // but this is not a solid process (not every type will have "file", or
+        // some other verbose identifier may be used to define a file)
+        //
         // There may be textures, their files should be relative to this
         // file as well
         if(auto tLoc = outJson.find(NodeNames::TEXTURE_LIST);
@@ -604,31 +617,29 @@ Expected<double> MRayConvert::ConvertMeshesToGFG(const std::string& outFileName,
             for(auto& tex : *tLoc)
             {
                 auto& files = tex.at(NodeNames::FILE);
+                auto ConvPath = [&](std::string_view texPathRelative)
+                {
+                    std::string texPathAbs = Filesystem::RelativePathToAbsolute(texPathRelative,
+                                                                                inScenePath);
+                    std::string newRelPath = fs::relative(fs::path(texPathAbs),
+                                                          outputScenePathAbsolute).generic_string();
+                    return newRelPath;
+                };
+                //
                 if(files.is_string())
                 {
-                    std::string texPath = files.get<std::string>();
-                    std::string texPathAbs = Filesystem::RelativePathToAbsolute(texPath,
-                                                                                inScenePath);
-                    auto outScenePath = fs::path(outFileName).remove_filename().generic_string();
-                    std::string texRelPath = fs::relative(fs::path(texPathAbs),
-                                                          outScenePath).generic_string();
-                    files = texRelPath;
+                    files = ConvPath(files.get<std::string_view>());
                 }
                 else for(auto& f : files)
                 {
-                    std::string texPath = f.get<std::string>();
-                    std::string texPathAbs = Filesystem::RelativePathToAbsolute(texPath,
-                                                                                inScenePath);
-                    auto outScenePath = fs::path(outFileName).remove_filename().generic_string();
-                    std::string texRelPath = fs::relative(fs::path(texPathAbs),
-                                                          outScenePath).generic_string();
-                    f = texRelPath;
+                    f = ConvPath(f.get<std::string_view>());
                 }
             }
         }
         // Write
-        fs::create_directories(fs::absolute(fs::path(outFileName)).remove_filename());
+        fs::create_directories(outputScenePathAbsolute);
         std::ofstream outFile(outFileName);
+        // TODO: Cooler output parsing maybe?
         outFile << outJson.dump(4);
         // All Done!
     }

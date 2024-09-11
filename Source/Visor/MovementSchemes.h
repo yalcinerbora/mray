@@ -25,8 +25,8 @@ class MovementSchemeFPS : public MovementSchemeI
     private:
     // TODO: Make these user defined later
     static constexpr Float  Sensitivity = Float(0.0025);
-    static constexpr Float  MovementRatio = Float(1.0 / 20.0);
-    static constexpr Float  MoveRatioModifier = Float(1.5);
+    static constexpr Float  MovementRatio = Float(1.0 / 100.0);
+    static constexpr Float  MoveRatioModifier = Float(4.0);
     //
     Vector2                 prevMouse = Vector2::Zero();
     bool                    fastMove = false;

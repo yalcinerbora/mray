@@ -13,8 +13,9 @@ class ConvertCommand : public CommandI
     bool            overwrite       = false;
     std::string     inFileName      = "";
     std::string     outFileName     = "";
+    uint32_t        threadCount;
 
-    private:            ConvertCommand() = default;
+    private:            ConvertCommand();
     public:
     static CommandI&    Instance();
 

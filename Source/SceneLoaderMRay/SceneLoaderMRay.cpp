@@ -7,6 +7,7 @@
 #include "Core/Filesystem.h"
 #include "Core/TypeNameGenerators.h"
 #include "Core/Error.hpp"
+#include "Core/GraphicsFunctions.h"
 
 #include "MeshLoader/EntryPoint.h"
 #include "MeshLoaderJson.h"
@@ -408,19 +409,25 @@ void LoadPrimitive(TracerI& tracer,
             size_t normalCount = meshFileView->MeshAttributeCount();
             TransientData quats(std::in_place_type_t<Quaternion>{}, normalCount);
             // Utilize TBN matrix directly
-            TransientData t = meshFileView->GetAttribute(TANGENT);
-            TransientData b = meshFileView->GetAttribute(BITANGENT);
-            TransientData n = meshFileView->GetAttribute(attribLogic);
+            TransientData tData = meshFileView->GetAttribute(TANGENT);
+            TransientData bData = meshFileView->GetAttribute(BITANGENT);
+            TransientData nData = meshFileView->GetAttribute(attribLogic);
 
-            Span<const Vector3> tangents = t.AccessAs<const Vector3>();
-            Span<const Vector3> bitangents = b.AccessAs<const Vector3>();
-            Span<const Vector3> normals = n.AccessAs<const Vector3>();
+            Span<const Vector3> tangents = tData.AccessAs<const Vector3>();
+            Span<const Vector3> bitangents = bData.AccessAs<const Vector3>();
+            Span<const Vector3> normals = nData.AccessAs<const Vector3>();
 
             for(size_t i = 0; i < normalCount; i++)
             {
-                Quaternion q = TransformGen::ToSpaceQuat(tangents[i],
-                                                         bitangents[i],
-                                                         normals[i]);
+                Vector3 t = tangents[i].Normalize();
+                Vector3 b = bitangents[i].Normalize();
+                Vector3 n = normals[i].Normalize();
+                // If the tangents are left-handed,
+                // convert them to right-handed
+                if(Vector3::Cross(t, b).Dot(n) < Float(0))
+                    t = -t;
+                auto [newT, newB] = Graphics::GSOrthonormalize(t, b, n);
+                Quaternion q = TransformGen::ToSpaceQuat(newT, newB, n);
                 quats.Push(Span<const Quaternion>(&q, 1));
             }
             assert(quats.IsFull());
