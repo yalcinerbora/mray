@@ -110,11 +110,10 @@ Expected<std::vector<MeshGroup>> FindMeshes(const nlohmann::json& sceneJson)
     return MRayError("There are no meshes to convert!");
 }
 
-MRayError THRDProcessMesh(Span<const MeshGroup> meshes,
-
+MRayError THRDProcessMesh(Span<MeshGroup> meshes,
+                          // Used when prims are packed to single mesh
                           GFGFileExporter& exporter,
                           std::mutex& exporterMutex,
-
                           const std::string& inScenePath,
                           MRayConvert::ConversionFlags flags)
 {
@@ -157,7 +156,7 @@ MRayError THRDProcessMesh(Span<const MeshGroup> meshes,
     VectorBackedMemory indexMem;
     VectorBackedMemory meshMem;
 
-    for(const auto& mesh : meshes)
+    for(auto& mesh : meshes)
     {
         std::string meshPath = Filesystem::RelativePathToAbsolute(mesh.filePath,
                                                                   inScenePath);
@@ -169,7 +168,7 @@ MRayError THRDProcessMesh(Span<const MeshGroup> meshes,
 
         // GFG require user to lay the data
         // We will push the data as SoA style
-        for(uint32_t meshIndex : mesh.innerIndices)
+        for(unsigned int& meshIndex : mesh.innerIndices)
         {
             const auto& meshIn = assimpScene->mMeshes[meshIndex];
             uint32_t vertexCount = meshIn->mNumVertices;
@@ -364,9 +363,9 @@ MRayError THRDProcessMesh(Span<const MeshGroup> meshes,
             {
                 // If packed
                 std::scoped_lock<std::mutex> lock(exporterMutex);
-                exporter.AddMesh(0, components,
-                                 header, meshMem.v,
-                                 &(indexMem.v));
+                meshIndex = exporter.AddMesh(0, components,
+                                             header, meshMem.v,
+                                             &(indexMem.v));
             }
             else
             {
@@ -464,7 +463,7 @@ Expected<double> MRayConvert::ConvertMeshesToGFG(const std::string& outFileName,
         Expected<std::vector<MeshGroup>> meshOut = FindMeshes(sceneJson);
         if(meshOut.has_error())
             return meshOut.error();
-        const auto& parsedMeshes = meshOut.value();
+        auto& parsedMeshes = meshOut.value();
 
         // Do file availability validation
         // If don't override flag is set this will give an error
@@ -477,7 +476,7 @@ Expected<double> MRayConvert::ConvertMeshesToGFG(const std::string& outFileName,
         // Normally this wont give much perf, but we do postprocess
         // meshes via assimp to create tangents etc. So this has
         // some gain.
-        Span<const MeshGroup> meshes(parsedMeshes);
+        Span<MeshGroup> meshes(parsedMeshes);
         std::mutex exporterMutex;
         GFGFileExporter globalExporter;
         auto future = threadPool.submit_blocks(static_cast<size_t>(0),
@@ -552,7 +551,6 @@ Expected<double> MRayConvert::ConvertMeshesToGFG(const std::string& outFileName,
             // etc. I did not bothered with it.
             packedPrimNode[NodeNames::TYPE] = "Triangle";
 
-            uint32_t globalInnerIndexCounter = 0;
             bool isSinglePrim = (parsedMeshes.size() == 1 &&
                                  parsedMeshes.front().primIds.size() == 1);
             if(isSinglePrim)
@@ -566,8 +564,7 @@ Expected<double> MRayConvert::ConvertMeshesToGFG(const std::string& outFileName,
                 for(size_t i = 0; i < m.primIds.size(); i++)
                 {
                     packedPrimNode[NodeNames::ID].push_back(m.primIds[i]);
-                    packedPrimNode[NodeNames::INNER_INDEX].push_back(globalInnerIndexCounter);
-                    globalInnerIndexCounter++;
+                    packedPrimNode[NodeNames::INNER_INDEX].push_back(m.innerIndices[i]);
                 }
             }
             newPrimArray.push_back(packedPrimNode);
