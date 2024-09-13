@@ -359,7 +359,8 @@ class AcceleratorGroupT : public AcceleratorGroupI
 
     PreprocessResult            PreprocessConstructionParams(const AccelGroupConstructParams& p);
     template<class T>
-    std::vector<Span<const T>>  CreateInstanceLeafSubspansConst(Span<T> fullRange);
+    std::vector<Span<T>>        CreateInstanceSubspans(Span<T> fullRange,
+                                                       const std::vector<Vector2ui>& rangeVector);
     void                        WriteInstanceKeysAndAABBsInternal(Span<AABB3> aabbWriteRegion,
                                                                   Span<AcceleratorKey> keyWriteRegion,
                                                                   // Input
@@ -710,11 +711,12 @@ AccelLeafResult AcceleratorGroupT<C, PG>::DetermineConcreteAccelCount(std::vecto
 
 template<class C, PrimitiveGroupC PG>
 template<class T>
-std::vector<Span<const T>>
-AcceleratorGroupT<C, PG>::CreateInstanceLeafSubspansConst(Span<T> fullRange)
+std::vector<Span<T>>
+AcceleratorGroupT<C, PG>::CreateInstanceSubspans(Span<T> fullRange,
+                                                 const std::vector<Vector2ui>& rangeVector)
 {
-    std::vector<Span<const T>> instanceLeafData(instanceLeafRanges.size());
-    std::transform(instanceLeafRanges.cbegin(), instanceLeafRanges.cend(),
+    std::vector<Span<const T>> instanceLeafData(rangeVector.size());
+    std::transform(rangeVector.cbegin(), rangeVector.cend(),
                    instanceLeafData.begin(),
                    [fullRange](const Vector2ui& offset)
     {

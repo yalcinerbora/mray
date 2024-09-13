@@ -27,7 +27,7 @@ constexpr Vector<N, T>::Vector(Span<const C, N> data)
 template <unsigned int N, ArithmeticC T>
 template <std::convertible_to<T>... Args>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<N, T>::Vector(const Args... dataList)// requires (std::convertible_to<Args, T> && ...) && (sizeof...(Args) == N)
+constexpr Vector<N, T>::Vector(const Args... dataList)
     : vector{static_cast<T>(dataList) ...}
 {}
 

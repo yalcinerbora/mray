@@ -188,7 +188,8 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
                                  this->concreteLeafRanges.back()[1]});
     // Generate offset spans
     using PrimKeySpanList = std::vector<Span<const PrimitiveKey>>;
-    PrimKeySpanList hInstanceLeafs = this->CreateInstanceLeafSubspansConst(dAllLeafs);
+    PrimKeySpanList hInstanceLeafs = this->CreateInstanceSubspans(ToConstSpan(dAllLeafs),
+                                                                  this->instanceLeafRanges);
 
     // Actual memcpy
     Span<CullFaceFlagArray>         hSpanCullFaceFlags(ppResult.surfData.cullFaceFlags);
@@ -205,10 +206,8 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
     queue.MemcpyAsync(dLeafs,           ToConstSpan(hSpanLeafs));
 
     // Copy Ids to the leaf buffer
-    auto hConcreteLeafRanges = Span<const Vector2ui>(this->concreteLeafRanges.begin(),
-                                                     this->concreteLeafRanges.end());
-    auto hConcretePrimRanges = Span<const PrimRangeArray>(ppResult.concretePrimRanges.cbegin(),
-                                                          ppResult.concretePrimRanges.cend());
+    auto hConcreteLeafRanges = Span<const Vector2ui>(this->concreteLeafRanges);
+    auto hConcretePrimRanges = Span<const PrimRangeArray>(ppResult.concretePrimRanges);
     queue.MemcpyAsync(dConcreteLeafRanges, hConcreteLeafRanges);
     queue.MemcpyAsync(dConcretePrimRanges, hConcretePrimRanges);
 

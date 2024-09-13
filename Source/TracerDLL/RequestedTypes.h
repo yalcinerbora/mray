@@ -6,8 +6,8 @@
 #include "Tracer/MaterialsDefault.h"
 #include "Tracer/CamerasDefault.h"
 #include "Tracer/MediumsDefault.h"
-#include "Tracer/AcceleratorWork.h"
 #include "Tracer/AcceleratorLinear.h"
+#include "Tracer/AcceleratorLBVH.h"
 #include "Tracer/MetaLight.h"
 
 // ================= //
@@ -116,7 +116,7 @@ using DefaultAccelTypePack = AccelTypePack
 >;
 
 using DefaultLinearAccelTypePack = DefaultAccelTypePack<BaseAcceleratorLinear, AcceleratorGroupLinear>;
-//using DefaultBVHAccelTypePack = DefaultAccelTypePack<BaseAcceleratorBVH, AcceleratorGroupBVH>;
+using DefaultBVHAccelTypePack = DefaultAccelTypePack<BaseAcceleratorLBVH, AcceleratorGroupLBVH>;
 //using DefaultDeviceAccelTypePack = DefaultAccelTypePack<BaseAcceleratorDevice, AcceleratorGroupDevice>;
 
 // ================= //

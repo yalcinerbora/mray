@@ -17,17 +17,6 @@ constexpr AABB<N, T>::AABB(Span<const T, N> dataMin,
 {}
 
 template<unsigned int N, FloatingPointC T>
-template <class... ArgsMin, class... ArgsMax>
-requires (sizeof...(ArgsMin) == N) && (std::convertible_to<T, ArgsMin> && ...) &&
-         (sizeof...(ArgsMax) == N) && (std::convertible_to<T, ArgsMax> && ...)
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr AABB<N, T>::AABB(const ArgsMin... dataListMin,
-                           const ArgsMax... dataListMax)
-    : min(dataListMin...)
-    , max(dataListMax...)
-{}
-
-template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr const Vector<N, T>& AABB<N, T>::Min() const
 {

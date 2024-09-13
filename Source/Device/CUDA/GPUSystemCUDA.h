@@ -82,6 +82,15 @@ static void BlockSynchronize()
     #endif
 }
 
+MRAY_GPU MRAY_GPU_INLINE
+static void ThreadFenceGrid()
+{
+    // Dirty fix to make host side happy
+    #ifdef __CUDA_ARCH__
+    __threadfence();
+    #endif
+}
+
 // A Good guess for TPB
 static constexpr uint32_t StaticThreadPerBlock1D()
 {

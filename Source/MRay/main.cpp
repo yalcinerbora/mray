@@ -27,7 +27,7 @@ int main(int argc, const char* const argv[])
 {
     if(!EnableVTMode())
     {
-        MRAY_WARNING_LOG("Unable to set virtual terminal processing! "
+        MRAY_WARNING_LOG("Unable to set virtual terminal processing. "
                          "Log outputs may have invalid characters!");
     }
 

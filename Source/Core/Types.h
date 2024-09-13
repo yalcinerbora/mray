@@ -162,7 +162,7 @@ constexpr Span<const T, Extent> ToConstSpan(Span<T, Extent> s)
     return Span<const T, Extent>(s);
 }
 
-// TODO add arrays maybe? (decay changes c arrays to ptrs)
+// TODO: add arrays maybe? (decay changes c arrays to ptrs)
 template<class T0, std::size_t E0,
          class T1, std::size_t E1>
 requires std::is_same_v<std::decay_t<T0>, std::decay_t<T1>>
@@ -214,3 +214,11 @@ constexpr auto SoASpan<Args...>::Get() const -> Span<std::tuple_element_t<I, Tup
     using ResulT = Span<std::tuple_element_t<I, Tuple<const Args...>>>;
     return ResulT(std::get<I>(ptrs), size);
 }
+
+// TODO: Move this later
+template <class T>
+struct IdentityFunctor
+{
+    MRAY_HYBRID MRAY_CGPU_INLINE
+    constexpr T operator()(const T& t) const { return t; }
+};

@@ -835,7 +835,7 @@ template <std::unsigned_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Bitspan<T>::Bitspan(Span<T> s)
     : data(s.data())
-    , size(Math::NextMultiple(s.size(), sizeof(T)))
+    , size(static_cast<uint32_t>(Math::NextMultiple(s.size(), sizeof(T))))
 {}
 
 template <std::unsigned_integral T>

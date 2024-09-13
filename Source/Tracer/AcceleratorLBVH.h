@@ -8,6 +8,7 @@
 #include "Core/Types.h"
 #include "Core/MemAlloc.h"
 #include "Core/AABB.h"
+#include "Core/GraphicsFunctions.h"
 
 #include "Device/GPUAlgForward.h"
 
@@ -55,13 +56,34 @@ namespace LBVHAccelDetail
     // Utilize "Key" type here to use the MSB as a flag
     using ChildIndex = KeyT<uint32_t, 1, 31>;
     static constexpr uint32_t IS_LEAF = 1;
+    static constexpr uint32_t IS_INTERNAL = 0;
+
+    class Delta
+    {
+        private:
+        const Span<const uint64_t>& dMortonCodes;
+
+        public:
+        MRAY_HYBRID Delta(const Span<const uint64_t>&);
+
+        MRAY_HYBRID
+        int32_t operator()(int32_t i, int32_t j) const;
+    };
+
 
     struct LBVHNode
     {
-        AABB3       aabb;
         ChildIndex  leftIndex;
         ChildIndex  rightIndex;
         uint32_t    parentIndex;
+    };
+    // This is seperate because of volatile writes
+    // on construction, also it makes the alignment
+    // better
+    struct alignas(8) LBVHBoundingBox
+    {
+        Float min[3];
+        Float max[3];
     };
 
     // SoA data of triangle group
@@ -73,9 +95,9 @@ namespace LBVHAccelDetail
         Span<const LightOrMatKeyArray>          dLightOrMatKeys;
         Span<const PrimRangeArray>              dPrimitiveRanges;
         Span<const TransformKey>                dInstanceTransforms;
-        Span<const uint32_t>                    dInstanceRootNodeIndices;
         Span<const Span<const PrimitiveKey>>    dLeafs;
         Span<const Span<const LBVHNode>>        dNodes;
+        Span<const Span<const LBVHBoundingBox>> dBoundingBoxes;
     };
 
     template<PrimitiveGroupC PrimGroup,
@@ -103,8 +125,8 @@ namespace LBVHAccelDetail
         const LightOrMatKeyArray&   lmKeys;
         Span<const PrimitiveKey>    leafs;
         Span<const LBVHNode>        nodes;
+        Span<const LBVHBoundingBox> boundingBoxes;
         // Primitive Related
-        uint32_t                    rootNodeIndex;
         TransformKey                transformKey;
         const TransDataSoA&         transformSoA;
         const PrimDataSoA&          primitiveSoA;
@@ -141,6 +163,7 @@ class AcceleratorGroupLBVH final : public AcceleratorGroupT<AcceleratorGroupLBVH
     using PrimitiveGroup    = PrimitiveGroupType;
     using DataSoA           = LBVHAccelDetail::LBVHAcceleratorSoA;
     using LBVHNode          = LBVHAccelDetail::LBVHNode;
+    using LBVHBoundingBox   = LBVHAccelDetail::LBVHBoundingBox;
 
     template<class TG = TransformGroupIdentity>
     using Accelerator = LBVHAccelDetail::AcceleratorLBVH<PrimitiveGroup, TG>;
@@ -159,12 +182,16 @@ class AcceleratorGroupLBVH final : public AcceleratorGroupT<AcceleratorGroupLBVH
     Span<PrimRangeArray>        dPrimitiveRanges;
     // These are not-duplicated, Instances have copy of the spans.
     // spans may be the same
-    Span<Span<PrimitiveKey>>    dLeafs;
-    Span<Span<LBVHNode>>        dNodes;
-    Span<uint32_t>              dRootNodeIndices;
+    Span<Span<const PrimitiveKey>>      dLeafs;
+    Span<Span<const LBVHNode>>          dNodes;
+    Span<Span<const LBVHBoundingBox>>   dNodeAABBs;
     // Global data, all accelerator leafs are in here
-    Span<PrimitiveKey>          dAllLeafs;
-    Span<LBVHNode>              dAllNodes;
+    Span<PrimitiveKey>              dAllLeafs;
+    Span<LBVHNode>                  dAllNodes;
+    Span<LBVHBoundingBox>           dAllNodeAABBs;
+
+    void    MulitBuildLBVH(Pair<const uint32_t, const AcceleratorWorkI*>* accelWork,
+                           const GPUQueue& queue);
 
     public:
     // Constructors & Destructor
@@ -275,10 +302,37 @@ BaseAcceleratorLBVH::BaseAcceleratorLBVH(BS::thread_pool& tp, const GPUSystem& s
 {}
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-extern void KCGenMortonCode(MRAY_GRID_CONSTANT const Span<uint64_t> dMortonCodes,
-                            // Inputs
-                            MRAY_GRID_CONSTANT const Span<const Vector3> dPrimCenters,
-                            // Constants
-                            MRAY_GRID_CONSTANT const Span<const AABB3, 1> dSceneAABB);
+void KCGenMortonCode(// Output
+                     MRAY_GRID_CONSTANT const Span<uint64_t> dMortonCodes,
+                     // Inputs
+                     MRAY_GRID_CONSTANT const Span<const uint32_t> dSegmentRanges,
+                     MRAY_GRID_CONSTANT const Span<const AABB3> dInstanceAABBs,
+                     //
+                     MRAY_GRID_CONSTANT const Span<const Vector3> dAllPrimCenters,
+                     // Constants
+                     MRAY_GRID_CONSTANT const uint32_t blockPerInstance);
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCConstructLBVHInternalNodes(// Output
+                                  MRAY_GRID_CONSTANT const Span<LBVHAccelDetail::LBVHNode> dAllNodes,
+                                  // Inputs
+                                  MRAY_GRID_CONSTANT const Span<const uint32_t> dSegmentRanges,
+                                  MRAY_GRID_CONSTANT const Span<const uint64_t> dAllMortonCodes,
+                                  MRAY_GRID_CONSTANT const Span<const uint32_t> dAllLeafIndices,
+                                  // Constants
+                                  MRAY_GRID_CONSTANT const uint32_t blockPerInstance,
+                                  MRAY_GRID_CONSTANT const uint32_t instanceCount);
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCUnionLBVHBoundingBoxes(// I-O
+                              MRAY_GRID_CONSTANT const Span<LBVHAccelDetail::LBVHBoundingBox> dAllNodeAABBs,
+                              MRAY_GRID_CONSTANT const Span<LBVHAccelDetail::LBVHNode> dAllNodes,
+                              MRAY_GRID_CONSTANT const Span<uint32_t> dAtomicCounters,
+                              // Inputs
+                              MRAY_GRID_CONSTANT const Span<const uint32_t> dSegmentRanges,
+                              MRAY_GRID_CONSTANT const Span<const AABB3> dAllLeafAABBs,
+                              // Constants
+                              MRAY_GRID_CONSTANT const uint32_t blockPerInstance,
+                              MRAY_GRID_CONSTANT const uint32_t instanceCount);
 
 #include "AcceleratorLBVH.hpp"

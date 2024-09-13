@@ -38,12 +38,6 @@ class AABB
     MRAY_HYBRID constexpr       AABB(Span<const T, N> dataMin,
                                      Span<const T, N> dataMax);
 
-    template <class... ArgsMin, class... ArgsMax>
-    requires (sizeof...(ArgsMin) == N) && (std::convertible_to<T, ArgsMin> && ...) &&
-             (sizeof...(ArgsMax) == N) && (std::convertible_to<T, ArgsMax> && ...)
-    MRAY_HYBRID constexpr       AABB(const ArgsMin... dataMin,
-                                     const ArgsMax... dataMax);
-
     // Accessors
     MRAY_HYBRID constexpr const Vector<N, T>&   Min() const;
     MRAY_HYBRID constexpr const Vector<N, T>&   Max() const;

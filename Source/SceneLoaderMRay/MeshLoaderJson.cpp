@@ -121,7 +121,7 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
 
         }
         // Normalize and calculate bitangent
-        for(size_t i = 0; i < primCount; i++)
+        for(size_t i = 0; i < attribCount; i++)
         {
             tSpan[i].NormalizeSelf();
             bSpan[i] = Vector3::Cross(nSpan[i], tSpan[i]);

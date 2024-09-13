@@ -1,6 +1,10 @@
 #include "Tracer.h"
 #include "RequestedTypes.h"
+
 #include "Device/GPUAlgReduce.h"
+#include "Device/GPUAlgGeneric.h"
+#include "Device/GPUAlgRadixSort.h"
+
 #include "Core/Error.hpp"
 
 TypeGeneratorPack Tracer::GLOBAL_TYPE_GEN = {};
@@ -132,5 +136,13 @@ void Tracer::AddAccelGenerators(Map<AcceleratorType, BaseAccelGenerator>& baseMa
         groupMap,
         workMap,
         AcceleratorType{ SOFTWARE_NONE }
+    );
+
+    AddAccelGeneratorsGeneric<DefaultBVHAccelTypePack>
+    (
+        baseMap,
+        groupMap,
+        workMap,
+        AcceleratorType{ SOFTWARE_BASIC_BVH }
     );
 }

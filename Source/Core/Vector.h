@@ -57,7 +57,7 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
     template<std::convertible_to<T> C>
     MRAY_HYBRID constexpr explicit  Vector(Span<const C , N> data);
     template <std::convertible_to<T>... Args>
-    MRAY_HYBRID constexpr explicit  Vector(const Args... dataList); //requires (, T> && ...) && (sizeof...(Args) == N);
+    MRAY_HYBRID constexpr explicit  Vector(const Args... dataList);
     template <class... Args>
     MRAY_HYBRID constexpr           Vector(const Vector<N - sizeof...(Args), T>&,
                                            const Args... dataList) requires (N - sizeof...(Args) > 1);

@@ -95,7 +95,6 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
     return result;
 }
 
-
 template <bool IsAscending, class K, class V>
 MRAY_HOST inline
 size_t SegmentedRadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
@@ -105,6 +104,32 @@ size_t SegmentedRadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
                           const GPUQueueCUDA& queue,
                           const Vector2ui& bitRange)
 {
+    using namespace cub;
+
+    cub::DoubleBuffer<K> keys(dKeyDoubleBuffer[0].data(),
+                              dKeyDoubleBuffer[1].data());
+    cub::DoubleBuffer<V> values(dValueDoubleBuffer[0].data(),
+                                dValueDoubleBuffer[1].data());
+    size_t tmSize = dTempMemory.size();
+    int totalElemCount = static_cast<int>(dKeyDoubleBuffer[0].size());
+    int totalSegments = static_cast<int>(dSegmentRanges.size() - 1);
+    if constexpr(IsAscending)
+        CUDA_CHECK(DeviceSegmentedRadixSort::SortPairs(dTempMemory.data(), tmSize,
+                                                       keys, values,
+                                                       totalElemCount, totalSegments,
+                                                       dSegmentRanges.data(),
+                                                       dSegmentRanges.data() + 1,
+                                                       bitRange[0], bitRange[1]));
+    else
+        CUDA_CHECK(DeviceRadixSort::SortPairsDescending(dTempMemory.data(), tmSize,
+                                                        keys, values,
+                                                        totalElemCount, totalSegments,
+                                                        dSegmentRanges.data(),
+                                                        dSegmentRanges.data() + 1,
+                                                        bitRange[0], bitRange[1]));
+    uint32_t result = (keys.Current() == dKeyDoubleBuffer[0].data()) ? 0u : 1u;
+    assert(((values.Current() == dValueDoubleBuffer[0].data()) ? 0u : 1u) == result);
+    return result;
 }
 
 }
