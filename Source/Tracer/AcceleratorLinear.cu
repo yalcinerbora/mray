@@ -150,9 +150,9 @@ AABB3 BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instan
     AABB3 hAABB;
     queue.MemcpyAsync(Span<AABB3>(&hAABB, 1), ToConstSpan(dReducedAABB));
     queue.Barrier().Wait();
-
     // This is very simple "accelerator" so basically we are done
-    return hAABB;
+    sceneAABB = hAABB;
+    return sceneAABB;
 }
 
 void BaseAcceleratorLinear::AllocateForTraversal(size_t maxRayCount)
@@ -187,10 +187,7 @@ void BaseAcceleratorLinear::CastRays(// Output
     const auto _ = annotation.AnnotateScope();
 
     assert(maxPartitionCount != 0);
-    using namespace std::string_view_literals;
     queue.MemsetAsync(dTraversalStack, 0x00);
-
-    //DeviceDebug::DumpGPUMemToFile("dRays", ToConstSpan(dRays), queue);
 
     // Initialize the ray partitioner
     uint32_t currentRayCount = static_cast<uint32_t>(dRays.size());
@@ -202,7 +199,7 @@ void BaseAcceleratorLinear::CastRays(// Output
     // - OptiX (or equavilent on other hardwares hopefully in the future) already
     //   does two-level acceleration in hardware, so we dont need to do this
     queue.MemcpyAsync(dCurrentIndices, dRayIndices);
-    // Continiously do traverse/partition untill all rays are missed
+    // Continiously do traverse/partition until all rays are missed
     while(currentRayCount != 0)
     {
         queue.IssueSaturatingKernel<KCIntersectBaseLinear>
@@ -264,7 +261,6 @@ void BaseAcceleratorLinear::CastRays(// Output
                 uint32_t partitionStart = hPartitionOffsets[pIndex];
                 uint32_t localSize = hPartitionOffsets[pIndex + 1] - partitionStart;
 
-                //....
                 Span<const RayIndex> dLocalIndices = ToConstSpan(dCurrentIndices.subspan(partitionStart,
                                                                                          localSize));
                 Span<const CommonKey> dLocalKeys = ToConstSpan(dCurrentKeys.subspan(partitionStart,

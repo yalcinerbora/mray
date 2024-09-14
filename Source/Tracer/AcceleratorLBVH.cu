@@ -8,7 +8,6 @@
 #include "Device/GPUAtomic.h"
 
 #include "Core/Error.hpp"
-
 #include "TypeFormat.h"
 
 struct MortonDiffFunctor
@@ -107,7 +106,8 @@ MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCConstructLBVHInternalNodes(// Output
                                   MRAY_GRID_CONSTANT const Span<LBVHAccelDetail::LBVHNode> dAllNodes,
                                   // Inputs
-                                  MRAY_GRID_CONSTANT const Span<const uint32_t> dSegmentRanges,
+                                  MRAY_GRID_CONSTANT const Span<const uint32_t> dLeafSegmentRanges,
+                                  MRAY_GRID_CONSTANT const Span<const uint32_t> dNodeSegmentRanges,
                                   MRAY_GRID_CONSTANT const Span<const uint64_t> dAllMortonCodes,
                                   MRAY_GRID_CONSTANT const Span<const uint32_t> dAllLeafIndices,
                                   // Constants
@@ -131,21 +131,23 @@ void KCConstructLBVHInternalNodes(// Output
         int32_t instanceLocalThreadId = static_cast<int32_t>(localBI * TPB + kp.threadId);
         int32_t primPerPass = static_cast<int32_t>(TPB * blockPerInstance);
         //
-        Vector2ui range = Vector2ui(dSegmentRanges[instanceI],
-                                    dSegmentRanges[instanceI + 1]);
-        auto dLocalNodes = dAllNodes.subspan(range[0],
-                                             range[1] - range[0]);
-        auto dLocalCodes = dAllMortonCodes.subspan(range[0],
-                                                   range[1] - range[0]);
-        auto dLocalIndices = dAllLeafIndices.subspan(range[0],
-                                                     range[1] - range[0]);
+        Vector2ui leafRange = Vector2ui(dLeafSegmentRanges[instanceI],
+                                        dLeafSegmentRanges[instanceI + 1]);
+        Vector2ui nodeRange = Vector2ui(dNodeSegmentRanges[instanceI],
+                                        dNodeSegmentRanges[instanceI + 1]);
+        auto dLocalNodes = dAllNodes.subspan(nodeRange[0],
+                                             nodeRange[1] - nodeRange[0]);
+        auto dLocalCodes = dAllMortonCodes.subspan(leafRange[0],
+                                                   leafRange[1] - leafRange[0]);
+        auto dLocalIndices = dAllLeafIndices.subspan(leafRange[0],
+                                                     leafRange[1] - leafRange[0]);
 
         // Delta function that is described in the paper
         Delta delta(dLocalCodes);
 
-        int32_t totalPrims = static_cast<int32_t>(dLocalNodes.size());
+        int32_t totalNodes = static_cast<int32_t>(dLocalNodes.size());
         // Edge case: Single primitive
-        if(totalPrims == 1 && instanceLocalThreadId == 0)
+        if(totalNodes == 1 && instanceLocalThreadId == 0)
         {
             LBVHNode& myNode = dLocalNodes[0];
             myNode.leftIndex = ChildIndex::CombinedKey(IS_LEAF, 0);
@@ -153,7 +155,7 @@ void KCConstructLBVHInternalNodes(// Output
             myNode.parentIndex = std::numeric_limits<uint32_t>::max();
         }
         // Edge case: Two primitives? (Paper says [0, n-2] where n is leaf count)
-        else if(totalPrims == 2 && instanceLocalThreadId == 0)
+        else if(totalNodes == 2 && instanceLocalThreadId == 0)
         {
             LBVHNode& myNode = dLocalNodes[0];
             myNode.leftIndex = ChildIndex::CombinedKey(IS_LEAF, 0);
@@ -161,7 +163,7 @@ void KCConstructLBVHInternalNodes(// Output
             myNode.parentIndex = std::numeric_limits<uint32_t>::max();
         }
         // Common case
-        else for(int32_t i = instanceLocalThreadId; i < totalPrims; i += primPerPass)
+        else for(int32_t i = instanceLocalThreadId; i < (totalNodes - 1); i += primPerPass)
         {
             // From paper's "Figure 4"
             int32_t d = ((delta(i, i + 1) - delta(i, i - 1)) < 0) ? 0 : -1;
@@ -192,7 +194,7 @@ void KCConstructLBVHInternalNodes(// Output
             }
             int32_t gamma = i + splitOffset * d + std::min(d, 0);
 
-            if(gamma < 0 || gamma >= totalPrims)
+            if(gamma < 0 || gamma >= totalNodes)
             {
                 printf("WTF\n");
             }
@@ -225,10 +227,11 @@ void KCConstructLBVHInternalNodes(// Output
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCUnionLBVHBoundingBoxes(// I-O
                               MRAY_GRID_CONSTANT const Span<LBVHAccelDetail::LBVHBoundingBox> dAllNodeAABBs,
-                              MRAY_GRID_CONSTANT const Span<LBVHAccelDetail::LBVHNode> dAllNodes,
                               MRAY_GRID_CONSTANT const Span<uint32_t> dAtomicCounters,
                               // Inputs
-                              MRAY_GRID_CONSTANT const Span<const uint32_t> dSegmentRanges,
+                              MRAY_GRID_CONSTANT const Span<const LBVHAccelDetail::LBVHNode> dAllNodes,
+                              MRAY_GRID_CONSTANT const Span<const uint32_t> dLeafSegmentRanges,
+                              MRAY_GRID_CONSTANT const Span<const uint32_t> dNodeSegmentRanges,
                               MRAY_GRID_CONSTANT const Span<const AABB3> dAllLeafAABBs,
                               // Constants
                               MRAY_GRID_CONSTANT const uint32_t blockPerInstance,
@@ -251,14 +254,16 @@ void KCUnionLBVHBoundingBoxes(// I-O
         int32_t instanceLocalThreadId = static_cast<int32_t>(localBI * TPB + kp.threadId);
         int32_t primPerPass = static_cast<int32_t>(TPB * blockPerInstance);
         //
-        Vector2ui range = Vector2ui(dSegmentRanges[instanceI],
-                                    dSegmentRanges[instanceI + 1]);
-        auto dLocalNodes = dAllNodes.subspan(range[0],
-                                             range[1] - range[0]);
-        auto dLocalAABBs = dAllLeafAABBs.subspan(range[0],
-                                                 range[1] - range[0]);
-        auto dLocalCounters = dAtomicCounters.subspan(range[0],
-                                                      range[1] - range[0]);
+        Vector2ui leafRange = Vector2ui(dLeafSegmentRanges[instanceI],
+                                        dLeafSegmentRanges[instanceI + 1]);
+        Vector2ui nodeRange = Vector2ui(dNodeSegmentRanges[instanceI],
+                                        dNodeSegmentRanges[instanceI + 1]);
+        auto dLocalNodes = dAllNodes.subspan(nodeRange[0],
+                                             nodeRange[1] - nodeRange[0]);
+        auto dLocalCounters = dAtomicCounters.subspan(nodeRange[0],
+                                                      nodeRange[1] - nodeRange[0]);
+        auto dLocalLeafAABBs = dAllLeafAABBs.subspan(leafRange[0],
+                                                     leafRange[1] - leafRange[0]);
         // Node AABBs are volatile since the writes needs to be coherent
         // between threads. This + thread fence hopefully should suffice
         // the parallel aabb union.
@@ -267,35 +272,49 @@ void KCUnionLBVHBoundingBoxes(// I-O
         // threadfence should prevent read/write reordering.
         // If not we can fall back to atomic
         using AABBVolatileSpan = Span<volatile LBVHAccelDetail::LBVHBoundingBox>;
-        auto dLocalNodeAABBs = AABBVolatileSpan(dAllNodeAABBs.data() + range[0],
-                                                size_t(range[1] - range[0]));
+        auto dLocalNodeAABBs = AABBVolatileSpan(dAllNodeAABBs.data() + nodeRange[0],
+                                                nodeRange[1] - nodeRange[0]);
 
         auto FetchAABB = [&](ChildIndex cIndex) -> AABB3
         {
             bool isLeaf = (cIndex.FetchBatchPortion() == IS_LEAF);
             uint32_t index = cIndex.FetchIndexPortion();
-            // Due to volatile, we need to load like this
-            // (without adding volatile overloads to functions)
-            Float min0 = dLocalNodeAABBs[index].min[0];
-            Float min1 = dLocalNodeAABBs[index].min[1];
-            Float min2 = dLocalNodeAABBs[index].min[2];
-            //
-            Float max0 = dLocalNodeAABBs[index].min[0];
-            Float max1 = dLocalNodeAABBs[index].min[1];
-            Float max2 = dLocalNodeAABBs[index].min[2];
-            //
-            AABB3 aabb = (isLeaf) ? dLocalAABBs[index]
-                                  : AABB3(Vector3(min0, min1, min2),
-                                          Vector3(max0, max1, max2));
-            return aabb;
+            if(!isLeaf)
+            {
+                // Due to volatile, we need to load like this
+                // (without adding volatile overloads to functions)
+                Float min0 = dLocalNodeAABBs[index].min[0];
+                Float min1 = dLocalNodeAABBs[index].min[1];
+                Float min2 = dLocalNodeAABBs[index].min[2];
+                //
+                Float max0 = dLocalNodeAABBs[index].min[0];
+                Float max1 = dLocalNodeAABBs[index].min[1];
+                Float max2 = dLocalNodeAABBs[index].min[2];
+                return AABB3(Vector3(min0, min1, min2),
+                             Vector3(max0, max1, max2));
+            }
+            else return dLocalLeafAABBs[index];
         };
 
-        // Actual loop
+        // Edge case: If there is a single primitive, we need to set the counter to one
+        // Paper does not discuss this, for single leaf node, we create a single intermediate node
+        // to make the tracing code simpler (use do a stackless traversal so it is complex already)
         int32_t totalPrims = static_cast<int32_t>(dLocalNodes.size());
-        for(int32_t i = instanceLocalThreadId; i < totalPrims;
+        if(totalPrims == 1)
+        {
+            volatile LBVHBoundingBox& bbox = dLocalNodeAABBs[0];
+            AABB3 aabb = dLocalLeafAABBs[0];
+            bbox.min[0] = aabb.Min()[0];
+            bbox.min[1] = aabb.Min()[1];
+            bbox.min[2] = aabb.Min()[2];
+            bbox.max[0] = aabb.Max()[0];
+            bbox.max[1] = aabb.Max()[1];
+            bbox.max[2] = aabb.Max()[2];
+        }
+        else for(int32_t i = instanceLocalThreadId; i < totalPrims;
             i += primPerPass)
         {
-            //
+            // Normal Case
             uint32_t nodeIndex = i;
             while(nodeIndex != std::numeric_limits<uint32_t>::max())
             {
@@ -341,48 +360,84 @@ void KCIntersectBaseLBVH(// Output
                          // Constants
                          MRAY_GRID_CONSTANT const Span<const AcceleratorKey> dLeafKeys,
                          MRAY_GRID_CONSTANT const Span<const AABB3> dLeafAABBs,
-                         MRAY_GRID_CONSTANT const Span<const LBVHAccelDetail::LBVHNode> dNodes)
+                         MRAY_GRID_CONSTANT const Span<const LBVHAccelDetail::LBVHNode> dNodes,
+                         MRAY_GRID_CONSTANT const Span<const LBVHAccelDetail::LBVHBoundingBox> dBoxes)
 {
-    //using Bit::FetchSubPortion;
-    //using AU32 = std::array<uint32_t, 2>;
-    //static constexpr AU32 StackStateRange = {0u, BaseAcceleratorLBVH::StackBitCount};
-    //static constexpr AU32 DepthRange = {BaseAcceleratorLBVH::StackBitCount, 32u};
+    using Bit::FetchSubPortion;
+    using AU32 = std::array<uint32_t, 2>;
+    static constexpr AU32 StackStateRange = {0u, BaseAcceleratorLBVH::StackBitCount};
+    static constexpr AU32 DepthRange = {BaseAcceleratorLBVH::StackBitCount, 32u};
 
-    //assert(dLeafAABBs.size() == dLeafKeys.size());
-    //KernelCallParams kp;
-    //uint32_t rayCount = static_cast<uint32_t>(dRayIndices.size());
-    //for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
-    //{
-    //    RayIndex index = dRayIndices[i];
-    //    auto [ray, tMM] = RayFromGMem(dRays, index);
+    assert(dLeafAABBs.size() == dLeafKeys.size());
+    KernelCallParams kp;
+    uint32_t rayCount = static_cast<uint32_t>(dRayIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
+    {
+        RayIndex index = dRayIndices[i];
+        auto [ray, tMM] = RayFromGMem(dRays, index);
 
-    //    AcceleratorKey foundKey = AcceleratorKey::InvalidKey();
-    //    uint32_t stackState = dBitStackStates[index];
-    //    uint32_t currentNodeIndex = dPrevNodeIndices[index];
-    //    using namespace LBVHAccelDetail;
-    //    BitStack bitStack(FetchSubPortion(stackState, StackStateRange),
-    //                      FetchSubPortion(stackState, DepthRange));
-    //    // Traversal
-    //    uint32_t newPrevIndex = TraverseLBVH(bitStack, tMM, ray, dNodes, true,
-    //                                         currentNodeIndex,
-    //    [&](Vector2& tMM, uint32_t leafIndex)
-    //    {
-    //        AABB3 aabb = dLeafAABBs[leafIndex];
-    //        bool doIntersect = ray.IntersectsAABB(aabb.Min(), aabb.Max(), tMM);
-    //        if(doIntersect)
-    //            foundKey = dLeafKeys[leafIndex];
-    //        // Stop traversal delegate to the inner accelerator
-    //        return doIntersect;
-    //    });
+        AcceleratorKey foundKey = AcceleratorKey::InvalidKey();
+        uint32_t stackState = dBitStackStates[index];
+        uint32_t currentNodeIndex = dPrevNodeIndices[index];
+        using namespace LBVHAccelDetail;
+        BitStack bitStack(FetchSubPortion(stackState, StackStateRange),
+                          FetchSubPortion(stackState, DepthRange));
+        // Traversal
+        uint32_t newPrevIndex = TraverseLBVH<BaseAcceleratorLBVH::StackBitCount>
+        (
+            bitStack, dNodes, dBoxes,
+            tMM, ray, currentNodeIndex,
+            [&](Vector2& tMM, uint32_t leafIndex)
+            {
+                AABB3 aabb = dLeafAABBs[leafIndex];
+                bool doIntersect = ray.IntersectsAABB(aabb.Min(), aabb.Max(), tMM);
+                if(doIntersect)
+                    foundKey = dLeafKeys[leafIndex];
+                // Stop traversal delegate to the inner accelerator
+                return doIntersect;
+            }
+        );
 
-    //    // Save the traversal stack state
-    //    static constexpr auto StackBits = BaseAcceleratorLBVH::StackBitCount;
-    //    static constexpr auto DepthBits = BaseAcceleratorLBVH::DepthBitCount;
-    //    dBitStackStates[index] = bitStack.CompressState<StackBits, DepthBits>();
-    //    dPrevNodeIndices[index] = newPrevIndex;
-    //    // Return the currently found key
-    //    dAccelKeys[index] = static_cast<CommonKey>(foundKey);
-    //}
+        // Save the traversal stack state
+        static constexpr auto StackBits = BaseAcceleratorLBVH::StackBitCount;
+        static constexpr auto DepthBits = BaseAcceleratorLBVH::DepthBitCount;
+        dBitStackStates[index] = bitStack.CompressState<StackBits, DepthBits>();
+        dPrevNodeIndices[index] = newPrevIndex;
+        // Return the currently found key
+        dAccelKeys[i] = static_cast<CommonKey>(foundKey);
+    }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCGenAABBCenters(// Outputs
+                      Span<Vector3> dAABBCenters,
+                      // Inputs
+                      const Span<const AABB3> dLeafAABBs)
+{
+    assert(dAABBCenters.size() == dLeafAABBs.size());
+   KernelCallParams kp;
+   uint32_t instanceCount = uint32_t(dLeafAABBs.size());
+   for(uint32_t i = kp.GlobalId(); i < instanceCount; i += kp.TotalSize())
+   {
+       dAABBCenters[i] = dLeafAABBs[i].Centroid();
+   }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCInitializeBitStack(Span<uint32_t> dBitStacksStates)
+{
+    LBVHAccelDetail::BitStack stack(0, BaseAcceleratorLBVH::StackBitCount);
+    //
+    KernelCallParams kp;
+    uint32_t total = uint32_t(dBitStacksStates.size());
+    for(uint32_t i = kp.GlobalId(); i < total; i += kp.TotalSize())
+    {
+        dBitStacksStates[i] = stack.CompressState
+        <
+            BaseAcceleratorLBVH::StackBitCount,
+            BaseAcceleratorLBVH::DepthBitCount
+        >();
+    }
 }
 
 std::string_view BaseAcceleratorLBVH::TypeName()
@@ -399,14 +454,14 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
 
     // Allocate persistent memory
     size_t instanceCount = instanceOffsets.back();
-    // Assume a complete tree, and allocate conservatively
-    size_t conservativeNodeCount = Math::NextPowerOfTwo(instanceCount) << 1u;
-    conservativeNodeCount -= 1;
+    // By definition LBVH has n-1 nodes
+    size_t nodeCount = std::max(instanceCount - 1u, size_t(1));
 
-    MemAlloc::AllocateMultiData(std::tie(dLeafKeys, dLeafAABBs, dNodes),
+    MemAlloc::AllocateMultiData(std::tie(dLeafKeys, dLeafAABBs,
+                                         dNodes, dBoundingBoxes),
                                 accelMem,
                                 {instanceCount, instanceCount,
-                                conservativeNodeCount});
+                                nodeCount, nodeCount});
 
     // Write leafs and transformed aabbs to the array
     size_t i = 0;
@@ -423,9 +478,159 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
         qIt.Next();
     }
 
+    // Lets start, the algorithm chain is defined in the AcceleratorGroup,
+    // refer to it for clarification.
+    using namespace DeviceAlgorithms;
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
-    //sceneAABB;// = LBVHAccelDetail::MulitBuildLBVH(queue)[0];
+    // One difference is that entire algorithm is segmented
+    // we have a single instance accelerator, so we have a single instance.
+    // There may be slight performance loss due to it but this is
+    // initialization-time operation so its fine I guess?
+    //
+    // As a ad-hoc measure, we define a large "blockPerSegment" to
+    // fully saturate the GPU.
+    uint32_t blockPerSegment = queue.Device()->SMCount() * 16u;
 
+    size_t reduceTMSize = ReduceTMSize<AABB3>(instanceCount);
+    size_t sortTMSize = RadixSortTMSize<true, uint64_t, uint32_t>(instanceCount);
+    size_t tmSize = std::max(reduceTMSize, sortTMSize);
+
+    // Temp memory
+    // TODO: Too much memory, some memory can be ailased
+    // since we use a single queue
+    Span<AABB3> dSceneAABB;
+    Span<Byte> dTemp;
+    Span<uint32_t> dLeafSegmentRange;
+    Span<uint32_t> dNodeSegmentRange;
+    Span<Vector3> dAABBCenters;
+    std::array<Span<uint32_t>, 2> dIndices;
+    std::array<Span<uint64_t>, 2> dMortonCodes;
+    DeviceMemory tempMem({queue.Device()}, 2_MiB, 128_MiB);
+    MemAlloc::AllocateMultiData(std::tie(dTemp, dSceneAABB,
+                                         dLeafSegmentRange, dNodeSegmentRange,
+                                         dAABBCenters,
+                                         dIndices[0], dIndices[1],
+                                         dMortonCodes[0], dMortonCodes[1]),
+                                tempMem,
+                                {tmSize, 1, 2, 2,
+                                instanceCount, instanceCount,
+                                instanceCount, instanceCount,
+                                instanceCount});
+
+    //
+    std::array<uint32_t, 2> hLeafSegmentRangeArray = {0u, uint32_t(instanceCount)};
+    std::array<uint32_t, 2> hNodeSegmentRangeArray = {0u, uint32_t(instanceCount - 1)};
+    queue.MemcpyAsync(dLeafSegmentRange, Span<const uint32_t>(hLeafSegmentRangeArray));
+    queue.MemcpyAsync(dNodeSegmentRange, Span<const uint32_t>(hNodeSegmentRangeArray));
+
+    // Get the scene AABB from the leaf AABBs,
+    Reduce(Span<AABB3, 1u>(dSceneAABB.data(), 1u), dTemp,
+           ToConstSpan(dLeafAABBs), AABB3::Negative(),
+           queue, UnionAABB3Functor());
+
+    // Since we work with AABBs we do not need to store
+    // centers but next kernel designed to get primitive center,
+    // so temporarily generating prim center. This is somewhat a waste
+    // TODO: Change this later maybe?
+    queue.IssueSaturatingKernel<KCGenAABBCenters>
+    (
+        "KCGenCentersFromAABB-Base",
+        KernelIssueParams{.workCount = static_cast<uint32_t>(instanceCount)},
+        dAABBCenters,
+        dLeafAABBs
+    );
+
+    static constexpr auto TPB = StaticThreadPerBlock1D();
+    uint32_t blockCount = queue.RecommendedBlockCountDevice(KCGenMortonCode,
+                                                            TPB, 0);
+    queue.IssueExactKernel<KCGenMortonCode>
+    (
+        "KCGenMortonCodes-Base",
+        KernelExactIssueParams
+        {
+            .gridSize = blockCount,
+            .blockSize = TPB
+        },
+        // Output
+        dMortonCodes[0],
+        // Inputs
+        ToConstSpan(dLeafSegmentRange),
+        ToConstSpan(dSceneAABB),
+        //
+        dAABBCenters,
+        blockPerSegment
+    );
+
+    // Sort
+    Iota(dIndices[0], 0u, queue);
+    uint32_t sortedIndex = RadixSort<true, uint64_t, uint32_t>
+    (
+        dMortonCodes, dIndices, dTemp, queue
+    );
+    if(sortedIndex == 1)
+    {
+        std::swap(dMortonCodes[0], dMortonCodes[1]);
+        std::swap(dIndices[0], dIndices[1]);
+    }
+
+    // 5. Now we have a multiple valid morton code lists,
+    // Construct the node hierarchy
+    blockCount = queue.RecommendedBlockCountDevice(KCConstructLBVHInternalNodes,
+                                                   TPB, 0);
+    queue.IssueExactKernel<KCConstructLBVHInternalNodes>
+    (
+        "KCConstructLBVHInternalNodes",
+        KernelExactIssueParams
+        {
+            .gridSize = blockCount,
+            .blockSize = TPB
+        },
+        // Output
+        dNodes,
+        // Inputs
+        ToConstSpan(dLeafSegmentRange),
+        ToConstSpan(dNodeSegmentRange),
+        ToConstSpan(dMortonCodes[0]),
+        ToConstSpan(dIndices[0]),
+        //
+        blockPerSegment, 1u
+    );
+
+    // 6. Finally at AABB union portion now, union the AABBs.
+    Span<uint32_t> dAtomicCounters = dIndices[1];
+    queue.MemsetAsync(dAtomicCounters, 0x00);
+    blockCount = queue.RecommendedBlockCountDevice(KCUnionLBVHBoundingBoxes,
+                                                   TPB, 0);
+    queue.IssueExactKernel<KCUnionLBVHBoundingBoxes>
+    (
+        "KCUnionLBVHBoundingBoxes-Base",
+        KernelExactIssueParams
+        {
+            .gridSize = blockCount,
+            .blockSize = TPB
+        },
+        // Output
+        dBoundingBoxes,
+        dAtomicCounters,
+        // Inputs
+        ToConstSpan(dNodes),
+        ToConstSpan(dLeafSegmentRange),
+        ToConstSpan(dNodeSegmentRange),
+        ToConstSpan(dLeafAABBs),
+        //
+        blockPerSegment, 1
+    );
+
+    DeviceDebug::DumpGPUMemToStdOut("BaseBVH Nodes", ToConstSpan(dNodes), queue);
+
+    // Issue copy and wait
+    LBVHBoundingBox hBBox;
+    queue.MemcpyAsync(Span<LBVHBoundingBox>(&hBBox, 1),
+                      ToConstSpan(dBoundingBoxes.subspan(0, 1)));
+    queue.Barrier().Wait();
+    // And done!
+    sceneAABB = AABB3(Vector3(hBBox.min[0], hBBox.min[1], hBBox.min[2]),
+                      Vector3(hBBox.max[0], hBBox.max[1], hBBox.max[2]));
     return sceneAABB;
 }
 
@@ -438,10 +643,13 @@ void BaseAcceleratorLBVH::AllocateForTraversal(size_t maxRayCount)
     {
         return pair.second->InstanceTypeCount();
     });
+    // We need one more potential partition which is "miss" partition
+    maxPartitionCount++;
 
     rayPartitioner = RayPartitioner(gpuSystem, static_cast<uint32_t>(maxRayCount),
                                     static_cast<uint32_t>(maxPartitionCount));
-    MemAlloc::AllocateMultiData(std::tie(dTraversalStack), stackMem, {maxRayCount});
+    MemAlloc::AllocateMultiData(std::tie(dBitStacks, dPrevNodeIndices),
+                                stackMem, {maxRayCount, maxRayCount});
 }
 
 void BaseAcceleratorLBVH::CastRays(// Output
@@ -458,9 +666,16 @@ void BaseAcceleratorLBVH::CastRays(// Output
     const auto annotation = gpuSystem.CreateAnnotation("Ray Casting"sv);
     const auto _ = annotation.AnnotateScope();
 
-    using namespace std::string_view_literals;
-    queue.MemsetAsync(dTraversalStack, 0x00);
-
+    assert(maxPartitionCount != 0);
+    // Root node is node index 0, so we are lucky we can memset
+    queue.MemsetAsync(dPrevNodeIndices, 0x00);
+    // For bit stack however we need to set it old fashioned way)
+    queue.IssueSaturatingKernel<KCInitializeBitStack>
+    (
+        "KCInitBitStack",
+        KernelIssueParams{.workCount = static_cast<uint32_t>(dBitStacks.size())},
+        dBitStacks
+    );
     // Initialize the ray partitioner
     uint32_t currentRayCount = static_cast<uint32_t>(dRays.size());
     uint32_t partitionCount = static_cast<uint32_t>(maxPartitionCount);
@@ -471,27 +686,30 @@ void BaseAcceleratorLBVH::CastRays(// Output
     // - OptiX (or equavilent on other hardwares hopefully in the future) already
     //   does two-level acceleration in hardware, so we dont need to do this
     queue.MemcpyAsync(dCurrentIndices, dRayIndices);
-    // Continiously do traverse/partition untill all rays are missed
+    // Continiously do traverse/partition until all rays are missed
     while(currentRayCount != 0)
     {
-        //queue.IssueSaturatingKernel<KCIntersectBaseLBVH>
-        //(
-        //    "(A)LBVHRayCast"sv,
-        //    KernelIssueParams{.workCount = static_cast<uint32_t>(dRayIndices.size())},
-        //    // Output
-        //    dCurrentKeys,
-        //    // I-O
-        //    dTraversalStack,
-        //    // Input
-        //    dRays,
-        //    dCurrentIndices,
-        //    // Constants
-        //    ToConstSpan(dLeafs),
-        //    ToConstSpan(dAABBs)
-        //);
+        queue.IssueSaturatingKernel<KCIntersectBaseLBVH>
+        (
+            "(A)LBVHRayCast"sv,
+            KernelIssueParams{.workCount = static_cast<uint32_t>(dRayIndices.size())},
+            // Output
+            dCurrentKeys,
+            // I-O
+            dBitStacks,
+            dPrevNodeIndices,
+            // Input
+            ToConstSpan(dRays),
+            ToConstSpan(dCurrentIndices),
+            // Constants
+            ToConstSpan(dLeafKeys),
+            ToConstSpan(dLeafAABBs),
+            ToConstSpan(dNodes),
+            ToConstSpan(dBoundingBoxes)
+        );
 
         static constexpr CommonKey IdBits = AcceleratorKey::IdBits;
-        static constexpr CommonKey BatchBits = AcceleratorKey::IdBits;
+        static constexpr CommonKey BatchBits = AcceleratorKey::BatchBits;
         auto batchRange = Vector2ui(BatchBits, BatchBits + maxBitsUsedOnKey[0]);
         auto idRange = Vector2ui(IdBits, IdBits + maxBitsUsedOnKey[1]);
         auto
@@ -509,6 +727,9 @@ void BaseAcceleratorLBVH::CastRays(// Output
                                           idRange,
                                           batchRange,
                                           queue, false);
+        dCurrentIndices = dIndices;
+        dCurrentKeys = dKeys;
+
         assert(isHostVisible == true);
         queue.Barrier().Wait();
         for(uint32_t pIndex = 0; pIndex < hPartitionCount[0]; pIndex++)
@@ -521,8 +742,8 @@ void BaseAcceleratorLBVH::CastRays(// Output
                 // This should be the last item due to invalid key being INT_MAX
                 assert(pIndex == hPartitionCount[0] - 1);
                 currentRayCount = hPartitionOffsets[pIndex];
-                dCurrentKeys = dKeys.subspan(0, currentRayCount);
-                dCurrentIndices = dIndices.subspan(0, currentRayCount);
+                dCurrentKeys = dCurrentKeys.subspan(0, currentRayCount);
+                dCurrentIndices = dCurrentIndices.subspan(0, currentRayCount);
             }
             else
             {
@@ -530,7 +751,6 @@ void BaseAcceleratorLBVH::CastRays(// Output
                 uint32_t partitionStart = hPartitionOffsets[pIndex];
                 uint32_t localSize = hPartitionOffsets[pIndex + 1] - partitionStart;
 
-                //....
                 Span<const RayIndex> dLocalIndices = ToConstSpan(dCurrentIndices.subspan(partitionStart,
                                                                                          localSize));
                 Span<const CommonKey> dLocalKeys = ToConstSpan(dCurrentKeys.subspan(partitionStart,

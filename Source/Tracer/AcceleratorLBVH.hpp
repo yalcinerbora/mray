@@ -3,7 +3,7 @@
 namespace LBVHAccelDetail
 {
 
-template <class IntersectFunc>
+template <uint32_t MAX_DEPTH, class IntersectFunc>
 MRAY_GPU MRAY_GPU_INLINE
 uint32_t TraverseLBVH(BitStack& bitStack,
                       // Traversal data
@@ -12,6 +12,7 @@ uint32_t TraverseLBVH(BitStack& bitStack,
                       // Inputs
                       Vector2 tMinMax,
                       const Ray& ray,
+                      uint32_t traverStartIndex,
                       // Constants
                       IntersectFunc&& Func)
 {
@@ -19,22 +20,30 @@ uint32_t TraverseLBVH(BitStack& bitStack,
     const LBVHBoundingBox* boxPtr = bBoxes.data();
 
     ChildIndex nodeIndex(0);
-    const LBVHNode* currentNode = nodesPtr;
-    const LBVHBoundingBox* currentBBox = boxPtr;
-    while(bitStack.Depth() <= BitStack::MAX_DEPTH)
+    const LBVHNode* currentNode = nodesPtr + traverStartIndex;
+    const LBVHBoundingBox* currentBBox = boxPtr + traverStartIndex;
+    while(bitStack.Depth() <= MAX_DEPTH)
     {
         // SpecialCase: We are on leaf node, check primitive intersection
         // and pop back to parent
         if(nodeIndex.FetchBatchPortion() == IS_LEAF)
         {
+            // Rare edge case: We have single leaf; thus a single internal node
+            // We enter right.
+            // For every other LBVH; by construction, there are no null children
+            // ever. TODO: We should not pay the price for this branch for other LBVH
+            // change this later?
+            if(nodeIndex == ChildIndex::InvalidKey())
+                return std::numeric_limits<uint32_t>::max();
+
             uint32_t leafIndex = nodeIndex.FetchIndexPortion();
             bool breakTraversal = Func(tMinMax, leafIndex);
-            if(breakTraversal) break;
-
             bitStack.MarkAsTraversed();
             bitStack.Ascend();
             nodeIndex = ChildIndex(0);
-            continue;
+            if(breakTraversal) break;
+            // TODO: Probably not need this
+            else continue;
         }
         // Determine traverse information
         BitStack::TraverseState traverseState = bitStack.CurrentState();
@@ -71,7 +80,6 @@ uint32_t TraverseLBVH(BitStack& bitStack,
                 currentBBox = boxPtr + nodeIndex.FetchIndexPortion();
             }
             bitStack.Descend();
-            break;
         }
         // Just go up (state is 0b10, 0b11 should not be possible)
         else
@@ -80,11 +88,16 @@ uint32_t TraverseLBVH(BitStack& bitStack,
             currentBBox = boxPtr + currentNode->parentIndex;
             bitStack.WipeLowerBits();
             bitStack.Ascend();
-            break;
         }
     }
     return std::distance(nodesPtr, currentNode);
 }
+
+MRAY_GPU MRAY_GPU_INLINE
+BitStack::BitStack()
+    : stack(0)
+    , depth(MAX_DEPTH)
+{}
 
 MRAY_GPU MRAY_GPU_INLINE
 BitStack::BitStack(uint32_t initialState, uint32_t initialDepth)
@@ -239,19 +252,23 @@ OptionalHitR<PG> AcceleratorLBVH<PG, TG>::ClosestHit(BackupRNG& rng,
     BitStack bitStack;
     OptionalHitR<PG> result = std::nullopt;
     //
-    TraverseLBVH(bitStack, nodes, boundingBoxes, tMinMax, ray,
-    [&](Vector2& tMM, uint32_t leafIndex)
-    {
-        PrimitiveKey primKey = leafs[leafIndex];
-        auto check = IntersectionCheck(ray, tMM, rng.NextFloat(), primKey);
-        if(check.has_value() && check->t < tMM[1])
+    TraverseLBVH<BitStack::MAX_DEPTH>
+    (
+        bitStack, nodes, boundingBoxes,
+        tMinMax, ray, 0u,
+        [&](Vector2& tMM, uint32_t leafIndex)
         {
-            result = check;
-            tMM[1] = check->t;
+            PrimitiveKey primKey = leafs[leafIndex];
+            auto check = IntersectionCheck(ray, tMM, rng.NextFloat(), primKey);
+            if(check.has_value() && check->t < tMM[1])
+            {
+                result = check;
+                tMM[1] = check->t;
+            }
+            // Never terminate
+            return false;
         }
-        // Never terminate
-        return false;
-    });
+    );
     return result;
 }
 
@@ -263,13 +280,17 @@ OptionalHitR<PG> AcceleratorLBVH<PG, TG>::FirstHit(BackupRNG& rng,
 {
     BitStack bitStack;
     OptionalHitR<PG> result = std::nullopt;
-    TraverseLBVH(bitStack, nodes, boundingBoxes, tMinMax, ray,
-    [&](Vector2& tMM, uint32_t leafIndex)
-    {
-        PrimitiveKey primKey = leafs[leafIndex];
-        result = IntersectionCheck(ray, tMM, rng.NextFloat(), primKey);
-        return result.has_value();
-    });
+    TraverseLBVH<BitStack::MAX_DEPTH>
+    (
+        bitStack, nodes, boundingBoxes,
+        tMinMax, ray, 0u,
+        [&](Vector2& tMM, uint32_t leafIndex)
+        {
+            PrimitiveKey primKey = leafs[leafIndex];
+            result = IntersectionCheck<BitStack::MAX_DEPTH>(ray, tMM, rng.NextFloat(), primKey);
+            return result.has_value();
+        }
+    );
 }
 
 }
@@ -295,7 +316,7 @@ AcceleratorGroupLBVH<PG>::AcceleratorGroupLBVH(uint32_t accelGroupId,
 
 template<PrimitiveGroupC PG>
 void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
-                                           const GPUQueue& queue)
+                                         const GPUQueue& queue)
 {
     PreprocessResult ppResult = this->PreprocessConstructionParams(p);
     // Before the allocation hickup, allocate the temp
@@ -414,12 +435,12 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
 
     // Easy part is done
     // We need to actually construct this thing now,
-    if(PG::TransformLogic != PrimTransformType::LOCALLY_CONSTANT_TRANSFORM)
+    if constexpr(PG::TransformLogic != PrimTransformType::LOCALLY_CONSTANT_TRANSFORM)
         MulitBuildLBVH(nullptr, queue);
     else for(const auto& kv : this->workInstances)
     {
-        Pair<const uint32_t, const AcceleratorWorkI*> p(kv.first, kv.second.get());
-        MulitBuildLBVH(&p, queue);
+        Pair<const uint32_t, const AcceleratorWorkI*> input(kv.first, kv.second.get());
+        MulitBuildLBVH(&input, queue);
     }
 
     data = DataSoA
@@ -438,6 +459,30 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
     queue.Barrier().Wait();
 }
 
+#include "Device/GPUDebug.h"
+#include "TypeFormat.h"
+
+//inline Tuple<HexKeyT<uint32_t, 1, 31>, HexKeyT<uint32_t, 1, 31>, uint32_t>
+//format_as(const LBVHAccelDetail::LBVHNode& node)
+//{
+//    return Tuple(HexKeyT(node.leftIndex), HexKeyT(node.rightIndex), node.parentIndex);
+//}
+
+template <> struct fmt::formatter<LBVHAccelDetail::LBVHNode> : formatter<std::string>
+{
+    auto format(LBVHAccelDetail::LBVHNode, format_context& ctx) const
+        ->format_context::iterator;
+};
+
+inline auto fmt::formatter<LBVHAccelDetail::LBVHNode>::format(LBVHAccelDetail::LBVHNode n,
+                                                       format_context& ctx) const
+-> format_context::iterator
+{
+    std::string out = MRAY_FORMAT("[L{}, R{}, P:{}]",
+                                  HexKeyT(n.leftIndex), HexKeyT(n.rightIndex), n.parentIndex);
+    return formatter<std::string>::format(out, ctx);
+}
+
 template<PrimitiveGroupC PG>
 void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const AcceleratorWorkI*>* accelWork,
                                               const GPUQueue& queue)
@@ -447,7 +492,8 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
     static constexpr uint32_t BLOCK_PER_INSTANCE = 16;
 
     // First calculate leaf ranges
-    std::vector<uint32_t> hSegmentLeafRanges;
+    std::vector<uint32_t> hLeafSegmentRanges;
+    std::vector<uint32_t> hNodeSegmentRanges;
     Span<TransformKey> dLocalTransformKeys;
     if constexpr(PER_PRIM_TRANSFORM)
     {
@@ -456,26 +502,26 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
                                                 this->workInstanceOffsets[workIndex + 1]);
         auto localInstanceLeafRanges = Span<Vector2ui>(this->instanceLeafRanges.begin() + workInstanceRange[0],
                                                        this->instanceLeafRanges.begin() + workInstanceRange[1]);
-        auto dLocalTransformKeys = dTransformKeys.subspan(workInstanceRange[0],
-                                                          workInstanceRange[1] - workInstanceRange[0]);
+        dLocalTransformKeys = dTransformKeys.subspan(workInstanceRange[0],
+                                                     workInstanceRange[1] - workInstanceRange[0]);
 
-        hSegmentLeafRanges.reserve(localInstanceLeafRanges.size() + 1);
-        hSegmentLeafRanges.push_back(0);
+        hLeafSegmentRanges.reserve(localInstanceLeafRanges.size() + 1);
+        hLeafSegmentRanges.push_back(0);
         // For per primitive transform types segment leaf ranges is
         // the instance leaf ranges itself, since we cannot reuse an accelerator
         // for primitives that require "per_primitive_transform"
         for(const Vector2ui& range : localInstanceLeafRanges)
-            hSegmentLeafRanges.push_back(range[1]);
+            hLeafSegmentRanges.push_back(range[1]);
     }
     else
     {
-        hSegmentLeafRanges.reserve(this->concreteLeafRanges.size() + 1);
-        hSegmentLeafRanges.push_back(0);
+        hLeafSegmentRanges.reserve(this->concreteLeafRanges.size() + 1);
+        hLeafSegmentRanges.push_back(0);
         for(const Vector2ui& range : this->concreteLeafRanges)
-            hSegmentLeafRanges.push_back(range[1]);
+            hLeafSegmentRanges.push_back(range[1]);
     }
-    size_t processedAccelCount = hSegmentLeafRanges.size() - 1;
-    size_t totalLeafCount = dAllLeafs.size();
+    uint32_t processedAccelCount = static_cast<uint32_t>(hLeafSegmentRanges.size() - 1);
+    uint32_t totalLeafCount = static_cast<uint32_t>(dAllLeafs.size());
 
     // Allocate temp memory
     // Construction of LBVH requires sorting (of MortonCodes)
@@ -490,6 +536,7 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
     // Specific Part 0
     Span<Byte> dTemp;
     Span<uint32_t> dLeafSegmentRanges;
+    Span<uint32_t> dNodeSegmentRanges;
     Span<AABB3> dLeafAABBs;
     Span<AABB3> dAccelAABBs;
     Span<Vector3> dPrimCenters;
@@ -506,12 +553,15 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
     // So we can repurpose
     DeviceMemory tempMem({queue.Device()}, 2_MiB, 128_MiB, true);
     // TODO: The memory can be further alised thus; reduced in size.
-    MemAlloc::AllocateMultiData(std::tie(dTemp, dLeafSegmentRanges, dAccelAABBs,
+    MemAlloc::AllocateMultiData(std::tie(dTemp, dLeafSegmentRanges,
+                                         dNodeSegmentRanges, dAccelAABBs,
                                          dPrimCenters, dLeafAABBs,
                                          dMortonCodes[0], dMortonCodes[1],
                                          dIndices[0], dIndices[1]),
                                 tempMem,
-                                {tempMemSize, processedAccelCount + 1,
+                                {tempMemSize,
+                                 processedAccelCount + 1,
+                                 processedAccelCount + 1,
                                  processedAccelCount,
                                  totalLeafCount, totalLeafCount,
                                  totalLeafCount, totalLeafCount,
@@ -520,7 +570,8 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
     dCounters = MemAlloc::RepurposeAlloc<uint32_t>(dPrimCenters);
 
     // Copy the ranges and lets go!
-    queue.MemcpyAsync(dLeafSegmentRanges, Span<const uint32_t>(hSegmentLeafRanges));
+    queue.MemcpyAsync(dLeafSegmentRanges, Span<const uint32_t>(hLeafSegmentRanges));
+    queue.MemcpyAsync(dNodeSegmentRanges, Span<const uint32_t>(hNodeSegmentRanges));
 
     // This implementation is related to this paper.
     // https://research.nvidia.com/publication/2012-06_maximizing-parallelism-construction-bvhs-octrees-and-k-d-trees
@@ -640,8 +691,8 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
         // Output
         dMortonCodes[0],
         // Inputs
-        dLeafSegmentRanges,
-        dAccelAABBs,
+        ToConstSpan(dLeafSegmentRanges),
+        ToConstSpan(dAccelAABBs),
         //
         dPrimCenters,
         BLOCK_PER_INSTANCE
@@ -649,8 +700,11 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
 
     // 4. Sort these codes to implicitly generate the BVH
     Iota(dIndices[0], 0u, queue);
-    uint32_t sortedIndex = SegmentedRadixSort<true, uint64_t, uint32_t>(dMortonCodes, dIndices, dTemp,
-                                                    dLeafSegmentRanges, queue);
+    uint32_t sortedIndex = SegmentedRadixSort<true, uint64_t, uint32_t>
+    (
+        dMortonCodes, dIndices, dTemp,
+        dLeafSegmentRanges, queue
+    );
     if(sortedIndex == 1)
     {
         std::swap(dMortonCodes[0], dMortonCodes[1]);
@@ -673,12 +727,15 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
         dAllNodes,
         // Inputs
         ToConstSpan(dLeafSegmentRanges),
+        ToConstSpan(dNodeSegmentRanges),
         ToConstSpan(dMortonCodes[0]),
         ToConstSpan(dIndices[0]),
         //
         BLOCK_PER_INSTANCE,
         processedAccelCount
     );
+
+    DeviceDebug::DumpGPUMemToStdOut("All Nodes", ToConstSpan(dAllNodes), queue);
 
     // 6. Finally at AABB union portion now, union the AABBs.
     queue.MemsetAsync(dCounters, 0x00);
@@ -694,15 +751,21 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
         },
         // Output
         dAllNodeAABBs,
-        dAllNodes,
         dCounters,
         // Inputs
+        ToConstSpan(dAllNodes),
         ToConstSpan(dLeafSegmentRanges),
+        ToConstSpan(dNodeSegmentRanges),
         ToConstSpan(dLeafAABBs),
         //
         BLOCK_PER_INSTANCE,
         processedAccelCount
     );
+
+    Span<const AABB3> gg(reinterpret_cast<AABB3*>(dAllNodeAABBs.data()),
+                         dAllNodeAABBs.size());
+    DeviceDebug::DumpGPUMemToStdOut("All AABBs", ToConstSpan(gg), queue);
+
     // All Done!
     // Wait GPU before dealloc
     queue.Barrier().Wait();

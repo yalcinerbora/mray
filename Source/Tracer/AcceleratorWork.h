@@ -402,7 +402,7 @@ void AcceleratorWork<AG, TG>::GeneratePrimitiveCenters(Span<Vector3> dAllPrimCen
         dAllPrimCenters,
         // Inputs
         ToConstSpan(dLeafSegmentRanges),
-        Span<const TransformKey>(),
+        dTransformKeys,
         ToConstSpan(dAllLeafs),
         BLOCK_PER_INSTANCE,
         processedAccelCount,
@@ -436,7 +436,7 @@ void AcceleratorWork<AG, TG>::GeneratePrimitiveAABBs(Span<AABB3> dAllLeafAABBs,
         dAllLeafAABBs,
         // Inputs
         ToConstSpan(dLeafSegmentRanges),
-        Span<const TransformKey>(),
+        dTransformKeys,
         ToConstSpan(dAllLeafs),
         // Constants
         BLOCK_PER_INSTANCE,

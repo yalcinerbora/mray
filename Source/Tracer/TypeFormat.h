@@ -30,6 +30,7 @@ auto format_as(const TriKeyT<T, FB, BB, IB>& k)
 template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
 struct HexKeyT : public KeyT<T, BB, IB>
 {
+    HexKeyT() = default;
     explicit HexKeyT(const KeyT<T, BB, IB>& k) : KeyT<T, BB, IB>(k)
     {}
 };
@@ -37,6 +38,7 @@ struct HexKeyT : public KeyT<T, BB, IB>
 template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
 struct HexTriKeyT : public TriKeyT<T, FB, BB, IB>
 {
+    HexTriKeyT() = default;
     explicit HexTriKeyT(const TriKeyT<T, FB, BB, IB>& k) : TriKeyT<T, FB, BB, IB>(k)
     {}
 };

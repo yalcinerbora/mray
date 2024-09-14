@@ -39,8 +39,8 @@ namespace LBVHAccelDetail
         uint32_t    depth;
 
         public:
-        MRAY_GPU            BitStack(uint32_t state = 0,
-                                     uint32_t depth = MAX_DEPTH);
+        MRAY_GPU                BitStack();
+        MRAY_GPU                BitStack(uint32_t state, uint32_t depth);
 
         MRAY_GPU void           WipeLowerBits();
         MRAY_GPU TraverseState  CurrentState() const;
@@ -229,19 +229,21 @@ class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
     public:
     static std::string_view TypeName();
     using LBVHNode          = LBVHAccelDetail::LBVHNode;
-    static constexpr uint32_t DepthBitCount = 7;
-    static constexpr uint32_t StackBitCount = 25;
+    using LBVHBoundingBox   = LBVHAccelDetail::LBVHBoundingBox;
+    static constexpr uint32_t DepthBitCount = 5;
+    static constexpr uint32_t StackBitCount = 27;
     static_assert(DepthBitCount + StackBitCount == sizeof(uint32_t) * CHAR_BIT);
-
 
     private:
     DeviceMemory            accelMem;
     Span<AcceleratorKey>    dLeafKeys;
     Span<AABB3>             dLeafAABBs;
     Span<LBVHNode>          dNodes;
+    Span<LBVHBoundingBox>   dBoundingBoxes;
     //
     DeviceMemory            stackMem;
-    Span<uint32_t>          dTraversalStack;
+    Span<uint32_t>          dBitStacks;
+    Span<uint32_t>          dPrevNodeIndices;
     RayPartitioner          rayPartitioner;
     size_t                  maxPartitionCount;
 
@@ -316,7 +318,8 @@ MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCConstructLBVHInternalNodes(// Output
                                   MRAY_GRID_CONSTANT const Span<LBVHAccelDetail::LBVHNode> dAllNodes,
                                   // Inputs
-                                  MRAY_GRID_CONSTANT const Span<const uint32_t> dSegmentRanges,
+                                  MRAY_GRID_CONSTANT const Span<const uint32_t> dLeafSegmentRanges,
+                                  MRAY_GRID_CONSTANT const Span<const uint32_t> dNodeSegmentRanges,
                                   MRAY_GRID_CONSTANT const Span<const uint64_t> dAllMortonCodes,
                                   MRAY_GRID_CONSTANT const Span<const uint32_t> dAllLeafIndices,
                                   // Constants
@@ -326,10 +329,11 @@ void KCConstructLBVHInternalNodes(// Output
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCUnionLBVHBoundingBoxes(// I-O
                               MRAY_GRID_CONSTANT const Span<LBVHAccelDetail::LBVHBoundingBox> dAllNodeAABBs,
-                              MRAY_GRID_CONSTANT const Span<LBVHAccelDetail::LBVHNode> dAllNodes,
                               MRAY_GRID_CONSTANT const Span<uint32_t> dAtomicCounters,
                               // Inputs
-                              MRAY_GRID_CONSTANT const Span<const uint32_t> dSegmentRanges,
+                              MRAY_GRID_CONSTANT const Span<const LBVHAccelDetail::LBVHNode> dAllNodes,
+                              MRAY_GRID_CONSTANT const Span<const uint32_t> dLeafSegmentRanges,
+                              MRAY_GRID_CONSTANT const Span<const uint32_t> dNodeSegmentRanges,
                               MRAY_GRID_CONSTANT const Span<const AABB3> dAllLeafAABBs,
                               // Constants
                               MRAY_GRID_CONSTANT const uint32_t blockPerInstance,

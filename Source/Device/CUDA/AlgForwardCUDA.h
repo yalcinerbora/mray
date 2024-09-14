@@ -50,13 +50,12 @@ namespace mray::cuda::algorithms
 
     template <bool IsAscending, class K, class V>
     MRAY_HOST
-    size_t SegmentedRadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
-                              Span<Span<V>, 2> dValueDoubleBuffer,
-                              Span<Byte> dTempMemory,
-                              Span<const uint32_t> dSegmentRanges,
-                              const GPUQueueCUDA& queue,
-                              const Vector2ui& bitRange = Vector2ui(0, sizeof(K) * CHAR_BIT));
-
+    uint32_t SegmentedRadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
+                               Span<Span<V>, 2> dValueDoubleBuffer,
+                               Span<Byte> dTempMemory,
+                               Span<const uint32_t> dSegmentRanges,
+                               const GPUQueueCUDA& queue,
+                               const Vector2ui& bitRange = Vector2ui(0, sizeof(K) * CHAR_BIT));
 
     //====================//
     //       Reduce       //

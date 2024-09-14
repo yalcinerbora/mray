@@ -26,7 +26,8 @@ size_t SegmentedRadixSortTMSize(size_t totalElementCount,
     if constexpr(IsAscending)
         CUDA_CHECK(DeviceSegmentedRadixSort::SortPairs(dTM, result,
                                                        keys, values,
-                                                       totalElementCount, totalSegments,
+                                                       static_cast<int>(totalElementCount),
+                                                       static_cast<int>(totalSegments),
                                                        dStartOffsets, dEndOffsets));
     else
         CUDA_CHECK(DeviceRadixSort::SortPairsDescending(dTM, result,
@@ -97,12 +98,12 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
 
 template <bool IsAscending, class K, class V>
 MRAY_HOST inline
-size_t SegmentedRadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
-                          Span<Span<V>, 2> dValueDoubleBuffer,
-                          Span<Byte> dTempMemory,
-                          Span<const uint32_t> dSegmentRanges,
-                          const GPUQueueCUDA& queue,
-                          const Vector2ui& bitRange)
+uint32_t SegmentedRadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
+                            Span<Span<V>, 2> dValueDoubleBuffer,
+                            Span<Byte> dTempMemory,
+                            Span<const uint32_t> dSegmentRanges,
+                            const GPUQueueCUDA& queue,
+                            const Vector2ui& bitRange)
 {
     using namespace cub;
 
