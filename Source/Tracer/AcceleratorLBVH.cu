@@ -67,6 +67,9 @@ void KCGenMortonCode(// Output
         // Current instance index of this iteration
         uint32_t instanceI = bI / blockPerInstance;
         uint32_t localBI = bI % blockPerInstance;
+
+        if(instanceI >= instanceCount) continue;
+
         //
         uint32_t instanceLocalThreadId = localBI * TPB + kp.threadId;
         uint32_t primPerPass = TPB * blockPerInstance;
@@ -80,13 +83,16 @@ void KCGenMortonCode(// Output
         // Loop invariant data
         // We will divide the instance local AABB to 12-bit slices
         // hope that the centers do not lay on the same voxel
-        Vector3 aabbSize = dInstanceAABBs[instanceI].GeomSpan();
+        AABB3 aabb = dInstanceAABBs[instanceI];
+        Vector3 aabbSize = aabb.GeomSpan();
         Float maxSide = aabbSize[aabbSize.Maximum()];
         using namespace Graphics::MortonCode;
-        static constexpr uint64_t MaxBits = MaxBits3D<uint64_t>();
+        static constexpr uint32_t MaxBits = MaxBits3D<uint64_t>();
+        static constexpr uint32_t LastValue = (1u << MaxBits) - 1;
         static constexpr Float SliceCount = Float(1ull << MaxBits);
         // TODO: Check if 32-bit float is not enough here (precision)
         Float deltaRecip = SliceCount / maxSide;
+        Vector3 bottomLeft = aabb.Min();
 
         // Finally multi-block primitive loop
         uint32_t totalPrims = static_cast<uint32_t>(dLocalPrimCenters.size());
@@ -94,10 +100,13 @@ void KCGenMortonCode(// Output
             i += primPerPass)
         {
             Vector3 center = dLocalPrimCenters[i];
-            // Quantize the center
-            center = (center  * deltaRecip).Round();
-            Vector3ui xyz(center[0], center[1], center[2]);
-            dLocalMortonCode[i] = Compose3D<uint64_t>(xyz);
+            Vector3 diff = center - bottomLeft;
+            // Quantize the center relative to the AABB
+            Vector3 result = (diff * deltaRecip).Round();
+            Vector3ui xyz(result[0], result[1], result[2]);
+            xyz = xyz.Clamp(0u, LastValue);
+            uint64_t code = Compose3D<uint64_t>(xyz);
+            dLocalMortonCode[i] = code;
         }
     }
 }
@@ -105,6 +114,7 @@ void KCGenMortonCode(// Output
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCConstructLBVHInternalNodes(// Output
                                   MRAY_GRID_CONSTANT const Span<LBVHAccelDetail::LBVHNode> dAllNodes,
+                                  MRAY_GRID_CONSTANT const Span<uint32_t> dAllLeafParentIndices,
                                   // Inputs
                                   MRAY_GRID_CONSTANT const Span<const uint32_t> dLeafSegmentRanges,
                                   MRAY_GRID_CONSTANT const Span<const uint32_t> dNodeSegmentRanges,
@@ -137,36 +147,33 @@ void KCConstructLBVHInternalNodes(// Output
                                         dNodeSegmentRanges[instanceI + 1]);
         auto dLocalNodes = dAllNodes.subspan(nodeRange[0],
                                              nodeRange[1] - nodeRange[0]);
+        auto dLocalLeafParentIndices = dAllLeafParentIndices.subspan(leafRange[0],
+                                                                     leafRange[1] - leafRange[0]);
         auto dLocalCodes = dAllMortonCodes.subspan(leafRange[0],
                                                    leafRange[1] - leafRange[0]);
         auto dLocalIndices = dAllLeafIndices.subspan(leafRange[0],
                                                      leafRange[1] - leafRange[0]);
 
+
         // Delta function that is described in the paper
         Delta delta(dLocalCodes);
 
+        int32_t totalLeafs = static_cast<int32_t>(dLocalCodes.size());
         int32_t totalNodes = static_cast<int32_t>(dLocalNodes.size());
         // Edge case: Single primitive
-        if(totalNodes == 1 && instanceLocalThreadId == 0)
+        if(totalLeafs == 1 && instanceLocalThreadId == 0)
         {
             LBVHNode& myNode = dLocalNodes[0];
             myNode.leftIndex = ChildIndex::CombinedKey(IS_LEAF, 0);
             myNode.rightIndex = ChildIndex::InvalidKey();
             myNode.parentIndex = std::numeric_limits<uint32_t>::max();
         }
-        // Edge case: Two primitives? (Paper says [0, n-2] where n is leaf count)
-        else if(totalNodes == 2 && instanceLocalThreadId == 0)
-        {
-            LBVHNode& myNode = dLocalNodes[0];
-            myNode.leftIndex = ChildIndex::CombinedKey(IS_LEAF, 0);
-            myNode.rightIndex = ChildIndex::CombinedKey(IS_LEAF, 1);
-            myNode.parentIndex = std::numeric_limits<uint32_t>::max();
-        }
         // Common case
-        else for(int32_t i = instanceLocalThreadId; i < (totalNodes - 1); i += primPerPass)
+        else for(int32_t i = instanceLocalThreadId; i < totalNodes; i += primPerPass)
         {
             // From paper's "Figure 4"
-            int32_t d = ((delta(i, i + 1) - delta(i, i - 1)) < 0) ? 0 : -1;
+            int32_t diff = delta(i, i + 1) - delta(i, i - 1);
+            int32_t d = (diff < 0) ? -1 : 1;
 
             // Compute upper bound
             int32_t deltaMin = delta(i, i - d);
@@ -175,34 +182,41 @@ void KCConstructLBVHInternalNodes(// Output
                 lMax <<= 1;
 
             // Binary search to find end
-            int32_t length = 0;
+            int32_t l = 0;
             for(int32_t t = lMax >> 1; t != 0; t >>= 1)
             {
-                if(delta(i, i + (length + t) * d) > deltaMin)
-                    length += t;
+                if(delta(i, i + (l + t) * d) > deltaMin)
+                    l += t;
             }
-            int32_t j = i + length * d;
+            int32_t j = i + l * d;
 
             // Binary search to find split
-            int32_t deltaRange = delta(i, j);
-            int32_t splitOffset = 0;
-            for(int32_t t = Math::DivideUp(length, 2);
-                t != 0; t = Math::DivideUp(t, 2))
+            // Our divide up never reaches to zero
+            // so adding a small function here
+            auto AdvanceCeil = [](int32_t i)
             {
-                if(delta(i, i + (splitOffset + t) * d) > deltaRange)
-                    splitOffset += t;
-            }
-            int32_t gamma = i + splitOffset * d + std::min(d, 0);
-
-            if(gamma < 0 || gamma >= totalNodes)
+                if(i == 1) return 0;
+                return Math::DivideUp(i, 2);
+            };
+            int32_t s = 0;
+            int32_t deltaNode = delta(i, j);
+            for(int32_t t = Math::DivideUp(l, 2);
+                t != 0; t = AdvanceCeil(t))
             {
-                printf("WTF\n");
+                if(delta(i, i + (s + t) * d) > deltaNode)
+                    s += t;
             }
+            int32_t gamma = i + s * d + std::min(d, 0);
+            assert(gamma >= 0 && gamma < totalNodes);
 
             // Finally write
             LBVHNode& myNode = dLocalNodes[i];
             if(std::min(i, j) == gamma)
-                myNode.leftIndex = ChildIndex::CombinedKey(IS_LEAF, dLocalIndices[gamma]);
+            {
+                uint32_t indirectLeafIndex = dLocalIndices[gamma];
+                myNode.leftIndex = ChildIndex::CombinedKey(IS_LEAF, indirectLeafIndex);
+                dLocalLeafParentIndices[indirectLeafIndex] = i;
+            }
             else
             {
                 myNode.leftIndex = ChildIndex::CombinedKey(IS_INTERNAL, gamma);
@@ -210,7 +224,12 @@ void KCConstructLBVHInternalNodes(// Output
             }
             //
             if(std::max(i, j) == (gamma + 1))
-                myNode.rightIndex = ChildIndex::CombinedKey(IS_LEAF, dLocalIndices[gamma + 1]);
+            {
+                uint32_t indirectLeafIndex = dLocalIndices[gamma + 1];
+                myNode.rightIndex = ChildIndex::CombinedKey(IS_LEAF, indirectLeafIndex);
+                dLocalLeafParentIndices[indirectLeafIndex] = i;
+            }
+
             else
             {
                 myNode.rightIndex = ChildIndex::CombinedKey(IS_INTERNAL, gamma + 1);
@@ -230,6 +249,7 @@ void KCUnionLBVHBoundingBoxes(// I-O
                               MRAY_GRID_CONSTANT const Span<uint32_t> dAtomicCounters,
                               // Inputs
                               MRAY_GRID_CONSTANT const Span<const LBVHAccelDetail::LBVHNode> dAllNodes,
+                              MRAY_GRID_CONSTANT const Span<const uint32_t> dAllLeafParentIndices,
                               MRAY_GRID_CONSTANT const Span<const uint32_t> dLeafSegmentRanges,
                               MRAY_GRID_CONSTANT const Span<const uint32_t> dNodeSegmentRanges,
                               MRAY_GRID_CONSTANT const Span<const AABB3> dAllLeafAABBs,
@@ -264,6 +284,8 @@ void KCUnionLBVHBoundingBoxes(// I-O
                                                       nodeRange[1] - nodeRange[0]);
         auto dLocalLeafAABBs = dAllLeafAABBs.subspan(leafRange[0],
                                                      leafRange[1] - leafRange[0]);
+        auto dLocalLeafParentIndices = dAllLeafParentIndices.subspan(leafRange[0],
+                                                                     leafRange[1] - leafRange[0]);
         // Node AABBs are volatile since the writes needs to be coherent
         // between threads. This + thread fence hopefully should suffice
         // the parallel aabb union.
@@ -287,9 +309,9 @@ void KCUnionLBVHBoundingBoxes(// I-O
                 Float min1 = dLocalNodeAABBs[index].min[1];
                 Float min2 = dLocalNodeAABBs[index].min[2];
                 //
-                Float max0 = dLocalNodeAABBs[index].min[0];
-                Float max1 = dLocalNodeAABBs[index].min[1];
-                Float max2 = dLocalNodeAABBs[index].min[2];
+                Float max0 = dLocalNodeAABBs[index].max[0];
+                Float max1 = dLocalNodeAABBs[index].max[1];
+                Float max2 = dLocalNodeAABBs[index].max[2];
                 return AABB3(Vector3(min0, min1, min2),
                              Vector3(max0, max1, max2));
             }
@@ -299,8 +321,9 @@ void KCUnionLBVHBoundingBoxes(// I-O
         // Edge case: If there is a single primitive, we need to set the counter to one
         // Paper does not discuss this, for single leaf node, we create a single intermediate node
         // to make the tracing code simpler (use do a stackless traversal so it is complex already)
-        int32_t totalPrims = static_cast<int32_t>(dLocalNodes.size());
-        if(totalPrims == 1)
+        int32_t totalLeafs = static_cast<int32_t>(dLocalLeafAABBs.size());
+        int32_t totalNodes = static_cast<int32_t>(dLocalNodes.size());
+        if(totalLeafs == 1)
         {
             volatile LBVHBoundingBox& bbox = dLocalNodeAABBs[0];
             AABB3 aabb = dLocalLeafAABBs[0];
@@ -311,16 +334,16 @@ void KCUnionLBVHBoundingBoxes(// I-O
             bbox.max[1] = aabb.Max()[1];
             bbox.max[2] = aabb.Max()[2];
         }
-        else for(int32_t i = instanceLocalThreadId; i < totalPrims;
-            i += primPerPass)
+        // Normal Case
+        else for(int32_t i = instanceLocalThreadId; i < totalLeafs;
+                 i += primPerPass)
         {
-            // Normal Case
-            uint32_t nodeIndex = i;
+            uint32_t nodeIndex = dLocalLeafParentIndices[i];
             while(nodeIndex != std::numeric_limits<uint32_t>::max())
             {
                 const LBVHNode& node = dLocalNodes[nodeIndex];
                 volatile LBVHBoundingBox& bbox = dLocalNodeAABBs[nodeIndex];
-                uint32_t result = DeviceAtomic::AtomicAdd(dLocalCounters[i], 1u);
+                uint32_t result = DeviceAtomic::AtomicAdd(dLocalCounters[nodeIndex], 1u);
                 // Last one come to the party, cleanup after the other guys
                 if(result == 1)
                 {
@@ -519,7 +542,7 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
 
     //
     std::array<uint32_t, 2> hLeafSegmentRangeArray = {0u, uint32_t(instanceCount)};
-    std::array<uint32_t, 2> hNodeSegmentRangeArray = {0u, uint32_t(instanceCount - 1)};
+    std::array<uint32_t, 2> hNodeSegmentRangeArray = {0u, std::max(1u, uint32_t(instanceCount - 1))};
     queue.MemcpyAsync(dLeafSegmentRange, Span<const uint32_t>(hLeafSegmentRangeArray));
     queue.MemcpyAsync(dNodeSegmentRange, Span<const uint32_t>(hNodeSegmentRangeArray));
 
@@ -539,6 +562,11 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
         dAABBCenters,
         dLeafAABBs
     );
+
+    //DeviceDebug::DumpGPUMemToStdOut("Scene AABB",
+    //                                ToConstSpan(dSceneAABB), queue);
+    //DeviceDebug::DumpGPUMemToStdOut("Base AABB Centers",
+    //                                ToConstSpan(dAABBCenters), queue);
 
     static constexpr auto TPB = StaticThreadPerBlock1D();
     uint32_t blockCount = queue.RecommendedBlockCountDevice(KCGenMortonCode,
@@ -561,6 +589,9 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
         blockPerSegment
     );
 
+    //DeviceDebug::DumpGPUMemToStdOut<DeviceDebug::HEXEDECIMAL>("Base Morton",
+    //                                                          ToConstSpan(dMortonCodes[0]), queue);
+
     // Sort
     Iota(dIndices[0], 0u, queue);
     uint32_t sortedIndex = RadixSort<true, uint64_t, uint32_t>
@@ -573,7 +604,12 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
         std::swap(dIndices[0], dIndices[1]);
     }
 
-    // 5. Now we have a multiple valid morton code lists,
+    // Alias the memory, indces[1], and mortonCode[1] are not used
+    // anymore
+    Span<uint32_t> dAtomicCounters = MemAlloc::RepurposeAlloc<uint32_t>(dIndices[1]);
+    Span<uint32_t> dLeafParentIndices = MemAlloc::RepurposeAlloc<uint32_t>(dMortonCodes[1]);
+
+    // Now we have a multiple valid morton code lists,
     // Construct the node hierarchy
     blockCount = queue.RecommendedBlockCountDevice(KCConstructLBVHInternalNodes,
                                                    TPB, 0);
@@ -587,6 +623,7 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
         },
         // Output
         dNodes,
+        dLeafParentIndices,
         // Inputs
         ToConstSpan(dLeafSegmentRange),
         ToConstSpan(dNodeSegmentRange),
@@ -596,8 +633,7 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
         blockPerSegment, 1u
     );
 
-    // 6. Finally at AABB union portion now, union the AABBs.
-    Span<uint32_t> dAtomicCounters = dIndices[1];
+    // Finally at AABB union portion now, union the AABBs.
     queue.MemsetAsync(dAtomicCounters, 0x00);
     blockCount = queue.RecommendedBlockCountDevice(KCUnionLBVHBoundingBoxes,
                                                    TPB, 0);
@@ -614,6 +650,7 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
         dAtomicCounters,
         // Inputs
         ToConstSpan(dNodes),
+        ToConstSpan(dLeafParentIndices),
         ToConstSpan(dLeafSegmentRange),
         ToConstSpan(dNodeSegmentRange),
         ToConstSpan(dLeafAABBs),
@@ -621,7 +658,14 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
         blockPerSegment, 1
     );
 
-    DeviceDebug::DumpGPUMemToStdOut("BaseBVH Nodes", ToConstSpan(dNodes), queue);
+    //DeviceDebug::DumpGPUMemToStdOut("BaseBVH Nodes", ToConstSpan(dNodes), queue);
+
+    //Span<const AABB3> nAABBs(reinterpret_cast<AABB3*>(dBoundingBoxes.data()),
+    //                         dBoundingBoxes.size());
+    //DeviceDebug::DumpGPUMemToStdOut("Base Node AABBs", ToConstSpan(nAABBs), queue);
+    //Span<const AABB3> lAABBs(reinterpret_cast<AABB3*>(dLeafAABBs.data()),
+    //                         dLeafAABBs.size());
+    //DeviceDebug::DumpGPUMemToStdOut("Base Leaf AABBs", ToConstSpan(lAABBs), queue);
 
     // Issue copy and wait
     LBVHBoundingBox hBBox;

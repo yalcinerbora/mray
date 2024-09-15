@@ -8,6 +8,11 @@ namespace mray::algorithms
     requires (requires(T x) { {x + x} -> std::same_as<T>; }&& std::is_constructible_v<T, uint32_t>)
     void Iota(Span<T> dOut, const T& hInitialValue, const GPUQueue& queue);
 
+    template <class T>
+    requires (requires(T x) { { x + x } -> std::same_as<T>; }&& std::is_constructible_v<T, uint32_t>)
+    void SegmentedIota(Span<T> dOut, Span<const uint32_t> dSegmentRanges,
+                       const T& hInitialValue, const GPUQueue& queue);
+
     template <class OutT, class InT, class BinaryFunction>
     requires requires(BinaryFunction f, InT x) { { f(x, x) } -> std::convertible_to<OutT>; }
     void AdjacentDifference(Span<OutT> dOut, Span<const InT> dIn, const GPUQueue& queue,

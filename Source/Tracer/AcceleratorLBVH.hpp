@@ -4,11 +4,11 @@ namespace LBVHAccelDetail
 {
 
 template <uint32_t MAX_DEPTH, class IntersectFunc>
-MRAY_GPU MRAY_GPU_INLINE
+MRAY_HYBRID MRAY_GPU_INLINE
 uint32_t TraverseLBVH(BitStack& bitStack,
                       // Traversal data
-                      Span<const LBVHNode> nodes,
-                      Span<const LBVHBoundingBox> bBoxes,
+                      const Span<const LBVHNode>& nodes,
+                      const Span<const LBVHBoundingBox>& bBoxes,
                       // Inputs
                       Vector2 tMinMax,
                       const Ray& ray,
@@ -48,7 +48,7 @@ uint32_t TraverseLBVH(BitStack& bitStack,
         // Determine traverse information
         BitStack::TraverseState traverseState = bitStack.CurrentState();
         // Fresh entry, we never checked this node,
-        // If intersects decsnd
+        // If intersects descend
         if(traverseState == BitStack::FIRST_ENTRY &&
            ray.IntersectsAABB(Vector3(Span<const Float, 3>(currentBBox->min)),
                               Vector3(Span<const Float, 3>(currentBBox->max)),
@@ -65,7 +65,9 @@ uint32_t TraverseLBVH(BitStack& bitStack,
         // Nothing to see here, go up
         else if(traverseState == BitStack::FIRST_ENTRY)
         {
-            currentNode = nodesPtr + currentNode->parentIndex;
+            uint32_t parentIndex = currentNode->parentIndex;
+            currentNode = nodesPtr + parentIndex;
+            currentBBox = boxPtr + parentIndex;
             bitStack.MarkAsTraversed();
             bitStack.Ascend();
         }
@@ -80,12 +82,14 @@ uint32_t TraverseLBVH(BitStack& bitStack,
                 currentBBox = boxPtr + nodeIndex.FetchIndexPortion();
             }
             bitStack.Descend();
+            bitStack.MarkAsTraversed();
         }
         // Just go up (state is 0b10, 0b11 should not be possible)
         else
         {
-            currentNode = nodesPtr + currentNode->parentIndex;
-            currentBBox = boxPtr + currentNode->parentIndex;
+            uint32_t parentIndex = currentNode->parentIndex;
+            currentNode = nodesPtr + parentIndex;
+            currentBBox = boxPtr + parentIndex;
             bitStack.WipeLowerBits();
             bitStack.Ascend();
         }
@@ -93,57 +97,57 @@ uint32_t TraverseLBVH(BitStack& bitStack,
     return std::distance(nodesPtr, currentNode);
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MRAY_HYBRID MRAY_GPU_INLINE
 BitStack::BitStack()
     : stack(0)
     , depth(MAX_DEPTH)
 {}
 
-MRAY_GPU MRAY_GPU_INLINE
-BitStack::BitStack(uint32_t initialState, uint32_t initialDepth)
+MRAY_HYBRID MRAY_GPU_INLINE
+BitStack::BitStack(uint64_t initialState, uint32_t initialDepth)
     : stack(initialState)
     , depth(initialDepth)
 {}
 
-MRAY_GPU MRAY_GPU_INLINE
+MRAY_HYBRID MRAY_GPU_INLINE
 void BitStack::WipeLowerBits()
 {
-    uint32_t mask = std::numeric_limits<uint32_t>::max() << uint32_t(depth - 1);
+    uint64_t mask = std::numeric_limits<uint64_t>::max() << (depth - 1);
     stack &= mask;
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MRAY_HYBRID MRAY_GPU_INLINE
 typename BitStack::TraverseState BitStack::CurrentState() const
 {
     return TraverseState((stack >> (depth - 2)) & 0x3u);
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MRAY_HYBRID MRAY_GPU_INLINE
 void BitStack::MarkAsTraversed()
 {
-    stack += (1u << (depth - 1));
+    stack += (uint64_t(1) << (depth - 1));
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MRAY_HYBRID MRAY_GPU_INLINE
 void BitStack::Descend()
 {
     depth--;
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MRAY_HYBRID MRAY_GPU_INLINE
 void BitStack::Ascend()
 {
     depth++;
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MRAY_HYBRID MRAY_GPU_INLINE
 uint32_t BitStack::Depth() const
 {
     return depth;
 }
 
 template<uint32_t SBits, uint32_t DBits>
-MRAY_GPU MRAY_GPU_INLINE
+MRAY_HYBRID MRAY_GPU_INLINE
 uint32_t BitStack::CompressState() const
 {
     return Bit::Compose<SBits, DBits>(stack, depth);
@@ -325,14 +329,11 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
     // Allocate concrete leaf ranges for processing
     // Copy device
     Span<Vector2ui> dConcreteLeafRanges;
-    Span<Vector2ui> dConcreteNodeRanges;
     Span<PrimRangeArray> dConcretePrimRanges;
     MemAlloc::AllocateMultiData(std::tie(dConcreteLeafRanges,
-                                         dConcreteNodeRanges,
                                          dConcretePrimRanges),
                                 tempMem,
                                 {this->concreteLeafRanges.size(),
-                                 this->concreteLeafRanges.size(),
                                  ppResult.concretePrimRanges.size()});
     assert(ppResult.concretePrimRanges.size() ==
            this->concreteLeafRanges.size());
@@ -340,19 +341,24 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
     // Calculate all node size
     // Thankfully LBVH has implicit node count which is "leafCount - 1"
     // This can be derived from concrete leafranges.
-    std::vector<Vector2ui> hConcereteNodeRangesVec;
-    hConcereteNodeRangesVec.reserve(this->concreteLeafRanges.size());
+    std::vector<Vector2ui> hConcreteNodeRangesVec;
+    hConcreteNodeRangesVec.reserve(this->concreteLeafRanges.size());
     uint32_t nodeOffset = 0;
     for(const Vector2ui& leafRange : this->concreteLeafRanges)
     {
         uint32_t localLeafCount = leafRange[1] - leafRange[0];
         uint32_t localNodeCount = std::max(1u, localLeafCount - 1);
-        hConcereteNodeRangesVec.push_back(Vector2ui(nodeOffset, nodeOffset + localNodeCount));
+        hConcreteNodeRangesVec.push_back(Vector2ui(nodeOffset, nodeOffset + localNodeCount));
         nodeOffset += localNodeCount;
     }
+    // Find the instance node ranges as well
+    std::vector<Vector2ui> hInstanceNodeRangesVec;
+    hInstanceNodeRangesVec.reserve(this->concreteIndicesOfInstances.size());
+    for(uint32_t concreteIndex : this->concreteIndicesOfInstances)
+        hInstanceNodeRangesVec.push_back(hConcreteNodeRangesVec[concreteIndex]);
 
     uint32_t totalLeafCount = this->concreteLeafRanges.back()[1];
-    uint32_t totalNodeCount = hConcereteNodeRangesVec.back()[1];
+    uint32_t totalNodeCount = hConcreteNodeRangesVec.back()[1];
     // Copy these host vectors to GPU
     MemAlloc::AllocateMultiData(std::tie(dCullFaceFlags,
                                          dAlphaMaps,
@@ -378,9 +384,9 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
     PrimKeySpanList hInstanceLeafs = this->CreateInstanceSubspans(ToConstSpan(dAllLeafs),
                                                                   this->instanceLeafRanges);
     NodeSpanList hInstanceNodes = this->CreateInstanceSubspans(ToConstSpan(dAllNodes),
-                                                               hConcereteNodeRangesVec);
+                                                               hInstanceNodeRangesVec);
     NodeAABBSpanList hInstanceNodeAABBs = this->CreateInstanceSubspans(ToConstSpan(dAllNodeAABBs),
-                                                                       hConcereteNodeRangesVec);
+                                                                       hInstanceNodeRangesVec);
 
     // Actual memcpy
     Span<CullFaceFlagArray>             hSpanCullFaceFlags(ppResult.surfData.cullFaceFlags);
@@ -403,10 +409,9 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
 
     // Copy Ids to the leaf buffer
     auto hConcreteLeafRanges = Span<const Vector2ui>(this->concreteLeafRanges);
-    auto hConcreteNodeRanges = Span<const Vector2ui>(hConcereteNodeRangesVec);
+    auto hConcreteNodeRanges = Span<const Vector2ui>(hConcreteNodeRangesVec);
     auto hConcretePrimRanges = Span<const PrimRangeArray>(ppResult.concretePrimRanges);
     queue.MemcpyAsync(dConcreteLeafRanges, hConcreteLeafRanges);
-    queue.MemcpyAsync(dConcreteNodeRanges, hConcreteNodeRanges);
     queue.MemcpyAsync(dConcretePrimRanges, hConcretePrimRanges);
 
     // Dedicate a block for each
@@ -436,11 +441,13 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
     // Easy part is done
     // We need to actually construct this thing now,
     if constexpr(PG::TransformLogic != PrimTransformType::LOCALLY_CONSTANT_TRANSFORM)
-        MulitBuildLBVH(nullptr, queue);
+        MulitBuildLBVH(nullptr, hInstanceNodeRangesVec,
+                       hConcreteNodeRangesVec, queue);
     else for(const auto& kv : this->workInstances)
     {
         Pair<const uint32_t, const AcceleratorWorkI*> input(kv.first, kv.second.get());
-        MulitBuildLBVH(&input, queue);
+        MulitBuildLBVH(&input, hInstanceNodeRangesVec,
+                       hConcreteNodeRangesVec, queue);
     }
 
     data = DataSoA
@@ -462,12 +469,6 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
 #include "Device/GPUDebug.h"
 #include "TypeFormat.h"
 
-//inline Tuple<HexKeyT<uint32_t, 1, 31>, HexKeyT<uint32_t, 1, 31>, uint32_t>
-//format_as(const LBVHAccelDetail::LBVHNode& node)
-//{
-//    return Tuple(HexKeyT(node.leftIndex), HexKeyT(node.rightIndex), node.parentIndex);
-//}
-
 template <> struct fmt::formatter<LBVHAccelDetail::LBVHNode> : formatter<std::string>
 {
     auto format(LBVHAccelDetail::LBVHNode, format_context& ctx) const
@@ -485,6 +486,8 @@ inline auto fmt::formatter<LBVHAccelDetail::LBVHNode>::format(LBVHAccelDetail::L
 
 template<PrimitiveGroupC PG>
 void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const AcceleratorWorkI*>* accelWork,
+                                              const std::vector<Vector2ui>& instanceNodeRanges,
+                                              const std::vector<Vector2ui>& concreteNodeRanges,
                                               const GPUQueue& queue)
 {
     static constexpr bool PER_PRIM_TRANSFORM = PG::TransformLogic == PrimTransformType::PER_PRIMITIVE_TRANSFORM;
@@ -500,18 +503,31 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
         uint32_t workIndex = accelWork->first;
         Vector2ui workInstanceRange = Vector2ui(this->workInstanceOffsets[workIndex],
                                                 this->workInstanceOffsets[workIndex + 1]);
-        auto localInstanceLeafRanges = Span<Vector2ui>(this->instanceLeafRanges.begin() + workInstanceRange[0],
-                                                       this->instanceLeafRanges.begin() + workInstanceRange[1]);
         dLocalTransformKeys = dTransformKeys.subspan(workInstanceRange[0],
                                                      workInstanceRange[1] - workInstanceRange[0]);
 
-        hLeafSegmentRanges.reserve(localInstanceLeafRanges.size() + 1);
-        hLeafSegmentRanges.push_back(0);
+        // Leaf segments
         // For per primitive transform types segment leaf ranges is
         // the instance leaf ranges itself, since we cannot reuse an accelerator
         // for primitives that require "per_primitive_transform"
+        auto iLeafRange = this->instanceLeafRanges;
+        auto localInstanceLeafRanges = Span<const Vector2ui>(iLeafRange.cbegin() + workInstanceRange[0],
+                                                             iLeafRange.cbegin() + workInstanceRange[1]);
+        hLeafSegmentRanges.reserve(localInstanceLeafRanges.size() + 1);
+        hLeafSegmentRanges.push_back(0);
         for(const Vector2ui& range : localInstanceLeafRanges)
             hLeafSegmentRanges.push_back(range[1]);
+
+        // Node Segments
+        // Do the same logic to the nodes as well
+        const auto& iNodeRange = instanceNodeRanges;
+        auto localInstanceNodeRanges = Span<const Vector2ui>(iNodeRange.cbegin() + workInstanceRange[0],
+                                                             iNodeRange.cbegin() + workInstanceRange[1]);
+
+        hNodeSegmentRanges.reserve(localInstanceNodeRanges.size() + 1);
+        hNodeSegmentRanges.push_back(0);
+        for(const Vector2ui& range : localInstanceNodeRanges)
+            hNodeSegmentRanges.push_back(range[1]);
     }
     else
     {
@@ -519,6 +535,11 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
         hLeafSegmentRanges.push_back(0);
         for(const Vector2ui& range : this->concreteLeafRanges)
             hLeafSegmentRanges.push_back(range[1]);
+
+        hNodeSegmentRanges.reserve(concreteNodeRanges.size() + 1);
+        hNodeSegmentRanges.push_back(0);
+        for(const Vector2ui& range : concreteNodeRanges)
+            hNodeSegmentRanges.push_back(range[1]);
     }
     uint32_t processedAccelCount = static_cast<uint32_t>(hLeafSegmentRanges.size() - 1);
     uint32_t totalLeafCount = static_cast<uint32_t>(dAllLeafs.size());
@@ -542,8 +563,6 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
     Span<Vector3> dPrimCenters;
     std::array<Span<uint32_t>, 2> dIndices;
     std::array<Span<uint64_t>, 2> dMortonCodes;
-    // Specific Part 1
-    Span<uint32_t> dCounters;
     //
     size_t segTRMemSize = SegmentedTransformReduceTMSize<AABB3, PrimitiveKey>(processedAccelCount);
     size_t segSortTMSize = SegmentedRadixSortTMSize<true, uint64_t, uint32_t>(totalLeafCount,
@@ -566,9 +585,6 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
                                  totalLeafCount, totalLeafCount,
                                  totalLeafCount, totalLeafCount,
                                  totalLeafCount, totalLeafCount});
-    // Alias the memory via alloc multi data
-    dCounters = MemAlloc::RepurposeAlloc<uint32_t>(dPrimCenters);
-
     // Copy the ranges and lets go!
     queue.MemcpyAsync(dLeafSegmentRanges, Span<const uint32_t>(hLeafSegmentRanges));
     queue.MemcpyAsync(dNodeSegmentRanges, Span<const uint32_t>(hNodeSegmentRanges));
@@ -699,7 +715,7 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
     );
 
     // 4. Sort these codes to implicitly generate the BVH
-    Iota(dIndices[0], 0u, queue);
+    SegmentedIota(dIndices[0], ToConstSpan(dLeafSegmentRanges), 0u, queue);
     uint32_t sortedIndex = SegmentedRadixSort<true, uint64_t, uint32_t>
     (
         dMortonCodes, dIndices, dTemp,
@@ -710,6 +726,11 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
         std::swap(dMortonCodes[0], dMortonCodes[1]);
         std::swap(dIndices[0], dIndices[1]);
     }
+
+    // Alias the memory, indces[1], and mortonCode[1] are not used
+    // anymore
+    Span<uint32_t> dAtomicCounters = MemAlloc::RepurposeAlloc<uint32_t>(dIndices[1]);
+    Span<uint32_t> dLeafParentIndices = MemAlloc::RepurposeAlloc<uint32_t>(dMortonCodes[1]);
 
     // 5. Now we have a multiple valid morton code lists,
     // Construct the node hierarchy
@@ -725,6 +746,7 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
         },
         // Output
         dAllNodes,
+        dLeafParentIndices,
         // Inputs
         ToConstSpan(dLeafSegmentRanges),
         ToConstSpan(dNodeSegmentRanges),
@@ -735,10 +757,8 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
         processedAccelCount
     );
 
-    DeviceDebug::DumpGPUMemToStdOut("All Nodes", ToConstSpan(dAllNodes), queue);
-
     // 6. Finally at AABB union portion now, union the AABBs.
-    queue.MemsetAsync(dCounters, 0x00);
+    queue.MemsetAsync(dAtomicCounters, 0x00);
     blockCount = queue.RecommendedBlockCountDevice(KCUnionLBVHBoundingBoxes,
                                                    TPB, 0);
     queue.IssueExactKernel<KCUnionLBVHBoundingBoxes>
@@ -751,9 +771,10 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
         },
         // Output
         dAllNodeAABBs,
-        dCounters,
+        dAtomicCounters,
         // Inputs
         ToConstSpan(dAllNodes),
+        ToConstSpan(dLeafParentIndices),
         ToConstSpan(dLeafSegmentRanges),
         ToConstSpan(dNodeSegmentRanges),
         ToConstSpan(dLeafAABBs),
@@ -761,10 +782,6 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
         BLOCK_PER_INSTANCE,
         processedAccelCount
     );
-
-    Span<const AABB3> gg(reinterpret_cast<AABB3*>(dAllNodeAABBs.data()),
-                         dAllNodeAABBs.size());
-    DeviceDebug::DumpGPUMemToStdOut("All AABBs", ToConstSpan(gg), queue);
 
     // All Done!
     // Wait GPU before dealloc
@@ -814,6 +831,51 @@ void AcceleratorGroupLBVH<PG>::CastLocalRays(// Output
                                                uint32_t workId,
                                                const GPUQueue& queue)
 {
+
+    //std::vector<CommonKey> hAccelKeys(dAccelKeys.size());
+    //std::vector<RayIndex> hRayIndices(dRayIndices.size());
+    //std::vector<RayGMem> hRays(dRays.size());
+    //std::vector<LBVHAccelDetail::LBVHNode> hNodes(dAllNodes.size());
+    //std::vector<LBVHAccelDetail::LBVHBoundingBox> hBoxes(dAllNodeAABBs.size());
+
+    //Span<LBVHAccelDetail::LBVHNode> hNodeSpan(hNodes);
+    //Span<LBVHAccelDetail::LBVHBoundingBox> hBoxSpan(hBoxes);
+
+    //queue.MemcpyAsync(Span(hAccelKeys), dAccelKeys);
+    //queue.MemcpyAsync(Span(hRayIndices), dRayIndices);
+    //queue.MemcpyAsync(Span(hRays), ToConstSpan(dRays));
+    //queue.MemcpyAsync(hNodeSpan, ToConstSpan(dAllNodes));
+    //queue.MemcpyAsync(hBoxSpan, ToConstSpan(dAllNodeAABBs));
+
+    //for(size_t i = 0; i < hRayIndices.size(); i++)
+    //{
+    //    auto [ray, tMinMax] = RayFromGMem(hRays, hRayIndices[i]);
+
+    //    // TEST
+    //    LBVHAccelDetail::BitStack bitStack;
+    //    OptionalHitR<PG> result = std::nullopt;
+    //    //
+    //    LBVHAccelDetail::TraverseLBVH<LBVHAccelDetail::BitStack::MAX_DEPTH>
+    //    (
+    //        bitStack, ToConstSpan(hNodeSpan), ToConstSpan(hBoxSpan),
+    //        tMinMax, ray, 0u,
+    //        [&](Vector2& tMM, uint32_t leafIndex)
+    //        {
+    //            // Never terminate
+    //            return false;
+    //        }
+    //    );
+    //};
+
+
+
+
+
+
+
+
+
+
     uint32_t localWorkId = workId - this->globalWorkIdToLocalOffset;
     const auto& workOpt = this->workInstances.at(localWorkId);
 

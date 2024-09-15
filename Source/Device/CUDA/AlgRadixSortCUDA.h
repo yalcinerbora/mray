@@ -114,20 +114,23 @@ uint32_t SegmentedRadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
     size_t tmSize = dTempMemory.size();
     int totalElemCount = static_cast<int>(dKeyDoubleBuffer[0].size());
     int totalSegments = static_cast<int>(dSegmentRanges.size() - 1);
+
     if constexpr(IsAscending)
         CUDA_CHECK(DeviceSegmentedRadixSort::SortPairs(dTempMemory.data(), tmSize,
                                                        keys, values,
                                                        totalElemCount, totalSegments,
                                                        dSegmentRanges.data(),
                                                        dSegmentRanges.data() + 1,
-                                                       bitRange[0], bitRange[1]));
+                                                       bitRange[0], bitRange[1],
+                                                       ToHandleCUDA(queue)));
     else
         CUDA_CHECK(DeviceRadixSort::SortPairsDescending(dTempMemory.data(), tmSize,
                                                         keys, values,
                                                         totalElemCount, totalSegments,
                                                         dSegmentRanges.data(),
                                                         dSegmentRanges.data() + 1,
-                                                        bitRange[0], bitRange[1]));
+                                                        bitRange[0], bitRange[1],
+                                                        ToHandleCUDA(queue)));
     uint32_t result = (keys.Current() == dKeyDoubleBuffer[0].data()) ? 0u : 1u;
     assert(((values.Current() == dValueDoubleBuffer[0].data()) ? 0u : 1u) == result);
     return result;

@@ -26,31 +26,34 @@ namespace LBVHAccelDetail
     class BitStack
     {
         public:
-        static constexpr uint32_t MAX_DEPTH = sizeof(uint32_t) * CHAR_BIT;
+        static constexpr uint32_t MAX_DEPTH = sizeof(uint64_t) * CHAR_BIT;
 
         enum TraverseState
         {
             FIRST_ENTRY = 0b00,
-            U_TURN      = 0b01
+            U_TURN      = 0b01,
+            GO_UP       = 0b10,
+            // This shouldn't happen?
+            INVALID     = 0b11
         };
 
         private:
-        uint32_t    stack;
+        uint64_t    stack;
         uint32_t    depth;
 
         public:
-        MRAY_GPU                BitStack();
-        MRAY_GPU                BitStack(uint32_t state, uint32_t depth);
-
-        MRAY_GPU void           WipeLowerBits();
-        MRAY_GPU TraverseState  CurrentState() const;
-        MRAY_GPU void           MarkAsTraversed();
-        MRAY_GPU void           Descend();
-        MRAY_GPU void           Ascend();
+        MRAY_HYBRID                 BitStack();
+        MRAY_HYBRID                 BitStack(uint64_t state, uint32_t depth);
+        MRAY_HYBRID
+        MRAY_HYBRID void            WipeLowerBits();
+        MRAY_HYBRID TraverseState   CurrentState() const;
+        MRAY_HYBRID void            MarkAsTraversed();
+        MRAY_HYBRID void            Descend();
+        MRAY_HYBRID void            Ascend();
         // Access
-        MRAY_GPU uint32_t       Depth() const;
+        MRAY_HYBRID uint32_t        Depth() const;
         template<uint32_t SBits, uint32_t DBits>
-        MRAY_GPU uint32_t       CompressState() const;
+        MRAY_HYBRID uint32_t        CompressState() const;
     };
 
     // Utilize "Key" type here to use the MSB as a flag
@@ -191,6 +194,8 @@ class AcceleratorGroupLBVH final : public AcceleratorGroupT<AcceleratorGroupLBVH
     Span<LBVHBoundingBox>           dAllNodeAABBs;
 
     void    MulitBuildLBVH(Pair<const uint32_t, const AcceleratorWorkI*>* accelWork,
+                           const std::vector<Vector2ui>& instanceNodeRanges,
+                           const std::vector<Vector2ui>& concreteNodeRanges,
                            const GPUQueue& queue);
 
     public:
@@ -317,6 +322,7 @@ void KCGenMortonCode(// Output
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCConstructLBVHInternalNodes(// Output
                                   MRAY_GRID_CONSTANT const Span<LBVHAccelDetail::LBVHNode> dAllNodes,
+                                  MRAY_GRID_CONSTANT const Span<uint32_t> dAllLeafParentIndices,
                                   // Inputs
                                   MRAY_GRID_CONSTANT const Span<const uint32_t> dLeafSegmentRanges,
                                   MRAY_GRID_CONSTANT const Span<const uint32_t> dNodeSegmentRanges,
@@ -332,6 +338,7 @@ void KCUnionLBVHBoundingBoxes(// I-O
                               MRAY_GRID_CONSTANT const Span<uint32_t> dAtomicCounters,
                               // Inputs
                               MRAY_GRID_CONSTANT const Span<const LBVHAccelDetail::LBVHNode> dAllNodes,
+                              MRAY_GRID_CONSTANT const Span<const uint32_t> dAllLeafParentIndices,
                               MRAY_GRID_CONSTANT const Span<const uint32_t> dLeafSegmentRanges,
                               MRAY_GRID_CONSTANT const Span<const uint32_t> dNodeSegmentRanges,
                               MRAY_GRID_CONSTANT const Span<const AABB3> dAllLeafAABBs,

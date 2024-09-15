@@ -501,9 +501,9 @@ constexpr uint32_t MortonCode::Compose3D(const Vector3ui& val)
         // https://fgiesen.wordpress.com/2009/12/13/decoding-morton-codes/
         x &= 0x000003ff;
         x = (x ^ (x << 16)) & 0xff0000ff;
-        x = (x ^ (x << 8)) & 0x0300f00f;
-        x = (x ^ (x << 4)) & 0x030c30c3;
-        x = (x ^ (x << 2)) & 0x09249249;
+        x = (x ^ (x << 8) ) & 0x0300f00f;
+        x = (x ^ (x << 4) ) & 0x030c30c3;
+        x = (x ^ (x << 2) ) & 0x09249249;
         return x;
     };
 
@@ -524,9 +524,9 @@ constexpr uint64_t MortonCode::Compose3D(const Vector3ui& val)
         x &= 0x1fffff;
         x = (x | x << 32) & 0x001f00000000ffff;
         x = (x | x << 16) & 0x001f0000ff0000ff;
-        x = (x | x << 8) & 0x100f00f00f00f00f;
-        x = (x | x << 4) & 0x10c30c30c30c30c3;
-        x = (x | x << 2) & 0x1249249249249249;
+        x = (x | x << 8 ) & 0x100f00f00f00f00f;
+        x = (x | x << 4 ) & 0x10c30c30c30c30c3;
+        x = (x | x << 2 ) & 0x1249249249249249;
         return x;
     };
 
@@ -543,9 +543,9 @@ constexpr Vector3ui MortonCode::Decompose3D(uint32_t code)
     auto Shrink3D = [](uint32_t x) -> uint32_t
     {
         x &= 0x09249249;
-        x = (x ^ (x >> 2)) & 0x030c30c3;
-        x = (x ^ (x >> 4)) & 0x0300f00f;
-        x = (x ^ (x >> 8)) & 0xff0000ff;
+        x = (x ^ (x >> 2) ) & 0x030c30c3;
+        x = (x ^ (x >> 4) ) & 0x0300f00f;
+        x = (x ^ (x >> 8) ) & 0xff0000ff;
         x = (x ^ (x >> 16)) & 0x000003ff;
         return x;
     };
@@ -563,9 +563,9 @@ constexpr Vector3ui MortonCode::Decompose3D(uint64_t code)
     auto Shrink3D = [](uint64_t x) -> uint32_t
     {
         x &= 0x1249249249249249;
-        x = (x ^ (x >> 2)) & 0x30c30c30c30c30c3;
-        x = (x ^ (x >> 4)) & 0xf00f00f00f00f00f;
-        x = (x ^ (x >> 8)) & 0x00ff0000ff0000ff;
+        x = (x ^ (x >> 2) ) & 0x30c30c30c30c30c3;
+        x = (x ^ (x >> 4) ) & 0xf00f00f00f00f00f;
+        x = (x ^ (x >> 8) ) & 0x00ff0000ff0000ff;
         x = (x ^ (x >> 16)) & 0x00ff00000000ffff;
         x = (x ^ (x >> 32)) & 0x00000000001fffff;
         return static_cast<uint32_t>(x);
