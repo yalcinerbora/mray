@@ -617,12 +617,12 @@ std::vector<TransientData> CameraAttributeLoad(const AttributeCountList& totalCo
         if(isFovX)
         {
             fnp[0] *= MathConstants::DegToRadCoef<Float>();
-            fnp[1] = Float(2.0) * std::atan(std::tan(fnp[0] * Float(0.5)) * aspect);
+            fnp[1] = Float(2.0) * std::atan(std::tan(fnp[0] * Float(0.5)) / aspect);
         }
         else
         {
             fnp[1] *= MathConstants::DegToRadCoef<Float>();
-            fnp[0] = Float(2.0) * std::atan(std::tan(fnp[1] * Float(0.5)) / aspect);
+            fnp[0] = Float(2.0) * std::atan(std::tan(fnp[1] * Float(0.5)) * aspect);
         }
         result[0].Push(Span<const Vector4>(&fnp, 1));
 

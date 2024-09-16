@@ -28,8 +28,8 @@ class SceneLoaderMRayTest : public ::testing::Test
 
 void SceneLoaderMRayTest::SetUp()
 {
-    pool = std::make_unique<BS::thread_pool>(std::thread::hardware_concurrency(),
-                                             [](){});
+    unsigned int tCount = std::max(1u, std::thread::hardware_concurrency());
+    pool = std::make_unique<BS::thread_pool>(tCount, [](){});
     dllFile = std::make_unique<SharedLibrary>("SceneLoaderMRay");
 
     SharedLibArgs args

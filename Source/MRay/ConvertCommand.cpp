@@ -16,7 +16,7 @@ namespace MRayCLI::ConvertNames
 };
 
 ConvertCommand::ConvertCommand()
-    : threadCount(std::thread::hardware_concurrency())
+    : threadCount(std::max(1u, std::thread::hardware_concurrency()))
 {}
 
 MRayError ConvertCommand::Invoke()

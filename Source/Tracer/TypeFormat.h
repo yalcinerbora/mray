@@ -6,6 +6,23 @@
 #include <fmt/format.h>
 #include <fmt/core.h>
 
+// Uncomment when needed
+// #include "AcceleratorLinear.h"
+//template <> struct fmt::formatter<LBVHAccelDetail::LBVHNode> : formatter<std::string>
+//{
+//    auto format(LBVHAccelDetail::LBVHNode, format_context& ctx) const
+//        ->format_context::iterator;
+//};
+//
+//inline auto fmt::formatter<LBVHAccelDetail::LBVHNode>::format(LBVHAccelDetail::LBVHNode n,
+//                                                              format_context& ctx) const
+//    -> format_context::iterator
+//{
+//    std::string out = MRAY_FORMAT("[L{}, R{}, P:{}]",
+//                                  HexKeyT(n.leftIndex), HexKeyT(n.rightIndex), n.parentIndex);
+//    return formatter<std::string>::format(out, ctx);
+//}
+
 // Format helpers for debugging
 template<std::unsigned_integral T, uint32_t BB, uint32_t IB>
 auto format_as(const KeyT<T, BB, IB>& k)

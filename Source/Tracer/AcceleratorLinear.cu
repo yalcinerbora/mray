@@ -132,6 +132,8 @@ AABB3 BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instan
         i++;
         qIt.Next();
     }
+    // Wait all queues
+    gpuSystem.SyncAll();
 
     // Reduce the given AABBs
     // Cheeckly utilize stack mem as temp mem
@@ -219,9 +221,8 @@ void BaseAcceleratorLinear::CastRays(// Output
         );
 
         static constexpr CommonKey IdBits = AcceleratorKey::IdBits;
-        static constexpr CommonKey BatchBits = AcceleratorKey::BatchBits;
-        auto batchRange = Vector2ui(BatchBits, BatchBits + maxBitsUsedOnKey[0]);
-        auto idRange = Vector2ui(IdBits, IdBits + maxBitsUsedOnKey[1]);
+        auto batchRange = Vector2ui(IdBits, IdBits + maxBitsUsedOnKey[0]);
+        auto idRange = Vector2ui(0, maxBitsUsedOnKey[1]);
         auto
         [
             hPartitionCount,

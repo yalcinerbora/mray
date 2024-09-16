@@ -466,24 +466,6 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
     queue.Barrier().Wait();
 }
 
-#include "Device/GPUDebug.h"
-#include "TypeFormat.h"
-
-template <> struct fmt::formatter<LBVHAccelDetail::LBVHNode> : formatter<std::string>
-{
-    auto format(LBVHAccelDetail::LBVHNode, format_context& ctx) const
-        ->format_context::iterator;
-};
-
-inline auto fmt::formatter<LBVHAccelDetail::LBVHNode>::format(LBVHAccelDetail::LBVHNode n,
-                                                       format_context& ctx) const
--> format_context::iterator
-{
-    std::string out = MRAY_FORMAT("[L{}, R{}, P:{}]",
-                                  HexKeyT(n.leftIndex), HexKeyT(n.rightIndex), n.parentIndex);
-    return formatter<std::string>::format(out, ctx);
-}
-
 template<PrimitiveGroupC PG>
 void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const AcceleratorWorkI*>* accelWork,
                                               const std::vector<Vector2ui>& instanceNodeRanges,
@@ -570,7 +552,20 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
     size_t tempMemSize = std::max(segTRMemSize, segSortTMSize);
     // For simplicity we are allocating twice here
     // So we can repurpose
-    DeviceMemory tempMem({queue.Device()}, 2_MiB, 128_MiB, true);
+    size_t total = MemAlloc::RequiredAllocation<10>
+    ({
+        tempMemSize * sizeof(Byte),
+        (processedAccelCount + 1) * sizeof(uint32_t),
+        (processedAccelCount + 1) * sizeof(uint32_t) ,
+        (processedAccelCount) * sizeof(AABB3),
+        totalLeafCount * sizeof(Vector3),
+        totalLeafCount * sizeof(AABB3),
+        totalLeafCount * sizeof(uint64_t),
+        totalLeafCount * sizeof(uint64_t),
+        totalLeafCount * sizeof(uint32_t),
+        totalLeafCount * sizeof(uint32_t)
+     });
+    DeviceMemory tempMem({queue.Device()}, total, total << 1);
     // TODO: The memory can be further alised thus; reduced in size.
     MemAlloc::AllocateMultiData(std::tie(dTemp, dLeafSegmentRanges,
                                          dNodeSegmentRanges, dAccelAABBs,
@@ -831,51 +826,6 @@ void AcceleratorGroupLBVH<PG>::CastLocalRays(// Output
                                                uint32_t workId,
                                                const GPUQueue& queue)
 {
-
-    //std::vector<CommonKey> hAccelKeys(dAccelKeys.size());
-    //std::vector<RayIndex> hRayIndices(dRayIndices.size());
-    //std::vector<RayGMem> hRays(dRays.size());
-    //std::vector<LBVHAccelDetail::LBVHNode> hNodes(dAllNodes.size());
-    //std::vector<LBVHAccelDetail::LBVHBoundingBox> hBoxes(dAllNodeAABBs.size());
-
-    //Span<LBVHAccelDetail::LBVHNode> hNodeSpan(hNodes);
-    //Span<LBVHAccelDetail::LBVHBoundingBox> hBoxSpan(hBoxes);
-
-    //queue.MemcpyAsync(Span(hAccelKeys), dAccelKeys);
-    //queue.MemcpyAsync(Span(hRayIndices), dRayIndices);
-    //queue.MemcpyAsync(Span(hRays), ToConstSpan(dRays));
-    //queue.MemcpyAsync(hNodeSpan, ToConstSpan(dAllNodes));
-    //queue.MemcpyAsync(hBoxSpan, ToConstSpan(dAllNodeAABBs));
-
-    //for(size_t i = 0; i < hRayIndices.size(); i++)
-    //{
-    //    auto [ray, tMinMax] = RayFromGMem(hRays, hRayIndices[i]);
-
-    //    // TEST
-    //    LBVHAccelDetail::BitStack bitStack;
-    //    OptionalHitR<PG> result = std::nullopt;
-    //    //
-    //    LBVHAccelDetail::TraverseLBVH<LBVHAccelDetail::BitStack::MAX_DEPTH>
-    //    (
-    //        bitStack, ToConstSpan(hNodeSpan), ToConstSpan(hBoxSpan),
-    //        tMinMax, ray, 0u,
-    //        [&](Vector2& tMM, uint32_t leafIndex)
-    //        {
-    //            // Never terminate
-    //            return false;
-    //        }
-    //    );
-    //};
-
-
-
-
-
-
-
-
-
-
     uint32_t localWorkId = workId - this->globalWorkIdToLocalOffset;
     const auto& workOpt = this->workInstances.at(localWorkId);
 
@@ -896,99 +846,3 @@ void AcceleratorGroupLBVH<PG>::CastLocalRays(// Output
                         // Constants
                         queue);
 }
-//
-//template<PrimitiveGroupC PG>
-//MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-//void KCGenPrimCenters(// Output
-//                      MRAY_GRID_CONSTANT const Span<Vector3> dAllPrimCenters,
-//                      // Inputs
-//                      MRAY_GRID_CONSTANT const Span<const uint32_t> dSegmentRanges,
-//                      MRAY_GRID_CONSTANT const Span<const PrimitiveKey> dAllLeafs,
-//                      // Constants
-//                      MRAY_GRID_CONSTANT const uint32_t blockPerInstance,
-//                      MRAY_GRID_CONSTANT const uint32_t instanceCount,
-//                      MRAY_GRID_CONSTANT const typename PG::DataSoA pData)
-//{
-//    static constexpr auto TPB = StaticThreadPerBlock1D();
-//    // Block-stride loop
-//    KernelCallParams kp;
-//    uint32_t blockCount = instanceCount * blockPerInstance;
-//    for(uint32_t bI = kp.blockId; bI < blockCount; bI += kp.gridSize)
-//    {
-//        // Current instance index of this iteration
-//        uint32_t instanceI = bI / blockPerInstance;
-//        uint32_t localBI = bI % blockPerInstance;
-//        //
-//        uint32_t instanceLocalThreadId = localBI * TPB + kp.threadId;
-//        uint32_t primPerPass = TPB * blockPerInstance;
-//        //
-//        Vector2ui range = Vector2ui(dSegmentRanges[instanceI],
-//                                    dSegmentRanges[instanceI + 1]);
-//        auto dLocalLeafs = dAllLeafs.subspan(range[0],
-//                                             range[1] - range[0]);
-//        auto dLocalPrimCenters = dAllPrimCenters.subspan(range[0],
-//                                                         range[1] - range[0]);
-//
-//        // Loop invariant data
-//        // We will divide the instance local AABB to 12-bit slices
-//        // hope that the centers do not lay on the same voxel
-//        // Finally multi-block primitive loop
-//        uint32_t totalPrims = static_cast<uint32_t>(dLocalPrimCenters.size());
-//        for(uint32_t i = instanceLocalThreadId; i < totalPrims;
-//            i += primPerPass)
-//        {
-//            using Prim = typename PG:: template Primitive<>;
-//            Prim prim(TransformContextIdentity{}, pData, dLocalLeafs[i]);
-//            Vector3 center = prim.GetCenter();
-//            dLocalPrimCenters[i] = center;
-//        }
-//    }
-//}
-//
-//template<PrimitiveGroupC PG>
-//MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-//void KCGeneratePrimAABBs(// Output
-//                         MRAY_GRID_CONSTANT const Span<AABB3> dAllPrimAABBs,
-//                         // Inputs
-//                         MRAY_GRID_CONSTANT const Span<const uint32_t> dSegmentRanges,
-//                         MRAY_GRID_CONSTANT const Span<const PrimitiveKey> dAllLeafs,
-//                         // Constants
-//                         MRAY_GRID_CONSTANT const uint32_t blockPerInstance,
-//                         MRAY_GRID_CONSTANT const uint32_t instanceCount,
-//                         MRAY_GRID_CONSTANT const typename PG::DataSoA pData)
-//{
-//    static constexpr auto TPB = StaticThreadPerBlock1D();
-//    // Block-stride loop
-//    KernelCallParams kp;
-//    uint32_t blockCount = instanceCount * blockPerInstance;
-//    for(uint32_t bI = kp.blockId; bI < blockCount; bI += kp.gridSize)
-//    {
-//        // Current instance index of this iteration
-//        uint32_t instanceI = bI / blockPerInstance;
-//        uint32_t localBI = bI % blockPerInstance;
-//        //
-//        uint32_t instanceLocalThreadId = localBI * TPB + kp.threadId;
-//        uint32_t primPerPass = TPB * blockPerInstance;
-//        //
-//        Vector2ui range = Vector2ui(dSegmentRanges[instanceI],
-//                                    dSegmentRanges[instanceI + 1]);
-//        auto dLocalLeafs = dAllLeafs.subspan(range[0],
-//                                             range[1] - range[0]);
-//        auto dLocalPrimAABBs = dAllPrimAABBs.subspan(range[0],
-//                                                     range[1] - range[0]);
-//
-//        // Loop invariant data
-//        // We will divide the instance local AABB to 12-bit slices
-//        // hope that the centers do not lay on the same voxel
-//        // Finally multi-block primitive loop
-//        uint32_t totalPrims = static_cast<uint32_t>(dLocalPrimAABBs.size());
-//        for(uint32_t i = instanceLocalThreadId; i < totalPrims;
-//            i += primPerPass)
-//        {
-//            using Prim = typename PG:: template Primitive<>;
-//            Prim prim(TransformContextIdentity{}, pData, dLocalLeafs[i]);
-//            AABB3 center = prim.GetAABB();
-//            dLocalPrimAABBs[i] = center;
-//        }
-//    }
-//}

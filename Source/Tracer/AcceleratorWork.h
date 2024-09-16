@@ -363,7 +363,7 @@ void AcceleratorWork<AG, TG>::CastLocalRays(// Output
     queue.IssueSaturatingKernel<KCLocalRayCast<AG, TG>>
     (
         "KCCastLocalRays-"s + std::string(TypeName()),
-        KernelIssueParams{.workCount = static_cast<uint32_t>(dRays.size())},
+        KernelIssueParams{.workCount = static_cast<uint32_t>(dRayIndices.size())},
         //
         dHitIds,
         dHitParams,

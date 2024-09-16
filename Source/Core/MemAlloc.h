@@ -63,12 +63,15 @@ std::vector<size_t> AllocateTextureSpace(Memory& memory,
                                          const std::vector<size_t>& sizes,
                                          const std::vector<size_t>& alignments);
 
+template<size_t N>
+size_t RequiredAllocation(const std::array<size_t, N>& byteSizeList,
+                          size_t alignment = DefaultSystemAlignment());
+
 template <ImplicitLifetimeC Left, ImplicitLifetimeC Right>
 requires RepurposeAllocRequirements<Left, Right>
 constexpr Span<Left> RepurposeAlloc(Span<Right> rhs);
 
 }
-
 
 namespace MemAlloc::Detail
 {
@@ -194,7 +197,15 @@ std::vector<size_t> AllocateTextureSpace(Memory& memory,
     return offsets;
 }
 
-
+template<size_t N>
+size_t RequiredAllocation(const std::array<size_t, N>& byteSizeList,
+                          size_t alignment)
+{
+    size_t result = 0;
+    for(size_t i = 0; i < N; i++)
+        result += Math::NextMultiple(byteSizeList[i], alignment);
+    return result;
+}
 template <ImplicitLifetimeC Left, ImplicitLifetimeC Right>
 requires RepurposeAllocRequirements<Left, Right>
 constexpr Span<Left> RepurposeAlloc(Span<Right> rhs)

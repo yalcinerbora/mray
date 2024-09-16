@@ -726,7 +726,7 @@ void ReconFilterGenericRGBAtomic(// Output
                                  const Span<const ImageCoordinate>& dImgCoords,
                                  // Constants
                                  Float scalarWeightMultiplier,
-                                 Float filterRadius,
+                                 Float,
                                  Filter filter,
                                  const GPUQueue& queue)
 {
@@ -965,7 +965,7 @@ void TextureFilterT<E, FF>::GenerateMips(const std::vector<MipArray<SurfRefVaria
                                          const std::vector<MipGenParams>& params) const
 {
     using namespace std::string_literals;
-    static const std::string Name = ("ConvertColor"s + std::string(FilterType::ToString(E)));
+    static const std::string Name = ("GenerateMips"s + std::string(FilterType::ToString(E)));
     static const auto annotation = gpuSystem.CreateAnnotation(Name);
     const auto _ = annotation.AnnotateScope();
 

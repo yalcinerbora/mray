@@ -7,10 +7,6 @@
 #include "Device/GPUSystem.hpp"
 #include "Device/GPUAlgGeneric.h"
 
-// TODO: Remove later
-#include "TypeFormat.h"
-#include "Device/GPUDebug.h"
-
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCGenerateWorkKeys(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
                         MRAY_GRID_CONSTANT const Span<const HitKeyPack> dInputKeys,
@@ -217,11 +213,6 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     // And initialze the hashes
     workHasher = InitializeHashes(dWorkHashes, dWorkBatchIds, queue);
 
-    //auto* ptr = reinterpret_cast<KeyT<uint32_t, 3, 29>*>(dWorkHashes.data());
-    //Span<const KeyT<uint32_t, 3, 29>> dHashSpan(ptr, dWorkHashes.size());
-    //DeviceDebug::DumpGPUMemToStdOut("WorkHashes", ToConstSpan(dWorkHashes), queue);
-    //DeviceDebug::DumpGPUMemToStdOut("WorkBatchIds", ToConstSpan(dWorkBatchIds), queue);
-
     // Initialize ray partitioner with worst case scenario,
     // All work types are used. (We do not use camera work
     // for this type of renderer)
@@ -355,8 +346,6 @@ RendererOutput SurfaceRenderer::DoRender()
         dRays, dIndices, processQueue
     );
 
-    //DeviceDebug::DumpGPUMemToFile("dHitKeys", ToConstSpan(dHitKeys), processQueue);
-
     // Generate work keys from hit packs
     using namespace std::string_literals;
     static const std::string GenWorkKernelName = std::string(TypeName()) + "-KCGenerateWorkKeys"s;
@@ -368,13 +357,6 @@ RendererOutput SurfaceRenderer::DoRender()
         ToConstSpan(dHitKeys),
         workHasher
     );
-
-    //DeviceDebug::DumpGPUMemToFile("dHashes", ToConstSpan(dKeys), processQueue);
-    //auto* ptr = reinterpret_cast<KeyT<uint32_t, 3, 29>*>(dKeys.data());
-    //Span<const KeyT<uint32_t, 3, 29>> dKeySpan(ptr, dKeys.size());
-    //DeviceDebug::DumpGPUMemToFile("dHashes", ToConstSpan(dKeys), processQueue);
-    //DeviceDebug::DumpGPUMemToFile("dHashes", dKeySpan, processQueue);
-    //DeviceDebug::DumpGPUMemToFile("dIndicesIn2", ToConstSpan(dIndices), processQueue);
 
     // Finally, partition using the generated keys.
     // Fully partition here using single sort
@@ -393,8 +375,6 @@ RendererOutput SurfaceRenderer::DoRender()
     assert(isHostVisible);
     // Wait for results to be available in host buffers
     processQueue.Barrier().Wait();
-    //DeviceDebug::DumpGPUMemToFile("dPartitionIndicesFull", ToConstSpan(dPartitionIndices), processQueue);
-    //DeviceDebug::DumpGPUMemToFile("dPartitionKeysFull", ToConstSpan(dPartitionKeys), processQueue);
 
     GlobalState globalState{currentOptions.mode};
     for(uint32_t i = 0; i < hPartitionCount[0]; i++)

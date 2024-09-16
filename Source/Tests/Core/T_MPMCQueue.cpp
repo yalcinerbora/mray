@@ -18,7 +18,8 @@ TEST(MPMCQueueTest, Stress)
 
     for(uint32_t iter = 0; iter < StressIterations; iter++)
     {
-        std::uniform_int_distribution<uint32_t> threadDist(1, std::thread::hardware_concurrency());
+        unsigned int tCount = std::max(1u, std::thread::hardware_concurrency());
+        std::uniform_int_distribution<uint32_t> threadDist(1, tCount);
         std::uniform_int_distribution<uint32_t> queueDist(1, MaxQueueSize);
         std::uniform_int_distribution<uint32_t> itemDist(1, MaxPushSize);
 

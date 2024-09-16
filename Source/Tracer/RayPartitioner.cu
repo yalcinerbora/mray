@@ -315,8 +315,6 @@ RayPartitioner::InitialBuffers RayPartitioner::Start(uint32_t rayCountIn,
     };
 }
 
-#include "Device/GPUDebug.h"
-
 MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
                                                     Span<CommonIndex> dIndicesIn,
                                                     const Vector2ui& keyDataBitRange,
@@ -376,9 +374,6 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
     Span<uint32_t> dSparseSplitIndices = RepurposeAlloc<uint32_t>(dIndicesDB[1]).subspan(0, partitionedRayCount);
     Span<uint32_t> dDenseSplitIndices = RepurposeAlloc<uint32_t>(dKeysDB[1]).subspan(0, partitionedRayCount);
 
-    //DeviceDebug::DumpGPUMemToFile("dSortedKeys",
-    //                              ToConstSpan(dSortedKeys), queue);
-
     // Mark the split positions
     uint32_t blockCount = queue.RecommendedBlockCountDevice(&KCFindSplits<FIND_SPLITS_TPB>,
                                                             FIND_SPLITS_TPB, 0);
@@ -406,10 +401,6 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
             return (id != INVALID_LOCATION);
         }
     );
-
-    //DeviceDebug::DumpGPUMemToFile("dSparseSplitIndices", ToConstSpan(dSparseSplitIndices), queue);
-    //DeviceDebug::DumpGPUMemToFile("dDenseSplitIndices", ToConstSpan(dDenseSplitIndices), queue);
-
     Span<uint32_t> hdPartitionStartOffsets = (isResultsInHostVisible) ? hPartitionStartOffsets : dPartitionStartOffsets;
     Span<uint32_t> hdPartitionKeys = (isResultsInHostVisible) ? hPartitionKeys : dPartitionKeys;
 

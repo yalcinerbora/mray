@@ -82,13 +82,17 @@ class AABBFetchFunctor
 class KeyGeneratorFunctor
 {
 
-    uint32_t accelBatchId;
+    CommonKey accelBatchId;
+    CommonKey accelIdStart;
     Span<AcceleratorKey> dLocalKeyWriteRegion;
 
     public:
-    KeyGeneratorFunctor(uint32_t b, Span<AcceleratorKey> kw)
-        : accelBatchId(b)
-        , dLocalKeyWriteRegion(kw)
+    KeyGeneratorFunctor(CommonKey accelBatchIdIn,
+                        CommonKey accelIdStartIn,
+                        Span<AcceleratorKey> dWriteRegions)
+        : accelBatchId(accelBatchIdIn)
+        , accelIdStart(accelIdStartIn)
+        , dLocalKeyWriteRegion(dWriteRegions)
     {}
 
     MRAY_HYBRID MRAY_CGPU_INLINE
@@ -96,8 +100,7 @@ class KeyGeneratorFunctor
     {
         uint32_t keyCount = static_cast<uint32_t>(dLocalKeyWriteRegion.size());
         for(uint32_t i = kp.GlobalId(); i < keyCount; i += kp.TotalSize())
-            dLocalKeyWriteRegion[kp.GlobalId()] =
-                AcceleratorKey::CombinedKey(accelBatchId, kp.GlobalId());
+            dLocalKeyWriteRegion[i] = AcceleratorKey::CombinedKey(accelBatchId, i + accelIdStart);
     }
 };
 
@@ -1005,10 +1008,10 @@ void AcceleratorGroupT<C, PG>::WriteInstanceKeysAndAABBsInternal(Span<AABB3> aab
         for(const auto& kv : workInstances)
         {
             uint32_t index = kv.first;
-            size_t size = (workInstanceOffsets[index + 1] -
-                           workInstanceOffsets[index]);
+            size_t wIOffset = workInstanceOffsets[index];
+            size_t size = (workInstanceOffsets[index + 1] - wIOffset);
             // Copy the keys as well
-            Span<AcceleratorKey> dLocalKeyWriteRegion = keyWriteRegion.subspan(workInstanceOffsets[index], size);
+            Span<AcceleratorKey> dLocalKeyWriteRegion = keyWriteRegion.subspan(wIOffset, size);
             uint32_t accelBatchId = globalWorkIdToLocalOffset + index;
             using namespace std::string_literals;
             static const auto KernelName = "KCCopyLocalAccelKeys-"s + std::string(C::TypeName());
@@ -1017,7 +1020,7 @@ void AcceleratorGroupT<C, PG>::WriteInstanceKeysAndAABBsInternal(Span<AABB3> aab
             (
                 KernelName,
                 KernelIssueParams{.workCount = static_cast<uint32_t>(size)},
-                KeyGeneratorFunctor(accelBatchId, dLocalKeyWriteRegion)
+                KeyGeneratorFunctor(accelBatchId, wIOffset, dLocalKeyWriteRegion)
             );
         }
         //  Don't forget to wait for temp memory!
@@ -1224,6 +1227,9 @@ void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<AccelGroupCon
 template <class C>
 void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
 {
+    static const auto annotation = gpuSystem.CreateAnnotation("Accelerator Construct");
+    const auto _ = annotation.AnnotateScope();
+
     std::vector<AccelGroupConstructParams> partitions;
     PartitionSurfaces(partitions, p.mSurfList, p.primGroups,
                       p.transformGroups, p.texViewMap);
@@ -1299,6 +1305,15 @@ void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
     using namespace Bit;
     maxBitsUsedOnKey = Vector2ui(RequiredBitsToRepresent(keyBatchPortionMax),
                                  RequiredBitsToRepresent(keyIdPortionMax));
+    // Calidate
+    if(maxBitsUsedOnKey[0] > AcceleratorKey::BatchBits ||
+       maxBitsUsedOnKey[1] > AcceleratorKey::IdBits)
+    {
+        throw MRayError("[{}]: Too many bits on accelerator [{}|{}], AcceleratorKey can hold "
+                        "[{}|{}] amount of bits",
+                        C::TypeName(), maxBitsUsedOnKey[0], maxBitsUsedOnKey[1],
+                        AcceleratorKey::BatchBits, AcceleratorKey::IdBits);
+    }
 
     // Internal construction routine,
     // we can not fetch the leaf data here because some accelerators are

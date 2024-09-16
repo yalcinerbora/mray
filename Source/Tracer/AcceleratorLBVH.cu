@@ -500,6 +500,8 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
         i++;
         qIt.Next();
     }
+    // Wait all queues
+    gpuSystem.SyncAll();
 
     // Lets start, the algorithm chain is defined in the AcceleratorGroup,
     // refer to it for clarification.
@@ -528,7 +530,20 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
     Span<Vector3> dAABBCenters;
     std::array<Span<uint32_t>, 2> dIndices;
     std::array<Span<uint64_t>, 2> dMortonCodes;
-    DeviceMemory tempMem({queue.Device()}, 2_MiB, 128_MiB);
+
+    size_t total = MemAlloc::RequiredAllocation<10>
+    ({
+        tmSize * sizeof(Byte),
+        1 * sizeof(AABB3),
+        2 * sizeof(uint32_t) ,
+        2 * sizeof(uint32_t),
+        instanceCount * sizeof(Vector3),
+        instanceCount * sizeof(uint64_t),
+        instanceCount * sizeof(uint64_t),
+        instanceCount * sizeof(uint32_t),
+        instanceCount * sizeof(uint32_t)
+        });
+    DeviceMemory tempMem({queue.Device()}, total, total << 1);
     MemAlloc::AllocateMultiData(std::tie(dTemp, dSceneAABB,
                                          dLeafSegmentRange, dNodeSegmentRange,
                                          dAABBCenters,
@@ -557,23 +572,18 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
     // TODO: Change this later maybe?
     queue.IssueSaturatingKernel<KCGenAABBCenters>
     (
-        "KCGenCentersFromAABB-Base",
+        "KCGenCentersFromAABBs",
         KernelIssueParams{.workCount = static_cast<uint32_t>(instanceCount)},
         dAABBCenters,
         dLeafAABBs
     );
-
-    //DeviceDebug::DumpGPUMemToStdOut("Scene AABB",
-    //                                ToConstSpan(dSceneAABB), queue);
-    //DeviceDebug::DumpGPUMemToStdOut("Base AABB Centers",
-    //                                ToConstSpan(dAABBCenters), queue);
 
     static constexpr auto TPB = StaticThreadPerBlock1D();
     uint32_t blockCount = queue.RecommendedBlockCountDevice(KCGenMortonCode,
                                                             TPB, 0);
     queue.IssueExactKernel<KCGenMortonCode>
     (
-        "KCGenMortonCodes-Base",
+        "KCGenMortonCodes",
         KernelExactIssueParams
         {
             .gridSize = blockCount,
@@ -588,9 +598,6 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
         dAABBCenters,
         blockPerSegment
     );
-
-    //DeviceDebug::DumpGPUMemToStdOut<DeviceDebug::HEXEDECIMAL>("Base Morton",
-    //                                                          ToConstSpan(dMortonCodes[0]), queue);
 
     // Sort
     Iota(dIndices[0], 0u, queue);
@@ -639,7 +646,7 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
                                                    TPB, 0);
     queue.IssueExactKernel<KCUnionLBVHBoundingBoxes>
     (
-        "KCUnionLBVHBoundingBoxes-Base",
+        "KCUnionLBVHBoundingBoxes",
         KernelExactIssueParams
         {
             .gridSize = blockCount,
@@ -657,15 +664,6 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
         //
         blockPerSegment, 1
     );
-
-    //DeviceDebug::DumpGPUMemToStdOut("BaseBVH Nodes", ToConstSpan(dNodes), queue);
-
-    //Span<const AABB3> nAABBs(reinterpret_cast<AABB3*>(dBoundingBoxes.data()),
-    //                         dBoundingBoxes.size());
-    //DeviceDebug::DumpGPUMemToStdOut("Base Node AABBs", ToConstSpan(nAABBs), queue);
-    //Span<const AABB3> lAABBs(reinterpret_cast<AABB3*>(dLeafAABBs.data()),
-    //                         dLeafAABBs.size());
-    //DeviceDebug::DumpGPUMemToStdOut("Base Leaf AABBs", ToConstSpan(lAABBs), queue);
 
     // Issue copy and wait
     LBVHBoundingBox hBBox;
@@ -753,9 +751,8 @@ void BaseAcceleratorLBVH::CastRays(// Output
         );
 
         static constexpr CommonKey IdBits = AcceleratorKey::IdBits;
-        static constexpr CommonKey BatchBits = AcceleratorKey::BatchBits;
-        auto batchRange = Vector2ui(BatchBits, BatchBits + maxBitsUsedOnKey[0]);
-        auto idRange = Vector2ui(IdBits, IdBits + maxBitsUsedOnKey[1]);
+        auto batchRange = Vector2ui(IdBits, IdBits + maxBitsUsedOnKey[0]);
+        auto idRange = Vector2ui(0, maxBitsUsedOnKey[1]);
         auto
         [
             hPartitionCount,
