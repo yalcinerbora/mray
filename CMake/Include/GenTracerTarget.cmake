@@ -8,6 +8,14 @@ function(gen_tracer_target)
     cmake_parse_arguments(GEN_TRACER_TARGET "${options}" "${oneValueArgs}"
                           "${multiValueArgs}" ${ARGN})
 
+    if(MRAY_ENABLE_HW_ACCELERATION AND
+       GEN_TRACER_TARGET_NAME STREQUAL "CUDA")
+       set(MRAY_OPTIX ON)
+    else()
+        set(MRAY_OPTIX OFF)
+    endif()
+    message(STATUS "MRAY_OPTIX: ${MRAY_OPTIX}")
+
     set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/Tracer)
 
     set(SRC_TEXTURE
@@ -143,6 +151,36 @@ function(gen_tracer_target)
     source_group("Utility" FILES ${SRC_UTILITY})
     source_group("" FILES ${SRC_COMMON})
 
+    # Enable/Disable HW Acceleration
+    if(MRAY_OPTIX)
+
+        set(SRC_ACCELLERATORS_HW
+            ${CURRENT_SOURCE_DIR}/OptiX/AcceleratorOptiX.cu
+            ${CURRENT_SOURCE_DIR}/OptiX/AcceleratorOptiX.h
+            ${CURRENT_SOURCE_DIR}/OptiX/AcceleratorOptiX.hpp)
+
+        set(SRC_ACCELLERATORS_PTX
+            ${CURRENT_SOURCE_DIR}/OptiX/OptiXPTX.cu
+            ${CURRENT_SOURCE_DIR}/OptiX/OptiXPTX.h)
+
+        set(SRC_ALL ${SRC_ALL}
+            ${SRC_ACCELLERATORS_HW}
+            ${SRC_ACCELLERATORS_PTX})
+
+        # Make OptiX Sources not participate in build
+        # only on the Tracer Target (so we can accsess
+        # them easily in IDE)
+        set_source_files_properties(${SRC_ACCELLERATORS_PTX}
+            PROPERTIES HEADER_FILE_ONLY TRUE)
+
+        source_group("Accelerators/OptiX" FILES
+                     ${SRC_ACCELLERATORS_HW})
+        source_group("Accelerators/OptiX/IR" FILES
+                     ${SRC_ACCELLERATORS_PTX})
+        source_group("" FILES ${SRC_ACCELLERATORS_PTX})
+    endif()
+
+    # Finally Gen Library
     set(TARGET_FULL_NAME "Tracer${GEN_TRACER_TARGET_NAME}")
     set(DEVICE_TARGET_FULL_NAME "Device${GEN_TRACER_TARGET_NAME}")
     add_library(${TARGET_FULL_NAME} STATIC ${SRC_ALL})
@@ -157,6 +195,16 @@ function(gen_tracer_target)
                           mray::meta_compile_opts
                           mray::cuda_extra_compile_opts)
 
+    # Optix Related Target definitions
+    if(MRAY_OPTIX)
+        target_include_directories(${TARGET_FULL_NAME}
+                                   PRIVATE
+                                   ${OPTIX_INCLUDE_DIR})
+        target_compile_definitions(${TARGET_FULL_NAME}
+                                   PUBLIC
+                                   MRAY_OPTIX)
+    endif()
+
     set_target_properties(${TARGET_FULL_NAME} PROPERTIES
                           POSITION_INDEPENDENT_CODE ON
                           CUDA_SEPARABLE_COMPILATION ON
@@ -165,5 +213,16 @@ function(gen_tracer_target)
     add_precompiled_headers(TARGET ${TARGET_FULL_NAME})
 
     set(GEN_TRACER_TARGET_NAME ${TARGET_FULL_NAME} PARENT_SCOPE)
+
+    # Generate OptiX-IR compilation target
+    if(MRAY_OPTIX)
+        # Here we can not directly use the nvcc_compile_optix_ir
+        # since we set set_source_files_properties to HEADER_FILE_ONLY
+        # This will creep up to the nvcc_compile_optix_ir
+        # Little bit of spagetti, since this is function itself
+        # thus, folder OptiX should be in "TracerDevice" folder
+        # instead of the "Include" folder
+        add_subdirectory(OptiX)
+    endif()
 
 endfunction()

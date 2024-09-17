@@ -10,6 +10,8 @@
 template<uint32_t N>
 class MetaHitT
 {
+    public:
+    static constexpr uint32_t MaxDim = N;
     private:
     Vector<N, Float>        vec;
 

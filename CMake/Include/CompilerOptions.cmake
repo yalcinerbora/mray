@@ -205,21 +205,6 @@ set(MRAY_PREPROCESSOR_DEFS_CUDA
     __CDPRT_SUPPRESS_SYNC_DEPRECATION_WARNING
 )
 
-if(MRAY_USE_OPTIX)
-    set(MRAY_PREPROCESSOR_DEFS_GENERIC
-        ${MRAY_PREPROCESSOR_DEFS_GENERIC} -DMRAY_OPTIX)
-
-    # There is not a easiy way to convert "native" to actual cc number
-    # so that the optix can load the actual cc version so we add preporcessor directive
-    # so that the module loader select native
-    # TODO: Change this to environment variable or something better
-    # maybe query the native CC from nvcc ? if that is something.
-    if(${CMAKE_CUDA_ARCHITECTURES} STREQUAL "native")
-        set(MRAY_PREPROCESSOR_DEFS_GENERIC ${MRAY_PREPROCESSOR_DEFS_GENERIC}
-            MRAY_OPTIX_USE_NATIVE_CC)
-    endif()
-endif()
-
 add_library(meta_compile_opts INTERFACE)
 add_library(cuda_extra_compile_opts INTERFACE)
 

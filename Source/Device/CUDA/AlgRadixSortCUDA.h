@@ -4,8 +4,18 @@
 #include "Core/Types.h"
 #include "GPUSystemCUDA.h"
 
+
+#ifdef MRAY_WINDOWS
+    #pragma warning( push )
+    #pragma warning( disable : 4706)
+#endif
+
 #include <cub/device/device_radix_sort.cuh>
 #include <cub/device/device_segmented_radix_sort.cuh>
+
+#ifdef MRAY_WINDOWS
+    #pragma warning( pop )
+#endif
 
 namespace mray::cuda::algorithms
 {

@@ -32,7 +32,7 @@ set(MRAY_DEVICE_BACKEND "MRAY_GPU_BACKEND_CUDA"
 set_property(CACHE MRAY_DEVICE_BACKEND
              PROPERTY STRINGS MRAY_GPU_BACKEND_CUDA)
 
-option(MRAY_USE_OPTIX "Try to find and use OptiX" OFF)
+option(MRAY_ENABLE_HW_ACCELERATION "Try to find, compile and and use HW accelration (i.e. this means OptiX for CUDA)" OFF)
 option(MRAY_BUILD_TESTS "Build Tests" ON)
 option(MRAY_EXPORT_COMPILE_COMMANDS "Export compile commands for IWYU" ON)
 option(MRAY_ENABLE_PCH "Enable precompiled headers functionality" OFF)
@@ -44,17 +44,6 @@ set(CMAKE_CUDA_STANDARD_REQUIRED True)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CUDA_RUNTIME_LIBRARY Shared)
-
-# Find Optix If Available
-if(MRAY_USE_OPTIX)
-    find_package(OPTIX 7)
-    if(NOT OPTIX_FOUND)
-        # Maybe we could not able to find the optix
-        # expose the OPTIX_DIR (in cmake-GUI) so user can manually set it
-        message(FATAL_ERROR "Optix Not Found, either set OPTIX_INSTALL_DIR or disable MRAY_USE_OPTIX")
-        set(MRAY_USE_OPTIX CACHE BOOL OFF)
-    endif()
-endif()
 
 # Set compile command export
 if(MRAY_EXPORT_COMPILE_COMMANDS)

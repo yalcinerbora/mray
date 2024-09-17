@@ -19,6 +19,17 @@ set(SRC_ALL
 
 source_group("" FILES ${SRC_COMMON})
 
+# Find OptiX if requested
+if(MRAY_ENABLE_HW_ACCELERATION)
+    find_package(OPTIX 8)
+    if(NOT OPTIX_FOUND)
+        # Maybe we could not able to find the optix
+        # expose the OPTIX_DIR (in cmake-GUI) so user can manually set it
+        message(FATAL_ERROR "OptiX Not Found, either set OPTIX_INSTALL_DIR or disable MRAY_ENABLE_HW_ACCELERATION")
+        set(MRAY_ENABLE_HW_ACCELERATION CACHE BOOL OFF)
+    endif()
+endif()
+
 # Target Generation
 gen_device_target(NAME ${MRAY_GPU_PLATFORM_NAME}
                   MACRO ${MRAY_DEVICE_BACKEND})

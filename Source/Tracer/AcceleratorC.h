@@ -1020,7 +1020,8 @@ void AcceleratorGroupT<C, PG>::WriteInstanceKeysAndAABBsInternal(Span<AABB3> aab
             (
                 KernelName,
                 KernelIssueParams{.workCount = static_cast<uint32_t>(size)},
-                KeyGeneratorFunctor(accelBatchId, wIOffset, dLocalKeyWriteRegion)
+                KeyGeneratorFunctor(accelBatchId, static_cast<uint32_t>(wIOffset),
+                                    dLocalKeyWriteRegion)
             );
         }
         //  Don't forget to wait for temp memory!

@@ -73,72 +73,72 @@ function(mray_build_ext_dependency_git)
 
     # Actual Call
     ExternalProject_Add(${BUILD_SUBPROJECT_NAME}
-                PREFIX ${SUBPROJECT_PREFIX_DIR}
-                BINARY_DIR ${SUBPROJECT_BUILD_DIR}
-                TMP_DIR ${SUBPROJECT_TMP_DIR}
-                SOURCE_DIR ${SUBPROJECT_SRC_DIR}
-                LOG_DIR ${SUBPROJECT_LOG_DIR}
-                INSTALL_DIR ${SUBPROJECT_INSTALL_DIR}
-                STAMP_DIR ${SUBPROJECT_STMP_DIR}
-                DOWNLOAD_DIR ${SUBPROJECT_DL_DIR}
+        PREFIX ${SUBPROJECT_PREFIX_DIR}
+        BINARY_DIR ${SUBPROJECT_BUILD_DIR}
+        TMP_DIR ${SUBPROJECT_TMP_DIR}
+        SOURCE_DIR ${SUBPROJECT_SRC_DIR}
+        LOG_DIR ${SUBPROJECT_LOG_DIR}
+        INSTALL_DIR ${SUBPROJECT_INSTALL_DIR}
+        STAMP_DIR ${SUBPROJECT_STMP_DIR}
+        DOWNLOAD_DIR ${SUBPROJECT_DL_DIR}
 
-                BUILD_IN_SOURCE OFF
+        BUILD_IN_SOURCE OFF
 
-                # DL Repo
-                GIT_REPOSITORY ${BUILD_SUBPROJECT_URL}
-                GIT_TAG ${BUILD_SUBPROJECT_TAG}
-                #GIT_SHALLOW ON
-                # with specific submodules if requested
-                ${BUILD_SUBPROJECT_SPECIFIC_SUBMODULES}
+        # DL Repo
+        GIT_REPOSITORY ${BUILD_SUBPROJECT_URL}
+        GIT_TAG ${BUILD_SUBPROJECT_TAG}
+        #GIT_SHALLOW ON
+        # with specific submodules if requested
+        ${BUILD_SUBPROJECT_SPECIFIC_SUBMODULES}
 
-                # Custom build root location if required
-                SOURCE_SUBDIR ${BUILD_SUBPROJECT_SOURCE_SUBDIR}
+        # Custom build root location if required
+        SOURCE_SUBDIR ${BUILD_SUBPROJECT_SOURCE_SUBDIR}
 
-                # In order to skip install
-                # I could not get it to work with lists dunno why
-                ${SUBPROJECT_INSTALL_COMMAND_ARG}
-                ${SUBPROJECT_INSTALL_COMMAND}
+        # In order to skip install
+        # I could not get it to work with lists dunno why
+        ${SUBPROJECT_INSTALL_COMMAND_ARG}
+        ${SUBPROJECT_INSTALL_COMMAND}
 
-                # Log the outputs instead of printing
-                # except when there is an error
-                LOG_DOWNLOAD OFF
-                LOG_UPDATE ON
-                LOG_PATCH ON
-                LOG_CONFIGURE ON
-                LOG_BUILD ON
-                LOG_INSTALL ON
-                LOG_OUTPUT_ON_FAILURE ON
+        # Log the outputs instead of printing
+        # except when there is an error
+        LOG_DOWNLOAD OFF
+        LOG_UPDATE ON
+        LOG_PATCH ON
+        LOG_CONFIGURE ON
+        LOG_BUILD ON
+        LOG_INSTALL ON
+        LOG_OUTPUT_ON_FAILURE ON
 
-                # Common args (it will share the generator and compiler)
-                LIST_SEPARATOR | # Use the alternate list separator
-                CMAKE_ARGS
-                    #-DCMAKE_BUILD_TYPE:STRING=$<CONFIG>
-                    -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                    -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-                    -DCMAKE_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}
-                    -DCMAKE_GENERATOR_TOOLSET=${CMAKE_GENERATOR_TOOLSET}
-                    -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
-                    -DCMAKE_PREFIX_PATH:PATH=${CMAKE_PREFIX_PATH}
-                    # Do not use system libraries
-                    -DCMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH=OFF
-                    # Mandate a debug postfix
-                    -DCMAKE_DEBUG_POSTFIX=d
+        # Common args (it will share the generator and compiler)
+        LIST_SEPARATOR | # Use the alternate list separator
+        CMAKE_ARGS
+            #-DCMAKE_BUILD_TYPE:STRING=$<CONFIG>
+            -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+            -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+            -DCMAKE_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}
+            -DCMAKE_GENERATOR_TOOLSET=${CMAKE_GENERATOR_TOOLSET}
+            -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
+            -DCMAKE_PREFIX_PATH:PATH=${CMAKE_PREFIX_PATH}
+            # Do not use system libraries
+            -DCMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH=OFF
+            # Mandate a debug postfix
+            -DCMAKE_DEBUG_POSTFIX=d
 
-                    # TODO: Do not do fresh install
-                    # find out a way to change package locations
-                    # since the very first config's dependencies
-                    # stays in the cache
-                    --fresh
+            # TODO: Do not do fresh install
+            # find out a way to change package locations
+            # since the very first config's dependencies
+            # stays in the cache
+            --fresh
 
-                    # Install Stuff
-                    -DCMAKE_INSTALL_PREFIX:PATH=${SUBPROJECT_INSTALL_PREFIX}
-                    ${SUBPROJECT_INSTALL_SUFFIXES}
-                    # Extra args from user to pass CMake
-                    ${BUILD_SUBPROJECT_BUILD_ARGS}
+            # Install Stuff
+            -DCMAKE_INSTALL_PREFIX:PATH=${SUBPROJECT_INSTALL_PREFIX}
+            ${SUBPROJECT_INSTALL_SUFFIXES}
+            # Extra args from user to pass CMake
+            ${BUILD_SUBPROJECT_BUILD_ARGS}
 
 
 
-                BUILD_ALWAYS OFF
+        BUILD_ALWAYS OFF
     )
 
     # Copy license file if available to the main Lib directory

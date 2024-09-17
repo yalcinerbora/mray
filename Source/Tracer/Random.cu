@@ -153,16 +153,15 @@ void RNGGroupIndependent::GenerateNumbers(// Output
                                           uint32_t dimensionCount,
                                           const GPUQueue& queue)
 {
-    uint32_t generatorCount = uint32_t(dMainStates.size());
+    uint32_t localGenCount = currentRange[1] - currentRange[0];
     using namespace std::string_view_literals;
     queue.IssueSaturatingKernel<KCGenRandomNumbersPCG32>
     (
         "KCGenRandomNumbersPCG32"sv,
-        KernelIssueParams{.workCount = generatorCount},
+        KernelIssueParams{.workCount = localGenCount},
         //
         dNumbersOut,
-        dMainStates.subspan(currentRange[0],
-                            currentRange[1] - currentRange[0]),
+        dMainStates.subspan(currentRange[0], localGenCount),
         dimensionCount
     );
 }
@@ -175,16 +174,15 @@ void RNGGroupIndependent::GenerateNumbersIndirect(// Output
                                                   uint32_t dimensionCount,
                                                   const GPUQueue& queue)
 {
-    uint32_t generatorCount = uint32_t(dMainStates.size());
+    uint32_t localGenCount = currentRange[1] - currentRange[0];
     using namespace std::string_view_literals;
     queue.IssueSaturatingKernel<KCGenRandomNumbersPCG32Indirect>
     (
         "KCGenRandomNumbersPCG32Indirect"sv,
-        KernelIssueParams{.workCount = generatorCount},
+        KernelIssueParams{.workCount = localGenCount},
         //
         dNumbersOut,
-        dMainStates.subspan(currentRange[0],
-                            currentRange[1] - currentRange[0]),
+        dMainStates.subspan(currentRange[0], localGenCount),
         dIndices,
         dimensionCount
     );
