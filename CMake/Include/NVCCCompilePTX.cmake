@@ -88,13 +88,9 @@ function(nvcc_compile_optix_ir)
         target_include_directories(${TARGET_NAME}
                                    PRIVATE
                                    ${OPTIX_INCLUDE_DIR})
-        # target_compile_definitions(${TARGET_NAME}
-        #                            PUBLIC
-        #                            MRAY_OPTIX)
-
+        #
         set_target_properties(${TARGET_NAME} PROPERTIES
                               FOLDER ${MRAY_GPU_PLATFORM_NAME}/OptiX)
-
         # I could not figure to use generator expressions here
         # so we write to a different folder for each CC
         set(OUTPUT "${MRAY_CONFIG_BIN_DIRECTORY}/OptiXShaders/CC_${COMPUTE_CAPABILITY}")

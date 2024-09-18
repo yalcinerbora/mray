@@ -158,6 +158,7 @@ concept BaseAccelC = true;
 //                       // Constants
 //                       gpuSystem)} -> std::same_as<void>;
 //};
+class BaseAcceleratorI;
 
 namespace TracerLimits
 {
@@ -221,6 +222,7 @@ class AcceleratorGroupI
                                   uint32_t instanceId,
                                   const GPUQueue& queue) = 0;
 
+    virtual void        PreConstruct(const BaseAcceleratorI*) = 0;
     virtual void        Construct(AccelGroupConstructParams,
                                   const GPUQueue&) = 0;
 
@@ -385,6 +387,7 @@ class AcceleratorGroupT : public AcceleratorGroupI
                                           const GenericGroupPrimitiveT& pg,
                                           const AccelWorkGenMap&);
 
+    virtual void        PreConstruct(const BaseAcceleratorI*) override;
     size_t              InstanceCount() const override;
     uint32_t            InstanceTypeCount() const override;
     uint32_t            AcceleratorCount() const override;
@@ -472,7 +475,6 @@ class BaseAcceleratorT : public BaseAcceleratorI
     Map<CommonKey, AcceleratorGroupI*>  accelInstances;
 
     virtual AABB3       InternalConstruct(const std::vector<size_t>& instanceOffsets) = 0;
-
     public:
     // Constructors & Destructor
                         BaseAcceleratorT(BS::thread_pool&,
@@ -1040,6 +1042,10 @@ void AcceleratorGroupT<C, PG>::WriteInstanceKeysAndAABBsInternal(Span<AABB3> aab
 }
 
 template<class C, PrimitiveGroupC PG>
+void AcceleratorGroupT<C, PG>::PreConstruct(const BaseAcceleratorI*)
+{}
+
+template<class C, PrimitiveGroupC PG>
 size_t AcceleratorGroupT<C, PG>::InstanceCount() const
 {
     return instanceLeafRanges.size();
@@ -1263,6 +1269,7 @@ void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
                                            workGenGlobalMap);
         auto loc = generatedAccels.emplace(aGroupId, std::move(accelPtr));
         AcceleratorGroupI* acc = loc.first->second.get();
+        acc->PreConstruct(this);
         acc->Construct(std::move(partition), qIt.Queue());
         qIt.Next();
     }

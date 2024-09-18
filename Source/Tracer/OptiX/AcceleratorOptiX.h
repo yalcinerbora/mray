@@ -94,8 +94,9 @@ namespace OptiXAccelDetail
 
 struct ComputeCapabilityTypePackOptiX
 {
-    OptixModule         optixModule = nullptr;
-    OptixPipeline       pipeline    = nullptr;
+    OptixModule         optixModule     = nullptr;
+    OptixPipeline       pipeline        = nullptr;
+    OptixProgramGroup   programGroup    = nullptr;
     std::string         computeCapability;
 
     // Constructors & Destructor
@@ -117,7 +118,7 @@ struct ComputeCapabilityTypePackOptiX
 class ContextOptiX
 {
     private:
-    OptixDeviceContext optixContext;
+    OptixDeviceContext optixContext = nullptr;
 
     public:
                     ContextOptiX();
@@ -148,7 +149,7 @@ class AcceleratorGroupOptiX final
     //static constexpr auto IsTriangle = PrimitiveGroup::IsTriangleGroup;
 
     private:
-    OptixDeviceContext optixContext;
+    OptixDeviceContext optixContext = nullptr;
 
     public:
     // Constructors & Destructor
@@ -158,6 +159,7 @@ class AcceleratorGroupOptiX final
                           const GenericGroupPrimitiveT& pg,
                           const AccelWorkGenMap&);
     //
+    void    PreConstruct(const BaseAcceleratorI*) override;
     void    Construct(AccelGroupConstructParams, const GPUQueue&) override;
     void    WriteInstanceKeysAndAABBs(Span<AABB3> dAABBWriteRegion,
                                       Span<AcceleratorKey> dKeyWriteRegion,
@@ -186,10 +188,8 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
     public:
     static std::string_view TypeName();
     private:
-    ContextOptiX optixContext;
-
     std::vector<ComputeCapabilityTypePackOptiX> optixTypesPerCC;
-
+    ContextOptiX            optixContext;
     DeviceMemory            accelMem;
     Span<ArgumentPackOpitX> dLaunchArgPack;
     OptixShaderBindingTable commonSBT;
@@ -197,13 +197,13 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
     OptixTraversableHandle  baseAccelerator;
 
     protected:
-    AABB3 InternalConstruct(const std::vector<size_t>& instanceOffsets) override;
+    AABB3   InternalConstruct(const std::vector<size_t>& instanceOffsets) override;
 
-     public:
+    public:
     // Constructors & Destructor
-     BaseAcceleratorOptiX(BS::thread_pool&, const GPUSystem&,
-                          const AccelGroupGenMap&,
-                          const AccelWorkGenMap&);
+    BaseAcceleratorOptiX(BS::thread_pool&, const GPUSystem&,
+                         const AccelGroupGenMap&,
+                         const AccelWorkGenMap&);
 
     //
     void    CastRays(// Output
@@ -237,9 +237,11 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
                           Span<const AcceleratorKey> dAccelIdPacks,
                           const GPUQueue& queue) override;
 
-    void    Construct(BaseAccelConstructParams) override;
     void    AllocateForTraversal(size_t maxRayCount) override;
     size_t  GPUMemoryUsage() const override;
+    // OptiX special
+
+    OptixDeviceContext GetOptixDeviceHandle() const;
 };
 
 inline ContextOptiX::operator OptixDeviceContext() const

@@ -18,8 +18,9 @@ static constexpr auto OPTIX_LOGGER_NAME = "OptiXLogger";
 static constexpr auto OPTIX_LOGGER_FILE_NAME = "optix_log";
 static constexpr auto OPTIX_SHADERS_FOLDER = "OptiXShaders";
 static constexpr auto OPTIX_SHADER_NAME = "OptiXPTX.optixir";
+//static constexpr auto OPTIX_SHADER_NAME = "OptiXPTX.ptx";
 
-Expected<std::vector<Byte>>
+Expected<std::vector<char>>
 DevourFile(const std::string& shaderName,
            const std::string& executablePath)
 {
@@ -28,16 +29,19 @@ DevourFile(const std::string& shaderName,
     std::streamoff size = std::ifstream(fullPath,
                                         std::ifstream::ate |
                                         std::ifstream::binary).tellg();
-    assert(size == Math::NextMultiple(size, std::streamoff(4)));
     std::vector<Byte> source(static_cast<size_t>(size), Byte(0));
     std::ifstream shaderFile = std::ifstream(fullPath, std::ios::binary);
 
     if(!shaderFile.is_open())
         return MRayError("Unable to open shader file \"{}\"",
                          fullPath);
-    shaderFile.read(reinterpret_cast<char*>(source.data()),
-                    static_cast<std::streamsize>(source.size()));
-    return source;
+    //shaderFile.read(reinterpret_cast<char*>(source.data()),
+    //                static_cast<std::streamsize>(source.size()));
+    //return source;
+
+    std::vector<char> data(std::istreambuf_iterator<char>(shaderFile), {});
+    return data;
+
 }
 
 void OptiXAssert(OptixResult code, const char* file, int line)
@@ -69,6 +73,7 @@ ComputeCapabilityTypePackOptiX::ComputeCapabilityTypePackOptiX(const std::string
 
 ComputeCapabilityTypePackOptiX::ComputeCapabilityTypePackOptiX(ComputeCapabilityTypePackOptiX&& other) noexcept
     : optixModule(std::exchange(other.optixModule, nullptr))
+    , programGroup(std::exchange(other.programGroup, nullptr))
     , pipeline(std::exchange(other.pipeline, nullptr))
 {}
 
@@ -77,18 +82,21 @@ ComputeCapabilityTypePackOptiX::operator=(ComputeCapabilityTypePackOptiX&& other
 {
     assert(this != &other);
 
-    OPTIX_CHECK(optixModuleDestroy(optixModule));
     OPTIX_CHECK(optixPipelineDestroy(pipeline));
+    OPTIX_CHECK(optixProgramGroupDestroy(programGroup));
+    OPTIX_CHECK(optixModuleDestroy(optixModule));
 
     optixModule = std::exchange(other.optixModule, nullptr);
+    programGroup = std::exchange(other.programGroup, nullptr);
     pipeline = std::exchange(other.pipeline, nullptr);
     return *this;
 }
 
 ComputeCapabilityTypePackOptiX::~ComputeCapabilityTypePackOptiX()
 {
-    OPTIX_CHECK(optixModuleDestroy(optixModule));
     OPTIX_CHECK(optixPipelineDestroy(pipeline));
+    OPTIX_CHECK(optixProgramGroupDestroy(programGroup));
+    OPTIX_CHECK(optixModuleDestroy(optixModule));
 }
 
 auto ComputeCapabilityTypePackOptiX::operator<=>(const ComputeCapabilityTypePackOptiX& right) const
@@ -107,11 +115,10 @@ ContextOptiX::ContextOptiX()
     // Init optix functions
     // TODO: No de-init??
     OPTIX_CHECK(optixInit());
-    OPTIX_CHECK(optixInit());
     try
     {
         auto logger = spdlog::basic_logger_mt(OPTIX_LOGGER_NAME,
-                                              OPTIX_LOGGER_FILE_NAME);
+                                              OPTIX_LOGGER_FILE_NAME, true);
     }
     catch(const spdlog::spdlog_ex& ex)
     {
@@ -152,7 +159,6 @@ BaseAcceleratorOptiX::BaseAcceleratorOptiX(BS::thread_pool& tp, const GPUSystem&
     : BaseAcceleratorT<BaseAcceleratorOptiX>(tp, sys, genMap, workGenMap)
     , accelMem(sys.AllGPUs(), 32_MiB, 256_MiB, true)
 {
-
     std::vector<std::string> ccList;
     ccList.reserve(gpuSystem.AllGPUs().size());
     for(const auto& gpu : gpuSystem.AllGPUs())
@@ -170,14 +176,14 @@ BaseAcceleratorOptiX::BaseAcceleratorOptiX(BS::thread_pool& tp, const GPUSystem&
         optixTypesPerCC.emplace_back(ccName);
         auto& optixTypeThisCC = optixTypesPerCC.back();
 
-        std::string shaderPath = MRAY_FORMAT("{}/{}/{}",
+        std::string shaderPath = MRAY_FORMAT("{}/{}/CC_{}",
                                              GetProcessPath(),
                                              OPTIX_SHADERS_FOLDER,
                                              optixTypeThisCC.computeCapability);
-        auto shader = DevourFile(OPTIX_SHADER_NAME, OPTIX_SHADER_NAME);
+        auto shader = DevourFile(OPTIX_SHADER_NAME, shaderPath);
         if(shader.has_error()) throw shader.error();
 
-        const char* shaderData = reinterpret_cast<char*>(shader.value().data());
+        const char* shaderData = shader.value().data();
         size_t shaderSize = shader.value().size();
         OPTIX_CHECK(optixModuleCreate(optixContext,
                                       &OptiXAccelDetail::MODULE_OPTIONS_OPTIX,
@@ -194,7 +200,6 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
 
 void BaseAcceleratorOptiX::AllocateForTraversal(size_t)
 {}
-
 
 void BaseAcceleratorOptiX::CastRays(// Output
                                    Span<HitKeyPack> dHitIds,
@@ -257,93 +262,6 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
 
 }
 
-void BaseAcceleratorOptiX::Construct(BaseAccelConstructParams p)
-{
-
-
-    //OptixModule moduleOut;
-    ////
-
-
-    //constexpr OptixPipelineLinkOptions linkOpts =
-    //{
-    //    .maxTraceDepth = 1,
-    //};
-
-    //std::array<OptixProgramGroupDesc, 3> g =
-    //{
-    //    OptixProgramGroupDesc
-    //    {
-    //        .kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN,
-    //        .flags = OPTIX_PROGRAM_GROUP_FLAGS_NONE,
-    //        .raygen = OptixProgramGroupSingleModule
-    //        {
-    //            .module = nullptr,
-    //            .entryFunctionName = "__raygen__OptiX",
-    //        },
-    //    },
-    //    OptixProgramGroupDesc
-    //    {
-    //        .kind = OPTIX_PROGRAM_GROUP_KIND_MISS,
-    //        .flags = OPTIX_PROGRAM_GROUP_FLAGS_NONE,
-    //        .miss = OptixProgramGroupSingleModule
-    //        {
-    //            .module = nullptr,
-    //            .entryFunctionName = "__miss__OptiX",
-    //        },
-    //    },
-    //    OptixProgramGroupDesc
-    //    {
-    //        .kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP,
-    //        .flags = OPTIX_PROGRAM_GROUP_FLAGS_NONE,
-    //        .hitgroup = OptixProgramGroupHitgroup
-    //        {
-    //            .moduleCH = nullptr,
-    //            .entryFunctionNameCH = "__closesthit__",
-    //            .moduleAH = nullptr,
-    //            .entryFunctionNameAH = "__anyhit__",
-    //            .moduleIS = nullptr,
-    //            .entryFunctionNameIS = "__intersection__"
-    //        }
-    //    }
-    //};
-
-    //std::array<OptixProgramGroup, 3> programGroups;
-
-    //const OptixProgramGroupOptions programGroupOpts =
-    //{
-    //    nullptr,
-    //};
-
-    //OPTIX_CHECK(optixProgramGroupCreate(optixContext, g.data(), g.size(),
-    //                                    &programGroupOpts,
-    //                                    nullptr, nullptr, programGroups.data()));
-
-
-
-    //OptixPipeline pipeline;
-    //OPTIX_CHECK(optixPipelineCreate(optixContext, &PIPELINE_OPTIONS_OPTIX,
-    //                                &linkOpts, programGroups.data(),
-    //                                programGroups.size(), nullptr, nullptr,
-    //                                &pipeline));
-
-
-
-    //optixTypes.reserve(gpuSystem.AllGPUs().size());
-    //for(const GPUDevice* device : gpuSystem.AllGPUs())
-    //{
-    //    DeviceTypesOptiX& typePack = optixTypes.emplace_back();
-
-
-
-    //}
-
-
-
-    //
-    //BaseAcceleratorT<BaseAcceleratorOptiX>::Construct(p);
-}
-
 size_t BaseAcceleratorOptiX::GPUMemoryUsage() const
 {
     size_t totalSize = accelMem.Size();
@@ -352,4 +270,9 @@ size_t BaseAcceleratorOptiX::GPUMemoryUsage() const
         totalSize += accelGroup->GPUMemoryUsage();
     }
     return totalSize;
+}
+
+OptixDeviceContext BaseAcceleratorOptiX::GetOptixDeviceHandle() const
+{
+    return optixContext;
 }

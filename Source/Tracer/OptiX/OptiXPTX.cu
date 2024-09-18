@@ -10,6 +10,17 @@
 
 extern "C" __constant__ ArgumentPackOpitX params;
 
+template<class T>
+MRAY_GPU MRAY_GPU_INLINE
+T* DriverPtrToType(CUdeviceptr ptrInt)
+{
+    // TODO: std::bit_cast fails when optixir used in
+    // module creation (It crashes). Report to OptiX.
+    void* hrRaw;
+    std::memcpy(&hrRaw, &ptrInt, sizeof(CUdeviceptr));
+    return static_cast<T*>(hrRaw);
+}
+
 template <VectorC Hit>
 requires std::is_floating_point_v<typename Hit::InnerType>
 MRAY_GPU MRAY_GPU_INLINE
@@ -19,13 +30,13 @@ MetaHit ReadHitFromAttributes()
                   "Could not fit hit into meta hit!");
     Hit h = Hit::Zero();
     if constexpr(4 <= Hit::Dims)
-        h[3] = std::bit_cast<float>(optixGetAttribute_3());
+        h[3] = __uint_as_float(optixGetAttribute_3());
     if constexpr(3 <= Hit::Dims)
-        h[2] = std::bit_cast<float>(optixGetAttribute_2());
+        h[2] = __uint_as_float(optixGetAttribute_2());
     if constexpr(2 <= Hit::Dims)
-        h[1] = std::bit_cast<float>(optixGetAttribute_1());
+        h[1] = __uint_as_float(optixGetAttribute_1());
     if constexpr(1 <= Hit::Dims)
-        h[0] = std::bit_cast<float>(optixGetAttribute_0());
+        h[0] = __uint_as_float(optixGetAttribute_0());
     return MetaHit(h);
 }
 
@@ -39,22 +50,22 @@ void ReportIntersection(float newT, unsigned int kind, Hit h)
     // But on device maybe it is different ??
     if constexpr(1 == Hit::Dims)
         optixReportIntersection(newT, kind,
-                                std::bit_cast<uint32_t>(float(h[0])));
+                                __float_as_uint(float(h[0])));
     else if constexpr(2 == Hit::Dims)
         optixReportIntersection(newT, kind,
-                                std::bit_cast<uint32_t>(float(h[0])),
-                                std::bit_cast<uint32_t>(float(h[1])));
+                                __float_as_uint(float(h[0])),
+                                __float_as_uint(float(h[1])));
     else if constexpr(3 == Hit::Dims)
         optixReportIntersection(newT, kind,
-                                std::bit_cast<uint32_t>(float(h[0])),
-                                std::bit_cast<uint32_t>(float(h[1])),
-                                std::bit_cast<uint32_t>(float(h[2])));
+                                __float_as_uint(float(h[0])),
+                                __float_as_uint(float(h[1])),
+                                __float_as_uint(float(h[2])));
     else if constexpr(4 == Hit::Dims)
         optixReportIntersection(newT, kind,
-                                std::bit_cast<uint32_t>(float(h[0])),
-                                std::bit_cast<uint32_t>(float(h[1])),
-                                std::bit_cast<uint32_t>(float(h[2])),
-                                std::bit_cast<uint32_t>(float(h[3])));
+                                __float_as_uint(float(h[0])),
+                                __float_as_uint(float(h[1])),
+                                __float_as_uint(float(h[2])),
+                                __float_as_uint(float(h[3])));
 }
 
 MRAY_GPU MRAY_GPU_INLINE
@@ -89,14 +100,14 @@ BackupRNGState GetRNGStateFromPayload()
 }
 
 // Meta Closest Hit Shader
-template<PrimitiveGroupC PGroup>
+//template<PrimitiveGroupC PGroup>
+template<class PGroup>
 MRAY_GPU MRAY_GPU_INLINE
 void KCClosestHit()
 {
     using Hit = typename PGroup::Hit;
     using HitRecord = Record<typename PGroup::DataSoA>;
-    const void* hrRaw = std::bit_cast<void*>(optixGetSbtDataPointer());
-    const HitRecord& record = *reinterpret_cast<const HitRecord*>(hrRaw);
+    auto& record = *DriverPtrToType<const HitRecord>(optixGetSbtDataPointer());
 
     const uint32_t leafId = optixGetPrimitiveIndex();
     const uint32_t rayId = optixGetLaunchIndex().x;
@@ -129,8 +140,7 @@ void KCAnyHit()
     using Primitive = typename PGroup:: template Primitive<>;
     using Hit = typename PGroup::Hit;
     using HitRecord = Record<typename PGroup::DataSoA>;
-    const void* hrRaw = std::bit_cast<void*>(optixGetSbtDataPointer());
-    const HitRecord& record = *reinterpret_cast<const HitRecord*>(hrRaw);
+    auto& record = *DriverPtrToType<const HitRecord>(optixGetSbtDataPointer());
 
     if(record.alphaMap)
     {
@@ -254,13 +264,11 @@ void KCRayGenOptix()
     RayIndex rIndex = params.dRayIndices[launchIndex];
     auto [ray, tMM] = RayFromGMem(params.dRays, rIndex);
 
-    // Set the ray index (indirection) as payload
-    // so we do not hit GMem for this
-    SetRayIndexAsPayload(rIndex);
-    // Set the RNG states as payload, any hit shaders will
-    // do stochastic any hit invocation
-    SetRNGStateAsPayload(params.dRNGStates[rIndex]);
-
+    // Set the RNG state as payload, any hit shaders will
+    // do stochastic any hit invocation.
+    BackupRNGState rngState = params.dRNGStates[rIndex];
+    // Set the ray index (indirection) as payload as well
+    // so we do not hit GMem for this.
     // Trace!
     optixTrace(// Accelerator
                params.baseAccelerator,
@@ -274,10 +282,11 @@ void KCRayGenOptix()
                // Flags
                OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
                // SBT
-               0, 1, 0);
+               0, 1, 0,
+               rIndex, rngState);
 
     // Save the state back
-    params.dRNGStates[rIndex] = GetRNGStateFromPayload();
+    params.dRNGStates[rIndex] = rngState;
 }
 
 // Actual Definitions
@@ -296,7 +305,7 @@ WRAP_FUCTION(__miss__OptiX, KCMissOptiX);
 //
 WRAP_FUCTION(__closesthit__Triangle, KCClosestHit<PrimGroupTriangle>)
 WRAP_FUCTION(__anyhit__Triangle, KCAnyHit<PrimGroupTriangle>)
-// TODO: Add more...
-
+//
 WRAP_FUCTION(__closesthit__TriangleSkinned, KCClosestHit<PrimGroupSkinnedTriangle>)
 WRAP_FUCTION(__anyhit__TriangleSkinned, KCAnyHit<PrimGroupSkinnedTriangle>)
+// TODO: Add more...

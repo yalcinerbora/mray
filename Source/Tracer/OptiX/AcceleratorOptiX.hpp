@@ -139,11 +139,22 @@ BuildInputPackAABB GenBuildInputsAABB(const PreprocessResult& p, uint32_t index,
 }
 
 template<PrimitiveGroupC PG>
+void AcceleratorGroupOptiX<PG>::PreConstruct(const BaseAcceleratorI* a)
+{
+    const auto* baseAccel = static_cast<const BaseAcceleratorOptiX*>(a);
+    optixContext = baseAccel->GetOptixDeviceHandle();
+}
+
+template<PrimitiveGroupC PG>
 void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
                                           const GPUQueue& queue)
 {
     using mray::cuda::ToHandleCUDA;
     PreprocessResult ppResult = this->PreprocessConstructionParams(p);
+
+    //OPTIX_CHECK(optixAccelComputeMemoryUsage(context, ...);
+    //optixAccelBuild(context, ...);
+    //optixAccelCompact(context, ...);
 
     //size_t doubleDipBufferSize;
     //// If we are
@@ -154,7 +165,7 @@ void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
 
     //    }
 
-    //    OPTIX_CHECK(optixAccelComputeMemoryUsage());
+    //
     //}
 
     //// Concrete indices of instances
