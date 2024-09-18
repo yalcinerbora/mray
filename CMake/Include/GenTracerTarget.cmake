@@ -14,7 +14,6 @@ function(gen_tracer_target)
     else()
         set(MRAY_OPTIX OFF)
     endif()
-    message(STATUS "MRAY_OPTIX: ${MRAY_OPTIX}")
 
     set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/Tracer)
 
@@ -197,12 +196,18 @@ function(gen_tracer_target)
 
     # Optix Related Target definitions
     if(MRAY_OPTIX)
+        # Add current source dir as include
+        # so that the OptiX folder can access the AcceleratorC.h etc.
         target_include_directories(${TARGET_FULL_NAME}
-                                   PRIVATE
+                                   PUBLIC
+                                   ${CURRENT_SOURCE_DIR}
                                    ${OPTIX_INCLUDE_DIR})
+        target_link_libraries(${TARGET_FULL_NAME}
+                              PRIVATE
+                              spdlog::spdlog)
         target_compile_definitions(${TARGET_FULL_NAME}
                                    PUBLIC
-                                   MRAY_OPTIX)
+                                   MRAY_ENABLE_HW_ACCELERATION)
     endif()
 
     set_target_properties(${TARGET_FULL_NAME} PROPERTIES

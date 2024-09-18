@@ -8,7 +8,7 @@
 #define WRAP_FUCTION(NAME, FUNCTION) \
     extern "C" __global__ void NAME(){FUNCTION();}
 
-extern "C" __constant__ OpitXArgumentPack params;
+extern "C" __constant__ ArgumentPackOpitX params;
 
 template <VectorC Hit>
 requires std::is_floating_point_v<typename Hit::InnerType>

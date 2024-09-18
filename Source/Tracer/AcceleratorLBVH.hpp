@@ -242,7 +242,7 @@ AcceleratorLBVH<PG, TG>::AcceleratorLBVH(const TransDataSoA& tSoA,
 
 template<PrimitiveGroupC PG, TransformGroupC TG>
 MRAY_GPU MRAY_GPU_INLINE
-TransformKey AcceleratorLBVH<PG, TG>::TransformKey() const
+TransformKey AcceleratorLBVH<PG, TG>::GetTransformKey() const
 {
     return transformKey;
 }
@@ -817,7 +817,7 @@ void AcceleratorGroupLBVH<PG>::CastLocalRays(// Output
                                                Span<HitKeyPack> dHitIds,
                                                Span<MetaHit> dHitParams,
                                                // I-O
-                                               Span<BackupRNGState> rngStates,
+                                               Span<BackupRNGState> dRNGStates,
                                                Span<RayGMem> dRays,
                                                // Input
                                                Span<const RayIndex> dRayIndices,
@@ -838,7 +838,7 @@ void AcceleratorGroupLBVH<PG>::CastLocalRays(// Output
                         dHitIds,
                         dHitParams,
                         // I-O
-                        rngStates,
+                        dRNGStates,
                         dRays,
                         //Input
                         dRayIndices,

@@ -18,6 +18,7 @@ target_link_libraries(MeshLoader
                       TransientPool
                       mray::meta_compile_opts
                       assimp::assimp
+                      spdlog::spdlog
                       gfgfileio::gfgfileio)
 
 target_compile_definitions(MeshLoader

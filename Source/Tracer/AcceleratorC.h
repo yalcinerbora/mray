@@ -48,6 +48,11 @@ concept AccelC = requires(AccelType acc,
 
     {acc.FirstHit(rng, Ray{}, Vector2f{})
     }-> std::same_as<Optional<typename AccelType::HitResult>>;
+
+    {acc.GetTransformKey()
+    }-> std::same_as<TransformKey>;
+
+
 };
 
 struct UnionAABB3Functor
@@ -207,7 +212,7 @@ class AcceleratorGroupI
                                   Span<HitKeyPack> dHitIds,
                                   Span<MetaHit> dHitParams,
                                   // I-O
-                                  Span<BackupRNGState> rngStates,
+                                  Span<BackupRNGState> dRNGStates,
                                   Span<RayGMem> dRays,
                                   // Input
                                   Span<const RayIndex> dRayIndices,
@@ -401,7 +406,7 @@ class BaseAcceleratorI
                              Span<HitKeyPack> dHitIds,
                              Span<MetaHit> dHitParams,
                              // I-O
-                             Span<BackupRNGState> rngStates,
+                             Span<BackupRNGState> dRNGStates,
                              Span<RayGMem> dRays,
                              // Input
                              Span<const RayIndex> dRayIndices,
@@ -412,7 +417,7 @@ class BaseAcceleratorI
                                    Bitspan<uint32_t> dIsVisibleBuffer,
                                    Bitspan<uint32_t> dFoundMediumInterface,
                                    // I-O
-                                   Span<BackupRNGState> rngStates,
+                                   Span<BackupRNGState> dRNGStates,
                                    // Input
                                    Span<const RayIndex> dRayIndices,
                                    Span<const RayGMem> dShadowRays,
@@ -423,7 +428,7 @@ class BaseAcceleratorI
                                   Span<HitKeyPack> dHitIds,
                                   Span<MetaHit> dHitParams,
                                   // I-O
-                                  Span<BackupRNGState> rngStates,
+                                  Span<BackupRNGState> dRNGStates,
                                   // Input
                                   Span<const RayGMem> dRays,
                                   Span<const RayIndex> dRayIndices,

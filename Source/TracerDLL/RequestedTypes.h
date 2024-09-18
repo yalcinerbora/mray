@@ -10,6 +10,10 @@
 #include "Tracer/AcceleratorLBVH.h"
 #include "Tracer/MetaLight.h"
 
+#if defined(MRAY_GPU_BACKEND_CUDA) && defined(MRAY_ENABLE_HW_ACCELERATION)
+    #include "Tracer/OptiX/AcceleratorOptiX.h"
+#endif
+
 // ================= //
 //     Primitives    //
 // ================= //
@@ -117,12 +121,13 @@ using DefaultAccelTypePack = AccelTypePack
 
 using DefaultLinearAccelTypePack = DefaultAccelTypePack<BaseAcceleratorLinear, AcceleratorGroupLinear>;
 using DefaultBVHAccelTypePack = DefaultAccelTypePack<BaseAcceleratorLBVH, AcceleratorGroupLBVH>;
-//using DefaultDeviceAccelTypePack = DefaultAccelTypePack<BaseAcceleratorDevice, AcceleratorGroupDevice>;
+#if defined(MRAY_GPU_BACKEND_CUDA) && defined(MRAY_ENABLE_HW_ACCELERATION)
+    using DefaultDeviceAccelTypePack = DefaultAccelTypePack<BaseAcceleratorOptiX, AcceleratorGroupOptiX>;
+#endif
 
 // ================= //
 //     Renderers     //
 // ================= //
-
 template <class Renderer>
 using EmptyRendererWorkTypes = RenderWorkTypePack
 <

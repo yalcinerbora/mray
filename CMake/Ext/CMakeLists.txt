@@ -133,7 +133,7 @@ mray_build_ext_dependency_git(
 mray_build_ext_dependency_git(
     NAME spdlog_ext
     URL "https://github.com/gabime/spdlog.git"
-    TAG "ad0e89cbfb4d0c1ce4d097e134eb7be67baebb36" # v.1.11.0
+    TAG "27cb4c76708608465c413f6d0e6b8d99a4d84302" # v.1.14.1
     LICENSE_NAME "LICENSE"
     BUILD_ARGS
         -DSPDLOG_BUILD_EXAMPLE=OFF
@@ -141,8 +141,10 @@ mray_build_ext_dependency_git(
         -DSPDLOG_BUILD_SHARED=ON
         # fmt release and spdlog release does not match
         # due to iterator debug level (MSVC)
-        -DSPDLOG_FMT_EXTERNAL=OFF
+        -DSPDLOG_FMT_EXTERNAL=ON
         -DCMAKE_DEBUG_POSTFIX=
+    DEPENDENCIES
+        fmt_ext
 )
 
 # Get CLI11

@@ -89,7 +89,7 @@ AcceleratorLinear<PG, TG>::AcceleratorLinear(const TransDataSoA& tSoA,
 
 template<PrimitiveGroupC PG, TransformGroupC TG>
 MRAY_GPU MRAY_GPU_INLINE
-TransformKey AcceleratorLinear<PG, TG>::TransformKey() const
+TransformKey AcceleratorLinear<PG, TG>::GetTransformKey() const
 {
     return transformKey;
 }
@@ -281,7 +281,7 @@ void AcceleratorGroupLinear<PG>::CastLocalRays(// Output
                                                Span<HitKeyPack> dHitIds,
                                                Span<MetaHit> dHitParams,
                                                // I-O
-                                               Span<BackupRNGState> rngStates,
+                                               Span<BackupRNGState> dRNGStates,
                                                Span<RayGMem> dRays,
                                                // Input
                                                Span<const RayIndex> dRayIndices,
@@ -302,7 +302,7 @@ void AcceleratorGroupLinear<PG>::CastLocalRays(// Output
                         dHitIds,
                         dHitParams,
                         // I-O
-                        rngStates,
+                        dRNGStates,
                         dRays,
                         //Input
                         dRayIndices,

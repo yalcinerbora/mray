@@ -169,7 +169,8 @@ gen_imported_target(NAME assimp::assimp SHARED DEBUG_TARGET assimpd RELEASE_TARG
 gen_imported_target(NAME gfgfileio::gfgfileio STATIC DEBUG_TARGET GFGFileIOd RELEASE_TARGET GFGFileIO)
 gen_imported_target(NAME oiio::oiio SHARED DEBUG_TARGET OpenImageIOd RELEASE_TARGET OpenImageIO)
 gen_imported_target(NAME oiio::oiio_util SHARED DEBUG_TARGET OpenImageIO_Utild RELEASE_TARGET OpenImageIO_Util)
-gen_imported_target(NAME spdlog::spdlog SHARED DEBUG_TARGET spdlogd RELEASE_TARGET spdlog)
+gen_imported_target(NAME spdlog::spdlog SHARED DEBUG_TARGET spdlogd RELEASE_TARGET spdlog
+                    EXTRA_DEFINES SPDLOG_FMT_EXTERNAL SPDLOG_COMPILED_LIB)
 gen_imported_target(NAME imgui::imgui STATIC DEBUG_TARGET imguid RELEASE_TARGET imgui)
 
 # Different names on different platforms

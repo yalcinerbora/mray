@@ -72,7 +72,7 @@ namespace LinearAccelDetail
                                                   const DataSoA& dataSoA,
                                                   AcceleratorKey aId);
         MRAY_GPU
-        TransformKey            TransformKey() const;
+        TransformKey            GetTransformKey() const;
         MRAY_GPU
         Optional<HitResult>     ClosestHit(BackupRNG& rng, const Ray&, const Vector2&) const;
         MRAY_GPU
@@ -130,7 +130,7 @@ class AcceleratorGroupLinear final : public AcceleratorGroupT<AcceleratorGroupLi
                           Span<HitKeyPack> dHitIds,
                           Span<MetaHit> dHitParams,
                           // I-O
-                          Span<BackupRNGState> rngStates,
+                          Span<BackupRNGState> dRNGStates,
                           Span<RayGMem> dRays,
                           // Input
                           Span<const RayIndex> dRayIndices,
@@ -172,7 +172,7 @@ class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinea
                      Span<HitKeyPack> dHitIds,
                      Span<MetaHit> dHitParams,
                      // I-O
-                     Span<BackupRNGState> rngStates,
+                     Span<BackupRNGState> dRNGStates,
                      Span<RayGMem> dRays,
                      // Input
                      Span<const RayIndex> dRayIndices,
@@ -182,7 +182,7 @@ class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinea
                            Bitspan<uint32_t> dIsVisibleBuffer,
                            Bitspan<uint32_t> dFoundMediumInterface,
                            // I-O
-                           Span<BackupRNGState> rngStates,
+                           Span<BackupRNGState> dRNGStates,
                            // Input
                            Span<const RayIndex> dRayIndices,
                            Span<const RayGMem> dShadowRays,
@@ -192,7 +192,7 @@ class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinea
                           Span<HitKeyPack> dHitIds,
                           Span<MetaHit> dHitParams,
                           // I-O
-                          Span<BackupRNGState> rngStates,
+                          Span<BackupRNGState> dRNGStates,
                           // Input
                           Span<const RayGMem> dRays,
                           Span<const RayIndex> dRayIndices,

@@ -147,7 +147,7 @@ namespace LBVHAccelDetail
                                                 const DataSoA& dataSoA,
                                                 AcceleratorKey aId);
         MRAY_GPU
-        TransformKey            TransformKey() const;
+        TransformKey            GetTransformKey() const;
         MRAY_GPU
         Optional<HitResult>     ClosestHit(BackupRNG& rng, const Ray&, const Vector2&) const;
         MRAY_GPU
@@ -202,9 +202,9 @@ class AcceleratorGroupLBVH final : public AcceleratorGroupT<AcceleratorGroupLBVH
     // Constructors & Destructor
     AcceleratorGroupLBVH(uint32_t accelGroupId,
                          BS::thread_pool&,
-                                 const GPUSystem&,
-                                 const GenericGroupPrimitiveT& pg,
-                                 const AccelWorkGenMap&);
+                         const GPUSystem&,
+                         const GenericGroupPrimitiveT& pg,
+                         const AccelWorkGenMap&);
     //
     void    Construct(AccelGroupConstructParams, const GPUQueue&) override;
     void    WriteInstanceKeysAndAABBs(Span<AABB3> dAABBWriteRegion,
@@ -216,7 +216,7 @@ class AcceleratorGroupLBVH final : public AcceleratorGroupT<AcceleratorGroupLBVH
                           Span<HitKeyPack> dHitIds,
                           Span<MetaHit> dHitParams,
                           // I-O
-                          Span<BackupRNGState> rngStates,
+                          Span<BackupRNGState> dRNGStates,
                           Span<RayGMem> dRays,
                           // Input
                           Span<const RayIndex> dRayIndices,
@@ -266,7 +266,7 @@ class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
                      Span<HitKeyPack> dHitIds,
                      Span<MetaHit> dHitParams,
                      // I-O
-                     Span<BackupRNGState> rngStates,
+                     Span<BackupRNGState> dRNGStates,
                      Span<RayGMem> dRays,
                      // Input
                      Span<const RayIndex> dRayIndices,
@@ -276,7 +276,7 @@ class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
                            Bitspan<uint32_t> dIsVisibleBuffer,
                            Bitspan<uint32_t> dFoundMediumInterface,
                            // I-O
-                           Span<BackupRNGState> rngStates,
+                           Span<BackupRNGState> dRNGStates,
                            // Input
                            Span<const RayIndex> dRayIndices,
                            Span<const RayGMem> dShadowRays,
@@ -286,7 +286,7 @@ class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
                           Span<HitKeyPack> dHitIds,
                           Span<MetaHit> dHitParams,
                           // I-O
-                          Span<BackupRNGState> rngStates,
+                          Span<BackupRNGState> dRNGStates,
                           // Input
                           Span<const RayGMem> dRays,
                           Span<const RayIndex> dRayIndices,

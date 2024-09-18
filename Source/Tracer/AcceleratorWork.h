@@ -181,7 +181,7 @@ static void KCLocalRayCast(// Output
                            MRAY_GRID_CONSTANT const Span<HitKeyPack> dHitIds,
                            MRAY_GRID_CONSTANT const Span<MetaHit> dHitParams,
                            // I-O
-                           MRAY_GRID_CONSTANT const Span<BackupRNGState> rngStates,
+                           MRAY_GRID_CONSTANT const Span<BackupRNGState> dRNGStates,
                            MRAY_GRID_CONSTANT const Span<RayGMem> dRays,
                            // Input
                            MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices,
@@ -201,7 +201,7 @@ static void KCLocalRayCast(// Output
         RayIndex index = dRayIndices[i];
         auto [ray, tMM] = RayFromGMem(dRays, index);
 
-        BackupRNG rng(rngStates[index]);
+        BackupRNG rng(dRNGStates[index]);
 
         // Get ids
         AcceleratorKey aId(dAcceleratorKeys[i]);
@@ -217,7 +217,7 @@ static void KCLocalRayCast(// Output
             // Since this prim "supports locally constant transforms"
             // Prim key does mean nothing, so set it to invalid and call the generator
             using TransContext = typename AccTransformContextType<AG, TG>::Result;
-            TransContext tContext = GenerateTransformContext(tSoA, pSoA, acc.TransformKey(),
+            TransContext tContext = GenerateTransformContext(tSoA, pSoA, acc.GetTransformKey(),
                                                              PrimitiveKey::InvalidKey());
             ray = tContext.InvApply(ray);
         }
@@ -231,7 +231,7 @@ static void KCLocalRayCast(// Output
         {
             .primKey = hit.primitiveKey,
             .lightOrMatKey = hit.lmKey,
-            .transKey = acc.TransformKey(),
+            .transKey = acc.GetTransformKey(),
             .accelKey = aId
         };
         UpdateTMax(dRays, index, hit.t);
@@ -248,7 +248,7 @@ class AcceleratorWorkI
                                   Span<HitKeyPack> dHitKeys,
                                   Span<MetaHit> dHitParams,
                                   // I-O
-                                  Span<BackupRNGState> rngStates,
+                                  Span<BackupRNGState> dRNGStates,
                                   Span<RayGMem> dRays,
                                   // Input
                                   Span<const RayIndex> dRayIndices,
@@ -302,7 +302,7 @@ class AcceleratorWork : public AcceleratorWorkI
                        Span<HitKeyPack> dHitKeys,
                        Span<MetaHit> dHitParams,
                        // I-O
-                       Span<BackupRNGState> rngStates,
+                       Span<BackupRNGState> dRNGStates,
                        Span<RayGMem> dRays,
                        // Input
                        Span<const RayIndex> dRayIndices,
@@ -345,7 +345,7 @@ void AcceleratorWork<AG, TG>::CastLocalRays(// Output
                                             Span<HitKeyPack> dHitIds,
                                             Span<MetaHit> dHitParams,
                                             // I-O
-                                            Span<BackupRNGState> rngStates,
+                                            Span<BackupRNGState> dRNGStates,
                                             Span<RayGMem> dRays,
                                             // Input
                                             Span<const RayIndex> dRayIndices,
@@ -354,8 +354,8 @@ void AcceleratorWork<AG, TG>::CastLocalRays(// Output
                                             const GPUQueue& queue) const
 {
     assert(dHitIds.size() == dHitParams.size());
-    assert(dHitParams.size() == rngStates.size());
-    assert(rngStates.size() == dRays.size());
+    assert(dHitParams.size() == dRNGStates.size());
+    assert(dRNGStates.size() == dRays.size());
     //
     assert(dRayIndices.size() == dAcceleratorKeys.size());
 
@@ -367,7 +367,7 @@ void AcceleratorWork<AG, TG>::CastLocalRays(// Output
         //
         dHitIds,
         dHitParams,
-        rngStates,
+        dRNGStates,
         dRays,
         dRayIndices,
         dAcceleratorKeys,

@@ -8,7 +8,7 @@
 
 #include <optix_device.h>
 
-struct OpitXArgumentPack
+struct ArgumentPackOpitX
 {
 	OptixTraversableHandle 	baseAccelerator;
 	// Outputs

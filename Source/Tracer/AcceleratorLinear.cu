@@ -178,7 +178,7 @@ void BaseAcceleratorLinear::CastRays(// Output
                                      Span<HitKeyPack> dHitIds,
                                      Span<MetaHit> dHitParams,
                                      // I-O
-                                     Span<BackupRNGState> rngStates,
+                                     Span<BackupRNGState> dRNGStates,
                                      Span<RayGMem> dRays,
                                      // Input
                                      Span<const RayIndex> dRayIndices,
@@ -276,7 +276,7 @@ void BaseAcceleratorLinear::CastRays(// Output
                                           dHitIds,
                                           dHitParams,
                                           // I-O
-                                          rngStates,
+                                          dRNGStates,
                                           //
                                           dRays,
                                           dLocalIndices,
@@ -293,7 +293,7 @@ void BaseAcceleratorLinear::CastShadowRays(// Output
                                            Bitspan<uint32_t> dIsVisibleBuffer,
                                            Bitspan<uint32_t> dFoundMediumInterface,
                                            // I-O
-                                           Span<BackupRNGState> rngStates,
+                                           Span<BackupRNGState> dRNGStates,
                                            // Input
                                            Span<const RayIndex> dRayIndices,
                                            Span<const RayGMem> dShadowRays,
@@ -306,7 +306,7 @@ void BaseAcceleratorLinear::CastLocalRays(// Output
                                           Span<HitKeyPack> dHitIds,
                                           Span<MetaHit> dHitParams,
                                           // I-O
-                                          Span<BackupRNGState> rngStates,
+                                          Span<BackupRNGState> dRNGStates,
                                           // Input
                                           Span<const RayGMem> dRays,
                                           Span<const RayIndex> dRayIndices,

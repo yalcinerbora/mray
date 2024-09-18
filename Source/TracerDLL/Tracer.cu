@@ -145,4 +145,14 @@ void Tracer::AddAccelGenerators(Map<AcceleratorType, BaseAccelGenerator>& baseMa
         workMap,
         AcceleratorType{ SOFTWARE_BASIC_BVH }
     );
+
+    #ifdef MRAY_ENABLE_HW_ACCELERATION
+        AddAccelGeneratorsGeneric<DefaultDeviceAccelTypePack>
+        (
+            baseMap,
+            groupMap,
+            workMap,
+            AcceleratorType{ HARDWARE }
+        );
+    #endif
 }
