@@ -275,6 +275,8 @@ class AcceleratorWorkI
                                                   Span<const TransformKey> dInstanceTransformKeys,
                                                   // Constants
                                                   const GPUQueue& queue) const = 0;
+    virtual size_t  TransformSoAByteSize() const = 0;
+    virtual void    CopyTransformSoA(Span<Byte>, const GPUQueue& queue) const = 0;
 };
 
 template<AccelGroupC AcceleratorGroupType,
@@ -330,6 +332,9 @@ class AcceleratorWork : public AcceleratorWorkI
                                        Span<const TransformKey> dInstanceTransformKeys,
                                        // Constants
                                        const GPUQueue& queue) const override;
+
+    size_t  TransformSoAByteSize() const override;
+    void    CopyTransformSoA(Span<Byte>, const GPUQueue& queue) const override;
 };
 
 template<AccelGroupC AG, TransformGroupC TG>
@@ -482,6 +487,23 @@ void AcceleratorWork<AG, TG>::TransformLocallyConstantAABBs(// Output
         throw MRayError("{:s}: This primitive does not support \"LOCALLY_CONSTANT_TRANSFORM\" "
                         "but \"TransformLocallyConstantAABBs\" is called", AG::TypeName());
     }
+}
+
+template<AccelGroupC AG, TransformGroupC TG>
+size_t AcceleratorWork<AG, TG>::TransformSoAByteSize() const
+{
+    return sizeof(typename TG::DataSoA);
+}
+
+template<AccelGroupC AG, TransformGroupC TG>
+void AcceleratorWork<AG, TG>::CopyTransformSoA(Span<Byte> dRegion, const GPUQueue& queue) const
+{
+    // TODO: Find a way to remove the barrier later
+    typename TG::DataSoA tgSoA = transGroup.SoA();
+    Span<const Byte> hSpan(reinterpret_cast<Byte*>(&tgSoA),
+                           sizeof(typename TG::DataSoA));
+    queue.MemcpyAsync(dRegion, hSpan);
+    queue.Barrier().Wait();
 }
 
 template<AccelGroupC AG, TransformGroupC TG>

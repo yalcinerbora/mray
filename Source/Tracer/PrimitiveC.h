@@ -181,6 +181,15 @@ concept PrimitiveGroupC = requires(PGType pg, TransientData input)
     requires GenericGroupC<PGType>;
 };
 
+// This concept is introduced because of OptiX
+// Optix requires specific types to constrcut accelerators
+template <class PGType>
+concept TrianglePrimGroupC = requires(const PGType& pg)
+{
+    {pg.GetIndexSpan()} -> std::same_as<Span<const Vector3ui>>;
+    {pg.GetVertexPositionSpan()} -> std::same_as<Span<const Vector3>>;
+};
+
 // Support Concepts
 template <class PrimType, class PrimGroupType, class Surface>
 concept PrimitiveWithSurfaceC = requires(PrimType mg,
@@ -224,6 +233,7 @@ struct PrimTransformContextType
 
 class GenericGroupPrimitiveT : public GenericGroupT<PrimBatchKey, PrimAttributeInfo>
 {
+    public:
     protected:
     size_t      TotalPrimCountImpl(uint32_t countIndex) const;
 

@@ -26,8 +26,8 @@ struct ArgumentPackOpitX
 //
 // We only utilize a subset of the SBT system.
 // Each each build input will have a single record.
-template <class PrimSoA, class TransSoA = void>
-struct Record
+template <class PrimSoA = void, class TransSoA = void>
+struct GenericHitRecordData
 {
 	// This pointer is can be accessed by optixGetPrimitiveIndex() from Optix
 	Span<const PrimitiveKey> dPrimKeys;
@@ -37,7 +37,7 @@ struct Record
 	// Each batch can have a single alpha map (This %100 fail for OptiX compilation but check)
 	Optional<AlphaMap>	alphaMap;
 	// Material key of the array
-	LightOrMatKey 		materialKey;
+	LightOrMatKey 		lightOrMatKey;
 	// MRay identifier of the GAS (may be used to individually
 	// trace the GAS for SSS)
 	AcceleratorKey		acceleratorKey;
@@ -59,12 +59,12 @@ struct Record
 
 // Meta Hit Record
 // This Record is kept for each accelerator in an accelerator group
-template <class PrimSoA, class TransSoA>
-struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) HitGroupRecord
+template <class PrimSoA = void, class TransSoA = void>
+struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) GenericHitRecord
 {
 	__align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
 
-	Record<PrimSoA, TransSoA> data;
+	GenericHitRecordData<PrimSoA, TransSoA> data;
 };
 
 // Other SBT Records are Empty (use this for those API calls)

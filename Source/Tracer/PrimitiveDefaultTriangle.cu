@@ -228,6 +228,16 @@ typename PrimGroupTriangle::DataSoA PrimGroupTriangle::SoA() const
     return soa;
 }
 
+Span<const Vector3ui> PrimGroupTriangle::GetIndexSpan() const
+{
+    return ToConstSpan(dIndexList);
+}
+
+Span<const Vector3> PrimGroupTriangle::GetVertexPositionSpan() const
+{
+    return ToConstSpan(dPositions);
+}
+
 PrimGroupSkinnedTriangle::PrimGroupSkinnedTriangle(uint32_t primGroupId,
                                                    const GPUSystem& sys)
     : GenericGroupPrimitive(primGroupId, sys,
@@ -412,4 +422,14 @@ size_t PrimGroupSkinnedTriangle::TotalPrimCount() const
 typename PrimGroupSkinnedTriangle::DataSoA PrimGroupSkinnedTriangle::SoA() const
 {
     return soa;
+}
+
+Span<const Vector3ui> PrimGroupSkinnedTriangle::GetIndexSpan() const
+{
+    return ToConstSpan(dIndexList);
+}
+
+Span<const Vector3> PrimGroupSkinnedTriangle::GetVertexPositionSpan() const
+{
+    return ToConstSpan(dPositions);
 }

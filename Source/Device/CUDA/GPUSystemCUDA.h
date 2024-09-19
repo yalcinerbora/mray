@@ -337,7 +337,7 @@ class GPUQueueCUDA
     MRAY_HOST void      IssueBufferForDestruction(TransientData data) const;
 
     // Synchronization
-    MRAY_HYBRID
+    MRAY_HYBRID [[nodiscard]]
     GPUFenceCUDA        Barrier() const;
     MRAY_HOST
     void                IssueSemaphoreWait(GPUSemaphoreViewCUDA&) const;

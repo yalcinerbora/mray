@@ -264,8 +264,10 @@ class PrimGroupTriangle final : public GenericGroupPrimitive<PrimGroupTriangle>
 
     Vector2ui               BatchRange(PrimBatchKey id) const override;
     size_t                  TotalPrimCount() const override;
-
     DataSoA                 SoA() const;
+
+    Span<const Vector3ui>   GetIndexSpan() const;
+    Span<const Vector3>     GetVertexPositionSpan() const;
 };
 
 class PrimGroupSkinnedTriangle final : public GenericGroupPrimitive<PrimGroupSkinnedTriangle>
@@ -332,9 +334,10 @@ class PrimGroupSkinnedTriangle final : public GenericGroupPrimitive<PrimGroupSki
 
     Vector2ui               BatchRange(PrimBatchKey id) const override;
     size_t                  TotalPrimCount() const override;
-
     DataSoA                 SoA() const;
 
+    Span<const Vector3ui>   GetIndexSpan() const;
+    Span<const Vector3>     GetVertexPositionSpan() const;
 };
 
 inline std::string_view PrimGroupTriangle::TypeName()
@@ -356,4 +359,7 @@ inline std::string_view PrimGroupSkinnedTriangle::TypeName()
 #include "PrimitiveDefaultTriangle.hpp"
 
 static_assert(PrimitiveGroupC<PrimGroupTriangle>);
+static_assert(TrianglePrimGroupC<PrimGroupTriangle>);
+//
 static_assert(PrimitiveGroupC<PrimGroupSkinnedTriangle>);
+static_assert(TrianglePrimGroupC<PrimGroupSkinnedTriangle>);

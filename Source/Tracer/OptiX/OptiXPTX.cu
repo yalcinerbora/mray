@@ -106,7 +106,7 @@ MRAY_GPU MRAY_GPU_INLINE
 void KCClosestHit()
 {
     using Hit = typename PGroup::Hit;
-    using HitRecord = Record<typename PGroup::DataSoA>;
+    using HitRecord = GenericHitRecordData<typename PGroup::DataSoA>;
     auto& record = *DriverPtrToType<const HitRecord>(optixGetSbtDataPointer());
 
     const uint32_t leafId = optixGetPrimitiveIndex();
@@ -115,7 +115,7 @@ void KCClosestHit()
     // Fetch the workKey, transformId, primitiveId from table
     PrimitiveKey pKey = record.dPrimKeys[leafId];
     TransformKey tKey = record.transformKey;
-    LightOrMatKey lmKey = record.materialKey;
+    LightOrMatKey lmKey = record.lightOrMatKey;
     AcceleratorKey aKey = record.acceleratorKey;
     MetaHit hit = ReadHitFromAttributes<Hit>();
 
@@ -139,7 +139,7 @@ void KCAnyHit()
 {
     using Primitive = typename PGroup:: template Primitive<>;
     using Hit = typename PGroup::Hit;
-    using HitRecord = Record<typename PGroup::DataSoA>;
+    using HitRecord = GenericHitRecordData<typename PGroup::DataSoA>;
     auto& record = *DriverPtrToType<const HitRecord>(optixGetSbtDataPointer());
 
     if(record.alphaMap)

@@ -5,14 +5,14 @@
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/spdlog.h>
 #include <fstream>
-// Magic linking, these are populated via CUDA runtime?
-#include <optix_stubs.h>
-#include <optix_function_table_definition.h>
 
 #include "Core/System.h"
 #include "Core/Expected.h"
 #include "Core/Filesystem.h"
 #include "Core/Error.hpp"
+
+// Magic linking, these are populated via CUDA runtime?
+#include <optix_function_table_definition.h>
 
 static constexpr auto OPTIX_LOGGER_NAME = "OptiXLogger";
 static constexpr auto OPTIX_LOGGER_FILE_NAME = "optix_log";
@@ -35,13 +35,9 @@ DevourFile(const std::string& shaderName,
     if(!shaderFile.is_open())
         return MRayError("Unable to open shader file \"{}\"",
                          fullPath);
-    //shaderFile.read(reinterpret_cast<char*>(source.data()),
-    //                static_cast<std::streamsize>(source.size()));
-    //return source;
 
     std::vector<char> data(std::istreambuf_iterator<char>(shaderFile), {});
     return data;
-
 }
 
 void OptiXAssert(OptixResult code, const char* file, int line)
@@ -54,7 +50,7 @@ void OptiXAssert(OptixResult code, const char* file, int line)
     }
 }
 
-void OptixLog(unsigned int level, const char* tag, const char* message, void* cbdata)
+void OptixLog(unsigned int level, const char* tag, const char* message, void*)
 {
     auto logger = spdlog::get(OPTIX_LOGGER_NAME);
     switch(level)
@@ -137,12 +133,12 @@ ContextOptiX::ContextOptiX()
                 ? OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL
                 : OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_OFF
     };
-    OPTIX_CHECK(optixDeviceContextCreate(mainCUDAContext, &opts, &optixContext));
+    OPTIX_CHECK(optixDeviceContextCreate(mainCUDAContext, &opts, &contextOptiX));
 }
 
 ContextOptiX::~ContextOptiX()
 {
-    OPTIX_CHECK(optixDeviceContextDestroy(optixContext));
+    OPTIX_CHECK(optixDeviceContextDestroy(contextOptiX));
 }
 
 std::string_view BaseAcceleratorOptiX::TypeName()
@@ -185,7 +181,7 @@ BaseAcceleratorOptiX::BaseAcceleratorOptiX(BS::thread_pool& tp, const GPUSystem&
 
         const char* shaderData = shader.value().data();
         size_t shaderSize = shader.value().size();
-        OPTIX_CHECK(optixModuleCreate(optixContext,
+        OPTIX_CHECK(optixModuleCreate(contextOptiX,
                                       &OptiXAccelDetail::MODULE_OPTIONS_OPTIX,
                                       &OptiXAccelDetail::PIPELINE_OPTIONS_OPTIX,
                                       shaderData, shaderSize, nullptr, nullptr,
@@ -214,7 +210,6 @@ void BaseAcceleratorOptiX::CastRays(// Output
     // This code is not generic, so we go in and take the stuff
     // from device interface specific stuff
     using mray::cuda::ToHandleCUDA;
-    const GPUDevice* device = queue.Device();
     const ComputeCapabilityTypePackOptiX& deviceTypes = optixTypesPerCC[0];
 
     // Copy args
@@ -274,5 +269,5 @@ size_t BaseAcceleratorOptiX::GPUMemoryUsage() const
 
 OptixDeviceContext BaseAcceleratorOptiX::GetOptixDeviceHandle() const
 {
-    return optixContext;
+    return contextOptiX;
 }

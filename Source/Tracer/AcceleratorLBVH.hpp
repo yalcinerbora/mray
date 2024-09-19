@@ -310,10 +310,10 @@ std::string_view AcceleratorGroupLBVH<PG>::TypeName()
 
 template<PrimitiveGroupC PG>
 AcceleratorGroupLBVH<PG>::AcceleratorGroupLBVH(uint32_t accelGroupId,
-                                                   BS::thread_pool& tp,
-                                                   const GPUSystem& sys,
-                                                   const GenericGroupPrimitiveT& pg,
-                                                   const AccelWorkGenMap& globalWorkMap)
+                                               BS::thread_pool& tp,
+                                               const GPUSystem& sys,
+                                               const GenericGroupPrimitiveT& pg,
+                                               const AccelWorkGenMap& globalWorkMap)
     : Base(accelGroupId, tp, sys, pg, globalWorkMap)
     , mem(sys.AllGPUs(), 2_MiB, 32_MiB)
 {}
@@ -472,7 +472,7 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
                                               const std::vector<Vector2ui>& concreteNodeRanges,
                                               const GPUQueue& queue)
 {
-    static constexpr bool PER_PRIM_TRANSFORM = PG::TransformLogic == PrimTransformType::PER_PRIMITIVE_TRANSFORM;
+    static constexpr bool PER_PRIM_TRANSFORM = TransformLogic == PrimTransformType::PER_PRIMITIVE_TRANSFORM;
     static constexpr uint32_t TPB = StaticThreadPerBlock1D();
     static constexpr uint32_t BLOCK_PER_INSTANCE = 16;
 

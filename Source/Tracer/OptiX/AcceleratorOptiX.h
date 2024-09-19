@@ -4,6 +4,7 @@
 #include "OptiXPTX.h"
 
 #include <optix_host.h>
+#include <optix_stubs.h>
 
 void OptiXAssert(OptixResult code, const char* file, int line);
 
@@ -34,6 +35,14 @@ namespace OptiXAccelDetail
         .numBoundValues = 0,
         .numPayloadTypes = 0,
         .payloadTypes = nullptr
+    };
+
+    static constexpr OptixAccelBuildOptions BUILD_OPTIONS_OPTIX =
+    {
+        .buildFlags = std::bit_cast<uint32_t>(OPTIX_BUILD_FLAG_ALLOW_COMPACTION |
+                                              OPTIX_BUILD_FLAG_PREFER_FAST_TRACE),
+        .operation = OPTIX_BUILD_OPERATION_BUILD,
+        .motionOptions = OptixMotionOptions{ 1 }
     };
 
     static constexpr OptixPipelineCompileOptions PIPELINE_OPTIONS_OPTIX =
@@ -118,7 +127,7 @@ struct ComputeCapabilityTypePackOptiX
 class ContextOptiX
 {
     private:
-    OptixDeviceContext optixContext = nullptr;
+    OptixDeviceContext contextOptiX = nullptr;
 
     public:
                     ContextOptiX();
@@ -136,20 +145,43 @@ class AcceleratorGroupOptiX final
     : public AcceleratorGroupT<AcceleratorGroupOptiX<PrimitiveGroupType>, PrimitiveGroupType>
 {
     using Base = AcceleratorGroupT<AcceleratorGroupOptiX <PrimitiveGroupType>, PrimitiveGroupType>;
-
+    using HitRecordVector = std::vector<GenericHitRecord<>>;
     public:
     static std::string_view TypeName();
     using PrimitiveGroup    = PrimitiveGroupType;
     using DataSoA           = EmptyType;
+    using PGSoA             = typename PrimitiveGroup::DataSoA;
 
     template<class TG = TransformGroupIdentity>
     using Accelerator = OptiXAccelDetail::AcceleratorOptiX<PrimitiveGroup, TG>;
 
     static constexpr auto TransformLogic = PrimitiveGroup::TransformLogic;
-    //static constexpr auto IsTriangle = PrimitiveGroup::IsTriangleGroup;
+    static constexpr auto IsTriangle = TrianglePrimGroupC<PrimitiveGroup>;
 
     private:
-    OptixDeviceContext optixContext = nullptr;
+    OptixDeviceContext      contextOptiX = nullptr;
+    DeviceMemory            memory;
+    Span<Byte>              dAllAccelerators;
+    Span<PGSoA>             dPrimGroupSoA;
+    Span<Byte>              dTransformGroupSoAList;
+    //
+    Span<PrimitiveKey>      dAllLeafs;
+    std::vector<size_t>     hConcreteHitRecordOffsets;
+    std::vector<Vector2ui>  hConcreteHitRecordPrimRanges;
+    std::vector<size_t>     hTransformSoAOffsets;
+    HitRecordVector         hHitRecords;
+
+    // Host side
+    std::vector<OptixTraversableHandle> accelHandels;
+
+    void    MultiBuildTriangleCLT(const PreprocessResult& ppResult,
+                                  const GPUQueue& queue);
+    void    MultiBuildTrianglePPT(const PreprocessResult& ppResult,
+                                  const GPUQueue& queue);
+    void    MultiBuildGenericCLT(const PreprocessResult& ppResult,
+                                 const GPUQueue& queue);
+    void    MultiBuildGenericPPT(const PreprocessResult& ppResult,
+                                 const GPUQueue& queue);
 
     public:
     // Constructors & Destructor
@@ -179,6 +211,11 @@ class AcceleratorGroupOptiX final
                           uint32_t workId,
                           const GPUQueue& queue) override;
 
+    // OptiX specific
+    std::vector<Vector2ui> GetRecordOffsets();
+    void                   WriteRecords(Span<GenericHitRecord<>> dRecordWriteRegion,
+                                        const GPUQueue&) const;
+
     DataSoA SoA() const;
     size_t  GPUMemoryUsage() const override;
 };
@@ -189,7 +226,7 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
     static std::string_view TypeName();
     private:
     std::vector<ComputeCapabilityTypePackOptiX> optixTypesPerCC;
-    ContextOptiX            optixContext;
+    ContextOptiX            contextOptiX;
     DeviceMemory            accelMem;
     Span<ArgumentPackOpitX> dLaunchArgPack;
     OptixShaderBindingTable commonSBT;
@@ -246,12 +283,12 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
 
 inline ContextOptiX::operator OptixDeviceContext() const
 {
-    return optixContext;
+    return contextOptiX;
 }
 
 inline ContextOptiX::operator OptixDeviceContext()
 {
-    return optixContext;
+    return contextOptiX;
 }
 
 #include "AcceleratorOptiX.hpp"
