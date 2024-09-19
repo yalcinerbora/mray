@@ -7,6 +7,7 @@
 #include <cub/block/block_scan.cuh>
 #include <cub/block/block_load.cuh>
 #include <cub/block/block_store.cuh>
+#include <cub/device/device_scan.cuh>
 
 namespace mray::cuda::algorithms
 {
@@ -15,12 +16,12 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
 
 template <class T, class BinaryOp>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-void KCInclusiveMultiScan(Span<T> dOut,
-                            Span<const T> dIn,
-                            uint32_t segmentSize,
-                            uint32_t totalBlocks,
-                            T identityElement,
-                            BinaryOp op)
+void KCInclusiveSegmentedScan(Span<T> dOut,
+                              Span<const T> dIn,
+                              uint32_t segmentSize,
+                              uint32_t totalBlocks,
+                              T identityElement,
+                              BinaryOp op)
 {
     KernelCallParamsCUDA kp;
 
@@ -77,24 +78,39 @@ void KCInclusiveMultiScan(Span<T> dOut,
     }
 }
 
+template <class T>
+MRAY_HOST
+size_t ExclusiveScanTMSize(size_t elementCount)
+{
+    using namespace cub;
+    T* dOut = nullptr;
+    T* dIn = nullptr;
+    void* dTM = nullptr;
+    size_t result;
+    CUDA_CHECK(DeviceScan::ExclusiveScan(dTM, result, dIn, dOut,
+                                         [] MRAY_HYBRID(T, T)->T{return T{};},
+                                         T{}, static_cast<int>(elementCount)));
+    return result;
+}
+
 template <class T, class BinaryOp>
 MRAY_HOST inline
-void InclusiveMultiScan(Span<T> dScannedValues,
-                        Span<const T> dValues,
-                        uint32_t segmentSize,
-                        const T& identityElement,
-                        const GPUQueueCUDA& queue,
-                        BinaryOp&& op)
+void InclusiveSegmentedScan(Span<T> dScannedValues,
+                            Span<const T> dValues,
+                            uint32_t segmentSize,
+                            const T& identityElement,
+                            const GPUQueueCUDA& queue,
+                            BinaryOp&& op)
 {
     using namespace std::literals;
     assert(dValues.size() % segmentSize == 0);
 
-    uint32_t gridSize = queue.RecommendedBlockCountDevice(&KCInclusiveMultiScan<T, BinaryOp>,
+    uint32_t gridSize = queue.RecommendedBlockCountDevice(&KCInclusiveSegmentedScan<T, BinaryOp>,
                                                           TPB, 0);
     uint32_t totalBlocks = static_cast<uint32_t>(dValues.size() / segmentSize);
-    queue.IssueExactKernel<KCInclusiveMultiScan<T, BinaryOp>>
+    queue.IssueExactKernel<KCInclusiveSegmentedScan<T, BinaryOp>>
     (
-        "KCMultExclusiveScan"sv,
+        "KCInclusiveSegmentedScan"sv,
         KernelExactIssueParams{.gridSize = gridSize, .blockSize = TPB},
         //
         dScannedValues,
@@ -104,6 +120,25 @@ void InclusiveMultiScan(Span<T> dScannedValues,
         identityElement,
         std::forward<BinaryOp>(op)
     );
+}
+
+template <class T, class BinaryOp>
+MRAY_HOST
+void ExclusiveScan(Span<T> dScannedValues,
+                   Span<Byte> dTempMem,
+                   Span<const T> dValues,
+                   const T& initialValue,
+                   const GPUQueueCUDA& queue,
+                   BinaryOp&& op)
+{
+    using namespace cub;
+    assert(dScannedValues.size() == dValues.size());
+    size_t tmSize = dTempMem.size();
+    CUDA_CHECK(DeviceScan::ExclusiveScan(dTempMem.data(), tmSize,
+                                         dValues.data(), dScannedValues.data(),
+                                         std::forward<BinaryOp>(op), initialValue,
+                                         static_cast<int>(dValues.size()),
+                                         ToHandleCUDA(queue)));
 }
 
 }

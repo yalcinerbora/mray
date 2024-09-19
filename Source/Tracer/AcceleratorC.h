@@ -335,8 +335,8 @@ uint32_t FindPrimBatchIndex(const PrimRangeArray& primRanges, PrimitiveKey k)
     return std::numeric_limits<uint32_t>::max();
 }
 
-template <class Child, PrimitiveGroupC PG>
-class AcceleratorGroupT : public AcceleratorGroupI
+template <class Child, PrimitiveGroupC PG, std::derived_from<AcceleratorGroupI> Base = AcceleratorGroupI>
+class AcceleratorGroupT : public Base
 {
     using PrimitiveGroupType = PG;
     private:
@@ -503,8 +503,8 @@ using PrimGroupIdFetcher = GroupIdFetcher<PrimBatchKey>;
 using TransGroupIdFetcher = GroupIdFetcher<TransformKey>;
 using LightGroupIdFetcher = GroupIdFetcher<LightKey>;
 
-template<class C, PrimitiveGroupC PG>
-AccelPartitionResult AcceleratorGroupT<C, PG>::PartitionParamsForWork(const AccelGroupConstructParams& p)
+template<class C, PrimitiveGroupC PG, std::derived_from<AcceleratorGroupI> B>
+AccelPartitionResult AcceleratorGroupT<C, PG, B>::PartitionParamsForWork(const AccelGroupConstructParams& p)
 {
     using IndexPack = typename AccelPartitionResult::IndexPack;
     AccelPartitionResult result = {};
@@ -580,9 +580,9 @@ AccelPartitionResult AcceleratorGroupT<C, PG>::PartitionParamsForWork(const Acce
 
 };
 
-template<class C, PrimitiveGroupC PG>
-AccelLeafResult AcceleratorGroupT<C, PG>::DetermineConcreteAccelCount(std::vector<SurfacePrimList> instancePrimBatches,
-                                                                      const std::vector<PrimRangeArray>& instancePrimRanges)
+template<class C, PrimitiveGroupC PG, std::derived_from<AcceleratorGroupI> B>
+AccelLeafResult AcceleratorGroupT<C, PG, B>::DetermineConcreteAccelCount(std::vector<SurfacePrimList> instancePrimBatches,
+                                                                         const std::vector<PrimRangeArray>& instancePrimRanges)
 {
     assert(instancePrimBatches.size() == instancePrimRanges.size());
 
@@ -719,11 +719,11 @@ AccelLeafResult AcceleratorGroupT<C, PG>::DetermineConcreteAccelCount(std::vecto
     };
 }
 
-template<class C, PrimitiveGroupC PG>
+template<class C, PrimitiveGroupC PG, std::derived_from<AcceleratorGroupI> B>
 template<class T>
 std::vector<Span<T>>
-AcceleratorGroupT<C, PG>::CreateInstanceSubspans(Span<T> fullRange,
-                                                 const std::vector<Vector2ui>& rangeVector)
+AcceleratorGroupT<C, PG, B>::CreateInstanceSubspans(Span<T> fullRange,
+                                                    const std::vector<Vector2ui>& rangeVector)
 {
     std::vector<Span<const T>> instanceLeafData(rangeVector.size());
     std::transform(rangeVector.cbegin(), rangeVector.cend(),
@@ -736,10 +736,10 @@ AcceleratorGroupT<C, PG>::CreateInstanceSubspans(Span<T> fullRange,
     return instanceLeafData;
 }
 
-template<class C, PrimitiveGroupC PG>
-LinearizedSurfaceData AcceleratorGroupT<C, PG>::LinearizeSurfaceData(const AccelGroupConstructParams& p,
-                                                                     const AccelPartitionResult& partitions,
-                                                                     const typename PG& pg)
+template<class C, PrimitiveGroupC PG, std::derived_from<AcceleratorGroupI> B>
+LinearizedSurfaceData AcceleratorGroupT<C, PG, B>::LinearizeSurfaceData(const AccelGroupConstructParams& p,
+                                                                        const AccelPartitionResult& partitions,
+                                                                        const typename PG& pg)
 {
     LinearizedSurfaceData result = {};
     result.primRanges.reserve(partitions.totalInstanceCount);
@@ -852,8 +852,8 @@ LinearizedSurfaceData AcceleratorGroupT<C, PG>::LinearizeSurfaceData(const Accel
     return result;
 }
 
-template<class C, PrimitiveGroupC PG>
-PreprocessResult AcceleratorGroupT<C, PG>::PreprocessConstructionParams(const AccelGroupConstructParams& p)
+template<class C, PrimitiveGroupC PG, std::derived_from<AcceleratorGroupI> B>
+PreprocessResult AcceleratorGroupT<C, PG, B>::PreprocessConstructionParams(const AccelGroupConstructParams& p)
 {
     assert(&pg == p.primGroup);
     // Instance Types (determined by transform type)
@@ -903,11 +903,11 @@ PreprocessResult AcceleratorGroupT<C, PG>::PreprocessConstructionParams(const Ac
     };
 }
 
-template<class C, PrimitiveGroupC PG>
-AcceleratorGroupT<C, PG>::AcceleratorGroupT(uint32_t groupId,
-                                            BS::thread_pool& tp, const GPUSystem& sys,
-                                            const GenericGroupPrimitiveT& pgIn,
-                                            const AccelWorkGenMap& workGenMap)
+template<class C, PrimitiveGroupC PG, std::derived_from<AcceleratorGroupI> B>
+AcceleratorGroupT<C, PG, B>::AcceleratorGroupT(uint32_t groupId,
+                                               BS::thread_pool& tp, const GPUSystem& sys,
+                                               const GenericGroupPrimitiveT& pgIn,
+                                               const AccelWorkGenMap& workGenMap)
     : threadPool(tp)
     , gpuSystem(sys)
     , accelGroupId(groupId)
@@ -915,14 +915,14 @@ AcceleratorGroupT<C, PG>::AcceleratorGroupT(uint32_t groupId,
     , accelWorkGenerators(workGenMap)
 {}
 
-template<class C, PrimitiveGroupC PG>
-void AcceleratorGroupT<C, PG>::WriteInstanceKeysAndAABBsInternal(Span<AABB3> aabbWriteRegion,
-                                                                 Span<AcceleratorKey> keyWriteRegion,
-                                                                 // Input
-                                                                 Span<const PrimitiveKey> dAllLeafs,
-                                                                 Span<const TransformKey> dTransformKeys,
-                                                                 // Constants
-                                                                 const GPUQueue& queue) const
+template<class C, PrimitiveGroupC PG, std::derived_from<AcceleratorGroupI> B>
+void AcceleratorGroupT<C, PG, B>::WriteInstanceKeysAndAABBsInternal(Span<AABB3> aabbWriteRegion,
+                                                                    Span<AcceleratorKey> keyWriteRegion,
+                                                                    // Input
+                                                                    Span<const PrimitiveKey> dAllLeafs,
+                                                                    Span<const TransformKey> dTransformKeys,
+                                                                    // Constants
+                                                                    const GPUQueue& queue) const
 {
     // Sanity Checks
     assert(aabbWriteRegion.size() == concreteIndicesOfInstances.size());
@@ -1041,50 +1041,50 @@ void AcceleratorGroupT<C, PG>::WriteInstanceKeysAndAABBsInternal(Span<AABB3> aab
     }
 }
 
-template<class C, PrimitiveGroupC PG>
-void AcceleratorGroupT<C, PG>::PreConstruct(const BaseAcceleratorI*)
+template<class C, PrimitiveGroupC PG, std::derived_from<AcceleratorGroupI> B>
+void AcceleratorGroupT<C, PG, B>::PreConstruct(const BaseAcceleratorI*)
 {}
 
-template<class C, PrimitiveGroupC PG>
-size_t AcceleratorGroupT<C, PG>::InstanceCount() const
+template<class C, PrimitiveGroupC PG, std::derived_from<AcceleratorGroupI> B>
+size_t AcceleratorGroupT<C, PG, B>::InstanceCount() const
 {
     return instanceLeafRanges.size();
 }
 
-template<class C, PrimitiveGroupC PG>
-uint32_t AcceleratorGroupT<C, PG>::InstanceTypeCount() const
+template<class C, PrimitiveGroupC PG, std::derived_from<AcceleratorGroupI> B>
+uint32_t AcceleratorGroupT<C, PG, B>::InstanceTypeCount() const
 {
     return static_cast<uint32_t>(workInstances.size());
 }
 
-template<class C, PrimitiveGroupC PG>
-uint32_t AcceleratorGroupT<C, PG>::AcceleratorCount() const
+template<class C, PrimitiveGroupC PG, std::derived_from<AcceleratorGroupI> B>
+uint32_t AcceleratorGroupT<C, PG, B>::AcceleratorCount() const
 {
     return static_cast<uint32_t>(concreteLeafRanges.size());
 }
 
-template<class C, PrimitiveGroupC PG>
-uint32_t AcceleratorGroupT<C, PG>::UsedIdBitsInKey() const
+template<class C, PrimitiveGroupC PG, std::derived_from<AcceleratorGroupI> B>
+uint32_t AcceleratorGroupT<C, PG, B>::UsedIdBitsInKey() const
 {
     using namespace Bit;
     size_t bitCount = RequiredBitsToRepresent(InstanceCount());
     return static_cast<uint32_t>(bitCount);
 }
 
-template<class C, PrimitiveGroupC PG>
-void AcceleratorGroupT<C, PG>::SetKeyOffset(uint32_t offset)
+template<class C, PrimitiveGroupC PG, std::derived_from<AcceleratorGroupI> B>
+void AcceleratorGroupT<C, PG, B>::SetKeyOffset(uint32_t offset)
 {
     globalWorkIdToLocalOffset = offset;
 }
 
-template<class C, PrimitiveGroupC PG>
-std::string_view AcceleratorGroupT<C, PG>::Name() const
+template<class C, PrimitiveGroupC PG, std::derived_from<AcceleratorGroupI> B>
+std::string_view AcceleratorGroupT<C, PG, B>::Name() const
 {
     return C::TypeName();
 }
 
-template<class C, PrimitiveGroupC PG>
-const GenericGroupPrimitiveT& AcceleratorGroupT<C, PG>::PrimGroup() const
+template<class C, PrimitiveGroupC PG, std::derived_from<AcceleratorGroupI> B>
+const GenericGroupPrimitiveT& AcceleratorGroupT<C, PG, B>::PrimGroup() const
 {
     return pg;
 }

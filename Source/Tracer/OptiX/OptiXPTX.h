@@ -68,7 +68,7 @@ struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) GenericHitRecord
 };
 
 // Other SBT Records are Empty (use this for those API calls)
-struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) EmptyRecord
+struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) EmptyHitRecord
 {
 	__align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
 	// Optix 7 Course had dummy pointer here so i will leave it as well

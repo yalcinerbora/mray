@@ -11,14 +11,48 @@
 #include "Core/Filesystem.h"
 #include "Core/Error.hpp"
 
+#include "Device/GPUAlgScan.h"
+#include "Device/GPUSystem.hpp"
+
 // Magic linking, these are populated via CUDA runtime?
 #include <optix_function_table_definition.h>
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCCopyToOptixInstance(// Output
+                           MRAY_GRID_CONSTANT const Span<OptixInstance> dInstances,
+                           // Input
+                           MRAY_GRID_CONSTANT const Span<const Matrix4x4> dMatrices,
+                           MRAY_GRID_CONSTANT const Span<const uint32_t> dInstanceFlags,
+                           MRAY_GRID_CONSTANT const Span<const OptixTraversableHandle> dHandles,
+                           MRAY_GRID_CONSTANT const Span<const uint32_t> dGlobalSBTOffsets)
+{
+    uint32_t totalInstanceCount = static_cast<uint32_t>(dInstances.size());
+
+    KernelCallParams kp;
+    for(uint32_t i = kp.GlobalId(); i < totalInstanceCount; i += kp.TotalSize())
+    {
+        OptixInstance out =
+        {
+            .transform =
+            {
+                dMatrices[i][0], dMatrices[i][1], dMatrices[i][ 2], dMatrices[i][ 3],
+                dMatrices[i][4], dMatrices[i][5], dMatrices[i][ 6], dMatrices[i][ 7],
+                dMatrices[i][8], dMatrices[i][9], dMatrices[i][10], dMatrices[i][11]
+            },
+            .instanceId = i,
+            .sbtOffset = dGlobalSBTOffsets[i],
+            .visibilityMask = 0xFF,
+            .flags = dInstanceFlags[i],
+            .traversableHandle = dHandles[i]
+        };
+        dInstances[i] = out;
+    }
+}
 
 static constexpr auto OPTIX_LOGGER_NAME = "OptiXLogger";
 static constexpr auto OPTIX_LOGGER_FILE_NAME = "optix_log";
 static constexpr auto OPTIX_SHADERS_FOLDER = "OptiXShaders";
 static constexpr auto OPTIX_SHADER_NAME = "OptiXPTX.optixir";
-//static constexpr auto OPTIX_SHADER_NAME = "OptiXPTX.ptx";
 
 Expected<std::vector<char>>
 DevourFile(const std::string& shaderName,
@@ -189,8 +223,117 @@ BaseAcceleratorOptiX::BaseAcceleratorOptiX(BS::thread_pool& tp, const GPUSystem&
     }
 }
 
+
+
+struct PrimShaderNames
+{
+    std::string_view PGName;
+    std::string_view TGName;
+};
+
+
 AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanceOffsets)
 {
+    static_assert((sizeof(OptixAabb) == sizeof(AABB3)) && (alignof(OptixAabb) <= alignof(AABB3)),
+                  "Optix and MRay AABBs do not match!");
+    size_t totalInstanceCount = instanceOffsets.back();
+
+    // First, create the traversable
+    // Temporary allocate AABB, AcceleratorKey,
+    // "OptixInstance", Matrix4x4... for each instance.
+    // Device stuff
+    DeviceMemory tempMem({gpuSystem.AllGPUs()}, 32_MiB, 128_MiB);
+    Span<AABB3> dLeafAABBs;
+    Span<AcceleratorKey> dLeafKeys;
+    Span<OptixTraversableHandle> dTraversableHandles;
+    Span<Matrix4x4> dInstanceMatrices;
+    Span<uint32_t> dSBTCounts;
+    Span<uint32_t> dFlags;
+    //
+    Span<OptixInstance> dInstanceBuildData;
+    Span<uint32_t> dSBTOffsets;
+    Span<Byte> dScanTempMem;
+
+    size_t scanTempMemSize = DeviceAlgorithms::ExclusiveScanTMSize<uint32_t>(totalInstanceCount);
+    MemAlloc::AllocateMultiData(std::tie(dLeafAABBs, dLeafKeys,
+                                         dTraversableHandles, dInstanceMatrices,
+                                         dSBTCounts, dFlags, dInstanceBuildData,
+                                         dSBTOffsets, dScanTempMem),
+                                tempMem,
+                                {totalInstanceCount, totalInstanceCount, totalInstanceCount,
+                                 totalInstanceCount, totalInstanceCount, totalInstanceCount,
+                                 totalInstanceCount, totalInstanceCount, scanTempMemSize});
+
+    // Write all required data to buffers
+    size_t i = 0;
+    GPUQueueIteratorRoundRobin qIt(gpuSystem);
+    for(const auto& accGroup : generatedAccels)
+    {
+        AcceleratorGroupOptixI* aGroup = static_cast<AcceleratorGroupOptixI*>(accGroup.second.get());
+        size_t localCount = instanceOffsets[i + 1] - instanceOffsets[i];
+        auto dAABBRegion = dLeafAABBs.subspan(instanceOffsets[i],
+                                              localCount);
+        auto dLeafRegion = dLeafKeys.subspan(instanceOffsets[i], localCount);
+        aGroup->WriteInstanceKeysAndAABBs(dAABBRegion, dLeafRegion, qIt.Queue());
+
+        // Get required parameters for IAS construction
+        auto dTraversableHandleRegion = dTraversableHandles.subspan(instanceOffsets[i],
+                                                                    localCount);
+        auto dSBTCountRegion = dSBTCounts.subspan(instanceOffsets[i],
+                                                  localCount);
+        auto dMatrixRegion = dInstanceMatrices.subspan(instanceOffsets[i],
+                                                       localCount);
+        auto dFlagRegion = dFlags.subspan(instanceOffsets[i],
+                                          localCount);
+        aGroup->AcquireIASConstructionParams(dTraversableHandleRegion,
+                                             dMatrixRegion,
+                                             dSBTCountRegion,
+                                             dFlagRegion);
+        i++;
+        qIt.Next();
+    }
+    // Wait all queues
+    gpuSystem.SyncAll();
+
+    // Calculate global offsets
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
+    DeviceAlgorithms::ExclusiveScan
+    (
+        dSBTOffsets, dScanTempMem,
+        ToConstSpan(dSBTCounts), 0u, queue,
+        std::plus{}
+    );
+
+    // Write these to OptixInstance struct
+    queue.IssueSaturatingKernel<KCCopyToOptixInstance>
+    (
+        "KCCopyToOptixInstance",
+        KernelIssueParams{.workCount = static_cast<uint32_t>(totalInstanceCount)},
+        // Output
+        dInstanceBuildData,
+        // Input
+        dInstanceMatrices,
+        dFlags,
+        dTraversableHandles,
+        dSBTOffsets
+    );
+
+    OptixBuildInput buildInput
+    {
+        .type = OPTIX_BUILD_INPUT_TYPE_INSTANCES,
+        .instanceArray = OptixBuildInputInstanceArray
+        {
+            .instances = std::bit_cast<CUdeviceptr>(dInstanceBuildData.data()),
+            .numInstances = static_cast<uint32_t>(totalInstanceCount),
+            .instanceStride = 0
+        }
+    };
+
+    //using mray::cuda::ToHandleCUDA;
+    //OPTIX_CHECK(optixAccelBuild(contextOptiX, ToHandleCUDA(queue),
+    //                            &OptiXAccelDetail::BUILD_OPTIONS_OPTIX,
+    //                            &buildInput, ));
+
     return AABB3::Negative();
 }
 

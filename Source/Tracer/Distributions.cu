@@ -239,12 +239,12 @@ void DistributionGroupPwC2D::Construct(uint32_t index,
     const DistData& d = distData[index];
 
     // Directly scan to cdf array
-    InclusiveMultiScan(d.dCDFsX,
-                       function,
-                       sizes[index][0],
-                       Float{0},
-                       queue,
-                       []MRAY_HYBRID(Float a, Float b) {return a + b; });
+    InclusiveSegmentedScan(d.dCDFsX,
+                           function,
+                           sizes[index][0],
+                           Float{0},
+                           queue,
+                           []MRAY_HYBRID(Float a, Float b) { return a + b; });
 
     // Copy to Y and normalize
     uint32_t yCount = static_cast<uint32_t>(sizes[index][1]);

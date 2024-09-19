@@ -140,11 +140,25 @@ class ContextOptiX
 
 };
 
+
+// Add Optix specific functions
+class AcceleratorGroupOptixI : public AcceleratorGroupI
+{
+    public:
+    virtual ~AcceleratorGroupOptixI() = default;
+
+    virtual void AcquireIASConstructionParams(Span<OptixTraversableHandle> dTraversableHandles,
+                                              Span<Matrix4x4> dInstanceMatrices,
+                                              Span<uint32_t> dSBTCounts,
+                                              Span<uint32_t> dFlags) const = 0;
+};
+
 template<PrimitiveGroupC PrimitiveGroupType>
 class AcceleratorGroupOptiX final
-    : public AcceleratorGroupT<AcceleratorGroupOptiX<PrimitiveGroupType>, PrimitiveGroupType>
+    : public AcceleratorGroupT<AcceleratorGroupOptiX<PrimitiveGroupType>, PrimitiveGroupType, AcceleratorGroupOptixI>
 {
-    using Base = AcceleratorGroupT<AcceleratorGroupOptiX <PrimitiveGroupType>, PrimitiveGroupType>;
+    using Base = AcceleratorGroupT<AcceleratorGroupOptiX <PrimitiveGroupType>,
+                                   PrimitiveGroupType, AcceleratorGroupOptixI>;
     using HitRecordVector = std::vector<GenericHitRecord<>>;
     public:
     static std::string_view TypeName();
@@ -196,6 +210,10 @@ class AcceleratorGroupOptiX final
     void    WriteInstanceKeysAndAABBs(Span<AABB3> dAABBWriteRegion,
                                       Span<AcceleratorKey> dKeyWriteRegion,
                                       const GPUQueue&) const override;
+    void    AcquireIASConstructionParams(Span<OptixTraversableHandle> dTraversableHandles,
+                                              Span<Matrix4x4> dInstanceMatrices,
+                                              Span<uint32_t> dSBTCounts,
+                                              Span<uint32_t> dFlags) const override;
 
     // Functionality
     void    CastLocalRays(// Output
@@ -227,8 +245,12 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
     private:
     std::vector<ComputeCapabilityTypePackOptiX> optixTypesPerCC;
     ContextOptiX            contextOptiX;
+
     DeviceMemory            accelMem;
     Span<ArgumentPackOpitX> dLaunchArgPack;
+    Span<Byte>              dAccelMemory;
+
+    // Host
     OptixShaderBindingTable commonSBT;
 
     OptixTraversableHandle  baseAccelerator;
