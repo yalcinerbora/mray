@@ -1653,7 +1653,11 @@ void TracerBase::SetCameraTransform(RendererId rId, CameraTransform transform)
 void TracerBase::StopRender()
 {
     if(currentRenderer)
+    {
+        gpuSystem.SyncAll();
         currentRenderer->StopRender();
+    }
+
 }
 
 RendererOutput TracerBase::DoRenderWork()

@@ -109,7 +109,7 @@ ComputeCapabilityTypePackOptiX::ComputeCapabilityTypePackOptiX(const std::string
 
 ComputeCapabilityTypePackOptiX::ComputeCapabilityTypePackOptiX(ComputeCapabilityTypePackOptiX&& other) noexcept
     : optixModule(std::exchange(other.optixModule, nullptr))
-    , programGroup(std::exchange(other.programGroup, nullptr))
+    , programGroups(std::exchange(other.programGroups, std::vector<OptixProgramGroup>{}))
     , pipeline(std::exchange(other.pipeline, nullptr))
 {}
 
@@ -119,11 +119,14 @@ ComputeCapabilityTypePackOptiX::operator=(ComputeCapabilityTypePackOptiX&& other
     assert(this != &other);
 
     OPTIX_CHECK(optixPipelineDestroy(pipeline));
-    OPTIX_CHECK(optixProgramGroupDestroy(programGroup));
+    for(auto pg : programGroups)
+        OPTIX_CHECK(optixProgramGroupDestroy(pg));
+    programGroups.clear();
+
     OPTIX_CHECK(optixModuleDestroy(optixModule));
 
     optixModule = std::exchange(other.optixModule, nullptr);
-    programGroup = std::exchange(other.programGroup, nullptr);
+    programGroups = std::exchange(other.programGroups, std::vector<OptixProgramGroup>{});
     pipeline = std::exchange(other.pipeline, nullptr);
     return *this;
 }
@@ -131,7 +134,9 @@ ComputeCapabilityTypePackOptiX::operator=(ComputeCapabilityTypePackOptiX&& other
 ComputeCapabilityTypePackOptiX::~ComputeCapabilityTypePackOptiX()
 {
     OPTIX_CHECK(optixPipelineDestroy(pipeline));
-    OPTIX_CHECK(optixProgramGroupDestroy(programGroup));
+    for(auto pg : programGroups)
+        OPTIX_CHECK(optixProgramGroupDestroy(pg));
+    programGroups.clear();
     OPTIX_CHECK(optixModuleDestroy(optixModule));
 }
 
@@ -389,8 +394,9 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     queue.Barrier().Wait();
 
     // Finally do the persistent allocation
-    MemAlloc::AllocateMultiData(std::tie(dLaunchArgPack, dAccelMemory, dHitRecords),
-                                allMem, {1, compactedSize, totalRecordCount});
+    MemAlloc::AllocateMultiData(std::tie(dLaunchArgPack, dAccelMemory,
+                                         dHitRecords, dEmptyRecords),
+                                allMem, {1, compactedSize, totalRecordCount, 2});
 
     OPTIX_CHECK(optixAccelCompact(contextOptiX, ToHandleCUDA(queue), phonyHandle,
                                   std::bit_cast<CUdeviceptr>(dAccelMemory.data()),
@@ -413,31 +419,183 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
         //
         auto localTypeNames = aGroup->GetShaderTypeNames();
         auto recordOffsets = aGroup->GetShaderOffsets();
-        assert(localTypeNames.size() == recordOffsets.size());
-        for(size_t i = 0; i < recordOffsets.size() - 1; i++)
+        assert(localTypeNames.size() == (recordOffsets.size() - 1));
+        for(size_t j = 0; j < recordOffsets.size() - 1; j++)
         {
-            uint32_t start = recordStartOffset + recordOffsets[i];
-            uint32_t end = recordStartOffset + recordOffsets[i + 1];
-
-            const auto& typeName = localTypeNames[i];
+            uint32_t start = recordStartOffset + recordOffsets[j];
+            uint32_t end = recordStartOffset + recordOffsets[j + 1];
+            uint32_t count = end - start;
+            const auto& typeName = localTypeNames[j];
             auto& indexList = shaderNames[typeName];
-            auto endLoc = indexList.insert(indexList.end(), end - start, 0);
-            std::iota(endLoc - (end - start), endLoc, recordStartOffset);
+            auto endLoc = indexList.insert(indexList.end(), count, 0);
+            std::iota(endLoc, endLoc + count, recordStartOffset + start);
         }
     }
 
     // Now we have all the things we need to generate shaders.
-    GenerateShaders(hAllHitRecords, shaderNames);
+    static constexpr auto RG_RECORD = 0;
+    static constexpr auto MISS_RECORD = 1;
+    std::array<EmptyHitRecord, 2> hEmptyRecords;
+    GenerateShaders(hEmptyRecords[RG_RECORD],
+                    hEmptyRecords[MISS_RECORD],
+                    hAllHitRecords, shaderNames);
 
+    //
+    queue.MemcpyAsync(dHitRecords, ToConstSpan(Span(hAllHitRecords)));
+    queue.MemcpyAsync(dEmptyRecords, ToConstSpan(Span(hEmptyRecords.cbegin(),
+                                                      hEmptyRecords.cend())));
+    // Finally set the table and GG
+    commonSBT = {};
+    // RG
+    commonSBT.raygenRecord = std::bit_cast<CUdeviceptr>(dEmptyRecords.data() + RG_RECORD);
+    // MISS
+    commonSBT.missRecordBase = std::bit_cast<CUdeviceptr>(dEmptyRecords.data() + MISS_RECORD);
+    commonSBT.missRecordStrideInBytes = sizeof(EmptyHitRecord);
+    commonSBT.missRecordCount = 1u;
+    // HITS
+    commonSBT.hitgroupRecordBase = std::bit_cast<CUdeviceptr>(dHitRecords.data());
+    commonSBT.hitgroupRecordStrideInBytes= sizeof(GenericHitRecord<>);
+    commonSBT.hitgroupRecordCount = static_cast<uint32_t>(dHitRecords.size());
     // Wait all queues
     gpuSystem.SyncAll();
+    // All Done!
     return sceneAABB;
 }
 
-void BaseAcceleratorOptiX::GenerateShaders(std::vector<GenericHitRecord<>>& records,
+void BaseAcceleratorOptiX::GenerateShaders(EmptyHitRecord& rgRecord, EmptyHitRecord& missRecord,
+                                           std::vector<GenericHitRecord<>>& records,
                                            const ShaderNameMap& shaderNames)
 {
+    static constexpr auto RaygenName = "__raygen__OptiX";
+    static constexpr auto MissName = "__miss__OptiX";
+    static constexpr auto CH_PREFIX = "__closesthit__";
+    static constexpr auto AH_PREFIX = "__anyhit__";
+    static constexpr auto IS_PREFIX = "__intersection__";
 
+    static constexpr auto CH_INDEX = 0;
+    static constexpr auto AH_INDEX = 1;
+    static constexpr auto IS_INDEX = 2;
+    // These are runtime, we need persistance
+    // to generate multiple data
+    std::vector<std::array<std::string, 3>> typeHitPackNames;
+    typeHitPackNames.reserve(shaderNames.size());
+
+    // First, generate the names (little bit of string
+    // processing is required)
+    for(const auto& [shaderPack, _] : shaderNames)
+    {
+        using TracerConstants::PRIM_PREFIX;
+        using TracerConstants::TRANSFORM_PREFIX;
+        assert(shaderPack.primName.starts_with(PRIM_PREFIX));
+        assert(shaderPack.transformName.starts_with(TRANSFORM_PREFIX));
+        //
+        std::string_view primStripped = shaderPack.primName.substr(PRIM_PREFIX.size());
+        std::string_view transStripped = shaderPack.transformName.substr(TRANSFORM_PREFIX.size());
+        typeHitPackNames.push_back
+        ({
+            std::string(CH_PREFIX) + std::string(primStripped),
+            std::string(AH_PREFIX) + std::string(primStripped),
+            std::string{}
+         });
+        if(!shaderPack.isTriangle)
+        {
+            typeHitPackNames.back()[IS_INDEX] =
+                (std::string(IS_PREFIX) + std::string(primStripped)
+                 + "_" + std::string(transStripped));
+        }
+    }
+
+    for(auto& optixTypePack : optixTypesPerCC)
+    {
+        OptixProgramGroupOptions options = {};
+        std::vector<OptixProgramGroupDesc> pgDesc;
+
+        pgDesc.push_back
+        (
+            OptixProgramGroupDesc
+            {
+                .kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN,
+                .raygen = OptixProgramGroupSingleModule
+                {
+                    .module = optixTypePack.optixModule,
+                    .entryFunctionName = RaygenName
+                }
+            }
+        );
+        pgDesc.push_back
+        (
+            OptixProgramGroupDesc
+            {
+                .kind = OPTIX_PROGRAM_GROUP_KIND_MISS,
+                .raygen = OptixProgramGroupSingleModule
+                {
+                    .module = optixTypePack.optixModule,
+                    .entryFunctionName = MissName
+                }
+            }
+        );
+
+        uint32_t i = 0;
+        for(const auto& shaderPack : shaderNames)
+        {
+            pgDesc.push_back
+            (
+                OptixProgramGroupDesc
+                {
+                    .kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP,
+                    .hitgroup = OptixProgramGroupHitgroup
+                    {
+                        .moduleCH = optixTypePack.optixModule,
+                        .entryFunctionNameCH = typeHitPackNames[i][CH_INDEX].c_str(),
+                        .moduleAH = optixTypePack.optixModule,
+                        .entryFunctionNameAH = typeHitPackNames[i][AH_INDEX].c_str(),
+                        .moduleIS =  nullptr,
+                        .entryFunctionNameIS = nullptr
+                    }
+                }
+            );
+            if(!shaderPack.first.isTriangle)
+            {
+                pgDesc.back().hitgroup.moduleIS = optixTypePack.optixModule;
+                pgDesc.back().hitgroup.entryFunctionNameIS = typeHitPackNames[i][IS_INDEX].c_str();
+            }
+            i++;
+        }
+        // Finally gen group and pipeline
+        optixTypePack.programGroups.resize(pgDesc.size(), nullptr);
+        OPTIX_CHECK(optixProgramGroupCreate(contextOptiX, pgDesc.data(),
+                                            static_cast<uint32_t>(pgDesc.size()),
+                                            &options, nullptr, nullptr,
+                                            optixTypePack.programGroups.data()));
+
+        OptixPipelineLinkOptions linkOptions =
+        {
+            .maxTraceDepth = 1
+        };
+        OPTIX_CHECK(optixPipelineCreate(contextOptiX, &OptiXAccelDetail::PIPELINE_OPTIONS_OPTIX,
+                                        &linkOptions, optixTypePack.programGroups.data(),
+                                        static_cast<uint32_t>(optixTypePack.programGroups.size()),
+                                        nullptr, nullptr, &optixTypePack.pipeline));
+    }
+
+    // Now set the descriptiors
+    currentCCIndex = 0;
+    const auto& ccPack = optixTypesPerCC[currentCCIndex];
+    uint32_t pgIndex = 0;
+    for(const auto& [_, hitRecordIndices] : shaderNames)
+    {
+        for(uint32_t index : hitRecordIndices)
+        {
+            auto& record = records[index];
+            OPTIX_CHECK(optixSbtRecordPackHeader(ccPack.programGroups[pgIndex + 2], record.header));
+        }
+        pgIndex ++;
+    }
+    // RG and Miss records and finish
+    OPTIX_CHECK(optixSbtRecordPackHeader(ccPack.programGroups[0],
+                                         rgRecord.header));
+    OPTIX_CHECK(optixSbtRecordPackHeader(ccPack.programGroups[1],
+                                         missRecord.header));
 }
 
 void BaseAcceleratorOptiX::AllocateForTraversal(size_t)
@@ -453,10 +611,17 @@ void BaseAcceleratorOptiX::CastRays(// Output
                                    Span<const RayIndex> dRayIndices,
                                    const GPUQueue& queue)
 {
+    using namespace std::string_view_literals;
+    const auto annotation = gpuSystem.CreateAnnotation("Ray Casting"sv);
+    const auto _ = annotation.AnnotateScope();
+
+    // TODO: Currently only works for single GPU
+    assert(gpuSystem.AllGPUs().size() == 1);
+
     // This code is not generic, so we go in and take the stuff
     // from device interface specific stuff
     using mray::cuda::ToHandleCUDA;
-    const ComputeCapabilityTypePackOptiX& deviceTypes = optixTypesPerCC[0];
+    const ComputeCapabilityTypePackOptiX& deviceTypes = optixTypesPerCC[currentCCIndex];
 
     // Copy args
     ArgumentPackOpitX argPack =

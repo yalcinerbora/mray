@@ -21,7 +21,7 @@ T* DriverPtrToType(CUdeviceptr ptrInt)
     return static_cast<T*>(hrRaw);
 }
 
-template <VectorC Hit>
+template <VectorC Hit, bool IsTriangle>
 requires std::is_floating_point_v<typename Hit::InnerType>
 MRAY_GPU MRAY_GPU_INLINE
 MetaHit ReadHitFromAttributes()
@@ -37,6 +37,13 @@ MetaHit ReadHitFromAttributes()
         h[1] = __uint_as_float(optixGetAttribute_1());
     if constexpr(1 <= Hit::Dims)
         h[0] = __uint_as_float(optixGetAttribute_0());
+
+    // MRay barycentric order is different
+    if constexpr(IsTriangle)
+    {
+        Float c = Float(1) - h[0] - h[1];
+        h = Hit(c, h[0]);
+    }
     return MetaHit(h);
 }
 
@@ -106,7 +113,7 @@ MRAY_GPU MRAY_GPU_INLINE
 void KCClosestHit()
 {
     using Hit = typename PGroup::Hit;
-    using HitRecord = GenericHitRecordData<typename PGroup::DataSoA>;
+    using HitRecord = GenericHitRecordData<>;
     auto& record = *DriverPtrToType<const HitRecord>(optixGetSbtDataPointer());
 
     const uint32_t leafId = optixGetPrimitiveIndex();
@@ -117,7 +124,7 @@ void KCClosestHit()
     TransformKey tKey = record.transformKey;
     LightOrMatKey lmKey = record.lightOrMatKey;
     AcceleratorKey aKey = record.acceleratorKey;
-    MetaHit hit = ReadHitFromAttributes<Hit>();
+    MetaHit hit = ReadHitFromAttributes<Hit, TrianglePrimGroupC<PGroup>>();
 
     // Write to the global memory
     RayIndex rIndex = params.dRayIndices[rayId];
@@ -147,7 +154,8 @@ void KCAnyHit()
         // This has alpha map check it
         const auto& alphaMap = record.alphaMap.value();
         // Get the current hit
-        Hit hit = ReadHitFromAttributes<Hit>().template AsVector<Hit::Dims>();
+        MetaHit metaHit = ReadHitFromAttributes<Hit, TrianglePrimGroupC<PGroup>>();
+        Hit hit = metaHit.AsVector<Hit::Dims>();
         // Create primitive
         const uint32_t leafId = optixGetPrimitiveIndex();
         Primitive prim(TransformContextIdentity{},
@@ -278,7 +286,7 @@ void KCRayGenOptix()
                tMM[0], tMM[1],
                0.0f,
                //
-               OptixVisibilityMask(255),
+               OptixVisibilityMask(0xFF),
                // Flags
                OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
                // SBT

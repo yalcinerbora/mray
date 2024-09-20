@@ -693,6 +693,7 @@ void TracerThread::InitialWork()
 
 void TracerThread::FinalWork()
 {
+    tracer->StopRender();
     // Terminate the queue manually if we are crashing
     if(isTerminated)
     {

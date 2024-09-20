@@ -114,7 +114,7 @@ class Bitset
                  void>>>>;
     static_assert(!std::is_same_v<Type, void>,
                   "MRay bitset at most supports 64-bits!");
-    static constexpr auto MASK = (size_t(1) << N) - 1;
+    static constexpr Type MASK = Type((size_t(1) << N) - 1);
 
     public:
     class BitRef
@@ -155,6 +155,8 @@ class Bitset
     // 64-bit(std::size_t) may use two registers maybe?
     MRAY_HYBRID constexpr uint32_t  Count() const;
     MRAY_HYBRID constexpr uint32_t  Size() const;
+    // How many bits is set
+    MRAY_HYBRID constexpr uint32_t  PopCount() const;
 
     MRAY_HYBRID constexpr Bitset& operator&=(const Bitset&);
     MRAY_HYBRID constexpr Bitset& operator|=(const Bitset&);
@@ -429,7 +431,7 @@ constexpr T Bit::PopC(T value)
         else
             return T(__popc(uint32_t(value)));
     #else
-        return std::popcount<T>(value);
+        return T(std::popcount<T>(value));
     #endif
 }
 
@@ -703,6 +705,13 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr uint32_t Bitset<N>::Size() const
 {
     return CHAR_BIT * sizeof(Type);
+}
+
+template<size_t N>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr uint32_t Bitset<N>::PopCount() const
+{
+    return Bit::PopC<Type>(MASK & bits);
 }
 
 template<size_t N>

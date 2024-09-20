@@ -112,10 +112,10 @@ namespace OptiXAccelDetail
 
 struct ComputeCapabilityTypePackOptiX
 {
-    OptixModule         optixModule     = nullptr;
-    OptixPipeline       pipeline        = nullptr;
-    OptixProgramGroup   programGroup    = nullptr;
-    std::string         computeCapability;
+    OptixModule                     optixModule     = nullptr;
+    std::vector<OptixProgramGroup>  programGroups;
+    OptixPipeline                   pipeline        = nullptr;
+    std::string                     computeCapability;
 
     // Constructors & Destructor
     ComputeCapabilityTypePackOptiX(const std::string&);
@@ -274,13 +274,16 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
     using ShaderNameMap = std::map<OptiXAccelDetail::ShaderTypeNames, std::vector<uint32_t>>;
     static std::string_view TypeName();
     private:
-    std::vector<ComputeCapabilityTypePackOptiX> optixTypesPerCC;
     ContextOptiX                contextOptiX;
+    std::vector<ComputeCapabilityTypePackOptiX> optixTypesPerCC;
     // Memory related
     DeviceMemory                allMem;
     Span<ArgumentPackOpitX>     dLaunchArgPack;
     Span<Byte>                  dAccelMemory;
     Span<GenericHitRecord<>>    dHitRecords;
+    Span<EmptyHitRecord>        dEmptyRecords;
+    // State of the CC
+    uint32_t currentCCIndex     = std::numeric_limits<uint32_t>::max();
     //
 
     // Host
@@ -288,8 +291,9 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
     OptixTraversableHandle  baseAccelerator;
 
     protected:
-    AABB3   InternalConstruct(const std::vector<size_t>& instanceOffsets) override;
-    void    GenerateShaders(std::vector<GenericHitRecord<>>&, const ShaderNameMap&);
+    AABB3           InternalConstruct(const std::vector<size_t>& instanceOffsets) override;
+    void GenerateShaders(EmptyHitRecord& rgRecord, EmptyHitRecord& missRecord,
+                         std::vector<GenericHitRecord<>>&, const ShaderNameMap&);
     public:
     // Constructors & Destructor
     BaseAcceleratorOptiX(BS::thread_pool&, const GPUSystem&,

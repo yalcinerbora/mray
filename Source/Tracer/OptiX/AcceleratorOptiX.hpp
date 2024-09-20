@@ -73,8 +73,7 @@ BuildInputPackTriangle GenBuildInputsTriangle(const Span<const Vector3>& vertice
         auto rangeIndices = indices.subspan(range[0], range[1] - range[0]);
 
         result.vertexPointers.push_back(std::bit_cast<CUdeviceptr>(vertices.data()));
-        unsigned int flags = (OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT |
-                              OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING);
+        unsigned int flags = OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT;
         result.geometryFlags.push_back(flags);
 
         result.buildInputs.emplace_back
@@ -381,6 +380,10 @@ AcceleratorGroupOptiX<PG>::MultiBuildTriangleCLT(const PreprocessResult& ppResul
         }
         hConcreteHitRecordCounts.emplace_back(innerCount);
     }
+
+    // Wait for temp memory
+    queue.Barrier().Wait();
+    // All done!
     return hConcreteAccelHandles;
 }
 
@@ -456,15 +459,26 @@ void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
     // Generate the common flags
     for(size_t i = 0; i < this->InstanceCount(); i++)
     {
+        // Get the valid sub-surface count
+        constexpr Vector2ui INVALID_BATCH = Vector2ui(std::numeric_limits<uint32_t>::max());
+        uint32_t validCount = 0;
+        for(auto& range : ppResult.surfData.primRanges[i])
+        {
+            if(range == INVALID_BATCH) break;
+            validCount++;
+        }
+        uint32_t validMask = (1 << validCount) - 1;
+
         const auto& alphaMaps = ppResult.surfData.alphaMaps[i];
         const auto& cfFlags = ppResult.surfData.cullFaceFlags[i];
 
-        bool enableAnyHit = std::any_of(alphaMaps.begin(), alphaMaps.end(),
+        bool enableAnyHit = std::any_of(alphaMaps.cbegin(),
+                                        alphaMaps.cbegin() + validCount,
                                         [](const Optional<AlphaMap>& a)
         {
             return a.has_value();
         });
-        bool enableCull = cfFlags.All();
+        bool enableCull = (cfFlags.PopCount() == validMask);
 
         uint32_t flag = OPTIX_INSTANCE_FLAG_NONE;
         if(!PER_PRIM_TRANSFORM)
@@ -615,30 +629,6 @@ AcceleratorGroupOptiX<PG>::GetShaderOffsets() const
 {
     return this->workInstanceOffsets;
 }
-
-//template<PrimitiveGroupC PG>
-//std::vector<Vector2ui> AcceleratorGroupOptiX<PG>::GetRecordOffsets()
-//{
-//    // We have concrete offsets convert it to instance offsets
-//    std::vector<Vector2ui> result(this->InstanceCount());
-//    uint32_t offset = 0;
-//    for(uint32_t i = 0; i < this->InstanceCount(); i++)
-//    {
-//        uint32_t cIndex = this->concreteIndicesOfInstances[i];
-//        size_t recordCount = (hConcreteHitRecordOffsets[cIndex + 1] -
-//                              hConcreteHitRecordOffsets[cIndex]);
-//        result.emplace_back(offset, recordCount);
-//        offset += recordCount;
-//    }
-//    return result;
-//}
-//
-//template<PrimitiveGroupC PG>
-//void AcceleratorGroupOptiX<PG>::WriteRecords(Span<GenericHitRecord<>> dRecordWriteRegion,
-//                                             const GPUQueue& queue) const
-//{
-//    queue.MemcpyAsync(dRecordWriteRegion, Span<GenericHitRecord<>>(hHitRecords));
-//}
 
 template<PrimitiveGroupC PG>
 void AcceleratorGroupOptiX<PG>::CastLocalRays(// Output
