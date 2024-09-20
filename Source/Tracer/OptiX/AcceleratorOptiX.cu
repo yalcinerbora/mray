@@ -1,6 +1,7 @@
 #include "AcceleratorOptiX.h"
 
 #include <cassert>
+#include <map>
 #include <optix_host.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/spdlog.h>
@@ -53,6 +54,11 @@ static constexpr auto OPTIX_LOGGER_NAME = "OptiXLogger";
 static constexpr auto OPTIX_LOGGER_FILE_NAME = "optix_log";
 static constexpr auto OPTIX_SHADERS_FOLDER = "OptiXShaders";
 static constexpr auto OPTIX_SHADER_NAME = "OptiXPTX.optixir";
+
+auto OptiXAccelDetail::ShaderTypeNames::operator<=>(const ShaderTypeNames& t) const
+{
+    return Tuple(primName, transformName) <=> Tuple(t.primName, t.transformName);
+}
 
 Expected<std::vector<char>>
 DevourFile(const std::string& shaderName,
@@ -155,7 +161,6 @@ ContextOptiX::ContextOptiX()
         throw MRayError("OptiX log init failed: {:s}", ex.what());
     }
 
-
     //
     const OptixDeviceContextOptions opts =
     {
@@ -187,7 +192,7 @@ BaseAcceleratorOptiX::BaseAcceleratorOptiX(BS::thread_pool& tp, const GPUSystem&
                                            const AccelGroupGenMap& genMap,
                                            const AccelWorkGenMap& workGenMap)
     : BaseAcceleratorT<BaseAcceleratorOptiX>(tp, sys, genMap, workGenMap)
-    , accelMem(sys.AllGPUs(), 32_MiB, 256_MiB, true)
+    , allMem(sys.AllGPUs(), 32_MiB, 256_MiB, true)
 {
     std::vector<std::string> ccList;
     ccList.reserve(gpuSystem.AllGPUs().size());
@@ -223,18 +228,16 @@ BaseAcceleratorOptiX::BaseAcceleratorOptiX(BS::thread_pool& tp, const GPUSystem&
     }
 }
 
-
-
 struct PrimShaderNames
 {
     std::string_view PGName;
     std::string_view TGName;
 };
 
-
 AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanceOffsets)
 {
-    static_assert((sizeof(OptixAabb) == sizeof(AABB3)) && (alignof(OptixAabb) <= alignof(AABB3)),
+    static_assert((sizeof(OptixAabb) == sizeof(AABB3)) &&
+                  (alignof(OptixAabb) <= alignof(AABB3)),
                   "Optix and MRay AABBs do not match!");
     size_t totalInstanceCount = instanceOffsets.back();
 
@@ -244,51 +247,45 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     // Device stuff
     DeviceMemory tempMem({gpuSystem.AllGPUs()}, 32_MiB, 128_MiB);
     Span<AABB3> dLeafAABBs;
-    Span<AcceleratorKey> dLeafKeys;
     Span<OptixTraversableHandle> dTraversableHandles;
     Span<Matrix4x4> dInstanceMatrices;
     Span<uint32_t> dSBTCounts;
     Span<uint32_t> dFlags;
-    //
     Span<OptixInstance> dInstanceBuildData;
     Span<uint32_t> dSBTOffsets;
-    Span<Byte> dScanTempMem;
+    Span<Byte> dScanOrReduceTempMem;
+    Span<AABB3> dReducedAABB;
 
-    size_t scanTempMemSize = DeviceAlgorithms::ExclusiveScanTMSize<uint32_t>(totalInstanceCount);
-    MemAlloc::AllocateMultiData(std::tie(dLeafAABBs, dLeafKeys,
-                                         dTraversableHandles, dInstanceMatrices,
-                                         dSBTCounts, dFlags, dInstanceBuildData,
-                                         dSBTOffsets, dScanTempMem),
+    size_t algoTempMemSize = std::max(DeviceAlgorithms::ExclusiveScanTMSize<uint32_t>(totalInstanceCount + 1),
+                                      DeviceAlgorithms::ReduceTMSize<AABB3>(totalInstanceCount));
+    MemAlloc::AllocateMultiData(std::tie(dLeafAABBs,  dTraversableHandles,
+                                         dInstanceMatrices, dSBTCounts, dFlags,
+                                         dInstanceBuildData, dSBTOffsets,
+                                         dScanOrReduceTempMem, dReducedAABB),
                                 tempMem,
-                                {totalInstanceCount, totalInstanceCount, totalInstanceCount,
+                                {totalInstanceCount, totalInstanceCount,
                                  totalInstanceCount, totalInstanceCount, totalInstanceCount,
-                                 totalInstanceCount, totalInstanceCount, scanTempMemSize});
+                                 totalInstanceCount, totalInstanceCount + 1, algoTempMemSize,
+                                 1});
 
     // Write all required data to buffers
     size_t i = 0;
     GPUQueueIteratorRoundRobin qIt(gpuSystem);
     for(const auto& accGroup : generatedAccels)
     {
-        AcceleratorGroupOptixI* aGroup = static_cast<AcceleratorGroupOptixI*>(accGroup.second.get());
+        using Base = AcceleratorGroupOptixI;
+        Base* aGroup = static_cast<Base*>(accGroup.second.get());
         size_t localCount = instanceOffsets[i + 1] - instanceOffsets[i];
-        auto dAABBRegion = dLeafAABBs.subspan(instanceOffsets[i],
-                                              localCount);
-        auto dLeafRegion = dLeafKeys.subspan(instanceOffsets[i], localCount);
-        aGroup->WriteInstanceKeysAndAABBs(dAABBRegion, dLeafRegion, qIt.Queue());
-
+        size_t offset = instanceOffsets[i];
         // Get required parameters for IAS construction
-        auto dTraversableHandleRegion = dTraversableHandles.subspan(instanceOffsets[i],
-                                                                    localCount);
-        auto dSBTCountRegion = dSBTCounts.subspan(instanceOffsets[i],
-                                                  localCount);
-        auto dMatrixRegion = dInstanceMatrices.subspan(instanceOffsets[i],
-                                                       localCount);
-        auto dFlagRegion = dFlags.subspan(instanceOffsets[i],
-                                          localCount);
-        aGroup->AcquireIASConstructionParams(dTraversableHandleRegion,
-                                             dMatrixRegion,
-                                             dSBTCountRegion,
-                                             dFlagRegion);
+        auto dHandleRegion = dTraversableHandles.subspan(offset, localCount);
+        auto dSBTCountRegion = dSBTCounts.subspan(offset, localCount);
+        auto dMatrixRegion = dInstanceMatrices.subspan(offset, localCount);
+        auto dFlagRegion = dFlags.subspan(offset, localCount);
+        aGroup->AcquireIASConstructionParams(dHandleRegion, dMatrixRegion,
+                                             dSBTCountRegion, dFlagRegion,
+                                             qIt.Queue());
+        aGroup->OffsetAccelKeyInRecords();
         i++;
         qIt.Next();
     }
@@ -299,7 +296,7 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     DeviceAlgorithms::ExclusiveScan
     (
-        dSBTOffsets, dScanTempMem,
+        dSBTOffsets, dScanOrReduceTempMem,
         ToConstSpan(dSBTCounts), 0u, queue,
         std::plus{}
     );
@@ -318,6 +315,8 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
         dSBTOffsets
     );
 
+    // Actually Construct to a temp mem to find out the compact size
+    // Again double dip
     OptixBuildInput buildInput
     {
         .type = OPTIX_BUILD_INPUT_TYPE_INSTANCES,
@@ -329,12 +328,116 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
         }
     };
 
-    //using mray::cuda::ToHandleCUDA;
-    //OPTIX_CHECK(optixAccelBuild(contextOptiX, ToHandleCUDA(queue),
-    //                            &OptiXAccelDetail::BUILD_OPTIONS_OPTIX,
-    //                            &buildInput, ));
+    OptixAccelBufferSizes bufferSizes;
+    OPTIX_CHECK(optixAccelComputeMemoryUsage(contextOptiX, &OptiXAccelDetail::BUILD_OPTIONS_OPTIX,
+                                             &buildInput, 1u, &bufferSizes));
 
-    return AABB3::Negative();
+    size_t totalTempAccelMemSize = (Math::NextMultiple(bufferSizes.outputSizeInBytes,
+                                                       MemAlloc::DefaultSystemAlignment()) +
+                                    Math::NextMultiple(bufferSizes.tempSizeInBytes,
+                                                       MemAlloc::DefaultSystemAlignment()));
+
+    OptixTraversableHandle phonyHandle;
+    Span<uint64_t> dCompactSize;
+    Span<Byte> dNonCompactAccelMem;
+    Span<Byte> dNonCompactAccelTempMem;
+    DeviceMemory accelTempMem({queue.Device()}, totalTempAccelMemSize, totalTempAccelMemSize << 1);
+    MemAlloc::AllocateMultiData(std::tie(dNonCompactAccelMem,
+                                         dNonCompactAccelTempMem,
+                                         dCompactSize),
+                                accelTempMem,
+                                {bufferSizes.outputSizeInBytes,
+                                 bufferSizes.tempSizeInBytes, 1});
+
+    std::array<OptixAccelEmitDesc, 2> emitProps =
+    {
+        OptixAccelEmitDesc
+        {
+            .result = std::bit_cast<CUdeviceptr>(dCompactSize.data()),
+            .type = OPTIX_PROPERTY_TYPE_COMPACTED_SIZE
+        },
+        OptixAccelEmitDesc
+        {
+            .result = std::bit_cast<CUdeviceptr>(dLeafAABBs.data()),
+            .type = OPTIX_PROPERTY_TYPE_AABBS
+        }
+    };
+    using mray::cuda::ToHandleCUDA;
+    OPTIX_CHECK(optixAccelBuild(contextOptiX, ToHandleCUDA(queue),
+                                &OptiXAccelDetail::BUILD_OPTIONS_OPTIX,
+                                &buildInput, 1u,
+                                std::bit_cast<CUdeviceptr>(dNonCompactAccelTempMem.data()),
+                                dNonCompactAccelTempMem.size(),
+                                std::bit_cast<CUdeviceptr>(dNonCompactAccelMem.data()),
+                                dNonCompactAccelMem.size(), &phonyHandle,
+                                emitProps.data(), 2u));
+
+    // Reduce the AABB for host
+    DeviceAlgorithms::Reduce(Span<AABB3, 1>(dReducedAABB),
+                             dScanOrReduceTempMem,
+                             ToConstSpan(dLeafAABBs),
+                             AABB3::Negative(),
+                             queue, UnionAABB3Functor());
+
+    uint64_t compactedSize = 0;
+    uint32_t totalRecordCount = 0;
+    queue.MemcpyAsync(Span(&compactedSize, 1), ToConstSpan(dCompactSize));
+    queue.MemcpyAsync(Span(&totalRecordCount, 1),
+                      ToConstSpan(Span(&dSBTOffsets.back(), 1)));
+    queue.MemcpyAsync(Span(&sceneAABB, 1),
+                      ToConstSpan(Span(dReducedAABB.data(), 1)));
+    queue.Barrier().Wait();
+
+    // Finally do the persistent allocation
+    MemAlloc::AllocateMultiData(std::tie(dLaunchArgPack, dAccelMemory, dHitRecords),
+                                allMem, {1, compactedSize, totalRecordCount});
+
+    OPTIX_CHECK(optixAccelCompact(contextOptiX, ToHandleCUDA(queue), phonyHandle,
+                                  std::bit_cast<CUdeviceptr>(dAccelMemory.data()),
+                                  dAccelMemory.size(), &baseAccelerator));
+
+    // Easy part is done
+    // now compile the shaders and attach those on the records
+    ShaderNameMap shaderNames;
+    std::vector<GenericHitRecord<>> hAllHitRecords;
+    hAllHitRecords.reserve(totalInstanceCount);
+    // Write all required data to buffers
+    for(const auto& accGroup : generatedAccels)
+    {
+        using Base = AcceleratorGroupOptixI;
+        const Base* aGroup = static_cast<const Base*>(accGroup.second.get());
+        uint32_t recordStartOffset = static_cast<uint32_t>(hAllHitRecords.size());
+        // Get the shader names
+        auto hitRecords = aGroup->GetHitRecords();
+        hAllHitRecords.insert(hAllHitRecords.end(), hitRecords.cbegin(), hitRecords.cend());
+        //
+        auto localTypeNames = aGroup->GetShaderTypeNames();
+        auto recordOffsets = aGroup->GetShaderOffsets();
+        assert(localTypeNames.size() == recordOffsets.size());
+        for(size_t i = 0; i < recordOffsets.size() - 1; i++)
+        {
+            uint32_t start = recordStartOffset + recordOffsets[i];
+            uint32_t end = recordStartOffset + recordOffsets[i + 1];
+
+            const auto& typeName = localTypeNames[i];
+            auto& indexList = shaderNames[typeName];
+            auto endLoc = indexList.insert(indexList.end(), end - start, 0);
+            std::iota(endLoc - (end - start), endLoc, recordStartOffset);
+        }
+    }
+
+    // Now we have all the things we need to generate shaders.
+    GenerateShaders(hAllHitRecords, shaderNames);
+
+    // Wait all queues
+    gpuSystem.SyncAll();
+    return sceneAABB;
+}
+
+void BaseAcceleratorOptiX::GenerateShaders(std::vector<GenericHitRecord<>>& records,
+                                           const ShaderNameMap& shaderNames)
+{
+
 }
 
 void BaseAcceleratorOptiX::AllocateForTraversal(size_t)
@@ -402,7 +505,7 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
 
 size_t BaseAcceleratorOptiX::GPUMemoryUsage() const
 {
-    size_t totalSize = accelMem.Size();
+    size_t totalSize = allMem.Size();
     for(const auto& [_, accelGroup] : this->generatedAccels)
     {
         totalSize += accelGroup->GPUMemoryUsage();

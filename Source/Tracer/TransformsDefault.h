@@ -52,6 +52,9 @@ class TransformGroupSingle final : public GenericGroupTransform<TransformGroupSi
     using DataSoA               = typename TransformDetail::SingleTransformSoA;
     static std::string_view     TypeName();
 
+    MRAY_HYBRID
+    static Matrix4x4 AcquireCommonTransform(DataSoA, TransformKey);
+
     private:
     Span<Matrix4x4> transforms;
     Span<Matrix4x4> invTransforms;
@@ -85,6 +88,9 @@ class TransformGroupMulti final : public GenericGroupTransform<TransformGroupMul
     using DefaultContext        = void;
     using DataSoA               = typename TransformDetail::MultiTransformSoA;
     static std::string_view     TypeName();
+
+    MRAY_HYBRID
+    static Matrix4x4 AcquireCommonTransform(DataSoA, TransformKey);
 
     private:
     Span<Matrix4x4> transforms;
@@ -139,6 +145,20 @@ inline std::string_view TransformGroupMulti::TypeName()
     using namespace std::string_view_literals;
     static constexpr auto Name = "Multi"sv;
     return TransformTypeName<Name>;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Matrix4x4 TransformGroupSingle::AcquireCommonTransform(DataSoA soa, TransformKey tKey)
+{
+    CommonKey index = tKey.FetchIndexPortion();
+    return  soa.transforms[index];
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Matrix4x4 TransformGroupMulti::AcquireCommonTransform(DataSoA, TransformKey)
+{
+    // We return identity, there is no common transform
+    return Matrix4x4::Identity();
 }
 
 #include "TransformsDefault.hpp"

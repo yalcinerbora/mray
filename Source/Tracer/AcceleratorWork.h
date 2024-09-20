@@ -139,6 +139,24 @@ void KCGeneratePrimAABBs(// Output
     }
 }
 
+template<TransformGroupC TG = TransformGroupIdentity>
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCGetCommonTransforms(// Output
+                           MRAY_GRID_CONSTANT const Span<Matrix4x4> dTransforms,
+                           // Inputs
+                           MRAY_GRID_CONSTANT const Span<const TransformKey> dTransformKeys,
+                           MRAY_GRID_CONSTANT const typename TG::DataSoA tSoA)
+{
+    assert(dTransformKeys.size() == dTransforms.size());
+    uint32_t tCount = static_cast<uint32_t>(dTransformKeys.size());
+    KernelCallParams kp;
+    for(uint32_t i = kp.GlobalId(); i < tCount; i += kp.TotalSize())
+    {
+        Matrix4x4 transform = TG::AcquireCommonTransform(tSoA, dTransformKeys[i]);
+        dTransforms[i] = transform;
+    }
+}
+
 template<AccelGroupC AG, TransformGroupC TG,
          auto GenerateTransformContext = MRAY_ACCEL_TGEN_FUNCTION(AG, TG)>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
@@ -266,7 +284,10 @@ class AcceleratorWorkI
                                            Span<const PrimitiveKey> dAllLeafs,
                                            Span<const TransformKey> dTransformKeys,
                                            const GPUQueue& queue) const = 0;
-
+    // Transform related
+    virtual void    GetCommonTransforms(Span<Matrix4x4> dTransforms,
+                                        Span<const TransformKey> dTransformKeys,
+                                        const GPUQueue& queue) const = 0;
     virtual void    TransformLocallyConstantAABBs(// Output
                                                   Span<AABB3> dInstanceAABBs,
                                                   // Input
@@ -277,6 +298,8 @@ class AcceleratorWorkI
                                                   const GPUQueue& queue) const = 0;
     virtual size_t  TransformSoAByteSize() const = 0;
     virtual void    CopyTransformSoA(Span<Byte>, const GPUQueue& queue) const = 0;
+
+    virtual std::string_view TransformName() const = 0;
 };
 
 template<AccelGroupC AcceleratorGroupType,
@@ -312,18 +335,21 @@ class AcceleratorWork : public AcceleratorWorkI
                        // Constants
                        const GPUQueue& queue) const override;
 
-    void    GeneratePrimitiveCenters(Span<Vector3> dAllPrimCenters,
-                                     Span<const uint32_t> dLeafSegmentRanges,
-                                     Span<const PrimitiveKey> dAllLeafs,
-                                     Span<const TransformKey> dTransformKeys,
-                                     const GPUQueue& queue) const override;
-    void    GeneratePrimitiveAABBs(Span<AABB3> dAllLeafAABBs,
-                                   Span<const uint32_t> dLeafSegmentRanges,
-                                   Span<const PrimitiveKey> dAllLeafs,
-                                   Span<const TransformKey> dTransformKeys,
-                                   const GPUQueue& queue) const override;
+    void GeneratePrimitiveCenters(Span<Vector3> dAllPrimCenters,
+                                  Span<const uint32_t> dLeafSegmentRanges,
+                                  Span<const PrimitiveKey> dAllLeafs,
+                                  Span<const TransformKey> dTransformKeys,
+                                  const GPUQueue& queue) const override;
+    void GeneratePrimitiveAABBs(Span<AABB3> dAllLeafAABBs,
+                                Span<const uint32_t> dLeafSegmentRanges,
+                                Span<const PrimitiveKey> dAllLeafs,
+                                Span<const TransformKey> dTransformKeys,
+                                const GPUQueue& queue) const override;
 
     // Transformation Related
+    void GetCommonTransforms(Span<Matrix4x4> dTransforms,
+                             Span<const TransformKey> dTransformKeys,
+                             const GPUQueue& queue) const override;
     void TransformLocallyConstantAABBs(// Output
                                        Span<AABB3> dInstanceAABBs,
                                        // Input
@@ -333,8 +359,10 @@ class AcceleratorWork : public AcceleratorWorkI
                                        // Constants
                                        const GPUQueue& queue) const override;
 
-    size_t  TransformSoAByteSize() const override;
-    void    CopyTransformSoA(Span<Byte>, const GPUQueue& queue) const override;
+    size_t              TransformSoAByteSize() const override;
+    void                CopyTransformSoA(Span<Byte>,
+                                         const GPUQueue& queue) const override;
+    std::string_view    TransformName() const override;
 };
 
 template<AccelGroupC AG, TransformGroupC TG>
@@ -406,9 +434,9 @@ void AcceleratorWork<AG, TG>::GeneratePrimitiveCenters(Span<Vector3> dAllPrimCen
         // Output
         dAllPrimCenters,
         // Inputs
-        ToConstSpan(dLeafSegmentRanges),
+        dLeafSegmentRanges,
         dTransformKeys,
-        ToConstSpan(dAllLeafs),
+        dAllLeafs,
         BLOCK_PER_INSTANCE,
         processedAccelCount,
         transGroup.SoA(),
@@ -440,14 +468,32 @@ void AcceleratorWork<AG, TG>::GeneratePrimitiveAABBs(Span<AABB3> dAllLeafAABBs,
         // Output
         dAllLeafAABBs,
         // Inputs
-        ToConstSpan(dLeafSegmentRanges),
+        dLeafSegmentRanges,
         dTransformKeys,
-        ToConstSpan(dAllLeafs),
+        dAllLeafs,
         // Constants
         BLOCK_PER_INSTANCE,
         processedAccelCount,
         transGroup.SoA(),
         primGroup.SoA()
+    );
+}
+
+template<AccelGroupC AG, TransformGroupC TG>
+void AcceleratorWork<AG, TG>::GetCommonTransforms(Span<Matrix4x4> dTransforms,
+                                                  Span<const TransformKey> dTransformKeys,
+                                                  const GPUQueue& queue) const
+{
+    uint32_t transformCount = static_cast<uint32_t>(dTransformKeys.size());
+    queue.IssueSaturatingKernel<KCGetCommonTransforms<TG>>
+    (
+        "KCGetCommonTransforms",
+        KernelIssueParams { .workCount = transformCount },
+        // Output
+        dTransforms,
+        // Inputs
+        dTransformKeys,
+        transGroup.SoA()
     );
 }
 
@@ -513,4 +559,10 @@ std::string_view AcceleratorWork<AG, TG>::TypeName()
     static const std::string Name = AccelWorkTypeName(AG::TypeName(),
                                                       TG::TypeName());
     return Name;
+}
+
+template<AccelGroupC AG, TransformGroupC TG>
+std::string_view AcceleratorWork<AG, TG>::TransformName() const
+{
+    return transGroup.Name();
 }

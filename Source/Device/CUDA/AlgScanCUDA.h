@@ -132,12 +132,13 @@ void ExclusiveScan(Span<T> dScannedValues,
                    BinaryOp&& op)
 {
     using namespace cub;
-    assert(dScannedValues.size() == dValues.size());
+    assert(dScannedValues.size() == 1 + dValues.size() ||
+           dScannedValues.size() == dValues.size());
     size_t tmSize = dTempMem.size();
     CUDA_CHECK(DeviceScan::ExclusiveScan(dTempMem.data(), tmSize,
                                          dValues.data(), dScannedValues.data(),
                                          std::forward<BinaryOp>(op), initialValue,
-                                         static_cast<int>(dValues.size()),
+                                         static_cast<int>(dScannedValues.size()),
                                          ToHandleCUDA(queue)));
 }
 

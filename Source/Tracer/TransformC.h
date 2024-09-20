@@ -40,6 +40,9 @@ concept TransformGroupC = requires(TGType tg)
     // Can request DataSoA
     {tg.SoA()}-> std::same_as<typename TGType::DataSoA>;
 
+    {TGType::AcquireCommonTransform(typename TGType::DataSoA{}, TransformKey{})
+    }->std::same_as<Matrix4x4>;
+
     requires GenericGroupC<TGType>;
 };
 
@@ -83,6 +86,9 @@ class TransformGroupIdentity final : public GenericGroupTransform<TransformGroup
     using DefaultContext    = TransformContextIdentity;
     using DataSoA           = EmptyType;
     static std::string_view TypeName();
+
+    MRAY_HYBRID
+    static Matrix4x4 AcquireCommonTransform(DataSoA, TransformKey);
 
     public:
                     TransformGroupIdentity(uint32_t groupId, const GPUSystem&);
@@ -202,6 +208,12 @@ inline std::string_view TransformGroupIdentity::TypeName()
     using namespace std::string_view_literals;
     static constexpr auto Name = "Identity"sv;
     return TransformTypeName<Name>;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Matrix4x4 TransformGroupIdentity::AcquireCommonTransform(DataSoA, TransformKey)
+{
+    return Matrix4x4::Identity();
 }
 
 inline TransformGroupIdentity::TransformGroupIdentity(uint32_t groupId,

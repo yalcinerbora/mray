@@ -114,6 +114,7 @@ class Bitset
                  void>>>>;
     static_assert(!std::is_same_v<Type, void>,
                   "MRay bitset at most supports 64-bits!");
+    static constexpr auto MASK = (size_t(1) << N) - 1;
 
     public:
     class BitRef
@@ -673,7 +674,7 @@ template<size_t N>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr bool Bitset<N>::All() const
 {
-    return (bits == std::numeric_limits<Type>::max());
+    return (bits == MASK);
 }
 
 template<size_t N>
@@ -739,7 +740,7 @@ template<size_t N>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Bitset<N>& Bitset<N>::Set()
 {
-    bits = std::numeric_limits<Type>::max();
+    bits = MASK;
     return *this;
 }
 

@@ -160,11 +160,13 @@ void AcceleratorGroupOptiX<PG>::PreConstruct(const BaseAcceleratorI* a)
 }
 
 template<PrimitiveGroupC PG>
-void AcceleratorGroupOptiX<PG>::MultiBuildTriangleCLT(const PreprocessResult& ppResult,
+std::vector<OptixTraversableHandle>
+AcceleratorGroupOptiX<PG>::MultiBuildTriangleCLT(const PreprocessResult& ppResult,
                                                       const GPUQueue& queue)
 {
     using mray::cuda::ToHandleCUDA;
     size_t totalLeafCount = this->concreteLeafRanges.back()[1];
+    std::vector<OptixTraversableHandle> hConcreteAccelHandles;
 
     // Do the build inputs
     std::vector<BuildInputPackTriangle> allBuildInputs;
@@ -284,17 +286,23 @@ void AcceleratorGroupOptiX<PG>::MultiBuildTriangleCLT(const PreprocessResult& pp
         [](const auto& work)
         {
             return Math::NextMultiple(work.second->TransformSoAByteSize(),
-                                      MemAlloc::DefaultSystemAlignment());;
+                                      MemAlloc::DefaultSystemAlignment());
         }
     );
     MemAlloc::AllocateMultiData(std::tie(dAllAccelerators, dAllLeafs,
-                                         dPrimGroupSoA, dTransformGroupSoAList),
+                                         dTransformKeys, dPrimGroupSoA,
+                                         dTransformGroupSoAList),
                                 memory,
                                 {hCompactedOffsets.back(), totalLeafCount,
-                                 1, hTransformSoAOffsets.back()});
+                                 this->InstanceCount(), 1,
+                                 hTransformSoAOffsets.back()});
+    // Finally, we allocated transform
+    // key buffer, copy.
+    Span<const TransformKey> hTransformKeySpan(ppResult.surfData.transformKeys);
+    queue.MemcpyAsync(dTransformKeys, hTransformKeySpan);
 
-    accelHandels.resize(allBuildInputs.size());
-    // Now do this all over again
+    // Now do this all over again,
+    hConcreteAccelHandles.resize(allBuildInputs.size());
     for(size_t i = 0; i < allBuildInputs.size(); i++)
     {
         const auto& pack = allBuildInputs[i];
@@ -316,7 +324,7 @@ void AcceleratorGroupOptiX<PG>::MultiBuildTriangleCLT(const PreprocessResult& pp
         OPTIX_CHECK(optixAccelCompact(contextOptiX, ToHandleCUDA(queue), handle,
                                       std::bit_cast<CUdeviceptr>(curAccelMem.data()),
                                       curAccelMem.size(),
-                                      &accelHandels[i]));
+                                      &hConcreteAccelHandles[i]));
     }
 
     // Generate the leaf keys etc.
@@ -326,6 +334,7 @@ void AcceleratorGroupOptiX<PG>::MultiBuildTriangleCLT(const PreprocessResult& pp
     auto hConcretePrimRanges = Span<const PrimRangeArray>(ppResult.concretePrimRanges);
     queue.MemcpyAsync(dConcreteLeafRanges, hConcreteLeafRanges);
     queue.MemcpyAsync(dConcretePrimRanges, hConcretePrimRanges);
+
     // Dedicate a block for each
     // concrete accelerator for copy
     uint32_t blockCount = queue.RecommendedBlockCountDevice(KCGeneratePrimitiveKeys,
@@ -354,13 +363,12 @@ void AcceleratorGroupOptiX<PG>::MultiBuildTriangleCLT(const PreprocessResult& pp
     constexpr Vector2ui INVALID_BATCH = Vector2ui(std::numeric_limits<uint32_t>::max());
     size_t conservativeRecordCount = (ppResult.concretePrimRanges.size() *
                                       TracerConstants::MaxPrimBatchPerSurface);
-    hConcreteHitRecordOffsets.reserve(ppResult.concretePrimRanges.size());
+    hConcreteHitRecordCounts.reserve(ppResult.concretePrimRanges.size());
     hConcreteHitRecordPrimRanges.reserve(conservativeRecordCount);
-    size_t recordOffset = 0;
     size_t primOffset = 0;
     for(const auto& primRanges : ppResult.concretePrimRanges)
     {
-        size_t innerCount = 0;
+        uint32_t innerCount = 0;
         for(const auto& range : primRanges)
         {
             if(range == INVALID_BATCH) break;
@@ -371,30 +379,31 @@ void AcceleratorGroupOptiX<PG>::MultiBuildTriangleCLT(const PreprocessResult& pp
                                                       primOffset + primCount);
             primOffset += primCount;
         }
-
-        hConcreteHitRecordOffsets.emplace_back(recordOffset);
-        recordOffset += innerCount;
+        hConcreteHitRecordCounts.emplace_back(innerCount);
     }
-    hConcreteHitRecordOffsets.push_back(recordOffset);
+    return hConcreteAccelHandles;
 }
 
 template<PrimitiveGroupC PG>
-void AcceleratorGroupOptiX<PG>::MultiBuildTrianglePPT(const PreprocessResult&,
-                                                      const GPUQueue&)
+std::vector<OptixTraversableHandle>
+AcceleratorGroupOptiX<PG>::MultiBuildTrianglePPT(const PreprocessResult&,
+                                                 const GPUQueue&)
 {
     throw MRayError("NotImplemented!");
 }
 
 template<PrimitiveGroupC PG>
-void AcceleratorGroupOptiX<PG>::MultiBuildGenericCLT(const PreprocessResult&,
-                                                     const GPUQueue&)
+std::vector<OptixTraversableHandle>
+AcceleratorGroupOptiX<PG>::MultiBuildGenericCLT(const PreprocessResult&,
+                                                const GPUQueue&)
 {
     throw MRayError("NotImplemented!");
 }
 
 template<PrimitiveGroupC PG>
-void AcceleratorGroupOptiX<PG>::MultiBuildGenericPPT(const PreprocessResult&,
-                                                     const GPUQueue&)
+std::vector<OptixTraversableHandle>
+AcceleratorGroupOptiX<PG>::MultiBuildGenericPPT(const PreprocessResult&,
+                                                const GPUQueue&)
 {
     throw MRayError("NotImplemented!");
 }
@@ -406,26 +415,78 @@ void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
     static constexpr bool PER_PRIM_TRANSFORM = TransformLogic == PrimTransformType::PER_PRIMITIVE_TRANSFORM;
     const PreprocessResult& ppResult = this->PreprocessConstructionParams(p);
     // Actual construction
+    std::vector<OptixTraversableHandle> hConcereteAccelHandles;
     if constexpr(IsTriangle && !PER_PRIM_TRANSFORM)
     {
-        MultiBuildTriangleCLT(ppResult, queue);
+        hConcereteAccelHandles = MultiBuildTriangleCLT(ppResult, queue);
     }
     else if constexpr(IsTriangle && PER_PRIM_TRANSFORM)
     {
-        MultiBuildTrianglePPT(ppResult, queue);
+        hConcereteAccelHandles = MultiBuildTrianglePPT(ppResult, queue);
     }
     else if constexpr(!IsTriangle && !PER_PRIM_TRANSFORM)
     {
-        MultiBuildGenericCLT(ppResult, queue);
+        hConcereteAccelHandles = MultiBuildGenericCLT(ppResult, queue);
     }
     else if constexpr(!IsTriangle && !PER_PRIM_TRANSFORM)
     {
-        MultiBuildGenericPPT(ppResult, queue);
+        hConcereteAccelHandles = MultiBuildGenericPPT(ppResult, queue);
     }
     else static_assert(!IsTriangle && !PER_PRIM_TRANSFORM,
                        "Unknown params on OptiX build");
 
-    // Calculate hit records for each build input
+    if constexpr(!PER_PRIM_TRANSFORM)
+    {
+        hInstanceAccelHandles.reserve(this->InstanceCount());
+        hInstanceHitRecordCounts.reserve(this->InstanceCount());
+        // TODO: Convert
+        for(uint32_t i : this->concreteIndicesOfInstances)
+            hInstanceAccelHandles.push_back(hConcereteAccelHandles[i]);
+        //
+        for(uint32_t i : this->concreteIndicesOfInstances)
+            hInstanceHitRecordCounts.push_back(hConcreteHitRecordCounts[i]);
+    }
+    else
+    {
+        hInstanceAccelHandles = std::move(hConcereteAccelHandles);
+        hInstanceHitRecordCounts = hConcreteHitRecordCounts;
+    }
+
+
+    // Generate the common flags
+    for(size_t i = 0; i < this->InstanceCount(); i++)
+    {
+        const auto& alphaMaps = ppResult.surfData.alphaMaps[i];
+        const auto& cfFlags = ppResult.surfData.cullFaceFlags[i];
+
+        bool enableAnyHit = std::any_of(alphaMaps.begin(), alphaMaps.end(),
+                                        [](const Optional<AlphaMap>& a)
+        {
+            return a.has_value();
+        });
+        bool enableCull = cfFlags.All();
+
+        uint32_t flag = OPTIX_INSTANCE_FLAG_NONE;
+        if(!PER_PRIM_TRANSFORM)
+        {
+            // We need to unify these here unfortunately,
+            // Since accelerators are common between these
+            if(!enableCull)
+                flag |= OPTIX_INSTANCE_FLAG_DISABLE_TRIANGLE_FACE_CULLING;
+            if(enableAnyHit)
+                flag |= OPTIX_INSTANCE_FLAG_ENFORCE_ANYHIT;
+            else
+                flag |= OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT;
+        }
+        hInstanceCommonFlags.push_back(flag);
+    }
+
+    // Calculate hit records for each instance
+    std::vector<size_t> hConcreteHitRecordOffsets(hConcreteHitRecordCounts.size() + 1);
+    std::inclusive_scan(hConcreteHitRecordCounts.cbegin(), hConcreteHitRecordCounts.cend(),
+                        hConcreteHitRecordOffsets.begin() + 1);
+    hConcreteHitRecordOffsets[0] = 0;
+
     hHitRecords.reserve(this->InstanceCount() * TracerConstants::MaxPrimBatchPerSurface);
     for(size_t i = 0; i < this->InstanceCount(); i++)
     {
@@ -438,24 +499,25 @@ void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
         auto workOffset = std::upper_bound(this->workInstanceOffsets.cbegin(),
                                            this->workInstanceOffsets.cend(), i);
         assert(workOffset != this->workInstanceOffsets.cend());
-        size_t transformStart = std::distance(this->workInstanceOffsets.cbegin(), workOffset - 1);
-        size_t transformByteStart = transformStart * MemAlloc::DefaultSystemAlignment();
-        const Byte* dTransSoAPtr = dTransformGroupSoAList.subspan(transformByteStart,
-                                                                  MemAlloc::DefaultSystemAlignment()).data();
-        MRAY_LOG("{}", i);
+        size_t workId = std::distance(this->workInstanceOffsets.cbegin(), workOffset - 1);
+        size_t transSoASize = hTransformSoAOffsets[workId + 1] - hTransformSoAOffsets[workId];
+        const Byte* dTransSoAPtr = dTransformGroupSoAList.subspan(hTransformSoAOffsets[workId],
+                                                                  transSoASize).data();
+        auto accKey = AcceleratorKey::CombinedKey(uint32_t(workId), uint32_t(i));
         for(size_t j = 0; j < recordCount; j++)
         {
             Vector2ui primRange = hConcreteHitRecordPrimRanges[hrRange[0] + j];
+            Span subPrimRange = dAllLeafs.subspan(primRange[0],
+                                                  primRange[1] - primRange[0]);
             GenericHitRecordData<> recordData =
             {
-                .dPrimKeys = dAllLeafs.subspan(primRange[0], primRange[1] - primRange[0]),
-                .transformKey = ppResult.surfData.transformKeys[i],
-                .alphaMap = ppResult.surfData.alphaMaps[i][j],
-                .lightOrMatKey = ppResult.surfData.lightOrMatKeys[i][j],
-                // We are not responsible for this base accelerator will set it
-                .acceleratorKey = AcceleratorKey::InvalidKey(),
-                .primSoA = dPrimGroupSoA.data(),
-                .transSoA = dTransSoAPtr
+                .dPrimKeys      = subPrimRange,
+                .transformKey   = ppResult.surfData.transformKeys[i],
+                .alphaMap       = ppResult.surfData.alphaMaps[i][j],
+                .lightOrMatKey  = ppResult.surfData.lightOrMatKeys[i][j],
+                .acceleratorKey = accKey,
+                .primSoA        = dPrimGroupSoA.data(),
+                .transSoA       = dTransSoAPtr
             };
             GenericHitRecord<> record = {};
             record.data = recordData;
@@ -465,49 +527,118 @@ void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
 }
 
 template<PrimitiveGroupC PG>
-void AcceleratorGroupOptiX<PG>::WriteInstanceKeysAndAABBs(Span<AABB3> dAABBWriteRegion,
-                                                          Span<AcceleratorKey> dKeyWriteRegion,
-                                                          const GPUQueue& queue) const
+void AcceleratorGroupOptiX<PG>::WriteInstanceKeysAndAABBs(Span<AABB3>,
+                                                          Span<AcceleratorKey>,
+                                                          const GPUQueue&) const
 {
-    //this->WriteInstanceKeysAndAABBsInternal(dAABBWriteRegion,
-    //                                        dKeyWriteRegion,
-    //                                        dAllLeafs,
-    //                                        dTransformKeys,
-    //                                        queue);
+    throw MRayError("For OptiX, this function should not be called");
+}
+
+template<PrimitiveGroupC PG>
+void AcceleratorGroupOptiX<PG>::OffsetAccelKeyInRecords()
+{
+    assert(this->globalWorkIdToLocalOffset != std::numeric_limits<uint32_t>::max());
+    // Calculate hit records for each build input
+    for(auto& hr : hHitRecords)
+    {
+        CommonKey batch = hr.data.acceleratorKey.FetchBatchPortion();
+        CommonKey index = hr.data.acceleratorKey.FetchIndexPortion();
+        batch += this->globalWorkIdToLocalOffset;
+        auto accKey = AcceleratorKey::CombinedKey(batch, index);
+        hr.data.acceleratorKey = accKey;
+    };
 }
 
 template<PrimitiveGroupC PG>
 void AcceleratorGroupOptiX<PG>::AcquireIASConstructionParams(Span<OptixTraversableHandle> dTraversableHandles,
                                                              Span<Matrix4x4> dInstanceMatrices,
                                                              Span<uint32_t> dSBTCounts,
-                                                             Span<uint32_t> dFlags) const
+                                                             Span<uint32_t> dFlags,
+                                                             const GPUQueue& queue) const
 {
+    Span<const OptixTraversableHandle> hHandleSpan(hInstanceAccelHandles);
+    Span<const uint32_t> hHitRecordCountSpan(hInstanceHitRecordCounts);
+    Span<const uint32_t> hFlagSpan(hInstanceCommonFlags);
 
+    queue.MemcpyAsync(dTraversableHandles, hHandleSpan);
+    queue.MemcpyAsync(dSBTCounts, hHitRecordCountSpan);
+    queue.MemcpyAsync(dFlags, hFlagSpan);
+
+    // The hard part
+    for(const auto& work : this->workInstances)
+    {
+        uint32_t workId = work.first;
+        uint32_t localStart = this->workInstanceOffsets[workId];
+        uint32_t localEnd = this->workInstanceOffsets[workId + 1];
+        uint32_t localCount = localEnd - localStart;
+
+        auto dTransformsLocal = dTransformKeys.subspan(localStart, localCount);
+        auto dMatricesLocal = dInstanceMatrices.subspan(localStart, localCount);
+        work.second->GetCommonTransforms(dMatricesLocal,
+                                         ToConstSpan(dTransformsLocal),
+                                         queue);
+    }
 }
 
 template<PrimitiveGroupC PG>
-std::vector<Vector2ui> AcceleratorGroupOptiX<PG>::GetRecordOffsets()
+std::vector<OptiXAccelDetail::ShaderTypeNames>
+AcceleratorGroupOptiX<PG>::GetShaderTypeNames() const
 {
-    // We have concrete offsets convert it to instance offsets
-    std::vector<Vector2ui> result(this->InstanceCount());
-    uint32_t offset = 0;
-    for(uint32_t i = 0; i < this->InstanceCount(); i++)
+    using STNames = OptiXAccelDetail::ShaderTypeNames;
+    std::vector<STNames> result;
+    result.reserve(this->workInstances.size());
+    std::string_view pgName = this->pg.Name();
+
+    for(const auto& [_, wI] : this->workInstances)
     {
-        uint32_t cIndex = this->concreteIndicesOfInstances[i];
-        size_t recordCount = (hConcreteHitRecordOffsets[cIndex + 1] -
-                              hConcreteHitRecordOffsets[cIndex]);
-        result.emplace_back(offset, recordCount);
-        offset += recordCount;
+        STNames st =
+        {
+            .primName = pgName,
+            .transformName = wI->TransformName(),
+            .isTriangle = IsTriangle
+        };
+        result.push_back(st);
     }
     return result;
 }
 
 template<PrimitiveGroupC PG>
-void AcceleratorGroupOptiX<PG>::WriteRecords(Span<GenericHitRecord<>> dRecordWriteRegion,
-                                             const GPUQueue& queue) const
+std::vector<GenericHitRecord<>>
+AcceleratorGroupOptiX<PG>::GetHitRecords() const
 {
-    queue.MemcpyAsync(dRecordWriteRegion, Span<GenericHitRecord<>>(hHitRecords));
+    return hHitRecords;
 }
+
+template<PrimitiveGroupC PG>
+std::vector<uint32_t>
+AcceleratorGroupOptiX<PG>::GetShaderOffsets() const
+{
+    return this->workInstanceOffsets;
+}
+
+//template<PrimitiveGroupC PG>
+//std::vector<Vector2ui> AcceleratorGroupOptiX<PG>::GetRecordOffsets()
+//{
+//    // We have concrete offsets convert it to instance offsets
+//    std::vector<Vector2ui> result(this->InstanceCount());
+//    uint32_t offset = 0;
+//    for(uint32_t i = 0; i < this->InstanceCount(); i++)
+//    {
+//        uint32_t cIndex = this->concreteIndicesOfInstances[i];
+//        size_t recordCount = (hConcreteHitRecordOffsets[cIndex + 1] -
+//                              hConcreteHitRecordOffsets[cIndex]);
+//        result.emplace_back(offset, recordCount);
+//        offset += recordCount;
+//    }
+//    return result;
+//}
+//
+//template<PrimitiveGroupC PG>
+//void AcceleratorGroupOptiX<PG>::WriteRecords(Span<GenericHitRecord<>> dRecordWriteRegion,
+//                                             const GPUQueue& queue) const
+//{
+//    queue.MemcpyAsync(dRecordWriteRegion, Span<GenericHitRecord<>>(hHitRecords));
+//}
 
 template<PrimitiveGroupC PG>
 void AcceleratorGroupOptiX<PG>::CastLocalRays(// Output

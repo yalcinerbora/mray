@@ -22,6 +22,15 @@ void OptiXAssert(OptixResult code, const char* file, int line);
 
 namespace OptiXAccelDetail
 {
+    struct ShaderTypeNames
+    {
+        std::string_view    primName;
+        std::string_view    transformName;
+        bool                isTriangle = false;
+
+        auto operator<=>(const ShaderTypeNames& t) const;
+    };
+
     static constexpr OptixModuleCompileOptions MODULE_OPTIONS_OPTIX =
     {
         .maxRegisterCount = 0,
@@ -140,7 +149,6 @@ class ContextOptiX
 
 };
 
-
 // Add Optix specific functions
 class AcceleratorGroupOptixI : public AcceleratorGroupI
 {
@@ -150,7 +158,19 @@ class AcceleratorGroupOptixI : public AcceleratorGroupI
     virtual void AcquireIASConstructionParams(Span<OptixTraversableHandle> dTraversableHandles,
                                               Span<Matrix4x4> dInstanceMatrices,
                                               Span<uint32_t> dSBTCounts,
-                                              Span<uint32_t> dFlags) const = 0;
+                                              Span<uint32_t> dFlags,
+                                              const GPUQueue& queue) const = 0;
+    //
+    virtual std::vector<OptiXAccelDetail::ShaderTypeNames>
+    GetShaderTypeNames() const = 0;
+    //
+    virtual std::vector<GenericHitRecord<>>
+    GetHitRecords() const = 0;
+
+    virtual std::vector<uint32_t>
+    GetShaderOffsets() const = 0;
+
+    virtual void OffsetAccelKeyInRecords() = 0;
 };
 
 template<PrimitiveGroupC PrimitiveGroupType>
@@ -176,26 +196,32 @@ class AcceleratorGroupOptiX final
     OptixDeviceContext      contextOptiX = nullptr;
     DeviceMemory            memory;
     Span<Byte>              dAllAccelerators;
+    Span<PrimitiveKey>      dAllLeafs;
+    Span<TransformKey>      dTransformKeys;
     Span<PGSoA>             dPrimGroupSoA;
     Span<Byte>              dTransformGroupSoAList;
-    //
-    Span<PrimitiveKey>      dAllLeafs;
-    std::vector<size_t>     hConcreteHitRecordOffsets;
+    // Host side
+    std::vector<uint32_t>   hConcreteHitRecordCounts;
     std::vector<Vector2ui>  hConcreteHitRecordPrimRanges;
     std::vector<size_t>     hTransformSoAOffsets;
     HitRecordVector         hHitRecords;
+    // Instance Related
+    std::vector<OptixTraversableHandle> hInstanceAccelHandles;
+    std::vector<uint32_t>               hInstanceHitRecordCounts;
+    std::vector<uint32_t>               hInstanceCommonFlags;
 
-    // Host side
-    std::vector<OptixTraversableHandle> accelHandels;
-
-    void    MultiBuildTriangleCLT(const PreprocessResult& ppResult,
-                                  const GPUQueue& queue);
-    void    MultiBuildTrianglePPT(const PreprocessResult& ppResult,
-                                  const GPUQueue& queue);
-    void    MultiBuildGenericCLT(const PreprocessResult& ppResult,
-                                 const GPUQueue& queue);
-    void    MultiBuildGenericPPT(const PreprocessResult& ppResult,
-                                 const GPUQueue& queue);
+    std::vector<OptixTraversableHandle>
+    MultiBuildTriangleCLT(const PreprocessResult& ppResult,
+                          const GPUQueue& queue);
+    std::vector<OptixTraversableHandle>
+    MultiBuildTrianglePPT(const PreprocessResult& ppResult,
+                          const GPUQueue& queue);
+    std::vector<OptixTraversableHandle>
+    MultiBuildGenericCLT(const PreprocessResult& ppResult,
+                         const GPUQueue& queue);
+    std::vector<OptixTraversableHandle>
+    MultiBuildGenericPPT(const PreprocessResult& ppResult,
+                         const GPUQueue& queue);
 
     public:
     // Constructors & Destructor
@@ -211,9 +237,18 @@ class AcceleratorGroupOptiX final
                                       Span<AcceleratorKey> dKeyWriteRegion,
                                       const GPUQueue&) const override;
     void    AcquireIASConstructionParams(Span<OptixTraversableHandle> dTraversableHandles,
-                                              Span<Matrix4x4> dInstanceMatrices,
-                                              Span<uint32_t> dSBTCounts,
-                                              Span<uint32_t> dFlags) const override;
+                                         Span<Matrix4x4> dInstanceMatrices,
+                                         Span<uint32_t> dSBTCounts,
+                                         Span<uint32_t> dFlags,
+                                         const GPUQueue& queue) const override;
+    std::vector<OptiXAccelDetail::ShaderTypeNames>
+            GetShaderTypeNames() const override;
+
+    std::vector<GenericHitRecord<>>
+            GetHitRecords() const override;
+    std::vector<uint32_t>
+            GetShaderOffsets() const override;
+    void    OffsetAccelKeyInRecords() override;
 
     // Functionality
     void    CastLocalRays(// Output
@@ -229,11 +264,6 @@ class AcceleratorGroupOptiX final
                           uint32_t workId,
                           const GPUQueue& queue) override;
 
-    // OptiX specific
-    std::vector<Vector2ui> GetRecordOffsets();
-    void                   WriteRecords(Span<GenericHitRecord<>> dRecordWriteRegion,
-                                        const GPUQueue&) const;
-
     DataSoA SoA() const;
     size_t  GPUMemoryUsage() const override;
 };
@@ -241,23 +271,25 @@ class AcceleratorGroupOptiX final
 class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
 {
     public:
+    using ShaderNameMap = std::map<OptiXAccelDetail::ShaderTypeNames, std::vector<uint32_t>>;
     static std::string_view TypeName();
     private:
     std::vector<ComputeCapabilityTypePackOptiX> optixTypesPerCC;
-    ContextOptiX            contextOptiX;
-
-    DeviceMemory            accelMem;
-    Span<ArgumentPackOpitX> dLaunchArgPack;
-    Span<Byte>              dAccelMemory;
+    ContextOptiX                contextOptiX;
+    // Memory related
+    DeviceMemory                allMem;
+    Span<ArgumentPackOpitX>     dLaunchArgPack;
+    Span<Byte>                  dAccelMemory;
+    Span<GenericHitRecord<>>    dHitRecords;
+    //
 
     // Host
     OptixShaderBindingTable commonSBT;
-
     OptixTraversableHandle  baseAccelerator;
 
     protected:
     AABB3   InternalConstruct(const std::vector<size_t>& instanceOffsets) override;
-
+    void    GenerateShaders(std::vector<GenericHitRecord<>>&, const ShaderNameMap&);
     public:
     // Constructors & Destructor
     BaseAcceleratorOptiX(BS::thread_pool&, const GPUSystem&,
