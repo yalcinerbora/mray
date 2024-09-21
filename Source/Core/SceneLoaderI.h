@@ -31,6 +31,7 @@ struct TracerIdPack
     std::vector<SurfaceId>      surfaces;
     std::vector<CamSurfaceId>   camSurfaces;
     std::vector<LightSurfaceId> lightSurfaces;
+    LightSurfaceId              boundarySurface;
 
     double  loadTimeMS = 0.0;
 };

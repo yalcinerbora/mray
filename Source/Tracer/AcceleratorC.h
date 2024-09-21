@@ -460,7 +460,8 @@ class BaseAcceleratorT : public BaseAcceleratorI
                            const TextureViewMap& textureViews);
     void AddLightSurfacesToPartitions(std::vector<AccelGroupConstructParams>& partitions,
                                       Span<const typename BaseAccelConstructParams::LightSurfPair> surfList,
-                                      const Map<LightGroupId, LightGroupPtr>& lightGroups);
+                                      const Map<LightGroupId, LightGroupPtr>& lightGroups,
+                                      const Map<TransGroupId, TransformGroupPtr>& transGroups);
 
     protected:
     BS::thread_pool&    threadPool;
@@ -1163,7 +1164,8 @@ void BaseAcceleratorT<C>::PartitionSurfaces(std::vector<AccelGroupConstructParam
 template <class C>
 void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<AccelGroupConstructParams>& partitions,
                                                        Span<const typename BaseAccelConstructParams::LightSurfPair> lSurfList,
-                                                       const Map<LightGroupId, LightGroupPtr>& lightGroups)
+                                                       const Map<LightGroupId, LightGroupPtr>& lightGroups,
+                                                       const Map<TransGroupId, TransformGroupPtr>& transformGroups)
 {
     using LightSurfP = typename BaseAccelConstructParams::LightSurfPair;
     assert(std::is_sorted(lSurfList.begin(), lSurfList.end(),
@@ -1204,7 +1206,7 @@ void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<AccelGroupCon
         {
             partitions.emplace_back(AccelGroupConstructParams
             {
-                .transformGroups = partitions.front().transformGroups,
+                .transformGroups = &transformGroups,
                 .primGroup = pGroup,
                 .lightGroup = lGroup,
                 .tGroupSurfs = {},
@@ -1246,7 +1248,8 @@ void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
     PartitionSurfaces(partitions, p.mSurfList, p.primGroups,
                       p.transformGroups, p.texViewMap);
     // Add primitive-backed lights surfaces as well
-    AddLightSurfacesToPartitions(partitions, p.lSurfList, p.lightGroups);
+    AddLightSurfacesToPartitions(partitions, p.lSurfList, p.lightGroups,
+                                 p.transformGroups);
 
     // Generate the accelerators
     GPUQueueIteratorRoundRobin qIt(gpuSystem);
