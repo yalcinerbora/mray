@@ -545,7 +545,20 @@ LightGroupSkysphere<CC>::LightGroupSkysphere(uint32_t groupId,
 template <CoordConverterC CC>
 void LightGroupSkysphere<CC>::CommitReservations()
 {
+    // TODO: Wasting 8x memory cost due to "Bit" is not a type
+    // Change this later
+    auto [rad, mIds, dists]
+        = this->template GenericCommit<ParamVaryingData<2, Vector3>,
+                                       MediumKey, DistributionPwC2D>({0, 0, 0});
 
+    dRadiances = rad;
+    dMediumIds = mIds;
+    dDistributions = dists;
+
+    soa.dRadiances = ToConstSpan(dRadiances);
+    soa.dMediumIds = ToConstSpan(dMediumIds);
+    soa.dDistributions = ToConstSpan(dDistributions);
+    soa.sceneDiameter = sceneDiameter;
 }
 
 template <CoordConverterC CC>

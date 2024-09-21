@@ -277,7 +277,7 @@ class LightGroupSkysphere final : public GenericGroupLight<LightGroupSkysphere<C
     private:
     const PrimGroup&                    primGroup;
     Span<ParamVaryingData<2, Vector3>>  dRadiances;
-    Span<MediumId>                      dMediumIds;
+    Span<MediumKey>                     dMediumIds;
     Span<DistributionPwC2D>             dDistributions;
     Float                               sceneDiameter;
     DataSoA                             soa;
