@@ -70,6 +70,7 @@ class SceneLoaderMRay : public SceneLoaderI
     std::vector<SurfaceId>          mRaySurfaces;
     std::vector<LightSurfaceId>     mRayLightSurfaces;
     std::vector<CamSurfaceId>       mRayCamSurfaces;
+    LightSurfaceId                  mRayBoundaryLightSurface;
 
     static LightSurfaceStruct               LoadBoundary(const nlohmann::json&);
     static std::vector<SurfaceStruct>       LoadSurfaces(const nlohmann::json&);
@@ -102,7 +103,8 @@ class SceneLoaderMRay : public SceneLoaderI
                                   const LightSurfaceStruct& boundary);
 
     void        CreateSurfaces(TracerI&, const std::vector<SurfaceStruct>&);
-    void        CreateLightSurfaces(TracerI&, const std::vector<LightSurfaceStruct>&);
+    void        CreateLightSurfaces(TracerI&, const std::vector<LightSurfaceStruct>&,
+                                    const LightSurfaceStruct& boundary);
     void        CreateCamSurfaces(TracerI&, const std::vector<CameraSurfaceStruct>&);
 
     MRayError       LoadAll(TracerI&);

@@ -184,40 +184,33 @@ AcceleratorGroupOptiX<PG>::MultiBuildTriangleCLT(const PreprocessResult& ppResul
         FixReferencesInInputs(pack);
     });
 
-    // Here we will do "double dip" to find the compacted size of each accelerator,
-    // We run build command once to get the compact sizes, and rerun with the addition
-    // of compactation operation. With this we can allocate a single large memory for
-    // all accelerators in the group.
-    //
+    // Here we will do build into a temporary buffer
+    // then compact the accelerators into the persistent buffer.
     // Find the input size for temp allocation
-    OptixAccelBufferSizes tempBufferSize = std::transform_reduce
+    std::vector<Vector2ul> allAccelBufferOffsets(allBuildInputs.size() + 1);
+    allAccelBufferOffsets[0] = Vector2ul::Zero();
+    std::transform_inclusive_scan
     (
-        allBuildInputs.begin(), allBuildInputs.end(), OptixAccelBufferSizes{},
-        // Reduction Operation
-        [](const OptixAccelBufferSizes& a, const OptixAccelBufferSizes& b) -> OptixAccelBufferSizes
-        {
-            return OptixAccelBufferSizes
-            {
-                .outputSizeInBytes = std::max(a.outputSizeInBytes, b.outputSizeInBytes),
-                .tempSizeInBytes = std::max(a.tempSizeInBytes, b.tempSizeInBytes),
-                .tempUpdateSizeInBytes = std::max(a.tempUpdateSizeInBytes, b.tempUpdateSizeInBytes),
-            };
-        },
+        allBuildInputs.cbegin(), allBuildInputs.cend(), allAccelBufferOffsets.begin() + 1,
+        // Reduce Operation
+        std::plus{},
         // Transform Operation
-        [this](const BuildInputPackTriangle& pack) -> OptixAccelBufferSizes
+        [this](const BuildInputPackTriangle& pack) -> Vector2ul
         {
             OptixAccelBufferSizes sizeList = {};
             OPTIX_CHECK(optixAccelComputeMemoryUsage(contextOptiX, &OptiXAccelDetail::BUILD_OPTIONS_OPTIX,
                                                      pack.buildInputs.data(),
                                                      static_cast<uint32_t>(pack.buildInputs.size()),
                                                      &sizeList));
-            return sizeList;
+            static constexpr uint64_t Alignment = OPTIX_ACCEL_BUFFER_BYTE_ALIGNMENT;
+            return Vector2ul(Math::NextMultiple(sizeList.outputSizeInBytes, Alignment),
+                             Math::NextMultiple(sizeList.tempSizeInBytes, Alignment));
         }
     );
 
     // Allocate the temp buffer
-    size_t totalSize = (Math::NextMultiple(tempBufferSize.outputSizeInBytes, MemAlloc::DefaultSystemAlignment()) +
-                        Math::NextMultiple(tempBufferSize.tempSizeInBytes, MemAlloc::DefaultSystemAlignment()));
+    size_t totalSize = (Math::NextMultiple(allAccelBufferOffsets.back()[0], MemAlloc::DefaultSystemAlignment()) +
+                        Math::NextMultiple(allAccelBufferOffsets.back()[1], MemAlloc::DefaultSystemAlignment()));
     DeviceMemory tempMem({queue.Device()}, totalSize, totalSize << 1);
     Span<Byte> dAcceleratorMem;
     Span<Byte> dBuildTempMem;
@@ -229,8 +222,8 @@ AcceleratorGroupOptiX<PG>::MultiBuildTriangleCLT(const PreprocessResult& ppResul
                                          dCompactSizes, dConcreteLeafRanges,
                                          dConcretePrimRanges),
                                 tempMem,
-                                {tempBufferSize.outputSizeInBytes,
-                                 tempBufferSize.tempSizeInBytes,
+                                {allAccelBufferOffsets.back()[0],
+                                 allAccelBufferOffsets.back()[1],
                                  allBuildInputs.size(),
                                  this->concreteLeafRanges.size(),
                                  ppResult.concretePrimRanges.size()});
@@ -240,11 +233,17 @@ AcceleratorGroupOptiX<PG>::MultiBuildTriangleCLT(const PreprocessResult& ppResul
     static_assert(MemAlloc::DefaultSystemAlignment() >= OPTIX_ACCEL_BUFFER_BYTE_ALIGNMENT,
                   "MRay and OptiX default alignments are not compatible");
 
-    OptixTraversableHandle phonyHandle;
+    std::vector<OptixTraversableHandle> tempHandles(allBuildInputs.size());
     for(size_t i = 0; i < allBuildInputs.size(); i++)
     {
         const auto& pack = allBuildInputs[i];
+        const Vector2ul& curOffsets = allAccelBufferOffsets[i];
+        const Vector2ul& nextOffsets = allAccelBufferOffsets[i + 1];
 
+        Span<Byte> dLocalAcceleratorMem = dAcceleratorMem.subspan(curOffsets[0],
+                                                                  nextOffsets[0] - curOffsets[0]);
+        Span<Byte> dLocalBuildTempMem = dBuildTempMem.subspan(curOffsets[1],
+                                                                nextOffsets[1] - curOffsets[1]);
         OptixAccelEmitDesc emitDesc =
         {
             .result = std::bit_cast<CUdeviceptr>(dCompactSizes.data() + i),
@@ -254,11 +253,11 @@ AcceleratorGroupOptiX<PG>::MultiBuildTriangleCLT(const PreprocessResult& ppResul
                                     &OptiXAccelDetail::BUILD_OPTIONS_OPTIX,
                                     pack.buildInputs.data(),
                                     static_cast<uint32_t>(pack.buildInputs.size()),
-                                    std::bit_cast<CUdeviceptr>(dBuildTempMem.data()),
-                                    dBuildTempMem.size(),
-                                    std::bit_cast<CUdeviceptr>(dAcceleratorMem.data()),
-                                    dAcceleratorMem.size(),
-                                    &phonyHandle, &emitDesc, 1u));
+                                    std::bit_cast<CUdeviceptr>(dLocalBuildTempMem.data()),
+                                    dLocalBuildTempMem.size(),
+                                    std::bit_cast<CUdeviceptr>(dLocalAcceleratorMem.data()),
+                                    dLocalAcceleratorMem.size(),
+                                    &tempHandles[i], &emitDesc, 1u));
     }
     std::vector<uint64_t> hCompactedSizes(dCompactSizes.size());
     queue.MemcpyAsync(Span<uint64_t>(hCompactedSizes), ToConstSpan(dCompactSizes));
@@ -300,27 +299,13 @@ AcceleratorGroupOptiX<PG>::MultiBuildTriangleCLT(const PreprocessResult& ppResul
     Span<const TransformKey> hTransformKeySpan(ppResult.surfData.transformKeys);
     queue.MemcpyAsync(dTransformKeys, hTransformKeySpan);
 
-    // Now do this all over again,
+    // Now compact,
     hConcreteAccelHandles.resize(allBuildInputs.size());
     for(size_t i = 0; i < allBuildInputs.size(); i++)
     {
-        const auto& pack = allBuildInputs[i];
-        OptixTraversableHandle handle;
-        // Due to queue logic we can overwrite on to the same memory for each accel
-        OPTIX_CHECK(optixAccelBuild(contextOptiX, ToHandleCUDA(queue),
-                                    &OptiXAccelDetail::BUILD_OPTIONS_OPTIX,
-                                    pack.buildInputs.data(),
-                                    static_cast<uint32_t>(pack.buildInputs.size()),
-                                    std::bit_cast<CUdeviceptr>(dBuildTempMem.data()),
-                                    dBuildTempMem.size(),
-                                    std::bit_cast<CUdeviceptr>(dAcceleratorMem.data()),
-                                    dAcceleratorMem.size(),
-                                    &handle, nullptr, 0u));
-
-
         auto curAccelMem = dAllAccelerators.subspan(hCompactedOffsets[i],
                                                     hCompactedOffsets[i + 1] - hCompactedOffsets[i]);
-        OPTIX_CHECK(optixAccelCompact(contextOptiX, ToHandleCUDA(queue), handle,
+        OPTIX_CHECK(optixAccelCompact(contextOptiX, ToHandleCUDA(queue), tempHandles[i],
                                       std::bit_cast<CUdeviceptr>(curAccelMem.data()),
                                       curAccelMem.size(),
                                       &hConcreteAccelHandles[i]));

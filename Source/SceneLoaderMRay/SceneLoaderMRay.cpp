@@ -2029,23 +2029,30 @@ void SceneLoaderMRay::CreateSurfaces(TracerI& tracer, const std::vector<SurfaceS
     }
 }
 
-void SceneLoaderMRay::CreateLightSurfaces(TracerI& tracer, const std::vector<LightSurfaceStruct>& surfs)
+void SceneLoaderMRay::CreateLightSurfaces(TracerI& tracer, const std::vector<LightSurfaceStruct>& surfs,
+                                          const LightSurfaceStruct& boundary)
 {
-    mRayLightSurfaces.reserve(surfs.size());
-    for(const auto& surf : surfs)
+    auto SurfStructToSurfParams = [this](const LightSurfaceStruct& surf)
     {
         LightId lId = lightMappings.map.at(surf.lightId).second;
         MediumId mId = mediumMappings.map.at(surf.mediumId).second;
         TransformId tId = (surf.transformId == EMPTY_TRANSFORM)
-                            ? TracerConstants::IdentityTransformId
-                            : transformMappings.map.at(surf.transformId).second;
-        LightSurfaceParams lSurfParams
+            ? TracerConstants::IdentityTransformId
+            : transformMappings.map.at(surf.transformId).second;
+        return LightSurfaceParams
         {
             lId, tId, mId
         };
+    };
+    mRayLightSurfaces.reserve(surfs.size());
+    for(const auto& surf : surfs)
+    {
+
+        LightSurfaceParams lSurfParams = SurfStructToSurfParams(surf);
         LightSurfaceId mRaySurf = tracer.CreateLightSurface(lSurfParams);
         mRayLightSurfaces.push_back(mRaySurf);
     }
+    mRayBoundaryLightSurface = tracer.SetBoundarySurface(SurfStructToSurfParams(boundary));
 }
 
 void SceneLoaderMRay::CreateCamSurfaces(TracerI& tracer, const std::vector<CameraSurfaceStruct>& surfs)
@@ -2180,7 +2187,7 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
         // Also this has a single bottleneck unlike tracer groups,
         // so it probably not worth it.
         CreateSurfaces(tracer, surfaces);
-        CreateLightSurfaces(tracer, lightSurfs);
+        CreateLightSurfaces(tracer, lightSurfs, boundary);
         CreateCamSurfaces(tracer, camSurfs);
     }
     // MRay related errros
@@ -2252,6 +2259,7 @@ TracerIdPack SceneLoaderMRay::MoveIdPack(double durationMS)
         .surfaces = std::move(mRaySurfaces),
         .camSurfaces = std::move(mRayCamSurfaces),
         .lightSurfaces = std::move(mRayLightSurfaces),
+        .boundarySurface = mRayBoundaryLightSurface,
         .loadTimeMS = durationMS
     };
 }
