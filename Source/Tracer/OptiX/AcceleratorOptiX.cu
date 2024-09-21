@@ -17,6 +17,7 @@
 
 // Magic linking, these are populated via CUDA runtime?
 #include <optix_function_table_definition.h>
+#include <optix_stack_size.h>
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCCopyToOptixInstance(// Output
@@ -576,6 +577,22 @@ void BaseAcceleratorOptiX::GenerateShaders(EmptyHitRecord& rgRecord, EmptyHitRec
                                         &linkOptions, optixTypePack.programGroups.data(),
                                         static_cast<uint32_t>(optixTypePack.programGroups.size()),
                                         nullptr, nullptr, &optixTypePack.pipeline));
+
+        // We need to specify the max traversal depth.  Calculate the stack sizes, so we can specify all
+        // parameters to optixPipelineSetStackSize.
+        OptixStackSizes stack_sizes = {};
+        for(const auto& pg : optixTypePack.programGroups)
+            OPTIX_CHECK(optixUtilAccumulateStackSizes(pg, &stack_sizes, nullptr));
+
+        uint32_t contStackSize;
+        OPTIX_CHECK(optixUtilComputeStackSizes(&stack_sizes,
+                                               linkOptions.maxTraceDepth,
+                                               0, 0,
+                                               nullptr, nullptr,
+                                               &contStackSize));
+        OPTIX_CHECK(optixPipelineSetStackSize(optixTypePack.pipeline,
+                                              0, 0, contStackSize,
+                                              2u));
     }
 
     // Now set the descriptiors

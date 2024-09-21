@@ -37,8 +37,8 @@ void MultiScanTest(const GPUSystem& system)
     const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
     queue.MemcpyAsync(dInputs, Span<const Value>(hInputs.begin(), hInputs.end()));
 
-    DeviceAlgorithms::InclusiveMultiScan(dOutputs, ToConstSpan(dInputs),
-                                         SegmentSize, Value(0), queue, Adder<Value>());
+    DeviceAlgorithms::InclusiveSegmentedScan(dOutputs, ToConstSpan(dInputs),
+                                             SegmentSize, Value(0), queue, Adder<Value>());
 
     std::vector<Value> hResults(ElementCount);
     queue.MemcpyAsync(Span<Value>(hResults.begin(), hResults.end()),
@@ -46,9 +46,9 @@ void MultiScanTest(const GPUSystem& system)
     queue.MemsetAsync(dOutputs, 0x00);
 
     // Do the reduction again with a lambda
-    DeviceAlgorithms::InclusiveMultiScan(dOutputs, ToConstSpan(dInputs),
-                                         SegmentSize, Value(0), queue,
-                                         []MRAY_HYBRID(const Value & l, const Value & r)
+    DeviceAlgorithms::InclusiveSegmentedScan(dOutputs, ToConstSpan(dInputs),
+                                             SegmentSize, Value(0), queue,
+                                             []MRAY_HYBRID(const Value & l, const Value & r)
     {
         return l + r;
     });

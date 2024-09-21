@@ -52,9 +52,6 @@ requires std::is_floating_point_v<typename Hit::InnerType>
 MRAY_GPU MRAY_GPU_INLINE
 void ReportIntersection(float newT, unsigned int kind, Hit h)
 {
-    // Pre-check the Empty (C++ sizeof empty struct is 1
-    // so this should never be branched)
-    // But on device maybe it is different ??
     if constexpr(1 == Hit::Dims)
         optixReportIntersection(newT, kind,
                                 __float_as_uint(float(h[0])));
@@ -87,7 +84,8 @@ MRAY_GPU MRAY_GPU_INLINE
 void SetRNGStateAsPayload(BackupRNGState s)
 {
     // TODO: We use PCG32 as a backup generator,
-    // it has 32-bit state. So directly writing it as payload
+    // it has 32-bit state. So directly writing it as payload.
+    // What about generic multi states?
     static_assert(std::is_same_v<BackupRNGState, unsigned int>);
     optixSetPayload_1(s);
 }
