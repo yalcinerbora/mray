@@ -651,7 +651,6 @@ void SceneLoaderMRay::ExceptionList::AddException(MRayError&& err)
         exceptions[location] = std::move(err);
 }
 
-
 LightSurfaceStruct SceneLoaderMRay::LoadBoundary(const nlohmann::json& n)
 {
     LightSurfaceStruct boundary = n.get<LightSurfaceStruct>();
@@ -659,7 +658,7 @@ LightSurfaceStruct SceneLoaderMRay::LoadBoundary(const nlohmann::json& n)
         throw MRayError("Boundary light must be set!");
     if(boundary.mediumId == std::numeric_limits<uint32_t>::max())
         throw MRayError("Boundary medium must be set!");
-    if(boundary.transformId)
+    if(boundary.transformId == std::numeric_limits<uint32_t>::max())
         throw MRayError("Boundary transform must be set!");
     return boundary;
 }

@@ -5,7 +5,8 @@ include("NVCCCompilePTX")
 # scope
 source_group("" FILES ${SRC_ACCELLERATORS_PTX})
 
-nvcc_compile_optix_ir(TARGET_PREFIX ${TARGET_FULL_NAME}
-                      SOURCES ${SRC_ACCELLERATORS_PTX})
+nvcc_compile_optix(TARGET_PREFIX ${TARGET_FULL_NAME}
+                   SOURCES ${SRC_ACCELLERATORS_PTX}
+                   AS_PTX ${MRAY_COMPILE_OPTIX_AS_PTX})
 
-add_dependencies(${TARGET_FULL_NAME} ${NVCC_COMPILE_OPTIX_IR_GENERATED_TARGETS})
+add_dependencies(${TARGET_FULL_NAME} ${NVCC_COMPILE_OPTIX_GENERATED_TARGETS})

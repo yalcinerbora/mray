@@ -4,6 +4,75 @@
 
 #include "Core/BitFunctions.h"
 
+template<class TransContextType>
+class Triangle2
+{
+    public:
+    using DataSoA = DefaultTriangleDetail::TriangleData;
+    using Hit = Vector2;
+    using Intersection = Optional<IntersectionT<Hit>>;
+    using TransformContext = TransContextType;
+    //
+    static constexpr uint32_t SampleRNCount = 2;
+
+    private:
+    const DataSoA*              data;
+    const TransContextType*     transformContext;
+    PrimitiveKey                key;
+
+    public:
+    MRAY_HYBRID         Triangle2(const DataSoA& data,
+                                  PrimitiveKey key);
+    MRAY_HYBRID         Triangle2(const TransContextType& transform,
+                                  const DataSoA& data,
+                                  PrimitiveKey key);
+    MRAY_HYBRID Vector2 SurfaceParametrization(const Vector2& hit) const;
+
+};
+
+template<class T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Triangle2<T>::Triangle2(const DataSoA& data,
+                        PrimitiveKey key)
+    : data(&data)
+    , transformContext(nullptr)
+    , key(key)
+{}
+
+template<class T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Triangle2<T>::Triangle2(const T& transform,
+                        const DataSoA& data,
+                        PrimitiveKey key)
+    : data(&data)
+    , transformContext(&transform)
+    , key(key)
+{}
+
+template<class T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Vector2 Triangle2<T>::SurfaceParametrization(const Vector2& hit) const
+{
+    //Vector3ui index = data->indexList[key.FetchIndexPortion()];
+    //Vector2 uv0 = data->uvs[index[0]];
+    //Vector2 uv1 = data->uvs[index[1]];
+    //Vector2 uv2 = data->uvs[index[2]];
+
+    //Vector3 baryCoords = Vector3(hit[0], hit[1], 1 - hit[1] - hit[0]);
+
+    //Vector2 uv = (baryCoords[0] * uv0 +
+    //              baryCoords[1] * uv1 +
+    //              baryCoords[2] * uv2);
+
+    //return uv;
+    return Vector2::Zero();
+}
+
+
+
+
+
+
 // ExternCWrapper Macro
 #define WRAP_FUCTION(NAME, FUNCTION) \
     extern "C" __global__ void NAME(){FUNCTION();}
@@ -151,20 +220,20 @@ void KCAnyHit()
     {
         // This has alpha map check it
         const auto& alphaMap = record.alphaMap.value();
+        const uint32_t leafId = optixGetPrimitiveIndex();
+        PrimitiveKey pKey = record.dPrimKeys[leafId];
         // Get the current hit
         MetaHit metaHit = ReadHitFromAttributes<Hit, TrianglePrimGroupC<PGroup>>();
         Hit hit = metaHit.AsVector<Hit::Dims>();
         // Create primitive
-        const uint32_t leafId = optixGetPrimitiveIndex();
-        Primitive prim(TransformContextIdentity{},
-                       * record.primSoA, record.dPrimKeys[leafId]);
+        Primitive prim(TransformContextIdentity{}, *record.primSoA, pKey);
         // Finally get uv form hit and get alpha
         Vector2 uv = prim.SurfaceParametrization(hit);
         Float alpha = alphaMap(uv).value();
         // Stochastic alpha culling
         BackupRNGState s = GetRNGStateFromPayload();
         Float xi = BackupRNG(s).NextFloat();
-        if(xi > alpha)
+        if(xi >= alpha)
         {
             SetRNGStateAsPayload(s);
             // This is somewhat like "return"

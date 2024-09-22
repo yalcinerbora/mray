@@ -12,6 +12,19 @@
 
 #define MRAY_GENERIC_ID(NAME, TYPE) enum class NAME : TYPE {}
 
+// std::numeric_limits<IdType>::max() returns **ZERO** !!!!
+// This should be reported I think?
+// enum class Id : uint32_t {} effectively create a new integral type
+// (This is how std byte is defined for example)
+// and maximum of Byte should be 255 (or whatever the maximum of byte size of that platform)
+// We do convert it to underlying type to call max here.
+template<class IdType>
+// TODO: This is c++23 (Can we implement this ourselves?)
+//requires std::is_scoped_enum_v<IdType>
+inline constexpr IdType TracerIdInvalid =  IdType(std::numeric_limits<std::underlying_type_t<IdType>>::max());
+
+static_assert(std::numeric_limits<std::byte>::max() == std::byte(0), "Really?");
+
 class TimelineSemaphore;
 
 using GPUThreadInitFunction = void(*)();

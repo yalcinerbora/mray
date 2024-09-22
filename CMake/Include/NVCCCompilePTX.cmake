@@ -22,7 +22,8 @@
 # with object libraries.
 #
 # Generate a custom build rule to translate *.cu files to *.ptx files.
-# nvcc_compile_optix_ir(
+# nvcc_compile_optix(
+#   [AS_PTX]
 #   TARGET_PREFIX name
 #   SOURCES file1.cu file2.cu ...
 # )
@@ -31,14 +32,15 @@
 # - MRAY_CONFIG_BIN_DIRECTORY   (to copy the generated ir files files)
 # - MRAY_GPU_PLATFORM_NAME      (to organize the generated files)
 # - CMAKE_CUDA_ARCHITECTURES    (to determine the compute capabilities)
-function(nvcc_compile_optix_ir)
+function(nvcc_compile_optix)
 
-    set(oneValueArgs TARGET_PREFIX)
+    set(oneValueArgs TARGET_PREFIX AS_PTX)
     set(multiValueArgs SOURCES)
+    set(options)
 
-    cmake_parse_arguments(NVCC_COMPILE_OPTIX_IR "${options}" "${oneValueArgs}"
-                        "${multiValueArgs}" ${ARGN})
-    set(OPTIX_TARGET_NAME ${NVCC_COMPILE_OPTIX_IR_TARGET_PREFIX}_OptiXIR)
+    cmake_parse_arguments(NVCC_COMPILE_OPTIX "${options}" "${oneValueArgs}"
+                          "${multiValueArgs}" ${ARGN})
+    set(OPTIX_TARGET_NAME ${NVCC_COMPILE_OPTIX_TARGET_PREFIX}_OptiXIR)
 
     # Here we need to do create a target for ALL CCs
     # This is the drawback of this approach
@@ -71,13 +73,20 @@ function(nvcc_compile_optix_ir)
 
         set(TARGET_NAME ${OPTIX_TARGET_NAME}_${COMPUTE_CAPABILITY})
         add_library(${TARGET_NAME} OBJECT
-                    ${NVCC_COMPILE_OPTIX_IR_SOURCES})
+                    ${NVCC_COMPILE_OPTIX_SOURCES})
         # Classic target stuff
         set_target_properties(${TARGET_NAME} PROPERTIES
-                                CUDA_OPTIX_COMPILATION ON
                                 CUDA_SEPARABLE_COMPILATION ON
                                 CUDA_RESOLVE_DEVICE_SYMBOLS ON
                                 CUDA_ARCHITECTURES "${COMPUTE_CAPABILITY}")
+
+        if(NVCC_COMPILE_OPTIX_AS_PTX)
+            set_target_properties(${TARGET_NAME} PROPERTIES
+                                  CUDA_PTX_COMPILATION ON)
+        else()
+            set_target_properties(${TARGET_NAME} PROPERTIES
+                                  CUDA_OPTIX_COMPILATION ON)
+        endif()
         #
         target_link_libraries(${TARGET_NAME}
                               PRIVATE
@@ -103,14 +112,14 @@ function(nvcc_compile_optix_ir)
     # commands we create a custom target and do that operation
     set(OPTIX_SHADER_OUTPUT_DIR "${MRAY_CONFIG_BIN_DIRECTORY}/OptiXShaders")
     add_custom_target(OptiX_Copy
-        DEPENDS ${OUTPUT_TARGETS}
-        COMMENT "Copying OptiX IR Files to ${OPTIX_SHADER_OUTPUT_DIR}")
+                      DEPENDS ${OUTPUT_TARGETS}
+                      COMMENT "Copying OptiX IR Files to ${OPTIX_SHADER_OUTPUT_DIR}")
     foreach(num IN ZIP_LISTS OUTPUT_FILES OUTPUT_FOLDERS)
         add_custom_command(TARGET OptiX_Copy
-            PRE_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${num_1}
-            COMMAND ${CMAKE_COMMAND} -E copy ${num_0} ${num_1}
-            COMMAND_EXPAND_LISTS)
+                           PRE_BUILD
+                           COMMAND ${CMAKE_COMMAND} -E make_directory ${num_1}
+                           COMMAND ${CMAKE_COMMAND} -E copy ${num_0} ${num_1}
+                           COMMAND_EXPAND_LISTS)
     endforeach()
 
     set_target_properties(OptiX_Copy PROPERTIES
@@ -118,5 +127,5 @@ function(nvcc_compile_optix_ir)
 
     add_dependencies(OptiX_Copy ${OUTPUT_TARGETS})
 
-    set(NVCC_COMPILE_OPTIX_IR_GENERATED_TARGETS OptiX_Copy PARENT_SCOPE)
+    set(NVCC_COMPILE_OPTIX_GENERATED_TARGETS OptiX_Copy PARENT_SCOPE)
 endfunction()

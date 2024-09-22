@@ -209,7 +209,7 @@ OptionalHitR<PG> AcceleratorLBVH<PG, TG>::IntersectionCheck(const Ray& ray,
         Vector2 uv = prim.SurfaceParametrization(intersection.value().hit);
         Float alpha = alphaMapV(uv).value();
         // Stochastic alpha culling
-        if(xi > alpha) return std::nullopt;
+        if(xi >= alpha) return std::nullopt;
     }
 
     // It is a hit! Update

@@ -62,7 +62,7 @@ struct WorkBatchInfo
 
 static constexpr Pair<LightSurfaceId, LightSurfaceParams> InvalidBoundarySurface =
 {
-    LightSurfaceId(std::numeric_limits<LightSurfaceId>::max()),
+    TracerIdInvalid<LightSurfaceId>,
     LightSurfaceParams{}
 };
 
@@ -107,7 +107,7 @@ class TracerBase : public TracerI
     //
     AcceleratorPtr          accelerator;
     RendererI*              currentRenderer = nullptr;
-    RendererId              currentRendererId = std::numeric_limits<RendererId>::max();
+    RendererId              currentRendererId = TracerIdInvalid<RendererId>;
 
     std::atomic_uint32_t    primGroupCounter    = 0;
     std::atomic_uint32_t    camGroupCounter     = 0;

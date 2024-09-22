@@ -33,7 +33,7 @@ class TracerThread final : public RealtimeThread
     std::string         currentRendererName;
     uint32_t            currentRenderLogic0     = 0;
     uint32_t            currentRenderLogic1     = 0;
-    RendererId          currentRenderer         = std::numeric_limits<RendererId>::max();
+    RendererId          currentRenderer         = TracerIdInvalid<RendererId>;
     size_t              currentCamIndex         = 0;
     CameraTransform     currentCamTransform;
     AABB3               currentSceneAABB        = AABB3::Zero();

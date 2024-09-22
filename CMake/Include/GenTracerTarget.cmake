@@ -196,6 +196,10 @@ function(gen_tracer_target)
 
     # Optix Related Target definitions
     if(MRAY_OPTIX)
+        # Check if user
+        option(MRAY_COMPILE_OPTIX_AS_PTX "Compile ptx for optix instead of optixir" OFF)
+        mark_as_advanced(MRAY_COMPILE_OPTIX_AS_PTX)
+
         # Add current source dir as include
         # so that the OptiX folder can access the AcceleratorC.h etc.
         target_include_directories(${TARGET_FULL_NAME}
@@ -208,11 +212,17 @@ function(gen_tracer_target)
         target_compile_definitions(${TARGET_FULL_NAME}
                                    PUBLIC
                                    MRAY_ENABLE_HW_ACCELERATION)
+        if(MRAY_COMPILE_OPTIX_AS_PTX)
+            target_compile_definitions(${TARGET_FULL_NAME}
+                                       PRIVATE
+                                       MRAY_COMPILE_OPTIX_AS_PTX)
+        endif()
+
         if(MSVC)
             add_custom_command(TARGET ${TARGET_FULL_NAME} PRE_BUILD
-                            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                            "${MRAY_CONFIG_LIB_DIRECTORY}/spdlog$<$<CONFIG:Debug>:d>.dll"
-                            ${MRAY_CONFIG_BIN_DIRECTORY})
+                               COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                               "${MRAY_CONFIG_LIB_DIRECTORY}/spdlog$<$<CONFIG:Debug>:d>.dll"
+                               ${MRAY_CONFIG_BIN_DIRECTORY})
         endif()
     endif()
 

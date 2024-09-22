@@ -21,7 +21,6 @@ inline
 BuildInputPackAABB GenBuildInputsAABB(const Span<const AABB3>& aabbs,
                                       const PrimRangeArray& primRanges)
 {
-
     BuildInputPackAABB result;
     for(const auto& range : primRanges)
     {
@@ -75,7 +74,6 @@ BuildInputPackTriangle GenBuildInputsTriangle(const Span<const Vector3>& vertice
         result.vertexPointers.push_back(std::bit_cast<CUdeviceptr>(vertices.data()));
         unsigned int flags = OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT;
         result.geometryFlags.push_back(flags);
-
         result.buildInputs.emplace_back
         (
             OptixBuildInput
@@ -298,6 +296,9 @@ AcceleratorGroupOptiX<PG>::MultiBuildTriangleCLT(const PreprocessResult& ppResul
     // key buffer, copy.
     Span<const TransformKey> hTransformKeySpan(ppResult.surfData.transformKeys);
     queue.MemcpyAsync(dTransformKeys, hTransformKeySpan);
+    // Also copy PG SoA
+    typename PG::DataSoA pgSoA = this->pg.SoA();
+    queue.MemcpyAsync(dPrimGroupSoA, ToConstSpan(Span(&pgSoA, 1)));
 
     // Now compact,
     hConcreteAccelHandles.resize(allBuildInputs.size());
@@ -612,7 +613,21 @@ template<PrimitiveGroupC PG>
 std::vector<uint32_t>
 AcceleratorGroupOptiX<PG>::GetShaderOffsets() const
 {
-    return this->workInstanceOffsets;
+    Span<const uint32_t> allRecordSpan(hInstanceHitRecordCounts);
+    const auto wIOffsets = this->workInstanceOffsets;
+
+    // Count the records
+    std::vector<uint32_t> result;
+    result.reserve(wIOffsets.size() + 1);
+    result.push_back(0);
+    for(size_t i = 0; i < wIOffsets.size() - 1; i++)
+    {
+        uint32_t count = wIOffsets[i + 1] - wIOffsets[i];
+        auto recordRange = allRecordSpan.subspan(wIOffsets[i], count);
+        uint32_t total = std::reduce(recordRange.begin(), recordRange.end(), uint32_t(0));
+        result.push_back(result.back() + total);
+    }
+    return result;
 }
 
 template<PrimitiveGroupC PG>

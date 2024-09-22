@@ -54,7 +54,12 @@ void KCCopyToOptixInstance(// Output
 static constexpr auto OPTIX_LOGGER_NAME = "OptiXLogger";
 static constexpr auto OPTIX_LOGGER_FILE_NAME = "optix_log";
 static constexpr auto OPTIX_SHADERS_FOLDER = "OptiXShaders";
-static constexpr auto OPTIX_SHADER_NAME = "OptiXPTX.optixir";
+
+#ifdef MRAY_COMPILE_OPTIX_AS_PTX
+    static constexpr auto OPTIX_SHADER_NAME = "OptiXPTX.ptx";
+#else
+    static constexpr auto OPTIX_SHADER_NAME = "OptiXPTX.optixir";
+#endif
 
 auto OptiXAccelDetail::ShaderTypeNames::operator<=>(const ShaderTypeNames& t) const
 {

@@ -1344,9 +1344,8 @@ SurfaceId TracerBase::CreateSurface(SurfaceParams p)
 
 LightSurfaceId TracerBase::SetBoundarySurface(LightSurfaceParams p)
 {
-    static constexpr auto InvalidSurfId = LightSurfaceId(std::numeric_limits<LightSurfaceId>::max());
     LightSurfaceId lightSId;
-    if(boundarySurface.first == InvalidSurfId)
+    if(boundarySurface.first == TracerIdInvalid<LightSurfaceId>)
         lightSId = LightSurfaceId(lightSurfaceCounter.fetch_add(1));
     else
         lightSId = boundarySurface.first;
@@ -1378,7 +1377,7 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
 
     // Check the boundary surface
     //
-    if(boundarySurface.first == std::numeric_limits<LightSurfaceId>::max())
+    if(boundarySurface.first == TracerIdInvalid<LightSurfaceId>)
     {
         MRAY_WARNING_LOG("No boundary surface is set! Setting a default one "
                          "(NullLight, IdentityTransform, VacuumMedium).");
@@ -1583,7 +1582,7 @@ void TracerBase::DestroyRenderer(RendererId rId)
 {
     if(currentRendererId == rId)
     {
-        currentRendererId = std::numeric_limits<RendererId>::max();
+        currentRendererId = TracerIdInvalid<RendererId>;
         currentRenderer = nullptr;
     }
 
@@ -1696,7 +1695,7 @@ void TracerBase::ClearAll()
     texMem.Clear();
 
     currentRenderer = nullptr;
-    currentRendererId = std::numeric_limits<RendererId>::max();
+    currentRendererId = TracerIdInvalid<RendererId>;
 
     // GroupId 0 is reserved for some default types regen those
     GenerateDefaultGroups();

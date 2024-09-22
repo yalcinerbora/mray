@@ -103,7 +103,16 @@ set(MRAY_CUDA_OPTIONS
     # i.e. cub
     #-Wreorder
     # Debug Related
-    $<$<CONFIG:Debug>:-G>
+    # Optix-IR with -G flag is buggy?
+    # So we do not set it
+    $<IF:$<BOOL:$<TARGET_PROPERTY:CUDA_OPTIX_COMPILATION>>,
+        -lineinfo,
+        $<IF:$<CONFIG:Debug>, -G, -lineinfo>>
+
+    # $<$<AND:,$<CONFIG:Debug>>:-lineinfo>
+    # $<$<NOT:$<AND:$<TARGET_PROPERTY:CUDA_OPTIX_COMPILATION>,$<CONFIG:Debug>>>:-G>
+
+    #$<$<CONFIG:Debug>:-G>
     $<$<CONFIG:SanitizeR>:-lineinfo>
     $<$<CONFIG:Release>:-lineinfo>
     # Extended Lambdas (__device__ tagged lambdas)

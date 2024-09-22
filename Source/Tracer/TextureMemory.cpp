@@ -300,9 +300,9 @@ SurfRefVariant Concept<T>::RWView(uint32_t mipLevel)
 template<class T, class... Args>
 inline
 GenericTexture::GenericTexture(std::in_place_type_t<T>,
-                                 MRayColorSpaceEnum cs, Float gammaIn,
-                                 AttributeIsColor col, MRayPixelTypeRT pt,
-                                 Args&&... args)
+                               MRayColorSpaceEnum cs, Float gammaIn,
+                               AttributeIsColor col, MRayPixelTypeRT pt,
+                               Args&&... args)
     : colorSpace(cs)
     , gamma(gammaIn)
     , isColor(col)
