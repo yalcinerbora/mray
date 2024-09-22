@@ -250,7 +250,7 @@ MRayDataTypeRT JsonTriangle::AttributeLayout(PrimitiveAttributeLogic attribLogic
 
 JsonSphere::JsonSphere(const JsonNode& jn)
     : id(jn.Id())
-    , position(jn.AccessData<Vector3>(JsonMeshNames::NODE_POSITION))
+    , position(jn.AccessData<Vector3>(JsonMeshNames::NODE_CENTER))
     , radius(jn.AccessData<Float>(JsonMeshNames::NODE_RADIUS))
 {}
 

@@ -1112,8 +1112,8 @@ void BaseAcceleratorT<C>::PartitionSurfaces(std::vector<AccelGroupConstructParam
     assert(std::is_sorted(surfList.begin(), surfList.end(),
     [](const SurfParam& left, const SurfParam& right) -> bool
     {
-        return (Tuple(left.second.primBatches.front(), left.second.transformId) <
-                Tuple(right.second.primBatches.front(), right.second.transformId));
+        return (Tuple(left.second.transformId, left.second.primBatches.front()) <
+                Tuple(right.second.transformId, right.second.primBatches.front()));
     }));
 
     // TODO: One linear access to vector should be enough
@@ -1171,8 +1171,8 @@ void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<AccelGroupCon
     assert(std::is_sorted(lSurfList.begin(), lSurfList.end(),
     [](const LightSurfP& left, const LightSurfP& right)
     {
-        return (Tuple(left.second.lightId, left.second.transformId) <
-                Tuple(right.second.lightId, right.second.transformId));
+        return (Tuple(left.second.transformId, left.second.lightId) <
+                Tuple(right.second.transformId, right.second.lightId));
     }));
 
     // Now partition

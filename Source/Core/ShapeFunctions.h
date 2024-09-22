@@ -21,6 +21,11 @@ namespace Triangle
     MRAY_HYBRID Vector3 PointToBarycentrics(Span<const Vector3, TRI_VERTEX_COUNT> positions,
                                             const Vector3& point);
 }
+
+namespace Sphere
+{
+    MRAY_HYBRID AABB3 BoundingBox(const Vector3& center, Float radius);
+}
 }
 
 namespace Shape
@@ -107,6 +112,12 @@ Vector3 Triangle::PointToBarycentrics(Span<const Vector3, TRI_VERTEX_COUNT> posi
     Float b = (d00 * d21 - d01 * d20) * denom;
     Float c = 1.0f - a - b;
     return Vector3(a, b, c);
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+AABB3 Sphere::BoundingBox(const Vector3& center, Float radius)
+{
+    return AABB3(center - radius, center + radius);
 }
 
 }

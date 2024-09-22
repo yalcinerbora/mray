@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Tracer/PrimitiveDefaultTriangle.h"
+#include "Tracer/PrimitivesDefault.h"
 #include "Tracer/TransformsDefault.h"
 #include "Tracer/LightsDefault.h"
 #include "Tracer/MaterialsDefault.h"
@@ -21,8 +22,9 @@ using PrimGTypes = Tuple
 <
     PrimGroupTriangle,
     PrimGroupSkinnedTriangle,
-    PrimGroupEmpty
+    PrimGroupEmpty,
     // Sphere
+    PrimGroupSphere
 >;
 
 // ================= //
@@ -105,7 +107,8 @@ using DefaultAccelTypePack = AccelTypePack
     Tuple
     <
         Group<PrimGroupTriangle>,
-        Group<PrimGroupSkinnedTriangle>
+        Group<PrimGroupSkinnedTriangle>,
+        Group<PrimGroupSphere>
     >,
     Tuple
     <
@@ -115,7 +118,10 @@ using DefaultAccelTypePack = AccelTypePack
         //
         AcceleratorWork<Group<PrimGroupSkinnedTriangle>, TransformGroupIdentity>,
         AcceleratorWork<Group<PrimGroupSkinnedTriangle>, TransformGroupSingle>,
-        AcceleratorWork<Group<PrimGroupSkinnedTriangle>, TransformGroupMulti>
+        AcceleratorWork<Group<PrimGroupSkinnedTriangle>, TransformGroupMulti>,
+        //
+        AcceleratorWork<Group<PrimGroupSphere>, TransformGroupIdentity>,
+        AcceleratorWork<Group<PrimGroupSphere>, TransformGroupSingle>
     >
 >;
 
@@ -154,14 +160,31 @@ using RendererWorkTypes = RenderWorkTypePack
         RenderWorkT<PrimGroupTriangle, MatGroupReflect, TransformGroupSingle>,
         RenderWorkT<PrimGroupTriangle, MatGroupRefract, TransformGroupSingle>,
         RenderWorkT<PrimGroupTriangle, MatGroupUnreal, TransformGroupSingle>,
+        //
+        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupLambert, TransformGroupIdentity>,
+        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupReflect, TransformGroupIdentity>,
+        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupRefract, TransformGroupIdentity>,
+        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupUnreal, TransformGroupIdentity>,
+
+        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupLambert, TransformGroupSingle>,
+        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupReflect, TransformGroupSingle>,
+        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupRefract, TransformGroupSingle>,
+        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupUnreal, TransformGroupSingle>,
 
         RenderWorkT<PrimGroupSkinnedTriangle, MatGroupLambert, TransformGroupMulti>,
         RenderWorkT<PrimGroupSkinnedTriangle, MatGroupReflect, TransformGroupMulti>,
         RenderWorkT<PrimGroupSkinnedTriangle, MatGroupRefract, TransformGroupMulti>,
-        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupUnreal, TransformGroupMulti>
-
+        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupUnreal, TransformGroupMulti>,
         // Sphere
-        // ...
+        RenderWorkT<PrimGroupSphere, MatGroupLambert, TransformGroupIdentity>,
+        RenderWorkT<PrimGroupSphere, MatGroupReflect, TransformGroupIdentity>,
+        RenderWorkT<PrimGroupSphere, MatGroupRefract, TransformGroupIdentity>,
+        RenderWorkT<PrimGroupSphere, MatGroupUnreal, TransformGroupIdentity>,
+
+        RenderWorkT<PrimGroupSphere, MatGroupLambert, TransformGroupSingle>,
+        RenderWorkT<PrimGroupSphere, MatGroupReflect, TransformGroupSingle>,
+        RenderWorkT<PrimGroupSphere, MatGroupRefract, TransformGroupSingle>,
+        RenderWorkT<PrimGroupSphere, MatGroupUnreal, TransformGroupSingle>
     >,
     // Lights
     Tuple

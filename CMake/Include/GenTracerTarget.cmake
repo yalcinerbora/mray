@@ -34,7 +34,10 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/PrimitiveC.h
         ${CURRENT_SOURCE_DIR}/PrimitiveDefaultTriangle.h
         ${CURRENT_SOURCE_DIR}/PrimitiveDefaultTriangle.hpp
-        ${CURRENT_SOURCE_DIR}/PrimitiveDefaultTriangle.cu)
+        ${CURRENT_SOURCE_DIR}/PrimitiveDefaultTriangle.cu
+        ${CURRENT_SOURCE_DIR}/PrimitivesDefault.h
+        ${CURRENT_SOURCE_DIR}/PrimitivesDefault.hpp
+        ${CURRENT_SOURCE_DIR}/PrimitivesDefault.cpp)
 
     set(SRC_TRANSFORMS
         ${CURRENT_SOURCE_DIR}/TransformC.h

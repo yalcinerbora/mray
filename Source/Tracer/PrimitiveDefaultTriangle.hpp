@@ -28,21 +28,18 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Optional<TriIntersection> Triangle<T>::Intersects(const Ray& ray, bool cullBackface) const
 {
     // Intersection
-    float t;
+    Float t;
     Vector3 baryCoords;
     bool intersects = ray.IntersectsTriangle(baryCoords, t,
                                              positions,
                                              cullBackface);
-    if(intersects)
+    if(!intersects) return std::nullopt;
+
+    return TriIntersection
     {
-        return TriIntersection
-        {
-            .hit = Vector2(baryCoords),
-            .t = t
-        };
-    }
-    else
-        return std::nullopt;
+        .hit = Vector2(baryCoords),
+        .t = t
+    };
 }
 
 template<TransformContextC T>
@@ -394,7 +391,7 @@ template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 void Triangle<T>::GenerateSurface(EmptySurface&,
                                   // Inputs
-                                  const Hit& baryCoords,
+                                  const Hit& hit,
                                   const Ray& ray,
                                   const RayDiff& differentials) const
 {}
@@ -403,12 +400,12 @@ template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 void Triangle<T>::GenerateSurface(BasicSurface& result,
                                   // Inputs
-                                  const Hit& baryCoords,
+                                  const Hit& hit,
                                   const Ray& ray,
                                   const RayDiff& differentials) const
 {
-    Float a = baryCoords[0];
-    Float b = baryCoords[1];
+    Float a = hit[0];
+    Float b = hit[1];
     Float c = Float{1} - a - b;
 
     // Get the position
@@ -433,12 +430,12 @@ template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 void Triangle<T>::GenerateSurface(DefaultSurface& result,
                                   // Inputs
-                                  const Hit& baryCoords,
+                                  const Hit& hit,
                                   const Ray& ray,
                                   const RayDiff& differentials) const
 {
-    Float a = baryCoords[0];
-    Float b = baryCoords[1];
+    Float a = hit[0];
+    Float b = hit[1];
     Float c = Float{1} - a - b;
 
     // Get the position

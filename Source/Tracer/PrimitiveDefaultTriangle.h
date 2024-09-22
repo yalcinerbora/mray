@@ -10,7 +10,6 @@
 #include "Core/Ray.h"
 #include "Core/Quaternion.h"
 #include "Core/Matrix.h"
-#include "Core/DataStructures.h"
 #include "Core/GraphicsFunctions.h"
 #include "Core/TypeNameGenerators.h"
 #include "Core/ShapeFunctions.h"
@@ -22,9 +21,7 @@
 namespace DefaultTriangleDetail
 {
     constexpr size_t DeviceMemAllocationGranularity = 32_MiB;
-    constexpr size_t DeviceMemReservationSize = 256_MiB;
-
-    using LookupTable = StratifiedIntegerAliasTable<PrimitiveKey::Type>;
+    constexpr size_t DeviceMemReservationSize       = 256_MiB;
 
     // SoA data of triangle group
     struct alignas(64) TriangleData

@@ -16,6 +16,7 @@ namespace JsonMeshNames
     static constexpr string_view NODE_UV        = "uv"sv;
     static constexpr string_view NODE_INDEX     = "index"sv;
     static constexpr string_view NODE_RADIUS    = "radius"sv;
+    static constexpr string_view NODE_CENTER    = "center"sv;
 }
 
 class JsonTriangle : public MeshFileViewI
