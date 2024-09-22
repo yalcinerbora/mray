@@ -1415,8 +1415,8 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     std::sort(surfList.begin(), surfList.end(),
               [](const SurfP& left, const SurfP& right) -> bool
     {
-        return (Tuple(left.second.transformId, left.second.primBatches.front()) <
-                Tuple(right.second.transformId, right.second.primBatches.front()));
+        return (Tuple(left.second.primBatches.front(), left.second.transformId) <
+                Tuple(right.second.primBatches.front(), right.second.transformId));
     });
 
     // Do the same thing for lights
@@ -1433,8 +1433,8 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     std::sort(lSurfList.begin(), lSurfList.end(),
     [](const LightSurfP& left, const LightSurfP& right)
     {
-        return (Tuple(left.second.transformId, left.second.lightId) <
-                Tuple(right.second.transformId, right.second.lightId));
+        return (Tuple(left.second.lightId, left.second.transformId) <
+                Tuple(right.second.lightId, right.second.transformId));
     });
 
     // And finally for the cameras as well
@@ -1443,8 +1443,8 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     std::sort(camSurfList.begin(), camSurfList.end(),
               [](const CamSurfP& left, const CamSurfP& right) -> bool
     {
-        return (Tuple(left.second.transformId, left.second.cameraId) <
-                Tuple(right.second.transformId, right.second.cameraId));
+        return (Tuple(left.second.cameraId, left.second.transformId) <
+                Tuple(right.second.cameraId, right.second.transformId));
     });
 
     // Send it!

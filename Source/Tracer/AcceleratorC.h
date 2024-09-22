@@ -1112,8 +1112,8 @@ void BaseAcceleratorT<C>::PartitionSurfaces(std::vector<AccelGroupConstructParam
     assert(std::is_sorted(surfList.begin(), surfList.end(),
     [](const SurfParam& left, const SurfParam& right) -> bool
     {
-        return (Tuple(left.second.transformId, left.second.primBatches.front()) <
-                Tuple(right.second.transformId, right.second.primBatches.front()));
+        return (Tuple(left.second.primBatches.front(), left.second.transformId) <
+                Tuple(right.second.primBatches.front(), right.second.transformId));
     }));
 
     // TODO: One linear access to vector should be enough
@@ -1146,7 +1146,7 @@ void BaseAcceleratorT<C>::PartitionSurfaces(std::vector<AccelGroupConstructParam
         {
             TransformId tId = innerStart->second.transformId;
             uint32_t tGroupId = TransGroupIdFetcher()(tId);
-            auto innerEnd = std::upper_bound(innerStart, surfList.end(), tGroupId,
+            auto innerEnd = std::upper_bound(innerStart, end, tGroupId,
             [](uint32_t value, const SurfParam& surf)
             {
                 auto tId = surf.second.transformId;

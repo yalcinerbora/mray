@@ -488,7 +488,7 @@ std::vector<TransientData> TransformAttributeLoad(const AttributeCountList& tota
         bool isArray = (std::get<GenericAttributeInfo::IS_ARRAY_INDEX>(info) ==
                         AttributeIsArray::IS_ARRAY);
 
-        std::string_view layout = nodes[0].CommonData<std::string_view>(LAYOUT);
+        std::string_view layout = n.CommonData<std::string_view>(LAYOUT);
         if(layout == LAYOUT_TRS)
         {
             static constexpr auto TRANSLATE = "translate"sv;
