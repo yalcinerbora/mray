@@ -165,6 +165,46 @@ namespace TracerLimits
     static constexpr size_t MaxPrimBatchPerSurface = 8;
 }
 
+// Comparison Routines
+inline bool SurfaceLessThan(const Pair<SurfaceId, SurfaceParams>& left,
+                            const Pair<SurfaceId, SurfaceParams>& right)
+{
+    PrimBatchKey lpk = std::bit_cast<PrimBatchKey>(left.second.primBatches.front());
+    TransformKey ltk = std::bit_cast<TransformKey>(left.second.transformId);
+    //
+    PrimBatchKey rpk = std::bit_cast<PrimBatchKey>(right.second.primBatches.front());
+    TransformKey rtk = std::bit_cast<TransformKey>(right.second.transformId);
+    //
+    return (Tuple(lpk.FetchBatchPortion(), ltk.FetchBatchPortion()) <
+            Tuple(rpk.FetchBatchPortion(), rtk.FetchBatchPortion()));
+}
+
+inline bool LightSurfaceLessThan(const Pair<LightSurfaceId, LightSurfaceParams>& left,
+                                 const Pair<LightSurfaceId, LightSurfaceParams>& right)
+{
+    LightKey llk = std::bit_cast<LightKey>(left.second.lightId);
+    TransformKey ltk = std::bit_cast<TransformKey>(left.second.transformId);
+    //
+    LightKey rlk = std::bit_cast<LightKey>(right.second.lightId);
+    TransformKey rtk = std::bit_cast<TransformKey>(right.second.transformId);
+    //
+    return (Tuple(llk.FetchBatchPortion(), ltk.FetchBatchPortion()) <
+            Tuple(rlk.FetchBatchPortion(), rtk.FetchBatchPortion()));
+}
+
+inline bool CamSurfaceLessThan(const Pair<CamSurfaceId, CameraSurfaceParams>& left,
+                               const Pair<CamSurfaceId, CameraSurfaceParams>& right)
+{
+    CameraKey lck = std::bit_cast<CameraKey>(left.second.cameraId);
+    TransformKey ltk = std::bit_cast<TransformKey>(left.second.transformId);
+    //
+    CameraKey rck = std::bit_cast<CameraKey>(right.second.cameraId);
+    TransformKey rtk = std::bit_cast<TransformKey>(right.second.transformId);
+    //
+    return (Tuple(lck.FetchBatchPortion(), ltk.FetchBatchPortion()) <
+            Tuple(rck.FetchBatchPortion(), rtk.FetchBatchPortion()));
+}
+
 // Alias some stuff to easily acquire the function and context type
 // Using macro instead of "static constexpr auto" since it make
 // GPU link errors
@@ -495,8 +535,7 @@ struct GroupIdFetcher
 {
     typename KeyType::Type operator()(auto id)
     {
-        uint32_t batchKeyRaw = static_cast<uint32_t>(id);
-        return KeyType(batchKeyRaw).FetchBatchPortion();
+        return std::bit_cast<KeyType>(id).FetchBatchPortion();
     }
 };
 
@@ -1109,12 +1148,7 @@ void BaseAcceleratorT<C>::PartitionSurfaces(std::vector<AccelGroupConstructParam
                                             const TextureViewMap& textureViews)
 {
     using SurfParam = typename BaseAccelConstructParams::SurfPair;
-    assert(std::is_sorted(surfList.begin(), surfList.end(),
-    [](const SurfParam& left, const SurfParam& right) -> bool
-    {
-        return (Tuple(left.second.primBatches.front(), left.second.transformId) <
-                Tuple(right.second.primBatches.front(), right.second.transformId));
-    }));
+    assert(std::is_sorted(surfList.begin(), surfList.end(), SurfaceLessThan));
 
     // TODO: One linear access to vector should be enough
     // to generate this after sort, but this is simpler to write
@@ -1168,12 +1202,7 @@ void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<AccelGroupCon
                                                        const Map<TransGroupId, TransformGroupPtr>& transformGroups)
 {
     using LightSurfP = typename BaseAccelConstructParams::LightSurfPair;
-    assert(std::is_sorted(lSurfList.begin(), lSurfList.end(),
-    [](const LightSurfP& left, const LightSurfP& right)
-    {
-        return (Tuple(left.second.transformId, left.second.lightId) <
-                Tuple(right.second.transformId, right.second.lightId));
-    }));
+    assert(std::is_sorted(lSurfList.begin(), lSurfList.end(), LightSurfaceLessThan));
 
     // Now partition
     auto start = lSurfList.begin();

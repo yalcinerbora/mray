@@ -1412,12 +1412,7 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     // PG TG {S0,...,SN}   -> AccelGroup
     auto& surfList = surfaces.Vec();
     using SurfP = Pair<SurfaceId, SurfaceParams>;
-    std::sort(surfList.begin(), surfList.end(),
-              [](const SurfP& left, const SurfP& right) -> bool
-    {
-        return (Tuple(left.second.primBatches.front(), left.second.transformId) <
-                Tuple(right.second.primBatches.front(), right.second.transformId));
-    });
+    std::sort(surfList.begin(), surfList.end(), SurfaceLessThan);
 
     // Do the same thing for lights
     using LightSurfP = Pair<LightSurfaceId, LightSurfaceParams>;
@@ -1426,26 +1421,16 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     [this](const LightSurfP& lSurf)
     {
         const auto& map = lightGroups.Map();
-        LightKey lKey(static_cast<uint32_t>(lSurf.second.lightId));
+        LightKey lKey = std::bit_cast<LightKey>(lSurf.second.lightId);
         auto gId = LightGroupId(lKey.FetchBatchPortion());
         return map.at(gId).value().get()->IsPrimitiveBacked();
     });
-    std::sort(lSurfList.begin(), lSurfList.end(),
-    [](const LightSurfP& left, const LightSurfP& right)
-    {
-        return (Tuple(left.second.lightId, left.second.transformId) <
-                Tuple(right.second.lightId, right.second.transformId));
-    });
+    std::sort(lSurfList.begin(), lSurfList.end(), LightSurfaceLessThan);
 
     // And finally for the cameras as well
     auto& camSurfList = cameraSurfaces.Vec();
     using CamSurfP = Pair<CamSurfaceId, CameraSurfaceParams>;
-    std::sort(camSurfList.begin(), camSurfList.end(),
-              [](const CamSurfP& left, const CamSurfP& right) -> bool
-    {
-        return (Tuple(left.second.cameraId, left.second.transformId) <
-                Tuple(right.second.cameraId, right.second.transformId));
-    });
+    std::sort(camSurfList.begin(), camSurfList.end(), CamSurfaceLessThan);
 
     // Send it!
     AcceleratorType type = params.accelMode;
