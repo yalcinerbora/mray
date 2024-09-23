@@ -1427,7 +1427,12 @@ bool VisorWindow::Render()
         }
     }
     // Image clear
-    if(newClearSignal || newRenderBuffer)
+    if(newRenderBuffer)
+    {
+        renderImagePool.IssueFullClear(imgWriteSem);
+        imgWriteSem.ChangeNextWait(1);
+    }
+    else if(newClearSignal)
     {
         renderImagePool.IssueClear(imgWriteSem);
         imgWriteSem.ChangeNextWait(1);

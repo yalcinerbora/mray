@@ -173,18 +173,10 @@ void RenderImagePool::GenerateClearCommand()
                          0, nullptr,
                          3, imgBarrierInfoList.data());
 
-    //vkCmdClearColorImage(clearCommand, hdrImage.Image(),
-    //                     VK_IMAGE_LAYOUT_GENERAL,
-    //                     &clearColorValue, 1u,
-    //                     &clearRange);
     vkCmdClearColorImage(clearCommand, hdrSampleImage.Image(),
                          VK_IMAGE_LAYOUT_GENERAL,
                          &clearColorValue, 1u,
                          &clearRange);
-    //vkCmdClearColorImage(clearCommand, sdrImage.Image(),
-    //                     VK_IMAGE_LAYOUT_GENERAL,
-    //                     &clearColorValue, 1u,
-    //                     &clearRange);
 
     // Make SDR image read optimal, since tonemap stage
     // expects the image to be previously read optimal.
@@ -196,6 +188,85 @@ void RenderImagePool::GenerateClearCommand()
     imgBarrierInfoList[0].newLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
     // Finally the barrier
     vkCmdPipelineBarrier(clearCommand,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         (VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT), 0,
+                         0, nullptr,
+                         0, nullptr,
+                         1, imgBarrierInfoList.data());
+}
+
+void RenderImagePool::GenerateFullClearCommand()
+{
+    // Clear
+    VkImageSubresourceRange clearRange
+    {
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .baseMipLevel = 0u,
+        .levelCount = 1u,
+        .baseArrayLayer = 0u,
+        .layerCount = 1u
+    };
+    VkClearColorValue clearColorValue = {};
+    // Change the HDR image state to writable
+    std::array<VkImageMemoryBarrier, 3> imgBarrierInfoList = {};
+    imgBarrierInfoList[0] =
+    {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .pNext = nullptr,
+        .srcAccessMask = VK_ACCESS_NONE,
+        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+        .srcQueueFamilyIndex = handlesVk->queueIndex,
+        .dstQueueFamilyIndex = handlesVk->queueIndex,
+        .image = hdrImage.Image(),
+        .subresourceRange = VkImageSubresourceRange
+        {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1
+        }
+    };
+    // For sample count image make it writable as well
+    imgBarrierInfoList[1] = imgBarrierInfoList[0];
+    imgBarrierInfoList[1].image = hdrSampleImage.Image();
+    // And for the sdr image
+    imgBarrierInfoList[2] = imgBarrierInfoList[0];
+    imgBarrierInfoList[2].image = sdrImage.Image();
+    // Finally the barrier
+    vkCmdPipelineBarrier(fullClearCommand,
+                         VK_PIPELINE_STAGE_NONE,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                         0, nullptr,
+                         0, nullptr,
+                         3, imgBarrierInfoList.data());
+
+    vkCmdClearColorImage(fullClearCommand, hdrImage.Image(),
+                         VK_IMAGE_LAYOUT_GENERAL,
+                         &clearColorValue, 1u,
+                         &clearRange);
+    vkCmdClearColorImage(fullClearCommand, hdrSampleImage.Image(),
+                         VK_IMAGE_LAYOUT_GENERAL,
+                         &clearColorValue, 1u,
+                         &clearRange);
+    vkCmdClearColorImage(fullClearCommand, sdrImage.Image(),
+                         VK_IMAGE_LAYOUT_GENERAL,
+                         &clearColorValue, 1u,
+                         &clearRange);
+
+    // Make SDR image read optimal, since tonemap stage
+    // expects the image to be previously read optimal.
+    imgBarrierInfoList[0].image = sdrImage.Image();
+    imgBarrierInfoList[0].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    imgBarrierInfoList[0].dstAccessMask = (VK_ACCESS_SHADER_READ_BIT |
+                                           VK_ACCESS_SHADER_WRITE_BIT);
+    imgBarrierInfoList[0].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imgBarrierInfoList[0].newLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+    // Finally the barrier
+    vkCmdPipelineBarrier(fullClearCommand,
                          VK_PIPELINE_STAGE_TRANSFER_BIT,
                          (VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT), 0,
@@ -273,6 +344,7 @@ RenderImagePool::RenderImagePool(BS::thread_pool* tp,
     hdrCopyCommand = VulkanCommandBuffer(*handlesVk);
     sdrCopyCommand = VulkanCommandBuffer(*handlesVk);
     clearCommand = VulkanCommandBuffer(*handlesVk);
+    fullClearCommand = VulkanCommandBuffer(*handlesVk);
 
     VkCommandBufferBeginInfo cBuffBeginInfo =
     {
@@ -295,6 +367,10 @@ RenderImagePool::RenderImagePool(BS::thread_pool* tp,
     vkBeginCommandBuffer(clearCommand, &cBuffBeginInfo);
     GenerateClearCommand();
     vkEndCommandBuffer(clearCommand);
+
+    vkBeginCommandBuffer(fullClearCommand, &cBuffBeginInfo);
+    GenerateFullClearCommand();
+    vkEndCommandBuffer(fullClearCommand);
 }
 
 void RenderImagePool::SaveImage(IsHDRImage t, const RenderImageSaveInfo& fileOutInfo,
@@ -402,6 +478,37 @@ void RenderImagePool::IssueClear(const VulkanTimelineSemaphore& imgSem)
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
         .pNext = nullptr,
         .commandBuffer = clearCommand,
+        .deviceMask = 0
+    };
+    VkSubmitInfo2 submitInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+        .pNext = nullptr,
+        .flags = 0,
+        .waitSemaphoreInfoCount = 1,
+        .pWaitSemaphoreInfos = &waitSemaphore,
+        .commandBufferInfoCount = 1,
+        .pCommandBufferInfos = &commandSubmitInfo,
+        .signalSemaphoreInfoCount = 1,
+        .pSignalSemaphoreInfos = &signalSemaphore
+    };
+    // Finally submit!
+    vkQueueSubmit2(handlesVk->mainQueueVk, 1, &submitInfo, nullptr);
+}
+
+void RenderImagePool::IssueFullClear(const VulkanTimelineSemaphore& imgSem)
+{
+    // ============= //
+    //   SUBMISSON   //
+    // ============= //
+    auto allStages = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    VkSemaphoreSubmitInfo waitSemaphore = imgSem.WaitInfo(allStages);
+    VkSemaphoreSubmitInfo signalSemaphore = imgSem.SignalInfo(allStages, 1);
+    VkCommandBufferSubmitInfo commandSubmitInfo =
+    {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+        .pNext = nullptr,
+        .commandBuffer = fullClearCommand,
         .deviceMask = 0
     };
     VkSubmitInfo2 submitInfo =

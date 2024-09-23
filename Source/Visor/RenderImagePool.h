@@ -37,6 +37,7 @@ class RenderImagePool
     VulkanCommandBuffer     hdrCopyCommand;
     VulkanCommandBuffer     sdrCopyCommand;
     VulkanCommandBuffer     clearCommand;
+    VulkanCommandBuffer     fullClearCommand;
     BS::thread_pool*        threadPool      = nullptr;
     ImageLoaderIPtr         imgLoader;
     //
@@ -45,6 +46,8 @@ class RenderImagePool
     void                    GenerateSDRCopyCommand();
     void                    GenerateHDRCopyCommand();
     void                    GenerateClearCommand();
+    void                    GenerateFullClearCommand();
+
     public:
     // Constructors & Destructor
                         RenderImagePool();
@@ -61,6 +64,7 @@ class RenderImagePool
     void                SaveImage(IsHDRImage, const RenderImageSaveInfo& fileOutInfo,
                                   const VulkanTimelineSemaphore&);
     void                IssueClear(const VulkanTimelineSemaphore&);
+    void                IssueFullClear(const VulkanTimelineSemaphore&);
 
     const VulkanImage&  GetHDRImage() const;
     const VulkanImage&  GetSampleImage() const;
