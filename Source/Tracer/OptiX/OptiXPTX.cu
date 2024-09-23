@@ -1,81 +1,25 @@
 #include "OptiXPTX.h"
 
 #include "Tracer/PrimitiveDefaultTriangle.h"
+#include "Tracer/PrimitivesDefault.h"
 
 #include "Core/BitFunctions.h"
 
-template<class TransContextType>
-class Triangle2
-{
-    public:
-    using DataSoA = DefaultTriangleDetail::TriangleData;
-    using Hit = Vector2;
-    using Intersection = Optional<IntersectionT<Hit>>;
-    using TransformContext = TransContextType;
-    //
-    static constexpr uint32_t SampleRNCount = 2;
-
-    private:
-    const DataSoA*              data;
-    const TransContextType*     transformContext;
-    PrimitiveKey                key;
-
-    public:
-    MRAY_HYBRID         Triangle2(const DataSoA& data,
-                                  PrimitiveKey key);
-    MRAY_HYBRID         Triangle2(const TransContextType& transform,
-                                  const DataSoA& data,
-                                  PrimitiveKey key);
-    MRAY_HYBRID Vector2 SurfaceParametrization(const Vector2& hit) const;
-
-};
-
-template<class T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-Triangle2<T>::Triangle2(const DataSoA& data,
-                        PrimitiveKey key)
-    : data(&data)
-    , transformContext(nullptr)
-    , key(key)
-{}
-
-template<class T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-Triangle2<T>::Triangle2(const T& transform,
-                        const DataSoA& data,
-                        PrimitiveKey key)
-    : data(&data)
-    , transformContext(&transform)
-    , key(key)
-{}
-
-template<class T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-Vector2 Triangle2<T>::SurfaceParametrization(const Vector2& hit) const
-{
-    //Vector3ui index = data->indexList[key.FetchIndexPortion()];
-    //Vector2 uv0 = data->uvs[index[0]];
-    //Vector2 uv1 = data->uvs[index[1]];
-    //Vector2 uv2 = data->uvs[index[2]];
-
-    //Vector3 baryCoords = Vector3(hit[0], hit[1], 1 - hit[1] - hit[0]);
-
-    //Vector2 uv = (baryCoords[0] * uv0 +
-    //              baryCoords[1] * uv1 +
-    //              baryCoords[2] * uv2);
-
-    //return uv;
-    return Vector2::Zero();
-}
-
-
-
-
-
-
 // ExternCWrapper Macro
-#define WRAP_FUCTION(NAME, FUNCTION) \
-    extern "C" __global__ void NAME(){FUNCTION();}
+#define WRAP_FUCTION_RAYGEN(NAME, FUNCTION) \
+    extern "C" __global__ void __raygen__##NAME(){FUNCTION();}
+
+#define WRAP_FUCTION_MISS(NAME, FUNCTION) \
+    extern "C" __global__ void __miss__##NAME(){FUNCTION();}
+
+#define WRAP_FUCTION_CLOSEST_HIT(NAME, PG) \
+    extern "C" __global__ void __closesthit__##NAME(){KCClosestHit<PG>();}
+
+#define WRAP_FUCTION_ANY_HIT(NAME, PG) \
+    extern "C" __global__ void __anyhit__##NAME(){KCAnyHit<PG>();}
+
+#define WRAP_FUCTION_INTERSECT(NAME, PG, TG) \
+    extern "C" __global__ void __intersection__##NAME(){KCIntersect<PG,TG>();}
 
 extern "C" __constant__ ArgumentPackOpitX params;
 
@@ -119,22 +63,25 @@ MetaHit ReadHitFromAttributes()
 template <VectorC Hit>
 requires std::is_floating_point_v<typename Hit::InnerType>
 MRAY_GPU MRAY_GPU_INLINE
-void ReportIntersection(float newT, unsigned int kind, Hit h)
+void ReportIntersection(const IntersectionT<Hit>& intersection, unsigned int hitKind)
 {
+    Float t = intersection.t;
+    const Hit& h = intersection.hit;
+
     if constexpr(1 == Hit::Dims)
-        optixReportIntersection(newT, kind,
+        optixReportIntersection(t, hitKind,
                                 __float_as_uint(float(h[0])));
     else if constexpr(2 == Hit::Dims)
-        optixReportIntersection(newT, kind,
+        optixReportIntersection(t, hitKind,
                                 __float_as_uint(float(h[0])),
                                 __float_as_uint(float(h[1])));
     else if constexpr(3 == Hit::Dims)
-        optixReportIntersection(newT, kind,
+        optixReportIntersection(t, hitKind,
                                 __float_as_uint(float(h[0])),
                                 __float_as_uint(float(h[1])),
                                 __float_as_uint(float(h[2])));
     else if constexpr(4 == Hit::Dims)
-        optixReportIntersection(newT, kind,
+        optixReportIntersection(t, hitKind,
                                 __float_as_uint(float(h[0])),
                                 __float_as_uint(float(h[1])),
                                 __float_as_uint(float(h[2])),
@@ -181,7 +128,7 @@ void KCClosestHit()
 {
     using Hit = typename PGroup::Hit;
     using HitRecord = GenericHitRecordData<>;
-    auto& record = *DriverPtrToType<const HitRecord>(optixGetSbtDataPointer());
+    const auto& record = *DriverPtrToType<const HitRecord>(optixGetSbtDataPointer());
 
     const uint32_t leafId = optixGetPrimitiveIndex();
     const uint32_t rayId = optixGetLaunchIndex().x;
@@ -214,7 +161,7 @@ void KCAnyHit()
     using Primitive = typename PGroup:: template Primitive<>;
     using Hit = typename PGroup::Hit;
     using HitRecord = GenericHitRecordData<typename PGroup::DataSoA>;
-    auto& record = *DriverPtrToType<const HitRecord>(optixGetSbtDataPointer());
+    const auto& record = *DriverPtrToType<const HitRecord>(optixGetSbtDataPointer());
 
     if(record.alphaMap)
     {
@@ -246,79 +193,50 @@ void KCAnyHit()
 }
 
 // Meta Intersect Shader
-template<PrimitiveGroupC PGroup, TransformGroupC TGroup>
+template<PrimitiveGroupC PGroup, TransformGroupC TGroup,
+         auto GenerateTransformContext = MRAY_PRIM_TGEN_FUNCTION(PGroup, TGroup)>
 MRAY_GPU MRAY_GPU_INLINE
 void KCIntersect()
 {
-    ////GPUTransformIdentity ID_TRANSFORM;
+    using enum PrimTransformType;
+    static constexpr bool IsPerPrimTransform = (PGroup::TransformLogic == PER_PRIMITIVE_TRANSFORM);
 
-    //using LeafStruct = typename PGroup::LeafData;
-    //using HitStruct  = typename PGroup::HitData;
-    //using HitRecord  = Record<typename PGroup::PrimitiveData,
-    //                          typename PGroup::LeafData>;
-    //// Construct a ray
-    //float3 rP = optixGetWorldRayOrigin();
-    //float3 rD = optixGetWorldRayDirection();
-    //const float  tMin = optixGetRayTmin();
-    //const float  tMax = optixGetRayTmax();
+    using Primitive = typename PGroup:: template Primitive<>;
+    using Intersection = typename Primitive::Intersection;
+    using Hit = typename PGroup::Hit;
+    using HitRecord = GenericHitRecordData<typename PGroup::DataSoA,
+                                           typename TGroup::DataSoA>;
+    const auto& record = *DriverPtrToType<const HitRecord>(optixGetSbtDataPointer());
 
-    //// Record Fetch
-    //const HitRecord* r = (const HitRecord*)optixGetSbtDataPointer();
-    //const int leafId = optixGetPrimitiveIndex();
-    //// Fetch Leaf
-    //const LeafStruct& gLeaf = r->gLeafs[leafId];
+    // Prim Key
+    const uint32_t leafId = optixGetPrimitiveIndex();
+    PrimitiveKey pKey = record.dPrimKeys[leafId];
 
-    //// Outputs
-    //float newT;
-    //HitStruct hitData;
-    //bool intersects = false;
-    //// Our intersects function requires a transform
-    //// Why?
-    ////
-    //// For skinned meshes (or any primitive with a transform that cannot be applied
-    //// to a ray inversely) each accelerator is fully constructed using transformed aabbs,
-    ////
-    //// However primitives are not transformed, thus for each shader we need the transform
-    //if constexpr(PGroup::TransType == PrimTransformType::CONSTANT_LOCAL_TRANSFORM)
-    //{
-    //    // Use optix transform the ray to local (object) space of the primitive
-    //    // and use an identity transform on the Intersection function
-    //    rD = optixTransformVectorFromWorldToObjectSpace(rD);
-    //    rP = optixTransformPointFromWorldToObjectSpace(rP);
-    //}
-    //else if constexpr(PGroup::TransType == PrimTransformType::PER_PRIMITIVE_TRANSFORM)
-    //{
-    //    // nvcc with clang compiles this when assert is false, so putting an impossible
-    //    // statement
-    //    static_assert(PGroup::TransType != PrimTransformType::PER_PRIMITIVE_TRANSFORM,
-    //                 "Per primitive transform is not supported on OptiX yet");
-    //    // Optix does not support virtual function calls
-    //    // Just leave it as is for now
-    //}
-    //// nvcc with clang compiles this when assert is false, so putting an impossible
-    //// statement
-    //else static_assert(PGroup::TransType == PrimTransformType::PER_PRIMITIVE_TRANSFORM,
-    //                   "Primitive does not have proper transform type");
+    // Get the ray
+    float3 rD = optixGetObjectRayDirection();
+    float3 rP = optixGetObjectRayOrigin();
+    Ray ray = Ray(Vector3(rD.x, rD.y, rD.z), Vector3(rP.x, rP.y, rP.z));
+    if constexpr(IsPerPrimTransform)
+    {
+        // If we are per-prim transform, the object-space transform
+        // is the common transform. We need to do the last process here
+        using TransContext = typename PrimTransformContextType<PGroup, TGroup>::Result;
+        TransContext tContext = GenerateTransformContext(*record.transSoA,
+                                                         *record.primSoA,
+                                                         record.transKey,
+                                                         pKey);
+        ray = tContext.InvApply(ray);
+    }
+    // For constant-local transform, to object is enough
+    //
+    // Get the actual primitive,
+    // We already transformed the ray, so generate via
+    // identity transform context
+    Primitive prim(TransformContextIdentity{}, *record.primSoA, pKey);
+    // TODO: We need back-face culling to transfer here
+    Intersection result = prim.Intersects(ray, true);
 
-    //// Construct the Register (after transformation)
-    //RayReg rayRegister = RayReg(RayF(Vector3f(rD.x, rD.y, rD.z),
-    //                                 Vector3f(rP.x, rP.y, rP.z)),
-    //                            tMin, tMax);
-
-    //// Since OptiX does not support virtual(indirect) function calls
-    //// Call with an empty transform (this is not virtual and does nothing)
-    //// <GPUTransformEmpty>
-    //intersects = PGroup::IntersectsT(// Output
-    //                                 newT,
-    //                                 hitData,
-    //                                 // I-O
-    //                                 rayRegister,
-    //                                 // Input
-    //                                 GPUTransformEmpty(),
-    //                                 gLeaf,
-    //                                 (*r->gPrimData));
-    //// Report the intersection
-    //if(intersects) ReportIntersection<HitStruct>(newT, 0, hitData);
+    if(result) ReportIntersection(*result, 0);
 }
 
 MRAY_GPU MRAY_GPU_INLINE
@@ -365,8 +283,8 @@ void KCRayGenOptix()
 }
 
 // Actual Definitions
-WRAP_FUCTION(__raygen__OptiX, KCRayGenOptix);
-WRAP_FUCTION(__miss__OptiX, KCMissOptiX);
+WRAP_FUCTION_RAYGEN(OptiX, KCRayGenOptix);
+WRAP_FUCTION_MISS(OptiX, KCMissOptiX);
 // These function names must be equavlient to the return type "TypeName()"
 // functions. We can't do language magic here unfortunately
 // this needs to be maintained when a new primitive type introduced
@@ -378,9 +296,14 @@ WRAP_FUCTION(__miss__OptiX, KCMissOptiX);
 // are handled by HW (Including the PER_PRIM and
 // CONSTANT_LOCAL transformations)
 //
-WRAP_FUCTION(__closesthit__Triangle, KCClosestHit<PrimGroupTriangle>)
-WRAP_FUCTION(__anyhit__Triangle, KCAnyHit<PrimGroupTriangle>)
+WRAP_FUCTION_CLOSEST_HIT(Triangle, PrimGroupTriangle)
+WRAP_FUCTION_ANY_HIT(Triangle, PrimGroupTriangle)
 //
-WRAP_FUCTION(__closesthit__TriangleSkinned, KCClosestHit<PrimGroupSkinnedTriangle>)
-WRAP_FUCTION(__anyhit__TriangleSkinned, KCAnyHit<PrimGroupSkinnedTriangle>)
+WRAP_FUCTION_CLOSEST_HIT(TriangleSkinned, PrimGroupSkinnedTriangle)
+WRAP_FUCTION_ANY_HIT(TriangleSkinned, PrimGroupSkinnedTriangle)
+// Sphere
+WRAP_FUCTION_CLOSEST_HIT(Sphere, PrimGroupSphere)
+WRAP_FUCTION_ANY_HIT(Sphere, PrimGroupSphere)
+WRAP_FUCTION_INTERSECT(Sphere_Identity, PrimGroupSphere, TransformGroupIdentity);
+WRAP_FUCTION_INTERSECT(Sphere_Single, PrimGroupSphere, TransformGroupSingle);
 // TODO: Add more...

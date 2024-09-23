@@ -43,6 +43,8 @@ struct GenericHitRecordData
 	AcceleratorKey		acceleratorKey;
 	// Cull face is instance level operation and is a software flag.
 	// so we do not hold it here
+	// TODO: This is wrong, (only true for triangles)
+	// We need to pass the flag here for custom primitives.
 	// ...
 	//
 	// SoA Access

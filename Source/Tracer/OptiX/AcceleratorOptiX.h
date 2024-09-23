@@ -2,6 +2,7 @@
 
 #include "AcceleratorC.h"
 #include "OptiXPTX.h"
+#include "AcceleratorWork.h"
 
 #include <optix_host.h>
 #include <optix_stubs.h>
@@ -211,16 +212,22 @@ class AcceleratorGroupOptiX final
     std::vector<uint32_t>               hInstanceCommonFlags;
 
     std::vector<OptixTraversableHandle>
-    MultiBuildTriangleCLT(const PreprocessResult& ppResult,
-                          const GPUQueue& queue);
+    MultiBuildTriangle_CLT(const PreprocessResult& ppResult,
+                             const GPUQueue& queue);
     std::vector<OptixTraversableHandle>
-    MultiBuildTrianglePPT(const PreprocessResult& ppResult,
-                          const GPUQueue& queue);
-    std::vector<OptixTraversableHandle>
-    MultiBuildGenericCLT(const PreprocessResult& ppResult,
+    MultiBuildAABB_CLT(const PreprocessResult& ppResult,
                          const GPUQueue& queue);
+    template<class T>
     std::vector<OptixTraversableHandle>
-    MultiBuildGenericPPT(const PreprocessResult& ppResult,
+    MultiBuildGeneric_CLT(const PreprocessResult& ppResult,
+                          const std::vector<T>& allBuildInputs,
+                          const GPUQueue& queue);
+
+    std::vector<OptixTraversableHandle>
+    MultiBuildViaTriangle_PPT(const PreprocessResult& ppResult,
+                          const GPUQueue& queue);
+    std::vector<OptixTraversableHandle>
+    MultiBuildViaAABB_PPT(const PreprocessResult& ppResult,
                          const GPUQueue& queue);
 
     public:

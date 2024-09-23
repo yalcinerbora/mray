@@ -124,12 +124,13 @@ ComputeCapabilityTypePackOptiX::operator=(ComputeCapabilityTypePackOptiX&& other
 {
     assert(this != &other);
 
-    OPTIX_CHECK(optixPipelineDestroy(pipeline));
+    if(pipeline) OPTIX_CHECK(optixPipelineDestroy(pipeline));
     for(auto pg : programGroups)
-        OPTIX_CHECK(optixProgramGroupDestroy(pg));
+    {
+        if(pg) OPTIX_CHECK(optixProgramGroupDestroy(pg));
+    }
     programGroups.clear();
-
-    OPTIX_CHECK(optixModuleDestroy(optixModule));
+    if(optixModule) OPTIX_CHECK(optixModuleDestroy(optixModule));
 
     optixModule = std::exchange(other.optixModule, nullptr);
     programGroups = std::exchange(other.programGroups, std::vector<OptixProgramGroup>{});
@@ -139,11 +140,14 @@ ComputeCapabilityTypePackOptiX::operator=(ComputeCapabilityTypePackOptiX&& other
 
 ComputeCapabilityTypePackOptiX::~ComputeCapabilityTypePackOptiX()
 {
-    OPTIX_CHECK(optixPipelineDestroy(pipeline));
+
+    if(pipeline) OPTIX_CHECK(optixPipelineDestroy(pipeline));
     for(auto pg : programGroups)
-        OPTIX_CHECK(optixProgramGroupDestroy(pg));
+    {
+        if(pg) OPTIX_CHECK(optixProgramGroupDestroy(pg));
+    }
     programGroups.clear();
-    OPTIX_CHECK(optixModuleDestroy(optixModule));
+    if(optixModule) OPTIX_CHECK(optixModuleDestroy(optixModule));
 }
 
 auto ComputeCapabilityTypePackOptiX::operator<=>(const ComputeCapabilityTypePackOptiX& right) const
@@ -428,8 +432,8 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
         assert(localTypeNames.size() == (recordOffsets.size() - 1));
         for(size_t j = 0; j < recordOffsets.size() - 1; j++)
         {
-            uint32_t start = recordStartOffset + recordOffsets[j];
-            uint32_t end = recordStartOffset + recordOffsets[j + 1];
+            uint32_t start = recordOffsets[j];
+            uint32_t end = recordOffsets[j + 1];
             uint32_t count = end - start;
             const auto& typeName = localTypeNames[j];
             auto& indexList = shaderNames[typeName];

@@ -157,30 +157,15 @@ void AcceleratorGroupOptiX<PG>::PreConstruct(const BaseAcceleratorI* a)
 }
 
 template<PrimitiveGroupC PG>
+template<class T>
 std::vector<OptixTraversableHandle>
-AcceleratorGroupOptiX<PG>::MultiBuildTriangleCLT(const PreprocessResult& ppResult,
-                                                      const GPUQueue& queue)
+AcceleratorGroupOptiX<PG>::MultiBuildGeneric_CLT(const PreprocessResult& ppResult,
+                                                 const std::vector<T>& allBuildInputs,
+                                                 const GPUQueue& queue)
 {
     using mray::cuda::ToHandleCUDA;
     size_t totalLeafCount = this->concreteLeafRanges.back()[1];
     std::vector<OptixTraversableHandle> hConcreteAccelHandles;
-
-    // Do the build inputs
-    std::vector<BuildInputPackTriangle> allBuildInputs;
-    allBuildInputs.reserve(ppResult.concretePrimRanges.size());
-
-    // Thankfully these are persistent, directly acquire from
-    // primitive group
-    Span<const Vector3> verts = this->pg.GetVertexPositionSpan();
-    Span<const Vector3ui> indices = this->pg.GetIndexSpan();
-    for(const auto& primRanges : ppResult.concretePrimRanges)
-        allBuildInputs.emplace_back(GenBuildInputsTriangle(verts, indices, primRanges));
-    // Fix the references
-    std::for_each(allBuildInputs.begin(), allBuildInputs.end(),
-    [](BuildInputPackTriangle& pack)
-    {
-        FixReferencesInInputs(pack);
-    });
 
     // Here we will do build into a temporary buffer
     // then compact the accelerators into the persistent buffer.
@@ -193,7 +178,7 @@ AcceleratorGroupOptiX<PG>::MultiBuildTriangleCLT(const PreprocessResult& ppResul
         // Reduce Operation
         std::plus{},
         // Transform Operation
-        [this](const BuildInputPackTriangle& pack) -> Vector2ul
+        [this](const T& pack) -> Vector2ul
         {
             OptixAccelBufferSizes sizeList = {};
             OPTIX_CHECK(optixAccelComputeMemoryUsage(contextOptiX, &OptiXAccelDetail::BUILD_OPTIONS_OPTIX,
@@ -375,24 +360,158 @@ AcceleratorGroupOptiX<PG>::MultiBuildTriangleCLT(const PreprocessResult& ppResul
 
 template<PrimitiveGroupC PG>
 std::vector<OptixTraversableHandle>
-AcceleratorGroupOptiX<PG>::MultiBuildTrianglePPT(const PreprocessResult&,
+AcceleratorGroupOptiX<PG>::MultiBuildTriangle_CLT(const PreprocessResult& ppResult,
+                                                  const GPUQueue& queue)
+{
+    size_t totalLeafCount = this->concreteLeafRanges.back()[1];
+    // Do the build inputs
+    std::vector<BuildInputPackTriangle> allBuildInputs;
+    allBuildInputs.reserve(ppResult.concretePrimRanges.size());
+
+    // Thankfully these are persistent, directly acquire from
+    // primitive group
+    Span<const Vector3> verts = this->pg.GetVertexPositionSpan();
+    Span<const Vector3ui> indices = this->pg.GetIndexSpan();
+    for(const auto& primRanges : ppResult.concretePrimRanges)
+        allBuildInputs.emplace_back(GenBuildInputsTriangle(verts, indices, primRanges));
+    // Fix the references
+    std::for_each(allBuildInputs.begin(), allBuildInputs.end(),
+    [](BuildInputPackTriangle& pack)
+    {
+        FixReferencesInInputs(pack);
+    });
+
+    return MultiBuildGeneric_CLT(ppResult, allBuildInputs, queue);
+}
+
+template<PrimitiveGroupC PG>
+std::vector<OptixTraversableHandle>
+AcceleratorGroupOptiX<PG>::MultiBuildAABB_CLT(const PreprocessResult& ppResult,
+                                              const GPUQueue& queue)
+{
+    uint32_t totalLeafCount = this->concreteLeafRanges.back()[1];
+    uint32_t processedAccelCount = static_cast<uint32_t>(this->concreteLeafRanges.size());
+
+    std::vector<uint32_t> hConcereteLeafOffsets;
+    hConcereteLeafOffsets.reserve(processedAccelCount + 1);
+    hConcereteLeafOffsets.push_back(0);
+    for(const auto& leafRange : this->concreteLeafRanges)
+        hConcereteLeafOffsets.push_back(leafRange[1]);
+
+    // Create the AABBs of all leafs
+    Span<AABB3> dLeafAABBs;
+    Span<PrimitiveKey> dTempLeafs;
+    Span<PrimRangeArray> dConcretePrimRanges;
+    Span<Vector2ui> dConcreteLeafRanges;
+    Span<uint32_t> dConcreteLeafOffsets;
+    size_t total = MemAlloc::RequiredAllocation<5>
+    ({
+        totalLeafCount * sizeof(AABB3),
+        totalLeafCount * sizeof(PrimitiveKey),
+        this->concreteLeafRanges.size() * sizeof(PrimRangeArray),
+        ppResult.concretePrimRanges.size() * sizeof(Vector2ui),
+        (processedAccelCount + 1) * sizeof(uint32_t)
+     });
+
+    DeviceMemory tempMem({queue.Device()}, total, total << 1);
+    MemAlloc::AllocateMultiData(std::tie(dLeafAABBs, dTempLeafs,
+                                         dConcretePrimRanges, dConcreteLeafRanges,
+                                         dConcreteLeafOffsets),
+                                tempMem,
+                                {totalLeafCount, totalLeafCount,
+                                 this->concreteLeafRanges.size(),
+                                 ppResult.concretePrimRanges.size(),
+                                 (processedAccelCount + 1)});
+    // Copy range buffer for batched processing
+    auto hConcreteLeafRanges = Span<const Vector2ui>(this->concreteLeafRanges);
+    auto hConcretePrimRanges = Span<const PrimRangeArray>(ppResult.concretePrimRanges);
+    auto hConcreteLeafOffsetSpan = Span<const uint32_t>(hConcereteLeafOffsets);
+    queue.MemcpyAsync(dConcreteLeafRanges, hConcreteLeafRanges);
+    queue.MemcpyAsync(dConcretePrimRanges, hConcretePrimRanges);
+    queue.MemcpyAsync(dConcreteLeafOffsets, hConcreteLeafOffsetSpan);
+
+    // Dedicate a block for each
+    // concrete accelerator for copy
+    uint32_t blockCount = queue.RecommendedBlockCountDevice(KCGeneratePrimitiveKeys,
+                                                            StaticThreadPerBlock1D(),
+                                                            0);
+    using namespace std::string_view_literals;
+    queue.IssueExactKernel<KCGeneratePrimitiveKeys>
+    (
+        "KCGeneratePrimitiveKeys-Temp"sv,
+        KernelExactIssueParams
+        {
+            .gridSize = blockCount,
+            .blockSize = StaticThreadPerBlock1D()
+        },
+        // Output
+        dTempLeafs,
+        // Input
+        dConcretePrimRanges,
+        dConcreteLeafRanges,
+        // Constant
+        this->pg.GroupId()
+    );
+    static constexpr auto AABBGenKernelName = KCGeneratePrimAABBs<AcceleratorGroupOptiX<PG>>;
+    blockCount = queue.RecommendedBlockCountDevice(AABBGenKernelName,
+                                                   StaticThreadPerBlock1D(),
+                                                   0);
+    static constexpr uint32_t BLOCK_PER_INSTANCE = 16;
+    queue.IssueExactKernel<AABBGenKernelName>
+    (
+        "KCGeneratePrimAABBs",
+        KernelExactIssueParams
+        {
+            .gridSize = blockCount,
+            .blockSize = StaticThreadPerBlock1D()
+        },
+        // Output
+        dLeafAABBs,
+        // Inputs
+        ToConstSpan(dConcreteLeafOffsets),
+        Span<const TransformKey>(),
+        ToConstSpan(dTempLeafs),
+        // Constants
+        BLOCK_PER_INSTANCE,
+        processedAccelCount,
+        typename TransformGroupIdentity::DataSoA{},
+        this->pg.SoA()
+    );
+    // AABBs are generated, gen build inputs
+
+    // Do the build inputs
+    std::vector<BuildInputPackAABB> allBuildInputs;
+    allBuildInputs.reserve(ppResult.concretePrimRanges.size());
+
+    // Thankfully these are persistent, directly acquire from
+    // primitive group
+    for(const auto& primRanges : ppResult.concretePrimRanges)
+        allBuildInputs.emplace_back(GenBuildInputsAABB(dLeafAABBs, primRanges));
+    // Fix the references
+    std::for_each(allBuildInputs.begin(), allBuildInputs.end(),
+                  [](BuildInputPackAABB& pack)
+    {
+        FixReferencesInInputs(pack);
+    });
+
+    auto result = MultiBuildGeneric_CLT(ppResult, allBuildInputs, queue);
+    queue.Barrier().Wait();
+    return result;
+}
+
+
+template<PrimitiveGroupC PG>
+std::vector<OptixTraversableHandle>
+AcceleratorGroupOptiX<PG>::MultiBuildViaTriangle_PPT(const PreprocessResult&,
+                                                     const GPUQueue&)
+{
+    throw MRayError("NotImplemented!");
+}
+
+template<PrimitiveGroupC PG>
+std::vector<OptixTraversableHandle>
+AcceleratorGroupOptiX<PG>::MultiBuildViaAABB_PPT(const PreprocessResult&,
                                                  const GPUQueue&)
-{
-    throw MRayError("NotImplemented!");
-}
-
-template<PrimitiveGroupC PG>
-std::vector<OptixTraversableHandle>
-AcceleratorGroupOptiX<PG>::MultiBuildGenericCLT(const PreprocessResult&,
-                                                const GPUQueue&)
-{
-    throw MRayError("NotImplemented!");
-}
-
-template<PrimitiveGroupC PG>
-std::vector<OptixTraversableHandle>
-AcceleratorGroupOptiX<PG>::MultiBuildGenericPPT(const PreprocessResult&,
-                                                const GPUQueue&)
 {
     throw MRayError("NotImplemented!");
 }
@@ -407,19 +526,20 @@ void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
     std::vector<OptixTraversableHandle> hConcereteAccelHandles;
     if constexpr(IsTriangle && !PER_PRIM_TRANSFORM)
     {
-        hConcereteAccelHandles = MultiBuildTriangleCLT(ppResult, queue);
+        hConcereteAccelHandles = MultiBuildTriangle_CLT(ppResult, queue);
+    }
+    else if constexpr(!IsTriangle && !PER_PRIM_TRANSFORM)
+    {
+        hConcereteAccelHandles = MultiBuildAABB_CLT(ppResult, queue);
     }
     else if constexpr(IsTriangle && PER_PRIM_TRANSFORM)
     {
-        hConcereteAccelHandles = MultiBuildTrianglePPT(ppResult, queue);
+        hConcereteAccelHandles = MultiBuildViaTriangle_PPT(ppResult, queue);
     }
+
     else if constexpr(!IsTriangle && !PER_PRIM_TRANSFORM)
     {
-        hConcereteAccelHandles = MultiBuildGenericCLT(ppResult, queue);
-    }
-    else if constexpr(!IsTriangle && !PER_PRIM_TRANSFORM)
-    {
-        hConcereteAccelHandles = MultiBuildGenericPPT(ppResult, queue);
+        hConcereteAccelHandles = MultiBuildViaAABB_PPT(ppResult, queue);
     }
     else static_assert(!IsTriangle && !PER_PRIM_TRANSFORM,
                        "Unknown params on OptiX build");
