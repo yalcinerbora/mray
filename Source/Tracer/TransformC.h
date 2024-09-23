@@ -15,6 +15,7 @@ concept TransformContextC = requires(const TContext& t,
                                      const AABB3& aabb,
                                      const Ray& r)
 {
+    {t.Scale()} -> std::same_as<Vector3>;
     {t.ApplyP(v)} -> std::same_as<Vector3>;
     {t.ApplyV(v)} -> std::same_as<Vector3>;
     {t.ApplyN(v)} -> std::same_as<Vector3>;
@@ -67,6 +68,7 @@ class TransformContextIdentity
                         TransformContextIdentity() = default;
     MRAY_HYBRID         TransformContextIdentity(const EmptyType&, TransformKey) {}
     //
+    MRAY_HYBRID Vector3 Scale() const;
     MRAY_HYBRID Vector3 ApplyP(const Vector3& point) const;
     MRAY_HYBRID Vector3 ApplyV(const Vector3& vec) const;
     MRAY_HYBRID Vector3 ApplyN(const Vector3& norm) const;
@@ -130,6 +132,12 @@ std::string_view GenericGroupTransform<C>::Name() const
 
 static_assert(TransformContextC<TransformContextIdentity>);
 static_assert(TransformGroupC<TransformGroupIdentity>);
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Vector3 TransformContextIdentity::Scale() const
+{
+    return Vector3(1);
+}
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 Vector3 TransformContextIdentity::ApplyP(const Vector3& point) const

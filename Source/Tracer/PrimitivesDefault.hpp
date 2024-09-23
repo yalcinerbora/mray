@@ -138,7 +138,7 @@ Optional<BasicSurface> Sphere<T>::SurfaceFromHit(const Hit& hit) const
     return BasicSurface
     {
         .position = position,
-        .normal = normal
+        .normal = geoNormal
     };
 }
 
@@ -200,17 +200,22 @@ void Sphere<T>::GenerateSurface(DefaultSurface& result,
                                 const Ray& ray,
                                 const RayDiff& differentials) const
 {
-    BasicSurface basicSurf;
-    GenerateSurface(basicSurf, hit, ray, differentials);
+    // Convert spherical hit to cartesian
+    Vector3 normal = Graphics::UnitSphericalToCartesian(hit);
+    Vector3 geoNormal = transformContext.get().ApplyN(normal).Normalize();
+    // Calculate local position using the normal
+    // then convert it to world position
+    Vector3 position = center + normal * radius;
+    position = transformContext.get().ApplyP(position);
 
     // Align this normal to Z axis to define tangent space rotation
-    Quaternion tbn = Quaternion::RotationBetweenZAxis(basicSurf.normal).Conjugate();
+    Quaternion tbn = Quaternion::RotationBetweenZAxis(normal.Normalize()).Conjugate();
 
     // Spheres are always two sided, check if we are inside
-    bool backSide = (basicSurf.normal.Dot(ray.Dir()) > Float(0));
+    bool backSide = (geoNormal.Dot(ray.Dir()) > Float(0));
     if(backSide)
     {
-        basicSurf.normal = -basicSurf.normal;
+        geoNormal = -geoNormal;
         // Change the tbn rotation so that Z is on opposite direction
         // TODO: here flipping Z would change the handedness of the
         // coordinate system
@@ -223,8 +228,8 @@ void Sphere<T>::GenerateSurface(DefaultSurface& result,
 
     result = DefaultSurface
     {
-        .position = basicSurf.position,
-        .geoNormal = basicSurf.normal,
+        .position = position,
+        .geoNormal = geoNormal,
         .shadingTBN = tbn,
         .uv = uv,
         .backSide = backSide

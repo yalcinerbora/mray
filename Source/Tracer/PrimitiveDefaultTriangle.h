@@ -133,6 +133,12 @@ namespace DefaultSkinnedTriangleDetail
                                 PrimitiveKey pId);
 
         MRAY_HYBRID MRAY_CGPU_INLINE
+        Vector3 Scale() const
+        {
+            return TransformGen::ExtractScale(transform);
+        }
+
+        MRAY_HYBRID MRAY_CGPU_INLINE
         Vector3 ApplyP(const Vector3& point) const
         {
             return Vector3(transform *  Vector4(point, 1));

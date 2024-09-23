@@ -231,7 +231,7 @@ template<PrimitiveC Prim, MaterialC Material,
          PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
 MRAY_HYBRID
 void SurfRDetail::WorkFunction(const Prim&, const Material&, const Surface& surf,
-                               const TContext&, RNGDispenser&,
+                               const TContext& tContext, RNGDispenser&,
                                const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params,
                                RayIndex rayIndex)
 {
@@ -251,6 +251,7 @@ void SurfRDetail::WorkFunction(const Prim&, const Material&, const Surface& surf
             else
             {
                 Vector3 normal = surf.shadingTBN.ApplyInvRotation(Vector3::ZAxis());
+                normal = tContext.ApplyN(normal).Normalize();
                 normal = (normal + Vector3(1)) * Vector3(0.5);
                 color = normal;
             }

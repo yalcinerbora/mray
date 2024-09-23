@@ -30,19 +30,20 @@ class TransformContextSingle
     Ref<const Matrix4x4>    invTransform;
 
     public:
-    MRAY_HYBRID             TransformContextSingle(const typename TransformDetail::SingleTransformSoA&,
+    MRAY_HYBRID         TransformContextSingle(const typename TransformDetail::SingleTransformSoA&,
                                                    TransformKey tId);
 
-    MRAY_HYBRID Vector3     ApplyP(const Vector3& point) const;
-    MRAY_HYBRID Vector3     ApplyV(const Vector3& vec) const;
-    MRAY_HYBRID Vector3     ApplyN(const Vector3& normal) const;
-    MRAY_HYBRID AABB3       Apply(const AABB3&) const;
-    MRAY_HYBRID Ray         Apply(const Ray&) const;
-    MRAY_HYBRID Vector3     InvApplyP(const Vector3& point) const;
-    MRAY_HYBRID Vector3     InvApplyV(const Vector3& vec) const;
-    MRAY_HYBRID Vector3     InvApplyN(const Vector3& normal) const;
-    MRAY_HYBRID AABB3       InvApply(const AABB3&) const;
-    MRAY_HYBRID Ray         InvApply(const Ray&) const;
+    MRAY_HYBRID Vector3 Scale() const;
+    MRAY_HYBRID Vector3 ApplyP(const Vector3& point) const;
+    MRAY_HYBRID Vector3 ApplyV(const Vector3& vec) const;
+    MRAY_HYBRID Vector3 ApplyN(const Vector3& normal) const;
+    MRAY_HYBRID AABB3   Apply(const AABB3&) const;
+    MRAY_HYBRID Ray     Apply(const Ray&) const;
+    MRAY_HYBRID Vector3 InvApplyP(const Vector3& point) const;
+    MRAY_HYBRID Vector3 InvApplyV(const Vector3& vec) const;
+    MRAY_HYBRID Vector3 InvApplyN(const Vector3& normal) const;
+    MRAY_HYBRID AABB3   InvApply(const AABB3&) const;
+    MRAY_HYBRID Ray     InvApply(const Ray&) const;
 };
 
 class TransformGroupSingle final : public GenericGroupTransform<TransformGroupSingle>

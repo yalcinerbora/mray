@@ -8,6 +8,12 @@ TransformContextSingle::TransformContextSingle(const typename TransformDetail::S
 {}
 
 MRAY_HYBRID MRAY_CGPU_INLINE
+Vector3 TransformContextSingle::Scale() const
+{
+    return TransformGen::ExtractScale(transform.get());
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
 Vector3 TransformContextSingle::ApplyP(const Vector3& point) const
 {
     return Vector3(transform.get() * Vector4(point, 1));
