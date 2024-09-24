@@ -593,10 +593,11 @@ void AcceleratorWork<AG, TG>::GetCommonTransforms(Span<Matrix4x4> dTransforms,
                                                   Span<const TransformKey> dTransformKeys,
                                                   const GPUQueue& queue) const
 {
+    static const std::string KernelName = "KCGetCommonTransforms-" + std::string(TG::TypeName());
     uint32_t transformCount = static_cast<uint32_t>(dTransformKeys.size());
     queue.IssueSaturatingKernel<KCGetCommonTransforms<TG>>
     (
-        "KCGetCommonTransforms",
+        KernelName,
         KernelIssueParams { .workCount = transformCount },
         // Output
         dTransforms,

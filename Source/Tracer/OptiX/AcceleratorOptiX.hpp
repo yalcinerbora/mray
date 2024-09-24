@@ -498,7 +498,6 @@ AcceleratorGroupOptiX<PG>::MultiBuildAABB_CLT(const PreprocessResult& ppResult,
     return result;
 }
 
-
 template<PrimitiveGroupC PG>
 std::vector<OptixTraversableHandle>
 AcceleratorGroupOptiX<PG>::MultiBuildViaTriangle_PPT(const PreprocessResult&,
