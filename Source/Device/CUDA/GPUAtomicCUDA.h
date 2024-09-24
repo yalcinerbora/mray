@@ -25,6 +25,18 @@ namespace mray::cuda::atomic
 {
     template<class T>
     MRAY_GPU T AtomicAdd(T& t, T v);
+
+    template<class T>
+    requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
+    MRAY_GPU T AtomicAnd(T& t, T v);
+
+    template<class T>
+    requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
+    MRAY_GPU T AtomicOr(T& t, T v);
+
+    template<class T>
+    requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
+    MRAY_GPU T AtomicXor(T& t, T v);
 }
 
 // A dirty fix to host side to not whine about
@@ -151,5 +163,30 @@ T AtomicAdd(T& t, T v)
     return atomicAdd(&t, v);
 }
 
+template<class T>
+requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
+MRAY_GPU MRAY_GPU_INLINE
+T AtomicAnd(T& t, T v)
+{
+    return atomicAnd(&t, v);
 }
+
+template<class T>
+requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
+MRAY_GPU MRAY_GPU_INLINE
+T AtomicOr(T& t, T v)
+{
+    return atomicOr(&t, v);
+}
+
+template<class T>
+requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
+MRAY_GPU MRAY_GPU_INLINE
+T AtomicXor(T& t, T v)
+{
+    return atomicXor(&t, v);
+}
+
+}
+
 #endif

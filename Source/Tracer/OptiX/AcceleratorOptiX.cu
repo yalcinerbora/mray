@@ -643,6 +643,7 @@ void BaseAcceleratorOptiX::CastRays(// Output
 
     // TODO: Currently only works for single GPU
     assert(gpuSystem.AllGPUs().size() == 1);
+    assert(dRayIndices.size() != 0);
 
     // This code is not generic, so we go in and take the stuff
     // from device interface specific stuff
@@ -657,7 +658,11 @@ void BaseAcceleratorOptiX::CastRays(// Output
         .dHits              = dHitParams,
         .dRNGStates         = dRNGStates,
         .dRays              = dRays,
-        .dRayIndices        = dRayIndices
+        .dRayIndices        = dRayIndices,
+        //
+        .doVisibility       = false,
+        .dIsVisibleBuffer   = Bitspan<uint32_t>(),
+        .dRaysConst         = Span<const RayGMem>()
     };
     queue.MemcpyAsync(dLaunchArgPack, Span<const ArgumentPackOpitX>(&argPack, 1));
     CUdeviceptr argsPtr = std::bit_cast<CUdeviceptr>(dLaunchArgPack.data());
@@ -669,16 +674,49 @@ void BaseAcceleratorOptiX::CastRays(// Output
     OPTIX_LAUNCH_CHECK();
 }
 
-void BaseAcceleratorOptiX::CastShadowRays(// Output
-                                          Bitspan<uint32_t> dIsVisibleBuffer,
-                                          Bitspan<uint32_t> dFoundMediumInterface,
-                                          // I-O
-                                          Span<BackupRNGState> dRNGStates,
-                                          // Input
-                                          Span<const RayIndex> dRayIndices,
-                                          Span<const RayGMem> dShadowRays,
-                                          const GPUQueue& queue)
-{}
+void BaseAcceleratorOptiX::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffer,
+                                              // I-O
+                                              Span<BackupRNGState> dRNGStates,
+                                              // Input
+                                              Span<const RayGMem> dRays,
+                                              Span<const RayIndex> dRayIndices,
+                                              const GPUQueue& queue)
+{
+    using namespace std::string_view_literals;
+    const auto annotation = gpuSystem.CreateAnnotation("Visibilty Casting"sv);
+    const auto _ = annotation.AnnotateScope();
+
+    // TODO: Currently only works for single GPU
+    assert(gpuSystem.AllGPUs().size() == 1);
+    assert(dRayIndices.size() != 0);
+    // This code is not generic, so we go in and take the stuff
+    // from device interface specific stuff
+    using mray::cuda::ToHandleCUDA;
+    const ComputeCapabilityTypePackOptiX& deviceTypes = optixTypesPerCC[currentCCIndex];
+
+    // Copy args
+    ArgumentPackOpitX argPack =
+    {
+        .baseAccelerator    = baseAccelerator,
+        .dHitKeys           = Span<HitKeyPack>(),
+        .dHits              = Span<MetaHit>(),
+        .dRNGStates         = dRNGStates,
+        .dRays              = Span<RayGMem>(),
+        .dRayIndices        = dRayIndices,
+        //
+        .doVisibility       = true,
+        .dIsVisibleBuffer   = dIsVisibleBuffer,
+        .dRaysConst         = dRays
+    };
+    queue.MemcpyAsync(dLaunchArgPack, Span<const ArgumentPackOpitX>(&argPack, 1));
+    CUdeviceptr argsPtr = std::bit_cast<CUdeviceptr>(dLaunchArgPack.data());
+
+    // Launch!
+    OPTIX_CHECK(optixLaunch(deviceTypes.pipeline, ToHandleCUDA(queue), argsPtr,
+                            dLaunchArgPack.size_bytes(), &commonSBT,
+                            static_cast<uint32_t>(dRayIndices.size()), 1u, 1u));
+    OPTIX_LAUNCH_CHECK();
+}
 
 void BaseAcceleratorOptiX::CastLocalRays(// Output
                                          Span<HitKeyPack> dHitIds,

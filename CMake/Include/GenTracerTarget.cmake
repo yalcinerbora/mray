@@ -106,6 +106,7 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/Distributions.cu)
 
     set(SRC_UTILITY
+        ${CURRENT_SOURCE_DIR}/Bitspan.h
         ${CURRENT_SOURCE_DIR}/RayPartitioner.h
         ${CURRENT_SOURCE_DIR}/RayPartitioner.cu
         ${CURRENT_SOURCE_DIR}/ParamVaryingData.h

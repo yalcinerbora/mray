@@ -72,7 +72,7 @@ void KCGenRandomNumbersPCG32Indirect(// Output
         for(uint32_t n = 0; n < dimPerGenerator; n++)
         {
             // Write in strided fashion to coalesce mem
-            dNumbers[i + dimPerGenerator * n] = rng.Next();
+            dNumbers[i + generatorCount * n] = rng.Next();
         }
         // Write the modified state
         dStates[i] = state;
@@ -150,9 +150,13 @@ void RNGGroupIndependent::SetupRange(Vector2ui range)
 void RNGGroupIndependent::GenerateNumbers(// Output
                                           Span<RandomNumber> dNumbersOut,
                                           // Constants
-                                          uint32_t dimensionCount,
+                                          Vector2ui dimensionRange,
                                           const GPUQueue& queue)
 {
+    // Independent RNG do not have a notion of dimensions (or has a single
+    // dimension)
+    // so we disregard range, and give single random numbers
+    uint32_t dimensionCount = dimensionRange[1] - dimensionRange[0];
     uint32_t localGenCount = currentRange[1] - currentRange[0];
     using namespace std::string_view_literals;
     queue.IssueSaturatingKernel<KCGenRandomNumbersPCG32>
@@ -171,9 +175,13 @@ void RNGGroupIndependent::GenerateNumbersIndirect(// Output
                                                   // Input
                                                   Span<const RayIndex> dIndices,
                                                   // Constants
-                                                  uint32_t dimensionCount,
+                                                  Vector2ui dimensionRange,
                                                   const GPUQueue& queue)
 {
+    // Independent RNG do not have a notion of dimensions (or has a single
+    // dimension)
+    // so we disregard range, and give single random numbers
+    uint32_t dimensionCount = dimensionRange[1] - dimensionRange[0];
     uint32_t localGenCount = currentRange[1] - currentRange[0];
     using namespace std::string_view_literals;
     queue.IssueSaturatingKernel<KCGenRandomNumbersPCG32Indirect>

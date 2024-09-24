@@ -122,14 +122,6 @@ struct RNGDispenserT
 using RandomNumber = uint32_t;
 using RNGDispenser = RNGDispenserT<RandomNumber>;
 
-//template<class RNG>
-//concept RNGeneratorC = requires()
-//{
-//    typename RNG::State;
-//    typename RNG::GlobalState;
-//    { RNG::GenerateState(uint32_t{}) } -> std::same_as<typename RNG::State>;
-//};
-
 // PCG with 32bit state
 // https://www.pcg-random.org
 // This RNG predominantly be used as a "backup" generator,
@@ -193,15 +185,15 @@ class RNGeneratorGroupI
     virtual void    GenerateNumbers(// Output
                                     Span<RandomNumber> dNumbersOut,
                                     // Constants
-                                    uint32_t dimensionCount,
+                                    Vector2ui dimensionRange,
                                     const GPUQueue& queue) = 0;
     virtual void    GenerateNumbersIndirect(// Output
-                                    Span<RandomNumber> dNumbersOut,
-                                    // Input
-                                    Span<const RayIndex> dIndices,
-                                    // Constants
-                                    uint32_t dimensionCount,
-                                    const GPUQueue& queue) = 0;
+                                            Span<RandomNumber> dNumbersOut,
+                                            // Input
+                                            Span<const RayIndex> dIndices,
+                                            // Constants
+                                            Vector2ui dimensionRange,
+                                            const GPUQueue& queue) = 0;
 
     virtual Span<BackupRNGState> GetBackupStates() = 0;
     virtual size_t UsedGPUMemory() const = 0;
@@ -247,14 +239,14 @@ class RNGGroupIndependent : public RNGeneratorGroupI
     void    GenerateNumbers(// Output
                             Span<RandomNumber> dNumbersOut,
                             // Constants
-                            uint32_t dimensionCount,
+                            Vector2ui dimensionRange,
                             const GPUQueue& queue) override;
     void    GenerateNumbersIndirect(// Output
                                     Span<RandomNumber> numbersOut,
                                     // Input
                                     Span<const RayIndex> dIndices,
                                     // Constants
-                                    uint32_t dimensionCount,
+                                    Vector2ui dimensionRange,
                                     const GPUQueue& queue) override;
 
     Span<BackupRNGState> GetBackupStates() override;

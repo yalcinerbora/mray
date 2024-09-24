@@ -363,7 +363,6 @@ std::vector<OptixTraversableHandle>
 AcceleratorGroupOptiX<PG>::MultiBuildTriangle_CLT(const PreprocessResult& ppResult,
                                                   const GPUQueue& queue)
 {
-    size_t totalLeafCount = this->concreteLeafRanges.back()[1];
     // Do the build inputs
     std::vector<BuildInputPackTriangle> allBuildInputs;
     allBuildInputs.reserve(ppResult.concretePrimRanges.size());
@@ -764,7 +763,23 @@ void AcceleratorGroupOptiX<PG>::CastLocalRays(// Output
                                               uint32_t workId,
                                               const GPUQueue& queue)
 {
+    throw MRayError("not implemented!");
+}
 
+template<PrimitiveGroupC PG>
+void AcceleratorGroupOptiX<PG>::CastVisibilityRays(// Output
+                                                   Bitspan<uint32_t>,
+                                                   // I-O
+                                                   Span<BackupRNGState>,
+                                                   // Input
+                                                   Span<const RayGMem>,
+                                                   Span<const RayIndex>,
+                                                   Span<const CommonKey>,
+                                                   // Constants
+                                                   uint32_t,
+                                                   const GPUQueue&)
+{
+    throw MRayError("For OptiX, this function should not be called");
 }
 
 template<PrimitiveGroupC PG>

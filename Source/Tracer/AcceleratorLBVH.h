@@ -225,6 +225,19 @@ class AcceleratorGroupLBVH final : public AcceleratorGroupT<AcceleratorGroupLBVH
                           uint32_t workId,
                           const GPUQueue& queue) override;
 
+    void    CastVisibilityRays(// Output
+                               Bitspan<uint32_t> dIsVisibleBuffer,
+                               // I-O
+                               Span<BackupRNGState> dRNGStates,
+                               // Input
+                               Span<const RayGMem> dRays,
+                               Span<const RayIndex> dRayIndices,
+                               Span<const CommonKey> dAccelKeys,
+                               // Constants
+                               uint32_t workId,
+                               const GPUQueue& queue) override;
+
+
     DataSoA SoA() const;
     size_t  GPUMemoryUsage() const override;
 };
@@ -272,15 +285,14 @@ class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
                      Span<const RayIndex> dRayIndices,
                      const GPUQueue& queue) override;
 
-    void    CastShadowRays(// Output
-                           Bitspan<uint32_t> dIsVisibleBuffer,
-                           Bitspan<uint32_t> dFoundMediumInterface,
-                           // I-O
-                           Span<BackupRNGState> dRNGStates,
-                           // Input
-                           Span<const RayIndex> dRayIndices,
-                           Span<const RayGMem> dShadowRays,
-                           const GPUQueue& queue) override;
+    void    CastVisibilityRays(// Output
+                               Bitspan<uint32_t> dIsVisibleBuffer,
+                               // I-O
+                               Span<BackupRNGState> dRNGStates,
+                               // Input
+                               Span<const RayGMem> dRays,
+                               Span<const RayIndex> dRayIndices,
+                               const GPUQueue& queue) override;
 
     void    CastLocalRays(// Output
                           Span<HitKeyPack> dHitIds,

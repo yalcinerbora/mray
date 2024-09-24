@@ -709,18 +709,20 @@ void BaseAcceleratorLBVH::CastRays(// Output
     const auto _ = annotation.AnnotateScope();
 
     assert(maxPartitionCount != 0);
+    assert(dRayIndices.size() != 0);
+    uint32_t allRayCount = static_cast<uint32_t>(dRays.size());
+    uint32_t currentRayCount = static_cast<uint32_t>(dRayIndices.size());
+    uint32_t partitionCount = static_cast<uint32_t>(maxPartitionCount);
     // Root node is node index 0, so we are lucky we can memset
-    queue.MemsetAsync(dPrevNodeIndices, 0x00);
+    queue.MemsetAsync(dPrevNodeIndices.subspan(0, allRayCount), 0x00);
     // For bit stack however we need to set it old fashioned way)
     queue.IssueSaturatingKernel<KCInitializeBitStack>
     (
         "KCInitBitStack",
-        KernelIssueParams{.workCount = static_cast<uint32_t>(dBitStacks.size())},
+        KernelIssueParams{.workCount = allRayCount},
         dBitStacks
     );
     // Initialize the ray partitioner
-    uint32_t currentRayCount = static_cast<uint32_t>(dRays.size());
-    uint32_t partitionCount = static_cast<uint32_t>(maxPartitionCount);
     auto [dCurrentIndices, dCurrentKeys] = rayPartitioner.Start(currentRayCount, partitionCount);
     // Copy the ray indices to the local buffer, normally we could utilize
     // global ray partitioner (if available) but
@@ -734,7 +736,7 @@ void BaseAcceleratorLBVH::CastRays(// Output
         queue.IssueSaturatingKernel<KCIntersectBaseLBVH>
         (
             "(A)LBVHRayCast"sv,
-            KernelIssueParams{.workCount = static_cast<uint32_t>(dRayIndices.size())},
+            KernelIssueParams{.workCount = currentRayCount},
             // Output
             dCurrentKeys,
             // I-O
@@ -807,8 +809,8 @@ void BaseAcceleratorLBVH::CastRays(// Output
                                           dHitParams,
                                           // I-O
                                           dRNGStates,
-                                          //
                                           dRays,
+                                          // Input
                                           dLocalIndices,
                                           dLocalKeys,
                                           //
@@ -819,17 +821,137 @@ void BaseAcceleratorLBVH::CastRays(// Output
     }
 }
 
-void BaseAcceleratorLBVH::CastShadowRays(// Output
-                                         Bitspan<uint32_t> dIsVisibleBuffer,
-                                         Bitspan<uint32_t> dFoundMediumInterface,
-                                         // I-O
-                                         Span<BackupRNGState> dRNGStates,
-                                         // Input
-                                         Span<const RayIndex> dRayIndices,
-                                         Span<const RayGMem> dShadowRays,
-                                         const GPUQueue& queue)
+void BaseAcceleratorLBVH::CastVisibilityRays(// Output
+                                             Bitspan<uint32_t> dIsVisibleBuffer,
+                                             // I-O
+                                             Span<BackupRNGState> dRNGStates,
+                                             // Input
+                                             Span<const RayGMem> dRays,
+                                             Span<const RayIndex> dRayIndices,
+                                             const GPUQueue& queue)
 {
+    using namespace std::string_view_literals;
+    const auto annotation = gpuSystem.CreateAnnotation("Visibility Casting"sv);
+    const auto _ = annotation.AnnotateScope();
 
+    assert(maxPartitionCount != 0);
+    assert(dRayIndices.size() != 0);
+    uint32_t allRayCount = static_cast<uint32_t>(dRays.size());
+    uint32_t currentRayCount = static_cast<uint32_t>(dRayIndices.size());
+    uint32_t partitionCount = static_cast<uint32_t>(maxPartitionCount);
+    // Root node is node index 0, so we are lucky we can memset
+    queue.MemsetAsync(dPrevNodeIndices.subspan(0, allRayCount), 0x00);
+    // Assume visible, cull if hits anything
+    queue.IssueSaturatingKernel<KCSetIsVisibleIndirect>
+    (
+        "KCSetIsVisibleIndirect"sv,
+        KernelIssueParams{.workCount = currentRayCount},
+        dIsVisibleBuffer,
+        dRayIndices
+    );
+
+    // For bit stack however we need to set it old fashioned way)
+    queue.IssueSaturatingKernel<KCInitializeBitStack>
+    (
+        "KCInitBitStack",
+        KernelIssueParams{.workCount = allRayCount},
+        dBitStacks
+    );
+    // Initialize the ray partitioner
+    auto [dCurrentIndices, dCurrentKeys] = rayPartitioner.Start(currentRayCount, partitionCount);
+    // Copy the ray indices to the local buffer, normally we could utilize
+    // global ray partitioner (if available) but
+    // - Not all renderers (very simple ones probably) may not have a partitioner
+    // - OptiX (or equavilent on other hardwares hopefully in the future) already
+    //   does two-level acceleration in hardware, so we dont need to do this
+    queue.MemcpyAsync(dCurrentIndices, dRayIndices);
+    // Continiously do traverse/partition until all rays are missed
+    while(currentRayCount != 0)
+    {
+        queue.IssueSaturatingKernel<KCIntersectBaseLBVH>
+        (
+            "(A)LBVHRayCast"sv,
+            KernelIssueParams{.workCount = currentRayCount},
+            // Output
+            dCurrentKeys,
+            // I-O
+            dBitStacks,
+            dPrevNodeIndices,
+            // Input
+            ToConstSpan(dRays),
+            ToConstSpan(dCurrentIndices),
+            // Constants
+            ToConstSpan(dLeafKeys),
+            ToConstSpan(dLeafAABBs),
+            ToConstSpan(dNodes),
+            ToConstSpan(dBoundingBoxes)
+        );
+        static constexpr CommonKey IdBits = AcceleratorKey::IdBits;
+        auto batchRange = Vector2ui(IdBits, IdBits + maxBitsUsedOnKey[0]);
+        auto idRange = Vector2ui(0, maxBitsUsedOnKey[1]);
+        auto
+        [
+            hPartitionCount,
+            //
+            isHostVisible,
+            hPartitionOffsets,
+            hKeys,
+            //
+            dIndices,
+            dKeys
+        ] = rayPartitioner.MultiPartition(dCurrentKeys,
+                                          dCurrentIndices,
+                                          idRange,
+                                          batchRange,
+                                          queue, false);
+        dCurrentIndices = dIndices;
+        dCurrentKeys = dKeys;
+
+        assert(isHostVisible == true);
+        queue.Barrier().Wait();
+        for(uint32_t pIndex = 0; pIndex < hPartitionCount[0]; pIndex++)
+        {
+            AcceleratorKey key(hKeys[pIndex]);
+            // This means we could not find the next second-level
+            // acceleration structure, meaning these rays are are finished traversing
+            if(key == AcceleratorKey::InvalidKey())
+            {
+                // This should be the last item due to invalid key being INT_MAX
+                assert(pIndex == hPartitionCount[0] - 1);
+                currentRayCount = hPartitionOffsets[pIndex];
+                dCurrentKeys = dCurrentKeys.subspan(0, currentRayCount);
+                dCurrentIndices = dCurrentIndices.subspan(0, currentRayCount);
+            }
+            else
+            {
+                // Normal work, find the accel group issue the kernel
+                uint32_t partitionStart = hPartitionOffsets[pIndex];
+                uint32_t localSize = hPartitionOffsets[pIndex + 1] - partitionStart;
+
+                Span<const RayIndex> dLocalIndices = ToConstSpan(dCurrentIndices.subspan(partitionStart,
+                                                                                         localSize));
+                Span<const CommonKey> dLocalKeys = ToConstSpan(dCurrentKeys.subspan(partitionStart,
+                                                                                    localSize));
+                auto accelGroupOpt = accelInstances.at(key.FetchBatchPortion());
+                if(!accelGroupOpt)
+                {
+                    throw MRayError("BaseAccelerator: Unknown accelerator key {}", HexKeyT(key));
+                }
+                AcceleratorGroupI* accelGroup = accelGroupOpt.value().get();
+                accelGroup->CastVisibilityRays(// Output
+                                               dIsVisibleBuffer,
+                                               // I-O
+                                               dRNGStates,
+                                               dRays,
+                                               // Input
+                                               dLocalIndices,
+                                               dLocalKeys,
+                                               //
+                                               key.FetchBatchPortion(),
+                                               queue);
+            }
+        }
+    }
 }
 
 void BaseAcceleratorLBVH::CastLocalRays(// Output

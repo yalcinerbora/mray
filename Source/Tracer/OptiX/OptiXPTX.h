@@ -19,6 +19,10 @@ struct ArgumentPackOpitX
 	Span<RayGMem>           dRays;
 	// Inputs
 	Span<const RayIndex>    dRayIndices;
+	// Visibility ray casting related
+	bool					doVisibility;
+	Bitspan<uint32_t>		dIsVisibleBuffer;
+	Span<const RayGMem>		dRaysConst;
 };
 
 // Hit records (as far as I understand) can be defined multiple times

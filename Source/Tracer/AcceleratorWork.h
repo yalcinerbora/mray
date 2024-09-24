@@ -257,6 +257,59 @@ static void KCLocalRayCast(// Output
     }
 };
 
+template<AccelGroupC AG, TransformGroupC TG,
+         auto GenerateTransformContext = MRAY_ACCEL_TGEN_FUNCTION(AG, TG)>
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+static void KCVisibilityRayCast(// Output
+                                MRAY_GRID_CONSTANT const Bitspan<uint32_t> dIsVisibleBuffer,
+                                // I-O
+                                MRAY_GRID_CONSTANT const Span<BackupRNGState> dRNGStates,
+                                // Input
+                                MRAY_GRID_CONSTANT const Span<const RayGMem> dRays,
+                                MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices,
+                                MRAY_GRID_CONSTANT const Span<const CommonKey> dAcceleratorKeys,
+                                // Constant
+                                MRAY_GRID_CONSTANT const typename TG::DataSoA tSoA,
+                                MRAY_GRID_CONSTANT const typename AG::DataSoA aSoA,
+                                MRAY_GRID_CONSTANT const typename AG::PrimitiveGroup::DataSoA pSoA)
+{
+    using PG = typename AG::PrimitiveGroup;
+    using Accelerator = typename AG:: template Accelerator<TG>;
+    KernelCallParams kp;
+
+    uint32_t workCount = static_cast<uint32_t>(dRayIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < workCount; i += kp.TotalSize())
+    {
+        RayIndex index = dRayIndices[i];
+        auto [ray, tMM] = RayFromGMem(dRays, index);
+
+        BackupRNG rng(dRNGStates[index]);
+
+        // Get ids
+        AcceleratorKey aId(dAcceleratorKeys[i]);
+        // Construct the accelerator view
+        Accelerator acc(tSoA, pSoA, aSoA, aId);
+
+        // Do work depending on the prim transorm logic
+        using enum PrimTransformType;
+        if constexpr(PG::TransformLogic == LOCALLY_CONSTANT_TRANSFORM)
+        {
+            // Transform is local
+            // we can transform the ray and use it on iterations.
+            // Since this prim "supports locally constant transforms"
+            // Prim key does mean nothing, so set it to invalid and call the generator
+            using TransContext = typename AccTransformContextType<AG, TG>::Result;
+            TransContext tContext = GenerateTransformContext(tSoA, pSoA, acc.GetTransformKey(),
+                                                             PrimitiveKey::InvalidKey());
+            ray = tContext.InvApply(ray);
+        }
+
+        // Actual ray cast!
+        OptionalHitR<PG> hitOpt = acc.FirstHit(rng, ray, tMM);
+        if(hitOpt) dIsVisibleBuffer.SetBitParallel(index, false);
+    }
+};
+
 class AcceleratorWorkI
 {
     public:
@@ -273,6 +326,17 @@ class AcceleratorWorkI
                                   Span<const CommonKey> dAccelIdPacks,
                                   // Constants
                                   const GPUQueue& queue) const = 0;
+
+    virtual void    CastVisibilityRays(// Output
+                                       Bitspan<uint32_t> dIsVisibleBuffer,
+                                       // I-O
+                                       Span<BackupRNGState> dRNGStates,
+                                       // Input
+                                       Span<const RayGMem> dRays,
+                                       Span<const RayIndex> dRayIndices,
+                                       Span<const CommonKey> dAcceleratorKeys,
+                                       // Constants
+                                       const GPUQueue& queue) const = 0;
 
     virtual void    GeneratePrimitiveCenters(Span<Vector3> dAllPrimCenters,
                                              Span<const uint32_t> dLeafSegmentRanges,
@@ -334,6 +398,17 @@ class AcceleratorWork : public AcceleratorWorkI
                        Span<const CommonKey> dAcceleratorKeys,
                        // Constants
                        const GPUQueue& queue) const override;
+
+    void    CastVisibilityRays(// Output
+                               Bitspan<uint32_t> dIsVisibleBuffer,
+                               // I-O
+                               Span<BackupRNGState> dRNGStates,
+                               // Input
+                               Span<const RayGMem> dRays,
+                               Span<const RayIndex> dRayIndices,
+                               Span<const CommonKey> dAcceleratorKeys,
+                               // Constants
+                               const GPUQueue& queue) const override;
 
     void GeneratePrimitiveCenters(Span<Vector3> dAllPrimCenters,
                                   Span<const uint32_t> dLeafSegmentRanges,
@@ -400,6 +475,40 @@ void AcceleratorWork<AG, TG>::CastLocalRays(// Output
         //
         dHitIds,
         dHitParams,
+        dRNGStates,
+        dRays,
+        dRayIndices,
+        dAcceleratorKeys,
+        transGroup.SoA(),
+        accelGroup.SoA(),
+        primGroup.SoA()
+    );
+}
+
+template<AccelGroupC AG, TransformGroupC TG>
+void AcceleratorWork<AG, TG>::CastVisibilityRays(// Output
+                                                 Bitspan<uint32_t> dIsVisibleBuffer,
+                                                 // I-O
+                                                 Span<BackupRNGState> dRNGStates,
+                                                 // Input
+                                                 Span<const RayGMem> dRays,
+                                                 Span<const RayIndex> dRayIndices,
+                                                 Span<const CommonKey> dAcceleratorKeys,
+                                                 // Constants
+                                                 const GPUQueue& queue) const
+{
+    assert(dIsVisibleBuffer.Size() == dRNGStates.size());
+    assert(dRNGStates.size() == dRays.size());
+    //
+    assert(dRayIndices.size() == dAcceleratorKeys.size());
+
+    using namespace std::string_literals;
+    queue.IssueSaturatingKernel<KCVisibilityRayCast<AG, TG>>
+    (
+        "KCCastVisibilityRays-"s + std::string(TypeName()),
+        KernelIssueParams{.workCount = static_cast<uint32_t>(dRayIndices.size())},
+        //
+        dIsVisibleBuffer,
         dRNGStates,
         dRays,
         dRayIndices,

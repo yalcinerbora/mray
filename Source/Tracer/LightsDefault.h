@@ -6,6 +6,7 @@
 #include "Random.h"
 #include "Distributions.h"
 #include "LightC.h"
+#include "Bitspan.h"
 
 #include "Core/GraphicsFunctions.h"
 #include "Core/TypeNameGenerators.h"

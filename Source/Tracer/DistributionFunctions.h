@@ -27,6 +27,10 @@ namespace Distribution::Medium
 
 namespace Distribution::Common
 {
+    template<class T>
+    MRAY_HYBRID
+    T DivideByPDF(T, Float pdf);
+
     MRAY_HYBRID
     Pair<uint32_t, Float>   BisectSample1(Float xi, Float weight);
     MRAY_HYBRID
@@ -96,6 +100,20 @@ namespace Distribution::MIS
 
 namespace Distribution
 {
+template<class T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+T Common::DivideByPDF(T t, Float pdf)
+{
+    assert(pdf >= Float(0));
+    if(pdf == Float(0)) return T(0);
+
+    if constexpr(VectorC<T>)
+    {
+        Float pdfRecip = Float(1) / pdf;
+        return t * pdfRecip;
+    }
+    return t / pdf;
+}
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 Pair<uint32_t, Float> Common::BisectSample1(Float xi, Float)

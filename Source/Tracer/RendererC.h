@@ -281,6 +281,7 @@ class RenderWorkT : public RenderWorkI
 {
     public:
     virtual MRAY_RENDER_DO_WORK_DECL(0) = 0;
+    virtual MRAY_RENDER_DO_WORK_DECL(1) = 0;
 };
 
 template<class R>
@@ -288,6 +289,7 @@ class RenderLightWorkT : public RenderLightWorkI
 {
     public:
     virtual MRAY_RENDER_DO_LIGHT_WORK_DECL(0) = 0;
+    virtual MRAY_RENDER_DO_LIGHT_WORK_DECL(1) = 0;
 };
 
 template<class R>

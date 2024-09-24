@@ -291,10 +291,11 @@ OptionalHitR<PG> AcceleratorLBVH<PG, TG>::FirstHit(BackupRNG& rng,
         [&](Vector2& tMM, uint32_t leafIndex)
         {
             PrimitiveKey primKey = leafs[leafIndex];
-            result = IntersectionCheck<BitStack::MAX_DEPTH>(ray, tMM, rng.NextFloat(), primKey);
+            result = IntersectionCheck(ray, tMM, rng.NextFloat(), primKey);
             return result.has_value();
         }
     );
+    return result;
 }
 
 }
@@ -845,4 +846,37 @@ void AcceleratorGroupLBVH<PG>::CastLocalRays(// Output
                         dAccelKeys,
                         // Constants
                         queue);
+}
+
+template<PrimitiveGroupC PG>
+void AcceleratorGroupLBVH<PG>::CastVisibilityRays(// Output
+                                                  Bitspan<uint32_t> dIsVisibleBuffer,
+                                                  // I-O
+                                                  Span<BackupRNGState> dRNGStates,
+                                                  // Input
+                                                  Span<const RayGMem> dRays,
+                                                  Span<const RayIndex> dRayIndices,
+                                                  Span<const CommonKey> dAccelKeys,
+                                                  // Constants
+                                                  uint32_t workId,
+                                                  const GPUQueue& queue)
+{
+    uint32_t localWorkId = workId - this->globalWorkIdToLocalOffset;
+    const auto& workOpt = this->workInstances.at(localWorkId);
+
+    if(!workOpt)
+        throw MRayError("{:s}:{:d}: Unable to find work for {:d}",
+                        TypeName(), this->accelGroupId, workId);
+
+    const auto& work = workOpt.value().get();
+    work->CastVisibilityRays(// Output
+                             dIsVisibleBuffer,
+                             // I-O
+                             dRNGStates,
+                             //Input
+                             dRays,
+                             dRayIndices,
+                             dAccelKeys,
+                             // Constants
+                             queue);
 }

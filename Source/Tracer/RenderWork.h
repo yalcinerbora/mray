@@ -153,6 +153,7 @@ class RenderWork : public RenderWorkT<R>
                        const GPUSystem&);
     //
     MRAY_RENDER_DO_WORK_DEF(0)
+    MRAY_RENDER_DO_WORK_DEF(1)
 
     std::string_view Name() const override;
 };
@@ -192,6 +193,7 @@ class RenderLightWork : public RenderLightWorkT<R>
                             const GPUSystem&);
     //
     MRAY_RENDER_DO_LIGHT_WORK_DEF(0)
+    MRAY_RENDER_DO_LIGHT_WORK_DEF(1)
 
     std::string_view    Name() const override;
 };
@@ -406,20 +408,20 @@ RenderLightWork<R, L, T>::RenderLightWork(const GenericGroupLightT& l,
 template<RendererC R, LightGroupC LG, TransformGroupC TG>
 template<uint32_t I>
 void RenderLightWork<R, LG, TG>::DoBoundaryWorkInternal(// I-O
-                                                      const typename R::RayState& dRayStates,
-                                                      // Input
-                                                      // Contiguous
-                                                      Span<const RayIndex> dRayIndicesIn,
-                                                      Span<const uint32_t> dRandomNumbers,
-                                                      // Accessed by index
-                                                      Span<const RayDiff> dRayDiffsIn,
-                                                      Span<const RayGMem> dRaysIn,
-                                                      Span<const MetaHit> dHitsIn,
-                                                      Span<const HitKeyPack> dKeysIn,
-                                                      const typename R::RayPayload& dPayloadsIn,
-                                                      // Constants
-                                                      const typename R::GlobalState& globalState,
-                                                      const GPUQueue& queue) const
+                                                        const typename R::RayState& dRayStates,
+                                                        // Input
+                                                        // Contiguous
+                                                        Span<const RayIndex> dRayIndicesIn,
+                                                        Span<const uint32_t> dRandomNumbers,
+                                                        // Accessed by index
+                                                        Span<const RayDiff> dRayDiffsIn,
+                                                        Span<const RayGMem> dRaysIn,
+                                                        Span<const MetaHit> dHitsIn,
+                                                        Span<const HitKeyPack> dKeysIn,
+                                                        const typename R::RayPayload& dPayloadsIn,
+                                                        // Constants
+                                                        const typename R::GlobalState& globalState,
+                                                        const GPUQueue& queue) const
 {
     // Please check the kernel for details
     using PG    = typename LG::PrimGroup;

@@ -7,6 +7,75 @@
 #include "Device/GPUSystem.hpp"
 #include "Device/GPUAlgGeneric.h"
 
+#include "Device/GPUDebug.h"
+#include "TypeFormat.h"
+
+struct IsValidRayFunctor
+{
+    private:
+    MRAY_HYBRID MRAY_CGPU_INLINE
+    static bool AllNaN(const Vector3& v)
+    {
+        return (v[0] != v[0] &&
+                v[1] != v[1] &&
+                v[2] != v[2]);
+    }
+
+    Span<const RayGMem> dRays;
+
+    public:
+    MRAY_HOST inline
+    IsValidRayFunctor(Span<const RayGMem> dRaysIn)
+        : dRays(dRaysIn)
+    {}
+
+    MRAY_HYBRID MRAY_CGPU_INLINE
+    bool operator()(RayIndex i) const
+    {
+        RayGMem r = dRays[i];
+        return !(AllNaN(r.dir) && AllNaN(r.pos) &&
+                 r.tMin == std::numeric_limits<Float>::infinity() &&
+                 r.tMax == std::numeric_limits<Float>::infinity());
+    }
+};
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCMemsetInvalidRays(MRAY_GRID_CONSTANT const Span<RayGMem> dRays)
+{
+    KernelCallParams kp;
+    uint32_t rayCount = static_cast<uint32_t>(dRays.size());
+    for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
+    {
+        RayGMem r
+        {
+            .pos = Vector3(std::numeric_limits<Float>::quiet_NaN()),
+            .tMin = std::numeric_limits<Float>::infinity(),
+            .dir = Vector3(std::numeric_limits<Float>::quiet_NaN()),
+            .tMax = std::numeric_limits<Float>::infinity()
+        };
+        dRays[i] = r;
+    }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCIsVisibleToSpectrum(MRAY_GRID_CONSTANT const Span<Spectrum> dOutputData,
+                           //
+                           MRAY_GRID_CONSTANT const Bitspan<const uint32_t> dIsVisibleBuffer,
+                           MRAY_GRID_CONSTANT const Span<const uint32_t> dIndices)
+{
+    assert(dIsVisibleBuffer.Size() >= dIndices.size());
+
+    KernelCallParams kp;
+    uint32_t rayCount = static_cast<uint32_t>(dIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
+    {
+        uint32_t index = dIndices[i];
+        // Mask out the not visible rays
+        if(!dIsVisibleBuffer[index])
+            dOutputData[index] = Spectrum::Zero();
+    }
+}
+
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCGenerateWorkKeys(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
                         MRAY_GRID_CONSTANT const Span<const HitKeyPack> dInputKeys,
@@ -84,7 +153,8 @@ SurfaceRenderer::AttributeInfo() const
     {
         {"totalSPP",            MRayDataType<MR_UINT32>{}, IS_SCALAR, MR_MANDATORY},
         {"renderType",          MRayDataType<MR_STRING>{}, IS_SCALAR, MR_MANDATORY},
-        {"doStochasticFilter",  MRayDataType<MR_BOOL>{}, IS_SCALAR, MR_MANDATORY}
+        {"doStochasticFilter",  MRayDataType<MR_BOOL>{}, IS_SCALAR, MR_MANDATORY},
+        {"tMaxAO",              MRayDataType<MR_FLOAT>{}, IS_SCALAR, MR_MANDATORY}
     };
 }
 
@@ -122,9 +192,19 @@ void SurfaceRenderer::PushAttribute(uint32_t attributeIndex,
         case 0: newOptions.totalSPP = data.AccessAs<uint32_t>()[0]; break;
         case 1: newOptions.mode = SurfRDetail::Mode::FromString(std::as_const(data).AccessAsString()); break;
         case 2: newOptions.doStochasticFilter = data.AccessAs<bool>()[0]; break;
+        case 3: newOptions.tMaxAO = data.AccessAs<Float>()[0]; break;
         default:
             throw MRayError("{} Unkown attribute index {}", TypeName(), attributeIndex);
     }
+}
+
+uint32_t SurfaceRenderer::FindMaxSamplePerIteration(uint32_t rayCount, SurfRDetail::Mode::E mode)
+{
+    using enum SurfRDetail::Mode::E;
+    uint32_t maxSample = (*curCamWork)->SampleRayRNCount();
+    if(mode == AO)
+        maxSample = std::max(maxSample, 2u);
+    return rayCount * maxSample;
 }
 
 RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
@@ -140,6 +220,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     curCamTransformOverride = std::nullopt;
     curColorSpace = tracerView.tracerParams.globalTextureColorSpace;
     currentOptions = newOptions;
+    anchorMode = currentOptions.mode;
     totalIterationCount = 0;
     globalPixelIndex = 0;
 
@@ -155,8 +236,11 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
 
     // Change the mode according to the render logic
     using Math::Roll;
-    uint32_t newMode = uint32_t(Roll(int32_t(customLogicIndex0), 0,
-                                             int32_t(Mode::END)));
+    int32_t modeIndex = (int32_t(anchorMode) +
+                         int32_t(customLogicIndex0));
+    uint32_t sendMode = uint32_t(Roll(int32_t(customLogicIndex0), 0,
+                                      int32_t(Mode::END)));
+    uint32_t newMode = uint32_t(Roll(modeIndex, 0, int32_t(Mode::END)));
     currentOptions.mode = SurfRDetail::Mode::E(newMode);
 
     imageTiler = ImageTiler(renderBuffer.get(), rIP,
@@ -195,21 +279,50 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     // Find the ray count (1spp per tile)
     uint32_t maxRayCount = imageTiler.ConservativeTileSize().Multiply();
-    MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys, dRays,
-                                         dRayDifferentials,
-                                         dRayState.dImageCoordinates,
-                                         dRayState.dOutputData,
-                                         dRayState.dFilmFilterWeights,
-                                         dCamGenRandomNums,
-                                         dWorkHashes, dWorkBatchIds,
-                                         dSubCameraBuffer),
-                                redererGlobalMem,
-                                {maxRayCount, maxRayCount, maxRayCount,
-                                 maxRayCount, maxRayCount, maxRayCount,
-                                 maxRayCount,
-                                 maxRayCount * (*curCamWork)->SampleRayRNCount(),
-                                 totalWorkCount, totalWorkCount,
-                                 SUB_CAMERA_BUFFER_SIZE});
+    uint32_t maxSampleCount = FindMaxSamplePerIteration(maxRayCount, currentOptions.mode);
+    if(currentOptions.mode == SurfRDetail::Mode::AO)
+    {
+        uint32_t isVisibleIntCount = Bitspan<uint32_t>::CountT(maxRayCount);
+        MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys,
+                                             dRays[0], dRays[1],
+                                             dRayDifferentials[0],
+                                             dRayDifferentials[1],
+                                             dRayState.dImageCoordinates,
+                                             dRayState.dOutputData,
+                                             dRayState.dFilmFilterWeights,
+                                             dIsVisibleBuffer,
+                                             dRandomNumBuffer,
+                                             dWorkHashes, dWorkBatchIds,
+                                             dSubCameraBuffer),
+                                    redererGlobalMem,
+                                    {maxRayCount, maxRayCount,
+                                     maxRayCount, maxRayCount,
+                                     maxRayCount, maxRayCount,
+                                     maxRayCount, maxRayCount,
+                                     maxRayCount,
+                                     isVisibleIntCount, maxSampleCount,
+                                     totalWorkCount, totalWorkCount,
+                                     SUB_CAMERA_BUFFER_SIZE});
+    }
+    else
+    {
+        MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys,
+                                             dRays[0], dRayDifferentials[0],
+                                             dRayState.dImageCoordinates,
+                                             dRayState.dOutputData,
+                                             dRayState.dFilmFilterWeights,
+                                             dRandomNumBuffer,
+                                             dWorkHashes, dWorkBatchIds,
+                                             dSubCameraBuffer),
+                                    redererGlobalMem,
+                                    {maxRayCount, maxRayCount,
+                                     maxRayCount, maxRayCount,
+                                     maxRayCount, maxRayCount,
+                                     maxRayCount, maxSampleCount,
+                                     totalWorkCount, totalWorkCount,
+                                     SUB_CAMERA_BUFFER_SIZE});
+    }
+
     // And initialze the hashes
     workHasher = InitializeHashes(dWorkHashes, dWorkBatchIds, queue);
 
@@ -245,7 +358,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
         .renderColorSpace = curColorSpace,
         .resolution = imageTiler.FullResolution(),
         .depth = renderBuffer->Depth(),
-        .curRenderLogic0 = newMode,
+        .curRenderLogic0 = sendMode,
         .curRenderLogic1 = std::numeric_limits<uint32_t>::max()
     };
 }
@@ -298,16 +411,16 @@ RendererOutput SurfaceRenderer::DoRender()
     // Generate rays
     rnGenerator->SetupRange(imageTiler.Tile1DRange());
     // Generate RN for camera rays
-    rnGenerator->GenerateNumbers(dCamGenRandomNums,
-                                 (*curCamWork)->SampleRayRNCount(),
+    rnGenerator->GenerateNumbers(dRandomNumBuffer,
+                                 Vector2ui(0, (*curCamWork)->SampleRayRNCount()),
                                  processQueue);
     if(currentOptions.doStochasticFilter)
     {
         cameraWork.GenRaysStochasticFilter
         (
-            dRayDifferentials, dRays, EmptyType{},
+            dRayDifferentials[0], dRays[0], EmptyType{},
             dRayState, dIndices,
-            ToConstSpan(dCamGenRandomNums),
+            ToConstSpan(dRandomNumBuffer),
             dSubCameraBuffer, curCamTransformKey,
             globalPixelIndex, imageTiler.CurrentTileSize(),
             tracerView.tracerParams.filmFilter,
@@ -318,9 +431,9 @@ RendererOutput SurfaceRenderer::DoRender()
     {
         cameraWork.GenerateRays
         (
-            dRayDifferentials, dRays, EmptyType{},
+            dRayDifferentials[0], dRays[0], EmptyType{},
             dRayState, dIndices,
-            ToConstSpan(dCamGenRandomNums),
+            ToConstSpan(dRandomNumBuffer),
             dSubCameraBuffer, curCamTransformKey,
             globalPixelIndex, imageTiler.CurrentTileSize(),
             processQueue
@@ -343,7 +456,7 @@ RendererOutput SurfaceRenderer::DoRender()
     tracerView.baseAccelerator.CastRays
     (
         dHitKeys, dHits, dBackupRNGStates,
-        dRays, dIndices, processQueue
+        dRays[0], dIndices, processQueue
     );
 
     // Generate work keys from hit packs
@@ -376,7 +489,21 @@ RendererOutput SurfaceRenderer::DoRender()
     // Wait for results to be available in host buffers
     processQueue.Barrier().Wait();
 
-    GlobalState globalState{currentOptions.mode};
+    if(currentOptions.mode == SurfRDetail::Mode::AO)
+    {
+        processQueue.IssueSaturatingKernel<KCMemsetInvalidRays>
+        (
+            "KCSetInvalidRays",
+            KernelIssueParams{.workCount = static_cast<uint32_t>(dRays[1].size())},
+            dRays[1]
+        );
+    }
+
+    GlobalState globalState
+    {
+        .mode = currentOptions.mode,
+        .tMaxAO = currentOptions.tMaxAO
+    };
     for(uint32_t i = 0; i < hPartitionCount[0]; i++)
     {
         uint32_t partitionStart = hPartitionStartOffsets[i];
@@ -384,6 +511,18 @@ RendererOutput SurfaceRenderer::DoRender()
                                   hPartitionStartOffsets[i]);
         auto dLocalIndices = dPartitionIndices.subspan(partitionStart,
                                                        partitionSize);
+        static constexpr auto RNCountAO = 2u;
+        auto localRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * RNCountAO);
+        if(currentOptions.mode == SurfRDetail::Mode::AO)
+        {
+            Vector2ui nextRNGDimRange = (Vector2ui(0u, RNCountAO) +
+                                         (*curCamWork)->SampleRayRNCount());
+            rnGenerator->GenerateNumbersIndirect(localRNBuffer,
+                                                 dLocalIndices,
+                                                 nextRNGDimRange,
+                                                 processQueue);
+        }
+
         // Find the work
         // TODO: Although work count should be small,
         // doing a linear search here may not be performant.
@@ -400,20 +539,41 @@ RendererOutput SurfaceRenderer::DoRender()
         });
         if(wLoc != currentWorks.cend())
         {
-            const auto& workPtr = *wLoc->workPtr.get();
-            workPtr.DoWork_0(Span<RayDiff>{},
-                             Span<RayGMem>{},
-                             RayPayload{},
-                             dRayState,
-                             dLocalIndices,
-                             Span<const RandomNumber>{},
-                             dRayDifferentials,
-                             dRays,
-                             dHits,
-                             dHitKeys,
-                             RayPayload{},
-                             globalState,
-                             processQueue);
+            if(currentOptions.mode == SurfRDetail::Mode::AO)
+            {
+                const auto& workPtr = *wLoc->workPtr.get();
+                workPtr.DoWork_1(dRayDifferentials[1],
+                                 dRays[1],
+                                 RayPayload{},
+                                 dRayState,
+                                 dLocalIndices,
+                                 dRandomNumBuffer,
+                                 dRayDifferentials[0],
+                                 dRays[0],
+                                 dHits,
+                                 dHitKeys,
+                                 RayPayload{},
+                                 globalState,
+                                 processQueue);
+            }
+            else
+            {
+                const auto& workPtr = *wLoc->workPtr.get();
+                workPtr.DoWork_0(Span<RayDiff>{},
+                                 Span<RayGMem>{},
+                                 RayPayload{},
+                                 dRayState,
+                                 dLocalIndices,
+                                 Span<const RandomNumber>{},
+                                 dRayDifferentials[0],
+                                 dRays[0],
+                                 dHits,
+                                 dHitKeys,
+                                 RayPayload{},
+                                 globalState,
+                                 processQueue);
+            }
+
         }
         else if(lightWLoc != currentLightWorks.cend())
         {
@@ -421,8 +581,8 @@ RendererOutput SurfaceRenderer::DoRender()
             workPtr.DoBoundaryWork_0(dRayState,
                                      dLocalIndices,
                                      Span<const RandomNumber>{},
-                                     dRayDifferentials,
-                                     dRays,
+                                     dRayDifferentials[0],
+                                     dRays[0],
                                      dHits,
                                      dHitKeys,
                                      RayPayload{},
@@ -434,6 +594,37 @@ RendererOutput SurfaceRenderer::DoRender()
 
     }
 
+    // Do shadow ray cast
+    if(currentOptions.mode == SurfRDetail::Mode::AO)
+    {
+        auto p = rayPartitioner.BinaryPartition(dPartitionIndices, processQueue,
+                                                IsValidRayFunctor(dRays[1]));
+        processQueue.Barrier().Wait();
+
+        auto dValidIndices = p.dPartitionIndices.subspan(p.hPartitionStartOffsets[0],
+                                                         p.hPartitionStartOffsets[1] - p.hPartitionStartOffsets[0]);
+
+        if(!dValidIndices.empty())
+        {
+            // Ray Casting
+            Bitspan<uint32_t> dIsVisibleBitSpan(dIsVisibleBuffer);
+            tracerView.baseAccelerator.CastVisibilityRays
+            (
+                dIsVisibleBitSpan, dBackupRNGStates,
+                dRays[1], dValidIndices, processQueue
+            );
+
+            // Write either one or zero
+            processQueue.IssueSaturatingKernel<KCIsVisibleToSpectrum>
+            (
+                "KCIsVisibleToSpectrum",
+                KernelIssueParams{.workCount = static_cast<uint32_t>(dValidIndices.size())},
+                dRayState.dOutputData,
+                ToConstSpan(dIsVisibleBitSpan),
+                dValidIndices
+            );
+        }
+    }
     // Filter the samples
     // Wait for previous copy to finish
     processQueue.IssueWait(renderBuffer->PrevCopyCompleteFence());

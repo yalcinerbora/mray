@@ -310,3 +310,36 @@ void AcceleratorGroupLinear<PG>::CastLocalRays(// Output
                         // Constants
                         queue);
 }
+
+template<PrimitiveGroupC PG>
+void AcceleratorGroupLinear<PG>::CastVisibilityRays(// Output
+                                                    Bitspan<uint32_t> dIsVisibleBuffer,
+                                                    // I-O
+                                                    Span<BackupRNGState> dRNGStates,
+                                                    // Input
+                                                    Span<const RayGMem> dRays,
+                                                    Span<const RayIndex> dRayIndices,
+                                                    Span<const CommonKey> dAccelKeys,
+                                                    // Constants
+                                                    uint32_t workId,
+                                                    const GPUQueue& queue)
+{
+    uint32_t localWorkId = workId - this->globalWorkIdToLocalOffset;
+    const auto& workOpt = this->workInstances.at(localWorkId);
+
+    if(!workOpt)
+        throw MRayError("{:s}:{:d}: Unable to find work for {:d}",
+                        TypeName(), this->accelGroupId, workId);
+
+    const auto& work = workOpt.value().get();
+    work->CastVisibilityRays(// Output
+                             dIsVisibleBuffer,
+                             // I-O
+                             dRNGStates,
+                             //Input
+                             dRays,
+                             dRayIndices,
+                             dAccelKeys,
+                             // Constants
+                             queue);
+}

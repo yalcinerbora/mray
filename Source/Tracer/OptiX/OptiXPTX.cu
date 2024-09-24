@@ -126,12 +126,21 @@ template<class PGroup>
 MRAY_GPU MRAY_GPU_INLINE
 void KCClosestHit()
 {
+    // If visibility check, just set it and go
+    if(params.doVisibility)
+    {
+        // We hit! Bad luck
+        const RayIndex rIndex = GetRayIndexFromPayload();
+        params.dIsVisibleBuffer.SetBitParallel(rIndex, false);
+        return;
+    }
+
     using Hit = typename PGroup::Hit;
     using HitRecord = GenericHitRecordData<>;
     const auto& record = *DriverPtrToType<const HitRecord>(optixGetSbtDataPointer());
 
     const uint32_t leafId = optixGetPrimitiveIndex();
-    const uint32_t rayId = optixGetLaunchIndex().x;
+    const RayIndex rIndex = GetRayIndexFromPayload();
 
     // Fetch the workKey, transformId, primitiveId from table
     PrimitiveKey pKey = record.dPrimKeys[leafId];
@@ -141,7 +150,6 @@ void KCClosestHit()
     MetaHit hit = ReadHitFromAttributes<Hit, TrianglePrimGroupC<PGroup>>();
 
     // Write to the global memory
-    RayIndex rIndex = params.dRayIndices[rayId];
     params.dHitKeys[rIndex] = HitKeyPack
     {
         .primKey = pKey,
@@ -242,7 +250,12 @@ void KCIntersect()
 MRAY_GPU MRAY_GPU_INLINE
 void KCMissOptiX()
 {
-    // Do Nothing
+    // Do Nothing, on conventional tracing
+    if(!params.doVisibility) return;
+
+    // If visibility check, just set it and go
+    const RayIndex rIndex = GetRayIndexFromPayload();
+    params.dIsVisibleBuffer.SetBitParallel(rIndex, true);
 }
 
 MRAY_GPU MRAY_GPU_INLINE
@@ -255,13 +268,19 @@ void KCRayGenOptix()
     if(launchIndex >= launchDim) return;
 
     RayIndex rIndex = params.dRayIndices[launchIndex];
-    auto [ray, tMM] = RayFromGMem(params.dRays, rIndex);
+    auto [ray, tMM] = (params.doVisibility)
+                        ? RayFromGMem(params.dRaysConst, rIndex)
+                        : RayFromGMem(params.dRays, rIndex);
 
     // Set the RNG state as payload, any hit shaders will
     // do stochastic any hit invocation.
     BackupRNGState rngState = params.dRNGStates[rIndex];
     // Set the ray index (indirection) as payload as well
     // so we do not hit GMem for this.
+    uint32_t flags = OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
+    if(params.doVisibility)
+        flags |= OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT;
+
     // Trace!
     optixTrace(// Accelerator
                params.baseAccelerator,
@@ -273,7 +292,7 @@ void KCRayGenOptix()
                //
                OptixVisibilityMask(0xFF),
                // Flags
-               OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
+               flags,
                // SBT
                0, 1, 0,
                rIndex, rngState);

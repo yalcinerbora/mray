@@ -6,13 +6,13 @@
 
 #include "Core/Types.h"
 #include "Core/TypeGenFunction.h"
-#include "Core/BitFunctions.h"
 
 #include "Device/GPUSystemForward.h"
 #include "Device/GPUAlgForward.h"
 
 #include "Random.h"
 
+#include "Bitspan.h"
 #include "GenericGroup.h"
 #include "PrimitiveC.h"
 #include "LightC.h"
@@ -249,7 +249,7 @@ class AcceleratorGroupI
     public:
     virtual         ~AcceleratorGroupI() = default;
 
-    virtual void    CastLocalRays(// Output
+    virtual void        CastLocalRays(// Output
                                   Span<HitKeyPack> dHitIds,
                                   Span<MetaHit> dHitParams,
                                   // I-O
@@ -261,6 +261,17 @@ class AcceleratorGroupI
                                   // Constants
                                   uint32_t instanceId,
                                   const GPUQueue& queue) = 0;
+    virtual void        CastVisibilityRays(// Output
+                                           Bitspan<uint32_t> dIsVisibleBuffer,
+                                           // I-O
+                                           Span<BackupRNGState> dRNGStates,
+                                           // Input
+                                           Span<const RayGMem> dRays,
+                                           Span<const RayIndex> dRayIndices,
+                                           Span<const CommonKey> dAccelKeys,
+                                           // Constants
+                                           uint32_t workId,
+                                           const GPUQueue& queue) = 0;
 
     virtual void        PreConstruct(const BaseAcceleratorI*) = 0;
     virtual void        Construct(AccelGroupConstructParams,
@@ -455,16 +466,16 @@ class BaseAcceleratorI
                              Span<const RayIndex> dRayIndices,
                              const GPUQueue& queue) = 0;
     // Fully cast rays to entire scene return true/false
-    // If it hits to a surface
-    virtual void    CastShadowRays(// Output
-                                   Bitspan<uint32_t> dIsVisibleBuffer,
-                                   Bitspan<uint32_t> dFoundMediumInterface,
-                                   // I-O
-                                   Span<BackupRNGState> dRNGStates,
-                                   // Input
-                                   Span<const RayIndex> dRayIndices,
-                                   Span<const RayGMem> dShadowRays,
-                                   const GPUQueue& queue) = 0;
+    // If it hits to a surface, (this should be faster
+    // since any hit will terminate the operation)
+    virtual void    CastVisibilityRays(// Output
+                                       Bitspan<uint32_t> dIsVisibleBuffer,
+                                       // I-O
+                                       Span<BackupRNGState> dRNGStates,
+                                       // Input
+                                       Span<const RayGMem> dRays,
+                                       Span<const RayIndex> dRayIndices,
+                                       const GPUQueue& queue) = 0;
     // Locally cast rays to a accelerator instances
     // This is multi-ray multi-accelerator instance
     virtual void    CastLocalRays(// Output
@@ -516,6 +527,7 @@ class BaseAcceleratorT : public BaseAcceleratorI
     Map<CommonKey, AcceleratorGroupI*>  accelInstances;
 
     virtual AABB3       InternalConstruct(const std::vector<size_t>& instanceOffsets) = 0;
+
     public:
     // Constructors & Destructor
                         BaseAcceleratorT(BS::thread_pool&,
@@ -1405,3 +1417,8 @@ void KCGeneratePrimitiveKeys(MRAY_GRID_CONSTANT const Span<PrimitiveKey> dAllLea
                              MRAY_GRID_CONSTANT const Span<const PrimRangeArray> dConcretePrimRanges,
                              MRAY_GRID_CONSTANT const Span<const Vector2ui> dConcreteLeafRanges,
                              MRAY_GRID_CONSTANT const uint32_t groupId);
+
+extern MRAY_KERNEL
+void KCSetIsVisibleIndirect(MRAY_GRID_CONSTANT const Bitspan<uint32_t> dIsVisibleBuffer,
+                            //
+                            MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices);

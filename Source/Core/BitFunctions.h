@@ -185,33 +185,6 @@ template<size_t N>
 MRAY_HYBRID constexpr
 Bitset<N> operator^(const Bitset<N>& lhs, const Bitset<N>& rhs);
 
-// Bitspan
-// Not exact match of a std::span but suits the needs
-// and only dynamic extent
-template<std::unsigned_integral T>
-class Bitspan
-{
-    private:
-    T*                  data;
-    uint32_t            size;
-
-    public:
-    MRAY_HYBRID constexpr           Bitspan();
-    MRAY_HYBRID constexpr           Bitspan(T*, uint32_t bitcount);
-    MRAY_HYBRID constexpr           Bitspan(Span<T>);
-
-    MRAY_HYBRID constexpr bool      operator[](uint32_t index) const;
-    // Hard to return reference for modification
-    MRAY_HYBRID constexpr void      SetBit(uint32_t index, bool) requires (!std::is_const_v<T>);
-    MRAY_HYBRID constexpr uint32_t  Size() const;
-    MRAY_HYBRID constexpr uint32_t  ByteSize() const;
-
-    MRAY_HYBRID constexpr
-    uint32_t*                       Data();
-    MRAY_HYBRID constexpr
-    const uint32_t*                 Data() const;
-};
-
 template<std::integral T>
 constexpr T Bit::FetchSubPortion(T value, std::array<T, 2> bitRange)
 {
@@ -825,80 +798,4 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Bitset<N> operator^(const Bitset<N>& lhs, const Bitset<N>& rhs)
 {
     return lhs.bits ^ rhs.bits;
-}
-
-template <std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitspan<T>::Bitspan()
-    : data(nullptr)
-    , size(0u)
-{}
-
-template <std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitspan<T>::Bitspan(T* ptr, uint32_t bitcount)
-    : data(ptr)
-    , size(bitcount)
-{}
-
-template <std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitspan<T>::Bitspan(Span<T> s)
-    : data(s.data())
-    , size(static_cast<uint32_t>(Math::NextMultiple(s.size(), sizeof(T))))
-{}
-
-template <std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr bool Bitspan<T>::operator[](uint32_t index) const
-{
-    assert(index < size && "Out of range access on bitspan!");
-
-    size_t wordIndex = index / sizeof(T);
-    size_t wordLocalIndex = index % sizeof(T);
-
-    return data[wordIndex] >> wordLocalIndex;
-}
-
-template <std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr void Bitspan<T>::SetBit(uint32_t index, bool v) requires (!std::is_const_v<T>)
-{
-    assert(index < size && "Out of range access on bitspan!");
-
-    size_t wordIndex = index / sizeof(T);
-    size_t wordLocalIndex = index % sizeof(T);
-
-    T localMask = std::numeric_limits<T>::max();
-    localMask &= (static_cast<T>(v) << wordLocalIndex);
-
-    data[wordIndex] &= localMask;
-}
-
-template <std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr uint32_t Bitspan<T>::Size() const
-{
-    return size;
-}
-
-template <std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr uint32_t Bitspan<T>::ByteSize() const
-{
-    return Math::NextMultiple<uint32_t>(size, static_cast<uint32_t>(sizeof(T)));
-}
-
-template <std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr uint32_t* Bitspan<T>::Data()
-{
-    return data;
-}
-
-template <std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr const uint32_t* Bitspan<T>::Data() const
-{
-    return data;
 }

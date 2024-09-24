@@ -26,6 +26,7 @@ namespace SurfRDetail
         public:
         enum E
         {
+            AO,
             WORLD_NORMAL,
             WORLD_POSITION,
             WORLD_GEO_NORMAL,
@@ -42,6 +43,7 @@ namespace SurfRDetail
         private:
         static constexpr std::array Names =
         {
+            "AmbientOcculusion",
             "WorldNormal",
             "WorldPosition",
             "WorldGeoNormal",
@@ -81,12 +83,15 @@ namespace SurfRDetail
         uint32_t    totalSPP            = 32;
         Mode::E     mode                = Mode::WORLD_NORMAL;
         bool        doStochasticFilter  = true;
+        Float       tMaxAO              = std::numeric_limits<Float>::max();
     };
 
     struct GlobalState
     {
         // What are we rendering
         Mode mode;
+        // For AO Renderer, secondary ray's tMax
+        Float tMaxAO;
     };
 
     struct RayState
@@ -105,16 +110,30 @@ namespace SurfRDetail
              class Surface, class TContext,
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     MRAY_HYBRID
-    void WorkFunction(const Prim&, const Material&, const Surface&,
-                      const TContext&, RNGDispenser&,
-                      const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params,
-                      RayIndex rayIndex);
+    void WorkFunctionCommon(const Prim&, const Material&, const Surface&,
+                            const TContext&, RNGDispenser&,
+                            const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params,
+                            RayIndex rayIndex);
+
+    template<PrimitiveC Prim, MaterialC Material,
+             class Surface, class TContext,
+             PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
+    MRAY_HYBRID
+    void WorkFunctionAO(const Prim&, const Material&, const Surface&,
+                        const TContext&, RNGDispenser&,
+                        const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params,
+                        RayIndex rayIndex);
 
     template<LightC Light, LightGroupC LG, TransformGroupC TG>
     MRAY_HYBRID
-    void LightWorkFunction(const Light&, RNGDispenser&,
-                           const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params,
-                           RayIndex rayIndex);
+    void LightWorkFunctionCommon(const Light&, RNGDispenser&,
+                                 const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params,
+                                 RayIndex rayIndex);
+    template<LightC Light, LightGroupC LG, TransformGroupC TG>
+    MRAY_HYBRID
+    void LightWorkFunctionAO(const Light&, RNGDispenser&,
+                             const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params,
+                             RayIndex rayIndex);
 
     MRAY_HYBRID
     void InitRayState(const RayPayload&, const RayState&,
@@ -139,12 +158,14 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     static constexpr Tuple WorkFunctions = Tuple
     {
-        SurfRDetail::WorkFunction<P, M, S, TContext, PG, MG, TG>
+        SurfRDetail::WorkFunctionCommon<P, M, S, TContext, PG, MG, TG>,
+        SurfRDetail::WorkFunctionAO<P, M, S, TContext, PG, MG, TG>
     };
     template<LightC L, LightGroupC LG, TransformGroupC TG>
     static constexpr auto LightWorkFunctions = Tuple
     {
-        SurfRDetail::LightWorkFunction<L, LG, TG>
+        SurfRDetail::LightWorkFunctionCommon<L, LG, TG>,
+        SurfRDetail::LightWorkFunctionAO<L, LG, TG>,
     };
     template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
     static constexpr auto CamWorkFunctions = Tuple{};
@@ -154,6 +175,7 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     Options     currentOptions  = {};
     Options     newOptions      = {};
     //
+    SurfRDetail::Mode::E        anchorMode;
     FilmFilterPtr               filmFilter;
     RenderWorkHasher            workHasher;
     //
@@ -167,17 +189,21 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     RayPartitioner              rayPartitioner;
     RNGeneratorPtr              rnGenerator;
     //
-    DeviceMemory                redererGlobalMem;
-    Span<MetaHit>               dHits;
-    Span<HitKeyPack>            dHitKeys;
-    Span<RayGMem>               dRays;
-    Span<RayDiff>               dRayDifferentials;
-    Span<RandomNumber>          dCamGenRandomNums;
+    DeviceMemory                    redererGlobalMem;
+    Span<MetaHit>                   dHits;
+    Span<HitKeyPack>                dHitKeys;
+    std::array<Span<RayGMem>, 2>    dRays;
+    std::array<Span<RayDiff>, 2>    dRayDifferentials;
+
+    Span<uint32_t>              dIsVisibleBuffer;
+    Span<RandomNumber>          dRandomNumBuffer;
     Span<Byte>                  dSubCameraBuffer;
     RayState                    dRayState;
     // Work Hash related
     Span<uint32_t>              dWorkHashes;
     Span<CommonKey>             dWorkBatchIds;
+
+    uint32_t    FindMaxSamplePerIteration(uint32_t rayCount, SurfRDetail::Mode::E);
 
     public:
     // Constructors & Destructor
@@ -230,10 +256,10 @@ template<PrimitiveC Prim, MaterialC Material,
          class Surface, class TContext,
          PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
 MRAY_HYBRID
-void SurfRDetail::WorkFunction(const Prim&, const Material&, const Surface& surf,
-                               const TContext& tContext, RNGDispenser&,
-                               const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params,
-                               RayIndex rayIndex)
+void SurfRDetail::WorkFunctionCommon(const Prim&, const Material&, const Surface& surf,
+                                     const TContext& tContext, RNGDispenser&,
+                                     const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params,
+                                     RayIndex rayIndex)
 {
     Vector3 color = Vector3::Zero();
     Mode::E mode = params.globalState.mode.e;
@@ -330,17 +356,72 @@ void SurfRDetail::WorkFunction(const Prim&, const Material&, const Surface& surf
     params.rayState.dOutputData[rayIndex] = Spectrum(color, Float(0));
 }
 
-template<LightC Light,
-         LightGroupC LG, TransformGroupC TG>
+template<PrimitiveC Prim, MaterialC Material,
+         class Surface, class TContext,
+         PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
 MRAY_HYBRID
-void SurfRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
-                                    const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params,
-                                    RayIndex rayIndex)
+void SurfRDetail::WorkFunctionAO(const Prim&, const Material&, const Surface& surf,
+                                 const TContext& tContext, RNGDispenser& rng,
+                                 const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params,
+                                 RayIndex rayIndex)
+{
+    assert(params.globalState.mode.e == Mode::AO);
+
+    Vector3 normal;
+    if constexpr(std::is_same_v<BasicSurface, Surface>)
+        normal = surf.normal;
+    else
+    {
+        normal = surf.shadingTBN.ApplyInvRotation(Vector3::ZAxis());
+        normal = tContext.ApplyN(normal).Normalize();
+    }
+    Vector3 position = surf.position;
+
+    Vector2 xi = rng.NextFloat2D<0>();
+    auto dirSample = Distribution::Common::SampleCosDirection(xi);
+    // From flat space (triangle laid out on XY plane) to directly world space
+    Quaternion q = Quaternion::RotationBetweenZAxis(normal);
+    Vector3 direction = q.ApplyRotation(dirSample.value);
+    Float nDotL = direction.Dot(normal);
+
+    // Technically ao multiplier should be one after division by PDF
+    // This is a simple shader, the division is explicitly specified
+    // for verbosity.
+    Vector3 aoMultiplier = Vector3(nDotL * MathConstants::InvPi<Float>());
+    aoMultiplier = Distribution::Common::DivideByPDF(aoMultiplier, dirSample.pdf);
+    // Preset the ao multiplier, visibility check may override it after casting
+    params.rayState.dOutputData[rayIndex] = Spectrum(aoMultiplier, 0);
+
+    // New ray
+    Ray rayOut = Ray(direction, position);
+    rayOut.NudgeSelf(normal);
+    Float tMax = params.globalState.tMaxAO;
+    RayToGMem(params.out.dRays, rayIndex, rayOut, Vector2(0, tMax));
+}
+
+template<LightC Light, LightGroupC LG, TransformGroupC TG>
+MRAY_HYBRID
+void SurfRDetail::LightWorkFunctionCommon(const Light& l, RNGDispenser&,
+                                          const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params,
+                                          RayIndex rayIndex)
 {
     if(l.IsPrimitiveBackedLight())
-        params.rayState.dOutputData[rayIndex] = Spectrum(1, 0, 0, 0);
+        params.rayState.dOutputData[rayIndex] = Spectrum(1, 1, 1, 0);
     else
         params.rayState.dOutputData[rayIndex] = Spectrum::Zero();
+}
+
+
+template<LightC Light, LightGroupC LG, TransformGroupC TG>
+MRAY_HYBRID
+void SurfRDetail::LightWorkFunctionAO(const Light&, RNGDispenser&,
+                                      const RenderLightWorkParams<SurfaceRenderer, LG, TG>&,
+                                      RayIndex)
+{
+    //if(l.IsPrimitiveBackedLight())
+    //    params.rayState.dOutputData[rayIndex] = Spectrum(1, 1, 1, 0);
+    //else
+    //    params.rayState.dOutputData[rayIndex] = Spectrum::Zero();
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
