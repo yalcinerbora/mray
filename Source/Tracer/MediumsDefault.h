@@ -42,6 +42,8 @@ namespace MediumDetail
         using DataSoA = EmptyType;
         using SpectrumConverter = typename SpectrumConverterContextIdentity::Converter;
 
+        static constexpr uint32_t SampleScatteringRNCount = 0;
+
         public:
         MRAY_HYBRID     MediumVacuum(const SpectrumConverter&,
                                      const DataSoA&, MediumKey);
@@ -50,8 +52,6 @@ namespace MediumDetail
         ScatterSample   SampleScattering(const Vector3& wO, RNGDispenser& rng) const;
         MRAY_HYBRID
         Float           PdfScattering(const Vector3& wI, const Vector3& wO) const;
-        MRAY_HYBRID
-        uint32_t        SampleScatteringRNCount() const;
 
         MRAY_HYBRID
         Spectrum        IoR(const Vector3& uv) const;
@@ -71,6 +71,8 @@ namespace MediumDetail
         using SpectrumConverter = typename SpectrumTransformer::Converter;
         using enum HomogeneousMediumData::I;
 
+        static constexpr uint32_t SampleScatteringRNCount = 2;
+
         private:
         Spectrum sigmaA;
         Spectrum sigmaS;
@@ -86,8 +88,6 @@ namespace MediumDetail
         ScatterSample   SampleScattering(const Vector3& wO, RNGDispenser& rng) const;
         MRAY_HYBRID
         Float           PdfScattering(const Vector3& wI, const Vector3& wO) const;
-        MRAY_HYBRID
-        uint32_t        SampleScatteringRNCount() const;
 
         MRAY_HYBRID
         Spectrum        IoR(const Vector3& uv) const;

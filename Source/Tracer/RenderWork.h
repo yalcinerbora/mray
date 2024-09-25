@@ -155,6 +155,8 @@ class RenderWork : public RenderWorkT<R>
     MRAY_RENDER_DO_WORK_DEF(0)
     MRAY_RENDER_DO_WORK_DEF(1)
 
+
+    uint32_t         SampleRNCount() const override;
     std::string_view Name() const override;
 };
 
@@ -378,6 +380,14 @@ void RenderWork<R, PG, MG, TG>::DoWorkInternal(// Output
             params
         );
     }
+}
+
+
+template<RendererC R, PrimitiveGroupC P,
+         MaterialGroupC M, TransformGroupC T>
+uint32_t RenderWork<R, P, M, T>::SampleRNCount() const
+{
+    return M::template Material<>::SampleRNCount;
 }
 
 template<RendererC R, PrimitiveGroupC P,

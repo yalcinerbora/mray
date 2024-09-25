@@ -80,7 +80,7 @@ Spectrum MetaLightViewT<CH, ML, SC>::EmitViaHit(const Vector3& wO, const CH& hit
     return DeviceVisit(light, [=](auto&& l) -> Spectrum
     {
         using HitType = decltype(l)::Primitive::Hit;
-        return l.Emit(wO, HitType(hit));
+        return specConverter(l.Emit(wO, HitType(hit)));
     });
 }
 

@@ -9,7 +9,12 @@
 
 namespace Distribution::BxDF
 {
+    MRAY_HYBRID
+    Float FresnelDielectric(Float cosFront, Float etaFront, Float etaBack);
 
+    template<VectorC T>
+    MRAY_HYBRID
+    Float FresnelConductor(Float cosFront, const T& etaFront, const T& etaBack);
 }
 
 namespace Distribution::Medium
@@ -27,7 +32,7 @@ namespace Distribution::Medium
 
 namespace Distribution::Common
 {
-    template<class T>
+    template<VectorOrFloatC  T>
     MRAY_HYBRID
     T DivideByPDF(T, Float pdf);
 
@@ -100,7 +105,60 @@ namespace Distribution::MIS
 
 namespace Distribution
 {
-template<class T>
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float BxDF::FresnelDielectric(Float cosFront, Float etaFront, Float etaBack)
+{
+    // Calculate Sin from Snell's Law
+    Float sinFront = Math::SqrtMax(Float(1) - cosFront * cosFront);
+    Float sinBack = etaFront / etaBack * sinFront;
+
+    // Total internal reflection
+    if(sinFront >= Float(1)) return Float(1);
+
+    // Fresnel Equation
+    Float cosBack = Math::SqrtMax(Float(1) - sinBack * sinBack);
+
+    Float parallel = ((etaBack * cosFront - etaFront * cosBack) /
+                      (etaBack * cosFront + etaFront * cosBack));
+    parallel = parallel * parallel;
+
+    float perpendicular = ((etaFront * cosFront - etaBack * cosBack) /
+                           (etaFront * cosFront + etaBack * cosBack));
+    perpendicular = perpendicular * perpendicular;
+
+    return (parallel + perpendicular) * Float(0.5);
+}
+
+template<VectorC T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float BxDF::FresnelConductor(Float cosTheta, const T& eta, const T& k)
+{
+    // https://pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission#FrConductor
+    //
+    // https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
+    // Find sin from trigonometry
+    Float cosTheta2 = cosTheta * cosTheta;
+    Float sinTheta2 = Float(1) - cosTheta2;
+    T eta2 = eta * eta;
+    T k2 = k * k;
+    //
+    T diff = eta2 - k2 - T(sinTheta2);
+    T a2b2 = T::SqrtMax(diff * diff + Float(4) * eta2 * k2);
+    T a = T::SqrtMax(T(0.5) * (a2b2 + diff));
+    //
+    T sT1 = a2b2 + cosTheta2;
+    T sT2 = a * (Float(2) * cosTheta);
+    T rS = (sT1 - sT2) / (sT1 + sT2);
+    //
+    T pT1 = a2b2 * cosTheta2 + T(sinTheta2 * sinTheta2);
+    T pT2 = sT2 * sinTheta2;
+    T rP = rS * (pT1 - pT2) / (pT1 + pT2);
+
+    return (rP + rS) * Float(0.5);
+}
+
+template<VectorOrFloatC  T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 T Common::DivideByPDF(T t, Float pdf)
 {

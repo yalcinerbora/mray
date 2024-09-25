@@ -61,7 +61,9 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/MediumC.h
         ${CURRENT_SOURCE_DIR}/MediumsDefault.h
         ${CURRENT_SOURCE_DIR}/MediumsDefault.hpp
-        ${CURRENT_SOURCE_DIR}/MediumsDefault.cpp)
+        ${CURRENT_SOURCE_DIR}/MediumsDefault.cpp
+        ${CURRENT_SOURCE_DIR}/MetaMedium.h
+        ${CURRENT_SOURCE_DIR}/MetaMedium.hpp)
 
     set(SRC_LIGHTS
         ${CURRENT_SOURCE_DIR}/LightC.h
@@ -94,6 +96,7 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/TexViewRenderer.cu)
 
     set(SRC_RENDERERS_SURFACE
+        ${CURRENT_SOURCE_DIR}/SurfaceRendererShaders.h
         ${CURRENT_SOURCE_DIR}/SurfaceRenderer.h
         ${CURRENT_SOURCE_DIR}/SurfaceRenderer.hpp
         ${CURRENT_SOURCE_DIR}/SurfaceRenderer.cu)

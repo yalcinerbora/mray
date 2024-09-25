@@ -483,6 +483,8 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
         .geoNormal = geoNormal,
         .shadingTBN = tbn,
         .uv = uv,
+        .dpdu = Vector2::Zero(),
+        .dpdv = Vector2::Zero(),
         .backSide = backSide
     };
 }

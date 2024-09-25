@@ -146,7 +146,7 @@ struct BxDFResult
 {
     Ray         wO;
     Spectrum    reflectance;
-    MediumKey   mediumId;
+    MediumKey   mediumKey;
 };
 
 struct VoxelizationParameters

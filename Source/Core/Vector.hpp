@@ -756,6 +756,19 @@ constexpr Vector<N, T> Vector<N, T>::Sqrt(const Vector<N, T>& v0) requires std::
 
 template <unsigned int N, ArithmeticC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Vector<N, T> Vector<N, T>::SqrtMax(const Vector&) requires std::floating_point<T>
+{
+    Vector v;
+    UNROLL_LOOP
+    for(unsigned int i = 0; i < N; i++)
+    {
+        v[i] = std::max(T(0), std::sqrt(v[i]));
+    }
+    return v;
+}
+
+template <unsigned int N, ArithmeticC T>
+MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector<N, T> Vector<N, T>::Min(const Vector& v0, const Vector& v1)
 {
     Vector v;

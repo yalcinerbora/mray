@@ -159,6 +159,7 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
     static MRAY_HYBRID constexpr Vector     Lerp(const Vector&, const Vector&, T) requires std::floating_point<T>;
     static MRAY_HYBRID constexpr Vector     Smoothstep(const Vector&, const Vector&, T) requires std::floating_point<T>;
     static MRAY_HYBRID constexpr Vector     Sqrt(const Vector&) requires std::floating_point<T>;
+    static MRAY_HYBRID constexpr Vector     SqrtMax(const Vector&) requires std::floating_point<T>;
 
     // Literals
     static MRAY_HYBRID constexpr Vector     Zero();
@@ -223,6 +224,16 @@ concept VectorC = (std::is_same_v<T, Vector2>   ||
                    std::is_same_v<T, Vector3uc> ||
                    std::is_same_v<T, Vector4c>  ||
                    std::is_same_v<T, Vector4uc>);
+
+// This comes up many times, Instead of having 1D vector
+// rely this to filter multi-dimensional fp types
+template<class T>
+concept VectorOrFloatC =
+(
+    (VectorC<T> && std::is_same_v<typename T::InnerType, Float>) ||
+    (std::is_same_v<T, Float>)
+);
+
 
 // TODO: Add more?
 static_assert(ArrayLikeC<Vector2>, "Vec2 is not ArrayLike!");

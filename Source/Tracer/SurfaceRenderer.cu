@@ -204,6 +204,21 @@ uint32_t SurfaceRenderer::FindMaxSamplePerIteration(uint32_t rayCount, SurfRDeta
     uint32_t maxSample = (*curCamWork)->SampleRayRNCount();
     if(mode == AO)
         maxSample = std::max(maxSample, 2u);
+    else if(mode == FURNACE)
+    {
+        maxSample = std::transform_reduce
+        (
+            currentWorks.cbegin(), currentWorks.cend(), maxSample,
+            [](uint32_t l, uint32_t r) -> uint32_t
+            {
+                return std::max(l, r);
+            },
+            [](const auto& renderWorkStruct) -> uint32_t
+            {
+                return renderWorkStruct.workPtr->SampleRNCount();
+            }
+        );
+    }
     return rayCount * maxSample;
 }
 
@@ -511,17 +526,6 @@ RendererOutput SurfaceRenderer::DoRender()
                                   hPartitionStartOffsets[i]);
         auto dLocalIndices = dPartitionIndices.subspan(partitionStart,
                                                        partitionSize);
-        static constexpr auto RNCountAO = 2u;
-        auto localRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * RNCountAO);
-        if(currentOptions.mode == SurfRDetail::Mode::AO)
-        {
-            Vector2ui nextRNGDimRange = (Vector2ui(0u, RNCountAO) +
-                                         (*curCamWork)->SampleRayRNCount());
-            rnGenerator->GenerateNumbersIndirect(localRNBuffer,
-                                                 dLocalIndices,
-                                                 nextRNGDimRange,
-                                                 processQueue);
-        }
 
         // Find the work
         // TODO: Although work count should be small,
@@ -539,9 +543,28 @@ RendererOutput SurfaceRenderer::DoRender()
         });
         if(wLoc != currentWorks.cend())
         {
-            if(currentOptions.mode == SurfRDetail::Mode::AO)
+            if(currentOptions.mode == SurfRDetail::Mode::AO ||
+               currentOptions.mode == SurfRDetail::Mode::FURNACE)
             {
+                using enum SurfRDetail::Mode::E;
                 const auto& workPtr = *wLoc->workPtr.get();
+
+                uint32_t rnCount = (currentOptions.mode == AO)
+                                    ? 2u
+                                    : workPtr.SampleRNCount();
+
+                auto localRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
+                if(currentOptions.mode == SurfRDetail::Mode::AO ||
+                   currentOptions.mode == SurfRDetail::Mode::FURNACE)
+                {
+                    Vector2ui nextRNGDimRange = (Vector2ui(0u, rnCount) +
+                                                 (*curCamWork)->SampleRayRNCount());
+                    rnGenerator->GenerateNumbersIndirect(localRNBuffer,
+                                                         dLocalIndices,
+                                                         nextRNGDimRange,
+                                                         processQueue);
+                }
+
                 workPtr.DoWork_1(dRayDifferentials[1],
                                  dRays[1],
                                  RayPayload{},

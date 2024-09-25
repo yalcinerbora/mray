@@ -32,12 +32,6 @@ Float MediumVacuum::PdfScattering(const Vector3&, const Vector3&) const
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t MediumVacuum::SampleScatteringRNCount() const
-{
-    return 0;
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum MediumVacuum::IoR(const Vector3&) const
 {
     return Spectrum(1.0);
@@ -117,13 +111,6 @@ Float MediumHomogeneous<ST>::PdfScattering(const Vector3& wI,
     using namespace MediumFunctions;
     Float cosTheta = wI.Dot(wO);
     return HenyeyGreensteinPhase(cosTheta, g);
-}
-
-template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t MediumHomogeneous<ST>::SampleScatteringRNCount() const
-{
-    return 2;
 }
 
 template <class ST>

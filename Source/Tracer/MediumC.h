@@ -46,11 +46,14 @@ concept MediumC = requires(MediumType md,
     // that creates a ray.
     {md.SampleScattering(Vector3{}, rng)} -> std::same_as<ScatterSample>;
     {md.PdfScattering(Vector3{}, Vector3{})} -> std::same_as<Float>;
-    {md.SampleScatteringRNCount()} -> std::same_as<uint32_t>;
+
     {md.IoR(Vector3{})} -> std::same_as<Spectrum>;
     {md.SigmaA(Vector3{})} -> std::same_as<Spectrum>;
     {md.SigmaS(Vector3{})} -> std::same_as<Spectrum>;
     {md.Emission(Vector3{})} -> std::same_as<Spectrum>;
+    // Sample RN count
+    MediumType::SampleScatteringRNCount;
+    requires std::is_same_v<decltype(MediumType::SampleScatteringRNCount), const uint32_t>;
 
     // TODO:
     // We need to expose the iterator in a different way here, because we may

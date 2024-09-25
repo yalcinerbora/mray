@@ -226,7 +226,6 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector<3, T> Quat<T>::ApplyRotation(const Vector<3, T>& vtor) const
 {
     // q * v * qInv
-    // .Normalize();
     Quat qInv = Conjugate();
     Quat vtorQ(0.0f, vtor[0], vtor[1], vtor[2]);
 

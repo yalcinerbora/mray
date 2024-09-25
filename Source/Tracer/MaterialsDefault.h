@@ -129,6 +129,64 @@ namespace RefractMatDetail
     };
 }
 
+namespace UnrealMatDetail
+{
+    struct alignas(32) UnrealMatData
+    {
+        Span<const ParamVaryingData<2, Vector3>>        dAlbedo;
+        Span<const Optional<TracerTexView<2, Vector3>>> dNormalMaps;
+        //
+        Span<const ParamVaryingData<2, Float>>          dRoughness;
+        Span<const ParamVaryingData<2, Float>>          dSpecular;
+        Span<const ParamVaryingData<2, Float>>          dMetallic;
+        //
+        Span<const MediumKey>                           dMediumIds;
+    };
+
+    template <class SpectrumTransformer = SpectrumConverterContextIdentity>
+    struct UnrealMaterial
+    {
+        using Surface           = DefaultSurface;
+        using AlbedoMap         = typename SpectrumTransformer:: template RendererParamVaryingData<2>;
+        using SpectrumConverter = typename SpectrumTransformer::Converter;
+        using FloatMap          = ParamVaryingData<2, Float>;
+        using OptionalNormalMap = Optional<TracerTexView<2, Vector3>>;
+        using DataSoA           = UnrealMatData;
+        //
+        static constexpr uint32_t SampleRNCount = 2;
+
+        private:
+        const AlbedoMap             albedoTex;
+        const OptionalNormalMap&    normalMapTex;
+        const FloatMap              roughness;
+        const FloatMap              specular;
+        const FloatMap              metallic;
+
+        MediumKey                   mediumId;
+
+        public:
+        MRAY_HYBRID
+        UnrealMaterial(const SpectrumConverter& sTransContext,
+                       const DataSoA& soa, MaterialKey mk);
+
+        MRAY_HYBRID
+        SampleT<BxDFResult>     SampleBxDF(const Vector3& wI,
+                                           const Surface& surface,
+                                           RNGDispenser& dispenser) const;
+        MRAY_HYBRID Float       Pdf(const Ray& wI,
+                                    const Ray& wO,
+                                    const Surface& surface) const;
+        MRAY_HYBRID Spectrum    Evaluate(const Ray& wO,
+                                         const Vector3& wI,
+                                         const Surface& surface) const;
+        MRAY_HYBRID bool        IsEmissive() const;
+        MRAY_HYBRID Spectrum    Emit(const Vector3& wO,
+                                     const Surface& surf) const;
+        MRAY_HYBRID bool        IsAllTexturesAreResident(const Surface& surface) const;
+    };
+
+}
+
 class MatGroupLambert final : public GenericGroupMaterial<MatGroupLambert>
 {
     public:
@@ -299,13 +357,13 @@ class MatGroupRefract final : public GenericGroupMaterial<MatGroupRefract>
 class MatGroupUnreal final : public GenericGroupMaterial<MatGroupUnreal>
 {
     public:
-    using DataSoA   = EmptyType;
+    using DataSoA   = UnrealMatDetail::UnrealMatData;
     template<class STContext = SpectrumConverterContextIdentity>
-    using Material  = ReflectMatDetail::ReflectMaterial<STContext>;
+    using Material  = UnrealMatDetail::UnrealMaterial<STContext>;
     using Surface   = typename Material<>::Surface;
 
     private:
-    DataSoA                                 soa;
+    DataSoA         soa;
 
     protected:
     void            HandleMediums(const MediumKeyPairList&) override;

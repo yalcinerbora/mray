@@ -129,8 +129,8 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Optional<T> ParamVaryingData<DIMS, T>::operator()(Vector<DIMS, Float> uvCoords) const
 {
     if(std::holds_alternative<Texture>(t))
-        return t(uvCoords);
-    return t;
+        return std::get<Texture>(t)(uvCoords);
+    return std::get<T>(t);
 }
 
 template <uint32_t DIMS, class T>
@@ -140,8 +140,8 @@ Optional<T> ParamVaryingData<DIMS, T>::operator()(Vector<DIMS, Float> uvCoords,
                                                   Vector<DIMS, Float> dpdv) const
 {
     if(std::holds_alternative<Texture>(t))
-        return t(uvCoords, dpdu, dpdv);
-    return t;
+        return std::get<Texture>(t)(uvCoords, dpdu, dpdv);
+    return std::get<T>(t);
 }
 
 template <uint32_t DIMS, class T>
@@ -150,8 +150,8 @@ Optional<T> ParamVaryingData<DIMS, T>::operator()(Vector<DIMS, Float> uvCoords,
                                                   uint32_t mipLevel) const
 {
     if(std::holds_alternative<Texture>(t))
-        return t(uvCoords, mipLevel);
-    return t;
+        return std::get<Texture>(t)(uvCoords, mipLevel);
+    return std::get<T>(t);
 }
 
 namespace SpectrumConverterDetail

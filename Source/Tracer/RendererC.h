@@ -77,6 +77,7 @@ class RenderWorkI
     public:
     virtual ~RenderWorkI() = default;
 
+    virtual uint32_t         SampleRNCount() const = 0;
     virtual std::string_view Name() const = 0;
 };
 
