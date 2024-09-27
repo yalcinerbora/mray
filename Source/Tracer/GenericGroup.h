@@ -125,8 +125,12 @@ class GenericGroupT : public GenericGroupI<IdTypeT, AttribInfoT>
 
     const AttributeRanges&      FindRange(IdInt) const;
 
+    //template <class... Args>
+    //Tuple<Span<Args>...>    GenericCommit(std::array<size_t, sizeof...(Args)> countLookup);
+
     template <class... Args>
-    Tuple<Span<Args>...>    GenericCommit(std::array<size_t, sizeof...(Args)> countLookup);
+    void GenericCommit(Tuple<Span<Args>&...> output,
+                       std::array<int32_t, sizeof...(Args)> countLookup);
 
     template <class T>
     void GenericPushData(const Span<T>& dAttributeRegion,
@@ -240,14 +244,15 @@ const AttributeRanges& GenericGroupT<ID, AI>::FindRange(IdInt id) const
 
 template<class ID, class AI>
 template <class... Args>
-Tuple<Span<Args>...> GenericGroupT<ID, AI>::GenericCommit(std::array<size_t, sizeof...(Args)> countLookup)
+void GenericGroupT<ID, AI>::GenericCommit(Tuple<Span<Args>&...> output,
+                                          std::array<int32_t, sizeof...(Args)> countLookup)
 {
     constexpr size_t TypeCount = sizeof...(Args);
     if(isCommitted)
     {
         MRAY_WARNING_LOG("{:s}:{:d}: is in committed state, "
                          "you cannot re-commit!", this->Name(), groupId);
-        return Tuple<Span<Args>...>{};
+        return;
     }
     // Cacluate offsets
     std::array<size_t, TypeCount> offsets = {0ull};
@@ -257,7 +262,7 @@ Tuple<Span<Args>...> GenericGroupT<ID, AI>::GenericCommit(std::array<size_t, siz
         AttributeRanges range;
         for(size_t i = 0; i < TypeCount; i++)
         {
-            size_t count = counts[countLookup[i]];
+            size_t count = (countLookup[i] == - 1) ? 1 : counts[countLookup[i]];
             range.emplace_back(offsets[i], offsets[i] + count);
             offsets[i] += count;
         }
@@ -273,14 +278,12 @@ Tuple<Span<Args>...> GenericGroupT<ID, AI>::GenericCommit(std::array<size_t, siz
         MRAY_WARNING_LOG("{:s}:{:d}: committing as empty, "
                          "is this correct?", this->Name(), groupId);
         isCommitted = true;
-        return Tuple<Span<Args>...>{};
+        return;
     }
 
     using namespace MemAlloc;
-    Tuple<Span<Args>...> result;
-    result = AllocateMultiData<DeviceMemory, Args...>(deviceMem, totalSize);
+    AllocateMultiData<DeviceMemory, Args...>(output, deviceMem, totalSize);
     isCommitted = true;
-    return result;
 }
 
 template<class ID, class AI>

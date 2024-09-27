@@ -88,13 +88,9 @@ MediumGroupHomogeneous::MediumGroupHomogeneous(uint32_t groupId,
 
 void MediumGroupHomogeneous::CommitReservations()
 {
-    auto[a, s, e, i, g] = GenericCommit<Vector3, Vector3, Vector3,
-                                        Vector3, Float>({0, 0, 0, 0, 0});
-    dSigmaA     = a;
-    dSigmaS     = s;
-    dEmission   = e;
-    dIoR        = i;
-    dPhaseVal   = g;
+    GenericCommit(std::tie(dSigmaA, dSigmaS, dEmission, dIoR,
+                           dPhaseVal),
+                  {0, 0, 0, 0, 0});
 
     soa = DataSoA(ToConstSpan(dSigmaA), ToConstSpan(dSigmaS),
                   ToConstSpan(dEmission), ToConstSpan(dIoR),

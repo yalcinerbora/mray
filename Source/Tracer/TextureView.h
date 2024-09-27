@@ -71,7 +71,8 @@ class TracerTexView
         TextureView<DIM, Vector3>   tV3;
         TextureView<DIM, Vector4>   tV4;
     };
-    //HWTextureView<DIM>      hwView;
+    // TODO: coalesce these reads (compiler does 1 byte reads here)
+    // Better to get a word (32-bit) and do bit stuff maybe?
     uint8_t                 index;
     TextureReadMode         mode;
     bool                    flipY = false;

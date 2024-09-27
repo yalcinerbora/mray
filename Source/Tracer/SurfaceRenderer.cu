@@ -7,9 +7,6 @@
 #include "Device/GPUSystem.hpp"
 #include "Device/GPUAlgGeneric.h"
 
-#include "Device/GPUDebug.h"
-#include "TypeFormat.h"
-
 struct IsValidRayFunctor
 {
     private:
@@ -154,7 +151,7 @@ SurfaceRenderer::AttributeInfo() const
         {"totalSPP",            MRayDataType<MR_UINT32>{}, IS_SCALAR, MR_MANDATORY},
         {"renderType",          MRayDataType<MR_STRING>{}, IS_SCALAR, MR_MANDATORY},
         {"doStochasticFilter",  MRayDataType<MR_BOOL>{}, IS_SCALAR, MR_MANDATORY},
-        {"tMaxAO",              MRayDataType<MR_FLOAT>{}, IS_SCALAR, MR_MANDATORY}
+        {"tMaxAORatio",         MRayDataType<MR_FLOAT>{}, IS_SCALAR, MR_MANDATORY}
     };
 }
 
@@ -176,6 +173,9 @@ RendererOptionPack SurfaceRenderer::CurrentAttributes() const
     result.attributes.push_back(TransientData(std::in_place_type_t<bool>{}, 1));
     result.attributes.back().Push(Span<const bool>(&currentOptions.doStochasticFilter, 1));
 
+    result.attributes.push_back(TransientData(std::in_place_type_t<Float>{}, 1));
+    result.attributes.back().Push(Span<const Float>(&currentOptions.tMaxAORatio, 1));
+
     if constexpr(MRAY_IS_DEBUG)
     {
         for(const auto& d: result.attributes)
@@ -192,7 +192,7 @@ void SurfaceRenderer::PushAttribute(uint32_t attributeIndex,
         case 0: newOptions.totalSPP = data.AccessAs<uint32_t>()[0]; break;
         case 1: newOptions.mode = SurfRDetail::Mode::FromString(std::as_const(data).AccessAsString()); break;
         case 2: newOptions.doStochasticFilter = data.AccessAs<bool>()[0]; break;
-        case 3: newOptions.tMaxAO = data.AccessAs<Float>()[0]; break;
+        case 3: newOptions.tMaxAORatio = data.AccessAs<Float>()[0]; break;
         default:
             throw MRayError("{} Unkown attribute index {}", TypeName(), attributeIndex);
     }
@@ -353,6 +353,10 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     // base accelerator (This should not allocate for HW accelerators)
     tracerView.baseAccelerator.AllocateForTraversal(maxRayCount);
 
+    // Calculate tMax for ambient occlusion
+    curTMaxAO = tracerView.baseAccelerator.SceneAABB().GeomSpan().Length();
+    curTMaxAO *= currentOptions.tMaxAORatio;
+
     // Finally generate RNG
     auto RngGen = tracerView.rngGenerators.at(tracerView.tracerParams.samplerType.type);
     if(!RngGen)
@@ -426,7 +430,9 @@ RendererOutput SurfaceRenderer::DoRender()
     // Generate rays
     rnGenerator->SetupRange(imageTiler.Tile1DRange());
     // Generate RN for camera rays
-    rnGenerator->GenerateNumbers(dRandomNumBuffer,
+    uint32_t camRayGenRNCount = rayCount * (*curCamWork)->SampleRayRNCount();
+    auto dCamRayGenRNBuffer = dRandomNumBuffer.subspan(0, camRayGenRNCount);
+    rnGenerator->GenerateNumbers(dCamRayGenRNBuffer,
                                  Vector2ui(0, (*curCamWork)->SampleRayRNCount()),
                                  processQueue);
     if(currentOptions.doStochasticFilter)
@@ -435,7 +441,7 @@ RendererOutput SurfaceRenderer::DoRender()
         (
             dRayDifferentials[0], dRays[0], EmptyType{},
             dRayState, dIndices,
-            ToConstSpan(dRandomNumBuffer),
+            ToConstSpan(dCamRayGenRNBuffer),
             dSubCameraBuffer, curCamTransformKey,
             globalPixelIndex, imageTiler.CurrentTileSize(),
             tracerView.tracerParams.filmFilter,
@@ -517,7 +523,7 @@ RendererOutput SurfaceRenderer::DoRender()
     GlobalState globalState
     {
         .mode = currentOptions.mode,
-        .tMaxAO = currentOptions.tMaxAO
+        .tMaxAO = curTMaxAO
     };
     for(uint32_t i = 0; i < hPartitionCount[0]; i++)
     {
@@ -553,13 +559,13 @@ RendererOutput SurfaceRenderer::DoRender()
                                     ? 2u
                                     : workPtr.SampleRNCount();
 
-                auto localRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
+                auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
                 if(currentOptions.mode == SurfRDetail::Mode::AO ||
                    currentOptions.mode == SurfRDetail::Mode::FURNACE)
                 {
                     Vector2ui nextRNGDimRange = (Vector2ui(0u, rnCount) +
                                                  (*curCamWork)->SampleRayRNCount());
-                    rnGenerator->GenerateNumbersIndirect(localRNBuffer,
+                    rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer,
                                                          dLocalIndices,
                                                          nextRNGDimRange,
                                                          processQueue);

@@ -27,12 +27,10 @@ TransformGroupSingle::TransformGroupSingle(uint32_t groupId,
 
 void TransformGroupSingle::CommitReservations()
 {
-    auto [t, it] = GenericCommit<Matrix4x4, Matrix4x4>({0, 0});
-    transforms = t;
-    invTransforms = it;
+    GenericCommit( std::tie(dTransforms, dInvTransforms),{0, 0});
 
-    soa.transforms = ToConstSpan(transforms);
-    soa.invTransforms = ToConstSpan(invTransforms);
+    soa.transforms = ToConstSpan(dTransforms);
+    soa.invTransforms = ToConstSpan(dInvTransforms);
 }
 
 TransAttributeInfoList TransformGroupSingle::AttributeInfo() const
@@ -52,7 +50,7 @@ void TransformGroupSingle::PushAttribute(TransformKey id , uint32_t attributeInd
 {
     if(attributeIndex == 0)
     {
-        GenericPushData(transforms, id.FetchIndexPortion(),
+        GenericPushData(dTransforms, id.FetchIndexPortion(),
                         attributeIndex,
                         std::move(data), queue);
     }
@@ -68,7 +66,7 @@ void TransformGroupSingle::PushAttribute(TransformKey id,
 {
     if(attributeIndex == 0)
     {
-        GenericPushData(transforms, id.FetchIndexPortion(),
+        GenericPushData(dTransforms, id.FetchIndexPortion(),
                         attributeIndex, subRange,
                         std::move(data), queue);
     }
@@ -84,7 +82,7 @@ void TransformGroupSingle::PushAttribute(TransformKey idStart, TransformKey idEn
     {
         auto idRange = Vector<2, IdInt>(idStart.FetchIndexPortion(),
                                         idEnd.FetchIndexPortion());
-        GenericPushData(transforms, idRange, attributeIndex,
+        GenericPushData(dTransforms, idRange, attributeIndex,
                         std::move(data), queue);
     }
     else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
@@ -93,7 +91,7 @@ void TransformGroupSingle::PushAttribute(TransformKey idStart, TransformKey idEn
 
 void TransformGroupSingle::Finalize(const GPUQueue& queue)
 {
-    DeviceAlgorithms::Transform(invTransforms, ToConstSpan(transforms), queue,
+    DeviceAlgorithms::Transform(dInvTransforms, ToConstSpan(dTransforms), queue,
                                 KCInvertTransforms());
 }
 
@@ -109,18 +107,10 @@ TransformGroupMulti::TransformGroupMulti(uint32_t groupId,
 
 void TransformGroupMulti::CommitReservations()
 {
-    Span<Span<const Matrix4x4>> batchedTransforms;
-    Span<Span<const Matrix4x4>> batchedInvTransforms;
 
-    //auto [t, it, bt22, bit22] =
-    auto [t, it, batchT, batchInvT] =
-        GenericCommit<Matrix4x4, Matrix4x4,
-                      Span<const Matrix4x4>,
-                      Span<const Matrix4x4>>({0, 0, 0, 0});
-    transforms = t;
-    invTransforms = it;
-    batchedTransforms = batchT;
-    batchedTransforms = batchInvT;
+    GenericCommit(std::tie(dTransforms, dInvTransforms,
+                           dTransformSpan, dInvTransformSpan),
+                  {0, 1, -1, -1});
 
     // TODO: Improve this?
     // Locally creating buffers ...
@@ -153,14 +143,14 @@ void TransformGroupMulti::CommitReservations()
                 Vector<2, size_t> range = dFlattenedRanges[i];
                 size_t size = range[1] - range[0];
 
-                batchedTransforms[i] = transforms.subspan(range[0], size);
-                batchedInvTransforms[i] = invTransforms.subspan(range[0], size);
+                dTransformSpan[i] = dTransforms.subspan(range[0], size);
+                dInvTransformSpan[i] = dInvTransforms.subspan(range[0], size);
             }
         }
     );
 
-    soa.transforms = ToConstSpan(batchedTransforms);
-    soa.invTransforms = ToConstSpan(batchedInvTransforms);
+    soa.transforms = ToConstSpan(dTransformSpan);
+    soa.invTransforms = ToConstSpan(dInvTransformSpan);
     // Wait here before locally deleting stuff.
     queue.Barrier().Wait();
 }
@@ -182,7 +172,7 @@ void TransformGroupMulti::PushAttribute(TransformKey id, uint32_t attributeIndex
 {
     if(attributeIndex == 0)
     {
-        GenericPushData(transforms, id.FetchIndexPortion(), attributeIndex,
+        GenericPushData(dTransforms, id.FetchIndexPortion(), attributeIndex,
                         std::move(data), queue);
     }
     else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
@@ -197,7 +187,7 @@ void TransformGroupMulti::PushAttribute(TransformKey id,
 {
     if(attributeIndex == 0)
     {
-        GenericPushData(transforms, id.FetchIndexPortion(),
+        GenericPushData(dTransforms, id.FetchIndexPortion(),
                         attributeIndex, subRange,
                         std::move(data), queue);
     }
@@ -213,7 +203,7 @@ void TransformGroupMulti::PushAttribute(TransformKey idStart, TransformKey idEnd
     {
         auto idRange = Vector<2, IdInt>(idStart.FetchIndexPortion(),
                                         idEnd.FetchIndexPortion());
-        GenericPushData(transforms, idRange, attributeIndex,
+        GenericPushData(dTransforms, idRange, attributeIndex,
                         std::move(data), queue);
     }
     else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
@@ -226,7 +216,7 @@ void TransformGroupMulti::Finalize(const GPUQueue& queue)
     // We can directly convert each transform individually
     // since each transform is independent from each other.
     // So a single invert call should suffice
-    DeviceAlgorithms::Transform(invTransforms, ToConstSpan(transforms), queue,
+    DeviceAlgorithms::Transform(dInvTransforms, ToConstSpan(dTransforms), queue,
                                 KCInvertTransforms());
 }
 

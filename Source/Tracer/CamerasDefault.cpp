@@ -17,12 +17,8 @@ CameraGroupPinhole::CameraGroupPinhole(uint32_t groupId,
 
 void CameraGroupPinhole::CommitReservations()
 {
-    auto [fnp, g, p, u] = GenericCommit<Vector4, Vector3,
-                                        Vector3, Vector3>({0, 0, 0, 0});
-    dFovAndPlanes = fnp;
-    dGazePoints = g;
-    dPositions = p;
-    dUpVectors = u;
+    GenericCommit(std::tie(dFovAndPlanes, dGazePoints, dPositions, dUpVectors),
+                  {0, 0, 0, 0});
 
     soa = DataSoA
     {

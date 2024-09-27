@@ -632,8 +632,8 @@ constexpr bool Vector<N, T>::HasNaN() const requires std::floating_point<T>
     UNROLL_LOOP
     for(unsigned int i = 0; i < N; i++)
     {
-        hasNan |= (std::isnan(vector[i]) ||
-                   std::isinf(vector[i]) ||
+        hasNan |= (Math::IsNan(vector[i]) ||
+                   Math::IsInf(vector[i]) ||
                    (vector[i] != vector[i]) ||
                    (vector[i] == std::numeric_limits<T>::infinity()) ||
                    (vector[i] == -std::numeric_limits<T>::infinity()));
@@ -889,7 +889,9 @@ template <unsigned int N, ArithmeticC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector<N, T> Vector<N, T>::OrthogonalVector(const Vector<N, T>& v) requires std::floating_point<T> && (N == 3)
 {
+    #ifndef MRAY_DEVICE_CODE_PATH
     using namespace std;
+    #endif
     // PBRT Book
     // https://www.pbr-book.org/3ed-2018/Geometry_and_Transformations/Vectors#CoordinateSystem
     if(abs(v[0]) > abs(v[1]))

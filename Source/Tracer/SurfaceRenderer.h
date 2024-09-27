@@ -52,6 +52,7 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     CameraKey                   curCamKey;
     const CameraWorkPtr*        curCamWork;
     uint64_t                    globalPixelIndex = 0;
+    Float                       curTMaxAO = std::numeric_limits<Float>::max();
     //
     RayPartitioner              rayPartitioner;
     RNGeneratorPtr              rnGenerator;

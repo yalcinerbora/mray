@@ -323,7 +323,7 @@ Vector3 CocentricOctahedralToDirection(const Vector2& st)
     // Clang signbit definition is only on std namespace
     // this is a crappy workaround
     #ifndef MRAY_DEVICE_CODE_PATH
-        using namespace std;
+    using namespace std;
     #endif
 
     // [0,1] to [-1,1]
@@ -337,12 +337,12 @@ Vector3 CocentricOctahedralToDirection(const Vector2& st)
     // Avoid division by zero
     if(radius != 0) phiPrime = ((uvAbs[1] - uvAbs[0]) / radius + 1) * PiOvr4;
     // Coords
-    Float cosPhi = (std::signbit(uv[0]) ? -1 : 1) * std::cos(phiPrime);
-    Float sinPhi = (std::signbit(uv[1]) ? -1 : 1) * std::sin(phiPrime);
+    Float cosPhi = (signbit(uv[0]) ? -1 : 1) * cos(phiPrime);
+    Float sinPhi = (signbit(uv[1]) ? -1 : 1) * sin(phiPrime);
     Float z = (signbit(d) ? -1 : 1) * (1 - radius * radius);
 
     // Now all is OK do the cocentric disk stuff
-    Float xyFactor = radius * std::sqrt(2 - radius * radius);
+    Float xyFactor = radius * sqrt(2 - radius * radius);
     Float x = cosPhi * xyFactor;
     Float y = sinPhi * xyFactor;
 

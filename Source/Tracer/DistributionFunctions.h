@@ -48,6 +48,9 @@ namespace Distribution::BxDF
     MRAY_HYBRID
     SampleT<Vector3> VNDFGGXSmithSample(const Vector3& V, Float alpha,
                                         const Vector2& xi);
+
+    MRAY_HYBRID
+    Float BurleyDiffuseCorrection(Float NdL, Float NdV, Float LdH, Float roughness);
 }
 
 namespace Distribution::Medium
@@ -66,8 +69,8 @@ namespace Distribution::Medium
 namespace Distribution::Common
 {
     template<VectorOrFloatC  T>
-    MRAY_HYBRID
-    T DivideByPDF(T, Float pdf);
+    MRAY_HYBRID T       DivideByPDF(T, Float pdf);
+    MRAY_HYBRID Float   DotN(Vector3);
 
     MRAY_HYBRID
     Pair<uint32_t, Float>   BisectSample1(Float xi, Float weight);
@@ -328,17 +331,42 @@ SampleT<Vector3> BxDF::VNDFGGXSmithSample(const Vector3& V, Float alpha,
     // Section 3.4: Finally back to Ellipsoid
     Vector3 NMicrofacet = Vector3(a * NHemi[0], a * NHemi[1],
                                   Math::SqrtMax(NHemi[2]));
-    float nLen2 = NMicrofacet.LengthSqr();
+    Float nLen2 = NMicrofacet.LengthSqr();
     if(nLen2 < MathConstants::Epsilon<Float>())
         NMicrofacet = Vector3::ZAxis();
     else
         NMicrofacet *= (Float(1) / std::sqrt(nLen2));
+
+    //if(NMicrofacet.HasNaN() || NMicrofacet == Vector3(0.0f) ||
+    //   VNDFGGXSmithPDF(V, NMicrofacet, alpha) < 0)
+    //    printf("H(%f, %f, %f), V(%f, %f, %f), VHemiV(%f, %f, %f), T1(%f, %f, %f), T2(%f, %f, %f), t1 %f, t2 %f, val %f\n",
+    //           NHemi[0], NHemi[1], NHemi[2],
+    //           V[0], V[1], V[2],
+    //           VHemi[0], VHemi[1], VHemi[2],
+    //           T1[0], T1[1], T1[2],
+    //           T2[0], T2[1], T2[2],
+    //           t1, t2, val);
 
     return SampleT<Vector3>
     {
         .value = NMicrofacet,
         .pdf = VNDFGGXSmithPDF(V, NMicrofacet, alpha)
     };
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float BxDF::BurleyDiffuseCorrection(Float NdL, Float NdV, Float LdH, Float roughness)
+{
+    // https://media.disneyanimation.com/uploads/production/publication_asset/48/asset/s2012_pbs_disney_brdf_notes_v3.pdf
+    Float Fd90 = Float(0.5) + Float(2) * roughness * LdH * LdH;
+    auto F = [&Fd90](Float dot)
+    {
+        Float pw = Float(1) - dot;
+        Float pw2 = pw * pw;
+        Float pw5 = pw2 * pw2 * pw;
+        return Float(1) + (Fd90 - Float(1)) * pw5;
+    };
+    return F(NdL) * F(NdV);
 }
 
 template<VectorOrFloatC  T>
@@ -354,6 +382,12 @@ T Common::DivideByPDF(T t, Float pdf)
         return t * pdfRecip;
     }
     return t / pdf;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float Common::DotN(Vector3 v)
+{
+    return v[2];
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -594,6 +628,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Float Common::PDFCosDirection(const Vector3& v, const Vector3& n)
 {
     Float pdf = n.Dot(v) * MathConstants::InvPi<Float>();
+    pdf = (pdf <= Float(0)) ? Float(0) : pdf;
     return pdf;
 }
 

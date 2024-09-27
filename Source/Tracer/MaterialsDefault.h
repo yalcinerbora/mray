@@ -153,16 +153,26 @@ namespace UnrealMatDetail
         using OptionalNormalMap = Optional<TracerTexView<2, Vector3>>;
         using DataSoA           = UnrealMatData;
         //
-        static constexpr uint32_t SampleRNCount = 2;
+        static constexpr uint32_t SampleRNCount = 3;
 
         private:
         const AlbedoMap             albedoTex;
         const OptionalNormalMap&    normalMapTex;
-        const FloatMap              roughness;
-        const FloatMap              specular;
-        const FloatMap              metallic;
+        const FloatMap              roughnessTex;
+        const FloatMap              specularTex;
+        const FloatMap              metallicTex;
 
         MediumKey                   mediumId;
+
+        MRAY_HYBRID
+        Float MISRatio(Float metallic, Float specular, Float avgAlbedo) const;
+        MRAY_HYBRID
+        Spectrum CalculateF0(Spectrum albedo, Float metallic, Float specular) const;
+        MRAY_HYBRID
+        Float ConverProbHToL(Float VdH, Float pdfH) const;
+        MRAY_HYBRID
+        Tuple<Float, Float, Float, Spectrum>
+        FetchData(const Surface&) const;
 
         public:
         MRAY_HYBRID
@@ -363,8 +373,20 @@ class MatGroupUnreal final : public GenericGroupMaterial<MatGroupUnreal>
     using Surface   = typename Material<>::Surface;
 
     private:
-    DataSoA         soa;
+    static constexpr uint32_t ALBEDO_INDEX      = 0;
+    static constexpr uint32_t NORMAL_MAP_INDEX  = 1;
+    static constexpr uint32_t ROUGHNESS_INDEX   = 2;
+    static constexpr uint32_t SPECULAR_INDEX    = 3;
+    static constexpr uint32_t METALLIC_INDEX    = 4;
 
+    private:
+    Span<ParamVaryingData<2, Vector3>>          dAlbedo;
+    Span<Optional<TracerTexView<2, Vector3>>>   dNormalMaps;
+    Span<ParamVaryingData<2, Float>>            dRoughness;
+    Span<ParamVaryingData<2, Float>>            dSpecular;
+    Span<ParamVaryingData<2, Float>>            dMetallic;
+    Span<MediumKey>                             dMediumIds;
+    DataSoA                                     soa;
     protected:
     void            HandleMediums(const MediumKeyPairList&) override;
 

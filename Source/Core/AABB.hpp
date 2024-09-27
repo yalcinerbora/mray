@@ -117,7 +117,7 @@ constexpr Vector<N, T> AABB<N, T>::FurthestCorner(const Vector<N, T>& point) con
     // Clang min definition is only on std namespace
     // this is a crappy workaround
     #ifndef MRAY_DEVICE_CODE_PATH
-        using namespace std;
+    using namespace std;
     #endif
 
     Vector<N, T> result;

@@ -57,8 +57,8 @@ class TransformGroupSingle final : public GenericGroupTransform<TransformGroupSi
     static Matrix4x4 AcquireCommonTransform(DataSoA, TransformKey);
 
     private:
-    Span<Matrix4x4> transforms;
-    Span<Matrix4x4> invTransforms;
+    Span<Matrix4x4> dTransforms;
+    Span<Matrix4x4> dInvTransforms;
     DataSoA         soa;
 
     public:
@@ -94,8 +94,11 @@ class TransformGroupMulti final : public GenericGroupTransform<TransformGroupMul
     static Matrix4x4 AcquireCommonTransform(DataSoA, TransformKey);
 
     private:
-    Span<Matrix4x4> transforms;
-    Span<Matrix4x4> invTransforms;
+    Span<Matrix4x4> dTransforms;
+    Span<Matrix4x4> dInvTransforms;
+    Span<Span<const Matrix4x4>> dTransformSpan;
+    Span<Span<const Matrix4x4>> dInvTransformSpan;
+
     DataSoA         soa;
 
     public:

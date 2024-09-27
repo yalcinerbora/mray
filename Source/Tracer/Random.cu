@@ -14,7 +14,7 @@ void KCGenRandomNumbersPCG32(// Output
                              // Constants
                              uint32_t dimPerGenerator)
 {
-    assert(dStates.size() * dimPerGenerator == dNumbers.size());
+    assert(dStates.size() * dimPerGenerator <= dNumbers.size());
     using State = typename PermutedCG32::State;
 
     uint32_t generatorCount = uint32_t(dStates.size());

@@ -315,7 +315,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 bool Math::IsInf(T f)
 {
     #ifndef MRAY_DEVICE_CODE_PATH_CUDA
-        using namespace std;
+    using namespace std;
     #endif
 
     return isinf(f);
@@ -326,7 +326,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 bool Math::IsNan(T f)
 {
     #ifndef MRAY_DEVICE_CODE_PATH_CUDA
-        using namespace std;
+    using namespace std;
     #endif
     return isnan(f);
 }

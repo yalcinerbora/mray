@@ -12,11 +12,7 @@ PrimGroupSphere::PrimGroupSphere(uint32_t primGroupId,
 
 void PrimGroupSphere::CommitReservations()
 {
-    std::array<size_t, AttributeCount> countLookup = {0, 0};
-    auto [c, r] = this->GenericCommit<Vector3, Float>(countLookup);
-
-    dCenters = c;
-    dRadius = r;
+    GenericCommit(std::tie(dCenters, dRadius), {0, 0});
 
     soa.centers = ToConstSpan(dCenters);
     soa.radius = ToConstSpan(dRadius);

@@ -267,19 +267,19 @@ template<RendererC R, PrimitiveGroupC PG,
          MaterialGroupC MG, TransformGroupC TG,
          auto WorkFunction,
          auto GenerateTransformContext = MRAY_PRIM_TGEN_FUNCTION(PG, TG)>
-MRAY_KERNEL
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParams<R, PG, MG, TG> params);
 
 template<RendererC R, LightGroupC LG, TransformGroupC TG,
          auto WorkFunction,
          auto GenerateTransformContext = MRAY_PRIM_TGEN_FUNCTION(typename LG::PrimGroup, TG)>
-MRAY_KERNEL
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static void KCRenderLightWork(MRAY_GRID_CONSTANT const RenderLightWorkParams<R, LG, TG> params);
 
 template<RendererC R, PrimitiveGroupC PG,
          CameraGroupC CG, TransformGroupC TG,
          auto WorkFunction>
-MRAY_KERNEL
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static void KCRenderCameraWork(MRAY_GRID_CONSTANT const RenderCameraWorkParams<R, CG, TG> params);
 
 template<RendererC R, PrimitiveGroupC PG,
@@ -687,7 +687,7 @@ uint32_t RenderCameraWork<R, C, T>::StochasticFilterSampleRayRNCount() const
 template<RendererC R, PrimitiveGroupC PG,
          MaterialGroupC MG, TransformGroupC TG,
          auto WorkFunction, auto GenerateTransformContext>
-MRAY_KERNEL
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParams<R, PG, MG, TG> params)
 {
     using SpectrumConv  = typename R::SpectrumConverterContext;
@@ -774,7 +774,7 @@ static void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParams<R, PG, MG, TG
 
 template<RendererC R, LightGroupC LG, TransformGroupC TG,
          auto WorkFunction, auto GenerateTransformContext>
-MRAY_KERNEL
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static void KCRenderLightWork(MRAY_GRID_CONSTANT const RenderLightWorkParams<R, LG, TG> params)
 {
     using SpectrumConv = typename R::SpectrumConverterContext;
@@ -829,7 +829,7 @@ static void KCRenderLightWork(MRAY_GRID_CONSTANT const RenderLightWorkParams<R, 
 
 template<RendererC R, CameraGroupC CG, TransformGroupC TG,
          auto WorkFunction>
-MRAY_KERNEL
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static void KCRenderCameraWork(MRAY_GRID_CONSTANT const RenderCameraWorkParams<R, CG, TG> params)
 {
 

@@ -75,7 +75,7 @@ namespace SurfRDetail
         uint32_t    totalSPP            = 32;
         Mode::E     mode                = Mode::WORLD_NORMAL;
         bool        doStochasticFilter  = true;
-        Float       tMaxAO              = std::numeric_limits<Float>::max();
+        Float       tMaxAORatio         = std::numeric_limits<Float>::max();
     };
 
     struct GlobalState

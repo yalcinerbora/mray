@@ -333,8 +333,7 @@ SampleT<Vector2> MitchellNetravaliFilter::Sample(const Vector2& xi) const
             default: assert(false);
         }
         using namespace Distribution;
-        Float misWeight = MIS::BalanceCancelled(Span<Float, 3>(pdfs.data(), 3),
-                                                Span<Float, 3>(weights.data(), 3));
+        Float misWeight = MIS::BalanceCancelled<3>(pdfs, weights);
         return SampleT<Float>
         {
             .value = sampleVal,
@@ -368,10 +367,8 @@ Float MitchellNetravaliFilter::Pdf(const Vector2& duv) const
         Common::PDFGaussian(duv[1], midSigma),
         Common::PDFGaussian(duv[1], sideSigma, sideMean)
     };
-    Float mis0 = MIS::BalanceCancelled(Span<Float, 3>(pdfs0.data(), 3),
-                                       Span<Float, 3>(weights.data(), 3));
-    Float mis1 = MIS::BalanceCancelled(Span<Float, 3>(pdfs1.data(), 3),
-                                       Span<Float, 3>(weights.data(), 3));
+    Float mis0 = MIS::BalanceCancelled<3>(pdfs0, weights);
+    Float mis1 = MIS::BalanceCancelled<3>(pdfs1, weights);
     return mis0 * mis1;
 }
 

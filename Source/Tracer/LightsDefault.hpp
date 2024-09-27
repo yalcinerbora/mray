@@ -396,19 +396,18 @@ void LightGroupPrim<PG>::CommitReservations()
 {
     // TODO: Wasting 8x memory cost due to "Bit" is not a type
     // Change this later
-    auto [rad, mIds, pRange, tSide]
-        = this->template GenericCommit<ParamVaryingData<2, Vector3>,
-                                       MediumKey, Vector2ui, uint32_t>({0, 0, 0, 0});
+    Span<uint32_t> dIsTwoSidedFlagsOut;
+    this->GenericCommit(std::tie(dRadiances, dMediumIds,
+                                 dPrimRanges,
+                                 dIsTwoSidedFlagsOut),
+                        {0, 0, 0, 0});
 
-    dRadiances = rad;
-    dMediumIds = mIds;
-    dPrimRanges = pRange;
-    dIsTwoSidedFlags = Bitspan<uint32_t>(tSide);
+    dIsTwoSidedFlags = Bitspan<uint32_t>(dIsTwoSidedFlagsOut);
 
     soa.dRadiances = ToConstSpan(dRadiances);
     soa.dMediumIds = ToConstSpan(dMediumIds);
     soa.dPrimRanges = ToConstSpan(dPrimRanges);
-    soa.dIsTwoSidedFlags = Bitspan<const uint32_t>(ToConstSpan(tSide));
+    soa.dIsTwoSidedFlags = ToConstSpan(dIsTwoSidedFlagsOut);
 }
 
 template <PrimitiveGroupC PG>
@@ -545,15 +544,8 @@ LightGroupSkysphere<CC>::LightGroupSkysphere(uint32_t groupId,
 template <CoordConverterC CC>
 void LightGroupSkysphere<CC>::CommitReservations()
 {
-    // TODO: Wasting 8x memory cost due to "Bit" is not a type
-    // Change this later
-    auto [rad, mIds, dists]
-        = this->template GenericCommit<ParamVaryingData<2, Vector3>,
-                                       MediumKey, DistributionPwC2D>({0, 0, 0});
-
-    dRadiances = rad;
-    dMediumIds = mIds;
-    dDistributions = dists;
+    this->GenericCommit(std::tie(dRadiances, dMediumIds, dDistributions),
+                        {0, 0, 0});
 
     soa.dRadiances = ToConstSpan(dRadiances);
     soa.dMediumIds = ToConstSpan(dMediumIds);

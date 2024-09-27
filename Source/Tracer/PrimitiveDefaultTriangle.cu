@@ -59,14 +59,8 @@ PrimGroupTriangle::PrimGroupTriangle(uint32_t primGroupId,
 
 void PrimGroupTriangle::CommitReservations()
 {
-    std::array<size_t, AttributeCount> countLookup = {1, 1, 1, 0};
-    auto [p, n, uv, i] = this->GenericCommit<Vector3, Quaternion,
-                                             Vector2, Vector3ui>(countLookup);
-
-    dPositions = p;
-    dTBNRotations = n;
-    dUVs = uv;
-    dIndexList = i;
+    GenericCommit(std::tie(dPositions, dTBNRotations, dUVs, dIndexList),
+                  {1, 1, 1, 0});
 
     soa.positions = ToConstSpan(dPositions);
     soa.tbnRotations = ToConstSpan(dTBNRotations);
@@ -247,19 +241,9 @@ PrimGroupSkinnedTriangle::PrimGroupSkinnedTriangle(uint32_t primGroupId,
 
 void PrimGroupSkinnedTriangle::CommitReservations()
 {
-    std::array<size_t, AttributeCount> countLookup = {1, 1, 1,
-                                                      1, 1, 0};
-    auto [p, n, uv, sw, si, i]
-        = GenericCommit<Vector3, Quaternion,
-                        Vector2, UNorm4x8,
-                        Vector4uc, Vector3ui>(countLookup);
-
-    dPositions = p;
-    dTBNRotations = n;
-    dUVs = uv;
-    dIndexList = i;
-    dSkinWeights = sw;
-    dSkinIndices = si;
+    GenericCommit(std::tie(dPositions, dTBNRotations, dUVs,
+                           dIndexList, dSkinWeights, dSkinIndices),
+                  {1, 1, 1, 1, 1, 0});
 
     soa.positions = ToConstSpan(dPositions);
     soa.tbnRotations = ToConstSpan(dTBNRotations);

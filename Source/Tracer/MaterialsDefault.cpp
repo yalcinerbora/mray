@@ -25,12 +25,8 @@ MatGroupLambert::MatGroupLambert(uint32_t groupId,
 
 void MatGroupLambert::CommitReservations()
 {
-    auto [a, nm, mIds] = GenericCommit<ParamVaryingData<2, Vector3>,
-                                       Optional<TracerTexView<2, Vector3>>,
-                                       MediumKey>({0, 0, 0});
-    dAlbedo = a;
-    dNormalMaps = nm;
-    dMediumIds = mIds;
+    GenericCommit(std::tie(dAlbedo, dNormalMaps, dMediumIds),
+                  {0, 0, -1});
 
     soa.dAlbedo = ToConstSpan(dAlbedo);
     soa.dNormalMaps = ToConstSpan(dNormalMaps);
@@ -228,7 +224,9 @@ MatGroupRefract::MatGroupRefract(uint32_t groupId,
 
 void MatGroupRefract::CommitReservations()
 {
-    isCommitted = true;
+    GenericCommit(std::tie(dMediumIds), {-1});
+
+    soa.dMediumIds = ToConstSpan(dMediumIds);
 }
 
 MatAttributeInfoList MatGroupRefract::AttributeInfo() const
@@ -299,7 +297,17 @@ MatGroupUnreal::MatGroupUnreal(uint32_t groupId,
 
 void MatGroupUnreal::CommitReservations()
 {
-    isCommitted = true;
+    GenericCommit(std::tie(dAlbedo, dNormalMaps,
+                           dRoughness, dSpecular, dMetallic,
+                           dMediumIds),
+                           {0, 0, 0, 0, 0, -1});
+
+    soa.dAlbedo = ToConstSpan(dAlbedo);
+    soa.dNormalMaps = ToConstSpan(dNormalMaps);
+    soa.dRoughness = ToConstSpan(dRoughness);
+    soa.dSpecular = ToConstSpan(dSpecular);
+    soa.dMetallic = ToConstSpan(dMetallic);
+    soa.dMediumIds = ToConstSpan(dMediumIds);
 }
 
 MatAttributeInfoList MatGroupUnreal::AttributeInfo() const
@@ -313,14 +321,14 @@ MatAttributeInfoList MatGroupUnreal::AttributeInfo() const
     {
         MatAttributeInfo("albedo", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
                          MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR),
-        MatAttributeInfo("metallic", MRayDataType<MR_FLOAT>(), IS_SCALAR,
+        MatAttributeInfo("normalMap", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+                         MR_OPTIONAL, MR_TEXTURE_ONLY, IS_PURE_DATA),
+        MatAttributeInfo("roughness", MRayDataType<MR_FLOAT>(), IS_SCALAR,
                          MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_PURE_DATA),
         MatAttributeInfo("specular", MRayDataType<MR_FLOAT>(), IS_SCALAR,
                          MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_PURE_DATA),
-        MatAttributeInfo("roughness", MRayDataType<MR_FLOAT>(), IS_SCALAR,
-                         MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_PURE_DATA),
-        MatAttributeInfo("normalMap", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
-                         MR_OPTIONAL, MR_TEXTURE_ONLY, IS_PURE_DATA)
+        MatAttributeInfo("metallic", MRayDataType<MR_FLOAT>(), IS_SCALAR,
+                         MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_PURE_DATA)
     };
     return LogicList;
 }
@@ -353,25 +361,54 @@ void MatGroupUnreal::PushAttribute(MaterialKey, MaterialKey,
 }
 
 
-void MatGroupUnreal::PushTexAttribute(MaterialKey, MaterialKey,
-                                      uint32_t, TransientData,
-                                      std::vector<Optional<TextureId>>,
-                                      const GPUQueue&)
+void MatGroupUnreal::PushTexAttribute(MaterialKey idStart, MaterialKey idEnd,
+                                      uint32_t attributeIndex, TransientData data,
+                                      std::vector<Optional<TextureId>> texIds,
+                                      const GPUQueue& queue)
 {
+    auto GenericLoad = [&]<class T>(Span<ParamVaryingData<2, T>> t)
+    {
+        GenericPushTexAttribute<2, T>(t, idStart, idEnd,
+                                      attributeIndex, std::move(data),
+                                      std::move(texIds), queue);
+    };
 
+    switch(attributeIndex)
+    {
+        case ALBEDO_INDEX:      GenericLoad(dAlbedo); break;
+        case ROUGHNESS_INDEX:   GenericLoad(dRoughness); break;
+        case SPECULAR_INDEX:    GenericLoad(dSpecular); break;
+        case METALLIC_INDEX:    GenericLoad(dMetallic); break;
+        default: throw MRayError("{:s}: Attribute {:d} is not \"ParamVarying\", wrong "
+                                 "function is called", TypeName(), attributeIndex);
+    }
 }
 
-void MatGroupUnreal::PushTexAttribute(MaterialKey, MaterialKey,
-                                      uint32_t,
-                                      std::vector<Optional<TextureId>>,
-                                      const GPUQueue&)
-{}
+void MatGroupUnreal::PushTexAttribute(MaterialKey idStart, MaterialKey idEnd,
+                                      uint32_t attributeIndex,
+                                      std::vector<Optional<TextureId>> texIds,
+                                      const GPUQueue& queue)
+{
+    if(attributeIndex == NORMAL_MAP_INDEX)
+    {
+        GenericPushTexAttribute<2, Vector3>(dNormalMaps,
+                                            //
+                                            idStart, idEnd,
+                                            attributeIndex,
+                                            std::move(texIds),
+                                            queue);
+    }
+    else throw MRayError("{:s}: Attribute {:d} is not \"Optional Texture\", wrong "
+                         "function is called", TypeName(), attributeIndex);
+}
 
 void MatGroupUnreal::PushTexAttribute(MaterialKey, MaterialKey,
                                       uint32_t,
                                       std::vector<TextureId>,
                                       const GPUQueue&)
-{}
+{
+    throw MRayError("{:s} do not have any mandatory textures!", TypeName());
+}
 
 typename MatGroupUnreal::DataSoA MatGroupUnreal::SoA() const
 {
