@@ -144,7 +144,7 @@ struct IntersectionT
 
 struct BxDFResult
 {
-    Ray         wO;
+    Ray         wI;
     Spectrum    reflectance;
     MediumKey   mediumKey;
 };

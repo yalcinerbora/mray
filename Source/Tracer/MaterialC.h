@@ -35,7 +35,7 @@ concept MaterialC = requires(MatType mt,
     // Calculate the pdf value
     // TODO: should we provide a surface?
     // For BSSRDF how tf we get the pdf???
-    {mt.Pdf(Ray{}, Ray{}, typename MatType::Surface{})
+    {mt.Pdf(Ray{}, Vector3{}, typename MatType::Surface{})
     } -> std::same_as<Float>;
 
     // How many random numbers the sampler of this class uses

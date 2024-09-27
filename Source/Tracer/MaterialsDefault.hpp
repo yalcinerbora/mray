@@ -21,9 +21,9 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
     using Distribution::Common::SampleCosDirection;
     // Sampling a vector from cosine weighted hemispherical distribution
     Vector2 xi = dispenser.NextFloat2D<0>();
-    auto [wO, pdf] = SampleCosDirection(xi);
+    auto [wI, pdf] = SampleCosDirection(xi);
     // Before lifting up to the local space calculate dot product
-    Float nDotL = std::max(wO[2], Float{0});
+    Float nDotL = std::max(wI[2], Float{0});
 
     // Check normal Mapping
     Vector3 normal = Vector3::ZAxis();
@@ -31,7 +31,7 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
     {
         normal = (*normalMapTex)(surface.uv).value();
         // Due to normal change our direction sample should be aligned as well
-        wO = Quaternion::RotationBetweenZAxis(normal).ApplyRotation(wO);
+        wI = Quaternion::RotationBetweenZAxis(normal).ApplyRotation(wI);
     }
 
     // Before transform calculate reflectance
@@ -41,16 +41,16 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
     // Material is responsible for transforming out of primitive's
     // shading space (same goes for wI but lambert material is
     // wI invariant so we did not convert it)
-    wO = surface.shadingTBN.ApplyInvRotation(wO);
+    wI = surface.shadingTBN.ApplyInvRotation(wI);
     // Lambert material is **not** asubsurface material,
     // directly delegate the incoming position as outgoing
-    Ray wORay = Ray(wO, surface.position);
+    Ray wIRay = Ray(wI, surface.position);
 
     return SampleT<BxDFResult>
     {
         .value = BxDFResult
         {
-            .wO = wORay,
+            .wI = wIRay,
             .reflectance = reflectance,
             .mediumKey = mediumId
         },
@@ -60,21 +60,21 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float LambertMaterial<ST>::Pdf(const Ray&,
-                               const Ray& wO,
+Float LambertMaterial<ST>::Pdf(const Ray& wI,
+                               const Vector3&,
                                const Surface& surface) const
 {
     using Distribution::Common::PDFCosDirection;
-    Vector3 wOLocal = surface.shadingTBN.ApplyRotation(wO.Dir());
+    Vector3 wILocal = surface.shadingTBN.ApplyRotation(wI.Dir());
     Vector3 normal = (normalMapTex) ? (*normalMapTex)(surface.uv).value()
                                     : Vector3::ZAxis();
-    Float pdf = PDFCosDirection(wOLocal, normal);
+    Float pdf = PDFCosDirection(wILocal, normal);
     return std::max(pdf, Float(0));
 }
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum LambertMaterial<ST>::Evaluate(const Ray& wO,
+Spectrum LambertMaterial<ST>::Evaluate(const Ray& wI,
                                        const Vector3&,
                                        const Surface& surface) const
 {
@@ -82,9 +82,9 @@ Spectrum LambertMaterial<ST>::Evaluate(const Ray& wO,
                                     : Vector3::ZAxis();
     // Calculate lightning in local space since
     // wO and wI is already in local space
-    Vector3 wOLocal = surface.shadingTBN.ApplyRotation(wO.Dir());
+    Vector3 wILocal = surface.shadingTBN.ApplyRotation(wI.Dir());
 
-    Float nDotL = std::max(normal.Dot(wOLocal), Float(0));
+    Float nDotL = std::max(normal.Dot(wILocal), Float(0));
     Spectrum albedo = sTransContext(albedoTex(surface.uv,
                                               surface.dpdu,
                                               surface.dpdv));
@@ -132,7 +132,7 @@ ReflectMaterial<ST>::ReflectMaterial(const SpectrumConverter&,
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<BxDFResult> ReflectMaterial<ST>::SampleBxDF(const Vector3& wI,
+SampleT<BxDFResult> ReflectMaterial<ST>::SampleBxDF(const Vector3& wO,
                                                     const Surface& surface,
                                                     RNGDispenser&) const
 {
@@ -142,14 +142,14 @@ SampleT<BxDFResult> ReflectMaterial<ST>::SampleBxDF(const Vector3& wI,
     // TODO: Maybe fast reflect (that assumes normal is ZAxis) maybe faster?
     Vector3 normal = Vector3::ZAxis();
     Vector3 localNormal = surface.shadingTBN.ApplyInvRotation(normal);
-    Vector3 wO = Graphics::Reflect(localNormal, wI);
+    Vector3 wI = Graphics::Reflect(localNormal, wO);
     // Directly delegate position, this is not a subsurface material
-    Ray wORay = Ray(wO, surface.position);
+    Ray wIRay = Ray(wI, surface.position);
     return SampleT<BxDFResult>
     {
         .value = BxDFResult
         {
-            .wO = wORay,
+            .wI = wIRay,
             .reflectance = Spectrum(1.0),
             // TODO: Change this later
             .mediumKey = MediumKey::InvalidKey()
@@ -161,7 +161,7 @@ SampleT<BxDFResult> ReflectMaterial<ST>::SampleBxDF(const Vector3& wI,
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float ReflectMaterial<ST>::Pdf(const Ray& wI,
-                               const Ray& wO,
+                               const Vector3& wO,
                                const Surface& surface) const
 {
     // We can not sample this
@@ -170,8 +170,8 @@ Float ReflectMaterial<ST>::Pdf(const Ray& wI,
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum ReflectMaterial<ST>::Evaluate(const Ray& wO,
-                                       const Vector3& wI,
+Spectrum ReflectMaterial<ST>::Evaluate(const Ray& wI,
+                                       const Vector3& wO,
                                        const Surface& surface) const
 {
     return Spectrum(1);
@@ -215,7 +215,7 @@ RefractMaterial<ST>::RefractMaterial(const SpectrumConverter& sTransContext,
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<BxDFResult> RefractMaterial<ST>::SampleBxDF(const Vector3& wI,
+SampleT<BxDFResult> RefractMaterial<ST>::SampleBxDF(const Vector3& wO,
                                                     const Surface& surface,
                                                     RNGDispenser& rng) const
 {
@@ -240,7 +240,7 @@ SampleT<BxDFResult> RefractMaterial<ST>::SampleBxDF(const Vector3& wI,
 
     // Surface is aligned with the ray (N dot Dir is always positive)
     const Vector3 nLocal = surface.shadingTBN.ApplyInvRotation(Vector3::ZAxis());
-    Float cosTheta = std::abs(wI.Dot(nLocal));
+    Float cosTheta = std::abs(wO.Dot(nLocal));
 
     // Calculate Fresnel Term
     Float f = Distribution::BxDF::FresnelDielectric(cosTheta, fromEta, toEta);
@@ -249,11 +249,11 @@ SampleT<BxDFResult> RefractMaterial<ST>::SampleBxDF(const Vector3& wI,
     Float xi = rng.NextFloat<0>();
     bool doReflection = (xi < f);
 
-    Vector3 wO = (doReflection)
-        ? Graphics::Reflect(nLocal, wI)
+    Vector3 wI = (doReflection)
+        ? Graphics::Reflect(nLocal, wO)
         // Since we refract via fresnel, total internal reflection
         // should not happen
-        : Graphics::Refract(nLocal, wI, fromEta, toEta).value();
+        : Graphics::Refract(nLocal, wO, fromEta, toEta).value();
     //
     MediumKey outMedium = (doReflection) ? fromMedium : toMedium;
     Float pdf           = (doReflection) ? f : (Float(1) - f);
@@ -262,7 +262,7 @@ SampleT<BxDFResult> RefractMaterial<ST>::SampleBxDF(const Vector3& wI,
     {
         .value = BxDFResult
         {
-            .wO = Ray(wO, surface.position).Nudge(nLocal),
+            .wI = Ray(wI, surface.position).Nudge(nLocal),
             .reflectance = Spectrum(pdf),
             .mediumKey = outMedium
         },
@@ -273,7 +273,7 @@ SampleT<BxDFResult> RefractMaterial<ST>::SampleBxDF(const Vector3& wI,
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float RefractMaterial<ST>::Pdf(const Ray& wI,
-                               const Ray& wO,
+                               const Vector3& wO,
                                const Surface& surface) const
 {
     // We can not sample this
@@ -282,8 +282,8 @@ Float RefractMaterial<ST>::Pdf(const Ray& wI,
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum RefractMaterial<ST>::Evaluate(const Ray& wO,
-                                       const Vector3& wI,
+Spectrum RefractMaterial<ST>::Evaluate(const Ray& wI,
+                                       const Vector3& wO,
                                        const Surface& surface) const
 {
     return Spectrum(1);
@@ -329,82 +329,30 @@ UnrealMaterial<SpectrumTransformer>::UnrealMaterial(const SpectrumConverter& spe
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3&,
+SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
                                                    const Surface& surface,
                                                    RNGDispenser& dispenser) const
 {
-    // TODO:
-    using Distribution::Common::SampleCosDirection;
-    // Sampling a vector from cosine weighted hemispherical distribution
-    Vector2 xi = dispenser.NextFloat2D<0>();
-    auto [wO, pdf] = SampleCosDirection(xi);
-    // Before lifting up to the local space calculate dot product
-    Float nDotL = std::max(wO[2], Float{0});
 
-    // Check normal Mapping
-    Vector3 normal = Vector3::ZAxis();
-    if(normalMapTex)
-    {
-        normal = (*normalMapTex)(surface.uv).value();
-        // Due to normal change our direction sample should be aligned as well
-        wO = Quaternion::RotationBetweenZAxis(normal).ApplyRotation(wO);
-    }
-
-    // Before transform calculate reflectance
-    Spectrum albedo = albedoTex(surface.uv, surface.dpdu, surface.dpdv).value();
-    Spectrum reflectance = albedo * nDotL * MathConstants::InvPi<Float>();
-
-    // Material is responsible for transforming out of primitive's
-    // shading space (same goes for wI but lambert material is
-    // wI invariant so we did not convert it)
-    wO = surface.shadingTBN.ApplyInvRotation(wO);
-    // Lambert material is **not** asubsurface material,
-    // directly delegate the incoming position as outgoing
-    Ray wORay = Ray(wO, surface.position);
-
-    return SampleT<BxDFResult>
-    {
-        .value = BxDFResult
-        {
-            .wO = wORay,
-            .reflectance = reflectance,
-            .mediumKey = mediumId
-        },
-        .pdf = pdf
-    };
+    return SampleT<BxDFResult> {};
 }
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float UnrealMaterial<ST>::Pdf(const Ray&,
-                              const Ray& wO,
+Float UnrealMaterial<ST>::Pdf(const Ray& wI,
+                              const Vector3& wO,
                               const Surface& surface) const
 {
-    using Distribution::Common::PDFCosDirection;
-    Vector3 wOLocal = surface.shadingTBN.ApplyRotation(wO.Dir());
-    Vector3 normal = (normalMapTex) ? (*normalMapTex)(surface.uv).value()
-                                    : Vector3::ZAxis();
-    Float pdf = PDFCosDirection(wOLocal, normal);
-    return std::max(pdf, Float(0));
+    return 0;
 }
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum UnrealMaterial<ST>::Evaluate(const Ray& wO,
-                                      const Vector3&,
+Spectrum UnrealMaterial<ST>::Evaluate(const Ray& wI,
+                                      const Vector3& wO,
                                       const Surface& surface) const
 {
-    Vector3 normal = (normalMapTex) ? (*normalMapTex)(surface.uv).value()
-                                    : Vector3::ZAxis();
-    // Calculate lightning in local space since
-    // wO and wI is already in local space
-    Vector3 wOLocal = surface.shadingTBN.ApplyRotation(wO.Dir());
-
-    Float nDotL = std::max(normal.Dot(wOLocal), Float(0));
-    Spectrum albedo = sTransContext(albedoTex(surface.uv,
-                                              surface.dpdu,
-                                              surface.dpdv));
-    return nDotL * albedo * MathConstants::InvPi<Float>();
+    return Spectrum::Zero();
 }
 
 template <class ST>

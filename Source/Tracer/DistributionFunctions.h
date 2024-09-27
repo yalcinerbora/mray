@@ -15,6 +15,39 @@ namespace Distribution::BxDF
     template<VectorC T>
     MRAY_HYBRID
     Float FresnelConductor(Float cosFront, const T& etaFront, const T& etaBack);
+
+    MRAY_HYBRID
+    Float DGGX(Float NdH, Float alpha);
+
+    MRAY_HYBRID
+    Float LambdaSmith(const Vector3& vec, Float alpha);
+
+    MRAY_HYBRID
+    Float GSmithSingle(const Vector3& vec, Float alpha);
+
+    MRAY_HYBRID
+    Float GSmithCorralated(const Vector3& wO, const Vector3& wI,
+                           Float alpha);
+
+    MRAY_HYBRID
+    Float GSmithSeperable(const Vector3& wO, const Vector3& wI,
+                          Float alpha);
+
+    MRAY_HYBRID
+    Float GSchlick(Float cosTheta, Float alpha);
+
+    MRAY_HYBRID
+    Float GeomGGX(Float cosTheta, Float alpha);
+
+    MRAY_HYBRID
+    Spectrum FSchlick(Float VdH, const Spectrum& f0);
+
+    MRAY_HYBRID
+    Float VNDFGGXSmithPDF(const Vector3& V, const Vector3& H, Float alpha);
+
+    MRAY_HYBRID
+    SampleT<Vector3> VNDFGGXSmithSample(const Vector3& V, Float alpha,
+                                        const Vector2& xi);
 }
 
 namespace Distribution::Medium
@@ -156,6 +189,156 @@ Float BxDF::FresnelConductor(Float cosTheta, const T& eta, const T& k)
     T rP = rS * (pT1 - pT2) / (pT1 + pT2);
 
     return (rP + rS) * Float(0.5);
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float BxDF::DGGX(Float NdH, Float alpha)
+{
+    Float alpha2 = alpha * alpha;
+    Float denom = NdH * NdH * (alpha2 - Float(1)) + Float(1);
+    denom = denom * denom;
+    denom *= MathConstants::Pi<Float>();
+    Float result = (alpha2 / denom);
+    return result;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float BxDF::LambdaSmith(const Vector3& vec, Float alpha)
+{
+    Vector3 vSqr = vec * vec;
+    Float alpha2 = alpha * alpha;
+    Float inner = alpha2 * (vSqr[0] + vSqr[1]) / vSqr[2];
+    Float lambda = std::sqrt(Float(1) + inner) - Float(1);
+    lambda *= Float(0.5);
+    return lambda;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float BxDF::GSmithSingle(const Vector3& vec, Float alpha)
+{
+    return Float(1) / (Float(1) + LambdaSmith(vec, alpha));
+
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float BxDF::GSmithCorralated(const Vector3& wO, const Vector3& wI,
+                             Float alpha)
+{
+    return Float(1) / (LambdaSmith(wO, alpha) + LambdaSmith(wI, alpha) + Float(1));
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float BxDF::GSmithSeperable(const Vector3& wO, const Vector3& wI,
+                            Float alpha)
+{
+    return GSmithSingle(wO, alpha) * GSmithSingle(wI, alpha);
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float BxDF::GSchlick(Float cosTheta, Float alpha)
+{
+    if(cosTheta == Float(0)) return Float(0);
+    Float k = alpha * Float(0.5);
+    return cosTheta / (cosTheta * (1 - k) + k);
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float BxDF::GeomGGX(Float NdV, Float alpha)
+{
+    // Straight from paper (Eq. 34)
+    // https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf
+    if(NdV == Float(0)) return Float(0);
+
+    // Eq has tan^2 theta which is
+    // sin^2 / cos^2
+    // sin^2 = 1 - cos^2
+    Float cosTheta2 = NdV * NdV;
+    Float tan2 = (Float(1) - cosTheta2) / cosTheta2;
+    Float alpha2 = alpha * alpha;
+    Float denom = Float(1) + std::sqrt(Float(1) + tan2 * alpha2);
+    return Float(2) / denom;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Spectrum BxDF::FSchlick(Float VdH, const Spectrum& f0)
+{
+    // Classic Schlick's approx of fresnel term
+    Float pw = Float(1) - VdH;
+    Float pw2 = pw * pw;
+    Float pw5 = pw2 * pw2 * pw;
+
+    Spectrum result = (Spectrum(1) - f0) * pw5;
+    result += f0;
+    return result;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float BxDF::VNDFGGXSmithPDF(const Vector3& V, const Vector3& H, Float alpha)
+{
+    Float VdH = std::max(Float(0), H.Dot(V));
+    Float NdH = std::max(Float(0), H[2]);
+    Float NdV = std::max(Float(0), V[2]);
+    Float D = DGGX(NdH, alpha);
+    Float GSingle = GSmithSingle(V, alpha);
+    //
+    if(NdV == Float(0)) return Float(0);
+    //
+    return VdH * D * GSingle / NdV;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+SampleT<Vector3> BxDF::VNDFGGXSmithSample(const Vector3& V, Float alpha,
+                                          const Vector2& xi)
+{
+    // VNDF Routine straight from the paper
+    // https://jcgt.org/published/0007/04/01/
+    // G1 is Smith here be careful,
+    // Everything is tangent space,
+    // So no surface normal is feed to the system,
+    // some Dot products (with normal) are thusly represented as
+    // X[2] where x is the vector is being dot product with the normal
+    //
+    // Unlike most of the routines this sampling function
+    // consists of multiple functions (namely NDF and Shadowing)
+    // because of that, it does not return the value of the function
+    // it returns the generated micro-facet normal
+    //
+    // And finally this routine represents isotropic material
+    // a_y ==  a_x == a
+    // Rename alpha for easier reading
+    Float a = alpha;
+    // Section 3.2 Ellipsoid to Spherical
+    Vector3 VHemi = Vector3(a * V[0], a * V[1], V[2]).Normalize();
+    // Section 4.1 Find orthonormal basis in the sphere
+    Float len2 = Vector2f(VHemi).LengthSqr();
+    Vector3 T1 = (len2 > 0)
+                    ? Vector3(-VHemi[1], VHemi[0], 0.0f) / std::sqrt(len2)
+                    : Vector3(1, 0, 0);
+    Vector3 T2 = Vector3::Cross(VHemi, T1);
+    // Section 4.2 Sampling using projected area
+    Float r = std::sqrt(xi[0]);
+    Float phi = Float(2) * MathConstants::Pi<Float>() * xi[1];
+    Float t1 = r * std::cos(phi);
+    Float t2 = r * std::sin(phi);
+    Float s = Float(0.5) * (Float(1) + VHemi[2]);
+    t2 = (Float(1) - s) * sqrt(Float(1) - t1 * t1) + s * t2;
+    // Section 4.3: Projection onto hemisphere
+    float val = Float(1) - t1 * t1 - t2 * t2;
+    Vector3 NHemi = t1 * T1 + t2 * T2 + Math::SqrtMax(val) * VHemi;
+    // Section 3.4: Finally back to Ellipsoid
+    Vector3 NMicrofacet = Vector3(a * NHemi[0], a * NHemi[1],
+                                  Math::SqrtMax(NHemi[2]));
+    float nLen2 = NMicrofacet.LengthSqr();
+    if(nLen2 < MathConstants::Epsilon<Float>())
+        NMicrofacet = Vector3::ZAxis();
+    else
+        NMicrofacet *= (Float(1) / std::sqrt(nLen2));
+
+    return SampleT<Vector3>
+    {
+        .value = NMicrofacet,
+        .pdf = VNDFGGXSmithPDF(V, NMicrofacet, alpha)
+    };
 }
 
 template<VectorOrFloatC  T>

@@ -41,10 +41,10 @@ namespace LambertMatDetail
                                            const Surface& surface,
                                            RNGDispenser& dispenser) const;
         MRAY_HYBRID Float       Pdf(const Ray& wI,
-                                    const Ray& wO,
+                                    const Vector3& wO,
                                     const Surface& surface) const;
-        MRAY_HYBRID Spectrum    Evaluate(const Ray& wO,
-                                         const Vector3& wI,
+        MRAY_HYBRID Spectrum    Evaluate(const Ray& wI,
+                                         const Vector3& wO,
                                          const Surface& surface) const;
         MRAY_HYBRID bool        IsEmissive() const;
         MRAY_HYBRID Spectrum    Emit(const Vector3& wO,
@@ -75,10 +75,10 @@ namespace ReflectMatDetail
                                            const Surface& surface,
                                            RNGDispenser& dispenser) const;
         MRAY_HYBRID Float       Pdf(const Ray& wI,
-                                const Ray& wO,
-                                const Surface& surface) const;
-        MRAY_HYBRID Spectrum    Evaluate(const Ray& wO,
-                                         const Vector3& wI,
+                                    const Vector3& wO,
+                                    const Surface& surface) const;
+        MRAY_HYBRID Spectrum    Evaluate(const Ray& wI,
+                                         const Vector3& wO,
                                          const Surface& surface) const;
         MRAY_HYBRID bool        IsEmissive() const;
         MRAY_HYBRID Spectrum    Emit(const Vector3& wO,
@@ -117,10 +117,10 @@ namespace RefractMatDetail
                                            const Surface& surface,
                                            RNGDispenser& dispenser) const;
         MRAY_HYBRID Float       Pdf(const Ray& wI,
-                                const Ray& wO,
+                                    const Vector3& wO,
                                 const Surface& surface) const;
-        MRAY_HYBRID Spectrum    Evaluate(const Ray& wO,
-                                         const Vector3& wI,
+        MRAY_HYBRID Spectrum    Evaluate(const Ray& wI,
+                                         const Vector3& wO,
                                          const Surface& surface) const;
         MRAY_HYBRID bool        IsEmissive() const;
         MRAY_HYBRID Spectrum    Emit(const Vector3& wO,
@@ -174,10 +174,10 @@ namespace UnrealMatDetail
                                            const Surface& surface,
                                            RNGDispenser& dispenser) const;
         MRAY_HYBRID Float       Pdf(const Ray& wI,
-                                    const Ray& wO,
+                                    const Vector3& wO,
                                     const Surface& surface) const;
-        MRAY_HYBRID Spectrum    Evaluate(const Ray& wO,
-                                         const Vector3& wI,
+        MRAY_HYBRID Spectrum    Evaluate(const Ray& wI,
+                                         const Vector3& wO,
                                          const Surface& surface) const;
         MRAY_HYBRID bool        IsEmissive() const;
         MRAY_HYBRID Spectrum    Emit(const Vector3& wO,
