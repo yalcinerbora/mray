@@ -242,13 +242,18 @@ void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, cons
 
     if(params.globalState.mode.e == Mode::FURNACE)
     {
+        using Distribution::Common::DivideByPDF;
         auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
         Vector3 wI = rayIn.Dir();
         wI = tContext.InvApplyN(wI).Normalize();
         auto raySample = mat.SampleBxDF(-wI, surf, rng);
 
-        Spectrum refl = Distribution::Common::DivideByPDF(raySample.value.reflectance,
-                                                          raySample.pdf);
+        Spectrum refl;
+        if(raySample.value.reflectance.HasNaN() || Math::IsNan(raySample.pdf))
+            refl = BIG_MAGENTA;
+        else
+            refl = DivideByPDF(raySample.value.reflectance, raySample.pdf);
+
         params.rayState.dOutputData[rayIndex] = refl;
     }
     else if(params.globalState.mode.e == Mode::AO)

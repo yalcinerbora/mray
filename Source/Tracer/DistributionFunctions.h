@@ -337,16 +337,6 @@ SampleT<Vector3> BxDF::VNDFGGXSmithSample(const Vector3& V, Float alpha,
     else
         NMicrofacet *= (Float(1) / std::sqrt(nLen2));
 
-    //if(NMicrofacet.HasNaN() || NMicrofacet == Vector3(0.0f) ||
-    //   VNDFGGXSmithPDF(V, NMicrofacet, alpha) < 0)
-    //    printf("H(%f, %f, %f), V(%f, %f, %f), VHemiV(%f, %f, %f), T1(%f, %f, %f), T2(%f, %f, %f), t1 %f, t2 %f, val %f\n",
-    //           NHemi[0], NHemi[1], NHemi[2],
-    //           V[0], V[1], V[2],
-    //           VHemi[0], VHemi[1], VHemi[2],
-    //           T1[0], T1[1], T1[2],
-    //           T2[0], T2[1], T2[2],
-    //           t1, t2, val);
-
     return SampleT<Vector3>
     {
         .value = NMicrofacet,

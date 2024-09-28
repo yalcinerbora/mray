@@ -333,7 +333,7 @@ Float UnrealMaterial<ST>::MISRatio(Float metallic, Float specular,
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float UnrealMaterial<ST>::ConverProbHToL(Float VdH, Float pdfH) const
+Float UnrealMaterial<ST>::ConvertProbHToL(Float VdH, Float pdfH) const
 {
     // VNDFGGXSmithPDF returns sampling of H Vector
     // convert it to sampling probability of L Vector
@@ -424,7 +424,7 @@ SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
         H = (L + V).Normalize();
         Float VdH = std::max(Float(0), V.Dot(H));
         pdf[SPECULAR] = BxDF::VNDFGGXSmithPDF(V, H, alpha);
-        pdf[SPECULAR] = ConverProbHToL(VdH, pdf[SPECULAR]);
+        pdf[SPECULAR] = ConvertProbHToL(VdH, pdf[SPECULAR]);
     }
     else
     {
@@ -432,7 +432,7 @@ SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
         H = s.value;
         L = Graphics::Reflect(H, V);
         Float VdH = std::max(Float(0), V.Dot(H));
-        pdf[SPECULAR] = ConverProbHToL(VdH, s.pdf);
+        pdf[SPECULAR] = ConvertProbHToL(VdH, s.pdf);
         //
         pdf[DIFFUSE] = Common::PDFCosDirection(L);
     }
@@ -477,29 +477,6 @@ SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
     // Convert direction to local space
     L = toTangentSpace.ApplyInvRotation(L);
 
-
-    //if(isnan(pdfOut))
-    //{
-    //    Spectrum r = specularTerm / pdfOut;
-    //    printf("[%s] D: %f, G: %f, F: (%f, %f, %f), "
-    //           "G[V] %f, VdH %f,"
-    //           "totalSpec (%f, %f, %f), "
-    //           "pdf %f, pdf[0] %f, pdf[1] %f, misR %f\n",
-    //           (doDiffuseSample) ? "Diffuse " : "Specular",
-    //           D, G,
-    //           F[0], F[1], F[2],
-    //           BxDF::GSmithSingle(V, alpha), VdH,
-    //           specularTerm[0], specularTerm[1], specularTerm[2],
-    //           pdfOut, pdf[0], pdf[1], misRatio);
-    //}
-    //if(pdfOut < 0.0f)
-    //{
-    //    printf("[%s] pdf %f, pdf[0] %f, pdf[1] %f, misR %f\n",
-    //           (doDiffuseSample) ? "Diffuse " : "Specular",
-    //           pdfOut, pdf[0], pdf[1], misRatio);
-    //}
-
-
     Spectrum reflectance = diffuseTerm + specularTerm;
     // Go all the way to the local space
     return SampleT<BxDFResult>
@@ -537,7 +514,7 @@ Float UnrealMaterial<ST>::Pdf(const Ray& wI,
     // Bring wO, wI all the way to the tangent space
     Vector3 V = toTangentSpace.ApplyRotation(wO);
     Vector3 L = toTangentSpace.ApplyRotation(wI.Dir());
-    Vector3f H = (L + V).Normalize();
+    Vector3 H = (L + V).Normalize();
     //
     Float misRatio = MISRatio(metallic, specular, avgAlbedo);
     std::array<Float, 2> weights = {misRatio, Float(1) - misRatio};
@@ -580,7 +557,7 @@ Spectrum UnrealMaterial<ST>::Evaluate(const Ray& wI,
     // Bring wO, wI all the way to the tangent space
     Vector3 V = toTangentSpace.ApplyRotation(wO);
     Vector3 L = toTangentSpace.ApplyRotation(wI.Dir());
-    Vector3f H = (L + V).Normalize();
+    Vector3 H = (L + V).Normalize();
 
     //=======================//
     //   Calculate Specular  //

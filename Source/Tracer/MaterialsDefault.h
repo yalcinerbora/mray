@@ -169,7 +169,7 @@ namespace UnrealMatDetail
         MRAY_HYBRID
         Spectrum CalculateF0(Spectrum albedo, Float metallic, Float specular) const;
         MRAY_HYBRID
-        Float ConverProbHToL(Float VdH, Float pdfH) const;
+        Float ConvertProbHToL(Float VdH, Float pdfH) const;
         MRAY_HYBRID
         Tuple<Float, Float, Float, Spectrum>
         FetchData(const Surface&) const;
