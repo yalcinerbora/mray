@@ -15,8 +15,8 @@ LambertMaterial<SpectrumTransformer>::LambertMaterial(const SpectrumConverter& s
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
-                                                   const Surface& surface,
-                                                   RNGDispenser& dispenser) const
+                                                    const Surface& surface,
+                                                    RNGDispenser& dispenser) const
 {
     using Distribution::Common::SampleCosDirection;
     // Sampling a vector from cosine weighted hemispherical distribution
@@ -29,7 +29,8 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
     Vector3 normal = Vector3::ZAxis();
     if(normalMapTex)
     {
-        normal = (*normalMapTex)(surface.uv).value();
+        normal = (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value();
+        normal.NormalizeSelf();
         // Due to normal change our direction sample should be aligned as well
         wI = Quaternion::RotationBetweenZAxis(normal).ApplyRotation(wI);
     }
@@ -66,8 +67,10 @@ Float LambertMaterial<ST>::Pdf(const Ray& wI,
 {
     using Distribution::Common::PDFCosDirection;
     Vector3 wILocal = surface.shadingTBN.ApplyRotation(wI.Dir());
-    Vector3 normal = (normalMapTex) ? (*normalMapTex)(surface.uv).value()
-                                    : Vector3::ZAxis();
+    Vector3 normal = (normalMapTex)
+        ? (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value()
+        : Vector3::ZAxis();
+    normal.NormalizeSelf();
     Float pdf = PDFCosDirection(wILocal, normal);
     return std::max(pdf, Float(0));
 }
@@ -78,8 +81,10 @@ Spectrum LambertMaterial<ST>::Evaluate(const Ray& wI,
                                        const Vector3&,
                                        const Surface& surface) const
 {
-    Vector3 normal = (normalMapTex) ? (*normalMapTex)(surface.uv).value()
-                                    : Vector3::ZAxis();
+    Vector3 normal = (normalMapTex)
+        ? (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value()
+        : Vector3::ZAxis();
+    normal.NormalizeSelf();
     // Calculate lightning in local space since
     // wO and wI is already in local space
     Vector3 wILocal = surface.shadingTBN.ApplyRotation(wI.Dir());
@@ -408,6 +413,7 @@ SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
     if(normalMapTex)
     {
         Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value();
+        normal.NormalizeSelf();
         // Due to normal change our direction sample should be aligned as well
         toTangentSpace = Quaternion::RotationBetweenZAxis(normal) * toTangentSpace;
     }
@@ -508,6 +514,7 @@ Float UnrealMaterial<ST>::Pdf(const Ray& wI,
     if(normalMapTex)
     {
         Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value();
+        normal.NormalizeSelf();
         // Due to normal change our direction sample should be aligned as well
         toTangentSpace = Quaternion::RotationBetweenZAxis(normal) * toTangentSpace;
     }
@@ -551,6 +558,7 @@ Spectrum UnrealMaterial<ST>::Evaluate(const Ray& wI,
     if(normalMapTex)
     {
         Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value();
+        normal.NormalizeSelf();
         // Due to normal change our direction sample should be aligned as well
         toTangentSpace = Quaternion::RotationBetweenZAxis(normal) * toTangentSpace;
     }

@@ -58,8 +58,9 @@ void KCShowTexture(MRAY_GRID_CONSTANT const ImageSpan<3> imgSpan,
         Vector3 result;
         if constexpr(C == 1)
         {
+            // For single channel textures, show grayscale
             const auto& view = std::get<TracerTexView<2, Float>>(texView);
-            result = Vector3(view(uv, Float(mipIndex)).value(), 0, 0);
+            result = Vector3(view(uv, Float(mipIndex)).value());
         }
         else if constexpr(C == 2)
         {

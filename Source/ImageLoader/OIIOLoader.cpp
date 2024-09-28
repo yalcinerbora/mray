@@ -463,8 +463,8 @@ Expected<MRayPixelTypeRT> ImageFileOIIO::ConvertFormatToRequested(MRayPixelTypeR
 }
 
 ImageFileOIIO::ImageFileOIIO(const std::string& filePath,
-              ImageSubChannelType subChannels,
-              ImageIOFlags flags)
+                             ImageSubChannelType subChannels,
+                             ImageIOFlags flags)
     : ImageFileBase(filePath, subChannels, flags)
 {}
 
@@ -569,12 +569,6 @@ Expected<Image> ImageFileOIIO::ReadImage()
 
     // Again determine the read format
     OIIO::TypeDesc readFormat = spec.format;
-    if(flags[ImageFlagTypes::LOAD_AS_SIGNED])
-    {
-        readFormat = (readFormat == OIIO::TypeDesc::UINT16)
-                        ? OIIO::TypeDesc::INT16
-                        : OIIO::TypeDesc::INT8;
-    }
 
     // Calculate read channel count according to channel expansion
     size_t readChannelCount = header.pixelType.ChannelCount();
@@ -620,7 +614,6 @@ Expected<Image> ImageFileOIIO::ReadImage()
         }, dataPixelType);
         pixels.ReserveAll();
 
-
         // Read inverted, OIIO has DirectX
         // (or most image processing literature) style
         // Point towards the last scanline, and put stride as negative
@@ -635,6 +628,38 @@ Expected<Image> ImageFileOIIO::ReadImage()
                                  readFormat, lastScanlinePtr,
                                  xStride, -oiioScanLineSize))
             return MRayError("OIIO Error ({})", oiioFile->geterror());
+
+        // Do the conversion
+        // This is recently added, "asSigned" conversion
+        // is for normal maps, OIIO conversion does something else.
+        // (It compresses the full range to signed range, halves the precision)
+        // We just invert the (x * 2 - 1) requirement of normal maps
+        // to singed reading, which corresponds to adding the half of the
+        // maximum magnitude of the integer.
+        if(flags[ImageFlagTypes::LOAD_AS_SIGNED])
+        {
+            // Overflow the range std::numeric_limits<T>::max >> 1
+            // Since overflow is only defined in unsigned integers
+            // access the data as unsigned int
+            if(readFormat == OIIO::TypeDesc::UINT16)
+            {
+                static constexpr auto HALF_SIZE = (std::numeric_limits<uint16_t>::max() >> 1u) + 1u;
+                Vector4us* usPtr = reinterpret_cast<Vector4us*>(pixels.AccessAs<Byte>().data());
+                for(uint32_t i = 0; i < result.header.dimensions.Multiply(); i++)
+                {
+                    usPtr[i] += Vector4us(HALF_SIZE);
+                }
+            }
+            else if(readFormat == OIIO::TypeDesc::UINT8)
+            {
+                static constexpr auto HALF_SIZE = (std::numeric_limits<uint8_t>::max() >> 1u) + 1u;
+                Vector4uc* ucPtr = reinterpret_cast<Vector4uc*>(pixels.AccessAs<Byte>().data());
+                for(uint32_t i = 0; i < result.header.dimensions.Multiply(); i++)
+                {
+                    ucPtr[i] += Vector4uc(HALF_SIZE);
+                }
+            }
+        }
 
         // Push the mip data to vector
         result.imgData.emplace_back(ImageMip

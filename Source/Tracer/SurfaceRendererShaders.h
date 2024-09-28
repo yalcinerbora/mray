@@ -250,7 +250,7 @@ void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, cons
 
         Spectrum refl;
         if(raySample.value.reflectance.HasNaN() || Math::IsNan(raySample.pdf))
-            refl = BIG_MAGENTA;
+            refl = Spectrum(BIG_MAGENTA, 0.0);
         else
             refl = DivideByPDF(raySample.value.reflectance, raySample.pdf);
 
