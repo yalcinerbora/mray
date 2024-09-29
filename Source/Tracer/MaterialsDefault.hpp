@@ -32,7 +32,7 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
         normal = (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value();
         normal.NormalizeSelf();
         // Due to normal change our direction sample should be aligned as well
-        wI = Quaternion::RotationBetweenZAxis(normal).ApplyRotation(wI);
+        wI = Quaternion::RotationBetweenZAxis(normal).Conjugate().ApplyRotation(wI);
     }
 
     // Before transform calculate reflectance
@@ -214,9 +214,18 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 RefractMaterial<ST>::RefractMaterial(const SpectrumConverter& sTransContext,
                                      const DataSoA& soa, MaterialKey mk)
     // TODO: Add medium here later
-    : mKeyIn(soa.dMediumIds[mk.FetchIndexPortion()].first)
-    , mKeyOut(soa.dMediumIds[mk.FetchIndexPortion()].second)
-{}
+    : mKeyFront(soa.dMediumIds[mk.FetchIndexPortion()].first)
+    , mKeyBack(soa.dMediumIds[mk.FetchIndexPortion()].second)
+{
+    // Fetch ior
+    auto CoeffsToIoR = [&](Vector3 coeffs)
+    {
+        using namespace Distribution::Medium;
+        return WavesToSpectrumCauchy(sTransContext.Wavelengths(), coeffs);
+    };
+    frontIoR = CoeffsToIoR(soa.dFrontCauchyCoeffs[mk.FetchIndexPortion()]);
+    backIoR = CoeffsToIoR(soa.dBackCauchyCoeffs[mk.FetchIndexPortion()]);
+}
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -224,16 +233,16 @@ SampleT<BxDFResult> RefractMaterial<ST>::SampleBxDF(const Vector3& wO,
                                                     const Surface& surface,
                                                     RNGDispenser& rng) const
 {
-    // Fetch Mat
-    // Determine medium index of refractions
-    //uint32_t mediumIndex = matData.mediumIndices[matId];
-    //Float iIOR = matData.dMediums[mediumIndex]->IOR();
-    //Float dIOR = matData.dMediums[matData.baseMediumIndex]->IOR();
-    //TODO:!!!
-    Float fromEta = Float(1);
-    Float toEta = Float(1.5);
-    MediumKey fromMedium;
-    MediumKey toMedium;
+    Float fromEta, toEta;
+    if constexpr(SpectrumConverter::IsRGB)
+    {
+        fromEta = frontIoR[0];
+        toEta = backIoR[0];
+    }
+    // TODO:
+    else static_assert(SpectrumConverter::IsRGB, "Dispersion is not implemented yet!");
+    MediumKey fromMedium = mKeyFront;
+    MediumKey toMedium = mKeyBack;
 
     // Check if we are exiting or entering
     bool entering = !surface.backSide;
@@ -326,14 +335,16 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Float UnrealMaterial<ST>::MISRatio(Float metallic, Float specular,
                                    Float avgAlbedo) const
 {
-    // This function returns diffuse selection probability
-    // Diffuse part
-    Float integralDiffuse = Float(2) * MathConstants::Pi<Float>() * avgAlbedo;
-    integralDiffuse *= (Float(1) - metallic);
-    // Specular part
-    Float specularRatio = Math::Lerp(specular, avgAlbedo, metallic);
-    Float total = specularRatio + integralDiffuse;
-    return (total == Float(0)) ? Float(0) : integralDiffuse / total;
+    return Float(0.5);
+
+    //// This function returns diffuse selection probability
+    //// Diffuse part
+    //Float integralDiffuse = Float(2) * MathConstants::Pi<Float>() * avgAlbedo;
+    //integralDiffuse *= (Float(1) - metallic);
+    //// Specular part
+    //Float specularRatio = Math::Lerp(specular, avgAlbedo, metallic);
+    //Float total = specularRatio + integralDiffuse;
+    //return (total == Float(0)) ? Float(0) : integralDiffuse / total;
 }
 
 template <class ST>
@@ -399,23 +410,24 @@ SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
     Float avgAlbedo = albedo.Sum() * Float(0.3333);
 
     // Get two random numbers
-    Float sXI = dispenser.NextFloat<0>();
+    Float sXi = dispenser.NextFloat<0>();
     Vector2 xi = dispenser.NextFloat2D<1>();
     // We do not use extra RNG for single samlple MIS
     // we just bisect the given samples
     // TODO: Is this correct?
     Float misRatio = MISRatio(metallic, specular, avgAlbedo);
     std::array<Float, 2> misWeights = {misRatio, Float(1) - misRatio};
-    bool doDiffuseSample = (sXI < misRatio);
+    bool doDiffuseSample = (sXi < misRatio);
 
     // Microfacet dist functions are all in tangent space
     Quaternion toTangentSpace = surface.shadingTBN;
+    Vector3 normal;
     if(normalMapTex)
     {
-        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value();
+        normal = (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value();
         normal.NormalizeSelf();
         // Due to normal change our direction sample should be aligned as well
-        toTangentSpace = Quaternion::RotationBetweenZAxis(normal) * toTangentSpace;
+        toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
     }
     // Bring wO all the way to the tangent space
     Vector3 V = toTangentSpace.ApplyRotation(wO);
@@ -475,7 +487,7 @@ SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
 
     // Diffsue Portion
     // Blend between albedo<->black for metallic material
-    Float NdL = std::max(0.0f, L[0]);
+    Float NdL = std::max(Float(0), Common::DotN(L));
     Spectrum diffuseAlbedo = (Float(1) - metallic) * albedo;
     Spectrum diffuseTerm = NdL * diffuseAlbedo * MathConstants::InvPi<Float>();
     diffuseTerm *= BxDF::BurleyDiffuseCorrection(NdL, NdV, LdH, roughness);
@@ -484,6 +496,23 @@ SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
     L = toTangentSpace.ApplyInvRotation(L);
 
     Spectrum reflectance = diffuseTerm + specularTerm;
+
+
+
+    Spectrum xxx = Common::DivideByPDF(reflectance, pdfOut);
+    if(xxx.Sum() > 100)
+    {
+        printf("[L]: Xi[%f, %f, %f], R: %f, S: %f, M: %f "
+               "A: [%f, %f, %f] wO [%f, %f, %f] "
+               "normal [%f, %f, %f], Q[%f, %f, %f, %f] = [%f, %f, %f]\n",
+               sXi, xi[0], xi[1], roughness, specular, metallic,
+               albedo[0], albedo[1], albedo[2],
+               wO[0], wO[1], wO[2], normal[0], normal[1], normal[2],
+               surface.shadingTBN[0], surface.shadingTBN[1],
+               surface.shadingTBN[2], surface.shadingTBN[3],
+               xxx[0], xxx[1], xxx[2]);
+    }
+
     // Go all the way to the local space
     return SampleT<BxDFResult>
     {
@@ -516,7 +545,7 @@ Float UnrealMaterial<ST>::Pdf(const Ray& wI,
         Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value();
         normal.NormalizeSelf();
         // Due to normal change our direction sample should be aligned as well
-        toTangentSpace = Quaternion::RotationBetweenZAxis(normal) * toTangentSpace;
+        toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
     }
     // Bring wO, wI all the way to the tangent space
     Vector3 V = toTangentSpace.ApplyRotation(wO);
@@ -560,7 +589,7 @@ Spectrum UnrealMaterial<ST>::Evaluate(const Ray& wI,
         Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value();
         normal.NormalizeSelf();
         // Due to normal change our direction sample should be aligned as well
-        toTangentSpace = Quaternion::RotationBetweenZAxis(normal) * toTangentSpace;
+        toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
     }
     // Bring wO, wI all the way to the tangent space
     Vector3 V = toTangentSpace.ApplyRotation(wO);

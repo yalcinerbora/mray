@@ -10,25 +10,15 @@ namespace MediumDetail
     // (Instead of 80 bytes, this is 48 bytes!)
     struct alignas(16) HomogeneousMediumData
         : public SoASpan <const Vector3, const Vector3,
-                          const Vector3, const Vector3,
-                          const Float>
+                          const Vector3, const Float>
     {
         using Base = SoASpan<const Vector3, const Vector3,
-                             const Vector3, const Vector3,
-                             const Float>;
+                             const Vector3, const Float>;
         enum I
         {
             SIGMA_A,
             SIGMA_S,
             EMISSION,
-            // Due to spectral rendering support
-            // this should be wavelength varying.
-            // Renderer's "SpectrumConverter" does not make sense for this
-            // data.
-            // But for RGB rendering, dispersing does not makes sense (I think?)
-            // So we assume ior is 3 channel and we slap cauchy A B coeff's
-            // for the last two parameters
-            IOR,
             HG_PHASE
         };
 
@@ -54,8 +44,6 @@ namespace MediumDetail
         Float           PdfScattering(const Vector3& wI, const Vector3& wO) const;
 
         MRAY_HYBRID
-        Spectrum        IoR(const Vector3& uv) const;
-        MRAY_HYBRID
         Spectrum        SigmaA(const Vector3& uv) const;
         MRAY_HYBRID
         Spectrum        SigmaS(const Vector3& uv) const;
@@ -77,7 +65,6 @@ namespace MediumDetail
         Spectrum sigmaA;
         Spectrum sigmaS;
         Spectrum emission;
-        Spectrum ior;
         Float    g;
 
         public:
@@ -89,8 +76,6 @@ namespace MediumDetail
         MRAY_HYBRID
         Float           PdfScattering(const Vector3& wI, const Vector3& wO) const;
 
-        MRAY_HYBRID
-        Spectrum        IoR(const Vector3& uv) const;
         MRAY_HYBRID
         Spectrum        SigmaA(const Vector3& uv) const;
         MRAY_HYBRID
@@ -163,7 +148,6 @@ class MediumGroupHomogeneous : public GenericGroupMedium<MediumGroupHomogeneous>
     Span<Vector3>   dSigmaA;
     Span<Vector3>   dSigmaS;
     Span<Vector3>   dEmission;
-    Span<Vector3>   dIoR;
     Span<Float>     dPhaseVal;
     DataSoA         soa;
 

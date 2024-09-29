@@ -37,7 +37,7 @@ namespace LambertMatDetail
                         const DataSoA& soa, MaterialKey mk);
 
         MRAY_HYBRID
-        SampleT<BxDFResult>     SampleBxDF(const Vector3& wI,
+        SampleT<BxDFResult>     SampleBxDF(const Vector3& wO,
                                            const Surface& surface,
                                            RNGDispenser& dispenser) const;
         MRAY_HYBRID Float       Pdf(const Ray& wI,
@@ -71,7 +71,7 @@ namespace ReflectMatDetail
                         const DataSoA& soa, MaterialKey mk);
 
         MRAY_HYBRID
-        SampleT<BxDFResult>     SampleBxDF(const Vector3& wI,
+        SampleT<BxDFResult>     SampleBxDF(const Vector3& wO,
                                            const Surface& surface,
                                            RNGDispenser& dispenser) const;
         MRAY_HYBRID Float       Pdf(const Ray& wI,
@@ -92,6 +92,8 @@ namespace RefractMatDetail
     struct alignas(32) RefractMatData
     {
         Span<const Pair<MediumKey, MediumKey>> dMediumIds;
+        Span<const Vector3>                    dFrontCauchyCoeffs;
+        Span<const Vector3>                    dBackCauchyCoeffs;
     };
 
     template <class SpectrumTransformer = SpectrumConverterContextIdentity>
@@ -104,8 +106,10 @@ namespace RefractMatDetail
         static constexpr uint32_t SampleRNCount = 0;
 
         private:
-        MediumKey mKeyIn;
-        MediumKey mKeyOut;
+        MediumKey   mKeyFront;
+        Spectrum    frontIoR;
+        MediumKey   mKeyBack;
+        Spectrum    backIoR;
 
         public:
         MRAY_HYBRID
@@ -113,7 +117,7 @@ namespace RefractMatDetail
                         const DataSoA& soa, MaterialKey mk);
 
         MRAY_HYBRID
-        SampleT<BxDFResult>     SampleBxDF(const Vector3& wI,
+        SampleT<BxDFResult>     SampleBxDF(const Vector3& wO,
                                            const Surface& surface,
                                            RNGDispenser& dispenser) const;
         MRAY_HYBRID Float       Pdf(const Ray& wI,
@@ -180,7 +184,7 @@ namespace UnrealMatDetail
                        const DataSoA& soa, MaterialKey mk);
 
         MRAY_HYBRID
-        SampleT<BxDFResult>     SampleBxDF(const Vector3& wI,
+        SampleT<BxDFResult>     SampleBxDF(const Vector3& wO,
                                            const Surface& surface,
                                            RNGDispenser& dispenser) const;
         MRAY_HYBRID Float       Pdf(const Ray& wI,
@@ -319,6 +323,8 @@ class MatGroupRefract final : public GenericGroupMaterial<MatGroupRefract>
 
     private:
     Span<Pair<MediumKey, MediumKey>>    dMediumIds;
+    Span<Vector3>                       dFrontCauchyCoeffs;
+    Span<Vector3>                       dBackCauchyCoeffs;
     DataSoA                             soa;
 
     protected:

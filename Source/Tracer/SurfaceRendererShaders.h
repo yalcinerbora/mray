@@ -75,7 +75,7 @@ namespace SurfRDetail
         uint32_t    totalSPP            = 32;
         Mode::E     mode                = Mode::WORLD_NORMAL;
         bool        doStochasticFilter  = true;
-        Float       tMaxAORatio         = std::numeric_limits<Float>::max();
+        Float       tMaxAORatio         = Float(0.15);
     };
 
     struct GlobalState
@@ -258,34 +258,35 @@ void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, cons
     }
     else if(params.globalState.mode.e == Mode::AO)
     {
+        Vector3 geoNormal;
         Vector3 normal;
         if constexpr(std::is_same_v<BasicSurface, Surface>)
-            normal = surf.normal;
+            geoNormal = normal = surf.normal;
         else
         {
             normal = surf.shadingTBN.ApplyInvRotation(Vector3::ZAxis());
-            normal = tContext.ApplyN(normal).Normalize();
+            geoNormal = surf.geoNormal;
         }
-        Vector3 position = surf.position;
+        normal = tContext.ApplyN(normal).Normalize();
 
         Vector2 xi = rng.NextFloat2D<0>();
         auto dirSample = Distribution::Common::SampleCosDirection(xi);
+        Float NdL = Distribution::Common::DotN(dirSample.value);
         // From flat space (triangle laid out on XY plane) to directly world space
         Quaternion q = Quaternion::RotationBetweenZAxis(normal);
         Vector3 direction = q.ApplyRotation(dirSample.value);
-        Float nDotL = direction.Dot(normal);
 
         // Technically ao multiplier should be one after division by PDF
         // This is a simple shader, the division is explicitly specified
         // for verbosity.
-        Vector3 aoMultiplier = Vector3(nDotL * MathConstants::InvPi<Float>());
+        Vector3 aoMultiplier = Vector3(NdL * MathConstants::InvPi<Float>());
         aoMultiplier = Distribution::Common::DivideByPDF(aoMultiplier, dirSample.pdf);
         // Preset the ao multiplier, visibility check may override it after casting
         params.rayState.dOutputData[rayIndex] = Spectrum(aoMultiplier, 0);
 
         // New ray
-        Ray rayOut = Ray(direction, position);
-        rayOut.NudgeSelf(normal);
+        Ray rayOut = Ray(direction, surf.position);
+        rayOut.NudgeSelf(geoNormal);
         Float tMax = params.globalState.tMaxAO;
         RayToGMem(params.out.dRays, rayIndex, rayOut, Vector2(0, tMax));
     }

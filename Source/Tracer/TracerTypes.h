@@ -75,6 +75,10 @@ using SpectrumWavesT = Vector<SPS, T>;
 using Spectrum      = SpectrumT<SpectraPerSpectrum, Float>;
 using SpectrumWaves = SpectrumWavesT<SpectraPerSpectrum, Float>;
 
+// Visible spectrum definitions
+inline constexpr Vector2   VisibleSpectrumRange = Vector2(380, 700);
+inline constexpr Float     VisibleSpectrumMiddle = VisibleSpectrumRange.Sum() * Float(0.5);
+
 // Invalid spectrum, this will be set when some form of numerical
 // error occurs (i.e. a NaN is found). It is specifically oversaturated
 // to "pop out" on the image (tonemapper probably darken everything else etc)
@@ -171,12 +175,6 @@ struct BasicSurface
     Vector3 position;
     Vector3 normal;
 };
-
-//struct BarycentricSurface
-//{
-//    Vector3 position;
-//    Vector3 baryCoords;
-//};
 
 struct DefaultSurface
 {

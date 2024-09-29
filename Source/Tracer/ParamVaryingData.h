@@ -34,7 +34,11 @@ template <class C>
 concept SpectrumConverterC = requires(const C c)
 {
     {c.Convert(Optional<Vector3>{})} -> std::same_as<Optional<Spectrum>>;
-    {c.Waves()} -> std::same_as<SpectrumWaves>;
+    {c.Wavelengths()} -> std::same_as<SpectrumWaves>;
+    // TODO: Why this does not work?
+    //{C::IsRGB} -> std::same_as<const bool>;
+    C::IsRGB;
+    requires std::is_same_v<decltype(C::IsRGB), const bool>;
 };
 
 template <class C>
@@ -102,7 +106,10 @@ struct SpectrumConverterIdentity
     // may change depending on the medium (unless we dictate a protocol)
     // This is little bit more scalable but for Identity converter this does not
     // makes sense. Medium logic should be careful to incorporate these
-    MRAY_HYBRID SpectrumWaves Waves() const;
+    MRAY_HYBRID SpectrumWaves Wavelengths() const;
+    // By design the identity converter is RGB
+    // (MRay holds every texture, value etc. as RGB)
+    static constexpr bool IsRGB = true;
 
 };
 
@@ -211,7 +218,7 @@ Optional<Spectrum> SpectrumConverterIdentity::Convert(const Optional<Vector3>& c
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-SpectrumWaves SpectrumConverterIdentity::Waves() const
+SpectrumWaves SpectrumConverterIdentity::Wavelengths() const
 {
-    return SpectrumWaves::Zero();
+    return SpectrumWaves(VisibleSpectrumMiddle);
 }

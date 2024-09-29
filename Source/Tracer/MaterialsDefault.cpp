@@ -224,50 +224,122 @@ MatGroupRefract::MatGroupRefract(uint32_t groupId,
 
 void MatGroupRefract::CommitReservations()
 {
-    GenericCommit(std::tie(dMediumIds), {-1});
+    GenericCommit(std::tie(dMediumIds,
+                           dFrontCauchyCoeffs,
+                           dBackCauchyCoeffs), {-1, 0, 0});
 
+    soa.dBackCauchyCoeffs = ToConstSpan(dBackCauchyCoeffs);
+    soa.dFrontCauchyCoeffs = ToConstSpan(dFrontCauchyCoeffs);
     soa.dMediumIds = ToConstSpan(dMediumIds);
 }
 
 MatAttributeInfoList MatGroupRefract::AttributeInfo() const
 {
-    return MatAttributeInfoList{};
+    using enum MRayDataEnum;
+    using enum AttributeOptionality;
+    using enum AttributeTexturable;
+    using enum AttributeIsArray;
+    using enum AttributeIsColor;
+    static const MatAttributeInfoList LogicList =
+    {
+        MatAttributeInfo("cauchyBack", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+                         MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA),
+        MatAttributeInfo("cauchyFront", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+                         MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA)
+    };
+    return LogicList;
 }
 
-void MatGroupRefract::PushAttribute(MaterialKey,
-                                    uint32_t,
-                                    TransientData,
-                                    const GPUQueue&)
-{}
+void MatGroupRefract::PushAttribute(MaterialKey matKey,
+                                    uint32_t attributeIndex,
+                                    TransientData data,
+                                    const GPUQueue& queue)
+{
+    auto GenericLoad = [&]<class T>(const Span<T>& d)
+    {
+        GenericPushData(d, matKey.FetchIndexPortion(),
+                        attributeIndex, std::move(data),
+                        queue);
+    };
 
-void MatGroupRefract::PushAttribute(MaterialKey,
-                                    uint32_t, const Vector2ui&,
-                                    TransientData, const GPUQueue&)
-{}
+    switch(attributeIndex)
+    {
+        case 0: GenericLoad(dBackCauchyCoeffs); break;
+        case 1: GenericLoad(dFrontCauchyCoeffs); break;
+        default: throw MRayError("{:s}: Unkown attribute index {:d}",
+                                 TypeName(), attributeIndex);
+    }
+}
 
-void MatGroupRefract::PushAttribute(MaterialKey, MaterialKey,
-                                    uint32_t, TransientData,
-                                    const GPUQueue&)
-{}
+void MatGroupRefract::PushAttribute(MaterialKey matKey,
+                                    uint32_t attributeIndex,
+                                    const Vector2ui& subRange,
+                                    TransientData data, const GPUQueue& queue)
+{
+    auto GenericLoad = [&]<class T>(const Span<T>& d)
+    {
+        GenericPushData(d, matKey.FetchIndexPortion(),
+                        attributeIndex, subRange,
+                        std::move(data), queue);
+    };
 
+    switch(attributeIndex)
+    {
+        case 0: GenericLoad(dBackCauchyCoeffs); break;
+        case 1: GenericLoad(dFrontCauchyCoeffs); break;
+        default: throw MRayError("{:s}: Unkown attribute index {:d}",
+                                 TypeName(), attributeIndex);
+    }
+}
+
+void MatGroupRefract::PushAttribute(MaterialKey idStart, MaterialKey idEnd,
+                                    uint32_t attributeIndex, TransientData data,
+                                    const GPUQueue& queue)
+{
+    auto GenericLoad = [&]<class T>(const Span<T>& d)
+    {
+        using Vec = Vector<2, CommonKey>;
+        GenericPushData(d, Vec(idStart.FetchIndexPortion(),
+                               idEnd.FetchIndexPortion()),
+                        attributeIndex, std::move(data),
+                        queue);
+    };
+
+    switch(attributeIndex)
+    {
+        case 0: GenericLoad(dBackCauchyCoeffs); break;
+        case 1: GenericLoad(dFrontCauchyCoeffs); break;
+        default: throw MRayError("{:s}: Unkown attribute index {:d}",
+                                 TypeName(), attributeIndex);
+    }
+}
 
 void MatGroupRefract::PushTexAttribute(MaterialKey, MaterialKey,
-                                       uint32_t, TransientData,
+                                       uint32_t attributeIndex, TransientData,
                                        std::vector<Optional<TextureId>>,
                                        const GPUQueue&)
-{}
+{
+    throw MRayError("{:s}: Attribute {:d} is not \"ParamVarying\", wrong "
+                    "function is called", TypeName(), attributeIndex);
+}
 
 void MatGroupRefract::PushTexAttribute(MaterialKey, MaterialKey,
-                                       uint32_t,
+                                       uint32_t attributeIndex,
                                        std::vector<Optional<TextureId>>,
                                        const GPUQueue&)
-{}
+{
+    throw MRayError("{:s}: Attribute {:d} is not \"Optional Texture\", wrong "
+                    "function is called", TypeName(), attributeIndex);
+}
 
 void MatGroupRefract::PushTexAttribute(MaterialKey, MaterialKey,
-                                       uint32_t,
+                                       uint32_t attributeIndex,
                                        std::vector<TextureId>,
                                        const GPUQueue&)
-{}
+{
+    throw MRayError("{:s}: Attribute {:d} is not \"Mandatory Texture\", wrong "
+                    "function is called", TypeName(), attributeIndex);
+}
 
 typename MatGroupRefract::DataSoA MatGroupRefract::SoA() const
 {

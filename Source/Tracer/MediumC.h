@@ -47,7 +47,6 @@ concept MediumC = requires(MediumType md,
     {md.SampleScattering(Vector3{}, rng)} -> std::same_as<ScatterSample>;
     {md.PdfScattering(Vector3{}, Vector3{})} -> std::same_as<Float>;
 
-    {md.IoR(Vector3{})} -> std::same_as<Spectrum>;
     {md.SigmaA(Vector3{})} -> std::same_as<Spectrum>;
     {md.SigmaS(Vector3{})} -> std::same_as<Spectrum>;
     {md.Emission(Vector3{})} -> std::same_as<Spectrum>;

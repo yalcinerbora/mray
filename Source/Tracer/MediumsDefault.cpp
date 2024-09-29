@@ -88,13 +88,11 @@ MediumGroupHomogeneous::MediumGroupHomogeneous(uint32_t groupId,
 
 void MediumGroupHomogeneous::CommitReservations()
 {
-    GenericCommit(std::tie(dSigmaA, dSigmaS, dEmission, dIoR,
-                           dPhaseVal),
-                  {0, 0, 0, 0, 0});
+    GenericCommit(std::tie(dSigmaA, dSigmaS, dEmission, dPhaseVal),
+                  {0, 0, 0, 0});
 
     soa = DataSoA(ToConstSpan(dSigmaA), ToConstSpan(dSigmaS),
-                  ToConstSpan(dEmission), ToConstSpan(dIoR),
-                  ToConstSpan(dPhaseVal));
+                  ToConstSpan(dEmission), ToConstSpan(dPhaseVal));
 }
 
 MediumAttributeInfoList MediumGroupHomogeneous::AttributeInfo() const
@@ -112,8 +110,6 @@ MediumAttributeInfoList MediumGroupHomogeneous::AttributeInfo() const
                          MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
         MatAttributeInfo("emission", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
                          MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
-        MatAttributeInfo("ior", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
-                         MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA),
         MatAttributeInfo("hgPhase", MRayDataType<MR_FLOAT>(), IS_SCALAR,
                          MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA)
     };
@@ -138,7 +134,6 @@ void MediumGroupHomogeneous::PushAttribute(MediumKey id,
         case SIGMA_A:   PushData(dSigmaA);      break;
         case SIGMA_S:   PushData(dSigmaS);      break;
         case EMISSION:  PushData(dEmission);    break;
-        case IOR:       PushData(dIoR);         break;
         case HG_PHASE:  PushData(dPhaseVal);    break;
         default:
             throw MRayError("{:s}:{:d}: Unknown Attribute Index {:d}",
@@ -165,7 +160,6 @@ void MediumGroupHomogeneous::PushAttribute(MediumKey id,
         case SIGMA_A:   PushData(dSigmaA);      break;
         case SIGMA_S:   PushData(dSigmaS);      break;
         case EMISSION:  PushData(dEmission);    break;
-        case IOR:       PushData(dIoR);         break;
         case HG_PHASE:  PushData(dPhaseVal);    break;
         default:
             throw MRayError("{:s}:{:d}: Unknown Attribute Index {:d}",
@@ -192,7 +186,6 @@ void MediumGroupHomogeneous::PushAttribute(MediumKey idStart, MediumKey idEnd,
         case SIGMA_A:   PushData(dSigmaA);      break;
         case SIGMA_S:   PushData(dSigmaS);      break;
         case EMISSION:  PushData(dEmission);    break;
-        case IOR:       PushData(dIoR);         break;
         case HG_PHASE:  PushData(dPhaseVal);    break;
         default:
             throw MRayError("{:s}:{:d}: Unknown Attribute Index {:d}",

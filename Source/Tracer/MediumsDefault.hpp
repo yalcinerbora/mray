@@ -32,12 +32,6 @@ Float MediumVacuum::PdfScattering(const Vector3&, const Vector3&) const
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum MediumVacuum::IoR(const Vector3&) const
-{
-    return Spectrum(1.0);
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum MediumVacuum::SigmaA(const Vector3&) const
 {
     return Spectrum::Zero();
@@ -66,27 +60,14 @@ MediumHomogeneous<ST>::MediumHomogeneous(const SpectrumConverter& sc,
     , sigmaS(sc.Convert(soa.Get<SIGMA_S>()[k.FetchIndexPortion()]))
     , emission(sc.Convert(soa.Get<EMISSION>()[k.FetchIndexPortion()]))
     , g(soa.Get<HG_PHASE>()[k.FetchIndexPortion()])
-{
-    // TODO: Check if this is state of the art?
-    // Check manuals of renderers and papers
-    //
-    // First parameter of IoR input is middle IoR (550nm)
-    // Last two parameters are Cauchy coefficients (only first two A and B)
-    Vector3 iorIn = soa.Get<IOR>()[k.FetchIndexPortion()];
-    using namespace Graphics;
-    if constexpr(std::is_same_v<ST, SpectrumConverterContextIdentity>)
-        ior = Spectrum(iorIn[0]);
-    else
-        ior = WavesToSpectrumCauchy(sc.Waves(),
-                                    Vector2(iorIn[1], iorIn[2]));
-}
+{}
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 ScatterSample MediumHomogeneous<ST>::SampleScattering(const Vector3& wO,
                                                       RNGDispenser& rng) const
 {
-    using namespace MediumFunctions;
+    using namespace Distribution::Medium;
     Vector2 xi = rng.NextFloat2D<0>();
     // We send the wO is world space
     // So returned vector is in world space
@@ -108,16 +89,9 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Float MediumHomogeneous<ST>::PdfScattering(const Vector3& wI,
                                            const Vector3& wO) const
 {
-    using namespace MediumFunctions;
+    using namespace Distribution::Medium;
     Float cosTheta = wI.Dot(wO);
     return HenyeyGreensteinPhase(cosTheta, g);
-}
-
-template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum MediumHomogeneous<ST>::IoR(const Vector3&) const
-{
-    return ior;
 }
 
 template <class ST>

@@ -16,7 +16,8 @@ function(gen_tracer_test)
         ${CURRENT_SOURCE_DIR}/T_RayPartitioner.cu
         ${CURRENT_SOURCE_DIR}/T_DefaultTriangle.cu
         ${CURRENT_SOURCE_DIR}/T_DefaultLights.cu
-        ${CURRENT_SOURCE_DIR}/T_Distributions.cu)
+        ${CURRENT_SOURCE_DIR}/T_Distributions.cu
+        ${CURRENT_SOURCE_DIR}/T_Materials.cu)
 
     source_group("" FILES ${SRC_COMMON})
 

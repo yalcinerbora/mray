@@ -57,7 +57,7 @@ namespace Distribution::Medium
 {
     MRAY_HYBRID
     constexpr Spectrum  WavesToSpectrumCauchy(const SpectrumWaves& waves,
-                                              const Vector2& coeffs);
+                                              const Vector3& coeffs);
     MRAY_HYBRID
     Float               HenyeyGreensteinPhase(Float cosTheta, Float g);
 
@@ -117,8 +117,9 @@ namespace Distribution::Common
     MRAY_HYBRID
     SampleT<Vector3>    SampleCosDirection(const Vector2& xi);
     MRAY_HYBRID
-    constexpr Float     PDFCosDirection(const Vector3& v,
-                                        const Vector3& n = Vector3::ZAxis());
+    constexpr Float     PDFCosDirection(const Vector3& v, const Vector3& n);
+    MRAY_HYBRID
+    constexpr Float     PDFCosDirection(const Vector3& v);
     MRAY_HYBRID
     SampleT<Vector3>    SampleUniformDirection(const Vector2& xi);
     MRAY_HYBRID
@@ -371,7 +372,7 @@ T Common::DivideByPDF(T t, Float pdf)
         Float pdfRecip = Float(1) / pdf;
         return t * pdfRecip;
     }
-    return t / pdf;
+    else return t / pdf;
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -617,8 +618,18 @@ SampleT<Vector3> Common::SampleCosDirection(const Vector2& xi)
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Float Common::PDFCosDirection(const Vector3& v, const Vector3& n)
 {
-    Float pdf = n.Dot(v) * MathConstants::InvPi<Float>();
-    pdf = (pdf <= Float(0)) ? Float(0) : pdf;
+    using namespace MathConstants;
+    Float pdf = n.Dot(v) * InvPi<Float>();
+    pdf = (pdf <= Epsilon<Float>()) ? Float(0) : pdf;
+    return pdf;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Float Common::PDFCosDirection(const Vector3& v)
+{
+    using namespace MathConstants;
+    Float pdf = v[2] * InvPi<Float>();
+    pdf = (pdf <= Epsilon<Float>()) ? Float(0) : pdf;
     return pdf;
 }
 
@@ -673,26 +684,23 @@ Float MIS::Balance(uint32_t pdfIndex,
     return weights[pdfIndex] * pdfs[pdfIndex] / denom;
 }
 
-}
-
-namespace MediumFunctions
-{
-
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Spectrum WavesToSpectrumCauchy(const SpectrumWaves& waves,
-                                         const Vector2& coeffs)
+constexpr Spectrum Medium::WavesToSpectrumCauchy(const SpectrumWaves& waves,
+                                                 const Vector3& coeffs)
 {
     Spectrum result;
     UNROLL_LOOP
     for(uint32_t i = 0; i < SpectrumWaves::Dims; i++)
     {
-        result[i] = coeffs[0] + coeffs[1] / (waves[0] * waves[0]);
+        Float w2 = waves[i] * waves[i];
+        Float w4 = w2 * w2;
+        result[i] = coeffs[0] + coeffs[1] / w2 + coeffs[2] / w4;
     }
     return result;
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float HenyeyGreensteinPhase(Float cosTheta, Float g)
+Float Medium::HenyeyGreensteinPhase(Float cosTheta, Float g)
 {
     // From the PBR book
     // https://pbr-book.org/4ed/Volume_Scattering/Phase_Functions#HenyeyGreenstein
@@ -709,8 +717,8 @@ Float HenyeyGreensteinPhase(Float cosTheta, Float g)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<Vector3> SampleHenyeyGreensteinPhase(const Vector3& wO, Float g,
-                                             const Vector2& xi)
+SampleT<Vector3> Medium::SampleHenyeyGreensteinPhase(const Vector3& wO, Float g,
+                                                     const Vector2& xi)
 {
     using namespace Math;
     // From the PBR book
