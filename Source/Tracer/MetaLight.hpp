@@ -231,8 +231,11 @@ void MetaLightArrayT<TLT...>::AddBatchGeneric(const GenericGroupLightT& lg,
                                               const Vector2ui& lightKeyRange,
                                               const GPUQueue& queue)
 {
+    // https://stackoverflow.com/questions/16387354/template-tuple-calling-a-function-on-each-element/37100197#37100197
+    // Except that implementation can be optimized out?
+    // Instead we use parameter pack expansion.
     uint32_t uncalled = 0;
-    std::apply([&, this](auto* tuple) -> void
+    auto Call = [&, this](auto* tuple) -> void
     {
         using TupleType = std::remove_pointer_t<decltype(tuple)>;
         using LGType = std::tuple_element_t<0, TupleType>;
@@ -241,11 +244,21 @@ void MetaLightArrayT<TLT...>::AddBatchGeneric(const GenericGroupLightT& lg,
         if(LGType::TypeName() == lg.Name() &&
            TGType::TypeName() == tg.Name())
         {
-            AddBatch(dynamic_cast<LGType&>(lg), dynamic_cast<TGType&>(tg),
+            AddBatch(dynamic_cast<const LGType&>(lg),
+                     dynamic_cast<const TGType&>(tg),
                      dPrimitiveKeys, dLightKeys, dTransformKeys,
                      lightKeyRange, queue);
         }
         else uncalled++;
+    };
+
+    std::apply([&](auto... x)
+    {
+        // Parameter pack expansion
+        (
+            (void)Call(x),
+            ...
+        );
     }, TLGroupPtrTuple{});
 
     if(uncalled == GroupCount)

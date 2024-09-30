@@ -70,4 +70,8 @@ TEST(DefaultLights, DISABLED_MetaLight)
     lightList.AddBatch(skysphereCOLightGroup, singleTG,
                        primKeys, lightKeys, transformKeys,
                        Vector2ui(0, 1), queue);
+
+    lightList.AddBatchGeneric(skysphereCOLightGroup, singleTG,
+                              primKeys, lightKeys, transformKeys,
+                              Vector2ui(0, 1), queue);
 }
