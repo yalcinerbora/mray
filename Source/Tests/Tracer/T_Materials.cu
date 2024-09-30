@@ -2,7 +2,7 @@
 
 #include "Tracer/MaterialsDefault.h"
 
-TEST(Unreal_Disabled, Test)
+TEST(DISABLED_Unreal, Test)
 {
     // TODO:
 }

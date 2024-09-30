@@ -61,9 +61,7 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/MediumC.h
         ${CURRENT_SOURCE_DIR}/MediumsDefault.h
         ${CURRENT_SOURCE_DIR}/MediumsDefault.hpp
-        ${CURRENT_SOURCE_DIR}/MediumsDefault.cpp
-        ${CURRENT_SOURCE_DIR}/MetaMedium.h
-        ${CURRENT_SOURCE_DIR}/MetaMedium.hpp)
+        ${CURRENT_SOURCE_DIR}/MediumsDefault.cpp)
 
     set(SRC_LIGHTS
         ${CURRENT_SOURCE_DIR}/LightC.h

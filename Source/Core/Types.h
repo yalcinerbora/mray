@@ -76,11 +76,25 @@ struct Unique<Variant<Ts...>, U, Us...>
     : std::conditional_t<(std::is_same_v<U, Ts> || ...)
     , Unique<Variant<Ts...>, Us...>
     , Unique<Variant<Ts..., U>, Us...>> {};
+}
 
+namespace UniqueTupleDetail
+{
+    template <typename T, typename... Ts>
+    struct Unique : std::type_identity<T> {};
+
+    template <typename... Ts, typename U, typename... Us>
+    struct Unique<Tuple<Ts...>, U, Us...>
+        : std::conditional_t<(std::is_same_v<U, Ts> || ...)
+        , Unique<Tuple<Ts...>, Us...>
+        , Unique<Tuple<Ts..., U>, Us...>> {};
 }
 
 template <typename... Ts>
 using UniqueVariant = typename UniqueVariantDetail::Unique<Variant<>, Ts...>::type;
+
+template <typename... Ts>
+using UniqueTuple = typename UniqueTupleDetail::Unique<Tuple<>, Ts...>::type;
 
 template <class T>
 struct SampleT

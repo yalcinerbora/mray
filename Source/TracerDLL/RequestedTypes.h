@@ -48,26 +48,25 @@ using LightGTypes = Tuple
     LightGroupSkysphere<SphericalCoordConverter>
 >;
 
-using MetaLightList = MetaLightArray
+using MetaLightList = MetaLightArrayT
 <
-    // Transforms
-    Variant
-    <
-        TransformContextIdentity,
-        TransformContextSingle
-    >,
-    // Lights
-    Variant
-    <
-        typename LightGroupSkysphere<CoOctaCoordConverter>:: template Light<TransformContextSingle>,
-        typename LightGroupSkysphere<CoOctaCoordConverter>:: template Light<TransformContextIdentity>,
-        typename LightGroupPrim<PrimGroupTriangle>:: template Light<TransformContextSingle>,
-        typename LightGroupPrim<PrimGroupTriangle>:: template Light<TransformContextIdentity>
-    >
+    Tuple<LightGroupSkysphere<CoOctaCoordConverter>, TransformGroupIdentity>,
+    Tuple<LightGroupSkysphere<CoOctaCoordConverter>, TransformGroupSingle>,
+
+    Tuple<LightGroupSkysphere<SphericalCoordConverter>, TransformGroupIdentity>,
+    Tuple<LightGroupSkysphere<SphericalCoordConverter>, TransformGroupSingle>,
+
+    Tuple<LightGroupPrim<PrimGroupTriangle>, TransformGroupIdentity>,
+    Tuple<LightGroupPrim<PrimGroupTriangle>, TransformGroupSingle>,
+
+    Tuple<LightGroupPrim<PrimGroupSkinnedTriangle>, TransformGroupMulti>,
+
+    Tuple<LightGroupPrim<PrimGroupSphere>, TransformGroupIdentity>,
+    Tuple<LightGroupPrim<PrimGroupSphere>, TransformGroupSingle>
 >;
 
-using MetaLight = typename MetaLightList::MetaLight;
-using MetaLightView = typename MetaLightList::MetaLightView<MetaHit>;
+//using MetaLight = typename MetaLightList::MetaLight;
+//using MetaLightView = typename MetaLightList::MetaLightView<MetaHit>;
 
 // ================= //
 //     Materials     //

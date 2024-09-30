@@ -1,16 +1,15 @@
 #pragma once
 
-template<class CH, class ML, class SC>
+template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-MetaLightViewT<CH, ML, SC>::MetaLightViewT(const SpectrumConverter& sConverter,
-                                           const ML& l)
-    : light(l)
-    , sConverter(sConverter)
+MetaLightViewT<V, ST>::MetaLightViewT(const V& v, const SpectrumConverter& sc)
+    : light(v)
+    , sConverter(sc)
 {}
 
-template<class CH, class ML, class SC>
+template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<Vector3> MetaLightViewT<CH, ML, SC>::SampleSolidAngle(RNGDispenser& rng,
+SampleT<Vector3> MetaLightViewT<V, ST>::SampleSolidAngle(RNGDispenser& rng,
                                                               const Vector3& distantPoint) const
 {
     return DeviceVisit(light, [&](auto&& l) -> Float
@@ -19,11 +18,11 @@ SampleT<Vector3> MetaLightViewT<CH, ML, SC>::SampleSolidAngle(RNGDispenser& rng,
     });
 }
 
-template<class CH, class ML, class SC>
+template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float MetaLightViewT<CH, ML, SC>::PdfSolidAngle(const CH& hit,
-                                                const Vector3& distantPoint,
-                                                const Vector3& dir) const
+Float MetaLightViewT<V, ST>::PdfSolidAngle(const MetaHit& hit,
+                                           const Vector3& distantPoint,
+                                           const Vector3& dir) const
 {
     return DeviceVisit(light, [=](auto&& l) -> Float
     {
@@ -33,9 +32,9 @@ Float MetaLightViewT<CH, ML, SC>::PdfSolidAngle(const CH& hit,
     });
 }
 
-template<class CH, class ML, class SC>
+template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t MetaLightViewT<CH, ML, SC>::SampleSolidAngleRNCount() const
+uint32_t MetaLightViewT<V, ST>::SampleSolidAngleRNCount() const
 {
     return DeviceVisit(light, [&](auto&& l) -> Float
     {
@@ -43,9 +42,9 @@ uint32_t MetaLightViewT<CH, ML, SC>::SampleSolidAngleRNCount() const
     });
 }
 
-template<class CH, class ML, class SC>
+template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-SampleT<Ray> MetaLightViewT<CH, ML, SC>::SampleRay(RNGDispenser& rng) const
+SampleT<Ray> MetaLightViewT<V, ST>::SampleRay(RNGDispenser& rng) const
 {
     return DeviceVisit(light, [&](auto&& l) -> SampleT<Ray>
     {
@@ -53,9 +52,9 @@ SampleT<Ray> MetaLightViewT<CH, ML, SC>::SampleRay(RNGDispenser& rng) const
     });
 }
 
-template<class CH, class ML, class SC>
+template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float MetaLightViewT<CH, ML, SC>::PdfRay(const Ray& ray) const
+Float MetaLightViewT<V, ST>::PdfRay(const Ray& ray) const
 {
     return DeviceVisit(light, [&](auto&& l) -> SampleT<Ray>
     {
@@ -63,9 +62,9 @@ Float MetaLightViewT<CH, ML, SC>::PdfRay(const Ray& ray) const
     });
 }
 
-template<class CH, class ML, class SC>
+template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t MetaLightViewT<CH, ML, SC>::SampleRayRNCount() const
+uint32_t MetaLightViewT<V, ST>::SampleRayRNCount() const
 {
     return DeviceVisit(light, [&](auto&& l) -> SampleT<Ray>
     {
@@ -73,9 +72,10 @@ uint32_t MetaLightViewT<CH, ML, SC>::SampleRayRNCount() const
     });
 }
 
-template<class CH, class ML, class SC>
+template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum MetaLightViewT<CH, ML, SC>::EmitViaHit(const Vector3& wO, const CH& hit) const
+Spectrum MetaLightViewT<V, ST>::EmitViaHit(const Vector3& wO,
+                                           const MetaHit& hit) const
 {
     return DeviceVisit(light, [=](auto&& l) -> Spectrum
     {
@@ -84,10 +84,10 @@ Spectrum MetaLightViewT<CH, ML, SC>::EmitViaHit(const Vector3& wO, const CH& hit
     });
 }
 
-template<class CH, class ML, class SC>
+template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum MetaLightViewT<CH, ML, SC>::EmitViaSurfacePoint(const Vector3& wO,
-                                                         const Vector3& surfacePoint) const
+Spectrum MetaLightViewT<V, ST>::EmitViaSurfacePoint(const Vector3& wO,
+                                                    const Vector3& surfacePoint) const
 {
     return DeviceVisit(light, [&](auto&& l) -> SampleT<Ray>
     {
@@ -95,9 +95,9 @@ Spectrum MetaLightViewT<CH, ML, SC>::EmitViaSurfacePoint(const Vector3& wO,
     });
 }
 
-template<class CH, class ML, class SC>
+template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-bool MetaLightViewT<CH, ML, SC>::IsPrimitiveBackedLight() const
+bool MetaLightViewT<V, ST>::IsPrimitiveBackedLight() const
 {
     return DeviceVisit(light, [&](auto&& l) -> bool
     {
@@ -105,85 +105,107 @@ bool MetaLightViewT<CH, ML, SC>::IsPrimitiveBackedLight() const
     });
 }
 
-template<TransformContextC... TC, LightC... L>
-MetaLightArray<Variant<TC...>, Variant<L...>>::MetaLightArray(const GPUSystem& s)
+template<LightTransPairC... TLT>
+MetaLightArrayT<TLT...>::
+MetaLightArrayView::MetaLightArrayView(Span<const MetaLight> dLights)
+    : dMetaLights(dLights)
+{}
+
+template<LightTransPairC... TLT>
+template<class STransformer>
+MRAY_HYBRID MRAY_CGPU_INLINE
+typename MetaLightArrayT<TLT...>::MetaLightView<STransformer>
+MetaLightArrayT<TLT...>::
+MetaLightArrayView::operator()(const typename STransformer::Converter& sc,
+                               uint32_t i) const
+{
+    return MetaLightView(dMetaLights[i], sc);
+}
+
+template<LightTransPairC... TLT>
+MetaLightArrayT<TLT...>::MetaLightArrayT(const GPUSystem& s)
     : system(s)
     , memory(system.AllGPUs(), 2_MiB, 16_MiB)
 {}
 
-template<TransformContextC... TC, LightC... L>
-template<LightGroupC LightGroup, TransformGroupC TransformGroup>
-void MetaLightArray<Variant<TC...>, Variant<L...>>::AddBatch(const LightGroup& lg, const TransformGroup& tg,
-                                                             const Span<const PrimitiveKey>& primitiveKeys,
-                                                             const Span<const LightKey>& lightKeys,
-                                                             const Span<const TransformKey>& transformKeys,
-                                                             const Vector2ui& batchRange)
-{
-    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
 
+template<LightTransPairC... TLT>
+template<LightGroupC LightGroup, TransformGroupC TransformGroup>
+void MetaLightArrayT<TLT...>::AddBatch(const LightGroup& lg, const TransformGroup& tg,
+                                       const Span<const PrimitiveKey>& primitiveKeys,
+                                       const Span<const LightKey>& lightKeys,
+                                       const Span<const TransformKey>& transformKeys,
+                                       const Vector2ui& lightKeyRange,
+                                       const GPUQueue& queue)
+{
     using TGSoA = typename TransformGroup::DataSoA;
     using LGSoA = typename LightGroup::DataSoA;
     using PGSoA = typename LightGroup::PrimGroup::DataSoA;
 
+    // Copy the SoA's to gpu memory
     PGSoA pgData = lg.PrimitiveGroup().SoA();
     LGSoA lgData = lg.SoA();
     TGSoA tgData = tg.SoA();
+    Span<Byte> dPrimSoAWriteRegion(dPrimSoA.subspan(soaCounter, 1)[0].data(),
+                                   sizeof(PGSoA));
+    Span<const Byte> dPrimSoAReadRegion(reinterpret_cast<const Byte*>(&pgData),
+                                        sizeof(PGSoA));
+    //
+    Span<Byte> dLightSoAWriteRegion(dLightSoA.subspan(soaCounter, 1)[0].data(),
+                                    sizeof(LGSoA));
+    Span<const Byte> dLightSoAReadRegion(reinterpret_cast<const Byte*>(&lgData),
+                                        sizeof(LGSoA));
+    //
+    Span<Byte> dTransSoAWriteRegion(dTransSoA.subspan(soaCounter, 1)[0].data(),
+                                    sizeof(TGSoA));
+    Span<const Byte> dTransSoAReadRegion(reinterpret_cast<const Byte*>(&tgData),
+                                         sizeof(TGSoA));
+    queue.MemcpyAsync(dPrimSoAWriteRegion, dPrimSoAReadRegion);
+    queue.MemcpyAsync(dTransSoAWriteRegion, dTransSoAReadRegion);
+    queue.MemcpyAsync(dLightSoAWriteRegion, dLightSoAReadRegion);
 
-    uint32_t lightCount = (batchRange[1] - batchRange[0]);
+    uint32_t lightCount = (lightKeyRange[1] - lightKeyRange[0]);
     assert(lightKeys.size() == lightCount);
 
     // Given light construct the transformed light
     // This means having a primitive context
     auto ConstructKernel = [=, this] MRAY_HYBRID(KernelCallParams kp)
     {
+        // Determine types, transform context primitive etc.
+        // Compile-time find the transform generator function and return type
+        using PrimGroup = typename LightGroup::PrimGroup;
+        using Primitive = MetaLightDetail::PrimType<LightGroup, TransformGroup>;
+        using Light     = MetaLightDetail::LightType<LightGroup, TransformGroup>;
+        using TContext  = MetaLightDetail::TContextType<LightGroup, TransformGroup>;
+        // Context generator of the prim group
+        constexpr auto GenerateTContext = AcquireTransformContextGenerator<PrimGroup, TransformGroup>();
+        // SoA Ptrs
+        const PGSoA* dPGData = reinterpret_cast<const PGSoA*>(dPrimSoA.subspan(soaCounter, 1)[0].data());
+        const LGSoA* dLGData = reinterpret_cast<const LGSoA*>(dLightSoA.subspan(soaCounter, 1)[0].data());
+        const TGSoA* dTGData = reinterpret_cast<const TGSoA*>(dTransSoA.subspan(soaCounter, 1)[0].data());
+
         for(uint32_t i = kp.GlobalId(); i < lightCount; i += kp.TotalSize())
         {
-            // Determine types, transform context primitive etc.
-            // Compile-time find the transform generator function and return type
-            using PrimGroup = typename LightGroup::PrimGroup;
-
-            constexpr auto GenerateTContext = AcquireTransformContextGenerator<PrimGroup, TransformGroup>();
-            // Define the types
-            // First, this kernel uses a transform context
-            // that this primitive group provides to generate a surface
-            using TContextType = typename PrimTransformContextType<PrimGroup, TransformGroup>::Result;
-            // Assert that this context is either single-transform or identity-transform
-            // Currently, each light can only be transformed via
-            // single or or identity transform (no skinned meshes :/)
-            static_assert(std::is_same_v<TContextType, TransformContextIdentity> ||
-                          std::is_same_v<TContextType, TransformContextSingle>);
-
-            // Second, we are using this primitive
-            using Primitive = typename PrimGroup:: template Primitive<TContextType>;
-
-            // Light type has to be with identity spectrum conversion
-            // meta light will handle the spectrum conversion instead of the light
-            using Light = typename LightGroup:: template Light<TContextType>;
-            // Check if the light type is in variant list
-            static_assert((std::is_same_v<Light, L> || ...),
-                          "This light type is not in variant list!");
-
             // Find the lights starting location
-            uint32_t index = batchRange[0] + i;
-
+            uint32_t index = lightCounter + i;
             // Primitives do not own the transform contexts,
             // save it to global memory.
-            dTContextList[index] = GenerateTContext(tgData, pgData,
-                                                    transformKeys[i],
-                                                    primitiveKeys[i]);
+            Byte* tContextLocation = dMetaTContexts[index].data();
+            TContext* tContext = new(tContextLocation) TContext(GenerateTContext(*dTGData, *dPGData,
+                                                                                  transformKeys[i],
+                                                                                  primitiveKeys[i]));
             // Now construct the primitive, it refers to the tc on global memory
-            auto& p = dLightPrimitiveList[index];
-            p.template emplace<Primitive>(std::get<TContextType>(dTContextList[index]),
-                                          pgData, primitiveKeys[i]);
+            Byte* primLocation = dMetaPrims[index].data();
+            Primitive* prim = new(primLocation) Primitive(*tContext, *dPGData, primitiveKeys[i]);
 
             // And finally construct the light, and this also refers to primitive
-            // on the global memory.
+            // on the global memory. This will be the variant
+            // unlike the other two, we will use this to call member function
             // Construct the lights with identity spectrum transform
             // context since it depends on per-ray data.
-            auto& l = dLightList[index];
-            l.template emplace<Light>(dSConverter[0],
-                                      std::get<Primitive>(dLightPrimitiveList[index]),
-                                      lgData, lightKeys[i]);
+            auto& l = dMetaLights[index];
+            l.template emplace<Light>(dSpectrumConverter[0],
+                                      *prim, *dLGData, lightKeys[i]);
         }
     };
 
@@ -195,11 +217,47 @@ void MetaLightArray<Variant<TC...>, Variant<L...>>::AddBatch(const LightGroup& l
         //
         std::move(ConstructKernel)
     );
+
+    // Need to wait for async memcopies
+    queue.Barrier().Wait();
 }
 
-template<TransformContextC... TC, LightC... L>
-Span<const Variant<std::monostate, L...>>
-MetaLightArray<Variant<TC...>, Variant<L...>>::Array() const
+template<LightTransPairC... TLT>
+void MetaLightArrayT<TLT...>::AddBatchGeneric(const GenericGroupLightT& lg,
+                                              const GenericGroupTransformT& tg,
+                                              const Span<const PrimitiveKey>& dPrimitiveKeys,
+                                              const Span<const LightKey>& dLightKeys,
+                                              const Span<const TransformKey>& dTransformKeys,
+                                              const Vector2ui& lightKeyRange,
+                                              const GPUQueue& queue)
 {
-    return ToConstSpan(dLightList);
+    uint32_t uncalled = 0;
+    std::apply([&, this](auto* tuple) -> void
+    {
+        using TupleType = std::remove_pointer_t<decltype(tuple)>;
+        using LGType = std::tuple_element_t<0, TupleType>;
+        using TGType = std::tuple_element_t<1, TupleType>;
+
+        if(LGType::TypeName() == lg.Name() &&
+           TGType::TypeName() == tg.Name())
+        {
+            AddBatch(dynamic_cast<LGType&>(lg), dynamic_cast<TGType&>(tg),
+                     dPrimitiveKeys, dLightKeys, dTransformKeys,
+                     lightKeyRange, queue);
+        }
+        else uncalled++;
+    }, TLGroupPtrTuple{});
+
+    if(uncalled == GroupCount)
+    {
+        throw MRayError("Unkown light/transform group pair (Id:{}/{}) is given to MetaLightArray",
+                        lg.GroupId(), tg.GroupId());
+    }
+}
+
+template<LightTransPairC... TLT>
+typename MetaLightArrayT<TLT...>::MetaLightArrayView
+MetaLightArrayT<TLT...>::Array() const
+{
+    return ToConstSpan(dMetaLights);
 }
