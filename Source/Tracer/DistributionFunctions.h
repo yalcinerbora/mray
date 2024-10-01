@@ -30,7 +30,7 @@ namespace Distribution::BxDF
                            Float alpha);
 
     MRAY_HYBRID
-    Float GSmithSeperable(const Vector3& wO, const Vector3& wI,
+    Float GSmithSeparable(const Vector3& wO, const Vector3& wI,
                           Float alpha);
 
     MRAY_HYBRID
@@ -232,7 +232,7 @@ Float BxDF::GSmithCorralated(const Vector3& wO, const Vector3& wI,
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float BxDF::GSmithSeperable(const Vector3& wO, const Vector3& wI,
+Float BxDF::GSmithSeparable(const Vector3& wO, const Vector3& wI,
                             Float alpha)
 {
     return GSmithSingle(wO, alpha) * GSmithSingle(wI, alpha);
