@@ -740,3 +740,18 @@ void SurfaceRenderer::StopRender()
     rnGenerator = {};
     globalPixelIndex = 0;
 }
+
+std::string_view SurfaceRenderer::TypeName()
+{
+    using namespace std::string_view_literals;
+    using namespace TypeNameGen::CompTime;
+    static constexpr auto Name = "Surface"sv;
+    return RendererTypeName<Name>;
+}
+
+size_t SurfaceRenderer::GPUMemoryUsage() const
+{
+    return (rayPartitioner.UsedGPUMemory() +
+            rnGenerator->UsedGPUMemory() +
+            redererGlobalMem.Size());
+}

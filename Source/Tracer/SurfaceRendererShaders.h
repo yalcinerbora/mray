@@ -2,8 +2,10 @@
 
 #include <array>
 #include <string_view>
+
 #include "Core/ColorFunctions.h"
 
+#include "RenderWork.h"
 #include "DistributionFunctions.h"
 
 class SurfaceRenderer;

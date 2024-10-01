@@ -2,45 +2,42 @@
 
 #include "RendererC.h"
 #include "RayPartitioner.h"
-#include "SurfaceRendererShaders.h"
+#include "PathTracerRendererShaders.h"
 
-#include "Core/TypeNameGenerators.h"
-
-class SurfaceRenderer final : public RendererT<SurfaceRenderer>
+class PathTracerRenderer final : public RendererT<PathTracerRenderer>
 {
     using FilmFilterPtr = std::unique_ptr<TextureFilterI>;
-    using CameraWorkPtr = std::unique_ptr<RenderCameraWorkT<SurfaceRenderer>>;
+    using CameraWorkPtr = std::unique_ptr<RenderCameraWorkT<PathTracerRenderer>>;
 
     public:
     static std::string_view TypeName();
     //
-    using GlobalState   = SurfRDetail::GlobalState;
-    using RayState      = SurfRDetail::RayState;
-    using RayPayload    = SurfRDetail::RayPayload;
+    using GlobalState   = PathTraceRDetail::GlobalState;
+    using RayState      = PathTraceRDetail::RayState;
+    using RayPayload    = PathTraceRDetail::RayPayload;
     using SpectrumConverterContext = SpectrumConverterContextIdentity;
-    using Options       = SurfRDetail::Options;
+    using Options       = PathTraceRDetail::Options;
     // Work Functions
     template<PrimitiveC P, MaterialC M, class S, class TContext,
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     static constexpr Tuple WorkFunctions = Tuple
     {
-        SurfRDetail::WorkFunctionCommon<P, M, S, TContext, PG, MG, TG>,
-        SurfRDetail::WorkFunctionFurnaceOrAO<P, M, S, TContext, PG, MG, TG>
+        PathTraceRDetail::WorkFunction<P, M, S, TContext, PG, MG, TG>,
+        PathTraceRDetail::WorkFunctionWithNEE<P, M, S, TContext, PG, MG, TG>
     };
     template<LightC L, LightGroupC LG, TransformGroupC TG>
     static constexpr auto LightWorkFunctions = Tuple
     {
-        SurfRDetail::LightWorkFunctionCommon<L, LG, TG>
+        PathTraceRDetail::LightWorkFunction<L, LG, TG>
     };
     template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
     static constexpr auto CamWorkFunctions = Tuple{};
-    static constexpr auto RayStateInitFunc = SurfRDetail::InitRayState;
+    static constexpr auto RayStateInitFunc = PathTraceRDetail::InitRayState;
 
     private:
     Options     currentOptions  = {};
     Options     newOptions      = {};
     //
-    SurfRDetail::Mode::E        anchorMode;
     FilmFilterPtr               filmFilter;
     RenderWorkHasher            workHasher;
     //
@@ -69,19 +66,19 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     Span<uint32_t>              dWorkHashes;
     Span<CommonKey>             dWorkBatchIds;
 
-    uint32_t    FindMaxSamplePerIteration(uint32_t rayCount, SurfRDetail::Mode::E);
+    uint32_t    FindMaxSamplePerIteration(uint32_t rayCount, PathTraceRDetail::SampleMode);
 
     public:
     // Constructors & Destructor
-                        SurfaceRenderer(const RenderImagePtr&,
-                                        TracerView,
-                                        BS::thread_pool&,
-                                        const GPUSystem&,
-                                        const RenderWorkPack&);
-                        SurfaceRenderer(const SurfaceRenderer&) = delete;
-                        SurfaceRenderer(SurfaceRenderer&&) = delete;
-    SurfaceRenderer&    operator=(const SurfaceRenderer&) = delete;
-    SurfaceRenderer&    operator=(SurfaceRenderer&&) = delete;
+                            PathTracerRenderer(const RenderImagePtr&,
+                                               TracerView,
+                                               BS::thread_pool&,
+                                               const GPUSystem&,
+                                               const RenderWorkPack&);
+                            PathTracerRenderer(const PathTracerRenderer&) = delete;
+                            PathTracerRenderer(PathTracerRenderer&&) = delete;
+    PathTracerRenderer&     operator=(const PathTracerRenderer&) = delete;
+    PathTracerRenderer&     operator=(PathTracerRenderer&&) = delete;
     //
     AttribInfoList      AttributeInfo() const override;
     RendererOptionPack  CurrentAttributes() const override;
@@ -98,13 +95,13 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     size_t              GPUMemoryUsage() const override;
 };
 
-static_assert(RendererC<SurfaceRenderer>);
+static_assert(RendererC<PathTracerRenderer>);
 
 template<PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-using SurfaceRenderWork = RenderWork<SurfaceRenderer, PG, MG, TG>;
+using PathTracerRenderWork = RenderWork<PathTracerRenderer, PG, MG, TG>;
 
 template<LightGroupC LG, TransformGroupC TG>
-using SurfaceRenderLightWork = RenderLightWork<SurfaceRenderer, LG, TG>;
+using PathTracerRenderLightWork = RenderLightWork<PathTracerRenderer, LG, TG>;
 
 template<CameraGroupC CG, TransformGroupC TG>
-using SurfaceRenderCamWork = RenderCameraWork<SurfaceRenderer, CG, TG>;
+using PathTracerRenderCamWork = RenderCameraWork<PathTracerRenderer, CG, TG>;
