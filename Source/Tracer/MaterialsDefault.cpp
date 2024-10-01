@@ -51,7 +51,7 @@ void MatGroupLambert::PushAttribute(MaterialKey,
                                     TransientData,
                                     const GPUQueue&)
 {
-    throw MRayError("{:s}: Attribute {:d} is \"ConstantOnly\", wrong "
+    throw MRayError("{:s}: Attribute {:d} is not \"ConstantOnly\", wrong "
                     "function is called", TypeName(), attributeIndex);
 }
 
@@ -61,7 +61,7 @@ void MatGroupLambert::PushAttribute(MaterialKey,
                                     TransientData,
                                     const GPUQueue&)
 {
-    throw MRayError("{:s}: Attribute {:d} is \"ConstantOnly\", wrong "
+    throw MRayError("{:s}: Attribute {:d} is not \"ConstantOnly\", wrong "
                     "function is called", TypeName(), attributeIndex);
 }
 
@@ -70,7 +70,7 @@ void MatGroupLambert::PushAttribute(MaterialKey, MaterialKey,
                                     TransientData,
                                     const GPUQueue&)
 {
-    throw MRayError("{:s}: Attribute {:d} is \"ConstantOnly\", wrong "
+    throw MRayError("{:s}: Attribute {:d} is not \"ConstantOnly\", wrong "
                     "function is called", TypeName(), attributeIndex);
 }
 

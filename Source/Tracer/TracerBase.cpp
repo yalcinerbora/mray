@@ -1488,11 +1488,26 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
                                             lPartitionEnd)
     });
 
+    // Set scene diameter for lights (should only be useful for
+    // boundary lights but we try to set for every light)
+    AABB3 sceneAABB = accelerator->SceneAABB();
+    Vector3 sceneSpan = sceneAABB.GeomSpan();
+    // TODO: Should we do this? maximum diameter of some sort?
+    //
+    // Float sceneDiameter = sceneSpan.Length();
+    //
+    // Since we are Y up always, get the diameter over XZ plane?
+    // Obviously uncommented one is being used
+    Float sceneDiameter = Vector2(sceneSpan[0], sceneSpan[2]).Length();
+    //
+    for(auto& g : lightGroups.Map())
+        g.second->SetSceneDiameter(sceneDiameter);
+
     // Rendering will start just after, and it is renderer's responsibility to wait
     // the commit process.
     return SurfaceCommitResult
     {
-        .aabb = accelerator->SceneAABB(),
+        .aabb = sceneAABB,
         .instanceCount = accelerator->TotalInstanceCount(),
         .acceleratorCount = accelerator->TotalAccelCount()
     };
@@ -1515,7 +1530,7 @@ CameraTransform TracerBase::GetCamTransform(CamSurfaceId camSurfId) const
     using T = typename CameraKey::Type;
     auto key = CameraKey(static_cast<T>(id));
     auto gId = CameraGroupId(key.FetchBatchPortion());
-    auto camGroup = camGroups.at(gId); ;
+    auto camGroup = camGroups.at(gId);
     if(!camGroup)
     {
         throw MRayError("Unable to find CameraGroup({})",

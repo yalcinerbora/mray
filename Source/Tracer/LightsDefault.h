@@ -5,6 +5,7 @@
 #include "TracerTypes.h"
 #include "Random.h"
 #include "Distributions.h"
+#include "DistributionFunctions.h"
 #include "LightC.h"
 #include "Bitspan.h"
 
@@ -207,7 +208,6 @@ class LightGroupPrim final : public GenericGroupLight<LightGroupPrim<PrimGroupT>
     private:
     const PrimGroup&                    primGroup;
     Span<ParamVaryingData<2, Vector3>>  dRadiances;
-    Span<MediumKey>                     dMediumIds;
     Span<Vector2ui>                     dPrimRanges;
     Bitspan<uint32_t>                   dIsTwoSidedFlags;
     DataSoA                             soa;
@@ -256,6 +256,7 @@ class LightGroupPrim final : public GenericGroupLight<LightGroupPrim<PrimGroupT>
     const PrimGroup&                PrimitiveGroup() const;
     const GenericGroupPrimitiveT&   GenericPrimGroup() const override;
     bool                            IsPrimitiveBacked() const override;
+    void                            Finalize(const GPUQueue& q) override;
 };
 
 template <CoordConverterC CoordConverter>
@@ -278,7 +279,6 @@ class LightGroupSkysphere final : public GenericGroupLight<LightGroupSkysphere<C
     private:
     const PrimGroup&                    primGroup;
     Span<ParamVaryingData<2, Vector3>>  dRadiances;
-    Span<MediumKey>                     dMediumIds;
     Span<DistributionPwC2D>             dDistributions;
     Float                               sceneDiameter;
     DataSoA                             soa;
@@ -326,7 +326,7 @@ class LightGroupSkysphere final : public GenericGroupLight<LightGroupSkysphere<C
     const PrimGroup&                PrimitiveGroup() const;
     const GenericGroupPrimitiveT&   GenericPrimGroup() const override;
     bool                            IsPrimitiveBacked() const override;
-
+    void                            SetSceneDiameter(Float) override;
 };
 
 class LightGroupNull : public GenericGroupLight<LightGroupNull>

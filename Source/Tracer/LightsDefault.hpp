@@ -18,7 +18,8 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Vector3> LightPrim<P, SC>::SampleSolidAngle(RNGDispenser& rng,
                                                     const Vector3& distantPoint) const
 {
-    SampleT<BasicSurface> surfaceSample = prim.SampleSurface(rng);
+    const P& primitive = prim.get();
+    SampleT<BasicSurface> surfaceSample = primitive.SampleSurface(rng);
     Vector3 sampledDir = (surfaceSample.value.position - distantPoint);
 
     Float NdL = surfaceSample.value.normal.Dot(-sampledDir.Normalize());
@@ -40,17 +41,18 @@ Float LightPrim<P, SC>::PdfSolidAngle(const typename P::Hit& hit,
                                       const Vector3& distantPoint,
                                       const Vector3& dir) const
 {
+    const P& primitive = prim.get();
     // Project point to surface (function assumes
-    Optional<BasicSurface> surfaceOpt = prim.SurfaceFromHit(hit);
+    Optional<BasicSurface> surfaceOpt = primitive.SurfaceFromHit(hit);
     if(!surfaceOpt) return Float{0};
 
-    BasicSurface surface = surfaceOpt.value();
+    const BasicSurface& surface = surfaceOpt.value();
 
-    Float pdf = prim.PdfSurface(hit);
+    Float pdf = primitive.PdfSurface(hit);
     Float NdL = surface.normal.Dot(-dir);
     NdL = (isTwoSided) ? abs(NdL) : max(Float{0}, NdL);
     // Get projected area
-    pdf = (NdL == 0) ? Float{0.0} : pdf / NdL;
+    pdf = (NdL == 0) ? Float{0} : pdf / NdL;
     pdf *= (distantPoint - surface.position).LengthSqr();
     return pdf;
 }
@@ -59,26 +61,75 @@ template<PrimitiveC P, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Ray> LightPrim<P, SC>::SampleRay(RNGDispenser& rng) const
 {
-    // What is the probability?
-    //return SampleT<Ray>{};
+    using Distribution::Common::SampleUniformDirection;
+    const P& primitive = prim.get();
+    SampleT<BasicSurface> surfaceSample = primitive.SampleSurface(rng);
+
+    Vector2 xi = rng.NextFloat2D<Primitive::SampleRNCount>();
+    SampleT<Vector3> dirSample;
+    if(isTwoSided)
+    {
+        using Distribution::Common::BisectSample2;
+        // TODO: We bisect one dimension of 2D sample.
+        // Is this wrong?
+        auto bisection = BisectSample2(xi[0], Vector2(0.5), true);
+        dirSample = SampleUniformDirection(Vector2(bisection.second, xi[1]));
+
+        if(bisection.first == 0)
+            dirSample.value = -dirSample.value;
+    }
+    else dirSample = SampleUniformDirection(xi);
+
+    return SampleT<Ray>
+    {
+        .value = Ray(dirSample.value, surfaceSample.value.position),
+        .pdf = surfaceSample.pdf * dirSample.pdf
+    };
 }
 
 template<PrimitiveC P, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float LightPrim<P, SC>::PdfRay(const Ray&) const
+Float LightPrim<P, SC>::PdfRay(const Ray& ray) const
 {
-    //return 0;
+    using Hit = typename P::Hit;
+    using Distribution::Common::PDFUniformDirection;
+
+    const P& primitive = prim.get();
+    Optional<Hit> hit = primitive.ProjectedHit(ray.Pos());
+    if(!hit.has_value()) return Float(0);
+
+    Optional<BasicSurface> surf = primitive.SurfaceFromHit(hit);
+    if(!surf.has_value()) return Float(0);
+
+    Float NdL = (*surf).normal.Dot(ray.Dir());
+    if(!isTwoSided && NdL <= Float(0))
+        return Float(0);
+
+    Float pdfDir = PDFUniformDirection();
+    if(isTwoSided) pdfDir *= Float(2);
+
+    Float pdfSurface = primitive.PdfSurface(hit);
+    return pdfDir * pdfSurface;
 }
 
 template<PrimitiveC P, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum LightPrim<P, SC>::EmitViaHit(const Vector3& wO,
-                                      const typename P::Hit& hitParams) const
+                                      const typename P::Hit& hit) const
 {
-    // Find
-    Vector2 uv = radiance.Constant()
-                    ? Vector2::Zero()
-                    : prim.ProjectedHit(hitParams);
+    const P& primitive = prim.get();
+    Vector2 uv = (radiance.Constant())
+        ? Vector2::Zero()
+        : primitive.SurfaceParametrization(hit);
+
+    Optional<BasicSurface> surf = primitive.SurfaceFromHit(hit);
+    if(!surf.has_value()) return Spectrum::Zero();
+
+    Float NdL = (*surf).normal.Dot(wO);
+    if(!isTwoSided && NdL <= Float(0))
+        return Spectrum::Zero();
+
+    // TODO: How to incorporate differentials here?
     return radiance(uv);
 }
 
@@ -87,13 +138,22 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum LightPrim<P, SC>::EmitViaSurfacePoint(const Vector3& wO,
                                                const Vector3& surfacePoint) const
 {
+    const P& primitive = prim.get();
     using Hit = typename P::Hit;
     Optional<Hit> hit = prim.ProjectedHit(surfacePoint);
     if(!hit) return Spectrum::Zero();
-
     Vector2 uv = radiance.Constant()
-                    ? Vector2::Zero()
-                    : hit.value();
+                ? Vector2::Zero()
+                : primitive.SurfaceParametrization(*hit);
+
+    Optional<BasicSurface> surf = primitive.SurfaceFromHit(hit);
+    if(!surf.has_value()) return Spectrum::Zero();
+
+    Float NdL = (*surf).normal.Dot(wO);
+    if(!isTwoSided && NdL <= Float(0))
+        return Spectrum::Zero();
+
+    // TODO: How to incorporate differentials here?
     return radiance(uv);
 }
 
@@ -269,16 +329,16 @@ Spectrum LightSkysphere<CC, TC, SC>::EmitViaHit(const Vector3& wO,
                                                 const typename EmptyPrimitive<TC>::Hit&) const
 {
     Vector3 dirYUp = prim.get().GetTransformContext().ApplyV(-wO);
-    // TODO: How to incorporate differentials here?
     Vector2 uv = radiance.Constant()
                     ? CC::DirToUV(dirYUp)
                     : Vector2::Zero();
+    // TODO: How to incorporate differentials here?
     return radiance(uv);
 }
 
 template<CoordConverterC CC, TransformContextC TC, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum LightSkysphere<CC, TC, SC>::EmitViaSurfacePoint(const Vector3& wO,
+Spectrum LightSkysphere<CC, TC, SC>::EmitViaSurfacePoint(const Vector3&,
                                                          const Vector3&) const
 {
     // Distant light do not have surfaces, this function
@@ -397,15 +457,13 @@ void LightGroupPrim<PG>::CommitReservations()
     // TODO: Wasting 8x memory cost due to "Bit" is not a type
     // Change this later
     Span<uint32_t> dIsTwoSidedFlagsOut;
-    this->GenericCommit(std::tie(dRadiances, dMediumIds,
-                                 dPrimRanges,
+    this->GenericCommit(std::tie(dRadiances, dPrimRanges,
                                  dIsTwoSidedFlagsOut),
-                        {0, 0, 0, 0});
+                        {0, 0, 0});
 
     dIsTwoSidedFlags = Bitspan<uint32_t>(dIsTwoSidedFlagsOut);
 
     soa.dRadiances = ToConstSpan(dRadiances);
-    soa.dMediumIds = ToConstSpan(dMediumIds);
     soa.dPrimRanges = ToConstSpan(dPrimRanges);
     soa.dIsTwoSidedFlags = ToConstSpan(dIsTwoSidedFlagsOut);
 }
@@ -427,70 +485,78 @@ LightAttributeInfoList LightGroupPrim<PG>::AttributeInfo() const
 }
 
 template <PrimitiveGroupC PG>
-void LightGroupPrim<PG>::PushAttribute(LightKey id,
+void LightGroupPrim<PG>::PushAttribute(LightKey,
                                        uint32_t attributeIndex,
-                                       TransientData data,
-                                       const GPUQueue& queue)
+                                       TransientData,
+                                       const GPUQueue&)
 {
-
+    throw MRayError("{:s}: Attribute {:d} is not \"ConstantOnly\", wrong "
+                    "function is called", TypeName(), attributeIndex);
 }
 
 template <PrimitiveGroupC PG>
-void LightGroupPrim<PG>::PushAttribute(LightKey id,
+void LightGroupPrim<PG>::PushAttribute(LightKey,
                                        uint32_t attributeIndex,
-                                       const Vector2ui& subRange,
-                                       TransientData data,
-                                       const GPUQueue& queue)
+                                       const Vector2ui&,
+                                       TransientData,
+                                       const GPUQueue&)
 {
-
+    throw MRayError("{:s}: Attribute {:d} is not \"ConstantOnly\", wrong "
+                    "function is called", TypeName(), attributeIndex);
 }
 
 template <PrimitiveGroupC PG>
-void LightGroupPrim<PG>::PushAttribute(LightKey idStart, LightKey idEnd,
+void LightGroupPrim<PG>::PushAttribute(LightKey, LightKey,
                                        uint32_t attributeIndex,
-                                       TransientData data,
-                                       const GPUQueue& queue)
+                                       TransientData,
+                                       const GPUQueue&)
 {
-
+    throw MRayError("{:s}: Attribute {:d} is not \"ConstantOnly\", wrong "
+                    "function is called", TypeName(), attributeIndex);
 }
 
 template <PrimitiveGroupC PG>
 void LightGroupPrim<PG>::PushTexAttribute(LightKey idStart, LightKey idEnd,
                                           uint32_t attributeIndex,
-                                          TransientData,
-                                          std::vector<Optional<TextureId>>,
+                                          TransientData data,
+                                          std::vector<Optional<TextureId>> texIds,
                                           const GPUQueue& queue)
 {
-
+    if(attributeIndex == 0)
+    {
+        this->template GenericPushTexAttribute<2, Vector3>
+        (
+            dRadiances,
+            //
+            idStart, idEnd,
+            attributeIndex,
+            std::move(data),
+            std::move(texIds),
+            queue
+        );
+    }
+    else throw MRayError("{:s}: Attribute {:d} is not \"ParamVarying\", wrong "
+                         "function is called", TypeName(), attributeIndex);
 }
 
 template <PrimitiveGroupC PG>
-void LightGroupPrim<PG>::PushTexAttribute(LightKey idStart, LightKey idEnd,
+void LightGroupPrim<PG>::PushTexAttribute(LightKey, LightKey,
                                           uint32_t attributeIndex,
                                           std::vector<Optional<TextureId>>,
-                                          const GPUQueue& queue)
+                                          const GPUQueue&)
 {
-    //if(attributeIndex == 0)
-    //{
-    //    GenericPushTexAttribute<2, Vector3>(dRadiances,
-    //                                        //
-    //                                        idStart, idEnd,
-    //                                        attributeIndex,
-    //                                        std::move(data),
-    //                                        std::move(texIds),
-    //                                        queue);
-    //}
-    //else throw MRayError("{:s}: Attribute {:d} is not \"ParamVarying\", wrong "
-    //                     "function is called", TypeName(), attributeIndex);
+    throw MRayError("{:s}: Attribute {:d} is not \"Optional Texture\", wrong "
+                    "function is called", TypeName(), attributeIndex);
 }
 
 template <PrimitiveGroupC PG>
-void LightGroupPrim<PG>::PushTexAttribute(LightKey idStart, LightKey idEnd,
+void LightGroupPrim<PG>::PushTexAttribute(LightKey, LightKey,
                                           uint32_t attributeIndex,
                                           std::vector<TextureId>,
-                                          const GPUQueue& queue)
+                                          const GPUQueue&)
 {
-
+    throw MRayError("{:s}: Attribute {:d} is not \"Mandatory Texture\", wrong "
+                    "function is called", TypeName(), attributeIndex);
 }
 
 template <PrimitiveGroupC PG>
@@ -515,6 +581,19 @@ template <PrimitiveGroupC PG>
 bool LightGroupPrim<PG>::IsPrimitiveBacked() const
 {
     return true;
+}
+
+template <PrimitiveGroupC PG>
+void LightGroupPrim<PG>::Finalize(const GPUQueue& q)
+{
+    std::vector<Vector2ui> hPrimRanges;
+    hPrimRanges.reserve(dPrimRanges.size());
+
+    for(const auto& [_, batchKey] : this->primMappings)
+        hPrimRanges.push_back(primGroup.BatchRange(batchKey));
+
+    q.MemcpyAsync(dPrimRanges, Span<const Vector2ui>(hPrimRanges));
+    q.Barrier().Wait();
 }
 
 template <CoordConverterC CC>
@@ -544,11 +623,10 @@ LightGroupSkysphere<CC>::LightGroupSkysphere(uint32_t groupId,
 template <CoordConverterC CC>
 void LightGroupSkysphere<CC>::CommitReservations()
 {
-    this->GenericCommit(std::tie(dRadiances, dMediumIds, dDistributions),
-                        {0, 0, 0});
+    this->GenericCommit(std::tie(dRadiances, dDistributions),
+                        {0, 0});
 
     soa.dRadiances = ToConstSpan(dRadiances);
-    soa.dMediumIds = ToConstSpan(dMediumIds);
     soa.dDistributions = ToConstSpan(dDistributions);
     soa.sceneDiameter = sceneDiameter;
 }
@@ -570,59 +648,78 @@ LightAttributeInfoList LightGroupSkysphere<CC>::AttributeInfo() const
 }
 
 template <CoordConverterC CC>
-void LightGroupSkysphere<CC>::PushAttribute(LightKey id,
+void LightGroupSkysphere<CC>::PushAttribute(LightKey,
                                             uint32_t attributeIndex,
-                                            TransientData data,
-                                            const GPUQueue& queue)
+                                            TransientData,
+                                            const GPUQueue&)
 {
-
+    throw MRayError("{:s}: Attribute {:d} is not \"ConstantOnly\", wrong "
+                    "function is called", TypeName(), attributeIndex);
 }
 
 template <CoordConverterC CC>
-void LightGroupSkysphere<CC>::PushAttribute(LightKey id,
+void LightGroupSkysphere<CC>::PushAttribute(LightKey,
                                             uint32_t attributeIndex,
-                                            const Vector2ui& subRange,
-                                            TransientData data,
-                                            const GPUQueue& queue)
+                                            const Vector2ui&,
+                                            TransientData,
+                                            const GPUQueue&)
 {
-
+    throw MRayError("{:s}: Attribute {:d} is not \"ConstantOnly\", wrong "
+                    "function is called", TypeName(), attributeIndex);
 }
 
 template <CoordConverterC CC>
-void LightGroupSkysphere<CC>::PushAttribute(LightKey idStart, LightKey idEnd,
+void LightGroupSkysphere<CC>::PushAttribute(LightKey, LightKey,
                                             uint32_t attributeIndex,
-                                            TransientData data,
-                                            const GPUQueue& queue)
+                                            TransientData,
+                                            const GPUQueue&)
 {
-
+    throw MRayError("{:s}: Attribute {:d} is not \"ConstantOnly\", wrong "
+                    "function is called", TypeName(), attributeIndex);
 }
 
 template <CoordConverterC CC>
 void LightGroupSkysphere<CC>::PushTexAttribute(LightKey idStart, LightKey idEnd,
                                                uint32_t attributeIndex,
-                                               TransientData,
-                                               std::vector<Optional<TextureId>>,
+                                               TransientData data,
+                                               std::vector<Optional<TextureId>> texIds,
                                                const GPUQueue& queue)
 {
-
+    if(attributeIndex == 0)
+    {
+        this->template GenericPushTexAttribute<2, Vector3>
+        (
+            dRadiances,
+            //
+            idStart, idEnd,
+            attributeIndex,
+            std::move(data),
+            std::move(texIds),
+            queue
+        );
+    }
+    else throw MRayError("{:s}: Attribute {:d} is not \"ParamVarying\", wrong "
+                         "function is called", TypeName(), attributeIndex);
 }
 
 template <CoordConverterC CC>
-void LightGroupSkysphere<CC>::PushTexAttribute(LightKey idStart, LightKey idEnd,
+void LightGroupSkysphere<CC>::PushTexAttribute(LightKey, LightKey,
                                                uint32_t attributeIndex,
                                                std::vector<Optional<TextureId>>,
-                                               const GPUQueue& queue)
+                                               const GPUQueue&)
 {
-
+    throw MRayError("{:s}: Attribute {:d} is not \"Optional Texture\", wrong "
+                    "function is called", TypeName(), attributeIndex);
 }
 
 template <CoordConverterC CC>
-void LightGroupSkysphere<CC>::PushTexAttribute(LightKey idStart, LightKey idEnd,
+void LightGroupSkysphere<CC>::PushTexAttribute(LightKey, LightKey,
                                                uint32_t attributeIndex,
                                                std::vector<TextureId>,
-                                               const GPUQueue& queue)
+                                               const GPUQueue&)
 {
-
+    throw MRayError("{:s}: Attribute {:d} is not \"Mandatory Texture\", wrong "
+                    "function is called", TypeName(), attributeIndex);
 }
 
 template <CoordConverterC CC>
@@ -647,4 +744,10 @@ template <CoordConverterC CC>
 bool LightGroupSkysphere<CC>::IsPrimitiveBacked() const
 {
     return false;
+}
+
+template <CoordConverterC CC>
+void LightGroupSkysphere<CC>::SetSceneDiameter(Float d)
+{
+    sceneDiameter = d;
 }

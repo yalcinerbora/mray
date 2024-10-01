@@ -750,19 +750,19 @@ AcceleratorGroupOptiX<PG>::GetShaderOffsets() const
 
 template<PrimitiveGroupC PG>
 void AcceleratorGroupOptiX<PG>::CastLocalRays(// Output
-                                              Span<HitKeyPack> dHitIds,
-                                              Span<MetaHit> dHitParams,
+                                              Span<HitKeyPack>,
+                                              Span<MetaHit>,
                                               // I-O
-                                              Span<BackupRNGState> dRNGStates,
-                                              Span<RayGMem> dRays,
+                                              Span<BackupRNGState>,
+                                              Span<RayGMem>,
                                               // Input
-                                              Span<const RayIndex> dRayIndices,
-                                              Span<const CommonKey> dAccelKeys,
+                                              Span<const RayIndex>,
+                                              Span<const CommonKey>,
                                               // Constants
-                                              uint32_t workId,
-                                              const GPUQueue& queue)
+                                              uint32_t,
+                                              const GPUQueue&)
 {
-    throw MRayError("not implemented!");
+    throw MRayError("For OptiX, this function should not be called");
 }
 
 template<PrimitiveGroupC PG>

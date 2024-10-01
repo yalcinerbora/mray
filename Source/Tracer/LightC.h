@@ -106,7 +106,9 @@ class GenericGroupLightT : public GenericTexturedGroupT<LightKey, LightAttribute
     //
     virtual bool                            IsPrimitiveBacked() const = 0;
     virtual const GenericGroupPrimitiveT&   GenericPrimGroup() const = 0;
+    virtual void                            SetSceneDiameter(Float sceneDiameter) = 0;
     PrimBatchKey                            LightPrimBatch(LightKey) const;
+
 };
 
 using LightGroupPtr = std::unique_ptr<GenericGroupLightT>;
@@ -120,6 +122,8 @@ class GenericGroupLight : public GenericGroupLightT
                                           size_t allocationGranularity = 2_MiB,
                                           size_t initialReservartionSize = 4_MiB);
     std::string_view    Name() const override;
+    // Not all lights need this
+    virtual void        SetSceneDiameter(Float) override {};
 
 };
 
