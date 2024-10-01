@@ -1,4 +1,5 @@
 #include "AcceleratorOptiX.h"
+#include "TransformC.h"
 
 #include <cassert>
 #include <map>
@@ -254,6 +255,7 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     static_assert((sizeof(OptixAabb) == sizeof(AABB3)) &&
                   (alignof(OptixAabb) <= alignof(AABB3)),
                   "Optix and MRay AABBs do not match!");
+    instanceBatchStartOffsets = instanceOffsets;
     size_t totalInstanceCount = instanceOffsets.back();
 
     // First, create the traversable
@@ -405,12 +407,24 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
 
     // Finally do the persistent allocation
     MemAlloc::AllocateMultiData(std::tie(dLaunchArgPack, dAccelMemory,
-                                         dHitRecords, dEmptyRecords),
-                                allMem, {1, compactedSize, totalRecordCount, 2});
+                                         dHitRecords, dEmptyRecords,
+                                         dGlobalInstanceInvTransforms,
+                                         dGlobalTraversableHandles),
+                                allMem,
+                                {1, compactedSize, totalRecordCount, 3,
+                                 instanceBatchStartOffsets.back(),
+                                 instanceBatchStartOffsets.back()});
 
     OPTIX_CHECK(optixAccelCompact(contextOptiX, ToHandleCUDA(queue), phonyHandle,
                                   std::bit_cast<CUdeviceptr>(dAccelMemory.data()),
                                   dAccelMemory.size(), &baseAccelerator));
+
+    // Invert the transforms
+    DeviceAlgorithms::Transform(dGlobalInstanceInvTransforms,
+                                ToConstSpan(dInstanceMatrices), queue,
+                                KCInvertTransforms());
+
+    queue.MemcpyAsync(dGlobalTraversableHandles, ToConstSpan(dTraversableHandles));
 
     // Easy part is done
     // now compile the shaders and attach those on the records
@@ -443,10 +457,9 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     }
 
     // Now we have all the things we need to generate shaders.
-    static constexpr auto RG_RECORD = 0;
-    static constexpr auto MISS_RECORD = 1;
-    std::array<EmptyHitRecord, 2> hEmptyRecords;
-    GenerateShaders(hEmptyRecords[RG_RECORD],
+    std::array<EmptyHitRecord, 3> hEmptyRecords;
+    GenerateShaders(hEmptyRecords[RG_COMMON_RECORD],
+                    hEmptyRecords[RG_LOCAL_RECORD],
                     hEmptyRecords[MISS_RECORD],
                     hAllHitRecords, shaderNames);
 
@@ -455,29 +468,35 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     queue.MemcpyAsync(dEmptyRecords, ToConstSpan(Span(hEmptyRecords.cbegin(),
                                                       hEmptyRecords.cend())));
     // Finally set the table and GG
-    commonSBT = {};
+    commonCastSBT = {};
     // RG
-    commonSBT.raygenRecord = std::bit_cast<CUdeviceptr>(dEmptyRecords.data() + RG_RECORD);
+    commonCastSBT.raygenRecord = std::bit_cast<CUdeviceptr>(dEmptyRecords.data() + RG_COMMON_RECORD);
     // MISS
-    commonSBT.missRecordBase = std::bit_cast<CUdeviceptr>(dEmptyRecords.data() + MISS_RECORD);
-    commonSBT.missRecordStrideInBytes = sizeof(EmptyHitRecord);
-    commonSBT.missRecordCount = 1u;
+    commonCastSBT.missRecordBase = std::bit_cast<CUdeviceptr>(dEmptyRecords.data() + MISS_RECORD);
+    commonCastSBT.missRecordStrideInBytes = sizeof(EmptyHitRecord);
+    commonCastSBT.missRecordCount = 1u;
     // HITS
-    commonSBT.hitgroupRecordBase = std::bit_cast<CUdeviceptr>(dHitRecords.data());
-    commonSBT.hitgroupRecordStrideInBytes= sizeof(GenericHitRecord<>);
-    commonSBT.hitgroupRecordCount = static_cast<uint32_t>(dHitRecords.size());
+    commonCastSBT.hitgroupRecordBase = std::bit_cast<CUdeviceptr>(dHitRecords.data());
+    commonCastSBT.hitgroupRecordStrideInBytes= sizeof(GenericHitRecord<>);
+    commonCastSBT.hitgroupRecordCount = static_cast<uint32_t>(dHitRecords.size());
+    //
+    localCastSBT = commonCastSBT;
+    localCastSBT.raygenRecord = std::bit_cast<CUdeviceptr>(dEmptyRecords.data() + RG_LOCAL_RECORD);
+
     // Wait all queues
     gpuSystem.SyncAll();
     // All Done!
     return sceneAABB;
 }
 
-void BaseAcceleratorOptiX::GenerateShaders(EmptyHitRecord& rgRecord, EmptyHitRecord& missRecord,
+void BaseAcceleratorOptiX::GenerateShaders(EmptyHitRecord& rgCommonRecord, EmptyHitRecord& rgLocalRecord,
+                                           EmptyHitRecord& missRecord,
                                            std::vector<GenericHitRecord<>>& records,
                                            const ShaderNameMap& shaderNames)
 {
-    static constexpr auto RaygenName = "__raygen__OptiX";
-    static constexpr auto MissName = "__miss__OptiX";
+    static constexpr auto RaygenCommonName  = "__raygen__OptiX";
+    static constexpr auto RaygenLocalName   = "__raygen__LocalOptiX";
+    static constexpr auto MissName  = "__miss__OptiX";
     static constexpr auto CH_PREFIX = "__closesthit__";
     static constexpr auto AH_PREFIX = "__anyhit__";
     static constexpr auto IS_PREFIX = "__intersection__";
@@ -528,7 +547,19 @@ void BaseAcceleratorOptiX::GenerateShaders(EmptyHitRecord& rgRecord, EmptyHitRec
                 .raygen = OptixProgramGroupSingleModule
                 {
                     .module = optixTypePack.optixModule,
-                    .entryFunctionName = RaygenName
+                    .entryFunctionName = RaygenCommonName
+                }
+            }
+        );
+        pgDesc.push_back
+        (
+            OptixProgramGroupDesc
+            {
+                .kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN,
+                .raygen = OptixProgramGroupSingleModule
+                {
+                    .module = optixTypePack.optixModule,
+                    .entryFunctionName = RaygenLocalName
                 }
             }
         );
@@ -613,14 +644,17 @@ void BaseAcceleratorOptiX::GenerateShaders(EmptyHitRecord& rgRecord, EmptyHitRec
         for(uint32_t index : hitRecordIndices)
         {
             auto& record = records[index];
-            OPTIX_CHECK(optixSbtRecordPackHeader(ccPack.programGroups[pgIndex + 2], record.header));
+            OPTIX_CHECK(optixSbtRecordPackHeader(ccPack.programGroups[pgIndex + 3],
+                                                 record.header));
         }
         pgIndex ++;
     }
     // RG and Miss records and finish
-    OPTIX_CHECK(optixSbtRecordPackHeader(ccPack.programGroups[0],
-                                         rgRecord.header));
-    OPTIX_CHECK(optixSbtRecordPackHeader(ccPack.programGroups[1],
+    OPTIX_CHECK(optixSbtRecordPackHeader(ccPack.programGroups[RG_COMMON_RECORD],
+                                         rgCommonRecord.header));
+    OPTIX_CHECK(optixSbtRecordPackHeader(ccPack.programGroups[RG_LOCAL_RECORD],
+                                         rgLocalRecord.header));
+    OPTIX_CHECK(optixSbtRecordPackHeader(ccPack.programGroups[MISS_RECORD],
                                          missRecord.header));
 }
 
@@ -653,23 +687,23 @@ void BaseAcceleratorOptiX::CastRays(// Output
     // Copy args
     ArgumentPackOpitX argPack =
     {
-        .baseAccelerator    = baseAccelerator,
-        .dHitKeys           = dHitIds,
-        .dHits              = dHitParams,
-        .dRNGStates         = dRNGStates,
-        .dRays              = dRays,
-        .dRayIndices        = dRayIndices,
-        //
-        .doVisibility       = false,
-        .dIsVisibleBuffer   = Bitspan<uint32_t>(),
-        .dRaysConst         = Span<const RayGMem>()
+        .mode = RenderModeOptiX::NORMAL,
+        .nParams = NormalRayCastArgPackOptiX
+        {
+            .baseAccelerator    = baseAccelerator,
+            .dHitKeys           = dHitIds,
+            .dHits              = dHitParams,
+            .dRNGStates         = dRNGStates,
+            .dRays              = dRays,
+            .dRayIndices        = dRayIndices
+        }
     };
     queue.MemcpyAsync(dLaunchArgPack, Span<const ArgumentPackOpitX>(&argPack, 1));
     CUdeviceptr argsPtr = std::bit_cast<CUdeviceptr>(dLaunchArgPack.data());
 
     // Launch!
     OPTIX_CHECK(optixLaunch(deviceTypes.pipeline, ToHandleCUDA(queue), argsPtr,
-                            dLaunchArgPack.size_bytes(), &commonSBT,
+                            dLaunchArgPack.size_bytes(), &commonCastSBT,
                             static_cast<uint32_t>(dRayIndices.size()), 1u, 1u));
     OPTIX_LAUNCH_CHECK();
 }
@@ -697,23 +731,22 @@ void BaseAcceleratorOptiX::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffer
     // Copy args
     ArgumentPackOpitX argPack =
     {
-        .baseAccelerator    = baseAccelerator,
-        .dHitKeys           = Span<HitKeyPack>(),
-        .dHits              = Span<MetaHit>(),
-        .dRNGStates         = dRNGStates,
-        .dRays              = Span<RayGMem>(),
-        .dRayIndices        = dRayIndices,
-        //
-        .doVisibility       = true,
-        .dIsVisibleBuffer   = dIsVisibleBuffer,
-        .dRaysConst         = dRays
+        .mode = RenderModeOptiX::VISIBILITY,
+        .vParams = VisibilityCastArgPackOptiX
+        {
+            .baseAccelerator    = baseAccelerator,
+            .dIsVisibleBuffer   = dIsVisibleBuffer,
+            .dRNGStates         = dRNGStates,
+            .dRays              = dRays,
+            .dRayIndices        = dRayIndices
+        }
     };
     queue.MemcpyAsync(dLaunchArgPack, Span<const ArgumentPackOpitX>(&argPack, 1));
     CUdeviceptr argsPtr = std::bit_cast<CUdeviceptr>(dLaunchArgPack.data());
 
     // Launch!
     OPTIX_CHECK(optixLaunch(deviceTypes.pipeline, ToHandleCUDA(queue), argsPtr,
-                            dLaunchArgPack.size_bytes(), &commonSBT,
+                            dLaunchArgPack.size_bytes(), &commonCastSBT,
                             static_cast<uint32_t>(dRayIndices.size()), 1u, 1u));
     OPTIX_LAUNCH_CHECK();
 }
@@ -723,13 +756,53 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
                                          Span<MetaHit> dHitParams,
                                          // I-O
                                          Span<BackupRNGState> dRNGStates,
+                                         Span<RayGMem> dRays,
                                          // Input
-                                         Span<const RayGMem> dRays,
                                          Span<const RayIndex> dRayIndices,
-                                         Span<const AcceleratorKey> dAccelIdPacks,
+                                         Span<const AcceleratorKey> dAccelKeys,
+                                         CommonKey dAccelKeyBatchPortion,
                                          const GPUQueue& queue)
 {
+    using namespace std::string_view_literals;
+    const auto annotation = gpuSystem.CreateAnnotation("Local Ray Casting"sv);
+    const auto _ = annotation.AnnotateScope();
 
+    // TODO: Currently only works for single GPU
+    assert(gpuSystem.AllGPUs().size() == 1);
+    assert(dRayIndices.size() != 0);
+    // This code is not generic, so we go in and take the stuff
+    // from device interface specific stuff
+    using mray::cuda::ToHandleCUDA;
+    const ComputeCapabilityTypePackOptiX& deviceTypes = optixTypesPerCC[currentCCIndex];
+
+    // Find the offset
+    uint32_t batchStartOffset = uint32_t(instanceBatchStartOffsets[dAccelKeyBatchPortion]);
+
+    // Copy args
+    ArgumentPackOpitX argPack =
+    {
+        .mode = RenderModeOptiX::LOCAL,
+        .lParams = LocalRayCastArgPackOptiX
+        {
+            .dHitKeys= dHitIds,
+            .dHits = dHitParams,
+            .dRNGStates = dRNGStates,
+            .dRays = dRays,
+            .dRayIndices = dRayIndices,
+            .dAcceleratorKeys = dAccelKeys,
+            .dGlobalInstanceTraversables = dGlobalTraversableHandles,
+            .dGlobalInstanceInvTransforms = dGlobalInstanceInvTransforms,
+            .batchStartOffset = batchStartOffset
+        }
+    };
+    queue.MemcpyAsync(dLaunchArgPack, Span<const ArgumentPackOpitX>(&argPack, 1));
+    CUdeviceptr argsPtr = std::bit_cast<CUdeviceptr>(dLaunchArgPack.data());
+
+    // Launch!
+    OPTIX_CHECK(optixLaunch(deviceTypes.pipeline, ToHandleCUDA(queue), argsPtr,
+                            dLaunchArgPack.size_bytes(), &localCastSBT,
+                            static_cast<uint32_t>(dRayIndices.size()), 1u, 1u));
+    OPTIX_LAUNCH_CHECK();
 }
 
 size_t BaseAcceleratorOptiX::GPUMemoryUsage() const

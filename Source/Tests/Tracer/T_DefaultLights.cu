@@ -10,6 +10,7 @@
 #include "Tracer/MetaLight.h"
 
 #include "Core/Log.h"
+#include "Core/Error.hpp"
 
 // Meta Light Test Types
 using LightGroupSkysphereCoOcta = LightGroupSkysphere<CoOctaCoordConverter>;
@@ -50,28 +51,23 @@ TEST(DefaultLights, DISABLED_MetaLight)
     LightGroupSkysphereCoOcta skysphereCOLightGroup(0u, system, {}, emptyPrimGroup);
 
     // Add ids
-
     Span<const LightKey> lightKeys;
     Span<const PrimitiveKey> primKeys;
     Span<const TransformKey> transformKeys;
 
     MetaLightList lightList = MetaLightList(system);
-    lightList.AddBatch(triangleLightGroup, identityTG,
+    lightList.AddBatchGeneric(triangleLightGroup, identityTG,
                        primKeys, lightKeys, transformKeys,
                        Vector2ui(0, 1), queue);
-    lightList.AddBatch(triangleLightGroup, singleTG,
-                       primKeys, lightKeys, transformKeys,
-                       Vector2ui(0, 1), queue);
-
-    lightList.AddBatch(skysphereCOLightGroup, identityTG,
+    lightList.AddBatchGeneric(triangleLightGroup, singleTG,
                        primKeys, lightKeys, transformKeys,
                        Vector2ui(0, 1), queue);
 
-    lightList.AddBatch(skysphereCOLightGroup, singleTG,
+    lightList.AddBatchGeneric(skysphereCOLightGroup, identityTG,
                        primKeys, lightKeys, transformKeys,
                        Vector2ui(0, 1), queue);
 
     lightList.AddBatchGeneric(skysphereCOLightGroup, singleTG,
-                              primKeys, lightKeys, transformKeys,
-                              Vector2ui(0, 1), queue);
+                       primKeys, lightKeys, transformKeys,
+                       Vector2ui(0, 1), queue);
 }

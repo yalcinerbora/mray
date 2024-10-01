@@ -9,6 +9,11 @@
 
 #include "GenericGroup.h"
 
+struct KCInvertTransforms
+{
+    MRAY_HYBRID Matrix4x4 operator()(const Matrix4x4&) const;
+};
+
 template <class TContext>
 concept TransformContextC = requires(const TContext& t,
                                      const Vector3& v,
@@ -112,6 +117,12 @@ class TransformGroupIdentity final : public GenericGroupTransform<TransformGroup
 
     DataSoA         SoA() const;
 };
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+Matrix4x4 KCInvertTransforms::operator()(const Matrix4x4& matrix) const
+{
+    return matrix.Inverse();
+}
 
 template <class C>
 GenericGroupTransform<C>::GenericGroupTransform(uint32_t transGroupId,

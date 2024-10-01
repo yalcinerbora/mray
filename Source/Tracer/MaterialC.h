@@ -6,7 +6,20 @@
 #include "TracerTypes.h"
 #include "GenericGroup.h"
 
-using MediumKeyPairList = std::vector<Pair<MediumKey, MediumKey>>;
+class alignas(8) MediumKeyPair
+{
+    private:
+    MediumKey frontKey;
+    MediumKey backKey;
+
+    public:
+    MRAY_HYBRID MediumKeyPair(MediumKey frontKey, MediumKey backKey);
+
+    MRAY_HYBRID MediumKey Back() const;
+    MRAY_HYBRID MediumKey Front() const;
+};
+
+using MediumKeyPairList = std::vector<MediumKeyPair>;
 
 template <class MatType>
 concept MaterialC = requires(MatType mt,
@@ -88,7 +101,7 @@ class GenericGroupMaterialT : public GenericTexturedGroupT<MaterialKey, MatAttri
     using typename Parent::IdList;
 
     protected:
-    virtual void    HandleMediums(const MediumKeyPairList&) = 0;
+    MediumKeyPairList allMediums;
 
     public:
     // Constructors & Destructor
@@ -118,6 +131,24 @@ class GenericGroupMaterial : public GenericGroupMaterialT
     std::string_view    Name() const override;
 };
 
+MRAY_HYBRID MRAY_CGPU_INLINE
+MediumKeyPair::MediumKeyPair(MediumKey f, MediumKey b)
+    : frontKey(f)
+    , backKey(b)
+{}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+MediumKey MediumKeyPair::Back() const
+{
+    return backKey;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+MediumKey MediumKeyPair::Front() const
+{
+    return frontKey;
+}
+
 inline
 GenericGroupMaterialT::GenericGroupMaterialT(uint32_t groupId, const GPUSystem& gpuSystem,
                                              const TextureViewMap& map,
@@ -141,9 +172,9 @@ GenericGroupMaterialT::Reserve(const std::vector<AttributeCountList>& countArray
     // We blocked the virutal chain, but we should be able to use it here
     // We will do the same here anyways migh as well use it.
     auto result = Parent::Reserve(countArrayList);
-
     std::lock_guard lock(mutex);
-    HandleMediums(mediumPairs);
+
+    allMediums.insert(allMediums.end(), mediumPairs.cbegin(), mediumPairs.cend());
     return result;
 }
 

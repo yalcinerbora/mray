@@ -432,13 +432,38 @@ void BaseAcceleratorLinear::CastLocalRays(// Output
                                           Span<MetaHit> dHitParams,
                                           // I-O
                                           Span<BackupRNGState> dRNGStates,
+                                          Span<RayGMem> dRays,
                                           // Input
-                                          Span<const RayGMem> dRays,
                                           Span<const RayIndex> dRayIndices,
-                                          Span<const AcceleratorKey> dAccelIdPacks,
+                                          Span<const AcceleratorKey> dAccelKeys,
+                                          CommonKey dAccelKeyBatchPortion,
                                           const GPUQueue& queue)
 {
+    using namespace std::string_view_literals;
+    const auto annotation = gpuSystem.CreateAnnotation("Local Ray Casting"sv);
+    const auto _ = annotation.AnnotateScope();
 
+    auto accelGroupOpt = accelInstances.at(dAccelKeyBatchPortion);
+    if(!accelGroupOpt)
+    {
+        throw MRayError("BaseAccelerator: Unknown accelerator batch {}",
+                        dAccelKeyBatchPortion);
+    }
+    AcceleratorGroupI* accelGroup = accelGroupOpt.value().get();
+    auto dAccelKeysCommon = MemAlloc::RepurposeAlloc<const CommonKey>(dAccelKeys);
+
+    accelGroup->CastLocalRays(// Output
+                              dHitIds,
+                              dHitParams,
+                              // I-O
+                              dRNGStates,
+                              dRays,
+                              // Input
+                              dRayIndices,
+                              dAccelKeysCommon,
+                              //
+                              dAccelKeyBatchPortion,
+                              queue);
 }
 
 size_t BaseAcceleratorLinear::GPUMemoryUsage() const

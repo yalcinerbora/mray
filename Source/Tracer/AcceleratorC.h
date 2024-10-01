@@ -483,10 +483,11 @@ class BaseAcceleratorI
                                   Span<MetaHit> dHitParams,
                                   // I-O
                                   Span<BackupRNGState> dRNGStates,
+                                  Span<RayGMem> dRays,
                                   // Input
-                                  Span<const RayGMem> dRays,
                                   Span<const RayIndex> dRayIndices,
-                                  Span<const AcceleratorKey> dAccelIdPacks,
+                                  Span<const AcceleratorKey> dAccelKeys,
+                                  CommonKey dAccelKeyBatchPortion,
                                   const GPUQueue& queue) = 0;
 
     // Construction

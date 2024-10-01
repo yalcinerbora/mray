@@ -126,12 +126,13 @@ template<class PGroup>
 MRAY_GPU MRAY_GPU_INLINE
 void KCClosestHit()
 {
+    using enum RenderModeOptiX;
     // If visibility check, just set it and go
-    if(params.doVisibility)
+    if(params.mode == VISIBILITY)
     {
         // We hit! Bad luck
         const RayIndex rIndex = GetRayIndexFromPayload();
-        params.dIsVisibleBuffer.SetBitParallel(rIndex, false);
+        params.vParams.dIsVisibleBuffer.SetBitParallel(rIndex, false);
         return;
     }
 
@@ -150,15 +151,32 @@ void KCClosestHit()
     MetaHit hit = ReadHitFromAttributes<Hit, TrianglePrimGroupC<PGroup>>();
 
     // Write to the global memory
-    params.dHitKeys[rIndex] = HitKeyPack
+    Span<HitKeyPack> dHitKeys;
+    Span<MetaHit> dHits;
+    Span<RayGMem> dRays;
+    if(params.mode == NORMAL)
     {
-        .primKey = pKey,
-        .lightOrMatKey = lmKey,
-        .transKey = tKey,
-        .accelKey = aKey
-    };
-    params.dHits[rIndex] = hit;
-    params.dRays[rIndex].tMax = optixGetRayTmax();
+        dHitKeys = params.nParams.dHitKeys;
+        dHits = params.nParams.dHits;
+        dRays = params.nParams.dRays;
+
+        dHitKeys[rIndex] = HitKeyPack
+        {
+            .primKey = pKey,
+            .lightOrMatKey = lmKey,
+            .transKey = tKey,
+            .accelKey = aKey
+        };
+        dHits[rIndex] = hit;
+        dRays[rIndex].tMax = optixGetRayTmax();
+
+    }
+    else
+    {
+        dHitKeys = params.lParams.dHitKeys;
+        dHits = params.lParams.dHits;
+        dRays = params.lParams.dRays;
+    }
 }
 
 // Meta Any Hit Shader
@@ -250,40 +268,51 @@ void KCIntersect()
 MRAY_GPU MRAY_GPU_INLINE
 void KCMissOptiX()
 {
+    using enum RenderModeOptiX;
     // Do Nothing, on conventional tracing
-    if(!params.doVisibility) return;
+    if(params.mode != VISIBILITY) return;
 
     // If visibility check, just set it and go
     const RayIndex rIndex = GetRayIndexFromPayload();
-    params.dIsVisibleBuffer.SetBitParallel(rIndex, true);
+    params.vParams.dIsVisibleBuffer.SetBitParallel(rIndex, true);
 }
 
 MRAY_GPU MRAY_GPU_INLINE
 void KCRayGenOptix()
 {
+    using enum RenderModeOptiX;
+    assert(params.mode != LOCAL);
+
     // We Launch linearly
     const uint32_t launchDim = optixGetLaunchDimensions().x;
     const uint32_t launchIndex = optixGetLaunchIndex().x;
     // Should we check this ??
     if(launchIndex >= launchDim) return;
 
-    RayIndex rIndex = params.dRayIndices[launchIndex];
-    auto [ray, tMM] = (params.doVisibility)
-                        ? RayFromGMem(params.dRaysConst, rIndex)
-                        : RayFromGMem(params.dRays, rIndex);
-
+    RayIndex rIndex = (params.mode == VISIBILITY)
+                        ? params.vParams.dRayIndices[launchIndex]
+                        : params.nParams.dRayIndices[launchIndex];
+    auto [ray, tMM] = (params.mode == VISIBILITY)
+                        ? RayFromGMem(params.vParams.dRays, rIndex)
+                        : RayFromGMem(params.nParams.dRays, rIndex);
+    OptixTraversableHandle traversable = (params.mode == VISIBILITY)
+                        ? params.vParams.baseAccelerator
+                        : params.nParams.baseAccelerator;
     // Set the RNG state as payload, any hit shaders will
     // do stochastic any hit invocation.
-    BackupRNGState rngState = params.dRNGStates[rIndex];
+    BackupRNGState rngState = (params.mode == VISIBILITY)
+                        ? params.vParams.dRNGStates[rIndex]
+                        : params.nParams.dRNGStates[rIndex];
+
     // Set the ray index (indirection) as payload as well
     // so we do not hit GMem for this.
     uint32_t flags = OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
-    if(params.doVisibility)
+    if(params.mode == VISIBILITY)
         flags |= OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT;
 
     // Trace!
     optixTrace(// Accelerator
-               params.baseAccelerator,
+               traversable,
                // Ray Input
                make_float3(ray.Pos()[0], ray.Pos()[1], ray.Pos()[2]),
                make_float3(ray.Dir()[0], ray.Dir()[1], ray.Dir()[2]),
@@ -298,11 +327,73 @@ void KCRayGenOptix()
                rIndex, rngState);
 
     // Save the state back
-    params.dRNGStates[rIndex] = rngState;
+    if(params.mode == VISIBILITY)
+        params.vParams.dRNGStates[rIndex] = rngState;
+    else
+        params.nParams.dRNGStates[rIndex] = rngState;
+}
+
+MRAY_GPU MRAY_GPU_INLINE
+void KCLocalRayGenOptix()
+{
+    //// We Launch linearly
+    //const uint32_t launchDim = optixGetLaunchDimensions().x;
+    //const uint32_t launchIndex = optixGetLaunchIndex().x;
+    //// Should we check this ??
+    //if(launchIndex >= launchDim) return;
+
+    //RayIndex rIndex = params.dRayIndices[launchIndex];
+    //auto [ray, tMM] = (params.doVisibility)
+    //                    ? RayFromGMem(params.dRaysConst, rIndex)
+    //                    : RayFromGMem(params.dRays, rIndex);
+
+    //OptixTraversableHandle traversable = params.baseAccelerator;
+    //// If we are doing local ray casting, we can't rely on
+    //// OptiX implicit transform changes.
+    //assert(params.doLocalCasting);
+
+    //AcceleratorKey aKey = params.dAcceleratorKeys[launchIndex];
+    //uint32_t globalIndex = params.batchStartOffset + aKey.FetchIndexPortion();
+    //traversable = params.dGlobalInstanceTraversables[globalIndex];
+
+    //Matrix4x4 invTransform = params.dGlobalInstanceInvTransforms[globalIndex];
+    //Vector3 dir = invTransform * ray.Dir();
+    //Vector3 pos = Vector3(invTransform * Vector4(ray.Pos(), 0));
+    //ray = Ray(dir, pos);
+
+    //// Set the RNG state as payload, any hit shaders will
+    //// do stochastic any hit invocation.
+    //BackupRNGState rngState = params.dRNGStates[rIndex];
+    //// Set the ray index (indirection) as payload as well
+    //// so we do not hit GMem for this.
+    //uint32_t flags = OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
+    //if(params.doVisibility)
+    //    flags |= OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT;
+
+    //// Trace!
+    //optixTrace(// Accelerator
+    //           params.baseAccelerator,
+    //           // Ray Input
+    //           make_float3(ray.Pos()[0], ray.Pos()[1], ray.Pos()[2]),
+    //           make_float3(ray.Dir()[0], ray.Dir()[1], ray.Dir()[2]),
+    //           tMM[0], tMM[1],
+    //           0.0f,
+    //           //
+    //           OptixVisibilityMask(0xFF),
+    //           // Flags
+    //           flags,
+    //           // SBT
+    //           0, 1, 0,
+    //           rIndex, rngState);
+
+    //// Save the state back
+    //params.dRNGStates[rIndex] = rngState;
+
 }
 
 // Actual Definitions
 WRAP_FUCTION_RAYGEN(OptiX, KCRayGenOptix);
+WRAP_FUCTION_RAYGEN(LocalOptiX, KCLocalRayGenOptix);
 WRAP_FUCTION_MISS(OptiX, KCMissOptiX);
 // These function names must be equavlient to the return type "TypeName()"
 // functions. We can't do language magic here unfortunately

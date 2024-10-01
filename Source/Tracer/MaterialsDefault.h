@@ -12,7 +12,7 @@ namespace LambertMatDetail
     {
         Span<const ParamVaryingData<2, Vector3>>        dAlbedo;
         Span<const Optional<TracerTexView<2, Vector3>>> dNormalMaps;
-        Span<const MediumKey>                           dMediumIds;
+        Span<const MediumKeyPair>                       dMediumKeys;
     };
 
     template <class SpectrumTransformer = SpectrumConverterContextIdentity>
@@ -29,7 +29,7 @@ namespace LambertMatDetail
         private:
         const AlbedoMap             albedoTex;
         const OptionalNormalMap&    normalMapTex;
-        MediumKey                   mediumId;
+        MediumKeyPair               mediumKeys;
 
         public:
         MRAY_HYBRID
@@ -56,14 +56,22 @@ namespace LambertMatDetail
 
 namespace ReflectMatDetail
 {
+    struct ReflectMatData
+    {
+        Span<const MediumKeyPair>  dMediumKeys;
+    };
+
     template <class SpectrumTransformer = SpectrumConverterContextIdentity>
     struct ReflectMaterial
     {
         using Surface           = DefaultSurface;
         using SpectrumConverter = typename SpectrumTransformer::Converter;
-        using DataSoA           = EmptyType;
+        using DataSoA           = ReflectMatData;
         //
         static constexpr uint32_t SampleRNCount = 0;
+
+        private:
+        MediumKeyPair  mediumKeys;
 
         public:
         MRAY_HYBRID
@@ -91,9 +99,9 @@ namespace RefractMatDetail
 {
     struct alignas(32) RefractMatData
     {
-        Span<const Pair<MediumKey, MediumKey>> dMediumIds;
-        Span<const Vector3>                    dFrontCauchyCoeffs;
-        Span<const Vector3>                    dBackCauchyCoeffs;
+        Span<const MediumKeyPair>   dMediumKeys;
+        Span<const Vector3>         dFrontCauchyCoeffs;
+        Span<const Vector3>         dBackCauchyCoeffs;
     };
 
     template <class SpectrumTransformer = SpectrumConverterContextIdentity>
@@ -106,10 +114,9 @@ namespace RefractMatDetail
         static constexpr uint32_t SampleRNCount = 0;
 
         private:
-        MediumKey   mKeyFront;
-        Spectrum    frontIoR;
-        MediumKey   mKeyBack;
-        Spectrum    backIoR;
+        MediumKeyPair   mediumKeys;
+        Spectrum        frontIoR;
+        Spectrum        backIoR;
 
         public:
         MRAY_HYBRID
@@ -144,7 +151,7 @@ namespace UnrealMatDetail
         Span<const ParamVaryingData<2, Float>>          dSpecular;
         Span<const ParamVaryingData<2, Float>>          dMetallic;
         //
-        Span<const MediumKey>                           dMediumIds;
+        Span<const MediumKeyPair>                       dMediumKeys;
     };
 
     template <class SpectrumTransformer = SpectrumConverterContextIdentity>
@@ -166,7 +173,7 @@ namespace UnrealMatDetail
         const FloatMap              specularTex;
         const FloatMap              metallicTex;
 
-        MediumKey                   mediumId;
+        MediumKeyPair               mediumKeys;
 
         MRAY_HYBRID
         Float MISRatio(Float metallic, Float specular, Float avgAlbedo) const;
@@ -212,11 +219,10 @@ class MatGroupLambert final : public GenericGroupMaterial<MatGroupLambert>
     private:
     Span<ParamVaryingData<2, Vector3>>          dAlbedo;
     Span<Optional<TracerTexView<2, Vector3>>>   dNormalMaps;
-    Span<MediumKey>                             dMediumIds;
+    Span<MediumKeyPair>                         dMediumKeys;
     DataSoA                                     soa;
 
     protected:
-    void            HandleMediums(const MediumKeyPairList&) override;
 
     public:
     static std::string_view TypeName();
@@ -256,22 +262,22 @@ class MatGroupLambert final : public GenericGroupMaterial<MatGroupLambert>
                                      const GPUQueue& queue) override;
 
     DataSoA         SoA() const;
+    void            Finalize(const GPUQueue&) override;
 };
 
 class MatGroupReflect final : public GenericGroupMaterial<MatGroupReflect>
 {
     public:
-    using DataSoA   = EmptyType;
+    using DataSoA   = ReflectMatDetail::ReflectMatData;
     template<class STContext = SpectrumConverterContextIdentity>
     using Material  = ReflectMatDetail::ReflectMaterial<STContext>;
     using Surface   = typename Material<>::Surface;
 
     private:
-    Span<MediumKey>     dMediumIds;
+    Span<MediumKeyPair> dMediumKeys;
     DataSoA             soa;
 
     protected:
-    void            HandleMediums(const MediumKeyPairList&) override;
 
     public:
     static std::string_view TypeName();
@@ -311,6 +317,7 @@ class MatGroupReflect final : public GenericGroupMaterial<MatGroupReflect>
                                      const GPUQueue& queue) override;
 
     DataSoA         SoA() const;
+    void            Finalize(const GPUQueue&) override;
 };
 
 class MatGroupRefract final : public GenericGroupMaterial<MatGroupRefract>
@@ -322,13 +329,12 @@ class MatGroupRefract final : public GenericGroupMaterial<MatGroupRefract>
     using Surface   = typename Material<>::Surface;
 
     private:
-    Span<Pair<MediumKey, MediumKey>>    dMediumIds;
-    Span<Vector3>                       dFrontCauchyCoeffs;
-    Span<Vector3>                       dBackCauchyCoeffs;
-    DataSoA                             soa;
+    Span<MediumKeyPair> dMediumKeys;
+    Span<Vector3>       dFrontCauchyCoeffs;
+    Span<Vector3>       dBackCauchyCoeffs;
+    DataSoA             soa;
 
     protected:
-    void            HandleMediums(const MediumKeyPairList&) override;
 
     public:
     static std::string_view TypeName();
@@ -368,6 +374,7 @@ class MatGroupRefract final : public GenericGroupMaterial<MatGroupRefract>
                                      const GPUQueue& queue) override;
 
     DataSoA         SoA() const;
+    void            Finalize(const GPUQueue&) override;
 };
 
 class MatGroupUnreal final : public GenericGroupMaterial<MatGroupUnreal>
@@ -391,10 +398,9 @@ class MatGroupUnreal final : public GenericGroupMaterial<MatGroupUnreal>
     Span<ParamVaryingData<2, Float>>            dRoughness;
     Span<ParamVaryingData<2, Float>>            dSpecular;
     Span<ParamVaryingData<2, Float>>            dMetallic;
-    Span<MediumKey>                             dMediumIds;
+    Span<MediumKeyPair>                         dMediumKeys;
     DataSoA                                     soa;
     protected:
-    void            HandleMediums(const MediumKeyPairList&) override;
 
     public:
     static std::string_view TypeName();
@@ -434,6 +440,7 @@ class MatGroupUnreal final : public GenericGroupMaterial<MatGroupUnreal>
                                      const GPUQueue& queue) override;
 
     DataSoA         SoA() const;
+    void            Finalize(const GPUQueue&) override;
 };
 
 #include "MaterialsDefault.hpp"

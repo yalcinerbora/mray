@@ -624,9 +624,8 @@ MaterialId TracerBase::ReserveMaterial(MatGroupId id,
 
     MediumKeyPairList medPairList;
     medPairList.reserve(1);
-    using MedKT = typename MediumKey::Type;
-    medPairList.emplace_back(MediumKey(static_cast<MedKT>(mediumPair.first)),
-                             MediumKey(static_cast<MedKT>(mediumPair.second)));
+    medPairList.emplace_back(std::bit_cast<MediumKey>(mediumPair.first),
+                             std::bit_cast<MediumKey>(mediumPair.second));
 
     std::vector<MaterialKey> output;
     output = matGroup.value().get()->Reserve(attribCountList, medPairList);
@@ -652,9 +651,8 @@ MaterialIdList TracerBase::ReserveMaterials(MatGroupId id,
     medPairList.reserve(countList.size());
     for(size_t i = 0; i < countList.size(); i++)
     {
-        using MedKT = typename MediumKey::Type;
-        medPairList.emplace_back(MediumKey(static_cast<MedKT>(medPairs[i].first)),
-                                 MediumKey(static_cast<MedKT>(medPairs[i].second)));
+        medPairList.emplace_back(std::bit_cast<MediumKey>(medPairs[i].first),
+                                 std::bit_cast<MediumKey>(medPairs[i].second));
     }
 
     std::vector<MaterialKey> output;

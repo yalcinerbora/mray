@@ -292,6 +292,11 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
     public:
     using ShaderNameMap = std::map<OptiXAccelDetail::ShaderTypeNames, std::vector<uint32_t>>;
     static std::string_view TypeName();
+
+    static constexpr auto RG_COMMON_RECORD = 0;
+    static constexpr auto RG_LOCAL_RECORD = 1;
+    static constexpr auto MISS_RECORD = 2;
+
     private:
     ContextOptiX                contextOptiX;
     std::vector<ComputeCapabilityTypePackOptiX> optixTypesPerCC;
@@ -301,18 +306,25 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
     Span<Byte>                  dAccelMemory;
     Span<GenericHitRecord<>>    dHitRecords;
     Span<EmptyHitRecord>        dEmptyRecords;
+    // For local ray casting
+    std::vector<size_t>             instanceBatchStartOffsets;
+    Span<Matrix4x4>                 dGlobalInstanceInvTransforms;
+    Span<OptixTraversableHandle>    dGlobalTraversableHandles;
+
     // State of the CC
     uint32_t currentCCIndex     = std::numeric_limits<uint32_t>::max();
     //
 
     // Host
-    OptixShaderBindingTable commonSBT;
+    OptixShaderBindingTable commonCastSBT;
+    OptixShaderBindingTable localCastSBT;
     OptixTraversableHandle  baseAccelerator;
 
     protected:
     AABB3           InternalConstruct(const std::vector<size_t>& instanceOffsets) override;
-    void GenerateShaders(EmptyHitRecord& rgRecord, EmptyHitRecord& missRecord,
-                         std::vector<GenericHitRecord<>>&, const ShaderNameMap&);
+    void            GenerateShaders(EmptyHitRecord& rgCommonRecord, EmptyHitRecord& rgLocalRecord,
+                                    EmptyHitRecord& missRecord, std::vector<GenericHitRecord<>>&,
+                                    const ShaderNameMap&);
     public:
     // Constructors & Destructor
     BaseAcceleratorOptiX(BS::thread_pool&, const GPUSystem&,
@@ -344,10 +356,11 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
                           Span<MetaHit> dHitParams,
                           // I-O
                           Span<BackupRNGState> dRNGStates,
+                          Span<RayGMem> dRays,
                           // Input
-                          Span<const RayGMem> dRays,
                           Span<const RayIndex> dRayIndices,
-                          Span<const AcceleratorKey> dAccelIdPacks,
+                          Span<const AcceleratorKey> dAccelKeys,
+                          CommonKey dAccelKeyBatchPortion,
                           const GPUQueue& queue) override;
 
     void    AllocateForTraversal(size_t maxRayCount) override;

@@ -13,10 +13,6 @@ std::string_view MatGroupLambert::TypeName()
     return MaterialTypeName<Name>;
 }
 
-void MatGroupLambert::HandleMediums(const MediumKeyPairList& mediumList)
-{
-}
-
 MatGroupLambert::MatGroupLambert(uint32_t groupId,
                                  const GPUSystem& s,
                                  const TextureViewMap& map)
@@ -25,12 +21,12 @@ MatGroupLambert::MatGroupLambert(uint32_t groupId,
 
 void MatGroupLambert::CommitReservations()
 {
-    GenericCommit(std::tie(dAlbedo, dNormalMaps, dMediumIds),
+    GenericCommit(std::tie(dAlbedo, dNormalMaps, dMediumKeys),
                   {0, 0, -1});
 
     soa.dAlbedo = ToConstSpan(dAlbedo);
     soa.dNormalMaps = ToConstSpan(dNormalMaps);
-    soa.dMediumIds = ToConstSpan(dMediumIds);
+    soa.dMediumKeys = ToConstSpan(dMediumKeys);
 }
 
 MatAttributeInfoList MatGroupLambert::AttributeInfo() const
@@ -130,6 +126,11 @@ typename MatGroupLambert::DataSoA MatGroupLambert::SoA() const
     return soa;
 }
 
+void MatGroupLambert::Finalize(const GPUQueue& q)
+{
+    q.MemcpyAsync(dMediumKeys, Span<const MediumKeyPair>(allMediums));
+}
+
 //===============================//
 //       Reflect Material        //
 //===============================//
@@ -141,10 +142,6 @@ std::string_view MatGroupReflect::TypeName()
     return MaterialTypeName<Name>;
 }
 
-void MatGroupReflect::HandleMediums(const MediumKeyPairList& mediumList)
-{
-}
-
 MatGroupReflect::MatGroupReflect(uint32_t groupId,
                                  const GPUSystem& s,
                                  const TextureViewMap& map)
@@ -153,7 +150,8 @@ MatGroupReflect::MatGroupReflect(uint32_t groupId,
 
 void MatGroupReflect::CommitReservations()
 {
-    isCommitted = true;
+    GenericCommit(std::tie(dMediumKeys), {-1});
+    soa.dMediumKeys = ToConstSpan(dMediumKeys);
 }
 
 MatAttributeInfoList MatGroupReflect::AttributeInfo() const
@@ -201,6 +199,11 @@ typename MatGroupReflect::DataSoA MatGroupReflect::SoA() const
     return soa;
 }
 
+void MatGroupReflect::Finalize(const GPUQueue& q)
+{
+    q.MemcpyAsync(dMediumKeys, Span<const MediumKeyPair>(allMediums));
+}
+
 //===============================//
 //       Refract Material        //
 //===============================//
@@ -212,10 +215,6 @@ std::string_view MatGroupRefract::TypeName()
     return MaterialTypeName<Name>;
 }
 
-void MatGroupRefract::HandleMediums(const MediumKeyPairList& mediumList)
-{
-}
-
 MatGroupRefract::MatGroupRefract(uint32_t groupId,
                                  const GPUSystem& s,
                                  const TextureViewMap& map)
@@ -224,13 +223,13 @@ MatGroupRefract::MatGroupRefract(uint32_t groupId,
 
 void MatGroupRefract::CommitReservations()
 {
-    GenericCommit(std::tie(dMediumIds,
+    GenericCommit(std::tie(dMediumKeys,
                            dFrontCauchyCoeffs,
                            dBackCauchyCoeffs), {-1, 0, 0});
 
     soa.dBackCauchyCoeffs = ToConstSpan(dBackCauchyCoeffs);
     soa.dFrontCauchyCoeffs = ToConstSpan(dFrontCauchyCoeffs);
-    soa.dMediumIds = ToConstSpan(dMediumIds);
+    soa.dMediumKeys = ToConstSpan(dMediumKeys);
 }
 
 MatAttributeInfoList MatGroupRefract::AttributeInfo() const
@@ -346,6 +345,11 @@ typename MatGroupRefract::DataSoA MatGroupRefract::SoA() const
     return soa;
 }
 
+void MatGroupRefract::Finalize(const GPUQueue& q)
+{
+    q.MemcpyAsync(dMediumKeys, Span<const MediumKeyPair>(allMediums));
+}
+
 //===============================//
 //        Unreal Material        //
 //===============================//
@@ -355,10 +359,6 @@ std::string_view MatGroupUnreal::TypeName()
     using namespace std::string_view_literals;
     static constexpr auto Name = "Unreal"sv;
     return MaterialTypeName<Name>;
-}
-
-void MatGroupUnreal::HandleMediums(const MediumKeyPairList& mediumList)
-{
 }
 
 MatGroupUnreal::MatGroupUnreal(uint32_t groupId,
@@ -371,7 +371,7 @@ void MatGroupUnreal::CommitReservations()
 {
     GenericCommit(std::tie(dAlbedo, dNormalMaps,
                            dRoughness, dSpecular, dMetallic,
-                           dMediumIds),
+                           dMediumKeys),
                            {0, 0, 0, 0, 0, -1});
 
     soa.dAlbedo = ToConstSpan(dAlbedo);
@@ -379,7 +379,7 @@ void MatGroupUnreal::CommitReservations()
     soa.dRoughness = ToConstSpan(dRoughness);
     soa.dSpecular = ToConstSpan(dSpecular);
     soa.dMetallic = ToConstSpan(dMetallic);
-    soa.dMediumIds = ToConstSpan(dMediumIds);
+    soa.dMediumKeys = ToConstSpan(dMediumKeys);
 }
 
 MatAttributeInfoList MatGroupUnreal::AttributeInfo() const
@@ -485,4 +485,9 @@ void MatGroupUnreal::PushTexAttribute(MaterialKey, MaterialKey,
 typename MatGroupUnreal::DataSoA MatGroupUnreal::SoA() const
 {
     return soa;
+}
+
+void MatGroupUnreal::Finalize(const GPUQueue& q)
+{
+    q.MemcpyAsync(dMediumKeys, Span<const MediumKeyPair>(allMediums));
 }

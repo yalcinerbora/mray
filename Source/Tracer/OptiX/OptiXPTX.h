@@ -8,7 +8,14 @@
 
 #include <optix_device.h>
 
-struct ArgumentPackOpitX
+enum class RenderModeOptiX
+{
+	NORMAL,
+	VISIBILITY,
+	LOCAL
+};
+
+struct NormalRayCastArgPackOptiX
 {
 	OptixTraversableHandle 	baseAccelerator;
 	// Outputs
@@ -19,10 +26,75 @@ struct ArgumentPackOpitX
 	Span<RayGMem>           dRays;
 	// Inputs
 	Span<const RayIndex>    dRayIndices;
-	// Visibility ray casting related
-	bool					doVisibility;
+};
+
+struct VisibilityCastArgPackOptiX
+{
+	OptixTraversableHandle 	baseAccelerator;
+	// Input
 	Bitspan<uint32_t>		dIsVisibleBuffer;
-	Span<const RayGMem>		dRaysConst;
+	// I-O
+	Span<BackupRNGState>	dRNGStates;
+	// Inputs
+	Span<const RayGMem>     dRays;
+	Span<const RayIndex>	dRayIndices;
+};
+
+struct LocalRayCastArgPackOptiX
+{
+	// Outputs
+	Span<HitKeyPack>        dHitKeys;
+	Span<MetaHit>			dHits;
+	// I-O
+	Span<BackupRNGState>	dRNGStates;
+	Span<RayGMem>           dRays;
+	// Inputs
+	Span<const RayIndex>		dRayIndices;
+	Span<const AcceleratorKey>	dAcceleratorKeys;
+	// Constants
+	Span<const OptixTraversableHandle>	dGlobalInstanceTraversables;
+	Span<const Matrix4x4>				dGlobalInstanceInvTransforms;
+	uint32_t							batchStartOffset;
+};
+
+struct ArgumentPackOpitX
+{
+	RenderModeOptiX mode;
+	union
+	{
+		NormalRayCastArgPackOptiX nParams;
+		VisibilityCastArgPackOptiX vParams;
+		LocalRayCastArgPackOptiX lParams;
+	};
+
+	////union;
+
+	//OptixTraversableHandle 	baseAccelerator;
+	//// Outputs
+	//Span<HitKeyPack>        dHitKeys;
+	//Span<MetaHit>			dHits;
+	//// I-O
+	//Span<BackupRNGState>	dRNGStates;
+	//Span<RayGMem>           dRays;
+	//// Inputs
+	//Span<const RayIndex>    dRayIndices;
+	//// Visibility ray casting related
+	//bool					doVisibility;
+	//Bitspan<uint32_t>		dIsVisibleBuffer;
+	//Span<const RayGMem>		dRaysConst;
+	//// Local ray-casting related
+	//bool								doLocalCasting;
+	//Span<const OptixTraversableHandle>	dGlobalInstanceTraversables;
+	//Span<const Matrix4x4>				dGlobalInstanceInvTransforms;
+	//Span<const AcceleratorKey>			dAcceleratorKeys;
+	//uint32_t							batchStartOffset;
+};
+
+struct LocalCastArgumentPackOptix
+{
+	// Local casting related
+
+
 };
 
 // Hit records (as far as I understand) can be defined multiple times

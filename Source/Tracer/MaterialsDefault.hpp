@@ -9,7 +9,7 @@ LambertMaterial<SpectrumTransformer>::LambertMaterial(const SpectrumConverter& s
                                                       const DataSoA& soa, MaterialKey mk)
     : albedoTex(specTransformer, soa.dAlbedo[mk.FetchIndexPortion()])
     , normalMapTex(soa.dNormalMaps[mk.FetchIndexPortion()])
-    , mediumId(soa.dMediumIds[mk.FetchIndexPortion()])
+    , mediumKeys(soa.dMediumKeys[mk.FetchIndexPortion()])
 {}
 
 template <class ST>
@@ -46,6 +46,7 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
     // Lambert material is **not** asubsurface material,
     // directly delegate the incoming position as outgoing
     Ray wIRay = Ray(wI, surface.position);
+    MediumKey outMedium = surface.backSide ? mediumKeys.Back() : mediumKeys.Front();
 
     return SampleT<BxDFResult>
     {
@@ -53,7 +54,7 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
         {
             .wI = wIRay,
             .reflectance = reflectance,
-            .mediumKey = mediumId
+            .mediumKey = outMedium
         },
         .pdf = pdf
     };
@@ -132,7 +133,8 @@ namespace ReflectMatDetail
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 ReflectMaterial<ST>::ReflectMaterial(const SpectrumConverter&,
-                                     const DataSoA&, MaterialKey)
+                                     const DataSoA& soa, MaterialKey mk)
+    : mediumKeys(soa.dMediumKeys[mk.FetchIndexPortion()])
 {}
 
 template <class ST>
@@ -150,6 +152,7 @@ SampleT<BxDFResult> ReflectMaterial<ST>::SampleBxDF(const Vector3& wO,
     Vector3 wI = Graphics::Reflect(localNormal, wO);
     // Directly delegate position, this is not a subsurface material
     Ray wIRay = Ray(wI, surface.position);
+    MediumKey outMedium = surface.backSide ? mediumKeys.Back() : mediumKeys.Front();
     return SampleT<BxDFResult>
     {
         .value = BxDFResult
@@ -157,7 +160,7 @@ SampleT<BxDFResult> ReflectMaterial<ST>::SampleBxDF(const Vector3& wO,
             .wI = wIRay,
             .reflectance = Spectrum(1.0),
             // TODO: Change this later
-            .mediumKey = MediumKey::InvalidKey()
+            .mediumKey = outMedium
         },
         .pdf = Float(1.0)
     };
@@ -213,9 +216,7 @@ template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 RefractMaterial<ST>::RefractMaterial(const SpectrumConverter& sTransContext,
                                      const DataSoA& soa, MaterialKey mk)
-    // TODO: Add medium here later
-    : mKeyFront(soa.dMediumIds[mk.FetchIndexPortion()].first)
-    , mKeyBack(soa.dMediumIds[mk.FetchIndexPortion()].second)
+    : mediumKeys(soa.dMediumKeys[mk.FetchIndexPortion()])
 {
     // Fetch ior
     auto CoeffsToIoR = [&](Vector3 coeffs)
@@ -241,8 +242,9 @@ SampleT<BxDFResult> RefractMaterial<ST>::SampleBxDF(const Vector3& wO,
     }
     // TODO:
     else static_assert(SpectrumConverter::IsRGB, "Dispersion is not implemented yet!");
-    MediumKey fromMedium = mKeyFront;
-    MediumKey toMedium = mKeyBack;
+
+    MediumKey fromMedium = mediumKeys.Front();
+    MediumKey toMedium = mediumKeys.Back();
 
     // Check if we are exiting or entering
     bool entering = !surface.backSide;
@@ -335,16 +337,14 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Float UnrealMaterial<ST>::MISRatio(Float metallic, Float specular,
                                    Float avgAlbedo) const
 {
-    return Float(0.5);
-
-    //// This function returns diffuse selection probability
-    //// Diffuse part
-    //Float integralDiffuse = Float(2) * MathConstants::Pi<Float>() * avgAlbedo;
-    //integralDiffuse *= (Float(1) - metallic);
-    //// Specular part
-    //Float specularRatio = Math::Lerp(specular, avgAlbedo, metallic);
-    //Float total = specularRatio + integralDiffuse;
-    //return (total == Float(0)) ? Float(0) : integralDiffuse / total;
+    // This function returns diffuse selection probability
+    // Diffuse part
+    Float integralDiffuse = Float(2) * MathConstants::Pi<Float>() * avgAlbedo;
+    integralDiffuse *= (Float(1) - metallic);
+    // Specular part
+    Float specularRatio = Math::Lerp(specular, avgAlbedo, metallic);
+    Float total = specularRatio + integralDiffuse;
+    return (total == Float(0)) ? Float(0) : integralDiffuse / total;
 }
 
 template <class ST>
@@ -388,7 +388,7 @@ UnrealMaterial<SpectrumTransformer>::UnrealMaterial(const SpectrumConverter& spe
     , roughnessTex(soa.dRoughness[mk.FetchIndexPortion()])
     , specularTex(soa.dSpecular[mk.FetchIndexPortion()])
     , metallicTex(soa.dMetallic[mk.FetchIndexPortion()])
-    , mediumId(soa.dMediumIds[mk.FetchIndexPortion()])
+    , mediumKeys(soa.dMediumKeys[mk.FetchIndexPortion()])
 {}
 
 template <class ST>
@@ -399,7 +399,6 @@ SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
 {
     static constexpr int DIFFUSE = 0;
     static constexpr int SPECULAR = 1;
-
 
     using namespace Distribution;
     auto [roughness, metallic, specular, albedo] = FetchData(surface);
@@ -496,23 +495,7 @@ SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
     L = toTangentSpace.ApplyInvRotation(L);
 
     Spectrum reflectance = diffuseTerm + specularTerm;
-
-
-
-    Spectrum xxx = Common::DivideByPDF(reflectance, pdfOut);
-    if(xxx.Sum() > 100)
-    {
-        printf("[L]: Xi[%f, %f, %f], R: %f, S: %f, M: %f "
-               "A: [%f, %f, %f] wO [%f, %f, %f] "
-               "normal [%f, %f, %f], Q[%f, %f, %f, %f] = [%f, %f, %f]\n",
-               sXi, xi[0], xi[1], roughness, specular, metallic,
-               albedo[0], albedo[1], albedo[2],
-               wO[0], wO[1], wO[2], normal[0], normal[1], normal[2],
-               surface.shadingTBN[0], surface.shadingTBN[1],
-               surface.shadingTBN[2], surface.shadingTBN[3],
-               xxx[0], xxx[1], xxx[2]);
-    }
-
+    MediumKey outMedium = surface.backSide ? mediumKeys.Back() : mediumKeys.Front();
     // Go all the way to the local space
     return SampleT<BxDFResult>
     {
@@ -520,7 +503,7 @@ SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
         {
             .wI = Ray(L, surface.position),
             .reflectance = reflectance,
-            .mediumKey = mediumId
+            .mediumKey = outMedium
         },
         .pdf = pdfOut
     };

@@ -5,16 +5,6 @@
 #include "Device/GPUAlgGeneric.h"
 #include "Device/GPUMemory.h"
 
-struct KCInvertTransforms
-{
-    MRAY_HYBRID Matrix4x4 operator()(const Matrix4x4&) const;
-};
-
-MRAY_HYBRID Matrix4x4 KCInvertTransforms::operator()(const Matrix4x4& matrix) const
-{
-    return matrix.Inverse();
-}
-
 typename TransformGroupIdentity::DataSoA TransformGroupIdentity::SoA() const
 {
     return EmptyType{};

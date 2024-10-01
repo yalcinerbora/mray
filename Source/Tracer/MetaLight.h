@@ -170,16 +170,13 @@ class MetaLightArrayT
         ...
     >;
 
-    //using PrimGroupPtrTuple = UniqueTuple<typename std::tuple_element_t<0, TransformLightTuple>::PrimGroup*...>;
-    using TLGroupPtrTuple = Tuple<TransformLightTuple*...>;
-    //using TransGroupPtrTuple = UniqueTuple<std::tuple_element_t<1, TransformLightTuple>*...>;
-
     using VariantLightSoA = Variant<typename std::tuple_element_t<0, TransformLightTuple>::DataSoA...>;
     using VariantPrimSoA = UniqueVariant<typename std::tuple_element_t<0, TransformLightTuple>::PrimGroup::DataSoA...>;
     using VariantTransformSoA = UniqueVariant<typename std::tuple_element_t<1, TransformLightTuple>::DataSoA...>;
     //
     using IdentitySConverter = typename SpectrumConverterContextIdentity::Converter;
-
+    //
+    using TLGroupPtrTuple = Tuple<TransformLightTuple*...>;
     // We will memcpy the SoA's these must be implicit lifetime types.
     // And we pray that std::variant implementation does not break between CPU/GPU.
     static_assert(ImplicitLifetimeC<VariantLightSoA>);
