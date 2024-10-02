@@ -86,7 +86,9 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/RendererC.h
         ${CURRENT_SOURCE_DIR}/RenderImage.cpp
         ${CURRENT_SOURCE_DIR}/RenderImage.h
-        ${CURRENT_SOURCE_DIR}/RayGenKernels.h)
+        ${CURRENT_SOURCE_DIR}/RayGenKernels.h
+        ${CURRENT_SOURCE_DIR}/LightSampler.hpp
+        ${CURRENT_SOURCE_DIR}/LightSampler.h)
 
     set(SRC_RENDERERS_TEX_VIEW
         ${CURRENT_SOURCE_DIR}/TexViewRenderer.h
@@ -100,7 +102,7 @@ function(gen_tracer_target)
     set(SRC_RENDERERS_PATH_TRACER
         ${CURRENT_SOURCE_DIR}/PathTracerRendererShaders.h
         ${CURRENT_SOURCE_DIR}/PathTracerRenderer.h
-        ${CURRENT_SOURCE_DIR}/PathTracerRenderer.cu)
+        ${CURRENT_SOURCE_DIR}/PathTracerRenderer.hpp)
 
     set(SRC_RANDOM
         ${CURRENT_SOURCE_DIR}/Random.cu

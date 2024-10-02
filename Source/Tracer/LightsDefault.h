@@ -67,6 +67,7 @@ namespace LightDetail
         using SpectrumConverter = typename SpectrumTransformer::Converter;
         using Primitive         = PrimitiveT;
         //
+        static constexpr bool     IsPrimitiveBackedLight    = true;
         static constexpr uint32_t SampleSolidAngleRNCount   = Primitive::SampleRNCount;
         static constexpr uint32_t SampleRayRNCount          = Primitive::SampleRNCount + 2;
 
@@ -98,8 +99,6 @@ namespace LightDetail
         MRAY_HYBRID
         Spectrum            EmitViaSurfacePoint(const Vector3& wO,
                                                 const Vector3& surfacePoint) const;
-
-        MRAY_HYBRID bool    IsPrimitiveBackedLight() const;
     };
 
      // Meta Primitive Related Light
@@ -115,8 +114,9 @@ namespace LightDetail
         using SpectrumConverter = typename SpectrumTransformer::Converter;
         using Primitive         = EmptyPrimitive<TContext>;
         //
-        static constexpr uint32_t SampleRayRNCount = 2;
-        static constexpr uint32_t SampleSolidAngleRNCount = 2;
+        static constexpr bool       IsPrimitiveBackedLight = false;
+        static constexpr uint32_t   SampleRayRNCount = 2;
+        static constexpr uint32_t   SampleSolidAngleRNCount = 4;
 
         private:
         Ref<const Primitive>    prim;
@@ -147,8 +147,6 @@ namespace LightDetail
         MRAY_HYBRID
         Spectrum            EmitViaSurfacePoint(const Vector3& wO,
                                                 const Vector3& surfacePoint) const;
-
-        MRAY_HYBRID bool    IsPrimitiveBackedLight() const;
     };
 
     template <TransformContextC TContext = TransformContextIdentity,
@@ -160,6 +158,7 @@ namespace LightDetail
         using SpectrumConverter = typename SpectrumTransformer::Converter;
         using Primitive         = EmptyPrimitive<TContext>;
         //
+        static constexpr bool     IsPrimitiveBackedLight    = false;
         static constexpr uint32_t SampleSolidAngleRNCount   = 0;
         static constexpr uint32_t SampleRayRNCount          = 0;
 
@@ -184,7 +183,6 @@ namespace LightDetail
         MRAY_HYBRID
         Spectrum            EmitViaSurfacePoint(const Vector3&,
                                                 const Vector3&) const;
-        MRAY_HYBRID bool    IsPrimitiveBackedLight() const;
     };
 }
 

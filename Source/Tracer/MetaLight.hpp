@@ -106,8 +106,7 @@ bool MetaLightViewT<V, ST>::IsPrimitiveBackedLight() const
 }
 
 template<LightTransPairC... TLT>
-MetaLightArrayT<TLT...>::
-MetaLightArrayView::MetaLightArrayView(Span<const MetaLight> dLights)
+MetaLightArrayT<TLT...>::View::View(Span<const MetaLight> dLights)
     : dMetaLights(dLights)
 {}
 
@@ -115,11 +114,17 @@ template<LightTransPairC... TLT>
 template<class STransformer>
 MRAY_HYBRID MRAY_CGPU_INLINE
 typename MetaLightArrayT<TLT...>::MetaLightView<STransformer>
-MetaLightArrayT<TLT...>::
-MetaLightArrayView::operator()(const typename STransformer::Converter& sc,
-                               uint32_t i) const
+MetaLightArrayT<TLT...>::View::operator()(const typename STransformer::Converter& sc,
+                                          uint32_t i) const
 {
     return MetaLightView(dMetaLights[i], sc);
+}
+
+template<LightTransPairC... TLT>
+MRAY_HYBRID
+uint32_t MetaLightArrayT<TLT...>::View::Size() const
+{
+    return static_cast<uint32_t>(dMetaLights.size());
 }
 
 template<LightTransPairC... TLT>
@@ -127,7 +132,6 @@ MetaLightArrayT<TLT...>::MetaLightArrayT(const GPUSystem& s)
     : system(s)
     , memory(system.AllGPUs(), 2_MiB, 16_MiB)
 {}
-
 
 template<LightTransPairC... TLT>
 template<LightGroupC LightGroup, TransformGroupC TransformGroup>
@@ -269,7 +273,7 @@ void MetaLightArrayT<TLT...>::AddBatchGeneric(const GenericGroupLightT& lg,
 }
 
 template<LightTransPairC... TLT>
-typename MetaLightArrayT<TLT...>::MetaLightArrayView
+typename MetaLightArrayT<TLT...>::View
 MetaLightArrayT<TLT...>::Array() const
 {
     return ToConstSpan(dMetaLights);

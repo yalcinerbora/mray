@@ -9,9 +9,8 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     public:
     static std::string_view TypeName();
 
-    using GlobalState   = EmptyType;
-    using RayState      = EmptyType;
-    using RayPayload    = EmptyType;
+    using GlobalStateList   = Tuple<>;
+    using RayStateList      = Tuple<>;
     using SpectrumConverterContext = SpectrumConverterContextIdentity;
 
     enum Mode
@@ -65,19 +64,3 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
 
 static_assert(RendererC<TexViewRenderer>, "\"TexViewRenderer\" does not "
               "satisfy renderer concept.");
-
-inline
-std::string_view TexViewRenderer::TypeName()
-{
-    using namespace std::string_view_literals;
-    using namespace TypeNameGen::CompTime;
-    static constexpr auto Name = "TexView"sv;
-    return RendererTypeName<Name>;
-}
-
-inline
-size_t TexViewRenderer::GPUMemoryUsage() const
-{
-    return 0;
-}
-

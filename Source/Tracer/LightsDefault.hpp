@@ -157,13 +157,6 @@ Spectrum LightPrim<P, SC>::EmitViaSurfacePoint(const Vector3& wO,
     return radiance(uv);
 }
 
-template<PrimitiveC P, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
-bool LightPrim<P, SC>::IsPrimitiveBackedLight() const
-{
-    return true;
-}
-
 }
 
 namespace LightDetail
@@ -338,20 +331,16 @@ Spectrum LightSkysphere<CC, TC, SC>::EmitViaHit(const Vector3& wO,
 
 template<CoordConverterC CC, TransformContextC TC, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum LightSkysphere<CC, TC, SC>::EmitViaSurfacePoint(const Vector3&,
+Spectrum LightSkysphere<CC, TC, SC>::EmitViaSurfacePoint(const Vector3& wO,
                                                          const Vector3&) const
 {
-    // Distant light do not have surfaces, this function
-    // should not be called.
-    assert(false);
+    Vector3 dirYUp = prim.get().GetTransformContext().ApplyV(-wO);
+    Vector2 uv = radiance.Constant()
+                    ? CC::DirToUV(dirYUp)
+                    : Vector2::Zero();
+    // TODO: How to incorporate differentials here?
+    return radiance(uv);
     return Spectrum::Zero();
-}
-
-template<CoordConverterC CC, TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
-bool LightSkysphere<CC, TC, SC>::IsPrimitiveBackedLight() const
-{
-    return false;
 }
 
 static_assert(LightC<LightSkysphere<SphericalCoordConverter>>);
@@ -423,13 +412,6 @@ Spectrum LightNull<TC, SC>::EmitViaSurfacePoint(const Vector3&,
                                                 const Vector3&) const
 {
     return Spectrum::Zero();
-}
-
-template<TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
-bool LightNull<TC, SC>::IsPrimitiveBackedLight() const
-{
-    return false;
 }
 
 }

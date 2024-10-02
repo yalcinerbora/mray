@@ -4,39 +4,49 @@
 #include "RayPartitioner.h"
 #include "PathTracerRendererShaders.h"
 
-class PathTracerRenderer final : public RendererT<PathTracerRenderer>
+template<class MetaLightArrayType>
+class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightArrayType>>
 {
-    using FilmFilterPtr = std::unique_ptr<TextureFilterI>;
-    using CameraWorkPtr = std::unique_ptr<RenderCameraWorkT<PathTracerRenderer>>;
+    using Base              = RendererT<PathTracerRenderer<MetaLightArrayType>>;
+    using FilmFilterPtr     = std::unique_ptr<TextureFilterI>;
+    using CameraWorkPtr     = std::unique_ptr<RenderCameraWorkT<PathTracerRenderer>>;
+    using MetaLightArray    = MetaLightArrayType;
+    using Options           = PathTraceRDetail::Options;
+    //
+    using UniformLightSampler   = DirectLightSamplerViewUniform<typename MetaLightArray::View>;
+    //using IrradianceLightSampler    = DirectLightSamplerViewUniform<typename MetaLightArray::View>;
 
     public:
     static std::string_view TypeName();
     //
-    using GlobalState   = PathTraceRDetail::GlobalState;
-    using RayState      = PathTraceRDetail::RayState;
-    using RayPayload    = PathTraceRDetail::RayPayload;
+    using AttribInfoList = typename Base::AttribInfoList;
     using SpectrumConverterContext = SpectrumConverterContextIdentity;
-    using Options       = PathTraceRDetail::Options;
+    using GlobalStateList   = Tuple<PathTraceRDetail::GlobalState<EmptyType>,
+                                    PathTraceRDetail::GlobalState<UniformLightSampler>>;
+    using RayStateList      = Tuple<PathTraceRDetail::RayState, PathTraceRDetail::RayState>;
+
     // Work Functions
     template<PrimitiveC P, MaterialC M, class S, class TContext,
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     static constexpr Tuple WorkFunctions = Tuple
     {
         PathTraceRDetail::WorkFunction<P, M, S, TContext, PG, MG, TG>,
-        PathTraceRDetail::WorkFunctionWithNEE<P, M, S, TContext, PG, MG, TG>
+        PathTraceRDetail::WorkFunctionWithNEE<UniformLightSampler, P, M, S, TContext, PG, MG, TG>
     };
     template<LightC L, LightGroupC LG, TransformGroupC TG>
     static constexpr auto LightWorkFunctions = Tuple
     {
-        PathTraceRDetail::LightWorkFunction<L, LG, TG>
+        PathTraceRDetail::LightWorkFunction<L, LG, TG>,
+        PathTraceRDetail::LightWorkFunctionWithNEE<UniformLightSampler, L, LG, TG>
     };
     template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
     static constexpr auto CamWorkFunctions = Tuple{};
-    static constexpr auto RayStateInitFunc = PathTraceRDetail::InitRayState;
 
     private:
     Options     currentOptions  = {};
     Options     newOptions      = {};
+    //
+    MetaLightArray              metaLightArray;
     //
     FilmFilterPtr               filmFilter;
     RenderWorkHasher            workHasher;
@@ -61,7 +71,7 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer>
     Span<uint32_t>              dIsVisibleBuffer;
     Span<RandomNumber>          dRandomNumBuffer;
     Span<Byte>                  dSubCameraBuffer;
-    RayState                    dRayState;
+    PathTraceRDetail::RayState  dRayState;
     // Work Hash related
     Span<uint32_t>              dWorkHashes;
     Span<CommonKey>             dWorkBatchIds;
@@ -95,13 +105,4 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer>
     size_t              GPUMemoryUsage() const override;
 };
 
-static_assert(RendererC<PathTracerRenderer>);
-
-template<PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-using PathTracerRenderWork = RenderWork<PathTracerRenderer, PG, MG, TG>;
-
-template<LightGroupC LG, TransformGroupC TG>
-using PathTracerRenderLightWork = RenderLightWork<PathTracerRenderer, LG, TG>;
-
-template<CameraGroupC CG, TransformGroupC TG>
-using PathTracerRenderCamWork = RenderCameraWork<PathTracerRenderer, CG, TG>;
+#include "PathTracerRenderer.hpp"

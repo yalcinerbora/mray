@@ -13,8 +13,7 @@ using RendererTypes_1 = Tuple
 
 using RendererWorkTypes_1 = Tuple
 <
-    RendererWorkTypes<SurfaceRenderer, SurfaceRenderWork,
-                      SurfaceRenderLightWork, SurfaceRenderCamWork>
+    RendererWorkTypes<SurfaceRenderer>
 >;
 
 void Tracer::AddRendererGenerators_1(Map<std::string_view, RendererGenerator>& map,

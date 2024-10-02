@@ -88,7 +88,7 @@ namespace SurfRDetail
         Float tMaxAO;
     };
 
-    struct RayState
+    struct RayStateCommon
     {
         // Can be position, furance radiance, normal
         // or a false color
@@ -96,16 +96,22 @@ namespace SurfRDetail
         Span<ImageCoordinate>   dImageCoordinates;
         Span<Float>             dFilmFilterWeights;
     };
-    // No payload (this is incident renderer so
-    // everything is on ray state)
-    using RayPayload = EmptyType;
+    struct RayStateAO
+    {
+        // Can be position, furance radiance, normal
+        // or a false color
+        Span<Spectrum>          dOutputData;
+        Span<ImageCoordinate>   dImageCoordinates;
+        Span<Float>             dFilmFilterWeights;
+        Span<RayGMem>           dVisibilityRays;
+    };
 
     template<PrimitiveC Prim, MaterialC Material, class Surface, class TContext,
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     MRAY_HYBRID
     void WorkFunctionCommon(const Prim&, const Material&, const Surface&,
                             const TContext&, RNGDispenser&,
-                            const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params,
+                            const RenderWorkParams<GlobalState, RayStateCommon, PG, MG, TG>& params,
                             RayIndex rayIndex);
 
     template<PrimitiveC Prim, MaterialC Material, class Surface, class TContext,
@@ -113,18 +119,15 @@ namespace SurfRDetail
     MRAY_HYBRID
     void WorkFunctionFurnaceOrAO(const Prim&, const Material&, const Surface&,
                                  const TContext&, RNGDispenser&,
-                                 const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params,
+                                 const RenderWorkParams<GlobalState, RayStateAO, PG, MG, TG>& params,
                                  RayIndex rayIndex);
 
     template<LightC Light, LightGroupC LG, TransformGroupC TG>
     MRAY_HYBRID
     void LightWorkFunctionCommon(const Light&, RNGDispenser&,
-                                 const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params,
+                                 const RenderLightWorkParams<GlobalState, RayStateCommon, LG, TG>& params,
                                  RayIndex rayIndex);
 
-    MRAY_HYBRID
-    void InitRayState(const RayPayload&, const RayState&,
-                      const RaySample&, uint32_t writeIndex);
 }
 
 template<PrimitiveC Prim, MaterialC Material,
@@ -133,7 +136,7 @@ template<PrimitiveC Prim, MaterialC Material,
 MRAY_HYBRID MRAY_GPU_INLINE
 void SurfRDetail::WorkFunctionCommon(const Prim&, const Material&, const Surface& surf,
                                      const TContext& tContext, RNGDispenser&,
-                                     const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params,
+                                     const RenderWorkParams<GlobalState, RayStateCommon, PG, MG, TG>& params,
                                      RayIndex rayIndex)
 {
     Vector3 color = Vector3::Zero();
@@ -236,7 +239,7 @@ template<PrimitiveC Prim, MaterialC Material,
 MRAY_HYBRID MRAY_CGPU_INLINE
 void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, const Surface& surf,
                                           const TContext& tContext, RNGDispenser& rng,
-                                          const RenderWorkParams<SurfaceRenderer, PG, MG, TG>& params,
+                                          const RenderWorkParams<GlobalState, RayStateAO, PG, MG, TG>& params,
                                           RayIndex rayIndex)
 {
     assert(params.globalState.mode.e == Mode::AO ||
@@ -267,9 +270,9 @@ void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, cons
         else
         {
             normal = surf.shadingTBN.ApplyInvRotation(Vector3::ZAxis());
+            normal = tContext.ApplyN(normal).Normalize();
             geoNormal = surf.geoNormal;
         }
-        normal = tContext.ApplyN(normal).Normalize();
 
         Vector2 xi = rng.NextFloat2D<0>();
         auto dirSample = Distribution::Common::SampleCosDirection(xi);
@@ -290,7 +293,7 @@ void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, cons
         Ray rayOut = Ray(direction, surf.position);
         rayOut.NudgeSelf(geoNormal);
         Float tMax = params.globalState.tMaxAO;
-        RayToGMem(params.out.dRays, rayIndex, rayOut, Vector2(0, tMax));
+        RayToGMem(params.rayState.dVisibilityRays, rayIndex, rayOut, Vector2(0, tMax));
     }
     else params.rayState.dOutputData[rayIndex] = Spectrum(BIG_MAGENTA, 0);
 }
@@ -298,21 +301,12 @@ void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, cons
 template<LightC Light, LightGroupC LG, TransformGroupC TG>
 MRAY_HYBRID MRAY_GPU_INLINE
 void SurfRDetail::LightWorkFunctionCommon(const Light& l, RNGDispenser&,
-                                          const RenderLightWorkParams<SurfaceRenderer, LG, TG>& params,
+                                          const RenderLightWorkParams<GlobalState, RayStateCommon
+                                          , LG, TG>& params,
                                           RayIndex rayIndex)
 {
-    if(l.IsPrimitiveBackedLight())
+    if constexpr (l.IsPrimitiveBackedLight)
         params.rayState.dOutputData[rayIndex] = Spectrum(1, 1, 1, 0);
     else
         params.rayState.dOutputData[rayIndex] = Spectrum::Zero();
-}
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-void SurfRDetail::InitRayState(const RayPayload&,
-                               const RayState& dStates,
-                               const RaySample& raySample,
-                               uint32_t writeIndex)
-{
-    dStates.dImageCoordinates[writeIndex] = raySample.value.imgCoords;
-    dStates.dFilmFilterWeights[writeIndex] = raySample.pdf;
 }

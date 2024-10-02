@@ -299,12 +299,11 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     {
         uint32_t isVisibleIntCount = Bitspan<uint32_t>::CountT(maxRayCount);
         MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys,
-                                             dRays[0], dRays[1],
-                                             dRayDifferentials[0],
-                                             dRayDifferentials[1],
-                                             dRayState.dImageCoordinates,
-                                             dRayState.dOutputData,
-                                             dRayState.dFilmFilterWeights,
+                                             dRays, dRayDifferentials,
+                                             dRayStateAO.dVisibilityRays,
+                                             dRayStateAO.dImageCoordinates,
+                                             dRayStateAO.dOutputData,
+                                             dRayStateAO.dFilmFilterWeights,
                                              dIsVisibleBuffer,
                                              dRandomNumBuffer,
                                              dWorkHashes, dWorkBatchIds,
@@ -314,18 +313,20 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
                                      maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
-                                     maxRayCount,
                                      isVisibleIntCount, maxSampleCount,
                                      totalWorkCount, totalWorkCount,
                                      SUB_CAMERA_BUFFER_SIZE});
+        dRayStateCommon.dImageCoordinates = dRayStateAO.dImageCoordinates;
+        dRayStateCommon.dOutputData = dRayStateAO.dOutputData;
+        dRayStateCommon.dFilmFilterWeights = dRayStateAO.dFilmFilterWeights;
     }
     else
     {
         MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys,
-                                             dRays[0], dRayDifferentials[0],
-                                             dRayState.dImageCoordinates,
-                                             dRayState.dOutputData,
-                                             dRayState.dFilmFilterWeights,
+                                             dRays, dRayDifferentials,
+                                             dRayStateCommon.dImageCoordinates,
+                                             dRayStateCommon.dOutputData,
+                                             dRayStateCommon.dFilmFilterWeights,
                                              dRandomNumBuffer,
                                              dWorkHashes, dWorkBatchIds,
                                              dSubCameraBuffer),
@@ -336,6 +337,10 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
                                      maxRayCount, maxSampleCount,
                                      totalWorkCount, totalWorkCount,
                                      SUB_CAMERA_BUFFER_SIZE});
+
+        dRayStateAO.dImageCoordinates = dRayStateCommon.dImageCoordinates;
+        dRayStateAO.dOutputData = dRayStateCommon.dOutputData;
+        dRayStateAO.dFilmFilterWeights = dRayStateCommon.dFilmFilterWeights;
     }
 
     // And initialze the hashes
@@ -439,8 +444,9 @@ RendererOutput SurfaceRenderer::DoRender()
     {
         cameraWork.GenRaysStochasticFilter
         (
-            dRayDifferentials[0], dRays[0], EmptyType{},
-            dRayState, dIndices,
+            dRayDifferentials, dRays,
+            dRayStateCommon.dImageCoordinates,
+            dRayStateCommon.dFilmFilterWeights, dIndices,
             ToConstSpan(dCamRayGenRNBuffer),
             dSubCameraBuffer, curCamTransformKey,
             globalPixelIndex, imageTiler.CurrentTileSize(),
@@ -452,8 +458,9 @@ RendererOutput SurfaceRenderer::DoRender()
     {
         cameraWork.GenerateRays
         (
-            dRayDifferentials[0], dRays[0], EmptyType{},
-            dRayState, dIndices,
+            dRayDifferentials, dRays,
+            dRayStateCommon.dImageCoordinates,
+            dRayStateCommon.dFilmFilterWeights, dIndices,
             ToConstSpan(dRandomNumBuffer),
             dSubCameraBuffer, curCamTransformKey,
             globalPixelIndex, imageTiler.CurrentTileSize(),
@@ -477,7 +484,7 @@ RendererOutput SurfaceRenderer::DoRender()
     tracerView.baseAccelerator.CastRays
     (
         dHitKeys, dHits, dBackupRNGStates,
-        dRays[0], dIndices, processQueue
+        dRays, dIndices, processQueue
     );
 
     // Generate work keys from hit packs
@@ -512,15 +519,16 @@ RendererOutput SurfaceRenderer::DoRender()
 
     if(currentOptions.mode == SurfRDetail::Mode::AO)
     {
+        Span<RayGMem> dVisibilityRays = dRayStateAO.dVisibilityRays;
         processQueue.IssueSaturatingKernel<KCMemsetInvalidRays>
         (
             "KCSetInvalidRays",
-            KernelIssueParams{.workCount = static_cast<uint32_t>(dRays[1].size())},
-            dRays[1]
+            KernelIssueParams{.workCount = static_cast<uint32_t>(dVisibilityRays.size())},
+            dVisibilityRays
         );
     }
 
-    GlobalState globalState
+    SurfRDetail::GlobalState globalState
     {
         .mode = currentOptions.mode,
         .tMaxAO = curTMaxAO
@@ -571,34 +579,26 @@ RendererOutput SurfaceRenderer::DoRender()
                                                          processQueue);
                 }
 
-                workPtr.DoWork_1(dRayDifferentials[1],
-                                 dRays[1],
-                                 RayPayload{},
-                                 dRayState,
+                workPtr.DoWork_1(dRayStateAO,
                                  dLocalIndices,
                                  dRandomNumBuffer,
-                                 dRayDifferentials[0],
-                                 dRays[0],
+                                 dRayDifferentials,
+                                 dRays,
                                  dHits,
                                  dHitKeys,
-                                 RayPayload{},
                                  globalState,
                                  processQueue);
             }
             else
             {
                 const auto& workPtr = *wLoc->workPtr.get();
-                workPtr.DoWork_0(Span<RayDiff>{},
-                                 Span<RayGMem>{},
-                                 RayPayload{},
-                                 dRayState,
+                workPtr.DoWork_0(dRayStateCommon,
                                  dLocalIndices,
                                  Span<const RandomNumber>{},
-                                 dRayDifferentials[0],
-                                 dRays[0],
+                                 dRayDifferentials,
+                                 dRays,
                                  dHits,
                                  dHitKeys,
-                                 RayPayload{},
                                  globalState,
                                  processQueue);
             }
@@ -607,14 +607,13 @@ RendererOutput SurfaceRenderer::DoRender()
         else if(lightWLoc != currentLightWorks.cend())
         {
             const auto& workPtr = *lightWLoc->workPtr.get();
-            workPtr.DoBoundaryWork_0(dRayState,
+            workPtr.DoBoundaryWork_0(dRayStateCommon,
                                      dLocalIndices,
                                      Span<const RandomNumber>{},
-                                     dRayDifferentials[0],
-                                     dRays[0],
+                                     dRayDifferentials,
+                                     dRays,
                                      dHits,
                                      dHitKeys,
-                                     RayPayload{},
                                      globalState,
                                      processQueue);
         }
@@ -626,8 +625,9 @@ RendererOutput SurfaceRenderer::DoRender()
     // Do shadow ray cast
     if(currentOptions.mode == SurfRDetail::Mode::AO)
     {
+        Span<RayGMem> dVisibilityRays = dRayStateAO.dVisibilityRays;
         auto p = rayPartitioner.BinaryPartition(dPartitionIndices, processQueue,
-                                                IsValidRayFunctor(dRays[1]));
+                                                IsValidRayFunctor(dVisibilityRays));
         processQueue.Barrier().Wait();
 
         auto dValidIndices = p.dPartitionIndices.subspan(p.hPartitionStartOffsets[0],
@@ -640,7 +640,7 @@ RendererOutput SurfaceRenderer::DoRender()
             tracerView.baseAccelerator.CastVisibilityRays
             (
                 dIsVisibleBitSpan, dBackupRNGStates,
-                dRays[1], dValidIndices, processQueue
+                dVisibilityRays, dValidIndices, processQueue
             );
 
             // Write either one or zero
@@ -648,7 +648,7 @@ RendererOutput SurfaceRenderer::DoRender()
             (
                 "KCIsVisibleToSpectrum",
                 KernelIssueParams{.workCount = static_cast<uint32_t>(dValidIndices.size())},
-                dRayState.dOutputData,
+                dRayStateAO.dOutputData,
                 ToConstSpan(dIsVisibleBitSpan),
                 dValidIndices
             );
@@ -666,9 +666,9 @@ RendererOutput SurfaceRenderer::DoRender()
     {
         SetImagePixels
         (
-            filmSpan, ToConstSpan(dRayState.dOutputData),
-            ToConstSpan(dRayState.dFilmFilterWeights),
-            ToConstSpan(dRayState.dImageCoordinates),
+            filmSpan, ToConstSpan(dRayStateCommon.dOutputData),
+            ToConstSpan(dRayStateCommon.dFilmFilterWeights),
+            ToConstSpan(dRayStateCommon.dImageCoordinates),
             Float(1), processQueue
         );
     }
@@ -679,8 +679,8 @@ RendererOutput SurfaceRenderer::DoRender()
         filmFilter->ReconstructionFilterAtomicRGB
         (
             filmSpan,
-            ToConstSpan(dRayState.dOutputData),
-            ToConstSpan(dRayState.dImageCoordinates),
+            ToConstSpan(dRayStateCommon.dOutputData),
+            ToConstSpan(dRayStateCommon.dImageCoordinates),
             Float(1), processQueue
         );
     }

@@ -320,3 +320,16 @@ RendererOutput TexViewRenderer::DoRender()
 
 void TexViewRenderer::StopRender()
 {}
+
+std::string_view TexViewRenderer::TypeName()
+{
+    using namespace std::string_view_literals;
+    using namespace TypeNameGen::CompTime;
+    static constexpr auto Name = "TexView"sv;
+    return RendererTypeName<Name>;
+}
+
+size_t TexViewRenderer::GPUMemoryUsage() const
+{
+    return 0;
+}

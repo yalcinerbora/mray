@@ -40,15 +40,13 @@ using RayStateInitFuncType = void(*)(const RPayload&,
                                      const RaySample&,
                                      uint32_t);
 
-template<class RayPayload, class RayState,
-         RayStateInitFuncType<RayPayload, RayState> RayStateInitFunc,
-         CameraC Camera, TransformGroupC TransG>
+template<CameraC Camera, TransformGroupC TransG>
 MRAY_KERNEL
 void KCGenerateCamRays(// Output (Only dOutIndices pointed data should be written)
                        MRAY_GRID_CONSTANT const Span<RayDiff> dRayDiffs,
                        MRAY_GRID_CONSTANT const Span<RayGMem> dRays,
-                       MRAY_GRID_CONSTANT const RayPayload dRayPayloads,
-                       MRAY_GRID_CONSTANT const RayState dRayStates,
+                       MRAY_GRID_CONSTANT const Span<ImageCoordinate> dImageCoordinates,
+                       MRAY_GRID_CONSTANT const Span<Float> dFilmFilterWeights,
                        // Input
                        MRAY_GRID_CONSTANT const Span<const uint32_t> dRayIndices,
                        MRAY_GRID_CONSTANT const Span<const RandomNumber> dRandomNums,
@@ -94,24 +92,19 @@ void KCGenerateCamRays(// Output (Only dOutIndices pointed data should be writte
         // Write the differentials
         dRayDiffs[writeIndex] = raySample.value.rayDifferentials;
 
-        // Now we have stratification index (img coords if
-        // stratification is 1 pixel) and pdf,
-        // we pass it to the renderer .
-        // For example;
-        // A path tracer will save them directly and set the throughput to the pdf maybe
-        RayStateInitFunc(dRayPayloads, dRayStates, raySample, writeIndex);
+        // Finally write
+        dImageCoordinates[writeIndex] = raySample.value.imgCoords;
+        dFilmFilterWeights[writeIndex] = raySample.pdf;
     }
 }
 
-template<class RayPayload, class RayState,
-         RayStateInitFuncType<RayPayload, RayState> RayStateInitFunc,
-         CameraC Camera, TransformGroupC TransG, class FilterType>
+template<CameraC Camera, TransformGroupC TransG, class FilterType>
 MRAY_KERNEL
 void KCGenerateCamRaysStochastic(// Output (Only dOutIndices pointed data should be written)
                                  MRAY_GRID_CONSTANT const Span<RayDiff> dRayDiffs,
                                  MRAY_GRID_CONSTANT const Span<RayGMem> dRays,
-                                 MRAY_GRID_CONSTANT const RayPayload dRayPayloads,
-                                 MRAY_GRID_CONSTANT const RayState dRayStates,
+                                 MRAY_GRID_CONSTANT const Span<ImageCoordinate> dImageCoordinates,
+                                 MRAY_GRID_CONSTANT const Span<Float> dFilmFilterWeights,
                                  // Input
                                  MRAY_GRID_CONSTANT const Span<const uint32_t> dRayIndices,
                                  MRAY_GRID_CONSTANT const Span<const RandomNumber> dRandomNums,
@@ -168,11 +161,8 @@ void KCGenerateCamRaysStochastic(// Output (Only dOutIndices pointed data should
         // Write filter weights (pdf normalized)
         raySample.pdf = weight / offsetSample.pdf;
 
-        // Now we have stratification index (img coords if
-        // stratification is 1 pixel) and pdf,
-        // we pass it to the renderer .
-        // For example;
-        // A path tracer will save them directly and set the throughput to the pdf maybe
-        RayStateInitFunc(dRayPayloads, dRayStates, raySample, writeIndex);
+        // Finally write
+        dImageCoordinates[writeIndex] = raySample.value.imgCoords;
+        dFilmFilterWeights[writeIndex] = raySample.pdf;
     }
 }

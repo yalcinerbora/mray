@@ -317,7 +317,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Vector2 RNGDispenserT<T>::NextFloat2D()
 {
     assert((globalId + (I + 1) * stride) < randomNumbers.size());
-    uint32_t xi0 = randomNumbers[globalId + I       * stride];
+    uint32_t xi0 = randomNumbers[globalId + (I    ) * stride];
     uint32_t xi1 = randomNumbers[globalId + (I + 1) * stride];
 
     return Vector2(RNGFunctions::ToFloat01<Float>(xi0),

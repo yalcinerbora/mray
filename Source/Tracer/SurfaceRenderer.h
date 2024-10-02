@@ -10,15 +10,17 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
 {
     using FilmFilterPtr = std::unique_ptr<TextureFilterI>;
     using CameraWorkPtr = std::unique_ptr<RenderCameraWorkT<SurfaceRenderer>>;
+    using Options = SurfRDetail::Options;
 
     public:
     static std::string_view TypeName();
     //
-    using GlobalState   = SurfRDetail::GlobalState;
-    using RayState      = SurfRDetail::RayState;
-    using RayPayload    = SurfRDetail::RayPayload;
     using SpectrumConverterContext = SpectrumConverterContextIdentity;
-    using Options       = SurfRDetail::Options;
+    // Work States
+    using GlobalStateList   = Tuple<SurfRDetail::GlobalState, SurfRDetail::GlobalState>;
+    using RayStateList      = Tuple<SurfRDetail::RayStateCommon, SurfRDetail::RayStateAO>;
+    using RayStateCommon    = std::tuple_element_t<0, RayStateList>;
+    using RayStateAO        = std::tuple_element_t<1, RayStateList>;
     // Work Functions
     template<PrimitiveC P, MaterialC M, class S, class TContext,
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
@@ -34,7 +36,6 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     };
     template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
     static constexpr auto CamWorkFunctions = Tuple{};
-    static constexpr auto RayStateInitFunc = SurfRDetail::InitRayState;
 
     private:
     Options     currentOptions  = {};
@@ -52,22 +53,24 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     uint64_t                    globalPixelIndex = 0;
     Float                       curTMaxAO = std::numeric_limits<Float>::max();
     //
-    RayPartitioner              rayPartitioner;
-    RNGeneratorPtr              rnGenerator;
+    RayPartitioner      rayPartitioner;
+    RNGeneratorPtr      rnGenerator;
     //
-    DeviceMemory                    redererGlobalMem;
-    Span<MetaHit>                   dHits;
-    Span<HitKeyPack>                dHitKeys;
-    std::array<Span<RayGMem>, 2>    dRays;
-    std::array<Span<RayDiff>, 2>    dRayDifferentials;
+    DeviceMemory        redererGlobalMem;
+    Span<MetaHit>       dHits;
+    Span<HitKeyPack>    dHitKeys;
+    Span<RayGMem>       dRays;
+    Span<RayDiff>       dRayDifferentials;
+    RayStateCommon      dRayStateCommon;
+    RayStateAO          dRayStateAO;
 
-    Span<uint32_t>              dIsVisibleBuffer;
-    Span<RandomNumber>          dRandomNumBuffer;
-    Span<Byte>                  dSubCameraBuffer;
-    RayState                    dRayState;
+    Span<uint32_t>      dIsVisibleBuffer;
+    Span<RandomNumber>  dRandomNumBuffer;
+    Span<Byte>          dSubCameraBuffer;
+
     // Work Hash related
-    Span<uint32_t>              dWorkHashes;
-    Span<CommonKey>             dWorkBatchIds;
+    Span<uint32_t>      dWorkHashes;
+    Span<CommonKey>     dWorkBatchIds;
 
     uint32_t    FindMaxSamplePerIteration(uint32_t rayCount, SurfRDetail::Mode::E);
 
@@ -98,13 +101,5 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     size_t              GPUMemoryUsage() const override;
 };
 
-static_assert(RendererC<SurfaceRenderer>);
-
-template<PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-using SurfaceRenderWork = RenderWork<SurfaceRenderer, PG, MG, TG>;
-
-template<LightGroupC LG, TransformGroupC TG>
-using SurfaceRenderLightWork = RenderLightWork<SurfaceRenderer, LG, TG>;
-
-template<CameraGroupC CG, TransformGroupC TG>
-using SurfaceRenderCamWork = RenderCameraWork<SurfaceRenderer, CG, TG>;
+static_assert(RendererC<SurfaceRenderer>, "\"SurfaceRenderer\" does not "
+              "satisfy renderer concept.");

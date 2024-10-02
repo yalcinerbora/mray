@@ -10,6 +10,7 @@
 #include "Tracer/AcceleratorLinear.h"
 #include "Tracer/AcceleratorLBVH.h"
 #include "Tracer/MetaLight.h"
+#include "Tracer/RenderWork.h"
 
 #if defined(MRAY_GPU_BACKEND_CUDA) && defined(MRAY_ENABLE_HW_ACCELERATION)
     #include "Tracer/OptiX/AcceleratorOptiX.h"
@@ -139,10 +140,7 @@ using EmptyRendererWorkTypes = RenderWorkTypePack
     Renderer, Tuple<>, Tuple<>, Tuple<>
 >;
 
-template <class Renderer,
-          template<class, class, class> class RenderWorkT,
-          template<class, class> class RenderLightWorkT,
-          template<class, class> class RenderCameraWorkT>
+template <class Renderer>
 using RendererWorkTypes = RenderWorkTypePack
 <
     Renderer,
@@ -150,58 +148,58 @@ using RendererWorkTypes = RenderWorkTypePack
     Tuple
     <
         // Triangle
-        RenderWorkT<PrimGroupTriangle, MatGroupLambert, TransformGroupIdentity>,
-        RenderWorkT<PrimGroupTriangle, MatGroupReflect, TransformGroupIdentity>,
-        RenderWorkT<PrimGroupTriangle, MatGroupRefract, TransformGroupIdentity>,
-        RenderWorkT<PrimGroupTriangle, MatGroupUnreal, TransformGroupIdentity>,
+        RenderWork<Renderer, PrimGroupTriangle, MatGroupLambert, TransformGroupIdentity>,
+        RenderWork<Renderer, PrimGroupTriangle, MatGroupReflect, TransformGroupIdentity>,
+        RenderWork<Renderer, PrimGroupTriangle, MatGroupRefract, TransformGroupIdentity>,
+        RenderWork<Renderer, PrimGroupTriangle, MatGroupUnreal, TransformGroupIdentity>,
 
-        RenderWorkT<PrimGroupTriangle, MatGroupLambert, TransformGroupSingle>,
-        RenderWorkT<PrimGroupTriangle, MatGroupReflect, TransformGroupSingle>,
-        RenderWorkT<PrimGroupTriangle, MatGroupRefract, TransformGroupSingle>,
-        RenderWorkT<PrimGroupTriangle, MatGroupUnreal, TransformGroupSingle>,
+        RenderWork<Renderer, PrimGroupTriangle, MatGroupLambert, TransformGroupSingle>,
+        RenderWork<Renderer, PrimGroupTriangle, MatGroupReflect, TransformGroupSingle>,
+        RenderWork<Renderer, PrimGroupTriangle, MatGroupRefract, TransformGroupSingle>,
+        RenderWork<Renderer, PrimGroupTriangle, MatGroupUnreal, TransformGroupSingle>,
         //
-        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupLambert, TransformGroupIdentity>,
-        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupReflect, TransformGroupIdentity>,
-        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupRefract, TransformGroupIdentity>,
-        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupUnreal, TransformGroupIdentity>,
+        RenderWork<Renderer, PrimGroupSkinnedTriangle, MatGroupLambert, TransformGroupIdentity>,
+        RenderWork<Renderer, PrimGroupSkinnedTriangle, MatGroupReflect, TransformGroupIdentity>,
+        RenderWork<Renderer, PrimGroupSkinnedTriangle, MatGroupRefract, TransformGroupIdentity>,
+        RenderWork<Renderer, PrimGroupSkinnedTriangle, MatGroupUnreal, TransformGroupIdentity>,
 
-        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupLambert, TransformGroupSingle>,
-        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupReflect, TransformGroupSingle>,
-        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupRefract, TransformGroupSingle>,
-        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupUnreal, TransformGroupSingle>,
+        RenderWork<Renderer, PrimGroupSkinnedTriangle, MatGroupLambert, TransformGroupSingle>,
+        RenderWork<Renderer, PrimGroupSkinnedTriangle, MatGroupReflect, TransformGroupSingle>,
+        RenderWork<Renderer, PrimGroupSkinnedTriangle, MatGroupRefract, TransformGroupSingle>,
+        RenderWork<Renderer, PrimGroupSkinnedTriangle, MatGroupUnreal, TransformGroupSingle>,
 
-        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupLambert, TransformGroupMulti>,
-        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupReflect, TransformGroupMulti>,
-        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupRefract, TransformGroupMulti>,
-        RenderWorkT<PrimGroupSkinnedTriangle, MatGroupUnreal, TransformGroupMulti>,
+        RenderWork<Renderer, PrimGroupSkinnedTriangle, MatGroupLambert, TransformGroupMulti>,
+        RenderWork<Renderer, PrimGroupSkinnedTriangle, MatGroupReflect, TransformGroupMulti>,
+        RenderWork<Renderer, PrimGroupSkinnedTriangle, MatGroupRefract, TransformGroupMulti>,
+        RenderWork<Renderer, PrimGroupSkinnedTriangle, MatGroupUnreal, TransformGroupMulti>,
         // Sphere
-        RenderWorkT<PrimGroupSphere, MatGroupLambert, TransformGroupIdentity>,
-        RenderWorkT<PrimGroupSphere, MatGroupReflect, TransformGroupIdentity>,
-        RenderWorkT<PrimGroupSphere, MatGroupRefract, TransformGroupIdentity>,
-        RenderWorkT<PrimGroupSphere, MatGroupUnreal, TransformGroupIdentity>,
+        RenderWork<Renderer, PrimGroupSphere, MatGroupLambert, TransformGroupIdentity>,
+        RenderWork<Renderer, PrimGroupSphere, MatGroupReflect, TransformGroupIdentity>,
+        RenderWork<Renderer, PrimGroupSphere, MatGroupRefract, TransformGroupIdentity>,
+        RenderWork<Renderer, PrimGroupSphere, MatGroupUnreal, TransformGroupIdentity>,
 
-        RenderWorkT<PrimGroupSphere, MatGroupLambert, TransformGroupSingle>,
-        RenderWorkT<PrimGroupSphere, MatGroupReflect, TransformGroupSingle>,
-        RenderWorkT<PrimGroupSphere, MatGroupRefract, TransformGroupSingle>,
-        RenderWorkT<PrimGroupSphere, MatGroupUnreal, TransformGroupSingle>
+        RenderWork<Renderer, PrimGroupSphere, MatGroupLambert, TransformGroupSingle>,
+        RenderWork<Renderer, PrimGroupSphere, MatGroupReflect, TransformGroupSingle>,
+        RenderWork<Renderer, PrimGroupSphere, MatGroupRefract, TransformGroupSingle>,
+        RenderWork<Renderer, PrimGroupSphere, MatGroupUnreal, TransformGroupSingle>
     >,
     // Lights
     Tuple
     <
-        RenderLightWorkT<LightGroupNull, TransformGroupIdentity>,
+        RenderLightWork<Renderer, LightGroupNull, TransformGroupIdentity>,
         //
-        RenderLightWorkT<LightGroupPrim<PrimGroupTriangle>, TransformGroupIdentity>,
-        RenderLightWorkT<LightGroupPrim<PrimGroupTriangle>, TransformGroupSingle>,
+        RenderLightWork<Renderer, LightGroupPrim<PrimGroupTriangle>, TransformGroupIdentity>,
+        RenderLightWork<Renderer, LightGroupPrim<PrimGroupTriangle>, TransformGroupSingle>,
         //
-        RenderLightWorkT<LightGroupSkysphere<CoOctaCoordConverter>, TransformGroupIdentity>,
-        RenderLightWorkT<LightGroupSkysphere<CoOctaCoordConverter>, TransformGroupSingle>,
+        RenderLightWork<Renderer, LightGroupSkysphere<CoOctaCoordConverter>, TransformGroupIdentity>,
+        RenderLightWork<Renderer, LightGroupSkysphere<CoOctaCoordConverter>, TransformGroupSingle>,
         //
-        RenderLightWorkT<LightGroupSkysphere<SphericalCoordConverter>, TransformGroupIdentity>,
-        RenderLightWorkT<LightGroupSkysphere<SphericalCoordConverter>, TransformGroupSingle>
+        RenderLightWork<Renderer, LightGroupSkysphere<SphericalCoordConverter>, TransformGroupIdentity>,
+        RenderLightWork<Renderer, LightGroupSkysphere<SphericalCoordConverter>, TransformGroupSingle>
     >,
     // And finally Camera
     Tuple
     <
-        RenderCameraWorkT<CameraGroupPinhole, TransformGroupIdentity>
+        RenderCameraWork<Renderer, CameraGroupPinhole, TransformGroupIdentity>
     >
 >;

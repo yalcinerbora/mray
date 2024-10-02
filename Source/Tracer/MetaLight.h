@@ -190,18 +190,21 @@ class MetaLightArrayT
     template <class SpectrumTransformer>
     using MetaLightView = MetaLightViewT<MetaLight, SpectrumTransformer>;
 
-    class MetaLightArrayView
+    class View
     {
         private:
         Span<const MetaLight> dMetaLights;
 
         public:
-        MetaLightArrayView(Span<const MetaLight> d);
+        View(Span<const MetaLight> d);
 
         template<class SpectrumTransformer>
         MRAY_HYBRID
         MetaLightView<SpectrumTransformer>
         operator()(const typename SpectrumTransformer::Converter&, uint32_t index) const;
+
+        MRAY_HYBRID
+        uint32_t Size() const;
     };
 
     private:
@@ -242,7 +245,7 @@ class MetaLightArrayT
                             const Vector2ui& lightKeyRange,
                             const GPUQueue& queue);
 
-    MetaLightArrayView  Array() const;
+    View    Array() const;
 
 };
 
