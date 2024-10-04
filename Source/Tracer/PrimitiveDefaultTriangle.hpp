@@ -382,6 +382,7 @@ Vector2 Triangle<T>::SurfaceParametrization(const Hit& hit) const
 }
 
 template<TransformContextC T>
+MRAY_HYBRID MRAY_CGPU_INLINE
 const T& Triangle<T>::GetTransformContext() const
 {
     return transformContext;

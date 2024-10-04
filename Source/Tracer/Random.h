@@ -186,14 +186,22 @@ class RNGeneratorGroupI
                                     Span<RandomNumber> dNumbersOut,
                                     // Constants
                                     Vector2ui dimensionRange,
-                                    const GPUQueue& queue) = 0;
+                                    const GPUQueue& queue) const = 0;
     virtual void    GenerateNumbersIndirect(// Output
                                             Span<RandomNumber> dNumbersOut,
                                             // Input
                                             Span<const RayIndex> dIndices,
                                             // Constants
                                             Vector2ui dimensionRange,
-                                            const GPUQueue& queue) = 0;
+                                            const GPUQueue& queue) const = 0;
+    virtual void    GenerateNumbersIndirect(// Output
+                                            Span<RandomNumber> dNumbersOut,
+                                            // Input
+                                            Span<const RayIndex> dIndices,
+                                            Span<const uint32_t> dDimensionStart,
+                                            // Constants
+                                            uint32_t dimensionCount,
+                                            const GPUQueue& queue) const = 0;
 
     virtual Span<BackupRNGState> GetBackupStates() = 0;
     virtual size_t UsedGPUMemory() const = 0;
@@ -203,6 +211,12 @@ using RNGGenerator = GeneratorFuncType<RNGeneratorGroupI, uint32_t, uint64_t,
                                        const GPUSystem&, BS::thread_pool&>;
 using RNGeneratorPtr = std::unique_ptr<RNGeneratorGroupI>;
 using RNGGeneratorMap = Map<typename SamplerType::E, RNGGenerator>;
+
+struct RNGPack
+{
+    BackupRNG&      backupRNG;
+    RNGDispenser&   rngDispenser;
+};
 
 class RNGGroupIndependent : public RNGeneratorGroupI
 {
@@ -240,14 +254,23 @@ class RNGGroupIndependent : public RNGeneratorGroupI
                             Span<RandomNumber> dNumbersOut,
                             // Constants
                             Vector2ui dimensionRange,
-                            const GPUQueue& queue) override;
+                            const GPUQueue& queue) const override;
     void    GenerateNumbersIndirect(// Output
                                     Span<RandomNumber> numbersOut,
                                     // Input
                                     Span<const RayIndex> dIndices,
                                     // Constants
                                     Vector2ui dimensionRange,
-                                    const GPUQueue& queue) override;
+                                    const GPUQueue& queue) const override;
+    void    GenerateNumbersIndirect(// Output
+                                    Span<RandomNumber> dNumbersOut,
+                                    // Input
+                                    Span<const RayIndex> dIndices,
+                                    Span<const uint32_t> dDimensionStart,
+                                    // Constants
+                                    uint32_t dimensionCount,
+                                    const GPUQueue& queue) const override;
+
 
     Span<BackupRNGState> GetBackupStates() override;
     size_t  UsedGPUMemory() const override;

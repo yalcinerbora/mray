@@ -33,7 +33,7 @@ namespace Math
     template <std::integral T>
     MRAY_HYBRID constexpr T Clamp(T, T minVal, T maxVal);
     template <std::floating_point T>
-    MRAY_HYBRID T           Clamp(T, T minVal, T maxVal);
+    MRAY_HYBRID constexpr T Clamp(T, T minVal, T maxVal);
     template <std::floating_point T>
     MRAY_HYBRID constexpr T Lerp(T a, T b, T t);
     template <std::floating_point T>
@@ -129,7 +129,7 @@ constexpr T Math::Clamp(T v, T minVal, T maxVal)
 
 template <std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-T Math::Clamp(T v, T minVal, T maxVal)
+constexpr T Math::Clamp(T v, T minVal, T maxVal)
 {
     assert(minVal < maxVal);
     return std::min(std::max(minVal, v), maxVal);

@@ -1,8 +1,33 @@
 #pragma once
 
 #include "RendererC.h"
+#include "RendererCommon.h"
 #include "RayPartitioner.h"
 #include "PathTracerRendererShaders.h"
+
+#include "Core/Timer.h"
+
+// Due to NVCC error
+// "An extended __host__ __device__
+// lambda cannot be defined inside a generic lambda expression."
+//
+// We make this a functor
+// TODO: This is somewhat related to the RNG (at least currently)
+// maybe change this later.
+class ConstAddFunctor
+{
+    private:
+    uint32_t constant;
+
+    public:
+    ConstAddFunctor(uint32_t c) : constant(c) {}
+
+    MRAY_HYBRID MRAY_GPU_INLINE
+    uint32_t operator()(uint32_t i) const
+    {
+        return i + constant;
+    }
+};
 
 template<class MetaLightArrayType>
 class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightArrayType>>
@@ -12,9 +37,11 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightAr
     using CameraWorkPtr     = std::unique_ptr<RenderCameraWorkT<PathTracerRenderer>>;
     using MetaLightArray    = MetaLightArrayType;
     using Options           = PathTraceRDetail::Options;
+    using SampleMode        = PathTraceRDetail::SampleMode;
+    using LightSamplerType  = PathTraceRDetail::LightSamplerType;
+    using RayState          = PathTraceRDetail::RayState;
     //
     using UniformLightSampler   = DirectLightSamplerViewUniform<typename MetaLightArray::View>;
-    //using IrradianceLightSampler    = DirectLightSamplerViewUniform<typename MetaLightArray::View>;
 
     public:
     static std::string_view TypeName();
@@ -57,24 +84,24 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightAr
     CameraKey                   curCamKey;
     const CameraWorkPtr*        curCamWork;
     uint64_t                    globalPixelIndex = 0;
-    Float                       curTMaxAO = std::numeric_limits<Float>::max();
+    SampleMode                  anchorSampleMode;
     //
     RayPartitioner              rayPartitioner;
     RNGeneratorPtr              rnGenerator;
     //
-    DeviceMemory                    redererGlobalMem;
-    Span<MetaHit>                   dHits;
-    Span<HitKeyPack>                dHitKeys;
-    std::array<Span<RayGMem>, 2>    dRays;
-    std::array<Span<RayDiff>, 2>    dRayDifferentials;
-
-    Span<uint32_t>              dIsVisibleBuffer;
-    Span<RandomNumber>          dRandomNumBuffer;
-    Span<Byte>                  dSubCameraBuffer;
-    PathTraceRDetail::RayState  dRayState;
+    DeviceMemory        redererGlobalMem;
+    Span<MetaHit>       dHits;
+    Span<HitKeyPack>    dHitKeys;
+    Span<RayGMem>       dRays;
+    Span<RayDiff>       dRayDifferentials;
+    Span<uint32_t>      dShadowRayVisibilities;
+    Span<RandomNumber>  dRandomNumBuffer;
+    Span<Byte>          dSubCameraBuffer;
+    Span<uint32_t>      dPathRNGDimensions;
+    RayState            dRayState;
     // Work Hash related
-    Span<uint32_t>              dWorkHashes;
-    Span<CommonKey>             dWorkBatchIds;
+    Span<uint32_t>      dWorkHashes;
+    Span<CommonKey>     dWorkBatchIds;
 
     uint32_t    FindMaxSamplePerIteration(uint32_t rayCount, PathTraceRDetail::SampleMode);
 
@@ -104,5 +131,35 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightAr
     void                StopRender() override;
     size_t              GPUMemoryUsage() const override;
 };
+
+template<RendererC R, PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
+class PathTracerRenderWork : public RenderWork<R, PG, MG, TG>
+{
+    using Base = RenderWork<R, PG, MG, TG>;
+
+    public:
+    using Base::Base;
+
+    uint32_t SampleRNCount(uint32_t workIndex) const override
+    {
+        constexpr uint32_t matSampleCount = MG::template Material<>::SampleRNCount;
+        constexpr uint32_t rrSampleCount = 1;
+        // TODO: Get this programatically?
+        constexpr uint32_t lightSampleCount = 2;
+
+        if(workIndex == 0)
+            return (matSampleCount + rrSampleCount);
+        else if(workIndex == 1)
+            return (matSampleCount + rrSampleCount + lightSampleCount);
+
+        return 0;
+    }
+};
+
+template<RendererC R, LightGroupC LG, TransformGroupC TG>
+using PathTracerRenderLightWork = RenderLightWork<R, LG, TG>;
+
+template<RendererC R, CameraGroupC CG, TransformGroupC TG>
+using PathTracerRenderCamWork = RenderCameraWork<R, CG, TG>;
 
 #include "PathTracerRenderer.hpp"

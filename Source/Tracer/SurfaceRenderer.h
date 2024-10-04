@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RendererC.h"
+#include "RendererCommon.h"
 #include "RayPartitioner.h"
 #include "SurfaceRendererShaders.h"
 
@@ -72,7 +73,9 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     Span<uint32_t>      dWorkHashes;
     Span<CommonKey>     dWorkBatchIds;
 
-    uint32_t    FindMaxSamplePerIteration(uint32_t rayCount, SurfRDetail::Mode::E);
+    uint32_t    FindMaxSamplePerIteration(uint32_t rayCount,
+                                          SurfRDetail::Mode::E,
+                                          bool doStochasticFilter);
 
     public:
     // Constructors & Destructor
@@ -103,3 +106,27 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
 
 static_assert(RendererC<SurfaceRenderer>, "\"SurfaceRenderer\" does not "
               "satisfy renderer concept.");
+
+
+template<RendererC R, PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
+class SurfaceRenderWork : public RenderWork<R, PG, MG, TG>
+{
+    using Base = RenderWork<R, PG, MG, TG>;
+
+    public:
+    using Base::Base;
+
+    uint32_t SampleRNCount(uint32_t workIndex) const override
+    {
+        constexpr uint32_t matSampleCount = MG::template Material<>::SampleRNCount;
+        if(workIndex == 1)
+            return matSampleCount;
+        return 0;
+    }
+};
+
+template<RendererC R, LightGroupC LG, TransformGroupC TG>
+using SurfaceRenderLightWork = RenderLightWork<R, LG, TG>;
+
+template<RendererC R, CameraGroupC CG, TransformGroupC TG>
+using SurfaceRenderCamWork = RenderCameraWork<R, CG, TG>;

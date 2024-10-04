@@ -292,6 +292,7 @@ class EmptyPrimitive
     Optional<BasicSurface>  SurfaceFromHit(const Hit& hit) const;
     constexpr Optional<Hit> ProjectedHit(const Vector3& point) const;
     constexpr Vector2       SurfaceParametrization(const Hit& hit) const;
+    constexpr
     const TransformContext& GetTransformContext() const;
 };
 
@@ -464,7 +465,7 @@ constexpr Vector2 EmptyPrimitive<TC>::SurfaceParametrization(const Hit& hit) con
 }
 
 template<TransformContextC TC>
-const TC& EmptyPrimitive<TC>::GetTransformContext() const
+constexpr const TC& EmptyPrimitive<TC>::GetTransformContext() const
 {
     return transformContext;
 }

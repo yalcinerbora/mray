@@ -26,9 +26,12 @@ namespace mray::algorithms
 
     template <class T, class UnaryFunction>
     requires requires(UnaryFunction f, T x) { {f(x)} -> std::convertible_to<T>; }
-    void InPlaceTransform(Span<T> dInOut,
-                          const GPUQueue& queue,
-                          UnaryFunction&&);
+    void InPlaceTransform(Span<T> dInOut, const GPUQueue& queue, UnaryFunction&&);
+
+    template <class T, class UnaryFunction>
+        requires requires(UnaryFunction f, T x) { { f(x) } -> std::convertible_to<T>; }
+    void InPlaceTransformIndirect(Span<T> dInOut, Span<const uint32_t> dIndices,
+                                  const GPUQueue& queue, UnaryFunction&&);
 
 }
 

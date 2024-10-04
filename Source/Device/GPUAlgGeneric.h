@@ -22,15 +22,16 @@ namespace mray::algorithms
 
     template <class T, class UnaryFunction>
     requires requires(UnaryFunction f, T x) { {f(x)} -> std::convertible_to<T>; }
-    void Transform(Span<T> dOut, Span<const T> dIn,
-                   const GPUQueue& queue,
-                   UnaryFunction&&);
+    void Transform(Span<T> dOut, Span<const T> dIn, const GPUQueue& queue, UnaryFunction&&);
 
     template <class T, class UnaryFunction>
     requires requires(UnaryFunction f, T x) { {f(x)} -> std::convertible_to<T>; }
-    void InPlaceTransform(Span<T> dInOut,
-                          const GPUQueue& queue,
-                          UnaryFunction&&);
+    void InPlaceTransform(Span<T> dInOut, const GPUQueue& queue, UnaryFunction&&);
+
+    template <class T, class UnaryFunction>
+    requires requires(UnaryFunction f, T x) { { f(x) } -> std::convertible_to<T>; }
+    void InPlaceTransformIndirect(Span<T> dInOut, Span<const uint32_t> dIndices,
+                                  const GPUQueue& queue, UnaryFunction&&);
 
 
 }
@@ -182,6 +183,33 @@ namespace mray::algorithms
                 {
                     T tReg = dInOut[i];
                     dInOut[i] = TransFunction(tReg);
+                }
+            }
+        );
+    }
+
+    template <class T, class UnaryFunction>
+        requires requires(UnaryFunction f, T x) { { f(x) } -> std::convertible_to<T>; }
+    void InPlaceTransformIndirect(Span<T> dInOut, Span<const uint32_t> dIndices,
+                                  const GPUQueue& queue, UnaryFunction&& TransFunction)
+    {
+        KernelIssueParams p
+        {
+            .workCount = static_cast<uint32_t>(dIndices.size()),
+            .sharedMemSize = 0
+        };
+        queue.IssueLambda
+        (
+            "KCInPlaceTransformIndirect", p,
+            [=] MRAY_HYBRID(KernelCallParams kp)
+            {
+                for(uint32_t i = kp.GlobalId();
+                    i < static_cast<uint32_t>(dIndices.size());
+                    i += kp.TotalSize())
+                {
+                    uint32_t index = dIndices[i];
+                    T tReg = dInOut[index];
+                    dInOut[index] = TransFunction(tReg);
                 }
             }
         );

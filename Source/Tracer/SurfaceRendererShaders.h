@@ -249,9 +249,9 @@ void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, cons
     {
         using Distribution::Common::DivideByPDF;
         auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
-        Vector3 wI = rayIn.Dir();
-        wI = tContext.InvApplyN(wI).Normalize();
-        auto raySample = mat.SampleBxDF(-wI, surf, rng);
+        Vector3 wO = rayIn.Dir();
+        wO = tContext.InvApplyN(wO).Normalize();
+        auto raySample = mat.SampleBxDF(-wO, surf, rng);
 
         Spectrum refl;
         if(raySample.value.reflectance.HasNaN() || Math::IsNan(raySample.pdf))

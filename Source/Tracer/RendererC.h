@@ -20,10 +20,14 @@
 
 #include "TransientPool/TransientPool.h"
 
+#include "Device/GPUSystemForward.h"
+
 #include "Common/RenderImageStructs.h"
 
 namespace BS { class thread_pool; }
 
+//
+struct MultiPartitionOutput;
 // A nasty forward declaration
 class GenericGroupPrimitiveT;
 class GenericGroupCameraT;
@@ -77,7 +81,16 @@ class RenderWorkI
     public:
     virtual ~RenderWorkI() = default;
 
-    virtual uint32_t         SampleRNCount() const = 0;
+    virtual uint32_t         SampleRNCount(uint32_t workIndex) const = 0;
+    virtual std::string_view Name() const = 0;
+};
+
+class RenderLightWorkI
+{
+    public:
+    virtual ~RenderLightWorkI() = default;
+
+    virtual uint32_t         SampleRNCount(uint32_t workIndex) const = 0;
     virtual std::string_view Name() const = 0;
 };
 
@@ -89,14 +102,6 @@ class RenderCameraWorkI
     virtual std::string_view    Name() const = 0;
     virtual uint32_t            SampleRayRNCount() const = 0;
     virtual uint32_t            StochasticFilterSampleRayRNCount() const = 0;
-};
-
-class RenderLightWorkI
-{
-    public:
-    virtual ~RenderLightWorkI() = default;
-
-    virtual std::string_view Name() const = 0;
 };
 
 using RenderImagePtr = std::unique_ptr<RenderImage>;
@@ -188,14 +193,6 @@ class RendererI
 };
 
 using RendererPtr = std::unique_ptr<RendererI>;
-
-//template<RendererC R, uint32_t I>
-//using RenderGlobalState = std::conditional_t
-//<
-//    I < std::tuple_size_v<typename R::GlobalStateList>,
-//    std::tuple_element_t<I, typename R::GlobalStateList>,
-//    EmptyType
-//>;
 
 namespace RendererDetail
 {
@@ -517,20 +514,28 @@ class RendererT : public RendererI
     const RenderImagePtr&       renderBuffer;
     Optional<CameraTransform>   cameraTransform = {};
 
-    WorkList                    currentWorks;
-    LightWorkList               currentLightWorks;
-    CameraWorkList              currentCameraWorks;
-    HitKeyPack                  boundaryLightKeyPack;
+    WorkList              currentWorks;
+    LightWorkList         currentLightWorks;
+    CameraWorkList        currentCameraWorks;
+    HitKeyPack            boundaryLightKeyPack;
     // Current Canvas info
-    MRayColorSpaceEnum          curColorSpace;
-    ImageTiler                  imageTiler;
-    uint64_t                    totalIterationCount;
+    MRayColorSpaceEnum    curColorSpace;
+    ImageTiler            imageTiler;
+    uint64_t              totalIterationCount;
 
-    uint32_t                    GenerateWorks();
-    void                        ClearAllWorkMappings();
-    RenderWorkHasher            InitializeHashes(Span<uint32_t> dHashes,
-                                                 Span<CommonKey> dWorkIds,
-                                                 const GPUQueue& queue);
+    uint32_t              GenerateWorks();
+    void                  ClearAllWorkMappings();
+    RenderWorkHasher      InitializeHashes(Span<uint32_t> dHashes,
+                                           Span<CommonKey> dWorkIds,
+                                           const GPUQueue& queue);
+
+    // Some common functions between renderer
+    template<class WorkF, class LightWorkF = EmptyFunctor, class CamWorkF = EmptyFunctor>
+    void    IssueWorkKernelsToPartitions(const RenderWorkHasher&,
+                                         const MultiPartitionOutput&,
+                                         WorkF&&,
+                                         LightWorkF && = LightWorkF(),
+                                         CamWorkF && = CamWorkF()) const;
 
     public:
                         RendererT(const RenderImagePtr&,
@@ -913,23 +918,6 @@ uint32_t RendererT<C>::GenerateLightWorkMappings(uint32_t workStart)
                 .transKey = tK,
                 .accelKey = AcceleratorKey::InvalidKey()
             };
-            // TODO: This restriction does not make sense too much.
-            // Probably change later maybe? Reason about this.
-            // Commented out
-            //auto duplicateLoc = std::find_if(currentLightWorks.cbegin(),
-            //                                 currentLightWorks.cend(),
-            //                                 [&](const auto& workInfo)
-            //{
-            //    return workInfo.idPack == Pair(lgId, tgId);
-            //});
-            //if(duplicateLoc != currentLightWorks.cend())
-            //{
-
-            //    throw MRayError("[{}]: Light/Transform group \"{}\"({}) / \"{}\"({}), is used "
-            //                    "as a non-boundary material. Boundary material should have its "
-            //                    "own unique group!", C::TypeName(),
-            //                    lgName, uint32_t(lgId), tgName, uint32_t(tgId));
-            //}
         }
 
         RenderLightWorkGenerator generator = loc->get();

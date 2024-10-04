@@ -56,7 +56,6 @@ void KCMemsetInvalidRays(MRAY_GRID_CONSTANT const Span<RayGMem> dRays)
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCIsVisibleToSpectrum(MRAY_GRID_CONSTANT const Span<Spectrum> dOutputData,
-                           //
                            MRAY_GRID_CONSTANT const Bitspan<const uint32_t> dIsVisibleBuffer,
                            MRAY_GRID_CONSTANT const Span<const uint32_t> dIndices)
 {
@@ -198,10 +197,15 @@ void SurfaceRenderer::PushAttribute(uint32_t attributeIndex,
     }
 }
 
-uint32_t SurfaceRenderer::FindMaxSamplePerIteration(uint32_t rayCount, SurfRDetail::Mode::E mode)
+uint32_t SurfaceRenderer::FindMaxSamplePerIteration(uint32_t rayCount, SurfRDetail::Mode::E mode,
+                                                    bool doStochasticFilter)
 {
     using enum SurfRDetail::Mode::E;
-    uint32_t maxSample = (*curCamWork)->SampleRayRNCount();
+    uint32_t camSample = (doStochasticFilter)
+        ? (*curCamWork)->StochasticFilterSampleRayRNCount()
+        : (*curCamWork)->SampleRayRNCount();
+
+    uint32_t maxSample = camSample;
     if(mode == AO)
         maxSample = std::max(maxSample, 2u);
     else if(mode == FURNACE)
@@ -215,7 +219,7 @@ uint32_t SurfaceRenderer::FindMaxSamplePerIteration(uint32_t rayCount, SurfRDeta
             },
             [](const auto& renderWorkStruct) -> uint32_t
             {
-                return renderWorkStruct.workPtr->SampleRNCount();
+                return renderWorkStruct.workPtr->SampleRNCount(1);
             }
         );
     }
@@ -242,8 +246,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     // Generate the Filter
     auto FilterGen = tracerView.filterGenerators.at(tracerView.tracerParams.filmFilter.type);
     if(!FilterGen)
-        throw MRayError("[{}]: Unkown film filter type {}.",
-                        SurfaceRenderer::TypeName(),
+        throw MRayError("[{}]: Unkown film filter type {}.", TypeName(),
                         uint32_t(tracerView.tracerParams.filmFilter.type));
     Float radius = tracerView.tracerParams.filmFilter.radius;
     filmFilter = FilterGen->get()(gpuSystem, Float(radius));
@@ -294,7 +297,8 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     // Find the ray count (1spp per tile)
     uint32_t maxRayCount = imageTiler.ConservativeTileSize().Multiply();
-    uint32_t maxSampleCount = FindMaxSamplePerIteration(maxRayCount, currentOptions.mode);
+    uint32_t maxSampleCount = FindMaxSamplePerIteration(maxRayCount, currentOptions.mode,
+                                                        currentOptions.doStochasticFilter);
     if(currentOptions.mode == SurfRDetail::Mode::AO)
     {
         uint32_t isVisibleIntCount = Bitspan<uint32_t>::CountT(maxRayCount);
@@ -365,8 +369,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     // Finally generate RNG
     auto RngGen = tracerView.rngGenerators.at(tracerView.tracerParams.samplerType.type);
     if(!RngGen)
-        throw MRayError("[{}]: Unkown random number generator type {}.",
-                        SurfaceRenderer::TypeName(),
+        throw MRayError("[{}]: Unkown random number generator type {}.", TypeName(),
                         uint32_t(tracerView.tracerParams.samplerType.type));
     uint32_t generatorCount = (rIP.regionMax - rIP.regionMin).Multiply();
     uint64_t seed = tracerView.tracerParams.seed;
@@ -435,10 +438,12 @@ RendererOutput SurfaceRenderer::DoRender()
     // Generate rays
     rnGenerator->SetupRange(imageTiler.Tile1DRange());
     // Generate RN for camera rays
-    uint32_t camRayGenRNCount = rayCount * (*curCamWork)->SampleRayRNCount();
+    uint32_t camSamplePerRay = currentOptions.doStochasticFilter
+                        ? (*curCamWork)->SampleRayRNCount()
+                        : (*curCamWork)->StochasticFilterSampleRayRNCount();
+    uint32_t camRayGenRNCount = rayCount * camSamplePerRay;
     auto dCamRayGenRNBuffer = dRandomNumBuffer.subspan(0, camRayGenRNCount);
-    rnGenerator->GenerateNumbers(dCamRayGenRNBuffer,
-                                 Vector2ui(0, (*curCamWork)->SampleRayRNCount()),
+    rnGenerator->GenerateNumbers(dCamRayGenRNBuffer, Vector2ui(0, camSamplePerRay),
                                  processQueue);
     if(currentOptions.doStochasticFilter)
     {
@@ -565,7 +570,7 @@ RendererOutput SurfaceRenderer::DoRender()
 
                 uint32_t rnCount = (currentOptions.mode == AO)
                                     ? 2u
-                                    : workPtr.SampleRNCount();
+                                    : workPtr.SampleRNCount(1);
 
                 auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
                 if(currentOptions.mode == SurfRDetail::Mode::AO ||
@@ -657,9 +662,6 @@ RendererOutput SurfaceRenderer::DoRender()
     // Filter the samples
     // Wait for previous copy to finish
     processQueue.IssueWait(renderBuffer->PrevCopyCompleteFence());
-    // Please note that ray partitioner will be invalidated here.
-    // In this case, we do not use the partitioner anymore
-    // so its fine.
     renderBuffer->ClearImage(processQueue);
     ImageSpan<3> filmSpan = imageTiler.GetTileSpan<3>();
     if(currentOptions.doStochasticFilter)
@@ -674,6 +676,18 @@ RendererOutput SurfaceRenderer::DoRender()
     }
     else
     {
+        // Old code used partition based filtering. It was slow,
+        // invalidated ray partitioner (to save memory we shared
+        // ray partitioner between the renderer and filter).
+        //
+        // Filter that uses atomic is faster, do not use any extra
+        // memory. It can be used
+        //
+        //
+        // Please note that ray partitioner will be invalidated here.
+        // In this case, we do not use the partitioner anymore
+        // so its fine.
+
         // Using atomic filter since the samples are uniformly distributed
         // And it is faster
         filmFilter->ReconstructionFilterAtomicRGB

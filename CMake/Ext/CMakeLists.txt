@@ -151,7 +151,7 @@ mray_build_ext_dependency_git(
 mray_build_ext_dependency_git(
     NAME cli11_ext
     URL "https://github.com/CLIUtils/CLI11.git"
-    TAG "291c58789c031208f08f4f261a858b5b7083e8e2" # v2.3.2
+    TAG "6c7b07a878ad834957b98d0f9ce1dbe0cb204fc9" # v2.4.2
     LICENSE_NAME "LICENSE"
     BUILD_ARGS
         -DBUILD_TESTING=OFF

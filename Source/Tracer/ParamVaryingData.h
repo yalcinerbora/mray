@@ -28,6 +28,7 @@ class ParamVaryingData
     // Direct Mip Access
     MRAY_HYBRID Optional<T>     operator()(Vector<DIMS, Float> uvCoords,
                                            uint32_t mipLevel) const;
+    MRAY_HYBRID bool            IsConstant() const;
 };
 
 template <class C>
@@ -83,6 +84,7 @@ class RendererParamVaryingSpectrum
     // Direct Mip Access
     MRAY_HYBRID Optional<Spectrum>  operator()(Vector<DIMS, Float> uvCoords,
                                                uint32_t mipLevel) const;
+    MRAY_HYBRID bool                IsConstant() const;
 };
 
 }
@@ -161,6 +163,13 @@ Optional<T> ParamVaryingData<DIMS, T>::operator()(Vector<DIMS, Float> uvCoords,
     return std::get<T>(t);
 }
 
+template <uint32_t DIMS, class T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool ParamVaryingData<DIMS, T>::IsConstant() const
+{
+    return (!std::holds_alternative<Texture>(t));
+}
+
 namespace SpectrumConverterDetail
 {
 
@@ -206,6 +215,13 @@ Optional<Spectrum> RendererParamVaryingSpectrum<C, D>::operator()(Vector<D, Floa
                                                                   uint32_t mipLevel) const
 {
     return converter.get().Convert(input.get()(uvCoords, mipLevel));
+}
+
+template<class C, uint32_t D>
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool RendererParamVaryingSpectrum<C, D>::IsConstant() const
+{
+    return input.get().IsConstant();
 }
 
 }

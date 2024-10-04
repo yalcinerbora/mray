@@ -3,6 +3,8 @@
 
 #include "Tracer/PathTracerRenderer.h"
 
+#include "Device/GPUAlgGeneric.h"
+
 // ================= //
 //     Renderers     //
 // ================= //
@@ -13,7 +15,8 @@ using RendererTypes_2 = Tuple
 
 using RendererWorkTypes_2 = Tuple
 <
-    RendererWorkTypes<PathTracerRenderer<MetaLightList>>
+    RendererWorkTypes<PathTracerRenderer<MetaLightList>, PathTracerRenderWork,
+                      PathTracerRenderLightWork, PathTracerRenderCamWork>
 >;
 
 // Since Path Tracer requires meta light list

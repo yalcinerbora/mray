@@ -118,7 +118,7 @@ Spectrum LightPrim<P, SC>::EmitViaHit(const Vector3& wO,
                                       const typename P::Hit& hit) const
 {
     const P& primitive = prim.get();
-    Vector2 uv = (radiance.Constant())
+    Vector2 uv = (radiance.IsConstant())
         ? Vector2::Zero()
         : primitive.SurfaceParametrization(hit);
 
@@ -130,7 +130,7 @@ Spectrum LightPrim<P, SC>::EmitViaHit(const Vector3& wO,
         return Spectrum::Zero();
 
     // TODO: How to incorporate differentials here?
-    return radiance(uv);
+    return radiance(uv).value();
 }
 
 template<PrimitiveC P, class SC>
@@ -142,7 +142,7 @@ Spectrum LightPrim<P, SC>::EmitViaSurfacePoint(const Vector3& wO,
     using Hit = typename P::Hit;
     Optional<Hit> hit = prim.ProjectedHit(surfacePoint);
     if(!hit) return Spectrum::Zero();
-    Vector2 uv = radiance.Constant()
+    Vector2 uv = radiance.IsConstant()
                 ? Vector2::Zero()
                 : primitive.SurfaceParametrization(*hit);
 
@@ -154,7 +154,7 @@ Spectrum LightPrim<P, SC>::EmitViaSurfacePoint(const Vector3& wO,
         return Spectrum::Zero();
 
     // TODO: How to incorporate differentials here?
-    return radiance(uv);
+    return radiance(uv).value();
 }
 
 }
@@ -322,11 +322,11 @@ Spectrum LightSkysphere<CC, TC, SC>::EmitViaHit(const Vector3& wO,
                                                 const typename EmptyPrimitive<TC>::Hit&) const
 {
     Vector3 dirYUp = prim.get().GetTransformContext().ApplyV(-wO);
-    Vector2 uv = radiance.Constant()
+    Vector2 uv = radiance.IsConstant()
                     ? CC::DirToUV(dirYUp)
                     : Vector2::Zero();
     // TODO: How to incorporate differentials here?
-    return radiance(uv);
+    return radiance(uv).value();
 }
 
 template<CoordConverterC CC, TransformContextC TC, class SC>
@@ -335,12 +335,11 @@ Spectrum LightSkysphere<CC, TC, SC>::EmitViaSurfacePoint(const Vector3& wO,
                                                          const Vector3&) const
 {
     Vector3 dirYUp = prim.get().GetTransformContext().ApplyV(-wO);
-    Vector2 uv = radiance.Constant()
+    Vector2 uv = radiance.IsConstant()
                     ? CC::DirToUV(dirYUp)
                     : Vector2::Zero();
     // TODO: How to incorporate differentials here?
-    return radiance(uv);
-    return Spectrum::Zero();
+    return radiance(uv).value();
 }
 
 static_assert(LightC<LightSkysphere<SphericalCoordConverter>>);

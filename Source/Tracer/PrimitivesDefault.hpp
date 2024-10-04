@@ -167,6 +167,7 @@ Vector2 Sphere<T>::SurfaceParametrization(const Hit& hit) const
 }
 
 template<TransformContextC T>
+MRAY_HYBRID MRAY_CGPU_INLINE
 const T& Sphere<T>::GetTransformContext() const
 {
     return transformContext;

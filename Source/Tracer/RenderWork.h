@@ -148,7 +148,7 @@ class RenderWork : public RenderWorkT<R>
     MRAY_RENDER_DO_WORK_DEF(1)
 
 
-    uint32_t         SampleRNCount() const override;
+    uint32_t         SampleRNCount(uint32_t workIndex) const override;
     std::string_view Name() const override;
 };
 
@@ -188,6 +188,7 @@ class RenderLightWork : public RenderLightWorkT<R>
     MRAY_RENDER_DO_LIGHT_WORK_DEF(0)
     MRAY_RENDER_DO_LIGHT_WORK_DEF(1)
 
+    uint32_t            SampleRNCount(uint32_t workIndex) const override;
     std::string_view    Name() const override;
 };
 
@@ -363,12 +364,11 @@ void RenderWork<R, PG, MG, TG>::DoWorkInternal(// I-O
     }
 }
 
-
 template<RendererC R, PrimitiveGroupC P,
          MaterialGroupC M, TransformGroupC T>
-uint32_t RenderWork<R, P, M, T>::SampleRNCount() const
+uint32_t RenderWork<R, P, M, T>::SampleRNCount(uint32_t) const
 {
-    return M::template Material<>::SampleRNCount;
+    return 0;
 }
 
 template<RendererC R, PrimitiveGroupC P,
@@ -460,6 +460,12 @@ void RenderLightWork<R, LG, TG>::DoBoundaryWorkInternal(// I-O
             params
         );
     }
+}
+
+template<RendererC R, LightGroupC L, TransformGroupC T>
+uint32_t RenderLightWork<R, L, T>::SampleRNCount(uint32_t) const
+{
+    return 0;
 }
 
 template<RendererC R, LightGroupC L, TransformGroupC T>

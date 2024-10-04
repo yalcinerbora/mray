@@ -124,6 +124,10 @@ namespace Distribution::Common
     SampleT<Vector3>    SampleUniformDirection(const Vector2& xi);
     MRAY_HYBRID
     constexpr Float     PDFUniformDirection();
+    //
+    MRAY_HYBRID
+    constexpr Optional<Spectrum> RussianRoulette(Spectrum, Float probability,
+                                                 Float xi);
 }
 
 namespace Distribution::MIS
@@ -660,6 +664,18 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Float Common::PDFUniformDirection()
 {
     return MathConstants::InvPi<Float>() * Float{0.5};
+}
+
+//
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Optional<Spectrum> Common::RussianRoulette(Spectrum throughput,
+                                                     Float probability, Float xi)
+{
+    probability = Math::Clamp(probability, Float(0.1), Float(1));
+    if(xi >= probability)
+        return std::nullopt;
+    else
+        return throughput * Float(1) / probability;
 }
 
 template<uint32_t N>

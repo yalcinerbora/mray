@@ -75,6 +75,7 @@ namespace DefaultTriangleDetail
         Optional<Hit>           ProjectedHit(const Vector3& point) const;
         MRAY_HYBRID Vector2     SurfaceParametrization(const Hit& hit) const;
 
+        MRAY_HYBRID
         const TransContextType& GetTransformContext() const;
 
         // Surface Generation

@@ -151,7 +151,7 @@ void RNGGroupIndependent::GenerateNumbers(// Output
                                           Span<RandomNumber> dNumbersOut,
                                           // Constants
                                           Vector2ui dimensionRange,
-                                          const GPUQueue& queue)
+                                          const GPUQueue& queue) const
 {
     // Independent RNG do not have a notion of dimensions (or has a single
     // dimension)
@@ -176,7 +176,7 @@ void RNGGroupIndependent::GenerateNumbersIndirect(// Output
                                                   Span<const RayIndex> dIndices,
                                                   // Constants
                                                   Vector2ui dimensionRange,
-                                                  const GPUQueue& queue)
+                                                  const GPUQueue& queue) const
 {
     // Independent RNG do not have a notion of dimensions (or has a single
     // dimension)
@@ -194,6 +194,32 @@ void RNGGroupIndependent::GenerateNumbersIndirect(// Output
         dIndices,
         dimensionCount
     );
+}
+
+void RNGGroupIndependent::GenerateNumbersIndirect(// Output
+                                                  Span<RandomNumber> dNumbersOut,
+                                                  // Input
+                                                  Span<const RayIndex> dIndices,
+                                                  Span<const uint32_t>,
+                                                  // Constants
+                                                  uint32_t dimensionCount,
+                                                  const GPUQueue& queue) const
+{
+    // Independent RNG do not have a notion of dimensions (or has a single
+    // dimension)
+    // so we disregard range, and give single random numbers
+    uint32_t localGenCount = currentRange[1] - currentRange[0];
+    using namespace std::string_view_literals;
+    queue.IssueSaturatingKernel<KCGenRandomNumbersPCG32Indirect>
+        (
+            "KCGenRandomNumbersPCG32Indirect"sv,
+            KernelIssueParams{.workCount = localGenCount},
+            //
+            dNumbersOut,
+            dMainStates.subspan(currentRange[0], localGenCount),
+            dIndices,
+            dimensionCount
+        );
 }
 
 Span<BackupRNGState> RNGGroupIndependent::GetBackupStates()

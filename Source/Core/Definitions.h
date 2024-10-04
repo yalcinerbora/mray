@@ -89,9 +89,19 @@ concept ImplicitLifetimeC = requires()
 // TODO: This should come from CMake
 using Float = float;
 
+// Aliasing the byte here
 using Byte = std::byte;
 
+
 class EmptyType{};
+
+// Idea is from here,
+// https://stackoverflow.com/questions/47495384/default-lambda-as-templated-parameter-of-a-function
+// One difference is that we just have a non-template operator()
+struct EmptyFunctor
+{
+    constexpr void operator()() const {}
+};
 
 // Common enumerations that many
 // internal libraries require
