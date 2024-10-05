@@ -671,6 +671,8 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Optional<Spectrum> Common::RussianRoulette(Spectrum throughput,
                                                      Float probability, Float xi)
 {
+    // We clamp the probability here.
+    // If prob is too low, fireflies become too large (value wise)
     probability = Math::Clamp(probability, Float(0.1), Float(1));
     if(xi >= probability)
         return std::nullopt;

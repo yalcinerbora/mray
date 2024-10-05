@@ -232,7 +232,7 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
         Float rrXi = rng.NextFloat<Material::SampleRNCount>();
         Float rrFactor = throughput.Sum() * Float(0.33333);
         auto result = RussianRoulette(throughput, rrFactor, rrXi);
-        isPathDead = result.has_value();
+        isPathDead = !result.has_value();
         throughput = result.value_or(throughput);
     }
     if(isPathDead) dataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
