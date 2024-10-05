@@ -22,20 +22,17 @@ void KCGenRandomNumbersPCG32(// Output
     for(uint32_t i = kp.GlobalId(); i < generatorCount;
         i += kp.TotalSize())
     {
-        // Get the state
-        // Save the in register space so every generation do not pound the
-        // global memory (Probably it will get optimized bu w/e).
+        // Generate RNG, it automatically saves the state in register-space,
+        // writes back on destruction
         PermutedCG32 rng(dStates[i]);
         // PCG32 do not have concept of dimensionality (technically you can
         // hold a state for each dimension but for a path tracer it is infeasible).
         //
         // So we just generate numbers using a single state
-        RandomNumber rn[2];
         for(uint32_t n = 0; n < dimPerGenerator; n++)
         {
             // Write in strided fashion to coalesce mem
-            rn[n] = rng.Next();
-            dNumbers[i + generatorCount * n] = rn[n];
+            dNumbers[i + generatorCount * n] = rng.Next();
         }
     }
 }
@@ -58,13 +55,11 @@ void KCGenRandomNumbersPCG32Indirect(// Output
     for(uint32_t i = kp.GlobalId(); i < generatorCount;
         i += kp.TotalSize())
     {
-        // Get the state
         RayIndex index = dIndices[i];
-        // Save the in register space so every generation do not pound the
-        // global memory (Probably it will get optimized bu w/e).
         assert(index < dStates.size());
-        State state = dStates[index];
-        PermutedCG32 rng(state);
+        // Generate RNG, it automatically saves the state in register-space,
+        // writes back on destruction
+        PermutedCG32 rng(dStates[index]);
         // PCG32 do not have concept of dimensionality (technically you can
         // hold a state for each dimension but for a path tracer it is infeasible).
         //
@@ -74,8 +69,6 @@ void KCGenRandomNumbersPCG32Indirect(// Output
             // Write in strided fashion to coalesce mem
             dNumbers[i + generatorCount * n] = rng.Next();
         }
-        // Write the modified state
-        dStates[i] = state;
     }
 }
 
@@ -146,7 +139,6 @@ void RNGGroupIndependent::SetupRange(Vector2ui range)
     currentRange = range;
 }
 
-
 void RNGGroupIndependent::GenerateNumbers(// Output
                                           Span<RandomNumber> dNumbersOut,
                                           // Constants
@@ -183,11 +175,12 @@ void RNGGroupIndependent::GenerateNumbersIndirect(// Output
     // so we disregard range, and give single random numbers
     uint32_t dimensionCount = dimensionRange[1] - dimensionRange[0];
     uint32_t localGenCount = currentRange[1] - currentRange[0];
+    uint32_t usedGenCount = static_cast<uint32_t>(dIndices.size());
     using namespace std::string_view_literals;
     queue.IssueSaturatingKernel<KCGenRandomNumbersPCG32Indirect>
     (
         "KCGenRandomNumbersPCG32Indirect"sv,
-        KernelIssueParams{.workCount = localGenCount},
+        KernelIssueParams{.workCount = usedGenCount},
         //
         dNumbersOut,
         dMainStates.subspan(currentRange[0], localGenCount),

@@ -9,7 +9,6 @@ LightPrim<P, SC>::LightPrim(const typename SpectrumConverter& specTransformer,
                             const P& p, const LightData& soa, LightKey key)
     : prim(p)
     , radiance(specTransformer, soa.dRadiances[key.FetchIndexPortion()])
-    , initialMedium(soa.dMediumIds[key.FetchIndexPortion()])
     , isTwoSided(soa.dIsTwoSidedFlags[key.FetchIndexPortion()])
 {}
 
@@ -117,6 +116,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum LightPrim<P, SC>::EmitViaHit(const Vector3& wO,
                                       const typename P::Hit& hit) const
 {
+
     const P& primitive = prim.get();
     Vector2 uv = (radiance.IsConstant())
         ? Vector2::Zero()
@@ -244,7 +244,6 @@ LightSkysphere<CC, TC, SC>::LightSkysphere(const SpectrumConverter& specTransfor
                                            const Primitive& p, const LightSkysphereData& soa, LightKey key)
     : prim(p)
     , radiance(specTransformer, soa.dRadiances[key.FetchIndexPortion()])
-    , initialMedium(soa.dMediumIds[key.FetchIndexPortion()])
     , dist2D(soa.dDistributions[key.FetchIndexPortion()])
     , sceneDiameter(soa.sceneDiameter)
 {}
@@ -435,18 +434,18 @@ LightGroupPrim<PG>::LightGroupPrim(uint32_t groupId,
 template <PrimitiveGroupC PG>
 void LightGroupPrim<PG>::CommitReservations()
 {
-    // TODO: Wasting 8x memory cost due to "Bit" is not a type
+    // TODO: Wasting 32x memory cost due to "Bit" is not a type
     // Change this later
-    Span<uint32_t> dIsTwoSidedFlagsOut;
     this->GenericCommit(std::tie(dRadiances, dPrimRanges,
-                                 dIsTwoSidedFlagsOut),
+                                 dIsTwoSidedFlags),
                         {0, 0, 0});
 
-    dIsTwoSidedFlags = Bitspan<uint32_t>(dIsTwoSidedFlagsOut);
+    auto dIsTwoSidedFlagsIn = Bitspan<uint32_t>(dIsTwoSidedFlags);
 
     soa.dRadiances = ToConstSpan(dRadiances);
-    soa.dPrimRanges = ToConstSpan(dPrimRanges);
-    soa.dIsTwoSidedFlags = ToConstSpan(dIsTwoSidedFlagsOut);
+    soa.dIsTwoSidedFlags = ToConstSpan(dIsTwoSidedFlagsIn);
+    // TODO:
+    //soa.dPrimRanges = ToConstSpan(dPrimRanges);
 }
 
 template <PrimitiveGroupC PG>
@@ -573,6 +572,8 @@ void LightGroupPrim<PG>::Finalize(const GPUQueue& q)
     for(const auto& [_, batchKey] : this->primMappings)
         hPrimRanges.push_back(primGroup.BatchRange(batchKey));
 
+    // TODO: Add is two sided flags
+    q.MemsetAsync(dIsTwoSidedFlags, 0x00);
     q.MemcpyAsync(dPrimRanges, Span<const Vector2ui>(hPrimRanges));
     q.Barrier().Wait();
 }

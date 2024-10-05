@@ -3,6 +3,7 @@
 
 #include "Tracer/PathTracerRenderer.h"
 
+#include "Device/GPUSystem.hpp"
 #include "Device/GPUAlgGeneric.h"
 
 // ================= //

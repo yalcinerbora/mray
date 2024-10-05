@@ -698,8 +698,7 @@ static void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParamsR<R, I, PG, MG
     for(uint32_t globalId = kp.GlobalId();
         globalId < rayCount; globalId += kp.TotalSize())
     {
-        RNGDispenser rng = RNGDispenser(params.in.dRandomNumbers, globalId, kp.TotalSize());
-
+        RNGDispenser rng(params.in.dRandomNumbers, globalId, rayCount);
         // Here is the potential drawback of sorting based
         // partitioning, all of the parameters are loaded
         // via scattered reads.
@@ -768,7 +767,7 @@ static void KCRenderLightWork(MRAY_GRID_CONSTANT const RenderLightWorkParamsR<R,
     for(uint32_t globalId = kp.GlobalId();
         globalId < rayCount; globalId += kp.TotalSize())
     {
-        RNGDispenser rng = RNGDispenser(params.in.dRandomNumbers, globalId, kp.TotalSize());
+        RNGDispenser rng(params.in.dRandomNumbers, globalId, rayCount);
         RayIndex rIndex = params.in.dRayIndices[globalId];
         // Keys
         HitKeyPack keys = params.in.dKeys[rIndex];

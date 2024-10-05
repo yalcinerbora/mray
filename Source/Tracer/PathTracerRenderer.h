@@ -29,9 +29,12 @@ class ConstAddFunctor
     }
 };
 
+#include "Core/Flag.h"
+
 template<class MetaLightArrayType>
 class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightArrayType>>
 {
+
     using Base              = RendererT<PathTracerRenderer<MetaLightArrayType>>;
     using FilmFilterPtr     = std::unique_ptr<TextureFilterI>;
     using CameraWorkPtr     = std::unique_ptr<RenderCameraWorkT<PathTracerRenderer>>;
@@ -84,6 +87,7 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightAr
     CameraKey                   curCamKey;
     const CameraWorkPtr*        curCamWork;
     uint64_t                    globalPixelIndex = 0;
+    uint64_t                    totalDeadRayCount = 0;
     SampleMode                  anchorSampleMode;
     //
     RayPartitioner              rayPartitioner;
@@ -103,7 +107,10 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightAr
     Span<uint32_t>      dWorkHashes;
     Span<CommonKey>     dWorkBatchIds;
 
-    uint32_t    FindMaxSamplePerIteration(uint32_t rayCount, PathTraceRDetail::SampleMode);
+    uint32_t            FindMaxSamplePerIteration(uint32_t rayCount, PathTraceRDetail::SampleMode);
+    Span<RayIndex>      ReloadPaths(Span<const RayIndex> dIndices,
+                                    const GPUQueue& processQueue);
+    void                ResetAllPaths(const GPUQueue& queue);
 
     public:
     // Constructors & Destructor

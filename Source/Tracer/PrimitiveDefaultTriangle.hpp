@@ -329,7 +329,7 @@ template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Optional<BasicSurface> Triangle<T>::SurfaceFromHit(const Hit& hit) const
 {
-    Vector3 baryCoords = Vector3(hit[0], hit[1], 1 - hit[0] - hit[1]);
+    Vector3 baryCoords = Vector3(hit[0], hit[1], Float(1) - hit[0] - hit[1]);
     if(baryCoords[0] < 0 || baryCoords[0] > 1 ||
        baryCoords[1] < 0 || baryCoords[1] > 1 ||
        baryCoords[2] < 0 || baryCoords[2] > 1)
@@ -339,12 +339,18 @@ Optional<BasicSurface> Triangle<T>::SurfaceFromHit(const Hit& hit) const
                         positions[1] * baryCoords[1] +
                         positions[2] * baryCoords[2]);
 
-    Vector3ui index = data.get().indexList[key.FetchIndexPortion()];
-    Quaternion q0 = data.get().tbnRotations[index[0]];
-    Quaternion q1 = data.get().tbnRotations[index[1]];
-    Quaternion q2 = data.get().tbnRotations[index[2]];
-    Quaternion tbn = Quaternion::BarySLerp(q0, q1, q2, baryCoords[0], baryCoords[1]);
-    Vector3 normal = tbn.Conjugate().ApplyRotation(Vector3::ZAxis());
+    // TODO: Should we do this?
+    //
+    //Vector3ui index = data.get().indexList[key.FetchIndexPortion()];
+    //Quaternion q0 = data.get().tbnRotations[index[0]];
+    //Quaternion q1 = data.get().tbnRotations[index[1]];
+    //Quaternion q2 = data.get().tbnRotations[index[2]];
+    //Quaternion tbn = Quaternion::BarySLerp(q0, q1, q2, baryCoords[0], baryCoords[1]);
+    //Vector3 normal = tbn.Conjugate().ApplyRotation(Vector3::ZAxis());
+    // normal = transformContext.get().ApplyN(normal).Normalize();
+    //
+    // Or return geometric normal?
+    Vector3 normal = Shape::Triangle::Normal(positions);
 
     return BasicSurface
     {

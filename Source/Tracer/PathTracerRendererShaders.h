@@ -39,8 +39,9 @@ class GenericEnum
         {
             return sv == r;
         });
-        if(loc != Names.cend());
-        throw MRayError("Bad enum name");
+        if(loc == Names.cend())
+            throw MRayError("Bad enum name");
+
         e = E(std::distance(Names.cbegin(), loc));
     }
 
@@ -87,7 +88,7 @@ namespace PathTraceRDetail
     };
     using SampleMode = GenericEnum<SampleModeEnum, SampleModeNames>;
 
-    enum class RayType : uint32_t
+    enum class RayType : uint8_t
     {
         SHADOW_RAY,
         SPECULAR_PATH_RAY,
@@ -95,12 +96,26 @@ namespace PathTraceRDetail
         CAMERA_RAY
     };
 
+    enum class PathStatusEnum : uint8_t
+    {
+        // Path is dead (due to russian roulette or hitting a light source)
+        DEAD                = 0,
+        // TODO: These are not used yet, but here for future use.
+        // Path did scatter because of the medium. It should not go
+        // Material scattering
+        MEDIUM_SCATTERED    = 1,
+        // TODO: Maybe incorporate ray type?
+        //
+        END
+    };
+    using PathStatus = Bitset<static_cast<size_t>(PathStatusEnum::END)>;
+
     struct Options
     {
         uint32_t            totalSPP = 32;
-        Vector2ui           russianRouletteRange = Vector2ui(3, 21);
+        Vector2ui           russianRouletteRange = Vector2ui(4, 20);
         LightSamplerType    lightSampler = LightSamplerType::E::UNIFORM;
-        SampleMode          sampleMode = SampleMode::E::NEE_WITH_MIS;
+        SampleMode          sampleMode = SampleMode::E::PURE;
     };
 
     template<class LightSampler>
@@ -111,6 +126,13 @@ namespace PathTraceRDetail
         LightSampler    lightSampler;
     };
 
+    struct alignas(4) PathDataPack
+    {
+        uint8_t    depth;
+        PathStatus  status;
+        RayType     type;
+    };
+
     struct RayState
     {
         // Output related
@@ -119,11 +141,11 @@ namespace PathTraceRDetail
         Span<Float>             dFilmFilterWeights;
         // Path state
         Span<Spectrum>          dThroughput;
-        Span<uint8_t>           dDepth;
+        Span<PathDataPack>      dPathDataPack;
         // Next set of rays
         Span<RayGMem>           dOutRays;
+        Span<RayDiff>           dOutRayDiffs;
         // Only used when NEE/MIS is active
-        Span<RayType>           dPathRayType;
         Span<Float>             dPrevMaterialPDF;
     };
 
@@ -172,6 +194,9 @@ namespace PathTraceRDetail
                                   RayIndex rayIndex);
 }
 
+// ======================== //
+//     PURE PATH TRACE      //
+// ======================== //
 template<PrimitiveC Prim, MaterialC Material,
          class Surface, class TContext,
          PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
@@ -195,9 +220,14 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     // Russian Roulette //
     // ================ //
     bool isPathDead = false;
-    uint32_t depth = params.rayState.dDepth[rayIndex] + 1;
+    PathDataPack dataPack = params.rayState.dPathDataPack[rayIndex];
+    dataPack.depth += 1u;
     Vector2ui rrRange = params.globalState.russianRouletteRange;
-    if(depth >= rrRange[0])
+    if(dataPack.depth > rrRange[1])
+    {
+        isPathDead = true;
+    }
+    else if(dataPack.depth >= rrRange[0])
     {
         Float rrXi = rng.NextFloat<Material::SampleRNCount>();
         Float rrFactor = throughput.Sum() * Float(0.33333);
@@ -205,16 +235,11 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
         isPathDead = result.has_value();
         throughput = result.value_or(throughput);
     }
-    else if(depth > rrRange[1])
-    {
-        isPathDead = true;
-    }
-    depth = isPathDead ? std::numeric_limits<uint8_t>::max() : depth;
-    params.rayState.dDepth[rayIndex] = static_cast<uint8_t>(depth);
+    if(isPathDead) dataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
 
-    // Write the throughput back
-    throughput = DivideByPDF(throughput, raySample.pdf);
-    params.rayState.dThroughput[rayIndex] = throughput;
+    // Write the updated state back
+    params.rayState.dPathDataPack[rayIndex] = dataPack;
+    params.rayState.dThroughput[rayIndex] = DivideByPDF(throughput, raySample.pdf);
 
     // New ray
     Ray rayOut = Ray(wI, surf.position);
@@ -223,17 +248,6 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     // so we put flt_max here.
     Vector2 tMMOut = Vector2(0, std::numeric_limits<Float>::max());
     RayToGMem(params.rayState.dOutRays, rayIndex, rayOut, tMMOut);
-}
-
-template<class LightSampler, PrimitiveC Prim, MaterialC Material,
-         class Surface, class TContext,
-         PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-MRAY_HYBRID MRAY_CGPU_INLINE
-void PathTraceRDetail::WorkFunctionWithNEE(const Prim&, const Material&, const Surface&,
-                                           const TContext&, RNGDispenser&,
-                                           const WorkParams<LightSampler, PG, MG, TG>&,
-                                           RayIndex)
-{
 }
 
 template<LightC Light, LightGroupC LG, TransformGroupC TG>
@@ -262,8 +276,33 @@ void PathTraceRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
         Vector3 position = ray.AdvancedPos(tMM[1]);
         emission = l.EmitViaSurfacePoint(wO, position);
     }
-    Spectrum radianceEstimate =  emission * throughput;
-    params.rayState.dPathRadiance[rayIndex] = radianceEstimate;
+
+    // Check the depth if we exceed it, do not accumulate
+    // we terminate the path regardless
+    PathDataPack pathDataPack = params.rayState.dPathDataPack[rayIndex];
+    Vector2ui rrRange = params.globalState.russianRouletteRange;
+    if((pathDataPack.depth + 1u) <= rrRange[1])
+    {
+        Spectrum radianceEstimate = emission * throughput;
+        params.rayState.dPathRadiance[rayIndex] = radianceEstimate;
+    }
+    // Set the path as dead
+    pathDataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
+    params.rayState.dPathDataPack[rayIndex] = pathDataPack;
+}
+
+// ======================== //
+//      NEE AND/OR MIS      //
+// ======================== //
+template<class LightSampler, PrimitiveC Prim, MaterialC Material,
+    class Surface, class TContext,
+    PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
+MRAY_HYBRID MRAY_CGPU_INLINE
+void PathTraceRDetail::WorkFunctionWithNEE(const Prim&, const Material&, const Surface&,
+                                           const TContext&, RNGDispenser&,
+                                           const WorkParams<LightSampler, PG, MG, TG>&,
+                                           RayIndex)
+{
 }
 
 template<class LightSampler, LightC Light, LightGroupC LG, TransformGroupC TG>

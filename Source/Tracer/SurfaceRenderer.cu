@@ -410,6 +410,7 @@ RendererOutput SurfaceRenderer::DoRender()
         totalIterationCount = 0;
         curCamTransformOverride = cameraTransform;
         cameraTransform = std::nullopt;
+        globalPixelIndex = 0;
     }
 
     // Generate subcamera of this specific tile

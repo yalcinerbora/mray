@@ -19,15 +19,12 @@ namespace LightDetail
     struct alignas(32) LightData
     {
         Span<const ParamVaryingData<2, Vector3>>    dRadiances;
-        Span<const MediumKey>                       dMediumIds;
-        Span<const Vector2ui>                       dPrimRanges;
         Bitspan<const uint32_t>                     dIsTwoSidedFlags;
     };
 
     struct alignas(32) LightSkysphereData
     {
         Span<const ParamVaryingData<2, Vector3>>    dRadiances;
-        Span<const MediumKey>                       dMediumIds;
         Span<const DistributionPwC2D>               dDistributions;
         Float                                       sceneDiameter;
     };
@@ -74,7 +71,6 @@ namespace LightDetail
         private:
         Ref<const Primitive>    prim;
         RadianceMap             radiance;
-        MediumKey               initialMedium;
         bool                    isTwoSided;
 
         public:
@@ -122,7 +118,6 @@ namespace LightDetail
         Ref<const Primitive>    prim;
         DistributionPwC2D       dist2D;
         RadianceMap             radiance;
-        MediumKey               initialMedium;
         Float                   sceneDiameter;
 
         public:
@@ -207,7 +202,7 @@ class LightGroupPrim final : public GenericGroupLight<LightGroupPrim<PrimGroupT>
     const PrimGroup&                    primGroup;
     Span<ParamVaryingData<2, Vector3>>  dRadiances;
     Span<Vector2ui>                     dPrimRanges;
-    Bitspan<uint32_t>                   dIsTwoSidedFlags;
+    Span<uint32_t>                      dIsTwoSidedFlags;
     DataSoA                             soa;
 
     public:

@@ -25,7 +25,7 @@ void RendererT<C>::IssueWorkKernelsToPartitions(const RenderWorkHasher& workHash
                                                 WorkF&& WF, LightWorkF&& LWF,
                                                 CamWorkF&&) const
 {
-    assert(partition.isHostVisible);
+    assert(p.isHostVisible);
     for(uint32_t i = 0; i < p.hPartitionCount[0]; i++)
     {
         uint32_t partitionStart = p.hdPartitionStartOffsets[i];

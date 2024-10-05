@@ -1,5 +1,78 @@
 #pragma once
 
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+static void KCInitPathState(MRAY_GRID_CONSTANT const PathTraceRDetail::RayState dRayState,
+                            MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices)
+{
+    using namespace PathTraceRDetail;
+    KernelCallParams kp;
+    uint32_t pathCount = static_cast<uint32_t>(dIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < pathCount; i += kp.TotalSize())
+    {
+        RayIndex index = dIndices[i];
+        dRayState.dPathRadiance[index] = Spectrum::Zero();
+        // dImageCoordinates is set by cam ray gen
+        // dFilmFilterWeights is set by cam ray gen
+        dRayState.dThroughput[index] = Spectrum(1);
+        dRayState.dPathDataPack[index] = PathDataPack
+        {
+            .depth = 0,
+            .status = PathStatus(uint8_t(0)),
+            .type = RayType::CAMERA_RAY
+        };
+        // dOutRays will be set when ray bounces
+        // dOutRayDiffs will be set when ray bounces
+        // dPrevMaterialPDF is set when MIS is enabled
+    }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+static void KCCopyRays(MRAY_GRID_CONSTANT const Span<RayGMem> dRaysOut,
+                       MRAY_GRID_CONSTANT const Span<RayDiff> dRayDiffOut,
+                       MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
+                       MRAY_GRID_CONSTANT const Span<const RayGMem> dRaysIn,
+                       MRAY_GRID_CONSTANT const Span<const RayDiff> dRayDiffIn)
+{
+    using namespace PathTraceRDetail;
+    KernelCallParams kp;
+    uint32_t pathCount = static_cast<uint32_t>(dIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < pathCount; i += kp.TotalSize())
+    {
+        RayIndex index = dIndices[i];
+        dRaysOut[index] = dRaysIn[index];
+        dRayDiffOut[index] = dRayDiffIn[index];
+    }
+}
+
+struct SetPathToDeadFunctor
+{
+    MRAY_HYBRID MRAY_CGPU_INLINE
+    PathTraceRDetail::PathDataPack operator()(PathTraceRDetail::PathDataPack s) const
+    {
+        using namespace PathTraceRDetail;
+        s.status.Set(uint32_t(PathStatusEnum::DEAD));
+        return s;
+    }
+};
+
+class IsDeadFunctor
+{
+    Span<PathTraceRDetail::PathDataPack> dPathDataPack;
+
+    public:
+    IsDeadFunctor(Span<PathTraceRDetail::PathDataPack> dPathDataPackIn)
+        : dPathDataPack(dPathDataPackIn)
+    {}
+
+    MRAY_HYBRID MRAY_CGPU_INLINE
+    bool operator()(RayIndex index)
+    {
+        using namespace PathTraceRDetail;
+        const PathStatus state = dPathDataPack[index].status;
+        return state[uint32_t(PathStatusEnum::DEAD)];
+    }
+};
+
 template<class MLA>
 PathTracerRenderer<MLA>::PathTracerRenderer(const RenderImagePtr& rb,
                                             TracerView tv,
@@ -8,7 +81,7 @@ PathTracerRenderer<MLA>::PathTracerRenderer(const RenderImagePtr& rb,
                                             const RenderWorkPack& wp)
     : RendererT<PathTracerRenderer<MLA>>(rb, wp, tv, s, tp)
     , rayPartitioner(s)
-    , redererGlobalMem(s.AllGPUs(), 32_MiB, 512_MiB)
+    , redererGlobalMem(s.AllGPUs(), 128_MiB, 512_MiB)
     , metaLightArray(s)
 {}
 
@@ -65,8 +138,7 @@ RendererOptionPack PathTracerRenderer<MLA>::CurrentAttributes() const
 template<class MLA>
 void PathTracerRenderer<MLA>::PushAttribute(uint32_t attributeIndex,
                                             TransientData data, const GPUQueue&)
-{
-    switch(attributeIndex)
+{    switch(attributeIndex)
     {
         case 0: newOptions.totalSPP = data.AccessAs<uint32_t>()[0]; break;
         case 1: newOptions.sampleMode = PathTraceRDetail::SampleMode(std::as_const(data).AccessAsString()); break;
@@ -102,6 +174,73 @@ uint32_t PathTracerRenderer<MLA>::FindMaxSamplePerIteration(uint32_t rayCount,
 }
 
 template<class MLA>
+Span<RayIndex> PathTracerRenderer<MLA>::ReloadPaths(Span<const RayIndex> dIndices,
+                                                    const GPUQueue& processQueue)
+{
+    // RELOADING!!!
+    // Find the dead rays
+    auto [hDeadRayRanges, dDeadAliveRayIndices] = rayPartitioner.BinaryPartition
+    (
+        dIndices, processQueue,
+        IsDeadFunctor(dRayState.dPathDataPack)
+    );
+    processQueue.Barrier().Wait();
+
+    // Generate RN for camera rays
+    uint32_t camSamplePerRay = (*curCamWork)->StochasticFilterSampleRayRNCount();
+    uint32_t deadRayCount = hDeadRayRanges[1] - hDeadRayRanges[0];
+    auto dDeadRayIndices = dDeadAliveRayIndices.subspan(hDeadRayRanges[0],
+                                                        deadRayCount);
+    uint32_t camRayGenRNCount = uint32_t(dDeadRayIndices.size()) * camSamplePerRay;
+    auto dCamRayGenRNBuffer = dRandomNumBuffer.subspan(0, camRayGenRNCount);
+    if(!dDeadRayIndices.empty())
+    {
+        rnGenerator->GenerateNumbersIndirect(dCamRayGenRNBuffer,
+                                             ToConstSpan(dDeadRayIndices),
+                                             Vector2ui(0, camSamplePerRay),
+                                             processQueue);
+        //
+        const auto& cameraWork = (*curCamWork->get());
+        cameraWork.GenRaysStochasticFilter
+        (
+            dRayDifferentials, dRays,
+            dRayState.dImageCoordinates,
+            dRayState.dFilmFilterWeights,
+            ToConstSpan(dDeadRayIndices),
+            ToConstSpan(dCamRayGenRNBuffer),
+            dSubCameraBuffer, curCamTransformKey,
+            globalPixelIndex,
+            this->imageTiler.CurrentTileSize(),
+            this->tracerView.tracerParams.filmFilter,
+            processQueue
+        );
+        globalPixelIndex += dDeadRayIndices.size();
+
+        // Initialize the state of new rays
+        processQueue.IssueSaturatingKernel<KCInitPathState>
+        (
+            "KCInitPathState",
+            KernelIssueParams{.workCount = deadRayCount},
+            dRayState,
+            dDeadRayIndices
+        );
+    }
+    // Index buffer may be invalidated (Binary partition should not
+    // invalidate but lets return the new buffer)
+    return dDeadAliveRayIndices;
+}
+
+template<class MLA>
+void PathTracerRenderer<MLA>::ResetAllPaths(const GPUQueue& queue)
+{
+    // Set all paths as dead (we just started)
+    using namespace PathTraceRDetail;
+    DeviceAlgorithms::InPlaceTransform(dRayState.dPathDataPack, queue,
+                                       SetPathToDeadFunctor());
+    queue.MemsetAsync(dPathRNGDimensions, 0x00);
+}
+
+template<class MLA>
 RenderBufferInfo PathTracerRenderer<MLA>::StartRender(const RenderImageParams& rIP,
                                                       CamSurfaceId camSurfId,
                                                       uint32_t customLogicIndex0,
@@ -117,6 +256,7 @@ RenderBufferInfo PathTracerRenderer<MLA>::StartRender(const RenderImageParams& r
     anchorSampleMode = currentOptions.sampleMode;
     this->totalIterationCount = 0;
     globalPixelIndex = 0;
+    totalDeadRayCount = 0;
 
     // Generate the Filter
     auto FilterGen = this->tracerView.filterGenerators.at(this->tracerView.tracerParams.filmFilter.type);
@@ -182,15 +322,15 @@ RenderBufferInfo PathTracerRenderer<MLA>::StartRender(const RenderImageParams& r
     if(currentOptions.sampleMode == SampleMode::E::PURE)
     {
         MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys,
-                                             dRays,
-                                             dRayDifferentials,
+                                             dRays, dRayDifferentials,
+                                             dRayState.dPathRadiance,
                                              dRayState.dImageCoordinates,
-                                             dRayState.dPathRadiance,
                                              dRayState.dFilmFilterWeights,
-                                             dRayState.dDepth,
-                                             dRayState.dOutRays,
-                                             dRayState.dPathRadiance,
                                              dRayState.dThroughput,
+                                             dRayState.dPathDataPack,
+                                             dRayState.dOutRays,
+                                             dRayState.dOutRayDiffs,
+                                             dPathRNGDimensions,
                                              dRandomNumBuffer,
                                              dWorkHashes, dWorkBatchIds,
                                              dSubCameraBuffer),
@@ -199,7 +339,9 @@ RenderBufferInfo PathTracerRenderer<MLA>::StartRender(const RenderImageParams& r
                                      maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
-                                     maxRayCount, maxSampleCount,
+                                     maxRayCount, maxRayCount,
+                                     maxRayCount, maxRayCount,
+                                     maxSampleCount,
                                      totalWorkCount, totalWorkCount,
                                      this->SUB_CAMERA_BUFFER_SIZE});
     }
@@ -227,9 +369,10 @@ RenderBufferInfo PathTracerRenderer<MLA>::StartRender(const RenderImageParams& r
                         uint32_t(this->tracerView.tracerParams.samplerType.type));
     uint32_t generatorCount = (rIP.regionMax - rIP.regionMin).Multiply();
     uint64_t seed = this->tracerView.tracerParams.seed;
-    rnGenerator = RngGen->get()(std::move(generatorCount),
-                                std::move(seed),
+    rnGenerator = RngGen->get()(std::move(generatorCount), std::move(seed),
                                 this->gpuSystem, this->globalThreadPool);
+
+    ResetAllPaths(queue);
 
     auto bufferPtrAndSize = this->renderBuffer->SharedDataPtrAndSize();
     return RenderBufferInfo
@@ -242,7 +385,6 @@ RenderBufferInfo PathTracerRenderer<MLA>::StartRender(const RenderImageParams& r
         .curRenderLogic0 = sendMode,
         .curRenderLogic1 = std::numeric_limits<uint32_t>::max()
     };
-    return RenderBufferInfo{};
 }
 
 template<class MLA>
@@ -266,6 +408,10 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
         this->totalIterationCount = 0;
         curCamTransformOverride = this->cameraTransform;
         this->cameraTransform = std::nullopt;
+        globalPixelIndex = 0;
+        totalDeadRayCount = 0;
+
+        ResetAllPaths(processQueue);
     }
 
     // Generate subcamera of this specific tile
@@ -281,7 +427,6 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
     // Find the ray count. Ray count is tile count
     // but tile can exceed film boundaries so clamp,
     uint32_t rayCount = this->imageTiler.CurrentTileSize().Multiply();
-
     // Start the partitioner, again worst case work count
     // Get the K/V pair buffer
     uint32_t maxWorkCount = uint32_t(this->currentWorks.size() + this->currentLightWorks.size());
@@ -289,54 +434,24 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
 
     // Iota the indices
     DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
-
-    // Find the dead rays
-    auto
-    [
-        hDeadRayRanges,
-        dDeadAliveRayIndices
-    ] = rayPartitioner.BinaryPartition
-    (
-        dIndices, processQueue,
-        [this] MRAY_HYBRID(RayIndex index) -> bool
-        {
-            return dRayState.dDepth[index] == std::numeric_limits<uint8_t>::max();
-        }
-    );
-    processQueue.Barrier().Wait();
-
     // Create RNG state for each ray
-    // Generate rays
     rnGenerator->SetupRange(this->imageTiler.Tile1DRange());
-    // Generate RN for camera rays
-    uint32_t camSamplePerRay = (*curCamWork)->StochasticFilterSampleRayRNCount();
-    auto dDeadRayIndices = dDeadAliveRayIndices.subspan(hDeadRayRanges[0],
-                                                        hDeadRayRanges[1] - hDeadRayRanges[0]);
-    uint32_t camRayGenRNCount = uint32_t(dDeadRayIndices.size()) * camSamplePerRay;
-    auto dCamRayGenRNBuffer = dRandomNumBuffer.subspan(0, camRayGenRNCount);
-    rnGenerator->GenerateNumbersIndirect(dCamRayGenRNBuffer,
-                                         ToConstSpan(dDeadRayIndices),
-                                         Vector2ui(0, camSamplePerRay),
-                                         processQueue);
+    // Reload dead paths with new
+    dIndices = ReloadPaths(dIndices, processQueue);
 
-    cameraWork.GenRaysStochasticFilter
-    (
-        dRayDifferentials, dRays,
-        dRayState.dImageCoordinates,
-        dRayState.dFilmFilterWeights,
-        ToConstSpan(dDeadRayIndices),
-        ToConstSpan(dCamRayGenRNBuffer),
-        dSubCameraBuffer, curCamTransformKey,
-        globalPixelIndex,
-        this->imageTiler.CurrentTileSize(),
-        this->tracerView.tracerParams.filmFilter,
-        processQueue
-    );
-    globalPixelIndex += dDeadRayIndices.size();
+    {
+        // Now binary partition the index buffer
+        auto [hDeadAliveRanges, dDeadAliveIndices] = rayPartitioner.BinaryPartition
+        (
+            dIndices, processQueue,
+            IsDeadFunctor(dRayState.dPathDataPack)
+        );
+        processQueue.Barrier().Wait();
+        dIndices = dDeadAliveIndices;
+    }
 
-    // Refilled the path buffer
-    // We can roll back to the Iota
-    // to get the all rays.
+    // We refilled the path buffer,
+    // and can roll back to the Iota
     DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
 
     // Cast rays
@@ -349,8 +464,7 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
         dHitKeys,
         this->boundaryLightKeyPack
     );
-
-    // Ray Casting
+    // Actual Ray Casting
     this->tracerView.baseAccelerator.CastRays
     (
         dHitKeys, dHits, dBackupRNGStates,
@@ -371,13 +485,16 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
 
     // Finally, partition using the generated keys.
     // Fully partition here using single sort
-    auto partitionOutput = rayPartitioner.MultiPartition(dKeys, dIndices,
-                                                         workHasher.WorkBatchDataRange(),
-                                                         workHasher.WorkBatchBitRange(),
-                                                         processQueue, false);
-    assert(isHostVisible);
+    auto& rp = rayPartitioner;
+    auto partitionOutput = rp.MultiPartition(dKeys, dIndices,
+                                             workHasher.WorkBatchDataRange(),
+                                             workHasher.WorkBatchBitRange(),
+                                             processQueue, false);
     // Wait for results to be available in host buffers
     processQueue.Barrier().Wait();
+    // Old Indices array (and the key) is invalidated
+    // Change indices to the partitioned one
+    dIndices = partitionOutput.dPartitionIndices;
 
     if(currentOptions.sampleMode == SampleMode::E::PURE)
     {
@@ -421,115 +538,103 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
         });
     }
 
-    // Copy the rays.
 
+    // Find the dead paths again
+    // Every path is processed, so we do not need to use the scambled
+    // index buffer. Iota again
+    DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
+    // Now binary partition the index buffer
+    auto[hDeadAliveRanges, dDeadAliveIndices] = rayPartitioner.BinaryPartition
+    (
+        dIndices, processQueue,
+        IsDeadFunctor(dRayState.dPathDataPack)
+    );
+    processQueue.Barrier().Wait();
 
-//    // Do shadow ray cast
-//    if(currentOptions.mode == SurfRDetail::Mode::AO)
-//    {
-//        auto p = rayPartitioner.BinaryPartition(dPartitionIndices, processQueue,
-//                                                IsValidRayFunctor(dRays[1]));
-//        processQueue.Barrier().Wait();
-//
-//        auto dValidIndices = p.dPartitionIndices.subspan(p.hPartitionStartOffsets[0],
-//                                                         p.hPartitionStartOffsets[1] - p.hPartitionStartOffsets[0]);
-//
-//        if(!dValidIndices.empty())
-//        {
-//            // Ray Casting
-//            Bitspan<uint32_t> dIsVisibleBitSpan(dIsVisibleBuffer);
-//            tracerView.baseAccelerator.CastVisibilityRays
-//            (
-//                dIsVisibleBitSpan, dBackupRNGStates,
-//                dRays[1], dValidIndices, processQueue
-//            );
-//
-//            // Write either one or zero
-//            processQueue.IssueSaturatingKernel<KCIsVisibleToSpectrum>
-//            (
-//                "KCIsVisibleToSpectrum",
-//                KernelIssueParams{.workCount = static_cast<uint32_t>(dValidIndices.size())},
-//                dRayState.dOutputData,
-//                ToConstSpan(dIsVisibleBitSpan),
-//                dValidIndices
-//            );
-//        }
-//    }
-//    // Filter the samples
-//    // Wait for previous copy to finish
-//    processQueue.IssueWait(renderBuffer->PrevCopyCompleteFence());
-//    renderBuffer->ClearImage(processQueue);
-//    ImageSpan<3> filmSpan = imageTiler.GetTileSpan<3>();
-//    if(currentOptions.doStochasticFilter)
-//    {
-//        SetImagePixels
-//        (
-//            filmSpan, ToConstSpan(dRayState.dOutputData),
-//            ToConstSpan(dRayState.dFilmFilterWeights),
-//            ToConstSpan(dRayState.dImageCoordinates),
-//            Float(1), processQueue
-//        );
-//    }
-//    else
-//    {
-//        // Using atomic filter since the samples are uniformly distributed
-//        // And it is faster
-//        filmFilter->ReconstructionFilterAtomicRGB
-//        (
-//            filmSpan,
-//            ToConstSpan(dRayState.dOutputData),
-//            ToConstSpan(dRayState.dImageCoordinates),
-//            Float(1), processQueue
-//        );
-//    }
-//    // Issue a send of the FBO to Visor
-//    const GPUQueue& transferQueue = device.GetTransferQueue();
-//    Optional<RenderImageSection>
-//    renderOut = imageTiler.TransferToHost(processQueue,
-//                                          transferQueue);
-//    // Semaphore is invalidated, visor is probably crashed
-//    if(!renderOut.has_value())
-//        return RendererOutput{};
-//    // Actual global weight
-//    renderOut->globalWeight = Float(1);
-//
-//    // We do not need to wait here, but we time
-//    // from CPU side so we need to wait
-//    // TODO: In future we should do OpenGL, Vulkan
-//    // style performance counters events etc. to
-//    // query the timing (may be couple of frame before even)
-//    // The timing is just a general performance indicator
-//    // It should not be super accurate.
-//    processQueue.Barrier().Wait();
-//    timer.Split();
-//
-//    double timeSec = timer.Elapsed<Second>();
-//    double samplePerSec = static_cast<double>(rayCount) / timeSec;
-//    samplePerSec /= 1'000'000;
-//    double spp = double(1) / double(imageTiler.TileCount().Multiply());
-//    totalIterationCount++;
-//    spp *= static_cast<double>(totalIterationCount);
-//    // Roll to the next tile
-//    imageTiler.NextTile();
-//
-//    return RendererOutput
-//    {
-//        .analytics = RendererAnalyticData
-//        {
-//            samplePerSec,
-//            "M samples/s",
-//            spp,
-//            "spp",
-//            float(timer.Elapsed<Millisecond>()),
-//            imageTiler.FullResolution(),
-//            MRayColorSpaceEnum::MR_ACES_CG,
-//            GPUMemoryUsage(),
-//            static_cast<uint32_t>(SurfRDetail::Mode::END),
-//            0
-//        },
-//        .imageOut = renderOut
-//    };
-    return RendererOutput{};
+    // Find the alive ranges first, copy the generated next ray stuff
+    uint32_t aliveRayCount = hDeadAliveRanges[2] - hDeadAliveRanges[1];
+    Span<RayIndex> dAliveRayIndices = dDeadAliveIndices.subspan(hDeadAliveRanges[1], aliveRayCount);
+    if(aliveRayCount != 0)
+    {
+        processQueue.IssueSaturatingKernel<KCCopyRays>
+        (
+            "KCCopyRays",
+            KernelIssueParams{.workCount = aliveRayCount},
+            dRays, dRayDifferentials,
+            dAliveRayIndices,
+            dRayState.dOutRays,
+            dRayState.dOutRayDiffs
+        );
+    }
+
+    // Now set the process queue
+    uint32_t deadRayCount = hDeadAliveRanges[1] - hDeadAliveRanges[0];
+    Span<RayIndex> dDeadRayIndices = dDeadAliveIndices.subspan(hDeadAliveRanges[0],
+                                                               deadRayCount);
+    Optional<RenderImageSection> renderOut;
+    if(deadRayCount != 0)
+    {
+        processQueue.IssueWait(this->renderBuffer->PrevCopyCompleteFence());
+        this->renderBuffer->ClearImage(processQueue);
+        ImageSpan<3> filmSpan = this->imageTiler.template GetTileSpan<3>();
+
+        SetImagePixelsIndirect
+        (
+            filmSpan,
+            ToConstSpan(dDeadRayIndices),
+            ToConstSpan(dRayState.dPathRadiance),
+            ToConstSpan(dRayState.dFilmFilterWeights),
+            ToConstSpan(dRayState.dImageCoordinates),
+            Float(1), processQueue
+        );
+        // Issue a send of the FBO to Visor
+        const GPUQueue& transferQueue = device.GetTransferQueue();
+        renderOut = this->imageTiler.TransferToHost(processQueue,
+                                                    transferQueue);
+        // Semaphore is invalidated, visor is probably crashed
+        if(!renderOut.has_value())
+            return RendererOutput{};
+        // Actual global weight
+        renderOut->globalWeight = Float(1);
+    }
+    // We do not need to wait here, but we time
+    // from CPU side so we need to wait
+    // TODO: In future we should do OpenGL, Vulkan
+    // style performance counters events etc. to
+    // query the timing (may be couple of frame before even)
+    // The timing is just a general performance indicator
+    // It should not be super accurate.
+    processQueue.Barrier().Wait();
+    timer.Split();
+
+    this->totalIterationCount++;
+    totalDeadRayCount += deadRayCount;
+    double timeSec = timer.Elapsed<Second>();
+    double pathPerSec = static_cast<double>(deadRayCount) / timeSec;
+    pathPerSec /= 1'000'000;
+
+    uint64_t totalPixels = this->imageTiler.FullResolution().Multiply();
+    double spp = double(totalDeadRayCount) / double(totalPixels);
+    // Roll to the next tile
+    this->imageTiler.NextTile();
+
+    return RendererOutput
+    {
+        .analytics = RendererAnalyticData
+        {
+            pathPerSec,
+            "M path/s",
+            spp,
+            "spp",
+            float(timer.Elapsed<Millisecond>()),
+            this->imageTiler.FullResolution(),
+            MRayColorSpaceEnum::MR_ACES_CG,
+            GPUMemoryUsage(),
+            static_cast<uint32_t>(PathTraceRDetail::SampleMode::E::END),
+            0
+        },
+        .imageOut = renderOut
+    };
 }
 
 template<class MLA>
