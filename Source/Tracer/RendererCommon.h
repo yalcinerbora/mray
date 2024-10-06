@@ -10,6 +10,12 @@ void KCGenerateWorkKeys(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
                         MRAY_GRID_CONSTANT const RenderWorkHasher workHasher);
 
 MRAY_KERNEL
+void KCGenerateWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
+                                MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
+                                MRAY_GRID_CONSTANT const Span<const HitKeyPack> dInputKeys,
+                                MRAY_GRID_CONSTANT const RenderWorkHasher workHasher);
+
+MRAY_KERNEL
 void KCSetBoundaryWorkKeys(MRAY_GRID_CONSTANT const Span<HitKeyPack> dWorkKey,
                            MRAY_GRID_CONSTANT const HitKeyPack boundaryWorkKey);
 

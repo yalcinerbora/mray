@@ -449,7 +449,7 @@ using RenderCameraWorkList = std::vector<RenderCameraWorkStruct<R>>;
 class RenderWorkHasher
 {
     private:
-    Span<uint32_t>  dWorkBatchHashes;
+    Span<CommonKey> dWorkBatchHashes;
     Span<CommonKey> dWorkBatchIds;
     uint32_t batchBits  = 0;
     uint32_t dataBits   = 0;
@@ -458,11 +458,12 @@ class RenderWorkHasher
     uint32_t maxMatOrLightIdBits    = 0;
     uint32_t maxPrimIdBits          = 0;
     uint32_t maxTransIdBits         = 0;
+    uint32_t maxIndexBits           = 0;
 
     protected:
     public:
                 RenderWorkHasher() = default;
-    MRAY_HOST   RenderWorkHasher(Span<uint32_t> dWorkBatchHashes,
+    MRAY_HOST   RenderWorkHasher(Span<CommonKey> dWorkBatchHashes,
                                  Span<CommonKey> dBatchIds);
 
     template<class R>
@@ -471,6 +472,7 @@ class RenderWorkHasher
                                const RenderWorkList<R>& curWorks,
                                const RenderLightWorkList<R>& curLightWorks,
                                const RenderCameraWorkList<R>& curCamWorks,
+                               uint32_t maxRayCount,
                                const GPUQueue& queue);
 
     MRAY_HYBRID
@@ -478,13 +480,13 @@ class RenderWorkHasher
     MRAY_HYBRID
     Vector2ui WorkBatchBitRange() const;
     MRAY_HYBRID
-    uint32_t BisectBatchPortion(CommonKey key) const;
+    CommonKey BisectBatchPortion(CommonKey key) const;
     MRAY_HYBRID
-    uint32_t HashWorkBatchPortion(HitKeyPack p) const;
+    CommonKey HashWorkBatchPortion(HitKeyPack p) const;
     MRAY_HYBRID
-    uint32_t HashWorkDataPortion(HitKeyPack p) const;
+    CommonKey HashWorkDataPortion(HitKeyPack p, RayIndex i) const;
     MRAY_HYBRID
-    CommonKey GenerateWorkKeyGPU(HitKeyPack p) const;
+    CommonKey GenerateWorkKeyGPU(HitKeyPack p, RayIndex i) const;
 };
 
 template <class Child>
@@ -492,7 +494,6 @@ class RendererT : public RendererI
 {
     public:
     using AttribInfoList    = typename RendererI::AttribInfoList;
-    //using MetaHit           = MetaHitT<TracerConstants::MaxHitFloatCount>;
     using WorkList          = RenderWorkList<Child>;
     using LightWorkList     = RenderLightWorkList<Child>;
     using CameraWorkList    = RenderCameraWorkList<Child>;
@@ -525,8 +526,9 @@ class RendererT : public RendererI
 
     uint32_t              GenerateWorks();
     void                  ClearAllWorkMappings();
-    RenderWorkHasher      InitializeHashes(Span<uint32_t> dHashes,
+    RenderWorkHasher      InitializeHashes(Span<CommonKey> dHashes,
                                            Span<CommonKey> dWorkIds,
+                                           uint32_t maxRayCount,
                                            const GPUQueue& queue);
 
     // Some common functions between renderer
@@ -550,15 +552,15 @@ inline bool FlatSurfParams::operator<(const FlatSurfParams& right) const
 {
     auto GetMG = [](MaterialId id) -> CommonKey
     {
-        return MaterialKey(static_cast<uint32_t>(id)).FetchBatchPortion();
+        return std::bit_cast<MaterialKey>(id).FetchBatchPortion();
     };
     auto GetPG = [](PrimBatchId id) -> CommonKey
     {
-        return PrimBatchKey(static_cast<uint32_t>(id)).FetchBatchPortion();
+        return std::bit_cast<PrimBatchKey>(id).FetchBatchPortion();
     };
     auto GetTG = [](TransformId id) -> CommonKey
     {
-        return TransformKey(static_cast<uint32_t>(id)).FetchBatchPortion();
+        return std::bit_cast<TransformKey>(id).FetchBatchPortion();
     };
 
     return (Tuple(GetMG(mId), GetTG(tId), GetPG(pId)) <
@@ -584,7 +586,7 @@ auto RenderCameraWorkStruct<R>::operator<=>(const RenderCameraWorkStruct& right)
 }
 
 MRAY_HOST inline
-RenderWorkHasher::RenderWorkHasher(Span<uint32_t> dWBHashes,
+RenderWorkHasher::RenderWorkHasher(Span<CommonKey> dWBHashes,
                                    Span<CommonKey> dWBIds)
     : dWorkBatchHashes(dWBHashes)
     , dWorkBatchIds(dWBIds)
@@ -603,12 +605,13 @@ void RenderWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
                                              const RenderWorkList<R>& curWorks,
                                              const RenderLightWorkList<R>& curLightWorks,
                                              const RenderCameraWorkList<R>& curCamWorks,
+                                             uint32_t maxRayCount,
                                              const GPUQueue& queue)
 {
     size_t totalWorkBatchCount = (curWorks.size() + curLightWorks.size() +
                                   curCamWorks.size());
-    std::vector<uint32_t> hHashes;
-    std::vector<uint32_t> hBatchIds;
+    std::vector<CommonKey> hHashes;
+    std::vector<CommonKey> hBatchIds;
     hHashes.reserve(totalWorkBatchCount);
     hBatchIds.reserve(totalWorkBatchCount);
     uint32_t primMaxCount = 0;
@@ -621,9 +624,9 @@ void RenderWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
         PrimGroupId primGroupId = std::get<1>(work.idPack);
         TransGroupId transGroupId = std::get<2>(work.idPack);
 
-        auto pK = PrimitiveKey::CombinedKey(static_cast<CommonKey>(primGroupId), 0u);
-        auto mK = LightOrMatKey::CombinedKey(IS_MAT_KEY_FLAG, static_cast<CommonKey>(matGroupId), 0u);
-        auto tK = TransformKey::CombinedKey(static_cast<CommonKey>(transGroupId), 0u);
+        auto pK = PrimitiveKey::CombinedKey(std::bit_cast<CommonKey>(primGroupId), 0u);
+        auto mK = LightOrMatKey::CombinedKey(IS_MAT_KEY_FLAG, std::bit_cast<CommonKey>(matGroupId), 0u);
+        auto tK = TransformKey::CombinedKey(std::bit_cast<CommonKey>(transGroupId), 0u);
         HitKeyPack kp =
         {
             .primKey = pK,
@@ -652,7 +655,7 @@ void RenderWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
         CommonKey primGroupId = lightGroup->GenericPrimGroup().GroupId();
 
         auto lK = LightOrMatKey::CombinedKey(IS_LIGHT_KEY_FLAG, static_cast<CommonKey>(lightGroupId), 0u);
-        auto tK = TransformKey::CombinedKey(static_cast<CommonKey>(transGroupId), 0u);
+        auto tK = TransformKey::CombinedKey(std::bit_cast<CommonKey>(transGroupId), 0u);
         auto pK = PrimitiveKey::CombinedKey(primGroupId, 0u);
         HitKeyPack kp =
         {
@@ -681,8 +684,9 @@ void RenderWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
     maxMatOrLightIdBits = Bit::RequiredBitsToRepresent(lmMaxCount);
     maxPrimIdBits = Bit::RequiredBitsToRepresent(primMaxCount);
     maxTransIdBits = Bit::RequiredBitsToRepresent(transMaxCount);
+    maxIndexBits = Bit::RequiredBitsToRepresent(maxRayCount);
 
-    queue.MemcpyAsync(dWorkBatchHashes, Span<const uint32_t>(hHashes));
+    queue.MemcpyAsync(dWorkBatchHashes, Span<const CommonKey>(hHashes));
     queue.MemcpyAsync(dWorkBatchIds, Span<const CommonKey>(hBatchIds));
 }
 
@@ -699,23 +703,23 @@ Vector2ui RenderWorkHasher::WorkBatchBitRange() const
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t RenderWorkHasher::BisectBatchPortion(CommonKey key) const
+CommonKey RenderWorkHasher::BisectBatchPortion(CommonKey key) const
 {
     return Bit::FetchSubPortion(key, {dataBits, dataBits + batchBits});
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t RenderWorkHasher::HashWorkBatchPortion(HitKeyPack p) const
+CommonKey RenderWorkHasher::HashWorkBatchPortion(HitKeyPack p) const
 {
     static_assert(PrimitiveKey::BatchBits + LightOrMatKey::BatchBits +
                   LightOrMatKey::FlagBits +
-                  TransformKey::BatchBits <= sizeof(uint32_t) * CHAR_BIT,
+                  TransformKey::BatchBits <= sizeof(CommonKey) * CHAR_BIT,
                   "Unable to pack batch bits for hasing!");
     // In common case, compose the batch identifiers
     bool isLight = (p.lightOrMatKey.FetchFlagPortion() == IS_LIGHT_KEY_FLAG);
-    uint32_t isLightInt = (isLight) ? 1u : 0u;
-    uint32_t r = Bit::Compose<TransformKey::BatchBits, PrimitiveKey::BatchBits,
-                              LightOrMatKey::BatchBits, LightOrMatKey::FlagBits>
+    CommonKey isLightInt = (isLight) ? 1u : 0u;
+    CommonKey r = Bit::Compose<TransformKey::BatchBits, PrimitiveKey::BatchBits,
+                               LightOrMatKey::BatchBits, LightOrMatKey::FlagBits>
     (
         p.transKey.FetchBatchPortion(),
         p.primKey.FetchBatchPortion(),
@@ -726,15 +730,22 @@ uint32_t RenderWorkHasher::HashWorkBatchPortion(HitKeyPack p) const
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t RenderWorkHasher::HashWorkDataPortion(HitKeyPack p) const
+CommonKey RenderWorkHasher::HashWorkDataPortion(HitKeyPack p, RayIndex i) const
 {
     // Get the Id portions
-    uint32_t mlIndex = p.lightOrMatKey.FetchIndexPortion();
-    uint32_t pIndex = p.primKey.FetchIndexPortion();
-    uint32_t tIndex = p.transKey.FetchIndexPortion();
+    CommonKey mlIndex = p.lightOrMatKey.FetchIndexPortion();
+    CommonKey pIndex = p.primKey.FetchIndexPortion();
+    CommonKey tIndex = p.transKey.FetchIndexPortion();
 
     // Heuristic: Most important bits are the material/light,
     // then primitive, then transform.
+    // ---
+    // This heuristic was incomplete.
+    // Adding actual ray index to the heuristic
+    // (which indirectly relates to ray payload)
+    // since according to the measurements
+    // it dominates due to writes.
+    // ---
     //
     // This is debateable, hence it is a heuristic.
     // For example skinned meshes
@@ -747,36 +758,38 @@ uint32_t RenderWorkHasher::HashWorkDataPortion(HitKeyPack p) const
     // We will see. (TODO: ...)
     uint32_t remainingBits = dataBits;
     uint32_t currentBit = 0;
-    uint32_t result = 0;
-    // Materials
-    uint32_t bitsForMat = std::min(maxMatOrLightIdBits, remainingBits);
-    result = Bit::SetSubPortion(result, mlIndex,
-                                {currentBit, currentBit + bitsForMat});
-    remainingBits -= bitsForMat;
-    currentBit += bitsForMat;
-    // Primitives
-    uint32_t bitsForPrim = std::min(maxPrimIdBits, remainingBits);
-    if(bitsForPrim == 0) return result;
-    result = Bit::SetSubPortion(result, pIndex,
-                                {currentBit, currentBit + bitsForPrim});
-    remainingBits -= bitsForPrim;
-    currentBit += bitsForPrim;
+    CommonKey result = 0;
+    auto WriteKey = [&](uint32_t maxItemBitCount, CommonKey item) -> bool
+    {
+        uint32_t bitsForItem = std::min(maxItemBitCount, remainingBits);
+        if(bitsForItem == 0) return false;
+        uint32_t offset = dataBits - bitsForItem + currentBit;
+        std::array range = {CommonKey(offset), CommonKey(offset + bitsForItem)};
+        result = Bit::SetSubPortion(result, item, range);
+        remainingBits -= bitsForItem;
+        currentBit += bitsForItem;
+        return true;
+    };
+    // Actual Payload index
+    if(!WriteKey(maxIndexBits, i)) return result;
     // Transforms
-    uint32_t bitsForTrans = std::min(maxTransIdBits, remainingBits);
-    if(bitsForTrans == 0) return result;
-    result = Bit::SetSubPortion(result, tIndex,
-                                {currentBit, currentBit + bitsForTrans});
+    if(!WriteKey(maxTransIdBits, tIndex)) return result;
+    // Primitives
+    if(!WriteKey(maxPrimIdBits, pIndex)) return result;
+    // Materials
+    if(!WriteKey(maxMatOrLightIdBits, mlIndex)) return result;
+
     return result;
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-CommonKey RenderWorkHasher::GenerateWorkKeyGPU(HitKeyPack p) const
+CommonKey RenderWorkHasher::GenerateWorkKeyGPU(HitKeyPack p, RayIndex rayIndex) const
 {
     CommonKey batchHash = HashWorkBatchPortion(p);
     // Find the batch portion (Linear search)
     uint32_t i = 0;
     CommonKey batchId = std::numeric_limits<CommonKey>::max();
-    for(uint32_t checkHash : dWorkBatchHashes)
+    for(CommonKey checkHash : dWorkBatchHashes)
     {
         if(checkHash == batchHash)
         {
@@ -786,7 +799,7 @@ CommonKey RenderWorkHasher::GenerateWorkKeyGPU(HitKeyPack p) const
         i++;
     }
     // Compose the sort key
-    CommonKey hashLower = HashWorkDataPortion(p);
+    CommonKey hashLower = HashWorkDataPortion(p, rayIndex);
     CommonKey result = Bit::SetSubPortion(hashLower, batchId,
                                           {dataBits, dataBits + batchBits});
     return result;
@@ -804,9 +817,9 @@ uint32_t RendererT<C>::GenerateWorkMappings(uint32_t workStart)
     for(const auto& p : partitions)
     {
         size_t i = p[0];
-        MatGroupId mgId{MaterialKey(uint32_t(flatSurfs[i].mId)).FetchBatchPortion()};
-        PrimGroupId pgId{PrimBatchKey(uint32_t(flatSurfs[i].pId)).FetchBatchPortion()};
-        TransGroupId tgId{TransformKey(uint32_t(flatSurfs[i].tId)).FetchBatchPortion()};
+        MatGroupId mgId{std::bit_cast<MaterialKey>(flatSurfs[i].mId).FetchBatchPortion()};
+        PrimGroupId pgId{std::bit_cast<PrimBatchKey>(flatSurfs[i].pId).FetchBatchPortion()};
+        TransGroupId tgId{std::bit_cast<TransformKey>(flatSurfs[i].tId).FetchBatchPortion()};
         // These should be checked beforehand, while actually creating
         // the surface
         const MaterialGroupPtr& mg = tracerView.matGroups.at(mgId).value();
@@ -855,11 +868,11 @@ uint32_t RendererT<C>::GenerateLightWorkMappings(uint32_t workStart)
     {
         auto GetLG = [](LightId id) -> CommonKey
         {
-            return LightKey(static_cast<uint32_t>(id)).FetchBatchPortion();
+            return std::bit_cast<LightKey>(id).FetchBatchPortion();
         };
         auto GetTG = [](TransformId id) -> CommonKey
         {
-            return TransformKey(static_cast<uint32_t>(id)).FetchBatchPortion();
+            return std::bit_cast<TransformKey>(id).FetchBatchPortion();
         };
 
         return (Tuple(GetLG(left.second.lightId), GetTG(left.second.transformId)) <
@@ -957,11 +970,11 @@ uint32_t RendererT<C>::GenerateCameraWorkMappings(uint32_t workStart)
     {
         auto GetCG = [](CameraId id) -> CommonKey
         {
-            return CameraKey(static_cast<uint32_t>(id)).FetchBatchPortion();
+            return std::bit_cast<CameraKey>(id).FetchBatchPortion();
         };
         auto GetTG = [](TransformId id) -> CommonKey
         {
-            return TransformKey(static_cast<uint32_t>(id)).FetchBatchPortion();
+            return std::bit_cast<TransformKey>(id).FetchBatchPortion();
         };
         return (Tuple(GetCG(left.second.cameraId), GetTG(left.second.transformId)) <
                 Tuple(GetCG(right.second.cameraId), GetTG(right.second.transformId)));
@@ -974,8 +987,8 @@ uint32_t RendererT<C>::GenerateCameraWorkMappings(uint32_t workStart)
     for(const auto& p : partitions)
     {
         size_t i = p[0];
-        CameraGroupId cgId{CameraKey(uint32_t(camSurfs[i].second.cameraId)).FetchBatchPortion()};
-        TransGroupId tgId{TransformKey(uint32_t(camSurfs[i].second.transformId)).FetchBatchPortion()};
+        CameraGroupId cgId{std::bit_cast<CameraKey>(camSurfs[i].second.cameraId).FetchBatchPortion()};
+        TransGroupId tgId{std::bit_cast<TransformKey>(camSurfs[i].second.transformId).FetchBatchPortion()};
         // These should be checked beforehand, while actually creating
         // the surface
         const CameraGroupPtr& cg = tracerView.camGroups.at(cgId).value();
@@ -1036,8 +1049,9 @@ uint32_t RendererT<C>::GenerateWorks()
 }
 
 template <class C>
-RenderWorkHasher RendererT<C>::InitializeHashes(Span<uint32_t> dHashes,
+RenderWorkHasher RendererT<C>::InitializeHashes(Span<CommonKey> dHashes,
                                                 Span<CommonKey> dWorkIds,
+                                                uint32_t maxRayCount,
                                                 const GPUQueue& queue)
 {
     RenderWorkHasher result(dHashes, dWorkIds);
@@ -1045,6 +1059,7 @@ RenderWorkHasher RendererT<C>::InitializeHashes(Span<uint32_t> dHashes,
                                     currentWorks,
                                     currentLightWorks,
                                     currentCameraWorks,
+                                    maxRayCount,
                                     queue);
     return result;
 }

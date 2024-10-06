@@ -268,7 +268,7 @@ class AcceleratorGroupOptiX final
                           Span<const RayIndex> dRayIndices,
                           Span<const CommonKey> dAccelKeys,
                           // Constants
-                          uint32_t workId,
+                          CommonKey workId,
                           const GPUQueue& queue) override;
 
     void    CastVisibilityRays(// Output
@@ -280,7 +280,7 @@ class AcceleratorGroupOptiX final
                                Span<const RayIndex> dRayIndices,
                                Span<const CommonKey> dAccelKeys,
                                // Constants
-                               uint32_t workId,
+                               CommonKey workId,
                                const GPUQueue& queue) override;
 
     DataSoA SoA() const;

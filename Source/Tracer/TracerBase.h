@@ -224,14 +224,14 @@ class TracerBase : public TracerI
 
     void            CommitMatReservations(MatGroupId) override;
     bool            IsMatCommitted(MatGroupId) const override;
-    void            PushMatAttribute(MatGroupId, Vector2ui range,
+    void            PushMatAttribute(MatGroupId, CommonIdRange range,
                                      uint32_t attributeIndex,
                                      TransientData data) override;
-    void            PushMatAttribute(MatGroupId, Vector2ui range,
+    void            PushMatAttribute(MatGroupId, CommonIdRange range,
                                      uint32_t attributeIndex,
                                      TransientData,
                                      std::vector<Optional<TextureId>> textures) override;
-    void            PushMatAttribute(MatGroupId, Vector2ui range,
+    void            PushMatAttribute(MatGroupId, CommonIdRange range,
                                      uint32_t attributeIndex,
                                      std::vector<TextureId>) override;
 
@@ -248,7 +248,7 @@ class TracerBase : public TracerI
     TransformIdList ReserveTransformations(TransGroupId, std::vector<AttributeCountList>) override;
     void            CommitTransReservations(TransGroupId) override;
     bool            IsTransCommitted(TransGroupId) const override;
-    void            PushTransAttribute(TransGroupId, Vector2ui range,
+    void            PushTransAttribute(TransGroupId, CommonIdRange range,
                                        uint32_t attributeIndex,
                                        TransientData data) override;
 
@@ -260,14 +260,14 @@ class TracerBase : public TracerI
                                   std::vector<PrimBatchId> = std::vector<PrimBatchId>{}) override;
     void            CommitLightReservations(LightGroupId) override;
     bool            IsLightCommitted(LightGroupId) const override;
-    void            PushLightAttribute(LightGroupId, Vector2ui range,
+    void            PushLightAttribute(LightGroupId, CommonIdRange range,
                                        uint32_t attributeIndex,
                                        TransientData data) override;
-    void            PushLightAttribute(LightGroupId, Vector2ui range,
+    void            PushLightAttribute(LightGroupId, CommonIdRange range,
                                        uint32_t attributeIndex,
                                        TransientData,
                                        std::vector<Optional<TextureId>> textures) override;
-    void            PushLightAttribute(LightGroupId, Vector2ui range,
+    void            PushLightAttribute(LightGroupId, CommonIdRange range,
                                        uint32_t attributeIndex,
                                        std::vector<TextureId>) override;
 
@@ -276,7 +276,7 @@ class TracerBase : public TracerI
     CameraIdList    ReserveCameras(CameraGroupId, std::vector<AttributeCountList>) override;
     void            CommitCamReservations(CameraGroupId) override;
     bool            IsCamCommitted(CameraGroupId) const override;
-    void            PushCamAttribute(CameraGroupId, Vector2ui range,
+    void            PushCamAttribute(CameraGroupId, CommonIdRange range,
                                      uint32_t attributeIndex,
                                      TransientData data) override;
 
@@ -285,14 +285,14 @@ class TracerBase : public TracerI
     MediumIdList    ReserveMediums(MediumGroupId, std::vector<AttributeCountList>) override;
     void            CommitMediumReservations(MediumGroupId) override;
     bool            IsMediumCommitted(MediumGroupId) const override;
-    void            PushMediumAttribute(MediumGroupId, Vector2ui range,
+    void            PushMediumAttribute(MediumGroupId, CommonIdRange range,
                                         uint32_t attributeIndex,
                                         TransientData data) override;
-    void            PushMediumAttribute(MediumGroupId, Vector2ui range,
+    void            PushMediumAttribute(MediumGroupId, CommonIdRange range,
                                         uint32_t attributeIndex,
                                         TransientData,
                                         std::vector<Optional<TextureId>> textures) override;
-    void            PushMediumAttribute(MediumGroupId, Vector2ui range,
+    void            PushMediumAttribute(MediumGroupId, CommonIdRange range,
                                         uint32_t attributeIndex,
                                         std::vector<TextureId> textures) override;
 

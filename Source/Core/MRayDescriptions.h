@@ -33,7 +33,9 @@ namespace MRay
                                     "This project utilize many open-source libraries. "
                                     "Please refer to *_LICENSE files for library licenses."sv;
 
-    //
-
+    // For future-proofing (Probably 64-bit one has bugs, I did refactor
+    // but not %100 sure)
+    using CommonKey = uint32_t;
+    using CommonIndex = uint32_t;
 }
 

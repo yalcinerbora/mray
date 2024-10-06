@@ -83,7 +83,7 @@ void KCGenerateWorkKeys(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
     uint32_t keyCount = static_cast<uint32_t>(dInputKeys.size());
     for(uint32_t i = kp.GlobalId(); i < keyCount; i += kp.TotalSize())
     {
-        dWorkKey[i] = workHasher.GenerateWorkKeyGPU(dInputKeys[i]);
+        dWorkKey[i] = workHasher.GenerateWorkKeyGPU(dInputKeys[i], i);
     }
 }
 
@@ -99,7 +99,7 @@ void KCGenerateWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKe
     {
         RayIndex keyIndex = dIndices[i];
         auto keyPack = dInputKeys[keyIndex];
-        dWorkKey[keyIndex] = workHasher.GenerateWorkKeyGPU(keyPack);
+        dWorkKey[keyIndex] = workHasher.GenerateWorkKeyGPU(keyPack, keyIndex);
     }
 }
 
@@ -282,8 +282,8 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
                         TypeName(), uint32_t(camSurfId));
     curCamSurfaceParams = surfLoc->second;
     // Find the transform/camera work for this specific surface
-    curCamKey = CameraKey(static_cast<CommonKey>(curCamSurfaceParams.cameraId));
-    curCamTransformKey = TransformKey(static_cast<CommonKey>(curCamSurfaceParams.transformId));
+    curCamKey = std::bit_cast<CameraKey>(curCamSurfaceParams.cameraId);
+    curCamTransformKey = std::bit_cast<TransformKey>(curCamSurfaceParams.transformId);
     CameraGroupId camGroupId = CameraGroupId(curCamKey.FetchBatchPortion());
     TransGroupId transGroupId = TransGroupId(curCamTransformKey.FetchBatchPortion());
     auto packLoc = std::find_if(currentCameraWorks.cbegin(), currentCameraWorks.cend(),
@@ -348,7 +348,8 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     }
 
     // And initialze the hashes
-    workHasher = InitializeHashes(dWorkHashes, dWorkBatchIds, queue);
+    workHasher = InitializeHashes(dWorkHashes, dWorkBatchIds,
+                                  maxRayCount, queue);
 
     // Initialize ray partitioner with worst case scenario,
     // All work types are used. (We do not use camera work

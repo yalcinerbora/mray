@@ -241,7 +241,7 @@ PrimAttributeInfoList TracerBase::AttributeInfo(PrimGroupId id) const
     if(!val)
     {
         throw MRayError("Unable to find PrimitiveGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     return val.value().get()->AttributeInfo();
 }
@@ -252,7 +252,7 @@ CamAttributeInfoList TracerBase::AttributeInfo(CameraGroupId id) const
     if(!val)
     {
         throw MRayError("Unable to find CameraGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     return val.value().get()->AttributeInfo();
 }
@@ -263,7 +263,7 @@ MediumAttributeInfoList TracerBase::AttributeInfo(MediumGroupId id) const
     if(!val)
     {
         throw MRayError("Unable to find MediumGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     return val.value().get()->AttributeInfo();
 }
@@ -274,7 +274,7 @@ MatAttributeInfoList TracerBase::AttributeInfo(MatGroupId id) const
     if(!val)
     {
         throw MRayError("Unable to find MaterialGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     return val.value().get()->AttributeInfo();
 }
@@ -285,7 +285,7 @@ TransAttributeInfoList TracerBase::AttributeInfo(TransGroupId id) const
     if(!val)
     {
         throw MRayError("Unable to find TransformGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     return val.value().get()->AttributeInfo();
 }
@@ -296,7 +296,7 @@ LightAttributeInfoList TracerBase::AttributeInfo(LightGroupId id) const
     if(!val)
     {
         throw MRayError("Unable to find LightGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     return val.value().get()->AttributeInfo();
 }
@@ -307,7 +307,7 @@ RendererAttributeInfoList TracerBase::AttributeInfo(RendererId id) const
     if(!val)
     {
         throw MRayError("Unable to find Renderer({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     return val.value().get()->AttributeInfo();
 }
@@ -388,7 +388,7 @@ std::string TracerBase::TypeName(PrimGroupId id) const
     if(!val)
     {
         throw MRayError("Unable to find PrimitiveGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     return std::string(val.value().get()->Name());
 }
@@ -399,7 +399,7 @@ std::string TracerBase::TypeName(CameraGroupId id) const
     if(!val)
     {
         throw MRayError("Unable to find CameraGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     return std::string(val.value().get()->Name());
 }
@@ -410,7 +410,7 @@ std::string TracerBase::TypeName(MediumGroupId id) const
     if(!val)
     {
         throw MRayError("Unable to find MediumGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     return std::string(val.value().get()->Name());
 }
@@ -421,7 +421,7 @@ std::string TracerBase::TypeName(MatGroupId id) const
     if(!val)
     {
         throw MRayError("Unable to find MaterialGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     return std::string(val.value().get()->Name());
 }
@@ -432,7 +432,7 @@ std::string TracerBase::TypeName(TransGroupId id) const
     if(!val)
     {
         throw MRayError("Unable to find TransformGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     return std::string(val.value().get()->Name());
 }
@@ -443,7 +443,7 @@ std::string TracerBase::TypeName(LightGroupId id) const
     if(!val)
     {
         throw MRayError("Unable to find LightGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     return std::string(val.value().get()->Name());
 }
@@ -454,7 +454,7 @@ std::string TracerBase::TypeName(RendererId id) const
     if(!val)
     {
         throw MRayError("Unable to find Renderer({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     return std::string(val.value().get()->Name());
 }
@@ -472,6 +472,8 @@ PrimGroupId TracerBase::CreatePrimitiveGroup(std::string name)
     }
 
     uint32_t idInt = primGroupCounter.fetch_add(1);
+    if(idInt > PrimitiveKey::BatchMask)
+        throw MRayError("Too many Transform Groups");
     PrimGroupId id = static_cast<PrimGroupId>(idInt);
     primGroups.try_emplace(id, genFunc.value()(static_cast<uint32_t>(id),
                                        gpuSystem));
@@ -487,14 +489,13 @@ PrimBatchId TracerBase::ReservePrimitiveBatch(PrimGroupId id, PrimCount count)
     if(!primGroup)
     {
         throw MRayError("Unable to find PrimitiveGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
 
     std::vector<AttributeCountList> input = {{count.primCount, count.attributeCount}};
     std::vector<PrimBatchKey> output;
     output = primGroup.value().get()->Reserve(input);
-    using T = typename PrimBatchKey::Type;
-    return PrimBatchId(static_cast<T>(output.front()));
+    return std::bit_cast<PrimBatchId>(output.front());
 }
 
 PrimBatchIdList TracerBase::ReservePrimitiveBatches(PrimGroupId id,
@@ -504,7 +505,7 @@ PrimBatchIdList TracerBase::ReservePrimitiveBatches(PrimGroupId id,
     if(!primGroup)
     {
         throw MRayError("Unable to find PrimitiveGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
 
     std::vector<AttributeCountList> input;
@@ -519,8 +520,7 @@ PrimBatchIdList TracerBase::ReservePrimitiveBatches(PrimGroupId id,
     result.reserve(output.size());
     for(const auto& key : output)
     {
-        using T = typename PrimBatchKey::Type;
-        result.push_back(PrimBatchId(static_cast<T>(key)));
+        result.push_back(std::bit_cast<PrimBatchId>(key));
     }
     return result;
 }
@@ -531,7 +531,7 @@ void TracerBase::CommitPrimReservations(PrimGroupId id)
     if(!primGroup)
     {
         throw MRayError("Unable to find PrimitiveGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     primGroup.value().get()->CommitReservations();
 }
@@ -542,7 +542,7 @@ bool TracerBase::IsPrimCommitted(PrimGroupId id) const
     if(!primGroup)
     {
         throw MRayError("Unable to find PrimitiveGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     return primGroup.value().get()->IsInCommitState();
 }
@@ -556,13 +556,13 @@ void TracerBase::PushPrimAttribute(PrimGroupId gId,
     if(!primGroup)
     {
         throw MRayError("Unable to find PrimitiveGroup({})",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     }
 
     // TODO: Change this to utilize muti-gpu/queue
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
 
-    PrimBatchKey key(static_cast<uint32_t>(batchId));
+    PrimBatchKey key = std::bit_cast<PrimBatchKey>(batchId);
     primGroup.value().get()->PushAttribute(key, attribIndex,
                                            std::move(data),
                                            queue);
@@ -578,13 +578,13 @@ void TracerBase::PushPrimAttribute(PrimGroupId gId,
     if(!primGroup)
     {
         throw MRayError("Unable to find PrimitiveGroup({})",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     }
 
     // TODO: Change this to utilize muti-gpu/queue
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
 
-    PrimBatchKey key(static_cast<uint32_t>(batchId));
+    PrimBatchKey key = std::bit_cast<PrimBatchKey>(batchId);
     primGroup.value().get()->PushAttribute(key, attribIndex,
                                            subBatchRange,
                                            std::move(data),
@@ -601,6 +601,8 @@ MatGroupId TracerBase::CreateMaterialGroup(std::string name)
     }
     uint32_t idInt = matGroupCounter.fetch_add(1);
     MatGroupId id = static_cast<MatGroupId>(idInt);
+    if(idInt > MaterialKey::BatchMask)
+        throw MRayError("Too many Material Groups");
     matGroups.try_emplace(id, genFunc.value()(static_cast<uint32_t>(id),
                                               gpuSystem,
                                               texMem.TextureViews()));
@@ -615,7 +617,7 @@ MaterialId TracerBase::ReserveMaterial(MatGroupId id,
     if(!matGroup)
     {
         throw MRayError("Unable to find MaterialGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
 
     std::vector<AttributeCountList> attribCountList;
@@ -629,9 +631,7 @@ MaterialId TracerBase::ReserveMaterial(MatGroupId id,
 
     std::vector<MaterialKey> output;
     output = matGroup.value().get()->Reserve(attribCountList, medPairList);
-
-    using MatKT = typename MaterialKey::Type;
-    MaterialId result = MaterialId(static_cast<MatKT>(output.front()));
+    MaterialId result = std::bit_cast<MaterialId>(output.front());
     return result;
 }
 
@@ -643,7 +643,7 @@ MaterialIdList TracerBase::ReserveMaterials(MatGroupId id,
     if(!matGroup)
     {
         throw MRayError("Unable to find MaterialGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
 
     assert(medPairs.size() == countList.size());
@@ -662,8 +662,7 @@ MaterialIdList TracerBase::ReserveMaterials(MatGroupId id,
     result.reserve(output.size());
     for(const auto& key : output)
     {
-        using T = typename MaterialKey::Type;
-        result.push_back(MaterialId(static_cast<T>(key)));
+        result.push_back(std::bit_cast<MaterialId>(key));
     }
     return result;
 }
@@ -674,7 +673,7 @@ void TracerBase::CommitMatReservations(MatGroupId id)
     if(!matGroup)
     {
         throw MRayError("Unable to find MaterialGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     matGroup.value().get()->CommitReservations();
 }
@@ -685,12 +684,12 @@ bool TracerBase::IsMatCommitted(MatGroupId id) const
     if(!matGroup)
     {
         throw MRayError("Unable to find MaterialGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     return matGroup.value().get()->IsInCommitState();
 }
 
-void TracerBase::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
+void TracerBase::PushMatAttribute(MatGroupId gId, CommonIdRange matRange,
                                   uint32_t attribIndex,
                                   TransientData data)
 {
@@ -698,18 +697,17 @@ void TracerBase::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
     if(!matGroup)
     {
         throw MRayError("Unable to find MaterialGroup({})",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     }
     // TODO: Change this to utilize muti-gpu/queue
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
-    using T = typename MaterialKey::Type;
-    auto keyStart = MaterialKey(static_cast<T>(matRange[0]));
-    auto keyEnd = MaterialKey(static_cast<T>(matRange[1]));
+    auto keyStart = std::bit_cast<MaterialKey>(matRange[0]);
+    auto keyEnd = std::bit_cast<MaterialKey>(matRange[1]);
     matGroup.value().get()->PushAttribute(keyStart, keyEnd, attribIndex,
                                           std::move(data), queue);
 }
 
-void TracerBase::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
+void TracerBase::PushMatAttribute(MatGroupId gId, CommonIdRange matRange,
                                   uint32_t attribIndex, TransientData data,
                                   std::vector<Optional<TextureId>> textures)
 {
@@ -717,12 +715,11 @@ void TracerBase::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
     if(!matGroup)
     {
         throw MRayError("Unable to find MaterialGroup({})",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     }
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
-    using T = typename MaterialKey::Type;
-    auto keyStart = MaterialKey(static_cast<T>(matRange[0]));
-    auto keyEnd = MaterialKey(static_cast<T>(matRange[1]));
+    auto keyStart = std::bit_cast<MaterialKey>(matRange[0]);
+    auto keyEnd = std::bit_cast<MaterialKey>(matRange[1]);
     if(data.IsEmpty())
     {
         matGroup.value().get()->PushTexAttribute(keyStart, keyEnd, attribIndex,
@@ -736,7 +733,7 @@ void TracerBase::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
     }
 }
 
-void TracerBase::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
+void TracerBase::PushMatAttribute(MatGroupId gId, CommonIdRange matRange,
                                   uint32_t attribIndex,
                                   std::vector<TextureId> textures)
 {
@@ -744,12 +741,11 @@ void TracerBase::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
     if(!matGroup)
     {
         throw MRayError("Unable to find MaterialGroup({})",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     }
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
-    using T = typename MaterialKey::Type;
-    auto keyStart = MaterialKey(static_cast<T>(matRange[0]));
-    auto keyEnd = MaterialKey(static_cast<T>(matRange[1]));
+    auto keyStart = std::bit_cast<MaterialKey>(matRange[0]);
+    auto keyEnd = std::bit_cast<MaterialKey>(matRange[1]);
     matGroup.value().get()->PushTexAttribute(keyStart, keyEnd, attribIndex,
                                              std::move(textures), queue);
 }
@@ -789,6 +785,8 @@ TransGroupId TracerBase::CreateTransformGroup(std::string name)
                         name);
     }
     uint32_t idInt = transGroupCounter.fetch_add(1);
+    if(idInt > TransformKey::BatchMask)
+        throw MRayError("Too many Transform Groups");
     TransGroupId id = static_cast<TransGroupId>(idInt);
     transGroups.try_emplace(id, genFunc.value()(static_cast<uint32_t>(id), gpuSystem));
     return id;
@@ -803,7 +801,7 @@ TransformId TracerBase::ReserveTransformation(TransGroupId id, AttributeCountLis
     if(!transGroup)
     {
         throw MRayError("Unable to find TransformGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
 
     std::vector<AttributeCountList> attribCountList;
@@ -812,9 +810,7 @@ TransformId TracerBase::ReserveTransformation(TransGroupId id, AttributeCountLis
 
     std::vector<TransformKey> output;
     output = transGroup.value().get()->Reserve(attribCountList);
-
-    using T = typename TransformKey::Type;
-    TransformId result = TransformId(static_cast<T>(output.front()));
+    TransformId result = std::bit_cast<TransformId>(output.front());
     return result;
 }
 
@@ -825,7 +821,7 @@ TransformIdList TracerBase::ReserveTransformations(TransGroupId id,
     if(!transGroup)
     {
         throw MRayError("Unable to find TransformGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
 
     std::vector<TransformKey> output;
@@ -835,8 +831,7 @@ TransformIdList TracerBase::ReserveTransformations(TransGroupId id,
     result.reserve(output.size());
     for(const auto& key : output)
     {
-        using T = typename TransformKey::Type;
-        result.push_back(TransformId(static_cast<T>(key)));
+        result.push_back(std::bit_cast<TransformId>(key));
     }
     return result;
 }
@@ -847,7 +842,7 @@ void TracerBase::CommitTransReservations(TransGroupId id)
     if(!transGroup)
     {
         throw MRayError("Unable to find TransformGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     transGroup.value().get()->CommitReservations();
 }
@@ -858,12 +853,12 @@ bool TracerBase::IsTransCommitted(TransGroupId id) const
     if(!transGroup)
     {
         throw MRayError("Unable to find TransformGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     return transGroup.value().get()->IsInCommitState();
 }
 
-void TracerBase::PushTransAttribute(TransGroupId gId, Vector2ui transRange,
+void TracerBase::PushTransAttribute(TransGroupId gId, CommonIdRange transRange,
                                     uint32_t attribIndex,
                                     TransientData data)
 {
@@ -871,13 +866,12 @@ void TracerBase::PushTransAttribute(TransGroupId gId, Vector2ui transRange,
     if(!transGroup)
     {
         throw MRayError("Unable to find TransformGroup({})",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     }
 
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
-    using T = typename TransformKey::Type;
-    auto keyStart = TransformKey(static_cast<T>(transRange[0]));
-    auto keyEnd = TransformKey(static_cast<T>(transRange[1]));
+    auto keyStart = std::bit_cast<TransformKey>(transRange[0]);
+    auto keyEnd = std::bit_cast<TransformKey>(transRange[1]);
     transGroup.value().get()->PushAttribute(keyStart, keyEnd, attribIndex,
                                             std::move(data), queue);
 }
@@ -898,9 +892,12 @@ LightGroupId TracerBase::CreateLightGroup(std::string name,
     if(!primGroup)
     {
         throw MRayError("Unable to locate PrimitiveGroup({})",
-                        static_cast<uint32_t>(primGId));
+                        static_cast<CommonKey>(primGId));
     }
     uint32_t idInt = lightGroupCounter.fetch_add(1);
+    if(idInt > LightKey::BatchMask)
+        throw MRayError("Too many Light Groups");
+
     LightGroupId id = static_cast<LightGroupId>(idInt);
     GenericGroupPrimitiveT& primGroupPtr = *primGroup.value().get().get();
     lightGroups.try_emplace(id, genFunc.value()(static_cast<uint32_t>(id), gpuSystem,
@@ -920,7 +917,7 @@ LightId TracerBase::ReserveLight(LightGroupId id,
     if(!lightGroup)
     {
         throw MRayError("Unable to find LightGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
 
     std::vector<AttributeCountList> attribCountList;
@@ -929,14 +926,11 @@ LightId TracerBase::ReserveLight(LightGroupId id,
 
     PrimBatchList primList;
     primList.reserve(1);
-    using PrimBatchKT = typename PrimBatchKey::Type;
-    primList.emplace_back(PrimBatchKey(static_cast<PrimBatchKT>(primId)));
+    primList.emplace_back(std::bit_cast<PrimBatchKey>(primId));
 
     std::vector<LightKey> output;
     output = lightGroup.value().get()->Reserve(attribCountList, primList);
-
-    using LightKT = typename LightKey::Type;
-    LightId result = LightId(static_cast<LightKT>(output.front()));
+    LightId result = std::bit_cast<LightId>(output.front());
     return result;
 }
 
@@ -948,7 +942,7 @@ LightIdList TracerBase::ReserveLights(LightGroupId id,
     if(!lightGroupOpt)
     {
         throw MRayError("Unable to find LightGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     const LightGroupPtr& lightGroup = lightGroupOpt.value().get();
 
@@ -960,8 +954,7 @@ LightIdList TracerBase::ReserveLights(LightGroupId id,
         primList.reserve(countList.size());
         for(size_t i = 0; i < countList.size(); i++)
         {
-            using PrimBatchKT = typename PrimBatchKey::Type;
-            primList.emplace_back(PrimBatchKey(static_cast<PrimBatchKT>(primBatches[i])));
+            primList.emplace_back(std::bit_cast<PrimBatchKey>(primBatches[i]));
         }
     }
 
@@ -972,8 +965,7 @@ LightIdList TracerBase::ReserveLights(LightGroupId id,
     result.reserve(output.size());
     for(const auto& key : output)
     {
-        using T = typename LightKey::Type;
-        result.push_back(LightId(static_cast<T>(key)));
+        result.push_back(std::bit_cast<LightId>(key));
     }
     return result;
 }
@@ -984,7 +976,7 @@ void TracerBase::CommitLightReservations(LightGroupId id)
     if(!lightGroup)
     {
         throw MRayError("Unable to find LightGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     lightGroup.value().get()->CommitReservations();
 }
@@ -995,13 +987,13 @@ bool TracerBase::IsLightCommitted(LightGroupId id) const
     if(!lightGroup)
     {
         throw MRayError("Unable to find LightGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
 
     return lightGroup.value().get()->IsInCommitState();
 }
 
-void TracerBase::PushLightAttribute(LightGroupId gId, Vector2ui lightRange,
+void TracerBase::PushLightAttribute(LightGroupId gId, CommonIdRange lightRange,
                                     uint32_t attribIndex,
                                     TransientData data)
 {
@@ -1009,17 +1001,16 @@ void TracerBase::PushLightAttribute(LightGroupId gId, Vector2ui lightRange,
     if(!lightGroup)
     {
         throw MRayError("Unable to find LightGroup({})",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     }
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
-    using T = typename LightKey::Type;
-    auto keyStart = LightKey(static_cast<T>(lightRange[0]));
-    auto keyEnd = LightKey(static_cast<T>(lightRange[1]));
+    auto keyStart = std::bit_cast<LightKey>(lightRange[0]);
+    auto keyEnd = std::bit_cast<LightKey>(lightRange[1]);
     lightGroup.value().get()->PushAttribute(keyStart, keyEnd, attribIndex,
                                             std::move(data), queue);
 }
 
-void TracerBase::PushLightAttribute(LightGroupId gId, Vector2ui lightRange,
+void TracerBase::PushLightAttribute(LightGroupId gId, CommonIdRange lightRange,
                                     uint32_t attribIndex,
                                     TransientData data,
                                     std::vector<Optional<TextureId>> textures)
@@ -1028,12 +1019,11 @@ void TracerBase::PushLightAttribute(LightGroupId gId, Vector2ui lightRange,
     if(!lightGroup)
     {
         throw MRayError("Unable to find LightGroup({})",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     }
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
-    using T = typename LightKey::Type;
-    auto keyStart = LightKey(static_cast<T>(lightRange[0]));
-    auto keyEnd = LightKey(static_cast<T>(lightRange[1]));
+    auto keyStart = std::bit_cast<LightKey>(lightRange[0]);
+    auto keyEnd = std::bit_cast<LightKey>(lightRange[1]);
 
     if(data.IsEmpty())
     {
@@ -1049,7 +1039,7 @@ void TracerBase::PushLightAttribute(LightGroupId gId, Vector2ui lightRange,
     }
 }
 
-void TracerBase::PushLightAttribute(LightGroupId gId, Vector2ui lightRange,
+void TracerBase::PushLightAttribute(LightGroupId gId, CommonIdRange lightRange,
                                     uint32_t attribIndex,
                                     std::vector<TextureId> textures)
 {
@@ -1057,13 +1047,12 @@ void TracerBase::PushLightAttribute(LightGroupId gId, Vector2ui lightRange,
     if(!lightGroup)
     {
         throw MRayError("Unable to find LightGroup({})",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     }
 
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
-    using T = typename LightKey::Type;
-    auto keyStart = LightKey(static_cast<T>(lightRange[0]));
-    auto keyEnd = LightKey(static_cast<T>(lightRange[1]));
+    auto keyStart = std::bit_cast<LightKey>(lightRange[0]);
+    auto keyEnd = std::bit_cast<LightKey>(lightRange[1]);
     lightGroup.value().get()->PushTexAttribute(keyStart, keyEnd, attribIndex,
                                                std::move(textures), queue);
 }
@@ -1077,6 +1066,8 @@ CameraGroupId TracerBase::CreateCameraGroup(std::string name)
                         name);
     }
     uint32_t idInt = camGroupCounter.fetch_add(1);
+    if(idInt > CameraKey::BatchMask)
+        throw MRayError("Too many Camera Groups");
     CameraGroupId id = static_cast<CameraGroupId>(idInt);
     camGroups.try_emplace(id, genFunc.value()(static_cast<uint32_t>(id), gpuSystem));
     return id;
@@ -1089,7 +1080,7 @@ CameraId TracerBase::ReserveCamera(CameraGroupId id,
     if(!camGroup)
     {
         throw MRayError("Unable to find CameraGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
 
     std::vector<AttributeCountList> attribCountList;
@@ -1098,9 +1089,7 @@ CameraId TracerBase::ReserveCamera(CameraGroupId id,
 
     std::vector<CameraKey> output;
     output = camGroup.value().get()->Reserve(attribCountList);
-
-    using T = typename CameraKey::Type;
-    CameraId result = CameraId(static_cast<T>(output.front()));
+    CameraId result = std::bit_cast<CameraId>(output.front());
     return result;
 }
 
@@ -1111,7 +1100,7 @@ CameraIdList TracerBase::ReserveCameras(CameraGroupId id,
     if(!camGroup)
     {
         throw MRayError("Unable to find CameraGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     std::vector<CameraKey> output;
     output = camGroup.value().get()->Reserve(countList);
@@ -1120,8 +1109,7 @@ CameraIdList TracerBase::ReserveCameras(CameraGroupId id,
     result.reserve(output.size());
     for(const auto& key : output)
     {
-        using T = typename CameraKey::Type;
-        result.push_back(CameraId(static_cast<T>(key)));
+        result.push_back(std::bit_cast<CameraId>(key));
     }
     return result;
 }
@@ -1132,7 +1120,7 @@ void TracerBase::CommitCamReservations(CameraGroupId id)
     if(!camGroup)
     {
         throw MRayError("Unable to find CameraGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     camGroup.value().get()->CommitReservations();
 }
@@ -1143,12 +1131,12 @@ bool TracerBase::IsCamCommitted(CameraGroupId id) const
     if(!camGroup)
     {
         throw MRayError("Unable to find CameraGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     return camGroup.value().get()->IsInCommitState();
 }
 
-void TracerBase::PushCamAttribute(CameraGroupId gId, Vector2ui camRange,
+void TracerBase::PushCamAttribute(CameraGroupId gId, CommonIdRange camRange,
                                   uint32_t attribIndex,
                                   TransientData data)
 {
@@ -1156,12 +1144,11 @@ void TracerBase::PushCamAttribute(CameraGroupId gId, Vector2ui camRange,
     if(!camGroup)
     {
         throw MRayError("Unable to find CameraGroup({})",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     }
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
-    using T = typename CameraKey::Type;
-    auto keyStart = CameraKey(static_cast<T>(camRange[0]));
-    auto keyEnd = CameraKey(static_cast<T>(camRange[1]));
+    auto keyStart = std::bit_cast<CameraKey>(camRange[0]);
+    auto keyEnd = std::bit_cast<CameraKey>(camRange[1]);
     camGroup.value().get()->PushAttribute(keyStart, keyEnd, attribIndex,
                                           std::move(data), queue);
 }
@@ -1178,6 +1165,8 @@ MediumGroupId TracerBase::CreateMediumGroup(std::string name)
                         name);
     }
     uint32_t idInt = mediumGroupCounter.fetch_add(1);
+    if(idInt > MediumKey::BatchMask)
+        throw MRayError("Too many Medium Groups");
     MediumGroupId id = static_cast<MediumGroupId>(idInt);
     mediumGroups.try_emplace(id, genFunc.value()(static_cast<uint32_t>(id),
                                                  gpuSystem,
@@ -1194,7 +1183,7 @@ MediumId TracerBase::ReserveMedium(MediumGroupId id, AttributeCountList count)
     if(!medGroup)
     {
         throw MRayError("Unable to find MediumGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     std::vector<AttributeCountList> attribCountList;
     attribCountList.reserve(1);
@@ -1202,9 +1191,7 @@ MediumId TracerBase::ReserveMedium(MediumGroupId id, AttributeCountList count)
 
     std::vector<MediumKey> output;
     output = medGroup.value().get()->Reserve(attribCountList);
-
-    using T = typename MediumKey::Type;
-    MediumId result = MediumId(static_cast<T>(output.front()));
+    MediumId result = std::bit_cast<MediumId>(output.front());
     return result;
 }
 
@@ -1215,7 +1202,7 @@ MediumIdList TracerBase::ReserveMediums(MediumGroupId id,
     if(!medGroup)
     {
         throw MRayError("Unable to find MediumGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     std::vector<MediumKey> output;
     output = medGroup.value().get()->Reserve(countList);
@@ -1223,8 +1210,7 @@ MediumIdList TracerBase::ReserveMediums(MediumGroupId id,
     result.reserve(output.size());
     for(const auto& key : output)
     {
-        using T = typename MediumKey::Type;
-        result.push_back(MediumId(static_cast<T>(key)));
+        result.push_back(std::bit_cast<MediumId>(key));
     }
     return result;
 }
@@ -1235,7 +1221,7 @@ void TracerBase::CommitMediumReservations(MediumGroupId id)
     if(!medGroup)
     {
         throw MRayError("Unable to find MediumGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     medGroup.value().get()->CommitReservations();
 }
@@ -1246,43 +1232,41 @@ bool TracerBase::IsMediumCommitted(MediumGroupId id) const
     if(!medGroup)
     {
         throw MRayError("Unable to find MediumGroup({})",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     return medGroup.value().get()->IsInCommitState();
 }
 
-void TracerBase::PushMediumAttribute(MediumGroupId gId, Vector2ui mediumRange,
+void TracerBase::PushMediumAttribute(MediumGroupId gId, CommonIdRange mediumRange,
                                      uint32_t attribIndex,
                                      TransientData data)
 {
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
-    using T = typename MediumKey::Type;
-    auto keyStart = MediumKey(static_cast<T>(mediumRange[0]));
-    auto keyEnd = MediumKey(static_cast<T>(mediumRange[1]));
+    auto keyStart = std::bit_cast<MediumKey>(mediumRange[0]);
+    auto keyEnd = std::bit_cast<MediumKey>(mediumRange[1]);
     auto medGroup = mediumGroups.at(gId);
     if(!medGroup)
     {
         throw MRayError("Unable to find MediumGroup({})",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     }
     medGroup.value().get()->PushAttribute(keyStart, keyEnd, attribIndex,
                                           std::move(data), queue);
 }
 
-void TracerBase::PushMediumAttribute(MediumGroupId gId, Vector2ui mediumRange,
+void TracerBase::PushMediumAttribute(MediumGroupId gId, CommonIdRange mediumRange,
                                      uint32_t attribIndex,
                                      TransientData data,
                                      std::vector<Optional<TextureId>> textures)
 {
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
-    using T = typename MediumKey::Type;
-    auto keyStart = MediumKey(static_cast<T>(mediumRange[0]));
-    auto keyEnd = MediumKey(static_cast<T>(mediumRange[1]));
+    auto keyStart = std::bit_cast<MediumKey>(mediumRange[0]);
+    auto keyEnd = std::bit_cast<MediumKey>(mediumRange[1]);
     auto medGroup = mediumGroups.at(gId);
     if(!medGroup)
     {
         throw MRayError("Unable to find MediumGroup({})",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     }
     if(data.IsEmpty())
     {
@@ -1301,19 +1285,18 @@ void TracerBase::PushMediumAttribute(MediumGroupId gId, Vector2ui mediumRange,
     }
 }
 
-void TracerBase::PushMediumAttribute(MediumGroupId gId, Vector2ui mediumRange,
+void TracerBase::PushMediumAttribute(MediumGroupId gId, CommonIdRange mediumRange,
                                      uint32_t attribIndex,
                                      std::vector<TextureId> textures)
 {
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
-    using T = typename MediumKey::Type;
-    auto keyStart = MediumKey(static_cast<T>(mediumRange[0]));
-    auto keyEnd = MediumKey(static_cast<T>(mediumRange[1]));
+    auto keyStart = std::bit_cast<MediumKey>(mediumRange[0]);
+    auto keyEnd = std::bit_cast<MediumKey>(mediumRange[1]);
     auto medGroup = mediumGroups.at(gId);
     if(!medGroup)
     {
         throw MRayError("Unable to find MediumGroup({})",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     }
     medGroup.value().get()->PushTexAttribute(keyStart, keyEnd, attribIndex,
                                              std::move(textures), queue);
@@ -1326,8 +1309,8 @@ SurfaceId TracerBase::CreateSurface(SurfaceParams p)
                                   p.primBatches.cend(),
     [](PrimBatchId lhs, PrimBatchId rhs)
     {
-        PrimBatchKey keyL(static_cast<uint32_t>(lhs));
-        PrimBatchKey keyR(static_cast<uint32_t>(rhs));
+        PrimBatchKey keyL = std::bit_cast<PrimBatchKey>(lhs);
+        PrimBatchKey keyR = std::bit_cast<PrimBatchKey>(rhs);
         return keyL.FetchBatchPortion() != keyR.FetchBatchPortion();
     });
 
@@ -1524,17 +1507,16 @@ CameraTransform TracerBase::GetCamTransform(CamSurfaceId camSurfId) const
     });
     if(loc == cameraSurfaces.Vec().cend())
         throw MRayError("Unable to find Camera Surface ({})",
-                        static_cast<uint32_t>(camSurfId));
+                        static_cast<CommonKey>(camSurfId));
 
     CameraId id = loc->second.cameraId;
-    using T = typename CameraKey::Type;
-    auto key = CameraKey(static_cast<T>(id));
-    auto gId = CameraGroupId(key.FetchBatchPortion());
+    auto key = std::bit_cast<CameraKey>(id);
+    auto gId = std::bit_cast<CameraGroupId>(key.FetchBatchPortion());
     auto camGroup = camGroups.at(gId);
     if(!camGroup)
     {
         throw MRayError("Unable to find CameraGroup({})",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     }
     return camGroup.value().get()->AcquireCameraTransform(key);
 }
@@ -1588,7 +1570,7 @@ void TracerBase::DestroyRenderer(RendererId rId)
     if(!renderers.remove_at(rId))
     {
         throw MRayError("Unable to find renderer ({})",
-                        static_cast<uint32_t>(rId));
+                        static_cast<CommonKey>(rId));
     }
 
 }
@@ -1601,7 +1583,7 @@ void TracerBase::PushRendererAttribute(RendererId rId,
     if(!renderer)
     {
         throw MRayError("Unable to find Renderer({})",
-                        static_cast<uint32_t>(rId));
+                        static_cast<CommonKey>(rId));
     }
     // TODO: Change this
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
@@ -1623,12 +1605,12 @@ RenderBufferInfo TracerBase::StartRender(RendererId rId, CamSurfaceId cId,
     if(!renderer)
     {
         throw MRayError("Unable to find Renderer({})",
-                        static_cast<uint32_t>(rId));
+                        static_cast<CommonKey>(rId));
     }
     currentRenderer = renderer.value().get().get();
     currentRendererId = rId;
 
-    auto camKey = CameraKey(static_cast<uint32_t>(cId));
+    auto camKey = std::bit_cast<CameraKey>(cId);
     return currentRenderer->StartRender(rIParams,
                                         cId,
                                         renderLogic0.value_or(0),
@@ -1641,7 +1623,7 @@ void TracerBase::SetCameraTransform(RendererId rId, CameraTransform transform)
     if(!renderer)
     {
         throw MRayError("Unable to find Renderer({})",
-                        static_cast<uint32_t>(rId));
+                        static_cast<CommonKey>(rId));
     }
     RendererI* rendererPtr = renderer.value().get().get();
     rendererPtr->SetCameraTransform(transform);

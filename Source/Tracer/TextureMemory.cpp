@@ -701,7 +701,7 @@ void TextureMemory::PushTextureData(TextureId id, uint32_t mipLevel,
     if(!texLoc)
     {
         throw MRayError("Unable to find texture(id)",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     GenericTexture& tex = texLoc.value().get();
     auto clampLoc = texClampParams.at(id);
@@ -763,7 +763,7 @@ MRayPixelTypeRT TextureMemory::GetPixelType(TextureId id) const
     if(!loc)
     {
         throw MRayError("Unable to find texture(id)",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     }
     const GenericTexture& tex = loc.value().get();
     return tex.PixelType();

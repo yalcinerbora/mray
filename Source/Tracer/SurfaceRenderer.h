@@ -70,7 +70,7 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     Span<Byte>          dSubCameraBuffer;
 
     // Work Hash related
-    Span<uint32_t>      dWorkHashes;
+    Span<CommonKey>     dWorkHashes;
     Span<CommonKey>     dWorkBatchIds;
 
     uint32_t    FindMaxSamplePerIteration(uint32_t rayCount,

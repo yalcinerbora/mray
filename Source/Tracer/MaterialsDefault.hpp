@@ -280,7 +280,8 @@ SampleT<BxDFResult> RefractMaterial<ST>::SampleBxDF(const Vector3& wO,
         {
             .wI = Ray(wI, surface.position).Nudge(nLocal),
             .reflectance = Spectrum(pdf),
-            .mediumKey = outMedium
+            .mediumKey = outMedium,
+            .isPassedThrough = !doReflection
         },
         .pdf = pdf
     };

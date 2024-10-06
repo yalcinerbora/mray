@@ -7,10 +7,14 @@
 #include "MRayDataType.h"
 #include "DataStructures.h"
 #include "System.h"
+#include "MRayDescriptions.h"
 
 #include "Common/RenderImageStructs.h"
 
 #define MRAY_GENERIC_ID(NAME, TYPE) enum class NAME : TYPE {}
+
+using CommonId = MRay::CommonKey;
+using CommonIdRange = Vector<2, CommonId>;
 
 // std::numeric_limits<IdType>::max() returns **ZERO** !!!!
 // This should be reported I think?
@@ -340,8 +344,8 @@ struct SurfaceCommitResult
 };
 
 // Prim related
-MRAY_GENERIC_ID(PrimGroupId, uint32_t);
-MRAY_GENERIC_ID(PrimBatchId, uint32_t);
+MRAY_GENERIC_ID(PrimGroupId, CommonId);
+MRAY_GENERIC_ID(PrimBatchId, CommonId);
 struct PrimCount { uint32_t primCount; uint32_t attributeCount; };
 using PrimBatchIdList = std::vector<PrimBatchId>;
 struct PrimAttributeInfo : public Tuple<PrimitiveAttributeLogic, MRayDataTypeRT,
@@ -361,43 +365,43 @@ struct PrimAttributeInfo : public Tuple<PrimitiveAttributeLogic, MRayDataTypeRT,
 using PrimAttributeInfoList = StaticVector<PrimAttributeInfo,
                                            TracerConstants::MaxAttributePerGroup>;
 // Texture Related
-MRAY_GENERIC_ID(TextureId, uint32_t);
+MRAY_GENERIC_ID(TextureId, CommonId);
 // Transform Related
-MRAY_GENERIC_ID(TransGroupId, uint32_t);
-MRAY_GENERIC_ID(TransformId, uint32_t);
+MRAY_GENERIC_ID(TransGroupId, CommonId);
+MRAY_GENERIC_ID(TransformId, CommonId);
 using TransAttributeInfo = GenericAttributeInfo;
 using TransAttributeInfoList = GenericAttributeInfoList;
 // Light Related
-MRAY_GENERIC_ID(LightGroupId, uint32_t);
-MRAY_GENERIC_ID(LightId, uint32_t);
+MRAY_GENERIC_ID(LightGroupId, CommonId);
+MRAY_GENERIC_ID(LightId, CommonId);
 using LightAttributeInfo = TexturedAttributeInfo;
 using LightAttributeInfoList = TexturedAttributeInfoList;
 // Camera Related
-MRAY_GENERIC_ID(CameraGroupId, uint32_t);
-MRAY_GENERIC_ID(CameraId, uint32_t);
+MRAY_GENERIC_ID(CameraGroupId, CommonId);
+MRAY_GENERIC_ID(CameraId, CommonId);
 using CamAttributeInfo = GenericAttributeInfo;
 using CamAttributeInfoList = GenericAttributeInfoList;
 // Material Related
-MRAY_GENERIC_ID(MatGroupId, uint32_t);
-MRAY_GENERIC_ID(MaterialId, uint32_t);
+MRAY_GENERIC_ID(MatGroupId, CommonId);
+MRAY_GENERIC_ID(MaterialId, CommonId);
 using MatAttributeInfo = TexturedAttributeInfo;
 using MatAttributeInfoList = TexturedAttributeInfoList;
 // Medium Related
-MRAY_GENERIC_ID(MediumGroupId, uint32_t);
-MRAY_GENERIC_ID(MediumId, uint32_t);
+MRAY_GENERIC_ID(MediumGroupId, CommonId);
+MRAY_GENERIC_ID(MediumId, CommonId);
 using MediumPair = Pair<MediumId, MediumId>;
 using MediumAttributeInfo = TexturedAttributeInfo;
 using MediumAttributeInfoList = TexturedAttributeInfoList;
 // Surface Related
-MRAY_GENERIC_ID(SurfaceId, uint32_t);
-MRAY_GENERIC_ID(LightSurfaceId, uint32_t);
-MRAY_GENERIC_ID(CamSurfaceId, uint32_t);
+MRAY_GENERIC_ID(SurfaceId, CommonId);
+MRAY_GENERIC_ID(LightSurfaceId, CommonId);
+MRAY_GENERIC_ID(CamSurfaceId, CommonId);
 using SurfaceMatList        = StaticVector<MaterialId, TracerConstants::MaxPrimBatchPerSurface>;
 using SurfacePrimList       = StaticVector<PrimBatchId, TracerConstants::MaxPrimBatchPerSurface>;
 using OptionalAlphaMapList  = StaticVector<Optional<TextureId>, TracerConstants::MaxPrimBatchPerSurface>;
 using CullBackfaceFlagList  = StaticVector<bool, TracerConstants::MaxPrimBatchPerSurface>;
 // Renderer Related
-MRAY_GENERIC_ID(RendererId, uint32_t);
+MRAY_GENERIC_ID(RendererId, CommonId);
 using RendererAttributeInfo = GenericAttributeInfo;
 using RendererAttributeInfoList = StaticVector<GenericAttributeInfo,
                                                TracerConstants::MaxRendererAttributeCount>;
@@ -539,14 +543,14 @@ class [[nodiscard]] TracerI
     virtual void        CommitMatReservations(MatGroupId) = 0;
     virtual bool        IsMatCommitted(MatGroupId) const = 0;
     //
-    virtual void        PushMatAttribute(MatGroupId, Vector2ui range,
+    virtual void        PushMatAttribute(MatGroupId, CommonIdRange range,
                                          uint32_t attributeIndex,
                                          TransientData data) = 0;
-    virtual void        PushMatAttribute(MatGroupId, Vector2ui range,
+    virtual void        PushMatAttribute(MatGroupId, CommonIdRange range,
                                          uint32_t attributeIndex,
                                          TransientData data,
                                          std::vector<Optional<TextureId>>) = 0;
-    virtual void        PushMatAttribute(MatGroupId, Vector2ui range,
+    virtual void        PushMatAttribute(MatGroupId, CommonIdRange range,
                                          uint32_t attributeIndex,
                                          std::vector<TextureId>) = 0;
     //================================//
@@ -572,7 +576,7 @@ class [[nodiscard]] TracerI
     virtual void            CommitTransReservations(TransGroupId) = 0;
     virtual bool            IsTransCommitted(TransGroupId) const = 0;
     //
-    virtual void            PushTransAttribute(TransGroupId, Vector2ui range,
+    virtual void            PushTransAttribute(TransGroupId, CommonIdRange range,
                                                uint32_t attributeIndex,
                                                TransientData data) = 0;
     //================================//
@@ -590,14 +594,14 @@ class [[nodiscard]] TracerI
     virtual void            CommitLightReservations(LightGroupId) = 0;
     virtual bool            IsLightCommitted(LightGroupId) const = 0;
     //
-    virtual void            PushLightAttribute(LightGroupId, Vector2ui range,
+    virtual void            PushLightAttribute(LightGroupId, CommonIdRange range,
                                                uint32_t attributeIndex,
                                                TransientData data) = 0;
-    virtual void            PushLightAttribute(LightGroupId, Vector2ui range,
+    virtual void            PushLightAttribute(LightGroupId, CommonIdRange range,
                                                uint32_t attributeIndex,
                                                TransientData,
                                                std::vector<Optional<TextureId>>) = 0;
-    virtual void            PushLightAttribute(LightGroupId, Vector2ui range,
+    virtual void            PushLightAttribute(LightGroupId, CommonIdRange range,
                                                uint32_t attributeIndex,
                                                std::vector<TextureId>) = 0;
 
@@ -611,7 +615,7 @@ class [[nodiscard]] TracerI
     virtual void            CommitCamReservations(CameraGroupId) = 0;
     virtual bool            IsCamCommitted(CameraGroupId) const = 0;
     //
-    virtual void            PushCamAttribute(CameraGroupId, Vector2ui range,
+    virtual void            PushCamAttribute(CameraGroupId, CommonIdRange range,
                                              uint32_t attributeIndex,
                                              TransientData data) = 0;
     //================================//
@@ -624,14 +628,14 @@ class [[nodiscard]] TracerI
     virtual void            CommitMediumReservations(MediumGroupId) = 0;
     virtual bool            IsMediumCommitted(MediumGroupId) const = 0;
     //
-    virtual void            PushMediumAttribute(MediumGroupId, Vector2ui range,
+    virtual void            PushMediumAttribute(MediumGroupId, CommonIdRange range,
                                                 uint32_t attributeIndex,
                                                 TransientData data) = 0;
-    virtual void            PushMediumAttribute(MediumGroupId, Vector2ui range,
+    virtual void            PushMediumAttribute(MediumGroupId, CommonIdRange range,
                                                 uint32_t attributeIndex,
                                                 TransientData,
                                                 std::vector<Optional<TextureId>> textures) = 0;
-    virtual void            PushMediumAttribute(MediumGroupId, Vector2ui range,
+    virtual void            PushMediumAttribute(MediumGroupId, CommonIdRange range,
                                                 uint32_t attributeIndex,
                                                 std::vector<TextureId> textures) = 0;
 

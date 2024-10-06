@@ -193,7 +193,7 @@ class AcceleratorGroupLBVH final : public AcceleratorGroupT<AcceleratorGroupLBVH
     Span<LBVHNode>                  dAllNodes;
     Span<LBVHBoundingBox>           dAllNodeAABBs;
 
-    void    MulitBuildLBVH(Pair<const uint32_t, const AcceleratorWorkI*>* accelWork,
+    void    MulitBuildLBVH(Pair<const CommonKey, const AcceleratorWorkI*>* accelWork,
                            const std::vector<Vector2ui>& instanceNodeRanges,
                            const std::vector<Vector2ui>& concreteNodeRanges,
                            const GPUQueue& queue);
@@ -222,7 +222,7 @@ class AcceleratorGroupLBVH final : public AcceleratorGroupT<AcceleratorGroupLBVH
                           Span<const RayIndex> dRayIndices,
                           Span<const CommonKey> dAccelKeys,
                           // Constants
-                          uint32_t workId,
+                          CommonKey workId,
                           const GPUQueue& queue) override;
 
     void    CastVisibilityRays(// Output
@@ -234,7 +234,7 @@ class AcceleratorGroupLBVH final : public AcceleratorGroupT<AcceleratorGroupLBVH
                                Span<const RayIndex> dRayIndices,
                                Span<const CommonKey> dAccelKeys,
                                // Constants
-                               uint32_t workId,
+                               CommonKey workId,
                                const GPUQueue& queue) override;
 
 

@@ -15,7 +15,7 @@ void KCGeneratePrimitiveKeys(MRAY_GRID_CONSTANT const Span<PrimitiveKey> dAllLea
                              //
                              MRAY_GRID_CONSTANT const Span<const PrimRangeArray> dConcretePrimRanges,
                              MRAY_GRID_CONSTANT const Span<const Vector2ui> dConcreteLeafRanges,
-                             MRAY_GRID_CONSTANT const uint32_t groupId)
+                             MRAY_GRID_CONSTANT const CommonKey groupId)
 {
     constexpr Vector2ui INVALID_BATCH = Vector2ui(std::numeric_limits<uint32_t>::max());
 

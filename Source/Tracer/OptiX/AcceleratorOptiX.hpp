@@ -685,7 +685,7 @@ void AcceleratorGroupOptiX<PG>::AcquireIASConstructionParams(Span<OptixTraversab
     // The hard part
     for(const auto& work : this->workInstances)
     {
-        uint32_t workId = work.first;
+        CommonKey workId = work.first;
         uint32_t localStart = this->workInstanceOffsets[workId];
         uint32_t localEnd = this->workInstanceOffsets[workId + 1];
         uint32_t localCount = localEnd - localStart;
@@ -759,7 +759,7 @@ void AcceleratorGroupOptiX<PG>::CastLocalRays(// Output
                                               Span<const RayIndex>,
                                               Span<const CommonKey>,
                                               // Constants
-                                              uint32_t,
+                                              CommonKey,
                                               const GPUQueue&)
 {
     throw MRayError("For OptiX, this function should not be called");
@@ -775,7 +775,7 @@ void AcceleratorGroupOptiX<PG>::CastVisibilityRays(// Output
                                                    Span<const RayIndex>,
                                                    Span<const CommonKey>,
                                                    // Constants
-                                                   uint32_t,
+                                                   CommonKey,
                                                    const GPUQueue&)
 {
     throw MRayError("For OptiX, this function should not be called");

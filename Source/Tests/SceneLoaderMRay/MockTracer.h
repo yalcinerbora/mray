@@ -212,14 +212,14 @@ class TracerMock : public TracerI
 
     void            CommitMatReservations(MatGroupId) override;
     bool            IsMatCommitted(MatGroupId) const override;
-    void            PushMatAttribute(MatGroupId, Vector2ui range,
+    void            PushMatAttribute(MatGroupId, CommonIdRange range,
                                      uint32_t attributeIndex,
                                      TransientData data) override;
-    void            PushMatAttribute(MatGroupId, Vector2ui range,
+    void            PushMatAttribute(MatGroupId, CommonIdRange range,
                                      uint32_t attributeIndex,
                                      TransientData,
                                      std::vector<Optional<TextureId>> textures) override;
-    void            PushMatAttribute(MatGroupId, Vector2ui range,
+    void            PushMatAttribute(MatGroupId, CommonIdRange range,
                                      uint32_t attributeIndex,
                                      std::vector<TextureId>) override;
 
@@ -237,7 +237,7 @@ class TracerMock : public TracerI
     TransformIdList ReserveTransformations(TransGroupId, std::vector<AttributeCountList>) override;
     void            CommitTransReservations(TransGroupId) override;
     bool            IsTransCommitted(TransGroupId) const override;
-    void            PushTransAttribute(TransGroupId, Vector2ui range,
+    void            PushTransAttribute(TransGroupId, CommonIdRange range,
                                        uint32_t attributeIndex,
                                        TransientData data) override;
 
@@ -250,14 +250,14 @@ class TracerMock : public TracerI
                                   std::vector<PrimBatchId> = std::vector<PrimBatchId>{}) override;
     void            CommitLightReservations(LightGroupId) override;
     bool            IsLightCommitted(LightGroupId) const override;
-    void            PushLightAttribute(LightGroupId, Vector2ui range,
+    void            PushLightAttribute(LightGroupId, CommonIdRange range,
                                        uint32_t attributeIndex,
                                        TransientData data) override;
-    void            PushLightAttribute(LightGroupId, Vector2ui range,
+    void            PushLightAttribute(LightGroupId, CommonIdRange range,
                                        uint32_t attributeIndex,
                                        TransientData,
                                        std::vector<Optional<TextureId>> textures) override;
-    void            PushLightAttribute(LightGroupId, Vector2ui range,
+    void            PushLightAttribute(LightGroupId, CommonIdRange range,
                                        uint32_t attributeIndex,
                                        std::vector<TextureId>) override;
 
@@ -267,7 +267,7 @@ class TracerMock : public TracerI
     CameraIdList    ReserveCameras(CameraGroupId, std::vector<AttributeCountList>) override;
     void            CommitCamReservations(CameraGroupId) override;
     bool            IsCamCommitted(CameraGroupId) const override;
-    void            PushCamAttribute(CameraGroupId, Vector2ui range,
+    void            PushCamAttribute(CameraGroupId, CommonIdRange range,
                                      uint32_t attributeIndex,
                                      TransientData data) override;
 
@@ -277,14 +277,14 @@ class TracerMock : public TracerI
     MediumIdList    ReserveMediums(MediumGroupId, std::vector<AttributeCountList>) override;
     void            CommitMediumReservations(MediumGroupId) override;
     bool            IsMediumCommitted(MediumGroupId) const override;
-    void            PushMediumAttribute(MediumGroupId, Vector2ui range,
+    void            PushMediumAttribute(MediumGroupId, CommonIdRange range,
                                         uint32_t attributeIndex,
                                         TransientData data) override;
-    void            PushMediumAttribute(MediumGroupId, Vector2ui range,
+    void            PushMediumAttribute(MediumGroupId, CommonIdRange range,
                                         uint32_t attributeIndex,
                                         TransientData,
                                         std::vector<Optional<TextureId>> textures) override;
-    void            PushMediumAttribute(MediumGroupId, Vector2ui range,
+    void            PushMediumAttribute(MediumGroupId, CommonIdRange range,
                                         uint32_t attributeIndex,
                                         std::vector<TextureId> textures) override;
 
@@ -712,7 +712,7 @@ inline PrimBatchId TracerMock::ReservePrimitiveBatch(PrimGroupId id, PrimCount c
 
     if(print)
         MRAY_LOG("Reserving primitive over PrimGroup({})[{}], VCount: {}, PCount: {}",
-                 static_cast<uint32_t>(id), name,
+                 static_cast<CommonKey>(id), name,
                  count.attributeCount, count.primCount);
 
     size_t batchId = atomicCounter->fetch_add(1);
@@ -739,7 +739,7 @@ inline PrimBatchIdList TracerMock::ReservePrimitiveBatches(PrimGroupId id,
         {
             log += MRAY_FORMAT("Reserving primitive over PrimGroup({})[{}], "
                                "VCount: {}, PCount: {}\n",
-                               static_cast<uint32_t>(id), name,
+                               static_cast<CommonKey>(id), name,
                                count.attributeCount,
                                count.primCount);
         }
@@ -768,7 +768,7 @@ inline void TracerMock::CommitPrimReservations(PrimGroupId id)
 
     if(*isCommitted)
         throw MRayError("PrimitiveGroup({})[{}] is already comitted!",
-                        static_cast<uint32_t>(id), v);
+                        static_cast<CommonKey>(id), v);
     else
         *isCommitted = true;
 }
@@ -790,7 +790,7 @@ inline void TracerMock::PushPrimAttribute(PrimGroupId gId,
     if(!pg.isComitted)
         throw MRayError("PrimitiveGroup({})[{}] is not committed. "
                         "You can not push data to it!",
-                        static_cast<uint32_t>(gId), pg.mp.name);
+                        static_cast<CommonKey>(gId), pg.mp.name);
     if(!print) return;
 
     const auto& attribType = pg.mp.attribInfo[attribIndex];
@@ -799,8 +799,8 @@ inline void TracerMock::PushPrimAttribute(PrimGroupId gId,
     size_t dataCount = AcquireTransientDataCount(dataTypeRT, data);
     MRAY_LOG("Pushing prim attribute of ({}[{}]:{}),"
              "DataType: {:s}, ByteSize: {}",
-             static_cast<uint32_t>(gId), pg.mp.name,
-             static_cast<uint32_t>(batchId),
+             static_cast<CommonKey>(gId), pg.mp.name,
+             static_cast<CommonKey>(batchId),
              MRayDataTypeStringifier::ToString(dataEnum), dataCount);
 }
 
@@ -816,7 +816,7 @@ inline void TracerMock::PushPrimAttribute(PrimGroupId gId,
     if(!pg.isComitted)
         throw MRayError("PrimitiveGroup({}) is not committed! "
                         "You can not push data to it!",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     if(!print) return;
 
     const auto& attribType = pg.mp.attribInfo[attribIndex];
@@ -825,8 +825,8 @@ inline void TracerMock::PushPrimAttribute(PrimGroupId gId,
     size_t dataCount = AcquireTransientDataCount(dataTypeRT, data);
     MRAY_LOG("Pushing prim attribute of ({}[{}]:{})->[{}, {}],"
              "DataType: {:s}, ByteSize: {}",
-             static_cast<uint32_t>(gId), pg.mp.name,
-             static_cast<uint32_t>(batchId),
+             static_cast<CommonKey>(gId), pg.mp.name,
+             static_cast<CommonKey>(batchId),
              subBatchRange[0], subBatchRange[1],
              MRayDataTypeStringifier::ToString(dataEnum), dataCount);
 }
@@ -864,10 +864,10 @@ inline MaterialId TracerMock::ReserveMaterial(MatGroupId id, AttributeCountList 
         attribCountString += "]";
 
         MRAY_LOG("Reserving material over MaterialGroup({}), AttribCount: {}, "
-                 "MediumPair: ({}, {})", static_cast<uint32_t>(id),
+                 "MediumPair: ({}, {})", static_cast<CommonKey>(id),
                  attribCountString,
-                 static_cast<uint32_t>(mediumPair.first),
-                 static_cast<uint32_t>(mediumPair.second));
+                 static_cast<CommonKey>(mediumPair.first),
+                 static_cast<CommonKey>(mediumPair.second));
     }
     size_t matId = atomicCounter->fetch_add(1);
     return MaterialId(matId);
@@ -901,10 +901,10 @@ inline MaterialIdList TracerMock::ReserveMaterials(MatGroupId id,
             attribCountString += "]";
 
             log += MRAY_FORMAT("Reserving material over MaterialGroup({}), AttribCount: {}, "
-                               "MediumPair: ({}, {})\n", static_cast<uint32_t>(id),
+                               "MediumPair: ({}, {})\n", static_cast<CommonKey>(id),
                                attribCountString,
-                               static_cast<uint32_t>(mediumPair.first),
-                               static_cast<uint32_t>(mediumPair.second));
+                               static_cast<CommonKey>(mediumPair.first),
+                               static_cast<CommonKey>(mediumPair.second));
         }
         MRAY_LOG("{}", log);
     }
@@ -928,7 +928,7 @@ inline void TracerMock::CommitMatReservations(MatGroupId id)
 
     if(*isCommitted)
         throw MRayError("MaterialGroup({}) is already comitted!",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     else
         *isCommitted = true;
 }
@@ -939,7 +939,7 @@ inline bool TracerMock::IsMatCommitted(MatGroupId id) const
     return matGroups.at(id).isComitted;
 }
 
-inline void TracerMock::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
+inline void TracerMock::PushMatAttribute(MatGroupId gId, CommonIdRange matRange,
                                          uint32_t attribIndex,
                                          TransientData data)
 {
@@ -949,7 +949,7 @@ inline void TracerMock::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
     if(!mg.isComitted)
         throw MRayError("MaterialGroup({}) is not committed! "
                         "You can not push data to it!",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     if(!print) return;
 
     const auto& attribType = mg.mp.attribInfo[attribIndex];
@@ -959,11 +959,11 @@ inline void TracerMock::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
 
     MRAY_LOG("Pushing mat attribute of ({}:[{}, {}]),"
              "DataType: {:s}, ByteSize: {}",
-             static_cast<uint32_t>(gId), matRange[0], matRange[1],
+             static_cast<CommonKey>(gId), matRange[0], matRange[1],
              MRayDataTypeStringifier::ToString(dataEnum), dataCount);
 }
 
-inline void TracerMock::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
+inline void TracerMock::PushMatAttribute(MatGroupId gId, CommonIdRange matRange,
                                          uint32_t attribIndex, TransientData data,
                                          std::vector<Optional<TextureId>> textures)
 {
@@ -973,7 +973,7 @@ inline void TracerMock::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
     if(!mg.isComitted)
         throw MRayError("MaterialGroup({}) is not committed! "
                         "You can not push data to it!",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     if(!print) return;
 
     const auto& attribType = mg.mp.attribInfo[attribIndex];
@@ -983,11 +983,11 @@ inline void TracerMock::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
 
     MRAY_LOG("Pushing mat texturable attribute of ({}:[{}, {}]),"
              "DataType: {:s}, ByteSize: {}",
-             static_cast<uint32_t>(gId), matRange[0], matRange[1],
+             static_cast<CommonKey>(gId), matRange[0], matRange[1],
              MRayDataTypeStringifier::ToString(dataEnum), dataCount);
 }
 
-inline void TracerMock::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
+inline void TracerMock::PushMatAttribute(MatGroupId gId, CommonIdRange matRange,
                                          uint32_t,
                                          std::vector<TextureId> textures)
 {
@@ -996,17 +996,17 @@ inline void TracerMock::PushMatAttribute(MatGroupId gId, Vector2ui matRange,
     if(!mg.isComitted)
         throw MRayError("MaterialGroup({}) is not committed! "
                         "You can not push data to it!",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     if(!print) return;
 
     std::string textureIdString;
     for(const auto& t : textures)
     {
-        textureIdString += MRAY_FORMAT("{}, ", static_cast<uint32_t>(t));
+        textureIdString += MRAY_FORMAT("{}, ", static_cast<CommonKey>(t));
     }
 
     MRAY_LOG("Pushing mat texture attribute of ({}:[{}, {}]),"
-             "TextureIds: [{:s}]", static_cast<uint32_t>(gId),
+             "TextureIds: [{:s}]", static_cast<CommonKey>(gId),
              matRange[0], matRange[1], textureIdString);
 }
 
@@ -1017,7 +1017,7 @@ inline TextureId TracerMock::CreateTexture2D(Vector2ui dimensions, uint32_t mipC
     if(print)
         MRAY_LOG("Creating Texture2D({}) Dim: ({}, {}), "
                  "Mip:{}, PixelType:{}, ColorSpace:{}, IsColor:{}",
-                 static_cast<uint32_t>(texId), dimensions[0], dimensions[1],
+                 static_cast<CommonKey>(texId), dimensions[0], dimensions[1],
                  mipCount, MRayPixelTypeStringifier::ToString(p.pixelType.Name()),
                  MRayColorSpaceStringifier::ToString(p.colorSpace),
                  (p.isColor == AttributeIsColor::IS_COLOR) ? true : false);
@@ -1031,7 +1031,7 @@ inline TextureId TracerMock::CreateTexture3D(Vector3ui dimensions, uint32_t mipC
     if(print)
         MRAY_LOG("Creating Texture3D({}) Dim: ({}, {}, {}), "
                  "Mip:{}, PixelType:{}, ColorSpace:{}, IsColor:{}",
-                 static_cast<uint32_t>(texId), dimensions[0], dimensions[1],
+                 static_cast<CommonKey>(texId), dimensions[0], dimensions[1],
                  dimensions[2], mipCount,
                  MRayPixelTypeStringifier::ToString(p.pixelType.Name()),
                  MRayColorSpaceStringifier::ToString(p.colorSpace),
@@ -1055,7 +1055,7 @@ inline void TracerMock::PushTextureData(TextureId tId, uint32_t mipLevel,
 
     if(!print) return;
     MRAY_LOG("Pushing data to Texture({}) MipLevel:{}",
-             static_cast<uint32_t>(tId), mipLevel);
+             static_cast<CommonKey>(tId), mipLevel);
 }
 
 inline TransGroupId TracerMock::CreateTransformGroup(std::string name)
@@ -1090,7 +1090,7 @@ inline TransformId TracerMock::ReserveTransformation(TransGroupId id, AttributeC
         attribCountString += "]";
 
         MRAY_LOG("Reserving transform over TransformGroup({}), AttribCount: {}\n",
-                 static_cast<uint32_t>(id), attribCountString);
+                 static_cast<CommonKey>(id), attribCountString);
     }
     size_t transId = atomicCounter->fetch_add(1);
     return TransformId(transId);
@@ -1120,7 +1120,7 @@ inline TransformIdList TracerMock::ReserveTransformations(TransGroupId id,
             attribCountString += "]";
 
             log += MRAY_FORMAT("Reserving transform over TransformGroup({}), AttribCount: {}\n",
-                               static_cast<uint32_t>(id), attribCountString);
+                               static_cast<CommonKey>(id), attribCountString);
         }
         MRAY_LOG("{}", log);
     }
@@ -1144,7 +1144,7 @@ inline void TracerMock::CommitTransReservations(TransGroupId id)
 
     if(*isCommitted)
         throw MRayError("TransformGroup({}) is already comitted!",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     else
         *isCommitted = true;
 }
@@ -1155,7 +1155,7 @@ inline bool TracerMock::IsTransCommitted(TransGroupId id) const
     return transGroups.at(id).isComitted;
 }
 
-inline void TracerMock::PushTransAttribute(TransGroupId gId, Vector2ui transRange,
+inline void TracerMock::PushTransAttribute(TransGroupId gId, CommonIdRange transRange,
                                            uint32_t attribIndex,
                                            TransientData data)
 {
@@ -1165,7 +1165,7 @@ inline void TracerMock::PushTransAttribute(TransGroupId gId, Vector2ui transRang
     if(!tg.isComitted)
         throw MRayError("TransformGroup({}) is not committed! "
                         "You can not push data to it!",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     if(!print) return;
 
     const auto& attribType = tg.mp.attribInfo[attribIndex];
@@ -1175,7 +1175,7 @@ inline void TracerMock::PushTransAttribute(TransGroupId gId, Vector2ui transRang
 
     MRAY_LOG("Pushing trans attribute of ({}:[{}, {}]),"
              "DataType: {:s}, ByteSize: {}",
-             static_cast<uint32_t>(gId), transRange[0], transRange[1],
+             static_cast<CommonKey>(gId), transRange[0], transRange[1],
              MRayDataTypeStringifier::ToString(dataEnum), dataCount);
 }
 
@@ -1214,10 +1214,10 @@ inline LightId TracerMock::ReserveLight(LightGroupId id,
         attribCountString += "]";
         std::string batchString = (primId == TracerConstants::EmptyPrimBatchId)
             ? std::string("Empty")
-            : MRAY_FORMAT("{}", static_cast<uint32_t>(primId));
+            : MRAY_FORMAT("{}", static_cast<CommonKey>(primId));
 
         MRAY_LOG("Reserving light over LightGroup({}), AttribCount: {} "
-                 "PrimBatchId: {:s}", static_cast<uint32_t>(id),
+                 "PrimBatchId: {:s}", static_cast<CommonKey>(id),
                  attribCountString, batchString);
     }
     size_t lId = atomicCounter->fetch_add(1);
@@ -1250,10 +1250,10 @@ inline LightIdList TracerMock::ReserveLights(LightGroupId id,
 
             std::string batchString = primBatches.empty()
                 ? "Empty"
-                : MRAY_FORMAT("{}", static_cast<uint32_t>(primBatches[i]));
+                : MRAY_FORMAT("{}", static_cast<CommonKey>(primBatches[i]));
 
             log += MRAY_FORMAT("Reserving light over LightGroup({}), AttribCount: {} "
-                               "PrimBatchId: {:s}\n", static_cast<uint32_t>(id),
+                               "PrimBatchId: {:s}\n", static_cast<CommonKey>(id),
                                attribCountString, batchString);
         }
         MRAY_LOG("{}", log);
@@ -1278,7 +1278,7 @@ inline void TracerMock::CommitLightReservations(LightGroupId id)
 
     if(*isCommitted)
         throw MRayError("LightGroup({}) is already comitted!",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     else
         *isCommitted = true;
 }
@@ -1289,7 +1289,7 @@ inline bool TracerMock::IsLightCommitted(LightGroupId id) const
     return lightGroups.at(id).isComitted;
 }
 
-inline void TracerMock::PushLightAttribute(LightGroupId gId, Vector2ui lightRange,
+inline void TracerMock::PushLightAttribute(LightGroupId gId, CommonIdRange lightRange,
                                            uint32_t attribIndex,
                                            TransientData data)
 {
@@ -1299,7 +1299,7 @@ inline void TracerMock::PushLightAttribute(LightGroupId gId, Vector2ui lightRang
     if(!lg.isComitted)
         throw MRayError("LightGroup({}) is not committed! "
                         "You can not push data to it!",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     if(!print) return;
 
     const auto& attribType = lg.mp.attribInfo[attribIndex];
@@ -1309,11 +1309,11 @@ inline void TracerMock::PushLightAttribute(LightGroupId gId, Vector2ui lightRang
 
     MRAY_LOG("Pushing light attribute of ({}:[{}, {}]),"
              "DataType: {:s}, ByteSize: {}",
-             static_cast<uint32_t>(gId), lightRange[0], lightRange[1],
+             static_cast<CommonKey>(gId), lightRange[0], lightRange[1],
              MRayDataTypeStringifier::ToString(dataEnum), dataCount);
 }
 
-inline void TracerMock::PushLightAttribute(LightGroupId gId, Vector2ui lightRange,
+inline void TracerMock::PushLightAttribute(LightGroupId gId, CommonIdRange lightRange,
                                            uint32_t attribIndex,
                                            TransientData data,
                                            std::vector<Optional<TextureId>> textures)
@@ -1324,7 +1324,7 @@ inline void TracerMock::PushLightAttribute(LightGroupId gId, Vector2ui lightRang
     if(!lg.isComitted)
         throw MRayError("LightGroup({}) is not committed! "
                         "You can not push data to it!",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     if(!print) return;
 
     const auto& attribType = lg.mp.attribInfo[attribIndex];
@@ -1334,11 +1334,11 @@ inline void TracerMock::PushLightAttribute(LightGroupId gId, Vector2ui lightRang
 
     MRAY_LOG("Pushing light texturable attribute of ({}:[{}, {}]),"
              "DataType: {:s}, ByteSize: {}",
-             static_cast<uint32_t>(gId), lightRange[0], lightRange[1],
+             static_cast<CommonKey>(gId), lightRange[0], lightRange[1],
              MRayDataTypeStringifier::ToString(dataEnum), dataCount);
 }
 
-inline void TracerMock::PushLightAttribute(LightGroupId gId, Vector2ui lightRange,
+inline void TracerMock::PushLightAttribute(LightGroupId gId, CommonIdRange lightRange,
                                            uint32_t,
                                            std::vector<TextureId> textures)
 {
@@ -1347,17 +1347,17 @@ inline void TracerMock::PushLightAttribute(LightGroupId gId, Vector2ui lightRang
     if(!lg.isComitted)
         throw MRayError("LightGroup({}) is not committed! "
                         "You can not push data to it!",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     if(!print) return;
 
     std::string textureIdString;
     for(const auto& t : textures)
     {
-        textureIdString += MRAY_FORMAT("{}, ", static_cast<uint32_t>(t));
+        textureIdString += MRAY_FORMAT("{}, ", static_cast<CommonKey>(t));
     }
 
     MRAY_LOG("Pushing light texture attribute of ({}:[{}, {}]),"
-             "TextureIds: [{:s}]", static_cast<uint32_t>(gId),
+             "TextureIds: [{:s}]", static_cast<CommonKey>(gId),
              lightRange[0], lightRange[1], textureIdString);
 }
 
@@ -1394,7 +1394,7 @@ inline CameraId TracerMock::ReserveCamera(CameraGroupId id,
         attribCountString += "]";
 
         MRAY_LOG("Reserving camera over CameraGroup({}), AttribCount: {}",
-                 static_cast<uint32_t>(id), attribCountString);
+                 static_cast<CommonKey>(id), attribCountString);
     }
     size_t camId = atomicCounter->fetch_add(1);
     return CameraId(camId);
@@ -1424,7 +1424,7 @@ inline CameraIdList TracerMock::ReserveCameras(CameraGroupId id,
             attribCountString += "]";
 
             log += MRAY_FORMAT("Reserving camera over CameraGroup({}), AttribCount: {}\n",
-                               static_cast<uint32_t>(id), attribCountString);
+                               static_cast<CommonKey>(id), attribCountString);
         }
         MRAY_LOG("{}", log);
     }
@@ -1448,7 +1448,7 @@ inline void TracerMock::CommitCamReservations(CameraGroupId id)
 
     if(*isCommitted)
         throw MRayError("CameraGroup({}) is already comitted!",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     else
         *isCommitted = true;
 }
@@ -1459,7 +1459,7 @@ inline bool TracerMock::IsCamCommitted(CameraGroupId id) const
     return camGroups.at(id).isComitted;
 }
 
-inline void TracerMock::PushCamAttribute(CameraGroupId gId, Vector2ui camRange,
+inline void TracerMock::PushCamAttribute(CameraGroupId gId, CommonIdRange camRange,
                                          uint32_t attribIndex,
                                          TransientData data)
 {
@@ -1469,7 +1469,7 @@ inline void TracerMock::PushCamAttribute(CameraGroupId gId, Vector2ui camRange,
     if(!cg.isComitted)
         throw MRayError("CameraGroup({}) is not committed! "
                         "You can not push data to it!",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     if(!print) return;
 
     const auto& attribType = cg.mp.attribInfo[attribIndex];
@@ -1479,7 +1479,7 @@ inline void TracerMock::PushCamAttribute(CameraGroupId gId, Vector2ui camRange,
 
     MRAY_LOG("Pushing camera attribute of ({}:[{}, {}]),"
              "DataType: {:s}, ByteSize: {}",
-             static_cast<uint32_t>(gId), camRange[0], camRange[1],
+             static_cast<CommonKey>(gId), camRange[0], camRange[1],
              MRayDataTypeStringifier::ToString(dataEnum), dataCount);
 }
 
@@ -1515,7 +1515,7 @@ inline MediumId TracerMock::ReserveMedium(MediumGroupId id, AttributeCountList c
         attribCountString += "]";
 
         MRAY_LOG("Reserving medium over MediumGroup({}), AttribCount: {}",
-                 static_cast<uint32_t>(id), attribCountString);
+                 static_cast<CommonKey>(id), attribCountString);
     }
     size_t medId = atomicCounter->fetch_add(1);
     return MediumId(medId);
@@ -1545,7 +1545,7 @@ inline MediumIdList TracerMock::ReserveMediums(MediumGroupId id,
             attribCountString += "]";
 
             log += MRAY_FORMAT("Reserving medium over MediumGroup({}), AttribCount: {}\n",
-                               static_cast<uint32_t>(id), attribCountString);
+                               static_cast<CommonKey>(id), attribCountString);
         }
         MRAY_LOG("{}", log);
     }
@@ -1569,7 +1569,7 @@ inline void TracerMock::CommitMediumReservations(MediumGroupId id)
 
     if(*isCommitted)
         throw MRayError("MediumGroup({}) is already comitted!",
-                        static_cast<uint32_t>(id));
+                        static_cast<CommonKey>(id));
     else
         *isCommitted = true;
 }
@@ -1580,7 +1580,7 @@ inline bool TracerMock::IsMediumCommitted(MediumGroupId id) const
     return mediumGroups.at(id).isComitted;
 }
 
-inline void TracerMock::PushMediumAttribute(MediumGroupId gId, Vector2ui mediumRange,
+inline void TracerMock::PushMediumAttribute(MediumGroupId gId, CommonIdRange mediumRange,
                                             uint32_t attribIndex,
                                             TransientData data)
 {
@@ -1590,7 +1590,7 @@ inline void TracerMock::PushMediumAttribute(MediumGroupId gId, Vector2ui mediumR
     if(!mg.isComitted)
         throw MRayError("MediumGroup({}) is not committed! "
                         "You can not push data to it!",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     if(!print) return;
 
     const auto& attribType = mg.mp.attribInfo[attribIndex];
@@ -1600,11 +1600,11 @@ inline void TracerMock::PushMediumAttribute(MediumGroupId gId, Vector2ui mediumR
 
     MRAY_LOG("Pushing medium attribute of ({}:[{}, {}]),"
              "DataType: {:s}, ByteSize: {}",
-             static_cast<uint32_t>(gId), mediumRange[0], mediumRange[1],
+             static_cast<CommonKey>(gId), mediumRange[0], mediumRange[1],
              MRayDataTypeStringifier::ToString(dataEnum), dataCount);
 }
 
-inline void TracerMock::PushMediumAttribute(MediumGroupId gId, Vector2ui mediumRange,
+inline void TracerMock::PushMediumAttribute(MediumGroupId gId, CommonIdRange mediumRange,
                                             uint32_t attribIndex,
                                             TransientData data,
                                             std::vector<Optional<TextureId>> textures)
@@ -1615,7 +1615,7 @@ inline void TracerMock::PushMediumAttribute(MediumGroupId gId, Vector2ui mediumR
     if(!mg.isComitted)
         throw MRayError("MediumGroup({}) is not committed! "
                         "You can not push data to it!",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     if(!print) return;
 
     const auto& attribType = mg.mp.attribInfo[attribIndex];
@@ -1625,11 +1625,11 @@ inline void TracerMock::PushMediumAttribute(MediumGroupId gId, Vector2ui mediumR
 
     MRAY_LOG("Pushing medium texturable attribute of ({}:[{}, {}]),"
              "DataType: {:s}, ByteSize: {}",
-             static_cast<uint32_t>(gId), mediumRange[0], mediumRange[1],
+             static_cast<CommonKey>(gId), mediumRange[0], mediumRange[1],
              MRayDataTypeStringifier::ToString(dataEnum), dataCount);
 }
 
-inline void TracerMock::PushMediumAttribute(MediumGroupId gId, Vector2ui mediumRange,
+inline void TracerMock::PushMediumAttribute(MediumGroupId gId, CommonIdRange mediumRange,
                                             uint32_t,
                                             std::vector<TextureId> textures)
 {
@@ -1638,17 +1638,17 @@ inline void TracerMock::PushMediumAttribute(MediumGroupId gId, Vector2ui mediumR
     if(!mg.isComitted)
         throw MRayError("MediumGroup({}) is not committed! "
                         "You can not push data to it!",
-                        static_cast<uint32_t>(gId));
+                        static_cast<CommonKey>(gId));
     if(!print) return;
 
     std::string textureIdString;
     for(const auto& t : textures)
     {
-        textureIdString += MRAY_FORMAT("{}, ", static_cast<uint32_t>(t));
+        textureIdString += MRAY_FORMAT("{}, ", static_cast<CommonKey>(t));
     }
 
     MRAY_LOG("Pushing medium texture attribute of ({}:[{}, {}]),"
-             "TextureIds: [{:s}]", static_cast<uint32_t>(gId),
+             "TextureIds: [{:s}]", static_cast<CommonKey>(gId),
              mediumRange[0], mediumRange[1], textureIdString);
 }
 
@@ -1668,16 +1668,16 @@ inline SurfaceId TracerMock::CreateSurface(SurfaceParams p)
 
     for(size_t i = 0; i < p.primBatches.size(); i++)
     {
-        primIdString += MRAY_FORMAT("{}, ", static_cast<uint32_t>(p.primBatches[i]));
-        matIdString += MRAY_FORMAT("{}, ", static_cast<uint32_t>(p.materials[i]));
+        primIdString += MRAY_FORMAT("{}, ", static_cast<CommonKey>(p.primBatches[i]));
+        matIdString += MRAY_FORMAT("{}, ", static_cast<CommonKey>(p.materials[i]));
         cullFaceString += MRAY_FORMAT("{}, ", p.cullFaceFlags[i]);
         alphaMapString += (p.alphaMaps[i].has_value())
-                            ? MRAY_FORMAT("{}, ", static_cast<uint32_t>(p.alphaMaps[i].value()))
+                            ? MRAY_FORMAT("{}, ", static_cast<CommonKey>(p.alphaMaps[i].value()))
                             : "None, ";
     }
 
     MRAY_LOG("Creating Surface({}): Trans:{}, Prim: [{}], Mat: [{}], AlphaMap: [{}], CullFace: [{}]",
-             surfId, static_cast<uint32_t>(p.transformId),
+             surfId, static_cast<CommonKey>(p.transformId),
              primIdString, matIdString, alphaMapString, cullFaceString);
     return SurfaceId(surfId);
 }
@@ -1688,9 +1688,9 @@ inline LightSurfaceId TracerMock::SetBoundarySurface(LightSurfaceParams p)
     if(!print) return LightSurfaceId(lightSurfId);
 
     MRAY_LOG("Setting BoundarySurface({}): Light: {}, Trans: {}, Medium: {}",
-             lightSurfId, static_cast<uint32_t>(p.lightId),
-             static_cast<uint32_t>(p.transformId),
-             static_cast<uint32_t>(p.mediumId));
+             lightSurfId, static_cast<CommonKey>(p.lightId),
+             static_cast<CommonKey>(p.transformId),
+             static_cast<CommonKey>(p.mediumId));
     return LightSurfaceId(lightSurfId);
 }
 
@@ -1701,9 +1701,9 @@ inline LightSurfaceId TracerMock::CreateLightSurface(LightSurfaceParams p)
 
 
     MRAY_LOG("Creating LightSurface({}): Light: {}, Trans: {}, Medium: {}",
-             lightSurfId, static_cast<uint32_t>(p.lightId),
-             static_cast<uint32_t>(p.transformId),
-             static_cast<uint32_t>(p.mediumId));
+             lightSurfId, static_cast<CommonKey>(p.lightId),
+             static_cast<CommonKey>(p.transformId),
+             static_cast<CommonKey>(p.mediumId));
     return LightSurfaceId(lightSurfId);
 }
 
@@ -1713,9 +1713,9 @@ inline CamSurfaceId TracerMock::CreateCameraSurface(CameraSurfaceParams p)
     if(!print) return CamSurfaceId(camSurfId);
 
     MRAY_LOG("Creating CameraSurface({}): Camera: {}, Trans: {}, Medium: {}",
-             camSurfId, static_cast<uint32_t>(p.cameraId),
-             static_cast<uint32_t>(p.transformId),
-             static_cast<uint32_t>(p.mediumId));
+             camSurfId, static_cast<CommonKey>(p.cameraId),
+             static_cast<CommonKey>(p.transformId),
+             static_cast<CommonKey>(p.mediumId));
     return CamSurfaceId(camSurfId);
 }
 
@@ -1730,7 +1730,7 @@ inline SurfaceCommitResult TracerMock::CommitSurfaces()
 CameraTransform TracerMock::GetCamTransform(CamSurfaceId camSurfId) const
 {
     MRAY_LOG("Returning transform of {}",
-             static_cast<uint32_t>(camSurfId));
+             static_cast<CommonKey>(camSurfId));
     return CameraTransform
     {
         .position = Vector3::Zero(),

@@ -211,7 +211,7 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     //
     auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
     Vector3 wO = -tContext.InvApplyN(rayIn.Dir()).Normalize();
-    SampleT<BxDFResult> raySample = mat.SampleBxDF(-wO, surf, rng);
+    SampleT<BxDFResult> raySample = mat.SampleBxDF(wO, surf, rng);
     Vector3 wI = tContext.ApplyN(raySample.value.wI.Dir());
     Spectrum throughput = params.rayState.dThroughput[rayIndex];
     throughput *= raySample.value.reflectance;
@@ -242,8 +242,11 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     params.rayState.dThroughput[rayIndex] = DivideByPDF(throughput, raySample.pdf);
 
     // New ray
+    Vector3 nudgeNormal = (raySample.value.isPassedThrough)
+                            ? -surf.geoNormal
+                            : surf.geoNormal;
     Ray rayOut = Ray(wI, surf.position);
-    rayOut.NudgeSelf(surf.geoNormal);
+    rayOut.NudgeSelf(nudgeNormal);
     // If I remember correctly, OptiX does not like INF on rays,
     // so we put flt_max here.
     Vector2 tMMOut = Vector2(0, std::numeric_limits<Float>::max());

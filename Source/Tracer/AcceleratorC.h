@@ -259,7 +259,7 @@ class AcceleratorGroupI
                                   Span<const RayIndex> dRayIndices,
                                   Span<const CommonKey> dAccelKeys,
                                   // Constants
-                                  uint32_t instanceId,
+                                  CommonKey instanceId,
                                   const GPUQueue& queue) = 0;
     virtual void        CastVisibilityRays(// Output
                                            Bitspan<uint32_t> dIsVisibleBuffer,
@@ -270,7 +270,7 @@ class AcceleratorGroupI
                                            Span<const RayIndex> dRayIndices,
                                            Span<const CommonKey> dAccelKeys,
                                            // Constants
-                                           uint32_t workId,
+                                           CommonKey workId,
                                            const GPUQueue& queue) = 0;
 
     virtual void        PreConstruct(const BaseAcceleratorI*) = 0;
@@ -414,10 +414,10 @@ class AcceleratorGroupT : public Base
     std::vector<uint32_t>       workInstanceOffsets;
 
     // Type Related
-    uint32_t                    globalWorkIdToLocalOffset = std::numeric_limits<uint32_t>::max();
-    const AccelWorkGenMap&      accelWorkGenerators;
-    Map<uint32_t, AccelWorkPtr> workInstances;
-
+    uint32_t                        globalWorkIdToLocalOffset = std::numeric_limits<uint32_t>::max();
+    const AccelWorkGenMap&          accelWorkGenerators;
+    Map<CommonKey, AccelWorkPtr>    workInstances;
+    //
     PreprocessResult            PreprocessConstructionParams(const AccelGroupConstructParams& p);
     template<class T>
     std::vector<Span<T>>        CreateInstanceSubspans(Span<T> fullRange,
@@ -655,7 +655,7 @@ AccelLeafResult AcceleratorGroupT<C, PG, B>::DetermineConcreteAccelCount(std::ve
             // Hopefully stl calls insertion sort here or something...
             std::sort(lst.begin(), lst.end(), [](PrimBatchId lhs, PrimBatchId rhs)
             {
-                return (static_cast<uint32_t>(lhs) < static_cast<uint32_t>(rhs));
+                return (std::bit_cast<CommonKey>(lhs) < std::bit_cast<CommonKey>(rhs));
             });
         }
         // Do an index/id sort here, c++ does not have it
@@ -670,7 +670,7 @@ AccelLeafResult AcceleratorGroupT<C, PG, B>::DetermineConcreteAccelCount(std::ve
                                                        rhs.cbegin(), rhs.cend(),
             [](PrimBatchId lhs, PrimBatchId rhs)
             {
-                return (static_cast<uint32_t>(lhs) < static_cast<uint32_t>(rhs));
+                return (std::bit_cast<CommonKey>(lhs) < std::bit_cast<CommonKey>(rhs));
             });
             return result;
         });
@@ -683,7 +683,7 @@ AccelLeafResult AcceleratorGroupT<C, PG, B>::DetermineConcreteAccelCount(std::ve
                                                                  rhs.cbegin(), rhs.cend(),
             [](PrimBatchId lhs, PrimBatchId rhs)
             {
-                return (static_cast<uint32_t>(lhs) <=> static_cast<uint32_t>(rhs));
+                return (std::bit_cast<CommonKey>(lhs) <=> std::bit_cast<CommonKey>(rhs));
             });
             return std::is_eq(result);
         });
@@ -702,7 +702,7 @@ AccelLeafResult AcceleratorGroupT<C, PG, B>::DetermineConcreteAccelCount(std::ve
                                                                      rhs.cbegin(), rhs.cend(),
                                                                      [](PrimBatchId lhs, PrimBatchId rhs)
                 {
-                    return (static_cast<uint32_t>(lhs) <=> static_cast<uint32_t>(rhs));
+                    return (std::bit_cast<CommonKey>(lhs) <=> std::bit_cast<CommonKey>(rhs));
                 });
                 return std::is_lt(result);
 
@@ -821,7 +821,7 @@ LinearizedSurfaceData AcceleratorGroupT<C, PG, B>::LinearizeSurfaceData(const Ac
         result.cullFaceFlags.emplace_back();
         result.lightOrMatKeys.emplace_back();
         result.primRanges.emplace_back();
-        result.transformKeys.emplace_back(TransformKey(static_cast<uint32_t>(surf.transformId)));;
+        result.transformKeys.emplace_back(std::bit_cast<TransformKey>(surf.transformId));
 
         assert(surf.alphaMaps.size() == surf.cullFaceFlags.size());
         assert(surf.cullFaceFlags.size() == surf.materials.size());
@@ -835,7 +835,7 @@ LinearizedSurfaceData AcceleratorGroupT<C, PG, B>::LinearizeSurfaceData(const Ac
                 {
                     throw MRayError("{:s}: Alpha map texture({:d}) is not found",
                                     C::TypeName(),
-                                    static_cast<uint32_t>(surf.alphaMaps[i].value()));
+                                    static_cast<CommonKey>(surf.alphaMaps[i].value()));
                 }
                 const GenericTextureView& view = optView.value();
                 assert(std::holds_alternative<AlphaMap>(view));
@@ -844,9 +844,9 @@ LinearizedSurfaceData AcceleratorGroupT<C, PG, B>::LinearizeSurfaceData(const Ac
             else result.alphaMaps.back()[i] = std::nullopt;
 
             result.cullFaceFlags.back()[i] = surf.cullFaceFlags[i];
-            PrimBatchKey pBatchKey = PrimBatchKey(static_cast<uint32_t>(surf.primBatches[i]));
+            PrimBatchKey pBatchKey = std::bit_cast<PrimBatchKey>(surf.primBatches[i]);
             result.primRanges.back()[i] = pg.BatchRange(pBatchKey);
-            MaterialKey mKey(static_cast<CommonKey>(surf.materials[i]));
+            MaterialKey mKey = std::bit_cast<MaterialKey>(surf.materials[i]);
             result.lightOrMatKeys.back()[i] = LightOrMatKey::CombinedKey(IS_MAT_KEY_FLAG,
                                                                          mKey.FetchBatchPortion(),
                                                                          mKey.FetchIndexPortion());
@@ -864,15 +864,15 @@ LinearizedSurfaceData AcceleratorGroupT<C, PG, B>::LinearizeSurfaceData(const Ac
         result.transformKeys.emplace_back();
         InitRest(0);
 
-        LightKey lKey = LightKey(static_cast<uint32_t>(lSurf.lightId));
+        LightKey lKey = std::bit_cast<LightKey>(lSurf.lightId);
         PrimBatchKey primBatchKey = p.lightGroup->LightPrimBatch(lKey);
         result.primRanges.back().front() = pg.BatchRange(primBatchKey);
         result.lightOrMatKeys.back().front() = LightOrMatKey::CombinedKey(IS_LIGHT_KEY_FLAG,
                                                                           lKey.FetchBatchPortion(),
                                                                           lKey.FetchIndexPortion());
 
-        PrimBatchId primBatchId = PrimBatchId(static_cast<uint32_t>(primBatchKey));
-        result.transformKeys.back() = TransformKey(static_cast<uint32_t>(lSurf.transformId));
+        PrimBatchId primBatchId = std::bit_cast<PrimBatchId>(primBatchKey);
+        result.transformKeys.back() = std::bit_cast<TransformKey>(lSurf.transformId);
         result.instancePrimBatches.back().push_back(primBatchId);
     };
 
@@ -931,7 +931,7 @@ PreprocessResult AcceleratorGroupT<C, PG, B>::PreprocessConstructionParams(const
         {
             throw MRayError("{:s}:{:d}: Unable to find transform {:d}",
                             C::TypeName(), accelGroupId,
-                            static_cast<uint32_t>(indices.tId));
+                            static_cast<CommonKey>(indices.tId));
         }
         const GenericGroupTransformT& tGroup = *tGroupOpt.value().get().get();
 
@@ -1043,7 +1043,7 @@ void AcceleratorGroupT<C, PG, B>::WriteInstanceKeysAndAABBsInternal(Span<AABB3> 
         // in world space)
         for(const auto& kv : workInstances)
         {
-            uint32_t index = kv.first;
+            CommonKey index = kv.first;
             const AccelWorkPtr& workPtr = kv.second;
             size_t size = (workInstanceOffsets[index + 1] -
                            workInstanceOffsets[index]);
@@ -1067,12 +1067,12 @@ void AcceleratorGroupT<C, PG, B>::WriteInstanceKeysAndAABBsInternal(Span<AABB3> 
         // in world space)
         for(const auto& kv : workInstances)
         {
-            uint32_t index = kv.first;
+            CommonKey index = kv.first;
             size_t wIOffset = workInstanceOffsets[index];
             size_t size = (workInstanceOffsets[index + 1] - wIOffset);
             // Copy the keys as well
             Span<AcceleratorKey> dLocalKeyWriteRegion = keyWriteRegion.subspan(wIOffset, size);
-            uint32_t accelBatchId = globalWorkIdToLocalOffset + index;
+            CommonKey accelBatchId = globalWorkIdToLocalOffset + index;
             using namespace std::string_literals;
             static const auto KernelName = "KCCopyLocalAccelKeys-"s + std::string(C::TypeName());
 
@@ -1170,11 +1170,11 @@ void BaseAcceleratorT<C>::PartitionSurfaces(std::vector<AccelGroupConstructParam
     while(start != surfList.end())
     {
         auto pBatchId = start->second.primBatches.front();
-        uint32_t pGroupId = PrimGroupIdFetcher()(pBatchId);
+        CommonKey pGroupId = PrimGroupIdFetcher()(pBatchId);
         auto end = std::upper_bound(start, surfList.end(), pGroupId,
-        [](const uint32_t& value, const SurfParam& surf)
+        [](CommonKey value, const SurfParam& surf)
         {
-            uint32_t batchPortion = PrimGroupIdFetcher()(surf.second.primBatches.front());
+            CommonKey batchPortion = PrimGroupIdFetcher()(surf.second.primBatches.front());
             return value < batchPortion;
         });
 
@@ -1192,9 +1192,9 @@ void BaseAcceleratorT<C>::PartitionSurfaces(std::vector<AccelGroupConstructParam
         while(innerStart != end)
         {
             TransformId tId = innerStart->second.transformId;
-            uint32_t tGroupId = TransGroupIdFetcher()(tId);
+            CommonKey tGroupId = TransGroupIdFetcher()(tId);
             auto innerEnd = std::upper_bound(innerStart, end, tGroupId,
-            [](uint32_t value, const SurfParam& surf)
+            [](CommonKey value, const SurfParam& surf)
             {
                 auto tId = surf.second.transformId;
                 return value < TransGroupIdFetcher()(tId);
@@ -1221,11 +1221,11 @@ void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<AccelGroupCon
     auto start = lSurfList.begin();
     while(start != lSurfList.end())
     {
-        uint32_t lGroupId = LightGroupIdFetcher()(start->second.lightId);
+        CommonKey lGroupId = LightGroupIdFetcher()(start->second.lightId);
         auto end = std::upper_bound(start, lSurfList.end(), lGroupId,
-        [](const uint32_t& value, const LightSurfP& surf)
+        [](CommonKey value, const LightSurfP& surf)
         {
-            uint32_t batchPortion = LightGroupIdFetcher()(surf.second.lightId);
+            CommonKey batchPortion = LightGroupIdFetcher()(surf.second.lightId);
             return value < batchPortion;
         });
 
@@ -1263,9 +1263,9 @@ void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<AccelGroupCon
         while(innerStart != end)
         {
             TransformId tId = innerStart->second.transformId;
-            uint32_t tGroupId = TransGroupIdFetcher()(tId);
+            CommonKey tGroupId = TransGroupIdFetcher()(tId);
             auto innerEnd = std::upper_bound(innerStart, end, tGroupId,
-            [](uint32_t value, const LightSurfP& surf) -> bool
+            [](CommonKey value, const LightSurfP& surf) -> bool
             {
                 auto tId = surf.second.transformId;
                 return (value < TransGroupIdFetcher()(tId));
@@ -1417,7 +1417,7 @@ void KCGeneratePrimitiveKeys(MRAY_GRID_CONSTANT const Span<PrimitiveKey> dAllLea
                              //
                              MRAY_GRID_CONSTANT const Span<const PrimRangeArray> dConcretePrimRanges,
                              MRAY_GRID_CONSTANT const Span<const Vector2ui> dConcreteLeafRanges,
-                             MRAY_GRID_CONSTANT const uint32_t groupId);
+                             MRAY_GRID_CONSTANT const CommonKey groupId);
 
 extern MRAY_KERNEL
 void KCSetIsVisibleIndirect(MRAY_GRID_CONSTANT const Bitspan<uint32_t> dIsVisibleBuffer,

@@ -287,10 +287,10 @@ void AcceleratorGroupLinear<PG>::CastLocalRays(// Output
                                                Span<const RayIndex> dRayIndices,
                                                Span<const CommonKey> dAccelKeys,
                                                // Constants
-                                               uint32_t workId,
+                                               CommonKey workId,
                                                const GPUQueue& queue)
 {
-    uint32_t localWorkId = workId - this->globalWorkIdToLocalOffset;
+    CommonKey localWorkId = workId - this->globalWorkIdToLocalOffset;
     const auto& workOpt = this->workInstances.at(localWorkId);
 
     if(!workOpt)
@@ -321,10 +321,10 @@ void AcceleratorGroupLinear<PG>::CastVisibilityRays(// Output
                                                     Span<const RayIndex> dRayIndices,
                                                     Span<const CommonKey> dAccelKeys,
                                                     // Constants
-                                                    uint32_t workId,
+                                                    CommonKey workId,
                                                     const GPUQueue& queue)
 {
-    uint32_t localWorkId = workId - this->globalWorkIdToLocalOffset;
+    CommonKey localWorkId = workId - this->globalWorkIdToLocalOffset;
     const auto& workOpt = this->workInstances.at(localWorkId);
 
     if(!workOpt)

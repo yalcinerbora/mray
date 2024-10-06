@@ -29,13 +29,14 @@ void SimulateBasicPathTracer()
 
     // Maximum medium counts / surface counts on scene.
     constexpr Vector2ui materialBits = Vector2ui(4, 8);
-    constexpr Vector2ui materialKeyBits = Vector2ui(4, 28);
+    constexpr uint32_t totalBits = sizeof(CommonKey) * CHAR_BIT;
+    constexpr Vector2ui materialKeyBits = Vector2ui(4, totalBits - 4);
     using TheKey = KeyT<CommonKey, materialKeyBits[0], materialKeyBits[1]>;
 
     constexpr Vector2ui materialCount = Vector2ui(1 << materialBits[0],
                                                   1 << materialBits[1]);
     // TODO: compile-time determine from "materialCount"
-    constexpr Vector2ui materialBitStart = Vector2ui(28, 0);
+    constexpr Vector2ui materialBitStart = Vector2ui(materialKeyBits[1], 0);
 
     constexpr Vector2ui materialBatchRange = Vector2ui(materialBitStart[0],
                                                        materialBitStart[0] + materialBits[0]);

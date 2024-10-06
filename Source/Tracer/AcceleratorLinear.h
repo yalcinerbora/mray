@@ -136,7 +136,7 @@ class AcceleratorGroupLinear final : public AcceleratorGroupT<AcceleratorGroupLi
                           Span<const RayIndex> dRayIndices,
                           Span<const CommonKey> dAccelKeys,
                           // Constants
-                          uint32_t workId,
+                          CommonKey workId,
                           const GPUQueue& queue) override;
 
     void    CastVisibilityRays(// Output
@@ -148,7 +148,7 @@ class AcceleratorGroupLinear final : public AcceleratorGroupT<AcceleratorGroupLi
                                Span<const RayIndex> dRayIndices,
                                Span<const CommonKey> dAccelKeys,
                                // Constants
-                               uint32_t workId,
+                               CommonKey workId,
                                const GPUQueue& queue) override;
 
     DataSoA SoA() const;

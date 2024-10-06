@@ -257,8 +257,8 @@ void KCClampImage(// Output
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCExpandSamplesToPixels(// Outputs
-                             MRAY_GRID_CONSTANT const Span<uint32_t> dPixelIds,
-                             MRAY_GRID_CONSTANT const Span<uint32_t> dIndices,
+                             MRAY_GRID_CONSTANT const Span<CommonKey> dPixelIds,
+                             MRAY_GRID_CONSTANT const Span<CommonIndex> dIndices,
                              // Inputs
                              MRAY_GRID_CONSTANT const Span<const ImageCoordinate> dImgCoords,
                              // Constants
@@ -345,9 +345,9 @@ MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
 void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan<3> img,
                           // Inputs per segment
                           MRAY_GRID_CONSTANT const Span<const uint32_t> dStartOffsets,
-                          MRAY_GRID_CONSTANT const Span<const uint32_t> dPixelIds,
+                          MRAY_GRID_CONSTANT const Span<const CommonKey> dPixelIds,
                           // Inputs per thread
-                          MRAY_GRID_CONSTANT const Span<const uint32_t> dIndices,
+                          MRAY_GRID_CONSTANT const Span<const CommonIndex> dIndices,
                           // Inputs Accessed by SampleId
                           MRAY_GRID_CONSTANT const Span<const Spectrum> dValues,
                           MRAY_GRID_CONSTANT const Span<const ImageCoordinate> dImgCoords,
@@ -371,7 +371,7 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan<3> img,
     using ReduceShMem = typename WarpReduceVec4::TempStorage;
     // Per-Warp Shared Memory
     MRAY_SHARED_MEMORY Vector2ui    sSegmentRange[WARP_PER_BLOCK];
-    MRAY_SHARED_MEMORY uint32_t     sResonsiblePixel[WARP_PER_BLOCK];
+    MRAY_SHARED_MEMORY CommonKey    sResonsiblePixel[WARP_PER_BLOCK];
     MRAY_SHARED_MEMORY ReduceShMem  sReduceMem[WARP_PER_BLOCK];
 
     // Warp-stride loop
@@ -540,7 +540,10 @@ void KCSetImagePixels(MRAY_GRID_CONSTANT const ImageSpan<3> img,
         Vector3 val = img.FetchPixel(pixCoords);
         Float weight = img.FetchWeight(pixCoords);
 
-        val += Vector3(dValues[i]) * dFilterWeights[i];
+        Vector3 valueIn = dValues[i].HasNaN()
+                            ? BIG_MAGENTA
+                            : Vector3(dValues[i]);
+        val += valueIn * dFilterWeights[i];
         weight += Float(1);
 
         img.StorePixel(val, pixCoords);
@@ -569,7 +572,10 @@ void KCSetImagePixelsIndirect(MRAY_GRID_CONSTANT const ImageSpan<3> img,
         Vector3 val = img.FetchPixel(pixCoords);
         Float weight = img.FetchWeight(pixCoords);
 
-        val += Vector3(dValues[index]) * dFilterWeights[index];
+        Vector3 valueIn = dValues[index].HasNaN()
+                            ? BIG_MAGENTA
+                            : Vector3(dValues[index]);
+        val += valueIn * dFilterWeights[index];
         weight += Float(1);
 
         img.StorePixel(val, pixCoords);

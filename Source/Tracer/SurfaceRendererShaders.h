@@ -199,25 +199,29 @@ void SurfRDetail::WorkFunctionCommon(const Prim&, const Material&, const Surface
             LightOrMatKey lmKey = params.in.dKeys[rayIndex].lightOrMatKey;
             MaterialKey mKey = MaterialKey::CombinedKey(lmKey.FetchBatchPortion(),
                                                         lmKey.FetchIndexPortion());
-            color = Color::RandomColorRGB(static_cast<uint32_t>(mKey));
+            CommonKey k = mKey.FetchBatchPortion() ^ mKey.FetchIndexPortion();
+            color = Color::RandomColorRGB(static_cast<uint32_t>(k));
             break;
         }
         case PRIM_ID:
         {
             PrimitiveKey pKey = params.in.dKeys[rayIndex].primKey;
-            color = Color::RandomColorRGB(static_cast<uint32_t>(pKey));
+            CommonKey k = pKey.FetchBatchPortion() ^ pKey.FetchIndexPortion();
+            color = Color::RandomColorRGB(static_cast<uint32_t>(k));
             break;
         }
         case ACCEL_ID:
         {
             AcceleratorKey aKey = params.in.dKeys[rayIndex].accelKey;
-            color = Color::RandomColorRGB(static_cast<uint32_t>(aKey));
+            CommonKey k = aKey.FetchBatchPortion() ^ aKey.FetchIndexPortion();
+            color = Color::RandomColorRGB(static_cast<uint32_t>(k));
             break;
         }
         case TRANSFORM_ID:
         {
             TransformKey tKey = params.in.dKeys[rayIndex].transKey;
-            color = Color::RandomColorRGB(static_cast<uint32_t>(tKey));
+            CommonKey k = tKey.FetchBatchPortion() ^ tKey.FetchIndexPortion();
+            color = Color::RandomColorRGB(static_cast<uint32_t>(k));
             break;
         }
         case UV:

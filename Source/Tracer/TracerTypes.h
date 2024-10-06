@@ -5,6 +5,7 @@
 #include "Core/Ray.h"
 #include "Core/AABB.h"
 #include "Core/Quaternion.h"
+#include "Core/MRayDescriptions.h"
 
 #include "Hit.h"
 #include "Key.h"
@@ -82,7 +83,7 @@ inline constexpr Float     VisibleSpectrumMiddle = VisibleSpectrumRange.Sum() * 
 // Invalid spectrum, this will be set when some form of numerical
 // error occurs (i.e. a NaN is found). It is specifically oversaturated
 // to "pop out" on the image (tonemapper probably darken everything else etc)
-static constexpr Vector3 BIG_MAGENTA = Vector3(1e4, 0.0, 1e4);
+static constexpr Vector3 BIG_MAGENTA = Vector3(1e7, 0.0, 1e7);
 
 // Some key types
 // these are defined seperately for fine-tuning
@@ -92,8 +93,9 @@ static constexpr Vector3 BIG_MAGENTA = Vector3(1e4, 0.0, 1e4);
 // (TODO: make these compile time def (via cmake input)
 // and all the key combination bit sizes)
 // User may want to mix and match these
-using CommonKey = uint32_t;
-using CommonIndex = uint32_t;
+using CommonKey = MRay::CommonKey;
+using CommonIndex = MRay::CommonIndex;
+static constexpr CommonKey CommonKeyBits = sizeof(CommonKey) * CHAR_BIT;
 
 // Work key when a ray hit an object
 // this key will be used to partition
@@ -102,13 +104,13 @@ using CommonIndex = uint32_t;
 using AccelWorkKey = KeyT<CommonKey, 8, 24>;
 
 // Accelerator key
-using AcceleratorKey    = KeyT<CommonKey, 12, 20>;
-using PrimitiveKey      = KeyT<CommonKey, 4, 28>;
-using PrimBatchKey      = KeyT<CommonKey, 4, 28>;
-using TransformKey      = KeyT<CommonKey, 8, 24>;
-using MediumKey         = KeyT<CommonKey, 8, 24>;
-using CameraKey         = KeyT<CommonKey, 8, 24>;
-using MaterialKey       = KeyT<CommonKey, 11, 21>;
+using AcceleratorKey    = KeyT<CommonKey, 12, CommonKeyBits - 12>;
+using PrimitiveKey      = KeyT<CommonKey,  4, CommonKeyBits -  4>;
+using PrimBatchKey      = KeyT<CommonKey,  4, CommonKeyBits -  4>;
+using TransformKey      = KeyT<CommonKey,  8, CommonKeyBits -  8>;
+using MediumKey         = KeyT<CommonKey,  8, CommonKeyBits -  8>;
+using CameraKey         = KeyT<CommonKey,  8, CommonKeyBits -  8>;
+using MaterialKey       = KeyT<CommonKey, 11, CommonKeyBits - 11>;
 using LightKey          = MaterialKey;
 using LightOrMatKey     = TriKeyT<CommonKey, 1,
                                   LightKey::BatchBits - 1,
@@ -151,6 +153,7 @@ struct BxDFResult
     Ray         wI;
     Spectrum    reflectance;
     MediumKey   mediumKey;
+    bool        isPassedThrough = false;
 };
 
 struct VoxelizationParameters

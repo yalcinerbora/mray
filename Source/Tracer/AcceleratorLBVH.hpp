@@ -446,7 +446,7 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
                        hConcreteNodeRangesVec, queue);
     else for(const auto& kv : this->workInstances)
     {
-        Pair<const uint32_t, const AcceleratorWorkI*> input(kv.first, kv.second.get());
+        Pair<const CommonKey, const AcceleratorWorkI*> input(kv.first, kv.second.get());
         MulitBuildLBVH(&input, hInstanceNodeRangesVec,
                        hConcreteNodeRangesVec, queue);
     }
@@ -468,7 +468,7 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
 }
 
 template<PrimitiveGroupC PG>
-void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const AcceleratorWorkI*>* accelWork,
+void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const CommonKey, const AcceleratorWorkI*>* accelWork,
                                               const std::vector<Vector2ui>& instanceNodeRanges,
                                               const std::vector<Vector2ui>& concreteNodeRanges,
                                               const GPUQueue& queue)
@@ -483,7 +483,7 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const uint32_t, const Acceler
     Span<TransformKey> dLocalTransformKeys;
     if constexpr(PER_PRIM_TRANSFORM)
     {
-        uint32_t workIndex = accelWork->first;
+        CommonKey workIndex = accelWork->first;
         Vector2ui workInstanceRange = Vector2ui(this->workInstanceOffsets[workIndex],
                                                 this->workInstanceOffsets[workIndex + 1]);
         dLocalTransformKeys = dTransformKeys.subspan(workInstanceRange[0],
@@ -824,10 +824,10 @@ void AcceleratorGroupLBVH<PG>::CastLocalRays(// Output
                                                Span<const RayIndex> dRayIndices,
                                                Span<const CommonKey> dAccelKeys,
                                                // Constants
-                                               uint32_t workId,
+                                               CommonKey workId,
                                                const GPUQueue& queue)
 {
-    uint32_t localWorkId = workId - this->globalWorkIdToLocalOffset;
+    CommonKey localWorkId = workId - this->globalWorkIdToLocalOffset;
     const auto& workOpt = this->workInstances.at(localWorkId);
 
     if(!workOpt)
@@ -858,10 +858,10 @@ void AcceleratorGroupLBVH<PG>::CastVisibilityRays(// Output
                                                   Span<const RayIndex> dRayIndices,
                                                   Span<const CommonKey> dAccelKeys,
                                                   // Constants
-                                                  uint32_t workId,
+                                                  CommonKey workId,
                                                   const GPUQueue& queue)
 {
-    uint32_t localWorkId = workId - this->globalWorkIdToLocalOffset;
+    CommonKey localWorkId = workId - this->globalWorkIdToLocalOffset;
     const auto& workOpt = this->workInstances.at(localWorkId);
 
     if(!workOpt)

@@ -1177,8 +1177,8 @@ void SceneLoaderMRay::LoadMediums(TracerI& tracer, ExceptionList& exceptions)
                 auto& data = dataOut[attribIndex];
                 MediumId idStart = ids.front();
                 MediumId idEnd = ids.back();
-                auto range = Vector2ui(static_cast<uint32_t>(idStart),
-                                       static_cast<uint32_t>(idEnd));
+                auto range = CommonIdRange(std::bit_cast<CommonId>(idStart),
+                                           std::bit_cast<CommonId>(idEnd));
                 if(std::get<IS_TEX_INDEX>(list[attribIndex]) == MR_CONSTANT_ONLY)
                     tracer.PushMediumAttribute(groupId, range, attribIndex,
                                                std::move(data.data));
@@ -1267,8 +1267,8 @@ void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
                 auto& data = dataOut[attribIndex];
                 MaterialId idStart = ids.front();
                 MaterialId idEnd = ids.back();
-                auto range = Vector2ui(static_cast<uint32_t>(idStart),
-                                       static_cast<uint32_t>(idEnd));
+                auto range = CommonIdRange(std::bit_cast<CommonId>(idStart),
+                                           std::bit_cast<CommonId>(idEnd));
                 if(std::get<IS_TEX_INDEX>(list[attribIndex]) == MR_CONSTANT_ONLY)
                     tracer.PushMatAttribute(groupId, range, attribIndex,
                                             std::move(data.data));
@@ -1333,8 +1333,8 @@ void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ExceptionList& exceptions)
             {
                 TransformId idStart = ids.front();
                 TransformId idEnd = ids.back();
-                auto range = Vector2ui(static_cast<uint32_t>(idStart),
-                                       static_cast<uint32_t>(idEnd));
+                auto range = CommonIdRange(std::bit_cast<CommonId>(idStart),
+                                           std::bit_cast<CommonId>(idEnd));
                 tracer.PushTransAttribute(groupId, range, attribIndex,
                                           std::move(data));
                 attribIndex++;
@@ -1530,8 +1530,8 @@ void SceneLoaderMRay::LoadCameras(TracerI& tracer, ExceptionList& exceptions)
             {
                 CameraId idStart = ids.front();
                 CameraId idEnd = ids.back();
-                auto range = Vector2ui(static_cast<uint32_t>(idStart),
-                                       static_cast<uint32_t>(idEnd));
+                auto range = CommonIdRange(std::bit_cast<CommonId>(idStart),
+                                           std::bit_cast<CommonId>(idEnd));
                 tracer.PushCamAttribute(groupId, range, attribIndex,
                                         std::move(data));
                 attribIndex++;
@@ -1629,8 +1629,8 @@ void SceneLoaderMRay::LoadLights(TracerI& tracer, ExceptionList& exceptions)
                 auto& data = dataOut[attribIndex];
                 LightId idStart = ids.front();
                 LightId idEnd = ids.back();
-                auto range = Vector2ui(static_cast<uint32_t>(idStart),
-                                       static_cast<uint32_t>(idEnd));
+                auto range = CommonIdRange(std::bit_cast<CommonId>(idStart),
+                                           std::bit_cast<CommonId>(idEnd));
                 if(std::get<IS_TEX_INDEX>(list[attribIndex]) == MR_CONSTANT_ONLY)
                     tracer.PushLightAttribute(groupId, range, attribIndex,
                                               std::move(data.data));

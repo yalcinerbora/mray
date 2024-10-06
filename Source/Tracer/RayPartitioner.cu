@@ -119,7 +119,7 @@ void KCFindSplits(//Output
     assert(gMarks.size() == gSortedKeys.size());
     KernelCallParams kp;
 
-    std::array<uint32_t, 2> range = {batchBitRange[0], batchBitRange[1]};
+    std::array<CommonKey, 2> range = {batchBitRange[0], batchBitRange[1]};
     uint32_t locCount = static_cast<uint32_t>(gSortedKeys.size() - 1);
 
     for(uint32_t globalId = kp.GlobalId();
@@ -402,7 +402,7 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
         }
     );
     Span<uint32_t> hdPartitionStartOffsets = (isResultsInHostVisible) ? hPartitionStartOffsets : dPartitionStartOffsets;
-    Span<uint32_t> hdPartitionKeys = (isResultsInHostVisible) ? hPartitionKeys : dPartitionKeys;
+    Span<CommonKey> hdPartitionKeys = (isResultsInHostVisible) ? hPartitionKeys : dPartitionKeys;
 
     // Debug check to find if partition count
     // found out is more than the set maximum.
