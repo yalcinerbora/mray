@@ -10,6 +10,10 @@ struct LightSampleOutput
 {
     uint32_t    lightIndex;
     Vector3     position;
+    Spectrum    emission;
+
+    MRAY_HYBRID
+    Pair<Ray, Vector2>  SampledRay(const Vector3& distantPoint) const;
 };
 using LightSample = SampleT<LightSampleOutput>;
 
@@ -29,9 +33,11 @@ class DirectLightSamplerViewUniform
     MetaLightArray dMetaLights;
 
     public:
+    template <class SpectrumConverterContext>
     MRAY_HYBRID
     LightSample SampleLight(RNGDispenser& rng,
-                            const Vector3& lookPosition) const;
+                            const typename SpectrumConverterContext::Converter&,
+                            const Vector3& distantPoint) const;
 
     MRAY_HYBRID
     Float       PdfLight(uint32_t index, const MetaHit& hit,
@@ -39,14 +45,29 @@ class DirectLightSamplerViewUniform
 
 };
 
+MRAY_HYBRID MRAY_CGPU_INLINE
+Pair<Ray, Vector2> LightSampleOutput::SampledRay(const Vector3& distantPoint) const
+{
+    Vector3 dir = position - distantPoint;
+    // Nudge the position back here, this will be used
+    // for visibility check
+    // TODO: Bad usage of API, constructing a ray to nudge a position
+    Vector3 pos = Ray(Vector3::Zero(), position).Nudge(-dir).Pos();
+    dir = pos - distantPoint;
+
+    Float length = dir.Length();
+    dir *= (Float(1) / length);
+    return Pair(Ray(dir, distantPoint), Vector2(0, length));
+}
+
 template <class ML>
-MRAY_HYBRID
+template <class SpectrumConverterContext>
+MRAY_HYBRID MRAY_CGPU_INLINE
 LightSample DirectLightSamplerViewUniform<ML>::SampleLight(RNGDispenser& rng,
+                                                           const typename SpectrumConverterContext::Converter& stConverter,
                                                            const Vector3& distantPoint) const
 {
-    using STIdentity = SpectrumConverterContextIdentity;
-    using MetaLightView = typename ML::template MetaLightView<STIdentity>;
-    STIdentity stIdentity;
+    using MetaLightView = typename ML::template MetaLightView<SpectrumConverterContext>;
 
     uint32_t lightCount = dMetaLights.Size();
     Float lightCountF = Float(lightCount);
@@ -58,7 +79,11 @@ LightSample DirectLightSamplerViewUniform<ML>::SampleLight(RNGDispenser& rng,
     // due to precision.
     lightIndex = Math::Clamp(lightIndex, 0u, lightCount - 1u);
     // Actual sampling
-    MetaLightView metaLight = dMetaLights(stIdentity, lightIndex);
+
+    // TODO: ....
+    MetaLightView metaLight = dMetaLights
+        .template operator()<SpectrumConverterContext>(stConverter, lightIndex);
+
     SampleT<Vector3> pointSample = metaLight.SampleSolidAngle(rng, distantPoint);
 
     Float selectionPdf = Float(1) / lightCountF;
@@ -74,7 +99,7 @@ LightSample DirectLightSamplerViewUniform<ML>::SampleLight(RNGDispenser& rng,
 }
 
 template <class ML>
-MRAY_HYBRID
+MRAY_HYBRID MRAY_CGPU_INLINE
 Float DirectLightSamplerViewUniform<ML>::PdfLight(uint32_t index,
                                                   const MetaHit& hit,
                                                   const Ray& r) const

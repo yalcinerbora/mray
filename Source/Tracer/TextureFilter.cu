@@ -112,6 +112,15 @@ Vector4 FilterPixel(const Vector2ui& pixelCoord,
     return writePix;
 }
 
+MRAY_HYBRID MRAY_GPU_INLINE
+Tuple<Vector3, Float> ConvertNaNsToColor(Spectrum value, Float weight)
+{
+    if(value.HasNaN())
+        return Tuple(BIG_MAGENTA(), weight * Float(128.0));
+    else
+        return Tuple(Vector3(value), weight);
+}
+
 // TODO: Should we dedicate a warp per pixel?
 template<uint32_t TPB, class Filter>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
@@ -540,11 +549,9 @@ void KCSetImagePixels(MRAY_GRID_CONSTANT const ImageSpan<3> img,
         Vector3 val = img.FetchPixel(pixCoords);
         Float weight = img.FetchWeight(pixCoords);
 
-        Vector3 valueIn = dValues[i].HasNaN()
-                            ? BIG_MAGENTA
-                            : Vector3(dValues[i]);
+        auto [valueIn, sampleIn] = ConvertNaNsToColor(dValues[i], i);
         val += valueIn * dFilterWeights[i];
-        weight += Float(1);
+        weight += sampleIn;
 
         img.StorePixel(val, pixCoords);
         img.StoreWeight(weight, pixCoords);
@@ -571,12 +578,9 @@ void KCSetImagePixelsIndirect(MRAY_GRID_CONSTANT const ImageSpan<3> img,
 
         Vector3 val = img.FetchPixel(pixCoords);
         Float weight = img.FetchWeight(pixCoords);
-
-        Vector3 valueIn = dValues[index].HasNaN()
-                            ? BIG_MAGENTA
-                            : Vector3(dValues[index]);
+        auto [valueIn, sampleIn] = ConvertNaNsToColor(dValues[index], i);
         val += valueIn * dFilterWeights[index];
-        weight += Float(1);
+        weight += sampleIn;
 
         img.StorePixel(val, pixCoords);
         img.StoreWeight(weight, pixCoords);

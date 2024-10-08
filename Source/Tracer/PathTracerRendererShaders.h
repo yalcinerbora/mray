@@ -91,7 +91,7 @@ namespace PathTraceRDetail
     enum class RayType : uint8_t
     {
         SHADOW_RAY,
-        SPECULAR_PATH_RAY,
+        SPECULAR_RAY,
         PATH_RAY,
         CAMERA_RAY
     };
@@ -128,7 +128,7 @@ namespace PathTraceRDetail
 
     struct alignas(4) PathDataPack
     {
-        uint8_t    depth;
+        uint8_t     depth;
         PathStatus  status;
         RayType     type;
     };
@@ -146,7 +146,9 @@ namespace PathTraceRDetail
         Span<RayGMem>           dOutRays;
         Span<RayDiff>           dOutRayDiffs;
         // Only used when NEE/MIS is active
-        Span<Float>             dPrevMaterialPDF;
+        Span<Float>             dPrevMatPDF;
+        Span<Spectrum>          dShadowRayRadiance;
+        Span<uint32_t>          dShadowRayLightIndex;
     };
 
     template<class LightSampler, PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
@@ -208,7 +210,9 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
 {
     using Distribution::Common::RussianRoulette;
     using Distribution::Common::DivideByPDF;
-    //
+    // ================ //
+    // Sample Material  //
+    // ================ //
     auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
     Vector3 wO = -tContext.InvApplyN(rayIn.Dir()).Normalize();
     SampleT<BxDFResult> raySample = mat.SampleBxDF(wO, surf, rng);
@@ -235,22 +239,44 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
         isPathDead = !result.has_value();
         throughput = result.value_or(throughput);
     }
-    if(isPathDead) dataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
+
+    //if(!isPathDead && params.globalState.sampleMode == SampleMode::E::NEE_WITH_MIS)
+    //{
+
+    //}
+    //else
+    //{
+    //}
+
+    // Selectively write if path is alive
+    if(!isPathDead)
+    {
+        // If alive update througput
+        params.rayState.dThroughput[rayIndex] = DivideByPDF(throughput, raySample.pdf);
+
+        // Save the previous pdf (aka. current pdf, naming is for the user)
+        // To correctly do MIS we will need it
+        if(params.globalState.sampleMode == SampleMode::E::NEE_WITH_MIS)
+            params.rayState.dPrevMatPDF[rayIndex] = raySample.pdf;
+
+        // ================ //
+        //  Scattered Ray   //
+        // ================ //
+        Vector3 nudgeNormal = (raySample.value.isPassedThrough)
+            ? -surf.geoNormal
+            : surf.geoNormal;
+        Ray rayOut = Ray(wI, surf.position);
+        rayOut.NudgeSelf(nudgeNormal);
+        // If I remember correctly, OptiX does not like INF on rays,
+        // so we put flt_max here.
+        Vector2 tMMOut = Vector2(0, std::numeric_limits<Float>::max());
+        RayToGMem(params.rayState.dOutRays, rayIndex, rayOut, tMMOut);
+    }
+    else dataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
 
     // Write the updated state back
     params.rayState.dPathDataPack[rayIndex] = dataPack;
-    params.rayState.dThroughput[rayIndex] = DivideByPDF(throughput, raySample.pdf);
 
-    // New ray
-    Vector3 nudgeNormal = (raySample.value.isPassedThrough)
-                            ? -surf.geoNormal
-                            : surf.geoNormal;
-    Ray rayOut = Ray(wI, surf.position);
-    rayOut.NudgeSelf(nudgeNormal);
-    // If I remember correctly, OptiX does not like INF on rays,
-    // so we put flt_max here.
-    Vector2 tMMOut = Vector2(0, std::numeric_limits<Float>::max());
-    RayToGMem(params.rayState.dOutRays, rayIndex, rayOut, tMMOut);
 }
 
 template<LightC Light, LightGroupC LG, TransformGroupC TG>
@@ -301,11 +327,69 @@ template<class LightSampler, PrimitiveC Prim, MaterialC Material,
     class Surface, class TContext,
     PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
 MRAY_HYBRID MRAY_CGPU_INLINE
-void PathTraceRDetail::WorkFunctionWithNEE(const Prim&, const Material&, const Surface&,
-                                           const TContext&, RNGDispenser&,
-                                           const WorkParams<LightSampler, PG, MG, TG>&,
-                                           RayIndex)
+void PathTraceRDetail::WorkFunctionWithNEE(const Prim&, const Material& mat, const Surface& surf,
+                                           const TContext& tContext, RNGDispenser& rng,
+                                           const WorkParams<LightSampler, PG, MG, TG>& params,
+                                           RayIndex rayIndex)
 {
+    // TODO: We need to get the context from somewhere
+    // &&
+    // TODO: Add spectrum related stuff, this should not be
+    // default constructed
+    typename SpectrumConverterContextIdentity::Converter specConverter;
+    using IdentityST = SpectrumConverterContextIdentity;
+
+    using Distribution::Common::RussianRoulette;
+    using Distribution::Common::DivideByPDF;
+    // ================ //
+    //       NEE        //
+    // ================ //
+    auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
+    Vector3 wO = -tContext.InvApplyN(rayIn.Dir()).Normalize();
+    const LightSampler& lightSampler = params.globalState.lightSampler;
+    Vector3 worldPos = tContext.ApplyP(surf.position);
+    LightSample lightSample = lightSampler.template SampleLight<IdentityST>(rng, specConverter, worldPos);
+    auto [shadowRay, shadowTMM] = lightSample.value.SampledRay(worldPos);
+    //
+    Spectrum reflectance = mat.Evaluate(shadowRay, wO, surf);
+    Spectrum throughput = params.rayState.dThroughput[rayIndex];
+    throughput *= reflectance;
+
+    // Either do MIS or normal sampling
+    Float pdf;
+    if(params.globalState.sampleMode == SampleMode::E::NEE_WITH_MIS)
+    {
+        using Distribution::MIS::BalanceCancelled;
+        Float bxdfPdf = mat.Pdf(shadowRay, wO, surf);
+        std::array<Float, 2> pdfs = {bxdfPdf, lightSample.pdf};
+        std::array<Float, 2> weights = {0.5, 0.5};
+        pdf = BalanceCancelled<2>(pdfs, weights);
+    }
+    else pdf = lightSample.pdf;
+    // Pre-calculate the result, we will only do a visibility
+    // check and if it succeeds we accumulate later
+    Spectrum shadowRadiance = throughput * lightSample.value.emission;
+    shadowRadiance = DivideByPDF(shadowRadiance, pdf);
+
+    // Writing
+    if(MaterialCommon::IsSpecular(mat.Specularity(surf)))
+    {
+        // Set the shadow ray as specular ray, we overwrite the ray state
+        // but ray state is important for rays that hit light.
+        // And next call (material-related one) will overwrite it
+        // anyway.
+        params.rayState.dPathDataPack[rayIndex].type = RayType::SPECULAR_RAY;
+    }
+    else
+    {
+        RayToGMem(params.rayState.dOutRays, rayIndex,
+                  shadowRay, shadowTMM);
+        // We can't overwrite the path throughput,
+        // we will need it on next iteration
+        params.rayState.dShadowRayRadiance[rayIndex] = shadowRadiance;
+        params.rayState.dShadowRayLightIndex[rayIndex] = lightSample.value.lightIndex;
+        params.rayState.dPathDataPack[rayIndex].type = RayType::SHADOW_RAY;
+    }
 }
 
 template<class LightSampler, LightC Light, LightGroupC LG, TransformGroupC TG>

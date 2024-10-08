@@ -438,8 +438,8 @@ constexpr Vector2 SphericalAnglesToUV(const Vector2& thetaPhi)
            thetaPhi[1] <= Pi<Float>());
 
     // Normalize to generate UV [0, 1]
-    Float u = (thetaPhi[0] + Pi<Float>()) * 0.5f / Pi<Float>();
-    Float v = 1 - (thetaPhi[1] * InvPi<Float>());
+    Float u = (thetaPhi[0] + Pi<Float>()) * Float(0.5) / Pi<Float>();
+    Float v = Float(1) - (thetaPhi[1] * InvPi<Float>());
     return Vector2(u, v);
 }
 template<uint32_t C>

@@ -57,7 +57,7 @@ SampleT<BasicSurface> Sphere<T>::SampleSurface(RNGDispenser& rng) const
     Float pdf = Float(1) / GetSurfaceArea();
 
     Vector3 sphrLoc = center + radius * unitPos;
-    sphrLoc = transformContext.get().Apply(sphrLoc);
+    sphrLoc = transformContext.get().ApplyP(sphrLoc);
     Vector3 normal = transformContext.get().ApplyN(unitPos.Normalize());
 
     return SampleT<BasicSurface>
@@ -86,7 +86,7 @@ Float Sphere<T>::GetSurfaceArea() const
     static constexpr Float p = Float(8) / Float(5);
     static constexpr Float pRecip = Float(1) / p;
 
-    Vector3 semiAxes = radius * transformContext.Scale();
+    Vector3 semiAxes = radius * transformContext.get().Scale();
     Float approxArea = pow(semiAxes[1] * semiAxes[2], p);
     approxArea += pow(semiAxes[2] * semiAxes[0], p);
     approxArea += pow(semiAxes[0] * semiAxes[1], p);

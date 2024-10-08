@@ -91,9 +91,9 @@ Spectrum LambertMaterial<ST>::Evaluate(const Ray& wI,
     Vector3 wILocal = surface.shadingTBN.ApplyRotation(wI.Dir());
 
     Float nDotL = std::max(normal.Dot(wILocal), Float(0));
-    Spectrum albedo = sTransContext(albedoTex(surface.uv,
-                                              surface.dpdu,
-                                              surface.dpdv));
+    Spectrum albedo = albedoTex(surface.uv,
+                                surface.dpdu,
+                                surface.dpdv).value();
     return nDotL * albedo * MathConstants::InvPi<Float>();
 }
 
@@ -123,6 +123,13 @@ bool LambertMaterial<ST>::IsAllTexturesAreResident(const Surface& surface) const
         allResident &= (*normalMapTex)(surface.uv).has_value();
     }
     return allResident;
+}
+
+template <class ST>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float LambertMaterial<ST>::Specularity(const Surface&) const
+{
+    return Float(0);
 }
 
 }
@@ -168,9 +175,9 @@ SampleT<BxDFResult> ReflectMaterial<ST>::SampleBxDF(const Vector3& wO,
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float ReflectMaterial<ST>::Pdf(const Ray& wI,
-                               const Vector3& wO,
-                               const Surface& surface) const
+Float ReflectMaterial<ST>::Pdf(const Ray&,
+                               const Vector3&,
+                               const Surface&) const
 {
     // We can not sample this
     return Float(0.0);
@@ -178,9 +185,9 @@ Float ReflectMaterial<ST>::Pdf(const Ray& wI,
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum ReflectMaterial<ST>::Evaluate(const Ray& wI,
-                                       const Vector3& wO,
-                                       const Surface& surface) const
+Spectrum ReflectMaterial<ST>::Evaluate(const Ray&,
+                                       const Vector3&,
+                                       const Surface&) const
 {
     return Spectrum(1);
 }
@@ -194,15 +201,22 @@ bool ReflectMaterial<ST>::IsEmissive() const
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum ReflectMaterial<ST>::Emit(const Vector3& wO,
-                                   const Surface& surf) const
+Spectrum ReflectMaterial<ST>::Emit(const Vector3&,
+                                   const Surface&) const
 {
     return Spectrum::Zero();
 }
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-bool ReflectMaterial<ST>::IsAllTexturesAreResident(const Surface& surface) const
+Float ReflectMaterial<ST>::Specularity(const Surface&) const
+{
+    return Float(1);
+}
+
+template <class ST>
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool ReflectMaterial<ST>::IsAllTexturesAreResident(const Surface&) const
 {
     return true;
 }
@@ -289,9 +303,9 @@ SampleT<BxDFResult> RefractMaterial<ST>::SampleBxDF(const Vector3& wO,
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float RefractMaterial<ST>::Pdf(const Ray& wI,
-                               const Vector3& wO,
-                               const Surface& surface) const
+Float RefractMaterial<ST>::Pdf(const Ray&,
+                               const Vector3&,
+                               const Surface&) const
 {
     // We can not sample this
     return Float(0.0);
@@ -299,9 +313,9 @@ Float RefractMaterial<ST>::Pdf(const Ray& wI,
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum RefractMaterial<ST>::Evaluate(const Ray& wI,
-                                       const Vector3& wO,
-                                       const Surface& surface) const
+Spectrum RefractMaterial<ST>::Evaluate(const Ray&,
+                                       const Vector3&,
+                                       const Surface&) const
 {
     return Spectrum(1);
 }
@@ -315,15 +329,22 @@ bool RefractMaterial<ST>::IsEmissive() const
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum RefractMaterial<ST>::Emit(const Vector3& wO,
-                                   const Surface& surf) const
+Spectrum RefractMaterial<ST>::Emit(const Vector3&,
+                                   const Surface&) const
 {
     return Spectrum::Zero();
 }
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-bool RefractMaterial<ST>::IsAllTexturesAreResident(const Surface& surface) const
+Float RefractMaterial<ST>::Specularity(const Surface&) const
+{
+    return Float(1);
+}
+
+template <class ST>
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool RefractMaterial<ST>::IsAllTexturesAreResident(const Surface&) const
 {
     return true;
 }
@@ -497,7 +518,7 @@ SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
 
     Spectrum reflectance = diffuseTerm + specularTerm;
     MediumKey outMedium = surface.backSide ? mediumKeys.Back() : mediumKeys.Front();
-    // Go all the way to the local space
+    // All done!
     return SampleT<BxDFResult>
     {
         .value = BxDFResult
@@ -546,7 +567,7 @@ Float UnrealMaterial<ST>::Pdf(const Ray& wI,
     Float VdH = std::max(Float(0), V.Dot(H));
     Float D = BxDF::DGGX(NdH, alpha);
     pdf[1] = BxDF::VNDFGGXSmithPDF(V, H, alpha);
-    pdf[1] = (std::isnan(D) || std::isinf(D)) ? Float(0) : pdf[1];
+    pdf[1] = (Math::IsNan(D) || Math::IsInf(D)) ? Float(0) : pdf[1];
     pdf[1] = (VdH == Float(0)) ? Float(0) : pdf[1] / (Float(4) * VdH);
 
     Float result = MIS::BalanceCancelled<2>(pdf, weights);
@@ -563,9 +584,6 @@ Spectrum UnrealMaterial<ST>::Evaluate(const Ray& wI,
     // Get the data first
     auto [roughness, metallic, specular, albedo] = FetchData(surface);
     Float alpha = roughness * roughness;
-    // TODO: This should be in spectrum converter, for RGB factor will
-    // be 0.33..3, but for other it will be 0.25
-    Float avgAlbedo = albedo.Sum() * Float(0.3333);
     // Microfacet dist functions are all in tangent space
     Quaternion toTangentSpace = surface.shadingTBN;
     if(normalMapTex)
@@ -630,6 +648,17 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum UnrealMaterial<ST>::Emit(const Vector3&, const Surface&) const
 {
     return Spectrum::Zero();
+}
+
+template <class ST>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float UnrealMaterial<ST>::Specularity(const Surface& surface) const
+{
+    auto [_, metallic, specular, albedo] = FetchData(surface);
+    // TODO: This should be in spectrum converter, for RGB factor will
+    // be 0.33..3, but for other it will be 0.25
+    Float avgAlbedo = albedo.Sum() * Float(0.3333);
+    return Float(1) - MISRatio(metallic, specular, avgAlbedo);
 }
 
 template <class ST>

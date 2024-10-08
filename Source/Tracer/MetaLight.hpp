@@ -10,11 +10,14 @@ MetaLightViewT<V, ST>::MetaLightViewT(const V& v, const SpectrumConverter& sc)
 template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Vector3> MetaLightViewT<V, ST>::SampleSolidAngle(RNGDispenser& rng,
-                                                              const Vector3& distantPoint) const
+                                                         const Vector3& distantPoint) const
 {
-    return DeviceVisit(light, [&](auto&& l) -> Float
+    return DeviceVisit(light, [&](auto&& l) -> SampleT<Vector3>
     {
-        return l.SampleSolidAngle(rng, distantPoint);
+        using T = std::remove_cvref_t<decltype(l)>;
+        if constexpr(std::is_same_v<T, std::monostate>)
+            return SampleT<Vector3>{};
+        else return l.SampleSolidAngle(rng, distantPoint);
     });
 }
 
@@ -26,9 +29,15 @@ Float MetaLightViewT<V, ST>::PdfSolidAngle(const MetaHit& hit,
 {
     return DeviceVisit(light, [=](auto&& l) -> Float
     {
-        using HitType = decltype(l)::Primitive::Hit;
-        HitType hitIn = hit.template AsVector<HitType::Dims>();
-        return l.PdfSolidAngle(hitIn, distantPoint, dir);
+        using T = std::remove_cvref_t<decltype(l)>;
+        if constexpr(std::is_same_v<T, std::monostate>)
+            return Float(0);
+        else
+        {
+            using HitType = decltype(l)::Primitive::Hit;
+            HitType hitIn = hit.template AsVector<HitType::Dims>();
+            return l.PdfSolidAngle(hitIn, distantPoint, dir);
+        }
     });
 }
 
@@ -36,9 +45,12 @@ template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t MetaLightViewT<V, ST>::SampleSolidAngleRNCount() const
 {
-    return DeviceVisit(light, [&](auto&& l) -> Float
+    return DeviceVisit(light, [&](auto&& l) -> uint32_t
     {
-        return l.SampleSolidAngleRNCount();
+        using T = std::remove_cvref_t<decltype(l)>;
+        if constexpr(std::is_same_v<T, std::monostate>)
+            return 0;
+        else return l.SampleSolidAngleRNCount();
     });
 }
 
@@ -48,7 +60,10 @@ SampleT<Ray> MetaLightViewT<V, ST>::SampleRay(RNGDispenser& rng) const
 {
     return DeviceVisit(light, [&](auto&& l) -> SampleT<Ray>
     {
-        return l.SampleRay(rng);
+        using T = std::remove_cvref_t<decltype(l)>;
+        if constexpr(std::is_same_v<T, std::monostate>)
+            return SampleT<Ray>{};
+        else return l.SampleRay(rng);
     });
 }
 
@@ -56,9 +71,12 @@ template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float MetaLightViewT<V, ST>::PdfRay(const Ray& ray) const
 {
-    return DeviceVisit(light, [&](auto&& l) -> SampleT<Ray>
+    return DeviceVisit(light, [&](auto&& l) -> Float
     {
-        return l.SampleRay(ray);
+        using T = std::remove_cvref_t<decltype(l)>;
+        if constexpr(std::is_same_v<T, std::monostate>)
+            return Float(0);
+        else return l.SampleRay(ray);
     });
 }
 
@@ -66,9 +84,12 @@ template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t MetaLightViewT<V, ST>::SampleRayRNCount() const
 {
-    return DeviceVisit(light, [&](auto&& l) -> SampleT<Ray>
+    return DeviceVisit(light, [&](auto&& l) -> uint32_t
     {
-        return l.SampleRayRNCount();
+        using T = std::remove_cvref_t<decltype(l)>;
+        if constexpr(std::is_same_v<T, std::monostate>)
+            return 0;
+        else return l.SampleRayRNCount();
     });
 }
 
@@ -79,8 +100,14 @@ Spectrum MetaLightViewT<V, ST>::EmitViaHit(const Vector3& wO,
 {
     return DeviceVisit(light, [=](auto&& l) -> Spectrum
     {
-        using HitType = decltype(l)::Primitive::Hit;
-        return specConverter(l.Emit(wO, HitType(hit)));
+        using T = std::remove_cvref_t<decltype(l)>;
+        if constexpr(std::is_same_v<T, std::monostate>)
+            return Spectrum::Zero();
+        else
+        {
+            using HitType = decltype(l)::Primitive::Hit;
+            return specConverter(l.Emit(wO, HitType(hit)));
+        }
     });
 }
 
@@ -113,11 +140,11 @@ MetaLightArrayT<TLT...>::View::View(Span<const MetaLight> dLights)
 template<LightTransPairC... TLT>
 template<class STransformer>
 MRAY_HYBRID MRAY_CGPU_INLINE
-typename MetaLightArrayT<TLT...>::MetaLightView<STransformer>
+typename MetaLightArrayT<TLT...>::View::MetaLightView<STransformer>
 MetaLightArrayT<TLT...>::View::operator()(const typename STransformer::Converter& sc,
                                           uint32_t i) const
 {
-    return MetaLightView(dMetaLights[i], sc);
+    return MetaLightView<STransformer>(dMetaLights[i], sc);
 }
 
 template<LightTransPairC... TLT>

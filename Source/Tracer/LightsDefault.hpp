@@ -256,7 +256,7 @@ SampleT<Vector3> LightSkysphere<CC, TC, SC>::SampleSolidAngle(RNGDispenser& rng,
     Vector2 xi = rng.NextFloat2D<0>();
     SampleT<Vector2> sampledUV = dist2D.SampleUV(xi);
     Vector3 dirYUp = CC::UVToDir(sampledUV.value);
-    Float pdf = CC::ToSolidAnglePDF(sampledUV.pdf, sampledUV.value);
+    Float pdf = CC::ToSolidAnglePdf(sampledUV.pdf, sampledUV.value);
     // Transform Direction to World Space
     Vector3 worldDir = prim.get().GetTransformContext().InvApplyV(dirYUp);
 
@@ -320,10 +320,10 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum LightSkysphere<CC, TC, SC>::EmitViaHit(const Vector3& wO,
                                                 const typename EmptyPrimitive<TC>::Hit&) const
 {
-    Vector3 dirYUp = prim.get().GetTransformContext().ApplyV(-wO);
+    Vector3 dirYUp = prim.get().GetTransformContext().InvApplyV(-wO);
     Vector2 uv = radiance.IsConstant()
-                    ? CC::DirToUV(dirYUp)
-                    : Vector2::Zero();
+                    ? Vector2::Zero()
+                    : CC::DirToUV(dirYUp);
     // TODO: How to incorporate differentials here?
     return radiance(uv).value();
 }
@@ -335,8 +335,8 @@ Spectrum LightSkysphere<CC, TC, SC>::EmitViaSurfacePoint(const Vector3& wO,
 {
     Vector3 dirYUp = prim.get().GetTransformContext().ApplyV(-wO);
     Vector2 uv = radiance.IsConstant()
-                    ? CC::DirToUV(dirYUp)
-                    : Vector2::Zero();
+                    ? Vector2::Zero()
+                    : CC::DirToUV(dirYUp);
     // TODO: How to incorporate differentials here?
     return radiance(uv).value();
 }

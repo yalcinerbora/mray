@@ -83,7 +83,8 @@ inline constexpr Float     VisibleSpectrumMiddle = VisibleSpectrumRange.Sum() * 
 // Invalid spectrum, this will be set when some form of numerical
 // error occurs (i.e. a NaN is found). It is specifically oversaturated
 // to "pop out" on the image (tonemapper probably darken everything else etc)
-static constexpr Vector3 BIG_MAGENTA = Vector3(1e7, 0.0, 1e7);
+MRAY_HYBRID MRAY_GPU_INLINE
+constexpr Vector3 BIG_MAGENTA() { return Vector3(1e7, 0.0, 1e7); }
 
 // Some key types
 // these are defined seperately for fine-tuning

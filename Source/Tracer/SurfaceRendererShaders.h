@@ -232,7 +232,7 @@ void SurfRDetail::WorkFunctionCommon(const Prim&, const Material&, const Surface
             }
             break;
         }
-        default: color = BIG_MAGENTA; break;
+        default: color = BIG_MAGENTA(); break;
     }
     params.rayState.dOutputData[rayIndex] = Spectrum(color, Float(0));
 }
@@ -259,7 +259,7 @@ void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, cons
 
         Spectrum refl;
         if(raySample.value.reflectance.HasNaN() || Math::IsNan(raySample.pdf))
-            refl = Spectrum(BIG_MAGENTA, 0.0);
+            refl = Spectrum(BIG_MAGENTA(), 0.0);
         else
             refl = DivideByPDF(raySample.value.reflectance, raySample.pdf);
 
@@ -299,7 +299,7 @@ void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, cons
         Float tMax = params.globalState.tMaxAO;
         RayToGMem(params.rayState.dVisibilityRays, rayIndex, rayOut, Vector2(0, tMax));
     }
-    else params.rayState.dOutputData[rayIndex] = Spectrum(BIG_MAGENTA, 0);
+    else params.rayState.dOutputData[rayIndex] = Spectrum(BIG_MAGENTA(), 0);
 }
 
 template<LightC Light, LightGroupC LG, TransformGroupC TG>

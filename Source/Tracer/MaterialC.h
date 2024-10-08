@@ -19,6 +19,13 @@ class alignas(8) MediumKeyPair
     MRAY_HYBRID MediumKey Front() const;
 };
 
+namespace MaterialCommon
+{
+    static constexpr Float SpecularThreshold = Float(0.95);
+
+    MRAY_HYBRID bool IsSpecular(Float specularity);
+}
+
 using MediumKeyPairList = std::vector<MediumKeyPair>;
 
 template <class MatType>
@@ -65,6 +72,16 @@ concept MaterialC = requires(MatType mt,
     // Emission
     {mt.Emit(Vector3{}, typename MatType::Surface{})
     } -> std::same_as<Spectrum>;
+
+    // Specularity of the material
+    // The value is between [0-1]. If one the material
+    // is perfectly specular (non-physical perfect mirror, glass
+    // etc)
+    // This is not a bool to make it flexible
+    {mt.Specularity(typename MatType::Surface{})
+    } -> std::same_as<Float>;
+    // TODO: Add for position as well (except for BSSRDF
+    // it will return zero)
 
     // Streaming texture query
     // Given surface, all textures of this material should be accessible
@@ -147,6 +164,13 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 MediumKey MediumKeyPair::Front() const
 {
     return frontKey;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool MaterialCommon::IsSpecular(Float specularity)
+{
+    constexpr auto Threshold = SpecularThreshold;
+    return specularity >= Threshold;
 }
 
 inline

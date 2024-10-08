@@ -43,6 +43,7 @@ namespace LambertMatDetail
         MRAY_HYBRID Float       Pdf(const Ray& wI,
                                     const Vector3& wO,
                                     const Surface& surface) const;
+
         MRAY_HYBRID Spectrum    Evaluate(const Ray& wI,
                                          const Vector3& wO,
                                          const Surface& surface) const;
@@ -50,6 +51,7 @@ namespace LambertMatDetail
         MRAY_HYBRID Spectrum    Emit(const Vector3& wO,
                                      const Surface& surf) const;
         MRAY_HYBRID bool        IsAllTexturesAreResident(const Surface& surface) const;
+        MRAY_HYBRID Float       Specularity(const Surface&) const;
     };
 
 }
@@ -92,6 +94,7 @@ namespace ReflectMatDetail
         MRAY_HYBRID Spectrum    Emit(const Vector3& wO,
                                      const Surface& surf) const;
         MRAY_HYBRID bool        IsAllTexturesAreResident(const Surface& surface) const;
+        MRAY_HYBRID Float       Specularity(const Surface&) const;
     };
 }
 
@@ -137,6 +140,7 @@ namespace RefractMatDetail
         MRAY_HYBRID Spectrum    Emit(const Vector3& wO,
                                      const Surface& surf) const;
         MRAY_HYBRID bool        IsAllTexturesAreResident(const Surface& surface) const;
+        MRAY_HYBRID Float       Specularity(const Surface&) const;
     };
 }
 
@@ -204,8 +208,8 @@ namespace UnrealMatDetail
         MRAY_HYBRID Spectrum    Emit(const Vector3& wO,
                                      const Surface& surf) const;
         MRAY_HYBRID bool        IsAllTexturesAreResident(const Surface& surface) const;
+        MRAY_HYBRID Float       Specularity(const Surface&) const;
     };
-
 }
 
 class MatGroupLambert final : public GenericGroupMaterial<MatGroupLambert>
