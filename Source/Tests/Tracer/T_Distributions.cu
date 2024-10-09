@@ -12,7 +12,7 @@
 #include "Device/GPUSystem.hpp"
 
 // Put it as a template for future tests (PwL maybe?)
-template<class Dist2D>
+template<class Dist2D, bool DoUV>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCSampleDist(Span<SampleT<Vector2>> dOutSamples,
                   Span<const Vector2> dRandomNumbers,
@@ -22,7 +22,11 @@ void KCSampleDist(Span<SampleT<Vector2>> dOutSamples,
     KernelCallParams kp;
     for(uint32_t i = kp.GlobalId(); i < sampleCount; i += kp.TotalSize())
     {
-        SampleT<Vector2> sample = dDist[0].SampleIndex(dRandomNumbers[i]);
+        SampleT<Vector2> sample;
+        if constexpr(DoUV)
+            sample = dDist[0].SampleUV(dRandomNumbers[i]);
+        else
+            sample = dDist[0].SampleIndex(dRandomNumbers[i]);
         dOutSamples[i] = sample;
     }
 }
@@ -37,10 +41,11 @@ struct DistTester2D
 
     DistTester2D() : distGroup(system) {}
 
+    template<bool DoUV>
     std::vector<SampleT<Vector2>>
-    GenSamplesIndex(const std::vector<Float>& hFunction,
-                    const Vector2ui& size,
-                    const std::vector<Vector2>& hRandomNumbers)
+    GenSamples(const std::vector<Float>& hFunction,
+               const Vector2ui& size,
+               const std::vector<Vector2>& hRandomNumbers)
     {
         using namespace std::literals;
         const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
@@ -69,7 +74,7 @@ struct DistTester2D
                           Span<const Vector2>(hRandomNumbers.cbegin(),
                                               hRandomNumbers.cend()));
 
-        queue.IssueSaturatingKernel<KCSampleDist<Dist2D>>
+        queue.IssueSaturatingKernel<KCSampleDist<Dist2D, DoUV>>
         (
             "GTest SampleDist2D"sv,
             KernelIssueParams{.workCount = sampleCount},
@@ -110,23 +115,46 @@ TEST(Dist_PiecewiseConstant2D, Uniform)
     hRandomNumbers[0] = Vector2::Zero();
     hRandomNumbers[1] = Vector2(std::nexttoward(Float(1), Float(0)));
 
-    DistTester2D tester;
-    auto hOutSamples = tester.GenSamplesIndex(hFunction, SIZE, hRandomNumbers);
-
-    uint32_t i = 0;
-    for(const auto& s : hOutSamples)
     {
-        using namespace MathConstants;
-        EXPECT_NEAR(s.pdf, Float{1}, VeryLargeEpsilon<Float>());
+        DistTester2D tester;
+        auto hOutSamples = tester.GenSamples<false>(hFunction, SIZE, hRandomNumbers);
 
-        // On uniform function, random numberss should match to the
-        // sampled index
-        Vector2 indexExpected = hRandomNumbers[i] * Vector2(SIZE);
-        EXPECT_EQUAL_MRAY(s.value, indexExpected,
-                          VeryLargeEpsilon<Float>());
-        i++;
+        uint32_t i = 0;
+        for(const auto& s : hOutSamples)
+        {
+            using namespace MathConstants;
+            EXPECT_NEAR(s.pdf, Float{1}, VeryLargeEpsilon<Float>());
+
+            // On uniform function, random numberss should match to the
+            // sampled index
+            Vector2 indexExpected = hRandomNumbers[i] * Vector2(SIZE);
+            EXPECT_EQUAL_MRAY(s.value, indexExpected,
+                              VeryLargeEpsilon<Float>());
+            i++;
+        }
+    }
+
+    {
+        DistTester2D tester;
+        auto hOutSamples = tester.GenSamples<true>(hFunction, SIZE, hRandomNumbers);
+
+        uint32_t i = 0;
+        for(const auto& s : hOutSamples)
+        {
+            using namespace MathConstants;
+            EXPECT_NEAR(s.pdf, Float{1}, VeryLargeEpsilon<Float>());
+
+            // On uniform function, random numberss should match to the
+            // sampled index
+            Vector2 expandedValue = s.value * Vector2(SIZE);
+            Vector2 indexExpected = hRandomNumbers[i] * Vector2(SIZE);
+            EXPECT_EQUAL_MRAY(expandedValue, indexExpected,
+                              VeryLargeEpsilon<Float>());
+            i++;
+        }
     }
 }
+
 
 TEST(Dist_PiecewiseConstant2D, ZeroVariance)
 {
@@ -178,7 +206,7 @@ TEST(Dist_PiecewiseConstant2D, ZeroVariance)
     }
 
     DistTester2D tester;
-    auto hOutSamples = tester.GenSamplesIndex(hFunction, SIZE, hRandomNumbers);
+    auto hOutSamples = tester.GenSamples<false>(hFunction, SIZE, hRandomNumbers);
 
     // Integrate the function
     Float total = std::reduce(hFunction.cbegin(), hFunction.cend(), Float{0});

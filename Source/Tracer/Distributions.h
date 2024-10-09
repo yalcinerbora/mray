@@ -225,25 +225,9 @@ template <uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Vector<D, Float>> DistributionPwC<D>::SampleUV(const VectorT& xi) const
 {
-    return SampleT<VectorT>{};
-
-    //using NextVecT = std::conditional_t<(D - 1) == 1, Float, Vector<D - 1, Float>>;
-
-    //SampleT<Float> r = dCurrentDistribution.SampleIndex(xi[D - 1]);
-
-
-
-    //uint32_t index = uint32_t(r.value);
-    //SampleT<NextVecT> rN = dNextDistributions[index].SampleUV(xi);
-
-    //VectorT result(rN.value, r.value);
-    //result *= SizeRecip();
-
-    //return SampleT<VectorT>
-    //{
-    //    .value = result,
-    //    .pdf = r.pdf * rN.pdf
-    //};
+    SampleT<VectorT> s = SampleIndex(xi);
+    s.value *= SizeRecip();
+    return s;
 }
 
 template <uint32_t D>
@@ -272,7 +256,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Vector<D, uint32_t> DistributionPwC<D>::Size() const
 {
     return SizeT(dNextDistributions[0].Size(),
-                   dCurrentDistribution.Size());
+                 dCurrentDistribution.Size());
 }
 
 template <uint32_t D>
