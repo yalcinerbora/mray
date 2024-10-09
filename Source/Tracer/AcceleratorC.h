@@ -17,6 +17,7 @@
 #include "PrimitiveC.h"
 #include "LightC.h"
 #include "TextureView.h"
+#include "SurfaceComparators.h"
 
 namespace BS { class thread_pool; }
 
@@ -163,46 +164,6 @@ class BaseAcceleratorI;
 namespace TracerLimits
 {
     static constexpr size_t MaxPrimBatchPerSurface = 8;
-}
-
-// Comparison Routines
-inline bool SurfaceLessThan(const Pair<SurfaceId, SurfaceParams>& left,
-                            const Pair<SurfaceId, SurfaceParams>& right)
-{
-    PrimBatchKey lpk = std::bit_cast<PrimBatchKey>(left.second.primBatches.front());
-    TransformKey ltk = std::bit_cast<TransformKey>(left.second.transformId);
-    //
-    PrimBatchKey rpk = std::bit_cast<PrimBatchKey>(right.second.primBatches.front());
-    TransformKey rtk = std::bit_cast<TransformKey>(right.second.transformId);
-    //
-    return (Tuple(lpk.FetchBatchPortion(), ltk.FetchBatchPortion()) <
-            Tuple(rpk.FetchBatchPortion(), rtk.FetchBatchPortion()));
-}
-
-inline bool LightSurfaceLessThan(const Pair<LightSurfaceId, LightSurfaceParams>& left,
-                                 const Pair<LightSurfaceId, LightSurfaceParams>& right)
-{
-    LightKey llk = std::bit_cast<LightKey>(left.second.lightId);
-    TransformKey ltk = std::bit_cast<TransformKey>(left.second.transformId);
-    //
-    LightKey rlk = std::bit_cast<LightKey>(right.second.lightId);
-    TransformKey rtk = std::bit_cast<TransformKey>(right.second.transformId);
-    //
-    return (Tuple(llk.FetchBatchPortion(), ltk.FetchBatchPortion()) <
-            Tuple(rlk.FetchBatchPortion(), rtk.FetchBatchPortion()));
-}
-
-inline bool CamSurfaceLessThan(const Pair<CamSurfaceId, CameraSurfaceParams>& left,
-                               const Pair<CamSurfaceId, CameraSurfaceParams>& right)
-{
-    CameraKey lck = std::bit_cast<CameraKey>(left.second.cameraId);
-    TransformKey ltk = std::bit_cast<TransformKey>(left.second.transformId);
-    //
-    CameraKey rck = std::bit_cast<CameraKey>(right.second.cameraId);
-    TransformKey rtk = std::bit_cast<TransformKey>(right.second.transformId);
-    //
-    return (Tuple(lck.FetchBatchPortion(), ltk.FetchBatchPortion()) <
-            Tuple(rck.FetchBatchPortion(), rtk.FetchBatchPortion()));
 }
 
 // Alias some stuff to easily acquire the function and context type
@@ -542,19 +503,6 @@ class BaseAcceleratorT : public BaseAcceleratorI
     size_t              TotalAccelCount() const override;
     size_t              TotalInstanceCount() const override;
 };
-
-template<class KeyType>
-struct GroupIdFetcher
-{
-    typename KeyType::Type operator()(auto id)
-    {
-        return std::bit_cast<KeyType>(id).FetchBatchPortion();
-    }
-};
-
-using PrimGroupIdFetcher = GroupIdFetcher<PrimBatchKey>;
-using TransGroupIdFetcher = GroupIdFetcher<TransformKey>;
-using LightGroupIdFetcher = GroupIdFetcher<LightKey>;
 
 template<class C, PrimitiveGroupC PG, std::derived_from<AcceleratorGroupI> B>
 AccelPartitionResult AcceleratorGroupT<C, PG, B>::PartitionParamsForWork(const AccelGroupConstructParams& p)
@@ -1238,6 +1186,14 @@ void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<AccelGroupCon
                             C::TypeName(), lGroupId);
         }
         const GenericGroupLightT* lGroup = lGroupOpt.value().get().get();
+
+        // Skip if not primitive backed
+        if(!lGroup->IsPrimitiveBacked())
+        {
+            start = end;
+            continue;
+        }
+
         const GenericGroupPrimitiveT* pGroup = &lGroup->GenericPrimGroup();
         auto slot = std::find_if(partitions.begin(), partitions.end(),
         [pGroup](const auto& partition)

@@ -1,5 +1,55 @@
 #pragma once
 
+#include "Core/Algorithm.h"
+
+inline std::vector<LightPartition>
+MetaLightListConstructionParams::Partition() const
+{
+    std::vector<LightPartition> partitionList;
+    partitionList.reserve(lightGroups.size());
+
+    auto start = lSurfList.begin();
+    while(start != lSurfList.end())
+    {
+        CommonKey lGroupId = LightGroupIdFetcher()(start->second.lightId);
+        auto end = std::upper_bound(start, lSurfList.end(), lGroupId,
+        [](CommonKey value, const LightSurfPair& surf)
+        {
+            CommonKey batchPortion = LightGroupIdFetcher()(surf.second.lightId);
+            return value < batchPortion;
+        });
+
+        auto& slot = partitionList.emplace_back(LightPartition
+        {
+            .lgId = LightGroupId(lGroupId),
+            .ltPartitions = {}
+        });
+        slot.ltPartitions.reserve(transformGroups.size());
+
+        // Sub-partition wrt. transform
+        auto innerStart = start;
+        while(innerStart != end)
+        {
+            TransformId tId = innerStart->second.transformId;
+            CommonKey tGroupId = TransGroupIdFetcher()(tId);
+            auto innerEnd = std::upper_bound(innerStart, end, tGroupId,
+            [](CommonKey value, const LightSurfPair& surf) -> bool
+            {
+                auto tId = surf.second.transformId;
+                return (value < TransGroupIdFetcher()(tId));
+            });
+
+            size_t elemCount = static_cast<size_t>(std::distance(innerStart, innerEnd));
+            size_t startDistance = static_cast<size_t>(std::distance(lSurfList.begin(), innerStart));
+            slot.ltPartitions.emplace_back(TransGroupId(tGroupId),
+                                           lSurfList.subspan(startDistance, elemCount));
+            innerStart = innerEnd;
+        }
+        start = end;
+    };
+    return partitionList;
+}
+
 template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 MetaLightViewT<V, ST>::MetaLightViewT(const V& v, const SpectrumConverter& sc)
@@ -166,9 +216,11 @@ void MetaLightArrayT<TLT...>::AddBatch(const LightGroup& lg, const TransformGrou
                                        const Span<const PrimitiveKey>& primitiveKeys,
                                        const Span<const LightKey>& lightKeys,
                                        const Span<const TransformKey>& transformKeys,
-                                       const Vector2ui& lightKeyRange,
                                        const GPUQueue& queue)
 {
+    uint32_t lightCount = static_cast<uint32_t>(lightKeys.size());
+    assert(primitiveKeys.size() == lightKeys.size() &&
+           lightKeys.size() == transformKeys.size());
     using TGSoA = typename TransformGroup::DataSoA;
     using LGSoA = typename LightGroup::DataSoA;
     using PGSoA = typename LightGroup::PrimGroup::DataSoA;
@@ -194,9 +246,6 @@ void MetaLightArrayT<TLT...>::AddBatch(const LightGroup& lg, const TransformGrou
     queue.MemcpyAsync(dPrimSoAWriteRegion, dPrimSoAReadRegion);
     queue.MemcpyAsync(dTransSoAWriteRegion, dTransSoAReadRegion);
     queue.MemcpyAsync(dLightSoAWriteRegion, dLightSoAReadRegion);
-
-    uint32_t lightCount = (lightKeyRange[1] - lightKeyRange[0]);
-    assert(lightKeys.size() == lightCount);
 
     // Given light construct the transformed light
     // This means having a primitive context
@@ -259,7 +308,6 @@ void MetaLightArrayT<TLT...>::AddBatchGeneric(const GenericGroupLightT& lg,
                                               const Span<const PrimitiveKey>& dPrimitiveKeys,
                                               const Span<const LightKey>& dLightKeys,
                                               const Span<const TransformKey>& dTransformKeys,
-                                              const Vector2ui& lightKeyRange,
                                               const GPUQueue& queue)
 {
     // https://stackoverflow.com/questions/16387354/template-tuple-calling-a-function-on-each-element/37100197#37100197
@@ -278,7 +326,7 @@ void MetaLightArrayT<TLT...>::AddBatchGeneric(const GenericGroupLightT& lg,
             AddBatch(dynamic_cast<const LGType&>(lg),
                      dynamic_cast<const TGType&>(tg),
                      dPrimitiveKeys, dLightKeys, dTransformKeys,
-                     lightKeyRange, queue);
+                     queue);
         }
         else uncalled++;
     };
@@ -297,6 +345,106 @@ void MetaLightArrayT<TLT...>::AddBatchGeneric(const GenericGroupLightT& lg,
         throw MRayError("Unkown light/transform group pair (Id:{}/{}) is given to MetaLightArray",
                         lg.GroupId(), tg.GroupId());
     }
+}
+
+template<LightTransPairC... TLT>
+void MetaLightArrayT<TLT...>::Construct(MetaLightListConstructionParams params,
+                                        const GPUQueue& queue)
+{
+    assert(std::is_sorted(params.lSurfList.begin(), params.lSurfList.end(),
+                          LightSurfaceLessThan));
+    std::vector<LightPartition> partitions = params.Partition();
+    // Find allocation size
+    std::vector<LightKey> hLKList;
+    std::vector<PrimitiveKey> hPKList;
+    std::vector<TransformKey> hTKList;
+    std::vector<Vector2ui> primExpandedRanges;
+    hLKList.reserve(1024);
+    hPKList.reserve(1024);
+    hTKList.reserve(1024);
+
+    uint32_t offset = 0;
+    for(const auto& p : partitions)
+    {
+        LightGroupId lgId = p.lgId;
+        for(const auto& ltP : p.ltPartitions)
+        {
+            primExpandedRanges.push_back(Vector2ui(offset, 0));
+            for(const auto& surf : ltP.second)
+            {
+                LightKey lKey = std::bit_cast<LightKey>(surf.second.lightId);
+                TransformKey tKey = std::bit_cast<TransformKey>(surf.second.transformId);
+                //
+                const auto& lg = *params.lightGroups.at(lgId).value().get().get();
+                PrimBatchKey primBatchKey = lg.LightPrimBatch(lKey);
+                if(lg.IsPrimitiveBacked())
+                {
+                    Vector2ui batchRange = lg.GenericPrimGroup().BatchRange(primBatchKey);
+                    uint32_t primCount = batchRange[1] - batchRange[0];
+                    offset += primCount;
+                    // Add keys
+                    for(uint32_t i = 0; i < primCount; i++)
+                    {
+                        hLKList.push_back(lKey);
+                        hTKList.push_back(tKey);
+                        auto pKey = PrimitiveKey::CombinedKey(primBatchKey.FetchBatchPortion(),
+                                                              batchRange[0] + i);
+                        hPKList.push_back(pKey);
+                    }
+                }
+                else
+                {
+                    hLKList.push_back(lKey);
+                    hTKList.push_back(tKey);
+                    CommonKey emptyGroupKey = static_cast<CommonKey>(TracerConstants::EmptyPrimGroupId);
+                    auto pKey = PrimitiveKey::CombinedKey(emptyGroupKey, 0u);
+                    hPKList.push_back(pKey);
+                }
+            }
+            primExpandedRanges.back()[1] = offset;
+        }
+    }
+    size_t totalLightCount = offset;
+
+    // Allocate for keys
+    Span<LightKey>        dLKList;
+    Span<PrimitiveKey>    dPKList;
+    Span<TransformKey>    dTKList;
+    DeviceLocalMemory tempMem(*queue.Device());
+    MemAlloc::AllocateMultiData(std::tie(dLKList, dPKList, dTKList),
+                                tempMem,
+                                {totalLightCount,
+                                 totalLightCount,
+                                 totalLightCount});
+    // Do the internal allocation as well
+    MemAlloc::AllocateMultiData(std::tie(dPrimSoA, dLightSoA, dTransSoA,
+                                         dMetaPrims, dMetaTContexts, dMetaLights),
+                                memory,
+                                {primExpandedRanges.size(),
+                                 primExpandedRanges.size(),
+                                 primExpandedRanges.size(),
+                                 totalLightCount,
+                                 totalLightCount,
+                                 totalLightCount});
+
+    queue.MemcpyAsync(dLKList, Span<const LightKey>(hLKList));
+    queue.MemcpyAsync(dPKList, Span<const PrimitiveKey>(hPKList));
+    queue.MemcpyAsync(dTKList, Span<const TransformKey>(hTKList));
+
+    for(Vector2ui range : primExpandedRanges)
+    {
+        LightGroupId lgId = LightGroupId(hLKList[range[0]].FetchBatchPortion());
+        TransGroupId tgId = TransGroupId(hTKList[range[0]].FetchBatchPortion());
+        const auto& lg = *params.lightGroups.at(lgId).value().get().get();
+        const auto& tg = *params.transformGroups.at(tgId).value().get().get();
+
+        AddBatchGeneric(lg, tg,
+                        dPKList.subspan(range[0], range[1] - range[0]),
+                        dLKList.subspan(range[0], range[1] - range[0]),
+                        dTKList.subspan(range[0], range[1] - range[0]),
+                        queue);
+    }
+    queue.Barrier().Wait();
 }
 
 template<LightTransPairC... TLT>

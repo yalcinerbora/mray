@@ -120,7 +120,8 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/Key.h
         ${CURRENT_SOURCE_DIR}/TypeFormat.h
         ${CURRENT_SOURCE_DIR}/Hit.h
-        ${CURRENT_SOURCE_DIR}/Filters.h)
+        ${CURRENT_SOURCE_DIR}/Filters.h
+        ${CURRENT_SOURCE_DIR}/SurfaceComparators.h)
 
     set(SRC_COMMON
         ${CMAKE_CURRENT_FUNCTION_LIST_FILE}

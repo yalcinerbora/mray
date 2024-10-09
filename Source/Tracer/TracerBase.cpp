@@ -1398,14 +1398,6 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     // Do the same thing for lights
     using LightSurfP = Pair<LightSurfaceId, LightSurfaceParams>;
     auto& lSurfList = lightSurfaces.Vec();
-    auto lPartitionEnd = std::partition(lSurfList.begin(), lSurfList.end(),
-    [this](const LightSurfP& lSurf)
-    {
-        const auto& map = lightGroups.Map();
-        LightKey lKey = std::bit_cast<LightKey>(lSurf.second.lightId);
-        auto gId = LightGroupId(lKey.FetchBatchPortion());
-        return map.at(gId).value().get()->IsPrimitiveBacked();
-    });
     std::sort(lSurfList.begin(), lSurfList.end(), LightSurfaceLessThan);
 
     // And finally for the cameras as well
@@ -1467,8 +1459,7 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
         .lightGroups = lightGroups.Map(),
         .transformGroups = transGroups.Map(),
         .mSurfList = surfaces.Vec(),
-        .lSurfList = Span<const LightSurfP>(lSurfList.begin(),
-                                            lPartitionEnd)
+        .lSurfList = Span<const LightSurfP>(lSurfList)
     });
 
     // Set scene diameter for lights (should only be useful for

@@ -4,6 +4,7 @@
 #include "ParamVaryingData.h"
 #include "TransformC.h"
 #include "LightC.h"
+#include "SurfaceComparators.h"
 
 #include "Device/GPUSystem.h"
 #include "Device/GPUSystem.hpp"
@@ -11,6 +12,27 @@
 // GPU link errors
 #define MRAY_LIGHT_TGEN_FUNCTION(LG, TG) \
     AcquireTransformContextGenerator<typename LG::PrimGroup, TG>()
+
+// Similar to the accelerator params, except no surfList
+struct LightPartition;
+
+struct MetaLightListConstructionParams
+{
+    using LightSurfPair = Pair<LightSurfaceId, LightSurfaceParams>;
+
+    const Map<LightGroupId, LightGroupPtr>&     lightGroups;
+    const Map<TransGroupId, TransformGroupPtr>& transformGroups;
+    Span<const LightSurfPair>                   lSurfList;
+
+    std::vector<LightPartition> Partition() const;
+};
+
+struct LightPartition
+{
+    using LSurfPair = typename MetaLightListConstructionParams::LightSurfPair;
+    LightGroupId lgId;
+    std::vector<Pair<TransGroupId, Span<const LSurfPair>>> ltPartitions;
+};
 
 // Meta Light Class
 // This will be used for routines that requires
@@ -215,17 +237,16 @@ class MetaLightArrayT
     const GPUSystem&    system;
     // All the stuff is in variants
     // These are per group
-    Span<IdentitySConverter> dSpectrumConverter;
-    Span<PrimSoABytePack> dPrimSoA;
-    Span<LightSoABytePack> dLightSoA;
-    Span<TransformSoABytePack> dTransSoA;
+    Span<IdentitySConverter>    dSpectrumConverter;
+    Span<PrimSoABytePack>       dPrimSoA;
+    Span<LightSoABytePack>      dLightSoA;
+    Span<TransformSoABytePack>  dTransSoA;
     // These are per-prim
-    Span<PrimBytePack> dMetaPrims;
-    Span<TContextBytePack> dMetaTContexts;
-    // This is the actual variant that refers to all other things
-    Span<LightVariant> dMetaLights;
+    Span<PrimBytePack>      dMetaPrims;
+    Span<TContextBytePack>  dMetaTContexts;
+    Span<LightVariant>      dMetaLights;
 
-    DeviceMemory        memory;
+    DeviceMemory    memory;
 
     uint32_t soaCounter = 0;
     uint32_t lightCounter = 0;
@@ -233,12 +254,13 @@ class MetaLightArrayT
     public:
             MetaLightArrayT(const GPUSystem&);
 
+
+    // We can't make these private/protected due to GPU Lambdas.
     template<LightGroupC LightGroup, TransformGroupC TransformGroup>
     void    AddBatch(const LightGroup& lg, const TransformGroup& tg,
                      const Span<const PrimitiveKey>& primitiveKeys,
                      const Span<const LightKey>& lightKeys,
                      const Span<const TransformKey>& transformKeys,
-                     const Vector2ui& lightKeyRange,
                      const GPUQueue& queue);
 
     void    AddBatchGeneric(const GenericGroupLightT& lg,
@@ -246,8 +268,10 @@ class MetaLightArrayT
                             const Span<const PrimitiveKey>& primitiveKeys,
                             const Span<const LightKey>& lightKeys,
                             const Span<const TransformKey>& transformKeys,
-                            const Vector2ui& lightKeyRange,
                             const GPUQueue& queue);
+
+    void    Construct(MetaLightListConstructionParams,
+                      const GPUQueue& queue);
 
     View    Array() const;
 
