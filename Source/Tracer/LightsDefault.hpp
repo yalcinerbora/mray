@@ -341,7 +341,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum LightSkysphere<CC, TC, SC>::EmitViaHit(const Vector3& wO,
                                                 const typename EmptyPrimitive<TC>::Hit&) const
 {
-    Vector3 dirYUp = prim.get().GetTransformContext().InvApplyV(-wO);
+    Vector3 dirYUp = prim.get().GetTransformContext().InvApplyV(-wO).Normalize();
     Vector2 uv = radiance.IsConstant()
                     ? Vector2::Zero()
                     : CC::DirToUV(dirYUp);
@@ -354,7 +354,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum LightSkysphere<CC, TC, SC>::EmitViaSurfacePoint(const Vector3& wO,
                                                          const Vector3&) const
 {
-    Vector3 dirYUp = prim.get().GetTransformContext().ApplyV(-wO);
+    Vector3 dirYUp = prim.get().GetTransformContext().ApplyV(-wO).Normalize();
     Vector2 uv = radiance.IsConstant()
                     ? Vector2::Zero()
                     : CC::DirToUV(dirYUp);
