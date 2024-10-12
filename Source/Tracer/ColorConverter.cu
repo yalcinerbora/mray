@@ -967,7 +967,7 @@ void ColorConverter::ExtractLuminance(std::vector<Span<Float>> hLuminanceBuffers
                       Span<const LuminanceExtractParams>(hLuminanceExtractParams));
     queue.MemcpyAsync(dLuminanceBuffers, Span<const Span<Float>>(hLuminanceBuffers));
 
-    static constexpr uint32_t BLOCK_PER_TEXTURE = 16;
+    static constexpr uint32_t BLOCK_PER_TEXTURE = 256;
     static constexpr uint32_t THREAD_PER_BLOCK = 512;
     // Get Compile Time Type
     static constexpr auto Kernel = KCExtractLuminance<THREAD_PER_BLOCK>;
