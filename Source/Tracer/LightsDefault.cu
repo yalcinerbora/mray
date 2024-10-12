@@ -7,12 +7,12 @@ std::string_view LightGroupNull::TypeName()
     using namespace std::string_view_literals;
     static constexpr auto Name = "Null"sv;
     return LightTypeName<Name>;
-    //return "(L)Null";
 }
 
 LightGroupNull::LightGroupNull(uint32_t groupId,
                                const GPUSystem& system,
                                const TextureViewMap& texMap,
+                               const TextureMap&,
                                const GenericGroupPrimitiveT& pg)
     : GenericGroupLight(groupId, system, texMap)
     , primGroup(static_cast<const PrimGroup&>(pg))

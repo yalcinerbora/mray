@@ -35,9 +35,12 @@ template <class C>
 concept SpectrumConverterC = requires(const C c)
 {
     {c.Convert(Optional<Vector3>{})} -> std::same_as<Optional<Spectrum>>;
+    {c.Convert(Spectrum{})} -> std::same_as<Spectrum>;
     {c.Wavelengths()} -> std::same_as<SpectrumWaves>;
     // TODO: Why this does not work?
+    // ====================
     //{C::IsRGB} -> std::same_as<const bool>;
+    // ====================
     C::IsRGB;
     requires std::is_same_v<decltype(C::IsRGB), const bool>;
 };
@@ -102,7 +105,8 @@ struct SpectrumConverterContext
 // Concerete Identity Spectrum Converter
 struct SpectrumConverterIdentity
 {
-    MRAY_HYBRID Optional<Spectrum> Convert(const Optional<Vector3>& c) const;
+    MRAY_HYBRID Optional<Spectrum>  Convert(const Optional<Vector3>&) const;
+    MRAY_HYBRID Spectrum            Convert(const Spectrum&) const;
     // Adding this for IoR conversion (dispersion)
     // We could've added ConvertIoR function, but the input arguments
     // may change depending on the medium (unless we dictate a protocol)
@@ -231,6 +235,11 @@ Optional<Spectrum> SpectrumConverterIdentity::Convert(const Optional<Vector3>& c
 {
     if(!c.has_value()) return std::nullopt;
     return Spectrum(c.value(), Float(0));
+}
+MRAY_HYBRID MRAY_CGPU_INLINE
+Spectrum SpectrumConverterIdentity::Convert(const Spectrum& c) const
+{
+    return c;
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE

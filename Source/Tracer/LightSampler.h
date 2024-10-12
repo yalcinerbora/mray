@@ -33,16 +33,15 @@ class DirectLightSamplerViewUniform
     MetaLightArray dMetaLights;
 
     public:
-    template <class SpectrumConverterContext>
+    template <class SpectrumConverter>
     MRAY_HYBRID
     LightSample SampleLight(RNGDispenser& rng,
-                            const typename SpectrumConverterContext::Converter&,
+                            const SpectrumConverter&,
                             const Vector3& distantPoint) const;
 
     MRAY_HYBRID
     Float       PdfLight(uint32_t index, const MetaHit& hit,
                          const Ray& r) const;
-
 };
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -61,13 +60,13 @@ Pair<Ray, Vector2> LightSampleOutput::SampledRay(const Vector3& distantPoint) co
 }
 
 template <class ML>
-template <class SpectrumConverterContext>
+template <class SpectrumConverter>
 MRAY_HYBRID MRAY_CGPU_INLINE
 LightSample DirectLightSamplerViewUniform<ML>::SampleLight(RNGDispenser& rng,
-                                                           const typename SpectrumConverterContext::Converter& stConverter,
+                                                           const SpectrumConverter& stConverter,
                                                            const Vector3& distantPoint) const
 {
-    using MetaLightView = typename ML::template MetaLightView<SpectrumConverterContext>;
+    using MetaLightView = typename ML::template MetaLightView<SpectrumConverter>;
 
     uint32_t lightCount = dMetaLights.Size();
     Float lightCountF = Float(lightCount);
@@ -79,11 +78,7 @@ LightSample DirectLightSamplerViewUniform<ML>::SampleLight(RNGDispenser& rng,
     // due to precision.
     lightIndex = Math::Clamp(lightIndex, 0u, lightCount - 1u);
     // Actual sampling
-
-    // TODO: ....
-    MetaLightView metaLight = dMetaLights
-        .template operator()<SpectrumConverterContext>(stConverter, lightIndex);
-
+    MetaLightView metaLight = dMetaLights(stConverter, lightIndex);
     SampleT<Vector3> pointSample = metaLight.SampleSolidAngle(rng, distantPoint);
 
     Float selectionPdf = Float(1) / lightCountF;

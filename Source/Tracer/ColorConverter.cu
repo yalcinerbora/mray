@@ -13,6 +13,7 @@
 using MipBlockCountList = StaticVector<uint64_t, TracerConstants::MaxTextureMipCount>;
 
 static constexpr uint32_t BC_TEX_PER_BATCH = 16;
+
 struct BCColorConvParams
 {
     Vector2ul           blockRange;
@@ -34,7 +35,7 @@ using ConverterList = Tuple
 >;
 
 static constexpr Tuple ConverterLists =
-{::
+{
     ConverterList<MRayColorSpaceEnum::MR_ACES2065_1>{},
     ConverterList<MRayColorSpaceEnum::MR_ACES_CG>{},
     ConverterList<MRayColorSpaceEnum::MR_REC_709>{},
@@ -58,8 +59,48 @@ using BCReaderFinder = BCTypeMap::Map
     typename BCTypeMap::template ETPair<MRayPixelEnum::MR_BC7_UNORM,    BlockCompressedIO::BC7>
 >;
 
+// Luminance Extract related
+
+using ColorspaceList = Tuple
+<
+    Color::Colorspace<MRayColorSpaceEnum::MR_ACES2065_1>,
+    Color::Colorspace<MRayColorSpaceEnum::MR_ACES_CG>,
+    Color::Colorspace<MRayColorSpaceEnum::MR_REC_709>,
+    Color::Colorspace<MRayColorSpaceEnum::MR_REC_2020>,
+    Color::Colorspace<MRayColorSpaceEnum::MR_DCI_P3>,
+    Color::Colorspace<MRayColorSpaceEnum::MR_ADOBE_RGB>
+>;
+
+struct LuminanceExtractParams
+{
+    Vector2ui           imgSize;
+    MRayColorSpaceEnum  colorSpace;
+};
+
+
+template<uint32_t TPB>
+MRAY_KERNEL
+void KCExtractLuminance(// I-O
+                        MRAY_GRID_CONSTANT const Span<const Span<Float>>,
+                        // Inputs
+                        MRAY_GRID_CONSTANT const Span<const LuminanceExtractParams>,
+                        MRAY_GRID_CONSTANT const Span<const Variant<std::monostate, GenericTextureView>>,
+                        // Constants
+                        MRAY_GRID_CONSTANT const uint32_t);
+
+template<uint32_t TPB, class ConverterTuple>
+MRAY_KERNEL
+void KCConvertColor(// I-O
+                    MRAY_GRID_CONSTANT const Span<MipArray<SurfViewVariant>>,
+                    // Inputs
+                    MRAY_GRID_CONSTANT const Span<const ColorConvParams>,
+                    // Constants
+                    MRAY_GRID_CONSTANT const MRayColorSpaceEnum,
+                    MRAY_GRID_CONSTANT const uint32_t,
+                    MRAY_GRID_CONSTANT const uint32_t);
+
 template<uint32_t TPB, class BCReader, class ConverterTuple>
-MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
+MRAY_KERNEL
 void KCConvertColorBC(// I-O
                       MRAY_GRID_CONSTANT const Span<typename BCReader::BlockType>,
                       // Inputs
@@ -168,6 +209,102 @@ Vector3 GenericToNorm(const Vector3& t, const SurfViewVariant& surfView)
     });
 }
 
+MRAY_GPU MRAY_GPU_INLINE
+Vector3 GenericReadFromView(const Vector2& uv, GenericTextureView& view)
+{
+    return DeviceVisit(view, [&](auto&& t) -> Vector3
+    {
+        using T = std::remove_cvref_t<decltype(t)>;
+        if constexpr(T::Dimensions != 2)
+            return Vector3::Zero();
+        else if constexpr(T::Channels == 1)
+            return Vector3(t(uv).value(), 0, 0);
+        else if constexpr(T::Channels == 2)
+            return Vector3(t(uv).value(), 0);
+        else if constexpr(T::Channels == 3)
+            return t(uv).value();
+        else if constexpr(T::Channels == 4)
+            return Vector3(t(uv).value());
+        //
+        return Vector3::Zero();
+    });
+}
+
+template<uint32_t TPB>
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
+void KCExtractLuminance(// I-O
+                        MRAY_GRID_CONSTANT const Span<const Span<Float>> dLuminanceOutput,
+                        // Inputs
+                        MRAY_GRID_CONSTANT const Span<const LuminanceExtractParams> dLuminanceParams,
+                        MRAY_GRID_CONSTANT const Span<const Variant<std::monostate, GenericTextureView>> dTextureViews,
+                        // Constants
+                        MRAY_GRID_CONSTANT const uint32_t blockPerTexture)
+{
+    static constexpr ColorspaceList colorspaceList = {};
+
+    assert(dTextureViews.size() == dLuminanceParams.size() &&
+           dTextureViews.size() == dLuminanceOutput.size());
+    // Block-stride loop
+    KernelCallParams kp;
+    uint32_t textureCount = static_cast<uint32_t>(dTextureViews.size());
+    uint32_t blockCount = blockPerTexture * textureCount;
+    for(uint32_t bI = kp.blockId; bI < blockCount; bI += kp.gridSize)
+    {
+        uint32_t tI = bI / blockPerTexture;
+        uint32_t localBI = bI % blockPerTexture;
+        // Load to local space
+        LuminanceExtractParams curParams = dLuminanceParams[tI];
+
+        if(std::holds_alternative<std::monostate>(dTextureViews[tI]))
+           continue;
+
+        GenericTextureView texView = std::get<GenericTextureView>(dTextureViews[tI]);
+        //
+        Vector2ui res = curParams.imgSize;
+        Vector2 resRecip = Vector2(1) / Vector2(res);
+        //if(std::holds_alternative<std::monostate>(texView)) continue;
+
+        // Loop over the blocks for this tex
+        static constexpr Vector2ui TILE_SIZE = Vector2ui(32, 16);
+        static_assert(TILE_SIZE.Multiply() == TPB);
+        Vector2ui totalTiles = Math::DivideUp(res, TILE_SIZE);
+        for(uint32_t tileI = localBI; tileI < totalTiles.Multiply();
+            tileI += blockPerTexture)
+        {
+            Vector2ui localPI = Vector2ui(kp.threadId % TILE_SIZE[0],
+                                          kp.threadId / TILE_SIZE[0]);
+            Vector2ui tile2D = Vector2ui(tileI % totalTiles[0],
+                                         tileI / totalTiles[0]);
+            Vector2ui pixCoord = tile2D * TILE_SIZE + localPI;
+            if(pixCoord[0] >= res[0] || pixCoord[1] >= res[1]) continue;
+
+            // We assume 4 channel textures are RGB (first 3 channels)
+            // and something else (A channel) so clamp to Vector3 and calculate
+            // If it is two or one channel, other one/two parameter(s) will be
+            // zeroed out.
+            // We disregard if the pixel data is normalized or not.
+            // It is user's problem.
+            Vector2 uv = (Vector2(pixCoord) + Vector2(0.5)) * resRecip;
+            Vector3 localPixRGB = GenericReadFromView(uv, texView);
+
+            Float luminance;
+            // Do the conversion
+            uint32_t i = static_cast<uint32_t>(curParams.colorSpace);
+            [[maybe_unused]]
+            bool invoked = InvokeAt(i, colorspaceList, [i, &luminance, &localPixRGB](auto&& tupleElem)
+            {
+                luminance = Color::XYZToYxy(tupleElem.ToXYZ(localPixRGB))[1];
+                return true;
+            });
+            assert(invoked);
+
+            //
+            Span<Float> dCurrentOutputSpan = dLuminanceOutput[tI];
+            uint32_t linearPixelIndex =  pixCoord[1] * res[0] + pixCoord[0];
+            dCurrentOutputSpan[linearPixelIndex] = luminance;
+        }
+    }
+}
 
 template<uint32_t TPB, class ConverterTuple>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
@@ -655,7 +792,7 @@ void CallColorConvertKernel(Span<MipArray<SurfViewVariant>> dSufViews,
         {
             // Get Compile Time Type
             using ConvListType = std::remove_cvref_t<decltype(ConvList)>;
-            static constexpr auto Kernel = KCConvertColor<512, ConvListType>;
+            static constexpr auto Kernel = KCConvertColor<THREAD_PER_BLOCK, ConvListType>;
             // Find maximum block count for state allocation
             uint32_t blockCount = queue.RecommendedBlockCountDevice(Kernel,
                                                                     THREAD_PER_BLOCK, 0);
@@ -782,5 +919,75 @@ void ColorConverter::ConvertColor(std::vector<MipArray<SurfRefVariant>> textures
         bcColorConverter.CallBCColorConvertKernels(dBCScratchBuffer, globalColorSpace, queue);
     }
     // Wait for deallocation
+    queue.Barrier().Wait();
+}
+
+void ColorConverter::ExtractLuminance(std::vector<Span<Float>> hLuminanceBuffers,
+                                      std::vector<const GenericTexture*> textures,
+                                      const GPUQueue& queue)
+{
+    std::vector<LuminanceExtractParams> hLuminanceExtractParams;
+    std::vector<Variant<std::monostate, GenericTextureView>> hTextureViews;
+    hLuminanceExtractParams.reserve(textures.size());
+    hTextureViews.reserve(textures.size());
+    size_t totalTexSize = textures.size();
+
+    for(const GenericTexture* t : textures)
+    {
+        if(!t)
+        {
+            hTextureViews.push_back(std::monostate{});
+            continue;
+        }
+
+        assert(t->DimensionCount() == 2);
+        LuminanceExtractParams params =
+        {
+            .imgSize = Vector2ui(t->Extents()),
+            .colorSpace = t->ColorSpace()
+        };
+        hLuminanceExtractParams.push_back(params);
+        hTextureViews.push_back(t->View(TextureReadMode::DIRECT));
+    }
+
+    DeviceLocalMemory localMem(*queue.Device());
+    //
+    Span<Span<Float>> dLuminanceBuffers;
+    Span<Variant<std::monostate, GenericTextureView>> dTextureViews;
+    Span<LuminanceExtractParams> dLuminanceExtractParams;
+    MemAlloc::AllocateMultiData(std::tie(dLuminanceExtractParams,
+                                         dTextureViews,
+                                         dLuminanceBuffers),
+                                localMem,
+                                {totalTexSize, totalTexSize, totalTexSize});
+
+    queue.MemcpyAsync(dTextureViews,
+                      Span<const Variant<std::monostate, GenericTextureView>>(hTextureViews));
+    queue.MemcpyAsync(dLuminanceExtractParams,
+                      Span<const LuminanceExtractParams>(hLuminanceExtractParams));
+    queue.MemcpyAsync(dLuminanceBuffers, Span<const Span<Float>>(hLuminanceBuffers));
+
+    static constexpr uint32_t BLOCK_PER_TEXTURE = 16;
+    static constexpr uint32_t THREAD_PER_BLOCK = 512;
+    // Get Compile Time Type
+    static constexpr auto Kernel = KCExtractLuminance<THREAD_PER_BLOCK>;
+    // Find maximum block count for state allocation
+    uint32_t blockCount = queue.RecommendedBlockCountDevice(Kernel, THREAD_PER_BLOCK, 0);
+
+    using namespace std::string_view_literals;
+    queue.IssueExactKernel<Kernel>
+    (
+        "KCExtractLuminance"sv,
+        KernelExactIssueParams
+        {
+            .gridSize = blockCount,
+            .blockSize = THREAD_PER_BLOCK
+        },
+        ToConstSpan(dLuminanceBuffers),
+        dLuminanceExtractParams,
+        ToConstSpan(dTextureViews),
+        BLOCK_PER_TEXTURE
+    );
+
     queue.Barrier().Wait();
 }

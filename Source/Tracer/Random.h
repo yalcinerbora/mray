@@ -204,7 +204,7 @@ class RNGeneratorGroupI
                                             const GPUQueue& queue) const = 0;
 
     virtual Span<BackupRNGState> GetBackupStates() = 0;
-    virtual size_t UsedGPUMemory() const = 0;
+    virtual size_t GPUMemoryUsage() const = 0;
 };
 
 using RNGGenerator = GeneratorFuncType<RNGeneratorGroupI, uint32_t, uint64_t,
@@ -273,7 +273,7 @@ class RNGGroupIndependent : public RNGeneratorGroupI
 
 
     Span<BackupRNGState> GetBackupStates() override;
-    size_t  UsedGPUMemory() const override;
+    size_t  GPUMemoryUsage() const override;
 };
 
 namespace RNGFunctions

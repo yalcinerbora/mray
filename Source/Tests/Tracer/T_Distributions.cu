@@ -65,7 +65,7 @@ struct DistTester2D
 
         uint32_t id = distGroup.Reserve(size);
         distGroup.Commit();
-        distGroup.Construct(id, dFunction);
+        distGroup.Construct(id, dFunction, queue);
 
         Span<const Dist2D> dists = distGroup.DeviceDistributions();
         EXPECT_EQ(dists.size(), 1);
@@ -154,7 +154,6 @@ TEST(Dist_PiecewiseConstant2D, Uniform)
         }
     }
 }
-
 
 TEST(Dist_PiecewiseConstant2D, ZeroVariance)
 {

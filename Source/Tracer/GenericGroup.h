@@ -21,7 +21,7 @@
 
 #include "TracerTypes.h"
 #include "ParamVaryingData.h"
-#include "TextureView.h"
+#include "Texture.h"
 
 using AttributeRanges = StaticVector<Vector<2, size_t>,
                                      TracerConstants::MaxAttributePerGroup>;
@@ -121,7 +121,6 @@ class GenericGroupT : public GenericGroupI<IdTypeT, AttribInfoT>
     std::mutex          mutex;
     IdInt               groupId;
     DeviceMemory        deviceMem;
-
 
     const AttributeRanges&      FindRange(IdInt) const;
 
@@ -424,7 +423,7 @@ GenericTexturedGroupT<I, A>::ConvertToView(std::vector<TextureId> texIds,
         {
             throw MRayError("{:s}:{:d}: Given texture({:d}) is not found",
                             this->Name(), this->groupId,
-                            static_cast<uint32_t>(texId));
+                            static_cast<CommonKey>(texId));
         }
         const GenericTextureView& view = optView.value();
         if(!std::holds_alternative<ViewType>(view))
@@ -432,7 +431,7 @@ GenericTexturedGroupT<I, A>::ConvertToView(std::vector<TextureId> texIds,
             throw MRayError("{:s}:{:d}: Given texture({:d}) does not have "
                             "a correct type for, Attribute {:d}",
                             this->Name(), this->groupId,
-                            static_cast<uint32_t>(texId), attributeIndex);
+                            static_cast<CommonKey>(texId), attributeIndex);
             return std::vector<Optional<TracerTexView<D, T>>>{};
         }
         result.push_back(std::get<ViewType>(view));
@@ -462,7 +461,7 @@ GenericTexturedGroupT<I, A>::ConvertToView(std::vector<Optional<TextureId>> texI
         {
             throw MRayError("{:s}:{:d}: Given texture({:d}) is not found",
                             this->Name(), this->groupId,
-                            static_cast<uint32_t>(texId.value()));
+                            static_cast<CommonKey>(texId.value()));
         }
         const GenericTextureView& view = optView.value();
         if(!std::holds_alternative<ViewType>(view))
@@ -470,7 +469,7 @@ GenericTexturedGroupT<I, A>::ConvertToView(std::vector<Optional<TextureId>> texI
             throw MRayError("{:s}:{:d}: Given texture({:d}) does not have "
                             "a correct type for, Attribute {:d}",
                             this->Name(), this->groupId,
-                            static_cast<uint32_t>(texId.value()),
+                            static_cast<CommonKey>(texId.value()),
                             attributeIndex);
         }
         result.push_back(std::get<ViewType>(view));

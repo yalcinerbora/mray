@@ -240,13 +240,11 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
         throughput = result.value_or(throughput);
     }
 
-    //if(!isPathDead && params.globalState.sampleMode == SampleMode::E::NEE_WITH_MIS)
-    //{
-
-    //}
-    //else
-    //{
-    //}
+    // Change the ray type, if mat is highly specular
+    // we do not bother casting NEE ray. So if this ray
+    // hits a light somehow it should not assume MIS is enabled.
+    bool isSpecular = MaterialCommon::IsSpecular(mat.Specularity(surf));
+    dataPack.type = isSpecular ? RayType::PATH_RAY : RayType::SPECULAR_RAY;
 
     // Selectively write if path is alive
     if(!isPathDead)
@@ -357,7 +355,7 @@ void PathTraceRDetail::WorkFunctionWithNEE(const Prim&, const Material& mat, con
     Vector3 wO = -tContext.InvApplyN(rayIn.Dir()).Normalize();
     const LightSampler& lightSampler = params.globalState.lightSampler;
     Vector3 worldPos = tContext.ApplyP(surf.position);
-    LightSample lightSample = lightSampler.template SampleLight<IdentityST>(rng, specConverter, worldPos);
+    LightSample lightSample = lightSampler.SampleLight(rng, specConverter, worldPos);
     auto [shadowRay, shadowTMM] = lightSample.value.SampledRay(worldPos);
     //
     Spectrum reflectance = mat.Evaluate(shadowRay, wO, surf);

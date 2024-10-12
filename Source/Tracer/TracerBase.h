@@ -23,14 +23,16 @@ using PrimGenerator     = GeneratorFuncType<GenericGroupPrimitiveT, uint32_t,
 using CamGenerator      = GeneratorFuncType<GenericGroupCameraT, uint32_t,
                                             const GPUSystem&>;
 using MedGenerator      = GeneratorFuncType<GenericGroupMediumT, uint32_t,
-                                            const GPUSystem&, const TextureViewMap&>;
+                                            const GPUSystem&, const TextureViewMap&,
+                                            const TextureMap&>;
 using MatGenerator      = GeneratorFuncType<GenericGroupMaterialT, uint32_t,
-                                            const GPUSystem&, const TextureViewMap&>;
+                                            const GPUSystem&, const TextureViewMap&,
+                                            const TextureMap&>;
 using TransGenerator    = GeneratorFuncType<GenericGroupTransformT, uint32_t,
                                             const GPUSystem&>;
 using LightGenerator    = GeneratorFuncType<GenericGroupLightT, uint32_t,
                                             const GPUSystem&, const TextureViewMap&,
-                                            GenericGroupPrimitiveT&>;
+                                            const TextureMap&, GenericGroupPrimitiveT&>;
 using RendererGenerator = GeneratorFuncType<RendererI,
                                             const RenderImagePtr&,
                                             TracerView,

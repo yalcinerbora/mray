@@ -198,8 +198,7 @@ void DistributionGroupPwC2D::Commit()
                                 memory,
                                 {totalSizes[0], totalSizes[1],
                                  totalSizes[2], totalSizes[3],
-                                totalSizes[3],
-                                });
+                                 totalSizes[3]});
 
     // Calculate "Pointers"
     distData.reserve(sizes.size());
@@ -228,14 +227,14 @@ void DistributionGroupPwC2D::Commit()
 }
 
 void DistributionGroupPwC2D::Construct(uint32_t index,
-                                       const Span<const Float>& function)
+                                       const Span<const Float>& function,
+                                       const GPUQueue& queue)
 {
     using namespace DeviceAlgorithms;
     using namespace std::literals;
     assert(index < distData.size());
 
     // TODO: select a device?
-    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
     const DistData& d = distData[index];
 
     // Directly scan to cdf array

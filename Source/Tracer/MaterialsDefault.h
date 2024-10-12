@@ -233,7 +233,8 @@ class MatGroupLambert final : public GenericGroupMaterial<MatGroupLambert>
 
                     MatGroupLambert(uint32_t groupId,
                                     const GPUSystem&,
-                                    const TextureViewMap&);
+                                    const TextureViewMap&,
+                                    const TextureMap&);
     void            CommitReservations() override;
     AttribInfoList  AttributeInfo() const override;
     void            PushAttribute(MaterialKey id,
@@ -288,7 +289,8 @@ class MatGroupReflect final : public GenericGroupMaterial<MatGroupReflect>
 
                     MatGroupReflect(uint32_t groupId,
                                     const GPUSystem&,
-                                    const TextureViewMap&);
+                                    const TextureViewMap&,
+                                    const TextureMap&);
     void            CommitReservations() override;
     AttribInfoList  AttributeInfo() const override;
     void            PushAttribute(MaterialKey id,
@@ -345,7 +347,8 @@ class MatGroupRefract final : public GenericGroupMaterial<MatGroupRefract>
 
                     MatGroupRefract(uint32_t groupId,
                                     const GPUSystem&,
-                                    const TextureViewMap&);
+                                    const TextureViewMap&,
+                                    const TextureMap&);
     void            CommitReservations() override;
     AttribInfoList  AttributeInfo() const override;
     void            PushAttribute(MaterialKey id,
@@ -410,8 +413,9 @@ class MatGroupUnreal final : public GenericGroupMaterial<MatGroupUnreal>
     static std::string_view TypeName();
 
                     MatGroupUnreal(uint32_t groupId,
-                                    const GPUSystem&,
-                                    const TextureViewMap&);
+                                   const GPUSystem&,
+                                   const TextureViewMap&,
+                                   const TextureMap&);
     void            CommitReservations() override;
     AttribInfoList  AttributeInfo() const override;
     void            PushAttribute(MaterialKey id,

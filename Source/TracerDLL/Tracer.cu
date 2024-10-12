@@ -36,7 +36,7 @@ void Tracer::AddTransformGenerators(Map<std::string_view, TransGenerator>& map)
 void Tracer::AddLightGenerators(Map<std::string_view, LightGenerator>& map)
 {
     using Args = Tuple<uint32_t, const GPUSystem&, const TextureViewMap&,
-                       GenericGroupPrimitiveT&>;
+                       const TextureMap&, GenericGroupPrimitiveT&>;
 
     Args*               resolver0 = nullptr;
     LightGTypes*        resolver1 = nullptr;
@@ -61,7 +61,7 @@ void Tracer::AddCamGenerators(Map<std::string_view, CamGenerator>& map)
 void Tracer::AddMaterialGenerators(Map<std::string_view, MatGenerator>& map)
 {
     using Args = Tuple<uint32_t, const GPUSystem&,
-                       const TextureViewMap&>;
+                       const TextureViewMap&, const TextureMap&>;
 
     Args*       resolver0 = nullptr;
     MatGTypes*  resolver1 = nullptr;
@@ -74,7 +74,7 @@ void Tracer::AddMaterialGenerators(Map<std::string_view, MatGenerator>& map)
 void Tracer::AddMediumGenerators(Map<std::string_view, MedGenerator>& map)
 {
     using Args = Tuple<uint32_t, const GPUSystem&,
-                       const TextureViewMap&>;
+                       const TextureViewMap&, const TextureMap&>;
 
     Args*       resolver0 = nullptr;
     MedGTypes*  resolver1 = nullptr;

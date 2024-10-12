@@ -15,7 +15,8 @@ std::string_view MatGroupLambert::TypeName()
 
 MatGroupLambert::MatGroupLambert(uint32_t groupId,
                                  const GPUSystem& s,
-                                 const TextureViewMap& map)
+                                 const TextureViewMap& map,
+                                 const TextureMap&)
     : GenericGroupMaterial<MatGroupLambert>(groupId, s, map)
 {}
 
@@ -144,7 +145,8 @@ std::string_view MatGroupReflect::TypeName()
 
 MatGroupReflect::MatGroupReflect(uint32_t groupId,
                                  const GPUSystem& s,
-                                 const TextureViewMap& map)
+                                 const TextureViewMap& map,
+                                 const TextureMap&)
     : GenericGroupMaterial<MatGroupReflect>(groupId, s, map)
 {}
 
@@ -217,7 +219,8 @@ std::string_view MatGroupRefract::TypeName()
 
 MatGroupRefract::MatGroupRefract(uint32_t groupId,
                                  const GPUSystem& s,
-                                 const TextureViewMap& map)
+                                 const TextureViewMap& map,
+                                 const TextureMap&)
     : GenericGroupMaterial<MatGroupRefract>(groupId, s, map)
 {}
 
@@ -363,7 +366,8 @@ std::string_view MatGroupUnreal::TypeName()
 
 MatGroupUnreal::MatGroupUnreal(uint32_t groupId,
                                const GPUSystem& s,
-                               const TextureViewMap& map)
+                               const TextureViewMap& map,
+                               const TextureMap&)
     : GenericGroupMaterial<MatGroupUnreal>(groupId, s, map)
 {}
 

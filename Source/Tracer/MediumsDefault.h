@@ -98,7 +98,8 @@ class MediumGroupVacuum : public GenericGroupMedium<MediumGroupVacuum>
 
                     MediumGroupVacuum(uint32_t groupId,
                                       const GPUSystem&,
-                                      const TextureViewMap&);
+                                      const TextureViewMap&,
+                                      const TextureMap&);
 
     //
     void            CommitReservations() override;
@@ -156,7 +157,8 @@ class MediumGroupHomogeneous : public GenericGroupMedium<MediumGroupHomogeneous>
 
                     MediumGroupHomogeneous(uint32_t groupId,
                                            const GPUSystem&,
-                                           const TextureViewMap&);
+                                           const TextureViewMap&,
+                                           const TextureMap&);
 
     void            CommitReservations() override;
 

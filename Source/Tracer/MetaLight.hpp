@@ -2,6 +2,65 @@
 
 #include "Core/Algorithm.h"
 
+template<class MetaLightArray, LightGroupC LightGroup, TransformGroupC TransformGroup>
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+static void KCConstructMetaLights(// These are per-light (sub-light)
+                                  MRAY_GRID_CONSTANT const Span<typename MetaLightArray::PrimBytePack> dMetaPrims,
+                                  MRAY_GRID_CONSTANT const Span<typename MetaLightArray::TContextBytePack> dMetaTContexts,
+                                  MRAY_GRID_CONSTANT const Span<typename MetaLightArray::MetaLight> dMetaLights,
+                                  // Input
+                                  MRAY_GRID_CONSTANT const Span<const LightKey> dLightKeys,
+                                  MRAY_GRID_CONSTANT const Span<const PrimitiveKey> dPrimitiveKeys,
+                                  MRAY_GRID_CONSTANT const Span<const TransformKey> dTransformKeys,
+                                  // Constants
+                                  MRAY_GRID_CONSTANT const typename LightGroup::PrimGroup::DataSoA* const dPrimSoA,
+                                  MRAY_GRID_CONSTANT const typename LightGroup::DataSoA* const dLightSoA,
+                                  MRAY_GRID_CONSTANT const typename TransformGroup::DataSoA* const dTransSoA,
+                                  MRAY_GRID_CONSTANT const SpectrumConverterIdentity* const dSpectrumConverter,
+                                  uint32_t writeOffset)
+{
+    KernelCallParams kp;
+    uint32_t lightCount = static_cast<uint32_t>(dLightKeys.size());
+    // Determine types, transform context primitive etc.
+    // Compile-time find the transform generator function and return type
+    using PrimGroup = typename LightGroup::PrimGroup;
+    using Primitive = MetaLightDetail::PrimType<LightGroup, TransformGroup>;
+    using Light = MetaLightDetail::LightType<LightGroup, TransformGroup>;
+    using TContext = MetaLightDetail::TContextType<LightGroup, TransformGroup>;
+    // Context generator of the prim group
+    constexpr auto GenerateTContext = AcquireTransformContextGenerator<PrimGroup, TransformGroup>();
+
+    for(uint32_t i = kp.GlobalId(); i < lightCount; i += kp.TotalSize())
+    {
+        // Find the lights starting location
+        uint32_t index = writeOffset + i;
+        // Primitives do not own the transform contexts,
+        // save it to global memory.
+        Byte* tContextLocation = dMetaTContexts[index].data();
+        TContext* tContext = new(tContextLocation) TContext(GenerateTContext(*dTransSoA, *dPrimSoA,
+                                                                             dTransformKeys[i],
+                                                                             dPrimitiveKeys[i]));
+        // Now construct the primitive, it refers to the tc on global memory
+        Byte* primLocation = dMetaPrims[index].data();
+        Primitive* prim = new(primLocation) Primitive(*tContext, *dPrimSoA, dPrimitiveKeys[i]);
+
+        // And finally construct the light, and this also refers to primitive
+        // on the global memory. This will be the variant
+        // unlike the other two, we will use this to call member function
+        // Construct the lights with identity spectrum transform
+        // context since it depends on per-ray data.
+        //
+        // This one crashes in debug mode (maybe msvc->nvcc constexpr
+        // evaluation due to relaxed-constexpr) or nvcc bug.
+        // =======================
+        // l.template emplace<Light>(*dSpectrumConverter,
+        //                           *prim, *dLightSoA, dLightKeys[i]);
+        // =======================
+        // Thankfully, lights are move/copy? assignable
+        dMetaLights[index] = Light(*dSpectrumConverter, *prim, *dLightSoA, dLightKeys[i]);;
+    }
+}
+
 inline std::vector<LightPartition>
 MetaLightListConstructionParams::Partition() const
 {
@@ -54,7 +113,7 @@ template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 MetaLightViewT<V, ST>::MetaLightViewT(const V& v, const SpectrumConverter& sc)
     : light(v)
-    , sConverter(sc)
+    , sConv(sc)
 {}
 
 template<class V, class ST>
@@ -84,9 +143,15 @@ Float MetaLightViewT<V, ST>::PdfSolidAngle(const MetaHit& hit,
             return Float(0);
         else
         {
-            using HitType = decltype(l)::Primitive::Hit;
-            HitType hitIn = hit.template AsVector<HitType::Dims>();
-            return l.PdfSolidAngle(hitIn, distantPoint, dir);
+            using HitType = typename T::Primitive::Hit;
+            // Null light check
+            if constexpr(std::is_same_v<HitType, EmptyType>)
+                return Float(0);
+            else
+            {
+                HitType hitIn = hit.template AsVector<HitType::Dims>();
+                return l.PdfSolidAngle(hitIn, distantPoint, dir);
+            }
         }
     });
 }
@@ -100,7 +165,7 @@ uint32_t MetaLightViewT<V, ST>::SampleSolidAngleRNCount() const
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
             return 0;
-        else return l.SampleSolidAngleRNCount();
+        else return T::SampleSolidAngleRNCount;
     });
 }
 
@@ -126,7 +191,7 @@ Float MetaLightViewT<V, ST>::PdfRay(const Ray& ray) const
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
             return Float(0);
-        else return l.SampleRay(ray);
+        else return l.PdfRay(ray);
     });
 }
 
@@ -139,7 +204,7 @@ uint32_t MetaLightViewT<V, ST>::SampleRayRNCount() const
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
             return 0;
-        else return l.SampleRayRNCount();
+        else return T::SampleRayRNCount;
     });
 }
 
@@ -148,15 +213,22 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum MetaLightViewT<V, ST>::EmitViaHit(const Vector3& wO,
                                            const MetaHit& hit) const
 {
-    return DeviceVisit(light, [=](auto&& l) -> Spectrum
+    return DeviceVisit(light, [=, this](auto&& l) -> Spectrum
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
             return Spectrum::Zero();
         else
         {
-            using HitType = decltype(l)::Primitive::Hit;
-            return specConverter(l.Emit(wO, HitType(hit)));
+            using HitType = typename T::Primitive::Hit;
+            // Null light check
+            if constexpr(std::is_same_v<HitType, EmptyType>)
+                return Spectrum::Zero();
+            else
+            {
+                HitType hitIn = hit.template AsVector<HitType::Dims>();
+                return sConv.Convert(l.EmitViaHit(wO, hitIn));
+            }
         }
     });
 }
@@ -166,9 +238,12 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum MetaLightViewT<V, ST>::EmitViaSurfacePoint(const Vector3& wO,
                                                     const Vector3& surfacePoint) const
 {
-    return DeviceVisit(light, [&](auto&& l) -> SampleT<Ray>
+    return DeviceVisit(light, [&, this](auto&& l) -> Spectrum
     {
-        return specConverter(l.SampleRay(wO, surfacePoint));
+        using T = std::remove_cvref_t<decltype(l)>;
+        if constexpr(std::is_same_v<T, std::monostate>)
+            return Spectrum::Zero();
+        else return sConv.Convert(l.EmitViaSurfacePoint(wO, surfacePoint));
     });
 }
 
@@ -178,7 +253,10 @@ bool MetaLightViewT<V, ST>::IsPrimitiveBackedLight() const
 {
     return DeviceVisit(light, [&](auto&& l) -> bool
     {
-        return IsPrimitiveBackedLight();
+        using T = std::remove_cvref_t<decltype(l)>;
+        if constexpr(std::is_same_v<T, std::monostate>)
+            return false;
+        else return T::IsPrimitiveBackedLight;
     });
 }
 
@@ -188,17 +266,17 @@ MetaLightArrayT<TLT...>::View::View(Span<const MetaLight> dLights)
 {}
 
 template<LightTransPairC... TLT>
-template<class STransformer>
+template<class SConverter>
 MRAY_HYBRID MRAY_CGPU_INLINE
-typename MetaLightArrayT<TLT...>::View::MetaLightView<STransformer>
-MetaLightArrayT<TLT...>::View::operator()(const typename STransformer::Converter& sc,
+typename MetaLightArrayT<TLT...>::View::MetaLightView<SConverter>
+MetaLightArrayT<TLT...>::View::operator()(const typename SConverter& sc,
                                           uint32_t i) const
 {
-    return MetaLightView<STransformer>(dMetaLights[i], sc);
+    return MetaLightView<SConverter>(dMetaLights[i], sc);
 }
 
 template<LightTransPairC... TLT>
-MRAY_HYBRID
+MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t MetaLightArrayT<TLT...>::View::Size() const
 {
     return static_cast<uint32_t>(dMetaLights.size());
@@ -213,14 +291,14 @@ MetaLightArrayT<TLT...>::MetaLightArrayT(const GPUSystem& s)
 template<LightTransPairC... TLT>
 template<LightGroupC LightGroup, TransformGroupC TransformGroup>
 void MetaLightArrayT<TLT...>::AddBatch(const LightGroup& lg, const TransformGroup& tg,
-                                       const Span<const PrimitiveKey>& primitiveKeys,
-                                       const Span<const LightKey>& lightKeys,
-                                       const Span<const TransformKey>& transformKeys,
+                                       const Span<const PrimitiveKey>& dPrimitiveKeys,
+                                       const Span<const LightKey>& dLightKeys,
+                                       const Span<const TransformKey>& dTransformKeys,
                                        const GPUQueue& queue)
 {
-    uint32_t lightCount = static_cast<uint32_t>(lightKeys.size());
-    assert(primitiveKeys.size() == lightKeys.size() &&
-           lightKeys.size() == transformKeys.size());
+    uint32_t lightCount = static_cast<uint32_t>(dLightKeys.size());
+    assert(dPrimitiveKeys.size() == dLightKeys.size() &&
+           dPrimitiveKeys.size() == dTransformKeys.size());
     using TGSoA = typename TransformGroup::DataSoA;
     using LGSoA = typename LightGroup::DataSoA;
     using PGSoA = typename LightGroup::PrimGroup::DataSoA;
@@ -247,59 +325,38 @@ void MetaLightArrayT<TLT...>::AddBatch(const LightGroup& lg, const TransformGrou
     queue.MemcpyAsync(dTransSoAWriteRegion, dTransSoAReadRegion);
     queue.MemcpyAsync(dLightSoAWriteRegion, dLightSoAReadRegion);
 
-    // Given light construct the transformed light
-    // This means having a primitive context
-    auto ConstructKernel = [=, this] MRAY_HYBRID(KernelCallParams kp)
-    {
-        // Determine types, transform context primitive etc.
-        // Compile-time find the transform generator function and return type
-        using PrimGroup = typename LightGroup::PrimGroup;
-        using Primitive = MetaLightDetail::PrimType<LightGroup, TransformGroup>;
-        using Light     = MetaLightDetail::LightType<LightGroup, TransformGroup>;
-        using TContext  = MetaLightDetail::TContextType<LightGroup, TransformGroup>;
-        // Context generator of the prim group
-        constexpr auto GenerateTContext = AcquireTransformContextGenerator<PrimGroup, TransformGroup>();
-        // SoA Ptrs
-        const PGSoA* dPGData = reinterpret_cast<const PGSoA*>(dPrimSoA.subspan(soaCounter, 1)[0].data());
-        const LGSoA* dLGData = reinterpret_cast<const LGSoA*>(dLightSoA.subspan(soaCounter, 1)[0].data());
-        const TGSoA* dTGData = reinterpret_cast<const TGSoA*>(dTransSoA.subspan(soaCounter, 1)[0].data());
+    // SoA Ptrs
+    const PGSoA* dPGData = reinterpret_cast<const PGSoA*>(dPrimSoA.subspan(soaCounter, 1)[0].data());
+    const LGSoA* dLGData = reinterpret_cast<const LGSoA*>(dLightSoA.subspan(soaCounter, 1)[0].data());
+    const TGSoA* dTGData = reinterpret_cast<const TGSoA*>(dTransSoA.subspan(soaCounter, 1)[0].data());
 
-        for(uint32_t i = kp.GlobalId(); i < lightCount; i += kp.TotalSize())
-        {
-            // Find the lights starting location
-            uint32_t index = lightCounter + i;
-            // Primitives do not own the transform contexts,
-            // save it to global memory.
-            Byte* tContextLocation = dMetaTContexts[index].data();
-            TContext* tContext = new(tContextLocation) TContext(GenerateTContext(*dTGData, *dPGData,
-                                                                                  transformKeys[i],
-                                                                                  primitiveKeys[i]));
-            // Now construct the primitive, it refers to the tc on global memory
-            Byte* primLocation = dMetaPrims[index].data();
-            Primitive* prim = new(primLocation) Primitive(*tContext, *dPGData, primitiveKeys[i]);
-
-            // And finally construct the light, and this also refers to primitive
-            // on the global memory. This will be the variant
-            // unlike the other two, we will use this to call member function
-            // Construct the lights with identity spectrum transform
-            // context since it depends on per-ray data.
-            auto& l = dMetaLights[index];
-            l.template emplace<Light>(dSpectrumConverter[0],
-                                      *prim, *dLGData, lightKeys[i]);
-        }
-    };
-
+    using This = MetaLightArrayT<TLT...>;
+    static constexpr auto KernelName = KCConstructMetaLights<This, LightGroup, TransformGroup>;
     using namespace std::literals;
-    queue.IssueSaturatingLambda
+    queue.IssueSaturatingKernel<KernelName>
     (
-        "KCConstructMetaLight"sv,
+        "KCConstructMetaLights"sv,
         KernelIssueParams{.workCount = lightCount},
         //
-        std::move(ConstructKernel)
+        dMetaPrims,
+        dMetaTContexts,
+        dMetaLights,
+        dLightKeys,
+        dPrimitiveKeys,
+        dTransformKeys,
+        dPGData,
+        dLGData,
+        dTGData,
+        dSpectrumConverter.data(),
+        lightCounter
     );
 
+    lightCounter += lightCount;
+    soaCounter++;
     // Need to wait for async memcopies
     queue.Barrier().Wait();
+
+    MRAY_LOG("{}-{}-Done!", lg.Name(), tg.Name());
 }
 
 template<LightTransPairC... TLT>
@@ -376,9 +433,9 @@ void MetaLightArrayT<TLT...>::Construct(MetaLightListConstructionParams params,
                 TransformKey tKey = std::bit_cast<TransformKey>(surf.second.transformId);
                 //
                 const auto& lg = *params.lightGroups.at(lgId).value().get().get();
-                PrimBatchKey primBatchKey = lg.LightPrimBatch(lKey);
                 if(lg.IsPrimitiveBacked())
                 {
+                    PrimBatchKey primBatchKey = lg.LightPrimBatch(lKey);
                     Vector2ui batchRange = lg.GenericPrimGroup().BatchRange(primBatchKey);
                     uint32_t primCount = batchRange[1] - batchRange[0];
                     offset += primCount;
@@ -394,6 +451,7 @@ void MetaLightArrayT<TLT...>::Construct(MetaLightListConstructionParams params,
                 }
                 else
                 {
+                    offset += 1;
                     hLKList.push_back(lKey);
                     hTKList.push_back(tKey);
                     CommonKey emptyGroupKey = static_cast<CommonKey>(TracerConstants::EmptyPrimGroupId);
@@ -418,14 +476,16 @@ void MetaLightArrayT<TLT...>::Construct(MetaLightListConstructionParams params,
                                  totalLightCount});
     // Do the internal allocation as well
     MemAlloc::AllocateMultiData(std::tie(dPrimSoA, dLightSoA, dTransSoA,
-                                         dMetaPrims, dMetaTContexts, dMetaLights),
+                                         dMetaPrims, dMetaTContexts, dMetaLights,
+                                         dSpectrumConverter),
                                 memory,
                                 {primExpandedRanges.size(),
                                  primExpandedRanges.size(),
                                  primExpandedRanges.size(),
                                  totalLightCount,
                                  totalLightCount,
-                                 totalLightCount});
+                                 totalLightCount,
+                                 1});
 
     queue.MemcpyAsync(dLKList, Span<const LightKey>(hLKList));
     queue.MemcpyAsync(dPKList, Span<const PrimitiveKey>(hPKList));

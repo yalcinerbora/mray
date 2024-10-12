@@ -8,6 +8,10 @@
 #include "DistributionFunctions.h"
 #include "LightC.h"
 #include "Bitspan.h"
+#include "ColorConverter.h"
+#include "Texture.h"
+
+#include "Device/GPUAlgGeneric.h"
 
 #include "Core/GraphicsFunctions.h"
 #include "Core/TypeNameGenerators.h"
@@ -120,6 +124,11 @@ namespace LightDetail
         RadianceMap             radiance;
         Float                   sceneDiameter;
 
+        MRAY_HYBRID
+        SampleT<Vector2>    SampleUV(Vector2 xi) const;
+        MRAY_HYBRID
+        Float               PdfUV(Vector2 uv) const;
+
         public:
         MRAY_HYBRID         LightSkysphere(const SpectrumConverter& sTransContext,
                                            const Primitive& p,
@@ -213,6 +222,7 @@ class LightGroupPrim final : public GenericGroupLight<LightGroupPrim<PrimGroupT>
                     LightGroupPrim(uint32_t groupId,
                                    const GPUSystem& system,
                                    const TextureViewMap&,
+                                   const TextureMap&,
                                    const GenericGroupPrimitiveT&);
 
     void                    CommitReservations() override;
@@ -272,9 +282,11 @@ class LightGroupSkysphere final : public GenericGroupLight<LightGroupSkysphere<C
     private:
     const PrimGroup&                    primGroup;
     Span<ParamVaryingData<2, Vector3>>  dRadiances;
-    Span<DistributionPwC2D>             dDistributions;
     Float                               sceneDiameter;
     DataSoA                             soa;
+    DistributionGroupPwC2D              pwcDistributions;
+    const TextureMap&                   texMap;
+    std::vector<const GenericTexture*>  radianceFieldTextures;
 
     public:
     static std::string_view TypeName();
@@ -282,6 +294,7 @@ class LightGroupSkysphere final : public GenericGroupLight<LightGroupSkysphere<C
                 LightGroupSkysphere(uint32_t groupId,
                                     const GPUSystem& system,
                                     const TextureViewMap&,
+                                    const TextureMap&,
                                     const GenericGroupPrimitiveT&);
 
 
@@ -320,6 +333,8 @@ class LightGroupSkysphere final : public GenericGroupLight<LightGroupSkysphere<C
     const GenericGroupPrimitiveT&   GenericPrimGroup() const override;
     bool                            IsPrimitiveBacked() const override;
     void                            SetSceneDiameter(Float) override;
+    void                            Finalize(const GPUQueue& q) override;
+    size_t                          GPUMemoryUsage() const override;
 };
 
 class LightGroupNull : public GenericGroupLight<LightGroupNull>
@@ -344,6 +359,7 @@ class LightGroupNull : public GenericGroupLight<LightGroupNull>
     LightGroupNull(uint32_t groupId,
                    const GPUSystem& system,
                    const TextureViewMap&,
+                   const TextureMap&,
                    const GenericGroupPrimitiveT&);
 
     void                    CommitReservations() override;

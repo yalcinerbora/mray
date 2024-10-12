@@ -111,7 +111,8 @@ class DistributionGroupPwC2D
     uint32_t                    Reserve(Vector2ui size);
     void                        Commit();
     void                        Construct(uint32_t index,
-                                          const Span<const Float>& function);
+                                          const Span<const Float>& function,
+                                          const GPUQueue& queue);
 
     Span<const Distribution2D>  DeviceDistributions() const;
 

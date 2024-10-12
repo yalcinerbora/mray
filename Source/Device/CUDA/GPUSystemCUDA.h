@@ -736,7 +736,7 @@ uint32_t GPUQueueCUDA::DetermineGridStrideBlock(const void* kernelPtr,
     uint32_t blockPerSM = RecommendedBlockCountSM(kernelPtr, threadCount, sharedMemSize);
     // Only call enough SM
     uint32_t totalRequiredBlocks = Math::DivideUp(workCount, threadCount);
-    uint32_t requiredSMCount = (totalRequiredBlocks + blockPerSM - 1) / blockPerSM;
+    uint32_t requiredSMCount = Math::DivideUp(totalRequiredBlocks, blockPerSM);
     uint32_t smCount = std::min(multiprocessorCount, requiredSMCount);
     uint32_t blockCount = std::min(requiredSMCount, smCount * blockPerSM);
     return blockCount;

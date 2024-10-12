@@ -57,6 +57,11 @@ Tuple<Span<Args>...> AllocateMultiData(Memory& memory,
                                        const std::array<size_t, sizeof...(Args)>& countList,
                                        size_t alignment = DefaultSystemAlignment());
 
+template<ImplicitLifetimeC T, MemoryC Memory>
+std::vector<Span<T>>
+AllocateSegmentedData(Memory& memory, const std::vector<size_t>& counts,
+                      size_t alignment = DefaultSystemAlignment());
+
 template <class Memory>
 requires requires(Memory m) { {m.ResizeBuffer(size_t{})} -> std::same_as<void>; }
 std::vector<size_t> AllocateTextureSpace(Memory& memory,
@@ -174,6 +179,46 @@ Tuple<Span<Args>...> AllocateMultiData(Memory& memory,
     AllocateMultiData(resultRef, memory, countList, alignment);
     return result;
 }
+
+template<ImplicitLifetimeC T, MemoryC Memory>
+std::vector<Span<T>>
+AllocateSegmentedData(Memory& memory, const std::vector<size_t>& counts,
+                      size_t alignment)
+{
+    std::vector<size_t> alignedByteOffsets(counts.size() + 1);
+    alignedByteOffsets[0] = 0;
+
+    std::transform_inclusive_scan
+    (
+        counts.cbegin(), counts.cend(), alignedByteOffsets.begin() + 1,
+        std::plus{},
+        [alignment](size_t s)
+        {
+            return Math::NextMultiple(s * sizeof(T), alignment);
+        }
+    );
+    //
+    size_t totalSize = alignedByteOffsets.back();
+    memory.ResizeBuffer(totalSize);
+    Span<Byte> allBytes = Span<Byte>(static_cast<Byte*>(memory), memory.Size());
+    //
+    std::vector<Span<T>> result;
+    result.reserve(counts.size());
+    for(size_t i = 0; i < counts.size(); i++)
+    {
+        size_t byteStart = alignedByteOffsets[i];
+        size_t byteEnd = alignedByteOffsets[i + 1];
+        size_t byteCount = byteEnd - byteStart;
+        assert(byteStart % sizeof(T) == 0);
+        assert(byteCount % sizeof(T) == 0);
+
+        Span<Byte> mem = allBytes.subspan(byteStart, byteCount);
+        Span<T> resultingSpan = RepurposeAlloc<T>(mem);
+        result.push_back(resultingSpan);
+    }
+    return result;
+}
+
 
 template <class Memory>
 requires requires(Memory m) { {m.ResizeBuffer(size_t{})} -> std::same_as<void>; }

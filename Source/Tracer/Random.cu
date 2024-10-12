@@ -221,7 +221,7 @@ Span<BackupRNGState> RNGGroupIndependent::GetBackupStates()
                                  currentRange[1] - currentRange[0]);
 }
 
-size_t RNGGroupIndependent::UsedGPUMemory() const
+size_t RNGGroupIndependent::GPUMemoryUsage() const
 {
     return deviceMem.Size();
 }

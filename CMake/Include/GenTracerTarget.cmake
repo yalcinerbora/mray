@@ -28,7 +28,8 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/TextureCommon.h
         ${CURRENT_SOURCE_DIR}/TextureFilter.h
         ${CURRENT_SOURCE_DIR}/TextureFilter.cu
-        ${CURRENT_SOURCE_DIR}/TextureView.h)
+        ${CURRENT_SOURCE_DIR}/TextureView.h
+        ${CURRENT_SOURCE_DIR}/Texture.h)
 
     set(SRC_PRIMITIVES
         ${CURRENT_SOURCE_DIR}/PrimitiveC.h

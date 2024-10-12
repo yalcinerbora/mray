@@ -28,8 +28,7 @@ using MetaLightList = MetaLightArrayT
 
 using MetaLight = typename MetaLightList::MetaLight;
 
-template<class SpectrumConverter>
-using MetaLightView = typename MetaLightList::MetaLightView< SpectrumConverter>;
+using MetaLightArrayView = typename MetaLightList::View;
 
 TransientData GenTriPos()
 {
@@ -97,6 +96,62 @@ TransientData GenMatrix()
     return data;
 }
 
+template <class MetaLightArrayView>
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCReadLights(MRAY_GRID_CONSTANT const MetaLightArrayView lightArrayView,
+                  MRAY_GRID_CONSTANT const Span<const RandomNumber> dRandomNumbers)
+{
+    Vector3 DistantPoint = Vector3(2, 3, 4);
+    MetaHit Hit = MetaHit(Vector2(0.5, 0.3));
+    Vector3 Dir = Vector3(2, 3, 4).Normalize();
+    Ray TestRay = Ray(Dir, DistantPoint);
+
+    using MLVIdentity = typename MetaLightArrayView::template MetaLightView<SpectrumConverterIdentity>;
+
+    SpectrumConverterIdentity identitySc = {};
+
+    KernelCallParams kp;
+    uint32_t lightCount = lightArrayView.Size();
+    for(uint32_t i = kp.GlobalId(); i < lightCount; i += kp.TotalSize())
+    {
+        RNGDispenser rng(dRandomNumbers, i, lightCount);
+
+        MLVIdentity light = lightArrayView(identitySc, i);
+
+        SampleT<Vector3> sampleVec = light.SampleSolidAngle(rng, DistantPoint);
+        Float pdfSolidAngle = light.PdfSolidAngle(Hit, DistantPoint, Dir);
+        uint32_t solidRNCount = light.SampleRayRNCount();
+        //
+        SampleT<Ray> sampleRay = light.SampleRay(rng);
+        Float pdfRay = light.PdfRay(TestRay);
+        uint32_t rayRNCount = light.SampleRayRNCount();
+        //
+        Spectrum radiance0 = light.EmitViaHit(Dir, Hit);
+        Spectrum radiance1 = light.EmitViaSurfacePoint(Dir, DistantPoint);
+        bool isPrimBacked = light.IsPrimitiveBackedLight();
+
+        printf("[%u]-----\n"
+               "    SolidAngle - (%f, %f, %f| %f), (%f), (%u)\n"
+               "    Ray        - ([%f, %f, %f] [%f, %f, %f]| %f), (%f), (%u) - Ray\n"
+               "    Emit       - (%f, %f, %f), (%f, %f, %f)\n"
+               "    PrimBacked - (%s)\n"
+               "--------\n",
+               i,
+               //
+               sampleVec.value[0], sampleVec.value[1], sampleVec.value[2],
+               sampleVec.pdf, pdfSolidAngle, solidRNCount,
+               //
+               sampleRay.value.Dir()[0], sampleRay.value.Dir()[1], sampleRay.value.Dir()[2],
+               sampleRay.value.Pos()[0], sampleRay.value.Pos()[1], sampleRay.value.Pos()[2],
+               sampleRay.pdf, pdfRay, rayRNCount,
+               //
+               radiance0[0], radiance0[1], radiance0[2],
+               radiance1[0], radiance1[1], radiance1[2],
+               //
+               (isPrimBacked) ? "True" : "False");
+    }
+}
+
 TEST(DefaultLights, DISABLED_Skysphere)
 {
 }
@@ -124,11 +179,24 @@ TEST(DefaultLights, MetaLight)
     auto& singleTG = *transformGroups.at(TransGroupId(1)).value().get().get();
     // LGs
     Map<LightGroupId, LightGroupPtr> lightGroups;
-
-    lightGroups.emplace(const LightGroupId(0),
-                        LightGroupPtr(std::make_unique<LightGroupPrim<PrimGroupTriangle>>(0u, system, TextureViewMap{}, triangleGroup)));
-    lightGroups.emplace(const LightGroupId(1),
-                        LightGroupPtr(std::make_unique<LightGroupSkysphereCoOcta>(1u, system, TextureViewMap{}, emptyPrimGroup)));
+    lightGroups.emplace
+    (
+        const LightGroupId(0),
+        LightGroupPtr
+        (
+            std::make_unique<LightGroupPrim<PrimGroupTriangle>>
+            (0u, system, TextureViewMap{}, TextureMap{}, triangleGroup)
+        )
+    );
+    lightGroups.emplace
+    (
+        const LightGroupId(1),
+        LightGroupPtr
+        (
+            std::make_unique<LightGroupSkysphereCoOcta>
+            (1u, system, TextureViewMap{}, TextureMap{}, emptyPrimGroup)
+        )
+    );
     auto& triangleLightGroup = *lightGroups.at(LightGroupId(0)).value().get().get();
     auto& skysphereCOLightGroup = *lightGroups.at(LightGroupId(1)).value().get().get();
     //
@@ -159,7 +227,15 @@ TEST(DefaultLights, MetaLight)
     skysphereCOLightGroup.PushTexAttribute(hTriLightIds[0], hTriLightIds[0], 0,
                                            GenRadiance(), std::vector<Optional<TextureId>>(1),
                                            queue);
-    // Allocate
+    // Finalize
+    emptyPrimGroup.Finalize(queue);
+    triangleGroup.Finalize(queue);
+    identityTG.Finalize(queue);
+    singleTG.Finalize(queue);
+    triangleGroup.Finalize(queue);
+    skysphereCOLightGroup.Finalize(queue);
+
+    //
     using LSPair = Pair<LightSurfaceId, LightSurfaceParams>;
     std::vector<LSPair> lSurfs =
     {
@@ -172,7 +248,7 @@ TEST(DefaultLights, MetaLight)
             },
         },
         {
-            LightSurfaceId(0),
+            LightSurfaceId(1),
             LightSurfaceParams
             {
                 .lightId = std::bit_cast<LightId>(hTriLightIds[0]),
@@ -180,7 +256,7 @@ TEST(DefaultLights, MetaLight)
             }
         },
         {
-            LightSurfaceId(0),
+            LightSurfaceId(2),
             LightSurfaceParams
             {
                 .lightId = std::bit_cast<LightId>(hSkysphereLightIds[0]),
@@ -188,7 +264,7 @@ TEST(DefaultLights, MetaLight)
             }
         },
         {
-            LightSurfaceId(0),
+            LightSurfaceId(3),
             LightSurfaceParams
             {
                 .lightId = std::bit_cast<LightId>(hSkysphereLightIds[0]),
@@ -207,5 +283,19 @@ TEST(DefaultLights, MetaLight)
     MetaLightList lightList = MetaLightList(system);
     lightList.Construct(params, queue);
 
-    // TODO: Call functions
+
+    Span<RandomNumber> dRandomNumbers;
+    DeviceLocalMemory rnMem(*queue.Device());
+    MemAlloc::AllocateMultiData(std::tie(dRandomNumbers), rnMem,
+                                {1024});
+
+    //
+    MetaLightArrayView lightView = lightList.Array();
+    queue.IssueSaturatingKernel<KCReadLights<MetaLightArrayView>>
+    (
+        "KCReadLights",
+        KernelIssueParams{.workCount = lightView.Size()},
+        lightView,
+        dRandomNumbers
+    );
 }

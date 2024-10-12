@@ -659,7 +659,7 @@ std::string_view PathTracerRenderer<MLA>::TypeName()
 template<class MLA>
 size_t PathTracerRenderer<MLA>::GPUMemoryUsage() const
 {
-    return (rayPartitioner.UsedGPUMemory() +
-            rnGenerator->UsedGPUMemory() +
+    return (rayPartitioner.GPUMemoryUsage() +
+            rnGenerator->GPUMemoryUsage() +
             redererGlobalMem.Size());
 }

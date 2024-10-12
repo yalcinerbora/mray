@@ -95,7 +95,7 @@ class RayPartitioner
                                            const GPUQueue& queue,
                                            bool onlySortForBatches = false) const;
 
-    size_t                  UsedGPUMemory() const;
+    size_t                  GPUMemoryUsage() const;
 };
 
 template<class T>
@@ -146,7 +146,7 @@ BinaryPartitionOutput RayPartitioner::BinaryPartition(Span<const CommonIndex> dI
     };
 }
 
-inline size_t RayPartitioner::UsedGPUMemory() const
+inline size_t RayPartitioner::GPUMemoryUsage() const
 {
     return deviceMem.Size();
 }

@@ -423,7 +423,11 @@ void TextureMemory::ConvertColorspaces()
                    t.Gamma() != Float(1));
         requiresConversion &= rq;
         // Skip if not color or writable
-        if(!requiresConversion) continue;
+        if(!requiresConversion)
+        {
+            t.SetColorSpace(tracerParams.globalTextureColorSpace);
+            continue;
+        }
 
         if(!t.IsBlockCompressed())
         {

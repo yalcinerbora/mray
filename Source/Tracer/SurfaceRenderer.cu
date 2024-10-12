@@ -767,7 +767,7 @@ std::string_view SurfaceRenderer::TypeName()
 
 size_t SurfaceRenderer::GPUMemoryUsage() const
 {
-    return (rayPartitioner.UsedGPUMemory() +
-            rnGenerator->UsedGPUMemory() +
+    return (rayPartitioner.GPUMemoryUsage() +
+            rnGenerator->GPUMemoryUsage() +
             redererGlobalMem.Size());
 }

@@ -71,13 +71,13 @@ namespace MetaLightDetail
 }
 
 template<class Variant,
-         class SpectrumTransformer = SpectrumConverterContextIdentity>
+         class SpectrumConverterIn = SpectrumConverterIdentity>
 class MetaLightViewT
 {
-    using SpectrumConverter = typename SpectrumTransformer::Converter;
+    using SpectrumConverter = SpectrumConverterIn;
 
     private:
-    const SpectrumConverter&    sConverter;
+    const SpectrumConverter&    sConv;
     const Variant&              light;
 
     public:
@@ -170,6 +170,7 @@ class MetaLightArrayT
         ...
     >();
 
+    public:
     using PrimBytePack = std::array<Byte, PrimVariantSize.first>;
     using TContextBytePack = std::array<Byte, TContextVariantSize.first>;
     //
@@ -183,6 +184,7 @@ class MetaLightArrayT
     static_assert(LightSoAVariantSize.second <= MemAlloc::DefaultSystemAlignment());
     static_assert(TransSoAVariantSize.second <= MemAlloc::DefaultSystemAlignment());
 
+    private:
     // Actual light variant
     using LightVariant = Variant
     <
@@ -212,8 +214,8 @@ class MetaLightArrayT
     class View
     {
         public:
-        template <class SpectrumTransformer>
-        using MetaLightView = MetaLightViewT<MetaLight, SpectrumTransformer>;
+        template <class SpectrumConverter>
+        using MetaLightView = MetaLightViewT<MetaLight, SpectrumConverter>;
 
         private:
         Span<const MetaLight> dMetaLights;
@@ -221,17 +223,14 @@ class MetaLightArrayT
         public:
         View(Span<const MetaLight> d);
 
-        template<class SpectrumTransformer>
+        template<class SpectrumConverter>
         MRAY_HYBRID
-        MetaLightView<SpectrumTransformer>
-        operator()(const typename SpectrumTransformer::Converter&, uint32_t index) const;
+        MetaLightView<SpectrumConverter>
+        operator()(const typename SpectrumConverter&, uint32_t index) const;
 
         MRAY_HYBRID
         uint32_t Size() const;
     };
-
-    template <class SpectrumTransformer>
-    using MetaLightView = View::MetaLightView<SpectrumTransformer>;
 
     private:
     const GPUSystem&    system;

@@ -28,4 +28,7 @@ class ColorConverter
                          std::vector<ColorConvParams> params,
                          std::vector<GenericTexture*> bcTextures,
                          MRayColorSpaceEnum globalColorSpace) const;
+    void    ExtractLuminance(std::vector<Span<Float>> dLuminanceBuffers,
+                             std::vector<const GenericTexture*> textures,
+                             const GPUQueue& queue);
 };

@@ -97,7 +97,7 @@ Float LightPrim<P, SC>::PdfRay(const Ray& ray) const
     Optional<Hit> hit = primitive.ProjectedHit(ray.Pos());
     if(!hit.has_value()) return Float(0);
 
-    Optional<BasicSurface> surf = primitive.SurfaceFromHit(hit);
+    Optional<BasicSurface> surf = primitive.SurfaceFromHit(*hit);
     if(!surf.has_value()) return Float(0);
 
     Float NdL = (*surf).normal.Dot(ray.Dir());
@@ -107,7 +107,7 @@ Float LightPrim<P, SC>::PdfRay(const Ray& ray) const
     Float pdfDir = PDFUniformDirection();
     if(isTwoSided) pdfDir *= Float(2);
 
-    Float pdfSurface = primitive.PdfSurface(hit);
+    Float pdfSurface = primitive.PdfSurface(*hit);
     return pdfDir * pdfSurface;
 }
 
@@ -140,13 +140,13 @@ Spectrum LightPrim<P, SC>::EmitViaSurfacePoint(const Vector3& wO,
 {
     const P& primitive = prim.get();
     using Hit = typename P::Hit;
-    Optional<Hit> hit = prim.ProjectedHit(surfacePoint);
+    Optional<Hit> hit = primitive.ProjectedHit(surfacePoint);
     if(!hit) return Spectrum::Zero();
     Vector2 uv = radiance.IsConstant()
                 ? Vector2::Zero()
                 : primitive.SurfaceParametrization(*hit);
 
-    Optional<BasicSurface> surf = primitive.SurfaceFromHit(hit);
+    Optional<BasicSurface> surf = primitive.SurfaceFromHit(*hit);
     if(!surf.has_value()) return Spectrum::Zero();
 
     Float NdL = (*surf).normal.Dot(wO);
@@ -240,6 +240,26 @@ Float CoOctaCoordConverter::ToSolidAnglePdf(Float pdf, const Vector2&)
 
 template<CoordConverterC CC, TransformContextC TC, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
+SampleT<Vector2> LightSkysphere<CC, TC, SC>::SampleUV(Vector2 xi) const
+{
+    if(radiance.IsConstant())
+        return SampleT<Vector2>{.value = xi, .pdf = Float(1)};
+    else
+        return dist2D.SampleUV(xi);
+}
+
+template<CoordConverterC CC, TransformContextC TC, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float LightSkysphere<CC, TC, SC>::PdfUV(Vector2 uv) const
+{
+    if(radiance.IsConstant())
+        return Float(1);
+    else
+        return dist2D.PdfUV(uv);
+}
+
+template<CoordConverterC CC, TransformContextC TC, class SC>
+MRAY_HYBRID MRAY_CGPU_INLINE
 LightSkysphere<CC, TC, SC>::LightSkysphere(const SpectrumConverter& specTransformer,
                                            const Primitive& p, const LightSkysphereData& soa, LightKey key)
     : prim(p)
@@ -254,7 +274,7 @@ SampleT<Vector3> LightSkysphere<CC, TC, SC>::SampleSolidAngle(RNGDispenser& rng,
                                                               const Vector3& distantPoint) const
 {
     Vector2 xi = rng.NextFloat2D<0>();
-    SampleT<Vector2> sampledUV = dist2D.SampleUV(xi);
+    SampleT<Vector2> sampledUV = SampleUV(xi);
     Vector3 dirYUp = CC::UVToDir(sampledUV.value);
     Float pdf = CC::ToSolidAnglePdf(sampledUV.pdf, sampledUV.value);
     // Transform Direction to World Space
@@ -277,7 +297,7 @@ Float LightSkysphere<CC, TC, SC>::PdfSolidAngle(const typename EmptyPrimitive<TC
 {
     Vector3 dirYUp = prim.get().GetTransformContext().ApplyV(dir);
     Vector2 uv = CC::DirToUV(dirYUp);
-    Float pdf = dist2D.PdfUV(uv);
+    Float pdf = PdfUV(uv);
     pdf = CC::ToSolidAnglePdf(pdf, dirYUp);
     return pdf;
 }
@@ -288,9 +308,10 @@ SampleT<Ray> LightSkysphere<CC, TC, SC>::SampleRay(RNGDispenser& rng) const
 {
     // What is the probability?
     Vector2 xi = rng.NextFloat2D<0>();
-    SampleT<Vector2> sampledUV = dist2D.SampleUV(xi);
+    SampleT<Vector2> sampledUV = SampleUV(xi);
+    //
     Vector3 dirYUp = CC::UVToDir(sampledUV.value);
-    Float pdf = CC::ToSolidAnglePDF(sampledUV.pdf, sampledUV.value);
+    Float pdf = CC::ToSolidAnglePdf(sampledUV.pdf, sampledUV.value);
 
     // Transform Direction to World Space
     Vector3 worldDir = prim.get().GetTransformContext().InvApplyV(dirYUp);
@@ -310,8 +331,8 @@ Float LightSkysphere<CC, TC, SC>::PdfRay(const Ray& ray) const
 {
     Vector3 dirYUp = prim.get().GetTransformContext().ApplyV(-ray.Dir());
     Vector2 uv = CC::DirToUV(dirYUp);
-    Float pdf = dist2D.PdfUV(uv);
-    pdf = CC::ToSolidAnglePDF(pdf, uv);
+    Float pdf = PdfUV(uv);
+    pdf = CC::ToSolidAnglePdf(pdf, uv);
     return pdf;
 }
 
@@ -349,7 +370,7 @@ static_assert(LightC<LightSkysphere<CoOctaCoordConverter>>);
 namespace LightDetail
 {
 
-    template<TransformContextC TC, class SC>
+template<TransformContextC TC, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
 LightNull<TC, SC>::LightNull(const SpectrumConverter&,
                             const Primitive&,
@@ -426,6 +447,7 @@ template <PrimitiveGroupC PG>
 LightGroupPrim<PG>::LightGroupPrim(uint32_t groupId,
                                    const GPUSystem& system,
                                    const TextureViewMap& map,
+                                   const TextureMap&,
                                    const GenericGroupPrimitiveT& primGroup)
     : Parent(groupId, system, map)
     , primGroup(static_cast<const PrimGroup&>(primGroup))
@@ -597,19 +619,20 @@ template <CoordConverterC CC>
 LightGroupSkysphere<CC>::LightGroupSkysphere(uint32_t groupId,
                                              const GPUSystem& system,
                                              const TextureViewMap& map,
+                                             const TextureMap& texMapIn,
                                              const GenericGroupPrimitiveT& primGroup)
     : Parent(groupId, system, map)
     , primGroup(static_cast<const PrimGroup&>(primGroup))
+    , pwcDistributions(system)
+    , texMap(texMapIn)
 {}
 
 template <CoordConverterC CC>
 void LightGroupSkysphere<CC>::CommitReservations()
 {
-    this->GenericCommit(std::tie(dRadiances, dDistributions),
-                        {0, 0});
-
+    this->GenericCommit(std::tie(dRadiances), {0});
+    radianceFieldTextures = std::vector<const GenericTexture*>(this->TotalItemCount(), nullptr);
     soa.dRadiances = ToConstSpan(dRadiances);
-    soa.dDistributions = ToConstSpan(dDistributions);
     soa.sceneDiameter = sceneDiameter;
 }
 
@@ -667,21 +690,36 @@ void LightGroupSkysphere<CC>::PushTexAttribute(LightKey idStart, LightKey idEnd,
                                                std::vector<Optional<TextureId>> texIds,
                                                const GPUQueue& queue)
 {
-    if(attributeIndex == 0)
+    if(attributeIndex != 0)
+        throw MRayError("{:s}: Attribute {:d} is not \"ParamVarying\", wrong "
+                        "function is called", TypeName(), attributeIndex);
+    //
+    CommonKey i = std::bit_cast<CommonKey>(idStart.FetchIndexPortion());
+    for(const auto& texId : texIds)
     {
-        this->template GenericPushTexAttribute<2, Vector3>
-        (
-            dRadiances,
-            //
-            idStart, idEnd,
-            attributeIndex,
-            std::move(data),
-            std::move(texIds),
-            queue
-        );
+        if(!texId.has_value()) continue;
+
+        auto optTex = texMap.at(*texId);
+        if(!optTex)
+        {
+            throw MRayError("{:s}: Given texture({:d}) is not found",
+                            TypeName(), static_cast<CommonKey>(*texId));
+        }
+        const GenericTexture& tex = optTex.value();
+        radianceFieldTextures[i] = &tex;
+        i++;
     }
-    else throw MRayError("{:s}: Attribute {:d} is not \"ParamVarying\", wrong "
-                         "function is called", TypeName(), attributeIndex);
+    //
+    this->template GenericPushTexAttribute<2, Vector3>
+    (
+        dRadiances,
+        //
+        idStart, idEnd,
+        attributeIndex,
+        std::move(data),
+        std::move(texIds),
+        queue
+    );
 }
 
 template <CoordConverterC CC>
@@ -732,4 +770,59 @@ template <CoordConverterC CC>
 void LightGroupSkysphere<CC>::SetSceneDiameter(Float d)
 {
     sceneDiameter = d;
+}
+
+template <CoordConverterC CC>
+void LightGroupSkysphere<CC>::Finalize(const GPUQueue& q)
+{
+    //
+    std::vector<size_t> radianceFieldSizesLinear;
+    radianceFieldSizesLinear.reserve(radianceFieldTextures.size());
+    // Find sizes and allocate a temp memory
+    for(const GenericTexture* t : radianceFieldTextures)
+    {
+        Vector2ui size = (t) ? Vector2ui(t->Extents()) : Vector2ui(1);
+        pwcDistributions.Reserve(size);
+        radianceFieldSizesLinear.push_back(size.Multiply());
+    }
+    pwcDistributions.Commit();
+
+    // Allocate the buffer
+    DeviceLocalMemory tempMem(*q.Device());
+    std::vector<Span<Float>> dLuminanceData =
+        MemAlloc::AllocateSegmentedData<Float>(tempMem, radianceFieldSizesLinear);
+
+    // For non-texture types just put 1.
+    auto allMem = Span<Byte>(static_cast<Byte*>(tempMem), tempMem.Size());
+    Span<Float> allMemFloat =  MemAlloc::RepurposeAlloc<Float>(allMem);
+    DeviceAlgorithms::InPlaceTransform
+    (
+        allMemFloat, q,
+        [] MRAY_HYBRID (Float) -> Float
+        {
+            return Float(1);
+        }
+    );
+
+    // Convert to Luminance
+    ColorConverter converter(this->gpuSystem);
+    converter.ExtractLuminance(dLuminanceData, radianceFieldTextures, q);
+    // Generate cdf/pdf for sampling
+    for(size_t i = 0; i < radianceFieldTextures.size(); i++)
+    {
+        if(!radianceFieldTextures[i]) continue;
+
+        pwcDistributions.Construct(uint32_t(i), dLuminanceData[i], q);
+    }
+    soa.dDistributions = pwcDistributions.DeviceDistributions();
+    // All Done!
+    q.Barrier().Wait();
+}
+
+template <CoordConverterC CC>
+size_t LightGroupSkysphere<CC>::GPUMemoryUsage() const
+{
+    return (Parent::GPUMemoryUsage() +
+            pwcDistributions.GPUMemoryUsage());
+
 }

@@ -81,10 +81,10 @@ void TracerBase::PopulateAttribInfoAndTypeLists()
                                 0u, gpuSystem);
     InstantiateAndGetAttribInfo(medAttributeInfoMap,
                                 typeGenerators.medGenerator,
-                                0u, gpuSystem, TextureViewMap{});
+                                0u, gpuSystem, TextureViewMap{}, TextureMap{});
     InstantiateAndGetAttribInfo(matAttributeInfoMap,
                                 typeGenerators.matGenerator,
-                                0u, gpuSystem, TextureViewMap{});
+                                0u, gpuSystem, TextureViewMap{}, TextureMap{});
     InstantiateAndGetAttribInfo(transAttributeInfoMap,
                                 typeGenerators.transGenerator,
                                 0u, gpuSystem);
@@ -120,12 +120,14 @@ void TracerBase::PopulateAttribInfoAndTypeLists()
             pg = pgGen.value()(0, gpuSystem);
             instance = kv.second(0u, gpuSystem,
                                  TextureViewMap{},
+                                 TextureMap{},
                                  *pg.get());
         }
         else
         {
             instance = kv.second(0u, gpuSystem,
                                  TextureViewMap{},
+                                 TextureMap{},
                                  emptyPG);
         }
         lightAttributeInfoMap.emplace(kv.first, instance->AttributeInfo());
@@ -173,6 +175,7 @@ void TracerBase::GenerateDefaultGroups()
     lightGroups.try_emplace(nullLGId,
                             genFuncL.value()(std::move(idInt), gpuSystem,
                                              texMem.TextureViews(),
+                                             texMem.Textures(),
                                              *primGLoc.first->second));
     assert(nullLGId == TracerConstants::NullLightGroupId);
     //
@@ -186,7 +189,8 @@ void TracerBase::GenerateDefaultGroups()
     idInt = mediumGroupCounter.fetch_add(1);
     MediumGroupId vacuumMedId = static_cast<MediumGroupId>(idInt);
     mediumGroups.try_emplace(vacuumMedId, genFuncMd.value()(std::move(idInt), gpuSystem,
-                                                            texMem.TextureViews()));
+                                                            texMem.TextureViews(),
+                                                            texMem.Textures()));
     assert(vacuumMedId == TracerConstants::VacuumMediumGroupId);
 }
 
@@ -605,7 +609,8 @@ MatGroupId TracerBase::CreateMaterialGroup(std::string name)
         throw MRayError("Too many Material Groups");
     matGroups.try_emplace(id, genFunc.value()(static_cast<uint32_t>(id),
                                               gpuSystem,
-                                              texMem.TextureViews()));
+                                              texMem.TextureViews(),
+                                              texMem.Textures()));
     return id;
 }
 
@@ -902,6 +907,7 @@ LightGroupId TracerBase::CreateLightGroup(std::string name,
     GenericGroupPrimitiveT& primGroupPtr = *primGroup.value().get().get();
     lightGroups.try_emplace(id, genFunc.value()(static_cast<uint32_t>(id), gpuSystem,
                                                 texMem.TextureViews(),
+                                                texMem.Textures(),
                                                 primGroupPtr));
     return id;
 }
@@ -1170,7 +1176,8 @@ MediumGroupId TracerBase::CreateMediumGroup(std::string name)
     MediumGroupId id = static_cast<MediumGroupId>(idInt);
     mediumGroups.try_emplace(id, genFunc.value()(static_cast<uint32_t>(id),
                                                  gpuSystem,
-                                                 texMem.TextureViews()));
+                                                 texMem.TextureViews(),
+                                                 texMem.Textures()));
     return id;
 }
 
@@ -1370,6 +1377,8 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     // namely triangles (which adjust the local index values
     // to global one) and tranforms (which invert the transforms and store)
     GPUQueueIteratorRoundRobin queueIt(gpuSystem);
+    // Finalize the texture operations
+    texMem.Finalize();
     for(auto& g : primGroups.Map())
     { g.second->Finalize(queueIt.Queue()); queueIt.Next(); }
     for(auto& g : camGroups.Map())
@@ -1382,8 +1391,6 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     { g.second->Finalize(queueIt.Queue()); queueIt.Next(); }
     for(auto& g : lightGroups.Map())
     { g.second->Finalize(queueIt.Queue()); queueIt.Next(); }
-    // Finalize the texture operations
-    texMem.Finalize();
 
     // Pack the surfaces via transform / primitive
     //
