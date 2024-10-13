@@ -84,12 +84,15 @@ class StratifiedIntegerAliasTable
 template <class LookupStrategy, class H, class Key>
 concept LookupStrategyC = requires()
 {
-    { LookupStrategy::Hash(Key{}, size_t{}) } -> std::same_as<H>;
+    { LookupStrategy::Hash(Key{}) } -> std::same_as<H>;
     { LookupStrategy::IsSentinel(H{}) } -> std::same_as<bool>;
     { LookupStrategy::IsEmpty(H{}) } -> std::same_as<bool>;
 };
 
-template <class K, class V, std::unsigned_integral H,
+template<class K>
+concept LookupKeyC = requires(const K & k) { k == k; };
+
+template <LookupKeyC K, class V, std::unsigned_integral H,
           uint32_t VEC_LENGTH, LookupStrategyC<H, K> Strategy>
 class LookupTable
 {
@@ -103,7 +106,7 @@ class LookupTable
     private:
     // Keys and values are seperate,
     // keys are small, values may be large
-    Span<Vector<4, H>>  hashes;
+    Span<Vector<VL, H>> hashes;
     Span<K>             keys;
     Span<V>             values;
 
@@ -113,7 +116,7 @@ class LookupTable
                                     const Span<V>& values);
 
     MRAY_HYBRID
-    Optional<const V&>  Search(const K&) const;
+    Optional<const V*>  Search(const K&) const;
 };
 
 // Simple host-only, static-sized array

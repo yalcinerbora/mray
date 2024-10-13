@@ -17,7 +17,7 @@ uint32_t StratifiedIntegerAliasTable<T>::FindIndex(T id) const
     return gAliasRanges[tableIndex];
 }
 
-template <class K, class V, std::unsigned_integral H,
+template <LookupKeyC K, class V, std::unsigned_integral H,
           uint32_t VECL, LookupStrategyC<H, K> S>
 MRAY_HYBRID MRAY_CGPU_INLINE
 LookupTable<K, V, H, VECL, S>::LookupTable(const Span<Vector<VL, H>>& hashes,
@@ -31,19 +31,19 @@ LookupTable<K, V, H, VECL, S>::LookupTable(const Span<Vector<VL, H>>& hashes,
     assert(keys.size() * VECL <= hashes.size());
 }
 
-template <class K, class V, std::unsigned_integral H,
+template <LookupKeyC K, class V, std::unsigned_integral H,
           uint32_t VECL, LookupStrategyC<H, K> S>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Optional<const V&> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
+Optional<const V*> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
 {
-    uint32_t tableSize = static_cast<uint32_t>(keys.size());
+    uint32_t tableSize = static_cast<uint32_t>(hashes.size());
     H hashVal = S::Hash(k);
     H index = hashVal % tableSize;
 
     while(true)
     {
         uint32_t vectorIndex = index >> VEC_SHIFT;
-        Vector<4, H> hashChunk = hashes[vectorIndex];
+        Vector<VL, H> hashChunk = hashes[vectorIndex];
         UNROLL_LOOP
         for(uint32_t i = 0; i < VL; i++)
         {
@@ -58,7 +58,7 @@ Optional<const V&> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
             // keys are equal, check them only if the hashes are equal
             uint32_t globalIndex = vectorIndex + i;
             if(hashVal == hashChunk[i] && keys[globalIndex] == k)
-                return values[globalIndex];
+                return &values[globalIndex];
         }
         index = (index >= tableSize) ? 0 : (index + VL);
         assert(index != hashVal % tableSize);

@@ -73,7 +73,7 @@ SampleT<BasicSurface> Sphere<T>::SampleSurface(RNGDispenser& rng) const
 
 template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float Sphere<T>::PdfSurface(const Hit& hit) const
+Float Sphere<T>::PdfSurface(const Hit&) const
 {
     return Float(1) / GetSurfaceArea();
 }

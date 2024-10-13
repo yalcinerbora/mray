@@ -44,7 +44,6 @@ Float LightPrim<P, SC>::PdfSolidAngle(const typename P::Hit& hit,
     // Project point to surface (function assumes
     Optional<BasicSurface> surfaceOpt = primitive.SurfaceFromHit(hit);
     if(!surfaceOpt) return Float{0};
-
     const BasicSurface& surface = surfaceOpt.value();
 
     Float pdf = primitive.PdfSurface(hit);

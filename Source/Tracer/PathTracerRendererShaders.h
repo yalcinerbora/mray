@@ -292,7 +292,6 @@ void PathTraceRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
                                          const LightWorkParams<EmptyType, LG, TG>& params,
                                          RayIndex rayIndex)
 {
-
     auto [ray, tMM] = RayFromGMem(params.in.dRays, rayIndex);
     Spectrum throughput = params.rayState.dThroughput[rayIndex];
 
@@ -401,99 +400,72 @@ void PathTraceRDetail::WorkFunctionWithNEE(const Prim&, const Material& mat, con
 
 template<class LightSampler, LightC Light, LightGroupC LG, TransformGroupC TG>
 MRAY_HYBRID MRAY_GPU_INLINE
-void PathTraceRDetail::LightWorkFunctionWithNEE(const Light&, RNGDispenser&,
-                                                const LightWorkParams<LightSampler, LG, TG>&,
-                                                RayIndex)
+void PathTraceRDetail::LightWorkFunctionWithNEE(const Light& l, RNGDispenser&,
+                                                const LightWorkParams<LightSampler, LG, TG>& params,
+                                                RayIndex rayIndex)
 {
+    PathDataPack pathDataPack = params.rayState.dPathDataPack[rayIndex];
 
-    //using enum RayType;
-    //using enum SampleMode::E;
-    ////
-    //RayType rType = params.rayState.dPathRayType[rayIndex];
-    //const GlobalState& gState = params.globalState;
-
-    //// If we call work function
-    //// Only accumulate if
-    //bool isSpecPathRay = (rType == SPECULAR_PATH_RAY);
-    //bool isPathRay = (rType == PATH_RAY);
-    //bool isPathRayAsMISRay = (gState.sampleMode == NEE_WITH_MIS && rType == PATH_RAY);
-    //bool isCameraRay = (rType == CAMERA_RAY);
-    //bool isSpecPathRay = (rType == SPECULAR_PATH_RAY);
-    //bool isNEEOff = (gState.sampleMode == PURE);
-    //bool doAccumulate = (isPathRayAsMISRay || isCameraRay || isSpecPathRay || isNEEOff);
+    // If mode is NEE, only camera rays are allowed
+    if(params.globalState.sampleMode == SampleMode::E::NEE &&
+       pathDataPack.type != RayType::CAMERA_RAY)
+    {
+        pathDataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
+        return;
+    }
 
 
-    //// If we are doing direct light MIS and hit a light,
-    //// actual path ray automatically becomes MIS ray.
-    //Float misWeight = Float(1);
-    //if(isPathRayAsMISRay)
-    //{
-    //    Float lightSamplePDF;
-    //    // Find out the pdf of the light
-    //    Float pdfLightM, pdfLightC;
-    //    //renderState.gLightSampler->Pdf(...);
+    bool switchToMISPdf = (params.globalState.sampleMode == SampleMode::E::NEE_WITH_MIS &&
+                           pathDataPack.type == RayType::PATH_RAY);
+    Spectrum throughput = params.rayState.dThroughput[rayIndex];
+    auto [ray, tMM] = RayFromGMem(params.in.dRays, rayIndex);
+    if(switchToMISPdf)
+    {
+        using Distribution::MIS::BalanceCancelled;
+        using Distribution::Common::DivideByPDF;
+        //
+        std::array<Float, 2> weights = {Float(0.5), Float(0.5)};
+        std::array<Float, 2> pdfs;
+        pdfs[0] = params.rayState.dPrevMatPDF[rayIndex];
+        // We need to find the index of this specific light
+        // Light sampler will handle it
+        HitKeyPack hitKeyPack = params.in.dKeys[rayIndex];
+        MetaHit hit = params.in.dHits[rayIndex];
+        pdfs[1] = params.globalState.lightSampler.PdfLight(hitKeyPack, hit, ray);
+        Float misPdf = BalanceCancelled<2>(pdfs, weights);
+        // We premultiply the throughput under the assumption this will not hit a light,
+        // but we did. So revert the multiplication first then multiply with
+        // MIS weight.
+        throughput *= pdfs[0];
+        throughput = DivideByPDF(throughput, misPdf);
+    }
 
-    //    // We are sub-sampling (discretely sampling) a single light
-    //    // pdf of BxDF should also incorporate this
-    //    Float bxdfPDF = params.rayState.dPrevMaterialPDF[rayIndex];
-    //    misWeight = Distribution::MIS::Power(1, bxdfPDF, 1, lightSamplePDF);
-    //}
+    Vector3 wO = -ray.Dir();
+    Spectrum emission;
+    if constexpr(Light::IsPrimitiveBackedLight)
+    {
+        // It is more accurate to use hit if we actually hit the material
+        using Hit = typename Light::Primitive::Hit;
+        static constexpr uint32_t N = Hit::Dims;
+        MetaHit metaHit = params.in.dHits[rayIndex];
+        Hit hit = metaHit.AsVector<N>();
+        emission = l.EmitViaHit(wO, hit);
+    }
+    else
+    {
+        Vector3 position = ray.AdvancedPos(tMM[1]);
+        emission = l.EmitViaSurfacePoint(wO, position);
+    }
 
-
-    ////bool isNEEOn = (gState.sampleMode == NEE_WITH_MIS ||
-    ////                gState.sampleMode == NEE);
-    ////bool isNEERay = isNEEOn && rType == NEE_RAY;
-
-    ////bool isPathRayNEEOff = ((!isNEEOn) &&
-    ////                        (rType == PATH_RAY ||
-    ////                         rType == SPECULAR_PATH_RAY));
-
-    //auto [ray, tMM] = RayFromGMem(params.in.dRays, rayIndex);
-    //Vector3 position;
-    //if constexpr(Light::IsPrimitiveBackedLight)
-    //{
-    //    params.in.position;
-    //    l.
-    //}
-    //else
-    //{
-
-    //}
-    //// = surface.WorldPosition();
-
-    //Float misWeight = Float(1);
-    //if(isPathRayAsMISRay)
-    //{
-    //    Float lightSamplePDF;
-    //    //// Find out the pdf of the light
-    //    //Float pdfLightM, pdfLightC;
-    //    //renderState.gLightSampler->Pdf(pdfLightM, pdfLightC,
-    //    //                               //
-    //    //                               gLight.GlobalLightIndex(),
-    //    //                               ray.tMax,
-    //    //                               position,
-    //    //                               direction,
-    //    //                               surface.worldToTangent);
-
-    //    // We are sub-sampling (discretely sampling) a single light
-    //    // pdf of BxDF should also incorporate this
-    //    Float bxdfPDF = params.rayState.dShadowRayMaterialPDF[rayIndex];
-    //    misWeight = Distribution::MIS::Power(1, bxdfPDF, 1, lightSamplePDF);
-    //}
-
-    //if(isPathRayNEEOff   || // We hit a light with a path ray while NEE is off
-    //   isPathRayAsMISRay || // We hit a light with a path ray while MIS option is enabled
-    //   isCorrectNEERay   || // We hit the correct light as a NEE ray while NEE is on
-    //   isCameraRay       || // We hit as a camera ray which should not be culled when NEE is on
-    //   isSpecularPathRay)   // We hit as spec ray which did not launched any NEE rays thus it should contribute
-    //{
-
-    //    Spectrum throughput = params.rayState.dPathThroughput[rIndex];
-    //    Spectrum emission = l.EmitViaSurfacePoint(-ray.Dir(), position);
-    //    Spectrum radianceEstimate =  emission * throughput;
-    //    //
-    //    radianceEstimate *= misWeight;
-    //    //
-    //    params.rayState.dPathRadiance[rayIndex] += radianceEstimate;
-    //}
+    // Check the depth if we exceed it, do not accumulate
+    // we terminate the path regardless
+    Vector2ui rrRange = params.globalState.russianRouletteRange;
+    if((pathDataPack.depth + 1u) <= rrRange[1])
+    {
+        Spectrum radianceEstimate = emission * throughput;
+        params.rayState.dPathRadiance[rayIndex] = radianceEstimate;
+    }
+    // Set the path as dead
+    pathDataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
+    params.rayState.dPathDataPack[rayIndex] = pathDataPack;
 }

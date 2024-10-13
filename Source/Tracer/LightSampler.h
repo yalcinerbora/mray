@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include "Core/Vector.h"
+#include "Core/DataStructures.h"
 
 #include "Random.h"
 #include "ParamVaryingData.h"
@@ -20,17 +21,44 @@ using LightSample = SampleT<LightSampleOutput>;
 
 template<class DLSampler>
 concept DirectLightSamplerC = requires(const DLSampler& sampler,
-                                       RNGDispenser& rng)
+                                       RNGDispenser& rng,
+                                       const HitKeyPack& hitPack,
+                                       MetaHit metaHit)
 {
     {sampler.SampleLight(rng, Vector3{})} -> std::same_as<LightSample>;
-    {sampler.PdfLight(uint32_t{}, Ray{})} -> std::same_as<Float>;
+    {sampler.PdfLight(uint32_t{}, metaHit, Ray{})} -> std::same_as<Float>;
+    {sampler.PdfLight(hitPack, metaHit, Ray{})} -> std::same_as<Float>;
 };
+
+
+struct LightSurfKeyPack
+{
+    CommonKey lK;
+    CommonKey tK;
+    CommonKey pK;
+
+    auto operator<=>(const LightSurfKeyPack&) const = default;
+};
+
+struct LightSurfKeyHasher
+{
+    MRAY_HYBRID
+    static uint32_t Hash(const LightSurfKeyPack&);
+    MRAY_HYBRID
+    static bool     IsSentinel(uint32_t);
+    MRAY_HYBRID
+    static bool     IsEmpty(uint32_t);
+};
+
+using LightLookupTable = LookupTable<LightSurfKeyPack, uint32_t, uint32_t, 4,
+                                     LightSurfKeyHasher>;
 
 template <class MetaLightArray>
 class DirectLightSamplerViewUniform
 {
     private:
-    MetaLightArray dMetaLights;
+    MetaLightArray      dMetaLights;
+    LightLookupTable    dLightIndexTable;
 
     public:
     template <class SpectrumConverter>
@@ -42,7 +70,28 @@ class DirectLightSamplerViewUniform
     MRAY_HYBRID
     Float       PdfLight(uint32_t index, const MetaHit& hit,
                          const Ray& r) const;
+    MRAY_HYBRID
+    Float       PdfLight(const HitKeyPack&, const MetaHit& hit,
+                         const Ray& r) const;
 };
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+uint32_t LightSurfKeyHasher::Hash(const LightSurfKeyPack&)
+{
+    return 0;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool LightSurfKeyHasher::IsSentinel(uint32_t hash)
+{
+    return hash == 0;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool LightSurfKeyHasher::IsEmpty(uint32_t hash)
+{
+    return hash == 1;
+}
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 Pair<Ray, Vector2> LightSampleOutput::SampledRay(const Vector3& distantPoint) const
@@ -97,15 +146,11 @@ template <class ML>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float DirectLightSamplerViewUniform<ML>::PdfLight(uint32_t index,
                                                   const MetaHit& hit,
-                                                  const Ray& r) const
+                                                  const Ray& ray) const
 {
-    // TODO............................
-    Vector3 direction, position;
-
     using STIdentity = SpectrumConverterContextIdentity;
     using MetaLightView = typename ML::template MetaLightView<STIdentity>;
     STIdentity stIdentity;
-
     if(index >= dMetaLights.Size()) return Float(0);
 
     // Discrete sampling of such light (its uniform)
@@ -114,10 +159,28 @@ Float DirectLightSamplerViewUniform<ML>::PdfLight(uint32_t index,
     Float selectionPDF = Float(1) / lightCountF;
 
     // Probability of sampling such direction from the particular light
-
-    Float lightPDF = dMetaLights(stIdentity,index).PdfSolidAngle(hit, direction, position);
-
+    MetaLightView light = dMetaLights(stIdentity, index);
+    Float lightPDF = light.PdfSolidAngle(hit, ray.Dir(), ray.Pos());
     return lightPDF * selectionPDF;
+}
+
+template <class ML>
+MRAY_HYBRID MRAY_CGPU_INLINE
+Float DirectLightSamplerViewUniform<ML>::PdfLight(const HitKeyPack& hitPack,
+                                                  const MetaHit& hit,
+                                                  const Ray& r) const
+{
+    LightSurfKeyPack keyPack =
+    {
+        .lK = std::bit_cast<CommonKey>(hitPack.lightOrMatKey),
+        .tK = std::bit_cast<CommonKey>(hitPack.transKey),
+        .pK = std::bit_cast<CommonKey>(hitPack.primKey)
+    };
+    auto lightIndexOpt = dLightIndexTable.Search(keyPack);
+    if(lightIndexOpt.has_value())
+        return PdfLight(*(lightIndexOpt.value()), hit, r);
+
+    return Float(0);
 }
 
 #include "LightSampler.hpp"
