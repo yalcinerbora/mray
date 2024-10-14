@@ -28,7 +28,7 @@ LookupTable<K, V, H, VECL, S>::LookupTable(const Span<Vector<VL, H>>& hashes,
     , values(values)
 {
     assert(keys.size() == values.size());
-    assert(keys.size() * VECL <= hashes.size());
+    assert(keys.size() <= hashes.size() * VL);
 }
 
 template <LookupKeyC K, class V, std::unsigned_integral H,
@@ -36,27 +36,26 @@ template <LookupKeyC K, class V, std::unsigned_integral H,
 MRAY_HYBRID MRAY_CGPU_INLINE
 Optional<const V*> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
 {
-    uint32_t tableSize = static_cast<uint32_t>(hashes.size());
+    uint32_t tableSize = static_cast<uint32_t>(keys.size());
     H hashVal = S::Hash(k);
     H index = hashVal % tableSize;
 
-    while(true)
+    for(uint32_t _ = 0; _ < tableSize; _++)
     {
         uint32_t vectorIndex = index >> VEC_SHIFT;
         Vector<VL, H> hashChunk = hashes[vectorIndex];
         UNROLL_LOOP
         for(uint32_t i = 0; i < VL; i++)
         {
+            uint32_t globalIndex = vectorIndex + i;
             // Roll to start of the case special case
             // (since we are bulk reading)
-            if(vectorIndex + i >= tableSize) break;
-            // If empty, this means linear probe chain is iterated
+            if(globalIndex >= tableSize) break;
+            // If empty, this means linear probe chain is fully iterated
             // and we did not find the value return null
             if(S::IsEmpty(hashChunk[i])) return std::nullopt;
-
             // Actual comparison case, if hash is equal it does not mean
             // keys are equal, check them only if the hashes are equal
-            uint32_t globalIndex = vectorIndex + i;
             if(hashVal == hashChunk[i] && keys[globalIndex] == k)
                 return &values[globalIndex];
         }
@@ -64,6 +63,43 @@ Optional<const V*> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
         assert(index != hashVal % tableSize);
     }
     return std::nullopt;
+}
+
+template <LookupKeyC K, class V, std::unsigned_integral H,
+    uint32_t VECL, LookupStrategyC<H, K> S>
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool LookupTable<K, V, H, VECL, S>::Insert(const K& k, const V& v) const
+{
+    uint32_t tableSize = static_cast<uint32_t>(hashes.size());
+    H hashVal = S::Hash(k);
+    H index = hashVal % tableSize;
+
+    for(uint32_t _ = 0; _ < tableSize; _++)
+    {
+        uint32_t vectorIndex = index >> VEC_SHIFT;
+        Vector<VL, H> hashChunk = hashes[vectorIndex];
+        UNROLL_LOOP
+        for(uint32_t i = 0; i < VL; i++)
+        {
+            uint32_t globalIndex = vectorIndex + i;
+            // Roll to start of the case special case
+            // (since we are bulk reading)
+            if(globalIndex >= tableSize) break;
+
+            // If empty, this means linear probe chain is fully iterated
+            // and we did not find the value return null
+            if(S::IsEmpty(hashChunk[i]) || S::IsSentinel(hashChunk[i]))
+            {
+                hashChunk[i] = hashVal;
+                values[globalIndex] = v;
+                keys[globalIndex] = k;
+                return true;
+            }
+        }
+        index = (index >= tableSize) ? 0 : (index + VL);
+        assert(index != hashVal % tableSize);
+    }
+    return false;
 }
 
 template<class T, size_t N>

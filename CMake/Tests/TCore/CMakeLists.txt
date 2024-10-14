@@ -2,6 +2,7 @@ set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/Tests/Core)
 
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/T_GraphicsFunctions.cpp
+    ${CURRENT_SOURCE_DIR}/T_Math.cpp
     ${CURRENT_SOURCE_DIR}/T_MPMCQueue.cpp
 )
 

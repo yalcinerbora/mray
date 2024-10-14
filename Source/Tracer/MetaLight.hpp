@@ -116,6 +116,35 @@ MetaLightViewT<V, ST>::MetaLightViewT(const V& v, const SpectrumConverter& sc)
     , sConv(sc)
 {}
 
+MRAY_HYBRID MRAY_CGPU_INLINE
+uint32_t LightSurfKeyHasher::Hash(const LightSurfKeyPack& pack)
+{
+    using RNGFunctions::HashPCG64::Hash;
+
+    uint64_t hash = Hash(pack.lK, pack.tK, pack.pK);
+    uint32_t v0 = uint32_t(Bit::FetchSubPortion(hash, {0, 32}));
+    uint32_t v1 = uint32_t(Bit::FetchSubPortion(hash, {32, 64}));
+
+    uint32_t result = v0 ^ v1;
+    if(IsSentinel(result))  result -= 1;
+    if(IsEmpty(result))     result -= 2;
+
+    return result;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool LightSurfKeyHasher::IsSentinel(uint32_t hash)
+{
+    return hash == std::numeric_limits<uint32_t>::max() - 1u;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+bool LightSurfKeyHasher::IsEmpty(uint32_t hash)
+{
+    return hash == std::numeric_limits<uint32_t>::max();
+}
+
+
 template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Vector3> MetaLightViewT<V, ST>::SampleSolidAngle(RNGDispenser& rng,
@@ -272,6 +301,7 @@ typename MetaLightArrayT<TLT...>::View::MetaLightView<SConverter>
 MetaLightArrayT<TLT...>::View::operator()(const typename SConverter& sc,
                                           uint32_t i) const
 {
+    assert(i < dMetaLights.size());
     return MetaLightView<SConverter>(dMetaLights[i], sc);
 }
 
@@ -474,9 +504,15 @@ void MetaLightArrayT<TLT...>::Construct(MetaLightListConstructionParams params,
                                 {totalLightCount,
                                  totalLightCount,
                                  totalLightCount});
+
+    // Create %50 load factor table
+    uint32_t tableElemCount = uint32_t(Math::NextPrime(totalLightCount * 2));
+    uint32_t hashCount = Math::DivideUp(tableElemCount, 4u);
+
     // Do the internal allocation as well
     MemAlloc::AllocateMultiData(std::tie(dPrimSoA, dLightSoA, dTransSoA,
                                          dMetaPrims, dMetaTContexts, dMetaLights,
+                                         dTableHashes, dTableKeys, dTableValues,
                                          dSpectrumConverter),
                                 memory,
                                 {primExpandedRanges.size(),
@@ -485,6 +521,7 @@ void MetaLightArrayT<TLT...>::Construct(MetaLightListConstructionParams params,
                                  totalLightCount,
                                  totalLightCount,
                                  totalLightCount,
+                                 hashCount, tableElemCount, tableElemCount,
                                  1});
 
     queue.MemcpyAsync(dLKList, Span<const LightKey>(hLKList));
@@ -504,6 +541,32 @@ void MetaLightArrayT<TLT...>::Construct(MetaLightListConstructionParams params,
                         dTKList.subspan(range[0], range[1] - range[0]),
                         queue);
     }
+
+    // Initialize the Hash table
+    // Using CPU here, I really can't find out (o check) an algorithm
+    // to do this
+    static constexpr Vector4ui EmptyMark = Vector4ui(std::numeric_limits<uint32_t>::max());
+    std::vector<Vector4ui>          hTableHashes(hashCount, EmptyMark);
+    std::vector<LightSurfKeyPack>   hTableKeys(tableElemCount);
+    std::vector<uint32_t>           hTableValues(tableElemCount);
+    LightLookupTable lt(hTableHashes, hTableKeys, hTableValues);
+
+    for(uint32_t i = 0; i < uint32_t(hLKList.size()); i++)
+    {
+        LightSurfKeyPack kp =
+        {
+            .lK = std::bit_cast<CommonKey>(hLKList[i]),
+            .tK = std::bit_cast<CommonKey>(hTKList[i]),
+            .pK = std::bit_cast<CommonKey>(hPKList[i])
+        };
+        [[maybe_unused]]
+        bool inserted = lt.Insert(kp, i);
+        assert(inserted);
+    }
+
+    queue.MemcpyAsync(dTableHashes, Span<const Vector4ui>(hTableHashes));
+    queue.MemcpyAsync(dTableKeys, Span<const LightSurfKeyPack>(hTableKeys));
+    queue.MemcpyAsync(dTableValues, Span<const uint32_t>(hTableValues));
     queue.Barrier().Wait();
 }
 
@@ -513,3 +576,11 @@ MetaLightArrayT<TLT...>::Array() const
 {
     return ToConstSpan(dMetaLights);
 }
+
+template<LightTransPairC... TLT>
+LightLookupTable MetaLightArrayT<TLT...>::IndexHashTable() const
+{
+    return LightLookupTable(dTableHashes, dTableKeys, dTableValues);
+}
+
+

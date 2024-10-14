@@ -5,6 +5,7 @@
 #include "TransformC.h"
 #include "LightC.h"
 #include "SurfaceComparators.h"
+#include "Random.h"
 
 #include "Device/GPUSystem.h"
 #include "Device/GPUSystem.hpp"
@@ -26,6 +27,28 @@ struct MetaLightListConstructionParams
 
     std::vector<LightPartition> Partition() const;
 };
+
+struct LightSurfKeyPack
+{
+    CommonKey lK;
+    CommonKey tK;
+    CommonKey pK;
+
+    auto operator<=>(const LightSurfKeyPack&) const = default;
+};
+
+struct LightSurfKeyHasher
+{
+    MRAY_HYBRID
+    static uint32_t Hash(const LightSurfKeyPack&);
+    MRAY_HYBRID
+    static bool     IsSentinel(uint32_t);
+    MRAY_HYBRID
+    static bool     IsEmpty(uint32_t);
+};
+
+using LightLookupTable = LookupTable<LightSurfKeyPack, uint32_t, uint32_t, 4,
+                                     LightSurfKeyHasher>;
 
 struct LightPartition
 {
@@ -244,6 +267,10 @@ class MetaLightArrayT
     Span<PrimBytePack>      dMetaPrims;
     Span<TContextBytePack>  dMetaTContexts;
     Span<LightVariant>      dMetaLights;
+    // These are related to the lookup table
+    Span<Vector4ui>         dTableHashes;
+    Span<LightSurfKeyPack>  dTableKeys;
+    Span<uint32_t>          dTableValues;
 
     DeviceMemory    memory;
 
@@ -272,8 +299,8 @@ class MetaLightArrayT
     void    Construct(MetaLightListConstructionParams,
                       const GPUQueue& queue);
 
-    View    Array() const;
-
+    View                Array() const;
+    LightLookupTable    IndexHashTable() const;
 };
 
 #include "MetaLight.hpp"

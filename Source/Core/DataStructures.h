@@ -101,7 +101,7 @@ class LookupTable
     // Vector class
     static_assert(std::has_single_bit(VL), "Lookup table hash chunk size"
                   " must be power of two");
-    static constexpr uint32_t VEC_SHIFT = (VL == 2) ? 1 : 2;
+    static constexpr uint32_t VEC_SHIFT = std::countl_zero(VL);
 
     private:
     // Keys and values are seperate,
@@ -117,6 +117,8 @@ class LookupTable
 
     MRAY_HYBRID
     Optional<const V*>  Search(const K&) const;
+    MRAY_HYBRID
+    bool                Insert(const K&, const V&) const;
 };
 
 // Simple host-only, static-sized array
