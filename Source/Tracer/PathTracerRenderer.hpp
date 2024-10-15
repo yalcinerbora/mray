@@ -50,19 +50,22 @@ static void KCCopyRays(MRAY_GRID_CONSTANT const Span<RayGMem> dRaysOut,
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static void KCAccumulateShadowRays(MRAY_GRID_CONSTANT const Span<Spectrum> dRadianceOut,
                                    MRAY_GRID_CONSTANT const Span<const Spectrum> dShadowRayRadiance,
-                                   MRAY_GRID_CONSTANT const Bitspan<const uint32_t> dIsVisibleBuffer)
+                                   MRAY_GRID_CONSTANT const Bitspan<const uint32_t> dIsVisibleBuffer,
+                                   MRAY_GRID_CONSTANT const Span<const PathTraceRDetail::PathDataPack> dPathDataPack,
+                                   MRAY_GRID_CONSTANT const Vector2ui rrRange)
 {
     using namespace PathTraceRDetail;
     KernelCallParams kp;
     uint32_t shadowRayCount = static_cast<uint32_t>(dShadowRayRadiance.size());
     for(uint32_t i = kp.GlobalId(); i < shadowRayCount; i += kp.TotalSize())
     {
-        Spectrum input = dShadowRayRadiance[i];
-        // We specifically check for zero here, not all rays hit a surface and cast
-        // shadow rays (rays that hit a light for example).
-        // But we run this kernel for the entire path buffer, to not bother
-        // with partitioning the rays for this
-        if(input != Spectrum::Zero() && dIsVisibleBuffer[i])
+        PathTraceRDetail::PathDataPack dataPack = dPathDataPack[i];
+
+        using enum PathTraceRDetail::RayType;
+        bool isShadowRay = (dataPack.type == SHADOW_RAY);
+        // +2 is correct here, we did not increment the depth yet
+        bool inDepthLimit = (dataPack.depth + 2 <= rrRange[1]);
+        if(inDepthLimit && isShadowRay && dIsVisibleBuffer[i])
             dRadianceOut[i] += dShadowRayRadiance[i];
     }
 }
@@ -504,17 +507,6 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
     // Reload dead paths with new
     dIndices = ReloadPaths(dIndices, processQueue);
 
-    {
-        // Now binary partition the index buffer
-        auto [hDeadAliveRanges, dDeadAliveIndices] = rayPartitioner.BinaryPartition
-        (
-            dIndices, processQueue,
-            IsDeadFunctor(dRayState.dPathDataPack)
-        );
-        processQueue.Barrier().Wait();
-        dIndices = dDeadAliveIndices;
-    }
-
     // We refilled the path buffer,
     // and can roll back to the Iota
     DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
@@ -664,8 +656,10 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
             KernelIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
             //
             dRayState.dPathRadiance,
-            dRayState.dShadowRayRadiance,
-            ToConstSpan(dIsVisibleBitSpan)
+            ToConstSpan(dRayState.dShadowRayRadiance),
+            ToConstSpan(dIsVisibleBitSpan),
+            ToConstSpan(dRayState.dPathDataPack),
+            currentOptions.russianRouletteRange
         );
 
         // Do the actual kernel

@@ -47,7 +47,6 @@ LightSample DirectLightSamplerUniform<ML>::SampleLight(RNGDispenser& rng,
     Vector3 wO = (distantPoint - pointSample.value).Normalize();
     Spectrum emission = metaLight.EmitViaSurfacePoint(wO, pointSample.value);
 
-
     Float selectionPdf = Float(1) / lightCountF;
     return LightSample
     {

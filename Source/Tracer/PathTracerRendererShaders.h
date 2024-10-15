@@ -417,7 +417,6 @@ void PathTraceRDetail::LightWorkFunctionWithNEE(const Light& l, RNGDispenser&,
         return;
     }
 
-
     bool switchToMISPdf = (params.globalState.sampleMode == SampleMode::E::NEE_WITH_MIS &&
                            pathDataPack.type == RayType::PATH_RAY);
     Spectrum throughput = params.rayState.dThroughput[rayIndex];
