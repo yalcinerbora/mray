@@ -148,7 +148,7 @@ namespace PathTraceRDetail
         // Only used when NEE/MIS is active
         Span<Float>             dPrevMatPDF;
         Span<Spectrum>          dShadowRayRadiance;
-        Span<uint32_t>          dShadowRayLightIndex;
+        //Span<uint32_t>          dShadowRayLightIndex;
     };
 
     template<class LightSampler, PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
@@ -178,10 +178,10 @@ namespace PathTraceRDetail
              PrimitiveC Prim, MaterialC Material, class Surface, class TContext,
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     MRAY_HYBRID
-    void WorkFunctionWithNEE(const Prim&, const Material&, const Surface&,
-                             const TContext&, RNGDispenser&,
-                             const WorkParams<LightSampler, PG, MG, TG>& params,
-                             RayIndex rayIndex);
+    void WorkFunctionNEE(const Prim&, const Material&, const Surface&,
+                         const TContext&, RNGDispenser&,
+                         const WorkParams<LightSampler, PG, MG, TG>& params,
+                         RayIndex rayIndex);
 
     template<LightC Light, LightGroupC LG, TransformGroupC TG>
     MRAY_HYBRID
@@ -333,10 +333,10 @@ template<class LightSampler, PrimitiveC Prim, MaterialC Material,
     class Surface, class TContext,
     PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
 MRAY_HYBRID MRAY_CGPU_INLINE
-void PathTraceRDetail::WorkFunctionWithNEE(const Prim&, const Material& mat, const Surface& surf,
-                                           const TContext& tContext, RNGDispenser& rng,
-                                           const WorkParams<LightSampler, PG, MG, TG>& params,
-                                           RayIndex rayIndex)
+void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const Surface& surf,
+                                       const TContext& tContext, RNGDispenser& rng,
+                                       const WorkParams<LightSampler, PG, MG, TG>& params,
+                                       RayIndex rayIndex)
 {
     // TODO: We need to get the context from somewhere
     // &&
@@ -351,13 +351,15 @@ void PathTraceRDetail::WorkFunctionWithNEE(const Prim&, const Material& mat, con
     //       NEE        //
     // ================ //
     auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
-    Vector3 wO = -tContext.InvApplyN(rayIn.Dir()).Normalize();
     const LightSampler& lightSampler = params.globalState.lightSampler;
-    Vector3 worldPos = tContext.ApplyP(surf.position);
+    Vector3 worldPos = surf.position;
     LightSample lightSample = lightSampler.SampleLight(rng, specConverter, worldPos);
     auto [shadowRay, shadowTMM] = lightSample.value.SampledRay(worldPos);
     //
-    Spectrum reflectance = mat.Evaluate(shadowRay, wO, surf);
+    Vector3 wO = -tContext.InvApplyN(rayIn.Dir()).Normalize();
+    Ray wI = Ray(tContext.InvApplyN(shadowRay.Dir()).Normalize(),
+                 shadowRay.Pos());
+    Spectrum reflectance = mat.Evaluate(wI, wO, surf);
     Spectrum throughput = params.rayState.dThroughput[rayIndex];
     throughput *= reflectance;
 
@@ -388,12 +390,12 @@ void PathTraceRDetail::WorkFunctionWithNEE(const Prim&, const Material& mat, con
     }
     else
     {
+        shadowRay.NudgeSelf(surf.geoNormal);
         RayToGMem(params.rayState.dOutRays, rayIndex,
                   shadowRay, shadowTMM);
         // We can't overwrite the path throughput,
         // we will need it on next iteration
         params.rayState.dShadowRayRadiance[rayIndex] = shadowRadiance;
-        params.rayState.dShadowRayLightIndex[rayIndex] = lightSample.value.lightIndex;
         params.rayState.dPathDataPack[rayIndex].type = RayType::SHADOW_RAY;
     }
 }
@@ -411,6 +413,7 @@ void PathTraceRDetail::LightWorkFunctionWithNEE(const Light& l, RNGDispenser&,
        pathDataPack.type != RayType::CAMERA_RAY)
     {
         pathDataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
+        params.rayState.dPathDataPack[rayIndex] = pathDataPack;
         return;
     }
 

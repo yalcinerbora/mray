@@ -190,7 +190,7 @@ constexpr T Bit::FetchSubPortion(T value, std::array<T, 2> bitRange)
 {
     assert(bitRange[0] < bitRange[1]);
     T bitCount = bitRange[1] - bitRange[0];
-    T mask = (1 << bitCount) - 1;
+    T mask = (T(1) << bitCount) - 1;
     return (value >> bitRange[0]) & mask;
 }
 
@@ -201,7 +201,7 @@ constexpr T Bit::SetSubPortion(T value, C in, std::array<T, 2> bitRange)
     assert(bitRange[0] < bitRange[1]);
     T inT = T(in);
     T bitCount = bitRange[1] - bitRange[0];
-    T mask0 = (1 << bitCount) - 1;
+    T mask0 = (T(1) << bitCount) - 1;
     T mask1 = ~(mask0 << bitRange[0]);
     return (value & mask1) | ((inT & mask0) << bitRange[0]);
 }

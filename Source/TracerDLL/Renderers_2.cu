@@ -2,6 +2,7 @@
 #include "RequestedTypes.h"
 
 #include "Tracer/PathTracerRenderer.h"
+#include "Tracer/PathTracerRenderer.hpp"
 
 #include "Device/GPUSystem.hpp"
 #include "Device/GPUAlgGeneric.h"

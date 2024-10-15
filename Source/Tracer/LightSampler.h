@@ -32,16 +32,20 @@ concept DirectLightSamplerC = requires(const DLSampler& sampler,
 };
 
 template <class MetaLightArray>
-class DirectLightSamplerViewUniform
+class DirectLightSamplerUniform
 {
+    using MetaLightArrayView = typename MetaLightArray::View;
     private:
-    MetaLightArray      dMetaLights;
+    MetaLightArrayView  dMetaLights;
     LightLookupTable    dLightIndexTable;
 
     public:
+    static constexpr uint32_t SampleLightRNCount = 1 + MetaLightArray::SampleSolidAngleRNCountWorst;
+
+    public:
     // Constructors
-    DirectLightSamplerViewUniform(const MetaLightArray&,
-                                  const LightLookupTable&);
+    DirectLightSamplerUniform(const MetaLightArrayView&,
+                              const LightLookupTable&);
 
     template <class SpectrumConverter>
     MRAY_HYBRID

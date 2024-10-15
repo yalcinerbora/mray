@@ -16,8 +16,8 @@ Pair<Ray, Vector2> LightSampleOutput::SampledRay(const Vector3& distantPoint) co
 }
 
 template<class ML>
-inline DirectLightSamplerViewUniform<ML>::DirectLightSamplerViewUniform(const ML& la,
-                                                                        const LightLookupTable& lt)
+inline DirectLightSamplerUniform<ML>::DirectLightSamplerUniform(const MetaLightArrayView& la,
+                                                                const LightLookupTable& lt)
     : dMetaLights(la)
     , dLightIndexTable(lt)
 {}
@@ -25,11 +25,11 @@ inline DirectLightSamplerViewUniform<ML>::DirectLightSamplerViewUniform(const ML
 template <class ML>
 template <class SpectrumConverter>
 MRAY_HYBRID MRAY_CGPU_INLINE
-LightSample DirectLightSamplerViewUniform<ML>::SampleLight(RNGDispenser& rng,
-                                                           const SpectrumConverter& stConverter,
-                                                           const Vector3& distantPoint) const
+LightSample DirectLightSamplerUniform<ML>::SampleLight(RNGDispenser& rng,
+                                                       const SpectrumConverter& stConverter,
+                                                       const Vector3& distantPoint) const
 {
-    using MetaLightView = typename ML::template MetaLightView<SpectrumConverter>;
+    using MetaLightView = typename MetaLightArrayView::template MetaLightView<SpectrumConverter>;
 
     uint32_t lightCount = dMetaLights.Size();
     Float lightCountF = Float(lightCount);
@@ -44,13 +44,18 @@ LightSample DirectLightSamplerViewUniform<ML>::SampleLight(RNGDispenser& rng,
     MetaLightView metaLight = dMetaLights(stConverter, lightIndex);
     SampleT<Vector3> pointSample = metaLight.SampleSolidAngle(rng, distantPoint);
 
+    Vector3 wO = (distantPoint - pointSample.value).Normalize();
+    Spectrum emission = metaLight.EmitViaSurfacePoint(wO, pointSample.value);
+
+
     Float selectionPdf = Float(1) / lightCountF;
     return LightSample
     {
         .value = LightSampleOutput
         {
-            .lightIndex = lightIndex ,
-            .position = pointSample.value
+            .lightIndex = lightIndex,
+            .position = pointSample.value,
+            .emission = emission
         },
         .pdf = selectionPdf * pointSample.pdf
     };
@@ -58,12 +63,12 @@ LightSample DirectLightSamplerViewUniform<ML>::SampleLight(RNGDispenser& rng,
 
 template <class ML>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float DirectLightSamplerViewUniform<ML>::PdfLight(uint32_t index,
-                                                  const MetaHit& hit,
-                                                  const Ray& ray) const
+Float DirectLightSamplerUniform<ML>::PdfLight(uint32_t index,
+                                              const MetaHit& hit,
+                                              const Ray& ray) const
 {
     using STIdentity = SpectrumConverterContextIdentity;
-    using MetaLightView = typename ML::template MetaLightView<STIdentity>;
+    using MetaLightView = typename MetaLightArrayView::template MetaLightView<STIdentity>;
     STIdentity stIdentity;
     if(index >= dMetaLights.Size()) return Float(0);
 
@@ -80,9 +85,9 @@ Float DirectLightSamplerViewUniform<ML>::PdfLight(uint32_t index,
 
 template <class ML>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float DirectLightSamplerViewUniform<ML>::PdfLight(const HitKeyPack& hitPack,
-                                                  const MetaHit& hit,
-                                                  const Ray& r) const
+Float DirectLightSamplerUniform<ML>::PdfLight(const HitKeyPack& hitPack,
+                                              const MetaHit& hit,
+                                              const Ray& r) const
 {
     LightSurfKeyPack keyPack =
     {

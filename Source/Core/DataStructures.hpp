@@ -37,17 +37,19 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Optional<const V*> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
 {
     uint32_t tableSize = static_cast<uint32_t>(keys.size());
+    uint32_t hashPackCount = static_cast<uint32_t>(hashes.size());
     H hashVal = S::Hash(k);
     H index = hashVal % tableSize;
 
-    for(uint32_t _ = 0; _ < tableSize; _++)
+    for(uint32_t _ = 0; _ < hashPackCount; _++)
     {
         uint32_t vectorIndex = index >> VEC_SHIFT;
+        uint32_t innerIndex = index & VEC_MASK;
         Vector<VL, H> hashChunk = hashes[vectorIndex];
         UNROLL_LOOP
-        for(uint32_t i = 0; i < VL; i++)
+        for(uint32_t i = innerIndex; i < VL; i++)
         {
-            uint32_t globalIndex = vectorIndex + i;
+            uint32_t globalIndex = (vectorIndex << VEC_SHIFT) + i;
             // Roll to start of the case special case
             // (since we are bulk reading)
             if(globalIndex >= tableSize) break;
@@ -59,7 +61,8 @@ Optional<const V*> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
             if(hashVal == hashChunk[i] && keys[globalIndex] == k)
                 return &values[globalIndex];
         }
-        index = (index >= tableSize) ? 0 : (index + VL);
+        index += VL - innerIndex;
+        index = (index >= tableSize) ? 0 : index;
         assert(index != hashVal % tableSize);
     }
     return std::nullopt;
@@ -70,18 +73,20 @@ template <LookupKeyC K, class V, std::unsigned_integral H,
 MRAY_HYBRID MRAY_CGPU_INLINE
 bool LookupTable<K, V, H, VECL, S>::Insert(const K& k, const V& v) const
 {
-    uint32_t tableSize = static_cast<uint32_t>(hashes.size());
+    uint32_t tableSize = static_cast<uint32_t>(keys.size());
+    uint32_t hashPackCount = static_cast<uint32_t>(hashes.size());
     H hashVal = S::Hash(k);
     H index = hashVal % tableSize;
 
-    for(uint32_t _ = 0; _ < tableSize; _++)
+    for(uint32_t _ = 0; _ < hashPackCount; _++)
     {
         uint32_t vectorIndex = index >> VEC_SHIFT;
+        uint32_t innerIndex = index & VEC_MASK;
         Vector<VL, H> hashChunk = hashes[vectorIndex];
         UNROLL_LOOP
-        for(uint32_t i = 0; i < VL; i++)
+        for(uint32_t i = innerIndex; i < VL; i++)
         {
-            uint32_t globalIndex = vectorIndex + i;
+            uint32_t globalIndex = (vectorIndex << VEC_SHIFT) + i;
             // Roll to start of the case special case
             // (since we are bulk reading)
             if(globalIndex >= tableSize) break;
@@ -93,10 +98,12 @@ bool LookupTable<K, V, H, VECL, S>::Insert(const K& k, const V& v) const
                 hashChunk[i] = hashVal;
                 values[globalIndex] = v;
                 keys[globalIndex] = k;
+                hashes[vectorIndex] = hashChunk;
                 return true;
             }
         }
-        index = (index >= tableSize) ? 0 : (index + VL);
+        index += VL - innerIndex;
+        index = (index >= tableSize) ? 0 : index;
         assert(index != hashVal % tableSize);
     }
     return false;

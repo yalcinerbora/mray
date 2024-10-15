@@ -43,14 +43,14 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightAr
     using SampleMode        = PathTraceRDetail::SampleMode;
     using LightSamplerType  = PathTraceRDetail::LightSamplerType;
     using RayState          = PathTraceRDetail::RayState;
-    //
-    using UniformLightSampler   = DirectLightSamplerViewUniform<typename MetaLightArray::View>;
 
     public:
     static std::string_view TypeName();
     //
-    using AttribInfoList = typename Base::AttribInfoList;
-    using SpectrumConverterContext = SpectrumConverterContextIdentity;
+    using UniformLightSampler       = DirectLightSamplerUniform<MetaLightArray>;
+    using AttribInfoList            = typename Base::AttribInfoList;
+    using SpectrumConverterContext  = SpectrumConverterContextIdentity;
+    //
     using GlobalStateList   = Tuple<PathTraceRDetail::GlobalState<EmptyType>,
                                     PathTraceRDetail::GlobalState<UniformLightSampler>>;
     using RayStateList      = Tuple<PathTraceRDetail::RayState, PathTraceRDetail::RayState>;
@@ -61,7 +61,7 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightAr
     static constexpr Tuple WorkFunctions = Tuple
     {
         PathTraceRDetail::WorkFunction<P, M, S, TContext, PG, MG, TG>,
-        PathTraceRDetail::WorkFunctionWithNEE<UniformLightSampler, P, M, S, TContext, PG, MG, TG>
+        PathTraceRDetail::WorkFunctionNEE<UniformLightSampler, P, M, S, TContext, PG, MG, TG>
     };
     template<LightC L, LightGroupC LG, TransformGroupC TG>
     static constexpr auto LightWorkFunctions = Tuple
@@ -149,16 +149,14 @@ class PathTracerRenderWork : public RenderWork<R, PG, MG, TG>
 
     uint32_t SampleRNCount(uint32_t workIndex) const override
     {
-        constexpr uint32_t matSampleCount = MG::template Material<>::SampleRNCount;
-        constexpr uint32_t rrSampleCount = 1;
-        // TODO: Get this programatically?
-        constexpr uint32_t lightSampleCount = 2;
+        constexpr uint32_t matSampleCount   = MG::template Material<>::SampleRNCount;
+        constexpr uint32_t rrSampleCount    = 1;
+        constexpr uint32_t lightSampleCount = R::UniformLightSampler::SampleLightRNCount;
 
         if(workIndex == 0)
             return (matSampleCount + rrSampleCount);
         else if(workIndex == 1)
-            return (matSampleCount + rrSampleCount + lightSampleCount);
-
+            return lightSampleCount;
         return 0;
     }
 };
@@ -168,5 +166,3 @@ using PathTracerRenderLightWork = RenderLightWork<R, LG, TG>;
 
 template<RendererC R, CameraGroupC CG, TransformGroupC TG>
 using PathTracerRenderCamWork = RenderCameraWork<R, CG, TG>;
-
-#include "PathTracerRenderer.hpp"

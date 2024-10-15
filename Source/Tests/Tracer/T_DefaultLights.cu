@@ -262,15 +262,12 @@ TEST(DefaultLights, MetaLight)
                 .lightId = std::bit_cast<LightId>(hSkysphereLightIds[0]),
                 .transformId = std::bit_cast<TransformId>(hIdentityTransIds[0])
             }
-        },
-        {
-            LightSurfaceId(3),
-            LightSurfaceParams
-            {
-                .lightId = std::bit_cast<LightId>(hSkysphereLightIds[0]),
-                .transformId = std::bit_cast<TransformId>(hSingleTransIds[0])
-            }
         }
+    };
+    LightSurfaceParams boundarySurface =
+    {
+        .lightId = std::bit_cast<LightId>(hSkysphereLightIds[0]),
+        .transformId = std::bit_cast<TransformId>(hSingleTransIds[0])
     };
     std::sort(lSurfs.begin(), lSurfs.end(), LightSurfaceLessThan);
 
@@ -281,8 +278,7 @@ TEST(DefaultLights, MetaLight)
         .lSurfList = Span<const LSPair>(lSurfs)
     };
     MetaLightList lightList = MetaLightList(system);
-    lightList.Construct(params, queue);
-
+    lightList.Construct(params, boundarySurface, queue);
 
     Span<RandomNumber> dRandomNumbers;
     DeviceLocalMemory rnMem(*queue.Device());

@@ -115,8 +115,9 @@ namespace LightDetail
         using Primitive         = EmptyPrimitive<TContext>;
         //
         static constexpr bool       IsPrimitiveBackedLight = false;
-        static constexpr uint32_t   SampleRayRNCount = 2;
-        static constexpr uint32_t   SampleSolidAngleRNCount = 4;
+        static constexpr uint32_t   SampleSolidAngleRNCount = 2;
+        static constexpr uint32_t   SampleRayRNCount        = 4;
+
 
         private:
         Ref<const Primitive>    prim;

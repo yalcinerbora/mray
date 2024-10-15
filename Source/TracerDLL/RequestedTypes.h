@@ -51,6 +51,8 @@ using LightGTypes = Tuple
 
 using MetaLightList = MetaLightArrayT
 <
+    Tuple<LightGroupNull, TransformGroupIdentity>,
+
     Tuple<LightGroupSkysphere<CoOctaCoordConverter>, TransformGroupIdentity>,
     Tuple<LightGroupSkysphere<CoOctaCoordConverter>, TransformGroupSingle>,
 
@@ -65,9 +67,6 @@ using MetaLightList = MetaLightArrayT
     Tuple<LightGroupPrim<PrimGroupSphere>, TransformGroupIdentity>,
     Tuple<LightGroupPrim<PrimGroupSphere>, TransformGroupSingle>
 >;
-
-//using MetaLight = typename MetaLightList::MetaLight;
-//using MetaLightView = typename MetaLightList::MetaLightView<MetaHit>;
 
 // ================= //
 //     Materials     //

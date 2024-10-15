@@ -56,21 +56,12 @@ SampleT<BasicSurface> Triangle<T>::SampleSurface(RNGDispenser& rng) const
     Float b = (1 - r2) * r1;
     Float c = r1 * r2;
 
-    Vector3 position = (positions[0] * a +
-                        positions[1] * b +
-                        positions[2] * c);
-
     Float area = GetSurfaceArea();
     Float pdf = 1.0f / area;
 
-    Vector3ui index = data.get().indexList[key.FetchIndexPortion()];
-    Quaternion q0 = data.get().tbnRotations[index[0]];
-    Quaternion q1 = data.get().tbnRotations[index[1]];
-    Quaternion q2 = data.get().tbnRotations[index[2]];
-    Quaternion tbn = Quaternion::BarySLerp(q0, q1, q2, a, b);
-    Vector3 normal = tbn.Conjugate().ApplyRotation(Vector3::ZAxis());
+    Vector3 position = (positions[0] * a + positions[1] * b + positions[2] * c);
+    Vector3 normal = Shape::Triangle::Normal(positions);
 
-    using Shape::Triangle::Normal;
     return SampleT<BasicSurface>
     {
         .value = BasicSurface

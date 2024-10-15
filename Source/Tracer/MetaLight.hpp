@@ -144,7 +144,6 @@ bool LightSurfKeyHasher::IsEmpty(uint32_t hash)
     return hash == std::numeric_limits<uint32_t>::max();
 }
 
-
 template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Vector3> MetaLightViewT<V, ST>::SampleSolidAngle(RNGDispenser& rng,
@@ -436,6 +435,7 @@ void MetaLightArrayT<TLT...>::AddBatchGeneric(const GenericGroupLightT& lg,
 
 template<LightTransPairC... TLT>
 void MetaLightArrayT<TLT...>::Construct(MetaLightListConstructionParams params,
+                                        const LightSurfaceParams& boundarySurface,
                                         const GPUQueue& queue)
 {
     assert(std::is_sorted(params.lSurfList.begin(), params.lSurfList.end(),
@@ -492,8 +492,15 @@ void MetaLightArrayT<TLT...>::Construct(MetaLightListConstructionParams params,
             primExpandedRanges.back()[1] = offset;
         }
     }
-    size_t totalLightCount = offset;
+    primExpandedRanges.push_back(Vector2ui(offset, offset + 1));
+    offset++;
+    // Boundary material cannot have a prim, so we can safely set empty prim as key
+    hLKList.push_back(std::bit_cast<LightKey>(boundarySurface.lightId));
+    hTKList.push_back(std::bit_cast<TransformKey>(boundarySurface.transformId));
+    hPKList.push_back(PrimitiveKey::CombinedKey(std::bit_cast<CommonKey>(TracerConstants::EmptyPrimGroupId),
+                                                CommonKey(0)));
 
+    size_t totalLightCount = offset;
     // Allocate for keys
     Span<LightKey>        dLKList;
     Span<PrimitiveKey>    dPKList;
@@ -564,6 +571,22 @@ void MetaLightArrayT<TLT...>::Construct(MetaLightListConstructionParams params,
         assert(inserted);
     }
 
+    if constexpr(MRAY_IS_DEBUG)
+    {
+        for(uint32_t i = 0; i < uint32_t(hLKList.size()); i++)
+        {
+            LightSurfKeyPack kp =
+            {
+                .lK = std::bit_cast<CommonKey>(hLKList[i]),
+                .tK = std::bit_cast<CommonKey>(hTKList[i]),
+                .pK = std::bit_cast<CommonKey>(hPKList[i])
+            };
+            auto loc = lt.Search(kp);
+            assert(loc.has_value());
+            assert(*loc.value() == i);
+        }
+    }
+
     queue.MemcpyAsync(dTableHashes, Span<const Vector4ui>(hTableHashes));
     queue.MemcpyAsync(dTableKeys, Span<const LightSurfKeyPack>(hTableKeys));
     queue.MemcpyAsync(dTableValues, Span<const uint32_t>(hTableValues));
@@ -583,4 +606,9 @@ LightLookupTable MetaLightArrayT<TLT...>::IndexHashTable() const
     return LightLookupTable(dTableHashes, dTableKeys, dTableValues);
 }
 
-
+template<LightTransPairC... TLT>
+void MetaLightArrayT<TLT...>::Clear()
+{
+    soaCounter = 0;
+    lightCounter = 0;
+}

@@ -1,5 +1,8 @@
 #pragma once
 
+#include "Device/GPUDebug.h"
+#include "TypeFormat.h"
+
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static void KCInitPathState(MRAY_GRID_CONSTANT const PathTraceRDetail::RayState dRayState,
                             MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices)
@@ -41,6 +44,26 @@ static void KCCopyRays(MRAY_GRID_CONSTANT const Span<RayGMem> dRaysOut,
         RayIndex index = dIndices[i];
         dRaysOut[index] = dRaysIn[index];
         dRayDiffOut[index] = dRayDiffIn[index];
+    }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+static void KCAccumulateShadowRays(MRAY_GRID_CONSTANT const Span<Spectrum> dRadianceOut,
+                                   MRAY_GRID_CONSTANT const Span<const Spectrum> dShadowRayRadiance,
+                                   MRAY_GRID_CONSTANT const Bitspan<const uint32_t> dIsVisibleBuffer)
+{
+    using namespace PathTraceRDetail;
+    KernelCallParams kp;
+    uint32_t shadowRayCount = static_cast<uint32_t>(dShadowRayRadiance.size());
+    for(uint32_t i = kp.GlobalId(); i < shadowRayCount; i += kp.TotalSize())
+    {
+        Spectrum input = dShadowRayRadiance[i];
+        // We specifically check for zero here, not all rays hit a surface and cast
+        // shadow rays (rays that hit a light for example).
+        // But we run this kernel for the entire path buffer, to not bother
+        // with partitioning the rays for this
+        if(input != Spectrum::Zero() && dIsVisibleBuffer[i])
+            dRadianceOut[i] += dShadowRayRadiance[i];
     }
 }
 
@@ -166,8 +189,11 @@ uint32_t PathTracerRenderer<MLA>::FindMaxSamplePerIteration(uint32_t rayCount,
         },
         [sampleMode](const auto& renderWorkStruct) -> uint32_t
         {
-            uint32_t workIndex = (sampleMode == PURE) ? 0 : 1;
-            return renderWorkStruct.workPtr->SampleRNCount(workIndex);
+            if(sampleMode == PURE)
+                return renderWorkStruct.workPtr->SampleRNCount(0);
+            else
+                return std::max(renderWorkStruct.workPtr->SampleRNCount(0),
+                                renderWorkStruct.workPtr->SampleRNCount(1));
         }
     );
     return rayCount * maxSample;
@@ -345,7 +371,45 @@ RenderBufferInfo PathTracerRenderer<MLA>::StartRender(const RenderImageParams& r
                                      totalWorkCount, totalWorkCount,
                                      this->SUB_CAMERA_BUFFER_SIZE});
     }
-    else throw MRayError("Not yet implemented!");
+    else
+    {
+        uint32_t isVisibleIntCount = Bitspan<uint32_t>::CountT(maxRayCount);
+        MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys,
+                                             dRays, dRayDifferentials,
+                                             dRayState.dPathRadiance,
+                                             dRayState.dImageCoordinates,
+                                             dRayState.dFilmFilterWeights,
+                                             dRayState.dThroughput,
+                                             dRayState.dPathDataPack,
+                                             dRayState.dOutRays,
+                                             dRayState.dOutRayDiffs,
+                                             dRayState.dPrevMatPDF,
+                                             dRayState.dShadowRayRadiance,
+                                             dPathRNGDimensions,
+                                             dShadowRayVisibilities,
+                                             dRandomNumBuffer,
+                                             dWorkHashes, dWorkBatchIds,
+                                             dSubCameraBuffer),
+                                    redererGlobalMem,
+                                    {maxRayCount, maxRayCount,
+                                     maxRayCount, maxRayCount,
+                                     maxRayCount, maxRayCount,
+                                     maxRayCount, maxRayCount,
+                                     maxRayCount, maxRayCount,
+                                     maxRayCount, maxRayCount,
+                                     maxRayCount, maxRayCount,
+                                     isVisibleIntCount, maxSampleCount,
+                                     totalWorkCount, totalWorkCount,
+                                     this->SUB_CAMERA_BUFFER_SIZE});
+        MetaLightListConstructionParams mlParams =
+        {
+            .lightGroups = this->tracerView.lightGroups,
+            .transformGroups = this->tracerView.transGroups,
+            .lSurfList = Span<const Pair<LightSurfaceId, LightSurfaceParams>>(this->tracerView.lightSurfs)
+        };
+        metaLightArray.Construct(mlParams, this->tracerView.boundarySurface,
+                                 queue);
+    }
 
     // And initialze the hashes
     workHasher = this->InitializeHashes(dWorkHashes, dWorkBatchIds,
@@ -538,7 +602,105 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
                                      globalState, processQueue);
         });
     }
+    else
+    {
+        UniformLightSampler lightSampler(metaLightArray.Array(),
+                                         metaLightArray.IndexHashTable());
 
+        using GlobalState = PathTraceRDetail::GlobalState<UniformLightSampler>;
+        GlobalState globalState
+        {
+            .russianRouletteRange = currentOptions.russianRouletteRange,
+            .sampleMode = currentOptions.sampleMode,
+            .lightSampler = lightSampler
+        };
+
+        // Clear the shadow ray radiance buffer
+        processQueue.MemsetAsync(dRayState.dShadowRayRadiance, 0x00);
+        processQueue.MemsetAsync(dShadowRayVisibilities, 0x00);
+
+        // Do the NEE kernel + nothing
+        this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,
+        [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
+                  uint32_t, uint32_t partitionSize)
+        {
+            uint32_t rnCount = workPtr.SampleRNCount(1);
+            auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
+            rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
+                                                 dPathRNGDimensions, rnCount,
+                                                 processQueue);
+
+            DeviceAlgorithms::InPlaceTransformIndirect
+            (
+                dPathRNGDimensions, dLocalIndices, processQueue,
+                ConstAddFunctor(rnCount)
+            );
+
+            workPtr.DoWork_1(dRayState, dLocalIndices,
+                             dRandomNumBuffer, dRayDifferentials,
+                             dRays, dHits, dHitKeys,
+                             globalState, processQueue);
+        },
+        // Empty Kernel for light
+        [&, this](const auto&, Span<uint32_t>, uint32_t, uint32_t) {});
+
+        // After the kernel call(s), "dRayState.dOutRays" holds the shadow rays
+        // check visibility.
+        Bitspan<uint32_t> dIsVisibleBitSpan(dShadowRayVisibilities);
+        this->tracerView.baseAccelerator.CastVisibilityRays
+        (
+            dIsVisibleBitSpan, dBackupRNGStates,
+            dRayState.dOutRays, dIndices, processQueue
+        );
+
+        //DeviceDebug::DumpGPUMemToFile("shadowVis",
+        //                                ToConstSpan(dShadowRayVisibilities), processQueue);
+
+
+        // Accumulate the pre-calculated radiance selectively
+        processQueue.IssueSaturatingKernel<KCAccumulateShadowRays>
+        (
+            "KCAccumulateShadowRays",
+            KernelIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
+            //
+            dRayState.dPathRadiance,
+            dRayState.dShadowRayRadiance,
+            ToConstSpan(dIsVisibleBitSpan)
+        );
+
+        // Do the actual kernel
+        this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,
+        [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
+                  uint32_t, uint32_t partitionSize)
+        {
+            uint32_t rnCount = workPtr.SampleRNCount(0);
+            auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
+            rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
+                                                 dPathRNGDimensions, rnCount,
+                                                 processQueue);
+
+            DeviceAlgorithms::InPlaceTransformIndirect
+            (
+                dPathRNGDimensions, dLocalIndices, processQueue,
+                ConstAddFunctor(rnCount)
+            );
+
+            workPtr.DoWork_1(dRayState, dLocalIndices,
+                             dRandomNumBuffer, dRayDifferentials,
+                             dRays, dHits, dHitKeys,
+                             globalState, processQueue);
+        },
+        //
+        [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
+                  uint32_t, uint32_t)
+        {
+            workPtr.DoBoundaryWork_1(dRayState, dLocalIndices,
+                                     Span<const RandomNumber>{},
+                                     dRayDifferentials, dRays,
+                                     dHits, dHitKeys,
+                                     globalState, processQueue);
+        });
+    }
 
     // Find the dead paths again
     // Every path is processed, so we do not need to use the scambled
@@ -645,6 +807,7 @@ void PathTracerRenderer<MLA>::StopRender()
     filmFilter = {};
     rnGenerator = {};
     globalPixelIndex = 0;
+    metaLightArray.Clear();
 }
 
 template<class MLA>

@@ -91,9 +91,23 @@ namespace MetaLightDetail
 
     template<ImplicitLifetimeC... Types>
     constexpr bool AllImplicitLifetime() { return true; }
+
+    template<LightC... Lights>
+    constexpr uint32_t SampleSolidAngleRNCountWorstCase()
+    {
+        uint32_t result = std::max({Lights::SampleSolidAngleRNCount...});
+        return result;
+    }
+
+    template<LightC... Lights>
+    constexpr uint32_t SampleRayRNCountWorstCase()
+    {
+        uint32_t result = std::max({Lights::SampleRayRNCount...});
+        return result;
+    }
 }
 
-template<class Variant,
+template<class LightVariant,
          class SpectrumConverterIn = SpectrumConverterIdentity>
 class MetaLightViewT
 {
@@ -101,10 +115,10 @@ class MetaLightViewT
 
     private:
     const SpectrumConverter&    sConv;
-    const Variant&              light;
+    const LightVariant&         light;
 
     public:
-    MRAY_HYBRID         MetaLightViewT(const Variant&,
+    MRAY_HYBRID         MetaLightViewT(const LightVariant&,
                                        const SpectrumConverter& sTransContext);
 
     MRAY_HYBRID
@@ -233,6 +247,19 @@ class MetaLightArrayT
 
     public:
     using MetaLight = LightVariant;
+    static constexpr uint32_t SampleSolidAngleRNCountWorst = MetaLightDetail::SampleSolidAngleRNCountWorstCase
+    <
+        MetaLightDetail::LightType<std::tuple_element_t<0, TransformLightTuple>,
+                                   std::tuple_element_t<1, TransformLightTuple>>
+        ...
+    >();
+
+    static constexpr uint32_t SampleRayRNCountWorst = MetaLightDetail::SampleRayRNCountWorstCase
+    <
+        MetaLightDetail::LightType<std::tuple_element_t<0, TransformLightTuple>,
+                                   std::tuple_element_t<1, TransformLightTuple>>
+        ...
+    >();
 
     class View
     {
@@ -278,6 +305,7 @@ class MetaLightArrayT
     uint32_t lightCounter = 0;
 
     public:
+    // Constructors & Destructor
             MetaLightArrayT(const GPUSystem&);
 
 
@@ -297,8 +325,10 @@ class MetaLightArrayT
                             const GPUQueue& queue);
 
     void    Construct(MetaLightListConstructionParams,
+                      const LightSurfaceParams& boundarySurface,
                       const GPUQueue& queue);
 
+    void                Clear();
     View                Array() const;
     LightLookupTable    IndexHashTable() const;
 };

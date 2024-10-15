@@ -19,9 +19,10 @@ SampleT<Vector3> LightPrim<P, SC>::SampleSolidAngle(RNGDispenser& rng,
 {
     const P& primitive = prim.get();
     SampleT<BasicSurface> surfaceSample = primitive.SampleSurface(rng);
-    Vector3 sampledDir = (surfaceSample.value.position - distantPoint);
+    Vector3 sampledDir = (distantPoint - surfaceSample.value.position);
+    sampledDir.NormalizeSelf();
 
-    Float NdL = surfaceSample.value.normal.Dot(-sampledDir.Normalize());
+    Float NdL = surfaceSample.value.normal.Dot(sampledDir);
     NdL = (isTwoSided) ? abs(NdL) : max(Float{0}, NdL);
     // Get projected area
     Float pdf = (NdL == 0) ? Float{0.0} : surfaceSample.pdf / NdL;
@@ -372,18 +373,18 @@ namespace LightDetail
 template<TransformContextC TC, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
 LightNull<TC, SC>::LightNull(const SpectrumConverter&,
-                            const Primitive&,
-                            const DataSoA&, LightKey)
+                             const Primitive&,
+                             const DataSoA&, LightKey)
 {}
 
 template<TransformContextC TC, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<Vector3> LightNull<TC, SC>::SampleSolidAngle(RNGDispenser&,
-                                             const Vector3&) const
+                                                     const Vector3&) const
 {
     return SampleT<Vector3>
     {
-        Vector3::Zero(),
+        Vector3(1e10),
         Float(0.0)
     };
 
@@ -404,7 +405,7 @@ SampleT<Ray> LightNull<TC, SC>::SampleRay(RNGDispenser&) const
 {
     return SampleT<Ray>
     {
-        Ray(Vector3::Zero(), Vector3::Zero()),
+        Ray(Vector3(1e10), Vector3::Zero()),
         Float(0.0)
     };
 }
