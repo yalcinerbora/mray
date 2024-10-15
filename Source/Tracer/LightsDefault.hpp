@@ -20,13 +20,14 @@ SampleT<Vector3> LightPrim<P, SC>::SampleSolidAngle(RNGDispenser& rng,
     const P& primitive = prim.get();
     SampleT<BasicSurface> surfaceSample = primitive.SampleSurface(rng);
     Vector3 sampledDir = (distantPoint - surfaceSample.value.position);
+    Float distSqr = sampledDir.LengthSqr();
     sampledDir.NormalizeSelf();
 
     Float NdL = surfaceSample.value.normal.Dot(sampledDir);
     NdL = (isTwoSided) ? abs(NdL) : max(Float{0}, NdL);
     // Get projected area
     Float pdf = (NdL == 0) ? Float{0.0} : surfaceSample.pdf / NdL;
-    pdf *= sampledDir.LengthSqr();
+    pdf *= distSqr;
 
     return SampleT<Vector3>
     {
