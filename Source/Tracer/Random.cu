@@ -106,9 +106,10 @@ RNGGroupIndependent::RNGGroupIndependent(uint32_t genCount,
             hMainStates[i] = MainRNG::GenerateState(rngLocal());
         }
     }, 4u);
+    future0.wait();
 
     // Do discarding after issue (it should be logN for PRNGS)
-    rngTemp.discard(genCount);
+    rngTemp.discard(generatorCount);
     const std::mt19937 rng1 = rngTemp;
 
     std::vector<BackupRNGState> hBackupStates(generatorCount);
@@ -125,7 +126,6 @@ RNGGroupIndependent::RNGGroupIndependent(uint32_t genCount,
             hBackupStates[i] = BackupRNG::GenerateState(rngLocal());
         }
     }, 4u);
-    future0.wait();
     future1.wait();
 
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);

@@ -313,21 +313,21 @@ RayT<float> RayT<float>::Nudge(const Vector3f& dir) const
         pointI[1] = __int_as_float(__float_as_int(p[1]) + ((p[1] < 0) ? -ofi[1] : ofi[1]));
         pointI[2] = __int_as_float(__float_as_int(p[2]) + ((p[2] < 0) ? -ofi[2] : ofi[2]));
     #else
-    // CPU code (this will be optimized out)
-    // and it is not UB
-    static_assert(sizeof(int32_t) == sizeof(float));
-    Vector3i pInt;
-    memcpy(&(pInt[0]), &(p[0]), sizeof(float));
-    memcpy(&(pInt[1]), &(p[1]), sizeof(float));
-    memcpy(&(pInt[2]), &(p[2]), sizeof(float));
+        // CPU code (this will be optimized out)
+        // and it is not UB
+        static_assert(sizeof(int32_t) == sizeof(float));
+        Vector3i pInt;
+        memcpy(&(pInt[0]), &(p[0]), sizeof(float));
+        memcpy(&(pInt[1]), &(p[1]), sizeof(float));
+        memcpy(&(pInt[2]), &(p[2]), sizeof(float));
 
-    pInt[0] += ((p[0] < 0) ? -ofi[0] : ofi[0]);
-    pInt[1] += ((p[1] < 0) ? -ofi[1] : ofi[1]);
-    pInt[2] += ((p[2] < 0) ? -ofi[2] : ofi[2]);
+        pInt[0] += ((p[0] < 0) ? -ofi[0] : ofi[0]);
+        pInt[1] += ((p[1] < 0) ? -ofi[1] : ofi[1]);
+        pInt[2] += ((p[2] < 0) ? -ofi[2] : ofi[2]);
 
-    memcpy(&(pointI[0]), &(pInt[0]), sizeof(float));
-    memcpy(&(pointI[1]), &(pInt[1]), sizeof(float));
-    memcpy(&(pointI[2]), &(pInt[2]), sizeof(float));
+        memcpy(&(pointI[0]), &(pInt[0]), sizeof(float));
+        memcpy(&(pointI[1]), &(pInt[1]), sizeof(float));
+        memcpy(&(pointI[2]), &(pInt[2]), sizeof(float));
     #endif
 
     // Find the next floating point towards

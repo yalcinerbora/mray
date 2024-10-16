@@ -3,16 +3,13 @@
 MRAY_HYBRID MRAY_CGPU_INLINE
 Pair<Ray, Vector2> LightSampleOutput::SampledRay(const Vector3& distantPoint) const
 {
-    Vector3 dir = position - distantPoint;
+    Vector3 dir = (position - distantPoint).Normalize();
     // Nudge the position back here, this will be used
     // for visibility check
     // TODO: Bad usage of API, constructing a ray to nudge a position
     Vector3 pos = Ray(Vector3::Zero(), position).Nudge(-dir).Pos();
-    dir = pos - distantPoint;
-
-    Float length = dir.Length();
-    dir *= (Float(1) / length);
-    return Pair(Ray(dir, distantPoint), Vector2(0, length));
+    Float length = (pos - distantPoint).Length();
+    return Pair(Ray(dir, distantPoint), Vector2(0, length * 0.999f));
 }
 
 template<class ML>
@@ -30,11 +27,12 @@ LightSample DirectLightSamplerUniform<ML>::SampleLight(RNGDispenser& rng,
                                                        const Vector3& distantPoint) const
 {
     using MetaLightView = typename MetaLightArrayView::template MetaLightView<SpectrumConverter>;
+    static constexpr auto DiscreteSampleIndex = ML::SampleSolidAngleRNCountWorst;
 
     uint32_t lightCount = dMetaLights.Size();
     Float lightCountF = Float(lightCount);
     // Randomly Select Light
-    Float dXi = rng.NextFloat<0>();
+    Float dXi = rng.NextFloat<DiscreteSampleIndex>();
     Float lightIndexF = dXi * lightCountF;
     uint32_t lightIndex = static_cast<uint32_t>(lightIndexF);
     // Rarely, index becomes the light count

@@ -280,7 +280,6 @@ SampleT<Vector3> LightSkysphere<CC, TC, SC>::SampleSolidAngle(RNGDispenser& rng,
     Float pdf = CC::ToSolidAnglePdf(sampledUV.pdf, sampledUV.value);
     // Transform Direction to World Space
     Vector3 worldDir = prim.get().GetTransformContext().InvApplyV(dirYUp);
-
     // Now add the extent of the scene
     Vector3 sampledPoint = distantPoint + worldDir * sceneDiameter;
     return SampleT<Vector3>
@@ -771,6 +770,7 @@ template <CoordConverterC CC>
 void LightGroupSkysphere<CC>::SetSceneDiameter(Float d)
 {
     sceneDiameter = d;
+    soa.sceneDiameter = sceneDiameter;
 }
 
 template <CoordConverterC CC>

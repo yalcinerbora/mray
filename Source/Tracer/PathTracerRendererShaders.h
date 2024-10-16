@@ -223,15 +223,11 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     // ================ //
     // Russian Roulette //
     // ================ //
-    bool isPathDead = false;
     PathDataPack dataPack = params.rayState.dPathDataPack[rayIndex];
     dataPack.depth += 1u;
     Vector2ui rrRange = params.globalState.russianRouletteRange;
-    if(dataPack.depth > rrRange[1])
-    {
-        isPathDead = true;
-    }
-    else if(dataPack.depth >= rrRange[0])
+    bool isPathDead = (dataPack.depth >= rrRange[1]);
+    if(dataPack.depth >= rrRange[0])
     {
         Float rrXi = rng.NextFloat<Material::SampleRNCount>();
         Float rrFactor = throughput.Sum() * Float(0.33333);
@@ -244,7 +240,7 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     // we do not bother casting NEE ray. So if this ray
     // hits a light somehow it should not assume MIS is enabled.
     bool isSpecular = MaterialCommon::IsSpecular(mat.Specularity(surf));
-    dataPack.type = isSpecular ? RayType::PATH_RAY : RayType::SPECULAR_RAY;
+    dataPack.type = isSpecular ? RayType::SPECULAR_RAY : RayType::PATH_RAY;
 
     // Selectively write if path is alive
     if(!isPathDead)
@@ -315,11 +311,12 @@ void PathTraceRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
     // Check the depth if we exceed it, do not accumulate
     // we terminate the path regardless
     PathDataPack pathDataPack = params.rayState.dPathDataPack[rayIndex];
+    pathDataPack.depth += 1u;
     Vector2ui rrRange = params.globalState.russianRouletteRange;
-    if((pathDataPack.depth + 1u) <= rrRange[1])
+    if(pathDataPack.depth <= rrRange[1])
     {
         Spectrum radianceEstimate = emission * throughput;
-        params.rayState.dPathRadiance[rayIndex] = radianceEstimate;
+        params.rayState.dPathRadiance[rayIndex] += radianceEstimate;
     }
     // Set the path as dead
     pathDataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
@@ -362,6 +359,15 @@ void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const S
     Spectrum reflectance = mat.Evaluate(wI, wO, surf);
     Spectrum throughput = params.rayState.dThroughput[rayIndex];
     throughput *= reflectance;
+
+    if(reflectance.HasNaN() || lightSample.value.emission.HasNaN())
+        printf("r(%f, %f, %f), (%f, %f, %f)\n",
+               reflectance[0],
+               reflectance[1],
+               reflectance[2],
+               lightSample.value.emission[0],
+               lightSample.value.emission[1],
+               lightSample.value.emission[2]);
 
     // Either do MIS or normal sampling
     Float pdf;
@@ -410,7 +416,8 @@ void PathTraceRDetail::LightWorkFunctionWithNEE(const Light& l, RNGDispenser&,
 
     // If mode is NEE, only camera rays are allowed
     if(params.globalState.sampleMode == SampleMode::E::NEE &&
-       pathDataPack.type != RayType::CAMERA_RAY)
+       (pathDataPack.type != RayType::CAMERA_RAY) &&
+       (pathDataPack.type != RayType::SPECULAR_RAY))
     {
         pathDataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
         params.rayState.dPathDataPack[rayIndex] = pathDataPack;
@@ -465,7 +472,7 @@ void PathTraceRDetail::LightWorkFunctionWithNEE(const Light& l, RNGDispenser&,
     if((pathDataPack.depth + 1u) <= rrRange[1])
     {
         Spectrum radianceEstimate = emission * throughput;
-        params.rayState.dPathRadiance[rayIndex] = radianceEstimate;
+        params.rayState.dPathRadiance[rayIndex] += radianceEstimate;
     }
     // Set the path as dead
     pathDataPack.status.Set(uint32_t(PathStatusEnum::DEAD));

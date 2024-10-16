@@ -26,13 +26,13 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
     Float nDotL = std::max(wI[2], Float{0});
 
     // Check normal Mapping
-    Vector3 normal = Vector3::ZAxis();
+    Quaternion toTangentSpace = surface.shadingTBN;
     if(normalMapTex)
     {
-        normal = (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value();
+        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value();
         normal.NormalizeSelf();
         // Due to normal change our direction sample should be aligned as well
-        wI = Quaternion::RotationBetweenZAxis(normal).Conjugate().ApplyRotation(wI);
+        toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
     }
 
     // Before transform calculate reflectance
@@ -42,7 +42,7 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
     // Material is responsible for transforming out of primitive's
     // shading space (same goes for wI but lambert material is
     // wI invariant so we did not convert it)
-    wI = surface.shadingTBN.ApplyInvRotation(wI);
+    wI = toTangentSpace.ApplyInvRotation(wI);
     // Lambert material is **not** asubsurface material,
     // directly delegate the incoming position as outgoing
     Ray wIRay = Ray(wI, surface.position);
@@ -82,15 +82,18 @@ Spectrum LambertMaterial<ST>::Evaluate(const Ray& wI,
                                        const Vector3&,
                                        const Surface& surface) const
 {
-    Vector3 normal = (normalMapTex)
-        ? (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value()
-        : Vector3::ZAxis();
-    normal.NormalizeSelf();
-    // Calculate lightning in local space since
-    // wO and wI is already in local space
-    Vector3 wILocal = surface.shadingTBN.ApplyRotation(wI.Dir());
-
-    Float nDotL = std::max(normal.Dot(wILocal), Float(0));
+    // Check normal Mapping
+    Quaternion toTangentSpace = surface.shadingTBN;
+    if(normalMapTex)
+    {
+        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value();
+        normal.NormalizeSelf();
+        // Due to normal change our direction sample should be aligned as well
+        toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
+    }
+    // Calculate lightning tangent space
+    Vector3 wILocal = toTangentSpace.ApplyRotation(wI.Dir());
+    Float nDotL = std::max(wILocal[2], Float(0));
     Spectrum albedo = albedoTex(surface.uv,
                                 surface.dpdu,
                                 surface.dpdv).value();
@@ -180,7 +183,7 @@ Float ReflectMaterial<ST>::Pdf(const Ray&,
                                const Surface&) const
 {
     // We can not sample this
-    return Float(0.0);
+    return Float(0);
 }
 
 template <class ST>
@@ -308,7 +311,7 @@ Float RefractMaterial<ST>::Pdf(const Ray&,
                                const Surface&) const
 {
     // We can not sample this
-    return Float(0.0);
+    return Float(0);
 }
 
 template <class ST>
@@ -442,10 +445,9 @@ SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
 
     // Microfacet dist functions are all in tangent space
     Quaternion toTangentSpace = surface.shadingTBN;
-    Vector3 normal;
     if(normalMapTex)
     {
-        normal = (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value();
+        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value();
         normal.NormalizeSelf();
         // Due to normal change our direction sample should be aligned as well
         toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;

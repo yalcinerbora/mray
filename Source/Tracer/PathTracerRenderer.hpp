@@ -606,6 +606,12 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
             .sampleMode = currentOptions.sampleMode,
             .lightSampler = lightSampler
         };
+        using GlobalStateE = PathTraceRDetail::GlobalState<EmptyType>;
+        GlobalStateE globalStateE
+        {
+            .russianRouletteRange = currentOptions.russianRouletteRange,
+            .sampleMode = currentOptions.sampleMode
+        };
 
         // Clear the shadow ray radiance buffer
         processQueue.MemsetAsync(dRayState.dShadowRayRadiance, 0x00);
@@ -633,8 +639,15 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
                              dRays, dHits, dHitKeys,
                              globalState, processQueue);
         },
-        // Empty Kernel for light
-        [&, this](const auto&, Span<uint32_t>, uint32_t, uint32_t) {});
+        [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
+                  uint32_t, uint32_t)
+        {
+            workPtr.DoBoundaryWork_1(dRayState, dLocalIndices,
+                                     Span<const RandomNumber>{},
+                                     dRayDifferentials, dRays,
+                                     dHits, dHitKeys,
+                                     globalState, processQueue);
+        });
 
         // After the kernel call(s), "dRayState.dOutRays" holds the shadow rays
         // check visibility.
@@ -679,21 +692,13 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
                 ConstAddFunctor(rnCount)
             );
 
-            workPtr.DoWork_1(dRayState, dLocalIndices,
+            workPtr.DoWork_0(dRayState, dLocalIndices,
                              dRandomNumBuffer, dRayDifferentials,
                              dRays, dHits, dHitKeys,
-                             globalState, processQueue);
+                             globalStateE, processQueue);
         },
-        //
-        [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
-                  uint32_t, uint32_t)
-        {
-            workPtr.DoBoundaryWork_1(dRayState, dLocalIndices,
-                                     Span<const RandomNumber>{},
-                                     dRayDifferentials, dRays,
-                                     dHits, dHitKeys,
-                                     globalState, processQueue);
-        });
+        // Empty Kernel for light
+        [&, this](const auto&, Span<uint32_t>, uint32_t, uint32_t) {});
     }
 
     // Find the dead paths again

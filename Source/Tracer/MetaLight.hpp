@@ -43,6 +43,8 @@ static void KCConstructMetaLights(// These are per-light (sub-light)
         // Now construct the primitive, it refers to the tc on global memory
         Byte* primLocation = dMetaPrims[index].data();
         Primitive* prim = new(primLocation) Primitive(*tContext, *dPrimSoA, dPrimitiveKeys[i]);
+        printf("PrimLoc %p, size %u, k %u\n", prim, static_cast<uint32_t>(sizeof(Primitive)),
+               std::bit_cast<CommonKey>(dPrimitiveKeys[i]));
 
         // And finally construct the light, and this also refers to primitive
         // on the global memory. This will be the variant
@@ -57,7 +59,7 @@ static void KCConstructMetaLights(// These are per-light (sub-light)
         //                           *prim, *dLightSoA, dLightKeys[i]);
         // =======================
         // Thankfully, lights are move/copy? assignable
-        dMetaLights[index] = Light(*dSpectrumConverter, *prim, *dLightSoA, dLightKeys[i]);;
+        dMetaLights[index] = Light(*dSpectrumConverter, *prim, *dLightSoA, dLightKeys[i]);
     }
 }
 
