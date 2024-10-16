@@ -293,7 +293,7 @@ void KCExtractLuminance(// I-O
             [[maybe_unused]]
             bool invoked = InvokeAt(i, colorspaceList, [i, &luminance, &localPixRGB](auto&& tupleElem)
             {
-                luminance = Color::XYZToYxy(tupleElem.ToXYZ(localPixRGB))[1];
+                luminance = Color::XYZToYxy(tupleElem.ToXYZ(localPixRGB))[0];
                 return true;
             });
             assert(invoked);
