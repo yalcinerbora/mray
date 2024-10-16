@@ -43,8 +43,6 @@ static void KCConstructMetaLights(// These are per-light (sub-light)
         // Now construct the primitive, it refers to the tc on global memory
         Byte* primLocation = dMetaPrims[index].data();
         Primitive* prim = new(primLocation) Primitive(*tContext, *dPrimSoA, dPrimitiveKeys[i]);
-        printf("PrimLoc %p, size %u, k %u\n", prim, static_cast<uint32_t>(sizeof(Primitive)),
-               std::bit_cast<CommonKey>(dPrimitiveKeys[i]));
 
         // And finally construct the light, and this also refers to primitive
         // on the global memory. This will be the variant
@@ -386,8 +384,6 @@ void MetaLightArrayT<TLT...>::AddBatch(const LightGroup& lg, const TransformGrou
     soaCounter++;
     // Need to wait for async memcopies
     queue.Barrier().Wait();
-
-    MRAY_LOG("{}-{}-Done!", lg.Name(), tg.Name());
 }
 
 template<LightTransPairC... TLT>

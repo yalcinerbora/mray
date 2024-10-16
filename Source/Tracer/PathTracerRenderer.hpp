@@ -1,8 +1,5 @@
 #pragma once
 
-#include "Device/GPUDebug.h"
-#include "TypeFormat.h"
-
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static void KCInitPathState(MRAY_GRID_CONSTANT const PathTraceRDetail::RayState dRayState,
                             MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices)
@@ -657,10 +654,6 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
             dIsVisibleBitSpan, dBackupRNGStates,
             dRayState.dOutRays, dIndices, processQueue
         );
-
-        //DeviceDebug::DumpGPUMemToFile("shadowVis",
-        //                                ToConstSpan(dShadowRayVisibilities), processQueue);
-
 
         // Accumulate the pre-calculated radiance selectively
         processQueue.IssueSaturatingKernel<KCAccumulateShadowRays>
