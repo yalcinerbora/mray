@@ -432,10 +432,22 @@ constexpr Vector2 SphericalAnglesToUV(const Vector2& thetaPhi)
     using namespace MathConstants;
     // Theta range [-pi, pi)
     assert(thetaPhi[0] >= -Pi<Float>() &&
-           thetaPhi[0] < Pi<Float>());
+           thetaPhi[0] <= Pi<Float>());
     // phi range [0, pi]
     assert(thetaPhi[1] >= 0 &&
            thetaPhi[1] <= Pi<Float>());
+    // Theta range [-pi, pi)
+    if(thetaPhi[0] < -Pi<Float>() ||
+       thetaPhi[0] > Pi<Float>() ||
+       thetaPhi[1] < 0 ||
+       thetaPhi[1] > Pi<Float>())
+    {
+        printf("(%f, %f) | (%f, %f) | (%f, %f)\n",
+               thetaPhi[0], thetaPhi[1],
+               -Pi<Float>(), Pi<Float>(),
+               0.0f, Pi<Float>());
+        //__debugbreak();
+    }
 
     // Normalize to generate UV [0, 1]
     Float u = (thetaPhi[0] + Pi<Float>()) * Float(0.5) / Pi<Float>();

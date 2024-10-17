@@ -43,7 +43,7 @@ Float LightPrim<P, SC>::PdfSolidAngle(const typename P::Hit& hit,
                                       const Vector3& dir) const
 {
     const P& primitive = prim.get();
-    // Project point to surface (function assumes
+    // Project point to surface
     Optional<BasicSurface> surfaceOpt = primitive.SurfaceFromHit(hit);
     if(!surfaceOpt) return Float{0};
     const BasicSurface& surface = surfaceOpt.value();
@@ -279,7 +279,7 @@ SampleT<Vector3> LightSkysphere<CC, TC, SC>::SampleSolidAngle(RNGDispenser& rng,
     Vector3 dirYUp = CC::UVToDir(sampledUV.value);
     Float pdf = CC::ToSolidAnglePdf(sampledUV.pdf, sampledUV.value);
     // Transform Direction to World Space
-    Vector3 worldDir = prim.get().GetTransformContext().InvApplyV(dirYUp);
+    Vector3 worldDir = prim.get().GetTransformContext().ApplyV(dirYUp);
     // Now add the extent of the scene
     Vector3 sampledPoint = distantPoint + worldDir * sceneDiameter;
     return SampleT<Vector3>
@@ -291,12 +291,12 @@ SampleT<Vector3> LightSkysphere<CC, TC, SC>::SampleSolidAngle(RNGDispenser& rng,
 
 template<CoordConverterC CC, TransformContextC TC, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float LightSkysphere<CC, TC, SC>::PdfSolidAngle(const typename EmptyPrimitive<TC>::Hit& hit,
+Float LightSkysphere<CC, TC, SC>::PdfSolidAngle(const typename EmptyPrimitive<TC>::Hit&,
                                                 const Vector3& distantPoint,
                                                 const Vector3& dir) const
 {
-    Vector3 dirYUp = prim.get().GetTransformContext().ApplyV(dir);
-    Vector2 uv = CC::DirToUV(dirYUp);
+    Vector3 dirYUp = prim.get().GetTransformContext().InvApplyV(dir);
+    Vector2 uv = CC::DirToUV(dirYUp.Normalize());
     Float pdf = PdfUV(uv);
     pdf = CC::ToSolidAnglePdf(pdf, dirYUp);
     return pdf;

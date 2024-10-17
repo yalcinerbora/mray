@@ -124,7 +124,7 @@ template <std::integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr T Math::Clamp(T v, T minVal, T maxVal)
 {
-    assert(minVal < maxVal);
+    assert(minVal <= maxVal);
     v = (v < minVal) ? minVal : v;
     v = (v > maxVal) ? maxVal : v;
     return v;
@@ -134,7 +134,7 @@ template <std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr T Math::Clamp(T v, T minVal, T maxVal)
 {
-    assert(minVal < maxVal);
+    assert(minVal <= maxVal);
     return std::min(std::max(minVal, v), maxVal);
 }
 

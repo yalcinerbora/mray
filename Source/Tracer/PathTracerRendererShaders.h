@@ -376,7 +376,7 @@ void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const S
         using Distribution::MIS::BalanceCancelled;
         Float bxdfPdf = mat.Pdf(shadowRay, wO, surf);
         std::array<Float, 2> pdfs = {bxdfPdf, lightSample.pdf};
-        std::array<Float, 2> weights = {0.5, 0.5};
+        std::array<Float, 2> weights = {1, 1};
         pdf = BalanceCancelled<2>(pdfs, weights);
     }
     else pdf = lightSample.pdf;
@@ -433,7 +433,7 @@ void PathTraceRDetail::LightWorkFunctionWithNEE(const Light& l, RNGDispenser&,
         using Distribution::MIS::BalanceCancelled;
         using Distribution::Common::DivideByPDF;
         //
-        std::array<Float, 2> weights = {Float(0.5), Float(0.5)};
+        std::array<Float, 2> weights = {1, 1};
         std::array<Float, 2> pdfs;
         pdfs[0] = params.rayState.dPrevMatPDF[rayIndex];
         // We need to find the index of this specific light

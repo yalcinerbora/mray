@@ -164,7 +164,7 @@ SampleT<Float> DistributionPwC<1>::SampleUV(Float xi) const
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float DistributionPwC<1>::PdfIndex(Float index) const
 {
-    assert(index < 1);
+    assert(index < static_cast<Float>(dCDF.size()));
     uint32_t indexI = static_cast<uint32_t>(index);
     Float prevCDF = (indexI == 0) ? Float{0.0} : dCDF[indexI - 1];
     Float myCDF = dCDF[indexI];
@@ -236,20 +236,23 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Float DistributionPwC<D>::PdfIndex(const VectorT& index) const
 {
     uint32_t indexInt = static_cast<uint32_t>(index[D - 1]);
-    Float pdfA = dNextDistributions[indexInt].PdfIndex(index);
-    Float pdfB = dCurrentDistribution.PdfIndex(index[D - 1]);
-    return pdfA * pdfB;
+    Float pdfMarginal = dCurrentDistribution.PdfIndex(index[D - 1]);
+
+    Float pdfConditional;
+    if constexpr((D - 1) == 1)
+        pdfConditional = dNextDistributions[indexInt].PdfIndex(index[0]);
+    else
+        pdfConditional = dNextDistributions[indexInt].PdfIndex(index);
+
+    return pdfConditional * pdfMarginal;
 }
 
 template <uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float DistributionPwC<D>::PdfUV(const VectorT& uv) const
 {
-    Float indexF = uv[D - 1] * dCurrentDistribution.Size();
-    uint32_t indexI = static_cast<uint32_t>(indexF);
-    Float pdfA = dNextDistributions[indexI].PdfIndex(indexF);
-    Float pdfB = dCurrentDistribution.PdfUV(uv[D - 1]);
-    return pdfA * pdfB;
+    VectorT indexF = uv * VectorT(Size());
+    return PdfIndex(indexF);
 }
 
 template <uint32_t D>

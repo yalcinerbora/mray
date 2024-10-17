@@ -64,10 +64,10 @@ Float DirectLightSamplerUniform<ML>::PdfLight(uint32_t index,
                                               const MetaHit& hit,
                                               const Ray& ray) const
 {
+    assert(index >= dMetaLights.Size());
     using STIdentity = SpectrumConverterContextIdentity;
     using MetaLightView = typename MetaLightArrayView::template MetaLightView<STIdentity>;
     STIdentity stIdentity;
-    if(index >= dMetaLights.Size()) return Float(0);
 
     // Discrete sampling of such light (its uniform)
     uint32_t lightCount = dMetaLights.Size();
@@ -76,7 +76,7 @@ Float DirectLightSamplerUniform<ML>::PdfLight(uint32_t index,
 
     // Probability of sampling such direction from the particular light
     MetaLightView light = dMetaLights(stIdentity, index);
-    Float lightPDF = light.PdfSolidAngle(hit, ray.Dir(), ray.Pos());
+    Float lightPDF = light.PdfSolidAngle(hit, ray.Pos(), ray.Dir());
     return lightPDF * selectionPDF;
 }
 
@@ -86,9 +86,13 @@ Float DirectLightSamplerUniform<ML>::PdfLight(const HitKeyPack& hitPack,
                                               const MetaHit& hit,
                                               const Ray& r) const
 {
+    const auto& lmK = hitPack.lightOrMatKey;
+    LightKey lK = LightKey::CombinedKey(lmK.FetchBatchPortion(),
+                                        lmK.FetchIndexPortion());
+
     LightSurfKeyPack keyPack =
     {
-        .lK = std::bit_cast<CommonKey>(hitPack.lightOrMatKey),
+        .lK = std::bit_cast<CommonKey>(lK),
         .tK = std::bit_cast<CommonKey>(hitPack.transKey),
         .pK = std::bit_cast<CommonKey>(hitPack.primKey)
     };

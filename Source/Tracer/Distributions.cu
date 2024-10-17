@@ -186,7 +186,7 @@ void DistributionGroupPwC2D::Commit()
         result[2] = a[2] + b[2];
         result[3] = a[3] + b[3];
 
-        return std::move(result);
+        return result;
     });
 
     Span<Float> dCDFsX;

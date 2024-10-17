@@ -15,6 +15,7 @@
 template<class Dist2D, bool DoUV>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCSampleDist(Span<SampleT<Vector2>> dOutSamples,
+                  Span<Float> dOutPdfs,
                   Span<const Vector2> dRandomNumbers,
                   Span<const Dist2D, 1> dDist,
                   uint32_t sampleCount)
@@ -23,11 +24,19 @@ void KCSampleDist(Span<SampleT<Vector2>> dOutSamples,
     for(uint32_t i = kp.GlobalId(); i < sampleCount; i += kp.TotalSize())
     {
         SampleT<Vector2> sample;
+        Float pdf;
         if constexpr(DoUV)
+        {
             sample = dDist[0].SampleUV(dRandomNumbers[i]);
+            pdf = dDist[0].PdfUV(sample.value);
+        }
         else
+        {
             sample = dDist[0].SampleIndex(dRandomNumbers[i]);
+            pdf = dDist[0].PdfIndex(sample.value);
+        }
         dOutSamples[i] = sample;
+        dOutPdfs[i] = pdf;
     }
 }
 
@@ -42,7 +51,8 @@ struct DistTester2D
     DistTester2D() : distGroup(system) {}
 
     template<bool DoUV>
-    std::vector<SampleT<Vector2>>
+    Pair<std::vector<SampleT<Vector2>>,
+         std::vector<Float>>
     GenSamples(const std::vector<Float>& hFunction,
                const Vector2ui& size,
                const std::vector<Vector2>& hRandomNumbers)
@@ -53,14 +63,15 @@ struct DistTester2D
         uint32_t sampleCount = static_cast<uint32_t>(hRandomNumbers.size());
         uint32_t sizeLinear = size.Multiply();
 
+        Span<Float> dOutPdfs;
         Span<SampleT<Vector2>> dOutSamples;
         Span<Vector2> dRandomNumbers;
         Span<Float> dFunction;
         DeviceMemory mem({&system.BestDevice()}, 32_MiB, 128_MiB);
         MemAlloc::AllocateMultiData(std::tie(dFunction, dRandomNumbers,
-                                             dOutSamples),
+                                             dOutSamples, dOutPdfs),
                                     mem,
-                                    {sizeLinear, sampleCount, sampleCount});
+                                    {sizeLinear, sampleCount, sampleCount, sampleCount});
         queue.MemcpyAsync(dFunction, Span<const Float>(hFunction.cbegin(), hFunction.cend()));
 
         uint32_t id = distGroup.Reserve(size);
@@ -80,17 +91,21 @@ struct DistTester2D
             KernelIssueParams{.workCount = sampleCount},
             //
             dOutSamples,
+            dOutPdfs,
             dRandomNumbers,
             Span<const Dist2D, 1>(dists.subspan(0, 1)),
             sampleCount
         );
 
-        std::vector<SampleT<Vector2>> hOutSamples(sampleCount);
-        queue.MemcpyAsync(Span<SampleT<Vector2>>(hOutSamples.begin(),
-                                                 hOutSamples.end()),
-                          ToConstSpan(dOutSamples));
+        using Result = Pair<std::vector<SampleT<Vector2>>, std::vector<Float>>;
+        Result result;
+        result.first.resize(sampleCount);
+        result.second.resize(sampleCount);
+
+        queue.MemcpyAsync(Span(result.first), ToConstSpan(dOutSamples));
+        queue.MemcpyAsync(Span(result.second), ToConstSpan(dOutPdfs));
         queue.Barrier().Wait();
-        return std::move(hOutSamples);
+        return result;
     }
 };
 
@@ -117,32 +132,43 @@ TEST(Dist_PiecewiseConstant2D, Uniform)
 
     {
         DistTester2D tester;
-        auto hOutSamples = tester.GenSamples<false>(hFunction, SIZE, hRandomNumbers);
+        auto [hOutSamples, hOutPdfs]
+            = tester.GenSamples<false>(hFunction, SIZE, hRandomNumbers);
 
-        uint32_t i = 0;
-        for(const auto& s : hOutSamples)
+        for(size_t i = 0; i < hOutSamples.size(); i++)
         {
+            const auto& s = hOutSamples[i];
+            const auto& pdf = hOutPdfs[i];
+
             using namespace MathConstants;
             EXPECT_NEAR(s.pdf, Float{1}, VeryLargeEpsilon<Float>());
+            EXPECT_FLOAT_EQ(s.pdf, pdf);
 
             // On uniform function, random numberss should match to the
             // sampled index
             Vector2 indexExpected = hRandomNumbers[i] * Vector2(SIZE);
             EXPECT_EQUAL_MRAY(s.value, indexExpected,
                               VeryLargeEpsilon<Float>());
-            i++;
         }
     }
 
     {
         DistTester2D tester;
-        auto hOutSamples = tester.GenSamples<true>(hFunction, SIZE, hRandomNumbers);
+        auto [hOutSamples, hOutPdfs]
+            = tester.GenSamples<true>(hFunction, SIZE, hRandomNumbers);
 
-        uint32_t i = 0;
-        for(const auto& s : hOutSamples)
+        for(size_t i = 0; i < hOutSamples.size(); i++)
         {
+            const auto& s = hOutSamples[i];
+            const auto& pdf = hOutPdfs[i];
+
             using namespace MathConstants;
             EXPECT_NEAR(s.pdf, Float{1}, VeryLargeEpsilon<Float>());
+            EXPECT_FLOAT_EQ(s.pdf, pdf);
+
+            if(s.pdf != pdf)
+                __debugbreak();
+
 
             // On uniform function, random numberss should match to the
             // sampled index
@@ -150,7 +176,6 @@ TEST(Dist_PiecewiseConstant2D, Uniform)
             Vector2 indexExpected = hRandomNumbers[i] * Vector2(SIZE);
             EXPECT_EQUAL_MRAY(expandedValue, indexExpected,
                               VeryLargeEpsilon<Float>());
-            i++;
         }
     }
 }
@@ -205,27 +230,30 @@ TEST(Dist_PiecewiseConstant2D, ZeroVariance)
     }
 
     DistTester2D tester;
-    auto hOutSamples = tester.GenSamples<false>(hFunction, SIZE, hRandomNumbers);
+    auto [hOutSamples, hOutPdfs]
+        = tester.GenSamples<false>(hFunction, SIZE, hRandomNumbers);
 
     // Integrate the function
     Float total = std::reduce(hFunction.cbegin(), hFunction.cend(), Float{0});
     Vector2 dxy = Vector2(1) / Vector2(SIZE);
     Float integralExpected = total * dxy.Multiply();
 
-    uint32_t i = 0;
     Float monteCarlo = 0;
     using namespace MathConstants;
-    for(const auto& s : hOutSamples)
+    for(size_t i = 0; i < hOutSamples.size(); i++)
     {
+        const auto& s = hOutSamples[i];
+        const auto& pdf = hOutPdfs[i];
+
         Vector2ui functionIndex = Vector2ui(s.value);
         uint32_t indexLinear = functionIndex[1] * SIZE[0] + functionIndex[0];
         ASSERT_LT(indexLinear, SIZE_LINEAR);
         Float f = hFunction[indexLinear];
         Float integralEstimate = f / s.pdf;
 
+        EXPECT_FLOAT_EQ(s.pdf, pdf);
         EXPECT_NEAR(integralEstimate, integralExpected, GiganticEpsilon);
         monteCarlo += integralEstimate;
-        i++;
     }
     // Check the Monte Carlo
     // Technically this should not be better since
