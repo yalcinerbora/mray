@@ -172,14 +172,10 @@ Float MetaLightViewT<V, ST>::PdfSolidAngle(const MetaHit& hit,
         else
         {
             using HitType = typename T::Primitive::Hit;
-            // Null light check
-            if constexpr(std::is_same_v<HitType, EmptyType>)
-                return Float(0);
-            else
-            {
-                HitType hitIn = hit.template AsVector<HitType::Dims>();
-                return l.PdfSolidAngle(hitIn, distantPoint, dir);
-            }
+            HitType hitIn;
+            if constexpr(!std::is_same_v<HitType, EmptyType>)
+                hitIn = hit.template AsVector<HitType::Dims>();
+            return l.PdfSolidAngle(hitIn, distantPoint, dir);
         }
     });
 }
