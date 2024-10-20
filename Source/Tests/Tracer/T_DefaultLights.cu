@@ -295,3 +295,74 @@ TEST(DefaultLights, MetaLight)
         dRandomNumbers
     );
 }
+
+TEST(DefaultLights, PrimLight_Triangle)
+{
+    using Triangle  = typename PrimGroupTriangle::Primitive<>;
+    using Light     = typename LightGroupPrim<PrimGroupTriangle>::template Light<>;
+    using LightData = typename LightGroupPrim<PrimGroupTriangle>::DataSoA;
+    using PrimData  = typename PrimGroupTriangle::DataSoA;
+
+    TransformContextIdentity tContext;
+    SpectrumConverterIdentity sContext;
+
+    std::vector<Vector3> hPos =
+    {
+        Vector3(-0.5, -0.5, -2),
+        Vector3( 0.5, -0.5, -2),
+        Vector3( 0.5,  0.5, -2),
+        Vector3(-0.5,  0.5, -2)
+    };
+    std::vector<Vector3ui> hIndex =
+    {
+        Vector3ui(0, 1, 2),
+        Vector3ui(0, 2, 3)
+    };
+    PrimData pData =
+    {
+        .positions = Span<const Vector3>(hPos),
+        .tbnRotations = Span<const Quaternion>(),
+        .uvs = Span<const Vector2>(),
+        .indexList = Span<const Vector3ui>(hIndex)
+    };
+
+    std::vector<uint32_t> hIsTwoSidedFlags = {0};
+    std::vector<ParamVaryingData<2, Vector3>> hRadiances = {ParamVaryingData<2, Vector3>(Vector3(1))};
+    LightData lData =
+    {
+        .dRadiances = Span<const ParamVaryingData<2, Vector3>>(hRadiances),
+        .dIsTwoSidedFlags = Bitspan<const uint32_t>(Span<const uint32_t>(hIsTwoSidedFlags))
+    };
+
+    Triangle tri0(tContext, pData, PrimitiveKey::CombinedKey(0, 0));
+    Triangle tri1(tContext, pData, PrimitiveKey::CombinedKey(0, 1));
+    Light l0(sContext, tri0, lData, LightKey::CombinedKey(0, 0));
+    Light l1(sContext, tri1, lData, LightKey::CombinedKey(0, 0));
+
+
+    static constexpr uint32_t SAMPLE_COUNT = 4096;
+    std::vector<RandomNumber> hRandomNumbers(SAMPLE_COUNT * 2 * 2);
+    std::mt19937 rng;
+    for(RandomNumber& rn : hRandomNumbers)
+        rn = rng();
+
+    for(uint32_t i = 0; i < SAMPLE_COUNT; i++)
+    {
+        RNGDispenser rng0(Span<const RandomNumber>(hRandomNumbers), i, 2);
+        RNGDispenser rng1(Span<const RandomNumber>(hRandomNumbers), i + 1, 2);
+        auto sample0 = l0.SampleSolidAngle(rng0, Vector3::Zero());
+        auto sample1 = l1.SampleSolidAngle(rng1, Vector3::Zero());
+
+        Ray r0 = Ray(sample0.value.Normalize(), Vector3::Zero());
+        Ray r1 = Ray(sample1.value.Normalize(), Vector3::Zero());
+
+        Float pdf0 = l0.PdfSolidAngle(tri0.Intersects(r0, false).value().hit,
+                                      r0.Pos(), r0.Dir());
+        Float pdf1 = l1.PdfSolidAngle(tri1.Intersects(r1, false).value().hit,
+                                      r1.Pos(), r1.Dir());
+
+        EXPECT_FLOAT_EQ(pdf0, sample0.pdf);
+        EXPECT_FLOAT_EQ(pdf1, sample1.pdf);
+    }
+
+}

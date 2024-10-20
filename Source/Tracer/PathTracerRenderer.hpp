@@ -80,10 +80,10 @@ struct SetPathToDeadFunctor
 
 class IsDeadFunctor
 {
-    Span<PathTraceRDetail::PathDataPack> dPathDataPack;
+    Span<const PathTraceRDetail::PathDataPack> dPathDataPack;
 
     public:
-    IsDeadFunctor(Span<PathTraceRDetail::PathDataPack> dPathDataPackIn)
+    IsDeadFunctor(Span<const PathTraceRDetail::PathDataPack> dPathDataPackIn)
         : dPathDataPack(dPathDataPackIn)
     {}
 
@@ -217,10 +217,10 @@ Span<RayIndex> PathTracerRenderer<MLA>::ReloadPaths(Span<const RayIndex> dIndice
     uint32_t deadRayCount = hDeadRayRanges[1] - hDeadRayRanges[0];
     auto dDeadRayIndices = dDeadAliveRayIndices.subspan(hDeadRayRanges[0],
                                                         deadRayCount);
-    uint32_t camRayGenRNCount = uint32_t(dDeadRayIndices.size()) * camSamplePerRay;
-    auto dCamRayGenRNBuffer = dRandomNumBuffer.subspan(0, camRayGenRNCount);
     if(!dDeadRayIndices.empty())
     {
+        uint32_t camRayGenRNCount = uint32_t(dDeadRayIndices.size()) * camSamplePerRay;
+        auto dCamRayGenRNBuffer = dRandomNumBuffer.subspan(0, camRayGenRNCount);
         rnGenerator->GenerateNumbersIndirect(dCamRayGenRNBuffer,
                                              ToConstSpan(dDeadRayIndices),
                                              Vector2ui(0, camSamplePerRay),
@@ -494,7 +494,8 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
     uint32_t rayCount = this->imageTiler.CurrentTileSize().Multiply();
     // Start the partitioner, again worst case work count
     // Get the K/V pair buffer
-    uint32_t maxWorkCount = uint32_t(this->currentWorks.size() + this->currentLightWorks.size());
+    uint32_t maxWorkCount = uint32_t(this->currentWorks.size() +
+                                     this->currentLightWorks.size());
     auto[dIndices, dKeys] = rayPartitioner.Start(rayCount, maxWorkCount, true);
 
     // Iota the indices
@@ -702,7 +703,7 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
     auto[hDeadAliveRanges, dDeadAliveIndices] = rayPartitioner.BinaryPartition
     (
         dIndices, processQueue,
-        IsDeadFunctor(dRayState.dPathDataPack)
+        IsDeadFunctor(ToConstSpan(dRayState.dPathDataPack))
     );
     processQueue.Barrier().Wait();
 

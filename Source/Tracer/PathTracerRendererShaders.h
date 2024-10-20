@@ -214,9 +214,9 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     // Sample Material  //
     // ================ //
     auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
-    Vector3 wO = -tContext.InvApplyN(rayIn.Dir()).Normalize();
+    Vector3 wO = tContext.InvApplyN(-rayIn.Dir()).Normalize();
     SampleT<BxDFResult> raySample = mat.SampleBxDF(wO, surf, rng);
-    Vector3 wI = tContext.ApplyN(raySample.value.wI.Dir());
+    Vector3 wI = tContext.ApplyN(raySample.value.wI.Dir()).Normalize();
     Spectrum throughput = params.rayState.dThroughput[rayIndex];
     throughput *= raySample.value.reflectance;
 
@@ -282,6 +282,9 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
 
 }
 
+// ======================== //
+//   PURE PATH TRACE LIGHT  //
+// ======================== //
 template<LightC Light, LightGroupC LG, TransformGroupC TG>
 MRAY_HYBRID MRAY_GPU_INLINE
 void PathTraceRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
@@ -289,7 +292,6 @@ void PathTraceRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
                                          RayIndex rayIndex)
 {
     auto [ray, tMM] = RayFromGMem(params.in.dRays, rayIndex);
-    Spectrum throughput = params.rayState.dThroughput[rayIndex];
 
     Vector3 wO = -ray.Dir();
     Spectrum emission;
@@ -315,8 +317,9 @@ void PathTraceRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
     Vector2ui rrRange = params.globalState.russianRouletteRange;
     if(pathDataPack.depth <= rrRange[1])
     {
+        Spectrum throughput = params.rayState.dThroughput[rayIndex];
         Spectrum radianceEstimate = emission * throughput;
-        params.rayState.dPathRadiance[rayIndex] += radianceEstimate;
+        params.rayState.dPathRadiance[rayIndex] = radianceEstimate;
     }
     // Set the path as dead
     pathDataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
@@ -324,7 +327,7 @@ void PathTraceRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
 }
 
 // ======================== //
-//      NEE AND/OR MIS      //
+//    NEE AND/OR MIS EXT    //
 // ======================== //
 template<class LightSampler, PrimitiveC Prim, MaterialC Material,
     class Surface, class TContext,
@@ -406,6 +409,9 @@ void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const S
     }
 }
 
+// ======================== //
+// NEE/MIS PATH TRACE LIGHT //
+// ======================== //
 template<class LightSampler, LightC Light, LightGroupC LG, TransformGroupC TG>
 MRAY_HYBRID MRAY_GPU_INLINE
 void PathTraceRDetail::LightWorkFunctionWithNEE(const Light& l, RNGDispenser&,

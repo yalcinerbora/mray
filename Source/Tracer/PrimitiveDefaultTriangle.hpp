@@ -458,7 +458,7 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     Vector2 uv = uv0 * a + uv1 * b + uv2 * c;
 
     // Flip the surface definitions (normal, geometric normal)
-    bool backSide = (geoNormal.Dot(ray.Dir()) > 0.0f);
+    bool backSide = (geoNormal.Dot(ray.Dir().Normalize()) > 0.0f);
     if(backSide)
     {
         geoNormal = -geoNormal;
@@ -470,6 +470,7 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
         static constexpr Quaternion TANGENT_ROT = Quaternion(0, 1, 0, 0);
         tbn = TANGENT_ROT * tbn;
     }
+    //bool backSide = false;
 
     // Transform to the requested space
     // pos already pre-transformed

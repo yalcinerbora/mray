@@ -64,7 +64,7 @@ Float DirectLightSamplerUniform<ML>::PdfLight(uint32_t index,
                                               const MetaHit& hit,
                                               const Ray& ray) const
 {
-    assert(index >= dMetaLights.Size());
+    assert(index < dMetaLights.Size());
     using STIdentity = SpectrumConverterContextIdentity;
     using MetaLightView = typename MetaLightArrayView::template MetaLightView<STIdentity>;
     STIdentity stIdentity;

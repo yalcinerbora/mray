@@ -292,7 +292,7 @@ SampleT<Vector3> LightSkysphere<CC, TC, SC>::SampleSolidAngle(RNGDispenser& rng,
 template<CoordConverterC CC, TransformContextC TC, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float LightSkysphere<CC, TC, SC>::PdfSolidAngle(const typename EmptyPrimitive<TC>::Hit&,
-                                                const Vector3& distantPoint,
+                                                const Vector3&,
                                                 const Vector3& dir) const
 {
     Vector3 dirYUp = prim.get().GetTransformContext().InvApplyV(dir);
