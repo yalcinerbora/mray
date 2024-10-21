@@ -40,6 +40,17 @@ void SetImagePixelsIndirect(// Output
                             // Constants
                             Float scalarWeightMultiplier,
                             const GPUQueue& queue);
+
+void SetImagePixelsIndirectAtomic(// Output
+                                  const ImageSpan<3>& img,
+                                  // Input
+                                  const Span<const RayIndex>& dIndices,
+                                  const Span<const Spectrum>& dValues,
+                                  const Span<const Float>& dFilterWeights,
+                                  const Span<const ImageCoordinate>& dImgCoords,
+                                  // Constants
+                                  Float scalarWeightMultiplier,
+                                  const GPUQueue& queue);
 class TextureFilterI
 {
     public:

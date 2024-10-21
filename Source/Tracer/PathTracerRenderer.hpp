@@ -734,7 +734,7 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
         this->renderBuffer->ClearImage(processQueue);
         ImageSpan<3> filmSpan = this->imageTiler.template GetTileSpan<3>();
 
-        SetImagePixelsIndirect
+        SetImagePixelsIndirectAtomic
         (
             filmSpan,
             ToConstSpan(dDeadRayIndices),

@@ -194,8 +194,7 @@ Optional<RenderImageSection> RenderImage::TransferToHost(const GPUQueue& process
 
     // Do not overwrite untill memcpy finishes
     previousCopyCompleteFence = copyQueue.Barrier();
-    //copyQueue.MemcpyAsync(hSamples, ToConstSpan(dSamples));
-    // Here we can not wait on host here, (or we sync)
+    // Here, we can not wait on host here, (or we sync)
     // so we Issue the release of the semaphore as host launch
     copyQueue.IssueSemaphoreSignal(sem);
 

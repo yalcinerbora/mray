@@ -447,7 +447,7 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan<3> img,
 
             Vector3 pixValue = img.FetchPixel(pixCoordsInt);
             img.StorePixel(pixValue + Vector3(totalValue),
-                               pixCoordsInt);
+                           pixCoordsInt);
         }
     }
 }
@@ -549,8 +549,9 @@ void KCSetImagePixels(MRAY_GRID_CONSTANT const ImageSpan<3> img,
         Vector3 val = img.FetchPixel(pixCoords);
         Float weight = img.FetchWeight(pixCoords);
 
-        auto [valueIn, sampleIn] = ConvertNaNsToColor(dValues[i], i);
-        val += valueIn * dFilterWeights[i];
+        auto [valueIn, sampleIn] = ConvertNaNsToColor(dValues[i],
+                                                      dFilterWeights[i]);
+        val += valueIn;
         weight += sampleIn;
 
         img.StorePixel(val, pixCoords);
@@ -578,25 +579,53 @@ void KCSetImagePixelsIndirect(MRAY_GRID_CONSTANT const ImageSpan<3> img,
 
         Vector3 val = img.FetchPixel(pixCoords);
         Float weight = img.FetchWeight(pixCoords);
-        auto [valueIn, sampleIn] = ConvertNaNsToColor(dValues[index], i);
-        val += valueIn * dFilterWeights[index];
-        weight += sampleIn;
+        auto [valueIn, weightIn] = ConvertNaNsToColor(dValues[index],
+                                                      dFilterWeights[index]);
+        val += valueIn;
+        weight += weightIn * scalarWeightMultiplier;
 
         img.StorePixel(val, pixCoords);
         img.StoreWeight(weight, pixCoords);
     }
 }
 
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCSetImagePixelsIndirectAtomic(MRAY_GRID_CONSTANT const ImageSpan<3> img,
+                                    // Input
+                                    MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
+                                    MRAY_GRID_CONSTANT const Span<const Spectrum> dValues,
+                                    MRAY_GRID_CONSTANT const Span<const Float> dFilterWeights,
+                                    MRAY_GRID_CONSTANT const Span<const ImageCoordinate> dImgCoords,
+                                    // Constants
+                                    MRAY_GRID_CONSTANT const Float scalarWeightMultiplier)
+{
+    uint32_t sampleCount = static_cast<uint32_t>(dIndices.size());
+
+    KernelCallParams kp;
+    for(uint32_t i = kp.GlobalId(); i < sampleCount; i += kp.TotalSize())
+    {
+        uint32_t index = dIndices[i];
+        Vector2i pixCoords = Vector2i(dImgCoords[index].pixelIndex);
+        auto [valueIn, weightIn] = ConvertNaNsToColor(dValues[index],
+                                                      dFilterWeights[index]);
+        Vector3 addVal = valueIn;
+        Float addWeight = weightIn * scalarWeightMultiplier;
+
+        img.AddToPixelAtomic(addVal, pixCoords);
+        img.AddToWeightAtomic(addWeight, pixCoords);
+    }
+}
+
 void SetImagePixelsIndirect(// Output
-                    const ImageSpan<3>& img,
-                    // Input
-                    const Span<const RayIndex>& dIndices,
-                    const Span<const Spectrum>& dValues,
-                    const Span<const Float>& dFilterWeights,
-                    const Span<const ImageCoordinate>& dImgCoords,
-                    // Constants
-                    Float scalarWeightMultiplier,
-                    const GPUQueue& queue)
+                            const ImageSpan<3>& img,
+                            // Input
+                            const Span<const RayIndex>& dIndices,
+                            const Span<const Spectrum>& dValues,
+                            const Span<const Float>& dFilterWeights,
+                            const Span<const ImageCoordinate>& dImgCoords,
+                            // Constants
+                            Float scalarWeightMultiplier,
+                            const GPUQueue& queue)
 {
     assert(dValues.size() == dFilterWeights.size());
     assert(dFilterWeights.size() == dImgCoords.size());
@@ -604,6 +633,33 @@ void SetImagePixelsIndirect(// Output
     queue.IssueSaturatingKernel<KCSetImagePixelsIndirect>
     (
         "KCSetImagePixelsIndirect",
+        KernelIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
+        img,
+        dIndices,
+        dValues,
+        dFilterWeights,
+        dImgCoords,
+        scalarWeightMultiplier
+    );
+}
+
+void SetImagePixelsIndirectAtomic(// Output
+                                  const ImageSpan<3>& img,
+                                  // Input
+                                  const Span<const RayIndex>& dIndices,
+                                  const Span<const Spectrum>& dValues,
+                                  const Span<const Float>& dFilterWeights,
+                                  const Span<const ImageCoordinate>& dImgCoords,
+                                  // Constants
+                                  Float scalarWeightMultiplier,
+                                  const GPUQueue& queue)
+{
+    assert(dValues.size() == dFilterWeights.size());
+    assert(dFilterWeights.size() == dImgCoords.size());
+    using namespace std::string_view_literals;
+    queue.IssueSaturatingKernel<KCSetImagePixelsIndirectAtomic>
+    (
+        "KCSetImagePixelsIndirectAtomic",
         KernelIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
         img,
         dIndices,

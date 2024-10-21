@@ -58,28 +58,19 @@ void KCAccumulateInputs(uint3 globalId: SV_DispatchThreadID,
     //
     float3 colorOut = params.outPixels.Load(pixOut).rgb;
     float sampleOut = params.outSamples.Load(pixOut);
-
+    float totalSample = sampleOut + sampleIn;
     // Accumulation
     // If sample out is exactly zero, this means we probably
     // cleared the image. However; colorOut is not cleared,
     // and may containg NaN's which will corrupt the mathematical
     // clearing ([0 * colorOut + colorIn * sIn] = colorIn * sIn, will
     // not be satisfied due to NaN)
-    float totalSample;
-    float3 newColor;
-    if(sampleOut == 0.0f)
-    {
-        newColor = colorIn;
-        totalSample = sampleIn;
-    }
-    // Normal weighted average
+    float3 newColor = colorOut * sampleOut + colorIn;
+    if (totalSample == 0)
+        newColor = float3(0);
     else
-    {
-        totalSample = sampleOut + sampleIn;
-        newColor = (sampleOut * colorOut +
-                    sampleIn * colorIn);
-        newColor = newColor / totalSample;
-    }
+        newColor /= float3(totalSample);
+
     // Write
     params.outPixels[pixOut] = float4(newColor, 1.0f);
     params.outSamples[pixOut] = totalSample;

@@ -13,7 +13,8 @@ class RenderImage;
 template <int32_t C>
 class ImageSpan
 {
-    private:
+    //private:
+    public:
     Span<Vector<C, Float>> dPixels;
     Span<Float> dWeights;
     Vector2i    extent;
