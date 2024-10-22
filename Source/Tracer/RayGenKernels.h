@@ -68,7 +68,7 @@ void KCGenerateCamRays(// Output (Only dOutIndices pointed data should be writte
     uint32_t rayCount = static_cast<uint32_t>(dRayIndices.size());
     for(uint32_t globalId = kp.GlobalId(); globalId < rayCount; globalId += kp.TotalSize())
     {
-        RNGDispenser rng(dRandomNums, kp.GlobalId(), globalId);
+        RNGDispenser rng(dRandomNums, globalId, rayCount);
         //
         uint64_t regionIndex = globalRegionIndex + globalId;
         uint64_t totalRegions = regionCount.Multiply();
@@ -127,7 +127,7 @@ void KCGenerateCamRaysStochastic(// Output (Only dOutIndices pointed data should
     uint32_t rayCount = static_cast<uint32_t>(dRayIndices.size());
     for(uint32_t globalId = kp.GlobalId(); globalId < rayCount; globalId += kp.TotalSize())
     {
-        RNGDispenser rng(dRandomNums, kp.GlobalId(), rayCount);
+        RNGDispenser rng(dRandomNums, globalId, rayCount);
         //
         uint64_t regionIndex = globalRegionIndex + globalId;
         uint64_t totalRegions = regionCount.Multiply();

@@ -274,14 +274,6 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
         // so we put flt_max here.
         Vector2 tMMOut = Vector2(0, std::numeric_limits<Float>::max());
         RayToGMem(params.rayState.dOutRays, rayIndex, rayOut, tMMOut);
-
-        //if(rayIndex == 0)
-        //    printf("Normal (%f, %f, %f) NewRay d(%f, %f, %f) p(%f, %f, %f)!\n",
-        //           nudgeNormal[0], nudgeNormal[1], nudgeNormal[2],
-        //           rayOut.Dir()[0], rayOut.Dir()[1], rayOut.Dir()[2],
-        //           raySample.value.wI.Dir()[0], raySample.value.wI.Dir()[1], raySample.value.wI.Dir()[2]
-        //           );
-
     }
     else dataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
     // Write the updated state back
@@ -368,15 +360,6 @@ void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const S
     Spectrum reflectance = mat.Evaluate(wI, wO, surf);
     Spectrum throughput = params.rayState.dThroughput[rayIndex];
     throughput *= reflectance;
-
-    //if(reflectance.HasNaN() || lightSample.value.emission.HasNaN())
-    //    printf("r(%f, %f, %f), (%f, %f, %f)\n",
-    //           reflectance[0],
-    //           reflectance[1],
-    //           reflectance[2],
-    //           lightSample.value.emission[0],
-    //           lightSample.value.emission[1],
-    //           lightSample.value.emission[2]);
 
     // Either do MIS or normal sampling
     Float pdf;

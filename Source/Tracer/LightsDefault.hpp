@@ -314,7 +314,7 @@ SampleT<Ray> LightSkysphere<CC, TC, SC>::SampleRay(RNGDispenser& rng) const
     Float pdf = CC::ToSolidAnglePdf(sampledUV.pdf, sampledUV.value);
 
     // Transform Direction to World Space
-    Vector3 worldDir = prim.get().GetTransformContext().InvApplyV(dirYUp);
+    Vector3 worldDir = prim.get().GetTransformContext().ApplyV(dirYUp);
 
     // Now add the extent of the scene
     Vector3 sampledPoint = worldDir * sceneDiameter;
@@ -329,7 +329,7 @@ template<CoordConverterC CC, TransformContextC TC, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float LightSkysphere<CC, TC, SC>::PdfRay(const Ray& ray) const
 {
-    Vector3 dirYUp = prim.get().GetTransformContext().ApplyV(-ray.Dir());
+    Vector3 dirYUp = prim.get().GetTransformContext().InvApplyV(-ray.Dir());
     Vector2 uv = CC::DirToUV(dirYUp);
     Float pdf = PdfUV(uv);
     pdf = CC::ToSolidAnglePdf(pdf, uv);
@@ -354,7 +354,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum LightSkysphere<CC, TC, SC>::EmitViaSurfacePoint(const Vector3& wO,
                                                          const Vector3&) const
 {
-    Vector3 dirYUp = prim.get().GetTransformContext().ApplyV(-wO).Normalize();
+    Vector3 dirYUp = prim.get().GetTransformContext().InvApplyV(-wO).Normalize();
     Vector2 uv = radiance.IsConstant()
                     ? Vector2::Zero()
                     : CC::DirToUV(dirYUp);

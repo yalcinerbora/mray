@@ -80,7 +80,6 @@ struct RenderCameraWorkParams
     TransSoA    transSoA;
 };
 
-
 // Some aliases for clarity
 template<class Renderer, uint32_t I, PrimitiveGroupC PG,
          MaterialGroupC MG, TransformGroupC TG>
