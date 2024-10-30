@@ -24,6 +24,72 @@ static constexpr std::array LegolasAnimSheet =
     LegolasLookupElem{"< _ >\r", AnimDurationShort}
 };
 
+//
+void AccumulateScanline(Span<Vector3d> hPixelsOut,
+                        Span<double> hSamplesOut,
+                        Span<const Vector3> hPixels,
+                        Span<const Float> hSamples)
+{
+    assert(hPixelsOut.size() == hSamplesOut.size());
+    assert(hSamplesOut.size() == hPixels.size());
+    assert(hPixels.size() == hSamples.size());
+
+    for(size_t i = 0; i < hPixelsOut.size(); i++)
+    {
+        Vector3d pixOut = hPixelsOut[i];
+        double sampleOut = hSamplesOut[i];
+        double totalSample = sampleOut + double(hSamples[i]);
+
+        Vector3d newColor = pixOut * sampleOut + Vector3d(hPixels[i]);
+        newColor /= Vector3d(totalSample);
+
+        hPixelsOut[i] = newColor;
+        hSamplesOut[i] = totalSample;
+    }
+}
+
+
+void Accumulate(Span<Vector3d> dPixelsOut, Span<double> dSamplesOut,
+                Span<const Vector3> dPixels, Span<const Float> dSamples,
+                Vector2ui canvasSize,
+                Vector2ui offset,
+                Vector2ui count)
+{
+    static constexpr size_t PAGE_ALIGN = 4096;
+    Vector3d* __restrict dPixelsOutPtr = std::assume_aligned<PAGE_ALIGN>(dPixelsOut.data());
+    double* __restrict dSamplesOutPtr = std::assume_aligned<PAGE_ALIGN>(dSamplesOut.data());
+    const Vector3* __restrict dPixelsPtr = std::assume_aligned<PAGE_ALIGN>(dPixels.data());
+    const Float* __restrict dSamplesPtr = std::assume_aligned<PAGE_ALIGN>(dSamples.data());
+
+    for(size_t j = 0; j < count[1]; j++)
+    for(size_t i = 0; i < count[0]; i++)
+    {
+        size_t inI = j * count[0] + i;
+
+        Vector2ui pixel = Vector2ui(i, j);
+        pixel += offset;
+        size_t outI = pixel[1] * canvasSize[0] + pixel[0];
+
+        double sampleOut = dSamplesOutPtr[outI];
+        double totalSample3D = dSamplesOutPtr[outI] + double(dSamplesPtr[inI]);
+
+        Vector3d newColor = dPixelsOutPtr[outI] * sampleOut + Vector3d(dPixelsPtr[inI]);
+        newColor /= totalSample3D;
+        dPixelsOutPtr[outI] = newColor;
+    }
+}
+
+
+
+//template<class T>
+//class alignas(SimdRegiserAlignment<T>()) SimdRegister
+//{
+//    std::array<T, N> data;
+//
+//    friend operator*(SimdRegister, SimdRegister);
+//};
+
+
 namespace MRayCLI::RunNames
 {
     using namespace std::literals;

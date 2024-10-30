@@ -18,7 +18,7 @@ uint32_t FindTexViewChannelCount(const GenericTextureView& genericTexView)
 }
 
 MRAY_KERNEL
-void KCColorTiles(MRAY_GRID_CONSTANT const ImageSpan<3> imgSpan,
+void KCColorTiles(MRAY_GRID_CONSTANT const ImageSpan imgSpan,
                   MRAY_GRID_CONSTANT const uint32_t colorIndex)
 {
     KernelCallParams kp;
@@ -35,7 +35,7 @@ void KCColorTiles(MRAY_GRID_CONSTANT const ImageSpan<3> imgSpan,
 
 template<uint32_t C>
 MRAY_KERNEL
-void KCShowTexture(MRAY_GRID_CONSTANT const ImageSpan<3> imgSpan,
+void KCShowTexture(MRAY_GRID_CONSTANT const ImageSpan imgSpan,
                    MRAY_GRID_CONSTANT const Vector2ui tileStart,
                    MRAY_GRID_CONSTANT const Vector2ui texResolution,
                    MRAY_GRID_CONSTANT const uint32_t mipIndex,
@@ -167,8 +167,7 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
             .data = nullptr,
             .totalSize = 0,
             .renderColorSpace = tracerView.tracerParams.globalTextureColorSpace,
-            .resolution = Vector2ui::Zero(),
-            .depth = 0
+            .resolution = Vector2ui::Zero()
         };
     }
 
@@ -195,7 +194,7 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
     };
     imageTiler = ImageTiler(renderBuffer.get(), rIParams,
                             tracerView.tracerParams.parallelizationHint,
-                            Vector2ui::Zero(), 3u, 1u);
+                            Vector2ui::Zero());
 
     curColorSpace = tracerView.tracerParams.globalTextureColorSpace;
     auto bufferPtrAndSize = renderBuffer->SharedDataPtrAndSize();
@@ -205,7 +204,6 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
         .totalSize = bufferPtrAndSize.second,
         .renderColorSpace = curColorSpace,
         .resolution = imageTiler.FullResolution(),
-        .depth = renderBuffer->Depth(),
         .curRenderLogic0 = textureIndex,
         .curRenderLogic1 = mipIndex
     };
@@ -239,7 +237,7 @@ RendererOutput TexViewRenderer::DoRender()
                 "KCColorTiles"sv,
                 KernelIssueParams{.workCount = curPixelCount},
                 //
-                imageTiler.GetTileSpan<3>(),
+                imageTiler.GetTileSpan(),
                 imageTiler.CurrentTileIndex().Multiply()
             );
             break;
@@ -257,7 +255,7 @@ RendererOutput TexViewRenderer::DoRender()
                     "KCShowTexture"sv,
                     KernelIssueParams{.workCount = curPixelCount},
                     //
-                    imageTiler.GetTileSpan<3>(),
+                    imageTiler.GetTileSpan(),
                     imageTiler.LocalTileStart(),
                     imageTiler.FullResolution(),
                     mipIndex,

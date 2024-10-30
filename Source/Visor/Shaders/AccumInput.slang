@@ -19,7 +19,9 @@ struct AccumulateParameters
     RWTexture2D<float4>         outPixels;
     RWTexture2D<float>          outSamples;
     // Input from host-backed memory
-    StructuredBuffer<float>     inPixels;
+    StructuredBuffer<float>     inPixelsR;
+    StructuredBuffer<float>     inPixelsG;
+    StructuredBuffer<float>     inPixelsB;
     StructuredBuffer<float>     inSamples;
 }
 
@@ -43,16 +45,14 @@ void KCAccumulateInputs(uint3 globalId: SV_DispatchThreadID,
     params.outPixels.GetDimensions(resolution[0], resolution[1]);
     pixOut.y = resolution.y - 1 - pixOut.y;
 
-
-
     // Cull threads that is out of range due to block size
     if(any(pixIn >= pixCount)) return;
 
     // Reads
     int pixLinear = pixIn[1] * pixCount.x + pixIn[0];
-    float3 colorIn = float3(params.inPixels[pixLinear * 3 + 0],
-                            params.inPixels[pixLinear * 3 + 1],
-                            params.inPixels[pixLinear * 3 + 2]);
+    float3 colorIn = float3(params.inPixelsR[pixLinear],
+                            params.inPixelsG[pixLinear],
+                            params.inPixelsB[pixLinear]);
     float sampleIn = (params.inSamples[pixLinear] *
                       params.U.globalSampleWeight);
     //

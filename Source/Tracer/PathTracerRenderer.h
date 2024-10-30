@@ -106,7 +106,10 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightAr
     // Work Hash related
     Span<CommonKey>     dWorkHashes;
     Span<CommonKey>     dWorkBatchIds;
-
+    //
+    bool                renderUntilSPPLimit;
+    //
+    uint64_t            SPPLimit() const;
     uint32_t            FindMaxSamplePerIteration(uint32_t rayCount, PathTraceRDetail::SampleMode);
     Span<RayIndex>      ReloadPaths(Span<const RayIndex> dIndices,
                                     const GPUQueue& processQueue);

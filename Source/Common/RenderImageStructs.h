@@ -2,6 +2,7 @@
 
 #include "AnalyticStructs.h"
 #include "TransientPool/TransientPool.h"
+#include "Core/MemAlloc.h"
 
 struct RenderBufferInfo
 {
@@ -13,9 +14,6 @@ struct RenderBufferInfo
     MRayColorSpaceEnum  renderColorSpace;
     // Total size of the film
     Vector2ui           resolution;
-    // Render output may be spectral data then this represents
-    // amount of spectral samples (equally distributed)
-    uint32_t            depth;
     // Given render logic's may be morphed
     // according to the internals of the renderer
     // these indices should be set by the visior
@@ -25,18 +23,24 @@ struct RenderBufferInfo
 
 struct RenderImageSection
 {
+    static constexpr size_t CHANNEL_START_ALIGNMENT = MemAlloc::DefaultSystemAlignment();
+
     // Logical layout of the data
     // Incoming data is between these pixel ranges
+    // [min, max)
     Vector2ui   pixelMin;
     Vector2ui   pixelMax;
-    // In addition to the per pixel accumulation
-    float       globalWeight;
     //
+    // In addition to the per pixel accumulation
+    Float       globalWeight;
+    // Semaphore wait number for Visor/Runner
     uint64_t    waitCounter;
-    // Pixel data starts over this offset (this should be almost always zero)
+    //
     size_t      pixelStartOffset;
-    // Pixel weights starts from this offset
     size_t      weightStartOffset;
+
+    std::array<size_t, 3>
+    PixelOffsetsRGB() const;
 };
 
 struct RenderImageSaveInfo
@@ -57,4 +61,19 @@ struct RendererOutput
 {
     Optional<RendererAnalyticData>  analytics;
     Optional<RenderImageSection>    imageOut;
+    bool                            triggerSave = false;
 };
+
+inline std::array<size_t, 3>
+RenderImageSection::PixelOffsetsRGB() const
+{
+    size_t pixCount = (pixelMax - pixelMin).Multiply();
+    size_t channelByteCount = Math::NextMultiple(pixCount * sizeof(Float),
+                                                 CHANNEL_START_ALIGNMENT);
+    size_t rOffset = pixelStartOffset + 0 * channelByteCount;
+    size_t gOffset = pixelStartOffset + 1 * channelByteCount;
+    size_t bOffset = pixelStartOffset + 2 * channelByteCount;
+
+    assert(weightStartOffset == pixelStartOffset + 3 * channelByteCount);
+    return {rOffset, gOffset, bOffset};
+}

@@ -21,7 +21,7 @@ struct alignas(Vector4ui) MipGenParams
 
 // TODO: Move these functions to somewhere proper
 void SetImagePixels(// Output
-                    const ImageSpan<3>& img,
+                    const ImageSpan& img,
                     // Input
                     const Span<const Spectrum>& dValues,
                     const Span<const Float>& dFilterWeights,
@@ -31,7 +31,7 @@ void SetImagePixels(// Output
                     const GPUQueue& queue);
 
 void SetImagePixelsIndirect(// Output
-                            const ImageSpan<3>& img,
+                            const ImageSpan& img,
                             // Input
                             const Span<const RayIndex>& dIndices,
                             const Span<const Spectrum>& dValues,
@@ -42,7 +42,7 @@ void SetImagePixelsIndirect(// Output
                             const GPUQueue& queue);
 
 void SetImagePixelsIndirectAtomic(// Output
-                                  const ImageSpan<3>& img,
+                                  const ImageSpan& img,
                                   // Input
                                   const Span<const RayIndex>& dIndices,
                                   const Span<const Spectrum>& dValues,
@@ -67,7 +67,7 @@ class TextureFilterI
                                          const Vector2ui& bufferImageDims,
                                          const GPUQueue& queue) const = 0;
     virtual void    ReconstructionFilterRGB(// Output
-                                            const ImageSpan<3>& img,
+                                            const ImageSpan& img,
                                             // I-O
                                             RayPartitioner& partitioner,
                                             // Input
@@ -79,7 +79,7 @@ class TextureFilterI
                                             const GPUQueue& queue) const = 0;
 
     virtual void    ReconstructionFilterAtomicRGB(// Output
-                                                  const ImageSpan<3>& img,
+                                                  const ImageSpan& img,
                                                   // Input
                                                   const Span<const Spectrum>& dValues,
                                                   const Span<const ImageCoordinate>& dImgCoords,
@@ -117,7 +117,7 @@ class TextureFilterT : public TextureFilterI
                                  const GPUQueue& queue) const override;
 
     void    ReconstructionFilterRGB(// Output
-                                    const ImageSpan<3>& img,
+                                    const ImageSpan& img,
                                     // I-O
                                     RayPartitioner& partitioner,
                                     // Input
@@ -129,7 +129,7 @@ class TextureFilterT : public TextureFilterI
                                     const GPUQueue& queue) const override;
 
     void    ReconstructionFilterAtomicRGB(// Output
-                                          const ImageSpan<3>& img,
+                                          const ImageSpan& img,
                                           // Input
                                           const Span<const Spectrum>& dValues,
                                           const Span<const ImageCoordinate>& dImgCoords,

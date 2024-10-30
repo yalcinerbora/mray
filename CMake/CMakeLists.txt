@@ -32,6 +32,15 @@ set(MRAY_DEVICE_BACKEND "MRAY_GPU_BACKEND_CUDA"
 set_property(CACHE MRAY_DEVICE_BACKEND
              PROPERTY STRINGS MRAY_GPU_BACKEND_CUDA)
 
+set(MRAY_HOST_ARCH "MRAY_HOST_ARCH_BASIC"
+    CACHE STRING "Host architecture chosen by the user at CMake configure time")
+set_property(CACHE MRAY_HOST_ARCH
+             PROPERTY STRINGS
+             MRAY_HOST_ARCH_BASIC
+             MRAY_HOST_ARCH_AVX2
+             MRAY_HOST_ARCH_AVX512)
+
+
 option(MRAY_ENABLE_HW_ACCELERATION "Try to find, compile and and use HW accelration (i.e. this means OptiX for CUDA)" OFF)
 option(MRAY_BUILD_TESTS "Build Tests" ON)
 option(MRAY_EXPORT_COMPILE_COMMANDS "Export compile commands for IWYU" ON)

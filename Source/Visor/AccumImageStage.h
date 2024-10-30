@@ -30,11 +30,13 @@ class AccumImageStage : public UniformMemoryRequesterI
         float       globalSampleWeight;
     };
 
-    static constexpr uint32_t UNIFORM_BIND_INDEX        = 0;
-    static constexpr uint32_t HDR_IMAGE_BIND_INDEX      = 1;
-    static constexpr uint32_t SAMPLE_IMAGE_BIND_INDEX   = 2;
-    static constexpr uint32_t IN_PIXEL_BUFF_BIND_INDEX  = 3;
-    static constexpr uint32_t IN_SAMPLE_BUFF_BIND_INDEX = 4;
+    static constexpr uint32_t UNIFORM_BIND_INDEX         = 0;
+    static constexpr uint32_t HDR_IMAGE_BIND_INDEX       = 1;
+    static constexpr uint32_t SAMPLE_IMAGE_BIND_INDEX    = 2;
+    static constexpr uint32_t IN_PIXEL_BUFF_R_BIND_INDEX = 3;
+    static constexpr uint32_t IN_PIXEL_BUFF_G_BIND_INDEX = 4;
+    static constexpr uint32_t IN_PIXEL_BUFF_B_BIND_INDEX = 5;
+    static constexpr uint32_t IN_SAMPLE_BUFF_BIND_INDEX  = 6;
 
     using DescriptorSets = typename VulkanComputePipeline::DescriptorSets;
 

@@ -37,5 +37,24 @@ namespace MRay
     // but not %100 sure)
     using CommonKey = uint32_t;
     using CommonIndex = uint32_t;
+
+    // I am prepending these with mray just to be sure
+    // Widnows probably will have a AVX512 macros somewhere in the windows.h header
+    // (didn't check but just to be sure)
+    enum class HostArch
+    {
+        MRAY_DEFAULT,
+        MRAY_AVX2,
+        MRAY_AVX512
+    };
+
+    #if defined MRAY_HOST_ARCH_AVX2
+        static constexpr HostArch MRAY_HOST_ARCH = HostArch::MRAY_AVX2;
+    #elif defined MRAY_HOST_ARCH_AVX512
+        static constexpr HostArch MRAY_HOST_ARCH = HostArch::MRAY_AVX512;
+    #else
+        static constexpr HostArch MRAY_HOST_ARCH = HostArch::MRAY_DEFAULT;
+    #endif
+
 }
 

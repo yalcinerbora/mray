@@ -100,10 +100,14 @@ namespace PathTraceRDetail
     {
         // Path is dead (due to russian roulette or hitting a light source)
         DEAD                = 0,
+        // Invalid rays are slightly different, sometimes due to exactly
+        // meeting the spp requirement, renderer may not launch rays,
+        // ıt will mark these as invalid in the pool
+        INVALID             = 1,
         // TODO: These are not used yet, but here for future use.
         // Path did scatter because of the medium. It should not go
         // Material scattering
-        MEDIUM_SCATTERED    = 1,
+        MEDIUM_SCATTERED    = 2,
         // TODO: Maybe incorporate ray type?
         //
         END
@@ -208,6 +212,9 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
                                     const WorkParams<EmptyType, PG, MG, TG>& params,
                                     RayIndex rayIndex)
 {
+    PathDataPack dataPack = params.rayState.dPathDataPack[rayIndex];
+    if(dataPack.status[uint32_t(PathStatusEnum::INVALID)]) return;
+
     using Distribution::Common::RussianRoulette;
     using Distribution::Common::DivideByPDF;
     // ================ //
@@ -223,7 +230,6 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     // ================ //
     // Russian Roulette //
     // ================ //
-    PathDataPack dataPack = params.rayState.dPathDataPack[rayIndex];
     dataPack.depth += 1u;
     Vector2ui rrRange = params.globalState.russianRouletteRange;
     bool isPathDead = (dataPack.depth >= rrRange[1]);
@@ -290,6 +296,9 @@ void PathTraceRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
                                          const LightWorkParams<EmptyType, LG, TG>& params,
                                          RayIndex rayIndex)
 {
+    PathDataPack pathDataPack = params.rayState.dPathDataPack[rayIndex];
+    if(pathDataPack.status[uint32_t(PathStatusEnum::INVALID)]) return;
+
     auto [ray, tMM] = RayFromGMem(params.in.dRays, rayIndex);
     Vector3 wO = -ray.Dir();
     Spectrum emission;
@@ -310,7 +319,6 @@ void PathTraceRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
 
     // Check the depth if we exceed it, do not accumulate
     // we terminate the path regardless
-    PathDataPack pathDataPack = params.rayState.dPathDataPack[rayIndex];
     pathDataPack.depth += 1u;
     Vector2ui rrRange = params.globalState.russianRouletteRange;
     if(pathDataPack.depth <= rrRange[1])
@@ -336,6 +344,9 @@ void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const S
                                        const WorkParams<LightSampler, PG, MG, TG>& params,
                                        RayIndex rayIndex)
 {
+    PathDataPack pathDataPack = params.rayState.dPathDataPack[rayIndex];
+    if(pathDataPack.status[uint32_t(PathStatusEnum::INVALID)]) return;
+
     // TODO: We need to get the context from somewhere
     // &&
     // TODO: Add spectrum related stuff, this should not be
@@ -384,7 +395,7 @@ void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const S
         // but ray state is important for rays that hit light.
         // And next call (material-related one) will overwrite it
         // anyway.
-        params.rayState.dPathDataPack[rayIndex].type = RayType::SPECULAR_RAY;
+        pathDataPack.type = RayType::SPECULAR_RAY;
     }
     else
     {
@@ -394,8 +405,9 @@ void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const S
         // We can't overwrite the path throughput,
         // we will need it on next iteration
         params.rayState.dShadowRayRadiance[rayIndex] = shadowRadiance;
-        params.rayState.dPathDataPack[rayIndex].type = RayType::SHADOW_RAY;
+        pathDataPack.type = RayType::SHADOW_RAY;
     }
+    params.rayState.dPathDataPack[rayIndex] = pathDataPack;
 }
 
 // ======================== //
@@ -408,6 +420,7 @@ void PathTraceRDetail::LightWorkFunctionWithNEE(const Light& l, RNGDispenser&,
                                                 RayIndex rayIndex)
 {
     PathDataPack pathDataPack = params.rayState.dPathDataPack[rayIndex];
+    if(pathDataPack.status[uint32_t(PathStatusEnum::INVALID)]) return;
 
     // If mode is NEE, only camera rays are allowed
     if(params.globalState.sampleMode == SampleMode::E::NEE &&

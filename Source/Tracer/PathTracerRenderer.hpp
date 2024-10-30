@@ -45,6 +45,27 @@ static void KCCopyRays(MRAY_GRID_CONSTANT const Span<RayGMem> dRaysOut,
 }
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+static void KCWriteInvalidRays(MRAY_GRID_CONSTANT const Span<PathTraceRDetail::PathDataPack> dPathDataPack,
+                               MRAY_GRID_CONSTANT const Span<RayGMem> dRaysOut,
+                               MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices)
+{
+    using namespace PathTraceRDetail;
+    KernelCallParams kp;
+    uint32_t rayCount = static_cast<uint32_t>(dIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
+    {
+        RayIndex index = dIndices[i];
+        Ray ray = Ray(Vector3::Zero(), Vector3::Zero());
+        // TODO: Check if inverted min max guarantees fast termination
+        // on ray casting.
+        Vector2 tMM = Vector2(1, -1);
+
+        dPathDataPack[index].status.Set(uint32_t(PathStatusEnum::INVALID));
+        RayToGMem(dRaysOut, dIndices[i], ray, tMM);
+    }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static void KCAccumulateShadowRays(MRAY_GRID_CONSTANT const Span<Spectrum> dRadianceOut,
                                    MRAY_GRID_CONSTANT const Span<const Spectrum> dShadowRayRadiance,
                                    MRAY_GRID_CONSTANT const Bitspan<const uint32_t> dIsVisibleBuffer,
@@ -67,13 +88,25 @@ static void KCAccumulateShadowRays(MRAY_GRID_CONSTANT const Span<Spectrum> dRadi
     }
 }
 
-struct SetPathToDeadFunctor
+struct SetPathStateFunctor
 {
+    PathTraceRDetail::PathStatusEnum e;
+
+    MRAY_HOST inline
+    SetPathStateFunctor(PathTraceRDetail::PathStatusEnum eIn)
+        : e(eIn)
+    {}
+
     MRAY_HYBRID MRAY_CGPU_INLINE
     PathTraceRDetail::PathDataPack operator()(PathTraceRDetail::PathDataPack s) const
     {
         using namespace PathTraceRDetail;
-        s.status.Set(uint32_t(PathStatusEnum::DEAD));
+        if(e == PathStatusEnum::INVALID)
+            s.status.Set(uint32_t(PathStatusEnum::DEAD), false);
+        else if(e == PathStatusEnum::DEAD)
+            s.status.Set(uint32_t(PathStatusEnum::INVALID), false);
+        //
+        s.status.Set(uint32_t(e));
         return s;
     }
 };
@@ -81,10 +114,13 @@ struct SetPathToDeadFunctor
 class IsDeadFunctor
 {
     Span<const PathTraceRDetail::PathDataPack> dPathDataPack;
+    bool checkInvalidAsDead;
 
     public:
-    IsDeadFunctor(Span<const PathTraceRDetail::PathDataPack> dPathDataPackIn)
+    IsDeadFunctor(Span<const PathTraceRDetail::PathDataPack> dPathDataPackIn,
+                  bool checkInvalidAsDeadIn = false)
         : dPathDataPack(dPathDataPackIn)
+        , checkInvalidAsDead(checkInvalidAsDeadIn)
     {}
 
     MRAY_HYBRID MRAY_CGPU_INLINE
@@ -92,7 +128,10 @@ class IsDeadFunctor
     {
         using namespace PathTraceRDetail;
         const PathStatus state = dPathDataPack[index].status;
-        return state[uint32_t(PathStatusEnum::DEAD)];
+        bool result = state[uint32_t(PathStatusEnum::DEAD)];
+        if(checkInvalidAsDead)
+            result = result || state[uint32_t(PathStatusEnum::INVALID)];
+        return result;
     }
 };
 
@@ -103,9 +142,10 @@ PathTracerRenderer<MLA>::PathTracerRenderer(const RenderImagePtr& rb,
                                             const GPUSystem& s,
                                             const RenderWorkPack& wp)
     : RendererT<PathTracerRenderer<MLA>>(rb, wp, tv, s, tp)
+    , metaLightArray(s)
     , rayPartitioner(s)
     , redererGlobalMem(s.AllGPUs(), 128_MiB, 512_MiB)
-    , metaLightArray(s)
+    , renderUntilSPPLimit(true)
 {}
 
 template<class MLA>
@@ -200,6 +240,14 @@ uint32_t PathTracerRenderer<MLA>::FindMaxSamplePerIteration(uint32_t rayCount,
 }
 
 template<class MLA>
+uint64_t PathTracerRenderer<MLA>::SPPLimit() const
+{
+    uint64_t result = uint64_t(currentOptions.totalSPP);
+    result *= this->imageTiler.FullResolution().Multiply();
+    return result;
+}
+
+template<class MLA>
 Span<RayIndex> PathTracerRenderer<MLA>::ReloadPaths(Span<const RayIndex> dIndices,
                                                     const GPUQueue& processQueue)
 {
@@ -208,7 +256,7 @@ Span<RayIndex> PathTracerRenderer<MLA>::ReloadPaths(Span<const RayIndex> dIndice
     auto [hDeadRayRanges, dDeadAliveRayIndices] = rayPartitioner.BinaryPartition
     (
         dIndices, processQueue,
-        IsDeadFunctor(dRayState.dPathDataPack)
+        IsDeadFunctor(dRayState.dPathDataPack, true)
     );
     processQueue.Barrier().Wait();
 
@@ -219,37 +267,68 @@ Span<RayIndex> PathTracerRenderer<MLA>::ReloadPaths(Span<const RayIndex> dIndice
                                                         deadRayCount);
     if(!dDeadRayIndices.empty())
     {
-        uint32_t camRayGenRNCount = uint32_t(dDeadRayIndices.size()) * camSamplePerRay;
-        auto dCamRayGenRNBuffer = dRandomNumBuffer.subspan(0, camRayGenRNCount);
-        rnGenerator->GenerateNumbersIndirect(dCamRayGenRNBuffer,
-                                             ToConstSpan(dDeadRayIndices),
-                                             Vector2ui(0, camSamplePerRay),
-                                             processQueue);
-        //
-        const auto& cameraWork = (*curCamWork->get());
-        cameraWork.GenRaysStochasticFilter
-        (
-            dRayDifferentials, dRays,
-            dRayState.dImageCoordinates,
-            dRayState.dFilmFilterWeights,
-            ToConstSpan(dDeadRayIndices),
-            ToConstSpan(dCamRayGenRNBuffer),
-            dSubCameraBuffer, curCamTransformKey,
-            globalPixelIndex,
-            this->imageTiler.CurrentTileSize(),
-            this->tracerView.tracerParams.filmFilter,
-            processQueue
-        );
-        globalPixelIndex += dDeadRayIndices.size();
+        uint32_t fillRayCount = 0;
+        if(renderUntilSPPLimit)
+        {
+            uint64_t sppLimit = SPPLimit();
+            uint64_t pixelIndexLimit = std::min(globalPixelIndex + deadRayCount, sppLimit);
+            fillRayCount = static_cast<uint32_t>(pixelIndexLimit - globalPixelIndex);
+        }
+        else fillRayCount = deadRayCount;
 
-        // Initialize the state of new rays
-        processQueue.IssueSaturatingKernel<KCInitPathState>
-        (
-            "KCInitPathState",
-            KernelIssueParams{.workCount = deadRayCount},
-            dRayState,
-            dDeadRayIndices
-        );
+        if(fillRayCount != 0)
+        {
+
+            auto dFilledRayIndices = dDeadRayIndices.subspan(0, fillRayCount);
+            uint32_t camRayGenRNCount = fillRayCount * camSamplePerRay;
+            auto dCamRayGenRNBuffer = dRandomNumBuffer.subspan(0, camRayGenRNCount);
+            rnGenerator->GenerateNumbersIndirect(dCamRayGenRNBuffer,
+                                                 ToConstSpan(dFilledRayIndices),
+                                                 Vector2ui(0, camSamplePerRay),
+                                                 processQueue);
+            //
+            const auto& cameraWork = (*curCamWork->get());
+            cameraWork.GenRaysStochasticFilter
+            (
+                dRayDifferentials, dRays,
+                dRayState.dImageCoordinates,
+                dRayState.dFilmFilterWeights,
+                ToConstSpan(dFilledRayIndices),
+                ToConstSpan(dCamRayGenRNBuffer),
+                dSubCameraBuffer, curCamTransformKey,
+                globalPixelIndex,
+                this->imageTiler.CurrentTileSize(),
+                this->tracerView.tracerParams.filmFilter,
+                processQueue
+            );
+            globalPixelIndex += fillRayCount;
+
+            // Initialize the state of new rays
+            processQueue.IssueSaturatingKernel<KCInitPathState>
+            (
+                "KCInitPathState",
+                KernelIssueParams{.workCount = fillRayCount},
+                dRayState,
+                dDeadRayIndices
+            );
+        }
+        //
+        if(fillRayCount != deadRayCount)
+        {
+            uint32_t unusedRays = deadRayCount - fillRayCount;
+            auto dUnusedIndices = dDeadRayIndices.subspan(fillRayCount, unusedRays);
+
+            // Fill the remaining values
+            processQueue.IssueSaturatingKernel<KCWriteInvalidRays>
+            (
+                "KCWriteInvalidRays",
+                KernelIssueParams{.workCount = unusedRays},
+                //
+                dRayState.dPathDataPack,
+                dRays,
+                dUnusedIndices
+            );
+        }
     }
     // Index buffer may be invalidated (Binary partition should not
     // invalidate but lets return the new buffer)
@@ -262,7 +341,7 @@ void PathTracerRenderer<MLA>::ResetAllPaths(const GPUQueue& queue)
     // Set all paths as dead (we just started)
     using namespace PathTraceRDetail;
     DeviceAlgorithms::InPlaceTransform(dRayState.dPathDataPack, queue,
-                                       SetPathToDeadFunctor());
+                                       SetPathStateFunctor(PathStatusEnum::INVALID));
     queue.MemsetAsync(dPathRNGDimensions, 0x00);
 }
 
@@ -304,7 +383,7 @@ RenderBufferInfo PathTracerRenderer<MLA>::StartRender(const RenderImageParams& r
 
     this->imageTiler = ImageTiler(this->renderBuffer.get(), rIP,
                                   this->tracerView.tracerParams.parallelizationHint,
-                                  Vector2ui::Zero(), 3, 1);
+                                  Vector2ui::Zero());
 
     // Generate Works to get the total work count
     // We will batch allocate
@@ -446,7 +525,6 @@ RenderBufferInfo PathTracerRenderer<MLA>::StartRender(const RenderImageParams& r
         .totalSize = bufferPtrAndSize.second,
         .renderColorSpace = this->curColorSpace,
         .resolution = this->imageTiler.FullResolution(),
-        .depth = this->renderBuffer->Depth(),
         .curRenderLogic0 = sendMode,
         .curRenderLogic1 = std::numeric_limits<uint32_t>::max()
     };
@@ -705,34 +783,64 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
         dIndices, processQueue,
         IsDeadFunctor(ToConstSpan(dRayState.dPathDataPack))
     );
+
     processQueue.Barrier().Wait();
 
-    // Find the alive ranges first, copy the generated next ray stuff
-    uint32_t aliveRayCount = hDeadAliveRanges[2] - hDeadAliveRanges[1];
-    Span<RayIndex> dAliveRayIndices = dDeadAliveIndices.subspan(hDeadAliveRanges[1], aliveRayCount);
-    if(aliveRayCount != 0)
-    {
-        processQueue.IssueSaturatingKernel<KCCopyRays>
-        (
-            "KCCopyRays",
-            KernelIssueParams{.workCount = aliveRayCount},
-            dRays, dRayDifferentials,
-            dAliveRayIndices,
-            dRayState.dOutRays,
-            dRayState.dOutRayDiffs
-        );
-    }
-
-    // Now set the process queue
+    // Non-dead Range
+    bool triggerSave = false;
+    uint32_t nonDeadRayCount = hDeadAliveRanges[2] - hDeadAliveRanges[1];
+    Span<RayIndex> dNonDeadRayIndices = dDeadAliveIndices.subspan(hDeadAliveRanges[1],
+                                                                  nonDeadRayCount);
+    // DeadRange
     uint32_t deadRayCount = hDeadAliveRanges[1] - hDeadAliveRanges[0];
     Span<RayIndex> dDeadRayIndices = dDeadAliveIndices.subspan(hDeadAliveRanges[0],
                                                                deadRayCount);
+    if(nonDeadRayCount != 0)
+    {
+        // Re partition the inner portion
+        auto [hInvalidAliveRanges, dInvalidAliveIndices] = rayPartitioner.BinaryPartition
+        (
+            dNonDeadRayIndices, processQueue,
+            IsDeadFunctor(ToConstSpan(dRayState.dPathDataPack), true)
+        );
+        processQueue.Barrier().Wait();
+
+        uint32_t aliveRayCount = hInvalidAliveRanges[2] - hInvalidAliveRanges[1];
+        Span<RayIndex> dAliveRayIndices = dNonDeadRayIndices.subspan(hInvalidAliveRanges[1],
+                                                                     aliveRayCount);
+        if(aliveRayCount != 0)
+        {
+            processQueue.IssueSaturatingKernel<KCCopyRays>
+            (
+                "KCCopyRays",
+                KernelIssueParams{.workCount = aliveRayCount},
+                dRays, dRayDifferentials,
+                dAliveRayIndices,
+                dRayState.dOutRays,
+                dRayState.dOutRayDiffs
+            );
+        }
+        else if(globalPixelIndex == SPPLimit())
+        {
+            // We exausted all alive rays while doing SPP limit.
+            // Trigger a save, and unleash the renderer.
+            triggerSave = true;
+            renderUntilSPPLimit = false;
+        }
+    }
+
     Optional<RenderImageSection> renderOut;
     if(deadRayCount != 0)
     {
+        DeviceAlgorithms::InPlaceTransformIndirect
+        (
+            dRayState.dPathDataPack, ToConstSpan(dDeadRayIndices), processQueue,
+            SetPathStateFunctor(PathTraceRDetail::PathStatusEnum::INVALID)
+        );
+
         processQueue.IssueWait(this->renderBuffer->PrevCopyCompleteFence());
         this->renderBuffer->ClearImage(processQueue);
-        ImageSpan<3> filmSpan = this->imageTiler.template GetTileSpan<3>();
+        ImageSpan filmSpan = this->imageTiler.GetTileSpan();
 
         SetImagePixelsIndirectAtomic
         (
@@ -789,7 +897,8 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
             static_cast<uint32_t>(PathTraceRDetail::SampleMode::E::END),
             0
         },
-        .imageOut = renderOut
+        .imageOut = renderOut,
+        .triggerSave = triggerSave
     };
 }
 

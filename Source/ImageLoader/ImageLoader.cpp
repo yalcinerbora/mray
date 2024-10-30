@@ -84,10 +84,6 @@ MRayError ImageLoader::WriteImage(const WriteImageParams& imgIn,
                                   ImageIOFlags flags) const
 {
     using enum ImageIOFlags::F;
-    // TODO: Implement deep writing
-    if(imgIn.depth > 1)
-        return MRayError("Deep image writing is currently not implemented");
-
     const auto& extE = ImageTypeToExtension(extension);
     if(!extE.has_value()) return extE.error();
 

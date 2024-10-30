@@ -63,6 +63,16 @@ set(MRAY_MSVC_OPTIONS
     $<$<CONFIG:Release>:/Zi> # Also add debug info on release builds (for profiling etc.)
 )
 
+# MSVC Arch related
+if(MRAY_HOST_ARCH STREQUAL "MRAY_HOST_ARCH_AVX2")
+    set(MRAY_MSVC_OPTIONS ${MRAY_MSVC_OPTIONS}
+        /arch:AVX2)
+elseif(MRAY_HOST_ARCH STREQUAL "MRAY_HOST_ARCH_AVX512")
+    set(MRAY_MSVC_OPTIONS ${MRAY_MSVC_OPTIONS}
+        /arch:AVX512)
+endif()
+
+
 set(MRAY_CLANG_OPTIONS
     -Wall
     -Wextra                 # reasonable and standard
@@ -84,7 +94,17 @@ set(MRAY_CLANG_OPTIONS
     $<$<CONFIG:SanitizeR>:-O2>
     $<$<CONFIG:SanitizeR>:-g>
     $<$<CONFIG:Release>:-g> # Also add debug info on release builds (for profiling etc.)
+
 )
+
+# Arch related
+if(MRAY_HOST_ARCH STREQUAL "MRAY_HOST_ARCH_AVX2")
+    set(MRAY_CLANG_OPTIONS ${MRAY_CLANG_OPTIONS}
+        -march=core-avx2)
+elseif(MRAY_HOST_ARCH STREQUAL "MRAY_HOST_ARCH_AVX512")
+    set(MRAY_CLANG_OPTIONS ${MRAY_CLANG_OPTIONS}
+        -march=skylake-avx512)
+endif()
 
 set(MRAY_GCC_OPTIONS
     ${MRAY_CLANG_OPTIONS}

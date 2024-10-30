@@ -111,7 +111,6 @@ struct Image
 struct WriteImageParams
 {
     ImageHeader         header;
-    uint32_t            depth;
     MRayPixelTypeRT     inputType;
     Span<const Byte>    pixels;
 };

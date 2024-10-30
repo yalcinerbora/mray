@@ -1353,9 +1353,7 @@ bool VisorWindow::Render()
         {
             newRB.resolution,
             newRB.renderColorSpace,
-            swapchain.ColorSpace(),
-            newRB.depth,
-            (newRB.depth > 1)
+            swapchain.ColorSpace()
         };
         renderImagePool = RenderImagePool(threadPool, handlesVk,
                                           renderImageInitParams);

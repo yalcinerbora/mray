@@ -263,7 +263,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
 
     imageTiler = ImageTiler(renderBuffer.get(), rIP,
                             tracerView.tracerParams.parallelizationHint,
-                            Vector2ui::Zero(), 3, 1);
+                            Vector2ui::Zero());
 
     // Generate Works to get the total work count
     // We will batch allocate
@@ -385,7 +385,6 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
         .totalSize = bufferPtrAndSize.second,
         .renderColorSpace = curColorSpace,
         .resolution = imageTiler.FullResolution(),
-        .depth = renderBuffer->Depth(),
         .curRenderLogic0 = sendMode,
         .curRenderLogic1 = std::numeric_limits<uint32_t>::max()
     };
@@ -665,7 +664,7 @@ RendererOutput SurfaceRenderer::DoRender()
     // Wait for previous copy to finish
     processQueue.IssueWait(renderBuffer->PrevCopyCompleteFence());
     renderBuffer->ClearImage(processQueue);
-    ImageSpan<3> filmSpan = imageTiler.GetTileSpan<3>();
+    ImageSpan filmSpan = imageTiler.GetTileSpan();
     if(currentOptions.doStochasticFilter)
     {
         SetImagePixels

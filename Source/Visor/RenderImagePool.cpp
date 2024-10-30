@@ -301,13 +301,9 @@ RenderImagePool::RenderImagePool(BS::thread_pool* tp,
                              VK_IMAGE_USAGE_TRANSFER_DST_BIT);
     auto hdrImgUsageFlags = sdrImgUsageFlags;
 
-    hdrImage = (initInfo.isSpectralPack)
-        ? VulkanImage(*handlesVk, VulkanSamplerMode::NEAREST,
-                      VK_FORMAT_R32_SFLOAT, hdrImgUsageFlags,
-                      initInfo.extent, initInfo.depth)
-        : VulkanImage(*handlesVk, VulkanSamplerMode::NEAREST,
-                      VK_FORMAT_R32G32B32A32_SFLOAT,
-                      hdrImgUsageFlags, initInfo.extent);
+    hdrImage = VulkanImage(*handlesVk, VulkanSamplerMode::NEAREST,
+                           VK_FORMAT_R32G32B32A32_SFLOAT,
+                           hdrImgUsageFlags, initInfo.extent);
     hdrSampleImage = VulkanImage(*handlesVk, VulkanSamplerMode::NEAREST,
                                  VK_FORMAT_R32_SFLOAT,
                                  hdrImgUsageFlags, initInfo.extent);
@@ -413,13 +409,11 @@ void RenderImagePool::SaveImage(IsHDRImage t, const RenderImageSaveInfo& fileOut
         imgSem.HostWait(1);
         // TODO: Find the proper tight size
         using enum MRayPixelEnum;
-        auto outPixelType = (t == HDR) ? ((initInfo.isSpectralPack)
-            ? MRayPixelTypeRT(MRayPixelType<MR_R_FLOAT>{})
-            : MRayPixelTypeRT(MRayPixelType<MR_RGB_FLOAT>{}))
+        auto outPixelType = (t == HDR)
+            ? MRayPixelTypeRT(MRayPixelType<MR_RGB_FLOAT>{})
             : MRayPixelTypeRT(MRayPixelType<MR_RGB16_UNORM>{});
-        auto inPixelType = (t == HDR) ? ((initInfo.isSpectralPack)
-            ? MRayPixelTypeRT(MRayPixelType<MR_R_FLOAT>{})
-            : MRayPixelTypeRT(MRayPixelType<MR_RGBA_FLOAT>{}))
+        auto inPixelType = (t == HDR)
+            ? MRayPixelTypeRT(MRayPixelType<MR_RGBA_FLOAT>{})
             : MRayPixelTypeRT(MRayPixelType<MR_RGBA16_UNORM>{});
         auto imgFileType = (t == HDR)
             ? ImageType::EXR
@@ -427,7 +421,7 @@ void RenderImagePool::SaveImage(IsHDRImage t, const RenderImageSaveInfo& fileOut
         auto colorSpace = (t == HDR)
             ? initInfo.hdrColorSpace
             : initInfo.sdrColorSpace.first;
-        Float gamma = (initInfo.isSpectralPack || t == HDR)
+        Float gamma = (t == HDR)
             ? Float(1.0)
             : initInfo.sdrColorSpace.second;
         size_t paddedImageSize = inPixelType.PixelSize() * initInfo.extent.Multiply();
@@ -441,7 +435,6 @@ void RenderImagePool::SaveImage(IsHDRImage t, const RenderImageSaveInfo& fileOut
                 .pixelType = outPixelType,
                 .colorSpace = Pair(gamma, colorSpace)
             },
-            .depth = initInfo.depth,
             .inputType = inPixelType,
             .pixels = Span<const Byte>(hStagePtr, paddedImageSize)
         };

@@ -55,8 +55,7 @@ Vector2ui ImageTiler::FindOptimumTileSize(const Vector2ui& fbSize,
 ImageTiler::ImageTiler(RenderImage* rI,
                        const RenderImageParams& rIParams,
                        uint32_t parallelizationHint,
-                       Vector2ui filterPadding,
-                       uint32_t channels, uint32_t depth)
+                       Vector2ui filterPadding)
     : renderBuffer(rI)
     , fullResolution(rIParams.resolution)
     , range{rIParams.regionMin, rIParams.regionMax}
@@ -71,7 +70,7 @@ ImageTiler::ImageTiler(RenderImage* rI,
                                        parallelizationHint);
 
     paddedTileSize = coveringTileSize + filterPadding * 2u;
-    renderBuffer->Resize(paddedTileSize, depth, channels);
+    renderBuffer->Resize(paddedTileSize);
     tileCount = Math::DivideUp(fbSize, coveringTileSize);
 
     pixel1DRange = Vector2ui(0u, CurrentTileSize().Multiply());
@@ -189,7 +188,7 @@ Optional<RenderImageSection> RenderImage::TransferToHost(const GPUQueue& process
     // Wait the process queue to finish on the transfer queue
     copyQueue.IssueWait(processCompleteFence);
     // Copy to staging buffers when the data is ready
-    copyQueue.MemcpyAsync(hPixels, ToConstSpan(dPixels));
+    copyQueue.MemcpyAsync(hPixelsAll, ToConstSpan(dPixelsAll));
     copyQueue.MemcpyAsync(hWeights, ToConstSpan(dWeights));
 
     // Do not overwrite untill memcpy finishes
@@ -218,19 +217,14 @@ Vector2ui RenderImage::Extents() const
     return extent;
 }
 
-uint32_t RenderImage::Depth() const
-{
-    return depth;
-}
-
 uint32_t RenderImage::ChannelCount() const
 {
-    return channelCount;
+    return 3;
 }
 
 void RenderImage::ClearImage(const GPUQueue& queue)
 {
-    queue.MemsetAsync(dPixels, 0x00);
+    queue.MemsetAsync(dPixelsAll, 0x00);
     queue.MemsetAsync(dWeights, 0x00);
 }
 
@@ -240,30 +234,34 @@ Pair<const Byte*, size_t> RenderImage::SharedDataPtrAndSize() const
     return {constPtr, stagingMemory.AllocSize()};
 }
 
-bool RenderImage::Resize(const Vector2ui& extentIn,
-                         uint32_t depthIn,
-                         uint32_t channelCountIn)
+bool RenderImage::Resize(const Vector2ui& extentIn)
 {
     // Acquire the memory, we may delete it
     if(!sem.HostAcquire()) return false;
     extent = extentIn;
-    depth = depthIn;
-    channelCount = channelCountIn;
 
-    uint32_t totalPixCount = extent.Multiply() * depth;
-    MemAlloc::AllocateMultiData(std::tie(dPixels, dWeights),
+    uint32_t totalPixCount = extent.Multiply();
+
+    MemAlloc::AllocateMultiData(std::tie(dPixelsR, dPixelsG,
+                                         dPixelsB, dWeights),
                                 deviceMemory,
-                                {totalPixCount * channelCount,
-                                 totalPixCount});
+                                {totalPixCount, totalPixCount,
+                                 totalPixCount, totalPixCount});
+    dPixelsAll = Span(dPixelsR.data(),
+                      std::distance(dPixelsR.data(), dWeights.data()));
+
     // Reallocate host buffer
-    MemAlloc::AllocateMultiData(std::tie(hPixels, hWeights),
+    MemAlloc::AllocateMultiData(std::tie(hPixelsR, hPixelsG,
+                                         hPixelsB, hWeights),
                                 stagingMemory,
-                                {totalPixCount * channelCount,
-                                 totalPixCount});
+                                {totalPixCount, totalPixCount,
+                                 totalPixCount, totalPixCount});
+    hPixelsAll = Span(hPixelsR.data(),
+                      std::distance(hPixelsR.data(), hWeights.data()));
 
     // Calculate offsets
     Byte* mem = static_cast<Byte*>(deviceMemory);
-    pixStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(dPixels.data())));
+    pixStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(dPixelsAll.data())));
     weightStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(dWeights.data())));
 
     sem.HostRelease();

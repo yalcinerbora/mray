@@ -351,7 +351,7 @@ void KCExpandSamplesToPixels(// Outputs
 
 template <uint32_t TPB, uint32_t LOGICAL_WARP_SIZE, class Filter>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan<3> img,
+void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan img,
                           // Inputs per segment
                           MRAY_GRID_CONSTANT const Span<const uint32_t> dStartOffsets,
                           MRAY_GRID_CONSTANT const Span<const CommonKey> dPixelIds,
@@ -454,7 +454,7 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan<3> img,
 
 template <class Filter>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCFilterToImgAtomicRGB(MRAY_GRID_CONSTANT const ImageSpan<3> img,
+void KCFilterToImgAtomicRGB(MRAY_GRID_CONSTANT const ImageSpan img,
                             // Input
                             MRAY_GRID_CONSTANT const Span<const Spectrum> dValues,
                             MRAY_GRID_CONSTANT const Span<const ImageCoordinate> dImgCoords,
@@ -531,7 +531,7 @@ void KCFilterToImgAtomicRGB(MRAY_GRID_CONSTANT const ImageSpan<3> img,
 }
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCSetImagePixels(MRAY_GRID_CONSTANT const ImageSpan<3> img,
+void KCSetImagePixels(MRAY_GRID_CONSTANT const ImageSpan img,
                       // Input
                       MRAY_GRID_CONSTANT const Span<const Spectrum> dValues,
                       MRAY_GRID_CONSTANT const Span<const Float> dFilterWeights,
@@ -560,7 +560,7 @@ void KCSetImagePixels(MRAY_GRID_CONSTANT const ImageSpan<3> img,
 }
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCSetImagePixelsIndirect(MRAY_GRID_CONSTANT const ImageSpan<3> img,
+void KCSetImagePixelsIndirect(MRAY_GRID_CONSTANT const ImageSpan img,
                               // Input
                               MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
                               MRAY_GRID_CONSTANT const Span<const Spectrum> dValues,
@@ -590,7 +590,7 @@ void KCSetImagePixelsIndirect(MRAY_GRID_CONSTANT const ImageSpan<3> img,
 }
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCSetImagePixelsIndirectAtomic(MRAY_GRID_CONSTANT const ImageSpan<3> img,
+void KCSetImagePixelsIndirectAtomic(MRAY_GRID_CONSTANT const ImageSpan img,
                                     // Input
                                     MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
                                     MRAY_GRID_CONSTANT const Span<const Spectrum> dValues,
@@ -617,7 +617,7 @@ void KCSetImagePixelsIndirectAtomic(MRAY_GRID_CONSTANT const ImageSpan<3> img,
 }
 
 void SetImagePixelsIndirect(// Output
-                            const ImageSpan<3>& img,
+                            const ImageSpan& img,
                             // Input
                             const Span<const RayIndex>& dIndices,
                             const Span<const Spectrum>& dValues,
@@ -644,7 +644,7 @@ void SetImagePixelsIndirect(// Output
 }
 
 void SetImagePixelsIndirectAtomic(// Output
-                                  const ImageSpan<3>& img,
+                                  const ImageSpan& img,
                                   // Input
                                   const Span<const RayIndex>& dIndices,
                                   const Span<const Spectrum>& dValues,
@@ -671,7 +671,7 @@ void SetImagePixelsIndirectAtomic(// Output
 }
 
 void SetImagePixels(// Output
-                    const ImageSpan<3>& img,
+                    const ImageSpan& img,
                     // Input
                     const Span<const Spectrum>& dValues,
                     const Span<const Float>& dFilterWeights,
@@ -697,7 +697,7 @@ void SetImagePixels(// Output
 
 template<class Filter>
 void ReconFilterGenericRGB(// Output
-                           const ImageSpan<3>& img,
+                           const ImageSpan& img,
                            // I-O
                            RayPartitioner& partitioner,
                            // Input
@@ -842,7 +842,7 @@ void ReconFilterGenericRGB(// Output
 
 template<class Filter>
 void ReconFilterGenericRGBAtomic(// Output
-                                 const ImageSpan<3>& img,
+                                 const ImageSpan& img,
                                  // Input
                                  const Span<const Spectrum>& dValues,
                                  const Span<const ImageCoordinate>& dImgCoords,
@@ -870,7 +870,7 @@ void ReconFilterGenericRGBAtomic(// Output
 
 template<class Filter>
 void MultiPassReconFilterGenericRGB(// Output
-                                    const ImageSpan<3>& img,
+                                    const ImageSpan& img,
                                     // I-O
                                     RayPartitioner& partitioner,
                                     // Input
@@ -1111,7 +1111,7 @@ void TextureFilterT<E, FF>::ClampImageFromBuffer(// Output
 
 template<FilterType::E E, class FF>
 void TextureFilterT<E, FF>::ReconstructionFilterRGB(// Output
-                                                    const ImageSpan<3>& img,
+                                                    const ImageSpan& img,
                                                     // I-O
                                                     RayPartitioner& partitioner,
                                                     // Input
@@ -1133,7 +1133,7 @@ void TextureFilterT<E, FF>::ReconstructionFilterRGB(// Output
 
 template<FilterType::E E, class FF>
 void TextureFilterT<E, FF>::ReconstructionFilterAtomicRGB(// Output
-                                                          const ImageSpan<3>& img,
+                                                          const ImageSpan& img,
                                                           // Input
                                                           const Span<const Spectrum>& dValues,
                                                           const Span<const ImageCoordinate>& dImgCoords,

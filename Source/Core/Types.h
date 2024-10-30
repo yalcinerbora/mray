@@ -133,6 +133,11 @@ struct SoASpan
     constexpr auto  Get() const -> Span<std::tuple_element_t<I, Tuple<const Args...>>>;
 };
 
+// Deuction guide for constructor
+template<class... Spans>
+SoASpan(const Spans&... spans) -> SoASpan<typename Spans::element_type...>;
+
+
 template<class... Args, std::size_t... I>
 constexpr Tuple<Args&...> TupleDetail::ToTupleRef(Tuple<Args...>& t,
                                                   std::index_sequence<I...>)

@@ -12,8 +12,6 @@ struct RenderImageInitInfo
     Vector2ui                       extent;
     MRayColorSpaceEnum              hdrColorSpace;
     Pair<MRayColorSpaceEnum, Float> sdrColorSpace;
-    uint32_t                        depth           = 1;
-    bool                            isSpectralPack  = false;
     Float                           sdrGamma        = Float(1.0);
 };
 

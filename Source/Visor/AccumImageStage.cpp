@@ -29,11 +29,13 @@ MRayError AccumImageStage::Initialize(const VulkanSystemView& handles,
     MRayError e = pipeline.Initialize(handlesVk->deviceVk,
     {
         {
-            {UNIFORM_BIND_INDEX,        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
-            {HDR_IMAGE_BIND_INDEX,      VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
-            {SAMPLE_IMAGE_BIND_INDEX,   VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
-            {IN_PIXEL_BUFF_BIND_INDEX,  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
-            {IN_SAMPLE_BUFF_BIND_INDEX, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER}
+            {UNIFORM_BIND_INDEX,         VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
+            {HDR_IMAGE_BIND_INDEX,       VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
+            {SAMPLE_IMAGE_BIND_INDEX,    VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
+            {IN_PIXEL_BUFF_R_BIND_INDEX, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+            {IN_PIXEL_BUFF_G_BIND_INDEX, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+            {IN_PIXEL_BUFF_B_BIND_INDEX, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+            {IN_SAMPLE_BUFF_BIND_INDEX,  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER}
         }
     },
     "Shaders/AccumInput.spv"s, execPath, "KCAccumulateInputs"s);
@@ -124,15 +126,12 @@ AccumulateStatus AccumImageStage::IssueAccumulation(const RenderImageSection& se
     // let the main render loop to terminate
     if(!syncSemaphore->Acquire(section.waitCounter))
         return AccumulateStatus::TIMELINE_FAILED;
-    //MRAY_LOG("[Visor] AcquiredImg {}", section.waitCounter);
 
     if(foreignMemory.SizeBytes() == 0)
     {
         // Drop the frames. We prematurely deallocated the buffers
         // since Vulkan does not allow memory to be pulled under its feet.
         // (Eventhough we do not use it explicitly)
-        //MRAY_LOG("[Visor] Released Img - DROP!!!\n"
-        //         "----------------------");
         syncSemaphore->Release();
         return AccumulateStatus::DROPPING_FRAME;
     }
@@ -149,16 +148,38 @@ AccumulateStatus AccumImageStage::IssueAccumulation(const RenderImageSection& se
     uniformBuffer.FlushRange(handlesVk->deviceVk);
 
     // TODO: Check if overlapping is allowed
+    std::array rgbOffsets = section.PixelOffsetsRGB();
+
     DescriptorBindList<ShaderBindingData> bindList =
     {
         {
-            IN_PIXEL_BUFF_BIND_INDEX,
+            IN_PIXEL_BUFF_R_BIND_INDEX,
             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             VkDescriptorBufferInfo
             {
                 .buffer = foreignBuffer.Buffer(),
-                .offset = section.pixelStartOffset,
-                .range = section.weightStartOffset,
+                .offset = rgbOffsets[0],
+                .range = rgbOffsets[1] - rgbOffsets[0],
+            },
+        },
+        {
+            IN_PIXEL_BUFF_G_BIND_INDEX,
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            VkDescriptorBufferInfo
+            {
+                .buffer = foreignBuffer.Buffer(),
+                .offset = rgbOffsets[1],
+                .range = rgbOffsets[2] - rgbOffsets[1],
+            },
+        },
+        {
+            IN_PIXEL_BUFF_B_BIND_INDEX,
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            VkDescriptorBufferInfo
+            {
+                .buffer = foreignBuffer.Buffer(),
+                .offset = rgbOffsets[2],
+                .range = section.weightStartOffset - rgbOffsets[2],
             },
         },
         {
@@ -235,8 +256,6 @@ AccumulateStatus AccumImageStage::IssueAccumulation(const RenderImageSection& se
         // doing this operation so it should be pretty fast (hopefully)
         vkWaitForFences(device, 1, &fenceHandle, VK_TRUE,
                         std::numeric_limits<uint64_t>::max());
-        //MRAY_LOG("[Visor] Released Img\n"
-        //         "----------------------");
         // Reset for the next issue
         vkResetFences(device, 1, &fenceHandle);
         // Signal the MRay renderer that
