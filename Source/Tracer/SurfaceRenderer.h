@@ -51,7 +51,7 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     TransformKey                curCamTransformKey;
     CameraKey                   curCamKey;
     const CameraWorkPtr*        curCamWork;
-    uint64_t                    globalPixelIndex = 0;
+    std::vector<uint64_t>       tilePixelIndices;
     Float                       curTMaxAO = std::numeric_limits<Float>::max();
     //
     RayPartitioner      rayPartitioner;
@@ -72,6 +72,8 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     // Work Hash related
     Span<CommonKey>     dWorkHashes;
     Span<CommonKey>     dWorkBatchIds;
+    //
+    bool                saveImage;
 
     uint32_t    FindMaxSamplePerIteration(uint32_t rayCount,
                                           SurfRDetail::Mode::E,

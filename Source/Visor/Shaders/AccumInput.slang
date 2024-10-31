@@ -62,11 +62,11 @@ void KCAccumulateInputs(uint3 globalId: SV_DispatchThreadID,
     // Accumulation
     // If sample out is exactly zero, this means we probably
     // cleared the image. However; colorOut is not cleared,
-    // and may containg NaN's which will corrupt the mathematical
+    // and may contain NaN's which will corrupt the mathematical
     // clearing ([0 * colorOut + colorIn * sIn] = colorIn * sIn, will
     // not be satisfied due to NaN)
     float3 newColor = colorOut * sampleOut + colorIn;
-    if (totalSample == 0)
+    if(totalSample == 0)
         newColor = float3(0);
     else
         newColor /= float3(totalSample);

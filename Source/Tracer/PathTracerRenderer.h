@@ -72,6 +72,10 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightAr
     template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
     static constexpr auto CamWorkFunctions = Tuple{};
 
+    // On throughput mode, we do this burst, on latency mode
+    // burst is implicit and is 1
+    static constexpr uint32_t BurstSize = 32;
+
     private:
     Options     currentOptions  = {};
     Options     newOptions      = {};
@@ -86,7 +90,7 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightAr
     TransformKey                curCamTransformKey;
     CameraKey                   curCamKey;
     const CameraWorkPtr*        curCamWork;
-    uint64_t                    globalPixelIndex = 0;
+    std::vector<uint64_t>       tilePixelIndices;
     uint64_t                    totalDeadRayCount = 0;
     SampleMode                  anchorSampleMode;
     //
@@ -107,27 +111,34 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightAr
     Span<CommonKey>     dWorkHashes;
     Span<CommonKey>     dWorkBatchIds;
     //
-    bool                renderUntilSPPLimit;
+    bool                saveImage;
     //
-    uint64_t            SPPLimit() const;
+    uint64_t            SPPLimit(uint32_t spp) const;
     uint32_t            FindMaxSamplePerIteration(uint32_t rayCount, PathTraceRDetail::SampleMode);
     Span<RayIndex>      ReloadPaths(Span<const RayIndex> dIndices,
+                                    uint32_t sppLimit,
                                     const GPUQueue& processQueue);
     void                ResetAllPaths(const GPUQueue& queue);
 
-    Span<RayIndex>      DoRenderPass(const GPUQueue& queue);
+    Span<RayIndex>      DoRenderPass(uint32_t sppLimit,
+                                     const GPUQueue& queue);
+
+    RendererOutput      DoThroughputSingleTileRender(const GPUDevice& device,
+                                                     const GPUQueue& queue);
+    RendererOutput      DoLatencyRender(const GPUDevice& device,
+                                        const GPUQueue& queue);
 
     public:
     // Constructors & Destructor
-                            PathTracerRenderer(const RenderImagePtr&,
-                                               TracerView,
-                                               BS::thread_pool&,
-                                               const GPUSystem&,
-                                               const RenderWorkPack&);
-                            PathTracerRenderer(const PathTracerRenderer&) = delete;
-                            PathTracerRenderer(PathTracerRenderer&&) = delete;
-    PathTracerRenderer&     operator=(const PathTracerRenderer&) = delete;
-    PathTracerRenderer&     operator=(PathTracerRenderer&&) = delete;
+                        PathTracerRenderer(const RenderImagePtr&,
+                                           TracerView,
+                                           BS::thread_pool&,
+                                           const GPUSystem&,
+                                           const RenderWorkPack&);
+                        PathTracerRenderer(const PathTracerRenderer&) = delete;
+                        PathTracerRenderer(PathTracerRenderer&&) = delete;
+    PathTracerRenderer& operator=(const PathTracerRenderer&) = delete;
+    PathTracerRenderer& operator=(PathTracerRenderer&&) = delete;
     //
     AttribInfoList      AttributeInfo() const override;
     RendererOptionPack  CurrentAttributes() const override;

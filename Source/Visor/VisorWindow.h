@@ -143,6 +143,8 @@ class VisorWindow
     // Initial rendering
     Optional<std::string_view>      initialSceneFile;
     Optional<std::string_view>      initialTracerRenderConfigPath;
+    //
+    bool shouldPollRealTime = false;
 
     private:
     friend class VisorVulkan;
@@ -194,5 +196,6 @@ class VisorWindow
     bool            Render();
     void            SetKickstartParameters(const Optional<std::string_view>& renderConfigPath,
                                            const Optional<std::string_view>& sceneFile);
+    bool            ShouldElevatePollingToRealTime() const;
 
 };

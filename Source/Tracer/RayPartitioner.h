@@ -3,9 +3,27 @@
 #include "Device/GPUSystem.h"
 #include "Device/GPUMemory.h"
 #include "Device/GPUAlgBinaryPartition.h"
+#include "Device/GPUAlgGeneric.h"
 
 #include "TracerTypes.h"
 #include "Core/Types.h"
+
+template<uint32_t SELECTION, class UnaryFunc>
+class TernaryToBinaryFunctor
+{
+    UnaryFunc F;
+
+    public:
+    TernaryToBinaryFunctor(UnaryFunc f)
+        : F(f)
+    {}
+
+    MRAY_HYBRID MRAY_CGPU_INLINE
+    bool operator()(CommonIndex i) const
+    {
+        return F(i) == SELECTION;
+    }
+};
 
 struct MultiPartitionOutput
 {
@@ -29,6 +47,18 @@ struct BinaryPartitionOutput
     Span<uint32_t, 3>   hPartitionStartOffsets;
     // Per-key partition indirection index
     Span<CommonIndex>   dPartitionIndices;
+
+    std::array<Span<CommonIndex>, 2> Spanify() const;
+};
+
+struct TernaryPartitionOutput
+{
+    // Prefix-sum buffer of partitions (TotalSize: 3 + 1)
+    Span<uint32_t, 4>   hPartitionStartOffsets;
+    // Per-key partition indirection index
+    Span<CommonIndex>   dPartitionIndices;
+
+    std::array<Span<CommonIndex>, 3> Spanify() const;
 };
 
 class RayPartitioner
@@ -87,6 +117,10 @@ class RayPartitioner
     BinaryPartitionOutput   BinaryPartition(Span<const CommonIndex> dIndices,
                                             const GPUQueue& queue,
                                             UnaryFunc&&) const;
+    template<class UnaryFunc>
+    TernaryPartitionOutput  TernaryPartition(Span<CommonIndex> dIndicesIn,
+                                             const GPUQueue& queue,
+                                             UnaryFunc&& UnaryF) const;
 
     MultiPartitionOutput    MultiPartition(Span<CommonKey> dKeysIn,
                                            Span<CommonIndex> dIndicesIn,
@@ -142,6 +176,68 @@ BinaryPartitionOutput RayPartitioner::BinaryPartition(Span<const CommonIndex> dI
     return BinaryPartitionOutput
     {
         .hPartitionStartOffsets = Span<uint32_t, 3>(hPartitionStartOffsets.subspan(0, 3)),
+        .dPartitionIndices = dOutput
+    };
+}
+
+template<class UnaryFunc>
+TernaryPartitionOutput RayPartitioner::TernaryPartition(Span<CommonIndex> dIndicesIn,
+                                                        const GPUQueue& queue,
+                                                        UnaryFunc&& UnaryF) const
+{
+    static constexpr uint32_t FIRST = 0;
+    static constexpr uint32_t SECOND = 1;
+
+    using namespace std::string_view_literals;
+    static const auto annotation = system.CreateAnnotation("Ray TernaryPartition"sv);
+    const auto _ = annotation.AnnotateScope();
+
+    // Determine output buffer
+    Span<CommonIndex> dOutput = DetermineOutputSpan(dIndices, ToConstSpan(dIndicesIn));
+
+    hPartitionStartOffsets[0] = 0;
+    Span<uint32_t, 1> hPartitionIndex0(hPartitionStartOffsets.subspan(1, 1));
+    Span<uint32_t, 1> hPartitionIndex1(hPartitionStartOffsets.subspan(2, 1));
+    hPartitionStartOffsets[3] = static_cast<uint32_t>(dIndicesIn.size());
+
+    using TTB0 = TernaryToBinaryFunctor<FIRST, UnaryFunc>;
+    DeviceAlgorithms::BinaryPartition(dOutput,
+                                      hPartitionIndex0,
+                                      dTempMemory,
+                                      ToConstSpan(dIndicesIn),
+                                      queue,
+                                      TTB0(UnaryF));
+    queue.Barrier().Wait();
+
+    auto dRightIn = dIndicesIn.subspan(hPartitionIndex0[0],
+                                       dIndicesIn.size() - hPartitionIndex0[0]);
+    auto dRightOut = dOutput.subspan(hPartitionIndex0[0],
+                                     dIndicesIn.size() - hPartitionIndex0[0]);
+    // Copy the right side back to input buffer, so that we can present
+    // a single buffer to the user
+    queue.MemcpyAsync(dRightIn, ToConstSpan(dRightOut));
+    // Again binary partition
+    using TTB1 = TernaryToBinaryFunctor<SECOND, UnaryFunc>;
+    DeviceAlgorithms::BinaryPartition(dRightOut,
+                                      hPartitionIndex1,
+                                      dTempMemory,
+                                      ToConstSpan(dRightIn),
+                                      queue,
+                                      TTB1(UnaryF));
+
+    DeviceAlgorithms::InPlaceTransform
+    (
+        hPartitionIndex1.subspan(0, 1),
+        queue,
+        [hPartitionIndex0] MRAY_HYBRID(uint32_t i)
+        {
+            return i + hPartitionIndex0[0];
+        }
+    );
+
+    return TernaryPartitionOutput
+    {
+        .hPartitionStartOffsets = Span<uint32_t, 4>(hPartitionStartOffsets.subspan(0, 4)),
         .dPartitionIndices = dOutput
     };
 }

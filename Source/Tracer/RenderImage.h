@@ -96,6 +96,7 @@ class ImageTiler
     Vector2ui   ConservativeTileSize() const;
     Vector2ui   CurrentTileSize() const;
     Vector2ui   CurrentTileIndex() const;
+    uint32_t    CurrentTileIndex1D() const;
     Vector2ui   TileCount() const;
     void        NextTile();
 

@@ -781,7 +781,7 @@ bool VisorVulkan::MTIsTerminated()
 
 void VisorVulkan::MTWaitForInputs()
 {
-    if(config.realTime)
+    if(config.realTime || window.ShouldElevatePollingToRealTime())
         glfwPollEvents();
     else
         glfwWaitEvents();

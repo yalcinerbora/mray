@@ -137,6 +137,7 @@ SurfaceRenderer::SurfaceRenderer(const RenderImagePtr& rb,
     : RendererT(rb, wp, tv, s, tp)
     , rayPartitioner(s)
     , redererGlobalMem(s.AllGPUs(), 32_MiB, 512_MiB)
+    , saveImage(true)
 {}
 
 typename SurfaceRenderer::AttribInfoList
@@ -241,7 +242,8 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     currentOptions = newOptions;
     anchorMode = currentOptions.mode;
     totalIterationCount = 0;
-    globalPixelIndex = 0;
+    std::fill(tilePixelIndices.begin(),
+              tilePixelIndices.end(), 0u);
 
     // Generate the Filter
     auto FilterGen = tracerView.filterGenerators.at(tracerView.tracerParams.filmFilter.type);
@@ -264,6 +266,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     imageTiler = ImageTiler(renderBuffer.get(), rIP,
                             tracerView.tracerParams.parallelizationHint,
                             Vector2ui::Zero());
+    tilePixelIndices.resize(imageTiler.TileCount().Multiply(), 0u);
 
     // Generate Works to get the total work count
     // We will batch allocate
@@ -410,7 +413,9 @@ RendererOutput SurfaceRenderer::DoRender()
         totalIterationCount = 0;
         curCamTransformOverride = cameraTransform;
         cameraTransform = std::nullopt;
-        globalPixelIndex = 0;
+        std::fill(tilePixelIndices.begin(),
+                  tilePixelIndices.end(), 0u);
+        saveImage = false;
     }
 
     // Generate subcamera of this specific tile
@@ -446,6 +451,8 @@ RendererOutput SurfaceRenderer::DoRender()
     auto dCamRayGenRNBuffer = dRandomNumBuffer.subspan(0, camRayGenRNCount);
     rnGenerator->GenerateNumbers(dCamRayGenRNBuffer, Vector2ui(0, camSamplePerRay),
                                  processQueue);
+
+    uint64_t& tilePixIndex = tilePixelIndices[imageTiler.CurrentTileIndex1D()];
     if(currentOptions.doStochasticFilter)
     {
         cameraWork.GenRaysStochasticFilter
@@ -455,7 +462,7 @@ RendererOutput SurfaceRenderer::DoRender()
             dRayStateCommon.dFilmFilterWeights, dIndices,
             ToConstSpan(dCamRayGenRNBuffer),
             dSubCameraBuffer, curCamTransformKey,
-            globalPixelIndex, imageTiler.CurrentTileSize(),
+            tilePixIndex, imageTiler.CurrentTileSize(),
             tracerView.tracerParams.filmFilter,
             processQueue
         );
@@ -469,11 +476,11 @@ RendererOutput SurfaceRenderer::DoRender()
             dRayStateCommon.dFilmFilterWeights, dIndices,
             ToConstSpan(dCamRayGenRNBuffer),
             dSubCameraBuffer, curCamTransformKey,
-            globalPixelIndex, imageTiler.CurrentTileSize(),
+            tilePixIndex, imageTiler.CurrentTileSize(),
             processQueue
         );
     }
-    globalPixelIndex += rayCount;
+    tilePixIndex += rayCount;
 
     // Cast rays
     using namespace std::string_view_literals;
@@ -730,6 +737,9 @@ RendererOutput SurfaceRenderer::DoRender()
     // Roll to the next tile
     imageTiler.NextTile();
 
+    bool triggerSave = saveImage &&
+        (currentOptions.totalSPP * imageTiler.TileCount().Multiply() ==
+         totalIterationCount);
     return RendererOutput
     {
         .analytics = RendererAnalyticData
@@ -745,7 +755,8 @@ RendererOutput SurfaceRenderer::DoRender()
             static_cast<uint32_t>(SurfRDetail::Mode::END),
             0
         },
-        .imageOut = renderOut
+        .imageOut = renderOut,
+        .triggerSave = triggerSave
     };
 }
 
@@ -754,7 +765,8 @@ void SurfaceRenderer::StopRender()
     ClearAllWorkMappings();
     filmFilter = {};
     rnGenerator = {};
-    globalPixelIndex = 0;
+    std::fill(tilePixelIndices.begin(),
+              tilePixelIndices.end(), 0u);
 }
 
 std::string_view SurfaceRenderer::TypeName()

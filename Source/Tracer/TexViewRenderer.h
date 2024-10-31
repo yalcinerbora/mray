@@ -31,6 +31,8 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     uint32_t    textureIndex    = 0;
     uint32_t    mipIndex        = 0;
     //
+    bool        saveImage;
+    //
     std::vector<const GenericTexture*> textures;
     std::vector<const GenericTextureView*> textureViews;
 

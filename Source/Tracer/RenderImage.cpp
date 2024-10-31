@@ -119,6 +119,11 @@ Vector2ui ImageTiler::CurrentTileIndex() const
                      currentTile / tileCount[0]);
 }
 
+uint32_t ImageTiler::CurrentTileIndex1D() const
+{
+    return currentTile;
+}
+
 Vector2ui ImageTiler::TileCount() const
 {
     return tileCount;
@@ -141,7 +146,7 @@ void ImageTiler::NextTile()
 
 Optional<RenderImageSection>
 ImageTiler::TransferToHost(const GPUQueue& processQueue,
-               const GPUQueue& transferQueue)
+                           const GPUQueue& transferQueue)
 {
     auto imageSection = renderBuffer->TransferToHost(processQueue,
                                                      transferQueue);
@@ -269,10 +274,10 @@ bool RenderImage::Resize(const Vector2ui& extentIn)
         std::distance(memF, hPixelsG.data()),
         std::distance(memF, hPixelsB.data())
     };
-    assert(pixOffsets[0] >= 0 && pixOffsets[1] >= 0, pixOffsets[2] >= 0);
-    assert(pixOffsets[0] < hPixelsAll.size() &&
-           pixOffsets[1] < hPixelsAll.size(),
-           pixOffsets[2] < hPixelsAll.size());
+    assert(pixOffsets[0] >= 0 && pixOffsets[1] >= 0 && pixOffsets[2] >= 0);
+    assert(pixOffsets[0] < std::ptrdiff_t(hPixelsAll.size()) &&
+           pixOffsets[1] < std::ptrdiff_t(hPixelsAll.size()) &&
+           pixOffsets[2] < std::ptrdiff_t(hPixelsAll.size()));
     pixStartOffsets =
     {
         size_t(pixOffsets[0]) * sizeof(Float),

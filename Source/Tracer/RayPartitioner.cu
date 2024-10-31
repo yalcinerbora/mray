@@ -170,6 +170,29 @@ void KCFindBinMatIds(// Output
         gBinRanges[partitionCount] = totalRays;
 }
 
+std::array<Span<CommonIndex>, 2> BinaryPartitionOutput::Spanify() const
+{
+    return
+    {
+        dPartitionIndices.subspan(hPartitionStartOffsets[0],
+                                  hPartitionStartOffsets[1] - hPartitionStartOffsets[0]),
+        dPartitionIndices.subspan(hPartitionStartOffsets[1],
+                                  hPartitionStartOffsets[2] - hPartitionStartOffsets[1])
+    };
+}
+std::array<Span<CommonIndex>, 3> TernaryPartitionOutput::Spanify() const
+{
+    return
+    {
+        dPartitionIndices.subspan(hPartitionStartOffsets[0],
+                                  hPartitionStartOffsets[1] - hPartitionStartOffsets[0]),
+        dPartitionIndices.subspan(hPartitionStartOffsets[1],
+                                  hPartitionStartOffsets[2] - hPartitionStartOffsets[1]),
+        dPartitionIndices.subspan(hPartitionStartOffsets[2],
+                                  hPartitionStartOffsets[3] - hPartitionStartOffsets[2])
+    };
+}
+
 size_t PartitionerDeviceBufferSize(size_t maxElementEstimate)
 {
     using namespace DeviceAlgorithms;
@@ -264,6 +287,8 @@ RayPartitioner::InitialBuffers RayPartitioner::Start(uint32_t rayCountIn,
 
     rayCount = rayCountIn;
     maxPartitionCount = maxPartitionCountIn;
+    // We may binary/ternary partition, support at least 3
+    maxPartitionCount = std::max(maxPartitionCount, 3u);
 
     size_t tempMemSizeIf = DeviceAlgorithms::BinPartitionTMSize<CommonKey>(rayCount);
     size_t tempMemSizeSort = DeviceAlgorithms::RadixSortTMSize<true, CommonKey, CommonIndex>(rayCount);

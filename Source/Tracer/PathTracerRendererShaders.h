@@ -248,7 +248,7 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     dataPack.depth += 1u;
     Vector2ui rrRange = params.globalState.russianRouletteRange;
     bool isPathDead = (dataPack.depth >= rrRange[1]);
-    if(dataPack.depth >= rrRange[0])
+    if(!isPathDead)
     {
         Float rrXi = rng.NextFloat<Material::SampleRNCount>();
         Float rrFactor = throughput.Sum() * Float(0.33333);
@@ -296,7 +296,10 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
         Vector2 tMMOut = Vector2(0, std::numeric_limits<Float>::max());
         RayToGMem(params.rayState.dOutRays, rayIndex, rayOut, tMMOut);
     }
-    else dataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
+    else
+    {
+        dataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
+    }
     // Write the updated state back
     params.rayState.dPathDataPack[rayIndex] = dataPack;
 

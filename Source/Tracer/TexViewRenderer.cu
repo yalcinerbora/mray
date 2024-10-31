@@ -92,6 +92,7 @@ TexViewRenderer::TexViewRenderer(const RenderImagePtr& rb,
                                  const GPUSystem& s,
                                  const RenderWorkPack& wp)
     : RendererT(rb, wp, tv, s, tp)
+    , saveImage(true)
 {
     // Pre-generate list
     textures.clear();
@@ -238,7 +239,7 @@ RendererOutput TexViewRenderer::DoRender()
                 KernelIssueParams{.workCount = curPixelCount},
                 //
                 imageTiler.GetTileSpan(),
-                imageTiler.CurrentTileIndex().Multiply()
+                imageTiler.CurrentTileIndex1D()
             );
             break;
         }
@@ -295,6 +296,10 @@ RendererOutput TexViewRenderer::DoRender()
     double spp = double(1) / double(imageTiler.TileCount().Multiply());
     totalIterationCount++;
     spp *= static_cast<double>(totalIterationCount);
+
+    bool triggerSave = saveImage &&
+        (currentOptions.totalSPP * imageTiler.TileCount().Multiply() ==
+         totalIterationCount);
     // Roll to the next tile
     imageTiler.NextTile();
     return RendererOutput
@@ -312,7 +317,8 @@ RendererOutput TexViewRenderer::DoRender()
             static_cast<uint32_t>(textures.size()),
             static_cast<uint32_t>(textures[textureIndex]->MipCount())
         },
-        .imageOut = renderOut
+        .imageOut = renderOut,
+        .triggerSave = triggerSave
     };
 }
 
@@ -331,3 +337,4 @@ size_t TexViewRenderer::GPUMemoryUsage() const
 {
     return 0;
 }
+

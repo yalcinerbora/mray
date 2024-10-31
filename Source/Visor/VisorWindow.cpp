@@ -1030,6 +1030,7 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
                     std::in_place_index<VisorAction::START_STOP_RENDER>,
                     true
                 ));
+                shouldPollRealTime = true;
                 break;
             }
             case TracerRunState::STOPPED:
@@ -1042,6 +1043,7 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
                     std::in_place_index<VisorAction::START_STOP_RENDER>,
                     false
                 ));
+                shouldPollRealTime = false;
                 break;
             }
             case TracerRunState::PAUSED:
@@ -1051,6 +1053,7 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
                     std::in_place_index<VisorAction::PAUSE_RENDER>,
                     true
                 ));
+                shouldPollRealTime = false;
                 break;
             }
             default:
@@ -1189,6 +1192,7 @@ void VisorWindow::DoInitialActions()
             std::in_place_index<VisorAction::START_STOP_RENDER>,
             true
         ));
+        shouldPollRealTime = true;
         // Set the state internally, this will not trigger another send command
         visorState.currentRendererState = TracerRunState::RUNNING;
 
@@ -1263,7 +1267,7 @@ bool VisorWindow::Render()
             }
             case RENDER_BUFFER_INFO:
             {
-                MRAY_LOG("[Visor]: Render Buffer Info received");
+                //MRAY_LOG("[Visor]: Render Buffer Info received");
                 newRenderBuffer = std::get<RENDER_BUFFER_INFO>(response);
                 visorState.renderThroughputAverage = typename VisorState::ThroughputAverage();
                 stopConsuming = true;
@@ -1477,4 +1481,9 @@ void VisorWindow::SetKickstartParameters(const Optional<std::string_view>& rende
 {
     initialTracerRenderConfigPath = renderConfigPath;
     initialSceneFile = sceneFile;
+}
+
+bool VisorWindow::ShouldElevatePollingToRealTime() const
+{
+    return shouldPollRealTime;
 }
