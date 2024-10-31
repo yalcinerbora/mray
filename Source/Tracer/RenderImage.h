@@ -130,8 +130,8 @@ class RenderImage
     Span<Float>             hPixelsB;
     Span<Float>             hWeights;
     //
-    size_t              pixStartOffset      = 0;
-    size_t              weightStartOffset   = 0;
+    std::array<size_t, 3>   pixStartOffsets     = {};
+    size_t                  weightStartOffset   = 0;
 
     GPUSemaphoreView    sem;
     GPUFence            processCompleteFence;

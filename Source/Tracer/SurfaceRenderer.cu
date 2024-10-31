@@ -467,7 +467,7 @@ RendererOutput SurfaceRenderer::DoRender()
             dRayDifferentials, dRays,
             dRayStateCommon.dImageCoordinates,
             dRayStateCommon.dFilmFilterWeights, dIndices,
-            ToConstSpan(dRandomNumBuffer),
+            ToConstSpan(dCamRayGenRNBuffer),
             dSubCameraBuffer, curCamTransformKey,
             globalPixelIndex, imageTiler.CurrentTileSize(),
             processQueue
@@ -478,18 +478,19 @@ RendererOutput SurfaceRenderer::DoRender()
     // Cast rays
     using namespace std::string_view_literals;
     Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
+    auto dHitKeysLocal = dHitKeys.subspan(0, rayCount);
     processQueue.IssueSaturatingKernel<KCSetBoundaryWorkKeys>
     (
         "KCSetBoundaryWorkKeys"sv,
-        KernelIssueParams{.workCount = static_cast<uint32_t>(dHitKeys.size())},
-        dHitKeys,
+        KernelIssueParams{.workCount = static_cast<uint32_t>(dHitKeysLocal.size())},
+        dHitKeysLocal,
         boundaryLightKeyPack
     );
 
     // Ray Casting
     tracerView.baseAccelerator.CastRays
     (
-        dHitKeys, dHits, dBackupRNGStates,
+        dHitKeysLocal, dHits, dBackupRNGStates,
         dRays, dIndices, processQueue
     );
 
@@ -499,9 +500,9 @@ RendererOutput SurfaceRenderer::DoRender()
     processQueue.IssueSaturatingKernel<KCGenerateWorkKeys>
     (
         GenWorkKernelName,
-        KernelIssueParams{.workCount = static_cast<uint32_t>(dHitKeys.size())},
+        KernelIssueParams{.workCount = static_cast<uint32_t>(dHitKeysLocal.size())},
         dKeys,
-        ToConstSpan(dHitKeys),
+        ToConstSpan(dHitKeysLocal),
         workHasher
     );
 

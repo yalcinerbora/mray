@@ -130,7 +130,8 @@ void ImageTiler::NextTile()
     currentTile = Roll<int32_t>(currentTile + 1,
                                 0, int32_t(tileCount.Multiply()));
     //
-    pixel1DRange += Vector2ui(CurrentTileSize().Multiply());
+    pixel1DRange = Vector2ui(pixel1DRange[1],
+                             pixel1DRange[1] + CurrentTileSize().Multiply());
     if(currentTile == 0)
     {
         pixel1DRange -= Vector2ui((range[1] - range[0]).Multiply());
@@ -207,7 +208,7 @@ Optional<RenderImageSection> RenderImage::TransferToHost(const GPUQueue& process
         .pixelMax           = extent,
         .globalWeight       = 0.0f,
         .waitCounter        = nextVal,
-        .pixelStartOffset   = pixStartOffset,
+        .pixStartOffsets    = pixStartOffsets,
         .weightStartOffset  = weightStartOffset
     };
 }
@@ -260,9 +261,26 @@ bool RenderImage::Resize(const Vector2ui& extentIn)
                       std::distance(hPixelsR.data(), hWeights.data()));
 
     // Calculate offsets
-    Byte* mem = static_cast<Byte*>(deviceMemory);
-    pixStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(dPixelsAll.data())));
-    weightStartOffset = static_cast<size_t>(std::distance(mem, reinterpret_cast<Byte*>(dWeights.data())));
+    Byte* mem = static_cast<Byte*>(stagingMemory);
+    Float* memF = reinterpret_cast<Float*>(mem);
+    std::array<ptrdiff_t, 3> pixOffsets =
+    {
+        std::distance(memF, hPixelsR.data()),
+        std::distance(memF, hPixelsG.data()),
+        std::distance(memF, hPixelsB.data())
+    };
+    assert(pixOffsets[0] >= 0 && pixOffsets[1] >= 0, pixOffsets[2] >= 0);
+    assert(pixOffsets[0] < hPixelsAll.size() &&
+           pixOffsets[1] < hPixelsAll.size(),
+           pixOffsets[2] < hPixelsAll.size());
+    pixStartOffsets =
+    {
+        size_t(pixOffsets[0]) * sizeof(Float),
+        size_t(pixOffsets[1]) * sizeof(Float),
+        size_t(pixOffsets[2]) * sizeof(Float)
+    };
+    weightStartOffset = static_cast<size_t>(std::distance(memF, hWeights.data()));
+    weightStartOffset *= sizeof(Float);
 
     sem.HostRelease();
     sem.SkipAState();

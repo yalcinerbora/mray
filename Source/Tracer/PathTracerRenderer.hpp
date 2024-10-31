@@ -158,6 +158,7 @@ PathTracerRenderer<MLA>::AttributeInfo() const
     return AttribInfoList
     {
         {"totalSPP",        MRayDataType<MR_UINT32>{}, IS_SCALAR, MR_MANDATORY},
+        {"renderMode",      MRayDataType<MR_STRING>{}, IS_SCALAR, MR_MANDATORY},
         {"sampleMode",      MRayDataType<MR_STRING>{}, IS_SCALAR, MR_MANDATORY},
         {"rrRange",         MRayDataType<MR_VECTOR_2UI>{}, IS_SCALAR, MR_MANDATORY},
         {"neeSamplerType",  MRayDataType<MR_STRING>{}, IS_SCALAR, MR_MANDATORY}
@@ -169,27 +170,33 @@ RendererOptionPack PathTracerRenderer<MLA>::CurrentAttributes() const
 {
     RendererOptionPack result;
     result.paramTypes = AttributeInfo();
-
+    //
     result.attributes.push_back(TransientData(std::in_place_type_t<uint32_t>{}, 1));
     result.attributes.back().Push(Span<const uint32_t>(&currentOptions.totalSPP, 1));
-
+    //
+    std::string_view curRenderModeName = currentOptions.renderMode.ToString();
+    result.attributes.push_back(TransientData(std::in_place_type_t<std::string>{},
+                                              curRenderModeName.size()));
+    auto svRead = result.attributes.back().AccessAsString();
+    assert(svRead.size() == curRenderModeName.size());
+    std::copy(curRenderModeName.cbegin(), curRenderModeName.cend(), svRead.begin());
+    //
     std::string_view curModeName = currentOptions.sampleMode.ToString();
     result.attributes.push_back(TransientData(std::in_place_type_t<std::string>{},
                                               curModeName.size()));
-    auto svRead = result.attributes.back().AccessAsString();
+    svRead = result.attributes.back().AccessAsString();
     assert(svRead.size() == curModeName.size());
     std::copy(curModeName.cbegin(), curModeName.cend(), svRead.begin());
-
+    //
     result.attributes.push_back(TransientData(std::in_place_type_t<Vector2>{}, 1));
     result.attributes.back().Push(Span<const Vector2ui>(&currentOptions.russianRouletteRange, 1));
-
-
+    //
     std::string_view lightSamplerName = currentOptions.lightSampler.ToString();
     result.attributes.push_back(TransientData(std::in_place_type_t<std::string>{}, lightSamplerName.size()));
     svRead = result.attributes.back().AccessAsString();
     assert(svRead.size() == lightSamplerName.size());
     std::copy(lightSamplerName.cbegin(), lightSamplerName.cend(), svRead.begin());
-
+    //
     if constexpr(MRAY_IS_DEBUG)
     {
         for(const auto& d: result.attributes)
@@ -204,9 +211,10 @@ void PathTracerRenderer<MLA>::PushAttribute(uint32_t attributeIndex,
 {    switch(attributeIndex)
     {
         case 0: newOptions.totalSPP = data.AccessAs<uint32_t>()[0]; break;
-        case 1: newOptions.sampleMode = PathTraceRDetail::SampleMode(std::as_const(data).AccessAsString()); break;
-        case 2: newOptions.russianRouletteRange = data.AccessAs<Vector2ui>()[0]; break;
-        case 3: newOptions.lightSampler = PathTraceRDetail::LightSamplerType(std::as_const(data).AccessAsString()); break;
+        case 1: newOptions.renderMode = PathTraceRDetail::RenderMode(std::as_const(data).AccessAsString()); break;
+        case 2: newOptions.sampleMode = PathTraceRDetail::SampleMode(std::as_const(data).AccessAsString()); break;
+        case 3: newOptions.russianRouletteRange = data.AccessAs<Vector2ui>()[0]; break;
+        case 4: newOptions.lightSampler = PathTraceRDetail::LightSamplerType(std::as_const(data).AccessAsString()); break;
         default:
             throw MRayError("{} Unkown attribute index {}", TypeName(), attributeIndex);
     }
@@ -343,6 +351,218 @@ void PathTracerRenderer<MLA>::ResetAllPaths(const GPUQueue& queue)
     DeviceAlgorithms::InPlaceTransform(dRayState.dPathDataPack, queue,
                                        SetPathStateFunctor(PathStatusEnum::INVALID));
     queue.MemsetAsync(dPathRNGDimensions, 0x00);
+}
+
+template<class MLA>
+Span<RayIndex> PathTracerRenderer<MLA>::DoRenderPass(const GPUQueue& processQueue)
+{
+    // Find the ray count. Ray count is tile count
+    // but tile can exceed film boundaries so clamp,
+    uint32_t rayCount = this->imageTiler.CurrentTileSize().Multiply();
+    // Start the partitioner, again worst case work count
+    // Get the K/V pair buffer
+    uint32_t maxWorkCount = uint32_t(this->currentWorks.size() +
+                                     this->currentLightWorks.size());
+    auto[dIndices, dKeys] = rayPartitioner.Start(rayCount, maxWorkCount, true);
+
+    // Iota the indices
+    DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
+    // Create RNG state for each ray
+    rnGenerator->SetupRange(this->imageTiler.Tile1DRange());
+    // Reload dead paths with new
+    dIndices = ReloadPaths(dIndices, processQueue);
+
+    // We refilled the path buffer,
+    // and can roll back to the Iota
+    DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
+
+    // Cast rays
+    using namespace std::string_view_literals;
+    Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
+    processQueue.IssueSaturatingKernel<KCSetBoundaryWorkKeys>
+    (
+        "KCSetBoundaryWorkKeys"sv,
+        KernelIssueParams{.workCount = static_cast<uint32_t>(dHitKeys.size())},
+        dHitKeys,
+        this->boundaryLightKeyPack
+    );
+    // Actual Ray Casting
+    this->tracerView.baseAccelerator.CastRays
+    (
+        dHitKeys, dHits, dBackupRNGStates,
+        dRays, dIndices, processQueue
+    );
+
+    // Generate work keys from hit packs
+    using namespace std::string_literals;
+    static const std::string GenWorkKernelName = std::string(TypeName()) + "-KCGenerateWorkKeys"s;
+    processQueue.IssueSaturatingKernel<KCGenerateWorkKeys>
+    (
+        GenWorkKernelName,
+        KernelIssueParams{.workCount = static_cast<uint32_t>(dHitKeys.size())},
+        dKeys,
+        ToConstSpan(dHitKeys),
+        workHasher
+    );
+
+    // Finally, partition using the generated keys.
+    // Fully partition here using single sort
+    auto& rp = rayPartitioner;
+    auto partitionOutput = rp.MultiPartition(dKeys, dIndices,
+                                             workHasher.WorkBatchDataRange(),
+                                             workHasher.WorkBatchBitRange(),
+                                             processQueue, false);
+    // Wait for results to be available in host buffers
+    processQueue.Barrier().Wait();
+    // Old Indices array (and the key) is invalidated
+    // Change indices to the partitioned one
+    dIndices = partitionOutput.dPartitionIndices;
+
+    if(currentOptions.sampleMode == SampleMode::E::PURE)
+    {
+        using GlobalState = PathTraceRDetail::GlobalState<EmptyType>;
+        GlobalState globalState
+        {
+            .russianRouletteRange = currentOptions.russianRouletteRange,
+            .sampleMode = currentOptions.sampleMode
+        };
+
+        this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,
+        [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
+                  uint32_t, uint32_t partitionSize)
+        {
+            uint32_t rnCount = workPtr.SampleRNCount(0);
+            auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
+            rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
+                                                 dPathRNGDimensions, rnCount,
+                                                 processQueue);
+
+            DeviceAlgorithms::InPlaceTransformIndirect
+            (
+                dPathRNGDimensions, dLocalIndices, processQueue,
+                ConstAddFunctor(rnCount)
+            );
+
+            workPtr.DoWork_0(dRayState, dLocalIndices,
+                             dRandomNumBuffer, dRayDifferentials,
+                             dRays, dHits, dHitKeys,
+                             globalState, processQueue);
+        },
+        //
+        [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
+                  uint32_t, uint32_t)
+        {
+            workPtr.DoBoundaryWork_0(dRayState, dLocalIndices,
+                                     Span<const RandomNumber>{},
+                                     dRayDifferentials, dRays,
+                                     dHits, dHitKeys,
+                                     globalState, processQueue);
+        });
+    }
+    else
+    {
+        UniformLightSampler lightSampler(metaLightArray.Array(),
+                                         metaLightArray.IndexHashTable());
+
+        using GlobalState = PathTraceRDetail::GlobalState<UniformLightSampler>;
+        GlobalState globalState
+        {
+            .russianRouletteRange = currentOptions.russianRouletteRange,
+            .sampleMode = currentOptions.sampleMode,
+            .lightSampler = lightSampler
+        };
+        using GlobalStateE = PathTraceRDetail::GlobalState<EmptyType>;
+        GlobalStateE globalStateE
+        {
+            .russianRouletteRange = currentOptions.russianRouletteRange,
+            .sampleMode = currentOptions.sampleMode
+        };
+
+        // Clear the shadow ray radiance buffer
+        processQueue.MemsetAsync(dRayState.dShadowRayRadiance, 0x00);
+        processQueue.MemsetAsync(dShadowRayVisibilities, 0x00);
+
+        // Do the NEE kernel + nothing
+        this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,
+        [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
+                  uint32_t, uint32_t partitionSize)
+        {
+            uint32_t rnCount = workPtr.SampleRNCount(1);
+            auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
+            rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
+                                                 dPathRNGDimensions, rnCount,
+                                                 processQueue);
+
+            DeviceAlgorithms::InPlaceTransformIndirect
+            (
+                dPathRNGDimensions, dLocalIndices, processQueue,
+                ConstAddFunctor(rnCount)
+            );
+
+            workPtr.DoWork_1(dRayState, dLocalIndices,
+                             dRandomNumBuffer, dRayDifferentials,
+                             dRays, dHits, dHitKeys,
+                             globalState, processQueue);
+        },
+        [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
+                  uint32_t, uint32_t)
+        {
+            workPtr.DoBoundaryWork_1(dRayState, dLocalIndices,
+                                     Span<const RandomNumber>{},
+                                     dRayDifferentials, dRays,
+                                     dHits, dHitKeys,
+                                     globalState, processQueue);
+        });
+
+        // After the kernel call(s), "dRayState.dOutRays" holds the shadow rays
+        // check visibility.
+        Bitspan<uint32_t> dIsVisibleBitSpan(dShadowRayVisibilities);
+        this->tracerView.baseAccelerator.CastVisibilityRays
+        (
+            dIsVisibleBitSpan, dBackupRNGStates,
+            dRayState.dOutRays, dIndices, processQueue
+        );
+
+        // Accumulate the pre-calculated radiance selectively
+        processQueue.IssueSaturatingKernel<KCAccumulateShadowRays>
+        (
+            "KCAccumulateShadowRays",
+            KernelIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
+            //
+            dRayState.dPathRadiance,
+            ToConstSpan(dRayState.dShadowRayRadiance),
+            ToConstSpan(dIsVisibleBitSpan),
+            ToConstSpan(dRayState.dPathDataPack),
+            currentOptions.russianRouletteRange
+        );
+
+        // Do the actual kernel
+        this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,
+        [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
+                  uint32_t, uint32_t partitionSize)
+        {
+            uint32_t rnCount = workPtr.SampleRNCount(0);
+            auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
+            rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
+                                                 dPathRNGDimensions, rnCount,
+                                                 processQueue);
+
+            DeviceAlgorithms::InPlaceTransformIndirect
+            (
+                dPathRNGDimensions, dLocalIndices, processQueue,
+                ConstAddFunctor(rnCount)
+            );
+
+            workPtr.DoWork_0(dRayState, dLocalIndices,
+                             dRandomNumBuffer, dRayDifferentials,
+                             dRays, dHits, dHitKeys,
+                             globalStateE, processQueue);
+        },
+        // Empty Kernel for light
+        [&, this](const auto&, Span<uint32_t>, uint32_t, uint32_t) {});
+    }
+
+    return dIndices;
 }
 
 template<class MLA>
@@ -557,6 +777,8 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
         ResetAllPaths(processQueue);
     }
 
+    // 
+
     // Generate subcamera of this specific tile
     cameraWork.GenerateSubCamera
     (
@@ -567,211 +789,8 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
         processQueue
     );
 
-    // Find the ray count. Ray count is tile count
-    // but tile can exceed film boundaries so clamp,
-    uint32_t rayCount = this->imageTiler.CurrentTileSize().Multiply();
-    // Start the partitioner, again worst case work count
-    // Get the K/V pair buffer
-    uint32_t maxWorkCount = uint32_t(this->currentWorks.size() +
-                                     this->currentLightWorks.size());
-    auto[dIndices, dKeys] = rayPartitioner.Start(rayCount, maxWorkCount, true);
-
-    // Iota the indices
-    DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
-    // Create RNG state for each ray
-    rnGenerator->SetupRange(this->imageTiler.Tile1DRange());
-    // Reload dead paths with new
-    dIndices = ReloadPaths(dIndices, processQueue);
-
-    // We refilled the path buffer,
-    // and can roll back to the Iota
-    DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
-
-    // Cast rays
-    using namespace std::string_view_literals;
-    Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
-    processQueue.IssueSaturatingKernel<KCSetBoundaryWorkKeys>
-    (
-        "KCSetBoundaryWorkKeys"sv,
-        KernelIssueParams{.workCount = static_cast<uint32_t>(dHitKeys.size())},
-        dHitKeys,
-        this->boundaryLightKeyPack
-    );
-    // Actual Ray Casting
-    this->tracerView.baseAccelerator.CastRays
-    (
-        dHitKeys, dHits, dBackupRNGStates,
-        dRays, dIndices, processQueue
-    );
-
-    // Generate work keys from hit packs
-    using namespace std::string_literals;
-    static const std::string GenWorkKernelName = std::string(TypeName()) + "-KCGenerateWorkKeys"s;
-    processQueue.IssueSaturatingKernel<KCGenerateWorkKeys>
-    (
-        GenWorkKernelName,
-        KernelIssueParams{.workCount = static_cast<uint32_t>(dHitKeys.size())},
-        dKeys,
-        ToConstSpan(dHitKeys),
-        workHasher
-    );
-
-    // Finally, partition using the generated keys.
-    // Fully partition here using single sort
-    auto& rp = rayPartitioner;
-    auto partitionOutput = rp.MultiPartition(dKeys, dIndices,
-                                             workHasher.WorkBatchDataRange(),
-                                             workHasher.WorkBatchBitRange(),
-                                             processQueue, false);
-    // Wait for results to be available in host buffers
-    processQueue.Barrier().Wait();
-    // Old Indices array (and the key) is invalidated
-    // Change indices to the partitioned one
-    dIndices = partitionOutput.dPartitionIndices;
-
-    if(currentOptions.sampleMode == SampleMode::E::PURE)
-    {
-        using GlobalState = PathTraceRDetail::GlobalState<EmptyType>;
-        GlobalState globalState
-        {
-            .russianRouletteRange = currentOptions.russianRouletteRange,
-            .sampleMode = currentOptions.sampleMode
-        };
-
-        this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,
-        [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
-                  uint32_t, uint32_t partitionSize)
-        {
-            uint32_t rnCount = workPtr.SampleRNCount(0);
-            auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
-            rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
-                                                 dPathRNGDimensions, rnCount,
-                                                 processQueue);
-
-            DeviceAlgorithms::InPlaceTransformIndirect
-            (
-                dPathRNGDimensions, dLocalIndices, processQueue,
-                ConstAddFunctor(rnCount)
-            );
-
-            workPtr.DoWork_0(dRayState, dLocalIndices,
-                             dRandomNumBuffer, dRayDifferentials,
-                             dRays, dHits, dHitKeys,
-                             globalState, processQueue);
-        },
-        //
-        [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
-                  uint32_t, uint32_t)
-        {
-            workPtr.DoBoundaryWork_0(dRayState, dLocalIndices,
-                                     Span<const RandomNumber>{},
-                                     dRayDifferentials, dRays,
-                                     dHits, dHitKeys,
-                                     globalState, processQueue);
-        });
-    }
-    else
-    {
-        UniformLightSampler lightSampler(metaLightArray.Array(),
-                                         metaLightArray.IndexHashTable());
-
-        using GlobalState = PathTraceRDetail::GlobalState<UniformLightSampler>;
-        GlobalState globalState
-        {
-            .russianRouletteRange = currentOptions.russianRouletteRange,
-            .sampleMode = currentOptions.sampleMode,
-            .lightSampler = lightSampler
-        };
-        using GlobalStateE = PathTraceRDetail::GlobalState<EmptyType>;
-        GlobalStateE globalStateE
-        {
-            .russianRouletteRange = currentOptions.russianRouletteRange,
-            .sampleMode = currentOptions.sampleMode
-        };
-
-        // Clear the shadow ray radiance buffer
-        processQueue.MemsetAsync(dRayState.dShadowRayRadiance, 0x00);
-        processQueue.MemsetAsync(dShadowRayVisibilities, 0x00);
-
-        // Do the NEE kernel + nothing
-        this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,
-        [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
-                  uint32_t, uint32_t partitionSize)
-        {
-            uint32_t rnCount = workPtr.SampleRNCount(1);
-            auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
-            rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
-                                                 dPathRNGDimensions, rnCount,
-                                                 processQueue);
-
-            DeviceAlgorithms::InPlaceTransformIndirect
-            (
-                dPathRNGDimensions, dLocalIndices, processQueue,
-                ConstAddFunctor(rnCount)
-            );
-
-            workPtr.DoWork_1(dRayState, dLocalIndices,
-                             dRandomNumBuffer, dRayDifferentials,
-                             dRays, dHits, dHitKeys,
-                             globalState, processQueue);
-        },
-        [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
-                  uint32_t, uint32_t)
-        {
-            workPtr.DoBoundaryWork_1(dRayState, dLocalIndices,
-                                     Span<const RandomNumber>{},
-                                     dRayDifferentials, dRays,
-                                     dHits, dHitKeys,
-                                     globalState, processQueue);
-        });
-
-        // After the kernel call(s), "dRayState.dOutRays" holds the shadow rays
-        // check visibility.
-        Bitspan<uint32_t> dIsVisibleBitSpan(dShadowRayVisibilities);
-        this->tracerView.baseAccelerator.CastVisibilityRays
-        (
-            dIsVisibleBitSpan, dBackupRNGStates,
-            dRayState.dOutRays, dIndices, processQueue
-        );
-
-        // Accumulate the pre-calculated radiance selectively
-        processQueue.IssueSaturatingKernel<KCAccumulateShadowRays>
-        (
-            "KCAccumulateShadowRays",
-            KernelIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
-            //
-            dRayState.dPathRadiance,
-            ToConstSpan(dRayState.dShadowRayRadiance),
-            ToConstSpan(dIsVisibleBitSpan),
-            ToConstSpan(dRayState.dPathDataPack),
-            currentOptions.russianRouletteRange
-        );
-
-        // Do the actual kernel
-        this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,
-        [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
-                  uint32_t, uint32_t partitionSize)
-        {
-            uint32_t rnCount = workPtr.SampleRNCount(0);
-            auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
-            rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
-                                                 dPathRNGDimensions, rnCount,
-                                                 processQueue);
-
-            DeviceAlgorithms::InPlaceTransformIndirect
-            (
-                dPathRNGDimensions, dLocalIndices, processQueue,
-                ConstAddFunctor(rnCount)
-            );
-
-            workPtr.DoWork_0(dRayState, dLocalIndices,
-                             dRandomNumBuffer, dRayDifferentials,
-                             dRays, dHits, dHitKeys,
-                             globalStateE, processQueue);
-        },
-        // Empty Kernel for light
-        [&, this](const auto&, Span<uint32_t>, uint32_t, uint32_t) {});
-    }
+    //
+    Span<RayIndex> dIndices = DoRenderPass(processQueue);
 
     // Find the dead paths again
     // Every path is processed, so we do not need to use the scambled

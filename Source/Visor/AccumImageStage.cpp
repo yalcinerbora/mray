@@ -148,7 +148,7 @@ AccumulateStatus AccumImageStage::IssueAccumulation(const RenderImageSection& se
     uniformBuffer.FlushRange(handlesVk->deviceVk);
 
     // TODO: Check if overlapping is allowed
-    std::array rgbOffsets = section.PixelOffsetsRGB();
+    std::array rgbOffsets = section.pixStartOffsets;
 
     DescriptorBindList<ShaderBindingData> bindList =
     {

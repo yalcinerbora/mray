@@ -88,6 +88,20 @@ namespace PathTraceRDetail
     };
     using SampleMode = GenericEnum<SampleModeEnum, SampleModeNames>;
 
+    enum class RenderModeEnum
+    {
+        THROUGHPUT,
+        LATENCY,
+        //
+        END
+    };
+    static constexpr std::array RenderModeNames =
+    {
+        "Throughput",
+        "Latency"
+    };
+    using RenderMode = GenericEnum<RenderModeEnum, RenderModeNames>;
+
     enum class RayType : uint8_t
     {
         SHADOW_RAY,
@@ -120,6 +134,7 @@ namespace PathTraceRDetail
         Vector2ui           russianRouletteRange = Vector2ui(4, 20);
         LightSamplerType    lightSampler = LightSamplerType::E::UNIFORM;
         SampleMode          sampleMode = SampleMode::E::PURE;
+        RenderMode          renderMode = RenderMode::E::THROUGHPUT;
     };
 
     template<class LightSampler>

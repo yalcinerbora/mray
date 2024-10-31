@@ -23,8 +23,6 @@ struct RenderBufferInfo
 
 struct RenderImageSection
 {
-    static constexpr size_t CHANNEL_START_ALIGNMENT = MemAlloc::DefaultSystemAlignment();
-
     // Logical layout of the data
     // Incoming data is between these pixel ranges
     // [min, max)
@@ -36,11 +34,8 @@ struct RenderImageSection
     // Semaphore wait number for Visor/Runner
     uint64_t    waitCounter;
     //
-    size_t      pixelStartOffset;
-    size_t      weightStartOffset;
-
-    std::array<size_t, 3>
-    PixelOffsetsRGB() const;
+    std::array<size_t, 3>   pixStartOffsets;
+    size_t                  weightStartOffset;
 };
 
 struct RenderImageSaveInfo
@@ -63,17 +58,3 @@ struct RendererOutput
     Optional<RenderImageSection>    imageOut;
     bool                            triggerSave = false;
 };
-
-inline std::array<size_t, 3>
-RenderImageSection::PixelOffsetsRGB() const
-{
-    size_t pixCount = (pixelMax - pixelMin).Multiply();
-    size_t channelByteCount = Math::NextMultiple(pixCount * sizeof(Float),
-                                                 CHANNEL_START_ALIGNMENT);
-    size_t rOffset = pixelStartOffset + 0 * channelByteCount;
-    size_t gOffset = pixelStartOffset + 1 * channelByteCount;
-    size_t bOffset = pixelStartOffset + 2 * channelByteCount;
-
-    assert(weightStartOffset == pixelStartOffset + 3 * channelByteCount);
-    return {rOffset, gOffset, bOffset};
-}

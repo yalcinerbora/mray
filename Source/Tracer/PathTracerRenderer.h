@@ -115,6 +115,8 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightAr
                                     const GPUQueue& processQueue);
     void                ResetAllPaths(const GPUQueue& queue);
 
+    Span<RayIndex>      DoRenderPass(const GPUQueue& queue);
+
     public:
     // Constructors & Destructor
                             PathTracerRenderer(const RenderImagePtr&,
