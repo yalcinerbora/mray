@@ -90,7 +90,8 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightAr
     TransformKey                curCamTransformKey;
     CameraKey                   curCamKey;
     const CameraWorkPtr*        curCamWork;
-    std::vector<uint64_t>       tilePixelIndices;
+    std::vector<uint64_t>       tilePathCounts;
+    std::vector<uint64_t>       tileSPPs;
     uint64_t                    totalDeadRayCount = 0;
     SampleMode                  anchorSampleMode;
     //
@@ -115,17 +116,19 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightAr
     //
     uint64_t            SPPLimit(uint32_t spp) const;
     uint32_t            FindMaxSamplePerIteration(uint32_t rayCount, PathTraceRDetail::SampleMode);
-    Span<RayIndex>      ReloadPaths(Span<const RayIndex> dIndices,
-                                    uint32_t sppLimit,
-                                    const GPUQueue& processQueue);
-    void                ResetAllPaths(const GPUQueue& queue);
 
+    Pair<Span<RayIndex>, uint32_t>
+    ReloadPaths(Span<const RayIndex> dIndices,
+                uint32_t sppLimit,
+                const GPUQueue& processQueue);
+
+    void                ResetAllPaths(const GPUQueue& queue);
     Span<RayIndex>      DoRenderPass(uint32_t sppLimit,
                                      const GPUQueue& queue);
-
     RendererOutput      DoThroughputSingleTileRender(const GPUDevice& device,
                                                      const GPUQueue& queue);
-    RendererOutput      DoLatencyRender(const GPUDevice& device,
+    RendererOutput      DoLatencyRender(uint32_t passCount,
+                                        const GPUDevice& device,
                                         const GPUQueue& queue);
 
     public:

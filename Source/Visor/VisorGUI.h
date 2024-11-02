@@ -18,10 +18,7 @@ class VulkanImage;
 struct VisorState;
 struct ImFont;
 
-
-
 using namespace std::string_view_literals;
-
 
 struct TopBarChanges
 {

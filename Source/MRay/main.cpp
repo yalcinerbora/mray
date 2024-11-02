@@ -5,12 +5,40 @@
 #include "Core/Error.h"
 #include "Core/Error.hpp"
 #include "Core/System.h"
+#include "Core/Timer.h"
 
 #include <CLI/CLI.hpp>
 #include <string_view>
 #include "CommandI.h"
 #include "ConvertCommand.h"
 #include "VisorCommand.h"
+
+class ProcessTimer
+{
+    private:
+    Timer t;
+
+    public:
+    // Constructors & Destructor
+                    ProcessTimer();
+                    ProcessTimer(const ProcessTimer&) = delete;
+                    ProcessTimer(ProcessTimer&&) = delete;
+    ProcessTimer&   operator=(const ProcessTimer&) = delete;
+    ProcessTimer&   operator=(ProcessTimer&&) = delete;
+                    ~ProcessTimer();
+};
+
+ProcessTimer::ProcessTimer()
+{
+    t.Start();
+}
+
+ProcessTimer::~ProcessTimer()
+{
+    t.Split();
+    std::string time = FormatTimeDynamic(t);
+    MRAY_LOG("\"int main(...)\" time: {:s}", time);
+}
 
 const StaticVector<CommandI*, MAX_SUBCOMMAND_COUNT>&
 InitializeCommands() noexcept
@@ -25,6 +53,8 @@ InitializeCommands() noexcept
 
 int main(int argc, const char* const argv[])
 {
+    ProcessTimer t;
+
     if(!EnableVTMode())
     {
         MRAY_WARNING_LOG("Unable to set virtual terminal processing. "

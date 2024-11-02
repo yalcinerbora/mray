@@ -286,6 +286,10 @@ void TracerThread::HandleRendering()
             renderOut.imageOut.value()
         ));
     }
+    if(renderOut.triggerSave)
+    {
+        MRAY_LOG("***********TRIGGERING SAVE************");
+    }
 }
 
 void TracerThread::HandleStartStop(bool newStartStopSignal)

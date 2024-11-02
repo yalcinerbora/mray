@@ -58,8 +58,6 @@ static void KCWriteInvalidRays(MRAY_GRID_CONSTANT const Span<PathTraceRDetail::P
     {
         RayIndex index = dIndices[i];
         Ray ray = Ray(LARGE_VEC, LARGE_VEC);
-        // TODO: Check if inverted min max guarantees fast termination
-        // on ray casting.
         Vector2 tMM = Vector2(std::numeric_limits<Float>::max());
 
         dPathDataPack[index].status.Set(uint32_t(PathStatusEnum::INVALID));
@@ -138,14 +136,14 @@ class IsDeadAliveInvalidFunctor
     }
 };
 
-class IsDeadFunctor
+class IsAliveFunctor
 {
     Span<const PathTraceRDetail::PathDataPack> dPathDataPack;
     bool checkInvalidAsDead;
 
     public:
-    IsDeadFunctor(Span<const PathTraceRDetail::PathDataPack> dPathDataPackIn,
-                  bool checkInvalidAsDeadIn = false)
+    IsAliveFunctor(Span<const PathTraceRDetail::PathDataPack> dPathDataPackIn,
+                   bool checkInvalidAsDeadIn = false)
         : dPathDataPack(dPathDataPackIn)
         , checkInvalidAsDead(checkInvalidAsDeadIn)
     {}
@@ -158,7 +156,7 @@ class IsDeadFunctor
         bool result = state[uint32_t(PathStatusEnum::DEAD)];
         if(checkInvalidAsDead)
             result = result || state[uint32_t(PathStatusEnum::INVALID)];
-        return result;
+        return !result;
     }
 };
 
@@ -277,35 +275,45 @@ uint32_t PathTracerRenderer<MLA>::FindMaxSamplePerIteration(uint32_t rayCount,
 template<class MLA>
 uint64_t PathTracerRenderer<MLA>::SPPLimit(uint32_t spp) const
 {
-    spp *= this->imageTiler.CurrentTileSize().Multiply();
-    return spp;
+    if(spp == std::numeric_limits<uint32_t>::max())
+        return std::numeric_limits<uint64_t>::max();
+
+    Vector2ul tileSizeLong(this->imageTiler.CurrentTileSize());
+    uint64_t result = spp;
+    result *= tileSizeLong.Multiply();
+    return result;
 }
 
 template<class MLA>
-Span<RayIndex> PathTracerRenderer<MLA>::ReloadPaths(Span<const RayIndex> dIndices,
-                                                    uint32_t sppLimit,
-                                                    const GPUQueue& processQueue)
+Pair<Span<RayIndex>, uint32_t>
+PathTracerRenderer<MLA>::ReloadPaths(Span<const RayIndex> dIndices,
+                                     uint32_t sppLimit,
+                                     const GPUQueue& processQueue)
 {
     // RELOADING!!!
     // Find the dead rays
     auto [hDeadRayRanges, dDeadAliveRayIndices] = rayPartitioner.BinaryPartition
     (
         dIndices, processQueue,
-        IsDeadFunctor(dRayState.dPathDataPack, true)
+        IsAliveFunctor(dRayState.dPathDataPack, true)
     );
     processQueue.Barrier().Wait();
 
     // Generate RN for camera rays
     uint32_t camSamplePerRay = (*curCamWork)->StochasticFilterSampleRayRNCount();
-    uint32_t deadRayCount = hDeadRayRanges[1] - hDeadRayRanges[0];
-    auto dDeadRayIndices = dDeadAliveRayIndices.subspan(hDeadRayRanges[0],
+    uint32_t deadRayCount = hDeadRayRanges[2] - hDeadRayRanges[1];
+    auto dDeadRayIndices = dDeadAliveRayIndices.subspan(hDeadRayRanges[1],
                                                         deadRayCount);
+
+    uint32_t aliveRayCount = hDeadRayRanges[1] - hDeadRayRanges[0];
     if(!dDeadRayIndices.empty())
     {
-        uint64_t& tilePixIndex = tilePixelIndices[this->imageTiler.CurrentTileIndex1D()];
+        uint64_t& tilePixIndex = tilePathCounts[this->imageTiler.CurrentTileIndex1D()];
         uint64_t localPathLimit = SPPLimit(sppLimit);
         uint64_t pixelIndexLimit = std::min(tilePixIndex + deadRayCount, localPathLimit);
         uint32_t fillRayCount = static_cast<uint32_t>(pixelIndexLimit - tilePixIndex);
+        fillRayCount = std::min(deadRayCount, fillRayCount);
+        aliveRayCount += fillRayCount;
 
         if(fillRayCount != 0)
         {
@@ -339,7 +347,7 @@ Span<RayIndex> PathTracerRenderer<MLA>::ReloadPaths(Span<const RayIndex> dIndice
                 "KCInitPathState",
                 KernelIssueParams{.workCount = fillRayCount},
                 dRayState,
-                dDeadRayIndices
+                dFilledRayIndices
             );
         }
         //
@@ -361,7 +369,7 @@ Span<RayIndex> PathTracerRenderer<MLA>::ReloadPaths(Span<const RayIndex> dIndice
     }
     // Index buffer may be invalidated (Binary partition should not
     // invalidate but lets return the new buffer)
-    return dDeadAliveRayIndices;
+    return Pair(dDeadAliveRayIndices, aliveRayCount);
 }
 
 template<class MLA>
@@ -393,20 +401,20 @@ Span<RayIndex> PathTracerRenderer<MLA>::DoRenderPass(uint32_t sppLimit,
     // Create RNG state for each ray
     rnGenerator->SetupRange(this->imageTiler.Tile1DRange());
     // Reload dead paths with new
-    dIndices = ReloadPaths(dIndices, sppLimit, processQueue);
-
-    // We refilled the path buffer,
-    // and can roll back to the Iota
-    DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
+    auto [dReloadIndices, aliveRayCount] = ReloadPaths(dIndices, sppLimit,
+                                                       processQueue);
+    dIndices = dReloadIndices.subspan(0, aliveRayCount);
+    dKeys = dKeys.subspan(0, aliveRayCount);
 
     // Cast rays
     using namespace std::string_view_literals;
     Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
-    processQueue.IssueSaturatingKernel<KCSetBoundaryWorkKeys>
+    processQueue.IssueSaturatingKernel<KCSetBoundaryWorkKeysIndirect>
     (
         "KCSetBoundaryWorkKeys"sv,
-        KernelIssueParams{.workCount = static_cast<uint32_t>(dHitKeys.size())},
+        KernelIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
         dHitKeys,
+        ToConstSpan(dIndices),
         this->boundaryLightKeyPack
     );
     // Actual Ray Casting
@@ -419,11 +427,12 @@ Span<RayIndex> PathTracerRenderer<MLA>::DoRenderPass(uint32_t sppLimit,
     // Generate work keys from hit packs
     using namespace std::string_literals;
     static const std::string GenWorkKernelName = std::string(TypeName()) + "-KCGenerateWorkKeys"s;
-    processQueue.IssueSaturatingKernel<KCGenerateWorkKeys>
+    processQueue.IssueSaturatingKernel<KCGenerateWorkKeysIndirect>
     (
         GenWorkKernelName,
-        KernelIssueParams{.workCount = static_cast<uint32_t>(dHitKeys.size())},
+        KernelIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
         dKeys,
+        ToConstSpan(dIndices),
         ToConstSpan(dHitKeys),
         workHasher
     );
@@ -608,16 +617,12 @@ RendererOutput PathTracerRenderer<MLA>::DoThroughputSingleTileRender(const GPUDe
     }
 
     //
-    uint32_t sppLimit = (saveImage)
-        ? currentOptions.totalSPP
-        : std::numeric_limits<uint32_t>::max();
+    uint32_t sppLimit = (saveImage) ? currentOptions.totalSPP
+                                    : std::numeric_limits<uint32_t>::max();
     Span<RayIndex> dIndices = DoRenderPass(sppLimit, processQueue);
 
     // Find the dead paths again
-    // Every path is processed, so we do not need to use the scambled
-    // index buffer. Iota again
-    DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
-    // Do a 3-way partition,
+    // Do a 3-way partition here to catch potential invalid rays
     auto deadAlivePartitionOut = rayPartitioner.TernaryPartition
     (
         dIndices, processQueue,
@@ -674,7 +679,7 @@ RendererOutput PathTracerRenderer<MLA>::DoThroughputSingleTileRender(const GPUDe
             dRayState.dOutRayDiffs
         );
     }
-    else if(tilePixelIndices[0] == SPPLimit(currentOptions.totalSPP))
+    else if(saveImage && tilePathCounts[0] == SPPLimit(currentOptions.totalSPP))
     {
         // We exausted all alive rays while doing SPP limit.
         // Trigger a save, and unleash the renderer.
@@ -723,9 +728,13 @@ RendererOutput PathTracerRenderer<MLA>::DoThroughputSingleTileRender(const GPUDe
 }
 
 template<class MLA>
-RendererOutput PathTracerRenderer<MLA>::DoLatencyRender(const GPUDevice& device,
+RendererOutput PathTracerRenderer<MLA>::DoLatencyRender(uint32_t passCount,
+                                                        const GPUDevice& device,
                                                         const GPUQueue& processQueue)
 {
+    Vector2ui tileCount2D = this->imageTiler.TileCount();
+    uint32_t tileCount1D = tileCount2D.Multiply();
+
     Timer timer; timer.Start();
     // Generate subcamera of this specific tile
     const auto& cameraWork = (*curCamWork->get());
@@ -734,7 +743,7 @@ RendererOutput PathTracerRenderer<MLA>::DoLatencyRender(const GPUDevice& device,
         dSubCameraBuffer,
         curCamKey, curCamTransformOverride,
         this->imageTiler.CurrentTileIndex(),
-        this->imageTiler.TileCount(),
+        tileCount2D,
         processQueue
     );
 
@@ -746,19 +755,24 @@ RendererOutput PathTracerRenderer<MLA>::DoLatencyRender(const GPUDevice& device,
     this->renderBuffer->ClearImage(processQueue);
 
     //
-    uint32_t passPathCount = this->imageTiler.CurrentTileSize().Multiply();
+    uint32_t tileIndex = this->imageTiler.CurrentTileIndex1D();
+    uint32_t tileSPP = static_cast<uint32_t>(tileSPPs[tileIndex]);
+    uint32_t sppLimit = tileSPP + passCount;
+    if(saveImage)
+        sppLimit = std::min(sppLimit, currentOptions.totalSPP);
+
+    tileSPPs[tileIndex] = sppLimit;
+    uint32_t currentPassCount = sppLimit - tileSPP;
+    uint32_t passPathCount = this->imageTiler.CurrentTileSize().Multiply() * currentPassCount;
     uint32_t invalidRayCount = 0;
     do
     {
-        uint32_t sppLimit = static_cast<uint32_t>((this->totalIterationCount + 1) /
-                                                  this->imageTiler.TileCount().Multiply());
-        this->imageTiler.CurrentTileSize().Multiply();
         Span<RayIndex> dIndices = DoRenderPass(sppLimit, processQueue);
 
         // Find the dead paths again
         // Every path is processed, so we do not need to use the scambled
         // index buffer. Iota again
-        DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
+        //DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
         // Do a 3-way partition,
         auto deadAlivePartitionOut = rayPartitioner.TernaryPartition
         (
@@ -801,9 +815,8 @@ RendererOutput PathTracerRenderer<MLA>::DoLatencyRender(const GPUDevice& device,
                 dRayState.dOutRayDiffs
             );
         }
-
-        invalidRayCount = (static_cast<uint32_t>(dInvalidRayIndices.size()) +
-                           static_cast<uint32_t>(dDeadRayIndices.size()));
+        assert(dInvalidRayIndices.size() == 0);
+        invalidRayCount += (static_cast<uint32_t>(dDeadRayIndices.size()));
     } while(invalidRayCount != passPathCount);
 
     // One spp of this tile should be done now.
@@ -817,9 +830,6 @@ RendererOutput PathTracerRenderer<MLA>::DoLatencyRender(const GPUDevice& device,
     if(!renderOut.has_value()) return RendererOutput{};
     // Actual global weight
     renderOut->globalWeight = Float(1);
-
-    // Check save trigger
-    bool triggerSave = false;
 
     // We do not need to wait here, but we time
     // from CPU side so we need to wait
@@ -836,11 +846,21 @@ RendererOutput PathTracerRenderer<MLA>::DoLatencyRender(const GPUDevice& device,
     double pathPerSec = static_cast<double>(passPathCount) / timeSec;
     pathPerSec /= 1'000'000;
 
-    double spp = double(1) / double(this->imageTiler.TileCount().Multiply());
-    spp *= static_cast<double>(this->totalIterationCount);
+    uint64_t sppSum = std::reduce(tileSPPs.cbegin(), tileSPPs.cend(), uint64_t(0));
+    double spp = double(sppSum) / double(tileCount1D);
     // Roll to the next tile
     this->imageTiler.NextTile();
 
+    // Check save trigger
+    // Notice, we've changed to the next tile above.
+    uint64_t sppSumCheck = (uint64_t(currentOptions.totalSPP) *
+                            uint64_t(tileCount1D));
+    bool triggerSave = false;
+    if(saveImage && sppSum == sppSumCheck)
+    {
+        triggerSave = true;
+        saveImage = false;
+    }
     return RendererOutput
     {
         .analytics = RendererAnalyticData
@@ -876,8 +896,6 @@ RenderBufferInfo PathTracerRenderer<MLA>::StartRender(const RenderImageParams& r
     currentOptions = newOptions;
     anchorSampleMode = currentOptions.sampleMode;
     this->totalIterationCount = 0;
-    std::fill(tilePixelIndices.begin(),
-              tilePixelIndices.end(), 0u);
     totalDeadRayCount = 0;
 
     // Generate the Filter
@@ -901,7 +919,10 @@ RenderBufferInfo PathTracerRenderer<MLA>::StartRender(const RenderImageParams& r
     this->imageTiler = ImageTiler(this->renderBuffer.get(), rIP,
                                   this->tracerView.tracerParams.parallelizationHint,
                                   Vector2ui::Zero());
-    tilePixelIndices.resize(this->imageTiler.TileCount().Multiply(), 0u);
+    tilePathCounts.resize(this->imageTiler.TileCount().Multiply(), 0u);
+    tileSPPs.resize(this->imageTiler.TileCount().Multiply(), 0u);
+    std::fill(tilePathCounts.begin(), tilePathCounts.end(), 0u);
+    std::fill(tileSPPs.begin(), tileSPPs.end(), 0u);
 
     // Generate Works to get the total work count
     // We will batch allocate
@@ -1065,8 +1086,8 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
         this->totalIterationCount = 0;
         curCamTransformOverride = this->cameraTransform;
         this->cameraTransform = std::nullopt;
-        std::fill(tilePixelIndices.begin(),
-                  tilePixelIndices.end(), 0u);
+        std::fill(tilePathCounts.begin(), tilePathCounts.end(), 0u);
+        std::fill(tileSPPs.begin(), tileSPPs.end(), 0u);
         totalDeadRayCount = 0;
 
         ResetAllPaths(processQueue);
@@ -1082,11 +1103,11 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
     else if(currentOptions.renderMode == RenderMode::E::THROUGHPUT &&
             !isSingleTile)
     {
-        throw MRayError("TODO: Implement multi-tile throughput focused render");
+        return DoLatencyRender(32u, device, processQueue);
     }
     else
     {
-        return DoLatencyRender(device, processQueue);
+        return DoLatencyRender(1u, device, processQueue);
     }
 }
 
@@ -1096,8 +1117,6 @@ void PathTracerRenderer<MLA>::StopRender()
     this->ClearAllWorkMappings();
     filmFilter = {};
     rnGenerator = {};
-    std::fill(tilePixelIndices.begin(),
-              tilePixelIndices.end(), 0u);
     metaLightArray.Clear();
 }
 

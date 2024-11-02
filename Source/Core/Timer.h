@@ -1,17 +1,16 @@
 #pragma once
 
 #include <ratio>
+#include <string>
 
 using Nanosecond    = std::nano;
 using Microsecond   = std::micro;
 using Millisecond   = std::milli;
 using Second        = std::ratio<1>;
-using Minue         = std::ratio<60>;
+using Minute        = std::ratio<60>;
 
 class Timer
 {
-
-
     private:
     uint64_t    elapsed;
     uint64_t    start;
@@ -25,13 +24,7 @@ class Timer
     void		Split();
     void		Lap();
     template <class Time>
-    double      Elapsed();
+    double      Elapsed() const;
 };
 
-
-
-//template <class Time>
-//double Timer::Elapsed()
-//{
-//    return std::chrono::duration<double, Time>(elapsed).count();
-//}
+std::string FormatTimeDynamic(const Timer& t);

@@ -29,7 +29,8 @@ Pair<ImVec2, ImVec2> CalculateInitialWindowLocation(WindowLocationType windowLoc
     uint32_t location = static_cast<uint32_t>(windowLocation);
     static constexpr float PADDING = 10.0f;
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImVec2 work_pos = viewport->WorkPos; // Use work area to avoid menu-bar/task-bar, if any!
+    // Use work area to avoid menu-bar/task-bar, if any!
+    ImVec2 work_pos = viewport->WorkPos;
     ImVec2 work_size = viewport->WorkSize;
     ImVec2 window_pos, window_pos_pivot;
     window_pos.x = (location & 1)

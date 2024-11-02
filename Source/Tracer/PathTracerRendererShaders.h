@@ -245,13 +245,16 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     // ================ //
     // Russian Roulette //
     // ================ //
+    Float specularity = mat.Specularity(surf);
     dataPack.depth += 1u;
     Vector2ui rrRange = params.globalState.russianRouletteRange;
     bool isPathDead = (dataPack.depth >= rrRange[1]);
-    if(!isPathDead)
+    if(!isPathDead && dataPack.depth >= rrRange[0])
     {
         Float rrXi = rng.NextFloat<Material::SampleRNCount>();
-        Float rrFactor = throughput.Sum() * Float(0.33333);
+        Float reflectanceAvg = raySample.value.reflectance.Sum() * Float(0.33333);
+        Float throughputAvg = raySample.value.reflectance.Sum() * Float(0.33333);
+        Float rrFactor = Math::Lerp(reflectanceAvg, throughputAvg, specularity);
         auto result = RussianRoulette(throughput, rrFactor, rrXi);
         isPathDead = !result.has_value();
         throughput = result.value_or(throughput);
@@ -260,7 +263,7 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     // Change the ray type, if mat is highly specular
     // we do not bother casting NEE ray. So if this ray
     // hits a light somehow it should not assume MIS is enabled.
-    bool isSpecular = MaterialCommon::IsSpecular(mat.Specularity(surf));
+    bool isSpecular = MaterialCommon::IsSpecular(specularity);
     dataPack.type = isSpecular ? RayType::SPECULAR_RAY : RayType::PATH_RAY;
 
     // Selectively write if path is alive

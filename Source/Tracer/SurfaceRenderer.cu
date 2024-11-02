@@ -99,7 +99,7 @@ void KCGenerateWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKe
     {
         RayIndex keyIndex = dIndices[i];
         auto keyPack = dInputKeys[keyIndex];
-        dWorkKey[keyIndex] = workHasher.GenerateWorkKeyGPU(keyPack, keyIndex);
+        dWorkKey[i] = workHasher.GenerateWorkKeyGPU(keyPack, keyIndex);
     }
 }
 
@@ -242,8 +242,8 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     currentOptions = newOptions;
     anchorMode = currentOptions.mode;
     totalIterationCount = 0;
-    std::fill(tilePixelIndices.begin(),
-              tilePixelIndices.end(), 0u);
+    std::fill(tilePathCounts.begin(),
+              tilePathCounts.end(), 0u);
 
     // Generate the Filter
     auto FilterGen = tracerView.filterGenerators.at(tracerView.tracerParams.filmFilter.type);
@@ -266,7 +266,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     imageTiler = ImageTiler(renderBuffer.get(), rIP,
                             tracerView.tracerParams.parallelizationHint,
                             Vector2ui::Zero());
-    tilePixelIndices.resize(imageTiler.TileCount().Multiply(), 0u);
+    tilePathCounts.resize(imageTiler.TileCount().Multiply(), 0u);
 
     // Generate Works to get the total work count
     // We will batch allocate
@@ -413,8 +413,8 @@ RendererOutput SurfaceRenderer::DoRender()
         totalIterationCount = 0;
         curCamTransformOverride = cameraTransform;
         cameraTransform = std::nullopt;
-        std::fill(tilePixelIndices.begin(),
-                  tilePixelIndices.end(), 0u);
+        std::fill(tilePathCounts.begin(),
+                  tilePathCounts.end(), 0u);
         saveImage = false;
     }
 
@@ -452,7 +452,7 @@ RendererOutput SurfaceRenderer::DoRender()
     rnGenerator->GenerateNumbers(dCamRayGenRNBuffer, Vector2ui(0, camSamplePerRay),
                                  processQueue);
 
-    uint64_t& tilePixIndex = tilePixelIndices[imageTiler.CurrentTileIndex1D()];
+    uint64_t& tilePixIndex = tilePathCounts[imageTiler.CurrentTileIndex1D()];
     if(currentOptions.doStochasticFilter)
     {
         cameraWork.GenRaysStochasticFilter
@@ -765,8 +765,8 @@ void SurfaceRenderer::StopRender()
     ClearAllWorkMappings();
     filmFilter = {};
     rnGenerator = {};
-    std::fill(tilePixelIndices.begin(),
-              tilePixelIndices.end(), 0u);
+    std::fill(tilePathCounts.begin(),
+              tilePathCounts.end(), 0u);
 }
 
 std::string_view SurfaceRenderer::TypeName()

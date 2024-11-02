@@ -51,7 +51,7 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     TransformKey                curCamTransformKey;
     CameraKey                   curCamKey;
     const CameraWorkPtr*        curCamWork;
-    std::vector<uint64_t>       tilePixelIndices;
+    std::vector<uint64_t>       tilePathCounts;
     Float                       curTMaxAO = std::numeric_limits<Float>::max();
     //
     RayPartitioner      rayPartitioner;
