@@ -3,7 +3,7 @@
 mray_build_ext_dependency_git(
     NAME imgui_ext
     URL "https://github.com/ocornut/imgui.git"
-    TAG "277ae93c41314ba5f4c7444f37c4319cdf07e8cf" # v1.90.4
+    TAG "99109c0b3b052cffa154a9295440f68868a39f74" # v1.91.4
     LICENSE_NAME "LICENSE.txt"
     BUILD_ARGS
         -DCMAKE_MODULE_PATH=${MRAY_CONFIG_LIB_DIRECTORY}/cmake

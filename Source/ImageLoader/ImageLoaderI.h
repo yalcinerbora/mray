@@ -161,7 +161,8 @@ class ImageLoaderI
         virtual MRayError       WriteImage(const WriteImageParams&,
                                            const std::string& filePath,
                                            ImageType extension,
-                                           ImageIOFlags = ImageIOFlags()) const = 0;
+                                           ImageIOFlags = ImageIOFlags(),
+                                           float* progressPercentData = nullptr) const = 0;
 };
 
 inline bool ImageHeader::Is2D() const

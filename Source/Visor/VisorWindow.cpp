@@ -1393,7 +1393,7 @@ bool VisorWindow::Render()
     if(newSaveInfo)
     {
         auto& rp = renderImagePool;
-        rp.SaveImage(isHDRSave, newSaveInfo.value(),
+        rp.SaveImage(gui, isHDRSave, newSaveInfo.value(),
                      imgWriteSem);
         imgWriteSem.ChangeNextWait(1);
     }

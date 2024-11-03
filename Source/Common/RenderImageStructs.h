@@ -41,9 +41,8 @@ struct RenderImageSection
 struct RenderImageSaveInfo
 {
     std::string     prefix;
-    Float           time;   // In seconds
-    Float           sample; // Mostly integer,
-    // but can be fractional
+    double          time;         // In seconds
+    double          workPerPixel;
 };
 
 struct TracerOptions

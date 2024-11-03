@@ -4,8 +4,12 @@
 #include "ImageLoader/EntryPoint.h"
 #include "Common/RenderImageStructs.h"
 
+#include <future>
+
 class FramePool;
 namespace BS { class thread_pool; }
+
+class VisorGUI;
 
 struct RenderImageInitInfo
 {
@@ -29,7 +33,6 @@ class RenderImagePool
     VulkanBuffer            outStageBuffer;
     VulkanDeviceMemory      stageMemory;
     VulkanDeviceMemory      imgMemory;
-    //VulkanTimelineSemaphore
     Byte*                   hStagePtr       = nullptr;
     // Command related
     VulkanCommandBuffer     hdrCopyCommand;
@@ -38,6 +41,7 @@ class RenderImagePool
     VulkanCommandBuffer     fullClearCommand;
     BS::thread_pool*        threadPool      = nullptr;
     ImageLoaderIPtr         imgLoader;
+    std::future<void>       loadEvent;
     //
     RenderImageInitInfo     initInfo;
 
@@ -56,10 +60,11 @@ class RenderImagePool
                         RenderImagePool(RenderImagePool&&) = default;
     RenderImagePool&    operator=(const RenderImagePool&) = delete;
     RenderImagePool&    operator=(RenderImagePool&&) = default;
-                        ~RenderImagePool() = default;
+                        ~RenderImagePool();
 
     //
-    void                SaveImage(IsHDRImage, const RenderImageSaveInfo& fileOutInfo,
+    void                SaveImage(VisorGUI& visorGUI,
+                                  IsHDRImage, const RenderImageSaveInfo& fileOutInfo,
                                   const VulkanTimelineSemaphore&);
     void                IssueClear(const VulkanTimelineSemaphore&);
     void                IssueFullClear(const VulkanTimelineSemaphore&);

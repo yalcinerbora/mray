@@ -12,6 +12,7 @@
 #include <vulkan/vulkan.h>
 #include <map>
 #include <memory>
+#include <mutex>
 
 class GUITonemapperI;
 class VulkanImage;
@@ -67,6 +68,19 @@ class MainStatusBar
     StatusBarChanges    Render(const VisorState&, bool camLocked);
 };
 
+class ImageSaveProgress
+{
+    private:
+    float       counter;
+    std::string filename;
+    public:
+    // Constructors & Destructor
+            ImageSaveProgress(std::string&& filename);
+    //
+    float*  Counter();
+    void    Render();
+};
+
 class VisorGUI
 {
     using MovementSchemeList = std::vector<std::unique_ptr<MovementSchemeI>>;
@@ -93,6 +107,9 @@ class VisorGUI
     //
     void                ShowFrameOverlay(bool&, const VisorState&);
     MovementSchemeI&    CurrentMovement();
+    //
+    std::mutex                  imgSaveMutex;
+    Optional<ImageSaveProgress> imgSaveProgress;
 
     [[nodiscard]]
     TopBarChanges   ShowTopMenu(const VisorState&);
@@ -119,4 +136,7 @@ class VisorGUI
                            const VisorState& globalState);
      void           ChangeDisplayImage(const VulkanImage&);
      void           ChangeTonemapperGUI(GUITonemapperI*);
+     // Save progress related
+     ImageSaveProgress& CreateSaveProgressWindow(std::string&& fileName);
+     void               RemoveSaveProgressWindow();
 };

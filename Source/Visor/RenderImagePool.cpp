@@ -1,8 +1,12 @@
 #include "RenderImagePool.h"
+#include "VisorGUI.h"
+
 #include "Core/Log.h"
 
 #include <BS/BS_thread_pool.hpp>
+
 #include <array>
+#include <filesystem>
 
 constexpr VkImageMemoryBarrier GENERIC_IMG_MEM_BARRIER =
 {
@@ -369,9 +373,24 @@ RenderImagePool::RenderImagePool(BS::thread_pool* tp,
     vkEndCommandBuffer(fullClearCommand);
 }
 
-void RenderImagePool::SaveImage(IsHDRImage t, const RenderImageSaveInfo& fileOutInfo,
+RenderImagePool::~RenderImagePool()
+{
+    if(loadEvent.valid()) loadEvent.wait();
+}
+
+void RenderImagePool::SaveImage(VisorGUI& visorGUI,
+                                IsHDRImage t, const RenderImageSaveInfo& fileOutInfo,
                                 const VulkanTimelineSemaphore& imgSem)
 {
+    // TODO: This is a dirty fix that halts the entire visor system,
+    // "loadEvent.wait()" will only trigger when one save operation
+    // is not done, and another is issued (probably user spammed save shortcut).
+    //
+    // We should conjure a system that no save command is *discarded from the tracer*
+    // but we should discard save commands from the hotkeys while
+    // not preventing responsiveness of the Visor.
+    if(loadEvent.valid()) loadEvent.wait();
+
     // ============= //
     //   SUBMISSON   //
     // ============= //
@@ -403,7 +422,7 @@ void RenderImagePool::SaveImage(IsHDRImage t, const RenderImageSaveInfo& fileOut
     // Copy everything on the stack.
     // Also copy semaphore and its value
     // Now during this thread's process we may encounter
-    threadPool->detach_task([this, fileOutInfo, t, &imgSem]()
+    loadEvent = threadPool->submit_task([this, fileOutInfo, t, &imgSem, &visorGUI]()
     {
         // Wait for the copy to staging buffer to finish
         imgSem.HostWait(1);
@@ -440,21 +459,25 @@ void RenderImagePool::SaveImage(IsHDRImage t, const RenderImageSaveInfo& fileOut
         };
 
         using namespace std::string_literals;
-        std::string filePath = MRAY_FORMAT("{:s}_{:f}spp_{:f}sec",
+        std::string filePath = MRAY_FORMAT("{:s}_{:010.2f}wpp_{:.2f}s",
                                            fileOutInfo.prefix,
-                                           fileOutInfo.sample,
+                                           fileOutInfo.workPerPixel,
                                            fileOutInfo.time);
+
+        std::string fileName = std::filesystem::path(filePath).filename().string();
+        ImageSaveProgress& progress = visorGUI.CreateSaveProgressWindow(std::move(fileName));
+
         // Vulkan images have top left starting coords,
         // so flip image while writing
         MRayError e = imgLoader->WriteImage(imgInfo, filePath,
                                             imgFileType,
-                                            ImageFlagTypes::FLIP_Y_COORDINATE);
-
-        // Signal ready for next command
-        //imgSem.HostSignal(2);
+                                            ImageFlagTypes::FLIP_Y_COORDINATE,
+                                            progress.Counter());
 
         // Log the error
         if(e) MRAY_ERROR_LOG("{}", e.GetError());
+
+        visorGUI.RemoveSaveProgressWindow();
     });
 }
 

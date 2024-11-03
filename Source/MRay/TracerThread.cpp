@@ -249,6 +249,8 @@ void TracerThread::RestartRenderer()
                                                rp,
                                                currentRenderLogic0,
                                                currentRenderLogic1);
+    renderTimer.Start();
+    currentWPP = 0.0;
 
     transferQueue.Enqueue(TracerResponse
     (
@@ -272,6 +274,7 @@ void TracerThread::HandleRendering()
     RendererOutput renderOut = tracer->DoRenderWork();
     if(renderOut.analytics)
     {
+        currentWPP = renderOut.analytics->workPerPixel;
         transferQueue.Enqueue(TracerResponse
         (
             std::in_place_index<TracerResponse::RENDERER_ANALYTICS>,
@@ -340,7 +343,10 @@ void TracerThread::HandleSceneChange(const std::string& newScene)
     using namespace std::filesystem;
     if(currentScene) currentScene->ClearScene();
 
-    std::string fileExt = path(newScene).extension().string();
+    auto scenePath = path(newScene);
+    currentSceneName = scenePath.filename().string();
+    std::string fileExt = scenePath.extension().string();
+
     fileExt = fileExt.substr(1);
     SceneLoaderI* loader = sceneLoaders.at(fileExt).get();
     currentScene = loader;
@@ -431,6 +437,17 @@ void TracerThread::HandleRendererChange(const std::string& rendererName)
     currentRenderer = tracer->CreateRenderer(currentRendererName);
 
     RestartRenderer();
+}
+
+std::string TracerThread::GenSavePrefix() const
+{
+    std::string prefix;
+    prefix.reserve(currentSceneName.size() +
+                   currentRendererName.size() + 1);
+    prefix += currentSceneName;
+    prefix += '_';
+    prefix += currentRendererName;
+    return prefix;
 }
 
 void TracerThread::LoopWork()
@@ -531,30 +548,34 @@ void TracerThread::LoopWork()
 
         if(hdrSaveDemand)
         {
+            std::string prefix = GenSavePrefix();
+            renderTimer.Split();
             MRAY_LOG("[Tracer]: Delegate HDR save");
             transferQueue.Enqueue(TracerResponse
             (
                 std::in_place_index<TracerResponse::SAVE_AS_HDR>,
                 RenderImageSaveInfo
                 {
-                    .prefix = "exr",
-                    .time = 3.0f,
-                    .sample = 13
+                    .prefix = std::move(prefix),
+                    .time = renderTimer.Elapsed<Second>(),
+                    .workPerPixel = currentWPP
                 }
             ));
         }
 
         if(sdrSaveDemand)
         {
+            renderTimer.Split();
+            std::string prefix = GenSavePrefix();
             MRAY_LOG("[Tracer]: Delegate SDR save");
             transferQueue.Enqueue(TracerResponse
             (
                 std::in_place_index<TracerResponse::SAVE_AS_SDR>,
                 RenderImageSaveInfo
                 {
-                    .prefix = "png",
-                    .time = 3.0f,
-                    .sample = 13
+                    .prefix = std::move(prefix),
+                    .time = renderTimer.Elapsed<Second>(),
+                    .workPerPixel = currentWPP
                 }
             ));
         }
@@ -592,11 +613,6 @@ void TracerThread::LoopWork()
         if(transform)
         {
             currentCamTransform = transform.value();
-
-            //MRAY_LOG("[Tracer]: NewTransform G{}, P{}, U{}",
-            //         currentCamTransform.gazePoint,
-            //         currentCamTransform.position,
-            //         currentCamTransform.up);
             // Transform change should be as real time as possible so
             tracer->SetCameraTransform(currentRenderer, currentCamTransform);
             transferQueue.Enqueue(TracerResponse
@@ -604,7 +620,6 @@ void TracerThread::LoopWork()
                 std::in_place_index<TracerResponse::CLEAR_IMAGE_SECTION>,
                 true
             ));
-            //RestartRenderer();
         }
         // New renderer
         if(rendererName) HandleRendererChange(rendererName.value());

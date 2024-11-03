@@ -4,6 +4,7 @@
 #include "Core/RealtimeThread.h"
 #include "Core/SharedLibrary.h"
 #include "Core/SceneLoaderI.h"
+#include "Core/Timer.h"
 
 #include "Common/TransferQueue.h"
 
@@ -30,6 +31,7 @@ class TracerThread final : public RealtimeThread
     Vector2ui   regionMin;
     Vector2ui   regionMax;
     // Current State
+    std::string         currentSceneName;
     std::string         currentRendererName;
     uint32_t            currentRenderLogic0     = 0;
     uint32_t            currentRenderLogic1     = 0;
@@ -39,6 +41,9 @@ class TracerThread final : public RealtimeThread
     AABB3               currentSceneAABB        = AABB3::Zero();
     TracerIdPack        sceneIds;
     SemaphoreInfo       currentSem = {};
+    //
+    double              currentWPP = 0;
+    Timer               renderTimer;
     // Flow states
     // TODO: I'm pretty sure this will get complicated really fast
     // maybe change this to a state machine later
@@ -65,6 +70,7 @@ class TracerThread final : public RealtimeThread
     void        HandlePause();
     void        HandleSceneChange(const std::string&);
     void        HandleRendererChange(const std::string&);
+    std::string GenSavePrefix() const;
 
     public:
     // Constructors & Destructor

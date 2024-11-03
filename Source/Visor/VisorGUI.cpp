@@ -415,6 +415,52 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
     };
 }
 
+
+ImageSaveProgress::ImageSaveProgress(std::string&& filenameIn)
+    : counter(0.0f)
+    , filename(std::move(filenameIn))
+{}
+
+float* ImageSaveProgress::Counter()
+{
+    return &counter;
+}
+
+void ImageSaveProgress::Render()
+{
+    static constexpr float PADDING = 10.0f;
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    // Use work area to avoid menu-bar/task-bar, if any!
+    ImVec2 work_pos = viewport->WorkPos;
+    ImVec2 work_size = viewport->WorkSize;
+    ImGuiWindowFlags window_flags = (ImGuiWindowFlags_NoDecoration       |
+                                     ImGuiWindowFlags_AlwaysAutoResize   |
+                                     ImGuiWindowFlags_NoSavedSettings    |
+                                     ImGuiWindowFlags_NoFocusOnAppearing |
+                                     ImGuiWindowFlags_NoNav              |
+                                     ImGuiWindowFlags_NoMove);
+
+    // TODO: Center to the work posiiton
+    ImVec2 window_pos = ImVec2(work_pos.x + work_size.x * 0.5f,
+                               work_pos.y + PADDING);
+
+    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+    ImGui::SetNextWindowBgAlpha(0.66f);
+    if(ImGui::Begin("##SaveWindow", nullptr, window_flags))
+    {
+        ImGui::Text("%s",  filename.c_str());
+        ImGui::ProgressBar(-0.7f * (float)ImGui::GetTime(),
+                           ImVec2(0.0f, 0.0f), "Saving...");
+        ImGui::SameLine();
+        // OIIO's progress is not a fine grained one.
+        // TODO: Check if we are doing something wrong in OIIO side
+        // So doing a indeterminate progress bar with padded value
+        float fetch = std::atomic_ref<float>(counter).load() * 100.0f;
+        ImGui::Text("[%u/100]", static_cast<uint32_t>(fetch));
+    }
+    ImGui::End();
+}
+
 void VisorGUI::ShowFrameOverlay(bool& isOpen,
                                 const VisorState& visorState)
 {
@@ -711,9 +757,15 @@ GUIChanges VisorGUI::Render(ImFont* windowScaledFont, const VisorState& visorSta
 
     if(topBarOn)
         guiChanges.topBarChanges = ShowTopMenu(visorState);
+    //
     if(bottomBarOn)
         guiChanges.statusBarState = ShowStatusBar(visorState);
     guiChanges.transform = ShowMainImage(visorState);
+    //
+    {
+        std::lock_guard _(imgSaveMutex);
+        if(imgSaveProgress) imgSaveProgress->Render();
+    }
 
     ImGui::PopFont();
     ImGui::Render();
@@ -733,4 +785,18 @@ void VisorGUI::ChangeDisplayImage(const VulkanImage& img)
 void VisorGUI::ChangeTonemapperGUI(GUITonemapperI* newTonemapperGUI)
 {
     tonemapperGUI = newTonemapperGUI;
+}
+
+ImageSaveProgress& VisorGUI::CreateSaveProgressWindow(std::string&& fileName)
+{
+    std::lock_guard _(imgSaveMutex);
+    assert(!imgSaveProgress.has_value());
+    imgSaveProgress = ImageSaveProgress(std::move(fileName));
+    return *imgSaveProgress;
+}
+
+void VisorGUI::RemoveSaveProgressWindow()
+{
+    std::lock_guard _(imgSaveMutex);
+    imgSaveProgress = std::nullopt;
 }

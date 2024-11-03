@@ -93,5 +93,6 @@ class ImageLoader final : public ImageLoaderI
         MRayError               WriteImage(const WriteImageParams&,
                                            const std::string& filePath,
                                            ImageType extension,
-                                           ImageIOFlags = ImageIOFlags()) const override;
+                                           ImageIOFlags = ImageIOFlags(),
+                                           float* progressPercentData = nullptr) const override;
 };

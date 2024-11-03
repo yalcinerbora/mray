@@ -7,6 +7,13 @@
 
 #include "Core/MRayDataType.h"
 
+bool ProgressCallbackOIIO(void* progressPercentData, float portion)
+{
+    auto floatPtr = static_cast<float*>(progressPercentData);
+    std::atomic_ref<float>(*floatPtr).store(portion);
+    return false;
+};
+
 Expected<std::string_view> ImageLoader::ImageTypeToExtension(ImageType type)
 {
     using namespace std::literals;
@@ -81,7 +88,8 @@ Expected<ImageFilePtr> ImageLoader::OpenFile(const std::string& filePath,
 MRayError ImageLoader::WriteImage(const WriteImageParams& imgIn,
                                   const std::string& filePath,
                                   ImageType extension,
-                                  ImageIOFlags flags) const
+                                  ImageIOFlags flags,
+                                  float* progressPercentData) const
 {
     using enum ImageIOFlags::F;
     const auto& extE = ImageTypeToExtension(extension);
@@ -114,10 +122,20 @@ MRayError ImageLoader::WriteImage(const WriteImageParams& imgIn,
         dataStart += (imgIn.header.dimensions[1] - 1) * inSpec.scanline_bytes();
     }
 
+    OIIO::ProgressCallback callback = nullptr;
+    void* progressPercentDataVoid = nullptr;
+    if(progressPercentData)
+    {
+        callback = ProgressCallbackOIIO;
+        progressPercentDataVoid = progressPercentData;
+    }
+
     // TODO: properly write an error check/out code for these.
     if(!out->open(fullPath, outSpec))
         return MRayError("OIIO Error ({})", out->geterror());
-    if(!out->write_image(outSpec.format, dataStart, xStride, yStride))
+    if(!out->write_image(outSpec.format, dataStart, xStride, yStride,
+                         OIIO::AutoStride, callback,
+                         progressPercentDataVoid))
         return MRayError("OIIO Error ({})", out->geterror());
     if(!out->close())
         return MRayError("OIIO Error ({})", out->geterror());
