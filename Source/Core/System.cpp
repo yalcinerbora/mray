@@ -92,6 +92,25 @@ bool EnableVTMode()
             SetVT(STD_ERROR_HANDLE));
 }
 
+// https://stackoverflow.com/questions/23369503/get-size-of-terminal-window-rows-columns
+std::array<size_t, 2>
+GetTerminalSize()
+{
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    int columns, rows;
+
+    GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
+    columns = csbi.srWindow.Right - csbi.srWindow.Left + 1;
+    rows = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+    //
+    assert(columns >= 0 && rows >= 0);
+    return
+    {
+        static_cast<size_t>(columns),
+        static_cast<size_t>(rows)
+    };
+}
+
 #elif defined MRAY_LINUX
 
 void RenameThread(std::thread::native_handle_type t, const std::string& name)
@@ -107,6 +126,19 @@ std::string GetProcessPath()
 bool EnableVTMode()
 {
     return true;
+}
+
+// https://stackoverflow.com/questions/23369503/get-size-of-terminal-window-rows-columns
+std::array<size_t, 2>
+GetTerminalSize()
+{
+    struct winsize w = {};
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    return
+    {
+        static_cast<size_t>(w.ws_col),
+        static_cast<size_t>(w.ws_row)
+    };
 }
 
 #else

@@ -53,19 +53,6 @@ Expected<nlohmann::json> OpenFile(const std::string& filePath)
     }
 }
 
-// Simple wrapper to utilize "MultiData" allocation scheme
-struct VectorBackedMemory
-{
-    std::vector<uint8_t> v;
-
-    void ResizeBuffer(size_t s) { v.resize(s); }
-    size_t Size() const { return v.size(); }
-
-    explicit operator const Byte*() const { return reinterpret_cast<const Byte*>(v.data()); }
-    explicit operator Byte* () { return reinterpret_cast<Byte*>(v.data()); }
-};
-static_assert(MemoryC<VectorBackedMemory>);
-
 Expected<std::vector<MeshGroup>> FindMeshes(const nlohmann::json& sceneJson)
 {
     if(auto primNodes = sceneJson.find(NodeNames::PRIMITIVE_LIST);
@@ -151,10 +138,9 @@ MRayError THRDProcessMesh(Span<MeshGroup> meshes,
         aiProcess_RemoveRedundantMaterials
     );
 
-
-    // Thread local buffers, used to
-    VectorBackedMemory indexMem;
-    VectorBackedMemory meshMem;
+    // Thread local buffers
+    MemAlloc::VectorBackedMemory indexMem;
+    MemAlloc::VectorBackedMemory meshMem;
 
     for(auto& mesh : meshes)
     {

@@ -226,7 +226,7 @@ MRayError VisorCommand::Invoke()
     // First stop the tracer, since tracer commands
     // submit glfw "empty event" to trigger visor rendering
     tracerThread.Stop();
-    // Now we can destory the tracer
+    // Now we can destory the visor
     visorSystem->MTDestroy();
     // All Done!
     return e;
@@ -236,7 +236,6 @@ CLI::App* VisorCommand::GenApp(CLI::App& mainApp)
 {
     using namespace MRayCLI::VisorNames;
     CLI::App* visorApp = mainApp.add_subcommand(std::string(Name), std::string(Description));
-        //->alias(std::string(Name));
 
     // Input
     visorApp->add_option("--tracerConf, --tConf"s, tracerConfigFile,

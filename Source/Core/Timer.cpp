@@ -27,6 +27,12 @@ void Timer::Lap()
     start = std::bit_cast<uint64_t>(end);
 }
 
+uint64_t Timer::ElapsedIntMS() const
+{
+    Duration dur = std::bit_cast<Duration>(elapsed);
+    return std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();
+}
+
 template <>
 double Timer::Elapsed<Nanosecond>() const
 {

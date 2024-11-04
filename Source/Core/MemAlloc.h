@@ -76,6 +76,17 @@ template <ImplicitLifetimeC Left, ImplicitLifetimeC Right>
 requires RepurposeAllocRequirements<Left, Right>
 constexpr Span<Left> RepurposeAlloc(Span<Right> rhs);
 
+// Simple wrapper to utilize "MultiData" allocation scheme
+struct VectorBackedMemory
+{
+    std::vector<uint8_t>    v;
+    //
+    void                    ResizeBuffer(size_t s);
+    size_t                  Size() const;
+    explicit operator const Byte*() const;
+    explicit operator       Byte*();
+};
+
 }
 
 namespace MemAlloc::Detail
@@ -263,5 +274,29 @@ constexpr Span<Left> RepurposeAlloc(Span<Right> rhs)
     Left* leftPtr = std::launder(reinterpret_cast<Left*>(rawPtr));
     return Span<Left>(leftPtr, elementCount);
 }
+
+inline void VectorBackedMemory::ResizeBuffer(size_t s)
+{
+    v.resize(s);
+}
+
+inline size_t VectorBackedMemory::Size() const
+{
+    return v.size();
+}
+
+inline VectorBackedMemory::operator const Byte*() const
+{
+    return reinterpret_cast<const Byte*>(v.data());
+}
+
+inline VectorBackedMemory::operator Byte*()
+{
+    return reinterpret_cast<Byte*>(v.data());
+}
+
+static_assert(MemoryC<VectorBackedMemory>,
+              "\"VectorBackedMemory\" does not "
+              "satisfy MemoryC concept!");
 
 }

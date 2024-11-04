@@ -23,6 +23,8 @@ class Timer
     void        Start();
     void		Split();
     void		Lap();
+    //
+    uint64_t    ElapsedIntMS() const;
     template <class Time>
     double      Elapsed() const;
 };

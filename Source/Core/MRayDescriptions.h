@@ -48,6 +48,9 @@ namespace MRay
         MRAY_AVX512
     };
 
+    template<class T>
+    constexpr size_t HostArchSIMDWidth();
+
     #if defined MRAY_HOST_ARCH_AVX2
         static constexpr HostArch MRAY_HOST_ARCH = HostArch::MRAY_AVX2;
     #elif defined MRAY_HOST_ARCH_AVX512
@@ -58,3 +61,15 @@ namespace MRay
 
 }
 
+template<class T>
+constexpr size_t MRay::HostArchSIMDWidth()
+{
+    size_t SIMD_WIDTH_BITS;
+    if constexpr(MRAY_HOST_ARCH == HostArch::MRAY_AVX2)
+        SIMD_WIDTH_BITS = 256;
+    else if constexpr(MRAY_HOST_ARCH == HostArch::MRAY_AVX512)
+        SIMD_WIDTH_BITS = 512;
+    else return 1;
+
+    return SIMD_WIDTH_BITS / CHAR_BIT / sizeof(T);
+}

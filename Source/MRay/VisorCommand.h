@@ -15,7 +15,7 @@ class VisorCommand : public CommandI
     OptionalRes             imgRes              = std::array<uint32_t, 2>{0, 0};
     uint32_t                threadCount;
 
-    private:            VisorCommand();
+                        VisorCommand();
     public:
     static CommandI&    Instance();
 

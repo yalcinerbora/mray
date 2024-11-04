@@ -12,6 +12,7 @@
 #include "CommandI.h"
 #include "ConvertCommand.h"
 #include "VisorCommand.h"
+#include "RunCommand.h"
 
 class ProcessTimer
 {
@@ -46,7 +47,8 @@ InitializeCommands() noexcept
     static const StaticVector<CommandI*, MAX_SUBCOMMAND_COUNT> CommandList =
     {
         &VisorCommand::Instance(),
-        &ConvertCommand::Instance()
+        &ConvertCommand::Instance(),
+        &RunCommand::Instance()
     };
     return CommandList;
 };
@@ -117,7 +119,7 @@ int main(int argc, const char* const argv[])
     MRayError e = appIt->first->Invoke();
     if(e)
     {
-        MRAY_ERROR_LOG("[Visor]: {}", e.GetError());
+        MRAY_ERROR_LOG("[Main]: {}", e.GetError());
         return 1;
     }
     return 0;
