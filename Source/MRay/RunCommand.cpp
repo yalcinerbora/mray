@@ -8,19 +8,35 @@
 #include "Common/RenderImageStructs.h"
 #include "Common/TransferQueue.h"
 
-#include <BS/BS_thread_pool.hpp>
 #include <CLI/CLI.hpp>
 #include <string_view>
+#include <barrier>
 #include <immintrin.h>
 
-#define MRAY_EQUALS_CHAR_8 "========"
-#define MRAY_EQUALS_CHAR_16 MRAY_EQUALS_CHAR_8 MRAY_EQUALS_CHAR_8
-#define MRAY_EQUALS_CHAR_32 MRAY_EQUALS_CHAR_16 MRAY_EQUALS_CHAR_16
-
-#define MRAY_SPACE_CHAR_8 "        "
-#define MRAY_SPACE_CHAR_16 MRAY_SPACE_CHAR_8 MRAY_SPACE_CHAR_8
-#define MRAY_SPACE_CHAR_32 MRAY_SPACE_CHAR_16 MRAY_SPACE_CHAR_16
-
+// Kinda hacky way but w/e.
+// fmt does not have a easy way to accept repeating char patterns
+// unless it is string etc. (You probably can do it, but we have at most 128 * 2
+// char buffer so it is fine, did not bother implementing some internals of fmt)
+//
+template<char C, uint32_t MAX_SIZE>
+struct RepeatingChar
+{
+    private:
+    static constexpr std::array<char, MAX_SIZE> Allocate()
+    {
+        std::array<char, MAX_SIZE> result;
+        result.fill(C);
+        return result;
+    }
+    static constexpr std::array CharBuffer = Allocate();
+    static constexpr std::string_view CharSV = std::string_view(CharBuffer.data(), MAX_SIZE);
+    //
+    public:
+    static constexpr std::string_view StringView(uint32_t length)
+    {
+        return CharSV.substr(0, std::min(length, MAX_SIZE));
+    };
+};
 
 namespace EyeAnim
 {
@@ -61,38 +77,62 @@ namespace EyeAnim
     class SimpleProgressBar
     {
         private:
-        static constexpr std::string_view EQUALS = MRAY_EQUALS_CHAR_32;
-        static constexpr std::string_view SPACES = MRAY_SPACE_CHAR_32;
-        static constexpr size_t MAX_WIDTH = EQUALS.size();
+
+        static constexpr uint32_t MAX_WIDTH = 128;
+        using EqualsBuffer = RepeatingChar<'=', MAX_WIDTH >;
+        using SpaceBuffer  = RepeatingChar<' ', MAX_WIDTH >;
 
         public:
-        void Display(Float ratio, uint64_t timeMS, std::string_view prefix);
+        void Display(Float ratio, uint64_t timeMS, std::string_view postfix);
     };
 }
 
-void EyeAnim::SimpleProgressBar::Display(Float ratio, uint64_t timeMS,
-                                         std::string_view prefix)
-{
-    // We query this everytime for adjusting the size
-    auto terminalSize = GetTerminalSize();
-    // TODO: Bound limit
-    size_t leftover = terminalSize[0] - prefix.size() - 2 - 5 - 3;
 
-    leftover = std::min(leftover, MAX_WIDTH);
-    size_t eqCount = static_cast<uint32_t>(std::round(Float(leftover) * ratio));
-    size_t spaceCount = leftover - eqCount;
+std::mutex test;
+
+
+void EyeAnim::SimpleProgressBar::Display(Float ratio, uint64_t timeMS,
+                                         std::string_view postfix)
+{
+    // TODO: Terminal sometimes fails when fast minimization occurs
+    // (Resudial characters appear at the next line).
+    // Investigate.
+    //
+    // There is a race condition that hard to synchronize
+    // since we can't properly lock the terminal resize event when this function runs.
+    // (Probably there is a way but I did not investigate fully)
+    static constexpr auto FMT_STR = fmt::string_view("[{:s}{:s}] {:s} {:s}\r");
 
     uint64_t localTime = timeMS % LegolasAnimDurations.back();
+    // TODO: "find_if" probably better
     auto loc = std::upper_bound(LegolasAnimDurations.cbegin(),
                                 LegolasAnimDurations.cend(), localTime);
     std::ptrdiff_t animIndex = std::distance(LegolasAnimDurations.begin(), loc) - 1;
     assert(loc != LegolasAnimDurations.end());
-
     std::string_view animSprite = LegolasAnimSheet[animIndex].first;
-    fmt::print("[{:s}{:s}] {:s} {:s}\n",
-               EQUALS.substr(0, eqCount),
-               SPACES.substr(0, spaceCount),
-               animSprite, prefix);
+
+    // We query this everytime for adjusting the size
+    auto terminalSize = GetTerminalSize();
+    // Do not bother with progress bar, just print eye and postfix
+    if(terminalSize[0] <= postfix.size())
+    {
+        fmt::print("{} {}\r", animSprite, postfix);
+        std::fflush(stdout);
+        return;
+    }
+
+    uint32_t leftover = static_cast<uint32_t>(terminalSize[0] - postfix.size());
+    leftover -= static_cast<uint32_t>(LegolasAnimSheet.front().first.size());
+    leftover -= 20; // Arbitrary 20 character padding
+    leftover = std::min(leftover, MAX_WIDTH);
+    uint32_t eqCount = static_cast<uint32_t>(std::round(Float(leftover) * ratio));
+    uint32_t spaceCount = leftover - eqCount;
+
+    fmt::print(FMT_STR,
+                EqualsBuffer::StringView(eqCount),
+                SpaceBuffer::StringView(spaceCount),
+                animSprite, postfix);
+    std::fflush(stdout);
 }
 
 namespace Accum
@@ -112,6 +152,7 @@ namespace Accum
 
     BS::multi_future<void>
     AccumulateImage(RGBWeightSpan<double> output,
+                    TimelineSemaphore& sem,
                     BS::thread_pool& threadPool,
                     const RenderImageSection&,
                     const RenderBufferInfo&);
@@ -147,14 +188,23 @@ void Accum::AccumulateScanline(RGBWeightSpan<double> output,
         }
         //
         __m512d sTotal = _mm512_add_pd(sOut, sIn);
-        __m512d sRecip = _mm512_rcp14_pd(sTotal);
         __m512d newR = _mm512_fmadd_pd(rOut, sOut, rIn);
         __m512d newG = _mm512_fmadd_pd(gOut, sOut, gIn);
         __m512d newB = _mm512_fmadd_pd(bOut, sOut, bIn);
-        //
-        newR = _mm512_mul_pd(newR, sRecip);
-        newG = _mm512_mul_pd(newG, sRecip);
-        newB = _mm512_mul_pd(newB, sRecip);
+        static constexpr bool HAS_RECIP = false;
+        if constexpr(HAS_RECIP)
+        {
+            __m512d sRecip = _mm512_rcp14_pd(sTotal);
+            newR = _mm512_mul_pd(newR, sRecip);
+            newG = _mm512_mul_pd(newG, sRecip);
+            newB = _mm512_mul_pd(newB, sRecip);
+        }
+        else
+        {
+            newR = _mm512_div_pd(newR, sTotal);
+            newG = _mm512_div_pd(newG, sTotal);
+            newB = _mm512_div_pd(newB, sTotal);
+        }
         //
         _mm512_storeu_pd(output.Get<R>().data() + i * SIMD_WIDTH, newR);
         _mm512_storeu_pd(output.Get<G>().data() + i * SIMD_WIDTH, newG);
@@ -186,14 +236,25 @@ void Accum::AccumulateScanline(RGBWeightSpan<double> output,
         }
         //
         __m256d sTotal = _mm256_add_pd(sOut, sIn);
-        __m256d sRecip = _mm256_rcp14_pd(sTotal);
+        //
         __m256d newR = _mm256_fmadd_pd(rOut, sOut, rIn);
         __m256d newG = _mm256_fmadd_pd(gOut, sOut, gIn);
         __m256d newB = _mm256_fmadd_pd(bOut, sOut, bIn);
         //
-        newR = _mm256_mul_pd(newR, sRecip);
-        newG = _mm256_mul_pd(newG, sRecip);
-        newB = _mm256_mul_pd(newB, sRecip);
+        static constexpr bool HAS_RECIP = false;
+        if constexpr(HAS_RECIP)
+        {
+            __m256d sRecip = _mm256_rcp14_pd(sTotal);
+            newR = _mm256_mul_pd(newR, sRecip);
+            newG = _mm256_mul_pd(newG, sRecip);
+            newB = _mm256_mul_pd(newB, sRecip);
+        }
+        else
+        {
+            newR = _mm256_div_pd(newR, sTotal);
+            newG = _mm256_div_pd(newG, sTotal);
+            newB = _mm256_div_pd(newB, sTotal);
+        }
         //
         _mm256_storeu_pd(output.Get<R>().data() + i * SIMD_WIDTH, newR);
         _mm256_storeu_pd(output.Get<G>().data() + i * SIMD_WIDTH, newG);
@@ -229,11 +290,11 @@ void Accum::AccumulateScanline(RGBWeightSpan<double> output,
     for(size_t i = 0; i < loopSize; i++)
     {
         using enum MRay::HostArch;
-        if constexpr(MRay::MRAY_HOST_ARCH == MRAY_AVX512)
-            Iteration_AVX512(i);
-        else if constexpr(MRay::MRAY_HOST_ARCH == MRAY_AVX2)
-            Iteration_AVX2(i);
-        else
+        //if constexpr(MRay::MRAY_HOST_ARCH == MRAY_AVX512)
+        //    Iteration_AVX512(i);
+        //else if constexpr(MRay::MRAY_HOST_ARCH == MRAY_AVX2)
+        //    Iteration_AVX2(i);
+        //else
             Iteration_Common(i);
     }
 
@@ -248,6 +309,7 @@ void Accum::AccumulateScanline(RGBWeightSpan<double> output,
 
 BS::multi_future<void>
 Accum::AccumulateImage(RGBWeightSpan<double> output,
+                       TimelineSemaphore& sem,
                        BS::thread_pool& threadPool,
                        const RenderImageSection& rIS,
                        const RenderBufferInfo& rBI)
@@ -259,13 +321,26 @@ Accum::AccumulateImage(RGBWeightSpan<double> output,
 
     uint32_t scanlineWidth = rIS.pixelMax[0] - rIS.pixelMin[0];
     uint32_t scanlineCount = rIS.pixelMax[1] - rIS.pixelMin[1];
-    //
-    auto wait = threadPool.submit_blocks(0u, scanlineCount,
-    [&](uint32_t start, uint32_t end) -> void
+
+    // TODO: Move this from shared ptr, at least allocate once instead of every iteration
+    static Timer t;
+    t.Start();
+    auto BarrierFunc = [&]() noexcept
+    {
+        t.Split();
+        MRAY_LOG("DONE in {}ms", t.Elapsed<Millisecond>());
+        sem.Release();
+    };
+    using Barrier = std::barrier<decltype(BarrierFunc)>;
+    uint32_t threadCount = threadPool.get_thread_count();
+    auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
+    // Enforce copy of the function between threads
+    // via const. (Or barrier shared pointer will not work)
+    const auto WorkFunc = [=](uint32_t start, uint32_t end) -> void
     {
         for(uint32_t i = start; i < end; i++)
         {
-            uint32_t offsetOut = i * rBI.resolution[0] + rIS.pixelMax[0];
+            uint32_t offsetOut = i * rBI.resolution[0] + rIS.pixelMin[0];
             auto scanlineOut = RGBWeightSpan<double>
             (
                 output.Get<R>().subspan(offsetOut, scanlineWidth),
@@ -285,7 +360,14 @@ Accum::AccumulateImage(RGBWeightSpan<double> output,
             //
             AccumulateScanline(scanlineOut, scanlineIn);
         }
-    });
+        // TODO: Only arrive gives warning, but we use barrier
+        // only for completion function. Check a way later.
+        barrier->arrive_and_wait();
+    };
+    //
+    auto wait = threadPool.submit_blocks(std::size_t(0),
+                                         std::size_t(scanlineCount),
+                                         WorkFunc, threadCount);
     return wait;
 }
 
@@ -296,14 +378,156 @@ namespace MRayCLI::RunNames
     static constexpr auto Description = "Directly runs a given scene file without GUI"sv;
 };
 
-bool RunCommand::EventLoop()
+bool RunCommand::EventLoop(TransferQueue& transferQueue,
+                           BS::thread_pool& threadPool)
 {
     auto size = GetTerminalSize();
     timer.Split();
 
-    EyeAnim::SimpleProgressBar p;
+    Optional<RenderBufferInfo>      newRenderBuffer;
+    Optional<RenderImageSection>    newImageSection;
+    Optional<bool>                  newClearSignal;
+    Optional<RenderImageSaveInfo>   newSaveInfo;
 
-    p.Display(Float(0.5), timer.ElapsedIntMS(), "Test");
+    TracerResponse response;
+    while(transferQueue.GetVisorView().TryDequeue(response))
+    {
+        using RespType = typename TracerResponse::Type;
+        RespType tp = static_cast<RespType>(response.index());
+        using enum TracerResponse::Type;
+
+        // Stop consuming commands if image section
+        // related things are in the queue
+        // these require to be processed.
+        //
+        // For other things, the latest value is enough
+        // (most of these are analytics etc)
+        bool stopConsuming = false;
+        switch(tp)
+        {
+            case CAMERA_INIT_TRANSFORM:
+            {
+                MRAY_LOG("[Run]: Transform received and ignored");
+                break;
+            }
+            case SCENE_ANALYTICS:
+            {
+                MRAY_LOG("[Run]: Scene Info received");
+                sceneInfo = std::get<SCENE_ANALYTICS>(response);
+                break;
+            }
+            case TRACER_ANALYTICS:
+            {
+                MRAY_LOG("[Run]: Tracer Info received");
+                tracerInfo = std::get<TRACER_ANALYTICS>(response);
+                break;
+            }
+            case RENDERER_ANALYTICS:
+            {
+                MRAY_LOG("[Run]: Render Info received");
+                rendererInfo = std::get<RENDERER_ANALYTICS>(response);
+                renderThroughputAverage.FeedValue(Float(rendererInfo.throughput));
+                iterationTimeAverage.FeedValue(Float(rendererInfo.iterationTimeMS));
+                break;
+            }
+            case RENDERER_OPTIONS:
+            {
+                MRAY_LOG("[Run]: Render Options received and ignored");
+                break; // TODO: User may change the render options during runtime
+            }
+            case RENDER_BUFFER_INFO:
+            {
+                MRAY_LOG("[Run]: Render Buffer Info received");
+                newRenderBuffer = std::get<RENDER_BUFFER_INFO>(response);
+                stopConsuming = true;
+                break;
+            }
+            case CLEAR_IMAGE_SECTION:
+            {
+                MRAY_LOG("[Run]: Clear Image received");
+                newClearSignal = std::get<CLEAR_IMAGE_SECTION>(response);
+                stopConsuming = true;
+                break;
+            }
+            case IMAGE_SECTION:
+            {
+                MRAY_LOG("[Run]: Image section received");
+                newImageSection = std::get<IMAGE_SECTION>(response);
+                stopConsuming = true;
+                break;
+            }
+            case SAVE_AS_HDR:
+            {
+                MRAY_LOG("[Run]: Save HDR received");
+                newSaveInfo = std::get<SAVE_AS_HDR>(response);
+                stopConsuming = true;
+                break;
+            }
+            case SAVE_AS_SDR:
+            {
+                MRAY_WARNING_LOG("[Run]: Save SDR cannot be processed "
+                                 "(No color conversion logic)");
+                break;
+            }
+            case MEMORY_USAGE:
+            {
+                MRAY_LOG("[Visor]: Memory usage received");
+                memUsage = std::get<MEMORY_USAGE>(response);
+                break;
+            }
+            default: MRAY_WARNING_LOG("[Run] Unkown tracer response is ignored!"); break;
+        }
+        if(stopConsuming) break;
+    }
+
+    //
+    if(newRenderBuffer)
+    {
+        if(accumulateFuture.valid())
+            accumulateFuture.wait();
+
+        size_t pixelCount = newRenderBuffer->resolution.Multiply();
+        MemAlloc::AllocateMultiData(std::tie(imageRData, imageGData,
+                                             imageBData, imageSData),
+                                    imageMem,
+                                    {pixelCount, pixelCount,
+                                    pixelCount, pixelCount});
+        renderBufferInfo = newRenderBuffer.value();
+    }
+    //
+    if(newClearSignal)
+    {
+        std::fill(imageSData.begin(), imageSData.end(), 0.0);
+    }
+    //
+    if(newImageSection)
+    {
+        const auto& section = newImageSection.value();
+        // Tracer may abruptly terminated (crash probably),
+        // so do not issue anything, return nullopt and
+        // let the main render loop to terminate
+        if(!syncSemaphore.Acquire(section.waitCounter))
+            return true;
+
+        // We may encounter runaway issue here, so only issue new
+        // accumulation when previous one is finished
+        if(accumulateFuture.valid())
+            accumulateFuture.wait();
+
+        Accum::RGBWeightSpan<double> out(imageRData, imageGData,
+                                         imageBData, imageSData);
+        accumulateFuture = Accum::AccumulateImage(out, syncSemaphore,
+                                                  threadPool,
+                                                  section, renderBufferInfo);
+    }
+
+    if(newSaveInfo)
+    {
+
+    }
+
+    //
+    EyeAnim::SimpleProgressBar().Display(Float(0.5), timer.ElapsedIntMS(), "Test");
     return false;
 }
 
@@ -312,7 +536,7 @@ MRayError RunCommand::Invoke()
     // Transfer queue, responsible for communication between main thread
     // (window render thread) and tracer thread
     static constexpr size_t CommandBufferSize = 8;
-    static_assert(CommandBufferSize >= 3,
+    static_assert(CommandBufferSize >= 4,
                   "Command buffer should at least have a size of two. "
                   "We issue two event before starting the tracer.");
     TransferQueue transferQueue(CommandBufferSize, CommandBufferSize,
@@ -343,10 +567,6 @@ MRayError RunCommand::Invoke()
         RenameThread(handles[i], name);
     }
 
-    // The "timeline semaphore" (CPU emulation)
-    // This will be used to synchronize between MRay and Run
-    TimelineSemaphore sem(0);
-
     // Set resolution
     Vector2ui resolution(imgRes[0], imgRes[1]);
     tracerThread.SetInitialResolution(resolution,
@@ -354,33 +574,38 @@ MRayError RunCommand::Invoke()
                                       resolution);
     // TODO: Cleanup this API (why SetInitResolution is a function
     // but these are queue events)
+    MRAY_LOG("[Run]: Sending sync semaphore...");
+    transferQueue.GetVisorView().Enqueue(VisorAction
+    (
+        std::in_place_index<VisorAction::SEND_SYNC_SEMAPHORE>,
+        SemaphoreInfo{&syncSemaphore, Accum::RenderBufferAlignment}
+    ));
+    MRAY_LOG("[Run]: Sending initial scene...");
+    transferQueue.GetVisorView().Enqueue(VisorAction
+    (
+        std::in_place_index<VisorAction::LOAD_SCENE>,
+        sceneFile
+    ));
+    // Launch the renderer
     MRAY_LOG("[Run]: Configuring Tracer via initial render config...");
     transferQueue.GetVisorView().Enqueue(VisorAction
     (
         std::in_place_index<VisorAction::KICKSTART_RENDER>,
         renderConfigFile
     ));
-
-    // Launch the renderer
     transferQueue.GetVisorView().Enqueue(VisorAction
     (
         std::in_place_index<VisorAction::START_STOP_RENDER>,
         true
     ));
-    transferQueue.GetVisorView().Enqueue(VisorAction
-    (
-        std::in_place_index<VisorAction::SEND_SYNC_SEMAPHORE>,
-        SemaphoreInfo{&sem, Accum::RenderBufferAlignment}
-    ));
-
     // Finally start the tracer
-    //tracerThread.Start("TracerThread");
+    tracerThread.Start("TracerThread");
 
     // Do the loop
     timer.Start();
     for(bool isTerminated = false; !isTerminated;)
     {
-        isTerminated = EventLoop();
+        isTerminated = EventLoop(transferQueue, threadPool);
     }
 
     // Order is important here
@@ -392,7 +617,7 @@ MRayError RunCommand::Invoke()
     // Invalidate the semaphore,
     // If tracer waits to issue next image section
     // it can terminate
-    sem.Invalidate();
+    syncSemaphore.Invalidate();
     // First stop the tracer, since tracer commands
     // submit glfw "empty event" to trigger visor rendering
     tracerThread.Stop();

@@ -1389,7 +1389,6 @@ bool VisorWindow::Render()
     GUIChanges guiChanges = gui.Render(CurrentFont(), visorState);
     HandleGUIChanges(guiChanges);
 
-
     if(newSaveInfo)
     {
         auto& rp = renderImagePool;

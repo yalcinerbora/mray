@@ -6,6 +6,8 @@
 #include <fmt/color.h>
 #include <fmt/ranges.h>
 
+// TODO: These should not generate runtime strings, we need to check the
+// fmt api to compiletime prepend stuff
 #ifdef MRAY_DEBUG
 
     template<class... Args>
@@ -25,14 +27,14 @@ template<class... Args>
 inline void MRAY_LOG(fmt::format_string<Args...> fstr, Args&&... args)
 {
     std::string s = fmt::format(fstr, std::forward<Args>(args)...);
-    fmt::print(stdout, "{:s}\n", s);
+    fmt::print(stdout, "\033[2K\r{:s}\n", s);
 }
 
 template<class... Args>
 inline void MRAY_WARNING_LOG(fmt::format_string<Args...> fstr, Args&&... args)
 {
     std::string s = fmt::format(fstr, std::forward<Args>(args)...);
-    fmt::print(stdout, "{:s}: {:s}\n",
+    fmt::print(stdout, "\033[2K\r{:s}: {:s}\n",
                fmt::format(fg(fmt::color::golden_rod), "Warning"),
                s);
 }
@@ -41,7 +43,7 @@ template<class... Args>
 inline void MRAY_ERROR_LOG(fmt::format_string<Args...> fstr, Args&&... args)
 {
     std::string s = fmt::format(fstr, std::forward<Args>(args)...);
-    fmt::print(stderr, "{:s}: {:s}\n",
+    fmt::print(stderr, "\033[2K\r{:s}: {:s}\n",
                fmt::format(fg(fmt::color::crimson), "Error"),
                s);
 }

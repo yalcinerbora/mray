@@ -1,4 +1,7 @@
+#pragma once
+
 #include <atomic>
+#include <mutex>
 
 // Vulkan - CUDA interop well define only for intra GPU operations.
 // However our main use-case is to synchronize between inter
