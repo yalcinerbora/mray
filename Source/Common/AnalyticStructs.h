@@ -37,6 +37,7 @@ struct RendererAnalyticData
     std::string         throughputSuffix;
     //
     double              workPerPixel;
+    double              wPPLimit;
     std::string         workPerPixelSuffix;
     // Timings
     float               iterationTimeMS;
@@ -66,3 +67,62 @@ struct SceneAnalyticData
     //
     AABB3       sceneExtent     = AABB3::Negative();
 };
+
+// TODO: Move this somewhere proper later
+#include "Core/MemAlloc.h"
+inline Pair<double, std::string_view> ConvertMemSizeToString(size_t size)
+{
+    // This function is overengineered for a GUI operation.
+    // This probably has better precision? (probably not)
+    // has high amount memory (TiB++ of memory).
+    Pair<double, std::string_view> result;
+    using namespace std::string_view_literals;
+    size_t shiftVal = 0;
+    if(size >= 1_TiB)
+    {
+        result.second = "TiB"sv;
+        shiftVal = 40;
+    }
+    else if(size >= 1_GiB)
+    {
+        result.second = "GiB"sv;
+        shiftVal = 30;
+    }
+    else if(size >= 1_MiB)
+    {
+        result.second = "MiB"sv;
+        shiftVal = 20;
+    }
+    else if(size >= 1_KiB)
+    {
+        result.second = "KiB"sv;
+        shiftVal = 10;
+    }
+    else
+    {
+        result.second = "Bytes"sv;
+        shiftVal = 0;
+    }
+
+    size_t mask = ((size_t(1) << shiftVal) - 1);
+    size_t integer = size >> shiftVal;
+    size_t decimal = mask & size;
+    // Sanity check
+    static_assert(std::numeric_limits<double>::is_iec559,
+                  "This overengineered function requires "
+                  "IEEE-754 floats.");
+    static constexpr size_t DOUBLE_MANTISSA = 52;
+    static constexpr size_t MANTISSA_MASK = (size_t(1) << DOUBLE_MANTISSA) - 1;
+    size_t bitCount = Bit::RequiredBitsToRepresent(decimal);
+    if(bitCount > DOUBLE_MANTISSA)
+        decimal >>= (bitCount - DOUBLE_MANTISSA);
+    else
+        decimal <<= (DOUBLE_MANTISSA - bitCount);
+
+
+    uint64_t dblFrac = std::bit_cast<uint64_t>(1.0);
+    dblFrac |= decimal & MANTISSA_MASK;
+    result.first = std::bit_cast<double>(dblFrac);
+    result.first += static_cast<double>(integer) - 1.0;
+    return result;
+}

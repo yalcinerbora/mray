@@ -63,6 +63,58 @@ double Timer::Elapsed<Minute>() const
     return std::chrono::duration<double, Minute>(std::bit_cast<Duration>(elapsed)).count();
 }
 
+std::string FormatTimeDynamic(uint64_t ms)
+{
+    if(ms == std::numeric_limits<uint64_t>::max())
+        return std::string("Eternity");
+
+    // TODO: There is probably smarter way to do this,
+    // check later
+    static constexpr double MICROSEC_THRESHOLD = 1000.0;
+    static constexpr double MILLISEC_THRESHOLD = 1000.0;
+    static constexpr double SEC_THRESHOLD = 60.0;
+    //
+    static constexpr double HOUR_IN_MINS = 60.0;
+    static constexpr double DAY_IN_MINS = 24.0 * HOUR_IN_MINS;
+
+    if(ms < MILLISEC_THRESHOLD)
+        return MRAY_FORMAT("{:.3f}ms", double(ms));
+    else if(auto sec = double(ms) / 1000.0; sec < SEC_THRESHOLD)
+        return MRAY_FORMAT("{:.3f}s", sec);
+
+    // Now do it manually
+    // Approixmate minutes as much as we can
+    double totalMinutes = double(ms / 1000) / 60.0;
+    if(totalMinutes < HOUR_IN_MINS)
+    {
+        double min;
+        double sec = std::modf(totalMinutes, &min) * 60.0;
+        return MRAY_FORMAT("{:d}m_{:.3f}s", static_cast<uint32_t>(min), sec);
+    }
+    else if(totalMinutes < DAY_IN_MINS)
+    {
+        double hour;
+        double min = std::modf(totalMinutes / HOUR_IN_MINS, &hour) * 60;
+        double sec = std::modf(min, &min) * 60;
+        return MRAY_FORMAT("{:d}h_{:d}m_{:.3f}s",
+                           static_cast<uint32_t>(hour),
+                           static_cast<uint32_t>(min),
+                           sec);
+    }
+    else
+    {
+        double day;
+        double hour = std::modf(totalMinutes / DAY_IN_MINS, &day) * 24;
+        double min = std::modf(hour, &hour) * 60;
+        double sec = std::modf(min, &min) * 60;
+        return MRAY_FORMAT("{:d}d_{:d}h_{:d}m_{:.3f}s",
+                           static_cast<uint32_t>(day),
+                           static_cast<uint32_t>(hour),
+                           static_cast<uint32_t>(min),
+                           sec);
+    }
+}
+
 std::string FormatTimeDynamic(const Timer& t)
 {
     // TODO: There is probably smarter way to do this,
@@ -87,14 +139,14 @@ std::string FormatTimeDynamic(const Timer& t)
     {
         double min;
         double sec = std::modf(totalMinutes, &min) * 60.0;
-        return MRAY_FORMAT("{:d}m_{:.3f}s", static_cast<uint32_t>(min), sec);
+        return MRAY_FORMAT("{:d}m_{:.2f}s", static_cast<uint32_t>(min), sec);
     }
     else if(totalMinutes < DAY_IN_MINS)
     {
         double hour;
         double min = std::modf(totalMinutes / HOUR_IN_MINS, &hour) * 60;
         double sec = std::modf(min, &min) * 60;
-        return MRAY_FORMAT("{:d}h_{:d}m_{:.3f}s",
+        return MRAY_FORMAT("{:d}h_{:d}m_{:.1f}s",
                            static_cast<uint32_t>(hour),
                            static_cast<uint32_t>(min),
                            sec);
@@ -105,7 +157,7 @@ std::string FormatTimeDynamic(const Timer& t)
         double hour = std::modf(totalMinutes / DAY_IN_MINS, &day) * 24;
         double min = std::modf(hour, &hour) * 60;
         double sec = std::modf(min, &min) * 60;
-        return MRAY_FORMAT("{:d}d_{:d}h_{:d}m_{:.3f}s",
+        return MRAY_FORMAT("{:d}d_{:d}h_{:d}m_{:.0f}s",
                            static_cast<uint32_t>(day),
                            static_cast<uint32_t>(hour),
                            static_cast<uint32_t>(min),

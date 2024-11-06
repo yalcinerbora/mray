@@ -20,6 +20,8 @@
     using SystemMemoryHandle = HANDLE;
     using SystemThreadHandle = HANDLE;
 
+    #define MRAY_RESTRICT __restrict
+
 #elif defined MRAY_LINUX
 
     #define MRAY_DLL_IMPORT
@@ -30,6 +32,8 @@
 
     using SystemSemaphoreHandle = int;
     using SystemMemoryHandle = int;
+
+    #define MRAY_RESTRICT __restrict
 
 #else
     #error System preprocessor definition is not set properly! (CMake should have handled this)

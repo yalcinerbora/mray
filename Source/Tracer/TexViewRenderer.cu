@@ -309,6 +309,7 @@ RendererOutput TexViewRenderer::DoRender()
             samplePerSec,
             "M pixels/s",
             spp,
+            double(currentOptions.totalSPP),
             "pix",
             float(timer.Elapsed<Millisecond>()),
             imageTiler.FullResolution(),

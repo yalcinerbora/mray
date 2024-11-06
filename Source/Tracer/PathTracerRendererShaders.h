@@ -249,12 +249,11 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     dataPack.depth += 1u;
     Vector2ui rrRange = params.globalState.russianRouletteRange;
     bool isPathDead = (dataPack.depth >= rrRange[1]);
-    if(!isPathDead && dataPack.depth >= rrRange[0])
+    if(!isPathDead && dataPack.depth >= rrRange[0] &&
+       !MaterialCommon::IsSpecular(mat.Specularity(surf)))
     {
         Float rrXi = rng.NextFloat<Material::SampleRNCount>();
-        Float reflectanceAvg = raySample.value.reflectance.Sum() * Float(0.33333);
-        Float throughputAvg = raySample.value.reflectance.Sum() * Float(0.33333);
-        Float rrFactor = Math::Lerp(reflectanceAvg, throughputAvg, specularity);
+        Float rrFactor = throughput.Sum() * Float(0.33333);
         auto result = RussianRoulette(throughput, rrFactor, rrXi);
         isPathDead = !result.has_value();
         throughput = result.value_or(throughput);

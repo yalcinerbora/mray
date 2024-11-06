@@ -30,3 +30,4 @@ class Timer
 };
 
 std::string FormatTimeDynamic(const Timer& t);
+std::string FormatTimeDynamic(uint64_t milliseconds);

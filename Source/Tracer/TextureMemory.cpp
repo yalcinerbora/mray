@@ -784,18 +784,18 @@ void TextureMemory::Finalize()
 
     Timer t;
     t.Start();
-    MRAY_LOG("[Tracer] Converting textures to global color space ...");
+    MRAY_LOG("[Tracer]: Converting textures to global color space ...");
     ConvertColorspaces();
     t.Lap();
-    MRAY_LOG("[Tracer] Texture color conversion took {}ms.",
+    MRAY_LOG("[Tracer]: Texture color conversion took {}ms.",
              t.Elapsed<Millisecond>());
 
     if(tracerParams.genMips)
     {
-        MRAY_LOG("[Tracer] Generating texture mipmaps...");
+        MRAY_LOG("[Tracer]: Generating texture mipmaps...");
         GenerateMipmaps();
         t.Split();
-        MRAY_LOG("[Tracer] Texture mipmap generation took {}ms.",
+        MRAY_LOG("[Tracer]: Texture mipmap generation took {}ms.",
                  t.Elapsed<Millisecond>());
     }
 }

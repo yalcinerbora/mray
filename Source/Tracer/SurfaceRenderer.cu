@@ -747,6 +747,7 @@ RendererOutput SurfaceRenderer::DoRender()
             samplePerSec,
             "M samples/s",
             spp,
+            double(currentOptions.totalSPP),
             "spp",
             float(timer.Elapsed<Millisecond>()),
             imageTiler.FullResolution(),

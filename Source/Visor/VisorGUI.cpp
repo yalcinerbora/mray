@@ -69,63 +69,6 @@ Pair<Vector2, Vector2> GenAspectCorrectVP(const Vector2& fbSize,
     return {vpSize, vpOffset};
 }
 
-Pair<double, std::string_view> ConvertMemSizeToGUI(size_t size)
-{
-    // This function is overengineered for a GUI operation.
-    // This probably has better precision? (probably not)
-    // has high amount memory (TiB++ of memory).
-    Pair<double, std::string_view> result;
-    using namespace std::string_view_literals;
-    size_t shiftVal = 0;
-    if(size >= 1_TiB)
-    {
-        result.second = "TiB"sv;
-        shiftVal = 40;
-    }
-    else if(size >= 1_GiB)
-    {
-        result.second = "GiB"sv;
-        shiftVal = 30;
-    }
-    else if(size >= 1_MiB)
-    {
-        result.second = "MiB"sv;
-        shiftVal = 20;
-    }
-    else if(size >= 1_KiB)
-    {
-        result.second = "KiB"sv;
-        shiftVal = 10;
-    }
-    else
-    {
-        result.second = "Bytes"sv;
-        shiftVal = 0;
-    }
-
-    size_t mask = ((size_t(1) << shiftVal) - 1);
-    size_t integer = size >> shiftVal;
-    size_t decimal = mask & size;
-    // Sanity check
-    static_assert(std::numeric_limits<double>::is_iec559,
-                  "This overengineered function requires "
-                  "IEEE-754 floats.");
-    static constexpr size_t DOUBLE_MANTISSA = 52;
-    static constexpr size_t MANTISSA_MASK = (size_t(1) << DOUBLE_MANTISSA) - 1;
-    size_t bitCount = Bit::RequiredBitsToRepresent(decimal);
-    if(bitCount > DOUBLE_MANTISSA)
-        decimal >>= (bitCount - DOUBLE_MANTISSA);
-    else
-        decimal <<= (DOUBLE_MANTISSA - bitCount);
-
-
-    uint64_t dblFrac = std::bit_cast<uint64_t>(1.0);
-    dblFrac |= decimal & MANTISSA_MASK;
-    result.first = std::bit_cast<double>(dblFrac);
-    result.first += static_cast<double>(integer) - 1.0;
-    return result;
-}
-
 const VisorKeyMap VisorGUI::DefaultKeyMap =
 {
     { VisorUserAction::TOGGLE_TOP_BAR, ImGuiKey::ImGuiKey_M },
@@ -283,8 +226,8 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
             uint64_t rendererUsedMem = visorState.renderer.usedGPUMemoryBytes;
             uint64_t totalUsedMem = rendererUsedMem + tracerUsedMem;
 
-            auto usedGPUMem = ConvertMemSizeToGUI(totalUsedMem);
-            auto totalGPUMem = ConvertMemSizeToGUI(visorState.tracer.totalGPUMemoryBytes);
+            auto usedGPUMem = ConvertMemSizeToString(totalUsedMem);
+            auto totalGPUMem = ConvertMemSizeToString(visorState.tracer.totalGPUMemoryBytes);
             std::string memUsage = MRAY_FORMAT("{:.1f}{:s} / {:.1f}{:s}",
                                                usedGPUMem.first, usedGPUMem.second,
                                                totalGPUMem.first, totalGPUMem.second);
@@ -292,8 +235,8 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
             ImGui::Text("%s", memUsage.c_str());
             if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
             {
-                auto tFormatOut = ConvertMemSizeToGUI(tracerUsedMem);
-                auto rFormatOut = ConvertMemSizeToGUI(rendererUsedMem);
+                auto tFormatOut = ConvertMemSizeToString(tracerUsedMem);
+                auto rFormatOut = ConvertMemSizeToString(rendererUsedMem);
                 std::string detailMemUsage = MRAY_FORMAT("Scene: {:.1f}{:s} / Renderer: {:.1f}{:s}",
                                                          tFormatOut.first, tFormatOut.second,
                                                          rFormatOut.first, rFormatOut.second);
@@ -479,7 +422,7 @@ void VisorGUI::ShowFrameOverlay(bool& isOpen,
     if(ImGui::Begin("##VisorOverlay", &isOpen, window_flags))
     {
         ImGui::Text("Frame       : %.2f ms", static_cast<double>(visorState.visor.frameTime));
-        auto [sz, suffix] = ConvertMemSizeToGUI(visorState.visor.usedGPUMemory);
+        auto [sz, suffix] = ConvertMemSizeToString(visorState.visor.usedGPUMemory);
         std::string memUsage = MRAY_FORMAT("{:.1f}{:s}", sz, suffix);
         ImGui::Text("Memory      : %s", memUsage.c_str());
 

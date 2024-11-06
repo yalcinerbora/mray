@@ -42,6 +42,7 @@ target_link_libraries(MRay PRIVATE
                       CoreLib
                       GFGConverter
                       TransientPool
+                      ImageLoader
                       cli11::cli11
                       bs::thread_pool
                       mray::meta_compile_opts)

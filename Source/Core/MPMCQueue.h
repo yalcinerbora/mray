@@ -21,10 +21,10 @@ class MPMCQueue
         size_t                  enqueueLoc;
         size_t                  dequeueLoc;
 
-        std::condition_variable enqueWake;
-        std::condition_variable dequeueWake;
+        std::condition_variable_any enqueWake;
+        std::condition_variable_any dequeueWake;
 
-        std::mutex              mutex;
+        std::timed_mutex        mutex;
         std::atomic_bool        isTerminated;
 
         bool                    IsEmpty();
@@ -44,6 +44,8 @@ class MPMCQueue
         // Interface
         void                    Dequeue(T&);
         bool                    TryDequeue(T&);
+        template<class D>
+        bool                    TryDequeue(T&, D);
         void                    Enqueue(T&&);
         bool                    TryEnqueue(T&&);
 
@@ -85,7 +87,7 @@ void MPMCQueue<T>::Dequeue(T& item)
 {
     if (isTerminated) return;
     {
-        std::unique_lock<std::mutex> lock(mutex);
+        std::unique_lock<std::timed_mutex> lock(mutex);
         dequeueWake.wait(lock, [&]()
         {
             return (!IsEmpty() || isTerminated);
@@ -103,8 +105,27 @@ bool MPMCQueue<T>::TryDequeue(T& item)
 {
     if (isTerminated) return false;
     {
-        std::unique_lock<std::mutex> lock(mutex);
+        std::unique_lock<std::timed_mutex> lock(mutex);
         if(IsEmpty() || isTerminated) return false;
+
+        Increment(dequeueLoc);
+        item = std::move(data[dequeueLoc]);
+    }
+    enqueWake.notify_one();
+    return true;
+}
+
+template<class T>
+template<class D>
+bool MPMCQueue<T>::TryDequeue(T& item, D duration)
+{
+    if(isTerminated) return false;
+    {
+        std::unique_lock<std::timed_mutex> lock(mutex, std::defer_lock);
+        bool result = lock.try_lock_for(duration);
+        //
+        if(IsEmpty() || isTerminated || !result)
+            return false;
 
         Increment(dequeueLoc);
         item = std::move(data[dequeueLoc]);
@@ -117,7 +138,7 @@ template<class T>
 void MPMCQueue<T>::Enqueue(T&& item)
 {
     {
-        std::unique_lock<std::mutex> lock(mutex);
+        std::unique_lock<std::timed_mutex> lock(mutex);
         enqueWake.wait(lock, [&]()
         {
             return (!IsFull() || isTerminated);
@@ -135,7 +156,7 @@ bool MPMCQueue<T>::TryEnqueue(T&& item)
 {
     if (isTerminated) return false;
     {
-        std::unique_lock<std::mutex> lock(mutex);
+        std::unique_lock<std::timed_mutex> lock(mutex);
         if(IsFull() || isTerminated) return false;
 
         data[enqueueLoc] = std::move(item);

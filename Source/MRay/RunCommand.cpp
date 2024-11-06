@@ -8,6 +8,8 @@
 #include "Common/RenderImageStructs.h"
 #include "Common/TransferQueue.h"
 
+#include "ImageLoader/EntryPoint.h"
+
 #include <CLI/CLI.hpp>
 #include <string_view>
 #include <barrier>
@@ -45,8 +47,12 @@ namespace EyeAnim
     using DurationMS = std::chrono::milliseconds;
     using LegolasLookupElem = Pair<std::string_view, DurationMS>;
 
+    static constexpr auto AragornSpeech = "Legolas! What do your elf eyes see?";
+    static constexpr auto LegolasResponse = "Uruks turn northeast, they're taking the hobbits to Isengard!";
+
     static constexpr auto AnimDurationLong = DurationMS(850);
     static constexpr auto AnimDurationShort = DurationMS(475);
+    static constexpr auto AnimDurationCommon = DurationMS(5);
     static constexpr std::array LegolasAnimSheet =
     {
         LegolasLookupElem{"< 0 >", AnimDurationLong},
@@ -87,10 +93,6 @@ namespace EyeAnim
     };
 }
 
-
-std::mutex test;
-
-
 void EyeAnim::SimpleProgressBar::Display(Float ratio, uint64_t timeMS,
                                          std::string_view postfix)
 {
@@ -101,7 +103,7 @@ void EyeAnim::SimpleProgressBar::Display(Float ratio, uint64_t timeMS,
     // There is a race condition that hard to synchronize
     // since we can't properly lock the terminal resize event when this function runs.
     // (Probably there is a way but I did not investigate fully)
-    static constexpr auto FMT_STR = fmt::string_view("[{:s}{:s}] {:s} {:s}\r");
+    static constexpr auto FMT_STR = fmt::string_view("\033[2K({:s}) [{:s}{:s}] {:s}\r");
 
     uint64_t localTime = timeMS % LegolasAnimDurations.back();
     // TODO: "find_if" probably better
@@ -116,7 +118,7 @@ void EyeAnim::SimpleProgressBar::Display(Float ratio, uint64_t timeMS,
     // Do not bother with progress bar, just print eye and postfix
     if(terminalSize[0] <= postfix.size())
     {
-        fmt::print("{} {}\r", animSprite, postfix);
+        fmt::print("\033[2K({:s}) {:s}\r", animSprite, postfix);
         std::fflush(stdout);
         return;
     }
@@ -129,16 +131,19 @@ void EyeAnim::SimpleProgressBar::Display(Float ratio, uint64_t timeMS,
     uint32_t spaceCount = leftover - eqCount;
 
     fmt::print(FMT_STR,
-                EqualsBuffer::StringView(eqCount),
-                SpaceBuffer::StringView(spaceCount),
-                animSprite, postfix);
+               animSprite,
+               EqualsBuffer::StringView(eqCount),
+               SpaceBuffer::StringView(spaceCount),
+               postfix);
     std::fflush(stdout);
 }
 
 namespace Accum
 {
     static constexpr size_t RenderBufferAlignment = 4096;
-
+    static_assert(RenderBufferAlignment >= MemAlloc::DefaultSystemAlignment(),
+                  "RenderBufferAlignment does not cover "
+                  "\"MemAlloc::DefaultSystemAlignment()\"!");
     template<std::floating_point T>
     using RGBWeightSpan = SoASpan<T, T, T, T>;
 
@@ -149,6 +154,17 @@ namespace Accum
 
     void AccumulateScanline(RGBWeightSpan<double> output,
                             RGBWeightSpan<const Float> input);
+    //
+    void AccumulatePortionBulk(double* MRAY_RESTRICT rOutPtr,
+                               double* MRAY_RESTRICT gOutPtr,
+                               double* MRAY_RESTRICT bOutPtr,
+                               double* MRAY_RESTRICT wOutPtr,
+                               const Float* MRAY_RESTRICT rInPtr,
+                               const Float* MRAY_RESTRICT gInPtr,
+                               const Float* MRAY_RESTRICT bInPtr,
+                               const Float* MRAY_RESTRICT wInPtr,
+                               size_t outputSize);
+
 
     BS::multi_future<void>
     AccumulateImage(RGBWeightSpan<double> output,
@@ -161,6 +177,7 @@ namespace Accum
 void Accum::AccumulateScanline(RGBWeightSpan<double> output,
                                RGBWeightSpan<const Float> input)
 {
+
     assert(output.Size() == input.Size());
     constexpr size_t SIMD_WIDTH = MRay::HostArchSIMDWidth<double>();
 
@@ -191,19 +208,22 @@ void Accum::AccumulateScanline(RGBWeightSpan<double> output,
         __m512d newR = _mm512_fmadd_pd(rOut, sOut, rIn);
         __m512d newG = _mm512_fmadd_pd(gOut, sOut, gIn);
         __m512d newB = _mm512_fmadd_pd(bOut, sOut, bIn);
+        //
+        __mmask8 notZero = _mm512_cmp_pd_mask(sTotal, _mm512_setzero_pd(),
+                                              _CMP_NEQ_UQ);
         static constexpr bool HAS_RECIP = false;
         if constexpr(HAS_RECIP)
         {
             __m512d sRecip = _mm512_rcp14_pd(sTotal);
-            newR = _mm512_mul_pd(newR, sRecip);
-            newG = _mm512_mul_pd(newG, sRecip);
-            newB = _mm512_mul_pd(newB, sRecip);
+            newR = _mm512_maskz_mul_pd(notZero, newR, sRecip);
+            newG = _mm512_maskz_mul_pd(notZero, newG, sRecip);
+            newB = _mm512_maskz_mul_pd(notZero, newB, sRecip);
         }
         else
         {
-            newR = _mm512_div_pd(newR, sTotal);
-            newG = _mm512_div_pd(newG, sTotal);
-            newB = _mm512_div_pd(newB, sTotal);
+            newR = _mm512_maskz_div_pd(notZero, newR, sTotal);
+            newG = _mm512_maskz_div_pd(notZero, newG, sTotal);
+            newB = _mm512_maskz_div_pd(notZero, newB, sTotal);
         }
         //
         _mm512_storeu_pd(output.Get<R>().data() + i * SIMD_WIDTH, newR);
@@ -241,6 +261,8 @@ void Accum::AccumulateScanline(RGBWeightSpan<double> output,
         __m256d newG = _mm256_fmadd_pd(gOut, sOut, gIn);
         __m256d newB = _mm256_fmadd_pd(bOut, sOut, bIn);
         //
+        __m256d notZero = _mm256_cmp_pd(sTotal, _mm256_setzero_pd(),
+                                        _CMP_NEQ_UQ);
         static constexpr bool HAS_RECIP = false;
         if constexpr(HAS_RECIP)
         {
@@ -255,6 +277,10 @@ void Accum::AccumulateScanline(RGBWeightSpan<double> output,
             newG = _mm256_div_pd(newG, sTotal);
             newB = _mm256_div_pd(newB, sTotal);
         }
+        newR = _mm256_blendv_pd(_mm256_setzero_pd(), newR, notZero);
+        newG = _mm256_blendv_pd(_mm256_setzero_pd(), newG, notZero);
+        newB = _mm256_blendv_pd(_mm256_setzero_pd(), newB, notZero);
+
         //
         _mm256_storeu_pd(output.Get<R>().data() + i * SIMD_WIDTH, newR);
         _mm256_storeu_pd(output.Get<G>().data() + i * SIMD_WIDTH, newG);
@@ -276,35 +302,238 @@ void Accum::AccumulateScanline(RGBWeightSpan<double> output,
         //
         double totalSample = sOut + double(sIn);
         double recip = double(1) / totalSample;
-        double newR = (rOut * sOut + rIn) * recip;
-        double newG = (gOut * sOut + gIn) * recip;
-        double newB = (bOut * sOut + bIn) * recip;
+        double newR = (totalSample == 0.0) ? 0.0 : (rOut * sOut + rIn) * recip;
+        double newG = (totalSample == 0.0) ? 0.0 : (gOut * sOut + gIn) * recip;
+        double newB = (totalSample == 0.0) ? 0.0 : (bOut * sOut + bIn) * recip;
         output.Get<R>()[i] = newR;
         output.Get<G>()[i] = newG;
         output.Get<B>()[i] = newB;
         output.Get<W>()[i] = totalSample;
     };
 
-    size_t loopSize = output.Size() / SIMD_WIDTH;
-    size_t residual = output.Size() % SIMD_WIDTH;
-    for(size_t i = 0; i < loopSize; i++)
-    {
-        using enum MRay::HostArch;
-        //if constexpr(MRay::MRAY_HOST_ARCH == MRAY_AVX512)
-        //    Iteration_AVX512(i);
-        //else if constexpr(MRay::MRAY_HOST_ARCH == MRAY_AVX2)
-        //    Iteration_AVX2(i);
-        //else
-            Iteration_Common(i);
-    }
 
-    // Calculate the rest via scalar ops
-    // TODO: We can decay to 8/4/2/1 etc but is it worth it?
-    size_t offset = loopSize * SIMD_WIDTH;
-    for(size_t i = offset; i < offset + residual; i++)
+    //// TODO: With scanline, we cannot guarantee memory
+    //// alignment, (due to image width is not aligned
+    //// with SIMD registers)
+    //// So the code below is slower!
+    //size_t loopSize = output.Size() / SIMD_WIDTH;
+    //size_t residual = output.Size() % SIMD_WIDTH;
+    //for(size_t i = 0; i < loopSize; i++)
+    //{
+    //    using enum MRay::HostArch;
+    //    if constexpr(MRay::MRAY_HOST_ARCH == MRAY_AVX512)
+    //        Iteration_AVX512(i);
+    //    else if constexpr(MRay::MRAY_HOST_ARCH == MRAY_AVX2)
+    //        Iteration_AVX2(i);
+    //    else
+    //        Iteration_Common(i);
+    //}
+    //// Calculate the rest via scalar ops
+    //// TODO: We can decay to 8/4/2/1 etc but is it worth it?
+    //size_t offset = loopSize * SIMD_WIDTH;
+    //for(size_t i = offset; i < offset + residual; i++)
+    //{
+    //    Iteration_Common(i);
+    //}
+
+    for(size_t i = 0; i < output.Size(); i++)
     {
         Iteration_Common(i);
     }
+}
+
+
+void Accum::AccumulatePortionBulk(double* MRAY_RESTRICT rOutPtr,
+                                  double* MRAY_RESTRICT gOutPtr,
+                                  double* MRAY_RESTRICT bOutPtr,
+                                  double* MRAY_RESTRICT wOutPtr,
+                                  const Float* MRAY_RESTRICT rInPtr,
+                                  const Float* MRAY_RESTRICT gInPtr,
+                                  const Float* MRAY_RESTRICT bInPtr,
+                                  const Float* MRAY_RESTRICT wInPtr,
+                                  size_t size)
+{
+    static constexpr size_t SIMD_WIDTH = MRay::HostArchSIMDWidth<double>();
+
+    static constexpr auto DSA = MemAlloc::DefaultSystemAlignment();
+    double* MRAY_RESTRICT rOutPtrA = std::assume_aligned<DSA>(rOutPtr);
+    double* MRAY_RESTRICT gOutPtrA = std::assume_aligned<DSA>(gOutPtr);
+    double* MRAY_RESTRICT bOutPtrA = std::assume_aligned<DSA>(bOutPtr);
+    double* MRAY_RESTRICT wOutPtrA = std::assume_aligned<DSA>(wOutPtr);
+    const Float* MRAY_RESTRICT rInPtrA = std::assume_aligned<DSA>(rInPtr);
+    const Float* MRAY_RESTRICT gInPtrA = std::assume_aligned<DSA>(gInPtr);
+    const Float* MRAY_RESTRICT bInPtrA = std::assume_aligned<DSA>(bInPtr);
+    const Float* MRAY_RESTRICT wInPtrA = std::assume_aligned<DSA>(wInPtr);
+
+    auto Iteration_AVX512 = [&](size_t i)
+    {
+        __m512d rOut = _mm512_load_pd(rOutPtrA + i * SIMD_WIDTH);
+        __m512d gOut = _mm512_load_pd(gOutPtrA + i * SIMD_WIDTH);
+        __m512d bOut = _mm512_load_pd(bOutPtrA + i * SIMD_WIDTH);
+        __m512d sOut = _mm512_load_pd(wOutPtrA + i * SIMD_WIDTH);
+        //
+        __m512d rIn, gIn, bIn, sIn;
+        if constexpr(std::is_same_v<Float, float>)
+        {
+            rIn = _mm512_cvtps_pd(_mm256_load_ps(rInPtrA + i * SIMD_WIDTH));
+            gIn = _mm512_cvtps_pd(_mm256_load_ps(gInPtrA + i * SIMD_WIDTH));
+            bIn = _mm512_cvtps_pd(_mm256_load_ps(bInPtrA + i * SIMD_WIDTH));
+            sIn = _mm512_cvtps_pd(_mm256_load_ps(wInPtrA + i * SIMD_WIDTH));
+        }
+        else
+        {
+            rIn = _mm512_load_pd(rInPtrA + i * SIMD_WIDTH);
+            gIn = _mm512_load_pd(gInPtrA + i * SIMD_WIDTH);
+            bIn = _mm512_load_pd(bInPtrA + i * SIMD_WIDTH);
+            sIn = _mm512_load_pd(wInPtrA + i * SIMD_WIDTH);
+        }
+        //
+        __m512d sTotal = _mm512_add_pd(sOut, sIn);
+        __m512d newR = _mm512_fmadd_pd(rOut, sOut, rIn);
+        __m512d newG = _mm512_fmadd_pd(gOut, sOut, gIn);
+        __m512d newB = _mm512_fmadd_pd(bOut, sOut, bIn);
+        //
+        __mmask8 notZero = _mm512_cmp_pd_mask(sTotal, _mm512_setzero_pd(),
+                                              _CMP_NEQ_UQ);
+        static constexpr bool HAS_RECIP = false;
+        if constexpr(HAS_RECIP)
+        {
+            __m512d sRecip = _mm512_rcp14_pd(sTotal);
+            newR = _mm512_maskz_mul_pd(notZero, newR, sRecip);
+            newG = _mm512_maskz_mul_pd(notZero, newG, sRecip);
+            newB = _mm512_maskz_mul_pd(notZero, newB, sRecip);
+        }
+        else
+        {
+            newR = _mm512_maskz_div_pd(notZero, newR, sTotal);
+            newG = _mm512_maskz_div_pd(notZero, newG, sTotal);
+            newB = _mm512_maskz_div_pd(notZero, newB, sTotal);
+        }
+        //
+        _mm512_store_pd(rOutPtrA + i * SIMD_WIDTH, newR);
+        _mm512_store_pd(gOutPtrA + i * SIMD_WIDTH, newG);
+        _mm512_store_pd(bOutPtrA + i * SIMD_WIDTH, newB);
+        _mm512_store_pd(wOutPtrA + i * SIMD_WIDTH, sTotal);
+    };
+
+    auto Iteration_AVX2 = [&](size_t i)
+    {
+        __m256d rOut = _mm256_load_pd(rOutPtrA + i * SIMD_WIDTH);
+        __m256d gOut = _mm256_load_pd(gOutPtrA + i * SIMD_WIDTH);
+        __m256d bOut = _mm256_load_pd(bOutPtrA + i * SIMD_WIDTH);
+        __m256d sOut = _mm256_load_pd(wOutPtrA + i * SIMD_WIDTH);
+        //
+        __m256d rIn, gIn, bIn, sIn;
+        if constexpr(std::is_same_v<Float, float>)
+        {
+            rIn = _mm256_cvtps_pd(_mm_load_ps(rInPtrA + i * SIMD_WIDTH));
+            gIn = _mm256_cvtps_pd(_mm_load_ps(gInPtrA + i * SIMD_WIDTH));
+            bIn = _mm256_cvtps_pd(_mm_load_ps(bInPtrA + i * SIMD_WIDTH));
+            sIn = _mm256_cvtps_pd(_mm_load_ps(wInPtrA + i * SIMD_WIDTH));
+        }
+        else
+        {
+            rIn = _mm256_load_pd(rInPtrA + i * SIMD_WIDTH);
+            gIn = _mm256_load_pd(gInPtrA + i * SIMD_WIDTH);
+            bIn = _mm256_load_pd(bInPtrA + i * SIMD_WIDTH);
+            sIn = _mm256_load_pd(wInPtrA + i * SIMD_WIDTH);
+        }
+        //
+        __m256d sTotal = _mm256_add_pd(sOut, sIn);
+        //
+        __m256d newR = _mm256_fmadd_pd(rOut, sOut, rIn);
+        __m256d newG = _mm256_fmadd_pd(gOut, sOut, gIn);
+        __m256d newB = _mm256_fmadd_pd(bOut, sOut, bIn);
+        //
+        __m256d notZero = _mm256_cmp_pd(sTotal, _mm256_setzero_pd(),
+                                        _CMP_NEQ_UQ);
+        static constexpr bool HAS_RECIP = false;
+        if constexpr(HAS_RECIP)
+        {
+            __m256d sRecip = _mm256_rcp14_pd(sTotal);
+            newR = _mm256_mul_pd(newR, sRecip);
+            newG = _mm256_mul_pd(newG, sRecip);
+            newB = _mm256_mul_pd(newB, sRecip);
+        }
+        else
+        {
+            newR = _mm256_div_pd(newR, sTotal);
+            newG = _mm256_div_pd(newG, sTotal);
+            newB = _mm256_div_pd(newB, sTotal);
+        }
+        newR = _mm256_blendv_pd(_mm256_setzero_pd(), newR, notZero);
+        newG = _mm256_blendv_pd(_mm256_setzero_pd(), newG, notZero);
+        newB = _mm256_blendv_pd(_mm256_setzero_pd(), newB, notZero);
+        //
+        _mm256_store_pd(rOutPtrA + i * SIMD_WIDTH, newR);
+        _mm256_store_pd(gOutPtrA + i * SIMD_WIDTH, newG);
+        _mm256_store_pd(bOutPtrA + i * SIMD_WIDTH, newB);
+        _mm256_store_pd(wOutPtrA + i * SIMD_WIDTH, sTotal);
+    };
+
+    auto Iteration_Common = [&](size_t i)
+    {
+        double rOut = rOutPtr[i];
+        double gOut = gOutPtr[i];
+        double bOut = bOutPtr[i];
+        double sOut = wOutPtr[i];
+        //
+        Float rIn = rInPtr[i];
+        Float gIn = gInPtr[i];
+        Float bIn = bInPtr[i];
+        Float sIn = wInPtr[i];
+        //
+        double totalSample = sOut + double(sIn);
+        double recip = double(1) / totalSample;
+        double newR = (totalSample == 0.0) ? 0.0 : (rOut * sOut + rIn) * recip;
+        double newG = (totalSample == 0.0) ? 0.0 : (gOut * sOut + gIn) * recip;
+        double newB = (totalSample == 0.0) ? 0.0 : (bOut * sOut + bIn) * recip;
+        rOutPtr[i] = newR;
+        gOutPtr[i] = newG;
+        bOutPtr[i] = newB;
+        wOutPtr[i] = totalSample;
+    };
+
+    size_t loopSize = size / SIMD_WIDTH;
+    size_t residual = size % SIMD_WIDTH;
+    for(size_t i = 0; i < loopSize;)
+    {
+        using enum MRay::HostArch;
+        if constexpr(MRay::MRAY_HOST_ARCH == MRAY_AVX512)
+        {
+            if(i++ < loopSize) [[likely]] Iteration_AVX512(i - 1);
+            if(i++ < loopSize) [[likely]] Iteration_AVX512(i - 1);
+        }
+        else if constexpr(MRay::MRAY_HOST_ARCH == MRAY_AVX2)
+        {
+            if(i++ < loopSize) [[likely]] Iteration_AVX2(i - 1);
+            if(i++ < loopSize) [[likely]] Iteration_AVX2(i - 1);
+            if(i++ < loopSize) [[likely]] Iteration_AVX2(i - 1);
+            if(i++ < loopSize) [[likely]] Iteration_AVX2(i - 1);
+        }
+        else
+        {
+            if(i++ < loopSize) [[likely]] Iteration_Common(i - 1);
+            if(i++ < loopSize) [[likely]] Iteration_Common(i - 1);
+            if(i++ < loopSize) [[likely]] Iteration_Common(i - 1);
+            if(i++ < loopSize) [[likely]] Iteration_Common(i - 1);
+            if(i++ < loopSize) [[likely]] Iteration_Common(i - 1);
+            if(i++ < loopSize) [[likely]] Iteration_Common(i - 1);
+            if(i++ < loopSize) [[likely]] Iteration_Common(i - 1);
+            if(i++ < loopSize) [[likely]] Iteration_Common(i - 1);
+        }
+    }
+
+    size_t offset = loopSize * SIMD_WIDTH;
+    static_assert(SIMD_WIDTH <= 8, "Expand this loop unroll");
+    if(residual + 0 < SIMD_WIDTH) Iteration_Common(offset + 0);
+    if(residual + 1 < SIMD_WIDTH) Iteration_Common(offset + 1);
+    if(residual + 2 < SIMD_WIDTH) Iteration_Common(offset + 2);
+    if(residual + 3 < SIMD_WIDTH) Iteration_Common(offset + 3);
+    if(residual + 4 < SIMD_WIDTH) Iteration_Common(offset + 4);
+    if(residual + 5 < SIMD_WIDTH) Iteration_Common(offset + 5);
+    if(residual + 6 < SIMD_WIDTH) Iteration_Common(offset + 6);
+    if(residual + 7 < SIMD_WIDTH) Iteration_Common(offset + 7);
 }
 
 BS::multi_future<void>
@@ -319,56 +548,86 @@ Accum::AccumulateImage(RGBWeightSpan<double> output,
     const Float* bStart = reinterpret_cast<const Float*>(rBI.data + rIS.pixStartOffsets[B]);
     const Float* wStart = reinterpret_cast<const Float*>(rBI.data + rIS.weightStartOffset);
 
-    uint32_t scanlineWidth = rIS.pixelMax[0] - rIS.pixelMin[0];
-    uint32_t scanlineCount = rIS.pixelMax[1] - rIS.pixelMin[1];
-
     // TODO: Move this from shared ptr, at least allocate once instead of every iteration
-    static Timer t;
-    t.Start();
-    auto BarrierFunc = [&]() noexcept
-    {
-        t.Split();
-        MRAY_LOG("DONE in {}ms", t.Elapsed<Millisecond>());
-        sem.Release();
-    };
+    auto BarrierFunc = [&]() noexcept { sem.Release();};
     using Barrier = std::barrier<decltype(BarrierFunc)>;
     uint32_t threadCount = threadPool.get_thread_count();
     auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
-    // Enforce copy of the function between threads
-    // via const. (Or barrier shared pointer will not work)
-    const auto WorkFunc = [=](uint32_t start, uint32_t end) -> void
+    if(rBI.resolution == rIS.pixelMax - rIS.pixelMin)
     {
-        for(uint32_t i = start; i < end; i++)
+        constexpr size_t SIMD_WIDTH = MRay::HostArchSIMDWidth<double>();
+        size_t totalPixels = rBI.resolution.Multiply();
+        size_t bulkCount = Math::DivideUp(totalPixels, SIMD_WIDTH);
+        // Enforce copy of the function between threads
+        // via const. (Or barrier shared pointer will not work)
+        const auto WorkFuncBulk = [=](uint32_t start, uint32_t end) -> void
         {
-            uint32_t offsetOut = i * rBI.resolution[0] + rIS.pixelMin[0];
-            auto scanlineOut = RGBWeightSpan<double>
-            (
-                output.Get<R>().subspan(offsetOut, scanlineWidth),
-                output.Get<G>().subspan(offsetOut, scanlineWidth),
-                output.Get<B>().subspan(offsetOut, scanlineWidth),
-                output.Get<W>().subspan(offsetOut, scanlineWidth)
-            );
+            size_t offsetInOut = start * SIMD_WIDTH;
+            size_t bulkEnd = std::min(end * SIMD_WIDTH, totalPixels);
+            size_t bulkWidth = bulkEnd - offsetInOut;
+
+            Timer t;  t.Start();
             //
-            uint32_t offsetIn = i * scanlineWidth;
-            auto scanlineIn = RGBWeightSpan<const Float>
-            (
-                Span(rStart + offsetIn, scanlineWidth),
-                Span(gStart + offsetIn, scanlineWidth),
-                Span(bStart + offsetIn, scanlineWidth),
-                Span(wStart + offsetIn, scanlineWidth)
-            );
-            //
-            AccumulateScanline(scanlineOut, scanlineIn);
-        }
-        // TODO: Only arrive gives warning, but we use barrier
-        // only for completion function. Check a way later.
-        barrier->arrive_and_wait();
-    };
-    //
-    auto wait = threadPool.submit_blocks(std::size_t(0),
-                                         std::size_t(scanlineCount),
-                                         WorkFunc, threadCount);
-    return wait;
+            AccumulatePortionBulk(output.Get<R>().subspan(offsetInOut, bulkWidth).data(),
+                                  output.Get<G>().subspan(offsetInOut, bulkWidth).data(),
+                                  output.Get<B>().subspan(offsetInOut, bulkWidth).data(),
+                                  output.Get<W>().subspan(offsetInOut, bulkWidth).data(),
+                                  rStart + offsetInOut,
+                                  gStart + offsetInOut,
+                                  bStart + offsetInOut,
+                                  wStart + offsetInOut,
+                                  bulkWidth);
+
+            // TODO: Only arrive gives warning, but we use barrier
+            // only for completion function. Check a way later.
+            barrier->arrive_and_wait();
+        };
+        //
+        return threadPool.submit_blocks(std::size_t(0),
+                                        std::size_t(bulkCount),
+                                        WorkFuncBulk, threadCount);
+    }
+    else
+    {
+        uint32_t scanlineWidth = rIS.pixelMax[0] - rIS.pixelMin[0];
+        uint32_t scanlineCount = rIS.pixelMax[1] - rIS.pixelMin[1];
+
+        // Enforce copy of the function between threads
+        // via const. (Or barrier shared pointer will not work)
+        const auto WorkFuncScanline = [=](uint32_t start, uint32_t end) -> void
+        {
+            for(uint32_t i = start; i < end; i++)
+            {
+                uint32_t offsetOut = (rIS.pixelMin[1] + i) * rBI.resolution[0];
+                offsetOut += rIS.pixelMin[0];
+                auto scanlineOut = RGBWeightSpan<double>
+                (
+                    output.Get<R>().subspan(offsetOut, scanlineWidth),
+                    output.Get<G>().subspan(offsetOut, scanlineWidth),
+                    output.Get<B>().subspan(offsetOut, scanlineWidth),
+                    output.Get<W>().subspan(offsetOut, scanlineWidth)
+                );
+                //
+                uint32_t offsetIn = i * scanlineWidth;
+                auto scanlineIn = RGBWeightSpan<const Float>
+                (
+                    Span(rStart + offsetIn, scanlineWidth),
+                    Span(gStart + offsetIn, scanlineWidth),
+                    Span(bStart + offsetIn, scanlineWidth),
+                    Span(wStart + offsetIn, scanlineWidth)
+                );
+                //
+                AccumulateScanline(scanlineOut, scanlineIn);
+            }
+            // TODO: Only arrive gives warning, but we use barrier
+            // only for completion function. Check a way later.
+            barrier->arrive_and_wait();
+        };
+        //
+        return threadPool.submit_blocks(std::size_t(0),
+                                        std::size_t(scanlineCount),
+                                        WorkFuncScanline, threadCount);
+    }
 }
 
 namespace MRayCLI::RunNames
@@ -382,7 +641,7 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
                            BS::thread_pool& threadPool)
 {
     auto size = GetTerminalSize();
-    timer.Split();
+    cmdTimer.Split();
 
     Optional<RenderBufferInfo>      newRenderBuffer;
     Optional<RenderImageSection>    newImageSection;
@@ -390,7 +649,8 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
     Optional<RenderImageSaveInfo>   newSaveInfo;
 
     TracerResponse response;
-    while(transferQueue.GetVisorView().TryDequeue(response))
+    auto& vView = transferQueue.GetVisorView();
+    while(vView.TryDequeue(response, EyeAnim::AnimDurationCommon))
     {
         using RespType = typename TracerResponse::Type;
         RespType tp = static_cast<RespType>(response.index());
@@ -407,71 +667,72 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
         {
             case CAMERA_INIT_TRANSFORM:
             {
-                MRAY_LOG("[Run]: Transform received and ignored");
+                //MRAY_LOG("[Run]   : Transform received and ignored");
                 break;
             }
             case SCENE_ANALYTICS:
             {
-                MRAY_LOG("[Run]: Scene Info received");
+                MRAY_LOG("[Run]   : Scene Info received");
                 sceneInfo = std::get<SCENE_ANALYTICS>(response);
                 break;
             }
             case TRACER_ANALYTICS:
             {
-                MRAY_LOG("[Run]: Tracer Info received");
+                MRAY_LOG("[Run]   : Tracer Info received");
                 tracerInfo = std::get<TRACER_ANALYTICS>(response);
                 break;
             }
             case RENDERER_ANALYTICS:
             {
-                MRAY_LOG("[Run]: Render Info received");
+                //MRAY_LOG("[Run]   : Render Info received");
                 rendererInfo = std::get<RENDERER_ANALYTICS>(response);
                 renderThroughputAverage.FeedValue(Float(rendererInfo.throughput));
                 iterationTimeAverage.FeedValue(Float(rendererInfo.iterationTimeMS));
+
                 break;
             }
             case RENDERER_OPTIONS:
             {
-                MRAY_LOG("[Run]: Render Options received and ignored");
+                MRAY_LOG("[Run]   :Render Options received and ignored");
                 break; // TODO: User may change the render options during runtime
             }
             case RENDER_BUFFER_INFO:
             {
-                MRAY_LOG("[Run]: Render Buffer Info received");
+                MRAY_LOG("[Run]   : Render Buffer Info received");
                 newRenderBuffer = std::get<RENDER_BUFFER_INFO>(response);
                 stopConsuming = true;
                 break;
             }
             case CLEAR_IMAGE_SECTION:
             {
-                MRAY_LOG("[Run]: Clear Image received");
+                MRAY_LOG("[Run]   : Clear Image received");
                 newClearSignal = std::get<CLEAR_IMAGE_SECTION>(response);
                 stopConsuming = true;
                 break;
             }
             case IMAGE_SECTION:
             {
-                MRAY_LOG("[Run]: Image section received");
+                //MRAY_LOG("[Run]   : Image section received");
                 newImageSection = std::get<IMAGE_SECTION>(response);
                 stopConsuming = true;
                 break;
             }
             case SAVE_AS_HDR:
             {
-                MRAY_LOG("[Run]: Save HDR received");
+                //MRAY_LOG("[Run]   : Save HDR received");
                 newSaveInfo = std::get<SAVE_AS_HDR>(response);
                 stopConsuming = true;
                 break;
             }
             case SAVE_AS_SDR:
             {
-                MRAY_WARNING_LOG("[Run]: Save SDR cannot be processed "
+                MRAY_WARNING_LOG("[Run]   : Save SDR cannot be processed "
                                  "(No color conversion logic)");
                 break;
             }
             case MEMORY_USAGE:
             {
-                MRAY_LOG("[Visor]: Memory usage received");
+                MRAY_LOG("[Run]   : Memory usage received");
                 memUsage = std::get<MEMORY_USAGE>(response);
                 break;
             }
@@ -493,6 +754,18 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
                                     {pixelCount, pixelCount,
                                     pixelCount, pixelCount});
         renderBufferInfo = newRenderBuffer.value();
+
+        std::fill(imageRData.begin(), imageRData.end(), 0.0);
+        std::fill(imageGData.begin(), imageGData.end(), 0.0);
+        std::fill(imageBData.begin(), imageBData.end(), 0.0);
+        std::fill(imageSData.begin(), imageSData.end(), 0.0);
+
+        MRAY_LOG("[Run]   : Rendering Started... Resolution [{}x{}]",
+                 renderBufferInfo.resolution[0],
+                 renderBufferInfo.resolution[1]);
+
+        MRAY_LOG(EyeAnim::AragornSpeech);
+        renderTimer.Start();
     }
     //
     if(newClearSignal)
@@ -502,6 +775,9 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
     //
     if(newImageSection)
     {
+        // After the first image section we can display something
+        startDisplayProgressBar = true;
+        //
         const auto& section = newImageSection.value();
         // Tracer may abruptly terminated (crash probably),
         // so do not issue anything, return nullopt and
@@ -523,13 +799,119 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
 
     if(newSaveInfo)
     {
+        const auto& saveInfo = newSaveInfo.value();
+        if(accumulateFuture.valid())
+            accumulateFuture.wait();
 
+        MRAY_LOG(EyeAnim::LegolasResponse);
+        transferQueue.Terminate();
+        syncSemaphore.Invalidate();
+
+        Vector2ui res = renderBufferInfo.resolution;
+        size_t pixCount = res.Multiply();
+        // Convert to AoS
+        Span<Vector3> rgbData;
+        MemAlloc::AlignedMemory saveMem;
+        MemAlloc::AllocateMultiData(std::tie(rgbData), saveMem,
+                                    {pixCount});
+        for(size_t i = 0; i < pixCount; i++)
+        {
+            rgbData[i] = Vector3(imageRData[i],
+                                 imageGData[i],
+                                 imageBData[i]);
+        }
+        const Byte* rgbPtr = reinterpret_cast<Byte*>(rgbData.data());
+        using enum MRayPixelEnum;
+        auto pixType = MRayPixelTypeRT(MRayPixelType<MR_RGB_FLOAT>{});
+        size_t paddedImageSize = pixType.PixelSize() * pixCount;
+        MRayColorSpaceEnum colorSpace = renderBufferInfo.renderColorSpace;
+        WriteImageParams imgInfo =
+        {
+            .header =
+            {
+                .dimensions = Vector3ui(res, 1u),
+                .mipCount = 1,
+                .pixelType = pixType,
+                .colorSpace = Pair(Float(1.0), colorSpace)
+            },
+            .inputType = pixType,
+            .pixels = Span<const Byte>(rgbPtr, paddedImageSize)
+        };
+
+        // Load the DLL for saving
+        ImageLoaderIPtr imgLoader(CreateImageLoader());
+        // TODO: render time prevents overwriting, and render time
+        // may be confused with frame count etc. we need to check how
+        // other renderers makes their file names.
+        std::string filePath = MRAY_FORMAT("{:s}_{:08.0f}wpp",
+                                           saveInfo.prefix,
+                                           std::round(saveInfo.workPerPixel));
+        //std::string filePath = MRAY_FORMAT("{:s}_{:08.0f}wpp_{:.2f}s",
+        //                                   saveInfo.prefix,
+        //                                   std::round(saveInfo.workPerPixel),
+        //                                   saveInfo.time);
+        MRAY_LOG("Saving \"{}\"...", filePath);
+
+        MRayError e = imgLoader->WriteImage(imgInfo, filePath,
+                                            ImageType::EXR);
+
+        // Log the error
+        if(e) MRAY_ERROR_LOG("{}", e.GetError());
+        else
+        {
+            renderTimer.Split();
+            // TODO: Accuracy issue maybe when render time is long?
+            double rtTotal = renderTimer.Elapsed<Millisecond>();
+
+            FormatTimeDynamic(renderTimer);
+            MRAY_LOG("Entire render took {} | {:.2f}ms wpp",
+                     FormatTimeDynamic(renderTimer),
+                     rtTotal / rendererInfo.wPPLimit);
+        }
+        return true;
     }
 
     //
-    EyeAnim::SimpleProgressBar().Display(Float(0.5), timer.ElapsedIntMS(), "Test");
+    double progressRatio = 0.0;
+    std::string displaySuffix;
+    if(startDisplayProgressBar)
+    {
+        progressRatio = rendererInfo.workPerPixel / rendererInfo.wPPLimit;
+        double sppLeft = rendererInfo.wPPLimit - rendererInfo.workPerPixel;
+        renderTimer.Split();
+        //
+        uint64_t totalMS = renderTimer.ElapsedIntMS();
+        uint64_t wppCurrent = uint64_t(std::round(rendererInfo.workPerPixel));
+        if(wppCurrent != 0)
+        {
+            totalMS /= wppCurrent;
+            totalMS *= uint64_t(std::round(sppLeft));
+        }
+        else totalMS = std::numeric_limits<uint64_t>::max();
+
+        //
+        uint64_t totalUsedMem = memUsage + rendererInfo.usedGPUMemoryBytes;
+        auto usedGPUMem = ConvertMemSizeToString(totalUsedMem);
+        auto totalGPUMem = ConvertMemSizeToString(tracerInfo.totalGPUMemoryBytes);
+        //
+        // TODO: Every frame we allocate a string... Wastefull
+        // Use "format_to" for both time left and the entire display prefix
+        std::string timeLeft = FormatTimeDynamic(totalMS);
+        displaySuffix = MRAY_FORMAT("mem [{:.1f}{:s}/{:.1f}{:s}] | wpp [{:.1f}/{:.1f}] ~left {}",
+                                    usedGPUMem.first, usedGPUMem.second,
+                                    totalGPUMem.first, totalGPUMem.second,
+                                    rendererInfo.workPerPixel, rendererInfo.wPPLimit,
+                                    timeLeft);
+    }
+    using namespace EyeAnim;
+    SimpleProgressBar().Display(Float(progressRatio),
+                                cmdTimer.ElapsedIntMS(), displaySuffix);
     return false;
 }
+
+RunCommand::RunCommand()
+    : threadCount(std::max(1u, std::thread::hardware_concurrency()))
+{}
 
 MRayError RunCommand::Invoke()
 {
@@ -574,20 +956,20 @@ MRayError RunCommand::Invoke()
                                       resolution);
     // TODO: Cleanup this API (why SetInitResolution is a function
     // but these are queue events)
-    MRAY_LOG("[Run]: Sending sync semaphore...");
+    MRAY_LOG("[Run]   : Sending sync semaphore...");
     transferQueue.GetVisorView().Enqueue(VisorAction
     (
         std::in_place_index<VisorAction::SEND_SYNC_SEMAPHORE>,
         SemaphoreInfo{&syncSemaphore, Accum::RenderBufferAlignment}
     ));
-    MRAY_LOG("[Run]: Sending initial scene...");
+    MRAY_LOG("[Run]   : Sending initial scene...");
     transferQueue.GetVisorView().Enqueue(VisorAction
     (
         std::in_place_index<VisorAction::LOAD_SCENE>,
         sceneFile
     ));
     // Launch the renderer
-    MRAY_LOG("[Run]: Configuring Tracer via initial render config...");
+    MRAY_LOG("[Run]   : Configuring Tracer via initial render config...");
     transferQueue.GetVisorView().Enqueue(VisorAction
     (
         std::in_place_index<VisorAction::KICKSTART_RENDER>,
@@ -602,7 +984,7 @@ MRayError RunCommand::Invoke()
     tracerThread.Start("TracerThread");
 
     // Do the loop
-    timer.Start();
+    cmdTimer.Start();
     for(bool isTerminated = false; !isTerminated;)
     {
         isTerminated = EventLoop(transferQueue, threadPool);

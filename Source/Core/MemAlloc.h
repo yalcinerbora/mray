@@ -76,16 +76,43 @@ template <ImplicitLifetimeC Left, ImplicitLifetimeC Right>
 requires RepurposeAllocRequirements<Left, Right>
 constexpr Span<Left> RepurposeAlloc(Span<Right> rhs);
 
-// Simple wrapper to utilize "MultiData" allocation scheme
-struct VectorBackedMemory
+// Simple wrappers to utilize "MultiData" allocation scheme
+struct AlignedMemory
 {
-    std::vector<uint8_t>    v;
-    //
-    void                    ResizeBuffer(size_t s);
-    size_t                  Size() const;
+    void*   mem;
+    size_t  alignment;
+    size_t  size;
+    size_t  allocSize;
+    bool    neverDecrease;
+
+    public:
+    // Constructors & Destructor
+    // TODO: Implement Move/Copy etc.
+    // Currently, we do not need it.
+                    AlignedMemory(size_t alignment = DefaultSystemAlignment(),
+                                  bool neverDecrease = true);
+                    AlignedMemory(size_t size,
+                                  size_t alignment = DefaultSystemAlignment(),
+                                  bool neverDecrease = true);
+                    AlignedMemory(const AlignedMemory&) = delete;
+                    AlignedMemory(AlignedMemory&&) = delete;
+    AlignedMemory&  operator=(const AlignedMemory&) = delete;
+    AlignedMemory&  operator=(AlignedMemory&&) = delete;
+                    ~AlignedMemory();
+
+    void            ResizeBuffer(size_t newSize);
+    size_t          Size() const;
+
+    explicit operator Byte*();
     explicit operator const Byte*() const;
-    explicit operator       Byte*();
+
+
+
 };
+
+static_assert(MemoryC<AlignedMemory>,
+              "\"MemAlloc::AlignedMemory\" does not "
+              "satisfy MemoryC concept!");
 
 }
 
@@ -262,6 +289,7 @@ size_t RequiredAllocation(const std::array<size_t, N>& byteSizeList,
         result += Math::NextMultiple(byteSizeList[i], alignment);
     return result;
 }
+
 template <ImplicitLifetimeC Left, ImplicitLifetimeC Right>
 requires RepurposeAllocRequirements<Left, Right>
 constexpr Span<Left> RepurposeAlloc(Span<Right> rhs)
@@ -274,29 +302,5 @@ constexpr Span<Left> RepurposeAlloc(Span<Right> rhs)
     Left* leftPtr = std::launder(reinterpret_cast<Left*>(rawPtr));
     return Span<Left>(leftPtr, elementCount);
 }
-
-inline void VectorBackedMemory::ResizeBuffer(size_t s)
-{
-    v.resize(s);
-}
-
-inline size_t VectorBackedMemory::Size() const
-{
-    return v.size();
-}
-
-inline VectorBackedMemory::operator const Byte*() const
-{
-    return reinterpret_cast<const Byte*>(v.data());
-}
-
-inline VectorBackedMemory::operator Byte*()
-{
-    return reinterpret_cast<Byte*>(v.data());
-}
-
-static_assert(MemoryC<VectorBackedMemory>,
-              "\"VectorBackedMemory\" does not "
-              "satisfy MemoryC concept!");
 
 }

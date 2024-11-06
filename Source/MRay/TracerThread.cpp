@@ -291,7 +291,18 @@ void TracerThread::HandleRendering()
     }
     if(renderOut.triggerSave)
     {
-        MRAY_LOG("***********TRIGGERING SAVE************");
+        renderTimer.Split();
+        std::string prefix = GenSavePrefix();
+        transferQueue.Enqueue(TracerResponse
+        (
+            std::in_place_index<TracerResponse::SAVE_AS_HDR>,
+            RenderImageSaveInfo
+            {
+                .prefix = std::move(prefix),
+                .time = renderTimer.Elapsed<Second>(),
+                .workPerPixel = currentWPP
+            }
+        ));
     }
 }
 
@@ -504,7 +515,7 @@ void TracerThread::LoopWork()
             }
             default:
             {
-                MRAY_WARNING_LOG("[Tracer] Unkown visor action is ignored!");
+                MRAY_WARNING_LOG("[Tracer]: Unkown visor action is ignored!");
                 break;
             }
         }
@@ -548,8 +559,8 @@ void TracerThread::LoopWork()
 
         if(hdrSaveDemand)
         {
-            std::string prefix = GenSavePrefix();
             renderTimer.Split();
+            std::string prefix = GenSavePrefix();
             MRAY_LOG("[Tracer]: Delegate HDR save");
             transferQueue.Enqueue(TracerResponse
             (

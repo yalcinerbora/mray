@@ -29,28 +29,30 @@ class RunCommand : public CommandI
     uint32_t    threadCount;
 
     // Runtime related
-    MemAlloc::VectorBackedMemory imageMem;
-    Span<double>                 imageRData;
-    Span<double>                 imageGData;
-    Span<double>                 imageBData;
-    Span<double>                 imageSData;
+    MemAlloc::AlignedMemory imageMem;
+    Span<double>            imageRData;
+    Span<double>            imageGData;
+    Span<double>            imageBData;
+    Span<double>            imageSData;
     //
-    Timer                        timer;
-    ThroughputAverage            renderThroughputAverage;
-    TimeAverage                  iterationTimeAverage;
-    SceneAnalyticData            sceneInfo;
-    TracerAnalyticData           tracerInfo;
-    RendererAnalyticData         rendererInfo;
-    RenderBufferInfo             renderBufferInfo;
-    uint64_t                     memUsage;
-    BS::multi_future<void>       accumulateFuture;
+    Timer                   renderTimer;
+    Timer                   cmdTimer;
+    ThroughputAverage       renderThroughputAverage;
+    TimeAverage             iterationTimeAverage;
+    SceneAnalyticData       sceneInfo;
+    TracerAnalyticData      tracerInfo;
+    RendererAnalyticData    rendererInfo;
+    RenderBufferInfo        renderBufferInfo;
+    uint64_t                memUsage;
+    BS::multi_future<void>  accumulateFuture;
+    bool                    startDisplayProgressBar = false;
     // The "timeline semaphore" (CPU emulation)
     // This will be used to synchronize between MRay and Run
-    TimelineSemaphore            syncSemaphore = TimelineSemaphore(0);
+    TimelineSemaphore       syncSemaphore = TimelineSemaphore(0);
     //
     bool                EventLoop(TransferQueue&, BS::thread_pool&);
     // Constructors
-                        RunCommand() = default;
+                        RunCommand();
     public:
     static CommandI&    Instance();
 

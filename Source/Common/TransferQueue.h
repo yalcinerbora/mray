@@ -126,6 +126,8 @@ class TransferQueue
                            VisorTriggerCommand&&);
         void    Dequeue(VisorAction&);
         bool    TryDequeue(VisorAction&);
+        template<class D>
+        bool    TryDequeue(VisorAction&, D duration);
         void    Enqueue(TracerResponse&&);
         bool    TryEnqueue(TracerResponse&&);
         //
@@ -141,6 +143,8 @@ class TransferQueue
                 VisorView(TransferQueue&);
         void    Dequeue(TracerResponse&);
         bool    TryDequeue(TracerResponse&);
+        template<class D>
+        bool    TryDequeue(TracerResponse&, D duration);
         void    Enqueue(VisorAction&&);
         bool    TryEnqueue(VisorAction&&);
         //
@@ -190,6 +194,12 @@ inline bool TransferQueue::TracerView::TryDequeue(VisorAction& vc)
     return tq.commands.TryDequeue(vc);
 }
 
+template<class D>
+inline bool TransferQueue::TracerView::TryDequeue(VisorAction& vc, D duration)
+{
+    return tq.commands.TryDequeue(vc, duration);
+}
+
 inline void TransferQueue::TracerView::Enqueue(TracerResponse&& tr)
 {
     tq.responses.Enqueue(std::move(tr));
@@ -228,6 +238,12 @@ inline void TransferQueue::VisorView::Dequeue(TracerResponse& tr)
 inline bool TransferQueue::VisorView::TryDequeue(TracerResponse& tr)
 {
     return tq.responses.TryDequeue(tr);
+}
+
+template<class D>
+inline bool TransferQueue::VisorView::TryDequeue(TracerResponse& vc, D duration)
+{
+    return tq.responses.TryDequeue(vc, duration);
 }
 
 inline void TransferQueue::VisorView::Enqueue(VisorAction&& vc)

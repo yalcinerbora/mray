@@ -44,6 +44,7 @@ set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/BitFunctions.h
     ${CURRENT_SOURCE_DIR}/DeviceVisit.h
     ${CURRENT_SOURCE_DIR}/MemAlloc.h
+    ${CURRENT_SOURCE_DIR}/MemAlloc.cpp
     ${CURRENT_SOURCE_DIR}/TypeFinder.h
     ${CURRENT_SOURCE_DIR}/NormTypes.h
     ${CURRENT_SOURCE_DIR}/Log.h

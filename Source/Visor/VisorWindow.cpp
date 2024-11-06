@@ -334,7 +334,7 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
             return sf.colorSpace == cSpace && !VkSurfaceFormatIsSRGB(sf.format);
         });
         if(loc == surfaceTypeList.cend() && isFirstFix)
-            MRAY_WARNING_LOG("[Visor]: Unable to create HDR surface, falling back to SDR...");
+            MRAY_WARNING_LOG("[Visor] : Unable to create HDR surface, falling back to SDR...");
     }
     //
     if(loc == surfaceTypeList.cend())
@@ -870,7 +870,7 @@ MRayError VisorWindow::Initialize(TransferQueue::VisorView& transferQueueIn,
     uniformBuffer.AllocateUniformBuffers(uboRequesters);
 
     // Initially, send the sync semaphore as a very first action
-    MRAY_LOG("[Visor]: Sending sync semaphore...");
+    MRAY_LOG("[Visor] : Sending sync semaphore...");
 
     transferQueue->Enqueue(VisorAction
     (
@@ -1057,7 +1057,7 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
                 break;
             }
             default:
-                MRAY_ERROR_LOG("[Visor]: Unkown run state is determined!");
+                MRAY_ERROR_LOG("[Visor] : Unkown run state is determined!");
                 break;
         }
     }
@@ -1165,7 +1165,7 @@ void VisorWindow::DoInitialActions()
 {
     if(initialSceneFile)
     {
-        MRAY_LOG("[Visor]: Sending initial scene...");
+        MRAY_LOG("[Visor] : Sending initial scene...");
         transferQueue->Enqueue(VisorAction
         (
             std::in_place_index<VisorAction::LOAD_SCENE>,
@@ -1178,7 +1178,7 @@ void VisorWindow::DoInitialActions()
     // This is sent here to start the rendering as well
     if(initialTracerRenderConfigPath)
     {
-        MRAY_LOG("[Visor]: Configuring Tracer via initial render config...");
+        MRAY_LOG("[Visor] : Configuring Tracer via initial render config...");
 
         transferQueue->Enqueue(VisorAction
         (
@@ -1236,25 +1236,25 @@ bool VisorWindow::Render()
         {
             case CAMERA_INIT_TRANSFORM:
             {
-                MRAY_LOG("[Visor]: Transform received");
+                MRAY_LOG("[Visor] : Transform received");
                 visorState.transform = std::get<CAMERA_INIT_TRANSFORM>(response);
                 break;
             }
             case SCENE_ANALYTICS:
             {
-                MRAY_LOG("[Visor]: Scene Info received");
+                MRAY_LOG("[Visor] : Scene Info received");
                 visorState.scene = std::get<SCENE_ANALYTICS>(response);
                 break;
             }
             case TRACER_ANALYTICS:
             {
-                MRAY_LOG("[Visor]: Tracer Info received");
+                MRAY_LOG("[Visor] : Tracer Info received");
                 visorState.tracer = std::get<TRACER_ANALYTICS>(response);
                 break;
             }
             case RENDERER_ANALYTICS:
             {
-                //MRAY_LOG("[Visor]: Render Info received");
+                //MRAY_LOG("[Visor] : Render Info received");
                 visorState.renderer = std::get<RENDERER_ANALYTICS>(response);
                 visorState.renderThroughputAverage.FeedValue(Float(visorState.renderer.throughput));
                 visorState.iterationTimeAverage.FeedValue(Float(visorState.renderer.iterationTimeMS));
@@ -1262,12 +1262,12 @@ bool VisorWindow::Render()
             }
             case RENDERER_OPTIONS:
             {
-                MRAY_LOG("[Visor]: Render Options received and ignored");
+                MRAY_LOG("[Visor] : Render Options received and ignored");
                 break; // TODO: User may change the render options during runtime
             }
             case RENDER_BUFFER_INFO:
             {
-                //MRAY_LOG("[Visor]: Render Buffer Info received");
+                //MRAY_LOG("[Visor] : Render Buffer Info received");
                 newRenderBuffer = std::get<RENDER_BUFFER_INFO>(response);
                 visorState.renderThroughputAverage = typename VisorState::ThroughputAverage();
                 stopConsuming = true;
@@ -1275,21 +1275,21 @@ bool VisorWindow::Render()
             }
             case CLEAR_IMAGE_SECTION:
             {
-                //MRAY_LOG("[Visor]: Clear Image received");
+                //MRAY_LOG("[Visor] : Clear Image received");
                 newClearSignal = std::get<CLEAR_IMAGE_SECTION>(response);
                 stopConsuming = true;
                 break;
             }
             case IMAGE_SECTION:
             {
-                //MRAY_LOG("[Visor]: Image section received");
+                //MRAY_LOG("[Visor] : Image section received");
                 newImageSection = std::get<IMAGE_SECTION>(response);
                 stopConsuming = true;
                 break;
             }
             case SAVE_AS_HDR:
             {
-                MRAY_LOG("[Visor]: Save HDR received");
+                MRAY_LOG("[Visor] : Save HDR received");
                 newSaveInfo = std::get<SAVE_AS_HDR>(response);
                 isHDRSave = RenderImagePool::HDR;
                 stopConsuming = true;
@@ -1297,7 +1297,7 @@ bool VisorWindow::Render()
             }
             case SAVE_AS_SDR:
             {
-                MRAY_LOG("[Visor]: Save SDR received");
+                MRAY_LOG("[Visor] : Save SDR received");
                 newSaveInfo = std::get<SAVE_AS_SDR>(response);
                 isHDRSave = RenderImagePool::SDR;
                 stopConsuming = true;
@@ -1305,7 +1305,7 @@ bool VisorWindow::Render()
             }
             case MEMORY_USAGE:
             {
-                MRAY_LOG("[Visor]: Memory usage received");
+                MRAY_LOG("[Visor] : Memory usage received");
                 visorState.tracerUsedGPUMemBytes = std::get<MEMORY_USAGE>(response);
                 break;
             }

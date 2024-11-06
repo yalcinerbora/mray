@@ -458,7 +458,6 @@ void RenderImagePool::SaveImage(VisorGUI& visorGUI,
             .pixels = Span<const Byte>(hStagePtr, paddedImageSize)
         };
 
-        using namespace std::string_literals;
         std::string filePath = MRAY_FORMAT("{:s}_{:010.2f}wpp_{:.2f}s",
                                            fileOutInfo.prefix,
                                            fileOutInfo.workPerPixel,
