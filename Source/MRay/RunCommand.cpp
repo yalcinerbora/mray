@@ -47,12 +47,12 @@ namespace EyeAnim
     using DurationMS = std::chrono::milliseconds;
     using LegolasLookupElem = Pair<std::string_view, DurationMS>;
 
-    static constexpr auto AragornSpeech = "Legolas! What do your elf eyes see?";
-    static constexpr auto LegolasResponse = "Uruks turn northeast, they're taking the hobbits to Isengard!";
+    static constexpr auto AragornLine = "Legolas! What do your elf eyes see?";
+    static constexpr auto LegolasLine = "Uruks turn north-east, they're taking the hobbits to Isengard!";
 
     static constexpr auto AnimDurationLong = DurationMS(850);
     static constexpr auto AnimDurationShort = DurationMS(475);
-    static constexpr auto AnimDurationCommon = DurationMS(5);
+    static constexpr auto AnimDurationCommon = DurationMS(25);
     static constexpr std::array LegolasAnimSheet =
     {
         LegolasLookupElem{"< 0 >", AnimDurationLong},
@@ -764,7 +764,7 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
                  renderBufferInfo.resolution[0],
                  renderBufferInfo.resolution[1]);
 
-        MRAY_LOG(EyeAnim::AragornSpeech);
+        MRAY_LOG(EyeAnim::AragornLine);
         renderTimer.Start();
     }
     //
@@ -803,7 +803,7 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
         if(accumulateFuture.valid())
             accumulateFuture.wait();
 
-        MRAY_LOG(EyeAnim::LegolasResponse);
+        MRAY_LOG(EyeAnim::LegolasLine);
         transferQueue.Terminate();
         syncSemaphore.Invalidate();
 

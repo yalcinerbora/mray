@@ -131,6 +131,7 @@ namespace PathTraceRDetail
     struct Options
     {
         uint32_t            totalSPP = 32;
+        uint32_t            burstSize = 1;
         Vector2ui           russianRouletteRange = Vector2ui(4, 20);
         LightSamplerType    lightSampler = LightSamplerType::E::UNIFORM;
         SampleMode          sampleMode = SampleMode::E::PURE;

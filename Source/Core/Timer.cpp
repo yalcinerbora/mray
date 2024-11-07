@@ -89,14 +89,14 @@ std::string FormatTimeDynamic(uint64_t ms)
     {
         double min;
         double sec = std::modf(totalMinutes, &min) * 60.0;
-        return MRAY_FORMAT("{:d}m_{:.3f}s", static_cast<uint32_t>(min), sec);
+        return MRAY_FORMAT("{:d}m_{:.0f}s", static_cast<uint32_t>(min), sec);
     }
     else if(totalMinutes < DAY_IN_MINS)
     {
         double hour;
         double min = std::modf(totalMinutes / HOUR_IN_MINS, &hour) * 60;
         double sec = std::modf(min, &min) * 60;
-        return MRAY_FORMAT("{:d}h_{:d}m_{:.3f}s",
+        return MRAY_FORMAT("{:d}h_{:d}m_{:.0f}s",
                            static_cast<uint32_t>(hour),
                            static_cast<uint32_t>(min),
                            sec);
@@ -107,7 +107,7 @@ std::string FormatTimeDynamic(uint64_t ms)
         double hour = std::modf(totalMinutes / DAY_IN_MINS, &day) * 24;
         double min = std::modf(hour, &hour) * 60;
         double sec = std::modf(min, &min) * 60;
-        return MRAY_FORMAT("{:d}d_{:d}h_{:d}m_{:.3f}s",
+        return MRAY_FORMAT("{:d}d_{:d}h_{:d}m_{:.0f}s",
                            static_cast<uint32_t>(day),
                            static_cast<uint32_t>(hour),
                            static_cast<uint32_t>(min),

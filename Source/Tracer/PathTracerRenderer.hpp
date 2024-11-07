@@ -183,6 +183,7 @@ PathTracerRenderer<MLA>::AttributeInfo() const
     return AttribInfoList
     {
         {"totalSPP",        MRayDataType<MR_UINT32>{}, IS_SCALAR, MR_MANDATORY},
+        {"burstSize",       MRayDataType<MR_UINT32>{}, IS_SCALAR, MR_OPTIONAL},
         {"renderMode",      MRayDataType<MR_STRING>{}, IS_SCALAR, MR_MANDATORY},
         {"sampleMode",      MRayDataType<MR_STRING>{}, IS_SCALAR, MR_MANDATORY},
         {"rrRange",         MRayDataType<MR_VECTOR_2UI>{}, IS_SCALAR, MR_MANDATORY},
@@ -198,6 +199,9 @@ RendererOptionPack PathTracerRenderer<MLA>::CurrentAttributes() const
     //
     result.attributes.push_back(TransientData(std::in_place_type_t<uint32_t>{}, 1));
     result.attributes.back().Push(Span<const uint32_t>(&currentOptions.totalSPP, 1));
+    //
+    result.attributes.push_back(TransientData(std::in_place_type_t<uint32_t>{}, 1));
+    result.attributes.back().Push(Span<const uint32_t>(&currentOptions.burstSize, 1));
     //
     std::string_view curRenderModeName = currentOptions.renderMode.ToString();
     result.attributes.push_back(TransientData(std::in_place_type_t<std::string>{},
@@ -236,10 +240,11 @@ void PathTracerRenderer<MLA>::PushAttribute(uint32_t attributeIndex,
 {    switch(attributeIndex)
     {
         case 0: newOptions.totalSPP = data.AccessAs<uint32_t>()[0]; break;
-        case 1: newOptions.renderMode = PathTraceRDetail::RenderMode(std::as_const(data).AccessAsString()); break;
-        case 2: newOptions.sampleMode = PathTraceRDetail::SampleMode(std::as_const(data).AccessAsString()); break;
-        case 3: newOptions.russianRouletteRange = data.AccessAs<Vector2ui>()[0]; break;
-        case 4: newOptions.lightSampler = PathTraceRDetail::LightSamplerType(std::as_const(data).AccessAsString()); break;
+        case 1: newOptions.burstSize = data.AccessAs<uint32_t>()[0]; break;
+        case 2: newOptions.renderMode = PathTraceRDetail::RenderMode(std::as_const(data).AccessAsString()); break;
+        case 3: newOptions.sampleMode = PathTraceRDetail::SampleMode(std::as_const(data).AccessAsString()); break;
+        case 4: newOptions.russianRouletteRange = data.AccessAs<Vector2ui>()[0]; break;
+        case 5: newOptions.lightSampler = PathTraceRDetail::LightSamplerType(std::as_const(data).AccessAsString()); break;
         default:
             throw MRayError("{} Unkown attribute index {}", TypeName(), attributeIndex);
     }
@@ -1100,12 +1105,15 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
     if(currentOptions.renderMode == RenderMode::E::THROUGHPUT &&
        isSingleTile)
     {
-        return DoThroughputSingleTileRender(device, processQueue);
+        if(currentOptions.burstSize == 1)
+            return DoThroughputSingleTileRender(device, processQueue);
+        else
+            return DoLatencyRender(currentOptions.burstSize, device, processQueue);
     }
     else if(currentOptions.renderMode == RenderMode::E::THROUGHPUT &&
             !isSingleTile)
     {
-        return DoLatencyRender(32u, device, processQueue);
+        return DoLatencyRender(currentOptions.burstSize, device, processQueue);
     }
     else
     {
