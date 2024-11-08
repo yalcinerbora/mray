@@ -64,7 +64,7 @@ static constexpr auto OPTIX_SHADERS_FOLDER = "OptiXShaders";
 
 auto OptiXAccelDetail::ShaderTypeNames::operator<=>(const ShaderTypeNames& t) const
 {
-    return Tuple(primName, transformName) <=> Tuple(t.primName, t.transformName);
+    return std::tuple(primName, transformName) <=> std::tuple(t.primName, t.transformName);
 }
 
 Expected<std::vector<char>>

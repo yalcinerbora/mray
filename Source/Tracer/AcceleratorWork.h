@@ -91,7 +91,7 @@ void KCGeneratePrimAABBs(// Output
                          MRAY_GRID_CONSTANT const uint32_t blockPerInstance,
                          MRAY_GRID_CONSTANT const uint32_t instanceCount,
                          MRAY_GRID_CONSTANT const typename TG::DataSoA tSoA,
-                         MRAY_GRID_CONSTANT const typename typename AG::PrimitiveGroup::DataSoA pSoA)
+                         MRAY_GRID_CONSTANT const typename AG::PrimitiveGroup::DataSoA pSoA)
 {
     using PG = typename AG::PrimitiveGroup;
     using TransContext = typename AccTransformContextType<AG, TG>::Result;
@@ -310,62 +310,6 @@ static void KCVisibilityRayCast(// Output
     }
 };
 
-class AcceleratorWorkI
-{
-    public:
-    virtual         ~AcceleratorWorkI() = default;
-
-    virtual void    CastLocalRays(// Output
-                                  Span<HitKeyPack> dHitKeys,
-                                  Span<MetaHit> dHitParams,
-                                  // I-O
-                                  Span<BackupRNGState> dRNGStates,
-                                  Span<RayGMem> dRays,
-                                  // Input
-                                  Span<const RayIndex> dRayIndices,
-                                  Span<const CommonKey> dAccelIdPacks,
-                                  // Constants
-                                  const GPUQueue& queue) const = 0;
-
-    virtual void    CastVisibilityRays(// Output
-                                       Bitspan<uint32_t> dIsVisibleBuffer,
-                                       // I-O
-                                       Span<BackupRNGState> dRNGStates,
-                                       // Input
-                                       Span<const RayGMem> dRays,
-                                       Span<const RayIndex> dRayIndices,
-                                       Span<const CommonKey> dAcceleratorKeys,
-                                       // Constants
-                                       const GPUQueue& queue) const = 0;
-
-    virtual void    GeneratePrimitiveCenters(Span<Vector3> dAllPrimCenters,
-                                             Span<const uint32_t> dLeafSegmentRanges,
-                                             Span<const PrimitiveKey> dAllLeafs,
-                                             Span<const TransformKey> dTransformKeys,
-                                             const GPUQueue& queue) const = 0;
-    virtual void    GeneratePrimitiveAABBs(Span<AABB3> dAllLeafAABBs,
-                                           Span<const uint32_t> dLeafSegmentRanges,
-                                           Span<const PrimitiveKey> dAllLeafs,
-                                           Span<const TransformKey> dTransformKeys,
-                                           const GPUQueue& queue) const = 0;
-    // Transform related
-    virtual void    GetCommonTransforms(Span<Matrix4x4> dTransforms,
-                                        Span<const TransformKey> dTransformKeys,
-                                        const GPUQueue& queue) const = 0;
-    virtual void    TransformLocallyConstantAABBs(// Output
-                                                  Span<AABB3> dInstanceAABBs,
-                                                  // Input
-                                                  Span<const AABB3> dConcreteAABBs,
-                                                  Span<const uint32_t> dConcreteIndicesOfInstances,
-                                                  Span<const TransformKey> dInstanceTransformKeys,
-                                                  // Constants
-                                                  const GPUQueue& queue) const = 0;
-    virtual size_t  TransformSoAByteSize() const = 0;
-    virtual void    CopyTransformSoA(Span<Byte>, const GPUQueue& queue) const = 0;
-
-    virtual std::string_view TransformName() const = 0;
-};
-
 template<AccelGroupC AcceleratorGroupType,
          TransformGroupC TransformGroupType>
 class AcceleratorWork : public AcceleratorWorkI
@@ -531,7 +475,11 @@ void AcceleratorWork<AG, TG>::GeneratePrimitiveCenters(Span<Vector3> dAllPrimCen
 
     static constexpr auto KernelName = KCGenPrimCenters<AG, TG>;
     uint32_t processedAccelCount = static_cast<uint32_t>(dLeafSegmentRanges.size() - 1);
-    uint32_t blockCount = queue.RecommendedBlockCountDevice(KernelName, TPB, 0);
+    uint32_t blockCount = queue.RecommendedBlockCountDevice
+    (
+        reinterpret_cast<const void*>(&KernelName),
+        TPB, 0
+    );
     queue.IssueExactKernel<KernelName>
     (
         "KCGenPrimCenters",
@@ -565,7 +513,11 @@ void AcceleratorWork<AG, TG>::GeneratePrimitiveAABBs(Span<AABB3> dAllLeafAABBs,
 
     static constexpr auto KernelName = KCGeneratePrimAABBs<AG, TG>;
     uint32_t processedAccelCount = static_cast<uint32_t>(dLeafSegmentRanges.size() - 1);
-    uint32_t blockCount = queue.RecommendedBlockCountDevice(KernelName, TPB, 0);
+    uint32_t blockCount = queue.RecommendedBlockCountDevice
+    (
+        reinterpret_cast<const void*>(&KernelName),
+        TPB, 0
+    );
     queue.IssueExactKernel<KernelName>
     (
         "KCGeneratePrimAABBs",

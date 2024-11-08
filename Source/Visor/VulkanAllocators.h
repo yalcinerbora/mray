@@ -97,19 +97,19 @@ class VulkanDeviceAllocator
 
     template<size_t... Is, class... Tp>
     void AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>&,
-                                  const Tuple<Tp&...>&,
+                                  const std::tuple<Tp&...>&,
                                   std::index_sequence<Is...>);
     template<class... Tp>
     void AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>& sizeAlignmentList,
-                                  const Tuple<Tp&...>& memObjects);
+                                  const std::tuple<Tp&...>& memObjects);
     //
     template<size_t... Is, class... Tp>
-    void AttachMemory(Tuple<Tp&...>&,
+    void AttachMemory(std::tuple<Tp&...>&,
                       VkDeviceMemory,
                       const OffsetList<sizeof...(Tp)>&,
                       std::index_sequence<Is...>);
     template<class... Tp>
-    void AttachMemory(Tuple<Tp&...>& inOutObjects,
+    void AttachMemory(std::tuple<Tp&...>& inOutObjects,
                       VkDeviceMemory mem,
                       const OffsetList<sizeof...(Tp)>& offsets);
 
@@ -122,7 +122,7 @@ class VulkanDeviceAllocator
     // The alloaction
     template<VulkanMemObjectC... Args>
     [[nodiscard]]
-    VulkanDeviceMemory AllocateMultiObject(Tuple<Args&...> inOutObjects,
+    VulkanDeviceMemory AllocateMultiObject(std::tuple<Args&...> inOutObjects,
                                            Location location);
     [[nodiscard]]
     VulkanDeviceMemory AllocateForeignObject(VulkanBuffer& buffer,
@@ -134,7 +134,7 @@ class VulkanDeviceAllocator
 template<size_t... Is, class... Tp>
 inline void
 VulkanDeviceAllocator::AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>& sizeAndAlignmentList,
-                                                const Tuple<Tp&...>& tp,
+                                                const std::tuple<Tp&...>& tp,
                                                 std::index_sequence<Is...>)
 {
     auto Align = [alignment = this->deviceCommonAlignment](SizeAlignPair sizeAlign)
@@ -155,7 +155,7 @@ VulkanDeviceAllocator::AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>
 template<class... Tp>
 inline void
 VulkanDeviceAllocator::AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>& sizeAlignmentList,
-                                                const Tuple<Tp&...>& memObjects)
+                                                const std::tuple<Tp&...>& memObjects)
 {
     return AcquireSizeAndAlignments(sizeAlignmentList, memObjects,
                                     std::index_sequence_for<Tp...>{});
@@ -163,7 +163,7 @@ VulkanDeviceAllocator::AcquireSizeAndAlignments(SizeAlignmentList<sizeof...(Tp)>
 
 template<size_t... Is, class... Tp>
 inline void
-VulkanDeviceAllocator::AttachMemory(Tuple<Tp&...>& inOutObjects,
+VulkanDeviceAllocator::AttachMemory(std::tuple<Tp&...>& inOutObjects,
                                     VkDeviceMemory mem,
                                     const OffsetList<sizeof...(Tp)>& offsets,
                                     std::index_sequence<Is...>)
@@ -173,7 +173,7 @@ VulkanDeviceAllocator::AttachMemory(Tuple<Tp&...>& inOutObjects,
 
 template<class... Tp>
 inline void
-VulkanDeviceAllocator::AttachMemory(Tuple<Tp&...>& inOutObjects,
+VulkanDeviceAllocator::AttachMemory(std::tuple<Tp&...>& inOutObjects,
                                     VkDeviceMemory mem,
                                     const OffsetList<sizeof...(Tp)>& offsets)
 {
@@ -182,7 +182,7 @@ VulkanDeviceAllocator::AttachMemory(Tuple<Tp&...>& inOutObjects,
 
 template<VulkanMemObjectC... Args>
 inline VulkanDeviceMemory
-VulkanDeviceAllocator::AllocateMultiObject(Tuple<Args&...> inOutObjects,
+VulkanDeviceAllocator::AllocateMultiObject(std::tuple<Args&...> inOutObjects,
                                            Location location)
 {
     static constexpr size_t N = sizeof...(Args);

@@ -131,10 +131,9 @@ TextureCUDA_Normal<D, T>::TextureCUDA_Normal(TextureCUDA_Normal&& other) noexcep
     , tex(other.tex)
     , data(other.data)
     , texParams(other.texParams)
-    , allocated(other.allocated)
     , size(other.size)
     , alignment(other.alignment)
-
+    , allocated(other.allocated)
 {
     other.data = nullptr;
     other.tex = cudaTextureObject_t(0);
@@ -185,7 +184,7 @@ RWTextureRefCUDA<D, T> TextureCUDA_Normal<D, T>::GenerateRWRef(uint32_t mipLevel
     // Since it is a "get" function we do not own this I guess
     cudaArray_t mipLevelArray = nullptr;
     CUDA_CHECK(cudaGetMipmappedArrayLevel(&mipLevelArray, data,
-                                          static_cast<int>(mipLevel)));
+                                          static_cast<unsigned int>(mipLevel)));
 
     cudaSurfaceObject_t surf;
     cudaResourceDesc desc = {};
@@ -353,10 +352,9 @@ TextureCUDA_BC<T>::TextureCUDA_BC(TextureCUDA_BC&& other) noexcept
     , tex(other.tex)
     , data(other.data)
     , texParams(other.texParams)
-    , allocated(other.allocated)
     , size(other.size)
     , alignment(other.alignment)
-
+    , allocated(other.allocated)
 {
     other.data = nullptr;
     other.tex = cudaTextureObject_t(0);

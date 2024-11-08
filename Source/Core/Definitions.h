@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <array>
 #include <string_view>
+#include <algorithm>
 
 #ifdef MRAY_GPU_BACKEND_CUDA
 
@@ -15,7 +16,11 @@
     #define MRAY_HOST __host__
     #define MRAY_KERNEL __global__
 
-    #define MRAY_GPU_INLINE __forceinline__
+    #ifdef MRAY_WINDOWS
+        #define MRAY_GPU_INLINE __forceinline__
+    #else
+        #define MRAY_GPU_INLINE inline
+    #endif
 
     #ifdef __CUDA_ARCH__
         #define MRAY_DEVICE_CODE_PATH

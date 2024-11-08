@@ -125,7 +125,8 @@ GPUDeviceCUDA::GPUDeviceCUDA(int deviceId, AnnotationHandle domain)
     {
         queues.emplace_back(props.multiProcessorCount, domain, this);
     }
-    transferQueue = GPUQueueCUDA(props.multiProcessorCount, domain, this);
+    transferQueue = GPUQueueCUDA(static_cast<uint32_t>(props.multiProcessorCount),
+                                 domain, this);
 }
 
 bool GPUDeviceCUDA::operator==(const GPUDeviceCUDA& other) const

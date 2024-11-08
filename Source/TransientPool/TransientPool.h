@@ -2,6 +2,7 @@
 
 #include <memory_resource>
 #include <mutex>
+#include <cstring>
 
 #include "Core/Definitions.h"
 #include "Core/System.h"

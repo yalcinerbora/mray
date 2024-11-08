@@ -579,8 +579,12 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
     );
 
     static constexpr auto TPB = StaticThreadPerBlock1D();
-    uint32_t blockCount = queue.RecommendedBlockCountDevice(KCGenMortonCode,
-                                                            TPB, 0);
+    uint32_t blockCount = queue.RecommendedBlockCountDevice
+    (
+        reinterpret_cast<const void*>(&KCGenMortonCode),
+        TPB, 0
+    );
+
     queue.IssueExactKernel<KCGenMortonCode>
     (
         "KCGenMortonCodes",
@@ -618,8 +622,11 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
 
     // Now we have a multiple valid morton code lists,
     // Construct the node hierarchy
-    blockCount = queue.RecommendedBlockCountDevice(KCConstructLBVHInternalNodes,
-                                                   TPB, 0);
+    blockCount = queue.RecommendedBlockCountDevice
+    (
+        reinterpret_cast<const void*>(&KCConstructLBVHInternalNodes),
+        TPB, 0
+    );
     queue.IssueExactKernel<KCConstructLBVHInternalNodes>
     (
         "KCConstructLBVHInternalNodes",
@@ -642,8 +649,11 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
 
     // Finally at AABB union portion now, union the AABBs.
     queue.MemsetAsync(dAtomicCounters, 0x00);
-    blockCount = queue.RecommendedBlockCountDevice(KCUnionLBVHBoundingBoxes,
-                                                   TPB, 0);
+    blockCount = queue.RecommendedBlockCountDevice
+    (
+        reinterpret_cast<const void*>(&KCUnionLBVHBoundingBoxes),
+        TPB, 0
+    );
     queue.IssueExactKernel<KCUnionLBVHBoundingBoxes>
     (
         "KCUnionLBVHBoundingBoxes",

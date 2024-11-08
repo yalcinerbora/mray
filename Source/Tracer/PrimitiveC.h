@@ -413,7 +413,7 @@ constexpr SampleT<BasicSurface> EmptyPrimitive<TC>::SampleSurface(const RNGDispe
 }
 
 template<TransformContextC TC>
-constexpr Float EmptyPrimitive<TC>::PdfSurface(const Hit& hit) const
+constexpr Float EmptyPrimitive<TC>::PdfSurface(const Hit&) const
 {
     return Float{std::numeric_limits<Float>::signaling_NaN()};
 }
@@ -438,28 +438,28 @@ constexpr Vector3 EmptyPrimitive<TC>::GetCenter() const
 }
 
 template<TransformContextC TC>
-constexpr uint32_t EmptyPrimitive<TC>::Voxelize(Span<uint64_t>& mortonCodes,
-                                                Span<Vector2us>& normals,
-                                                bool onlyCalculateSize,
-                                                const VoxelizationParameters& voxelParams) const
+constexpr uint32_t EmptyPrimitive<TC>::Voxelize(Span<uint64_t>&,
+                                                Span<Vector2us>&,
+                                                bool,
+                                                const VoxelizationParameters&) const
 {
     return 0;
 }
 
 template<TransformContextC TC>
-constexpr Optional<BasicSurface> EmptyPrimitive<TC>::SurfaceFromHit(const Hit& hit) const
+constexpr Optional<BasicSurface> EmptyPrimitive<TC>::SurfaceFromHit(const Hit&) const
 {
     return std::nullopt;
 }
 
 template<TransformContextC TC>
-constexpr Optional<EmptyType> EmptyPrimitive<TC>::ProjectedHit(const Vector3& point) const
+constexpr Optional<EmptyType> EmptyPrimitive<TC>::ProjectedHit(const Vector3&) const
 {
     return std::nullopt;
 }
 
 template<TransformContextC TC>
-constexpr Vector2 EmptyPrimitive<TC>::SurfaceParametrization(const Hit& hit) const
+constexpr Vector2 EmptyPrimitive<TC>::SurfaceParametrization(const Hit&) const
 {
     return Vector2::Zero();
 }

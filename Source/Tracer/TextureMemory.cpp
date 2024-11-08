@@ -31,7 +31,7 @@ class Concept : public GenericTextureI
     const GPUDevice&    Device() const override;
     //
     TextureExtent<3>    Extents() const override;
-    uint32_t            DimensionCount() const;
+    uint32_t            DimensionCount() const override ;
     void                CopyFromAsync(const GPUQueue& queue,
                                       uint32_t mipLevel,
                                       const TextureExtent<3>& offset,
@@ -134,7 +134,6 @@ void Concept<T>::CopyFromAsync(const GPUQueue& queue,
     ExtType offsetIn;
     ExtType sizeIn;
 
-    auto ext = tex.Extents();
     if constexpr(T::Dims == 1)
     {
         offsetIn = ExtType(offset[0]);
@@ -163,7 +162,6 @@ void Concept<T>::CopyFromAsync(const GPUQueue& queue,
     ExtType offsetIn;
     ExtType sizeIn;
 
-    auto ext = tex.Extents();
     if constexpr(T::Dims == 1)
     {
         offsetIn = ExtType(offset[0]);
@@ -196,7 +194,6 @@ void Concept<T>::CopyToAsync(Span<Byte> regionTo,
         ExtType offsetIn;
         ExtType sizeIn;
 
-        auto ext = tex.Extents();
         if constexpr(T::Dims == 1)
         {
             offsetIn = ExtType(offset[0]);
@@ -224,18 +221,18 @@ GenericTextureView Concept<T>::View(TextureReadMode mode) const
     static constexpr uint32_t C = T::ChannelCount;
     static constexpr uint32_t D = T::Dims;
     static constexpr bool IsBC = T::IsBlockCompressed;
-    auto GenView = [this]<class T>(TextureReadMode mode,
+    auto GenView = [this]<class X>(TextureReadMode mode,
                                    // For overload resolution
-                                   std::in_place_type_t<T>)
+                                   std::in_place_type_t<X>)
     {
         if constexpr(C == 1)
-            return TracerTexView<D, T>(tex.View<Float>(), mode, IsBC);
+            return TracerTexView<D, X>(tex.template View<Float>(), mode, IsBC);
         else if constexpr(C == 2)
-            return TracerTexView<D, T>(tex.View<Vector2>(), mode, IsBC);
+            return TracerTexView<D, X>(tex.template View<Vector2>(), mode, IsBC);
         else if constexpr(C == 3)
-            return TracerTexView<D, T>(tex.View<Vector3>(), mode, IsBC);
+            return TracerTexView<D, X>(tex.template View<Vector3>(), mode, IsBC);
         else
-            return TracerTexView<D, T>(tex.View<Vector4>(), mode, IsBC);
+            return TracerTexView<D, X>(tex.template View<Vector4>(), mode, IsBC);
     };
 
     using enum TextureReadMode;
@@ -258,13 +255,13 @@ GenericTextureView Concept<T>::View(TextureReadMode mode) const
         default:
         {
             if constexpr(C == 1)
-                return TracerTexView<D, Float>(tex.View<Float>(), mode, IsBC);
+                return TracerTexView<D, Float>(tex.template View<Float>(), mode, IsBC);
             else if constexpr(C == 2)
-                return TracerTexView<D, Vector2>(tex.View<Vector2>(), mode, IsBC);
+                return TracerTexView<D, Vector2>(tex.template View<Vector2>(), mode, IsBC);
             else if constexpr(C == 3)
-                return TracerTexView<D, Vector3>(tex.View<Vector3>(), mode, IsBC);
+                return TracerTexView<D, Vector3>(tex.template View<Vector3>(), mode, IsBC);
             else
-                return TracerTexView<D, Vector4>(tex.View<Vector4>(), mode, IsBC);
+                return TracerTexView<D, Vector4>(tex.template View<Vector4>(), mode, IsBC);
         }
     }
 }
@@ -303,10 +300,12 @@ GenericTexture::GenericTexture(std::in_place_type_t<T>,
                                MRayColorSpaceEnum cs, Float gammaIn,
                                AttributeIsColor col, MRayPixelTypeRT pt,
                                Args&&... args)
-    : colorSpace(cs)
+    : impl(nullptr)
+    , pixelType(pt)
+    , colorSpace(cs)
     , gamma(gammaIn)
     , isColor(col)
-    , pixelType(pt)
+    , isMipLoaded(false)
 {
     isMipLoaded.Reset();
     using ConceptType = TexDetail::Concept<T>;
@@ -360,6 +359,7 @@ TextureReadMode DetermineReadMode(MRayPixelTypeRT pixelType,
                 return TextureReadMode::TO_2C_FROM_3C;
             else if(channelCount == 4)
                 return TextureReadMode::TO_3C_FROM_4C;
+            [[fallthrough]];
         }
         case MR_DROP_2:
         {
@@ -369,6 +369,7 @@ TextureReadMode DetermineReadMode(MRayPixelTypeRT pixelType,
                 return TextureReadMode::TO_1C_FROM_3C;
             else if(channelCount == 4)
                 return TextureReadMode::TO_2C_FROM_4C;
+            [[fallthrough]];
         }
         case MR_DROP_3:
         {
@@ -376,6 +377,7 @@ TextureReadMode DetermineReadMode(MRayPixelTypeRT pixelType,
                 throw MRayError("Not enough channels to drop 3 channels");
             else if(channelCount == 4)
                 return TextureReadMode::TO_1C_FROM_4C;
+            [[fallthrough]];
         }
         default: break;
     }
@@ -415,12 +417,11 @@ void TextureMemory::ConvertColorspaces()
     // Load to linear memory
     for(auto& [_, t] : textures.Map())
     {
-        MRayPixelTypeRT pt = t.PixelType();
         bool isColor = (t.IsColor() == AttributeIsColor::IS_COLOR);
         bool requiresConversion = isColor;
         bool rq = ((t.ColorSpace() != MRayColorSpaceEnum::MR_DEFAULT &&
                     t.ColorSpace() != tracerParams.globalTextureColorSpace) ||
-                   t.Gamma() != Float(1));
+                    t.Gamma() != Float(1));
         requiresConversion &= rq;
         // Skip if not color or writable
         if(!requiresConversion)
@@ -509,7 +510,7 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
     gpuIndex %= 1;// gpuSystem.SystemDevices().size();
     const GPUDevice& device = gpuSystem.SystemDevices()[gpuIndex];
 
-    TexClampParameters tClampParams = {Vector2ui(size), 0, 0, false};
+    TexClampParameters tClampParams = {Vector2ui(size), 0, 0, false, SurfRefVariant()};
     uint32_t newMipCount = mipCount;
     Vector<D, uint32_t> newSize = size;
     if constexpr(D == 2)
@@ -552,7 +553,8 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
             .inputMaxRes = size,
             .filteredMipLevel = uint16_t(filteredMip),
             .ignoredMipCount = uint16_t(ignoredMipCount),
-            .willBeFiltered = willBeFiltered
+            .willBeFiltered = willBeFiltered,
+            .surface = SurfRefVariant()
         };
         newMipCount = uint32_t(mipCountI);
 
@@ -656,8 +658,8 @@ void TextureMemory::CommitTextures()
     for(auto& kv : texMap)
     {
         GenericTexture& tex = kv.second;
-        size_t gpuIndex = std::distance(gpuSystem.SystemDevices().data(),
-                                        &tex.Device());
+        size_t gpuIndex = static_cast<size_t>(std::distance(gpuSystem.SystemDevices().data(),
+                                                            &tex.Device()));
         texPtrs[gpuIndex].push_back(&tex);
         texSizes[gpuIndex].push_back(tex.Size());
         texAlignments[gpuIndex].push_back(tex.Alignment());
@@ -726,7 +728,7 @@ void TextureMemory::PushTextureData(TextureId id, uint32_t mipLevel,
        mipLevel == clampParams.filteredMipLevel)
     {
         Vector2ui size = Graphics::TextureMipSize(clampParams.inputMaxRes, mipLevel);
-        auto texClampBufferSpan = Span(static_cast<Byte*>(texClampBuffer), texClampBuffer.Size());
+        auto texClampBufferSpan = Span<Byte>(static_cast<Byte*>(texClampBuffer), texClampBuffer.Size());
         auto dataSpan = ToConstSpan(data.AccessAs<Byte>());
 
         // Utilize the TexClampParamters

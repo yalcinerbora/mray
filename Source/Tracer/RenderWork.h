@@ -415,7 +415,7 @@ void RenderLightWork<R, LG, TG>::DoBoundaryWorkInternal(// I-O
     // Please check the kernel for details
     using PG    = typename LG::PrimGroup;
     using TC    = typename PrimTransformContextType<PG, TG>::Result;
-    using L     = typename LG::Light<TC, typename R::SpectrumConverterContext>;
+    using L     = typename LG::template Light<TC, typename R::SpectrumConverterContext>;
     static constexpr auto WF = R:: template LightWorkFunctions<L, LG, TG>;
 
     if constexpr(I >= std::tuple_size_v<decltype(WF)>)

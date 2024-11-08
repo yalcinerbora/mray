@@ -173,9 +173,9 @@ MRAY_HOST
 TracerTexView<D, T>::TracerTexView(HWTextureView<D> hw,
                                    TextureReadMode m,
                                    bool flipYIn)
-    : mode(m)
+    : index(static_cast<uint8_t>(hw.index()))
+    , mode(m)
     , flipY(flipYIn)
-    , index(static_cast<uint8_t>(hw.index()))
 {
     static_assert(std::variant_size_v<HWTextureView<D>> == 4);
     switch(index)

@@ -7,6 +7,8 @@ Ray struct for convenient usability.
 #include "Vector.h"
 #include "MathConstants.h"
 
+#include <cstring>
+
 template<FloatingPointC T>
 class RayT
 {

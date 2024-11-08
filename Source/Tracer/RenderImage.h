@@ -230,8 +230,8 @@ uint32_t ImageSpan::LinearIndexFrom2D(const Vector2i& xy) const
 MRAY_GPU MRAY_GPU_INLINE
 Vector2i ImageSpan::LinearIndexTo2D(uint32_t linearIndex) const
 {
-    Vector2i result(linearIndex % extent[0],
-                    linearIndex / extent[0]);
+    Vector2i result(linearIndex % uint32_t(extent[0]),
+                    linearIndex / uint32_t(extent[0]));
     return result;
 }
 

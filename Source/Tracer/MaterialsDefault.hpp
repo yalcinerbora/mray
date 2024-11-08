@@ -394,14 +394,15 @@ Spectrum UnrealMaterial<ST>::CalculateF0(Spectrum albedo, Float metallic,
 
 template <class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Tuple<Float, Float, Float, Spectrum>
+std::tuple<Float, Float, Float, Spectrum>
 UnrealMaterial<ST>::FetchData(const Surface& s) const
 {
     Float roughness = roughnessTex(s.uv, s.dpdu, s.dpdv).value();
     Float metallic = metallicTex(s.uv, s.dpdu, s.dpdv).value();
     Float specular = specularTex(s.uv, s.dpdu, s.dpdv).value();
     Spectrum albedo = albedoTex(s.uv, s.dpdu, s.dpdv).value();
-    return Tuple{roughness, metallic, specular, albedo};
+    using Tup = std::tuple<Float, Float, Float, Spectrum>;
+    return Tup(roughness, metallic, specular, albedo);
 }
 
 template <class SpectrumTransformer>
@@ -501,8 +502,8 @@ SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
 
     // Edge case D is unstable since alpha is too small
     // fall back to cancelled version
-    if(isinf(D) ||  // alpha is small
-       isnan(D))    // alpha is zero
+    if(Math::IsInf(D) ||  // alpha is small
+       Math::IsNan(D))    // alpha is zero
     {
         specularTerm = G * F / BxDF::GSmithSingle(V, alpha);
         pdf[SPECULAR] = Float(1);
@@ -613,7 +614,7 @@ Spectrum UnrealMaterial<ST>::Evaluate(const Ray& wI,
     // (alpha is zero).
     // Assume geometry term was going to zero out the contribution
     // and zero here as well.
-    D = (isnan(D) || isinf(D)) ? Float(0) : D;
+    D = (Math::IsNan(D) || Math::IsInf(D)) ? Float(0) : D;
     // Shadowing Term (Smith Model)
     Float G = BxDF::GSmithCorralated(V, L, alpha);
     G = (LdH == Float(0)) ? Float(0) : G;

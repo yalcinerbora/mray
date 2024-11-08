@@ -1,6 +1,6 @@
 #pragma once
 
-#include "GPUSystemForward.h"
+#include "../GPUSystemForward.h"
 #include "Core/MathForward.h"
 
 namespace mray::cuda::algorithms

@@ -557,6 +557,8 @@ GPUQueueCUDA::GPUQueueCUDA(uint32_t multiprocessorCount,
                 stream = cudaStreamTailLaunch;
                 break;
             default: __trap(); break;
+        #else
+            default: assert(false); break;
         #endif
     }
 }
@@ -718,8 +720,8 @@ uint32_t GPUQueueCUDA::RecommendedBlockCountSM(const void* kernelPtr,
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t GPUQueueCUDA::RecommendedBlockCountDevice(const void* kernelPtr,
-                                                      uint32_t threadsPerBlock,
-                                                      uint32_t sharedMemSize) const
+                                                   uint32_t threadsPerBlock,
+                                                   uint32_t sharedMemSize) const
 {
     uint32_t blockPerSM = RecommendedBlockCountSM(kernelPtr, threadsPerBlock,
                                                   sharedMemSize);

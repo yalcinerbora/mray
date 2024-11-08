@@ -292,8 +292,8 @@ MetaLightArrayT<TLT...>::View::View(Span<const MetaLight> dLights)
 template<LightTransPairC... TLT>
 template<class SConverter>
 MRAY_HYBRID MRAY_CGPU_INLINE
-typename MetaLightArrayT<TLT...>::View::MetaLightView<SConverter>
-MetaLightArrayT<TLT...>::View::operator()(const typename SConverter& sc,
+typename MetaLightArrayT<TLT...>::View::template MetaLightView<SConverter>
+MetaLightArrayT<TLT...>::View::operator()(const SConverter& sc,
                                           uint32_t i) const
 {
     assert(i < dMetaLights.size());

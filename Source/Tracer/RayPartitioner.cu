@@ -400,8 +400,12 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
     Span<uint32_t> dDenseSplitIndices = RepurposeAlloc<uint32_t>(dKeysDB[1]).subspan(0, partitionedRayCount);
 
     // Mark the split positions
-    uint32_t blockCount = queue.RecommendedBlockCountDevice(&KCFindSplits<FIND_SPLITS_TPB>,
-                                                            FIND_SPLITS_TPB, 0);
+    static constexpr auto* Kernel = KCFindSplits<FIND_SPLITS_TPB>;
+    uint32_t blockCount = queue.RecommendedBlockCountDevice
+    (
+        reinterpret_cast<const void*>(Kernel),
+        FIND_SPLITS_TPB, 0
+    );
     queue.IssueExactKernel<KCFindSplits<FIND_SPLITS_TPB>>
     (
         "KCFindSplits",

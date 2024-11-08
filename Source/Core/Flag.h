@@ -24,6 +24,7 @@ class Flag
     public:
         // Constructors & Destructor
                         Flag() = default;
+                        Flag(uint64_t);
                         Flag(Enum);
                         template <int C>
                         Flag(const std::array<Enum, C>& vals);
@@ -48,6 +49,11 @@ Flag<Enum, S> operator|(Enum e1, Enum e2)
 {
     return Flag<Enum, S>(std::array<Enum, 2>{e1, e2});
 }
+
+template<class Enum, int S>
+Flag<Enum, S>::Flag(uint64_t v)
+ : flagData(v)
+{}
 
 template<class Enum, int S>
 Flag<Enum, S>::Flag(Enum e)

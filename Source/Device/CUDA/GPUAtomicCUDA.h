@@ -149,7 +149,7 @@ Vector4 AtomicAdd(Vector4& t, Vector4 v)
 }
 
 template<class T>
-MRAY_GPU MRAY_GPU_INLINE
+MRAY_GPU //MRAY_GPU_INLINE
 T AtomicAdd(T& t, T v)
 {
     // TODO: Check proper template instantiations

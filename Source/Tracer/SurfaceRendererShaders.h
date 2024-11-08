@@ -133,7 +133,7 @@ namespace SurfRDetail
 template<PrimitiveC Prim, MaterialC Material,
          class Surface, class TContext,
          PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-MRAY_HYBRID MRAY_GPU_INLINE
+MRAY_HYBRID MRAY_CGPU_INLINE
 void SurfRDetail::WorkFunctionCommon(const Prim&, const Material&, const Surface& surf,
                                      const TContext& tContext, RNGDispenser&,
                                      const RenderWorkParams<GlobalState, RayStateCommon, PG, MG, TG>& params,
@@ -303,13 +303,13 @@ void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, cons
 }
 
 template<LightC Light, LightGroupC LG, TransformGroupC TG>
-MRAY_HYBRID MRAY_GPU_INLINE
+MRAY_HYBRID MRAY_CGPU_INLINE
 void SurfRDetail::LightWorkFunctionCommon(const Light& l, RNGDispenser&,
                                           const RenderLightWorkParams<GlobalState, RayStateCommon
                                           , LG, TG>& params,
                                           RayIndex rayIndex)
 {
-    if constexpr (l.IsPrimitiveBackedLight)
+    if constexpr (Light::IsPrimitiveBackedLight)
         params.rayState.dOutputData[rayIndex] = Spectrum(1, 1, 1, 0);
     else
         params.rayState.dOutputData[rayIndex] = Spectrum::Zero();

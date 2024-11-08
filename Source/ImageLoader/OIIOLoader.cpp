@@ -551,8 +551,11 @@ Expected<ImageHeader> ImageFileOIIO::ReadHeader()
         .dimensions = dimension,
         .mipCount = static_cast<uint32_t>(mipCount),
         .pixelType = convPixFormat,
-        .colorSpace = Pair((isDefaultColorSpace) ? Float(1) : colorSpace.first,
-                           (isDefaultColorSpace) ? MR_DEFAULT : colorSpace.second),
+        .colorSpace = Pair<Float, MRayColorSpaceEnum>
+        (
+            (isDefaultColorSpace) ? Float(1) : colorSpace.first,
+            (isDefaultColorSpace) ? MR_DEFAULT : colorSpace.second
+        ),
         // OIIO provides loading adjacent subchannels so this is always passthrough
         .readMode = MRayTextureReadMode::MR_PASSTHROUGH
     };
@@ -590,7 +593,7 @@ Expected<Image> ImageFileOIIO::ReadImage()
     // Read mip by mip
     for(uint32_t mipLevel = 0; mipLevel < header.mipCount; mipLevel++)
     {
-        OIIO::ImageSpec mipSpec = oiioFile->spec(0, mipLevel);
+        OIIO::ImageSpec mipSpec = oiioFile->spec(0, static_cast<int>(mipLevel));
         assert(mipSpec.format == spec.format);
 
         // Calculate the read buffer stride
@@ -618,12 +621,12 @@ Expected<Image> ImageFileOIIO::ReadImage()
         // (or most image processing literature) style
         // Point towards the last scanline, and put stride as negative
         Byte* lastScanlinePtr = (pixels.AccessAs<Byte>().data() +
-                                 (mipSpec.height - 1) * scanLineSize);
+                                 static_cast<size_t>(mipSpec.height - 1) * scanLineSize);
         // Now we can read the file directly flipped and with proper format etc. etc.
         OIIO::stride_t oiioScanLineSize = static_cast<OIIO::stride_t>(scanLineSize);
 
         // Directly read the data
-        if(!oiioFile->read_image(0, mipLevel,
+        if(!oiioFile->read_image(0, static_cast<int>(mipLevel),
                                  channelRange[0], channelRange[1],
                                  readFormat, lastScanlinePtr,
                                  xStride, -oiioScanLineSize))

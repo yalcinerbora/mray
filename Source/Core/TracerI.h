@@ -275,10 +275,10 @@ struct MRayTextureParameters
 };
 
 // Generic Attribute Info
-struct GenericAttributeInfo : public Tuple<std::string, MRayDataTypeRT,
+struct GenericAttributeInfo : public std::tuple<std::string, MRayDataTypeRT,
                                            AttributeIsArray, AttributeOptionality>
 {
-    using Base = Tuple<std::string, MRayDataTypeRT,
+    using Base = std::tuple<std::string, MRayDataTypeRT,
                        AttributeIsArray, AttributeOptionality>;
     using Base::Base;
     enum E
@@ -290,11 +290,11 @@ struct GenericAttributeInfo : public Tuple<std::string, MRayDataTypeRT,
     };
 };
 
-struct TexturedAttributeInfo : public Tuple<std::string, MRayDataTypeRT,
+struct TexturedAttributeInfo : public std::tuple<std::string, MRayDataTypeRT,
                                             AttributeIsArray, AttributeOptionality,
                                             AttributeTexturable, AttributeIsColor>
 {
-    using Base = Tuple<std::string, MRayDataTypeRT,
+    using Base = std::tuple<std::string, MRayDataTypeRT,
                        AttributeIsArray, AttributeOptionality,
                        AttributeTexturable, AttributeIsColor>;
     using Base::Base;
@@ -348,10 +348,10 @@ MRAY_GENERIC_ID(PrimGroupId, CommonId);
 MRAY_GENERIC_ID(PrimBatchId, CommonId);
 struct PrimCount { uint32_t primCount; uint32_t attributeCount; };
 using PrimBatchIdList = std::vector<PrimBatchId>;
-struct PrimAttributeInfo : public Tuple<PrimitiveAttributeLogic, MRayDataTypeRT,
+struct PrimAttributeInfo : public std::tuple<PrimitiveAttributeLogic, MRayDataTypeRT,
                                         AttributeIsArray, AttributeOptionality>
 {
-    using Base = Tuple<PrimitiveAttributeLogic, MRayDataTypeRT,
+    using Base = std::tuple<PrimitiveAttributeLogic, MRayDataTypeRT,
                        AttributeIsArray, AttributeOptionality>;
     using Base::Base;
     enum
@@ -690,7 +690,7 @@ class [[nodiscard]] TracerI
     virtual const TracerParameters& Parameters() const = 0;
 };
 
-using TracerConstructorArgs = Tuple<const TracerParameters&>;
+using TracerConstructorArgs = std::tuple<const TracerParameters&>;
 
 // We use this on a map, so overload less
 inline bool AcceleratorType::operator<(AcceleratorType t) const

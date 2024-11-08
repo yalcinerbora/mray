@@ -44,8 +44,8 @@ mray_build_ext_dependency_git(
         BUILD_ARGS
             # Directly write in a folder
             # Zlib stores these variables between configs
-            # wich is bad. When you switch to release ti still installs
-            # to debug. So we need to write these
+            # wich is bad. When you switch to release it still installs
+            # the debug config. So we need to write these
             -DINSTALL_BIN_DIR=${ZLIB_INSTALL_LOC}
             -DINSTALL_INC_DIR=${ZLIB_INSTALL_LOC}
             -DINSTALL_LIB_DIR=${ZLIB_INSTALL_LOC}
@@ -55,6 +55,28 @@ mray_build_ext_dependency_git(
 
 )
 append_cmake_prefix_path(${ZLIB_INSTALL_LOC})
+
+# set(BZLIB_INSTALL_LOC ${OIIO_TMP_DIR}/bzip2)
+# mray_build_ext_dependency_git(
+#         NAME oiio_bzib2_ext
+#         URL "https://gitlab.com/bzip2/bzip2.git"
+#         TAG "66c46b8c9436613fd81bc5d03f63a61933a4dcc3" # Latest commit 08.11.2024
+#         LICENSE_NAME "COPYING"
+
+#         OVERRIDE_INSTALL_PREFIX ${BZLIB_INSTALL_LOC}
+#         BUILD_ARGS
+#             -DCMAKE_POSITION_INDEPENDENDENT_CODE=ON
+#             -DCMAKE_BUILD_SHARED_LIBS=OFF
+#             -DINSTALL_BIN_DIR=${BZLIB_INSTALL_LOC}
+#             -DINSTALL_INC_DIR=${BZLIB_INSTALL_LOC}
+#             -DINSTALL_LIB_DIR=${BZLIB_INSTALL_LOC}
+#             -DINSTALL_MAN_DIR=${BZLIB_INSTALL_LOC}
+#             -DINSTALL_PKGCONFIG_DIR=${BZLIB_INSTALL_LOC}
+#             -DCMAKE_DEBUG_POSTFIX:STRING=d
+
+
+# )
+# append_cmake_prefix_path(${BZLIB_INSTALL_LOC})
 
 # Copy zlib.dll to "Lib"
 if(MSVC)
@@ -205,7 +227,7 @@ mray_build_ext_dependency_git(
             -DUSE_OPENGL=ON
             -DUSE_QT=OFF
             -DBUILD_SHARED_LIBS=ON
-            -DLINKSTATIC=ON
+            -DLINKSTATIC=OFF
             -DOIIO_BUILD_TESTS=OFF
             -DOIIO_BUILD_TOOLS=OFF
             -DBUILD_DOCS=OFF
@@ -216,6 +238,10 @@ mray_build_ext_dependency_git(
             -DALWAYS_PREFER_CONFIG=ON
             # Do not use system (clash with miniconda etc...)
             -DCMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH=OFF
+            -DCMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH=OFF
+            -DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF
+            -DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF
+
             -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
             # Dep Root Files
             # AoS
@@ -227,6 +253,7 @@ mray_build_ext_dependency_git(
             -DJPEG_ROOT:PATH=${JPEGTURBO_INSTALL_LOC}
             -DTIFF_ROOT:PATH=${LIBTIFF_INSTALL_LOC}
             -DPNG_ROOT:PATH=${LIBPNG_INSTALL_LOC}
+            #-DBZip2_DIR:PATH=${BZLIB_INSTALL_LOC}
             -DVERBOSE=OFF
 
             # Do not install msvc runtime libraries

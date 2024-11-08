@@ -105,8 +105,12 @@ void InclusiveSegmentedScan(Span<T> dScannedValues,
     using namespace std::literals;
     assert(dValues.size() % segmentSize == 0);
 
-    uint32_t gridSize = queue.RecommendedBlockCountDevice(&KCInclusiveSegmentedScan<T, BinaryOp>,
-                                                          TPB, 0);
+    uint32_t gridSize = queue.RecommendedBlockCountDevice
+    (
+        reinterpret_cast<const void*>(&KCInclusiveSegmentedScan<T, BinaryOp>),
+        TPB, 0
+    );
+
     uint32_t totalBlocks = static_cast<uint32_t>(dValues.size() / segmentSize);
     queue.IssueExactKernel<KCInclusiveSegmentedScan<T, BinaryOp>>
     (

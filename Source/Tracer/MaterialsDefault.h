@@ -186,7 +186,7 @@ namespace UnrealMatDetail
         MRAY_HYBRID
         Float ConvertProbHToL(Float VdH, Float pdfH) const;
         MRAY_HYBRID
-        Tuple<Float, Float, Float, Spectrum>
+        std::tuple<Float, Float, Float, Spectrum>
         FetchData(const Surface&) const;
 
         public:

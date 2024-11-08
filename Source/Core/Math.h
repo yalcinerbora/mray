@@ -109,7 +109,7 @@ Math::MovingAverage<N>::MovingAverage(Float initialVal)
 template<uint32_t N>
 void Math::MovingAverage<N>::FeedValue(Float v)
 {
-    values[index] = v;
+    values[static_cast<size_t>(index)] = v;
     index = Roll(index + 1, 0, int32_t(N));
 }
 

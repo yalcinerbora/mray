@@ -50,18 +50,18 @@ DetermineTextureReadMode(MRayTextureReadMode imageReadMode,
             userRM == MR_AS_3C_TS_NORMAL_COOCTA)
     {
         if(pixelType.ChannelCount() != 2)
-            return std::move(MRayError("A non 2-channel texture requested "
-                                       "to be converted to normal \"{}\"",
-                                       filePath));
+            return MRayError("A non 2-channel texture requested "
+                             "to be converted to normal \"{}\"",
+                             filePath);
         // Image wants to drop the channels,
         // but user wants to expand it back to 3-channel
         // This is not allowed
         if(imageReadMode == MR_DROP_1 || imageReadMode == MR_DROP_2)
-            return std::move(MRayError("A compressed texture with pixel type {} requested to be read as "
-                                       "2 channels but also requested to be read as 3 channel normal. "
-                                       "This is not allowed. \"{}\"",
-                                       MRayPixelTypeStringifier::ToString(pixelType.Name()),
-                                       filePath));
+            return MRayError("A compressed texture with pixel type {} requested to be read as "
+                             "2 channels but also requested to be read as 3 channel normal. "
+                             "This is not allowed. \"{}\"",
+                             MRayPixelTypeStringifier::ToString(pixelType.Name()),
+                             filePath);
         else return userRM;
     }
     else return imageReadMode;
@@ -2255,6 +2255,7 @@ TracerIdPack SceneLoaderMRay::MoveIdPack(double durationMS)
         .transforms = std::move(transformMappings.map),
         .mats = std::move(matMappings.map),
         .mediums = std::move(mediumMappings.map),
+        .textures = std::move(texMappings),
         .surfaces = std::move(mRaySurfaces),
         .camSurfaces = std::move(mRayCamSurfaces),
         .lightSurfaces = std::move(mRayLightSurfaces),

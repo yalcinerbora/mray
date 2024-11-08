@@ -417,9 +417,12 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
 
     // Dedicate a block for each
     // concrete accelerator for copy
-    uint32_t blockCount = queue.RecommendedBlockCountDevice(&KCGeneratePrimitiveKeys,
-                                                            StaticThreadPerBlock1D(),
-                                                            0);
+    uint32_t blockCount = queue.RecommendedBlockCountDevice
+    (
+        reinterpret_cast<const void*>(&KCGeneratePrimitiveKeys),
+        StaticThreadPerBlock1D(),
+        0
+    );
     using namespace std::string_literals;
     static const auto KernelName = "KCGeneratePrimitiveKeys-"s + std::string(TypeName());
     queue.IssueExactKernel<KCGeneratePrimitiveKeys>
@@ -623,7 +626,11 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const CommonKey, const Accele
     else
     {
         static constexpr auto KernelName = KCGeneratePrimAABBs<AcceleratorGroupLBVH<PG>>;
-        uint32_t blockCount = queue.RecommendedBlockCountDevice(KernelName, TPB, 0);
+        uint32_t blockCount = queue.RecommendedBlockCountDevice
+        (
+            reinterpret_cast<const void*>(&KernelName),
+            TPB, 0
+        );
         queue.IssueExactKernel<KernelName>
         (
             "KCGeneratePrimAABBs",
@@ -667,7 +674,11 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const CommonKey, const Accele
     else
     {
         static constexpr auto KernelName = KCGenPrimCenters<AcceleratorGroupLBVH<PG>>;
-        uint32_t blockCount = queue.RecommendedBlockCountDevice(KernelName, TPB, 0);
+        uint32_t blockCount = queue.RecommendedBlockCountDevice
+        (
+            reinterpret_cast<const void*>(&KernelName),
+            TPB, 0
+        );
         queue.IssueExactKernel<KernelName>
         (
             "KCGenPrimCenters",
@@ -690,8 +701,11 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const CommonKey, const Accele
         );
     }
     // 3. Convert these to morton codes
-    uint32_t blockCount = queue.RecommendedBlockCountDevice(KCGenMortonCode,
-                                                            TPB, 0);
+    uint32_t blockCount = queue.RecommendedBlockCountDevice
+    (
+        reinterpret_cast<const void*>(&KCGenMortonCode),
+        TPB, 0
+    );
     queue.IssueExactKernel<KCGenMortonCode>
     (
         "KCGenMortonCodes",
@@ -730,8 +744,11 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const CommonKey, const Accele
 
     // 5. Now we have a multiple valid morton code lists,
     // Construct the node hierarchy
-    blockCount = queue.RecommendedBlockCountDevice(KCConstructLBVHInternalNodes,
-                                                   TPB, 0);
+    blockCount = queue.RecommendedBlockCountDevice
+    (
+        reinterpret_cast<const void*>(&KCConstructLBVHInternalNodes),
+        TPB, 0
+    );
     queue.IssueExactKernel<KCConstructLBVHInternalNodes>
     (
         "KCConstructLBVHInternalNodes",
@@ -755,8 +772,11 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const CommonKey, const Accele
 
     // 6. Finally at AABB union portion now, union the AABBs.
     queue.MemsetAsync(dAtomicCounters, 0x00);
-    blockCount = queue.RecommendedBlockCountDevice(KCUnionLBVHBoundingBoxes,
-                                                   TPB, 0);
+    blockCount = queue.RecommendedBlockCountDevice
+    (
+        reinterpret_cast<const void*>(&KCUnionLBVHBoundingBoxes),
+        TPB, 0
+    );
     queue.IssueExactKernel<KCUnionLBVHBoundingBoxes>
     (
         "KCUnionLBVHBoundingBoxes",

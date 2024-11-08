@@ -53,4 +53,4 @@ namespace BS
     class thread_pool;
 }
 
-using SceneLoaderConstructorArgs = Tuple<BS::thread_pool&>;
+using SceneLoaderConstructorArgs = std::tuple<BS::thread_pool&>;

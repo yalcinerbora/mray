@@ -223,7 +223,7 @@ class RNGGroupIndependent : public RNGeneratorGroupI
     public:
     using MainRNG       = PermutedCG32;
     using MainRNGState  = typename MainRNG::State;
-    static constexpr typename SamplerType::E TypeName = SamplerType::INDEPENDENT;;
+    static constexpr typename SamplerType::E TypeName = SamplerType::INDEPENDENT;
 
     private:
     BS::thread_pool&        mainThreadPool;

@@ -9,8 +9,8 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     public:
     static std::string_view TypeName();
 
-    using GlobalStateList   = Tuple<>;
-    using RayStateList      = Tuple<>;
+    using GlobalStateList   = std::tuple<>;
+    using RayStateList      = std::tuple<>;
     using SpectrumConverterContext = SpectrumConverterContextIdentity;
 
     enum Mode

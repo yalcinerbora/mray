@@ -18,11 +18,11 @@ MainUniformBuffer::MainUniformBuffer(const VulkanSystemView& handles)
 {}
 
 MainUniformBuffer::MainUniformBuffer(MainUniformBuffer&& other)
-    : mainUniformBuffer(std::move(other.mainUniformBuffer))
+    : handlesVk(other.handlesVk)
+    , mainUniformBuffer(std::move(other.mainUniformBuffer))
+    , mainMemory(std::move(other.mainMemory))
     , totalSize(other.totalSize)
     , alwaysMappedPtr(other.alwaysMappedPtr)
-    , mainMemory(std::move(other.mainMemory))
-    , handlesVk(other.handlesVk)
 {}
 
 MainUniformBuffer& MainUniformBuffer::operator=(MainUniformBuffer&& other)

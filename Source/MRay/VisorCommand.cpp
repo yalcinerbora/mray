@@ -33,7 +33,7 @@ Expected<VisorConfig> LoadVisorConfig(const std::string& configJsonPath)
     // Object keys
     static constexpr auto DLL_NAME          = "VisorDLL"sv;
     static constexpr auto OPTIONS_NAME      = "VisorOptions"sv;
-    static constexpr auto INTERVAL_OUT_NAME = "IntervalOutput"sv;
+    //static constexpr auto INTERVAL_OUT_NAME = "IntervalOutput"sv;
     // DLL entries
     static constexpr auto DLL_FILE_NAME         = "name"sv;
     static constexpr auto DLL_CONSTRUCT_NAME    = "construct"sv;
@@ -118,7 +118,7 @@ MRayError VisorCommand::Invoke()
         .mangledConstructorName = visorConfig.dllCreateFuncName,
         .mangledDestructorName = visorConfig.dllDeleteFuncName
     };
-    MRayError e = lib.GenerateObjectWithArgs<Tuple<>>(visorSystem,
+    MRayError e = lib.GenerateObjectWithArgs<std::tuple<>>(visorSystem,
                                                       VisorDLLArgs);
     if(e) return e;
 

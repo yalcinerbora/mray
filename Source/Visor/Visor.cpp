@@ -448,6 +448,7 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     VkPhysicalDeviceSynchronization2Features sync2Features =
     {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES,
+        .pNext = nullptr,
         .synchronization2 = 0
     };
     VkPhysicalDeviceHostQueryResetFeatures resetFeatures =
@@ -558,6 +559,7 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     VkDescriptorPoolCreateInfo descPoolInfo =
     {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .pNext = nullptr,
         .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
         .maxSets = 32,
         .poolSizeCount = static_cast<uint32_t>(imguiPoolSizes.size()),
@@ -596,6 +598,8 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
         .mipLodBias = 1.0f,
         .anisotropyEnable = false,
         .maxAnisotropy = 1.0f,
+        .compareEnable = VK_FALSE,
+        .compareOp = VK_COMPARE_OP_NEVER,
         .minLod = 0,
         .maxLod = 0,
         .borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,

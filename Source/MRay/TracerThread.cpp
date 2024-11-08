@@ -86,7 +86,7 @@ Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
     static constexpr auto TEX_COLOR_SPACE_NAME  = "globalTexColorSpace"sv;
     static constexpr auto MIP_GEN_FILTER_NAME   = "mipGenFilter"sv;
     static constexpr auto FILM_FILTER_NAME      = "filmFilter"sv;
-    static constexpr auto PARTITION_LOGIC_NAME  = "partitionLogic"sv;
+    //static constexpr auto PARTITION_LOGIC_NAME  = "partitionLogic"sv;
 
     nlohmann::json configJson;
     auto OptionalFetch = [](auto& outEntry, std::string_view NAME,

@@ -132,8 +132,8 @@ Vector2ui ImageTiler::TileCount() const
 void ImageTiler::NextTile()
 {
     using Math::Roll;
-    currentTile = Roll<int32_t>(currentTile + 1,
-                                0, int32_t(tileCount.Multiply()));
+    currentTile = uint32_t(Roll(static_cast<int32_t>(currentTile + 1),
+                                0, int32_t(tileCount.Multiply())));
     //
     pixel1DRange = Vector2ui(pixel1DRange[1],
                              pixel1DRange[1] + CurrentTileSize().Multiply());
@@ -253,8 +253,8 @@ bool RenderImage::Resize(const Vector2ui& extentIn)
                                 deviceMemory,
                                 {totalPixCount, totalPixCount,
                                  totalPixCount, totalPixCount});
-    dPixelsAll = Span(dPixelsR.data(),
-                      std::distance(dPixelsR.data(), dWeights.data()));
+    size_t allSizeDevice = size_t(std::distance(dPixelsR.data(), dWeights.data()));
+    dPixelsAll = Span<Float>(dPixelsR.data(), allSizeDevice);
 
     // Reallocate host buffer
     MemAlloc::AllocateMultiData(std::tie(hPixelsR, hPixelsG,
@@ -262,8 +262,8 @@ bool RenderImage::Resize(const Vector2ui& extentIn)
                                 stagingMemory,
                                 {totalPixCount, totalPixCount,
                                  totalPixCount, totalPixCount});
-    hPixelsAll = Span(hPixelsR.data(),
-                      std::distance(hPixelsR.data(), hWeights.data()));
+    size_t allSizeHost = size_t(std::distance(hPixelsR.data(), hWeights.data()));
+    hPixelsAll = Span<Float>(hPixelsR.data(), allSizeHost);
 
     // Calculate offsets
     Byte* mem = static_cast<Byte*>(stagingMemory);

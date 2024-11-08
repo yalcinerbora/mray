@@ -290,7 +290,7 @@ uint64_t PathTracerRenderer<MLA>::SPPLimit(uint32_t spp) const
 }
 
 template<class MLA>
-Pair<Span<RayIndex>, uint32_t>
+std::pair<Span<RayIndex>, uint32_t>
 PathTracerRenderer<MLA>::ReloadPaths(Span<const RayIndex> dIndices,
                                      uint32_t sppLimit,
                                      const GPUQueue& processQueue)
@@ -374,7 +374,7 @@ PathTracerRenderer<MLA>::ReloadPaths(Span<const RayIndex> dIndices,
     }
     // Index buffer may be invalidated (Binary partition should not
     // invalidate but lets return the new buffer)
-    return Pair(dDeadAliveRayIndices, aliveRayCount);
+    return std::pair(dDeadAliveRayIndices, aliveRayCount);
 }
 
 template<class MLA>
@@ -960,7 +960,7 @@ RenderBufferInfo PathTracerRenderer<MLA>::StartRender(const RenderImageParams& r
         this->currentCameraWorks.cbegin(), this->currentCameraWorks.cend(),
         [camGroupId, transGroupId](const auto& pack)
         {
-            return pack.idPack == Pair(camGroupId, transGroupId);
+            return pack.idPack == std::pair(camGroupId, transGroupId);
         }
     );
     curCamWork = &packLoc->workPtr;

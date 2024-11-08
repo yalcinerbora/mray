@@ -52,68 +52,68 @@ void ImguiCallback(VkResult vkResult)
 // These are available on validation layer repo
 // Currently validation dll comes from SDK
 // TODO: Change validation fetching
-static std::string VkColorSpaceToString(VkColorSpaceKHR colorSpace)
-{
-    switch(colorSpace)
-    {
-        using namespace std::string_literals;
-        case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
-            return "VK_COLOR_SPACE_SRGB_NONLINEAR_KHR"s;
-        case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
-            return "VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT"s;
-        case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
-            return "VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT"s;
-        case VK_COLOR_SPACE_DISPLAY_P3_LINEAR_EXT:
-            return "VK_COLOR_SPACE_DISPLAY_P3_LINEAR_EXT"s;
-        case VK_COLOR_SPACE_DCI_P3_NONLINEAR_EXT:
-            return "VK_COLOR_SPACE_DCI_P3_NONLINEAR_EXT"s;
-        case VK_COLOR_SPACE_BT709_LINEAR_EXT:
-            return "VK_COLOR_SPACE_BT709_LINEAR_EXT"s;
-        case VK_COLOR_SPACE_BT709_NONLINEAR_EXT:
-            return "VK_COLOR_SPACE_BT709_NONLINEAR_EXT"s;
-        case VK_COLOR_SPACE_BT2020_LINEAR_EXT:
-            return "VK_COLOR_SPACE_BT2020_LINEAR_EXT"s;
-        case VK_COLOR_SPACE_HDR10_ST2084_EXT:
-            return "VK_COLOR_SPACE_HDR10_ST2084_EXT"s;
-        case VK_COLOR_SPACE_DOLBYVISION_EXT:
-            return "VK_COLOR_SPACE_DOLBYVISION_EXT"s;
-        case VK_COLOR_SPACE_HDR10_HLG_EXT:
-            return "VK_COLOR_SPACE_HDR10_HLG_EXT"s;
-        case VK_COLOR_SPACE_ADOBERGB_LINEAR_EXT:
-            return "VK_COLOR_SPACE_ADOBERGB_LINEAR_EXT"s;
-        case VK_COLOR_SPACE_ADOBERGB_NONLINEAR_EXT:
-            return "VK_COLOR_SPACE_ADOBERGB_NONLINEAR_EXT"s;
-        case VK_COLOR_SPACE_PASS_THROUGH_EXT:
-            return "VK_COLOR_SPACE_PASS_THROUGH_EXT"s;
-        case VK_COLOR_SPACE_EXTENDED_SRGB_NONLINEAR_EXT:
-            return "VK_COLOR_SPACE_EXTENDED_SRGB_NONLINEAR_EXT"s;
-        case VK_COLOR_SPACE_DISPLAY_NATIVE_AMD:
-            return "VK_COLOR_SPACE_DISPLAY_NATIVE_AMD"s;
-        default:
-            throw MRayError("Unable to convert VkColorSpaceKHR to string!");
-    }
-}
+// static std::string VkColorSpaceToString(VkColorSpaceKHR colorSpace)
+// {
+//     switch(colorSpace)
+//     {
+//         using namespace std::string_literals;
+//         case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
+//             return "VK_COLOR_SPACE_SRGB_NONLINEAR_KHR"s;
+//         case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
+//             return "VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT"s;
+//         case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
+//             return "VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT"s;
+//         case VK_COLOR_SPACE_DISPLAY_P3_LINEAR_EXT:
+//             return "VK_COLOR_SPACE_DISPLAY_P3_LINEAR_EXT"s;
+//         case VK_COLOR_SPACE_DCI_P3_NONLINEAR_EXT:
+//             return "VK_COLOR_SPACE_DCI_P3_NONLINEAR_EXT"s;
+//         case VK_COLOR_SPACE_BT709_LINEAR_EXT:
+//             return "VK_COLOR_SPACE_BT709_LINEAR_EXT"s;
+//         case VK_COLOR_SPACE_BT709_NONLINEAR_EXT:
+//             return "VK_COLOR_SPACE_BT709_NONLINEAR_EXT"s;
+//         case VK_COLOR_SPACE_BT2020_LINEAR_EXT:
+//             return "VK_COLOR_SPACE_BT2020_LINEAR_EXT"s;
+//         case VK_COLOR_SPACE_HDR10_ST2084_EXT:
+//             return "VK_COLOR_SPACE_HDR10_ST2084_EXT"s;
+//         case VK_COLOR_SPACE_DOLBYVISION_EXT:
+//             return "VK_COLOR_SPACE_DOLBYVISION_EXT"s;
+//         case VK_COLOR_SPACE_HDR10_HLG_EXT:
+//             return "VK_COLOR_SPACE_HDR10_HLG_EXT"s;
+//         case VK_COLOR_SPACE_ADOBERGB_LINEAR_EXT:
+//             return "VK_COLOR_SPACE_ADOBERGB_LINEAR_EXT"s;
+//         case VK_COLOR_SPACE_ADOBERGB_NONLINEAR_EXT:
+//             return "VK_COLOR_SPACE_ADOBERGB_NONLINEAR_EXT"s;
+//         case VK_COLOR_SPACE_PASS_THROUGH_EXT:
+//             return "VK_COLOR_SPACE_PASS_THROUGH_EXT"s;
+//         case VK_COLOR_SPACE_EXTENDED_SRGB_NONLINEAR_EXT:
+//             return "VK_COLOR_SPACE_EXTENDED_SRGB_NONLINEAR_EXT"s;
+//         case VK_COLOR_SPACE_DISPLAY_NATIVE_AMD:
+//             return "VK_COLOR_SPACE_DISPLAY_NATIVE_AMD"s;
+//         default:
+//             throw MRayError("Unable to convert VkColorSpaceKHR to string!");
+//     }
+// }
 
-static std::string VkPresentModeToString(VkPresentModeKHR presentMode)
-{
-    switch(presentMode)
-    {
-        case VK_PRESENT_MODE_IMMEDIATE_KHR:
-            return "VK_PRESENT_MODE_IMMEDIATE_KHR";
-        case VK_PRESENT_MODE_MAILBOX_KHR:
-            return "VK_PRESENT_MODE_MAILBOX_KHR";
-        case VK_PRESENT_MODE_FIFO_KHR:
-            return "VK_PRESENT_MODE_FIFO_KHR";
-        case VK_PRESENT_MODE_FIFO_RELAXED_KHR:
-            return "VK_PRESENT_MODE_FIFO_RELAXED_KHR";
-        case VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR:
-            return "VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR";
-        case VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR:
-            return "VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR";
-        default:
-            throw MRayError("Unable to convert VkPresentModeKHR to string!");
-    }
-}
+// static std::string VkPresentModeToString(VkPresentModeKHR presentMode)
+// {
+//     switch(presentMode)
+//     {
+//         case VK_PRESENT_MODE_IMMEDIATE_KHR:
+//             return "VK_PRESENT_MODE_IMMEDIATE_KHR";
+//         case VK_PRESENT_MODE_MAILBOX_KHR:
+//             return "VK_PRESENT_MODE_MAILBOX_KHR";
+//         case VK_PRESENT_MODE_FIFO_KHR:
+//             return "VK_PRESENT_MODE_FIFO_KHR";
+//         case VK_PRESENT_MODE_FIFO_RELAXED_KHR:
+//             return "VK_PRESENT_MODE_FIFO_RELAXED_KHR";
+//         case VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR:
+//             return "VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR";
+//         case VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR:
+//             return "VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR";
+//         default:
+//             throw MRayError("Unable to convert VkPresentModeKHR to string!");
+//     }
+// }
 
 static bool VkSurfaceFormatIsSRGB(VkFormat format)
 {
@@ -202,8 +202,8 @@ FrameCounter::FrameCounter(FrameCounter&& other)
     , queryPool(std::exchange(other.queryPool, nullptr))
     , startCommand(std::move(other.startCommand))
     , queryData(std::exchange(other.queryData, {}))
-    , avg(other.avg)
     , timestampPeriod(other.timestampPeriod)
+    , avg(other.avg)
 {}
 
 FrameCounter& FrameCounter::operator=(FrameCounter&& other)
@@ -391,6 +391,7 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
         .pQueueFamilyIndices = nullptr,
         .preTransform = capabilities.currentTransform,
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+        .presentMode = swapchainInfo.presentMode,
         .clipped = VK_TRUE,
         .oldSwapchain = oldChain
     };
@@ -594,6 +595,7 @@ MRayError Swapchain::Initialize(VulkanSystemView handles,
     VkDescriptorPoolCreateInfo descPoolInfo =
     {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .pNext = nullptr,
         .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
         .maxSets = 16,
         .poolSizeCount = static_cast<uint32_t>(imguiPoolSizes.size()),
@@ -1106,7 +1108,7 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
         transferQueue->Enqueue(VisorAction
         (
             std::in_place_index<VisorAction::CHANGE_RENDERER>,
-            visorState.tracer.rendererTypes[rIndex]
+            visorState.tracer.rendererTypes[size_t(rIndex)]
         ));
     }
 
@@ -1349,8 +1351,8 @@ bool VisorWindow::Render()
         // Flush the device, we will need to reallocate
         vkDeviceWaitIdle(handlesVk.deviceVk);
 
-        visorState.currentRenderLogic0 = newRenderBuffer->curRenderLogic0;
-        visorState.currentRenderLogic1 = newRenderBuffer->curRenderLogic1;
+        visorState.currentRenderLogic0 = int32_t(newRenderBuffer->curRenderLogic0);
+        visorState.currentRenderLogic1 = int32_t(newRenderBuffer->curRenderLogic1);
 
         const auto& newRB = newRenderBuffer.value();
         RenderImageInitInfo renderImageInitParams =

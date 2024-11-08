@@ -252,7 +252,7 @@ AcceleratorGroupOptiX<PG>::MultiBuildGeneric_CLT(const PreprocessResult& ppResul
                    hCompactedOffsets.begin() + 1,
     [](size_t in) -> size_t
     {
-        return Math::NextMultiple(in, OPTIX_ACCEL_BUFFER_BYTE_ALIGNMENT);
+        return Math::NextMultiple<size_t>(in, OPTIX_ACCEL_BUFFER_BYTE_ALIGNMENT);
     });
     std::inclusive_scan(hCompactedOffsets.cbegin() + 1, hCompactedOffsets.cend(),
                         hCompactedOffsets.begin() + 1);
@@ -283,7 +283,8 @@ AcceleratorGroupOptiX<PG>::MultiBuildGeneric_CLT(const PreprocessResult& ppResul
     queue.MemcpyAsync(dTransformKeys, hTransformKeySpan);
     // Also copy PG SoA
     typename PG::DataSoA pgSoA = this->pg.SoA();
-    queue.MemcpyAsync(dPrimGroupSoA, ToConstSpan(Span(&pgSoA, 1)));
+    using SpanPGData = Span<typename PG::DataSoA>;
+    queue.MemcpyAsync(dPrimGroupSoA, ToConstSpan(SpanPGData(&pgSoA, 1)));
 
     // Now compact,
     hConcreteAccelHandles.resize(allBuildInputs.size());
@@ -307,9 +308,12 @@ AcceleratorGroupOptiX<PG>::MultiBuildGeneric_CLT(const PreprocessResult& ppResul
 
     // Dedicate a block for each
     // concrete accelerator for copy
-    uint32_t blockCount = queue.RecommendedBlockCountDevice(KCGeneratePrimitiveKeys,
-                                                            StaticThreadPerBlock1D(),
-                                                            0);
+    uint32_t blockCount = queue.RecommendedBlockCountDevice
+    (
+        reinterpret_cast<const void*>(&KCGeneratePrimitiveKeys),
+        StaticThreadPerBlock1D(),
+        0
+    );
     using namespace std::string_literals;
     static const auto KernelName = "KCGeneratePrimitiveKeys-"s + std::string(TypeName());
     queue.IssueExactKernel<KCGeneratePrimitiveKeys>
@@ -431,9 +435,12 @@ AcceleratorGroupOptiX<PG>::MultiBuildAABB_CLT(const PreprocessResult& ppResult,
 
     // Dedicate a block for each
     // concrete accelerator for copy
-    uint32_t blockCount = queue.RecommendedBlockCountDevice(KCGeneratePrimitiveKeys,
-                                                            StaticThreadPerBlock1D(),
-                                                            0);
+    uint32_t blockCount = queue.RecommendedBlockCountDevice
+    (
+        reinterpret_cast<const void*>(&KCGeneratePrimitiveKeys),
+        StaticThreadPerBlock1D(),
+        0
+    );
     using namespace std::string_view_literals;
     queue.IssueExactKernel<KCGeneratePrimitiveKeys>
     (
@@ -451,10 +458,13 @@ AcceleratorGroupOptiX<PG>::MultiBuildAABB_CLT(const PreprocessResult& ppResult,
         // Constant
         this->pg.GroupId()
     );
-    static constexpr auto AABBGenKernelName = KCGeneratePrimAABBs<AcceleratorGroupOptiX<PG>>;
-    blockCount = queue.RecommendedBlockCountDevice(AABBGenKernelName,
-                                                   StaticThreadPerBlock1D(),
-                                                   0);
+    static constexpr auto* AABBGenKernelName = KCGeneratePrimAABBs<AcceleratorGroupOptiX<PG>>;
+    blockCount = queue.RecommendedBlockCountDevice
+    (
+        reinterpret_cast<const void*>(AABBGenKernelName),
+        StaticThreadPerBlock1D(),
+        0
+    );
     static constexpr uint32_t BLOCK_PER_INSTANCE = 16;
     queue.IssueExactKernel<AABBGenKernelName>
     (
@@ -625,13 +635,13 @@ void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
         for(size_t j = 0; j < recordCount; j++)
         {
             Vector2ui primRange = hConcreteHitRecordPrimRanges[hrRange[0] + j];
-            Span subPrimRange = dAllLeafs.subspan(primRange[0],
-                                                  primRange[1] - primRange[0]);
+            Span<PrimitiveKey> subPrimRange = dAllLeafs.subspan(primRange[0],
+                                                                primRange[1] - primRange[0]);
             GenericHitRecordData<> recordData =
             {
                 .dPrimKeys      = subPrimRange,
                 .transformKey   = ppResult.surfData.transformKeys[i],
-                .alphaMap       = ppResult.surfData.alphaMaps[i][j],
+                //.alphaMap       = ppResult.surfData.alphaMaps[i][j],
                 .lightOrMatKey  = ppResult.surfData.lightOrMatKeys[i][j],
                 .acceleratorKey = accKey,
                 .primSoA        = dPrimGroupSoA.data(),

@@ -179,7 +179,8 @@ MRayError VulkanComputePipeline::Initialize(VkDevice dev,
             .flags = 0,
             .stage = VK_SHADER_STAGE_COMPUTE_BIT,
             .module = shaderModule,
-            .pName = entryPointName.c_str()
+            .pName = entryPointName.c_str(),
+            .pSpecializationInfo = nullptr
         },
         .layout = pipelineLayout,
         .basePipelineHandle = nullptr,

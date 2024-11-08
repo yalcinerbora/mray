@@ -1,7 +1,7 @@
-
 #include "TransientPool.h"
 #include <new>
 #include <type_traits>
+
 #include "Core/MemAlloc.h"
 
 // TODO: I really did not understand the parameters from cppreference.

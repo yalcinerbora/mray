@@ -5,6 +5,8 @@
 #include <bit>
 #include <type_traits>
 
+#include <climits>
+
 #include "Math.h"
 
 namespace Bit
@@ -22,7 +24,7 @@ namespace Bit
 
     template<size_t... Is, std::unsigned_integral... Ts>
     requires(sizeof...(Is) == sizeof...(Ts))
-    constexpr std::tuple_element_t<0, Tuple<Ts...>>
+    constexpr std::tuple_element_t<0, std::tuple<Ts...>>
     Compose(Ts... values);
 
     template<std::unsigned_integral T>
@@ -208,11 +210,11 @@ constexpr T Bit::SetSubPortion(T value, C in, std::array<T, 2> bitRange)
 
 template<size_t... Is, std::unsigned_integral... Ts>
 requires(sizeof...(Is) == sizeof...(Ts))
-constexpr std::tuple_element_t<0, Tuple<Ts...>>
+constexpr std::tuple_element_t<0, std::tuple<Ts...>>
 Bit::Compose(Ts... values)
 {
     constexpr uint32_t E = sizeof...(Is);
-    using RetT = std::tuple_element_t<0, Tuple<Ts...>>;
+    using RetT = std::tuple_element_t<0, std::tuple<Ts...>>;
     // Compile time check the bits
     static_assert((Is + ...) <= sizeof(RetT) * CHAR_BIT,
                   "Template \"Is\" must not exceed the entire bit range");
@@ -225,10 +227,10 @@ Bit::Compose(Ts... values)
         [[maybe_unused]]
         uint32_t i = 1;
         assert
-        (
+        ((
             (RetT(values) < (RetT(1) << offsets[i++])) &&
             ...
-        );
+        ));
     }
     // Do scan
     UNROLL_LOOP
@@ -357,7 +359,7 @@ constexpr T Bit::CountLZero(T value)
         else
             return T(__clz(int(value)));
     #else
-        return std::countl_zero<T>(value);
+        return static_cast<T>(std::countl_zero<T>(value));
     #endif
 }
 
@@ -580,7 +582,7 @@ constexpr T Bit::NormConversion::ToSNorm(R in)
     constexpr R DIFF = (MAX - R(0));
 
     in *= DIFF;
-    in = round(in);
+    in = std::round(in);
     return T(in);
 }
 
@@ -595,7 +597,7 @@ template<size_t N>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Bitset<N>::BitRef& Bitset<N>::BitRef::operator=(bool b)
 {
-    Type mask = (Type(1) << index);
+    Type mask = Type(1u << index);
     reference.bits = (b)
             ? reference.bits | mask
             : reference.bits & (~mask);

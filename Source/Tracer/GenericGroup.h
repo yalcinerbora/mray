@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <numeric>
+#include <atomic>
 
 #include "Core/Types.h"
 #include "Core/Map.h"
@@ -125,10 +126,10 @@ class GenericGroupT : public GenericGroupI<IdTypeT, AttribInfoT>
     const AttributeRanges&      FindRange(IdInt) const;
 
     //template <class... Args>
-    //Tuple<Span<Args>...>    GenericCommit(std::array<size_t, sizeof...(Args)> countLookup);
+    //std::tuple<Span<Args>...>    GenericCommit(std::array<size_t, sizeof...(Args)> countLookup);
 
     template <class... Args>
-    void GenericCommit(Tuple<Span<Args>&...> output,
+    void GenericCommit(std::tuple<Span<Args>&...> output,
                        std::array<int32_t, sizeof...(Args)> countLookup);
 
     template <class T>
@@ -243,7 +244,7 @@ const AttributeRanges& GenericGroupT<ID, AI>::FindRange(IdInt id) const
 
 template<class ID, class AI>
 template <class... Args>
-void GenericGroupT<ID, AI>::GenericCommit(Tuple<Span<Args>&...> output,
+void GenericGroupT<ID, AI>::GenericCommit(std::tuple<Span<Args>&...> output,
                                           std::array<int32_t, sizeof...(Args)> countLookup)
 {
     constexpr size_t TypeCount = sizeof...(Args);
@@ -261,7 +262,9 @@ void GenericGroupT<ID, AI>::GenericCommit(Tuple<Span<Args>&...> output,
         AttributeRanges range;
         for(size_t i = 0; i < TypeCount; i++)
         {
-            size_t count = (countLookup[i] == - 1) ? 1 : counts[countLookup[i]];
+            size_t count = (countLookup[i] == -1)
+                    ? 1
+                    : counts[static_cast<uint32_t>(countLookup[i])];
             range.emplace_back(offsets[i], offsets[i] + count);
             offsets[i] += count;
         }

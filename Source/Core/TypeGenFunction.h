@@ -19,7 +19,7 @@ template<class GeneratorType, class BaseType,
 void GenerateMapping(Map<std::string_view, GeneratorType>& map,
                      // These types are here for overload resolution,
                      // these will not be used directly
-                     Tuple<Args...>*, Tuple<Types...>*)
+                     std::tuple<Args...>*, std::tuple<Types...>*)
 {
     // I've come up with this to move the Args... pack away
     // from expansion of Types...

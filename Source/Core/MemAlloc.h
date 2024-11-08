@@ -41,19 +41,20 @@ namespace MemAlloc
 template<ImplicitLifetimeC Left, ImplicitLifetimeC Right>
 static constexpr bool RepurposeAllocRequirements =
 (
-    !std::is_same_v<std::remove_cvref_t<Right>, Byte> && (alignof(Right) >= alignof(Left)) ||
+    (!std::is_same_v<std::remove_cvref_t<Right>, Byte> &&
+      alignof(std::remove_cvref_t<Right>) >= alignof(std::remove_cvref_t<Left>)) ||
     std::is_same_v<std::remove_cvref_t<Right>, Byte>
 );
 
 constexpr size_t DefaultSystemAlignment();
 
 template <MemoryC Memory, ImplicitLifetimeC... Args>
-void AllocateMultiData(Tuple<Span<Args>&...> spans, Memory& memory,
+void AllocateMultiData(std::tuple<Span<Args>&...> spans, Memory& memory,
                        const std::array<size_t, sizeof...(Args)>& countList,
                        size_t alignment = DefaultSystemAlignment());
 
 template <MemoryC Memory, ImplicitLifetimeC... Args>
-Tuple<Span<Args>...> AllocateMultiData(Memory& memory,
+std::tuple<Span<Args>...> AllocateMultiData(Memory& memory,
                                        const std::array<size_t, sizeof...(Args)>& countList,
                                        size_t alignment = DefaultSystemAlignment());
 
@@ -134,7 +135,7 @@ namespace MemAlloc::Detail
                                       size_t alignment)
     {
         using namespace Math;
-        using CurrentType = typename std::tuple_element_t<I, Tuple<Tp...>>;
+        using CurrentType = typename std::tuple_element_t<I, std::tuple<Tp...>>;
         size_t alignedSize = NextMultiple(sizeof(CurrentType) * countList[I], alignment);
         alignedSizeList[I] = alignedSize;
         return alignedSize + AcquireTotalSize<I + 1, Tp...>(alignedSizeList,
@@ -143,18 +144,18 @@ namespace MemAlloc::Detail
 
     template<std::size_t I = 0, class... Tp>
     requires (I == sizeof...(Tp))
-    constexpr void CalculateSpans(Tuple<Span<Tp>&...>&, size_t&, Byte*,
+    constexpr void CalculateSpans(std::tuple<Span<Tp>&...>&, size_t&, Byte*,
                                   const std::array<size_t, sizeof...(Tp)>&,
                                   const std::array<size_t, sizeof...(Tp)>&)
     {}
 
     template<std::size_t I = 0, class... Tp>
     requires (I < sizeof...(Tp))
-    constexpr void CalculateSpans(Tuple<Span<Tp>&...>& t, size_t& offset, Byte* memory,
+    constexpr void CalculateSpans(std::tuple<Span<Tp>&...>& t, size_t& offset, Byte* memory,
                                   const std::array<size_t, sizeof...(Tp)>& alignedSizeList,
                                   const std::array<size_t, sizeof...(Tp)>& countList)
     {
-        using CurrentType = typename std::tuple_element_t<I, Tuple<Tp...>>;
+        using CurrentType = typename std::tuple_element_t<I, std::tuple<Tp...>>;
         // Set Pointer
         size_t size = alignedSizeList[I];
         CurrentType* tPtr = reinterpret_cast<CurrentType*>(memory + offset);
@@ -188,7 +189,7 @@ constexpr size_t DefaultSystemAlignment()
 }
 
 template <MemoryC Memory, ImplicitLifetimeC... Args>
-void AllocateMultiData(Tuple<Span<Args>&...> spans, Memory& memory,
+void AllocateMultiData(std::tuple<Span<Args>&...> spans, Memory& memory,
                        const std::array<size_t, sizeof...(Args)>& countList,
                        size_t alignment)
 {
@@ -208,12 +209,12 @@ void AllocateMultiData(Tuple<Span<Args>&...> spans, Memory& memory,
 }
 
 template <MemoryC Memory, ImplicitLifetimeC... Args>
-Tuple<Span<Args>...> AllocateMultiData(Memory& memory,
+std::tuple<Span<Args>...> AllocateMultiData(Memory& memory,
                                        const std::array<size_t, sizeof...(Args)>& countList,
                                        size_t alignment)
 {
-    Tuple<Span<Args>...> result;
-    Tuple<Span<Args>&...> resultRef = ToTupleRef(result);
+    std::tuple<Span<Args>...> result;
+    std::tuple<Span<Args>&...> resultRef = ToTupleRef(result);
     AllocateMultiData(resultRef, memory, countList, alignment);
     return result;
 }

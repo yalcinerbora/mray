@@ -54,7 +54,7 @@ struct SurfaceStruct
     public:
     static constexpr size_t MATERIAL_INDEX = 0;
     static constexpr size_t PRIM_INDEX = 1;
-    using IdPair        = Tuple<uint32_t, uint32_t>;
+    using IdPair        = std::tuple<uint32_t, uint32_t>;
     using IdPairList    = std::array<IdPair, PPS>;
     using TextureList   = std::array<Optional<SceneTexId>, PPS>;
     using CullList      = std::array<bool, PPS>;

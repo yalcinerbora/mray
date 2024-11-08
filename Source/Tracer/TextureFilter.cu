@@ -113,12 +113,12 @@ Vector4 FilterPixel(const Vector2ui& pixelCoord,
 }
 
 MRAY_HYBRID MRAY_GPU_INLINE
-Tuple<Vector3, Float> ConvertNaNsToColor(Spectrum value, Float weight)
+std::tuple<Vector3, Float> ConvertNaNsToColor(Spectrum value, Float weight)
 {
     if(value.HasNaN())
-        return Tuple(BIG_MAGENTA(), weight * Float(128.0));
+        return std::tuple(BIG_MAGENTA(), weight * Float(128.0));
     else
-        return Tuple(Vector3(value), weight);
+        return std::tuple(Vector3(value), weight);
 }
 
 // TODO: Should we dedicate a warp per pixel?
@@ -792,9 +792,11 @@ void ReconFilterGenericRGB(// Output
         Span<const Spectrum> dValuesIn = dValues;
         Span<const ImageCoordinate> dImgCoordsIn = dImgCoords;
 
-        uint32_t blockCount =
-            queue.RecommendedBlockCountDevice(Kernel,
-                                              StaticThreadPerBlock1D(), 0);
+        uint32_t blockCount = queue.RecommendedBlockCountDevice
+        (
+            reinterpret_cast<const void*>(Kernel),
+            StaticThreadPerBlock1D(), 0
+        );
         queue.IssueExactKernel<Kernel>
         (
             Name,
@@ -934,14 +936,17 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
     // We will dedicate N blocks for each texture.
     static constexpr uint32_t THREAD_PER_BLOCK = 512;
     static constexpr uint32_t BLOCK_PER_TEXTURE = 256;
-    static constexpr auto Kernel = KCGenerateMipmaps<THREAD_PER_BLOCK, Filter>;
+    static constexpr auto* Kernel = KCGenerateMipmaps<THREAD_PER_BLOCK, Filter>;
 
     // Find maximum block count for state allocation
     // TODO: Change this so that it is relative to the
     // filter radius.
     static constexpr Vector2ui SPP = Vector2ui(8, 8);
-    uint32_t blockCount = queue.RecommendedBlockCountDevice(Kernel,
-                                                            THREAD_PER_BLOCK, 0);
+    uint32_t blockCount = queue.RecommendedBlockCountDevice
+    (
+        reinterpret_cast<const void*>(Kernel),
+        THREAD_PER_BLOCK, 0
+    );
 
     // We can temporarily allocate here. This will be done at
     // initialization time.
@@ -1039,7 +1044,11 @@ void ClampImageFromBufferGeneric(// Output
     // TODO: Change this so that it is relative to the
     // filter radius.
     static constexpr Vector2ui SPP = Vector2ui(8, 8);
-    uint32_t blockCount = queue.RecommendedBlockCountDevice(Kernel, THREAD_PER_BLOCK, 0);
+    uint32_t blockCount = queue.RecommendedBlockCountDevice
+    (
+        reinterpret_cast<const void*>(&Kernel),
+        THREAD_PER_BLOCK, 0
+    );
     uint32_t blockPerTexture = DivideUp(surfImageDims, TILE_SIZE).Multiply();
     blockCount = std::min(blockPerTexture, blockCount);
 
@@ -1156,7 +1165,7 @@ Vector2ui TextureFilterT<E, FF>::FilterExtent() const
     return Vector2ui(FilterRadiusToPixelWH(filterRadius));
 }
 
-template TextureFilterT<FilterType::BOX, BoxFilter>;
-template TextureFilterT<FilterType::TENT, TentFilter>;
-template TextureFilterT<FilterType::GAUSSIAN, GaussianFilter>;
-template TextureFilterT<FilterType::MITCHELL_NETRAVALI, MitchellNetravaliFilter>;
+template class TextureFilterT<FilterType::BOX, BoxFilter>;
+template class TextureFilterT<FilterType::TENT, TentFilter>;
+template class TextureFilterT<FilterType::GAUSSIAN, GaussianFilter>;
+template class TextureFilterT<FilterType::MITCHELL_NETRAVALI, MitchellNetravaliFilter>;

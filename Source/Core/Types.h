@@ -24,26 +24,23 @@ using Variant = std::variant<Types...>;
 template <class T0, class T1>
 using Pair = std::pair<T0, T1>;
 
-template <class... Args>
-using Tuple = std::tuple<Args...>;
-
 // TODO: reference_wrapper<T> vs. span<T,1> which is better?
 template <class T>
 using Ref = std::reference_wrapper<T>;
 
-namespace TupleDetail
+namespace std::tupleDetail
 {
     template<class... Args, std::size_t... I>
-    constexpr Tuple<Args&...> ToTupleRef(Tuple<Args...>&t,
+    constexpr std::tuple<Args&...> ToTupleRef(std::tuple<Args...>&t,
                                          std::index_sequence<I...>);
 
     template<typename Func, class... Args, size_t... Is>
-    constexpr bool InvokeAt(size_t idx, const Tuple<Args...>& t, Func&& F,
+    constexpr bool InvokeAt(size_t idx, const std::tuple<Args...>& t, Func&& F,
                             std::index_sequence<Is...>);
 }
 
 template<class... Args, typename Indices = std::index_sequence_for<Args...>>
-constexpr Tuple<Args&...> ToTupleRef(Tuple<Args...>& t);
+constexpr std::tuple<Args&...> ToTupleRef(std::tuple<Args...>& t);
 
 // https://stackoverflow.com/questions/28997271/c11-way-to-index-tuple-at-runtime-without-using-switch
 // From here, recursive expansion of if(i == I) F(std::get<I>(tuple));
@@ -51,7 +48,7 @@ constexpr Tuple<Args&...> ToTupleRef(Tuple<Args...>& t);
 // Predicate function must return bool to abuse short circuiting.
 template<class Func, class... Args>
 requires(std::is_same_v<std::invoke_result_t<Func, Args>, bool> && ...)
-constexpr bool InvokeAt(uint32_t index, const Tuple<Args...>& t, Func&& F);
+constexpr bool InvokeAt(uint32_t index, const std::tuple<Args...>& t, Func&& F);
 
 // Some span wrappers for convenience
 template<class T, std::size_t Extent = std::dynamic_extent>
@@ -84,17 +81,17 @@ namespace UniqueTupleDetail
     struct Unique : std::type_identity<T> {};
 
     template <typename... Ts, typename U, typename... Us>
-    struct Unique<Tuple<Ts...>, U, Us...>
+    struct Unique<std::tuple<Ts...>, U, Us...>
         : std::conditional_t<(std::is_same_v<U, Ts> || ...)
-        , Unique<Tuple<Ts...>, Us...>
-        , Unique<Tuple<Ts..., U>, Us...>> {};
+        , Unique<std::tuple<Ts...>, Us...>
+        , Unique<std::tuple<Ts..., U>, Us...>> {};
 }
 
 template <typename... Ts>
 using UniqueVariant = typename UniqueVariantDetail::Unique<Variant<>, Ts...>::type;
 
 template <typename... Ts>
-using UniqueTuple = typename UniqueTupleDetail::Unique<Tuple<>, Ts...>::type;
+using UniqueTuple = typename UniqueTupleDetail::Unique<std::tuple<>, Ts...>::type;
 
 template <class T>
 struct SampleT
@@ -112,13 +109,13 @@ using EnumNameArray = std::array<std::string_view, static_cast<uint32_t>(E::END)
 template<class... Args>
 struct SoASpan
 {
-    constexpr Tuple<Args*...> NullifyPtrs();
+    constexpr std::tuple<Args*...> NullifyPtrs();
 
     private:
     // TODO: Find a way to default initialize this.
     // My template metaprogramming capabilities was not enough.
     // We are setting size to zero at least.
-    Tuple<Args*...> ptrs = NullifyPtrs();
+    std::tuple<Args*...> ptrs = NullifyPtrs();
     size_t          size = 0;
 
     public:
@@ -127,9 +124,9 @@ struct SoASpan
     constexpr       SoASpan(const Spans&... args);
 
     template<size_t I>
-    constexpr auto   Get() -> Span<std::tuple_element_t<I, Tuple<Args...>>>;
+    constexpr auto   Get() -> Span<std::tuple_element_t<I, std::tuple<Args...>>>;
     template<size_t I>
-    constexpr auto   Get() const -> Span<std::tuple_element_t<I, Tuple<Args...>>>;
+    constexpr auto   Get() const -> Span<std::tuple_element_t<I, std::tuple<Args...>>>;
     //
     constexpr size_t Size() const;
 };
@@ -140,14 +137,14 @@ SoASpan(const Spans&... spans) -> SoASpan<typename Spans::element_type...>;
 
 
 template<class... Args, std::size_t... I>
-constexpr Tuple<Args&...> TupleDetail::ToTupleRef(Tuple<Args...>& t,
+constexpr std::tuple<Args&...> std::tupleDetail::ToTupleRef(std::tuple<Args...>& t,
                                                   std::index_sequence<I...>)
 {
     return std::tie(std::get<I>(t)...);
 }
 
 template<typename Func, class... Args, size_t... Is>
-constexpr bool TupleDetail::InvokeAt(size_t idx, const Tuple<Args...>& t, Func&& F,
+constexpr bool std::tupleDetail::InvokeAt(size_t idx, const std::tuple<Args...>& t, Func&& F,
                                      std::index_sequence<Is...>)
 {
     // Parameter pack expansion (comma seperator abuse)
@@ -162,16 +159,16 @@ constexpr bool TupleDetail::InvokeAt(size_t idx, const Tuple<Args...>& t, Func&&
 }
 
 template<class... Args, typename Indices>
-constexpr Tuple<Args&...> ToTupleRef(Tuple<Args...>& t)
+constexpr std::tuple<Args&...> ToTupleRef(std::tuple<Args...>& t)
 {
-    return TupleDetail::ToTupleRef(t, Indices{});
+    return std::tupleDetail::ToTupleRef(t, Indices{});
 }
 
 template<class Func, class... Args>
 requires(std::is_same_v<std::invoke_result_t<Func, Args>, bool> && ...)
-constexpr bool InvokeAt(uint32_t index, const Tuple<Args...>& t, Func&& F)
+constexpr bool InvokeAt(uint32_t index, const std::tuple<Args...>& t, Func&& F)
 {
-    return TupleDetail::InvokeAt(index, t,
+    return std::tupleDetail::InvokeAt(index, t,
                                  std::forward<Func>(F),
                                  std::make_index_sequence<sizeof...(Args)>{});
 }
@@ -200,9 +197,9 @@ constexpr bool IsSubspan(Span<T0, E0> checkedSpan, Span<T1, E1> bigSpan)
 }
 
 template<class... Args>
-constexpr Tuple<Args*...> SoASpan<Args...>::NullifyPtrs()
+constexpr std::tuple<Args*...> SoASpan<Args...>::NullifyPtrs()
 {
-    Tuple<Args*...> result;
+    std::tuple<Args*...> result;
     std::apply([](auto&&... args)
     {
         ((args = nullptr), ...);
@@ -214,24 +211,24 @@ template<class... Args>
 template<class... Spans>
 constexpr SoASpan<Args...>::SoASpan(const Spans&... args)
     : ptrs(args.data()...)
-    , size(std::get<0>(Tuple<Spans...>(args...)).size())
+    , size(std::get<0>(std::tuple<Spans...>(args...)).size())
 {
-    assert((args.size() == size) &&...);
+    assert(((args.size() == size) &&...));
 }
 
 template<class... Args>
 template<size_t I>
-constexpr auto SoASpan<Args...>::Get() -> Span<std::tuple_element_t<I, Tuple<Args...>>>
+constexpr auto SoASpan<Args...>::Get() -> Span<std::tuple_element_t<I, std::tuple<Args...>>>
 {
-    using ResulT = Span<std::tuple_element_t<I, Tuple<Args...>>>;
+    using ResulT = Span<std::tuple_element_t<I, std::tuple<Args...>>>;
     return ResulT(std::get<I>(ptrs), size);
 }
 
 template<class... Args>
 template<size_t I>
-constexpr auto SoASpan<Args...>::Get() const -> Span<std::tuple_element_t<I, Tuple<Args...>>>
+constexpr auto SoASpan<Args...>::Get() const -> Span<std::tuple_element_t<I, std::tuple<Args...>>>
 {
-    using ResulT = Span<std::tuple_element_t<I, Tuple<Args...>>>;
+    using ResulT = Span<std::tuple_element_t<I, std::tuple<Args...>>>;
     return ResulT(std::get<I>(ptrs), size);
 }
 

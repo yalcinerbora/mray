@@ -30,7 +30,7 @@ void Timer::Lap()
 uint64_t Timer::ElapsedIntMS() const
 {
     Duration dur = std::bit_cast<Duration>(elapsed);
-    return std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();
+    return uint64_t(std::chrono::duration_cast<std::chrono::milliseconds>(dur).count());
 }
 
 template <>
@@ -70,8 +70,7 @@ std::string FormatTimeDynamic(uint64_t ms)
 
     // TODO: There is probably smarter way to do this,
     // check later
-    static constexpr double MICROSEC_THRESHOLD = 1000.0;
-    static constexpr double MILLISEC_THRESHOLD = 1000.0;
+    static constexpr uint64_t MILLISEC_THRESHOLD = 1000;
     static constexpr double SEC_THRESHOLD = 60.0;
     //
     static constexpr double HOUR_IN_MINS = 60.0;

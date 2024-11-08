@@ -13,7 +13,8 @@
 
 #elif defined MRAY_LINUX
 
-    #include<pthread.h>
+    #include <pthread.h>
+    #include <sys/ioctl.h>
 
 #else
 #error System preprocessor definition is not set properly! (CMake should have handled this)

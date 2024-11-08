@@ -3,18 +3,17 @@
 
 #include "Core/Error.hpp"
 
+
+using FilterFuncPair = Pair< const FilterType::E, TexFilterGenerator>;
 template<class T>
-static constexpr auto FilterGenFuncPack = Pair
-<
-    const FilterType::E,
-    TexFilterGenerator
->
+static constexpr auto FilterGenFuncPack = FilterFuncPair
+
 {
     T::TypeName,
     &GenerateType<TextureFilterI, T, const GPUSystem&, Float>
 };
 
-static constexpr const std::initializer_list FilterGenFuncList =
+static constexpr const std::initializer_list<FilterFuncPair> FilterGenFuncList =
 {
     FilterGenFuncPack<TextureFilterBox>,
     FilterGenFuncPack<TextureFilterTent>,
@@ -22,19 +21,17 @@ static constexpr const std::initializer_list FilterGenFuncList =
     FilterGenFuncPack<TextureFilterMitchellNetravali>
 };
 
+using RNGGenPair = Pair<const SamplerType::E, RNGGenerator>;
+
 template<class T>
-static constexpr auto RNGGenFuncPack = Pair
-<
-    const SamplerType::E,
-    RNGGenerator
->
+static constexpr auto RNGGenFuncPack = RNGGenPair
 {
     T::TypeName,
     &GenerateType<RNGeneratorGroupI, T, uint32_t, uint64_t,
                   const GPUSystem&, BS::thread_pool&>
 };
 
-static constexpr std::initializer_list RNGGenFuncList =
+static constexpr std::initializer_list<RNGGenPair> RNGGenFuncList =
 {
     RNGGenFuncPack<RNGGroupIndependent>
 };
@@ -198,9 +195,9 @@ TracerBase::TracerBase(const TypeGeneratorPack& tGen,
                        const TracerParameters& tParams)
     : globalThreadPool(nullptr)
     , typeGenerators(tGen)
-    , params(tParams)
     , filterGenMap(FilterGenFuncList)
     , rngGenMap(RNGGenFuncList)
+    , params(tParams)
     , texMem(gpuSystem, params, filterGenMap)
 {}
 
@@ -1399,7 +1396,6 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     // ....
     // PG TG {S0,...,SN}   -> AccelGroup
     auto& surfList = surfaces.Vec();
-    using SurfP = Pair<SurfaceId, SurfaceParams>;
     std::sort(surfList.begin(), surfList.end(), SurfaceLessThan);
 
     // Do the same thing for lights
@@ -1409,7 +1405,6 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
 
     // And finally for the cameras as well
     auto& camSurfList = cameraSurfaces.Vec();
-    using CamSurfP = Pair<CamSurfaceId, CameraSurfaceParams>;
     std::sort(camSurfList.begin(), camSurfList.end(), CamSurfaceLessThan);
 
     // Send it!
@@ -1608,7 +1603,6 @@ RenderBufferInfo TracerBase::StartRender(RendererId rId, CamSurfaceId cId,
     currentRenderer = renderer.value().get().get();
     currentRendererId = rId;
 
-    auto camKey = std::bit_cast<CameraKey>(cId);
     return currentRenderer->StartRender(rIParams,
                                         cId,
                                         renderLogic0.value_or(0),

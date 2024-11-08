@@ -26,8 +26,9 @@ inline bool SurfaceLessThan(const Pair<SurfaceId, SurfaceParams>& left,
     PrimBatchKey rpk = std::bit_cast<PrimBatchKey>(right.second.primBatches.front());
     TransformKey rtk = std::bit_cast<TransformKey>(right.second.transformId);
     //
-    return (Tuple(lpk.FetchBatchPortion(), ltk.FetchBatchPortion()) <
-            Tuple(rpk.FetchBatchPortion(), rtk.FetchBatchPortion()));
+    using T = std::tuple<CommonKey, CommonKey>;
+    return (T(lpk.FetchBatchPortion(), ltk.FetchBatchPortion()) <
+            T(rpk.FetchBatchPortion(), rtk.FetchBatchPortion()));
 }
 
 inline bool LightSurfaceLessThan(const Pair<LightSurfaceId, LightSurfaceParams>& left,
@@ -39,8 +40,9 @@ inline bool LightSurfaceLessThan(const Pair<LightSurfaceId, LightSurfaceParams>&
     LightKey rlk = std::bit_cast<LightKey>(right.second.lightId);
     TransformKey rtk = std::bit_cast<TransformKey>(right.second.transformId);
     //
-    return (Tuple(llk.FetchBatchPortion(), ltk.FetchBatchPortion()) <
-            Tuple(rlk.FetchBatchPortion(), rtk.FetchBatchPortion()));
+    using T = std::tuple<CommonKey, CommonKey>;
+    return (T(llk.FetchBatchPortion(), ltk.FetchBatchPortion()) <
+            T(rlk.FetchBatchPortion(), rtk.FetchBatchPortion()));
 }
 
 inline bool CamSurfaceLessThan(const Pair<CamSurfaceId, CameraSurfaceParams>& left,
@@ -52,6 +54,7 @@ inline bool CamSurfaceLessThan(const Pair<CamSurfaceId, CameraSurfaceParams>& le
     CameraKey rck = std::bit_cast<CameraKey>(right.second.cameraId);
     TransformKey rtk = std::bit_cast<TransformKey>(right.second.transformId);
     //
-    return (Tuple(lck.FetchBatchPortion(), ltk.FetchBatchPortion()) <
-            Tuple(rck.FetchBatchPortion(), rtk.FetchBatchPortion()));
+    using T = std::tuple<CommonKey, CommonKey>;
+    return (T(lck.FetchBatchPortion(), ltk.FetchBatchPortion()) <
+            T(rck.FetchBatchPortion(), rtk.FetchBatchPortion()));
 }

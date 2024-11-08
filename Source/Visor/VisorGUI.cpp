@@ -15,6 +15,7 @@
 #include "Core/Log.h"
 
 #include <vulkan/vulkan.hpp>
+#include <atomic>
 
 enum class WindowLocationType
 {
@@ -392,7 +393,7 @@ void ImageSaveProgress::Render()
     if(ImGui::Begin("##SaveWindow", nullptr, window_flags))
     {
         ImGui::Text("%s",  filename.c_str());
-        ImGui::ProgressBar(-0.7f * (float)ImGui::GetTime(),
+        ImGui::ProgressBar(-0.7f * static_cast<float>(ImGui::GetTime()),
                            ImVec2(0.0f, 0.0f), "Saving...");
         ImGui::SameLine();
         // OIIO's progress is not a fine grained one.

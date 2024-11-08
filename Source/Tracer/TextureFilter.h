@@ -140,10 +140,10 @@ class TextureFilterT : public TextureFilterI
     Vector2ui FilterExtent() const override;
 };
 
-extern template TextureFilterT<FilterType::BOX, BoxFilter>;
-extern template TextureFilterT<FilterType::TENT, TentFilter>;
-extern template TextureFilterT<FilterType::GAUSSIAN, GaussianFilter>;
-extern template TextureFilterT<FilterType::MITCHELL_NETRAVALI, MitchellNetravaliFilter>;
+extern template class TextureFilterT<FilterType::BOX, BoxFilter>;
+extern template class TextureFilterT<FilterType::TENT, TentFilter>;
+extern template class TextureFilterT<FilterType::GAUSSIAN, GaussianFilter>;
+extern template class TextureFilterT<FilterType::MITCHELL_NETRAVALI, MitchellNetravaliFilter>;
 
 using TextureFilterBox = TextureFilterT<FilterType::BOX, BoxFilter>;
 using TextureFilterTent = TextureFilterT<FilterType::TENT, TentFilter>;

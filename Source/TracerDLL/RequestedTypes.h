@@ -19,7 +19,7 @@
 // ================= //
 //     Primitives    //
 // ================= //
-using PrimGTypes = Tuple
+using PrimGTypes = std::tuple
 <
     PrimGroupTriangle,
     PrimGroupSkinnedTriangle,
@@ -31,7 +31,7 @@ using PrimGTypes = Tuple
 // ================= //
 //     Transforms    //
 // ================= //
-using TransformGTypes = Tuple
+using TransformGTypes = std::tuple
 <
     TransformGroupIdentity,
     TransformGroupSingle,
@@ -41,7 +41,7 @@ using TransformGTypes = Tuple
 // ================= //
 //      Lights       //
 // ================= //
-using LightGTypes = Tuple
+using LightGTypes = std::tuple
 <
     LightGroupNull,
     LightGroupPrim<PrimGroupTriangle>,
@@ -51,27 +51,27 @@ using LightGTypes = Tuple
 
 using MetaLightList = MetaLightArrayT
 <
-    Tuple<LightGroupNull, TransformGroupIdentity>,
+    std::tuple<LightGroupNull, TransformGroupIdentity>,
 
-    Tuple<LightGroupSkysphere<CoOctaCoordConverter>, TransformGroupIdentity>,
-    Tuple<LightGroupSkysphere<CoOctaCoordConverter>, TransformGroupSingle>,
+    std::tuple<LightGroupSkysphere<CoOctaCoordConverter>, TransformGroupIdentity>,
+    std::tuple<LightGroupSkysphere<CoOctaCoordConverter>, TransformGroupSingle>,
 
-    Tuple<LightGroupSkysphere<SphericalCoordConverter>, TransformGroupIdentity>,
-    Tuple<LightGroupSkysphere<SphericalCoordConverter>, TransformGroupSingle>,
+    std::tuple<LightGroupSkysphere<SphericalCoordConverter>, TransformGroupIdentity>,
+    std::tuple<LightGroupSkysphere<SphericalCoordConverter>, TransformGroupSingle>,
 
-    Tuple<LightGroupPrim<PrimGroupTriangle>, TransformGroupIdentity>,
-    Tuple<LightGroupPrim<PrimGroupTriangle>, TransformGroupSingle>,
+    std::tuple<LightGroupPrim<PrimGroupTriangle>, TransformGroupIdentity>,
+    std::tuple<LightGroupPrim<PrimGroupTriangle>, TransformGroupSingle>,
 
-    Tuple<LightGroupPrim<PrimGroupSkinnedTriangle>, TransformGroupMulti>,
+    std::tuple<LightGroupPrim<PrimGroupSkinnedTriangle>, TransformGroupMulti>,
 
-    Tuple<LightGroupPrim<PrimGroupSphere>, TransformGroupIdentity>,
-    Tuple<LightGroupPrim<PrimGroupSphere>, TransformGroupSingle>
+    std::tuple<LightGroupPrim<PrimGroupSphere>, TransformGroupIdentity>,
+    std::tuple<LightGroupPrim<PrimGroupSphere>, TransformGroupSingle>
 >;
 
 // ================= //
 //     Materials     //
 // ================= //
-using MatGTypes = Tuple
+using MatGTypes = std::tuple
 <
     MatGroupLambert,
     MatGroupReflect,
@@ -82,7 +82,7 @@ using MatGTypes = Tuple
 // ================= //
 //      Cameras      //
 // ================= //
-using CamGTypes = Tuple
+using CamGTypes = std::tuple
 <
     CameraGroupPinhole
 >;
@@ -90,7 +90,7 @@ using CamGTypes = Tuple
 // ================= //
 //      Mediums      //
 // ================= //
-using MedGTypes = Tuple
+using MedGTypes = std::tuple
 <
     MediumGroupVacuum,
     MediumGroupHomogeneous
@@ -103,13 +103,13 @@ template <class Base, template<class> class Group>
 using DefaultAccelTypePack = AccelTypePack
 <
     Base,
-    Tuple
+    std::tuple
     <
         Group<PrimGroupTriangle>,
         Group<PrimGroupSkinnedTriangle>,
         Group<PrimGroupSphere>
     >,
-    Tuple
+    std::tuple
     <
         //
         AcceleratorWork<Group<PrimGroupTriangle>, TransformGroupIdentity>,
@@ -136,7 +136,7 @@ using DefaultBVHAccelTypePack = DefaultAccelTypePack<BaseAcceleratorLBVH, Accele
 template <class Renderer>
 using EmptyRendererWorkTypes = RenderWorkTypePack
 <
-    Renderer, Tuple<>, Tuple<>, Tuple<>
+    Renderer, std::tuple<>, std::tuple<>, std::tuple<>
 >;
 
 template <class Renderer,
@@ -147,7 +147,7 @@ using RendererWorkTypes = RenderWorkTypePack
 <
     Renderer,
     // RenderWork
-    Tuple
+    std::tuple
     <
         // Triangle
         RenderWorkT<Renderer, PrimGroupTriangle, MatGroupLambert, TransformGroupIdentity>,
@@ -186,7 +186,7 @@ using RendererWorkTypes = RenderWorkTypePack
         RenderWorkT<Renderer, PrimGroupSphere, MatGroupUnreal, TransformGroupSingle>
     >,
     // Lights
-    Tuple
+    std::tuple
     <
         RenderLightWorkT<Renderer, LightGroupNull, TransformGroupIdentity>,
         //
@@ -200,7 +200,7 @@ using RendererWorkTypes = RenderWorkTypePack
         RenderLightWorkT<Renderer, LightGroupSkysphere<SphericalCoordConverter>, TransformGroupSingle>
     >,
     // And finally Camera
-    Tuple
+    std::tuple
     <
         RenderCameraWorkT<Renderer, CameraGroupPinhole, TransformGroupIdentity>
     >

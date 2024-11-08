@@ -47,7 +47,7 @@ constexpr Matrix<N, T>::Matrix(const Rows&... rows) requires (std::is_same_v<Row
     auto GenSequence = [Write]<unsigned int... I>
     (
         std::integer_sequence<unsigned int, I...>,
-        Tuple<const Rows&...> tuple
+        std::tuple<const Rows&...> tuple
     ) -> void
     {
         // Parameter pack expansion
@@ -58,7 +58,7 @@ constexpr Matrix<N, T>::Matrix(const Rows&... rows) requires (std::is_same_v<Row
     };
     // Utilize "std::get" via tuple
     GenSequence(std::make_integer_sequence<unsigned int, sizeof...(Rows)>{},
-                Tuple(rows...));
+                std::tuple<const Rows&...>(rows...));
 }
 
 template <unsigned int N, ArithmeticC T>

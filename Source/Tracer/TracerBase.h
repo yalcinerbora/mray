@@ -77,7 +77,7 @@ struct TypeGeneratorPack
     Map<std::string_view, TransGenerator>       transGenerator;
     Map<std::string_view, LightGenerator>       lightGenerator;
     Map<std::string_view, RendererGenerator>    rendererGenerator;
-    Map<std::string_view, RenderWorkPack>      renderWorkGenerator;
+    Map<std::string_view, RenderWorkPack>       renderWorkGenerator;
 
     Map<AcceleratorType, BaseAccelGenerator>    baseAcceleratorGenerator;
     Map<AcceleratorType, AccelGroupGenMap>      accelGeneratorMap;

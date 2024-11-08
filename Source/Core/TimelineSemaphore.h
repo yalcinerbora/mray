@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <mutex>
+#include <condition_variable>
 
 // Vulkan - CUDA interop well define only for intra GPU operations.
 // However our main use-case is to synchronize between inter

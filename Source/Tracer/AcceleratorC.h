@@ -18,10 +18,9 @@
 #include "LightC.h"
 #include "TextureView.h"
 #include "SurfaceComparators.h"
+#include "AcceleratorWorkI.h"
 
 namespace BS { class thread_pool; }
-
-class AcceleratorWorkI;
 
 using AccelWorkPtr = std::unique_ptr<AcceleratorWorkI>;
 
@@ -358,7 +357,7 @@ class AcceleratorGroupT : public Base
                                                                 const std::vector<PrimRangeArray>& instancePrimRanges);
     static LinearizedSurfaceData    LinearizeSurfaceData(const AccelGroupConstructParams& p,
                                                          const AccelPartitionResult& partitions,
-                                                         const typename PrimitiveGroupType& pg);
+                                                         const PrimitiveGroupType& pg);
 
     protected:
     BS::thread_pool&            threadPool;
@@ -740,7 +739,7 @@ AcceleratorGroupT<C, PG, B>::CreateInstanceSubspans(Span<T> fullRange,
 template<class C, PrimitiveGroupC PG, std::derived_from<AcceleratorGroupI> B>
 LinearizedSurfaceData AcceleratorGroupT<C, PG, B>::LinearizeSurfaceData(const AccelGroupConstructParams& p,
                                                                         const AccelPartitionResult& partitions,
-                                                                        const typename PG& pg)
+                                                                        const PG& pg)
 {
     LinearizedSurfaceData result = {};
     result.primRanges.reserve(partitions.totalInstanceCount);
@@ -1205,6 +1204,7 @@ void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<AccelGroupCon
             partitions.emplace_back(AccelGroupConstructParams
             {
                 .transformGroups = &transformGroups,
+                .textureViews = nullptr,
                 .primGroup = pGroup,
                 .lightGroup = lGroup,
                 .tGroupSurfs = {},

@@ -1,7 +1,7 @@
 #pragma once
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Pair<Ray, Vector2> LightSampleOutput::SampledRay(const Vector3& distantPoint) const
+std::pair<Ray, Vector2> LightSampleOutput::SampledRay(const Vector3& distantPoint) const
 {
     Vector3 dir = (position - distantPoint).Normalize();
     // Nudge the position back here, this will be used
@@ -9,7 +9,7 @@ Pair<Ray, Vector2> LightSampleOutput::SampledRay(const Vector3& distantPoint) co
     // TODO: Bad usage of API, constructing a ray to nudge a position
     Vector3 pos = Ray(Vector3::Zero(), position).Nudge(-dir).Pos();
     Float length = (pos - distantPoint).Length();
-    return Pair(Ray(dir, distantPoint), Vector2(0, length * 0.999f));
+    return std::pair(Ray(dir, distantPoint), Vector2(0, length * 0.999f));
 }
 
 template<class ML>

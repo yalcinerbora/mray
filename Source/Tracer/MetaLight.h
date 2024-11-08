@@ -83,7 +83,7 @@ namespace MetaLightDetail
         constexpr std::array Alignments = {sizeof(Types)...};
         size_t maxSize = *std::max_element(Sizes.cbegin(), Sizes.cend());
         size_t maxAlign = *std::max_element(Alignments.cbegin(), Alignments.cend());
-        return Pair(maxSize, maxAlign);
+        return Pair<size_t, size_t>(maxSize, maxAlign);
     }
 
     template<class... Types>
@@ -179,29 +179,29 @@ class MetaLightArrayT
                   <typename std::tuple_element_t<0, TransformLightTuple>::PrimGroup::DataSoA...>(),
                   "Prim SoA types are not implicit lifetime!");
     //
-    static constexpr Pair PrimVariantSize = MetaLightDetail::MaxSizeAlign
+    static constexpr Pair<size_t, size_t> PrimVariantSize = MetaLightDetail::MaxSizeAlign
     <
         MetaLightDetail::PrimType<std::tuple_element_t<0, TransformLightTuple>,
                                   std::tuple_element_t<1, TransformLightTuple>>
         ...
     >();
-    static constexpr Pair TContextVariantSize = MetaLightDetail::MaxSizeAlign
+    static constexpr Pair<size_t, size_t> TContextVariantSize = MetaLightDetail::MaxSizeAlign
     <
         MetaLightDetail::TContextType<std::tuple_element_t<0, TransformLightTuple>,
                                       std::tuple_element_t<1, TransformLightTuple>>
         ...
     >();
-    static constexpr Pair LightSoAVariantSize = MetaLightDetail::MaxSizeAlign
+    static constexpr Pair<size_t, size_t> LightSoAVariantSize = MetaLightDetail::MaxSizeAlign
     <
         typename std::tuple_element_t<0, TransformLightTuple>::DataSoA
         ...
     >();
-    static constexpr Pair PrimSoAVariantSize = MetaLightDetail::MaxSizeAlign
+    static constexpr Pair<size_t, size_t> PrimSoAVariantSize = MetaLightDetail::MaxSizeAlign
     <
         typename std::tuple_element_t<0, TransformLightTuple>::PrimGroup::DataSoA
         ...
     >();
-    static constexpr Pair TransSoAVariantSize = MetaLightDetail::MaxSizeAlign
+    static constexpr Pair<size_t, size_t> TransSoAVariantSize = MetaLightDetail::MaxSizeAlign
     <
         typename std::tuple_element_t<1, TransformLightTuple>::DataSoA
         ...
@@ -237,7 +237,7 @@ class MetaLightArrayT
     //
     using IdentitySConverter = typename SpectrumConverterContextIdentity::Converter;
     //
-    using TLGroupPtrTuple = Tuple<TransformLightTuple*...>;
+    using TLGroupPtrTuple = std::tuple<TransformLightTuple*...>;
     // We will memcpy the SoA's these must be implicit lifetime types.
     // And we pray that std::variant implementation does not break between CPU/GPU.
     static_assert(ImplicitLifetimeC<VariantLightSoA>);
@@ -276,7 +276,7 @@ class MetaLightArrayT
         template<class SpectrumConverter>
         MRAY_HYBRID
         MetaLightView<SpectrumConverter>
-        operator()(const typename SpectrumConverter&, uint32_t index) const;
+        operator()(const SpectrumConverter&, uint32_t index) const;
 
         MRAY_HYBRID
         uint32_t Size() const;

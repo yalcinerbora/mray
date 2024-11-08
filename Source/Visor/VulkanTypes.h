@@ -242,8 +242,8 @@ VulkanSemaphore<T>::VulkanSemaphore(const VulkanSystemView& handles)
 template<VulkanSemaphoreType T>
 VulkanSemaphore<T>::VulkanSemaphore(VulkanSemaphore&& other)
     : handlesVk(std::exchange(other.handlesVk, nullptr))
-    , handle(std::exchange(other.handle, nullptr))
     , waitValue(other.waitValue)
+    , handle(std::exchange(other.handle, nullptr))
 {}
 
 template<VulkanSemaphoreType T>

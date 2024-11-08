@@ -123,7 +123,7 @@ using RenderCameraWorkGenerator = GeneratorFuncType<RenderCameraWorkI,
 using RenderWorkGenMap = Map<std::string_view, RenderWorkGenerator>;
 using RenderLightWorkGenMap = Map<std::string_view, RenderLightWorkGenerator>;
 using RenderCamWorkGenMap = Map<std::string_view, RenderCameraWorkGenerator>;
-using RenderWorkPack = Tuple<RenderWorkGenMap, RenderLightWorkGenMap, RenderCamWorkGenMap>;
+using RenderWorkPack = std::tuple<RenderWorkGenMap, RenderLightWorkGenMap, RenderCamWorkGenMap>;
 
 template<class RendererType>
 concept RendererC = requires(RendererType rt,
@@ -374,7 +374,7 @@ template<class R>
 struct RenderWorkStruct
 {
     using WorkPtr = std::unique_ptr<RenderWorkT<R>>;
-    using IdTuple = Tuple<MatGroupId, PrimGroupId, TransGroupId>;
+    using IdTuple = std::tuple<MatGroupId, PrimGroupId, TransGroupId>;
 
     IdTuple     idPack;
     CommonKey   workGroupId;
@@ -563,8 +563,9 @@ inline bool FlatSurfParams::operator<(const FlatSurfParams& right) const
         return std::bit_cast<TransformKey>(id).FetchBatchPortion();
     };
 
-    return (Tuple(GetMG(mId), GetTG(tId), GetPG(pId)) <
-            Tuple(GetMG(right.mId), GetTG(right.tId), GetPG(right.pId)));
+    using T = std::tuple<CommonKey, CommonKey, CommonKey>;
+    return (T(GetMG(mId), GetTG(tId), GetPG(pId)) <
+            T(GetMG(right.mId), GetTG(right.tId), GetPG(right.pId)));
 }
 
 template<class R>
@@ -849,7 +850,10 @@ uint32_t RendererT<C>::GenerateWorkMappings(uint32_t workStart)
         (
             RenderWorkStruct
             {
-                .idPack = Tuple(mgId, pgId, tgId),
+                .idPack = std::tuple<MatGroupId, PrimGroupId, TransGroupId>
+                (
+                    mgId, pgId, tgId
+                ),
                 .workGroupId = workStart++,
                 .workPtr = std::move(renderTypedPtr)
             }
@@ -874,9 +878,8 @@ uint32_t RendererT<C>::GenerateLightWorkMappings(uint32_t workStart)
         {
             return std::bit_cast<TransformKey>(id).FetchBatchPortion();
         };
-
-        return (Tuple(GetLG(left.second.lightId), GetTG(left.second.transformId)) <
-                Tuple(GetLG(right.second.lightId), GetTG(right.second.transformId)));
+        return (std::tuple(GetLG(left.second.lightId), GetTG(left.second.transformId)) <
+                std::tuple(GetLG(right.second.lightId), GetTG(right.second.transformId)));
     };
     assert(std::is_sorted(lightSurfs.cbegin(), lightSurfs.cend(),
                           LightSurfIsLess));
@@ -943,7 +946,7 @@ uint32_t RendererT<C>::GenerateLightWorkMappings(uint32_t workStart)
         (
             RenderLightWorkStruct
             {
-                .idPack = Pair(lgId, tgId),
+                .idPack = Pair<LightGroupId, TransGroupId>(lgId, tgId),
                 .workGroupId = workStart++,
                 .workPtr = std::move(renderTypedPtr)
             }
@@ -976,8 +979,8 @@ uint32_t RendererT<C>::GenerateCameraWorkMappings(uint32_t workStart)
         {
             return std::bit_cast<TransformKey>(id).FetchBatchPortion();
         };
-        return (Tuple(GetCG(left.second.cameraId), GetTG(left.second.transformId)) <
-                Tuple(GetCG(right.second.cameraId), GetTG(right.second.transformId)));
+        return (std::tuple(GetCG(left.second.cameraId), GetTG(left.second.transformId)) <
+                std::tuple(GetCG(right.second.cameraId), GetTG(right.second.transformId)));
     };
     assert(std::is_sorted(camSurfs.cbegin(), camSurfs.cend(),
                           CamSurfIsLess));
@@ -1016,7 +1019,7 @@ uint32_t RendererT<C>::GenerateCameraWorkMappings(uint32_t workStart)
         (
             RenderCameraWorkStruct
             {
-                .idPack = Pair(cgId, tgId),
+                .idPack = Pair<CameraGroupId, TransGroupId>(cgId, tgId),
                 .workGroupId = workStart++,
                 .workPtr = std::move(renderTypedPtr)
             }
@@ -1116,7 +1119,7 @@ inline void AddSingleRenderWork(Map<std::string_view, RenderWorkPack>& workMap,
     //================//
     // Material Works //
     //================//
-    using WorkGenArgs = Tuple<const GenericGroupMaterialT&,
+    using WorkGenArgs = std::tuple<const GenericGroupMaterialT&,
                               const GenericGroupPrimitiveT&,
                               const GenericGroupTransformT&,
                               const GPUSystem&>;
@@ -1131,7 +1134,7 @@ inline void AddSingleRenderWork(Map<std::string_view, RenderWorkPack>& workMap,
     //================//
     //   Light Works  //
     //================//
-    using LightWorkGenArgs = Tuple<const GenericGroupLightT&,
+    using LightWorkGenArgs = std::tuple<const GenericGroupLightT&,
                                    const GenericGroupTransformT&,
                                    const GPUSystem&>;
     LightWorkGenArgs* lightWorkArgsResolver = nullptr;
@@ -1145,7 +1148,7 @@ inline void AddSingleRenderWork(Map<std::string_view, RenderWorkPack>& workMap,
     //================//
     //  Camera Works  //
     //================//
-    using CameraWorkGenArgs = Tuple<const GenericGroupCameraT&,
+    using CameraWorkGenArgs = std::tuple<const GenericGroupCameraT&,
                                     const GenericGroupTransformT&,
                                     const GPUSystem&>;
     CameraWorkGenArgs* cameraWorkArgsResolver = nullptr;
@@ -1160,12 +1163,12 @@ inline void AddSingleRenderWork(Map<std::string_view, RenderWorkPack>& workMap,
 
 template <class... Args>
 void AddRenderWorks(Map<std::string_view, RenderWorkPack>& workMap,
-                    Tuple<Args...>* list)
+                    std::tuple<Args...>* list)
 {
     auto AddRenderWorksInternal =
-    []<class... Args, size_t... Is>(Map<std::string_view, RenderWorkPack>&workMap,
-                                    Tuple<Args...>* list,
-                                    std::index_sequence<Is...>)
+    []<size_t... Is>(Map<std::string_view, RenderWorkPack>&workMap,
+                     std::tuple<Args...>* list,
+                     std::index_sequence<Is...>)
     {
         // Param pack expansion over the index sequence
         (

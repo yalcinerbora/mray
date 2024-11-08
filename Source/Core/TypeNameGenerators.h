@@ -73,7 +73,7 @@ namespace CompTime
     std::string_view LightTypeName = Detail::ct_str_join_v<LIGHT_PREFIX, Name>;
 
     // Hard to make these constexpr
-    static std::string PrimLightTypeName(std::string_view PrimName)
+    inline std::string PrimLightTypeName(std::string_view PrimName)
     {
         return (std::string(LIGHT_PREFIX) +
                 std::string(Detail::PRIM_SV) +
@@ -84,19 +84,19 @@ namespace CompTime
     static constexpr
     std::string_view BaseAccelTypeName = Detail::ct_str_join_v<ACCEL_PREFIX, Name>;
 
-    static std::string AccelGroupTypeName(std::string_view BaseAccelName,
+    inline std::string AccelGroupTypeName(std::string_view BaseAccelName,
                                           std::string_view PrimName)
     {
         return std::string(BaseAccelName) + std::string(PrimName);
     }
 
-    static std::string AccelWorkTypeName(const std::string_view& AccelGroupName,
+    inline std::string AccelWorkTypeName(const std::string_view& AccelGroupName,
                                          const std::string_view& TransformName)
     {
         return std::string(AccelGroupName) + std::string(TransformName);
     }
 
-    static std::string RenderWorkTypeName(std::string_view matType,
+    inline std::string RenderWorkTypeName(std::string_view matType,
                                           std::string_view primType,
                                           std::string_view transType)
     {
@@ -107,7 +107,7 @@ namespace CompTime
                 std::string(transType));
     }
 
-    static std::string RenderLightWorkTypeName(std::string_view lightType,
+    inline std::string RenderLightWorkTypeName(std::string_view lightType,
                                                std::string_view transType)
     {
         using namespace std::string_literals;
@@ -115,7 +115,7 @@ namespace CompTime
                 std::string(lightType) + std::string(transType));
     }
 
-    static std::string RenderCameraWorkTypeName(std::string_view camType,
+    inline std::string RenderCameraWorkTypeName(std::string_view camType,
                                                 std::string_view transType)
     {
         using namespace std::string_literals;

@@ -965,7 +965,7 @@ inline void TracerMock::PushMatAttribute(MatGroupId gId, CommonIdRange matRange,
 
 inline void TracerMock::PushMatAttribute(MatGroupId gId, CommonIdRange matRange,
                                          uint32_t attribIndex, TransientData data,
-                                         std::vector<Optional<TextureId>> textures)
+                                         std::vector<Optional<TextureId>>)
 {
     std::lock_guard<std::mutex> lock(mtGLock);
 
@@ -1316,7 +1316,7 @@ inline void TracerMock::PushLightAttribute(LightGroupId gId, CommonIdRange light
 inline void TracerMock::PushLightAttribute(LightGroupId gId, CommonIdRange lightRange,
                                            uint32_t attribIndex,
                                            TransientData data,
-                                           std::vector<Optional<TextureId>> textures)
+                                           std::vector<Optional<TextureId>>)
 {
     std::lock_guard<std::mutex> lock(lGLock);
 
@@ -1607,7 +1607,7 @@ inline void TracerMock::PushMediumAttribute(MediumGroupId gId, CommonIdRange med
 inline void TracerMock::PushMediumAttribute(MediumGroupId gId, CommonIdRange mediumRange,
                                             uint32_t attribIndex,
                                             TransientData data,
-                                            std::vector<Optional<TextureId>> textures)
+                                            std::vector<Optional<TextureId>>)
 {
     std::lock_guard<std::mutex> lock(meGLock);
 
@@ -1739,7 +1739,7 @@ CameraTransform TracerMock::GetCamTransform(CamSurfaceId camSurfId) const
     };
 }
 
-inline RendererId TracerMock::CreateRenderer(std::string typeName)
+inline RendererId TracerMock::CreateRenderer(std::string)
 {
     throw MRayError("\"CreateRenderer\" is not implemented in mock tracer!");
 }

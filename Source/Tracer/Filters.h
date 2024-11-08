@@ -296,7 +296,7 @@ SampleT<Vector2> MitchellNetravaliFilter::Sample(const Vector2& xi) const
     {
         using namespace Distribution::Common;
         std::array<Float, 3> weights{MIS_SIDES, MIS_MID, MIS_SIDES};
-        auto [index, localXi] = BisectSample(xi, Span<Float, 3>(weights.data(), 3), true);
+        auto [index, localXi] = BisectSample<3>(xi, Span<Float, 3>(weights.data(), 3), true);
 
         Float sampleVal = Float(0);
         std::array<Float, 3> pdfs;

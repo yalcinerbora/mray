@@ -397,7 +397,8 @@ Pair<Vector2ui, uint32_t> MipSizeToBlockSize(MRayPixelTypeRT pf, const Vector2ui
     // 8 bytes or 16 bytes
     uint32_t bytesPerBlock = std::visit([](auto&& p) -> uint32_t
     {
-        return CalculateBCBytesPerBlock<p.Name>();
+        using T = std::remove_cvref_t<decltype(p)>;
+        return CalculateBCBytesPerBlock<T::Name>();
     }, pf);
 
     Pair<Vector2ui, uint32_t> result;
@@ -475,19 +476,20 @@ Pair<MRayTextureReadMode, bool> IsPlausibleChannelLayout(MRayPixelTypeRT pixType
         }
         // Only BC4, but we let BC5 slide (only for R)
         case ImageSubChannelType::R:
-            {
+        {
             if (pt == MR_BC5_UNORM || pt == MR_BC5_SNORM)
                 return {MR_DROP_1, true};
             else if(pt == MR_BC4_UNORM || pt == MR_BC4_SNORM)
                 return {MR_PASSTHROUGH, true};
+            [[fallthrough]];
         }
         // These are types will be delegated to OIIO.
-        case ImageSubChannelType::G:
-        case ImageSubChannelType::B:
-        case ImageSubChannelType::A:
-        case ImageSubChannelType::GB:
-        case ImageSubChannelType::BA:
-        case ImageSubChannelType::GBA:
+        case ImageSubChannelType::G:   [[fallthrough]];
+        case ImageSubChannelType::B:   [[fallthrough]];
+        case ImageSubChannelType::A:   [[fallthrough]];
+        case ImageSubChannelType::GB:  [[fallthrough]];
+        case ImageSubChannelType::BA:  [[fallthrough]];
+        case ImageSubChannelType::GBA: [[fallthrough]];
         default: break;
     }
     return {MR_PASSTHROUGH, false};
@@ -529,7 +531,7 @@ Expected<ImageHeader> ImageFileDDS::ReadHeader()
 
     ImageHeader outputHeader = {};
     Optional<HeaderExtended> headerDX10;
-    if((ddsHeader.ddspf.dwFourCC == DX10_FOURCC))
+    if(ddsHeader.ddspf.dwFourCC == DX10_FOURCC)
     {
         if(fileSize < sizeof(HeaderExtended) + sizeof(HeaderBase))
             return MRayError("File \"{}\" is too small to "
@@ -566,7 +568,7 @@ Expected<ImageHeader> ImageFileDDS::ReadHeader()
     else
     {
         using enum FlagsDX9::F;
-        FlagsDX9 dx9Flags = std::bit_cast<FlagsDX9>(ddsHeader.dwFlags);
+        FlagsDX9 dx9Flags = FlagsDX9(ddsHeader.dwFlags);
         if(dx9Flags[DDSD_DEPTH])
         {
             return MRayError("File \"{}\" has cube texture, it is not "
@@ -629,16 +631,18 @@ Expected<Image> ImageFileDDS::ReadImage()
 
         TransientData data = std::visit([&](auto&& p) -> TransientData
         {
+            using T = std::remove_cvref_t<decltype(p)>;
+            constexpr uint32_t BC_BLOCK_SIZE = CalculateBCBytesPerBlock<T::Name>();
             uint32_t blockTotal = blockCount.Multiply();
-            if constexpr(p.IsBCPixel)
-                return TransientData(std::in_place_type_t<Byte[CalculateBCBytesPerBlock<p.Name>()]>{}, blockTotal);
+            if constexpr(T::IsBCPixel)
+                return TransientData(std::in_place_type_t<Byte[BC_BLOCK_SIZE]>{}, blockTotal);
             else
                 return TransientData(std::in_place_type_t<Byte>{}, 0);
         }, header.pixelType);
         data.ReserveAll();
         auto dataSpan = data.AccessAs<Byte>();
         ddsFile.read(reinterpret_cast<char*>(dataSpan.data()),
-                     dataSpan.size_bytes());
+                     static_cast<std::streamsize>(dataSpan.size_bytes()));
         if(!ddsFile)
             return MRayError("File \"{}\" does not have enough data to "
                              "fulfill its header!", filePath);

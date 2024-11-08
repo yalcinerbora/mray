@@ -213,9 +213,11 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
 
     // Dedicate a block for each
     // concrete accelerator for copy
-    uint32_t blockCount = queue.RecommendedBlockCountDevice(&KCGeneratePrimitiveKeys,
-                                                            StaticThreadPerBlock1D(),
-                                                            0);
+    uint32_t blockCount = queue.RecommendedBlockCountDevice
+    (
+        reinterpret_cast<const void*>(&KCGeneratePrimitiveKeys),
+        StaticThreadPerBlock1D(), 0
+    );
     using namespace std::string_literals;
     static const auto KernelName = "KCGeneratePrimitiveKeys-"s + std::string(TypeName());
     queue.IssueExactKernel<KCGeneratePrimitiveKeys>

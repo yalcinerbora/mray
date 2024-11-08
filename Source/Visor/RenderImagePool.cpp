@@ -299,11 +299,11 @@ RenderImagePool::RenderImagePool(BS::thread_pool* tp,
     // TODO: Reduce floating point usage, currently formats are
     // technically a protocol between tracer and
     // visor, (we assume it is always XXX_FLOAT).
-    auto sdrImgUsageFlags = (VK_IMAGE_USAGE_SAMPLED_BIT |
-                             VK_IMAGE_USAGE_STORAGE_BIT |
-                             VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-                             VK_IMAGE_USAGE_TRANSFER_DST_BIT);
-    auto hdrImgUsageFlags = sdrImgUsageFlags;
+    VkFlags sdrImgUsageFlags = VkFlags(VK_IMAGE_USAGE_SAMPLED_BIT |
+                                       VK_IMAGE_USAGE_STORAGE_BIT |
+                                       VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                                       VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    VkFlags hdrImgUsageFlags = sdrImgUsageFlags;
 
     hdrImage = VulkanImage(*handlesVk, VulkanSamplerMode::NEAREST,
                            VK_FORMAT_R32G32B32A32_SFLOAT,
@@ -452,7 +452,8 @@ void RenderImagePool::SaveImage(VisorGUI& visorGUI,
                 .dimensions = Vector3ui(initInfo.extent, 1u),
                 .mipCount = 1,
                 .pixelType = outPixelType,
-                .colorSpace = Pair(gamma, colorSpace)
+                .colorSpace = Pair<Float, MRayColorSpaceEnum>(gamma, colorSpace),
+                .readMode = MRayTextureReadMode::MR_END
             },
             .inputType = inPixelType,
             .pixels = Span<const Byte>(hStagePtr, paddedImageSize)

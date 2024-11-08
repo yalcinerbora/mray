@@ -531,7 +531,8 @@ RendererOutput SurfaceRenderer::DoRender()
     // Wait for results to be available in host buffers
     processQueue.Barrier().Wait();
 
-    if(currentOptions.mode == SurfRDetail::Mode::AO)
+    SurfRDetail::Mode::E curMode = currentOptions.mode;
+    if(curMode == SurfRDetail::Mode::AO)
     {
         Span<RayGMem> dVisibilityRays = dRayStateAO.dVisibilityRays;
         processQueue.IssueSaturatingKernel<KCMemsetInvalidRays>
@@ -542,9 +543,9 @@ RendererOutput SurfaceRenderer::DoRender()
         );
     }
 
-    SurfRDetail::GlobalState globalState
+    SurfRDetail::GlobalState globalState =
     {
-        .mode = currentOptions.mode,
+        .mode = SurfRDetail::Mode(curMode),
         .tMaxAO = curTMaxAO
     };
     for(uint32_t i = 0; i < hPartitionCount[0]; i++)

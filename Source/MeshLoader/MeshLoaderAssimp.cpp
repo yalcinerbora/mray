@@ -45,56 +45,60 @@ uint32_t MeshViewAssimp::InnerIndex() const
     return innerIndex;
 }
 
+// TODO: Report bug to clang. This function was a lambda in
+// "MeshViewAssimp::GetAttribute" but it did crash.
+template<class T>
+TransientData PushVertexAttribute(PrimitiveAttributeLogic attribLogic,
+                                  const aiMesh* mesh)
+{
+    size_t localCount = mesh->mNumVertices;
+    TransientData input(std::in_place_type_t<T>{}, localCount);
+
+    // Sanity check (check if aiVector3D has no padding)
+    static_assert(sizeof(std::array<aiVector3D, 2>) ==
+                    sizeof(Float) * 3 * 2);
+
+    const T* attributePtr;
+    using enum PrimitiveAttributeLogic;
+    switch(attribLogic)
+    {
+        case POSITION:
+            attributePtr = reinterpret_cast<const T*>(mesh->mVertices);
+            break;
+        case NORMAL:
+            attributePtr = reinterpret_cast<const T*>(mesh->mNormals);
+            break;
+        case TANGENT:
+            attributePtr = reinterpret_cast<const T*>(mesh->mTangents);
+            break;
+        case BITANGENT:
+            attributePtr = reinterpret_cast<const T*>(mesh->mBitangents);
+            break;
+        case UV0: case UV1:
+        {
+            // Manual push for uv
+            uint32_t texCoordIndex = (attribLogic == UV0) ? 0 : 1;
+            for(unsigned int i = 0; i < mesh->mNumVertices; i++)
+            {
+                T uv = T(mesh->mTextureCoords[texCoordIndex][i].x,
+                            mesh->mTextureCoords[texCoordIndex][i].y);
+                input.Push(Span<const T>(&uv, 1));
+            }
+            return input;
+        }
+        default: return TransientData(std::in_place_type_t<Byte>{}, 0);
+    }
+    input.template Push<T>(Span<const T>(attributePtr, localCount));
+    assert(input.IsFull());
+    return input;
+};
+
 TransientData MeshViewAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) const
 {
     static_assert(std::is_same_v<Float, float>,
                   "Currently \"MeshLoaderAssimp\" do not support double "
                   "precision mode change this later.");
 
-    auto PushVertexAttribute = [&]<class T>() -> TransientData
-    {
-        const auto& mesh = assimpFile.scene->mMeshes[innerIndex];
-        size_t localCount = mesh->mNumVertices;
-        TransientData input(std::in_place_type_t<T>{}, localCount);
-
-        // Sanity check (check if aiVector3D has no padding)
-        static_assert(sizeof(std::array<aiVector3D, 2>) ==
-                      sizeof(Float) * 3 * 2);
-
-        const T* attributePtr;
-        using enum PrimitiveAttributeLogic;
-        switch(attribLogic)
-        {
-            case POSITION:
-                attributePtr = reinterpret_cast<const T*>(mesh->mVertices);
-                break;
-            case NORMAL:
-                attributePtr = reinterpret_cast<const T*>(mesh->mNormals);
-                break;
-            case TANGENT:
-                attributePtr = reinterpret_cast<const T*>(mesh->mTangents);
-                break;
-            case BITANGENT:
-                attributePtr = reinterpret_cast<const T*>(mesh->mBitangents);
-                break;
-            case UV0: case UV1:
-            {
-                // Manual push for uv
-                uint32_t texCoordIndex = (attribLogic == UV0) ? 0 : 1;
-                for(unsigned int i = 0; i < mesh->mNumVertices; i++)
-                {
-                    T uv = T(mesh->mTextureCoords[texCoordIndex][i].x,
-                             mesh->mTextureCoords[texCoordIndex][i].y);
-                    input.Push(Span<const T>(&uv, 1));
-                }
-                return input;
-            }
-            default: return TransientData(std::in_place_type_t<Byte>{}, 0);
-        }
-        input.Push(Span<const T>(attributePtr, localCount));
-        assert(input.IsFull());
-        return input;
-    };
 
     const auto& mesh = assimpFile.scene->mMeshes[innerIndex];
     if(attribLogic == PrimitiveAttributeLogic::INDEX)
@@ -116,12 +120,12 @@ TransientData MeshViewAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) 
         using enum PrimitiveAttributeLogic;
         switch(attribLogic)
         {
-            case POSITION:  return PushVertexAttribute.operator()<Vector3>();
-            case NORMAL:    return PushVertexAttribute.operator()<Vector3>();
-            case TANGENT:   return PushVertexAttribute.operator()<Vector3>();
-            case BITANGENT: return PushVertexAttribute.operator()<Vector3>();
-            case UV0:       return PushVertexAttribute.operator()<Vector2>();
-            case UV1:       return PushVertexAttribute.operator()<Vector2>();
+            case POSITION:  return PushVertexAttribute<Vector3>(attribLogic, mesh);
+            case NORMAL:    return PushVertexAttribute<Vector3>(attribLogic, mesh);
+            case TANGENT:   return PushVertexAttribute<Vector3>(attribLogic, mesh);
+            case BITANGENT: return PushVertexAttribute<Vector3>(attribLogic, mesh);
+            case UV0:       return PushVertexAttribute<Vector2>(attribLogic, mesh);
+            case UV1:       return PushVertexAttribute<Vector2>(attribLogic, mesh);
             default: throw MRayError("Uknown attribute logic");
         }
     }

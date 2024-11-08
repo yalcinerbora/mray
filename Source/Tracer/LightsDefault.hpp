@@ -5,7 +5,7 @@ namespace LightDetail
 
 template<PrimitiveC P, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-LightPrim<P, SC>::LightPrim(const typename SpectrumConverter& specTransformer,
+LightPrim<P, SC>::LightPrim(const SpectrumConverter& specTransformer,
                             const P& p, const LightData& soa, LightKey key)
     : prim(p)
     , radiance(specTransformer, soa.dRadiances[key.FetchIndexPortion()])

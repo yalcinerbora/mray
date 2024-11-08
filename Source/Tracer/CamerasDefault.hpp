@@ -60,7 +60,6 @@ RaySample CameraPinhole::SampleRay(// Input
     assert(sampleId <= Vector2ui(std::numeric_limits<uint16_t>::max()));
 
     Vector2 localJitter = xi - Vector2(0.5);
-    Vector2 out = Vector2(SNorm2x16(localJitter));
     ImageCoordinate imgCoords =
     {
         .pixelIndex = Vector2us(sampleId),
@@ -186,8 +185,8 @@ CameraPinhole CameraPinhole::GenerateSubCamera(const Vector2ui& statumIndex,
     Vector3 regionBottomLeft = bottomLeft + ((regionlDistance[0] * right) +
                                              (regionlDistance[1] * up));
 
-    Vector2 fovRegion = Vector2(fov[0] / stataCount[0],
-                                fov[1] / stataCount[1]);
+    Vector2 fovRegion = Vector2(fov[0] / static_cast<Float>(stataCount[0]),
+                                fov[1] / static_cast<Float>(stataCount[1]));
 
     CameraPinhole p = CameraPinhole(*this);
     // Change the bottom left, and the FoV

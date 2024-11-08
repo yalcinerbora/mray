@@ -222,7 +222,7 @@ namespace PathTraceRDetail
 template<PrimitiveC Prim, MaterialC Material,
          class Surface, class TContext,
          PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-MRAY_HYBRID MRAY_GPU_INLINE
+MRAY_HYBRID MRAY_CGPU_INLINE
 void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surface& surf,
                                     const TContext& tContext, RNGDispenser& rng,
                                     const WorkParams<EmptyType, PG, MG, TG>& params,
@@ -312,7 +312,7 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
 //   PURE PATH TRACE LIGHT  //
 // ======================== //
 template<LightC Light, LightGroupC LG, TransformGroupC TG>
-MRAY_HYBRID MRAY_GPU_INLINE
+MRAY_HYBRID MRAY_CGPU_INLINE
 void PathTraceRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
                                          const LightWorkParams<EmptyType, LG, TG>& params,
                                          RayIndex rayIndex)
@@ -435,7 +435,7 @@ void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const S
 // NEE/MIS PATH TRACE LIGHT //
 // ======================== //
 template<class LightSampler, LightC Light, LightGroupC LG, TransformGroupC TG>
-MRAY_HYBRID MRAY_GPU_INLINE
+MRAY_HYBRID MRAY_CGPU_INLINE
 void PathTraceRDetail::LightWorkFunctionWithNEE(const Light& l, RNGDispenser&,
                                                 const LightWorkParams<LightSampler, LG, TG>& params,
                                                 RayIndex rayIndex)

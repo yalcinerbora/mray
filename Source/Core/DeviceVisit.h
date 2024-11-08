@@ -20,7 +20,7 @@ namespace DeviceVisitDetail
 
 template<uint32_t I, class VariantT, class Func>
 requires(I < std::variant_size_v<std::remove_reference_t<VariantT>>)
-MRAY_GPU MRAY_GPU_INLINE
+MRAY_GPU //MRAY_GPU_INLINE
 constexpr auto DeviceVisitDetail::LoopAndInvoke(VariantT&& v, Func&& f) -> decltype(auto)
 {
     using CurrentType = decltype(std::get<I>(v));

@@ -329,7 +329,7 @@ SampleT<Vector3> BxDF::VNDFGGXSmithSample(const Vector3& V, Float alpha,
     Float t1 = r * std::cos(phi);
     Float t2 = r * std::sin(phi);
     Float s = Float(0.5) * (Float(1) + VHemi[2]);
-    t2 = (Float(1) - s) * sqrt(Float(1) - t1 * t1) + s * t2;
+    t2 = (Float(1) - s) * std::sqrt(Float(1) - t1 * t1) + s * t2;
     // Section 4.3: Projection onto hemisphere
     float val = Float(1) - t1 * t1 - t2 * t2;
     Vector3 NHemi = t1 * T1 + t2 * T2 + Math::SqrtMax(val) * VHemi;
@@ -405,7 +405,7 @@ Pair<uint32_t, Float> Common::BisectSample2(Float xi, Vector2 weights,
             : (xi - w) / (Float(1) - w);
     localXi = std::min(localXi, PrevFloat<Float>(1));
     assert(localXi >= 0 && localXi < 1);
-    return Pair(i, localXi);
+    return Pair<uint32_t, Float>(i, localXi);
 }
 
 template<uint32_t N>
@@ -447,7 +447,7 @@ Pair<uint32_t, Float> Common::BisectSample(Float xi, const Span<Float, N>& weigh
     localXi = (isAlreadyNorm) ? localXi : localXi * sum;
     localXi = std::min(localXi, PrevFloat<Float>(1));
     assert(localXi >= 0 && localXi < 1);
-    return Pair(i, localXi);
+    return Pair<uint32_t, Float>(i, localXi);
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE

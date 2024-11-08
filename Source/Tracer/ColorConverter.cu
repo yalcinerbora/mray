@@ -24,7 +24,7 @@ using BCColorConvParamList = std::array<BCColorConvParams, BC_TEX_PER_BATCH>;
 
 // Order is important here
 template <MRayColorSpaceEnum E>
-using ConverterList = Tuple
+using ConverterList = std::tuple
 <
     Color::ColorspaceTransfer<MRayColorSpaceEnum::MR_ACES2065_1,    E>,
     Color::ColorspaceTransfer<MRayColorSpaceEnum::MR_ACES_CG,       E>,
@@ -34,7 +34,9 @@ using ConverterList = Tuple
     Color::ColorspaceTransfer<MRayColorSpaceEnum::MR_ADOBE_RGB,     E>
 >;
 
-static constexpr Tuple ConverterLists =
+// TODO: This cannot be alised or clang throws fatal error
+// Report.
+static constexpr auto ConverterLists = std::tuple
 {
     ConverterList<MRayColorSpaceEnum::MR_ACES2065_1>{},
     ConverterList<MRayColorSpaceEnum::MR_ACES_CG>{},
@@ -60,8 +62,7 @@ using BCReaderFinder = BCTypeMap::Map
 >;
 
 // Luminance Extract related
-
-using ColorspaceList = Tuple
+using ColorspaceList = std::tuple
 <
     Color::Colorspace<MRayColorSpaceEnum::MR_ACES2065_1>,
     Color::Colorspace<MRayColorSpaceEnum::MR_ACES_CG>,
@@ -76,39 +77,6 @@ struct LuminanceExtractParams
     Vector2ui           imgSize;
     MRayColorSpaceEnum  colorSpace;
 };
-
-
-template<uint32_t TPB>
-MRAY_KERNEL
-void KCExtractLuminance(// I-O
-                        MRAY_GRID_CONSTANT const Span<const Span<Float>>,
-                        // Inputs
-                        MRAY_GRID_CONSTANT const Span<const LuminanceExtractParams>,
-                        MRAY_GRID_CONSTANT const Span<const Variant<std::monostate, GenericTextureView>>,
-                        // Constants
-                        MRAY_GRID_CONSTANT const uint32_t);
-
-template<uint32_t TPB, class ConverterTuple>
-MRAY_KERNEL
-void KCConvertColor(// I-O
-                    MRAY_GRID_CONSTANT const Span<MipArray<SurfViewVariant>>,
-                    // Inputs
-                    MRAY_GRID_CONSTANT const Span<const ColorConvParams>,
-                    // Constants
-                    MRAY_GRID_CONSTANT const MRayColorSpaceEnum,
-                    MRAY_GRID_CONSTANT const uint32_t,
-                    MRAY_GRID_CONSTANT const uint32_t);
-
-template<uint32_t TPB, class BCReader, class ConverterTuple>
-MRAY_KERNEL
-void KCConvertColorBC(// I-O
-                      MRAY_GRID_CONSTANT const Span<typename BCReader::BlockType>,
-                      // Inputs
-                      MRAY_GRID_CONSTANT const BCColorConvParamList,
-                      // Constants
-                      MRAY_GRID_CONSTANT const uint32_t,
-                      MRAY_GRID_CONSTANT const MRayColorSpaceEnum,
-                      MRAY_GRID_CONSTANT const uint32_t);
 
 MRAY_GPU MRAY_GPU_INLINE
 Vector3 GenericFromNorm(const Vector3& t, const SurfViewVariant& surfView)
@@ -230,78 +198,104 @@ Vector3 GenericReadFromView(const Vector2& uv, GenericTextureView& view)
     });
 }
 
-template<uint32_t TPB>
-MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-void KCExtractLuminance(// I-O
-                        MRAY_GRID_CONSTANT const Span<const Span<Float>> dLuminanceOutput,
-                        // Inputs
-                        MRAY_GRID_CONSTANT const Span<const LuminanceExtractParams> dLuminanceParams,
-                        MRAY_GRID_CONSTANT const Span<const Variant<std::monostate, GenericTextureView>> dTextureViews,
-                        // Constants
-                        MRAY_GRID_CONSTANT const uint32_t blockPerTexture)
-{
-    static constexpr ColorspaceList colorspaceList = {};
 
-    assert(dTextureViews.size() == dLuminanceParams.size() &&
-           dTextureViews.size() == dLuminanceOutput.size());
+template<uint32_t TPB, class BCReader, class ConverterTuple>
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
+void KCConvertColorBC(// I-O
+                      MRAY_GRID_CONSTANT const Span<typename BCReader::BlockType> dBCBlocks,
+                      // Inputs
+                      MRAY_GRID_CONSTANT const BCColorConvParamList dTexConvParams,
+                      // Constants
+                      MRAY_GRID_CONSTANT const uint32_t validTexCount,
+                      MRAY_GRID_CONSTANT const MRayColorSpaceEnum globalColorSpace,
+                      MRAY_GRID_CONSTANT const uint32_t processorPerTexture)
+{
+    static constexpr ConverterTuple converterList = {};
+
     // Block-stride loop
     KernelCallParams kp;
-    uint32_t textureCount = static_cast<uint32_t>(dTextureViews.size());
-    uint32_t blockCount = blockPerTexture * textureCount;
-    for(uint32_t bI = kp.blockId; bI < blockCount; bI += kp.gridSize)
+    uint32_t textureCount = static_cast<uint32_t>(dTexConvParams.size());
+    uint32_t blockCount = processorPerTexture * textureCount;
+    for(uint32_t procI = kp.blockId; procI < blockCount; procI += kp.gridSize)
     {
-        uint32_t tI = bI / blockPerTexture;
-        uint32_t localBI = bI % blockPerTexture;
+        uint32_t texI = procI / processorPerTexture;
+        uint32_t localProcI = procI % processorPerTexture;
         // Load to local space
-        LuminanceExtractParams curParams = dLuminanceParams[tI];
+        const BCColorConvParams& curParams = dTexConvParams[texI];
+        uint32_t tileCount = curParams.blockRange[1] - curParams.blockRange[0];
+        if(texI >= validTexCount) continue;
 
-        if(std::holds_alternative<std::monostate>(dTextureViews[tI]))
-           continue;
+        // Skip this mip if it is not available.
+        // Mips may be partially available so we check all mips.
+        bool noColorConvert = (curParams.fromColorSpace == MRayColorSpaceEnum::MR_DEFAULT ||
+                               curParams.fromColorSpace == globalColorSpace);
+        bool noGammaConvert = (curParams.gamma == Float(1));
+        if(noGammaConvert && noColorConvert) continue;
 
-        GenericTextureView texView = std::get<GenericTextureView>(dTextureViews[tI]);
-        //
-        Vector2ui res = curParams.imgSize;
-        Vector2 resRecip = Vector2(1) / Vector2(res);
-        //if(std::holds_alternative<std::monostate>(texView)) continue;
+        // Convert color routine, this wrapped to a lambda due to
+        // different compress decompress systems
+        auto ConvColor = [&](Vector3 color)
+        {
+            using namespace Color;
+            // First do gamma correction
+            if(!noGammaConvert)
+                color = OpticalTransferGamma(curParams.gamma).ToLinear(color);
+
+            // Then color
+            if(!noColorConvert)
+            {
+                uint32_t i = static_cast<uint32_t>(curParams.fromColorSpace);
+                [[maybe_unused]]
+                bool invoked = InvokeAt(i, converterList, [&](auto&& tupleElem)
+                {
+                    color = tupleElem.Convert(color);
+                    return true;
+                });
+                assert(invoked);
+            }
+            return color;
+        };
 
         // Loop over the blocks for this tex
-        static constexpr Vector2ui TILE_SIZE = Vector2ui(32, 16);
-        static_assert(TILE_SIZE.Multiply() == TPB);
-        Vector2ui totalTiles = Math::DivideUp(res, TILE_SIZE);
-        for(uint32_t tileI = localBI; tileI < totalTiles.Multiply();
-            tileI += blockPerTexture)
+        uint32_t tileStart = localProcI * kp.blockSize + kp.threadId;
+        uint32_t tileIncrement = processorPerTexture * kp.blockSize;
+        for(uint32_t tileI = tileStart; tileI < tileCount; tileI += tileIncrement)
         {
-            Vector2ui localPI = Vector2ui(kp.threadId % TILE_SIZE[0],
-                                          kp.threadId / TILE_SIZE[0]);
-            Vector2ui tile2D = Vector2ui(tileI % totalTiles[0],
-                                         tileI / totalTiles[0]);
-            Vector2ui pixCoord = tile2D * TILE_SIZE + localPI;
-            if(pixCoord[0] >= res[0] || pixCoord[1] >= res[1]) continue;
+            using BlockType = typename BCReader::BlockType;
+            BlockType block = dBCBlocks[curParams.blockRange[0] + tileI];
 
-            // We assume 4 channel textures are RGB (first 3 channels)
-            // and something else (A channel) so clamp to Vector3 and calculate
-            // If it is two or one channel, other one/two parameter(s) will be
-            // zeroed out.
-            // We disregard if the pixel data is normalized or not.
-            // It is user's problem.
-            Vector2 uv = (Vector2(pixCoord) + Vector2(0.5)) * resRecip;
-            Vector3 localPixRGB = GenericReadFromView(uv, texView);
-
-            Float luminance;
-            // Do the conversion
-            uint32_t i = static_cast<uint32_t>(curParams.colorSpace);
-            [[maybe_unused]]
-            bool invoked = InvokeAt(i, colorspaceList, [i, &luminance, &localPixRGB](auto&& tupleElem)
-            {
-                luminance = Color::XYZToYxy(tupleElem.ToXYZ(localPixRGB))[0];
-                return true;
-            });
-            assert(invoked);
-
+            // YOLO constexpr here,
+            // BC7 has too many colors, register spill galore.
+            // For BC7 we do streaming architecture
+            // so that we do not have to store the all colors.
             //
-            Span<Float> dCurrentOutputSpan = dLuminanceOutput[tI];
-            uint32_t linearPixelIndex =  pixCoord[1] * res[0] + pixCoord[0];
-            dCurrentOutputSpan[linearPixelIndex] = luminance;
+            // BC(1-5) has small inter color dependency
+            // (i.e. color0 > color1 switches to alpha mode etc.)
+            // For these we could not do streaming.
+            // Thus; this constexpr if statement
+            static constexpr bool IsBC7 = std::is_same_v<BCReader, BlockCompressedIO::BC7>;
+            if constexpr(IsBC7)
+            {
+                BCReader bcIO(block);
+                for(uint32_t i = 0; i < bcIO.ColorCount(); i++)
+                {
+                    Vector3 c = bcIO.ExtractColor(i);
+                    c = ConvColor(c);
+                    bcIO.InjectColor(i, c);
+                }
+                block = bcIO.Block();
+            }
+            else
+            {
+                using ColorPack = typename BCReader::ColorPack;
+                ColorPack localPixels = BCReader::ExtractColors(block);
+                for(auto& localPixRGB : localPixels)
+                    localPixRGB = ConvColor(localPixRGB);
+                block = BCReader::InjectColors(block, localPixels);
+            }
+
+            // Finally, Write back
+            dBCBlocks[curParams.blockRange[0] + tileI] = block;
         }
     }
 }
@@ -402,104 +396,78 @@ void KCConvertColor(// I-O
     }
 }
 
-template<uint32_t TPB, class BCReader, class ConverterTuple>
+template<uint32_t TPB>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-void KCConvertColorBC(// I-O
-                      MRAY_GRID_CONSTANT const Span<typename BCReader::BlockType> dBCBlocks,
-                      // Inputs
-                      MRAY_GRID_CONSTANT const BCColorConvParamList dTexConvParams,
-                      // Constants
-                      MRAY_GRID_CONSTANT const uint32_t validTexCount,
-                      MRAY_GRID_CONSTANT const MRayColorSpaceEnum globalColorSpace,
-                      MRAY_GRID_CONSTANT const uint32_t processorPerTexture)
+void KCExtractLuminance(// I-O
+                        MRAY_GRID_CONSTANT const Span<const Span<Float>> dLuminanceOutput,
+                        // Inputs
+                        MRAY_GRID_CONSTANT const Span<const LuminanceExtractParams> dLuminanceParams,
+                        MRAY_GRID_CONSTANT const Span<const Variant<std::monostate, GenericTextureView>> dTextureViews,
+                        // Constants
+                        MRAY_GRID_CONSTANT const uint32_t blockPerTexture)
 {
-    static constexpr ConverterTuple converterList = {};
+    static constexpr ColorspaceList colorspaceList = {};
 
+    assert(dTextureViews.size() == dLuminanceParams.size() &&
+           dTextureViews.size() == dLuminanceOutput.size());
     // Block-stride loop
     KernelCallParams kp;
-    uint32_t textureCount = static_cast<uint32_t>(dTexConvParams.size());
-    uint32_t blockCount = processorPerTexture * textureCount;
-    for(uint32_t procI = kp.blockId; procI < blockCount; procI += kp.gridSize)
+    uint32_t textureCount = static_cast<uint32_t>(dTextureViews.size());
+    uint32_t blockCount = blockPerTexture * textureCount;
+    for(uint32_t bI = kp.blockId; bI < blockCount; bI += kp.gridSize)
     {
-        uint32_t texI = procI / processorPerTexture;
-        uint32_t localProcI = procI % processorPerTexture;
+        uint32_t tI = bI / blockPerTexture;
+        uint32_t localBI = bI % blockPerTexture;
         // Load to local space
-        const BCColorConvParams& curParams = dTexConvParams[texI];
-        uint32_t tileCount = curParams.blockRange[1] - curParams.blockRange[0];
-        if(texI >= validTexCount) continue;
+        LuminanceExtractParams curParams = dLuminanceParams[tI];
 
+        if(std::holds_alternative<std::monostate>(dTextureViews[tI]))
+           continue;
 
-        // Skip this mip if it is not available.
-        // Mips may be partially available so we check all mips.
-        bool noColorConvert = (curParams.fromColorSpace == MRayColorSpaceEnum::MR_DEFAULT ||
-                               curParams.fromColorSpace == globalColorSpace);
-        bool noGammaConvert = (curParams.gamma == Float(1));
-        if(noGammaConvert && noColorConvert) continue;
-
-        // Convert color routine, this wrapped to a lambda due to
-        // different compress decompress systems
-        auto ConvColor = [&](Vector3 color)
-        {
-            using namespace Color;
-            // First do gamma correction
-            if(!noGammaConvert)
-                color = OpticalTransferGamma(curParams.gamma).ToLinear(color);
-
-            // Then color
-            if(!noColorConvert)
-            {
-                uint32_t i = static_cast<uint32_t>(curParams.fromColorSpace);
-                [[maybe_unused]]
-                bool invoked = InvokeAt(i, converterList, [&](auto&& tupleElem)
-                {
-                    color = tupleElem.Convert(color);
-                    return true;
-                });
-                assert(invoked);
-            }
-            return color;
-        };
+        GenericTextureView texView = std::get<GenericTextureView>(dTextureViews[tI]);
+        //
+        Vector2ui res = curParams.imgSize;
+        Vector2 resRecip = Vector2(1) / Vector2(res);
+        //if(std::holds_alternative<std::monostate>(texView)) continue;
 
         // Loop over the blocks for this tex
-        uint32_t tileStart = localProcI * kp.blockSize + kp.threadId;
-        uint32_t tileIncrement = processorPerTexture * kp.blockSize;
-        for(uint32_t tileI = tileStart; tileI < tileCount; tileI += tileIncrement)
+        static constexpr Vector2ui TILE_SIZE = Vector2ui(32, 16);
+        static_assert(TILE_SIZE.Multiply() == TPB);
+        Vector2ui totalTiles = Math::DivideUp(res, TILE_SIZE);
+        for(uint32_t tileI = localBI; tileI < totalTiles.Multiply();
+            tileI += blockPerTexture)
         {
-            using BlockType = typename BCReader::BlockType;
-            BlockType block = dBCBlocks[curParams.blockRange[0] + tileI];
+            Vector2ui localPI = Vector2ui(kp.threadId % TILE_SIZE[0],
+                                          kp.threadId / TILE_SIZE[0]);
+            Vector2ui tile2D = Vector2ui(tileI % totalTiles[0],
+                                         tileI / totalTiles[0]);
+            Vector2ui pixCoord = tile2D * TILE_SIZE + localPI;
+            if(pixCoord[0] >= res[0] || pixCoord[1] >= res[1]) continue;
 
-            // YOLO constexpr here,
-            // BC7 has too many colors, register spill galore.
-            // For BC7 we do streaming architecture
-            // so that we do not have to store the all colors.
+            // We assume 4 channel textures are RGB (first 3 channels)
+            // and something else (A channel) so clamp to Vector3 and calculate
+            // If it is two or one channel, other one/two parameter(s) will be
+            // zeroed out.
+            // We disregard if the pixel data is normalized or not.
+            // It is user's problem.
+            Vector2 uv = (Vector2(pixCoord) + Vector2(0.5)) * resRecip;
+            Vector3 localPixRGB = GenericReadFromView(uv, texView);
+
+            Float luminance;
+            // Do the conversion
+            uint32_t i = static_cast<uint32_t>(curParams.colorSpace);
+            [[maybe_unused]]
+            bool invoked = InvokeAt(i, colorspaceList, [i, &luminance, &localPixRGB](auto&& tupleElem)
+            {
+                luminance = Color::XYZToYxy(tupleElem.ToXYZ(localPixRGB))[0];
+                return true;
+            });
+            assert(invoked);
+
             //
-            // BC(1-5) has small inter color dependency
-            // (i.e. color0 > color1 switches to alpha mode etc.)
-            // For these we could not do streaming.
-            // Thus; this constexpr if statement
-            static constexpr bool IsBC7 = std::is_same_v<BCReader, BlockCompressedIO::BC7>;
-            if constexpr(IsBC7)
-            {
-                BCReader bcIO(block);
-                for(uint32_t i = 0; i < bcIO.ColorCount(); i++)
-                {
-                    Vector3 c = bcIO.ExtractColor(i);
-                    c = ConvColor(c);
-                    bcIO.InjectColor(i, c);
-                }
-                block = bcIO.Block();
-            }
-            else
-            {
-                using ColorPack = typename BCReader::ColorPack;
-                ColorPack localPixels = BCReader::ExtractColors(block);
-                for(auto& localPixRGB : localPixels)
-                    localPixRGB = ConvColor(localPixRGB);
-                block = BCReader::InjectColors(block, localPixels);
-            }
-
-            // Finally, Write back
-            dBCBlocks[curParams.blockRange[0] + tileI] = block;
+            Span<Float> dCurrentOutputSpan = dLuminanceOutput[tI];
+            uint32_t linearPixelIndex =  pixCoord[1] * res[0] + pixCoord[0];
+            dCurrentOutputSpan[linearPixelIndex] = luminance;
         }
     }
 }
@@ -541,6 +509,16 @@ class BCColorConverter
     void    CallBCColorConvertKernels(Span<Byte> dScratchBuffer,
                                       MRayColorSpaceEnum globalColorSpace,
                                      const GPUQueue& queue);
+};
+
+class NormalColorConverter
+{
+    public:
+    void CallColorConvertKernel(Span<MipArray<SurfViewVariant>> dSufViews,
+                                Span<const ColorConvParams> dColorConvParams,
+                                uint8_t maxMipCount,
+                                MRayColorSpaceEnum globalColorSpace,
+                                const GPUQueue& queue);
 };
 
 template<MRayPixelEnum E>
@@ -653,8 +631,11 @@ void BCColorConverter::CallKernelForType(Span<Byte> dScratchBuffer,
             static constexpr auto Kernel = KCConvertColorBC<THREAD_PER_BLOCK, BCReaderType,
                                                             ConvListType>;
             // Find maximum block count for state allocation
-            uint32_t blockCount = queue.RecommendedBlockCountDevice(Kernel,
-                                                                    THREAD_PER_BLOCK, 0);
+            uint32_t blockCount = queue.RecommendedBlockCountDevice
+            (
+                reinterpret_cast<const void*>(&Kernel),
+                THREAD_PER_BLOCK, 0
+            );
 
             using namespace std::string_literals;
             static const std::string KernelName = ("KCConvertColorspaceBC"s +
@@ -759,7 +740,7 @@ void BCColorConverter::CallBCColorConvertKernels(Span<Byte> dScratchBuffer,
         const Vector2ul& range = partitions[pIndex];
         std::visit([&, this](auto&& v)
         {
-            using PT = std::_Remove_cvref_t<decltype(v)>;
+            using PT = std::remove_cvref_t<decltype(v)>;
             constexpr MRayPixelEnum E = PT::Name;
             if constexpr(PT::IsBCPixel)
             {
@@ -771,52 +752,75 @@ void BCColorConverter::CallBCColorConvertKernels(Span<Byte> dScratchBuffer,
     }
 }
 
-void CallColorConvertKernel(Span<MipArray<SurfViewVariant>> dSufViews,
-                            Span<const ColorConvParams> dColorConvParams,
-                            uint8_t maxMipCount,
-                            MRayColorSpaceEnum globalColorSpace,
-                            const GPUQueue& queue)
+struct ConvertKernelCallFunctor
 {
-    using enum MRayColorSpaceEnum;
-    // Start from 1, we assume miplevel zero is already available
-    for(uint16_t i = 0; i < maxMipCount; i++)
+    Span<MipArray<SurfViewVariant>> dSufViews;
+    Span<const ColorConvParams>     dColorConvParams;
+    uint8_t                         maxMipCount;
+    MRayColorSpaceEnum              globalColorSpace;
+    const GPUQueue&                 queue;
+    uint16_t                        i;
+
+    template<class T>
+    bool operator()(T ConvList) const
     {
         // We will dedicate N blocks for each texture.
         static constexpr uint32_t THREAD_PER_BLOCK = 512;
         static constexpr uint32_t BLOCK_PER_TEXTURE = 256;
         constexpr uint32_t BlockPerTexture = std::max(1u, BLOCK_PER_TEXTURE >> 1);
 
+        // Get Compile Time Type
+        using ConvListType = std::remove_cvref_t<decltype(ConvList)>;
+        static constexpr auto* Kernel = KCConvertColor<THREAD_PER_BLOCK, ConvListType>;
+        // Find maximum block count for state allocation
+        uint32_t blockCount = queue.RecommendedBlockCountDevice
+        (
+            reinterpret_cast<const void*>(Kernel),
+            THREAD_PER_BLOCK, 0
+        );
+        using namespace std::string_view_literals;
+        queue.IssueExactKernel<Kernel>
+        (
+            "KCConvertColorspace"sv,
+            KernelExactIssueParams
+            {
+                .gridSize = blockCount,
+                .blockSize = THREAD_PER_BLOCK
+            },
+            // I-O
+            dSufViews,
+            // Inputs
+            dColorConvParams,
+            // Constants
+            globalColorSpace,
+            i,
+            BlockPerTexture
+        );
+        return true;
+    }
+};
+
+void NormalColorConverter::CallColorConvertKernel(Span<MipArray<SurfViewVariant>> dSufViews,
+                                                  Span<const ColorConvParams> dColorConvParams,
+                                                  uint8_t maxMipCount,
+                                                  MRayColorSpaceEnum globalColorSpace,
+                                                  const GPUQueue& queue)
+{
+    using enum MRayColorSpaceEnum;
+    // Start from 1, we assume miplevel zero is already available
+    for(uint16_t i = 0; i < maxMipCount; i++)
+    {
         uint32_t colorSpaceI = static_cast<uint32_t>(globalColorSpace);
         InvokeAt(colorSpaceI, ConverterLists,
-        [&](auto&& ConvList) -> bool
-        {
-            // Get Compile Time Type
-            using ConvListType = std::remove_cvref_t<decltype(ConvList)>;
-            static constexpr auto Kernel = KCConvertColor<THREAD_PER_BLOCK, ConvListType>;
-            // Find maximum block count for state allocation
-            uint32_t blockCount = queue.RecommendedBlockCountDevice(Kernel,
-                                                                    THREAD_PER_BLOCK, 0);
-
-            using namespace std::string_view_literals;
-            queue.IssueExactKernel<Kernel>
-            (
-                "KCConvertColorspace"sv,
-                KernelExactIssueParams
-                {
-                    .gridSize = blockCount,
-                    .blockSize = THREAD_PER_BLOCK
-                },
-                // I-O
-                dSufViews,
-                // Inputs
-                dColorConvParams,
-                // Constants
-                globalColorSpace,
-                i,
-                BlockPerTexture
-            );
-            return true;
-        });
+                 ConvertKernelCallFunctor
+                 {
+                    .dSufViews = dSufViews,
+                    .dColorConvParams= dColorConvParams,
+                    .maxMipCount = maxMipCount,
+                    .globalColorSpace = globalColorSpace,
+                    .queue = queue,
+                    .i = i
+                });
     }
 }
 
@@ -905,8 +909,8 @@ void ColorConverter::ConvertColor(std::vector<MipArray<SurfRefVariant>> textures
         {
             return p.mipCount;
         });
-        CallColorConvertKernel(dSufViews, dColorConvParams, maxMipCount,
-                               globalColorSpace, queue);
+        NormalColorConverter().CallColorConvertKernel(dSufViews, dColorConvParams, maxMipCount,
+                                                      globalColorSpace, queue);
     }
     //==============================//
     //       BC TEXTURES            //
@@ -970,9 +974,13 @@ void ColorConverter::ExtractLuminance(std::vector<Span<Float>> hLuminanceBuffers
     static constexpr uint32_t BLOCK_PER_TEXTURE = 256;
     static constexpr uint32_t THREAD_PER_BLOCK = 512;
     // Get Compile Time Type
-    static constexpr auto Kernel = KCExtractLuminance<THREAD_PER_BLOCK>;
+    static constexpr auto* Kernel = KCExtractLuminance<THREAD_PER_BLOCK>;
     // Find maximum block count for state allocation
-    uint32_t blockCount = queue.RecommendedBlockCountDevice(Kernel, THREAD_PER_BLOCK, 0);
+    uint32_t blockCount = queue.RecommendedBlockCountDevice
+    (
+        reinterpret_cast<const void*>(Kernel),
+        THREAD_PER_BLOCK, 0
+    );
 
     using namespace std::string_view_literals;
     queue.IssueExactKernel<Kernel>

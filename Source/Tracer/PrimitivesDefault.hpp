@@ -17,7 +17,7 @@ Sphere<T>::Sphere(const T& transform,
 
 template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Optional<SphereIntersection> Sphere<T>::Intersects(const Ray& ray, bool cullBackface) const
+Optional<SphereIntersection> Sphere<T>::Intersects(const Ray& ray, bool cullBackFace) const
 {
     Ray transformedRay = transformContext.get().InvApply(ray);
 
@@ -30,6 +30,11 @@ Optional<SphereIntersection> Sphere<T>::Intersects(const Ray& ray, bool cullBack
 
     Vector3 unitDir = (hitPos - center).Normalize();
     Vector2 hit = Graphics::CartesianToUnitSpherical(unitDir);
+
+    bool isInside = (transformedRay.Pos() - center).Length() < radius;
+    if(cullBackFace && isInside)
+        return std::nullopt;
+
     return SphereIntersection
     {
         .hit = hit,
@@ -49,8 +54,10 @@ SampleT<BasicSurface> Sphere<T>::SampleSurface(RNGDispenser& rng) const
     Float cosPhi = Float(2) * xi[1] - Float(1);
     Float sinPhi = sqrtf(fmaxf(Float(0), Float(1) - cosPhi * cosPhi));
 
-    Vector3 unitPos = Graphics::UnitSphericalToCartesian(Vector2(sin(theta), cos(theta)),
-                                                         Vector2(sinPhi, cosPhi));
+    auto sinCosTheta = Vector2(std::sin(theta), std::cos(theta));
+    auto sinCosPhi = Vector2(sinPhi, cosPhi);
+    Vector3 unitPos = Graphics::UnitSphericalToCartesian(sinCosTheta,
+                                                         sinCosPhi);
 
     // Calculate PDF
     // Approximate the area with the determinant
@@ -87,11 +94,11 @@ Float Sphere<T>::GetSurfaceArea() const
     static constexpr Float pRecip = Float(1) / p;
 
     Vector3 semiAxes = radius * transformContext.get().Scale();
-    Float approxArea = pow(semiAxes[1] * semiAxes[2], p);
-    approxArea += pow(semiAxes[2] * semiAxes[0], p);
-    approxArea += pow(semiAxes[0] * semiAxes[1], p);
+    Float approxArea = std::pow(semiAxes[1] * semiAxes[2], p);
+    approxArea += std::pow(semiAxes[2] * semiAxes[0], p);
+    approxArea += std::pow(semiAxes[0] * semiAxes[1], p);
     approxArea *= Float(0.33333333);
-    approxArea = pow(approxArea, pRecip);
+    approxArea = std::pow(approxArea, pRecip);
     approxArea *= Float(4) * MathConstants::Pi<Float>();
     return approxArea;
 }
@@ -113,10 +120,10 @@ Vector3 Sphere<T>::GetCenter() const
 
 template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t Sphere<T>::Voxelize(Span<uint64_t>& mortonCodes,
-                             Span<Vector2us>& normals,
-                             bool onlyCalculateSize,
-                             const VoxelizationParameters& voxelParams) const
+uint32_t Sphere<T>::Voxelize(Span<uint64_t>&,
+                             Span<Vector2us>&,
+                             bool,
+                             const VoxelizationParameters&) const
 {
     // TODO: Implement voxelization
     return 0;
@@ -177,9 +184,9 @@ template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 void Sphere<T>::GenerateSurface(EmptySurface&,
                                 // Inputs
-                                const Hit& hit,
-                                const Ray& ray,
-                                const RayDiff& differentials) const
+                                const Hit&,
+                                const Ray&,
+                                const RayDiff&) const
 {}
 
 template<TransformContextC T>
@@ -199,7 +206,7 @@ void Sphere<T>::GenerateSurface(DefaultSurface& result,
                                 // Inputs
                                 const Hit& hit,
                                 const Ray& ray,
-                                const RayDiff& differentials) const
+                                const RayDiff&) const
 {
     // Convert spherical hit to cartesian
     Vector3 normal = Graphics::UnitSphericalToCartesian(hit);

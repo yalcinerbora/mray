@@ -10,12 +10,12 @@
 // ================= //
 //     Renderers     //
 // ================= //
-using RendererTypes_2 = Tuple
+using RendererTypes_2 = std::tuple
 <
     PathTracerRenderer<MetaLightList>
 >;
 
-using RendererWorkTypes_2 = Tuple
+using RendererWorkTypes_2 = std::tuple
 <
     RendererWorkTypes<PathTracerRenderer<MetaLightList>, PathTracerRenderWork,
                       PathTracerRenderLightWork, PathTracerRenderCamWork>
@@ -29,7 +29,7 @@ static_assert(RendererC<PathTracerRenderer<MetaLightList>>, "\"PathTracerRendere
 void Tracer::AddRendererGenerators_2(Map<std::string_view, RendererGenerator>& map,
                                      Map<std::string_view, RenderWorkPack>& workMap)
 {
-    using Args = Tuple<const RenderImagePtr&, TracerView,
+    using Args = std::tuple<const RenderImagePtr&, TracerView,
                        BS::thread_pool&, const GPUSystem&,
                        const RenderWorkPack&>;
 

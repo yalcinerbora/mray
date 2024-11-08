@@ -18,12 +18,12 @@ using LightGroupSkysphereSpherical = LightGroupSkysphere<SphericalCoordConverter
 
 using MetaLightList = MetaLightArrayT
 <
-    Tuple<LightGroupNull, TransformGroupIdentity>,
-    Tuple<LightGroupSkysphereCoOcta, TransformGroupIdentity>,
-    Tuple<LightGroupSkysphereCoOcta, TransformGroupSingle>,
-    Tuple<LightGroupPrim<PrimGroupTriangle>, TransformGroupIdentity>,
-    Tuple<LightGroupPrim<PrimGroupTriangle>, TransformGroupSingle>,
-    Tuple<LightGroupPrim<PrimGroupSkinnedTriangle>, TransformGroupMulti>
+    std::tuple<LightGroupNull, TransformGroupIdentity>,
+    std::tuple<LightGroupSkysphereCoOcta, TransformGroupIdentity>,
+    std::tuple<LightGroupSkysphereCoOcta, TransformGroupSingle>,
+    std::tuple<LightGroupPrim<PrimGroupTriangle>, TransformGroupIdentity>,
+    std::tuple<LightGroupPrim<PrimGroupTriangle>, TransformGroupSingle>,
+    std::tuple<LightGroupPrim<PrimGroupSkinnedTriangle>, TransformGroupMulti>
 >;
 
 using MetaLight = typename MetaLightList::MetaLight;

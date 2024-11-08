@@ -30,6 +30,7 @@
     static constexpr bool MRAY_IS_ON_WINDOWS    = false;
     static constexpr bool MRAY_IS_ON_LINUX      = true;
 
+    using SystemThreadHandle = unsigned long int;
     using SystemSemaphoreHandle = int;
     using SystemMemoryHandle = int;
 

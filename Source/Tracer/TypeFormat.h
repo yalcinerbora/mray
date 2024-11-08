@@ -81,13 +81,13 @@ auto format_as(const HexTriKeyT<T, FB, BB, IB>& k)
 
 inline auto format_as(const HitKeyPack& hk)
 {
-    return Tuple(HexKeyT(hk.primKey), HexTriKeyT(hk.lightOrMatKey),
+    return std::tuple(HexKeyT(hk.primKey), HexTriKeyT(hk.lightOrMatKey),
                  HexKeyT(hk.transKey), HexKeyT(hk.accelKey));
 }
 
 inline auto format_as(const RayGMem& r)
 {
-    return Tuple(r.dir, r.pos, Vector2(r.tMin, r.tMax));
+    return std::tuple(r.dir, r.pos, Vector2(r.tMin, r.tMax));
 }
 
 inline auto format_as(const ImageCoordinate& ic)

@@ -51,26 +51,26 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightAr
     using AttribInfoList            = typename Base::AttribInfoList;
     using SpectrumConverterContext  = SpectrumConverterContextIdentity;
     //
-    using GlobalStateList   = Tuple<PathTraceRDetail::GlobalState<EmptyType>,
+    using GlobalStateList   = std::tuple<PathTraceRDetail::GlobalState<EmptyType>,
                                     PathTraceRDetail::GlobalState<UniformLightSampler>>;
-    using RayStateList      = Tuple<PathTraceRDetail::RayState, PathTraceRDetail::RayState>;
+    using RayStateList      = std::tuple<PathTraceRDetail::RayState, PathTraceRDetail::RayState>;
 
     // Work Functions
     template<PrimitiveC P, MaterialC M, class S, class TContext,
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-    static constexpr Tuple WorkFunctions = Tuple
+    static constexpr auto WorkFunctions = std::tuple
     {
-        PathTraceRDetail::WorkFunction<P, M, S, TContext, PG, MG, TG>,
-        PathTraceRDetail::WorkFunctionNEE<UniformLightSampler, P, M, S, TContext, PG, MG, TG>
+        &PathTraceRDetail::WorkFunction<P, M, S, TContext, PG, MG, TG>,
+        &PathTraceRDetail::WorkFunctionNEE<UniformLightSampler, P, M, S, TContext, PG, MG, TG>
     };
     template<LightC L, LightGroupC LG, TransformGroupC TG>
-    static constexpr auto LightWorkFunctions = Tuple
+    static constexpr auto LightWorkFunctions = std::tuple
     {
-        PathTraceRDetail::LightWorkFunction<L, LG, TG>,
-        PathTraceRDetail::LightWorkFunctionWithNEE<UniformLightSampler, L, LG, TG>
+        &PathTraceRDetail::LightWorkFunction<L, LG, TG>,
+        &PathTraceRDetail::LightWorkFunctionWithNEE<UniformLightSampler, L, LG, TG>
     };
     template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
-    static constexpr auto CamWorkFunctions = Tuple{};
+    static constexpr auto CamWorkFunctions = std::tuple{};
 
     // On throughput mode, we do this burst, on latency mode
     // burst is implicit and is 1

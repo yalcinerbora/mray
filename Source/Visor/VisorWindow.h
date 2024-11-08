@@ -62,7 +62,7 @@ class Swapchain
     private:
     // MESA intel iGPU returns minImage as 3 so increasing this to 4
     // TODO: Make it dynamic later maybe?
-    static constexpr size_t MAX_WINDOW_FBO_COUNT = 4;
+    static constexpr size_t MAX_WINDOW_FBO_COUNT = 8;
     template<class T>
     using SwapchainVec = StaticVector<T, MAX_WINDOW_FBO_COUNT>;
 
