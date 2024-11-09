@@ -134,16 +134,16 @@ struct ComputeCapabilityTypePackOptiX
     auto operator<=>(const ComputeCapabilityTypePackOptiX& right) const;
 };
 
-class ContextOptiX
+class MRayOptiXContext
 {
     private:
     OptixDeviceContext contextOptiX = nullptr;
 
     public:
-                    ContextOptiX();
-                    ContextOptiX(const ContextOptiX&) = delete;
-    ContextOptiX&   operator=(const ContextOptiX&) = delete;
-                    ~ContextOptiX();
+                        MRayOptiXContext();
+                        MRayOptiXContext(const MRayOptiXContext&) = delete;
+    MRayOptiXContext&   operator=(const MRayOptiXContext&) = delete;
+                        ~MRayOptiXContext();
 
     operator OptixDeviceContext() const;
     operator OptixDeviceContext();
@@ -298,7 +298,7 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
     static constexpr auto MISS_RECORD = 2;
 
     private:
-    ContextOptiX                contextOptiX;
+    MRayOptiXContext            contextOptiX;
     std::vector<ComputeCapabilityTypePackOptiX> optixTypesPerCC;
     // Memory related
     DeviceMemory                allMem;
@@ -370,12 +370,12 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
     OptixDeviceContext GetOptixDeviceHandle() const;
 };
 
-inline ContextOptiX::operator OptixDeviceContext() const
+inline MRayOptiXContext::operator OptixDeviceContext() const
 {
     return contextOptiX;
 }
 
-inline ContextOptiX::operator OptixDeviceContext()
+inline MRayOptiXContext::operator OptixDeviceContext()
 {
     return contextOptiX;
 }

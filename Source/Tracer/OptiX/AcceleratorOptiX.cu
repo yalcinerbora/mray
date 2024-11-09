@@ -3,7 +3,6 @@
 
 #include <cassert>
 #include <map>
-#include <optix_host.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/spdlog.h>
 #include <fstream>
@@ -17,6 +16,7 @@
 #include "Device/GPUSystem.hpp"
 
 // Magic linking, these are populated via CUDA runtime?
+#include <optix_host.h>
 #include <optix_function_table_definition.h>
 #include <optix_stack_size.h>
 
@@ -156,7 +156,7 @@ auto ComputeCapabilityTypePackOptiX::operator<=>(const ComputeCapabilityTypePack
     return computeCapability <=> right.computeCapability;
 }
 
-ContextOptiX::ContextOptiX()
+MRayOptiXContext::MRayOptiXContext()
 {
     // We assume every device is otpix capable (this is more or less true)
     // except for Maxwell? (CC_50 is maxwell? I forgot)
@@ -169,8 +169,8 @@ ContextOptiX::ContextOptiX()
     OPTIX_CHECK(optixInit());
     try
     {
-        auto logger = spdlog::basic_logger_mt(OPTIX_LOGGER_NAME,
-                                              OPTIX_LOGGER_FILE_NAME, true);
+        spdlog::basic_logger_mt(OPTIX_LOGGER_NAME,
+                                OPTIX_LOGGER_FILE_NAME, true);
     }
     catch(const spdlog::spdlog_ex& ex)
     {
@@ -191,9 +191,13 @@ ContextOptiX::ContextOptiX()
     OPTIX_CHECK(optixDeviceContextCreate(mainCUDAContext, &opts, &contextOptiX));
 }
 
-ContextOptiX::~ContextOptiX()
+MRayOptiXContext::~MRayOptiXContext()
 {
     OPTIX_CHECK(optixDeviceContextDestroy(contextOptiX));
+
+    auto logger = spdlog::get(OPTIX_LOGGER_NAME);
+    logger->flush();
+    spdlog::drop(OPTIX_LOGGER_NAME);
 }
 
 std::string_view BaseAcceleratorOptiX::TypeName()
