@@ -752,6 +752,18 @@ void BCColorConverter::CallBCColorConvertKernels(Span<Byte> dScratchBuffer,
     }
 }
 
+// This become a functor due to clang/nvcc interaction
+// creates the kernels in a wrong way. NVCC creates
+// explicit template specialization for the KCConvertColor...
+// as a stub and calls the demangled kernel.
+//
+// clang throws an error for the host portion,
+// throws an error about implicit template instantiated after
+// nvcc's explicit one.
+//
+// I have absoultely no idea but making this function good old
+// functor prevents it.
+// TODO: Report error maybe? (to who though?)
 struct ConvertKernelCallFunctor
 {
     Span<MipArray<SurfViewVariant>> dSufViews;

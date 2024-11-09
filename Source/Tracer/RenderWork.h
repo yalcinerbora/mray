@@ -324,7 +324,7 @@ void RenderWork<R, PG, MG, TG>::DoWorkInternal(// I-O
     if constexpr(I >= std::tuple_size_v<decltype(WF)>)
     {
         throw MRayError("[{}]: Runtime call to \"DoWork_{}\" which does not have a kernel "
-                        "associated with it!");
+                        "associated with it!", R::TypeName(), I);
     }
     else
     {
@@ -421,7 +421,7 @@ void RenderLightWork<R, LG, TG>::DoBoundaryWorkInternal(// I-O
     if constexpr(I >= std::tuple_size_v<decltype(WF)>)
     {
         throw MRayError("[{}]: Runtime call to \"DoBoundaryWork_{}\" which does not have a kernel "
-                        "associated with it!");
+                        "associated with it!", R::TypeName(), I);
     }
     else
     {

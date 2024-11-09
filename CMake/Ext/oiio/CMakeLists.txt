@@ -209,6 +209,13 @@ append_cmake_prefix_path(${LIBPNG_INSTALL_LOC})
 
 # TODO: Add Jpeg2000, HEIF, HDR
 
+# MSVC requires do static linking, but on linux it must be off
+# due to linking with system libraries....
+set(DO_STATIC_LINKING OFF)
+if(WIN32)
+    set(DO_STATIC_LINKING ON)
+endif()
+
 # And finally oiio
 mray_build_ext_dependency_git(
         NAME oiio_ext
@@ -227,7 +234,7 @@ mray_build_ext_dependency_git(
             -DUSE_OPENGL=ON
             -DUSE_QT=OFF
             -DBUILD_SHARED_LIBS=ON
-            -DLINKSTATIC=OFF
+            -DLINKSTATIC=${DO_STATIC_LINKING}
             -DOIIO_BUILD_TESTS=OFF
             -DOIIO_BUILD_TOOLS=OFF
             -DBUILD_DOCS=OFF
