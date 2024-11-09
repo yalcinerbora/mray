@@ -149,8 +149,10 @@ MRayError THRDProcessMesh(Span<MeshGroup> meshes,
     importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS,
                                 aiComponent_BONEWEIGHTS |
                                 aiComponent_COLORS);
-    static constexpr unsigned int assimpFlags = //static_cast<unsigned int>
-    //(
+    // TODO: GCC warns redundant cast, but MSVC says default enum type is
+    // int. so we obey MSVC's warning.
+    static constexpr unsigned int assimpFlags = static_cast<unsigned int>
+    (
         // Generate Bounding Boxes
         aiProcess_GenBoundingBoxes |
         // Generate Normals if not avail
@@ -169,8 +171,8 @@ MRayError THRDProcessMesh(Span<MeshGroup> meshes,
         // (this guarantees a "mesh" has same types triangles)
         aiProcess_SortByPType |
         //
-        aiProcess_RemoveRedundantMaterials;
-    //);
+        aiProcess_RemoveRedundantMaterials
+    );
 
     // Thread local buffers
     VectorBackedMemory indexMem;

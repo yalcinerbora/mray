@@ -51,8 +51,8 @@ VulkanFence::VulkanFence(const VulkanSystemView& view,
         .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
         .pNext = nullptr,
         .flags = (isSignalled)
-                    ? VK_FENCE_CREATE_SIGNALED_BIT
-                    : VkFenceCreateFlagBits(0)
+                    ? VkFenceCreateFlags(VK_FENCE_CREATE_SIGNALED_BIT)
+                    : VkFenceCreateFlags(0)
     };
     vkCreateFence(handlesVk->deviceVk, &fenceCreateInfo,
                   VulkanHostAllocator::Functions(),

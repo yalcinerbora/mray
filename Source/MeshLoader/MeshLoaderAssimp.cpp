@@ -174,8 +174,10 @@ MeshFileAssimp::MeshFileAssimp(Assimp::Importer& imp,
     , importer(imp)
     , scene(nullptr)
 {
-    unsigned int flags = //static_cast<unsigned int>
-    //(
+    // TODO: GCC warns redundant cast, but MSVC says default enum type is
+    // int. so we obey MSVC's warning.
+    unsigned int flags = static_cast<unsigned int>
+    (
         // Generate Bounding Boxes
         aiProcess_GenBoundingBoxes |
         // Generate Normals if not avail
@@ -195,8 +197,7 @@ MeshFileAssimp::MeshFileAssimp(Assimp::Importer& imp,
         aiProcess_SortByPType |
         //
         aiProcess_RemoveRedundantMaterials
-        ;
-    //);
+    );
     const aiScene* sceneRaw = importer.ReadFile(filePath, flags);
     if(!sceneRaw) throw MRayError("Assimp: Unable to read file \"{}\"", Name());
     scene.reset(importer.GetOrphanedScene());

@@ -304,9 +304,9 @@ void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, cons
 
 template<LightC Light, LightGroupC LG, TransformGroupC TG>
 MRAY_HYBRID MRAY_CGPU_INLINE
-void SurfRDetail::LightWorkFunctionCommon(const Light& l, RNGDispenser&,
-                                          const RenderLightWorkParams<GlobalState, RayStateCommon
-                                          , LG, TG>& params,
+void SurfRDetail::LightWorkFunctionCommon(const Light&, RNGDispenser&,
+                                          const RenderLightWorkParams<GlobalState,
+                                                                      RayStateCommon, LG, TG>& params,
                                           RayIndex rayIndex)
 {
     if constexpr (Light::IsPrimitiveBackedLight)
