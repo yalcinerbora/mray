@@ -57,7 +57,16 @@ static void KCConstructMetaLights(// These are per-light (sub-light)
         //                           *prim, *dLightSoA, dLightKeys[i]);
         // =======================
         // Thankfully, lights are move/copy? assignable
-        dMetaLights[index] = Light(*dSpectrumConverter, *prim, *dLightSoA, dLightKeys[i]);
+        //
+        // TODO: nvcc/gcc stdlib interaction bug again?
+        // std::variant boils down to inplace new, and it crashes.
+        // =======================
+        // dMetaLights[index] = Light(*dSpectrumConverter, *prim, *dLightSoA, dLightKeys[i]);
+        // =======================
+        // However copy assigning a register-space variant is OK (the code below).
+        using MetaLight = typename MetaLightArray::MetaLight;
+        MetaLight ml = Light(*dSpectrumConverter, *prim, *dLightSoA, dLightKeys[i]);
+        dMetaLights[index] = ml;
     }
 }
 

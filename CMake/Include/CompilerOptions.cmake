@@ -330,7 +330,7 @@ endif()
 target_link_libraries(meta_compile_opts INTERFACE
                       ${MRAY_PLATFORM_SPEC_LIBRARIES})
 
-add_dependencies(meta_compile_opts MRayExternal)
+#add_dependencies(meta_compile_opts MRayExternal)
 
 endblock()
 

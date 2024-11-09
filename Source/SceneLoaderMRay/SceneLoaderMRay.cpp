@@ -178,11 +178,15 @@ std::vector<TransientData> GenericAttributeLoad(const AttributeCountList& totalC
             i++;
         }
     }
-    if constexpr(MRAY_IS_DEBUG)
+    // clang evaluates the constexpr if
+    // warns about unused local typedef.
+    // So putting in macro
+    #if MRAY_DEBUG
     {
         for(const auto& r : result)
             assert(r.IsFull());
     }
+    #endif
     return result;
 }
 
@@ -323,7 +327,10 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
     }
 
     // Sanity check
-    if constexpr(MRAY_IS_DEBUG)
+    // clang evaluates the constexpr if
+    // warns about unused local typedef
+    // so putting in macro
+    #ifdef MRAY_DEBUG
     {
         uint32_t i = 0;
         for(const auto& l : list)
@@ -342,6 +349,7 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
             i++;
         }
     }
+    #endif
     return result;
 }
 
@@ -566,11 +574,12 @@ std::vector<TransientData> TransformAttributeLoad(const AttributeCountList& tota
         }
     }
 
-    if constexpr(MRAY_IS_DEBUG)
+    #ifdef MRAY_DEBUG
     {
         for(const auto& d : result)
             assert(d.IsFull());
     }
+    #endif
     return result;
 }
 
@@ -635,11 +644,13 @@ std::vector<TransientData> CameraAttributeLoad(const AttributeCountList& totalCo
         result[2].Push(Span<const Vector3>(&position, 1));
         result[3].Push(Span<const Vector3>(&up, 1));
     }
-    if constexpr(MRAY_IS_DEBUG)
+
+    #ifdef MRAY_DEBUG
     {
-        for(const auto& r : result)
-            assert(r.IsFull());
+        for(const auto& d : result)
+            assert(d.IsFull());
     }
+    #endif
     return result;
 }
 

@@ -294,8 +294,14 @@ constexpr Vector<N, T> Math::DivideUp(Vector<N, T> value, Vector<N, T> divisor)
     //assert(divisor != Vector<N, T>::Zero());
     // But this works? (MSVC, or CUDA?)
     // probably need "template" token somewhere
-    using V = Vector<N, T>;
-    assert(divisor != V::Zero());
+    //
+    // clang evaluates the constexpr if
+    // warns about unused local typedef
+    // so putting in macro
+    #ifdef MRAY_DEBUG
+        using V = Vector<N, T>;
+        assert(divisor != V::Zero());
+    #endif
     return (value + divisor - 1) / divisor;
 }
 

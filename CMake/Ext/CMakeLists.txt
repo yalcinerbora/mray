@@ -250,41 +250,41 @@ endif()
 # Image Libraries compiled into oiio
 add_subdirectory(oiio)
 
-
 # slang shader compiler
 # this is a bit tricky, since we will not build it
-# but we will download the exce and copy it
+# but we will download the executable and copy it.
 # so external project should not work? (TODO: Check this)
 include(FetchContent)
-# Slang version v.2024.1.6
-# We are downloading an executable, validate it with a hash at least.
-# Slang does not provide a sha256 hash, so we will create it.
+# More importantly, we are downloading an pre-compiled executable,
+# validate it with a hash at least.
+# Slang does not provide a sha256 hash directly in github, so we will create it
+# manually.
 # !!!!
-# THE HASHES ARE GENERATED ON WINDOWS SYSTEM "Get-FileHash" COMMAND MANUALLY
+# THE HASHES ARE GENERATED ON LINUX SYSTEM "sha256sum v9.4" MANUALLY!
 # Technically you are still trusting me, please be advised.
 # !!!
 # Force TLS certificate check
 set(CMAKE_TLS_VERIFY ON)
 
+# Slang version v.2024.14.4
 if(MSVC)
-    set(SLANGC_PLATFORM_NAME "windows-x64")
-    set(SLANGC_ZIP_NAME "slang-2024.1.6-win64.zip")
-    set(SLANGC_SHA256_HASH "093A9D53BB5B44BF23446701F6BAEE47E08B6FE036E1A87A2155A8824AEAD786")
+    set(SLANGC_ZIP_NAME "slang-2024.14.4-windows-x86_64.zip")
+    set(SLANGC_SHA256_HASH "c4410ac09dd86dfcceeb2b2ed494ec976c533b7e18608fad518ec54c4fde8b42")
 elseif(UNIX AND NOT APPLE)
-    set(SLANGC_PLATFORM_NAME "linux-x64")
-    set(SLANGC_ZIP_NAME "slang-2024.1.6-linux-x86_64.tar.gz")
-    set(SLANGC_SHA256_HASH "09E0A0443F142F6DB5ED9EAB2CC568EB3529461DDDE6426A02E75D1446B092E1")
+    set(SLANGC_ZIP_NAME "slang-2024.14.4-linux-x86_64.tar.gz")
+    set(SLANGC_SHA256_HASH "025e6be9fc0277021b9ea559b8a7f7f47b6fa843671203284cbecc8d1a50610f")
 else()
     message(FATAL_ERROR "Unsupported platform for macos(?)")
 endif()
 FetchContent_Declare(slangc_ext
-    URL "https://github.com/shader-slang/slang/releases/download/v2024.1.6/${SLANGC_ZIP_NAME}"
+    URL "https://github.com/shader-slang/slang/releases/download/v2024.14.4/${SLANGC_ZIP_NAME}"
     URL_HASH "SHA256=${SLANGC_SHA256_HASH}")
 FetchContent_MakeAvailable(slangc_ext)
 
 # Now write it to the MRAY_LIB_DIRECTORY
 file(GLOB SLANGC_BINARIES
-    "${slangc_ext_SOURCE_DIR}/bin/${SLANGC_PLATFORM_NAME}/release/*")
+    "${slangc_ext_SOURCE_DIR}/bin/*"
+    "${slangc_ext_SOURCE_DIR}/lib/*")
 file(COPY ${SLANGC_BINARIES} DESTINATION ${MRAY_PLATFORM_LIB_DIRECTORY}/slang)
 
 set(MRAY_ALL_EXT_DEP_TARGETS ${MRAY_ALL_EXT_DEP_TARGETS}
