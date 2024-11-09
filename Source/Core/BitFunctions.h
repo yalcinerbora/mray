@@ -276,20 +276,21 @@ constexpr inline
 typename Bit::TPair<uint64_t>
 Bit::RotateLeft(TPair<uint64_t> value, uint32_t shift)
 {
+    uint64_t shift64 = uint64_t(shift);
     constexpr uint64_t Bits = sizeof(uint64_t) * CHAR_BIT;
-    assert(shift < Bits * 2);
+    assert(shift64 < Bits * 2);
     if(shift >= Bits)
     {
-        shift -= Bits;
+        shift64 -= Bits;
         std::swap(value[0], value[1]);
     }
-    if(shift == 0) return value;
+    if(shift64 == 0) return value;
 
-    uint64_t invShift = Bits - shift;
+    uint64_t invShift = Bits - shift64;
     TPair<uint64_t> result;
-    result[1] = (value[1] << shift);
+    result[1] = (value[1] << shift64);
     result[1] |= (value[0] >> invShift);
-    result[0] = (value[0] << shift);
+    result[0] = (value[0] << shift64);
     result[0] |= (value[1] >> invShift);
     return result;
 }
@@ -298,20 +299,21 @@ constexpr inline
 typename Bit::TPair<uint64_t>
 Bit::RotateRight(TPair<uint64_t> value, uint32_t shift)
 {
+    uint64_t shift64 = uint64_t(shift);
     constexpr uint64_t Bits = sizeof(uint64_t) * CHAR_BIT;
-    assert(shift < Bits * 2);
-    if(shift >= Bits)
+    assert(shift64 < Bits * 2);
+    if(shift64 >= Bits)
     {
-        shift -= Bits;
+        shift64 -= Bits;
         std::swap(value[0], value[1]);
     }
     if(shift == 0) return value;
 
-    uint64_t invShift = Bits - shift;
+    uint64_t invShift = Bits - shift64;
     TPair<uint64_t> result;
-    result[0] = (value[0] >> shift);
+    result[0] = (value[0] >> shift64);
     result[0] |= (value[1] << invShift);
-    result[1] = (value[1] >> shift);
+    result[1] = (value[1] >> shift64);
     result[1] |= (value[0] << invShift);
     return result;
 }

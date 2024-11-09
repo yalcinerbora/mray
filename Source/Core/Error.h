@@ -66,3 +66,5 @@ inline std::string MRayError::GetError() const
 {
     return customInfo;
 }
+
+#include "Error.hpp"

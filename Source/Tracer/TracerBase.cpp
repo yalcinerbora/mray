@@ -136,12 +136,12 @@ TracerView TracerBase::GenerateTracerView()
     return TracerView
     {
         .baseAccelerator = *accelerator,
-        .primGroups = primGroups.Map(),
-        .camGroups = camGroups.Map(),
-        .mediumGroups = mediumGroups.Map(),
-        .matGroups = matGroups.Map(),
-        .transGroups = transGroups.Map(),
-        .lightGroups = lightGroups.Map(),
+        .primGroups = primGroups.GetMap(),
+        .camGroups = camGroups.GetMap(),
+        .mediumGroups = mediumGroups.GetMap(),
+        .matGroups = matGroups.GetMap(),
+        .transGroups = transGroups.GetMap(),
+        .lightGroups = lightGroups.GetMap(),
         .textures = texMem.Textures(),
         .textureViews = texMem.TextureViews(),
         .tracerParams = params,
@@ -1376,17 +1376,17 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     GPUQueueIteratorRoundRobin queueIt(gpuSystem);
     // Finalize the texture operations
     texMem.Finalize();
-    for(auto& g : primGroups.Map())
+    for(auto& g : primGroups.GetMap())
     { g.second->Finalize(queueIt.Queue()); queueIt.Next(); }
-    for(auto& g : camGroups.Map())
+    for(auto& g : camGroups.GetMap())
     { g.second->Finalize(queueIt.Queue()); queueIt.Next(); }
-    for(auto& g : mediumGroups.Map())
+    for(auto& g : mediumGroups.GetMap())
     { g.second->Finalize(queueIt.Queue()); queueIt.Next(); }
-    for(auto& g : matGroups.Map())
+    for(auto& g : matGroups.GetMap())
     { g.second->Finalize(queueIt.Queue()); queueIt.Next(); }
-    for(auto& g : transGroups.Map())
+    for(auto& g : transGroups.GetMap())
     { g.second->Finalize(queueIt.Queue()); queueIt.Next(); }
-    for(auto& g : lightGroups.Map())
+    for(auto& g : lightGroups.GetMap())
     { g.second->Finalize(queueIt.Queue()); queueIt.Next(); }
 
     // Pack the surfaces via transform / primitive
@@ -1457,9 +1457,9 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     accelerator->Construct(BaseAccelConstructParams
     {
         .texViewMap = texMem.TextureViews(),
-        .primGroups = primGroups.Map(),
-        .lightGroups = lightGroups.Map(),
-        .transformGroups = transGroups.Map(),
+        .primGroups = primGroups.GetMap(),
+        .lightGroups = lightGroups.GetMap(),
+        .transformGroups = transGroups.GetMap(),
         .mSurfList = surfaces.Vec(),
         .lSurfList = Span<const LightSurfP>(lSurfList)
     });
@@ -1476,7 +1476,7 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     // Obviously uncommented one is being used
     Float sceneDiameter = Vector2(sceneSpan[0], sceneSpan[2]).Length();
     //
-    for(auto& g : lightGroups.Map())
+    for(auto& g : lightGroups.GetMap())
         g.second->SetSceneDiameter(sceneDiameter);
 
     // Rendering will start just after, and it is renderer's responsibility to wait
@@ -1706,13 +1706,13 @@ size_t TracerBase::UsedDeviceMemory() const
     };
 
     size_t totalMem = 0;
-    totalMem += FetchMemUsage(primGroups.Map());
-    totalMem += FetchMemUsage(camGroups.Map());
-    totalMem += FetchMemUsage(mediumGroups.Map());
-    totalMem += FetchMemUsage(matGroups.Map());
-    totalMem += FetchMemUsage(transGroups.Map());
-    totalMem += FetchMemUsage(lightGroups.Map());
-    totalMem += FetchMemUsage(renderers.Map());
+    totalMem += FetchMemUsage(primGroups.GetMap());
+    totalMem += FetchMemUsage(camGroups.GetMap());
+    totalMem += FetchMemUsage(mediumGroups.GetMap());
+    totalMem += FetchMemUsage(matGroups.GetMap());
+    totalMem += FetchMemUsage(transGroups.GetMap());
+    totalMem += FetchMemUsage(lightGroups.GetMap());
+    totalMem += FetchMemUsage(renderers.GetMap());
     totalMem += texMem.GPUMemoryUsage();
     if(accelerator)
         totalMem += accelerator->GPUMemoryUsage();

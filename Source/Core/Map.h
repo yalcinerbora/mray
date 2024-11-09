@@ -77,8 +77,8 @@ class ThreadSafeMap
     Optional<std::reference_wrapper<V>>
     at(const K& k);
 
-    const MapType& Map() const;
-    MapType& Map();
+    const MapType& GetMap() const;
+    MapType& GetMap();
 };
 
 // Simple thread safe vector wrapper
@@ -174,14 +174,14 @@ void ThreadSafeMap<K, V>::clear()
 
 template<class K, class V>
 const typename ThreadSafeMap<K, V>::MapType&
-ThreadSafeMap<K, V>::Map() const
+ThreadSafeMap<K, V>::GetMap() const
 {
     return map;
 }
 
 template<class K, class V>
 typename ThreadSafeMap<K, V>::MapType&
-ThreadSafeMap<K, V>::Map()
+ThreadSafeMap<K, V>::GetMap()
 {
     return map;
 }

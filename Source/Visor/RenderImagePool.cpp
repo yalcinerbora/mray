@@ -8,26 +8,26 @@
 #include <array>
 #include <filesystem>
 
-constexpr VkImageMemoryBarrier GENERIC_IMG_MEM_BARRIER =
-{
-    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-    .pNext = nullptr,
-    .srcAccessMask = VK_ACCESS_NONE,
-    .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-    .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-    .newLayout = VK_IMAGE_LAYOUT_GENERAL,
-    .srcQueueFamilyIndex = 0,
-    .dstQueueFamilyIndex = 0,
-    .image = nullptr,
-    .subresourceRange = VkImageSubresourceRange
-    {
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        .baseMipLevel = 0,
-        .levelCount = 1,
-        .baseArrayLayer = 0,
-        .layerCount = 1
-    },
-};
+// constexpr VkImageMemoryBarrier GENERIC_IMG_MEM_BARRIER =
+// {
+//     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+//     .pNext = nullptr,
+//     .srcAccessMask = VK_ACCESS_NONE,
+//     .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+//     .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+//     .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+//     .srcQueueFamilyIndex = 0,
+//     .dstQueueFamilyIndex = 0,
+//     .image = nullptr,
+//     .subresourceRange = VkImageSubresourceRange
+//     {
+//         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+//         .baseMipLevel = 0,
+//         .levelCount = 1,
+//         .baseArrayLayer = 0,
+//         .layerCount = 1
+//     },
+// };
 
 void RenderImagePool::GenerateSDRCopyCommand()
 {
@@ -291,9 +291,9 @@ RenderImagePool::RenderImagePool(BS::thread_pool* tp,
     , imgLoader(CreateImageLoader())
     , initInfo(initInfoIn)
 {
-    VkImageMemoryBarrier imgBarrierInfo = GENERIC_IMG_MEM_BARRIER;
-    imgBarrierInfo.srcQueueFamilyIndex = handlesVk->queueIndex;
-    imgBarrierInfo.dstQueueFamilyIndex = handlesVk->queueIndex;
+    // VkImageMemoryBarrier imgBarrierInfo = GENERIC_IMG_MEM_BARRIER;
+    // imgBarrierInfo.srcQueueFamilyIndex = handlesVk->queueIndex;
+    // imgBarrierInfo.dstQueueFamilyIndex = handlesVk->queueIndex;
 
     // Work with floating point
     // TODO: Reduce floating point usage, currently formats are

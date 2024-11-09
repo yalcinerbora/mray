@@ -680,7 +680,7 @@ FramebufferPack Swapchain::NextFrame(const VulkanBinarySemaphore& imgAvailSem)
     else if(result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
         throw MRayError("Fatal error on swapchain recreation");
 
-    currentImgIndex = nextImageIndex % images.size();
+    currentImgIndex = nextImageIndex % static_cast<uint32_t>(images.size());
     return FramebufferPack
     {
         .extent = swapchainInfo.extent,

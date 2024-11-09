@@ -160,6 +160,7 @@ mray_build_ext_dependency_git(
             # It may be on path like in my system
             -DCMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH=OFF
             -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON
         DEPENDENCIES
             oiio_zlib_ext
             libjpeg_turbo_ext
@@ -180,6 +181,7 @@ mray_build_ext_dependency_git(
         BUILD_ARGS
             -DENABLE_SHARED=OFF
             -DCMAKE_DEBUG_POSTFIX:STRING=d
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON
 )
 append_cmake_prefix_path(${JPEGTURBO_INSTALL_LOC})
 
@@ -202,6 +204,7 @@ mray_build_ext_dependency_git(
             -DPNG_STATIC=ON
             -DPNG_TESTS=OFF
             -DCMAKE_DEBUG_POSTFIX:STRING=d
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON
         DEPENDENCIES
             oiio_zlib_ext
 )

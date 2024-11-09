@@ -235,7 +235,6 @@ GenericTextureView Concept<T>::View(TextureReadMode mode) const
             return TracerTexView<D, X>(tex.template View<Vector4>(), mode, IsBC);
     };
 
-    using enum TextureReadMode;
     switch(mode)
     {
         case TO_3C_BASIC_NORMAL_FROM_SIGNED_2C:
@@ -411,11 +410,11 @@ void TextureMemory::ConvertColorspaces()
     std::vector<ColorConvParams> colorConvParams;
     std::vector<GenericTexture*> bcTextures;
 
-    bcTextures.reserve(textures.Map().size());
-    texSurfs.reserve(textures.Map().size());
-    colorConvParams.reserve(textures.Map().size());
+    bcTextures.reserve(textures.GetMap().size());
+    texSurfs.reserve(textures.GetMap().size());
+    colorConvParams.reserve(textures.GetMap().size());
     // Load to linear memory
-    for(auto& [_, t] : textures.Map())
+    for(auto& [_, t] : textures.GetMap())
     {
         bool isColor = (t.IsColor() == AttributeIsColor::IS_COLOR);
         bool requiresConversion = isColor;
@@ -465,10 +464,10 @@ void TextureMemory::GenerateMipmaps()
 {
     std::vector<MipArray<SurfRefVariant>> texSurfs;
     std::vector<MipGenParams> mipGenParams;
-    texSurfs.reserve(textures.Map().size());
-    mipGenParams.reserve(textures.Map().size());
+    texSurfs.reserve(textures.GetMap().size());
+    mipGenParams.reserve(textures.GetMap().size());
     // Load to linear memory
-    for(auto& [_, t] : textures.Map())
+    for(auto& [_, t] : textures.GetMap())
     {
         if(!t.HasRWView()) continue;
 
@@ -638,7 +637,7 @@ TextureId TextureMemory::CreateTexture3D(const Vector3ui& size, uint32_t mipCoun
 void TextureMemory::CommitTextures()
 {
     // Linearize per-gpu textures
-    auto& texMap = textures.Map();
+    auto& texMap = textures.GetMap();
     size_t gpuCount = gpuSystem.AllGPUs().size();
     size_t totalTexCount = texMap.size();
 
@@ -781,7 +780,7 @@ void TextureMemory::Finalize()
     if(texClampBufferSize > 0)
         texClampBuffer = DeviceLocalMemory(gpuSystem.BestDevice());
     // Destroy the surface objects due to clamping op
-    for(auto&[_, cp] : texClampParams.Map())
+    for(auto&[_, cp] : texClampParams.GetMap())
         cp.surface = SurfRefVariant();
 
     Timer t;
@@ -804,12 +803,12 @@ void TextureMemory::Finalize()
 
 const TextureViewMap& TextureMemory::TextureViews() const
 {
-    return textureViews.Map();
+    return textureViews.GetMap();
 }
 
 const TextureMap& TextureMemory::Textures() const
 {
-    return textures.Map();
+    return textures.GetMap();
 }
 
 void TextureMemory::Clear()

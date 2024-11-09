@@ -163,9 +163,9 @@ TEST(DefaultLights, MetaLight)
     // Generate some groups in maps
     // PGs
     Map<PrimGroupId, PrimGroupPtr> primGroups;
-    primGroups.emplace(const PrimGroupId(0),
+    primGroups.emplace(PrimGroupId(0),
                        PrimGroupPtr(std::make_unique<PrimGroupEmpty>(0u, system)));
-    primGroups.emplace(const PrimGroupId(1),
+    primGroups.emplace(PrimGroupId(1),
                        PrimGroupPtr(std::make_unique<PrimGroupTriangle>(1u, system)));
     auto& emptyPrimGroup = *primGroups.at(PrimGroupId(0)).value().get().get();
     auto& triangleGroup = *primGroups.at(PrimGroupId(1)).value().get().get();
@@ -181,7 +181,7 @@ TEST(DefaultLights, MetaLight)
     Map<LightGroupId, LightGroupPtr> lightGroups;
     lightGroups.emplace
     (
-        const LightGroupId(0),
+        LightGroupId(0),
         LightGroupPtr
         (
             std::make_unique<LightGroupPrim<PrimGroupTriangle>>
@@ -190,7 +190,7 @@ TEST(DefaultLights, MetaLight)
     );
     lightGroups.emplace
     (
-        const LightGroupId(1),
+        LightGroupId(1),
         LightGroupPtr
         (
             std::make_unique<LightGroupSkysphereCoOcta>

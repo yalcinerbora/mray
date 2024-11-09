@@ -4,7 +4,7 @@ namespace LambertMatDetail
 {
 
 template <class SpectrumTransformer>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 LambertMaterial<SpectrumTransformer>::LambertMaterial(const SpectrumConverter& specTransformer,
                                                       const DataSoA& soa, MaterialKey mk)
     : albedoTex(specTransformer, soa.dAlbedo[mk.FetchIndexPortion()])
@@ -13,7 +13,7 @@ LambertMaterial<SpectrumTransformer>::LambertMaterial(const SpectrumConverter& s
 {}
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
                                                     const Surface& surface,
                                                     RNGDispenser& dispenser) const
@@ -61,7 +61,7 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Float LambertMaterial<ST>::Pdf(const Ray& wI,
                                const Vector3&,
                                const Surface& surface) const
@@ -77,7 +77,7 @@ Float LambertMaterial<ST>::Pdf(const Ray& wI,
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Spectrum LambertMaterial<ST>::Evaluate(const Ray& wI,
                                        const Vector3&,
                                        const Surface& surface) const
@@ -101,21 +101,21 @@ Spectrum LambertMaterial<ST>::Evaluate(const Ray& wI,
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 bool LambertMaterial<ST>::IsEmissive() const
 {
     return false;
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Spectrum LambertMaterial<ST>::Emit(const Vector3&, const Surface&) const
 {
     return Spectrum::Zero();
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 bool LambertMaterial<ST>::IsAllTexturesAreResident(const Surface& surface) const
 {
     bool allResident = true;
@@ -129,7 +129,7 @@ bool LambertMaterial<ST>::IsAllTexturesAreResident(const Surface& surface) const
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Float LambertMaterial<ST>::Specularity(const Surface&) const
 {
     return Float(0);
@@ -141,14 +141,14 @@ namespace ReflectMatDetail
 {
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 ReflectMaterial<ST>::ReflectMaterial(const SpectrumConverter&,
                                      const DataSoA& soa, MaterialKey mk)
     : mediumKeys(soa.dMediumKeys[mk.FetchIndexPortion()])
 {}
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 SampleT<BxDFResult> ReflectMaterial<ST>::SampleBxDF(const Vector3& wO,
                                                     const Surface& surface,
                                                     RNGDispenser&) const
@@ -177,7 +177,7 @@ SampleT<BxDFResult> ReflectMaterial<ST>::SampleBxDF(const Vector3& wO,
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Float ReflectMaterial<ST>::Pdf(const Ray&,
                                const Vector3&,
                                const Surface&) const
@@ -187,7 +187,7 @@ Float ReflectMaterial<ST>::Pdf(const Ray&,
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Spectrum ReflectMaterial<ST>::Evaluate(const Ray&,
                                        const Vector3&,
                                        const Surface&) const
@@ -196,14 +196,14 @@ Spectrum ReflectMaterial<ST>::Evaluate(const Ray&,
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 bool ReflectMaterial<ST>::IsEmissive() const
 {
     return false;
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Spectrum ReflectMaterial<ST>::Emit(const Vector3&,
                                    const Surface&) const
 {
@@ -211,14 +211,14 @@ Spectrum ReflectMaterial<ST>::Emit(const Vector3&,
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Float ReflectMaterial<ST>::Specularity(const Surface&) const
 {
     return Float(1);
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 bool ReflectMaterial<ST>::IsAllTexturesAreResident(const Surface&) const
 {
     return true;
@@ -230,7 +230,7 @@ namespace RefractMatDetail
 {
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 RefractMaterial<ST>::RefractMaterial(const SpectrumConverter& sTransContext,
                                      const DataSoA& soa, MaterialKey mk)
     : mediumKeys(soa.dMediumKeys[mk.FetchIndexPortion()])
@@ -246,7 +246,7 @@ RefractMaterial<ST>::RefractMaterial(const SpectrumConverter& sTransContext,
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 SampleT<BxDFResult> RefractMaterial<ST>::SampleBxDF(const Vector3& wO,
                                                     const Surface& surface,
                                                     RNGDispenser& rng) const
@@ -305,7 +305,7 @@ SampleT<BxDFResult> RefractMaterial<ST>::SampleBxDF(const Vector3& wO,
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Float RefractMaterial<ST>::Pdf(const Ray&,
                                const Vector3&,
                                const Surface&) const
@@ -315,7 +315,7 @@ Float RefractMaterial<ST>::Pdf(const Ray&,
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Spectrum RefractMaterial<ST>::Evaluate(const Ray&,
                                        const Vector3&,
                                        const Surface&) const
@@ -324,14 +324,14 @@ Spectrum RefractMaterial<ST>::Evaluate(const Ray&,
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 bool RefractMaterial<ST>::IsEmissive() const
 {
     return false;
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Spectrum RefractMaterial<ST>::Emit(const Vector3&,
                                    const Surface&) const
 {
@@ -339,14 +339,14 @@ Spectrum RefractMaterial<ST>::Emit(const Vector3&,
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Float RefractMaterial<ST>::Specularity(const Surface&) const
 {
     return Float(1);
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 bool RefractMaterial<ST>::IsAllTexturesAreResident(const Surface&) const
 {
     return true;
@@ -358,7 +358,7 @@ namespace UnrealMatDetail
 {
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Float UnrealMaterial<ST>::MISRatio(Float metallic, Float specular,
                                    Float avgAlbedo) const
 {
@@ -373,7 +373,7 @@ Float UnrealMaterial<ST>::MISRatio(Float metallic, Float specular,
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Float UnrealMaterial<ST>::ConvertProbHToL(Float VdH, Float pdfH) const
 {
     // VNDFGGXSmithPDF returns sampling of H Vector
@@ -382,6 +382,7 @@ Float UnrealMaterial<ST>::ConvertProbHToL(Float VdH, Float pdfH) const
 }
 
 template <class ST>
+MRAY_GPU MRAY_GPU_INLINE
 Spectrum UnrealMaterial<ST>::CalculateF0(Spectrum albedo, Float metallic,
                                          Float specular) const
 {
@@ -393,7 +394,7 @@ Spectrum UnrealMaterial<ST>::CalculateF0(Spectrum albedo, Float metallic,
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 std::tuple<Float, Float, Float, Spectrum>
 UnrealMaterial<ST>::FetchData(const Surface& s) const
 {
@@ -406,7 +407,7 @@ UnrealMaterial<ST>::FetchData(const Surface& s) const
 }
 
 template <class SpectrumTransformer>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 UnrealMaterial<SpectrumTransformer>::UnrealMaterial(const SpectrumConverter& specTransformer,
                                                     const DataSoA& soa, MaterialKey mk)
     : albedoTex(specTransformer, soa.dAlbedo[mk.FetchIndexPortion()])
@@ -418,7 +419,7 @@ UnrealMaterial<SpectrumTransformer>::UnrealMaterial(const SpectrumConverter& spe
 {}
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
                                                    const Surface& surface,
                                                    RNGDispenser& dispenser) const
@@ -535,7 +536,7 @@ SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Float UnrealMaterial<ST>::Pdf(const Ray& wI,
                               const Vector3& wO,
                               const Surface& surface) const
@@ -578,7 +579,7 @@ Float UnrealMaterial<ST>::Pdf(const Ray& wI,
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Spectrum UnrealMaterial<ST>::Evaluate(const Ray& wI,
                                       const Vector3& wO,
                                       const Surface& surface) const
@@ -640,21 +641,21 @@ Spectrum UnrealMaterial<ST>::Evaluate(const Ray& wI,
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 bool UnrealMaterial<ST>::IsEmissive() const
 {
     return false;
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Spectrum UnrealMaterial<ST>::Emit(const Vector3&, const Surface&) const
 {
     return Spectrum::Zero();
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 Float UnrealMaterial<ST>::Specularity(const Surface& surface) const
 {
     auto [_, metallic, specular, albedo] = FetchData(surface);
@@ -665,7 +666,7 @@ Float UnrealMaterial<ST>::Specularity(const Surface& surface) const
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 bool UnrealMaterial<ST>::IsAllTexturesAreResident(const Surface& surface) const
 {
     bool allResident = true;

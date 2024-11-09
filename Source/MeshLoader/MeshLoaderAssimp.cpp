@@ -174,8 +174,8 @@ MeshFileAssimp::MeshFileAssimp(Assimp::Importer& imp,
     , importer(imp)
     , scene(nullptr)
 {
-    unsigned int flags = static_cast<unsigned int>
-    (
+    unsigned int flags = //static_cast<unsigned int>
+    //(
         // Generate Bounding Boxes
         aiProcess_GenBoundingBoxes |
         // Generate Normals if not avail
@@ -195,7 +195,8 @@ MeshFileAssimp::MeshFileAssimp(Assimp::Importer& imp,
         aiProcess_SortByPType |
         //
         aiProcess_RemoveRedundantMaterials
-    );
+        ;
+    //);
     const aiScene* sceneRaw = importer.ReadFile(filePath, flags);
     if(!sceneRaw) throw MRayError("Assimp: Unable to read file \"{}\"", Name());
     scene.reset(importer.GetOrphanedScene());

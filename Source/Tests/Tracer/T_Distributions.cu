@@ -166,10 +166,6 @@ TEST(Dist_PiecewiseConstant2D, Uniform)
             EXPECT_NEAR(s.pdf, Float{1}, VeryLargeEpsilon<Float>());
             EXPECT_FLOAT_EQ(s.pdf, pdf);
 
-            if(s.pdf != pdf)
-                __debugbreak();
-
-
             // On uniform function, random numberss should match to the
             // sampled index
             Vector2 expandedValue = s.value * Vector2(SIZE);

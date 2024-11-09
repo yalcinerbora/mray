@@ -649,5 +649,5 @@ Expected<Image> ImageFileDDS::ReadImage()
         result.imgData.emplace_back(Vector3ui(mipSize, 1), std::move(data));
 
     }
-    return std::move(result);
+    return result;
 }

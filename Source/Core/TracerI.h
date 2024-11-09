@@ -766,7 +766,7 @@ constexpr PrimitiveAttributeLogic PrimAttributeStringifier::FromString(std::stri
         if(checkSV == sv) return PrimitiveAttributeLogic(i);
         i++;
     }
-    return PrimitiveAttributeLogic(END);
+    return PrimitiveAttributeLogic::END;
 }
 
 // formatter for AcceleratorType

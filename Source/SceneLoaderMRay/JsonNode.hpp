@@ -303,7 +303,7 @@ Optional<TransientData> JsonNode::AccessOptionalDataArray(std::string_view name)
             T val = nodeArray[i].get<T>();
             input.Push(Span<const T>(&val, 1));
         }
-        return std::move(input);
+        return input;
     }
 }
 

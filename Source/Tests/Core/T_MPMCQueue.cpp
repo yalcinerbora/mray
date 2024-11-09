@@ -37,7 +37,7 @@ TEST(MPMCQueueTest, Stress)
             producerThreads.emplace_back([&]()
             {
                 for(uint32_t i = 0; i < itemPerThreadCount; i++)
-                    queue.Enqueue(uint32_t(i + 1));
+                    queue.Enqueue(i + 1);
             });
         }
 

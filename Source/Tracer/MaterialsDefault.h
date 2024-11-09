@@ -32,26 +32,26 @@ namespace LambertMatDetail
         MediumKeyPair               mediumKeys;
 
         public:
-        MRAY_HYBRID
+        MRAY_GPU
         LambertMaterial(const SpectrumConverter& sTransContext,
                         const DataSoA& soa, MaterialKey mk);
 
-        MRAY_HYBRID
-        SampleT<BxDFResult>     SampleBxDF(const Vector3& wO,
-                                           const Surface& surface,
-                                           RNGDispenser& dispenser) const;
-        MRAY_HYBRID Float       Pdf(const Ray& wI,
-                                    const Vector3& wO,
-                                    const Surface& surface) const;
+        MRAY_GPU
+        SampleT<BxDFResult> SampleBxDF(const Vector3& wO,
+                                       const Surface& surface,
+                                       RNGDispenser& dispenser) const;
+        MRAY_GPU Float      Pdf(const Ray& wI,
+                                const Vector3& wO,
+                                const Surface& surface) const;
 
-        MRAY_HYBRID Spectrum    Evaluate(const Ray& wI,
-                                         const Vector3& wO,
-                                         const Surface& surface) const;
-        MRAY_HYBRID bool        IsEmissive() const;
-        MRAY_HYBRID Spectrum    Emit(const Vector3& wO,
-                                     const Surface& surf) const;
-        MRAY_HYBRID bool        IsAllTexturesAreResident(const Surface& surface) const;
-        MRAY_HYBRID Float       Specularity(const Surface&) const;
+        MRAY_GPU Spectrum   Evaluate(const Ray& wI,
+                                     const Vector3& wO,
+                                     const Surface& surface) const;
+        MRAY_GPU bool       IsEmissive() const;
+        MRAY_GPU Spectrum   Emit(const Vector3& wO,
+                                 const Surface& surf) const;
+        MRAY_GPU bool       IsAllTexturesAreResident(const Surface& surface) const;
+        MRAY_GPU Float      Specularity(const Surface&) const;
     };
 
 }
@@ -76,25 +76,25 @@ namespace ReflectMatDetail
         MediumKeyPair  mediumKeys;
 
         public:
-        MRAY_HYBRID
+        MRAY_GPU
         ReflectMaterial(const SpectrumConverter& sTransContext,
                         const DataSoA& soa, MaterialKey mk);
 
-        MRAY_HYBRID
-        SampleT<BxDFResult>     SampleBxDF(const Vector3& wO,
+        MRAY_GPU
+        SampleT<BxDFResult> SampleBxDF(const Vector3& wO,
                                            const Surface& surface,
                                            RNGDispenser& dispenser) const;
-        MRAY_HYBRID Float       Pdf(const Ray& wI,
+        MRAY_GPU Float      Pdf(const Ray& wI,
                                     const Vector3& wO,
                                     const Surface& surface) const;
-        MRAY_HYBRID Spectrum    Evaluate(const Ray& wI,
+        MRAY_GPU Spectrum    Evaluate(const Ray& wI,
                                          const Vector3& wO,
                                          const Surface& surface) const;
-        MRAY_HYBRID bool        IsEmissive() const;
-        MRAY_HYBRID Spectrum    Emit(const Vector3& wO,
+        MRAY_GPU bool        IsEmissive() const;
+        MRAY_GPU Spectrum    Emit(const Vector3& wO,
                                      const Surface& surf) const;
-        MRAY_HYBRID bool        IsAllTexturesAreResident(const Surface& surface) const;
-        MRAY_HYBRID Float       Specularity(const Surface&) const;
+        MRAY_GPU bool        IsAllTexturesAreResident(const Surface& surface) const;
+        MRAY_GPU Float       Specularity(const Surface&) const;
     };
 }
 
@@ -122,25 +122,26 @@ namespace RefractMatDetail
         Spectrum        backIoR;
 
         public:
-        MRAY_HYBRID
+        MRAY_GPU
         RefractMaterial(const SpectrumConverter& sTransContext,
                         const DataSoA& soa, MaterialKey mk);
 
-        MRAY_HYBRID
-        SampleT<BxDFResult>     SampleBxDF(const Vector3& wO,
-                                           const Surface& surface,
-                                           RNGDispenser& dispenser) const;
-        MRAY_HYBRID Float       Pdf(const Ray& wI,
-                                    const Vector3& wO,
+        MRAY_GPU
+        SampleT<BxDFResult> SampleBxDF(const Vector3& wO,
+                                       const Surface& surface,
+                                       RNGDispenser& dispenser) const;
+        MRAY_GPU Float      Pdf(const Ray& wI,
+                                const Vector3& wO,
                                 const Surface& surface) const;
-        MRAY_HYBRID Spectrum    Evaluate(const Ray& wI,
-                                         const Vector3& wO,
-                                         const Surface& surface) const;
-        MRAY_HYBRID bool        IsEmissive() const;
-        MRAY_HYBRID Spectrum    Emit(const Vector3& wO,
-                                     const Surface& surf) const;
-        MRAY_HYBRID bool        IsAllTexturesAreResident(const Surface& surface) const;
-        MRAY_HYBRID Float       Specularity(const Surface&) const;
+
+        MRAY_GPU Spectrum   Evaluate(const Ray& wI,
+                                     const Vector3& wO,
+                                     const Surface& surface) const;
+        MRAY_GPU bool       IsEmissive() const;
+        MRAY_GPU Spectrum   Emit(const Vector3& wO,
+                                 const Surface& surf) const;
+        MRAY_GPU bool       IsAllTexturesAreResident(const Surface& surface) const;
+        MRAY_GPU Float      Specularity(const Surface&) const;
     };
 }
 
@@ -179,36 +180,37 @@ namespace UnrealMatDetail
 
         MediumKeyPair               mediumKeys;
 
-        MRAY_HYBRID
+        MRAY_GPU
         Float MISRatio(Float metallic, Float specular, Float avgAlbedo) const;
-        MRAY_HYBRID
+        MRAY_GPU
         Spectrum CalculateF0(Spectrum albedo, Float metallic, Float specular) const;
-        MRAY_HYBRID
+        MRAY_GPU
         Float ConvertProbHToL(Float VdH, Float pdfH) const;
-        MRAY_HYBRID
+        MRAY_GPU
         std::tuple<Float, Float, Float, Spectrum>
         FetchData(const Surface&) const;
 
         public:
-        MRAY_HYBRID
+        MRAY_GPU
         UnrealMaterial(const SpectrumConverter& sTransContext,
                        const DataSoA& soa, MaterialKey mk);
 
-        MRAY_HYBRID
-        SampleT<BxDFResult>     SampleBxDF(const Vector3& wO,
-                                           const Surface& surface,
-                                           RNGDispenser& dispenser) const;
-        MRAY_HYBRID Float       Pdf(const Ray& wI,
-                                    const Vector3& wO,
-                                    const Surface& surface) const;
-        MRAY_HYBRID Spectrum    Evaluate(const Ray& wI,
-                                         const Vector3& wO,
-                                         const Surface& surface) const;
-        MRAY_HYBRID bool        IsEmissive() const;
-        MRAY_HYBRID Spectrum    Emit(const Vector3& wO,
-                                     const Surface& surf) const;
-        MRAY_HYBRID bool        IsAllTexturesAreResident(const Surface& surface) const;
-        MRAY_HYBRID Float       Specularity(const Surface&) const;
+        MRAY_GPU
+        SampleT<BxDFResult> SampleBxDF(const Vector3& wO,
+                                       const Surface& surface,
+                                       RNGDispenser& dispenser) const;
+        MRAY_GPU Float      Pdf(const Ray& wI,
+                                const Vector3& wO,
+                                const Surface& surface) const;
+
+        MRAY_GPU Spectrum   Evaluate(const Ray& wI,
+                                     const Vector3& wO,
+                                     const Surface& surface) const;
+        MRAY_GPU bool       IsEmissive() const;
+        MRAY_GPU Spectrum   Emit(const Vector3& wO,
+                                 const Surface& surf) const;
+        MRAY_GPU bool       IsAllTexturesAreResident(const Surface& surface) const;
+        MRAY_GPU Float      Specularity(const Surface&) const;
     };
 }
 

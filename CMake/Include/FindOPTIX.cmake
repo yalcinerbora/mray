@@ -15,12 +15,19 @@ set(OPTIX_INSTALL_DIR $ENV{OPTIX_INSTALL_DIR})
 if(WIN32)
     # Default Installation Locations
     set(OPTIX_POTENTIAL_PATH_LIST
+        "C:/ProgramData/NVIDIA Corporation/OptiX SDK 8.1.0"
         "C:/ProgramData/NVIDIA Corporation/OptiX SDK 8.0.0"
         )
 else()
     set(OPTIX_POTENTIAL_PATH_LIST
+            "/usr/local/NVIDIA-OptiX-SDK-8.1.0-linux64-x86_64"
+            "/usr/local/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64"
+
+            "/opt/nvidia/NVIDIA-OptiX-SDK-8.1.0-linux64-x86_64"
             "/opt/nvidia/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64"
+
             "~/NVIDIA-Optix-SDK-8.0.0-linux64"
+            "~/NVIDIA-Optix-SDK-8.1.0-linux64"
         )
 endif()
 
