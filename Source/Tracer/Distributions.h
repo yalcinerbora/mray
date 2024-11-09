@@ -252,6 +252,9 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Float DistributionPwC<D>::PdfUV(const VectorT& uv) const
 {
     VectorT indexF = uv * VectorT(Size());
+    // UV can be [0, 1], also maybe because of numerical precision
+    // it can exceed 1.
+    indexF = VectorT::Min(indexF, Math::PrevFloat(Float(1)));
     return PdfIndex(indexF);
 }
 

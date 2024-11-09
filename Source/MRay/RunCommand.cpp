@@ -834,6 +834,7 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
 
         MRAY_LOG(EyeAnim::AragornLine);
         renderTimer.Start();
+        startDisplayProgressBar = true;
     }
     //
     if(newClearSignal)
@@ -843,9 +844,9 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
     //
     if(newImageSection)
     {
-        // After the first image section we can display something
-        startDisplayProgressBar = true;
-        //
+        renderTimer.Split();
+        lastReceiveMS = renderTimer.ElapsedIntMS();
+
         const auto& section = newImageSection.value();
         // Tracer may abruptly terminated (crash probably),
         // so do not issue anything, return nullopt and
@@ -951,9 +952,8 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
     {
         progressRatio = rendererInfo.workPerPixel / rendererInfo.wPPLimit;
         double sppLeft = rendererInfo.wPPLimit - rendererInfo.workPerPixel;
-        renderTimer.Split();
         //
-        uint64_t totalMS = renderTimer.ElapsedIntMS();
+        uint64_t totalMS = lastReceiveMS;
         uint64_t wppCurrent = uint64_t(std::round(rendererInfo.workPerPixel));
         if(wppCurrent != 0)
         {
@@ -975,10 +975,11 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
                                     totalGPUMem.first, totalGPUMem.second,
                                     rendererInfo.workPerPixel, rendererInfo.wPPLimit,
                                     timeLeft);
+        using namespace EyeAnim;
+        SimpleProgressBar().Display(Float(progressRatio),
+                                    cmdTimer.ElapsedIntMS(), displaySuffix);
     }
-    using namespace EyeAnim;
-    SimpleProgressBar().Display(Float(progressRatio),
-                                cmdTimer.ElapsedIntMS(), displaySuffix);
+
     return false;
 }
 

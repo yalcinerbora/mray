@@ -45,6 +45,7 @@ class RunCommand : public CommandI
     RenderBufferInfo        renderBufferInfo;
     uint64_t                memUsage;
     BS::multi_future<void>  accumulateFuture;
+    uint64_t                lastReceiveMS;
     bool                    startDisplayProgressBar = false;
     // The "timeline semaphore" (CPU emulation)
     // This will be used to synchronize between MRay and Run
