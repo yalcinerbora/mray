@@ -1,12 +1,14 @@
 
 // Minimal Intrusion by the CMake
-// "configure_fire" is just a substititor,
+// "configure_file" is just a substititor,
 // we could create c++ codegen here, but this will be
 // enough for now.
 
 #define MRAY_VERSION_MAJOR @MRAY_VERSION_MAJOR@
 #define MRAY_VERSION_MINOR @MRAY_VERSION_MINOR@
 #define MRAY_VERSION_PATCH @MRAY_VERSION_PATCH@
+
+#cmakedefine01 MRAY_BUILD_VISOR
 
 #define @MRAY_HOST_ARCH@
 

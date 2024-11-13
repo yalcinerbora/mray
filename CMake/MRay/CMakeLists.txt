@@ -52,14 +52,21 @@ add_precompiled_headers(TARGET MRay)
 # Not-linked but dependent targets
 # Dynamically loaded DLLs
 add_dependencies(MRay
-                 Visor
                  SceneLoaderMRay
                  TracerDLL_CUDA)
+
+if(MRAY_BUILD_VISOR)
+    add_dependencies(MRay Visor)
+endif()
 
 # Debug Parameters (For my own use case)
 if(MSVC)
     set(DEBUG_ARGS "")
-    string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "visor ")
+    if(MRAY_BUILD_VISOR)
+        string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "visor ")
+    else()
+        string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "run ")
+    endif()
     string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "-r 640x360 ")
     string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "-s Scenes/helloTriangle.json ")
     string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "--tConf tracerConfig.json ")

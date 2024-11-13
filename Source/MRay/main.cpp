@@ -44,12 +44,15 @@ ProcessTimer::~ProcessTimer()
 const StaticVector<CommandI*, MAX_SUBCOMMAND_COUNT>&
 InitializeCommands() noexcept
 {
-    static const StaticVector<CommandI*, MAX_SUBCOMMAND_COUNT> CommandList =
+    static StaticVector<CommandI*, MAX_SUBCOMMAND_COUNT> CommandList =
     {
-        &VisorCommand::Instance(),
         &ConvertCommand::Instance(),
         &RunCommand::Instance()
     };
+
+    if constexpr(MRay::IsVisorBuilt)
+        CommandList.push_back(&VisorCommand::Instance());
+
     return CommandList;
 };
 

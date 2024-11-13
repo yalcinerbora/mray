@@ -330,8 +330,6 @@ endif()
 target_link_libraries(meta_compile_opts INTERFACE
                       ${MRAY_PLATFORM_SPEC_LIBRARIES})
 
-#add_dependencies(meta_compile_opts MRayExternal)
-
 endblock()
 
 add_library(mray::meta_compile_opts ALIAS meta_compile_opts)

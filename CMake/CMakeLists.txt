@@ -43,6 +43,7 @@ set_property(CACHE MRAY_HOST_ARCH
 
 option(MRAY_ENABLE_HW_ACCELERATION "Try to find, compile and and use HW accelration (i.e. this means OptiX for CUDA)" OFF)
 option(MRAY_BUILD_TESTS "Build Tests" ON)
+option(MRAY_BUILD_VISOR "Build Visor (Interactive Vulkan Viewer)" ON)
 option(MRAY_EXPORT_COMPILE_COMMANDS "Export compile commands for IWYU" ON)
 option(MRAY_ENABLE_PCH "Enable precompiled headers functionality" OFF)
 
@@ -97,7 +98,7 @@ endif()
 # After project is set and nvcc is found invoke find CUDA toolkit
 # we will use curand for sampling
 find_package(CUDAToolkit REQUIRED)
-# Bug on cmake maybe this variable is not advanced
+# Bug on cmake maybe this variable is not in "advanced"
 mark_as_advanced(CUDAToolkit_CUPTI_INCLUDE_DIR)
 
 # Force Colored Output on Ninja
@@ -158,7 +159,10 @@ add_subdirectory(SceneLoaderMRay)
 add_subdirectory(MeshLoader)
 add_subdirectory(ImageLoader)
 add_subdirectory(GFGConverter)
-add_subdirectory(Visor)
+
+if(MRAY_BUILD_VISOR)
+    add_subdirectory(Visor)
+endif()
 
 # Generate Targets
 add_subdirectory(TracerDevice)

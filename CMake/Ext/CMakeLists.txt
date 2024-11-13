@@ -24,7 +24,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # Create a project..
 project(MRayExternal DESCRIPTION "MRay dependency downloader/compiler")
 
-option(MRAY_BUILD_TESTS "Build Tests" ON)
+option(MRAY_BUILD_TESTS "Build Test Libraries (gtest)" ON)
+option(MRAY_BUILD_VISOR "Build Visor Libraries (glfw etc..)" ON)
 
 # Populate the meta directories for this project hierarchy
 include("Macros")
@@ -161,74 +162,97 @@ mray_build_ext_dependency_git(
         -DCLI11_SINGLE_FILE=OFF
 )
 
-# Get glfw
-mray_build_ext_dependency_git(
-    NAME glfw_ext
-    URL "https://github.com/glfw/glfw.git"
-    TAG "3fa2360720eeba1964df3c0ecf4b5df8648a8e52" # 17.06.2023 Latest Commit
-    LICENSE_NAME "LICENSE.md"
-    BUILD_ARGS
-        -DBUILD_SHARED_LIBS=ON
-        -DGLFW_BUILD_DOCS=OFF
-        -DGLFW_BUILD_EXAMPLES=OFF
-        -DGLFW_BUILD_TESTS=OFF
-        -DGLFW_INSTALL=ON
-        -DGLFW_USE_HYBRID_HPG=OFF
-        # Windows Related
-        -DGLFW_BUILD_WIN32=ON
-        -DUSE_MSVC_RUNTIME_LIBRARY_DLL=ON
-)
+if(MRAY_BUILD_VISOR)
 
-# Get vulkan-related
-mray_build_ext_dependency_git(
-    NAME vulkan_headers_ext
-    URL "https://github.com/KhronosGroup/Vulkan-Headers.git"
-    TAG "577baa05033cf1d9236b3d078ca4b3269ed87a2b" # 1.3.280
-    LICENSE_NAME "LICENSE.md"
-    FORCE_RELEASE
-    BUILD_ARGS
-        -DUPDATE_DEPS=OFF
-        -DBUILD_TESTS=OFF
-        -DVULKAN_HEADERS_INSTALL=ON
-)
+    # Get glfw
+    mray_build_ext_dependency_git(
+        NAME glfw_ext
+        URL "https://github.com/glfw/glfw.git"
+        TAG "3fa2360720eeba1964df3c0ecf4b5df8648a8e52" # 17.06.2023 Latest Commit
+        LICENSE_NAME "LICENSE.md"
+        BUILD_ARGS
+            -DBUILD_SHARED_LIBS=ON
+            -DGLFW_BUILD_DOCS=OFF
+            -DGLFW_BUILD_EXAMPLES=OFF
+            -DGLFW_BUILD_TESTS=OFF
+            -DGLFW_INSTALL=ON
+            -DGLFW_USE_HYBRID_HPG=OFF
+            # Windows Related
+            -DGLFW_BUILD_WIN32=ON
+            -DUSE_MSVC_RUNTIME_LIBRARY_DLL=ON
+    )
 
-mray_build_ext_dependency_git(
-    NAME vulkan_loader_ext
-    URL "https://github.com/KhronosGroup/Vulkan-Loader.git"
-    TAG "61a9c50248e09f3a0e0be7ce6f8bb1663855f979" # 1.3.280
-    LICENSE_NAME "LICENSE.txt"
-    FORCE_RELEASE
-    BUILD_ARGS
-        -DUPDATE_DEPS=OFF
-        -DBUILD_TESTS=OFF
-        -DVULKAN_HEADERS_INSTALL_DIR=${MRAY_LIB_DIRECTORY}/share
+    # Get vulkan-related
+    mray_build_ext_dependency_git(
+        NAME vulkan_headers_ext
+        URL "https://github.com/KhronosGroup/Vulkan-Headers.git"
+        TAG "577baa05033cf1d9236b3d078ca4b3269ed87a2b" # 1.3.280
+        LICENSE_NAME "LICENSE.md"
+        FORCE_RELEASE
+        BUILD_ARGS
+            -DUPDATE_DEPS=OFF
+            -DBUILD_TESTS=OFF
+            -DVULKAN_HEADERS_INSTALL=ON
+    )
 
-    DEPENDENCIES
-        vulkan_headers_ext
-)
+    mray_build_ext_dependency_git(
+        NAME vulkan_loader_ext
+        URL "https://github.com/KhronosGroup/Vulkan-Loader.git"
+        TAG "61a9c50248e09f3a0e0be7ce6f8bb1663855f979" # 1.3.280
+        LICENSE_NAME "LICENSE.txt"
+        FORCE_RELEASE
+        BUILD_ARGS
+            -DUPDATE_DEPS=OFF
+            -DBUILD_TESTS=OFF
+            -DVULKAN_HEADERS_INSTALL_DIR=${MRAY_LIB_DIRECTORY}/share
 
-# TODO: Add Vulkan Validation Layer, currently dll comes from SDK
-# mray_build_ext_dependency_git(
-#     NAME vulkan_validation_layer_ext
-#     URL "https://github.com/KhronosGroup/Vulkan-ValidationLayers.git"
-#     TAG "8506077b9a25a00684e8be24b779733ae1405a54" # 1.3.280
-#     LICENSE_NAME "LICENSE.txt"
-#     FORCE_RELEASE
-#     BUILD_ARGS
-#         -DUPDATE_DEPS=ON
-#         -DBUILD_TESTS=OFF
-#         -DVULKAN_HEADERS_INSTALL_DIR=${MRAY_LIB_DIRECTORY}/share
-#         -DVULKAN_LOADER_INSTALL_DIR=${MRAY_LIB_DIRECTORY}/share
+        DEPENDENCIES
+            vulkan_headers_ext
+    )
 
-#     DEPENDENCIES
-#         vulkan_headers_ext
-#         vulkan_loader_ext
-# )
+    # Get ImGUI
+    include(DownloadDearImGUI.cmake)
+    # Get ImGUI Tex Inspect
+    #include(DownloadImGUITexInspect.cmake)
 
-# Get ImGUI
-include(DownloadDearImGUI.cmake)
-# Get ImGUI Tex Inspect
-#include(DownloadImGUITexInspect.cmake)
+    # slang shader compiler
+    # this is a bit tricky, since we will not build it
+    # but we will download the executable and copy it.
+    # so external project should not work? (TODO: Check this)
+    include(FetchContent)
+    # More importantly, we are downloading an pre-compiled executable,
+    # validate it with a hash at least.
+    # Slang does not provide a sha256 hash directly in github, so we will create it
+    # manually.
+    # !!!!
+    # THE HASHES ARE GENERATED ON LINUX SYSTEM "sha256sum v9.4" MANUALLY!
+    # Technically you are still trusting me, please be advised.
+    # !!!
+    # Force TLS certificate check
+    set(CMAKE_TLS_VERIFY ON)
+
+    # Slang version v.2024.14.4
+    if(MSVC)
+        set(SLANGC_ZIP_NAME "slang-2024.14.4-windows-x86_64.zip")
+        set(SLANGC_SHA256_HASH "c4410ac09dd86dfcceeb2b2ed494ec976c533b7e18608fad518ec54c4fde8b42")
+    elseif(UNIX AND NOT APPLE)
+        set(SLANGC_ZIP_NAME "slang-2024.14.4-linux-x86_64.tar.gz")
+        set(SLANGC_SHA256_HASH "025e6be9fc0277021b9ea559b8a7f7f47b6fa843671203284cbecc8d1a50610f")
+    else()
+        message(FATAL_ERROR "Unsupported platform for macos(?)")
+    endif()
+    FetchContent_Declare(slangc_ext
+        URL "https://github.com/shader-slang/slang/releases/download/v2024.14.4/${SLANGC_ZIP_NAME}"
+        URL_HASH "SHA256=${SLANGC_SHA256_HASH}")
+    FetchContent_MakeAvailable(slangc_ext)
+
+    # Now write it to the MRAY_LIB_DIRECTORY
+    file(GLOB SLANGC_BINARIES
+        "${slangc_ext_SOURCE_DIR}/bin/*"
+        "${slangc_ext_SOURCE_DIR}/lib/*")
+    file(COPY ${SLANGC_BINARIES} DESTINATION ${MRAY_PLATFORM_LIB_DIRECTORY}/slang)
+
+endif()
 
 # Get gtest
 if(MRAY_BUILD_TESTS)
@@ -247,45 +271,9 @@ if(MRAY_BUILD_TESTS)
     )
 endif()
 
+# The boss!
 # Image Libraries compiled into oiio
 add_subdirectory(oiio)
-
-# slang shader compiler
-# this is a bit tricky, since we will not build it
-# but we will download the executable and copy it.
-# so external project should not work? (TODO: Check this)
-include(FetchContent)
-# More importantly, we are downloading an pre-compiled executable,
-# validate it with a hash at least.
-# Slang does not provide a sha256 hash directly in github, so we will create it
-# manually.
-# !!!!
-# THE HASHES ARE GENERATED ON LINUX SYSTEM "sha256sum v9.4" MANUALLY!
-# Technically you are still trusting me, please be advised.
-# !!!
-# Force TLS certificate check
-set(CMAKE_TLS_VERIFY ON)
-
-# Slang version v.2024.14.4
-if(MSVC)
-    set(SLANGC_ZIP_NAME "slang-2024.14.4-windows-x86_64.zip")
-    set(SLANGC_SHA256_HASH "c4410ac09dd86dfcceeb2b2ed494ec976c533b7e18608fad518ec54c4fde8b42")
-elseif(UNIX AND NOT APPLE)
-    set(SLANGC_ZIP_NAME "slang-2024.14.4-linux-x86_64.tar.gz")
-    set(SLANGC_SHA256_HASH "025e6be9fc0277021b9ea559b8a7f7f47b6fa843671203284cbecc8d1a50610f")
-else()
-    message(FATAL_ERROR "Unsupported platform for macos(?)")
-endif()
-FetchContent_Declare(slangc_ext
-    URL "https://github.com/shader-slang/slang/releases/download/v2024.14.4/${SLANGC_ZIP_NAME}"
-    URL_HASH "SHA256=${SLANGC_SHA256_HASH}")
-FetchContent_MakeAvailable(slangc_ext)
-
-# Now write it to the MRAY_LIB_DIRECTORY
-file(GLOB SLANGC_BINARIES
-    "${slangc_ext_SOURCE_DIR}/bin/*"
-    "${slangc_ext_SOURCE_DIR}/lib/*")
-file(COPY ${SLANGC_BINARIES} DESTINATION ${MRAY_PLATFORM_LIB_DIRECTORY}/slang)
 
 set(MRAY_ALL_EXT_DEP_TARGETS ${MRAY_ALL_EXT_DEP_TARGETS}
     ${MRAY_OIIO_EXT_DEP_TARGETS})
