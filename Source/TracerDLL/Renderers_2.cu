@@ -1,8 +1,6 @@
 #include "Tracer.h"
 #include "RequestedTypes.h"
-
-#include "Tracer/PathTracerRenderer.h"
-#include "Tracer/PathTracerRenderer.hpp"
+#include "PathTracerRenderer.h"
 
 #include "Device/GPUSystem.hpp"
 #include "Device/GPUAlgGeneric.h"
@@ -12,19 +10,14 @@
 // ================= //
 using RendererTypes_2 = std::tuple
 <
-    PathTracerRenderer<MetaLightList>
+    PathTracerRenderer
 >;
 
 using RendererWorkTypes_2 = std::tuple
 <
-    RendererWorkTypes<PathTracerRenderer<MetaLightList>, PathTracerRenderWork,
+    RendererWorkTypes<PathTracerRenderer, PathTracerRenderWork,
                       PathTracerRenderLightWork, PathTracerRenderCamWork>
 >;
-
-// Since Path Tracer requires meta light list
-// we do check the concept here
-static_assert(RendererC<PathTracerRenderer<MetaLightList>>, "\"PathTracerRenderer\" does not "
-              "satisfy renderer concept.");
 
 void Tracer::AddRendererGenerators_2(Map<std::string_view, RendererGenerator>& map,
                                      Map<std::string_view, RenderWorkPack>& workMap)

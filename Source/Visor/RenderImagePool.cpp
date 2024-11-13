@@ -459,10 +459,14 @@ void RenderImagePool::SaveImage(VisorGUI& visorGUI,
             .pixels = Span<const Byte>(hStagePtr, paddedImageSize)
         };
 
-        std::string filePath = MRAY_FORMAT("{:s}_{:010.2f}wpp_{:.2f}s",
+        std::string filePath = MRAY_FORMAT("{:s}_{:010.2f}wpp",
                                            fileOutInfo.prefix,
                                            fileOutInfo.workPerPixel,
                                            fileOutInfo.time);
+        //std::string filePath = MRAY_FORMAT("{:s}_{:010.2f}wpp_{:.2f}s",
+        //                                   fileOutInfo.prefix,
+        //                                   fileOutInfo.workPerPixel,
+        //                                   fileOutInfo.time);
 
         std::string fileName = std::filesystem::path(filePath).filename().string();
         ImageSaveProgress& progress = visorGUI.CreateSaveProgressWindow(std::move(fileName));

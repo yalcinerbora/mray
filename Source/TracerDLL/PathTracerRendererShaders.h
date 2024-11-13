@@ -11,7 +11,6 @@
 #include "DistributionFunctions.h"
 #include "LightSampler.h"
 
-template<class ML>
 class PathTracerRenderer;
 
 // Lets use this on path tracer, then we make it over the CoreLib
@@ -240,6 +239,7 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     Vector3 wO = tContext.InvApplyN(-rayIn.Dir()).Normalize();
     SampleT<BxDFResult> raySample = mat.SampleBxDF(wO, surf, rng);
     Vector3 wI = tContext.ApplyN(raySample.value.wI.Dir()).Normalize();
+
     Spectrum throughput = params.rayState.dThroughput[rayIndex];
     throughput *= raySample.value.reflectance;
 
@@ -385,10 +385,10 @@ void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const S
     Vector3 worldPos = surf.position;
     LightSample lightSample = lightSampler.SampleLight(rng, specConverter, worldPos);
     auto [shadowRay, shadowTMM] = lightSample.value.SampledRay(worldPos);
-    //
     Vector3 wO = -tContext.InvApplyN(rayIn.Dir()).Normalize();
     Ray wI = Ray(tContext.InvApplyN(shadowRay.Dir()).Normalize(),
                  shadowRay.Pos());
+
     Spectrum reflectance = mat.Evaluate(wI, wO, surf);
     Spectrum throughput = params.rayState.dThroughput[rayIndex];
     throughput *= reflectance;

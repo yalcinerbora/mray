@@ -102,11 +102,6 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/SurfaceRenderer.h
         ${CURRENT_SOURCE_DIR}/SurfaceRenderer.cu)
 
-    set(SRC_RENDERERS_PATH_TRACER
-        ${CURRENT_SOURCE_DIR}/PathTracerRendererShaders.h
-        ${CURRENT_SOURCE_DIR}/PathTracerRenderer.h
-        ${CURRENT_SOURCE_DIR}/PathTracerRenderer.hpp)
-
     set(SRC_RANDOM
         ${CURRENT_SOURCE_DIR}/Random.cu
         ${CURRENT_SOURCE_DIR}/Random.h
@@ -144,7 +139,6 @@ function(gen_tracer_target)
         ${SRC_RENDERERS}
         ${SRC_RENDERERS_TEX_VIEW}
         ${SRC_RENDERERS_SURFACE}
-        ${SRC_RENDERERS_PATH_TRACER}
         ${SRC_RANDOM}
         ${SRC_UTILITY}
         ${SRC_COMMON})
@@ -162,7 +156,6 @@ function(gen_tracer_target)
     source_group("Renderers" FILES ${SRC_RENDERERS})
     source_group("Renderers/Surface" FILES ${SRC_RENDERERS_SURFACE})
     source_group("Renderers/TexView" FILES ${SRC_RENDERERS_TEX_VIEW})
-    source_group("Renderers/PathTracer" FILES ${SRC_RENDERERS_PATH_TRACER})
     source_group("Utility" FILES ${SRC_UTILITY})
     source_group("" FILES ${SRC_COMMON})
 

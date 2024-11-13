@@ -36,7 +36,7 @@ void KCInclusiveSegmentedScan(Span<T> dOut,
     auto PrefixLoader = [&](T iterationAggregate)
     {
         T temp = aggregate;
-        aggregate += iterationAggregate;
+        aggregate = op(aggregate, iterationAggregate);
         return temp;
     };
 
@@ -59,11 +59,11 @@ void KCInclusiveSegmentedScan(Span<T> dOut,
                 BlockLoad().Load(dSubBlockIn.data(), dataRegisters);
             else
                 BlockLoad().Load(dSubBlockIn.data(), dataRegisters,
-                                    validItems, identityElement);
+                                 validItems, identityElement);
 
             // Scan
             BlockScan().InclusiveScan(dataRegisters, dataRegisters,
-                                        op, PrefixLoader);
+                                      op, PrefixLoader);
 
             // Store
             if(validItems == DATA_PER_BLOCK) [[likely]]

@@ -2,10 +2,16 @@
 #include "Core/MemAlloc.h"
 
 #include "Device/GPUSystem.hpp"
-#include "Device/GPUAlgScan.h"
 
 #include <algorithm>
 #include <numeric>
+
+#ifdef MRAY_GPU_BACKEND_CUDA
+    #include <cub/block/block_scan.cuh>
+    #include <cub/block/block_load.cuh>
+    #include <cub/block/block_store.cuh>
+    #include <cub/device/device_scan.cuh>
+#endif
 
 namespace Distribution
 {
@@ -137,10 +143,104 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
         if(kp.blockId == 0) NormalizeRow(dYCDFs);
     }
 
+    MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
+    void KCSegmentedScanPrecise(Span<Float> dOut,
+                                Span<const Float> dIn,
+                                uint32_t segmentSize,
+                                uint32_t totalBlocks)
+    {
+        KernelCallParams kp;
+
+        static constexpr uint32_t ITEMS_PER_THREAD = 4;
+        static constexpr uint32_t DATA_PER_BLOCK = TPB * ITEMS_PER_THREAD;
+
+        using BlockLoad = cub::BlockLoad<Float, TPB, ITEMS_PER_THREAD, cub::BLOCK_LOAD_VECTORIZE>;
+        using BlockStore = cub::BlockStore<Float, TPB, ITEMS_PER_THREAD, cub::BLOCK_STORE_VECTORIZE>;
+        using BlockScan = cub::BlockScan<double, TPB>;
+
+        double aggregate = double(0);
+        auto PrefixLoader = [&](double iterationAggregate) -> double
+        {
+            double temp = aggregate;
+            aggregate += iterationAggregate;
+            return temp;
+        };
+
+        // Block-stride loop
+        for(uint32_t block = kp.blockId; block < totalBlocks; block += kp.gridSize)
+        {
+            auto dBlockIn = dIn.subspan(block * segmentSize, segmentSize);
+            auto dBlockOut = dOut.subspan(block * segmentSize, segmentSize);
+
+            uint32_t processedItemsSoFar = 0;
+            while(processedItemsSoFar != segmentSize)
+            {
+                uint32_t validItems = min(DATA_PER_BLOCK, segmentSize - processedItemsSoFar);
+                auto dSubBlockIn = dBlockIn.subspan(processedItemsSoFar, validItems);
+                auto dSubBlockOut = dBlockOut.subspan(processedItemsSoFar, validItems);
+
+                // Load
+                Float dataRegisters[ITEMS_PER_THREAD];
+                if(validItems == DATA_PER_BLOCK) [[likely]]
+                    BlockLoad().Load(dSubBlockIn.data(), dataRegisters);
+                else
+                    BlockLoad().Load(dSubBlockIn.data(), dataRegisters,
+                                     validItems, double(0));
+
+                // Due to precision errors, we do this operation
+                // in double precision.
+                double dataRegistersDouble[ITEMS_PER_THREAD];
+                UNROLL_LOOP
+                for(uint32_t i = 0; i < ITEMS_PER_THREAD; i++)
+                    dataRegistersDouble[i] = double(dataRegisters[i]);
+
+                // Scan
+                BlockScan().InclusiveSum(dataRegistersDouble,
+                                         dataRegistersDouble,
+                                         PrefixLoader);
+
+                UNROLL_LOOP
+                for(uint32_t i = 0; i < ITEMS_PER_THREAD; i++)
+                    dataRegisters[i] = Float(dataRegistersDouble[i]);
+
+                // Store
+                if(validItems == DATA_PER_BLOCK) [[likely]]
+                    BlockStore().Store(dSubBlockOut.data(), dataRegisters);
+                else
+                    BlockStore().Store(dSubBlockOut.data(), dataRegisters, validItems);
+
+                processedItemsSoFar += validItems;
+                BlockSynchronize();
+            }
+            aggregate = double(0);
+        }
+    }
+
 #else
     #error DistributionPwC2D kernels do not have generic implementation yet!
 #endif
 
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCValidateScan(Span<const Float> dXCDFs, uint32_t segmentSize)
+{
+    uint32_t totalElements = static_cast<uint32_t>(dXCDFs.size());
+    uint32_t segmentCount = totalElements / segmentSize;
+    assert(totalElements % segmentSize == 0);
+
+    // Block-stride loop (one block for each row)
+    KernelCallParams kp;
+    for(uint32_t block = kp.blockId; block < segmentCount; block += kp.gridSize)
+    {
+        auto dRowCDF = dXCDFs.subspan(block * segmentSize, segmentSize);
+
+        for(uint32_t i = kp.threadId; i < segmentSize; i += kp.blockSize)
+        {
+            Float prevCDF = (i == 0) ? Float(0) : dRowCDF[i - 1];
+            Float myCDF = dRowCDF[i];
+            assert(prevCDF <= myCDF);
+        }
+    }
+}
 
 DistributionGroupPwC2D::DistributionGroupPwC2D(const GPUSystem& s)
     : system(s)
@@ -237,16 +337,42 @@ void DistributionGroupPwC2D::Construct(uint32_t index,
     // TODO: select a device?
     const DistData& d = distData[index];
 
+    uint32_t xCount = static_cast<uint32_t>(sizes[index][0]);
+    uint32_t yCount = static_cast<uint32_t>(sizes[index][1]);
+
     // Directly scan to cdf array
-    InclusiveSegmentedScan(d.dCDFsX,
-                           function,
-                           sizes[index][0],
-                           Float{0},
-                           queue,
-                           []MRAY_HYBRID(Float a, Float b) { return a + b; });
+    queue.IssueExactKernel<KCSegmentedScanPrecise>
+    (
+        "Dist2D-PreciseSegmentedScan"sv,
+        //
+        KernelExactIssueParams
+        {
+            .gridSize = yCount,
+            .blockSize = TPB
+        },
+        d.dCDFsX,
+        function,
+        xCount,
+        yCount
+    );
+
+    if constexpr(MRAY_IS_DEBUG)
+    {
+        queue.IssueExactKernel<KCValidateScan>
+        (
+            "Dist2D-ValidateScanX"sv,
+            KernelExactIssueParams
+            {
+                .gridSize = yCount,
+                .blockSize = StaticThreadPerBlock1D()
+            },
+            //
+            d.dCDFsX,
+            xCount
+        );
+    }
 
     // Copy to Y and normalize
-    uint32_t yCount = static_cast<uint32_t>(sizes[index][1]);
     queue.IssueExactKernel<KCCopyScanY>
     (
         "Dist2D-Copy&ScanY"sv,
@@ -255,8 +381,7 @@ void DistributionGroupPwC2D::Construct(uint32_t index,
         d.dCDFsY,
         ToConstSpan(d.dCDFsX)
     );
-
-    uint32_t xCount = static_cast<uint32_t>(sizes[index][0]);
+    // Normalize rows, finally making it a proper CDF
     queue.IssueSaturatingKernel<KCNormalizeXY>
     (
         "Dist2D-NormalizeXY"sv,

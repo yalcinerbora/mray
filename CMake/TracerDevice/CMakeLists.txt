@@ -4,6 +4,11 @@ include("GenTracerTarget")
 
 set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/TracerDLL)
 
+set(SRC_RENDERERS_PATH_TRACER
+    ${CURRENT_SOURCE_DIR}/PathTracerRenderer.cu
+    ${CURRENT_SOURCE_DIR}/PathTracerRenderer.h
+    ${CURRENT_SOURCE_DIR}/PathTracerRendererShaders.h)
+
 set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/EntryPoint.h
     ${CURRENT_SOURCE_DIR}/EntryPoint.cpp
@@ -15,8 +20,10 @@ set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/Renderers_2.cu)
 
 set(SRC_ALL
+    ${SRC_RENDERERS_PATH_TRACER}
     ${SRC_COMMON})
 
+source_group("Renderers/PathTracer" FILES ${SRC_RENDERERS_PATH_TRACER})
 source_group("" FILES ${SRC_COMMON})
 
 # Find OptiX if requested

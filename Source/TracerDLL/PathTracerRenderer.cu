@@ -1,4 +1,5 @@
-#pragma once
+#include "PathTracerRenderer.h"
+#include "Core/MemAlloc.h"
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static void KCInitPathState(MRAY_GRID_CONSTANT const PathTraceRDetail::RayState dRayState,
@@ -160,22 +161,20 @@ class IsAliveFunctor
     }
 };
 
-template<class MLA>
-PathTracerRenderer<MLA>::PathTracerRenderer(const RenderImagePtr& rb,
-                                            TracerView tv,
-                                            BS::thread_pool& tp,
-                                            const GPUSystem& s,
-                                            const RenderWorkPack& wp)
-    : RendererT<PathTracerRenderer<MLA>>(rb, wp, tv, s, tp)
+PathTracerRenderer::PathTracerRenderer(const RenderImagePtr& rb,
+                                       TracerView tv,
+                                       BS::thread_pool& tp,
+                                       const GPUSystem& s,
+                                       const RenderWorkPack& wp)
+    : RendererT<Base>(rb, wp, tv, s, tp)
     , metaLightArray(s)
     , rayPartitioner(s)
     , redererGlobalMem(s.AllGPUs(), 128_MiB, 512_MiB)
     , saveImage(true)
 {}
 
-template<class MLA>
-typename PathTracerRenderer<MLA>::AttribInfoList
-PathTracerRenderer<MLA>::AttributeInfo() const
+typename PathTracerRenderer::AttribInfoList
+PathTracerRenderer::AttributeInfo() const
 {
     using enum MRayDataEnum;
     using enum AttributeIsArray;
@@ -191,8 +190,7 @@ PathTracerRenderer<MLA>::AttributeInfo() const
     };
 }
 
-template<class MLA>
-RendererOptionPack PathTracerRenderer<MLA>::CurrentAttributes() const
+RendererOptionPack PathTracerRenderer::CurrentAttributes() const
 {
     RendererOptionPack result;
     result.paramTypes = AttributeInfo();
@@ -234,9 +232,8 @@ RendererOptionPack PathTracerRenderer<MLA>::CurrentAttributes() const
     return result;
 }
 
-template<class MLA>
-void PathTracerRenderer<MLA>::PushAttribute(uint32_t attributeIndex,
-                                            TransientData data, const GPUQueue&)
+void PathTracerRenderer::PushAttribute(uint32_t attributeIndex,
+                                       TransientData data, const GPUQueue&)
 {    switch(attributeIndex)
     {
         case 0: newOptions.totalSPP = data.AccessAs<uint32_t>()[0]; break;
@@ -250,9 +247,8 @@ void PathTracerRenderer<MLA>::PushAttribute(uint32_t attributeIndex,
     }
 }
 
-template<class MLA>
-uint32_t PathTracerRenderer<MLA>::FindMaxSamplePerIteration(uint32_t rayCount,
-                                                            PathTraceRDetail::SampleMode sampleMode)
+uint32_t PathTracerRenderer::FindMaxSamplePerIteration(uint32_t rayCount,
+                                                       PathTraceRDetail::SampleMode sampleMode)
 {
     using enum PathTraceRDetail::SampleMode::E;
     uint32_t camSample = (*curCamWork)->StochasticFilterSampleRayRNCount();
@@ -277,8 +273,7 @@ uint32_t PathTracerRenderer<MLA>::FindMaxSamplePerIteration(uint32_t rayCount,
     return rayCount * maxSample;
 }
 
-template<class MLA>
-uint64_t PathTracerRenderer<MLA>::SPPLimit(uint32_t spp) const
+uint64_t PathTracerRenderer::SPPLimit(uint32_t spp) const
 {
     if(spp == std::numeric_limits<uint32_t>::max())
         return std::numeric_limits<uint64_t>::max();
@@ -289,11 +284,10 @@ uint64_t PathTracerRenderer<MLA>::SPPLimit(uint32_t spp) const
     return result;
 }
 
-template<class MLA>
 std::pair<Span<RayIndex>, uint32_t>
-PathTracerRenderer<MLA>::ReloadPaths(Span<const RayIndex> dIndices,
-                                     uint32_t sppLimit,
-                                     const GPUQueue& processQueue)
+PathTracerRenderer::ReloadPaths(Span<const RayIndex> dIndices,
+                                uint32_t sppLimit,
+                                const GPUQueue& processQueue)
 {
     // RELOADING!!!
     // Find the dead rays
@@ -377,8 +371,7 @@ PathTracerRenderer<MLA>::ReloadPaths(Span<const RayIndex> dIndices,
     return std::pair(dDeadAliveRayIndices, aliveRayCount);
 }
 
-template<class MLA>
-void PathTracerRenderer<MLA>::ResetAllPaths(const GPUQueue& queue)
+void PathTracerRenderer::ResetAllPaths(const GPUQueue& queue)
 {
     // Set all paths as dead (we just started)
     using namespace PathTraceRDetail;
@@ -387,9 +380,8 @@ void PathTracerRenderer<MLA>::ResetAllPaths(const GPUQueue& queue)
     queue.MemsetAsync(dPathRNGDimensions, 0x00);
 }
 
-template<class MLA>
-Span<RayIndex> PathTracerRenderer<MLA>::DoRenderPass(uint32_t sppLimit,
-                                                     const GPUQueue& processQueue)
+Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
+                                                const GPUQueue& processQueue)
 {
     assert(sppLimit != 0);
     // Find the ray count. Ray count is tile count
@@ -602,9 +594,8 @@ Span<RayIndex> PathTracerRenderer<MLA>::DoRenderPass(uint32_t sppLimit,
     return dIndices;
 }
 
-template<class MLA>
-RendererOutput PathTracerRenderer<MLA>::DoThroughputSingleTileRender(const GPUDevice& device,
-                                                                     const GPUQueue& processQueue)
+RendererOutput PathTracerRenderer::DoThroughputSingleTileRender(const GPUDevice& device,
+                                                                const GPUQueue& processQueue)
 {
     Timer timer; timer.Start();
     const auto& cameraWork = (*curCamWork->get());
@@ -733,10 +724,9 @@ RendererOutput PathTracerRenderer<MLA>::DoThroughputSingleTileRender(const GPUDe
     };
 }
 
-template<class MLA>
-RendererOutput PathTracerRenderer<MLA>::DoLatencyRender(uint32_t passCount,
-                                                        const GPUDevice& device,
-                                                        const GPUQueue& processQueue)
+RendererOutput PathTracerRenderer::DoLatencyRender(uint32_t passCount,
+                                                   const GPUDevice& device,
+                                                   const GPUQueue& processQueue)
 {
     Vector2ui tileCount2D = this->imageTiler.TileCount();
     uint32_t tileCount1D = tileCount2D.Multiply();
@@ -888,11 +878,11 @@ RendererOutput PathTracerRenderer<MLA>::DoLatencyRender(uint32_t passCount,
     };
 }
 
-template<class MLA>
-RenderBufferInfo PathTracerRenderer<MLA>::StartRender(const RenderImageParams& rIP,
-                                                      CamSurfaceId camSurfId,
-                                                      uint32_t customLogicIndex0,
-                                                      uint32_t)
+RenderBufferInfo
+PathTracerRenderer::StartRender(const RenderImageParams& rIP,
+                                CamSurfaceId camSurfId,
+                                uint32_t customLogicIndex0,
+                                uint32_t)
 {
     // TODO: These may be  common operations, every renderer
     // does this move to a templated intermediate class
@@ -994,7 +984,7 @@ RenderBufferInfo PathTracerRenderer<MLA>::StartRender(const RenderImageParams& r
                                      maxRayCount, maxRayCount,
                                      maxSampleCount,
                                      totalWorkCount, totalWorkCount,
-                                     this->SUB_CAMERA_BUFFER_SIZE});
+                                     Base::SUB_CAMERA_BUFFER_SIZE});
     }
     else
     {
@@ -1025,7 +1015,7 @@ RenderBufferInfo PathTracerRenderer<MLA>::StartRender(const RenderImageParams& r
                                      maxRayCount, maxRayCount,
                                      isVisibleIntCount, maxSampleCount,
                                      totalWorkCount, totalWorkCount,
-                                     this->SUB_CAMERA_BUFFER_SIZE});
+                                     Base::SUB_CAMERA_BUFFER_SIZE});
         MetaLightListConstructionParams mlParams =
         {
             .lightGroups = this->tracerView.lightGroups,
@@ -1076,8 +1066,7 @@ RenderBufferInfo PathTracerRenderer<MLA>::StartRender(const RenderImageParams& r
     };
 }
 
-template<class MLA>
-RendererOutput PathTracerRenderer<MLA>::DoRender()
+RendererOutput PathTracerRenderer::DoRender()
 {
     static const auto annotation = this->gpuSystem.CreateAnnotation("Render Frame");
     const auto _ = annotation.AnnotateScope();
@@ -1121,8 +1110,7 @@ RendererOutput PathTracerRenderer<MLA>::DoRender()
     }
 }
 
-template<class MLA>
-void PathTracerRenderer<MLA>::StopRender()
+void PathTracerRenderer::StopRender()
 {
     this->ClearAllWorkMappings();
     filmFilter = {};
@@ -1130,8 +1118,7 @@ void PathTracerRenderer<MLA>::StopRender()
     metaLightArray.Clear();
 }
 
-template<class MLA>
-std::string_view PathTracerRenderer<MLA>::TypeName()
+std::string_view PathTracerRenderer::TypeName()
 {
     using namespace std::string_view_literals;
     using namespace TypeNameGen::CompTime;
@@ -1139,10 +1126,13 @@ std::string_view PathTracerRenderer<MLA>::TypeName()
     return RendererTypeName<Name>;
 }
 
-template<class MLA>
-size_t PathTracerRenderer<MLA>::GPUMemoryUsage() const
+size_t PathTracerRenderer::GPUMemoryUsage() const
 {
     return (rayPartitioner.GPUMemoryUsage() +
             rnGenerator->GPUMemoryUsage() +
             redererGlobalMem.Size());
 }
+
+static_assert(RendererC<PathTracerRenderer>,
+              "\"PathTracerRenderer\" does not "
+              "satisfy renderer concept.");

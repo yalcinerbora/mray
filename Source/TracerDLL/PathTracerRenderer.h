@@ -1,11 +1,14 @@
 #pragma once
 
-#include "RendererC.h"
-#include "RendererCommon.h"
-#include "RayPartitioner.h"
-#include "PathTracerRendererShaders.h"
+#include "Tracer/RendererC.h"
+#include "Tracer/RendererCommon.h"
+#include "Tracer/RayPartitioner.h"
 
 #include "Core/Timer.h"
+
+
+#include "PathTracerRendererShaders.h"
+#include "RequestedTypes.h"
 
 // Due to NVCC error
 // "An extended __host__ __device__
@@ -29,16 +32,12 @@ class ConstAddFunctor
     }
 };
 
-#include "Core/Flag.h"
-
-template<class MetaLightArrayType>
-class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightArrayType>>
+class PathTracerRenderer final : public RendererT<PathTracerRenderer>
 {
 
-    using Base              = RendererT<PathTracerRenderer<MetaLightArrayType>>;
+    using Base              = RendererT<PathTracerRenderer>;
     using FilmFilterPtr     = std::unique_ptr<TextureFilterI>;
     using CameraWorkPtr     = std::unique_ptr<RenderCameraWorkT<PathTracerRenderer>>;
-    using MetaLightArray    = MetaLightArrayType;
     using Options           = PathTraceRDetail::Options;
     using SampleMode        = PathTraceRDetail::SampleMode;
     using LightSamplerType  = PathTraceRDetail::LightSamplerType;
@@ -47,12 +46,12 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightAr
     public:
     static std::string_view TypeName();
     //
-    using UniformLightSampler       = DirectLightSamplerUniform<MetaLightArray>;
+    using UniformLightSampler       = DirectLightSamplerUniform<MetaLightList>;
     using AttribInfoList            = typename Base::AttribInfoList;
     using SpectrumConverterContext  = SpectrumConverterContextIdentity;
     //
     using GlobalStateList   = std::tuple<PathTraceRDetail::GlobalState<EmptyType>,
-                                    PathTraceRDetail::GlobalState<UniformLightSampler>>;
+                                         PathTraceRDetail::GlobalState<UniformLightSampler>>;
     using RayStateList      = std::tuple<PathTraceRDetail::RayState, PathTraceRDetail::RayState>;
 
     // Work Functions
@@ -80,7 +79,7 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer<MetaLightAr
     Options     currentOptions  = {};
     Options     newOptions      = {};
     //
-    MetaLightArray              metaLightArray;
+    MetaLightList               metaLightArray;
     //
     FilmFilterPtr               filmFilter;
     RenderWorkHasher            workHasher;

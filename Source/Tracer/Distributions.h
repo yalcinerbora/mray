@@ -170,6 +170,7 @@ Float DistributionPwC<1>::PdfIndex(Float index) const
     Float myCDF = dCDF[indexI];
 
     Float pdf = (myCDF - prevCDF) * static_cast<Float>(dCDF.size());
+    assert(pdf >= Float(0));
     return pdf;
 }
 
@@ -251,10 +252,11 @@ template <uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float DistributionPwC<D>::PdfUV(const VectorT& uv) const
 {
-    VectorT indexF = uv * VectorT(Size());
     // UV can be [0, 1], also maybe because of numerical precision
     // it can exceed 1.
-    indexF = VectorT::Min(indexF, Math::PrevFloat(Float(1)));
+    VectorT sizeF = VectorT(Size());
+    VectorT indexF = uv * sizeF;
+    indexF = VectorT::Min(indexF, sizeF - Float(1));
     return PdfIndex(indexF);
 }
 
