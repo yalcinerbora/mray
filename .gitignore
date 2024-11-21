@@ -16,3 +16,6 @@
 ### Nothing on Bin or Build Folder ###
 /[Bb]in/
 /[Bb]uild/
+
+compile_commands.json
+/.cache/

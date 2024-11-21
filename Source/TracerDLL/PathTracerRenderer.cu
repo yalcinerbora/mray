@@ -166,7 +166,7 @@ PathTracerRenderer::PathTracerRenderer(const RenderImagePtr& rb,
                                        BS::thread_pool& tp,
                                        const GPUSystem& s,
                                        const RenderWorkPack& wp)
-    : RendererT<Base>(rb, wp, tv, s, tp)
+    : Base(rb, wp, tv, s, tp)
     , metaLightArray(s)
     , rayPartitioner(s)
     , redererGlobalMem(s.AllGPUs(), 128_MiB, 512_MiB)

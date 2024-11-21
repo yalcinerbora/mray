@@ -34,7 +34,6 @@ class ConstAddFunctor
 
 class PathTracerRenderer final : public RendererT<PathTracerRenderer>
 {
-
     using Base              = RendererT<PathTracerRenderer>;
     using FilmFilterPtr     = std::unique_ptr<TextureFilterI>;
     using CameraWorkPtr     = std::unique_ptr<RenderCameraWorkT<PathTracerRenderer>>;
