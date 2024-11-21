@@ -46,6 +46,7 @@ option(MRAY_BUILD_TESTS "Build Tests" ON)
 option(MRAY_BUILD_VISOR "Build Visor (Interactive Vulkan Viewer)" ON)
 option(MRAY_EXPORT_COMPILE_COMMANDS "Export compile commands for IWYU" ON)
 option(MRAY_ENABLE_PCH "Enable precompiled headers functionality" OFF)
+option(MRAY_BUILD_DOCS "Build Documentation" OFF)
 
 # Globals Common for All Projects
 # TODO: Align CUDA Standard with CXX Standard
@@ -175,4 +176,9 @@ add_subdirectory(MRay)
 if(MRAY_BUILD_TESTS)
     enable_testing()
     add_subdirectory(Tests)
+endif()
+
+# Docs
+if(MRAY_BUILD_DOCS)
+    add_subdirectory(Docs)
 endif()

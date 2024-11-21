@@ -94,7 +94,7 @@ namespace RNGFunctions
         static_assert(sizeof(uint32_t) == sizeof(float), "float is not 32-bit!");
 
         // This is simpler version also it's 24-bit instead of 23-bit
-        //https://marc-b-reynolds.github.io/distribution/2017/01/17/DenseFloat.html
+        // https://marc-b-reynolds.github.io/distribution/2017/01/17/DenseFloat.html
         float rngFloat = static_cast<float>(v >> 8);
         return  rngFloat * 0x1p-24f;
     }

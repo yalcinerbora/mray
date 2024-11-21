@@ -6,6 +6,7 @@ macro(populate_mray_directory_variables)
         return()
     endif()
 
+    set(MRAY_DOCS_DIRECTORY ${ARGV0}Docs)
     set(MRAY_SOURCE_DIRECTORY ${ARGV0}Source)
     set(MRAY_LIB_DIRECTORY ${ARGV0}Lib)
     set(MRAY_LIB_INCLUDE_DIRECTORY ${ARGV0}Lib/Include)
