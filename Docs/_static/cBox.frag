@@ -8,6 +8,7 @@
 //
 //
 precision highp float;
+precision highp int;
 
 // ============================= //
 //           LITERALS            //
@@ -15,7 +16,7 @@ precision highp float;
 const uint PCG32_Multiplier = 747796405u;
 const uint PCG32_Increment = 2891336453u;
 
-const mat4 TransformsAABB[4]= mat4[4]
+const mat4 TransformsAABB[4] = mat4[4]
 (
     // Outer box
     mat4( 1,  0,  0, 0,
@@ -42,7 +43,7 @@ const mat4 TransformsAABB[4]= mat4[4]
 
 // TODO: Check if these are literals or every shader invocation calculates
 // these (which will be slow).
-const mat4 InvTransformsAABB[4]= mat4[4]
+const mat4 InvTransformsAABB[4] = mat4[4]
 (
     // Outer box
     inverse(TransformsAABB[0]),
@@ -54,7 +55,7 @@ const mat4 InvTransformsAABB[4]= mat4[4]
     inverse(TransformsAABB[3])
 );
 
-const vec3 Colors[3]= vec3[3]
+const vec3 Colors[3] = vec3[3]
 (
     // Red
     vec3(0.6300, 0.0650, 0.0500),
@@ -75,6 +76,7 @@ struct Hit
     vec3 N;
     bool isLight;
     bool isMissed;
+    float tMax;
 };
 
 struct RayPack
@@ -87,15 +89,16 @@ struct RayPack
 // ============================= //
 //           UNIFORMS            //
 // ============================= //
-uniform vec3 uResolution;
+uniform vec2 uResolution;
 uniform uint uFrame;
+uniform vec3 uBGColor;
+uniform vec3 uCamPos;
 
-const vec3 gaze = vec3(0, 1, 0);
-const vec3 pos = vec3(0, 1, 6.8);
-const vec3 uUp = vec3(0, 1, 0);
-const float fovX = 2.0f * 19.5f * 3.1415f / 180.0f; // Radians
-const vec2 nearFar = vec2(0.05, 200);
-const vec3 bgColor = vec3(0);
+// These are not required to be changed from CPU
+const vec3 uCamGaze = vec3(0, 1, 0);
+const vec3 uCamUp   = vec3(0, 1, 0);
+const float fovX    = 22.5 * 3.1415 / 180.0; // Radians
+const vec2 nearFar  = vec2(0.05, 200);
 
 // ============================= //
 //          FUNCTIONS            //
@@ -171,10 +174,10 @@ Hit IntersectScene(in RayPack ray)
     Hit h;
     h.isLight = false;
     h.isMissed = false;
+    h.tMax = tMax;
     if(tMax == tMM0[1])
     {
         h.N = CalculateNormal(uint(tMM0[3]), 0u, ray.rDir);
-        //h.albedoOrRadiance = vec3(0, 0.5, 0);
 
         if(tMM0[3] == 0.0f && h.N[0] == 1.0f)
             h.albedoOrRadiance = Colors[0];
@@ -201,13 +204,14 @@ Hit IntersectScene(in RayPack ray)
     }
     else
     {
-        h.albedoOrRadiance = bgColor;
+        h.albedoOrRadiance = uBGColor;
+        //h.albedoOrRadiance = vec3(100);
         h.isMissed = true;
     }
     return h;
 }
 
-RayPack CamRayGen(in vec2 fragCoord)
+RayPack CamRayGen(in vec2 fragCoord, in vec2 xi)
 {
     // Find world space window sizes
     float fovY = uResolution.y / uResolution.x * fovX;
@@ -215,20 +219,20 @@ RayPack CamRayGen(in vec2 fragCoord)
     float heightHalf = tan(fovY * 0.5f) * nearFar[0];
 
     // Camera Vector Correction
-    vec3 gazeDir = gaze - pos;
-    vec3 right = normalize(cross(gazeDir, uUp));
+    vec3 gazeDir = uCamGaze - uCamPos;
+    vec3 right = normalize(cross(gazeDir, uCamUp));
     vec3 up = normalize(cross(right, gazeDir));
     gazeDir = normalize(cross(up, right));
 
     // Camera parameters
-    vec3 bottomLeft = pos;
+    vec3 bottomLeft = uCamPos;
     bottomLeft -= right   * widthHalf;
     bottomLeft -= up      * heightHalf;
     bottomLeft += gazeDir * nearFar[0];
 
     vec2 planeSize = vec2(widthHalf, heightHalf) * 2.0f;
-    vec2 delta = planeSize / uResolution.xy;
-    vec2 jitter =vec2(0.0f);
+    vec2 delta = planeSize / uResolution;
+    vec2 jitter = xi;
 
     vec2 sampleDist = (fragCoord + jitter) * delta;
     vec3 samplePoint = bottomLeft;
@@ -236,12 +240,39 @@ RayPack CamRayGen(in vec2 fragCoord)
     samplePoint += sampleDist[1] * up;
 
     RayPack ray;
-    ray.rDir = normalize(samplePoint - pos);
-    ray.rPos = pos;
+    ray.rDir = normalize(samplePoint - uCamPos);
+    ray.rPos = uCamPos;
     ray.tMM = nearFar;
     return ray;
 }
 
+vec3 SampleCosDirection(in vec2 xi, vec3 N)
+{
+    // Generated direction is on unit space (+Z oriented hemisphere)
+    float xi1Angle = 2.0 * 3.1415 * xi[1];
+    float xi0Sqrt = sqrt(xi[0]);
+
+    vec3 dir;
+    dir[0] = xi0Sqrt * cos(xi1Angle);
+    dir[1] = xi0Sqrt * sin(xi1Angle);
+    dir[2] = max(0.0, sqrt(1.0 - dot(dir.xy, dir.xy)));
+
+    // Align with the normal (dir is in tangent space)
+    // Edge cases
+    if(N[2] == 1.0)
+        return dir;
+    if(N[2] == -1.0)
+        return -dir;
+
+    //vec3 k = normalize(cross(dir, N));
+    vec3 k = normalize(vec3(-N[1], N[0], 0.0));
+    vec3 v = dir;
+    float cosTheta = -N[2];
+    float sinTheta = max(0.0, sqrt(1.0 - cosTheta * cosTheta));
+    vec3 r = v * cosTheta + cross(k, v) * sinTheta;
+    r += k * dot(k, v) * (1.0 - cosTheta);
+    return normalize(r);
+}
 
 // To make the shader stateless, we create a random
 // state for every invokation of every pixel.
@@ -284,33 +315,63 @@ vec2 PCG32_Vec2(inout uint state)
     return vec2(v0, v1);
 }
 
-// ============================= //
-//     FRAGMENT SHADER ENTRY     //
-// ============================= //
-void mainImage( out vec4 fragColor, in vec2 fragCoord )
+vec3 mainImage(in vec2 fragCoord)
 {
-    RayPack ray = CamRayGen(fragCoord);
-    Hit hit = IntersectScene(ray);
-
-    // Output to screen
-    //fragColor = vec4(hit.albedoOrRadiance, 1.0);
-    //fragColor = vec4(hit.N * 0.5 + 0.5, 0.0);
-
     uint state = PCG32_State(fragCoord);
-    vec2 xi = PCG32_Vec2(state);
-    fragColor = vec4(vec3(xi[0]), 1);
+    vec3 fragColor;
+
+    // Initial ray
+    RayPack ray = CamRayGen(fragCoord, PCG32_Vec2(state));
 
     // Four bounce
     vec3 radiance = vec3(0);
     vec3 throughput = vec3(1);
-    //for(int i = 0; i < 4; i++)
-    //{
+    for(int i = 0; i < 6; i++)
+    {
+        Hit hit = IntersectScene(ray);
 
-        // Check the scene intersection
-        // If light accumulate terminate
+        if(hit.isLight || hit.isMissed)
+        {
+            radiance = throughput * hit.albedoOrRadiance;
+            break;
+        }
 
-    //}
+        // Calculate w0
+        vec3 w0 = SampleCosDirection(PCG32_Vec2(state), hit.N);
+        ray.rPos += ray.rDir * hit.tMax;
+        ray.rPos += hit.N * 1e-4f;
+        ray.rDir = w0;
+        ray.tMM = vec2(0, 200);
 
+        throughput *= hit.albedoOrRadiance;
+    }
+    return radiance;
+}
 
+// ============================= //
+//     FRAGMENT SHADER ENTRY     //
+// ============================= //
+uniform highp usampler2D tRadiance;
+in vec2 fUV;
 
+layout(location = 0)
+out uvec4 fboColor;
+
+void main(void)
+{
+    uvec4 radianceInt = texture(tRadiance, fUV);
+    uint sampleCount = radianceInt.a;
+    vec3 radiance = vec3(radianceInt.rgb) * vec3(1.525902189669642e-5);
+    //
+    vec2 fragCoord = fUV * vec2(uResolution);
+    vec3 outColor = mainImage(fragCoord);
+
+    // Combine samples
+    vec3 outRadiance = radiance * float(sampleCount) + outColor;
+    uint outSampleCount = sampleCount + uint(1);
+    outRadiance /= float(outSampleCount);
+
+    uvec4 outRadianceInt = uvec4(uvec3(outRadiance * vec3(65535.0)), outSampleCount);
+
+    fboColor = outRadianceInt;
 }
