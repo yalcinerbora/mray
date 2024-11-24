@@ -1,7 +1,7 @@
 
 class IOState
 {
-    constructor(canvas, camPos)
+    constructor(canvas, camPos, camUp)
     {
         // Props
         this.angle = [0, 0];
@@ -11,6 +11,7 @@ class IOState
         this.clicked = false;
         this.initCamPos = camPos;
         this.camPos = camPos;
+        this.camUp = camUp;
     }
 
     // References
@@ -83,16 +84,24 @@ class IOState
         let cX = Math.cos(-this.angle[1] * Math.PI * 0.005555);
         let sY = Math.sin(-this.angle[0] * Math.PI * 0.005555);
         let cY = Math.cos(-this.angle[0] * Math.PI * 0.005555);
-
-        //let vX = [0, -sX, cX];
+        // This is the rotation matrix X and rotation matrix Y (with the angles above)
+        // multiplied by Z axis (initially cam is towards Z)
         let vRot = [sY * cX, -sX, cX * cY];
         vRot[0] *= len;
         vRot[1] *= len;
         vRot[2] *= len;
 
+        // Translate it back (gaze is [0,1,0])
         vRot[1] += 1;
-
+        //
         this.camPos = vRot;
+
+        // Realign the up vector
+        const x = Math.abs(Math.floor((this.angle[1] - 90.0) / 180));
+        if(x % 2 == 1)
+            this.camUp = [0, 1.0, 0];
+        else
+            this.camUp = [0, -1.0, 0];
     }
 }
 
@@ -164,6 +173,7 @@ let pathTraceTextures;
 let ioState;
 // Misc.
 const INITIAL_CAM_POS = [0, 1, 6.8];
+const INITIAL_CAM_UP = [0, 1, 0];
 const MAX_FRAMES = 512;
 let frameCount = 0;
 let prevWH = [0, 0];
@@ -212,7 +222,7 @@ function RenderGL(timestamp)
     BindUniforms
     (
         pathTraceShader,
-        ["uResolution", "uFrame", "uBGColor", "uCamPos"],
+        ["uResolution", "uFrame", "uBGColor", "uCamPos", "uCamUp"],
         (locList) =>
         {
             gl.uniform2f(locList[0], prevWH[0], prevWH[1]);
@@ -220,6 +230,8 @@ function RenderGL(timestamp)
             gl.uniform3f(locList[2], bgColor[0], bgColor[1], bgColor[2]);
             gl.uniform3f(locList[3], ioState.camPos[0],
                          ioState.camPos[1], ioState.camPos[2]);
+            gl.uniform3f(locList[4], ioState.camUp[0],
+                         ioState.camUp[1], ioState.camUp[2]);
         }
     );
     // Draw!
@@ -279,7 +291,7 @@ async function InitGL()
         alpha       : false,
         failIfMajorPerformanceCaveat: true,
     });
-    ioState = new IOState(canvas, INITIAL_CAM_POS);
+    ioState = new IOState(canvas, INITIAL_CAM_POS, INITIAL_CAM_UP);
 
     // Do not show the canvas untill all shaders are loaded
     canvas.style.display = "none";

@@ -93,10 +93,9 @@ uniform vec2 uResolution;
 uniform uint uFrame;
 uniform vec3 uBGColor;
 uniform vec3 uCamPos;
-
+uniform vec3 uCamUp;
 // These are not required to be changed from CPU
 const vec3 uCamGaze = vec3(0, 1, 0);
-const vec3 uCamUp   = vec3(0, 1, 0);
 const float fovX    = 22.5 * 3.1415 / 180.0; // Radians
 const vec2 nearFar  = vec2(0.05, 200);
 
