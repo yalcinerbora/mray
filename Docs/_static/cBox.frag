@@ -263,10 +263,9 @@ vec3 SampleCosDirection(in vec2 xi, vec3 N)
     if(N[2] == -1.0)
         return -dir;
 
-    //vec3 k = normalize(cross(dir, N));
     vec3 k = normalize(vec3(-N[1], N[0], 0.0));
     vec3 v = dir;
-    float cosTheta = -N[2];
+    float cosTheta = N[2];
     float sinTheta = max(0.0, sqrt(1.0 - cosTheta * cosTheta));
     vec3 r = v * cosTheta + cross(k, v) * sinTheta;
     r += k * dot(k, v) * (1.0 - cosTheta);
@@ -369,6 +368,10 @@ void main(void)
     vec3 outRadiance = radiance * float(sampleCount) + outColor;
     uint outSampleCount = sampleCount + uint(1);
     outRadiance /= float(outSampleCount);
+
+    // TODO: Clamp each cahannel to the light radiance which will be
+    // the maximum.
+    outRadiance = clamp(outRadiance, vec3(0), vec3(1));
 
     uvec4 outRadianceInt = uvec4(uvec3(outRadiance * vec3(65535.0)), outSampleCount);
 
