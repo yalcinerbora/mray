@@ -29,9 +29,9 @@ html_theme = 'sphinx_book_theme'
 html_static_path = ['_static']
 html_title = "MRay Documentation"
 html_css_files = ['custom.css']
-html_js_files  = ['cbox.js'];
+html_js_files  = ['cBox.js'];
 html_favicon = '_static/mray_cbox.png'
-html_baseurl = '/docs/'
+html_baseurl = '/Docs/'
 
 html_theme_options = {
     "repository_url": "https://github.com/yalcinerbora/mray",
