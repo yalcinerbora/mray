@@ -997,6 +997,8 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
                 //            .value_or(TEX_NODE_IS_3D_DEFAULT);
                 auto channelLayout = jsonNode.AccessOptionalData<ImageSubChannelType>(TEX_NODE_CHANNELS)
                                                 .value_or(ImageSubChannelType::ALL);
+                auto ignoreResClamp = jsonNode.AccessOptionalData<bool>(TEX_NODE_IGNORE_CLAMP)
+                                .value_or(TEX_NODE_IGNORE_CLAMP_DEFAULT);
                 fileName = Filesystem::RelativePathToAbsolute(fileName, scenePath);
 
                 using enum ImageIOFlags::F;
@@ -1031,7 +1033,8 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
                 {
                     .pixelType = header.pixelType,
                     .colorSpace = header.colorSpace.second,
-                    .gamma = header.colorSpace.first
+                    .gamma = header.colorSpace.first,
+                    .ignoreResClamp = ignoreResClamp
                 };
                 // Check and add user params
                 if(edgeResolve.has_value()) params.edgeResolve = *edgeResolve;

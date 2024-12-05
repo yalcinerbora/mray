@@ -60,6 +60,8 @@ namespace NodeNames
     static constexpr bool TEX_NODE_AS_SIGNED_DEFAULT    = false;
     static constexpr string_view TEX_NODE_IS_COLOR      = "isColor"sv;
     static constexpr bool TEX_NODE_IS_COLOR_DEFAULT     = true;
+    static constexpr string_view TEX_NODE_IGNORE_CLAMP  = "ignoreResClamp"sv;
+    static constexpr bool TEX_NODE_IGNORE_CLAMP_DEFAULT = false;
     static constexpr string_view TEX_NODE_EDGE_RESOLVE  = "edgeResolve"sv;
     static constexpr string_view TEX_NODE_INTERPOLATION = "interpolation"sv;
     static constexpr string_view TEX_NODE_COLOR_SPACE   = "colorSpace"sv;

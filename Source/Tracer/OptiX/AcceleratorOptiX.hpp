@@ -641,7 +641,7 @@ void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
             {
                 .dPrimKeys      = subPrimRange,
                 .transformKey   = ppResult.surfData.transformKeys[i],
-                //.alphaMap       = ppResult.surfData.alphaMaps[i][j],
+                .alphaMap       = ppResult.surfData.alphaMaps[i][j],
                 .lightOrMatKey  = ppResult.surfData.lightOrMatKeys[i][j],
                 .acceleratorKey = accKey,
                 .primSoA        = dPrimGroupSoA.data(),

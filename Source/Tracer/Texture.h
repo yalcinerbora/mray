@@ -88,6 +88,7 @@ class alignas(8u) GenericTexture
     MRayPixelTypeRT     PixelType() const;
 
     void                SetAllMipsToLoaded();
+    void                SetMipToLoaded(uint32_t mipLevel);
     void                SetColorSpace(MRayColorSpaceEnum, Float = Float(1));
 };
 

@@ -518,7 +518,9 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
         // Here we need to clamp the resolution of the texture
         // if requested.
         uint32_t maxDim = size[size.Maximum()];
-        uint32_t clampRes = std::min(tracerParams.clampedTexRes, maxDim);
+        uint32_t clampCheck = inputParams.ignoreResClamp ? maxDim : tracerParams.clampedTexRes;
+        uint32_t clampRes = std::min(clampCheck, maxDim);
+
         uint32_t ratio = Math::DivideUp(maxDim, clampRes);
         int32_t mipReduceAmount = int32_t(std::ceil(std::log2(ratio)));
         // We will have atleast one mip
@@ -732,6 +734,8 @@ void TextureMemory::PushTextureData(TextureId id, uint32_t mipLevel,
 
         // Utilize the TexClampParamters
         clampParams.surface = tex.RWView(0);
+
+        tex.SetMipToLoaded(mipLevel);
 
         // Order is important here
         // Multiple threads can call this function

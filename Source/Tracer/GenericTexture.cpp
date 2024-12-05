@@ -147,6 +147,11 @@ void GenericTexture::SetAllMipsToLoaded()
     isMipLoaded.Set();
 }
 
+void GenericTexture::SetMipToLoaded(uint32_t mipLevel)
+{
+    isMipLoaded[mipLevel] = true;
+}
+
 void GenericTexture::SetColorSpace(MRayColorSpaceEnum e, Float gammaIn)
 {
     colorSpace = e;

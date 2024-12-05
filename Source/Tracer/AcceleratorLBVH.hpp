@@ -625,10 +625,10 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const CommonKey, const Accele
     }
     else
     {
-        static constexpr auto KernelName = KCGeneratePrimAABBs<AcceleratorGroupLBVH<PG>>;
+        static constexpr auto* KernelName = KCGeneratePrimAABBs<AcceleratorGroupLBVH<PG>>;
         uint32_t blockCount = queue.RecommendedBlockCountDevice
         (
-            reinterpret_cast<const void*>(&KernelName),
+            reinterpret_cast<const void*>(KernelName),
             TPB, 0
         );
         queue.IssueExactKernel<KernelName>
@@ -673,10 +673,10 @@ void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const CommonKey, const Accele
     }
     else
     {
-        static constexpr auto KernelName = KCGenPrimCenters<AcceleratorGroupLBVH<PG>>;
+        static constexpr auto* KernelName = KCGenPrimCenters<AcceleratorGroupLBVH<PG>>;
         uint32_t blockCount = queue.RecommendedBlockCountDevice
         (
-            reinterpret_cast<const void*>(&KernelName),
+            reinterpret_cast<const void*>(KernelName),
             TPB, 0
         );
         queue.IssueExactKernel<KernelName>

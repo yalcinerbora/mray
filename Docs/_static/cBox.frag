@@ -263,6 +263,8 @@ vec3 SampleCosDirection(in vec2 xi, vec3 N)
     if(N[2] == -1.0)
         return -dir;
 
+    // Rodrigues' Rotation Formula
+    // https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
     vec3 k = normalize(vec3(-N[1], N[0], 0.0));
     vec3 v = dir;
     float cosTheta = N[2];
@@ -273,10 +275,8 @@ vec3 SampleCosDirection(in vec2 xi, vec3 N)
 }
 
 // To make the shader stateless, we create a random
-// state for every invokation of every pixel.
-//
-// TODO: This may make the RNG a low quality one maybe?
-//
+// state for every invocation of every pixel.
+// TODO: This may make the RNG a low quality one maybe? Check.
 uint PCG32_State(in vec2 fragCoord)
 {
     // Hash a state from fragCoord, and Frame Index
@@ -316,7 +316,6 @@ vec2 PCG32_Vec2(inout uint state)
 vec3 mainImage(in vec2 fragCoord)
 {
     uint state = PCG32_State(fragCoord);
-    vec3 fragColor;
 
     // Initial ray
     RayPack ray = CamRayGen(fragCoord, PCG32_Vec2(state));
@@ -369,7 +368,7 @@ void main(void)
     uint outSampleCount = sampleCount + uint(1);
     outRadiance /= float(outSampleCount);
 
-    // TODO: Clamp each cahannel to the light radiance which will be
+    // TODO: Clamp each cahannel to the light's radiance which will be
     // the maximum.
     outRadiance = clamp(outRadiance, vec3(0), vec3(1));
 

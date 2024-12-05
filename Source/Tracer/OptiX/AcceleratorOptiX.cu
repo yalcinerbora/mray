@@ -651,7 +651,7 @@ void BaseAcceleratorOptiX::GenerateShaders(EmptyHitRecord& rgCommonRecord, Empty
             OPTIX_CHECK(optixSbtRecordPackHeader(ccPack.programGroups[pgIndex + 3],
                                                  record.header));
         }
-        pgIndex ++;
+        pgIndex++;
     }
     // RG and Miss records and finish
     OPTIX_CHECK(optixSbtRecordPackHeader(ccPack.programGroups[RG_COMMON_RECORD],

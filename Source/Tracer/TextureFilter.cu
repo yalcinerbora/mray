@@ -1039,14 +1039,14 @@ void ClampImageFromBufferGeneric(// Output
     using Math::DivideUp;
     static constexpr Vector2ui TILE_SIZE = Vector2ui(32, 16);
     static constexpr uint32_t THREAD_PER_BLOCK = TILE_SIZE.Multiply();
-    static constexpr auto Kernel = KCClampImage<THREAD_PER_BLOCK, Filter>;
+    static constexpr auto* Kernel = KCClampImage<THREAD_PER_BLOCK, Filter>;
     // Find maximum block count for state allocation
     // TODO: Change this so that it is relative to the
     // filter radius.
     static constexpr Vector2ui SPP = Vector2ui(8, 8);
     uint32_t blockCount = queue.RecommendedBlockCountDevice
     (
-        reinterpret_cast<const void*>(&Kernel),
+        reinterpret_cast<const void*>(Kernel),
         THREAD_PER_BLOCK, 0
     );
     uint32_t blockPerTexture = DivideUp(surfImageDims, TILE_SIZE).Multiply();

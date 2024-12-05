@@ -43,7 +43,6 @@ html_sidebars = {
     "**": [
            "path_trace.html",
            "navbar-logo.html",
-           #"icon-links.html",
            "search-button-field.html",
            "sbt-sidebar-nav.html"]
 }
