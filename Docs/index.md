@@ -30,11 +30,6 @@ A::test() const
 
 ```{toctree}
 :hidden:
-index.md
-```
-
-```{toctree}
-:hidden:
 scene/scene.md
 ```
 
