@@ -785,7 +785,12 @@ LinearizedSurfaceData AcceleratorGroupT<C, PG, B>::LinearizeSurfaceData(const Ac
                                     static_cast<CommonKey>(surf.alphaMaps[i].value()));
                 }
                 const GenericTextureView& view = optView.value();
-                assert(std::holds_alternative<AlphaMap>(view));
+                if(!std::holds_alternative<AlphaMap>(view))
+                {
+                    throw MRayError("{:s}: Alpha map texture({:d}) is not a single channel texture!",
+                                    C::TypeName(),
+                                    static_cast<CommonKey>(surf.alphaMaps[i].value()));
+                }
                 result.alphaMaps.back()[i] = std::get<AlphaMap>(view);
             }
             else result.alphaMaps.back()[i] = std::nullopt;

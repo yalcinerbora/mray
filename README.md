@@ -13,6 +13,7 @@ Most of the dependencies are handled by the build system itself via CMake extern
 
 #### Common
 
+- CMake. A recent version of CMake should suffice. Tested with v3.30.0.
 - C++20 compliant C++ compiler. Only tested with latest MSVC and Clang-18.
 - CUDA Installation. Version 12 and above is recommended.
 - Nvidia OptiX installation (Required for HW accelerated ray tracing, which is strongly recommended)
