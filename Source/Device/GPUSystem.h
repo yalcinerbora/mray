@@ -14,6 +14,17 @@
     using GPUSystem         = mray::cuda::GPUSystemCUDA;
     using GPUAnnotation     = mray::cuda::GPUAnnotationCUDA;
 
+#elif defined MRAY_GPU_BACKEND_HIP
+    #include "HIP/GPUSystemHIP.h"
+
+    // Alias
+    using KernelCallParams  = mray::hip::KernelCallParamsHIP;
+    using GPUSemaphoreView  = mray::hip::GPUSemaphoreViewHIP;
+    using GPUDevice         = mray::hip::GPUDeviceHIP;
+    using GPUQueue          = mray::hip::GPUQueueHIP;
+    using GPUFence          = mray::hip::GPUFenceHIP;
+    using GPUSystem         = mray::hip::GPUSystemHIP;
+    using GPUAnnotation     = mray::hip::GPUAnnotationHIP;
 #elif defined GPU_BACKEND_HOST
     #error Not yet!
 #else

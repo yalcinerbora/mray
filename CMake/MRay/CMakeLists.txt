@@ -51,9 +51,14 @@ add_precompiled_headers(TARGET MRay)
 
 # Not-linked but dependent targets
 # Dynamically loaded DLLs
-add_dependencies(MRay
-                 SceneLoaderMRay
-                 TracerDLL_CUDA)
+add_dependencies(MRay SceneLoaderMRay)
+
+# Tracer Related dependencies
+if(${MRAY_DEVICE_BACKEND} STREQUAL "MRAY_GPU_BACKEND_CUDA")
+    add_dependencies(MRay TracerDLL_CUDA)
+elseif(${MRAY_DEVICE_BACKEND} STREQUAL "MRAY_GPU_BACKEND_HIP")
+    add_dependencies(MRay TracerDLL_HIP)
+endif()
 
 if(MRAY_BUILD_VISOR)
     add_dependencies(MRay Visor)

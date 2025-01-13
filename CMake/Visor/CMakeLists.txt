@@ -85,12 +85,12 @@ add_custom_command(TARGET Visor POST_BUILD
                    "${MRAY_RESOURCE_DIRECTORY}/Fonts"
                    "${MRAY_CONFIG_BIN_DIRECTORY}/Fonts")
 
-if(MSVC)
-add_custom_command(TARGET Visor POST_BUILD
-                   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                   "${MRAY_CONFIG_LIB_DIRECTORY}/vulkan-1$<$<CONFIG:Debug>:d>.dll"
-                   "${MRAY_CONFIG_LIB_DIRECTORY}/glfw3$<$<CONFIG:Debug>:d>.dll"
-                   ${MRAY_CONFIG_BIN_DIRECTORY})
+if(WIN32)
+    add_custom_command(TARGET Visor POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                       "${MRAY_CONFIG_LIB_DIRECTORY}/vulkan-1$<$<CONFIG:Debug>:d>.dll"
+                       "${MRAY_CONFIG_LIB_DIRECTORY}/glfw3$<$<CONFIG:Debug>:d>.dll"
+                       ${MRAY_CONFIG_BIN_DIRECTORY})
 endif()
 
 # ==============================#

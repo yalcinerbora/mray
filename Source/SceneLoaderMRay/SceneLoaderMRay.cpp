@@ -1711,34 +1711,34 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     primHT.reserve(surfaces.size() * MaxPrimBatchPerSurface +
                    lightSurfaces.size());
     std::future<void> primHTReady = threadPool.submit_task(
-    [&primHT, CreateHT, &sceneJson = this->sceneJson]()
+    [&primHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
-        CreateHT(primHT, sceneJson.at(NodeNames::PRIMITIVE_LIST));
+        CreateHT(primHT, sceneJsonIn.at(NodeNames::PRIMITIVE_LIST));
     });
     // Materials
     ItemLocationMap matHT;
     matHT.reserve(surfaces.size() * MaxPrimBatchPerSurface);
     std::future<void> matHTReady = threadPool.submit_task(
-    [&matHT, CreateHT, &sceneJson = this->sceneJson]()
+    [&matHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
-        CreateHT(matHT, sceneJson.at(NodeNames::MATERIAL_LIST));
+        CreateHT(matHT, sceneJsonIn.at(NodeNames::MATERIAL_LIST));
     });
     // Cameras
     ItemLocationMap camHT;
     camHT.reserve(camSurfaces.size());
     std::future<void> camHTReady = threadPool.submit_task(
-    [&camHT, CreateHT, &sceneJson = this->sceneJson]()
+    [&camHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
-        CreateHT(camHT, sceneJson.at(NodeNames::CAMERA_LIST));
+        CreateHT(camHT, sceneJsonIn.at(NodeNames::CAMERA_LIST));
     });
     // Lights
     // +1 Comes from boundary light
     ItemLocationMap lightHT;
     lightHT.reserve(lightSurfaces.size() + 1);
     std::future<void> lightHTReady = threadPool.submit_task(
-    [&lightHT, CreateHT, &sceneJson = this->sceneJson]()
+    [&lightHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
-        CreateHT(lightHT, sceneJson.at(NodeNames::LIGHT_LIST));
+        CreateHT(lightHT, sceneJsonIn.at(NodeNames::LIGHT_LIST));
     });
     // Transforms
     ItemLocationMap transformHT;
@@ -1746,9 +1746,9 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
                         surfaces.size() +
                         camSurfaces.size() + 1);
     std::future<void> transformHTReady = threadPool.submit_task(
-    [&transformHT, CreateHT, &sceneJson = this->sceneJson]()
+    [&transformHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
-        CreateHT(transformHT, sceneJson.at(NodeNames::TRANSFORM_LIST));
+        CreateHT(transformHT, sceneJsonIn.at(NodeNames::TRANSFORM_LIST));
     });
 
     // Mediums
@@ -1760,9 +1760,9 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     ItemLocationMap mediumHT;
     mediumHT.reserve(512);
     std::future<void> mediumHTReady = threadPool.submit_task(
-    [&mediumHT, CreateHT, &sceneJson = this->sceneJson]()
+    [&mediumHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
-        return CreateHT(mediumHT, sceneJson.at(NodeNames::MEDIUM_LIST));
+        return CreateHT(mediumHT, sceneJsonIn.at(NodeNames::MEDIUM_LIST));
     });
     // Textures
     // It is hard to find estimate the worst case texture count as well.
@@ -1773,17 +1773,17 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     textureHT.reserve(surfaces.size() * MaxPrimBatchPerSurface * 2 +
                       16);
     std::future<void> textureHTReady = threadPool.submit_task(
-    [&textureHT, CreateHT, &sceneJson = this->sceneJson]()
+    [&textureHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
-        return CreateHT(textureHT, sceneJson.at(NodeNames::TEXTURE_LIST));
+        return CreateHT(textureHT, sceneJsonIn.at(NodeNames::TEXTURE_LIST));
     });
 
     // Check boundary first
     auto PushToTypeMapping =
-    [&sceneJson = std::as_const(sceneJson)](TypeMappedNodes& typeMappings,
-                                            const ItemLocationMap& map, uint32_t id,
-                                            const std::string_view& listName,
-                                            bool skipUnknown = false)
+    [&sceneJsonIn = std::as_const(sceneJson)](TypeMappedNodes& typeMappings,
+                                              const ItemLocationMap& map, uint32_t id,
+                                              const std::string_view& listName,
+                                              bool skipUnknown = false)
     {
         const auto it = map.find(id);
         if(skipUnknown && it == map.end()) return;
@@ -1796,7 +1796,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
         uint32_t arrayIndex = std::get<ARRAY_INDEX>(location);
         uint32_t innerIndex = std::get<INNER_INDEX>(location);
 
-        auto node = JsonNode(sceneJson[listName][arrayIndex], innerIndex);
+        auto node = JsonNode(sceneJsonIn[listName][arrayIndex], innerIndex);
         //std::string type = Annotate(std::string(node.Type()));
         std::string type = std::string(node.Type());
         typeMappings[type].emplace_back(std::move(node));

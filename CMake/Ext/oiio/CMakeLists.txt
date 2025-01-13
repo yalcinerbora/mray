@@ -79,7 +79,7 @@ append_cmake_prefix_path(${ZLIB_INSTALL_LOC})
 # append_cmake_prefix_path(${BZLIB_INSTALL_LOC})
 
 # Copy zlib.dll to "Lib"
-if(MSVC)
+if(WIN32)
     ExternalProject_Add_Step(oiio_zlib_ext install_extra
                     WORKING_DIRECTORY ${ZLIB_INSTALL_LOC}/
                     COMMAND ${CMAKE_COMMAND} -E copy_if_different

@@ -43,7 +43,7 @@ function(gen_device_test)
 
     add_precompiled_headers(TARGET ${TARGET_FULL_NAME})
 
-    if(MSVC)
+    if(WIN32)
         add_custom_command(TARGET ${TARGET_FULL_NAME} PRE_BUILD
                            COMMAND ${CMAKE_COMMAND} -E copy_if_different
                            "${MRAY_CONFIG_LIB_DIRECTORY}/gtest.dll"

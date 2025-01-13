@@ -13,6 +13,9 @@ function(gen_device_target)
     set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/Device)
 
     # SOURCES
+    ################
+    # CUDA RELATED #
+    ################
     set(SRC_CUDA_MEMORY
         ${CURRENT_SOURCE_DIR}/CUDA/DeviceMemoryCUDA.h
         ${CURRENT_SOURCE_DIR}/CUDA/DeviceMemoryCUDA.cpp
@@ -36,15 +39,35 @@ function(gen_device_target)
         ${CURRENT_SOURCE_DIR}/CUDA/AlgBinaryPartitionCUDA.h
         ${CURRENT_SOURCE_DIR}/CUDA/AlgBinarySearchCUDA.h)
 
-    set(SRC_ALGS
-        ${CURRENT_SOURCE_DIR}/GPUAlgForward.h
-        ${CURRENT_SOURCE_DIR}/GPUAlgGeneric.h
-        ${CURRENT_SOURCE_DIR}/GPUAlgReduce.h
-        ${CURRENT_SOURCE_DIR}/GPUAlgScan.h
-        ${CURRENT_SOURCE_DIR}/GPUAlgRadixSort.h
-        ${CURRENT_SOURCE_DIR}/GPUAlgBinaryPartition.h
-        ${CURRENT_SOURCE_DIR}/GPUAlgBinarySearch.h)
+    ###############
+    # HIP RELATED #
+    ###############
+    set(SRC_HIP_MEMORY
+        ${CURRENT_SOURCE_DIR}/HIP/DeviceMemoryHIP.h
+        ${CURRENT_SOURCE_DIR}/HIP/DeviceMemoryHIP.cpp
+        ${CURRENT_SOURCE_DIR}/HIP/TextureHIP.h
+        ${CURRENT_SOURCE_DIR}/HIP/TextureHIP.hpp
+        ${CURRENT_SOURCE_DIR}/HIP/TextureHIP.cpp
+        ${CURRENT_SOURCE_DIR}/HIP/TextureViewHIP.h)
 
+    set(SRC_HIP
+        ${CURRENT_SOURCE_DIR}/HIP/GPUSystemHIP.h
+        ${CURRENT_SOURCE_DIR}/HIP/GPUSystemHIP.hpp
+        ${CURRENT_SOURCE_DIR}/HIP/GPUSystemHIP.cpp
+        ${CURRENT_SOURCE_DIR}/HIP/DefinitionsHIP.h
+        ${CURRENT_SOURCE_DIR}/HIP/GPUAtomicHIP.h)
+
+    set(SRC_HIP_ALGS
+        ${CURRENT_SOURCE_DIR}/HIP/AlgForwardHIP.h
+        ${CURRENT_SOURCE_DIR}/HIP/AlgReduceHIP.h
+        ${CURRENT_SOURCE_DIR}/HIP/AlgScanHIP.h
+        ${CURRENT_SOURCE_DIR}/HIP/AlgRadixSortHIP.h
+        ${CURRENT_SOURCE_DIR}/HIP/AlgBinaryPartitionHIP.h
+        ${CURRENT_SOURCE_DIR}/HIP/AlgBinarySearchHIP.h)
+
+    ##########
+    # COMMON #
+    ##########
     set(SRC_COMMON
         ${CMAKE_CURRENT_FUNCTION_LIST_FILE}
         ${CURRENT_SOURCE_DIR}/GPUTexture.h
@@ -56,6 +79,15 @@ function(gen_device_target)
         ${CURRENT_SOURCE_DIR}/GPUDebug.h
         ${CURRENT_SOURCE_DIR}/GPUTypes.h
         ${CURRENT_SOURCE_DIR}/GPUAtomic.h)
+
+    set(SRC_ALGS
+        ${CURRENT_SOURCE_DIR}/GPUAlgForward.h
+        ${CURRENT_SOURCE_DIR}/GPUAlgGeneric.h
+        ${CURRENT_SOURCE_DIR}/GPUAlgReduce.h
+        ${CURRENT_SOURCE_DIR}/GPUAlgScan.h
+        ${CURRENT_SOURCE_DIR}/GPUAlgRadixSort.h
+        ${CURRENT_SOURCE_DIR}/GPUAlgBinaryPartition.h
+        ${CURRENT_SOURCE_DIR}/GPUAlgBinarySearch.h)
 
     set(SRC_ALL
         ${SRC_COMMON}
@@ -70,6 +102,16 @@ function(gen_device_target)
         source_group("CUDA/Memory" FILES ${SRC_CUDA_MEMORY})
         source_group("CUDA" FILES ${SRC_CUDA})
         source_group("CUDA/Algorithms" FILES ${SRC_CUDA_ALGS})
+
+    elseif(${GEN_DEVICE_TARGET_MACRO} STREQUAL "MRAY_GPU_BACKEND_HIP")
+        set(SRC_ALL ${SRC_ALL}
+            ${SRC_HIP_MEMORY}
+            ${SRC_HIP}
+            ${SRC_HIP_ALGS})
+
+        source_group("HIP/Memory" FILES ${SRC_HIP_MEMORY})
+        source_group("HIP" FILES ${SRC_HIP})
+        source_group("HIP/Algorithms" FILES ${SRC_HIP_ALGS})
     else()
         message(FATAL_ERROR "Unsupported Device Macro")
     endif()
@@ -91,15 +133,28 @@ function(gen_device_target)
                           PUBLIC
                           CoreLib
                           TransientPool
-                          CUDA::cuda_driver
                           PRIVATE
-                          mray::meta_compile_opts
-                          mray::cuda_extra_compile_opts)
+                          mray::meta_compile_opts)
 
     set_target_properties(${TARGET_FULL_NAME} PROPERTIES
                           POSITION_INDEPENDENT_CODE ON
                           CUDA_SEPARABLE_COMPILATION ON
                           CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+
+    if(${GEN_DEVICE_TARGET_MACRO} STREQUAL "MRAY_GPU_BACKEND_CUDA")
+        target_link_libraries(${TARGET_FULL_NAME}
+                              PUBLIC
+                              CUDA::cuda_driver
+                              PRIVATE
+                              mray::cuda_extra_compile_opts)
+
+    elseif(${GEN_DEVICE_TARGET_MACRO} STREQUAL "MRAY_GPU_BACKEND_HIP")
+        # target_link_libraries(${TARGET_FULL_NAME}
+        #                       PUBLIC
+        #                       hip::host)
+    else()
+        message(FATAL_ERROR "Unsupported Device Macro")
+    endif()
 
     add_precompiled_headers(TARGET ${TARGET_FULL_NAME})
 

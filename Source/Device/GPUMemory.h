@@ -11,12 +11,14 @@
     using HostLocalMemory           = mray::cuda::HostLocalMemoryCUDA;
     using HostLocalAlignedMemory    = mray::cuda::HostLocalAlignedMemoryCUDA;
 
-//#elif defined MRAY_GPU_BACKEND_SYCL
-//    // TODO:
-//    //#include "GPUSystemSycl.h"
-#elif defined GPU_BACKEND_HOST
+#elif defined MRAY_GPU_BACKEND_HIP
+    #include "HIP/DeviceMemoryHIP.h"
 
-    //DeviceVisit()
+    // Alias the types
+    using DeviceMemory              = mray::hip::DeviceMemoryHIP;
+    using DeviceLocalMemory         = mray::hip::DeviceLocalMemoryHIP;
+    using HostLocalMemory           = mray::hip::HostLocalMemoryHIP;
+    using HostLocalAlignedMemory    = mray::hip::HostLocalAlignedMemoryHIP;
 
 #else
     #error Please define a GPU Backend!

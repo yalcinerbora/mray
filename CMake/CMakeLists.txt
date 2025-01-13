@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.26)
 
-# Deduplicate archivies when linking
+# Deduplicate archives when linking
 cmake_policy(VERSION 3.26)
 
 # Some things that will be fed to both CMAKE and C++
@@ -17,20 +17,17 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/Include"
 include("PreventInSourceBuilds")
 
 # Only Debug and Release
-set(CMAKE_CONFIGURATION_TYPES Debug;SanitizeR;Release CACHE STRING "Build configurations. SanitizeR has sanitized output")
+set(CMAKE_CONFIGURATION_TYPES Debug;SanitizeR;Release CACHE STRING "Build configurations. SanitizeR is a config with address sanitizer/release")
 set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type for single config generators")
 
 # Architecture
 # Use a drop-down menu for selecting Compute Capability
-set(CMAKE_CUDA_ARCHITECTURES "native"
-    CACHE STRING "Architecture chosen by the user at CMake configure time")
-set_property(CACHE CMAKE_CUDA_ARCHITECTURES
-             PROPERTY STRINGS native 52 60 61 70 72 75 86 89 90 all all-major)
-
 set(MRAY_DEVICE_BACKEND "MRAY_GPU_BACKEND_CUDA"
     CACHE STRING "Device backend chosen by the user at CMake configure time")
 set_property(CACHE MRAY_DEVICE_BACKEND
-             PROPERTY STRINGS MRAY_GPU_BACKEND_CUDA)
+             PROPERTY STRINGS
+             MRAY_GPU_BACKEND_CUDA
+             MRAY_GPU_BACKEND_HIP)
 
 set(MRAY_HOST_ARCH "MRAY_HOST_ARCH_BASIC"
     CACHE STRING "Host architecture chosen by the user at CMake configure time")
@@ -40,6 +37,40 @@ set_property(CACHE MRAY_HOST_ARCH
              MRAY_HOST_ARCH_AVX2
              MRAY_HOST_ARCH_AVX512)
 
+# Globals Common for All Projects
+# TODO: Align CUDA Standard with CXX Standard
+if(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_CUDA")
+
+    set(CMAKE_CUDA_ARCHITECTURES "native"
+        CACHE STRING "Architecture chosen by the user at CMake configure time")
+    set_property(CACHE CMAKE_CUDA_ARCHITECTURES
+                PROPERTY STRINGS native 52 60 61 70 72 75 86 89 90 all all-major)
+
+    set(CMAKE_CUDA_STANDARD 20)
+    set(CMAKE_CUDA_STANDARD_REQUIRED True)
+    set(CMAKE_CUDA_RUNTIME_LIBRARY Shared)
+    set(MRAY_PROJECT_GPU_LANGUAGES CUDA)
+    set(MRAY_GPU_PLATFORM_NAME "CUDA")
+
+elseif(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_HIP")
+
+    # TODO: Remove this HIP will only target AMD gpus
+    set(CMAKE_HIP_PLATFORM "amd" CACHE STRING)
+    mark_as_advanced(CMAKE_HIP_PLATFORM)
+
+    set(CMAKE_HIP_ARCHITECTURES "gfx1030;gfx1100;gfx1101;gfx1102")
+
+    set(CMAKE_HIP_STANDARD 20)
+    set(CMAKE_HIP_STANDARD_REQUIRED True)
+    set(CMAKE_HIP_RUNTIME_LIBRARY Shared)
+    set(MRAY_PROJECT_GPU_LANGUAGES HIP)
+    set(MRAY_GPU_PLATFORM_NAME "HIP")
+    # Add .cu files as source files for HIP
+    set(CMAKE_USER_MAKE_RULES_OVERRIDE "HIPFileExtExtras")
+else()
+    message(FATAL_ERROR "Unknown Device backend!"
+                        "Please set MRAY_DEVICE_BACKEND to a valid backend")
+endif()
 
 option(MRAY_ENABLE_HW_ACCELERATION "Try to find, compile and and use HW accelration (i.e. this means OptiX for CUDA)" OFF)
 option(MRAY_BUILD_TESTS "Build Tests" ON)
@@ -48,13 +79,8 @@ option(MRAY_EXPORT_COMPILE_COMMANDS "Export compile commands for IWYU" ON)
 option(MRAY_ENABLE_PCH "Enable precompiled headers functionality" OFF)
 option(MRAY_BUILD_DOCS "Build Documentation" OFF)
 
-# Globals Common for All Projects
-# TODO: Align CUDA Standard with CXX Standard
-set(CMAKE_CUDA_STANDARD 20)
-set(CMAKE_CUDA_STANDARD_REQUIRED True)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-set(CMAKE_CUDA_RUNTIME_LIBRARY Shared)
 
 # Set compile command export
 if(MRAY_EXPORT_COMPILE_COMMANDS)
@@ -72,7 +98,7 @@ set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER ${MRAY_PREDEFINED_TARGETS
 #     Project Start      #
 # ====================== #
 project(${MRAY_PROJECT_NAME}
-        LANGUAGES CUDA CXX
+        LANGUAGES ${MRAY_PROJECT_GPU_LANGUAGES} CXX
         VERSION "${MRAY_VERSION_MAJOR}.${MRAY_VERSION_MINOR}.${MRAY_VERSION_PATCH}"
         DESCRIPTION ${MRAY_PROJECT_DESCRIPTION}
 )
@@ -98,9 +124,14 @@ endif()
 
 # After project is set and nvcc is found invoke find CUDA toolkit
 # we will use curand for sampling
-find_package(CUDAToolkit REQUIRED)
-# Bug on cmake maybe this variable is not in "advanced"
-mark_as_advanced(CUDAToolkit_CUPTI_INCLUDE_DIR)
+if(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_CUDA")
+    find_package(CUDAToolkit REQUIRED)
+    # Bug on cmake maybe this variable is not in "advanced"
+    mark_as_advanced(CUDAToolkit_CUPTI_INCLUDE_DIR)
+
+# elseif(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_HIP")
+#     find_package(hip REQUIRED)
+endif()
 
 # Force Colored Output on Ninja
 set(CMAKE_COLOR_DIAGNOSTICS ON)
@@ -113,14 +144,10 @@ include("CompilerOptions")
 
 # Generate Configuration Header
 cmake_path(GET CMAKE_CXX_COMPILER STEM MRAY_COMPILER_NAME)
-cmake_path(GET CMAKE_CUDA_COMPILER STEM MRAY_CUDA_COMPILER_NAME)
-
-# Determine gpu platform via MRAY_DEVICE_BACKEND
 if(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_CUDA")
-    set(MRAY_GPU_PLATFORM_NAME "CUDA")
-else()
-    message(FATAL_ERROR "Unknown Device backend!"
-                        "Please set MRAY_DEVICE_BACKEND to a valid backend")
+    cmake_path(GET CMAKE_CUDA_COMPILER STEM MRAY_GPU_COMPILER_NAME)
+elseif(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_HIP")
+    cmake_path(GET CMAKE_HIP_COMPILER STEM MRAY_GPU_COMPILER_NAME)
 endif()
 
 configure_file(${MRAY_SOURCE_DIRECTORY}/mray_cmake.h.in

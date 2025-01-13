@@ -5,11 +5,11 @@
 
 #include "Core/ColorFunctions.h"
 
-#include "PrimitiveC.h"
-#include "MaterialC.h"
-#include "RenderWork.h"
-#include "DistributionFunctions.h"
-#include "LightSampler.h"
+#include "Tracer/PrimitiveC.h"
+#include "Tracer/MaterialC.h"
+#include "Tracer/RenderWork.h"
+#include "Tracer/DistributionFunctions.h"
+#include "Tracer/LightSampler.h"
 
 class PathTracerRenderer;
 

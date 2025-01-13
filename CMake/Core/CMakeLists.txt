@@ -97,4 +97,13 @@ target_link_libraries(CoreLib
                       PRIVATE
                       mray::meta_compile_opts)
 
+# TODO: This is somehwat a hack?
+# When HIP is enabled as a language AMD does not give
+# lib and include variables ?????
+if(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_HIP")
+    target_include_directories(CoreLib
+                               PUBLIC
+                               ${CMAKE_HIP_COMPILER_ROCM_ROOT}/include)
+endif()
+
 add_precompiled_headers(TARGET CoreLib)

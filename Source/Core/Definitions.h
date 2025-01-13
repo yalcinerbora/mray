@@ -27,6 +27,34 @@
         #define MRAY_DEVICE_CODE_PATH_CUDA
     #endif
 
+    #define NO_DISCARD [[nodiscard]]
+
+#elif defined MRAY_GPU_BACKEND_HIP
+
+    #include <hip/amd_detail/host_defines.h>
+
+    #define MRAY_HYBRID __host__ __device__
+    #define MRAY_GPU __device__
+    #define MRAY_HOST __host__
+    #define MRAY_KERNEL __global__
+
+    #ifdef MRAY_WINDOWS
+        #define MRAY_GPU_INLINE __forceinline__
+    #else
+        #define MRAY_GPU_INLINE inline
+    #endif
+
+    #ifdef __HIP_DEVICE_COMPILE__
+        #define MRAY_DEVICE_CODE_PATH
+        #define MRAY_DEVICE_CODE_PATH_HIP
+    #endif
+
+    // TODO: Hip does not like the order.
+    // "__host__ [[nodiscard]]", but NVCC does not like
+    // the order "[[nodiscard]] __host__", if I remember correctly
+    // So, we will not use NO_DISCARD for now
+    #define NO_DISCARD
+
 #else
 
     #define MRAY_GPU_INLINE inline
@@ -35,6 +63,8 @@
     #define MRAY_GPU
     #define MRAY_HOST
     #define MRAY_KERNEL
+
+    #define NO_DISCARD [[nodiscard]]
 
 #endif
 
@@ -57,7 +87,6 @@
 
 // Hybrid function inline
 #define MRAY_CGPU_INLINE inline
-#define NO_DISCARD [[nodiscard]]
 
 // Comes from build system
 #define MRAY_SPECTRA_PER_SPECTRUM 4

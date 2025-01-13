@@ -23,7 +23,7 @@ set(SRC_HEADERS
     <filesystem>
 )
 
-if(MSVC)
+if(WIN32)
     set(SRC_HEADERS ${SRC_HEADERS}
         <Windows.h>)
 endif()

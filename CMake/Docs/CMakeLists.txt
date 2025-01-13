@@ -46,7 +46,7 @@ source_group(TREE ${MRAY_DOCS_DIRECTORY} FILES ${MRAY_DOCS_SRC})
 # check if we are building with visual studio
 if(MSVC)
     set(MRAY_DOCS_BUILD_COMMAND ${MRAY_DOCS_BUILD_COMMAND} --no-color)
-endif(MSVC)
+endif()
 
 # Generate Build Targets
 add_custom_target(MRayDocs_HTML

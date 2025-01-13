@@ -163,6 +163,7 @@ Optional<T> TracerTexView<D, T>::Postprocess(Optional<ReadType>&& t) const
                 val = Vector2(val[0] + val[1], val[0] - val[1]) * Float(0.5);
                 return Vector3(val, Float(1) - val.Abs().Sum());
             }
+            default: break;
         }
     }
     return std::nullopt;

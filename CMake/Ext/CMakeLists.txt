@@ -232,7 +232,7 @@ if(MRAY_BUILD_VISOR)
     set(CMAKE_TLS_VERIFY ON)
 
     # Slang version v.2024.14.4
-    if(MSVC)
+    if(WIN32)
         set(SLANGC_ZIP_NAME "slang-2024.14.4-windows-x86_64.zip")
         set(SLANGC_SHA256_HASH "c4410ac09dd86dfcceeb2b2ed494ec976c533b7e18608fad518ec54c4fde8b42")
     elseif(UNIX AND NOT APPLE)

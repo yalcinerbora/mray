@@ -5,7 +5,14 @@
 
 #ifdef MRAY_WINDOWS
 
-    #define MRAY_DLL_IMPORT __declspec(dllimport)
+    // Clang on Windows ignores __declspec(dllimport)
+    #ifdef MRAY_CLANG
+        #define MRAY_DLL_IMPORT
+    #else
+        #define MRAY_DLL_IMPORT __declspec(dllimport)
+    #endif
+
+    // This is fine?
     #define MRAY_DLL_EXPORT __declspec(dllexport)
 
     static constexpr bool MRAY_IS_ON_WINDOWS    = true;

@@ -379,7 +379,7 @@ constexpr Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E)
                         "\"{} <= E < {}\"",
                         static_cast<uint32_t>(E), uint32_t(0),
                         static_cast<uint32_t>(MR_END));
-        #else
+        #elif defined MRAY_DEVICE_CODE_PATH_CUDA
             // TODO: This is CUDA only
             __trap();
         #endif

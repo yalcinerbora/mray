@@ -12,6 +12,16 @@
     template<uint32_t DIM, class T>
     using TextureView = mray::cuda::TextureViewCUDA<DIM, T>;
 
+#elif defined MRAY_GPU_BACKEND_HIP
+    #include "HIP/TextureViewHIP.h"
+
+    // Alias the types
+    template<uint32_t DIM, class T>
+    using RWTextureView = mray::hip::RWTextureViewHIP<DIM, T>;
+
+    template<uint32_t DIM, class T>
+    using TextureView = mray::hip::TextureViewHIP<DIM, T>;
+
 #elif defined GPU_BACKEND_HOST
     #error Not yet!
 #else

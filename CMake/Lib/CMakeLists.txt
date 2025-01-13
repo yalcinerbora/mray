@@ -141,7 +141,7 @@ function(gen_imported_target)
                                     ${GEN_IMPORTED_TGT_EXTRA_DEFINES})
     endif()
 
-    if(MSVC AND NOT GEN_IMPORTED_TGT_STATIC)
+    if(WIN32 AND NOT GEN_IMPORTED_TGT_STATIC)
         set_target_properties(${GEN_IMPORTED_TGT_NAME} PROPERTIES
                               IMPORTED_IMPLIB_DEBUG "${MRAY_PLATFORM_LIB_DIRECTORY}/Debug/${DBG_NAME}.lib"
                               IMPORTED_IMPLIB_RELEASE "${MRAY_PLATFORM_LIB_DIRECTORY}/Release/${REL_NAME}.lib")
@@ -175,7 +175,7 @@ gen_imported_target(NAME spdlog::spdlog SHARED DEBUG_TARGET spdlogd RELEASE_TARG
 gen_imported_target(NAME imgui::imgui STATIC DEBUG_TARGET imguid RELEASE_TARGET imgui)
 
 # Different names on different platforms
-if(MSVC)
+if(WIN32)
     gen_imported_target(NAME vulkan::vulkan SHARED DEBUG_TARGET vulkan-1d RELEASE_TARGET vulkan-1)
     gen_imported_target(NAME glfw3::glfw3 SHARED DEBUG_TARGET glfw3ddll RELEASE_TARGET glfw3dll)
 else()

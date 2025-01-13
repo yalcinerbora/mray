@@ -31,10 +31,14 @@ constexpr auto DeviceVisitDetail::LoopAndInvoke(VariantT&& v, Func&& f) -> declt
         return LoopAndInvoke<I + 1>(std::forward<VariantT>(v), std::forward<Func>(f));
     else
     {
-        #ifdef MRAY_DEVICE_CODE_PATH_CUDA
+        #ifdef MRAY_DEVICE_CODE_PATH
             if constexpr (MRAY_IS_DEBUG)
                 printf("Invalid variant access on device!\n");
-            __trap();
+            #ifdef MRAY_DEVICE_CODE_PATH_CUDA
+                __trap();
+            #else
+                abort();
+            #endif
         #else
             throw MRayError("Invalid variant access on device!");
         #endif

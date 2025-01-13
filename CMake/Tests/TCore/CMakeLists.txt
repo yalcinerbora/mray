@@ -15,12 +15,14 @@ target_link_libraries(TCore PRIVATE
                       mray::meta_compile_opts
                       mray::test_common
                       gtest::gtest
-                      gtest::gtest_main
+                      gtest::gtest_main)
 
-                      # This is requires on linux since currently tests do not have
-                      # and .cu files so CMake does not add CUDA related libs
-                      CUDA::cudart
-                      )
+
+# This is requires on linux since currently tests do not have
+# and .cu files so CMake does not add CUDA related libs
+if(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_CUDA")
+    target_link_libraries(TCore PRIVATE CUDA::cudart)
+endif()
 
 gtest_discover_tests(TCore)
 
@@ -32,7 +34,7 @@ set_target_properties(TCore PROPERTIES
 
 add_precompiled_headers(TARGET TCore)
 
-if(MSVC)
+if(WIN32)
     add_custom_command(TARGET TCore PRE_BUILD
                         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                         "${MRAY_CONFIG_LIB_DIRECTORY}/gtest.dll"

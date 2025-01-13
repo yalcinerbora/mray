@@ -31,7 +31,7 @@ set_target_properties(TSceneLoaderMRay PROPERTIES
 
 add_precompiled_headers(TARGET TSceneLoaderMRay)
 
-if(MSVC)
+if(WIN32)
     add_custom_command(TARGET TSceneLoaderMRay PRE_BUILD
                         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                         "${MRAY_CONFIG_LIB_DIRECTORY}/gtest.dll"

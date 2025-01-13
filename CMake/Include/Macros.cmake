@@ -36,7 +36,7 @@ macro(generate_platform_name)
 
     # Determine Platform and Config
     # Only Windows (and probably not mingw adn cygwin) and Linux is supported
-    if(MSVC)
+    if(WIN32)
         set(MRAY_PLATFORM_NAME Win)
     elseif(UNIX AND NOT APPLE)
         set(MRAY_PLATFORM_NAME Linux)

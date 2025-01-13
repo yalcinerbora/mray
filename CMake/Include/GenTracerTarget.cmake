@@ -227,7 +227,7 @@ function(gen_tracer_target)
                                        MRAY_COMPILE_OPTIX_AS_PTX)
         endif()
 
-        if(MSVC)
+        if(WIN32)
             add_custom_command(TARGET ${TARGET_FULL_NAME} PRE_BUILD
                                COMMAND ${CMAKE_COMMAND} -E copy_if_different
                                "${MRAY_CONFIG_LIB_DIRECTORY}/spdlog$<$<CONFIG:Debug>:d>.dll"

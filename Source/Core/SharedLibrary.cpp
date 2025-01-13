@@ -29,7 +29,8 @@ static std::string FormatErrorWin32()
                                  FORMAT_MESSAGE_IGNORE_INSERTS,
                                  NULL, errorMessageID,
                                  MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                                 (LPSTR)&messageBuffer, 0, NULL);
+                                 reinterpret_cast<LPSTR>(&messageBuffer),
+                                 0, NULL);
     // Get the buffer
     std::string message(messageBuffer, size);
     LocalFree(messageBuffer);
@@ -52,7 +53,7 @@ static std::wstring ConvertWCharWin32(const std::string& unicodeStr)
             0                           // Request size of destination buffer, in wchar_ts
         );
 
-        std::wstring wString(utf16Length, L'\0');
+        std::wstring wString(static_cast<size_t>(utf16Length), L'\0');
 
         // Convert from UTF-8 to UTF-16
         ::MultiByteToWideChar(
@@ -71,12 +72,12 @@ static std::wstring ConvertWCharWin32(const std::string& unicodeStr)
 void* SharedLibrary::GetProcAdressInternal(const std::string& fName) const
 {
     #ifdef MRAY_WINDOWS
-        FARPROC proc = GetProcAddress((HINSTANCE)libHandle, fName.c_str());
+        FARPROC proc = GetProcAddress(std::bit_cast<HINSTANCE>(libHandle), fName.c_str());
         if(proc == nullptr)
         {
             throw MRayError("{}", FormatErrorWin32());
         }
-        return (void*)proc;
+        return std::bit_cast<void*>(proc);
     #elif defined MRAY_LINUX
         void* result = dlsym(libHandle, fName.c_str());
         if(result == nullptr)
@@ -91,7 +92,7 @@ SharedLibrary::SharedLibrary(const std::string& libName)
     std::string libWithExt = libName;
     #if defined MRAY_WINDOWS
         libWithExt += WinDLLExt;
-        libHandle = (void*)LoadLibrary(ConvertWCharWin32(libWithExt).c_str());
+        libHandle = std::bit_cast<void*>(LoadLibrary(ConvertWCharWin32(libWithExt).c_str()));
         if(libHandle == nullptr)
         {
             potentialError = FormatErrorWin32();
@@ -117,7 +118,7 @@ SharedLibrary::SharedLibrary(const std::string& libName)
 SharedLibrary::~SharedLibrary()
 {
     #if defined MRAY_WINDOWS
-        if(libHandle != nullptr) FreeLibrary((HINSTANCE)libHandle);
+        if(libHandle != nullptr) FreeLibrary(std::bit_cast<HINSTANCE>(libHandle));
     #elif defined MRAY_LINUX
         if(libHandle != nullptr) dlclose(libHandle);
     #endif
@@ -134,7 +135,7 @@ SharedLibrary& SharedLibrary::operator=(SharedLibrary&& other) noexcept
     assert(this != &other);
 
     #if defined MRAY_WINDOWS
-        if(libHandle != nullptr) FreeLibrary((HINSTANCE)libHandle);
+        if(libHandle != nullptr) FreeLibrary(std::bit_cast<HINSTANCE>(libHandle));
     #elif defined MRAY_LINUX
         if(libHandle != nullptr) dlclose(libHandle);
     #endif

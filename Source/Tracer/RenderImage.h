@@ -227,7 +227,7 @@ uint32_t ImageSpan::LinearIndexFrom2D(const Vector2i& xy) const
     return static_cast<uint32_t>(linear);
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MRAY_HYBRID MRAY_GPU_INLINE
 Vector2i ImageSpan::LinearIndexTo2D(uint32_t linearIndex) const
 {
     Vector2i result(linearIndex % uint32_t(extent[0]),

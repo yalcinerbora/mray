@@ -44,7 +44,15 @@ namespace mray::algorithms
         inline namespace DeviceSpecific{ using namespace ::mray::cuda::algorithms; }
         inline namespace DeviceAgnostic{ using namespace ::mray::algorithms; }
     }
+#elif defined MRAY_GPU_BACKEND_HIP
 
+    #include "HIP/AlgForwardHIP.h"
+
+    namespace DeviceAlgorithms
+    {
+        inline namespace DeviceSpecific{ using namespace ::mray::hip::algorithms; }
+        inline namespace DeviceAgnostic{ using namespace ::mray::algorithms; }
+    }
 #else
     #error Please define a GPU Backend!
 #endif
