@@ -2,12 +2,12 @@
 
 #include "Core/Definitions.h"
 #include "Core/Types.h"
-#include "GPUSystemCUDA.h"
+#include "GPUSystemHIP.h"
 
-#include <rocprim/block/block_scan.cuh>
-#include <rocprim/block/block_load.cuh>
-#include <rocprim/block/block_store.cuh>
-#include <rocprim/device/device_scan.cuh>
+#include <rocprim/block/block_scan.hpp>
+#include <rocprim/block/block_load.hpp>
+#include <rocprim/block/block_store.hpp>
+#include <rocprim/device/device_scan.hpp>
 
 namespace mray::hip::algorithms
 {

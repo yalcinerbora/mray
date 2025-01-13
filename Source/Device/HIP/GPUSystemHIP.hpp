@@ -34,7 +34,8 @@ static void WarpSynchronize()
         uint32_t localWarpId = threadIdx.x % WarpSize();
         uint32_t logicalWarpId = localWarpId / LOGICAL_WARP_SIZE;
         uint32_t localMask = MASK << (logicalWarpId * LOGICAL_WARP_SIZE);
-        __syncwarp(localMask);
+        // TODO: no "__syncwarp(...)" in AMD, should we need it?
+        // __syncwarp(localMask);
     }
     #endif
 }
@@ -234,16 +235,16 @@ void GPUQueueHIP::DeviceIssueKernel(std::string_view name,
                                     KernelIssueParams p,
                                     Args&&... fArgs) const
 {
-    assert(p.workCount != 0);
-    using namespace HipKernelCalls;
-    uint32_t blockCount = Math::DivideUp(p.workCount, StaticThreadPerBlock1D());
-    uint32_t blockSize = StaticThreadPerBlock1D();
+    // assert(p.workCount != 0);
+    // using namespace HipKernelCalls;
+    // uint32_t blockCount = Math::DivideUp(p.workCount, StaticThreadPerBlock1D());
+    // uint32_t blockSize = StaticThreadPerBlock1D();
 
-    Kernel<<<blockCount, blockSize, p.sharedMemSize, stream>>>
-    (
-        std::forward<Args>(fArgs)...
-    );
-    HIP_KERNEL_CHECK();
+    // Kernel<<<blockCount, blockSize, p.sharedMemSize, stream>>>
+    // (
+    //     std::forward<Args>(fArgs)...
+    // );
+    // HIP_KERNEL_CHECK();
 }
 
 template<class Lambda>
@@ -253,20 +254,20 @@ void GPUQueueHIP::DeviceIssueLambda(std::string_view name,
                                     //
                                     Lambda&& func) const
 {
-    assert(p.workCount != 0);
-    static_assert(std::is_rvalue_reference_v<decltype(func)>,
-                  "Not passing Lambda as rvalue_reference. This kernel call "
-                  "would've been failed in runtime!");
-    using namespace HipKernelCalls;
-    uint32_t blockCount = Math::DivideUp(p.workCount, StaticThreadPerBlock1D());
-    uint32_t blockSize = StaticThreadPerBlock1D();
+    // assert(p.workCount != 0);
+    // static_assert(std::is_rvalue_reference_v<decltype(func)>,
+    //               "Not passing Lambda as rvalue_reference. This kernel call "
+    //               "would've been failed in runtime!");
+    // using namespace HipKernelCalls;
+    // uint32_t blockCount = Math::DivideUp(p.workCount, StaticThreadPerBlock1D());
+    // uint32_t blockSize = StaticThreadPerBlock1D();
 
-    KernelCallLambdaHIP<Lambda>
-    <<<blockCount, blockSize, p.sharedMemSize, stream>>>
-    (
-        std::forward<Lambda>(func)
-    );
-    HIP_KERNEL_CHECK();
+    // KernelCallLambdaHIP<Lambda>
+    // <<<blockCount, blockSize, p.sharedMemSize, stream>>>
+    // (
+    //     std::forward<Lambda>(func)
+    // );
+    // HIP_KERNEL_CHECK();
 }
 
 template<auto Kernel, class... Args>
@@ -276,21 +277,21 @@ void GPUQueueHIP::DeviceIssueSaturatingKernel(std::string_view name,
                                               //
                                               Args&&... fArgs) const
 {
-    assert(p.workCount != 0);
-    using namespace HipKernelCalls;
+    // assert(p.workCount != 0);
+    // using namespace HipKernelCalls;
 
-    const void* kernelPtr = reinterpret_cast<const void*>(Kernel);
-    uint32_t threadCount = StaticThreadPerBlock1D();
-    uint32_t blockCount = DetermineGridStrideBlock(kernelPtr,
-                                                   p.sharedMemSize,
-                                                   threadCount,
-                                                   p.workCount);
+    // const void* kernelPtr = reinterpret_cast<const void*>(Kernel);
+    // uint32_t threadCount = StaticThreadPerBlock1D();
+    // uint32_t blockCount = DetermineGridStrideBlock(kernelPtr,
+    //                                                p.sharedMemSize,
+    //                                                threadCount,
+    //                                                p.workCount);
 
-    Kernel<<<blockCount, threadCount, p.sharedMemSize, stream>>>
-    (
-        std::forward<Args>(fArgs)...
-    );
-    HIP_KERNEL_CHECK();
+    // Kernel<<<blockCount, threadCount, p.sharedMemSize, stream>>>
+    // (
+    //     std::forward<Args>(fArgs)...
+    // );
+    // HIP_KERNEL_CHECK();
 }
 
 template<class Lambda>
@@ -300,25 +301,25 @@ void GPUQueueHIP::DeviceIssueSaturatingLambda(std::string_view name,
                                               //
                                               Lambda&& func) const
 {
-    assert(p.workCount != 0);
-    static_assert(std::is_rvalue_reference_v<decltype(func)>,
-                  "Not passing Lambda as rvalue_reference. This kernel call "
-                  "would've been failed in runtime!");
-    using namespace HipKernelCalls;
-    const void* kernelPtr = reinterpret_cast<const void*>(&KernelCallLambdaHIP<Lambda, StaticThreadPerBlock1D()>);
-    uint32_t threadCount = StaticThreadPerBlock1D();
-    uint32_t blockCount = DetermineGridStrideBlock(kernelPtr,
-                                                   p.sharedMemSize,
-                                                   threadCount,
-                                                   p.workCount);
+    // assert(p.workCount != 0);
+    // static_assert(std::is_rvalue_reference_v<decltype(func)>,
+    //               "Not passing Lambda as rvalue_reference. This kernel call "
+    //               "would've been failed in runtime!");
+    // using namespace HipKernelCalls;
+    // const void* kernelPtr = reinterpret_cast<const void*>(&KernelCallLambdaHIP<Lambda, StaticThreadPerBlock1D()>);
+    // uint32_t threadCount = StaticThreadPerBlock1D();
+    // uint32_t blockCount = DetermineGridStrideBlock(kernelPtr,
+    //                                                p.sharedMemSize,
+    //                                                threadCount,
+    //                                                p.workCount);
 
 
-    KernelCallLambdaHIP<Lambda>
-    <<<blockCount, threadCount, p.sharedMemSize, stream>>>
-    (
-        std::forward<Lambda>(func)
-    );
-    HIP_KERNEL_CHECK();
+    // KernelCallLambdaHIP<Lambda>
+    // <<<blockCount, threadCount, p.sharedMemSize, stream>>>
+    // (
+    //     std::forward<Lambda>(func)
+    // );
+    // HIP_KERNEL_CHECK();
 }
 
 template<auto Kernel, class... Args>
@@ -328,13 +329,13 @@ void GPUQueueHIP::DeviceIssueExactKernel(std::string_view name,
                                          //
                                          Args&&... fArgs) const
 {
-    assert(p.gridSize != 0);
-    using namespace HipKernelCalls;
-    Kernel<<<p.gridSize, p.blockSize, p.sharedMemSize, stream>>>
-    (
-        std::forward<Args>(fArgs)...
-    );
-    HIP_KERNEL_CHECK();
+    // assert(p.gridSize != 0);
+    // using namespace HipKernelCalls;
+    // Kernel<<<p.gridSize, p.blockSize, p.sharedMemSize, stream>>>
+    // (
+    //     std::forward<Args>(fArgs)...
+    // );
+    // HIP_KERNEL_CHECK();
 }
 
 template<class Lambda, uint32_t Bounds>
@@ -344,18 +345,18 @@ void GPUQueueHIP::DeviceIssueExactLambda(std::string_view name,
                                          //
                                          Lambda&& func) const
 {
-    assert(p.gridSize != 0);
-    static_assert(std::is_rvalue_reference_v<decltype(func)>,
-                  "Not passing Lambda as rvalue_reference. This kernel call "
-                  "would've been failed in runtime!");
-    using namespace HipKernelCalls;
+    // assert(p.gridSize != 0);
+    // static_assert(std::is_rvalue_reference_v<decltype(func)>,
+    //               "Not passing Lambda as rvalue_reference. This kernel call "
+    //               "would've been failed in runtime!");
+    // using namespace HipKernelCalls;
 
-    KernelCallLambdaHIP<Lambda, Bounds>
-    <<<p.gridSize, p.blockSize, p.sharedMemSize, stream>>>
-    (
-        std::forward<Lambda>(func)
-    );
-    HIP_KERNEL_CHECK();
+    // KernelCallLambdaHIP<Lambda, Bounds>
+    // <<<p.gridSize, p.blockSize, p.sharedMemSize, stream>>>
+    // (
+    //     std::forward<Lambda>(func)
+    // );
+    // HIP_KERNEL_CHECK();
 }
 
 }

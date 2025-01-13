@@ -31,7 +31,7 @@
 
 #elif defined MRAY_GPU_BACKEND_HIP
 
-    #include <hip/amd_detail/host_defines.h>
+    #include <hip/hip_runtime.h>
 
     #define MRAY_HYBRID __host__ __device__
     #define MRAY_GPU __device__

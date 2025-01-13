@@ -105,7 +105,7 @@ struct MRayToHipTexType<MRayType, HipType, 2>
 {
     static constexpr HipType Convert(MRayType vec)
     {
-        return HipType{.x = vec[0], .y = vec[1]};
+        return HipType(vec[0], vec[1]);
     }
 };
 
@@ -123,7 +123,7 @@ struct MRayToHipTexType<MRayType, HipType, 4>
 {
     static constexpr HipType Convert(MRayType vec)
     {
-        return HipType{.x = vec[0], .y = vec[1], .z = vec[2], .w = vec[3]};
+        return HipType(vec[0], vec[1], vec[2], vec[3]);
     }
 };
 
@@ -354,16 +354,18 @@ T RWTextureViewHIP<D, T>::operator()(TextureExtent<D> ij) const
     PaddedHipType t;
     if constexpr(D == 1)
     {
-        t = surf1DRead<PaddedHipType>
+        surf1DRead<PaddedHipType>
         (
+            &t,
             surfHandle,
             static_cast<int>(ij) * size
         );
     }
     else if constexpr(D == 2)
     {
-        t = surf2Dread<PaddedHipType>
+        surf2Dread<PaddedHipType>
         (
+            &t,
             surfHandle,
             static_cast<int>(ij[0]) * size,
             ij[1]
@@ -371,8 +373,9 @@ T RWTextureViewHIP<D, T>::operator()(TextureExtent<D> ij) const
     }
     else if constexpr(D == 3)
     {
-        t = surf3Dread<PaddedHipType>
+        surf3Dread<PaddedHipType>
         (
+            &t,
             surfHandle,
             static_cast<int>(ij[0]) * size,
             ij[1], ij[2]

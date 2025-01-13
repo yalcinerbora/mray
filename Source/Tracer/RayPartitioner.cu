@@ -11,7 +11,7 @@
 #define INVALID_LOCATION std::numeric_limits<uint32_t>::max()
 #define FIND_SPLITS_TPB 512
 
-#ifndef MRAY_GPU_BACKEND_CUDA
+#if 0
 
 #include "cub/block/block_load.cuh"
 #include "cub/block/block_store.cuh"

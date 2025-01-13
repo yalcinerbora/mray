@@ -90,8 +90,8 @@ namespace mray::hip
     #endif
 
 #else
-    #define HIP_CHECK(func) func
-    #define HIP_DRIVER_CHECK(func) func
+    #define HIP_CHECK(func) (void)func
+    #define HIP_DRIVER_CHECK(func) (void)func
     #define HIP_KERNEL_CHECK()
 #endif
 

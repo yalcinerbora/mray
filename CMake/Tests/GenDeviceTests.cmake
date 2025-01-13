@@ -24,6 +24,20 @@ function(gen_device_test)
 
     source_group("" FILES ${SRC_COMMON})
 
+    # I dunno why but global set did not work
+    if(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_HIP")
+
+        set_source_files_properties(${CURRENT_SOURCE_DIR}/T_Texture.cu
+                                    ${CURRENT_SOURCE_DIR}/T_KernelCall.cu
+                                    ${CURRENT_SOURCE_DIR}/T_AlgScan.cu
+                                    ${CURRENT_SOURCE_DIR}/T_AlgReduce.cu
+                                    ${CURRENT_SOURCE_DIR}/T_AlgRadixSort.cu
+                                    ${CURRENT_SOURCE_DIR}/T_AlgBinPartition.cu
+                                    ${CURRENT_SOURCE_DIR}/T_AlgCommon.cu
+                                    PROPERTIES LANGUAGE HIP)
+
+    endif()
+
     set(TARGET_FULL_NAME "TDevice${GEN_DEVICE_TEST_NAME}")
     set(DEVICE_TARGET_FULL_NAME "Device${GEN_DEVICE_TEST_NAME}")
     add_executable(${TARGET_FULL_NAME} ${SRC_COMMON})

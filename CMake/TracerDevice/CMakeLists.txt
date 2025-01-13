@@ -26,6 +26,18 @@ set(SRC_ALL
 source_group("Renderers/PathTracer" FILES ${SRC_RENDERERS_PATH_TRACER})
 source_group("" FILES ${SRC_COMMON})
 
+# I dunno why but global set did not work
+if(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_HIP")
+
+    set_source_files_properties(${CURRENT_SOURCE_DIR}/PathTracerRenderer.cu
+                                ${CURRENT_SOURCE_DIR}/Tracer.cu
+                                ${CURRENT_SOURCE_DIR}/Renderers_0.cu
+                                ${CURRENT_SOURCE_DIR}/Renderers_1.cu
+                                ${CURRENT_SOURCE_DIR}/Renderers_2.cu
+                                PROPERTIES LANGUAGE HIP)
+
+endif()
+
 # Find OptiX if requested
 if(MRAY_ENABLE_HW_ACCELERATION)
     find_package(OPTIX 8)

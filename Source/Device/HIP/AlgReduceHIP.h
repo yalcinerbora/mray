@@ -2,11 +2,11 @@
 
 #include "Core/Definitions.h"
 #include "Core/Types.h"
-#include "GPUSystemCUDA.h"
+#include "GPUSystemHIP.h"
 
-#include <rocprim/device/device_reduce.cuh>
-#include <rocprim/device/device_segmented_reduce.cuh>
-#include <rocprim/iterator/transform_input_iterator.cuh>
+#include <rocprim/device/device_reduce.hpp>
+#include <rocprim/device/device_segmented_reduce.hpp>
+#include <rocprim/iterator/transform_iterator.hpp>
 
 namespace mray::hip::algorithms
 {
@@ -21,9 +21,9 @@ size_t ReduceTMSize(size_t elementCount)
     T* dOut = nullptr;
     void* dTM = nullptr;
     size_t result;
-    CUDA_CHECK(DeviceReduce::Reduce(dTM, result, dIn, dOut,
-                                    static_cast<int>(elementCount),
-                                    [] MRAY_HYBRID(T, T)->T{ return T{}; }, T{}));
+    HIP_CHECK(reduce(dTM, result, dIn, dOut,
+                     T{}, static_cast<int>(elementCount),
+                     [] MRAY_HYBRID(T, T)->T{ return T{}; }));
     return result;
 }
 
@@ -34,15 +34,15 @@ size_t TransformReduceTMSize(size_t elementCount)
     using namespace rocprim;
 
     auto TFunc = [] MRAY_HYBRID(InT) -> OutT{ return OutT{}; };
-    using TransIt = TransformInputIterator<OutT, decltype(TFunc), const InT*>;
+    using TransIt = transform_iterator<OutT, decltype(TFunc), const InT*>;
     TransIt dIn = TransIt(nullptr, TFunc);
     OutT* dOut = nullptr;
     void* dTM = nullptr;
     size_t result;
-    CUDA_CHECK(DeviceReduce::Reduce(dTM, result, dIn, dOut,
-                                    static_cast<int>(elementCount),
-                                    [] MRAY_HYBRID(OutT, OutT)-> OutT { return OutT{}; },
-                                    OutT{}));
+    HIP_CHECK(reduce(dTM, result, dIn, dOut,
+                     static_cast<int>(elementCount),
+                     [] MRAY_HYBRID(OutT, OutT)-> OutT { return OutT{}; },
+                     OutT{}));
     return result;
 }
 
@@ -52,7 +52,7 @@ size_t SegmentedTransformReduceTMSize(size_t numSegments)
 {
     using namespace rocprim;
     auto TFunc = [] MRAY_HYBRID(InT) -> OutT{ return OutT{}; };
-    using TransIt = TransformInputIterator<OutT, decltype(TFunc), const InT*>;
+    using TransIt = transform_iterator<OutT, decltype(TFunc), const InT*>;
     TransIt dIn = TransIt(nullptr, TFunc);
     uint32_t* dStartOffsets = nullptr;
     uint32_t* dEndOffsets = nullptr;
@@ -60,11 +60,11 @@ size_t SegmentedTransformReduceTMSize(size_t numSegments)
     void* dTM = nullptr;
 
     size_t result;
-    CUDA_CHECK(DeviceSegmentedReduce::Reduce(dTM, result, dIn, dOut,
-                                             static_cast<int>(numSegments),
-                                             dStartOffsets, dEndOffsets,
-                                             [] MRAY_HYBRID(OutT, OutT)-> OutT { return OutT{}; },
-                                             OutT{}));
+    HIP_CHECK(segmented_reduce(dTM, result, dIn, dOut,
+                               static_cast<int>(numSegments),
+                               dStartOffsets, dEndOffsets,
+                               [] MRAY_HYBRID(OutT, OutT)-> OutT { return OutT{}; },
+                               OutT{}));
     return result;
 }
 
@@ -83,11 +83,12 @@ void Reduce(Span<T, 1> dReducedValue,
     const auto _ = annotation.AnnotateScope();
 
     size_t size = dTempMemory.size();
-    CUDA_CHECK(DeviceReduce::Reduce(dTempMemory.data(), size,
-                                    dValues.data(), dReducedValue.data(),
-                                    static_cast<int>(dValues.size()),
-                                    std::forward<BinaryOp>(op), initialValue,
-                                    ToHandleCUDA(queue)));
+    HIP_CHECK(reduce(dTempMemory.data(), size,
+                     dValues.data(), dReducedValue.data(),
+                     initialValue,
+                     static_cast<int>(dValues.size()),
+                     std::forward<BinaryOp>(op),
+                     ToHandleHIP(queue)));
 }
 
 template <class OutT, class InT, class BinaryOp, class TransformOp>
@@ -105,15 +106,15 @@ void TransformReduce(Span<OutT, 1> dReducedValue,
     static const auto annotation = queue.CreateAnnotation("KCTransformReduce"sv);
     const auto _ = annotation.AnnotateScope();
 
-    using TransIt = TransformInputIterator<OutT, TransformOp, const InT*>;
+    using TransIt = transform_iterator<OutT, TransformOp, const InT*>;
     TransIt dIn = TransIt(dValues.data(), std::forward<TransformOp>(transformOp));
 
     size_t size = dTempMemory.size();
-    CUDA_CHECK(DeviceReduce::Reduce(dTempMemory.data(), size,
-                                    dIn, dReducedValue.data(),
-                                    static_cast<int>(dValues.size()),
-                                    std::forward<BinaryOp>(binaryOp),
-                                    initialValue, ToHandleCUDA(queue)));
+    HIP_CHECK(reduce(dTempMemory.data(), size,
+                     dIn, dReducedValue.data(),
+                     static_cast<int>(dValues.size()),
+                     std::forward<BinaryOp>(binaryOp),
+                     initialValue, ToHandleHIP(queue)));
 }
 
 template <class OutT, class InT, class BinaryOp, class TransformOp>
@@ -131,19 +132,19 @@ void SegmentedTransformReduce(Span<OutT> dReducedValues,
     using namespace std::literals;
     static const auto annotation = queue.CreateAnnotation("KCSegmentedTransformReduce"sv);
     const auto _ = annotation.AnnotateScope();
-    using TransIt = TransformInputIterator<OutT, TransformOp, const InT*>;
+    using TransIt = transform_iterator<OutT, TransformOp, const InT*>;
     TransIt dIn = TransIt(dValues.data(), std::forward<TransformOp>(transformOp));
 
     int segmentCount = static_cast<int>(dSegmentRanges.size() - 1);
     size_t size = dTempMemory.size();
-    CUDA_CHECK(DeviceSegmentedReduce::Reduce(dTempMemory.data(), size,
-                                             dIn,
-                                             dReducedValues.data(),
-                                             segmentCount,
-                                             dSegmentRanges.data(),
-                                             dSegmentRanges.data() + 1,
-                                             std::forward<BinaryOp>(binaryOp),
-                                             initialValue, ToHandleCUDA(queue)));
+    HIP_CHECK(segmented_reduce(dTempMemory.data(), size,
+                               dIn,
+                               dReducedValues.data(),
+                               segmentCount,
+                               dSegmentRanges.data(),
+                               dSegmentRanges.data() + 1,
+                               std::forward<BinaryOp>(binaryOp),
+                               initialValue, ToHandleHIP(queue)));
 }
 
 }

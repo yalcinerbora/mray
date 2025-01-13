@@ -55,7 +55,7 @@ if(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_CUDA")
 elseif(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_HIP")
 
     # TODO: Remove this HIP will only target AMD gpus
-    set(CMAKE_HIP_PLATFORM "amd" CACHE STRING)
+    set(CMAKE_HIP_PLATFORM "amd")
     mark_as_advanced(CMAKE_HIP_PLATFORM)
 
     set(CMAKE_HIP_ARCHITECTURES "gfx1030;gfx1100;gfx1101;gfx1102")
@@ -66,7 +66,7 @@ elseif(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_HIP")
     set(MRAY_PROJECT_GPU_LANGUAGES HIP)
     set(MRAY_GPU_PLATFORM_NAME "HIP")
     # Add .cu files as source files for HIP
-    set(CMAKE_USER_MAKE_RULES_OVERRIDE "HIPFileExtExtras")
+    set(CMAKE_USER_MAKE_RULES_OVERRIDE_HIP "HIPFileExtExtras")
 else()
     message(FATAL_ERROR "Unknown Device backend!"
                         "Please set MRAY_DEVICE_BACKEND to a valid backend")

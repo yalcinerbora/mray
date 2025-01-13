@@ -21,6 +21,19 @@ function(gen_tracer_test)
 
     source_group("" FILES ${SRC_COMMON})
 
+    # I dunno why but global set did not work
+    if(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_HIP")
+
+        set_source_files_properties(${CURRENT_SOURCE_DIR}/T_Random.cu
+                                    ${CURRENT_SOURCE_DIR}/T_Filters.cu
+                                    ${CURRENT_SOURCE_DIR}/T_RayPartitioner.cu
+                                    ${CURRENT_SOURCE_DIR}/T_DefaultTriangle.cu
+                                    ${CURRENT_SOURCE_DIR}/T_DefaultLights.cu
+                                    ${CURRENT_SOURCE_DIR}/T_Distributions.cu
+                                    ${CURRENT_SOURCE_DIR}/T_Materials.cu
+                                    PROPERTIES LANGUAGE HIP)
+    endif()
+
     set(TARGET_FULL_NAME "TTracer${GEN_TRACER_TEST_NAME}")
     set(TRACER_TARGET_FULL_NAME "Tracer${GEN_TRACER_TEST_NAME}")
     add_executable(${TARGET_FULL_NAME} ${SRC_COMMON})

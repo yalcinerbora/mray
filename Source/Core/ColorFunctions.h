@@ -382,8 +382,11 @@ constexpr Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E)
         #elif defined MRAY_DEVICE_CODE_PATH_CUDA
             // TODO: This is CUDA only
             __trap();
+        #elif defined MRAY_DEVICE_CODE_PATH_HIP
+            abort();
         #endif
     }
+    return Color::Primaries{};
 }
 
 template <MRayColorSpaceEnum E>

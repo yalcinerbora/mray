@@ -218,6 +218,24 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
 
 #else
     #error DistributionPwC2D kernels do not have generic implementation yet!
+
+    MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
+    void KCCopyScanY(Span<Float> dYCDFs,
+                     // I-O
+                     Span<const Float> dXCDFs)
+    {}
+
+    MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
+    void KCSegmentedScanPrecise(Span<Float> dOut,
+                                Span<const Float> dIn,
+                                uint32_t segmentSize,
+                                uint32_t totalBlocks)
+    {}
+
+    MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
+    void KCNormalizeXY(Span<Float> dXCDFs, Span<Float> dYCDFs)
+    {}
+
 #endif
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT

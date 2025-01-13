@@ -14,16 +14,16 @@ template <class T>
 MRAY_HOST inline
 size_t BinPartitionTMSize(size_t elementCount)
 {
-    using namespace rocprim ;
+    using namespace rocprim;
 
     T* dOut = nullptr;
     T* dIn = nullptr;
     void* dTM = nullptr;
     uint32_t* dEndOffset = nullptr;
     size_t result;
-    CUDA_CHECK(DevicePartition::If(dTM, result, dIn, dOut, dEndOffset,
-                                   static_cast<int>(elementCount),
-                                   [] MRAY_HYBRID(T)->bool{ return false; }));
+    HIP_CHECK(partition(dTM, result, dIn, dOut, dEndOffset,
+                        static_cast<int>(elementCount),
+                        [] MRAY_HYBRID(T)->bool{ return false; }));
 
     return result;
 }
@@ -34,7 +34,7 @@ void BinaryPartition(Span<T> dOutput,
                      Span<uint32_t, 1> dEndOffset,
                      Span<Byte> dTempMemory,
                      Span<const T> dInput,
-                     const GPUQueueCUDA& queue,
+                     const GPUQueueHIP& queue,
                      UnaryOp&& op)
 {
     using namespace rocprim;
@@ -44,10 +44,10 @@ void BinaryPartition(Span<T> dOutput,
     assert(dInput.size() == dOutput.size());
 
     size_t size = dTempMemory.size();
-    CUDA_CHECK(DevicePartition::If(dTempMemory.data(), size,
-                                   dInput.data(), dOutput.data(), dEndOffset.data(),
-                                   static_cast<int>(dInput.size()),
-                                   std::forward<UnaryOp>(op),
-                                   ToHandleCUDA(queue)));
+    HIP_CHECK(partition(dTempMemory.data(), size,
+                        dInput.data(), dOutput.data(), dEndOffset.data(),
+                        static_cast<int>(dInput.size()),
+                        std::forward<UnaryOp>(op),
+                        ToHandleHIP(queue)));
 }
 }

@@ -20,7 +20,7 @@ namespace DeviceVisitDetail
 
 template<uint32_t I, class VariantT, class Func>
 requires(I < std::variant_size_v<std::remove_reference_t<VariantT>>)
-MRAY_GPU //MRAY_GPU_INLINE
+MRAY_GPU MRAY_GPU_INLINE
 constexpr auto DeviceVisitDetail::LoopAndInvoke(VariantT&& v, Func&& f) -> decltype(auto)
 {
     using CurrentType = decltype(std::get<I>(v));
@@ -31,16 +31,14 @@ constexpr auto DeviceVisitDetail::LoopAndInvoke(VariantT&& v, Func&& f) -> declt
         return LoopAndInvoke<I + 1>(std::forward<VariantT>(v), std::forward<Func>(f));
     else
     {
-        #ifdef MRAY_DEVICE_CODE_PATH
-            if constexpr (MRAY_IS_DEBUG)
-                printf("Invalid variant access on device!\n");
-            #ifdef MRAY_DEVICE_CODE_PATH_CUDA
-                __trap();
-            #else
-                abort();
-            #endif
+        if constexpr(MRAY_IS_DEBUG)
+            printf("Invalid variant access on device!\n");
+
+        //
+        #ifdef MRAY_DEVICE_CODE_PATH_CUDA
+            __trap();
         #else
-            throw MRayError("Invalid variant access on device!");
+            abort();
         #endif
     }
 }
