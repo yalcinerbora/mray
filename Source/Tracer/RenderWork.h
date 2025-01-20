@@ -20,7 +20,7 @@ struct RenderWorkInputs
     Span<const RayIndex>    dRayIndices;
     Span<const uint32_t>    dRandomNumbers;
     // Accesed by index
-    Span<const RayDiff>     dRayDiffs;
+    Span<const RayCone>     dRayCones;
     Span<const RayGMem>     dRays;
     Span<const MetaHit>     dHits;
     Span<const HitKeyPack>  dKeys;
@@ -128,7 +128,7 @@ class RenderWork : public RenderWorkT<R>
                         Span<const RayIndex> dRayIndicesIn,
                         Span<const RandomNumber> dRandomNumbers,
                         // Accessed by index
-                        Span<const RayDiff> dRayDiffsIn,
+                        Span<const RayCone> dRayDiffsIn,
                         Span<const RayGMem> dRaysIn,
                         Span<const MetaHit> dHitsIn,
                         Span<const HitKeyPack> dKeysIn,
@@ -170,7 +170,7 @@ class RenderLightWork : public RenderLightWorkT<R>
                                    Span<const RayIndex> dRayIndicesIn,
                                    Span<const uint32_t> dRandomNumbers,
                                    // Accessed by index
-                                   Span<const RayDiff> dRayDiffsIn,
+                                   Span<const RayCone> dRayDiffsIn,
                                    Span<const RayGMem> dRaysIn,
                                    Span<const MetaHit> dHitsIn,
                                    Span<const HitKeyPack> dKeysIn,
@@ -218,7 +218,7 @@ class RenderCameraWork : public RenderCameraWorkT<R>
                               const GPUQueue& queue) const override;
 
     void    GenerateRays(// Output
-                         const Span<RayDiff>& dRayDiffsOut,
+                         const Span<RayCone>& dRayDiffsOut,
                          const Span<RayGMem>& dRaysOut,
                          const Span<ImageCoordinate>& dImageCoordsOut,
                          const Span<Float>& dSampleWeightsOut,
@@ -233,7 +233,7 @@ class RenderCameraWork : public RenderCameraWorkT<R>
                          const Vector2ui regionCount,
                          const GPUQueue& queue) const override;
     void    GenRaysStochasticFilter(// Output
-                                    const Span<RayDiff>& dRayDiffsOut,
+                                    const Span<RayCone>& dRayDiffsOut,
                                     const Span<RayGMem>& dRaysOut,
                                     const Span<ImageCoordinate>& dImageCoordsOut,
                                     const Span<Float>& dSampleWeightsOut,
@@ -306,7 +306,7 @@ void RenderWork<R, PG, MG, TG>::DoWorkInternal(// I-O
                                                Span<const RayIndex> dRayIndicesIn,
                                                Span<const RandomNumber> dRandomNumbers,
                                                // Accessed by index
-                                               Span<const RayDiff> dRayDiffsIn,
+                                               Span<const RayCone> dRayDiffsIn,
                                                Span<const RayGMem> dRaysIn,
                                                Span<const MetaHit> dHitsIn,
                                                Span<const HitKeyPack> dKeysIn,
@@ -338,7 +338,7 @@ void RenderWork<R, PG, MG, TG>::DoWorkInternal(// I-O
             {
                 .dRayIndices    = dRayIndicesIn,
                 .dRandomNumbers = dRandomNumbers,
-                .dRayDiffs      = dRayDiffsIn,
+                .dRayCones      = dRayDiffsIn,
                 .dRays          = dRaysIn,
                 .dHits          = dHitsIn,
                 .dKeys          = dKeysIn
@@ -404,7 +404,7 @@ void RenderLightWork<R, LG, TG>::DoBoundaryWorkInternal(// I-O
                                                         Span<const RayIndex> dRayIndicesIn,
                                                         Span<const uint32_t> dRandomNumbers,
                                                         // Accessed by index
-                                                        Span<const RayDiff> dRayDiffsIn,
+                                                        Span<const RayCone> dRayDiffsIn,
                                                         Span<const RayGMem> dRaysIn,
                                                         Span<const MetaHit> dHitsIn,
                                                         Span<const HitKeyPack> dKeysIn,
@@ -436,7 +436,7 @@ void RenderLightWork<R, LG, TG>::DoBoundaryWorkInternal(// I-O
             {
                 .dRayIndices    = dRayIndicesIn,
                 .dRandomNumbers = dRandomNumbers,
-                .dRayDiffs      = dRayDiffsIn,
+                .dRayCones      = dRayDiffsIn,
                 .dRays          = dRaysIn,
                 .dHits          = dHitsIn,
                 .dKeys          = dKeysIn
@@ -528,7 +528,7 @@ void RenderCameraWork<R, C, T>::GenerateSubCamera(// Output
 
 template<RendererC R, CameraGroupC C, TransformGroupC T>
 void RenderCameraWork<R, C, T>::GenerateRays(// Output
-                                             const Span<RayDiff>& dRayDiffsOut,
+                                             const Span<RayCone>& dRayDiffsOut,
                                              const Span<RayGMem>& dRaysOut,
                                              const Span<ImageCoordinate>& dImageCoordsOut,
                                              const Span<Float>& dSampleWeightsOut,
@@ -577,7 +577,7 @@ void RenderCameraWork<R, C, T>::GenerateRays(// Output
 
 template<RendererC R, CameraGroupC C, TransformGroupC T>
 void RenderCameraWork<R, C, T>::GenRaysStochasticFilter(// Output
-                                                        const Span<RayDiff>& dRayDiffsOut,
+                                                        const Span<RayCone>& dRayDiffsOut,
                                                         const Span<RayGMem>& dRaysOut,
                                                         const Span<ImageCoordinate>& dImageCoordsOut,
                                                         const Span<Float>& dSampleWeightsOut,
@@ -707,12 +707,13 @@ static void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParamsR<R, I, PG, MG
         // here
         // Ray
         RayIndex rIndex = params.in.dRayIndices[globalId];
-        auto [ray, tMinMax] = RayFromGMem(params.in.dRays, rIndex);
+        auto [ray, tMM] = RayFromGMem(params.in.dRays, rIndex);
         // Keys
         HitKeyPack keys = params.in.dKeys[rIndex];
         // Hit (TODO: What about single parameters?)
         Hit hit = params.in.dHits[rIndex].template AsVector<Hit::Dims>();
-        RayDiff rayDiff = params.in.dRayDiffs[rIndex];
+        // Advance the differential to the hit location
+        RayCone rayCone = params.in.dRayCones[rIndex].Advance(tMM[1]);
 
         // Get instantiation of converter
         // TODO: Add spectrum related stuff, this should not be
@@ -729,13 +730,15 @@ static void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParamsR<R, I, PG, MG
                                    keys.primKey);
         // Generate the surface
         Surface surface;
-        primitive.GenerateSurface(surface, hit, ray, RayDiff{});
+        RayConeSurface rayConeSurface;
+        primitive.GenerateSurface(surface, rayConeSurface,
+                                  hit, ray, rayCone);
         // Generate the material
         auto material = Material(specConverter, params.matSoA,
                                  std::bit_cast<MaterialKey>(keys.lightOrMatKey));
         // Call the function
-        WorkFunction(primitive, material, surface, tContext,
-                     rng, params, rIndex);
+        WorkFunction(primitive, material, surface, rayConeSurface,
+                     tContext, rng, params, rIndex);
         // All Done!
     }
 }

@@ -66,35 +66,6 @@ struct ArgumentPackOpitX
 		VisibilityCastArgPackOptiX vParams;
 		LocalRayCastArgPackOptiX lParams;
 	};
-
-	////union;
-
-	//OptixTraversableHandle 	baseAccelerator;
-	//// Outputs
-	//Span<HitKeyPack>        dHitKeys;
-	//Span<MetaHit>			dHits;
-	//// I-O
-	//Span<BackupRNGState>	dRNGStates;
-	//Span<RayGMem>           dRays;
-	//// Inputs
-	//Span<const RayIndex>    dRayIndices;
-	//// Visibility ray casting related
-	//bool					doVisibility;
-	//Bitspan<uint32_t>		dIsVisibleBuffer;
-	//Span<const RayGMem>		dRaysConst;
-	//// Local ray-casting related
-	//bool								doLocalCasting;
-	//Span<const OptixTraversableHandle>	dGlobalInstanceTraversables;
-	//Span<const Matrix4x4>				dGlobalInstanceInvTransforms;
-	//Span<const AcceleratorKey>			dAcceleratorKeys;
-	//uint32_t							batchStartOffset;
-};
-
-struct LocalCastArgumentPackOptix
-{
-	// Local casting related
-
-
 };
 
 // Hit records (as far as I understand) can be defined multiple times
@@ -117,11 +88,9 @@ struct GenericHitRecordData
 	// MRay identifier of the GAS (may be used to individually
 	// trace the GAS for SSS)
 	AcceleratorKey		acceleratorKey;
-	// Cull face is instance level operation and is a software flag.
-	// so we do not hold it here
-	// TODO: This is wrong, (only true for triangles)
-	// We need to pass the flag here for custom primitives.
-	// ...
+	// Cull face is instance level operation and is a software flag
+	// for triangles, for other primitives this will be valid
+	bool				cullBackFaceNonTri;
 	//
 	// SoA Access
 	// Triangle types do not need SoA since

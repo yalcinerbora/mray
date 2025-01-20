@@ -242,7 +242,7 @@ void DoWork_##tag                                   \
     const RenderRayState<R, tag>& dRayStates,       \
     Span<const RayIndex> dRayIndicesIn,             \
     Span<const RandomNumber> dRandomNumbers,        \
-    Span<const RayDiff> dRayDiffsIn,                \
+    Span<const RayCone> dRayDiffsIn,                \
     Span<const RayGMem> dRaysIn,                    \
     Span<const MetaHit> dHitsIn,                    \
     Span<const HitKeyPack> dKeysIn,                 \
@@ -256,7 +256,7 @@ void DoWork_##tag                       \
     const RenderRayState<R, tag>& a,    \
     Span<const RayIndex> b,             \
     Span<const RandomNumber> c,         \
-    Span<const RayDiff> d,              \
+    Span<const RayCone> d,              \
     Span<const RayGMem> e,              \
     Span<const MetaHit> f,              \
     Span<const HitKeyPack> g,           \
@@ -274,7 +274,7 @@ void DoBoundaryWork_##tag                           \
     const RenderRayState<R, tag>& dRayStates,       \
     Span<const RayIndex> dRayIndicesIn,             \
     Span<const uint32_t> dRandomNumbers,            \
-    Span<const RayDiff> dRayDiffsIn,                \
+    Span<const RayCone> dRayDiffsIn,                \
     Span<const RayGMem> dRaysIn,                    \
     Span<const MetaHit> dHitsIn,                    \
     Span<const HitKeyPack> dKeysIn,                 \
@@ -288,7 +288,7 @@ void DoBoundaryWork_##tag                   \
     const RenderRayState<R, tag>& a,        \
     Span<const RayIndex> b,                 \
     Span<const uint32_t> c,                 \
-    Span<const RayDiff> d,                  \
+    Span<const RayCone> d,                  \
     Span<const RayGMem> e,                  \
     Span<const MetaHit> f,                  \
     Span<const HitKeyPack> g,               \
@@ -333,7 +333,7 @@ class RenderCameraWorkT : public RenderCameraWorkI
                                    Vector2ui stratumCount,
                                    const GPUQueue& queue) const = 0;
     virtual void GenerateRays(// Output
-                              const Span<RayDiff>& dRayDiffsOut,
+                              const Span<RayCone>& dRayDiffsOut,
                               const Span<RayGMem>& dRaysOut,
                               const Span<ImageCoordinate>& dImageCoordsOut,
                               const Span<Float>& dSampleWeightsOut,
@@ -348,7 +348,7 @@ class RenderCameraWorkT : public RenderCameraWorkI
                               const Vector2ui regionCount,
                               const GPUQueue& queue) const = 0;
     virtual void GenRaysStochasticFilter(// Output
-                                         const Span<RayDiff>& dRayDiffsOut,
+                                         const Span<RayCone>& dRayDiffsOut,
                                          const Span<RayGMem>& dRaysOut,
                                          const Span<ImageCoordinate>& dImageCoordsOut,
                                          const Span<Float>& dSampleWeightsOut,

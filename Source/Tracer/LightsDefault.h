@@ -43,6 +43,10 @@ namespace LightDetail
         static Float    ToSolidAnglePdf(Float pdf, const Vector3& dirYUp);
         MRAY_HYBRID
         static Float    ToSolidAnglePdf(Float pdf, const Vector2& uv);
+
+        MRAY_HYBRID
+        static std::array<Vector2, 2> Gradient(Float coneAperture,
+                                               const Vector3& dirYUp);
     };
 
     struct CoOctaCoordConverter
@@ -55,6 +59,10 @@ namespace LightDetail
         static Float    ToSolidAnglePdf(Float pdf, const Vector3& dirYUp);
         MRAY_HYBRID
         static Float    ToSolidAnglePdf(Float pdf, const Vector2& uv);
+
+        MRAY_HYBRID
+        static std::array<Vector2, 2> Gradient(Float coneAperture,
+                                               const Vector3& dirYUp);
     };
 
     // Meta Primitive Related Light
@@ -95,10 +103,12 @@ namespace LightDetail
         Float               PdfRay(const Ray&) const;
         MRAY_HYBRID
         Spectrum            EmitViaHit(const Vector3& wO,
-                                       const typename Primitive::Hit& hit) const;
+                                       const typename Primitive::Hit& hit,
+                                       const RayCone& rayCone) const;
         MRAY_HYBRID
         Spectrum            EmitViaSurfacePoint(const Vector3& wO,
-                                                const Vector3& surfacePoint) const;
+                                                const Vector3& surfacePoint,
+                                                const RayCone& rayCone) const;
     };
 
      // Meta Primitive Related Light
@@ -148,10 +158,12 @@ namespace LightDetail
         Float               PdfRay(const Ray&) const;
         MRAY_HYBRID
         Spectrum            EmitViaHit(const Vector3& wO,
-                                       const typename Primitive::Hit& hit) const;
+                                       const typename Primitive::Hit& hit,
+                                       const RayCone& rayCone) const;
         MRAY_HYBRID
         Spectrum            EmitViaSurfacePoint(const Vector3& wO,
-                                                const Vector3& surfacePoint) const;
+                                                const Vector3& surfacePoint,
+                                                const RayCone& rayCone) const;
     };
 
     template <TransformContextC TContext = TransformContextIdentity,
@@ -184,10 +196,11 @@ namespace LightDetail
         Float               PdfRay(const Ray&) const;
         MRAY_HYBRID
         Spectrum            EmitViaHit(const Vector3&,
-                                       const typename Primitive::Hit&) const;
+                                       const typename Primitive::Hit&,
+                                       const RayCone&) const;
         MRAY_HYBRID
-        Spectrum            EmitViaSurfacePoint(const Vector3&,
-                                                const Vector3&) const;
+        Spectrum            EmitViaSurfacePoint(const Vector3&, const Vector3&,
+                                                const RayCone&) const;
     };
 }
 

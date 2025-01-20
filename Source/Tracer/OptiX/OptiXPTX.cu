@@ -253,14 +253,13 @@ void KCIntersect()
                                                          pKey);
         ray = tContext.InvApply(ray);
     }
-    // For constant-local transform, to object is enough
+    // For constant-local transform, "to object" is enough
     //
     // Get the actual primitive,
     // We already transformed the ray, so generate via
     // identity transform context
     Primitive prim(TransformContextIdentity{}, *record.primSoA, pKey);
-    // TODO: We need back-face culling to transfer here
-    Intersection result = prim.Intersects(ray, true);
+    Intersection result = prim.Intersects(ray, record.cullBackFaceNonTri);
 
     if(result) ReportIntersection(*result, 0);
 }

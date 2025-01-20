@@ -30,8 +30,8 @@ concept LightC = requires(LightType l,
     {l.PdfSolidAngle(hit, Vector3{}, Vector3{})} -> std::same_as<Float>;
     {l.SampleRay(rng)} -> std::same_as<SampleT<Ray>>;
     {l.PdfRay(Ray{})} -> std::same_as<Float>;
-    {l.EmitViaHit(Vector3{}, hit)} -> std::same_as<Spectrum>;
-    {l.EmitViaSurfacePoint(Vector3{}, Vector3{})} -> std::same_as<Spectrum>;
+    {l.EmitViaHit(Vector3{}, hit, RayCone{})} -> std::same_as<Spectrum>;
+    {l.EmitViaSurfacePoint(Vector3{}, Vector3{}, RayCone{})} -> std::same_as<Spectrum>;
     //
     LightType::IsPrimitiveBackedLight;
     requires std::is_same_v<decltype(LightType::IsPrimitiveBackedLight), const bool>;

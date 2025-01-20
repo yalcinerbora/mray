@@ -115,7 +115,8 @@ Float LightPrim<P, SC>::PdfRay(const Ray& ray) const
 template<PrimitiveC P, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum LightPrim<P, SC>::EmitViaHit(const Vector3& wO,
-                                      const typename P::Hit& hit) const
+                                      const typename P::Hit& hit,
+                                      const RayCone&) const
 {
 
     const P& primitive = prim.get();
@@ -137,7 +138,8 @@ Spectrum LightPrim<P, SC>::EmitViaHit(const Vector3& wO,
 template<PrimitiveC P, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum LightPrim<P, SC>::EmitViaSurfacePoint(const Vector3& wO,
-                                               const Vector3& surfacePoint) const
+                                               const Vector3& surfacePoint,
+                                               const RayCone&) const
 {
     const P& primitive = prim.get();
     using Hit = typename P::Hit;
@@ -210,6 +212,35 @@ Float SphericalCoordConverter::ToSolidAnglePdf(Float pdf, const Vector2& uv)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
+std::array<Vector2, 2>
+SphericalCoordConverter::Gradient(Float coneAperture,
+                                  const Vector3& dirYUp)
+{
+    // Ray Tracing Gems I Chapter 21
+    // requires the texture width.
+    // We do not have these on the system (which should be
+    // added)
+    // Instead we calculate the gradients and feed it
+    //
+    // For Lat/Lon mapping, we can find the cos(phi) to increase
+    // the resolution towards poles.
+    Float cosPhi = MathConstants::Pi<Float>() * Float(0.5);
+    cosPhi -= std::abs(dirYUp[1]);
+
+    // On horizon, du change is constant and is between [0 2pi)
+    Float coneAngle = coneAperture * Float(0.5);
+    Float dpdx = coneAngle * MathConstants::Inv2Pi<Float>();
+    // U change is dependent on the altitude so we need to scale it
+    dpdx *= cosPhi;
+
+    // For altitude, the range is [-pi/2, pi/2]
+    Float dpdy = coneAngle * MathConstants::InvPi<Float>();
+
+    // No anisotrophy
+    return {Vector2(dpdx, 0), Vector2(0, dpdy)};
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
 Vector2 CoOctaCoordConverter::DirToUV(const Vector3& dirYUp)
 {
     Vector3 dirZUp = TransformGen::YUpToZUp(dirYUp);
@@ -237,6 +268,31 @@ Float CoOctaCoordConverter::ToSolidAnglePdf(Float pdf, const Vector2&)
 {
     using namespace MathConstants;
     return pdf * Float(0.25) * InvPi<Float>();
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+std::array<Vector2, 2>
+CoOctaCoordConverter::Gradient(Float coneAperture,
+                               const Vector3&)
+{
+    // Ray Tracing Gems I Chapter 21
+    // requires the texture width.
+    // We do not have these on the system (which should be
+    // added tbh, but cuda does not expose these on textures
+    // so we need to explicitly hold these which is extra memory)
+    // Instead we calculate the gradients and feed it
+    //
+    // Convert coneAngle is a solid angle
+    // https://arxiv.org/pdf/2108.05226
+    //
+    Float omega = MathConstants::Pi<Float>() * Float(2);
+    Float coneAngle = coneAperture * Float(0.5);
+    omega *= Float(1) - std::cos(coneAngle);
+
+    // Omega changes wrt. entire solid angle domain wihch is 4pi
+    Float duv = omega * MathConstants::Inv4Pi<Float>();
+    // No anisotrophy
+    return {Vector2(duv, 0), Vector2(0, duv)};
 }
 
 template<CoordConverterC CC, TransformContextC TC, class SC>
@@ -339,26 +395,38 @@ Float LightSkysphere<CC, TC, SC>::PdfRay(const Ray& ray) const
 template<CoordConverterC CC, TransformContextC TC, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum LightSkysphere<CC, TC, SC>::EmitViaHit(const Vector3& wO,
-                                                const typename EmptyPrimitive<TC>::Hit&) const
+                                                const typename EmptyPrimitive<TC>::Hit&,
+                                                const RayCone&) const
 {
     Vector3 dirYUp = prim.get().GetTransformContext().InvApplyV(-wO).Normalize();
     Vector2 uv = radiance.IsConstant()
                     ? Vector2::Zero()
                     : CC::DirToUV(dirYUp);
-    // TODO: How to incorporate differentials here?
+    // TODO: Differentials generate extra noise (Disabled!)
+    // This is probably due to sampled value does not match the distribution
+    // Probably we need to have a distribution for each mip level to make it
+    // work?
+    //auto [dpdx, dpdy] = CC::Gradient(rayCone.aperture, dirYUp);
+    //return radiance(uv, dpdx, dpdy).value();
     return radiance(uv).value();
 }
 
 template<CoordConverterC CC, TransformContextC TC, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum LightSkysphere<CC, TC, SC>::EmitViaSurfacePoint(const Vector3& wO,
-                                                         const Vector3&) const
+                                                         const Vector3&,
+                                                         const RayCone&) const
 {
     Vector3 dirYUp = prim.get().GetTransformContext().InvApplyV(-wO).Normalize();
     Vector2 uv = radiance.IsConstant()
                     ? Vector2::Zero()
                     : CC::DirToUV(dirYUp);
-    // TODO: How to incorporate differentials here?
+    // TODO: Differentials generate extra noise (Disabled!)
+    // This is probably due to sampled value does not match the distribution
+    // Probably we need to have a distribution for each mip level to make it
+    // work?
+    //auto [dpdx, dpdy] = CC::Gradient(rayCone.aperture, dirYUp);
+    //return radiance(uv, dpdx, dpdy).value();
     return radiance(uv).value();
 }
 
@@ -420,15 +488,16 @@ Float LightNull<TC, SC>::PdfRay(const Ray&) const
 template<TransformContextC TC, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum LightNull<TC, SC>::EmitViaHit(const Vector3&,
-                                       const typename Primitive::Hit&) const
+                                       const typename Primitive::Hit&,
+                                       const RayCone&) const
 {
     return Spectrum::Zero();
 }
 
 template<TransformContextC TC, class SC>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum LightNull<TC, SC>::EmitViaSurfacePoint(const Vector3&,
-                                                const Vector3&) const
+Spectrum LightNull<TC, SC>::EmitViaSurfacePoint(const Vector3&, const Vector3&,
+                                                const RayCone&) const
 {
     return Spectrum::Zero();
 }

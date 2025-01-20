@@ -81,7 +81,7 @@ TransientData PushVertexAttribute(PrimitiveAttributeLogic attribLogic,
             for(unsigned int i = 0; i < mesh->mNumVertices; i++)
             {
                 T uv = T(mesh->mTextureCoords[texCoordIndex][i].x,
-                            mesh->mTextureCoords[texCoordIndex][i].y);
+                         mesh->mTextureCoords[texCoordIndex][i].y);
                 input.Push(Span<const T>(&uv, 1));
             }
             return input;

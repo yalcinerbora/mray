@@ -83,6 +83,14 @@ concept MaterialC = requires(MatType mt,
     // TODO: Add for position as well (except for BSSRDF
     // it will return zero)
 
+    // Refract the RayCone and calculate the
+    // invBetaN of the cone. If refraction
+    // does not make sense with this material
+    // This function should be an identity function.
+    {mt.RefractRayCone(RayConeSurface{}, Vector3{},
+                       typename MatType::Surface{})
+    } -> std::same_as<RayConeSurface>;
+
     // Streaming texture query
     // Given surface, all textures of this material should be accessible
     { mt.IsAllTexturesAreResident(typename MatType::Surface{})} -> std::same_as<bool>;

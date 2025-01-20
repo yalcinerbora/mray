@@ -65,6 +65,7 @@ RaySample CameraPinhole::SampleRay(// Input
         .pixelIndex = Vector2us(sampleId),
         .offset = SNorm2x16(localJitter)
     };
+
     // Initialize Ray
     return RaySample
     {
@@ -73,7 +74,13 @@ RaySample CameraPinhole::SampleRay(// Input
             .ray = Ray(rayDir, position),
             .tMinMax = nearFar,
             .imgCoords = imgCoords,
-            .rayDifferentials = RayDiff{}
+
+            // Ray Tracing Gems I. Chapter2 equation 30
+            .rayCone = RayCone
+            {
+                .aperture = Float(2) * tan(fov[1] * Float(0.5)) / stratumCount[1],
+                .width = Float(0)
+            }
         },
         .pdf = Float(1.0)
     };
@@ -118,7 +125,11 @@ RaySample CameraPinhole::EvaluateRay(const Vector2ui& generationIndex,
             .ray = Ray(rayDir, position),
             .tMinMax = nearFar,
             .imgCoords = imgCoords,
-            .rayDifferentials = RayDiff{}
+            .rayCone = RayCone
+            {
+                .aperture = Float(2) * tan(fov[1] * Float(0.5)) / stratumCount[1],
+                .width = Float(0)
+            }
         },
         .pdf = Float(1.0)
     };

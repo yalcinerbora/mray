@@ -139,10 +139,12 @@ class MetaLightViewT
 
     MRAY_HYBRID
     Spectrum            EmitViaHit(const Vector3& wO,
-                                   const MetaHit& hit) const;
+                                   const MetaHit& hit,
+                                   const RayCone& rayCone) const;
     MRAY_HYBRID
     Spectrum            EmitViaSurfacePoint(const Vector3& wO,
-                                            const Vector3& surfacePoint) const;
+                                            const Vector3& surfacePoint,
+                                            const RayCone& rayCone) const;
 
     MRAY_HYBRID bool    IsPrimitiveBackedLight() const;
 };

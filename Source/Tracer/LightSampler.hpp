@@ -24,7 +24,9 @@ template <class SpectrumConverter>
 MRAY_HYBRID MRAY_CGPU_INLINE
 LightSample DirectLightSamplerUniform<ML>::SampleLight(RNGDispenser& rng,
                                                        const SpectrumConverter& stConverter,
-                                                       const Vector3& distantPoint) const
+                                                       const Vector3& distantPoint,
+                                                       const Vector3& distantNormal,
+                                                       const RayConeSurface& distantRayConeSurf) const
 {
     using MetaLightView = typename MetaLightArrayView::template MetaLightView<SpectrumConverter>;
     static constexpr auto DiscreteSampleIndex = ML::SampleSolidAngleRNCountWorst;
@@ -42,8 +44,13 @@ LightSample DirectLightSamplerUniform<ML>::SampleLight(RNGDispenser& rng,
     MetaLightView metaLight = dMetaLights(stConverter, lightIndex);
     SampleT<Vector3> pointSample = metaLight.SampleSolidAngle(rng, distantPoint);
 
-    Vector3 wO = (distantPoint - pointSample.value).Normalize();
-    Spectrum emission = metaLight.EmitViaSurfacePoint(wO, pointSample.value);
+    Vector3 wO = (distantPoint - pointSample.value);
+    Float distance = wO.Length();
+    wO.NormalizeSelf();
+    RayCone surfaceCone = distantRayConeSurf.ConeAfterScatter(wO, distantNormal);
+    surfaceCone = surfaceCone.Advance(distance);
+    Spectrum emission = metaLight.EmitViaSurfacePoint(wO, pointSample.value,
+                                                      surfaceCone);
 
     Float selectionPdf = Float(1) / lightCountF;
     return LightSample

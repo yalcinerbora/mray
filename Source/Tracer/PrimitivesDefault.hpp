@@ -183,30 +183,46 @@ const T& Sphere<T>::GetTransformContext() const
 template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 void Sphere<T>::GenerateSurface(EmptySurface&,
+                                RayConeSurface& rayConeSurface,
                                 // Inputs
                                 const Hit&,
                                 const Ray&,
-                                const RayDiff&) const
-{}
+                                const RayCone& rayCone) const
+{
+    rayConeSurface = RayConeSurface
+    {
+        .rayConeFront   = rayCone,
+        .rayConeBack    = rayCone,
+        .betaN          = 0
+    };
+}
 
 template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 void Sphere<T>::GenerateSurface(BasicSurface& result,
+                                RayConeSurface& rayConeSurface,
                                 // Inputs
                                 const Hit& hit,
                                 const Ray&,
-                                const RayDiff&) const
+                                const RayCone& rayCone) const
 {
     result = *SurfaceFromHit(hit);
+    rayConeSurface = RayConeSurface
+    {
+        .rayConeFront   = rayCone,
+        .rayConeBack    = rayCone,
+        .betaN          = 0
+    };
 }
 
 template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 void Sphere<T>::GenerateSurface(DefaultSurface& result,
+                                RayConeSurface& rayConeSurface,
                                 // Inputs
                                 const Hit& hit,
                                 const Ray& ray,
-                                const RayDiff&) const
+                                const RayCone& rayCone) const
 {
     // Convert spherical hit to cartesian
     Vector3 normal = Graphics::UnitSphericalToCartesian(hit);
@@ -220,7 +236,8 @@ void Sphere<T>::GenerateSurface(DefaultSurface& result,
     Quaternion tbn = Quaternion::RotationBetweenZAxis(normal.Normalize()).Conjugate();
 
     // Spheres are always two sided, check if we are inside
-    bool backSide = (geoNormal.Dot(ray.Dir()) > Float(0));
+    Float dDotN = geoNormal.Dot(ray.Dir().Normalize());
+    bool backSide = (dDotN > Float(0));
     if(backSide)
     {
         geoNormal = -geoNormal;
@@ -234,15 +251,36 @@ void Sphere<T>::GenerateSurface(DefaultSurface& result,
     }
     Vector2 uv = SurfaceParametrization(hit);
 
+
+    // Curvature / texture differentials
+    // https://www.jcgt.org/published/0010/01/01/
+    // Sphere implementation is not there
+    // Equation 5
+    Vector3 centerWorld = transformContext.get().ApplyP(center);
+    // The sphere may be transformed via non-uniform scale
+    // so we need to calculate "radius" from the world positions
+    Float r = (centerWorld - position).Length();
+    Float betaN = Float(-1) * std::abs(rayCone.width) / (dDotN * r);
+    betaN = backSide ? -betaN : betaN;
+    // Texture space differentials
+    // TODO: ...
+
     result = DefaultSurface
     {
         .position = position,
         .geoNormal = geoNormal,
         .shadingTBN = tbn,
         .uv = uv,
-        .dpdu = Vector2::Zero(),
-        .dpdv = Vector2::Zero(),
+        .dpdx = Vector2::Zero(),
+        .dpdy = Vector2::Zero(),
         .backSide = backSide
+    };
+    // TODO:
+    rayConeSurface = RayConeSurface
+    {
+        .rayConeFront   = rayCone,
+        .rayConeBack    = rayCone,
+        .betaN          = betaN
     };
 }
 

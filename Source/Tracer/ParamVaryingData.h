@@ -23,8 +23,8 @@ class ParamVaryingData
     MRAY_HYBRID Optional<T>     operator()(Vector<DIMS, Float> uvCoords) const;
     // Gradient Access
     MRAY_HYBRID Optional<T>     operator()(Vector<DIMS, Float> uvCoords,
-                                           Vector<DIMS, Float> dpdu,
-                                           Vector<DIMS, Float> dpdv) const;
+                                           Vector<DIMS, Float> dpdx,
+                                           Vector<DIMS, Float> dpdy) const;
     // Direct Mip Access
     MRAY_HYBRID Optional<T>     operator()(Vector<DIMS, Float> uvCoords,
                                            uint32_t mipLevel) const;
@@ -82,8 +82,8 @@ class RendererParamVaryingSpectrum
     MRAY_HYBRID Optional<Spectrum>  operator()(Vector<DIMS, Float> uvCoords) const;
     // Gradient Access
     MRAY_HYBRID Optional<Spectrum>  operator()(Vector<DIMS, Float> uvCoords,
-                                               Vector<DIMS, Float> dpdu,
-                                               Vector<DIMS, Float> dpdv) const;
+                                               Vector<DIMS, Float> dpdx,
+                                               Vector<DIMS, Float> dpdy) const;
     // Direct Mip Access
     MRAY_HYBRID Optional<Spectrum>  operator()(Vector<DIMS, Float> uvCoords,
                                                uint32_t mipLevel) const;
@@ -149,11 +149,11 @@ Optional<T> ParamVaryingData<DIMS, T>::operator()(Vector<DIMS, Float> uvCoords) 
 template <uint32_t DIMS, class T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Optional<T> ParamVaryingData<DIMS, T>::operator()(Vector<DIMS, Float> uvCoords,
-                                                  Vector<DIMS, Float> dpdu,
-                                                  Vector<DIMS, Float> dpdv) const
+                                                  Vector<DIMS, Float> dpdx,
+                                                  Vector<DIMS, Float> dpdy) const
 {
     if(std::holds_alternative<Texture>(t))
-        return std::get<Texture>(t)(uvCoords, dpdu, dpdv);
+        return std::get<Texture>(t)(uvCoords, dpdx, dpdy);
     return std::get<T>(t);
 }
 
@@ -207,10 +207,10 @@ Optional<Spectrum> RendererParamVaryingSpectrum<C, D>::operator()(Vector<D, Floa
 template<class C, uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Optional<Spectrum> RendererParamVaryingSpectrum<C, D>::operator()(Vector<D, Float> uvCoords,
-                                                                  Vector<D, Float> dpdu,
-                                                                  Vector<D, Float> dpdv) const
+                                                                  Vector<D, Float> dpdx,
+                                                                  Vector<D, Float> dpdy) const
 {
-    return converter.get().Convert(input.get()(uvCoords, dpdu, dpdv));
+    return converter.get().Convert(input.get()(uvCoords, dpdx, dpdy));
 }
 
 template<class C, uint32_t D>

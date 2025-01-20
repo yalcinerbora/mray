@@ -569,7 +569,6 @@ void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
         hInstanceHitRecordCounts = hConcreteHitRecordCounts;
     }
 
-
     // Generate the common flags
     for(size_t i = 0; i < this->InstanceCount(); i++)
     {
@@ -632,20 +631,21 @@ void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
         const Byte* dTransSoAPtr = dTransformGroupSoAList.subspan(hTransformSoAOffsets[workId],
                                                                   transSoASize).data();
         auto accKey = AcceleratorKey::CombinedKey(uint32_t(workId), uint32_t(i));
-        for(size_t j = 0; j < recordCount; j++)
+        for(uint32_t j = 0; j < recordCount; j++)
         {
             Vector2ui primRange = hConcreteHitRecordPrimRanges[hrRange[0] + j];
             Span<PrimitiveKey> subPrimRange = dAllLeafs.subspan(primRange[0],
                                                                 primRange[1] - primRange[0]);
             GenericHitRecordData<> recordData =
             {
-                .dPrimKeys      = subPrimRange,
-                .transformKey   = ppResult.surfData.transformKeys[i],
-                .alphaMap       = ppResult.surfData.alphaMaps[i][j],
-                .lightOrMatKey  = ppResult.surfData.lightOrMatKeys[i][j],
-                .acceleratorKey = accKey,
-                .primSoA        = dPrimGroupSoA.data(),
-                .transSoA       = dTransSoAPtr
+                .dPrimKeys          = subPrimRange,
+                .transformKey       = ppResult.surfData.transformKeys[i],
+                .alphaMap           = ppResult.surfData.alphaMaps[i][j],
+                .lightOrMatKey      = ppResult.surfData.lightOrMatKeys[i][j],
+                .acceleratorKey     = accKey,
+                .cullBackFaceNonTri = ppResult.surfData.cullFaceFlags[i][j],
+                .primSoA            = dPrimGroupSoA.data(),
+                .transSoA           = dTransSoAPtr
             };
             GenericHitRecord<> record = {};
             record.data = recordData;

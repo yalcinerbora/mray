@@ -11,7 +11,7 @@ struct RaySampleT
     Ray             ray;
     Vector2         tMinMax;
     ImageCoordinate imgCoords;
-    RayDiff         rayDifferentials;
+    RayCone         rayCone;
 };
 using RaySample = SampleT<RaySampleT>;
 

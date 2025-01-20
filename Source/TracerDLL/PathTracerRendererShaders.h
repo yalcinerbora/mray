@@ -163,7 +163,7 @@ namespace PathTraceRDetail
         Span<PathDataPack>      dPathDataPack;
         // Next set of rays
         Span<RayGMem>           dOutRays;
-        Span<RayDiff>           dOutRayDiffs;
+        Span<RayCone>           dOutRayCones;
         // Only used when NEE/MIS is active
         Span<Float>             dPrevMatPDF;
         Span<Spectrum>          dShadowRayRadiance;
@@ -189,7 +189,7 @@ namespace PathTraceRDetail
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     MRAY_HYBRID
     void WorkFunction(const Prim&, const Material&, const Surface&,
-                      const TContext&, RNGDispenser&,
+                      const RayConeSurface&, const TContext&, RNGDispenser&,
                       const WorkParams<EmptyType, PG, MG, TG>& params,
                       RayIndex rayIndex);
 
@@ -198,7 +198,7 @@ namespace PathTraceRDetail
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     MRAY_HYBRID
     void WorkFunctionNEE(const Prim&, const Material&, const Surface&,
-                         const TContext&, RNGDispenser&,
+                         const RayConeSurface&, const TContext&, RNGDispenser&,
                          const WorkParams<LightSampler, PG, MG, TG>& params,
                          RayIndex rayIndex);
 
@@ -223,7 +223,7 @@ template<PrimitiveC Prim, MaterialC Material,
          PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
 MRAY_HYBRID MRAY_CGPU_INLINE
 void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surface& surf,
-                                    const TContext& tContext, RNGDispenser& rng,
+                                    const RayConeSurface& surfRayCone, const TContext& tContext, RNGDispenser& rng,
                                     const WorkParams<EmptyType, PG, MG, TG>& params,
                                     RayIndex rayIndex)
 {
@@ -237,11 +237,14 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     // ================ //
     auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
     Vector3 wO = tContext.InvApplyN(-rayIn.Dir()).Normalize();
+    RayConeSurface rConeRefract = mat.RefractRayCone(surfRayCone, wO, surf);
     SampleT<BxDFResult> raySample = mat.SampleBxDF(wO, surf, rng);
     Vector3 wI = tContext.ApplyN(raySample.value.wI.Dir()).Normalize();
 
     Spectrum throughput = params.rayState.dThroughput[rayIndex];
     throughput *= raySample.value.reflectance;
+
+    RayCone rayConeOut = rConeRefract.ConeAfterScatter(wI, surf.geoNormal);
 
     // ================ //
     // Russian Roulette //
@@ -298,6 +301,8 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
         // so we put flt_max here.
         Vector2 tMMOut = Vector2(0, std::numeric_limits<Float>::max());
         RayToGMem(params.rayState.dOutRays, rayIndex, rayOut, tMMOut);
+        // Continue the ray cone
+        params.rayState.dOutRayCones[rayIndex] = rayConeOut;
     }
     else
     {
@@ -305,7 +310,6 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     }
     // Write the updated state back
     params.rayState.dPathDataPack[rayIndex] = dataPack;
-
 }
 
 // ======================== //
@@ -322,6 +326,8 @@ void PathTraceRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
 
     auto [ray, tMM] = RayFromGMem(params.in.dRays, rayIndex);
     Vector3 wO = -ray.Dir();
+    RayCone rayCone = params.in.dRayCones[rayIndex].Advance(tMM[1]);
+
     Spectrum emission;
     if constexpr(Light::IsPrimitiveBackedLight)
     {
@@ -330,12 +336,12 @@ void PathTraceRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
         static constexpr uint32_t N = Hit::Dims;
         MetaHit metaHit = params.in.dHits[rayIndex];
         Hit hit = metaHit.AsVector<N>();
-        emission = l.EmitViaHit(wO, hit);
+        emission = l.EmitViaHit(wO, hit, rayCone);
     }
     else
     {
         Vector3 position = ray.AdvancedPos(tMM[1]);
-        emission = l.EmitViaSurfacePoint(wO, position);
+        emission = l.EmitViaSurfacePoint(wO, position, rayCone);
     }
 
     // Check the depth if we exceed it, do not accumulate
@@ -361,7 +367,7 @@ template<class LightSampler, PrimitiveC Prim, MaterialC Material,
     PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
 MRAY_HYBRID MRAY_CGPU_INLINE
 void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const Surface& surf,
-                                       const TContext& tContext, RNGDispenser& rng,
+                                       const RayConeSurface& surfRayCone, const TContext& tContext, RNGDispenser& rng,
                                        const WorkParams<LightSampler, PG, MG, TG>& params,
                                        RayIndex rayIndex)
 {
@@ -381,13 +387,15 @@ void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const S
     //       NEE        //
     // ================ //
     auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
+    Vector3 wO = -tContext.InvApplyN(rayIn.Dir()).Normalize();
     const LightSampler& lightSampler = params.globalState.lightSampler;
     Vector3 worldPos = surf.position;
-    LightSample lightSample = lightSampler.SampleLight(rng, specConverter, worldPos);
+    RayConeSurface refractedRayCone = mat.RefractRayCone(surfRayCone, wO, surf);
+    LightSample lightSample = lightSampler.SampleLight(rng, specConverter,
+                                                       worldPos, surf.geoNormal,
+                                                       refractedRayCone);
     auto [shadowRay, shadowTMM] = lightSample.value.SampledRay(worldPos);
-    Vector3 wO = -tContext.InvApplyN(rayIn.Dir()).Normalize();
-    Ray wI = Ray(tContext.InvApplyN(shadowRay.Dir()).Normalize(),
-                 shadowRay.Pos());
+    Ray wI = tContext.InvApply(shadowRay);
 
     Spectrum reflectance = mat.Evaluate(wI, wO, surf);
     Spectrum throughput = params.rayState.dThroughput[rayIndex];
@@ -420,6 +428,9 @@ void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const S
     }
     else
     {
+        // TODO: We need to check if material is transmissive
+        // If transmissive we can set the geoNormal towards the
+        // shadow ray and nudge
         shadowRay.NudgeSelf(surf.geoNormal);
         RayToGMem(params.rayState.dOutRays, rayIndex,
                   shadowRay, shadowTMM);
@@ -457,6 +468,7 @@ void PathTraceRDetail::LightWorkFunctionWithNEE(const Light& l, RNGDispenser&,
                            pathDataPack.type == RayType::PATH_RAY);
     Spectrum throughput = params.rayState.dThroughput[rayIndex];
     auto [ray, tMM] = RayFromGMem(params.in.dRays, rayIndex);
+    RayCone rayCone = params.in.dRayCones[rayIndex].Advance(tMM[1]);
     if(switchToMISPdf)
     {
         using Distribution::MIS::BalanceCancelled;
@@ -487,12 +499,12 @@ void PathTraceRDetail::LightWorkFunctionWithNEE(const Light& l, RNGDispenser&,
         static constexpr uint32_t N = Hit::Dims;
         MetaHit metaHit = params.in.dHits[rayIndex];
         Hit hit = metaHit.AsVector<N>();
-        emission = l.EmitViaHit(wO, hit);
+        emission = l.EmitViaHit(wO, hit, rayCone);
     }
     else
     {
         Vector3 position = ray.AdvancedPos(tMM[1]);
-        emission = l.EmitViaSurfacePoint(wO, position);
+        emission = l.EmitViaSurfacePoint(wO, position, rayCone);
     }
 
     // Check the depth if we exceed it, do not accumulate

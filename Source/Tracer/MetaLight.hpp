@@ -244,7 +244,8 @@ uint32_t MetaLightViewT<V, ST>::SampleRayRNCount() const
 template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum MetaLightViewT<V, ST>::EmitViaHit(const Vector3& wO,
-                                           const MetaHit& hit) const
+                                           const MetaHit& hit,
+                                           const RayCone& rayCone) const
 {
     return DeviceVisit(light, [=, this](auto&& l) -> Spectrum
     {
@@ -260,7 +261,7 @@ Spectrum MetaLightViewT<V, ST>::EmitViaHit(const Vector3& wO,
             else
             {
                 HitType hitIn = hit.template AsVector<HitType::Dims>();
-                return sConv.Convert(l.EmitViaHit(wO, hitIn));
+                return sConv.Convert(l.EmitViaHit(wO, hitIn, rayCone));
             }
         }
     });
@@ -269,14 +270,15 @@ Spectrum MetaLightViewT<V, ST>::EmitViaHit(const Vector3& wO,
 template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Spectrum MetaLightViewT<V, ST>::EmitViaSurfacePoint(const Vector3& wO,
-                                                    const Vector3& surfacePoint) const
+                                                    const Vector3& surfacePoint,
+                                                    const RayCone& rayCone) const
 {
     return DeviceVisit(light, [&, this](auto&& l) -> Spectrum
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
             return Spectrum::Zero();
-        else return sConv.Convert(l.EmitViaSurfacePoint(wO, surfacePoint));
+        else return sConv.Convert(l.EmitViaSurfacePoint(wO, surfacePoint, rayCone));
     });
 }
 

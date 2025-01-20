@@ -77,22 +77,25 @@ namespace DefaultSphereDetail
 
         // Surface Generation
         MRAY_HYBRID void        GenerateSurface(EmptySurface&,
+                                                RayConeSurface&,
                                                 // Inputs
                                                 const Hit&,
                                                 const Ray&,
-                                                const RayDiff&) const;
+                                                const RayCone&) const;
 
         MRAY_HYBRID void        GenerateSurface(BasicSurface&,
+                                                RayConeSurface&,
                                                 // Inputs
                                                 const Hit&,
                                                 const Ray&,
-                                                const RayDiff&) const;
+                                                const RayCone&) const;
 
         MRAY_HYBRID void        GenerateSurface(DefaultSurface&,
+                                                RayConeSurface&,
                                                 // Inputs
                                                 const Hit&,
                                                 const Ray&,
-                                                const RayDiff&) const;
+                                                const RayCone&) const;
     };
 
 }

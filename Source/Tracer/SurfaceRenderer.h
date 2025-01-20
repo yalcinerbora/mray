@@ -61,7 +61,7 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     Span<MetaHit>       dHits;
     Span<HitKeyPack>    dHitKeys;
     Span<RayGMem>       dRays;
-    Span<RayDiff>       dRayDifferentials;
+    Span<RayCone>       dRayCones;
     RayStateCommon      dRayStateCommon;
     RayStateAO          dRayStateAO;
 

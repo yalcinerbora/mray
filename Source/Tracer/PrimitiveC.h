@@ -37,7 +37,7 @@ enum class PrimTransformType : uint8_t
 
 template<class Surface, class Prim, class Hit>
 using SurfaceGenFunc = Surface(Prim::*)(const Hit&,
-                                        const RayDiff&,
+                                        const RayCone&,
                                         const Ray&);
 
 template<class TransformContext, class PrimData, class TransformData>
@@ -193,7 +193,8 @@ concept TrianglePrimGroupC = requires(const PGType& pg)
 // Support Concepts
 template <class PrimType, class PrimGroupType, class Surface>
 concept PrimitiveWithSurfaceC = requires(PrimType mg,
-                                    Surface& surface)
+                                         Surface& surface,
+                                         RayConeSurface& rcs)
 {
     // Base concept
     requires PrimitiveC<PrimType>;
@@ -202,10 +203,10 @@ concept PrimitiveWithSurfaceC = requires(PrimType mg,
     // constrain the function to thave a specific
     // signature to prevent partial updates
     // when non-derived function exists.
-    {mg.GenerateSurface(surface,
+    {mg.GenerateSurface(surface, rcs,
                         typename PrimType::Hit{},
                         Ray{},
-                        RayDiff{})
+                        RayCone{})
     } -> std::same_as<void>;
 
 };

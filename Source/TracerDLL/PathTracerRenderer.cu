@@ -29,10 +29,10 @@ static void KCInitPathState(MRAY_GRID_CONSTANT const PathTraceRDetail::RayState 
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static void KCCopyRays(MRAY_GRID_CONSTANT const Span<RayGMem> dRaysOut,
-                       MRAY_GRID_CONSTANT const Span<RayDiff> dRayDiffOut,
+                       MRAY_GRID_CONSTANT const Span<RayCone> dRayDiffOut,
                        MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
                        MRAY_GRID_CONSTANT const Span<const RayGMem> dRaysIn,
-                       MRAY_GRID_CONSTANT const Span<const RayDiff> dRayDiffIn)
+                       MRAY_GRID_CONSTANT const Span<const RayCone> dRayDiffIn)
 {
     using namespace PathTraceRDetail;
     KernelCallParams kp;
@@ -327,7 +327,7 @@ PathTracerRenderer::ReloadPaths(Span<const RayIndex> dIndices,
             const auto& cameraWork = (*curCamWork->get());
             cameraWork.GenRaysStochasticFilter
             (
-                dRayDifferentials, dRays,
+                dRayCones, dRays,
                 dRayState.dImageCoordinates,
                 dRayState.dFilmFilterWeights,
                 ToConstSpan(dFilledRayIndices),
@@ -473,7 +473,7 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
             );
 
             workPtr.DoWork_0(dRayState, dLocalIndices,
-                             dRandomNumBuffer, dRayDifferentials,
+                             dRandomNumBuffer, dRayCones,
                              dRays, dHits, dHitKeys,
                              globalState, processQueue);
         },
@@ -483,7 +483,7 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
         {
             workPtr.DoBoundaryWork_0(dRayState, dLocalIndices,
                                      Span<const RandomNumber>{},
-                                     dRayDifferentials, dRays,
+                                     dRayCones, dRays,
                                      dHits, dHitKeys,
                                      globalState, processQueue);
         });
@@ -511,7 +511,7 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
         processQueue.MemsetAsync(dRayState.dShadowRayRadiance, 0x00);
         processQueue.MemsetAsync(dShadowRayVisibilities, 0x00);
 
-        // Do the NEE kernel + nothing
+        // Do the NEE kernel + boundary work
         this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,
         [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
                   uint32_t, uint32_t partitionSize)
@@ -529,7 +529,7 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
             );
 
             workPtr.DoWork_1(dRayState, dLocalIndices,
-                             dRandomNumBuffer, dRayDifferentials,
+                             dRandomNumBuffer, dRayCones,
                              dRays, dHits, dHitKeys,
                              globalState, processQueue);
         },
@@ -538,7 +538,7 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
         {
             workPtr.DoBoundaryWork_1(dRayState, dLocalIndices,
                                      Span<const RandomNumber>{},
-                                     dRayDifferentials, dRays,
+                                     dRayCones, dRays,
                                      dHits, dHitKeys,
                                      globalState, processQueue);
         });
@@ -583,7 +583,7 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
             );
 
             workPtr.DoWork_0(dRayState, dLocalIndices,
-                             dRandomNumBuffer, dRayDifferentials,
+                             dRandomNumBuffer, dRayCones,
                              dRays, dHits, dHitKeys,
                              globalStateE, processQueue);
         },
@@ -669,10 +669,10 @@ RendererOutput PathTracerRenderer::DoThroughputSingleTileRender(const GPUDevice&
         (
             "KCCopyRays",
             KernelIssueParams{.workCount = aliveRayCount},
-            dRays, dRayDifferentials,
+            dRays, dRayCones,
             dAliveRayIndices,
             dRayState.dOutRays,
-            dRayState.dOutRayDiffs
+            dRayState.dOutRayCones
         );
     }
     else if(saveImage && tilePathCounts[0] == SPPLimit(currentOptions.totalSPP))
@@ -805,10 +805,10 @@ RendererOutput PathTracerRenderer::DoLatencyRender(uint32_t passCount,
             (
                 "KCCopyRays",
                 KernelIssueParams{.workCount = aliveRayCount},
-                dRays, dRayDifferentials,
+                dRays, dRayCones,
                 dAliveRayIndices,
                 dRayState.dOutRays,
-                dRayState.dOutRayDiffs
+                dRayState.dOutRayCones
             );
         }
         assert(dInvalidRayIndices.size() == 0);
@@ -963,14 +963,14 @@ PathTracerRenderer::StartRender(const RenderImageParams& rIP,
     if(currentOptions.sampleMode == SampleMode::E::PURE)
     {
         MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys,
-                                             dRays, dRayDifferentials,
+                                             dRays, dRayCones,
                                              dRayState.dPathRadiance,
                                              dRayState.dImageCoordinates,
                                              dRayState.dFilmFilterWeights,
                                              dRayState.dThroughput,
                                              dRayState.dPathDataPack,
                                              dRayState.dOutRays,
-                                             dRayState.dOutRayDiffs,
+                                             dRayState.dOutRayCones,
                                              dPathRNGDimensions,
                                              dRandomNumBuffer,
                                              dWorkHashes, dWorkBatchIds,
@@ -990,14 +990,14 @@ PathTracerRenderer::StartRender(const RenderImageParams& rIP,
     {
         uint32_t isVisibleIntCount = Bitspan<uint32_t>::CountT(maxRayCount);
         MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys,
-                                             dRays, dRayDifferentials,
+                                             dRays, dRayCones,
                                              dRayState.dPathRadiance,
                                              dRayState.dImageCoordinates,
                                              dRayState.dFilmFilterWeights,
                                              dRayState.dThroughput,
                                              dRayState.dPathDataPack,
                                              dRayState.dOutRays,
-                                             dRayState.dOutRayDiffs,
+                                             dRayState.dOutRayCones,
                                              dRayState.dPrevMatPDF,
                                              dRayState.dShadowRayRadiance,
                                              dPathRNGDimensions,

@@ -52,6 +52,10 @@ namespace LambertMatDetail
                                  const Surface& surf) const;
         MRAY_GPU bool       IsAllTexturesAreResident(const Surface& surface) const;
         MRAY_GPU Float      Specularity(const Surface&) const;
+
+        MRAY_GPU
+        RayConeSurface      RefractRayCone(const RayConeSurface&, const Vector3& wO,
+                                           const Surface&) const;
     };
 
 }
@@ -95,6 +99,10 @@ namespace ReflectMatDetail
                                      const Surface& surf) const;
         MRAY_GPU bool        IsAllTexturesAreResident(const Surface& surface) const;
         MRAY_GPU Float       Specularity(const Surface&) const;
+
+        MRAY_GPU
+        RayConeSurface      RefractRayCone(const RayConeSurface&, const Vector3& wO,
+                                           const Surface&) const;
     };
 }
 
@@ -142,6 +150,10 @@ namespace RefractMatDetail
                                  const Surface& surf) const;
         MRAY_GPU bool       IsAllTexturesAreResident(const Surface& surface) const;
         MRAY_GPU Float      Specularity(const Surface&) const;
+
+        MRAY_GPU
+        RayConeSurface      RefractRayCone(const RayConeSurface&, const Vector3& wO,
+                                           const Surface&) const;
     };
 }
 
@@ -211,6 +223,10 @@ namespace UnrealMatDetail
                                  const Surface& surf) const;
         MRAY_GPU bool       IsAllTexturesAreResident(const Surface& surface) const;
         MRAY_GPU Float      Specularity(const Surface&) const;
+
+        MRAY_GPU
+        RayConeSurface      RefractRayCone(const RayConeSurface&, const Vector3& wO,
+                                           const Surface&) const;
     };
 }
 

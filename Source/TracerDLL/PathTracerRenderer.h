@@ -100,7 +100,7 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer>
     Span<MetaHit>       dHits;
     Span<HitKeyPack>    dHitKeys;
     Span<RayGMem>       dRays;
-    Span<RayDiff>       dRayDifferentials;
+    Span<RayCone>       dRayCones;
     Span<uint32_t>      dShadowRayVisibilities;
     Span<RandomNumber>  dRandomNumBuffer;
     Span<Byte>          dSubCameraBuffer;

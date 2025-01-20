@@ -29,14 +29,14 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
     Quaternion toTangentSpace = surface.shadingTBN;
     if(normalMapTex)
     {
-        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value();
+        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdx, surface.dpdy).value();
         normal.NormalizeSelf();
         // Due to normal change our direction sample should be aligned as well
         toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
     }
 
     // Before transform calculate reflectance
-    Spectrum albedo = albedoTex(surface.uv, surface.dpdu, surface.dpdv).value();
+    Spectrum albedo = albedoTex(surface.uv, surface.dpdx, surface.dpdy).value();
     Spectrum reflectance = albedo * nDotL * MathConstants::InvPi<Float>();
 
     // Material is responsible for transforming out of primitive's
@@ -69,7 +69,7 @@ Float LambertMaterial<ST>::Pdf(const Ray& wI,
     using Distribution::Common::PDFCosDirection;
     Vector3 wILocal = surface.shadingTBN.ApplyRotation(wI.Dir());
     Vector3 normal = (normalMapTex)
-        ? (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value()
+        ? (*normalMapTex)(surface.uv, surface.dpdx, surface.dpdy).value()
         : Vector3::ZAxis();
     normal.NormalizeSelf();
     Float pdf = PDFCosDirection(wILocal, normal);
@@ -86,7 +86,7 @@ Spectrum LambertMaterial<ST>::Evaluate(const Ray& wI,
     Quaternion toTangentSpace = surface.shadingTBN;
     if(normalMapTex)
     {
-        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value();
+        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdx, surface.dpdy).value();
         normal.NormalizeSelf();
         // Due to normal change our direction sample should be aligned as well
         toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
@@ -95,8 +95,8 @@ Spectrum LambertMaterial<ST>::Evaluate(const Ray& wI,
     Vector3 wILocal = toTangentSpace.ApplyRotation(wI.Dir());
     Float nDotL = std::max(wILocal[2], Float(0));
     Spectrum albedo = albedoTex(surface.uv,
-                                surface.dpdu,
-                                surface.dpdv).value();
+                                surface.dpdx,
+                                surface.dpdy).value();
     return nDotL * albedo * MathConstants::InvPi<Float>();
 }
 
@@ -119,8 +119,8 @@ MRAY_GPU MRAY_GPU_INLINE
 bool LambertMaterial<ST>::IsAllTexturesAreResident(const Surface& surface) const
 {
     bool allResident = true;
-    allResident &= albedoTex(surface.uv, surface.dpdu,
-                             surface.dpdv).has_value();
+    allResident &= albedoTex(surface.uv, surface.dpdx,
+                             surface.dpdy).has_value();
     if(normalMapTex)
     {
         allResident &= (*normalMapTex)(surface.uv).has_value();
@@ -133,6 +133,15 @@ MRAY_GPU MRAY_GPU_INLINE
 Float LambertMaterial<ST>::Specularity(const Surface&) const
 {
     return Float(0);
+}
+
+template <class ST>
+MRAY_GPU MRAY_GPU_INLINE
+RayConeSurface LambertMaterial<ST>::RefractRayCone(const RayConeSurface& r,
+                                                   const Vector3&,
+                                                   const Surface&) const
+{
+    return r;
 }
 
 }
@@ -222,6 +231,15 @@ MRAY_GPU MRAY_GPU_INLINE
 bool ReflectMaterial<ST>::IsAllTexturesAreResident(const Surface&) const
 {
     return true;
+}
+
+template <class ST>
+MRAY_GPU MRAY_GPU_INLINE
+RayConeSurface ReflectMaterial<ST>::RefractRayCone(const RayConeSurface& r,
+                                                   const Vector3&,
+                                                   const Surface&) const
+{
+    return r;
 }
 
 }
@@ -352,6 +370,112 @@ bool RefractMaterial<ST>::IsAllTexturesAreResident(const Surface&) const
     return true;
 }
 
+template <class ST>
+MRAY_GPU MRAY_GPU_INLINE
+RayConeSurface RefractMaterial<ST>::RefractRayCone(const RayConeSurface& rayConeSurfIn,
+                                                   const Vector3& wO,
+                                                   const Surface& surf) const
+{
+    auto Rotate2D_UL = [](Vector2 v, Float alpha) -> std::array<Vector2, 2>
+    {
+        // Matrix
+        // [cos, -sin]
+        // [sin, cos]
+        //
+        // Optimizations,
+        //  cos(x) = cos(-x) (where x in [-90, 90])
+        // -sin(x) = sin(-x) (where x in [-90, 90])
+        // Thus we can rotate +- by single "cos and sin"
+        Float s = std::sin(alpha);
+        Float c = std::cos(alpha);
+        return
+        {
+            Vector2(v[0] * c - v[1] * s,
+                    v[0] * s + v[1] * c),
+                    //
+            Vector2(v[0] *  c + v[1] * s,
+                    v[0] * -s + v[1] * c)
+        };
+    };
+
+    auto Refract2D = [](Vector2 v, Vector2 n, Float fromEta, Float toEta) -> Vector2
+    {
+        // Just call 3D with zero literal
+        // Pray compiler optimizes it (probably not since it is float)
+        auto result = Graphics::Refract(Vector3(n, 0), Vector3(-v, 0),
+                                        fromEta, toEta);
+        return (result.has_value())
+                ? Vector2(result.value())
+                : (v - n * n.Dot(v)).Normalize();
+    };
+
+    Float fromEta, toEta;
+    if constexpr(SpectrumConverter::IsRGB)
+    {
+        fromEta = frontIoR[0];
+        toEta = backIoR[0];
+    }
+    // TODO:
+    else static_assert(SpectrumConverter::IsRGB, "Dispersion is not implemented yet!");
+
+    // Swap eta if backside
+    if(surf.backSide) std::swap(fromEta, toEta);
+
+    // Refract the wO
+    auto wI = Graphics::Refract(surf.geoNormal, wO, fromEta, toEta);
+    // No change if reflection occurs.
+    if(!wI.has_value()) return rayConeSurfIn;
+
+    // From the RT Gems II Chapter 10 Figure 10-5.
+    // This implementation follows the Falcor implementation.
+    Vector3 d3D = -wO, t3D = wI.value();
+    // Define the 2D space
+    Vector3 x = Graphics::GSOrthonormalize(d3D, surf.geoNormal);
+    Vector3 y = surf.geoNormal;
+
+    // Project on the XY plane / Align the basis
+    Vector2 d = Vector2(x.Dot(d3D), y.Dot(d3D));
+    Vector2 t = Vector2(x.Dot(t3D), y.Dot(t3D));
+
+    // BetaN is pre-added to the cones
+    Float aperture = rayConeSurfIn.rayConeFront.aperture;
+    Float coneWidth = rayConeSurfIn.rayConeFront.width;
+    Float wSign = (coneWidth > Float(0)) ? Float(1) : Float(0);
+    auto [du, dl] = Rotate2D_UL(d, wSign * aperture * Float(0.5));
+    // We calculated all, now find the distance between two vectors
+    // To calculate widths, we need to find the horizon hit points
+    Vector2 orthoD = Vector2(-d[1], d[0]) * coneWidth * Float(0.5);
+    Float uHitX = +orthoD[0] + du[0] * (-orthoD[1] / du[1]);
+    Float lHitX = -orthoD[0] + dl[0] * (+orthoD[1] / dl[1]);
+
+    // Normal spread calculation
+    Float nSign = (uHitX > lHitX) ? Float(1) : Float(-1);
+    Float deltaNTheta = -rayConeSurfIn.betaN * nSign * Float(0.5);
+    auto [nu, nl] = Rotate2D_UL(Vector2(0, 1), deltaNTheta);
+    Vector2 tu = Refract2D(du, nu, fromEta, toEta);
+    Vector2 tl = Refract2D(dl, nl, fromEta, toEta);
+
+    orthoD = Vector2(-d[1], d[0]);
+    Float wl = -uHitX * tu[1] / orthoD.Dot(Vector2(-tu[1], tu[0]));
+    Float wu = +lHitX * tl[1] / orthoD.Dot(Vector2(-tl[1], tl[0]));
+
+    // Calculate the new cone
+    Float sign = std::signbit(tu[0] * tl[1] - tu[1] * tl[0])
+                    ? Float(-1) : Float(1);
+    Float newConeAperture = std::acos(tu.Dot(tl)) * sign;
+
+    Float width = wu + wl;
+    RayConeSurface result = rayConeSurfIn;
+    // We save the state **as if** it is pre-refracted (thus adding betaN,
+    // "ConeAfterScatter" function will subtract it back
+    result.rayConeBack = RayCone
+    {
+        .aperture = newConeAperture + rayConeSurfIn.betaN,
+        .width = width
+    };
+    return result;
+}
+
 }
 
 namespace UnrealMatDetail
@@ -398,10 +522,10 @@ MRAY_GPU MRAY_GPU_INLINE
 std::tuple<Float, Float, Float, Spectrum>
 UnrealMaterial<ST>::FetchData(const Surface& s) const
 {
-    Float roughness = roughnessTex(s.uv, s.dpdu, s.dpdv).value();
-    Float metallic = metallicTex(s.uv, s.dpdu, s.dpdv).value();
-    Float specular = specularTex(s.uv, s.dpdu, s.dpdv).value();
-    Spectrum albedo = albedoTex(s.uv, s.dpdu, s.dpdv).value();
+    Float roughness = roughnessTex(s.uv, s.dpdx, s.dpdy).value();
+    Float metallic = metallicTex(s.uv, s.dpdx, s.dpdy).value();
+    Float specular = specularTex(s.uv, s.dpdx, s.dpdy).value();
+    Spectrum albedo = albedoTex(s.uv, s.dpdx, s.dpdy).value();
     using Tup = std::tuple<Float, Float, Float, Spectrum>;
     return Tup(roughness, metallic, specular, albedo);
 }
@@ -449,7 +573,7 @@ SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
     Quaternion toTangentSpace = surface.shadingTBN;
     if(normalMapTex)
     {
-        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value();
+        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdx, surface.dpdy).value();
         normal.NormalizeSelf();
         // Due to normal change our direction sample should be aligned as well
         toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
@@ -551,7 +675,7 @@ Float UnrealMaterial<ST>::Pdf(const Ray& wI,
     Quaternion toTangentSpace = surface.shadingTBN;
     if(normalMapTex)
     {
-        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value();
+        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdx, surface.dpdy).value();
         normal.NormalizeSelf();
         // Due to normal change our direction sample should be aligned as well
         toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
@@ -592,7 +716,7 @@ Spectrum UnrealMaterial<ST>::Evaluate(const Ray& wI,
     Quaternion toTangentSpace = surface.shadingTBN;
     if(normalMapTex)
     {
-        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdu, surface.dpdv).value();
+        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdx, surface.dpdy).value();
         normal.NormalizeSelf();
         // Due to normal change our direction sample should be aligned as well
         toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
@@ -670,18 +794,28 @@ MRAY_GPU MRAY_GPU_INLINE
 bool UnrealMaterial<ST>::IsAllTexturesAreResident(const Surface& surface) const
 {
     bool allResident = true;
-    allResident &= albedoTex(surface.uv, surface.dpdu,
-                             surface.dpdv).has_value();
+    allResident &= albedoTex(surface.uv, surface.dpdx,
+                             surface.dpdy).has_value();
     if(normalMapTex)
     {
         allResident &= (*normalMapTex)(surface.uv).has_value();
     }
-    allResident &= roughnessTex(surface.uv, surface.dpdu,
-                                surface.dpdv).has_value();
-    allResident &= specularTex(surface.uv, surface.dpdu,
-                               surface.dpdv).has_value();
-    allResident &= metallicTex(surface.uv, surface.dpdu,
-                               surface.dpdv).has_value();
+    allResident &= roughnessTex(surface.uv, surface.dpdx,
+                                surface.dpdy).has_value();
+    allResident &= specularTex(surface.uv, surface.dpdx,
+                               surface.dpdy).has_value();
+    allResident &= metallicTex(surface.uv, surface.dpdx,
+                               surface.dpdy).has_value();
     return allResident;
 }
+
+template <class ST>
+MRAY_GPU MRAY_GPU_INLINE
+RayConeSurface UnrealMaterial<ST>::RefractRayCone(const RayConeSurface& r,
+                                                  const Vector3&,
+                                                  const Surface&) const
+{
+    return r;
+}
+
 }

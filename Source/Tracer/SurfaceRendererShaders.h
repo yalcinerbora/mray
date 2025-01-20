@@ -110,7 +110,7 @@ namespace SurfRDetail
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     MRAY_HYBRID
     void WorkFunctionCommon(const Prim&, const Material&, const Surface&,
-                            const TContext&, RNGDispenser&,
+                            const RayConeSurface&, const TContext&, RNGDispenser&,
                             const RenderWorkParams<GlobalState, RayStateCommon, PG, MG, TG>& params,
                             RayIndex rayIndex);
 
@@ -118,7 +118,7 @@ namespace SurfRDetail
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     MRAY_HYBRID
     void WorkFunctionFurnaceOrAO(const Prim&, const Material&, const Surface&,
-                                 const TContext&, RNGDispenser&,
+                                 const RayConeSurface&, const TContext&, RNGDispenser&,
                                  const RenderWorkParams<GlobalState, RayStateAO, PG, MG, TG>& params,
                                  RayIndex rayIndex);
 
@@ -135,7 +135,7 @@ template<PrimitiveC Prim, MaterialC Material,
          PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
 MRAY_HYBRID MRAY_CGPU_INLINE
 void SurfRDetail::WorkFunctionCommon(const Prim&, const Material&, const Surface& surf,
-                                     const TContext& tContext, RNGDispenser&,
+                                     const RayConeSurface&, const TContext& tContext, RNGDispenser&,
                                      const RenderWorkParams<GlobalState, RayStateCommon, PG, MG, TG>& params,
                                      RayIndex rayIndex)
 {
@@ -242,7 +242,7 @@ template<PrimitiveC Prim, MaterialC Material,
          PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
 MRAY_HYBRID MRAY_CGPU_INLINE
 void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, const Surface& surf,
-                                          const TContext& tContext, RNGDispenser& rng,
+                                          const RayConeSurface&, const TContext& tContext, RNGDispenser& rng,
                                           const RenderWorkParams<GlobalState, RayStateAO, PG, MG, TG>& params,
                                           RayIndex rayIndex)
 {

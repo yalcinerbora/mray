@@ -126,8 +126,9 @@ void KCReadLights(MRAY_GRID_CONSTANT const MetaLightArrayView lightArrayView,
         Float pdfRay = light.PdfRay(TestRay);
         uint32_t rayRNCount = light.SampleRayRNCount();
         //
-        Spectrum radiance0 = light.EmitViaHit(Dir, Hit);
-        Spectrum radiance1 = light.EmitViaSurfacePoint(Dir, DistantPoint);
+        RayCone rayCone = RayCone{.aperture = 0, .width = 0};
+        Spectrum radiance0 = light.EmitViaHit(Dir, Hit, rayCone);
+        Spectrum radiance1 = light.EmitViaSurfacePoint(Dir, DistantPoint, rayCone);
         bool isPrimBacked = light.IsPrimitiveBackedLight();
 
         printf("[%u]-----\n"

@@ -43,7 +43,7 @@ using RayStateInitFuncType = void(*)(const RPayload&,
 template<CameraC Camera, TransformGroupC TransG>
 MRAY_KERNEL
 void KCGenerateCamRays(// Output (Only dOutIndices pointed data should be written)
-                       MRAY_GRID_CONSTANT const Span<RayDiff> dRayDiffs,
+                       MRAY_GRID_CONSTANT const Span<RayCone> dRayCones,
                        MRAY_GRID_CONSTANT const Span<RayGMem> dRays,
                        MRAY_GRID_CONSTANT const Span<ImageCoordinate> dImageCoordinates,
                        MRAY_GRID_CONSTANT const Span<Float> dFilmFilterWeights,
@@ -90,7 +90,7 @@ void KCGenerateCamRays(// Output (Only dOutIndices pointed data should be writte
                   raySample.value.tMinMax);
 
         // Write the differentials
-        dRayDiffs[writeIndex] = raySample.value.rayDifferentials;
+        dRayCones[writeIndex] = raySample.value.rayCone;
 
         // Finally write
         dImageCoordinates[writeIndex] = raySample.value.imgCoords;
@@ -101,7 +101,7 @@ void KCGenerateCamRays(// Output (Only dOutIndices pointed data should be writte
 template<CameraC Camera, TransformGroupC TransG, class FilterType>
 MRAY_KERNEL
 void KCGenerateCamRaysStochastic(// Output (Only dOutIndices pointed data should be written)
-                                 MRAY_GRID_CONSTANT const Span<RayDiff> dRayDiffs,
+                                 MRAY_GRID_CONSTANT const Span<RayCone> dRayCones,
                                  MRAY_GRID_CONSTANT const Span<RayGMem> dRays,
                                  MRAY_GRID_CONSTANT const Span<ImageCoordinate> dImageCoordinates,
                                  MRAY_GRID_CONSTANT const Span<Float> dFilmFilterWeights,
@@ -157,7 +157,7 @@ void KCGenerateCamRaysStochastic(// Output (Only dOutIndices pointed data should
                   raySample.value.tMinMax);
 
         // Write the differentials
-        dRayDiffs[writeIndex] = raySample.value.rayDifferentials;
+        dRayCones[writeIndex] = raySample.value.rayCone;
         // Write filter weights (pdf normalized)
         raySample.pdf = weight / offsetSample.pdf;
 

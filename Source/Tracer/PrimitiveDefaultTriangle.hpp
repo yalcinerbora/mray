@@ -388,19 +388,28 @@ const T& Triangle<T>::GetTransformContext() const
 template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 void Triangle<T>::GenerateSurface(EmptySurface&,
+                                  RayConeSurface& rayConeSurface,
                                   // Inputs
                                   const Hit& hit,
                                   const Ray& ray,
-                                  const RayDiff& differentials) const
-{}
+                                  const RayCone& rayCone) const
+{
+    rayConeSurface = RayConeSurface
+    {
+        .rayConeFront   = rayCone,
+        .rayConeBack    = rayCone,
+        .betaN = 0
+    };
+}
 
 template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 void Triangle<T>::GenerateSurface(BasicSurface& result,
+                                  RayConeSurface& rayConeSurface,
                                   // Inputs
                                   const Hit& hit,
                                   const Ray& ray,
-                                  const RayDiff& differentials) const
+                                  const RayCone& rayCone) const
 {
     Float a = hit[0];
     Float b = hit[1];
@@ -422,15 +431,22 @@ void Triangle<T>::GenerateSurface(BasicSurface& result,
         .position = pos,
         .normal = geoNormal
     };
+    rayConeSurface = RayConeSurface
+    {
+        .rayConeFront   = rayCone,
+        .rayConeBack    = rayCone,
+        .betaN          = 0
+    };
 }
 
 template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 void Triangle<T>::GenerateSurface(DefaultSurface& result,
+                                  RayConeSurface& rayConeSurface,
                                   // Inputs
                                   const Hit& hit,
                                   const Ray& ray,
-                                  const RayDiff& differentials) const
+                                  const RayCone& rayCone) const
 {
     Float a = hit[0];
     Float b = hit[1];
@@ -458,7 +474,8 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     Vector2 uv = uv0 * a + uv1 * b + uv2 * c;
 
     // Flip the surface definitions (normal, geometric normal)
-    bool backSide = (geoNormal.Dot(ray.Dir()) > Float(0));
+    Float dDotN = geoNormal.Dot(ray.Dir().Normalize());
+    bool backSide = (dDotN) > Float(0);
     if(backSide)
     {
         geoNormal = -geoNormal;
@@ -470,6 +487,88 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
         static constexpr Quaternion TANGENT_ROT = Quaternion(0, 1, 0, 0);
         tbn = TANGENT_ROT * tbn;
     }
+
+    // Now the cone generation...
+    // RT Gems I chapter 20 and
+    // https://www.jcgt.org/published/0010/01/01/
+    Vector3 f = geoNormal;
+    Vector3 d = ray.Dir().Normalize();
+    // Equation 8, 9;
+    // Preprocess the eliptic axes
+    Vector3 h1 = d - f.Dot(d) * f;
+    Vector3 h2 = Vector3::Cross(f, h1);
+    Float r = rayCone.width * Float(0.5);
+    auto EllipseAxes = [&](Vector3 h) -> Vector3
+    {
+        Float denom = (h - d.Dot(h) * d).Length();
+        denom = std::max(MathConstants::Epsilon<Float>(), denom);
+        return (r / denom) * h;
+    };
+    Vector3 a1 = EllipseAxes(h1);
+    Vector3 a2 = EllipseAxes(h2);
+    Matrix3x3 M = Matrix3x3(a1.Normalize(), a2.Normalize(), geoNormal);
+
+    // Curvatures
+    std::array<Vector3, 3> edges =
+    {
+        positions[1] - positions[0],
+        positions[2] - positions[0],
+        positions[2] - positions[1]
+    };
+    std::array<Vector3, 3> normals =
+    {
+        q0.ApplyInvRotation(Vector3::ZAxis()),
+        q1.ApplyInvRotation(Vector3::ZAxis()),
+        q2.ApplyInvRotation(Vector3::ZAxis())
+    };
+    // Curvature approximation
+    // Equation 6.
+    auto CurvatureEdge = [](Vector3 dp, Vector3 dn) -> Float
+    {
+        return dn.Dot(dp) / dp.Dot(dp);
+    };
+    Vector3 curvatures = Vector3(CurvatureEdge(edges[0], normals[1] - normals[0]),
+                                 CurvatureEdge(edges[1], normals[2] - normals[0]),
+                                 CurvatureEdge(edges[2], normals[2] - normals[1]));
+    uint32_t minIndex = curvatures.Minimum();
+    uint32_t maxIndex = curvatures.Maximum();
+    //
+    Vector2 eMin = Vector2(M * edges[minIndex]);
+    Vector2 eMax = Vector2(M * edges[maxIndex]);
+    //
+    Float a1L = a1.Length(), a2L = a2.Length();
+    Float l0 = a1L * a2L / std::sqrt(a1L * a1L * eMin[0] * eMin[0] +
+                                     a2L * a2L * eMin[1] * eMin[1]);
+    Float l1 = a1L * a2L / std::sqrt(a1L * a1L * eMax[0] * eMax[0] +
+                                     a2L * a2L * eMax[1] * eMax[1]);
+    Float lMax = std::max(l0, l1);
+    Float k0 = curvatures[minIndex] * l0 / lMax;
+    Float k1 = curvatures[maxIndex] * l1 / lMax;
+
+    auto Beta = [&](Float curvature)
+    {
+        return Float(-1) * curvature * std::abs(rayCone.width) / dDotN;
+    };
+    Float beta0 = Beta(k0);
+    Float beta1 = Beta(k1);
+    Float betaFinal = (std::abs(rayCone.aperture + beta0) >= std::abs(rayCone.aperture + beta1))
+                        ? beta0 : beta1;
+    // Texture derivatives
+    // https://www.jcgt.org/published/0010/01/01/
+    // Listing 1
+    Float areaRecip = Float(1) / f.Dot(Vector3::Cross(edges[0], edges[1]));
+    auto TexGradient = [&](Vector3 offset)
+    {
+        Vector3 eP = pos - positions[0] + offset;
+        Float a = f.Dot(Vector3::Cross(eP, edges[1]) * areaRecip);
+        Float b = f.Dot(Vector3::Cross(edges[0], eP) * areaRecip);
+        Float c = Float(1) - a - b;
+        Vector2 uvAtOffset = uv0 * c + uv1 * a + uv2 * b;
+        return uvAtOffset - uv;
+    };
+    Vector2 dpdx = TexGradient(a1);
+    Vector2 dpdy = TexGradient(a2);
+
     // Transform to the requested space
     // pos already pre-transformed
     // geoNormal generated from pre-transformed pos's
@@ -480,9 +579,15 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
         .geoNormal = geoNormal,
         .shadingTBN = tbn,
         .uv = uv,
-        .dpdu = Vector2::Zero(),
-        .dpdv = Vector2::Zero(),
+        .dpdx = dpdx,
+        .dpdy = dpdy,
         .backSide = backSide
+    };
+    rayConeSurface = RayConeSurface
+    {
+        .rayConeFront   = rayCone,
+        .rayConeBack    = rayCone,
+        .betaN          = betaFinal
     };
 }
 

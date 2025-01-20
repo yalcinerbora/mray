@@ -306,7 +306,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     {
         uint32_t isVisibleIntCount = Bitspan<uint32_t>::CountT(maxRayCount);
         MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys,
-                                             dRays, dRayDifferentials,
+                                             dRays, dRayCones,
                                              dRayStateAO.dVisibilityRays,
                                              dRayStateAO.dImageCoordinates,
                                              dRayStateAO.dOutputData,
@@ -330,7 +330,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     else
     {
         MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys,
-                                             dRays, dRayDifferentials,
+                                             dRays, dRayCones,
                                              dRayStateCommon.dImageCoordinates,
                                              dRayStateCommon.dOutputData,
                                              dRayStateCommon.dFilmFilterWeights,
@@ -457,7 +457,7 @@ RendererOutput SurfaceRenderer::DoRender()
     {
         cameraWork.GenRaysStochasticFilter
         (
-            dRayDifferentials, dRays,
+            dRayCones, dRays,
             dRayStateCommon.dImageCoordinates,
             dRayStateCommon.dFilmFilterWeights, dIndices,
             ToConstSpan(dCamRayGenRNBuffer),
@@ -471,7 +471,7 @@ RendererOutput SurfaceRenderer::DoRender()
     {
         cameraWork.GenerateRays
         (
-            dRayDifferentials, dRays,
+            dRayCones, dRays,
             dRayStateCommon.dImageCoordinates,
             dRayStateCommon.dFilmFilterWeights, dIndices,
             ToConstSpan(dCamRayGenRNBuffer),
@@ -597,7 +597,7 @@ RendererOutput SurfaceRenderer::DoRender()
                 workPtr.DoWork_1(dRayStateAO,
                                  dLocalIndices,
                                  dRandomNumBuffer,
-                                 dRayDifferentials,
+                                 dRayCones,
                                  dRays,
                                  dHits,
                                  dHitKeys,
@@ -610,7 +610,7 @@ RendererOutput SurfaceRenderer::DoRender()
                 workPtr.DoWork_0(dRayStateCommon,
                                  dLocalIndices,
                                  Span<const RandomNumber>{},
-                                 dRayDifferentials,
+                                 dRayCones,
                                  dRays,
                                  dHits,
                                  dHitKeys,
@@ -625,7 +625,7 @@ RendererOutput SurfaceRenderer::DoRender()
             workPtr.DoBoundaryWork_0(dRayStateCommon,
                                      dLocalIndices,
                                      Span<const RandomNumber>{},
-                                     dRayDifferentials,
+                                     dRayCones,
                                      dRays,
                                      dHits,
                                      dHitKeys,

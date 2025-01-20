@@ -19,17 +19,17 @@ struct LightSampleOutput
 };
 using LightSample = SampleT<LightSampleOutput>;
 
-
-template<class DLSampler>
-concept DirectLightSamplerC = requires(const DLSampler& sampler,
-                                       RNGDispenser& rng,
-                                       const HitKeyPack& hitPack,
-                                       MetaHit metaHit)
-{
-    {sampler.SampleLight(rng, Vector3{})} -> std::same_as<LightSample>;
-    {sampler.PdfLight(uint32_t{}, metaHit, Ray{})} -> std::same_as<Float>;
-    {sampler.PdfLight(hitPack, metaHit, Ray{})} -> std::same_as<Float>;
-};
+// Not used atm
+//template<class LSampler>
+//concept LightSamplerC = requires(const LSampler& sampler,
+//                                 RNGDispenser& rng,
+//                                 const HitKeyPack& hitPack,
+//                                 MetaHit metaHit)
+//{
+//    {sampler.SampleLight(rng, Vector3{})} -> std::same_as<LightSample>;
+//    {sampler.PdfLight(uint32_t{}, metaHit, Ray{})} -> std::same_as<Float>;
+//    {sampler.PdfLight(hitPack, metaHit, Ray{})} -> std::same_as<Float>;
+//};
 
 template <class MetaLightArray>
 class DirectLightSamplerUniform
@@ -51,7 +51,9 @@ class DirectLightSamplerUniform
     MRAY_HYBRID
     LightSample SampleLight(RNGDispenser& rng,
                             const SpectrumConverter&,
-                            const Vector3& distantPoint) const;
+                            const Vector3& distantPoint,
+                            const Vector3& distantNormal,
+                            const RayConeSurface& distantRayConeSurface) const;
 
     MRAY_HYBRID
     Float       PdfLight(uint32_t index, const MetaHit& hit,

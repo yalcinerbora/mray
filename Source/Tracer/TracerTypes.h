@@ -17,16 +17,51 @@ using RNGDispenser = RNGDispenserT<uint32_t>;
 
 using MetaHit = MetaHitT<2>;
 
-// Differential portion of a ray
-struct alignas(16) RayDiff
+// Ray differentials
+// https://www.realtimerendering.com/raytracinggems/unofficial_RayTracingGems_v1.9.pdf
+// This paper also explains ray cones which dramatically reduces memory consumption
+// (~120 MiB). But it had not have aniso-filtering support.
+//
+// This paper introduces the aniso (which is the continuation of the paper above)
+// https://d1qx31qr3h6wln.cloudfront.net/publications/Akenine-Moller2021LOD.pdf
+//
+//
+// Disadvantages are come coupling between surface and ray
+// So we will implement ray cones!
+//
+// For example, traditional ray differentials use 12 floats!
+// For average 2M paths in circulation, this corresponds to 96MiB of data!
+// (Maybe more when we do shadow rays)
+//struct alignas(16) RayDiff
+//{
+//    Vector3 dPdx;
+//    Vector3 dPdy;
+//    Vector3 dDdx;
+//    Vector3 dDdy;
+//};
+//
+// TODO: Check and test for half precision. Angle is revole around (-Pi/2, Pi/2)
+// Width is world space related it can be large (but should fit to half)
+// aperture can be 16-bit UNORM as well since it has a fixed range. (We can round down
+// to increase aliasing, since we do monte carlo simulation)
+struct alignas(8) RayCone
 {
-    // TODO: Need to check the paper
-    // But in the end it should have
-    // dud{x,y,z}
-    // dvd{x,y,z}
-    // So 6 floats? (or 12?)
-    Vector3 dRdx;
-    Vector3 dRdy;
+    Float aperture  = Float(0);
+    Float width     = Float(0);
+
+    MRAY_HYBRID
+    RayCone Advance(Float t) const;
+};
+
+struct RayConeSurface
+{
+    RayCone rayConeFront;   // Incoming ray cone of the surface
+    RayCone rayConeBack;    // Potential refracted ray cone
+    Float betaN = Float(0); // Cuvature estimation of surface
+
+    MRAY_HYBRID
+    RayCone ConeAfterScatter(const Vector3& wO,
+                             const Vector3& surfNormal) const;
 };
 
 // Image coordinate is little bit special.
@@ -187,9 +222,8 @@ struct DefaultSurface
     Quaternion  shadingTBN;
     Vector2     uv;
 
-    Vector2     dpdu;
-    Vector2     dpdv;
-
+    Vector2     dpdx;
+    Vector2     dpdy;
     //
     bool        backSide;
 };
@@ -237,4 +271,35 @@ Vector2 ImageCoordinate::GetPixelIndex() const
     Vector2 result(pixelIndex);
     result += Vector2(offset);
     return result;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+RayCone RayCone::Advance(Float t) const
+{
+    return RayCone
+    {
+        .aperture = aperture,
+        // Exact version
+        //.width = width + tanf(aperture * Float(0.5)) * t * Float(2)
+        // Approx version in the paper (RT Gems chapter 20, Eq. under Figure 20-5)
+        .width = width + aperture * t
+    };
+}
+
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+RayCone RayConeSurface::ConeAfterScatter(const Vector3& wO, const Vector3& n) const
+{
+    auto rcFront = RayCone
+    {
+        .aperture = rayConeFront.aperture + Float(2) * betaN,
+        .width = rayConeFront.width
+    };
+    auto rcBack = RayCone
+    {
+        .aperture = rayConeBack.aperture - betaN,
+        .width = rayConeBack.width
+    };
+
+    return (wO.Dot(n) > Float(0)) ? rcFront : rcBack;
 }
