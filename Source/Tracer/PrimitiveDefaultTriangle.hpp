@@ -493,19 +493,7 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     // https://www.jcgt.org/published/0010/01/01/
     Vector3 f = geoNormal;
     Vector3 d = ray.Dir().Normalize();
-    // Equation 8, 9;
-    // Preprocess the eliptic axes
-    Vector3 h1 = d - f.Dot(d) * f;
-    Vector3 h2 = Vector3::Cross(f, h1);
-    Float r = rayCone.width * Float(0.5);
-    auto EllipseAxes = [&](Vector3 h) -> Vector3
-    {
-        Float denom = (h - d.Dot(h) * d).Length();
-        denom = std::max(MathConstants::Epsilon<Float>(), denom);
-        return (r / denom) * h;
-    };
-    Vector3 a1 = EllipseAxes(h1);
-    Vector3 a2 = EllipseAxes(h2);
+    auto [a1, a2] = rayCone.Project(f, d);
     Matrix3x3 M = Matrix3x3(a1.Normalize(), a2.Normalize(), geoNormal);
 
     // Curvatures

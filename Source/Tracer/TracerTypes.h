@@ -51,6 +51,10 @@ struct alignas(8) RayCone
 
     MRAY_HYBRID
     RayCone Advance(Float t) const;
+
+    MRAY_HYBRID
+    std::array<Vector3, 2>
+    Project(Vector3 surfaceNormal, Vector3 dirTowards) const;
 };
 
 struct RayConeSurface
@@ -302,4 +306,23 @@ RayCone RayConeSurface::ConeAfterScatter(const Vector3& wO, const Vector3& n) co
     };
 
     return (wO.Dot(n) > Float(0)) ? rcFront : rcBack;
+}
+
+MRAY_HYBRID MRAY_CGPU_INLINE
+std::array<Vector3, 2> RayCone::Project(Vector3 f, Vector3 d) const
+{
+    // Equation 8, 9;
+    // Preprocess the eliptic axes
+    Vector3 h1 = d - f.Dot(d) * f;
+    Vector3 h2 = Vector3::Cross(f, h1);
+    Float r = width * Float(0.5);
+    auto EllipseAxes = [&](Vector3 h) -> Vector3
+    {
+        Float denom = (h - d.Dot(h) * d).Length();
+        denom = std::max(MathConstants::Epsilon<Float>(), denom);
+        return (r / denom) * h;
+    };
+    Vector3 a1 = EllipseAxes(h1);
+    Vector3 a2 = EllipseAxes(h2);
+    return {a1, a2};
 }

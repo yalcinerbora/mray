@@ -224,19 +224,22 @@ void Sphere<T>::GenerateSurface(DefaultSurface& result,
                                 const Ray& ray,
                                 const RayCone& rayCone) const
 {
+    const auto& transform = transformContext.get();
+
     // Convert spherical hit to cartesian
     Vector3 normal = Graphics::UnitSphericalToCartesian(hit);
-    Vector3 geoNormal = transformContext.get().ApplyN(normal).Normalize();
+    Vector3 geoNormal = transform.ApplyN(normal).Normalize();
     // Calculate local position using the normal
     // then convert it to world position
     Vector3 position = center + normal * radius;
-    position = transformContext.get().ApplyP(position);
+    position = transform.ApplyP(position);
 
     // Align this normal to Z axis to define tangent space rotation
     Quaternion tbn = Quaternion::RotationBetweenZAxis(normal.Normalize()).Conjugate();
 
     // Spheres are always two sided, check if we are inside
-    Float dDotN = geoNormal.Dot(ray.Dir().Normalize());
+    Vector3 rDir = ray.Dir().Normalize();
+    Float dDotN = geoNormal.Dot(rDir);
     bool backSide = (dDotN > Float(0));
     if(backSide)
     {
@@ -256,14 +259,29 @@ void Sphere<T>::GenerateSurface(DefaultSurface& result,
     // https://www.jcgt.org/published/0010/01/01/
     // Sphere implementation is not there
     // Equation 5
-    Vector3 centerWorld = transformContext.get().ApplyP(center);
+    Vector3 centerWorld = transform.ApplyP(center);
     // The sphere may be transformed via non-uniform scale
     // so we need to calculate "radius" from the world positions
     Float r = (centerWorld - position).Length();
     Float betaN = Float(-1) * std::abs(rayCone.width) / (dDotN * r);
     betaN = backSide ? -betaN : betaN;
     // Texture space differentials
-    // TODO: ...
+    auto [a1, a2] = rayCone.Project(geoNormal, rDir);
+    //
+    auto TexGradient = [&](Vector3 offset)
+    {
+        // Sphere may have been transformed and skewed
+        // So we need to calculate UVs in local space
+        // But this is costly.
+        // TODO: Optimize this maybe?
+        Vector3 offsetP = (position + offset);
+        Vector3 n = (transform.InvApplyP(offsetP) - center).Normalize();
+        Vector2 sphrCoords = Graphics::CartesianToUnitSpherical(n);
+        Vector2 texCoord = SurfaceParametrization(sphrCoords);
+        return texCoord - uv;
+    };
+    Vector2 dpdx = TexGradient(a1);
+    Vector2 dpdy = TexGradient(a2);
 
     result = DefaultSurface
     {
@@ -271,8 +289,8 @@ void Sphere<T>::GenerateSurface(DefaultSurface& result,
         .geoNormal = geoNormal,
         .shadingTBN = tbn,
         .uv = uv,
-        .dpdx = Vector2::Zero(),
-        .dpdy = Vector2::Zero(),
+        .dpdx = dpdx,
+        .dpdy = dpdy,
         .backSide = backSide
     };
     // TODO:
