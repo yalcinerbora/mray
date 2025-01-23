@@ -19,7 +19,7 @@ function(mray_build_ext_dependency_git)
 
     # Parse Args
     set(options SKIP_INSTALL DONT_OVERRIDE_INSTALL_SUFFIXES FORCE_RELEASE)
-    set(oneValueArgs NAME URL TAG SOURCE_SUBDIR OVERRIDE_INSTALL_PREFIX LICENSE_NAME)
+    set(oneValueArgs NAME URL TAG SOURCE_SUBDIR OVERRIDE_INSTALL_PREFIX LICENSE_NAME APPLY_PATCH)
     set(multiValueArgs BUILD_ARGS DEPENDENCIES SPECIFIC_SUBMODULES)
 
     cmake_parse_arguments(BUILD_SUBPROJECT "${options}" "${oneValueArgs}"
@@ -71,6 +71,21 @@ function(mray_build_ext_dependency_git)
         set(SUBPROJECT_INSTALL_SUFFIXES)
     endif()
 
+    if(BUILD_SUBPROJECT_APPLY_PATCH)
+        set(BUILD_SUBPROJECT_APPLY_PATCH
+            PATCH_COMMAND
+                curl ${BUILD_SUBPROJECT_APPLY_PATCH} -s -o tbb_patch.patch
+            # Weird but what to do ...
+            # Reset the patch and apply it again
+            COMMAND
+                git checkout src/tbb/CMakeLists.txt
+            COMMAND
+                git apply -v tbb_patch.patch
+        )
+    endif()
+
+    message(STATUS "ASDASDADS ${BUILD_SUBPROJECT_APPLY_PATCH}")
+
     # Actual Call
     ExternalProject_Add(${BUILD_SUBPROJECT_NAME}
         PREFIX ${SUBPROJECT_PREFIX_DIR}
@@ -83,6 +98,8 @@ function(mray_build_ext_dependency_git)
         DOWNLOAD_DIR ${SUBPROJECT_DL_DIR}
 
         BUILD_IN_SOURCE OFF
+
+        ${BUILD_SUBPROJECT_APPLY_PATCH}
 
         # DL Repo
         GIT_REPOSITORY ${BUILD_SUBPROJECT_URL}

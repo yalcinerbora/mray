@@ -236,7 +236,7 @@ SphericalCoordConverter::Gradient(Float coneAperture,
     // For altitude, the range is [-pi/2, pi/2]
     Float dpdy = coneAngle * MathConstants::InvPi<Float>();
 
-    // No anisotrophy
+    // No anisotropy
     return {Vector2(dpdx, 0), Vector2(0, dpdy)};
 }
 
@@ -291,7 +291,7 @@ CoOctaCoordConverter::Gradient(Float coneAperture,
 
     // Omega changes wrt. entire solid angle domain wihch is 4pi
     Float duv = omega * MathConstants::Inv4Pi<Float>();
-    // No anisotrophy
+    // No anisotropy
     return {Vector2(duv, 0), Vector2(0, duv)};
 }
 

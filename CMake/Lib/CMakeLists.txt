@@ -7,7 +7,6 @@
 # However maybe for install etc user wants a single config of the MRay
 # thus we only need to build that config for the external libraries too.
 # Do an adjustment for that...
-
 set(MRAY_EXT_DIR ${MRAY_DIRECTORY}Ext/${MRAY_PLATFORM_NAME})
 set(MRAY_CMAKE_EXT_DIR ${MRAY_DIRECTORY}CMake/Ext)
 set(MRAY_EXT_BUILD_DIR ${MRAY_EXT_DIR}/build-CMake)
@@ -20,6 +19,7 @@ set(MRAY_EXT_CONFIG_META_ARGS
         -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
         -DMRAY_BUILD_TESTS=${MRAY_BUILD_TESTS}
         -DMRAY_BUILD_VISOR=${MRAY_BUILD_VISOR}
+        -DMRAY_BUILD_USD=${MRAY_ENABLE_USD}
 )
 
 set(MRAY_EXTERNAL_LIBRARIES_STAMP ${MRAY_CONFIG_LIB_DIRECTORY}/MRayLib.stamp)
