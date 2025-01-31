@@ -10,6 +10,10 @@
 
 enum class SceneTexId : uint32_t {};
 
+// TODO: Some formats (well probably all formats)
+// Have a string as "name" parameter. MRay scene format
+// has integer identifiers, change this later to support
+// strings.
 struct TracerIdPack
 {
     using PrimIdMappings        = std::map<uint32_t, Pair<PrimGroupId, PrimBatchId>>;

@@ -92,8 +92,8 @@ namespace TransformGen
 {
     template<std::floating_point T>
     MRAY_HYBRID Quat<T> ToSpaceQuat(const Vector<3, T>& x,
-                              const Vector<3, T>& y,
-                              const Vector<3, T>& z);
+                                    const Vector<3, T>& y,
+                                    const Vector<3, T>& z);
     template<std::floating_point T>
     MRAY_HYBRID Quat<T> ToInvSpaceQuat(const Vector<3, T>& x,
                                        const Vector<3, T>& y,

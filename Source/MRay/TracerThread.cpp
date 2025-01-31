@@ -344,7 +344,6 @@ void TracerThread::HandlePause()
 
 void TracerThread::HandleSceneChange(const std::string& newScene)
 {
-
     // Flush the GPU before freeing memory
     tracer->Flush();
     tracer->ClearAll();
@@ -354,6 +353,7 @@ void TracerThread::HandleSceneChange(const std::string& newScene)
     using namespace std::filesystem;
     if(currentScene) currentScene->ClearScene();
 
+    MRAY_LOG("[Tracer]: Loading Scene...");
     auto scenePath = path(newScene);
     currentSceneName = scenePath.filename().string();
     std::string fileExt = scenePath.extension().string();
@@ -740,7 +740,7 @@ TracerThread::TracerThread(TransferQueue& queue,
     , currentRenderer(INVALID_RENDERER_ID)
 {}
 
-MRayError TracerThread::MTInitialize(const std::string& tracerConfigFile)
+MRayError TracerThread::LoadSceneLoaderDLLs()
 {
     using namespace std::string_literals;
     using namespace std::string_view_literals;
@@ -749,25 +749,67 @@ MRayError TracerThread::MTInitialize(const std::string& tracerConfigFile)
     static const auto MRAY_SCENE_LOADER_LIB_C_NAME = "ConstructSceneLoaderMRay"s;
     static const auto MRAY_SCENE_LOADER_LIB_D_NAME = "DestroySceneLoaderMRay"s;
     static constexpr auto MRAY_SCENE_LOADER_EXT_NAME = "json"sv;
+    //
+    static const auto USD_SCENE_LOADER_LIB_NAME = "SceneLoaderUSD"s;
+    static const auto USD_SCENE_LOADER_LIB_C_NAME = "ConstructSceneLoaderUSD"s;
+    static const auto USD_SCENE_LOADER_LIB_D_NAME = "DestroySceneLoaderUSD"s;
+    static constexpr std::array USD_SCENE_LOADER_EXT_NAMES = {"usd"sv, "usda"sv, "usdc"sv};
 
     // Emplace dll's
     // TODO: Maybe load on demand later
-    sceneLoaderDLLs.emplace(MRAY_SCENE_LOADER_LIB_NAME, MRAY_SCENE_LOADER_LIB_NAME);
+    // DLL construction may throw, so we need to catch
+    try
+    {
+        sceneLoaderDLLs.emplace(MRAY_SCENE_LOADER_LIB_NAME, MRAY_SCENE_LOADER_LIB_NAME);
+        sceneLoaderDLLs.emplace(USD_SCENE_LOADER_LIB_NAME, USD_SCENE_LOADER_LIB_NAME);
 
-    // Create loaders
-    auto& sceneLoaderDLL = sceneLoaderDLLs.at(MRAY_SCENE_LOADER_LIB_NAME);
-    sceneLoaders.emplace(MRAY_SCENE_LOADER_EXT_NAME, SceneLoaderPtr{nullptr, nullptr});
-    MRayError e = sceneLoaderDLL.GenerateObjectWithArgs<SceneLoaderConstructorArgs>
-    (
-        sceneLoaders.at(MRAY_SCENE_LOADER_EXT_NAME),
-        SharedLibArgs
+        // Create loaders
+        // MRay
+        auto& mrayDLL = sceneLoaderDLLs.at(MRAY_SCENE_LOADER_LIB_NAME);
+        sceneLoaders.emplace(MRAY_SCENE_LOADER_EXT_NAME, SceneLoaderPtr{nullptr, nullptr});
+        MRayError e = mrayDLL.GenerateObjectWithArgs<SceneLoaderConstructorArgs>
+        (
+            sceneLoaders.at(MRAY_SCENE_LOADER_EXT_NAME),
+            SharedLibArgs
+            {
+                MRAY_SCENE_LOADER_LIB_C_NAME,
+                MRAY_SCENE_LOADER_LIB_D_NAME
+            },
+            threadPool
+        );
+        if(e) return e;
+
+        // USD
+        SharedLibArgs usdLibArgs = SharedLibArgs
         {
-            MRAY_SCENE_LOADER_LIB_C_NAME,
-            MRAY_SCENE_LOADER_LIB_C_NAME
-        },
-        threadPool
-    );
-    if(e) return e;
+            USD_SCENE_LOADER_LIB_C_NAME,
+            USD_SCENE_LOADER_LIB_D_NAME
+        };
+        auto& usdDLL = sceneLoaderDLLs.at(USD_SCENE_LOADER_LIB_NAME);
+        for(const std::string_view extension : USD_SCENE_LOADER_EXT_NAMES)
+        {
+            sceneLoaders.emplace(extension, SceneLoaderPtr{nullptr, nullptr});
+            e = usdDLL.GenerateObjectWithArgs<SceneLoaderConstructorArgs>
+            (
+                sceneLoaders.at(extension),
+                usdLibArgs,
+                threadPool
+            );
+            if(e) return e;
+        }
+        return e;
+    }
+    catch(const MRayError& e)
+    {
+        return e;
+    }
+}
+
+MRayError TracerThread::MTInitialize(const std::string& tracerConfigFile)
+{
+    MRayError err = MRayError::OK;
+    err = LoadSceneLoaderDLLs();
+    if(err) return err;
 
     Expected<TracerConfig> tConfE = LoadTracerConfig(tracerConfigFile);
     if(tConfE.has_error()) return tConfE.error();
@@ -779,7 +821,6 @@ MRayError TracerThread::MTInitialize(const std::string& tracerConfigFile)
         tracerConfig.dllDeleteFuncName
     };
     dllFile = std::make_unique<SharedLibrary>(tracerConfig.dllName);
-    MRayError err = MRayError::OK;
     // GPU System may fail to construct which thorws an exception
     try
     {

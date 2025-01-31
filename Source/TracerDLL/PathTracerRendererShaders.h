@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "Core/ColorFunctions.h"
+#include "Core/NamedEnum.h"
 
 #include "Tracer/PrimitiveC.h"
 #include "Tracer/MaterialC.h"
@@ -12,48 +13,6 @@
 #include "Tracer/LightSampler.h"
 
 class PathTracerRenderer;
-
-// Lets use this on path tracer, then we make it over the CoreLib
-// so we can refine as needed
-template<class Enum, const std::array<const char*, static_cast<size_t>(Enum::END)>& NamesIn>
-class GenericEnum
-{
-    static constexpr std::array Names = NamesIn;
-
-    public:
-    using E = Enum;
-    // This do not work :(
-    //using enum E;
-
-    private:
-    E e;
-
-    public:
-    GenericEnum() = default;
-    constexpr GenericEnum(E eIn) : e(eIn) {}
-    constexpr GenericEnum(std::string_view sv)
-    {
-        auto loc = std::find_if(Names.cbegin(), Names.cend(),
-                                [&](std::string_view r)
-        {
-            return sv == r;
-        });
-        if(loc == Names.cend())
-            throw MRayError("Bad enum name");
-
-        e = E(std::distance(Names.cbegin(), loc));
-    }
-
-
-    constexpr operator E() const { return e; }
-    constexpr operator E() { return e; }
-    //
-    constexpr std::string_view ToString() const
-    {
-        assert(e < E::END);
-        return Names[static_cast<uint32_t>(e)];
-    }
-};
 
 namespace PathTraceRDetail
 {
@@ -69,7 +28,7 @@ namespace PathTraceRDetail
         "Uniform",
         "IrradianceWeighted"
     };
-    using LightSamplerType = GenericEnum<LightSamplerEnum, LightSamplerNames>;
+    using LightSamplerType = NamedEnum<LightSamplerEnum, LightSamplerNames>;
 
     enum class SampleModeEnum
     {
@@ -85,7 +44,7 @@ namespace PathTraceRDetail
         "WithNextEventEstimation",
         "WithNEEAndMIS"
     };
-    using SampleMode = GenericEnum<SampleModeEnum, SampleModeNames>;
+    using SampleMode = NamedEnum<SampleModeEnum, SampleModeNames>;
 
     enum class RenderModeEnum
     {
@@ -99,7 +58,7 @@ namespace PathTraceRDetail
         "Throughput",
         "Latency"
     };
-    using RenderMode = GenericEnum<RenderModeEnum, RenderModeNames>;
+    using RenderMode = NamedEnum<RenderModeEnum, RenderModeNames>;
 
     enum class RayType : uint8_t
     {

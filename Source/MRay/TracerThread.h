@@ -63,6 +63,7 @@ class TracerThread final : public RealtimeThread
     void        FinalWork() override;
 
     MRayError   CreateRendererFromConfig(const std::string& configJsonPath);
+    MRayError   LoadSceneLoaderDLLs();
     void        RestartRenderer();
 
     void        HandleRendering();
@@ -71,6 +72,7 @@ class TracerThread final : public RealtimeThread
     void        HandleSceneChange(const std::string&);
     void        HandleRendererChange(const std::string&);
     std::string GenSavePrefix() const;
+
 
     public:
     // Constructors & Destructor

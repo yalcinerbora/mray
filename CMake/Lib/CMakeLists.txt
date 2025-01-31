@@ -87,8 +87,8 @@ set_target_properties(MRayExternal PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD TRUE)
 function(gen_imported_target)
     # Parse Args
     set(options STATIC SHARED)
-    set(oneValueArgs NAME DEBUG_TARGET RELEASE_TARGET)
-    set(multiValueArgs EXTRA_INCLUDES EXTRA_DEFINES)
+    set(oneValueArgs NAME DEBUG_TARGET RELEASE_TARGET OVERRIDE_LIB_PREFIX)
+    set(multiValueArgs EXTRA_INCLUDES EXTRA_DEFINES EXTRA_LIB_FOLDERS)
     cmake_parse_arguments(GEN_IMPORTED_TGT "${options}" "${oneValueArgs}"
                         "${multiValueArgs}" ${ARGN})
 
@@ -123,10 +123,19 @@ function(gen_imported_target)
     set_property(TARGET ${GEN_IMPORTED_TGT_NAME} APPEND PROPERTY IMPORTED_CONFIGURATIONS DEBUG)
     set_property(TARGET ${GEN_IMPORTED_TGT_NAME} APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
 
-    set_target_properties(${GEN_IMPORTED_TGT_NAME} PROPERTIES
-        IMPORTED_LOCATION_DEBUG "${MRAY_PLATFORM_LIB_DIRECTORY}/Debug/${DBG_NAME}${TGT_SUFFIX}"
-        IMPORTED_LOCATION_RELEASE "${MRAY_PLATFORM_LIB_DIRECTORY}/Release/${REL_NAME}${TGT_SUFFIX}"
-    )
+    # TODO: GEN_IMPORTED_TGT_OVERRIDE_LIB_PREFIX is not generic enough?
+    # What if the system has per-config lib folders?
+    if(GEN_IMPORTED_TGT_OVERRIDE_LIB_PREFIX)
+        set_target_properties(${GEN_IMPORTED_TGT_NAME} PROPERTIES
+            IMPORTED_LOCATION_DEBUG "${GEN_IMPORTED_TGT_OVERRIDE_LIB_PREFIX}/${DBG_NAME}${TGT_SUFFIX}"
+            IMPORTED_LOCATION_RELEASE "${GEN_IMPORTED_TGT_OVERRIDE_LIB_PREFIX}/${REL_NAME}${TGT_SUFFIX}")
+    else()
+        set_target_properties(${GEN_IMPORTED_TGT_NAME} PROPERTIES
+            IMPORTED_LOCATION_DEBUG "${MRAY_PLATFORM_LIB_DIRECTORY}/Debug/${DBG_NAME}${TGT_SUFFIX}"
+            IMPORTED_LOCATION_RELEASE "${MRAY_PLATFORM_LIB_DIRECTORY}/Release/${REL_NAME}${TGT_SUFFIX}")
+    endif()
+
+
     set_target_properties(${GEN_IMPORTED_TGT_NAME} PROPERTIES MAP_IMPORTED_CONFIG_SANITIZER Release)
 
     if(GEN_IMPORTED_TGT_EXTRA_INCLUDES)
@@ -141,10 +150,24 @@ function(gen_imported_target)
                                     ${GEN_IMPORTED_TGT_EXTRA_DEFINES})
     endif()
 
+    if(GEN_IMPORTED_TGT_EXTRA_LIB_FOLDERS)
+        target_link_directories(${GEN_IMPORTED_TGT_NAME}
+                                INTERFACE
+                                ${GEN_IMPORTED_TGT_EXTRA_LIB_FOLDERS})
+    endif()
+
     if(WIN32 AND NOT GEN_IMPORTED_TGT_STATIC)
-        set_target_properties(${GEN_IMPORTED_TGT_NAME} PROPERTIES
-                              IMPORTED_IMPLIB_DEBUG "${MRAY_PLATFORM_LIB_DIRECTORY}/Debug/${DBG_NAME}.lib"
-                              IMPORTED_IMPLIB_RELEASE "${MRAY_PLATFORM_LIB_DIRECTORY}/Release/${REL_NAME}.lib")
+        # TODO: GEN_IMPORTED_TGT_OVERRIDE_LIB_PREFIX is not generic enough?
+        # What if the system has per-config lib folders?
+        if(GEN_IMPORTED_TGT_OVERRIDE_LIB_PREFIX)
+            set_target_properties(${GEN_IMPORTED_TGT_NAME} PROPERTIES
+                IMPORTED_IMPLIB_DEBUG "${GEN_IMPORTED_TGT_OVERRIDE_LIB_PREFIX}/${DBG_NAME}.lib"
+                IMPORTED_IMPLIB_RELEASE "${GEN_IMPORTED_TGT_OVERRIDE_LIB_PREFIX}/${REL_NAME}.lib")
+        else()
+            set_target_properties(${GEN_IMPORTED_TGT_NAME} PROPERTIES
+                IMPORTED_IMPLIB_DEBUG "${MRAY_PLATFORM_LIB_DIRECTORY}/Debug/${DBG_NAME}.lib"
+                IMPORTED_IMPLIB_RELEASE "${MRAY_PLATFORM_LIB_DIRECTORY}/Release/${REL_NAME}.lib")
+        endif()
     endif()
 
 endfunction()
@@ -181,6 +204,15 @@ if(WIN32)
 else()
     gen_imported_target(NAME vulkan::vulkan SHARED DEBUG_TARGET vulkand RELEASE_TARGET vulkan)
     gen_imported_target(NAME glfw3::glfw3 SHARED DEBUG_TARGET glfwd RELEASE_TARGET glfw)
+endif()
+
+if(MRAY_ENABLE_USD)
+    gen_imported_target(NAME usd::usd SHARED
+                        OVERRIDE_LIB_PREFIX ${MRAY_PLATFORM_LIB_DIRECTORY}/usd/lib
+                        DEBUG_TARGET        usd_msd
+                        RELEASE_TARGET      usd_ms
+                        EXTRA_INCLUDES      ${MRAY_PLATFORM_LIB_DIRECTORY}/usd/include)
+    gen_imported_target(NAME tbb::tbb STATIC DEBUG_TARGET tbb12_debug RELEASE_TARGET tbb12)
 endif()
 
 # gen_imported_target(NAME imgui::imgui_ti STATIC DEBUG_TARGET imgui_tex_inspectd RELEASE_TARGET imgui_tex_inspect)

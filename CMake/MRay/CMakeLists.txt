@@ -53,6 +53,11 @@ add_precompiled_headers(TARGET MRay)
 # Dynamically loaded DLLs
 add_dependencies(MRay SceneLoaderMRay)
 
+# Same as above, but USD may not be built
+if(MRAY_ENABLE_USD)
+    add_dependencies(MRay SceneLoaderUSD)
+endif()
+
 # Tracer Related dependencies
 if(${MRAY_DEVICE_BACKEND} STREQUAL "MRAY_GPU_BACKEND_CUDA")
     add_dependencies(MRay TracerDLL_CUDA)

@@ -64,6 +64,7 @@ set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/Filesystem.h)
 
 set(SRC_DATA_TYPES
+    ${CURRENT_SOURCE_DIR}/NamedEnum.h
     ${CURRENT_SOURCE_DIR}/MRayDataType.h
     ${CURRENT_SOURCE_DIR}/MRayDataType.cpp)
 

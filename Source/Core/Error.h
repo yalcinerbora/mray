@@ -42,6 +42,7 @@ struct MRayError
     MRayError&  operator=(MRayError&&) noexcept = default;
                 ~MRayError()                    = default;
 
+    explicit operator bool() const;
     explicit operator bool();
 
     std::string GetError() const;
@@ -56,6 +57,11 @@ inline MRayError::MRayError(std::string_view sv)
     : type(MRayError::HAS_ERROR)
     , customInfo(sv)
 {}
+
+inline MRayError::operator bool() const
+{
+    return type != MRayError::OK;
+}
 
 inline MRayError::operator bool()
 {

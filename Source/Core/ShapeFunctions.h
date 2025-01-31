@@ -26,6 +26,17 @@ namespace Sphere
 {
     MRAY_HYBRID AABB3 BoundingBox(const Vector3& center, Float radius);
 }
+
+namespace Polygon
+{
+    // Given a polygon with vertices "vertices"
+    // calculate triangulation of such polygon via "ear clipping"
+    // method. Polygon winding order must be clockwise
+    template<size_t N>
+    MRAY_HYBRID
+    constexpr void ClipEars(Span<Vector3ui, N - 2> localIndicesOut,
+                            Span<const Vector3, N> vertices);
+}
 }
 
 namespace Shape
@@ -107,10 +118,10 @@ Vector3 Triangle::PointToBarycentrics(Span<const Vector3, TRI_VERTEX_COUNT> posi
     Float d11 = e1.Dot(e1);
     Float d20 = v.Dot(e0);
     Float d21 = v.Dot(e1);
-    Float denom = 1.0f / (d00 * d11 - d01 * d01);
+    Float denom = Float(1) / (d00 * d11 - d01 * d01);
     Float a = (d11 * d20 - d01 * d21) * denom;
     Float b = (d00 * d21 - d01 * d20) * denom;
-    Float c = 1.0f - a - b;
+    Float c = Float(1) - a - b;
     return Vector3(a, b, c);
 }
 
@@ -120,4 +131,51 @@ AABB3 Sphere::BoundingBox(const Vector3& center, Float radius)
     return AABB3(center - radius, center + radius);
 }
 
+template<size_t N>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr void Polygon::ClipEars(Span<Vector3ui, N - 2> localIndicesOut,
+                                 Span<const Vector3, N> vertices)
+{
+    // We "expand" the vertices to previous/next we will access elements
+    // via this
+    StaticVector<uint32_t, N + 2> indices;
+    std::iota(indices.begin() + 1, indices.end() - 1, 0u);
+    indices[0] = N - 1;
+    indices[N + 1] = 0;
+    //
+    const auto IsConvexEdge = [&](uint32_t i) -> bool
+    {
+        Vector3 e0 = vertices[indices[i - 1]] - vertices[indices[i]];
+        Vector3 e1 = vertices[indices[i]] - vertices[indices[i + 1]];
+        return Vector3::Cross(e0, e1).Length() > Float(0);
+    };
+    //
+    const auto Next = [&indices](uint32_t i) -> uint32_t
+    {
+        i++;
+        if(i >= indices.size() + 1u) return 1u;
+        return i;
+    };
+    // Basic ear clipping algorithm
+    // Traverse the contigious triplets
+    uint32_t writeIndex = 0;
+    for(uint32_t i = 1; true; i = Next(i))
+    {
+        if(!IsConvexEdge(i)) continue;
+        // Write the triplet
+        Vector3ui triplet(indices[i - 1],
+                          indices[i + 0],
+                          indices[i + 1]);
+        localIndicesOut[writeIndex++] = triplet;
+        // Now collapse the array
+        indices.remove(&indices[i]);
+        if(indices.size() == 2) break;
+        // When we continue, do not decrement
+        // to compansate the Next(..) function
+        // Given a equilateral polygon, this will
+        // give similar results to Delunay (sometimes).
+        // Otherwise, it will generate fan triangulation
+        // which is arguably worse?
+    }
+}
 }

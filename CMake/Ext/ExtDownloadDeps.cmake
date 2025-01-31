@@ -84,8 +84,6 @@ function(mray_build_ext_dependency_git)
         )
     endif()
 
-    message(STATUS "ASDASDADS ${BUILD_SUBPROJECT_APPLY_PATCH}")
-
     # Actual Call
     ExternalProject_Add(${BUILD_SUBPROJECT_NAME}
         PREFIX ${SUBPROJECT_PREFIX_DIR}

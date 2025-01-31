@@ -135,7 +135,7 @@ TEST(DefaultTriangle, TypeCheck)
     EXPECT_EQ(std::get<PrimAttributeInfo::LAYOUT_INDEX>(list[1]).Name(),
               MRayDataEnum::MR_QUATERNION);
     EXPECT_EQ(std::get<PrimAttributeInfo::OPTIONALITY_INDEX>(list[1]),
-              AttributeOptionality::MR_OPTIONAL);
+              AttributeOptionality::MR_MANDATORY);
     EXPECT_EQ(std::get<PrimAttributeInfo::IS_ARRAY_INDEX>(list[1]),
               AttributeIsArray::IS_SCALAR);
 
@@ -144,7 +144,7 @@ TEST(DefaultTriangle, TypeCheck)
     EXPECT_EQ(std::get<PrimAttributeInfo::LAYOUT_INDEX>(list[2]).Name(),
               MRayDataEnum::MR_VECTOR_2);
     EXPECT_EQ(std::get<PrimAttributeInfo::OPTIONALITY_INDEX>(list[2]),
-              AttributeOptionality::MR_OPTIONAL);
+              AttributeOptionality::MR_MANDATORY);
     EXPECT_EQ(std::get<PrimAttributeInfo::IS_ARRAY_INDEX>(list[2]),
               AttributeIsArray::IS_SCALAR);
 

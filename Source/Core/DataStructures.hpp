@@ -237,6 +237,7 @@ requires std::is_copy_assignable_v<T>
             DestructObjectAt(i);
         ConstructObjectAt(i, other[i]);
     }
+    return *this;
 }
 
 template<class T, size_t N>
