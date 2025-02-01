@@ -39,7 +39,9 @@ enum class IndexMode
     PER_VERTEX_WITH_INDEX,
     //
     PER_VERTEX_PER_PRIM,
-    PER_VERTEX_PER_PRIM_WITH_INDEX
+    PER_VERTEX_PER_PRIM_WITH_INDEX,
+    //
+    CONSTANT
 };
 
 class AttributeIndexer
@@ -67,13 +69,11 @@ inline AttributeIndexer::AttributeIndexer(const pxr::VtArray<int>& posIndicesIn,
     if(layout == pxr::UsdGeomTokens->vertex ||
        layout == pxr::UsdGeomTokens->varying)
         mode = hasIndex ? PER_VERTEX_WITH_INDEX : PER_VERTEX;
-    else
+    else if(layout == pxr::UsdGeomTokens->faceVarying)
         mode = hasIndex ? PER_VERTEX_PER_PRIM_WITH_INDEX
                         : PER_VERTEX_PER_PRIM;
-    //
-    assert(((mode == IndexMode::PER_VERTEX_PER_PRIM_WITH_INDEX ||
-             mode == IndexMode::PER_VERTEX_WITH_INDEX) && (!attributeIndices.empty())) ||
-           (mode == IndexMode::PER_VERTEX_PER_PRIM || mode == IndexMode::PER_VERTEX));
+    else // constant
+        mode = CONSTANT;
 }
 
 inline uint32_t AttributeIndexer::operator()(uint32_t perVertexPerFaceCounter) const
@@ -99,7 +99,8 @@ inline uint32_t AttributeIndexer::operator()(uint32_t perVertexPerFaceCounter) c
             // Do single indirection
         case PER_VERTEX_PER_PRIM_WITH_INDEX:
             return uint32_t(attributeIndices[perVertexPerFaceCounter]);
-            //
+        case CONSTANT:
+            return 0u;
         default:
         {
             assert(false);
@@ -108,15 +109,15 @@ inline uint32_t AttributeIndexer::operator()(uint32_t perVertexPerFaceCounter) c
     }
 }
 
-void Triangulate(Span<Vector3ui> localIndicesOut,
+bool Triangulate(Span<Vector3ui> localIndicesOut,
                  Span<const Vector3> vertices)
 {
     using Shape::Polygon::ClipEars;
     // Doing this static functions to enable some unrolling etc.
     // Probably not worth it but w/e
-    #define MRAY_CLIP_EAR_GEN(num) case num: \
-        ClipEars<num>(Span<Vector3ui, num-2>(localIndicesOut), \
-                      Span<const Vector3, num>(vertices)); break
+    #define MRAY_CLIP_EAR_GEN(N) case N: \
+        ClipEars<N>(Span<Vector3ui, N-2>(localIndicesOut), \
+                    Span<const Vector3, N>(vertices)); break
 
     assert(localIndicesOut.size() + 2 == vertices.size());
     switch(vertices.size())
@@ -138,9 +139,10 @@ void Triangulate(Span<Vector3ui> localIndicesOut,
         MRAY_CLIP_EAR_GEN(14);
         MRAY_CLIP_EAR_GEN(15);
         MRAY_CLIP_EAR_GEN(16);
-        default: break;
+        default: return true;
     }
     #undef MRAY_CLIP_EAR_GEN
+    return false;
 }
 
 Vector3 CalculateTriangleTangent(Vector3ui triIndex, uint32_t vertexIndex,
@@ -163,21 +165,16 @@ Vector3 CalculateTriangleTangent(Vector3ui triIndex, uint32_t vertexIndex,
     return Graphics::GSOrthonormalize(tangent, normals[triIndex[0]]);
 }
 
-MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomIndex,
-                                                               const AttributeIndexer& posIndexer,
-                                                               const AttributeIndexer& uvIndexer,
-                                                               const AttributeIndexer& normalIndexer,
-                                                               const pxr::VtArray<int>& faceIndices,
-                                                               const pxr::VtArray<int>& faceIndexOffsets,
-                                                               const pxr::VtArray<pxr::GfVec3f>& positions,
-                                                               const pxr::VtArray<pxr::GfVec3f>& normals,
-                                                               const pxr::VtArray<pxr::GfVec2f>& uvs)
+
+MRayError MeshProcessorThread::AllocateTransientBuffers(Span<Vector3ui>& indexBuffer, Span<Vector3>& posBuffer,
+                                                        Span<Quaternion>& normalBuffer, Span<Vector2>& uvBuffer,
+                                                        SubGeomTransientData& transientDataList,
+                                                        uint32_t primCount, uint32_t attributeCount)
 {
-    SubGeomTransientData& transientData = primIndexTransientData.back().emplace_back();
-    uint32_t indexAttribI   = std::numeric_limits<uint32_t>::max();
-    uint32_t posAttribI     = std::numeric_limits<uint32_t>::max();
-    uint32_t normalAttribI  = std::numeric_limits<uint32_t>::max();
-    uint32_t uvAttribI      = std::numeric_limits<uint32_t>::max();
+    uint32_t indexAttribI = std::numeric_limits<uint32_t>::max();
+    uint32_t posAttribI = std::numeric_limits<uint32_t>::max();
+    uint32_t normalAttribI = std::numeric_limits<uint32_t>::max();
+    uint32_t uvAttribI = std::numeric_limits<uint32_t>::max();
     // TODO: Now we need to do a type dynamic stuff here,
     // but we dont do it right now so do a runtime check and crash the system for now
     // I am overloaded from the dynamics of USD I did not bother with this.
@@ -190,10 +187,9 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
         {
             using DataType = typename std::remove_cvref_t<decltype(type)>::Type;
             size_t elementCount = (logic == PrimitiveAttributeLogic::INDEX)
-                                    ? primLocalPrimCounts.back().primCount
-                                    : primLocalPrimCounts.back().attributeCount;
-            transientData.emplace_back(std::in_place_type_t<DataType>{},
-                                       elementCount);
+                                    ? primCount : attributeCount;
+            transientDataList.emplace_back(std::in_place_type_t<DataType>{}, elementCount);
+            transientDataList.back().ReserveAll();
             switch(logic)
             {
                 using enum PrimitiveAttributeLogic;
@@ -205,10 +201,10 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
             }
 
             using enum PrimitiveAttributeLogic;
-            bool fatalCrash = (logic == INDEX       && !std::is_same_v<Vector3ui, DataType> ||
-                               logic == POSITION    && !std::is_same_v<Vector3, DataType>   ||
-                               logic == UV0         && !std::is_same_v<Vector2, DataType>   ||
-                               logic == NORMAL      && !std::is_same_v<Quaternion, DataType>);
+            bool fatalCrash = (logic == INDEX    && !std::is_same_v<Vector3ui, DataType> ||
+                               logic == POSITION && !std::is_same_v<Vector3, DataType>   ||
+                               logic == UV0      && !std::is_same_v<Vector2, DataType>   ||
+                               logic == NORMAL   && !std::is_same_v<Quaternion, DataType>);
             if(fatalCrash)
             {
                 return MRayError("[Fatal Error!]: MRayUSD's Triangle Layout is different "
@@ -221,23 +217,33 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
         //
         attribIndex++;
     }
-
     // Transient buffers are allocated, now fill them
-    Span indexBuffer = transientData[indexAttribI].AccessAs<Vector3ui>();
-    Span posBuffer = transientData[posAttribI].AccessAs<Vector3>();
-    Span normalBuffer = transientData[normalAttribI].AccessAs<Quaternion>();
-    Span uvBuffer = transientData[uvAttribI].AccessAs<Vector2>();
+    indexBuffer = transientDataList[indexAttribI].AccessAs<Vector3ui>();
+    posBuffer = transientDataList[posAttribI].AccessAs<Vector3>();
+    normalBuffer = transientDataList[normalAttribI].AccessAs<Quaternion>();
+    uvBuffer = transientDataList[uvAttribI].AccessAs<Vector2>();
+    return MRayError::OK;
+}
 
+MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomIndex, bool changeWinding,
+                                                               const AttributeIndexer& posIndexer,
+                                                               const AttributeIndexer& uvIndexer,
+                                                               const AttributeIndexer& normalIndexer,
+                                                               const pxr::VtArray<int>& faceIndices,
+                                                               const pxr::VtArray<int>& faceIndexOffsets,
+                                                               const pxr::VtArray<pxr::GfVec3f>& positions,
+                                                               const pxr::VtArray<pxr::GfVec3f>& normals,
+                                                               const pxr::VtArray<pxr::GfVec2f>& uvs)
+{
     uint32_t indexCounter = 0;
     uint32_t attribCounter = 0;
     for(int faceIndex : faceIndices.AsConst())
     {
-        auto faceLoc = std::lower_bound(faceIndexOffsets.cbegin(), faceIndexOffsets.cend(),
-                                    faceIndex, std::plus<int>{});
-        uint32_t faceIndexStart = (faceLoc == std::begin(faceIndexOffsets))
-                                    ? 0u : uint32_t (*(faceLoc - 1));
-        uint32_t faceIndexEnd = *faceLoc;
+        uint32_t faceIndexStart = (faceIndex == 0) ? 0u : uint32_t(faceIndexOffsets[faceIndex - 1]);
+        uint32_t faceIndexEnd = uint32_t(faceIndexOffsets[faceIndex]);
         uint32_t faceVertexCount = uint32_t(faceIndexEnd - faceIndexStart);
+        bool failTriangulation = faceVertexCount > MRAY_USD_MAX_TRI_POLY_COUNT;
+        // We ignore, if poly is too large
         faceVertexCount = std::min(faceVertexCount, MRAY_USD_MAX_TRI_POLY_COUNT);
         uint32_t faceTriCount = faceVertexCount - 2u;
 
@@ -250,22 +256,38 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
         TriangulateFaceArray<uint32_t> usdUVIndices;
         TriangulateFaceArray<uint32_t> usdNormalIndices;
         TriangulateFaceArray<uint32_t> usdPosIndices;
-        // Load all the data
+        // Load the indices
         for(uint32_t i = 0; i < faceVertexCount; i++)
         {
             uint32_t indexOffset  = faceIndexStart + i;
             usdUVIndices[i]     = uvIndexer(indexOffset);
             usdNormalIndices[i] = normalIndexer(indexOffset);
             usdPosIndices[i]    = posIndexer(indexOffset);
-            //
-            // These are guaranteed to be available.
-            pxr::GfVec3f pos    = positions[usdPosIndices[i]];
-            localPositions[i]   = Vector3(pos[0], pos[1], pos[2]);
+        }
+        // Change the winding if requested
+        if(changeWinding)
+        {
+            std::reverse(usdUVIndices.begin(), usdUVIndices.begin() + faceVertexCount);
+            std::reverse(usdNormalIndices.begin(), usdNormalIndices.begin() + faceVertexCount);
+            std::reverse(usdPosIndices.begin(), usdPosIndices.begin() + faceVertexCount);
+        }
+
+        // These are guaranteed to be available.
+        for(uint32_t i = 0; i < faceVertexCount; i++)
+        {
+            pxr::GfVec3f pos = positions[usdPosIndices[i]];
+            localPositions[i] = Vector3(pos[0], pos[1], pos[2]);
         }
 
         // First off triangulate the mesh
-        Triangulate(Span(localIndicesTriangulated.data(), faceTriCount),
-                    Span(localPositions.data(), faceVertexCount));
+        // Skip if we can't triangulate (either 1,2 or more than 16 vertices)
+        failTriangulation = Triangulate(Span(localIndicesTriangulated.data(), faceTriCount),
+                                        Span(localPositions.data(), faceVertexCount));
+        if(failTriangulation)
+        {
+            warnFailTriangulation = true;
+            continue;
+        }
 
         // Normals are not guaranteed
         // So set something reasonable
@@ -328,8 +350,7 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
                     indexCounter++;
                     triangleDataTangents.push_back(Vector3::Zero());
                     triangleDataNormals.push_back(localNormals[localIndex]);
-                    posBuffer[attribCounter] = localPositions[localIndex];
-                    uvBuffer[attribCounter] = localUVs[localIndex];
+                    usdDataIndices.push_back(indexTriplet);
                 }
             }
             triangleIndices.push_back(outIndex);
@@ -354,6 +375,29 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
         .attributeCount = uint32_t(triangleDataTangents.size())
     };
 
+    Span<Vector3ui> indexBuffer;
+    Span<Vector3> posBuffer;
+    Span<Quaternion> normalBuffer;
+    Span<Vector2> uvBuffer;
+    MRayError err = AllocateTransientBuffers(indexBuffer, posBuffer,
+                                             normalBuffer, uvBuffer,
+                                             primTransientData.back()[subgeomIndex],
+                                             primLocalPrimCounts[subgeomIndex].primCount,
+                                             primLocalPrimCounts[subgeomIndex].attributeCount);
+    if(err) return err;
+
+    // Indirect copy the uv and positions
+    for(const auto& indexTriplet : usdDataIndices)
+    {
+        pxr::GfVec3f pos = positions[indexTriplet[0]];
+        pxr::GfVec2f uv = uvs[indexTriplet[1]];
+        posBuffer[attribCounter] = Vector3(pos[0], pos[1], pos[2]);
+        uvBuffer[attribCounter] = Vector2(uv[0], uv[1]);
+    }
+    // Memcpy the indices
+    assert(triangleIndices.size() == indexBuffer.size());
+    std::copy(triangleIndices.cbegin(), triangleIndices.cend(), indexBuffer.begin());
+
     // Calculate the Quaternion
     assert(triangleDataNormals.size() == triangleDataTangents.size());
     for(size_t i = 0; i < triangleDataNormals.size(); i++)
@@ -363,13 +407,18 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
         Vector3 b = Vector3::Cross(t, n);
         normalBuffer[i] = TransformGen::ToSpaceQuat(t, b, n);
     }
+
+    MRAY_LOG("[{}] After single-index triangulation: primCount {}, vertexCount {}",
+             subgeomIndex, primLocalPrimCounts[subgeomIndex].primCount,
+             primLocalPrimCounts[subgeomIndex].attributeCount);
     // Finally, after days of work
     // All Done! (Hopefully)
+    return MRayError::OK;
 }
 
 MRayError MeshProcessorThread::PreprocessIndicesSingle(uint32_t index)
 {
-    primIndexTransientData.emplace_back();
+    primTransientData.emplace_back();
 
     using PrimVar = pxr::UsdGeomPrimvar;
     using Attribute = pxr::UsdAttribute;
@@ -393,7 +442,7 @@ MRayError MeshProcessorThread::PreprocessIndicesSingle(uint32_t index)
     pxr::VtArray<int> vertexIndices; faceVIndexA.Get(&vertexIndices);
     pxr::VtArray<int> uvIndices; uvPV.GetIndices(&uvIndices);
     pxr::VtArray<int> normalIndices; normalPV.GetIndices(&normalIndices);
-    AttributeIndexer posIndexer(vertexIndices, uvIndices, pxr::UsdGeomTokens->faceVarying);
+    AttributeIndexer posIndexer(vertexIndices, vertexIndices, pxr::UsdGeomTokens->faceVarying);
     AttributeIndexer uvIndexer(vertexIndices, uvIndices, uvPV.GetInterpolation());
     AttributeIndexer normalIndexer(vertexIndices, normalIndices, normalPV.GetInterpolation());
 
@@ -414,11 +463,49 @@ MRayError MeshProcessorThread::PreprocessIndicesSingle(uint32_t index)
     pxr::VtArray<pxr::GfVec2f> uvs;
     uvPV.GetAttr().Get(&uvs);
 
+    MRAY_LOG("Face Count: Input {}", faceIndexOffsets.size());
+    MRAY_LOG("Pos: IndexCount({}), Count({})", vertexIndices.size(), positions.size());
+    MRAY_LOG("UV: IndexCount({}), Count({}), Interp({})",
+             uvIndices.size(), uvs.size(), uvPV.GetInterpolation().GetString());
+    MRAY_LOG("Normal: IndexCount({}), Count({}), Interp({})",
+             normalIndices.size(), normals.size(), normalPV.GetInterpolation().GetString());
+    MRAY_LOG("---------------------------");
+
+    // Orientation
+    pxr::TfToken orientation;
+    mesh.GetOrientationAttr().Get(&orientation);
+    bool changeToCW = (orientation == pxr::UsdGeomTokens->leftHanded);
+
     // Reset the buffers
     auto subsets = pxr::UsdGeomSubset::GetAllGeomSubsets(mesh);
-    primLocalPrimCounts.resize(subsets.size());
-    primIndexTransientData.back().resize(subsets.size());
-    for(uint32_t i = 0; i < subsets.size(); i++)
+    primLocalPrimCounts.resize(std::max(size_t(1), subsets.size()));
+    primTransientData.back().resize(std::max(size_t(1), subsets.size()));
+    if(subsets.empty())
+    {
+        // Reset the hash table & buffers
+        indexLookupTable.clear();
+        usdDataIndices.clear();
+        triangleDataTangents.clear();
+        triangleDataNormals.clear();
+        triangleIndices.clear();
+        // To reuse the complex triangulation + single-indexer function
+        // we create iota here.
+        // TODO: Abstract this to a ranges view later
+        // (a python generator-like concept)
+        pxr::VtArray<int> faceIndices(faceIndexOffsetsIn.size());
+        std::iota(faceIndices.begin(), faceIndices.end(), 0);
+
+        MRAY_LOG("    No Subset: FaceCount {}", faceIndices.size());
+
+        // All the work is here
+        MRayError err = TriangulateAndCalculateTangents(0, changeToCW,
+                                                        posIndexer, uvIndexer,
+                                                        normalIndexer, faceIndices,
+                                                        faceIndexOffsets, positions,
+                                                        normals, uvs);
+        if(err) return err;
+    }
+    else for(uint32_t i = 0; i < subsets.size(); i++)
     {
         const auto& subset = subsets[i];
         // Reset the hash table & buffers
@@ -431,8 +518,11 @@ MRayError MeshProcessorThread::PreprocessIndicesSingle(uint32_t index)
         pxr::VtArray<int> faceIndices;
         subset.GetIndicesAttr().Get(&faceIndices);
 
+        MRAY_LOG("    {: >2} Subset: FaceCount {}", i, faceIndices.size());
+
         // All the work is here
-        MRayError err = TriangulateAndCalculateTangents(i, posIndexer, uvIndexer,
+        MRayError err = TriangulateAndCalculateTangents(i, changeToCW ,
+                                                        posIndexer, uvIndexer,
                                                         normalIndexer, faceIndices,
                                                         faceIndexOffsets, positions,
                                                         normals, uvs);
@@ -441,24 +531,25 @@ MRayError MeshProcessorThread::PreprocessIndicesSingle(uint32_t index)
     // Fully reserve the batches
     primBatchOutputs[index] = tracer.ReservePrimitiveBatches(primGroupId, primLocalPrimCounts);
 
-    //MRAY_LOG("Face Count: Input {} | Tri {}", faceVertexCounts.size(), triFaceCount);
-    //MRAY_LOG("Pos: HasIndex({:s}), IndexCount({}), Count({})",
-    //         true, vertexIndices.size(), vertices.size());
-    //MRAY_LOG("UV: HasIndex({:s}), IndexCount({}), Count({}), Interp({})",
-    //         hasUVIndices, uvIndices.size(), uvs.size(), uvInterp.GetString());
-    //MRAY_LOG("Normal: HasIndex({:s}), IndexCount({}), Count({}), Interp({})",
-    //         hasNormalIndices, normalIndices.size(), normals.size(), normalInterp.GetString());
-    //MRAY_LOG("---------------------------");
     return MRayError::OK;
 }
 
-MRayError MeshProcessorThread::LoadMeshDataSingle(uint32_t index) const
+MRayError MeshProcessorThread::LoadMeshDataSingle(uint32_t index)
 {
-    //assert(flatUniques.size() == primBatchOutputs.size());
-    //for(uint32_t i = 0; i < flatUniques.size(); i++)
-    //{
-    //    LoadMeshDataSingle(i);
-    //}
+    std::vector<SubGeomTransientData>& primGeomData = primTransientData[index];
+    const std::vector<PrimBatchId>& primBatchIds = primBatchOutputs[index];
+    assert(primBatchIds.size() == primGeomData.size());
+
+    for(uint32_t i = 0; i < primBatchIds.size(); i++)
+    {
+        SubGeomTransientData& subGeomData = primGeomData[i];
+        PrimBatchId primBatchId = primBatchIds[i];
+        for(uint32_t aI = 0; aI < subGeomData.size(); aI++)
+        {
+            tracer.PushPrimAttribute(primGroupId, primBatchId, aI,
+                                     std::move(subGeomData[aI]));
+        }
+    }
     return MRayError::OK;
 }
 
@@ -488,7 +579,7 @@ MRayError MeshProcessorThread::PreprocessIndices()
     return err;
 }
 
-MRayError MeshProcessorThread::LoadMeshData() const
+MRayError MeshProcessorThread::LoadMeshData()
 {
     MRayError err = MRayError::OK;
     assert(flatUniques.size() == primBatchOutputs.size());
@@ -498,11 +589,12 @@ MRayError MeshProcessorThread::LoadMeshData() const
         err = LoadMeshDataSingle(i);
         if(err) break;
     }
+    primTransientData.clear();
     return err;
 }
 
 MRayError ProcessUniqueMeshes(// Output
-                              std::vector<std::vector<PrimBatchId>> outPrimBatches,
+                              std::map<pxr::UsdPrim, std::vector<PrimBatchId>>& outPrimBatches,
                               // I-O
                               TracerI& tracer,
                               BS::thread_pool& threadPool,
@@ -510,10 +602,12 @@ MRayError ProcessUniqueMeshes(// Output
                               const CollapsedPrims& meshMatPrims)
 {
     uint32_t uniquePrimCount = uint32_t(meshMatPrims.uniquePrims.size());
-    outPrimBatches.resize(uniquePrimCount);
+    std::vector<std::vector<PrimBatchId>> outPrimBatchesFlat;
+    outPrimBatchesFlat.resize(uniquePrimCount);
 
     std::atomic_bool warnSubdivisionSurface = false;
     std::atomic_bool warnTriangulation = false;
+    std::atomic_bool warnFailTriangulation = false;
 
     // Flatten the primitive set
     std::vector<pxr::UsdPrim> flatUniques;
@@ -539,6 +633,8 @@ MRayError ProcessUniqueMeshes(// Output
     };
     uint32_t threadCount = std::min(threadPool.get_thread_count(),
                                     uniquePrimCount);
+    //uint32_t threadCount = 1;
+
     using Barrier = std::barrier<decltype(BarrierFunc)>;
     auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
 
@@ -546,7 +642,7 @@ MRayError ProcessUniqueMeshes(// Output
     {
         // Subset the data to per core
         std::span myPrimRange(flatUniques.begin() + start, end - start);
-        std::span myPrimBatchOutput(outPrimBatches.begin() + start, end - start);
+        std::span myPrimBatchOutput(outPrimBatchesFlat.begin() + start, end - start);
         MeshProcessorThread meshProcessor
         {
             .tracer = tracer,
@@ -562,6 +658,8 @@ MRayError ProcessUniqueMeshes(// Output
             warnSubdivisionSurface = true;
         if(meshProcessor.warnTriangulation)
             warnTriangulation = true;
+        if(meshProcessor.warnFailTriangulation)
+            warnFailTriangulation = true;
 
         // Sync point, let the barrier function to commit the
         // GPU buffers
@@ -577,7 +675,7 @@ MRayError ProcessUniqueMeshes(// Output
         return err;
     };
     auto future = threadPool.submit_blocks(uint32_t(0), uniquePrimCount,
-                                           THRD_ProcessMeshes, 1 /*threadCount*/);
+                                           THRD_ProcessMeshes, threadCount);
     future.wait();
 
     if(warnSubdivisionSurface)
@@ -587,6 +685,10 @@ MRayError ProcessUniqueMeshes(// Output
         MRAY_WARNING_LOG("Some meshes have more than 4 face per geometry MRay only supports "
                          "triangle meshes, these are triangulated (Basic ear clipping algorithm, "
                          "do not expect miracles).");
+
+    if(warnFailTriangulation)
+        MRAY_WARNING_LOG("Some meshes have either degenerate (1 or 2) vertex or more than 16 vertex "
+                         "face. MRay is not a modelling software, fix your mesh.");
 
     // Concat Errors
     auto errorArray = future.get();
@@ -599,11 +701,21 @@ MRayError ProcessUniqueMeshes(// Output
         else if(threadErr)
             err.AppendInfo(threadErr.GetError());
     }
+    if(err) return err;
+
+    // Copy the batchIds, to map
+    assert(flatUniques.size() == outPrimBatchesFlat.size());
+    for(size_t i = 0; i < flatUniques.size(); i++)
+    {
+        outPrimBatches.emplace(flatUniques[i], std::move(outPrimBatchesFlat[i]));
+    }
+    assert(outPrimBatchesFlat.size() == outPrimBatches.size());
+    // All done!
     return err;
 }
 
 MRayError  ProcessUniqueSpheres(// Output
-                                std::vector<std::vector<PrimBatchId>> outPrimBatches,
+                                std::map<pxr::UsdPrim, std::vector<PrimBatchId>>& outPrimBatches,
                                 // I-O
                                 TracerI& tracer,
                                 BS::thread_pool& threadPool,

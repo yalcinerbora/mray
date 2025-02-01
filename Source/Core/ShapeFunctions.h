@@ -138,44 +138,46 @@ constexpr void Polygon::ClipEars(Span<Vector3ui, N - 2> localIndicesOut,
 {
     // We "expand" the vertices to previous/next we will access elements
     // via this
-    StaticVector<uint32_t, N + 2> indices;
-    std::iota(indices.begin() + 1, indices.end() - 1, 0u);
-    indices[0] = N - 1;
-    indices[N + 1] = 0;
-    //
-    const auto IsConvexEdge = [&](uint32_t i) -> bool
-    {
-        Vector3 e0 = vertices[indices[i - 1]] - vertices[indices[i]];
-        Vector3 e1 = vertices[indices[i]] - vertices[indices[i + 1]];
-        return Vector3::Cross(e0, e1).Length() > Float(0);
-    };
+    auto indices = StaticVector<uint32_t, N>(StaticVecSize(N));
+    std::iota(indices.begin(), indices.end(), 0u);
     //
     const auto Next = [&indices](uint32_t i) -> uint32_t
     {
-        i++;
-        if(i >= indices.size() + 1u) return 1u;
-        return i;
+        return ((++i) >= indices.size()) ? 0u : i;
+    };
+    const auto Prev = [&indices](uint32_t i) -> uint32_t
+    {
+        return (i == 0u) ? uint32_t(indices.size() - 1u) : i - 1u;
+    };
+    //
+    using MathConstants::Epsilon;
+    const auto IsConvexEdge = [&](Vector3ui i) -> bool
+    {
+        Vector3 e0 = vertices[i[2]] - vertices[i[1]];
+        Vector3 e1 = vertices[i[0]] - vertices[i[1]];
+        return Vector3::Cross(e0, e1).LengthSqr() >= -Epsilon<Float>();
     };
     // Basic ear clipping algorithm
     // Traverse the contigious triplets
     uint32_t writeIndex = 0;
-    for(uint32_t i = 1; true; i = Next(i))
+    for(uint32_t i = 1; indices.size() > 2; i = Next(i))
     {
-        if(!IsConvexEdge(i)) continue;
-        // Write the triplet
-        Vector3ui triplet(indices[i - 1],
-                          indices[i + 0],
-                          indices[i + 1]);
-        localIndicesOut[writeIndex++] = triplet;
-        // Now collapse the array
-        indices.remove(&indices[i]);
-        if(indices.size() == 2) break;
-        // When we continue, do not decrement
-        // to compansate the Next(..) function
-        // Given a equilateral polygon, this will
-        // give similar results to Delunay (sometimes).
-        // Otherwise, it will generate fan triangulation
-        // which is arguably worse?
+        Vector3ui triplet(indices[Prev(i)],
+                          indices[i],
+                          indices[Next(i)]);
+        if(IsConvexEdge(triplet))
+        {
+            // Write the triplet
+            localIndicesOut[writeIndex++] = triplet;
+            // Now collapse the array
+            indices.remove(&indices[i]);
+            // When we continue, do not decrement "i"
+            // to compansate the Next(..) function
+            // Given a equilateral polygon, this will
+            // give similar results to Delunay (sometimes).
+            // Otherwise, it will generate fan triangulation
+            // which is arguably worse?
+        }
     }
 }
 }

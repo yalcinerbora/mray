@@ -42,9 +42,14 @@ struct MeshProcessorThread
     bool IsIndicesPerVertex(const pxr::TfToken& t);
 
     MRayError PreprocessIndicesSingle(uint32_t index);
-    MRayError LoadMeshDataSingle(uint32_t index) const;
+    MRayError LoadMeshDataSingle(uint32_t index);
 
+    MRayError AllocateTransientBuffers(Span<Vector3ui>& indexBuffer, Span<Vector3>& posBuffer,
+                                       Span<Quaternion>& normalBuffer, Span<Vector2>& uvBuffer,
+                                       SubGeomTransientData& transientData,
+                                       uint32_t primCount, uint32_t attributeCount);
     MRayError TriangulateAndCalculateTangents(uint32_t subgeomIndex,
+                                              bool changeWinding,
                                               const AttributeIndexer& posIndexer,
                                               const AttributeIndexer& uvIndexer,
                                               const AttributeIndexer& normalIndexer,
@@ -78,31 +83,32 @@ struct MeshProcessorThread
     // this may be optimized but we touch most of the data.
     // Especially for USD scenes this may be too much.
     // Check this later
-    StdVector2D<SubGeomTransientData>   primIndexTransientData;
+    StdVector2D<SubGeomTransientData>   primTransientData;
 
 
     //
     bool warnSubdivisionSurface = false;
     bool warnTriangulation      = false;
+    bool warnFailTriangulation  = false;
 
     public:
     MRayError PreprocessIndices();
-    MRayError LoadMeshData() const;
+    MRayError LoadMeshData();
 };
 
 // Return something....
-MRayError  ProcessUniqueMeshes(// Output
-                               std::vector<std::vector<PrimBatchId>> outPrimBatches,
+MRayError ProcessUniqueMeshes(// Output
+                              std::map<pxr::UsdPrim, std::vector<PrimBatchId>>& outPrimBatches,
+                              // I-O
+                              TracerI& tracer,
+                              BS::thread_pool& threadPool,
+                              // Input
+                              const CollapsedPrims& meshMatPrims);
+
+MRayError ProcessUniqueSpheres(// Output
+                               std::map<pxr::UsdPrim, std::vector<PrimBatchId>>& outPrimBatches,
                                // I-O
                                TracerI& tracer,
                                BS::thread_pool& threadPool,
                                // Input
                                const CollapsedPrims& meshMatPrims);
-
-MRayError  ProcessUniqueSpheres(// Output
-                                std::vector<std::vector<PrimBatchId>> outPrimBatches,
-                                // I-O
-                                TracerI& tracer,
-                                BS::thread_pool& threadPool,
-                                // Input
-                                const CollapsedPrims& meshMatPrims);

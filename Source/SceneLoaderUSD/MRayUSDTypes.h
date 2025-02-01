@@ -28,12 +28,12 @@ struct CollapsedPrims
 
 struct MRayUSDFallbackMaterial
 {
-    Vector3 color;
+    pxr::GfVec3f color;
     // TODO: As a sophisticated platform, I did expect usd to have color space for
     // display color. But it does not. This stays here to ease of change
     MRayColorSpaceEnum colorSpace = MRayColorSpaceEnum::MR_DEFAULT;
 };
 
-using UsdBoundMaterial = std::variant<pxr::UsdPrim, MRayUSDFallbackMaterial>;
-using ResolvedMaterialMap = std::map<pxr::UsdPrim, UsdBoundMaterial>;
+using MRayUSDBoundMaterial = std::variant<pxr::UsdPrim, MRayUSDFallbackMaterial>;
+using MRayUSDMaterialMap = std::map<pxr::UsdPrim, MRayUSDBoundMaterial>;
 

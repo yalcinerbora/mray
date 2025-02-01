@@ -7,6 +7,8 @@ set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/SceneLoaderUSD.cpp
     ${CURRENT_SOURCE_DIR}/MeshProcessor.h
     ${CURRENT_SOURCE_DIR}/MeshProcessor.cpp
+    ${CURRENT_SOURCE_DIR}/MaterialProcessor.h
+    ${CURRENT_SOURCE_DIR}/MaterialProcessor.cpp
     ${CURRENT_SOURCE_DIR}/MRayUSDTypes.h)
 
 source_group("" FILES ${SRC_COMMON})

@@ -2,6 +2,7 @@
 
 #include "MRayUSDTypes.h"
 #include "MeshProcessor.h"
+#include "MaterialProcessor.h"
 
 #include "Core/TracerI.h"
 #include "Core/Log.h"
@@ -11,12 +12,11 @@
 #include "Core/Algorithm.h"
 
 #include "ImageLoader/EntryPoint.h"
-//
 // Traversal
 #include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usd/primRange.h>
 #include <pxr/usd/usdGeom/xformCache.h>
-//// Supported Geom Schemas
+// Supported Geom Schemas
 #include <pxr/usd/usdGeom/sphere.h>
 #include <pxr/usd/usdGeom/mesh.h>
 #include <pxr/usd/usdGeom/pointInstancer.h>
@@ -28,23 +28,8 @@
 #include <pxr/usd/usdLux/lightAPI.h>
 // Error Related
 #include <pxr/base/tf/errorMark.h>
-//#include <pxr/usd/usdUtils/coalescingDiagnosticDelegate.h>
 
 using namespace TypeNameGen::Runtime;
-
-// Can be used to suppress all warnings
-// Will be used to log the errors later maybe?
-//class CustomUSDDiagnostic final : public pxr::UsdUtilsCoalescingDiagnosticDelegate
-//{
-//    public:
-//    CustomUSDDiagnostic() = default;
-//
-//    //void IssueWarning(const pxr::TfWarning& w) override
-//    //{
-//    //    //MRAY_LOG("warning code {}", w.GetDiagnosticCode().GetValueAsInt());
-//    //    UsdUtilsCoalescingDiagnosticDelegate::IssueWarning(w);
-//    //}
-//};
 
 Matrix4x4 ConvertToMRayMatrix(const pxr::GfMatrix4d& matIn)
 {
@@ -56,7 +41,7 @@ Matrix4x4 ConvertToMRayMatrix(const pxr::GfMatrix4d& matIn)
 
 void PrintPrims(const CollapsedPrims& meshMatPrims,
                 const CollapsedPrims& sphereMatPrims,
-                const ResolvedMaterialMap& uniqueMaterials,
+                const MRayUSDMaterialMap& uniqueMaterials,
                 //
                 Optional<MRayUSDPrimSurface> domeLight,
                 //
@@ -78,7 +63,8 @@ void PrintPrims(const CollapsedPrims& meshMatPrims,
                 else
                 {
                     auto fallbackMat = std::get<MRayUSDFallbackMaterial>(material);
-                    MRAY_LOG("    {} | [{}, {}]", subGeoIndex, fallbackMat.color.AsArray(),
+                    MRAY_LOG("    {} | [[{}, {}, {}], {}]",  subGeoIndex,
+                             fallbackMat.color[0], fallbackMat.color[1], fallbackMat.color[2],
                              MRayColorSpaceStringifier::ToString(fallbackMat.colorSpace));
                 }
             }
@@ -103,7 +89,8 @@ void PrintPrims(const CollapsedPrims& meshMatPrims,
         else
         {
             MRayUSDFallbackMaterial fallbackMat = std::get<MRayUSDFallbackMaterial>(mat);
-            MRAY_LOG("[F]: {} | {}", fallbackMat.color.AsArray(),
+            MRAY_LOG("[F]: [{}, {}, {}] | {}",
+                     fallbackMat.color[0], fallbackMat.color[1], fallbackMat.color[2],
                      MRayColorSpaceStringifier::ToString(fallbackMat.colorSpace));
         }
     }
@@ -124,7 +111,7 @@ void PrintPrims(const CollapsedPrims& meshMatPrims,
 }
 
 void ExpandGeomsAndFindMaterials(CollapsedPrims& subGeomPack,
-                                 ResolvedMaterialMap& uniqueMaterials,
+                                 MRayUSDMaterialMap& uniqueMaterials,
                                  Span<MRayUSDPrimSurface> surfacesRange)
 {
     bool warnLightIndependent = false;
@@ -132,50 +119,59 @@ void ExpandGeomsAndFindMaterials(CollapsedPrims& subGeomPack,
     bool warnMaterialDisplayColorVarying = false;
     bool warnMaterialDisplayNotFound = false;
     bool warnUsingDisplayColor = false;
+    bool warnUnsupportedMaterial = false;
     bool warnEdgeSubset = false;
+
+    // TODO: It is not avail on the token pool (UsdShadeTokens)?
+    // Check later.
+    pxr::TfToken usdPrevSurfToken = pxr::TfToken("UsdPreviewSurface");
 
     auto BindMaterial = [&](MRayUSDPrimSurface& surface,
                             pxr::UsdShadeMaterial boundMaterial,
                             uint32_t subGeomIndex = std::numeric_limits<uint32_t>::max())
     {
-        if(boundMaterial)
+        pxr::TfToken shaderId;
+        boundMaterial.ComputeSurfaceSource().GetShaderId(&shaderId);
+        // Check if the material is usd preview surface, if not fallback to
+        // display color stuff
+        if(boundMaterial && shaderId == usdPrevSurfToken)
         {
             pxr::UsdPrim matPrim = boundMaterial.GetPrim();
             surface.subGeometryMaterialKeys.emplace_back(subGeomIndex, matPrim.GetPath());
             if(matPrim.IsInstanceProxy())
                 matPrim = matPrim.GetPrimInPrototype();
             uniqueMaterials.emplace(matPrim, matPrim);
+            return;
         }
-        else
+        else warnUnsupportedMaterial = true;
+
+        warnUsingDisplayColor = true;
+        using DisplayColorUSD = pxr::VtArray<pxr::GfVec3f>;
+
+        // No material found, fallback to display color
+        // iff is constant, if not do a middle gray
+        MRayUSDFallbackMaterial fallbackMat = {};
+        pxr::UsdGeomGprim gPrim(surface.surfacePrim);
+        pxr::UsdGeomPrimvar displayColor = gPrim.GetDisplayColorPrimvar();
+        if(!displayColor.HasValue())
         {
-            warnUsingDisplayColor = true;
-            using DisplayColorUSD = pxr::VtArray<pxr::GfVec3f>;
-
-            // No material found, fallback to display color
-            // iff is constant, if not do a middle gray
-            MRayUSDFallbackMaterial fallbackMat = {};
-            pxr::UsdGeomGprim gPrim(surface.surfacePrim);
-            pxr::UsdGeomPrimvar displayColor = gPrim.GetDisplayColorPrimvar();
-            if(!displayColor.HasValue())
-            {
-                // Warn about no display color,
-                warnMaterialDisplayNotFound = true;
-                fallbackMat.color = Vector3(0.5);
-            }
-            else if(displayColor.GetInterpolation() != pxr::UsdGeomTokens->constant)
-            {
-                // Warn about display color is not constant
-                warnMaterialDisplayColorVarying = true;
-            }
-            DisplayColorUSD displayColorValue;
-            displayColor.Get<DisplayColorUSD>(&displayColorValue);
-            fallbackMat.color = Vector3(Span<const float, 3>(displayColorValue.AsConst()[0].GetArray(), 3));
-
-            // Here we key the material via the instance proxy, assuming
-            // Instance proxies can be override the instance prim's display value
-            surface.subGeometryMaterialKeys.emplace_back(subGeomIndex, surface.surfacePrim.GetPath());
-            uniqueMaterials.emplace(surface.surfacePrim, fallbackMat);
+            // Warn about no display color,
+            warnMaterialDisplayNotFound = true;
+            fallbackMat.color = pxr::GfVec3f(0.5);
         }
+        else if(displayColor.GetInterpolation() != pxr::UsdGeomTokens->constant)
+        {
+            // Warn about display color is not constant
+            warnMaterialDisplayColorVarying = true;
+        }
+        DisplayColorUSD displayColorValue;
+        displayColor.Get<DisplayColorUSD>(&displayColorValue);
+        fallbackMat.color = displayColorValue.AsConst()[0];
+
+        // Here we key the material via the instance proxy, assuming
+        // Instance proxies can be override the instance prim's display value
+        surface.subGeometryMaterialKeys.emplace_back(subGeomIndex, surface.surfacePrim.GetPath());
+        uniqueMaterials.emplace(surface.surfacePrim, fallbackMat);
     };
 
     using MatUSD = pxr::UsdShadeMaterial;
@@ -285,9 +281,11 @@ void ExpandGeomsAndFindMaterials(CollapsedPrims& subGeomPack,
                          "set to \"edge\" or \"point\". MRay does not understand edge "
                          "or point sets. Only \"\face\" sets are allowed. These "
                          "meshes are skipped.");
+    if(warnUnsupportedMaterial)
+        MRAY_WARNING_LOG("[MRayUSD]: Some meshes' have unkown bound shader. "
+                         "MRay supports \"USDPreviewSurface\" shaders only. "
+                         "These surfaces will utilize meshes' display color property.");
 }
-
-
 
 SceneLoaderUSD::SceneLoaderUSD(BS::thread_pool& tp)
     : threadPool(tp)
@@ -296,8 +294,6 @@ SceneLoaderUSD::SceneLoaderUSD(BS::thread_pool& tp)
 Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                                                  const std::string& filePath)
 {
-    //CustomUSDDiagnostic dd;
-
     Timer t; t.Start();
     MRayError e = MRayError::OK;
 
@@ -356,6 +352,14 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                            prim.IsA<pxr::UsdGeomSphere>());
         bool isLight = prim.IsA<pxr::UsdLuxDomeLight>();
         bool isCamera = prim.IsA<pxr::UsdGeomCamera>();
+
+        pxr::TfToken visibility;
+        if(isGeometry && pxr::UsdGeomImageable(prim).GetVisibilityAttr().Get(&visibility) &&
+           visibility == pxr::UsdGeomTokens->invisible)
+        {
+            i.PruneChildren();
+            continue;
+        }
         // TODO: How to validate these?
         bool isIntermediate = true;
         if(!(isGeometry || isLight || isCamera || isIntermediate))
@@ -391,7 +395,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                                               PrimTypeCompUSD);
 
     // Resolve the Geometries
-    ResolvedMaterialMap uniqueMaterials;
+    MRayUSDMaterialMap uniqueMaterials;
     CollapsedPrims meshMatPrims;
     CollapsedPrims sphereMatPrims;
     for(const auto& startEnd : primTypeRange)
@@ -436,11 +440,17 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                domeLight, cameras, loadedStage);
 
     // Now do the processing
-    std::vector<std::vector<PrimBatchId>> outMeshPrimBatches;
-    ProcessUniqueMeshes(outMeshPrimBatches, tracer, threadPool, meshMatPrims);
+    std::map<pxr::UsdPrim, std::vector<PrimBatchId>> outMeshPrimBatches;
+    e = ProcessUniqueMeshes(outMeshPrimBatches, tracer, threadPool, meshMatPrims);
+    if(e) return e;
 
-    std::vector<std::vector<PrimBatchId>> outSpherePrimBatches;
-    ProcessUniqueSpheres(outSpherePrimBatches, tracer, threadPool, meshMatPrims);
+    std::map<pxr::UsdPrim, std::vector<PrimBatchId>> outSpherePrimBatches;
+    e = ProcessUniqueSpheres(outSpherePrimBatches, tracer, threadPool, meshMatPrims);
+    if(e) return e;
+
+    // Process the materials
+    std::map<pxr::UsdPrim, MRayUSDMatAlphaPack> outMaterials;
+    ProcessUniqueMaterials(outMaterials, tracer, threadPool, uniqueMaterials);
 
     //
     t.Split();
