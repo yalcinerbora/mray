@@ -610,7 +610,7 @@ MRayError ProcessUniqueMaterials(std::map<pxr::UsdPrim, MRayUSDMatAlphaPack>& ou
     if(converter.warnSpecularMode)
         MRAY_WARNING_LOG("[MRayUSD]: Some materials' have \"useSpecularWorkflow\" value "
                          "set to 1. MRay supports only metallic workflows. These "
-                         "materials not correctly read and may not be visually pleasing");
+                         "materials are not correctly read and may not be visually pleasing");
 
     return MRayError::OK;
 }
