@@ -139,6 +139,9 @@ function(gen_imported_target)
     set_target_properties(${GEN_IMPORTED_TGT_NAME} PROPERTIES MAP_IMPORTED_CONFIG_SANITIZER Release)
 
     if(GEN_IMPORTED_TGT_EXTRA_INCLUDES)
+        # Create these directories if they do not exist.
+        # "MRayExternal" target did not run yet, so these may not be available
+        file(MAKE_DIRECTORY ${GEN_IMPORTED_TGT_EXTRA_INCLUDES})
         target_include_directories(${GEN_IMPORTED_TGT_NAME}
                                     INTERFACE
                                     ${GEN_IMPORTED_TGT_EXTRA_INCLUDES})
