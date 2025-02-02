@@ -20,8 +20,8 @@ GenericTexture::~GenericTexture()
 }
 
 void GenericTexture::CommitMemory(const GPUQueue& queue,
-                                   const TextureBackingMemory& deviceMem,
-                                   size_t offset)
+                                  const TextureBackingMemory& deviceMem,
+                                  size_t offset)
 {
     Impl()->CommitMemory(queue, deviceMem, offset);
 }

@@ -96,6 +96,9 @@ T GetInput(const pxr::UsdShadeInput& input, const T& defaultValue)
 template<class T>
 ImageSubChannelType ResolveSubchannel(pxr::TfToken& outName)
 {
+    static_assert(std::is_same_v<T, pxr::GfVec3f> || std::is_same_v<T, float>,
+                  "Not yet implemented!");
+
     const auto& tokens = MRayUSDShadeTokens();
     if constexpr(std::is_same_v<T, float>)
     {
@@ -104,7 +107,7 @@ ImageSubChannelType ResolveSubchannel(pxr::TfToken& outName)
             return ImageSubChannelType::R;
         else if(outName == tokens.g)
             return ImageSubChannelType::G;
-        else if(outName == tokens.b)
+        else // if(outName == tokens.b)
             return ImageSubChannelType::B;
     }
     else if constexpr(std::is_same_v<T, pxr::GfVec3f>)
@@ -112,7 +115,6 @@ ImageSubChannelType ResolveSubchannel(pxr::TfToken& outName)
         // TODO: Error out when channels mismatch
         return ImageSubChannelType::RGB;
     }
-    else static_assert(false, "Not yet implemented!");
 }
 
 MRayUSDTexture MaterialConverter::ReadTextureNode(const pxr::UsdPrim& texNodePrim,
@@ -231,7 +233,6 @@ MaterialConverter::GetTexturedAttribute(const pxr::UsdShadeInput& input,
 
 MRayUSDMaterialProps MaterialConverter::ResolveMatPropsSingle(const MRayUSDBoundMaterial& m)
 {
-    MRayUSDMaterialType matType = MRayUSDMaterialType::DIFFUSE;
     const auto& tokens = MRayUSDShadeTokens();
     if(std::holds_alternative<MRayUSDFallbackMaterial>(m))
     {
@@ -266,8 +267,8 @@ MRayUSDMaterialProps MaterialConverter::ResolveMatPropsSingle(const MRayUSDBound
     using MTT = MRayUSDTextureTerminal;
     bool nonMetal = (!std::holds_alternative<MTT>(metallic) &&
                      std::get<float>(metallic) == 0.0f);
-    bool smooth = (!std::holds_alternative<MTT>(roughness) &&
-                   std::get<float>(roughness) == 0.0f);
+    //bool smooth = (!std::holds_alternative<MTT>(roughness) &&
+    //               std::get<float>(roughness) == 0.0f);
     bool rough = (!std::holds_alternative<MTT>(roughness) &&
                    std::get<float>(roughness) == 1.0f);
     //

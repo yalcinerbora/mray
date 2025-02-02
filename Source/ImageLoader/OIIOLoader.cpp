@@ -212,19 +212,6 @@ Expected<ColorSpacePack> ImageFileOIIO::ColorSpaceToMRay(const std::string& oiio
     {
         return static_cast<char>(std::tolower(c));
     });
-
-    // Special case: OIIO returned "GammaX.Y"
-    if(lowercaseStr.starts_with("gamma"))
-    {
-        std::string s = lowercaseStr.substr(5);
-        Float gamma = Float(1);
-        std::from_chars(s.data(), s.data() + s.size(), gamma);
-        return ColorSpacePack
-        {
-            gamma,
-            MR_DEFAULT
-        };
-    }
     // TODO: Not complete, add later
     static constexpr ArrayType LookupList =
     {
@@ -246,6 +233,23 @@ Expected<ColorSpacePack> ImageFileOIIO::ColorSpaceToMRay(const std::string& oiio
             std::get<2>(checkType),
             std::get<1>(checkType)
         };
+    }
+    // Special case: OIIO returned "GammaX.Y" (maybe)
+    Float gamma = Float(1);
+    if(lowercaseStr.starts_with("gamma"))
+    {
+        auto [ptr, ec] = std::from_chars(lowercaseStr.data() + 5u,
+                                         lowercaseStr.data() + lowercaseStr.size(),
+                                         gamma);
+        if(ec != std::errc::invalid_argument &&
+           ec != std::errc::result_out_of_range)
+        {
+            return ColorSpacePack
+            {
+                gamma,
+                MR_DEFAULT
+            };
+        }
     }
     return MRayError("Unable to convert OIIO type (\"{}\") to MRay color space type",
                      oiioString);
