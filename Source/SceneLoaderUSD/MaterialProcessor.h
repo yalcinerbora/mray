@@ -5,6 +5,8 @@
 #include "Core/Error.h"
 #include "Core/TracerI.h"
 
+#include "ImageLoader/ImageLoaderI.h"
+
 #include <map>
 
 #include <pxr/usd/usdShade/input.h>
@@ -31,8 +33,14 @@ struct MRayUSDMatAlphaPack
     MaterialId          materialId;
 };
 
+struct MRayUSDTextureTerminal
+{
+    pxr::UsdPrim        texShaderNode;
+    ImageSubChannelType channelRead;
+};
+
 template<class T>
-using MaterialTerminalVariant = std::variant<pxr::UsdPrim, T>;
+using MaterialTerminalVariant = std::variant<MRayUSDTextureTerminal, T>;
 
 // Hard-coded material definition
 struct MRayUSDMaterialProps
@@ -44,6 +52,19 @@ struct MRayUSDMaterialProps
     MaterialTerminalVariant<float> roughness;
     MaterialTerminalVariant<float> opacity;
     MaterialTerminalVariant<float> iorOrSpec;
+};
+
+inline auto operator<=>(const MRayTextureParameters& l,
+                        const MRayTextureParameters& r);
+
+struct MRayUSDTexture
+{
+    std::string             absoluteFilePath;
+    ImageSubChannelType     imageSubChannel;
+    bool                    isNormal;
+    MRayTextureParameters   params;
+    //
+    auto operator<=>(const MRayUSDTexture& t) const;
 };
 
 struct MaterialConverter
@@ -59,7 +80,10 @@ struct MaterialConverter
     GetTexturedAttribute(const pxr::UsdShadeInput& input,
                          const T& defaultValue);
     //
-    MRayUSDMaterialProps ResolveSingle(const MRayUSDBoundMaterial& m);
+    MRayUSDMaterialProps    ResolveMatPropsSingle(const MRayUSDBoundMaterial& m);
+    MRayUSDTexture          ReadTextureNode(const pxr::UsdPrim& texNodePrim,
+                                            ImageSubChannelType imageSubChannel,
+                                            bool isColor, bool isNormal);
 
     public:
     bool warnMultipleTerminals = false;
@@ -68,9 +92,41 @@ struct MaterialConverter
     bool warnDielectricMaterialSucks = false;
 
     std::vector<MRayUSDMaterialProps>
-    Resolve(const MRayUSDMaterialMap& uniqueMaterials);
+    ResolveMatProps(const MRayUSDMaterialMap& uniqueMaterials);
+    //
+    FlatSet<std::pair<pxr::UsdPrim, MRayUSDTexture>>
+    ResolveTextures(const std::vector<MRayUSDMaterialProps>&);
+    //
+    MRayError LoadTextures(FlatSet<std::pair<pxr::UsdPrim, TextureId>>& result,
+                           FlatSet<std::pair<pxr::UsdPrim, MRayUSDTexture>>&& tex,
+                           TracerI& tracer, BS::thread_pool& threadPool);
+
+    std::map<pxr::UsdPrim, MRayUSDMatAlphaPack>
+    CreateMaterials(TracerI& tracer,
+                    const std::vector<pxr::UsdPrim>& flatMatNames,
+                    const std::vector<MRayUSDMaterialProps>& flatMatProps,
+                    FlatSet<std::pair<pxr::UsdPrim, TextureId>>&& loadedTextures);
 };
 
 MRayError ProcessUniqueMaterials(std::map<pxr::UsdPrim, MRayUSDMatAlphaPack>& outMaterials,
                                  TracerI& tracer, BS::thread_pool& threadPool,
                                  const MRayUSDMaterialMap& uniqueMaterials);
+
+inline auto operator<=>(const MRayTextureParameters& l,
+                        const MRayTextureParameters& r)
+{
+    #define MRAY_GEN_TUPLE(a) \
+        std::tuple(a.pixelType.Name(), a.colorSpace, a.gamma, \
+                   a.ignoreResClamp, a.isColor, a.edgeResolve, \
+                   a.interpolation, a.readMode)
+
+    // Little bit of overkill but w/e
+    return (MRAY_GEN_TUPLE(l) <=> MRAY_GEN_TUPLE(r));
+    #undef MRAY_GEN_TUPLE
+}
+
+inline auto MRayUSDTexture::operator<=>(const MRayUSDTexture& t) const
+{
+    return (std::tuple(absoluteFilePath, params) <=>
+            std::tuple(t.absoluteFilePath, t.params));
+}

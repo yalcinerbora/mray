@@ -425,10 +425,10 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
         else if(range.front().surfacePrim.IsA<pxr::UsdLuxDomeLight>())
         {
             if(range.size() > 1)
-                MRAY_WARNING_LOG("There is more than one \"DomeLight\" in the scene. "
+                MRAY_WARNING_LOG("[MRayUSD]: There is more than one \"DomeLight\" in the scene. "
                                  "MRay support only single boundary light "
-                                 "dome light. First light will be used "
-                                 "(According to the traversal).");
+                                 "(dome light). First light will be used "
+                                 "(According to the USD traversal).");
             domeLight = range.front();
         }
     }
@@ -450,7 +450,8 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
 
     // Process the materials
     std::map<pxr::UsdPrim, MRayUSDMatAlphaPack> outMaterials;
-    ProcessUniqueMaterials(outMaterials, tracer, threadPool, uniqueMaterials);
+    e = ProcessUniqueMaterials(outMaterials, tracer, threadPool, uniqueMaterials);
+    if(e) return e;
 
     //
     t.Split();

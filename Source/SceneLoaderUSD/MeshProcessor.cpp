@@ -631,9 +631,9 @@ MRayError ProcessUniqueMeshes(// Output
             std::exit(1);
         }
     };
-    uint32_t threadCount = std::min(threadPool.get_thread_count(),
-                                    uniquePrimCount);
-    //uint32_t threadCount = 1;
+    //uint32_t threadCount = std::min(threadPool.get_thread_count(),
+    //                                uniquePrimCount);
+    uint32_t threadCount = 1;
 
     using Barrier = std::barrier<decltype(BarrierFunc)>;
     auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
@@ -679,15 +679,15 @@ MRayError ProcessUniqueMeshes(// Output
     future.wait();
 
     if(warnSubdivisionSurface)
-        MRAY_WARNING_LOG("Some meshes have subdivision enabled. MRay only supports "
+        MRAY_WARNING_LOG("[MRayUSD]: Some meshes have subdivision enabled. MRay only supports "
                          "\"none\" SubdivisionScheme. These are skipped.");
     if(warnTriangulation)
-        MRAY_WARNING_LOG("Some meshes have more than 4 face per geometry MRay only supports "
+        MRAY_WARNING_LOG("[MRayUSD]: Some meshes have more than 4 face per geometry MRay only supports "
                          "triangle meshes, these are triangulated (Basic ear clipping algorithm, "
                          "do not expect miracles).");
 
     if(warnFailTriangulation)
-        MRAY_WARNING_LOG("Some meshes have either degenerate (1 or 2) vertex or more than 16 vertex "
+        MRAY_WARNING_LOG("[MRayUSD]: Some meshes have either degenerate (1 or 2) vertex or more than 16 vertex "
                          "face. MRay is not a modelling software, fix your mesh.");
 
     // Concat Errors

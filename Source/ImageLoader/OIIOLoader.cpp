@@ -213,6 +213,18 @@ Expected<ColorSpacePack> ImageFileOIIO::ColorSpaceToMRay(const std::string& oiio
         return static_cast<char>(std::tolower(c));
     });
 
+    // Special case: OIIO returned "GammaX.Y"
+    if(lowercaseStr.starts_with("gamma"))
+    {
+        std::string s = lowercaseStr.substr(5);
+        Float gamma = Float(1);
+        std::from_chars(s.data(), s.data() + s.size(), gamma);
+        return ColorSpacePack
+        {
+            gamma,
+            MR_DEFAULT
+        };
+    }
     // TODO: Not complete, add later
     static constexpr ArrayType LookupList =
     {
@@ -223,7 +235,7 @@ Expected<ColorSpacePack> ImageFileOIIO::ColorSpaceToMRay(const std::string& oiio
         MapType{"lin_srgb"sv,       MR_REC_709,     Float(1)},
         MapType{"adobergb"sv,       MR_ADOBE_RGB,   Float(2.222)},
         MapType{"linear"sv,         MR_DEFAULT,     Float(1)},
-        MapType{"scene_linear"sv,   MR_DEFAULT,     Float(1)}
+        MapType{"scene_linear"sv,   MR_DEFAULT,     Float(1)},
     };
 
     for(const auto& checkType : LookupList)
@@ -237,7 +249,6 @@ Expected<ColorSpacePack> ImageFileOIIO::ColorSpaceToMRay(const std::string& oiio
     }
     return MRayError("Unable to convert OIIO type (\"{}\") to MRay color space type",
                      oiioString);
-
 }
 
 Expected<MRayPixelTypeRT> ImageFileOIIO::ConvertFormatToRequested(MRayPixelTypeRT pixFormat,
@@ -514,7 +525,8 @@ Expected<ImageHeader> ImageFileOIIO::ReadHeader()
         e.AppendInfo(MRAY_FORMAT("({})", filePath));
         return e;
     }
-    if(hasColorSpace && colorSpaceE.value().second == MRayColorSpaceEnum::MR_DEFAULT)
+    if(hasColorSpace && !flags[ImageFlagTypes::DISREGARD_COLOR_SPACE] &&
+       colorSpaceE.value().second == MRayColorSpaceEnum::MR_DEFAULT)
         MRAY_WARNING_LOG("Texture \"{}\" has linear colorspace. "
                          "Assuming it is on tracer's global texture color space.",
                          filePath);

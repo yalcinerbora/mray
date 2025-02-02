@@ -16,7 +16,7 @@ enum class TextureReadMode : uint8_t
 {
     // Directly read whatever the type is
     DIRECT,
-    // Given 2-channel **Signed** format,
+    // Given 2-channel **signed** format,
     // calculate Z channel,
     // abuse |N| = 1. (Usefull for BC5s)
     TO_3C_BASIC_NORMAL_FROM_SIGNED_2C,
@@ -153,6 +153,7 @@ Optional<T> TracerTexView<D, T>::Postprocess(Optional<ReadType>&& t) const
             }
             // Octahedral mapping
             // From https://jcgt.org/published/0003/02/01/paper.pdf
+            // Listing 6.
             case TO_3C_OCTA_NORMAL_FROM_UNSIGNED_2C:
             {
                 val = val * Vector2(2) - Vector2(1);

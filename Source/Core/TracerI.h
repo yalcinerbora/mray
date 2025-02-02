@@ -88,8 +88,8 @@ namespace TracerConstants
     // are inherently 2D), and this may be changed
     static constexpr size_t MaxHitFloatCount = 2;
     // Maximum camera size, a renderer will allocate this
-    // much memory, and camera should fit into this
-    // this will be compile time checked.
+    // much memory, and camera should fit into this.
+    // This will be compile time checked.
     static constexpr size_t MaxCameraInstanceByteSize = 512;
 
     static constexpr std::string_view IdentityTransName = "(T)Identity";
@@ -219,14 +219,13 @@ struct TracerParameters
     // Random Seed value, many samplers etc.
     // will start via this seed if applicable
     uint64_t        seed = 0;
-    // Accelerator move, software/hardware
+    // Accelerator mode, software/hardware etc.
     AcceleratorType accelMode = AcceleratorType{ AcceleratorType::HARDWARE };
     // Item pool size, amount of "items" (paths/rays/etc) processed
     // in parallel
     uint32_t    parallelizationHint = 1 << 21; // 2^21 ~= 2M
     // Current sampler logic,
     SamplerType samplerType = SamplerType{ SamplerType::INDEPENDENT };
-
     // Texture Related
     uint32_t            clampedTexRes = std::numeric_limits<uint32_t>::max();
     bool                genMips = false;
