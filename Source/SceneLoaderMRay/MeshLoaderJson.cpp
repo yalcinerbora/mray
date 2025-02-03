@@ -103,12 +103,15 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
             Vector2 uv2 = uvSpan[index[2]];
 
             // Generate the tangents for this triangle orientation
-            Vector3 t0 = CalculateTangent(p0, p1, p2,
-                                          uv0, uv1, uv2);
-            Vector3 t1 = CalculateTangent(p1, p2, p0,
-                                          uv1, uv2, uv0);
-            Vector3 t2 = CalculateTangent(p2, p0, p1,
-                                          uv2, uv0, uv1);
+            Vector3 t0 = CalculateTangent(n0,
+                                          {p0, p1, p2},
+                                          {uv0, uv1, uv2});
+            Vector3 t1 = CalculateTangent(n1,
+                                          {p1, p2, p0},
+                                          {uv1, uv2, uv0});
+            Vector3 t2 = CalculateTangent(n2,
+                                          {p2, p0, p1},
+                                          {uv2, uv0, uv1});
 
             if(t0.HasNaN()) t0 = Vector3::OrthogonalVector(n0);
             if(t1.HasNaN()) t1 = Vector3::OrthogonalVector(n1);

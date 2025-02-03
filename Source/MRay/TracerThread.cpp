@@ -245,7 +245,7 @@ void TracerThread::RestartRenderer()
         .regionMax = regionMax,
     };
     RenderBufferInfo rbi = tracer->StartRender(currentRenderer,
-                                               sceneIds.camSurfaces[currentCamIndex],
+                                               sceneIds.camSurfaces[currentCamIndex].second,
                                                rp,
                                                currentRenderLogic0,
                                                currentRenderLogic1);
@@ -260,7 +260,7 @@ void TracerThread::RestartRenderer()
 
     // When new scene is loaded, send the
     // Initial cam transform
-    CamSurfaceId camSurf = sceneIds.camSurfaces[currentCamIndex];
+    CamSurfaceId camSurf = sceneIds.camSurfaces[currentCamIndex].second;
     currentCamTransform = tracer->GetCamTransform(camSurf);
     transferQueue.Enqueue(TracerResponse
     (
@@ -394,7 +394,7 @@ void TracerThread::HandleSceneChange(const std::string& newScene)
              instanceCount, accelCount);
 
     currentCamIndex = 0;
-    CamSurfaceId camSurf = sceneIds.camSurfaces[currentCamIndex];
+    CamSurfaceId camSurf = sceneIds.camSurfaces[currentCamIndex].second;
     currentCamTransform = tracer->GetCamTransform(camSurf);
 
     // When new scene is loaded, send the
@@ -608,7 +608,7 @@ void TracerThread::LoopWork()
             MRAY_LOG("[Tracer]: NewCamera {}", cameraIndex.value());
             currentCamIndex = cameraIndex.value();
 
-            CamSurfaceId camSurf = sceneIds.camSurfaces[currentCamIndex];
+            CamSurfaceId camSurf = sceneIds.camSurfaces[currentCamIndex].second;
             currentCamTransform = tracer->GetCamTransform(camSurf);
 
             // When cam is changed send the initial transform

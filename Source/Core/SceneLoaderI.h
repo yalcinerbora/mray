@@ -24,6 +24,9 @@ struct TracerIdPack
     using MediumIdMappings      = std::map<uint32_t, Pair<MediumGroupId, MediumId>>;
     using TextureIdMappings     = std::map<SceneTexId, TextureId>;
 
+    std::vector<char>           concatStrings;
+    std::vector<Vector2ul>      stringRanges;
+
     PrimIdMappings      prims;
     CamIdMappings       cams;
     LightIdMappings     lights;
@@ -31,11 +34,10 @@ struct TracerIdPack
     MaterialIdMappings  mats;
     MediumIdMappings    mediums;
     TextureIdMappings   textures;
-
-    std::vector<SurfaceId>      surfaces;
-    std::vector<CamSurfaceId>   camSurfaces;
-    std::vector<LightSurfaceId> lightSurfaces;
-    LightSurfaceId              boundarySurface;
+    std::vector<std::pair<uint32_t, SurfaceId>>         surfaces;
+    std::vector<std::pair<uint32_t, CamSurfaceId>>      camSurfaces;
+    std::vector<std::pair<uint32_t, LightSurfaceId>>    lightSurfaces;
+    std::pair<uint32_t, LightSurfaceId>                 boundarySurface;
 
     double  loadTimeMS = 0.0;
 };

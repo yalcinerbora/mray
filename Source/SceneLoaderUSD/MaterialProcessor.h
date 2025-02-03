@@ -21,16 +21,17 @@
 // This will require quite a bit of design to support stuff, but we'll see.
 enum class MRayUSDMaterialType
 {
-    DIFFUSE,
-    SPECULAR_DIFFUSE_COMBO,
-    PURE_REFLECT,
-    PURE_REFRACT
+    DIFFUSE                 = 0,
+    SPECULAR_DIFFUSE_COMBO  = 1,
+    PURE_REFLECT            = 2,
+    PURE_REFRACT            = 3
 };
 
 struct MRayUSDMatAlphaPack
 {
-    Optional<TextureId> alphaMap;
+    MatGroupId          groupId;
     MaterialId          materialId;
+    Optional<TextureId> alphaMap;
 };
 
 struct MRayUSDTextureTerminal
@@ -97,7 +98,7 @@ struct MaterialConverter
     FlatSet<std::pair<pxr::UsdPrim, MRayUSDTexture>>
     ResolveTextures(const std::vector<MRayUSDMaterialProps>&);
     //
-    MRayError LoadTextures(FlatSet<std::pair<pxr::UsdPrim, TextureId>>& result,
+    MRayError LoadTextures(std::map<pxr::UsdPrim, TextureId>& result,
                            FlatSet<std::pair<pxr::UsdPrim, MRayUSDTexture>>&& tex,
                            TracerI& tracer, BS::thread_pool& threadPool);
 
@@ -105,12 +106,14 @@ struct MaterialConverter
     CreateMaterials(TracerI& tracer,
                     const std::vector<pxr::UsdPrim>& flatMatNames,
                     const std::vector<MRayUSDMaterialProps>& flatMatProps,
-                    FlatSet<std::pair<pxr::UsdPrim, TextureId>>&& loadedTextures);
+                    const std::map<pxr::UsdPrim, TextureId>& loadedTextures);
 };
 
 MRayError ProcessUniqueMaterials(std::map<pxr::UsdPrim, MRayUSDMatAlphaPack>& outMaterials,
+                                 std::map<pxr::UsdPrim, TextureId>& uniqueTextureIds,
                                  TracerI& tracer, BS::thread_pool& threadPool,
-                                 const MRayUSDMaterialMap& uniqueMaterials);
+                                 const MRayUSDMaterialMap& uniqueMaterials,
+                                 const std::map<pxr::UsdPrim, MRayUSDTexture>& extraTextures);
 
 inline auto operator<=>(const MRayTextureParameters& l,
                         const MRayTextureParameters& r)

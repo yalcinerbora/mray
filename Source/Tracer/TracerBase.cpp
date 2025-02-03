@@ -648,11 +648,17 @@ MaterialIdList TracerBase::ReserveMaterials(MatGroupId id,
                         static_cast<CommonKey>(id));
     }
 
-    assert(medPairs.size() == countList.size());
     MediumKeyPairList medPairList;
     medPairList.reserve(countList.size());
-    for(size_t i = 0; i < countList.size(); i++)
+    if(medPairs.empty())
     {
+        using TracerConstants::VacuumMediumId;
+        MediumKey mKey = std::bit_cast<MediumKey>(VacuumMediumId);
+        medPairList.resize(countList.size(), MediumKeyPair{mKey, mKey});
+    }
+    else for(size_t i = 0; i < countList.size(); i++)
+    {
+        assert(medPairs.size() == countList.size());
         medPairList.emplace_back(std::bit_cast<MediumKey>(medPairs[i].first),
                                  std::bit_cast<MediumKey>(medPairs[i].second));
     }

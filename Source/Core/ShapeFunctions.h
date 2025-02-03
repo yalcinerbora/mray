@@ -14,8 +14,9 @@ namespace Triangle
     MRAY_HYBRID AABB3   BoundingBox(Span<const Vector3, TRI_VERTEX_COUNT> positions);
     MRAY_HYBRID Float   Area(Span<const Vector3, TRI_VERTEX_COUNT> positions);
     MRAY_HYBRID Vector3 Normal(Span<const Vector3, TRI_VERTEX_COUNT> positions);
-    MRAY_HYBRID Vector3 CalculateTangent(const Vector3& p0, const Vector3& p1, const Vector3& p2,
-                                         const Vector2& uv0, const Vector2& uv1, const Vector2& uv2);
+    MRAY_HYBRID Vector3 CalculateTangent(const Vector3& p0Normal,
+                                         const std::array<Vector3, 3>& positions,
+                                         const std::array<Vector2, 3>& uvs);
     MRAY_HYBRID Vector3 Project(Span<const Vector3, TRI_VERTEX_COUNT> positions,
                                 const Vector3& point);
     MRAY_HYBRID Vector3 PointToBarycentrics(Span<const Vector3, TRI_VERTEX_COUNT> positions,
@@ -72,26 +73,44 @@ Vector3 Triangle::Normal(Span<const Vector3, TRI_VERTEX_COUNT> positions)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 Triangle::CalculateTangent(const Vector3& p0, const Vector3& p1, const Vector3& p2,
-                                   const Vector2& uv0, const Vector2& uv1, const Vector2& uv2)
+Vector3 Triangle::CalculateTangent(const Vector3& p0Normal,
+                                   const std::array<Vector3, 3>& p,
+                                   const std::array<Vector2, 3>& uv)
 {
     // Edges (Tri is CCW)
-    Vector3 vec0 = p1 - p0;
-    Vector3 vec1 = p2 - p0;
+    Vector3 e0 = p[1] - p[0];
+    Vector3 e1 = p[2] - p[0];
 
-    Vector2 dUV0 = uv1 - uv0;
-    Vector2 dUV1 = uv2 - uv0;
+    Vector2 dUV0 = uv[1] - uv[0];
+    Vector2 dUV1 = uv[2] - uv[0];
 
-    Float t = (dUV0[0] * dUV1[1] -
-               dUV1[0] * dUV0[1]);
-    // UVs are not set or bad just return NaN
-    if(t == 0.0f) return Vector3(std::numeric_limits<Float>::quiet_NaN());
+    Float det = (dUV0[0] * dUV1[1] -
+                 dUV1[0] * dUV0[1]);
+    // Numeric precision issues
+    if(std::abs(det) < MathConstants::Epsilon<Float>())
+    {
+        // From PBRT-v4
+        // https://github.com/mmp/pbrt-v4/blob/779d1a78b74aab393853544198189729434121b5/src/pbrt/shapes.h#L911
+        // Basically just generate random tangent related to shading normal
+        Vector3 normal = Shape::Triangle::Normal(p);
+        // Triangle is degenerate (line probably)
+        normal = (normal.HasNaN()) ? p0Normal : normal;
+        // If tangent is still has issues, we tried...
+        // return it
+        Vector3 tangent = Vector3::OrthogonalVector(normal);
+        if(tangent.HasNaN())
+            __debugbreak();
+        return tangent;
+    }
+    if(det == 0)
+        __debugbreak();
     // Calculate as normal
-    float r = 1.0f / t;
-    Vector3 tangent = r * (dUV1[1] * vec0 - dUV0[1] * vec1);
+    Float r = Float(1) / det;
+    Vector3 tangent = r * (dUV1[1] * e0 - dUV0[1] * e1);
     // Check if the tangent, bi-tangent determine
     // a right handed coordinate system
-    return (t < 0) ? -tangent : tangent;
+    //return tangent;
+    return (det < Float(0)) ? -tangent : tangent;
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE

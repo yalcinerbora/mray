@@ -452,9 +452,9 @@ struct SurfaceParams
 {
     SurfacePrimList         primBatches;
     SurfaceMatList          materials;
-    TransformId             transformId     = TracerConstants::IdentityTransformId;
-    OptionalAlphaMapList    alphaMaps       = TracerConstants::NoAlphaMapList;
-    CullBackfaceFlagList    cullFaceFlags   = TracerConstants::CullFaceTrueList;
+    TransformId             transformId;
+    OptionalAlphaMapList    alphaMaps;
+    CullBackfaceFlagList    cullFaceFlags;
 };
 
 struct LightSurfaceParams

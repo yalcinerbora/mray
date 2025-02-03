@@ -1103,3 +1103,21 @@ constexpr Vector<3, T> TransformGen::ZUpToYUp(const Vector<3, T>& v)
 {
     return Vector<3, T>(v[1], v[2], v[0]);
 }
+
+template<std::floating_point T>
+MRAY_HYBRID constexpr Matrix<4, T> TransformGen::YUpToZUpMat()
+{
+    return Matrix<4, T>(0, 0, 1, 0,
+                        1, 0, 0, 0,
+                        0, 1, 0, 0,
+                        0, 0, 0, 1);
+}
+
+template<std::floating_point T>
+MRAY_HYBRID constexpr Matrix<4, T> TransformGen::ZUpToYUpMat()
+{
+    return Matrix<4, T>(0, 1, 0, 0,
+                        0, 0, 1, 0,
+                        1, 0, 0, 0,
+                        0, 0, 0, 1);
+}

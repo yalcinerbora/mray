@@ -2003,6 +2003,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
 
 void SceneLoaderMRay::CreateSurfaces(TracerI& tracer, const std::vector<SurfaceStruct>& surfs)
 {
+    uint32_t surfaceId = 0;
     mRaySurfaces.reserve(surfs.size());
     for(const auto& surf : surfs)
     {
@@ -2038,7 +2039,7 @@ void SceneLoaderMRay::CreateSurfaces(TracerI& tracer, const std::vector<SurfaceS
             cullFace
         };
         SurfaceId mRaySurf = tracer.CreateSurface(surfParams);
-        mRaySurfaces.push_back(mRaySurf);
+        mRaySurfaces.push_back(std::pair(surfaceId++, mRaySurf));
     }
 }
 
@@ -2057,19 +2058,21 @@ void SceneLoaderMRay::CreateLightSurfaces(TracerI& tracer, const std::vector<Lig
             lId, tId, mId
         };
     };
+    uint32_t lightSurfaceId = 0;
     mRayLightSurfaces.reserve(surfs.size());
     for(const auto& surf : surfs)
     {
 
         LightSurfaceParams lSurfParams = SurfStructToSurfParams(surf);
         LightSurfaceId mRaySurf = tracer.CreateLightSurface(lSurfParams);
-        mRayLightSurfaces.push_back(mRaySurf);
+        mRayLightSurfaces.push_back(std::pair(lightSurfaceId++, mRaySurf));
     }
     mRayBoundaryLightSurface = tracer.SetBoundarySurface(SurfStructToSurfParams(boundary));
 }
 
 void SceneLoaderMRay::CreateCamSurfaces(TracerI& tracer, const std::vector<CameraSurfaceStruct>& surfs)
 {
+    uint32_t camSurfaceId = 0;
     mRayLightSurfaces.reserve(surfs.size());
     for(const auto& surf : surfs)
     {
@@ -2084,7 +2087,7 @@ void SceneLoaderMRay::CreateCamSurfaces(TracerI& tracer, const std::vector<Camer
             cId, tId, mId
         };
         CamSurfaceId mRaySurf = tracer.CreateCameraSurface(cSurfParams);
-        mRayCamSurfaces.push_back(mRaySurf);
+        mRayCamSurfaces.push_back(std::pair(camSurfaceId++, mRaySurf));
     }
 }
 
@@ -2263,6 +2266,8 @@ TracerIdPack SceneLoaderMRay::MoveIdPack(double durationMS)
 {
     return TracerIdPack
     {
+        .concatStrings = std::vector<char>(),
+        .stringRanges = std::vector<Vector2ul>(),
         .prims = std::move(primMappings.map),
         .cams = std::move(camMappings.map),
         .lights = std::move(lightMappings.map),
@@ -2273,7 +2278,7 @@ TracerIdPack SceneLoaderMRay::MoveIdPack(double durationMS)
         .surfaces = std::move(mRaySurfaces),
         .camSurfaces = std::move(mRayCamSurfaces),
         .lightSurfaces = std::move(mRayLightSurfaces),
-        .boundarySurface = mRayBoundaryLightSurface,
+        .boundarySurface = std::pair(0, mRayBoundaryLightSurface),
         .loadTimeMS = durationMS
     };
 }

@@ -296,6 +296,13 @@ void GenericGroupT<ID, AI>::GenericPushData(const Span<T>& dAttributeRegion,
                                             TransientData data,
                                             const GPUQueue& deviceQueue) const
 {
+    if(!isCommitted)
+    {
+        throw MRayError("{:s}:{:d}: is not committed yet. "
+                        "You cannot push data!",
+                        this->Name(), groupId);
+    }
+
     assert(data.IsFull());
     auto range = FindRange(id)[attribIndex];
     size_t itemCount = range[1] - range[0];
@@ -315,6 +322,12 @@ void GenericGroupT<ID, AI>::GenericPushData(const Span<T>& dAttributeRegion,
                                             TransientData data,
                                             const GPUQueue& deviceQueue) const
 {
+    if(!isCommitted)
+    {
+        throw MRayError("{:s}:{:d}: is not committed yet. "
+                        "You cannot push data!",
+                        this->Name(), groupId);
+    }
     assert(data.IsFull());
     auto rangeStart = FindRange(idRange[0])[attribIndex];
     auto rangeEnd   = FindRange(idRange[1])[attribIndex];
@@ -335,6 +348,12 @@ void GenericGroupT<ID, AI>::GenericPushData(const Span<T>& dAttributeRegion,
                                             TransientData data,
                                             const GPUQueue& deviceQueue) const
 {
+    if(!isCommitted)
+    {
+        throw MRayError("{:s}:{:d}: is not committed yet. "
+                        "You cannot push data!",
+                        this->Name(), groupId);
+    }
     assert(data.IsFull());
     auto range = FindRange(id)[attribIndex];
     size_t itemCount = subRange[1] - subRange[0];
@@ -502,6 +521,12 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<ParamVaryingData<
                                                           std::vector<Optional<TextureId>> optionalTexIds,
                                                           const GPUQueue& queue)
 {
+    if(!this->isCommitted)
+    {
+        throw MRayError("{:s}:{:d}: is not committed yet. "
+                        "You cannot push data!",
+                        this->Name(), this->groupId);
+    }
     assert(hData.IsFull());
     auto hOptTexViews = ConvertToView<D, T>(std::move(optionalTexIds),
                                             attributeIndex);
@@ -531,7 +556,6 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<ParamVaryingData<
     queue.MemcpyAsync(dSubspan, hParamVaryingDataSpan);
     // TODO: Try to find a way to remove this wait
     queue.Barrier().Wait();
-
 }
 
 template<class I, class A>
@@ -543,6 +567,12 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<Optional<TracerTe
                                                           std::vector<Optional<TextureId>> optionalTexIds,
                                                           const GPUQueue& queue)
 {
+    if(!this->isCommitted)
+    {
+        throw MRayError("{:s}:{:d}: is not committed yet. "
+                        "You cannot push data!",
+                        this->Name(), this->groupId);
+    }
     auto hOptTexViews = ConvertToView<D, T>(std::move(optionalTexIds),
                                             attributeIndex);
 
@@ -568,6 +598,12 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<TracerTexView<D, 
                                                           std::vector<TextureId> textureIds,
                                                           const GPUQueue& queue)
 {
+    if(!this->isCommitted)
+    {
+        throw MRayError("{:s}:{:d}: is not committed yet. "
+                        "You cannot push data!",
+                        this->Name(), this->groupId);
+    }
     auto hTexViews = ConvertToView<D, T>(std::move(textureIds),
                                          attributeIndex);
 

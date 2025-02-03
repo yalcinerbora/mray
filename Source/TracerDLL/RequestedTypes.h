@@ -202,6 +202,7 @@ using RendererWorkTypes = RenderWorkTypePack
     // And finally Camera
     std::tuple
     <
-        RenderCameraWorkT<Renderer, CameraGroupPinhole, TransformGroupIdentity>
+        RenderCameraWorkT<Renderer, CameraGroupPinhole, TransformGroupIdentity>,
+        RenderCameraWorkT<Renderer, CameraGroupPinhole, TransformGroupSingle>
     >
 >;

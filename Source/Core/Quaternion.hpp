@@ -243,6 +243,13 @@ constexpr Vector<3, T> Quat<T>::ApplyInvRotation(const Vector<3, T>& vtor) const
 
 template<FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr bool Quat<T>::HasNaN() const
+{
+    return v.HasNaN();
+}
+
+template<FloatingPointC T>
+MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Quat<T> Quat<T>::NLerp(const Quat<T>& start,
                                  const Quat<T>& end, T t)
 {

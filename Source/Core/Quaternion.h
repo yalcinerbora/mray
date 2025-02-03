@@ -61,6 +61,7 @@ class Quat
     MRAY_HYBRID constexpr T                 Dot(const Quat&) const;
     MRAY_HYBRID constexpr Vector<3, T>      ApplyRotation(const Vector<3, T>&) const;
     MRAY_HYBRID constexpr Vector<3, T>      ApplyInvRotation(const Vector<3, T>&) const;
+    MRAY_HYBRID constexpr bool              HasNaN() const;
 
     static MRAY_HYBRID constexpr Quat<T>    NLerp(const Quat<T>& start,
                                                   const Quat<T>& end, T t);

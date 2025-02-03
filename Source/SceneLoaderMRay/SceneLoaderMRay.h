@@ -67,10 +67,10 @@ class SceneLoaderMRay : public SceneLoaderI
     MutexedMap<LightIdMappings>     lightMappings;
     TextureIdMappings               texMappings;
 
-    std::vector<SurfaceId>          mRaySurfaces;
-    std::vector<LightSurfaceId>     mRayLightSurfaces;
-    std::vector<CamSurfaceId>       mRayCamSurfaces;
-    LightSurfaceId                  mRayBoundaryLightSurface;
+    LightSurfaceId  mRayBoundaryLightSurface;
+    std::vector<std::pair<uint32_t, SurfaceId>>         mRaySurfaces;
+    std::vector<std::pair<uint32_t, LightSurfaceId>>    mRayLightSurfaces;
+    std::vector<std::pair<uint32_t, CamSurfaceId>>      mRayCamSurfaces;
 
     static LightSurfaceStruct               LoadBoundary(const nlohmann::json&);
     static std::vector<SurfaceStruct>       LoadSurfaces(const nlohmann::json&);

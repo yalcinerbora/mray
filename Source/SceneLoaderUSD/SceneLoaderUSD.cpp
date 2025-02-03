@@ -21,6 +21,7 @@
 #include <pxr/usd/usdGeom/mesh.h>
 #include <pxr/usd/usdGeom/pointInstancer.h>
 #include <pxr/usd/usdGeom/camera.h>
+#include <pxr/usd/usdGeom/metrics.h>
 // Materials
 #include <pxr/usd/usdShade/materialBindingAPI.h>
 // Lights
@@ -128,7 +129,7 @@ void ExpandGeomsAndFindMaterials(CollapsedPrims& subGeomPack,
 
     auto BindMaterial = [&](MRayUSDPrimSurface& surface,
                             pxr::UsdShadeMaterial boundMaterial,
-                            uint32_t subGeomIndex = std::numeric_limits<uint32_t>::max())
+                            uint32_t subGeomIndex = 0)
     {
         pxr::TfToken shaderId;
         boundMaterial.ComputeSurfaceSource().GetShaderId(&shaderId);
@@ -287,6 +288,171 @@ void ExpandGeomsAndFindMaterials(CollapsedPrims& subGeomPack,
                          "These surfaces will utilize meshes' display color property.");
 }
 
+MRayError ProcessCameras(CameraGroupId& camGroupId,
+                         std::vector<std::pair<pxr::UsdPrim, CameraId>>& outCamIds,
+                         TracerI& tracer, BS::thread_pool&,
+                         const std::vector<MRayUSDPrimSurface>& cameras)
+{
+    size_t camCount = std::max(size_t(1), cameras.size());
+
+    using namespace std::string_view_literals;
+    static constexpr auto CAMERA_NAME = "Pinhole"sv;
+    auto CAMERA_TYPE = TypeNameGen::CompTime::CameraTypeName<CAMERA_NAME>;
+    camGroupId = tracer.CreateCameraGroup(std::string(CAMERA_TYPE));
+
+    using AList = std::vector<AttributeCountList>;
+    auto camIds = tracer.ReserveCameras(camGroupId, AList(camCount, {1, 1, 1, 1}));
+
+    TransientData fovPlaneBuffer(std::in_place_type_t<Vector4>(), camCount);
+    TransientData gazeBuffer(std::in_place_type_t<Vector3>(), camCount);
+    TransientData positionBuffer(std::in_place_type_t<Vector3>(), camCount);
+    TransientData upBuffer(std::in_place_type_t<Vector3>(), camCount);
+    fovPlaneBuffer.ReserveAll();
+    gazeBuffer.ReserveAll();
+    positionBuffer.ReserveAll();
+    upBuffer.ReserveAll();
+    Span fovPlaneSpan = fovPlaneBuffer.AccessAs<Vector4>();
+    Span gazeSpan = gazeBuffer.AccessAs<Vector3>();
+    Span positionSpan = positionBuffer.AccessAs<Vector3>();
+    Span upSpan = upBuffer.AccessAs<Vector3>();
+    std::fill(gazeSpan.begin(), gazeSpan.end(), -Vector3::ZAxis());
+    std::fill(positionSpan.begin(), positionSpan.end(), Vector3::Zero());
+    std::fill(upSpan.begin(), upSpan.end(), Vector3::YAxis());
+    if(cameras.empty())
+    {
+        MRAY_WARNING_LOG("[MRayUSD]: There is no camera on USD Scene. "
+                         "Creating a generic camera (16:9)");
+        Float fovX = Float(70) * MathConstants::DegToRadCoef<Float>();
+        Float fovY = Float(2.0) * std::atan(std::tan(fovX * Float(0.5)) / Float(0.5625));
+        Vector4 fovAndPlanes(fovX, fovY, Float(0.1), Float(5000));
+        fovPlaneSpan[0] = fovAndPlanes;
+    }
+    else for(size_t i = 0; i < cameras.size(); i++)
+    {
+        const auto& cam = cameras[i];
+        auto camPrim = pxr::UsdGeomCamera(cam.surfacePrim);
+        // For camera matrices, embed to the camera position vector
+        // direction etc.
+        // This is not always true, but most of the time
+        // up vector is always anchore
+        Vector3 front = -Vector3::ZAxis();
+        Vector3 pos = Vector3::Zero();
+        pos = Vector3(cam.surfaceTransform * Vector4(pos, 1));
+        front = cam.surfaceTransform * front;
+        gazeSpan[i] = pos + front;
+        positionSpan[i] = pos;
+        upSpan[i] = Vector3::YAxis();
+
+        pxr::GfCamera pxrCam = camPrim.GetCamera(pxr::UsdTimeCode());
+        float fovX = pxrCam.GetFieldOfView(pxr::GfCamera::FOVHorizontal);
+        float fovY = pxrCam.GetFieldOfView(pxr::GfCamera::FOVVertical);
+        fovX *= MathConstants::DegToRadCoef<float>();
+        fovY *= MathConstants::DegToRadCoef<float>();
+        pxr::GfRange1f nearFar = pxrCam.GetClippingRange();
+
+        Vector4 fovAndPlanes(fovX, fovY, nearFar.GetMin(), nearFar.GetMax());
+        fovPlaneSpan[i] = fovAndPlanes;
+    }
+    CommonIdRange range = CommonIdRange(std::bit_cast<CommonId>(camIds.front()),
+                                        std::bit_cast<CommonId>(camIds.back()));
+    tracer.CommitCamReservations(camGroupId);
+    tracer.PushCamAttribute(camGroupId, range, 0, std::move(fovPlaneBuffer));
+    tracer.PushCamAttribute(camGroupId, range, 1, std::move(gazeBuffer));
+    tracer.PushCamAttribute(camGroupId, range, 2, std::move(positionBuffer));
+    tracer.PushCamAttribute(camGroupId, range, 3, std::move(upBuffer));
+
+    if(cameras.empty())
+        outCamIds.emplace_back(pxr::UsdPrim(), camIds[0]);
+    else for(size_t i = 0; i < cameras.size(); i++)
+        outCamIds.emplace_back(cameras[i].surfacePrim, camIds[i]);
+
+    return MRayError::OK;
+}
+
+MRayError FindLightTextures(std::map<pxr::UsdPrim, MRayUSDTexture>& extraTextures,
+                            const std::vector<MRayUSDPrimSurface>&,
+                            const std::vector<MRayUSDPrimSurface>&,
+                            const Optional<MRayUSDPrimSurface>& domeLight)
+{
+    if(domeLight)
+    {
+        pxr::UsdLuxDomeLight lightPrim(domeLight->uniquePrim);
+        pxr::UsdAttribute fileA = lightPrim.GetTextureFileAttr();
+        pxr::SdfAssetPath path; fileA.Get(&path);
+        std::string filePath = path.GetResolvedPath();
+        MRayUSDTexture tex =
+        {
+            .absoluteFilePath = filePath,
+            .imageSubChannel = ImageSubChannelType::RGB,
+            .isNormal = false,
+            .params = MRayTextureParameters
+            {
+                // Random ass type this will be overriden
+                .pixelType = MRayPixelType<MRayPixelEnum::MR_R_HALF>(),
+                .colorSpace = MRayColorSpaceEnum::MR_DEFAULT,
+                .gamma = Float(1),
+                // Ignore the resolution clamping
+                .ignoreResClamp = true,
+                .isColor = AttributeIsColor::IS_COLOR,
+                .edgeResolve = MRayTextureEdgeResolveEnum::MR_WRAP,
+                .interpolation = MRayTextureInterpEnum::MR_LINEAR,
+                .readMode = MRayTextureReadMode::MR_PASSTHROUGH
+            }
+        };
+        extraTextures.emplace(domeLight->uniquePrim, tex);
+    }
+    // TODO: Do the rest
+
+    return MRayError::OK;
+}
+
+MRayError ProcessLights(std::vector<std::pair<LightGroupId, LightId>>&,
+                        LightGroupId& domeLightGroupId, LightId& domeLightId,
+                        TracerI& tracer, BS::thread_pool&,
+                        const std::vector<MRayUSDPrimSurface>& meshGeomLights,
+                        const std::vector<MRayUSDPrimSurface>& sphereGeomLights,
+                        const Optional<MRayUSDPrimSurface>& domeLight,
+                        const std::map<pxr::UsdPrim, std::vector<PrimBatchId>>&,
+                        const std::map<pxr::UsdPrim, std::vector<PrimBatchId>>&,
+                        const std::map<pxr::UsdPrim, TextureId>& uniqueTextureIds)
+{
+    using namespace std::string_view_literals;
+    static constexpr auto SKY_LIGHT_NAME = "Skysphere_Spherical"sv;
+    auto SKY_LIGHT_TYPE = TypeNameGen::CompTime::LightTypeName<SKY_LIGHT_NAME>;
+    domeLightGroupId = tracer.CreateLightGroup(std::string(SKY_LIGHT_TYPE));
+
+    domeLightId = tracer.ReserveLight(domeLightGroupId, {1});
+    TransientData lightBuffer(std::in_place_type_t<Vector3>{}, 1);
+    std::vector<Optional<TextureId>> lightTexture(1);
+    lightBuffer.ReserveAll();
+    if(!domeLight)
+    {
+        MRAY_WARNING_LOG("[MRayUSD]: There is no boundary light on USD Scene. "
+                         "Creating a uniform white background");
+        lightBuffer.AccessAs<Vector3>()[0] = Vector3(10);
+    }
+    else
+    {
+        pxr::UsdLuxDomeLight lightPrim(domeLight->uniquePrim);
+        TextureId texId = uniqueTextureIds.at(domeLight->uniquePrim);
+        lightTexture[0] = texId;
+    }
+    tracer.CommitLightReservations(domeLightGroupId);
+    tracer.PushLightAttribute(domeLightGroupId,
+                              CommonIdRange(std::bit_cast<CommonId>(domeLightId),
+                                            std::bit_cast<CommonId>(domeLightId)),
+                              0, std::move(lightBuffer), lightTexture);
+
+    // TODO: Implement later
+    if(!meshGeomLights.empty() || !sphereGeomLights.empty())
+    {
+        MRAY_WARNING_LOG("[MRayUSD]: MRay detected geometry lights (in MRay terms, primitive-backed "
+                         "lights) in the scene. Altough these are supported in MRay, wiring is not yet "
+                         "implemented. Please use a single dome light");
+    }
+    return MRayError::OK;
+}
+
 SceneLoaderUSD::SceneLoaderUSD(BS::thread_pool& tp)
     : threadPool(tp)
 {}
@@ -434,29 +600,329 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     }
     surfaces.clear();
 
-
     // Report
-    PrintPrims(meshMatPrims, sphereMatPrims, uniqueMaterials,
-               domeLight, cameras, loadedStage);
+    //PrintPrims(meshMatPrims, sphereMatPrims, uniqueMaterials,
+    //           domeLight, cameras, loadedStage);
 
     // Now do the processing
-    std::map<pxr::UsdPrim, std::vector<PrimBatchId>> outMeshPrimBatches;
-    e = ProcessUniqueMeshes(outMeshPrimBatches, tracer, threadPool, meshMatPrims);
+    PrimGroupId meshPrimGroupId;
+    std::map<pxr::UsdPrim, std::vector<PrimBatchId>> uniqueMeshPrimBatches;
+    e = ProcessUniqueMeshes(meshPrimGroupId,
+                            uniqueMeshPrimBatches, tracer, threadPool,
+                            meshMatPrims.uniquePrims);
+    if(e) return e;
+    //
+    PrimGroupId spherePrimGroupId;
+    std::map<pxr::UsdPrim, std::vector<PrimBatchId>> uniqueSpherePrimBatches;
+    e = ProcessUniqueSpheres(spherePrimGroupId,
+                             uniqueSpherePrimBatches, tracer, threadPool,
+                             sphereMatPrims.uniquePrims);
     if(e) return e;
 
-    std::map<pxr::UsdPrim, std::vector<PrimBatchId>> outSpherePrimBatches;
-    e = ProcessUniqueSpheres(outSpherePrimBatches, tracer, threadPool, meshMatPrims);
+    // Find extra textures
+    // From lights
+    std::map<pxr::UsdPrim, MRayUSDTexture> extraTextures;
+    e = FindLightTextures(extraTextures,
+                          meshMatPrims.geomLightSurfaces,
+                          sphereMatPrims.geomLightSurfaces,
+                          domeLight);
     if(e) return e;
 
     // Process the materials
     std::map<pxr::UsdPrim, MRayUSDMatAlphaPack> outMaterials;
-    e = ProcessUniqueMaterials(outMaterials, tracer, threadPool, uniqueMaterials);
+    std::map<pxr::UsdPrim, TextureId> uniqueTextureIds;
+    e = ProcessUniqueMaterials(outMaterials, uniqueTextureIds,
+                               tracer, threadPool, uniqueMaterials,
+                               extraTextures);
     if(e) return e;
 
+    // Process cameras
+    CameraGroupId camGroupId;
+    std::vector<std::pair<pxr::UsdPrim, CameraId>> outCameras;
+    e = ProcessCameras(camGroupId, outCameras, tracer, threadPool, cameras);
+    if(e) return e;
+
+    LightGroupId boundaryLightGroup;
+    LightId boundaryLight;
+    std::vector<std::pair<LightGroupId, LightId>> outLights;
+    e = ProcessLights(outLights, boundaryLightGroup, boundaryLight,
+                      tracer, threadPool,
+                      meshMatPrims.geomLightSurfaces,
+                      sphereMatPrims.geomLightSurfaces,
+                      domeLight, uniqueMeshPrimBatches,
+                      uniqueSpherePrimBatches,
+                      uniqueTextureIds);
+    if(e) return e;
+
+    // Load Transforms
+    std::array<size_t, 7> allSizes;
+    allSizes[0] = 0;
+    allSizes[1] = meshMatPrims.surfaces.size();
+    allSizes[2] = meshMatPrims.geomLightSurfaces.size();
+    allSizes[3] = sphereMatPrims.surfaces.size();
+    allSizes[4] = sphereMatPrims.geomLightSurfaces.size();
+    allSizes[5] = 0; // cameras.size();
+    allSizes[6] = domeLight.has_value() ? 1 : 0;
+    std::inclusive_scan(allSizes.cbegin(), allSizes.cend(), allSizes.begin());
+    size_t totalSurfSize = allSizes.back();
     //
+    TransientData matrixBuffer(std::in_place_type_t<Matrix4x4>(), totalSurfSize);
+    matrixBuffer.ReserveAll();
+    Span allMatrices = matrixBuffer.AccessAs<Matrix4x4>();
+    Span meshSurfMats = allMatrices.subspan(allSizes[0], allSizes[1] - allSizes[0]);
+    Span meshLightSurfMats = allMatrices.subspan(allSizes[1], allSizes[2] - allSizes[1]);
+    Span sphereSurfMats = allMatrices.subspan(allSizes[2], allSizes[3] - allSizes[2]);
+    Span sphereLightSurfMats = allMatrices.subspan(allSizes[3], allSizes[4] - allSizes[3]);
+    Span cameraSurfMats = allMatrices.subspan(allSizes[4], allSizes[5] - allSizes[4]);
+    Span domeLightSurfMats = allMatrices.subspan(allSizes[5], allSizes[6] - allSizes[5]);
+
+    for(size_t i = 0; i < meshMatPrims.surfaces.size(); i++)
+        meshSurfMats[i] = meshMatPrims.surfaces[i].surfaceTransform;
+    for(size_t i = 0; i < meshMatPrims.geomLightSurfaces.size(); i++)
+        meshLightSurfMats[i] = meshMatPrims.geomLightSurfaces[i].surfaceTransform;
+    for(size_t i = 0; i < sphereMatPrims.surfaces.size(); i++)
+        sphereSurfMats[i] = sphereMatPrims.surfaces[i].surfaceTransform;
+    for(size_t i = 0; i < sphereMatPrims.geomLightSurfaces.size(); i++)
+        sphereLightSurfMats[i] = sphereMatPrims.geomLightSurfaces[i].surfaceTransform;
+    for(size_t i = 0; i < cameras.size(); i++)
+        cameraSurfMats[i] = cameras[i].surfaceTransform;
+
+    if(domeLight.has_value())
+        domeLightSurfMats[0] = domeLight->surfaceTransform;
+
+    // Convert to Y up if required
+    if(pxr::UsdGeomGetStageUpAxis(loadedStage) == pxr::UsdGeomTokens->z)
+    {
+        for(auto& mat : allMatrices)
+            mat = TransformGen::ZUpToYUpMat<Float>() * mat;
+    }
+
+    using TypeNameGen::Runtime::AddTransformPrefix;
+    TransGroupId tgId = tracer.CreateTransformGroup(AddTransformPrefix("Single"));
+    std::vector<AttributeCountList> transformAttribCounts(totalSurfSize, {1});
+    std::vector<TransformId> tIds = tracer.ReserveTransformations(tgId, transformAttribCounts);
+    tracer.CommitTransReservations(tgId);
+    //
+    CommonIdRange range(std::bit_cast<CommonId>(tIds.front()),
+                        std::bit_cast<CommonId>(tIds.back()));
+    tracer.PushTransAttribute(tgId, range, 0, std::move(matrixBuffer));
+    Span allTIds = Span(tIds.cbegin(), tIds.size());
+    Span meshSurfTIds = allTIds.subspan(allSizes[0], allSizes[1] - allSizes[0]);
+    Span meshLightSurfTIds= allTIds.subspan(allSizes[1], allSizes[2] - allSizes[1]);
+    Span sphereSurfTIds = allTIds.subspan(allSizes[2], allSizes[3] - allSizes[2]);
+    Span sphereLightSurfTIds= allTIds.subspan(allSizes[3], allSizes[4] - allSizes[3]);
+    Span cameraSurfTIds = allTIds.subspan(allSizes[4], allSizes[5] - allSizes[4]);
+    Span domeLightSurfTIds = allTIds.subspan(allSizes[5], allSizes[6] - allSizes[5]);
+
+    // Wire the meshes
+    std::vector<Pair<pxr::UsdPrim, SurfaceId>> surfaceList;
+    surfaceList.reserve(totalSurfSize);
+    for(size_t i = 0; i < meshMatPrims.surfaces.size(); i++)
+    {
+        const auto& prim = meshMatPrims.surfaces[i];
+        const auto& subGeomMaterials = prim.subGeometryMaterialKeys;
+        size_t surfCount = Math::DivideUp(subGeomMaterials.size(),
+                                          TracerConstants::MaxPrimBatchPerSurface);
+        for(size_t batchI = 0; batchI < surfCount; batchI++)
+        {
+            size_t start = batchI * TracerConstants::MaxPrimBatchPerSurface;
+            size_t end = (batchI + 1) * TracerConstants::MaxPrimBatchPerSurface;
+            end = std::min(subGeomMaterials.size(), end);
+            //
+            SurfaceParams surface;
+            surface.transformId = meshSurfTIds[i];
+            for(size_t j = start; j < end; j++)
+            {
+                const auto& [geomIndex, matPath] = prim.subGeometryMaterialKeys[j];
+                auto primName = prim.uniquePrim;
+                const auto& mat = outMaterials.at(loadedStage->GetPrimAtPath(matPath));
+                const auto& primBatchId = uniqueMeshPrimBatches.at(primName)[geomIndex];
+                surface.materials.push_back(mat.materialId);
+                surface.primBatches.push_back(primBatchId);
+                surface.cullFaceFlags.push_back(!mat.alphaMap.has_value());
+                surface.alphaMaps.push_back(mat.alphaMap);
+            }
+            SurfaceId sId = tracer.CreateSurface(surface);
+            surfaceList.emplace_back(prim.surfacePrim, sId);
+        }
+    }
+    //
+    for(size_t i = 0; i < sphereMatPrims.surfaces.size(); i++)
+    {
+        const auto& prim = sphereMatPrims.surfaces[i];
+        const auto& subGeomMaterials = prim.subGeometryMaterialKeys;
+        size_t surfCount = Math::DivideUp(subGeomMaterials.size(),
+                                          TracerConstants::MaxPrimBatchPerSurface);
+        for(size_t batchI = 0; batchI < surfCount; batchI++)
+        {
+            size_t start = batchI * TracerConstants::MaxPrimBatchPerSurface;
+            size_t end = (batchI + 1) * TracerConstants::MaxPrimBatchPerSurface;
+            end = std::min(subGeomMaterials.size(), end);
+            //
+            SurfaceParams surface;
+            surface.transformId = sphereSurfTIds[i];
+            for(size_t j = start; j < end; j++)
+            {
+                auto [geomIndex, matPath] = prim.subGeometryMaterialKeys[j];
+                auto primName = prim.uniquePrim;
+                const auto& mat = outMaterials.at(loadedStage->GetPrimAtPath(matPath));
+                const auto& primBatchId = uniqueSpherePrimBatches.at(primName)[geomIndex];
+                surface.materials.push_back(mat.materialId);
+                surface.primBatches.push_back(primBatchId);
+                surface.cullFaceFlags.push_back(!mat.alphaMap.has_value());
+                surface.alphaMaps.push_back(mat.alphaMap);
+            }
+            SurfaceId sId = tracer.CreateSurface(surface);
+            surfaceList.emplace_back(prim.surfacePrim, sId);
+        }
+    }
+
+    // Camera Surfaces
+    std::vector<Pair<pxr::UsdPrim, CamSurfaceId>> camSurfaceList;
+    camSurfaceList.reserve(cameras.size());
+    for(size_t i = 0; i < cameras.size(); i++)
+    {
+        const auto& cam = cameras[i];
+        CameraSurfaceParams surface =
+        {
+            .cameraId = outCameras[i].second,
+            .transformId = cameraSurfTIds.empty()
+                                ? TracerConstants::IdentityTransformId
+                                : cameraSurfTIds[0],
+            .mediumId = TracerConstants::VacuumMediumId,
+        };
+        CamSurfaceId csId = tracer.CreateCameraSurface(surface);
+        camSurfaceList.emplace_back(cam.surfacePrim, csId);
+    }
+
+    // Set the boundary surface
+    tracer.SetBoundarySurface(LightSurfaceParams
+                              {
+                                  .lightId = boundaryLight,
+                                  .transformId = domeLightSurfTIds.empty()
+                                                    ? TracerConstants::IdentityTransformId
+                                                    : domeLightSurfTIds[0],
+                                  .mediumId = TracerConstants::VacuumMediumId
+                              });
+    //
+    TracerIdPack result;
+    std::vector<char> stringConcat;
+    std::vector<Vector2ul> stringRange;
+    stringConcat.reserve(4096);
+    stringRange.reserve(4096);
+
+    // TODO: Too many string alloc/dealloc
+    // Change this later
+    uint32_t globalCounter = 0;
+    for(const auto& [prim, batchList] : uniqueMeshPrimBatches)
+    {
+        std::string s = prim.GetPath().GetString();
+        for(uint32_t i = 0; i < batchList.size(); i++)
+        {
+            std::string v = s + std::to_string(i);
+            auto loc = stringConcat.insert(stringConcat.end(),
+                                           v.cbegin(), v.cend());
+            auto start = std::distance(loc, stringConcat.begin());
+            auto end = stringConcat.size();
+            stringRange.emplace_back(start, end);
+            result.prims.emplace(globalCounter++,
+                                 Pair(meshPrimGroupId, batchList[i]));
+        }
+    }
+    for(const auto& [prim, batchList] : uniqueSpherePrimBatches)
+    {
+        std::string s = prim.GetPath().GetString();
+        for(uint32_t i = 0; i < batchList.size(); i++)
+        {
+            std::string v = s + std::to_string(i);
+            auto loc = stringConcat.insert(stringConcat.end(),
+                                           v.cbegin(), v.cend());
+            auto start = std::distance(loc, stringConcat.begin());
+            auto end = stringConcat.size();
+            stringRange.emplace_back(start, end);
+            result.prims.emplace(globalCounter++,
+                                 Pair(spherePrimGroupId, batchList[i]));
+        }
+    }
+    // Cameras
+    for(const auto& [camPrim, camId] : outCameras)
+    {
+        std::string s = camPrim.GetPath().GetString();
+        auto loc = stringConcat.insert(stringConcat.end(),
+                                        s.cbegin(), s.cend());
+        auto start = std::distance(loc, stringConcat.begin());
+        auto end = stringConcat.size();
+        stringRange.emplace_back(start, end);
+        result.cams.emplace(globalCounter++,
+                            Pair(camGroupId, camId));
+    }
+    // Lights
+    {
+        std::string s = (domeLight) ? domeLight->surfacePrim.GetPath().GetString()
+                                    : "GENERATED";
+        auto loc = stringConcat.insert(stringConcat.end(),
+                                       s.cbegin(), s.cend());
+        auto start = std::distance(loc, stringConcat.begin());
+        auto end = stringConcat.size();
+        stringRange.emplace_back(start, end);
+        result.lights.emplace(globalCounter++,
+                              Pair(boundaryLightGroup, boundaryLight));
+    }
+    // Materials
+    for(const auto& [matPrim, matPack] : outMaterials)
+    {
+        std::string s = matPrim.GetPath().GetString();
+        auto loc = stringConcat.insert(stringConcat.end(),
+                                       s.cbegin(), s.cend());
+        auto start = std::distance(loc, stringConcat.begin());
+        auto end = stringConcat.size();
+        stringRange.emplace_back(start, end);
+        result.mats.emplace(globalCounter++,
+                            Pair(matPack.groupId, matPack.materialId));
+    }
+    // Textures
+    for(const auto& [texPrim, texId] : uniqueTextureIds)
+    {
+        std::string s = texPrim.GetPath().GetString();
+        auto loc = stringConcat.insert(stringConcat.end(),
+                                       s.cbegin(), s.cend());
+        auto start = std::distance(loc, stringConcat.begin());
+        auto end = stringConcat.size();
+        stringRange.emplace_back(start, end);
+        result.textures.emplace(SceneTexId(globalCounter++), texId);
+    }
+    // TODO: Mediums (Not loaded)
+    // TODO: Transforms
+    // Surfaces
+    for(const auto& [surfPrim, surfId] : surfaceList)
+    {
+        std::string s = surfPrim.GetPath().GetString();
+        auto loc = stringConcat.insert(stringConcat.end(),
+                                       s.cbegin(), s.cend());
+        auto start = std::distance(loc, stringConcat.begin());
+        auto end = stringConcat.size();
+        stringRange.emplace_back(start, end);
+        result.surfaces.emplace_back(globalCounter++, surfId);
+    }
+    // TODO: Light Surfaces
+    // CameraSurfaces is required to select cameras etc
+    for(const auto& [camPrim, camSurfId] : camSurfaceList)
+    {
+        std::string s = (camPrim) ? camPrim.GetPath().GetString()
+                                  : "GENERATED";
+        auto loc = stringConcat.insert(stringConcat.end(),
+                                       s.cbegin(), s.cend());
+        auto start = std::distance(loc, stringConcat.begin());
+        auto end = stringConcat.size();
+        stringRange.emplace_back(start, end);
+        result.camSurfaces.emplace_back(globalCounter++, camSurfId);
+    }
+
+    result.concatStrings = std::move(stringConcat);
+    result.stringRanges = std::move(stringRange);
     t.Split();
-    return MRayError("Not yet implemented");
-    //return resultinIdPack;
+    result.loadTimeMS = t.Elapsed<Millisecond>();
+    return result;
 }
 
 Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI&, std::istream&)

@@ -173,6 +173,12 @@ namespace TransformGen
 
     template<std::floating_point T>
     MRAY_HYBRID constexpr Vector<3, T> ZUpToYUp(const Vector<3, T>& vec);
+
+    template<std::floating_point T>
+    MRAY_HYBRID constexpr Matrix<4, T> YUpToZUpMat();
+
+    template<std::floating_point T>
+    MRAY_HYBRID constexpr Matrix<4, T> ZUpToYUpMat();
 }
 
 // Implementation

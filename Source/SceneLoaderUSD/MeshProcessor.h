@@ -98,17 +98,19 @@ struct MeshProcessorThread
 
 // Return something....
 MRayError ProcessUniqueMeshes(// Output
+                              PrimGroupId& id,
                               std::map<pxr::UsdPrim, std::vector<PrimBatchId>>& outPrimBatches,
                               // I-O
                               TracerI& tracer,
                               BS::thread_pool& threadPool,
                               // Input
-                              const CollapsedPrims& meshMatPrims);
+                              const std::set<pxr::UsdPrim>& uniquePrims);
 
 MRayError ProcessUniqueSpheres(// Output
+                               PrimGroupId& id,
                                std::map<pxr::UsdPrim, std::vector<PrimBatchId>>& outPrimBatches,
                                // I-O
                                TracerI& tracer,
                                BS::thread_pool& threadPool,
                                // Input
-                               const CollapsedPrims& meshMatPrims);
+                               const std::set<pxr::UsdPrim>& uniquePrims);
