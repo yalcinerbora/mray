@@ -858,21 +858,21 @@ template <unsigned int N, ArithmeticC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector<N, T> Vector<N, T>::XAxis() requires (N == 3)
 {
-    return Vector3(1, 0, 0);
+    return Vector<3, T>(1, 0, 0);
 }
 
 template <unsigned int N, ArithmeticC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector<N,T> Vector<N, T>::YAxis() requires (N == 3)
 {
-    return Vector3(0, 1, 0);
+    return Vector<3, T>(0, 1, 0);
 }
 
 template <unsigned int N, ArithmeticC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector<N, T> Vector<N, T>::ZAxis() requires (N == 3)
 {
-    return Vector3(0, 0, 1);
+    return Vector<3, T>(0, 0, 1);
 }
 
 template <unsigned int N, ArithmeticC T>

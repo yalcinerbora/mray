@@ -22,7 +22,7 @@ struct IndexHasher
     size_t operator()(const IndexTriplet& t) const
     {
         std::hash<uint32_t> h;
-        return h(t[0]) ^ h(t[1]) ^ h(t[2]);
+        return h(t[0]) + h(t[1]) + h(t[2]);
     }
 };
 
@@ -35,7 +35,8 @@ struct MeshProcessorThread
 
     using SubGeomTransientData = StaticVector<TransientData, TracerConstants::MaxAttributePerGroup>;
 
-    static const pxr::TfToken uvToken;
+    static const pxr::TfToken uvToken0;
+    static const pxr::TfToken uvToken1;
     static const pxr::TfToken normalsToken;
 
     private:

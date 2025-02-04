@@ -48,11 +48,11 @@ struct MRayUSDMaterialProps
 {
     MRayUSDMaterialType type;
     MaterialTerminalVariant<pxr::GfVec3f> albedo;
-    MaterialTerminalVariant<pxr::GfVec3f> normal;
-    MaterialTerminalVariant<float> metallic;
-    MaterialTerminalVariant<float> roughness;
-    MaterialTerminalVariant<float> opacity;
-    MaterialTerminalVariant<float> iorOrSpec;
+    MaterialTerminalVariant<pxr::GfVec3f> normal    = pxr::GfVec3f(0, 1, 1);
+    MaterialTerminalVariant<float> metallic         = 0.0f;
+    MaterialTerminalVariant<float> roughness        = 1.0f;
+    MaterialTerminalVariant<float> opacity          = 1.0f;
+    MaterialTerminalVariant<float> iorOrSpec        = 1.0f;
 };
 
 inline auto operator<=>(const MRayTextureParameters& l,

@@ -268,21 +268,65 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
                                           visorState.renderer.workPerPixelSuffix).c_str());
             ImGui::Separator();
 
-            std::string prefix = std::string(RENDERING_NAME);
-            std::string body = (prefix + " " + visorState.scene.sceneName + "...");
+
+            // Calculate text size and clamp
+            // TODO: Too much string construction/destruction
+            // on GUI loop (which is implicitly hot loop)
+            // change this later
+            std::string sceneNamePrefix = std::string(RENDERING_NAME) + " ";
+            std::string sceneNameSuffix = "...";
             if(paused)
-                body += " ("s + std::string(PAUSED_NAME) + ")"s;
+                sceneNameSuffix += " ("s + std::string(PAUSED_NAME) + ")"s;
             else if(stopped)
-                body += " ("s + std::string(STOPPED_NAME) + ")"s;
-            ImGui::Text("%s", body.c_str());
+                sceneNameSuffix += " ("s + std::string(STOPPED_NAME) + ")"s;
 
             float buttonSize = (ImGui::CalcTextSize(ICON_ICOMN_ARROW_LEFT).x +
                                 ImGui::GetStyle().FramePadding.x * 2.0f);
             float spacingSize = ImGui::GetStyle().ItemSpacing.x;
+            float sceneNameStart = ImGui::GetCursorPosX();
+            float sceneNameEnd = (ImGui::GetWindowContentRegionMax().x -
+                                  (buttonSize * 5 + spacingSize * 6 + 2));
+            float sceneNameWidth = sceneNameEnd - sceneNameStart;
+            // We create the full string just to feed it to the "CalcTextSize"
+            // This is not a good api but I'am assuming this is for UTF-8 style
+            // variable length-sized character string
+            std::string sceneNameBody = (sceneNamePrefix + visorState.scene.sceneName +
+                                         sceneNameSuffix);
+            if(sceneNameWidth < ImGui::CalcTextSize(sceneNameBody.c_str()).x)
+            {
+                // First try to get the filename
+                size_t fNameStart = visorState.scene.sceneName.rfind("/") + 1;
+                std::string shrinkedBody = sceneNameBody;
+                if(fNameStart != std::string::npos)
+                {
+                    std::string fName = visorState.scene.sceneName.substr(fNameStart);
+                    shrinkedBody = (sceneNamePrefix + fName + sceneNameSuffix);
+                }
+                // String is already is relative path (or something),
+                // or even after shrink we still couldn't fit it.
+                if(sceneNameWidth < ImGui::CalcTextSize(shrinkedBody.c_str()).x)
+                {
+                    // Just display "Rendering ...".
+                    // Even this does not fit, ignore
+                    ImGui::Text("%s", (sceneNamePrefix + sceneNameSuffix).c_str());
+                }
+                // Shrink was enough render that
+                else ImGui::Text("%s", shrinkedBody.c_str());
+                //
+                // Add scene name as a tooltip for both cases
+                if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+                {
+                    ImGui::BeginTooltip();
+                    ImGui::Text("%s", visorState.scene.sceneName.c_str());
+                    ImGui::EndTooltip();
+                }
+            }
+            // Just render
+            else ImGui::Text("%s", sceneNameBody.c_str());
 
-            ImGui::SameLine(ImGui::GetWindowContentRegionMax().x -
-                            (buttonSize * 5 + spacingSize * 6 + 2));
 
+
+            ImGui::SameLine(sceneNameEnd);
             ImGui::Separator();
             if(camLocked) ImGui::BeginDisabled();
             if(ImGui::Button(ICON_ICOMN_ARROW_LEFT) ||

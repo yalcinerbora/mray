@@ -98,12 +98,8 @@ Vector3 Triangle::CalculateTangent(const Vector3& p0Normal,
         // If tangent is still has issues, we tried...
         // return it
         Vector3 tangent = Vector3::OrthogonalVector(normal);
-        if(tangent.HasNaN())
-            __debugbreak();
         return tangent;
     }
-    if(det == 0)
-        __debugbreak();
     // Calculate as normal
     Float r = Float(1) / det;
     Vector3 tangent = r * (dUV1[1] * e0 - dUV0[1] * e1);

@@ -16,9 +16,9 @@
 #include <pxr/usd/usdGeom/sphere.h>
 #include <pxr/usd/usdGeom/subset.h>
 
-const pxr::TfToken MeshProcessorThread::uvToken = pxr::TfToken("st");
+const pxr::TfToken MeshProcessorThread::uvToken0 = pxr::TfToken("st");
+const pxr::TfToken MeshProcessorThread::uvToken1 = pxr::TfToken("map1");
 const pxr::TfToken MeshProcessorThread::normalsToken = pxr::TfToken("normals");
-
 
 // At most 16-gon poly is supported
 static constexpr uint32_t MRAY_USD_MAX_TRI_POLY_COUNT = 16;
@@ -86,16 +86,22 @@ inline uint32_t AttributeIndexer::operator()(uint32_t perVertexPerFaceCounter) c
         // via position indices
         case PER_VERTEX:
             return uint32_t(posIndices[perVertexPerFaceCounter]);
-            // Most complicated one, the **index** of the
-            // attribute is laid out per-vertex. Find the vertex
-            // then find the index
+        // Most complicated one, the **index** of the
+        // attribute is laid out per-vertex. Find the vertex
+        // then find the index
         case PER_VERTEX_WITH_INDEX:
-            return uint32_t(attributeIndices[uint32_t(posIndices[perVertexPerFaceCounter])]);
-            // Data is laid out same as the index counter,
-            // no need to process "counter is index".
+        {
+            // Intel sponza curtains are bugged, return int_max
+            uint32_t vertexIndex = uint32_t(posIndices[perVertexPerFaceCounter]);
+            if(vertexIndex > attributeIndices.size())
+                return std::numeric_limits<uint32_t>::max();
+            return uint32_t(attributeIndices[vertexIndex]);
+        }
+        // Data is laid out same as the index counter,
+        // no need to process "counter is index".
         case PER_VERTEX_PER_PRIM:
             return uint32_t(perVertexPerFaceCounter);
-            // Data's **index** is laid out same as the index counter.
+        // Data's **index** is laid out same as the index counter.
             // Do single indirection
         case PER_VERTEX_PER_PRIM_WITH_INDEX:
             return uint32_t(attributeIndices[perVertexPerFaceCounter]);
@@ -292,7 +298,7 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
 
         // Normals are not guaranteed
         // So set something reasonable
-        if(normals.empty())
+        const auto GenFaceNormal = [&]()
         {
             // Set to face normal (assuming vertices are planar)
             Vector3 p0 = localPositions[localIndicesTriangulated[0][0]];
@@ -301,14 +307,29 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
             Vector3 e0 = p1 - p0;
             Vector3 e1 = p2 - p0;
             Vector3 n = Vector3::Cross(e0, e1).Normalize();
+            return n;
+        };
+        if(normals.empty())
+        {
+            Vector3 n = GenFaceNormal();
             std::fill(localNormals.begin(),
                       localNormals.begin() + faceVertexCount,
                       n);
         }
         else for(uint32_t i = 0; i < faceVertexCount; i++)
         {
-            pxr::GfVec3f n = normals[usdNormalIndices[i]];
-            localNormals[i] = Vector3(n[0], n[1], n[2]);
+            // Intel sponza curtains is bugged?
+            // Setting normals to face
+            if(usdNormalIndices[i] > normals.size())
+            {
+                Vector3 n = GenFaceNormal();
+                localNormals[i] = n;
+            }
+            else
+            {
+                pxr::GfVec3f n = normals[usdNormalIndices[i]];
+                localNormals[i] = Vector3(n[0], n[1], n[2]);
+            }
         }
         // We will need uv's for tangent space calcuation
         // Write something reasonable
@@ -390,7 +411,9 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
     for(const auto& indexTriplet : usdDataIndices)
     {
         pxr::GfVec3f pos = positions[indexTriplet[0]];
-        pxr::GfVec2f uv = uvs[indexTriplet[1]];
+        pxr::GfVec2f uv = pxr::GfVec2f(0);
+        uv = uvs.empty() ? uv : uv = uvs[indexTriplet[1]];
+
         posBuffer[attribCounter] = Vector3(pos[0], pos[1], pos[2]);
         uvBuffer[attribCounter] = Vector2(uv[0], uv[1]);
         attribCounter++;
@@ -438,7 +461,9 @@ MRayError MeshProcessorThread::PreprocessIndicesSingle(uint32_t index)
     Attribute vertexPosA = mesh.GetPointsAttr();
     Attribute faceVCountA = mesh.GetFaceVertexCountsAttr();
     Attribute faceVIndexA = mesh.GetFaceVertexIndicesAttr();
-    PrimVar uvPV = primVars.FindPrimvarWithInheritance(uvToken);
+    PrimVar uvPV = primVars.FindPrimvarWithInheritance(uvToken0);
+    // Try "map1" old 3DMax thing?
+    if(!uvPV) uvPV = primVars.FindPrimvarWithInheritance(uvToken1);
     PrimVar normalPV = primVars.FindPrimvarWithInheritance(normalsToken);
 
     // Unfortunately usd has a complex indexing scheme,
@@ -636,9 +661,9 @@ MRayError ProcessUniqueMeshes(// Output
             std::exit(1);
         }
     };
-    uint32_t threadCount = std::min(threadPool.get_thread_count(),
-                                    uniquePrimCount);
-    //uint32_t threadCount = 1;
+    //uint32_t threadCount = std::min(threadPool.get_thread_count(),
+    //                                uniquePrimCount);
+    uint32_t threadCount = 1;
 
     using Barrier = std::barrier<decltype(BarrierFunc)>;
     auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);

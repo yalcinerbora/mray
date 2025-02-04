@@ -326,7 +326,7 @@ void CreateRefractMaterials(Span<MRayUSDMatAlphaPack> matIdsOut, TracerI& tracer
     for(size_t i = 0; i < matPairs.size(); i++)
     {
         Span<Vector3> iorBackSpan = cauchyBackBuffer.AccessAs<Vector3>();
-        Span<Vector3> iorFrontSpan = cauchyBackBuffer.AccessAs<Vector3>();
+        Span<Vector3> iorFrontSpan = cauchyFrontBuffer.AccessAs<Vector3>();
         const auto& pair = matPairs[i];
         auto [ior, iorTex] = ReadUSDMatAttribute(pair.second->iorOrSpec, texLookup);
         assert(!iorTex.has_value());
@@ -489,16 +489,13 @@ MaterialTerminalVariant<T>
 MaterialConverter::GetTexturedAttribute(const pxr::UsdShadeInput& input,
                                         const T& defaultValue)
 {
+    if(!input) return defaultValue;
     // Punch thorugh the graph and find the connected texture
     // Or directly return the the value
     if(!input.HasConnectedSource())
     {
-        if(input)
-        {
-            T result; input.Get<T>(&result);
-            return result;
-        }
-        else return defaultValue;
+        T result; input.Get<T>(&result);
+        return result;
     }
     else return PunchThroughGraphFindTexture<T>(input, defaultValue);
 }
@@ -530,7 +527,7 @@ MRayUSDMaterialProps MaterialConverter::ResolveMatPropsSingle(const MRayUSDBound
     bool dielectric = (opacityMode == tokens.transparent);
     // Get props
     auto metallic   = GetTexturedAttribute(shader.GetInput(tokens.metallic), 0.0f);
-    auto roughness  = GetTexturedAttribute(shader.GetInput(tokens.roughness), 1.0f);
+    auto roughness  = GetTexturedAttribute(shader.GetInput(tokens.roughness), 0.5f);
     auto albedo     = GetTexturedAttribute(shader.GetInput(tokens.diffuseColor), pxr::GfVec3f(0.5f));
     auto normal     = GetTexturedAttribute(shader.GetInput(tokens.normal), pxr::GfVec3f(0));
     auto opacity    = GetTexturedAttribute(shader.GetInput(tokens.opacity), 1.0f);
@@ -774,7 +771,12 @@ MRayError MaterialConverter::LoadTextures(std::map<pxr::UsdPrim, TextureId>& res
 
     // Copy to map
     for(const auto& t : texIds)
-        result.emplace(t.first, t.second);
+    {
+        [[maybe_unused]]
+        const auto& [_, inserted] = result.emplace(t.first, t.second);
+        assert(inserted);
+    }
+
     return MRayError::OK;
 }
 
@@ -908,7 +910,7 @@ MRayError ProcessUniqueMaterials(std::map<pxr::UsdPrim, MRayUSDMatAlphaPack>& ou
     auto uniqueTextures = converter.ResolveTextures(matPropList);
     for(const auto& e : extraTextures)
         uniqueTextures.emplace(e);
-    ;
+
     MRayError err = converter.LoadTextures(uniqueTextureIds,
                                            std::move(uniqueTextures),
                                            tracer, threadPool);

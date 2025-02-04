@@ -32,6 +32,20 @@
 
 using namespace TypeNameGen::Runtime;
 
+enum class MRayUSDGeomMatResolveWarningsEnum : uint32_t
+{
+    LIGHT_INDEPENDENT,
+    LIGHT_MATERIAL_TINT,
+    DISPLAY_COLOR_VARYING,
+    DISPLAY_COLOR_NOT_FOUND,
+    USING_DISPLAY_COLOR,
+    UNSUPPORTED_MATERIAL,
+    EDGE_SUBSET,
+
+    END
+};
+using MRayUSDGeomMatResolWarnings = std::bitset<uint32_t(MRayUSDGeomMatResolveWarningsEnum::END)>;
+
 Matrix4x4 ConvertToMRayMatrix(const pxr::GfMatrix4d& matIn)
 {
     // USD says their matrix is row-major order but their vectors are
@@ -111,17 +125,12 @@ void PrintPrims(const CollapsedPrims& meshMatPrims,
         MRAY_LOG("{}", cam.surfacePrim.GetPath().GetString());
 }
 
-void ExpandGeomsAndFindMaterials(CollapsedPrims& subGeomPack,
-                                 MRayUSDMaterialMap& uniqueMaterials,
-                                 Span<MRayUSDPrimSurface> surfacesRange)
+MRayUSDGeomMatResolWarnings ExpandGeomsAndFindMaterials(CollapsedPrims& subGeomPack,
+                                                        MRayUSDMaterialMap& uniqueMaterials,
+                                                        Span<MRayUSDPrimSurface> surfacesRange)
 {
-    bool warnLightIndependent = false;
-    bool warnLightMaterialTint = false;
-    bool warnMaterialDisplayColorVarying = false;
-    bool warnMaterialDisplayNotFound = false;
-    bool warnUsingDisplayColor = false;
-    bool warnUnsupportedMaterial = false;
-    bool warnEdgeSubset = false;
+    using enum MRayUSDGeomMatResolveWarningsEnum;
+    MRayUSDGeomMatResolWarnings warnings;
 
     // TODO: It is not avail on the token pool (UsdShadeTokens)?
     // Check later.
@@ -131,44 +140,48 @@ void ExpandGeomsAndFindMaterials(CollapsedPrims& subGeomPack,
                             pxr::UsdShadeMaterial boundMaterial,
                             uint32_t subGeomIndex = 0)
     {
-        pxr::TfToken shaderId;
-        boundMaterial.ComputeSurfaceSource().GetShaderId(&shaderId);
         // Check if the material is usd preview surface, if not fallback to
         // display color stuff
-        if(boundMaterial && shaderId == usdPrevSurfToken)
+        if(boundMaterial)
         {
-            pxr::UsdPrim matPrim = boundMaterial.GetPrim();
-            surface.subGeometryMaterialKeys.emplace_back(subGeomIndex, matPrim.GetPath());
-            if(matPrim.IsInstanceProxy())
-                matPrim = matPrim.GetPrimInPrototype();
-            uniqueMaterials.emplace(matPrim, matPrim);
-            return;
+            auto shader = boundMaterial.ComputeSurfaceSource();
+            pxr::TfToken shaderId;
+            shader.GetShaderId(&shaderId);
+            if(shaderId == usdPrevSurfToken)
+            {
+                pxr::UsdPrim matPrim = boundMaterial.GetPrim();
+                surface.subGeometryMaterialKeys.emplace_back(subGeomIndex, matPrim.GetPath());
+                if(matPrim.IsInstanceProxy())
+                    matPrim = matPrim.GetPrimInPrototype();
+                uniqueMaterials.emplace(matPrim, matPrim);
+                return;
+            }
         }
-        else warnUnsupportedMaterial = true;
+        else warnings[uint32_t(UNSUPPORTED_MATERIAL)] = true;
 
-        warnUsingDisplayColor = true;
-        using DisplayColorUSD = pxr::VtArray<pxr::GfVec3f>;
-
+        warnings[uint32_t(USING_DISPLAY_COLOR)] = true;
         // No material found, fallback to display color
         // iff is constant, if not do a middle gray
         MRayUSDFallbackMaterial fallbackMat = {};
         pxr::UsdGeomGprim gPrim(surface.surfacePrim);
         pxr::UsdGeomPrimvar displayColor = gPrim.GetDisplayColorPrimvar();
-        if(!displayColor.HasValue())
+        if(!displayColor || !displayColor.HasAuthoredValue())
         {
             // Warn about no display color,
-            warnMaterialDisplayNotFound = true;
+            warnings[uint32_t(DISPLAY_COLOR_NOT_FOUND)] = true;
             fallbackMat.color = pxr::GfVec3f(0.5);
         }
-        else if(displayColor.GetInterpolation() != pxr::UsdGeomTokens->constant)
+        else
         {
-            // Warn about display color is not constant
-            warnMaterialDisplayColorVarying = true;
-        }
-        DisplayColorUSD displayColorValue;
-        displayColor.Get<DisplayColorUSD>(&displayColorValue);
-        fallbackMat.color = displayColorValue.AsConst()[0];
+            using DisplayColorUSD = pxr::VtArray<pxr::GfVec3f>;
+            DisplayColorUSD displayColorValue;
+            displayColor.Get<DisplayColorUSD>(&displayColorValue);
+            fallbackMat.color = displayColorValue.AsConst()[0];
 
+            // Warn about display color is not constant
+            warnings[uint32_t(DISPLAY_COLOR_VARYING)] = (displayColor.GetInterpolation() !=
+                                                         pxr::UsdGeomTokens->constant);
+        }
         // Here we key the material via the instance proxy, assuming
         // Instance proxies can be override the instance prim's display value
         surface.subGeometryMaterialKeys.emplace_back(subGeomIndex, surface.surfacePrim.GetPath());
@@ -198,7 +211,7 @@ void ExpandGeomsAndFindMaterials(CollapsedPrims& subGeomPack,
         // We can't recover from this, so skip this mesh
         if(hasEdgeSubset)
         {
-            warnEdgeSubset = true;
+            warnings[uint32_t(EDGE_SUBSET)] = true;
             continue;
         }
 
@@ -211,12 +224,12 @@ void ExpandGeomsAndFindMaterials(CollapsedPrims& subGeomPack,
             if(lightBindMode == pxr::UsdLuxTokens->independent)
             {
                 // Warn about "independent" is not supported
-                warnLightIndependent = true;
+                warnings[uint32_t(LIGHT_INDEPENDENT)] = true;
             }
             else if(lightBindMode == pxr::UsdLuxTokens->materialGlowTintsLight)
             {
                 // Warn about "materialGlowTintsLight" is not supported
-                warnLightMaterialTint = true;
+                warnings[uint32_t(LIGHT_MATERIAL_TINT)] = true;
             }
             else if(lightBindMode == pxr::UsdLuxTokens->noMaterialResponse)
             {
@@ -250,48 +263,14 @@ void ExpandGeomsAndFindMaterials(CollapsedPrims& subGeomPack,
             BindMaterial(subGeomPack.surfaces.back(), boundMaterial, i);
         }
     }
-
-    // Warn about stuff.
-    static constexpr auto LightWarningLog =
-        "[MRayUSD]: Some geometry lights have the tag "
-        "\"{}\". MRay supports geometry lights with no material response. "
-        "These geometries contribute to the via the materials only. "
-        "These material-backed geometries are not considered in NEE system. ";
-
-    if(warnLightIndependent)
-        MRAY_WARNING_LOG(LightWarningLog, "independent");
-    if(warnLightMaterialTint)
-        MRAY_WARNING_LOG(LightWarningLog, "materialGlowTintsLight");
-    if(warnUsingDisplayColor)
-        MRAY_WARNING_LOG("[MRayUSD]: Some geometries had no material bound. The "
-                         "\"displayColor\" attribute colored Lambert materials "
-                         "are attached to these scenes.");
-    if(warnMaterialDisplayNotFound)
-        MRAY_WARNING_LOG("[MRayUSD]: When trying to find \"displayColor\" to "
-                         "create fallback material for non material-bounded "
-                         "geometries, \"displayColor\" is not found. "
-                         "Color is set to middle gray (linear).");
-    if(warnMaterialDisplayColorVarying)
-        MRAY_WARNING_LOG("[MRayUSD]: When trying to find \"displayColor\" to create "
-                         "fallback material for non material-bounded geometries, "
-                         "\"displayColor\" is not constant. MRay does not support "
-                         "per-vertex / per-face varying display colors (yet). "
-                         "First value of the queried array will be used.");
-    if(warnEdgeSubset)
-        MRAY_WARNING_LOG("[MRayUSD]: Some meshes' geometry subset element type is "
-                         "set to \"edge\" or \"point\". MRay does not understand edge "
-                         "or point sets. Only \"\face\" sets are allowed. These "
-                         "meshes are skipped.");
-    if(warnUnsupportedMaterial)
-        MRAY_WARNING_LOG("[MRayUSD]: Some meshes' have unkown bound shader. "
-                         "MRay supports \"USDPreviewSurface\" shaders only. "
-                         "These surfaces will utilize meshes' display color property.");
+    return warnings;
 }
 
 MRayError ProcessCameras(CameraGroupId& camGroupId,
                          std::vector<std::pair<pxr::UsdPrim, CameraId>>& outCamIds,
                          TracerI& tracer, BS::thread_pool&,
-                         const std::vector<MRayUSDPrimSurface>& cameras)
+                         const std::vector<MRayUSDPrimSurface>& cameras,
+                         const pxr::UsdStageRefPtr& loadedStage)
 {
     size_t camCount = std::max(size_t(1), cameras.size());
 
@@ -320,12 +299,50 @@ MRayError ProcessCameras(CameraGroupId& camGroupId,
     std::fill(upSpan.begin(), upSpan.end(), Vector3::YAxis());
     if(cameras.empty())
     {
+        using MathConstants::DegToRadCoef;
         MRAY_WARNING_LOG("[MRayUSD]: There is no camera on USD Scene. "
                          "Creating a generic camera (16:9)");
-        Float fovX = Float(70) * MathConstants::DegToRadCoef<Float>();
-        Float fovY = Float(2.0) * std::atan(std::tan(fovX * Float(0.5)) / Float(0.5625));
-        Vector4 fovAndPlanes(fovX, fovY, Float(0.1), Float(5000));
+        // TODO: This should be costly, maybe we generate this during traversal
+        pxr::UsdGeomImageable rootImg(loadedStage->GetPseudoRoot());
+        pxr::GfBBox3d bb = rootImg.ComputeWorldBound(pxr::UsdTimeCode::Default(),
+                                                       pxr::UsdGeomTokens->default_);
+        pxr::GfRange3d bbox = bb.ComputeAlignedRange();
+        pxr::GfVec3d bboxSize = bbox.GetSize();
+        pxr::GfVec3d mid = bbox.GetMidpoint();
+        bool zUp = (pxr::UsdGeomGetStageUpAxis(loadedStage) == pxr::UsdGeomTokens->z);
+        // Convert to MRay vectors, it is little bit easier to express
+        // (Countinue double since USD returned double)
+        // Find the max
+        Vector3d extent = Vector3d(bboxSize[0], bboxSize[1], bboxSize[2]);
+        Vector3d gaze = Vector3d(mid[0], mid[1], mid[2]);
+        // Orient the camera to max index
+        uint32_t axis = (zUp ? Vector2d(extent[0], extent[1])
+                             : Vector2d(extent[0], extent[2])).Maximum();
+        uint32_t dirAxis = (axis == 1) ? 0 : 1;
+        axis = (!zUp && axis == 1) ? axis + 1 : axis;
+        dirAxis = (!zUp && dirAxis == 1) ? dirAxis + 1 : dirAxis;
+        Vector3d dir = Vector3d::Zero();
+        dir[dirAxis] = 1;
+        // Get fov half to calculate the cam position (cam will cover
+        // entire bbox
+        double widthHalf = extent[axis] * 0.5;
+        static constexpr double fovX = 70.0 * DegToRadCoef<double>();
+        double tanXHalf = std::tan(fovX * 0.5);
+        double posDist = widthHalf / tanXHalf;
+        Vector3d pos = gaze - dir * posDist;
+        // Find fovY (aspect correct)
+        double fovY = 2.0 * std::atan(tanXHalf * 0.5625);
+        Vector4 fovAndPlanes(fovX, fovY, 0.1, 5000);
+        //
+        if(zUp)
+        {
+            gaze = TransformGen::ZUpToYUp(gaze);
+            pos = TransformGen::ZUpToYUp(pos);
+        }
+        // Write all!
         fovPlaneSpan[0] = fovAndPlanes;
+        positionSpan[0] = Vector3(pos[0], pos[1], pos[2]);
+        gazeSpan[0] = Vector3(gaze[0], gaze[1], gaze[2]);
     }
     else for(size_t i = 0; i < cameras.size(); i++)
     {
@@ -564,15 +581,55 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     MRayUSDMaterialMap uniqueMaterials;
     CollapsedPrims meshMatPrims;
     CollapsedPrims sphereMatPrims;
+    MRayUSDGeomMatResolWarnings geomExpandWarnings;
     for(const auto& startEnd : primTypeRange)
     {
         Span<MRayUSDPrimSurface> range(surfaces.begin() + startEnd[0],
                                        startEnd[1] - startEnd[0]);
         if(range.front().surfacePrim.IsA<pxr::UsdGeomMesh>())
-            ExpandGeomsAndFindMaterials(meshMatPrims, uniqueMaterials, range);
+            geomExpandWarnings |= ExpandGeomsAndFindMaterials(meshMatPrims,
+                                                              uniqueMaterials,
+                                                              range);
         else if(range.front().surfacePrim.IsA<pxr::UsdGeomSphere>())
-            ExpandGeomsAndFindMaterials(sphereMatPrims, uniqueMaterials, range);
+            geomExpandWarnings |= ExpandGeomsAndFindMaterials(sphereMatPrims,
+                                                              uniqueMaterials,
+                                                              range);
     }
+    // Warn about stuff.
+    static constexpr auto LightWarningLog =
+        "[MRayUSD]: Some geometry lights have the tag "
+        "\"{}\". MRay supports geometry lights with no material response. "
+        "These geometries contribute to the via the materials only. "
+        "These material-backed geometries are not considered in NEE system. ";
+    using enum MRayUSDGeomMatResolveWarningsEnum;
+    if(geomExpandWarnings[uint32_t(LIGHT_INDEPENDENT)])
+        MRAY_WARNING_LOG(LightWarningLog, "independent");
+    if(geomExpandWarnings[uint32_t(LIGHT_MATERIAL_TINT)])
+        MRAY_WARNING_LOG(LightWarningLog, "materialGlowTintsLight");
+    if(geomExpandWarnings[uint32_t(USING_DISPLAY_COLOR)])
+        MRAY_WARNING_LOG("[MRayUSD]: Some geometries had no material bound. The "
+                         "\"displayColor\" attribute colored Lambert materials "
+                         "are attached to these scenes.");
+    if(geomExpandWarnings[uint32_t(UNSUPPORTED_MATERIAL)])
+        MRAY_WARNING_LOG("[MRayUSD]: Some meshes' have unkown bound shader. "
+                         "MRay supports \"USDPreviewSurface\" shaders only. "
+                         "These surfaces will utilize meshes' display color property.");
+    if(geomExpandWarnings[uint32_t(DISPLAY_COLOR_NOT_FOUND)])
+        MRAY_WARNING_LOG("[MRayUSD]: When trying to find \"displayColor\" to "
+                         "create fallback material for non material-bounded "
+                         "geometries, \"displayColor\" is not found. "
+                         "Color is set to middle gray (linear).");
+    if(geomExpandWarnings[uint32_t(DISPLAY_COLOR_VARYING)])
+        MRAY_WARNING_LOG("[MRayUSD]: When trying to find \"displayColor\" to create "
+                         "fallback material for non material-bounded geometries, "
+                         "\"displayColor\" is not constant. MRay does not support "
+                         "per-vertex / per-face varying display colors (yet). "
+                         "First value of the queried array will be used.");
+    if(geomExpandWarnings[uint32_t(EDGE_SUBSET)])
+        MRAY_WARNING_LOG("[MRayUSD]: Some meshes' geometry subset element type is "
+                         "set to \"edge\" or \"point\". MRay does not understand edge "
+                         "or point sets. Only \"\face\" sets are allowed. These "
+                         "meshes are skipped.");
 
     // Resolve Lights & Cameras
     // We do not need to do anything here just split the range by type
@@ -639,7 +696,8 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     // Process cameras
     CameraGroupId camGroupId;
     std::vector<std::pair<pxr::UsdPrim, CameraId>> outCameras;
-    e = ProcessCameras(camGroupId, outCameras, tracer, threadPool, cameras);
+    e = ProcessCameras(camGroupId, outCameras, tracer,
+                       threadPool, cameras, loadedStage);
     if(e) return e;
 
     LightGroupId boundaryLightGroup;
@@ -676,15 +734,15 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     Span cameraSurfMats = allMatrices.subspan(allSizes[4], allSizes[5] - allSizes[4]);
     Span domeLightSurfMats = allMatrices.subspan(allSizes[5], allSizes[6] - allSizes[5]);
 
-    for(size_t i = 0; i < meshMatPrims.surfaces.size(); i++)
+    for(size_t i = 0; i < meshSurfMats.size(); i++)
         meshSurfMats[i] = meshMatPrims.surfaces[i].surfaceTransform;
-    for(size_t i = 0; i < meshMatPrims.geomLightSurfaces.size(); i++)
+    for(size_t i = 0; i < meshLightSurfMats.size(); i++)
         meshLightSurfMats[i] = meshMatPrims.geomLightSurfaces[i].surfaceTransform;
-    for(size_t i = 0; i < sphereMatPrims.surfaces.size(); i++)
+    for(size_t i = 0; i < sphereSurfMats.size(); i++)
         sphereSurfMats[i] = sphereMatPrims.surfaces[i].surfaceTransform;
-    for(size_t i = 0; i < sphereMatPrims.geomLightSurfaces.size(); i++)
+    for(size_t i = 0; i < sphereLightSurfMats.size(); i++)
         sphereLightSurfMats[i] = sphereMatPrims.geomLightSurfaces[i].surfaceTransform;
-    for(size_t i = 0; i < cameras.size(); i++)
+    for(size_t i = 0; i < cameraSurfMats.size(); i++)
         cameraSurfMats[i] = cameras[i].surfaceTransform;
 
     if(domeLight.has_value())
@@ -779,31 +837,34 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
 
     // Camera Surfaces
     std::vector<Pair<pxr::UsdPrim, CamSurfaceId>> camSurfaceList;
-    camSurfaceList.reserve(cameras.size());
-    for(size_t i = 0; i < cameras.size(); i++)
+    camSurfaceList.reserve(outCameras.size());
+    for(size_t i = 0; i < outCameras.size(); i++)
     {
-        const auto& cam = cameras[i];
+        const auto& outCam = outCameras[i];
         CameraSurfaceParams surface =
         {
-            .cameraId = outCameras[i].second,
+            .cameraId = outCam.second,
             .transformId = cameraSurfTIds.empty()
                                 ? TracerConstants::IdentityTransformId
                                 : cameraSurfTIds[0],
             .mediumId = TracerConstants::VacuumMediumId,
         };
         CamSurfaceId csId = tracer.CreateCameraSurface(surface);
-        camSurfaceList.emplace_back(cam.surfacePrim, csId);
+        camSurfaceList.emplace_back(outCam.first, csId);
     }
 
     // Set the boundary surface
-    tracer.SetBoundarySurface(LightSurfaceParams
-                              {
-                                  .lightId = boundaryLight,
-                                  .transformId = domeLightSurfTIds.empty()
-                                                    ? TracerConstants::IdentityTransformId
-                                                    : domeLightSurfTIds[0],
-                                  .mediumId = TracerConstants::VacuumMediumId
-                              });
+    tracer.SetBoundarySurface
+    (
+        LightSurfaceParams
+        {
+            .lightId = boundaryLight,
+            .transformId = domeLightSurfTIds.empty()
+                            ? TracerConstants::IdentityTransformId
+                            : domeLightSurfTIds[0],
+            .mediumId = TracerConstants::VacuumMediumId
+        }
+    );
     //
     TracerIdPack result;
     std::vector<char> stringConcat;
@@ -847,7 +908,9 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     // Cameras
     for(const auto& [camPrim, camId] : outCameras)
     {
-        std::string s = camPrim.GetPath().GetString();
+        std::string s = (cameras.empty())
+                            ? "GENERATED"
+                            : camPrim.GetPath().GetString();
         auto loc = stringConcat.insert(stringConcat.end(),
                                         s.cbegin(), s.cend());
         auto start = std::distance(loc, stringConcat.begin());

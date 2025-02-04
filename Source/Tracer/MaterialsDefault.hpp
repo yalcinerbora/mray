@@ -308,6 +308,14 @@ SampleT<BxDFResult> RefractMaterial<ST>::SampleBxDF(const Vector3& wO,
     //
     MediumKey outMedium = (doReflection) ? fromMedium : toMedium;
     Float pdf           = (doReflection) ? f : (Float(1) - f);
+
+    if(isnan(pdf))
+        printf("NaN Pdf(%f), f(%f) reflect?(%s)\n"
+               "fromEta(%f), toEta(%f)",
+               pdf, f,
+               doReflection ? "true" : "false",
+               fromEta, toEta);
+
     //
     return SampleT<BxDFResult>
     {
