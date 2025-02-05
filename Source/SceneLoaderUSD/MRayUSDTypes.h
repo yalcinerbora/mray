@@ -13,6 +13,7 @@ struct MRayUSDPrimSurface
 {
     using SubGeomMaterials = std::vector<std::pair<uint32_t, pxr::SdfPath>>;
     //
+    bool                cullFace = false;
     pxr::UsdPrim        surfacePrim;
     pxr::UsdPrim        uniquePrim;
     Matrix4x4           surfaceTransform;

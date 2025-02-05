@@ -147,6 +147,9 @@ void KCFindAvgMaxLumTex(uint3 globalId: SV_DispatchThreadID,
     {
         float3 inColor = params.inputTex.Load(uint3(pixId, 0)).xyz;
         float luminance = ColorConverterIn::ToYxy(inColor)[0];
+        // Due to filtering, luminance can be negative.
+        // clamp  to [0, inf)
+        luminance = max(luminance, 0.0f);
         readMin = luminance;
         readMax = luminance;
         readAvg = luminance;

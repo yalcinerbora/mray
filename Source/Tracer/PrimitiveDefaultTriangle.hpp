@@ -539,7 +539,8 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     };
     Float beta0 = Beta(k0);
     Float beta1 = Beta(k1);
-    Float betaFinal = (std::abs(rayCone.aperture + beta0) >= std::abs(rayCone.aperture + beta1))
+    Float betaFinal = (std::abs(rayCone.aperture + beta0) >=
+                       std::abs(rayCone.aperture + beta1))
                         ? beta0 : beta1;
     // Texture derivatives
     // https://www.jcgt.org/published/0010/01/01/
@@ -556,6 +557,39 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     };
     Vector2 dpdx = TexGradient(a1);
     Vector2 dpdy = TexGradient(a2);
+
+    // Geometry Discretization Compansation
+    // This is shelved, I try to compansate for extreme geometry changes
+    // on smooth surfaces (It happens on Intel Sponza curtains).
+    // This leaks light a lot. But approach maybe inpoved and used
+    //                N_v
+    //        N_g     ^          N_v vertex normal
+    //           ^    |          N_g face normal (geometry normal)
+    //            \  / \
+    //             \/   \   Approx Neig. Triangle
+    //             /     \
+    //
+    // We assume a reflected triangle exists and vertex normal is used to
+    // smooth the discretization.
+    //auto FindTipOffset = [&](uint32_t vIndex) -> Float
+    //{
+    //    Vector3 g = geoNormal;
+    //    Vector3 n = normals[vIndex];
+    //    Vector3 gR = Graphics::Reflect(n, g);
+    //    // Concave region, skip.
+    //    if(curvatures[vIndex] < Float(0)) return 0;
+    //    //
+    //    Float cosTheta = n.Dot(g);
+    //    Float sinTheta = Math::SqrtMax(Float(1) - cosTheta * cosTheta);
+    //    return (pos - positions[vIndex]).Length() * sinTheta * Float(2) * areaRecip;
+    //};
+    // Average out via barycentrics
+    //Float tMin = (FindTipOffset(0) * a +
+    //              FindTipOffset(1) * b +
+    //              FindTipOffset(2) * c);
+    // Or This
+    //Float tMin = std::min(FindTipOffset(0), FindTipOffset(1));
+    //tMin = std::min(tMin, FindTipOffset(2));
 
     // Transform to the requested space
     // pos already pre-transformed

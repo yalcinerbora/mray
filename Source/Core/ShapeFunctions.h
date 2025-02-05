@@ -36,7 +36,8 @@ namespace Polygon
     template<size_t N>
     MRAY_HYBRID
     constexpr void ClipEars(Span<Vector3ui, N - 2> localIndicesOut,
-                            Span<const Vector3, N> vertices);
+                            Span<const Vector3, N> vertices,
+                            const Vector3& normal);
 }
 }
 
@@ -149,7 +150,8 @@ AABB3 Sphere::BoundingBox(const Vector3& center, Float radius)
 template<size_t N>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr void Polygon::ClipEars(Span<Vector3ui, N - 2> localIndicesOut,
-                                 Span<const Vector3, N> vertices)
+                                 Span<const Vector3, N> vertices,
+                                 const Vector3& normal)
 {
     // We "expand" the vertices to previous/next we will access elements
     // via this
@@ -165,22 +167,27 @@ constexpr void Polygon::ClipEars(Span<Vector3ui, N - 2> localIndicesOut,
         return (i == 0u) ? uint32_t(indices.size() - 1u) : i - 1u;
     };
     //
-    using MathConstants::Epsilon;
+    using namespace MathConstants;
     const auto IsConvexEdge = [&](Vector3ui i) -> bool
     {
         Vector3 e0 = vertices[i[2]] - vertices[i[1]];
         Vector3 e1 = vertices[i[0]] - vertices[i[1]];
-        return Vector3::Cross(e0, e1).LengthSqr() >= -Epsilon<Float>();
+        Vector3 nV = Vector3::Cross(e0, e1);
+        return nV.Dot(normal) >= Float(0);
     };
     // Basic ear clipping algorithm
     // Traverse the contigious triplets
+    uint32_t iter = 0;
     uint32_t writeIndex = 0;
     for(uint32_t i = 1; indices.size() > 2; i = Next(i))
     {
+        // Maybe triangles are degenerate do a 2 * N pass,
+        // after that start accepting triangles
+        bool degenerateTri = (iter++) >= (2 * N);
         Vector3ui triplet(indices[Prev(i)],
                           indices[i],
                           indices[Next(i)]);
-        if(IsConvexEdge(triplet))
+        if(IsConvexEdge(triplet) || degenerateTri)
         {
             // Write the triplet
             localIndicesOut[writeIndex++] = triplet;

@@ -306,12 +306,6 @@ void MatGroupRefract::PushAttribute(MaterialKey idStart, MaterialKey idEnd,
                         attributeIndex, std::move(data),
                         queue);
     };
-
-    MRAY_LOG("A:{} [{}, {}]",
-             attributeIndex,
-             data.AccessAs<Vector3>()[0].AsArray(),
-             data.AccessAs<Vector3>()[1].AsArray());
-
     switch(attributeIndex)
     {
         case 0: GenericLoad(dBackCauchyCoeffs); break;

@@ -21,8 +21,14 @@ struct IndexHasher
 {
     size_t operator()(const IndexTriplet& t) const
     {
+        // These are random, no special meaning
+        static constexpr size_t PRIME_0 = 17;
+        static constexpr size_t PRIME_1 = 103'099;
+        static constexpr size_t PRIME_2 = 997'693;
         std::hash<uint32_t> h;
-        return h(t[0]) + h(t[1]) + h(t[2]);
+        return ((h(t[0]) + 1) * PRIME_0 ^
+                (h(t[1]) + 1) * PRIME_1 ^
+                (h(t[2]) + 1) * PRIME_2);
     }
 };
 

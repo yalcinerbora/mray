@@ -116,14 +116,15 @@ inline uint32_t AttributeIndexer::operator()(uint32_t perVertexPerFaceCounter) c
 }
 
 bool Triangulate(Span<Vector3ui> localIndicesOut,
-                 Span<const Vector3> vertices)
+                 Span<const Vector3> vertices,
+                 const Vector3 normal)
 {
     using Shape::Polygon::ClipEars;
     // Doing this static functions to enable some unrolling etc.
     // Probably not worth it but w/e
     #define MRAY_CLIP_EAR_GEN(N) case N: \
         ClipEars<N>(Span<Vector3ui, N-2>(localIndicesOut), \
-                    Span<const Vector3, N>(vertices)); break
+                    Span<const Vector3, N>(vertices), normal); break
 
     assert(localIndicesOut.size() + 2 == vertices.size());
     switch(vertices.size())
@@ -285,36 +286,51 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
             pxr::GfVec3f pos = positions[usdPosIndices[i]];
             localPositions[i] = Vector3(pos[0], pos[1], pos[2]);
         }
+        // Normal of the face for triangulation
+        const auto GenFaceNormal = [&]()
+        {
+            const auto Normal = [&](uint32_t i0, uint32_t i1, uint32_t i2)
+            {
+                Vector3 e0 = localPositions[i1] - localPositions[i0];
+                Vector3 e1 = localPositions[i2] - localPositions[i0];
+                return Vector3::Cross(e0, e1).Normalize();
+            };
+            using PosSpan = Span<const Vector3, 3>;
+            //using Shape::Triangle::Normal;
+            // we do not know if the triangle is wrong or not
+            // Determine the dominant "up" direction as face normal
+            // [0, 1, 2]
+            Vector3 n0 = Normal(0, 1, 2);
+            if(faceVertexCount == 3) return n0;
+            // [1, 2, 3]
+            Vector3 n1 = Normal(1, 2, 3);
+            // [2, 3, 4] or [2, 3, 0]
+             Vector3 n2 = (faceVertexCount == 4)
+                ? Normal(2, 3, 0) : Normal(2, 3, 4);
+            // TODO: This fails if two concave vertices are back to back,
+            // Change this later
+            return (n0 + n1 + n2).Normalize();
+        };
+        const Vector3 faceNormal = GenFaceNormal();
 
         // First off triangulate the mesh
         // Skip if we can't triangulate (either 1,2 or more than 16 vertices)
         failTriangulation = Triangulate(Span(localIndicesTriangulated.data(), faceTriCount),
-                                        Span(localPositions.data(), faceVertexCount));
+                                        Span(localPositions.data(), faceVertexCount),
+                                        GenFaceNormal());
         if(failTriangulation)
         {
             warnFailTriangulation = true;
             continue;
         }
-
+        //
         // Normals are not guaranteed
         // So set something reasonable
-        const auto GenFaceNormal = [&]()
-        {
-            // Set to face normal (assuming vertices are planar)
-            Vector3 p0 = localPositions[localIndicesTriangulated[0][0]];
-            Vector3 p1 = localPositions[localIndicesTriangulated[0][1]];
-            Vector3 p2 = localPositions[localIndicesTriangulated[0][2]];
-            Vector3 e0 = p1 - p0;
-            Vector3 e1 = p2 - p0;
-            Vector3 n = Vector3::Cross(e0, e1).Normalize();
-            return n;
-        };
         if(normals.empty())
         {
-            Vector3 n = GenFaceNormal();
             std::fill(localNormals.begin(),
                       localNormals.begin() + faceVertexCount,
-                      n);
+                      faceNormal);
         }
         else for(uint32_t i = 0; i < faceVertexCount; i++)
         {
@@ -322,8 +338,7 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
             // Setting normals to face
             if(usdNormalIndices[i] > normals.size())
             {
-                Vector3 n = GenFaceNormal();
-                localNormals[i] = n;
+                localNormals[i] = faceNormal;
             }
             else
             {

@@ -67,7 +67,9 @@ void PrintPrims(const CollapsedPrims& meshMatPrims,
     {
         for(const auto& s : primSurf)
         {
-            MRAY_LOG("{}", s.surfacePrim.GetPath().GetString());
+            MRAY_LOG("[{:>8s}] {}",
+                     s.cullFace ? "CullFace" : "NoCull",
+                     s.surfacePrim.GetPath().GetString());
             for(const auto& [subGeoIndex, mk] : s.subGeometryMaterialKeys)
             {
                 pxr::UsdPrim matKey = loadedStage->GetPrimAtPath(mk);
@@ -234,7 +236,8 @@ MRayUSDGeomMatResolWarnings ExpandGeomsAndFindMaterials(CollapsedPrims& subGeomP
             else if(lightBindMode == pxr::UsdLuxTokens->noMaterialResponse)
             {
                 // If this is set no need to continue,
-                subGeomPack.geomLightSurfaces.emplace_back(surface.surfacePrim, surface.uniquePrim,
+                subGeomPack.geomLightSurfaces.emplace_back(false,
+                                                           surface.surfacePrim, surface.uniquePrim,
                                                            surface.surfaceTransform);
                 auto& newLight = subGeomPack.geomLightSurfaces.back();
                 newLight.subGeometryMaterialKeys.emplace_back(std::numeric_limits<uint32_t>::max(),
@@ -245,8 +248,12 @@ MRayUSDGeomMatResolWarnings ExpandGeomsAndFindMaterials(CollapsedPrims& subGeomP
 
         // Copy the surface
         subGeomPack.surfaces.push_back(surface);
-        // Copy the unique prim
+        // Copy the unique prim (conditional)
         subGeomPack.uniquePrims.emplace(surface.uniquePrim);
+        // Set cull face flag
+        bool isDoubleSided = false;
+        gPrim.GetDoubleSidedAttr().Get<bool>(&isDoubleSided);
+        subGeomPack.surfaces.back().cullFace = !isDoubleSided;
         if(subsets.empty())
         {
             MatBindAPI matBinder(surfacePrim);
@@ -553,7 +560,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
         //
         Matrix4x4 toWorld = ConvertToMRayMatrix(transformCache.GetLocalToWorldTransform(prim));
         pxr::UsdPrim uniquePrim = prim.IsInstanceProxy() ? prim.GetPrimInPrototype() : prim;
-        surfaces.emplace_back(prim, uniquePrim, toWorld);
+        surfaces.emplace_back(false, prim, uniquePrim, toWorld);
     }
     transformCache.Clear();
 
@@ -797,7 +804,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                 const auto& primBatchId = uniqueMeshPrimBatches.at(primName)[geomIndex];
                 surface.materials.push_back(mat.materialId);
                 surface.primBatches.push_back(primBatchId);
-                surface.cullFaceFlags.push_back(!mat.alphaMap.has_value());
+                surface.cullFaceFlags.push_back(prim.cullFace);
                 surface.alphaMaps.push_back(mat.alphaMap);
             }
             SurfaceId sId = tracer.CreateSurface(surface);
