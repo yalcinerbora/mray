@@ -676,9 +676,8 @@ MRayError ProcessUniqueMeshes(// Output
             std::exit(1);
         }
     };
-    //uint32_t threadCount = std::min(threadPool.get_thread_count(),
-    //                                uniquePrimCount);
-    uint32_t threadCount = 1;
+    uint32_t threadCount = std::min(threadPool.get_thread_count(),
+                                    uniquePrimCount);
 
     using Barrier = std::barrier<decltype(BarrierFunc)>;
     auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
