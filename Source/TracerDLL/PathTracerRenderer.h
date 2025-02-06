@@ -26,9 +26,9 @@ class ConstAddFunctor
     ConstAddFunctor(uint32_t c) : constant(c) {}
 
     MRAY_HYBRID MRAY_GPU_INLINE
-    uint32_t operator()(uint32_t i) const
+    void operator()(uint32_t& i) const
     {
-        return i + constant;
+        i += constant;
     }
 };
 

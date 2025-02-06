@@ -868,9 +868,9 @@ void LightGroupSkysphere<CC>::Finalize(const GPUQueue& q)
     DeviceAlgorithms::InPlaceTransform
     (
         allMemFloat, q,
-        [] MRAY_HYBRID (Float) -> Float
+        [] MRAY_HYBRID (Float& s) -> void
         {
-            return Float(1);
+            s = Float(1);
         }
     );
 

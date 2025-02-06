@@ -69,14 +69,14 @@ Optional<const V*> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
 }
 
 template <LookupKeyC K, class V, std::unsigned_integral H,
-    uint32_t VECL, LookupStrategyC<H, K> S>
+          uint32_t VECL, LookupStrategyC<H, K> S>
 MRAY_HYBRID MRAY_CGPU_INLINE
-bool LookupTable<K, V, H, VECL, S>::Insert(const K& k, const V& v) const
+std::pair<const V*, bool> LookupTable<K, V, H, VECL, S>::Insert(const K& k, const V& v) const
 {
     uint32_t tableSize = static_cast<uint32_t>(keys.size());
     uint32_t hashPackCount = static_cast<uint32_t>(hashes.size());
     H hashVal = S::Hash(k);
-    H index = hashVal % tableSize;
+    uint32_t index = uint32_t(hashVal % tableSize);
 
     for(uint32_t _ = 0; _ < hashPackCount; _++)
     {
@@ -91,6 +91,12 @@ bool LookupTable<K, V, H, VECL, S>::Insert(const K& k, const V& v) const
             // (since we are bulk reading)
             if(globalIndex >= tableSize) break;
 
+            // Actual comparison case, if hash is equal it does not mean
+            // keys are equal, check them only if the hashes are equal.
+            // If true, return the old val
+            if(hashVal == hashChunk[i] && keys[globalIndex] == k)
+                return std::pair(&values[globalIndex], false);
+
             // If empty, this means linear probe chain is fully iterated
             // and we did not find the value return null
             if(S::IsEmpty(hashChunk[i]) || S::IsSentinel(hashChunk[i]))
@@ -99,14 +105,14 @@ bool LookupTable<K, V, H, VECL, S>::Insert(const K& k, const V& v) const
                 values[globalIndex] = v;
                 keys[globalIndex] = k;
                 hashes[vectorIndex] = hashChunk;
-                return true;
+                return std::pair(&values[globalIndex], true);
             }
         }
         index += VL - innerIndex;
         index = (index >= tableSize) ? 0 : index;
         assert(index != hashVal % tableSize);
     }
-    return false;
+    return std::pair(nullptr, false);
 }
 
 template<class T, size_t N>

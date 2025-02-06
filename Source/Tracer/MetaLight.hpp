@@ -535,7 +535,7 @@ void MetaLightArrayT<TLT...>::Construct(MetaLightListConstructionParams params,
                                  totalLightCount,
                                  hashCount, tableElemCount, tableElemCount,
                                  1});
-
+    queue.MemsetAsync(dMetaLights, 0x00);
     queue.MemcpyAsync(dLKList, Span<const LightKey>(hLKList));
     queue.MemcpyAsync(dPKList, Span<const PrimitiveKey>(hPKList));
     queue.MemcpyAsync(dTKList, Span<const TransformKey>(hTKList));
@@ -572,7 +572,7 @@ void MetaLightArrayT<TLT...>::Construct(MetaLightListConstructionParams params,
             .pK = std::bit_cast<CommonKey>(hPKList[i])
         };
         [[maybe_unused]]
-        bool inserted = lt.Insert(kp, i);
+        auto [_, inserted] = lt.Insert(kp, i);
         assert(inserted);
     }
 

@@ -117,9 +117,9 @@ class LookupTable
                                     const Span<V>& values);
 
     MRAY_HYBRID
-    Optional<const V*>  Search(const K&) const;
+    Optional<const V*>      Search(const K&) const;
     MRAY_HYBRID
-    bool                Insert(const K&, const V&) const;
+    Pair<const V*, bool>    Insert(const K&, const V&) const;
 
 };
 

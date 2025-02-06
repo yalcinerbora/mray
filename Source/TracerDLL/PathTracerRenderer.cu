@@ -92,15 +92,19 @@ static void KCAccumulateShadowRays(MRAY_GRID_CONSTANT const Span<Spectrum> dRadi
 struct SetPathStateFunctor
 {
     PathTraceRDetail::PathStatusEnum e;
+    bool firstInit;
 
     MRAY_HOST inline
-    SetPathStateFunctor(PathTraceRDetail::PathStatusEnum eIn)
+    SetPathStateFunctor(PathTraceRDetail::PathStatusEnum eIn, bool firstInit = false)
         : e(eIn)
+        , firstInit(firstInit)
     {}
 
     MRAY_HYBRID MRAY_CGPU_INLINE
-    PathTraceRDetail::PathDataPack operator()(PathTraceRDetail::PathDataPack s) const
+    void operator()(PathTraceRDetail::PathDataPack& s) const
     {
+        if(firstInit) s.status.Reset();
+
         using namespace PathTraceRDetail;
         if(e == PathStatusEnum::INVALID)
             s.status.Set(uint32_t(PathStatusEnum::DEAD), false);
@@ -108,7 +112,6 @@ struct SetPathStateFunctor
             s.status.Set(uint32_t(PathStatusEnum::INVALID), false);
         //
         s.status.Set(uint32_t(e));
-        return s;
     }
 };
 
@@ -373,10 +376,13 @@ PathTracerRenderer::ReloadPaths(Span<const RayIndex> dIndices,
 
 void PathTracerRenderer::ResetAllPaths(const GPUQueue& queue)
 {
+    // Clear states
+    queue.MemsetAsync(dRayState.dPathDataPack, 0x00);
+
     // Set all paths as dead (we just started)
     using namespace PathTraceRDetail;
     DeviceAlgorithms::InPlaceTransform(dRayState.dPathDataPack, queue,
-                                       SetPathStateFunctor(PathStatusEnum::INVALID));
+                                       SetPathStateFunctor(PathStatusEnum::INVALID, true));
     queue.MemsetAsync(dPathRNGDimensions, 0x00);
 }
 
@@ -510,6 +516,9 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
         // Clear the shadow ray radiance buffer
         processQueue.MemsetAsync(dRayState.dShadowRayRadiance, 0x00);
         processQueue.MemsetAsync(dShadowRayVisibilities, 0x00);
+        // CUDA Init check error, we access the rays even if it is not written
+        processQueue.MemsetAsync(dRayState.dOutRays, 0x00);
+        
 
         // Do the NEE kernel + boundary work
         this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,
@@ -1025,6 +1034,7 @@ PathTracerRenderer::StartRender(const RenderImageParams& rIP,
         metaLightArray.Construct(mlParams, this->tracerView.boundarySurface,
                                  queue);
     }
+    queue.MemsetAsync(dHits, 0x00);
 
     // And initialze the hashes
     workHasher = this->InitializeHashes(dWorkHashes, dWorkBatchIds,

@@ -210,6 +210,7 @@ AcceleratorGroupOptiX<PG>::MultiBuildGeneric_CLT(const PreprocessResult& ppResul
                                  allBuildInputs.size(),
                                  this->concreteLeafRanges.size(),
                                  ppResult.concretePrimRanges.size()});
+    queue.MemsetAsync(dCompactSizes, 0x00);
 
     // Build all accelerators, and overwrite to a single memory location
     // Find out the compacted memory sizes

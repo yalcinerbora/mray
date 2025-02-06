@@ -288,6 +288,12 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
                                  totalInstanceCount, totalInstanceCount, totalInstanceCount,
                                  totalInstanceCount, totalInstanceCount + 1, algoTempMemSize,
                                  1});
+    // Again CUDA Init check warns about this, but this should be set?
+    // via "AcquireIASConstructionParams". maybe we alloc too much?
+    // Just memset everything (TODO: wastefull due to barrier wait)
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
+    queue.MemsetAsync(Span(static_cast<Byte*>(tempMem), tempMem.Size()), 0x00);
+    queue.Barrier().Wait();
 
     // Write all required data to buffers
     size_t i = 0;
@@ -314,7 +320,6 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     gpuSystem.SyncAll();
 
     // Calculate global offsets
-    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     DeviceAlgorithms::ExclusiveScan
     (
         dSBTOffsets, dScanOrReduceTempMem,
@@ -369,7 +374,11 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
                                 accelTempMem,
                                 {bufferSizes.outputSizeInBytes,
                                  bufferSizes.tempSizeInBytes, 1});
-
+    // I think there is a bug on CUDA Init check, 
+    // It does not track optix functions??
+    // Memset anyway
+    queue.MemsetAsync(Span(static_cast<Byte*>(accelTempMem), accelTempMem.Size()), 0x00);
+    
     std::array<OptixAccelEmitDesc, 2> emitProps =
     {
         OptixAccelEmitDesc

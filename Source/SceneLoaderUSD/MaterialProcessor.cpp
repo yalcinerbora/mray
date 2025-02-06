@@ -636,7 +636,7 @@ MRayError MaterialConverter::LoadTextures(std::map<pxr::UsdPrim, TextureId>& res
 
     const auto BarrierFunc = [&]() noexcept
     {
-        try { tracer.CommitTextures(); }
+        try{ tracer.CommitTextures();}
         catch(const MRayError& e)
         {
             // Fatally crash here, barrier's sync
@@ -647,7 +647,6 @@ MRayError MaterialConverter::LoadTextures(std::map<pxr::UsdPrim, TextureId>& res
     };
     uint32_t threadCount = std::min(threadPool.get_thread_count(),
                                     textureCount);
-    //uint32_t threadCount = 1;
 
     using Barrier = std::barrier<decltype(BarrierFunc)>;
     auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);

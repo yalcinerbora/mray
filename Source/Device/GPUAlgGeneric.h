@@ -163,7 +163,7 @@ namespace mray::algorithms
     }
 
     template <class T, class UnaryFunction>
-    requires requires(UnaryFunction f, T x) { {f(x)} -> std::convertible_to<T>; }
+    requires requires(UnaryFunction f, T& x) { {f(x)} -> std::same_as<void>; }
     void InPlaceTransform(Span<T> dInOut, const GPUQueue& queue,
                           UnaryFunction&& TransFunction)
     {
@@ -181,15 +181,14 @@ namespace mray::algorithms
                     i < static_cast<uint32_t>(dInOut.size());
                     i += kp.TotalSize())
                 {
-                    T tReg = dInOut[i];
-                    dInOut[i] = TransFunction(tReg);
+                    TransFunction(dInOut[i]);
                 }
             }
         );
     }
 
     template <class T, class UnaryFunction>
-        requires requires(UnaryFunction f, T x) { { f(x) } -> std::convertible_to<T>; }
+    requires requires(UnaryFunction f, T& x) { { f(x) } -> std::same_as<void>; }
     void InPlaceTransformIndirect(Span<T> dInOut, Span<const uint32_t> dIndices,
                                   const GPUQueue& queue, UnaryFunction&& TransFunction)
     {
@@ -208,8 +207,7 @@ namespace mray::algorithms
                     i += kp.TotalSize())
                 {
                     uint32_t index = dIndices[i];
-                    T tReg = dInOut[index];
-                    dInOut[index] = TransFunction(tReg);
+                    TransFunction(dInOut[index]);
                 }
             }
         );

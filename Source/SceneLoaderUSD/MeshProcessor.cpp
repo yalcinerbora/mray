@@ -337,9 +337,7 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
             // Intel sponza curtains is bugged?
             // Setting normals to face
             if(usdNormalIndices[i] > normals.size())
-            {
                 localNormals[i] = faceNormal;
-            }
             else
             {
                 pxr::GfVec3f n = normals[usdNormalIndices[i]];
@@ -350,7 +348,7 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
         // Write something reasonable
         for(uint32_t i = 0; i < faceVertexCount; i++)
         {
-            if(uvs.empty())
+            if(uvs.empty() || usdUVIndices[i] > uvs.size())
             {
                 // In this case, we do simple planar mapping-like approach
                 // Rotate each vertex poisition to tangent space and get (x,y)
@@ -379,8 +377,13 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
                     usdUVIndices[localIndex],
                     usdNormalIndices[localIndex]
                 };
-                auto [indexLoc, isInserted] = indexLookupTable.emplace(indexTriplet, indexCounter);
-                outIndex[j] = indexLoc->second;
+                //auto [indexLoc, isInserted] = indexLookupTable.Insert(indexTriplet, indexCounter);
+                //outIndex[j] = *indexLoc;
+                //outIndex[j] = indexLoc->second;
+
+                //auto [indexLoc, isInserted] = indexLookupTable.Insert(indexTriplet, indexCounter);
+                outIndex[j] = indexCounter;
+                bool isInserted = true;
 
                 if(isInserted)
                 {
@@ -426,9 +429,9 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
     for(const auto& indexTriplet : usdDataIndices)
     {
         pxr::GfVec3f pos = positions[indexTriplet[0]];
-        pxr::GfVec2f uv = pxr::GfVec2f(0);
-        uv = uvs.empty() ? uv : uv = uvs[indexTriplet[1]];
-
+        bool noUV = uvs.empty() || indexTriplet[1] > uvs.size();
+        pxr::GfVec2f uv = noUV ? pxr::GfVec2f(0) : uvs[indexTriplet[1]];
+        //
         posBuffer[attribCounter] = Vector3(pos[0], pos[1], pos[2]);
         uvBuffer[attribCounter] = Vector2(uv[0], uv[1]);
         attribCounter++;
@@ -471,6 +474,7 @@ MRayError MeshProcessorThread::PreprocessIndicesSingle(uint32_t index)
     pxr::UsdGeomMesh mesh = pxr::UsdGeomMesh(flatUniques[index]);
     pxr::UsdGeomPrimvarsAPI primVars(flatUniques[index]);
 
+
     //MRAY_LOG("Processing {}...", flatUniques[index].GetPath().GetString());
 
     Attribute vertexPosA = mesh.GetPointsAttr();
@@ -510,6 +514,7 @@ MRayError MeshProcessorThread::PreprocessIndicesSingle(uint32_t index)
     pxr::VtArray<pxr::GfVec2f> uvs;
     uvPV.GetAttr().Get(&uvs);
 
+    //MRAY_LOG("Total Vertex Count: Input {}", faceIndexOffsets.back());
     //MRAY_LOG("Face Count: Input {}", faceIndexOffsets.size());
     //MRAY_LOG("Pos: IndexCount({}), Count({})", vertexIndices.size(), positions.size());
     //MRAY_LOG("UV: IndexCount({}), Count({}), Interp({})",
@@ -530,7 +535,7 @@ MRayError MeshProcessorThread::PreprocessIndicesSingle(uint32_t index)
     if(subsets.empty())
     {
         // Reset the hash table & buffers
-        indexLookupTable.clear();
+        indexLookupTable.Clear();
         usdDataIndices.clear();
         triangleDataTangents.clear();
         triangleDataNormals.clear();
@@ -539,8 +544,10 @@ MRayError MeshProcessorThread::PreprocessIndicesSingle(uint32_t index)
         // we create iota here.
         // TODO: Abstract this to a ranges view later
         // (a python generator-like concept)
-        pxr::VtArray<int> faceIndices(faceIndexOffsetsIn.size());
+        size_t faceCount = faceIndexOffsetsIn.size();
+        pxr::VtArray<int> faceIndices(faceCount);
         std::iota(faceIndices.begin(), faceIndices.end(), 0);
+        indexLookupTable.Reserve(faceCount * 4);
         // All the work is here
         MRayError err = TriangulateAndCalculateTangents(0, changeToCW,
                                                         posIndexer, uvIndexer,
@@ -553,7 +560,7 @@ MRayError MeshProcessorThread::PreprocessIndicesSingle(uint32_t index)
     {
         const auto& subset = subsets[i];
         // Reset the hash table & buffers
-        indexLookupTable.clear();
+        indexLookupTable.Clear();
         usdDataIndices.clear();
         triangleDataTangents.clear();
         triangleDataNormals.clear();
@@ -561,7 +568,7 @@ MRayError MeshProcessorThread::PreprocessIndicesSingle(uint32_t index)
         // Get the face indices
         pxr::VtArray<int> faceIndices;
         subset.GetIndicesAttr().Get(&faceIndices);
-
+        indexLookupTable.Reserve(faceIndices.size() * 4);
         //MRAY_LOG("    {: >2} Subset: FaceCount {}", i, faceIndices.size());
 
         // All the work is here
@@ -600,7 +607,8 @@ MRayError MeshProcessorThread::LoadMeshDataSingle(uint32_t index)
 MRayError MeshProcessorThread::PreprocessIndices()
 {
     // Reserve for 2^20 (~1 million) elements beforehand.
-    indexLookupTable.reserve(1_MiB);
+    //indexLookupTable.max_load_factor(0.5f);
+    indexLookupTable.Reserve(1_MiB);
     usdDataIndices.reserve(1_MiB);
     triangleDataTangents.reserve(1_MiB);
     triangleDataNormals.reserve(1_MiB);

@@ -573,7 +573,6 @@ TextureBackingMemoryCUDA& TextureBackingMemoryCUDA::operator=(TextureBackingMemo
 
 void TextureBackingMemoryCUDA::ResizeBuffer(size_t newSize)
 {
-    TextureBackingMemoryCUDA newMem(*gpu, newSize);
     *this = TextureBackingMemoryCUDA(*gpu, newSize);
 }
 

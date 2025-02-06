@@ -30,7 +30,7 @@ DeviceLocalMemoryCUDA::DeviceLocalMemoryCUDA(const GPUDeviceCUDA& device, size_t
     CUDA_DRIVER_CHECK(cuMemGetAllocationGranularity(&granularity, &props,
                                                     CU_MEM_ALLOC_GRANULARITY_RECOMMENDED));
     allocSize = Math::NextMultiple(size, granularity);
-    CUDA_DRIVER_CHECK(cuMemCreate(&memHandle, allocSize, &props, 0));
+    CUDA_DRIVER_MEM_THROW(cuMemCreate(&memHandle, allocSize, &props, 0));
 
     // Map to address space
     CUdeviceptr driverPtr;
@@ -570,7 +570,7 @@ void DeviceMemoryCUDA::ResizeBuffer(size_t newSize)
                 .handle = 0,
                 .allocSize = allocationGranularity,
             };
-            CUDA_DRIVER_CHECK(cuMemCreate(&newAlloc.handle, allocationGranularity, &props, 0));
+            CUDA_DRIVER_MEM_THROW(cuMemCreate(&newAlloc.handle, allocationGranularity, &props, 0));
             CUDA_DRIVER_MEM_THROW(cuMemMap(mPtr + offset, allocationGranularity, 0, newAlloc.handle, 0));
             offset += allocationGranularity;
 

@@ -229,9 +229,9 @@ TernaryPartitionOutput RayPartitioner::TernaryPartition(Span<CommonIndex> dIndic
     (
         hPartitionIndex1.subspan(0, 1),
         queue,
-        [hPartitionIndex0] MRAY_HYBRID(uint32_t i)
+        [hPartitionIndex0] MRAY_HYBRID(uint32_t& i)
         {
-            return i + hPartitionIndex0[0];
+            i += hPartitionIndex0[0];
         }
     );
 
