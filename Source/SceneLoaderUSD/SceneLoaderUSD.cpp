@@ -701,6 +701,13 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     if(e) return e;
 
     // Process cameras
+    // Sort the camera's by name for consistent loads
+    // Some compositions weill reorder the cameras
+    std::sort(cameras.begin(), cameras.end(), 
+    [](const MRayUSDPrimSurface& l, const MRayUSDPrimSurface& r) -> bool
+    {
+        return l.surfacePrim < r.surfacePrim;
+    });
     CameraGroupId camGroupId;
     std::vector<std::pair<pxr::UsdPrim, CameraId>> outCameras;
     e = ProcessCameras(camGroupId, outCameras, tracer,
