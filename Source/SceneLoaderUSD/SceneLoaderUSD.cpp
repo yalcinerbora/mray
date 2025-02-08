@@ -355,17 +355,23 @@ MRayError ProcessCameras(CameraGroupId& camGroupId,
     {
         const auto& cam = cameras[i];
         auto camPrim = pxr::UsdGeomCamera(cam.surfacePrim);
+        //
+        using TransformGen::ZUpToYUpMat, TransformGen::YUpToZUpMat;
+        Matrix4x4 transform = *cam.surfaceTransform;
+        if(pxr::UsdGeomGetStageUpAxis(loadedStage) == pxr::UsdGeomTokens->z)
+            transform = ZUpToYUpMat<Float>() * transform * YUpToZUpMat<Float>();
         // For camera matrices, embed to the camera position vector
         // direction etc.
         // This is not always true, but most of the time
         // up vector is always anchore
-        Vector3 front = -Vector3::ZAxis();
+        Vector3 gaze = Vector3(0, 0, -1);
         Vector3 pos = Vector3::Zero();
-        pos = Vector3(*cam.surfaceTransform * Vector4(pos, 1));
-        front = *cam.surfaceTransform * front;
-        gazeSpan[i] = pos + front;
+        Vector3 up = Vector3::YAxis();
+        pos = Vector3(transform * Vector4(pos, 1));
+        gaze = Vector3(transform * Vector4(gaze, 1));
+        gazeSpan[i] = gaze;
         positionSpan[i] = pos;
-        upSpan[i] = Vector3::YAxis();
+        upSpan[i] = up;
 
         pxr::GfCamera pxrCam = camPrim.GetCamera(pxr::UsdTimeCode());
         float fovX = pxrCam.GetFieldOfView(pxr::GfCamera::FOVHorizontal);
@@ -821,7 +827,8 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     // Convert to Y up if required
     if(pxr::UsdGeomGetStageUpAxis(loadedStage) == pxr::UsdGeomTokens->z)
     {
-        for(auto& mat : allMatrices)
+        Span allExceptDome = allMatrices.subspan(allSizes[0], allSizes[5] - allSizes[0]);
+        for(auto& mat : allExceptDome)
             mat = TransformGen::ZUpToYUpMat<Float>() * mat;
     }
 
