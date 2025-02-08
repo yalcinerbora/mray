@@ -1,5 +1,8 @@
 # MRay
 
+![sponza_teaser](sponza_teaser_1024spp.png)
+*[Intel Sponza][6] with Curtains 1080p (Nvidia RTX 3070ti Mobile, 1024spp / 40.41ms spp )*
+
 MRay: An interactive GPU-Based Renderer / Framework. MRay is extensible and performant ray tracing-based renderer framework written in CUDA.
 
 > [!Note]
@@ -152,4 +155,5 @@ MRay is under the Apache 2.0 License. See [LICENSE][lic] for details.
 [3]: https://drive.google.com/file/d/1yPcrjZuyCDQVhFWHN0ZqMdeOpWn7WR76/view?usp=sharing
 [4]: https://github.com/mitsuba-renderer/mitsuba3
 [5]: https://github.com/mmp/pbrt-v4
+[6]: https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-research/samples.html
 [lic]: LICENSE
