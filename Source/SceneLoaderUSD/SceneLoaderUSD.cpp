@@ -410,6 +410,7 @@ MRayError FindLightTextures(std::map<pxr::UsdPrim, MRayUSDTexture>& extraTexture
         pxr::UsdAttribute fileA = lightPrim.GetTextureFileAttr();
         pxr::SdfAssetPath path; fileA.Get(&path);
         std::string filePath = path.GetResolvedPath();
+        assert(!filePath.empty());
         MRayUSDTexture tex =
         {
             .absoluteFilePath = filePath,
@@ -709,7 +710,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     // Process cameras
     // Sort the camera's by name for consistent loads
     // Some compositions weill reorder the cameras
-    std::sort(cameras.begin(), cameras.end(), 
+    std::sort(cameras.begin(), cameras.end(),
     [](const MRayUSDPrimSurface& l, const MRayUSDPrimSurface& r) -> bool
     {
         return l.surfacePrim < r.surfacePrim;
@@ -733,20 +734,20 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     if(e) return e;
 
     // For mesh prims, pre-apply transformations if this prim is used once
-    // (no instancing)        
+    // (no instancing)
     {
         std::vector<pxr::UsdPrim> uniqueMeshPrims;
         uniqueMeshPrims.reserve(uniqueMeshPrimBatches.size());
         for(const auto& meshPrim : uniqueMeshPrimBatches)
             uniqueMeshPrims.push_back(meshPrim.first);
         std::sort(uniqueMeshPrims.begin(), uniqueMeshPrims.end());
-        
+
         std::vector<PrimBatchId> meshPrimBatches;
         std::vector<Matrix4x4>  meshTransforms;
         // Traverse through unique prim batches, add transform application list
         for(auto& surface : meshMatPrims.surfaces)
         {
-            auto [start, end] = std::equal_range(uniqueMeshPrims.cbegin(), 
+            auto [start, end] = std::equal_range(uniqueMeshPrims.cbegin(),
                                                  uniqueMeshPrims.cend(),
                                                  surface.uniquePrim);
             if(std::distance(end, start) > 1) continue;
@@ -759,7 +760,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
             {
                 meshPrimBatches.push_back(pbId);
                 meshTransforms.push_back(transform);
-            }                
+            }
             surface.surfaceTransform = std::nullopt;
         }
         // Flush up to this point (load operations are async, we will apply
@@ -769,7 +770,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                                    std::move(meshPrimBatches),
                                    std::move(meshTransforms));
     }
-    
+
     std::vector<uint32_t> meshTransformOffsets(meshMatPrims.surfaces.size() + 1);
     meshTransformOffsets[0] = 0;
     std::transform_inclusive_scan
@@ -812,7 +813,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
         if(!s.surfaceTransform.has_value()) continue;
 
         meshSurfMats[meshTransformOffsets[i]] = *meshMatPrims.surfaces[i].surfaceTransform;
-    }        
+    }
     for(size_t i = 0; i < meshLightSurfMats.size(); i++)
         meshLightSurfMats[i] = *meshMatPrims.geomLightSurfaces[i].surfaceTransform;
     for(size_t i = 0; i < sphereSurfMats.size(); i++)
@@ -831,16 +832,20 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
         for(auto& mat : allExceptDome)
             mat = TransformGen::ZUpToYUpMat<Float>() * mat;
     }
-
-    using TypeNameGen::Runtime::AddTransformPrefix;
-    TransGroupId tgId = tracer.CreateTransformGroup(AddTransformPrefix("Single"));
-    std::vector<AttributeCountList> transformAttribCounts(totalSurfSize, {1});
-    std::vector<TransformId> tIds = tracer.ReserveTransformations(tgId, transformAttribCounts);
-    tracer.CommitTransReservations(tgId);
     //
-    CommonIdRange range(std::bit_cast<CommonId>(tIds.front()),
-                        std::bit_cast<CommonId>(tIds.back()));
-    tracer.PushTransAttribute(tgId, range, 0, std::move(matrixBuffer));
+    std::vector<TransformId> tIds;
+    if(totalSurfSize != 0)
+    {
+        using TypeNameGen::Runtime::AddTransformPrefix;
+        TransGroupId tgId = tracer.CreateTransformGroup(AddTransformPrefix("Single"));
+        std::vector<AttributeCountList> transformAttribCounts(totalSurfSize, {1});
+        tIds = tracer.ReserveTransformations(tgId, transformAttribCounts);
+        tracer.CommitTransReservations(tgId);
+        CommonIdRange range(std::bit_cast<CommonId>(tIds.front()),
+                            std::bit_cast<CommonId>(tIds.back()));
+        tracer.PushTransAttribute(tgId, range, 0, std::move(matrixBuffer));
+    }
+    //
     Span allTIds = Span(tIds.cbegin(), tIds.size());
     Span meshSurfTIds = allTIds.subspan(allSizes[0], allSizes[1] - allSizes[0]);
     Span meshLightSurfTIds= allTIds.subspan(allSizes[1], allSizes[2] - allSizes[1]);

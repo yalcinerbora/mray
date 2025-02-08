@@ -426,6 +426,7 @@ MRayUSDTexture MaterialConverter::ReadTextureNode(const pxr::UsdPrim& texNodePri
     // Resolve file
     auto fileSdf = GetInput(tNode.GetInput(tokens.file), pxr::SdfAssetPath());
     std::string file = fileSdf.GetResolvedPath();
+    assert(!file.empty());
     // TODO: load "st" and check if it is properly connected
     return MRayUSDTexture
     {
