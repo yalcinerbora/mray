@@ -269,6 +269,10 @@ class PrimGroupTriangle final : public GenericGroupPrimitive<PrimGroupTriangle>
                                           const GPUQueue& queue) override;
     void                    Finalize(const GPUQueue& queue) override;
 
+    void                    ApplyTransformations(const std::vector<PrimBatchKey>& primBatches,
+                                                 const std::vector<Matrix4x4>& batchTransformations,
+                                                 const GPUQueue& deviceQueue) override;
+
     Vector2ui               BatchRange(PrimBatchKey id) const override;
     size_t                  TotalPrimCount() const override;
     DataSoA                 SoA() const;

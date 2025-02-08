@@ -361,8 +361,8 @@ MRayError ProcessCameras(CameraGroupId& camGroupId,
         // up vector is always anchore
         Vector3 front = -Vector3::ZAxis();
         Vector3 pos = Vector3::Zero();
-        pos = Vector3(cam.surfaceTransform * Vector4(pos, 1));
-        front = cam.surfaceTransform * front;
+        pos = Vector3(*cam.surfaceTransform * Vector4(pos, 1));
+        front = *cam.surfaceTransform * front;
         gazeSpan[i] = pos + front;
         positionSpan[i] = pos;
         upSpan[i] = Vector3::YAxis();
@@ -726,10 +726,62 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                       uniqueTextureIds);
     if(e) return e;
 
+    // For mesh prims, pre-apply transformations if this prim is used once
+    // (no instancing)        
+    {
+        std::vector<pxr::UsdPrim> uniqueMeshPrims;
+        uniqueMeshPrims.reserve(uniqueMeshPrimBatches.size());
+        for(const auto& meshPrim : uniqueMeshPrimBatches)
+            uniqueMeshPrims.push_back(meshPrim.first);
+        std::sort(uniqueMeshPrims.begin(), uniqueMeshPrims.end());
+        
+        std::vector<PrimBatchId> meshPrimBatches;
+        std::vector<Matrix4x4>  meshTransforms;
+        // Traverse through unique prim batches, add transform application list
+        for(auto& surface : meshMatPrims.surfaces)
+        {
+            auto [start, end] = std::equal_range(uniqueMeshPrims.cbegin(), 
+                                                 uniqueMeshPrims.cend(),
+                                                 surface.uniquePrim);
+            if(std::distance(end, start) > 1) continue;
+
+            Matrix4x4 transform = *surface.surfaceTransform;
+            if(pxr::UsdGeomGetStageUpAxis(loadedStage) == pxr::UsdGeomTokens->z)
+                transform = TransformGen::ZUpToYUpMat<Float>() * transform;
+
+            for(PrimBatchId pbId : uniqueMeshPrimBatches.at(surface.uniquePrim))
+            {
+                meshPrimBatches.push_back(pbId);
+                meshTransforms.push_back(transform);
+            }                
+            surface.surfaceTransform = std::nullopt;
+        }
+        // Flush up to this point (load operations are async, we will apply
+        // transformations on loaded meshes)
+        tracer.Flush();
+        tracer.TransformPrimitives(meshPrimGroupId,
+                                   std::move(meshPrimBatches),
+                                   std::move(meshTransforms));
+    }
+    
+    std::vector<uint32_t> meshTransformOffsets(meshMatPrims.surfaces.size() + 1);
+    meshTransformOffsets[0] = 0;
+    std::transform_inclusive_scan
+    (
+        meshMatPrims.surfaces.cbegin(),
+        meshMatPrims.surfaces.cend(),
+        meshTransformOffsets.begin() + 1,
+        std::plus<uint32_t>{},
+        [](const MRayUSDPrimSurface& s) ->uint32_t
+        {
+            return s.surfaceTransform.has_value() ? 1u : 0u;
+        }
+    );
+
     // Load Transforms
     std::array<size_t, 7> allSizes;
     allSizes[0] = 0;
-    allSizes[1] = meshMatPrims.surfaces.size();
+    allSizes[1] = meshTransformOffsets.back();
     allSizes[2] = meshMatPrims.geomLightSurfaces.size();
     allSizes[3] = sphereMatPrims.surfaces.size();
     allSizes[4] = sphereMatPrims.geomLightSurfaces.size();
@@ -749,18 +801,22 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     Span domeLightSurfMats = allMatrices.subspan(allSizes[5], allSizes[6] - allSizes[5]);
 
     for(size_t i = 0; i < meshSurfMats.size(); i++)
-        meshSurfMats[i] = meshMatPrims.surfaces[i].surfaceTransform;
-    for(size_t i = 0; i < meshLightSurfMats.size(); i++)
-        meshLightSurfMats[i] = meshMatPrims.geomLightSurfaces[i].surfaceTransform;
-    for(size_t i = 0; i < sphereSurfMats.size(); i++)
-        sphereSurfMats[i] = sphereMatPrims.surfaces[i].surfaceTransform;
-    for(size_t i = 0; i < sphereLightSurfMats.size(); i++)
-        sphereLightSurfMats[i] = sphereMatPrims.geomLightSurfaces[i].surfaceTransform;
-    for(size_t i = 0; i < cameraSurfMats.size(); i++)
-        cameraSurfMats[i] = cameras[i].surfaceTransform;
+    {
+        const auto& s = meshMatPrims.surfaces[i];
+        if(!s.surfaceTransform.has_value()) continue;
 
+        meshSurfMats[meshTransformOffsets[i]] = *meshMatPrims.surfaces[i].surfaceTransform;
+    }        
+    for(size_t i = 0; i < meshLightSurfMats.size(); i++)
+        meshLightSurfMats[i] = *meshMatPrims.geomLightSurfaces[i].surfaceTransform;
+    for(size_t i = 0; i < sphereSurfMats.size(); i++)
+        sphereSurfMats[i] = *sphereMatPrims.surfaces[i].surfaceTransform;
+    for(size_t i = 0; i < sphereLightSurfMats.size(); i++)
+        sphereLightSurfMats[i] = *sphereMatPrims.geomLightSurfaces[i].surfaceTransform;
+    for(size_t i = 0; i < cameraSurfMats.size(); i++)
+        cameraSurfMats[i] = *cameras[i].surfaceTransform;
     if(domeLight.has_value())
-        domeLightSurfMats[0] = domeLight->surfaceTransform;
+        domeLightSurfMats[0] = *domeLight->surfaceTransform;
 
     // Convert to Y up if required
     if(pxr::UsdGeomGetStageUpAxis(loadedStage) == pxr::UsdGeomTokens->z)
@@ -802,7 +858,9 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
             end = std::min(subGeomMaterials.size(), end);
             //
             SurfaceParams surface;
-            surface.transformId = meshSurfTIds[i];
+            surface.transformId = TracerConstants::IdentityTransformId;
+            if(prim.surfaceTransform.has_value())
+                surface.transformId = meshSurfTIds[meshTransformOffsets[i]];
             for(size_t j = start; j < end; j++)
             {
                 const auto& [geomIndex, matPath] = prim.subGeometryMaterialKeys[j];

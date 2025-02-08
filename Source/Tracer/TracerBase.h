@@ -216,6 +216,9 @@ class TracerBase : public TracerI
                                       uint32_t attributeIndex,
                                       Vector2ui subBatchRange,
                                       TransientData data) override;
+    void            TransformPrimitives(PrimGroupId,
+                                        std::vector<PrimBatchId>,
+                                        std::vector<Matrix4x4>) override;
 
     MatGroupId      CreateMaterialGroup(std::string typeName) override;
     MaterialId      ReserveMaterial(MatGroupId, AttributeCountList,

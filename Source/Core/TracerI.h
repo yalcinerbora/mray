@@ -530,6 +530,9 @@ class [[nodiscard]] TracerI
                                               uint32_t attributeIndex,
                                               Vector2ui subBatchRange,
                                               TransientData data) = 0;
+    virtual void            TransformPrimitives(PrimGroupId,
+                                                std::vector<PrimBatchId>,
+                                                std::vector<Matrix4x4>) = 0;
     //================================//
     //            Material            //
     //================================//

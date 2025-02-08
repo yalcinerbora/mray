@@ -569,6 +569,33 @@ void TracerBase::PushPrimAttribute(PrimGroupId gId,
                                            queue);
 }
 
+
+void TracerBase::TransformPrimitives(PrimGroupId gId,
+                                     std::vector<PrimBatchId> primBatchIds,
+                                     std::vector<Matrix4x4> transforms)
+{
+    auto primGroup = primGroups.at(gId);
+    if(!primGroup)
+    {
+        throw MRayError("Unable to find PrimitiveGroup({})",
+                        static_cast<CommonKey>(gId));
+    }
+
+    // "PrimBatchId" is same as "PrimBatchKey",
+    // but it is wrapped around std::vector
+    // so we can't bit cast the std::vector
+    // copy...
+    std::vector<PrimBatchKey> primBatches;
+    primBatches.reserve(primBatchIds.size());
+    for(auto id : primBatchIds)
+        primBatches.push_back(std::bit_cast<PrimBatchKey>(id));
+
+    // TODO: Change this to utilize muti-gpu/queue
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
+    primGroup.value().get()->ApplyTransformations(primBatches,
+                                                  transforms, queue);
+}
+
 void TracerBase::PushPrimAttribute(PrimGroupId gId,
                                    PrimBatchId batchId,
                                    uint32_t attribIndex,

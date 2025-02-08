@@ -202,6 +202,9 @@ class TracerMock : public TracerI
                                       uint32_t attributeIndex,
                                       Vector2ui subBatchRange,
                                       TransientData data) override;
+    void            TransformPrimitives(PrimGroupId gId,
+                                        std::vector<PrimBatchId> primBatchIds,
+                                        std::vector<Matrix4x4> transforms) override;
 
     MatGroupId      CreateMaterialGroup(std::string typeName) override;
     MaterialId      ReserveMaterial(MatGroupId, AttributeCountList,
@@ -829,6 +832,13 @@ inline void TracerMock::PushPrimAttribute(PrimGroupId gId,
              static_cast<CommonId>(batchId),
              subBatchRange[0], subBatchRange[1],
              MRayDataTypeStringifier::ToString(dataEnum), dataCount);
+}
+
+
+inline void TracerMock::TransformPrimitives(PrimGroupId,
+                                            std::vector<PrimBatchId>,
+                                            std::vector<Matrix4x4>)
+{    
 }
 
 inline MatGroupId TracerMock::CreateMaterialGroup(std::string name)

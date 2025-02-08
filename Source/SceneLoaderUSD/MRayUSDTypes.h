@@ -16,7 +16,7 @@ struct MRayUSDPrimSurface
     bool                cullFace = false;
     pxr::UsdPrim        surfacePrim;
     pxr::UsdPrim        uniquePrim;
-    Matrix4x4           surfaceTransform;
+    Optional<Matrix4x4> surfaceTransform;
     SubGeomMaterials    subGeometryMaterialKeys;
 };
 

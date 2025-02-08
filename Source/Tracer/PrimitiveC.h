@@ -244,6 +244,9 @@ class GenericGroupPrimitiveT : public GenericGroupT<PrimBatchKey, PrimAttributeI
                                        size_t allocationGranularity = 16_MiB,
                                        size_t initialReservartionSize = 64_MiB);
 
+    virtual void        ApplyTransformations(const std::vector<PrimBatchKey>& primBatches,
+                                             const std::vector<Matrix4x4>& batchTransformations,
+                                             const GPUQueue& deviceQueue) = 0;
     virtual Vector2ui   BatchRange(PrimBatchKey) const = 0;
     virtual size_t      TotalPrimCount() const = 0;
 };
@@ -254,11 +257,14 @@ template<class Child>
 class GenericGroupPrimitive : public GenericGroupPrimitiveT
 {
     public:
-                     GenericGroupPrimitive(uint32_t groupId,
-                                           const GPUSystem& sys,
-                                           size_t allocationGranularity = 16_MiB,
-                                           size_t initialReservartionSize = 64_MiB);
-    std::string_view Name() const override;
+                        GenericGroupPrimitive(uint32_t groupId,
+                                              const GPUSystem& sys,
+                                              size_t allocationGranularity = 16_MiB,
+                                              size_t initialReservartionSize = 64_MiB);                     
+    void                ApplyTransformations(const std::vector<PrimBatchKey>& primBatches,
+                                             const std::vector<Matrix4x4>& batchTransformations,
+                                             const GPUQueue& deviceQueue) override;
+    std::string_view    Name() const override;
 };
 
 template<TransformContextC TransContextType = TransformContextIdentity>
@@ -389,6 +395,16 @@ GenericGroupPrimitive<C>::GenericGroupPrimitive(uint32_t groupId,
                              allocationGranularity,
                              initialReservartionSize)
 {}
+
+template<class C>
+inline void GenericGroupPrimitive<C>::ApplyTransformations(const std::vector<PrimBatchKey>&,
+                                                           const std::vector<Matrix4x4>&,
+                                                           const GPUQueue&)
+{
+    throw MRayError("{:s}:{:d}: \"ApplyTransformations\" functionality "
+                    "is not available for this primitive type!",
+                    C::TypeName(), this->groupId);
+}
 
 template<class C>
 std::string_view GenericGroupPrimitive<C>::Name() const

@@ -1,6 +1,7 @@
 #include "PrimitiveDefaultTriangle.h"
 #include "Device/GPUSystem.hpp"
 #include "Device/GPUMemory.h"
+#include "Device/GPUAlgGeneric.h"
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCAdjustIndices(// I-O
@@ -44,6 +45,80 @@ void KCAdjustIndices(// I-O
             if(j < vICount) dVI[vIStart + j] += vStart; j += kp.blockSize;
             if(j < vICount) dVI[vIStart + j] += vStart; j += kp.blockSize;
             if(j < vICount) dVI[vIStart + j] += vStart; j += kp.blockSize;
+        }
+        // Before writing new shared memory values wait all threads to end
+        BlockSynchronize();
+    }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCApplyTransformsTriangle(// I-O
+                               MRAY_GRID_CONSTANT const Span<Vector3> dPositionsInOut,
+                               MRAY_GRID_CONSTANT const Span<Quaternion> dNormalsInOut,
+                               // Input
+                               MRAY_GRID_CONSTANT const Span<const Matrix4x4> dBatchTransforms,
+                               MRAY_GRID_CONSTANT const Span<const Matrix4x4> dBatchInvTransforms,
+                               MRAY_GRID_CONSTANT const Span<const Vector2ul> dVertexRanges,
+                               MRAY_GRID_CONSTANT const uint32_t blockPerBatch)
+{
+    KernelCallParams kp;
+    uint32_t totalBatches = static_cast<uint32_t>(dVertexRanges.size());
+    uint32_t blockCount = totalBatches * blockPerBatch;
+
+    // Block-stride Loop
+    for(uint32_t blockId = kp.blockId; blockId < blockCount; blockId += kp.gridSize)
+    {
+        MRAY_SHARED_MEMORY Matrix4x4 sBatchTransform;
+        MRAY_SHARED_MEMORY Matrix4x4 sBatchInvTransform;
+        MRAY_SHARED_MEMORY Vector2ul sVertexRanges;
+
+        uint32_t batchI = blockId / blockPerBatch;
+        uint32_t localBatchI = blockId % blockPerBatch;
+        // Load matrices / ranges
+        if(kp.threadId < 16)
+        {
+            uint32_t i = kp.threadId;
+            sBatchTransform[i] = dBatchTransforms[batchI][i];
+
+        }            
+        else if(kp.threadId >= 16 && kp.threadId < 32)
+        {
+            uint32_t i = kp.threadId - 16;
+            sBatchInvTransform[i] = dBatchInvTransforms[batchI][i];            
+        }
+        else if(kp.threadId >= 32 && kp.threadId < 34)
+        {
+            uint32_t i = kp.threadId - 32;
+            sVertexRanges[i] = dVertexRanges[batchI][i];
+        }        
+        BlockSynchronize();
+
+        // Loop over each vertex for this tex
+        uint32_t vertexCount = uint32_t(sVertexRanges[1] - sVertexRanges[0]);
+        uint32_t vertexStart = localBatchI * kp.blockSize + kp.threadId;
+        uint32_t vertexIncrement = blockPerBatch * kp.blockSize;
+        for(uint32_t i = vertexStart; i < vertexCount; i += vertexIncrement)
+        {
+            // Convert the position (easy)
+            uint64_t vI = sVertexRanges[0] + i;
+            Vector4 pos = Vector4(dPositionsInOut[vI], 1);
+            dPositionsInOut[vI] = Vector3(sBatchTransform * pos);
+            // Convert the normal (hard)
+            // Create the tbn vectors from quaternion
+            // multiply with the matrices
+            // then convert back to the tbn quaternion
+            Quaternion tbn = dNormalsInOut[vI];
+            Vector3 t = tbn.ApplyInvRotation(Vector3::XAxis());
+            Vector3 b = tbn.ApplyInvRotation(Vector3::YAxis());
+            Vector3 n = tbn.ApplyInvRotation(Vector3::ZAxis());
+            // We need to multiply these with normal matrix
+            t = Vector3(sBatchInvTransform.LeftMultiply(Vector4(t, 0))).Normalize();
+            b = Vector3(sBatchInvTransform.LeftMultiply(Vector4(b, 0))).Normalize();
+            n = Vector3(sBatchInvTransform.LeftMultiply(Vector4(n, 0))).Normalize();
+            auto[tN, bN] = Graphics::GSOrthonormalize(t, b, n);
+            //
+            Quaternion tbnOut = TransformGen::ToSpaceQuat(tN, bN, n);
+            dNormalsInOut[vI] = tbnOut;
         }
         // Before writing new shared memory values wait all threads to end
         BlockSynchronize();
@@ -205,6 +280,82 @@ void PrimGroupTriangle::Finalize(const GPUQueue& queue)
         dIndexList,
         dVertexIndexRanges
     );
+    queue.Barrier().Wait();
+}
+
+void PrimGroupTriangle::ApplyTransformations(const std::vector<PrimBatchKey>& primBatches,
+                                             const std::vector<Matrix4x4>& batchTransformations,
+                                             const GPUQueue& queue)
+{
+    if(primBatches.empty()) return;
+
+    for(PrimBatchKey bk : primBatches)
+    {
+        if(bk.FetchBatchPortion() != this->groupId)
+            throw MRayError("{:s}:{:d}: While doing \"ApplyTransformations\", " 
+                            "there are PrimBatchIds which does not belong this group",
+                            TypeName(), this->groupId);
+    }
+
+    assert(primBatches.size() == batchTransformations.size());
+    size_t batchCount = primBatches.size();
+
+    Span<Vector2ul> dVertexRanges;
+    Span<Matrix4x4> dTransformations;
+    Span<Matrix4x4> dInvTransformations;
+    DeviceLocalMemory tempMem(*queue.Device());
+    MemAlloc::AllocateMultiData(std::tie(dVertexRanges,
+                                         dTransformations,
+                                         dInvTransformations),
+                                tempMem,
+                                {batchCount, batchCount, batchCount});
+
+    // Issue transformation inverting before finding batch ranges
+    queue.MemcpyAsync(dTransformations,
+                      ToConstSpan(Span(batchTransformations.data(), batchCount)));
+    DeviceAlgorithms::Transform(dInvTransformations, ToConstSpan(dTransformations), 
+                                queue, KCInvertTransforms());
+
+    // While GPU inverts transformation create batch range buffer
+    std::vector<Vector2ul> hVertexRanges;
+    hVertexRanges.reserve(batchCount);
+    for(PrimBatchKey batchKey : primBatches)
+    {         
+        auto rangeOpt = this->itemRanges.at(batchKey.FetchIndexPortion());
+        assert(rangeOpt.has_value());
+        const AttributeRanges& ranges = rangeOpt.value().get();
+        assert(ranges[POSITION_ATTRIB_INDEX] == ranges[NORMAL_ATTRIB_INDEX]);
+        hVertexRanges.push_back(ranges[POSITION_ATTRIB_INDEX]);
+    }
+    queue.MemcpyAsync(dVertexRanges,
+                      Span<const Vector2ul>(hVertexRanges.data(), batchCount));
+
+    uint32_t blockCount = queue.RecommendedBlockCountDevice
+    (
+        reinterpret_cast<const void*>(&KCApplyTransformsTriangle),
+        StaticThreadPerBlock1D(), 
+        0
+    );
+    using namespace std::string_view_literals;
+    static constexpr uint32_t BLOCK_PER_BATCH = 128;
+    queue.IssueExactKernel<KCApplyTransformsTriangle>
+    (
+        "KCApplyTransformationsTriangle"sv,
+        KernelExactIssueParams
+        {
+            .gridSize = blockCount,
+            .blockSize = StaticThreadPerBlock1D()            
+        },
+        //
+        dPositions,
+        dTBNRotations,
+        ToConstSpan(dTransformations),
+        ToConstSpan(dInvTransformations),
+        ToConstSpan(dVertexRanges),
+        BLOCK_PER_BATCH
+    );  
+    // Wait for completion, before scope exit
+    // due to temporary memory allocation
     queue.Barrier().Wait();
 }
 

@@ -79,8 +79,6 @@ option(MRAY_EXPORT_COMPILE_COMMANDS "Export compile commands for IWYU" ON)
 option(MRAY_ENABLE_PCH "Enable precompiled headers functionality" OFF)
 option(MRAY_BUILD_DOCS "Build Documentation" OFF)
 option(MRAY_ENABLE_USD "Enable usd scene file reading functionality" OFF)
-# TODO: USD is not ready
-mark_as_advanced(MRAY_ENABLE_USD)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
