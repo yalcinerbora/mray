@@ -198,13 +198,12 @@ Vector3 GenericReadFromView(const Vector2& uv, GenericTextureView& view)
     });
 }
 
-
 template<uint32_t TPB, class BCReader, class ConverterTuple>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
 void KCConvertColorBC(// I-O
                       MRAY_GRID_CONSTANT const Span<typename BCReader::BlockType> dBCBlocks,
                       // Inputs
-                      MRAY_GRID_CONSTANT const BCColorConvParamList dTexConvParams,
+                      MRAY_GRID_CONSTANT const BCColorConvParamList texConvParams,
                       // Constants
                       MRAY_GRID_CONSTANT const uint32_t validTexCount,
                       MRAY_GRID_CONSTANT const MRayColorSpaceEnum globalColorSpace,
@@ -214,14 +213,14 @@ void KCConvertColorBC(// I-O
 
     // Block-stride loop
     KernelCallParams kp;
-    uint32_t textureCount = static_cast<uint32_t>(dTexConvParams.size());
+    uint32_t textureCount = static_cast<uint32_t>(texConvParams.size());
     uint32_t blockCount = processorPerTexture * textureCount;
     for(uint32_t procI = kp.blockId; procI < blockCount; procI += kp.gridSize)
     {
         uint32_t texI = procI / processorPerTexture;
         uint32_t localProcI = procI % processorPerTexture;
         // Load to local space
-        const BCColorConvParams& curParams = dTexConvParams[texI];
+        const BCColorConvParams& curParams = texConvParams[texI];
         uint32_t tileCount = curParams.blockRange[1] - curParams.blockRange[0];
         if(texI >= validTexCount) continue;
 
@@ -595,7 +594,7 @@ void BCColorConverter::CallKernelForType(Span<Byte> dScratchBuffer,
             assert(mipBlocks.size() == t->MipCount());
             paramsList[tI] = BCColorConvParams
             {
-                .blockRange = Vector2ul(texBlockOffset, totalBlocks),
+                .blockRange = Vector2ul(texBlockOffset, texBlockOffset + totalBlocks),
                 .gamma = t->Gamma(),
                 .fromColorSpace = t->ColorSpace()
             };
@@ -628,12 +627,12 @@ void BCColorConverter::CallKernelForType(Span<Byte> dScratchBuffer,
             static constexpr uint32_t THREAD_PER_BLOCK = 512;
             // Get Compile Time Type
             using ConvListType = std::remove_cvref_t<decltype(ConvList)>;
-            static constexpr auto Kernel = KCConvertColorBC<THREAD_PER_BLOCK, BCReaderType,
+            static constexpr auto* Kernel = KCConvertColorBC<THREAD_PER_BLOCK, BCReaderType,
                                                             ConvListType>;
             // Find maximum block count for state allocation
             uint32_t blockCount = queue.RecommendedBlockCountDevice
             (
-                reinterpret_cast<const void*>(&Kernel),
+                reinterpret_cast<const void*>(Kernel),
                 THREAD_PER_BLOCK, 0
             );
 

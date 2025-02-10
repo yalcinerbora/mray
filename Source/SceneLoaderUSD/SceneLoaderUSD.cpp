@@ -148,8 +148,7 @@ MRayUSDGeomMatResolWarnings ExpandGeomsAndFindMaterials(CollapsedPrims& subGeomP
         {
             auto shader = boundMaterial.ComputeSurfaceSource();
             pxr::TfToken shaderId;
-            shader.GetShaderId(&shaderId);
-            if(shaderId == usdPrevSurfToken)
+            if(shader && shader.GetShaderId(&shaderId) && shaderId == usdPrevSurfToken)
             {
                 pxr::UsdPrim matPrim = boundMaterial.GetPrim();
                 surface.subGeometryMaterialKeys.emplace_back(subGeomIndex, matPrim.GetPath());
@@ -358,13 +357,18 @@ MRayError ProcessCameras(CameraGroupId& camGroupId,
         //
         using TransformGen::ZUpToYUpMat, TransformGen::YUpToZUpMat;
         Matrix4x4 transform = *cam.surfaceTransform;
-        if(pxr::UsdGeomGetStageUpAxis(loadedStage) == pxr::UsdGeomTokens->z)
+        bool zUp = pxr::UsdGeomGetStageUpAxis(loadedStage) == pxr::UsdGeomTokens->z;
+        if(zUp)
             transform = ZUpToYUpMat<Float>() * transform * YUpToZUpMat<Float>();
-        // For camera matrices, embed to the camera position vector
-        // direction etc.
-        // This is not always true, but most of the time
-        // up vector is always anchore
-        Vector3 gaze = Vector3(0, 0, -1);
+        // For camera matrices, embed to the camera position,
+        // look direction etc.
+        // Anchor the up as Y axis, out camera re-orthogonalize the vectors.
+        // This orients the camera properly.
+
+        // TODO: According to the USD camera is always have OGL style
+        // NDC. But for Z up systems this does not give proper results?
+        // Do manual adjustment. Investigate this later?
+        Vector3 gaze = zUp ? Vector3(0, -1, 0) : Vector3(0, 0, -1);
         Vector3 pos = Vector3::Zero();
         Vector3 up = Vector3::YAxis();
         pos = Vector3(transform * Vector4(pos, 1));

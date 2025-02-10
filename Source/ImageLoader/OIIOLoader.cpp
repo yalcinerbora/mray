@@ -664,7 +664,7 @@ Expected<Image> ImageFileOIIO::ReadImage()
             {
                 static constexpr auto HALF_SIZE = (std::numeric_limits<uint16_t>::max() >> 1u) + 1u;
                 Vector4us* usPtr = reinterpret_cast<Vector4us*>(pixels.AccessAs<Byte>().data());
-                for(uint32_t i = 0; i < result.header.dimensions.Multiply(); i++)
+                for(uint32_t i = 0; i < totalPixels; i++)
                 {
                     usPtr[i] += Vector4us(HALF_SIZE);
                 }
@@ -673,7 +673,7 @@ Expected<Image> ImageFileOIIO::ReadImage()
             {
                 static constexpr auto HALF_SIZE = (std::numeric_limits<uint8_t>::max() >> 1u) + 1u;
                 Vector4uc* ucPtr = reinterpret_cast<Vector4uc*>(pixels.AccessAs<Byte>().data());
-                for(uint32_t i = 0; i < result.header.dimensions.Multiply(); i++)
+                for(uint32_t i = 0; i < totalPixels; i++)
                 {
                     ucPtr[i] += Vector4uc(HALF_SIZE);
                 }

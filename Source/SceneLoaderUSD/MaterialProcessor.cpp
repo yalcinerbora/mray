@@ -712,6 +712,8 @@ MRayError MaterialConverter::LoadTextures(std::map<pxr::UsdPrim, TextureId>& res
                 // But set the pixel type and override colorspace if
                 // USD's value does not exist.
                 MRayTextureParameters params = myTex.second.params;
+                params.readMode = header.readMode;
+                //
                 params.pixelType = header.pixelType;
                 if(params.colorSpace == MRayColorSpaceEnum::MR_DEFAULT &&
                    header.colorSpace.second != MRayColorSpaceEnum::MR_DEFAULT)
