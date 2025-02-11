@@ -1,7 +1,7 @@
 # MRay
 
 ![sponza_teaser](sponza_teaser_1024spp.png)
-*[Intel Sponza][6] with Curtains 1080p (Nvidia RTX 3070ti Mobile, 1024spp / 40.41ms spp )*
+*[Intel Sponza][6] with Curtains 1080p (Nvidia RTX 3070ti Mobile, 1024spp / 40.41ms per sample)*
 
 MRay: An interactive GPU-Based Renderer / Framework. MRay is extensible and performant ray tracing-based renderer framework written in CUDA.
 
@@ -27,7 +27,7 @@ Most of the dependencies are handled by the build system itself via CMake extern
     - sphinx_copybutton
 
 #### Windows
- Besides the common packages building the project in Windows do not require and extra packages. Vulkan-SDK is recommended for validation layer for debugging. We do not auto build/install the entire vulkan sdk but only the headers and libraries.
+ Besides the common packages, building the project in Windows do not require and extra packages. Vulkan-SDK is recommended for validation layer for debugging. We do not auto build/install the entire vulkan sdk but only the headers and libraries.
 
 #### Linux (apt package names)
 - libtbb-dev (required for parallel execution of c++ std library)
@@ -57,10 +57,15 @@ These libraries are automatically managed by the build system (uncommon librarie
     - libtiff
     - libjpeg-turbo
     - libpng
+- OpenUSD [^3]
+    - oneTBB
+    - openSubdiv
 
 [^1]: Only when Visor is built.
 
 [^2]: Only when Tests are built.
+
+[^3]: Only when OpenUSD support is enabled.
 
 ### CMake Build
 
@@ -78,6 +83,8 @@ These flags are not required to be set and all of which has a default value. `MR
 - `MRAY_BUILD_DOCS`: Generate documentation build command (default: false).
 - `MRAY_BUILD_TESTS`: Generate test projects (default: false).
 - `MRAY_BUILD_VISOR`: Enable Visor project. Visor is real-time image viewer/tone mapper for the renderer (for interactive rendering)
+
+- `MRAY_ENABLE_USD`: Enable OpenUSD support. MRay will try to load the USD scene. (**Experimental**)
 
 - `MRAY_ENABLE_HW_ACCELERATION`: Enables GPU Hardware acceleration for ray tracing. CMake script look common locations for the required libraries
 (only CUDA/OptiX at the moment).
