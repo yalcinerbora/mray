@@ -318,7 +318,7 @@ class TracerMock : public TracerI
     // Misc
     void                    ClearAll() override;
     void                    Flush() const override;
-    void                    SetThreadPool(BS::thread_pool& tp) override;
+    void                    SetThreadPool(ThreadPool& tp) override;
     GPUThreadInitFunction   GetThreadInitFunction() const override;
     size_t                  TotalDeviceMemory() const override;
     size_t                  UsedDeviceMemory() const override;
@@ -838,7 +838,7 @@ inline void TracerMock::PushPrimAttribute(PrimGroupId gId,
 inline void TracerMock::TransformPrimitives(PrimGroupId,
                                             std::vector<PrimBatchId>,
                                             std::vector<Matrix4x4>)
-{    
+{
 }
 
 inline MatGroupId TracerMock::CreateMaterialGroup(std::string name)
@@ -1800,7 +1800,7 @@ inline void TracerMock::ClearAll()
 inline void TracerMock::Flush() const
 {}
 
-inline void TracerMock::SetThreadPool(BS::thread_pool&)
+inline void TracerMock::SetThreadPool(ThreadPool&)
 {}
 
 inline GPUThreadInitFunction TracerMock::GetThreadInitFunction() const

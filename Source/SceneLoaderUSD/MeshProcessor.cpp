@@ -6,10 +6,9 @@
 #include "Core/TracerI.h"
 #include "Core/TypeNameGenerators.h"
 #include "Core/ShapeFunctions.h"
+#include "Core/ThreadPool.h"
 
 #include <barrier>
-
-#include <BS/BS_thread_pool.hpp>
 
 #include <pxr/usd/usdGeom/primvarsAPI.h>
 #include <pxr/usd/usdGeom/mesh.h>
@@ -377,13 +376,8 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
                     usdUVIndices[localIndex],
                     usdNormalIndices[localIndex]
                 };
-                //auto [indexLoc, isInserted] = indexLookupTable.Insert(indexTriplet, indexCounter);
-                //outIndex[j] = *indexLoc;
-                //outIndex[j] = indexLoc->second;
-
-                //auto [indexLoc, isInserted] = indexLookupTable.Insert(indexTriplet, indexCounter);
-                outIndex[j] = indexCounter;
-                bool isInserted = true;
+                auto [indexLoc, isInserted] = indexLookupTable.Insert(indexTriplet, indexCounter);
+                outIndex[j] = *indexLoc;
 
                 if(isInserted)
                 {
@@ -650,11 +644,11 @@ MRayError ProcessUniqueMeshes(// Output
                               std::map<pxr::UsdPrim, std::vector<PrimBatchId>>& outPrimBatches,
                               // I-O
                               TracerI& tracer,
-                              BS::thread_pool& threadPool,
+                              ThreadPool& threadPool,
                               // Input
                               const std::set<pxr::UsdPrim>& uniquePrims)
 {
-    uint32_t uniquePrimCount = uint32_t(uniquePrims.size());
+    size_t uniquePrimCount = uint32_t(uniquePrims.size());
     std::vector<std::vector<PrimBatchId>> outPrimBatchesFlat;
     outPrimBatchesFlat.resize(uniquePrimCount);
 
@@ -684,13 +678,14 @@ MRayError ProcessUniqueMeshes(// Output
             std::exit(1);
         }
     };
-    uint32_t threadCount = std::min(threadPool.get_thread_count(),
-                                    uniquePrimCount);
+    uint32_t threadCount = std::min(threadPool.ThreadCount(),
+                                    uint32_t(uniquePrimCount));
 
     using Barrier = std::barrier<decltype(BarrierFunc)>;
     auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
+    ErrorList errorList;
 
-    const auto THRD_ProcessMeshes = [&](uint32_t start, uint32_t end) -> MRayError
+    const auto THRD_ProcessMeshes = [&](uint32_t start, uint32_t end) -> void
     {
         // Subset the data to per core
         std::span myPrimRange(flatUniques.begin() + start, end - start);
@@ -718,17 +713,20 @@ MRayError ProcessUniqueMeshes(// Output
         if(err)
         {
             barrier->arrive_and_drop();
-            return err;
+            errorList.AddException(std::move(err));
+            return;
         }
         barrier->arrive_and_wait();
 
         // Finally load the mesh data
         err = meshProcessor.LoadMeshData();
-        return err;
+        if(err)
+            errorList.AddException(std::move(err));
+        return;
     };
-    auto future = threadPool.submit_blocks(uint32_t(0), uniquePrimCount,
-                                           THRD_ProcessMeshes, threadCount);
-    future.wait();
+    auto future = threadPool.SubmitBlocks(uint32_t(uniquePrimCount),
+                                          THRD_ProcessMeshes, threadCount);
+    future.WaitAll();
 
     if(warnSubdivisionSurface)
         MRAY_WARNING_LOG("[MRayUSD]: Some meshes have subdivision enabled. MRay only supports "
@@ -742,11 +740,10 @@ MRayError ProcessUniqueMeshes(// Output
         MRAY_WARNING_LOG("[MRayUSD]: Some meshes have either degenerate (1 or 2) vertex or more than 16 vertex "
                          "face. MRay is not a modelling software, fix your mesh.");
 
-    // Concat Errors
-    auto errorArray = future.get();
+    // Concat Errors;
     MRayError err = MRayError::OK;
     bool isFirst = true;
-    for(const auto& threadErr : errorArray)
+    for(const auto& threadErr : errorList.exceptions)
     {
         if(threadErr && isFirst)
             err = threadErr;
@@ -771,7 +768,7 @@ MRayError  ProcessUniqueSpheres(// Output
                                 std::map<pxr::UsdPrim, std::vector<PrimBatchId>>& outPrimBatches,
                                 // I-O
                                 TracerI& tracer,
-                                BS::thread_pool& threadPool,
+                                ThreadPool& threadPool,
                                 // Input
                                 const std::set<pxr::UsdPrim>& uniquePrims)
 {

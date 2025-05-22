@@ -7,8 +7,6 @@
 #include <assimp/postprocess.h>
 #include <assimp/DefaultLogger.hpp>
 
-#include <BS/BS_thread_pool.hpp>
-
 #include <gfg/GFGFileExporter.h>
 
 #include <nlohmann/json.hpp>
@@ -18,8 +16,8 @@
 #include "Core/Vector.h"
 #include "Core/Quaternion.h"
 #include "Core/Filesystem.h"
-#include "Core/Error.hpp"
 #include "Core/GraphicsFunctions.h"
+#include "Core/ThreadPool.h"
 
 // TODO: Type leak change it? (This functionaly is
 // highly intrusive, probably needs a redesign?)
@@ -131,12 +129,12 @@ Expected<std::vector<MeshGroup>> FindMeshes(const nlohmann::json& sceneJson)
     return MRayError("There are no meshes to convert!");
 }
 
-MRayError THRDProcessMesh(Span<MeshGroup> meshes,
-                          // Used when prims are packed to single mesh
-                          GFGFileExporter& exporter,
-                          std::mutex& exporterMutex,
-                          const std::string& inScenePath,
-                          MRayConvert::ConversionFlags flags)
+void THRDProcessMesh(ErrorList& errors, Span<MeshGroup> meshes,
+                     // Used when prims are packed to single mesh
+                     GFGFileExporter& exporter,
+                     std::mutex& exporterMutex,
+                     const std::string& inScenePath,
+                     MRayConvert::ConversionFlags flags)
 {
     using enum MRayConvert::ConvFlagEnum;
 
@@ -185,8 +183,12 @@ MRayError THRDProcessMesh(Span<MeshGroup> meshes,
 
         // TODO: Delete previously created files??
         const aiScene* assimpScene = importer.ReadFile(meshPath, assimpFlags);
-        if(!assimpScene) return MRayError("Assimp: Unable to read file \"{}\"",
-                                          meshPath);
+        if(!assimpScene)
+        {
+            errors.AddException(MRayError("Assimp: Unable to read file \"{}\"",
+                                          meshPath));
+            return;
+        }
 
         // GFG require user to lay the data
         // We will push the data as SoA style
@@ -409,8 +411,6 @@ MRayError THRDProcessMesh(Span<MeshGroup> meshes,
             exporter.Write(fileWriter);
         }
     }
-
-    return MRayError::OK;
 }
 
 MRayError ValidateOutputFiles(MRayConvert::ConversionFlags flags,
@@ -457,7 +457,7 @@ Expected<double> MRayConvert::ConvertMeshesToGFG(const std::string& outFileName,
                                                  uint32_t threadCount,
                                                  ConversionFlags flags)
 {
-    BS::thread_pool threadPool(threadCount);
+    ThreadPool threadPool(threadCount);
 
     using enum ConvFlagEnum;
     namespace fs = std::filesystem;
@@ -498,27 +498,27 @@ Expected<double> MRayConvert::ConvertMeshesToGFG(const std::string& outFileName,
         // Normally this wont give much perf, but we do postprocess
         // meshes via assimp to create tangents etc. So this has
         // some gain.
+        ErrorList errors;
         Span<MeshGroup> meshes(parsedMeshes);
         std::mutex exporterMutex;
         GFGFileExporter globalExporter;
-        auto future = threadPool.submit_blocks(static_cast<size_t>(0),
-                                               parsedMeshes.size(),
-                                               [&, meshes, flags](size_t start,
-                                                                  size_t end)
+        auto future = threadPool.SubmitBlocks(uint32_t(parsedMeshes.size()),
+                                              [&, meshes, flags](size_t start,
+                                                                 size_t end)
         {
             auto mySpan = meshes.subspan(start, end - start);
             GFGFileExporter localExporter;
             GFGFileExporter* expRef = (flags[PACK_GFG]) ? &globalExporter
                                                         : &localExporter;
-            return THRDProcessMesh(mySpan, *expRef, exporterMutex,
-                                   inScenePath, flags);
+            THRDProcessMesh(errors, mySpan, *expRef, exporterMutex,
+                            inScenePath, flags);
         });
 
         // Process the errors if any
-        auto errors = future.get();
+        future.WaitAll();
         MRayError errOut = MRayError::OK;
         bool hasErrors = false;
-        for(MRayError& err : errors)
+        for(MRayError& err : errors.exceptions)
         {
             hasErrors = hasErrors || err;
             if(err)

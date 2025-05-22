@@ -1,7 +1,5 @@
 #pragma once
 
-#include <BS/BS_thread_pool.hpp>
-
 #include "MeshLoader/EntryPoint.h"
 #include "Core/SceneLoaderI.h"
 #include "Core/TracerI.h"
@@ -11,6 +9,8 @@
 #include <pxr/usd/usd/common.h>
 #include <pxr/usd/usdGeom/tokens.h>
 #include <pxr/usd/usdLux/tokens.h>
+
+class ThreadPool;
 
 // CTAD to the rescue!
 static const std::array MRayEquavilentUSDTypes =
@@ -29,13 +29,13 @@ static const std::array MRayEquavilentUSDTypes =
 class SceneLoaderUSD : public SceneLoaderI
 {
     private:
-    BS::thread_pool&        threadPool;
+    ThreadPool&             threadPool;
     pxr::UsdStageRefPtr     loadedStage;
     //
     TracerIdPack            resultingIdPack;
 
     public:
-                            SceneLoaderUSD(BS::thread_pool&);
+                            SceneLoaderUSD(ThreadPool&);
                             SceneLoaderUSD(const SceneLoaderUSD&) = delete;
     SceneLoaderUSD&         operator=(const SceneLoaderUSD&) = delete;
 

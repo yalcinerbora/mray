@@ -96,7 +96,7 @@ class VisorVulkan : public VisorI
     bool                    EnableValidation(VkInstanceCreateInfo&);
     MRayError               QueryAndPickPhysicalDevice(const VisorConfig&);
     Expected<VisorWindow>   GenerateWindow(TransferQueue::VisorView&,
-                                           TimelineSemaphore* syncSem, BS::thread_pool*,
+                                           TimelineSemaphore* syncSem, ThreadPool*,
                                            const VisorConfig&);
     MRayError               InitImGui();
 
@@ -111,7 +111,7 @@ class VisorVulkan : public VisorI
     //
     MRayError           MTInitialize(TransferQueue& transferQueue,
                                      TimelineSemaphore* syncSem,
-                                     BS::thread_pool*,
+                                     ThreadPool*,
                                      const VisorConfig&,
                                      const std::string& processPath) override;
     bool                MTIsTerminated() override;

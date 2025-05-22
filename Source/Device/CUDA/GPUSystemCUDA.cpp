@@ -1,7 +1,6 @@
 #include "GPUSystemCUDA.h"
 #include "DeviceMemoryCUDA.h"
 
-#include "Core/Error.hpp"
 #include "Core/TimelineSemaphore.h"
 
 #include <cuda.h>
@@ -9,8 +8,75 @@
 
 #include "Core/Timer.h"
 
+#include <fmt/color.h>
+
 namespace mray::cuda
 {
+    MRAY_HOST
+    void GPUAssertHost(cudaError_t code, const char* file, int line)
+    {
+        if(code == cudaSuccess) return;
+
+        MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
+                       fmt::format(fg(fmt::color::green),
+                                   std::string("CUDA Failure")),
+                       cudaGetErrorString(code), file, line);
+        assert(false);
+    }
+
+    MRAY_HOST
+    void GPUMemThrow(cudaError_t code, const char* file, int line)
+    {
+        if(code == cudaErrorMemoryAllocation)
+        {
+            MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
+                           fmt::format(fg(fmt::color::green),
+                                       std::string("CUDA Failure")),
+                           cudaGetErrorString(code),
+                           file,
+                           line);
+
+            throw MRayError("GPU Device is out of memory!");
+        }
+    }
+
+    MRAY_HOST
+    void GPUDriverAssert(CUresult code, const char* file, int line)
+    {
+        if(code != CUDA_SUCCESS)
+        {
+            std::string greenErrorCode = fmt::format(fg(fmt::color::green),
+                                                     std::string("CUDA Failure"));
+            const char* errStr;
+            cuGetErrorString(code, &errStr);
+
+            MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
+                           fmt::format(fg(fmt::color::green),
+                                       std::string("CUDA Failure")),
+                           errStr, file, line);
+            assert(false);
+        }
+    }
+
+    MRAY_HOST
+    void GPUDriverMemThrow(CUresult code, const char* file, int line)
+    {
+        if(code == CUDA_ERROR_OUT_OF_MEMORY)
+        {
+            std::string greenErrorCode = fmt::format(fg(fmt::color::green),
+                                                     std::string("CUDA Failure"));
+            const char* errStr;
+            cuGetErrorString(code, &errStr);
+
+            MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
+                           fmt::format(fg(fmt::color::green),
+                                       std::string("CUDA Failure")),
+                           errStr, file, line);
+
+            throw MRayError("GPU Device is out of memory!");
+        }
+    }
+
 
 GPUAnnotationCUDA::Scope::Scope(AnnotationHandle d)
     : domain(d)

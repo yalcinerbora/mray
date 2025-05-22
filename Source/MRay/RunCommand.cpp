@@ -4,6 +4,7 @@
 #include "Core/Timer.h"
 #include "Core/MRayDescriptions.h"
 #include "Core/Log.h"
+#include "Core/ThreadPool.h"
 
 #include "Common/RenderImageStructs.h"
 #include "Common/TransferQueue.h"
@@ -202,10 +203,10 @@ namespace Accum
                                const Float* MRAY_RESTRICT wInPtr,
                                size_t outputSize);
 
-    BS::multi_future<void>
+    MultiFuture<void>
     AccumulateImage(RGBWeightSpan<double> output,
                     TimelineSemaphore& sem,
-                    BS::thread_pool& threadPool,
+                    ThreadPool& threadPool,
                     const RenderImageSection&,
                     const RenderBufferInfo&);
 }
@@ -605,10 +606,10 @@ void Accum::AccumulatePortionBulk(double* MRAY_RESTRICT rOutPtr,
     if(residual + 7 < SIMD_WIDTH) Iteration_Common(offset + 7);
 }
 
-BS::multi_future<void>
+MultiFuture<void>
 Accum::AccumulateImage(RGBWeightSpan<double> output,
                        TimelineSemaphore& sem,
-                       BS::thread_pool& threadPool,
+                       ThreadPool& threadPool,
                        const RenderImageSection& rIS,
                        const RenderBufferInfo& rBI)
 {
@@ -620,7 +621,7 @@ Accum::AccumulateImage(RGBWeightSpan<double> output,
     // TODO: Move this from shared ptr, at least allocate once instead of every iteration
     auto BarrierFunc = [&]() noexcept { sem.Release();};
     using Barrier = std::barrier<decltype(BarrierFunc)>;
-    uint32_t threadCount = threadPool.get_thread_count();
+    uint32_t threadCount = threadPool.ThreadCount();
     auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
     if(rBI.resolution == rIS.pixelMax - rIS.pixelMin)
     {
@@ -652,9 +653,8 @@ Accum::AccumulateImage(RGBWeightSpan<double> output,
             barrier->arrive_and_wait();
         };
         //
-        return threadPool.submit_blocks(std::size_t(0),
-                                        std::size_t(bulkCount),
-                                        WorkFuncBulk, threadCount);
+        return threadPool.SubmitBlocks(uint32_t(bulkCount),
+                                       WorkFuncBulk);
     }
     else
     {
@@ -693,9 +693,8 @@ Accum::AccumulateImage(RGBWeightSpan<double> output,
             barrier->arrive_and_wait();
         };
         //
-        return threadPool.submit_blocks(std::size_t(0),
-                                        std::size_t(scanlineCount),
-                                        WorkFuncScanline, threadCount);
+        return threadPool.SubmitBlocks(scanlineCount,
+                                       WorkFuncScanline, threadCount);
     }
 }
 
@@ -707,7 +706,7 @@ namespace MRayCLI::RunNames
 };
 
 bool RunCommand::EventLoop(TransferQueue& transferQueue,
-                           BS::thread_pool& threadPool)
+                           ThreadPool& threadPool)
 {
     cmdTimer.Split();
 
@@ -812,8 +811,8 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
     //
     if(newRenderBuffer)
     {
-        if(accumulateFuture.valid())
-            accumulateFuture.wait();
+        if(accumulateFuture.AnyValid())
+            accumulateFuture.WaitAll();
 
         size_t pixelCount = newRenderBuffer->resolution.Multiply();
         MemAlloc::AllocateMultiData(std::tie(imageRData, imageGData,
@@ -856,8 +855,8 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
 
         // We may encounter runaway issue here, so only issue new
         // accumulation when previous one is finished
-        if(accumulateFuture.valid())
-            accumulateFuture.wait();
+        if(accumulateFuture.AnyValid())
+            accumulateFuture.WaitAll();
 
         Accum::RGBWeightSpan<double> out(imageRData, imageGData,
                                          imageBData, imageSData);
@@ -869,8 +868,8 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
     if(newSaveInfo)
     {
         const auto& saveInfo = newSaveInfo.value();
-        if(accumulateFuture.valid())
-            accumulateFuture.wait();
+        if(accumulateFuture.AnyValid())
+            accumulateFuture.WaitAll();
 
         MRAY_LOG(EyeAnim::LegolasLine);
         transferQueue.Terminate();
@@ -1000,7 +999,7 @@ MRayError RunCommand::Invoke()
         TransferQueue transferQueue(CommandBufferSize, CommandBufferSize,
                                     [](){});
 
-        BS::thread_pool threadPool(threadCount);
+        ThreadPool threadPool(threadCount);
 
         // Get the tracer dll
         TracerThread tracerThread(transferQueue, threadPool);
@@ -1011,19 +1010,15 @@ MRayError RunCommand::Invoke()
         // initialization routine, also change the name of the threads.
         // We need to do this somewhere here, if we do it on tracer side
         // due to passing between dll boundaries, it crash on destruction.
-        threadPool.reset(threadCount, [&tracerThread]()
-        {
-            auto GPUInit = tracerThread.GetThreadInitFunction();
-            GPUInit();
-        });
-        std::vector<std::thread::native_handle_type> handles;
-        handles = threadPool.get_native_handles();
-        for(size_t i = 0; i < handles.size(); i++)
+        threadPool.RestartThreads(threadCount, [&tracerThread](std::thread::native_handle_type handle, uint32_t i)
         {
             using namespace std::string_literals;
             std::string name = "WorkerThread_"s + std::to_string(i);
-            RenameThread(handles[i], name);
-        }
+            RenameThread(handle, name);
+
+            auto GPUInit = tracerThread.GetThreadInitFunction();
+            GPUInit();
+        });
 
         // Set resolution
         Vector2ui resolution(imgRes[0], imgRes[1]);
@@ -1068,7 +1063,7 @@ MRayError RunCommand::Invoke()
 
         // Order is important here
         // First wait the thread pool
-        threadPool.wait();
+        threadPool.Wait();
         // Destroy the transfer queue
         // So that the tracer can drop from queue wait
         transferQueue.Terminate();

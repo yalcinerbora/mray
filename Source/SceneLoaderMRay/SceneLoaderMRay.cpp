@@ -6,8 +6,8 @@
 #include "Core/NormTypes.h"
 #include "Core/Filesystem.h"
 #include "Core/TypeNameGenerators.h"
-#include "Core/Error.hpp"
 #include "Core/GraphicsFunctions.h"
+#include "Core/ThreadPool.h"
 
 #include "MeshLoader/EntryPoint.h"
 #include "MeshLoaderJson.h"
@@ -654,14 +654,6 @@ std::vector<TransientData> CameraAttributeLoad(const AttributeCountList& totalCo
     return result;
 }
 
-void SceneLoaderMRay::ExceptionList::AddException(MRayError&& err)
-{
-    size_t location = size.fetch_add(1);
-    // If too many exceptions skip it
-    if(location < MaxExceptionSize)
-        exceptions[location] = std::move(err);
-}
-
 LightSurfaceStruct SceneLoaderMRay::LoadBoundary(const nlohmann::json& n)
 {
     LightSurfaceStruct boundary = n.get<LightSurfaceStruct>();
@@ -782,9 +774,9 @@ void SceneLoaderMRay::DryRunNodesForTex(std::vector<SceneTexId>& textureIds,
 
 template<bool FeedFirstNode, class Loader, class GroupIdType, class IdType>
 void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, Pair<GroupIdType, IdType>>>& outputMappings,
-                       typename SceneLoaderMRay::ExceptionList& exceptions,
+                       typename ErrorList& exceptions,
                        const typename SceneLoaderMRay::TypeMappedNodes& nodeLists,
-                       BS::thread_pool& threadPool,
+                       ThreadPool& threadPool,
                        Loader&& loader)
 {
     using KeyValuePair  = Pair<uint32_t, Pair<GroupIdType, IdType>>;
@@ -838,13 +830,13 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
             }
         };
         // Determine the thread size
-        uint32_t threadCount = std::min(threadPool.get_thread_count(),
+        uint32_t threadCount = std::min(uint32_t(threadPool.ThreadCount()),
                                         groupEntityCount);
 
         using Barrier = std::barrier<decltype(BarrierFunc)>;
         auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
 
-        // BS_threadpool submit_blocks (all every submit variant I think, passes
+        // BS_threadpool SubmitTask (all every submit variant I think, passes
         // the lambda by forwarding reference, however in our case we utilize the
         // lambda's scope as a thread local storage, forwarding does not work in this case
         // shared_ptrs are deleted when the 'first' thread exits the scope.
@@ -905,21 +897,20 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
                 if(!barrierPassed) barrier->arrive_and_drop();
             }
         };
-        auto future = threadPool.submit_blocks(std::size_t(0),
-                                               std::size_t(groupEntityCount),
-                                               LoadTask, threadCount);
+        auto future = threadPool.SubmitBlocks(groupEntityCount,
+                                              LoadTask, threadCount);
 
-        future.wait();
+        future.WaitAll();
 
         // Move future to shared_ptr
-        using FutureSharedPtr = std::shared_ptr<BS::multi_future<void>>;
-        FutureSharedPtr futureShared = std::make_shared<BS::multi_future<void>>(std::move(future));
+        using FutureSharedPtr = std::shared_ptr<MultiFuture<void>>;
+        FutureSharedPtr futureShared = std::make_shared<MultiFuture<void>>(std::move(future));
 
         // Issue a one final task that pushes the primitives to the global map
-        threadPool.detach_task([&, future = futureShared, groupEntityList]()
+        threadPool.SubmitDetachedTask([&, future = futureShared, groupEntityList]()
         {
             // Wait other tasks to complere
-            future->wait();
+            future->WaitAll();
             // After this point groupBatchList is fully loaded
             std::scoped_lock lock(outputMappings.mutex);
             outputMappings.map.insert(groupEntityList->cbegin(), groupEntityList->cend());
@@ -927,7 +918,7 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
     }
 }
 
-void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
+void SceneLoaderMRay::LoadTextures(TracerI& tracer, ErrorList& exceptions)
 {
     using TextureIdList = std::vector<std::pair<SceneTexId, TextureId>>;
 
@@ -960,8 +951,8 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
     };
 
     // Determine the thread size
-    uint32_t threadCount = std::min(threadPool.get_thread_count(),
-                                    static_cast<uint32_t>(textureNodes.size()));
+    uint32_t threadCount = uint32_t(std::min(size_t(threadPool.ThreadCount()),
+                                             textureNodes.size()));
 
     using Barrier = std::barrier<decltype(BarrierFunc)>;
     auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
@@ -1115,18 +1106,18 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
         }
     };
 
-    auto future = threadPool.submit_blocks(std::size_t(0), textureNodes.size(),
-                                           TextureLoadTask, threadCount);
+    auto future = threadPool.SubmitBlocks(uint32_t(textureNodes.size()),
+                                          TextureLoadTask, threadCount);
 
     // Move the future to shared ptr
-    using FutureSharedPtr = std::shared_ptr<BS::multi_future<void>>;
-    FutureSharedPtr futureShared = std::make_shared<BS::multi_future<void>>(std::move(future));
+    using FutureSharedPtr = std::shared_ptr<MultiFuture<void>>;
+    FutureSharedPtr futureShared = std::make_shared<MultiFuture<void>>(std::move(future));
 
     // Issue a one final task that pushes the primitives to the global map
-    threadPool.detach_task([&, this, future = futureShared, texIdListPtr]()
+    threadPool.SubmitDetachedTask([&, this, future = futureShared, texIdListPtr]()
     {
         // Wait other tasks to complere
-        future->wait();
+        future->WaitAll();
 
         // If no textures are loaded, commit the tracer
         // texture system. So it will let mapping to be accessed
@@ -1139,7 +1130,7 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ExceptionList& exceptions)
     // All important data is in shared_ptrs we can safely exit scope.
 }
 
-void SceneLoaderMRay::LoadMediums(TracerI& tracer, ExceptionList& exceptions)
+void SceneLoaderMRay::LoadMediums(TracerI& tracer, ErrorList& exceptions)
 {
     struct MediumLoader
     {
@@ -1209,7 +1200,7 @@ void SceneLoaderMRay::LoadMediums(TracerI& tracer, ExceptionList& exceptions)
 }
 
 void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
-                                    ExceptionList& exceptions,
+                                    ErrorList& exceptions,
                                     uint32_t boundaryMediumId)
 {
     struct MaterialLoader
@@ -1300,7 +1291,7 @@ void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
                                             texMappings, mediumMappings.map));
 }
 
-void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ExceptionList& exceptions)
+void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ErrorList& exceptions)
 {
     struct TransformLoader
     {
@@ -1361,7 +1352,7 @@ void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ExceptionList& exceptions)
                              TransformLoader(tracer));
 }
 
-void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
+void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ErrorList& exceptions)
 {
     std::shared_ptr<const MeshLoaderPoolI> meshLoaderPool = CreateMeshLoaderPool();
 
@@ -1501,7 +1492,7 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ExceptionList& exceptions)
                                              meshLoaderPool));
 }
 
-void SceneLoaderMRay::LoadCameras(TracerI& tracer, ExceptionList& exceptions)
+void SceneLoaderMRay::LoadCameras(TracerI& tracer, ErrorList& exceptions)
 {
     struct CameraLoader
     {
@@ -1558,7 +1549,7 @@ void SceneLoaderMRay::LoadCameras(TracerI& tracer, ExceptionList& exceptions)
                              CameraLoader(tracer));
 }
 
-void SceneLoaderMRay::LoadLights(TracerI& tracer, ExceptionList& exceptions)
+void SceneLoaderMRay::LoadLights(TracerI& tracer, ErrorList& exceptions)
 {
     struct LightLoader
     {
@@ -1710,7 +1701,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     ItemLocationMap primHT;
     primHT.reserve(surfaces.size() * MaxPrimBatchPerSurface +
                    lightSurfaces.size());
-    std::future<void> primHTReady = threadPool.submit_task(
+    std::future<void> primHTReady = threadPool.SubmitTask(
     [&primHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
         CreateHT(primHT, sceneJsonIn.at(NodeNames::PRIMITIVE_LIST));
@@ -1718,7 +1709,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     // Materials
     ItemLocationMap matHT;
     matHT.reserve(surfaces.size() * MaxPrimBatchPerSurface);
-    std::future<void> matHTReady = threadPool.submit_task(
+    std::future<void> matHTReady = threadPool.SubmitTask(
     [&matHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
         CreateHT(matHT, sceneJsonIn.at(NodeNames::MATERIAL_LIST));
@@ -1726,7 +1717,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     // Cameras
     ItemLocationMap camHT;
     camHT.reserve(camSurfaces.size());
-    std::future<void> camHTReady = threadPool.submit_task(
+    std::future<void> camHTReady = threadPool.SubmitTask(
     [&camHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
         CreateHT(camHT, sceneJsonIn.at(NodeNames::CAMERA_LIST));
@@ -1735,7 +1726,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     // +1 Comes from boundary light
     ItemLocationMap lightHT;
     lightHT.reserve(lightSurfaces.size() + 1);
-    std::future<void> lightHTReady = threadPool.submit_task(
+    std::future<void> lightHTReady = threadPool.SubmitTask(
     [&lightHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
         CreateHT(lightHT, sceneJsonIn.at(NodeNames::LIGHT_LIST));
@@ -1745,7 +1736,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     transformHT.reserve(lightSurfaces.size() +
                         surfaces.size() +
                         camSurfaces.size() + 1);
-    std::future<void> transformHTReady = threadPool.submit_task(
+    std::future<void> transformHTReady = threadPool.SubmitTask(
     [&transformHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
         CreateHT(transformHT, sceneJsonIn.at(NodeNames::TRANSFORM_LIST));
@@ -1759,7 +1750,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     // Worst case, we will have couple of rehashes nothing critical.
     ItemLocationMap mediumHT;
     mediumHT.reserve(512);
-    std::future<void> mediumHTReady = threadPool.submit_task(
+    std::future<void> mediumHTReady = threadPool.SubmitTask(
     [&mediumHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
         return CreateHT(mediumHT, sceneJsonIn.at(NodeNames::MEDIUM_LIST));
@@ -1772,7 +1763,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     ItemLocationMap textureHT;
     textureHT.reserve(surfaces.size() * MaxPrimBatchPerSurface * 2 +
                       16);
-    std::future<void> textureHTReady = threadPool.submit_task(
+    std::future<void> textureHTReady = threadPool.SubmitTask(
     [&textureHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
         return CreateHT(textureHT, sceneJsonIn.at(NodeNames::TEXTURE_LIST));
@@ -1959,31 +1950,31 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     // Per-type per-array will be too fine grained?
     // (i.e., for cameras, probably a scene has at most 1-2 camera types 5-10 camera,
     // but a primitive may have thousands of primitives (not indiviual, as a batch))
-    threadPool.detach_task([this, &EliminateDuplicates]()
+    threadPool.SubmitDetachedTask([this, &EliminateDuplicates]()
     {
         for(auto& p : primNodes) EliminateDuplicates(p.second);
     });
-    threadPool.detach_task([this, &EliminateDuplicates]()
+    threadPool.SubmitDetachedTask([this, &EliminateDuplicates]()
     {
         for(auto& c : cameraNodes) EliminateDuplicates(c.second);
     });
-    threadPool.detach_task([this, &EliminateDuplicates]()
+    threadPool.SubmitDetachedTask([this, &EliminateDuplicates]()
     {
         for(auto& t : transformNodes) EliminateDuplicates(t.second);
     });
-    threadPool.detach_task([this, &EliminateDuplicates]()
+    threadPool.SubmitDetachedTask([this, &EliminateDuplicates]()
     {
         for(auto& l : lightNodes) EliminateDuplicates(l.second);
     });
-    threadPool.detach_task([this, &EliminateDuplicates]()
+    threadPool.SubmitDetachedTask([this, &EliminateDuplicates]()
     {
         for(auto& m : materialNodes) EliminateDuplicates(m.second);
     });
-    threadPool.detach_task([this, &EliminateDuplicates]()
+    threadPool.SubmitDetachedTask([this, &EliminateDuplicates]()
     {
         for(auto& m : mediumNodes) EliminateDuplicates(m.second);
     });
-    threadPool.detach_task([this]()
+    threadPool.SubmitDetachedTask([this]()
     {
         auto LessThan = [](const auto& lhs, const auto& rhs)
         {
@@ -1998,7 +1989,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
         textureNodes.erase(last, textureNodes.end());
     });
 
-    threadPool.wait();
+    threadPool.Wait();
 }
 
 void SceneLoaderMRay::CreateSurfaces(TracerI& tracer, const std::vector<SurfaceStruct>& surfs)
@@ -2138,7 +2129,7 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
                           lightSurfs, boundary);
 
         // Multi-threaded section
-        ExceptionList exceptionList;
+        ErrorList exceptionList;
         // Concat to a single exception and return it
         auto ConcatIfError = [&exceptionList]() -> MRayError
         {
@@ -2166,7 +2157,7 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
         // We are waiting here for future proofness, in future
         // or a user may create a custom primitive type that holds
         // a texture etc.
-        threadPool.wait();
+        threadPool.Wait();
         // We already bottlenecked ourselves here (by waiting),
         // might as well check if errors are occured and return early
         if(auto e = ConcatIfError(); e) return e;
@@ -2175,7 +2166,7 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
         LoadMediums(tracer, exceptionList);
         // Waiting here because Materials depend on mediums
         // In mray, materials seperate two mediums.
-        threadPool.wait();
+        threadPool.Wait();
         // Same as above
         if(auto e = ConcatIfError(); e) return e;
 
@@ -2186,13 +2177,13 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
         LoadCameras(tracer, exceptionList);
         // Lights may depend on primitives (primitive-backed lights)
         // So we need to wait primitive id mappings to complete
-        threadPool.wait();
+        threadPool.Wait();
         if(auto e = ConcatIfError(); e) return e;
 
         LoadLights(tracer, exceptionList);
 
         // Finally, wait all load operations to complete
-        threadPool.wait();
+        threadPool.Wait();
         if(auto e = ConcatIfError(); e) return e;
 
         // Scene id -> tracer id mappings are created
@@ -2209,19 +2200,19 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
     // MRay related errros
     catch(const MRayError& e)
     {
-        threadPool.purge();
-        threadPool.wait();
+        threadPool.ClearTasks();
+        threadPool.Wait();
         return e;
     }
     // Json related errors
     catch(const nlohmann::json::exception& e)
     {
-        threadPool.purge();
-        threadPool.wait();
+        threadPool.ClearTasks();
+        threadPool.Wait();
         return MRayError("Json Error ({})", std::string(e.what()));
     }
 
-    threadPool.wait();
+    threadPool.Wait();
     return MRayError::OK;
 }
 
@@ -2294,7 +2285,7 @@ void SceneLoaderMRay::ClearIntermediateBuffers()
     textureNodes.clear();
 }
 
-SceneLoaderMRay::SceneLoaderMRay(BS::thread_pool& pool)
+SceneLoaderMRay::SceneLoaderMRay(ThreadPool& pool)
     :threadPool(pool)
 {}
 

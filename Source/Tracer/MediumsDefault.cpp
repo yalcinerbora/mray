@@ -1,6 +1,5 @@
 #include "MediumsDefault.h"
 #include "Core/TypeNameGenerators.h"
-#include "Core/Error.hpp"
 
 std::string_view MediumGroupVacuum::TypeName()
 {

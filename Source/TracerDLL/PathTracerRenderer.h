@@ -133,7 +133,7 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer>
     // Constructors & Destructor
                         PathTracerRenderer(const RenderImagePtr&,
                                            TracerView,
-                                           BS::thread_pool&,
+                                           ThreadPool&,
                                            const GPUSystem&,
                                            const RenderWorkPack&);
                         PathTracerRenderer(const PathTracerRenderer&) = delete;

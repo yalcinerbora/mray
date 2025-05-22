@@ -5,16 +5,16 @@
 
 namespace mray::cuda
 {
+    MRAY_HOST void GPUAssertHost(cudaError_t code, const char* file, int line);
+    MRAY_HOST void GPUMemThrow(cudaError_t code, const char* file, int line);
+    MRAY_HOST void GPUDriverAssert(CUresult code, const char* file, int line);
+    MRAY_HOST void GPUDriverMemThrow(CUresult code, const char* file, int line);
+
     inline constexpr void GPUAssert(cudaError_t code, const char* file, int line)
     {
         #ifndef __CUDA_ARCH__
             if(code == cudaSuccess) return;
-
-            MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
-                            fmt::format(fg(fmt::color::green),
-                                        std::string("CUDA Failure")),
-                            cudaGetErrorString(code), file, line);
-            assert(false);
+            GPUAssertHost(code, file, line);
         #else
             if(code == cudaSuccess) return;
 
@@ -23,57 +23,6 @@ namespace mray::cuda
             __brkpt();
         #endif
     }
-
-    inline constexpr void GPUMemThrow(cudaError_t code, const char* file, int line)
-    {
-        if(code == cudaErrorMemoryAllocation)
-        {
-            MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
-                           fmt::format(fg(fmt::color::green),
-                                       std::string("CUDA Failure")),
-                           cudaGetErrorString(code),
-                           file,
-                           line);
-
-            throw MRayError("GPU Device is out of memory!");
-        }
-    }
-
-    inline constexpr void GPUDriverAssert(CUresult code, const char* file, int line)
-    {
-        if(code != CUDA_SUCCESS)
-        {
-            std::string greenErrorCode = fmt::format(fg(fmt::color::green),
-                                                     std::string("CUDA Failure"));
-            const char* errStr;
-            cuGetErrorString(code, &errStr);
-
-            MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
-                           fmt::format(fg(fmt::color::green),
-                                       std::string("CUDA Failure")),
-                           errStr, file, line);
-            assert(false);
-        }
-    }
-
-    inline constexpr void GPUDriverMemThrow(CUresult code, const char* file, int line)
-    {
-        if(code == CUDA_ERROR_OUT_OF_MEMORY)
-        {
-            std::string greenErrorCode = fmt::format(fg(fmt::color::green),
-                                                     std::string("CUDA Failure"));
-            const char* errStr;
-            cuGetErrorString(code, &errStr);
-
-            MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
-                           fmt::format(fg(fmt::color::green),
-                                       std::string("CUDA Failure")),
-                           errStr, file, line);
-
-            throw MRayError("GPU Device is out of memory!");
-        }
-    }
-
 }
 
 

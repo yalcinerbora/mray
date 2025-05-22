@@ -4,7 +4,6 @@
 #include "Matrix.h"
 #include "Types.h"
 #include "Error.h"
-#include "Error.hpp"
 
 namespace Color
 {

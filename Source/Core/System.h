@@ -47,13 +47,13 @@
     #error System preprocessor definition is not set properly! (CMake should have handled this)
 #endif
 
-
-std::string GetProcessPath();
-bool        EnableVTMode();
-void        RenameThread(SystemThreadHandle,
-                         const std::string& name);
-std::array<size_t, 2>
-GetTerminalSize();
+//
+std::string             GetProcessPath();
+bool                    EnableVTMode();
+void                    RenameThread(SystemThreadHandle,
+                                 const std::string& name);
+SystemThreadHandle      GetCurrentThreadHandle();
+std::array<size_t, 2>   GetTerminalSize();
 
 // Loaded class from a shared library
 // Destructor may be from the other side of DLL boundary.

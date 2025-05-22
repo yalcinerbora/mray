@@ -14,7 +14,6 @@ target_link_libraries(TSceneLoaderMRay
                       PRIVATE
                       CoreLib
                       TransientPool
-                      bs::thread_pool
                       mray::meta_compile_opts
                       mray::cuda_extra_compile_opts
                       mray::test_common

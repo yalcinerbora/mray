@@ -5,12 +5,11 @@
 
 #include <barrier>
 
-#include <BS/BS_thread_pool.hpp>
-
 #include "ImageLoader/EntryPoint.h"
 
 #include "Core/Algorithm.h"
 #include "Core/TypeNameGenerators.h"
+#include "Core/ThreadPool.h"
 
 using MatKeyValPair = std::pair<const pxr::UsdPrim*, const MRayUSDMaterialProps*>;
 
@@ -629,7 +628,7 @@ MaterialConverter::ResolveTextures(const std::vector<MRayUSDMaterialProps>& prop
 
 MRayError MaterialConverter::LoadTextures(std::map<pxr::UsdPrim, TextureId>& result,
                                           FlatSet<std::pair<pxr::UsdPrim, MRayUSDTexture>>&& tex,
-                                          TracerI& tracer, BS::thread_pool& threadPool)
+                                          TracerI& tracer, ThreadPool& threadPool)
 {
     auto flatTextures = std::move(tex).extract();
     uint32_t textureCount = static_cast<uint32_t>(flatTextures.size());
@@ -646,7 +645,7 @@ MRayError MaterialConverter::LoadTextures(std::map<pxr::UsdPrim, TextureId>& res
             std::exit(1);
         }
     };
-    uint32_t threadCount = std::min(threadPool.get_thread_count(),
+    uint32_t threadCount = std::min(threadPool.ThreadCount(),
                                     textureCount);
 
     using Barrier = std::barrier<decltype(BarrierFunc)>;
@@ -657,9 +656,10 @@ MRayError MaterialConverter::LoadTextures(std::map<pxr::UsdPrim, TextureId>& res
     // (We wait the threads before the scope exit, but just to be safe.
     // later we may enable more asynchronicity)
     auto imgLoader = std::shared_ptr(CreateImageLoader(false));
+    ErrorList errors;
 
     const auto THRD_ProcessTextures =
-    [&, imgLoader](uint32_t start, uint32_t end) -> MRayError
+    [&, imgLoader](uint32_t start, uint32_t end) -> void
     {
         MRayError err = MRayError::OK;
         // Subset the data to per core
@@ -695,7 +695,8 @@ MRayError MaterialConverter::LoadTextures(std::map<pxr::UsdPrim, TextureId>& res
                 if(imgFileE.has_error())
                 {
                     barrier->arrive_and_drop();
-                    return imgFileE.error();
+                    errors.AddException(MRayError(imgFileE.error()));
+                    return;
                 }
                 localTexFiles.emplace_back(std::move(imgFileE.value()));
 
@@ -703,7 +704,8 @@ MRayError MaterialConverter::LoadTextures(std::map<pxr::UsdPrim, TextureId>& res
                 if(!headerE.has_value())
                 {
                     barrier->arrive_and_drop();
-                    return headerE.error();
+                    errors.AddException(MRayError(headerE.error()));
+                    return;
                 }
 
                 const auto& header = headerE.value();
@@ -735,7 +737,11 @@ MRayError MaterialConverter::LoadTextures(std::map<pxr::UsdPrim, TextureId>& res
             {
                 const auto& myId = myIdRange[i];
                 Expected<Image> imgE = localTexFiles[i]->ReadImage();
-                if(!imgE.has_value()) return imgE.error();
+                if(!imgE.has_value())
+                {
+                    errors.AddException(MRayError(imgE.error()));
+                    return;
+                }
                 auto& img = imgE.value();
                 // Send data mip by mip
                 for(uint32_t j = 0; j < img.header.mipCount; j++)
@@ -746,22 +752,22 @@ MRayError MaterialConverter::LoadTextures(std::map<pxr::UsdPrim, TextureId>& res
         catch(MRayError& e)
         {
             if(!barrierPassed) barrier->arrive_and_drop();
-            return e;
+            errors.AddException(MRayError(e));
+            return;
         }
         catch(std::exception& e)
         {
             if(!barrierPassed) barrier->arrive_and_drop();
-            return MRayError("Unknown Error ({})", std::string(e.what()));
+            errors.AddException(MRayError("Unknown Error ({})", std::string(e.what())));
+            return;
         }
-        return err;
     };
-    auto future = threadPool.submit_blocks(uint32_t(0), textureCount,
-                                           THRD_ProcessTextures, threadCount);
-    future.wait();
-    auto errorArray = future.get();
+    auto future = threadPool.SubmitBlocks(uint32_t(textureCount),
+                                         THRD_ProcessTextures, threadCount);
+    future.WaitAll();
     MRayError err = MRayError::OK;
     bool isFirst = true;
-    for(const auto& threadErr : errorArray)
+    for(const auto& threadErr : errors.exceptions)
     {
         if(threadErr && isFirst)
             err = threadErr;
@@ -769,7 +775,6 @@ MRayError MaterialConverter::LoadTextures(std::map<pxr::UsdPrim, TextureId>& res
             err.AppendInfo(threadErr.GetError());
     }
     if(err) return err;
-
 
     // Copy to map
     for(const auto& t : texIds)
@@ -894,7 +899,7 @@ void PrintMaterials(const std::vector<MRayUSDMaterialProps>& matPropList,
 
 MRayError ProcessUniqueMaterials(std::map<pxr::UsdPrim, MRayUSDMatAlphaPack>& outMaterials,
                                  std::map<pxr::UsdPrim, TextureId>& uniqueTextureIds,
-                                 TracerI& tracer, BS::thread_pool& threadPool,
+                                 TracerI& tracer, ThreadPool& threadPool,
                                  const MRayUSDMaterialMap& uniqueMaterials,
                                  const std::map<pxr::UsdPrim, MRayUSDTexture>& extraTextures)
 {

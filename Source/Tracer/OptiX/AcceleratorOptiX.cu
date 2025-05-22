@@ -10,7 +10,6 @@
 #include "Core/System.h"
 #include "Core/Expected.h"
 #include "Core/Filesystem.h"
-#include "Core/Error.hpp"
 
 #include "Device/GPUAlgScan.h"
 #include "Device/GPUSystem.hpp"
@@ -208,7 +207,7 @@ std::string_view BaseAcceleratorOptiX::TypeName()
     return BaseAccelTypeName<Name>;
 }
 
-BaseAcceleratorOptiX::BaseAcceleratorOptiX(BS::thread_pool& tp, const GPUSystem& sys,
+BaseAcceleratorOptiX::BaseAcceleratorOptiX(ThreadPool& tp, const GPUSystem& sys,
                                            const AccelGroupGenMap& genMap,
                                            const AccelWorkGenMap& workGenMap)
     : BaseAcceleratorT<BaseAcceleratorOptiX>(tp, sys, genMap, workGenMap)
@@ -374,11 +373,11 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
                                 accelTempMem,
                                 {bufferSizes.outputSizeInBytes,
                                  bufferSizes.tempSizeInBytes, 1});
-    // I think there is a bug on CUDA Init check, 
+    // I think there is a bug on CUDA Init check,
     // It does not track optix functions??
     // Memset anyway
     queue.MemsetAsync(Span(static_cast<Byte*>(accelTempMem), accelTempMem.Size()), 0x00);
-    
+
     std::array<OptixAccelEmitDesc, 2> emitProps =
     {
         OptixAccelEmitDesc

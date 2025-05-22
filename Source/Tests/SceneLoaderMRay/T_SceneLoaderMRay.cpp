@@ -1,14 +1,13 @@
 #include <sstream>
 
 #include <gtest/gtest.h>
-#include <BS/BS_thread_pool.hpp>
 
 #include "SceneLoaderMRay/EntryPoint.h"
 
 #include "Core/Types.h"
 #include "Core/SharedLibrary.h"
 #include "Core/SceneLoaderI.h"
-#include "Core/Error.hpp"
+#include "Core/ThreadPool.h"
 
 #include "MockTracer.h"
 #include "TestScenes.h"
@@ -18,7 +17,7 @@ class SceneLoaderMRayTest : public ::testing::Test
     protected:
     // Dunno where or when the destructor is called
     // So everything is wrapped on unique_ptrs
-    std::unique_ptr<BS::thread_pool>    pool = nullptr;
+    std::unique_ptr<ThreadPool>         pool = nullptr;
     std::unique_ptr<SharedLibrary>      dllFile = nullptr;
     SharedLibPtr<SceneLoaderI>          loader = {nullptr, nullptr};
 
@@ -29,7 +28,7 @@ class SceneLoaderMRayTest : public ::testing::Test
 void SceneLoaderMRayTest::SetUp()
 {
     unsigned int tCount = std::max(1u, std::thread::hardware_concurrency());
-    pool = std::make_unique<BS::thread_pool>(tCount, [](){});
+    pool = std::make_unique<ThreadPool>(tCount);
     dllFile = std::make_unique<SharedLibrary>("SceneLoaderMRay");
 
     SharedLibArgs args

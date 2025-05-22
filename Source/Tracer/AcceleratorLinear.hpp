@@ -144,7 +144,7 @@ std::string_view AcceleratorGroupLinear<PG>::TypeName()
 
 template<PrimitiveGroupC PG>
 AcceleratorGroupLinear<PG>::AcceleratorGroupLinear(uint32_t accelGroupId,
-                                                   BS::thread_pool& tp,
+                                                   ThreadPool& tp,
                                                    const GPUSystem& sys,
                                                    const GenericGroupPrimitiveT& pg,
                                                    const AccelWorkGenMap& globalWorkMap)

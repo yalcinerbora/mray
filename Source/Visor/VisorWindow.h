@@ -15,12 +15,11 @@
 #include "TonemapStage.h"
 #include "RenderImagePool.h"
 
+class ThreadPool;
 struct ImFont;
 struct GLFWwindow;
 struct VisorConfig;
 struct MRayError;
-
-namespace BS { class thread_pool; }
 
 struct FrameCounter
 {
@@ -128,7 +127,7 @@ class VisorWindow
     GLFWwindow*         window          = nullptr;
     bool                hdrRequested    = false;
     bool                stopPresenting  = false;
-    BS::thread_pool*    threadPool      = nullptr;
+    ThreadPool*         threadPool      = nullptr;
     //
     VisorGUI                    gui;
     VisorState                  visorState      = {};
@@ -167,7 +166,7 @@ class VisorWindow
                            const VulkanSystemView& handlesVk,
                            TimelineSemaphore* syncSem,
                            uint32_t hostImportAlignment,
-                           BS::thread_pool* threadPool,
+                           ThreadPool* threadPool,
                            const std::string& windowTitle,
                            const VisorConfig& config,
                            const std::string& processPath);

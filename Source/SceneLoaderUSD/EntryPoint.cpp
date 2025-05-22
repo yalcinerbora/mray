@@ -3,7 +3,7 @@
 
 // C Mangling, we will load these in runtime
 extern "C" MRAY_SCENELOADER_USD_ENTRYPOINT
-SceneLoaderI* SceneLoaderMRayDetail::ConstructSceneLoaderUSD(BS::thread_pool& p)
+SceneLoaderI* SceneLoaderMRayDetail::ConstructSceneLoaderUSD(ThreadPool& p)
 {
     return new SceneLoaderUSD(p);
 }

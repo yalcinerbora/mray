@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "TracerTypes.h"
 #include "RenderImage.h"
 #include "GenericGroup.h"
@@ -24,8 +23,7 @@
 
 #include "Common/RenderImageStructs.h"
 
-namespace BS { class thread_pool; }
-
+class ThreadPool;
 //
 struct MultiPartitionOutput;
 // A nasty forward declaration
@@ -129,7 +127,7 @@ template<class RendererType>
 concept RendererC = requires(RendererType rt,
                              const TracerView& tv,
                              TransientData input,
-                             BS::thread_pool& tp,
+                             ThreadPool& tp,
                              const GPUSystem& gpuSystem,
                              const GPUQueue& q)
 {
@@ -509,7 +507,7 @@ class RendererT : public RendererI
     uint32_t                GenerateCameraWorkMappings(uint32_t workIdStart);
 
     protected:
-    BS::thread_pool&            globalThreadPool;
+    ThreadPool&                 globalThreadPool;
     const GPUSystem&            gpuSystem;
     TracerView                  tracerView;
     const RenderImagePtr&       renderBuffer;
@@ -543,7 +541,7 @@ class RendererT : public RendererI
                         RendererT(const RenderImagePtr&,
                                   const RenderWorkPack& workPacks,
                                   TracerView, const GPUSystem&,
-                                  BS::thread_pool&);
+                                  ThreadPool&);
     void                SetCameraTransform(const CameraTransform&) override;
     std::string_view    Name() const override;
 };
@@ -1071,7 +1069,7 @@ template <class C>
 RendererT<C>::RendererT(const RenderImagePtr& rb,
                         const RenderWorkPack& wp,
                         TracerView tv, const GPUSystem& s,
-                        BS::thread_pool& tp)
+                        ThreadPool& tp)
     : globalThreadPool(tp)
     , gpuSystem(s)
     , tracerView(tv)

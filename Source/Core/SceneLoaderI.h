@@ -8,6 +8,8 @@
 
 #include "ImageLoader/ImageLoaderI.h"
 
+class ThreadPool;
+
 enum class SceneTexId : uint32_t {};
 
 // TODO: Some formats (well probably all formats)
@@ -54,9 +56,4 @@ class SceneLoaderI
     virtual void                    ClearScene() = 0;
 };
 
-namespace BS
-{
-    class thread_pool;
-}
-
-using SceneLoaderConstructorArgs = std::tuple<BS::thread_pool&>;
+using SceneLoaderConstructorArgs = std::tuple<ThreadPool&>;

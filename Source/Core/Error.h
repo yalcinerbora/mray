@@ -1,18 +1,9 @@
 #pragma once
 
 #include <string>
-
-namespace fmt { inline namespace v10
-{
-    template <typename T> struct type_identity;
-    template <typename T> using type_identity_t = typename type_identity<T>::type;
-
-    template <typename Char, typename... Args> class basic_format_string;
-
-    template <typename... Args>
-    using format_string = basic_format_string<char, type_identity_t<Args>...>;
-
-}}
+#include <array>
+#include <atomic>
+#include "Log.h"
 
 // Very generic error
 // Throw it return it, stick in a stew
@@ -42,35 +33,27 @@ struct MRayError
     MRayError&  operator=(MRayError&&) noexcept = default;
                 ~MRayError()                    = default;
 
-    explicit operator bool() const;
-    explicit operator bool();
+    explicit    operator bool() const;
+    explicit    operator bool();
 
     std::string GetError() const;
     void        AppendInfo(const std::string&);
 };
 
-inline MRayError::MRayError(Type t)
-    : type(t)
-{}
+struct ErrorList
+{
+    private:
+    static constexpr size_t MaxExceptionSize = 128;
+    using ExceptionArray = std::array<MRayError, MaxExceptionSize>;
 
-inline MRayError::MRayError(std::string_view sv)
+    public:
+    std::atomic_size_t  size = 0;
+    ExceptionArray      exceptions;
+    void                AddException(MRayError&&);
+};
+
+template<class... Args>
+MRayError::MRayError(fmt::format_string<Args...> fstr, Args&&... args)
     : type(MRayError::HAS_ERROR)
-    , customInfo(sv)
+    , customInfo(MRAY_FORMAT(fstr, std::forward<Args>(args)...))
 {}
-
-inline MRayError::operator bool() const
-{
-    return type != MRayError::OK;
-}
-
-inline MRayError::operator bool()
-{
-    return type != MRayError::OK;
-}
-
-inline std::string MRayError::GetError() const
-{
-    return customInfo;
-}
-
-#include "Error.hpp"

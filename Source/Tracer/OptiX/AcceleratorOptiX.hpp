@@ -141,7 +141,7 @@ std::string_view AcceleratorGroupOptiX<PG>::TypeName()
 
 template<PrimitiveGroupC PG>
 AcceleratorGroupOptiX<PG>::AcceleratorGroupOptiX(uint32_t accelGroupId,
-                                                 BS::thread_pool& tp,
+                                                 ThreadPool& tp,
                                                  const GPUSystem& sys,
                                                  const GenericGroupPrimitiveT& pg,
                                                  const AccelWorkGenMap& wMap)

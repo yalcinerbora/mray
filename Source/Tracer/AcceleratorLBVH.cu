@@ -7,7 +7,6 @@
 #include "Device/GPUAlgGeneric.h"
 #include "Device/GPUAtomic.h"
 
-#include "Core/Error.hpp"
 #include "TypeFormat.h"
 
 struct MortonDiffFunctor

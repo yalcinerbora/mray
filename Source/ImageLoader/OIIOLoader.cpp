@@ -2,7 +2,6 @@
 
 #include "Core/Expected.h"
 #include "Core/Log.h"
-#include "Core/Error.hpp"
 
 #include <OpenImageIO/imageio.h>
 

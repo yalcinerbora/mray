@@ -5,7 +5,6 @@
 
 #include "DataStructures.h"
 #include "Error.h"
-#include "Error.hpp"
 
 #ifdef MRAY_WINDOWS
 
@@ -70,6 +69,11 @@ void RenameThread(std::thread::native_handle_type t, const std::string& name)
     SetThreadDescription(t, wideStr.data());
 }
 
+SystemThreadHandle GetCurrentThreadHandle()
+{
+    return GetCurrentThread();
+}
+
 bool EnableVTMode()
 {
     auto SetVT = [](DWORD outputHandle) -> bool
@@ -117,6 +121,11 @@ GetTerminalSize()
 void RenameThread(std::thread::native_handle_type t, const std::string& name)
 {
     pthread_setname_np(t, name.c_str());
+}
+
+SystemThreadHandle GetCurrentThreadHandle()
+{
+    return pthread_getthreadid_np();
 }
 
 std::string GetProcessPath()

@@ -2,8 +2,7 @@
 #include "VisorGUI.h"
 
 #include "Core/Log.h"
-
-#include <BS/BS_thread_pool.hpp>
+#include "Core/ThreadPool.h"
 
 #include <array>
 #include <filesystem>
@@ -283,7 +282,7 @@ RenderImagePool::RenderImagePool()
     : imgLoader(nullptr, nullptr)
 {}
 
-RenderImagePool::RenderImagePool(BS::thread_pool* tp,
+RenderImagePool::RenderImagePool(ThreadPool* tp,
                                  const VulkanSystemView& handles,
                                  const RenderImageInitInfo& initInfoIn)
     : handlesVk(&handles)
@@ -422,7 +421,7 @@ void RenderImagePool::SaveImage(VisorGUI& visorGUI,
     // Copy everything on the stack.
     // Also copy semaphore and its value
     // Now during this thread's process we may encounter
-    loadEvent = threadPool->submit_task([this, fileOutInfo, t, &imgSem, &visorGUI]()
+    loadEvent = threadPool->SubmitTask([this, fileOutInfo, t, &imgSem, &visorGUI]()
     {
         // Wait for the copy to staging buffer to finish
         imgSem.HostWait(1);

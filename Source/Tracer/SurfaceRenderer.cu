@@ -1,7 +1,6 @@
 #include "SurfaceRenderer.h"
 #include "RayGenKernels.h"
 
-#include "Core/Error.hpp"
 #include "Core/Timer.h"
 
 #include "Device/GPUSystem.hpp"
@@ -131,7 +130,7 @@ void KCSetBoundaryWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<HitKeyPack> dWo
 
 SurfaceRenderer::SurfaceRenderer(const RenderImagePtr& rb,
                                  TracerView tv,
-                                 BS::thread_pool& tp,
+                                 ThreadPool& tp,
                                  const GPUSystem& s,
                                  const RenderWorkPack& wp)
     : RendererT(rb, wp, tv, s, tp)

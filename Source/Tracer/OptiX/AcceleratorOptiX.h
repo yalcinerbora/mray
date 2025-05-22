@@ -233,7 +233,7 @@ class AcceleratorGroupOptiX final
     public:
     // Constructors & Destructor
     AcceleratorGroupOptiX(uint32_t accelGroupId,
-                          BS::thread_pool&,
+                          ThreadPool&,
                           const GPUSystem&,
                           const GenericGroupPrimitiveT& pg,
                           const AccelWorkGenMap&);
@@ -327,7 +327,7 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
                                     const ShaderNameMap&);
     public:
     // Constructors & Destructor
-    BaseAcceleratorOptiX(BS::thread_pool&, const GPUSystem&,
+    BaseAcceleratorOptiX(ThreadPool&, const GPUSystem&,
                          const AccelGroupGenMap&,
                          const AccelWorkGenMap&);
 

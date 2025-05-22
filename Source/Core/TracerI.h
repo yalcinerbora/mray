@@ -30,9 +30,9 @@ inline constexpr IdType TracerIdInvalid =  IdType(std::numeric_limits<std::under
 static_assert(std::numeric_limits<std::byte>::max() == std::byte(0), "Really?");
 
 class TimelineSemaphore;
+class ThreadPool;
 
 using GPUThreadInitFunction = void(*)();
-namespace BS { class thread_pool; }
 
 struct RenderImageParams
 {
@@ -687,7 +687,7 @@ class [[nodiscard]] TracerI
     virtual void    Flush() const = 0;
 
     virtual GPUThreadInitFunction   GetThreadInitFunction() const = 0;
-    virtual void                    SetThreadPool(BS::thread_pool&) = 0;
+    virtual void                    SetThreadPool(ThreadPool&) = 0;
     virtual size_t                  TotalDeviceMemory() const = 0;
     virtual size_t                  UsedDeviceMemory() const = 0;
     virtual const TracerParameters& Parameters() const = 0;

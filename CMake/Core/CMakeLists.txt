@@ -13,6 +13,8 @@ endif()
 set(SRC_SYSTEM
     ${CURRENT_SOURCE_DIR}/System.h
     ${CURRENT_SOURCE_DIR}/System.cpp
+    ${CURRENT_SOURCE_DIR}/ThreadPool.h
+    ${CURRENT_SOURCE_DIR}/ThreadPool.cpp
     ${CURRENT_SOURCE_DIR}/SharedLibrary.h
     ${CURRENT_SOURCE_DIR}/SharedLibrary.cpp
     ${CURRENT_SOURCE_DIR}/MRayDescriptions.h
@@ -49,8 +51,9 @@ set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/TypeFinder.h
     ${CURRENT_SOURCE_DIR}/NormTypes.h
     ${CURRENT_SOURCE_DIR}/Log.h
+    ${CURRENT_SOURCE_DIR}/Log.cpp
     ${CURRENT_SOURCE_DIR}/Error.h
-    ${CURRENT_SOURCE_DIR}/Error.hpp
+    ${CURRENT_SOURCE_DIR}/Error.cpp
     ${CURRENT_SOURCE_DIR}/Expected.h
     ${CURRENT_SOURCE_DIR}/Types.h
     ${CURRENT_SOURCE_DIR}/Flag.h

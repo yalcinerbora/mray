@@ -88,7 +88,7 @@ void KCShowTexture(MRAY_GRID_CONSTANT const ImageSpan imgSpan,
 
 TexViewRenderer::TexViewRenderer(const RenderImagePtr& rb,
                                  TracerView tv,
-                                 BS::thread_pool& tp,
+                                 ThreadPool& tp,
                                  const GPUSystem& s,
                                  const RenderWorkPack& wp)
     : RendererT(rb, wp, tv, s, tp)

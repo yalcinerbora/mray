@@ -311,7 +311,7 @@ std::string_view AcceleratorGroupLBVH<PG>::TypeName()
 
 template<PrimitiveGroupC PG>
 AcceleratorGroupLBVH<PG>::AcceleratorGroupLBVH(uint32_t accelGroupId,
-                                               BS::thread_pool& tp,
+                                               ThreadPool& tp,
                                                const GPUSystem& sys,
                                                const GenericGroupPrimitiveT& pg,
                                                const AccelWorkGenMap& globalWorkMap)

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.26)
+cmake_minimum_required(VERSION 3.26...4.0)
 
 # Deduplicate archives when linking
 cmake_policy(VERSION 3.26)

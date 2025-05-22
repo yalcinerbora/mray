@@ -16,7 +16,7 @@
 #include "TextureFilter.h"
 #include "Random.h"
 
-namespace BS { class thread_pool; }
+class ThreadPool;
 
 using PrimGenerator     = GeneratorFuncType<GenericGroupPrimitiveT, uint32_t,
                                             const GPUSystem&>;
@@ -36,11 +36,11 @@ using LightGenerator    = GeneratorFuncType<GenericGroupLightT, uint32_t,
 using RendererGenerator = GeneratorFuncType<RendererI,
                                             const RenderImagePtr&,
                                             TracerView,
-                                            BS::thread_pool&,
+                                            ThreadPool&,
                                             const GPUSystem&,
                                             const RenderWorkPack&>;
 using BaseAccelGenerator = GeneratorFuncType<BaseAcceleratorI,
-                                             BS::thread_pool&,
+                                             ThreadPool&,
                                              const GPUSystem&,
                                              const AccelGroupGenMap&,
                                              const AccelWorkGenMap&>;
@@ -124,7 +124,7 @@ class TracerBase : public TracerI
     std::atomic_uint32_t    camSurfaceCounter   = 0;
 
     protected:
-    BS::thread_pool*    globalThreadPool;
+    ThreadPool*         globalThreadPool;
 
     // Supported Types
     TypeNameList        primTypes;
@@ -328,7 +328,7 @@ class TracerBase : public TracerI
     void                    ClearAll() override;
     void                    Flush() const override;
     GPUThreadInitFunction   GetThreadInitFunction() const override;
-    void                    SetThreadPool(BS::thread_pool&) override;
+    void                    SetThreadPool(ThreadPool&) override;
     size_t                  TotalDeviceMemory() const override;
     size_t                  UsedDeviceMemory() const override;
     const TracerParameters& Parameters() const override;

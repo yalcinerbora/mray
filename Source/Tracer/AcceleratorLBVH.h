@@ -201,7 +201,7 @@ class AcceleratorGroupLBVH final : public AcceleratorGroupT<AcceleratorGroupLBVH
     public:
     // Constructors & Destructor
     AcceleratorGroupLBVH(uint32_t accelGroupId,
-                         BS::thread_pool&,
+                         ThreadPool&,
                          const GPUSystem&,
                          const GenericGroupPrimitiveT& pg,
                          const AccelWorkGenMap&);
@@ -270,7 +270,7 @@ class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
 
     public:
     // Constructors & Destructor
-    BaseAcceleratorLBVH(BS::thread_pool&, const GPUSystem&,
+    BaseAcceleratorLBVH(ThreadPool&, const GPUSystem&,
                         const AccelGroupGenMap&,
                         const AccelWorkGenMap&);
 
@@ -311,7 +311,7 @@ class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
 };
 
 inline
-BaseAcceleratorLBVH::BaseAcceleratorLBVH(BS::thread_pool& tp, const GPUSystem& sys,
+BaseAcceleratorLBVH::BaseAcceleratorLBVH(ThreadPool& tp, const GPUSystem& sys,
                                          const AccelGroupGenMap& aGen,
                                          const AccelWorkGenMap& globalWorkMap)
     : BaseAcceleratorT<BaseAcceleratorLBVH>(tp, sys, aGen, globalWorkMap)

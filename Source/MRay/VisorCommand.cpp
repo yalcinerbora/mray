@@ -2,14 +2,13 @@
 
 #include <CLI/CLI.hpp>
 #include <string_view>
-#include <BS/BS_thread_pool.hpp>
 
 #include "Visor/EntryPoint.h"
 
 #include "Core/SharedLibrary.h"
 #include "Core/System.h"
 #include "Core/Error.h"
-#include "Core/Error.hpp"
+#include "Core/ThreadPool.h"
 
 #include "TracerThread.h"
 
@@ -135,7 +134,7 @@ MRayError VisorCommand::Invoke()
     });
 
     // Thread pool, many things will need this
-    BS::thread_pool threadPool(threadCount);
+    ThreadPool threadPool;
 
     // Get the tracer dll
     TracerThread tracerThread(transferQueue, threadPool);
@@ -146,19 +145,16 @@ MRayError VisorCommand::Invoke()
     // initialization routine, also change the name of the threads.
     // We need to do this somewhere here, if we do it on tracer side
     // due to passing between dll boundaries, it crash on destruction.
-    threadPool.reset(threadCount, [&tracerThread]()
+    threadPool.RestartThreads(threadCount,
+                              [&tracerThread](std::thread::native_handle_type handle, uint32_t threadNumber)
     {
+        using namespace std::string_literals;
+        std::string name = "WorkerThread_"s + std::to_string(threadNumber);
+        RenameThread(handle, name);
+
         auto GPUInit = tracerThread.GetThreadInitFunction();
         GPUInit();
     });
-    std::vector<std::thread::native_handle_type> handles;
-    handles = threadPool.get_native_handles();
-    for(size_t i = 0; i < handles.size(); i++)
-    {
-        using namespace std::string_literals;
-        std::string name = "WorkerThread_"s + std::to_string(i);
-        RenameThread(handles[i], name);
-    }
 
     // The "timeline semaphore" (CPU emulation)
     // This will be used to synchronize between MRay and Visor
@@ -215,7 +211,7 @@ MRayError VisorCommand::Invoke()
     }
     // Order is important here
     // First wait the thread pool
-    threadPool.wait();
+    threadPool.Wait();
     // Destroy the transfer queue
     // So that the tracer can drop from queue wait
     transferQueue.Terminate();

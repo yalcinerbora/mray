@@ -23,8 +23,8 @@ void Tracer::AddRendererGenerators_2(Map<std::string_view, RendererGenerator>& m
                                      Map<std::string_view, RenderWorkPack>& workMap)
 {
     using Args = std::tuple<const RenderImagePtr&, TracerView,
-                       BS::thread_pool&, const GPUSystem&,
-                       const RenderWorkPack&>;
+                            ThreadPool&, const GPUSystem&,
+                            const RenderWorkPack&>;
 
     Args* resolver0 = nullptr;
     RendererTypes_2* resolver1 = nullptr;

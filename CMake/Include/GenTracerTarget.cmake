@@ -219,7 +219,6 @@ function(gen_tracer_target)
                           ${DEVICE_TARGET_FULL_NAME}
                           CoreLib
                           TransientPool
-                          bs::thread_pool
                           PRIVATE
                           mray::meta_compile_opts
                           mray::cuda_extra_compile_opts)

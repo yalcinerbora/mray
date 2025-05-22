@@ -4,7 +4,7 @@
 
 #include "Device/GPUSystem.hpp"
 
-#include <BS/BS_thread_pool.hpp>
+#include "Core/ThreadPool.h"
 
 MRAY_KERNEL
 void KCGenRandomNumbersPCG32(// Output
@@ -75,7 +75,7 @@ void KCGenRandomNumbersPCG32Indirect(// Output
 RNGGroupIndependent::RNGGroupIndependent(uint32_t genCount,
                                          uint64_t seed,
                                          const GPUSystem& sys,
-                                         BS::thread_pool& tp)
+                                         ThreadPool& tp)
     : mainThreadPool(tp)
     , gpuSystem(sys)
     , generatorCount(genCount)
@@ -93,7 +93,7 @@ RNGGroupIndependent::RNGGroupIndependent(uint32_t genCount,
     std::mt19937 rngTemp = rng0;
 
     std::vector<MainRNGState> hMainStates(generatorCount);
-    auto future0 = tp.submit_blocks(size_t(0), size_t(generatorCount),
+    auto future0 = tp.SubmitBlocks(generatorCount,
     [&rng0, &hMainStates](size_t start, size_t end)
     {
         // Local copy to the stack
@@ -106,14 +106,14 @@ RNGGroupIndependent::RNGGroupIndependent(uint32_t genCount,
             hMainStates[i] = MainRNG::GenerateState(rngLocal());
         }
     }, 4u);
-    future0.wait();
+    future0.WaitAll();
 
     // Do discarding after issue (it should be logN for PRNGS)
     rngTemp.discard(generatorCount);
     const std::mt19937 rng1 = rngTemp;
 
     std::vector<BackupRNGState> hBackupStates(generatorCount);
-    auto future1 = tp.submit_blocks(size_t(0), size_t(generatorCount),
+    auto future1 = tp.SubmitBlocks(generatorCount,
     [&rng1, &hBackupStates](size_t start, size_t end)
     {
         // Local copy to the stack
@@ -126,7 +126,7 @@ RNGGroupIndependent::RNGGroupIndependent(uint32_t genCount,
             hBackupStates[i] = BackupRNG::GenerateState(rngLocal());
         }
     }, 4u);
-    future1.wait();
+    future1.WaitAll();
 
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     queue.MemcpyAsync(dBackupStates, Span<const BackupRNGState>(hBackupStates));

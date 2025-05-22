@@ -74,13 +74,13 @@ function(mray_build_ext_dependency_git)
     if(BUILD_SUBPROJECT_APPLY_PATCH)
         set(BUILD_SUBPROJECT_APPLY_PATCH
             PATCH_COMMAND
-                curl ${BUILD_SUBPROJECT_APPLY_PATCH} -s -o tbb_patch.patch
+                curl ${BUILD_SUBPROJECT_APPLY_PATCH} -s -o ${BUILD_SUBPROJECT_NAME}.patch
             # Weird but what to do ...
             # Reset the patch and apply it again
             COMMAND
-                git checkout src/tbb/CMakeLists.txt
+                git checkout -- .
             COMMAND
-                git apply -v tbb_patch.patch
+                git apply -v ${BUILD_SUBPROJECT_NAME}.patch
         )
     endif()
 

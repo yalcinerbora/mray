@@ -83,7 +83,7 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     // Constructors & Destructor
                         SurfaceRenderer(const RenderImagePtr&,
                                         TracerView,
-                                        BS::thread_pool&,
+                                        ThreadPool&,
                                         const GPUSystem&,
                                         const RenderWorkPack&);
                         SurfaceRenderer(const SurfaceRenderer&) = delete;

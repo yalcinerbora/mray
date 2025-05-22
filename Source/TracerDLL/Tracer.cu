@@ -5,8 +5,6 @@
 #include "Device/GPUAlgGeneric.h"
 #include "Device/GPUAlgRadixSort.h"
 
-#include "Core/Error.hpp"
-
 TypeGeneratorPack Tracer::GLOBAL_TYPE_GEN = {};
 
 void Tracer::AddPrimGenerators(Map<std::string_view, PrimGenerator>& map)
@@ -93,11 +91,11 @@ static void AddAccelGeneratorsGeneric(Map<AcceleratorType, BaseAccelGenerator>& 
     // Base
     using LinAccel = typename AcceleratorPack::BaseType;
     baseMap.emplace(t, &GenerateType<BaseAcceleratorI, LinAccel,
-                                     BS::thread_pool&, const GPUSystem&,
+                                     ThreadPool&, const GPUSystem&,
                                      const AccelGroupGenMap&,
                                      const AccelWorkGenMap&>);
 
-    using GroupGenArgs = std::tuple<uint32_t, BS::thread_pool&, const GPUSystem&,
+    using GroupGenArgs = std::tuple<uint32_t, ThreadPool&, const GPUSystem&,
                                const GenericGroupPrimitiveT&,
                                const AccelWorkGenMap&>;
     using AccelGTypes = typename AcceleratorPack::GroupTypes;

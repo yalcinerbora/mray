@@ -4,7 +4,6 @@
 #include "Core/Filesystem.h"
 #include "Core/Expected.h"
 #include "Core/Error.h"
-#include "Core/Error.hpp"
 
 #include "VulkanAllocators.h"
 #include "VulkanTypes.h"

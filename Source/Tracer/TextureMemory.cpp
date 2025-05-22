@@ -1,7 +1,6 @@
 #include "TextureMemory.h"
 #include "ColorConverter.h"
 
-#include "Core/Error.hpp"
 #include "Core/GraphicsFunctions.h"
 #include "Core/Timer.h"
 #include "Core/Vector.h"

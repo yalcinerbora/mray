@@ -20,9 +20,9 @@
 #include "SurfaceComparators.h"
 #include "AcceleratorWorkI.h"
 
-namespace BS { class thread_pool; }
-
 using AccelWorkPtr = std::unique_ptr<AcceleratorWorkI>;
+
+class TheadPool;
 
 template<class HitType>
 struct HitResultT
@@ -309,7 +309,7 @@ using AccelWorkGenerator = GeneratorFuncType<AcceleratorWorkI,
 using AccelWorkGenMap = Map<std::string_view, AccelWorkGenerator>;
 
 using AccelGroupGenerator = GeneratorFuncType<AcceleratorGroupI, uint32_t,
-                                              BS::thread_pool&,
+                                              ThreadPool&,
                                               const GPUSystem&,
                                               const GenericGroupPrimitiveT&,
                                               const AccelWorkGenMap&>;
@@ -360,7 +360,7 @@ class AcceleratorGroupT : public Base
                                                          const PrimitiveGroupType& pg);
 
     protected:
-    BS::thread_pool&            threadPool;
+    ThreadPool&                 threadPool;
     const GPUSystem&            gpuSystem;
     const PrimitiveGroupType&   pg;
     uint32_t                    accelGroupId = 0;
@@ -393,7 +393,7 @@ class AcceleratorGroupT : public Base
     public:
     // Constructors & Destructor
                         AcceleratorGroupT(uint32_t accelGroupId,
-                                          BS::thread_pool&,
+                                          ThreadPool&,
                                           const GPUSystem&,
                                           const GenericGroupPrimitiveT& pg,
                                           const AccelWorkGenMap&);
@@ -476,7 +476,7 @@ class BaseAcceleratorT : public BaseAcceleratorI
                                       const Map<TransGroupId, TransformGroupPtr>& transGroups);
 
     protected:
-    BS::thread_pool&    threadPool;
+    ThreadPool&         threadPool;
     const GPUSystem&    gpuSystem;
     uint32_t            idCounter           = 0;
     Vector2ui           maxBitsUsedOnKey    = Vector2ui::Zero();
@@ -491,7 +491,7 @@ class BaseAcceleratorT : public BaseAcceleratorI
 
     public:
     // Constructors & Destructor
-                        BaseAcceleratorT(BS::thread_pool&,
+                        BaseAcceleratorT(ThreadPool&,
                                          const GPUSystem&,
                                          const AccelGroupGenMap&,
                                          const AccelWorkGenMap&);
@@ -910,7 +910,7 @@ PreprocessResult AcceleratorGroupT<C, PG, B>::PreprocessConstructionParams(const
 
 template<class C, PrimitiveGroupC PG, std::derived_from<AcceleratorGroupI> B>
 AcceleratorGroupT<C, PG, B>::AcceleratorGroupT(uint32_t groupId,
-                                               BS::thread_pool& tp, const GPUSystem& sys,
+                                               ThreadPool& tp, const GPUSystem& sys,
                                                const GenericGroupPrimitiveT& pgIn,
                                                const AccelWorkGenMap& workGenMap)
     : threadPool(tp)
@@ -1095,7 +1095,7 @@ const GenericGroupPrimitiveT& AcceleratorGroupT<C, PG, B>::PrimGroup() const
 }
 
 template <class C>
-BaseAcceleratorT<C>::BaseAcceleratorT(BS::thread_pool& tp,
+BaseAcceleratorT<C>::BaseAcceleratorT(ThreadPool& tp,
                                       const GPUSystem& system,
                                       const AccelGroupGenMap& aGen,
                                       const AccelWorkGenMap& globalWorkMap)

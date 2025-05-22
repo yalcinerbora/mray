@@ -1,6 +1,5 @@
 #include "MeshLoaderGFG.h"
 #include "Core/ShapeFunctions.h"
-#include "Core/Error.hpp"
 
 #include <filesystem>
 #include <gfg/GFGFileExporter.h>

@@ -12,9 +12,9 @@
 #include <pxr/base/vt/array.h>
 #include <pxr/usd/usd/prim.h>
 
+class ThreadPool;
 class AttributeIndexer;
 struct CollapsedPrims;
-namespace BS { class thread_pool;}
 
 using IndexTriplet = std::array<uint32_t, 3>;
 
@@ -98,12 +98,9 @@ class IndexLookupTable
     public:
     IndexLookupTable() = default;
 
-    uint32_t maxLoadCount = 0;
-
     //
     void Clear()
     {
-        maxLoadCount = 0;
         std::fill(hashes.begin(), hashes.end(), Vector4ui::Zero());
     }
 
@@ -123,7 +120,6 @@ class IndexLookupTable
         values.resize(allocSize);
     }
 
-
     std::pair<const uint32_t*, bool> Insert(IndexTriplet key, uint32_t value)
     {
         using LT = LookupTable<IndexTriplet, uint32_t,
@@ -133,62 +129,6 @@ class IndexLookupTable
                   Span(keys.begin(), keys.end()),
                   Span(values.begin(), values.end())).Insert(key, value);
     }
-    //    static constexpr uint32_t VEC_SHIFT = std::countr_zero(4u);
-    //    static constexpr uint32_t VEC_MASK = (VEC_SHIFT == 0) ? 0 : ((1u << VEC_SHIFT) - 1);
-
-    //    using S = IndexLookupStrategy;
-    //    uint32_t tableSize = static_cast<uint32_t>(keys.size());
-    //    uint32_t hashPackCount = static_cast<uint32_t>(hashes.size());
-    //    uint32_t hashVal = S::Hash(key);
-    //    uint32_t index = uint32_t(hashVal % tableSize);
-
-    //    uint32_t totalLoads = 0;
-    //    for(uint32_t _ = 0; _ < hashPackCount; _++)
-    //    {
-    //        uint32_t vectorIndex = index >> VEC_SHIFT;
-    //        uint32_t innerIndex = index & VEC_MASK;
-    //        Vector<4, uint32_t> hashChunk = hashes[vectorIndex];
-
-    //        totalLoads++;
-
-    //        UNROLL_LOOP
-    //        for(uint32_t i = innerIndex; i < 4; i++)
-    //        {
-    //            uint32_t globalIndex = (vectorIndex << VEC_SHIFT) + i;
-    //            // Roll to start of the case special case
-    //            // (since we are bulk reading)
-    //            if(globalIndex >= tableSize) break;
-
-    //            // Actual comparison case, if hash is equal it does not mean
-    //            // keys are equal, check them only if the hashes are equal.
-    //            // If true, return the old val
-    //            if(hashVal == hashChunk[i] && keys[globalIndex] == key)
-    //            {
-    //                maxLoadCount = std::max(maxLoadCount, totalLoads);
-    //                return std::pair(&values[globalIndex], false);
-    //            }
-
-
-    //            // If empty, this means linear probe chain is fully iterated
-    //            // and we did not find the value return null
-    //            if(S::IsEmpty(hashChunk[i]) || S::IsSentinel(hashChunk[i]))
-    //            {
-    //                hashChunk[i] = hashVal;
-    //                values[globalIndex] = value;
-    //                keys[globalIndex] = key;
-    //                hashes[vectorIndex] = hashChunk;
-
-    //                maxLoadCount = std::max(maxLoadCount, totalLoads);
-    //                return std::pair(&values[globalIndex], true);
-    //            }
-    //        }
-    //        index += 4 - innerIndex;
-    //        index = (index >= tableSize) ? 0 : index;
-    //        assert(index != hashVal % tableSize);
-    //    }
-    //    maxLoadCount = std::max(maxLoadCount, totalLoads);
-    //    return std::pair(nullptr, false);
-    //}
 };
 
 struct MeshProcessorThread
@@ -267,7 +207,7 @@ MRayError ProcessUniqueMeshes(// Output
                               std::map<pxr::UsdPrim, std::vector<PrimBatchId>>& outPrimBatches,
                               // I-O
                               TracerI& tracer,
-                              BS::thread_pool& threadPool,
+                              ThreadPool& threadPool,
                               // Input
                               const std::set<pxr::UsdPrim>& uniquePrims);
 
@@ -276,6 +216,6 @@ MRayError ProcessUniqueSpheres(// Output
                                std::map<pxr::UsdPrim, std::vector<PrimBatchId>>& outPrimBatches,
                                // I-O
                                TracerI& tracer,
-                               BS::thread_pool& threadPool,
+                               ThreadPool& threadPool,
                                // Input
                                const std::set<pxr::UsdPrim>& uniquePrims);

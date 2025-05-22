@@ -6,9 +6,8 @@
 
 #include <future>
 
+class ThreadPool;
 class FramePool;
-namespace BS { class thread_pool; }
-
 class VisorGUI;
 
 struct RenderImageInitInfo
@@ -39,7 +38,7 @@ class RenderImagePool
     VulkanCommandBuffer     sdrCopyCommand;
     VulkanCommandBuffer     clearCommand;
     VulkanCommandBuffer     fullClearCommand;
-    BS::thread_pool*        threadPool      = nullptr;
+    ThreadPool*             threadPool      = nullptr;
     ImageLoaderIPtr         imgLoader;
     std::future<void>       loadEvent;
     //
@@ -53,7 +52,7 @@ class RenderImagePool
     public:
     // Constructors & Destructor
                         RenderImagePool();
-                        RenderImagePool(BS::thread_pool*,
+                        RenderImagePool(ThreadPool*,
                                         const VulkanSystemView&,
                                         const RenderImageInitInfo&);
                         RenderImagePool(const RenderImagePool&) = delete;

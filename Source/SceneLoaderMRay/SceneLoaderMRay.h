@@ -1,7 +1,5 @@
 #pragma once
 
-#include <BS/BS_thread_pool.hpp>
-
 #include "MeshLoader/EntryPoint.h"
 #include "Core/SceneLoaderI.h"
 #include "Core/TracerI.h"
@@ -9,6 +7,8 @@
 #include "Core/Expected.h"
 
 #include "JsonNode.h"
+
+class ThreadPool;
 
 class SceneLoaderMRay : public SceneLoaderI
 {
@@ -23,18 +23,6 @@ class SceneLoaderMRay : public SceneLoaderI
         Map         map;
     };
 
-    struct ExceptionList
-    {
-        private:
-        static constexpr size_t MaxExceptionSize = 128;
-        using ExceptionArray = std::array<MRayError, MaxExceptionSize>;
-
-        public:
-        std::atomic_size_t  size = 0;
-        ExceptionArray      exceptions;
-        void                AddException(MRayError&&);
-    };
-
     private:
     using PrimIdMappings        = typename TracerIdPack::PrimIdMappings;
     using CamIdMappings         = typename TracerIdPack::CamIdMappings;
@@ -47,7 +35,7 @@ class SceneLoaderMRay : public SceneLoaderI
     private:
     std::string         scenePath;
     nlohmann::json      sceneJson;
-    BS::thread_pool&    threadPool;
+    ThreadPool&         threadPool;
 
     // Temporary Internal Data
     TypeMappedNodes     primNodes;
@@ -87,14 +75,14 @@ class SceneLoaderMRay : public SceneLoaderI
                                   AnnotateFunc&&,
                                   TracerInterfaceFunc&&);
 
-    void        LoadTextures(TracerI&, ExceptionList&);
-    void        LoadMediums(TracerI&, ExceptionList&);
-    void        LoadMaterials(TracerI&, ExceptionList&,
+    void        LoadTextures(TracerI&, ErrorList&);
+    void        LoadMediums(TracerI&, ErrorList&);
+    void        LoadMaterials(TracerI&, ErrorList&,
                               uint32_t boundaryMediumId);
-    void        LoadTransforms(TracerI&, ExceptionList&);
-    void        LoadPrimitives(TracerI&, ExceptionList&);
-    void        LoadCameras(TracerI&, ExceptionList&);
-    void        LoadLights(TracerI&, ExceptionList&);
+    void        LoadTransforms(TracerI&, ErrorList&);
+    void        LoadPrimitives(TracerI&, ErrorList&);
+    void        LoadCameras(TracerI&, ErrorList&);
+    void        LoadLights(TracerI&, ErrorList&);
 
     void        CreateTypeMapping(const TracerI&,
                                   const SceneSurfList&,
@@ -115,7 +103,7 @@ class SceneLoaderMRay : public SceneLoaderI
     void            ClearIntermediateBuffers();
 
     public:
-                            SceneLoaderMRay(BS::thread_pool& pool);
+                            SceneLoaderMRay(ThreadPool& pool);
                             SceneLoaderMRay(const SceneLoaderMRay&) = delete;
     SceneLoaderMRay&        operator=(const SceneLoaderMRay&) = delete;
 

@@ -3,7 +3,6 @@
 #include "Core/MRayDescriptions.h"
 #include "Core/DataStructures.h"
 #include "Core/Error.h"
-#include "Core/Error.hpp"
 #include "Core/System.h"
 #include "Core/Timer.h"
 

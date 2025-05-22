@@ -166,7 +166,7 @@ class IsAliveFunctor
 
 PathTracerRenderer::PathTracerRenderer(const RenderImagePtr& rb,
                                        TracerView tv,
-                                       BS::thread_pool& tp,
+                                       ThreadPool& tp,
                                        const GPUSystem& s,
                                        const RenderWorkPack& wp)
     : Base(rb, wp, tv, s, tp)
@@ -518,7 +518,7 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
         processQueue.MemsetAsync(dShadowRayVisibilities, 0x00);
         // CUDA Init check error, we access the rays even if it is not written
         processQueue.MemsetAsync(dRayState.dOutRays, 0x00);
-        
+
 
         // Do the NEE kernel + boundary work
         this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,

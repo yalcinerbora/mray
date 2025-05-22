@@ -52,6 +52,8 @@ class MPMCQueue
         // Awakes all threads and forces them to leave queue
         void                    Terminate();
         bool                    IsTerminated() const;
+        // Removes the queued tasks
+        void                    RemoveQueuedTasks();
 };
 
 template<class T>
@@ -178,4 +180,16 @@ template<class T>
 bool MPMCQueue<T>::IsTerminated() const
 {
     return isTerminated;
+}
+
+template<class T>
+void MPMCQueue<T>::RemoveQueuedTasks()
+{
+    std::unique_lock<std::timed_mutex> lock(mutex);
+    for(T& t : data)
+    {
+        t = T();
+    }
+    enqueueLoc = 1;
+    dequeueLoc = 0;
 }

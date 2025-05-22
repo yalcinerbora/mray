@@ -83,16 +83,6 @@ mray_build_ext_dependency_git(
             -DNLOHMANN_ADD_NATVIS=OFF
 )
 
-# BS Thread pool
-mray_build_ext_dependency_git(
-        NAME thread_pool_ext
-        URL "https://github.com/yalcinerbora/thread-pool.git"
-        TAG "6c4ff304d09e0cdbfc085991d7c23fdfc0c48c1c" # v4.0.1 (Forked from original repo)
-        LICENSE_NAME "LICENSE.txt"
-        BUILD_ARGS
-            -DTHREADPOOL_INSTALL=ON
-)
-
 # Get assimp
 mray_build_ext_dependency_git(
     NAME assimp_ext
@@ -234,16 +224,17 @@ if(MRAY_BUILD_VISOR)
 
     # Slang version v.2024.14.4
     if(WIN32)
-        set(SLANGC_ZIP_NAME "slang-2024.14.4-windows-x86_64.zip")
-        set(SLANGC_SHA256_HASH "c4410ac09dd86dfcceeb2b2ed494ec976c533b7e18608fad518ec54c4fde8b42")
+        set(SLANGC_ZIP_NAME "slang-2025.8-windows-x86_64.zip")
+        set(SLANGC_SHA256_HASH "21D4F2786BBE7E23B79F8186C2BEA6782BB3FF0CFB3BA26FB487DE1019EC08D7")
     elseif(UNIX AND NOT APPLE)
-        set(SLANGC_ZIP_NAME "slang-2024.14.4-linux-x86_64.tar.gz")
-        set(SLANGC_SHA256_HASH "025e6be9fc0277021b9ea559b8a7f7f47b6fa843671203284cbecc8d1a50610f")
+        set(SLANGC_ZIP_NAME "slang-2025.8-linux-x86_64.tar.gz")
+        set(SLANGC_SHA256_HASH "E94ED4CC6372B9B028844B6874049F8DBB0AE2B5E174323D9B52BEF327C8B4BB")
     else()
         message(FATAL_ERROR "Unsupported platform for macos(?)")
     endif()
+
     FetchContent_Declare(slangc_ext
-        URL "https://github.com/shader-slang/slang/releases/download/v2024.14.4/${SLANGC_ZIP_NAME}"
+        URL "https://github.com/shader-slang/slang/releases/download/v2025.8/${SLANGC_ZIP_NAME}"
         URL_HASH "SHA256=${SLANGC_SHA256_HASH}")
     FetchContent_MakeAvailable(slangc_ext)
 

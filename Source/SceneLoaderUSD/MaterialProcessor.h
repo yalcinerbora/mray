@@ -100,7 +100,7 @@ struct MaterialConverter
     //
     MRayError LoadTextures(std::map<pxr::UsdPrim, TextureId>& result,
                            FlatSet<std::pair<pxr::UsdPrim, MRayUSDTexture>>&& tex,
-                           TracerI& tracer, BS::thread_pool& threadPool);
+                           TracerI& tracer, ThreadPool& threadPool);
 
     std::map<pxr::UsdPrim, MRayUSDMatAlphaPack>
     CreateMaterials(TracerI& tracer,
@@ -111,7 +111,7 @@ struct MaterialConverter
 
 MRayError ProcessUniqueMaterials(std::map<pxr::UsdPrim, MRayUSDMatAlphaPack>& outMaterials,
                                  std::map<pxr::UsdPrim, TextureId>& uniqueTextureIds,
-                                 TracerI& tracer, BS::thread_pool& threadPool,
+                                 TracerI& tracer, ThreadPool& threadPool,
                                  const MRayUSDMaterialMap& uniqueMaterials,
                                  const std::map<pxr::UsdPrim, MRayUSDTexture>& extraTextures);
 

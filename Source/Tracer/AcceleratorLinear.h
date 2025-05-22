@@ -115,7 +115,7 @@ class AcceleratorGroupLinear final : public AcceleratorGroupT<AcceleratorGroupLi
     public:
     // Constructors & Destructor
             AcceleratorGroupLinear(uint32_t accelGroupId,
-                                   BS::thread_pool&,
+                                   ThreadPool&,
                                    const GPUSystem&,
                                    const GenericGroupPrimitiveT& pg,
                                    const AccelWorkGenMap&);
@@ -175,7 +175,7 @@ class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinea
 
     public:
     // Constructors & Destructor
-    BaseAcceleratorLinear(BS::thread_pool&, const GPUSystem&,
+    BaseAcceleratorLinear(ThreadPool&, const GPUSystem&,
                           const AccelGroupGenMap&,
                           const AccelWorkGenMap&);
 
@@ -216,7 +216,7 @@ class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinea
 };
 
 inline
-BaseAcceleratorLinear::BaseAcceleratorLinear(BS::thread_pool& tp, const GPUSystem& sys,
+BaseAcceleratorLinear::BaseAcceleratorLinear(ThreadPool& tp, const GPUSystem& sys,
                                              const AccelGroupGenMap& aGen,
                                              const AccelWorkGenMap& globalWorkMap)
     : BaseAcceleratorT<BaseAcceleratorLinear>(tp, sys, aGen, globalWorkMap)

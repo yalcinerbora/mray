@@ -3,13 +3,12 @@
 #include <fstream>
 #include <filesystem>
 
-#include <BS/BS_thread_pool.hpp>
 #include <nlohmann/json.hpp>
 
 #include "Core/Timer.h"
 #include "Core/TypeNameGenerators.h"
 #include "Core/Error.h"
-#include "Core/Error.hpp"
+#include "Core/ThreadPool.h"
 
 #include "Common/JsonCommon.h"
 
@@ -732,7 +731,7 @@ void TracerThread::FinalWork()
 }
 
 TracerThread::TracerThread(TransferQueue& queue,
-                           BS::thread_pool& tp)
+                           ThreadPool& tp)
     : dllFile{nullptr}
     , tracer{nullptr, nullptr}
     , transferQueue(queue.GetTracerView())

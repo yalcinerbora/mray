@@ -1,15 +1,14 @@
 #include "AccumImageStage.h"
 #include "VulkanAllocators.h"
 
-#include "Core/Error.hpp"
 #include "Core/TimelineSemaphore.h"
-#include <BS/BS_thread_pool.hpp>
+#include "Core/ThreadPool.h"
 
 PFN_vkGetMemoryHostPointerPropertiesEXT AccumImageStage::vkGetMemoryHostPointerProperties = nullptr;
 
 MRayError AccumImageStage::Initialize(const VulkanSystemView& handles,
                                       TimelineSemaphore* ts,
-                                      BS::thread_pool* tp,
+                                      ThreadPool* tp,
                                       const std::string& execPath)
 {
     handlesVk = &handles;
@@ -246,9 +245,9 @@ AccumulateStatus AccumImageStage::IssueAccumulation(const RenderImageSection& se
     vkQueueSubmit2(handlesVk->mainQueueVk, 1, &submitInfo, accumCompleteFence);
 
     // Launch a wait and reset task for this fence
-    threadPool->detach_task([fence = &this->accumCompleteFence,
-                             sem = this->syncSemaphore,
-                             device = this->handlesVk->deviceVk]()
+    threadPool->SubmitDetachedTask([fence = &this->accumCompleteFence,
+                                    sem = this->syncSemaphore,
+                                    device = this->handlesVk->deviceVk]()
     {
         VkFence fenceHandle = *fence;
         // Wait over the fence

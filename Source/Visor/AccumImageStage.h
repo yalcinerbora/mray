@@ -10,7 +10,7 @@
 #include "MainUniformBuffer.h"
 
 class TimelineSemaphore;
-namespace BS { class thread_pool; }
+class ThreadPool;
 
 enum class AccumulateStatus
 {
@@ -54,7 +54,7 @@ class AccumImageStage : public UniformMemoryRequesterI
     VulkanCommandBuffer     accumulateCommand;
     // Main system related stuff
     TimelineSemaphore*      syncSemaphore   = nullptr;
-    BS::thread_pool*        threadPool      = nullptr;
+    ThreadPool*      threadPool      = nullptr;
     //
     VulkanComputePipeline   pipeline;
     DescriptorSets          descriptorSets;
@@ -69,7 +69,7 @@ class AccumImageStage : public UniformMemoryRequesterI
     //
     MRayError   Initialize(const VulkanSystemView& handlesVk,
                            TimelineSemaphore* ts,
-                           BS::thread_pool* threadPool,
+                           ThreadPool* threadPool,
                            const std::string& execPath);
     void        ImportExternalHandles(const RenderBufferInfo&);
     void        DropExternalHandles(const VulkanTimelineSemaphore&);

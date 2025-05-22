@@ -5,11 +5,10 @@
 #include "Core/MemAlloc.h"
 #include "Core/Timer.h"
 #include "Core/TimelineSemaphore.h"
+#include "Core/ThreadPool.h"
 
 #include "Common/AnalyticStructs.h"
 #include "Common/RenderImageStructs.h"
-
-#include <BS/BS_thread_pool.hpp>
 
 class TransferQueue;
 
@@ -44,14 +43,14 @@ class RunCommand : public CommandI
     RendererAnalyticData    rendererInfo;
     RenderBufferInfo        renderBufferInfo;
     uint64_t                memUsage;
-    BS::multi_future<void>  accumulateFuture;
+    MultiFuture<void>       accumulateFuture;
     uint64_t                lastReceiveMS;
     bool                    startDisplayProgressBar = false;
     // The "timeline semaphore" (CPU emulation)
     // This will be used to synchronize between MRay and Run
     TimelineSemaphore       syncSemaphore = TimelineSemaphore(0);
     //
-    bool                EventLoop(TransferQueue&, BS::thread_pool&);
+    bool                EventLoop(TransferQueue&, ThreadPool&);
     // Constructors
                         RunCommand();
     public:

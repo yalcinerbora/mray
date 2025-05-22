@@ -581,7 +581,7 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<Optional<TracerTe
     auto rangeEnd = this->FindRange(idEnd.FetchIndexPortion())[attributeIndex];
     size_t count = rangeEnd[1] - rangeStart[0];
     Span<Optional<TracerTexView<D, T>>> dSubspan = dAttributeSpan.subspan(rangeStart[0],
-                                                                        count);
+                                                                          count);
     Span<Optional<TracerTexView<D, T>>> hSpan(hOptTexViews.begin(), hOptTexViews.end());
     assert(hSpan.size() == dSubspan.size());
     queue.MemcpyAsync(dSubspan, ToConstSpan(hSpan));

@@ -224,8 +224,11 @@ mray_build_ext_dependency_git(
         NAME oiio_ext
         URL "https://github.com/OpenImageIO/oiio.git"
         TAG "feb28fd2647b088f5b083621a98fec97fddaf167" # Latest commit as  of  05.05.2024
-
         LICENSE_NAME "LICENSE.md"
+
+        # Patch of size_t int narrowing conversion error
+        APPLY_PATCH "file://${MRAY_CMAKE_DIRECTORY}/Ext/oiio/oiio_size_change.patch"
+
         BUILD_ARGS
             # OIIO caches xxx_ROOT variables
             # and libaries does not change between configs
@@ -255,7 +258,6 @@ mray_build_ext_dependency_git(
             -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
             # Dep Root Files
             # AoS
-            #-DImath_DIR:PATH=${OIIO_LIB_CONFIG_DIR}/cmake/Imath
             -DImath_ROOT:PATH=${IMATH_INSTALL_LOC}
             -DOpenEXR_ROOT:PATH=${OPENEXR_INSTALL_LOC}
             -DZLIB_ROOT:PATH=${ZLIB_INSTALL_LOC}
@@ -263,9 +265,7 @@ mray_build_ext_dependency_git(
             -DJPEG_ROOT:PATH=${JPEGTURBO_INSTALL_LOC}
             -DTIFF_ROOT:PATH=${LIBTIFF_INSTALL_LOC}
             -DPNG_ROOT:PATH=${LIBPNG_INSTALL_LOC}
-            #-DBZip2_DIR:PATH=${BZLIB_INSTALL_LOC}
             -DVERBOSE=OFF
-
             # Do not install msvc runtime libraries
             -DCMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP=ON
 

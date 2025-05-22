@@ -5,7 +5,6 @@
 #include <filesystem>
 
 #include "TransientPool/TransientPool.h"
-#include "Core/Error.hpp"
 
 MeshViewAssimp::MeshViewAssimp(uint32_t innerIndexIn, const MeshFileAssimp& fileIn)
     : innerIndex(innerIndexIn)

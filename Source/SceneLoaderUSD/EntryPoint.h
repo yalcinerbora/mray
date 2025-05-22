@@ -10,17 +10,14 @@
 #define MRAY_SCENELOADER_USD_ENTRYPOINT MRAY_DLL_IMPORT
 #endif
 
-namespace BS
-{
-    class thread_pool;
-}
+class ThreadPool;
 
 // C Mangling, we will load these in runtime
 namespace SceneLoaderMRayDetail
 {
 
 extern "C" MRAY_SCENELOADER_USD_ENTRYPOINT
-SceneLoaderI* ConstructSceneLoaderUSD(BS::thread_pool&);
+SceneLoaderI* ConstructSceneLoaderUSD(ThreadPool&);
 
 extern "C" MRAY_SCENELOADER_USD_ENTRYPOINT
 void DestroySceneLoaderUSD(SceneLoaderI* ptr);

@@ -1,8 +1,4 @@
 #include "TracerBase.h"
-#include <BS/BS_thread_pool.hpp>
-
-#include "Core/Error.hpp"
-
 
 using FilterFuncPair = Pair< const FilterType::E, TexFilterGenerator>;
 template<class T>
@@ -28,7 +24,7 @@ static constexpr auto RNGGenFuncPack = RNGGenPair
 {
     T::TypeName,
     &GenerateType<RNGeneratorGroupI, T, uint32_t, uint64_t,
-                  const GPUSystem&, BS::thread_pool&>
+                  const GPUSystem&, ThreadPool&>
 };
 
 static constexpr std::initializer_list<RNGGenPair> RNGGenFuncList =
@@ -1716,7 +1712,7 @@ GPUThreadInitFunction TracerBase::GetThreadInitFunction() const
     return gpuSystem.GetThreadInitFunction();
 }
 
-void TracerBase::SetThreadPool(BS::thread_pool& tp)
+void TracerBase::SetThreadPool(ThreadPool& tp)
 {
     globalThreadPool = &tp;
 }

@@ -9,7 +9,6 @@
 
 #include "Core/Log.h"
 #include "Core/Error.h"
-#include "Core/Error.hpp"
 #include "Core/MemAlloc.h"
 
 #include "VisorI.h"
@@ -811,7 +810,7 @@ MRayError VisorWindow::Initialize(TransferQueue::VisorView& transferQueueIn,
                                   const VulkanSystemView& handles,
                                   TimelineSemaphore* syncSem,
                                   uint32_t hostImportAlignment,
-                                  BS::thread_pool* tp,
+                                  ThreadPool* tp,
                                   const std::string& windowTitle,
                                   const VisorConfig& config,
                                   const std::string& processPath)

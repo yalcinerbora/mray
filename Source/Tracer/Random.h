@@ -12,7 +12,7 @@
 
 #include "TracerTypes.h"
 
-namespace BS { class thread_pool; }
+class ThreadPool;
 
 namespace RNGFunctions::HashPCG64
 {
@@ -208,7 +208,7 @@ class RNGeneratorGroupI
 };
 
 using RNGGenerator = GeneratorFuncType<RNGeneratorGroupI, uint32_t, uint64_t,
-                                       const GPUSystem&, BS::thread_pool&>;
+                                       const GPUSystem&, ThreadPool&>;
 using RNGeneratorPtr = std::unique_ptr<RNGeneratorGroupI>;
 using RNGGeneratorMap = Map<typename SamplerType::E, RNGGenerator>;
 
@@ -226,7 +226,7 @@ class RNGGroupIndependent : public RNGeneratorGroupI
     static constexpr typename SamplerType::E TypeName = SamplerType::INDEPENDENT;
 
     private:
-    BS::thread_pool&        mainThreadPool;
+    ThreadPool&             mainThreadPool;
     const GPUSystem&        gpuSystem;
     // Due to tiling, we save the all state of the
     // entire image in host side.
@@ -246,7 +246,7 @@ class RNGGroupIndependent : public RNGeneratorGroupI
             RNGGroupIndependent(uint32_t generatorCount,
                                 uint64_t seed,
                                 const GPUSystem& system,
-                                BS::thread_pool& mainThreadPool);
+                                ThreadPool& mainThreadPool);
 
     void    SetupRange(Vector2ui range) override;
 

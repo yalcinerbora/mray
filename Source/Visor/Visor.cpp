@@ -6,7 +6,6 @@
 #include "Core/System.h"
 #include "Core/Log.h"
 #include "Core/Error.h"
-#include "Core/Error.hpp"
 
 #include <Imgui/imgui.h>
 #include <Imgui/imgui_impl_glfw.h>
@@ -621,7 +620,7 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
 
 Expected<VisorWindow> VisorVulkan::GenerateWindow(TransferQueue::VisorView& transferQueue,
                                                   TimelineSemaphore* syncSem,
-                                                  BS::thread_pool* tp,
+                                                  ThreadPool* tp,
                                                   const VisorConfig& vConfig)
 {
     VisorWindow w;
@@ -674,7 +673,7 @@ MRayError VisorVulkan::InitImGui()
 
 MRayError VisorVulkan::MTInitialize(TransferQueue& transferQueue,
                                     TimelineSemaphore* syncSem,
-                                    BS::thread_pool* tp,
+                                    ThreadPool* tp,
                                     const VisorConfig& visorConfig,
                                     const std::string& pPath)
 {

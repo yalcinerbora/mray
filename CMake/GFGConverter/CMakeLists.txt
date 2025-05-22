@@ -12,7 +12,6 @@ target_link_libraries(GFGConverter
                       CoreLib
                       mray::meta_compile_opts
                       nlohmann::json
-                      bs::thread_pool
                       assimp::assimp
                       gfgfileio::gfgfileio)
 

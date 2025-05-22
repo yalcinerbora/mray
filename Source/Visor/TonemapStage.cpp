@@ -14,7 +14,6 @@
 #include "VulkanTypes.h"
 #include "VulkanPipeline.h"
 
-#include "Core/Error.hpp"
 #include "Core/MemAlloc.h"
 
 // Common descriptor set indices of tonemappers

@@ -8,7 +8,6 @@
 #include "Core/Log.h"
 #include "Core/Timer.h"
 #include "Core/TypeNameGenerators.h"
-#include "Core/Error.hpp"
 #include "Core/Algorithm.h"
 
 #include "ImageLoader/EntryPoint.h"
@@ -274,7 +273,7 @@ MRayUSDGeomMatResolWarnings ExpandGeomsAndFindMaterials(CollapsedPrims& subGeomP
 
 MRayError ProcessCameras(CameraGroupId& camGroupId,
                          std::vector<std::pair<pxr::UsdPrim, CameraId>>& outCamIds,
-                         TracerI& tracer, BS::thread_pool&,
+                         TracerI& tracer, ThreadPool&,
                          const std::vector<MRayUSDPrimSurface>& cameras,
                          const pxr::UsdStageRefPtr& loadedStage)
 {
@@ -443,7 +442,7 @@ MRayError FindLightTextures(std::map<pxr::UsdPrim, MRayUSDTexture>& extraTexture
 
 MRayError ProcessLights(std::vector<std::pair<LightGroupId, LightId>>&,
                         LightGroupId& domeLightGroupId, LightId& domeLightId,
-                        TracerI& tracer, BS::thread_pool&,
+                        TracerI& tracer, ThreadPool&,
                         const std::vector<MRayUSDPrimSurface>& meshGeomLights,
                         const std::vector<MRayUSDPrimSurface>& sphereGeomLights,
                         const Optional<MRayUSDPrimSurface>& domeLight,
@@ -488,7 +487,7 @@ MRayError ProcessLights(std::vector<std::pair<LightGroupId, LightId>>&,
     return MRayError::OK;
 }
 
-SceneLoaderUSD::SceneLoaderUSD(BS::thread_pool& tp)
+SceneLoaderUSD::SceneLoaderUSD(ThreadPool& tp)
     : threadPool(tp)
 {}
 

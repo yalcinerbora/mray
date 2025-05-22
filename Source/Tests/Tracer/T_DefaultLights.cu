@@ -10,7 +10,6 @@
 #include "Tracer/MetaLight.h"
 
 #include "Core/Log.h"
-#include "Core/Error.hpp"
 
 // Meta Light Test Types
 using LightGroupSkysphereCoOcta = LightGroupSkysphere<CoOctaCoordConverter>;

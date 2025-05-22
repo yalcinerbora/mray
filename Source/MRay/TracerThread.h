@@ -8,7 +8,7 @@
 
 #include "Common/TransferQueue.h"
 
-namespace BS { class thread_pool; }
+class ThreadPool;
 
 class TracerThread final : public RealtimeThread
 {
@@ -18,7 +18,7 @@ class TracerThread final : public RealtimeThread
     std::unique_ptr<SharedLibrary>  dllFile;
     SharedLibPtr<TracerI>           tracer;
     TransferQueue::TracerView       transferQueue;
-    BS::thread_pool&                threadPool;
+    ThreadPool&                     threadPool;
 
     //
     std::map<std::string_view, SharedLibrary>   sceneLoaderDLLs;
@@ -77,7 +77,7 @@ class TracerThread final : public RealtimeThread
     public:
     // Constructors & Destructor
                 TracerThread(TransferQueue& queue,
-                             BS::thread_pool& tp);
+                             ThreadPool& tp);
                 ~TracerThread() = default;
 
     MRayError   MTInitialize(const std::string& tracerConfig);
