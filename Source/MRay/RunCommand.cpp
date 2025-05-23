@@ -1060,9 +1060,9 @@ MRayError RunCommand::Invoke()
         {
             isTerminated = EventLoop(transferQueue, threadPool);
         }
-
         // Order is important here
         // First wait the thread pool
+        accumulateFuture.futures.clear();
         threadPool.Wait();
         // Destroy the transfer queue
         // So that the tracer can drop from queue wait
