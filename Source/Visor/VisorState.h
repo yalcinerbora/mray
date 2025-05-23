@@ -32,6 +32,10 @@ struct VisorAnalyticData
     float               frameTime;
     size_t              usedGPUMemory;
     SwapchainInfo       swapchainInfo;
+
+    std::string         deviceName;
+    Vector2ui           deviceMaxTex2D;
+    size_t              deviceHeapMemSize;
 };
 
 struct VisorState

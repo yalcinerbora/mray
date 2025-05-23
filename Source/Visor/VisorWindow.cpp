@@ -823,6 +823,42 @@ MRayError VisorWindow::Initialize(TransferQueue::VisorView& transferQueueIn,
     hdrRequested = config.displayHDR;
     threadPool = tp;
 
+    // Acquire the name etc for display
+    VkPhysicalDeviceProperties2 deviceProps
+    {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+        .pNext = nullptr,
+        .properties = {}
+    };
+    vkGetPhysicalDeviceProperties2(handles.pDeviceVk, &deviceProps);
+    visorState.visor.deviceName = deviceProps.properties.deviceName;
+    visorState.visor.deviceMaxTex2D = Vector2ui(deviceProps.properties.limits.maxImageDimension2D);
+    VkPhysicalDeviceMemoryProperties memProps;
+    vkGetPhysicalDeviceMemoryProperties(handles.pDeviceVk, &memProps);
+    // Show the memory of the device
+    Span<const VkMemoryHeap> memHeapSpan(memProps.memoryHeaps,
+                                         memProps.memoryHeapCount);
+    auto deviceHeap = std::find_if(memHeapSpan.begin(),
+                                   memHeapSpan.end(),
+                                   [](const auto& heap)
+    {
+        return heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT;
+    });
+    assert(deviceHeap != memHeapSpan.end());
+    visorState.visor.deviceHeapMemSize = deviceHeap->size;
+    // Report the GPU as log
+    double heapSizeGiB = (static_cast<double>(visorState.visor.deviceHeapMemSize)
+                          / (1024.0 * 1024.0 * 1024.0));
+    MRAY_LOG("----Visor-GPU----\n"
+             "Name      : {}\n"
+             "Max Tex2D : [{}, {}]\n"
+             "Memory    : {:.3f}GiB\n"
+             "-----------------\n",
+             visorState.visor.deviceName,
+             visorState.visor.deviceMaxTex2D[0],
+             visorState.visor.deviceMaxTex2D[1],
+             heapSizeGiB);
+
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     window = glfwCreateWindow(config.wSize[0], config.wSize[1],

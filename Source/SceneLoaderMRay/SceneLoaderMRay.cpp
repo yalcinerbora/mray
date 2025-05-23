@@ -951,8 +951,8 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ErrorList& exceptions)
     };
 
     // Determine the thread size
-    uint32_t threadCount = uint32_t(std::min(size_t(threadPool.ThreadCount()),
-                                             textureNodes.size()));
+    uint32_t threadCount = std::min(threadPool.ThreadCount(),
+                                    uint32_t(textureNodes.size()));
 
     using Barrier = std::barrier<decltype(BarrierFunc)>;
     auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);

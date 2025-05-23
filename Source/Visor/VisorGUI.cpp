@@ -466,11 +466,17 @@ void VisorGUI::ShowFrameOverlay(bool& isOpen,
 
     if(ImGui::Begin("##VisorOverlay", &isOpen, window_flags))
     {
+        ImGui::Text("Name        : %s", visorState.visor.deviceName.c_str());
         ImGui::Text("Frame       : %.2f ms", static_cast<double>(visorState.visor.frameTime));
-        auto [sz, suffix] = ConvertMemSizeToString(visorState.visor.usedGPUMemory);
-        std::string memUsage = MRAY_FORMAT("{:.1f}{:s}", sz, suffix);
-        ImGui::Text("Memory      : %s", memUsage.c_str());
-
+        auto [usedMemSize, usedMemSuffix] = ConvertMemSizeToString(visorState.visor.usedGPUMemory);
+        auto [totalMemSize, totalMemSuffix] = ConvertMemSizeToString(visorState.visor.deviceHeapMemSize);
+        std::string memUsageStr = MRAY_FORMAT("{:.1f}{:s} / {:.1f}{:s}",
+                                              usedMemSize, usedMemSuffix,
+                                              totalMemSize, totalMemSuffix);
+        ImGui::Text("Memory      : %s", memUsageStr.c_str());
+        ImGui::Text("Max Tex 2D  : [%u, %u]",
+                    visorState.visor.deviceMaxTex2D[0],
+                    visorState.visor.deviceMaxTex2D[1]);
         const auto& sc = visorState.visor.swapchainInfo;
         ImGui::Separator();
         ImGui::Text("--Swapchain--");

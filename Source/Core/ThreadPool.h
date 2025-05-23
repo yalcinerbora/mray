@@ -57,12 +57,12 @@ class ThreadPool
     static constexpr uint32_t DefaultQueueSize = 512;
 
     private:
-    std::vector<std::jthread>   threads;
+    std::pmr::monotonic_buffer_resource     baseAllocator;
+    std::pmr::synchronized_pool_resource    poolAllocator;
     //
-    std::pmr::monotonic_buffer_resource                 baseAllocator;
-    std::pmr::unsynchronized_pool_resource              poolAllocator;
+    MPMCQueue<std::function<void()>>        taskQueue;
     //
-    MPMCQueue<std::function<void()>>                    taskQueue;
+    std::vector<std::jthread>               threads;
 
     void RestartThreadsImpl(uint32_t threadCount, ThreadInitFunction);
 
@@ -79,7 +79,7 @@ class ThreadPool
                     ThreadPool(ThreadPool&&) = default;
     ThreadPool&     operator=(const ThreadPool&) = delete;
     ThreadPool&     operator=(ThreadPool&&) = default;
-                    ~ThreadPool() = default;
+                    ~ThreadPool();
 
     template<ThreadInitFuncC InitFunction>
     void            RestartThreads(uint32_t threadCount, InitFunction&&);
@@ -122,6 +122,21 @@ bool MultiFuture<T>::AnyValid() const
     return false;
 }
 
+template<>
+inline bool MultiFuture<void>::AnyValid() const
+{
+    // This is technically valid for "void" futures.
+    // We allow user to submit empty work block works
+    // It will return empty multi future
+    if(futures.empty()) return true;
+
+    for(const std::future<void>& f : futures)
+    {
+        if(f.valid()) return true;
+    }
+    return false;
+}
+
 template<ThreadInitFuncC InitFunction>
 ThreadPool::ThreadPool(uint32_t threadCount, InitFunction&& initFunction,
                        size_t queueSize)
@@ -141,13 +156,16 @@ MultiFuture<void>
 ThreadPool::SubmitBlocks(uint32_t totalWorkSize, WorkFunc&& wf,
                          uint32_t partitionCount)
 {
+    if(totalWorkSize == 0) return MultiFuture<void>{};
+
     using ResultT = std::invoke_result_t<WorkFunc, uint32_t, uint32_t>;
 
     // Determine partition size etc..
     if(partitionCount == 0)
         partitionCount = static_cast<uint32_t>(threads.size());
     partitionCount = std::min(totalWorkSize, partitionCount);
-    uint32_t sizePerPartition = Math::DivideUp(totalWorkSize, partitionCount);
+    uint32_t sizePerPartition = totalWorkSize / partitionCount;
+    uint32_t residual = totalWorkSize - sizePerPartition * partitionCount;
 
     // Store the work functor somewhere safe.
     // Work functor will be copied once to a shared_ptr,
@@ -158,10 +176,18 @@ ThreadPool::SubmitBlocks(uint32_t totalWorkSize, WorkFunc&& wf,
     // Enqueue the type ereased works to the queue
     MultiFuture<ResultT> result;
     result.futures.reserve(partitionCount);
+    uint32_t startOffset = 0;
     for(uint32_t i = 0; i < partitionCount; i++)
     {
-        uint32_t start = i * sizePerPartition;
-        uint32_t end = std::min((i + 1) * sizePerPartition, totalWorkSize);
+        uint32_t start = startOffset;
+        uint32_t end = start + sizePerPartition;
+        if(residual > 0)
+        {
+            end++;
+            residual--;
+        }
+        startOffset = end;
+
         using AllocT = std::pmr::polymorphic_allocator<std::promise<ResultT>>;
         auto promise = std::allocate_shared<std::promise<ResultT>>(AllocT(&poolAllocator));
 
@@ -187,6 +213,9 @@ ThreadPool::SubmitBlocks(uint32_t totalWorkSize, WorkFunc&& wf,
         });
         result.futures.push_back(std::move(future));
     }
+    assert(residual == 0);
+    assert(startOffset == totalWorkSize);
+
     return result;
 }
 

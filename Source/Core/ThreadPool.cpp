@@ -26,7 +26,7 @@ class ThreadLoop
         {
             std::function<void()> work;
             taskQueue.Dequeue(work);
-            work();
+            if(work) work();
         }
     }
 };
@@ -50,6 +50,16 @@ ThreadPool::ThreadPool(uint32_t threadCount, size_t queueSize)
     RestartThreads(threadCount, ThreadInitFunction());
 }
 
+ThreadPool::~ThreadPool()
+{
+    // Wait all jobs to finish
+    Wait();
+    // Terminate the task queue,
+    // Threads may be waiting over the condition variable
+    taskQueue.Terminate();
+    threads.clear();
+}
+
 uint32_t ThreadPool::ThreadCount() const
 {
     return static_cast<uint32_t>(threads.size());
@@ -57,6 +67,8 @@ uint32_t ThreadPool::ThreadCount() const
 
 void ThreadPool::Wait()
 {
+    if(threads.empty()) return;
+
     std::future<void> endToken = SubmitTask([](){});
     endToken.wait();
 }
@@ -66,7 +78,7 @@ void ThreadPool::RestartThreadsImpl(uint32_t threadCount, ThreadInitFunction ini
     Wait();
     taskQueue.Terminate();
     threads.clear();
-    taskQueue.RemoveQueuedTasks();
+    taskQueue.RemoveQueuedTasks(true);
 
     threads.reserve(threadCount);
     for(uint32_t i = 0; i < threadCount; i++)
@@ -77,5 +89,5 @@ void ThreadPool::RestartThreadsImpl(uint32_t threadCount, ThreadInitFunction ini
 
 void ThreadPool::ClearTasks()
 {
-    taskQueue.RemoveQueuedTasks();
+    taskQueue.RemoveQueuedTasks(false);
 }

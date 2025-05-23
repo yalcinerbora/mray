@@ -53,7 +53,7 @@ class MPMCQueue
         void                    Terminate();
         bool                    IsTerminated() const;
         // Removes the queued tasks
-        void                    RemoveQueuedTasks();
+        void                    RemoveQueuedTasks(bool reEnable);
 };
 
 template<class T>
@@ -183,7 +183,7 @@ bool MPMCQueue<T>::IsTerminated() const
 }
 
 template<class T>
-void MPMCQueue<T>::RemoveQueuedTasks()
+void MPMCQueue<T>::RemoveQueuedTasks(bool reEnable)
 {
     std::unique_lock<std::timed_mutex> lock(mutex);
     for(T& t : data)
@@ -192,4 +192,6 @@ void MPMCQueue<T>::RemoveQueuedTasks()
     }
     enqueueLoc = 1;
     dequeueLoc = 0;
+
+    if(reEnable) isTerminated = false;
 }

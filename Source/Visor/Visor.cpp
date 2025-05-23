@@ -506,29 +506,6 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     VkPhysicalDeviceMemoryProperties memProps;
     vkGetPhysicalDeviceMemoryProperties(selectedDevice.pDevice,
                                         &memProps);
-
-    // Show the memory of the device
-    Span<const VkMemoryHeap> memHeapSpan(memProps.memoryHeaps,
-                                         memProps.memoryHeapCount);
-    auto deviceHeap = std::find_if(memHeapSpan.begin(),
-                                   memHeapSpan.end(),
-                                   [](const auto& heap)
-    {
-        return heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT;
-    });
-    assert(deviceHeap != memHeapSpan.end());
-
-    // Report the GPU
-    MRAY_LOG("----Visor-GPU----\n"
-             "Name      : {}\n"
-             "Max Tex2D : [{}, {}]\n"
-             "Memory    : {:.3f}GiB\n"
-             "-----------------\n",
-             selectedDeviceProps.properties.deviceName,
-             selectedDeviceProps.properties.limits.maxImageDimension2D,
-             selectedDeviceProps.properties.limits.maxImageDimension2D,
-             static_cast<double>(deviceHeap->size) / (1024.0 * 1024.0 * 1024.0));
-
     // Get the queue
     vkGetDeviceQueue(deviceVk, queueFamilyIndex, 0,
                      &mainQueueVk);
