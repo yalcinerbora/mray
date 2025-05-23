@@ -999,7 +999,7 @@ MRayError RunCommand::Invoke()
         TransferQueue transferQueue(CommandBufferSize, CommandBufferSize,
                                     [](){});
 
-        ThreadPool threadPool(threadCount);
+        ThreadPool threadPool;
 
         // Get the tracer dll
         TracerThread tracerThread(transferQueue, threadPool);

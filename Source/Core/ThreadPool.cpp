@@ -19,7 +19,7 @@ class ThreadLoop
         SystemThreadHandle handle = GetCurrentThreadHandle();
         std::thread::native_handle_type handleCPP = handle;
 
-        initFunction(handleCPP, threadNumber);
+        if(initFunction) initFunction(handleCPP, threadNumber);
 
         while(!token.stop_requested() &&
               !taskQueue.IsTerminated())
