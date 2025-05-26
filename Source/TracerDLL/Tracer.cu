@@ -9,7 +9,7 @@ TypeGeneratorPack Tracer::GLOBAL_TYPE_GEN = {};
 
 void Tracer::AddPrimGenerators(Map<std::string_view, PrimGenerator>& map)
 {
-    using Args = std::tuple<uint32_t, const GPUSystem&>;
+    using Args = PackedTypes<uint32_t, const GPUSystem&>;
 
     Args*           resolver0 = nullptr;
     PrimGTypes*     resolver1 = nullptr;
@@ -21,7 +21,7 @@ void Tracer::AddPrimGenerators(Map<std::string_view, PrimGenerator>& map)
 
 void Tracer::AddTransformGenerators(Map<std::string_view, TransGenerator>& map)
 {
-    using Args = std::tuple<uint32_t, const GPUSystem&>;
+    using Args = PackedTypes<uint32_t, const GPUSystem&>;
 
     Args*               resolver0 = nullptr;
     TransformGTypes*    resolver1 = nullptr;
@@ -33,8 +33,8 @@ void Tracer::AddTransformGenerators(Map<std::string_view, TransGenerator>& map)
 
 void Tracer::AddLightGenerators(Map<std::string_view, LightGenerator>& map)
 {
-    using Args = std::tuple<uint32_t, const GPUSystem&, const TextureViewMap&,
-                       const TextureMap&, GenericGroupPrimitiveT&>;
+    using Args = PackedTypes<uint32_t, const GPUSystem&, const TextureViewMap&,
+                             const TextureMap&, GenericGroupPrimitiveT&>;
 
     Args*               resolver0 = nullptr;
     LightGTypes*        resolver1 = nullptr;
@@ -46,7 +46,7 @@ void Tracer::AddLightGenerators(Map<std::string_view, LightGenerator>& map)
 
 void Tracer::AddCamGenerators(Map<std::string_view, CamGenerator>& map)
 {
-    using Args = std::tuple<uint32_t, const GPUSystem&>;
+    using Args = PackedTypes<uint32_t, const GPUSystem&>;
 
     Args*       resolver0 = nullptr;
     CamGTypes*  resolver1 = nullptr;
@@ -58,8 +58,8 @@ void Tracer::AddCamGenerators(Map<std::string_view, CamGenerator>& map)
 
 void Tracer::AddMaterialGenerators(Map<std::string_view, MatGenerator>& map)
 {
-    using Args = std::tuple<uint32_t, const GPUSystem&,
-                       const TextureViewMap&, const TextureMap&>;
+    using Args = PackedTypes<uint32_t, const GPUSystem&,
+                             const TextureViewMap&, const TextureMap&>;
 
     Args*       resolver0 = nullptr;
     MatGTypes*  resolver1 = nullptr;
@@ -71,8 +71,8 @@ void Tracer::AddMaterialGenerators(Map<std::string_view, MatGenerator>& map)
 
 void Tracer::AddMediumGenerators(Map<std::string_view, MedGenerator>& map)
 {
-    using Args = std::tuple<uint32_t, const GPUSystem&,
-                       const TextureViewMap&, const TextureMap&>;
+    using Args = PackedTypes<uint32_t, const GPUSystem&,
+                             const TextureViewMap&, const TextureMap&>;
 
     Args*       resolver0 = nullptr;
     MedGTypes*  resolver1 = nullptr;
@@ -89,15 +89,15 @@ static void AddAccelGeneratorsGeneric(Map<AcceleratorType, BaseAccelGenerator>& 
                                       AcceleratorType t)
 {
     // Base
-    using LinAccel = typename AcceleratorPack::BaseType;
-    baseMap.emplace(t, &GenerateType<BaseAcceleratorI, LinAccel,
+    using BaseAccel = typename AcceleratorPack::BaseType;
+    baseMap.emplace(t, &GenerateType<BaseAcceleratorI, BaseAccel,
                                      ThreadPool&, const GPUSystem&,
                                      const AccelGroupGenMap&,
                                      const AccelWorkGenMap&>);
 
-    using GroupGenArgs = std::tuple<uint32_t, ThreadPool&, const GPUSystem&,
-                               const GenericGroupPrimitiveT&,
-                               const AccelWorkGenMap&>;
+    using GroupGenArgs = PackedTypes<uint32_t, ThreadPool&, const GPUSystem&,
+                                     const GenericGroupPrimitiveT&,
+                                     const AccelWorkGenMap&>;
     using AccelGTypes = typename AcceleratorPack::GroupTypes;
     GroupGenArgs*   groupResolver0 = nullptr;
     AccelGTypes*    groupResolver1 = nullptr;
@@ -111,7 +111,7 @@ static void AddAccelGeneratorsGeneric(Map<AcceleratorType, BaseAccelGenerator>& 
 
     // Works
     auto& workMapGlobal = workMap.emplace(t, AccelWorkGenMap()).first->second;
-    using WorkGenArgs = std::tuple<const AcceleratorGroupI&, const GenericGroupTransformT&>;
+    using WorkGenArgs = PackedTypes<const AcceleratorGroupI&, const GenericGroupTransformT&>;
     using AccelWTypes = typename AcceleratorPack::WorkTypes;
     WorkGenArgs* workResolver0 = nullptr;
     AccelWTypes* workResolver1 = nullptr;

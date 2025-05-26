@@ -28,6 +28,31 @@ using Pair = std::pair<T0, T1>;
 template <class T>
 using Ref = std::reference_wrapper<T>;
 
+// Simple type package, usefull while metaprogramming
+template<class... T>
+struct PackedTypes {};
+
+namespace std
+{
+    // We try to cut tuple instantiations of
+    // GPU kernel genration. But tuple_element
+    // trait is hard to implement efficiently.
+    // We rarely rely on it so we fallback to std
+    // currently
+    template<std::size_t I, class... T>
+    struct tuple_element<I, PackedTypes<T...>>
+    {
+        using type = std::tuple_element_t<I, std::tuple<T...>>;
+    };
+
+    template<class... Args>
+    struct tuple_size<::PackedTypes<Args...>>
+        : std::integral_constant<std::size_t, sizeof...(Args)>
+    {};
+}
+
+
+
 namespace std::tupleDetail
 {
     template<class... Args, std::size_t... I>

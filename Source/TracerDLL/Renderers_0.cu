@@ -7,13 +7,13 @@
 // ================= //
 //     Renderers     //
 // ================= //
-using RendererTypes_0 = std::tuple
+using RendererTypes_0 = PackedTypes
 <
     TexViewRenderer
 >;
 
 // Currently empty
-using RendererWorkTypes_0 = std::tuple
+using RendererWorkTypes_0 = PackedTypes
 <
     EmptyRendererWorkTypes<TexViewRenderer>
 >;
@@ -21,9 +21,9 @@ using RendererWorkTypes_0 = std::tuple
 void Tracer::AddRendererGenerators_0(Map<std::string_view, RendererGenerator>& map,
                                      Map<std::string_view, RenderWorkPack>& workMap)
 {
-    using Args = std::tuple<const RenderImagePtr&, TracerView,
-                            ThreadPool&, const GPUSystem&,
-                            const RenderWorkPack&>;
+    using Args = PackedTypes<const RenderImagePtr&, TracerView,
+                             ThreadPool&, const GPUSystem&,
+                             const RenderWorkPack&>;
 
     Args* resolver0 = nullptr;
     RendererTypes_0* resolver1 = nullptr;

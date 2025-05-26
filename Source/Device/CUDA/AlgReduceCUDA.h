@@ -6,7 +6,7 @@
 
 #include <cub/device/device_reduce.cuh>
 #include <cub/device/device_segmented_reduce.cuh>
-#include <cub/iterator/transform_input_iterator.cuh>
+#include <thrust/iterator/transform_iterator.h>
 
 namespace mray::cuda::algorithms
 {
@@ -34,7 +34,7 @@ size_t TransformReduceTMSize(size_t elementCount)
     using namespace cub;
 
     auto TFunc = [] MRAY_HYBRID(InT) -> OutT{ return OutT{}; };
-    using TransIt = TransformInputIterator<OutT, decltype(TFunc), const InT*>;
+    using TransIt = thrust::transform_iterator<decltype(TFunc), const InT*, OutT>;
     TransIt dIn = TransIt(nullptr, TFunc);
     OutT* dOut = nullptr;
     void* dTM = nullptr;
@@ -52,7 +52,7 @@ size_t SegmentedTransformReduceTMSize(size_t numSegments)
 {
     using namespace cub;
     auto TFunc = [] MRAY_HYBRID(InT) -> OutT{ return OutT{}; };
-    using TransIt = TransformInputIterator<OutT, decltype(TFunc), const InT*>;
+    using TransIt = thrust::transform_iterator<decltype(TFunc), const InT*, OutT>;
     TransIt dIn = TransIt(nullptr, TFunc);
     uint32_t* dStartOffsets = nullptr;
     uint32_t* dEndOffsets = nullptr;
@@ -105,7 +105,7 @@ void TransformReduce(Span<OutT, 1> dReducedValue,
     static const auto annotation = queue.CreateAnnotation("KCTransformReduce"sv);
     const auto _ = annotation.AnnotateScope();
 
-    using TransIt = TransformInputIterator<OutT, TransformOp, const InT*>;
+    using TransIt = thrust::transform_iterator<TransformOp, const InT*, OutT>;
     TransIt dIn = TransIt(dValues.data(), std::forward<TransformOp>(transformOp));
 
     size_t size = dTempMemory.size();
@@ -131,7 +131,8 @@ void SegmentedTransformReduce(Span<OutT> dReducedValues,
     using namespace std::literals;
     static const auto annotation = queue.CreateAnnotation("KCSegmentedTransformReduce"sv);
     const auto _ = annotation.AnnotateScope();
-    using TransIt = TransformInputIterator<OutT, TransformOp, const InT*>;
+    //using TransIt = thrust::transform_iterator<OutT, TransformOp, const InT*>;
+    using TransIt = thrust::transform_iterator<TransformOp, const InT*, OutT>;
     TransIt dIn = TransIt(dValues.data(), std::forward<TransformOp>(transformOp));
 
     int segmentCount = static_cast<int>(dSegmentRanges.size() - 1);

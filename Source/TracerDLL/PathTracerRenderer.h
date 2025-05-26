@@ -49,9 +49,9 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer>
     using AttribInfoList            = typename Base::AttribInfoList;
     using SpectrumConverterContext  = SpectrumConverterContextIdentity;
     //
-    using GlobalStateList   = std::tuple<PathTraceRDetail::GlobalState<EmptyType>,
-                                         PathTraceRDetail::GlobalState<UniformLightSampler>>;
-    using RayStateList      = std::tuple<PathTraceRDetail::RayState, PathTraceRDetail::RayState>;
+    using GlobalStateList   = PackedTypes<PathTraceRDetail::GlobalState<EmptyType>,
+                                          PathTraceRDetail::GlobalState<UniformLightSampler>>;
+    using RayStateList      = PackedTypes<PathTraceRDetail::RayState, PathTraceRDetail::RayState>;
 
     // Work Functions
     template<PrimitiveC P, MaterialC M, class S, class TContext,

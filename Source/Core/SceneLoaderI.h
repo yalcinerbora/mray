@@ -56,4 +56,4 @@ class SceneLoaderI
     virtual void                    ClearScene() = 0;
 };
 
-using SceneLoaderConstructorArgs = std::tuple<ThreadPool&>;
+using SceneLoaderConstructorArgs = PackedTypes<ThreadPool&>;

@@ -6,12 +6,12 @@
 // ================= //
 //     Renderers     //
 // ================= //
-using RendererTypes_1 = std::tuple
+using RendererTypes_1 = PackedTypes
 <
     SurfaceRenderer
 >;
 
-using RendererWorkTypes_1 = std::tuple
+using RendererWorkTypes_1 = PackedTypes
 <
      RendererWorkTypes<SurfaceRenderer, RenderWork,
                        RenderLightWork, RenderCameraWork>
@@ -20,9 +20,9 @@ using RendererWorkTypes_1 = std::tuple
 void Tracer::AddRendererGenerators_1(Map<std::string_view, RendererGenerator>& map,
                                      Map<std::string_view, RenderWorkPack>& workMap)
 {
-    using Args = std::tuple<const RenderImagePtr&, TracerView,
-                            ThreadPool&, const GPUSystem&,
-                            const RenderWorkPack&>;
+    using Args = PackedTypes<const RenderImagePtr&, TracerView,
+                             ThreadPool&, const GPUSystem&,
+                             const RenderWorkPack&>;
 
     Args* resolver0 = nullptr;
     RendererTypes_1* resolver1 = nullptr;

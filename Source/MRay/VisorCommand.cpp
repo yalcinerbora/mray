@@ -117,8 +117,8 @@ MRayError VisorCommand::Invoke()
         .mangledConstructorName = visorConfig.dllCreateFuncName,
         .mangledDestructorName = visorConfig.dllDeleteFuncName
     };
-    MRayError e = lib.GenerateObjectWithArgs<std::tuple<>>(visorSystem,
-                                                      VisorDLLArgs);
+    MRayError e = lib.GenerateObjectWithArgs<PackedTypes<>>(visorSystem,
+                                                            VisorDLLArgs);
     if(e) return e;
 
     // Transfer queue, responsible for communication between main thread

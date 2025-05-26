@@ -693,7 +693,7 @@ class [[nodiscard]] TracerI
     virtual const TracerParameters& Parameters() const = 0;
 };
 
-using TracerConstructorArgs = std::tuple<const TracerParameters&>;
+using TracerConstructorArgs = PackedTypes<const TracerParameters&>;
 
 // We use this on a map, so overload less
 inline bool AcceleratorType::operator<(AcceleratorType t) const

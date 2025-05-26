@@ -5,10 +5,10 @@
 #include "Core/Map.h"
 #include "Core/Types.h"
 
-template<class BaseType, class...Args>
+template<class BaseType, class... Args>
 using GeneratorFuncType = std::unique_ptr<BaseType>(*)(Args&&... args);
 
-template<class BaseType, class Type, class...Args>
+template<class BaseType, class Type, class... Args>
 std::unique_ptr<BaseType> GenerateType(Args&&... args)
 {
     return std::make_unique<Type>(std::forward<Args>(args)...);
@@ -19,7 +19,7 @@ template<class GeneratorType, class BaseType,
 void GenerateMapping(Map<std::string_view, GeneratorType>& map,
                      // These types are here for overload resolution,
                      // these will not be used directly
-                     std::tuple<Args...>*, std::tuple<Types...>*)
+                     PackedTypes<Args...>*, PackedTypes<Types...>*)
 {
     // I've come up with this to move the Args... pack away
     // from expansion of Types...

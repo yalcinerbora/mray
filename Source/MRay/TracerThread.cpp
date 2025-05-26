@@ -760,8 +760,6 @@ MRayError TracerThread::LoadSceneLoaderDLLs()
     try
     {
         sceneLoaderDLLs.emplace(MRAY_SCENE_LOADER_LIB_NAME, MRAY_SCENE_LOADER_LIB_NAME);
-        sceneLoaderDLLs.emplace(USD_SCENE_LOADER_LIB_NAME, USD_SCENE_LOADER_LIB_NAME);
-
         // Create loaders
         // MRay
         auto& mrayDLL = sceneLoaderDLLs.at(MRAY_SCENE_LOADER_LIB_NAME);
@@ -779,22 +777,27 @@ MRayError TracerThread::LoadSceneLoaderDLLs()
         if(e) return e;
 
         // USD
-        SharedLibArgs usdLibArgs = SharedLibArgs
+        // USD may not be built. So we check if the DLL exists first
+        if(std::filesystem::exists(std::filesystem::path(USD_SCENE_LOADER_LIB_NAME)))
         {
-            USD_SCENE_LOADER_LIB_C_NAME,
-            USD_SCENE_LOADER_LIB_D_NAME
-        };
-        auto& usdDLL = sceneLoaderDLLs.at(USD_SCENE_LOADER_LIB_NAME);
-        for(const std::string_view extension : USD_SCENE_LOADER_EXT_NAMES)
-        {
-            sceneLoaders.emplace(extension, SceneLoaderPtr{nullptr, nullptr});
-            e = usdDLL.GenerateObjectWithArgs<SceneLoaderConstructorArgs>
-            (
-                sceneLoaders.at(extension),
-                usdLibArgs,
-                threadPool
-            );
-            if(e) return e;
+            sceneLoaderDLLs.emplace(USD_SCENE_LOADER_LIB_NAME, USD_SCENE_LOADER_LIB_NAME);
+            SharedLibArgs usdLibArgs = SharedLibArgs
+            {
+                USD_SCENE_LOADER_LIB_C_NAME,
+                USD_SCENE_LOADER_LIB_D_NAME
+            };
+            auto& usdDLL = sceneLoaderDLLs.at(USD_SCENE_LOADER_LIB_NAME);
+            for(const std::string_view extension : USD_SCENE_LOADER_EXT_NAMES)
+            {
+                sceneLoaders.emplace(extension, SceneLoaderPtr{nullptr, nullptr});
+                e = usdDLL.GenerateObjectWithArgs<SceneLoaderConstructorArgs>
+                (
+                    sceneLoaders.at(extension),
+                    usdLibArgs,
+                    threadPool
+                );
+                if(e) return e;
+            }
         }
         return e;
     }

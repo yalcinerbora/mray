@@ -111,7 +111,8 @@ SharedLibrary::SharedLibrary(const std::string& libName)
     #endif
 
     if(libHandle == nullptr)
-        throw MRayError("[DLLError] {}", potentialError);
+        throw MRayError("[DLLError] ({}) {}",
+                        libName, potentialError);
 }
 
 SharedLibrary::~SharedLibrary()

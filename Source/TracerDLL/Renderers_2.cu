@@ -8,12 +8,12 @@
 // ================= //
 //     Renderers     //
 // ================= //
-using RendererTypes_2 = std::tuple
+using RendererTypes_2 = PackedTypes
 <
     PathTracerRenderer
 >;
 
-using RendererWorkTypes_2 = std::tuple
+using RendererWorkTypes_2 = PackedTypes
 <
     RendererWorkTypes<PathTracerRenderer, PathTracerRenderWork,
                       PathTracerRenderLightWork, PathTracerRenderCamWork>
@@ -22,9 +22,9 @@ using RendererWorkTypes_2 = std::tuple
 void Tracer::AddRendererGenerators_2(Map<std::string_view, RendererGenerator>& map,
                                      Map<std::string_view, RenderWorkPack>& workMap)
 {
-    using Args = std::tuple<const RenderImagePtr&, TracerView,
-                            ThreadPool&, const GPUSystem&,
-                            const RenderWorkPack&>;
+    using Args = PackedTypes<const RenderImagePtr&, TracerView,
+                             ThreadPool&, const GPUSystem&,
+                             const RenderWorkPack&>;
 
     Args* resolver0 = nullptr;
     RendererTypes_2* resolver1 = nullptr;

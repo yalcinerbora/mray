@@ -1117,10 +1117,10 @@ inline void AddSingleRenderWork(Map<std::string_view, RenderWorkPack>& workMap,
     //================//
     // Material Works //
     //================//
-    using WorkGenArgs = std::tuple<const GenericGroupMaterialT&,
-                              const GenericGroupPrimitiveT&,
-                              const GenericGroupTransformT&,
-                              const GPUSystem&>;
+    using WorkGenArgs = PackedTypes<const GenericGroupMaterialT&,
+                                    const GenericGroupPrimitiveT&,
+                                    const GenericGroupTransformT&,
+                                    const GPUSystem&>;
     WorkGenArgs* workArgsResolver = nullptr;
     WorkTypes* workTypesResolver = nullptr;
     GenerateMapping<RenderWorkGenerator, RenderWorkI>
@@ -1132,9 +1132,9 @@ inline void AddSingleRenderWork(Map<std::string_view, RenderWorkPack>& workMap,
     //================//
     //   Light Works  //
     //================//
-    using LightWorkGenArgs = std::tuple<const GenericGroupLightT&,
-                                   const GenericGroupTransformT&,
-                                   const GPUSystem&>;
+    using LightWorkGenArgs = PackedTypes<const GenericGroupLightT&,
+                                         const GenericGroupTransformT&,
+                                         const GPUSystem&>;
     LightWorkGenArgs* lightWorkArgsResolver = nullptr;
     LightWorkTypes* lightWorkTypesResolver = nullptr;
     GenerateMapping<RenderLightWorkGenerator, RenderLightWorkI>
@@ -1146,9 +1146,9 @@ inline void AddSingleRenderWork(Map<std::string_view, RenderWorkPack>& workMap,
     //================//
     //  Camera Works  //
     //================//
-    using CameraWorkGenArgs = std::tuple<const GenericGroupCameraT&,
-                                    const GenericGroupTransformT&,
-                                    const GPUSystem&>;
+    using CameraWorkGenArgs = PackedTypes<const GenericGroupCameraT&,
+                                          const GenericGroupTransformT&,
+                                          const GPUSystem&>;
     CameraWorkGenArgs* cameraWorkArgsResolver = nullptr;
     CameraWorkTypes* cameraWorkTypesResolver = nullptr;
     GenerateMapping<RenderCameraWorkGenerator, RenderCameraWorkI>
@@ -1161,7 +1161,7 @@ inline void AddSingleRenderWork(Map<std::string_view, RenderWorkPack>& workMap,
 
 template <class... Args>
 void AddRenderWorks(Map<std::string_view, RenderWorkPack>& workMap,
-                    std::tuple<Args...>* list)
+                    PackedTypes<Args...>*)
 {
     auto AddRenderWorksInternal =
     []<size_t... Is>(Map<std::string_view, RenderWorkPack>&workMap,
@@ -1175,6 +1175,7 @@ void AddRenderWorks(Map<std::string_view, RenderWorkPack>& workMap,
         );
     };
 
+    std::tuple<Args...>* list = nullptr;
     AddRenderWorksInternal(workMap, list,
                            std::index_sequence_for<Args...>{});
 }

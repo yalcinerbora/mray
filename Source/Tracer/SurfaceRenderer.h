@@ -18,8 +18,8 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     //
     using SpectrumConverterContext = SpectrumConverterContextIdentity;
     // Work States
-    using GlobalStateList   = std::tuple<SurfRDetail::GlobalState, SurfRDetail::GlobalState>;
-    using RayStateList      = std::tuple<SurfRDetail::RayStateCommon, SurfRDetail::RayStateAO>;
+    using GlobalStateList   = PackedTypes<SurfRDetail::GlobalState, SurfRDetail::GlobalState>;
+    using RayStateList      = PackedTypes<SurfRDetail::RayStateCommon, SurfRDetail::RayStateAO>;
     using RayStateCommon    = std::tuple_element_t<0, RayStateList>;
     using RayStateAO        = std::tuple_element_t<1, RayStateList>;
     // Work Functions
