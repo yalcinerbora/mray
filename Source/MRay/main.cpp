@@ -11,6 +11,7 @@
 #include "CommandI.h"
 #include "ConvertCommand.h"
 #include "VisorCommand.h"
+#include "QueryCommand.h"
 #include "RunCommand.h"
 
 class ProcessTimer
@@ -56,7 +57,8 @@ InitializeCommands() noexcept
     static StaticVector<CommandI*, MAX_SUBCOMMAND_COUNT> CommandList =
     {
         &ConvertCommand::Instance(),
-        &RunCommand::Instance()
+        &RunCommand::Instance(),
+        &QueryCommand::Instance()
     };
 
     if constexpr(MRay::IsVisorBuilt)
@@ -110,6 +112,7 @@ int main(int argc, const char* const argv[])
                            DeviceCompilerName,
                            License);
     });
+
     // Create Subcommands
     const auto& commandList = InitializeCommands();
     for(CommandI* command : commandList)

@@ -994,8 +994,8 @@ MRayError RunCommand::Invoke()
         // (window render thread) and tracer thread
         static constexpr size_t CommandBufferSize = 8;
         static_assert(CommandBufferSize >= 4,
-                    "Command buffer should at least have a size of two. "
-                    "We issue two event before starting the tracer.");
+                      "Command buffer should at least have a size of two. "
+                      "We issue two event before starting the tracer.");
         TransferQueue transferQueue(CommandBufferSize, CommandBufferSize,
                                     [](){});
 
@@ -1111,7 +1111,6 @@ CLI::App* RunCommand::GenApp(CLI::App& mainApp)
         ->check(CLI::ExistingFile)
         ->required()
         ->expected(1);
-
 
     converter->add_option("--renderConf, --rConf"s, renderConfigFile,
                           "Renderer to be launched."s)

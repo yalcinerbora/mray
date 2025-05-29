@@ -860,3 +860,153 @@ void TracerThread::SetInitialResolution(const Vector2ui& res,
     regionMin = rMin;
     regionMax = rMax;
 }
+
+void TracerThread::DisplayTypes()
+{
+    assert(tracer);
+
+    auto ListNames = [](const TypeNameList& list)
+    {
+        for(const auto& n : list)
+            MRAY_LOG("    {}", n);
+
+        MRAY_LOG("");
+    };
+
+    MRAY_LOG("Primitive Groups:");
+    ListNames(tracer->PrimitiveGroups());
+
+    MRAY_LOG("Material Groups:");
+    ListNames(tracer->MaterialGroups());
+
+    MRAY_LOG("Transform Groups:");
+    ListNames(tracer->TransformGroups());
+
+    MRAY_LOG("Camera Groups:");
+    ListNames(tracer->CameraGroups());
+
+    MRAY_LOG("Medium Groups:");
+    ListNames(tracer->MediumGroups());
+
+    MRAY_LOG("Light Groups:");
+    ListNames(tracer->LightGroups());
+
+    MRAY_LOG("Renderers");
+    ListNames(tracer->Renderers());
+}
+
+void TracerThread::DisplayTypeAttributes(std::string_view typeName)
+{
+    assert(tracer);
+    auto PrintGenericAttributes = []<size_t N>(std::string_view name,
+                                               const StaticVector<GenericAttributeInfo, N>&attribInfo)
+    {
+        MRAY_LOG("Attributes of {}:", name);
+        MRAY_LOG("{:^16s} | {:^16s} | {:^6s} | {:^9s}",
+                 "Name", "Layout", "Array?", "Optional?");
+        MRAY_LOG("--------------------------------------------------------");
+        for(const auto& a : attribInfo)
+        {
+            std::string logic = std::get<GenericAttributeInfo::LOGIC_INDEX>(a);
+            MRayDataTypeRT layout = std::get<GenericAttributeInfo::LAYOUT_INDEX>(a);
+            AttributeIsArray isArray = std::get<GenericAttributeInfo::IS_ARRAY_INDEX>(a);
+            AttributeOptionality isOptional = std::get<GenericAttributeInfo::OPTIONALITY_INDEX>(a);
+
+            MRAY_LOG("{:<16} | {:<16} | {:<6s} | {:<9s}",
+                     logic,
+                     MRayDataTypeStringifier::ToString(layout.Name()),
+                     isArray == AttributeIsArray::IS_ARRAY,
+                     isOptional == AttributeOptionality::MR_OPTIONAL);
+        }
+    };
+    auto PrintPrimAttributes = [](std::string_view name,
+                                  const PrimAttributeInfoList& attribInfo)
+    {
+        MRAY_LOG("Attributes of {}:", name);
+        MRAY_LOG("{:^16s} | {:^16s} | {:^6s} | {:^9s}",
+                 "Name", "Layout", "Array?", "Optional?");
+        MRAY_LOG("--------------------------------------------------------");
+        for(const auto& a : attribInfo)
+        {
+            PrimitiveAttributeLogic logic = std::get<GenericAttributeInfo::LOGIC_INDEX>(a);
+            MRayDataTypeRT layout = std::get<GenericAttributeInfo::LAYOUT_INDEX>(a);
+            AttributeIsArray isArray = std::get<GenericAttributeInfo::IS_ARRAY_INDEX>(a);
+            AttributeOptionality isOptional = std::get<GenericAttributeInfo::OPTIONALITY_INDEX>(a);
+
+            MRAY_LOG("{:<16} | {:<16} | {:<6s} | {:<9s}",
+                     PrimAttributeStringifier::ToString(logic),
+                     MRayDataTypeStringifier::ToString(layout.Name()),
+                     isArray == AttributeIsArray::IS_ARRAY,
+                     isOptional == AttributeOptionality::MR_OPTIONAL);
+        }
+    };
+    auto PrintTexturableAttributes = [](std::string_view name,
+                                        const TexturedAttributeInfoList& attribInfo)
+    {
+        MRAY_LOG("Attributes of {}:", name);
+        MRAY_LOG("{:^16s} | {:^16s} | {:^6s} | {:^9s} | {:^11s} | {:^6s}",
+                 "Name", "Layout", "Array?", "Optional?", "Texturable?", "Color?");
+        MRAY_LOG("----------------------------------------"
+                 "---------------------------------------");
+        for(const auto& a : attribInfo)
+        {
+            std::string logic = std::get<TexturedAttributeInfo::LOGIC_INDEX>(a);
+            MRayDataTypeRT layout = std::get<TexturedAttributeInfo::LAYOUT_INDEX>(a);
+            AttributeIsArray isArray = std::get<TexturedAttributeInfo::IS_ARRAY_INDEX>(a);
+            AttributeOptionality isOptional = std::get<TexturedAttributeInfo::OPTIONALITY_INDEX>(a);
+            AttributeTexturable isTexturable = std::get<TexturedAttributeInfo::TEXTURABLE_INDEX>(a);
+            AttributeIsColor isColor = std::get<TexturedAttributeInfo::COLORIMETRY_INDEX>(a);
+
+            std::string_view texturability;
+            switch(isTexturable)
+            {
+                using namespace std::string_view_literals;
+                using enum AttributeTexturable;
+
+                case MR_CONSTANT_ONLY:          texturability = "Constant"; break;
+                case MR_TEXTURE_OR_CONSTANT:    texturability = "Both"; break;
+                case MR_TEXTURE_ONLY:           texturability = "Texture"; break;
+            }
+
+            MRAY_LOG("{:<16} | {:<16} | {:<6s} | {:<9s} | {:<11} | {:<6s}",
+                     logic,
+                     MRayDataTypeStringifier::ToString(layout.Name()),
+                     isArray == AttributeIsArray::IS_ARRAY,
+                     isOptional == AttributeOptionality::MR_OPTIONAL,
+                     texturability,
+                     isColor == AttributeIsColor::IS_COLOR);
+        }
+    };
+
+    auto prefixEnd = typeName.find_first_of(')');
+    if(prefixEnd == std::string_view::npos)
+    {
+        MRAY_LOG("Unable to parse prefix of \"{}\"", typeName);
+        return;
+    }
+    //
+    try
+    {
+        std::string_view prefix = typeName.substr(0, prefixEnd + 1);
+        if(prefix == TracerConstants::PRIM_PREFIX)
+            PrintPrimAttributes(typeName, tracer->AttributeInfoPrim(typeName));
+        else if(prefix == TracerConstants::MAT_PREFIX)
+            PrintTexturableAttributes(typeName, tracer->AttributeInfoMat(typeName));
+        else if(prefix == TracerConstants::TRANSFORM_PREFIX)
+            PrintGenericAttributes(typeName, tracer->AttributeInfoTrans(typeName));
+        else if(prefix == TracerConstants::CAM_PREFIX)
+            PrintGenericAttributes(typeName, tracer->AttributeInfoCam(typeName));
+        else if(prefix == TracerConstants::MEDIUM_PREFIX)
+            PrintTexturableAttributes(typeName, tracer->AttributeInfoMedium(typeName));
+        else if(prefix == TracerConstants::LIGHT_PREFIX)
+            PrintTexturableAttributes(typeName, tracer->AttributeInfoLight(typeName));
+        else if(prefix == TracerConstants::RENDERER_PREFIX)
+            PrintGenericAttributes(typeName, tracer->AttributeInfoRenderer(typeName));
+        else
+            MRAY_LOG("Unkown type prefix \"{}\"", prefix);
+    }
+    catch(const MRayError& e)
+    {
+        MRAY_LOG("{}", e.GetError());
+    }
+}

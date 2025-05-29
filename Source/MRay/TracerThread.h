@@ -86,6 +86,8 @@ class TracerThread final : public RealtimeThread
     void        SetInitialResolution(const Vector2ui& resolution,
                                      const Vector2ui& regionMin,
                                      const Vector2ui& regionMax);
+    void        DisplayTypes();
+    void        DisplayTypeAttributes(std::string_view);
 
     // Misc.
     GPUThreadInitFunction GetThreadInitFunction() const;

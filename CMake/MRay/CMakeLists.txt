@@ -7,6 +7,8 @@ set(SRC_SUBCOMMAND
     ${CURRENT_SOURCE_DIR}/VisorCommand.h
     ${CURRENT_SOURCE_DIR}/RunCommand.cpp
     ${CURRENT_SOURCE_DIR}/RunCommand.h
+    ${CURRENT_SOURCE_DIR}/QueryCommand.cpp
+    ${CURRENT_SOURCE_DIR}/QueryCommand.h
     ${CURRENT_SOURCE_DIR}/CommandI.h)
 
 set(SRC_TRACER

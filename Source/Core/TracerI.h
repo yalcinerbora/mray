@@ -276,10 +276,10 @@ struct MRayTextureParameters
 
 // Generic Attribute Info
 struct GenericAttributeInfo : public std::tuple<std::string, MRayDataTypeRT,
-                                           AttributeIsArray, AttributeOptionality>
+                                                AttributeIsArray, AttributeOptionality>
 {
     using Base = std::tuple<std::string, MRayDataTypeRT,
-                       AttributeIsArray, AttributeOptionality>;
+                            AttributeIsArray, AttributeOptionality>;
     using Base::Base;
     enum E
     {
@@ -291,12 +291,12 @@ struct GenericAttributeInfo : public std::tuple<std::string, MRayDataTypeRT,
 };
 
 struct TexturedAttributeInfo : public std::tuple<std::string, MRayDataTypeRT,
-                                            AttributeIsArray, AttributeOptionality,
-                                            AttributeTexturable, AttributeIsColor>
+                                                 AttributeIsArray, AttributeOptionality,
+                                                 AttributeTexturable, AttributeIsColor>
 {
     using Base = std::tuple<std::string, MRayDataTypeRT,
-                       AttributeIsArray, AttributeOptionality,
-                       AttributeTexturable, AttributeIsColor>;
+                            AttributeIsArray, AttributeOptionality,
+                            AttributeTexturable, AttributeIsColor>;
     using Base::Base;
     enum E
     {
@@ -305,7 +305,7 @@ struct TexturedAttributeInfo : public std::tuple<std::string, MRayDataTypeRT,
         IS_ARRAY_INDEX      = 2,
         OPTIONALITY_INDEX   = 3,
         TEXTURABLE_INDEX    = 4,
-        COLOROMETRY_INDEX   = 5,
+        COLORIMETRY_INDEX   = 5,
     };
 };
 
@@ -349,10 +349,10 @@ MRAY_GENERIC_ID(PrimBatchId, CommonId);
 struct PrimCount { uint32_t primCount; uint32_t attributeCount; };
 using PrimBatchIdList = std::vector<PrimBatchId>;
 struct PrimAttributeInfo : public std::tuple<PrimitiveAttributeLogic, MRayDataTypeRT,
-                                        AttributeIsArray, AttributeOptionality>
+                                             AttributeIsArray, AttributeOptionality>
 {
     using Base = std::tuple<PrimitiveAttributeLogic, MRayDataTypeRT,
-                       AttributeIsArray, AttributeOptionality>;
+                            AttributeIsArray, AttributeOptionality>;
     using Base::Base;
     enum
     {
