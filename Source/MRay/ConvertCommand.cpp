@@ -11,7 +11,7 @@ namespace MRayCLI::ConvertNames
 {
     using namespace std::literals;
     static constexpr auto Name = "convert"sv;
-    static constexpr auto Description = "Converts various scene types to MRay "
+    static constexpr auto Description = "Converts various scene types to MRay-"
                                         "readable form"sv;
 };
 

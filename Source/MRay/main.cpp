@@ -16,7 +16,8 @@
 class ProcessTimer
 {
     private:
-    Timer t;
+    Timer       t;
+    bool        display = false;
 
     public:
     // Constructors & Destructor
@@ -26,6 +27,8 @@ class ProcessTimer
     ProcessTimer&   operator=(const ProcessTimer&) = delete;
     ProcessTimer&   operator=(ProcessTimer&&) = delete;
                     ~ProcessTimer();
+
+    void            Display();
 };
 
 ProcessTimer::ProcessTimer()
@@ -35,9 +38,16 @@ ProcessTimer::ProcessTimer()
 
 ProcessTimer::~ProcessTimer()
 {
+    if(!display) return;
+
     t.Split();
     std::string time = FormatTimeDynamic(t);
     MRAY_LOG("\"int main(...)\" time: {:s}", time);
+}
+
+void ProcessTimer::Display()
+{
+    display = true;
 }
 
 const StaticVector<CommandI*, MAX_SUBCOMMAND_COUNT>&
@@ -57,7 +67,7 @@ InitializeCommands() noexcept
 
 int main(int argc, const char* const argv[])
 {
-    ProcessTimer t;
+    ProcessTimer processTimer;
 
     if(!EnableVTMode())
     {
@@ -82,7 +92,7 @@ int main(int argc, const char* const argv[])
 
     // Version information
     using namespace std::string_literals;
-    app.set_version_flag("--version, -v"s, []() -> std::string
+    app.set_version_flag("--version, -v"s, [&processTimer]() -> std::string
     {
         using namespace MRay;
         return MRAY_FORMAT("{}: {}\n"
@@ -118,6 +128,7 @@ int main(int argc, const char* const argv[])
     });
     assert(appIt != appList.cend());
 
+    processTimer.Display();
     MRayError e = appIt->first->Invoke();
     if(e)
     {

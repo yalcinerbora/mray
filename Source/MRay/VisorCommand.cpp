@@ -94,7 +94,7 @@ namespace MRayCLI::VisorNames
 {
     using namespace std::literals;
     static constexpr auto Name = "visor"sv;
-    static constexpr auto Description = "enables the visor system for interactive "
+    static constexpr auto Description = "Enables the visor system for interactive "
                                         "rendering"sv;
 };
 
