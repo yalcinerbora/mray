@@ -358,8 +358,14 @@ void TracerThread::HandleSceneChange(const std::string& newScene)
     std::string fileExt = scenePath.extension().string();
 
     fileExt = fileExt.substr(1);
-    SceneLoaderI* loader = sceneLoaders.at(fileExt).get();
-    currentScene = loader;
+    auto loaderIt = sceneLoaders.find(fileExt);
+    if(loaderIt == sceneLoaders.end())
+    {
+        throw MRayError("Unable to Find a scene loader "
+                        "for extension \"{}\"",
+                        fileExt);
+    }
+    currentScene = loaderIt->second.get();
     Expected<TracerIdPack> result = currentScene->LoadScene(*tracer, newScene);
     if(result.has_error())
     {
