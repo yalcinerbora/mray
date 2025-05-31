@@ -110,7 +110,7 @@ namespace TracerConstants
 
 // Accelerators are responsible for accelerating ray/surface interactions
 // This is abstracted away but exposed to the user for prototyping different
-// accelerators. This is less usefull due to hw-accelerated ray tracing.
+// accelerators. This is less useful due to hw-accelerated ray tracing.
 //
 // The old design supported mixing and matching "Base Accelerator"
 // (TLAS, IAS on other APIs) with bottom-level accelerators. This
@@ -125,8 +125,9 @@ namespace TracerConstants
 //  -- SOFTWARE_NONE :  No acceleration, ray caster does a !LINEAR SEARCH! over the
 //                      primitives (Should not be used, it is for debugging,
 //                      testing etc.)
-//  -- SOFTWARE_BVH  :  Very basic midpoint BVH. Provided for completeness sake and
-//                      should not be used.
+//  -- SOFTWARE_BVH  :  Very basic LBVH. Each triangle's center is converted to
+//                      a morton code and these are sorted. Provided for completeness
+//                      sake and should not be used.
 //  -- HARDWARE      :  On CUDA, it utilizes OptiX for hardware acceleration.
 class AcceleratorType
 {

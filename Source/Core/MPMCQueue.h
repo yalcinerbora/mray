@@ -27,8 +27,8 @@ class MPMCQueue
         std::timed_mutex        mutex;
         std::atomic_bool        isTerminated;
 
-        bool                    IsEmpty();
-        bool                    IsFull();
+        bool                    IsEmptyUnsafe();
+        bool                    IsFullUnsafe();
         void                    Increment(size_t&);
 
     protected:
@@ -48,6 +48,9 @@ class MPMCQueue
         bool                    TryDequeue(T&, D);
         void                    Enqueue(T&&);
         bool                    TryEnqueue(T&&);
+        //
+        bool                    IsEmpty();
+        bool                    IsFull();
 
         // Awakes all threads and forces them to leave queue
         void                    Terminate();
@@ -57,13 +60,13 @@ class MPMCQueue
 };
 
 template<class T>
-bool MPMCQueue<T>::IsEmpty()
+bool MPMCQueue<T>::IsEmptyUnsafe()
 {
     return ((dequeueLoc + 1) % data.size())  == enqueueLoc;
 }
 
 template<class T>
-bool MPMCQueue<T>::IsFull()
+bool MPMCQueue<T>::IsFullUnsafe()
 {
     return enqueueLoc == dequeueLoc;
 }
@@ -92,7 +95,7 @@ void MPMCQueue<T>::Dequeue(T& item)
         std::unique_lock<std::timed_mutex> lock(mutex);
         dequeueWake.wait(lock, [&]()
         {
-            return (!IsEmpty() || isTerminated);
+            return (!IsEmptyUnsafe() || isTerminated);
         });
         if (isTerminated) return;
 
@@ -108,7 +111,7 @@ bool MPMCQueue<T>::TryDequeue(T& item)
     if (isTerminated) return false;
     {
         std::unique_lock<std::timed_mutex> lock(mutex);
-        if(IsEmpty() || isTerminated) return false;
+        if(IsEmptyUnsafe() || isTerminated) return false;
 
         Increment(dequeueLoc);
         item = std::move(data[dequeueLoc]);
@@ -126,7 +129,7 @@ bool MPMCQueue<T>::TryDequeue(T& item, D duration)
         std::unique_lock<std::timed_mutex> lock(mutex, std::defer_lock);
         bool result = lock.try_lock_for(duration);
         //
-        if(IsEmpty() || isTerminated || !result)
+        if(IsEmptyUnsafe() || isTerminated || !result)
             return false;
 
         Increment(dequeueLoc);
@@ -143,7 +146,7 @@ void MPMCQueue<T>::Enqueue(T&& item)
         std::unique_lock<std::timed_mutex> lock(mutex);
         enqueWake.wait(lock, [&]()
         {
-            return (!IsFull() || isTerminated);
+            return (!IsFullUnsafe() || isTerminated);
         });
         if (isTerminated) return;
 
@@ -159,7 +162,7 @@ bool MPMCQueue<T>::TryEnqueue(T&& item)
     if (isTerminated) return false;
     {
         std::unique_lock<std::timed_mutex> lock(mutex);
-        if(IsFull() || isTerminated) return false;
+        if(IsFullUnsafe() || isTerminated) return false;
 
         data[enqueueLoc] = std::move(item);
         Increment(enqueueLoc);
@@ -180,6 +183,20 @@ template<class T>
 bool MPMCQueue<T>::IsTerminated() const
 {
     return isTerminated;
+}
+
+template<class T>
+bool MPMCQueue<T>::IsEmpty()
+{
+    std::unique_lock<std::timed_mutex> lock(mutex);
+    return IsEmptyUnsafe();
+}
+
+template<class T>
+bool MPMCQueue<T>::IsFull()
+{
+    std::unique_lock<std::timed_mutex> lock(mutex);
+    return IsFullUnsafe();
 }
 
 template<class T>

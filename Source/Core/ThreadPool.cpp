@@ -7,11 +7,17 @@ class ThreadLoop
 
     private:
     MPMCQueue<std::function<void()>>&   taskQueue;
+    // For waiting
+    std::atomic_uint32_t&               runningTaskCount;
+    std::condition_variable&            waitCondition;
+    //
     ThreadInitFunction                  initFunction;
     uint32_t                            threadNumber;
 
     public:
     ThreadLoop(MPMCQueue<std::function<void()>>& taskQueue,
+               std::atomic_uint32_t& runningTaskCount,
+               std::condition_variable& waitCondition,
                ThreadInitFunction initFunction, uint32_t threadNumber);
 
     void operator()(std::stop_token token)
@@ -26,15 +32,26 @@ class ThreadLoop
         {
             std::function<void()> work;
             taskQueue.Dequeue(work);
+            runningTaskCount++;
             if(work) work();
+            runningTaskCount--;
+
+            if(runningTaskCount == 0 && taskQueue.IsEmpty())
+            {
+                waitCondition.notify_all();
+            }
         }
     }
 };
 
 ThreadLoop::ThreadLoop(MPMCQueue<std::function<void()>>& taskQueue,
+                       std::atomic_uint32_t& runningTaskCount,
+                       std::condition_variable& waitCondition,
                        ThreadInitFunction initFunction,
                        uint32_t threadNumber)
     : taskQueue(taskQueue)
+    , runningTaskCount(runningTaskCount)
+    , waitCondition(waitCondition)
     , initFunction(initFunction)
     , threadNumber(threadNumber)
 {}
@@ -69,8 +86,12 @@ void ThreadPool::Wait()
 {
     if(threads.empty()) return;
 
-    std::future<void> endToken = SubmitTask([](){});
-    endToken.wait();
+
+    std::unique_lock<std::mutex> lock(waitMutex);
+    waitCondition.wait(lock, [&]() -> bool
+    {
+        return (runningTaskCount == 0) && taskQueue.IsEmpty();
+    });
 }
 
 void ThreadPool::RestartThreadsImpl(uint32_t threadCount, ThreadInitFunction initFunc)
@@ -83,7 +104,8 @@ void ThreadPool::RestartThreadsImpl(uint32_t threadCount, ThreadInitFunction ini
     threads.reserve(threadCount);
     for(uint32_t i = 0; i < threadCount; i++)
     {
-        threads.emplace_back(ThreadLoop(taskQueue, initFunc, i));
+        threads.emplace_back(ThreadLoop(taskQueue, runningTaskCount,
+                                        waitCondition, initFunc, i));
     }
 }
 

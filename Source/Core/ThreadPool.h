@@ -63,6 +63,10 @@ class ThreadPool
     MPMCQueue<std::function<void()>>        taskQueue;
     //
     std::vector<std::jthread>               threads;
+    //
+    std::atomic_uint32_t                    runningTaskCount;
+    std::condition_variable                 waitCondition;
+    std::mutex                              waitMutex;
 
     void RestartThreadsImpl(uint32_t threadCount, ThreadInitFunction);
 
