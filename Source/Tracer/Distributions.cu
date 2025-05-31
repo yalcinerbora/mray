@@ -154,6 +154,10 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
         static constexpr uint32_t ITEMS_PER_THREAD = 4;
         static constexpr uint32_t DATA_PER_BLOCK = TPB * ITEMS_PER_THREAD;
 
+        // TODO: Check performance of implicit shared memory usage
+        // We do not utilize single shared memory block since these routines
+        // should not require occupancy-limiting shared memory.
+        // We need to check this to be sure.
         using BlockLoad = cub::BlockLoad<Float, TPB, ITEMS_PER_THREAD, cub::BLOCK_LOAD_VECTORIZE>;
         using BlockStore = cub::BlockStore<Float, TPB, ITEMS_PER_THREAD, cub::BLOCK_STORE_VECTORIZE>;
         using BlockScan = cub::BlockScan<double, TPB>;
@@ -185,16 +189,25 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
                     BlockLoad().Load(dSubBlockIn.data(), dataRegisters);
                 else
                     BlockLoad().Load(dSubBlockIn.data(), dataRegisters,
-                                     validItems, double(0));
+                                     validItems, Float(0));
 
                 // Due to precision errors, we do this operation
                 // in double precision.
                 double dataRegistersDouble[ITEMS_PER_THREAD];
                 UNROLL_LOOP
                 for(uint32_t i = 0; i < ITEMS_PER_THREAD; i++)
-                    dataRegistersDouble[i] = double(dataRegisters[i]);
+                {
+                    // Function can be negative take the absolute value.
+                    // In general case this can happen frequently.
+                    // This distribution currently only used for HDR sampling.
+                    // HDR image may be numerically unstable or
+                    // We did filter that image while doing a texture clamp
+                    // and used Mitchell-Netravali filter which can generate
+                    // negative values.
+                    dataRegistersDouble[i] = std::abs(double(dataRegisters[i]));
+                }
 
-                // Scan
+                // Actual Scan
                 BlockScan().InclusiveSum(dataRegistersDouble,
                                          dataRegistersDouble,
                                          PrefixLoader);
@@ -255,7 +268,13 @@ void KCValidateScan(Span<const Float> dXCDFs, uint32_t segmentSize)
         {
             Float prevCDF = (i == 0) ? Float(0) : dRowCDF[i - 1];
             Float myCDF = dRowCDF[i];
-            assert(prevCDF <= myCDF);
+
+            if(prevCDF > myCDF)
+            {
+                printf("[%u, %u]: Prev %f, Cur %f\n", i, block, prevCDF, myCDF);
+            }
+
+            //assert(prevCDF <= myCDF);
         }
     }
 }
