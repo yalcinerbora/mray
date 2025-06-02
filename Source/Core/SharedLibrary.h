@@ -41,6 +41,9 @@ class SharedLibrary
 
     protected:
     public:
+    static bool             CheckLibExists(std::string_view libName);
+
+    public:
         // Constructors & Destructor
                             SharedLibrary(const std::string& libName);
                             SharedLibrary(const SharedLibrary&) = delete;

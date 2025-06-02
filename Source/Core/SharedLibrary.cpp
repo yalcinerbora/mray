@@ -85,6 +85,19 @@ void* SharedLibrary::GetProcAdressInternal(const std::string& fName) const
     #endif
 }
 
+bool SharedLibrary::CheckLibExists(std::string_view libName)
+{
+    std::string fullName;
+    #if defined MRAY_WINDOWS
+        fullName = std::string(libName) + WinDLLExt;
+    #elif defined MRAY_LINUX
+        fullName = "lib" + std::string(libName) + LinuxDLLExt;
+    #endif
+
+    fullName = Filesystem::RelativePathToAbsolute(fullName, GetProcessPath());
+    return std::filesystem::exists(std::filesystem::path(fullName));
+}
+
 SharedLibrary::SharedLibrary(const std::string& libName)
 {
     std::string potentialError;

@@ -784,7 +784,7 @@ MRayError TracerThread::LoadSceneLoaderDLLs()
 
         // USD
         // USD may not be built. So we check if the DLL exists first
-        if(std::filesystem::exists(std::filesystem::path(USD_SCENE_LOADER_LIB_NAME)))
+        if(SharedLibrary::CheckLibExists(USD_SCENE_LOADER_LIB_NAME))
         {
             sceneLoaderDLLs.emplace(USD_SCENE_LOADER_LIB_NAME, USD_SCENE_LOADER_LIB_NAME);
             SharedLibArgs usdLibArgs = SharedLibArgs

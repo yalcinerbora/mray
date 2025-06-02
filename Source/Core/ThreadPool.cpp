@@ -86,7 +86,8 @@ void ThreadPool::Wait()
 {
     if(threads.empty()) return;
 
-
+    // TODO: This may be wrong, at least it feels like it.
+    // Check it later
     std::unique_lock<std::mutex> lock(waitMutex);
     waitCondition.wait(lock, [&]() -> bool
     {
