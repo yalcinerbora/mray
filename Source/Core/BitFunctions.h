@@ -327,14 +327,7 @@ constexpr T Bit::RequiredBitsToRepresent(T value)
 template<std::unsigned_integral T>
 constexpr T Bit::BitReverse(T value, T width)
 {
-    #ifdef MRAY_DEVICE_CODE_PATH_CUDA
-    {
-        if constexpr(std::is_same_v<T, uint64_t>)
-            return T(__brevll(value));
-        else
-            return T(__brev(uint32_t(value)));
-    }
-    #else
+    constexpr auto Func = [](T value, T width) -> T
     {
         // TODO: Is there a good way to do this
         // other than O(n)
@@ -346,23 +339,50 @@ constexpr T Bit::BitReverse(T value, T width)
             value >>= 1;
         }
         return result;
+    };
+
+    if(std::is_constant_evaluated())
+    {
+        return Func(value, width);
     }
-    #endif
+    else
+    {
+        #ifdef MRAY_DEVICE_CODE_PATH_CUDA
+        {
+            if constexpr(std::is_same_v<T, uint64_t>)
+                return T(__brevll(value));
+            else
+                return T(__brev(uint32_t(value)));
+        }
+        #else
+        {
+            return Func(value, width);
+        }
+        #endif
+    }
+
 }
 
 template<std::unsigned_integral T>
 constexpr T Bit::CountLZero(T value)
 {
-    #ifdef MRAY_DEVICE_CODE_PATH_CUDA
-        if constexpr(std::is_same_v<T, uint64_t>)
-            return T(__clzll(std::bit_cast<long long int>(value)));
-        else if constexpr(std::is_same_v<T, uint32_t>)
-            return std::bit_cast<T>(__clz(std::bit_cast<int>(value)));
-        else
-            return T(__clz(int(value)));
-    #else
+    if(std::is_constant_evaluated())
+    {
         return static_cast<T>(std::countl_zero<T>(value));
-    #endif
+    }
+    else
+    {
+        #ifdef MRAY_DEVICE_CODE_PATH_CUDA
+            if constexpr(std::is_same_v<T, uint64_t>)
+                return T(__clzll(std::bit_cast<long long int>(value)));
+            else if constexpr(std::is_same_v<T, uint32_t>)
+                return std::bit_cast<T>(__clz(std::bit_cast<int>(value)));
+            else
+                return T(__clz(int(value)));
+        #else
+            return static_cast<T>(std::countl_zero<T>(value));
+        #endif
+    };
 }
 
 template<std::unsigned_integral T>

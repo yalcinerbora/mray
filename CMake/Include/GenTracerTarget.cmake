@@ -21,6 +21,8 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/BCColorIO.h
         ${CURRENT_SOURCE_DIR}/TextureMemory.h
         ${CURRENT_SOURCE_DIR}/TextureMemory.cpp
+        ${CURRENT_SOURCE_DIR}/StreamingTextureCache.h
+        ${CURRENT_SOURCE_DIR}/StreamingTexture.h
         ${CURRENT_SOURCE_DIR}/GenericTexture.cpp
         ${CURRENT_SOURCE_DIR}/GenericTextureRW.h
         ${CURRENT_SOURCE_DIR}/ColorConverter.h
@@ -30,8 +32,6 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/TextureFilter.cu
         ${CURRENT_SOURCE_DIR}/TextureView.h
         ${CURRENT_SOURCE_DIR}/Texture.h)
-
-
 
     set(SRC_PRIMITIVES
         ${CURRENT_SOURCE_DIR}/PrimitiveC.h

@@ -289,7 +289,7 @@ CoOctaCoordConverter::Gradient(Float coneAperture,
     Float coneAngle = coneAperture * Float(0.5);
     omega *= Float(1) - std::cos(coneAngle);
 
-    // Omega changes wrt. entire solid angle domain wihch is 4pi
+    // Omega changes wrt. entire solid angle domain which is 4pi
     Float duv = omega * MathConstants::Inv4Pi<Float>();
     // No anisotropy
     return {Vector2(duv, 0), Vector2(0, duv)};

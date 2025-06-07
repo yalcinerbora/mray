@@ -295,7 +295,6 @@ TextureCUDA_BC<T>::TextureCUDA_BC(const GPUDeviceCUDA& device,
     CUDA_MEM_THROW(cudaMallocMipmappedArray(&data, &channelDesc, extent,
                                             texParams.mipCount,
                                             cudaArrayDeferredMapping));
-
     cudaArrayMemoryRequirements memReq;
     CUDA_CHECK(cudaMipmappedArrayGetMemoryRequirements(&memReq, data, gpu->DeviceId()));
     alignment = memReq.alignment;

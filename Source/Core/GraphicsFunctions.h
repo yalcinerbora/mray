@@ -99,6 +99,10 @@ namespace Graphics
     template<uint32_t C>
     MRAY_HYBRID constexpr
     uint32_t                TextureMipCount(const Vector<C, uint32_t>& resolution);
+    template<uint32_t C>
+    MRAY_HYBRID constexpr
+    uint32_t                TextureMipPixelStart(const Vector<C, uint32_t>& resolution,
+                                                 uint32_t mipLevel);
 
     template<uint32_t C>
     MRAY_HYBRID constexpr
@@ -462,6 +466,31 @@ uint32_t TextureMipCount(const Vector<C, uint32_t>& resolution)
 {
     uint32_t maxDim = resolution[resolution.Maximum()];
     return Bit::RequiredBitsToRepresent(maxDim);
+}
+
+template<uint32_t C>
+MRAY_HYBRID constexpr
+uint32_t TextureMipPixelStart(const Vector<C, uint32_t>& baseResolution,
+                              uint32_t mipLevel)
+{
+    constexpr auto MAX_ITERATIONS = 18u;
+    assert(TextureMipCount(baseResolution) > mipLevel);
+    assert(TextureMipCount(baseResolution) > MAX_ITERATIONS);
+    using VecXui = Vector<C, uint32_t>;
+
+    uint32_t mipPixelStart = 0;
+    // TODO: Can we do this analitically?
+    // This loop will run 17 times for extreme cases
+    // (160k x 160k tex for example)
+    // We try to hint the compiler to unroll the loop
+    // by giving a static size of 18.
+    UNROLL_LOOP
+    for(uint32_t i = 0; i < MAX_ITERATIONS; i++)
+    {
+        mipPixelStart += TextureMipSize(baseResolution, i).Multiply();
+        if(i < mipLevel) break;
+    }
+    return mipPixelStart;
 }
 
 template<uint32_t C>
