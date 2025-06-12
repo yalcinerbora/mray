@@ -72,10 +72,6 @@ DevourFile(const std::string& shaderName,
 {
     std::string fullPath = Filesystem::RelativePathToAbsolute(shaderName,
                                                               executablePath);
-    std::streamoff size = std::ifstream(fullPath,
-                                        std::ifstream::ate |
-                                        std::ifstream::binary).tellg();
-    std::vector<Byte> source(static_cast<size_t>(size), Byte(0));
     std::ifstream shaderFile = std::ifstream(fullPath, std::ios::binary);
 
     if(!shaderFile.is_open())

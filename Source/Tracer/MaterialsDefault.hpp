@@ -29,14 +29,14 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
     Quaternion toTangentSpace = surface.shadingTBN;
     if(normalMapTex)
     {
-        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdx, surface.dpdy).value();
+        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdx, surface.dpdy);
         normal.NormalizeSelf();
         // Due to normal change our direction sample should be aligned as well
         toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
     }
 
     // Before transform calculate reflectance
-    Spectrum albedo = albedoTex(surface.uv, surface.dpdx, surface.dpdy).value();
+    Spectrum albedo = albedoTex(surface.uv, surface.dpdx, surface.dpdy);
     Spectrum reflectance = albedo * nDotL * MathConstants::InvPi<Float>();
 
     // Material is responsible for transforming out of primitive's
@@ -69,7 +69,7 @@ Float LambertMaterial<ST>::Pdf(const Ray& wI,
     using Distribution::Common::PDFCosDirection;
     Vector3 wILocal = surface.shadingTBN.ApplyRotation(wI.Dir());
     Vector3 normal = (normalMapTex)
-        ? (*normalMapTex)(surface.uv, surface.dpdx, surface.dpdy).value()
+        ? (*normalMapTex)(surface.uv, surface.dpdx, surface.dpdy)
         : Vector3::ZAxis();
     normal.NormalizeSelf();
     Float pdf = PDFCosDirection(wILocal, normal);
@@ -86,7 +86,7 @@ Spectrum LambertMaterial<ST>::Evaluate(const Ray& wI,
     Quaternion toTangentSpace = surface.shadingTBN;
     if(normalMapTex)
     {
-        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdx, surface.dpdy).value();
+        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdx, surface.dpdy);
         normal.NormalizeSelf();
         // Due to normal change our direction sample should be aligned as well
         toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
@@ -96,7 +96,7 @@ Spectrum LambertMaterial<ST>::Evaluate(const Ray& wI,
     Float nDotL = std::max(wILocal[2], Float(0));
     Spectrum albedo = albedoTex(surface.uv,
                                 surface.dpdx,
-                                surface.dpdy).value();
+                                surface.dpdy);
     return nDotL * albedo * MathConstants::InvPi<Float>();
 }
 
@@ -119,11 +119,11 @@ MRAY_GPU MRAY_GPU_INLINE
 bool LambertMaterial<ST>::IsAllTexturesAreResident(const Surface& surface) const
 {
     bool allResident = true;
-    allResident &= albedoTex(surface.uv, surface.dpdx,
-                             surface.dpdy).has_value();
+    allResident &= albedoTex.IsResident(surface.uv, surface.dpdx,
+                                        surface.dpdy);
     if(normalMapTex)
     {
-        allResident &= (*normalMapTex)(surface.uv).has_value();
+        allResident &= (*normalMapTex).IsResident(surface.uv);
     }
     return allResident;
 }
@@ -530,10 +530,10 @@ MRAY_GPU MRAY_GPU_INLINE
 std::tuple<Float, Float, Float, Spectrum>
 UnrealMaterial<ST>::FetchData(const Surface& s) const
 {
-    Float roughness = roughnessTex(s.uv, s.dpdx, s.dpdy).value();
-    Float metallic = metallicTex(s.uv, s.dpdx, s.dpdy).value();
-    Float specular = specularTex(s.uv, s.dpdx, s.dpdy).value();
-    Spectrum albedo = albedoTex(s.uv, s.dpdx, s.dpdy).value();
+    Float roughness = roughnessTex(s.uv, s.dpdx, s.dpdy);
+    Float metallic = metallicTex(s.uv, s.dpdx, s.dpdy);
+    Float specular = specularTex(s.uv, s.dpdx, s.dpdy);
+    Spectrum albedo = albedoTex(s.uv, s.dpdx, s.dpdy);
     using Tup = std::tuple<Float, Float, Float, Spectrum>;
     return Tup(roughness, metallic, specular, albedo);
 }
@@ -581,7 +581,7 @@ SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
     Quaternion toTangentSpace = surface.shadingTBN;
     if(normalMapTex)
     {
-        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdx, surface.dpdy).value();
+        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdx, surface.dpdy);
         normal.NormalizeSelf();
         // Due to normal change our direction sample should be aligned as well
         toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
@@ -683,7 +683,7 @@ Float UnrealMaterial<ST>::Pdf(const Ray& wI,
     Quaternion toTangentSpace = surface.shadingTBN;
     if(normalMapTex)
     {
-        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdx, surface.dpdy).value();
+        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdx, surface.dpdy);
         normal.NormalizeSelf();
         // Due to normal change our direction sample should be aligned as well
         toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
@@ -724,7 +724,7 @@ Spectrum UnrealMaterial<ST>::Evaluate(const Ray& wI,
     Quaternion toTangentSpace = surface.shadingTBN;
     if(normalMapTex)
     {
-        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdx, surface.dpdy).value();
+        Vector3 normal = (*normalMapTex)(surface.uv, surface.dpdx, surface.dpdy);
         normal.NormalizeSelf();
         // Due to normal change our direction sample should be aligned as well
         toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
@@ -802,18 +802,18 @@ MRAY_GPU MRAY_GPU_INLINE
 bool UnrealMaterial<ST>::IsAllTexturesAreResident(const Surface& surface) const
 {
     bool allResident = true;
-    allResident &= albedoTex(surface.uv, surface.dpdx,
-                             surface.dpdy).has_value();
+    allResident &= albedoTex.IsResident(surface.uv, surface.dpdx,
+                                        surface.dpdy);
+    allResident &= roughnessTex.IsResident(surface.uv, surface.dpdx,
+                                           surface.dpdy);
+    allResident &= specularTex.IsResident(surface.uv, surface.dpdx,
+                                          surface.dpdy);
+    allResident &= metallicTex.IsResident(surface.uv, surface.dpdx,
+                                          surface.dpdy);
     if(normalMapTex)
     {
-        allResident &= (*normalMapTex)(surface.uv).has_value();
+        allResident &= (*normalMapTex).IsResident(surface.uv);
     }
-    allResident &= roughnessTex(surface.uv, surface.dpdx,
-                                surface.dpdy).has_value();
-    allResident &= specularTex(surface.uv, surface.dpdx,
-                               surface.dpdy).has_value();
-    allResident &= metallicTex(surface.uv, surface.dpdx,
-                               surface.dpdy).has_value();
     return allResident;
 }
 

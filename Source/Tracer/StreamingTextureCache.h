@@ -7,7 +7,7 @@
 
 #include "Device/GPUTexture.h"
 
-#include "StreamingTexture.h"
+#include "StreamingTextureView.h"
 
 // ============================================== //
 //       THIS SYSTEM IS IN CONCEPTION PHASE		  //
@@ -233,7 +233,7 @@
 struct StreamingTexturePack
 {
 	template <class T>
-	using TextureList = StaticVector<Texture<2, T>, 8>;
+	using TextureList = StaticVector<Texture<2, T>, StreamingTexParams::MaxPhysicalTextureCount>;
 
 	private:
 	// Aliases - Pair 1 - Square tiles
@@ -276,6 +276,12 @@ struct StreamingTexturePack
 	TextureList<PixelBC1>	texList_BC1;
 	TextureList<PixelBC4U>	texList_BC4U;
 	TextureList<PixelBC4S>	texList_BC4S;
+};
+
+struct StreamingTexture
+{
+	std::string				absoluteFilePath;
+	MRayTextureParameters	texParams;
 };
 
 class StreamingTextureCache
@@ -339,4 +345,7 @@ class StreamingTextureCache
 	//
 	// These backends are not even in conception phase, but
 	// future proofing this system will come in handy.
+
+
+	//
 };

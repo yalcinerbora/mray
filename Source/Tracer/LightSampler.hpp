@@ -105,7 +105,7 @@ Float DirectLightSamplerUniform<ML>::PdfLight(const HitKeyPack& hitPack,
     };
     auto lightIndexOpt = dLightIndexTable.Search(keyPack);
     if(lightIndexOpt.has_value())
-        return PdfLight(*(lightIndexOpt.value()), hit, r);
+        return PdfLight(lightIndexOpt.value(), hit, r);
 
     return Float(0);
 }

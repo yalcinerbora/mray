@@ -201,6 +201,7 @@ if(MRAY_BUILD_VISOR)
 endif()
 
 # Generate Targets
+add_subdirectory(TracerKernelGen)
 add_subdirectory(TracerDevice)
 #add_subdirectory(TracerHost)
 

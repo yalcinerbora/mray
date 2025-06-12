@@ -145,15 +145,15 @@ class TextureViewCUDA
     cudaTextureObject_t     texHandle;
 
     public:
-    MRAY_HOST               TextureViewCUDA(cudaTextureObject_t t) : texHandle(t) {}
+    MRAY_HOST   TextureViewCUDA(cudaTextureObject_t t) : texHandle(t) {}
     // Base Access
-    MRAY_GPU Optional<T>    operator()(UV uv) const;
+    MRAY_GPU T  operator()(UV uv) const;
     // Gradient Access
-    MRAY_GPU Optional<T>    operator()(UV uv,
-                                       UV dpdx,
-                                       UV dpdy) const;
+    MRAY_GPU T  operator()(UV uv,
+                           UV dpdx,
+                           UV dpdy) const;
     // Direct Mip Access
-    MRAY_GPU Optional<T>    operator()(UV uv, Float mipLevel) const;
+    MRAY_GPU T  operator()(UV uv, Float mipLevel) const;
 };
 
 // Writable texture views (disregards normalization etc)
@@ -202,7 +202,7 @@ class RWTextureViewCUDA
 
 template<uint32_t D, class T>
 MRAY_GPU MRAY_GPU_INLINE
-Optional<T> TextureViewCUDA<D, T>::operator()(UV uv) const
+T TextureViewCUDA<D, T>::operator()(UV uv) const
 {
     bool isResident = false;
     CudaType t;
@@ -222,14 +222,14 @@ Optional<T> TextureViewCUDA<D, T>::operator()(UV uv) const
                             &isResident);
     }
     if(isResident) return ConvertType::Convert(t);
-    return std::nullopt;
+    return T(NAN);
 }
 
 template<uint32_t D, class T>
 MRAY_GPU MRAY_GPU_INLINE
-Optional<T> TextureViewCUDA<D, T>::operator()(UV uv,
-                                              UV dpdx,
-                                              UV dpdy) const
+T TextureViewCUDA<D, T>::operator()(UV uv,
+                                    UV dpdx,
+                                    UV dpdy) const
 {
     bool isResident = false;
     CudaType t;
@@ -254,12 +254,12 @@ Optional<T> TextureViewCUDA<D, T>::operator()(UV uv,
                                 &isResident);
     }
     if(isResident) return ConvertType::Convert(t);
-    return std::nullopt;
+    return T(NAN);
 }
 
 template<uint32_t D, class T>
 MRAY_GPU MRAY_GPU_INLINE
-Optional<T> TextureViewCUDA<D, T>::operator()(UV uv, Float mipLevel) const
+T TextureViewCUDA<D, T>::operator()(UV uv, Float mipLevel) const
 {
     bool isResident = false;
     CudaType t;
@@ -281,7 +281,7 @@ Optional<T> TextureViewCUDA<D, T>::operator()(UV uv, Float mipLevel) const
                                &isResident);
     }
     if(isResident) return ConvertType::Convert(t);
-    return std::nullopt;
+    return T(NAN);
 }
 
 template<uint32_t D, class T>

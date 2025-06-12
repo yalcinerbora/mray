@@ -463,10 +463,10 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
         };
 
         this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,
-        [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
+        [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
                   uint32_t, uint32_t partitionSize)
         {
-            uint32_t rnCount = workPtr.SampleRNCount(0);
+            uint32_t rnCount = workI.SampleRNCount(0);
             auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
             rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
                                                  dPathRNGDimensions, rnCount,
@@ -478,20 +478,20 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
                 ConstAddFunctor(rnCount)
             );
 
-            workPtr.DoWork_0(dRayState, dLocalIndices,
-                             dRandomNumBuffer, dRayCones,
-                             dRays, dHits, dHitKeys,
-                             globalState, processQueue);
+            workI.DoWork_0(dRayState, dLocalIndices,
+                           dRandomNumBuffer, dRayCones,
+                           dRays, dHits, dHitKeys,
+                           globalState, processQueue);
         },
         //
-        [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
+        [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
                   uint32_t, uint32_t)
         {
-            workPtr.DoBoundaryWork_0(dRayState, dLocalIndices,
-                                     Span<const RandomNumber>{},
-                                     dRayCones, dRays,
-                                     dHits, dHitKeys,
-                                     globalState, processQueue);
+            workI.DoBoundaryWork_0(dRayState, dLocalIndices,
+                                   Span<const RandomNumber>{},
+                                   dRayCones, dRays,
+                                   dHits, dHitKeys,
+                                   globalState, processQueue);
         });
     }
     else
@@ -522,10 +522,10 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
 
         // Do the NEE kernel + boundary work
         this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,
-        [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
+        [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
                   uint32_t, uint32_t partitionSize)
         {
-            uint32_t rnCount = workPtr.SampleRNCount(1);
+            uint32_t rnCount = workI.SampleRNCount(1);
             auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
             rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
                                                  dPathRNGDimensions, rnCount,
@@ -537,19 +537,19 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
                 ConstAddFunctor(rnCount)
             );
 
-            workPtr.DoWork_1(dRayState, dLocalIndices,
-                             dRandomNumBuffer, dRayCones,
-                             dRays, dHits, dHitKeys,
-                             globalState, processQueue);
+            workI.DoWork_1(dRayState, dLocalIndices,
+                           dRandomNumBuffer, dRayCones,
+                           dRays, dHits, dHitKeys,
+                           globalState, processQueue);
         },
-        [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
+        [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
                   uint32_t, uint32_t)
         {
-            workPtr.DoBoundaryWork_1(dRayState, dLocalIndices,
-                                     Span<const RandomNumber>{},
-                                     dRayCones, dRays,
-                                     dHits, dHitKeys,
-                                     globalState, processQueue);
+            workI.DoBoundaryWork_1(dRayState, dLocalIndices,
+                                   Span<const RandomNumber>{},
+                                   dRayCones, dRays,
+                                   dHits, dHitKeys,
+                                   globalState, processQueue);
         });
 
         // After the kernel call(s), "dRayState.dOutRays" holds the shadow rays
@@ -576,10 +576,10 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
 
         // Do the actual kernel
         this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,
-        [&, this](const auto& workPtr, Span<uint32_t> dLocalIndices,
+        [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
                   uint32_t, uint32_t partitionSize)
         {
-            uint32_t rnCount = workPtr.SampleRNCount(0);
+            uint32_t rnCount = workI.SampleRNCount(0);
             auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
             rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
                                                  dPathRNGDimensions, rnCount,
@@ -591,10 +591,10 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
                 ConstAddFunctor(rnCount)
             );
 
-            workPtr.DoWork_0(dRayState, dLocalIndices,
-                             dRandomNumBuffer, dRayCones,
-                             dRays, dHits, dHitKeys,
-                             globalStateE, processQueue);
+            workI.DoWork_0(dRayState, dLocalIndices,
+                           dRandomNumBuffer, dRayCones,
+                           dRays, dHits, dHitKeys,
+                           globalStateE, processQueue);
         },
         // Empty Kernel for light
         [&, this](const auto&, Span<uint32_t>, uint32_t, uint32_t) {});

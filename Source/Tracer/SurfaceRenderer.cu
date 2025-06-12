@@ -575,11 +575,11 @@ RendererOutput SurfaceRenderer::DoRender()
                currentOptions.mode == SurfRDetail::Mode::FURNACE)
             {
                 using enum SurfRDetail::Mode::E;
-                const auto& workPtr = *wLoc->workPtr.get();
+                const auto& workI = *wLoc->workPtr.get();
 
                 uint32_t rnCount = (currentOptions.mode == AO)
                                     ? 2u
-                                    : workPtr.SampleRNCount(1);
+                                    : workI.SampleRNCount(1);
 
                 auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
                 if(currentOptions.mode == SurfRDetail::Mode::AO ||
@@ -593,43 +593,43 @@ RendererOutput SurfaceRenderer::DoRender()
                                                          processQueue);
                 }
 
-                workPtr.DoWork_1(dRayStateAO,
-                                 dLocalIndices,
-                                 dRandomNumBuffer,
-                                 dRayCones,
-                                 dRays,
-                                 dHits,
-                                 dHitKeys,
-                                 globalState,
-                                 processQueue);
+                workI.DoWork_1(dRayStateAO,
+                               dLocalIndices,
+                               dRandomNumBuffer,
+                               dRayCones,
+                               dRays,
+                               dHits,
+                               dHitKeys,
+                               globalState,
+                               processQueue);
             }
             else
             {
-                const auto& workPtr = *wLoc->workPtr.get();
-                workPtr.DoWork_0(dRayStateCommon,
-                                 dLocalIndices,
-                                 Span<const RandomNumber>{},
-                                 dRayCones,
-                                 dRays,
-                                 dHits,
-                                 dHitKeys,
-                                 globalState,
-                                 processQueue);
+                const auto& workI = *wLoc->workPtr.get();
+                workI.DoWork_0(dRayStateCommon,
+                               dLocalIndices,
+                               Span<const RandomNumber>{},
+                               dRayCones,
+                               dRays,
+                               dHits,
+                               dHitKeys,
+                               globalState,
+                               processQueue);
             }
 
         }
         else if(lightWLoc != currentLightWorks.cend())
         {
-            const auto& workPtr = *lightWLoc->workPtr.get();
-            workPtr.DoBoundaryWork_0(dRayStateCommon,
-                                     dLocalIndices,
-                                     Span<const RandomNumber>{},
-                                     dRayCones,
-                                     dRays,
-                                     dHits,
-                                     dHitKeys,
-                                     globalState,
-                                     processQueue);
+            const auto& workI = *lightWLoc->workPtr.get();
+            workI.DoBoundaryWork_0(dRayStateCommon,
+                                   dLocalIndices,
+                                   Span<const RandomNumber>{},
+                                   dRayCones,
+                                   dRays,
+                                   dHits,
+                                   dHitKeys,
+                                   globalState,
+                                   processQueue);
         }
         else throw MRayError("[{}]: Unkown work id is found ({}).",
                              TypeName(), key);

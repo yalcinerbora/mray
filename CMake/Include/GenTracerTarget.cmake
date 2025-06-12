@@ -22,7 +22,9 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/TextureMemory.h
         ${CURRENT_SOURCE_DIR}/TextureMemory.cpp
         ${CURRENT_SOURCE_DIR}/StreamingTextureCache.h
-        ${CURRENT_SOURCE_DIR}/StreamingTexture.h
+        ${CURRENT_SOURCE_DIR}/StreamingTextureCache.cpp
+        ${CURRENT_SOURCE_DIR}/StreamingTextureView.h
+        ${CURRENT_SOURCE_DIR}/StreamingTextureView.hpp
         ${CURRENT_SOURCE_DIR}/GenericTexture.cpp
         ${CURRENT_SOURCE_DIR}/GenericTextureRW.h
         ${CURRENT_SOURCE_DIR}/ColorConverter.h
@@ -31,6 +33,7 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/TextureFilter.h
         ${CURRENT_SOURCE_DIR}/TextureFilter.cu
         ${CURRENT_SOURCE_DIR}/TextureView.h
+        ${CURRENT_SOURCE_DIR}/TextureView.hpp
         ${CURRENT_SOURCE_DIR}/Texture.h)
 
     set(SRC_PRIMITIVES
@@ -77,6 +80,7 @@ function(gen_tracer_target)
     set(SRC_ACCELLERATORS
         ${CURRENT_SOURCE_DIR}/AcceleratorC.h
         ${CURRENT_SOURCE_DIR}/AcceleratorWork.h
+        ${CURRENT_SOURCE_DIR}/AcceleratorWork.kt.h
         ${CURRENT_SOURCE_DIR}/AcceleratorWorkI.h
         ${CURRENT_SOURCE_DIR}/AcceleratorLinear.cu
         ${CURRENT_SOURCE_DIR}/AcceleratorLinear.h
@@ -87,11 +91,13 @@ function(gen_tracer_target)
 
     set(SRC_RENDERERS
         ${CURRENT_SOURCE_DIR}/RenderWork.h
+        ${CURRENT_SOURCE_DIR}/RenderWork.kt.h
         ${CURRENT_SOURCE_DIR}/RendererC.h
         ${CURRENT_SOURCE_DIR}/RendererCommon.h
         ${CURRENT_SOURCE_DIR}/RenderImage.cpp
         ${CURRENT_SOURCE_DIR}/RenderImage.h
         ${CURRENT_SOURCE_DIR}/RayGenKernels.h
+        ${CURRENT_SOURCE_DIR}/RayGenKernels.kt.h
         ${CURRENT_SOURCE_DIR}/LightSampler.hpp
         ${CURRENT_SOURCE_DIR}/LightSampler.h)
 

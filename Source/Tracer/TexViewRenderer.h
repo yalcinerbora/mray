@@ -13,6 +13,16 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     using RayStateList      = PackedTypes<>;
     using SpectrumConverterContext = SpectrumConverterContextIdentity;
 
+    template<PrimitiveC P, MaterialC M, class S, class TContext,
+             PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
+    static constexpr auto WorkFunctions = std::tuple{};
+
+    template<LightC L, LightGroupC LG, TransformGroupC TG>
+    static constexpr auto LightWorkFunctions = std::tuple{};
+
+    template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
+    static constexpr auto CamWorkFunctions = std::tuple{};
+
     enum Mode
     {
         SHOW_TILING,

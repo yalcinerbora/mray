@@ -588,7 +588,7 @@ void MetaLightArrayT<TLT...>::Construct(MetaLightListConstructionParams params,
             };
             auto loc = lt.Search(kp);
             assert(loc.has_value());
-            assert(*loc.value() == i);
+            assert(loc.value() == i);
         }
     }
 

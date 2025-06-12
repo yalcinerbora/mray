@@ -1,5 +1,6 @@
 #include "TexViewRenderer.h"
 #include "TracerBase.h"
+#include "TextureView.hpp"
 
 #include "Device/GPUSystem.hpp"
 
@@ -60,17 +61,17 @@ void KCShowTexture(MRAY_GRID_CONSTANT const ImageSpan imgSpan,
         {
             // For single channel textures, show grayscale
             const auto& view = std::get<TracerTexView<2, Float>>(texView);
-            result = Vector3(view(uv, Float(mipIndex)).value());
+            result = Vector3(view(uv, Float(mipIndex)));
         }
         else if constexpr(C == 2)
         {
             const auto& view = std::get<TracerTexView<2, Vector<C, Float>>>(texView);
-            result = Vector3(view(uv, Float(mipIndex)).value(), 0);
+            result = Vector3(view(uv, Float(mipIndex)), 0);
         }
         else if constexpr(C == 3)
         {
             const auto& view = std::get<TracerTexView<2, Vector<C, Float>>>(texView);
-            result = Vector3(view(uv, Float(mipIndex)).value());
+            result = Vector3(view(uv, Float(mipIndex)));
         }
         else if constexpr(C == 4)
         {
@@ -79,7 +80,7 @@ void KCShowTexture(MRAY_GRID_CONSTANT const ImageSpan imgSpan,
             // We drop the last pixel since it will be considered as alpha
             // if we send it to visor and it may be invisible
             const auto& view = std::get<TracerTexView<2, Vector<C, Float>>>(texView);
-            result = Vector3(view(uv, Float(mipIndex)).value());
+            result = Vector3(view(uv, Float(mipIndex)));
         }
         imgSpan.StoreWeight(Float(1), localIndexInt);
         imgSpan.StorePixel(result, localIndexInt);

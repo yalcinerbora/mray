@@ -151,7 +151,7 @@ set(MRAY_CUDA_OPTIONS
     # Relaxed constexpr usage (mostly used to get
     # constexpr std:: functions to device)
     -expt-relaxed-constexpr
-    # ALL pointers are restric
+    # ALL pointers are restrict
     -restrict
     # Misc.
     -extra-device-vectorization

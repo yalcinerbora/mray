@@ -274,6 +274,30 @@ void TextureCUDA_Normal<D, T>::CopyFromAsync(const GPUQueueCUDA& queue,
     CUDA_CHECK(cudaMemcpy3DAsync(&p, ToHandleCUDA(queue)));
 }
 
+template<uint32_t D, class T>
+void TextureCUDA_Normal<D, T>::CopyToAsync(Span<PaddedChannelType> regionFrom,
+                                           const GPUQueueCUDA& queue,
+                                           uint32_t mipLevel,
+                                           const TextureExtent<D>& offset,
+                                           const TextureExtent<D>& sizes)
+{
+    cudaArray_t levelArray = nullptr;
+    CUDA_CHECK(cudaGetMipmappedArrayLevel(&levelArray, data, mipLevel));
+
+    cudaMemcpy3DParms p = {};
+    p.kind = cudaMemcpyDefault;
+    p.extent = MakeCudaExtent<D, 1>(sizes);
+
+    p.srcArray = levelArray;
+    p.srcPos = MakeCudaPos<D, 0>(offset);
+    //
+    p.dstPos = make_cudaPos(0, 0, 0);
+    p.dstPtr = make_cudaPitchedPtr(regionFrom.data(),
+                                   p.extent.width * sizeof(PaddedChannelType),
+                                   p.extent.width, p.extent.height);
+    CUDA_CHECK(cudaMemcpy3DAsync(&p, ToHandleCUDA(queue)));
+}
+
 template<class T>
 TextureCUDA_BC<T>::TextureCUDA_BC(const GPUDeviceCUDA& device,
                                   const TextureInitParams<2>& p)

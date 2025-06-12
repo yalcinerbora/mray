@@ -132,7 +132,7 @@ Spectrum LightPrim<P, SC>::EmitViaHit(const Vector3& wO,
         return Spectrum::Zero();
 
     // TODO: How to incorporate differentials here?
-    return radiance(uv).value();
+    return radiance(uv);
 }
 
 template<PrimitiveC P, class SC>
@@ -157,7 +157,7 @@ Spectrum LightPrim<P, SC>::EmitViaSurfacePoint(const Vector3& wO,
         return Spectrum::Zero();
 
     // TODO: How to incorporate differentials here?
-    return radiance(uv).value();
+    return radiance(uv);
 }
 
 }
@@ -427,7 +427,7 @@ Spectrum LightSkysphere<CC, TC, SC>::EmitViaSurfacePoint(const Vector3& wO,
     // work?
     //auto [dpdx, dpdy] = CC::Gradient(rayCone.aperture, dirYUp);
     //return radiance(uv, dpdx, dpdy).value();
-    return radiance(uv).value();
+    return radiance(uv);
 }
 
 static_assert(LightC<LightSkysphere<SphericalCoordConverter>>);

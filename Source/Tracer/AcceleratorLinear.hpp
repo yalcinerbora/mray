@@ -56,7 +56,7 @@ OptionalHitR<PG> AcceleratorLinear<PG, TG>::IntersectionCheck(const Ray& ray,
         const auto& alphaMapV = alphaMap.value();
         // This has alpha map check it
         Vector2 uv = prim.SurfaceParametrization(intersection.value().hit);
-        Float alpha = alphaMapV(uv).value();
+        Float alpha = alphaMapV(uv);
         // Stochastic alpha culling
         if(xi >= alpha) return std::nullopt;
     }

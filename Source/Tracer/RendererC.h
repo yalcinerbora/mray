@@ -1164,7 +1164,7 @@ void AddRenderWorks(Map<std::string_view, RenderWorkPack>& workMap,
                     PackedTypes<Args...>*)
 {
     auto AddRenderWorksInternal =
-    []<size_t... Is>(Map<std::string_view, RenderWorkPack>&workMap,
+    []<size_t... Is>(Map<std::string_view, RenderWorkPack>& workMap,
                      std::tuple<Args...>* list,
                      std::index_sequence<Is...>)
     {

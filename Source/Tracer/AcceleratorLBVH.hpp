@@ -207,7 +207,7 @@ OptionalHitR<PG> AcceleratorLBVH<PG, TG>::IntersectionCheck(const Ray& ray,
         const auto& alphaMapV = alphaMap.value();
         // This has alpha map check it
         Vector2 uv = prim.SurfaceParametrization(intersection.value().hit);
-        Float alpha = alphaMapV(uv).value();
+        Float alpha = alphaMapV(uv);
         // Stochastic alpha culling
         if(xi >= alpha) return std::nullopt;
     }
@@ -445,12 +445,12 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
     // Easy part is done
     // We need to actually construct this thing now,
     if constexpr(PG::TransformLogic != PrimTransformType::LOCALLY_CONSTANT_TRANSFORM)
-        MulitBuildLBVH(nullptr, hInstanceNodeRangesVec,
+        MultiBuildLBVH(nullptr, hInstanceNodeRangesVec,
                        hConcreteNodeRangesVec, queue);
     else for(const auto& kv : this->workInstances)
     {
         Pair<const CommonKey, const AcceleratorWorkI*> input(kv.first, kv.second.get());
-        MulitBuildLBVH(&input, hInstanceNodeRangesVec,
+        MultiBuildLBVH(&input, hInstanceNodeRangesVec,
                        hConcreteNodeRangesVec, queue);
     }
 
@@ -471,7 +471,7 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
 }
 
 template<PrimitiveGroupC PG>
-void AcceleratorGroupLBVH<PG>::MulitBuildLBVH(Pair<const CommonKey, const AcceleratorWorkI*>* accelWork,
+void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const AcceleratorWorkI*>* accelWork,
                                               const std::vector<Vector2ui>& instanceNodeRanges,
                                               const std::vector<Vector2ui>& concreteNodeRanges,
                                               const GPUQueue& queue)

@@ -193,7 +193,7 @@ class AcceleratorGroupLBVH final : public AcceleratorGroupT<AcceleratorGroupLBVH
     Span<LBVHNode>                  dAllNodes;
     Span<LBVHBoundingBox>           dAllNodeAABBs;
 
-    void    MulitBuildLBVH(Pair<const CommonKey, const AcceleratorWorkI*>* accelWork,
+    void    MultiBuildLBVH(Pair<const CommonKey, const AcceleratorWorkI*>* accelWork,
                            const std::vector<Vector2ui>& instanceNodeRanges,
                            const std::vector<Vector2ui>& concreteNodeRanges,
                            const GPUQueue& queue);

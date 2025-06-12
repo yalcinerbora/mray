@@ -6,6 +6,8 @@
 
 #include "Device/GPUTextureView.h"
 
+#include "StreamingTextureView.h"
+
 // Wrapper around the texture view of the
 // hardware. These views have postprocess
 // capability. In order to make this
@@ -51,13 +53,16 @@ using HWTextureView = Variant
 >;
 
 template<uint32_t DIM, class T>
-class TracerTexView
+class TracerTexView;
+
+template<class T>
+class TracerTexView<2, T>
 {
     public:
     static constexpr uint32_t Channels = VectorTypeToChannels<T>();
-    static constexpr uint32_t Dimensions = DIM;
+    static constexpr uint32_t Dimensions = 2;
     private:
-    using UV = UVType<DIM>;
+    using UV = UVType<2>;
 
     private:
     // TODO: We are wasting 8 bytes of memory when this is
@@ -66,10 +71,11 @@ class TracerTexView
     // Because of this we need to define our constructors
     union
     {
-        TextureView<DIM, Float>     tF;
-        TextureView<DIM, Vector2>   tV2;
-        TextureView<DIM, Vector3>   tV3;
-        TextureView<DIM, Vector4>   tV4;
+        TextureView<2, Float>   tF;
+        TextureView<2, Vector2> tV2;
+        TextureView<2, Vector3> tV3;
+        TextureView<2, Vector4> tV4;
+        StreamingTextureView    sT;
     };
     // TODO: coalesce these reads (compiler does 1 byte reads here)
     // Better to get a word (32-bit) and do bit stuff maybe?
@@ -77,109 +83,88 @@ class TracerTexView
     TextureReadMode         mode;
     bool                    flipY = false;
 
-    template<class ReadType>
-    MRAY_GPU Optional<T>    Postprocess(Optional<ReadType>&&) const;
+    public:
+    // Constructors & Desructor
+    MRAY_HOST   TracerTexView(HWTextureView<2> hwView,
+                              TextureReadMode mode,
+                              bool flipY = false);
+    MRAY_HOST   TracerTexView(StreamingTextureView sTView,
+                              TextureReadMode mode,
+                              bool flipY = false);
+
+    // Base Access
+    MRAY_GPU T  operator()(UV uv) const;
+    // Gradient Access
+    MRAY_GPU T  operator()(UV uv,
+                           UV dpdx,
+                           UV dpdy) const;
+
+    // Direct Mip Access
+    MRAY_GPU T  operator()(UV uv, Float mipLevel) const;
+
+    // Texture Residency check
+    MRAY_GPU bool IsResident(UV uv, Float mipLevel) const;
+    MRAY_GPU bool IsResident(UV uv, UV dpdx, UV dpdy) const;
+    MRAY_GPU bool IsResident(UV uv) const;
+};
+
+template<class T>
+class TracerTexView<3, T>
+{
+    public:
+    static constexpr uint32_t Channels = VectorTypeToChannels<T>();
+    static constexpr uint32_t Dimensions = 3;
+    private:
+    using UV = UVType<3>;
+
+    private:
+    // TODO: We are wasting 8 bytes of memory when this is
+    // variant (padding etc. issues)
+    // This struct is 16 bytes when we do C unions.
+    // Because of this we need to define our constructors
+    union
+    {
+        TextureView<3, Float>     tF;
+        TextureView<3, Vector2>   tV2;
+        TextureView<3, Vector3>   tV3;
+        TextureView<3, Vector4>   tV4;
+    };
+    // TODO: coalesce these reads (compiler does 1 byte reads here)
+    // Better to get a word (32-bit) and do bit stuff maybe?
+    uint8_t             index;
+    TextureReadMode     mode;
+    bool                flipY = false;
 
     public:
     // Constructors & Desructor
-    MRAY_HOST               TracerTexView(HWTextureView<DIM> hwView,
-                                          TextureReadMode mode,
-                                          bool flipY = false);
+    MRAY_HOST   TracerTexView(HWTextureView<3> hwView,
+                              TextureReadMode mode,
+                              bool flipY = false);
     // Base Access
-    MRAY_GPU Optional<T>    operator()(UV uv) const;
+    MRAY_GPU T  operator()(UV uv) const;
     // Gradient Access
-    MRAY_GPU Optional<T>    operator()(UV uv,
-                                       UV dpdx,
-                                       UV dpdy) const;
+    MRAY_GPU T  operator()(UV uv,
+                           UV dpdx,
+                           UV dpdy) const;
     // Direct Mip Access
-    MRAY_GPU Optional<T>    operator()(UV uv, Float mipLevel) const;
+    MRAY_GPU T  operator()(UV uv, Float mipLevel) const;
+
+    // Texture Residency check
+    MRAY_GPU bool IsResident(UV, Float) const { return true; }
+    MRAY_GPU bool IsResident(UV, UV, UV) const { return true; }
+    MRAY_GPU bool IsResident(UV) const { return true; }
 };
 
-template<uint32_t D, class T>
-template<class ReadType>
-MRAY_GPU MRAY_GPU_INLINE
-Optional<T> TracerTexView<D, T>::Postprocess(Optional<ReadType>&& t) const
-{
-    // Empty optional
-    if(!t) return std::nullopt;
-
-    // We specifically do not care about "mode"
-    // swicth to reduce the code bloat
-    // CPU side will validate the mode and type correctness
-    //
-    // YOLO Switch/Case + If/Else
-    //
-    // Same channel
-    if constexpr(std::is_same_v<ReadType, T>)
-        return t;
-    // Channel drop for V1
-    if constexpr(std::is_same_v<T, Float> &&
-                 (std::is_same_v<ReadType, Vector2> ||
-                  std::is_same_v<ReadType, Vector3> ||
-                  std::is_same_v<ReadType, Vector4>))
-    {
-        return Float((*t)[0]);
-    }
-    // Channel drop for V2
-    else if constexpr(std::is_same_v<T, Vector2> &&
-                      (std::is_same_v<ReadType, Vector3> ||
-                       std::is_same_v<ReadType, Vector4>))
-    {
-        return Vector2(*t);
-    }
-    // Channel drop for V3
-    else if constexpr(std::is_same_v<T, Vector3> &&
-                      std::is_same_v<ReadType, Vector4>)
-    {
-        return Vector3(*t);
-    }
-    // Normal mapping conversions
-    else if constexpr(std::is_same_v<T, Vector3> &&
-                      std::is_same_v<ReadType, Vector2>)
-    {
-        Vector2 val = *t;
-        switch(mode)
-        {
-            using enum TextureReadMode;
-            case TO_3C_BASIC_NORMAL_FROM_UNSIGNED_2C:
-            {
-                val = val * Vector2(2) - Vector2(1);
-            }
-            [[fallthrough]];
-            case TO_3C_BASIC_NORMAL_FROM_SIGNED_2C:
-            {
-                Float z = Math::SqrtMax(Float(1) - val[0] * val[0] - val[1] * val[1]);
-                return Vector3(val[0], val[1], z);
-            }
-            // Octahedral mapping
-            // From https://jcgt.org/published/0003/02/01/paper.pdf
-            // Listing 6.
-            case TO_3C_OCTA_NORMAL_FROM_UNSIGNED_2C:
-            {
-                val = val * Vector2(2) - Vector2(1);
-            }
-            [[fallthrough]];
-            case TO_3C_OCTA_NORMAL_FROM_SIGNED_2C:
-            {
-                val = Vector2(val[0] + val[1], val[0] - val[1]) * Float(0.5);
-                return Vector3(val, Float(1) - val.Abs().Sum());
-            }
-            default: break;
-        }
-    }
-    return std::nullopt;
-}
-
-template<uint32_t D, class T>
+template<class T>
 MRAY_HOST
-TracerTexView<D, T>::TracerTexView(HWTextureView<D> hw,
+TracerTexView<2, T>::TracerTexView(HWTextureView<2> hw,
                                    TextureReadMode m,
                                    bool flipYIn)
     : index(static_cast<uint8_t>(hw.index()))
     , mode(m)
     , flipY(flipYIn)
 {
-    static_assert(std::variant_size_v<HWTextureView<D>> == 4);
+    static_assert(std::variant_size_v<HWTextureView<2>> == 4);
     switch(index)
     {
         case 0: tF  = std::get<0>(hw); break;
@@ -189,51 +174,34 @@ TracerTexView<D, T>::TracerTexView(HWTextureView<D> hw,
     }
 }
 
-template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
-Optional<T> TracerTexView<D, T>::operator()(UV uv) const
-{
-    if(flipY) uv[1] = Float(1) - uv[1];
-    switch(index)
-    {
-        case 0: return Postprocess(tF (uv));
-        case 1: return Postprocess(tV2(uv));
-        case 2: return Postprocess(tV3(uv));
-        case 3: return Postprocess(tV4(uv));
-    }
-    return std::nullopt;
-}
+template<class T>
+MRAY_HOST
+TracerTexView<2, T>::TracerTexView(StreamingTextureView sTView,
+                                   TextureReadMode m,
+                                   bool flipYIn)
+    : index(uint8_t{4})
+    , mode(m)
+    , flipY(flipYIn)
+    , sT(sTView)
+{}
 
-template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
-Optional<T> TracerTexView<D, T>::operator()(UV uv,
-                                            UV dpdx,
-                                            UV dpdy) const
+template<class T>
+MRAY_HOST
+TracerTexView<3, T>::TracerTexView(HWTextureView<3> hw,
+                                   TextureReadMode m,
+                                   bool flipYIn)
+    : index(static_cast<uint8_t>(hw.index()))
+    , mode(m)
+    , flipY(flipYIn)
 {
-    if(flipY) uv[1] = Float(1) - uv[1];
+    static_assert(std::variant_size_v<HWTextureView<3>> == 4);
     switch(index)
     {
-        case 0: return Postprocess(tF (uv, dpdx, dpdy));
-        case 1: return Postprocess(tV2(uv, dpdx, dpdy));
-        case 2: return Postprocess(tV3(uv, dpdx, dpdy));
-        case 3: return Postprocess(tV4(uv, dpdx, dpdy));
+        case 0: tF  = std::get<0>(hw); break;
+        case 1: tV2 = std::get<1>(hw); break;
+        case 2: tV3 = std::get<2>(hw); break;
+        case 3: tV4 = std::get<3>(hw); break;
     }
-    return std::nullopt;
-}
-
-template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
-Optional<T> TracerTexView<D, T>::operator()(UV uv, Float mipLevel) const
-{
-    if(flipY) uv[1] = Float(1) - uv[1];
-    switch(index)
-    {
-        case 0: return Postprocess(tF (uv, mipLevel));
-        case 1: return Postprocess(tV2(uv, mipLevel));
-        case 2: return Postprocess(tV3(uv, mipLevel));
-        case 3: return Postprocess(tV4(uv, mipLevel));
-    }
-    return std::nullopt;
 }
 
 // Texture Related types

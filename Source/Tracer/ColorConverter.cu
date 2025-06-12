@@ -2,6 +2,7 @@
 #include "GenericTextureRW.h"
 #include "BCColorIO.h"
 #include "TextureMemory.h"
+#include "TextureView.hpp"
 
 #include "Device/GPUSystem.h"
 #include "Device/GPUSystem.hpp"
@@ -186,13 +187,13 @@ Vector3 GenericReadFromView(const Vector2& uv, GenericTextureView& view)
         if constexpr(T::Dimensions != 2)
             return Vector3::Zero();
         else if constexpr(T::Channels == 1)
-            return Vector3(t(uv).value(), 0, 0);
+            return Vector3(t(uv), 0, 0);
         else if constexpr(T::Channels == 2)
-            return Vector3(t(uv).value(), 0);
+            return Vector3(t(uv), 0);
         else if constexpr(T::Channels == 3)
-            return t(uv).value();
+            return t(uv);
         else if constexpr(T::Channels == 4)
-            return Vector3(t(uv).value());
+            return Vector3(t(uv));
         //
         return Vector3::Zero();
     });

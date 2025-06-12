@@ -94,7 +94,7 @@ static void ThreadFenceGrid()
 // A Good guess for TPB
 static constexpr uint32_t StaticThreadPerBlock1D()
 {
-    return 512u;
+    return 256u;
 }
 
 // TODO: This should not be compile time static

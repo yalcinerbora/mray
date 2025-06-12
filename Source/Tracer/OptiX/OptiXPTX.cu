@@ -2,6 +2,7 @@
 
 #include "Tracer/PrimitiveDefaultTriangle.h"
 #include "Tracer/PrimitivesDefault.h"
+#include "Tracer/TextureView.hpp"
 
 #include "Core/BitFunctions.h"
 
@@ -202,7 +203,7 @@ void KCAnyHit()
         Primitive prim(TransformContextIdentity{}, *record.primSoA, pKey);
         // Finally get uv form hit and get alpha
         Vector2 uv = prim.SurfaceParametrization(hit);
-        Float alpha = alphaMap(uv).value();
+        Float alpha = alphaMap(uv);
         // Stochastic alpha culling
         BackupRNGState s = GetRNGStateFromPayload();
         Float xi = BackupRNG(s).NextFloat();

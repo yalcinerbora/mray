@@ -77,8 +77,17 @@ constexpr uint32_t BCTypeToBlockSize()
     {
         return 16;
     }
-    else static_assert(std::is_same_v<T, PixelBC1>,
-                       "Unknown Block Compressed Format!");
+    else
+    {
+        // I forget but clang or nvcc, does not like
+        // static_assert(false, "....") and immidiately
+        // asserts. So we check with the a random BCType
+        // since it is handled on the first branch it should
+        // fail.
+        static_assert(std::is_same_v<T, PixelBC1>,
+                      "Unknown Block Compressed Format!");
+        return 0;
+    }
 }
 
 template<uint32_t D, class T>
@@ -190,6 +199,11 @@ class TextureCUDA_Normal
                                           const TextureExtent<D>& offset,
                                           const TextureExtent<D>& size,
                                           Span<const PaddedChannelType> regionFrom);
+    void                    CopyToAsync(Span<PaddedChannelType> regionFrom,
+                                        const GPUQueueCUDA& queue,
+                                        uint32_t mipLevel,
+                                        const TextureExtent<D>& offset,
+                                        const TextureExtent<D>& sizes);
 };
 
 template<class T>

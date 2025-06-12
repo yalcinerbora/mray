@@ -24,7 +24,7 @@ void CheckCheckerboardPattern(Span<uint8_t> dResults,
         globalId += params.TotalSize())
     {
         UVType<D> uv = LinearToFloatIndex<D>(extent, globalId);
-        T out = tex(uv).value();
+        T out = tex(uv);
         T compare = (globalId % 2 == 0) ? T(1) : T(0);
         uint8_t result = (out != compare) ? 1 : 0;
         dResults[globalId] = result;

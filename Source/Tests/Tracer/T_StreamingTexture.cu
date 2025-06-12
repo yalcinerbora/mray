@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "Tracer/StreamingTexture.h"
+#include "Tracer/StreamingTextureView.h"
 
 #include "Device/GPUSystem.hpp"
 
@@ -28,5 +28,8 @@
 
 TEST(StreamingTexture, TileCheck)
 {
-
+    using namespace StreamingTexParams;
+    static_assert(PhysicalTileSize == 65536,
+                  "Streaming Texture PhysicalTileSize must be 65536"
+                  "for these test to work!");
 }

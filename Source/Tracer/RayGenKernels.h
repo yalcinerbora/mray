@@ -4,10 +4,9 @@
 #include "RendererC.h"
 #include "Random.h"
 
-
 template<CameraGroupC CameraG, TransformGroupC TransG>
 // Camera must be implicit lifetime type.
-// If some dynamic polymorphism kicksin somewhere in the code
+// If some dynamic polymorphism kicks in somewhere in the code
 // we will need to construct the camera via inplace new to create
 // proper virtual function pointers (that refers the device code)
 requires(ImplicitLifetimeC<typename CameraG::Camera>)
@@ -20,29 +19,11 @@ void KCGenerateSubCamera(// Output
                          MRAY_GRID_CONSTANT const typename CameraG::DataSoA camSoA,
                          MRAY_GRID_CONSTANT const Optional<CameraTransform> camTransform,
                          MRAY_GRID_CONSTANT const Vector2ui stratumIndex,
-                         MRAY_GRID_CONSTANT const Vector2ui stratumCount)
-{
-    using Camera = typename CameraG::Camera;
-    KernelCallParams kp;
-    if(kp.GlobalId() != 0) return;
-    // Construction
-    Camera cam = Camera(camSoA, camKey);
-    if(camTransform.has_value())
-        cam.OverrideTransform(camTransform.value());
-    // Generate sub camera for rendered regions
-    *dCam = cam.GenerateSubCamera(stratumIndex,
-                                  stratumCount);
-}
-
-template<class RPayload, class RState>
-using RayStateInitFuncType = void(*)(const RPayload&,
-                                     const RState&,
-                                     const RaySample&,
-                                     uint32_t);
+                         MRAY_GRID_CONSTANT const Vector2ui stratumCount);
 
 template<CameraC Camera, TransformGroupC TransG>
-MRAY_KERNEL
-void KCGenerateCamRays(// Output (Only dOutIndices pointed data should be written)
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCGenerateCamRays(// Output (Only dRayIndices pointed data should be written)
                        MRAY_GRID_CONSTANT const Span<RayCone> dRayCones,
                        MRAY_GRID_CONSTANT const Span<RayGMem> dRays,
                        MRAY_GRID_CONSTANT const Span<ImageCoordinate> dImageCoordinates,
@@ -55,52 +36,11 @@ void KCGenerateCamRays(// Output (Only dOutIndices pointed data should be writte
                        MRAY_GRID_CONSTANT const TransformKey transformKey,
                        MRAY_GRID_CONSTANT const typename TransG::DataSoA transSoA,
                        MRAY_GRID_CONSTANT const uint64_t globalRegionIndex,
-                       MRAY_GRID_CONSTANT const Vector2ui regionCount)
-{
-    assert(dRayIndices.size() * Camera::SampleRayRNCount == dRandomNums.size());
-    KernelCallParams kp;
-    const Camera& dCam = *dCamera;
-
-    // Get the transform
-    using TransformContext = TransG::DefaultContext;
-    TransformContext transform(transSoA, transformKey);
-
-    uint32_t rayCount = static_cast<uint32_t>(dRayIndices.size());
-    for(uint32_t globalId = kp.GlobalId(); globalId < rayCount; globalId += kp.TotalSize())
-    {
-        RNGDispenser rng(dRandomNums, globalId, rayCount);
-        //
-        uint64_t regionIndex = globalRegionIndex + globalId;
-        uint64_t totalRegions = regionCount.Multiply();
-        // Rollover, globalRegionIndex is never rolled to zero
-        // (it is ever increasing, we may use it to show timings etc.)
-        // so roll here (some other code will add rayCount to globalRegionIndex)
-        regionIndex %= totalRegions;
-        Vector2ui regionIndex2D = Vector2ui(regionIndex % regionCount[0],
-                                            regionIndex / regionCount[0]);
-        // Generate the sample
-        RaySample raySample = dCam.SampleRay(regionIndex2D, regionCount, rng);
-        // TODO: Should we normalize and push the length to tminmax
-        // (Because of a scale?)
-        raySample.value.ray = transform.Apply(raySample.value.ray);
-        // Ray part is easy, just write
-        uint32_t writeIndex = dRayIndices[globalId];
-        RayToGMem(dRays, writeIndex,
-                  raySample.value.ray,
-                  raySample.value.tMinMax);
-
-        // Write the differentials
-        dRayCones[writeIndex] = raySample.value.rayCone;
-
-        // Finally write
-        dImageCoordinates[writeIndex] = raySample.value.imgCoords;
-        dFilmFilterWeights[writeIndex] = raySample.pdf;
-    }
-}
+                       MRAY_GRID_CONSTANT const Vector2ui regionCount);
 
 template<CameraC Camera, TransformGroupC TransG, class FilterType>
-MRAY_KERNEL
-void KCGenerateCamRaysStochastic(// Output (Only dOutIndices pointed data should be written)
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCGenerateCamRaysStochastic(// Output (Only dRayIndices pointed data should be written)
                                  MRAY_GRID_CONSTANT const Span<RayCone> dRayCones,
                                  MRAY_GRID_CONSTANT const Span<RayGMem> dRays,
                                  MRAY_GRID_CONSTANT const Span<ImageCoordinate> dImageCoordinates,
@@ -114,55 +54,4 @@ void KCGenerateCamRaysStochastic(// Output (Only dOutIndices pointed data should
                                  MRAY_GRID_CONSTANT const typename TransG::DataSoA transSoA,
                                  MRAY_GRID_CONSTANT const uint64_t globalRegionIndex,
                                  MRAY_GRID_CONSTANT const Vector2ui regionCount,
-                                 MRAY_GRID_CONSTANT const FilterType Filter)
-{
-    assert(dRayIndices.size() * Camera::SampleRayRNCount == dRandomNums.size());
-    KernelCallParams kp;
-    const Camera& dCam = *dCamera;
-
-    // Get the transform
-    using TransformContext = TransG::DefaultContext;
-    TransformContext transform(transSoA, transformKey);
-
-    uint32_t rayCount = static_cast<uint32_t>(dRayIndices.size());
-    for(uint32_t globalId = kp.GlobalId(); globalId < rayCount; globalId += kp.TotalSize())
-    {
-        RNGDispenser rng(dRandomNums, globalId, rayCount);
-        //
-        uint64_t regionIndex = globalRegionIndex + globalId;
-        uint64_t totalRegions = regionCount.Multiply();
-        // Rollover, globalRegionIndex is never rolled to zero
-        // (it is ever increasing, we may use it to show timings etc.)
-        // so roll here (some other code will add rayCount to globalRegionIndex)
-        regionIndex %= totalRegions;
-        Vector2ui regionIndex2D = Vector2ui(regionIndex % regionCount[0],
-                                            regionIndex / regionCount[0]);
-
-        Vector2 xi = rng.NextFloat2D<0>();
-        SampleT<Vector2> offsetSample = Filter.Sample(xi);
-        Float weight = Filter.Evaluate(offsetSample.value);
-
-        // Evaluate the sample
-        Float filterRadius = Filter.Radius();
-        RaySample raySample = dCam.EvaluateRay(regionIndex2D, regionCount,
-                                               offsetSample.value,
-                                               Vector2(filterRadius * Float(2)));
-        // TODO: Should we normalize and push the length to tminmax
-        // (Because of a scale?)
-        raySample.value.ray = transform.Apply(raySample.value.ray);
-        // Ray part is easy, just write
-        uint32_t writeIndex = dRayIndices[globalId];
-        RayToGMem(dRays, writeIndex,
-                  raySample.value.ray,
-                  raySample.value.tMinMax);
-
-        // Write the differentials
-        dRayCones[writeIndex] = raySample.value.rayCone;
-        // Write filter weights (pdf normalized)
-        raySample.pdf = weight / offsetSample.pdf;
-
-        // Finally write
-        dImageCoordinates[writeIndex] = raySample.value.imgCoords;
-        dFilmFilterWeights[writeIndex] = raySample.pdf;
-    }
-}
+                                 MRAY_GRID_CONSTANT const FilterType Filter);

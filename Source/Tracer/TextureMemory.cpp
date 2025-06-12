@@ -693,7 +693,7 @@ void TextureMemory::CommitTextures()
     }
 
     // Allocate the filter buffer now, texture data will come
-    // now
+    // shortly
     if(texClampBufferSize)
         texClampBuffer.ResizeBuffer(texClampBufferSize);
 

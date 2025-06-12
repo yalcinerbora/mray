@@ -9,6 +9,40 @@
 
 #include "TypeFormat.h"
 
+// Explicitly instantiate these
+// These are used by "AcceleratorGroupLBVH::MultiBuildBVH"
+template size_t
+DeviceAlgorithms::SegmentedTransformReduceTMSize<AABB3, PrimitiveKey>(size_t);
+
+template size_t
+DeviceAlgorithms::SegmentedRadixSortTMSize<true, uint64_t, uint32_t>(size_t, size_t);
+
+template void
+DeviceAlgorithms::
+SegmentedTransformReduce
+<AABB3, AABB3, UnionAABB3Functor, IdentityFunctor<AABB3>>
+(
+    Span<AABB3>,
+    Span<Byte>,
+    Span<const AABB3>,
+    Span<const uint32_t>,
+    const AABB3&,
+    const GPUQueue&,
+    UnionAABB3Functor&& ,
+    IdentityFunctor<AABB3>&&
+);
+
+template uint32_t
+DeviceAlgorithms::SegmentedRadixSort<true, uint64_t, uint32_t>
+(
+    Span<Span<uint64_t>, 2>,
+    Span<Span<uint32_t>, 2>,
+    Span<Byte>,
+    Span<const uint32_t>,
+    const GPUQueue&,
+    const Vector2ui&
+);
+
 struct MortonDiffFunctor
 {
     MRAY_HYBRID MRAY_CGPU_INLINE

@@ -1,9 +1,16 @@
+#ifdef MRAY_WINDOWS
+// After nvcc passes through
+// some residual code catched by msvc
+// and "unreachable code" is generated
+// TODO: Investigate
+#pragma warning( disable : 4702)
+#endif
+
 #include "Tracer.h"
 #include "RequestedTypes.h"
+#include "RequestedRenderers.h"
 
 #include "Device/GPUAlgReduce.h"
-#include "Device/GPUAlgGeneric.h"
-#include "Device/GPUAlgRadixSort.h"
 
 TypeGeneratorPack Tracer::GLOBAL_TYPE_GEN = {};
 
@@ -153,4 +160,23 @@ void Tracer::AddAccelGenerators(Map<AcceleratorType, BaseAccelGenerator>& baseMa
             AcceleratorType{ HARDWARE }
         );
     #endif
+}
+
+void Tracer::AddRendererGenerators(Map<std::string_view, RendererGenerator>& map,
+                                   Map<std::string_view, RenderWorkPack>& workMap)
+{
+    using Args = PackedTypes<const RenderImagePtr&, TracerView,
+        ThreadPool&, const GPUSystem&,
+        const RenderWorkPack&>;
+
+    Args* resolver0 = nullptr;
+    RendererTypeList* resolver1 = nullptr;
+    GenerateMapping<RendererGenerator, RendererI>
+    (
+        map, resolver0, resolver1
+    );
+
+    // Work portion
+    RendererWorkTypesList* resolver2 = nullptr;
+    AddRenderWorks(workMap, resolver2);
 }

@@ -34,7 +34,7 @@ LookupTable<K, V, H, VECL, S>::LookupTable(const Span<Vector<VL, H>>& hashes,
 template <LookupKeyC K, class V, std::unsigned_integral H,
           uint32_t VECL, LookupStrategyC<H, K> S>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Optional<const V*> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
+Optional<V> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
 {
     uint32_t tableSize = static_cast<uint32_t>(keys.size());
     uint32_t hashPackCount = static_cast<uint32_t>(hashes.size());
@@ -59,7 +59,7 @@ Optional<const V*> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
             // Actual comparison case, if hash is equal it does not mean
             // keys are equal, check them only if the hashes are equal
             if(hashVal == hashChunk[i] && keys[globalIndex] == k)
-                return &values[globalIndex];
+                return values[globalIndex];
         }
         index += VL - innerIndex;
         index = (index >= tableSize) ? 0 : index;
