@@ -125,7 +125,7 @@ class GenericGroupLight : public GenericGroupLightT
                                           size_t initialReservartionSize = 4_MiB);
     std::string_view    Name() const override;
     // Not all lights need this
-    virtual void        SetSceneDiameter(Float) override {};
+    void                SetSceneDiameter(Float) override {};
 
 };
 

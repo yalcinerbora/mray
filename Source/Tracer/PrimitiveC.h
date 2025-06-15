@@ -159,10 +159,10 @@ concept PrimitiveGroupC = requires(PGType pg, TransientData input)
     // Primitive itself can support multiple of these, but also it needs to inject
     // its own information to the transform. Thus; it generates a transform context.
     // For example, a rigid-body primitive batch can support only identity and single transform
-    // since the batch does not have per-primitive varying transforms.
+    // since the batch does not have per primitive-varying transforms.
     //
     // Skinned meshes may support additional multi-transform type. Then first two probably
-    // does not makes sense (mesh will be stuck on a T-pose) but it can be provided by the
+    // does not make sense (mesh will be stuck on a T-pose) but it can be provided by the
     // primitive implementor for debugging etc.
     //
     // If a generator is not on this list, that transform can not act on this primitive.
@@ -260,7 +260,7 @@ class GenericGroupPrimitive : public GenericGroupPrimitiveT
                         GenericGroupPrimitive(uint32_t groupId,
                                               const GPUSystem& sys,
                                               size_t allocationGranularity = 16_MiB,
-                                              size_t initialReservartionSize = 64_MiB);                     
+                                              size_t initialReservartionSize = 64_MiB);
     void                ApplyTransformations(const std::vector<PrimBatchKey>& primBatches,
                                              const std::vector<Matrix4x4>& batchTransformations,
                                              const GPUQueue& deviceQueue) override;

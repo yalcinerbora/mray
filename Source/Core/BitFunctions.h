@@ -393,7 +393,7 @@ constexpr T Bit::CountTZero(T value)
         T vR = BitReverse(value);
         return CountLZero(vR);
     #else
-        return std::countr_zero<T>(value);
+        return T(std::countr_zero<T>(value));
     #endif
 }
 

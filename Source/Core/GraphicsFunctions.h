@@ -476,7 +476,6 @@ uint32_t TextureMipPixelStart(const Vector<C, uint32_t>& baseResolution,
     constexpr auto MAX_ITERATIONS = 18u;
     assert(TextureMipCount(baseResolution) > mipLevel);
     assert(TextureMipCount(baseResolution) > MAX_ITERATIONS);
-    using VecXui = Vector<C, uint32_t>;
 
     uint32_t mipPixelStart = 0;
     // TODO: Can we do this analitically?

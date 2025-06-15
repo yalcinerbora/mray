@@ -222,7 +222,11 @@ T TextureViewCUDA<D, T>::operator()(UV uv) const
                             &isResident);
     }
     if(isResident) return ConvertType::Convert(t);
-    return T(NAN);
+
+    #ifdef __CUDA_ARCH__
+        if constexpr(MRAY_IS_DEBUG) __trap();
+    #endif
+    return T();
 }
 
 template<uint32_t D, class T>
@@ -254,7 +258,11 @@ T TextureViewCUDA<D, T>::operator()(UV uv,
                                 &isResident);
     }
     if(isResident) return ConvertType::Convert(t);
-    return T(NAN);
+
+    #ifdef __CUDA_ARCH__
+        if constexpr(MRAY_IS_DEBUG) __trap();
+    #endif
+    return T();
 }
 
 template<uint32_t D, class T>
@@ -281,7 +289,11 @@ T TextureViewCUDA<D, T>::operator()(UV uv, Float mipLevel) const
                                &isResident);
     }
     if(isResident) return ConvertType::Convert(t);
-    return T(NAN);
+
+    #ifdef __CUDA_ARCH__
+        if constexpr(MRAY_IS_DEBUG) __trap();
+    #endif
+    return T();
 }
 
 template<uint32_t D, class T>

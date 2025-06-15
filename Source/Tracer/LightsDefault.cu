@@ -91,5 +91,3 @@ bool LightGroupNull::IsPrimitiveBacked() const
 
 template class LightGroupSkysphere<CoOctaCoordConverter>;
 template class LightGroupSkysphere<SphericalCoordConverter>;
-
-template class LightGroupPrim<PrimGroupTriangle>;

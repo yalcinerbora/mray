@@ -181,9 +181,9 @@ R"(// =========================== //
 
 // Types
 #include "InstantiationMacros.h"
+
 #include "RequestedTypes.h"
 #include "RequestedRenderers.h"
-
 
 // Kernel Work Instantiations
 {}
@@ -191,7 +191,6 @@ R"(// =========================== //
 {}
 // Kernel Camera Work Instantiations
 {}
-
 // Accelerator Work Instantiations
 {}
 // Camera Raygen Instantiations

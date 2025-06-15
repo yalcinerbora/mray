@@ -774,7 +774,7 @@ void SceneLoaderMRay::DryRunNodesForTex(std::vector<SceneTexId>& textureIds,
 
 template<bool FeedFirstNode, class Loader, class GroupIdType, class IdType>
 void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, Pair<GroupIdType, IdType>>>& outputMappings,
-                       typename ErrorList& exceptions,
+                       ErrorList& exceptions,
                        const typename SceneLoaderMRay::TypeMappedNodes& nodeLists,
                        ThreadPool& threadPool,
                        Loader&& loader)

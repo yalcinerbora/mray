@@ -268,16 +268,37 @@ void KCValidateScan(Span<const Float> dXCDFs, uint32_t segmentSize)
         {
             Float prevCDF = (i == 0) ? Float(0) : dRowCDF[i - 1];
             Float myCDF = dRowCDF[i];
-
-            if(prevCDF > myCDF)
-            {
-                printf("[%u, %u]: Prev %f, Cur %f\n", i, block, prevCDF, myCDF);
-            }
-
-            //assert(prevCDF <= myCDF);
         }
     }
 }
+
+struct SetupDistPointers
+{
+    using Distribution1D = Distribution::DistributionPwC<1>;
+    using Distribution2D = Distribution::DistributionPwC<2>;
+
+    uint32_t xCount;
+    uint32_t yCount;
+    Span<Distribution2D> dDist;
+    typename DistributionGroupPwC2D::DistData d;
+
+    MRAY_GPU MRAY_CGPU_INLINE
+    void operator()(KernelCallParams kp)
+    {
+        for(uint32_t i = kp.GlobalId(); i < yCount;
+            i += kp.TotalSize())
+        {
+            d.dDistsX[i] = Distribution1D(ToConstSpan(d.dCDFsX.subspan(i * xCount, xCount)));
+        }
+        BlockSynchronize();
+
+        if(kp.GlobalId() == 0)
+        {
+            d.dDistY[0] = Distribution1D(d.dCDFsY);
+            dDist[0] = Distribution2D(ToConstSpan(d.dDistsX), d.dDistY[0]);
+        }
+    }
+};
 
 DistributionGroupPwC2D::DistributionGroupPwC2D(const GPUSystem& s)
     : system(s)
@@ -428,25 +449,12 @@ void DistributionGroupPwC2D::Construct(uint32_t index,
         d.dCDFsY
     );
 
+
     queue.IssueSaturatingLambda
     (
         "Dist2D-ConstructDist"sv,
         KernelIssueParams{.workCount = yCount},
-        [d, xCount, yCount, dDist = dDistributions.subspan(index, 1)] MRAY_GPU(KernelCallParams kp)
-        {
-            for(uint32_t i = kp.GlobalId(); i < yCount;
-                i += kp.TotalSize())
-            {
-                d.dDistsX[i] = Distribution1D(ToConstSpan(d.dCDFsX.subspan(i * xCount, xCount)));
-            }
-            BlockSynchronize();
-
-            if(kp.GlobalId() == 0)
-            {
-                d.dDistY[0] = Distribution1D(d.dCDFsY);
-                dDist[0] = Distribution2D(ToConstSpan(d.dDistsX), d.dDistY[0]);
-            }
-        }
+        SetupDistPointers{xCount, yCount, dDistributions.subspan(index, 1), d}
     );
 }
 

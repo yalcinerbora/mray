@@ -13,6 +13,7 @@
 #elif defined MRAY_LINUX
 
     #include <pthread.h>
+    #include <sys/types.h>
     #include <sys/ioctl.h>
 
 #else
@@ -120,12 +121,13 @@ GetTerminalSize()
 
 void RenameThread(std::thread::native_handle_type t, const std::string& name)
 {
+    static_assert(std::is_same_v<std::thread::native_handle_type, pthread_t>);
     pthread_setname_np(t, name.c_str());
 }
 
 SystemThreadHandle GetCurrentThreadHandle()
 {
-    return pthread_getthreadid_np();
+    return SystemThreadHandle(pthread_self());
 }
 
 std::string GetProcessPath()

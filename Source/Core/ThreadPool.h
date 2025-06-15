@@ -80,9 +80,9 @@ class ThreadPool
                     ThreadPool(uint32_t threadCount, InitFunction&&,
                                size_t queueSize = DefaultQueueSize);
                     ThreadPool(const ThreadPool&) = delete;
-                    ThreadPool(ThreadPool&&) = default;
+                    ThreadPool(ThreadPool&&) = delete;
     ThreadPool&     operator=(const ThreadPool&) = delete;
-    ThreadPool&     operator=(ThreadPool&&) = default;
+    ThreadPool&     operator=(ThreadPool&&) = delete;
                     ~ThreadPool();
 
     template<ThreadInitFuncC InitFunction>

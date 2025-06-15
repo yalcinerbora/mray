@@ -254,6 +254,7 @@ void KCTonemapImage(uint3 globalId: SV_DispatchThreadID)
                                             avgLuminance);
     params.outputTex[pixId] = float4(outColorSDR, 1.0f);
 
+    // For testing, "Identity Tone Mapper"
     //float3 inColorHDR = params.inputTex.Load(uint3(pixId, 0)).xyz;
     //params.outputTex[pixId] = float4(inColorHDR, 1.0f);
 }

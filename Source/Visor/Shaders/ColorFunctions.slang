@@ -10,10 +10,10 @@ module ColorFunctions;
 // https://www.color.org/specification/icc1v43_2010-12.pdf
 float3 XYZToYxy(in float3 xyz)
 {
-    let invSum = 1 / (xyz.x + xyz.y + xyz.z);
+    let invSum = float(1) / (xyz.x + xyz.y + xyz.z);
     // This has slightly better precision maybe?
-    let x = 1 - (xyz.y + xyz.z) * invSum;
-    let y = 1 - (xyz.x + xyz.z) * invSum;
+    let x = float(1) - (xyz.y + xyz.z) * invSum;
+    let y = float(1) - (xyz.x + xyz.z) * invSum;
     return float3(xyz.y, x, y);
 }
 
@@ -24,7 +24,7 @@ float3 YxyToXYZ(in float3 Yxy)
     float yy = (Yxy.r / Yxy.b);
     float x = Yxy.g * yy;
     float y = Yxy.r;
-    float z = (1 - Yxy.g - Yxy.b) * yy;
+    float z = (float(1) - Yxy.g - Yxy.b) * yy;
     float3 xyz = float3(x, y, z);
     return xyz;
 }
@@ -56,10 +56,9 @@ float3 ChangeWhitePoint(in float3 outWhitePoint,
     float3 coneRespIn = mul(BradfordMatrix, inWhitePoint);
     float3 coneRespOut = mul(BradfordMatrix, outWhitePoint);
     float3 d = coneRespOut / coneRespIn;
-    //float3 d = coneRespIn / coneRespOut;
-    float3x3 scaleMatrix = float3x3(d[0],    0,    0,
-                                       0, d[1],    0,
-                                       0,    0, d[2]);
+    float3x3 scaleMatrix = float3x3(d[0], 0,    0,
+                                    0,    d[1], 0,
+                                    0,    0,    d[2]);
     float3x3 matrix = mul(InvBradfordMatrix, mul(scaleMatrix, BradfordMatrix));
     return mul(matrix, xyz);
 }
@@ -85,7 +84,7 @@ public struct SRGBColorConv : IColorConv
 
     public static float3 FromLinear(in float3 color, in float gamma)
     {
-        float v = float(1.0) / gamma;
+        float v = float(1) / gamma;
         return pow(color, v);
     }
 
@@ -124,7 +123,7 @@ public struct AcesCGColorConv : IColorConv
 
     public static float3 ToLinear(in float3 color, in float gamma)
     {
-        let v = float(1.0) / gamma;
+        let v = float(1) / gamma;
         return pow(color, gamma);
     }
 

@@ -44,7 +44,7 @@ function(nvcc_compile_optix)
 
     # Here we need to do create a target for ALL CCs
     # This is the drawback of this approach
-     if(${CMAKE_CUDA_ARCHITECTURES} STREQUAL "all")
+    if(${CMAKE_CUDA_ARCHITECTURES} STREQUAL "all")
         # TODO: I think we can get these programatically
         # but it is a hassle, so we will just set them manually
         set(COMPUTE_CAPABILITY_LIST

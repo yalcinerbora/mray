@@ -57,14 +57,14 @@ if(MRAY_IS_MULTI_CONFIG)
         COMMAND ${CMAKE_COMMAND} --build ${MRAY_EXT_BUILD_DIR} --config $<IF:$<CONFIG:SanitizeR>,Release,$<CONFIG>>
         COMMAND ${CMAKE_COMMAND} -E touch ${MRAY_EXTERNAL_LIBRARIES_STAMP}
         COMMENT "Compiling external libraries($<CONFIG>). This may take a while..."
-    )
+        USES_TERMINAL)
 else()
     add_custom_command(OUTPUT ${MRAY_EXTERNAL_LIBRARIES_STAMP}
         COMMAND ${CMAKE_COMMAND} ${MRAY_EXT_CONFIG_META_ARGS} -DCMAKE_BUILD_TYPE=$<IF:$<CONFIG:SanitizeR>,Release,$<CONFIG>>
         COMMAND ${CMAKE_COMMAND} --build ${MRAY_EXT_BUILD_DIR}
         COMMAND ${CMAKE_COMMAND} -E touch ${MRAY_EXTERNAL_LIBRARIES_STAMP}
         COMMENT "Compiling external libraries($<CONFIG>). This may take a while..."
-    )
+        USES_TERMINAL)
 endif()
 
 add_custom_target(MRayExternal DEPENDS ${MRAY_EXTERNAL_LIBRARIES_STAMP})

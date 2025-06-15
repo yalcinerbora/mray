@@ -78,7 +78,7 @@ RaySample CameraPinhole::SampleRay(// Input
             // Ray Tracing Gems I. Chapter2 equation 30
             .rayCone = RayCone
             {
-                .aperture = Float(2) * tan(fov[1] * Float(0.5)) / stratumCount[1],
+                .aperture = Float(2) * std::tan(fov[1] * Float(0.5)) / stratumCount[1],
                 .width = Float(0)
             }
         },
@@ -127,7 +127,7 @@ RaySample CameraPinhole::EvaluateRay(const Vector2ui& generationIndex,
             .imgCoords = imgCoords,
             .rayCone = RayCone
             {
-                .aperture = Float(2) * tan(fov[1] * Float(0.5)) / stratumCount[1],
+                .aperture = Float(2) * std::tan(fov[1] * Float(0.5)) / stratumCount[1],
                 .width = Float(0)
             }
         },

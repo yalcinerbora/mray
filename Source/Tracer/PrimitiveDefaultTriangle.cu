@@ -80,17 +80,17 @@ void KCApplyTransformsTriangle(// I-O
             uint32_t i = kp.threadId;
             sBatchTransform[i] = dBatchTransforms[batchI][i];
 
-        }            
+        }
         else if(kp.threadId >= 16 && kp.threadId < 32)
         {
             uint32_t i = kp.threadId - 16;
-            sBatchInvTransform[i] = dBatchInvTransforms[batchI][i];            
+            sBatchInvTransform[i] = dBatchInvTransforms[batchI][i];
         }
         else if(kp.threadId >= 32 && kp.threadId < 34)
         {
             uint32_t i = kp.threadId - 32;
             sVertexRanges[i] = dVertexRanges[batchI][i];
-        }        
+        }
         BlockSynchronize();
 
         // Loop over each vertex for this tex
@@ -292,7 +292,7 @@ void PrimGroupTriangle::ApplyTransformations(const std::vector<PrimBatchKey>& pr
     for(PrimBatchKey bk : primBatches)
     {
         if(bk.FetchBatchPortion() != this->groupId)
-            throw MRayError("{:s}:{:d}: While doing \"ApplyTransformations\", " 
+            throw MRayError("{:s}:{:d}: While doing \"ApplyTransformations\", "
                             "there are PrimBatchIds which does not belong this group",
                             TypeName(), this->groupId);
     }
@@ -313,14 +313,14 @@ void PrimGroupTriangle::ApplyTransformations(const std::vector<PrimBatchKey>& pr
     // Issue transformation inverting before finding batch ranges
     queue.MemcpyAsync(dTransformations,
                       ToConstSpan(Span(batchTransformations.data(), batchCount)));
-    DeviceAlgorithms::Transform(dInvTransformations, ToConstSpan(dTransformations), 
+    DeviceAlgorithms::Transform(dInvTransformations, ToConstSpan(dTransformations),
                                 queue, KCInvertTransforms());
 
     // While GPU inverts transformation create batch range buffer
     std::vector<Vector2ul> hVertexRanges;
     hVertexRanges.reserve(batchCount);
     for(PrimBatchKey batchKey : primBatches)
-    {         
+    {
         auto rangeOpt = this->itemRanges.at(batchKey.FetchIndexPortion());
         assert(rangeOpt.has_value());
         const AttributeRanges& ranges = rangeOpt.value().get();
@@ -333,7 +333,7 @@ void PrimGroupTriangle::ApplyTransformations(const std::vector<PrimBatchKey>& pr
     uint32_t blockCount = queue.RecommendedBlockCountDevice
     (
         reinterpret_cast<const void*>(&KCApplyTransformsTriangle),
-        StaticThreadPerBlock1D(), 
+        StaticThreadPerBlock1D(),
         0
     );
     using namespace std::string_view_literals;
@@ -344,7 +344,7 @@ void PrimGroupTriangle::ApplyTransformations(const std::vector<PrimBatchKey>& pr
         KernelExactIssueParams
         {
             .gridSize = blockCount,
-            .blockSize = StaticThreadPerBlock1D()            
+            .blockSize = StaticThreadPerBlock1D()
         },
         //
         dPositions,
@@ -353,7 +353,7 @@ void PrimGroupTriangle::ApplyTransformations(const std::vector<PrimBatchKey>& pr
         ToConstSpan(dInvTransformations),
         ToConstSpan(dVertexRanges),
         BLOCK_PER_BATCH
-    );  
+    );
     // Wait for completion, before scope exit
     // due to temporary memory allocation
     queue.Barrier().Wait();

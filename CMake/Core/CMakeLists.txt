@@ -101,6 +101,9 @@ target_link_libraries(CoreLib
                       PRIVATE
                       mray::meta_compile_opts)
 
+set_target_properties(CoreLib PROPERTIES
+                      POSITION_INDEPENDENT_CODE ON)
+
 # TODO: This is somehwat a hack?
 # When HIP is enabled as a language AMD does not give
 # lib and include variables ?????

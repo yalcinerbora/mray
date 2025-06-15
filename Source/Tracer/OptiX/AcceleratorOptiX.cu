@@ -13,6 +13,8 @@
 
 #include "Device/GPUAlgScan.h"
 #include "Device/GPUSystem.hpp"
+#include "Device/GPUAlgReduce.h"
+#include "Device/GPUAlgGeneric.h"
 
 // Magic linking, these are populated via CUDA runtime?
 #include <optix_host.h>

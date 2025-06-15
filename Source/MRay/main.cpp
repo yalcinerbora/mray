@@ -94,7 +94,7 @@ int main(int argc, const char* const argv[])
 
     // Version information
     using namespace std::string_literals;
-    app.set_version_flag("--version, -v"s, [&processTimer]() -> std::string
+    app.set_version_flag("--version, -v"s, []() -> std::string
     {
         using namespace MRay;
         return MRAY_FORMAT("{}: {}\n"

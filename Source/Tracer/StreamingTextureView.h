@@ -583,6 +583,7 @@ Vector2ui TextureStreamingContext::FetchTileSize(MRayPixelEnum pixType, bool isP
 		case MR_BC6H_UFLOAT:	tileSize = TypeTileSizeList[static_cast<int>(MR_BC6H_UFLOAT)]; break;
 		case MR_BC6H_SFLOAT:	tileSize = TypeTileSizeList[static_cast<int>(MR_BC6H_SFLOAT)]; break;
 		case MR_BC7_UNORM:		tileSize = TypeTileSizeList[static_cast<int>(MR_BC7_UNORM)]; break;
+		default:				tileSize = Vector2ui::Zero(); break;
 	}
 
 	if(!isPhysical)
@@ -629,6 +630,6 @@ Vector2ui TextureStreamingContext::GenVirtualMipAndTileGrad(const VirtualTexInfo
 MRAY_HYBRID MRAY_CGPU_INLINE
 StreamingTextureView::StreamingTextureView(VirtualTextureId tid,
 										   TextureStreamingContext* c)
-	: texId(tid)
-	, context(c)
+	: context(c)
+	, texId(tid)
 {}

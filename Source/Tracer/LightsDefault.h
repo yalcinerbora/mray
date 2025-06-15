@@ -204,8 +204,22 @@ namespace LightDetail
     };
 }
 
+// TODO: Making this class final breaks linking weirdly
+// (clang-19).
+//
+// Variadic arg of MetaLightArrayT is created in T_DefaultLights.cu:
+// "
+//  PackedTypes<LightGroupPrim<PrimGroupTriangle>, TransformGroupSingle>,
+//  PackedTypes<LightGroupPrim<PrimGroupSkinnedTriangle>, TransformGroupMulti>
+// "
+// Somehow PackedTypes<LightGroupPrim<PrimGroupTriangle>, TransformGroupSingle>,
+// linked perfrectly fine (PackedTypes is empty variadic pack class btw)
+// but skinned triangle references could not be found
+//
+// This smells like name mangling issue but dunno
+// Report to llvm bu dont know how (minimal reproducing example will be hassle)
 template <PrimitiveGroupC PrimGroupT>
-class LightGroupPrim final : public GenericGroupLight<LightGroupPrim<PrimGroupT>>
+class LightGroupPrim : public GenericGroupLight<LightGroupPrim<PrimGroupT>>
 {
     using Parent        = GenericGroupLight<LightGroupPrim<PrimGroupT>>;
 
