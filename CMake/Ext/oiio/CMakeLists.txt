@@ -56,39 +56,20 @@ mray_build_ext_dependency_git(
 )
 append_cmake_prefix_path(${ZLIB_INSTALL_LOC})
 
-# set(BZLIB_INSTALL_LOC ${OIIO_TMP_DIR}/bzip2)
-# mray_build_ext_dependency_git(
-#         NAME oiio_bzib2_ext
-#         URL "https://gitlab.com/bzip2/bzip2.git"
-#         TAG "66c46b8c9436613fd81bc5d03f63a61933a4dcc3" # Latest commit 08.11.2024
-#         LICENSE_NAME "COPYING"
+# Copy zlib.dll/so to "Lib"
 
-#         OVERRIDE_INSTALL_PREFIX ${BZLIB_INSTALL_LOC}
-#         BUILD_ARGS
-#             -DCMAKE_POSITION_INDEPENDENDENT_CODE=ON
-#             -DCMAKE_BUILD_SHARED_LIBS=OFF
-#             -DINSTALL_BIN_DIR=${BZLIB_INSTALL_LOC}
-#             -DINSTALL_INC_DIR=${BZLIB_INSTALL_LOC}
-#             -DINSTALL_LIB_DIR=${BZLIB_INSTALL_LOC}
-#             -DINSTALL_MAN_DIR=${BZLIB_INSTALL_LOC}
-#             -DINSTALL_PKGCONFIG_DIR=${BZLIB_INSTALL_LOC}
-#             -DCMAKE_DEBUG_POSTFIX:STRING=d
-
-
-# )
-# append_cmake_prefix_path(${BZLIB_INSTALL_LOC})
-
-# Copy zlib.dll to "Lib"
-if(WIN32)
-    ExternalProject_Add_Step(oiio_zlib_ext install_extra
-                    WORKING_DIRECTORY ${ZLIB_INSTALL_LOC}/
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                            zlib$<$<CONFIG:Debug>:d>${CMAKE_SHARED_LIBRARY_SUFFIX}
-                            ${MRAY_CONFIG_LIB_DIRECTORY}
-                    DEPENDEES install
-                    COMMENT "Copy zlib to Lib folder"
-    )
+if(UNIX AND NOT APPLE)
+    set(MRAY_ZLIB_COPY_NAME libz$<$<CONFIG:Debug>:d>${CMAKE_SHARED_LIBRARY_SUFFIX}.1)
+elseif(MSVC)
+    set(MRAY_ZLIB_COPY_NAME zlib$<$<CONFIG:Debug>:d>${CMAKE_SHARED_LIBRARY_SUFFIX})
 endif()
+ExternalProject_Add_Step(oiio_zlib_ext install_extra
+                WORKING_DIRECTORY ${ZLIB_INSTALL_LOC}/
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        ${MRAY_ZLIB_COPY_NAME}
+                        ${MRAY_CONFIG_LIB_DIRECTORY}
+                DEPENDEES install
+                COMMENT "Copy zlib to Lib folder")
 
 # OpenEXR & IMath
 set(IMATH_INSTALL_LOC ${OIIO_TMP_DIR}/imath)
@@ -249,6 +230,7 @@ mray_build_ext_dependency_git(
             -DBUILD_MISSING_FMT=OFF # We have a fmt
             -DINTERNALIZE_FMT=OFF # On Linux this was required
             -DALWAYS_PREFER_CONFIG=ON
+            -DSTOP_ON_WARNING=OFF
             # Do not use system (clash with miniconda etc...)
             -DCMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH=OFF
             -DCMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH=OFF

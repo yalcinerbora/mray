@@ -46,4 +46,11 @@ if(WIN32)
     set_target_properties(TCore PROPERTIES
                           VS_DEBUGGER_WORKING_DIRECTORY ${MRAY_WORKING_DIRECTORY}
                           VS_DEBUGGER_COMMAND_ARGUMENTS ${DEBUG_ARGS})
+else()
+    add_custom_command(TARGET TCore POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                       "$<TARGET_FILE:gtest::gtest>"
+                       "$<TARGET_FILE:gtest::gtest_main>"
+                       "$<TARGET_FILE:gtest::gmock>"
+                       ${MRAY_CONFIG_BIN_DIRECTORY})
 endif()

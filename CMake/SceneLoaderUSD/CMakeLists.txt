@@ -38,10 +38,16 @@ if(WIN32)
                        "${MRAY_PLATFORM_LIB_DIRECTORY}/usd/lib/usd_ms$<$<CONFIG:Debug>:d>.dll"
                        ${MRAY_CONFIG_BIN_DIRECTORY}
                        COMMENT "Copying USD DLLs")
-    # USD Plugin folder
+else()
     add_custom_command(TARGET SceneLoaderUSD POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
-                       ${MRAY_PLATFORM_LIB_DIRECTORY}/usd/lib/usd
-                       ${MRAY_CONFIG_BIN_DIRECTORY}/usd
-                       COMMENT "Copying USD plugins")
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                       "$<TARGET_FILE:usd::usd>"
+                       ${MRAY_CONFIG_BIN_DIRECTORY})
 endif()
+
+# USD Plugin folder
+add_custom_command(TARGET SceneLoaderUSD POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+                   ${MRAY_PLATFORM_LIB_DIRECTORY}/usd/lib/usd
+                   ${MRAY_CONFIG_BIN_DIRECTORY}/usd
+                   COMMENT "Copying USD plugins")

@@ -901,7 +901,7 @@ int main(int argc, const char* argv[])
     // is not null terminated!!!!
     // args[0] wraps null terminated c-string so its fine here
     std::ifstream file = std::ifstream(args[0].data(), std::ios::binary);
-    if(!file.is_open())
+    if(!file.is_open() || !file)
     {
         fmt::println("Unable to open file \"{}\"", args[0]);
         return 1;

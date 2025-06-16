@@ -35,4 +35,12 @@ if(WIN32)
                        "${MRAY_CONFIG_LIB_DIRECTORY}/OpenImageIO$<$<CONFIG:Debug>:d>.dll"
                        "${MRAY_CONFIG_LIB_DIRECTORY}/OpenImageIO_Util$<$<CONFIG:Debug>:d>.dll"
                        ${MRAY_CONFIG_BIN_DIRECTORY})
+
+else()
+    add_custom_command(TARGET ImageLoader POST_BUILD
+                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${MRAY_CONFIG_LIB_DIRECTORY}/libz$<$<CONFIG:Debug>:d>.so.1"
+                        "$<TARGET_FILE:oiio::oiio>"
+                        "$<TARGET_FILE:oiio::oiio_util>"
+                        ${MRAY_CONFIG_BIN_DIRECTORY})
 endif()

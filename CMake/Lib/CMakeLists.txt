@@ -87,7 +87,7 @@ set_target_properties(MRayExternal PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD TRUE)
 function(gen_imported_target)
     # Parse Args
     set(options STATIC SHARED)
-    set(oneValueArgs NAME DEBUG_TARGET RELEASE_TARGET OVERRIDE_LIB_PREFIX)
+    set(oneValueArgs NAME DEBUG_TARGET RELEASE_TARGET OVERRIDE_LIB_PREFIX VERSION)
     set(multiValueArgs EXTRA_INCLUDES EXTRA_DEFINES EXTRA_LIB_FOLDERS)
     cmake_parse_arguments(GEN_IMPORTED_TGT "${options}" "${oneValueArgs}"
                         "${multiValueArgs}" ${ARGN})
@@ -123,16 +123,25 @@ function(gen_imported_target)
     set_property(TARGET ${GEN_IMPORTED_TGT_NAME} APPEND PROPERTY IMPORTED_CONFIGURATIONS DEBUG)
     set_property(TARGET ${GEN_IMPORTED_TGT_NAME} APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
 
+    set(GEN_IMPORTED_TGT_DBG_IMPORT_NAME ${DBG_NAME}${TGT_SUFFIX})
+    set(GEN_IMPORTED_TGT_REL_IMPORT_NAME ${REL_NAME}${TGT_SUFFIX})
+    # On linux, give the version to the link name, we will copy these if
+    # these are shared libraries (Simulating Windows DLL search)
+    if(UNIX AND NOT APPLE AND GEN_IMPORTED_TGT_SHARED)
+        set(GEN_IMPORTED_TGT_DBG_IMPORT_NAME ${DBG_NAME}${TGT_SUFFIX}.${GEN_IMPORTED_TGT_VERSION})
+        set(GEN_IMPORTED_TGT_REL_IMPORT_NAME ${REL_NAME}${TGT_SUFFIX}.${GEN_IMPORTED_TGT_VERSION})
+    endif()
+
     # TODO: GEN_IMPORTED_TGT_OVERRIDE_LIB_PREFIX is not generic enough?
     # What if the system has per-config lib folders?
     if(GEN_IMPORTED_TGT_OVERRIDE_LIB_PREFIX)
         set_target_properties(${GEN_IMPORTED_TGT_NAME} PROPERTIES
-            IMPORTED_LOCATION_DEBUG "${GEN_IMPORTED_TGT_OVERRIDE_LIB_PREFIX}/${DBG_NAME}${TGT_SUFFIX}"
-            IMPORTED_LOCATION_RELEASE "${GEN_IMPORTED_TGT_OVERRIDE_LIB_PREFIX}/${REL_NAME}${TGT_SUFFIX}")
+            IMPORTED_LOCATION_DEBUG "${GEN_IMPORTED_TGT_OVERRIDE_LIB_PREFIX}/${GEN_IMPORTED_TGT_DBG_IMPORT_NAME}"
+            IMPORTED_LOCATION_RELEASE "${GEN_IMPORTED_TGT_OVERRIDE_LIB_PREFIX}/${GEN_IMPORTED_TGT_REL_IMPORT_NAME}")
     else()
         set_target_properties(${GEN_IMPORTED_TGT_NAME} PROPERTIES
-            IMPORTED_LOCATION_DEBUG "${MRAY_PLATFORM_LIB_DIRECTORY}/Debug/${DBG_NAME}${TGT_SUFFIX}"
-            IMPORTED_LOCATION_RELEASE "${MRAY_PLATFORM_LIB_DIRECTORY}/Release/${REL_NAME}${TGT_SUFFIX}")
+            IMPORTED_LOCATION_DEBUG "${MRAY_PLATFORM_LIB_DIRECTORY}/Debug/${GEN_IMPORTED_TGT_DBG_IMPORT_NAME}"
+            IMPORTED_LOCATION_RELEASE "${MRAY_PLATFORM_LIB_DIRECTORY}/Release/${GEN_IMPORTED_TGT_REL_IMPORT_NAME}")
     endif()
 
 
@@ -188,11 +197,11 @@ add_library(cli11::cli11 ALIAS cli11)
 gen_imported_target(NAME fmt::fmt STATIC DEBUG_TARGET fmt RELEASE_TARGET fmt
                     EXTRA_DEFINES FMT_USE_NONTYPE_TEMPLATE_ARGS=0)
 gen_imported_target(NAME simdjson::simdjson STATIC DEBUG_TARGET simdjsond RELEASE_TARGET simdjson)
-gen_imported_target(NAME assimp::assimp SHARED DEBUG_TARGET assimpd RELEASE_TARGET assimp)
+gen_imported_target(NAME assimp::assimp SHARED DEBUG_TARGET assimpd RELEASE_TARGET assimp VERSION 5)
 gen_imported_target(NAME gfgfileio::gfgfileio STATIC DEBUG_TARGET GFGFileIOd RELEASE_TARGET GFGFileIO)
-gen_imported_target(NAME oiio::oiio SHARED DEBUG_TARGET OpenImageIOd RELEASE_TARGET OpenImageIO)
-gen_imported_target(NAME oiio::oiio_util SHARED DEBUG_TARGET OpenImageIO_Utild RELEASE_TARGET OpenImageIO_Util)
-gen_imported_target(NAME spdlog::spdlog SHARED DEBUG_TARGET spdlogd RELEASE_TARGET spdlog
+gen_imported_target(NAME oiio::oiio SHARED DEBUG_TARGET OpenImageIOd RELEASE_TARGET OpenImageIO VERSION 2.6.2)
+gen_imported_target(NAME oiio::oiio_util SHARED DEBUG_TARGET OpenImageIO_Utild RELEASE_TARGET OpenImageIO_Util VERSION 2.6.2)
+gen_imported_target(NAME spdlog::spdlog SHARED DEBUG_TARGET spdlogd RELEASE_TARGET spdlog VERSION 1.14
                     EXTRA_DEFINES SPDLOG_FMT_EXTERNAL SPDLOG_COMPILED_LIB)
 gen_imported_target(NAME imgui::imgui STATIC DEBUG_TARGET imguid RELEASE_TARGET imgui)
 
@@ -201,8 +210,8 @@ if(WIN32)
     gen_imported_target(NAME vulkan::vulkan SHARED DEBUG_TARGET vulkan-1d RELEASE_TARGET vulkan-1)
     gen_imported_target(NAME glfw3::glfw3 SHARED DEBUG_TARGET glfw3ddll RELEASE_TARGET glfw3dll)
 else()
-    gen_imported_target(NAME vulkan::vulkan SHARED DEBUG_TARGET vulkand RELEASE_TARGET vulkan)
-    gen_imported_target(NAME glfw3::glfw3 SHARED DEBUG_TARGET glfwd RELEASE_TARGET glfw)
+    gen_imported_target(NAME vulkan::vulkan SHARED DEBUG_TARGET vulkand RELEASE_TARGET vulkan VERSION 1)
+    gen_imported_target(NAME glfw3::glfw3 SHARED DEBUG_TARGET glfwd RELEASE_TARGET glfw VERSION 3)
 endif()
 
 if(MRAY_ENABLE_USD)
@@ -217,8 +226,8 @@ endif()
 # gen_imported_target(NAME imgui::imgui_ti STATIC DEBUG_TARGET imgui_tex_inspectd RELEASE_TARGET imgui_tex_inspect)
 
 if(MRAY_BUILD_TESTS)
-    gen_imported_target(NAME gtest::gtest SHARED DEBUG_TARGET gtest RELEASE_TARGET gtest)
-    gen_imported_target(NAME gtest::gtest_main SHARED DEBUG_TARGET gtest_main RELEASE_TARGET gtest_main)
-    gen_imported_target(NAME gtest::gmock SHARED DEBUG_TARGET gmock RELEASE_TARGET gmock)
-    gen_imported_target(NAME gtest::gmock_main SHARED DEBUG_TARGET gmock_main RELEASE_TARGET gmock_main)
+    gen_imported_target(NAME gtest::gtest SHARED DEBUG_TARGET gtest RELEASE_TARGET gtest VERSION 1.13.0)
+    gen_imported_target(NAME gtest::gtest_main SHARED DEBUG_TARGET gtest_main RELEASE_TARGET gtest_main VERSION 1.13.0)
+    gen_imported_target(NAME gtest::gmock SHARED DEBUG_TARGET gmock RELEASE_TARGET gmock VERSION 1.13.0)
+    gen_imported_target(NAME gtest::gmock_main SHARED DEBUG_TARGET gmock_main RELEASE_TARGET gmock_main VERSION 1.13.0)
 endif()

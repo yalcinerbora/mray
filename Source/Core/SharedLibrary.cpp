@@ -113,11 +113,6 @@ SharedLibrary::SharedLibrary(const std::string& libName)
         libWithExt = "lib";
         libWithExt += libName;
         libWithExt += LinuxDLLExt;
-
-        // On Linux Directly provide the path
-        // TODO: Change this to a more generic solution
-        std::string execPath = GetProcessPath();
-        libWithExt = Filesystem::RelativePathToAbsolute(libWithExt, execPath);
         libHandle = dlopen(libWithExt.c_str(), RTLD_LAZY);
         if(libHandle == nullptr)
             potentialError = dlerror();

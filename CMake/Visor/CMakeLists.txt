@@ -91,6 +91,12 @@ if(WIN32)
                        "${MRAY_CONFIG_LIB_DIRECTORY}/vulkan-1$<$<CONFIG:Debug>:d>.dll"
                        "${MRAY_CONFIG_LIB_DIRECTORY}/glfw3$<$<CONFIG:Debug>:d>.dll"
                        ${MRAY_CONFIG_BIN_DIRECTORY})
+else()
+    add_custom_command(TARGET Visor POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                       "$<TARGET_FILE:vulkan::vulkan>"
+                       "$<TARGET_FILE:glfw3::glfw3>"
+                       ${MRAY_CONFIG_BIN_DIRECTORY})
 endif()
 
 # ==============================#

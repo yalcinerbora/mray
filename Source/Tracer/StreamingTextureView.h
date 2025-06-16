@@ -313,9 +313,9 @@ struct TextureStreamingContext
 											  uint32_t virtualMipIndex,
 											  uint32_t virtualTileIndex);
 
-	MRAY_HYBRID static
+	MRAY_HYBRID static constexpr
 	uint32_t		FetchChannelCount(MRayPixelEnum pixType);
-	MRAY_HYBRID static
+	MRAY_HYBRID static constexpr
 	Vector2ui		FetchTileSize(MRayPixelEnum pixType, bool isPhysical);
 	MRAY_HYBRID static
 	Vector2ui 		GenVirtualMipAndTileLod(const VirtualTexInfo& texInfo,
@@ -478,7 +478,7 @@ constexpr  uint64_t TextureStreamingContext::GenerateVirtualTextureKey(uint32_t 
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t TextureStreamingContext::FetchChannelCount(MRayPixelEnum pixType)
+constexpr uint32_t TextureStreamingContext::FetchChannelCount(MRayPixelEnum pixType)
 {
 	using namespace StreamingTexParams;
 	switch(pixType)
@@ -534,7 +534,7 @@ uint32_t TextureStreamingContext::FetchChannelCount(MRayPixelEnum pixType)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Vector2ui TextureStreamingContext::FetchTileSize(MRayPixelEnum pixType, bool isPhysical)
+constexpr Vector2ui TextureStreamingContext::FetchTileSize(MRayPixelEnum pixType, bool isPhysical)
 {
 	using namespace StreamingTexParams;
 	// We converted the TypeTileSizeList to switch/case

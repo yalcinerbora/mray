@@ -20,6 +20,10 @@ include("PreventInSourceBuilds")
 set(CMAKE_CONFIGURATION_TYPES Debug;SanitizeR;Release CACHE STRING "Build configurations. SanitizeR is a config with address sanitizer/release")
 set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type for single config generators")
 
+# Add build runpath $ORIGIN
+# Emulate windows style
+set(CMAKE_BUILD_RPATH $ORIGIN)
+
 # Architecture
 # Use a drop-down menu for selecting Compute Capability
 set(MRAY_DEVICE_BACKEND "MRAY_GPU_BACKEND_CUDA"

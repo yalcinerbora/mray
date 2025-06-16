@@ -110,9 +110,18 @@ set(MRAY_GCC_OPTIONS
     ${MRAY_CLANG_OPTIONS}
     -Wmisleading-indentation    # warn if indentation implies blocks where blocks do not exist
     -Wduplicated-cond           # warn if if / else chain has duplicated conditions
-    -Wduplicated-branches       # warn if if / else branches have duplicated code
     -Wlogical-op                # warn about logical operations being used where bitwise were probably wanted
-    -Wuseless-cast              # warn if you perform a cast to the same type
+
+    # We needed to duplicate branches for NVCC/MSVC/constexpr trio
+    # (check "T Bit::CountLZero(T value)" function for an example).
+    # So we skip this warning.
+    #-Wduplicated-branches       # warn if if / else branches have duplicated code
+
+    # There are some "useless" casts due to templates config parameters (64-bit/32-bit key mode for example)
+    # more importantly MSVC uses unsigned it c enums but gcc uses signed int enums.
+    # so we cast enums to unsigned int always. GCC warns about these, cant do anything about it
+    # so skipping
+    # -Wuseless-cast              # warn if you perform a cast to the same type
 
     -Wno-shadow
     -Wno-abi                  # Disable ABI warnings (it occured due to nvcc)

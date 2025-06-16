@@ -139,6 +139,10 @@ function(mray_build_ext_dependency_git)
             # Mandate a debug postfix
             -DCMAKE_DEBUG_POSTFIX=d
 
+            # Propagate $ORIGIN to libraries
+            # we emulate Windows
+            -DCMAKE_INSTALL_RPATH=$ORIGIN
+
             # TODO: Do not do fresh install
             # find out a way to change package locations
             # since the very first config's dependencies
