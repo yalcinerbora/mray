@@ -253,17 +253,10 @@ function(gen_tracer_target)
                                        MRAY_COMPILE_OPTIX_AS_PTX)
         endif()
 
-        if(WIN32)
-            add_custom_command(TARGET ${TARGET_FULL_NAME} PRE_BUILD
-                               COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                               "${MRAY_CONFIG_LIB_DIRECTORY}/spdlog$<$<CONFIG:Debug>:d>.dll"
-                               ${MRAY_CONFIG_BIN_DIRECTORY})
-        else()
-            add_custom_command(TARGET ${TARGET_FULL_NAME} POST_BUILD
-                                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                                "$<TARGET_FILE:spdlog::spdlog>"
-                                ${MRAY_CONFIG_BIN_DIRECTORY})
-        endif()
+        add_custom_command(TARGET ${TARGET_FULL_NAME} POST_BUILD
+                           COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                           "$<TARGET_FILE:spdlog::spdlog>"
+                           ${MRAY_CONFIG_BIN_DIRECTORY})
     endif()
 
     set_target_properties(${TARGET_FULL_NAME} PROPERTIES

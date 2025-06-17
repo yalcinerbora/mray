@@ -28,19 +28,15 @@ target_link_libraries(ImageLoader PRIVATE
 add_precompiled_headers(TARGET ImageLoader)
 
 # Copy DLLS
-if(WIN32)
-    add_custom_command(TARGET ImageLoader POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                       "${MRAY_CONFIG_LIB_DIRECTORY}/zlib$<$<CONFIG:Debug>:d>.dll"
-                       "${MRAY_CONFIG_LIB_DIRECTORY}/OpenImageIO$<$<CONFIG:Debug>:d>.dll"
-                       "${MRAY_CONFIG_LIB_DIRECTORY}/OpenImageIO_Util$<$<CONFIG:Debug>:d>.dll"
-                       ${MRAY_CONFIG_BIN_DIRECTORY})
-
-else()
-    add_custom_command(TARGET ImageLoader POST_BUILD
-                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                        "${MRAY_CONFIG_LIB_DIRECTORY}/libz$<$<CONFIG:Debug>:d>.so.1"
-                        "$<TARGET_FILE:oiio::oiio>"
-                        "$<TARGET_FILE:oiio::oiio_util>"
-                        ${MRAY_CONFIG_BIN_DIRECTORY})
+if(UNIX AND NOT APPLE)
+    set(MRAY_ZLIB_COPY_NAME libz$<$<CONFIG:Debug>:d>${CMAKE_SHARED_LIBRARY_SUFFIX}.1)
+elseif(MSVC)
+    set(MRAY_ZLIB_COPY_NAME zlib$<$<CONFIG:Debug>:d>${CMAKE_SHARED_LIBRARY_SUFFIX})
 endif()
+
+add_custom_command(TARGET ImageLoader POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                   "${MRAY_CONFIG_LIB_DIRECTORY}/${MRAY_ZLIB_COPY_NAME}"
+                   "$<TARGET_FILE:oiio::oiio>"
+                   "$<TARGET_FILE:oiio::oiio_util>"
+                   ${MRAY_CONFIG_BIN_DIRECTORY})

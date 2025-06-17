@@ -31,22 +31,15 @@ set_target_properties(TSceneLoaderMRay PROPERTIES
 add_precompiled_headers(TARGET TSceneLoaderMRay)
 
 if(WIN32)
-    add_custom_command(TARGET TSceneLoaderMRay PRE_BUILD
-                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                        "${MRAY_CONFIG_LIB_DIRECTORY}/gtest.dll"
-                        "${MRAY_CONFIG_LIB_DIRECTORY}/gtest_main.dll"
-                        "${MRAY_CONFIG_LIB_DIRECTORY}/gmock.dll"
-                        "${MRAY_CONFIG_LIB_DIRECTORY}/gmock_main.dll"
-                        ${MRAY_CONFIG_BIN_DIRECTORY})
     set(DEBUG_ARGS "--gtest_filter=*.* --gtest_catch_exceptions=0 --gtest_repeat=1 --gtest_shuffle=0")
     set_target_properties(TSceneLoaderMRay PROPERTIES
                           VS_DEBUGGER_WORKING_DIRECTORY ${MRAY_WORKING_DIRECTORY}
                           VS_DEBUGGER_COMMAND_ARGUMENTS ${DEBUG_ARGS})
-else()
-    add_custom_command(TARGET TSceneLoaderMRay POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                       "$<TARGET_FILE:gtest::gtest>"
-                       "$<TARGET_FILE:gtest::gtest_main>"
-                       "$<TARGET_FILE:gtest::gmock>"
-                       ${MRAY_CONFIG_BIN_DIRECTORY})
 endif()
+
+add_custom_command(TARGET TSceneLoaderMRay POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                   "$<TARGET_FILE:gtest::gtest>"
+                   "$<TARGET_FILE:gtest::gtest_main>"
+                   "$<TARGET_FILE:gtest::gmock>"
+                   ${MRAY_CONFIG_BIN_DIRECTORY})

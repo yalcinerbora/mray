@@ -85,19 +85,18 @@ add_custom_command(TARGET Visor POST_BUILD
                    "${MRAY_RESOURCE_DIRECTORY}/Fonts"
                    "${MRAY_CONFIG_BIN_DIRECTORY}/Fonts")
 
-if(WIN32)
-    add_custom_command(TARGET Visor POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                       "${MRAY_CONFIG_LIB_DIRECTORY}/vulkan-1$<$<CONFIG:Debug>:d>.dll"
-                       "${MRAY_CONFIG_LIB_DIRECTORY}/glfw3$<$<CONFIG:Debug>:d>.dll"
-                       ${MRAY_CONFIG_BIN_DIRECTORY})
-else()
-    add_custom_command(TARGET Visor POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                       "$<TARGET_FILE:vulkan::vulkan>"
-                       "$<TARGET_FILE:glfw3::glfw3>"
-                       ${MRAY_CONFIG_BIN_DIRECTORY})
+# GLFW has absurd .lib / .dll naming convention
+# (We also may be the culprit)
+if(UNIX AND NOT APPLE)
+    set(MRAY_GLFW_COPY_NAME "$<TARGET_FILE:glfw3::glfw3>")
+elseif(MSVC)
+    set(MRAY_GLFW_COPY_NAME "glfw3$<$<CONFIG:Debug>:d>.dll")
 endif()
+add_custom_command(TARGET Visor POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                   "$<TARGET_FILE:vulkan::vulkan>"
+                   "${MRAY_CONFIG_LIB_DIRECTORY}/${MRAY_GLFW_COPY_NAME}"
+                   ${MRAY_CONFIG_BIN_DIRECTORY})
 
 # ==============================#
 #        Shader Related         #
