@@ -511,7 +511,7 @@ void GenRenderWorkTemplates(pmr::string& works,
                 else works += "    "sv;
                 works += FormatToGlobalBuffer(WORK_TEMPLATE_FMT.size(),
                                               WORK_TEMPLATE_FMT, p.typeName,
-                                              m.typeName, t.typeName);;
+                                              m.typeName, t.typeName);
             }
         }
     }
