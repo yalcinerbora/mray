@@ -139,7 +139,7 @@ std::string_view FormatToGlobalBuffer(size_t sizeHint,
     // Changing since pmr::string may have sso
     // while vector does not
     pmr::vector<char> fmtBuffer(&globalAllocator);
-    fmtBuffer.reserve(sizeHint + sizeof...(Args) * 256);
+    fmtBuffer.reserve(sizeHint + sizeof...(Args) * 64);
     fmt::format_to(std::back_inserter(fmtBuffer),
                    fmtStr, std::forward<Args>(args)...);
 
@@ -210,7 +210,6 @@ void ParseAccelLines(pmr::vector<AccelLine>& lines,
                 fmt::println(stderr, "Unkown accelerator type \"{}\"", line);
                 std::exit(1);
             }
-
         }
         else if(i == 2)
             result.baseName = line;
