@@ -136,7 +136,9 @@ template<class... Args>
 std::string_view FormatToGlobalBuffer(size_t sizeHint,
                                       fmt::format_string<Args...> fmtStr, Args&&... args)
 {
-    pmr::string fmtBuffer(&globalAllocator);
+    // Changing since pmr::string may have sso
+    // while vector does not
+    pmr::vector<char> fmtBuffer(&globalAllocator);
     fmtBuffer.reserve(sizeHint + sizeof...(Args) * 256);
     fmt::format_to(std::back_inserter(fmtBuffer),
                    fmtStr, std::forward<Args>(args)...);
