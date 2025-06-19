@@ -352,7 +352,6 @@ void GPUSystemHIP::ThreadInitFunction()
 GPUAnnotationHIP GPUSystemHIP::CreateAnnotation(std::string_view name) const
 {
     // TODO:
-    //return GPUAnnotationCUDA(roctxDomain, name);
     return GPUAnnotationHIP(nullptr, name);
 }
 

@@ -326,9 +326,18 @@ void KCUnionLBVHBoundingBoxes(// I-O
         // volatile should make the data to punch-through the cache hierarchy and,
         // threadfence should prevent read/write reordering.
         // If not we can fall back to atomic
-        using AABBVolatileSpan = Span<volatile LBVHAccelDetail::LBVHBoundingBox>;
-        auto dLocalNodeAABBs = AABBVolatileSpan(dAllNodeAABBs.data() + nodeRange[0],
-                                                nodeRange[1] - nodeRange[0]);
+        //
+        // std::span<volatile T> where T is a compound type (class?)
+        // is ill-formed.
+        //
+        // NVCC did not care but MSVC did care. Falling back to C
+        auto GetLocalAABBVolatile = [=](uint32_t i) -> volatile LBVHAccelDetail::LBVHBoundingBox&
+        {
+            using AABBVolatileSpanPtr = volatile LBVHAccelDetail::LBVHBoundingBox*;
+            auto dLocalNodeAABBs = AABBVolatileSpanPtr(dAllNodeAABBs.data() + nodeRange[0]);
+            assert(i < nodeRange[1] - nodeRange[0]);
+            return dLocalNodeAABBs[i];
+        };
 
         auto FetchAABB = [&](ChildIndex cIndex) -> AABB3
         {
@@ -338,13 +347,13 @@ void KCUnionLBVHBoundingBoxes(// I-O
             {
                 // Due to volatile, we need to load like this
                 // (without adding volatile overloads to functions)
-                Float min0 = dLocalNodeAABBs[index].min[0];
-                Float min1 = dLocalNodeAABBs[index].min[1];
-                Float min2 = dLocalNodeAABBs[index].min[2];
+                Float min0 = GetLocalAABBVolatile(index).min[0];
+                Float min1 = GetLocalAABBVolatile(index).min[1];
+                Float min2 = GetLocalAABBVolatile(index).min[2];
                 //
-                Float max0 = dLocalNodeAABBs[index].max[0];
-                Float max1 = dLocalNodeAABBs[index].max[1];
-                Float max2 = dLocalNodeAABBs[index].max[2];
+                Float max0 = GetLocalAABBVolatile(index).max[0];
+                Float max1 = GetLocalAABBVolatile(index).max[1];
+                Float max2 = GetLocalAABBVolatile(index).max[2];
                 return AABB3(Vector3(min0, min1, min2),
                              Vector3(max0, max1, max2));
             }
@@ -358,7 +367,7 @@ void KCUnionLBVHBoundingBoxes(// I-O
         int32_t totalNodes = static_cast<int32_t>(dLocalNodes.size());
         if(totalLeafs == 1)
         {
-            volatile LBVHBoundingBox& bbox = dLocalNodeAABBs[0];
+            volatile LBVHBoundingBox& bbox = GetLocalAABBVolatile(0);
             AABB3 aabb = dLocalLeafAABBs[0];
             bbox.min[0] = aabb.Min()[0];
             bbox.min[1] = aabb.Min()[1];
@@ -375,7 +384,7 @@ void KCUnionLBVHBoundingBoxes(// I-O
             while(nodeIndex != std::numeric_limits<uint32_t>::max())
             {
                 const LBVHNode& node = dLocalNodes[nodeIndex];
-                volatile LBVHBoundingBox& bbox = dLocalNodeAABBs[nodeIndex];
+                volatile LBVHBoundingBox& bbox = GetLocalAABBVolatile(nodeIndex);
                 uint32_t result = DeviceAtomic::AtomicAdd(dLocalCounters[nodeIndex], 1u);
                 // Last one come to the party, cleanup after the other guys
                 if(result == 1)

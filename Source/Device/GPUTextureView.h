@@ -22,8 +22,14 @@
     template<uint32_t DIM, class T>
     using TextureView = mray::hip::TextureViewHIP<DIM, T>;
 
-#elif defined GPU_BACKEND_HOST
-    #error Not yet!
+#elif defined MRAY_GPU_BACKEND_CPU
+    #include "CPU/TextureViewCPU.h"
+    // Alias the types
+    template<uint32_t DIM, class T>
+    using RWTextureView = mray::host::RWTextureViewCPU<DIM, T>;
+
+    template<uint32_t DIM, class T>
+    using TextureView = mray::host::TextureViewCPU<DIM, T>;
 #else
     #error Please define a GPU Backend!
 #endif

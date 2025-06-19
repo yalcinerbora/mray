@@ -13,11 +13,12 @@ target_link_libraries(TracerKernelGen
                       CoreLib
                       mray::meta_compile_opts)
 
-                      # Debug Parameters (For my own use case)
+# Debug Parameters (For my own use case)
 if(MSVC)
     set(DEBUG_ARGS "")
     string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "../Source/TracerDLL/TracerTypeGenInput.txt ")
     string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "0 ")
+    string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "1 ")
     string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} ". ")
     string(CONCAT DEBUG_ARGS ${DEBUG_ARGS} "MRAY_GPU_BACKEND_CUDA")
 

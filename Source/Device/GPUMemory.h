@@ -20,6 +20,15 @@
     using HostLocalMemory           = mray::hip::HostLocalMemoryHIP;
     using HostLocalAlignedMemory    = mray::hip::HostLocalAlignedMemoryHIP;
 
+#elif defined MRAY_GPU_BACKEND_CPU
+    #include "CPU/DeviceMemoryCPU.h"
+
+    // Alias the types
+    using DeviceMemory              = mray::host::DeviceMemoryCPU;
+    using DeviceLocalMemory         = mray::host::DeviceLocalMemoryCPU;
+    using HostLocalMemory           = mray::host::HostLocalMemoryCPU;
+    using HostLocalAlignedMemory    = mray::host::HostLocalAlignedMemoryCPU;
+
 #else
     #error Please define a GPU Backend!
 #endif

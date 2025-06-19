@@ -25,8 +25,17 @@
     using GPUFence          = mray::hip::GPUFenceHIP;
     using GPUSystem         = mray::hip::GPUSystemHIP;
     using GPUAnnotation     = mray::hip::GPUAnnotationHIP;
-#elif defined GPU_BACKEND_HOST
-    #error Not yet!
+#elif defined MRAY_GPU_BACKEND_CPU
+    #include "CPU/GPUSystemCPU.h"
+
+    // Alias
+    using KernelCallParams = mray::host::KernelCallParamsCPU;
+    using GPUSemaphoreView = mray::host::GPUSemaphoreViewCPU;
+    using GPUDevice = mray::host::GPUDeviceCPU;
+    using GPUQueue = mray::host::GPUQueueCPU;
+    using GPUFence = mray::host::GPUFenceCPU;
+    using GPUSystem = mray::host::GPUSystemCPU;
+    using GPUAnnotation = mray::host::GPUAnnotationCPU;
 #else
     #error Please define a GPU Backend!
 #endif

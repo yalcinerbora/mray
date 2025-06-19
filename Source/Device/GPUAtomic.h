@@ -17,6 +17,13 @@
     {
         using namespace ::mray::hip::atomic;
     }
+#elif defined MRAY_GPU_BACKEND_CPU
+    #include "CPU/GPUAtomicCPU.h"
+
+    namespace DeviceAtomic
+    {
+        using namespace ::mray::host::atomic;
+    }
 
 #else
     #error Please define a GPU Backend!

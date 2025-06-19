@@ -454,7 +454,7 @@ void FindAccelNames(std::array<std::string_view, 2>& linAccelNamePair,
                     const LinePack& lp)
 {
     auto Find = [&](std::array<std::string_view, 2>& out,
-                    AccelLine::AccelType t)
+                    AccelLine::AccelType t, std::string_view name)
     {
         auto loc = std::find_if(lp.accels.begin(),
                                 lp.accels.end(),
@@ -465,7 +465,8 @@ void FindAccelNames(std::array<std::string_view, 2>& linAccelNamePair,
 
         if(loc == lp.accels.end())
         {
-            fmt::println(stderr, "No linear-marked accelerator found in input file");
+            fmt::println(stderr, "No {}-marked accelerator found in input file",
+                         name);
             std::exit(1);
         };
         out[0] = loc->baseName;
@@ -475,9 +476,9 @@ void FindAccelNames(std::array<std::string_view, 2>& linAccelNamePair,
             guardedInclude = loc->headerFile;
     };
 
-    Find(linAccelNamePair, AccelLine::LIN);
-    Find(bvhAccelNamePair, AccelLine::BVH);
-    Find(hwAccelNamePair, AccelLine::HW);
+    Find(linAccelNamePair, AccelLine::LIN, "LIN");
+    Find(bvhAccelNamePair, AccelLine::BVH, "BVH");
+    Find(hwAccelNamePair, AccelLine::HW, "HW");
 }
 
 void GenRenderWorkTemplates(pmr::string& works,
@@ -559,8 +560,8 @@ void GenRenderWorkList(pmr::string& workList, const LinePack& lp)
 }
 
 void WriteRequestedTypesFiles(const LinePack& lp,
-                             std::filesystem::path outDir,
-                             std::string_view hwAccelHeaderGuard)
+                              std::filesystem::path outDir,
+                              std::string_view hwAccelHeaderGuard)
 {
     auto includes = pmr::string(&globalAllocator);
     auto guardedInclude = pmr::string(&globalAllocator);
@@ -641,7 +642,8 @@ void WriteRequestedTypesFiles(const LinePack& lp,
 
 void GenerateKernelInstantiationFiles(const LinePack& lp,
                                       std::filesystem::path outDir,
-                                      size_t fileCount)
+                                      size_t fileCount,
+                                      bool skipHWAccelInstances)
 {
     static constexpr auto WORK_FMT = "MRAY_RENDERER_KERNEL_INSTANTIATE({}, {}, {}, {}, {});\n"sv;
     static constexpr auto LIGHT_WORK_FMT = "MRAY_RENDERER_LIGHT_KERNEL_INSTANTIATE({}, {}, {}, {});\n"sv;
@@ -727,6 +729,7 @@ void GenerateKernelInstantiationFiles(const LinePack& lp,
     for(const auto& t : lp.trans)
     for(const auto& p : lp.prims)
     {
+        if(a.type == AccelLine::HW && skipHWAccelInstances) continue;
         if(p.typeName == "PrimGroupEmpty"sv) continue;
         if(LookFilterAndSkip(p.transFilters, t)) continue;
         if(LookFilterAndSkip(t.primFilters, p)) continue;
@@ -876,7 +879,7 @@ int main(int argc, const char* argv[])
     Timer t; t.Start();
 
     uint32_t argcUInt = static_cast<uint32_t>(argc);
-    static constexpr uint32_t MAX_ARG_COUNT = 4;
+    static constexpr uint32_t MAX_ARG_COUNT = 5;
     if(argcUInt != MAX_ARG_COUNT + 1)
     {
         fmt::println(stderr, "Wrong Argument Count({})", argcUInt);
@@ -895,8 +898,18 @@ int main(int argc, const char* argv[])
     };
     fileCount = std::max(size_t(1), std::min(fileCount, size_t(std::thread::hardware_concurrency())));
 
-    auto outDir = args[2];
-    auto headerGuard = args[3];
+    //
+    uint32_t writeHWAccelInstancesInt = 0;
+    if(std::from_chars(args[2].data(), args[2].data() + args[2].size(),
+                       writeHWAccelInstancesInt).ec != std::errc())
+    {
+        fmt::println(stderr, "3rd arg is not a number (It will be interpreted as int). ({})", args[2]);
+        return 1;
+    };
+    bool skipHWAccelInstances = (writeHWAccelInstancesInt == 0);
+
+    auto outDir = args[3];
+    auto headerGuard = args[4];
 
     // Don't use data() anywhere else like this, it is UB since string_view
     // is not null terminated!!!!
@@ -916,7 +929,7 @@ int main(int argc, const char* argv[])
 
     //
     WriteRequestedTypesFiles(lp, outDir, headerGuard);
-    GenerateKernelInstantiationFiles(lp, outDir, fileCount);
+    GenerateKernelInstantiationFiles(lp, outDir, fileCount, skipHWAccelInstances);
 
     t.Split();
     //fmt::println("Generation took {:f}ms", t.Elapsed<Millisecond>());

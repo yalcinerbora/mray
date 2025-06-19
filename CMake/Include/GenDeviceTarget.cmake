@@ -65,6 +65,32 @@ function(gen_device_target)
         ${CURRENT_SOURCE_DIR}/HIP/AlgBinaryPartitionHIP.h
         ${CURRENT_SOURCE_DIR}/HIP/AlgBinarySearchHIP.h)
 
+    ###############
+    # CPU RELATED #
+    ###############
+    set(SRC_CPU_MEMORY
+        ${CURRENT_SOURCE_DIR}/CPU/DeviceMemoryCPU.h
+        ${CURRENT_SOURCE_DIR}/CPU/DeviceMemoryCPU.cpp
+        ${CURRENT_SOURCE_DIR}/CPU/TextureCPU.h
+        ${CURRENT_SOURCE_DIR}/CPU/TextureCPU.hpp
+        ${CURRENT_SOURCE_DIR}/CPU/TextureCPU.cpp
+        ${CURRENT_SOURCE_DIR}/CPU/TextureViewCPU.h)
+
+    set(SRC_CPU
+        ${CURRENT_SOURCE_DIR}/CPU/GPUSystemCPU.h
+        ${CURRENT_SOURCE_DIR}/CPU/GPUSystemCPU.hpp
+        ${CURRENT_SOURCE_DIR}/CPU/GPUSystemCPU.cpp
+        ${CURRENT_SOURCE_DIR}/CPU/DefinitionsCPU.h
+        ${CURRENT_SOURCE_DIR}/CPU/GPUAtomicCPU.h)
+
+    set(SRC_CPU_ALGS
+        ${CURRENT_SOURCE_DIR}/CPU/AlgForwardCPU.h
+        ${CURRENT_SOURCE_DIR}/CPU/AlgReduceCPU.h
+        ${CURRENT_SOURCE_DIR}/CPU/AlgScanCPU.h
+        ${CURRENT_SOURCE_DIR}/CPU/AlgRadixSortCPU.h
+        ${CURRENT_SOURCE_DIR}/CPU/AlgBinaryPartitionCPU.h
+        ${CURRENT_SOURCE_DIR}/CPU/AlgBinarySearchCPU.h)
+
     ##########
     # COMMON #
     ##########
@@ -93,7 +119,7 @@ function(gen_device_target)
         ${SRC_COMMON}
         ${SRC_ALGS})
 
-    if(${GEN_DEVICE_TARGET_MACRO} STREQUAL "MRAY_GPU_BACKEND_CUDA")
+    if(GEN_DEVICE_TARGET_MACRO STREQUAL "MRAY_GPU_BACKEND_CUDA")
         set(SRC_ALL ${SRC_ALL}
             ${SRC_CUDA_MEMORY}
             ${SRC_CUDA}
@@ -103,7 +129,7 @@ function(gen_device_target)
         source_group("CUDA" FILES ${SRC_CUDA})
         source_group("CUDA/Algorithms" FILES ${SRC_CUDA_ALGS})
 
-    elseif(${GEN_DEVICE_TARGET_MACRO} STREQUAL "MRAY_GPU_BACKEND_HIP")
+    elseif(GEN_DEVICE_TARGET_MACRO STREQUAL "MRAY_GPU_BACKEND_HIP")
         set(SRC_ALL ${SRC_ALL}
             ${SRC_HIP_MEMORY}
             ${SRC_HIP}
@@ -112,6 +138,17 @@ function(gen_device_target)
         source_group("HIP/Memory" FILES ${SRC_HIP_MEMORY})
         source_group("HIP" FILES ${SRC_HIP})
         source_group("HIP/Algorithms" FILES ${SRC_HIP_ALGS})
+
+    elseif(GEN_DEVICE_TARGET_MACRO STREQUAL "MRAY_GPU_BACKEND_CPU")
+        set(SRC_ALL ${SRC_ALL}
+            ${SRC_CPU_MEMORY}
+            ${SRC_CPU}
+            ${SRC_CPU_ALGS})
+
+        source_group("CPU/Memory" FILES ${SRC_CPU_MEMORY})
+        source_group("CPU" FILES ${SRC_CPU})
+        source_group("CPU/Algorithms" FILES ${SRC_CPU_ALGS})
+
     else()
         message(FATAL_ERROR "Unsupported Device Macro")
     endif()
@@ -141,20 +178,20 @@ function(gen_device_target)
                           CUDA_SEPARABLE_COMPILATION ON
                           CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
-    if(${GEN_DEVICE_TARGET_MACRO} STREQUAL "MRAY_GPU_BACKEND_CUDA")
+    if(GEN_DEVICE_TARGET_MACRO STREQUAL "MRAY_GPU_BACKEND_CUDA")
         target_link_libraries(${TARGET_FULL_NAME}
                               PUBLIC
                               CUDA::cuda_driver
                               PRIVATE
                               mray::cuda_extra_compile_opts)
-
-    elseif(${GEN_DEVICE_TARGET_MACRO} STREQUAL "MRAY_GPU_BACKEND_HIP")
-        # target_link_libraries(${TARGET_FULL_NAME}
-        #                       PUBLIC
-        #                       hip::host)
-    else()
-        message(FATAL_ERROR "Unsupported Device Macro")
     endif()
+    # elseif(${GEN_DEVICE_TARGET_MACRO} STREQUAL "MRAY_GPU_BACKEND_HIP")
+    #     # target_link_libraries(${TARGET_FULL_NAME}
+    #     #                       PUBLIC
+    #     #                       hip::host)
+    # else()
+    #     message(FATAL_ERROR "Unsupported Device Macro")
+    # endif()
 
     add_precompiled_headers(TARGET ${TARGET_FULL_NAME})
 

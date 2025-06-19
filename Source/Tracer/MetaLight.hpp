@@ -193,7 +193,7 @@ template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t MetaLightViewT<V, ST>::SampleSolidAngleRNCount() const
 {
-    return DeviceVisit(light, [&](auto&& l) -> uint32_t
+    return DeviceVisit(light, [](auto&& l) -> uint32_t
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -232,7 +232,7 @@ template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 uint32_t MetaLightViewT<V, ST>::SampleRayRNCount() const
 {
-    return DeviceVisit(light, [&](auto&& l) -> uint32_t
+    return DeviceVisit(light, [](auto&& l) -> uint32_t
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -286,7 +286,7 @@ template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 bool MetaLightViewT<V, ST>::IsPrimitiveBackedLight() const
 {
-    return DeviceVisit(light, [&](auto&& l) -> bool
+    return DeviceVisit(light, [](auto&& l) -> bool
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)

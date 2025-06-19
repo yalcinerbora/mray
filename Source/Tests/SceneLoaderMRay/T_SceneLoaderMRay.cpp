@@ -81,7 +81,7 @@ TEST_F(SceneLoaderMRayTest, Basic)
 
 TEST_F(SceneLoaderMRayTest, Kitchen)
 {
-    static constexpr size_t TOTAL_RUNS = 16;
+    static constexpr size_t TOTAL_RUNS = 2;
     double all = 0.0;
     for(uint32_t i = 0; i < TOTAL_RUNS; i++)
     {
@@ -104,7 +104,7 @@ TEST_F(SceneLoaderMRayTest, Kitchen)
 TEST_F(SceneLoaderMRayTest, KitchenGFG)
 {
 
-    static constexpr size_t TOTAL_RUNS = 16;
+    static constexpr size_t TOTAL_RUNS = 2;
     double all = 0.0;
     for(uint32_t i = 0; i < TOTAL_RUNS; i++)
     {

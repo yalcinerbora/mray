@@ -60,10 +60,16 @@ if(MRAY_ENABLE_USD)
 endif()
 
 # Tracer Related dependencies
-if(${MRAY_DEVICE_BACKEND} STREQUAL "MRAY_GPU_BACKEND_CUDA")
-    add_dependencies(MRay TracerDLL_CUDA)
-elseif(${MRAY_DEVICE_BACKEND} STREQUAL "MRAY_GPU_BACKEND_HIP")
-    add_dependencies(MRay TracerDLL_HIP)
+if(NOT MRAY_DISABLE_DEVICE_BACKEND)
+    if(${MRAY_DEVICE_BACKEND} STREQUAL "MRAY_GPU_BACKEND_CUDA")
+        add_dependencies(MRay TracerDLL_CUDA)
+    elseif(${MRAY_DEVICE_BACKEND} STREQUAL "MRAY_GPU_BACKEND_HIP")
+        add_dependencies(MRay TracerDLL_HIP)
+    endif()
+endif()
+
+if(MRAY_BUILD_HOST_BACKEND)
+    add_dependencies(MRay TracerDLL_CPU)
 endif()
 
 if(MRAY_BUILD_VISOR)

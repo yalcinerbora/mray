@@ -349,6 +349,8 @@ void KCExpandSamplesToPixels(// Outputs
     }
 }
 
+#ifdef MRAY_GPU_BACKEND_CUDA
+
 template <uint32_t TPB, uint32_t LOGICAL_WARP_SIZE, class Filter>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
 void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan img,
@@ -451,6 +453,27 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan img,
         }
     }
 }
+
+#else
+
+template <uint32_t TPB, uint32_t LOGICAL_WARP_SIZE, class Filter>
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
+void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan img,
+                          // Inputs per segment
+                          MRAY_GRID_CONSTANT const Span<const uint32_t> dStartOffsets,
+                          MRAY_GRID_CONSTANT const Span<const CommonKey> dPixelIds,
+                          // Inputs per thread
+                          MRAY_GRID_CONSTANT const Span<const CommonIndex> dIndices,
+                          // Inputs Accessed by SampleId
+                          MRAY_GRID_CONSTANT const Span<const Spectrum> dValues,
+                          MRAY_GRID_CONSTANT const Span<const ImageCoordinate> dImgCoords,
+                          // Constants
+                          MRAY_GRID_CONSTANT const Span<const uint32_t, 1u> hPartitionCount,
+                          MRAY_GRID_CONSTANT const Float scalarWeightMultiplier,
+                          MRAY_GRID_CONSTANT const Filter filter)
+{}
+
+#endif
 
 template <class Filter>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT

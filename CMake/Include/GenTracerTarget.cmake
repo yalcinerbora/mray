@@ -2,7 +2,7 @@ function(gen_tracer_target)
 
     # Parse Args
     set(options)
-    set(oneValueArgs NAME)
+    set(oneValueArgs NAME MACRO)
     set(multiValueArgs)
 
     cmake_parse_arguments(GEN_TRACER_TARGET "${options}" "${oneValueArgs}"
@@ -167,24 +167,23 @@ function(gen_tracer_target)
     source_group("Utility" FILES ${SRC_UTILITY})
     source_group("" FILES ${SRC_COMMON})
 
-    # I dunno why but global set did not work
-    if(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_HIP")
-
-        set_source_files_properties(${CURRENT_SOURCE_DIR}/ColorConverter.cu
-                                    ${CURRENT_SOURCE_DIR}/TextureFilter.cu
-                                    ${CURRENT_SOURCE_DIR}/PrimitiveDefaultTriangle.cu
-                                    ${CURRENT_SOURCE_DIR}/TransformsDefault.cu
-                                    ${CURRENT_SOURCE_DIR}/LightsDefault.cu
-                                    ${CURRENT_SOURCE_DIR}/AcceleratorLinear.cu
-                                    ${CURRENT_SOURCE_DIR}/AcceleratorLBVH.cu
-                                    ${CURRENT_SOURCE_DIR}/TexViewRenderer.cu
-                                    ${CURRENT_SOURCE_DIR}/SurfaceRenderer.cu
-                                    ${CURRENT_SOURCE_DIR}/Random.cu
-                                    ${CURRENT_SOURCE_DIR}/Distributions.cu
-                                    ${CURRENT_SOURCE_DIR}/RayPartitioner.cu
-                                    PROPERTIES LANGUAGE HIP)
-
-    endif()
+    change_device_source_file_language(
+        MACRO
+        ${GEN_TRACER_TARGET_MACRO}
+        SOURCE_FILES
+        ${CURRENT_SOURCE_DIR}/ColorConverter.cu
+        ${CURRENT_SOURCE_DIR}/TextureFilter.cu
+        ${CURRENT_SOURCE_DIR}/PrimitiveDefaultTriangle.cu
+        ${CURRENT_SOURCE_DIR}/TransformsDefault.cu
+        ${CURRENT_SOURCE_DIR}/LightsDefault.cu
+        ${CURRENT_SOURCE_DIR}/AcceleratorLinear.cu
+        ${CURRENT_SOURCE_DIR}/AcceleratorLBVH.cu
+        ${CURRENT_SOURCE_DIR}/TexViewRenderer.cu
+        ${CURRENT_SOURCE_DIR}/SurfaceRenderer.cu
+        ${CURRENT_SOURCE_DIR}/Random.cu
+        ${CURRENT_SOURCE_DIR}/Distributions.cu
+        ${CURRENT_SOURCE_DIR}/RayPartitioner.cu
+    )
 
     # Enable/Disable HW Acceleration
     if(MRAY_OPTIX)

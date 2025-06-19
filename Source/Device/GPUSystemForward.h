@@ -104,6 +104,56 @@
     template<uint32_t D, class T>
     using Texture = mray::hip::TextureHIP<D, T>;
 
+#elif defined MRAY_GPU_BACKEND_CPU
+
+    namespace mray::host
+    {
+        struct KernelCallParamsCPU;
+        class GPUSemaphoreViewCPU;
+        class GPUDeviceCPU;
+        class GPUQueueCPU;
+        class GPUFenceCPU;
+        class GPUSystemCPU;
+        class DeviceMemoryCPU;
+        class DeviceLocalMemoryCPU;
+        class HostLocalMemoryCPU;
+        class TextureBackingMemoryCPU;
+
+        template<uint32_t DIM, class T>
+        class TextureViewCPU;
+
+        template<uint32_t DIM, class T>
+        class RWTextureViewCPU;
+
+        template<uint32_t DIM, class T>
+        class RWTextureRefCPU;
+
+        template<uint32_t DIM, class T>
+        class TextureCPU;
+    }
+
+    // Alias the types
+    using KernelCallParams = mray::host::KernelCallParamsCPU;
+    using GPUSemaphore = mray::host::GPUSemaphoreViewCPU;
+    using GPUDevice = mray::host::GPUDeviceCPU;
+    using GPUQueue = mray::host::GPUQueueCPU;
+    using GPUFence = mray::host::GPUFenceCPU;
+    using GPUSystem = mray::host::GPUSystemCPU;
+    using DeviceMemory = mray::host::DeviceMemoryCPU;
+    using DeviceLocalMemory = mray::host::DeviceLocalMemoryCPU;
+    using HostLocalMemory = mray::host::HostLocalMemoryCPU;
+    using TextureBackingMemory = mray::host::TextureBackingMemoryCPU;
+
+    template<uint32_t D, class T>
+    using TextureView = mray::host::TextureViewCPU<D, T>;
+    template<uint32_t D, class T>
+    using RWTextureView = mray::host::RWTextureViewCPU<D, T>;
+    template<uint32_t D, class T>
+    using RWTextureRef = mray::host::RWTextureRefCPU<D, T>;
+
+    template<uint32_t D, class T>
+    using Texture = mray::host::TextureCPU<D, T>;
+
 #else
     #error Please define a GPU Backend!
 #endif

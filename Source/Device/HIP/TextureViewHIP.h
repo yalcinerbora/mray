@@ -145,13 +145,13 @@ class TextureViewHIP
     public:
     MRAY_HOST               TextureViewHIP(hipTextureObject_t t) : texHandle(t) {}
     // Base Access
-    MRAY_GPU Optional<T>    operator()(UV uv) const;
+    MRAY_GPU T              operator()(UV uv) const;
     // Gradient Access
-    MRAY_GPU Optional<T>    operator()(UV uv,
+    MRAY_GPU T              operator()(UV uv,
                                        UV dpdx,
                                        UV dpdy) const;
     // Direct Mip Access
-    MRAY_GPU Optional<T>    operator()(UV uv, Float mipLevel) const;
+    MRAY_GPU T              operator()(UV uv, Float mipLevel) const;
 };
 
 // Writable texture views (disregards normalization etc)
@@ -200,9 +200,8 @@ class RWTextureViewHIP
 
 template<uint32_t D, class T>
 MRAY_GPU MRAY_GPU_INLINE
-Optional<T> TextureViewHIP<D, T>::operator()(UV uv) const
+T TextureViewHIP<D, T>::operator()(UV uv) const
 {
-    bool isResident = true;
     HipType t;
     if constexpr(D == 1)
     {
@@ -217,17 +216,13 @@ Optional<T> TextureViewHIP<D, T>::operator()(UV uv) const
         t = tex3D<HipType>(texHandle,
                             uv[0], uv[1], uv[2]);
     }
-    if(isResident) return ConvertType::Convert(t);
-    return std::nullopt;
+    return ConvertType::Convert(t);
 }
 
 template<uint32_t D, class T>
 MRAY_GPU MRAY_GPU_INLINE
-Optional<T> TextureViewHIP<D, T>::operator()(UV uv,
-                                             UV dpdx,
-                                             UV dpdy) const
+T TextureViewHIP<D, T>::operator()(UV uv, UV dpdx, UV dpdy) const
 {
-    bool isResident = true;
     HipType t;
     if constexpr(D == 1)
     {
@@ -247,15 +242,13 @@ Optional<T> TextureViewHIP<D, T>::operator()(UV uv,
                                {dpdx[0], dpdx[1], dpdx[2]},
                                {dpdy[0], dpdy[1], dpdy[2]});
     }
-    if(isResident) return ConvertType::Convert(t);
-    return std::nullopt;
+    return ConvertType::Convert(t);
 }
 
 template<uint32_t D, class T>
 MRAY_GPU MRAY_GPU_INLINE
-Optional<T> TextureViewHIP<D, T>::operator()(UV uv, Float mipLevel) const
+T TextureViewHIP<D, T>::operator()(UV uv, Float mipLevel) const
 {
-    bool isResident = true;
     HipType t;
     if constexpr(D == 1)
     {
@@ -271,8 +264,7 @@ Optional<T> TextureViewHIP<D, T>::operator()(UV uv, Float mipLevel) const
                               uv[0], uv[1], uv[2],
                               mipLevel);
     }
-    if(isResident) return ConvertType::Convert(t);
-    return std::nullopt;
+    return ConvertType::Convert(t);    
 }
 
 template<uint32_t D, class T>

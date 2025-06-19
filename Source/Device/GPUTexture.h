@@ -5,7 +5,6 @@
 #ifdef MRAY_GPU_BACKEND_CUDA
     #include "CUDA/TextureCUDA.h"
 
-    // Alias the types
     using TextureBackingMemory = mray::cuda::TextureBackingMemoryCUDA;
 
     template<uint32_t DIM, class T>
@@ -17,7 +16,6 @@
 #elif defined MRAY_GPU_BACKEND_HIP
     #include "HIP/TextureHIP.h"
 
-    // Alias the types
     using TextureBackingMemory = mray::hip::TextureBackingMemoryHIP;
 
     template<uint32_t DIM, class T>
@@ -26,8 +24,17 @@
     template<uint32_t DIM, class T>
     using RWTextureRef = mray::hip::RWTextureRefHIP<DIM, T>;
 
-#elif defined GPU_BACKEND_HOST
-    #error Not yet!
+#elif defined MRAY_GPU_BACKEND_CPU
+    #include "CPU/TextureCPU.h"
+
+    using TextureBackingMemory = mray::host::TextureBackingMemoryCPU;
+
+    template<uint32_t DIM, class T>
+    using Texture = mray::host::TextureCPU<DIM, T>;
+
+    template<uint32_t DIM, class T>
+    using RWTextureRef = mray::host::RWTextureRefCPU<DIM, T>;
+
 #else
     #error Please define a GPU Backend!
 #endif

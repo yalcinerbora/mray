@@ -76,6 +76,14 @@ else()
                         "Please set MRAY_DEVICE_BACKEND to a valid backend")
 endif()
 
+# Secret Host backend and Device disabling
+# These are secret because CPU backend is not implemented
+# and disable option is to develop CPU-backend faster (to not waste compilation time)
+option(MRAY_BUILD_HOST_BACKEND "Compile CPU backend in addition to GPU backend" OFF)
+# Secrect Device disable option
+option(MRAY_DISABLE_DEVICE_BACKEND "Disable GPU backend" OFF)
+mark_as_advanced(MRAY_BUILD_HOST_BACKEND MRAY_DISABLE_DEVICE_BACKEND)
+
 option(MRAY_ENABLE_HW_ACCELERATION "Try to find, compile and and use HW accelration (i.e. this means OptiX for CUDA)" OFF)
 option(MRAY_BUILD_TESTS "Build Tests" ON)
 option(MRAY_BUILD_VISOR "Build Visor (Interactive Vulkan Viewer)" ON)
@@ -162,14 +170,8 @@ configure_file(${MRAY_SOURCE_DIRECTORY}/mray_cmake.h.in
                NO_SOURCE_PERMISSIONS
                @ONLY)
 target_include_directories(meta_compile_opts
-                           SYSTEM INTERFACE "${CMAKE_CURRENT_BINARY_DIR}/mray_gen")
-
-# After Everything is set
-# Include NVCC compile to ptx routine
-# Since Optix programs require precompiled *.ptx files
-if(MRAY_USE_OPTIX)
-    include("NVCCCompilePTX")
-endif()
+                           SYSTEM INTERFACE
+                           "${CMAKE_CURRENT_BINARY_DIR}/mray_gen")
 
 # Enable LTO / Device-LTO
 # Device LTO is slow so we disabled it.
@@ -204,10 +206,20 @@ if(MRAY_BUILD_VISOR)
     add_subdirectory(Visor)
 endif()
 
-# Generate Targets
+# Generate Tracers
 add_subdirectory(TracerKernelGen)
-add_subdirectory(TracerDevice)
-#add_subdirectory(TracerHost)
+# Skip device targets if disabled
+# It is for debugging reducing compile times
+# Thus, the parameter is inverted
+if(NOT MRAY_DISABLE_DEVICE_BACKEND)
+    add_subdirectory(TracerCUDA)
+    #add_subdirectory(TracerHIP)
+endif()
+
+# Enable Host target if requested
+if(MRAY_BUILD_HOST_BACKEND)
+    add_subdirectory(TracerCPU)
+endif()
 
 # Execs
 add_subdirectory(MRay)

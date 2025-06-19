@@ -506,8 +506,6 @@ inline TracerMock::TracerMock(bool pl)
                              MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
             MatAttributeInfo("emission", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
                              MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
-            MatAttributeInfo("ior", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
-                             MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA),
             MatAttributeInfo("hgPhase", MRayDataType<MR_FLOAT>(), IS_SCALAR,
                              MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA)
         },

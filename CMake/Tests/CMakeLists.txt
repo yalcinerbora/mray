@@ -13,6 +13,11 @@ add_library(mray::test_common ALIAS test_common)
 add_subdirectory(TCore)
 add_subdirectory(TSceneLoaderMRay)
 
-add_subdirectory(TTracerDevice)
-#add_subdirectory(TTracerHost)
+if(NOT MRAY_DISABLE_DEVICE_BACKEND)
+    add_subdirectory(TTracerCUDA)
+endif()
+
+if(MRAY_BUILD_HOST_BACKEND)
+    add_subdirectory(TTracerCPU)
+endif()
 

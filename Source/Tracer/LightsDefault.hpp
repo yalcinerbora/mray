@@ -24,7 +24,7 @@ SampleT<Vector3> LightPrim<P, SC>::SampleSolidAngle(RNGDispenser& rng,
     sampledDir.NormalizeSelf();
 
     Float NdL = surfaceSample.value.normal.Dot(sampledDir);
-    NdL = (isTwoSided) ? abs(NdL) : max(Float{0}, NdL);
+    NdL = (isTwoSided) ? abs(NdL) : std::max(Float{0}, NdL);
     // Get projected area
     Float pdf = (NdL == 0) ? Float{0.0} : surfaceSample.pdf / NdL;
     pdf *= distSqr;
@@ -50,7 +50,7 @@ Float LightPrim<P, SC>::PdfSolidAngle(const typename P::Hit& hit,
 
     Float pdf = primitive.PdfSurface(hit);
     Float NdL = surface.normal.Dot(-dir);
-    NdL = (isTwoSided) ? abs(NdL) : max(Float{0}, NdL);
+    NdL = (isTwoSided) ? abs(NdL) : std::max(Float{0}, NdL);
     // Get projected area
     pdf = (NdL == 0) ? Float{0} : pdf / NdL;
     pdf *= (distantPoint - surface.position).LengthSqr();

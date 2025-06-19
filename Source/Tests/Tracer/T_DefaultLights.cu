@@ -96,7 +96,6 @@ TransientData GenMatrix()
     return data;
 }
 
-template <class MetaLightArrayView>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCReadLights(MRAY_GRID_CONSTANT const MetaLightArrayView lightArrayView,
                   MRAY_GRID_CONSTANT const Span<const RandomNumber> dRandomNumbers)
@@ -120,7 +119,7 @@ void KCReadLights(MRAY_GRID_CONSTANT const MetaLightArrayView lightArrayView,
 
         SampleT<Vector3> sampleVec = light.SampleSolidAngle(rng, DistantPoint);
         Float pdfSolidAngle = light.PdfSolidAngle(Hit, DistantPoint, Dir);
-        uint32_t solidRNCount = light.SampleRayRNCount();
+        uint32_t solidRNCount = light.SampleSolidAngleRNCount();
         //
         SampleT<Ray> sampleRay = light.SampleRay(rng);
         Float pdfRay = light.PdfRay(TestRay);
@@ -285,16 +284,16 @@ TEST(DefaultLights, MetaLight)
     DeviceLocalMemory rnMem(*queue.Device());
     MemAlloc::AllocateMultiData(std::tie(dRandomNumbers), rnMem,
                                 {1024});
-
     //
     MetaLightArrayView lightView = lightList.Array();
-    queue.IssueSaturatingKernel<KCReadLights<MetaLightArrayView>>
+    queue.IssueSaturatingKernel<KCReadLights>
     (
         "KCReadLights",
         KernelIssueParams{.workCount = lightView.Size()},
         lightView,
         dRandomNumbers
     );
+    queue.Barrier().Wait();
 }
 
 TEST(DefaultLights, PrimLight_Triangle)
