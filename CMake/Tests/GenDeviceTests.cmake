@@ -1,7 +1,7 @@
 function(gen_device_test)
     # Parse Args
     set(options)
-    set(oneValueArgs NAME)
+    set(oneValueArgs NAME BACKEND)
     set(multiValueArgs)
 
     cmake_parse_arguments(GEN_DEVICE_TEST "${options}" "${oneValueArgs}"
@@ -27,7 +27,7 @@ function(gen_device_test)
     # I dunno why but global set did not work
     change_device_source_file_language(
         MACRO
-        ${MRAY_DEVICE_BACKEND}
+        ${GEN_DEVICE_TEST_BACKEND}
         SOURCE_FILES
         ${CURRENT_SOURCE_DIR}/T_Texture.cu
         ${CURRENT_SOURCE_DIR}/T_KernelCall.cu

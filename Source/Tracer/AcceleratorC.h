@@ -945,7 +945,8 @@ void AcceleratorGroupT<C, PG, B>::WriteInstanceKeysAndAABBsInternal(Span<AABB3> 
     if constexpr(PG::TransformLogic == LOCALLY_CONSTANT_TRANSFORM)
     {
         using namespace DeviceAlgorithms;
-        size_t tmSize = SegmentedTransformReduceTMSize<AABB3, PrimitiveKey>(concreteLeafRanges.size());
+        size_t tmSize = SegmentedTransformReduceTMSize<AABB3, PrimitiveKey>(concreteLeafRanges.size(),
+                                                                            queue);
         Span<uint32_t> dConcreteIndicesOfInstances;
         Span<AABB3> dConcreteAABBs;
         Span<uint32_t> dConcreteLeafOffsets;
@@ -1028,10 +1029,10 @@ void AcceleratorGroupT<C, PG, B>::WriteInstanceKeysAndAABBsInternal(Span<AABB3> 
             using namespace std::string_literals;
             static const auto KernelName = "KCCopyLocalAccelKeys-"s + std::string(C::TypeName());
 
-            queue.IssueSaturatingLambda
+            queue.IssueWorkLambda
             (
                 KernelName,
-                KernelIssueParams{.workCount = static_cast<uint32_t>(size)},
+                DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(size)},
                 KeyGeneratorFunctor(accelBatchId, static_cast<uint32_t>(wIOffset),
                                     dLocalKeyWriteRegion)
             );

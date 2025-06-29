@@ -4,50 +4,41 @@ namespace mray::host
 {
 
 template <uint32_t D, class T>
-RWTextureRefCPU<D, T>::RWTextureRefCPU()
+RWTextureRefCPU<D, T>::RWTextureRefCPU(Span<PaddedChannelType> data,
+                                       TextureExtent<D> dim)
+    : data(data)
+    , dim(dim)
 {}
-
-template <uint32_t D, class T>
-RWTextureRefCPU<D, T>::RWTextureRefCPU(RWTextureRefCPU&& other)
-{}
-
-template <uint32_t D, class T>
-RWTextureRefCPU<D, T>& RWTextureRefCPU<D, T>::operator=(RWTextureRefCPU&& other)
-{
-    assert(this != &other);
-    return *this;
-}
-
-template <uint32_t D, class T>
-RWTextureRefCPU<D, T>::~RWTextureRefCPU()
-{
-}
 
 template <uint32_t D, class T>
 RWTextureViewCPU<D, T> RWTextureRefCPU<D, T>::View() const
 {
-    return RWTextureViewCPU<D, T>();
+    return RWTextureViewCPU<D, T>(data, dim);
 }
 
 template<uint32_t D, class T>
 template<class QT>
-requires(std::is_same_v<QT, T>)
-TextureViewCPU<D, QT> TextureCPU_Normal<D, T>::View() const
+requires(!IsBlockCompressedPixel<T> && std::is_same_v<QT, T>)
+TextureViewCPU<D, QT> TextureCPU<D, T>::View() const
 {
     // Normalize integers requested bu view is created with the same type
     if(texParams.normIntegers)
         throw MRayError("Unable to create a view of texture. "
                         "View type must be \"Float\" (or vector equavilents) "
                         "for normalized integers");
-    return TextureViewCPU<D, QT>();
+    Span<const Byte> byteData(reinterpret_cast<const Byte*>(dataPtr),
+                              size / sizeof(PaddedChannelType));
+    static constexpr auto PixelEnum = static_cast<MRayPixelEnum>(PixelTypeToEnum::template Find<PaddedChannelType>);
+    return TextureViewCPU<D, QT>(byteData, &texParams,
+                                 MRayPixelTypeRT(MRayPixelType<PixelEnum>()));
 }
 
 template<uint32_t D, class T>
 template<class QT>
-requires(!std::is_same_v<QT, T> &&
-         (VectorTypeToChannels<T>() ==
-          VectorTypeToChannels<QT>()))
-TextureViewCPU<D, QT> TextureCPU_Normal<D, T>::View() const
+requires(!IsBlockCompressedPixel<T> &&
+         !std::is_same_v<QT, T> &&
+         (PixelTypeToChannels<T>() == PixelTypeToChannels<QT>()))
+TextureViewCPU<D, QT> TextureCPU<D, T>::View() const
 {
     constexpr bool IsFloatType = (std::is_same_v<QT, Float> ||
                                  std::is_same_v<QT, Vector<ChannelCount, Float>>);
@@ -56,7 +47,13 @@ TextureViewCPU<D, QT> TextureCPU_Normal<D, T>::View() const
                         "View type must be \"Float\" (or vector equavilents) "
                         "for normalized integers");
     else if(texParams.normCoordinates && IsFloatType)
-        return TextureViewCPU<D, QT>();
+    {
+        Span<const Byte> byteData(reinterpret_cast<const Byte*>(dataPtr),
+                                  size / sizeof(PaddedChannelType));
+        static constexpr auto PixelEnum = static_cast<MRayPixelEnum>(PixelTypeToEnum::template Find<PaddedChannelType>);
+        return TextureViewCPU<D, QT>(byteData, &texParams,
+                                     MRayPixelTypeRT(MRayPixelType<PixelEnum>()));
+    }
     else
     {
         // Now we have integer types and these will not be fetched
@@ -73,20 +70,12 @@ TextureViewCPU<D, QT> TextureCPU_Normal<D, T>::View() const
     }
 }
 
-template<class T>
+template<uint32_t D, class T>
 template<class QT>
-requires(!std::is_same_v<QT, T> &&
-         (BCTypeToChannels<T>() == VectorTypeToChannels<QT>()))
-TextureViewCPU<2, QT> TextureCPU_BC<T>::View() const
+requires(IsBlockCompressedPixel<T>)
+TextureViewCPU<D, QT> TextureCPU<D, T>::View() const
 {
-    constexpr bool IsFloatType = (std::is_same_v<QT, Float> ||
-                                  std::is_same_v<QT, Vector<ChannelCount, Float>>);
-    if(!IsFloatType)
-        throw MRayError("Unable to create a view of texture. "
-                        "View type must be \"Float\" (or vector equavilents) "
-                        "for block compressed textures (BC1-7)");
-    return TextureViewCPU<2, QT>();
-};
-
+    throw MRayError("CPU Device does not support block-compressed textures!");
+}
 
 }

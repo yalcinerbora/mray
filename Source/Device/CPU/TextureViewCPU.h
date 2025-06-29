@@ -4,6 +4,9 @@
 #include "Core/TypeFinder.h"
 #include "Core/Vector.h"
 #include "Core/Types.h"
+#include "Core/MRayDataType.h"
+#include "Core/GraphicsFunctions.h"
+
 #include "Device/GPUTypes.h"
 
 namespace mray::host
@@ -20,9 +23,24 @@ class TextureViewCPU
     using UV            = UVType<DIM>;
 
     private:
+    // Type erease data and params
+    Span<const Byte>                data;
+    const TextureInitParams<DIM>*   texParams;
+    MRayPixelTypeRT                 dt;
+
+    private:
+    template<uint32_t C, bool IsSigned, class PixelType>
+    MRAY_GPU T              Convert(const PixelType&) const;
+    MRAY_GPU T              ReadPixel(TextureExtent<DIM> ijk,
+                                      TextureExtent<DIM> mipSize,
+                                      Span<const Byte> mipData) const;
+    MRAY_GPU T              ReadInterpolatedPixel(UV uv, TextureExtent<DIM> mipSize,
+                                                  Span<const Byte> mipData) const;
 
     public:
-    MRAY_HOST               TextureViewCPU() {}
+    MRAY_HOST               TextureViewCPU(Span<const Byte> data,
+                                           const TextureInitParams<DIM>* texParams,
+                                           MRayPixelTypeRT dt);
     // Base Access
     MRAY_GPU T              operator()(UV uv) const;
     // Gradient Access
@@ -45,24 +63,27 @@ class RWTextureViewCPU
         public:
         // Texture channels
         static constexpr uint32_t Channels = VectorTypeToChannels<T>();
+        using PaddedChannelType = PaddedChannel<Channels, T>;
 
         private:
-        T&                  pixel;
+        PaddedChannelType&  pixel;
         // Constructor
-        MRAY_GPU            PixRef(T& pixel);
+        MRAY_GPU            PixRef(PaddedChannelType& pixel);
         public:
         MRAY_GPU PixRef&    operator=(const T&);
     };
     static constexpr uint32_t Channels = PixRef::Channels;
     using Type              = T;
-    using PaddedChannelType = T;
+    using PaddedChannelType = typename PixRef::PaddedChannelType;
 
     private:
-    Span<T>         pixels;
+    Span<PaddedChannelType> pixels;
+    TextureExtent<DIM>      dim;
 
     public:
     // Full Texture object access
-    MRAY_HOST       RWTextureViewCPU() {}
+    MRAY_HOST       RWTextureViewCPU(Span<PaddedChannelType> pixels,
+                                     TextureExtent<DIM> dim);
     // Write
     MRAY_GPU PixRef operator()(TextureExtent<DIM>);
     // Read
@@ -70,29 +91,240 @@ class RWTextureViewCPU
 };
 
 template<uint32_t D, class T>
+template<uint32_t C, bool IsSigned, class PixelType>
+MRAY_GPU
+T TextureViewCPU<D, T>::Convert(const PixelType& pixel) const
+{
+    using namespace Bit::NormConversion;
+    if constexpr(C == 1)
+    {
+        if constexpr(IsNormConvertibleCPU<PixelType>() &&
+                     std::is_same_v<T, Float>)
+        {
+            if constexpr(IsSigned)  return FromSNorm<T>(pixel);
+            else                    return FromUNorm<T>(pixel);
+        }
+        else return pixel;
+    }
+    // Mutli Channel norm conversion
+    else
+    {
+        if constexpr(IsNormConvertibleCPU<PixelType>() &&
+                     std::is_same_v<typename T::InnerType, Float>)
+        {
+            using InnerT = typename T::InnerType;
+
+            T result;
+            UNROLL_LOOP
+            for(uint32_t i = 0; i < C; i++)
+            {
+                if constexpr(IsSigned)  result[i] = FromSNorm<InnerT>(pixel[i]);
+                else                    result[i] = FromUNorm<InnerT>(pixel[i]);
+            }
+            return result;
+        }
+        else return pixel;
+    }
+}
+
+template<uint32_t D, class T>
+MRAY_GPU
+T TextureViewCPU<D, T>::ReadPixel(TextureExtent<D> ijk,
+                                  TextureExtent<D> mipSize,
+                                  Span<const Byte> mipData) const
+{
+    using VecXui = TextureExtent<D>;
+    switch(texParams->eResolve)
+    {
+        using enum MRayTextureEdgeResolveEnum;
+        case MR_CLAMP:
+        {
+            if constexpr(D == 1)
+                ijk = Math::Clamp(ijk, VecXui(0), mipSize);
+            else
+                ijk = ijk.Clamp(VecXui(0), mipSize);
+            break;
+        }
+        case MR_MIRROR:
+        {
+            VecXui dim = ijk / mipSize;
+            ijk = ijk % mipSize;
+
+            if constexpr(D == 1)
+            {
+                if((dim & 0x1) == 1) ijk = mipSize - ijk;
+            }
+            else
+            {
+                for(uint32_t i = 0; i < D; i++)
+                {
+                    if((dim[i] & 0x1) == 1) ijk[i] = mipSize[i] - ijk[i];
+                }
+            }
+            break;
+        }
+        case MR_WRAP:   ijk = ijk % mipSize; break;
+        default:        break;
+    }
+    //
+    uint32_t linearIndex = 0;
+    if constexpr(D == 1) linearIndex = ijk;
+    if constexpr(D == 2) linearIndex = (ijk[1] * mipSize[0] +
+                                        ijk[0]);
+    if constexpr(D == 3) linearIndex = (ijk[2] * mipSize[1] * mipSize[0] +
+                                        ijk[1] * mipSize[0] +
+                                        ijk[0]);
+
+    T pixResult = std::visit([&, this](auto&& pt) -> T
+    {
+        using EnumT = std::remove_cvref_t<decltype(pt)>;
+        static constexpr uint32_t OutC = VectorTypeToChannels<T>();
+        static constexpr uint32_t C = EnumT::ChannelCount;
+        static constexpr uint32_t IsSigned = EnumT::IsSigned;
+        static constexpr uint32_t IsBCPixel = EnumT::IsBCPixel;
+        using PixelType = typename EnumT::Type;
+        // Skip, stuff that do not get compiled
+        if constexpr(IsBCPixel || OutC != C) return T();
+        // Rest should be fine
+        else
+        {
+            const PixelType* pixels = reinterpret_cast<const PixelType*>(mipData.data());
+            return Convert<C, IsSigned, PixelType>(pixels[linearIndex]);
+        }
+    }, dt);
+    return pixResult;
+}
+
+template<uint32_t D, class T>
+MRAY_GPU
+T TextureViewCPU<D, T>::ReadInterpolatedPixel(UV uv, TextureExtent<D> mipSize,
+                                              Span<const Byte> mipData) const
+{
+    UV texel = uv * UV(mipSize) - UV(0.5);
+    std::array<Float, D> frac;
+    TextureExtent<D> ijkStart;
+    if constexpr(D != 1)
+    {
+        UNROLL_LOOP
+        for(uint32_t i = 0; i < D; i++)
+            ijkStart[i] = uint32_t(std::modf(texel[i], &frac[i]));
+    }
+    else ijkStart = TextureExtent<D>(std::modf(texel, &frac[0]));
+
+    // Fill a local buffer for interp
+    static constexpr uint32_t DATA_PER_LERP = (1u << (D + 1));
+    std::array<T, DATA_PER_LERP> pix;
+    UNROLL_LOOP
+    for(uint32_t k = 0; k < ((D >= 3) ? 2 : 0); k++)
+    UNROLL_LOOP
+    for(uint32_t j = 0; j < ((D >= 2) ? 2 : 0); j++)
+    UNROLL_LOOP
+    for(uint32_t i = 0; i < ((D >= 1) ? 2 : 0); i++)
+    {
+        TextureExtent<D> ijk = ijkStart;
+        if constexpr(D == 1)        ijk += i;
+        else if constexpr(D == 2)   ijk += TextureExtent<D>(i, j);
+        else                        ijk += TextureExtent<D>(i, j, k);
+        //
+        pix[(k << 2) + (j << 1) + k] = ReadPixel(ijk, mipSize, mipData);
+    }
+    // Lerp part
+    UNROLL_LOOP
+    for(uint32_t i = 0; i < D + 1; i++)
+    UNROLL_LOOP
+    for(uint32_t j = (1 << D); i > 0u; i >>= 1)
+        if constexpr(std::is_same_v<Float, T>)
+            pix[j * 2] = Math::Lerp(pix[j * 2], pix[j * 2 + 1], frac[i]);
+        else
+            pix[j * 2] = T::Lerp(pix[j * 2], pix[j * 2 + 1], frac[i]);
+    //
+    return pix[0];
+}
+
+template<uint32_t D, class T>
+MRAY_HOST
+TextureViewCPU<D, T>::TextureViewCPU(Span<const Byte> data,
+                                     const TextureInitParams<D>* tp,
+                                     MRayPixelTypeRT dt)
+    : data(data)
+    , texParams(tp)
+    , dt(dt)
+{}
+
+template<uint32_t D, class T>
 MRAY_GPU MRAY_GPU_INLINE
 T TextureViewCPU<D, T>::operator()(UV uv) const
 {
-    return T();
+    if(texParams->interp == MRayTextureInterpEnum::MR_LINEAR)
+    {
+        UV texel = uv * UV(texParams->size);
+        TextureExtent<D> ijk = TextureExtent<D>(texel);
+        return ReadPixel(ijk, texParams->size, data);
+    }
+    else return ReadInterpolatedPixel(uv, texParams->size, data);
 }
 
 template<uint32_t D, class T>
 MRAY_GPU MRAY_GPU_INLINE
 T TextureViewCPU<D, T>::operator()(UV uv, UV dpdx, UV dpdy) const
 {
-    return T();
+    // TODO: We ignore AF, change this later
+    dpdx *= UV(texParams->size);
+    dpdy *= UV(texParams->size);
+    Float maxLenSqr = std::max(dpdx.LengthSqr(), dpdy.LengthSqr());
+    Float mipLevel = Float(0.5) * std::log2(maxLenSqr);
+
+    return (*this)(uv, mipLevel);
 }
 
 template<uint32_t D, class T>
 MRAY_GPU MRAY_GPU_INLINE
 T TextureViewCPU<D, T>::operator()(UV uv, Float mipLevel) const
 {
-    return T();
+    if(texParams->interp == MRayTextureInterpEnum::MR_LINEAR)
+    {
+        uint32_t mipLevelInt = uint32_t(mipLevel);
+        uint32_t offset = Graphics::TextureMipPixelStart(texParams->size,
+                                                         mipLevelInt);
+        TextureExtent<D> size = Graphics::TextureMipSize(texParams->size, mipLevelInt);
+        auto mipData = data.subspan(offset);
+
+        UV texel = uv * UV(size);
+        TextureExtent<D> ijk = TextureExtent<D>(texel);
+        return ReadPixel(ijk, size, mipData);
+    }
+    else
+    {
+        auto FetchPix = [&, this](int32_t mip) -> T
+        {
+            using namespace Graphics;
+            uint32_t offset = TextureMipPixelStart(texParams->size, mip);
+            TextureExtent<D> size = Graphics::TextureMipSize(texParams->size, mip);
+            auto mipData = data.subspan(offset);
+            return ReadInterpolatedPixel(uv, size, mipData);
+        };
+
+        Float frac;
+        int32_t m0 = int32_t(std::modf(mipLevel, &frac));
+        int32_t m1 = int32_t(mipLevel + Float(0.5));
+        m0 = Math::Clamp(m1, 0, int32_t(texParams->mipCount));
+        m1 = Math::Clamp(m0, 0, int32_t(texParams->mipCount));
+
+        T pix0  = FetchPix(m0);
+        if(m0 == m1) return pix0;
+
+        T pix1 = FetchPix(m1);
+
+        if constexpr(std::is_same_v<Float, T>)
+            return Math::Lerp(pix0, pix1, frac);
+        else
+            return T::Lerp(pix0, pix1, frac);
+    }
 }
 
 template<uint32_t D, class T>
 MRAY_GPU MRAY_GPU_INLINE
-RWTextureViewCPU<D, T>::PixRef::PixRef(T& p)
+RWTextureViewCPU<D, T>::PixRef::PixRef(PaddedChannelType& p)
     : pixel(p)
 {}
 
@@ -101,23 +333,41 @@ MRAY_GPU MRAY_GPU_INLINE
 typename RWTextureViewCPU<D, T>::PixRef&
 RWTextureViewCPU<D, T>::PixRef::operator=(const T& val)
 {
-    pixel = val;
+    if constexpr(std::is_same_v<PaddedChannelType, T>)
+        pixel = val;
+    else
+        pixel = PaddedChannelType(val, 0);
+
     return *this;
 }
+
+template<uint32_t D, class T>
+MRAY_HOST inline
+RWTextureViewCPU<D, T>::RWTextureViewCPU(Span<PaddedChannelType> pixels,
+                                         TextureExtent<D> dim)
+    : pixels(pixels)
+    , dim(dim)
+{}
 
 template<uint32_t D, class T>
 MRAY_GPU MRAY_GPU_INLINE
 typename RWTextureViewCPU<D, T>::PixRef
 RWTextureViewCPU<D, T>::operator()(TextureExtent<D> ij)
 {
-    return PixRef(pixels[0]);
+    if constexpr(D == 1)        return PixRef(pixels[ij]);
+    else if constexpr(D == 2)   return PixRef(pixels[ij[1] * dim[0] + ij[0]]);
+    else                        return PixRef(pixels[ij[1] * dim[0] * dim[1] +
+                                              ij[1] * dim[0] + ij[0]]);
 }
 
 template<uint32_t D, class T>
 MRAY_GPU MRAY_GPU_INLINE
 T RWTextureViewCPU<D, T>::operator()(TextureExtent<D> ij) const
 {
-    return T();
+    if constexpr(D == 1)        return T(pixels[ij]);
+    else if constexpr(D == 2)   return T(pixels[ij[1] * dim[0] + ij[0]]);
+    else                        return T(pixels[ij[1] * dim[0] * dim[1] +
+                                                ij[1] * dim[0] + ij[0]]);
 }
 
 }

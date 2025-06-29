@@ -28,57 +28,10 @@ KernelCallParamsCUDA::KernelCallParamsCUDA()
 
 template<auto Kernel, class... Args>
 MRAY_HOST inline
-void GPUQueueCUDA::IssueKernel(std::string_view name,
-                               KernelIssueParams p,
-                               Args&&... fArgs) const
-{
-    static const auto annotation = GPUAnnotationCUDA(nvtxDomain, name);
-    const auto _ = annotation.AnnotateScope();
-
-    assert(p.workCount != 0);
-    using namespace CudaKernelCalls;
-    uint32_t blockCount = Math::DivideUp(p.workCount, StaticThreadPerBlock1D());
-    uint32_t blockSize = StaticThreadPerBlock1D();
-
-    Kernel<<<blockCount, blockSize, p.sharedMemSize, stream>>>
-    (
-        std::forward<Args>(fArgs)...
-    );
-    CUDA_KERNEL_CHECK();
-}
-
-template<class Lambda>
-MRAY_HOST inline
-void GPUQueueCUDA::IssueLambda(std::string_view name,
-                               KernelIssueParams p,
-                               //
-                               Lambda&& func) const
-{
-    static const auto annotation = GPUAnnotationCUDA(nvtxDomain, name);
-    const auto _ = annotation.AnnotateScope();
-
-    assert(p.workCount != 0);
-    static_assert(std::is_rvalue_reference_v<decltype(func)>,
-                  "Not passing Lambda as rvalue_reference. This kernel call "
-                  "would've been failed in runtime!");
-    using namespace CudaKernelCalls;
-    uint32_t blockCount = Math::DivideUp(p.workCount, StaticThreadPerBlock1D());
-    uint32_t blockSize = StaticThreadPerBlock1D();
-
-    KernelCallLambdaCUDA<Lambda>
-    <<<blockCount, blockSize, p.sharedMemSize, stream>>>
-    (
-        std::forward<Lambda>(func)
-    );
-    CUDA_KERNEL_CHECK();
-}
-
-template<auto Kernel, class... Args>
-MRAY_HOST inline
-void GPUQueueCUDA::IssueSaturatingKernel(std::string_view name,
-                                         KernelIssueParams p,
-                                         //
-                                         Args&&... fArgs) const
+void GPUQueueCUDA::IssueWorkKernel(std::string_view name,
+                                   DeviceWorkIssueParams p,
+                                   //
+                                   Args&&... fArgs) const
 {
     static const auto annotation = GPUAnnotationCUDA(nvtxDomain, name);
     const auto _ = annotation.AnnotateScope();
@@ -102,10 +55,10 @@ void GPUQueueCUDA::IssueSaturatingKernel(std::string_view name,
 
 template<class Lambda>
 MRAY_HOST inline
-void GPUQueueCUDA::IssueSaturatingLambda(std::string_view name,
-                                         KernelIssueParams p,
-                                         //
-                                         Lambda&& func) const
+void GPUQueueCUDA::IssueWorkLambda(std::string_view name,
+                                   DeviceWorkIssueParams p,
+                                   //
+                                   Lambda&& func) const
 {
     static const auto annotation = GPUAnnotationCUDA(nvtxDomain, name);
     const auto _ = annotation.AnnotateScope();
@@ -133,8 +86,8 @@ void GPUQueueCUDA::IssueSaturatingLambda(std::string_view name,
 
 template<auto Kernel, class... Args>
 MRAY_HOST inline
-void GPUQueueCUDA::IssueExactKernel(std::string_view name,
-                                    KernelExactIssueParams p,
+void GPUQueueCUDA::IssueBlockKernel(std::string_view name,
+                                    DeviceBlockIssueParams p,
                                     //
                                     Args&&... fArgs) const
 {
@@ -152,8 +105,8 @@ void GPUQueueCUDA::IssueExactKernel(std::string_view name,
 
 template<class Lambda, uint32_t Bounds>
 MRAY_HOST inline
-void GPUQueueCUDA::IssueExactLambda(std::string_view name,
-                                    KernelExactIssueParams p,
+void GPUQueueCUDA::IssueBlockLambda(std::string_view name,
+                                    DeviceBlockIssueParams p,
                                     //
                                     Lambda&& func) const
 {
@@ -176,49 +129,8 @@ void GPUQueueCUDA::IssueExactLambda(std::string_view name,
 
 template<auto Kernel, class... Args>
 MRAY_GPU inline
-void GPUQueueCUDA::DeviceIssueKernel(std::string_view name,
-                                     KernelIssueParams p,
-                                     Args&&... fArgs) const
-{
-    assert(p.workCount != 0);
-    using namespace CudaKernelCalls;
-    uint32_t blockCount = Math::DivideUp(p.workCount, StaticThreadPerBlock1D());
-    uint32_t blockSize = StaticThreadPerBlock1D();
-
-    Kernel<<<blockCount, blockSize, p.sharedMemSize, stream>>>
-    (
-        std::forward<Args>(fArgs)...
-    );
-    CUDA_KERNEL_CHECK();
-}
-
-template<class Lambda>
-MRAY_GPU inline
-void GPUQueueCUDA::DeviceIssueLambda(std::string_view name,
-                                     KernelIssueParams p,
-                                     //
-                                     Lambda&& func) const
-{
-    assert(p.workCount != 0);
-    static_assert(std::is_rvalue_reference_v<decltype(func)>,
-                  "Not passing Lambda as rvalue_reference. This kernel call "
-                  "would've been failed in runtime!");
-    using namespace CudaKernelCalls;
-    uint32_t blockCount = Math::DivideUp(p.workCount, StaticThreadPerBlock1D());
-    uint32_t blockSize = StaticThreadPerBlock1D();
-
-    KernelCallLambdaCUDA<Lambda>
-    <<<blockCount, blockSize, p.sharedMemSize, stream>>>
-    (
-        std::forward<Lambda>(func)
-    );
-    CUDA_KERNEL_CHECK();
-}
-
-template<auto Kernel, class... Args>
-MRAY_GPU inline
-void GPUQueueCUDA::DeviceIssueSaturatingKernel(std::string_view name,
-                                               KernelIssueParams p,
+void GPUQueueCUDA::DeviceIssueWorkKernel(std::string_view name,
+                                               DeviceWorkIssueParams p,
                                                //
                                                Args&&... fArgs) const
 {
@@ -241,8 +153,8 @@ void GPUQueueCUDA::DeviceIssueSaturatingKernel(std::string_view name,
 
 template<class Lambda>
 MRAY_GPU inline
-void GPUQueueCUDA::DeviceIssueSaturatingLambda(std::string_view name,
-                                               KernelIssueParams p,
+void GPUQueueCUDA::DeviceIssueWorkLambda(std::string_view name,
+                                               DeviceWorkIssueParams p,
                                                //
                                                Lambda&& func) const
 {
@@ -269,10 +181,10 @@ void GPUQueueCUDA::DeviceIssueSaturatingLambda(std::string_view name,
 
 template<auto Kernel, class... Args>
 MRAY_GPU inline
-void GPUQueueCUDA::DeviceIssueExactKernel(std::string_view name,
-                                          KernelExactIssueParams p,
-                                          //
-                                          Args&&... fArgs) const
+void GPUQueueCUDA::DeviceIssueBlockKernel(std::string_view name,
+                                            DeviceBlockIssueParams p,
+                                            //
+                                            Args&&... fArgs) const
 {
     assert(p.gridSize != 0);
     using namespace CudaKernelCalls;
@@ -285,8 +197,8 @@ void GPUQueueCUDA::DeviceIssueExactKernel(std::string_view name,
 
 template<class Lambda, uint32_t Bounds>
 MRAY_GPU inline
-void GPUQueueCUDA::DeviceIssueExactLambda(std::string_view name,
-                                          KernelExactIssueParams p,
+void GPUQueueCUDA::DeviceIssueBlockLambda(std::string_view name,
+                                          DeviceBlockIssueParams p,
                                           //
                                           Lambda&& func) const
 {

@@ -36,6 +36,8 @@ void NestedKernel(uint32_t* dOutBuffer,
     }
 }
 
+#ifndef MRAY_GPU_BACKEND_CPU
+
 MRAY_KERNEL
 void ParentKernel(uint32_t* dOutBuffer,
                   const uint32_t& dReferenceValue,
@@ -47,16 +49,18 @@ void ParentKernel(uint32_t* dOutBuffer,
     {
         const GPUQueue tailQueue(deviceSMCount, nullptr,
                                  DeviceQueueType::TAIL_LAUNCH);
-        tailQueue.DeviceIssueKernel<NestedKernel>
+        tailQueue.DeviceIssueWorkKernel<NestedKernel>
         (
             "GTest Nested Kernel",
-            KernelIssueParams{totalThreads, 0},
+            DeviceWorkIssueParams{totalThreads, 0},
             dOutBuffer,
             dReferenceValue,
             totalThreads
         );
     };
 }
+
+#endif
 
 // TODO: Deduplicate these
 void KernelCallFreeFunctionTester(const GPUSystem& system)
@@ -81,7 +85,6 @@ void KernelCallFreeFunctionTester(const GPUSystem& system)
     const uint32_t& dReference = dRefSpan.front();
     std::vector<uint32_t> hValues(totalThreads, HostInitValue);
 
-
     // Copy back to host and check
     auto CopyBackAndCheck = [&]()
     {
@@ -97,12 +100,12 @@ void KernelCallFreeFunctionTester(const GPUSystem& system)
     };
 
     // ====================== //
-    //      Basic Kernel      //
+    //       Work Kernel      //
     // ====================== //
-    queue.IssueKernel<HelloWorldKernel>
+    queue.IssueWorkKernel<HelloWorldKernel>
     (
-        "GTest Hello World Kernel",
-        KernelIssueParams{totalThreads, 0u},
+        "GTest Hello World Kernel Work",
+        DeviceWorkIssueParams{totalThreads, 0u},
         dWriteSpan,
         dReference,
         totalThreads
@@ -110,25 +113,12 @@ void KernelCallFreeFunctionTester(const GPUSystem& system)
     CopyBackAndCheck();
 
     // ====================== //
-    //    Saturating Kernel   //
+    //      Block Kernel      //
     // ====================== //
-    queue.IssueSaturatingKernel<HelloWorldKernel>
+    queue.IssueBlockKernel<HelloWorldKernel>
     (
-        "GTest Hello World Kernel Saturating",
-        KernelIssueParams{totalThreads, 0u},
-        dWriteSpan,
-        dReference,
-        totalThreads
-    );
-    CopyBackAndCheck();
-
-    // ====================== //
-    //      Exact Kernel      //
-    // ====================== //
-    queue.IssueExactKernel<HelloWorldKernel>
-    (
-        "GTest Hello World Kernel Exact",
-        KernelExactIssueParams{1u, totalThreads, 0u},
+        "GTest Hello World Kernel Block",
+        DeviceBlockIssueParams{1u, totalThreads, 0u},
         dWriteSpan,
         dReference,
         totalThreads
@@ -186,42 +176,33 @@ void KernelCallLambdaTester(const GPUSystem& system)
         }
     };
 
-    // ====================== //
-    //      Basic Kernel      //
-    // ====================== //
-    queue.IssueLambda
+    // ================ //
+    //    Work Kernel   //
+    // ================ //
+    queue.IssueWorkLambda
     (
-        "GTest Hello World Kernel Lambda",
-        KernelIssueParams{totalThreads, 0u},
-        std::move(LambdaKernel)
-    );
-    CopyBackAndCheck();
-
-    // ====================== //
-    //    Saturating Kernel   //
-    // ====================== //
-    queue.IssueSaturatingLambda
-    (
-        "GTest Hello World Kernel Saturating",
-        KernelIssueParams{totalThreads, 0u},
+        "GTest Hello World Kernel Work",
+        DeviceWorkIssueParams{totalThreads, 0u},
         std::move(LambdaKernel)
     );
     CopyBackAndCheck();
 
 
     // ====================== //
-    //      Exact Kernel      //
+    //      Block Kernel      //
     // ====================== //
-    queue.IssueExactLambda
+    queue.IssueBlockLambda
     (
-        "GTest Hello World Kernel Exact",
-        KernelExactIssueParams{1u, totalThreads, 0u},
+        "GTest Hello World Kernel Block",
+        DeviceBlockIssueParams{1u, totalThreads, 0u},
         std::move(LambdaKernel)
     );
     CopyBackAndCheck();
 
     queue.Barrier().Wait();
 }
+
+#ifndef MRAY_GPU_BACKEND_CPU
 
 void KernelCallNestedTester(const GPUSystem& system)
 {
@@ -259,27 +240,14 @@ void KernelCallNestedTester(const GPUSystem& system)
         system.Memset(dWriteSpan, 0x00);
     };
 
-    // ====================== //
-    //      Basic Kernel      //
-    // ====================== //
-    queue.IssueKernel<ParentKernel>
-    (
-        "GTest Parent Kernel",
-        KernelIssueParams{totalThreads, 0u},
-        dWriteSpan.data(),
-        dReference,
-        totalThreads,
-        system.BestDevice().SMCount()
-    );
-    CopyBackAndCheck();
 
     // ====================== //
     //    Saturating Kernel   //
     // ====================== //
-    queue.IssueSaturatingKernel<ParentKernel>
+    queue.IssueWorkKernel<ParentKernel>
     (
         "GTest Parent Kernel Saturating",
-        KernelIssueParams{totalThreads, 0u},
+        DeviceWorkIssueParams{totalThreads, 0u},
         dWriteSpan.data(),
         dReference,
         totalThreads,
@@ -288,12 +256,12 @@ void KernelCallNestedTester(const GPUSystem& system)
     CopyBackAndCheck();
 
     // ====================== //
-    //      Exact Kernel      //
+    //      Block Kernel      //
     // ====================== //
-    queue.IssueExactKernel<ParentKernel>
+    queue.IssueBlockKernel<ParentKernel>
     (
-        "GTest Parent Kernel Exact",
-        KernelExactIssueParams{1u, totalThreads, 0u},
+        "GTest Parent Kernel Block",
+        DeviceBlockIssueParams{1u, totalThreads, 0u},
         dWriteSpan.data(),
         dReference,
         totalThreads,
@@ -302,6 +270,8 @@ void KernelCallNestedTester(const GPUSystem& system)
     CopyBackAndCheck();
     queue.Barrier().Wait();
 }
+
+#endif
 
 TEST(GPUKernelCalls, FreeFunction)
 {
@@ -318,8 +288,12 @@ TEST(GPUKernelCalls, Lambda)
     KernelCallLambdaTester(system);
 }
 
-TEST(GPUKernelCalls, Nested)
-{
-    GPUSystem system;
-    KernelCallNestedTester(system);
-}
+#ifndef MRAY_GPU_BACKEND_CPU
+
+    TEST(GPUKernelCalls, Nested)
+    {
+        GPUSystem system;
+        KernelCallNestedTester(system);
+    }
+
+#endif

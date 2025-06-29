@@ -57,6 +57,9 @@ set(MRAY_MSVC_OPTIONS
     $<$<CONFIG:SanitizeR>:/Oy->
     $<$<CONFIG:SanitizeR>:/fsanitize=address>
 
+    # Large section tables (too many templates on CPU Device)
+    /bigobj
+
     # Debug Specific
     # CMAKE does not have this on debug build (in x64, this is ignored i think bu w/e)
     $<$<CONFIG:Debug>:/Oy->

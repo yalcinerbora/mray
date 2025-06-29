@@ -122,10 +122,10 @@ void TransformGroupMulti::CommitReservations()
 
     uint32_t workCount = static_cast<uint32_t>(hFlattenedRanges.size());
     using namespace std::literals;
-    queue.IssueSaturatingLambda
+    queue.IssueWorkLambda
     (
         "MultiTransform Construct Spans"sv,
-        KernelIssueParams{.workCount = workCount},
+        DeviceWorkIssueParams{.workCount = workCount},
         [=, this] MRAY_HYBRID(KernelCallParams kp)
         {
             for(uint32_t i = 0; i < workCount; i += kp.TotalSize())

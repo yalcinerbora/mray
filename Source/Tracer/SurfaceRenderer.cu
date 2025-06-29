@@ -434,7 +434,8 @@ RendererOutput SurfaceRenderer::DoRender()
     // Start the partitioner, again worst case work count
     // Get the K/V pair buffer
     uint32_t maxWorkCount = uint32_t(currentWorks.size() + currentLightWorks.size());
-    auto[dIndices, dKeys] = rayPartitioner.Start(rayCount, maxWorkCount, true);
+    auto[dIndices, dKeys] = rayPartitioner.Start(rayCount, maxWorkCount,
+                                                 processQueue, true);
 
     // Iota the indices
     DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
@@ -485,10 +486,10 @@ RendererOutput SurfaceRenderer::DoRender()
     using namespace std::string_view_literals;
     Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
     auto dHitKeysLocal = dHitKeys.subspan(0, rayCount);
-    processQueue.IssueSaturatingKernel<KCSetBoundaryWorkKeys>
+    processQueue.IssueWorkKernel<KCSetBoundaryWorkKeys>
     (
         "KCSetBoundaryWorkKeys"sv,
-        KernelIssueParams{.workCount = static_cast<uint32_t>(dHitKeysLocal.size())},
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dHitKeysLocal.size())},
         dHitKeysLocal,
         boundaryLightKeyPack
     );
@@ -503,10 +504,10 @@ RendererOutput SurfaceRenderer::DoRender()
     // Generate work keys from hit packs
     using namespace std::string_literals;
     static const std::string GenWorkKernelName = std::string(TypeName()) + "-KCGenerateWorkKeys"s;
-    processQueue.IssueSaturatingKernel<KCGenerateWorkKeys>
+    processQueue.IssueWorkKernel<KCGenerateWorkKeys>
     (
         GenWorkKernelName,
-        KernelIssueParams{.workCount = static_cast<uint32_t>(dHitKeysLocal.size())},
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dHitKeysLocal.size())},
         dKeys,
         ToConstSpan(dHitKeysLocal),
         workHasher
@@ -534,10 +535,10 @@ RendererOutput SurfaceRenderer::DoRender()
     if(curMode == SurfRDetail::Mode::AO)
     {
         Span<RayGMem> dVisibilityRays = dRayStateAO.dVisibilityRays;
-        processQueue.IssueSaturatingKernel<KCMemsetInvalidRays>
+        processQueue.IssueWorkKernel<KCMemsetInvalidRays>
         (
             "KCSetInvalidRays",
-            KernelIssueParams{.workCount = static_cast<uint32_t>(dVisibilityRays.size())},
+            DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dVisibilityRays.size())},
             dVisibilityRays
         );
     }
@@ -658,10 +659,10 @@ RendererOutput SurfaceRenderer::DoRender()
             );
 
             // Write either one or zero
-            processQueue.IssueSaturatingKernel<KCIsVisibleToSpectrum>
+            processQueue.IssueWorkKernel<KCIsVisibleToSpectrum>
             (
                 "KCIsVisibleToSpectrum",
-                KernelIssueParams{.workCount = static_cast<uint32_t>(dValidIndices.size())},
+                DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dValidIndices.size())},
                 dRayStateAO.dOutputData,
                 ToConstSpan(dIsVisibleBitSpan),
                 dValidIndices

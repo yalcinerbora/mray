@@ -81,8 +81,7 @@ MRAY_KERNEL void KCAccessFirstTriangle(Span<uint8_t> dIsValid,
         using Int = PrimitiveKey::Type;
         Int index = primKeys[i].FetchIndexPortion();
 
-        uint8_t isValid = true;
-
+        bool isValid = true;
         // Index offsets are internally handled by the primitive
         Vector3ui indicesReg = soa.indexList[index];
         isValid &= (soa.indexList[index] == (indices[0] + i * TRI_VERTEX_COUNT));
@@ -108,7 +107,7 @@ MRAY_KERNEL void KCAccessFirstTriangle(Span<uint8_t> dIsValid,
         isValid &= (uv1 == uvs[1]);
         isValid &= (uv2 == uvs[2]);
 
-        dIsValid[i] = isValid;
+        dIsValid[i] = isValid ? uint8_t(0) : uint8_t(1);
     }
 }
 
@@ -213,10 +212,10 @@ TEST(DefaultTriangle, Load)
     queue.MemsetAsync(dPrimKeys, 0x00);
 
     using namespace std::literals;
-    queue.IssueSaturatingKernel<KCAccessFirstTriangle>
+    queue.IssueWorkKernel<KCAccessFirstTriangle>
     (
         "GTest CheckDefaultTri"sv,
-        KernelIssueParams{.workCount = 1},
+        DeviceWorkIssueParams{.workCount = 1},
         //
         dIsValid,
         dPrimKeys,
@@ -312,10 +311,10 @@ TEST(DefaultTriangle, LoadMulti)
     queue.MemcpyAsync(dPrimKeys, hPrimKeySpan);
 
     using namespace std::literals;
-    queue.IssueSaturatingKernel<KCAccessFirstTriangle>
+    queue.IssueWorkKernel<KCAccessFirstTriangle>
     (
         "GTest CheckDefaultTri"sv,
-        KernelIssueParams{.workCount = TRI_COUNT},
+        DeviceWorkIssueParams{.workCount = TRI_COUNT},
         //
         dIsValid,
         dPrimKeys,

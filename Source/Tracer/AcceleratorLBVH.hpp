@@ -94,7 +94,7 @@ uint32_t TraverseLBVH(BitStack& bitStack,
             bitStack.Ascend();
         }
     }
-    return std::distance(nodesPtr, currentNode);
+    return uint32_t(std::distance(nodesPtr, currentNode));
 }
 
 MRAY_HYBRID MRAY_GPU_INLINE
@@ -150,7 +150,7 @@ template<uint32_t SBits, uint32_t DBits>
 MRAY_HYBRID MRAY_GPU_INLINE
 uint32_t BitStack::CompressState() const
 {
-    return Bit::Compose<SBits, DBits>(stack, depth);
+    return uint32_t(Bit::Compose<SBits, DBits>(stack, depth));
 }
 
 template<PrimitiveGroupC PG, TransformGroupC TG>
@@ -425,10 +425,10 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
     );
     using namespace std::string_literals;
     static const auto KernelName = "KCGeneratePrimitiveKeys-"s + std::string(TypeName());
-    queue.IssueExactKernel<KCGeneratePrimitiveKeys>
+    queue.IssueBlockKernel<KCGeneratePrimitiveKeys>
     (
         KernelName,
-        KernelExactIssueParams
+        DeviceBlockIssueParams
         {
             .gridSize = blockCount,
             .blockSize = StaticThreadPerBlock1D()
@@ -550,9 +550,9 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
     std::array<Span<uint32_t>, 2> dIndices;
     std::array<Span<uint64_t>, 2> dMortonCodes;
     //
-    size_t segTRMemSize = SegmentedTransformReduceTMSize<AABB3, PrimitiveKey>(processedAccelCount);
+    size_t segTRMemSize = SegmentedTransformReduceTMSize<AABB3, PrimitiveKey>(processedAccelCount, queue);
     size_t segSortTMSize = SegmentedRadixSortTMSize<true, uint64_t, uint32_t>(totalLeafCount,
-                                                                              processedAccelCount);
+                                                                              processedAccelCount, queue);
     size_t tempMemSize = std::max(segTRMemSize, segSortTMSize);
     // For simplicity we are allocating twice here
     // So we can repurpose
@@ -631,10 +631,10 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
             reinterpret_cast<const void*>(KernelName),
             TPB, 0
         );
-        queue.IssueExactKernel<KernelName>
+        queue.IssueBlockKernel<KernelName>
         (
             "KCGeneratePrimAABBs",
-            KernelExactIssueParams
+            DeviceBlockIssueParams
             {
                 .gridSize = blockCount,
                 .blockSize = TPB
@@ -679,10 +679,10 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
             reinterpret_cast<const void*>(KernelName),
             TPB, 0
         );
-        queue.IssueExactKernel<KernelName>
+        queue.IssueBlockKernel<KernelName>
         (
             "KCGenPrimCenters",
-            KernelExactIssueParams
+            DeviceBlockIssueParams
             {
                 .gridSize = blockCount,
                 .blockSize = TPB
@@ -706,10 +706,10 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
         reinterpret_cast<const void*>(&KCGenMortonCode),
         TPB, 0
     );
-    queue.IssueExactKernel<KCGenMortonCode>
+    queue.IssueBlockKernel<KCGenMortonCode>
     (
         "KCGenMortonCodes",
-        KernelExactIssueParams
+        DeviceBlockIssueParams
         {
             .gridSize = blockCount,
             .blockSize = TPB
@@ -749,10 +749,10 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
         reinterpret_cast<const void*>(&KCConstructLBVHInternalNodes),
         TPB, 0
     );
-    queue.IssueExactKernel<KCConstructLBVHInternalNodes>
+    queue.IssueBlockKernel<KCConstructLBVHInternalNodes>
     (
         "KCConstructLBVHInternalNodes",
-        KernelExactIssueParams
+        DeviceBlockIssueParams
         {
             .gridSize = blockCount,
             .blockSize = TPB
@@ -777,10 +777,10 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
         reinterpret_cast<const void*>(&KCUnionLBVHBoundingBoxes),
         TPB, 0
     );
-    queue.IssueExactKernel<KCUnionLBVHBoundingBoxes>
+    queue.IssueBlockKernel<KCUnionLBVHBoundingBoxes>
     (
         "KCUnionLBVHBoundingBoxes",
-        KernelExactIssueParams
+        DeviceBlockIssueParams
         {
             .gridSize = blockCount,
             .blockSize = TPB

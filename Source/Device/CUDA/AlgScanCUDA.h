@@ -80,7 +80,7 @@ void KCInclusiveSegmentedScan(Span<T> dOut,
 
 template <class T>
 MRAY_HOST
-size_t ExclusiveScanTMSize(size_t elementCount)
+size_t ExclusiveScanTMSize(size_t elementCount, const GPUQueueCUDA& q)
 {
     using namespace cub;
     T* dOut = nullptr;
@@ -89,7 +89,8 @@ size_t ExclusiveScanTMSize(size_t elementCount)
     size_t result;
     CUDA_CHECK(DeviceScan::ExclusiveScan(dTM, result, dIn, dOut,
                                          [] MRAY_HYBRID(T, T)->T{return T{};},
-                                         T{}, static_cast<int>(elementCount)));
+                                         T{}, static_cast<int>(elementCount),
+                                         ToHandleCUDA(q)));
     return result;
 }
 
@@ -112,10 +113,10 @@ void InclusiveSegmentedScan(Span<T> dScannedValues,
     );
 
     uint32_t totalBlocks = static_cast<uint32_t>(dValues.size() / segmentSize);
-    queue.IssueExactKernel<KCInclusiveSegmentedScan<T, BinaryOp>>
+    queue.IssueBlockKernel<KCInclusiveSegmentedScan<T, BinaryOp>>
     (
         "KCInclusiveSegmentedScan"sv,
-        KernelExactIssueParams{.gridSize = gridSize, .blockSize = TPB},
+        DeviceBlockIssueParams{.gridSize = gridSize, .blockSize = TPB},
         //
         dScannedValues,
         dValues,

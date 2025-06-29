@@ -268,10 +268,10 @@ void PrimGroupTriangle::Finalize(const GPUQueue& queue)
         0
     );
     using namespace std::string_view_literals;
-    queue.IssueExactKernel<KCAdjustIndices>
+    queue.IssueBlockKernel<KCAdjustIndices>
     (
         "KCAdjustIndices"sv,
-        KernelExactIssueParams
+        DeviceBlockIssueParams
         {
             .gridSize = blockCount,
             .blockSize = StaticThreadPerBlock1D()
@@ -338,10 +338,10 @@ void PrimGroupTriangle::ApplyTransformations(const std::vector<PrimBatchKey>& pr
     );
     using namespace std::string_view_literals;
     static constexpr uint32_t BLOCK_PER_BATCH = 128;
-    queue.IssueExactKernel<KCApplyTransformsTriangle>
+    queue.IssueBlockKernel<KCApplyTransformsTriangle>
     (
         "KCApplyTransformationsTriangle"sv,
-        KernelExactIssueParams
+        DeviceBlockIssueParams
         {
             .gridSize = blockCount,
             .blockSize = StaticThreadPerBlock1D()
@@ -532,10 +532,10 @@ void PrimGroupSkinnedTriangle::Finalize(const GPUQueue& queue)
         0
     );
     using namespace std::string_view_literals;
-    queue.IssueExactKernel<KCAdjustIndices>
+    queue.IssueBlockKernel<KCAdjustIndices>
     (
         "KCAdjustIndices"sv,
-        KernelExactIssueParams
+        DeviceBlockIssueParams
         {
             .gridSize = blockCount,
             .blockSize = StaticThreadPerBlock1D()

@@ -369,10 +369,10 @@ void MetaLightArrayT<TLT...>::AddBatch(const LightGroup& lg, const TransformGrou
     using This = MetaLightArrayT<TLT...>;
     static constexpr auto KernelName = KCConstructMetaLights<This, LightGroup, TransformGroup>;
     using namespace std::literals;
-    queue.IssueSaturatingKernel<KernelName>
+    queue.IssueWorkKernel<KernelName>
     (
         "KCConstructMetaLights"sv,
-        KernelIssueParams{.workCount = lightCount},
+        DeviceWorkIssueParams{.workCount = lightCount},
         //
         dMetaPrims,
         dMetaTContexts,

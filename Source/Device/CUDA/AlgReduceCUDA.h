@@ -13,7 +13,7 @@ namespace mray::cuda::algorithms
 
 template <class T>
 MRAY_HOST inline
-size_t ReduceTMSize(size_t elementCount)
+size_t ReduceTMSize(size_t elementCount, const GPUQueueCUDA& q)
 {
     using namespace cub;
 
@@ -23,13 +23,14 @@ size_t ReduceTMSize(size_t elementCount)
     size_t result;
     CUDA_CHECK(DeviceReduce::Reduce(dTM, result, dIn, dOut,
                                     static_cast<int>(elementCount),
-                                    [] MRAY_HYBRID(T, T)->T{ return T{}; }, T{}));
+                                    [] MRAY_HYBRID(T, T)->T{ return T{}; }, T{},
+                                    ToHandleCUDA(q)));
     return result;
 }
 
 template <class OutT, class InT>
 MRAY_HOST inline
-size_t TransformReduceTMSize(size_t elementCount)
+size_t TransformReduceTMSize(size_t elementCount, const GPUQueueCUDA& q)
 {
     using namespace cub;
 
@@ -42,13 +43,13 @@ size_t TransformReduceTMSize(size_t elementCount)
     CUDA_CHECK(DeviceReduce::Reduce(dTM, result, dIn, dOut,
                                     static_cast<int>(elementCount),
                                     [] MRAY_HYBRID(OutT, OutT)-> OutT { return OutT{}; },
-                                    OutT{}));
+                                    OutT{}, ToHandleCUDA(q)));
     return result;
 }
 
 template <class OutT, class InT>
 MRAY_HOST inline
-size_t SegmentedTransformReduceTMSize(size_t numSegments)
+size_t SegmentedTransformReduceTMSize(size_t numSegments, const GPUQueueCUDA& q)
 {
     using namespace cub;
     auto TFunc = [] MRAY_HYBRID(InT) -> OutT{ return OutT{}; };
@@ -64,7 +65,7 @@ size_t SegmentedTransformReduceTMSize(size_t numSegments)
                                              static_cast<int>(numSegments),
                                              dStartOffsets, dEndOffsets,
                                              [] MRAY_HYBRID(OutT, OutT)-> OutT { return OutT{}; },
-                                             OutT{}));
+                                             OutT{}, ToHandleCUDA(q)));
     return result;
 }
 

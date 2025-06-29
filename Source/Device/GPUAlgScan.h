@@ -18,6 +18,14 @@
         inline namespace DeviceSpecific{ using namespace ::mray::hip::algorithms; }
     }
 
+#elif defined MRAY_GPU_BACKEND_CPU
+    #include "CPU/AlgScanCPU.h"
+
+    namespace DeviceAlgorithms
+    {
+        inline namespace DeviceSpecific{ using namespace ::mray::host::algorithms; }
+    }
+
 #else
     #error Please define a GPU Backend!
 #endif

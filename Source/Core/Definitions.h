@@ -62,7 +62,12 @@
     #define MRAY_HYBRID
     #define MRAY_GPU
     #define MRAY_HOST
-    #define MRAY_KERNEL
+
+    #ifdef MRAY_WINDOWS
+        #define MRAY_KERNEL __forceinline
+    #else
+        #define MRAY_KERNEL inline
+    #endif
 
     #define NO_DISCARD [[nodiscard]]
 

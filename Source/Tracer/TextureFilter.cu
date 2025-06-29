@@ -653,10 +653,10 @@ void SetImagePixelsIndirect(// Output
     assert(dValues.size() == dFilterWeights.size());
     assert(dFilterWeights.size() == dImgCoords.size());
     using namespace std::string_view_literals;
-    queue.IssueSaturatingKernel<KCSetImagePixelsIndirect>
+    queue.IssueWorkKernel<KCSetImagePixelsIndirect>
     (
         "KCSetImagePixelsIndirect",
-        KernelIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
         img,
         dIndices,
         dValues,
@@ -680,10 +680,10 @@ void SetImagePixelsIndirectAtomic(// Output
     assert(dValues.size() == dFilterWeights.size());
     assert(dFilterWeights.size() == dImgCoords.size());
     using namespace std::string_view_literals;
-    queue.IssueSaturatingKernel<KCSetImagePixelsIndirectAtomic>
+    queue.IssueWorkKernel<KCSetImagePixelsIndirectAtomic>
     (
         "KCSetImagePixelsIndirectAtomic",
-        KernelIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
         img,
         dIndices,
         dValues,
@@ -706,10 +706,10 @@ void SetImagePixels(// Output
     assert(dValues.size() == dFilterWeights.size());
     assert(dFilterWeights.size() == dImgCoords.size());
     using namespace std::string_view_literals;
-    queue.IssueSaturatingKernel<KCSetImagePixels>
+    queue.IssueWorkKernel<KCSetImagePixels>
     (
         "KCSetImagePixels",
-        KernelIssueParams{.workCount = static_cast<uint32_t>(dValues.size())},
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dValues.size())},
         img,
         dValues,
         dFilterWeights,
@@ -750,13 +750,13 @@ void ReconFilterGenericRGB(// Output
     Vector2i maxPixels = img.Extent() + Vector2i(wh);
     uint32_t maxPartitionCount = static_cast<uint32_t>(maxPixels.Multiply());
 
-    auto [dIndices, dKeys] = partitioner.Start(totalPPS, maxPartitionCount, false);
+    auto [dIndices, dKeys] = partitioner.Start(totalPPS, maxPartitionCount, queue, false);
 
     using namespace std::string_view_literals;
-    queue.IssueSaturatingKernel<KCExpandSamplesToPixels>
+    queue.IssueWorkKernel<KCExpandSamplesToPixels>
     (
         "KCExpandSamplesToPixels"sv,
-        KernelIssueParams{.workCount = elementCount},
+        DeviceWorkIssueParams{.workCount = elementCount},
         // Outputs
         dKeys,
         dIndices,
@@ -820,10 +820,10 @@ void ReconFilterGenericRGB(// Output
             reinterpret_cast<const void*>(Kernel),
             StaticThreadPerBlock1D(), 0
         );
-        queue.IssueExactKernel<Kernel>
+        queue.IssueBlockKernel<Kernel>
         (
             Name,
-            KernelExactIssueParams
+            DeviceBlockIssueParams
             {
                 .gridSize = blockCount,
                 .blockSize = StaticThreadPerBlock1D()
@@ -878,10 +878,10 @@ void ReconFilterGenericRGBAtomic(// Output
                                  const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
-    queue.IssueSaturatingKernel<KCFilterToImgAtomicRGB<Filter>>
+    queue.IssueWorkKernel<KCFilterToImgAtomicRGB<Filter>>
     (
         "KCFilterToImgAtomicRGB"sv,
-        KernelIssueParams{.workCount = static_cast<uint32_t>(dValues.size())},
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dValues.size())},
         //
         img,
         //
@@ -1025,10 +1025,10 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
     {
         uint32_t BlockPerTexture = std::max(1u, BLOCK_PER_TEXTURE >> 1);
         using namespace std::string_view_literals;
-        queue.IssueExactKernel<Kernel>
+        queue.IssueBlockKernel<Kernel>
         (
             "KCGenerateMipmaps"sv,
-            KernelExactIssueParams
+            DeviceBlockIssueParams
             {
                 .gridSize = blockCount,
                 .blockSize = THREAD_PER_BLOCK
@@ -1084,10 +1084,10 @@ void ClampImageFromBufferGeneric(// Output
     }, surf);
 
     using namespace std::string_view_literals;
-    queue.IssueExactKernel<Kernel>
+    queue.IssueBlockKernel<Kernel>
     (
         "KCClampImage"sv,
-        KernelExactIssueParams
+        DeviceBlockIssueParams
         {
             .gridSize = blockCount,
             .blockSize = THREAD_PER_BLOCK

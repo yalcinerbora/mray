@@ -220,10 +220,10 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
     );
     using namespace std::string_literals;
     static const auto KernelName = "KCGeneratePrimitiveKeys-"s + std::string(TypeName());
-    queue.IssueExactKernel<KCGeneratePrimitiveKeys>
+    queue.IssueBlockKernel<KCGeneratePrimitiveKeys>
     (
         KernelName,
-        KernelExactIssueParams
+        DeviceBlockIssueParams
         {
             .gridSize = blockCount,
             .blockSize = StaticThreadPerBlock1D()

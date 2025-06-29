@@ -13,7 +13,7 @@ template <class T>
 struct Adder
 {
     MRAY_HYBRID MRAY_CGPU_INLINE
-    T operator()(const T& l, const T& r)
+    T operator()(const T& l, const T& r) const
     {
         return r + l;
     }
@@ -22,8 +22,9 @@ struct Adder
 template<class Value>
 void ReduceTest(const GPUSystem& system)
 {
+    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
     static constexpr size_t ElementCount = 1'000;
-    size_t tempMemSize = DeviceAlgorithms::ReduceTMSize<Value>(ElementCount);
+    size_t tempMemSize = DeviceAlgorithms::ReduceTMSize<Value>(ElementCount, queue);
     DeviceMemory mem({&system.BestDevice()}, 1_MiB, 8_MiB);
 
     Span<Value> dInputs;
@@ -35,7 +36,6 @@ void ReduceTest(const GPUSystem& system)
     std::vector<Value> hInputs(ElementCount, Value(0));
     std::iota(hInputs.begin(), hInputs.end(), Value(0));
 
-    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
     queue.MemcpyAsync(dInputs, Span<const Value>(hInputs.begin(), hInputs.end()));
 
     DeviceAlgorithms::Reduce(Span<Value, 1>(dOutput), dTempMemory,

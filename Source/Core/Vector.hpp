@@ -582,7 +582,7 @@ constexpr Vector<N, T> Vector<N, T>::Clamp(const Vector& minVal, const Vector& m
     UNROLL_LOOP
     for(int i = 0; i < N; i++)
     {
-        v[i] = min(max(minVal[i], vector[i]), maxVal[i]);
+        v[i] = std::min(std::max(minVal[i], vector[i]), maxVal[i]);
     }
     return v;
 }

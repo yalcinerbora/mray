@@ -34,13 +34,13 @@ struct KernelAttributes
     size_t  staticSharedMemorySize;
 };
 
-struct KernelIssueParams
+struct DeviceWorkIssueParams
 {
     uint32_t workCount;
     uint32_t sharedMemSize = 0;
 };
 
-struct KernelExactIssueParams
+struct DeviceBlockIssueParams
 {
     uint32_t gridSize;
     uint32_t blockSize;
@@ -118,6 +118,15 @@ constexpr uint32_t BCTypeToChannels()
     }
     else static_assert(std::is_same_v<T, PixelBC1>,
                        "Unknown Block Compressed Format!");
+}
+
+template <class T>
+constexpr uint32_t PixelTypeToChannels()
+{
+    if constexpr(IsBlockCompressedPixel<T>)
+        return BCTypeToChannels<T>();
+    else
+        return VectorTypeToChannels<T>();
 }
 
 // Texture initialization parameters

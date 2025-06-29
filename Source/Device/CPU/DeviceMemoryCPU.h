@@ -25,6 +25,9 @@ TODO: should we interface these?
 namespace mray::host
 {
 
+void*   AlignedAllocate(size_t allocSize, size_t alignment);
+void    AlignedFree(void* ptr, size_t allocSize, size_t alignment);
+
 class GPUDeviceCPU;
 class GPUSystemCPU;
 class GPUQueueCPU;
@@ -144,30 +147,14 @@ class HostLocalAlignedMemoryCPU
 // Automatic multi-device seperation (round-robin style) etc.
 class DeviceMemoryCPU
 {
-    struct Allocations
-    {
-        int                             deviceId;
-        size_t                          allocSize;
-    };
-    using VARanges = Pair<void*, size_t>;
-
-
     private:
-    std::vector<int>            deviceIds;
-    std::vector<Allocations>    allocs;
-    std::vector<VARanges>       vaRanges;
-
-    size_t                      curDeviceIndex = 0;
-    size_t                      allocationGranularity;
-    size_t                      reserveGranularity;
-    size_t                      reservedSize;
+    std::vector<const GPUDeviceCPU*>  devices;
 
     void*                       mPtr;
+    size_t                      allocationGranularity;
+    size_t                      reserveGranularity;
     size_t                      allocSize;
     bool                        neverDecrease = false;
-
-    size_t                      FindCommonGranularity() const;
-    size_t                      NextDeviceIndex();
 
     public:
     // Constructors & Destructor

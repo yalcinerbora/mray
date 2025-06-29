@@ -151,10 +151,10 @@ void RNGGroupIndependent::GenerateNumbers(// Output
     uint32_t dimensionCount = dimensionRange[1] - dimensionRange[0];
     uint32_t localGenCount = currentRange[1] - currentRange[0];
     using namespace std::string_view_literals;
-    queue.IssueSaturatingKernel<KCGenRandomNumbersPCG32>
+    queue.IssueWorkKernel<KCGenRandomNumbersPCG32>
     (
         "KCGenRandomNumbersPCG32"sv,
-        KernelIssueParams{.workCount = localGenCount},
+        DeviceWorkIssueParams{.workCount = localGenCount},
         //
         dNumbersOut,
         dMainStates.subspan(currentRange[0], localGenCount),
@@ -177,10 +177,10 @@ void RNGGroupIndependent::GenerateNumbersIndirect(// Output
     uint32_t localGenCount = currentRange[1] - currentRange[0];
     uint32_t usedGenCount = static_cast<uint32_t>(dIndices.size());
     using namespace std::string_view_literals;
-    queue.IssueSaturatingKernel<KCGenRandomNumbersPCG32Indirect>
+    queue.IssueWorkKernel<KCGenRandomNumbersPCG32Indirect>
     (
         "KCGenRandomNumbersPCG32Indirect"sv,
-        KernelIssueParams{.workCount = usedGenCount},
+        DeviceWorkIssueParams{.workCount = usedGenCount},
         //
         dNumbersOut,
         dMainStates.subspan(currentRange[0], localGenCount),
@@ -203,10 +203,10 @@ void RNGGroupIndependent::GenerateNumbersIndirect(// Output
     // so we disregard range, and give single random numbers
     uint32_t localGenCount = currentRange[1] - currentRange[0];
     using namespace std::string_view_literals;
-    queue.IssueSaturatingKernel<KCGenRandomNumbersPCG32Indirect>
+    queue.IssueWorkKernel<KCGenRandomNumbersPCG32Indirect>
         (
             "KCGenRandomNumbersPCG32Indirect"sv,
-            KernelIssueParams{.workCount = localGenCount},
+            DeviceWorkIssueParams{.workCount = localGenCount},
             //
             dNumbersOut,
             dMainStates.subspan(currentRange[0], localGenCount),

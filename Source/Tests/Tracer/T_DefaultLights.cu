@@ -286,10 +286,10 @@ TEST(DefaultLights, MetaLight)
                                 {1024});
     //
     MetaLightArrayView lightView = lightList.Array();
-    queue.IssueSaturatingKernel<KCReadLights>
+    queue.IssueWorkKernel<KCReadLights>
     (
         "KCReadLights",
-        KernelIssueParams{.workCount = lightView.Size()},
+        DeviceWorkIssueParams{.workCount = lightView.Size()},
         lightView,
         dRandomNumbers
     );

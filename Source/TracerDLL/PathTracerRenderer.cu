@@ -83,7 +83,7 @@ static void KCAccumulateShadowRays(MRAY_GRID_CONSTANT const Span<Spectrum> dRadi
         using enum PathTraceRDetail::RayType;
         bool isShadowRay = (dataPack.type == SHADOW_RAY);
         // +2 is correct here, we did not increment the depth yet
-        bool inDepthLimit = (dataPack.depth + 2 <= rrRange[1]);
+        bool inDepthLimit = ((dataPack.depth + 2u) <= rrRange[1]);
         if(inDepthLimit && isShadowRay && dIsVisibleBuffer[i])
             dRadianceOut[i] += dShadowRayRadiance[i];
     }
@@ -344,10 +344,10 @@ PathTracerRenderer::ReloadPaths(Span<const RayIndex> dIndices,
             tilePixIndex += fillRayCount;
 
             // Initialize the state of new rays
-            processQueue.IssueSaturatingKernel<KCInitPathState>
+            processQueue.IssueWorkKernel<KCInitPathState>
             (
                 "KCInitPathState",
-                KernelIssueParams{.workCount = fillRayCount},
+                DeviceWorkIssueParams{.workCount = fillRayCount},
                 dRayState,
                 dFilledRayIndices
             );
@@ -358,10 +358,10 @@ PathTracerRenderer::ReloadPaths(Span<const RayIndex> dIndices,
             uint32_t unusedRays = deadRayCount - fillRayCount;
             auto dUnusedIndices = dDeadRayIndices.subspan(fillRayCount, unusedRays);
             // Fill the remaining values
-            processQueue.IssueSaturatingKernel<KCWriteInvalidRays>
+            processQueue.IssueWorkKernel<KCWriteInvalidRays>
             (
                 "KCWriteInvalidRays",
-                KernelIssueParams{.workCount = unusedRays},
+                DeviceWorkIssueParams{.workCount = unusedRays},
                 //
                 dRayState.dPathDataPack,
                 dRays,
@@ -397,7 +397,8 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
     // Get the K/V pair buffer
     uint32_t maxWorkCount = uint32_t(this->currentWorks.size() +
                                      this->currentLightWorks.size());
-    auto[dIndices, dKeys] = rayPartitioner.Start(rayCount, maxWorkCount, true);
+    auto[dIndices, dKeys] = rayPartitioner.Start(rayCount, maxWorkCount,
+                                                 processQueue, true);
 
     // Iota the indices
     DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
@@ -412,10 +413,10 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
     // Cast rays
     using namespace std::string_view_literals;
     Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
-    processQueue.IssueSaturatingKernel<KCSetBoundaryWorkKeysIndirect>
+    processQueue.IssueWorkKernel<KCSetBoundaryWorkKeysIndirect>
     (
         "KCSetBoundaryWorkKeys"sv,
-        KernelIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
         dHitKeys,
         ToConstSpan(dIndices),
         this->boundaryLightKeyPack
@@ -430,10 +431,10 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
     // Generate work keys from hit packs
     using namespace std::string_literals;
     static const std::string GenWorkKernelName = std::string(TypeName()) + "-KCGenerateWorkKeys"s;
-    processQueue.IssueSaturatingKernel<KCGenerateWorkKeysIndirect>
+    processQueue.IssueWorkKernel<KCGenerateWorkKeysIndirect>
     (
         GenWorkKernelName,
-        KernelIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
         dKeys,
         ToConstSpan(dIndices),
         ToConstSpan(dHitKeys),
@@ -562,10 +563,10 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
         );
 
         // Accumulate the pre-calculated radiance selectively
-        processQueue.IssueSaturatingKernel<KCAccumulateShadowRays>
+        processQueue.IssueWorkKernel<KCAccumulateShadowRays>
         (
             "KCAccumulateShadowRays",
-            KernelIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
+            DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
             //
             dRayState.dPathRadiance,
             ToConstSpan(dRayState.dShadowRayRadiance),
@@ -674,10 +675,10 @@ RendererOutput PathTracerRenderer::DoThroughputSingleTileRender(const GPUDevice&
     if(!dAliveRayIndices.empty())
     {
         uint32_t aliveRayCount = static_cast<uint32_t>(dAliveRayIndices.size());
-        processQueue.IssueSaturatingKernel<KCCopyRays>
+        processQueue.IssueWorkKernel<KCCopyRays>
         (
             "KCCopyRays",
-            KernelIssueParams{.workCount = aliveRayCount},
+            DeviceWorkIssueParams{.workCount = aliveRayCount},
             dRays, dRayCones,
             dAliveRayIndices,
             dRayState.dOutRays,
@@ -810,10 +811,10 @@ RendererOutput PathTracerRenderer::DoLatencyRender(uint32_t passCount,
         if(!dAliveRayIndices.empty())
         {
             uint32_t aliveRayCount = static_cast<uint32_t>(dAliveRayIndices.size());
-            processQueue.IssueSaturatingKernel<KCCopyRays>
+            processQueue.IssueWorkKernel<KCCopyRays>
             (
                 "KCCopyRays",
-                KernelIssueParams{.workCount = aliveRayCount},
+                DeviceWorkIssueParams{.workCount = aliveRayCount},
                 dRays, dRayCones,
                 dAliveRayIndices,
                 dRayState.dOutRays,

@@ -622,7 +622,7 @@ Expected<Image> ImageFileDDS::ReadImage()
     result.header = header;
     for(uint32_t i = 0; i < result.header.mipCount; i++)
     {
-        Vector2ui mipSize = Graphics::TextureMipSize<2>(Vector2ui(header.dimensions), i);
+        Vector2ui mipSize = Graphics::TextureMipSize(Vector2ui(header.dimensions), i);
         auto
         [
             blockCount,

@@ -354,10 +354,10 @@ void RenderWork<R, PG, MG, TG>::DoWorkInternal(// I-O
         static const std::string KernelName = std::string(TypeName()) + "-Work"s;
         static constexpr auto WorkFunc = std::get<I>(WF);
         static constexpr auto Kernel = KCRenderWork<R, I, PG, MG, TG, WorkFunc>;
-        queue.IssueSaturatingKernel<Kernel>
+        queue.IssueWorkKernel<Kernel>
         (
             KernelName,
-            KernelIssueParams{.workCount = rayCount},
+            DeviceWorkIssueParams{.workCount = rayCount},
             params
         );
     }
@@ -452,10 +452,10 @@ void RenderLightWork<R, LG, TG>::DoBoundaryWorkInternal(// I-O
         static const std::string KernelName = std::string(TypeName()) + "-BoundaryWork"s;
         static constexpr auto WorkFunc = std::get<I>(WF);
         static constexpr auto Kernel = KCRenderLightWork<R, I, LG, TG, WorkFunc>;
-        queue.IssueSaturatingKernel<Kernel>
+        queue.IssueWorkKernel<Kernel>
         (
             TypeName(),
-            KernelIssueParams{.workCount = rayCount},
+            DeviceWorkIssueParams{.workCount = rayCount},
             params
         );
     }
@@ -510,10 +510,10 @@ void RenderCameraWork<R, C, T>::GenerateSubCamera(// Output
     using namespace std::string_literals;
     static const std::string KernelName = std::string(TypeName()) + "-GenSubCam"s;
     //
-    queue.IssueExactKernel<Kernel>
+    queue.IssueBlockKernel<Kernel>
     (
         KernelName,
-        KernelExactIssueParams{.gridSize = 1, .blockSize = 1},
+        DeviceBlockIssueParams{.gridSize = 1, .blockSize = 1},
         // Out
         dCamera,
         // Constants
@@ -554,10 +554,10 @@ void RenderCameraWork<R, C, T>::GenerateRays(// Output
     using namespace std::string_literals;
     static const std::string KernelName = std::string(TypeName()) + "-GenRays"s;
     //
-    queue.IssueSaturatingKernel<Kernel>
+    queue.IssueWorkKernel<Kernel>
     (
         KernelName,
-        KernelIssueParams{.workCount = rayCount},
+        DeviceWorkIssueParams{.workCount = rayCount},
         // Out
         dRayDiffsOut,
         dRaysOut,
@@ -608,10 +608,10 @@ void RenderCameraWork<R, C, T>::GenRaysStochasticFilter(// Output
                                                           TypeName(),
                                                           FilterType::ToString(filterType.type));
         //
-        queue.IssueSaturatingKernel<Kernel>
+        queue.IssueWorkKernel<Kernel>
         (
             KernelName,
-            KernelIssueParams{.workCount = rayCount},
+            DeviceWorkIssueParams{.workCount = rayCount},
             // Out
             dRayDiffsOut,
             dRaysOut,

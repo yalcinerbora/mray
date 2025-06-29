@@ -202,6 +202,7 @@ HostLocalMemoryCUDA& HostLocalMemoryCUDA::operator=(const HostLocalMemoryCUDA& o
 HostLocalMemoryCUDA& HostLocalMemoryCUDA::operator=(HostLocalMemoryCUDA&& other) noexcept
 {
     assert(this != &other);
+    CUDA_CHECK(cudaFreeHost(hPtr));
     size = other.size;
     hPtr = other.hPtr;
     dPtr = other.dPtr;
@@ -262,7 +263,6 @@ HostLocalAlignedMemoryCUDA::HostLocalAlignedMemoryCUDA(const GPUSystemCUDA& syst
 {
     size = sizeInBytes;
     allocSize = Math::NextMultiple(sizeInBytes, alignment);
-    alignment = alignIn;
 
     // Windows is hipster as always
     // does not have "std::aligned_alloc"
@@ -448,9 +448,7 @@ DeviceMemoryCUDA::~DeviceMemoryCUDA()
 {
     if(allocSize != 0) CUDA_DRIVER_CHECK(cuMemUnmap(mPtr, allocSize));
     for(const Allocations& a : allocs)
-    {
         CUDA_DRIVER_CHECK(cuMemRelease(a.handle));
-    }
     for(const VARanges& vaRange : vaRanges)
         CUDA_DRIVER_CHECK(cuMemAddressFree(vaRange.first, vaRange.second));
 }

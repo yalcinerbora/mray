@@ -12,10 +12,10 @@
 // Explicitly instantiate these
 // These are used by "AcceleratorGroupLBVH::MultiBuildBVH"
 template size_t
-DeviceAlgorithms::SegmentedTransformReduceTMSize<AABB3, PrimitiveKey>(size_t);
+DeviceAlgorithms::SegmentedTransformReduceTMSize<AABB3, PrimitiveKey>(size_t, const GPUQueue&);
 
 template size_t
-DeviceAlgorithms::SegmentedRadixSortTMSize<true, uint64_t, uint32_t>(size_t, size_t);
+DeviceAlgorithms::SegmentedRadixSortTMSize<true, uint64_t, uint32_t>(size_t, size_t, const GPUQueue&);
 
 template void
 DeviceAlgorithms::
@@ -120,7 +120,7 @@ void KCGenMortonCode(// Output
         Vector3 aabbSize = aabb.GeomSpan();
         Float maxSide = aabbSize[aabbSize.Maximum()];
         using namespace Graphics::MortonCode;
-        static constexpr uint32_t MaxBits = MaxBits3D<uint64_t>();
+        static constexpr uint32_t MaxBits = uint32_t(MaxBits3D<uint64_t>());
         static constexpr uint32_t LastValue = (1u << MaxBits) - 1;
         static constexpr Float SliceCount = Float(1ull << MaxBits);
         // TODO: Check if 32-bit float is not enough here (precision)
@@ -558,8 +558,8 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
     // fully saturate the GPU.
     uint32_t blockPerSegment = queue.Device()->SMCount() * 16u;
 
-    size_t reduceTMSize = ReduceTMSize<AABB3>(instanceCount);
-    size_t sortTMSize = RadixSortTMSize<true, uint64_t, uint32_t>(instanceCount);
+    size_t reduceTMSize = ReduceTMSize<AABB3>(instanceCount, queue);
+    size_t sortTMSize = RadixSortTMSize<true, uint64_t, uint32_t>(instanceCount, queue);
     size_t tmSize = std::max(reduceTMSize, sortTMSize);
 
     // Temp memory
@@ -612,10 +612,10 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
     // centers but next kernel designed to get primitive center,
     // so temporarily generating prim center. This is somewhat a waste
     // TODO: Change this later maybe?
-    queue.IssueSaturatingKernel<KCGenAABBCenters>
+    queue.IssueWorkKernel<KCGenAABBCenters>
     (
         "KCGenCentersFromAABBs",
-        KernelIssueParams{.workCount = static_cast<uint32_t>(instanceCount)},
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(instanceCount)},
         dAABBCenters,
         dLeafAABBs
     );
@@ -627,10 +627,10 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
         TPB, 0
     );
 
-    queue.IssueExactKernel<KCGenMortonCode>
+    queue.IssueBlockKernel<KCGenMortonCode>
     (
         "KCGenMortonCodes",
-        KernelExactIssueParams
+        DeviceBlockIssueParams
         {
             .gridSize = blockCount,
             .blockSize = TPB
@@ -669,10 +669,10 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
         reinterpret_cast<const void*>(&KCConstructLBVHInternalNodes),
         TPB, 0
     );
-    queue.IssueExactKernel<KCConstructLBVHInternalNodes>
+    queue.IssueBlockKernel<KCConstructLBVHInternalNodes>
     (
         "KCConstructLBVHInternalNodes",
-        KernelExactIssueParams
+        DeviceBlockIssueParams
         {
             .gridSize = blockCount,
             .blockSize = TPB
@@ -696,10 +696,10 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
         reinterpret_cast<const void*>(&KCUnionLBVHBoundingBoxes),
         TPB, 0
     );
-    queue.IssueExactKernel<KCUnionLBVHBoundingBoxes>
+    queue.IssueBlockKernel<KCUnionLBVHBoundingBoxes>
     (
         "KCUnionLBVHBoundingBoxes",
-        KernelExactIssueParams
+        DeviceBlockIssueParams
         {
             .gridSize = blockCount,
             .blockSize = TPB
@@ -768,14 +768,16 @@ void BaseAcceleratorLBVH::CastRays(// Output
     // Root node is node index 0, so we are lucky we can memset
     queue.MemsetAsync(dPrevNodeIndices.subspan(0, allRayCount), 0x00);
     // For bit stack however we need to set it old fashioned way)
-    queue.IssueSaturatingKernel<KCInitializeBitStack>
+    queue.IssueWorkKernel<KCInitializeBitStack>
     (
         "KCInitBitStack",
-        KernelIssueParams{.workCount = allRayCount},
+        DeviceWorkIssueParams{.workCount = allRayCount},
         dBitStacks
     );
     // Initialize the ray partitioner
-    auto [dCurrentIndices, dCurrentKeys] = rayPartitioner.Start(currentRayCount, partitionCount);
+    auto [dCurrentIndices, dCurrentKeys] = rayPartitioner.Start(currentRayCount,
+                                                                partitionCount,
+                                                                queue);
     // Copy the ray indices to the local buffer, normally we could utilize
     // global ray partitioner (if available) but
     // - Not all renderers (very simple ones probably) may not have a partitioner
@@ -785,10 +787,10 @@ void BaseAcceleratorLBVH::CastRays(// Output
     // Continiously do traverse/partition until all rays are missed
     while(currentRayCount != 0)
     {
-        queue.IssueSaturatingKernel<KCIntersectBaseLBVH>
+        queue.IssueWorkKernel<KCIntersectBaseLBVH>
         (
             "(A)LBVHRayCast"sv,
-            KernelIssueParams{.workCount = currentRayCount},
+            DeviceWorkIssueParams{.workCount = currentRayCount},
             // Output
             dCurrentKeys,
             // I-O
@@ -894,23 +896,25 @@ void BaseAcceleratorLBVH::CastVisibilityRays(// Output
     // Root node is node index 0, so we are lucky we can memset
     queue.MemsetAsync(dPrevNodeIndices.subspan(0, allRayCount), 0x00);
     // Assume visible, cull if hits anything
-    queue.IssueSaturatingKernel<KCSetIsVisibleIndirect>
+    queue.IssueWorkKernel<KCSetIsVisibleIndirect>
     (
         "KCSetIsVisibleIndirect"sv,
-        KernelIssueParams{.workCount = currentRayCount},
+        DeviceWorkIssueParams{.workCount = currentRayCount},
         dIsVisibleBuffer,
         dRayIndices
     );
 
     // For bit stack however we need to set it old fashioned way)
-    queue.IssueSaturatingKernel<KCInitializeBitStack>
+    queue.IssueWorkKernel<KCInitializeBitStack>
     (
         "KCInitBitStack",
-        KernelIssueParams{.workCount = allRayCount},
+        DeviceWorkIssueParams{.workCount = allRayCount},
         dBitStacks
     );
     // Initialize the ray partitioner
-    auto [dCurrentIndices, dCurrentKeys] = rayPartitioner.Start(currentRayCount, partitionCount);
+    auto [dCurrentIndices, dCurrentKeys] = rayPartitioner.Start(currentRayCount,
+                                                                partitionCount,
+                                                                queue);
     // Copy the ray indices to the local buffer, normally we could utilize
     // global ray partitioner (if available) but
     // - Not all renderers (very simple ones probably) may not have a partitioner
@@ -920,10 +924,10 @@ void BaseAcceleratorLBVH::CastVisibilityRays(// Output
     // Continiously do traverse/partition until all rays are missed
     while(currentRayCount != 0)
     {
-        queue.IssueSaturatingKernel<KCIntersectBaseLBVH>
+        queue.IssueWorkKernel<KCIntersectBaseLBVH>
         (
             "(A)LBVHRayCast"sv,
-            KernelIssueParams{.workCount = currentRayCount},
+            DeviceWorkIssueParams{.workCount = currentRayCount},
             // Output
             dCurrentKeys,
             // I-O

@@ -234,10 +234,10 @@ RendererOutput TexViewRenderer::DoRender()
     {
         case Mode::SHOW_TILING:
         {
-            processQueue.IssueSaturatingKernel<KCColorTiles>
+            processQueue.IssueWorkKernel<KCColorTiles>
             (
                 "KCColorTiles"sv,
-                KernelIssueParams{.workCount = curPixelCount},
+                DeviceWorkIssueParams{.workCount = curPixelCount},
                 //
                 imageTiler.GetTileSpan(),
                 imageTiler.CurrentTileIndex1D()
@@ -252,10 +252,10 @@ RendererOutput TexViewRenderer::DoRender()
             {
                 // Do not start writing to device side untill copy is complete
                 // (device buffer is read fully)
-                processQueue.IssueSaturatingKernel<KCShowTexture<C>>
+                processQueue.IssueWorkKernel<KCShowTexture<C>>
                 (
                     "KCShowTexture"sv,
-                    KernelIssueParams{.workCount = curPixelCount},
+                    DeviceWorkIssueParams{.workCount = curPixelCount},
                     //
                     imageTiler.GetTileSpan(),
                     imageTiler.LocalTileStart(),

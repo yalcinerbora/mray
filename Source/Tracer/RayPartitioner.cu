@@ -193,13 +193,21 @@ std::array<Span<CommonIndex>, 3> TernaryPartitionOutput::Spanify() const
     };
 }
 
-size_t PartitionerDeviceBufferSize(size_t maxElementEstimate)
+size_t PartitionerDeviceBufferSize(size_t maxElementEstimate, const GPUSystem& gpuSystem)
 {
     using namespace DeviceAlgorithms;
-    size_t radixSortTM = RadixSortTMSize<false, CommonKey, CommonIndex>(maxElementEstimate);
-    size_t partitionTM = BinPartitionTMSize<CommonIndex>(maxElementEstimate);
-    size_t totalTempMem = std::max(radixSortTM, partitionTM);
+    size_t radixSortTM = 0u, partitionTM = 0u;
+    for(const auto& gpu : gpuSystem.SystemDevices())
+    {
+        radixSortTM = std::max(RadixSortTMSize<false, CommonKey, CommonIndex>(maxElementEstimate,
+                                                                              gpu.GetComputeQueue(0)),
+                               radixSortTM);
+        partitionTM = std::max(BinPartitionTMSize<CommonIndex>(maxElementEstimate,
+                                                               gpu.GetComputeQueue(0)),
+                               partitionTM);
+    }
 
+    size_t totalTempMem = std::max(radixSortTM, partitionTM);
     static constexpr size_t Alignment = MemAlloc::DefaultSystemAlignment();
     using Math::NextMultiple;
 
@@ -234,7 +242,7 @@ RayPartitioner::RayPartitioner(const GPUSystem& system,
                                uint32_t maxPartitionEstimate)
     : system(system)
     , deviceMem(system.AllGPUs(), 16_MiB,
-                PartitionerDeviceBufferSize(maxElementEstimate),
+                PartitionerDeviceBufferSize(maxElementEstimate, system),
                 true)
     , hostMem(system,
               PartitionerHostBufferSize(maxPartitionEstimate),
@@ -281,6 +289,7 @@ RayPartitioner& RayPartitioner::operator=(RayPartitioner&& other)
 
 RayPartitioner::InitialBuffers RayPartitioner::Start(uint32_t rayCountIn,
                                                      uint32_t maxPartitionCountIn,
+                                                     const GPUQueue& queue,
                                                      bool isHostVisible)
 {
     isResultsInHostVisible = isHostVisible;
@@ -290,8 +299,8 @@ RayPartitioner::InitialBuffers RayPartitioner::Start(uint32_t rayCountIn,
     // We may binary/ternary partition, support at least 3
     maxPartitionCount = std::max(maxPartitionCount, 3u);
 
-    size_t tempMemSizeIf = DeviceAlgorithms::BinPartitionTMSize<CommonKey>(rayCount);
-    size_t tempMemSizeSort = DeviceAlgorithms::RadixSortTMSize<true, CommonKey, CommonIndex>(rayCount);
+    size_t tempMemSizeIf = DeviceAlgorithms::BinPartitionTMSize<CommonKey>(rayCount, queue);
+    size_t tempMemSizeSort = DeviceAlgorithms::RadixSortTMSize<true, CommonKey, CommonIndex>(rayCount, queue);
     size_t totalTempMemSize = std::max(tempMemSizeIf, tempMemSizeSort);
 
     if(isResultsInHostVisible)
@@ -406,10 +415,10 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
         reinterpret_cast<const void*>(Kernel),
         FIND_SPLITS_TPB, 0
     );
-    queue.IssueExactKernel<KCFindSplits<FIND_SPLITS_TPB>>
+    queue.IssueBlockKernel<KCFindSplits<FIND_SPLITS_TPB>>
     (
         "KCFindSplits",
-        KernelExactIssueParams{.gridSize = blockCount, .blockSize = FIND_SPLITS_TPB},
+        DeviceBlockIssueParams{.gridSize = blockCount, .blockSize = FIND_SPLITS_TPB},
         //
         dSparseSplitIndices,
         ToConstSpan(dSortedKeys),
@@ -456,10 +465,10 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
     }
 
     // Mark the split positions
-    queue.IssueKernel<KCFindBinMatIds>
+    queue.IssueWorkKernel<KCFindBinMatIds>
     (
         "KCFindBinMatIds",
-        KernelIssueParams{.workCount = maxPartitionCount},
+        DeviceWorkIssueParams{.workCount = maxPartitionCount},
         //
         hdPartitionKeys,
         hdPartitionStartOffsets,

@@ -22,7 +22,7 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
 
     MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
     void KCCopyScanY(Span<Float> dYCDFs,
-                     // I-O
+                     // Input
                      Span<const Float> dXCDFs)
     {
         KernelCallParams kp;
@@ -229,12 +229,85 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
         }
     }
 
+
+#elif defined MRAY_GPU_BACKEND_CPU
+
+    MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
+    void KCCopyScanY(Span<Float> dYCDFs,
+                     // Input
+                     Span<const Float> dXCDFs)
+    {
+        KernelCallParams kp;
+        if(kp.blockId != 0) return;
+
+        assert(dXCDFs.size() % dYCDFs.size() == 0);
+        uint32_t yCount = static_cast<uint32_t>(dYCDFs.size());
+        uint32_t xCount = static_cast<uint32_t>(dXCDFs.size() / yCount);
+
+        Float sum = 0;
+        for(uint32_t i = 0; i < yCount; i++)
+        {
+            uint32_t rowLastItemIndex = i * xCount + (xCount - 1);
+
+            sum += dXCDFs[rowLastItemIndex];
+            dYCDFs[i] = sum;
+        }
+    }
+
+    MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
+    void KCSegmentedScanPrecise(Span<Float> dOut,
+                                Span<const Float> dIn,
+                                uint32_t segmentSize,
+                                uint32_t totalBlocks)
+    {
+        KernelCallParams kp;
+        // Block-stride loop
+        for(uint32_t block = kp.blockId; block < totalBlocks; block += kp.gridSize)
+        {
+            Span<const Float> rowIn = dIn.subspan(block * segmentSize, segmentSize);
+            Span<Float> rowOut = dOut.subspan(block * segmentSize, segmentSize);
+
+            double sum = 0.0;
+            for(uint32_t i = 0; i < segmentSize; i++)
+            {
+                sum += double(std::abs(rowIn[i]));
+                rowOut[i] = Float(sum);
+            }
+        }
+    }
+
+    MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
+    void KCNormalizeXY(Span<Float> dXCDFs, Span<Float> dYCDFs)
+    {
+        KernelCallParams kp;
+
+        auto NormalizeRow = [](Span<Float> dCDF)
+        {
+            double rowRecip = 1.0 / double(dCDF.back());
+            for(uint32_t i = 0; i < static_cast<uint32_t>(dCDF.size()); i++)
+            {
+                double data = double(dCDF[i]) * rowRecip;
+                dCDF[i] = Float(data);
+            }
+        };
+
+        // Block-stride loop (one block for each row)
+        uint32_t yCount = static_cast<uint32_t>(dYCDFs.size());
+        uint32_t xCount = static_cast<uint32_t>(dXCDFs.size() / yCount);
+        for(uint32_t block = kp.blockId; block < yCount; block += kp.gridSize)
+        {
+            NormalizeRow(dXCDFs.subspan(block * xCount, xCount));
+        }
+        // Let first block to divide the thing as well
+        if(kp.blockId == 0) NormalizeRow(dYCDFs);
+    }
+
 #else
     #error DistributionPwC2D kernels do not have generic implementation yet!
 
     MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
     void KCCopyScanY(Span<Float> dYCDFs,
-                     // I-O
+                     // Input
                      Span<const Float> dXCDFs)
     {}
 
@@ -266,8 +339,9 @@ void KCValidateScan(Span<const Float> dXCDFs, uint32_t segmentSize)
 
         for(uint32_t i = kp.threadId; i < segmentSize; i += kp.blockSize)
         {
-            Float prevCDF = (i == 0) ? Float(0) : dRowCDF[i - 1];
-            Float myCDF = dRowCDF[i];
+            [[maybe_unused]] Float prevCDF = (i == 0) ? Float(0) : dRowCDF[i - 1];
+            [[maybe_unused]] Float myCDF = dRowCDF[i];
+            assert(prevCDF <= myCDF);
         }
     }
 }
@@ -398,15 +472,17 @@ void DistributionGroupPwC2D::Construct(uint32_t index,
     uint32_t xCount = static_cast<uint32_t>(sizes[index][0]);
     uint32_t yCount = static_cast<uint32_t>(sizes[index][1]);
 
+    static constexpr auto TPBCall = (MRAY_GPU_BACKEND_CPU) ? 1u : TPB;
+
     // Directly scan to cdf array
-    queue.IssueExactKernel<KCSegmentedScanPrecise>
+    queue.IssueBlockKernel<KCSegmentedScanPrecise>
     (
         "Dist2D-PreciseSegmentedScan"sv,
         //
-        KernelExactIssueParams
+        DeviceBlockIssueParams
         {
             .gridSize = yCount,
-            .blockSize = TPB
+            .blockSize = TPBCall
         },
         d.dCDFsX,
         function,
@@ -416,13 +492,13 @@ void DistributionGroupPwC2D::Construct(uint32_t index,
 
     if constexpr(MRAY_IS_DEBUG)
     {
-        queue.IssueExactKernel<KCValidateScan>
+        queue.IssueBlockKernel<KCValidateScan>
         (
             "Dist2D-ValidateScanX"sv,
-            KernelExactIssueParams
+            DeviceBlockIssueParams
             {
                 .gridSize = yCount,
-                .blockSize = StaticThreadPerBlock1D()
+                .blockSize = (MRAY_GPU_BACKEND_CPU) ? 1u : StaticThreadPerBlock1D()
             },
             //
             d.dCDFsX,
@@ -431,29 +507,28 @@ void DistributionGroupPwC2D::Construct(uint32_t index,
     }
 
     // Copy to Y and normalize
-    queue.IssueExactKernel<KCCopyScanY>
+    queue.IssueBlockKernel<KCCopyScanY>
     (
         "Dist2D-Copy&ScanY"sv,
-        KernelExactIssueParams{.gridSize = 1, .blockSize = TPB},
+        DeviceBlockIssueParams{.gridSize = 1, .blockSize = TPBCall},
         //
         d.dCDFsY,
         ToConstSpan(d.dCDFsX)
     );
     // Normalize rows, finally making it a proper CDF
-    queue.IssueSaturatingKernel<KCNormalizeXY>
+    queue.IssueBlockKernel<KCNormalizeXY>
     (
         "Dist2D-NormalizeXY"sv,
-        KernelIssueParams{.workCount = xCount * TPB},
+        DeviceBlockIssueParams{.gridSize = yCount + 1, .blockSize = TPBCall},
         //
         d.dCDFsX,
         d.dCDFsY
     );
 
-
-    queue.IssueSaturatingLambda
+    queue.IssueWorkLambda
     (
         "Dist2D-ConstructDist"sv,
-        KernelIssueParams{.workCount = yCount},
+        DeviceWorkIssueParams{.workCount = yCount},
         SetupDistPointers{xCount, yCount, dDistributions.subspan(index, 1), d}
     );
 }

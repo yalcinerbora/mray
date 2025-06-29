@@ -13,7 +13,7 @@ template <class T>
 struct Partitioner
 {
     MRAY_HYBRID MRAY_CGPU_INLINE
-    bool operator()(const T& t)
+    bool operator()(const T& t) const
     {
         return t != T(0);
     }
@@ -22,8 +22,9 @@ struct Partitioner
 template<class Value>
 void BinPartitionTest(const GPUSystem& system)
 {
+    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
     static constexpr size_t ElementCount = 1'000;
-    size_t tempMemSize = DeviceAlgorithms::BinPartitionTMSize<Value>(ElementCount);
+    size_t tempMemSize = DeviceAlgorithms::BinPartitionTMSize<Value>(ElementCount, queue);
     DeviceMemory mem({&system.BestDevice()}, 1_MiB, 8_MiB);
 
     Span<Value> dInputs;
@@ -41,7 +42,6 @@ void BinPartitionTest(const GPUSystem& system)
         v = (rng() % 2 == 0) ? Value(0) : Value(1);
     }
 
-    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
     queue.MemcpyAsync(dInputs, Span<const Value>(hInputs.begin(), hInputs.end()));
 
     DeviceAlgorithms::BinaryPartition(dOutputs, Span<uint32_t, 1>(dOffset),

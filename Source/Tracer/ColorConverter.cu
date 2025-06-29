@@ -222,7 +222,7 @@ void KCConvertColorBC(// I-O
         uint32_t localProcI = procI % processorPerTexture;
         // Load to local space
         const BCColorConvParams& curParams = texConvParams[texI];
-        uint32_t tileCount = curParams.blockRange[1] - curParams.blockRange[0];
+        uint32_t tileCount = uint32_t(curParams.blockRange[1] - curParams.blockRange[0]);
         if(texI >= validTexCount) continue;
 
         // Skip this mip if it is not available.
@@ -640,10 +640,10 @@ void BCColorConverter::CallKernelForType(Span<Byte> dScratchBuffer,
             using namespace std::string_literals;
             static const std::string KernelName = ("KCConvertColorspaceBC"s +
                                                    std::string(MRayPixelTypeStringifier::ToString(E)));
-            queue.IssueExactKernel<Kernel>
+            queue.IssueBlockKernel<Kernel>
             (
                 KernelName,
-                KernelExactIssueParams
+                DeviceBlockIssueParams
                 {
                     .gridSize = blockCount,
                     .blockSize = THREAD_PER_BLOCK
@@ -791,10 +791,10 @@ struct ConvertKernelCallFunctor
             THREAD_PER_BLOCK, 0
         );
         using namespace std::string_view_literals;
-        queue.IssueExactKernel<Kernel>
+        queue.IssueBlockKernel<Kernel>
         (
             "KCConvertColorspace"sv,
-            KernelExactIssueParams
+            DeviceBlockIssueParams
             {
                 .gridSize = blockCount,
                 .blockSize = THREAD_PER_BLOCK
@@ -995,10 +995,10 @@ void ColorConverter::ExtractLuminance(std::vector<Span<Float>> hLuminanceBuffers
     );
 
     using namespace std::string_view_literals;
-    queue.IssueExactKernel<Kernel>
+    queue.IssueBlockKernel<Kernel>
     (
         "KCExtractLuminance"sv,
-        KernelExactIssueParams
+        DeviceBlockIssueParams
         {
             .gridSize = blockCount,
             .blockSize = THREAD_PER_BLOCK

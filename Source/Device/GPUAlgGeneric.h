@@ -42,12 +42,12 @@ namespace mray::algorithms
     requires (requires(T x) { {x + x} -> std::same_as<T>; } && std::is_constructible_v<T, uint32_t>)
     void Iota(Span<T> dOut, const T& hInitialValue, const GPUQueue& queue)
     {
-        KernelIssueParams p
+        DeviceWorkIssueParams p
         {
             .workCount = static_cast<uint32_t>(dOut.size()),
             .sharedMemSize = 0
         };
-        queue.IssueLambda
+        queue.IssueWorkLambda
         (
             "KCIota", p,
             [=] MRAY_HYBRID(KernelCallParams kp)
@@ -75,12 +75,12 @@ namespace mray::algorithms
         uint32_t totalSegments = static_cast<uint32_t>(dSegmentRanges.size() - 1);
         uint32_t totalBlocks = totalSegments * BlockPerSegment;
 
-        KernelExactIssueParams p
+        DeviceBlockIssueParams p
         {
             .gridSize = maxBlocks,
             .blockSize = StaticThreadPerBlock1D()
         };
-        queue.IssueExactLambda
+        queue.IssueBlockLambda
         (
             "KCSegmentedIota", p,
             [=] MRAY_HYBRID(KernelCallParams kp)
@@ -115,12 +115,12 @@ namespace mray::algorithms
         assert(dOut.size() == dIn.size() - 1);
         assert(dIn.size() > 1);
         uint32_t workCount = static_cast<uint32_t>(dOut.size() - 1);
-        KernelIssueParams p
+        DeviceWorkIssueParams p
         {
             .workCount = workCount,
             .sharedMemSize = 0
         };
-        queue.IssueLambda
+        queue.IssueWorkLambda
         (
             "KCAdjacentDifference", p,
             [=] MRAY_HYBRID(KernelCallParams kp)
@@ -142,12 +142,12 @@ namespace mray::algorithms
                    UnaryFunction&& TransFunction)
     {
         assert(dOut.size() == dIn.size());
-        KernelIssueParams p
+        DeviceWorkIssueParams p
         {
             .workCount = static_cast<uint32_t>(dOut.size()),
             .sharedMemSize = 0
         };
-        queue.IssueLambda
+        queue.IssueWorkLambda
         (
             "KCTransform", p,
             [=] MRAY_HYBRID(KernelCallParams kp)
@@ -167,12 +167,12 @@ namespace mray::algorithms
     void InPlaceTransform(Span<T> dInOut, const GPUQueue& queue,
                           UnaryFunction&& TransFunction)
     {
-        KernelIssueParams p
+        DeviceWorkIssueParams p
         {
             .workCount = static_cast<uint32_t>(dInOut.size()),
             .sharedMemSize = 0
         };
-        queue.IssueLambda
+        queue.IssueWorkLambda
         (
             "KCInPlaceTransform", p,
             [=] MRAY_HYBRID(KernelCallParams kp)
@@ -192,12 +192,12 @@ namespace mray::algorithms
     void InPlaceTransformIndirect(Span<T> dInOut, Span<const uint32_t> dIndices,
                                   const GPUQueue& queue, UnaryFunction&& TransFunction)
     {
-        KernelIssueParams p
+        DeviceWorkIssueParams p
         {
             .workCount = static_cast<uint32_t>(dIndices.size()),
             .sharedMemSize = 0
         };
-        queue.IssueLambda
+        queue.IssueWorkLambda
         (
             "KCInPlaceTransformIndirect", p,
             [=] MRAY_HYBRID(KernelCallParams kp)

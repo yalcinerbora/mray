@@ -10,7 +10,7 @@ namespace mray::cuda::algorithms
     //====================//
     template <class T>
     MRAY_HOST
-    size_t BinPartitionTMSize(size_t elementCount);
+    size_t BinPartitionTMSize(size_t elementCount, const GPUQueueCUDA&);
 
     template <class T, class UnaryOp>
     MRAY_HOST
@@ -33,7 +33,7 @@ namespace mray::cuda::algorithms
     //====================//
     template <bool IsAscending, class K, class V>
     MRAY_HOST
-    size_t RadixSortTMSize(size_t elementCount);
+    size_t RadixSortTMSize(size_t elementCount, const GPUQueueCUDA&);
 
     template <bool IsAscending, class K, class V>
     MRAY_HOST
@@ -46,7 +46,8 @@ namespace mray::cuda::algorithms
     template <bool IsAscending, class K, class V>
     MRAY_HOST
     size_t SegmentedRadixSortTMSize(size_t totalElementCount,
-                                    size_t totalSegments);
+                                    size_t totalSegments,
+                                    const GPUQueueCUDA&);
 
     template <bool IsAscending, class K, class V>
     MRAY_HOST
@@ -62,15 +63,15 @@ namespace mray::cuda::algorithms
     //====================//
     template <class T>
     MRAY_HOST
-    size_t ReduceTMSize(size_t elementCount);
+    size_t ReduceTMSize(size_t elementCount, const GPUQueueCUDA&);
 
     template <class OutT, class InT>
     MRAY_HOST
-    size_t TransformReduceTMSize(size_t elementCount);
+    size_t TransformReduceTMSize(size_t elementCount, const GPUQueueCUDA&);
 
     template <class OutT, class InT>
     MRAY_HOST
-    size_t SegmentedTransformReduceTMSize(size_t numSegments);
+    size_t SegmentedTransformReduceTMSize(size_t numSegments, const GPUQueueCUDA&);
 
     template <class T, class BinaryOp>
     MRAY_HOST
@@ -107,7 +108,7 @@ namespace mray::cuda::algorithms
     //====================//
     template <class T>
     MRAY_HOST
-    size_t ExclusiveScanTMSize(size_t elementCount);
+    size_t ExclusiveScanTMSize(size_t elementCount, const GPUQueueCUDA&);
 
     template <class T, class BinaryOp>
     MRAY_HOST

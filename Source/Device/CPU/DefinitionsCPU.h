@@ -5,20 +5,20 @@
 
 namespace mray::host
 {
-    inline constexpr void DeviceAssert(void* code, const char* file, int line)
+    inline constexpr void DeviceAssert(void*, const char*, int)
     {
     }
 
-    inline constexpr void GPUMemThrow(void* code, const char* file, int line)
+    inline constexpr void GPUMemThrow(void*, const char*, int)
     {
     }
 
-    inline constexpr void GPUDriverAssert(void* code, const char* file, int line)
+    inline constexpr void GPUDriverAssert(void*, const char*, int)
     {
 
     }
 
-    inline constexpr void GPUDriverMemThrow(void* code, const char* file, int line)
+    inline constexpr void GPUDriverMemThrow(void*, const char*, int)
     {
     }
 

@@ -11,6 +11,9 @@
 
 #include "Device/GPUTypes.h"
 
+#ifdef MRAY_GPU_BACKEND_CUDA
+
+
 TEST(GPUMemory, DeviceMemory_Allocate)
 {
     GPUSystem system;
@@ -288,3 +291,5 @@ TYPED_TEST(GPUMemoryAlloc, MultiAlloc)
         EXPECT_EQ(data[i], Byte{0x56});
     }
 }
+
+#endif

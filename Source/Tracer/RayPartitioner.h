@@ -111,6 +111,7 @@ class RayPartitioner
 
     InitialBuffers          Start(uint32_t rayCount,
                                   uint32_t maxPartitionCount,
+                                  const GPUQueue& queue,
                                   bool isResultsInHostVisible = true);
 
     template<class UnaryFunc>

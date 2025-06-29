@@ -274,8 +274,9 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     Span<Byte> dScanOrReduceTempMem;
     Span<AABB3> dReducedAABB;
 
-    size_t algoTempMemSize = std::max(DeviceAlgorithms::ExclusiveScanTMSize<uint32_t>(totalInstanceCount + 1),
-                                      DeviceAlgorithms::ReduceTMSize<AABB3>(totalInstanceCount));
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
+    size_t algoTempMemSize = std::max(DeviceAlgorithms::ExclusiveScanTMSize<uint32_t>(totalInstanceCount + 1, queue),
+                                      DeviceAlgorithms::ReduceTMSize<AABB3>(totalInstanceCount, queue));
     MemAlloc::AllocateMultiData(std::tie(dLeafAABBs,  dTraversableHandles,
                                          dInstanceMatrices, dSBTCounts, dFlags,
                                          dInstanceBuildData, dSBTOffsets,
@@ -288,7 +289,6 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     // Again CUDA Init check warns about this, but this should be set?
     // via "AcquireIASConstructionParams". maybe we alloc too much?
     // Just memset everything (TODO: wastefull due to barrier wait)
-    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     queue.MemsetAsync(Span(static_cast<Byte*>(tempMem), tempMem.Size()), 0x00);
     queue.Barrier().Wait();
 
@@ -325,10 +325,10 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     );
 
     // Write these to OptixInstance struct
-    queue.IssueSaturatingKernel<KCCopyToOptixInstance>
+    queue.IssueWorkKernel<KCCopyToOptixInstance>
     (
         "KCCopyToOptixInstance",
-        KernelIssueParams{.workCount = static_cast<uint32_t>(totalInstanceCount)},
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(totalInstanceCount)},
         // Output
         dInstanceBuildData,
         // Input

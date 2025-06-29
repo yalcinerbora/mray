@@ -505,14 +505,14 @@ Optional<int32_t> VisorGUI::ShowRendererComboBox(const VisorState& visorState)
 
     Optional<int32_t> result;
     const std::vector<std::string>& rTypes = visorState.tracer.rendererTypes;
-    int32_t rCount = static_cast<int32_t>(rTypes.size());
+    int32_t right = static_cast<int32_t>(rTypes.size());
     int32_t rIndex = visorState.currentRenderIndex;
     if(inputChecker.CheckKeyPress(VisorUserAction::NEXT_RENDERER) ||
        inputChecker.CheckKeyPress(VisorUserAction::PREV_RENDERER))
     {
         int32_t i = inputChecker.CheckKeyPress(VisorUserAction::PREV_RENDERER) ? -1 : 1;
         rIndex += i;
-        rIndex = Math::Roll(rIndex, 0, rCount);
+        rIndex = Math::Roll(rIndex, 0, right);
         result = rIndex;
     }
     const int32_t& curRIndex = (result.has_value())
@@ -532,7 +532,7 @@ Optional<int32_t> VisorGUI::ShowRendererComboBox(const VisorState& visorState)
     if(ImGui::BeginCombo("##Renderers", prevName.c_str(),
                          ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_HeightSmall))
     {
-        for(int32_t i = 0; i < rCount; i++)
+        for(int32_t i = 0; i < right; i++)
         {
             const auto& rendererName = visorState.tracer.rendererTypes[static_cast<uint32_t>(i)];
             bool isSelected = (i == curRIndex);

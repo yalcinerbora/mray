@@ -190,42 +190,31 @@ class GPUQueueHIP
     MRAY_HYBRID GPUQueueHIP&    operator=(GPUQueueHIP&&) noexcept;
     MRAY_HYBRID                 ~GPUQueueHIP();
 
-    // Classic GPU Calls
-    // Create just enough blocks according to work size
-    template<auto Kernel, class... Args>
-    MRAY_HOST void  IssueKernel(std::string_view name,
-                                KernelIssueParams,
-                                //
-                                Args&&...) const;
-    template<class Lambda>
-    MRAY_HOST void  IssueLambda(std::string_view name,
-                                KernelIssueParams,
-                                //
-                                Lambda&&) const;
+
     // Grid-Stride Kernels
     // Kernel is launched just enough blocks to
     // fully saturate the GPU.
     template<auto Kernel, class... Args>
-    MRAY_HOST void  IssueSaturatingKernel(std::string_view name,
-                                          KernelIssueParams,
-                                          //
-                                          Args&&...) const;
+    MRAY_HOST void  IssueWorkKernel(std::string_view name,
+                                    DeviceWorkIssueParams,
+                                    //
+                                    Args&&...) const;
     template<class Lambda>
-    MRAY_HOST void  IssueSaturatingLambda(std::string_view name,
-                                          KernelIssueParams,
-                                          //
-                                          Lambda&&) const;
+    MRAY_HOST void  IssueWorkLambda(std::string_view name,
+                                    DeviceWorkIssueParams,
+                                    //
+                                    Lambda&&) const;
     // Exact Kernel Calls
     // You 1-1 specify block and grid dimensions
     // Important: These can not be annottated with launch_bounds
     template<auto Kernel, class... Args>
-    MRAY_HOST void  IssueExactKernel(std::string_view name,
-                                     KernelExactIssueParams,
+    MRAY_HOST void  IssueBlockKernel(std::string_view name,
+                                     DeviceBlockIssueParams,
                                      //
                                      Args&&...) const;
     template<class Lambda, uint32_t Bounds = StaticThreadPerBlock1D()>
-    MRAY_HOST void  IssueExactLambda(std::string_view name,
-                                     KernelExactIssueParams,
+    MRAY_HOST void  IssueBlockLambda(std::string_view name,
+                                     DeviceBlockIssueParams,
                                      //
                                      Lambda&&) const;
 
@@ -234,33 +223,23 @@ class GPUQueueHIP
     // because of that even if we dont call the kernel from the
     // device.
     template<auto Kernel, class... Args>
-    MRAY_GPU void   DeviceIssueKernel(std::string_view name,
-                                      KernelIssueParams,
-                                      //
-                                      Args&&...) const;
-    template<class Lambda>
-    MRAY_GPU void   DeviceIssueLambda(std::string_view name,
-                                      KernelIssueParams,
-                                      //
-                                      Lambda&&) const;
-    template<auto Kernel, class... Args>
-    MRAY_GPU void   DeviceIssueSaturatingKernel(std::string_view name,
-                                                KernelIssueParams,
+    MRAY_GPU void   DeviceIssueWorkKernel(std::string_view name,
+                                                DeviceWorkIssueParams,
                                                 //
                                                 Args&&...) const;
     template<class Lambda>
-    MRAY_GPU void   DeviceIssueSaturatingLambda(std::string_view name,
-                                                KernelIssueParams,
+    MRAY_GPU void   DeviceIssueWorkLambda(std::string_view name,
+                                                DeviceWorkIssueParams,
                                                 //
                                                 Lambda&&) const;
     template<auto Kernel, class... Args>
-    MRAY_GPU void   DeviceIssueExactKernel(std::string_view name,
-                                           KernelExactIssueParams,
+    MRAY_GPU void   DeviceIssueBlockKernel(std::string_view name,
+                                           DeviceBlockIssueParams,
                                            //
                                            Args&&...) const;
     template<class Lambda, uint32_t Bounds = StaticThreadPerBlock1D()>
-    MRAY_GPU void   DeviceIssueExactLambda(std::string_view name,
-                                           KernelExactIssueParams,
+    MRAY_GPU void   DeviceIssueBlockLambda(std::string_view name,
+                                           DeviceBlockIssueParams,
                                            //
                                            Lambda&&) const;
 

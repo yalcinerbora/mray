@@ -12,7 +12,7 @@ namespace mray::cuda::algorithms
 
 template <class T>
 MRAY_HOST inline
-size_t BinPartitionTMSize(size_t elementCount)
+size_t BinPartitionTMSize(size_t elementCount, const GPUQueueCUDA& q)
 {
     using namespace cub;
 
@@ -23,7 +23,8 @@ size_t BinPartitionTMSize(size_t elementCount)
     size_t result;
     CUDA_CHECK(DevicePartition::If(dTM, result, dIn, dOut, dEndOffset,
                                    static_cast<int>(elementCount),
-                                   [] MRAY_HYBRID(T)->bool{ return false; }));
+                                   [] MRAY_HYBRID(T)->bool{ return false; },
+                                   ToHandleCUDA(q)));
 
     return result;
 }

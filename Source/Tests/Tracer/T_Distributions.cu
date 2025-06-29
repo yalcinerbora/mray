@@ -85,10 +85,10 @@ struct DistTester2D
                           Span<const Vector2>(hRandomNumbers.cbegin(),
                                               hRandomNumbers.cend()));
 
-        queue.IssueSaturatingKernel<KCSampleDist<Dist2D, DoUV>>
+        queue.IssueWorkKernel<KCSampleDist<Dist2D, DoUV>>
         (
             "GTest SampleDist2D"sv,
-            KernelIssueParams{.workCount = sampleCount},
+            DeviceWorkIssueParams{.workCount = sampleCount},
             //
             dOutSamples,
             dOutPdfs,
@@ -102,8 +102,9 @@ struct DistTester2D
         result.first.resize(sampleCount);
         result.second.resize(sampleCount);
 
-        queue.MemcpyAsync(Span(result.first), ToConstSpan(dOutSamples));
-        queue.MemcpyAsync(Span(result.second), ToConstSpan(dOutPdfs));
+        queue.MemcpyAsync(Span<SampleT<Vector2>>(result.first),
+                          ToConstSpan(dOutSamples));
+        queue.MemcpyAsync(Span<Float>(result.second), ToConstSpan(dOutPdfs));
         queue.Barrier().Wait();
         return result;
     }

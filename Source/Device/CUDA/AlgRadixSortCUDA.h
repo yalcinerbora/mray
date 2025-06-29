@@ -23,7 +23,8 @@ namespace mray::cuda::algorithms
 template <bool IsAscending, class K, class V>
 MRAY_HOST inline
 size_t SegmentedRadixSortTMSize(size_t totalElementCount,
-                                size_t totalSegments)
+                                size_t totalSegments,
+                                const GPUQueueCUDA& q)
 {
     using namespace cub;
 
@@ -38,17 +39,22 @@ size_t SegmentedRadixSortTMSize(size_t totalElementCount,
                                                        keys, values,
                                                        static_cast<int>(totalElementCount),
                                                        static_cast<int>(totalSegments),
-                                                       dStartOffsets, dEndOffsets));
+                                                       dStartOffsets, dEndOffsets,
+                                                       0, sizeof(K) * CHAR_BIT,
+                                                       ToHandleCUDA(q)));
     else
         CUDA_CHECK(DeviceRadixSort::SortPairsDescending(dTM, result,
                                                         keys, values,
-                                                        totalElementCount, totalSegments,                                                        dStartOffsets, dEndOffsets));
+                                                        totalElementCount, totalSegments,
+                                                        dStartOffsets, dEndOffsets,
+                                                        0, sizeof(K) * CHAR_BIT,
+                                                        ToHandleCUDA(q)));
     return result;
 }
 
 template <bool IsAscending, class K, class V>
 MRAY_HOST inline
-size_t RadixSortTMSize(size_t elementCount)
+size_t RadixSortTMSize(size_t elementCount, const GPUQueueCUDA& q)
 {
     using namespace cub;
 
@@ -58,10 +64,14 @@ size_t RadixSortTMSize(size_t elementCount)
     size_t result;
     if constexpr(IsAscending)
         CUDA_CHECK(DeviceRadixSort::SortPairs(dTM, result, keys,
-                                              values, elementCount));
+                                              values, elementCount,
+                                              0, sizeof(K) * CHAR_BIT,
+                                              ToHandleCUDA(q)));
     else
         CUDA_CHECK(DeviceRadixSort::SortPairsDescending(dTM, result, keys,
-                                                        values, elementCount));
+                                                        values, elementCount,
+                                                        0, sizeof(K) * CHAR_BIT,
+                                                        ToHandleCUDA(q)));
     return result;
 }
 
@@ -91,14 +101,12 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
     if constexpr(IsAscending)
         CUDA_CHECK(DeviceRadixSort::SortPairs(dTempMemory.data(), size, keys, values,
                                               dKeyDoubleBuffer[0].size(),
-                                              bitRange[0],
-                                              bitRange[1],
+                                              bitRange[0], bitRange[1],
                                               ToHandleCUDA(queue)));
     else
         CUDA_CHECK(DeviceRadixSort::SortPairsDescending(dTempMemory.data(), size, keys, values,
                                                         dKeyDoubleBuffer[0].size(),
-                                                        bitRange[0],
-                                                        bitRange[1],
+                                                        bitRange[0], bitRange[1],
                                                         ToHandleCUDA(queue)));
 
     uint32_t result = (keys.Current() == dKeyDoubleBuffer[0].data()) ? 0u : 1u;

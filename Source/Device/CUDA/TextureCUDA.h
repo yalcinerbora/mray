@@ -203,7 +203,7 @@ class TextureCUDA_Normal
                                         const GPUQueueCUDA& queue,
                                         uint32_t mipLevel,
                                         const TextureExtent<D>& offset,
-                                        const TextureExtent<D>& sizes);
+                                        const TextureExtent<D>& fromSize);
 };
 
 template<class T>
@@ -431,7 +431,6 @@ extern template class mray::cuda::TextureCUDA_Normal<3, int16_t>;
 extern template class mray::cuda::TextureCUDA_Normal<3, Vector2s>;
 extern template class mray::cuda::TextureCUDA_Normal<3, Vector3s>;
 extern template class mray::cuda::TextureCUDA_Normal<3, Vector4s>;
-
 
 // Common Textures 1D
 extern template class mray::cuda::TextureCUDA<1, Float>;

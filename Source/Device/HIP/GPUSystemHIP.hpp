@@ -83,57 +83,10 @@ KernelCallParamsHIP::KernelCallParamsHIP()
 
 template<auto Kernel, class... Args>
 MRAY_HOST inline
-void GPUQueueHIP::IssueKernel(std::string_view name,
-                              KernelIssueParams p,
-                              Args&&... fArgs) const
-{
-    static const auto annotation = GPUAnnotationHIP(roctxDomain, name);
-    const auto _ = annotation.AnnotateScope();
-
-    assert(p.workCount != 0);
-    using namespace HipKernelCalls;
-    uint32_t blockCount = Math::DivideUp(p.workCount, StaticThreadPerBlock1D());
-    uint32_t blockSize = StaticThreadPerBlock1D();
-
-    Kernel<<<blockCount, blockSize, p.sharedMemSize, stream>>>
-    (
-        std::forward<Args>(fArgs)...
-    );
-    HIP_KERNEL_CHECK();
-}
-
-template<class Lambda>
-MRAY_HOST inline
-void GPUQueueHIP::IssueLambda(std::string_view name,
-                              KernelIssueParams p,
-                              //
-                              Lambda&& func) const
-{
-    static const auto annotation = GPUAnnotationHIP(roctxDomain, name);
-    const auto _ = annotation.AnnotateScope();
-
-    assert(p.workCount != 0);
-    static_assert(std::is_rvalue_reference_v<decltype(func)>,
-                  "Not passing Lambda as rvalue_reference. This kernel call "
-                  "would've been failed in runtime!");
-    using namespace HipKernelCalls;
-    uint32_t blockCount = Math::DivideUp(p.workCount, StaticThreadPerBlock1D());
-    uint32_t blockSize = StaticThreadPerBlock1D();
-
-    KernelCallLambdaHIP<Lambda>
-    <<<blockCount, blockSize, p.sharedMemSize, stream>>>
-    (
-        std::forward<Lambda>(func)
-    );
-    HIP_KERNEL_CHECK();
-}
-
-template<auto Kernel, class... Args>
-MRAY_HOST inline
-void GPUQueueHIP::IssueSaturatingKernel(std::string_view name,
-                                        KernelIssueParams p,
-                                        //
-                                        Args&&... fArgs) const
+void GPUQueueHIP::IssueWorkKernel(std::string_view name,
+                                  DeviceWorkIssueParams p,
+                                  //
+                                  Args&&... fArgs) const
 {
     static const auto annotation = GPUAnnotationHIP(roctxDomain, name);
     const auto _ = annotation.AnnotateScope();
@@ -157,10 +110,10 @@ void GPUQueueHIP::IssueSaturatingKernel(std::string_view name,
 
 template<class Lambda>
 MRAY_HOST inline
-void GPUQueueHIP::IssueSaturatingLambda(std::string_view name,
-                                        KernelIssueParams p,
-                                        //
-                                        Lambda&& func) const
+void GPUQueueHIP::IssueWorkLambda(std::string_view name,
+                                  DeviceWorkIssueParams p,
+                                  //
+                                  Lambda&& func) const
 {
     static const auto annotation = GPUAnnotationHIP(roctxDomain, name);
     const auto _ = annotation.AnnotateScope();
@@ -188,8 +141,8 @@ void GPUQueueHIP::IssueSaturatingLambda(std::string_view name,
 
 template<auto Kernel, class... Args>
 MRAY_HOST inline
-void GPUQueueHIP::IssueExactKernel(std::string_view name,
-                                   KernelExactIssueParams p,
+void GPUQueueHIP::IssueBlockKernel(std::string_view name,
+                                   DeviceBlockIssueParams p,
                                    //
                                    Args&&... fArgs) const
 {
@@ -207,8 +160,8 @@ void GPUQueueHIP::IssueExactKernel(std::string_view name,
 
 template<class Lambda, uint32_t Bounds>
 MRAY_HOST inline
-void GPUQueueHIP::IssueExactLambda(std::string_view name,
-                                   KernelExactIssueParams p,
+void GPUQueueHIP::IssueBlockLambda(std::string_view name,
+                                   DeviceBlockIssueParams p,
                                    //
                                    Lambda&& func) const
 {
@@ -231,132 +184,42 @@ void GPUQueueHIP::IssueExactLambda(std::string_view name,
 
 template<auto Kernel, class... Args>
 MRAY_GPU inline
-void GPUQueueHIP::DeviceIssueKernel(std::string_view name,
-                                    KernelIssueParams p,
-                                    Args&&... fArgs) const
+void GPUQueueHIP::DeviceIssueWorkKernel(std::string_view name,
+                                        DeviceWorkIssueParams p,
+                                        //
+                                        Args&&... fArgs) const
 {
-    // assert(p.workCount != 0);
-    // using namespace HipKernelCalls;
-    // uint32_t blockCount = Math::DivideUp(p.workCount, StaticThreadPerBlock1D());
-    // uint32_t blockSize = StaticThreadPerBlock1D();
-
-    // Kernel<<<blockCount, blockSize, p.sharedMemSize, stream>>>
-    // (
-    //     std::forward<Args>(fArgs)...
-    // );
-    // HIP_KERNEL_CHECK();
+    throw MRayError("Not yet Implemented (HIP does not support it maybe?)");
 }
 
 template<class Lambda>
 MRAY_GPU inline
-void GPUQueueHIP::DeviceIssueLambda(std::string_view name,
-                                    KernelIssueParams p,
-                                    //
-                                    Lambda&& func) const
+void GPUQueueHIP::DeviceIssueWorkLambda(std::string_view name,
+                                        DeviceWorkIssueParams p,
+                                        //
+                                        Lambda&& func) const
 {
-    // assert(p.workCount != 0);
-    // static_assert(std::is_rvalue_reference_v<decltype(func)>,
-    //               "Not passing Lambda as rvalue_reference. This kernel call "
-    //               "would've been failed in runtime!");
-    // using namespace HipKernelCalls;
-    // uint32_t blockCount = Math::DivideUp(p.workCount, StaticThreadPerBlock1D());
-    // uint32_t blockSize = StaticThreadPerBlock1D();
-
-    // KernelCallLambdaHIP<Lambda>
-    // <<<blockCount, blockSize, p.sharedMemSize, stream>>>
-    // (
-    //     std::forward<Lambda>(func)
-    // );
-    // HIP_KERNEL_CHECK();
+    throw MRayError("Not yet Implemented (HIP does not support it maybe?)");
 }
 
 template<auto Kernel, class... Args>
 MRAY_GPU inline
-void GPUQueueHIP::DeviceIssueSaturatingKernel(std::string_view name,
-                                              KernelIssueParams p,
-                                              //
-                                              Args&&... fArgs) const
-{
-    // assert(p.workCount != 0);
-    // using namespace HipKernelCalls;
-
-    // const void* kernelPtr = reinterpret_cast<const void*>(Kernel);
-    // uint32_t threadCount = StaticThreadPerBlock1D();
-    // uint32_t blockCount = DetermineGridStrideBlock(kernelPtr,
-    //                                                p.sharedMemSize,
-    //                                                threadCount,
-    //                                                p.workCount);
-
-    // Kernel<<<blockCount, threadCount, p.sharedMemSize, stream>>>
-    // (
-    //     std::forward<Args>(fArgs)...
-    // );
-    // HIP_KERNEL_CHECK();
-}
-
-template<class Lambda>
-MRAY_GPU inline
-void GPUQueueHIP::DeviceIssueSaturatingLambda(std::string_view name,
-                                              KernelIssueParams p,
-                                              //
-                                              Lambda&& func) const
-{
-    // assert(p.workCount != 0);
-    // static_assert(std::is_rvalue_reference_v<decltype(func)>,
-    //               "Not passing Lambda as rvalue_reference. This kernel call "
-    //               "would've been failed in runtime!");
-    // using namespace HipKernelCalls;
-    // const void* kernelPtr = reinterpret_cast<const void*>(&KernelCallLambdaHIP<Lambda, StaticThreadPerBlock1D()>);
-    // uint32_t threadCount = StaticThreadPerBlock1D();
-    // uint32_t blockCount = DetermineGridStrideBlock(kernelPtr,
-    //                                                p.sharedMemSize,
-    //                                                threadCount,
-    //                                                p.workCount);
-
-
-    // KernelCallLambdaHIP<Lambda>
-    // <<<blockCount, threadCount, p.sharedMemSize, stream>>>
-    // (
-    //     std::forward<Lambda>(func)
-    // );
-    // HIP_KERNEL_CHECK();
-}
-
-template<auto Kernel, class... Args>
-MRAY_GPU inline
-void GPUQueueHIP::DeviceIssueExactKernel(std::string_view name,
-                                         KernelExactIssueParams p,
+void GPUQueueHIP::DeviceIssueBlockKernel(std::string_view name,
+                                         DeviceBlockIssueParams p,
                                          //
                                          Args&&... fArgs) const
 {
-    // assert(p.gridSize != 0);
-    // using namespace HipKernelCalls;
-    // Kernel<<<p.gridSize, p.blockSize, p.sharedMemSize, stream>>>
-    // (
-    //     std::forward<Args>(fArgs)...
-    // );
-    // HIP_KERNEL_CHECK();
+    throw MRayError("Not yet Implemented (HIP does not support it maybe?)");
 }
 
 template<class Lambda, uint32_t Bounds>
 MRAY_GPU inline
-void GPUQueueHIP::DeviceIssueExactLambda(std::string_view name,
-                                         KernelExactIssueParams p,
+void GPUQueueHIP::DeviceIssueBlockLambda(std::string_view name,
+                                         DeviceBlockIssueParams p,
                                          //
                                          Lambda&& func) const
 {
-    // assert(p.gridSize != 0);
-    // static_assert(std::is_rvalue_reference_v<decltype(func)>,
-    //               "Not passing Lambda as rvalue_reference. This kernel call "
-    //               "would've been failed in runtime!");
-    // using namespace HipKernelCalls;
-
-    // KernelCallLambdaHIP<Lambda, Bounds>
-    // <<<p.gridSize, p.blockSize, p.sharedMemSize, stream>>>
-    // (
-    //     std::forward<Lambda>(func)
-    // );
-    // HIP_KERNEL_CHECK();
+    throw MRayError("Not yet Implemented (HIP does not support it maybe?)");
 }
 
 }

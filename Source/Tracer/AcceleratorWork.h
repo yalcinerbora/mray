@@ -203,10 +203,10 @@ void AcceleratorWork<AG, TG>::CastLocalRays(// Output
     assert(dRayIndices.size() == dAcceleratorKeys.size());
 
     using namespace std::string_literals;
-    queue.IssueSaturatingKernel<KCLocalRayCast<AG, TG>>
+    queue.IssueWorkKernel<KCLocalRayCast<AG, TG>>
     (
         "KCCastLocalRays-"s + std::string(TypeName()),
-        KernelIssueParams{.workCount = static_cast<uint32_t>(dRayIndices.size())},
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dRayIndices.size())},
         //
         dHitIds,
         dHitParams,
@@ -238,10 +238,10 @@ void AcceleratorWork<AG, TG>::CastVisibilityRays(// Output
     assert(dRayIndices.size() == dAcceleratorKeys.size());
 
     using namespace std::string_literals;
-    queue.IssueSaturatingKernel<KCVisibilityRayCast<AG, TG>>
+    queue.IssueWorkKernel<KCVisibilityRayCast<AG, TG>>
     (
         "KCCastVisibilityRays-"s + std::string(TypeName()),
-        KernelIssueParams{.workCount = static_cast<uint32_t>(dRayIndices.size())},
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dRayIndices.size())},
         //
         dIsVisibleBuffer,
         dRNGStates,
@@ -271,10 +271,10 @@ void AcceleratorWork<AG, TG>::GeneratePrimitiveCenters(Span<Vector3> dAllPrimCen
         reinterpret_cast<const void*>(&KernelName),
         TPB, 0
     );
-    queue.IssueExactKernel<KernelName>
+    queue.IssueBlockKernel<KernelName>
     (
         "KCGenPrimCenters",
-        KernelExactIssueParams
+        DeviceBlockIssueParams
         {
             .gridSize = blockCount,
             .blockSize = TPB
@@ -309,10 +309,10 @@ void AcceleratorWork<AG, TG>::GeneratePrimitiveAABBs(Span<AABB3> dAllLeafAABBs,
         reinterpret_cast<const void*>(&KernelName),
         TPB, 0
     );
-    queue.IssueExactKernel<KernelName>
+    queue.IssueBlockKernel<KernelName>
     (
         "KCGeneratePrimAABBs",
-        KernelExactIssueParams
+        DeviceBlockIssueParams
         {
             .gridSize = blockCount,
             .blockSize = TPB
@@ -338,10 +338,10 @@ void AcceleratorWork<AG, TG>::GetCommonTransforms(Span<Matrix4x4> dTransforms,
 {
     static const std::string KernelName = "KCGetCommonTransforms-" + std::string(TG::TypeName());
     uint32_t transformCount = static_cast<uint32_t>(dTransformKeys.size());
-    queue.IssueSaturatingKernel<KCGetCommonTransforms<TG>>
+    queue.IssueWorkKernel<KCGetCommonTransforms<TG>>
     (
         KernelName,
-        KernelIssueParams { .workCount = transformCount },
+        DeviceWorkIssueParams { .workCount = transformCount },
         // Output
         dTransforms,
         // Inputs
@@ -368,10 +368,10 @@ void AcceleratorWork<AG, TG>::TransformLocallyConstantAABBs(// Output
 
         using namespace std::string_literals;
         static const auto KernelName = "KCTransformLocallyConstantAABBs-"s + std::string(TypeName());
-        queue.IssueSaturatingKernel<KCTransformLocallyConstantAABBs<AG, TG>>
+        queue.IssueWorkKernel<KCTransformLocallyConstantAABBs<AG, TG>>
         (
             KernelName,
-            KernelIssueParams{.workCount = static_cast<uint32_t>(dConcreteIndicesOfInstances.size())},
+            DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dConcreteIndicesOfInstances.size())},
             //
             dInstanceAABBs,
             dConcreteAABBs,

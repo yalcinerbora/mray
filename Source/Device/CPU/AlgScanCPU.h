@@ -7,22 +7,9 @@
 namespace mray::host::algorithms
 {
 
-static constexpr uint32_t TPB = StaticThreadPerBlock1D();
-
-template <class T, class BinaryOp>
-MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-void KCInclusiveSegmentedScan(Span<T> dOut,
-                              Span<const T> dIn,
-                              uint32_t segmentSize,
-                              uint32_t totalBlocks,
-                              T identityElement,
-                              BinaryOp op)
-{
-}
-
 template <class T>
 MRAY_HOST
-size_t ExclusiveScanTMSize(size_t elementCount)
+size_t ExclusiveScanTMSize(size_t elementCount, const GPUQueueCPU&)
 {
     return 0u;
 }

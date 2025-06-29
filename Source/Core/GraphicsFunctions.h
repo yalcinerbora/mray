@@ -92,16 +92,16 @@ namespace Graphics
     MRAY_HYBRID constexpr Vector2       UVToSphericalAngles(const Vector2& uv);
     MRAY_HYBRID constexpr Vector2       SphericalAnglesToUV(const Vector2& thetaPhi);
 
-    template<uint32_t C>
+    template<class DimType>
     MRAY_HYBRID constexpr
-    Vector<C, uint32_t>     TextureMipSize(const Vector<C, uint32_t>& resolution,
+    DimType                 TextureMipSize(const DimType& resolution,
                                            uint32_t mipLevel);
-    template<uint32_t C>
+    template<class DimType>
     MRAY_HYBRID constexpr
-    uint32_t                TextureMipCount(const Vector<C, uint32_t>& resolution);
-    template<uint32_t C>
+    uint32_t                TextureMipCount(const DimType& resolution);
+    template<class DimType>
     MRAY_HYBRID constexpr
-    uint32_t                TextureMipPixelStart(const Vector<C, uint32_t>& resolution,
+    uint32_t                TextureMipPixelStart(const DimType& baseResolution,
                                                  uint32_t mipLevel);
 
     template<uint32_t C>
@@ -445,33 +445,50 @@ constexpr Vector2 SphericalAnglesToUV(const Vector2& thetaPhi)
     Float v = Float(1) - (thetaPhi[1] * InvPi<Float>());
     return Vector2(u, v);
 }
-template<uint32_t C>
+
+template<>
 MRAY_HYBRID constexpr
-Vector<C, uint32_t> TextureMipSize(const Vector<C, uint32_t>& resolution,
-                                   uint32_t mipLevel)
+uint32_t TextureMipSize<uint32_t>(const uint32_t& resolution, uint32_t mipLevel)
 {
-    using VecXui = Vector<C, uint32_t>;
-    VecXui mipRes;
-
-    UNROLL_LOOP
-    for(uint32_t i = 0; i < C; i++)
-        mipRes[i] = resolution[i] >> mipLevel;
-
-    return VecXui::Max(mipRes, VecXui(1));
+    return std::max(resolution >> mipLevel, 1u);
 }
 
-template<uint32_t C>
+template<class DimType>
+requires(std::is_same_v<DimType, Vector2ui> || std::is_same_v<DimType, Vector3ui>)
 MRAY_HYBRID constexpr
-uint32_t TextureMipCount(const Vector<C, uint32_t>& resolution)
+DimType TextureMipSize(const DimType& resolution,
+                       uint32_t mipLevel)
+{
+    DimType mipRes;
+    UNROLL_LOOP
+    for(uint32_t i = 0; i < DimType::Dims; i++)
+        mipRes[i] = resolution[i] >> mipLevel;
+
+    return DimType::Max(mipRes, DimType(1));
+}
+
+template<>
+MRAY_HYBRID constexpr
+uint32_t TextureMipCount<uint32_t>(const uint32_t& resolution)
+{
+    return Bit::RequiredBitsToRepresent(resolution);
+}
+
+template<class DimType>
+requires(std::is_same_v<DimType, Vector2ui> || std::is_same_v<DimType, Vector3ui>)
+MRAY_HYBRID constexpr
+uint32_t TextureMipCount(const DimType& resolution)
 {
     uint32_t maxDim = resolution[resolution.Maximum()];
     return Bit::RequiredBitsToRepresent(maxDim);
 }
 
-template<uint32_t C>
+template<class DimType>
+requires(std::is_same_v<DimType, Vector2ui> ||
+         std::is_same_v<DimType, Vector3ui> ||
+         std::is_same_v<DimType, uint32_t>)
 MRAY_HYBRID constexpr
-uint32_t TextureMipPixelStart(const Vector<C, uint32_t>& baseResolution,
-                              uint32_t mipLevel)
+uint32_t TextureMipPixelStart(const DimType& baseResolution, uint32_t mipLevel)
 {
     constexpr auto MAX_ITERATIONS = 18u;
     assert(TextureMipCount(baseResolution) > mipLevel);
@@ -486,7 +503,10 @@ uint32_t TextureMipPixelStart(const Vector<C, uint32_t>& baseResolution,
     UNROLL_LOOP
     for(uint32_t i = 0; i < MAX_ITERATIONS; i++)
     {
-        mipPixelStart += TextureMipSize(baseResolution, i).Multiply();
+        if constexpr(std::is_same_v<DimType, uint32_t>)
+            mipPixelStart += TextureMipSize(baseResolution, i);
+        else
+            mipPixelStart += TextureMipSize(baseResolution, i).Multiply();
         if(i < mipLevel) break;
     }
     return mipPixelStart;

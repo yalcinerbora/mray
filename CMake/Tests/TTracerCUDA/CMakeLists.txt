@@ -2,8 +2,10 @@ include("GenDeviceTests")
 include("GenTracerTests")
 
 # Target Generation
-gen_device_test(NAME ${MRAY_GPU_PLATFORM_NAME})
-gen_tracer_test(NAME ${MRAY_GPU_PLATFORM_NAME})
+gen_device_test(NAME ${MRAY_GPU_PLATFORM_NAME}
+                BACKEND ${MRAY_DEVICE_BACKEND})
+gen_tracer_test(NAME ${MRAY_GPU_PLATFORM_NAME}
+                BACKEND ${MRAY_DEVICE_BACKEND})
 
 gtest_discover_tests(${GEN_DEVICE_TEST_TARGET_NAME})
 gtest_discover_tests(${GEN_TRACER_TEST_TARGET_NAME})

@@ -16,8 +16,9 @@ void RadixSortTest(const GPUSystem& system)
     using DeviceAlgorithms::RadixSortTMSize;
     using DeviceAlgorithms::RadixSort;
 
-    static constexpr size_t ElementCount = 1'0;
-    size_t tempMemSize = RadixSortTMSize<IsAscending, Key, Value>(ElementCount);
+    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
+    static constexpr size_t ElementCount = 10;
+    size_t tempMemSize = RadixSortTMSize<IsAscending, Key, Value>(ElementCount, queue);
     DeviceMemory mem({&system.BestDevice()}, 1_MiB, 8_MiB);
 
     Span<Key> dKeys[2];
@@ -43,7 +44,6 @@ void RadixSortTest(const GPUSystem& system)
     std::iota(hValues.begin(), hValues.end(), Value(0));
     hOldKeys = hKeys;
 
-    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
     queue.MemcpyAsync(dKeys[0], Span<const Key>(hKeys.begin(), hKeys.end()));
     queue.MemcpyAsync(dValues[0], Span<const Value>(hValues.begin(), hValues.end()));
 

@@ -3,8 +3,59 @@
 
 #include "Core/Error.h"
 #include "Core/TimelineSemaphore.h"
+#include "Core/DataStructures.h"
+#include "Core/ThreadPool.h"
 
-#include "Core/Timer.h"
+#ifdef MRAY_WINDOWS
+    #include <windows.h>
+#elif defined MRAY_LINUX
+    #include <sys/sysinfo.h>
+#endif
+
+std::string GetCPUName()
+{
+    if constexpr(MRAY_IS_ON_WINDOWS)
+    {
+        static constexpr uint32_t MAX_NAME_CHARS = 48u;
+        std::string result(MAX_NAME_CHARS + 1, '\0');
+        // Intel x86 ISA manual, volume 2 page 347
+        // https://cdrdv2.intel.com/v1/dl/getContent/671110
+        __cpuidex(reinterpret_cast<int*>(result.data()) + 0 * 4, 0x80000002, 0);
+        __cpuidex(reinterpret_cast<int*>(result.data()) + 4 * 4, 0x80000003, 0);
+        __cpuidex(reinterpret_cast<int*>(result.data()) + 8 * 4, 0x80000004, 0);
+        while(result.back() != '\0')
+            result.pop_back();
+
+        return result;
+    }
+    #ifdef MRAY_LINUX
+        #error GetCPUName is not implemented in Linux!!!
+        return std::string();
+    #endif
+}
+
+uint64_t GetTotalCPUMemory()
+{
+    #ifdef MRAY_WINDOWS
+
+        ULONGLONG totalMemKB;
+        GetPhysicallyInstalledSystemMemory(&totalMemKB);
+        return size_t(totalMemKB) * 1'000;
+
+    #elif defined MRAY_LINUX
+
+        // Doing a extern C here,
+        // since I dunno struct sysinfo
+        // and function sysinfo collides or not
+        extern "C"
+        {
+            struct sysinfo s;
+            sysinfo(&s);
+            return size_t(s.totalram);
+        }
+
+    #endif
+}
 
 namespace mray::host
 {
@@ -18,7 +69,7 @@ GPUAnnotationCPU::Scope::~Scope()
 }
 
 GPUAnnotationCPU::GPUAnnotationCPU(AnnotationHandle h,
-                                   std::string_view name)
+                                   std::string_view)
     : domainHandle(h)
     , stringHandle(nullptr)
 {
@@ -57,41 +108,50 @@ void GPUSemaphoreViewCPU::HostRelease()
     externalSemaphore->Release();
 }
 
-GPUDeviceCPU::GPUDeviceCPU(int deviceId, AnnotationHandle domain)
+GPUDeviceCPU::GPUDeviceCPU(ThreadPool& tp, int deviceId,
+                           AnnotationHandle domain)
+    : deviceId(deviceId)
+    , domain(domain)
+    , threadPool(tp)
+    , name(GetCPUName())
+    , totalMemory(GetTotalCPUMemory())
 {
+    for(uint32_t i = 0; i < TotalQueuePerDevice(); i++)
+        queues.emplace_back(tp, domain, this);
 }
 
 bool GPUDeviceCPU::operator==(const GPUDeviceCPU& other) const
 {
-    return true;
+    return deviceId == other.deviceId;
 }
 
 int GPUDeviceCPU::DeviceId() const
 {
-    return 0;
+    return deviceId;
 }
 
 std::string GPUDeviceCPU::Name() const
 {
-    return std::string("CPU");
+    return name;
 }
 
 std::string GPUDeviceCPU::ComputeCapability() const
 {
-    return std::string("v0");
+    return std::string("none");
 }
 
 size_t GPUDeviceCPU::TotalMemory() const
 {
-    return 0u;
+
+    return totalMemory;
 }
 
 uint32_t GPUDeviceCPU::SMCount() const
 {
-    return 1u;
+    return threadPool.ThreadCount();
 }
 
-uint32_t GPUDeviceCPU::MaxActiveBlockPerSM(uint32_t threadsPerBlock) const
+uint32_t GPUDeviceCPU::MaxActiveBlockPerSM(uint32_t) const
 {
     return 1u;
 }
@@ -107,28 +167,48 @@ const GPUQueueCPU& GPUDeviceCPU::GetTransferQueue() const
     return transferQueue;
 }
 
-GPUSystemCPU::GPUSystemCPU()
-
+GPUQueueCPU::~GPUQueueCPU()
 {
-    // TODO:
-    if(globalGPUListPtr)
-        throw MRayError("One process can only have "
-                        "a single GPUSystem object!");
+    tp->Wait();
+}
 
-    throw MRayError("CPU-backend is not implemented yet!");
+GPUSystemCPU::GPUSystemCPU()
+ : localTP(nullptr)
+{
+    uint32_t queueSize = Math::NextPowerOfTwo(std::thread::hardware_concurrency() * 8);
+    localTP = std::make_unique<ThreadPool>(std::thread::hardware_concurrency(),
+                                           [](SystemThreadHandle handle, uint32_t id)
+    {
+        RenameThread(handle, MRAY_FORMAT("GPUEmulator_{}", id));
+    }, queueSize);
+
+    // TODO: Check NUMA stuff:
+    //  - Put a flag, to auto combine or split
+    //    NUMA nodes as seperate "Device"
+    systemGPUs.emplace_back(*localTP.get(), 0, nullptr);
+}
+
+GPUSystemCPU::GPUSystemCPU(ThreadPool& tp)
+    : cpuDomain(nullptr)
+{
+    // TODO: Check NUMA stuff:
+    //  - Put a flag, to auto combine or split
+    //    NUMA nodes as seperate "Device"
+    systemGPUs.emplace_back(tp, 0, nullptr);
 }
 
 GPUSystemCPU::~GPUSystemCPU()
 {
-    globalGPUListPtr = nullptr;
 }
 
 std::vector<size_t> GPUSystemCPU::SplitWorkToMultipleGPU(uint32_t workCount,
-                                                         uint32_t threadCount,
-                                                         uint32_t sharedMemSize,
-                                                         void* kernelPtr) const
+                                                         uint32_t,
+                                                         uint32_t,
+                                                         void*) const
 {
-    return std::vector<size_t>(9);
+    // We assume single NUMA currently, it should be changed
+    // after that is implemented.
+    return std::vector<size_t>(workCount);
 }
 
 const GPUSystemCPU::GPUList& GPUSystemCPU::SystemDevices() const
@@ -146,32 +226,43 @@ const GPUDeviceCPU& GPUSystemCPU::BestDevice() const
     return systemGPUs[0];
 }
 
-KernelAttributes GPUSystemCPU::GetKernelAttributes(const void* kernelPtr) const
+KernelAttributes GPUSystemCPU::GetKernelAttributes(const void*) const
 {
-    return KernelAttributes {};
+    // TODO: This does not make sense for the CPU
+    // It'd be cool if we could've returned
+    // Stack usage, total size static variables etc.
+    return KernelAttributes
+    {
+        .localMemoryPerThread = 0,
+        .constantMemorySize = 0,
+        .maxDynamicSharedMemorySize = 0,
+        .maxTBP = 1,
+        .registerCountPerThread = 0,
+        .staticSharedMemorySize = 0
+    };
 }
 
-bool GPUSystemCPU::SetKernelShMemSize(const void* kernelPtr,
-                                      int sharedMemConfigSize) const
+bool GPUSystemCPU::SetKernelShMemSize(const void*, int) const
 {
-    return false;
+    return true;
 }
 
 size_t GPUSystemCPU::TotalMemory() const
 {
-    return 0u;
+    return GetTotalCPUMemory();
 }
 
 void GPUSystemCPU::SyncAll() const
 {
+    for(const auto& gpu : AllGPUs())
+    {
+        for(uint32_t i = 0; i < ComputeQueuePerDevice; i++)
+            gpu->GetComputeQueue(0).Barrier().Wait();
+        gpu->GetTransferQueue().Barrier().Wait();
+    }
 }
 
-typename GPUSystemCPU::GPUList*
-GPUSystemCPU::globalGPUListPtr = nullptr;
-
-void GPUSystemCPU::ThreadInitFunction()
-{
-}
+void GPUSystemCPU::ThreadInitFunction() {}
 
 GPUAnnotationCPU GPUSystemCPU::CreateAnnotation(std::string_view name) const
 {

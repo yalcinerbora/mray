@@ -54,7 +54,8 @@ void SimulateBasicPathTracer()
     // =================== //
     //        Start        //
     // =================== //
-    auto [dInitialIndices, dInitialKeys] = partitioner.Start(RayCount, MaxPartitionCount);
+    auto [dInitialIndices, dInitialKeys] = partitioner.Start(RayCount, MaxPartitionCount,
+                                                             queue);
     EXPECT_EQ(dInitialIndices.size(), RayCount);
     DeviceAlgorithms::Iota(dInitialIndices, CommonIndex{0}, queue);
 
@@ -79,10 +80,10 @@ void SimulateBasicPathTracer()
     //   Issue New Rays    //
     // =================== //
     uint32_t deadRayCount = hDeadAlivePartitions[1] - hDeadAlivePartitions[0];
-    queue.IssueLambda
+    queue.IssueWorkLambda
     (
         "GTest Mock Generate Rays",
-        KernelIssueParams{.workCount = deadRayCount},
+        DeviceWorkIssueParams{.workCount = deadRayCount},
         [=]MRAY_HYBRID(const KernelCallParams kp)
         {
             for(uint32_t i = kp.GlobalId(); i < deadRayCount;
@@ -158,10 +159,10 @@ void SimulateBasicPathTracer()
                                                                        localPartitionSize);
         Span<CommonKey> dKeysLocal = dMatPartitionKeys.subspan(partitionRange[0],
                                                                localPartitionSize);
-        queue.IssueLambda
+        queue.IssueWorkLambda
         (
             "GTest Mock Kill Rays",
-            KernelIssueParams{.workCount = localPartitionSize},
+            DeviceWorkIssueParams{.workCount = localPartitionSize},
             [=]MRAY_HYBRID(const KernelCallParams kp)
             {
                 for(uint32_t i = kp.GlobalId(); i < localPartitionSize;

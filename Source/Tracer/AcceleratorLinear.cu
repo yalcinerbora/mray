@@ -63,7 +63,7 @@ void KCSetIsVisibleIndirect(MRAY_GRID_CONSTANT const Bitspan<uint32_t> dIsVisibl
                             //
                             MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices)
 {
-    uint32_t rayCount = dRayIndices.size();
+    uint32_t rayCount = uint32_t(dRayIndices.size());
     KernelCallParams kp;
     for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
     {
@@ -148,13 +148,13 @@ AABB3 BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instan
 
     // Reduce the given AABBs
     // Cheeckly utilize stack mem as temp mem
-    size_t tempMemSize = DeviceAlgorithms::ReduceTMSize<AABB3>(dAABBs.size());
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
+    size_t tempMemSize = DeviceAlgorithms::ReduceTMSize<AABB3>(dAABBs.size(), queue);
     Span<AABB3> dReducedAABB;
     Span<Byte> dTemp;
     MemAlloc::AllocateMultiData(std::tie(dTemp, dReducedAABB),
                                 stackMem, {tempMemSize, 1});
 
-    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     DeviceAlgorithms::Reduce(Span<AABB3,1>(dReducedAABB), dTemp,
                              ToConstSpan(dAABBs),
                              AABB3::Negative(),
@@ -207,7 +207,9 @@ void BaseAcceleratorLinear::CastRays(// Output
     //
     queue.MemsetAsync(dTraversalStack.subspan(0, allRayCount), 0x00);
     // Initialize the ray partitioner
-    auto [dCurrentIndices, dCurrentKeys] = rayPartitioner.Start(currentRayCount, partitionCount);
+    auto [dCurrentIndices, dCurrentKeys] = rayPartitioner.Start(currentRayCount,
+                                                                partitionCount,
+                                                                queue);
     // Copy the ray indices to the local buffer, normally we could utilize
     // global ray partitioner (if available) but
     // - Not all renderers (very simple ones probably) may not have a partitioner
@@ -217,10 +219,10 @@ void BaseAcceleratorLinear::CastRays(// Output
     // Continiously do traverse/partition until all rays are missed
     while(currentRayCount != 0)
     {
-        queue.IssueSaturatingKernel<KCIntersectBaseLinear>
+        queue.IssueWorkKernel<KCIntersectBaseLinear>
         (
             "(A)LinearRayCast"sv,
-            KernelIssueParams{.workCount = currentRayCount},
+            DeviceWorkIssueParams{.workCount = currentRayCount},
             // Output
             dCurrentKeys,
             // I-O
@@ -323,15 +325,17 @@ void BaseAcceleratorLinear::CastVisibilityRays(// Output
     //
     queue.MemsetAsync(dTraversalStack.subspan(0, allRayCount), 0x00);
     // Assume visible, cull if hits anything
-    queue.IssueSaturatingKernel<KCSetIsVisibleIndirect>
+    queue.IssueWorkKernel<KCSetIsVisibleIndirect>
     (
         "KCSetIsVisibleIndirect"sv,
-        KernelIssueParams{.workCount = currentRayCount},
+        DeviceWorkIssueParams{.workCount = currentRayCount},
         dIsVisibleBuffer,
         dRayIndices
     );
     // Initialize the ray partitioner
-    auto [dCurrentIndices, dCurrentKeys] = rayPartitioner.Start(currentRayCount, partitionCount);
+    auto [dCurrentIndices, dCurrentKeys] = rayPartitioner.Start(currentRayCount,
+                                                                partitionCount,
+                                                                queue);
     // Copy the ray indices to the local buffer, normally we could utilize
     // global ray partitioner (if available) but
     // - Not all renderers (very simple ones probably) may not have a partitioner
@@ -341,10 +345,10 @@ void BaseAcceleratorLinear::CastVisibilityRays(// Output
     // Continiously do traverse/partition until all rays are missed
     while(currentRayCount != 0)
     {
-        queue.IssueSaturatingKernel<KCIntersectBaseLinear>
+        queue.IssueWorkKernel<KCIntersectBaseLinear>
         (
             "(A)LinearRayCast"sv,
-            KernelIssueParams{.workCount = static_cast<uint32_t>(dCurrentIndices.size())},
+            DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dCurrentIndices.size())},
             // Output
             dCurrentKeys,
             // I-O

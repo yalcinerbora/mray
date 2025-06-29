@@ -317,10 +317,10 @@ AcceleratorGroupOptiX<PG>::MultiBuildGeneric_CLT(const PreprocessResult& ppResul
     );
     using namespace std::string_literals;
     static const auto KernelName = "KCGeneratePrimitiveKeys-"s + std::string(TypeName());
-    queue.IssueExactKernel<KCGeneratePrimitiveKeys>
+    queue.IssueBlockKernel<KCGeneratePrimitiveKeys>
     (
         KernelName,
-        KernelExactIssueParams
+        DeviceBlockIssueParams
         {
             .gridSize = blockCount,
             .blockSize = StaticThreadPerBlock1D()
@@ -443,10 +443,10 @@ AcceleratorGroupOptiX<PG>::MultiBuildAABB_CLT(const PreprocessResult& ppResult,
         0
     );
     using namespace std::string_view_literals;
-    queue.IssueExactKernel<KCGeneratePrimitiveKeys>
+    queue.IssueBlockKernel<KCGeneratePrimitiveKeys>
     (
         "KCGeneratePrimitiveKeys-Temp"sv,
-        KernelExactIssueParams
+        DeviceBlockIssueParams
         {
             .gridSize = blockCount,
             .blockSize = StaticThreadPerBlock1D()
@@ -467,10 +467,10 @@ AcceleratorGroupOptiX<PG>::MultiBuildAABB_CLT(const PreprocessResult& ppResult,
         0
     );
     static constexpr uint32_t BLOCK_PER_INSTANCE = 16;
-    queue.IssueExactKernel<AABBGenKernelName>
+    queue.IssueBlockKernel<AABBGenKernelName>
     (
         "KCGeneratePrimAABBs",
-        KernelExactIssueParams
+        DeviceBlockIssueParams
         {
             .gridSize = blockCount,
             .blockSize = StaticThreadPerBlock1D()

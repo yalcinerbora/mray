@@ -10,14 +10,16 @@ namespace mray::host::algorithms
 template <bool IsAscending, class K, class V>
 MRAY_HOST inline
 size_t SegmentedRadixSortTMSize(size_t totalElementCount,
-                                size_t totalSegments)
+                                size_t totalSegments,
+                                const GPUQueueCPU& q)
 {
     return 0u;
 }
 
 template <bool IsAscending, class K, class V>
 MRAY_HOST inline
-size_t RadixSortTMSize(size_t elementCount)
+size_t RadixSortTMSize(size_t elementCount,
+                       const GPUQueueCPU& q)
 {
     return 0u;
 }
