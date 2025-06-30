@@ -528,8 +528,6 @@ void TextureCUDA_BC<T>::CopyToAsync(Span<PaddedChannelType> regionFrom,
     CUDA_CHECK(cudaMemcpy3DAsync(&p, ToHandleCUDA(queue)));
 }
 
-
-
 TextureBackingMemoryCUDA::TextureBackingMemoryCUDA(const GPUDeviceCUDA& gpu)
     : gpu(&gpu)
     , size(0)

@@ -1,6 +1,10 @@
 #include "MaterialsDefault.h"
 #include "Core/TypeNameGenerators.h"
 
+#ifdef MRAY_GPU_BACKEND_CPU
+    #include "Device/GPUSystem.hpp"
+#endif
+
 //===============================//
 //       Lambert Material        //
 //===============================//

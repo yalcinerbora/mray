@@ -29,13 +29,13 @@
     #include "CPU/GPUSystemCPU.h"
 
     // Alias
-    using KernelCallParams = mray::host::KernelCallParamsCPU;
-    using GPUSemaphoreView = mray::host::GPUSemaphoreViewCPU;
-    using GPUDevice = mray::host::GPUDeviceCPU;
-    using GPUQueue = mray::host::GPUQueueCPU;
-    using GPUFence = mray::host::GPUFenceCPU;
-    using GPUSystem = mray::host::GPUSystemCPU;
-    using GPUAnnotation = mray::host::GPUAnnotationCPU;
+    using KernelCallParams  = mray::host::KernelCallParamsCPU;
+    using GPUSemaphoreView  = mray::host::GPUSemaphoreViewCPU;
+    using GPUDevice         = mray::host::GPUDeviceCPU;
+    using GPUQueue          = mray::host::GPUQueueCPU;
+    using GPUFence          = mray::host::GPUFenceCPU;
+    using GPUSystem         = mray::host::GPUSystemCPU;
+    using GPUAnnotation     = mray::host::GPUAnnotationCPU;
 #else
     #error Please define a GPU Backend!
 #endif
@@ -57,7 +57,6 @@
 #ifndef MRAY_SHARED_MEMORY
     #error "MRAY_SHARED_MEMORY" is not defined!
 #endif
-
 
 class GPUQueueIteratorRoundRobin
 {

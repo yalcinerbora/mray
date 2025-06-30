@@ -2,6 +2,10 @@
 
 #include "Device/GPUMemory.h"
 
+#ifdef MRAY_GPU_BACKEND_CPU
+    #include "Device/GPUSystem.hpp"
+#endif
+
 
 PrimGroupSphere::PrimGroupSphere(uint32_t primGroupId,
                                  const GPUSystem& sys)

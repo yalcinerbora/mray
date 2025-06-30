@@ -364,7 +364,7 @@ void KCUnionLBVHBoundingBoxes(// I-O
         // Paper does not discuss this, for single leaf node, we create a single intermediate node
         // to make the tracing code simpler (use do a stackless traversal so it is complex already)
         int32_t totalLeafs = static_cast<int32_t>(dLocalLeafAABBs.size());
-        int32_t totalNodes = static_cast<int32_t>(dLocalNodes.size());
+        //int32_t totalNodes = static_cast<int32_t>(dLocalNodes.size());
         if(totalLeafs == 1)
         {
             volatile LBVHBoundingBox& bbox = GetLocalAABBVolatile(0);

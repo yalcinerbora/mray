@@ -14,8 +14,6 @@
 
 #ifdef MRAY_GPU_BACKEND_CUDA
     #include <cub/block/block_reduce.cuh>
-#else
-    #error "Only CUDA Version of Reconstruction filter is implemented"
 #endif
 
 enum class FilterMode
@@ -279,7 +277,7 @@ void KCExpandSamplesToPixels(// Outputs
     Vector2i range = FilterRadiusPixelRange(filterWH);
     // Don't use 1.0f exactly here
     // pixel is [0,1)
-    Float pixelWidth = Math::PrevFloat<Float>(1);
+    //Float pixelWidth = Math::PrevFloat<Float>(1);
     Float radiusSqr = filterRadius * filterRadius;
 
     KernelCallParams kp;
@@ -304,7 +302,7 @@ void KCExpandSamplesToPixels(// Outputs
         }
 
         // Actual write
-        int32_t stride = 0;
+        uint32_t stride = 0;
         for(int32_t y = localRangeX[0]; y < localRangeX[1]; y++)
         for(int32_t x = localRangeX[0]; x < localRangeX[1]; x++)
         {
@@ -454,7 +452,62 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan img,
     }
 }
 
+#elif defined MRAY_GPU_BACKEND_CPU
+
+template <uint32_t TPB, uint32_t LOGICAL_WARP_SIZE, class Filter>
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
+void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan img,
+                          // Inputs per segment
+                          MRAY_GRID_CONSTANT const Span<const uint32_t> dStartOffsets,
+                          MRAY_GRID_CONSTANT const Span<const CommonKey> dPixelIds,
+                          // Inputs per thread
+                          MRAY_GRID_CONSTANT const Span<const CommonIndex> dIndices,
+                          // Inputs Accessed by SampleId
+                          MRAY_GRID_CONSTANT const Span<const Spectrum> dValues,
+                          MRAY_GRID_CONSTANT const Span<const ImageCoordinate> dImgCoords,
+                          // Constants
+                          MRAY_GRID_CONSTANT const Span<const uint32_t, 1u> hPartitionCount,
+                          MRAY_GRID_CONSTANT const Float scalarWeightMultiplier,
+                          MRAY_GRID_CONSTANT const Filter filter)
+{
+    KernelCallParams kp;
+    // Each thread is responsible for a segment
+    for(uint32_t pixId = kp.GlobalId(); pixId < hPartitionCount[0]; pixId += kp.TotalSize())
+    {
+        //
+        Vector2ui segmentRange = Vector2ui(dStartOffsets[pixId + 0], dStartOffsets[pixId + 1]);
+        CommonKey responsiblePixel = dPixelIds[pixId];
+
+        // This partition is residuals, we conservatively allocated but not every
+        // potential filter slot is not filled. Skip this partition
+        if(responsiblePixel == INVALID_MORTON) continue;
+
+        //
+        namespace Morton = Graphics::MortonCode;
+        Vector2i pixCoordsInt = Vector2i(Morton::Decompose2D(responsiblePixel));
+        Vector2 pixCoords = Vector2(pixCoordsInt) + Float(0.5);
+        Vector4 value = Vector4::Zero();
+        for(uint32_t i = segmentRange[0]; i < segmentRange[1]; i++)
+        {
+            uint32_t readIndex = dIndices[i];
+            Vector3 sampleVal = Vector3(dValues[readIndex]);
+            Vector2 sampleCoord = dImgCoords[readIndex].GetPixelIndex();
+            Float weight = filter.Evaluate(pixCoords - sampleCoord) * scalarWeightMultiplier;
+            sampleVal *= weight;
+            value += Vector4(sampleVal, weight);
+        }
+
+        Float weight = img.FetchWeight(pixCoordsInt);
+        img.StoreWeight(weight + value[3], pixCoordsInt);
+
+        Vector3 pixValue = img.FetchPixel(pixCoordsInt);
+        img.StorePixel(pixValue + Vector3(value), pixCoordsInt);
+    }
+}
+
 #else
+
+#error "Generic version of reconstruction filter is not implemented!"
 
 template <uint32_t TPB, uint32_t LOGICAL_WARP_SIZE, class Filter>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
@@ -491,7 +544,7 @@ void KCFilterToImgAtomicRGB(MRAY_GRID_CONSTANT const ImageSpan img,
     Vector2i range = FilterRadiusPixelRange(filterWH);
     // Don't use 1.0f exactly here
     // pixel is [0,1)
-    Float pixelWidth = Math::PrevFloat<Float>(1);
+    //Float pixelWidth = Math::PrevFloat<Float>(1);
     Float radiusSqr = filterRadius * filterRadius;
 
     assert(dValues.size() == dImgCoords.size());
@@ -560,7 +613,7 @@ void KCSetImagePixels(MRAY_GRID_CONSTANT const ImageSpan img,
                       MRAY_GRID_CONSTANT const Span<const Float> dFilterWeights,
                       MRAY_GRID_CONSTANT const Span<const ImageCoordinate> dImgCoords,
                       // Constants
-                      MRAY_GRID_CONSTANT const Float scalarWeightMultiplier)
+                      MRAY_GRID_CONSTANT const Float)
 {
     uint32_t sampleCount = static_cast<uint32_t>(dImgCoords.size());
 
@@ -852,7 +905,12 @@ void ReconFilterGenericRGB(// Output
         KCFilterToImgWarpRGB<StaticThreadPerBlock1D(), 16, Filter>,
         KCFilterToImgWarpRGB<StaticThreadPerBlock1D(), 32, Filter>
     };
-    switch(logicalWarpSize - 1)
+
+    if constexpr(MRAY_GPU_BACKEND_IS_CPU)
+    {
+        KernelCall.template operator()<WK[0]>("KCFilterToImgWarpRGB<1>"sv);
+    }
+    else switch(logicalWarpSize - 1)
     {
         case 0: KernelCall.template operator()<WK[0]>("KCFilterToImgWarpRGB<1>"sv); break;
         case 1: KernelCall.template operator()<WK[1]>("KCFilterToImgWarpRGB<2>"sv); break;

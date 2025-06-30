@@ -13,7 +13,7 @@ template <class T>
 struct Adder
 {
     MRAY_HYBRID MRAY_CGPU_INLINE
-    T operator()(const T& l, const T& r)
+    T operator()(const T& l, const T& r) const
     {
         return r + l;
     }

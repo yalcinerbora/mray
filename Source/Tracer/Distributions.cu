@@ -472,7 +472,7 @@ void DistributionGroupPwC2D::Construct(uint32_t index,
     uint32_t xCount = static_cast<uint32_t>(sizes[index][0]);
     uint32_t yCount = static_cast<uint32_t>(sizes[index][1]);
 
-    static constexpr auto TPBCall = (MRAY_GPU_BACKEND_CPU) ? 1u : TPB;
+    static constexpr auto TPBCall = (MRAY_GPU_BACKEND_IS_CPU) ? 1u : TPB;
 
     // Directly scan to cdf array
     queue.IssueBlockKernel<KCSegmentedScanPrecise>
@@ -498,7 +498,7 @@ void DistributionGroupPwC2D::Construct(uint32_t index,
             DeviceBlockIssueParams
             {
                 .gridSize = yCount,
-                .blockSize = (MRAY_GPU_BACKEND_CPU) ? 1u : StaticThreadPerBlock1D()
+                .blockSize = (MRAY_GPU_BACKEND_IS_CPU) ? 1u : StaticThreadPerBlock1D()
             },
             //
             d.dCDFsX,

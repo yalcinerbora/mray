@@ -10,6 +10,8 @@
 #include "RequestedTypes.h"
 #include "RequestedRenderers.h"
 
+#include "Tracer/TextureView.hpp"
+
 #include "Device/GPUAlgReduce.h"
 
 TypeGeneratorPack Tracer::GLOBAL_TYPE_GEN = {};

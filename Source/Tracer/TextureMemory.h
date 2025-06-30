@@ -89,7 +89,6 @@ class GenericTextureI
     // And All Done!
 };
 
-
 class TextureMemory
 {
     using GPUIterator       = GPUQueueIteratorRoundRobin;

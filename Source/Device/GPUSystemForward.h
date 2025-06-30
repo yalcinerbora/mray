@@ -54,6 +54,10 @@
     template<uint32_t D, class T>
     using Texture = mray::cuda::TextureCUDA<D, T>;
 
+    inline constexpr bool MRAY_GPU_BACKEND_IS_CUDA  = true;
+    inline constexpr bool MRAY_GPU_BACKEND_IS_HIP   = false;
+    inline constexpr bool MRAY_GPU_BACKEND_IS_CPU   = false;
+
 #elif defined(MRAY_GPU_BACKEND_HIP)
 
     namespace mray::hip
@@ -104,6 +108,10 @@
     template<uint32_t D, class T>
     using Texture = mray::hip::TextureHIP<D, T>;
 
+    inline constexpr bool MRAY_GPU_BACKEND_IS_CUDA  = false;
+    inline constexpr bool MRAY_GPU_BACKEND_IS_HIP   = true;
+    inline constexpr bool MRAY_GPU_BACKEND_IS_CPU   = false;
+
 #elif defined MRAY_GPU_BACKEND_CPU
 
     namespace mray::host
@@ -133,16 +141,16 @@
     }
 
     // Alias the types
-    using KernelCallParams = mray::host::KernelCallParamsCPU;
-    using GPUSemaphore = mray::host::GPUSemaphoreViewCPU;
-    using GPUDevice = mray::host::GPUDeviceCPU;
-    using GPUQueue = mray::host::GPUQueueCPU;
-    using GPUFence = mray::host::GPUFenceCPU;
-    using GPUSystem = mray::host::GPUSystemCPU;
-    using DeviceMemory = mray::host::DeviceMemoryCPU;
-    using DeviceLocalMemory = mray::host::DeviceLocalMemoryCPU;
-    using HostLocalMemory = mray::host::HostLocalMemoryCPU;
-    using TextureBackingMemory = mray::host::TextureBackingMemoryCPU;
+    using KernelCallParams      = mray::host::KernelCallParamsCPU;
+    using GPUSemaphore          = mray::host::GPUSemaphoreViewCPU;
+    using GPUDevice             = mray::host::GPUDeviceCPU;
+    using GPUQueue              = mray::host::GPUQueueCPU;
+    using GPUFence              = mray::host::GPUFenceCPU;
+    using GPUSystem             = mray::host::GPUSystemCPU;
+    using DeviceMemory          = mray::host::DeviceMemoryCPU;
+    using DeviceLocalMemory     = mray::host::DeviceLocalMemoryCPU;
+    using HostLocalMemory       = mray::host::HostLocalMemoryCPU;
+    using TextureBackingMemory  = mray::host::TextureBackingMemoryCPU;
 
     template<uint32_t D, class T>
     using TextureView = mray::host::TextureViewCPU<D, T>;
@@ -153,6 +161,10 @@
 
     template<uint32_t D, class T>
     using Texture = mray::host::TextureCPU<D, T>;
+
+    static constexpr bool MRAY_GPU_BACKEND_IS_CUDA  = false;
+    static constexpr bool MRAY_GPU_BACKEND_IS_HIP   = false;
+    static constexpr bool MRAY_GPU_BACKEND_IS_CPU   = true;
 
 #else
     #error Please define a GPU Backend!

@@ -1,6 +1,10 @@
 #include "RenderImage.h"
 #include "Core/TracerI.h"
 
+#ifdef MRAY_GPU_BACKEND_CPU
+    #include "Device/GPUSystem.hpp"
+#endif
+
 Vector2ui ImageTiler::ResponsibleSize() const
 {
     return range[1] - range[0];

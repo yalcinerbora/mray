@@ -195,7 +195,7 @@ Vector3 GenericReadFromView(const Vector2& uv, GenericTextureView& view)
         else if constexpr(T::Channels == 4)
             return Vector3(t(uv));
         //
-        return Vector3::Zero();
+        else return Vector3::Zero();
     });
 }
 

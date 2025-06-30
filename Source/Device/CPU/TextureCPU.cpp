@@ -1,5 +1,6 @@
 #include "TextureCPU.h"
 #include "DeviceMemoryCPU.h"
+#include "GPUSystemCPU.hpp"
 
 #include "Core/GraphicsFunctions.h"
 
@@ -7,8 +8,8 @@ namespace mray::host
 {
 
 template<uint32_t D, class T>
-TextureCPU<D, T>::TextureCPU(const GPUDeviceCPU& device,
-                             const TextureInitParams<D>& p)
+TextureCPU_Normal<D, T>::TextureCPU_Normal(const GPUDeviceCPU& device,
+                                           const TextureInitParams<D>& p)
     : gpu(&device)
     , texParams(p)
 {
@@ -22,7 +23,7 @@ TextureCPU<D, T>::TextureCPU(const GPUDeviceCPU& device,
 }
 
 template<uint32_t D, class T>
-TextureCPU<D, T>::TextureCPU(TextureCPU&& other) noexcept
+TextureCPU_Normal<D, T>::TextureCPU_Normal(TextureCPU_Normal&& other) noexcept
     : gpu(other.gpu)
     , texParams(other.texParams)
     , size(other.size)
@@ -31,7 +32,7 @@ TextureCPU<D, T>::TextureCPU(TextureCPU&& other) noexcept
 {}
 
 template<uint32_t D, class T>
-TextureCPU<D, T>& TextureCPU<D, T>::operator=(TextureCPU&& other) noexcept
+TextureCPU_Normal<D, T>& TextureCPU_Normal<D, T>::operator=(TextureCPU_Normal&& other) noexcept
 {
     assert(&other != this);
     gpu = other.gpu;
@@ -43,11 +44,10 @@ TextureCPU<D, T>& TextureCPU<D, T>::operator=(TextureCPU&& other) noexcept
 }
 
 template<uint32_t D, class T>
-TextureCPU<D, T>::~TextureCPU()
-{}
+TextureCPU_Normal<D, T>::~TextureCPU_Normal() = default;
 
 template<uint32_t D, class T>
-RWTextureRefCPU<D, T> TextureCPU<D, T>::GenerateRWRef(uint32_t mipLevel)
+RWTextureRefCPU<D, T> TextureCPU_Normal<D, T>::GenerateRWRef(uint32_t mipLevel)
 {
     if(mipLevel >= texParams.mipCount)
         throw MRayError("Requested out of bounds mip level!");
@@ -61,51 +61,51 @@ RWTextureRefCPU<D, T> TextureCPU<D, T>::GenerateRWRef(uint32_t mipLevel)
 }
 
 template<uint32_t D, class T>
-size_t TextureCPU<D, T>::Size() const
+size_t TextureCPU_Normal<D, T>::Size() const
 {
     return size;
 }
 
 template<uint32_t D, class T>
-size_t TextureCPU<D, T>::Alignment() const
+size_t TextureCPU_Normal<D, T>::Alignment() const
 {
     return alignment;
 }
 
 template<uint32_t D, class T>
-TextureExtent<D> TextureCPU<D, T>::Extents() const
+TextureExtent<D> TextureCPU_Normal<D, T>::Extents() const
 {
     return texParams.size;
 }
 
 template<uint32_t D, class T>
-uint32_t TextureCPU<D, T>::MipCount() const
+uint32_t TextureCPU_Normal<D, T>::MipCount() const
 {
     return texParams.mipCount;
 }
 
 template<uint32_t D, class T>
-const GPUDeviceCPU& TextureCPU<D, T>::Device() const
+const GPUDeviceCPU& TextureCPU_Normal<D, T>::Device() const
 {
     assert(gpu != nullptr);
     return *gpu;
 }
 
 template<uint32_t D, class T>
-void TextureCPU<D, T>::CommitMemory(const GPUQueueCPU&,
-                                    const TextureBackingMemoryCPU& deviceMem,
-                                    size_t offset)
+void TextureCPU_Normal<D, T>::CommitMemory(const GPUQueueCPU&,
+                                           const TextureBackingMemoryCPU& deviceMem,
+                                           size_t offset)
 {
     Span<Byte> data = ToHandleCPU(deviceMem);
     dataPtr = reinterpret_cast<PaddedChannelType*>(data.subspan(offset, size).data());
 }
 
 template<uint32_t D, class T>
-void TextureCPU<D, T>::CopyFromAsync(const GPUQueueCPU& queue,
-                                     uint32_t mipLevel,
-                                     const TextureExtent<D>& offset,
-                                     const TextureExtent<D>& fromSize,
-                                     Span<const PaddedChannelType> regionFrom)
+void TextureCPU_Normal<D, T>::CopyFromAsync(const GPUQueueCPU& queue,
+                                            uint32_t mipLevel,
+                                            const TextureExtent<D>& offset,
+                                            const TextureExtent<D>& fromSize,
+                                            Span<const PaddedChannelType> regionFrom)
 {
     assert(mipLevel < texParams.mipCount);
     Span<PaddedChannelType> dataSpan = Span<PaddedChannelType>(dataPtr, size);
@@ -167,11 +167,11 @@ void TextureCPU<D, T>::CopyFromAsync(const GPUQueueCPU& queue,
 }
 
 template<uint32_t D, class T>
-void TextureCPU<D, T>::CopyToAsync(Span<PaddedChannelType> regionTo,
-                                   const GPUQueueCPU& queue,
-                                   uint32_t mipLevel,
-                                   const TextureExtent<D>& offset,
-                                   const TextureExtent<D>& toSize) const
+void TextureCPU_Normal<D, T>::CopyToAsync(Span<PaddedChannelType> regionTo,
+                                          const GPUQueueCPU& queue,
+                                          uint32_t mipLevel,
+                                          const TextureExtent<D>& offset,
+                                          const TextureExtent<D>& toSize) const
 {
     assert(mipLevel < texParams.mipCount);
     Span<PaddedChannelType> dataSpan = Span<PaddedChannelType>(dataPtr, size);
@@ -229,6 +229,70 @@ void TextureCPU<D, T>::CopyToAsync(Span<PaddedChannelType> regionTo,
                                 Vector2ui(toSize));
         }
     }
+}
+
+template<class T>
+TextureCPU_BC<T>::TextureCPU_BC(const GPUDeviceCPU&,
+                                const TextureInitParams<2>&)
+{
+    // Unreachable code warning MSVC?
+    //throw MRayError("CPU Device does not support BC textures!");
+}
+
+template<class T>
+size_t TextureCPU_BC<T>::Size() const
+{
+    return size;
+}
+
+template<class T>
+size_t TextureCPU_BC<T>::Alignment() const
+
+{
+    return alignment;
+}
+
+template<class T>
+TextureExtent<2> TextureCPU_BC<T>::Extents() const
+{
+    return texParams.size;
+}
+
+template<class T>
+uint32_t TextureCPU_BC<T>::MipCount() const
+{
+    return texParams.mipCount;
+}
+
+template<class T>
+const GPUDeviceCPU& TextureCPU_BC<T>::Device() const
+{
+    assert(gpu != nullptr);
+    return *gpu;
+}
+
+template<class T>
+void TextureCPU_BC<T>::CommitMemory(const GPUQueueCPU&,
+                                    const TextureBackingMemoryCPU&,
+                                    size_t)
+{
+    throw MRayError("CPU Device does not support BC textures!");
+}
+
+template<class T>
+void TextureCPU_BC<T>::CopyFromAsync(const GPUQueueCPU&, uint32_t,
+                                     const TextureExtent<2>&, const TextureExtent<2>&,
+                                     Span<const PaddedChannelType>)
+{
+    throw MRayError("CPU Device does not support BC textures!");
+}
+
+template<class T>
+void TextureCPU_BC<T>::CopyToAsync(Span<PaddedChannelType>, const GPUQueueCPU&,
+                                    uint32_t, const TextureExtent<2>&,
+                                    const TextureExtent<2>&) const
+{
+    throw MRayError("CPU Device does not support BC textures!");
 }
 
 TextureBackingMemoryCPU::TextureBackingMemoryCPU(const GPUDeviceCPU& gpu)
@@ -297,6 +361,95 @@ size_t TextureBackingMemoryCPU::Size() const
 }
 
 // Common Textures 1D
+template class mray::host::TextureCPU_Normal<1, Float>;
+template class mray::host::TextureCPU_Normal<1, Vector2>;
+template class mray::host::TextureCPU_Normal<1, Vector3>;
+template class mray::host::TextureCPU_Normal<1, Vector4>;
+
+template class mray::host::TextureCPU_Normal<1, uint8_t>;
+template class mray::host::TextureCPU_Normal<1, Vector2uc>;
+template class mray::host::TextureCPU_Normal<1, Vector3uc>;
+template class mray::host::TextureCPU_Normal<1, Vector4uc>;
+
+template class mray::host::TextureCPU_Normal<1, int8_t>;
+template class mray::host::TextureCPU_Normal<1, Vector2c>;
+template class mray::host::TextureCPU_Normal<1, Vector3c>;
+template class mray::host::TextureCPU_Normal<1, Vector4c>;
+
+template class mray::host::TextureCPU_Normal<1, uint16_t>;
+template class mray::host::TextureCPU_Normal<1, Vector2us>;
+template class mray::host::TextureCPU_Normal<1, Vector3us>;
+template class mray::host::TextureCPU_Normal<1, Vector4us>;
+
+template class mray::host::TextureCPU_Normal<1, int16_t>;
+template class mray::host::TextureCPU_Normal<1, Vector2s>;
+template class mray::host::TextureCPU_Normal<1, Vector3s>;
+template class mray::host::TextureCPU_Normal<1, Vector4s>;
+
+// Common Textures 2D
+template class mray::host::TextureCPU_Normal<2, Float>;
+template class mray::host::TextureCPU_Normal<2, Vector2>;
+template class mray::host::TextureCPU_Normal<2, Vector3>;
+template class mray::host::TextureCPU_Normal<2, Vector4>;
+
+template class mray::host::TextureCPU_Normal<2, uint8_t>;
+template class mray::host::TextureCPU_Normal<2, Vector2uc>;
+template class mray::host::TextureCPU_Normal<2, Vector3uc>;
+template class mray::host::TextureCPU_Normal<2, Vector4uc>;
+
+template class mray::host::TextureCPU_Normal<2, int8_t>;
+template class mray::host::TextureCPU_Normal<2, Vector2c>;
+template class mray::host::TextureCPU_Normal<2, Vector3c>;
+template class mray::host::TextureCPU_Normal<2, Vector4c>;
+
+template class mray::host::TextureCPU_Normal<2, uint16_t>;
+template class mray::host::TextureCPU_Normal<2, Vector2us>;
+template class mray::host::TextureCPU_Normal<2, Vector3us>;
+template class mray::host::TextureCPU_Normal<2, Vector4us>;
+
+template class mray::host::TextureCPU_Normal<2, int16_t>;
+template class mray::host::TextureCPU_Normal<2, Vector2s>;
+template class mray::host::TextureCPU_Normal<2, Vector3s>;
+template class mray::host::TextureCPU_Normal<2, Vector4s>;
+
+template class mray::host::TextureCPU_BC<PixelBC1>;
+template class mray::host::TextureCPU_BC<PixelBC2>;
+template class mray::host::TextureCPU_BC<PixelBC3>;
+template class mray::host::TextureCPU_BC<PixelBC4U>;
+template class mray::host::TextureCPU_BC<PixelBC4S>;
+template class mray::host::TextureCPU_BC<PixelBC5U>;
+template class mray::host::TextureCPU_BC<PixelBC5S>;
+template class mray::host::TextureCPU_BC<PixelBC6U>;
+template class mray::host::TextureCPU_BC<PixelBC6S>;
+template class mray::host::TextureCPU_BC<PixelBC7>;
+
+// Common Textures 3D
+template class mray::host::TextureCPU_Normal<3, Float>;
+template class mray::host::TextureCPU_Normal<3, Vector2>;
+template class mray::host::TextureCPU_Normal<3, Vector3>;
+template class mray::host::TextureCPU_Normal<3, Vector4>;
+
+template class mray::host::TextureCPU_Normal<3, uint8_t>;
+template class mray::host::TextureCPU_Normal<3, Vector2uc>;
+template class mray::host::TextureCPU_Normal<3, Vector3uc>;
+template class mray::host::TextureCPU_Normal<3, Vector4uc>;
+
+template class mray::host::TextureCPU_Normal<3, int8_t>;
+template class mray::host::TextureCPU_Normal<3, Vector2c>;
+template class mray::host::TextureCPU_Normal<3, Vector3c>;
+template class mray::host::TextureCPU_Normal<3, Vector4c>;
+
+template class mray::host::TextureCPU_Normal<3, uint16_t>;
+template class mray::host::TextureCPU_Normal<3, Vector2us>;
+template class mray::host::TextureCPU_Normal<3, Vector3us>;
+template class mray::host::TextureCPU_Normal<3, Vector4us>;
+
+template class mray::host::TextureCPU_Normal<3, int16_t>;
+template class mray::host::TextureCPU_Normal<3, Vector2s>;
+template class mray::host::TextureCPU_Normal<3, Vector3s>;
+template class mray::host::TextureCPU_Normal<3, Vector4s>;
+
+// Common Textures 1D
 template class mray::host::TextureCPU<1, Float>;
 template class mray::host::TextureCPU<1, Vector2>;
 template class mray::host::TextureCPU<1, Vector3>;
@@ -347,6 +500,17 @@ template class mray::host::TextureCPU<2, int16_t>;
 template class mray::host::TextureCPU<2, Vector2s>;
 template class mray::host::TextureCPU<2, Vector3s>;
 template class mray::host::TextureCPU<2, Vector4s>;
+
+template class mray::host::TextureCPU<2, PixelBC1>;
+template class mray::host::TextureCPU<2, PixelBC2>;
+template class mray::host::TextureCPU<2, PixelBC3>;
+template class mray::host::TextureCPU<2, PixelBC4U>;
+template class mray::host::TextureCPU<2, PixelBC4S>;
+template class mray::host::TextureCPU<2, PixelBC5U>;
+template class mray::host::TextureCPU<2, PixelBC5S>;
+template class mray::host::TextureCPU<2, PixelBC6U>;
+template class mray::host::TextureCPU<2, PixelBC6S>;
+template class mray::host::TextureCPU<2, PixelBC7>;
 
 // Common Textures 3D
 template class mray::host::TextureCPU<3, Float>;

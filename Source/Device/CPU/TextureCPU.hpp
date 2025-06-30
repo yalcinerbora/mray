@@ -18,8 +18,8 @@ RWTextureViewCPU<D, T> RWTextureRefCPU<D, T>::View() const
 
 template<uint32_t D, class T>
 template<class QT>
-requires(!IsBlockCompressedPixel<T> && std::is_same_v<QT, T>)
-TextureViewCPU<D, QT> TextureCPU<D, T>::View() const
+requires(std::is_same_v<QT, T>)
+TextureViewCPU<D, QT> TextureCPU_Normal<D, T>::View() const
 {
     // Normalize integers requested bu view is created with the same type
     if(texParams.normIntegers)
@@ -35,10 +35,9 @@ TextureViewCPU<D, QT> TextureCPU<D, T>::View() const
 
 template<uint32_t D, class T>
 template<class QT>
-requires(!IsBlockCompressedPixel<T> &&
-         !std::is_same_v<QT, T> &&
+requires(!std::is_same_v<QT, T> &&
          (PixelTypeToChannels<T>() == PixelTypeToChannels<QT>()))
-TextureViewCPU<D, QT> TextureCPU<D, T>::View() const
+TextureViewCPU<D, QT> TextureCPU_Normal<D, T>::View() const
 {
     constexpr bool IsFloatType = (std::is_same_v<QT, Float> ||
                                  std::is_same_v<QT, Vector<ChannelCount, Float>>);
@@ -70,12 +69,13 @@ TextureViewCPU<D, QT> TextureCPU<D, T>::View() const
     }
 }
 
-template<uint32_t D, class T>
+template<class T>
 template<class QT>
-requires(IsBlockCompressedPixel<T>)
-TextureViewCPU<D, QT> TextureCPU<D, T>::View() const
+requires(!std::is_same_v<QT, T> &&
+         (BCTypeToChannels<T>() == VectorTypeToChannels<QT>()))
+TextureViewCPU<2, QT> TextureCPU_BC<T>::View() const
 {
-    throw MRayError("CPU Device does not support block-compressed textures!");
-}
+    throw MRayError("CPU Device does not support BC textures!");
+};
 
 }

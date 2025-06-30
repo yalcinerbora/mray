@@ -43,12 +43,13 @@ size_t SegmentedRadixSortTMSize(size_t totalElementCount,
                                                        0, sizeof(K) * CHAR_BIT,
                                                        ToHandleCUDA(q)));
     else
-        CUDA_CHECK(DeviceRadixSort::SortPairsDescending(dTM, result,
-                                                        keys, values,
-                                                        totalElementCount, totalSegments,
-                                                        dStartOffsets, dEndOffsets,
-                                                        0, sizeof(K) * CHAR_BIT,
-                                                        ToHandleCUDA(q)));
+        CUDA_CHECK(DeviceSegmentedRadixSort::SortPairsDescending(dTM, result,
+                                                                 keys, values,
+                                                                 static_cast<int>(totalElementCount),
+                                                                 static_cast<int>(totalSegments),
+                                                                 dStartOffsets, dEndOffsets,
+                                                                 0, sizeof(K) * CHAR_BIT,
+                                                                 ToHandleCUDA(q)));
     return result;
 }
 
@@ -142,13 +143,13 @@ uint32_t SegmentedRadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
                                                        bitRange[0], bitRange[1],
                                                        ToHandleCUDA(queue)));
     else
-        CUDA_CHECK(DeviceRadixSort::SortPairsDescending(dTempMemory.data(), tmSize,
-                                                        keys, values,
-                                                        totalElemCount, totalSegments,
-                                                        dSegmentRanges.data(),
-                                                        dSegmentRanges.data() + 1,
-                                                        bitRange[0], bitRange[1],
-                                                        ToHandleCUDA(queue)));
+        CUDA_CHECK(DeviceSegmentedRadixSort::SortPairsDescending(dTempMemory.data(), tmSize,
+                                                                 keys, values,
+                                                                 totalElemCount, totalSegments,
+                                                                 dSegmentRanges.data(),
+                                                                 dSegmentRanges.data() + 1,
+                                                                 bitRange[0], bitRange[1],
+                                                                 ToHandleCUDA(queue)));
     uint32_t result = (keys.Current() == dKeyDoubleBuffer[0].data()) ? 0u : 1u;
     assert(((values.Current() == dValueDoubleBuffer[0].data()) ? 0u : 1u) == result);
     return result;
