@@ -104,13 +104,19 @@ class RWTextureViewCPU
 };
 
 template<class T>
-class InnerType;
+struct InnerType
+{
+    using Type = void;
+};
 
 template<VectorC T>
-class InnerType<T>
+struct InnerType<T>
 {
     using Type = typename T::InnerType;
 };
+
+template<class T>
+using InnerTypeT = typename InnerType<T>::Type;
 
 template<uint32_t D, class T>
 template<uint32_t C, bool IsSigned, class PixelType>
@@ -124,6 +130,9 @@ T TextureViewCPU<D, T>::Convert(const PixelType& pixel) const
     // Identity Conversion read type and query type is same
     if constexpr(std::is_same_v<PixelType, T>)
         return pixel;
+    // Padded channel to channel
+    else if constexpr(C == 3 && std::is_same_v<InnerTypeT<PixelType>, InnerTypeT<T>>)
+        return T(pixel);
     // Single Channel UNorm/SNorm conversion
     else if constexpr(C == 1 && IsNormConvertible<PixelType>() &&
                       std::is_same_v<T, Float>)
@@ -133,7 +142,7 @@ T TextureViewCPU<D, T>::Convert(const PixelType& pixel) const
     }
     // Multi Channel UNorm/SNorm conversion
     else if constexpr(C != 1 && IsNormConvertible<PixelType>() &&
-                      std::is_same_v<InnerType<T>, Float>)
+                      std::is_same_v<InnerTypeT<T>, Float>)
     {
         T result;
         UNROLL_LOOP
@@ -206,12 +215,14 @@ T TextureViewCPU<D, T>::ReadPixel(TextureExtent<D> ijk,
         static constexpr uint32_t IsBCPixel = EnumT::IsBCPixel;
         using PixelType = typename EnumT::Type;
         // Skip, stuff that do not get compiled
-        if constexpr(IsBCPixel || OutC != C) return T();
+        if constexpr(IsBCPixel)                 return T();
+        //else if constexpr(OutC != 3 || C != 4 || OutC != C)  return T();
+        else if constexpr((OutC != 3 || C != 4) && OutC != C)  return T();
         // Rest should be fine
         else
         {
             const PixelType* pixels = reinterpret_cast<const PixelType*>(mipData.data());
-            return Convert<C, IsSigned, PixelType>(pixels[linearIndex]);
+            return Convert<OutC, IsSigned, PixelType>(pixels[linearIndex]);
         }
     }, dt);
     return pixResult;
@@ -235,42 +246,48 @@ T TextureViewCPU<D, T>::ReadInterpolatedPixel(UV uv, TextureExtent<D> mipSize,
 requires (FloatPixelC<T>)
 {
     UV texel = uv * UV(mipSize) - UV(0.5);
-    std::array<Float, D> frac;
+    //
+    std::array<Float, D> texelFrac, texelBase;
     TextureExtent<D> ijkStart;
     if constexpr(D != 1)
     {
-        UNROLL_LOOP
         for(uint32_t i = 0; i < D; i++)
-            ijkStart[i] = uint32_t(std::modf(texel[i], &frac[i]));
+        {
+            texelFrac[i] = std::modf(texel[i], &texelBase[i]);
+            ijkStart[i] = uint32_t(texelBase[i]);
+        }
     }
-    else ijkStart = TextureExtent<D>(std::modf(texel, &frac[0]));
+    else
+    {
+        texelFrac[0] = std::modf(texel, &texelBase[0]);
+        ijkStart = TextureExtent<D>(texelBase[0]);
+    }
 
     // Fill a local buffer for interp
-    static constexpr uint32_t DATA_PER_LERP = (1u << (D + 1));
+    static constexpr uint32_t DATA_PER_LERP = (1u << (D));
     std::array<T, DATA_PER_LERP> pix;
-    UNROLL_LOOP
-    for(uint32_t k = 0; k < ((D >= 3) ? 2 : 0); k++)
-    UNROLL_LOOP
-    for(uint32_t j = 0; j < ((D >= 2) ? 2 : 0); j++)
-    UNROLL_LOOP
-    for(uint32_t i = 0; i < ((D >= 1) ? 2 : 0); i++)
+    //
+    static constexpr uint32_t K = (D >= 3) ? 2u : 1u;
+    static constexpr uint32_t J = (D >= 2) ? 2u : 1u;
+    static constexpr uint32_t I = (D >= 1) ? 2u : 1u;
+    for(uint32_t k = 0; k < K; k++)
+    for(uint32_t j = 0; j < J; j++)
+    for(uint32_t i = 0; i < I; i++)
     {
         TextureExtent<D> ijk = ijkStart;
         if constexpr(D == 1)        ijk += i;
         else if constexpr(D == 2)   ijk += TextureExtent<D>(i, j);
         else                        ijk += TextureExtent<D>(i, j, k);
         //
-        pix[(k << 2) + (j << 1) + k] = ReadPixel(ijk, mipSize, mipData);
+        pix[(k << 2) + (j << 1) + i] = ReadPixel(ijk, mipSize, mipData);
     }
     // Lerp part
-    UNROLL_LOOP
-    for(uint32_t i = 0; i < D + 1; i++)
-    UNROLL_LOOP
-    for(uint32_t j = (1 << D); i > 0u; i >>= 1)
+    for(uint32_t pass = D; pass > 0; pass--)
+    for(uint32_t i = 0; i < pass; i++)
         if constexpr(std::is_same_v<Float, T>)
-            pix[j * 2] = Math::Lerp(pix[j * 2], pix[j * 2 + 1], frac[i]);
+            pix[i] = Math::Lerp(pix[i * 2], pix[i * 2 + 1], texelFrac[i]);
         else
-            pix[j * 2] = T::Lerp(pix[j * 2], pix[j * 2 + 1], frac[i]);
+            pix[i] = T::Lerp(pix[i * 2], pix[i * 2 + 1], texelFrac[i]);
     //
     return pix[0];
 }
@@ -289,13 +306,20 @@ template<uint32_t D, class T>
 MRAY_GPU MRAY_GPU_INLINE
 T TextureViewCPU<D, T>::operator()(UV uv) const
 {
-    if(texParams->interp == MRayTextureInterpEnum::MR_LINEAR)
+    if(texParams->interp != MRayTextureInterpEnum::MR_LINEAR)
     {
-        UV texel = uv * UV(texParams->size);
+        UV texel = (texParams->normCoordinates)
+                    ? uv * UV(texParams->size)
+                    : uv;
         TextureExtent<D> ijk = TextureExtent<D>(texel);
         return ReadPixel(ijk, texParams->size, data);
     }
-    else return ReadInterpolatedPixel(uv, texParams->size, data);
+    else
+    {
+        if(texParams->normCoordinates)
+            uv = (uv + UV(0.5)) / UV(texParams->size);
+        return ReadInterpolatedPixel(uv, texParams->size, data);
+    }
 }
 
 template<uint32_t D, class T>
@@ -303,8 +327,11 @@ MRAY_GPU MRAY_GPU_INLINE
 T TextureViewCPU<D, T>::operator()(UV uv, UV dpdx, UV dpdy) const
 {
     // TODO: We ignore AF, change this later
-    dpdx *= UV(texParams->size);
-    dpdy *= UV(texParams->size);
+    if(!texParams->normCoordinates)
+    {
+        dpdx *= UV(texParams->size);
+        dpdy *= UV(texParams->size);
+    }
     Float maxLenSqr = std::max(dpdx.LengthSqr(), dpdy.LengthSqr());
     Float mipLevel = Float(0.5) * std::log2(maxLenSqr);
 
@@ -315,15 +342,19 @@ template<uint32_t D, class T>
 MRAY_GPU MRAY_GPU_INLINE
 T TextureViewCPU<D, T>::operator()(UV uv, Float mipLevel) const
 {
-    if(texParams->interp == MRayTextureInterpEnum::MR_LINEAR)
+    if(texParams->interp != MRayTextureInterpEnum::MR_LINEAR)
     {
         uint32_t mipLevelInt = uint32_t(mipLevel);
         uint32_t offset = Graphics::TextureMipPixelStart(texParams->size,
                                                          mipLevelInt);
         TextureExtent<D> size = Graphics::TextureMipSize(texParams->size, mipLevelInt);
         auto mipData = data.subspan(offset);
-
-        UV texel = uv * UV(size);
+        // TODO: Check how textureLOD works when coordinates
+        // are not UV (i.e. not [0, 1])
+        // given coordinates should be in mip sizes or base mip size???
+        UV texel = (texParams->normCoordinates)
+                    ? uv * UV(texParams->size)
+                    : uv;
         TextureExtent<D> ijk = TextureExtent<D>(texel);
         return ReadPixel(ijk, size, mipData);
     }
@@ -335,18 +366,21 @@ T TextureViewCPU<D, T>::operator()(UV uv, Float mipLevel) const
             uint32_t offset = TextureMipPixelStart(texParams->size, mip);
             TextureExtent<D> size = Graphics::TextureMipSize(texParams->size, mip);
             auto mipData = data.subspan(offset);
-            return ReadInterpolatedPixel(uv, size, mipData);
+            UV readUV = (texParams->normCoordinates)
+                        ? ((uv + UV(0.5)) / UV(texParams->size))
+                        : uv;
+            return ReadInterpolatedPixel(readUV, size, mipData);
         };
 
-        Float frac;
-        int32_t m0 = int32_t(std::modf(mipLevel, &frac));
+        Float m0F;
+        Float frac = std::modf(mipLevel, &m0F);
+        int32_t m0 = int32_t(m0F);
         int32_t m1 = int32_t(mipLevel + Float(0.5));
         m0 = Math::Clamp(m1, 0, int32_t(texParams->mipCount));
         m1 = Math::Clamp(m0, 0, int32_t(texParams->mipCount));
 
         T pix0  = FetchPix(uint32_t(m0));
         if(m0 == m1) return pix0;
-
         T pix1 = FetchPix(uint32_t(m1));
 
         if constexpr(std::is_same_v<Float, T>)

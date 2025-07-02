@@ -20,6 +20,17 @@ TextureCPU_Normal<D, T>::TextureCPU_Normal(const GPUDeviceCPU& device,
                          " Setting \"unormIntegers\" to false");
         texParams.normIntegers = false;
     };
+
+    // Calculate the full size by hand
+    static constexpr auto BPP = sizeof(PaddedChannelType);
+    uint32_t mipCount = std::min(texParams.mipCount, Graphics::TextureMipCount(texParams.size));
+    for(uint32_t i = 0; i < mipCount; i++)
+    {
+        if constexpr(D == 1)
+            size += Graphics::TextureMipSize(texParams.size, i) * BPP;
+        else
+            size += Graphics::TextureMipSize(texParams.size, i).Multiply() * BPP;
+    }
 }
 
 template<uint32_t D, class T>
@@ -119,7 +130,7 @@ void TextureCPU_Normal<D, T>::CopyFromAsync(const GPUQueueCPU& queue,
             mipStartOffset += Graphics::TextureMipSize(texParams.size, i).Multiply();
     }
     TextureExtent<D> mipSize = Graphics::TextureMipSize(texParams.size, mipLevel);
-    assert(offset + fromSize < mipSize);
+    assert(offset + fromSize <= mipSize);
 
     if constexpr(D == 1)
     {
@@ -148,19 +159,22 @@ void TextureCPU_Normal<D, T>::CopyFromAsync(const GPUQueueCPU& queue,
         size_t mipSizeLinear = mipSize.Multiply();
         Span<PaddedChannelType> mipPtr = dataSpan.subspan(mipStartOffset,
                                                           mipSizeLinear);
-        for(uint32_t z = offset[2]; z < offset[2] + fromSize[2]; z++)
+        for(uint32_t z = 0; z < fromSize[2]; z++)
         {
             Vector2ui sliceSize = Vector2ui(mipSize);
+            Vector2ui fromSliceSize = Vector2ui(fromSize);
 
             size_t toStride = sliceSize[0];
             size_t fromStride = fromSize[0];
-            Span<PaddedChannelType> slicePtr = mipPtr.subspan(z * sliceSize.Multiply(),
-                                                              sliceSize.Multiply());
+            Span<PaddedChannelType> toSlice = mipPtr.subspan(z * sliceSize.Multiply(),
+                                                             sliceSize.Multiply());
+            Span<const PaddedChannelType> fromSlice = regionFrom.subspan(z * fromSliceSize.Multiply(),
+                                                                         fromSliceSize.Multiply());
             // Y shift
-            slicePtr = slicePtr.subspan(offset[1] * mipSize[0]);
+            toSlice = toSlice.subspan(offset[1] * mipSize[0]);
             // X shift
-            slicePtr = slicePtr.subspan(offset[0]);
-            queue.MemcpyAsync2D(mipPtr, toStride, regionFrom, fromStride,
+            toSlice = toSlice.subspan(offset[0]);
+            queue.MemcpyAsync2D(toSlice, toStride, fromSlice, fromStride,
                                 Vector2ui(fromSize));
         }
     }
@@ -216,16 +230,19 @@ void TextureCPU_Normal<D, T>::CopyToAsync(Span<PaddedChannelType> regionTo,
         for(uint32_t z = offset[2]; z < offset[2] + toSize[2]; z++)
         {
             Vector2ui sliceSize = Vector2ui(mipSize);
+            Vector2ui toSliceSize = Vector2ui(toSize);
 
             size_t fromStride = sliceSize[0];
             size_t toStride = toSize[0];
-            Span<PaddedChannelType> slicePtr = mipPtr.subspan(z * sliceSize.Multiply(),
-                                                              sliceSize.Multiply());
+            Span<PaddedChannelType> fromSlice = mipPtr.subspan(z * sliceSize.Multiply(),
+                                                               sliceSize.Multiply());
+            Span<PaddedChannelType> toSlice = regionTo.subspan(z * toSliceSize.Multiply(),
+                                                               toSliceSize.Multiply());
             // Y shift
-            slicePtr = slicePtr.subspan(offset[1] * mipSize[0]);
+            fromSlice = fromSlice.subspan(offset[1] * mipSize[0]);
             // X shift
-            slicePtr = slicePtr.subspan(offset[0]);
-            queue.MemcpyAsync2D(regionTo, toStride, ToConstSpan(mipPtr), fromStride,
+            fromSlice = fromSlice.subspan(offset[0]);
+            queue.MemcpyAsync2D(toSlice, toStride, ToConstSpan(fromSlice), fromStride,
                                 Vector2ui(toSize));
         }
     }

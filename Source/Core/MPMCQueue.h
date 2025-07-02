@@ -174,7 +174,16 @@ bool MPMCQueue<T>::TryEnqueue(T&& item)
 template<class T>
 void MPMCQueue<T>::Terminate()
 {
-    isTerminated = true;
+    // TODO: There was a rare race condition
+    // due to isTerminated is not guarded with
+    // mutex? (It is an atomic variable)
+    // Some threads do not see the is terminated value
+    // although assignment operator should be "seq_cst"?
+    // Anyway, this may be a problem in the future
+    {
+        std::unique_lock<std::timed_mutex> lock(mutex);
+        isTerminated = true;
+    }
     dequeueWake.notify_all();
     enqueWake.notify_all();
 }

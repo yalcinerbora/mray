@@ -39,11 +39,19 @@ void Reduce(Span<T, 1> dReducedValue,
 {
     using namespace std::string_view_literals;
 
-    dReducedValue[0] = initialValue;
     uint32_t elemCount = static_cast<uint32_t>(dValues.size());
+    queue.IssueBlockLambda
+    (
+        "KCReduce-SetInitValue"sv,
+        DeviceBlockIssueParams{.gridSize = 1u, .blockSize = 1u},
+        [dReducedValue, initialValue](KernelCallParams)
+        {
+            dReducedValue[0] = initialValue;
+        }
+    );
     queue.IssueWorkLambda
     (
-        "KCReduce"sv,
+        "KCReduce-Actual"sv,
         DeviceWorkIssueParams{.workCount = elemCount},
         [=](KernelCallParams kp)
         {
@@ -59,13 +67,14 @@ void Reduce(Span<T, 1> dReducedValue,
             //
             if(kp.threadId == kp.blockSize - 1)
             {
-                // Do this at the end?????
+
                 std::atomic_ref<T> finalRef(dReducedValue[0]);
-                T expected = finalRef.load();
+                T myLocal = local;
+                T expected = finalRef;
                 T desired;
                 do
                 {
-                    desired = op(local, expected);
+                    desired = op(myLocal, expected);
                 } while(!finalRef.compare_exchange_weak(expected, desired));
             }
         }

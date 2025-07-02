@@ -132,7 +132,7 @@ class TextureCPU_Normal
 
     // Allocation related
     size_t  size        = 0;
-    size_t  alignment   = 64_KiB;
+    size_t  alignment   = MemAlloc::DefaultSystemAlignment();
     bool    allocated   = false;
 
 

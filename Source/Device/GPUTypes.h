@@ -191,7 +191,7 @@ struct TextureInitParams
     Float       minMipmapClamp  = -100.0f;
     Float       maxMipmapClamp  = 100.0f;
     // Dimension Related (must be set)
-    uint32_t            mipCount        = 0;
+    uint32_t            mipCount        = 1;
     TextureExtent<D>    size            = TextureExtent<D>(0);
     bool                normIntegers    = true;
     bool                normCoordinates = true;

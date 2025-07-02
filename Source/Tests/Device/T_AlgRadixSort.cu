@@ -115,9 +115,14 @@ void SegmentedRadixSortTest(const GPUSystem& system)
         hSegmentRanges[4] = 52;
         hSegmentRanges[5] = ElementCount;
     }
-
-    std::iota(hKeys.begin(), hKeys.end(), Key(0));
+    //
     std::iota(hValues.begin(), hValues.end(), Value(0));
+    if constexpr(!IsAscending)
+        std::iota(std::reverse_iterator(hKeys.end()),
+                  std::reverse_iterator(hKeys.begin()), Key(0));
+    else
+        std::iota(hKeys.begin(), hKeys.end(), Key(0));
+
     // Shuffle locally, so that we can globally check it is become
     // iota again
     std::mt19937 rng(123);

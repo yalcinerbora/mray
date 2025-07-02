@@ -37,14 +37,16 @@ void ReduceTest(const GPUSystem& system)
     std::iota(hInputs.begin(), hInputs.end(), Value(0));
 
     queue.MemcpyAsync(dInputs, Span<const Value>(hInputs.begin(), hInputs.end()));
-
+    // Windows style set output to garbage
+    queue.MemsetAsync(dOutput, 0xCD);
+    //
     DeviceAlgorithms::Reduce(Span<Value, 1>(dOutput), dTempMemory,
                              ToConstSpan(dInputs.subspan(0, ElementCount)),
                              Value(0), queue, Adder<Value>());
 
     Value hResult;
     queue.MemcpyAsync(Span<Value>(&hResult, 1), ToConstSpan(dOutput));
-    queue.MemsetAsync(dOutput, 0x00);
+    queue.MemsetAsync(dOutput, 0xCD);
 
     // Do the reduction again with a lambda
     DeviceAlgorithms::Reduce(Span<Value, 1>(dOutput), dTempMemory,

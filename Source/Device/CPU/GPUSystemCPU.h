@@ -430,7 +430,7 @@ void GPUFenceCPU::Wait() const
 {
     auto completedCounter = std::atomic_ref<uint64_t>(*completedKernelCounter);
     while(completedCounter.load() < valueToWait)
-        completedCounter.wait(0);
+        completedCounter.wait(std::numeric_limits<uint64_t>::max());
 }
 
 MRAY_HYBRID inline
@@ -581,7 +581,6 @@ void GPUQueueCPU::MemsetAsync(Span<T> region, uint8_t perByteValue) const
             uint32_t i = kp.GlobalId();
             uint32_t writeBound = std::min(elemCount, (i + 1) * workPerThread);
             writeBound -= i * workPerThread;
-
             auto localRegion = region.subspan(i * workPerThread, writeBound);
             std::memset(localRegion.data(), perByteValue, localRegion.size_bytes());
         }
@@ -661,7 +660,7 @@ void GPUQueueCPU::IssueWait(const GPUFenceCPU& barrier) const
         {
             std::atomic_ref<uint64_t> completedCounter(*barrierValue);
             while(completedCounter < valueToAchieve)
-                completedCounter.wait(0);
+                completedCounter.wait(std::numeric_limits<uint64_t>::max());
         }
     );
 }

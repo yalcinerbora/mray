@@ -72,9 +72,7 @@ void ExclusiveScan(Span<T> dScannedValues,
     T* dLocalSumPtr = reinterpret_cast<T*>(dTempMem.data());
     assert(dTempMem.size_bytes() >= blockCount * sizeof(T));
     Span<T> dBlockSums = Span<T>(dLocalSumPtr, blockCount + 1);
-    dBlockSums[0] = initialValue;
 
-    //..........................
     // Each thread sums partially
     queue.IssueBlockLambda
     (
@@ -82,6 +80,9 @@ void ExclusiveScan(Span<T> dScannedValues,
         DeviceBlockIssueParams{.gridSize = blockCount, .blockSize = 1u},
         [=](KernelCallParams kp)
         {
+            // One thread set this value as well
+            if(kp.blockId == 0) dBlockSums[0] = initialValue;
+            //
             for(uint32_t bId = kp.blockId; bId < blockCount; bId += kp.gridSize)
             {
                 size_t curStart = bId * StaticThreadPerBlock1D();

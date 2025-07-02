@@ -65,7 +65,7 @@ void GPUQueueCPU::IssueKernelInternal(std::string_view name,
     uint32_t callerBlockCount = Math::DivideUp(totalWorkCount, tpb);
     //
     auto atomicKCounter = std::atomic_ref<uint64_t>(cb->issuedKernelCounter);
-    uint64_t oldIssueCount = atomicKCounter.fetch_add(blockCount, std::memory_order_seq_cst);
+    uint64_t oldIssueCount = atomicKCounter.fetch_add(blockCount);
 
     // Issue kernel
     // "SubmitBlocks" does a "for loop Enqueue" calls which is thread-safe
@@ -83,14 +83,13 @@ void GPUQueueCPU::IssueKernelInternal(std::string_view name,
             //,name
         ](uint32_t blockStart, [[maybe_unused]] uint32_t blockEnd)
         {
-            //MRAY_LOG("Waiting to Start \"{}\"", name);
             // Wait the previous kernel to finish
             // CUDA style queue emulation.
             auto atomicCompletedCounter = std::atomic_ref<uint64_t>((*cbRef)->completedKernelCounter);
             while(atomicCompletedCounter < oldIssueCount)
-                atomicCompletedCounter.wait(0);
+                atomicCompletedCounter.wait(std::numeric_limits<uint64_t>::max());
 
-            //MRAY_LOG("Starting \"{}\"", name);
+            std::atomic_thread_fence(std::memory_order_seq_cst);
             // I dont understand this wait, wait until "curIssueCount == oldIssueCount"
             // but what if we skip a beat and curIssueCount becomes larger than wait value?
             // Further thinking, how this is useful at all?
@@ -121,11 +120,10 @@ void GPUQueueCPU::IssueKernelInternal(std::string_view name,
                     Kernel(fArgs...);
                 }
             }
-
-            //MRAY_LOG("Exiting \"{}\"", name);
-
             atomicCompletedCounter.fetch_add(1);
             atomicCompletedCounter.notify_all();
+
+            std::atomic_thread_fence(std::memory_order_seq_cst);
         },
         blockCount
     );
@@ -160,7 +158,7 @@ void GPUQueueCPU::IssueLambdaInternal(std::string_view name,
     uint32_t callerBlockCount = Math::DivideUp(totalWorkCount, tpb);
     //
     auto atomicKCounter = std::atomic_ref<uint64_t>(cb->issuedKernelCounter);
-    uint64_t oldIssueCount = atomicKCounter.fetch_add(blockCount, std::memory_order_seq_cst);
+    uint64_t oldIssueCount = atomicKCounter.fetch_add(blockCount);
 
     // Issue kernel
     // "SubmitBlocks" does a "for loop Enqueue" calls which is thread-safe
@@ -178,12 +176,11 @@ void GPUQueueCPU::IssueLambdaInternal(std::string_view name,
             func = std::forward<Lambda>(func)
         ](uint32_t blockStart, [[maybe_unused]] uint32_t blockEnd)
         {
-            //MRAY_LOG("Waiting to Start \"{}\"", name);
             // Wait the previous kernel to finish
             // CUDA style queue emulation.
             auto atomicCompletedCounter = std::atomic_ref<uint64_t>((*cbRef)->completedKernelCounter);
             while(atomicCompletedCounter < oldIssueCount)
-                atomicCompletedCounter.wait(0);
+                atomicCompletedCounter.wait(std::numeric_limits<uint64_t>::max());
             // I dont understand this wait, wait until "curIssueCount == oldIssueCount"
             // but what if we skip a beat and curIssueCount becomes larger than wait value?
             // Further thinking, how this is useful at all?
@@ -198,8 +195,7 @@ void GPUQueueCPU::IssueLambdaInternal(std::string_view name,
             // From this point on it previous kernels should be completed
             //
             //
-
-            //MRAY_LOG("Starting \"{}\"", name);
+            std::atomic_thread_fence(std::memory_order_seq_cst);
 
             assert(blockEnd - blockStart == 1);
             globalKCParams.gridSize = callerBlockCount;
@@ -218,10 +214,10 @@ void GPUQueueCPU::IssueLambdaInternal(std::string_view name,
                     func(kp);
                 }
             }
-            //MRAY_LOG("Exiting \"{}\"", name);
-
             atomicCompletedCounter.fetch_add(1);
             atomicCompletedCounter.notify_all();
+            //
+            std::atomic_thread_fence(std::memory_order_seq_cst);
         },
         blockCount
     );
