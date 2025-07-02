@@ -112,22 +112,28 @@ void SegmentedRadixSortTest(const GPUSystem& system)
         hSegmentRanges[1] = 21;
         hSegmentRanges[2] = 45;
         hSegmentRanges[3] = 49;
-        hSegmentRanges[4] = ElementCount;
+        hSegmentRanges[4] = 52;
+        hSegmentRanges[5] = ElementCount;
     }
 
     std::iota(hKeys.begin(), hKeys.end(), Key(0));
-    std::shuffle(hKeys.begin(), hKeys.end(), std::mt19937(123));
     std::iota(hValues.begin(), hValues.end(), Value(0));
+    // Shuffle locally, so that we can globally check it is become
+    // iota again
+    std::mt19937 rng(123);
+    for(uint32_t i = 0; i < SegmentCount; i++)
+    {
+        std::shuffle(hKeys.begin() + hSegmentRanges[i],
+                     hKeys.begin() + hSegmentRanges[i + 1], rng);
+    }
     hOldKeys = hKeys;
 
     queue.MemcpyAsync(dKeys[0], Span<const Key>(hKeys.begin(), hKeys.end()));
     queue.MemcpyAsync(dValues[0], Span<const Value>(hValues.begin(), hValues.end()));
     queue.MemcpyAsync(dSegmentRanges, Span<const uint32_t>(hSegmentRanges.begin(),
                                                            hSegmentRanges.end()));
-
     uint32_t bufferIndex = SegmentedRadixSort<IsAscending>(dKeysDB, dValuesDB, dTempMemory,
                                                            dSegmentRanges, queue);
-
     // Read back
     queue.MemcpyAsync(Span<Key>(hKeys.begin(), hKeys.end()),
                       ToConstSpan(dKeysDB[bufferIndex]));
@@ -150,7 +156,6 @@ void SegmentedRadixSortTest(const GPUSystem& system)
         }
     }
 }
-
 
 TYPED_TEST(DeviceAlorithmsTest, RadixSortAscending)
 {

@@ -178,9 +178,9 @@ class AcceleratorWork : public AcceleratorWorkI
 template<AccelGroupC AG, TransformGroupC TG>
 AcceleratorWork<AG, TG>::AcceleratorWork(const AcceleratorGroupI& ag,
                                          const GenericGroupTransformT& tg)
-    : accelGroup(static_cast<const AG&>(ag))
+    : primGroup(static_cast<const PrimitiveGroup&>(ag.PrimGroup()))
+    , accelGroup(static_cast<const AG&>(ag))
     , transGroup(static_cast<const TG&>(tg))
-    , primGroup(static_cast<const PrimitiveGroup&>(ag.PrimGroup()))
 {}
 
 template<AccelGroupC AG, TransformGroupC TG>

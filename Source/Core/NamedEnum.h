@@ -63,7 +63,7 @@ constexpr NamedEnum<Enum, NamesIn>::operator E()
 template<class Enum, const std::array<const char*, static_cast<size_t>(Enum::END)>& NamesIn>
 constexpr std::strong_ordering NamedEnum<Enum, NamesIn>::operator<=>(const NamedEnum& right) const
 {
-    return std::underlying_type_t<Enum>{e} <=> std::underlying_type_t<Enum>{e};
+    return std::underlying_type_t<Enum>{e} <=> std::underlying_type_t<Enum>{right.e};
 }
 
 template<class Enum, const std::array<const char*, static_cast<size_t>(Enum::END)>& NamesIn>

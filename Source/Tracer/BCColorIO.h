@@ -339,14 +339,14 @@ Vector4ui BC5<IsSigned>::InjectColors(Vector4ui block, const ColorPack& colorIn)
 template<bool IsSigned>
 MRAY_HYBRID MRAY_CGPU_INLINE
 typename BC6H<IsSigned>::ColorPack
-BC6H<IsSigned>::ExtractColors(Vector4ui block)
+BC6H<IsSigned>::ExtractColors(Vector4ui)
 {
     return {};
 }
 
 template<bool IsSigned>
 MRAY_HYBRID MRAY_CGPU_INLINE
-Vector4ui BC6H<IsSigned>::InjectColors(Vector4ui block, const ColorPack& colorIn)
+Vector4ui BC6H<IsSigned>::InjectColors(Vector4ui, const ColorPack&)
 {
     return Vector4ui::Zero();
 }

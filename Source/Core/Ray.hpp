@@ -24,7 +24,7 @@ constexpr bool RayT<T>::IntersectsSphere(Vector<3, T>& intersectPos, T& t,
     // Clang min definition is only on std namespace
     // this is a crappy workaround
     #ifndef MRAY_DEVICE_CODE_PATH
-    using namespace std;
+        using namespace std;
     #endif
 
     // RayTracing Gems
@@ -125,6 +125,9 @@ constexpr bool RayT<T>::IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
                                            bool cullFace) const
 {
     using namespace MathConstants;
+    #ifndef MRAY_DEVICE_CODE_PATH
+        using namespace std;
+    #endif
 
     // Moller-Trumbore
     // Ray-Tri Intersection
@@ -202,7 +205,7 @@ constexpr bool RayT<T>::IntersectsAABB(Vector<2, T>& tOut,
     tOut = tMinMax;
 
     UNROLL_LOOP
-    for(int i = 0; i < 3; i++)
+    for(unsigned int i = 0; i < 3; i++)
     {
         if(invD[i] < 0) std::swap(t0[i], t1[i]);
 

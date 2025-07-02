@@ -130,25 +130,47 @@ void KCReadLights(MRAY_GRID_CONSTANT const MetaLightArrayView lightArrayView,
         Spectrum radiance1 = light.EmitViaSurfacePoint(Dir, DistantPoint, rayCone);
         bool isPrimBacked = light.IsPrimitiveBackedLight();
 
-        printf("[%u]-----\n"
-               "    SolidAngle - (%f, %f, %f| %f), (%f), (%u)\n"
-               "    Ray        - ([%f, %f, %f] [%f, %f, %f]| %f), (%f), (%u) - Ray\n"
-               "    Emit       - (%f, %f, %f), (%f, %f, %f)\n"
-               "    PrimBacked - (%s)\n"
-               "--------\n",
-               i,
-               //
-               sampleVec.value[0], sampleVec.value[1], sampleVec.value[2],
-               sampleVec.pdf, pdfSolidAngle, solidRNCount,
-               //
-               sampleRay.value.Dir()[0], sampleRay.value.Dir()[1], sampleRay.value.Dir()[2],
-               sampleRay.value.Pos()[0], sampleRay.value.Pos()[1], sampleRay.value.Pos()[2],
-               sampleRay.pdf, pdfRay, rayRNCount,
-               //
-               radiance0[0], radiance0[1], radiance0[2],
-               radiance1[0], radiance1[1], radiance1[2],
-               //
-               (isPrimBacked) ? "True" : "False");
+        #ifdef MRAY_GPU_BACKEND_CPU
+            MRAY_LOG("[{}]-----\n"
+                     "    SolidAngle - ({}, {}, {}| {}), ({}), ({})\n"
+                     "    Ray        - ([{}, {}, {}] [{}, {}, {}]| {}), ({}), ({}) - Ray\n"
+                     "    Emit       - ({}, {}, {}), ({}, {}, {})\n"
+                     "    PrimBacked - ({})\n"
+                     "--------\n",
+                     i,
+                     //
+                     sampleVec.value[0], sampleVec.value[1], sampleVec.value[2],
+                     sampleVec.pdf, pdfSolidAngle, solidRNCount,
+                     //
+                     sampleRay.value.Dir()[0], sampleRay.value.Dir()[1], sampleRay.value.Dir()[2],
+                     sampleRay.value.Pos()[0], sampleRay.value.Pos()[1], sampleRay.value.Pos()[2],
+                     sampleRay.pdf, pdfRay, rayRNCount,
+                     //
+                     radiance0[0], radiance0[1], radiance0[2],
+                     radiance1[0], radiance1[1], radiance1[2],
+                     //
+                     (isPrimBacked) ? "True" : "False");
+        #else
+            printf("[%u]-----\n"
+                   "    SolidAngle - (%f, %f, %f| %f), (%f), (%u)\n"
+                   "    Ray        - ([%f, %f, %f] [%f, %f, %f]| %f), (%f), (%u) - Ray\n"
+                   "    Emit       - (%f, %f, %f), (%f, %f, %f)\n"
+                   "    PrimBacked - (%s)\n"
+                   "--------\n",
+                   i,
+                   //
+                   sampleVec.value[0], sampleVec.value[1], sampleVec.value[2],
+                   sampleVec.pdf, pdfSolidAngle, solidRNCount,
+                   //
+                   sampleRay.value.Dir()[0], sampleRay.value.Dir()[1], sampleRay.value.Dir()[2],
+                   sampleRay.value.Pos()[0], sampleRay.value.Pos()[1], sampleRay.value.Pos()[2],
+                   sampleRay.pdf, pdfRay, rayRNCount,
+                   //
+                   radiance0[0], radiance0[1], radiance0[2],
+                   radiance1[0], radiance1[1], radiance1[2],
+                   //
+                   (isPrimBacked) ? "True" : "False");
+        #endif
     }
 }
 
@@ -344,7 +366,7 @@ TEST(DefaultLights, PrimLight_Triangle)
     std::vector<RandomNumber> hRandomNumbers(SAMPLE_COUNT * 2 * 2);
     std::mt19937 rng;
     for(RandomNumber& rn : hRandomNumbers)
-        rn = rng();
+        rn = RandomNumber(rng());
 
     for(uint32_t i = 0; i < SAMPLE_COUNT; i++)
     {

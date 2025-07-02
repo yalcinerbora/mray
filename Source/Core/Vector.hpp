@@ -580,7 +580,7 @@ constexpr Vector<N, T> Vector<N, T>::Clamp(const Vector& minVal, const Vector& m
 {
     Vector v;
     UNROLL_LOOP
-    for(int i = 0; i < N; i++)
+    for(unsigned int i = 0; i < N; i++)
     {
         v[i] = std::min(std::max(minVal[i], vector[i]), maxVal[i]);
     }
@@ -890,7 +890,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector<N, T> Vector<N, T>::OrthogonalVector(const Vector<N, T>& v) requires std::floating_point<T> && (N == 3)
 {
     #ifndef MRAY_DEVICE_CODE_PATH
-    using namespace std;
+        using namespace std;
     #endif
     // PBRT Book
     // https://www.pbr-book.org/3ed-2018/Geometry_and_Transformations/Vectors#CoordinateSystem

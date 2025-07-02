@@ -140,7 +140,8 @@ Span<T> RayPartitioner::DetermineOutputSpan(const std::array<Span<T>, 2>& double
     auto SisterSpan = [s = checkedSpan, db = doubleBuffer](uint32_t from, uint32_t to)
     {
         ptrdiff_t diff = s.data() - db[from].data();
-        return db[to].subspan(diff, s.size());
+        assert(diff >= 0);
+        return db[to].subspan(uint32_t(diff), s.size());
     };
 
     if(IsSubspan(checkedSpan, doubleBuffer[0]))

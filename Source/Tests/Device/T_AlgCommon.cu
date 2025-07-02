@@ -90,13 +90,6 @@ TYPED_TEST(DeviceAlorithmsTest, Iota)
     IotaTest<Value>(system);
 }
 
-template <class T>
-requires (requires(T x) { {x + x} -> std::same_as<T>; }&& std::is_constructible_v<T, uint32_t>)
-void Common(Span<T> dOut, const T& hInitialValue)
-{
-
-}
-
 TYPED_TEST(DeviceAlorithmsTest, Transform)
 {
     using Value = typename DeviceAlorithmsTest<TypeParam>::ValueType;

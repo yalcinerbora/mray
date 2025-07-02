@@ -117,16 +117,17 @@ function(gen_tracer_dll_target)
                           ${GEN_TRACER_TARGET_NAME}
                           CoreLib
                           TransientPool
-                          mray::meta_compile_opts
-                          mray::cuda_extra_compile_opts)
+                          mray::meta_compile_opts)
+
+    set_target_properties(${TARGET_NAME} PROPERTIES
+                          POSITION_INDEPENDENT_CODE ON)
 
     if(GEN_TRACER_DLL_MACRO STREQUAL "MRAY_GPU_BACKEND_CUDA")
 
         target_link_libraries(${TARGET_NAME} PRIVATE
-                            mray::cuda_extra_compile_opts)
+                              mray::cuda_extra_compile_opts)
 
         set_target_properties(${TARGET_NAME} PROPERTIES
-                              POSITION_INDEPENDENT_CODE ON
                               CUDA_SEPARABLE_COMPILATION ON
                               CUDA_RESOLVE_DEVICE_SYMBOLS ON)
     endif()

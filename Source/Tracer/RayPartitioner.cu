@@ -261,11 +261,14 @@ RayPartitioner::RayPartitioner(RayPartitioner&& other)
     , dKeys(other.dKeys)
     , dIndices(other.dIndices)
     , dTempMemory(other.dTempMemory)
-    , hPartitionStartOffsets(other.hPartitionStartOffsets)
     , hPartitionCount(other.hPartitionCount)
+    , hPartitionStartOffsets(other.hPartitionStartOffsets)
     , hPartitionKeys(other.hPartitionKeys)
+    , dPartitionStartOffsets(other.dPartitionStartOffsets)
+    , dPartitionKeys(other.dPartitionKeys)
     , rayCount(other.rayCount)
     , maxPartitionCount(other.maxPartitionCount)
+    , isResultsInHostVisible(other.isResultsInHostVisible)
 {}
 
 RayPartitioner& RayPartitioner::operator=(RayPartitioner&& other)
@@ -277,13 +280,15 @@ RayPartitioner& RayPartitioner::operator=(RayPartitioner&& other)
     hostMem = std::move(other.hostMem);
     dKeys = other.dKeys;
     dIndices = other.dIndices;
-    dKeys = other.dKeys;
     dTempMemory = other.dTempMemory;
-    hPartitionStartOffsets = other.hPartitionStartOffsets;
     hPartitionCount = other.hPartitionCount;
+    hPartitionStartOffsets = other.hPartitionStartOffsets;
     hPartitionKeys = other.hPartitionKeys;
+    dPartitionStartOffsets = other.dPartitionStartOffsets;
+    dPartitionKeys = other.dPartitionKeys;
     rayCount = other.rayCount;
     maxPartitionCount = other.maxPartitionCount;
+    isResultsInHostVisible = other.isResultsInHostVisible;
     return *this;
 }
 

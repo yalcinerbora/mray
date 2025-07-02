@@ -153,6 +153,7 @@ class DeviceMemoryCPU
     void*                       mPtr;
     size_t                      allocationGranularity;
     size_t                      reserveGranularity;
+    size_t                      size;
     size_t                      allocSize;
     bool                        neverDecrease = false;
 

@@ -17,8 +17,8 @@ struct RenderBufferInfo
     // Given render logic's may be morphed
     // according to the internals of the renderer
     // these indices should be set by the visior
-    uint32_t            curRenderLogic0;
-    uint32_t            curRenderLogic1;
+    uint32_t            curRenderLogic0 = 0;
+    uint32_t            curRenderLogic1 = 0;
 };
 
 struct RenderImageSection

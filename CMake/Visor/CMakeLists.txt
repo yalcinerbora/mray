@@ -90,12 +90,12 @@ add_custom_command(TARGET Visor POST_BUILD
 if(UNIX AND NOT APPLE)
     set(MRAY_GLFW_COPY_NAME "$<TARGET_FILE:glfw3::glfw3>")
 elseif(MSVC)
-    set(MRAY_GLFW_COPY_NAME "glfw3$<$<CONFIG:Debug>:d>.dll")
+    set(MRAY_GLFW_COPY_NAME "${MRAY_CONFIG_LIB_DIRECTORY}/glfw3$<$<CONFIG:Debug>:d>.dll")
 endif()
 add_custom_command(TARGET Visor POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
                    "$<TARGET_FILE:vulkan::vulkan>"
-                   "${MRAY_CONFIG_LIB_DIRECTORY}/${MRAY_GLFW_COPY_NAME}"
+                   "${MRAY_GLFW_COPY_NAME}"
                    ${MRAY_CONFIG_BIN_DIRECTORY})
 
 # ==============================#

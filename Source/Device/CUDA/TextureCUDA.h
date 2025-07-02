@@ -29,67 +29,6 @@ using BCEnumFinder = TypeFinder::T_VMapper:: template Map
 
 class TextureBackingMemoryCUDA;
 
-template <class T>
-constexpr bool IsNormConvertibleCUDA()
-{
-    // 32-bit types are not norm convertible,
-    // so removed these from this function
-    //
-    // YOLO
-    return (std::is_same_v<T, uint16_t>     ||
-            std::is_same_v<T, Vector2us>    ||
-            std::is_same_v<T, Vector3us>    ||
-            std::is_same_v<T, Vector4us>    ||
-
-            std::is_same_v<T, int16_t>      ||
-            std::is_same_v<T, Vector2s>     ||
-            std::is_same_v<T, Vector3s>     ||
-            std::is_same_v<T, Vector4s>     ||
-
-            std::is_same_v<T, uint8_t>      ||
-            std::is_same_v<T, Vector2uc>    ||
-            std::is_same_v<T, Vector3uc>    ||
-            std::is_same_v<T, Vector4uc>    ||
-
-            std::is_same_v<T, int8_t>       ||
-            std::is_same_v<T, Vector2c>     ||
-            std::is_same_v<T, Vector3c>     ||
-            std::is_same_v<T, Vector4c>);
-}
-
-template <class T>
-constexpr uint32_t BCTypeToBlockSize()
-{
-    // https://developer.nvidia.com/blog/revealing-new-features-in-the-cuda-11-5-toolkit/
-    if constexpr(std::is_same_v<T, PixelBC1>  ||
-                 std::is_same_v<T, PixelBC4U> ||
-                 std::is_same_v<T, PixelBC4S>)
-    {
-        return 8;
-    }
-    else if constexpr(std::is_same_v<T, PixelBC2>  ||
-                      std::is_same_v<T, PixelBC3>  ||
-                      std::is_same_v<T, PixelBC5U> ||
-                      std::is_same_v<T, PixelBC5S> ||
-                      std::is_same_v<T, PixelBC6U> ||
-                      std::is_same_v<T, PixelBC6S> ||
-                      std::is_same_v<T, PixelBC7>)
-    {
-        return 16;
-    }
-    else
-    {
-        // I forget but clang or nvcc, does not like
-        // static_assert(false, "....") and immidiately
-        // asserts. So we check with the a random BCType
-        // since it is handled on the first branch it should
-        // fail.
-        static_assert(std::is_same_v<T, PixelBC1>,
-                      "Unknown Block Compressed Format!");
-        return 0;
-    }
-}
-
 template<uint32_t D, class T>
 class TextureCUDA_Normal;
 
@@ -139,7 +78,7 @@ class TextureCUDA_Normal
 {
     public:
     static constexpr uint32_t ChannelCount  = VectorTypeToChannels<T>();
-    static constexpr bool IsNormConvertible = IsNormConvertibleCUDA<T>();
+    static constexpr bool IsNormConvertible = ::IsNormConvertible<T>();
     static constexpr uint32_t Dims          = D;
 
     using Type              = T;

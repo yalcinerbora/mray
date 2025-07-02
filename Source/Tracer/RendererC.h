@@ -1070,11 +1070,12 @@ RendererT<C>::RendererT(const RenderImagePtr& rb,
                         const RenderWorkPack& wp,
                         TracerView tv, const GPUSystem& s,
                         ThreadPool& tp)
-    : globalThreadPool(tp)
+    : workPack(wp)
+    , globalThreadPool(tp)
     , gpuSystem(s)
     , tracerView(tv)
     , renderBuffer(rb)
-    , workPack(wp)
+
 {}
 
 template <class C>

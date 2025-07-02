@@ -143,7 +143,7 @@ void KCRenderLightWork(MRAY_GRID_CONSTANT const RenderLightWorkParamsR<R, I, LG,
 template<RendererC R, uint32_t I, CameraGroupC CG, TransformGroupC TG,
          auto WorkFunction>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCRenderCameraWork(MRAY_GRID_CONSTANT const RenderCameraWorkParamsR<R, I, CG, TG> params)
+void KCRenderCameraWork(MRAY_GRID_CONSTANT const RenderCameraWorkParamsR<R, I, CG, TG>)
 {
     // TODO: This will be needed for light tracers
     // (Light -> Camera)

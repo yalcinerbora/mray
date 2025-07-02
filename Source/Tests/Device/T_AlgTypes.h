@@ -49,7 +49,7 @@ void ExpectEqualVecOrArithmetic(const T& expected, const T& checked)
     }
     else
     {
-        for(int d = 0; d < T::Dims; d++)
+        for(unsigned int d = 0; d < T::Dims; d++)
         {
             if constexpr(std::is_integral_v<typename T::InnerType>)
                 EXPECT_EQ(expected[d], checked[d]);

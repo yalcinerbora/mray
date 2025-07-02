@@ -63,14 +63,16 @@ int32_t LBVHAccelDetail::Delta::operator()(int32_t i, int32_t j) const
     if(j < 0 || j >= static_cast<int32_t>(dMortonCodes.size()))
         return -1;
 
-    uint64_t left = dMortonCodes[i];
-    uint64_t right = dMortonCodes[j];
+    assert(i >= 0);
+    assert(j >= 0);
+    uint64_t left = dMortonCodes[uint32_t(i)];
+    uint64_t right = dMortonCodes[uint32_t(j)];
 
     // Equal morton fallback
     if(left == right)
     {
-        left = i;
-        right = j;
+        left = uint64_t(i);
+        right = uint64_t(j);
     }
 
     uint64_t diffBits = left ^ right;
@@ -243,30 +245,29 @@ void KCConstructLBVHInternalNodes(// Output
             assert(gamma >= 0 && gamma < totalNodes);
 
             // Finally write
-            LBVHNode& myNode = dLocalNodes[i];
+            LBVHNode& myNode = dLocalNodes[uint32_t(i)];
             if(std::min(i, j) == gamma)
             {
-                uint32_t indirectLeafIndex = dLocalIndices[gamma];
+                uint32_t indirectLeafIndex = dLocalIndices[uint32_t(gamma)];
                 myNode.leftIndex = ChildIndex::CombinedKey(IS_LEAF, indirectLeafIndex);
-                dLocalLeafParentIndices[indirectLeafIndex] = i;
+                dLocalLeafParentIndices[indirectLeafIndex] = uint32_t(i);
             }
             else
             {
-                myNode.leftIndex = ChildIndex::CombinedKey(IS_INTERNAL, gamma);
-                dLocalNodes[gamma].parentIndex = i;
+                myNode.leftIndex = ChildIndex::CombinedKey(IS_INTERNAL, uint32_t(gamma));
+                dLocalNodes[uint32_t(gamma)].parentIndex = uint32_t(i);
             }
             //
             if(std::max(i, j) == (gamma + 1))
             {
-                uint32_t indirectLeafIndex = dLocalIndices[gamma + 1];
+                uint32_t indirectLeafIndex = dLocalIndices[uint32_t(gamma + 1)];
                 myNode.rightIndex = ChildIndex::CombinedKey(IS_LEAF, indirectLeafIndex);
-                dLocalLeafParentIndices[indirectLeafIndex] = i;
+                dLocalLeafParentIndices[indirectLeafIndex] = uint32_t(i);
             }
-
             else
             {
-                myNode.rightIndex = ChildIndex::CombinedKey(IS_INTERNAL, gamma + 1);
-                dLocalNodes[gamma + 1].parentIndex = i;
+                myNode.rightIndex = ChildIndex::CombinedKey(IS_INTERNAL, uint32_t(gamma + 1));
+                dLocalNodes[uint32_t(gamma + 1)].parentIndex = uint32_t(i);
             }
 
             // Edge case: if root node, set parent to "null"
@@ -380,7 +381,7 @@ void KCUnionLBVHBoundingBoxes(// I-O
         else for(int32_t i = instanceLocalThreadId; i < totalLeafs;
                  i += primPerPass)
         {
-            uint32_t nodeIndex = dLocalLeafParentIndices[i];
+            uint32_t nodeIndex = dLocalLeafParentIndices[uint32_t(i)];
             while(nodeIndex != std::numeric_limits<uint32_t>::max())
             {
                 const LBVHNode& node = dLocalNodes[nodeIndex];
@@ -439,7 +440,7 @@ void KCIntersectBaseLBVH(// Output
     for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
     {
         RayIndex index = dRayIndices[i];
-        auto [ray, tMM] = RayFromGMem(dRays, index);
+        auto [ray, initialTMM] = RayFromGMem(dRays, index);
 
         AcceleratorKey foundKey = AcceleratorKey::InvalidKey();
         uint32_t stackState = dBitStackStates[index];
@@ -451,7 +452,7 @@ void KCIntersectBaseLBVH(// Output
         uint32_t newPrevIndex = TraverseLBVH<BaseAcceleratorLBVH::StackBitCount>
         (
             bitStack, dNodes, dBoxes,
-            tMM, ray, currentNodeIndex,
+            initialTMM, ray, currentNodeIndex,
             [&](Vector2& tMM, uint32_t leafIndex)
             {
                 AABB3 aabb = dLeafAABBs[leafIndex];
@@ -714,7 +715,7 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
         ToConstSpan(dNodeSegmentRange),
         ToConstSpan(dLeafAABBs),
         //
-        blockPerSegment, 1
+        blockPerSegment, 1u
     );
 
     // Issue copy and wait

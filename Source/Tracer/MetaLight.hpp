@@ -121,8 +121,8 @@ MetaLightListConstructionParams::Partition() const
 template<class V, class ST>
 MRAY_HYBRID MRAY_CGPU_INLINE
 MetaLightViewT<V, ST>::MetaLightViewT(const V& v, const SpectrumConverter& sc)
-    : light(v)
-    , sConv(sc)
+    : sConv(sc)
+    , light(v)
 {}
 
 MRAY_HYBRID MRAY_CGPU_INLINE
@@ -405,7 +405,7 @@ void MetaLightArrayT<TLT...>::AddBatchGeneric(const GenericGroupLightT& lg,
     // Except that implementation can be optimized out?
     // Instead we use parameter pack expansion.
     uint32_t uncalled = 0;
-    auto Call = [&, this](auto* tuple) -> void
+    auto Call = [&](auto* tuple) -> void
     {
         using TupleType = std::remove_pointer_t<decltype(tuple)>;
         using LGType = std::tuple_element_t<0, TupleType>;
@@ -586,6 +586,7 @@ void MetaLightArrayT<TLT...>::Construct(MetaLightListConstructionParams params,
                 .tK = std::bit_cast<CommonKey>(hTKList[i]),
                 .pK = std::bit_cast<CommonKey>(hPKList[i])
             };
+            [[maybe_unused]]
             auto loc = lt.Search(kp);
             assert(loc.has_value());
             assert(loc.value() == i);

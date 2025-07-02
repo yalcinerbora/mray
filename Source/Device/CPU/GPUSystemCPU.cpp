@@ -8,30 +8,40 @@
 
 #ifdef MRAY_WINDOWS
     #include <windows.h>
+    #define CPUId __cpuidex
+
 #elif defined MRAY_LINUX
     #include <sys/sysinfo.h>
+
+    void cpuidex_func(int* regs, int i, int j)
+    {
+        asm volatile
+        (
+            "cpuid" : "=a" (regs[0]),
+                      "=b" (regs[1]),
+                      "=c" (regs[2]),
+                      "=d" (regs[3])
+                    : "a" (i), "c" (j)
+        );
+    }
+
+    #define CPUId cpuidex_func
 #endif
 
 std::string GetCPUName()
 {
-    if constexpr(MRAY_IS_ON_WINDOWS)
-    {
-        static constexpr uint32_t MAX_NAME_CHARS = 48u;
-        std::string result(MAX_NAME_CHARS + 1, '\0');
-        // Intel x86 ISA manual, volume 2 page 347
-        // https://cdrdv2.intel.com/v1/dl/getContent/671110
-        __cpuidex(reinterpret_cast<int*>(result.data()) + 0 * 4, 0x80000002, 0);
-        __cpuidex(reinterpret_cast<int*>(result.data()) + 4 * 4, 0x80000003, 0);
-        __cpuidex(reinterpret_cast<int*>(result.data()) + 8 * 4, 0x80000004, 0);
-        while(result.back() != '\0')
-            result.pop_back();
+    static constexpr uint32_t MAX_NAME_CHARS = 48u;
+    std::string result(MAX_NAME_CHARS + 1, '\0');
+    // Intel x86 ISA manual, volume 2 page 347
+    // https://cdrdv2.intel.com/v1/dl/getContent/671110
+    CPUId(reinterpret_cast<int*>(result.data() + 0 * 4), std::bit_cast<int>(0x80000002), 0);
+    CPUId(reinterpret_cast<int*>(result.data() + 4 * 4), std::bit_cast<int>(0x80000003), 0);
+    CPUId(reinterpret_cast<int*>(result.data() + 8 * 4), std::bit_cast<int>(0x80000004), 0);
+    while(result.back() == '\0')
+        result.pop_back();
+    result.push_back('\0');
 
-        return result;
-    }
-    #ifdef MRAY_LINUX
-        #error GetCPUName is not implemented in Linux!!!
-        return std::string();
-    #endif
+    return result;
 }
 
 uint64_t GetTotalCPUMemory()
@@ -47,12 +57,9 @@ uint64_t GetTotalCPUMemory()
         // Doing a extern C here,
         // since I dunno struct sysinfo
         // and function sysinfo collides or not
-        extern "C"
-        {
-            struct sysinfo s;
-            sysinfo(&s);
-            return size_t(s.totalram);
-        }
+        struct sysinfo s;
+        sysinfo(&s);
+        return size_t(s.totalram);
 
     #endif
 }
@@ -112,12 +119,13 @@ GPUDeviceCPU::GPUDeviceCPU(ThreadPool& tp, int deviceId,
                            AnnotationHandle domain)
     : deviceId(deviceId)
     , domain(domain)
-    , threadPool(tp)
+    , threadPool(&tp)
     , name(GetCPUName())
     , totalMemory(GetTotalCPUMemory())
 {
     for(uint32_t i = 0; i < TotalQueuePerDevice(); i++)
         queues.emplace_back(tp, domain, this);
+    transferQueue = GPUQueueCPU(tp, domain, this);
 }
 
 bool GPUDeviceCPU::operator==(const GPUDeviceCPU& other) const
@@ -142,13 +150,12 @@ std::string GPUDeviceCPU::ComputeCapability() const
 
 size_t GPUDeviceCPU::TotalMemory() const
 {
-
     return totalMemory;
 }
 
 uint32_t GPUDeviceCPU::SMCount() const
 {
-    return threadPool.ThreadCount();
+    return threadPool->ThreadCount();
 }
 
 uint32_t GPUDeviceCPU::MaxActiveBlockPerSM(uint32_t) const

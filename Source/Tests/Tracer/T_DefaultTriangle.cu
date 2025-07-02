@@ -171,7 +171,7 @@ TEST(DefaultTriangle, Load)
     EXPECT_EQ(batch.front(), PrimBatchKey::CombinedKey(0, 0));
 
     triGroup.CommitReservations();
-    PrimAttributeInfoList primIdList = triGroup.AttributeInfo();
+    //PrimAttributeInfoList primIdList = triGroup.AttributeInfo();
 
     TransientData inputIndex(std::in_place_type<Vector3ui>, IndexCount);
     inputIndex.Push<Vector3ui>(indices);
@@ -250,7 +250,7 @@ TEST(DefaultTriangle, LoadMulti)
         EXPECT_EQ(batch, PrimBatchKey::CombinedKey(PRIM_GROUP_ID, counter++));
 
     triGroup.CommitReservations();
-    PrimAttributeInfoList primIdList = triGroup.AttributeInfo();
+    //PrimAttributeInfoList primIdList = triGroup.AttributeInfo();
 
     uint32_t queueIndex = 0;
     for(const auto& batch : batches)

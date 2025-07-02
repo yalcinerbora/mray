@@ -37,21 +37,26 @@ void Reduce(Span<T, 1> dReducedValue,
             const GPUQueueCPU& queue,
             BinaryOp&& op)
 {
-    dReducedValue[0] = initialValue;
-
     using namespace std::string_view_literals;
+
+    dReducedValue[0] = initialValue;
+    uint32_t elemCount = static_cast<uint32_t>(dValues.size());
     queue.IssueWorkLambda
     (
         "KCReduce"sv,
-        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dValues.size())},
+        DeviceWorkIssueParams{.workCount = elemCount},
         [=](KernelCallParams kp)
         {
             MRAY_SHARED_MEMORY T local;
-            if(kp.threadId == 0)
-                local = dValues[kp.GlobalId()];
-            else
-                local = op(local, dValues[kp.GlobalId()]);
 
+            if(kp.GlobalId() < elemCount)
+            {
+                if(kp.threadId == 0)
+                    local = dValues[kp.GlobalId()];
+                else
+                    local = op(local, dValues[kp.GlobalId()]);
+            }
+            //
             if(kp.threadId == kp.blockSize - 1)
             {
                 // Do this at the end?????

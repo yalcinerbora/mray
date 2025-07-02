@@ -64,6 +64,7 @@ class ThreadPool
     //
     std::vector<std::jthread>               threads;
     //
+    std::atomic_uint32_t                    startedTaskCount;
     std::atomic_uint32_t                    runningTaskCount;
     std::condition_variable                 waitCondition;
     std::mutex                              waitMutex;

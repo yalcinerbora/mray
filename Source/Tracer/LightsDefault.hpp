@@ -24,7 +24,7 @@ SampleT<Vector3> LightPrim<P, SC>::SampleSolidAngle(RNGDispenser& rng,
     sampledDir.NormalizeSelf();
 
     Float NdL = surfaceSample.value.normal.Dot(sampledDir);
-    NdL = (isTwoSided) ? abs(NdL) : std::max(Float{0}, NdL);
+    NdL = (isTwoSided) ? std::abs(NdL) : std::max(Float{0}, NdL);
     // Get projected area
     Float pdf = (NdL == 0) ? Float{0.0} : surfaceSample.pdf / NdL;
     pdf *= distSqr;
@@ -42,6 +42,10 @@ Float LightPrim<P, SC>::PdfSolidAngle(const typename P::Hit& hit,
                                       const Vector3& distantPoint,
                                       const Vector3& dir) const
 {
+    #ifndef MRAY_DEVICE_CODE_PATH
+        using namespace std;
+    #endif
+
     const P& primitive = prim.get();
     // Project point to surface
     Optional<BasicSurface> surfaceOpt = primitive.SurfaceFromHit(hit);
@@ -186,6 +190,10 @@ Vector3 SphericalCoordConverter::UVToDir(const Vector2& uv)
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float SphericalCoordConverter::ToSolidAnglePdf(Float pdf, const Vector3& dirYUp)
 {
+    #ifndef MRAY_DEVICE_CODE_PATH
+        using namespace std;
+    #endif
+
     using namespace MathConstants;
     // There is code duplication here hopefully this will optimized out
     Vector3 dirZUp = TransformGen::YUpToZUp(dirYUp);
@@ -201,6 +209,10 @@ Float SphericalCoordConverter::ToSolidAnglePdf(Float pdf, const Vector3& dirYUp)
 MRAY_HYBRID MRAY_CGPU_INLINE
 Float SphericalCoordConverter::ToSolidAnglePdf(Float pdf, const Vector2& uv)
 {
+    #ifndef MRAY_DEVICE_CODE_PATH
+        using namespace std;
+    #endif
+
     using namespace MathConstants;
     // Similar to the direction version, code duplication here
     Vector2 thetaPhi = Graphics::UVToSphericalAngles(uv);
@@ -216,6 +228,9 @@ std::array<Vector2, 2>
 SphericalCoordConverter::Gradient(Float coneAperture,
                                   const Vector3& dirYUp)
 {
+    #ifndef MRAY_DEVICE_CODE_PATH
+        using namespace std;
+    #endif
     // Ray Tracing Gems I Chapter 21
     // requires the texture width.
     // We do not have these on the system (which should be
@@ -225,7 +240,7 @@ SphericalCoordConverter::Gradient(Float coneAperture,
     // For Lat/Lon mapping, we can find the cos(phi) to increase
     // the resolution towards poles.
     Float cosPhi = MathConstants::Pi<Float>() * Float(0.5);
-    cosPhi -= std::abs(dirYUp[1]);
+    cosPhi -= abs(dirYUp[1]);
 
     // On horizon, du change is constant and is between [0 2pi)
     Float coneAngle = coneAperture * Float(0.5);
@@ -320,8 +335,8 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 LightSkysphere<CC, TC, SC>::LightSkysphere(const SpectrumConverter& specTransformer,
                                            const Primitive& p, const LightSkysphereData& soa, LightKey key)
     : prim(p)
-    , radiance(specTransformer, soa.dRadiances[key.FetchIndexPortion()])
     , dist2D(soa.dDistributions[key.FetchIndexPortion()])
+    , radiance(specTransformer, soa.dRadiances[key.FetchIndexPortion()])
     , sceneDiameter(soa.sceneDiameter)
 {}
 

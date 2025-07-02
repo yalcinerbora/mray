@@ -52,7 +52,6 @@ void MultiScanTest(const GPUSystem& system)
     {
         return l + r;
     });
-
     std::vector<Value> hResultsLambda(ElementCount);
     queue.MemcpyAsync(Span<Value>(hResultsLambda.begin(), hResultsLambda.end()),
                       ToConstSpan(dOutputs));

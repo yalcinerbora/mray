@@ -410,7 +410,7 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
 
     // Copy Ids to the leaf buffer
     auto hConcreteLeafRanges = Span<const Vector2ui>(this->concreteLeafRanges);
-    auto hConcreteNodeRanges = Span<const Vector2ui>(hConcreteNodeRangesVec);
+    //auto hConcreteNodeRanges = Span<const Vector2ui>(hConcreteNodeRangesVec);
     auto hConcretePrimRanges = Span<const PrimRangeArray>(ppResult.concretePrimRanges);
     queue.MemcpyAsync(dConcreteLeafRanges, hConcreteLeafRanges);
     queue.MemcpyAsync(dConcretePrimRanges, hConcretePrimRanges);

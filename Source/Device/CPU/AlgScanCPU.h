@@ -12,7 +12,7 @@ MRAY_HOST
 size_t ExclusiveScanTMSize(size_t elementCount, const GPUQueueCPU& q)
 {
     uint32_t blockCount = q.DetermineGridStrideBlock(nullptr, 0u, StaticThreadPerBlock1D(),
-                                                     elementCount);
+                                                     uint32_t(elementCount));
     return (blockCount + 1) * sizeof(T);
 }
 
@@ -31,16 +31,20 @@ void InclusiveSegmentedScan(Span<T> dScannedValues,
 
     // Dedicate a thread for each segment
     uint32_t segmentCount = uint32_t(dValues.size() / segmentSize);
-    queue.IssueWorkLambda
+    queue.IssueBlockLambda
     (
         "KCInclusiveSegmentedScan"sv,
-        DeviceWorkIssueParams{.workCount = segmentCount},
+        DeviceBlockIssueParams
+        {
+            .gridSize = segmentCount,
+            .blockSize = 1
+        },
         [=](KernelCallParams kp)
         {
-            for(uint32_t sId = 0; sId < segmentCount; sId += kp.TotalSize())
+            for(uint32_t bId = kp.blockId; bId < segmentCount; bId += kp.gridSize)
             {
-                auto dLocalValues = dValues.subspan(sId * segmentSize, segmentSize);
-                auto dLocalOut = dScannedValues.subspan(sId * segmentSize, segmentSize);
+                auto dLocalValues = dValues.subspan(bId * segmentSize, segmentSize);
+                auto dLocalOut = dScannedValues.subspan(bId * segmentSize, segmentSize);
 
                 T sum = identityElement;
                 for(uint32_t i = 0; i < segmentSize; i++)
@@ -104,7 +108,7 @@ void ExclusiveScan(Span<T> dScannedValues,
     (
         "KCExclusiveScan-ScanBlockSums"sv,
         DeviceBlockIssueParams{.gridSize = 1u, .blockSize = 1u},
-        [=](KernelCallParams kp)
+        [=](KernelCallParams)
         {
             for(size_t i = 1; i < dBlockSums[i].size(); i++)
                 dBlockSums[i] = op(dBlockSums[i] + dBlockSums[i - 1]);
@@ -120,7 +124,6 @@ void ExclusiveScan(Span<T> dScannedValues,
             T sum;
             for(size_t i = kp.GlobalId(); i < dBlockSums[i].size(); i += kp.TotalSize())
             {
-                size_t blockId = i / StaticThreadPerBlock1D();
                 bool isFirstThreadInBlock = (i % StaticThreadPerBlock1D() == 0);
                 if(isFirstThreadInBlock)
                     dValues[i] = dBlockSums[i];

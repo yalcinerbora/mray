@@ -60,13 +60,15 @@ void BinaryPartition(Span<T> dOutput,
     assert(dTempMemory.size_bytes() <= sizeof(LRCounter) * counterAmount);
     Span<LRCounter> dCounters = Span<LRCounter>(dTempPtr, counterAmount);
     //
-    dCounters[0] = LRCounter{.left = 0, .right = 0};
+    queue.MemsetAsync(dCounters, 0x00);
     queue.IssueWorkLambda
     (
         "KCBinaryPartition-FindOffsets",
         DeviceWorkIssueParams{.workCount = uint32_t(dInput.size())},
         [=](KernelCallParams kp)
         {
+            if(kp.GlobalId() >= elemCount) return;
+
             if(op(dInput[kp.GlobalId()]))
                 dCounters[kp.blockId + 1].left += 1;
             else
@@ -79,43 +81,48 @@ void BinaryPartition(Span<T> dOutput,
         DeviceBlockIssueParams{.gridSize = 1, .blockSize = 1},
         [=](KernelCallParams)
         {
-            LRCounter offsetSum = dCounters[0];
+            uint32_t offset = dCounters[0].left;
+            assert(offset == 0);
+            // Inclusive Scan
+            for(uint32_t i = 1; i < uint32_t(dCounters.size()); i++)
+            {
+                dCounters[i].left += offset;
+                offset = dCounters[i].left;
+            }
             for(uint32_t i = 0; i < uint32_t(dCounters.size()); i++)
             {
-                // Inclusive Scan
-                dCounters[i + 1].left += offsetSum.left;
-                dCounters[i + 1].right += offsetSum.right;
-                offsetSum = dCounters[i + 1];
+                dCounters[i].right += offset;
+                offset = dCounters[i].right;
             }
+            assert(offset == elemCount);
         }
     );
     // From now on counters are write offsets
     queue.IssueWorkLambda
     (
         "KCBinaryPartition-WriteData",
-        DeviceWorkIssueParams{.workCount = uint32_t(dInput.size())},
+        DeviceWorkIssueParams{.workCount = elemCount},
         [=](KernelCallParams kp)
         {
-
             MRAY_SHARED_MEMORY Vector2ui localOffset;
             if(kp.threadId == 0) localOffset = Vector2ui::Zero();
-
             // The first thread sets the offset counter from the dCounters variable.
-            if(kp.GlobalId() == 0)
-                dEndOffset[0] = dCounters.back().left;
+            if(kp.GlobalId() == 0) dEndOffset[0] = dCounters.back().left;
 
             const auto& globalOffset = dCounters[kp.blockId];
-            //
-            if(op(dInput[kp.GlobalId()]))
-                dOutput[globalOffset.left + (localOffset[0]++)] = dInput[kp.GlobalId()];
-            else
-                dOutput[globalOffset.right + (localOffset[1]++)] = dInput[kp.GlobalId()];
-
+            if(kp.GlobalId() < elemCount)
+            {
+                if(op(dInput[kp.GlobalId()]))
+                    dOutput[globalOffset.left + (localOffset[0]++)] = dInput[kp.GlobalId()];
+                else
+                    dOutput[globalOffset.right + (localOffset[1]++)] = dInput[kp.GlobalId()];
+            }
             if constexpr(MRAY_IS_DEBUG)
             {
                 if(kp.threadId == kp.blockSize - 1)
                 {
-                    LRCounter nextCounter = dCounters[kp.blockId];
+                    [[maybe_unused]]
+                    LRCounter nextCounter = dCounters[kp.blockId + 1];
                     assert(localOffset[0] == nextCounter.left - globalOffset.left);
                     assert(localOffset[1] == nextCounter.right - globalOffset.right);
                 }

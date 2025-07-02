@@ -229,7 +229,7 @@ RendererOptionPack PathTracerRenderer::CurrentAttributes() const
     //
     if constexpr(MRAY_IS_DEBUG)
     {
-        for(const auto& d: result.attributes)
+        for([[maybe_unused]] const auto& d: result.attributes)
             assert(d.IsFull());
     }
     return result;
@@ -460,7 +460,8 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
         GlobalState globalState
         {
             .russianRouletteRange = currentOptions.russianRouletteRange,
-            .sampleMode = currentOptions.sampleMode
+            .sampleMode = currentOptions.sampleMode,
+            .lightSampler = EmptyType{}
         };
 
         this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,
@@ -511,7 +512,8 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
         GlobalStateE globalStateE
         {
             .russianRouletteRange = currentOptions.russianRouletteRange,
-            .sampleMode = currentOptions.sampleMode
+            .sampleMode = currentOptions.sampleMode,
+            .lightSampler = EmptyType{}
         };
 
         // Clear the shadow ray radiance buffer
@@ -577,8 +579,8 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
 
         // Do the actual kernel
         this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,
-        [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
-                  uint32_t, uint32_t partitionSize)
+        [&](const auto& workI, Span<uint32_t> dLocalIndices,
+            uint32_t, uint32_t partitionSize)
         {
             uint32_t rnCount = workI.SampleRNCount(0);
             auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
@@ -598,7 +600,7 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
                            globalStateE, processQueue);
         },
         // Empty Kernel for light
-        [&, this](const auto&, Span<uint32_t>, uint32_t, uint32_t) {});
+        [&](const auto&, Span<uint32_t>, uint32_t, uint32_t) {});
     }
 
     return dIndices;
@@ -912,7 +914,6 @@ PathTracerRenderer::StartRender(const RenderImageParams& rIP,
                         uint32_t(this->tracerView.tracerParams.filmFilter.type));
     Float radius = this->tracerView.tracerParams.filmFilter.radius;
     filmFilter = FilterGen->get()(this->gpuSystem, Float(radius));
-    Vector2ui filterPadSize = filmFilter->FilterExtent();
 
     // Change the mode according to the render logic
     using Math::Roll;

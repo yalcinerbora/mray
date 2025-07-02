@@ -59,8 +59,16 @@ struct KernelCallParamsCPU
     MRAY_HYBRID uint32_t    TotalSize() const;
 };
 
+struct KernelCallParamsGlobal
+{
+    uint32_t gridSize   = 0;
+    uint32_t blockSize  = 0;
+    uint32_t blockId    = 0;
+    uint32_t threadId   = 0;
+};
+
 // Global list of KP
-inline thread_local KernelCallParamsCPU globalKCParams;
+inline thread_local KernelCallParamsGlobal globalKCParams;
 
 using AnnotationHandle = void*;
 using AnnotationStringHandle = void*;
@@ -162,15 +170,15 @@ class GPUQueueCPU
 
     template<auto Kernel, class... Args>
     MRAY_HYBRID void IssueKernelInternal(std::string_view name,
-                                         uint32_t workCount,
-                                         bool oneWorkPerThread,
+                                         uint32_t totalWorkCount,
+                                         uint32_t tpb,
                                          //
                                          Args&&...) const;
 
     template<class Lambda>
     MRAY_HYBRID void IssueLambdaInternal(std::string_view name,
-                                         uint32_t workCount,
-                                         bool oneWorkPerThread,
+                                         uint32_t totalWorkCount,
+                                         uint32_t tpb,
                                          Lambda&&) const;
 
     private:
@@ -305,7 +313,7 @@ class GPUDeviceCPU
     //
     int                     deviceId;
     AnnotationHandle        domain;
-    ThreadPool&             threadPool;
+    ThreadPool*             threadPool;
     //
     std::string             name;
     size_t                  totalMemory;
@@ -342,10 +350,10 @@ class GPUSystemCPU
     using GPUPtrList = std::vector<const GPUDeviceCPU*>;
 
     private:
+    std::unique_ptr<ThreadPool> localTP;
     GPUList                     systemGPUs;
     GPUPtrList                  systemGPUPtrs;
     AnnotationHandle            cpuDomain;
-    std::unique_ptr<ThreadPool> localTP;
 
     // TODO: Check designs for this, this made the GPUSystem global
     // which is fine
@@ -422,7 +430,7 @@ void GPUFenceCPU::Wait() const
 {
     auto completedCounter = std::atomic_ref<uint64_t>(*completedKernelCounter);
     while(completedCounter.load() < valueToWait)
-        completedCounter.wait(valueToWait, std::memory_order_seq_cst);
+        completedCounter.wait(0);
 }
 
 MRAY_HYBRID inline
@@ -432,6 +440,7 @@ GPUQueueCPU::GPUQueueCPU(ThreadPool& tp,
     : domain(domain)
     , myDevice(device)
     , tp(&tp)
+    , cb(std::make_unique<ControlBlockData>())
 {}
 
 // Memory Movement (Async)
@@ -443,15 +452,20 @@ void GPUQueueCPU::MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const
 
     assert(regionTo.size() >= regionFrom.size());
     uint32_t elemCount = static_cast<uint32_t>(regionTo.size());
-    uint32_t blockCount = DetermineGridStrideBlock(nullptr, 0, 0, elemCount);
-    uint32_t workPerThread = Math::DivideUp(elemCount, blockCount);
-
+    uint32_t workPerThread = StaticThreadPerBlock1D();
+    uint32_t blockCount = DetermineGridStrideBlock(nullptr, 0,
+                                                   workPerThread,
+                                                   elemCount);
+    // We find grid size via StaticTPB, we only set
+    // single thread for each block. We want to use
+    // memcpy, instead of thread copy assigning variables
+    // one by one.
     IssueBlockLambda
     (
         "MemcpyAsync"sv,
         DeviceBlockIssueParams
         {
-            .gridSize = blockCount,
+            .gridSize= blockCount,
             .blockSize = 1u
         },
         [=](KernelCallParamsCPU kp)
@@ -462,6 +476,7 @@ void GPUQueueCPU::MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const
 
             auto localFromSpan = regionFrom.subspan(i * workPerThread, writeBound);
             auto localToSpan = regionTo.subspan(i * workPerThread, writeBound);
+            assert(localFromSpan.size() == localToSpan.size());
             std::memcpy(localToSpan.data(), localFromSpan.data(), localFromSpan.size_bytes());
         }
     );
@@ -549,8 +564,9 @@ void GPUQueueCPU::MemsetAsync(Span<T> region, uint8_t perByteValue) const
     using namespace std::string_view_literals;
 
     uint32_t elemCount = static_cast<uint32_t>(region.size());
-    uint32_t blockCount = DetermineGridStrideBlock(nullptr, 0, 0, elemCount);
-    uint32_t workPerThread = Math::DivideUp(elemCount, blockCount);
+    uint32_t blockCount = DetermineGridStrideBlock(nullptr, 0, StaticThreadPerBlock1D(),
+                                                   elemCount);
+    uint32_t workPerThread = StaticThreadPerBlock1D();
 
     IssueBlockLambda
     (
@@ -645,7 +661,7 @@ void GPUQueueCPU::IssueWait(const GPUFenceCPU& barrier) const
         {
             std::atomic_ref<uint64_t> completedCounter(*barrierValue);
             while(completedCounter < valueToAchieve)
-                completedCounter.wait(valueToAchieve, std::memory_order_seq_cst);
+                completedCounter.wait(0);
         }
     );
 }

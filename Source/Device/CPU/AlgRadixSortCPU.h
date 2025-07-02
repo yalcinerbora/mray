@@ -8,10 +8,10 @@ namespace mray::host::algorithms
 {
 
 static constexpr int32_t BIT_PER_PASS = 8;
-static constexpr int32_t OFFSET_BUFFER_SIZE = (1u << BIT_PER_PASS);
+static constexpr int32_t COUNT_BUFFER_SIZE = (1u << BIT_PER_PASS);
 
-using CountBuffer = std::array<uint32_t, OFFSET_BUFFER_SIZE>;
-using OffsetBuffer = std::array<uint32_t, OFFSET_BUFFER_SIZE + 1>;
+using CountBuffer = std::array<uint32_t, COUNT_BUFFER_SIZE>;
+using OffsetBuffer = CountBuffer;
 
 template <bool IsAscending, class K, class V>
 MRAY_GPU inline
@@ -33,30 +33,41 @@ uint32_t RadixSortKVSingleThread(Span<Span<K>, 2> dKeyDoubleBuffer,
     {
         std::array<UIntType, 2> curBitRange =
         {
-            UIntType(std::max(int32_t(bitRange[1]) - (pass + 0) * BIT_PER_PASS, 0)),
-            UIntType(std::max(int32_t(bitRange[1]) - (pass + 1) * BIT_PER_PASS, 0))
+            UIntType(std::max(int32_t(bitRange[1]) - (pass + BIT_PER_PASS), 0)),
+            UIntType(std::max(int32_t(bitRange[1]) - (pass + 0), 0))
         };
         uint32_t curPassBitCount = uint32_t(curBitRange[1] - curBitRange[0]);
-
+        uint32_t curPassBucketCount = (1u << curPassBitCount);
+        //
         Span<K> dRKeyBuffer = dKeyDoubleBuffer[inputBufferIndex];
         Span<V> dRValBuffer = dValueDoubleBuffer[inputBufferIndex];
         //
         Span<K> dWKeyBuffer = dKeyDoubleBuffer[outputBufferIndex];
         Span<V> dWValBuffer = dValueDoubleBuffer[outputBufferIndex];
 
+        std::fill(countBuffer.begin(), countBuffer.begin() + curPassBucketCount, 0u);
         for(const K& key : dRKeyBuffer)
         {
             UIntType keyBits = 0u;
             std::memcpy(&keyBits, &key, sizeof(K));
             uint32_t bucketIndex = uint32_t(Bit::FetchSubPortion(keyBits, curBitRange));
-            countBuffer[bucketIndex + 1] += 1;
+            countBuffer[bucketIndex] += 1;
         }
 
-        std::inclusive_scan(countBuffer.cbegin(),
-                            countBuffer.cbegin() + curPassBitCount,
-                            offsetBuffer.begin() + 1);
-        offsetBuffer[0] = 0u;
-
+        if constexpr(!IsAscending)
+        {
+            auto start = std::reverse_iterator(countBuffer.cbegin() + curPassBucketCount);
+            auto end = std::reverse_iterator(countBuffer.cbegin());
+            auto writeStart = std::reverse_iterator(offsetBuffer.begin() + curPassBucketCount);
+            std::exclusive_scan(start, end, writeStart, 0u);
+            std::fill(countBuffer.begin(), countBuffer.begin() + curPassBucketCount, 0u);
+        }
+        else
+        {
+            std::exclusive_scan(countBuffer.cbegin(), countBuffer.cbegin() + curPassBucketCount,
+                                offsetBuffer.begin(), 0u);
+            std::fill(countBuffer.begin(), countBuffer.begin() + curPassBucketCount, 0u);
+        }
         for(uint32_t i = 0; i < uint32_t(dRKeyBuffer.size()); i++)
         {
             K& key = dRKeyBuffer[i];
@@ -65,25 +76,17 @@ uint32_t RadixSortKVSingleThread(Span<Span<K>, 2> dKeyDoubleBuffer,
             UIntType keyBits = 0u;
             std::memcpy(&keyBits, &key, sizeof(K));
             uint32_t bucketIndex = uint32_t(Bit::FetchSubPortion(keyBits, curBitRange));
-
-            uint32_t bucketSize = offsetBuffer[bucketIndex + 1] - offsetBuffer[bucketIndex];
-            uint32_t localIndex = bucketSize - countBuffer[bucketIndex]--;
+            uint32_t localIndex = countBuffer[bucketIndex]++;
             uint32_t pushLoc = offsetBuffer[bucketIndex] + localIndex;
 
             dWKeyBuffer[pushLoc] = std::move(key);
             dWValBuffer[pushLoc] = std::move(val);
         }
-
-        if constexpr(MRAY_IS_DEBUG)
-        {
-            assert(std::all_of(offsetBuffer.cbegin(), offsetBuffer.cend(),
-                               [](uint32_t v){return v == 0; }));
-        }
         std::swap(inputBufferIndex, outputBufferIndex);
     }
-    return outputBufferIndex;
+    // We do one extra swap above, so "output" is in "input"
+    return inputBufferIndex;
 }
-
 
 template <bool IsAscending, class K, class V>
 MRAY_HOST inline
@@ -114,8 +117,9 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
 {
     using namespace std::string_view_literals;
 
+    uint32_t elemCount = static_cast<uint32_t>(dValueDoubleBuffer[0].size());
     uint32_t blockCount = queue.DetermineGridStrideBlock(nullptr, 0u, StaticThreadPerBlock1D(),
-                                                         uint32_t(dValueDoubleBuffer[0].size()));
+                                                         elemCount);
     Byte* dOffsetBufPtr = dTempMemory.data();
     Byte* dCountBufPtr = dTempMemory.data() + sizeof(OffsetBuffer) * blockCount;
     static_assert((sizeof(OffsetBuffer)) % alignof(CountBuffer) == 0, "Alignment mismatch!");
@@ -124,9 +128,6 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
     // TODO: Set these buffers from temp memory
     Span<OffsetBuffer> dOffsetBuffers(reinterpret_cast<OffsetBuffer*>(dOffsetBufPtr), blockCount);
     Span<CountBuffer> dCountBuffers(reinterpret_cast<CountBuffer*>(dCountBufPtr), blockCount);
-
-    // Initially set the count buffers to zer
-    queue.MemsetAsync(dCountBuffers, 0x00);
 
     using UIntType = std::conditional_t<(sizeof(K) > sizeof(uint32_t)), uint64_t, uint32_t>;
     uint32_t inputBufferIndex = 0;
@@ -137,11 +138,12 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
     {
         std::array<UIntType, 2> curBitRange =
         {
-            UIntType(std::max(int32_t(bitRange[1]) - (pass + 0) * BIT_PER_PASS, 0)),
-            UIntType(std::max(int32_t(bitRange[1]) - (pass + 1) * BIT_PER_PASS, 0))
+            UIntType(std::max(int32_t(bitRange[1]) - (pass + BIT_PER_PASS), 0)),
+            UIntType(std::max(int32_t(bitRange[1]) - (pass + 0), 0))
         };
         uint32_t curPassBitCount = uint32_t(curBitRange[1] - curBitRange[0]);
-
+        uint32_t curPassBucketCount = (1u << curPassBitCount);
+        //
         Span<K> dRKeyBuffer = dKeyDoubleBuffer[inputBufferIndex];
         Span<V> dRValBuffer = dValueDoubleBuffer[inputBufferIndex];
         //
@@ -154,10 +156,17 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
             DeviceWorkIssueParams{.workCount = uint32_t(dRKeyBuffer.size())},
             [=](KernelCallParams kp)
             {
+                if(kp.threadId == 0)
+                {
+                    auto& arr = dCountBuffers[kp.blockId];
+                    std::fill(arr.begin(), arr.begin() + curPassBucketCount, 0u);
+                }
+                if(kp.GlobalId() >= elemCount) return;
+
                 UIntType keyBits = 0u;
                 std::memcpy(&keyBits, &dRKeyBuffer[kp.GlobalId()], sizeof(K));
                 uint32_t bucketIndex = uint32_t(Bit::FetchSubPortion(keyBits, curBitRange));
-                dCountBuffers[kp.blockId][bucketIndex + 1] += 1;
+                dCountBuffers[kp.blockId][bucketIndex] += 1;
             }
         );
         //
@@ -167,14 +176,19 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
             DeviceBlockIssueParams{.gridSize = 1u, .blockSize = 1u},
             [=](KernelCallParams)
             {
+                uint32_t offset = 0;
+                // We need to do column major order here unfortunately
+                for(uint32_t i = 0; i < curPassBucketCount; i++)
                 for(uint32_t bId = 0; bId < blockCount; bId++)
                 {
-                    dCountBuffers[bId][0] = (bId != 0) ? dCountBuffers[bId - 1][0] : 0;
-                    for(uint32_t i = 1; i < (curPassBitCount + 1); i++)
-                    {
-                        dOffsetBuffers[bId][i] = (dOffsetBuffers[bId][i - 1] +
-                                                  dCountBuffers[bId][i]);
-                    }
+                    // Exclusive Scan
+                    uint32_t index = i;
+                    if constexpr(!IsAscending)
+                        index = curPassBucketCount - i - 1;
+
+                    dOffsetBuffers[bId][index] = offset;
+                    offset += dCountBuffers[bId][index];
+                    dCountBuffers[bId][index] = 0;
                 }
             }
         );
@@ -185,47 +199,27 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
             DeviceWorkIssueParams{.workCount = uint32_t(dRKeyBuffer.size())},
             [=](KernelCallParams kp)
             {
+                if(kp.GlobalId() >= elemCount) return;
+
                 K& key = dRKeyBuffer[kp.GlobalId()];
                 V& val = dRValBuffer[kp.GlobalId()];
-                const auto offsetBuffer = dOffsetBuffers[kp.blockId];
+                const auto& offsetBuffer = dOffsetBuffers[kp.blockId];
                 auto& countBuffer = dCountBuffers[kp.blockId];
 
                 UIntType keyBits = 0u;
                 std::memcpy(&keyBits, &key, sizeof(K));
                 uint32_t bucketIndex = uint32_t(Bit::FetchSubPortion(keyBits, curBitRange));
-
-                uint32_t bucketSize = offsetBuffer[bucketIndex + 1] - offsetBuffer[bucketIndex];
-                uint32_t localIndex = bucketSize - countBuffer[bucketIndex]--;
+                uint32_t localIndex = countBuffer[bucketIndex]++;
                 uint32_t pushLoc = offsetBuffer[bucketIndex] + localIndex;
 
                 dWKeyBuffer[pushLoc] = std::move(key);
                 dWValBuffer[pushLoc] = std::move(val);
             }
         );
-
-        if constexpr(MRAY_IS_DEBUG)
-        {
-            queue.IssueBlockLambda
-            (
-                "KCRadixSort-ScanBuckets"sv,
-                DeviceBlockIssueParams{.gridSize = 1u, .blockSize = 1u},
-                [=](KernelCallParams)
-                {
-                    [[maybe_unused]]
-                    bool allZero = true;
-
-                    for(uint32_t bId = 0; bId < blockCount; bId++)
-                    for(uint32_t i = 0; i < BIT_PER_PASS; i++)
-                    {
-                        allZero &= (dCountBuffers[bId][i] == 0);
-                    }
-                    assert(allZero);
-                }
-            );
-        }
         std::swap(inputBufferIndex, outputBufferIndex);
     }
-    return outputBufferIndex;
+    // We do one extra swap above, so "output" is in "input"
+    return inputBufferIndex;
 }
 
 template <bool IsAscending, class K, class V>

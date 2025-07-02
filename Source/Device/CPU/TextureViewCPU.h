@@ -12,6 +12,16 @@
 namespace mray::host
 {
 
+template<class T>
+concept FloatPixelC =
+(
+    std::is_same_v<T, Float>    ||
+    std::is_same_v<T, Vector2>  ||
+    std::is_same_v<T, Vector3>  ||
+    std::is_same_v<T, Vector4>
+    // TODO: Add half here when it is supported
+);
+
 template<uint32_t DIM, class T>
 class TextureViewCPU
 {
@@ -34,8 +44,11 @@ class TextureViewCPU
     MRAY_GPU T              ReadPixel(TextureExtent<DIM> ijk,
                                       TextureExtent<DIM> mipSize,
                                       Span<const Byte> mipData) const;
+
     MRAY_GPU T              ReadInterpolatedPixel(UV uv, TextureExtent<DIM> mipSize,
-                                                  Span<const Byte> mipData) const;
+                                                  Span<const Byte> mipData) const requires(FloatPixelC<T>);
+    MRAY_GPU T              ReadInterpolatedPixel(UV uv, TextureExtent<DIM> mipSize,
+                                                  Span<const Byte> mipData) const requires(!FloatPixelC<T>);
 
     public:
     MRAY_HOST               TextureViewCPU(Span<const Byte> data,
@@ -90,41 +103,50 @@ class RWTextureViewCPU
     MRAY_GPU T      operator()(TextureExtent<DIM>) const;
 };
 
+template<class T>
+class InnerType;
+
+template<VectorC T>
+class InnerType<T>
+{
+    using Type = typename T::InnerType;
+};
+
 template<uint32_t D, class T>
 template<uint32_t C, bool IsSigned, class PixelType>
 MRAY_GPU
 T TextureViewCPU<D, T>::Convert(const PixelType& pixel) const
 {
+    // Fetch the inner type if any (for multi-channel types)
+    //using InnerType = std::conditional_t<VectorC<T>, typename T::InnerType, void>;
     using namespace Bit::NormConversion;
-    if constexpr(C == 1)
-    {
-        if constexpr(IsNormConvertibleCPU<PixelType>() &&
-                     std::is_same_v<T, Float>)
-        {
-            if constexpr(IsSigned)  return FromSNorm<T>(pixel);
-            else                    return FromUNorm<T>(pixel);
-        }
-        else return pixel;
-    }
-    // Mutli Channel norm conversion
-    else
-    {
-        if constexpr(IsNormConvertibleCPU<PixelType>() &&
-                     std::is_same_v<typename T::InnerType, Float>)
-        {
-            using InnerT = typename T::InnerType;
 
-            T result;
-            UNROLL_LOOP
-            for(uint32_t i = 0; i < C; i++)
-            {
-                if constexpr(IsSigned)  result[i] = FromSNorm<InnerT>(pixel[i]);
-                else                    result[i] = FromUNorm<InnerT>(pixel[i]);
-            }
-            return result;
-        }
-        else return pixel;
+    // Identity Conversion read type and query type is same
+    if constexpr(std::is_same_v<PixelType, T>)
+        return pixel;
+    // Single Channel UNorm/SNorm conversion
+    else if constexpr(C == 1 && IsNormConvertible<PixelType>() &&
+                      std::is_same_v<T, Float>)
+    {
+        if constexpr(IsSigned)  return FromSNorm<T>(pixel);
+        else                    return FromUNorm<T>(pixel);
     }
+    // Multi Channel UNorm/SNorm conversion
+    else if constexpr(C != 1 && IsNormConvertible<PixelType>() &&
+                      std::is_same_v<InnerType<T>, Float>)
+    {
+        T result;
+        UNROLL_LOOP
+        for(uint32_t i = 0; i < C; i++)
+        {
+            if constexpr(IsSigned)  result[i] = FromSNorm<Float>(pixel[i]);
+            else                    result[i] = FromUNorm<Float>(pixel[i]);
+        }
+        return result;
+    }
+    // Query data <=> Read data mismatch
+    // just return default T
+    else return T();
 }
 
 template<uint32_t D, class T>
@@ -175,7 +197,7 @@ T TextureViewCPU<D, T>::ReadPixel(TextureExtent<D> ijk,
                                         ijk[1] * mipSize[0] +
                                         ijk[0]);
 
-    T pixResult = std::visit([&, this](auto&& pt) -> T
+    T pixResult = std::visit([&](auto&& pt) -> T
     {
         using EnumT = std::remove_cvref_t<decltype(pt)>;
         static constexpr uint32_t OutC = VectorTypeToChannels<T>();
@@ -195,10 +217,22 @@ T TextureViewCPU<D, T>::ReadPixel(TextureExtent<D> ijk,
     return pixResult;
 }
 
+
+template<uint32_t D, class T>
+
+MRAY_GPU
+T TextureViewCPU<D, T>::ReadInterpolatedPixel(UV, TextureExtent<D>,
+                                              Span<const Byte>) const
+requires (!FloatPixelC<T>)
+{
+    return T();
+}
+
 template<uint32_t D, class T>
 MRAY_GPU
 T TextureViewCPU<D, T>::ReadInterpolatedPixel(UV uv, TextureExtent<D> mipSize,
                                               Span<const Byte> mipData) const
+requires (FloatPixelC<T>)
 {
     UV texel = uv * UV(mipSize) - UV(0.5);
     std::array<Float, D> frac;
@@ -295,7 +329,7 @@ T TextureViewCPU<D, T>::operator()(UV uv, Float mipLevel) const
     }
     else
     {
-        auto FetchPix = [&, this](int32_t mip) -> T
+        auto FetchPix = [&, this](uint32_t mip) -> T
         {
             using namespace Graphics;
             uint32_t offset = TextureMipPixelStart(texParams->size, mip);
@@ -310,10 +344,10 @@ T TextureViewCPU<D, T>::operator()(UV uv, Float mipLevel) const
         m0 = Math::Clamp(m1, 0, int32_t(texParams->mipCount));
         m1 = Math::Clamp(m0, 0, int32_t(texParams->mipCount));
 
-        T pix0  = FetchPix(m0);
+        T pix0  = FetchPix(uint32_t(m0));
         if(m0 == m1) return pix0;
 
-        T pix1 = FetchPix(m1);
+        T pix1 = FetchPix(uint32_t(m1));
 
         if constexpr(std::is_same_v<Float, T>)
             return Math::Lerp(pix0, pix1, frac);

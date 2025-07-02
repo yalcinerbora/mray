@@ -43,6 +43,7 @@ DeviceLocalMemoryCPU::DeviceLocalMemoryCPU(const GPUDeviceCPU& device)
 DeviceLocalMemoryCPU::DeviceLocalMemoryCPU(const GPUDeviceCPU& device, size_t sizeInBytes)
     : DeviceLocalMemoryCPU(device)
 {
+    assert(sizeInBytes != 0);
     allocSize = Math::NextMultiple(sizeInBytes, MemAlloc::DefaultSystemAlignment());
     size = sizeInBytes;
     dPtr = AlignedAllocate(allocSize, MemAlloc::DefaultSystemAlignment());
@@ -322,18 +323,19 @@ size_t HostLocalAlignedMemoryCPU::AllocSize() const
 }
 
 DeviceMemoryCPU::DeviceMemoryCPU(const std::vector<const GPUDeviceCPU*>& devicesIn,
-                                 size_t,
-                                 size_t,
+                                 [[maybe_unused]] size_t allocGranularityIn,
+                                 [[maybe_unused]] size_t reserveGranularityIn,
                                  bool neverDecrease)
     : devices(devicesIn)
     , mPtr(nullptr)
     , allocationGranularity(MemAlloc::DefaultSystemAlignment())
     , reserveGranularity(MemAlloc::DefaultSystemAlignment())
+    , size(0)
     , allocSize(0)
     , neverDecrease(neverDecrease)
 {
-    assert(allocationGranularity != 0);
-    assert(reserveGranularity != 0);
+    assert(allocGranularityIn != 0);
+    assert(reserveGranularityIn != 0);
     assert(!devices.empty());
 }
 
@@ -346,6 +348,7 @@ DeviceMemoryCPU& DeviceMemoryCPU::operator=(DeviceMemoryCPU&& other) noexcept
     allocationGranularity = other.allocationGranularity;
     reserveGranularity = other.reserveGranularity;
     mPtr = other.mPtr;
+    size = other.size;
     allocSize = other.allocSize;
     neverDecrease = other.neverDecrease;
     return *this;
@@ -358,6 +361,12 @@ DeviceMemoryCPU::~DeviceMemoryCPU()
 
 void DeviceMemoryCPU::ResizeBuffer(size_t newSize)
 {
+    if(neverDecrease && newSize < size)
+    {
+        size = newSize;
+        return;
+    }
+    //
     auto HaltVisibleDevices = [this]()
     {
         for(const auto* device : devices)
@@ -367,18 +376,23 @@ void DeviceMemoryCPU::ResizeBuffer(size_t newSize)
             device->GetTransferQueue().Barrier().Wait();
         }
     };
+    //
     HaltVisibleDevices();
-
     size_t newAllocSize = Math::NextMultiple(newSize, allocationGranularity);
     void* newPtr = AlignedAllocate(newAllocSize, allocationGranularity);
-    std::memcpy(newPtr, mPtr, std::min(newAllocSize, allocSize));
-    if(mPtr) AlignedFree(mPtr, allocSize, allocationGranularity);
+    if(mPtr)
+    {
+        std::memcpy(newPtr, mPtr, std::min(newSize, size));
+        AlignedFree(mPtr, allocSize, allocationGranularity);
+    }
+    mPtr = newPtr;
     allocSize = newAllocSize;
+    size = newSize;
 }
 
 size_t DeviceMemoryCPU::Size() const
 {
-    return allocSize;
+    return size;
 }
 
 }

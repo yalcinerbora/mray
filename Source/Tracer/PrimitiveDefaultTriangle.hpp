@@ -9,9 +9,9 @@ Triangle<T>::Triangle(const T& transform,
                       const TriangleData& data,
                       PrimitiveKey key)
     : data(data)
+    , transformContext(transform)
     , key(key)
     , positions{}
-    , transformContext(transform)
 {
     Vector3ui index = data.indexList[key.FetchIndexPortion()];
     positions[0] = data.positions[index[0]];
@@ -46,6 +46,10 @@ template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 SampleT<BasicSurface> Triangle<T>::SampleSurface(RNGDispenser& rng) const
 {
+    #ifndef MRAY_DEVICE_CODE_PATH
+        using namespace std;
+    #endif
+
     Vector2 xi = rng.NextFloat2D<0>();
     Float r1 = sqrt(xi[0]);
     Float r2 = xi[1];
@@ -105,9 +109,9 @@ template<TransformContextC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 Vector3 Triangle<T>::GetCenter() const
 {
-    Vector3 center = (positions[0] * Float{0.333333} +
-                      positions[1] * Float{0.333333} +
-                      positions[2] * Float{0.333333});
+    Vector3 center = (positions[0] * Float(0.333333333) +
+                      positions[1] * Float(0.333333333) +
+                      positions[2] * Float(0.333333333));
     return center;
 }
 
@@ -125,14 +129,14 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
     // this is a crappy workaround, since this is only a device function
     // but clang gives an error
     #ifndef MRAY_DEVICE_CODE_PATH
-    using namespace std;
+        using namespace std;
     #endif
 
     // World Space Normal (Will be used to determine best projection plane)
     Vector3 normal = Shape::Triangle::Normal(positions);
     normal = transformContext.ApplyN(normal);
     // Find the best projection plane (XY, YZ, XZ)
-    int domAxis = normal.Abs().Maximum();
+    unsigned int domAxis = normal.Abs().Maximum();
     bool hasNegSign = signbit(normal[domAxis]);
     float domSign = hasNegSign ? Float{-1} : Float{1};
 
@@ -199,10 +203,10 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
     aabbMax = Vector2::Max(aabbMax, positions2D[2]);
 
     // Convert to [0, resolution] (pixel space)
-    Vector2i xRangeInt(floor((Float{0.5} + Float{0.5} * aabbMin[0]) * rasterResolution[0]),
-                       ceil((Float{0.5} + Float{0.5} * aabbMax[0]) * rasterResolution[0]));
-    Vector2i yRangeInt(floor((Float{0.5} + Float{0.5} * aabbMin[1]) * rasterResolution[1]),
-                       ceil((Float{0.5} + Float{0.5} * aabbMax[1]) * rasterResolution[1]));
+    Vector2i xRangeInt(floor((Float{0.5} + Float{0.5} * aabbMin[0]) * Float(rasterResolution[0])),
+                       ceil((Float{0.5} + Float{0.5} * aabbMax[0]) * Float(rasterResolution[0])));
+    Vector2i yRangeInt(floor((Float{0.5} + Float{0.5} * aabbMin[1]) * Float(rasterResolution[1])),
+                       ceil((Float{0.5} + Float{0.5} * aabbMax[1]) * Float(rasterResolution[1])));
     // Clip the range
     xRangeInt.ClampSelf(0, rasterResolution[0]);
     yRangeInt.ClampSelf(0, rasterResolution[1]);
@@ -390,8 +394,8 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 void Triangle<T>::GenerateSurface(EmptySurface&,
                                   RayConeSurface& rayConeSurface,
                                   // Inputs
-                                  const Hit& hit,
-                                  const Ray& ray,
+                                  const Hit&,
+                                  const Ray&,
                                   const RayCone& rayCone) const
 {
     rayConeSurface = RayConeSurface
@@ -632,7 +636,7 @@ TransformContextSkinned::TransformContextSkinned(const typename TransformGroupMu
     // Blend Transforms
     transform = Matrix4x4::Zero();
     UNROLL_LOOP
-    for(int i = 0; i < TRANSFORM_PER_PRIMITIVE; i++)
+    for(unsigned int i = 0; i < TRANSFORM_PER_PRIMITIVE; i++)
     {
         transform += t[indices[i]] * weights[i];
     }
@@ -640,7 +644,7 @@ TransformContextSkinned::TransformContextSkinned(const typename TransformGroupMu
     // Blend Inverse Transforms
     invTransform = Matrix4x4::Zero();
     UNROLL_LOOP
-    for(int i = 0; i < TRANSFORM_PER_PRIMITIVE; i++)
+    for(unsigned int i = 0; i < TRANSFORM_PER_PRIMITIVE; i++)
     {
         invTransform += tInverse[indices[i]] * weights[i];
     }

@@ -204,72 +204,72 @@ void KernelCallLambdaTester(const GPUSystem& system)
 
 #ifndef MRAY_GPU_BACKEND_CPU
 
-void KernelCallNestedTester(const GPUSystem& system)
-{
-    static constexpr uint32_t HostInitValue = 999;
-    uint32_t totalThreads = 32;
-    uint32_t hReferenceTest = 512;
-    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
-
-    DeviceLocalMemory mem(system.BestDevice());
-    Span<uint32_t> dWriteSpan;
-    Span<uint32_t> dRefSpan;
-    MemAlloc::AllocateMultiData(std::tie(dWriteSpan, dRefSpan),
-                                mem,
-                                {totalThreads, 1});
-    // Copy reference to host
-    Span<const uint32_t, 1> readSpan(&hReferenceTest, 1);
-    system.Memcpy<uint32_t>(dRefSpan, readSpan);
-    system.Memset(dWriteSpan, 0x12);
-
-    // Construct reference type from host
-    const uint32_t& dReference = dRefSpan.front();
-    std::vector<uint32_t> hValues(totalThreads, HostInitValue);
-
-    // Copy back to host and check
-    auto CopyBackAndCheck = [&]()
+    void KernelCallNestedTester(const GPUSystem& system)
     {
-        queue.MemcpyAsync(Span<uint32_t>(hValues.begin(), hValues.end()),
-                          ToConstSpan(dWriteSpan.subspan(0, totalThreads)));
-        queue.Barrier().Wait();
-        for(uint32_t i = 0; i < static_cast<uint32_t>(hValues.size()); i++)
+        static constexpr uint32_t HostInitValue = 999;
+        uint32_t totalThreads = 32;
+        uint32_t hReferenceTest = 512;
+        const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
+
+        DeviceLocalMemory mem(system.BestDevice());
+        Span<uint32_t> dWriteSpan;
+        Span<uint32_t> dRefSpan;
+        MemAlloc::AllocateMultiData(std::tie(dWriteSpan, dRefSpan),
+                                    mem,
+                                    {totalThreads, 1});
+        // Copy reference to host
+        Span<const uint32_t, 1> readSpan(&hReferenceTest, 1);
+        system.Memcpy<uint32_t>(dRefSpan, readSpan);
+        system.Memset(dWriteSpan, 0x12);
+
+        // Construct reference type from host
+        const uint32_t& dReference = dRefSpan.front();
+        std::vector<uint32_t> hValues(totalThreads, HostInitValue);
+
+        // Copy back to host and check
+        auto CopyBackAndCheck = [&]()
         {
-            EXPECT_EQ(hValues[i], hReferenceTest + i);
-            hValues[i] = HostInitValue;
-        }
-        system.Memset(dWriteSpan, 0x00);
-    };
+            queue.MemcpyAsync(Span<uint32_t>(hValues.begin(), hValues.end()),
+                              ToConstSpan(dWriteSpan.subspan(0, totalThreads)));
+            queue.Barrier().Wait();
+            for(uint32_t i = 0; i < static_cast<uint32_t>(hValues.size()); i++)
+            {
+                EXPECT_EQ(hValues[i], hReferenceTest + i);
+                hValues[i] = HostInitValue;
+            }
+            system.Memset(dWriteSpan, 0x00);
+        };
 
 
-    // ====================== //
-    //    Saturating Kernel   //
-    // ====================== //
-    queue.IssueWorkKernel<ParentKernel>
-    (
-        "GTest Parent Kernel Saturating",
-        DeviceWorkIssueParams{totalThreads, 0u},
-        dWriteSpan.data(),
-        dReference,
-        totalThreads,
-        system.BestDevice().SMCount()
-    );
-    CopyBackAndCheck();
+        // ====================== //
+        //    Saturating Kernel   //
+        // ====================== //
+        queue.IssueWorkKernel<ParentKernel>
+        (
+            "GTest Parent Kernel Saturating",
+            DeviceWorkIssueParams{totalThreads, 0u},
+            dWriteSpan.data(),
+            dReference,
+            totalThreads,
+            system.BestDevice().SMCount()
+        );
+        CopyBackAndCheck();
 
-    // ====================== //
-    //      Block Kernel      //
-    // ====================== //
-    queue.IssueBlockKernel<ParentKernel>
-    (
-        "GTest Parent Kernel Block",
-        DeviceBlockIssueParams{1u, totalThreads, 0u},
-        dWriteSpan.data(),
-        dReference,
-        totalThreads,
-        system.BestDevice().SMCount()
-    );
-    CopyBackAndCheck();
-    queue.Barrier().Wait();
-}
+        // ====================== //
+        //      Block Kernel      //
+        // ====================== //
+        queue.IssueBlockKernel<ParentKernel>
+        (
+            "GTest Parent Kernel Block",
+            DeviceBlockIssueParams{1u, totalThreads, 0u},
+            dWriteSpan.data(),
+            dReference,
+            totalThreads,
+            system.BestDevice().SMCount()
+        );
+        CopyBackAndCheck();
+        queue.Barrier().Wait();
+    }
 
 #endif
 

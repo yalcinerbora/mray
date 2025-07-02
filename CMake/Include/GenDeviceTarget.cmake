@@ -174,9 +174,7 @@ function(gen_device_target)
                           mray::meta_compile_opts)
 
     set_target_properties(${TARGET_FULL_NAME} PROPERTIES
-                          POSITION_INDEPENDENT_CODE ON
-                          CUDA_SEPARABLE_COMPILATION ON
-                          CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+                          POSITION_INDEPENDENT_CODE ON)
 
     if(GEN_DEVICE_TARGET_MACRO STREQUAL "MRAY_GPU_BACKEND_CUDA")
         target_link_libraries(${TARGET_FULL_NAME}
@@ -184,6 +182,10 @@ function(gen_device_target)
                               CUDA::cuda_driver
                               PRIVATE
                               mray::cuda_extra_compile_opts)
+
+        set_target_properties(${TARGET_FULL_NAME} PROPERTIES
+                              CUDA_SEPARABLE_COMPILATION ON
+                              CUDA_RESOLVE_DEVICE_SYMBOLS ON)
     endif()
     # elseif(${GEN_DEVICE_TARGET_MACRO} STREQUAL "MRAY_GPU_BACKEND_HIP")
     #     # target_link_libraries(${TARGET_FULL_NAME}

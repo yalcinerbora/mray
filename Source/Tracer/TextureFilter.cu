@@ -27,6 +27,10 @@ static constexpr uint32_t INVALID_MORTON = std::numeric_limits<uint32_t>::max();
 MRAY_HYBRID MRAY_CGPU_INLINE
 int32_t FilterRadiusToPixelWH(Float filterRadius)
 {
+    #ifndef MRAY_DEVICE_CODE_PATH
+        using namespace std;
+    #endif
+
     // At every 0.5 increment, conservative pixel estimate is increasing
     // [0]          = Single Pixel (Special Case)
     // (0, 0.5]     = 2x2
@@ -37,7 +41,7 @@ int32_t FilterRadiusToPixelWH(Float filterRadius)
     int32_t result = 1;
     if(filterRadius == Float(0)) return result;
     // Do division
-    int32_t quot = static_cast<uint32_t>(filterRadius / Float(0.5));
+    int32_t quot = static_cast<int32_t>(filterRadius / Float(0.5));
     float remainder = fmod(filterRadius, Float(0.5));
     // Exact divisions reside on previous segment
     if(remainder == Float(0)) quot -= 1;
@@ -154,7 +158,6 @@ void KCGenerateMipmaps(// I-O
                                                     currentMipLevel);
         Vector2ui parentRes = Graphics::TextureMipSize(curParams.mipZeroRes,
                                                        currentMipLevel - 1);
-        Vector2 uvRatio = Vector2(parentRes) / Vector2(mipRes);
         // Skip this mip if it is already loaded.
         // This may happen when a texture has up to x amount of mips
         // but it can support log2(floor(max(res))) amount so we generate
@@ -215,9 +218,6 @@ void KCClampImage(// Output
     static constexpr Vector2ui TILE_SIZE = Vector2ui(32, 16);
     static_assert(TILE_SIZE.Multiply() == TPB);
 
-    // Pre-calculation, calculate uv ratio
-    Vector2 uvRatio = Vector2(bufferImageRes) / Vector2(surfaceImageRes);
-
     KernelCallParams kp;
     // Loop over the tiles for this tex, each block is dedicated to a tile
     // (32, 16) pixels
@@ -270,6 +270,7 @@ void KCExpandSamplesToPixels(// Outputs
                              MRAY_GRID_CONSTANT const Span<const ImageCoordinate> dImgCoords,
                              // Constants
                              MRAY_GRID_CONSTANT const Float filterRadius,
+                             [[maybe_unused]]
                              MRAY_GRID_CONSTANT const uint32_t maxPixelPerSample,
                              MRAY_GRID_CONSTANT const Vector2i extent)
 {
@@ -795,7 +796,7 @@ void ReconFilterGenericRGB(// Output
     assert(dValues.size() == dImgCoords.size());
     uint32_t elementCount = static_cast<uint32_t>(dValues.size());
 
-    uint32_t wh = FilterRadiusToPixelWH(filterRadius);
+    uint32_t wh = uint32_t(FilterRadiusToPixelWH(filterRadius));
     uint32_t maxPixelPerSample = wh * wh;
     uint32_t totalPPS = elementCount * maxPixelPerSample;
 
@@ -980,7 +981,7 @@ void MultiPassReconFilterGenericRGB(// Output
     // reduce memory usage.
     assert(dValues.size() == dImgCoords.size());
     uint32_t totalWork = static_cast<uint32_t>(dValues.size());
-    uint32_t wh = FilterRadiusToPixelWH(filterRadius);
+    uint32_t wh = uint32_t(FilterRadiusToPixelWH(filterRadius));
     uint32_t maxPixelPerSample = wh * wh;
     uint32_t totalPPS = totalWork * maxPixelPerSample;
 

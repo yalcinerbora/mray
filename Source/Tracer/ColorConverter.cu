@@ -380,7 +380,7 @@ void KCConvertColor(// I-O
             {
                 uint32_t i = static_cast<uint32_t>(curParams.fromColorSpace);
                 [[maybe_unused]]
-                bool invoked = InvokeAt(i, converterList, [i, &localPixRGB](auto&& tupleElem)
+                bool invoked = InvokeAt(i, converterList, [&localPixRGB](auto&& tupleElem)
                 {
                     localPixRGB = tupleElem.Convert(localPixRGB);
                     return true;
@@ -457,7 +457,7 @@ void KCExtractLuminance(// I-O
             // Do the conversion
             uint32_t i = static_cast<uint32_t>(curParams.colorSpace);
             [[maybe_unused]]
-            bool invoked = InvokeAt(i, colorspaceList, [i, &luminance, &localPixRGB](auto&& tupleElem)
+            bool invoked = InvokeAt(i, colorspaceList, [&luminance, &localPixRGB](auto&& tupleElem)
             {
                 luminance = Color::XYZToYxy(tupleElem.ToXYZ(localPixRGB))[0];
                 return true;

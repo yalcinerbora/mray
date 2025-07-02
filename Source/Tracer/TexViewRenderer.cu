@@ -24,11 +24,11 @@ void KCColorTiles(MRAY_GRID_CONSTANT const ImageSpan imgSpan,
 {
     KernelCallParams kp;
 
-    uint32_t totalPix = imgSpan.Extent().Multiply();
+    uint32_t totalPix = uint32_t(imgSpan.Extent().Multiply());
     Vector3 color = Color::RandomColorRGB(colorIndex);
     for(uint32_t i = kp.GlobalId(); i < totalPix; i += kp.TotalSize())
     {
-        Vector2i pixelIndex = imgSpan.LinearIndexTo2D(int32_t(i));
+        Vector2i pixelIndex = imgSpan.LinearIndexTo2D(i);
         imgSpan.StorePixel(color, pixelIndex);
         imgSpan.StoreWeight(Float(1), pixelIndex);
     }
@@ -51,7 +51,7 @@ void KCShowTexture(MRAY_GRID_CONSTANT const ImageSpan imgSpan,
         i < totalPix; i += int32_t(kp.TotalSize()))
     {
         // Calculate uv coords
-        Vector2i localIndexInt = imgSpan.LinearIndexTo2D(i);
+        Vector2i localIndexInt = imgSpan.LinearIndexTo2D(uint32_t(i));
         Vector2 localIndex = Vector2(localIndexInt);
         Vector2 globalIndex = Vector2(tileStart) + localIndex + Vector2(0.5);
         Vector2 uv = globalIndex / Vector2(texResolution);
@@ -133,7 +133,7 @@ RendererOptionPack TexViewRenderer::CurrentAttributes() const
 
     if constexpr(MRAY_IS_DEBUG)
     {
-        for(const auto& d: result.attributes)
+        for([[maybe_unused]] const auto& d: result.attributes)
             assert(d.IsFull());
     }
     return result;

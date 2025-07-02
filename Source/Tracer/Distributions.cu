@@ -357,7 +357,7 @@ struct SetupDistPointers
     typename DistributionGroupPwC2D::DistData d;
 
     MRAY_GPU MRAY_CGPU_INLINE
-    void operator()(KernelCallParams kp)
+    void operator()(KernelCallParams kp) const
     {
         for(uint32_t i = kp.GlobalId(); i < yCount;
             i += kp.TotalSize())

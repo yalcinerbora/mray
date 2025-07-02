@@ -157,8 +157,8 @@ void SimulateBasicPathTracer()
         // "hPartitionKeys". Here we launch the same kernel
         Span<CommonIndex> dIndicesLocal = dMatPartitionIndices.subspan(partitionRange[0],
                                                                        localPartitionSize);
-        Span<CommonKey> dKeysLocal = dMatPartitionKeys.subspan(partitionRange[0],
-                                                               localPartitionSize);
+        //Span<CommonKey> dKeysLocal = dMatPartitionKeys.subspan(partitionRange[0],
+        //                                                       localPartitionSize);
         queue.IssueWorkLambda
         (
             "GTest Mock Kill Rays",

@@ -11,15 +11,13 @@
 
 #include "Device/GPUTypes.h"
 
-#ifdef MRAY_GPU_BACKEND_CUDA
-
-
 TEST(GPUMemory, DeviceMemory_Allocate)
 {
     GPUSystem system;
     // Check invalid params
     {
         EXPECT_DEBUG_DEATH(DeviceMemory memory({&system.BestDevice()}, 0, 0), ".*");
+        EXPECT_DEBUG_DEATH(DeviceMemory memory({}, 1_MiB, 3_MiB), ".*");
     }
     // Simple Test
     {
@@ -62,7 +60,6 @@ TEST(GPUMemory, DeviceMemory_Allocate)
     }
 
     // Memcpy Test
-    CUDA_CHECK(cudaSetDevice(system.BestDevice().DeviceId()));
     for(size_t i = 0; i < 2; i++)
     {
         DeviceMemory memoryFrom({&system.BestDevice()}, 3_MiB << i, 8_MiB << i);
@@ -71,20 +68,18 @@ TEST(GPUMemory, DeviceMemory_Allocate)
         memoryTo.ResizeBuffer(1_MiB << i);
 
         size_t copySize = 1_MiB << i;
+        auto toSpan = Span<Byte>(static_cast<Byte*>(memoryTo), memoryTo.Size());
+        auto fromSpan = Span<Byte>(static_cast<Byte*>(memoryFrom), memoryFrom.Size());
+        system.Memset(toSpan, 0x00);
+        system.Memset(fromSpan, 0x12);
 
-        CUDA_CHECK(cudaMemset(static_cast<Byte*>(memoryTo), 0x00,
-                              memoryTo.Size()));
-        CUDA_CHECK(cudaMemset(static_cast<Byte*>(memoryFrom), 0x12,
-                              memoryFrom.Size()));
-
-        CUDA_CHECK(cudaMemcpy(static_cast<Byte*>(memoryTo),
-                              static_cast<Byte*>(memoryFrom),
-                              copySize, cudaMemcpyDefault));
+        // Copy only copy size
+        system.Memcpy(toSpan.subspan(0, copySize),
+                      ToConstSpan(fromSpan.subspan(copySize)));
 
         std::vector<Byte> hostAlloc(copySize, Byte{0x00});
-        CUDA_CHECK(cudaMemcpy(hostAlloc.data(),
-                              static_cast<Byte*>(memoryTo),
-                              copySize, cudaMemcpyDefault));
+        system.Memcpy(Span<Byte>(hostAlloc.data(), hostAlloc.size()),
+                      ToConstSpan(toSpan.subspan(0, copySize)));
 
         for(Byte b : hostAlloc)
         {
@@ -197,16 +192,12 @@ TEST(GPUMemory, HostLocalMemory_Allocate)
         memoryFrom.ResizeBuffer(2_MiB << i);
         size_t copySize = 1_MiB << i;
 
-        CUDA_CHECK(cudaSetDevice(system.BestDevice().DeviceId()));
-
-        CUDA_CHECK(cudaMemset(memoryTo.DevicePtr(), 0x00,
-                              memoryTo.Size()));
-        CUDA_CHECK(cudaMemset(static_cast<Byte*>(memoryFrom), 0x11,
-                              memoryFrom.Size()));
-
-        CUDA_CHECK(cudaMemcpy(memoryTo.DevicePtr(),
-                              static_cast<Byte*>(memoryFrom),
-                              copySize, cudaMemcpyDefault));
+        auto toSpan = Span<Byte>(memoryTo.DevicePtr(), memoryTo.Size());
+        auto fromSpan = Span<Byte>(static_cast<Byte*>(memoryFrom), memoryFrom.Size());
+        system.Memset(toSpan, 0x00);
+        system.Memset(fromSpan, 0x11);
+        system.Memcpy(toSpan.subspan(0, copySize),
+                      ToConstSpan(fromSpan.subspan(0, copySize)));
 
         const Byte* hData = static_cast<const Byte*>(memoryTo);
         for(size_t j = 0 ; j < memoryTo.Size(); j++)
@@ -291,5 +282,3 @@ TYPED_TEST(GPUMemoryAlloc, MultiAlloc)
         EXPECT_EQ(data[i], Byte{0x56});
     }
 }
-
-#endif

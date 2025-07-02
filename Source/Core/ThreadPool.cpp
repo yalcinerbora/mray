@@ -8,6 +8,7 @@ class ThreadLoop
     private:
     MPMCQueue<std::function<void()>>&   taskQueue;
     // For waiting
+    std::atomic_uint32_t&               startedTaskCount;
     std::atomic_uint32_t&               runningTaskCount;
     std::condition_variable&            waitCondition;
     //
@@ -16,6 +17,7 @@ class ThreadLoop
 
     public:
     ThreadLoop(MPMCQueue<std::function<void()>>& taskQueue,
+               std::atomic_uint32_t& startedTaskCount,
                std::atomic_uint32_t& runningTaskCount,
                std::condition_variable& waitCondition,
                ThreadInitFunction initFunction, uint32_t threadNumber);
@@ -26,6 +28,8 @@ class ThreadLoop
         std::thread::native_handle_type handleCPP = handle;
 
         if(initFunction) initFunction(handleCPP, threadNumber);
+        startedTaskCount++;
+        startedTaskCount.notify_all();
 
         while(!token.stop_requested() &&
               !taskQueue.IsTerminated())
@@ -45,11 +49,13 @@ class ThreadLoop
 };
 
 ThreadLoop::ThreadLoop(MPMCQueue<std::function<void()>>& taskQueue,
+                       std::atomic_uint32_t& startedTaskCount,
                        std::atomic_uint32_t& runningTaskCount,
                        std::condition_variable& waitCondition,
                        ThreadInitFunction initFunction,
                        uint32_t threadNumber)
     : taskQueue(taskQueue)
+    , startedTaskCount(startedTaskCount)
     , runningTaskCount(runningTaskCount)
     , waitCondition(waitCondition)
     , initFunction(initFunction)
@@ -59,6 +65,8 @@ ThreadLoop::ThreadLoop(MPMCQueue<std::function<void()>>& taskQueue,
 ThreadPool::ThreadPool(size_t queueSize)
     : poolAllocator(&baseAllocator)
     , taskQueue(queueSize)
+    , startedTaskCount(0)
+    , runningTaskCount(0)
 {}
 
 ThreadPool::ThreadPool(uint32_t threadCount, size_t queueSize)
@@ -105,9 +113,13 @@ void ThreadPool::RestartThreadsImpl(uint32_t threadCount, ThreadInitFunction ini
     threads.reserve(threadCount);
     for(uint32_t i = 0; i < threadCount; i++)
     {
-        threads.emplace_back(ThreadLoop(taskQueue, runningTaskCount,
-                                        waitCondition, initFunc, i));
+        threads.emplace_back(ThreadLoop(taskQueue, startedTaskCount,
+                                        runningTaskCount, waitCondition,
+                                        initFunc, i));
     }
+
+    while(startedTaskCount < threadCount)
+        startedTaskCount.wait(0);
 }
 
 void ThreadPool::ClearTasks()

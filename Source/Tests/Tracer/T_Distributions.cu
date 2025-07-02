@@ -129,8 +129,7 @@ TEST(Dist_PiecewiseConstant2D, Uniform)
     });
     // Add boundary ranges
     hRandomNumbers[0] = Vector2::Zero();
-    hRandomNumbers[1] = Vector2(std::nexttoward(Float(1), Float(0)));
-
+    hRandomNumbers[1] = Vector2(std::nexttoward(Float(1), static_cast<long double>(0)));
     {
         DistTester2D tester;
         auto [hOutSamples, hOutPdfs]
@@ -206,8 +205,7 @@ TEST(Dist_PiecewiseConstant2D, ZeroVariance)
     });
     // Add boundary ranges
     hRandomNumbers[0] = Vector2::Zero();
-    hRandomNumbers[1] = Vector2(std::nexttoward(Float(1), Float(0)));
-
+    hRandomNumbers[1] = Vector2(std::nexttoward(Float(1), static_cast<long double>(0)));
 
     std::vector<Float> hFunction(SIZE_LINEAR);
     std::uniform_real_distribution<Float> distF(FUNCTION_MIN, FUNCTION_MAX);

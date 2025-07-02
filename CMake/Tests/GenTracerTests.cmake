@@ -44,15 +44,21 @@ function(gen_tracer_test)
     target_link_libraries(${TARGET_FULL_NAME} PRIVATE
                           ${TRACER_TARGET_FULL_NAME}
                           mray::meta_compile_opts
-                          mray::cuda_extra_compile_opts
                           mray::test_common
                           gtest::gtest
                           gtest::gtest_main)
 
     set_target_properties(${TARGET_FULL_NAME} PROPERTIES
-                          POSITION_INDEPENDENT_CODE ON
-                          CUDA_SEPARABLE_COMPILATION ON
-                          CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+                          POSITION_INDEPENDENT_CODE ON)
+
+    if(GEN_TRACER_TEST_BACKEND STREQUAL "MRAY_GPU_BACKEND_CUDA")
+        target_link_libraries(${TARGET_FULL_NAME} PRIVATE
+                              mray::cuda_extra_compile_opts)
+
+        set_target_properties(${TARGET_FULL_NAME} PROPERTIES
+                              CUDA_SEPARABLE_COMPILATION ON
+                              CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+    endif()
 
     add_precompiled_headers(TARGET ${TARGET_FULL_NAME})
 

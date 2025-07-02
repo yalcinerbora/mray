@@ -101,7 +101,7 @@ class KeyGeneratorFunctor
     {}
 
     MRAY_HYBRID MRAY_CGPU_INLINE
-    void operator()(KernelCallParams kp)
+    void operator()(KernelCallParams kp) const
     {
         uint32_t keyCount = static_cast<uint32_t>(dLocalKeyWriteRegion.size());
         for(uint32_t i = kp.GlobalId(); i < keyCount; i += kp.TotalSize())
@@ -538,7 +538,7 @@ AccelPartitionResult AcceleratorGroupT<C, PG, B>::PartitionParamsForWork(const A
 
         if(loc != p.tGroupSurfs.cend())
         {
-            size_t index = std::distance(loc, p.tGroupSurfs.begin());
+            size_t index = size_t(std::distance(loc, p.tGroupSurfs.begin()));
             result.packedIndices[index].tLightSurfIndex = ltIndex;
         }
         else
@@ -915,8 +915,8 @@ AcceleratorGroupT<C, PG, B>::AcceleratorGroupT(uint32_t groupId,
                                                const AccelWorkGenMap& workGenMap)
     : threadPool(tp)
     , gpuSystem(sys)
-    , accelGroupId(groupId)
     , pg(static_cast<const PG&>(pgIn))
+    , accelGroupId(groupId)
     , accelWorkGenerators(workGenMap)
 {}
 

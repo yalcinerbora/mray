@@ -338,7 +338,6 @@ void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const S
     // TODO: Add spectrum related stuff, this should not be
     // default constructed
     typename SpectrumConverterContextIdentity::Converter specConverter;
-    using IdentityST = SpectrumConverterContextIdentity;
 
     using Distribution::Common::RussianRoulette;
     using Distribution::Common::DivideByPDF;

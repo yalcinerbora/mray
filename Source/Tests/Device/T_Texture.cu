@@ -10,7 +10,7 @@
 
 #include "T_TextureTypes.h"
 
-/*
+
 template <uint32_t D, class T>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void CheckCheckerboardPattern(Span<uint8_t> dResults,
@@ -164,10 +164,10 @@ TYPED_TEST(GPUTextureTest, Copy)
 
     // Get a texture view (same as the inner type)
     TextureView<D, ChannelType> view = tex. template View<ChannelType>();
-    queue.IssueKernel<CheckCheckerboardPattern<D, ChannelType>>
+    queue.IssueWorkKernel<CheckCheckerboardPattern<D, ChannelType>>
     (
         "GTest Texture CheckCheckerboard",
-        KernelIssueParams{.workCount = total, .sharedMemSize = 0},
+        DeviceWorkIssueParams{.workCount = total, .sharedMemSize = 0},
         dTrueFalseBuffer,
         view,
         tex.Extents(),
@@ -185,7 +185,7 @@ TYPED_TEST(GPUTextureTest, Copy)
         hTrueFalseBuffer.cbegin(),
         hTrueFalseBuffer.cend(),
         uint8_t{0x00},
-        [](uint8_t lhs, uint8_t rhs)
+        [](uint8_t lhs, uint8_t rhs) -> uint8_t
         {
             return lhs | rhs;
         }
@@ -193,4 +193,3 @@ TYPED_TEST(GPUTextureTest, Copy)
     EXPECT_EQ(anyFalse, 0x00);
 }
 
-*/

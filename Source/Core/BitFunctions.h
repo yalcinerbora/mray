@@ -527,7 +527,7 @@ template<std::unsigned_integral T, std::floating_point R>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr T Bit::NormConversion::ToUNorm(R in)
 {
-    #ifdef MRAY_DEVICE_CODE_PATH
+    #ifndef MRAY_DEVICE_CODE_PATH
         using std::round;
     #endif
 
@@ -545,7 +545,7 @@ template<std::unsigned_integral T, std::floating_point R>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr T Bit::NormConversion::ToUNormVarying(R in, T bits)
 {
-    #ifdef MRAY_DEVICE_CODE_PATH
+    #ifndef MRAY_DEVICE_CODE_PATH
         using std::round;
     #endif
 
@@ -590,7 +590,7 @@ template<std::signed_integral T, std::floating_point R>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr T Bit::NormConversion::ToSNorm(R in)
 {
-    #ifdef MRAY_DEVICE_CODE_PATH
+    #ifndef MRAY_DEVICE_CODE_PATH
         using std::round;
     #endif
 
@@ -604,7 +604,7 @@ constexpr T Bit::NormConversion::ToSNorm(R in)
     constexpr R DIFF = (MAX - R(0));
 
     in *= DIFF;
-    in = std::round(in);
+    in = round(in);
     return T(in);
 }
 

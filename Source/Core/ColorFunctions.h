@@ -131,6 +131,9 @@ namespace Color
 MRAY_HYBRID MRAY_CGPU_INLINE
 Vector3 Color::HSVToRGB(const Vector3& hsv)
 {
+    #ifndef MRAY_DEVICE_CODE_PATH
+        using namespace std;
+    #endif
     // H, S, V both normalized
     // H: [0-1) (meaning 0 is 0, 1 is 360)
     // S: [0-1] (meaning 0 is 0, 1 is 100)

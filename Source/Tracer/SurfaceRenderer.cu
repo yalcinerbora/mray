@@ -177,7 +177,7 @@ RendererOptionPack SurfaceRenderer::CurrentAttributes() const
 
     if constexpr(MRAY_IS_DEBUG)
     {
-        for(const auto& d: result.attributes)
+        for([[maybe_unused]] const auto& d: result.attributes)
             assert(d.IsFull());
     }
     return result;
@@ -251,8 +251,6 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
                         uint32_t(tracerView.tracerParams.filmFilter.type));
     Float radius = tracerView.tracerParams.filmFilter.radius;
     filmFilter = FilterGen->get()(gpuSystem, Float(radius));
-    Vector2ui filterPadSize = filmFilter->FilterExtent();
-
     // Change the mode according to the render logic
     using Math::Roll;
     int32_t modeIndex = (int32_t(anchorMode) +

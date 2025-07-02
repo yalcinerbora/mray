@@ -15,7 +15,6 @@ void KCGenRandomNumbersPCG32(// Output
                              uint32_t dimPerGenerator)
 {
     assert(dStates.size() * dimPerGenerator <= dNumbers.size());
-    using State = typename PermutedCG32::State;
 
     uint32_t generatorCount = uint32_t(dStates.size());
     KernelCallParams kp;
@@ -48,7 +47,6 @@ void KCGenRandomNumbersPCG32Indirect(// Output
                                      uint32_t dimPerGenerator)
 {
     assert(dNumbers.size() == dIndices.size() * dimPerGenerator);
-    using State = typename PermutedCG32::State;
 
     uint32_t generatorCount = uint32_t(dIndices.size());
     KernelCallParams kp;
@@ -103,7 +101,8 @@ RNGGroupIndependent::RNGGroupIndependent(uint32_t genCount,
         rngLocal.discard(start);
         for(size_t i = start; i < end; i++)
         {
-            hMainStates[i] = MainRNG::GenerateState(rngLocal());
+            auto xi = rngLocal();
+            hMainStates[i] = MainRNG::GenerateState(uint32_t(xi));
         }
     }, 4u);
     future0.WaitAll();
@@ -123,7 +122,8 @@ RNGGroupIndependent::RNGGroupIndependent(uint32_t genCount,
         rngLocal.discard(start);
         for(size_t i = start; i < end; i++)
         {
-            hBackupStates[i] = BackupRNG::GenerateState(rngLocal());
+            auto xi = rngLocal();
+            hBackupStates[i] = BackupRNG::GenerateState(uint32_t(xi));
         }
     }, 4u);
     future1.WaitAll();

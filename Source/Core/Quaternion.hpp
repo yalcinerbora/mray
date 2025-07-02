@@ -270,6 +270,10 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr  Quat<T> Quat<T>::SLerp(const Quat<T>& start,
                                   const Quat<T>& end, T t)
 {
+    #ifndef MRAY_DEVICE_CODE_PATH
+        using namespace std;
+    #endif
+
     using namespace MathConstants;
 
     T cosTetha = start.Dot(end);
@@ -302,6 +306,9 @@ constexpr Quat<T> Quat<T>::BarySLerp(const Quat<T>& q0,
                                      const Quat<T>& q2,
                                      T a, T b)
 {
+    #ifndef MRAY_DEVICE_CODE_PATH
+        using namespace std;
+    #endif
     // Proper way to do this is
     // http://www.acsu.buffalo.edu/~johnc/ave_quat07.pdf
     //
