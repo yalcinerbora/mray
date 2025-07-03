@@ -170,7 +170,6 @@ TEST(DefaultTriangle, Load)
     EXPECT_EQ(batch.front(), PrimBatchKey::CombinedKey(0, 0));
 
     triGroup.CommitReservations();
-    //PrimAttributeInfoList primIdList = triGroup.AttributeInfo();
 
     TransientData inputIndex(std::in_place_type<Vector3ui>, IndexCount);
     inputIndex.Push<Vector3ui>(indices);

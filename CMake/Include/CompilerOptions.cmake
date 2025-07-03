@@ -60,6 +60,9 @@ set(MRAY_MSVC_OPTIONS
     # Large section tables (too many templates on CPU Device)
     /bigobj
 
+    # MT Build
+    /MP
+
     # Debug Specific
     # CMAKE does not have this on debug build (in x64, this is ignored i think bu w/e)
     $<$<CONFIG:Debug>:/Oy->
