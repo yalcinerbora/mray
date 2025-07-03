@@ -28,13 +28,13 @@ uint32_t RadixSortKVSingleThread(Span<Span<K>, 2> dKeyDoubleBuffer,
     uint32_t outputBufferIndex = 1;
 
     // Sort MSB to LSB
-    int32_t totalBits = int32_t(bitRange[1] - bitRange[0]);
-    for(int32_t pass = 0; pass < totalBits; pass += BIT_PER_PASS)
+    uint32_t totalBits = bitRange[1] - bitRange[0];
+    for(uint32_t pass = 0; pass < totalBits; pass += BIT_PER_PASS)
     {
         std::array<UIntType, 2> curBitRange =
         {
-            UIntType(std::max(int32_t(bitRange[1]) - (pass + BIT_PER_PASS), 0)),
-            UIntType(std::max(int32_t(bitRange[1]) - (pass + 0), 0))
+            UIntType(std::min(bitRange[0] + pass + 0           , bitRange[1])),
+            UIntType(std::min(bitRange[0] + pass + BIT_PER_PASS, bitRange[1]))
         };
         uint32_t curPassBitCount = uint32_t(curBitRange[1] - curBitRange[0]);
         uint32_t curPassBucketCount = (1u << curPassBitCount);
@@ -104,7 +104,7 @@ size_t RadixSortTMSize(size_t elementCount,
 {
     uint32_t blockCount = q.DetermineGridStrideBlock(nullptr, 0u, StaticThreadPerBlock1D(),
                                                      uint32_t(elementCount));
-    return sizeof(CountBuffer) + sizeof(OffsetBuffer) * blockCount;
+    return (sizeof(CountBuffer) + sizeof(OffsetBuffer)) * blockCount;
 }
 
 template <bool IsAscending, class K, class V>
@@ -115,11 +115,15 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
                    const GPUQueueCPU& queue,
                    const Vector2ui& bitRange)
 {
+    static_assert(sizeof(K) <= sizeof(uint64_t),
+                  "CPU Radix sort only supports Keys with at most "
+                  "64-bit size!");
     using namespace std::string_view_literals;
 
     uint32_t elemCount = static_cast<uint32_t>(dValueDoubleBuffer[0].size());
     uint32_t blockCount = queue.DetermineGridStrideBlock(nullptr, 0u, StaticThreadPerBlock1D(),
                                                          elemCount);
+    uint32_t workPerBlock = Math::DivideUp(elemCount, blockCount);
     Byte* dOffsetBufPtr = dTempMemory.data();
     Byte* dCountBufPtr = dTempMemory.data() + sizeof(OffsetBuffer) * blockCount;
     static_assert((sizeof(OffsetBuffer)) % alignof(CountBuffer) == 0, "Alignment mismatch!");
@@ -133,13 +137,13 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
     uint32_t inputBufferIndex = 0;
     uint32_t outputBufferIndex = 1;
     // Sort MSB to LSB
-    int32_t totalBits = int32_t(bitRange[1] - bitRange[0]);
-    for(int32_t pass = 0; pass < totalBits; pass += BIT_PER_PASS)
+    uint32_t totalBits = bitRange[1] - bitRange[0];
+    for(uint32_t pass = 0; pass < totalBits; pass += BIT_PER_PASS)
     {
         std::array<UIntType, 2> curBitRange =
         {
-            UIntType(std::max(int32_t(bitRange[1]) - (pass + BIT_PER_PASS), 0)),
-            UIntType(std::max(int32_t(bitRange[1]) - (pass + 0), 0))
+            UIntType(std::min(bitRange[0] + pass + 0           , bitRange[1])),
+            UIntType(std::min(bitRange[0] + pass + BIT_PER_PASS, bitRange[1]))
         };
         uint32_t curPassBitCount = uint32_t(curBitRange[1] - curBitRange[0]);
         uint32_t curPassBucketCount = (1u << curPassBitCount);
@@ -150,10 +154,14 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
         Span<K> dWKeyBuffer = dKeyDoubleBuffer[outputBufferIndex];
         Span<V> dWValBuffer = dValueDoubleBuffer[outputBufferIndex];
 
-        queue.IssueWorkLambda
+        queue.IssueBlockLambda
         (
             "KCRadixSort-DetermineBuckets"sv,
-            DeviceWorkIssueParams{.workCount = uint32_t(dRKeyBuffer.size())},
+            DeviceBlockIssueParams
+            {
+                .gridSize = blockCount,
+                .blockSize = 1u
+            },
             [=](KernelCallParams kp)
             {
                 if(kp.threadId == 0)
@@ -161,12 +169,17 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
                     auto& arr = dCountBuffers[kp.blockId];
                     std::fill(arr.begin(), arr.begin() + curPassBucketCount, 0u);
                 }
-                if(kp.GlobalId() >= elemCount) return;
 
-                UIntType keyBits = 0u;
-                std::memcpy(&keyBits, &dRKeyBuffer[kp.GlobalId()], sizeof(K));
-                uint32_t bucketIndex = uint32_t(Bit::FetchSubPortion(keyBits, curBitRange));
-                dCountBuffers[kp.blockId][bucketIndex] += 1;
+                uint32_t offset = kp.blockId * workPerBlock;
+                uint32_t localWCount = std::min(offset + workPerBlock, elemCount) - offset;
+                Span<const K> dLocalRKeyBuffer = dRKeyBuffer.subspan(offset, localWCount);
+                for(const K& k : dLocalRKeyBuffer)
+                {
+                    UIntType keyBits = 0u;
+                    std::memcpy(&keyBits, &k, sizeof(K));
+                    uint32_t bucketIndex = uint32_t(Bit::FetchSubPortion(keyBits, curBitRange));
+                    dCountBuffers[kp.blockId][bucketIndex] += 1;
+                }
             }
         );
         //
@@ -193,27 +206,40 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
             }
         );
         //
-        queue.IssueWorkLambda
+        queue.IssueBlockLambda
         (
             "KCRadixSort-DetermineBuckets"sv,
-            DeviceWorkIssueParams{.workCount = uint32_t(dRKeyBuffer.size())},
+            DeviceBlockIssueParams
+            {
+                .gridSize = blockCount,
+                .blockSize = 1u
+            },
             [=](KernelCallParams kp)
             {
-                if(kp.GlobalId() >= elemCount) return;
+                uint32_t offset = kp.blockId * workPerBlock;
+                uint32_t localWCount = std::min(offset + workPerBlock, elemCount) - offset;
+                Span<K> dLocalRKeyBuffer = dRKeyBuffer.subspan(offset, localWCount);
+                Span<V> dLocalRValBuffer = dRValBuffer.subspan(offset, localWCount);
+                assert(dLocalRKeyBuffer.size() == dLocalRValBuffer.size());
+                //
+                uint32_t localSize = uint32_t(dLocalRKeyBuffer.size());
+                for(uint32_t i = 0; i < localSize; i++)
+                {
+                    K& key = dLocalRKeyBuffer[i];
+                    V& val = dLocalRValBuffer[i];
+                    const auto& offsetBuffer = dOffsetBuffers[kp.blockId];
+                    auto& countBuffer = dCountBuffers[kp.blockId];
 
-                K& key = dRKeyBuffer[kp.GlobalId()];
-                V& val = dRValBuffer[kp.GlobalId()];
-                const auto& offsetBuffer = dOffsetBuffers[kp.blockId];
-                auto& countBuffer = dCountBuffers[kp.blockId];
+                    UIntType keyBits = 0u;
+                    std::memcpy(&keyBits, &key, sizeof(K));
+                    uint32_t bucketIndex = uint32_t(Bit::FetchSubPortion(keyBits,
+                                                                         curBitRange));
+                    uint32_t localIndex = countBuffer[bucketIndex]++;
+                    uint32_t pushLoc = offsetBuffer[bucketIndex] + localIndex;
 
-                UIntType keyBits = 0u;
-                std::memcpy(&keyBits, &key, sizeof(K));
-                uint32_t bucketIndex = uint32_t(Bit::FetchSubPortion(keyBits, curBitRange));
-                uint32_t localIndex = countBuffer[bucketIndex]++;
-                uint32_t pushLoc = offsetBuffer[bucketIndex] + localIndex;
-
-                dWKeyBuffer[pushLoc] = std::move(key);
-                dWValBuffer[pushLoc] = std::move(val);
+                    dWKeyBuffer[pushLoc] = std::move(key);
+                    dWValBuffer[pushLoc] = std::move(val);
+                }
             }
         );
         std::swap(inputBufferIndex, outputBufferIndex);

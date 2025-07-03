@@ -107,10 +107,9 @@ MRAY_KERNEL void KCAccessFirstTriangle(Span<uint8_t> dIsValid,
         isValid &= (uv1 == uvs[1]);
         isValid &= (uv2 == uvs[2]);
 
-        dIsValid[i] = isValid ? uint8_t(0) : uint8_t(1);
+        dIsValid[i] = isValid ? uint8_t(1) : uint8_t(0);
     }
 }
-
 
 TEST(DefaultTriangle, TypeCheck)
 {
@@ -250,8 +249,6 @@ TEST(DefaultTriangle, LoadMulti)
         EXPECT_EQ(batch, PrimBatchKey::CombinedKey(PRIM_GROUP_ID, counter++));
 
     triGroup.CommitReservations();
-    //PrimAttributeInfoList primIdList = triGroup.AttributeInfo();
-
     uint32_t queueIndex = 0;
     for(const auto& batch : batches)
     {

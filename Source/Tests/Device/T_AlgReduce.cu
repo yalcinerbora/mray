@@ -23,7 +23,7 @@ template<class Value>
 void ReduceTest(const GPUSystem& system)
 {
     const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
-    static constexpr size_t ElementCount = 1'000;
+    static constexpr size_t ElementCount = 1'111;
     size_t tempMemSize = DeviceAlgorithms::ReduceTMSize<Value>(ElementCount, queue);
     DeviceMemory mem({&system.BestDevice()}, 1_MiB, 8_MiB);
 
@@ -67,9 +67,9 @@ void ReduceTest(const GPUSystem& system)
     ExpectEqualVecOrArithmetic(result, hResultLambda);
 }
 
-TYPED_TEST(DeviceAlorithmsTest, Reduce)
+TYPED_TEST(DeviceAlgorithmsTest, Reduce)
 {
-    using Value = typename DeviceAlorithmsTest<TypeParam>::ValueType;
+    using Value = typename DeviceAlgorithmsTest<TypeParam>::ValueType;
     GPUSystem system;
     ReduceTest<Value>(system);
 }

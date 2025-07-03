@@ -45,8 +45,47 @@ struct MultiFuture
 {
     std::vector<std::future<T>> futures;
     //
-    void WaitAll() const;
-    bool AnyValid() const;
+    void            WaitAll() const;
+    bool            AnyValid() const;
+    std::vector<T>  GetAll();
+};
+
+template<>
+struct MultiFuture<void>
+{
+    std::vector<std::future<void>> futures;
+    //
+    void WaitAll() const
+    {
+        for(const std::future<void>& f : futures)
+        {
+            f.wait();
+        }
+    }
+    //
+    bool AnyValid() const
+    {
+        // This is technically valid for "void" futures.
+        // We allow user to submit empty work block works
+        // It will return empty multi future
+        if(futures.empty()) return true;
+
+        for(const std::future<void>& f : futures)
+        {
+            if(f.valid()) return true;
+        }
+        return false;
+    }
+    //
+    void GetAll()
+    {
+        if(futures.empty()) return;
+        for(std::future<void>& f : futures)
+        {
+            f.get();
+        }
+        return;
+    }
 };
 
 class ThreadPool
@@ -127,20 +166,19 @@ bool MultiFuture<T>::AnyValid() const
     return false;
 }
 
-template<>
-inline bool MultiFuture<void>::AnyValid() const
+template<class T>
+std::vector<T> MultiFuture<T>::GetAll()
 {
-    // This is technically valid for "void" futures.
-    // We allow user to submit empty work block works
-    // It will return empty multi future
-    if(futures.empty()) return true;
-
-    for(const std::future<void>& f : futures)
+    std::vector<T> result;
+    result.reserve(futures.size());
+    for(std::future<T>& f : futures)
     {
-        if(f.valid()) return true;
+        result.emplace_back(f.get());
     }
-    return false;
+    return result;
 }
+
+
 
 template<ThreadInitFuncC InitFunction>
 ThreadPool::ThreadPool(uint32_t threadCount, InitFunction&& initFunction,
@@ -195,8 +233,6 @@ ThreadPool::SubmitBlocks(uint32_t totalWorkSize, WorkFunc&& wf,
 
         using AllocT = std::pmr::polymorphic_allocator<std::promise<ResultT>>;
         auto promise = std::allocate_shared<std::promise<ResultT>>(AllocT(&poolAllocator));
-
-        std::future<ResultT> future = promise->get_future();
         taskQueue.Enqueue([=]()
         {
             try
@@ -216,7 +252,7 @@ ThreadPool::SubmitBlocks(uint32_t totalWorkSize, WorkFunc&& wf,
                 promise->set_exception(std::current_exception());
             }
         });
-        result.futures.push_back(std::move(future));
+        result.futures.push_back(promise->get_future());
     }
     assert(residual == 0);
     assert(startOffset == totalWorkSize);
@@ -231,7 +267,6 @@ ThreadPool::SubmitTask(WorkFunc&& wf)
     using ResultT = std::invoke_result_t<WorkFunc>;
     using AllocT = std::pmr::polymorphic_allocator<std::promise<ResultT>>;
     auto promise = std::allocate_shared<std::promise<ResultT>>(AllocT(&poolAllocator));
-    std::future<ResultT> result = promise->get_future();
 
     // Here we do not need to copy the functor on a shared location
     // since each task will be executed by a single thread
@@ -255,7 +290,7 @@ ThreadPool::SubmitTask(WorkFunc&& wf)
             promise->set_exception(std::current_exception());
         }
     });
-    return result;
+    return promise->get_future();
 }
 
 template<ThreadDetachableTaskWorkC WorkFunc>

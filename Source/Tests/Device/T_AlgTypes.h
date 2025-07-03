@@ -10,7 +10,7 @@ struct KVType
 };
 
 template <class T>
-class DeviceAlorithmsTest : public testing::Test
+class DeviceAlgorithmsTest : public testing::Test
 {
     public:
     using KeyType = typename T::Key;
@@ -25,7 +25,7 @@ using Implementations = ::testing::Types
     KVType<uint32_t, Vector2>
 >;
 
-TYPED_TEST_SUITE(DeviceAlorithmsTest, Implementations);
+TYPED_TEST_SUITE(DeviceAlgorithmsTest, Implementations);
 
 // Temporarily define a increment for iota
 template <unsigned int D, class T>

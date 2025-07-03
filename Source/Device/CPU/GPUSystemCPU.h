@@ -29,7 +29,7 @@ class ThreadPool;
 
 static constexpr uint32_t StaticThreadPerBlock1D()
 {
-    return 4096u;
+    return 1u;
 }
 
 // TODO: This should not be compile time static
@@ -451,11 +451,9 @@ void GPUQueueCPU::MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const
     using namespace std::string_view_literals;
 
     assert(regionTo.size() >= regionFrom.size());
-    uint32_t elemCount = static_cast<uint32_t>(regionTo.size());
-    uint32_t workPerThread = StaticThreadPerBlock1D();
-    uint32_t blockCount = DetermineGridStrideBlock(nullptr, 0,
-                                                   workPerThread,
-                                                   elemCount);
+    uint32_t elemCount = uint32_t(regionFrom.size());
+    uint32_t tpb = StaticThreadPerBlock1D();
+    uint32_t blockCount = Math::DivideUp(elemCount, tpb);
     // We find grid size via StaticTPB, we only set
     // single thread for each block. We want to use
     // memcpy, instead of thread copy assigning variables
@@ -471,13 +469,16 @@ void GPUQueueCPU::MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const
         [=](KernelCallParamsCPU kp)
         {
             uint32_t i = kp.GlobalId();
-            uint32_t writeBound = std::min(elemCount, (i + 1) * workPerThread);
-            writeBound -= i * workPerThread;
+            uint32_t writeBound = std::min(elemCount, (i + 1) * tpb);
+            writeBound -= i * tpb;
 
-            auto localFromSpan = regionFrom.subspan(i * workPerThread, writeBound);
-            auto localToSpan = regionTo.subspan(i * workPerThread, writeBound);
-            assert(localFromSpan.size() == localToSpan.size());
-            std::memcpy(localToSpan.data(), localFromSpan.data(), localFromSpan.size_bytes());
+            auto localFromSpan = regionFrom.subspan(i * tpb, writeBound);
+            auto localToSpan = regionTo.subspan(i * tpb, writeBound);
+            if(writeBound != 0)
+            {
+                assert(localFromSpan.size() == localToSpan.size());
+                std::memcpy(localToSpan.data(), localFromSpan.data(), localFromSpan.size_bytes());
+            }
         }
     );
 }
@@ -564,10 +565,8 @@ void GPUQueueCPU::MemsetAsync(Span<T> region, uint8_t perByteValue) const
     using namespace std::string_view_literals;
 
     uint32_t elemCount = static_cast<uint32_t>(region.size());
-    uint32_t blockCount = DetermineGridStrideBlock(nullptr, 0, StaticThreadPerBlock1D(),
-                                                   elemCount);
-    uint32_t workPerThread = StaticThreadPerBlock1D();
-
+    uint32_t tpb = StaticThreadPerBlock1D();
+    uint32_t blockCount = Math::DivideUp(elemCount, tpb);
     IssueBlockLambda
     (
         "MemsetAsync"sv,
@@ -579,10 +578,13 @@ void GPUQueueCPU::MemsetAsync(Span<T> region, uint8_t perByteValue) const
         [=](KernelCallParamsCPU kp)
         {
             uint32_t i = kp.GlobalId();
-            uint32_t writeBound = std::min(elemCount, (i + 1) * workPerThread);
-            writeBound -= i * workPerThread;
-            auto localRegion = region.subspan(i * workPerThread, writeBound);
-            std::memset(localRegion.data(), perByteValue, localRegion.size_bytes());
+            uint32_t writeBound = std::min(elemCount, (i + 1) * tpb);
+            writeBound -= i * tpb;
+            if(writeBound != 0)
+            {
+                auto localRegion = region.subspan(i * tpb, writeBound);
+                std::memset(localRegion.data(), perByteValue, localRegion.size_bytes());
+            }
         }
     );
 }

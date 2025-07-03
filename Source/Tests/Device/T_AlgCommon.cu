@@ -23,7 +23,7 @@ template<class Value>
 void IotaTest(const GPUSystem& system)
 {
     const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
-    static constexpr size_t ElementCount = 1'000;
+    static constexpr size_t ElementCount = 1'111;
     DeviceMemory mem({&system.BestDevice()}, 1_MiB, 8_MiB);
 
     Span<Value> dOutputs;
@@ -51,7 +51,7 @@ template<class Value>
 void TransformTest(const GPUSystem& system)
 {
     const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
-    static constexpr size_t ElementCount = 1'000;
+    static constexpr size_t ElementCount = 1'111;
     DeviceMemory mem({&system.BestDevice()}, 1_MiB, 8_MiB);
 
     Span<Value> dOutputs, dInputs;
@@ -83,16 +83,16 @@ void TransformTest(const GPUSystem& system)
     }
 }
 
-TYPED_TEST(DeviceAlorithmsTest, Iota)
+TYPED_TEST(DeviceAlgorithmsTest, Iota)
 {
-    using Value = typename DeviceAlorithmsTest<TypeParam>::ValueType;
+    using Value = typename DeviceAlgorithmsTest<TypeParam>::ValueType;
     GPUSystem system;
     IotaTest<Value>(system);
 }
 
-TYPED_TEST(DeviceAlorithmsTest, Transform)
+TYPED_TEST(DeviceAlgorithmsTest, Transform)
 {
-    using Value = typename DeviceAlorithmsTest<TypeParam>::ValueType;
+    using Value = typename DeviceAlgorithmsTest<TypeParam>::ValueType;
     GPUSystem system;
     TransformTest<Value>(system);
 }

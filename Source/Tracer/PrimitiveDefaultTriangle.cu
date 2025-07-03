@@ -25,9 +25,19 @@ void KCAdjustIndices(// I-O
     {
         using namespace TracerConstants;
         uint32_t localTid = kp.threadId;
+
         MRAY_SHARED_MEMORY Vector4ui sVertexIndexRange;
-        if(localTid < Vector4ui::Dims)
-            sVertexIndexRange[localTid] = dVertexIndexRanges[blockId][localTid];
+        // CPU Does not have proper shared memory
+        // and parallel loads, so let t0 to load it to
+        // thread_local memory at start
+        #ifdef MRAY_GPU_BACKEND_CPU
+            if(localTid == 0)
+                sVertexIndexRange = dVertexIndexRanges[blockId];
+        #else
+            assert(kp.blockSize >= Vector4ui::Dims);
+            if(localTid < Vector4ui::Dims)
+                sVertexIndexRange[localTid] = dVertexIndexRanges[blockId][localTid];
+        #endif
         BlockSynchronize();
 
         Vector2ui indexRange = Vector2ui(sVertexIndexRange[2],
@@ -68,29 +78,39 @@ void KCApplyTransformsTriangle(// I-O
     // Block-stride Loop
     for(uint32_t blockId = kp.blockId; blockId < blockCount; blockId += kp.gridSize)
     {
+        uint32_t batchI = blockId / blockPerBatch;
+        uint32_t localBatchI = blockId % blockPerBatch;
+
         MRAY_SHARED_MEMORY Matrix4x4 sBatchTransform;
         MRAY_SHARED_MEMORY Matrix4x4 sBatchInvTransform;
         MRAY_SHARED_MEMORY Vector2ul sVertexRanges;
+        #ifdef MRAY_GPU_BACKEND_CPU
+            if(kp.threadId == 0)
+            {
+                sBatchTransform = dBatchTransforms[batchI];
+                sBatchInvTransform = dBatchInvTransforms[batchI];
+                sVertexRanges = dVertexRanges[batchI];
+            }
+        #else
+            assert(kp.blockSize >= 34);
+            // Load matrices / ranges
+            if(kp.threadId < 16)
+            {
+                uint32_t i = kp.threadId;
+                sBatchTransform[i] = dBatchTransforms[batchI][i];
 
-        uint32_t batchI = blockId / blockPerBatch;
-        uint32_t localBatchI = blockId % blockPerBatch;
-        // Load matrices / ranges
-        if(kp.threadId < 16)
-        {
-            uint32_t i = kp.threadId;
-            sBatchTransform[i] = dBatchTransforms[batchI][i];
-
-        }
-        else if(kp.threadId >= 16 && kp.threadId < 32)
-        {
-            uint32_t i = kp.threadId - 16;
-            sBatchInvTransform[i] = dBatchInvTransforms[batchI][i];
-        }
-        else if(kp.threadId >= 32 && kp.threadId < 34)
-        {
-            uint32_t i = kp.threadId - 32;
-            sVertexRanges[i] = dVertexRanges[batchI][i];
-        }
+            }
+            else if(kp.threadId >= 16 && kp.threadId < 32)
+            {
+                uint32_t i = kp.threadId - 16;
+                sBatchInvTransform[i] = dBatchInvTransforms[batchI][i];
+            }
+            else if(kp.threadId >= 32 && kp.threadId < 34)
+            {
+                uint32_t i = kp.threadId - 32;
+                sVertexRanges[i] = dVertexRanges[batchI][i];
+            }
+        #endif
         BlockSynchronize();
 
         // Loop over each vertex for this tex

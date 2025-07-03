@@ -112,13 +112,12 @@ TYPED_TEST(GPUTextureTest, Copy)
 
     GPUSystem system;
 
-    // Allocate Asymetric to check padding/access issues
+    // Allocate Asymmetric to check padding/access issues
     SizeType sz = SizeType(16);
     if constexpr(D == 2)
         sz = SizeType(16, 32);
     else if constexpr(D == 3)
         sz = SizeType(16, 32, 8);
-
 
     // Do a default allocate
     ParamType tParams = {};

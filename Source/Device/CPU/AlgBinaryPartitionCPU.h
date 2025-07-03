@@ -54,6 +54,7 @@ void BinaryPartition(Span<T> dOutput,
     uint32_t blockCount = queue.DetermineGridStrideBlock(nullptr, 0u,
                                                          StaticThreadPerBlock1D(),
                                                          elemCount);
+    uint32_t workPerBlock = Math::DivideUp(elemCount, blockCount);
 
     LRCounter* dTempPtr = reinterpret_cast<LRCounter*>(dTempMemory.data());
     size_t counterAmount = (blockCount + 1);
@@ -61,18 +62,24 @@ void BinaryPartition(Span<T> dOutput,
     Span<LRCounter> dCounters = Span<LRCounter>(dTempPtr, counterAmount);
     //
     queue.MemsetAsync(dCounters, 0x00);
-    queue.IssueWorkLambda
+    queue.IssueBlockLambda
     (
         "KCBinaryPartition-FindOffsets",
-        DeviceWorkIssueParams{.workCount = uint32_t(dInput.size())},
+        DeviceBlockIssueParams
+        {
+            .gridSize = blockCount,
+            .blockSize = 1u
+        },
         [=](KernelCallParams kp)
         {
-            if(kp.GlobalId() >= elemCount) return;
-
-            if(op(dInput[kp.GlobalId()]))
-                dCounters[kp.blockId + 1].left += 1;
-            else
-                dCounters[kp.blockId + 1].right += 1;
+            uint32_t offset = kp.blockId * workPerBlock;
+            uint32_t localWCount = std::min(offset + workPerBlock, elemCount) - offset;
+            Span<const T> dLocalInput = dInput.subspan(offset, localWCount);
+            for(const T& v : dLocalInput)
+            {
+                if(op(v))   dCounters[kp.blockId + 1].left += 1;
+                else        dCounters[kp.blockId + 1].right += 1;
+            }
         }
     );
     queue.IssueBlockLambda
@@ -98,34 +105,36 @@ void BinaryPartition(Span<T> dOutput,
         }
     );
     // From now on counters are write offsets
-    queue.IssueWorkLambda
+    queue.IssueBlockLambda
     (
         "KCBinaryPartition-WriteData",
-        DeviceWorkIssueParams{.workCount = elemCount},
+        DeviceBlockIssueParams
+        {
+            .gridSize = blockCount,
+            .blockSize = 1u
+        },
         [=](KernelCallParams kp)
         {
-            MRAY_SHARED_MEMORY Vector2ui localOffset;
-            if(kp.threadId == 0) localOffset = Vector2ui::Zero();
+            Vector2ui localOffset = Vector2ui::Zero();
             // The first thread sets the offset counter from the dCounters variable.
-            if(kp.GlobalId() == 0) dEndOffset[0] = dCounters.back().left;
+            if(kp.blockId == 0) dEndOffset[0] = dCounters.back().left;
 
             const auto& globalOffset = dCounters[kp.blockId];
-            if(kp.GlobalId() < elemCount)
+
+            uint32_t offset = kp.blockId * workPerBlock;
+            uint32_t localWCount = std::min(offset + workPerBlock, elemCount) - offset;
+            Span<const T> dLocalInput = dInput.subspan(offset, localWCount);
+            for(const T& v : dLocalInput)
             {
-                if(op(dInput[kp.GlobalId()]))
-                    dOutput[globalOffset.left + (localOffset[0]++)] = dInput[kp.GlobalId()];
-                else
-                    dOutput[globalOffset.right + (localOffset[1]++)] = dInput[kp.GlobalId()];
+                if(op(v))   dOutput[globalOffset.left +  (localOffset[0]++)] = v;
+                else        dOutput[globalOffset.right + (localOffset[1]++)] = v;
             }
             if constexpr(MRAY_IS_DEBUG)
             {
-                if(kp.threadId == kp.blockSize - 1)
-                {
-                    [[maybe_unused]]
-                    LRCounter nextCounter = dCounters[kp.blockId + 1];
-                    assert(localOffset[0] == nextCounter.left - globalOffset.left);
-                    assert(localOffset[1] == nextCounter.right - globalOffset.right);
-                }
+                [[maybe_unused]]
+                LRCounter nextCounter = dCounters[kp.blockId + 1];
+                assert(localOffset[0] == nextCounter.left - globalOffset.left);
+                assert(localOffset[1] == nextCounter.right - globalOffset.right);
             }
         }
     );

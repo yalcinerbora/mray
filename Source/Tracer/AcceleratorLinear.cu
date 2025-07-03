@@ -26,12 +26,23 @@ void KCGeneratePrimitiveKeys(MRAY_GRID_CONSTANT const Span<PrimitiveKey> dAllLea
     {
         using namespace TracerConstants;
         uint32_t localTid = kp.threadId;
+
         MRAY_SHARED_MEMORY PrimRangeArray sPrimRanges;
         MRAY_SHARED_MEMORY Vector2ui sConcreteLeafRange;
-        if(localTid < MaxPrimBatchPerSurface)
-            sPrimRanges[localTid] = dConcretePrimRanges[blockId][localTid];
-        if(localTid < Vector2ui::Dims)
-            sConcreteLeafRange[localTid] = dConcreteLeafRanges[blockId][localTid];
+        #ifdef MRAY_GPU_BACKEND_CPU
+            if(localTid < MaxPrimBatchPerSurface)
+            {
+                sPrimRanges = dConcretePrimRanges[blockId];
+                sConcreteLeafRange = dConcreteLeafRanges[blockId];
+            }
+        #else
+            assert(kp.blockSize >= MaxPrimBatchPerSurface);
+            assert(kp.blockSize >= Vector2ui::Dims);
+            if(localTid < MaxPrimBatchPerSurface)
+                sPrimRanges[localTid] = dConcretePrimRanges[blockId][localTid];
+            if(localTid < Vector2ui::Dims)
+                sConcreteLeafRange[localTid] = dConcreteLeafRanges[blockId][localTid];
+        #endif
         BlockSynchronize();
 
         // Do batch by batch

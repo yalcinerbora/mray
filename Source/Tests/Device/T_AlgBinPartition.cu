@@ -23,7 +23,7 @@ template<class Value>
 void BinPartitionTest(const GPUSystem& system)
 {
     const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
-    static constexpr size_t ElementCount = 1'000;
+    static constexpr size_t ElementCount = 1'111;
     size_t tempMemSize = DeviceAlgorithms::BinPartitionTMSize<Value>(ElementCount, queue);
     DeviceMemory mem({&system.BestDevice()}, 1_MiB, 8_MiB);
 
@@ -78,9 +78,9 @@ void BinPartitionTest(const GPUSystem& system)
     }
 }
 
-TYPED_TEST(DeviceAlorithmsTest, BinaryPartition)
+TYPED_TEST(DeviceAlgorithmsTest, BinaryPartition)
 {
-    using Value = typename DeviceAlorithmsTest<TypeParam>::ValueType;
+    using Value = typename DeviceAlgorithmsTest<TypeParam>::ValueType;
     GPUSystem system;
     BinPartitionTest<Value>(system);
 }

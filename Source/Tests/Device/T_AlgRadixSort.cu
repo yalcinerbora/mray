@@ -17,7 +17,7 @@ void RadixSortTest(const GPUSystem& system)
     using DeviceAlgorithms::RadixSort;
 
     const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
-    static constexpr size_t ElementCount = 10;
+    static constexpr size_t ElementCount = 1'111;
     size_t tempMemSize = RadixSortTMSize<IsAscending, Key, Value>(ElementCount, queue);
     DeviceMemory mem({&system.BestDevice()}, 1_MiB, 8_MiB);
 
@@ -78,7 +78,7 @@ void SegmentedRadixSortTest(const GPUSystem& system)
     using DeviceAlgorithms::SegmentedRadixSort;
 
     const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
-    static constexpr size_t ElementCount = 64;
+    static constexpr size_t ElementCount = 1'111;
     static constexpr size_t SegmentCount = 5;
     size_t tempMemSize = SegmentedRadixSortTMSize<IsAscending, Key, Value>(ElementCount,
                                                                            SegmentCount,
@@ -109,10 +109,10 @@ void SegmentedRadixSortTest(const GPUSystem& system)
     static_assert(SegmentCount == 5, "SegmentCount is changed!");
     {
         hSegmentRanges[0] = 0;
-        hSegmentRanges[1] = 21;
-        hSegmentRanges[2] = 45;
-        hSegmentRanges[3] = 49;
-        hSegmentRanges[4] = 52;
+        hSegmentRanges[1] = 221;
+        hSegmentRanges[2] = 545;
+        hSegmentRanges[3] = 749;
+        hSegmentRanges[4] = 996;
         hSegmentRanges[5] = ElementCount;
     }
     //
@@ -162,37 +162,36 @@ void SegmentedRadixSortTest(const GPUSystem& system)
     }
 }
 
-TYPED_TEST(DeviceAlorithmsTest, RadixSortAscending)
+TYPED_TEST(DeviceAlgorithmsTest, RadixSortAscending)
 {
-    using Key = typename DeviceAlorithmsTest<TypeParam>::KeyType;
-    using Value = typename DeviceAlorithmsTest<TypeParam>::ValueType;
+    using Key = typename DeviceAlgorithmsTest<TypeParam>::KeyType;
+    using Value = typename DeviceAlgorithmsTest<TypeParam>::ValueType;
     GPUSystem system;
-
     RadixSortTest<true, Key, Value>(system);
 }
 
-TYPED_TEST(DeviceAlorithmsTest, RadixSortDescending)
+TYPED_TEST(DeviceAlgorithmsTest, RadixSortDescending)
 {
-    using Key = typename DeviceAlorithmsTest<TypeParam>::KeyType;
-    using Value = typename DeviceAlorithmsTest<TypeParam>::ValueType;
+    using Key = typename DeviceAlgorithmsTest<TypeParam>::KeyType;
+    using Value = typename DeviceAlgorithmsTest<TypeParam>::ValueType;
     GPUSystem system;
 
     RadixSortTest<false, Key, Value>(system);
 }
 
-TYPED_TEST(DeviceAlorithmsTest, SegmentedRadixSortAscending)
+TYPED_TEST(DeviceAlgorithmsTest, SegmentedRadixSortAscending)
 {
-    using Key = typename DeviceAlorithmsTest<TypeParam>::KeyType;
-    using Value = typename DeviceAlorithmsTest<TypeParam>::ValueType;
+    using Key = typename DeviceAlgorithmsTest<TypeParam>::KeyType;
+    using Value = typename DeviceAlgorithmsTest<TypeParam>::ValueType;
     GPUSystem system;
 
     SegmentedRadixSortTest<true, Key, Value>(system);
 }
 
-TYPED_TEST(DeviceAlorithmsTest, SegmentedRadixSortDescending)
+TYPED_TEST(DeviceAlgorithmsTest, SegmentedRadixSortDescending)
 {
-    using Key = typename DeviceAlorithmsTest<TypeParam>::KeyType;
-    using Value = typename DeviceAlorithmsTest<TypeParam>::ValueType;
+    using Key = typename DeviceAlgorithmsTest<TypeParam>::KeyType;
+    using Value = typename DeviceAlgorithmsTest<TypeParam>::ValueType;
     GPUSystem system;
 
     SegmentedRadixSortTest<false, Key, Value>(system);

@@ -91,13 +91,22 @@ void TransformReduce(Span<OutT, 1> dReducedValue,
                      BinaryOp&& binaryOp,
                      TransformOp&& transformOp)
 {
-    dReducedValue[0] = initialValue;
-
     using namespace std::string_view_literals;
+
+    uint32_t elemCount = static_cast<uint32_t>(dValues.size());
+    queue.IssueBlockLambda
+    (
+        "KCTransformReduce-SetInitValue"sv,
+        DeviceBlockIssueParams{.gridSize = 1u, .blockSize = 1u},
+        [dReducedValue, initialValue](KernelCallParams)
+        {
+            dReducedValue[0] = initialValue;
+        }
+    );
     queue.IssueWorkLambda
     (
-        "KCTransformReduce"sv,
-        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dValues.size())},
+        "KCTransformReduce-Actual"sv,
+        DeviceWorkIssueParams{.workCount = elemCount},
         [=](KernelCallParams kp)
         {
             MRAY_SHARED_MEMORY OutT local;
@@ -134,12 +143,13 @@ void SegmentedTransformReduce(Span<OutT> dReducedValues,
 {
     // Dedicate a block for each segment
     using namespace std::string_view_literals;
+    uint32_t segmentCount = static_cast<uint32_t>(dSegmentRanges.size());
     queue.IssueBlockLambda
     (
         "KCSegmentedTransformReduce"sv,
         DeviceBlockIssueParams
         {
-            .gridSize= static_cast<uint32_t>(dSegmentRanges.size()),
+            .gridSize = segmentCount,
             // We are CPU so 1 TPB is fine
             .blockSize = 1u
         },

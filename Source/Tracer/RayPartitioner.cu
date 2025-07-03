@@ -11,102 +11,6 @@
 #define INVALID_LOCATION std::numeric_limits<uint32_t>::max()
 #define FIND_SPLITS_TPB 512
 
-#if 0
-
-#include "cub/block/block_load.cuh"
-#include "cub/block/block_store.cuh"
-#include "cub/block/block_adjacent_difference.cuh"
-
-template<int TPB>
-MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-void KCFindSplits(//Output
-                  MRAY_GRID_CONSTANT const Span<uint32_t> gMarks,
-                  // Input
-                  MRAY_GRID_CONSTANT const Span<const CommonKey> gSortedKeys,
-                  // Constants
-                  MRAY_GRID_CONSTANT const Vector2ui batchBitRange)
-{
-    KernelCallParams kp;
-
-    assert(gMarks.size() == gSortedKeys.size());
-    uint32_t locCount = static_cast<uint32_t>(gSortedKeys.size());
-
-    static constexpr int ITEMS_PER_THREAD = 4;
-    static constexpr uint32_t DATA_PER_BLOCK = TPB * ITEMS_PER_THREAD;
-
-    using KVPair = cub::KeyValuePair<CommonKey, uint32_t>;
-    using AdjDifference = cub::BlockAdjacentDifference<KVPair, TPB>;
-    using BlockLoad = cub::BlockLoad<CommonKey, TPB, ITEMS_PER_THREAD,
-                                     cub::BLOCK_LOAD_VECTORIZE>;
-    using BlockStore = cub::BlockStore<uint32_t, TPB, ITEMS_PER_THREAD,
-                                       cub::BLOCK_STORE_VECTORIZE>;
-
-    uint32_t totalBlock = (locCount + DATA_PER_BLOCK - 1) / DATA_PER_BLOCK;
-    CommonKey predecessor = INVALID_LOCATION;
-
-    // DifferenceOp for Adjacentdifference
-    auto FindMark = [&batchBitRange](KVPair current, KVPair prev) -> uint32_t
-    {
-        bool foundSplit = (Bit::FetchSubPortion(current.key, batchBitRange.AsArray()) !=
-                           Bit::FetchSubPortion(prev.key, batchBitRange.AsArray()));
-        foundSplit |= (current.value == 0);
-
-        uint32_t mark = (foundSplit) ? current.value : INVALID_LOCATION;
-        return mark;
-    };
-
-    // Block Loop
-    for(uint32_t blockId = kp.blockId;
-        blockId < totalBlock;
-        blockId += kp.gridSize)
-    {
-        uint32_t processedItemsSoFar = blockId * DATA_PER_BLOCK;
-        uint32_t validItems = min(DATA_PER_BLOCK, locCount - processedItemsSoFar);
-        const CommonKey* blockLocalKeys = gSortedKeys.data() + processedItemsSoFar;
-        uint32_t* blockLocalMarks = gMarks.data() + processedItemsSoFar;
-
-        CommonKey keys[ITEMS_PER_THREAD];
-        if(validItems == DATA_PER_BLOCK) [[likely]]
-        {
-            BlockLoad().Load(blockLocalKeys, keys);
-        }
-        else
-        {
-            BlockLoad().Load(blockLocalKeys, keys, validItems);
-        }
-        // Load predecessor for non-zero blocks
-        if(kp.threadId == 0 && kp.blockId != 0)
-            predecessor = blockLocalKeys[-1];
-
-        // Convert globalId and key to pairs, difference operator will use these
-        KVPair kvPairs[ITEMS_PER_THREAD];
-        UNROLL_LOOP
-        for(uint32_t i = 0; i < ITEMS_PER_THREAD; i++)
-        {
-            kvPairs[i].key = keys[i];
-            kvPairs[i].value = processedItemsSoFar + kp.threadId * ITEMS_PER_THREAD + i;
-        }
-
-        // Actual Adjacent difference call
-        uint32_t marks[ITEMS_PER_THREAD];
-        AdjDifference().SubtractLeft(kvPairs, marks, FindMark, KVPair{predecessor, 0});
-
-        // Finally do store
-        if(validItems == DATA_PER_BLOCK) [[likely]]
-        {
-            BlockStore().Store(blockLocalMarks, marks);
-        }
-        else
-        {
-            BlockStore().Store(blockLocalMarks, marks, validItems);
-        }
-        // Barrier here for shared memory
-        BlockSynchronize();
-    }
-}
-
-#else
-
 template<int TPB>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
 void KCFindSplits(//Output
@@ -139,8 +43,6 @@ void KCFindSplits(//Output
     if(kp.GlobalId() == 0)
         gMarks[0] = 0;
 }
-
-#endif
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCFindBinMatIds(// Output

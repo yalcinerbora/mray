@@ -193,6 +193,7 @@ GPUSystemCPU::GPUSystemCPU()
     //  - Put a flag, to auto combine or split
     //    NUMA nodes as seperate "Device"
     systemGPUs.emplace_back(*localTP.get(), 0, nullptr);
+    systemGPUPtrs.push_back(&systemGPUs.back());
 }
 
 GPUSystemCPU::GPUSystemCPU(ThreadPool& tp)
@@ -202,6 +203,7 @@ GPUSystemCPU::GPUSystemCPU(ThreadPool& tp)
     //  - Put a flag, to auto combine or split
     //    NUMA nodes as seperate "Device"
     systemGPUs.emplace_back(tp, 0, nullptr);
+    systemGPUPtrs.push_back(&systemGPUs.back());
 }
 
 GPUSystemCPU::~GPUSystemCPU()

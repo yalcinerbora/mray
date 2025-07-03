@@ -28,9 +28,10 @@ void InclusiveSegmentedScan(Span<T> dScannedValues,
     using namespace std::string_view_literals;
     assert(dValues.size() == dScannedValues.size());
     assert(dValues.size() % segmentSize == 0);
-
     // Dedicate a thread for each segment
-    uint32_t segmentCount = uint32_t(dValues.size() / segmentSize);
+    uint32_t elemCount = uint32_t(dValues.size());
+    uint32_t segmentCount = elemCount / segmentSize;
+
     queue.IssueBlockLambda
     (
         "KCInclusiveSegmentedScan"sv,
@@ -41,6 +42,7 @@ void InclusiveSegmentedScan(Span<T> dScannedValues,
         },
         [=](KernelCallParams kp)
         {
+            // Block-stride loop
             for(uint32_t bId = kp.blockId; bId < segmentCount; bId += kp.gridSize)
             {
                 auto dLocalValues = dValues.subspan(bId * segmentSize, segmentSize);
@@ -67,8 +69,11 @@ void ExclusiveScan(Span<T> dScannedValues,
                    BinaryOp&& op)
 {
     using namespace std::string_view_literals;
-    uint32_t blockCount = queue.DetermineGridStrideBlock(nullptr, 0u, StaticThreadPerBlock1D(),
-                                                         dValues.size());
+    uint32_t elemCount = static_cast<uint32_t>(dValues.size());
+    uint32_t blockCount = queue.DetermineGridStrideBlock(nullptr, 0u,
+                                                         StaticThreadPerBlock1D(),
+                                                         elemCount);
+    uint32_t elemPerBlock = Math::DivideUp(elemCount, blockCount);
     T* dLocalSumPtr = reinterpret_cast<T*>(dTempMem.data());
     assert(dTempMem.size_bytes() >= blockCount * sizeof(T));
     Span<T> dBlockSums = Span<T>(dLocalSumPtr, blockCount + 1);
@@ -85,17 +90,16 @@ void ExclusiveScan(Span<T> dScannedValues,
             //
             for(uint32_t bId = kp.blockId; bId < blockCount; bId += kp.gridSize)
             {
-                size_t curStart = bId * StaticThreadPerBlock1D();
-                size_t nextStart = std::min((bId + 1) * StaticThreadPerBlock1D(),
-                                            dValues.size());
+                size_t curStart = bId * elemPerBlock;
+                size_t nextStart = std::min((bId + 1) * elemPerBlock, elemCount);
                 size_t localSize = nextStart - curStart;
                 if(localSize == 0) continue;
 
                 Span<const T> dLocalValues = dValues.subspan(curStart, localSize);
-                Span<const T> dLocalOut = dScannedValues.subspan(curStart, localSize);
+                Span<T> dLocalOut = dScannedValues.subspan(curStart, localSize);
 
-                T localSum = dLocalValues[0];
-                for(uint32_t i = 1; i < uint32_t(localSize); i++)
+                T localSum = initialValue;
+                for(uint32_t i = 0; i < uint32_t(localSize); i++)
                 {
                     dLocalOut[i] = localSum;
                     localSum = op(localSum, dLocalValues[i]);
@@ -111,25 +115,28 @@ void ExclusiveScan(Span<T> dScannedValues,
         DeviceBlockIssueParams{.gridSize = 1u, .blockSize = 1u},
         [=](KernelCallParams)
         {
-            for(size_t i = 1; i < dBlockSums[i].size(); i++)
-                dBlockSums[i] = op(dBlockSums[i] + dBlockSums[i - 1]);
+            for(size_t i = 1; i < dBlockSums.size(); i++)
+                dBlockSums[i] = op(dBlockSums[i], dBlockSums[i - 1]);
         }
     );
 
-    queue.IssueWorkLambda
+    queue.IssueBlockLambda
     (
         "KCExclusiveScan-AddBlockOffsets"sv,
-        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dValues.size())},
+        DeviceBlockIssueParams{.gridSize = blockCount, .blockSize = 1u},
         [=](KernelCallParams kp)
         {
-            T sum;
-            for(size_t i = kp.GlobalId(); i < dBlockSums[i].size(); i += kp.TotalSize())
+            for(uint32_t bId = kp.blockId; bId < blockCount; bId += kp.gridSize)
             {
-                bool isFirstThreadInBlock = (i % StaticThreadPerBlock1D() == 0);
-                if(isFirstThreadInBlock)
-                    dValues[i] = dBlockSums[i];
-                else
-                    dValues[i] = op(dValues[i], dBlockSums[i]);
+                size_t curStart = bId * elemPerBlock;
+                size_t nextStart = std::min((bId + 1) * elemPerBlock, elemCount);
+                size_t localSize = nextStart - curStart;
+                if(localSize == 0) continue;
+
+                Span<T> dLocalOut = dScannedValues.subspan(curStart, localSize);
+
+                for(uint32_t i = 0; i < uint32_t(localSize); i++)
+                    dLocalOut[i] = op(dLocalOut[i], dBlockSums[bId]);
             }
         }
     );

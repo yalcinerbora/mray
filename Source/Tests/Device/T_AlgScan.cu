@@ -22,8 +22,8 @@ struct Adder
 template<class Value>
 void MultiScanTest(const GPUSystem& system)
 {
-    static constexpr size_t SegmentSize = 96;
-    static constexpr size_t ElementCount = SegmentSize * 32;
+    static constexpr size_t SegmentSize = 97;
+    static constexpr size_t ElementCount = SegmentSize * 37;
     DeviceMemory mem({&system.BestDevice()}, 1_MiB, 8_MiB);
 
     Span<Value> dInputs;
@@ -36,14 +36,14 @@ void MultiScanTest(const GPUSystem& system)
 
     const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
     queue.MemcpyAsync(dInputs, Span<const Value>(hInputs.begin(), hInputs.end()));
-
+    queue.MemsetAsync(dOutputs, 0xCD);
     DeviceAlgorithms::InclusiveSegmentedScan(dOutputs, ToConstSpan(dInputs),
                                              SegmentSize, Value(0), queue, Adder<Value>());
 
     std::vector<Value> hResults(ElementCount);
     queue.MemcpyAsync(Span<Value>(hResults.begin(), hResults.end()),
                       ToConstSpan(dOutputs));
-    queue.MemsetAsync(dOutputs, 0x00);
+    queue.MemsetAsync(dOutputs, 0xCD);
 
     // Do the reduction again with a lambda
     DeviceAlgorithms::InclusiveSegmentedScan(dOutputs, ToConstSpan(dInputs),
@@ -70,13 +70,74 @@ void MultiScanTest(const GPUSystem& system)
 
         ExpectEqualVecOrArithmetic(result, hResults[i]);
         ExpectEqualVecOrArithmetic(result, hResultsLambda[i]);
-
     }
 }
 
-TYPED_TEST(DeviceAlorithmsTest, MultiScan)
+template<class Value>
+void ExclusiveScanTest(const GPUSystem& system)
 {
-    using Value = typename DeviceAlorithmsTest<TypeParam>::ValueType;
+    const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
+
+    static constexpr size_t ElementCount = 1'00;
+    DeviceMemory mem({&system.BestDevice()}, 1_MiB, 8_MiB);
+
+    Span<Value> dInputs;
+    Span<Value> dOutputs;
+    Span<Byte> dTempMem;
+    size_t tempMemSize = DeviceAlgorithms::ExclusiveScanTMSize<Value>(ElementCount, queue);
+    MemAlloc::AllocateMultiData(std::tie(dInputs, dOutputs, dTempMem),
+                                mem, {ElementCount, ElementCount, tempMemSize});
+
+    std::vector<Value> hInputs(ElementCount, Value(0));
+    std::iota(hInputs.begin(), hInputs.end(), Value(1));
+    queue.MemcpyAsync(dInputs, Span<const Value>(hInputs.begin(), hInputs.end()));
+    queue.MemsetAsync(dOutputs, 0xCD);
+
+    DeviceAlgorithms::ExclusiveScan(dOutputs, dTempMem,
+                                    ToConstSpan(dInputs),
+                                    Value(0), queue, Adder<Value>());
+
+    std::vector<Value> hResults(ElementCount);
+    queue.MemcpyAsync(Span<Value>(hResults.begin(), hResults.end()),
+                      ToConstSpan(dOutputs));
+    queue.MemsetAsync(dOutputs, 0xCD);
+
+    // Do the reduction again with a lambda
+    DeviceAlgorithms::ExclusiveScan
+    (
+        dOutputs, dTempMem,
+        ToConstSpan(dInputs),
+        Value(0), queue,
+        []MRAY_HYBRID(const Value & l, const Value & r)
+        {
+            return l + r;
+        }
+    );
+    std::vector<Value> hResultsLambda(ElementCount);
+    queue.MemcpyAsync(Span<Value>(hResultsLambda.begin(), hResultsLambda.end()),
+                      ToConstSpan(dOutputs));
+    queue.Barrier().Wait();
+
+    for(size_t i = 0; i < ElementCount; i++)
+    {
+        Value val = hInputs[i];
+        Value result = val * (val - 1) / 2;
+
+        ExpectEqualVecOrArithmetic(result, hResults[i]);
+        ExpectEqualVecOrArithmetic(result, hResultsLambda[i]);
+    }
+}
+
+TYPED_TEST(DeviceAlgorithmsTest, MultiScan)
+{
+    using Value = typename DeviceAlgorithmsTest<TypeParam>::ValueType;
     GPUSystem system;
     MultiScanTest<Value>(system);
+}
+
+TYPED_TEST(DeviceAlgorithmsTest, ExclusiveScan)
+{
+    using Value = typename DeviceAlgorithmsTest<TypeParam>::ValueType;
+    GPUSystem system;
+    ExclusiveScanTest<Value>(system);
 }

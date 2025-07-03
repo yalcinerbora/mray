@@ -73,7 +73,8 @@ void GPUQueueCPU::IssueKernelInternal(std::string_view name,
     // critical section, instead of the internal queue's data.
     // (see the above "TODO" section)
     auto* cbRef = &this->cb;
-    tp->SubmitBlocks
+    [[maybe_unused]]
+    auto r = tp->SubmitBlocks
     (
         blockCount,
         [
@@ -127,6 +128,8 @@ void GPUQueueCPU::IssueKernelInternal(std::string_view name,
         },
         blockCount
     );
+
+    if constexpr(MRAY_IS_DEBUG) r.GetAll();
 }
 
 template<class Lambda>
@@ -166,7 +169,8 @@ void GPUQueueCPU::IssueLambdaInternal(std::string_view name,
     // critical section, instead of the internal queue's data.
     // (see the above "TODO" section)
     auto* cbRef = &this->cb;
-    tp->SubmitBlocks
+    [[maybe_unused]]
+    auto r = tp->SubmitBlocks
     (
         blockCount,
         [
@@ -221,6 +225,8 @@ void GPUQueueCPU::IssueLambdaInternal(std::string_view name,
         },
         blockCount
     );
+
+    if constexpr(MRAY_IS_DEBUG) r.GetAll();
 }
 
 template<auto Kernel, class... Args>
