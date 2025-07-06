@@ -231,6 +231,16 @@ class GPUQueueCUDA
                                                  uint32_t threadCount,
                                                  uint32_t workCount) const;
 
+    MRAY_HYBRID
+    uint32_t            RecommendedBlockCountDevice(const void* kernelPtr,
+                                                    uint32_t threadsPerBlock,
+                                                    uint32_t sharedMemSize) const;
+
+    MRAY_HYBRID
+    static uint32_t     RecommendedBlockCountSM(const void* kernelPtr,
+                                                uint32_t threadsPerBlock,
+                                                uint32_t sharedMemSize);
+
     public:
     // Constructors & Destructor
                                 GPUQueueCUDA() = default;
@@ -278,16 +288,6 @@ class GPUQueueCUDA
     // explicitly defined defaulted destructor and NVCC errors
     // because of that even if we dont call the kernel from the
     // device.
-    //template<auto Kernel, class... Args>
-    //MRAY_GPU void   DeviceIssueKernel(std::string_view name,
-    //                                  KernelIssueParams,
-    //                                  //
-    //                                  Args&&...) const;
-    //template<class Lambda>
-    //MRAY_GPU void   DeviceIssueLambda(std::string_view name,
-    //                                  KernelIssueParams,
-    //                                  //
-    //                                  Lambda&&) const;
     template<auto Kernel, class... Args>
     MRAY_GPU void   DeviceIssueWorkKernel(std::string_view name,
                                           DeviceWorkIssueParams,
@@ -338,18 +338,7 @@ class GPUQueueCUDA
     MRAY_HYBRID
     uint32_t            SMCount() const;
 
-    private:
-    MRAY_HYBRID
-    uint32_t            RecommendedBlockCountDevice(const void* kernelPtr,
-                                                    uint32_t threadsPerBlock,
-                                                    uint32_t sharedMemSize) const;
-
-    MRAY_HYBRID
-    static uint32_t     RecommendedBlockCountSM(const void* kernelPtr,
-                                                uint32_t threadsPerBlock,
-                                                uint32_t sharedMemSize);
     public:
-
     // Annotation for profiling etc. (uses NVTX)
     MRAY_HOST
     GPUAnnotationCUDA       CreateAnnotation(std::string_view) const;

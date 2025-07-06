@@ -10,6 +10,8 @@
 
 #include "../GPUTypes.h"
 
+#include "AlgForwardCPU.h"
+
 class TimelineSemaphore;
 class ThreadPool;
 
@@ -189,6 +191,42 @@ class GPUQueueCPU
     ThreadPool*         tp          = nullptr;
     ControlBlockPtr     cb          = nullptr;
 
+
+    // Friends that use RecommendedBlockCount... functions
+    template<bool, class, class>
+    friend size_t algorithms::RadixSortTMSize(size_t, const GPUQueueCPU&);
+    template<bool, class K, class V>
+    friend uint32_t algorithms::RadixSort(Span<Span<K>, 2>, Span<Span<V>, 2>,
+                                          Span<Byte>, const GPUQueueCPU&,
+                                          const Vector2ui&);
+
+    template<class>
+    friend size_t algorithms::BinPartitionTMSize(size_t, const GPUQueueCPU&);
+    template<class T, class U>
+    friend void algorithms::BinaryPartition(Span<T>, Span<uint32_t, 1>,
+                                            Span<Byte>, Span<const T>,
+                                            const GPUQueueCPU&, U&&);
+    template<class>
+    friend size_t algorithms::ExclusiveScanTMSize(size_t, const GPUQueueCPU&);
+    template<class T, class B>
+    friend void algorithms::ExclusiveScan(Span<T>, Span<Byte>, Span<const T>,
+                                          const T&, const GPUQueueCPU&, B&& op);
+
+    MRAY_HYBRID
+    uint32_t    RecommendedBlockCountDevice(const void* kernelPtr,
+                                            uint32_t threadsPerBlock,
+                                            uint32_t sharedMemSize) const;
+
+    MRAY_HYBRID
+    uint32_t    RecommendedBlockCountSM(const void* kernelPtr,
+                                        uint32_t threadsPerBlock,
+                                        uint32_t sharedMemSize);
+    MRAY_HYBRID
+    uint32_t    DetermineGridStrideBlock(const void* kernelPtr,
+                                         uint32_t sharedMemSize,
+                                         uint32_t threadCount,
+                                         uint32_t workCount) const;
+
     public:
     // Constructors & Destructor
                     GPUQueueCPU() = default;
@@ -281,21 +319,6 @@ class GPUQueueCPU
 
     MRAY_HYBRID
     uint32_t            SMCount() const;
-
-    MRAY_HYBRID
-    uint32_t            RecommendedBlockCountDevice(const void* kernelPtr,
-                                                    uint32_t threadsPerBlock,
-                                                    uint32_t sharedMemSize) const;
-
-    MRAY_HYBRID
-    uint32_t            RecommendedBlockCountSM(const void* kernelPtr,
-                                                uint32_t threadsPerBlock,
-                                                uint32_t sharedMemSize);
-    MRAY_HYBRID
-    uint32_t            DetermineGridStrideBlock(const void* kernelPtr,
-                                             uint32_t sharedMemSize,
-                                             uint32_t threadCount,
-                                             uint32_t workCount) const;
 
     // Annotation for profiling etc. (uses rocTX)
     MRAY_HOST
