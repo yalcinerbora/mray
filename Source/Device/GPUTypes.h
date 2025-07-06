@@ -48,13 +48,15 @@ struct DeviceBlockIssueParams
 };
 
 // Texture Size Type Metaprogramming
-template <uint32_t D, class = void> struct TextureExtentT;
-template <uint32_t D> requires(D == 1)
-struct TextureExtentT<D> { using type = uint32_t; };
-template <uint32_t D> requires(D > 1 && D < 4)
-struct TextureExtentT<D> { using type = Vector<D, uint32_t>; };
+template <uint32_t D, std::integral T, class = void> struct TextureExtentT;
+template <uint32_t D, std::integral T> requires(D == 1)
+struct TextureExtentT<D, T> { using type = T; };
+template <uint32_t D, std::integral T> requires(D > 1 && D < 4)
+struct TextureExtentT<D, T> { using type = Vector<D, T>; };
 template <uint32_t D>
-using TextureExtent = typename TextureExtentT<D>::type;
+using TextureExtent = typename TextureExtentT<D, uint32_t>::type;
+template <uint32_t D>
+using TextureSignedExtent = typename TextureExtentT<D, int32_t>::type;
 
 // Padded channel type metaprogramming
 template <uint32_t C, class T, class = void> struct PaddedChannelT;
@@ -203,8 +205,8 @@ struct TextureInitParams
 
 template<uint32_t D>
 MRAY_HYBRID MRAY_CGPU_INLINE
-UVType<D> LinearToFloatIndex(const TextureExtent<D>& extents,
-                             uint32_t linearIndex)
+UVType<D> LinearToTexelCoordinates(const TextureExtent<D>& extents,
+                                   uint32_t linearIndex)
 {
     if constexpr(D == 1)
         return UVType<D>(Float(linearIndex) + Float(0.5));

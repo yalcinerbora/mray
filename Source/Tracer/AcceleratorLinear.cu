@@ -30,7 +30,7 @@ void KCGeneratePrimitiveKeys(MRAY_GRID_CONSTANT const Span<PrimitiveKey> dAllLea
         MRAY_SHARED_MEMORY PrimRangeArray sPrimRanges;
         MRAY_SHARED_MEMORY Vector2ui sConcreteLeafRange;
         #ifdef MRAY_GPU_BACKEND_CPU
-            if(localTid < MaxPrimBatchPerSurface)
+            if(localTid == 0)
             {
                 sPrimRanges = dConcretePrimRanges[blockId];
                 sConcreteLeafRange = dConcreteLeafRanges[blockId];

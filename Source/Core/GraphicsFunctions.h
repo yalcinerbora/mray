@@ -490,24 +490,15 @@ requires(std::is_same_v<DimType, Vector2ui> ||
 MRAY_HYBRID constexpr
 uint32_t TextureMipPixelStart(const DimType& baseResolution, uint32_t mipLevel)
 {
-    constexpr auto MAX_ITERATIONS = 18u;
     assert(TextureMipCount(baseResolution) > mipLevel);
-    assert(TextureMipCount(baseResolution) > MAX_ITERATIONS);
-
     uint32_t mipPixelStart = 0;
-    // TODO: Can we do this analitically?
-    // This loop will run 17 times for extreme cases
-    // (160k x 160k tex for example)
-    // We try to hint the compiler to unroll the loop
-    // by giving a static size of 18.
     UNROLL_LOOP
-    for(uint32_t i = 0; i < MAX_ITERATIONS; i++)
+    for(uint32_t i = 0; i < mipLevel; i++)
     {
         if constexpr(std::is_same_v<DimType, uint32_t>)
             mipPixelStart += TextureMipSize(baseResolution, i);
         else
             mipPixelStart += TextureMipSize(baseResolution, i).Multiply();
-        if(i < mipLevel) break;
     }
     return mipPixelStart;
 }

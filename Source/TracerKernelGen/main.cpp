@@ -7,9 +7,7 @@
 #include <filesystem>
 #include <thread>
 
-#include "Core/Log.h"
-#include "Core/MemAlloc.h"
-#include "Core/Timer.h"
+#include <fmt/core.h>
 
 #include "Templates.h"
 
@@ -19,7 +17,7 @@ static constexpr auto KERNEL_FILE_FMT = "_GEN_Kernels{}.cu"sv;
 static constexpr auto TYPEGEN_HEADER_FILE = "_GEN_RequestedTypes.h"sv;
 static constexpr auto TYPEGEN_RENDER_HEADER_FILE = "_GEN_RequestedRenderers.h"sv;
 
-auto globalAllocator = pmr::monotonic_buffer_resource(2_MiB);
+auto globalAllocator = pmr::monotonic_buffer_resource(2 * 1ull << 20);
 
 struct BasicLine
 {
@@ -818,10 +816,11 @@ void GenerateKernelInstantiationFiles(const LinePack& lp,
     }
 
     // Split the works
-    auto AppendInstantiations = [fileCount](PerFileVector& perFileLists, uint32_t listIndex,
+    auto AppendInstantiations = [fileCount](PerFileVector& perFileLists,
+                                            uint32_t listIndex,
                                             const StringViewVec& instatiationList)
     {
-        size_t workInstantiationPerFile = Math::DivideUp(instatiationList.size(), fileCount);
+        size_t workInstantiationPerFile = (instatiationList.size() + fileCount - 1) / fileCount;
         for(size_t i = 0; i < fileCount; i++)
         for(size_t j = 0; j < workInstantiationPerFile; j++)
         {
@@ -876,8 +875,6 @@ void GenerateKernelInstantiationFiles(const LinePack& lp,
 
 int main(int argc, const char* argv[])
 {
-    Timer t; t.Start();
-
     uint32_t argcUInt = static_cast<uint32_t>(argc);
     static constexpr uint32_t MAX_ARG_COUNT = 5;
     if(argcUInt != MAX_ARG_COUNT + 1)
@@ -930,8 +927,5 @@ int main(int argc, const char* argv[])
     //
     WriteRequestedTypesFiles(lp, outDir, headerGuard);
     GenerateKernelInstantiationFiles(lp, outDir, fileCount, skipHWAccelInstances);
-
-    t.Split();
-    //fmt::println("Generation took {:f}ms", t.Elapsed<Millisecond>());
     return 0;
 }

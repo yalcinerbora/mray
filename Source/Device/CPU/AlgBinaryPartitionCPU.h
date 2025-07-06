@@ -58,7 +58,7 @@ void BinaryPartition(Span<T> dOutput,
 
     LRCounter* dTempPtr = reinterpret_cast<LRCounter*>(dTempMemory.data());
     size_t counterAmount = (blockCount + 1);
-    assert(dTempMemory.size_bytes() <= sizeof(LRCounter) * counterAmount);
+    assert(dTempMemory.size_bytes() >= sizeof(LRCounter) * counterAmount);
     Span<LRCounter> dCounters = Span<LRCounter>(dTempPtr, counterAmount);
     //
     queue.MemsetAsync(dCounters, 0x00);

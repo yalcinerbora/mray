@@ -29,7 +29,7 @@ class ThreadPool;
 
 static constexpr uint32_t StaticThreadPerBlock1D()
 {
-    return 1u;
+    return 32u;
 }
 
 // TODO: This should not be compile time static
@@ -113,6 +113,8 @@ class GPUAnnotationCPU
     Scope               AnnotateScope() const;
 };
 
+void AtomicWaitValueToAchieve(std::atomic_uint64_t& checkLoc, uint64_t valToAchieve);
+
 class GPUSemaphoreViewCPU
 {
     private:
@@ -140,8 +142,8 @@ class GPUSemaphoreViewCPU
 class GPUFenceCPU
 {
     private:
-    uint64_t    valueToWait;
-    uint64_t*   completedKernelCounter;
+    uint64_t                valueToWait;
+    std::atomic_uint64_t*   completedKernelCounter;
 
     friend class GPUQueueCPU;
 
@@ -160,9 +162,9 @@ class GPUQueueCPU
 {
     struct ControlBlockData
     {
-        uint64_t    issuedKernelCounter = 0;
-        uint64_t    completedKernelCounter = 0;
-        std::mutex  issueMutex;
+        std::atomic_uint64_t    issuedKernelCounter = 0;
+        std::atomic_uint64_t    completedKernelCounter = 0;
+        std::mutex              issueMutex;
     };
     using ControlBlockPtr = std::unique_ptr<ControlBlockData>;
 
@@ -419,18 +421,46 @@ uint32_t KernelCallParamsCPU::TotalSize() const
     return gridSize * blockSize;
 }
 
+inline
+void AtomicWaitValueToAchieve(std::atomic_uint64_t& checkLoc, uint64_t valToAchieve)
+{
+    // I dont understand the new wait functions...
+    //
+    // We need to wait until "X >= Y" (i.e. completedCount >= achievedCount)
+    // but atomic only waits when X == Y returns otherwise.
+    //
+    // So we awake the threads alot. Below code somewhat minimizes this.
+    // "wait_predicate" would have been better?
+    // Probably hard to implement or most CPU's/Kernels does not have
+    // this functionality, I dunno.
+    //
+    // Anyway if this comment stays it works robustly.
+    // TODO: Even if this there is no ABA issue, check the perf
+    // and fall back to condition variable / mutex
+    // compare as such "wait until (curIssueCount >= oldIssueCount)
+    // similar implementation of the TimelineSemaphore class.
+    //
+    // Order is important here, for loop semantics should
+    // give what we want
+    // Load the data initially,
+    //      if it is already >=, return
+    //      if not wait
+    // When thread awakes
+    // reload the value and check if its passed again etc...
+    for(uint64_t check = checkLoc; check < valToAchieve; check = checkLoc)
+        checkLoc.wait(check);
+}
+
 MRAY_HYBRID MRAY_CGPU_INLINE
 GPUFenceCPU::GPUFenceCPU(const GPUQueueCPU& q)
-    : valueToWait(std::atomic_ref(q.cb->issuedKernelCounter).load())
+    : valueToWait(q.cb->issuedKernelCounter.load())
     , completedKernelCounter(&q.cb->completedKernelCounter)
 {}
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 void GPUFenceCPU::Wait() const
 {
-    auto completedCounter = std::atomic_ref<uint64_t>(*completedKernelCounter);
-    while(completedCounter.load() < valueToWait)
-        completedCounter.wait(std::numeric_limits<uint64_t>::max());
+    AtomicWaitValueToAchieve(*completedKernelCounter, valueToWait);
 }
 
 MRAY_HYBRID inline
@@ -468,6 +498,8 @@ void GPUQueueCPU::MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const
         },
         [=](KernelCallParamsCPU kp)
         {
+            uint32_t elemCount = uint32_t(regionFrom.size());
+
             uint32_t i = kp.GlobalId();
             uint32_t writeBound = std::min(elemCount, (i + 1) * tpb);
             writeBound -= i * tpb;
@@ -651,7 +683,7 @@ void GPUQueueCPU::IssueWait(const GPUFenceCPU& barrier) const
 {
     using namespace std::string_view_literals;
 
-    uint64_t* barrierValue = barrier.completedKernelCounter;
+    auto* barrierValue = barrier.completedKernelCounter;
     uint64_t valueToAchieve = barrier.valueToWait;
 
     IssueBlockLambda
@@ -660,9 +692,7 @@ void GPUQueueCPU::IssueWait(const GPUFenceCPU& barrier) const
         DeviceBlockIssueParams{.gridSize = 1, .blockSize = 1},
         [barrierValue, valueToAchieve](KernelCallParamsCPU)
         {
-            std::atomic_ref<uint64_t> completedCounter(*barrierValue);
-            while(completedCounter < valueToAchieve)
-                completedCounter.wait(std::numeric_limits<uint64_t>::max());
+            AtomicWaitValueToAchieve(*barrierValue, valueToAchieve);
         }
     );
 }

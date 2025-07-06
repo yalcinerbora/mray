@@ -16,45 +16,27 @@ using PixelTypeToEnum = TypeFinder::T_VMapper:: template Map
 <
     TypeFinder::T_VMapper::template TVPair<uint8_t, MRayPixelEnum::MR_R8_UNORM>,
     TypeFinder::T_VMapper::template TVPair<Vector2uc, MRayPixelEnum::MR_RG8_UNORM>,
-    //TypeFinder::T_VMapper::template TVPair<Vector4uc, MRayPixelEnum::MR_RGB8_UNORM>,
     TypeFinder::T_VMapper::template TVPair<Vector4uc, MRayPixelEnum::MR_RGBA8_UNORM>,
 
     TypeFinder::T_VMapper::template TVPair<uint16_t, MRayPixelEnum::MR_R16_UNORM>,
     TypeFinder::T_VMapper::template TVPair<Vector2us, MRayPixelEnum::MR_RG16_UNORM>,
-    //TypeFinder::T_VMapper::template TVPair<Vector4us, MRayPixelEnum::MR_RGB16_UNORM>,
     TypeFinder::T_VMapper::template TVPair<Vector4us, MRayPixelEnum::MR_RGBA16_UNORM>,
 
     TypeFinder::T_VMapper::template TVPair<int8_t, MRayPixelEnum::MR_R8_SNORM>,
     TypeFinder::T_VMapper::template TVPair<Vector2c, MRayPixelEnum::MR_RG8_SNORM>,
-    //TypeFinder::T_VMapper::template TVPair<Vector4c, MRayPixelEnum::MR_RGB8_SNORM>,
     TypeFinder::T_VMapper::template TVPair<Vector4c, MRayPixelEnum::MR_RGBA8_SNORM>,
 
     TypeFinder::T_VMapper::template TVPair<int16_t, MRayPixelEnum::MR_R16_SNORM>,
     TypeFinder::T_VMapper::template TVPair<Vector2s, MRayPixelEnum::MR_RG16_SNORM>,
-    //TypeFinder::T_VMapper::template TVPair<Vector4s, MRayPixelEnum::MR_RGB16_SNORM>,
     TypeFinder::T_VMapper::template TVPair<Vector4s, MRayPixelEnum::MR_RGBA16_SNORM>,
 
     //TypeFinder::T_VMapper::template TVPair<half, MRayPixelEnum::MR_R_HALF>,
     //TypeFinder::T_VMapper::template TVPair<Vector2uh, MRayPixelEnum::MR_RG_HALF>,
-    //TypeFinder::T_VMapper::template TVPair<Vector4uh, MRayPixelEnum::MR_RGB_HALF>,
     //TypeFinder::T_VMapper::template TVPair<Vector4uh, MRayPixelEnum::MR_RGBA_HALF>,
 
     TypeFinder::T_VMapper::template TVPair<Float, MRayPixelEnum::MR_R_FLOAT>,
     TypeFinder::T_VMapper::template TVPair<Vector2f, MRayPixelEnum::MR_RG_FLOAT>,
-    //TypeFinder::T_VMapper::template TVPair<Vector3f, MRayPixelEnum::MR_RGB_FLOAT>,
     TypeFinder::T_VMapper::template TVPair<Vector4f, MRayPixelEnum::MR_RGBA_FLOAT>
-
-    //TypeFinder::T_VMapper::template TVPair<..., MRayPixelEnum::MR_BC1_UNORM>,
-    //TypeFinder::T_VMapper::template TVPair<..., MRayPixelEnum::MR_BC2_UNORM>,
-    //TypeFinder::T_VMapper::template TVPair<..., MRayPixelEnum::MR_BC3_UNORM>,
-    //TypeFinder::T_VMapper::template TVPair<..., MRayPixelEnum::MR_BC4_UNORM>,
-    //TypeFinder::T_VMapper::template TVPair<..., MRayPixelEnum::MR_BC4_SNORM>,
-    //TypeFinder::T_VMapper::template TVPair<..., MRayPixelEnum::MR_BC5_UNORM>,
-    //TypeFinder::T_VMapper::template TVPair<..., MRayPixelEnum::MR_BC5_SNORM>,
-    //TypeFinder::T_VMapper::template TVPair<..., MRayPixelEnum::MR_BC6H_UFLOAT>,
-    //TypeFinder::T_VMapper::template TVPair<..., MRayPixelEnum::MR_BC6H_SFLOAT>,
-    //TypeFinder::T_VMapper::template TVPair<..., MRayPixelEnum::MR_BC7_UNORM>
-
 >;
 
 class TextureBackingMemoryCPU;
@@ -73,16 +55,18 @@ class TextureCPU;
 template<uint32_t D, class T>
 class RWTextureRefCPU
 {
-    friend class TextureCPU<D, T>;
+    friend class TextureCPU_Normal<D, T>;
     static constexpr uint32_t C = PixelTypeToChannels<T>();
     using PaddedChannelType = PaddedChannel<C, T>;
 
     private:
-    Span<PaddedChannelType> data;
-    TextureExtent<D>        dim;
+    PaddedChannelType* const*   data;
+    size_t                      mipStartOffset;
+    TextureExtent<D>            dim;
 
     // Hide this, only texture class can create
-                            RWTextureRefCPU(Span<PaddedChannelType> data,
+                            RWTextureRefCPU(PaddedChannelType* const* data,
+                                            size_t mipStartOffset,
                                             TextureExtent<D> dim);
     public:
     // Constructors & Destructor

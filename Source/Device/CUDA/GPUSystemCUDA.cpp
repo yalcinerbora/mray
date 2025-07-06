@@ -291,39 +291,40 @@ GPUSystemCUDA::~GPUSystemCUDA()
     globalGPUListPtr = nullptr;
 }
 
-std::vector<size_t> GPUSystemCUDA::SplitWorkToMultipleGPU(uint32_t workCount,
-                                                          uint32_t threadCount,
-                                                          uint32_t sharedMemSize,
-                                                          void* kernelPtr) const
+std::vector<size_t> GPUSystemCUDA::SplitWorkToMultipleGPU(uint32_t,
+                                                          uint32_t,
+                                                          uint32_t,
+                                                          void*) const
 {
-    std::vector<size_t> workPerGPU;
-    // Split work into all GPUs
-    uint32_t totalAvailBlocks = 0;
-    for(const GPUDeviceCUDA& g : systemGPUs)
-    {
-        uint32_t blockPerSM = GPUQueueCUDA::RecommendedBlockCountSM(kernelPtr,
-                                                                    threadCount,
-                                                                    sharedMemSize);
-        uint32_t blockGPU = blockPerSM * g.SMCount();
-        workPerGPU.push_back(blockGPU);
-        totalAvailBlocks += blockGPU;
-    }
+    throw MRayError("Not yet implemented!");
+    //std::vector<size_t> workPerGPU;
+    //// Split work into all GPUs
+    //uint32_t totalAvailBlocks = 0;
+    //for(const GPUDeviceCUDA& g : systemGPUs)
+    //{
+    //    uint32_t blockPerSM = GPUQueueCUDA::RecommendedBlockCountSM(kernelPtr,
+    //                                                                threadCount,
+    //                                                                sharedMemSize);
+    //    uint32_t blockGPU = blockPerSM * g.SMCount();
+    //    workPerGPU.push_back(blockGPU);
+    //    totalAvailBlocks += blockGPU;
+    //}
 
-    // Total Threads
-    uint32_t totalThreads = threadCount * totalAvailBlocks;
-    uint32_t iterationPerThread = Math::DivideUp(workCount, totalThreads);
+    //// Total Threads
+    //uint32_t totalThreads = threadCount * totalAvailBlocks;
+    //uint32_t iterationPerThread = Math::DivideUp(workCount, totalThreads);
 
-    size_t workDispatched = 0;
-    for(size_t i = 0; i < systemGPUs.size(); i++)
-    {
-        // Send Data
-        size_t workPerBlock = threadCount * iterationPerThread;
-        size_t gpuWorkCount = workPerGPU[i] * workPerBlock;
-        gpuWorkCount = std::min(gpuWorkCount, workCount - workDispatched);
-        workDispatched += gpuWorkCount;
-        workPerGPU[i] = gpuWorkCount;
-    }
-    return workPerGPU;
+    //size_t workDispatched = 0;
+    //for(size_t i = 0; i < systemGPUs.size(); i++)
+    //{
+    //    // Send Data
+    //    size_t workPerBlock = threadCount * iterationPerThread;
+    //    size_t gpuWorkCount = workPerGPU[i] * workPerBlock;
+    //    gpuWorkCount = std::min(gpuWorkCount, workCount - workDispatched);
+    //    workDispatched += gpuWorkCount;
+    //    workPerGPU[i] = gpuWorkCount;
+    //}
+    //return workPerGPU;
 }
 
 const GPUSystemCUDA::GPUList& GPUSystemCUDA::SystemDevices() const

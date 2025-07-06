@@ -263,15 +263,9 @@ void AcceleratorWork<AG, TG>::GeneratePrimitiveCenters(Span<Vector3> dAllPrimCen
 {
     static constexpr uint32_t TPB = StaticThreadPerBlock1D();
     static constexpr uint32_t BLOCK_PER_INSTANCE = 16;
-
-    static constexpr auto KernelName = KCGenPrimCenters<AG, TG>;
     uint32_t processedAccelCount = static_cast<uint32_t>(dLeafSegmentRanges.size() - 1);
-    uint32_t blockCount = queue.RecommendedBlockCountDevice
-    (
-        reinterpret_cast<const void*>(&KernelName),
-        TPB, 0
-    );
-    queue.IssueBlockKernel<KernelName>
+    uint32_t blockCount = processedAccelCount * BLOCK_PER_INSTANCE;
+    queue.IssueBlockKernel<KCGenPrimCenters<AG, TG>>
     (
         "KCGenPrimCenters",
         DeviceBlockIssueParams
@@ -301,15 +295,9 @@ void AcceleratorWork<AG, TG>::GeneratePrimitiveAABBs(Span<AABB3> dAllLeafAABBs,
 {
     static constexpr uint32_t TPB = StaticThreadPerBlock1D();
     static constexpr uint32_t BLOCK_PER_INSTANCE = 16;
-
-    static constexpr auto KernelName = KCGeneratePrimAABBs<AG, TG>;
     uint32_t processedAccelCount = static_cast<uint32_t>(dLeafSegmentRanges.size() - 1);
-    uint32_t blockCount = queue.RecommendedBlockCountDevice
-    (
-        reinterpret_cast<const void*>(&KernelName),
-        TPB, 0
-    );
-    queue.IssueBlockKernel<KernelName>
+    uint32_t blockCount = processedAccelCount * BLOCK_PER_INSTANCE;
+    queue.IssueBlockKernel<KCGeneratePrimAABBs<AG, TG>>
     (
         "KCGeneratePrimAABBs",
         DeviceBlockIssueParams

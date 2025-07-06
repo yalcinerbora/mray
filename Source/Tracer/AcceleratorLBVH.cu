@@ -620,32 +620,27 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
         dAABBCenters,
         dLeafAABBs
     );
-
-    static constexpr auto TPB = StaticThreadPerBlock1D();
-    uint32_t blockCount = queue.RecommendedBlockCountDevice
-    (
-        reinterpret_cast<const void*>(&KCGenMortonCode),
-        TPB, 0
-    );
-
-    queue.IssueBlockKernel<KCGenMortonCode>
-    (
-        "KCGenMortonCodes",
-        DeviceBlockIssueParams
-        {
-            .gridSize = blockCount,
-            .blockSize = TPB
-        },
-        // Output
-        dMortonCodes[0],
-        // Inputs
-        ToConstSpan(dLeafSegmentRange),
-        ToConstSpan(dSceneAABB),
-        //
-        dAABBCenters,
-        blockPerSegment
-    );
-
+    //
+    {
+        uint32_t blockCount = blockPerSegment;
+        queue.IssueBlockKernel<KCGenMortonCode>
+        (
+            "KCGenMortonCodes",
+            DeviceBlockIssueParams
+            {
+                .gridSize = blockCount,
+                .blockSize = StaticThreadPerBlock1D()
+            },
+            // Output
+            dMortonCodes[0],
+            // Inputs
+            ToConstSpan(dLeafSegmentRange),
+            ToConstSpan(dSceneAABB),
+            //
+            dAABBCenters,
+            blockPerSegment
+        );
+    };
     // Sort
     Iota(dIndices[0], 0u, queue);
     uint32_t sortedIndex = RadixSort<true, uint64_t, uint32_t>
@@ -662,62 +657,57 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
     // anymore
     Span<uint32_t> dAtomicCounters = MemAlloc::RepurposeAlloc<uint32_t>(dIndices[1]);
     Span<uint32_t> dLeafParentIndices = MemAlloc::RepurposeAlloc<uint32_t>(dMortonCodes[1]);
-
     // Now we have a multiple valid morton code lists,
     // Construct the node hierarchy
-    blockCount = queue.RecommendedBlockCountDevice
-    (
-        reinterpret_cast<const void*>(&KCConstructLBVHInternalNodes),
-        TPB, 0
-    );
-    queue.IssueBlockKernel<KCConstructLBVHInternalNodes>
-    (
-        "KCConstructLBVHInternalNodes",
-        DeviceBlockIssueParams
-        {
-            .gridSize = blockCount,
-            .blockSize = TPB
-        },
-        // Output
-        dNodes,
-        dLeafParentIndices,
-        // Inputs
-        ToConstSpan(dLeafSegmentRange),
-        ToConstSpan(dNodeSegmentRange),
-        ToConstSpan(dMortonCodes[0]),
-        ToConstSpan(dIndices[0]),
-        //
-        blockPerSegment, 1u
-    );
-
+    {
+        uint32_t blockCount = blockPerSegment;
+        queue.IssueBlockKernel<KCConstructLBVHInternalNodes>
+        (
+            "KCConstructLBVHInternalNodes",
+            DeviceBlockIssueParams
+            {
+                .gridSize = blockCount,
+                .blockSize = StaticThreadPerBlock1D()
+            },
+            // Output
+            dNodes,
+            dLeafParentIndices,
+            // Inputs
+            ToConstSpan(dLeafSegmentRange),
+            ToConstSpan(dNodeSegmentRange),
+            ToConstSpan(dMortonCodes[0]),
+            ToConstSpan(dIndices[0]),
+            //
+            blockPerSegment,
+            1u
+        );
+    };
     // Finally at AABB union portion now, union the AABBs.
     queue.MemsetAsync(dAtomicCounters, 0x00);
-    blockCount = queue.RecommendedBlockCountDevice
-    (
-        reinterpret_cast<const void*>(&KCUnionLBVHBoundingBoxes),
-        TPB, 0
-    );
-    queue.IssueBlockKernel<KCUnionLBVHBoundingBoxes>
-    (
-        "KCUnionLBVHBoundingBoxes",
-        DeviceBlockIssueParams
-        {
-            .gridSize = blockCount,
-            .blockSize = TPB
-        },
-        // Output
-        dBoundingBoxes,
-        dAtomicCounters,
-        // Inputs
-        ToConstSpan(dNodes),
-        ToConstSpan(dLeafParentIndices),
-        ToConstSpan(dLeafSegmentRange),
-        ToConstSpan(dNodeSegmentRange),
-        ToConstSpan(dLeafAABBs),
-        //
-        blockPerSegment, 1u
-    );
-
+    {
+        uint32_t blockCount = blockPerSegment;
+        queue.IssueBlockKernel<KCUnionLBVHBoundingBoxes>
+        (
+            "KCUnionLBVHBoundingBoxes",
+            DeviceBlockIssueParams
+            {
+                .gridSize = blockCount,
+                .blockSize = StaticThreadPerBlock1D()
+            },
+            // Output
+            dBoundingBoxes,
+            dAtomicCounters,
+            // Inputs
+            ToConstSpan(dNodes),
+            ToConstSpan(dLeafParentIndices),
+            ToConstSpan(dLeafSegmentRange),
+            ToConstSpan(dNodeSegmentRange),
+            ToConstSpan(dLeafAABBs),
+            //
+            blockPerSegment,
+            1u
+        );
+    }
     // Issue copy and wait
     LBVHBoundingBox hBBox;
     queue.MemcpyAsync(Span<LBVHBoundingBox>(&hBBox, 1),

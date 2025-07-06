@@ -577,7 +577,7 @@ constexpr R Bit::NormConversion::FromSNorm(T in)
     static_assert(std::numeric_limits<T>::max() +
                   std::numeric_limits<T>::min() == -1,
                   "Not two's complement int type?");
-    constexpr T MIN = std::numeric_limits<T>::max();
+    constexpr T MIN = std::numeric_limits<T>::min();
     constexpr R MAX = R(std::numeric_limits<T>::max());
     constexpr R DELTA = R(1) / (MAX - R(0));
 

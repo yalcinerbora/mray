@@ -141,9 +141,10 @@ void SegmentedTransformReduce(Span<OutT> dReducedValues,
                               BinaryOp&& binaryOp,
                               TransformOp&& transformOp)
 {
+    assert(dSegmentRanges.size() >= 2);
     // Dedicate a block for each segment
     using namespace std::string_view_literals;
-    uint32_t segmentCount = static_cast<uint32_t>(dSegmentRanges.size());
+    uint32_t segmentCount = static_cast<uint32_t>(dSegmentRanges.size() - 1);
     queue.IssueBlockLambda
     (
         "KCSegmentedTransformReduce"sv,
@@ -158,7 +159,7 @@ void SegmentedTransformReduce(Span<OutT> dReducedValues,
             assert(kp.threadId == 0);
 
             // Block-stride loop
-            for(uint32_t bId = kp.blockId; bId < dSegmentRanges.size();
+            for(uint32_t bId = kp.blockId; bId < segmentCount;
                 bId += kp.gridSize)
             {
                 OutT local = initialValue;

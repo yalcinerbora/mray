@@ -309,12 +309,7 @@ AcceleratorGroupOptiX<PG>::MultiBuildGeneric_CLT(const PreprocessResult& ppResul
 
     // Dedicate a block for each
     // concrete accelerator for copy
-    uint32_t blockCount = queue.RecommendedBlockCountDevice
-    (
-        reinterpret_cast<const void*>(&KCGeneratePrimitiveKeys),
-        StaticThreadPerBlock1D(),
-        0
-    );
+    uint32_t blockCount = static_cast<uint32_t>(dConcreteLeafRanges.size());
     using namespace std::string_literals;
     static const auto KernelName = "KCGeneratePrimitiveKeys-"s + std::string(TypeName());
     queue.IssueBlockKernel<KCGeneratePrimitiveKeys>
@@ -436,12 +431,7 @@ AcceleratorGroupOptiX<PG>::MultiBuildAABB_CLT(const PreprocessResult& ppResult,
 
     // Dedicate a block for each
     // concrete accelerator for copy
-    uint32_t blockCount = queue.RecommendedBlockCountDevice
-    (
-        reinterpret_cast<const void*>(&KCGeneratePrimitiveKeys),
-        StaticThreadPerBlock1D(),
-        0
-    );
+    uint32_t blockCount = static_cast<uint32_t>(dConcreteLeafRanges.size());
     using namespace std::string_view_literals;
     queue.IssueBlockKernel<KCGeneratePrimitiveKeys>
     (
@@ -459,15 +449,9 @@ AcceleratorGroupOptiX<PG>::MultiBuildAABB_CLT(const PreprocessResult& ppResult,
         // Constant
         this->pg.GroupId()
     );
-    static constexpr auto* AABBGenKernelName = KCGeneratePrimAABBs<AcceleratorGroupOptiX<PG>>;
-    blockCount = queue.RecommendedBlockCountDevice
-    (
-        reinterpret_cast<const void*>(AABBGenKernelName),
-        StaticThreadPerBlock1D(),
-        0
-    );
     static constexpr uint32_t BLOCK_PER_INSTANCE = 16;
-    queue.IssueBlockKernel<AABBGenKernelName>
+    blockCount = BLOCK_PER_INSTANCE * processedAccelCount;
+    queue.IssueBlockKernel<KCGeneratePrimAABBs<AcceleratorGroupOptiX<PG>>>
     (
         "KCGeneratePrimAABBs",
         DeviceBlockIssueParams

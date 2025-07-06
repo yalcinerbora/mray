@@ -202,6 +202,8 @@ void KCGenerateMipmaps(// I-O
 }
 
 // TODO: Should we dedicate a warp per pixel?
+static constexpr auto KC_CLAMP_IMAGE_TILE_SIZE = Vector2ui(32, 16);
+
 template<uint32_t TPB, class Filter>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
 void KCClampImage(// Output
@@ -215,7 +217,7 @@ void KCClampImage(// Output
                   MRAY_GRID_CONSTANT const FilterMode filterMode,
                   MRAY_GRID_CONSTANT const Filter FilterFunc)
 {
-    static constexpr Vector2ui TILE_SIZE = Vector2ui(32, 16);
+    static constexpr Vector2ui TILE_SIZE = KC_CLAMP_IMAGE_TILE_SIZE;
     static_assert(TILE_SIZE.Multiply() == TPB);
 
     KernelCallParams kp;
@@ -868,12 +870,7 @@ void ReconFilterGenericRGB(// Output
         // TODO: Investigate
         Span<const Spectrum> dValuesIn = dValues;
         Span<const ImageCoordinate> dImgCoordsIn = dImgCoords;
-
-        uint32_t blockCount = queue.RecommendedBlockCountDevice
-        (
-            reinterpret_cast<const void*>(Kernel),
-            StaticThreadPerBlock1D(), 0
-        );
+        uint32_t blockCount = Math::DivideUp(hPartitionCount[0], logicalWarpSize);
         queue.IssueBlockKernel<Kernel>
         (
             Name,
@@ -1015,21 +1012,6 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
     const GPUDevice& bestDevice = gpuSystem.BestDevice();
     const GPUQueue& queue = bestDevice.GetComputeQueue(0);
 
-    // We will dedicate N blocks for each texture.
-    static constexpr uint32_t THREAD_PER_BLOCK = 512;
-    static constexpr uint32_t BLOCK_PER_TEXTURE = 256;
-    static constexpr auto* Kernel = KCGenerateMipmaps<THREAD_PER_BLOCK, Filter>;
-
-    // Find maximum block count for state allocation
-    // TODO: Change this so that it is relative to the
-    // filter radius.
-    static constexpr Vector2ui SPP = Vector2ui(8, 8);
-    uint32_t blockCount = queue.RecommendedBlockCountDevice
-    (
-        reinterpret_cast<const void*>(Kernel),
-        THREAD_PER_BLOCK, 0
-    );
-
     // We can temporarily allocate here. This will be done at
     // initialization time.
     DeviceLocalMemory mem(gpuSystem.BestDevice());
@@ -1082,9 +1064,19 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
     // Start from 1, we assume miplevel zero is already available
     for(uint16_t i = 1; i < maxMipCount; i++)
     {
-        uint32_t BlockPerTexture = std::max(1u, BLOCK_PER_TEXTURE >> 1);
+        // Find maximum block count for state allocation
+        // TODO: Change this so that it is relative to the
+        // filter radius.
+        // We will dedicate N blocks for each texture.
+        static constexpr uint32_t THREAD_PER_BLOCK = 512;
+        static constexpr uint32_t BLOCK_PER_TEXTURE = 256;
+        static constexpr Vector2ui SPP = Vector2ui(8, 8);
+        static constexpr uint32_t BlockPerTexture = std::max(1u, BLOCK_PER_TEXTURE >> 1);
+        uint32_t textureCount = static_cast<uint32_t>(dSufViews.size());
+        uint32_t blockCount = BlockPerTexture * textureCount;
+
         using namespace std::string_view_literals;
-        queue.IssueBlockKernel<Kernel>
+        queue.IssueBlockKernel<KCGenerateMipmaps<THREAD_PER_BLOCK, Filter>>
         (
             "KCGenerateMipmaps"sv,
             DeviceBlockIssueParams
@@ -1119,20 +1111,13 @@ void ClampImageFromBufferGeneric(// Output
                                  const GPUQueue& queue)
 {
     using Math::DivideUp;
-    static constexpr Vector2ui TILE_SIZE = Vector2ui(32, 16);
-    static constexpr uint32_t THREAD_PER_BLOCK = TILE_SIZE.Multiply();
-    static constexpr auto* Kernel = KCClampImage<THREAD_PER_BLOCK, Filter>;
     // Find maximum block count for state allocation
     // TODO: Change this so that it is relative to the
     // filter radius.
     static constexpr Vector2ui SPP = Vector2ui(8, 8);
-    uint32_t blockCount = queue.RecommendedBlockCountDevice
-    (
-        reinterpret_cast<const void*>(Kernel),
-        THREAD_PER_BLOCK, 0
-    );
-    uint32_t blockPerTexture = DivideUp(surfImageDims, TILE_SIZE).Multiply();
-    blockCount = std::min(blockPerTexture, blockCount);
+    static constexpr Vector2ui TILE_SIZE = KC_CLAMP_IMAGE_TILE_SIZE;
+    static constexpr uint32_t THREAD_PER_BLOCK = TILE_SIZE.Multiply();
+    uint32_t blockCount = DivideUp(surfImageDims, TILE_SIZE).Multiply();
 
     SurfViewVariant surfRef = std::visit([](auto&& v) -> SurfViewVariant
     {
@@ -1143,7 +1128,7 @@ void ClampImageFromBufferGeneric(// Output
     }, surf);
 
     using namespace std::string_view_literals;
-    queue.IssueBlockKernel<Kernel>
+    queue.IssueBlockKernel<KCClampImage<THREAD_PER_BLOCK, Filter>>
     (
         "KCClampImage"sv,
         DeviceBlockIssueParams

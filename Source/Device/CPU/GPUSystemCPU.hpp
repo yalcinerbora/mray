@@ -27,6 +27,16 @@ static void ThreadFenceGrid()
 namespace mray::host
 {
 
+inline
+void NotifyWhenValueReaches(std::atomic_uint64_t& notifyLoc, uint64_t valueToNotify)
+{
+    uint64_t oldCount = notifyLoc.fetch_add(1);
+    // Only notify when all threads of this block is
+    // done to minimize unnecessary wake up.
+    if(oldCount + 1 == valueToNotify)
+        notifyLoc.notify_all();
+}
+
 MRAY_GPU MRAY_CGPU_INLINE
 KernelCallParamsCPU::KernelCallParamsCPU()
     : gridSize(globalKCParams.gridSize)
@@ -64,8 +74,8 @@ void GPUQueueCPU::IssueKernelInternal(std::string_view name,
                                                    totalWorkCount);
     uint32_t callerBlockCount = Math::DivideUp(totalWorkCount, tpb);
     //
-    auto atomicKCounter = std::atomic_ref<uint64_t>(cb->issuedKernelCounter);
-    uint64_t oldIssueCount = atomicKCounter.fetch_add(blockCount);
+    uint64_t oldIssueCount = cb->issuedKernelCounter.fetch_add(blockCount);
+    uint64_t newIssueCount = oldIssueCount + blockCount;
 
     // Issue kernel
     // "SubmitBlocks" does a "for loop Enqueue" calls which is thread-safe
@@ -79,32 +89,17 @@ void GPUQueueCPU::IssueKernelInternal(std::string_view name,
         blockCount,
         [
             ... fArgs = std::forward<Args>(fArgs),
-            blockCount, oldIssueCount, cbRef,
-            callerBlockCount, tpb
+            blockCount, oldIssueCount, newIssueCount,
+            cbRef, callerBlockCount, tpb
             //,name
         ](uint32_t blockStart, [[maybe_unused]] uint32_t blockEnd)
         {
             // Wait the previous kernel to finish
             // CUDA style queue emulation.
-            auto atomicCompletedCounter = std::atomic_ref<uint64_t>((*cbRef)->completedKernelCounter);
-            while(atomicCompletedCounter < oldIssueCount)
-                atomicCompletedCounter.wait(std::numeric_limits<uint64_t>::max());
+            AtomicWaitValueToAchieve((*cbRef)->completedKernelCounter, oldIssueCount);
 
             std::atomic_thread_fence(std::memory_order_seq_cst);
-            // I dont understand this wait, wait until "curIssueCount == oldIssueCount"
-            // but what if we skip a beat and curIssueCount becomes larger than wait value?
-            // Further thinking, how this is useful at all?
-            // Given a value set I, A is technically all elements of the set but one
-            // which is B.
-            // "wait_predicate" would be better? Probably hard to implement, i dunno.
-            // Anyway if this comment stays it works robustly.
-            // TODO: Even if this there is no ABA issue, check the perf
-            // and fall back to condition variable / mutex
-            // compare as such "wait until (curIssueCount >= oldIssueCount)
-            //
             // From this point on it previous kernels should be completed
-            //
-            //
             assert(blockEnd - blockStart == 1);
             globalKCParams.gridSize = callerBlockCount;
             globalKCParams.blockSize = tpb;
@@ -121,10 +116,10 @@ void GPUQueueCPU::IssueKernelInternal(std::string_view name,
                     Kernel(fArgs...);
                 }
             }
-            atomicCompletedCounter.fetch_add(1);
-            atomicCompletedCounter.notify_all();
-
+            //
             std::atomic_thread_fence(std::memory_order_seq_cst);
+            NotifyWhenValueReaches((*cbRef)->completedKernelCounter,
+                                   newIssueCount);
         },
         blockCount
     );
@@ -160,8 +155,8 @@ void GPUQueueCPU::IssueLambdaInternal(std::string_view name,
                                                    totalWorkCount);
     uint32_t callerBlockCount = Math::DivideUp(totalWorkCount, tpb);
     //
-    auto atomicKCounter = std::atomic_ref<uint64_t>(cb->issuedKernelCounter);
-    uint64_t oldIssueCount = atomicKCounter.fetch_add(blockCount);
+    uint64_t oldIssueCount = cb->issuedKernelCounter.fetch_add(blockCount);
+    uint64_t newIssueCount = oldIssueCount + blockCount;
 
     // Issue kernel
     // "SubmitBlocks" does a "for loop Enqueue" calls which is thread-safe
@@ -175,30 +170,16 @@ void GPUQueueCPU::IssueLambdaInternal(std::string_view name,
         blockCount,
         [
             //name,
-            blockCount, oldIssueCount, cbRef,
-            callerBlockCount, tpb,
+            blockCount, oldIssueCount, newIssueCount,
+            cbRef, callerBlockCount, tpb,
             func = std::forward<Lambda>(func)
         ](uint32_t blockStart, [[maybe_unused]] uint32_t blockEnd)
         {
             // Wait the previous kernel to finish
             // CUDA style queue emulation.
-            auto atomicCompletedCounter = std::atomic_ref<uint64_t>((*cbRef)->completedKernelCounter);
-            while(atomicCompletedCounter < oldIssueCount)
-                atomicCompletedCounter.wait(std::numeric_limits<uint64_t>::max());
-            // I dont understand this wait, wait until "curIssueCount == oldIssueCount"
-            // but what if we skip a beat and curIssueCount becomes larger than wait value?
-            // Further thinking, how this is useful at all?
-            // Given a value set I, A is technically all elements of the set but one
-            // which is B.
-            // "wait_predicate" would be better? Probably hard to implement, i dunno.
-            // Anyway if this comment stays it works robustly.
-            // TODO: Even if this there is no ABA issue, check the perf
-            // and fall back to condition variable / mutex
-            // compare as such "wait until (curIssueCount >= oldIssueCount)
-            //
+            AtomicWaitValueToAchieve((*cbRef)->completedKernelCounter, oldIssueCount);
+
             // From this point on it previous kernels should be completed
-            //
-            //
             std::atomic_thread_fence(std::memory_order_seq_cst);
 
             assert(blockEnd - blockStart == 1);
@@ -218,10 +199,10 @@ void GPUQueueCPU::IssueLambdaInternal(std::string_view name,
                     func(kp);
                 }
             }
-            atomicCompletedCounter.fetch_add(1);
-            atomicCompletedCounter.notify_all();
             //
             std::atomic_thread_fence(std::memory_order_seq_cst);
+            NotifyWhenValueReaches((*cbRef)->completedKernelCounter,
+                                   newIssueCount);
         },
         blockCount
     );
@@ -236,6 +217,7 @@ void GPUQueueCPU::IssueWorkKernel(std::string_view name,
                                   //
                                   Args&&... fArgs) const
 {
+    assert(p.workCount != 0);
     IssueKernelInternal<Kernel>
     (
         name, p.workCount, StaticThreadPerBlock1D(), std::forward<Args>(fArgs)...
@@ -249,6 +231,7 @@ void GPUQueueCPU::IssueWorkLambda(std::string_view name,
                                   //
                                   Lambda&& func) const
 {
+    assert(p.workCount != 0);
     IssueLambdaInternal
     (
         name, p.workCount, StaticThreadPerBlock1D(), std::forward<Lambda>(func)
@@ -262,6 +245,8 @@ void GPUQueueCPU::IssueBlockKernel(std::string_view name,
                                    //
                                    Args&&... fArgs) const
 {
+    assert(p.gridSize != 0);
+    assert(p.blockSize != 0);
     // TODO: Reason about this
     uint32_t workCount = p.blockSize * p.gridSize;
     //
@@ -278,6 +263,9 @@ void GPUQueueCPU::IssueBlockLambda(std::string_view name,
                                    //
                                    Lambda&& func) const
 {
+    assert(p.gridSize != 0);
+    assert(p.blockSize != 0);
+
     // TODO: Reason about this
     uint32_t workCount = p.blockSize * p.gridSize;
     //

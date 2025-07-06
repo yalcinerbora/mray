@@ -10,6 +10,8 @@ namespace mray::host::algorithms
 static constexpr int32_t BIT_PER_PASS = 8;
 static constexpr int32_t COUNT_BUFFER_SIZE = (1u << BIT_PER_PASS);
 
+template <class K>
+using UIntType = std::conditional_t<(sizeof(K) > sizeof(uint32_t)), uint64_t, uint32_t>;
 using CountBuffer = std::array<uint32_t, COUNT_BUFFER_SIZE>;
 using OffsetBuffer = CountBuffer;
 
@@ -23,18 +25,16 @@ uint32_t RadixSortKVSingleThread(Span<Span<K>, 2> dKeyDoubleBuffer,
     CountBuffer countBuffer;
     std::fill(countBuffer.begin(), countBuffer.end(), 0u);
 
-    using UIntType = std::conditional_t<(sizeof(K) > sizeof(uint32_t)), uint64_t, uint32_t>;
     uint32_t inputBufferIndex = 0;
     uint32_t outputBufferIndex = 1;
-
     // Sort MSB to LSB
     uint32_t totalBits = bitRange[1] - bitRange[0];
     for(uint32_t pass = 0; pass < totalBits; pass += BIT_PER_PASS)
     {
-        std::array<UIntType, 2> curBitRange =
+        std::array<UIntType<K>, 2> curBitRange =
         {
-            UIntType(std::min(bitRange[0] + pass + 0           , bitRange[1])),
-            UIntType(std::min(bitRange[0] + pass + BIT_PER_PASS, bitRange[1]))
+            UIntType<K>(std::min(bitRange[0] + pass + 0           , bitRange[1])),
+            UIntType<K>(std::min(bitRange[0] + pass + BIT_PER_PASS, bitRange[1]))
         };
         uint32_t curPassBitCount = uint32_t(curBitRange[1] - curBitRange[0]);
         uint32_t curPassBucketCount = (1u << curPassBitCount);
@@ -48,7 +48,7 @@ uint32_t RadixSortKVSingleThread(Span<Span<K>, 2> dKeyDoubleBuffer,
         std::fill(countBuffer.begin(), countBuffer.begin() + curPassBucketCount, 0u);
         for(const K& key : dRKeyBuffer)
         {
-            UIntType keyBits = 0u;
+            UIntType<K> keyBits = 0u;
             std::memcpy(&keyBits, &key, sizeof(K));
             uint32_t bucketIndex = uint32_t(Bit::FetchSubPortion(keyBits, curBitRange));
             countBuffer[bucketIndex] += 1;
@@ -73,7 +73,7 @@ uint32_t RadixSortKVSingleThread(Span<Span<K>, 2> dKeyDoubleBuffer,
             K& key = dRKeyBuffer[i];
             V& val = dRValBuffer[i];
 
-            UIntType keyBits = 0u;
+            UIntType<K> keyBits = 0u;
             std::memcpy(&keyBits, &key, sizeof(K));
             uint32_t bucketIndex = uint32_t(Bit::FetchSubPortion(keyBits, curBitRange));
             uint32_t localIndex = countBuffer[bucketIndex]++;
@@ -127,23 +127,22 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
     Byte* dOffsetBufPtr = dTempMemory.data();
     Byte* dCountBufPtr = dTempMemory.data() + sizeof(OffsetBuffer) * blockCount;
     static_assert((sizeof(OffsetBuffer)) % alignof(CountBuffer) == 0, "Alignment mismatch!");
-    assert(dTempMemory.size_bytes() <= (sizeof(CountBuffer) + sizeof(OffsetBuffer)) * blockCount);
+    assert(dTempMemory.size_bytes() >= (sizeof(CountBuffer) + sizeof(OffsetBuffer)) * blockCount);
 
     // TODO: Set these buffers from temp memory
     Span<OffsetBuffer> dOffsetBuffers(reinterpret_cast<OffsetBuffer*>(dOffsetBufPtr), blockCount);
     Span<CountBuffer> dCountBuffers(reinterpret_cast<CountBuffer*>(dCountBufPtr), blockCount);
 
-    using UIntType = std::conditional_t<(sizeof(K) > sizeof(uint32_t)), uint64_t, uint32_t>;
     uint32_t inputBufferIndex = 0;
     uint32_t outputBufferIndex = 1;
     // Sort MSB to LSB
     uint32_t totalBits = bitRange[1] - bitRange[0];
     for(uint32_t pass = 0; pass < totalBits; pass += BIT_PER_PASS)
     {
-        std::array<UIntType, 2> curBitRange =
+        std::array<UIntType<K>, 2> curBitRange =
         {
-            UIntType(std::min(bitRange[0] + pass + 0           , bitRange[1])),
-            UIntType(std::min(bitRange[0] + pass + BIT_PER_PASS, bitRange[1]))
+            UIntType<K>(std::min(bitRange[0] + pass + 0           , bitRange[1])),
+            UIntType<K>(std::min(bitRange[0] + pass + BIT_PER_PASS, bitRange[1]))
         };
         uint32_t curPassBitCount = uint32_t(curBitRange[1] - curBitRange[0]);
         uint32_t curPassBucketCount = (1u << curPassBitCount);
@@ -175,7 +174,7 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
                 Span<const K> dLocalRKeyBuffer = dRKeyBuffer.subspan(offset, localWCount);
                 for(const K& k : dLocalRKeyBuffer)
                 {
-                    UIntType keyBits = 0u;
+                    UIntType<K> keyBits = 0u;
                     std::memcpy(&keyBits, &k, sizeof(K));
                     uint32_t bucketIndex = uint32_t(Bit::FetchSubPortion(keyBits, curBitRange));
                     dCountBuffers[kp.blockId][bucketIndex] += 1;
@@ -230,7 +229,7 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
                     const auto& offsetBuffer = dOffsetBuffers[kp.blockId];
                     auto& countBuffer = dCountBuffers[kp.blockId];
 
-                    UIntType keyBits = 0u;
+                    UIntType<K> keyBits = 0u;
                     std::memcpy(&keyBits, &key, sizeof(K));
                     uint32_t bucketIndex = uint32_t(Bit::FetchSubPortion(keyBits,
                                                                          curBitRange));

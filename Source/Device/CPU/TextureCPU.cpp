@@ -63,12 +63,13 @@ RWTextureRefCPU<D, T> TextureCPU_Normal<D, T>::GenerateRWRef(uint32_t mipLevel)
     if(mipLevel >= texParams.mipCount)
         throw MRayError("Requested out of bounds mip level!");
 
-    throw MRayError("Not yet implemented!");
-    // TODO: Get the slice with the alignment etc
-    // and use it. Shirnk the given span to catch bugs
-    // etc..
-    //return RWTextureRefCPU<D, T>(Span(dataPtr, size),
-    //                             texParams.size);
+    assert(size % sizeof(PaddedChannelType) == 0);
+    size_t typeCount = size / sizeof(PaddedChannelType);
+    Span<PaddedChannelType> dataSpan(dataPtr, typeCount);
+
+    uint32_t offset = Graphics::TextureMipPixelStart(texParams.size, mipLevel);
+    TextureExtent<D> mipSize = Graphics::TextureMipSize(texParams.size, mipLevel);
+    return RWTextureRefCPU<D, T>(&dataPtr, offset, mipSize);
 }
 
 template<uint32_t D, class T>

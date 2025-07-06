@@ -98,9 +98,6 @@ function(gen_tracer_dll_target)
         SOURCE_FILES
         ${CURRENT_SOURCE_DIR}/PathTracerRenderer.cu
         ${CURRENT_SOURCE_DIR}/Tracer.cu
-        ${CURRENT_SOURCE_DIR}/Renderers_0.cu
-        ${CURRENT_SOURCE_DIR}/Renderers_1.cu
-        ${CURRENT_SOURCE_DIR}/Renderers_2.cu
         ${TRACER_KERNEL_GEN_INSTANTIATIONS}
     )
 

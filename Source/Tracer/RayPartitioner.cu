@@ -8,8 +8,8 @@
 #include "Device/GPUSystem.hpp"
 #include "Device/GPUAlgRadixSort.h"
 
-#define INVALID_LOCATION std::numeric_limits<uint32_t>::max()
-#define FIND_SPLITS_TPB 512
+static constexpr auto INVALID_LOCATION = std::numeric_limits<uint32_t>::max();
+static constexpr auto FIND_SPLITS_TPB = 512u;
 
 template<int TPB>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
@@ -281,6 +281,8 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
     Span<CommonKey> dKeysDB[2] = {dKeysIn, dKeysOut};
     Span<CommonIndex> dIndicesDB[2] = {dIndicesIn, dIndicesOut};
 
+    //MRAY_LOG("Key Ranges B ({}), D ({})", keyBatchBitRange, keyDataBitRange);
+
     // TODO: Why are we doing two seperate sorts? Keys almost always should be contiguous.
     // If not we are wasting information space here.
     // So a single pass should suffice maybe? Reason about this more later
@@ -308,7 +310,6 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
         std::swap(dIndicesDB[0], dIndicesDB[1]);
     }
 
-
     // Rename/Repurpose buffers for readability
     Span<CommonIndex> dSortedRayIndices = dIndicesDB[0];
     Span<CommonKey> dSortedKeys = dKeysDB[0];
@@ -316,16 +317,16 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
     Span<uint32_t> dDenseSplitIndices = RepurposeAlloc<uint32_t>(dKeysDB[1]).subspan(0, partitionedRayCount);
 
     // Mark the split positions
-    static constexpr auto* Kernel = KCFindSplits<FIND_SPLITS_TPB>;
-    uint32_t blockCount = queue.RecommendedBlockCountDevice
-    (
-        reinterpret_cast<const void*>(Kernel),
-        FIND_SPLITS_TPB, 0
-    );
+    uint32_t segmentCount = static_cast<uint32_t>(dSortedKeys.size());
+    uint32_t blockCount = Math::DivideUp(segmentCount, FIND_SPLITS_TPB);
     queue.IssueBlockKernel<KCFindSplits<FIND_SPLITS_TPB>>
     (
         "KCFindSplits",
-        DeviceBlockIssueParams{.gridSize = blockCount, .blockSize = FIND_SPLITS_TPB},
+        DeviceBlockIssueParams
+        {
+            .gridSize = blockCount,
+            .blockSize = FIND_SPLITS_TPB
+        },
         //
         dSparseSplitIndices,
         ToConstSpan(dSortedKeys),

@@ -95,8 +95,16 @@ void GPUQueueCUDA::IssueBlockKernel(std::string_view name,
     const auto _ = annotation.AnnotateScope();
 
     assert(p.gridSize != 0);
+    const void* kernelPtr = reinterpret_cast<const void*>(Kernel);
+    uint32_t blockCount = RecommendedBlockCountDevice
+    (
+        kernelPtr,
+        p.blockSize,
+        p.sharedMemSize
+    );
+    //
     using namespace CudaKernelCalls;
-    Kernel<<<p.gridSize, p.blockSize, p.sharedMemSize, stream>>>
+    Kernel<<<blockCount, p.blockSize, p.sharedMemSize, stream>>>
     (
         std::forward<Args>(fArgs)...
     );
@@ -119,8 +127,16 @@ void GPUQueueCUDA::IssueBlockLambda(std::string_view name,
                   "would've been failed in runtime!");
     using namespace CudaKernelCalls;
 
+    const void* kernelPtr = reinterpret_cast<const void*>(&KernelCallLambdaCUDA<Lambda, Bounds>);
+    uint32_t blockCount = RecommendedBlockCountDevice
+    (
+        kernelPtr,
+        p.blockSize,
+        p.sharedMemSize
+    );
+
     KernelCallLambdaCUDA<Lambda, Bounds>
-    <<<p.gridSize, p.blockSize, p.sharedMemSize, stream>>>
+    <<<blockCount, p.blockSize, p.sharedMemSize, stream>>>
     (
         std::forward<Lambda>(func)
     );
@@ -187,8 +203,15 @@ void GPUQueueCUDA::DeviceIssueBlockKernel(std::string_view name,
                                             Args&&... fArgs) const
 {
     assert(p.gridSize != 0);
-    using namespace CudaKernelCalls;
-    Kernel<<<p.gridSize, p.blockSize, p.sharedMemSize, stream>>>
+    const void* kernelPtr = reinterpret_cast<const void*>(&Kernel);
+    uint32_t blockCount = RecommendedBlockCountDevice
+    (
+        kernelPtr,
+        p.blockSize,
+        p.sharedMemSize
+    );
+
+    Kernel<<<blockCount, p.blockSize, p.sharedMemSize, stream>>>
     (
         std::forward<Args>(fArgs)...
     );
@@ -207,9 +230,16 @@ void GPUQueueCUDA::DeviceIssueBlockLambda(std::string_view name,
                   "Not passing Lambda as rvalue_reference. This kernel call "
                   "would've been failed in runtime!");
     using namespace CudaKernelCalls;
+    const void* kernelPtr = reinterpret_cast<const void*>(&KernelCallLambdaCUDA<Lambda, Bounds>);
+    uint32_t blockCount = RecommendedBlockCountDevice
+    (
+        kernelPtr,
+        p.blockSize,
+        p.sharedMemSize
+    );
 
     KernelCallLambdaCUDA<Lambda, Bounds>
-    <<<p.gridSize, p.blockSize, p.sharedMemSize, stream>>>
+    <<<blockCount, p.blockSize, p.sharedMemSize, stream>>>
     (
         std::forward<Lambda>(func)
     );

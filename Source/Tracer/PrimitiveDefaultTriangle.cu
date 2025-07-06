@@ -281,19 +281,14 @@ void PrimGroupTriangle::Finalize(const GPUQueue& queue)
                       Span<const Vector4ui>(hVertexIndexRanges.cbegin(),
                                             hVertexIndexRanges.end()));
 
-    uint32_t blockCount = queue.RecommendedBlockCountDevice
-    (
-        reinterpret_cast<const void*>(&KCAdjustIndices),
-        StaticThreadPerBlock1D(),
-        0
-    );
+    uint32_t totalRanges = static_cast<uint32_t>(dVertexIndexRanges.size());
     using namespace std::string_view_literals;
     queue.IssueBlockKernel<KCAdjustIndices>
     (
         "KCAdjustIndices"sv,
         DeviceBlockIssueParams
         {
-            .gridSize = blockCount,
+            .gridSize = totalRanges,
             .blockSize = StaticThreadPerBlock1D()
         },
         // I-O
@@ -350,14 +345,9 @@ void PrimGroupTriangle::ApplyTransformations(const std::vector<PrimBatchKey>& pr
     queue.MemcpyAsync(dVertexRanges,
                       Span<const Vector2ul>(hVertexRanges.data(), batchCount));
 
-    uint32_t blockCount = queue.RecommendedBlockCountDevice
-    (
-        reinterpret_cast<const void*>(&KCApplyTransformsTriangle),
-        StaticThreadPerBlock1D(),
-        0
-    );
     using namespace std::string_view_literals;
     static constexpr uint32_t BLOCK_PER_BATCH = 128;
+    uint32_t blockCount = uint32_t(dVertexRanges.size() * BLOCK_PER_BATCH);
     queue.IssueBlockKernel<KCApplyTransformsTriangle>
     (
         "KCApplyTransformationsTriangle"sv,
@@ -545,19 +535,14 @@ void PrimGroupSkinnedTriangle::Finalize(const GPUQueue& queue)
                       Span<const Vector4ui>(hVertexIndexRanges.cbegin(),
                                             hVertexIndexRanges.end()));
 
-    uint32_t blockCount = queue.RecommendedBlockCountDevice
-    (
-        reinterpret_cast<const void*>(&KCAdjustIndices),
-        StaticThreadPerBlock1D(),
-        0
-    );
+    uint32_t totalRanges = static_cast<uint32_t>(dVertexIndexRanges.size());
     using namespace std::string_view_literals;
     queue.IssueBlockKernel<KCAdjustIndices>
     (
         "KCAdjustIndices"sv,
         DeviceBlockIssueParams
         {
-            .gridSize = blockCount,
+            .gridSize = totalRanges,
             .blockSize = StaticThreadPerBlock1D()
         },
         // I-O

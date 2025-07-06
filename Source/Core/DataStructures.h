@@ -159,6 +159,14 @@ class alignas(std::max(alignof(T), size_t(8))) StaticVector
     constexpr T&            ConstructObjectAt(size_t, Args...);
 
     public:
+    // STL type mumbo jumbo
+    // (We use StaticVector as std::stack container)
+    using value_type        = T;
+    using reference         = T&;
+    using const_reference   = const T&;
+    using size_type         = size_t;
+
+    public:
     // Constructors & Destructor
     constexpr               StaticVector();
     constexpr               StaticVector(std::initializer_list<T>);
@@ -199,6 +207,7 @@ class alignas(std::max(alignof(T), size_t(8))) StaticVector
 
     constexpr size_t        size() const;
     constexpr size_t        isEmpty() const;
+    constexpr size_t        empty() const;
     constexpr size_t        capacity() const;
 
     constexpr void          resize(size_t size);

@@ -4,16 +4,25 @@ namespace mray::host
 {
 
 template <uint32_t D, class T>
-RWTextureRefCPU<D, T>::RWTextureRefCPU(Span<PaddedChannelType> data,
+RWTextureRefCPU<D, T>::RWTextureRefCPU(PaddedChannelType* const* data,
+                                       size_t mipStartOffset,
                                        TextureExtent<D> dim)
     : data(data)
+    , mipStartOffset(mipStartOffset)
     , dim(dim)
 {}
 
 template <uint32_t D, class T>
 RWTextureViewCPU<D, T> RWTextureRefCPU<D, T>::View() const
 {
-    return RWTextureViewCPU<D, T>(data, dim);
+    size_t mipPixelCount = 0;
+    if constexpr(D == 1)
+        mipPixelCount = dim;
+    else
+        mipPixelCount = dim.Multiply();
+    Span<PaddedChannelType> dataSpan(*data + mipStartOffset,
+                                     mipPixelCount);
+    return RWTextureViewCPU<D, T>(dataSpan, dim);
 }
 
 template<uint32_t D, class T>
@@ -26,8 +35,7 @@ TextureViewCPU<D, QT> TextureCPU_Normal<D, T>::View() const
         throw MRayError("Unable to create a view of texture. "
                         "View type must be \"Float\" (or vector equavilents) "
                         "for normalized integers");
-    Span<const Byte> byteData(reinterpret_cast<const Byte*>(dataPtr),
-                              size / sizeof(PaddedChannelType));
+    const Byte* const* byteData = reinterpret_cast<const Byte* const*>(&dataPtr);
     static constexpr auto PixelEnum = static_cast<MRayPixelEnum>(PixelTypeToEnum::template Find<PaddedChannelType>);
     return TextureViewCPU<D, QT>(byteData, &texParams,
                                  MRayPixelTypeRT(MRayPixelType<PixelEnum>()));
@@ -47,8 +55,7 @@ TextureViewCPU<D, QT> TextureCPU_Normal<D, T>::View() const
                         "for normalized integers");
     else if(texParams.normCoordinates && IsFloatType)
     {
-        Span<const Byte> byteData(reinterpret_cast<const Byte*>(dataPtr),
-                                  size / sizeof(PaddedChannelType));
+        const Byte* const* byteData = reinterpret_cast<const Byte* const*>(&dataPtr);
         static constexpr auto PixelEnum = static_cast<MRayPixelEnum>(PixelTypeToEnum::template Find<PaddedChannelType>);
         return TextureViewCPU<D, QT>(byteData, &texParams,
                                      MRayPixelTypeRT(MRayPixelType<PixelEnum>()));

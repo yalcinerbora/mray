@@ -625,28 +625,21 @@ void BCColorConverter::CallKernelForType(Span<Byte> dScratchBuffer,
         [&](auto ConvList) -> bool
         {
             static constexpr uint32_t PROCESSOR_PER_TEXTURE = 256;
-            static constexpr uint32_t THREAD_PER_BLOCK = 512;
+            static constexpr uint32_t TPB = 512;
             // Get Compile Time Type
             using ConvListType = std::remove_cvref_t<decltype(ConvList)>;
-            static constexpr auto* Kernel = KCConvertColorBC<THREAD_PER_BLOCK, BCReaderType,
-                                                            ConvListType>;
-            // Find maximum block count for state allocation
-            uint32_t blockCount = queue.RecommendedBlockCountDevice
-            (
-                reinterpret_cast<const void*>(Kernel),
-                THREAD_PER_BLOCK, 0
-            );
-
+            uint32_t textureCount = static_cast<uint32_t>(paramsList.size());
+            uint32_t blockCount = PROCESSOR_PER_TEXTURE * textureCount;
             using namespace std::string_literals;
             static const std::string KernelName = ("KCConvertColorspaceBC"s +
                                                    std::string(MRayPixelTypeStringifier::ToString(E)));
-            queue.IssueBlockKernel<Kernel>
+            queue.IssueBlockKernel<KCConvertColorBC<TPB, BCReaderType, ConvListType>>
             (
                 KernelName,
                 DeviceBlockIssueParams
                 {
                     .gridSize = blockCount,
-                    .blockSize = THREAD_PER_BLOCK
+                    .blockSize = TPB
                 },
                 // I-O
                 dBlocks,
@@ -777,27 +770,21 @@ struct ConvertKernelCallFunctor
     bool operator()(T ConvList) const
     {
         // We will dedicate N blocks for each texture.
-        static constexpr uint32_t THREAD_PER_BLOCK = 512;
         static constexpr uint32_t BLOCK_PER_TEXTURE = 256;
-        constexpr uint32_t BlockPerTexture = std::max(1u, BLOCK_PER_TEXTURE >> 1);
-
+        static constexpr uint32_t TPB = 512;
+        constexpr uint32_t BlockPerTexture = std::max(1u, TPB >> 1);
         // Get Compile Time Type
         using ConvListType = std::remove_cvref_t<decltype(ConvList)>;
-        static constexpr auto* Kernel = KCConvertColor<THREAD_PER_BLOCK, ConvListType>;
-        // Find maximum block count for state allocation
-        uint32_t blockCount = queue.RecommendedBlockCountDevice
-        (
-            reinterpret_cast<const void*>(Kernel),
-            THREAD_PER_BLOCK, 0
-        );
+        uint32_t texCount = static_cast<uint32_t>(dSufViews.size());
+        uint32_t blockCount = texCount * BLOCK_PER_TEXTURE;
         using namespace std::string_view_literals;
-        queue.IssueBlockKernel<Kernel>
+        queue.IssueBlockKernel<KCConvertColor<TPB, ConvListType>>
         (
             "KCConvertColorspace"sv,
             DeviceBlockIssueParams
             {
                 .gridSize = blockCount,
-                .blockSize = THREAD_PER_BLOCK
+                .blockSize = TPB
             },
             // I-O
             dSufViews,
@@ -986,16 +973,11 @@ void ColorConverter::ExtractLuminance(std::vector<Span<Float>> hLuminanceBuffers
     static constexpr uint32_t BLOCK_PER_TEXTURE = 256;
     static constexpr uint32_t THREAD_PER_BLOCK = 512;
     // Get Compile Time Type
-    static constexpr auto* Kernel = KCExtractLuminance<THREAD_PER_BLOCK>;
     // Find maximum block count for state allocation
-    uint32_t blockCount = queue.RecommendedBlockCountDevice
-    (
-        reinterpret_cast<const void*>(Kernel),
-        THREAD_PER_BLOCK, 0
-    );
-
+    uint32_t textureCount = static_cast<uint32_t>(dTextureViews.size());
+    uint32_t blockCount = BLOCK_PER_TEXTURE * textureCount;
     using namespace std::string_view_literals;
-    queue.IssueBlockKernel<Kernel>
+    queue.IssueBlockKernel<KCExtractLuminance<THREAD_PER_BLOCK>>
     (
         "KCExtractLuminance"sv,
         DeviceBlockIssueParams

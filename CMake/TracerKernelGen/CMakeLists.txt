@@ -10,7 +10,7 @@ source_group("" FILES ${SRC_ALL})
 add_executable(TracerKernelGen ${SRC_ALL})
 target_link_libraries(TracerKernelGen
                       PRIVATE
-                      CoreLib
+                      fmt::fmt
                       mray::meta_compile_opts)
 
 # Debug Parameters (For my own use case)

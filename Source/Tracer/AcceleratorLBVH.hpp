@@ -12,16 +12,17 @@ uint32_t TraverseLBVH(BitStack& bitStack,
                       // Inputs
                       Vector2 tMinMax,
                       const Ray& ray,
-                      uint32_t traverStartIndex,
+                      uint32_t traverseStartIndex,
                       // Constants
                       IntersectFunc&& Func)
 {
+    assert(ChildIndex(traverseStartIndex).FetchBatchPortion() != IS_LEAF);
     const LBVHNode* nodesPtr = nodes.data();
     const LBVHBoundingBox* boxPtr = bBoxes.data();
 
     ChildIndex nodeIndex(0);
-    const LBVHNode* currentNode = nodesPtr + traverStartIndex;
-    const LBVHBoundingBox* currentBBox = boxPtr + traverStartIndex;
+    const LBVHNode* currentNode = nodesPtr + traverseStartIndex;
+    const LBVHBoundingBox* currentBBox = boxPtr + traverseStartIndex;
     while(bitStack.Depth() <= MAX_DEPTH)
     {
         // SpecialCase: We are on leaf node, check primitive intersection
@@ -96,6 +97,68 @@ uint32_t TraverseLBVH(BitStack& bitStack,
     }
     return uint32_t(std::distance(nodesPtr, currentNode));
 }
+
+#ifdef MRAY_GPU_BACKEND_CPU
+
+template <uint32_t MAX_DEPTH, class IntersectFunc>
+MRAY_HYBRID MRAY_GPU_INLINE
+uint32_t TraverseLBVHStack(// I-O
+                           BitStack&,
+                           // Traversal data
+                           const Span<const LBVHNode>& nodes,
+                           const Span<const LBVHBoundingBox>& bBoxes,
+                           // Inputs
+                           Vector2 tMinMax,
+                           const Ray& ray,
+                           uint32_t traverseStartIndex,
+                           // Constants
+                           IntersectFunc&& Func)
+{
+    // With traditional recursive -> Stack implementation
+    // There will be "DEPTH" amount of items in the stack
+    // Assuming deepest branch's nodes all have children.
+    // So we double the stack (+1 for good measure.
+    using Stack = std::stack<ChildIndex, StaticVector<ChildIndex, MAX_DEPTH * 2u + 1>>;
+
+    const LBVHNode* nodesPtr            = nodes.data();
+    const LBVHBoundingBox* boxPtr       = bBoxes.data();
+    const LBVHNode* currentNode         = nodesPtr + traverseStartIndex;
+    const LBVHBoundingBox* currentBBox  = boxPtr + traverseStartIndex;
+    //
+    Stack nodeStack; nodeStack.push(ChildIndex(traverseStartIndex));
+    while(!nodeStack.empty())
+    {
+        const ChildIndex nodeIndex = nodeStack.top();
+        currentNode = nodesPtr + nodeIndex.FetchIndexPortion();
+        currentBBox = boxPtr + nodeIndex.FetchIndexPortion();
+        nodeStack.pop();
+
+        // Rare edge case: We have single leaf; thus a single internal node
+        // We enter right.
+        // For every other LBVH; by construction, there are no null children
+        // ever. TODO: We should not pay the price for this branch for other LBVH
+        // change this later?
+        if(nodeIndex == ChildIndex::InvalidKey())
+            return std::numeric_limits<uint32_t>::max();
+
+        // Case: Leaf
+        if(nodeIndex.FetchBatchPortion() == IS_LEAF)
+        {
+            uint32_t leafIndex = nodeIndex.FetchIndexPortion();
+            bool breakTraversal = Func(tMinMax, leafIndex);
+            if(breakTraversal) break;
+        }
+        else if(ray.IntersectsAABB(Vector3(Span<const Float, 3>(currentBBox->min)),
+                                   Vector3(Span<const Float, 3>(currentBBox->max)),
+                                   tMinMax))
+        {
+            nodeStack.push(currentNode->leftIndex);
+            nodeStack.push(currentNode->rightIndex);
+        }
+    }
+    return uint32_t(std::distance(nodesPtr, currentNode));
+}
+#endif
 
 MRAY_HYBRID MRAY_GPU_INLINE
 BitStack::BitStack()
@@ -256,23 +319,43 @@ OptionalHitR<PG> AcceleratorLBVH<PG, TG>::ClosestHit(BackupRNG& rng,
     BitStack bitStack;
     OptionalHitR<PG> result = std::nullopt;
     //
-    TraverseLBVH<BitStack::MAX_DEPTH>
-    (
-        bitStack, nodes, boundingBoxes,
-        tMinMax, ray, 0u,
-        [&](Vector2& tMM, uint32_t leafIndex)
-        {
-            PrimitiveKey primKey = leafs[leafIndex];
-            auto check = IntersectionCheck(ray, tMM, rng.NextFloat(), primKey);
-            if(check.has_value() && check->t < tMM[1])
+    #ifdef MRAY_GPU_BACKEND_CPU
+        TraverseLBVHStack<BitStack::MAX_DEPTH>
+        (
+            bitStack, nodes, boundingBoxes,
+            tMinMax, ray, 0u,
+            [&](Vector2& tMM, uint32_t leafIndex)
             {
-                result = check;
-                tMM[1] = check->t;
+                PrimitiveKey primKey = leafs[leafIndex];
+                auto check = IntersectionCheck(ray, tMM, rng.NextFloat(), primKey);
+                if(check.has_value() && check->t < tMM[1])
+                {
+                    result = check;
+                    tMM[1] = check->t;
+                }
+                // Never terminate
+                return false;
             }
-            // Never terminate
-            return false;
-        }
-    );
+        );
+    #else
+        TraverseLBVH<BitStack::MAX_DEPTH>
+        (
+            bitStack, nodes, boundingBoxes,
+            tMinMax, ray, 0u,
+            [&](Vector2& tMM, uint32_t leafIndex)
+            {
+                PrimitiveKey primKey = leafs[leafIndex];
+                auto check = IntersectionCheck(ray, tMM, rng.NextFloat(), primKey);
+                if(check.has_value() && check->t < tMM[1])
+                {
+                    result = check;
+                    tMM[1] = check->t;
+                }
+                // Never terminate
+                return false;
+            }
+        );
+    #endif
     return result;
 }
 
@@ -284,17 +367,31 @@ OptionalHitR<PG> AcceleratorLBVH<PG, TG>::FirstHit(BackupRNG& rng,
 {
     BitStack bitStack;
     OptionalHitR<PG> result = std::nullopt;
-    TraverseLBVH<BitStack::MAX_DEPTH>
-    (
-        bitStack, nodes, boundingBoxes,
-        tMinMax, ray, 0u,
-        [&](Vector2& tMM, uint32_t leafIndex)
-        {
-            PrimitiveKey primKey = leafs[leafIndex];
-            result = IntersectionCheck(ray, tMM, rng.NextFloat(), primKey);
-            return result.has_value();
-        }
-    );
+    #ifdef MRAY_GPU_BACKEND_CPU
+        TraverseLBVHStack<BitStack::MAX_DEPTH>
+        (
+            bitStack, nodes, boundingBoxes,
+            tMinMax, ray, 0u,
+            [&](Vector2& tMM, uint32_t leafIndex)
+            {
+                PrimitiveKey primKey = leafs[leafIndex];
+                result = IntersectionCheck(ray, tMM, rng.NextFloat(), primKey);
+                return result.has_value();
+            }
+        );
+    #else
+        TraverseLBVH<BitStack::MAX_DEPTH>
+        (
+            bitStack, nodes, boundingBoxes,
+            tMinMax, ray, 0u,
+            [&](Vector2& tMM, uint32_t leafIndex)
+            {
+                PrimitiveKey primKey = leafs[leafIndex];
+                result = IntersectionCheck(ray, tMM, rng.NextFloat(), primKey);
+                return result.has_value();
+            }
+        );
+    #endif
     return result;
 }
 
@@ -417,12 +514,7 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
 
     // Dedicate a block for each
     // concrete accelerator for copy
-    uint32_t blockCount = queue.RecommendedBlockCountDevice
-    (
-        reinterpret_cast<const void*>(&KCGeneratePrimitiveKeys),
-        StaticThreadPerBlock1D(),
-        0
-    );
+    uint32_t blockCount = static_cast<uint32_t>(dConcreteLeafRanges.size());
     using namespace std::string_literals;
     static const auto KernelName = "KCGeneratePrimitiveKeys-"s + std::string(TypeName());
     queue.IssueBlockKernel<KCGeneratePrimitiveKeys>
@@ -535,6 +627,7 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
     // calculate that, we also need to reduce the AABBs beforehand,
     // to find and optimal Morton Code delta
     using namespace DeviceAlgorithms;
+    using namespace std::string_view_literals;
 
     // TODO: The memory usage can be optimized
     // by repurposing some buffers but currently no memory issues
@@ -625,15 +718,10 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
     }
     else
     {
-        static constexpr auto* KernelName = KCGeneratePrimAABBs<AcceleratorGroupLBVH<PG>>;
-        uint32_t blockCount = queue.RecommendedBlockCountDevice
+        uint32_t blockCount = BLOCK_PER_INSTANCE * processedAccelCount;
+        queue.IssueBlockKernel<KCGeneratePrimAABBs<AcceleratorGroupLBVH<PG>>>
         (
-            reinterpret_cast<const void*>(KernelName),
-            TPB, 0
-        );
-        queue.IssueBlockKernel<KernelName>
-        (
-            "KCGeneratePrimAABBs",
+            "KCGeneratePrimAABBs"sv,
             DeviceBlockIssueParams
             {
                 .gridSize = blockCount,
@@ -673,15 +761,10 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
     }
     else
     {
-        static constexpr auto* KernelName = KCGenPrimCenters<AcceleratorGroupLBVH<PG>>;
-        uint32_t blockCount = queue.RecommendedBlockCountDevice
+        uint32_t blockCount = BLOCK_PER_INSTANCE * processedAccelCount;
+        queue.IssueBlockKernel<KCGenPrimCenters<AcceleratorGroupLBVH<PG>>>
         (
-            reinterpret_cast<const void*>(KernelName),
-            TPB, 0
-        );
-        queue.IssueBlockKernel<KernelName>
-        (
-            "KCGenPrimCenters",
+            "KCGenPrimCenters"sv,
             DeviceBlockIssueParams
             {
                 .gridSize = blockCount,
@@ -701,29 +784,27 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
         );
     }
     // 3. Convert these to morton codes
-    uint32_t blockCount = queue.RecommendedBlockCountDevice
-    (
-        reinterpret_cast<const void*>(&KCGenMortonCode),
-        TPB, 0
-    );
-    queue.IssueBlockKernel<KCGenMortonCode>
-    (
-        "KCGenMortonCodes",
-        DeviceBlockIssueParams
-        {
-            .gridSize = blockCount,
-            .blockSize = TPB
-        },
-        // Output
-        dMortonCodes[0],
-        // Inputs
-        ToConstSpan(dLeafSegmentRanges),
-        ToConstSpan(dAccelAABBs),
-        //
-        dPrimCenters,
-        BLOCK_PER_INSTANCE
-    );
-
+    {
+        uint32_t instanceCount = static_cast<uint32_t>(dAccelAABBs.size());
+        uint32_t blockCount = instanceCount * BLOCK_PER_INSTANCE;
+        queue.IssueBlockKernel<KCGenMortonCode>
+        (
+            "KCGenMortonCodes"sv,
+            DeviceBlockIssueParams
+            {
+                .gridSize = blockCount,
+                .blockSize = TPB
+            },
+            // Output
+            dMortonCodes[0],
+            // Inputs
+            ToConstSpan(dLeafSegmentRanges),
+            ToConstSpan(dAccelAABBs),
+            //
+            dPrimCenters,
+            BLOCK_PER_INSTANCE
+        );
+    }
     // 4. Sort these codes to implicitly generate the BVH
     SegmentedIota(dIndices[0], ToConstSpan(dLeafSegmentRanges), 0u, queue);
     uint32_t sortedIndex = SegmentedRadixSort<true, uint64_t, uint32_t>
@@ -744,61 +825,55 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
 
     // 5. Now we have a multiple valid morton code lists,
     // Construct the node hierarchy
-    blockCount = queue.RecommendedBlockCountDevice
-    (
-        reinterpret_cast<const void*>(&KCConstructLBVHInternalNodes),
-        TPB, 0
-    );
-    queue.IssueBlockKernel<KCConstructLBVHInternalNodes>
-    (
-        "KCConstructLBVHInternalNodes",
-        DeviceBlockIssueParams
-        {
-            .gridSize = blockCount,
-            .blockSize = TPB
-        },
-        // Output
-        dAllNodes,
-        dLeafParentIndices,
-        // Inputs
-        ToConstSpan(dLeafSegmentRanges),
-        ToConstSpan(dNodeSegmentRanges),
-        ToConstSpan(dMortonCodes[0]),
-        ToConstSpan(dIndices[0]),
-        //
-        BLOCK_PER_INSTANCE,
-        processedAccelCount
-    );
-
+    {
+        uint32_t blockCount = processedAccelCount * BLOCK_PER_INSTANCE;
+        queue.IssueBlockKernel<KCConstructLBVHInternalNodes>
+        (
+            "KCConstructLBVHInternalNodes"sv,
+            DeviceBlockIssueParams
+            {
+                .gridSize = blockCount,
+                .blockSize = TPB
+            },
+            // Output
+            dAllNodes,
+            dLeafParentIndices,
+            // Inputs
+            ToConstSpan(dLeafSegmentRanges),
+            ToConstSpan(dNodeSegmentRanges),
+            ToConstSpan(dMortonCodes[0]),
+            ToConstSpan(dIndices[0]),
+            //
+            BLOCK_PER_INSTANCE,
+            processedAccelCount
+        );
+    }
     // 6. Finally at AABB union portion now, union the AABBs.
-    queue.MemsetAsync(dAtomicCounters, 0x00);
-    blockCount = queue.RecommendedBlockCountDevice
-    (
-        reinterpret_cast<const void*>(&KCUnionLBVHBoundingBoxes),
-        TPB, 0
-    );
-    queue.IssueBlockKernel<KCUnionLBVHBoundingBoxes>
-    (
-        "KCUnionLBVHBoundingBoxes",
-        DeviceBlockIssueParams
-        {
-            .gridSize = blockCount,
-            .blockSize = TPB
-        },
-        // Output
-        dAllNodeAABBs,
-        dAtomicCounters,
-        // Inputs
-        ToConstSpan(dAllNodes),
-        ToConstSpan(dLeafParentIndices),
-        ToConstSpan(dLeafSegmentRanges),
-        ToConstSpan(dNodeSegmentRanges),
-        ToConstSpan(dLeafAABBs),
-        //
-        BLOCK_PER_INSTANCE,
-        processedAccelCount
-    );
-
+    {
+        queue.MemsetAsync(dAtomicCounters, 0x00);
+        uint32_t blockCount = BLOCK_PER_INSTANCE * processedAccelCount;
+        queue.IssueBlockKernel<KCUnionLBVHBoundingBoxes>
+        (
+            "KCUnionLBVHBoundingBoxes"sv,
+            DeviceBlockIssueParams
+            {
+                .gridSize = blockCount,
+                .blockSize = TPB
+            },
+            // Output
+            dAllNodeAABBs,
+            dAtomicCounters,
+            // Inputs
+            ToConstSpan(dAllNodes),
+            ToConstSpan(dLeafParentIndices),
+            ToConstSpan(dLeafSegmentRanges),
+            ToConstSpan(dNodeSegmentRanges),
+            ToConstSpan(dLeafAABBs),
+            //
+            BLOCK_PER_INSTANCE,
+            processedAccelCount
+        );
+    }
     // All Done!
     // Wait GPU before dealloc
     queue.Barrier().Wait();

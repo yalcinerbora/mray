@@ -376,6 +376,12 @@ constexpr size_t StaticVector<T, N>::isEmpty() const
 }
 
 template<class T, size_t N>
+constexpr size_t StaticVector<T, N>::empty() const
+{
+    return isEmpty();
+}
+
+template<class T, size_t N>
 constexpr size_t StaticVector<T, N>::capacity() const
 {
     return N;

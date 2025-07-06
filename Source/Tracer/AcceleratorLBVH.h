@@ -5,6 +5,11 @@
 #include <algorithm>
 #include <bitset>
 
+#ifdef MRAY_GPU_BACKEND_CPU
+    #include <stack>
+    #include <Core/DataStructures.h>
+#endif
+
 #include "Core/Types.h"
 #include "Core/MemAlloc.h"
 #include "Core/AABB.h"

@@ -338,6 +338,7 @@ class GPUQueueCUDA
     MRAY_HYBRID
     uint32_t            SMCount() const;
 
+    private:
     MRAY_HYBRID
     uint32_t            RecommendedBlockCountDevice(const void* kernelPtr,
                                                     uint32_t threadsPerBlock,
@@ -347,6 +348,7 @@ class GPUQueueCUDA
     static uint32_t     RecommendedBlockCountSM(const void* kernelPtr,
                                                 uint32_t threadsPerBlock,
                                                 uint32_t sharedMemSize);
+    public:
 
     // Annotation for profiling etc. (uses NVTX)
     MRAY_HOST
@@ -714,7 +716,7 @@ uint32_t GPUQueueCUDA::RecommendedBlockCountDevice(const void* kernelPtr,
 {
     uint32_t blockPerSM = RecommendedBlockCountSM(kernelPtr, threadsPerBlock,
                                                   sharedMemSize);
-    return multiprocessorCount* blockPerSM;
+    return multiprocessorCount * blockPerSM;
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
