@@ -200,9 +200,6 @@ Expected<ColorSpacePack> ImageFileOIIO::ColorSpaceToMRay(const std::string& oiio
     using namespace std::literals;
     using enum MRayColorSpaceEnum;
     using MapType = std::tuple<std::string_view, MRayColorSpaceEnum, Float>;
-    constexpr uint32_t TableSize = uint32_t(MRayColorSpaceEnum::MR_END) + 1;
-    using ArrayType = std::array<MapType, TableSize>;
-
     // TODO: unicode utf8 etc...
     std::string lowercaseStr(oiioString.size(), '\n');
     std::transform(oiioString.cbegin(), oiioString.cend(),
@@ -212,7 +209,7 @@ Expected<ColorSpacePack> ImageFileOIIO::ColorSpaceToMRay(const std::string& oiio
         return static_cast<char>(std::tolower(c));
     });
     // TODO: Not complete, add later
-    static constexpr ArrayType LookupList =
+    static constexpr std::array LookupList =
     {
         MapType{"aces2065-1"sv,     MR_ACES2065_1,  Float(1)},
         MapType{"acescg"sv,         MR_ACES_CG,     Float(1)},
@@ -222,6 +219,10 @@ Expected<ColorSpacePack> ImageFileOIIO::ColorSpaceToMRay(const std::string& oiio
         MapType{"adobergb"sv,       MR_ADOBE_RGB,   Float(2.222)},
         MapType{"linear"sv,         MR_DEFAULT,     Float(1)},
         MapType{"scene_linear"sv,   MR_DEFAULT,     Float(1)},
+        // TODO: New version OIIO finds this, quick google search
+        // shows this is rec709 as well (non-linear). Check it properly
+        // later
+        MapType{"g22_rec709"sv,   MR_REC_709,     Float(2.222)}
     };
 
     for(const auto& checkType : LookupList)

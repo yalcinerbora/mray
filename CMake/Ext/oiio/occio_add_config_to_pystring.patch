@@ -1,0 +1,158 @@
+diff --git a/share/cmake/modules/Findpystring.cmake b/share/cmake/modules/Findpystring.cmake
+index 50fc6463..9b4675d7 100644
+--- a/share/cmake/modules/Findpystring.cmake
++++ b/share/cmake/modules/Findpystring.cmake
+@@ -12,9 +12,9 @@
+ # Global targets defined by this module:
+ #   pystring::pystring - IMPORTED target, if found
+ #
+-# Usually CMake will use the dynamic library rather than static, if both are present. 
++# Usually CMake will use the dynamic library rather than static, if both are present.
+ #
+-# If the library is not installed in a typical location where CMake will find it, you may specify 
++# If the library is not installed in a typical location where CMake will find it, you may specify
+ # the location using one of the following methods:
+ # -- Set -Dpystring_ROOT to point to the directory containing the lib and include directories.
+ # -- Set -Dpystring_LIBRARY and -Dpystring_INCLUDE_DIR to point to the lib and include directories.
+@@ -25,42 +25,53 @@
+ ### Try to find package ###
+ 
+ if(NOT OCIO_INSTALL_EXT_PACKAGES STREQUAL ALL)
+-    # Find include directory
+-    find_path(pystring_INCLUDE_DIR
+-        NAMES
+-            pystring.h
+-        HINTS
+-            ${pystring_ROOT}
+-        PATH_SUFFIXES
+-            include
+-            include/pystring
+-            pystring/include
+-    )
+-
+-    # Find library
+-    find_library(pystring_LIBRARY
+-        NAMES
+-            pystring libpystring
+-        HINTS
+-            ${_pystring_SEARCH_DIRS}
+-        PATH_SUFFIXES
+-            pystring/lib
+-            lib64
+-            lib
+-    )
+ 
+-    # Override REQUIRED if package can be installed
+-    if(OCIO_INSTALL_EXT_PACKAGES STREQUAL MISSING)
+-        set(pystring_FIND_REQUIRED FALSE)
++    # Try to find via config first
++    if(NOT DEFINED pystring_ROOT)
++        # Search for pystring-config.cmake
++        find_package(pystring ${pystring_FIND_VERSION} CONFIG QUIET)
+     endif()
+ 
+-    include(FindPackageHandleStandardArgs)
+-    find_package_handle_standard_args(pystring
+-        REQUIRED_VARS 
+-            pystring_INCLUDE_DIR 
+-            pystring_LIBRARY
+-    )
+-    set(pystring_FOUND ${pystring_FOUND})
++    # Fallback to ad-hoc find method
++    if(NOT pystring_FOUND)
++
++        # Find include directory
++        find_path(pystring_INCLUDE_DIR
++            NAMES
++                pystring.h
++            HINTS
++                ${pystring_ROOT}
++            PATH_SUFFIXES
++                include
++                include/pystring
++                pystring/include
++        )
++
++        # Find library
++        find_library(pystring_LIBRARY
++            NAMES
++                pystring libpystring
++            HINTS
++                ${_pystring_SEARCH_DIRS}
++            PATH_SUFFIXES
++                pystring/lib
++                lib64
++                lib
++        )
++
++        # Override REQUIRED if package can be installed
++        if(OCIO_INSTALL_EXT_PACKAGES STREQUAL MISSING)
++            set(pystring_FIND_REQUIRED FALSE)
++        endif()
++
++        include(FindPackageHandleStandardArgs)
++        find_package_handle_standard_args(pystring
++            REQUIRED_VARS
++                pystring_INCLUDE_DIR
++                pystring_LIBRARY
++        )
++        set(pystring_FOUND ${pystring_FOUND})
++    endif()
+ endif()
+ 
+ ###############################################################################
+diff --git a/share/cmake/projects/Buildpystring.cmake b/share/cmake/projects/Buildpystring.cmake
+index 85dbb486..9d865eca 100644
+--- a/share/cmake/projects/Buildpystring.cmake
++++ b/share/cmake/projects/Buildpystring.cmake
+@@ -21,7 +21,7 @@ if(UNIX)
+     set(pystring_CXX_FLAGS "${pystring_CXX_FLAGS};-fPIC")
+ endif()
+ 
+-set_target_properties(${PROJECT_NAME} PROPERTIES 
++set_target_properties(${PROJECT_NAME} PROPERTIES
+     COMPILE_OPTIONS "${PLATFORM_COMPILE_OPTIONS};${pystring_CXX_FLAGS}"
+     LINK_OPTIONS "${PLATFORM_LINK_OPTIONS}"
+     PUBLIC_HEADER "${HEADERS}"
+diff --git a/src/cmake/Config.cmake.in b/src/cmake/Config.cmake.in
+index 4e2367b0..1896703c 100644
+--- a/src/cmake/Config.cmake.in
++++ b/src/cmake/Config.cmake.in
+@@ -8,7 +8,7 @@ if (NOT @BUILD_SHARED_LIBS@) # NOT @BUILD_SHARED_LIBS@
+         set(_PREVIOUS_CMAKE_FIND_FRAMEWORK ${CMAKE_FIND_FRAMEWORK})
+         set(_PREVIOUS_CMAKE_FIND_APPBUNDLE ${CMAKE_FIND_APPBUNDLE})
+ 
+-        # Prioritize other paths before Frameworks and Appbundle for find_path, find_library and 
++        # Prioritize other paths before Frameworks and Appbundle for find_path, find_library and
+         # find_package.
+         set(CMAKE_FIND_FRAMEWORK LAST)
+         set(CMAKE_FIND_APPBUNDLE LAST)
+@@ -19,23 +19,23 @@ if (NOT @BUILD_SHARED_LIBS@) # NOT @BUILD_SHARED_LIBS@
+     list(APPEND CMAKE_MODULE_PATH "${PACKAGE_PREFIX_DIR}/share/OpenColorIO/cmake/macros")
+ 
+     ########################
+-    # Required dependencies 
++    # Required dependencies
+     ########################
+ 
+     if (NOT TARGET expat::expat)
+-        find_dependency(expat @expat_VERSION@)
++        find_dependency(expat @expat_VERSION@ CONFIG)
+     endif()
+ 
+     if (NOT TARGET Imath::Imath)
+-        find_dependency(Imath @Imath_VERSION@)
++        find_dependency(Imath @Imath_VERSION@ CONFIG)
+     endif()
+ 
+     if (NOT TARGET pystring::pystring)
+-        find_dependency(pystring @pystring_VERSION@)
++        find_dependency(pystring @pystring_VERSION@ CONFIG)
+     endif()
+ 
+     if (NOT TARGET yaml-cpp::yaml-cpp)
+-        find_dependency(yaml-cpp @yaml-cpp_VERSION@)
++        find_dependency(yaml-cpp @yaml-cpp_VERSION@ CONFIG)
+         if (TARGET yaml-cpp AND NOT TARGET yaml-cpp::yaml-cpp)
+             add_library(yaml-cpp::yaml-cpp ALIAS yaml-cpp)
+         endif()

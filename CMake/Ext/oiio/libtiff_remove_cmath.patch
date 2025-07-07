@@ -1,0 +1,13 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 31ae5f64..222facc3 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -135,7 +135,7 @@ include(LibraryFeatures)
+ 
+ 
+ # math.h/libm portability
+-find_package(CMath REQUIRED)
++#find_package(CMath REQUIRED)
+ 
+ # Release support
+ include(Release)

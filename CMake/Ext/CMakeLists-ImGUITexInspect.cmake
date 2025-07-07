@@ -14,11 +14,11 @@ add_library(imgui_tex_inspect STATIC)
 # then compile and run
 
 target_sources(imgui_tex_inspect PUBLIC FILE_SET HEADERS
-            BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR} # This is correct?
-            FILES
-            # Headers
-            ${CMAKE_CURRENT_SOURCE_DIR}/imgui_tex_inspect_internal.h
-            ${CMAKE_CURRENT_SOURCE_DIR}/imgui_tex_inspect.h
+               BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR} # This is correct?
+               FILES
+               # Headers
+               ${CMAKE_CURRENT_SOURCE_DIR}/imgui_tex_inspect_internal.h
+               ${CMAKE_CURRENT_SOURCE_DIR}/imgui_tex_inspect.h
 )
 
 target_sources(imgui_tex_inspect PRIVATE

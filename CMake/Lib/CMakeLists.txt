@@ -7,6 +7,13 @@
 # However maybe for install etc user wants a single config of the MRay
 # thus we only need to build that config for the external libraries too.
 # Do an adjustment for that...
+
+# Check if we should DL Embree
+set(DMRAY_ENABLE_EMBREE OFF)
+if(MRAY_BUILD_HOST_BACKEND AND MRAY_ENABLE_HW_ACCELERATION)
+    set(DMRAY_ENABLE_EMBREE ON)
+endif()
+
 set(MRAY_EXT_DIR ${MRAY_DIRECTORY}Ext/${MRAY_PLATFORM_NAME})
 set(MRAY_CMAKE_EXT_DIR ${MRAY_DIRECTORY}CMake/Ext)
 set(MRAY_EXT_BUILD_DIR ${MRAY_EXT_DIR}/build-CMake)
@@ -20,6 +27,7 @@ set(MRAY_EXT_CONFIG_META_ARGS
         -DMRAY_BUILD_TESTS=${MRAY_BUILD_TESTS}
         -DMRAY_BUILD_VISOR=${MRAY_BUILD_VISOR}
         -DMRAY_BUILD_USD=${MRAY_ENABLE_USD}
+        -DMRAY_DL_EMBREE=${DMRAY_ENABLE_EMBREE}
 )
 
 set(MRAY_EXTERNAL_LIBRARIES_STAMP ${MRAY_CONFIG_LIB_DIRECTORY}/MRayLib.stamp)
@@ -54,14 +62,14 @@ get_property(MRAY_IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(MRAY_IS_MULTI_CONFIG)
     add_custom_command(OUTPUT ${MRAY_EXTERNAL_LIBRARIES_STAMP}
         COMMAND ${CMAKE_COMMAND} ${MRAY_EXT_CONFIG_META_ARGS}
-        COMMAND ${CMAKE_COMMAND} --build ${MRAY_EXT_BUILD_DIR} --config $<IF:$<CONFIG:SanitizeR>,Release,$<CONFIG>>
+        COMMAND ${CMAKE_COMMAND} --build ${MRAY_EXT_BUILD_DIR} -j --config $<IF:$<CONFIG:SanitizeR>,Release,$<CONFIG>>
         COMMAND ${CMAKE_COMMAND} -E touch ${MRAY_EXTERNAL_LIBRARIES_STAMP}
         COMMENT "Compiling external libraries($<CONFIG>). This may take a while..."
         USES_TERMINAL)
 else()
     add_custom_command(OUTPUT ${MRAY_EXTERNAL_LIBRARIES_STAMP}
         COMMAND ${CMAKE_COMMAND} ${MRAY_EXT_CONFIG_META_ARGS} -DCMAKE_BUILD_TYPE=$<IF:$<CONFIG:SanitizeR>,Release,$<CONFIG>>
-        COMMAND ${CMAKE_COMMAND} --build ${MRAY_EXT_BUILD_DIR}
+        COMMAND ${CMAKE_COMMAND} --build ${MRAY_EXT_BUILD_DIR} -j
         COMMAND ${CMAKE_COMMAND} -E touch ${MRAY_EXTERNAL_LIBRARIES_STAMP}
         COMMENT "Compiling external libraries($<CONFIG>). This may take a while..."
         USES_TERMINAL)
@@ -199,8 +207,8 @@ gen_imported_target(NAME fmt::fmt STATIC DEBUG_TARGET fmt RELEASE_TARGET fmt
 gen_imported_target(NAME simdjson::simdjson STATIC DEBUG_TARGET simdjsond RELEASE_TARGET simdjson)
 gen_imported_target(NAME assimp::assimp SHARED DEBUG_TARGET assimpd RELEASE_TARGET assimp VERSION 5)
 gen_imported_target(NAME gfgfileio::gfgfileio STATIC DEBUG_TARGET GFGFileIOd RELEASE_TARGET GFGFileIO)
-gen_imported_target(NAME oiio::oiio SHARED DEBUG_TARGET OpenImageIOd RELEASE_TARGET OpenImageIO VERSION 2.6.2)
-gen_imported_target(NAME oiio::oiio_util SHARED DEBUG_TARGET OpenImageIO_Utild RELEASE_TARGET OpenImageIO_Util VERSION 2.6.2)
+gen_imported_target(NAME oiio::oiio SHARED DEBUG_TARGET OpenImageIOd RELEASE_TARGET OpenImageIO VERSION 3.0.8)
+gen_imported_target(NAME oiio::oiio_util SHARED DEBUG_TARGET OpenImageIO_Utild RELEASE_TARGET OpenImageIO_Util VERSION 3.0.8)
 gen_imported_target(NAME spdlog::spdlog SHARED DEBUG_TARGET spdlogd RELEASE_TARGET spdlog VERSION 1.14
                     EXTRA_DEFINES SPDLOG_FMT_EXTERNAL SPDLOG_COMPILED_LIB)
 gen_imported_target(NAME imgui::imgui STATIC DEBUG_TARGET imguid RELEASE_TARGET imgui)

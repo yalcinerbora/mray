@@ -27,6 +27,7 @@ project(MRayExternal DESCRIPTION "MRay dependency downloader/compiler")
 option(MRAY_BUILD_TESTS "Build Test Libraries (gtest)" ON)
 option(MRAY_BUILD_VISOR "Build Visor Libraries (glfw etc..)" ON)
 option(MRAY_BUILD_USD "Build USD Libraries (usd/tbb/opensubdiv)" OFF)
+option(MRAY_DL_EMBREE "Download Embree Libraries (embree4)" OFF)
 
 # Populate the meta directories for this project hierarchy
 include("Macros")
@@ -261,6 +262,34 @@ if(MRAY_BUILD_TESTS)
             # forgot to paste the link and i could not find it anymore
             -DCMAKE_DEBUG_POSTFIX=
     )
+endif()
+
+if(MRAY_DL_EMBREE)
+    # Embree v.4.4.0 with SYCL
+    if(WIN32)
+        set(EMBREE_ZIP_NAME "embree-4.4.0.sycl.x64.windows.zip")
+        set(EMBREE_SHA256_HASH "D2145CDC9C4FA038BBB708BE35DAE6E526547C53632C6A4A0FACAE5BF71815C0")
+    elseif(UNIX AND NOT APPLE)
+        set(EMBREE_ZIP_NAME "embree-4.4.0.sycl.x86_64.linux.tar.gz")
+        set(EMBREE_SHA256_HASH "C67F7E7622584686778E0F84AB7370D810AC5AA020AEE2A1C3AE58CEA9462E6D")
+    else()
+        message(FATAL_ERROR "Unsupported platform for macos(?)")
+    endif()
+
+    FetchContent_Declare(embree_ext
+        URL "https://github.com/RenderKit/embree/releases/download/v4.4.0/${EMBREE_ZIP_NAME}"
+        URL_HASH "SHA256=${EMBREE_SHA256_HASH}")
+    FetchContent_MakeAvailable(embree_ext)
+
+    # Now write it to the MRAY_LIB_DIRECTORY
+    file(GLOB EMBREE_BINARIES
+        "${embree_ext_SOURCE_DIR}/lib/*"
+        "${embree_ext_SOURCE_DIR}/bin/*${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    file(GLOB EMBREE_INCLUDES
+        "${embree_ext_SOURCE_DIR}/include/*")
+    file(COPY ${EMBREE_INCLUDES} DESTINATION ${MRAY_PLATFORM_LIB_DIRECTORY}/embree/include)
+    file(COPY ${EMBREE_BINARIES} DESTINATION ${MRAY_PLATFORM_LIB_DIRECTORY}/embree/lib)
+
 endif()
 
 # The boss!

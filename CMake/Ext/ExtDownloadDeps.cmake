@@ -127,6 +127,15 @@ function(mray_build_ext_dependency_git)
         # Common args (it will share the generator and compiler)
         LIST_SEPARATOR | # Use the alternate list separator
         CMAKE_ARGS
+
+            # We really don't care external lib
+            # stuff, so enable these, if something fails
+            # we can disable
+            -Wno-dev
+            -Wno-error=dev
+            -Wno-deprecated
+            -Wno-error=deprecated
+
             #-DCMAKE_BUILD_TYPE:STRING=$<CONFIG>
             -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
             -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}

@@ -1,0 +1,13 @@
+diff --git a/src/png.imageio/png_pvt.h b/src/png.imageio/png_pvt.h
+index 85ac6ec74..adf461ec7 100644
+--- a/src/png.imageio/png_pvt.h
++++ b/src/png.imageio/png_pvt.h
+@@ -4,7 +4,7 @@
+ 
+ #pragma once
+ 
+-#include <libpng16/png.h>
++#include <png.h>
+ #include <zlib.h>
+ 
+ #include <OpenImageIO/Imath.h>

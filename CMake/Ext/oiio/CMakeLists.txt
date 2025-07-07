@@ -57,7 +57,6 @@ mray_build_ext_dependency_git(
 append_cmake_prefix_path(${ZLIB_INSTALL_LOC})
 
 # Copy zlib.dll/so to "Lib"
-
 if(UNIX AND NOT APPLE)
     set(MRAY_ZLIB_COPY_NAME libz$<$<CONFIG:Debug>:d>${CMAKE_SHARED_LIBRARY_SUFFIX}.1)
 elseif(MSVC)
@@ -76,26 +75,29 @@ set(IMATH_INSTALL_LOC ${OIIO_TMP_DIR}/imath)
 mray_build_ext_dependency_git(
         NAME imath_ext
         URL "https://github.com/AcademySoftwareFoundation/Imath.git"
-        TAG "9fe5ed213cd99237976f2eb48b8bf86e112d90fa" # v3.1.10
+        TAG "c0396a055a01bc537d32f435aee11a9b7ed6f0b5" # v3.1.12
 
         LICENSE_NAME "LICENSE.md"
         # OpenImageIO uses Imath as a subdirectory on includes.
-        # Altough we do not use it, we need to install it to proper folder
-        # DONT_OVERRIDE_INSTALL_SUFFIXES
-        # OVERRIDE_INSTALL_PREFIX ${IMATH_INSTALL_LOC}
+        # Although we do not use it, we need to install it to proper folder
+        DONT_OVERRIDE_INSTALL_SUFFIXES
+        OVERRIDE_INSTALL_PREFIX ${IMATH_INSTALL_LOC}
 
         BUILD_ARGS
             -DBUILD_SHARED_LIBS=OFF
             -DBUILD_TESTING=OFF
             -DCMAKE_DEBUG_POSTFIX:STRING=d
+            -DPYTHON=OFF
+            -DDOCS=OFF
+            -DIMATH_HALF_USE_LOOKUP_TABLE=OFF
 )
-#append_cmake_prefix_path(${IMATH_INSTALL_LOC})
+append_cmake_prefix_path(${IMATH_INSTALL_LOC})
 
 set(OPENEXR_INSTALL_LOC ${OIIO_TMP_DIR}/openexr)
 mray_build_ext_dependency_git(
         NAME openexr_ext
         URL "https://github.com/AcademySoftwareFoundation/openexr.git"
-        TAG "456bf42dc2fddb647c0e9ab911656e5cf757fc36" # v3.2.0
+        TAG "7ec1cf59a0409d9d5c60ed111da9831890fa8296" # v3.3.4
 
         LICENSE_NAME "LICENSE.md"
         DONT_OVERRIDE_INSTALL_SUFFIXES
@@ -109,9 +111,12 @@ mray_build_ext_dependency_git(
             -DOPENEXR_INSTALL_PKG_CONFIG=OFF
             -DOPENEXR_INSTALL_TOOLS=OFF
             -DBUILD_TESTING=OFF
-            -DZLIB_ROOT=${ZLIB_INSTALL_LOC}
             -DCMAKE_DEBUG_POSTFIX:STRING=d
-            #-DImath_DIR:PATH=${IMATH_INSTALL_LOC}/cmake/Imath
+            #
+            -DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF
+            -DCMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH=OFF
+            #
+            -DImath_DIR:PATH=${IMATH_INSTALL_LOC}/lib/cmake/Imath
 
         DEPENDENCIES
             imath_ext
@@ -123,7 +128,9 @@ set(LIBTIFF_INSTALL_LOC ${OIIO_TMP_DIR}/libtiff)
 mray_build_ext_dependency_git(
         NAME libtiff_ext
         URL "https://gitlab.com/libtiff/libtiff.git"
-        TAG "38eb7b00cb5767770017fb91743a960ffd96d774" # v4.5.0
+        TAG "9dff73bebc5661f2dace6f16e14cf9e857172f4e" # v4.7.0
+
+        APPLY_PATCH "file://${MRAY_CMAKE_DIRECTORY}/Ext/oiio/libtiff_remove_cmath.patch"
 
         LICENSE_NAME "LICENSE.md"
         DONT_OVERRIDE_INSTALL_SUFFIXES
@@ -133,13 +140,17 @@ mray_build_ext_dependency_git(
             -Dtiff-tools=OFF
             -Dtiff-tests=OFF
             -Dtiff-docs=OFF
+            -Dtiff-contrib=OFF
+            -Dtiff-install=ON
             -Dzlib=ON
             -DZLIB_ROOT:PATH=${ZLIB_INSTALL_LOC}
             -DJPEG_ROOT:PATH=${JPEGTURBO_INSTALL_LOC}
             -DCMAKE_DEBUG_POSTFIX:STRING=d
             # Finds stuff from miniconda since it is on path
             # It may be on path like in my system
+            -DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF
             -DCMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH=OFF
+            #
             -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON
         DEPENDENCIES
@@ -170,8 +181,8 @@ append_cmake_prefix_path(${JPEGTURBO_INSTALL_LOC})
 set(LIBPNG_INSTALL_LOC ${OIIO_TMP_DIR}/libPNG)
 mray_build_ext_dependency_git(
         NAME libpng_ext
-        URL "https://github.com/glennrp/libpng.git"
-        TAG "07b8803110da160b158ebfef872627da6c85cbdf" # v2.1.5.1
+        URL "https://github.com/pnggroup/libpng.git"
+        TAG "ea127968204cc5d10f3fc9250c306b9e8cbd9b80" # v1.6.48
 
         LICENSE_NAME "LICENSE"
         DONT_OVERRIDE_INSTALL_SUFFIXES
@@ -179,17 +190,165 @@ mray_build_ext_dependency_git(
         BUILD_ARGS
             -DPNG_BUILD_ZLIB=OFF
             -DPNG_EXECUTABLES=OFF
-            -DPNG_DEBUG=ON
-            -DPNG_FAMEWORK=OFF
+            -DPNG_TOOLS=OFF
+            -DPNG_HARDWARE_OPTIMIZATIONS=ON
+            -DPNG_FRAMEWORK=OFF
             -DPNG_SHARED=OFF
             -DPNG_STATIC=ON
             -DPNG_TESTS=OFF
+            -DPNG_DEBUG_POSTFIX:STRING=d
             -DCMAKE_DEBUG_POSTFIX:STRING=d
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+
         DEPENDENCIES
             oiio_zlib_ext
 )
 append_cmake_prefix_path(${LIBPNG_INSTALL_LOC})
+
+# OpenColorIO and Sidekicks
+set(MINIZIP_NG_INSTALL_LOC ${OIIO_TMP_DIR}/minizip_ng)
+mray_build_ext_dependency_git(
+        NAME minizip_ng_ext
+        URL "https://github.com/zlib-ng/minizip-ng.git"
+        TAG "241428886216f0f0efd6926efcaaaa13794e51bd" # v3.0.7
+
+        LICENSE_NAME "LICENSE"
+        DONT_OVERRIDE_INSTALL_SUFFIXES
+        OVERRIDE_INSTALL_PREFIX ${MINIZIP_NG_INSTALL_LOC}
+        BUILD_ARGS
+
+            -DBUILD_SHARED_LIBS=OFF
+            -DMZ_OPENSSL=OFF
+            -DMZ_LIBBSD=OFF
+            -DMZ_BUILD_TESTS=OFF
+            -DMZ_COMPAT=OFF
+            -DMZ_BZIP2=OFF
+            -DMZ_LZMA=OFF
+            -DMZ_LIBCOMP=OFF
+            -DMZ_ZSTD=OFF
+            -DMZ_PKCRYPT=OFF
+            -DMZ_WZAES=OFF
+            -DMZ_SIGNING=OFF
+            -DMZ_ZLIB=ON
+            -DMZ_ICONV=OFF
+            -DMZ_FETCH_LIBS=OFF
+            -DMZ_FORCE_FETCH_LIBS=OFF
+            -DZLIB_LIBRARY=${ZLIB_LIBRARIES}
+            -DZLIB_INCLUDE_DIR=${ZLIB_INCLUDE_DIRS}
+        DEPENDENCIES
+            oiio_zlib_ext
+
+)
+
+set(EXPAT_INSTALL_LOC ${OIIO_TMP_DIR}/expat)
+mray_build_ext_dependency_git(
+        NAME expat_ext
+        URL "https://github.com/libexpat/libexpat.git"
+        TAG "654d2de0da85662fcc7644a7acd7c2dd2cfb21f0" # v2.5.0
+
+        LICENSE_NAME "COPYING"
+        DONT_OVERRIDE_INSTALL_SUFFIXES
+        OVERRIDE_INSTALL_PREFIX ${EXPAT_INSTALL_LOC}
+        SOURCE_SUBDIR "expat"
+        BUILD_ARGS
+
+            -DEXPAT_BUILD_DOCS=OFF
+            -DEXPAT_BUILD_EXAMPLES=OFF
+            -DEXPAT_BUILD_TESTS=OFF
+            -DEXPAT_BUILD_TOOLS=OFF
+            -DEXPAT_SHARED_LIBS=OFF
+
+)
+
+set(YAML_CPP_INSTALL_LOC ${OIIO_TMP_DIR}/yaml_cpp)
+mray_build_ext_dependency_git(
+        NAME yaml_cpp_ext
+        URL "https://github.com/jbeder/yaml-cpp.git"
+        TAG "f7320141120f720aecc4c32be25586e7da9eb978" # v0.8.0
+
+        LICENSE_NAME "LICENSE"
+        DONT_OVERRIDE_INSTALL_SUFFIXES
+        OVERRIDE_INSTALL_PREFIX ${YAML_CPP_INSTALL_LOC}
+        BUILD_ARGS
+
+            -DBUILD_SHARED_LIBS=OFF
+            -DYAML_BUILD_SHARED_LIBS=OFF
+            -DYAML_CPP_BUILD_TESTS=OFF
+            -DYAML_CPP_BUILD_TOOLS=OFF
+            -DYAML_CPP_BUILD_CONTRIB=OFF
+
+)
+
+# Inject an custom cmakelists.txt and make cmake to use it
+set(PYSTRING_INSTALL_LOC ${OIIO_TMP_DIR}/pystring)
+mray_build_ext_dependency_git(
+        NAME pystring_ext
+        URL "https://github.com/imageworks/pystring.git"
+        TAG "c2de99deb4f0bd13751f8436400b5e8662301769" # v1.1.3
+
+        LICENSE_NAME "LICENSE"
+        DONT_OVERRIDE_INSTALL_SUFFIXES
+        OVERRIDE_INSTALL_PREFIX ${PYSTRING_INSTALL_LOC}
+)
+ExternalProject_Get_property(pystring_ext SOURCE_DIR)
+set(MRAY_PYSTRING_SRC_LOCATION ${SOURCE_DIR})
+# Inject an custom CMakeLists.txt and make cmake to use it
+ExternalProject_Add_Step(pystring_ext inject_cmake
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        ${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists-pystring.cmake
+                        ${MRAY_PYSTRING_SRC_LOCATION}/CMakeLists.txt
+                DEPENDEES download update patch
+                DEPENDERS configure
+                COMMENT "Injecting a cmake lists to pystring"
+)
+
+set(OCIO_INSTALL_LOC ${OIIO_TMP_DIR}/OpenColorIO)
+mray_build_ext_dependency_git(
+        NAME ocio_ext
+        URL "https://github.com/AcademySoftwareFoundation/OpenColorIO.git"
+        TAG "6918fad3f5d22ac3ef2397c754bf4268c2b58dd0" # v2.4.2
+
+        APPLY_PATCH "file://${MRAY_CMAKE_DIRECTORY}/Ext/oiio/occio_add_config_to_pystring.patch"
+
+        LICENSE_NAME "LICENSE"
+        DONT_OVERRIDE_INSTALL_SUFFIXES
+        OVERRIDE_INSTALL_PREFIX ${OCIO_INSTALL_LOC}
+        BUILD_ARGS
+            # TODO: Change this later(oiio has "print" clashes with fmt)
+            -DCMAKE_CXX_STANDARD=20
+            -DBUILD_SHARED_LIBS=OFF
+            -DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF
+            -DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF
+
+            -DOCIO_BUILD_APPS=OFF
+            -DOCIO_BUILD_DOCS=OFF
+            -DOCIO_BUILD_FROZEN_DOCS=OFF
+            -DOCIO_BUILD_GPU_TESTS=OFF
+            -DOCIO_BUILD_JAVA=OFF
+            -DOCIO_BUILD_NUKE=OFF
+            -DOCIO_BUILD_PYTHON=OFF
+            -DOCIO_BUILD_TESTS=OFF
+            -DOCIO_INSTALL_EXT_PACKAGES=NONE
+
+            # ZLIB does not have config
+            -DZLIB_ROOT:PATH=${ZLIB_INSTALL_LOC}
+            # We create config for pystring
+            -Dpystring_DIR:PATH=${PYSTRING_INSTALL_LOC}/lib/cmake/pystring
+            # For the rest, configs should be fine
+            -DImath_DIR:PATH=${IMATH_INSTALL_LOC}/lib/cmake/Imath
+            -Dminizip-ng_DIR:PATH=${MINIZIP_NG_INSTALL_LOC}/lib/cmake/minizip-ng
+            -Dexpat_DIR:PATH=${EXPAT_INSTALL_LOC}/lib/cmake/expat-2.5.0
+            -Dyaml-cpp_DIR:PATH=${YAML_CPP_INSTALL_LOC}/lib/cmake/yaml-cpp
+
+        DEPENDENCIES
+            imath_ext
+            oiio_zlib_ext
+            expat_ext
+            minizip_ng_ext
+            yaml_cpp_ext
+            pystring_ext
+)
+append_cmake_prefix_path(${OCIO_INSTALL_LOC})
 
 # TODO: Add Jpeg2000, HEIF, HDR
 
@@ -204,52 +363,58 @@ endif()
 mray_build_ext_dependency_git(
         NAME oiio_ext
         URL "https://github.com/OpenImageIO/oiio.git"
-        TAG "feb28fd2647b088f5b083621a98fec97fddaf167" # Latest commit as  of  05.05.2024
+        TAG "e24cac1b35f0e0bec7f884571e4bfad104ec5e73" # v3.0.8.1
         LICENSE_NAME "LICENSE.md"
 
-        # Patch of size_t int narrowing conversion error
-        APPLY_PATCH "file://${MRAY_CMAKE_DIRECTORY}/Ext/oiio/oiio_size_change.patch"
+        APPLY_PATCH "file://${MRAY_CMAKE_DIRECTORY}/Ext/oiio/oiio_change_old_png_include.patch"
 
         BUILD_ARGS
             # OIIO caches xxx_ROOT variables
             # and libaries does not change between configs
-
+            --fresh
             # TODO: Change this later(oiio has "print" clashes with fmt)
             -DCMAKE_CXX_STANDARD=20
             -DEMBEDPLUGINS=ON
             -DUSE_PYTHON=OFF
-            -DUSE_OPENGL=ON
             -DUSE_QT=OFF
+
             -DBUILD_SHARED_LIBS=ON
             -DLINKSTATIC=${DO_STATIC_LINKING}
             -DOIIO_BUILD_TESTS=OFF
             -DOIIO_BUILD_TOOLS=OFF
+            -DOIIO_INTERNALIZE_FMT=OFF # On Linux this was required
             -DBUILD_DOCS=OFF
             -DBUILD_TESTING=OFF
             -DINSTALL_DOCS=OFF
             -DBUILD_MISSING_FMT=OFF # We have a fmt
-            -DINTERNALIZE_FMT=OFF # On Linux this was required
-            -DALWAYS_PREFER_CONFIG=ON
+            -DOpenImageIO_ALWAYS_PREFER_CONFIG=ON
             -DSTOP_ON_WARNING=OFF
+            -DVERBOSE=OFF
             # Do not use system (clash with miniconda etc...)
             -DCMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH=OFF
             -DCMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH=OFF
             -DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF
             -DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF
-
-            -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
-            # Dep Root Files
-            # AoS
-            -DImath_ROOT:PATH=${IMATH_INSTALL_LOC}
-            -DOpenEXR_ROOT:PATH=${OPENEXR_INSTALL_LOC}
-            -DZLIB_ROOT:PATH=${ZLIB_INSTALL_LOC}
-            -DJPEGTurbo_ROOT:PATH=${JPEGTURBO_INSTALL_LOC}
-            -DJPEG_ROOT:PATH=${JPEGTURBO_INSTALL_LOC}
-            -DTIFF_ROOT:PATH=${LIBTIFF_INSTALL_LOC}
-            -DPNG_ROOT:PATH=${LIBPNG_INSTALL_LOC}
-            -DVERBOSE=OFF
             # Do not install msvc runtime libraries
             -DCMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP=ON
+            -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
+
+            # ZLIB do not have cmake config
+            -DZLIB_ROOT:PATH=${ZLIB_INSTALL_LOC}
+            # For the rest, configs should be fine
+            -DImath_DIR:PATH=${IMATH_INSTALL_LOC}/lib/cmake/Imath
+            -DOpenEXR_DIR:PATH=${OPENEXR_INSTALL_LOC}/lib/cmake/OpenEXR
+            -DJPEGTurbo_DIR:PATH=${JPEGTURBO_INSTALL_LOC}/lib/cmake/libjpeg-turbo
+            -DJPEG_DIR:PATH=${JPEGTURBO_INSTALL_LOC}/lib/cmake/libjpeg-turbo
+            -DTIFF_DIR:PATH=${LIBTIFF_INSTALL_LOC}/lib/cmake/tiff
+            -DPNG_DIR:PATH=${PNG_INSTALL_LOC}/lib/cmake/PNG
+            #
+            -DOpenColorIO_DIR:PATH=${PNG_INSTALL_LOC}/lib/cmake/OpenColorIO
+            -Dpystring_DIR:PATH=${PYSTRING_INSTALL_LOC}/lib/cmake/pystring
+            -DImath_DIR:PATH=${IMATH_INSTALL_LOC}/lib/cmake/Imath
+            -Dminizip-ng_DIR:PATH=${MINIZIP_NG_INSTALL_LOC}/lib/cmake/minizip-ng
+            -Dexpat_DIR:PATH=${EXPAT_INSTALL_LOC}/lib/cmake/expat-2.5.0
+            -Dyaml-cpp_DIR:PATH=${YAML_CPP_INSTALL_LOC}/lib/cmake/yaml-cpp
 
         DEPENDENCIES
             openexr_ext
@@ -258,6 +423,7 @@ mray_build_ext_dependency_git(
             libpng_ext
             fmt_ext
             oiio_zlib_ext
+            ocio_ext
 )
 
 # Get the name of the deps outside
