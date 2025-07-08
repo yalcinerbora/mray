@@ -135,7 +135,7 @@ function(gen_imported_target)
     set(GEN_IMPORTED_TGT_REL_IMPORT_NAME ${REL_NAME}${TGT_SUFFIX})
     # On linux, give the version to the link name, we will copy these if
     # these are shared libraries (Simulating Windows DLL search)
-    if(UNIX AND NOT APPLE AND GEN_IMPORTED_TGT_SHARED)
+    if(UNIX AND NOT APPLE AND GEN_IMPORTED_TGT_SHARED AND GEN_IMPORTED_TGT_VERSION)
         set(GEN_IMPORTED_TGT_DBG_IMPORT_NAME ${DBG_NAME}${TGT_SUFFIX}.${GEN_IMPORTED_TGT_VERSION})
         set(GEN_IMPORTED_TGT_REL_IMPORT_NAME ${REL_NAME}${TGT_SUFFIX}.${GEN_IMPORTED_TGT_VERSION})
     endif()
@@ -207,8 +207,8 @@ gen_imported_target(NAME fmt::fmt STATIC DEBUG_TARGET fmt RELEASE_TARGET fmt
 gen_imported_target(NAME simdjson::simdjson STATIC DEBUG_TARGET simdjsond RELEASE_TARGET simdjson)
 gen_imported_target(NAME assimp::assimp SHARED DEBUG_TARGET assimpd RELEASE_TARGET assimp VERSION 5)
 gen_imported_target(NAME gfgfileio::gfgfileio STATIC DEBUG_TARGET GFGFileIOd RELEASE_TARGET GFGFileIO)
-gen_imported_target(NAME oiio::oiio SHARED DEBUG_TARGET OpenImageIOd RELEASE_TARGET OpenImageIO VERSION 3.0.8)
-gen_imported_target(NAME oiio::oiio_util SHARED DEBUG_TARGET OpenImageIO_Utild RELEASE_TARGET OpenImageIO_Util VERSION 3.0.8)
+gen_imported_target(NAME oiio::oiio SHARED DEBUG_TARGET OpenImageIOd RELEASE_TARGET OpenImageIO VERSION 3.0)
+gen_imported_target(NAME oiio::oiio_util SHARED DEBUG_TARGET OpenImageIO_Utild RELEASE_TARGET OpenImageIO_Util VERSION 3.0)
 gen_imported_target(NAME spdlog::spdlog SHARED DEBUG_TARGET spdlogd RELEASE_TARGET spdlog VERSION 1.14
                     EXTRA_DEFINES SPDLOG_FMT_EXTERNAL SPDLOG_COMPILED_LIB)
 gen_imported_target(NAME imgui::imgui STATIC DEBUG_TARGET imguid RELEASE_TARGET imgui)
@@ -223,12 +223,22 @@ else()
 endif()
 
 if(MRAY_ENABLE_USD)
+    if(WIN32)
+        set(MRAY_TBB_DEBUG_NAME tbb12_debug)
+        set(MRAY_TBB_RELEASE_NAME tbb12)
+    else()
+        set(MRAY_TBB_DEBUG_NAME tbb_debug)
+        set(MRAY_TBB_RELEASE_NAME tbb)
+    endif()
     gen_imported_target(NAME usd::usd SHARED
                         OVERRIDE_LIB_PREFIX ${MRAY_PLATFORM_LIB_DIRECTORY}/usd/lib
                         DEBUG_TARGET        usd_msd
                         RELEASE_TARGET      usd_ms
                         EXTRA_INCLUDES      ${MRAY_PLATFORM_LIB_DIRECTORY}/usd/include)
-    gen_imported_target(NAME tbb::tbb STATIC DEBUG_TARGET tbb12_debug RELEASE_TARGET tbb12)
+    gen_imported_target(NAME tbb::tbb SHARED
+                        DEBUG_TARGET ${MRAY_TBB_DEBUG_NAME}
+                        RELEASE_TARGET ${MRAY_TBB_RELEASE_NAME}
+                        VERSION 12)
 endif()
 
 # gen_imported_target(NAME imgui::imgui_ti STATIC DEBUG_TARGET imgui_tex_inspectd RELEASE_TARGET imgui_tex_inspect)

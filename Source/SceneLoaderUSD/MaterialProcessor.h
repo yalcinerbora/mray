@@ -2,14 +2,13 @@
 
 #include "MRayUSDTypes.h"
 
+#include <map>
+#include <pxr/usd/usdShade/input.h>
+
 #include "Core/Error.h"
 #include "Core/TracerI.h"
 
 #include "ImageLoader/ImageLoaderI.h"
-
-#include <map>
-
-#include <pxr/usd/usdShade/input.h>
 
 // Materials are little bit complex, it will be handled differently,
 // One std surface is "USDPreviewSurface" it is mega shader-like

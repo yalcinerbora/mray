@@ -15,9 +15,6 @@ mray_build_ext_dependency_git(
             -DTBB_STRICT=ON
 )
 # And finally usd!
-set(USD_TBB_LIB_DEBUG ${MRAY_CONFIG_LIB_DIRECTORY}/tbb_debug${CMAKE_LINK_LIBRARY_SUFFIX})
-set(USD_TBB_LIB_RELEASE ${MRAY_CONFIG_LIB_DIRECTORY}/tbb${CMAKE_LINK_LIBRARY_SUFFIX})
-
 mray_build_ext_dependency_git(
         NAME usd_ext
         URL "https://github.com/PixarAnimationStudios/OpenUSD.git"
@@ -26,6 +23,8 @@ mray_build_ext_dependency_git(
         # OpenUSD has it own structure and patching it will be
         # tedius. So it will have its own structure
         OVERRIDE_INSTALL_PREFIX ${MRAY_PLATFORM_LIB_DIRECTORY}/usd
+
+        APPLY_PATCH "file://${MRAY_CMAKE_DIRECTORY}/Ext/usd/usd_fix_pair_template_instantiation.patch"
 
         LICENSE_NAME "LICENSE.txt"
         BUILD_ARGS

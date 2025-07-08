@@ -336,16 +336,9 @@ if(MSVC)
     # Besides the cmake defaults.
     # Probably Windows SDK etc..
 elseif(UNIX AND NOT APPLE)
-    # MRay utilizes std::execution c++ features
-    # throughout its targets
-    # on clang/gcc (at least on linux)
-    # this requires tbb to be linked with the system
-    # we add this as a meta target on linux
-    find_package(TBB REQUIRED)
-    mark_as_advanced(TBB_DIR)
+    # dl library is only platform-specific library
     set(MRAY_PLATFORM_SPEC_LIBRARIES
         ${MRAY_PLATFORM_SPEC_LIBRARIES}
-        TBB::tbb
         dl)
 endif()
 

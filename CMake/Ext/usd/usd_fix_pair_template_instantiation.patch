@@ -1,0 +1,46 @@
+diff --git a/pxr/usd/usd/schemaRegistry.cpp b/pxr/usd/usd/schemaRegistry.cpp
+index be5e98534..fda87217f 100644
+--- a/pxr/usd/usd/schemaRegistry.cpp
++++ b/pxr/usd/usd/schemaRegistry.cpp
+@@ -784,6 +784,24 @@ UsdSchemaRegistry::IsMultipleApplyNameTemplate(
+     return _FindInstanceNamePlaceholder(nameTemplate) != std::string::npos;
+ }
+ 
++// FIX: _appliedAPIPrimDefinitions is unordered_map of
++// std::pair<const TfToken, std::pair<X, std::unique_ptr<ForwardDeclaredType>>
++// (In this case ForwardDeclaredType is "UsdPrimDefinition").
++// Inner pair somehow gets instantiated and std::pair has defaulted destructor.
++//
++// It compilation fails in clang-19. Some template instantiation
++// order is changed in clang I guess?
++//
++// Anyway this function is moved to cpp file to prevent this
++inline
++const UsdPrimDefinition*
++UsdSchemaRegistry::FindAppliedAPIPrimDefinition(const TfToken& typeName) const
++{
++    const auto it = _appliedAPIPrimDefinitions.find(typeName);
++    return it != _appliedAPIPrimDefinitions.end() ?
++        it->second.primDef.get() : nullptr;
++}
++
+ static SdfLayerRefPtr
+ _GetGeneratedSchema(const PlugPluginPtr &plugin)
+ {
+diff --git a/pxr/usd/usd/schemaRegistry.h b/pxr/usd/usd/schemaRegistry.h
+index 6566dfcdf..07cff9965 100644
+--- a/pxr/usd/usd/schemaRegistry.h
++++ b/pxr/usd/usd/schemaRegistry.h
+@@ -506,11 +506,7 @@ public:
+     /// \p typeName is a registered applied API schema type. Returns null if
+     /// it is not.
+     const UsdPrimDefinition *FindAppliedAPIPrimDefinition(
+-        const TfToken &typeName) const {
+-        const auto it = _appliedAPIPrimDefinitions.find(typeName);
+-        return it != _appliedAPIPrimDefinitions.end() ?
+-            it->second.primDef.get() : nullptr;
+-    }
++        const TfToken &typeName) const;
+ 
+     /// Returns the empty prim definition.
+     const UsdPrimDefinition *GetEmptyPrimDefinition() const {

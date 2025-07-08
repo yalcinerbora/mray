@@ -209,10 +209,10 @@ MRayError MeshProcessorThread::AllocateTransientBuffers(Span<Vector3ui>& indexBu
             }
 
             using enum PrimitiveAttributeLogic;
-            bool fatalCrash = (logic == INDEX    && !std::is_same_v<Vector3ui, DataType> ||
-                               logic == POSITION && !std::is_same_v<Vector3, DataType>   ||
-                               logic == UV0      && !std::is_same_v<Vector2, DataType>   ||
-                               logic == NORMAL   && !std::is_same_v<Quaternion, DataType>);
+            bool fatalCrash = ((logic == INDEX    && !std::is_same_v<Vector3ui, DataType>) ||
+                               (logic == POSITION && !std::is_same_v<Vector3, DataType>)   ||
+                               (logic == UV0      && !std::is_same_v<Vector2, DataType>)   ||
+                               (logic == NORMAL   && !std::is_same_v<Quaternion, DataType>));
             if(fatalCrash)
             {
                 return MRayError("[Fatal Error!]: MRayUSD's Triangle Layout is different "
@@ -246,8 +246,8 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
     uint32_t indexCounter = 0;
     for(int faceIndex : faceIndices.AsConst())
     {
-        uint32_t faceIndexStart = (faceIndex == 0) ? 0u : uint32_t(faceIndexOffsets[faceIndex - 1]);
-        uint32_t faceIndexEnd = uint32_t(faceIndexOffsets[faceIndex]);
+        uint32_t faceIndexStart = (faceIndex == 0) ? 0u : uint32_t(faceIndexOffsets[uint32_t(faceIndex - 1)]);
+        uint32_t faceIndexEnd = uint32_t(faceIndexOffsets[uint32_t(faceIndex)]);
         uint32_t faceVertexCount = uint32_t(faceIndexEnd - faceIndexStart);
         bool failTriangulation = faceVertexCount > MRAY_USD_MAX_TRI_POLY_COUNT;
         // We ignore, if poly is too large
@@ -294,8 +294,6 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
                 Vector3 e1 = localPositions[i2] - localPositions[i0];
                 return Vector3::Cross(e0, e1).Normalize();
             };
-            using PosSpan = Span<const Vector3, 3>;
-            //using Shape::Triangle::Normal;
             // we do not know if the triangle is wrong or not
             // Determine the dominant "up" direction as face normal
             // [0, 1, 2]
@@ -601,7 +599,6 @@ MRayError MeshProcessorThread::LoadMeshDataSingle(uint32_t index)
 MRayError MeshProcessorThread::PreprocessIndices()
 {
     // Reserve for 2^20 (~1 million) elements beforehand.
-    //indexLookupTable.max_load_factor(0.5f);
     indexLookupTable.Reserve(1_MiB);
     usdDataIndices.reserve(1_MiB);
     triangleDataTangents.reserve(1_MiB);
@@ -696,7 +693,15 @@ MRayError ProcessUniqueMeshes(// Output
             .mrayPrimAttribInfoList = mrayPrimAttribInfoList,
             .flatUniques = myPrimRange,
             .primBatchOutputs = myPrimBatchOutput,
-            .primGroupId = primGroupId
+            .primGroupId = primGroupId,
+            .primLocalPrimCounts = std::vector<PrimCount>(),
+            .indexLookupTable = IndexLookupTable(),
+            .usdDataIndices = std::vector<IndexTriplet>(),
+            .triangleDataTangents = std::vector<Vector3>(),
+            .triangleDataNormals = std::vector<Vector3>(),
+            .triangleIndices = std::vector<Vector3ui>(),
+            .primTransientData = typename MeshProcessorThread:: template StdVector2D<typename MeshProcessorThread::SubGeomTransientData>(),
+
         };
         MRayError err = MRayError::OK;
         err = meshProcessor.PreprocessIndices();
@@ -764,13 +769,13 @@ MRayError ProcessUniqueMeshes(// Output
 }
 
 MRayError  ProcessUniqueSpheres(// Output
-                                PrimGroupId& primGroupId,
-                                std::map<pxr::UsdPrim, std::vector<PrimBatchId>>& outPrimBatches,
+                                PrimGroupId&,
+                                std::map<pxr::UsdPrim, std::vector<PrimBatchId>>&,
                                 // I-O
-                                TracerI& tracer,
-                                ThreadPool& threadPool,
+                                TracerI&,
+                                ThreadPool&,
                                 // Input
-                                const std::set<pxr::UsdPrim>& uniquePrims)
+                                const std::set<pxr::UsdPrim>&)
 {
     // TODO: ...
     return MRayError::OK;

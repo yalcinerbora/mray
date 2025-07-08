@@ -41,6 +41,7 @@ if(WIN32)
 else()
     add_custom_command(TARGET SceneLoaderUSD POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                       "$<TARGET_FILE:tbb::tbb>"
                        "$<TARGET_FILE:usd::usd>"
                        ${MRAY_CONFIG_BIN_DIRECTORY})
 endif()

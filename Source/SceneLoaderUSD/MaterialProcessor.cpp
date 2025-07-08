@@ -1,9 +1,10 @@
-#include "MaterialProcessor.h"
-
+#include <pxr/usd/usd/primDefinition.h>
+#include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdShade/material.h>
 #include <pxr/usd/usdShade/shader.h>
-
 #include <barrier>
+
+#include "MaterialProcessor.h"
 
 #include "ImageLoader/EntryPoint.h"
 
@@ -474,12 +475,14 @@ MaterialConverter::PunchThroughGraphFindTexture(const auto& inputOutput, const T
     else if constexpr(std::is_same_v<decltype(inputOutput), pxr::UsdShadeInput>)
     {
         warnNonDirectTexConnection = true;
-        return PunchThroughGraphFindTexture(pxr::UsdShadeOutput(attribList[0]));
+        return PunchThroughGraphFindTexture(pxr::UsdShadeOutput(attribList[0]),
+                                            defaultValue);
     }
     else if constexpr(std::is_same_v<decltype(inputOutput), pxr::UsdShadeOutput>)
     {
         warnNonDirectTexConnection = true;
-        return PunchThroughGraphFindTexture(pxr::UsdShadeInput(attribList[0]));
+        return PunchThroughGraphFindTexture(pxr::UsdShadeInput(attribList[0]),
+                                            defaultValue);
     }
     return defaultValue;
 }
@@ -611,11 +614,9 @@ MaterialConverter::ResolveTextures(const std::vector<MRayUSDMaterialProps>& prop
             );
         }
     };
-
     //
     for(const auto& p : props)
     {
-        using MTT = MRayUSDTextureTerminal;
         ReadAndEmplace(p.albedo, true);
         ReadAndEmplace(p.normal, false, true);
         ReadAndEmplace(p.metallic, false);
@@ -812,9 +813,9 @@ MaterialConverter::CreateMaterials(TracerI& tracer,
     std::vector<MRayUSDMatAlphaPack> flatMaterialIds(combinedMatKVPairs.size());
     for(const Vector2ul& range : ranges)
     {
-        Span<const MatKeyValPair> localKVPairs(combinedMatKVPairs.begin() + range[0],
+        Span<const MatKeyValPair> localKVPairs(combinedMatKVPairs.begin() + std::ptrdiff_t(range[0]),
                                                range[1] - range[0]);
-        Span<MRayUSDMatAlphaPack> idOuts(flatMaterialIds.begin() + range[0],
+        Span<MRayUSDMatAlphaPack> idOuts(flatMaterialIds.begin() + std::ptrdiff_t(range[0]),
                                          range[1] - range[0]);
         switch(localKVPairs.front().second->type)
         {
@@ -905,7 +906,7 @@ MRayError ProcessUniqueMaterials(std::map<pxr::UsdPrim, MRayUSDMatAlphaPack>& ou
 {
     std::vector<pxr::UsdPrim> flatKeys;
     flatKeys.reserve(uniqueMaterials.size());
-    for(const auto [name, _] : uniqueMaterials)
+    for(const auto& [name, _] : uniqueMaterials)
         flatKeys.push_back(name);
 
     MaterialConverter converter;

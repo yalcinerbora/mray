@@ -1,5 +1,10 @@
 #pragma once
 
+#include <pxr/usd/usd/primDefinition.h>
+#include <pxr/usd/usd/prim.h>
+#include <pxr/base/tf/token.h>
+#include <pxr/base/vt/array.h>
+
 #include <array>
 #include <cstdint>
 
@@ -7,10 +12,6 @@
 #include "Core/DataStructures.h"
 #include "Core/TracerI.h"
 #include "Core/BitFunctions.h"
-
-#include <pxr/base/tf/token.h>
-#include <pxr/base/vt/array.h>
-#include <pxr/usd/usd/prim.h>
 
 class ThreadPool;
 class AttributeIndexer;

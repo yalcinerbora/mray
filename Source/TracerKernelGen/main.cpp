@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <thread>
+#include <algorithm>
 
 #include <fmt/core.h>
 

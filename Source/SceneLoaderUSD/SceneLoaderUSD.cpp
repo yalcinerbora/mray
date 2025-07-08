@@ -601,7 +601,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     MRayUSDGeomMatResolWarnings geomExpandWarnings;
     for(const auto& startEnd : primTypeRange)
     {
-        Span<MRayUSDPrimSurface> range(surfaces.begin() + startEnd[0],
+        Span<MRayUSDPrimSurface> range(surfaces.begin() + std::ptrdiff_t(startEnd[0]),
                                        startEnd[1] - startEnd[0]);
         if(range.front().surfacePrim.IsA<pxr::UsdGeomMesh>())
             geomExpandWarnings |= ExpandGeomsAndFindMaterials(meshMatPrims,
@@ -654,7 +654,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     std::vector<MRayUSDPrimSurface> cameras;
     for(const auto& startEnd : primTypeRange)
     {
-        Span<MRayUSDPrimSurface> range(surfaces.begin() + startEnd[0],
+        Span<MRayUSDPrimSurface> range(surfaces.begin() + std::ptrdiff_t(startEnd[0]),
                                        startEnd[1] - startEnd[0]);
 
         if(range.front().surfacePrim.IsA<pxr::UsdGeomCamera>())
@@ -851,9 +851,9 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     //
     Span allTIds = Span(tIds.cbegin(), tIds.size());
     Span meshSurfTIds = allTIds.subspan(allSizes[0], allSizes[1] - allSizes[0]);
-    Span meshLightSurfTIds= allTIds.subspan(allSizes[1], allSizes[2] - allSizes[1]);
+    //Span meshLightSurfTIds= allTIds.subspan(allSizes[1], allSizes[2] - allSizes[1]);
     Span sphereSurfTIds = allTIds.subspan(allSizes[2], allSizes[3] - allSizes[2]);
-    Span sphereLightSurfTIds= allTIds.subspan(allSizes[3], allSizes[4] - allSizes[3]);
+    //Span sphereLightSurfTIds= allTIds.subspan(allSizes[3], allSizes[4] - allSizes[3]);
     Span cameraSurfTIds = allTIds.subspan(allSizes[4], allSizes[5] - allSizes[4]);
     Span domeLightSurfTIds = allTIds.subspan(allSizes[5], allSizes[6] - allSizes[5]);
 
