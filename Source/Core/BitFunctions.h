@@ -190,8 +190,11 @@ Bitset<N> operator^(const Bitset<N>& lhs, const Bitset<N>& rhs);
 template<std::integral T>
 constexpr T Bit::FetchSubPortion(T value, std::array<T, 2> bitRange)
 {
-    assert(bitRange[0] < bitRange[1]);
     T bitCount = bitRange[1] - bitRange[0];
+    assert(bitRange[0] < bitRange[1]);
+    assert(bitCount < sizeof(T) * CHAR_BIT);
+    assert(bitCount >= 0);
+
     T mask = (T(1) << bitCount) - 1;
     return (value >> bitRange[0]) & mask;
 }
@@ -200,9 +203,12 @@ template<std::integral T, std::integral C>
 requires (std::convertible_to<C, T>)
 constexpr T Bit::SetSubPortion(T value, C in, std::array<T, 2> bitRange)
 {
-    assert(bitRange[0] < bitRange[1]);
-    T inT = T(in);
     T bitCount = bitRange[1] - bitRange[0];
+    assert(bitRange[0] < bitRange[1]);
+    assert(bitCount < sizeof(T) * CHAR_BIT);
+    assert(bitCount >= 0);
+
+    T inT = T(in);
     T mask0 = (T(1) << bitCount) - 1;
     T mask1 = ~(mask0 << bitRange[0]);
     return (value & mask1) | ((inT & mask0) << bitRange[0]);
@@ -469,7 +475,7 @@ constexpr R Bit::NormConversion::FromUNormVaryingInsane(T value)
     // We can do divide an all, but we get our hands dirty for
     // bisecting BC compressions for color conversion
     // So lets do a cool version of unorm generation directly
-    // embedding to the matissa of the float
+    // embedding to the mantissa of the float
      // Directly embed these to mantissa
     static_assert(std::numeric_limits<Float>::is_iec559,
                   "IEEE-754 floats are required for this function");
@@ -497,7 +503,7 @@ constexpr R Bit::NormConversion::FromUNormVaryingInsane(T value)
     }
     // All this work makes sense when Float is 1.0, extract 1.
     //
-    // Is this worth it? Definately no.
+    // Is this worth it? Definitely no.
     // NVCC recommends to not mix float -> int conversions, we did that
     // a classical approach
     // R(input) / R((1 << bitSize) - 1) also have type conversions

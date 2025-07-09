@@ -1,4 +1,5 @@
 #include "MemAlloc.h"
+#include "System.h"
 
 MemAlloc::AlignedMemory::AlignedMemory(size_t alignmentIn,
                                        bool neverDecreaseIn)
@@ -28,6 +29,7 @@ MemAlloc::AlignedMemory::~AlignedMemory()
 
 void MemAlloc::AlignedMemory::ResizeBuffer(size_t newSize)
 {
+    size_t oldSize = size;
     if(newSize == 0)
     {
         size = newSize;
@@ -41,15 +43,9 @@ void MemAlloc::AlignedMemory::ResizeBuffer(size_t newSize)
 
     // Actually allocate
     allocSize = Math::NextMultiple(newSize, alignment);
-    // TODO: All these should be mmap, VirtualAlloc change these later
-    #ifdef MRAY_WINDOWS
-        _aligned_free(mem);
-        mem = _aligned_malloc(allocSize, alignment);
-    #elif defined MRAY_LINUX
-        std::free(mem);
-        mem = std::aligned_alloc(alignment, allocSize);
-    #endif
-
+    // TODO: This should be mmap, VirtualAlloc change these later
+    AlignedFree(mem, oldSize, alignment);
+    mem = AlignedAlloc(allocSize, alignment);
     size = newSize;
 }
 size_t MemAlloc::AlignedMemory::Size() const

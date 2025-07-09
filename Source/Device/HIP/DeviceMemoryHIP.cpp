@@ -271,17 +271,7 @@ HostLocalAlignedMemoryHIP::HostLocalAlignedMemoryHIP(const GPUSystemHIP& systemI
     size = sizeInBytes;
     allocSize = Math::NextMultiple(sizeInBytes, alignment);
     alignment = alignIn;
-
-    // Windows is hipster as always
-    // does not have "std::aligned_alloc"
-    // but have its own "_aligned_malloc" so using it.
-    // To confuse it is also has its parameters swapped :)
-    #ifdef MRAY_WINDOWS
-        hPtr = _aligned_malloc(allocSize, alignment);
-    #elif defined MRAY_LINUX
-        hPtr = std::aligned_alloc(alignment, allocSize);
-    #endif
-
+    hPtr = AlignedAlloc(alignment, allocSize);
     HIP_CHECK(hipHostRegister(hPtr, size, hipHostRegisterMapped));
     HIP_CHECK(hipHostGetDevicePointer(&dPtr, hPtr, 0));
 }

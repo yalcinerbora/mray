@@ -48,7 +48,7 @@ if(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_CUDA")
     set(CMAKE_CUDA_ARCHITECTURES "native"
         CACHE STRING "Architecture chosen by the user at CMake configure time")
     set_property(CACHE CMAKE_CUDA_ARCHITECTURES
-                PROPERTY STRINGS native 52 60 61 70 72 75 86 89 90 all all-major)
+                 PROPERTY STRINGS native 52 60 61 70 72 75 86 89 90 all all-major)
 
     set(CMAKE_CUDA_STANDARD 20)
     set(CMAKE_CUDA_STANDARD_REQUIRED True)
@@ -84,13 +84,24 @@ option(MRAY_BUILD_HOST_BACKEND "Compile CPU backend in addition to GPU backend" 
 option(MRAY_DISABLE_DEVICE_BACKEND "Disable GPU backend" OFF)
 mark_as_advanced(MRAY_BUILD_HOST_BACKEND MRAY_DISABLE_DEVICE_BACKEND)
 
-option(MRAY_ENABLE_HW_ACCELERATION "Try to find, compile and and use HW accelration (i.e. this means OptiX for CUDA)" OFF)
+option(MRAY_ENABLE_HW_ACCELERATION "Try to find, compile and and use HW acceleration (i.e. this means OptiX for CUDA)" OFF)
 option(MRAY_BUILD_TESTS "Build Tests" ON)
 option(MRAY_BUILD_VISOR "Build Visor (Interactive Vulkan Viewer)" ON)
 option(MRAY_EXPORT_COMPILE_COMMANDS "Export compile commands for IWYU" ON)
 option(MRAY_ENABLE_PCH "Enable precompiled headers functionality" OFF)
 option(MRAY_BUILD_DOCS "Build Documentation" OFF)
 option(MRAY_ENABLE_USD "Enable usd scene file reading functionality" OFF)
+
+# Sanitizer Modes for debugging etc.
+set(MRAY_SANITIZER_MODE "address"
+    CACHE STRING
+    "Mode for the SanitizeR target, possible values \
+    \"address\", \"undefined\", \"memory\", and     \
+    \"thread\"")
+set_property(CACHE MRAY_SANITIZER_MODE
+             PROPERTY STRINGS
+             "address" "undefined"
+             "memory" "thread")
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)

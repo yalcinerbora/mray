@@ -114,13 +114,7 @@ TexViewRenderer::TexViewRenderer(const RenderImagePtr& rb,
 typename TexViewRenderer::AttribInfoList
 TexViewRenderer::AttributeInfo() const
 {
-    using enum MRayDataEnum;
-    using enum AttributeIsArray;
-    using enum AttributeOptionality;
-    return AttribInfoList
-    {
-        {"totalSPP", MRayDataType<MR_UINT32>{}, IS_SCALAR, MR_MANDATORY}
-    };
+    return StaticAttributeInfo();
 }
 
 RendererOptionPack TexViewRenderer::CurrentAttributes() const
@@ -333,6 +327,18 @@ std::string_view TexViewRenderer::TypeName()
     using namespace TypeNameGen::CompTime;
     static constexpr auto Name = "TexView"sv;
     return RendererTypeName<Name>;
+}
+
+typename TexViewRenderer::AttribInfoList
+TexViewRenderer::StaticAttributeInfo()
+{
+    using enum MRayDataEnum;
+    using enum AttributeIsArray;
+    using enum AttributeOptionality;
+    return AttribInfoList
+    {
+        {"totalSPP", MRayDataType<MR_UINT32>{}, IS_SCALAR, MR_MANDATORY}
+    };
 }
 
 size_t TexViewRenderer::GPUMemoryUsage() const

@@ -34,3 +34,19 @@ void GenerateMapping(Map<std::string_view, GeneratorType>& map,
     //https://codereview.stackexchange.com/questions/201106/iteration-over-zipped-tuples-for-each-in-tuples
     ((void)GenTypeWrapper.template operator()<Types>(), ...);
 }
+
+template<class AttributeListType, class... Types>
+void GenerateAttributeMapping(Map<std::string_view, AttributeListType>& map,
+                              // These types are here for overload resolution,
+                              // these will not be used directly
+                              PackedTypes<Types...>*)
+{
+    // Use comma operator expansion
+    // Trick from here
+    //https://codereview.stackexchange.com/questions/201106/iteration-over-zipped-tuples-for-each-in-tuples
+    // Parameter pack expansion
+    (
+        (map.emplace(Types::TypeName(), Types::StaticAttributeInfo())),
+        ...
+    );
+}

@@ -312,8 +312,8 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
 
         // First off triangulate the mesh
         // Skip if we can't triangulate (either 1,2 or more than 16 vertices)
-        failTriangulation = Triangulate(Span(localIndicesTriangulated.data(), faceTriCount),
-                                        Span(localPositions.data(), faceVertexCount),
+        failTriangulation = Triangulate(std::span(localIndicesTriangulated.data(), faceTriCount),
+                                        std::span(localPositions.data(), faceVertexCount),
                                         GenFaceNormal());
         if(failTriangulation)
         {

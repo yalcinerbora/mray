@@ -8,6 +8,13 @@
 #include "Device/GPUTexture.h"
 #include "Device/GPUTextureView.h"
 
+// Linux: compiler could not generate code for IssueLambda's
+// in GPUQueueCPU::Memcopy functions.
+// Somehow MSVC does not care
+#ifdef MRAY_GPU_BACKEND_CPU
+    #include "Device/GPUSystem.hpp"
+#endif
+
 namespace TexDetail
 {
 

@@ -126,8 +126,11 @@ void DeviceLocalMemoryCUDA::ResizeBuffer(size_t newSize)
 
     // Copy to new memory
     size_t copySize = std::min(newSize, size);
-    CUDA_DRIVER_CHECK(cuMemcpy(std::bit_cast<CUdeviceptr>(newMem.dPtr),
-                               std::bit_cast<CUdeviceptr>(dPtr), copySize));
+    if(dPtr)
+    {
+        CUDA_DRIVER_CHECK(cuMemcpy(std::bit_cast<CUdeviceptr>(newMem.dPtr),
+                                   std::bit_cast<CUdeviceptr>(dPtr), copySize));
+    }
     *this = std::move(newMem);
 }
 
@@ -235,7 +238,7 @@ void HostLocalMemoryCUDA::ResizeBuffer(size_t newSize)
 
     size_t copySize = std::min(newSize, size);
     HostLocalMemoryCUDA newMem(*system, newSize, neverDecrease);
-    std::memcpy(newMem.hPtr, hPtr, copySize);
+    if(hPtr) std::memcpy(newMem.hPtr, hPtr, copySize);
     *this = std::move(newMem);
 }
 
@@ -264,16 +267,7 @@ HostLocalAlignedMemoryCUDA::HostLocalAlignedMemoryCUDA(const GPUSystemCUDA& syst
     size = sizeInBytes;
     allocSize = Math::NextMultiple(sizeInBytes, alignment);
 
-    // Windows is hipster as always
-    // does not have "std::aligned_alloc"
-    // but have its own "_aligned_malloc" so using it.
-    // To confuse it is also has its parameters swapped :)
-    #ifdef MRAY_WINDOWS
-        hPtr = _aligned_malloc(allocSize, alignment);
-    #elif defined MRAY_LINUX
-        hPtr = std::aligned_alloc(alignment, allocSize);
-    #endif
-
+    hPtr = AlignedAlloc(allocSize, alignment);
     CUDA_CHECK(cudaHostRegister(hPtr, size, cudaHostRegisterMapped));
     CUDA_CHECK(cudaHostGetDevicePointer(&dPtr, hPtr, 0));
 }
@@ -352,7 +346,7 @@ void HostLocalAlignedMemoryCUDA::ResizeBuffer(size_t newSize)
 
     size_t copySize = std::min(newSize, size);
     HostLocalAlignedMemoryCUDA newMem(*system, newSize, alignment, neverDecrease);
-    std::memcpy(newMem.hPtr, hPtr, copySize);
+    if(hPtr) std::memcpy(newMem.hPtr, hPtr, copySize);
     *this = std::move(newMem);
 }
 

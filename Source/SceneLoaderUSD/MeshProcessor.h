@@ -126,9 +126,9 @@ class IndexLookupTable
         using LT = LookupTable<IndexTriplet, uint32_t,
                                uint32_t, 4, IndexLookupStrategy>;
         //
-        return LT(Span(hashes.begin(), hashes.end()),
-                  Span(keys.begin(), keys.end()),
-                  Span(values.begin(), values.end())).Insert(key, value);
+        return LT(std::span(hashes.begin(), hashes.end()),
+                  std::span(keys.begin(), keys.end()),
+                  std::span(values.begin(), values.end())).Insert(key, value);
     }
 };
 

@@ -44,6 +44,7 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer>
 
     public:
     static std::string_view TypeName();
+    static AttribInfoList   StaticAttributeInfo();
     //
     using UniformLightSampler       = DirectLightSamplerUniform<MetaLightList>;
     using AttribInfoList            = typename Base::AttribInfoList;

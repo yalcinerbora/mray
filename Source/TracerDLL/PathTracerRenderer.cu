@@ -179,18 +179,7 @@ PathTracerRenderer::PathTracerRenderer(const RenderImagePtr& rb,
 typename PathTracerRenderer::AttribInfoList
 PathTracerRenderer::AttributeInfo() const
 {
-    using enum MRayDataEnum;
-    using enum AttributeIsArray;
-    using enum AttributeOptionality;
-    return AttribInfoList
-    {
-        {"totalSPP",        MRayDataType<MR_UINT32>{}, IS_SCALAR, MR_MANDATORY},
-        {"burstSize",       MRayDataType<MR_UINT32>{}, IS_SCALAR, MR_OPTIONAL},
-        {"renderMode",      MRayDataType<MR_STRING>{}, IS_SCALAR, MR_MANDATORY},
-        {"sampleMode",      MRayDataType<MR_STRING>{}, IS_SCALAR, MR_MANDATORY},
-        {"rrRange",         MRayDataType<MR_VECTOR_2UI>{}, IS_SCALAR, MR_MANDATORY},
-        {"neeSamplerType",  MRayDataType<MR_STRING>{}, IS_SCALAR, MR_MANDATORY}
-    };
+    return StaticAttributeInfo();
 }
 
 RendererOptionPack PathTracerRenderer::CurrentAttributes() const
@@ -1136,6 +1125,23 @@ std::string_view PathTracerRenderer::TypeName()
     using namespace TypeNameGen::CompTime;
     static constexpr auto Name = "PathTracerRGB"sv;
     return RendererTypeName<Name>;
+}
+
+typename PathTracerRenderer::AttribInfoList
+PathTracerRenderer::StaticAttributeInfo()
+{
+    using enum MRayDataEnum;
+    using enum AttributeIsArray;
+    using enum AttributeOptionality;
+    return AttribInfoList
+    {
+        {"totalSPP",        MRayDataType<MR_UINT32>{}, IS_SCALAR, MR_MANDATORY},
+        {"burstSize",       MRayDataType<MR_UINT32>{}, IS_SCALAR, MR_OPTIONAL},
+        {"renderMode",      MRayDataType<MR_STRING>{}, IS_SCALAR, MR_MANDATORY},
+        {"sampleMode",      MRayDataType<MR_STRING>{}, IS_SCALAR, MR_MANDATORY},
+        {"rrRange",         MRayDataType<MR_VECTOR_2UI>{}, IS_SCALAR, MR_MANDATORY},
+        {"neeSamplerType",  MRayDataType<MR_STRING>{}, IS_SCALAR, MR_MANDATORY}
+    };
 }
 
 size_t PathTracerRenderer::GPUMemoryUsage() const

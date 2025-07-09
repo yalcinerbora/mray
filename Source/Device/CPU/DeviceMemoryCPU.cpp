@@ -9,30 +9,6 @@
 namespace mray::host
 {
 
-// TODO: Use some fancy allocators maybe later?
-// Also add virtual page table etc
-void* AlignedAllocate(size_t allocSize, size_t alignment)
-{
-    // Windows is hipster as always
-    // does not have "std::aligned_alloc"
-    // but have its own "_aligned_malloc" so using it.
-    // To confuse it is also has its parameters swapped :)
-    #ifdef MRAY_WINDOWS
-        return _aligned_malloc(allocSize, alignment);
-    #elif defined MRAY_LINUX
-        return std::aligned_alloc(alignment, allocSize);
-    #endif
-}
-
-void AlignedFree(void* ptr, size_t, size_t)
-{
-    #ifdef MRAY_WINDOWS
-        _aligned_free(ptr);
-    #elif defined MRAY_LINUX
-        std::free(ptr);
-    #endif
-}
-
 DeviceLocalMemoryCPU::DeviceLocalMemoryCPU(const GPUDeviceCPU& device)
     : gpu(&device)
     , dPtr(nullptr)
@@ -46,7 +22,7 @@ DeviceLocalMemoryCPU::DeviceLocalMemoryCPU(const GPUDeviceCPU& device, size_t si
     assert(sizeInBytes != 0);
     allocSize = Math::NextMultiple(sizeInBytes, MemAlloc::DefaultSystemAlignment());
     size = sizeInBytes;
-    dPtr = AlignedAllocate(allocSize, MemAlloc::DefaultSystemAlignment());
+    dPtr = AlignedAlloc(allocSize, MemAlloc::DefaultSystemAlignment());
 }
 
 DeviceLocalMemoryCPU::DeviceLocalMemoryCPU(const DeviceLocalMemoryCPU& other)
@@ -72,7 +48,7 @@ DeviceLocalMemoryCPU& DeviceLocalMemoryCPU::operator=(const DeviceLocalMemoryCPU
         AlignedFree(dPtr, allocSize, MemAlloc::DefaultSystemAlignment());
         dPtr = nullptr;
     }
-    dPtr = AlignedAllocate(other.allocSize, MemAlloc::DefaultSystemAlignment());
+    dPtr = AlignedAlloc(other.allocSize, MemAlloc::DefaultSystemAlignment());
     gpu = other.gpu;
     size = other.size;
     allocSize = other.allocSize;
@@ -111,7 +87,7 @@ void DeviceLocalMemoryCPU::ResizeBuffer(size_t newSize)
 {
     DeviceLocalMemoryCPU newMem(*gpu, newSize);
     size_t copySize = std::min(newSize, size);
-    std::memcpy(newMem.dPtr, dPtr, copySize);
+    if(dPtr) std::memcpy(newMem.dPtr, dPtr, copySize);
     *this = std::move(newMem);
 }
 
@@ -142,7 +118,7 @@ HostLocalMemoryCPU::HostLocalMemoryCPU(const GPUSystemCPU& system,
 {
     assert(sizeInBytes != 0);
     // TODO: change this to virtual memory calls as well
-    hPtr = AlignedAllocate(sizeInBytes, MemAlloc::DefaultSystemAlignment());
+    hPtr = AlignedAlloc(sizeInBytes, MemAlloc::DefaultSystemAlignment());
     dPtr = hPtr;
     size = sizeInBytes;
 }
@@ -173,7 +149,7 @@ HostLocalMemoryCPU& HostLocalMemoryCPU::operator=(const HostLocalMemoryCPU& othe
     if(hPtr) AlignedFree(hPtr, size, MemAlloc::DefaultSystemAlignment());
     size = other.size;
     neverDecrease = other.neverDecrease;
-    hPtr = AlignedAllocate(size, MemAlloc::DefaultSystemAlignment());
+    hPtr = AlignedAlloc(size, MemAlloc::DefaultSystemAlignment());
     dPtr = hPtr;
     std::memcpy(hPtr, other.hPtr, size);
     return *this;
@@ -243,7 +219,7 @@ HostLocalAlignedMemoryCPU::HostLocalAlignedMemoryCPU(const GPUSystemCPU& systemI
 {
     size = sizeInBytes;
     allocSize = Math::NextMultiple(sizeInBytes, alignment);
-    hPtr = AlignedAllocate(allocSize, alignment);
+    hPtr = AlignedAlloc(allocSize, alignment);
     dPtr = hPtr;
 }
 
@@ -308,7 +284,7 @@ void HostLocalAlignedMemoryCPU::ResizeBuffer(size_t newSize)
 
     size_t copySize = std::min(newSize, size);
     HostLocalAlignedMemoryCPU newMem(*system, newSize, alignment, neverDecrease);
-    std::memcpy(newMem.hPtr, hPtr, copySize);
+    if(hPtr) std::memcpy(newMem.hPtr, hPtr, copySize);
     *this = std::move(newMem);
 }
 
@@ -379,7 +355,7 @@ void DeviceMemoryCPU::ResizeBuffer(size_t newSize)
     //
     HaltVisibleDevices();
     size_t newAllocSize = Math::NextMultiple(newSize, allocationGranularity);
-    void* newPtr = AlignedAllocate(newAllocSize, allocationGranularity);
+    void* newPtr = AlignedAlloc(newAllocSize, allocationGranularity);
     if(mPtr)
     {
         std::memcpy(newPtr, mPtr, std::min(newSize, size));

@@ -15,6 +15,7 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
 
     public:
     static std::string_view TypeName();
+    static AttribInfoList StaticAttributeInfo();
     //
     using SpectrumConverterContext = SpectrumConverterContextIdentity;
     // Work States

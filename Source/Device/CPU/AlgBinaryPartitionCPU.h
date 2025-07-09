@@ -1,13 +1,28 @@
 #pragma once
 
+#include <new>
+
 #include "Core/Definitions.h"
 #include "Core/Types.h"
 #include "GPUSystemCPU.h"
 
 namespace mray::host::algorithms
 {
+// Wow clang-18 do not have these???
+// From this example, it is a good approach
+// https://en.cppreference.com/w/cpp/thread/hardware_destructive_interference_size.html
+#ifdef __cpp_lib_hardware_interference_size
+    using std::hardware_constructive_interference_size;
+    using std::hardware_destructive_interference_size;
+#else
+    // x86-64 Only. Intel/Amd has 64 byte L1 cache since forever?
+    // We use these constructs to prevent implicit data sharing between
+    // threads (each thread will write to adjacent locations).
+    static constexpr std::size_t hardware_constructive_interference_size = 64;
+    static constexpr std::size_t hardware_destructive_interference_size = 64;
+#endif
 
-struct alignas(std::hardware_destructive_interference_size) LRCounter
+struct alignas(hardware_destructive_interference_size) LRCounter
 {
     uint32_t left;
     uint32_t right;
@@ -41,7 +56,7 @@ void BinaryPartition(Span<T> dOutput,
     //        aligned to prevent cache flushes or data persistance between threads.
     //
     //
-    // For both parths the partition is stable. Each thread
+    // For both parts, the partition is stable. Each thread
     // compares the element via "UnaryOP". Increments either left
     // or right counters (left side is true side). One comparison
     // for each element.

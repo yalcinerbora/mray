@@ -327,7 +327,7 @@ void PrimGroupTriangle::ApplyTransformations(const std::vector<PrimBatchKey>& pr
 
     // Issue transformation inverting before finding batch ranges
     queue.MemcpyAsync(dTransformations,
-                      ToConstSpan(Span(batchTransformations.data(), batchCount)));
+                      Span<const Matrix4x4>(batchTransformations.data(), batchCount));
     DeviceAlgorithms::Transform(dInvTransformations, ToConstSpan(dTransformations),
                                 queue, KCInvertTransforms());
 

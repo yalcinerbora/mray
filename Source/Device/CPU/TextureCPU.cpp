@@ -325,7 +325,7 @@ TextureBackingMemoryCPU::TextureBackingMemoryCPU(const GPUDeviceCPU& device, siz
 {
     size = sizeInBytes;
     allocSize = Math::NextMultiple(size, MemAlloc::DefaultSystemAlignment());
-    memPtr = AlignedAllocate(allocSize, MemAlloc::DefaultSystemAlignment());
+    memPtr = AlignedAlloc(allocSize, MemAlloc::DefaultSystemAlignment());
 }
 
 TextureBackingMemoryCPU::TextureBackingMemoryCPU(TextureBackingMemoryCPU&& other) noexcept
@@ -362,7 +362,7 @@ TextureBackingMemoryCPU& TextureBackingMemoryCPU::operator=(TextureBackingMemory
 void TextureBackingMemoryCPU::ResizeBuffer(size_t newSize)
 {
     TextureBackingMemoryCPU newMem(*gpu, newSize);
-    std::memcpy(newMem.memPtr, memPtr, std::min(newSize, size));
+    if(memPtr) std::memcpy(newMem.memPtr, memPtr, std::min(newSize, size));
     *this = std::move(newMem);
 }
 

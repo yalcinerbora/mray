@@ -28,8 +28,8 @@ mray_build_ext_dependency_git(
 
         LICENSE_NAME "LICENSE.txt"
         BUILD_ARGS
-            -DBUILD_SHARED_LIBS=ON
-            -DPXR_BUILD_MONOLITHIC=ON
+            -DBUILD_SHARED_LIBS=OFF
+            -DPXR_BUILD_MONOLITHIC=OFF
 
             -DTBB_INCLUDE_DIRS=${MRAY_LIB_DIRECTORY}/Include
             -DTBB_LIBRARY=${MRAY_CONFIG_LIB_DIRECTORY}

@@ -8,6 +8,7 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
 {
     public:
     static std::string_view TypeName();
+    static AttribInfoList StaticAttributeInfo();
 
     using GlobalStateList   = PackedTypes<>;
     using RayStateList      = PackedTypes<>;

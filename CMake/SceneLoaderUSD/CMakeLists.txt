@@ -14,13 +14,18 @@ set(SRC_COMMON
 source_group("" FILES ${SRC_COMMON})
 add_library(SceneLoaderUSD SHARED ${SRC_COMMON})
 
+target_include_directories(SceneLoaderUSD
+PRIVATE
+${MRAY_PLATFORM_LIB_DIRECTORY}/usd/include)
+
 target_link_libraries(SceneLoaderUSD
                       PRIVATE
                       CoreLib
                       ImageLoader
                       TransientPool
                       mray::meta_compile_opts
-                      usd::usd
+                      #usd::usd
+                      usd::usd_archive
                       # Why do we need this? usd is a dll?
                       tbb::tbb)
 
@@ -35,14 +40,14 @@ if(WIN32)
     add_custom_command(TARGET SceneLoaderUSD POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
                        "${MRAY_CONFIG_LIB_DIRECTORY}/tbb12$<$<CONFIG:Debug>:_debug>.dll"
-                       "$<TARGET_FILE:usd::usd>"
+                       #"$<TARGET_FILE:usd::usd>"
                        ${MRAY_CONFIG_BIN_DIRECTORY}
                        COMMENT "Copying USD DLLs")
 else()
     add_custom_command(TARGET SceneLoaderUSD POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
                        "$<TARGET_FILE:tbb::tbb>"
-                       "$<TARGET_FILE:usd::usd>"
+                       #"$<TARGET_FILE:usd::usd>"
                        ${MRAY_CONFIG_BIN_DIRECTORY})
 endif()
 

@@ -82,6 +82,10 @@ struct TypeGeneratorPack
     Map<AcceleratorType, BaseAccelGenerator>    baseAcceleratorGenerator;
     Map<AcceleratorType, AccelGroupGenMap>      accelGeneratorMap;
     Map<AcceleratorType, AccelWorkGenMap>       accelWorkGeneratorMap;
+
+    // Attribute Maps
+    // TODO: Add more for all other types
+    Map<std::string_view, RendererAttributeInfoList> rendererAttribMap;
 };
 
 class TracerBase : public TracerI
@@ -137,7 +141,7 @@ class TracerBase : public TracerI
 
     // Type Generators
     const TypeGeneratorPack&   typeGenerators;
-    // This is common type generator so this is seperate
+    // This is common type generator so this is separate
     FilterGeneratorMap  filterGenMap;
     //
     RNGGeneratorMap     rngGenMap;
@@ -155,7 +159,7 @@ class TracerBase : public TracerI
     Map<std::string_view, MatAttributeInfoList>        matAttributeInfoMap;
     Map<std::string_view, TransAttributeInfoList>      transAttributeInfoMap;
     Map<std::string_view, LightAttributeInfoList>      lightAttributeInfoMap;
-    Map<std::string_view, RendererAttributeInfoList>   rendererAttributeInfoMap;
+    //Map<std::string_view, RendererAttributeInfoList>   rendererAttributeInfoMap;
 
     void            PopulateAttribInfoAndTypeLists();
     TracerView      GenerateTracerView();

@@ -164,18 +164,25 @@ void Tracer::AddAccelGenerators(Map<AcceleratorType, BaseAccelGenerator>& baseMa
     #endif
 }
 
-void Tracer::AddRendererGenerators(Map<std::string_view, RendererGenerator>& map,
+void Tracer::AddRendererGenerators(Map<std::string_view, RendererAttributeInfoList>& attribMap,
+                                   Map<std::string_view, RendererGenerator>& map,
                                    Map<std::string_view, RenderWorkPack>& workMap)
 {
     using Args = PackedTypes<const RenderImagePtr&, TracerView,
-        ThreadPool&, const GPUSystem&,
-        const RenderWorkPack&>;
+                             ThreadPool&, const GPUSystem&,
+                             const RenderWorkPack&>;
 
     Args* resolver0 = nullptr;
     RendererTypeList* resolver1 = nullptr;
     GenerateMapping<RendererGenerator, RendererI>
     (
         map, resolver0, resolver1
+    );
+    //
+    GenerateAttributeMapping
+    (
+        attribMap,
+        resolver1
     );
 
     // Work portion

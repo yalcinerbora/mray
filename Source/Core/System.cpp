@@ -5,6 +5,7 @@
 
 #include "DataStructures.h"
 #include "Error.h"
+#include "Math.h"
 
 #ifdef MRAY_WINDOWS
 
@@ -12,12 +13,17 @@
 
 #elif defined MRAY_LINUX
 
+    #include <malloc.h>
     #include <pthread.h>
     #include <sys/types.h>
     #include <sys/ioctl.h>
 
 #else
 #error System preprocessor definition is not set properly! (CMake should have handled this)
+#endif
+
+#ifdef MRAY_DEBUG
+    #include "BitFunctions.h"
 #endif
 
 // Static checks of forward declared types
@@ -117,6 +123,29 @@ GetTerminalSize()
     };
 }
 
+void* AlignedAlloc(size_t size, size_t alignment)
+{
+    // Windows is hipster as always
+    // does not have "std::aligned_alloc"
+    // but have its own "_aligned_malloc" so using it.
+    // To confuse it is also has its parameters swapped :)
+    assert(Bit::PopC(alignment) == 1);
+    size_t alignedSize = Math::NextMultiple(size, alignment);
+    return _aligned_malloc(alignedSize, align);
+}
+
+void* AlignedRealloc(void* ptr, size_t size, size_t alignment)
+{
+    assert(Bit::PopC(alignment) == 1);
+    size_t alignedSize = Math::NextMultiple(size, alignment);
+    return _aligned_realloc(ptr, alignedSize, align);
+}
+
+void AlignedFree(void* ptr, size_t, size_t)
+{
+    _aligned_free(ptr);
+}
+
 #elif defined MRAY_LINUX
 
 void RenameThread(std::thread::native_handle_type t, const std::string& name)
@@ -151,6 +180,31 @@ GetTerminalSize()
         static_cast<size_t>(w.ws_col),
         static_cast<size_t>(w.ws_row)
     };
+}
+
+void* AlignedAlloc(size_t size, size_t alignment)
+{
+    assert(Bit::PopC(alignment) == 1);
+    size_t alignedSize = Math::NextMultiple(size, alignment);
+    return std::aligned_alloc(alignment, alignedSize);
+}
+
+void* AlignedRealloc(void* ptr, size_t size, size_t alignment)
+{
+    // TODO: Is there really no aligned_realloc on Linux??
+    //https://stackoverflow.com/questions/64884745/is-there-a-linux-equivalent-of-aligned-realloc
+    assert(Bit::PopC(alignment) == 1);
+    size_t alignedSize = Math::NextMultiple(size, alignment);
+    auto oldSize = malloc_usable_size(ptr);
+    void* newPtr = std::aligned_alloc(alignment, alignedSize);
+    std::memcpy(newPtr, ptr, std::min(oldSize, alignedSize));
+    std::free(ptr);
+    return newPtr;
+}
+
+void AlignedFree(void* ptr, size_t, size_t)
+{
+    std::free(ptr);
 }
 
 #else

@@ -836,17 +836,17 @@ void GenerateKernelInstantiationFiles(const LinePack& lp,
     AppendInstantiations(perFileLists, 2, camWorkInstantiations);
     AppendInstantiations(perFileLists, 3, accelInstantiations);
     AppendInstantiations(perFileLists, 4, rayGenInstantiations);
-    /*for(size_t i = 0; i < workInstantiations.size(); i++)
-        perFileLists[i % fileCount][0] += workInstantiations[i];
-    for(size_t i = 0; i < lightWorkInstantiations.size(); i++)
-        perFileLists[i % fileCount][1] += lightWorkInstantiations[i];
-    for(size_t i = 0; i < camWorkInstantiations.size(); i++)
-        perFileLists[i % fileCount][2] += camWorkInstantiations[i];
+    // for(size_t i = 0; i < workInstantiations.size(); i++)
+    //     perFileLists[i % fileCount][0] += workInstantiations[i];
+    // for(size_t i = 0; i < lightWorkInstantiations.size(); i++)
+    //     perFileLists[i % fileCount][1] += lightWorkInstantiations[i];
+    // for(size_t i = 0; i < camWorkInstantiations.size(); i++)
+    //     perFileLists[i % fileCount][2] += camWorkInstantiations[i];
 
-    for(size_t i = 0; i < accelInstantiations.size(); i++)
-        perFileLists[i % fileCount][3] += accelInstantiations[i];
-    for(size_t i = 0; i < rayGenInstantiations.size(); i++)
-        perFileLists[i % fileCount][4] += rayGenInstantiations[i];*/
+    // for(size_t i = 0; i < accelInstantiations.size(); i++)
+    //     perFileLists[i % fileCount][3] += accelInstantiations[i];
+    // for(size_t i = 0; i < rayGenInstantiations.size(); i++)
+    //     perFileLists[i % fileCount][4] += rayGenInstantiations[i];
 
     for(size_t i = 0; i < size_t(fileCount); i++)
     {

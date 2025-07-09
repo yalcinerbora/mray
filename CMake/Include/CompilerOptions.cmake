@@ -97,7 +97,11 @@ set(MRAY_CLANG_OPTIONS
     -Wformat=2              # warn on security issues around functions that format output (ie printf)
     -Wimplicit-fallthrough  # warn on statements that fallthrough without an explicit annotation
 
-    $<$<CONFIG:SanitizeR>:-O2>
+
+    $<$<CONFIG:SanitizeR>:-fsanitize=${MRAY_SANITIZER_MODE}>
+    $<$<CONFIG:SanitizeR>:-fno-sanitize-recover=undefined>
+    $<$<CONFIG:SanitizeR>:-fno-omit-frame-pointer>
+    $<$<CONFIG:SanitizeR>:-O0>
     $<$<CONFIG:SanitizeR>:-g>
     $<$<CONFIG:Release>:-g> # Also add debug info on release builds (for profiling etc.)
 
@@ -295,6 +299,18 @@ if(MSVC)
                         $<HOST_LINK:$<$<CONFIG:SanitizeR>:/INCREMENTAL:NO>>
                         $<HOST_LINK:$<$<CONFIG:SanitizeR>:/wholearchive:clang_rt.asan_dynamic-x86_64.lib>>
                         $<HOST_LINK:$<$<CONFIG:SanitizeR>:/wholearchive:clang_rt.asan_dynamic_runtime_thunk-x86_64.lib>>
+                        )
+else()
+    target_link_options(meta_compile_opts INTERFACE
+                        # TODO: Prematurely putting this to host linker
+                        # only, maybe add it to device linker later
+                        # Windows DLL emulation on Linux (ld only maybe?)
+                        #
+                        # Sanitizers do not like these so only available on Debug/Release
+                        $<HOST_LINK:$<$<NOT:$<CONFIG:SanitizeR>>:LINKER:--no-undefined>>
+                        $<HOST_LINK:$<$<NOT:$<CONFIG:SanitizeR>>:LINKER:--no-allow-shlib-undefined>>
+                        #
+                        $<$<CONFIG:SanitizeR>:-fsanitize=${MRAY_SANITIZER_MODE}>
                         )
 endif()
 

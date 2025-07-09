@@ -22,6 +22,7 @@
 #include "Device/GPUSystemForward.h"
 
 #include "Common/RenderImageStructs.h"
+#include <climits>
 
 class ThreadPool;
 //
@@ -145,6 +146,11 @@ concept RendererC = requires(RendererType rt,
     RendererType(RenderImagePtr{}, tv, tp, gpuSystem, RenderWorkPack{});
     {rt.AttributeInfo()
     } -> std::same_as<typename RendererType::AttribInfoList>;
+    // It is hard to instantiate renderer
+    // due to it requires multiple references
+    {RendererType::StaticAttributeInfo()
+    } -> std::same_as<typename RendererType::AttribInfoList>;
+    //
     {rt.PushAttribute(uint32_t{}, std::move(input), q)
     } -> std::same_as<void>;
     {rt.StartRender(RenderImageParams{}, CamSurfaceId{},
@@ -430,12 +436,12 @@ using RenderCameraWorkList = std::vector<RenderCameraWorkStruct<R>>;
 // (i.e. Triangle/Lambert/Identity, Triangle/Lambert/Single,
 //       Triangle/Disney/Single, Sphere/Lambert/Identity)
 // light surfaces partitioned to 2 groups
-// (i.e. PrimLight<Triangle>/Single, Skyphere/Identity),
+// (i.e. PrimLight<Triangle>/Single, Skysphere/Identity),
 // Work identifiers will be in range [0,7).
 //
-// Then, this class will dedicate 3 bits to distinquish the partitions
+// Then, this class will dedicate 3 bits to distinguish the partitions
 // and the rest of the bits (Given 32-bit key 29 bits) will be utilized
-// for data coherency. Not all of the remaning bits will be utilized.
+// for data coherency. Not all of the remaining bits will be utilized.
 // Similary renderer will ask each group how many actual materials/primitives
 // are present and utilize that information to minimize the usage.
 // Additional heuristics may apply to reduce the partitioning time.
@@ -636,7 +642,7 @@ void RenderWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
         hHashes.emplace_back(HashWorkBatchPortion(kp));
         hBatchIds.push_back(work.workGroupId);
 
-        // Might aswell check the data amount here
+        // Might as well check the data amount here
         uint32_t primCount = uint32_t(tracerView.primGroups.at(primGroupId)->get()->TotalPrimCount());
         uint32_t matCount = uint32_t(tracerView.matGroups.at(matGroupId)->get()->TotalItemCount());
         uint32_t transformCount = uint32_t(tracerView.transGroups.at(transGroupId)->get()->TotalItemCount());
@@ -746,7 +752,7 @@ CommonKey RenderWorkHasher::HashWorkDataPortion(HitKeyPack p, RayIndex i) const
     // it dominates due to writes.
     // ---
     //
-    // This is debateable, hence it is a heuristic.
+    // This is debatable, hence it is a heuristic.
     // For example skinned meshes
     // will transform cost may be higher, a basic lambert
     // material does not have much data to be fetched from memory,
@@ -762,8 +768,11 @@ CommonKey RenderWorkHasher::HashWorkDataPortion(HitKeyPack p, RayIndex i) const
     {
         uint32_t bitsForItem = std::min(maxItemBitCount, remainingBits);
         if(bitsForItem == 0) return false;
-        uint32_t offset = dataBits - bitsForItem + currentBit;
-        std::array range = {CommonKey(offset), CommonKey(offset + bitsForItem)};
+
+        uint32_t start = currentBit;
+        uint32_t end = currentBit + bitsForItem;
+        assert(end <= sizeof(CommonKey) * CHAR_BIT);
+        std::array range = {CommonKey(start), CommonKey(end)};
         result = Bit::SetSubPortion(result, item, range);
         remainingBits -= bitsForItem;
         currentBit += bitsForItem;
@@ -1165,13 +1174,13 @@ void AddRenderWorks(Map<std::string_view, RenderWorkPack>& workMap,
                     PackedTypes<Args...>*)
 {
     auto AddRenderWorksInternal =
-    []<size_t... Is>(Map<std::string_view, RenderWorkPack>& workMap,
-                     std::tuple<Args...>* list,
-                     std::index_sequence<Is...>)
+    []<class TupleT, size_t... Is>(Map<std::string_view, RenderWorkPack>& workMap,
+                                   TupleT*,
+                                   std::index_sequence<Is...>)
     {
         // Param pack expansion over the index sequence
         (
-            (AddSingleRenderWork(workMap, &std::get<Is>(*list))),
+            (AddSingleRenderWork<std::tuple_element_t<Is, TupleT>>(workMap, nullptr)),
             ...
         );
     };

@@ -295,10 +295,10 @@ MRayError ProcessCameras(CameraGroupId& camGroupId,
     gazeBuffer.ReserveAll();
     positionBuffer.ReserveAll();
     upBuffer.ReserveAll();
-    Span fovPlaneSpan = fovPlaneBuffer.AccessAs<Vector4>();
-    Span gazeSpan = gazeBuffer.AccessAs<Vector3>();
-    Span positionSpan = positionBuffer.AccessAs<Vector3>();
-    Span upSpan = upBuffer.AccessAs<Vector3>();
+    std::span fovPlaneSpan = fovPlaneBuffer.AccessAs<Vector4>();
+    std::span gazeSpan = gazeBuffer.AccessAs<Vector3>();
+    std::span positionSpan = positionBuffer.AccessAs<Vector3>();
+    std::span upSpan = upBuffer.AccessAs<Vector3>();
     std::fill(gazeSpan.begin(), gazeSpan.end(), -Vector3::ZAxis());
     std::fill(positionSpan.begin(), positionSpan.end(), Vector3::Zero());
     std::fill(upSpan.begin(), upSpan.end(), Vector3::YAxis());
@@ -802,13 +802,13 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     //
     TransientData matrixBuffer(std::in_place_type_t<Matrix4x4>(), totalSurfSize);
     matrixBuffer.ReserveAll();
-    Span allMatrices = matrixBuffer.AccessAs<Matrix4x4>();
-    Span meshSurfMats = allMatrices.subspan(allSizes[0], allSizes[1] - allSizes[0]);
-    Span meshLightSurfMats = allMatrices.subspan(allSizes[1], allSizes[2] - allSizes[1]);
-    Span sphereSurfMats = allMatrices.subspan(allSizes[2], allSizes[3] - allSizes[2]);
-    Span sphereLightSurfMats = allMatrices.subspan(allSizes[3], allSizes[4] - allSizes[3]);
-    Span cameraSurfMats = allMatrices.subspan(allSizes[4], allSizes[5] - allSizes[4]);
-    Span domeLightSurfMats = allMatrices.subspan(allSizes[5], allSizes[6] - allSizes[5]);
+    std::span allMatrices           = matrixBuffer.AccessAs<Matrix4x4>();
+    std::span meshSurfMats          = allMatrices.subspan(allSizes[0], allSizes[1] - allSizes[0]);
+    std::span meshLightSurfMats     = allMatrices.subspan(allSizes[1], allSizes[2] - allSizes[1]);
+    std::span sphereSurfMats        = allMatrices.subspan(allSizes[2], allSizes[3] - allSizes[2]);
+    std::span sphereLightSurfMats   = allMatrices.subspan(allSizes[3], allSizes[4] - allSizes[3]);
+    std::span cameraSurfMats        = allMatrices.subspan(allSizes[4], allSizes[5] - allSizes[4]);
+    std::span domeLightSurfMats     = allMatrices.subspan(allSizes[5], allSizes[6] - allSizes[5]);
 
     for(size_t i = 0; i < meshSurfMats.size(); i++)
     {
@@ -831,7 +831,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     // Convert to Y up if required
     if(pxr::UsdGeomGetStageUpAxis(loadedStage) == pxr::UsdGeomTokens->z)
     {
-        Span allExceptDome = allMatrices.subspan(allSizes[0], allSizes[5] - allSizes[0]);
+        std::span allExceptDome = allMatrices.subspan(allSizes[0], allSizes[5] - allSizes[0]);
         for(auto& mat : allExceptDome)
             mat = TransformGen::ZUpToYUpMat<Float>() * mat;
     }
@@ -849,13 +849,13 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
         tracer.PushTransAttribute(tgId, range, 0, std::move(matrixBuffer));
     }
     //
-    Span allTIds = Span(tIds.cbegin(), tIds.size());
-    Span meshSurfTIds = allTIds.subspan(allSizes[0], allSizes[1] - allSizes[0]);
-    //Span meshLightSurfTIds= allTIds.subspan(allSizes[1], allSizes[2] - allSizes[1]);
-    Span sphereSurfTIds = allTIds.subspan(allSizes[2], allSizes[3] - allSizes[2]);
-    //Span sphereLightSurfTIds= allTIds.subspan(allSizes[3], allSizes[4] - allSizes[3]);
-    Span cameraSurfTIds = allTIds.subspan(allSizes[4], allSizes[5] - allSizes[4]);
-    Span domeLightSurfTIds = allTIds.subspan(allSizes[5], allSizes[6] - allSizes[5]);
+    std::span allTIds               = std::span(tIds.cbegin(), tIds.size());
+    std::span meshSurfTIds          = allTIds.subspan(allSizes[0], allSizes[1] - allSizes[0]);
+    //std::span meshLightSurfTIds     = allTIds.subspan(allSizes[1], allSizes[2] - allSizes[1]);
+    std::span sphereSurfTIds        = allTIds.subspan(allSizes[2], allSizes[3] - allSizes[2]);
+    //std::span sphereLightSurfTIds   = allTIds.subspan(allSizes[3], allSizes[4] - allSizes[3]);
+    std::span cameraSurfTIds        = allTIds.subspan(allSizes[4], allSizes[5] - allSizes[4]);
+    std::span domeLightSurfTIds     = allTIds.subspan(allSizes[5], allSizes[6] - allSizes[5]);
 
     // Wire the meshes
     std::vector<Pair<pxr::UsdPrim, SurfaceId>> surfaceList;
@@ -974,7 +974,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
             auto end = stringConcat.size();
             stringRange.emplace_back(start, end);
             result.prims.emplace(globalCounter++,
-                                 Pair(meshPrimGroupId, batchList[i]));
+                                 std::pair(meshPrimGroupId, batchList[i]));
         }
     }
     for(const auto& [prim, batchList] : uniqueSpherePrimBatches)
@@ -989,7 +989,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
             auto end = stringConcat.size();
             stringRange.emplace_back(start, end);
             result.prims.emplace(globalCounter++,
-                                 Pair(spherePrimGroupId, batchList[i]));
+                                 std::pair(spherePrimGroupId, batchList[i]));
         }
     }
     // Cameras
@@ -1004,7 +1004,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
         auto end = stringConcat.size();
         stringRange.emplace_back(start, end);
         result.cams.emplace(globalCounter++,
-                            Pair(camGroupId, camId));
+                            std::pair(camGroupId, camId));
     }
     // Lights
     {
@@ -1016,7 +1016,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
         auto end = stringConcat.size();
         stringRange.emplace_back(start, end);
         result.lights.emplace(globalCounter++,
-                              Pair(boundaryLightGroup, boundaryLight));
+                              std::pair(boundaryLightGroup, boundaryLight));
     }
     // Materials
     for(const auto& [matPrim, matPack] : outMaterials)
@@ -1028,7 +1028,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
         auto end = stringConcat.size();
         stringRange.emplace_back(start, end);
         result.mats.emplace(globalCounter++,
-                            Pair(matPack.groupId, matPack.materialId));
+                            std::pair(matPack.groupId, matPack.materialId));
     }
     // Textures
     for(const auto& [texPrim, texId] : uniqueTextureIds)

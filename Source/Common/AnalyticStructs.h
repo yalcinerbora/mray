@@ -37,7 +37,7 @@ struct RendererAnalyticData
     std::string         throughputSuffix;
     //
     double              workPerPixel;
-    double              wPPLimit;
+    double              wppLimit;
     std::string         workPerPixelSuffix;
     // Timings
     float               iterationTimeMS;

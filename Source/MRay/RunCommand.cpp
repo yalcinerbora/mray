@@ -939,7 +939,7 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
             FormatTimeDynamic(renderTimer);
             MRAY_LOG("Entire render took {} | {:.2f}ms wpp",
                      FormatTimeDynamic(renderTimer),
-                     rtTotal / rendererInfo.wPPLimit);
+                     rtTotal / rendererInfo.wppLimit);
         }
         return true;
     }
@@ -949,8 +949,8 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
     std::string displaySuffix;
     if(startDisplayProgressBar)
     {
-        progressRatio = rendererInfo.workPerPixel / rendererInfo.wPPLimit;
-        double sppLeft = rendererInfo.wPPLimit - rendererInfo.workPerPixel;
+        progressRatio = rendererInfo.workPerPixel / rendererInfo.wppLimit;
+        double sppLeft = rendererInfo.wppLimit - rendererInfo.workPerPixel;
         //
         uint64_t totalMS = lastReceiveMS;
         uint64_t wppCurrent = uint64_t(std::round(rendererInfo.workPerPixel));
@@ -972,7 +972,7 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
         displaySuffix = MRAY_FORMAT("mem [{:.1f}{:s}/{:.1f}{:s}] | wpp [{:.1f}/{:.1f}] ~left {}",
                                     usedGPUMem.first, usedGPUMem.second,
                                     totalGPUMem.first, totalGPUMem.second,
-                                    rendererInfo.workPerPixel, rendererInfo.wPPLimit,
+                                    rendererInfo.workPerPixel, rendererInfo.wppLimit,
                                     timeLeft);
         using namespace EyeAnim;
         SimpleProgressBar().Display(Float(progressRatio),
@@ -984,7 +984,11 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
 
 RunCommand::RunCommand()
     : threadCount(std::max(1u, std::thread::hardware_concurrency()))
-{}
+    , rendererInfo({})
+{
+    // To prevent
+    rendererInfo.wppLimit = 1;
+}
 
 MRayError RunCommand::Invoke()
 {

@@ -25,9 +25,6 @@ TODO: should we interface these?
 namespace mray::host
 {
 
-void*   AlignedAllocate(size_t allocSize, size_t alignment);
-void    AlignedFree(void* ptr, size_t allocSize, size_t alignment);
-
 class GPUDeviceCPU;
 class GPUSystemCPU;
 class GPUQueueCPU;

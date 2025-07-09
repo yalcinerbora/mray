@@ -55,6 +55,10 @@ void                    RenameThread(SystemThreadHandle,
 SystemThreadHandle      GetCurrentThreadHandle();
 std::array<size_t, 2>   GetTerminalSize();
 
+void*   AlignedAlloc(size_t size, size_t alignment);
+void*   AlignedRealloc(void* ptr, size_t size, size_t alignment);
+void    AlignedFree(void* ptr, size_t size, size_t alignment);
+
 // Loaded class from a shared library
 // Destructor may be from the other side of DLL boundary.
 //

@@ -154,6 +154,7 @@ RayPartitioner::RayPartitioner(const GPUSystem& system,
     , hPartitionCount(reinterpret_cast<uint32_t*>(static_cast<Byte*>(hostMem)), 1)
     , rayCount(0)
     , maxPartitionCount(0)
+    , isResultsInHostVisible(true)
 {}
 
 RayPartitioner::RayPartitioner(RayPartitioner&& other)
@@ -283,7 +284,7 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
 
     //MRAY_LOG("Key Ranges B ({}), D ({})", keyBatchBitRange, keyDataBitRange);
 
-    // TODO: Why are we doing two seperate sorts? Keys almost always should be contiguous.
+    // TODO: Why are we doing two separate sorts? Keys almost always should be contiguous.
     // If not we are wasting information space here.
     // So a single pass should suffice maybe? Reason about this more later
     if(!onlySortForBatches)

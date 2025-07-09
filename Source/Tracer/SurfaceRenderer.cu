@@ -142,16 +142,7 @@ SurfaceRenderer::SurfaceRenderer(const RenderImagePtr& rb,
 typename SurfaceRenderer::AttribInfoList
 SurfaceRenderer::AttributeInfo() const
 {
-    using enum MRayDataEnum;
-    using enum AttributeIsArray;
-    using enum AttributeOptionality;
-    return AttribInfoList
-    {
-        {"totalSPP",            MRayDataType<MR_UINT32>{}, IS_SCALAR, MR_MANDATORY},
-        {"renderType",          MRayDataType<MR_STRING>{}, IS_SCALAR, MR_MANDATORY},
-        {"doStochasticFilter",  MRayDataType<MR_BOOL>{}, IS_SCALAR, MR_MANDATORY},
-        {"tMaxAORatio",         MRayDataType<MR_FLOAT>{}, IS_SCALAR, MR_MANDATORY}
-    };
+    return StaticAttributeInfo();
 }
 
 RendererOptionPack SurfaceRenderer::CurrentAttributes() const
@@ -289,7 +280,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     auto packLoc = std::find_if(currentCameraWorks.cbegin(), currentCameraWorks.cend(),
     [camGroupId, transGroupId](const auto& pack)
     {
-        return pack.idPack == Pair(camGroupId, transGroupId);
+        return pack.idPack == std::pair(camGroupId, transGroupId);
     });
     curCamWork = &packLoc->workPtr;
 
@@ -775,6 +766,21 @@ std::string_view SurfaceRenderer::TypeName()
     using namespace TypeNameGen::CompTime;
     static constexpr auto Name = "Surface"sv;
     return RendererTypeName<Name>;
+}
+
+typename SurfaceRenderer::AttribInfoList
+SurfaceRenderer::StaticAttributeInfo()
+{
+    using enum MRayDataEnum;
+    using enum AttributeIsArray;
+    using enum AttributeOptionality;
+    return AttribInfoList
+    {
+        {"totalSPP",            MRayDataType<MR_UINT32>{}, IS_SCALAR, MR_MANDATORY},
+        {"renderType",          MRayDataType<MR_STRING>{}, IS_SCALAR, MR_MANDATORY},
+        {"doStochasticFilter",  MRayDataType<MR_BOOL>{}, IS_SCALAR, MR_MANDATORY},
+        {"tMaxAORatio",         MRayDataType<MR_FLOAT>{}, IS_SCALAR, MR_MANDATORY}
+    };
 }
 
 size_t SurfaceRenderer::GPUMemoryUsage() const

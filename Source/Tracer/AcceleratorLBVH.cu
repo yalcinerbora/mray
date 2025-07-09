@@ -124,9 +124,13 @@ void KCGenMortonCode(// Output
         using namespace Graphics::MortonCode;
         static constexpr uint32_t MaxBits = uint32_t(MaxBits3D<uint64_t>());
         static constexpr uint32_t LastValue = (1u << MaxBits) - 1;
-        static constexpr Float SliceCount = Float(1ull << MaxBits);
+        // We do double calculation here since we need to divide
+        // with 2^20 (3D 64-bit morton code fits 20-bit integers)
+        // This will be slow on the GPU but I've tried to
+        // minimize it as much as possible...
+        static constexpr double SliceCount = double(1ull << MaxBits);
         // TODO: Check if 32-bit float is not enough here (precision)
-        Float deltaRecip = SliceCount / maxSide;
+        double deltaRecip = SliceCount / static_cast<double>(maxSide);
         Vector3 bottomLeft = aabb.Min();
 
         // Finally multi-block primitive loop
@@ -136,8 +140,11 @@ void KCGenMortonCode(// Output
         {
             Vector3 center = dLocalPrimCenters[i];
             Vector3 diff = center - bottomLeft;
+            // Diff still can have numeric errors
+            // Make it positive
+            diff = Vector3::Max(diff, Vector3::Zero());
             // Quantize the center relative to the AABB
-            Vector3 result = (diff * deltaRecip).Round();
+            auto result = Vector3(Vector3d(diff) * deltaRecip).Round();
             Vector3ui xyz(result[0], result[1], result[2]);
             xyz = xyz.Clamp(0u, LastValue);
             uint64_t code = Compose3D<uint64_t>(xyz);
@@ -772,10 +779,10 @@ void BaseAcceleratorLBVH::CastRays(// Output
     // Copy the ray indices to the local buffer, normally we could utilize
     // global ray partitioner (if available) but
     // - Not all renderers (very simple ones probably) may not have a partitioner
-    // - OptiX (or equavilent on other hardwares hopefully in the future) already
-    //   does two-level acceleration in hardware, so we dont need to do this
+    // - OptiX (or equivalent on other hardwares hopefully in the future) already
+    //   does two-level acceleration in hardware, so we don't need to do this
     queue.MemcpyAsync(dCurrentIndices, dRayIndices);
-    // Continiously do traverse/partition until all rays are missed
+    // Continuously do traverse/partition until all rays are missed
     while(currentRayCount != 0)
     {
         queue.IssueWorkKernel<KCIntersectBaseLBVH>
@@ -909,10 +916,10 @@ void BaseAcceleratorLBVH::CastVisibilityRays(// Output
     // Copy the ray indices to the local buffer, normally we could utilize
     // global ray partitioner (if available) but
     // - Not all renderers (very simple ones probably) may not have a partitioner
-    // - OptiX (or equavilent on other hardwares hopefully in the future) already
-    //   does two-level acceleration in hardware, so we dont need to do this
+    // - OptiX (or equivalent on other hardwares hopefully in the future) already
+    //   does two-level acceleration in hardware, so we don't need to do this
     queue.MemcpyAsync(dCurrentIndices, dRayIndices);
-    // Continiously do traverse/partition until all rays are missed
+    // Continuously do traverse/partition until all rays are missed
     while(currentRayCount != 0)
     {
         queue.IssueWorkKernel<KCIntersectBaseLBVH>

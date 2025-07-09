@@ -351,7 +351,7 @@ class AcceleratorGroupT : public Base
 {
     using PrimitiveGroupType = PG;
     private:
-    // Common functionality for ineriting types
+    // Common functionality for inheriting types
     static AccelPartitionResult     PartitionParamsForWork(const AccelGroupConstructParams& p);
     static AccelLeafResult          DetermineConcreteAccelCount(std::vector<SurfacePrimList> instancePrimBatches,
                                                                 const std::vector<PrimRangeArray>& instancePrimRanges);

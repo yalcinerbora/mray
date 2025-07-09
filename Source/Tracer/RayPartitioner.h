@@ -215,6 +215,18 @@ TernaryPartitionOutput RayPartitioner::TernaryPartition(Span<CommonIndex> dIndic
                                        dIndicesIn.size() - hPartitionIndex0[0]);
     auto dRightOut = dOutput.subspan(hPartitionIndex0[0],
                                      dIndicesIn.size() - hPartitionIndex0[0]);
+
+    // We already partitioned the entire list, just return
+    if(dRightIn.size() == 0)
+    {
+        hPartitionStartOffsets[2] = static_cast<uint32_t>(dIndicesIn.size());
+        return TernaryPartitionOutput
+        {
+            .hPartitionStartOffsets = Span<uint32_t, 4>(hPartitionStartOffsets.subspan(0, 4)),
+            .dPartitionIndices = dOutput
+        };
+    }
+
     // Copy the right side back to input buffer, so that we can present
     // a single buffer to the user
     queue.MemcpyAsync(dRightIn, ToConstSpan(dRightOut));

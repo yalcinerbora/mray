@@ -152,7 +152,6 @@ function(gen_imported_target)
             IMPORTED_LOCATION_RELEASE "${MRAY_PLATFORM_LIB_DIRECTORY}/Release/${GEN_IMPORTED_TGT_REL_IMPORT_NAME}")
     endif()
 
-
     set_target_properties(${GEN_IMPORTED_TGT_NAME} PROPERTIES MAP_IMPORTED_CONFIG_SANITIZER Release)
 
     if(GEN_IMPORTED_TGT_EXTRA_INCLUDES)
@@ -189,6 +188,59 @@ function(gen_imported_target)
                 IMPORTED_IMPLIB_RELEASE "${MRAY_PLATFORM_LIB_DIRECTORY}/Release/${REL_NAME}.lib")
         endif()
     endif()
+
+endfunction()
+
+function(gen_archive_pack)
+    set(options HAS_DEBUG_SUFFIX)
+    set(oneValueArgs NAME)
+    set(multiValueArgs ARCHIVES EXTRA_INCLUDES EXTRA_DEFINES EXTRA_LIB_FOLDERS)
+    cmake_parse_arguments(GEN_ARCHIVE_PACK "${options}" "${oneValueArgs}"
+                        "${multiValueArgs}" ${ARGN})
+
+    add_library(${GEN_ARCHIVE_PACK_NAME} INTERFACE IMPORTED)
+    set_target_properties(${GEN_ARCHIVE_PACK_NAME} PROPERTIES IMPORTED_GLOBAL TRUE)
+
+    list(TRANSFORM GEN_ARCHIVE_PACK_ARCHIVES PREPEND ${CMAKE_STATIC_LIBRARY_PREFIX})
+    # Debug
+    set(GEN_ARCHIVE_PACK_DBG_NAMES ${GEN_ARCHIVE_PACK_ARCHIVES})
+    if(GEN_ARCHIVE_PACK_HAS_DEBUG_SUFFIX)
+        list(TRANSFORM GEN_ARCHIVE_PACK_DBG_NAMES APPEND d)
+    endif()
+    list(TRANSFORM GEN_ARCHIVE_PACK_DBG_NAMES APPEND ${CMAKE_STATIC_LIBRARY_SUFFIX})
+    # Release
+    set(GEN_ARCHIVE_PACK_REL_NAMES ${GEN_ARCHIVE_PACK_ARCHIVES})
+    list(TRANSFORM GEN_ARCHIVE_PACK_REL_NAMES APPEND ${CMAKE_STATIC_LIBRARY_SUFFIX})
+    # Make it absolute path (kinda)
+
+    # Add extra includes if needed
+    if(GEN_ARCHIVE_PACK_EXTRA_INCLUDES)
+        # Create these directories if they do not exist.
+        # "MRayExternal" target did not run yet, so these may not be available
+        file(MAKE_DIRECTORY ${GEN_ARCHIVE_PACK_EXTRA_INCLUDES})
+        target_include_directories(${GEN_ARCHIVE_PACK_NAME}
+                                    # Adding system since USD has many
+                                    # warnings...
+                                    SYSTEM INTERFACE
+                                    ${GEN_ARCHIVE_PACK_EXTRA_INCLUDES})
+    endif()
+    if(GEN_ARCHIVE_PACK_TGT_EXTRA_DEFINES)
+        target_compile_definitions(${GEN_ARCHIVE_PACK_NAME}
+                                    INTERFACE
+                                    ${GEN_ARCHIVE_PACK_EXTRA_DEFINES})
+    endif()
+    if(GEN_ARCHIVE_PACK_EXTRA_LIB_FOLDERS)
+        target_link_directories(${GEN_ARCHIVE_PACK_NAME}
+                                INTERFACE
+                                ${GEN_ARCHIVE_PACK_EXTRA_LIB_FOLDERS})
+    endif()
+
+    # Finally the libraries
+    target_link_libraries(${GEN_ARCHIVE_PACK_NAME}
+                          INTERFACE
+                          $<$<CONFIG:Debug>:${GEN_ARCHIVE_PACK_DBG_NAMES}>
+                          $<$<CONFIG:Release>:${GEN_ARCHIVE_PACK_REL_NAMES}>
+                          $<$<CONFIG:SanitizeR>:${GEN_ARCHIVE_PACK_REL_NAMES}>)
 
 endfunction()
 
@@ -230,11 +282,42 @@ if(MRAY_ENABLE_USD)
         set(MRAY_TBB_DEBUG_NAME tbb_debug)
         set(MRAY_TBB_RELEASE_NAME tbb)
     endif()
-    gen_imported_target(NAME usd::usd SHARED
-                        OVERRIDE_LIB_PREFIX ${MRAY_PLATFORM_LIB_DIRECTORY}/usd/lib
-                        DEBUG_TARGET        usd_msd
-                        RELEASE_TARGET      usd_ms
-                        EXTRA_INCLUDES      ${MRAY_PLATFORM_LIB_DIRECTORY}/usd/include)
+    # Monolithic Build of USD
+    # gen_imported_target(NAME usd::usd SHARED
+    #                     OVERRIDE_LIB_PREFIX ${MRAY_PLATFORM_LIB_DIRECTORY}/usd/lib
+    #                     DEBUG_TARGET        usd_msd
+    #                     RELEASE_TARGET      usd_ms
+    #                     EXTRA_INCLUDES      ${MRAY_PLATFORM_LIB_DIRECTORY}/usd/include)
+    # Achieve Build of USD
+    gen_archive_pack(NAME usd::usd_archive
+                     HAS_DEBUG_SUFFIX
+                     EXTRA_INCLUDES      ${MRAY_PLATFORM_LIB_DIRECTORY}/usd/include
+                     EXTRA_LIB_FOLDERS   ${MRAY_PLATFORM_LIB_DIRECTORY}/usd/lib
+                     # Lets go!
+                     ARCHIVES
+                            usd_usdLux
+                            usd_usdShade
+                            usd_usdGeom
+                            usd_usdUtils
+                            usd_usd
+                            usd_plug
+                            usd_pcp
+                            usd_sdr
+                            usd_ndr
+                            usd_kind
+                            usd_sdf
+                            usd_ar
+                            # Base
+                            usd_work
+                            usd_trace
+                            usd_js
+                            usd_ts
+                            usd_vt
+                            usd_gf
+                            usd_tf
+                            usd_arch
+                     )
+
     gen_imported_target(NAME tbb::tbb SHARED
                         DEBUG_TARGET ${MRAY_TBB_DEBUG_NAME}
                         RELEASE_TARGET ${MRAY_TBB_RELEASE_NAME}

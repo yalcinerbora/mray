@@ -81,13 +81,13 @@ void TracerBase::PopulateAttribInfoAndTypeLists()
     InstantiateAndGetAttribInfo(transAttributeInfoMap,
                                 typeGenerators.transGenerator,
                                 0u, gpuSystem);
-    InstantiateAndGetAttribInfo(rendererAttributeInfoMap,
-                                typeGenerators.rendererGenerator,
-                                RenderImagePtr(),
-                                GenerateTracerView(),
-                                *globalThreadPool,
-                                gpuSystem,
-                                RenderWorkPack());
+    // InstantiateAndGetAttribInfo(rendererAttributeInfoMap,
+    //                             typeGenerators.rendererGenerator,
+    //                             RenderImagePtr(),
+    //                             GenerateTracerView(),
+    //                             *globalThreadPool,
+    //                             gpuSystem,
+    //                             RenderWorkPack());
 
     // Light is special so write it by hand
     // Find instantiate the prim again...
@@ -371,7 +371,8 @@ LightAttributeInfoList TracerBase::AttributeInfoLight(std::string_view name) con
 
 RendererAttributeInfoList TracerBase::AttributeInfoRenderer(std::string_view name) const
 {
-    auto rInfo = rendererAttributeInfoMap.at(name);
+    //auto rInfo = rendererAttributeInfoMap.at(name);
+    auto rInfo = typeGenerators.rendererAttribMap.at(name);
     if(!rInfo)
     {
         throw MRayError("Unable to find type \"{}\"", name);

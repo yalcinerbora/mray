@@ -2,10 +2,10 @@ diff --git a/pxr/usd/usd/schemaRegistry.cpp b/pxr/usd/usd/schemaRegistry.cpp
 index be5e98534..fda87217f 100644
 --- a/pxr/usd/usd/schemaRegistry.cpp
 +++ b/pxr/usd/usd/schemaRegistry.cpp
-@@ -784,6 +784,24 @@ UsdSchemaRegistry::IsMultipleApplyNameTemplate(
+@@ -784,6 +784,23 @@ UsdSchemaRegistry::IsMultipleApplyNameTemplate(
      return _FindInstanceNamePlaceholder(nameTemplate) != std::string::npos;
  }
- 
+
 +// FIX: _appliedAPIPrimDefinitions is unordered_map of
 +// std::pair<const TfToken, std::pair<X, std::unique_ptr<ForwardDeclaredType>>
 +// (In this case ForwardDeclaredType is "UsdPrimDefinition").
@@ -15,7 +15,6 @@ index be5e98534..fda87217f 100644
 +// order is changed in clang I guess?
 +//
 +// Anyway this function is moved to cpp file to prevent this
-+inline
 +const UsdPrimDefinition*
 +UsdSchemaRegistry::FindAppliedAPIPrimDefinition(const TfToken& typeName) const
 +{
@@ -41,6 +40,6 @@ index 6566dfcdf..07cff9965 100644
 -            it->second.primDef.get() : nullptr;
 -    }
 +        const TfToken &typeName) const;
- 
+
      /// Returns the empty prim definition.
      const UsdPrimDefinition *GetEmptyPrimDefinition() const {
