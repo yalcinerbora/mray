@@ -7,7 +7,6 @@
 #include "Core/Types.h"
 #include "Core/TracerI.h"
 
-
 #include <array>
 
 using TexMipBitSet = Bitset<TracerConstants::MaxTextureMipCount>;

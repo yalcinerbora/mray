@@ -1,5 +1,8 @@
 #pragma once
 
+#include "AcceleratorLinear.h"
+#include "Tracer/AcceleratorWork.h"
+
 namespace LinearAccelDetail
 {
 

@@ -10,8 +10,6 @@
 
 #include "../Resources/Fonts/IcoMoonFontTable.h"
 
-#include "Core/MemAlloc.h"
-#include "Core/BitFunctions.h"
 #include "Core/Log.h"
 
 #include <vulkan/vulkan.hpp>

@@ -3,7 +3,6 @@
 #include <array>
 #include <tuple>
 #include <vector>
-#include <algorithm>
 #include <cstdint>
 #include <numeric>
 #include <atomic>
@@ -22,7 +21,6 @@
 
 #include "TracerTypes.h"
 #include "ParamVaryingData.h"
-#include "Texture.h"
 
 using AttributeRanges = StaticVector<Vector<2, size_t>,
                                      TracerConstants::MaxAttributePerGroup>;

@@ -13,7 +13,6 @@
 #include "Random.h"
 
 #include "Bitspan.h"
-#include "GenericGroup.h"
 #include "PrimitiveC.h"
 #include "LightC.h"
 #include "TextureView.h"

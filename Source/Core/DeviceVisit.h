@@ -1,6 +1,10 @@
 #pragma once
 
-#include "Types.h"
+#include "Definitions.h"
+
+#include <cstdio>
+#include <functional>
+#include <variant>
 
 // First failure related to the concerns described above
 // nvcc did not like it (see: https://godbolt.org/z/fM811b4cx)

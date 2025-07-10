@@ -4,7 +4,6 @@
 #include "Core/TracerI.h"
 #include "TracerTypes.h"
 #include "GenericGroup.h"
-#include <map>
 
 struct ScatterSampleT
 {

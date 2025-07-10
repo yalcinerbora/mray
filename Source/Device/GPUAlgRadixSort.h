@@ -2,7 +2,7 @@
 
 
 #ifdef MRAY_GPU_BACKEND_CUDA
-    #include "CUDA/AlgRadixSortCUDA.h"
+    #include "CUDA/AlgRadixSortCUDA.h" // IWYU pragma: export
 
     namespace DeviceAlgorithms
     {
@@ -10,7 +10,7 @@
     }
 
 #elif defined MRAY_GPU_BACKEND_HIP
-    #include "HIP/AlgRadixSortHIP.h"
+    #include "HIP/AlgRadixSortHIP.h" // IWYU pragma: export
 
     namespace DeviceAlgorithms
     {
@@ -18,7 +18,7 @@
     }
 
 #elif defined MRAY_GPU_BACKEND_CPU
-    #include "CPU/AlgRadixSortCPU.h"
+    #include "CPU/AlgRadixSortCPU.h" // IWYU pragma: export
 
     namespace DeviceAlgorithms
     {

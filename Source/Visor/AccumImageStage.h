@@ -3,7 +3,6 @@
 #include <vulkan/vulkan.h>
 
 #include "Common/RenderImageStructs.h"
-#include "Core/System.h"
 
 #include "VulkanTypes.h"
 #include "VulkanPipeline.h"

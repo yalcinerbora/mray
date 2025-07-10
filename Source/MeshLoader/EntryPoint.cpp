@@ -15,6 +15,7 @@ class MeshLoaderPool : public MeshLoaderPoolI
 
     private:
     std::map<std::string, GeneratorFunc>  generators;
+    std::unique_ptr<MRayAssimpLogger>     assimpLogger;
 
     public:
                             MeshLoaderPool();
@@ -24,8 +25,8 @@ class MeshLoaderPool : public MeshLoaderPoolI
 
 MeshLoaderPool::MeshLoaderPool()
 {
-    Assimp::DefaultLogger::create(MeshLoaderAssimp::AssimpLogFileName.data(),
-                                  Assimp::Logger::VERBOSE);
+    assimpLogger = std::make_unique<MRayAssimpLogger>();
+    Assimp::DefaultLogger::set(assimpLogger.get());
 
     generators.emplace(MeshLoaderAssimp::Tag,
                        &GenerateType<MeshLoaderI, MeshLoaderAssimp>);

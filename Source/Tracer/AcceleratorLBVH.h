@@ -1,30 +1,14 @@
 #pragma once
 
-#pragma once
-
-#include <algorithm>
-#include <bitset>
-
-#ifdef MRAY_GPU_BACKEND_CPU
-    #include <stack>
-    #include <Core/DataStructures.h>
-#endif
-
 #include "Core/Types.h"
 #include "Core/MemAlloc.h"
-#include "Core/AABB.h"
-#include "Core/GraphicsFunctions.h"
-
-#include "Device/GPUAlgForward.h"
 
 #include "TracerTypes.h"
-#include "ParamVaryingData.h"
 #include "AcceleratorC.h"
 #include "PrimitiveC.h"
 #include "TransformC.h"
 #include "Random.h"
 #include "RayPartitioner.h"
-#include "AcceleratorWork.h"
 
 namespace LBVHAccelDetail
 {

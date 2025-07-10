@@ -2,6 +2,7 @@
 
 #include "EntryPoint.h"
 
+#include <assimp/Logger.hpp>
 #include <assimp/scene.h>
 #include <assimp/Importer.hpp>
 #include <assimp/DefaultLogger.hpp>
@@ -59,6 +60,32 @@ class MeshLoaderAssimp final : public MeshLoaderI
     public:
                                     MeshLoaderAssimp();
     std::unique_ptr<MeshFileI>      OpenFile(std::string& filePath) override;
+};
+
+class MRayAssimpLogger final : public Assimp::Logger
+{
+    private:
+    static constexpr auto LOG_FILE_NAME = "assimp_log";
+    FILE* f;
+
+    public:
+    // Constructors & Destructor
+                        MRayAssimpLogger();
+                        MRayAssimpLogger(const MRayAssimpLogger&) = delete;
+                        MRayAssimpLogger(MRayAssimpLogger&&) noexcept = delete;
+    MRayAssimpLogger&   operator=(const MRayAssimpLogger&) = delete;
+    MRayAssimpLogger&   operator=(MRayAssimpLogger&&) noexcept = delete;
+                        ~MRayAssimpLogger();
+
+    //
+    bool attachStream(Assimp::LogStream *pStream, unsigned int severity) override;
+    bool detachStream(Assimp::LogStream *pStream, unsigned int severity) override;
+
+    void OnDebug(const char*) override;
+    void OnVerboseDebug(const char*) override;
+    void OnInfo(const char*) override;
+    void OnWarn(const char*) override;
+    void OnError(const char*) override;
 };
 
 // Sanity checks

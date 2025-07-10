@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Imgui/imgui.h>
-#include <map>
 #include <algorithm>
 
 #include "Common/AnalyticStructs.h"

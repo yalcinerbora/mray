@@ -5,7 +5,6 @@
 #include "MaterialC.h"
 #include "PrimitiveC.h"
 #include "TracerTypes.h"
-#include "Hit.h"
 #include "Random.h"
 #include "RayGenKernels.h"
 

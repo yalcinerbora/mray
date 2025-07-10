@@ -3,7 +3,6 @@
 #include <cstdint>
 
 #include "Core/Vector.h"
-#include "Core/BitFunctions.h"
 #include "Core/TypeGenFunction.h"
 #include "Core/TracerI.h"
 

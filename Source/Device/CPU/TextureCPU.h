@@ -1,8 +1,8 @@
 #pragma once
+// IWYU pragma: private; include "Texture.h"
 
 #include "DeviceMemoryCPU.h"
 #include "TextureViewCPU.h"
-#include "DefinitionsCPU.h"
 #include "GPUSystemCPU.h"
 
 #include "../GPUTypes.h"

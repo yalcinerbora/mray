@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include "Device/GPUTypes.h"
+
 template <uint32_t DIM, class TT>
 struct DTPair
 {

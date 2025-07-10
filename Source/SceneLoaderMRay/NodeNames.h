@@ -70,7 +70,4 @@ namespace NodeNames
     static constexpr string_view TEX_NODE_IS_3D         = "is3D";
     static constexpr bool TEX_NODE_IS_3D_DEFAULT        = false;
     static constexpr string_view TEX_NODE_CHANNELS      = "channels";
-
-    //// Identity Transform Type Name
-    //static constexpr string_view TRANSFORM_IDENTITY     = "Identity"sv;
 }

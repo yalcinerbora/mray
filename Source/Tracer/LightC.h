@@ -3,9 +3,8 @@
 #include "Core/Definitions.h"
 #include "Core/Types.h"
 
+#include "PrimitiveC.h"
 #include "TracerTypes.h"
-#include "ParamVaryingData.h"
-#include "TransformsDefault.h"
 #include "GenericGroup.h"
 
 using PrimBatchList = std::vector<PrimBatchKey>;

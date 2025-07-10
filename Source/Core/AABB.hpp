@@ -1,5 +1,7 @@
 #pragma once
 
+#include "AABB.h"
+
 template<unsigned int N, FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr AABB<N, T>::AABB(const Vector<N, T>& min,

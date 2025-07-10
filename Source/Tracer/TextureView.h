@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Core/Map.h"
-#include "Core/DeviceVisit.h"
 #include "Core/TracerI.h"
 
 #include "Device/GPUTextureView.h"

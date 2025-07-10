@@ -1,7 +1,9 @@
 #pragma once
+// IWYU pragma: private; include "AlgForward.h"
 
 #include "../GPUSystemForward.h"
-#include "Core/MathForward.h"
+#include "Core/Vector.h"
+#include <climits>
 
 namespace mray::host::algorithms
 {

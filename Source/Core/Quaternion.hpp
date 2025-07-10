@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Quaternion.h"
+
 template<FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Quat<T>::Quat(T w, T x, T y, T z)

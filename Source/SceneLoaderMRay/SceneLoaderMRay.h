@@ -3,7 +3,6 @@
 #include "MeshLoader/EntryPoint.h"
 #include "Core/SceneLoaderI.h"
 #include "Core/TracerI.h"
-#include "Core/Flag.h"
 #include "Core/Expected.h"
 
 #include "JsonNode.h"

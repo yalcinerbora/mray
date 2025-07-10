@@ -2,7 +2,6 @@
 
 #include "Core/TracerI.h"
 #include "Core/System.h"
-#include "Core/SharedLibrary.h"
 
 #ifdef MRAY_TRACER_DEVICE_SHARED_EXPORT
     #define MRAY_TRACER_DEVICE_ENTRYPOINT MRAY_DLL_EXPORT

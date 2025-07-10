@@ -1,8 +1,8 @@
 #include "ColorConverter.h"
 #include "GenericTextureRW.h"
 #include "BCColorIO.h"
-#include "TextureMemory.h"
-#include "TextureView.hpp"
+#include "Texture.h"
+#include "TextureView.hpp" // IWYU pragma: keep
 
 #include "Device/GPUSystem.h"
 #include "Device/GPUSystem.hpp"
@@ -952,6 +952,11 @@ void ColorConverter::ExtractLuminance(std::vector<Span<Float>> hLuminanceBuffers
         hLuminanceExtractParams.push_back(params);
         hTextureViews.push_back(t->View(TextureReadMode::DIRECT));
     }
+
+    // All texture's are nullptr,
+    // quit early
+    if(hLuminanceExtractParams.empty())
+        return;
 
     DeviceLocalMemory localMem(*queue.Device());
     //

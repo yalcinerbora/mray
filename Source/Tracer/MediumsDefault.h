@@ -1,8 +1,8 @@
 #pragma once
 
 #include "MediumC.h"
-#include "DistributionFunctions.h"
 #include "Random.h"
+#include "Texture.h"
 
 namespace MediumDetail
 {

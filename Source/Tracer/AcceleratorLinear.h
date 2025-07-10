@@ -1,20 +1,15 @@
 #pragma once
 
-#include <algorithm>
-#include <bitset>
-
 #include "Core/Types.h"
 #include "Core/MemAlloc.h"
-#include "Core/AABB.h"
+
 
 #include "TracerTypes.h"
-#include "ParamVaryingData.h"
 #include "AcceleratorC.h"
 #include "PrimitiveC.h"
 #include "TransformC.h"
 #include "Random.h"
 #include "RayPartitioner.h"
-#include "AcceleratorWork.h"
 
 namespace LinearAccelDetail
 {

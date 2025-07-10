@@ -1,5 +1,6 @@
 #include "LightsDefault.h"
-#include "PrimitiveDefaultTriangle.h"
+
+#include "Device/GPUSystem.hpp" // IWYU pragma: keep
 
 std::string_view LightGroupNull::TypeName()
 {

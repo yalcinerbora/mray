@@ -1,5 +1,9 @@
 #pragma once
 
+#include "TransientPool.h"
+
+#include "Core/Error.h"
+
 namespace TransientPoolDetail
 {
 

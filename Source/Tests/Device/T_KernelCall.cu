@@ -3,9 +3,7 @@
 #include "Device/GPUSystem.h"
 #include "Device/GPUMemory.h"
 #include "Device/GPUSystem.hpp"
-#include "Core/Log.h"
 
-#include "T_TextureTypes.h"
 #include <tuple>
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT

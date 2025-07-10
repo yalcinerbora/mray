@@ -4,7 +4,6 @@
 #include "Core/Types.h"
 #include <bit>
 #include <type_traits>
-#include <numeric>
 #include <algorithm>
 #include <iterator>
 

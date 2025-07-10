@@ -1,7 +1,5 @@
 #pragma once
 
-#include <bitset>
-
 #include "Core/TracerI.h"
 
 #include "Device/GPUSystemForward.h"
@@ -9,7 +7,6 @@
 
 #include "TransientPool/TransientPool.h"
 
-#include "GenericGroup.h"
 #include "TextureFilter.h"
 #include "Texture.h"
 

@@ -101,7 +101,7 @@ set(MRAY_CLANG_OPTIONS
     $<$<CONFIG:SanitizeR>:-fsanitize=${MRAY_SANITIZER_MODE}>
     $<$<CONFIG:SanitizeR>:-fno-sanitize-recover=undefined>
     $<$<CONFIG:SanitizeR>:-fno-omit-frame-pointer>
-    $<$<CONFIG:SanitizeR>:-O0>
+    $<$<CONFIG:SanitizeR>:-O2>
     $<$<CONFIG:SanitizeR>:-g>
     $<$<CONFIG:Release>:-g> # Also add debug info on release builds (for profiling etc.)
 

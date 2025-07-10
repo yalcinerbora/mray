@@ -1,7 +1,5 @@
 #pragma once
 
-#include "GPUTypes.h"
-
 #ifdef MRAY_GPU_BACKEND_CUDA
     #include "CUDA/TextureViewCUDA.h"
 
@@ -23,7 +21,7 @@
     using TextureView = mray::hip::TextureViewHIP<DIM, T>;
 
 #elif defined MRAY_GPU_BACKEND_CPU
-    #include "CPU/TextureViewCPU.h"
+    #include "CPU/TextureViewCPU.h" // IWYU pragma: export
     // Alias the types
     template<uint32_t DIM, class T>
     using RWTextureView = mray::host::RWTextureViewCPU<DIM, T>;

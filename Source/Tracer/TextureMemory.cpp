@@ -6,7 +6,6 @@
 #include "Core/Vector.h"
 
 #include "Device/GPUTexture.h"
-#include "Device/GPUTextureView.h"
 
 // Linux: compiler could not generate code for IssueLambda's
 // in GPUQueueCPU::Memcopy functions.

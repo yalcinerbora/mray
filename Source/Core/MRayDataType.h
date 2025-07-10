@@ -2,12 +2,18 @@
 
 #include "TypeFinder.h"
 #include "Definitions.h"
-#include "Vector.h"
-#include "Matrix.h"
-#include "Quaternion.h"
 #include "NormTypes.h"
-#include "Ray.h"
-#include "AABB.h"
+
+// Compilers successfully get away with
+// forward declaration, but if user forgot to
+// include these, hell break loose. ("Domain expert"-level
+// compiler diagnostics...)
+// So we pre-include these here
+#include "Vector.h"     // IWYU pragma: keep
+#include "Matrix.h"     // IWYU pragma: keep
+#include "Quaternion.h" // IWYU pragma: keep
+#include "Ray.h"        // IWYU pragma: keep
+#include "AABB.h"       // IWYU pragma: keep
 
 #include <string>
 

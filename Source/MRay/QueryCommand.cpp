@@ -1,6 +1,5 @@
 #include "QueryCommand.h"
 
-#include "Core/Log.h"
 #include "Core/Error.h"
 #include "Core/ThreadPool.h"
 
@@ -8,7 +7,6 @@
 
 #include <CLI/CLI.hpp>
 #include <string_view>
-#include <thread>
 
 namespace MRayCLI::QueryNames
 {

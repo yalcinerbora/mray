@@ -2,10 +2,8 @@
 
 #include <cstdint>
 #include "Core/Vector.h"
-#include "Core/DataStructures.h"
 
 #include "Random.h"
-#include "ParamVaryingData.h"
 #include "MetaLight.h"
 
 struct LightSampleOutput

@@ -1,12 +1,14 @@
 
 #pragma once
+// IWYU pragma: private; include "GPUSystem.h"
 
 #include <vector>
 #include <mutex>
 
 #include "Core/Types.h"
 #include "Core/Math.h"
-#include "DefinitionsCPU.h"
+
+#include "TransientPool/TransientPool.h"
 
 #include "../GPUTypes.h"
 

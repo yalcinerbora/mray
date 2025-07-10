@@ -4,11 +4,9 @@
 #include "ParamVaryingData.h"
 #include "TransformC.h"
 #include "LightC.h"
-#include "SurfaceComparators.h"
 #include "Random.h"
 
 #include "Device/GPUSystem.h"
-#include "Device/GPUSystem.hpp"
 
 // GPU link errors
 #define MRAY_LIGHT_TGEN_FUNCTION(LG, TG) \

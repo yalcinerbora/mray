@@ -2,13 +2,8 @@
 #include <gmock/gmock-matchers.h>
 #include <random>
 #include <numeric>
-#include <chrono>
 
 #include "Core/MPMCQueue.h"
-#include "Core/Vector.h"
-
-#include "GTestWrappers.h"
-
 
 TEST(MPMCQueueTest, Stress)
 {

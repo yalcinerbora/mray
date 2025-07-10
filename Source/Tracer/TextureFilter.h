@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Core/BitFunctions.h"
 #include "Core/TracerI.h"
 #include "Core/TypeGenFunction.h"
 

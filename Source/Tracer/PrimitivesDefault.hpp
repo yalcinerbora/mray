@@ -1,6 +1,7 @@
 #pragma once
 
-#pragma once
+#include "PrimitivesDefault.h"
+#include "Core/ShapeFunctions.h"
 
 namespace DefaultSphereDetail
 {

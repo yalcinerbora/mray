@@ -1,3 +1,5 @@
+#pragma once
+// IWYU pragma: private; include "GPUAtomic.h"
 
 #include "Core/Vector.h"
 #include <atomic>

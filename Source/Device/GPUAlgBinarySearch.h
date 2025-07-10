@@ -1,7 +1,7 @@
 #pragma once
 
 #ifdef MRAY_GPU_BACKEND_CUDA
-    #include "CUDA/AlgBinarySearchCUDA.h"
+    #include "CUDA/AlgBinarySearchCUDA.h" // IWYU pragma: export
 
     namespace DeviceAlgorithms
     {
@@ -9,7 +9,7 @@
     }
 
 #elif defined MRAY_GPU_BACKEND_HIP
-    #include "HIP/AlgBinarySearchHIP.h"
+    #include "HIP/AlgBinarySearchHIP.h" // IWYU pragma: export
 
     namespace DeviceAlgorithms
     {
@@ -17,7 +17,7 @@
     }
 
 #elif defined MRAY_GPU_BACKEND_CPU
-    #include "CPU/AlgBinarySearchCPU.h"
+    #include "CPU/AlgBinarySearchCPU.h" // IWYU pragma: export
 
     namespace DeviceAlgorithms
     {

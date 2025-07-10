@@ -4,8 +4,6 @@
 #include "Core/TracerI.h"
 #include "Core/TimelineSemaphore.h"
 
-#include "TransientPool/TransientPool.h"
-
 #include "AnalyticStructs.h"
 #include "RenderImageStructs.h"
 

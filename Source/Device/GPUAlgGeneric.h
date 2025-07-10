@@ -2,7 +2,6 @@
 
 #include <concepts>
 #include "GPUSystem.h"
-#include "GPUSystem.hpp"
 
 namespace mray::algorithms
 {

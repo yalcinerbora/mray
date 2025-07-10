@@ -3,14 +3,14 @@
 #include <CLI/CLI.hpp>
 #include <string_view>
 
-#include "Visor/EntryPoint.h"
-
 #include "Core/SharedLibrary.h"
 #include "Core/System.h"
 #include "Core/Error.h"
 #include "Core/ThreadPool.h"
 
 #include "TracerThread.h"
+
+#include "Visor/VisorI.h"
 
 #include <nlohmann/json.hpp>
 

@@ -10,7 +10,6 @@
 #include "Core/TypeNameGenerators.h"
 #include "Core/Algorithm.h"
 
-#include "ImageLoader/EntryPoint.h"
 // Traversal
 #include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usd/primRange.h>

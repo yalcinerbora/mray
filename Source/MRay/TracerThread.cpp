@@ -1,8 +1,6 @@
 #include "TracerThread.h"
 
 #include <fstream>
-#include <filesystem>
-
 #include <nlohmann/json.hpp>
 
 #include "Core/Timer.h"
@@ -10,7 +8,7 @@
 #include "Core/Error.h"
 #include "Core/ThreadPool.h"
 
-#include "Common/JsonCommon.h"
+#include "Common/JsonCommon.h" // IWYU pragma: keep
 
 static constexpr RendererId INVALID_RENDERER_ID = RendererId(std::numeric_limits<uint32_t>::max());
 

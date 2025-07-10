@@ -1,5 +1,8 @@
 #pragma once
 
+#include "MediumsDefault.h"
+#include "DistributionFunctions.h"
+
 namespace MediumDetail
 {
 

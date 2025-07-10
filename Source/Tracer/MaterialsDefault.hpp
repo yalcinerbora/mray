@@ -1,5 +1,8 @@
 #pragma once
 
+#include "MaterialsDefault.h"
+#include "DistributionFunctions.h"
+
 namespace LambertMatDetail
 {
 

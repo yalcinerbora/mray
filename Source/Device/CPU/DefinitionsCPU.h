@@ -1,8 +1,5 @@
 #pragma once
 
-#include "Core/Log.h"
-#include "Core/Error.h"
-
 namespace mray::host
 {
     inline constexpr void DeviceAssert(void*, const char*, int)

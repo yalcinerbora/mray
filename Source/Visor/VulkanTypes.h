@@ -4,7 +4,6 @@
 #include <limits>
 
 #include "Core/Vector.h"
-#include "Core/DataStructures.h"
 #include "Core/Types.h"
 
 #include "VulkanAllocators.h"

@@ -6,8 +6,8 @@
 
 #include <map>
 
-size_t AcquireTransientDataCount(MRayDataTypeRT dataTypeRT,
-                                 const TransientData& data)
+static size_t AcquireTransientDataCount(MRayDataTypeRT dataTypeRT,
+                                        const TransientData& data)
 {
     return std::visit([&data](auto&& type)
     {
@@ -575,7 +575,7 @@ inline TypeNameList TracerMock::LightGroups() const
     };
 }
 
-TypeNameList TracerMock::Renderers() const
+inline TypeNameList TracerMock::Renderers() const
 {
     return std::vector<std::string_view>{};
 }
@@ -1735,7 +1735,7 @@ inline SurfaceCommitResult TracerMock::CommitSurfaces()
     return SurfaceCommitResult{};
 }
 
-CameraTransform TracerMock::GetCamTransform(CamSurfaceId camSurfId) const
+inline CameraTransform TracerMock::GetCamTransform(CamSurfaceId camSurfId) const
 {
     MRAY_LOG("Returning transform of {}",
              static_cast<CommonId>(camSurfId));
@@ -1777,7 +1777,7 @@ inline RenderBufferInfo TracerMock::StartRender(RendererId, CamSurfaceId,
     throw MRayError("\"StartRender\" is not implemented in mock tracer!");
 }
 
-void TracerMock::SetCameraTransform(RendererId, CameraTransform)
+inline void TracerMock::SetCameraTransform(RendererId, CameraTransform)
 {
     throw MRayError("\"SetCameraTransform\" is not implemented in mock tracer!");
 }

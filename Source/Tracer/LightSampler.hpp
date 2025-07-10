@@ -1,5 +1,7 @@
 #pragma once
 
+#include "LightSampler.h"
+
 MRAY_HYBRID MRAY_CGPU_INLINE
 std::pair<Ray, Vector2> LightSampleOutput::SampledRay(const Vector3& distantPoint) const
 {

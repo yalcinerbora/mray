@@ -1,17 +1,16 @@
 #pragma once
 
-#include "Core/Log.h"
-#include "Core/Error.h"
 #include "Core/Types.h"
 #include "Core/TracerI.h"
 #include "Core/SceneLoaderI.h"
 
-#include "Common/JsonCommon.h"
+#include "Common/JsonCommon.h" // IWYU pragma: keep
 
 #include <nlohmann/json.hpp>
-#include <functional>
 
-#include "NodeNames.h"
+#include "ImageLoader/ImageLoaderI.h"
+
+#include "NodeNames.h" // IWYU pragma: keep
 
 static constexpr uint32_t EMPTY_TRANSFORM = std::numeric_limits<uint32_t>::max();
 static constexpr uint32_t EMPTY_MEDIUM = std::numeric_limits<uint32_t>::max();

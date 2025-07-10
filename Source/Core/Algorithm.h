@@ -1,7 +1,11 @@
 #pragma once
 
+
 #include <iterator>
-#include "Vector.h"
+#include <vector>
+#include <algorithm>
+
+#include "MathForward.h"
 
 namespace Algo
 {

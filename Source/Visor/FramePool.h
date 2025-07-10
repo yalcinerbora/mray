@@ -1,8 +1,6 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
-#include <array>
-#include "Core/Types.h"
 #include "VulkanTypes.h"
 
 struct MRayError;

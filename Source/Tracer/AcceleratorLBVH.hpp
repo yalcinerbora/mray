@@ -1,5 +1,13 @@
 #pragma once
 
+#include "AcceleratorLBVH.h"
+#include "Tracer/AcceleratorWork.h"
+
+#ifdef MRAY_GPU_BACKEND_CPU
+    #include <Core/DataStructures.h>
+    #include <stack>
+#endif
+
 namespace LBVHAccelDetail
 {
 

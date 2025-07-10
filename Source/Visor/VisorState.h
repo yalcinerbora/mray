@@ -1,14 +1,11 @@
 #pragma once
 
 #include <string>
-#include <vector>
-#include "Core/Types.h"
+#include <vulkan/vulkan.h>
+
 #include "Core/Vector.h"
 
-//
 #include "Common/AnalyticStructs.h"
-
-#include <vulkan/vulkan.h>
 
 enum class TracerRunState
 {

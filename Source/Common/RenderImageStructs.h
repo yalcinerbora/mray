@@ -1,8 +1,6 @@
 #pragma once
 
 #include "AnalyticStructs.h"
-#include "TransientPool/TransientPool.h"
-#include "Core/MemAlloc.h"
 
 struct RenderBufferInfo
 {

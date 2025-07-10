@@ -13,7 +13,6 @@
 
 #include "VisorI.h"
 #include "VulkanAllocators.h"
-#include "VulkanCapabilityFinder.h"
 #include "FontAtlas.h"
 #include "Visor.h"
 

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <memory_resource>
 #include <cstdint>
 
 #include "Core/DataStructures.h"

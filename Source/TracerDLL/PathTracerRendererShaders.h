@@ -1,9 +1,7 @@
 #pragma once
 
 #include <array>
-#include <string_view>
 
-#include "Core/ColorFunctions.h"
 #include "Core/NamedEnum.h"
 
 #include "Tracer/PrimitiveC.h"

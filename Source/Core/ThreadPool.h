@@ -4,14 +4,11 @@
 #include <thread>
 #include <vector>
 #include <functional>
-#include <barrier>
 #include <future>
 #include <memory_resource>
-#include <variant>
 
+#include "Log.h"
 #include "MPMCQueue.h"
-#include "Math.h"
-#include "Error.h"
 
 // TODO: Check if std has these predefined somewhere?
 // (i.e. concept "callable_as")

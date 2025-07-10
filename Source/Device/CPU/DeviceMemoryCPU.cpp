@@ -1,5 +1,4 @@
 #include "DeviceMemoryCPU.h"
-#include "DefinitionsCPU.h"
 #include "GPUSystemCPU.h"
 
 #include "Core/System.h"

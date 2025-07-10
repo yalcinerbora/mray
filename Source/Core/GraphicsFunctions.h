@@ -2,7 +2,6 @@
 
 #include "Vector.h"
 #include "Types.h"
-#include "Quaternion.h"
 #include "BitFunctions.h"
 
 namespace Graphics

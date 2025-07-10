@@ -3,7 +3,6 @@
 #include <span>
 #include <optional>
 #include <variant>
-#include <vector>
 #include <functional>
 
 #include "Definitions.h"

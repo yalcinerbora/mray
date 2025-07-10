@@ -1,8 +1,6 @@
 #pragma once
 
-
-#include "Core/Types.h"
-#include <string_view>
+#include <cstdint>
 
 #ifdef MRAY_GPU_BACKEND_CUDA
 

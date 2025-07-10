@@ -13,7 +13,6 @@
 #include "RendererC.h"
 #include "AcceleratorC.h"
 #include "TextureMemory.h"
-#include "TextureFilter.h"
 #include "Random.h"
 
 class ThreadPool;

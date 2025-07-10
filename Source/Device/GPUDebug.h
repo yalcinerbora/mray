@@ -3,7 +3,10 @@
 #include <string_view>
 #include <fstream>
 #include <iostream>
-#include "GPUSystemForward.h"
+
+#include "Core/Log.h"
+
+#include "GPUSystem.h"
 
 #pragma message ("WARNING! \"GPUDebug.h\" is included, don't forget to remove when " \
                  "debugging is done.")

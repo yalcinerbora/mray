@@ -51,7 +51,7 @@
 std::string             GetProcessPath();
 bool                    EnableVTMode();
 void                    RenameThread(SystemThreadHandle,
-                                 const std::string& name);
+                                     const std::string& name);
 SystemThreadHandle      GetCurrentThreadHandle();
 std::array<size_t, 2>   GetTerminalSize();
 

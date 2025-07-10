@@ -5,8 +5,6 @@
 #include "Core/Math.h"
 #include "TracerTypes.h"
 
-#include "Core/Log.h"
-
 namespace Distribution::BxDF
 {
     MRAY_HYBRID

@@ -6,10 +6,11 @@
 #include "Vector.h"
 #include "MRayDataType.h"
 #include "DataStructures.h"
-#include "System.h"
 #include "MRayDescriptions.h"
 
 #include "Common/RenderImageStructs.h"
+
+#include "TransientPool/TransientPool.h"
 
 #define MRAY_GENERIC_ID(NAME, TYPE) enum class NAME : TYPE {}
 
@@ -40,9 +41,6 @@ struct RenderImageParams
     Vector2ui               regionMin;
     Vector2ui               regionMax;
 };
-
-namespace TransientPoolDetail { class TransientData; }
-using TransientData = TransientPoolDetail::TransientData;
 
 enum class PrimitiveAttributeLogic : uint8_t
 {

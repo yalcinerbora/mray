@@ -3,16 +3,14 @@
 #include "Core/TracerI.h"
 #include "Core/Log.h"
 #include "Core/Timer.h"
-#include "Core/NormTypes.h"
 #include "Core/Filesystem.h"
 #include "Core/TypeNameGenerators.h"
 #include "Core/GraphicsFunctions.h"
 #include "Core/ThreadPool.h"
 
+#include "ImageLoader/EntryPoint.h"
 #include "MeshLoader/EntryPoint.h"
 #include "MeshLoaderJson.h"
-
-#include "ImageLoader/EntryPoint.h"
 
 #include <nlohmann/json.hpp>
 #include <filesystem>
@@ -20,10 +18,7 @@
 #include <memory>
 #include <string_view>
 #include <barrier>
-#include <atomic>
-#include <istream>
 
-#include "JsonNode.h"
 
 using namespace TypeNameGen::Runtime;
 

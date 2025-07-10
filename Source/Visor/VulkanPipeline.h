@@ -1,7 +1,8 @@
 #pragma once
 
-#include "Core/DataStructures.h"
 #include <vulkan/vulkan.h>
+
+#include "Core/DataStructures.h"
 #include "Core/Expected.h"
 
 static constexpr size_t VISOR_MAX_SHADER_BINDINGS = 8;

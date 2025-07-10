@@ -1,5 +1,8 @@
 #include "PathTracerRenderer.h"
+
 #include "Core/MemAlloc.h"
+#include "Core/Timer.h"
+#include "Tracer/RendererCommon.h"
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static void KCInitPathState(MRAY_GRID_CONSTANT const PathTraceRDetail::RayState dRayState,

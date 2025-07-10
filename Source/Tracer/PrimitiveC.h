@@ -1,10 +1,8 @@
 #pragma once
 
 #include <type_traits>
-#include <tuple>
 #include <cstdint>
 
-#include "Core/MRayDataType.h"
 #include "Core/MemAlloc.h"
 #include "Core/TypeFinder.h"
 

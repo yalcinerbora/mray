@@ -1,5 +1,7 @@
 #pragma once
 
+#include "CamerasDefault.h"
+
 namespace CameraDetail
 {
 

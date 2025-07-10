@@ -1,7 +1,5 @@
 #include "MeshProcessor.h"
 
-#include "MRayUSDTypes.h"
-
 #include "Core/Log.h"
 #include "Core/TracerI.h"
 #include "Core/TypeNameGenerators.h"

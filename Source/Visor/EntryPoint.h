@@ -1,7 +1,9 @@
 #pragma once
 
 #include <memory>
-#include "Core/SharedLibrary.h"
+
+#include "Core/System.h"
+
 #include "VisorI.h"
 
 #ifdef MRAY_VISOR_SHARED_EXPORT
@@ -9,7 +11,6 @@
 #else
     #define MRAY_VISOR_ENTRYPOINT MRAY_DLL_IMPORT
 #endif
-
 
 namespace VisorDetail
 {

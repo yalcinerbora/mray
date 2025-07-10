@@ -1,7 +1,8 @@
 #pragma once
+// IWYU pragma: private; include "GPUTextureView.h"
 
 #include <cstdint>
-#include "Core/TypeFinder.h"
+
 #include "Core/Vector.h"
 #include "Core/Types.h"
 #include "Core/MRayDataType.h"
@@ -251,10 +252,10 @@ TextureSignedExtent<D> TextureViewCPU<D, T>::NearestPixel(UV texel) const
 {
     TextureSignedExtent<D> result;
     if constexpr(D == 1)
-        result = int32_t(std::round(texel));
+        result = int32_t(std::round(texel - Float(0.5)));
     else for(uint32_t i = 0; i < D; i++)
     {
-        result[i] = int32_t(std::round(texel[i]));
+        result[i] = int32_t(std::round(texel[i] - Float(0.5)));
     }
     return TextureSignedExtent<D>(result);
 }

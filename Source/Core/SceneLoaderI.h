@@ -2,11 +2,9 @@
 
 #include <string>
 #include <map>
-#include "Error.h"
+#include "Expected.h"
 #include "Types.h"
 #include "TracerI.h"
-
-#include "ImageLoader/ImageLoaderI.h"
 
 class ThreadPool;
 

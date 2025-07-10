@@ -1,5 +1,8 @@
 #pragma once
 
+#include "Core/MathConstants.h"
+#include "Core/MathForward.h"
+
 #include <gtest/gtest.h>
 #include <gmock/gmock-matchers.h>
 

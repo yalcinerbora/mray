@@ -2,7 +2,7 @@
 
 #ifdef MRAY_GPU_BACKEND_CUDA
 
-    #include "CUDA/GPUAtomicCUDA.h"
+    #include "CUDA/GPUAtomicCUDA.h" // IWYU pragma: export
 
     namespace DeviceAtomic
     {
@@ -11,14 +11,14 @@
 
 #elif defined MRAY_GPU_BACKEND_HIP
 
-    #include "HIP/GPUAtomicHIP.h"
+    #include "HIP/GPUAtomicHIP.h" // IWYU pragma: export
 
     namespace DeviceAtomic
     {
         using namespace ::mray::hip::atomic;
     }
 #elif defined MRAY_GPU_BACKEND_CPU
-    #include "CPU/GPUAtomicCPU.h"
+    #include "CPU/GPUAtomicCPU.h" // IWYU pragma: export
 
     namespace DeviceAtomic
     {

@@ -7,7 +7,7 @@
 #include <pxr/usd/usd/prim.h>
 
 #include "Core/Definitions.h"
-#include "Core/Matrix.h"
+#include "Core/Matrix.h"        // IWYU pragma: keep
 
 struct MRayUSDPrimSurface
 {

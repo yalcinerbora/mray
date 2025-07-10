@@ -1,5 +1,7 @@
 #pragma once
 
+#include "DataStructures.h"
+
 template <std::unsigned_integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 StratifiedIntegerAliasTable<T>::StratifiedIntegerAliasTable(const T* dAliasRanges, T gcd)

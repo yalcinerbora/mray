@@ -1,8 +1,5 @@
 #include "ImageLoader.h"
 
-#include <execution>
-#include <algorithm>
-#include <array>
 #include <filesystem>
 
 #include "Core/MRayDataType.h"

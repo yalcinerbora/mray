@@ -1,6 +1,8 @@
 #pragma once
 
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
+
+#include "Core/Vector.h"
 
 template <class K, class V>
 struct KVType

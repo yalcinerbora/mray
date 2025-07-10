@@ -1,5 +1,7 @@
 #pragma once
 
+#include "TransformsDefault.h"
+
 MRAY_HYBRID MRAY_CGPU_INLINE
 TransformContextSingle::TransformContextSingle(const typename TransformDetail::SingleTransformSoA& tData,
                                                TransformKey tK)

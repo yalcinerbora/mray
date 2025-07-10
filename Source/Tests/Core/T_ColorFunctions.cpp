@@ -1,9 +1,6 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock-matchers.h>
 
-
-#include "Core/Vector.h"
-#include "Core/Quaternion.h"
 #include "Core/ColorFunctions.h"
 
 #include "GTestWrappers.h"

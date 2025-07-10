@@ -2,9 +2,11 @@
 #include <gmock/gmock-matchers.h>
 #include <random>
 
+#include "Device/GPUAlgGeneric.h"
+#include "Device/GPUSystem.hpp"
+
 #include "Tracer/RayPartitioner.h"
 #include "Tracer/Key.h"
-#include "Device/GPUAlgGeneric.h"
 
 void SimulateBasicPathTracer()
 {

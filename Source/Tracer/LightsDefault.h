@@ -5,16 +5,10 @@
 #include "TracerTypes.h"
 #include "Random.h"
 #include "Distributions.h"
-#include "DistributionFunctions.h"
 #include "LightC.h"
 #include "Bitspan.h"
 #include "ColorConverter.h"
 #include "Texture.h"
-
-#include "Device/GPUAlgGeneric.h"
-
-#include "Core/GraphicsFunctions.h"
-#include "Core/TypeNameGenerators.h"
 
 namespace LightDetail
 {

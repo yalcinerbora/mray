@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Tracer/PrimitiveC.h"
+
 #include <cstdint>
 
 // These are for instantiation convenience

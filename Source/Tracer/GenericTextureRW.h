@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Device/GPUTextureView.h"
+#include "Device/GPUTextureView.h"  // IWYU pragma: keep
 #include "Core/DeviceVisit.h"
 #include "TextureCommon.h"
 

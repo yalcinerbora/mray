@@ -1,5 +1,7 @@
 #pragma once
 
+#include "PrimitiveDefaultTriangle.h"
+
 namespace DefaultTriangleDetail
 {
 

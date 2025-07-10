@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Vector.h"
-#include "MathConstants.h"
 
 // Quaternion, layout is (w, x, y, z)
 // where; v[0] = w, v[1] = x, v[2] = y, v[3] = z

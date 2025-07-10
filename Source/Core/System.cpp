@@ -1,10 +1,10 @@
 #include "System.h"
+
+#include <cstring>
 #include <filesystem>
 #include <thread>
 #include <type_traits>
 
-#include "DataStructures.h"
-#include "Error.h"
 #include "Math.h"
 
 #ifdef MRAY_WINDOWS
@@ -75,6 +75,8 @@ void RenameThread(std::thread::native_handle_type t, const std::string& name)
     assert(totalConv == wideStr.size());
     SetThreadDescription(t, wideStr.data());
 }
+
+std::string_view        GetThreadName(SystemThreadHandle);
 
 SystemThreadHandle GetCurrentThreadHandle()
 {

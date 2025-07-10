@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include "Tracer/StreamingTextureView.h"
 
-#include "Device/GPUSystem.hpp"
+//#include "Device/GPUSystem.hpp"
 
 //MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 //void KCHashStatic(MRAY_GRID_CONSTANT const Span<uint64_t> out,

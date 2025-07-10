@@ -2,9 +2,13 @@
 
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <cstdio>
 #include <filesystem>
 
+#include "Core/Definitions.h"
+#include "Core/System.h"
 #include "TransientPool/TransientPool.h"
+
 
 MeshViewAssimp::MeshViewAssimp(uint32_t innerIndexIn, const MeshFileAssimp& fileIn)
     : innerIndex(innerIndexIn)
@@ -227,4 +231,64 @@ MeshLoaderAssimp::MeshLoaderAssimp()
 std::unique_ptr<MeshFileI> MeshLoaderAssimp::OpenFile(std::string& filePath)
 {
     return std::unique_ptr<MeshFileI>(new MeshFileAssimp(importer, filePath));
+}
+
+bool MRayAssimpLogger::attachStream(Assimp::LogStream*, unsigned int)
+{
+    throw MRayError("Cannot attach stream from MRayAssimpLogger!");
+}
+
+bool MRayAssimpLogger::detachStream(Assimp::LogStream*, unsigned int)
+{
+    throw MRayError("Cannot detach stream from MRayAssimpLogger!");
+}
+
+MRayAssimpLogger::MRayAssimpLogger()
+    : f(nullptr)
+{
+    f = std::fopen(LOG_FILE_NAME, "w");
+}
+
+MRayAssimpLogger::~MRayAssimpLogger()
+{
+    std::fclose(f);
+}
+
+void MRayAssimpLogger::OnDebug(const char* m)
+{
+    if constexpr(!MRAY_IS_DEBUG) return;
+
+    SystemThreadHandle handle = GetCurrentThreadHandle();
+    fmt::print(f, "[{}] [DEBUG] : {:s}",
+               std::bit_cast<uint64_t>(handle), m);
+}
+
+void MRayAssimpLogger::OnVerboseDebug(const char* m)
+{
+    if constexpr(!MRAY_IS_DEBUG) return;
+
+    SystemThreadHandle handle = GetCurrentThreadHandle();
+    fmt::print(f, "[{}] [DEBUG!] : {:s}",
+               std::bit_cast<uint64_t>(handle), m);
+}
+
+void MRayAssimpLogger::OnInfo(const char* m)
+{
+    SystemThreadHandle handle = GetCurrentThreadHandle();
+    fmt::print(f, "[{}] [INFO] : {:s}",
+               std::bit_cast<uint64_t>(handle), m);
+}
+
+void MRayAssimpLogger::OnWarn(const char* m)
+{
+    SystemThreadHandle handle = GetCurrentThreadHandle();
+    fmt::print(f, "[{}] [WARN] : {:s}",
+        std::bit_cast<uint64_t>(handle), m);
+}
+
+void MRayAssimpLogger::OnError(const char* m)
+{
+    SystemThreadHandle handle = GetCurrentThreadHandle();
+    fmt::print(f, "[{}] [ERR] : {:s}",
+        std::bit_cast<uint64_t>(handle), m);
 }

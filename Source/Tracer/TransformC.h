@@ -1,7 +1,6 @@
 #pragma once
 
 #include <concepts>
-#include <vector>
 
 #include "Core/MathForward.h"
 #include "Core/TracerI.h"

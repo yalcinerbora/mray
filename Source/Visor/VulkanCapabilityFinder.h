@@ -1,8 +1,11 @@
 #pragma once
 
-#include "Core/DataStructures.h"
-
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <algorithm>
 //
+
 template <std::contiguous_iterator ItL,
           std::contiguous_iterator ItS,
           class BinaryOp>

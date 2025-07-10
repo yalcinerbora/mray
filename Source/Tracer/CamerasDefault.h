@@ -2,7 +2,6 @@
 
 #include "CameraC.h"
 #include "Random.h"
-#include "Core/GraphicsFunctions.h"
 
 namespace CameraDetail
 {

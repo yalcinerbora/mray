@@ -1,4 +1,5 @@
 #include "MeshLoaderGFG.h"
+
 #include "Core/ShapeFunctions.h"
 
 #include <filesystem>
@@ -9,12 +10,12 @@ Optional<GFGVertexComponent> MeshViewGFG::FindComponent(PrimitiveAttributeLogic 
     for(const GFGVertexComponent& c : gfgFile.loader.Header().meshes[innerIndex].components)
     {
         using enum GFGVertexComponentLogic;
-        bool eq = ((c.logic == POSITION && l == PrimitiveAttributeLogic::POSITION) ||
-                   (c.logic == NORMAL && l == PrimitiveAttributeLogic::NORMAL) ||
-                   (c.logic == BINORMAL && l == PrimitiveAttributeLogic::BITANGENT) ||
-                   (c.logic == TANGENT && l == PrimitiveAttributeLogic::TANGENT) ||
-                   (c.logic == UV && l == PrimitiveAttributeLogic::UV0) ||
-                   (c.logic == WEIGHT && l == PrimitiveAttributeLogic::WEIGHT) ||
+        bool eq = ((c.logic == POSITION     && l == PrimitiveAttributeLogic::POSITION)  ||
+                   (c.logic == NORMAL       && l == PrimitiveAttributeLogic::NORMAL)    ||
+                   (c.logic == BINORMAL     && l == PrimitiveAttributeLogic::BITANGENT) ||
+                   (c.logic == TANGENT      && l == PrimitiveAttributeLogic::TANGENT)   ||
+                   (c.logic == UV           && l == PrimitiveAttributeLogic::UV0)       ||
+                   (c.logic == WEIGHT       && l == PrimitiveAttributeLogic::WEIGHT)    ||
                    (c.logic == WEIGHT_INDEX && l == PrimitiveAttributeLogic::WEIGHT_INDEX));
         if(eq) return c;
     }

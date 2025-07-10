@@ -1,5 +1,4 @@
 #pragma once
-
 /**
 
 Arbitrary sized axis aligned bounding box.

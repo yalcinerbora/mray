@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Core/Types.h"
 #include "Core/Vector.h"
 
 // Size ereased vector of floats

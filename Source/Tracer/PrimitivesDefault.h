@@ -1,19 +1,9 @@
 #pragma once
 
-#include <limits>
 #include <string_view>
-#include <unordered_map>
 
 #include "Core/TypeFinder.h"
-#include "Core/MRayDataType.h"
-#include "Core/Vector.h"
-#include "Core/Ray.h"
-#include "Core/Quaternion.h"
-#include "Core/Matrix.h"
-#include "Core/DataStructures.h"
-#include "Core/GraphicsFunctions.h"
 #include "Core/TypeNameGenerators.h"
-#include "Core/ShapeFunctions.h"
 
 #include "PrimitiveC.h"
 #include "TransformsDefault.h"

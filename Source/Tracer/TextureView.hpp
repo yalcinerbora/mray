@@ -1,7 +1,7 @@
 #pragma once
 
 #include "TextureView.h"
-#include "StreamingTextureView.hpp"
+#include "StreamingTextureView.hpp" // IWYU pragma: keep
 
 template<class T>
 MRAY_GPU MRAY_GPU_INLINE

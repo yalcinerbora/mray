@@ -2,7 +2,7 @@
 #include "Core/TypeNameGenerators.h"
 
 #ifdef MRAY_GPU_BACKEND_CPU
-    #include "Device/GPUSystem.hpp"
+    #include "Device/GPUSystem.hpp" // IWYU pragma: keep
 #endif
 
 std::string_view CameraGroupPinhole::TypeName()

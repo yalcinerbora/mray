@@ -3,7 +3,6 @@
 
 #include "Core/System.h"
 #include "Core/Log.h"
-#include "Core/Error.h"
 
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_to_string.hpp>

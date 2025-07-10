@@ -1,7 +1,4 @@
 #pragma once
-
-#pragma once
-
 /**
 
 Arbitrary sized vector. Vector is column vector (N x 1 matrix)
@@ -13,15 +10,12 @@ N should be 2, 3 or 4 at most.
 
 #include <cmath>
 #include <type_traits>
-#include <tuple>
 #include <concepts>
 #include <array>
 
 #include "MathForward.h"
-#include "Math.h"
 #include "NormTypes.h"
 #include "Types.h"
-#include "BitFunctions.h"
 
 static consteval unsigned int ChooseVectorAlignment(unsigned int totalSize)
 {

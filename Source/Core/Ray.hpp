@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Ray.h"
+
 template<FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr RayT<T>::RayT(const Vector<3, T>& direction,

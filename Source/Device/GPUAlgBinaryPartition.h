@@ -2,7 +2,7 @@
 
 #ifdef MRAY_GPU_BACKEND_CUDA
 
-    #include "CUDA/AlgBinaryPartitionCUDA.h"
+    #include "CUDA/AlgBinaryPartitionCUDA.h" // IWYU pragma: export
 
     namespace DeviceAlgorithms
     {
@@ -11,14 +11,14 @@
 
 #elif defined MRAY_GPU_BACKEND_HIP
 
-    #include "HIP/AlgBinaryPartitionHIP.h"
+    #include "HIP/AlgBinaryPartitionHIP.h" // IWYU pragma: export
 
     namespace DeviceAlgorithms
     {
         inline namespace DeviceSpecific{ using namespace ::mray::hip::algorithms; }
     }
 #elif defined MRAY_GPU_BACKEND_CPU
-    #include "CPU/AlgBinaryPartitionCPU.h"
+    #include "CPU/AlgBinaryPartitionCPU.h" // IWYU pragma: export
 
     namespace DeviceAlgorithms
     {

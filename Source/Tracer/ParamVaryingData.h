@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Device/GPUSystem.h"
 #include "TracerTypes.h"
 #include "TextureView.h"
 

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "GPUTypes.h"
-
 #ifdef MRAY_GPU_BACKEND_CUDA
     #include "CUDA/TextureCUDA.h"
 
@@ -25,7 +23,7 @@
     using RWTextureRef = mray::hip::RWTextureRefHIP<DIM, T>;
 
 #elif defined MRAY_GPU_BACKEND_CPU
-    #include "CPU/TextureCPU.h"
+    #include "CPU/TextureCPU.h" // IWYU pragma: export
 
     using TextureBackingMemory = mray::host::TextureBackingMemoryCPU;
 

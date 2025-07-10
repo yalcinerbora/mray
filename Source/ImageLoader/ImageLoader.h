@@ -1,13 +1,9 @@
 #pragma once
 
-#include <vector>
 #include <string>
-#include <memory>
 #include <fstream>
 
 #include "ImageLoaderI.h"
-
-#include "TransientPool/TransientPool.h"
 
 #include "Core/TypeGenFunction.h"
 // We need to add our own fmt header here

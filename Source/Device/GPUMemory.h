@@ -21,7 +21,7 @@
     using HostLocalAlignedMemory    = mray::hip::HostLocalAlignedMemoryHIP;
 
 #elif defined MRAY_GPU_BACKEND_CPU
-    #include "CPU/DeviceMemoryCPU.h"
+    #include "CPU/DeviceMemoryCPU.h" // IWYU pragma: export
 
     // Alias the types
     using DeviceMemory              = mray::host::DeviceMemoryCPU;

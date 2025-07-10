@@ -10,7 +10,6 @@
 #include "InputChecker.h"
 
 #include <vulkan/vulkan.h>
-#include <map>
 #include <memory>
 #include <mutex>
 

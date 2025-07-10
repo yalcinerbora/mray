@@ -1,14 +1,11 @@
 #pragma once
 
 #include "Tracer/RendererC.h"
-#include "Tracer/RendererCommon.h"
 #include "Tracer/RayPartitioner.h"
 
-#include "Core/Timer.h"
-
-
+#include "RequestedTypes.h" // IWYU pragma: keep
 #include "PathTracerRendererShaders.h"
-#include "RequestedTypes.h"
+
 
 // Due to NVCC error
 // "An extended __host__ __device__

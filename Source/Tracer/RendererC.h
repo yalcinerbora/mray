@@ -4,7 +4,6 @@
 #include "RenderImage.h"
 #include "GenericGroup.h"
 #include "TextureMemory.h"
-
 #include "MaterialC.h"
 #include "PrimitiveC.h"
 #include "CameraC.h"
@@ -14,7 +13,6 @@
 #include "AcceleratorC.h"
 
 #include "Core/TracerI.h"
-#include "Core/DataStructures.h"
 #include "Core/Algorithm.h"
 
 #include "TransientPool/TransientPool.h"
@@ -22,6 +20,7 @@
 #include "Device/GPUSystemForward.h"
 
 #include "Common/RenderImageStructs.h"
+
 #include <climits>
 
 class ThreadPool;

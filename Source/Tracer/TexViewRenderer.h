@@ -1,8 +1,6 @@
 #pragma once
 
 #include "RendererC.h"
-#include "Core/TypeGenFunction.h"
-#include "Core/TypeNameGenerators.h"
 
 class TexViewRenderer final : public RendererT<TexViewRenderer>
 {

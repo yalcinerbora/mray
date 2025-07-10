@@ -6,7 +6,6 @@
 #include "Core/Error.h"
 
 #include "VulkanAllocators.h"
-#include "VulkanTypes.h"
 
 #include <fstream>
 

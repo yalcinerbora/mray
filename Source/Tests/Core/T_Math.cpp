@@ -3,7 +3,6 @@
 
 #include "Core/Math.h"
 
-
 TEST(MathTest, Primes)
 {
     using namespace Math;

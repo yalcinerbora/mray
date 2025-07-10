@@ -1,8 +1,8 @@
 #pragma once
 
 #include "CameraC.h"
-#include "RendererC.h"
 #include "Random.h"
+#include "TransformC.h"
 
 template<CameraGroupC CameraG, TransformGroupC TransG>
 // Camera must be implicit lifetime type.

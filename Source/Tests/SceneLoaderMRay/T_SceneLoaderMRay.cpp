@@ -4,7 +4,6 @@
 
 #include "SceneLoaderMRay/EntryPoint.h"
 
-#include "Core/Types.h"
 #include "Core/SharedLibrary.h"
 #include "Core/SceneLoaderI.h"
 #include "Core/ThreadPool.h"

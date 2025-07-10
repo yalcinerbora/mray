@@ -4,10 +4,8 @@
 #include <pxr/usd/usdGeom/tokens.h>
 #include <pxr/usd/usdLux/tokens.h>
 
-#include "MeshLoader/EntryPoint.h"
 #include "Core/SceneLoaderI.h"
 #include "Core/TracerI.h"
-#include "Core/Flag.h"
 #include "Core/Expected.h"
 
 class ThreadPool;

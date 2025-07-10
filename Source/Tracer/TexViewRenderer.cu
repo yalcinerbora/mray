@@ -1,14 +1,11 @@
 #include "TexViewRenderer.h"
 #include "TracerBase.h"
-#include "TextureView.hpp"
+#include "TextureView.hpp"  // IWYU pragma: keep
 
 #include "Device/GPUSystem.hpp"
 
 #include "Core/Timer.h"
-#include "Core/DeviceVisit.h"
 #include "Core/ColorFunctions.h"
-
-#include "Device/GPUAlgGeneric.h"
 
 uint32_t FindTexViewChannelCount(const GenericTextureView& genericTexView)
 {

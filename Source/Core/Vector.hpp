@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Vector.h"
+
 template <unsigned int N, ArithmeticC T>
 template<std::convertible_to<T> C>
 MRAY_HYBRID MRAY_CGPU_INLINE

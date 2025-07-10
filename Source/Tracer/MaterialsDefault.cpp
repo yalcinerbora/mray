@@ -1,4 +1,6 @@
 #include "MaterialsDefault.h"
+#include "Texture.h"
+
 #include "Core/TypeNameGenerators.h"
 
 #ifdef MRAY_GPU_BACKEND_CPU

@@ -152,7 +152,13 @@ function(gen_imported_target)
             IMPORTED_LOCATION_RELEASE "${MRAY_PLATFORM_LIB_DIRECTORY}/Release/${GEN_IMPORTED_TGT_REL_IMPORT_NAME}")
     endif()
 
+    # Default is to link with release configuration
+    # since the build is "Release". You can change this to debug here.
+    # This should only be valid in clang/gcc STL libraries, MSVC has "ITERATOR_DEBUG_LEVEL"
+    # macros and other stuff that prevents linking Release/Debug builds. Thus, this is not propagated
+    # as an option to the user.
     set_target_properties(${GEN_IMPORTED_TGT_NAME} PROPERTIES MAP_IMPORTED_CONFIG_SANITIZER Release)
+    #set_target_properties(${GEN_IMPORTED_TGT_NAME} PROPERTIES MAP_IMPORTED_CONFIG_SANITIZER Debug)
 
     if(GEN_IMPORTED_TGT_EXTRA_INCLUDES)
         # Create these directories if they do not exist.

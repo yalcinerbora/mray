@@ -1,5 +1,12 @@
 #pragma once
 
+#include "LightsDefault.h"
+#include "DistributionFunctions.h"
+#include "Device/GPUAlgGeneric.h"
+
+#include "Core/GraphicsFunctions.h"
+#include "Core/TypeNameGenerators.h"
+
 namespace LightDetail
 {
 

@@ -1,6 +1,7 @@
 #pragma once
 
-#include "GPUSystemForward.h"
+#include <cstdint>
+#include <type_traits>
 
 namespace mray::algorithms
 {
@@ -37,7 +38,7 @@ namespace mray::algorithms
 
 #ifdef MRAY_GPU_BACKEND_CUDA
 
-    #include "CUDA/AlgForwardCUDA.h"
+    #include "CUDA/AlgForwardCUDA.h" // IWYU pragma: export
 
     namespace DeviceAlgorithms
     {
@@ -46,7 +47,7 @@ namespace mray::algorithms
     }
 #elif defined MRAY_GPU_BACKEND_HIP
 
-    #include "HIP/AlgForwardHIP.h"
+    #include "HIP/AlgForwardHIP.h" // IWYU pragma: export
 
     namespace DeviceAlgorithms
     {
@@ -54,7 +55,7 @@ namespace mray::algorithms
         inline namespace DeviceAgnostic{ using namespace ::mray::algorithms; }
     }
 #elif defined MRAY_GPU_BACKEND_CPU
-    #include "CPU/AlgForwardCPU.h"
+    #include "CPU/AlgForwardCPU.h" // IWYU pragma: export
 
     namespace DeviceAlgorithms
     {

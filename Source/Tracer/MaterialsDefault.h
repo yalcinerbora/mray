@@ -1,7 +1,6 @@
 #pragma once
 
-#include "DistributionFunctions.h"
-
+#include "Texture.h"
 #include "MaterialC.h"
 #include "ParamVaryingData.h"
 #include "Random.h"

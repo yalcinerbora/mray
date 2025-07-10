@@ -1,8 +1,8 @@
 #include "TextureCPU.h"
 #include "DeviceMemoryCPU.h"
-#include "GPUSystemCPU.hpp"
 
 #include "Core/GraphicsFunctions.h"
+#include "Device/GPUSystem.hpp"     // IWYU pragma: keep
 
 namespace mray::host
 {

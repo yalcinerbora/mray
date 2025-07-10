@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Core/System.h"
-#include "Core/SharedLibrary.h"
 #include "Core/SceneLoaderI.h"
 
 class ThreadPool;

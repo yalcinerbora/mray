@@ -2,12 +2,10 @@
 
 #pragma once
 
-#include <vector>
 #include <string>
 #include <memory>
 
 #include "Core/DataStructures.h"
-#include "Core/Vector.h"
 #include "Core/Flag.h"
 #include "Core/MRayDataType.h"
 #include "Core/TracerI.h"

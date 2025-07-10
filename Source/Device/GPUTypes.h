@@ -1,8 +1,6 @@
 #pragma once
 
 #include "Core/Vector.h"
-#include "Core/MemAlloc.h"
-#include "TransientPool/TransientPool.h"
 
 #include <type_traits>
 
