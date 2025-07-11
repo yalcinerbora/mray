@@ -137,7 +137,7 @@ class HostLocalAlignedMemoryCUDA
 };
 
 // Generic Device Memory (most of the cases this should be used)
-// Automatic multi-device seperation (round-robin style) etc.
+// Automatic multi-device separation (round-robin style) etc.
 class DeviceMemoryCUDA
 {
     struct Allocations

@@ -1490,7 +1490,7 @@ bool VisorWindow::Render()
     //    GUI RENDER/ Command Start   //
     // ============================== //
     if(stopPresenting) return true;
-    // Wait availablility of the command buffer
+    // Wait availability of the command buffer
     FramePack frameHandle = NextFrame();
     StartCommandBuffer(frameHandle);
     // ================== //

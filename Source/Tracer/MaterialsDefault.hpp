@@ -46,7 +46,7 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
     // shading space (same goes for wI but lambert material is
     // wI invariant so we did not convert it)
     wI = toTangentSpace.ApplyInvRotation(wI);
-    // Lambert material is **not** asubsurface material,
+    // Lambert material is **not** a subsurface material,
     // directly delegate the incoming position as outgoing
     Ray wIRay = Ray(wI, surface.position);
     MediumKey outMedium = surface.backSide ? mediumKeys.Back() : mediumKeys.Front();
@@ -573,7 +573,7 @@ SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
     // Get two random numbers
     Float sXi = dispenser.NextFloat<0>();
     Vector2 xi = dispenser.NextFloat2D<1>();
-    // We do not use extra RNG for single samlple MIS
+    // We do not use extra RNG for single sample MIS
     // we just bisect the given samples
     // TODO: Is this correct?
     Float misRatio = MISRatio(metallic, specular, avgAlbedo);
@@ -626,7 +626,7 @@ SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
     // Normal Distribution Function (GGX)
     Float D = BxDF::DGGX(NdH, alpha);
     // Shadowing Term (Smith Model)
-    Float G = BxDF::GSmithCorralated(V, L, alpha);
+    Float G = BxDF::GSmithCorrelated(V, L, alpha);
     G = (LdH == Float(0)) ? Float(0) : G;
     G = (VdH == Float(0)) ? Float(0) : G;
     // Fresnel Term (Schlick's Approx)
@@ -752,7 +752,7 @@ Spectrum UnrealMaterial<ST>::Evaluate(const Ray& wI,
     // and zero here as well.
     D = (Math::IsNan(D) || Math::IsInf(D)) ? Float(0) : D;
     // Shadowing Term (Smith Model)
-    Float G = BxDF::GSmithCorralated(V, L, alpha);
+    Float G = BxDF::GSmithCorrelated(V, L, alpha);
     G = (LdH == Float(0)) ? Float(0) : G;
     G = (VdH == Float(0)) ? Float(0) : G;
     // Fresnel Term (Schlick's Approx)

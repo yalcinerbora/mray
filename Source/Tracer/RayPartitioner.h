@@ -84,7 +84,7 @@ class RayPartitioner
     // Host Memory
     Span<uint32_t>  hPartitionStartOffsets;
     Span<CommonKey> hPartitionKeys;
-    // If user requested only divice visible these will be used
+    // If user requested only device visible these will be used
     // These have much faster bandwidth
     Span<uint32_t>  dPartitionStartOffsets;
     Span<CommonKey> dPartitionKeys;

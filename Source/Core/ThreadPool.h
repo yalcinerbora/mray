@@ -213,7 +213,7 @@ ThreadPool::SubmitBlocks(uint32_t totalWorkSize, WorkFunc&& wf,
     auto sharedWork = std::allocate_shared<BlockWorkFunction>(std::pmr::polymorphic_allocator<BlockWorkFunction>(&poolAllocator),
                                                               std::forward<WorkFunc>(wf));
 
-    // Enqueue the type ereased works to the queue
+    // Enqueue the type erased works to the queue
     MultiFuture<ResultT> result;
     result.futures.reserve(partitionCount);
     uint32_t startOffset = 0;
@@ -230,6 +230,7 @@ ThreadPool::SubmitBlocks(uint32_t totalWorkSize, WorkFunc&& wf,
 
         using AllocT = std::pmr::polymorphic_allocator<std::promise<ResultT>>;
         auto promise = std::allocate_shared<std::promise<ResultT>>(AllocT(&poolAllocator));
+        auto future = promise->get_future();
         taskQueue.Enqueue([=]()
         {
             try
@@ -249,7 +250,7 @@ ThreadPool::SubmitBlocks(uint32_t totalWorkSize, WorkFunc&& wf,
                 promise->set_exception(std::current_exception());
             }
         });
-        result.futures.push_back(promise->get_future());
+        result.futures.push_back(std::move(future));
     }
     assert(residual == 0);
     assert(startOffset == totalWorkSize);
@@ -264,6 +265,7 @@ ThreadPool::SubmitTask(WorkFunc&& wf)
     using ResultT = std::invoke_result_t<WorkFunc>;
     using AllocT = std::pmr::polymorphic_allocator<std::promise<ResultT>>;
     auto promise = std::allocate_shared<std::promise<ResultT>>(AllocT(&poolAllocator));
+    auto future = promise->get_future();
 
     // Here we do not need to copy the functor on a shared location
     // since each task will be executed by a single thread
@@ -287,7 +289,7 @@ ThreadPool::SubmitTask(WorkFunc&& wf)
             promise->set_exception(std::current_exception());
         }
     });
-    return promise->get_future();
+    return future;
 }
 
 template<ThreadDetachableTaskWorkC WorkFunc>

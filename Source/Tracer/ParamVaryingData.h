@@ -107,7 +107,7 @@ struct SpectrumConverterContext
     using RendererSpectrum = SpectrumConverterDetail:: template RendererSpectrum<C>;
 };
 
-// Concerete Identity Spectrum Converter
+// Concrete Identity Spectrum Converter
 struct SpectrumConverterIdentity
 {
     MRAY_HYBRID Spectrum Convert(const Vector3&) const;
@@ -126,9 +126,9 @@ struct SpectrumConverterIdentity
 
 using SpectrumConverterContextIdentity = SpectrumConverterContext<SpectrumConverterIdentity>;
 static_assert(SpectrumConverterC<SpectrumConverterIdentity>,
-              "\"SpectrumConverterIdentity\" do not satistfy \"SpectrumConverterC\" concept.");
+              "\"SpectrumConverterIdentity\" do not satisfy \"SpectrumConverterC\" concept.");
 static_assert(SpectrumConverterContextC<SpectrumConverterContextIdentity>,
-              "\"SpectrumConverterContextIdentity\" do not satistfy \"SpectrumConverterContextC\" concept." );
+              "\"SpectrumConverterContextIdentity\" do not satisfy \"SpectrumConverterContextC\" concept." );
 
 template <uint32_t DIMS, class T>
 MRAY_HYBRID MRAY_CGPU_INLINE

@@ -198,7 +198,7 @@ function(gen_imported_target)
 endfunction()
 
 function(gen_archive_pack)
-    set(options HAS_DEBUG_SUFFIX)
+    set(options HAS_DEBUG_SUFFIX PACKAGE_WHOLE_ARCHIVE)
     set(oneValueArgs NAME)
     set(multiValueArgs ARCHIVES EXTRA_INCLUDES EXTRA_DEFINES EXTRA_LIB_FOLDERS)
     cmake_parse_arguments(GEN_ARCHIVE_PACK "${options}" "${oneValueArgs}"
@@ -230,7 +230,7 @@ function(gen_archive_pack)
                                     SYSTEM INTERFACE
                                     ${GEN_ARCHIVE_PACK_EXTRA_INCLUDES})
     endif()
-    if(GEN_ARCHIVE_PACK_TGT_EXTRA_DEFINES)
+    if(GEN_ARCHIVE_PACK_EXTRA_DEFINES)
         target_compile_definitions(${GEN_ARCHIVE_PACK_NAME}
                                     INTERFACE
                                     ${GEN_ARCHIVE_PACK_EXTRA_DEFINES})
@@ -241,7 +241,24 @@ function(gen_archive_pack)
                                 ${GEN_ARCHIVE_PACK_EXTRA_LIB_FOLDERS})
     endif()
 
-    # Finally the libraries
+    # Convert to "whole archive" if requested
+    if(GEN_ARCHIVE_PACK_PACKAGE_WHOLE_ARCHIVE)
+
+        set(GEN_ARCHIVE_PACK_DBG_LINK_OPTS ${GEN_ARCHIVE_PACK_DBG_NAMES})
+        set(GEN_ARCHIVE_PACK_REL_LINK_OPTS ${GEN_ARCHIVE_PACK_REL_NAMES})
+        list(JOIN GEN_ARCHIVE_PACK_DBG_NAMES "," GEN_ARCHIVE_PACK_DBG_NAMES)
+        string(PREPEND GEN_ARCHIVE_PACK_DBG_NAMES $<LINK_LIBRARY:WHOLE_ARCHIVE,)
+        string(APPEND GEN_ARCHIVE_PACK_DBG_NAMES >)
+
+        list(JOIN GEN_ARCHIVE_PACK_REL_NAMES "," GEN_ARCHIVE_PACK_REL_NAMES)
+        string(PREPEND GEN_ARCHIVE_PACK_REL_NAMES $<LINK_LIBRARY:WHOLE_ARCHIVE,)
+        string(APPEND GEN_ARCHIVE_PACK_REL_NAMES >)
+
+    endif()
+    message(STATUS ${GEN_ARCHIVE_PACK_DBG_NAMES})
+    message(STATUS ${GEN_ARCHIVE_PACK_REL_NAMES})
+
+    # Finally the link command...
     target_link_libraries(${GEN_ARCHIVE_PACK_NAME}
                           INTERFACE
                           $<$<CONFIG:Debug>:${GEN_ARCHIVE_PACK_DBG_NAMES}>
@@ -294,34 +311,41 @@ if(MRAY_ENABLE_USD)
     #                     DEBUG_TARGET        usd_msd
     #                     RELEASE_TARGET      usd_ms
     #                     EXTRA_INCLUDES      ${MRAY_PLATFORM_LIB_DIRECTORY}/usd/include)
+    # Above one (with USD_MONOLITHIC=ON "Ext" side) does not properly generate the shared
+    # library on Linux. So we manually do it here
     # Achieve Build of USD
     gen_archive_pack(NAME usd::usd_archive
-                     HAS_DEBUG_SUFFIX
+                     HAS_DEBUG_SUFFIX PACKAGE_WHOLE_ARCHIVE
                      EXTRA_INCLUDES      ${MRAY_PLATFORM_LIB_DIRECTORY}/usd/include
                      EXTRA_LIB_FOLDERS   ${MRAY_PLATFORM_LIB_DIRECTORY}/usd/lib
+                     EXTRA_DEFINES       PXR_STATIC
                      # Lets go!
                      ARCHIVES
-                            usd_usdLux
-                            usd_usdShade
-                            usd_usdGeom
-                            usd_usdUtils
-                            usd_usd
-                            usd_plug
-                            usd_pcp
-                            usd_sdr
-                            usd_ndr
-                            usd_kind
-                            usd_sdf
-                            usd_ar
-                            # Base
-                            usd_work
-                            usd_trace
-                            usd_js
-                            usd_ts
-                            usd_vt
-                            usd_gf
-                            usd_tf
-                            usd_arch
+                        usd_usdLux
+                        usd_usdProc
+                        usd_usdMedia
+                        usd_usdVol
+                        usd_usdSemantics
+                        usd_usdShade
+                        usd_usdSkel
+                        usd_usdGeom
+                        usd_usd
+                        usd_pcp
+                        usd_sdr
+                        usd_ndr
+                        usd_sdf
+                        usd_kind
+                        usd_ar
+                        usd_ts
+                        usd_vt
+                        usd_plug
+                        usd_work
+                        usd_trace
+                        usd_js
+                        usd_pegtl
+                        usd_gf
+                        usd_tf
+                        usd_arch
                      )
 
     gen_imported_target(NAME tbb::tbb SHARED

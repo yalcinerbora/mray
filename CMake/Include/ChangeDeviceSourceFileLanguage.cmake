@@ -15,7 +15,7 @@ function(change_device_source_file_language)
     elseif(CHANGE_SOURCE_LANG_MACRO STREQUAL "MRAY_GPU_BACKEND_CPU")
         set(CHANGE_SOURCE_LANG_NAME CXX)
     else()
-        message(FATAL_ERROR "Unkown MRAY_GPU_BACKEND_* macro!")
+        message(FATAL_ERROR "Unknown MRAY_GPU_BACKEND_* macro!")
     endif()
 
     set_source_files_properties(${CHANGE_SOURCE_LANG_SOURCE_FILES}

@@ -366,13 +366,13 @@ void LoadPrimitive(TracerI& tracer,
     // (Probably one exception is the Bezier curve's control points but you can
     // put it as tangent maybe?)
     //
-    // This is all fun and games untill this point.
+    // This is all fun and games until this point.
     //
     // Some primitive groups may mandate some attributes, others may not.
     // Some files may have that attribute some may not.
     // In between this matrix of dependencies we can generate these from other attributes
     // (if available). All these things complicates the implementation.
-    //
+    // assimp is good
     // On top of all these complications, our default primitive requires normals as
     // quaternions for space efficiency (to tangent space transformation is held as a quat)
     //
@@ -812,7 +812,7 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
                 loaderIn.CommitReservations(groupId);
             }
             // Only proper exception here is the out of memory by the GPU probably.
-            // So abrubtly terminate the proces.
+            // So abruptly terminate the process.
             catch(MRayError& e)
             {
                 MRAY_ERROR_LOG("Fatal Error ({:s})", e.GetError());
@@ -904,7 +904,7 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
         // Issue a one final task that pushes the primitives to the global map
         threadPool.SubmitDetachedTask([&, future = futureShared, groupEntityList]()
         {
-            // Wait other tasks to complere
+            // Wait other tasks to complete
             future->WaitAll();
             // After this point groupBatchList is fully loaded
             std::scoped_lock lock(outputMappings.mutex);
@@ -926,13 +926,13 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ErrorList& exceptions)
     {
         // When barrier completed
         // Reserve the space for mappings
-        // Commit textures greoups reservations
+        // Commit textures group reservations
         try
         {
             tracer.CommitTextures();
         }
         // Only proper exception here is the out of memory by the GPU probably.
-        // So abrubtly terminate the proces.
+        // So abruptly terminate the process.
         catch(MRayError& e)
         {
             MRAY_ERROR_LOG("Fatal Error ({:s})", e.GetError());
@@ -1111,7 +1111,7 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ErrorList& exceptions)
     // Issue a one final task that pushes the primitives to the global map
     threadPool.SubmitDetachedTask([&, this, future = futureShared, texIdListPtr]()
     {
-        // Wait other tasks to complere
+        // Wait other tasks to complete
         future->WaitAll();
 
         // If no textures are loaded, commit the tracer
@@ -1389,7 +1389,7 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ErrorList& exceptions)
         // Key is the full path of the mesh file. For in node primitives,
         //  it is the scene "primitiveId".
         std::map<std::string, std::shared_ptr<MeshFileI>> meshFiles;
-        // Each mesh may have multiple submeshes so we don't wastefully open the same file
+        // Each mesh may have multiple sub-meshes so we don't wastefully open the same file
         // multiple times
         std::vector<std::shared_ptr<MeshFileViewI>> meshViews;
 
@@ -1790,16 +1790,16 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
 
     // Start with boundary
     using namespace NodeNames;
-    lightHTReady.wait();
+    lightHTReady.get();
     PushToTypeMapping(lightNodes, lightHT, boundary.lightId, LIGHT_LIST);
-    mediumHTReady.wait();
+    mediumHTReady.get();
     PushToTypeMapping(mediumNodes, mediumHT, boundary.mediumId, MEDIUM_LIST);
-    transformHTReady.wait();
+    transformHTReady.get();
     PushToTypeMapping(transformNodes, transformHT, boundary.transformId, TRANSFORM_LIST);
 
     // Prim/Material Surfaces
-    matHTReady.wait();
-    primHTReady.wait();
+    matHTReady.get();
+    primHTReady.get();
 
     std::vector<SceneTexId> textureIds;
     textureIds.reserve(surfaces.size() * 2);
@@ -1819,7 +1819,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
         }
     }
     // Camera Surfaces
-    camHTReady.wait();
+    camHTReady.get();
     for(const auto& c : camSurfaces)
     {
         PushToTypeMapping(cameraNodes, camHT, c.cameraId, CAMERA_LIST);
@@ -1828,7 +1828,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
                           c.transformId, TRANSFORM_LIST, true);
     }
     // Light Surfaces
-    lightHTReady.wait();
+    // Already waited for light hash table
     for(const auto& l : lightSurfaces)
     {
         // We could not use "PushToTypeMapping" here
@@ -1912,7 +1912,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     }
 
     // And finally create texture mappings
-    textureHTReady.wait();
+    textureHTReady.get();
     for(const auto& t : textureIds)
     {
         const auto& it = textureHT.find(uint32_t(t));
@@ -1924,7 +1924,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
         uint32_t arrayIndex = std::get<ARRAY_INDEX>(location);
         uint32_t innerIndex = std::get<INNER_INDEX>(location);
         auto node = JsonNode(sceneJson[TEXTURE_LIST][arrayIndex], innerIndex);
-        // TODO: Add support for 3D texs.
+        // TODO: Add support for 3D textures.
         textureNodes.emplace_back(t, std::move(node));
     }
 
@@ -1944,7 +1944,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     // TODO: Load balance here maybe?
     // Per-type per-array will be too fine grained?
     // (i.e., for cameras, probably a scene has at most 1-2 camera types 5-10 camera,
-    // but a primitive may have thousands of primitives (not indiviual, as a batch))
+    // but a primitive may have thousands of primitives (not individual, as a batch))
     threadPool.SubmitDetachedTask([this, &EliminateDuplicates]()
     {
         for(auto& p : primNodes) EliminateDuplicates(p.second);
@@ -2154,13 +2154,13 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
         // a texture etc.
         threadPool.Wait();
         // We already bottlenecked ourselves here (by waiting),
-        // might as well check if errors are occured and return early
+        // might as well check if errors are occurred and return early
         if(auto e = ConcatIfError(); e) return e;
 
         // Types that depend on textures
         LoadMediums(tracer, exceptionList);
         // Waiting here because Materials depend on mediums
-        // In mray, materials seperate two mediums.
+        // In mray, materials separate two mediums.
         threadPool.Wait();
         // Same as above
         if(auto e = ConcatIfError(); e) return e;
@@ -2192,7 +2192,7 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
         CreateLightSurfaces(tracer, lightSurfs, boundary);
         CreateCamSurfaces(tracer, camSurfs);
     }
-    // MRay related errros
+    // MRay related errors
     catch(const MRayError& e)
     {
         threadPool.ClearTasks();

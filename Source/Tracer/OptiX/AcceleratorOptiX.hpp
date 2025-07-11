@@ -391,11 +391,11 @@ AcceleratorGroupOptiX<PG>::MultiBuildAABB_CLT(const PreprocessResult& ppResult,
     uint32_t totalLeafCount = this->concreteLeafRanges.back()[1];
     uint32_t processedAccelCount = static_cast<uint32_t>(this->concreteLeafRanges.size());
 
-    std::vector<uint32_t> hConcereteLeafOffsets;
-    hConcereteLeafOffsets.reserve(processedAccelCount + 1);
-    hConcereteLeafOffsets.push_back(0);
+    std::vector<uint32_t> hConcreteLeafOffsets;
+    hConcreteLeafOffsets.reserve(processedAccelCount + 1);
+    hConcreteLeafOffsets.push_back(0);
     for(const auto& leafRange : this->concreteLeafRanges)
-        hConcereteLeafOffsets.push_back(leafRange[1]);
+    hConcreteLeafOffsets.push_back(leafRange[1]);
 
     // Create the AABBs of all leafs
     Span<AABB3> dLeafAABBs;
@@ -424,7 +424,7 @@ AcceleratorGroupOptiX<PG>::MultiBuildAABB_CLT(const PreprocessResult& ppResult,
     // Copy range buffer for batched processing
     auto hConcreteLeafRanges = Span<const Vector2ui>(this->concreteLeafRanges);
     auto hConcretePrimRanges = Span<const PrimRangeArray>(ppResult.concretePrimRanges);
-    auto hConcreteLeafOffsetSpan = Span<const uint32_t>(hConcereteLeafOffsets);
+    auto hConcreteLeafOffsetSpan = Span<const uint32_t>(hConcreteLeafOffsets);
     queue.MemcpyAsync(dConcreteLeafRanges, hConcreteLeafRanges);
     queue.MemcpyAsync(dConcretePrimRanges, hConcretePrimRanges);
     queue.MemcpyAsync(dConcreteLeafOffsets, hConcreteLeafOffsetSpan);
@@ -516,23 +516,23 @@ void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
     static constexpr bool PER_PRIM_TRANSFORM = TransformLogic == PrimTransformType::PER_PRIMITIVE_TRANSFORM;
     const PreprocessResult& ppResult = this->PreprocessConstructionParams(p);
     // Actual construction
-    std::vector<OptixTraversableHandle> hConcereteAccelHandles;
+    std::vector<OptixTraversableHandle> hConcreteAccelHandles;
     if constexpr(IsTriangle && !PER_PRIM_TRANSFORM)
     {
-        hConcereteAccelHandles = MultiBuildTriangle_CLT(ppResult, queue);
+        hConcreteAccelHandles = MultiBuildTriangle_CLT(ppResult, queue);
     }
     else if constexpr(!IsTriangle && !PER_PRIM_TRANSFORM)
     {
-        hConcereteAccelHandles = MultiBuildAABB_CLT(ppResult, queue);
+        hConcreteAccelHandles = MultiBuildAABB_CLT(ppResult, queue);
     }
     else if constexpr(IsTriangle && PER_PRIM_TRANSFORM)
     {
-        hConcereteAccelHandles = MultiBuildViaTriangle_PPT(ppResult, queue);
+        hConcreteAccelHandles = MultiBuildViaTriangle_PPT(ppResult, queue);
     }
 
     else if constexpr(!IsTriangle && !PER_PRIM_TRANSFORM)
     {
-        hConcereteAccelHandles = MultiBuildViaAABB_PPT(ppResult, queue);
+        hConcreteAccelHandles = MultiBuildViaAABB_PPT(ppResult, queue);
     }
     else static_assert(!IsTriangle && !PER_PRIM_TRANSFORM,
                        "Unknown params on OptiX build");
@@ -543,14 +543,14 @@ void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
         hInstanceHitRecordCounts.reserve(this->InstanceCount());
         // TODO: Convert
         for(uint32_t i : this->concreteIndicesOfInstances)
-            hInstanceAccelHandles.push_back(hConcereteAccelHandles[i]);
+            hInstanceAccelHandles.push_back(hConcreteAccelHandles[i]);
         //
         for(uint32_t i : this->concreteIndicesOfInstances)
             hInstanceHitRecordCounts.push_back(hConcreteHitRecordCounts[i]);
     }
     else
     {
-        hInstanceAccelHandles = std::move(hConcereteAccelHandles);
+        hInstanceAccelHandles = std::move(hConcreteAccelHandles);
         hInstanceHitRecordCounts = hConcreteHitRecordCounts;
     }
 

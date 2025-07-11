@@ -339,14 +339,14 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
                 localNormals[i] = Vector3(n[0], n[1], n[2]);
             }
         }
-        // We will need uv's for tangent space calcuation
+        // We will need uv's for tangent space calculation
         // Write something reasonable
         for(uint32_t i = 0; i < faceVertexCount; i++)
         {
             if(uvs.empty() || usdUVIndices[i] > uvs.size())
             {
                 // In this case, we do simple planar mapping-like approach
-                // Rotate each vertex poisition to tangent space and get (x,y)
+                // Rotate each vertex position to tangent space and get (x,y)
                 // After that, normalize the coordinates (no need for normalization,
                 // but it at least be between [0,1]).
                 Quaternion rot = Quaternion::RotationBetweenZAxis(localNormals[i]);

@@ -144,7 +144,7 @@ TEST(Dist_PiecewiseConstant2D, Uniform)
             EXPECT_NEAR(s.pdf, Float{1}, VeryLargeEpsilon<Float>());
             EXPECT_FLOAT_EQ(s.pdf, pdf);
 
-            // On uniform function, random numberss should match to the
+            // On uniform function, random numbers should match to the
             // sampled index
             Vector2 indexExpected = hRandomNumbers[i] * Vector2(SIZE);
             EXPECT_EQUAL_MRAY(s.value, indexExpected,
@@ -166,7 +166,7 @@ TEST(Dist_PiecewiseConstant2D, Uniform)
             EXPECT_NEAR(s.pdf, Float{1}, VeryLargeEpsilon<Float>());
             EXPECT_FLOAT_EQ(s.pdf, pdf);
 
-            // On uniform function, random numberss should match to the
+            // On uniform function, random numbers should match to the
             // sampled index
             Vector2 expandedValue = s.value * Vector2(SIZE);
             Vector2 indexExpected = hRandomNumbers[i] * Vector2(SIZE);
@@ -365,7 +365,7 @@ TEST(Dist_Gaussian, ZeroVariance)
             // the estimate should exactly match
             // actual integral.
             // For gaussian it will require EXPECT_NEAR
-            // though since it is numerically comples
+            // though since it is numerically complex
             EXPECT_FLOAT_EQ(integral, estimate);
             estimateTotal += estimate;
         }
@@ -426,7 +426,7 @@ TEST(Dist_Gaussian2D, ZeroVariance)
             // the estimate should exactly match
             // actual integral.
             // For gaussian it will require EXPECT_NEAR
-            // though since it is numerically comples
+            // though since it is numerically complex
             EXPECT_FLOAT_EQ(integral, estimate);
             estimateTotal += estimate;
         }

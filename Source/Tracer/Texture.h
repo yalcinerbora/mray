@@ -21,7 +21,7 @@ class alignas(8u) GenericTexture
     using MipIsLoadedBits = Bitset<TracerConstants::MaxTextureMipCount>;
     private:
     std::array<Byte, BuffSize> storage;
-    // TODO: Could not cast the storate to the interface,
+    // TODO: Could not cast the storage to the interface,
     //
     GenericTextureI*    impl;
     MRayPixelTypeRT     pixelType;

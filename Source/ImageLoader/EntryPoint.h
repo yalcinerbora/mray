@@ -5,18 +5,18 @@
 #include "Core/System.h"
 
 #ifdef MRAY_IMAGELOADER_SHARED_EXPORT
-    #define MRAY_IMAGEOADER_ENTRYPOINT MRAY_DLL_EXPORT
+    #define MRAY_IMAGELOADER_ENTRYPOINT MRAY_DLL_EXPORT
 #else
-    #define MRAY_IMAGEOADER_ENTRYPOINT MRAY_DLL_IMPORT
+    #define MRAY_IMAGELOADER_ENTRYPOINT MRAY_DLL_IMPORT
 #endif
 
 // C Interface (Used when dynamically loading the DLL)
 namespace ImageLoaderDetail
 {
-    extern "C" MRAY_IMAGEOADER_ENTRYPOINT
+    extern "C" MRAY_IMAGELOADER_ENTRYPOINT
     ImageLoaderI* ConstructImageLoader(bool enableMT = false);
 
-    extern "C" MRAY_IMAGEOADER_ENTRYPOINT
+    extern "C" MRAY_IMAGELOADER_ENTRYPOINT
     void DestroyImageLoader(ImageLoaderI*);
 
 }

@@ -807,7 +807,7 @@ void GenerateKernelInstantiationFiles(const LinePack& lp,
     //
     using PerFileVector = pmr::vector<std::array<pmr::string, 5>>;
     PerFileVector perFileLists(fileCount, &globalAllocator);
-    // Propogation of our allocator stops due to "std::array"
+    // Propagation of our allocator stops due to "std::array"
     // Manually allocate and reserve
     for(auto& arr : perFileLists)
     for(auto& s : arr)
@@ -819,16 +819,16 @@ void GenerateKernelInstantiationFiles(const LinePack& lp,
     // Split the works
     auto AppendInstantiations = [fileCount](PerFileVector& perFileLists,
                                             uint32_t listIndex,
-                                            const StringViewVec& instatiationList)
+                                            const StringViewVec& instantiationList)
     {
-        size_t workInstantiationPerFile = (instatiationList.size() + fileCount - 1) / fileCount;
+        size_t workInstantiationPerFile = (instantiationList.size() + fileCount - 1) / fileCount;
         for(size_t i = 0; i < fileCount; i++)
         for(size_t j = 0; j < workInstantiationPerFile; j++)
         {
             size_t instantiationIndex = i * workInstantiationPerFile + j;
-            if(instantiationIndex >= instatiationList.size()) break;
+            if(instantiationIndex >= instantiationList.size()) break;
 
-            perFileLists[i][listIndex] += instatiationList[instantiationIndex];
+            perFileLists[i][listIndex] += instantiationList[instantiationIndex];
         }
     };
     AppendInstantiations(perFileLists, 0, workInstantiations);
@@ -913,7 +913,7 @@ int main(int argc, const char* argv[])
     // is not null terminated!!!!
     // args[0] wraps null terminated c-string so its fine here
     std::ifstream file = std::ifstream(args[0].data(), std::ios::binary);
-    if(!file.is_open() || !file)
+    if(!file || !file.is_open())
     {
         fmt::println("Unable to open file \"{}\"", args[0]);
         return 1;

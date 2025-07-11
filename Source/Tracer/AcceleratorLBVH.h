@@ -69,7 +69,7 @@ namespace LBVHAccelDetail
         ChildIndex  rightIndex;
         uint32_t    parentIndex;
     };
-    // This is seperate because of volatile writes
+    // This is separate because of volatile writes
     // on construction, also it makes the alignment
     // better
     struct alignas(8) LBVHBoundingBox

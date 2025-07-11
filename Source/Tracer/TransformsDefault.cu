@@ -44,7 +44,7 @@ void TransformGroupSingle::PushAttribute(TransformKey id , uint32_t attributeInd
                         attributeIndex,
                         std::move(data), queue);
     }
-    else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
+    else throw MRayError("{:s}: Unknown AttributeIndex {:d}",
                          TypeName(), attributeIndex);
 }
 
@@ -60,7 +60,7 @@ void TransformGroupSingle::PushAttribute(TransformKey id,
                         attributeIndex, subRange,
                         std::move(data), queue);
     }
-    else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
+    else throw MRayError("{:s}: Unknown AttributeIndex {:d}",
                          TypeName(), attributeIndex);
 }
 
@@ -75,7 +75,7 @@ void TransformGroupSingle::PushAttribute(TransformKey idStart, TransformKey idEn
         GenericPushData(dTransforms, idRange, attributeIndex,
                         std::move(data), queue);
     }
-    else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
+    else throw MRayError("{:s}: Unknown AttributeIndex {:d}",
                          TypeName(), attributeIndex);
 }
 
@@ -165,7 +165,7 @@ void TransformGroupMulti::PushAttribute(TransformKey id, uint32_t attributeIndex
         GenericPushData(dTransforms, id.FetchIndexPortion(), attributeIndex,
                         std::move(data), queue);
     }
-    else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
+    else throw MRayError("{:s}: Unknown AttributeIndex {:d}",
                          TypeName(), attributeIndex);
 }
 
@@ -181,7 +181,7 @@ void TransformGroupMulti::PushAttribute(TransformKey id,
                         attributeIndex, subRange,
                         std::move(data), queue);
     }
-    else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
+    else throw MRayError("{:s}: Unknown AttributeIndex {:d}",
                          TypeName(), attributeIndex);
 }
 
@@ -196,13 +196,13 @@ void TransformGroupMulti::PushAttribute(TransformKey idStart, TransformKey idEnd
         GenericPushData(dTransforms, idRange, attributeIndex,
                         std::move(data), queue);
     }
-    else throw MRayError("{:s}: Unkown AttributeIndex {:d}",
+    else throw MRayError("{:s}: Unknown AttributeIndex {:d}",
                          TypeName(), attributeIndex);
 }
 
 void TransformGroupMulti::Finalize(const GPUQueue& queue)
 {
-    // Altough Multi tranform has non-regular arrayed transformations
+    // Although Multi transform has non-regular arrayed transformations
     // We can directly convert each transform individually
     // since each transform is independent from each other.
     // So a single invert call should suffice

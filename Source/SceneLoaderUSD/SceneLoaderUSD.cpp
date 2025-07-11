@@ -315,7 +315,7 @@ MRayError ProcessCameras(CameraGroupId& camGroupId,
         pxr::GfVec3d mid = bbox.GetMidpoint();
         bool zUp = (pxr::UsdGeomGetStageUpAxis(loadedStage) == pxr::UsdGeomTokens->z);
         // Convert to MRay vectors, it is little bit easier to express
-        // (Countinue double since USD returned double)
+        // (Continue double since USD returned double)
         // Find the max
         Vector3d extent = Vector3d(bboxSize[0], bboxSize[1], bboxSize[2]);
         Vector3d gaze = Vector3d(mid[0], mid[1], mid[2]);
@@ -480,7 +480,7 @@ MRayError ProcessLights(std::vector<std::pair<LightGroupId, LightId>>&,
     if(!meshGeomLights.empty() || !sphereGeomLights.empty())
     {
         MRAY_WARNING_LOG("[MRayUSD]: MRay detected geometry lights (in MRay terms, primitive-backed "
-                         "lights) in the scene. Altough these are supported in MRay, wiring is not yet "
+                         "lights) in the scene. Although these are supported in MRay, wiring is not yet "
                          "implemented. Please use a single dome light");
     }
     return MRayError::OK;
@@ -488,7 +488,13 @@ MRayError ProcessLights(std::vector<std::pair<LightGroupId, LightId>>&,
 
 SceneLoaderUSD::SceneLoaderUSD(ThreadPool& tp)
     : threadPool(tp)
-{}
+{
+    // using namespace std::string_view_literals;
+    // namespace fs = std::filesystem;
+
+    // std::string s = (fs::path(GetProcessPath())/ "usd"sv).string();
+    // pxr::PlugRegistry::GetInstance().RegisterPlugins(s);
+}
 
 Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                                                  const std::string& filePath)
@@ -522,7 +528,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
 
     // Hopefully everything is ok.
     //
-    // I've checked the imaging pipeline, but it was unecessarily
+    // I've checked the imaging pipeline, but it was unnecessarily
     // complicated? (It is because of the transitioning from Hd-1.0
     // to Hd-2.0 probably). Hd instancer uses scene delegate but
     // not scene index?
@@ -546,7 +552,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
             continue;
         }
         // For the rest, assume these are transforms only
-        // We do not swicth/case here, but these are seperated for readibility
+        // We do not switch/case here, but these are separated for readability
         bool isGeometry = (prim.IsA<pxr::UsdGeomMesh>() ||
                            prim.IsA<pxr::UsdGeomSphere>());
         bool isLight = prim.IsA<pxr::UsdLuxDomeLight>();

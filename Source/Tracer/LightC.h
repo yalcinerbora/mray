@@ -69,7 +69,7 @@ concept LightGroupC = requires(LGType lg)
     // Runtime Acquire the primitive group
     {lg.PrimitiveGroup()} -> std::same_as<const typename LGType::PrimGroup&>;
 
-    // TODO: This concept requres "Reserve" function to be visible,
+    // TODO: This concept requires "Reserve" function to be visible,
     // however we switched it so...
     //requires GenericGroupC<LGType>;
 };
@@ -96,8 +96,8 @@ class GenericGroupLightT : public GenericTexturedGroupT<LightKey, LightAttribute
                     GenericGroupLightT(uint32_t groupId, const GPUSystem&,
                                        const TextureViewMap&,
                                        size_t allocationGranularity = 2_MiB,
-                                       size_t initialReservartionSize = 4_MiB);
-    // Swap the interfaces (old switcharoo)
+                                       size_t initialReservationSize = 4_MiB);
+    // Swap the interfaces (old switcheroo)
     private:
     IdList          Reserve(const std::vector<AttributeCountList>&) override;
 
@@ -121,7 +121,7 @@ class GenericGroupLight : public GenericGroupLightT
                         GenericGroupLight(uint32_t groupId, const GPUSystem&,
                                           const TextureViewMap&,
                                           size_t allocationGranularity = 2_MiB,
-                                          size_t initialReservartionSize = 4_MiB);
+                                          size_t initialReservationSize = 4_MiB);
     std::string_view    Name() const override;
     // Not all lights need this
     void                SetSceneDiameter(Float) override {};
@@ -132,10 +132,10 @@ inline
 GenericGroupLightT::GenericGroupLightT(uint32_t groupId, const GPUSystem& s,
                                        const TextureViewMap& map,
                                        size_t allocationGranularity,
-                                       size_t initialReservartionSize)
+                                       size_t initialReservationSize)
     : Parent(groupId, s, map,
              allocationGranularity,
-             initialReservartionSize)
+             initialReservationSize)
 {}
 
 inline typename GenericGroupLightT::IdList
@@ -149,12 +149,12 @@ inline typename GenericGroupLightT::IdList
 GenericGroupLightT::Reserve(const std::vector<AttributeCountList>& countArrayList,
                             const PrimBatchList& primBatches)
 {
-    // We blocked the virutal chain, but we should be able to use it here
-    // We will do the same here anyways migh as well use it.
+    // We blocked the virtual chain, but we should be able to use it here
+    // We will do the same here anyways might as well use it.
     auto result = Parent::Reserve(countArrayList);
     if(!IsPrimitiveBacked()) return result;
 
-    // Relock the mutex (protect the "primMapping" DS)
+    // Re-lock the mutex (protect the "primMapping" DS)
     std::lock_guard lock{mutex};
     assert(result.size() == primBatches.size());
     for(size_t i = 0; i < primBatches.size(); i++)
@@ -178,10 +178,10 @@ template <class C>
 GenericGroupLight<C>::GenericGroupLight(uint32_t groupId, const GPUSystem& sys,
                                         const TextureViewMap& map,
                                         size_t allocationGranularity,
-                                        size_t initialReservartionSize)
+                                        size_t initialReservationSize)
     : GenericGroupLightT(groupId, sys, map,
                          allocationGranularity,
-                         initialReservartionSize)
+                         initialReservationSize)
 {}
 
 template <class C>

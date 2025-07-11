@@ -15,7 +15,7 @@
 // skinned mesh etc.) and another function can request the application function.
 // This example is for optix accelerator, or again the surface. Generated surface
 //
-// I'm not good at template metaprogramming
+// I'm not good at template metaprograming
 // probably this can be cleaner but it works...
 //
 // Old implementation were using recursive function instantiations

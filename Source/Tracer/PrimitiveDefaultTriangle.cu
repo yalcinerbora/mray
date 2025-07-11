@@ -12,7 +12,7 @@ void KCAdjustIndices(// I-O
     KernelCallParams kp;
     uint32_t totalRanges = static_cast<uint32_t>(dVertexIndexRanges.size());
 
-    // TODO: Check if this is undefined behaviour,
+    // TODO: Check if this is undefined behavior,
     // We technically do an out of bounds access over the "std::array<uint32_t, 3>"
     // Sanity check, if there is a padding (it should not but just to be sure)
     static_assert(sizeof(std::array<Vector3ui, 2>) == sizeof(Vector3ui) * 2);

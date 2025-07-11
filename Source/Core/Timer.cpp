@@ -82,7 +82,7 @@ std::string FormatTimeDynamic(uint64_t ms)
         return MRAY_FORMAT("{:.3f}s", sec);
 
     // Now do it manually
-    // Approixmate minutes as much as we can
+    // Approximate minutes as much as we can
     double totalMinutes = double(ms / 1000) / 60.0;
     if(totalMinutes < HOUR_IN_MINS)
     {

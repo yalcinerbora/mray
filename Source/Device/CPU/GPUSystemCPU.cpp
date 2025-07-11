@@ -189,7 +189,7 @@ GPUSystemCPU::GPUSystemCPU()
 
     // TODO: Check NUMA stuff:
     //  - Put a flag, to auto combine or split
-    //    NUMA nodes as seperate "Device"
+    //    NUMA nodes as separate "Device"
     systemGPUs.emplace_back(*localTP.get(), 0, nullptr);
     systemGPUPtrs.push_back(&systemGPUs.back());
 }
@@ -199,7 +199,7 @@ GPUSystemCPU::GPUSystemCPU(ThreadPool& tp)
 {
     // TODO: Check NUMA stuff:
     //  - Put a flag, to auto combine or split
-    //    NUMA nodes as seperate "Device"
+    //    NUMA nodes as separate "Device"
     systemGPUs.emplace_back(tp, 0, nullptr);
     systemGPUPtrs.push_back(&systemGPUs.back());
 }
@@ -285,7 +285,7 @@ GPUThreadInitFunction GPUSystemCPU::GetThreadInitFunction() const
 void TimelineSemAcquireInternal(void* params)
 {
     GPUSemaphoreViewCPU* ts = static_cast<GPUSemaphoreViewCPU*>(params);
-    // Device side acquision, we cant do much here,
+    // Device side acquisition, we cant do much here,
     // because this is async, so we drop the result and on text iteration
     // GPU driving code may check the semaphore before sending an
     // acquisition code to GPU (a host launch)

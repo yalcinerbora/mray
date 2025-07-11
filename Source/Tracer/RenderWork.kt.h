@@ -11,13 +11,13 @@ void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParamsR<R, I, PG, MG, TG> p
     using SpectrumConv  = typename R::SpectrumConverterContext;
     // Define the types
     // First, this kernel uses a transform context.
-    // Thil will be used to transform the primitive.
+    // This will be used to transform the primitive.
     // We may not be able act on the primitive without the primitive's data
     // (For example skinned meshes, we need weights and transform indices)
     // "TransformContext" abstraction handles these
     using TransContext = typename PrimTransformContextType<PG, TG>::Result;
     // Similarly Renderer may not be RGB, but Material is
-    // So it sends the spectrum converter contex, which is either identity
+    // So it sends the spectrum converter context, which is either identity
     // or a function that is constructed via wavelengths etc.
     using Material = typename MG:: template Material<SpectrumConv>;
     // Primitive is straightforward but we get a type with the proper
@@ -95,7 +95,7 @@ void KCRenderLightWork(MRAY_GRID_CONSTANT const RenderLightWorkParamsR<R, I, LG,
     using PG = typename LG::PrimGroup;
     // Define the types
     // First, this kernel uses a transform context.
-    // Thil will be used to transform the primitive.
+    // This will be used to transform the primitive.
     // We may not be able act on the primitive without the primitive's data
     // (For example skinned meshes, we need weights and transform indices)
     // "TransformContext" abstraction handles these

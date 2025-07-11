@@ -50,7 +50,7 @@ class TextureCPU_BC;
 template<uint32_t D, class T>
 class TextureCPU;
 
-// This is unnecesary layer but GPUs need it so
+// This is unnecessary layer but GPUs need it so
 // we just delegate the data to the actual non-owning view
 template<uint32_t D, class T>
 class RWTextureRefCPU

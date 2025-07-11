@@ -119,7 +119,7 @@ class VulkanDeviceAllocator
                                            Span<const VkMemoryType> = Span<const VkMemoryType>(),
                                            VkPhysicalDeviceType deviceType = VK_PHYSICAL_DEVICE_TYPE_MAX_ENUM);
 
-    // The alloaction
+    // The allocation
     template<VulkanMemObjectC... Args>
     [[nodiscard]]
     VulkanDeviceMemory AllocateMultiObject(std::tuple<Args&...> inOutObjects,

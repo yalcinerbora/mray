@@ -22,7 +22,7 @@
 #define WRAP_FUCTION_INTERSECT(NAME, PG, TG) \
     extern "C" __global__ void __intersection__##NAME(){KCIntersect<PG,TG>();}
 
-extern "C" __constant__ ArgumentPackOpitX params;
+extern "C" __constant__ ArgumentPackOptiX params;
 
 template<class T>
 MRAY_GPU MRAY_GPU_INLINE
@@ -395,12 +395,12 @@ void KCLocalRayGenOptix()
 WRAP_FUCTION_RAYGEN(OptiX, KCRayGenOptix);
 WRAP_FUCTION_RAYGEN(LocalOptiX, KCLocalRayGenOptix);
 WRAP_FUCTION_MISS(OptiX, KCMissOptiX);
-// These function names must be equavlient to the return type "TypeName()"
+// These function names must be equivalent to the return type "TypeName()"
 // functions. We can't do language magic here unfortunately
 // this needs to be maintained when a new primitive type introduced
 // to the system.
 //
-// Default Triange
+// Default Triangle
 //
 // Triange types do not need KCIntersect functions, since all these
 // are handled by HW (Including the PER_PRIM and

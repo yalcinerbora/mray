@@ -2,7 +2,7 @@
 
 #include "Core/Vector.h"
 
-// Size ereased vector of floats
+// Size erased vector of floats
 // For triangles and spheres it is Vector2 (N=2)
 // For other things it may be other sized floats
 // N is compile time constant at most can be 3 maybe?

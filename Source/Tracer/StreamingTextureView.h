@@ -60,7 +60,7 @@ namespace StreamingTexParams
 	static constexpr uint32_t	VirtualTexIndexBits = (sizeof(uint32_t) * CHAR_BIT -
 													   TypeIndexBits -
 													   Bit::RequiredBitsToRepresent(MaxPackCount));
-	// This is total maximum total alised texture per pack
+	// This is total maximum total aliased texture per pack
 	// We have two packs total (1:1 aspect 2:1 aspect tiled textures)
 	static constexpr uint32_t	MaxPhysicalTextureCount = 1024u;
 	// Bits left on the 32-bit virtual tex id.
@@ -95,13 +95,13 @@ namespace StreamingTexParams
 		{
 			tileWidth = PhysicalTileSize / InnerType::BlockSize;
 			static_assert(PhysicalTileSize % InnerType::BlockSize == 0,
-						  "PhysicalTileSize must be evenly divisable by BC block size");
+						  "PhysicalTileSize must be evenly divisible by BC block size");
 		}
 		else
 		{
 			tileWidth = PhysicalTileSize / PT::PaddedPixelSize;
 			static_assert(PhysicalTileSize % PT::PaddedPixelSize == 0,
-						  "PhysicalTileSize must be evenly divisable by pixels size");
+						  "PhysicalTileSize must be evenly divisible by pixels size");
 		}
 
 		uint32_t tZeroes = Bit::CountTZero(tileWidth);
@@ -527,7 +527,7 @@ constexpr uint32_t TextureStreamingContext::FetchChannelCount(MRayPixelEnum pixT
 		default:
 		{
 			assert(false);
-			// Immidiately crash on release
+			// Immediately crash on release
 			return std::numeric_limits<uint32_t>::max();
 		}
 	}
@@ -544,7 +544,7 @@ constexpr Vector2ui TextureStreamingContext::FetchTileSize(MRayPixelEnum pixType
 	// "static constexpr auto TileSizeListGPU = TypeTileSizeList;"
 	// loads the data to constant memory and fetches it.
 	// With switch case we hope the constexpr values to
-	// propogate
+	// propagate
 	Vector2ui tileSize = Vector2ui::Zero();
 	switch(pixType)
 	{

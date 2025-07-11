@@ -1,7 +1,8 @@
 #pragma once
 
 #include "../GPUSystemForward.h"
-#include "Core/MathForward.h"
+
+#include "Core/Vector.h"
 
 namespace mray::cuda::algorithms
 {

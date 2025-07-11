@@ -44,7 +44,7 @@ set(MRAY_MSVC_OPTIONS
     /permissive-    # standards conformance mode for MSVC compiler.
 
     /wd4324         # Disable type alignment padding warnings
-    /wd4505         # Diable "unreferenced function with internal linkage has been removed"
+    /wd4505         # Disable "unreferenced function with internal linkage has been removed"
 
     /external:anglebrackets # Minimize warnings on external stuff
     /external:W0            # i.e. it is included with the <...> syntax.
@@ -103,8 +103,11 @@ set(MRAY_CLANG_OPTIONS
     $<$<CONFIG:SanitizeR>:-fno-omit-frame-pointer>
     $<$<CONFIG:SanitizeR>:-O2>
     $<$<CONFIG:SanitizeR>:-g>
+
+    $<$<CONFIG:Release>:-O3>
     $<$<CONFIG:Release>:-g> # Also add debug info on release builds (for profiling etc.)
 
+    $<$<CONFIG:Debug>:-g>
 )
 
 # Arch related
@@ -134,7 +137,7 @@ set(MRAY_GCC_OPTIONS
     # -Wuseless-cast              # warn if you perform a cast to the same type
 
     -Wno-shadow
-    -Wno-abi                  # Disable ABI warnings (it occured due to nvcc)
+    -Wno-abi                  # Disable ABI warnings (it occurred due to nvcc)
 )
 
 set(MRAY_CUDA_OPTIONS
@@ -142,7 +145,7 @@ set(MRAY_CUDA_OPTIONS
     # i.e. cub
     #-Wreorder
     # Debug Related
-    # Optix-IR with -G flag is buggy?
+    # OptiX-IR with -G flag is buggy?
     # So we do not set it
     $<IF:$<BOOL:$<TARGET_PROPERTY:CUDA_OPTIX_COMPILATION>>,
         -lineinfo,
@@ -151,7 +154,7 @@ set(MRAY_CUDA_OPTIONS
     # $<$<AND:,$<CONFIG:Debug>>:-lineinfo>
     # $<$<NOT:$<AND:$<TARGET_PROPERTY:CUDA_OPTIX_COMPILATION>,$<CONFIG:Debug>>>:-G>
 
-    #$<$<CONFIG:Debug>:-G>
+    $<$<CONFIG:Debug>:-G>
     $<$<CONFIG:SanitizeR>:-lineinfo>
     $<$<CONFIG:Release>:-lineinfo>
     # Extended Lambdas (__device__ tagged lambdas)
@@ -215,7 +218,10 @@ endif()
 set(MRAY_PREPROCESSOR_DEFS_GENERIC
     $<$<CONFIG:Debug>:MRAY_DEBUG>
     $<$<CONFIG:SanitizeR>:MRAY_DEBUG>
-    $<$<CONFIG:Release>:NDEBUG>)
+    $<$<CONFIG:Release>:NDEBUG>
+
+    #$<$<CONFIG:Release>:MRAY_DEBUG>
+    )
 
 if(MSVC)
     set(MRAY_PREPROCESSOR_DEFS_GENERIC

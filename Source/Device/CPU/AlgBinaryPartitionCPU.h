@@ -51,10 +51,10 @@ void BinaryPartition(Span<T> dOutput,
     // Important!!! Binary partition MUST be stable
     // at least the true(left) part
     //
-    // Alogrihm Summary:
+    // Algorithm Summary:
     //   ---- O(2N + C) where C is the core count.
     //   ---- O(C) memory (two 32-bit integers per core (should be size_t)
-    //        aligned to prevent cache flushes or data persistance between threads.
+    //        aligned to prevent cache flushes or data persistence between threads.
     //
     //
     // For both parts, the partition is stable. Each thread

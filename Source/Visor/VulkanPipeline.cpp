@@ -98,7 +98,7 @@ MRayError VulkanComputePipeline::Initialize(VkDevice dev,
                          &shaderModule);
 
     // ====================== //
-    //  Discriptor Set Layout //
+    //  Descriptor Set Layout //
     // ====================== //
     Descriptor2DList<VkDescriptorSetLayoutBinding> bindings;
     for(const auto& bindingSet : bindingInfoList)

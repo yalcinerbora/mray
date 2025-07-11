@@ -44,7 +44,7 @@ mray_build_ext_dependency_git(
         BUILD_ARGS
             # Directly write in a folder
             # Zlib stores these variables between configs
-            # wich is bad. When you switch to release it still installs
+            # which is bad. When you switch to release it still installs
             # the debug config. So we need to write these
             -DINSTALL_BIN_DIR=${ZLIB_INSTALL_LOC}
             -DINSTALL_INC_DIR=${ZLIB_INSTALL_LOC}
@@ -370,7 +370,7 @@ mray_build_ext_dependency_git(
 
         BUILD_ARGS
             # OIIO caches xxx_ROOT variables
-            # and libaries does not change between configs
+            # and libraries does not change between configs
             --fresh
             # TODO: Change this later(oiio has "print" clashes with fmt)
             -DCMAKE_CXX_STANDARD=20

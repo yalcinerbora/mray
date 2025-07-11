@@ -98,7 +98,7 @@ void EyeAnim::SimpleProgressBar::Display(Float ratio, uint64_t timeMS,
                                          std::string_view postfix)
 {
     // TODO: Terminal sometimes fails when fast minimization occurs
-    // (Resudial characters appear at the next line).
+    // (Residual characters appear at the next line).
     // Investigate.
     //
     // There is a race condition that hard to synchronize
@@ -966,7 +966,7 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
         auto usedGPUMem = ConvertMemSizeToString(totalUsedMem);
         auto totalGPUMem = ConvertMemSizeToString(tracerInfo.totalGPUMemoryBytes);
         //
-        // TODO: Every frame we allocate a string... Wastefull
+        // TODO: Every frame we allocate a string... Wasteful
         // Use "format_to" for both time left and the entire display prefix
         std::string timeLeft = FormatTimeDynamic(totalMS);
         displaySuffix = MRAY_FORMAT("mem [{:.1f}{:s}/{:.1f}{:s}] | wpp [{:.1f}/{:.1f}] ~left {}",

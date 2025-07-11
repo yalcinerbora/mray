@@ -39,7 +39,7 @@ concept MediumC = requires(MediumType md,
     // for spatially varying media it is dense grid and does DDA march over it.
     //
     // Iterator calls a callback function that does the actual work,
-    // It can prematurely terminate the iteration due to scattering/absrobtion etc.
+    // It can prematurely terminate the iteration due to scattering/absorption etc.
     // March logic should not be here it will be the renderer's responsibility
     // Phase function should be here so we need a scatter function
     // that creates a ray.
@@ -91,7 +91,7 @@ class GenericGroupMedium : public GenericGroupMediumT
                                            const GPUSystem&,
                                            const TextureViewMap&,
                                            size_t allocationGranularity = 2_MiB,
-                                           size_t initialReservartionSize = 4_MiB);
+                                           size_t initialReservationSize = 4_MiB);
     std::string_view    Name() const override;
 };
 
@@ -100,10 +100,10 @@ GenericGroupMedium<C>::GenericGroupMedium(uint32_t groupId,
                                           const GPUSystem& sys,
                                           const TextureViewMap& map,
                                           size_t allocationGranularity,
-                                          size_t initialReservartionSize)
+                                          size_t initialReservationSize)
     : GenericGroupMediumT(groupId, sys, map,
                           allocationGranularity,
-                          initialReservartionSize)
+                          initialReservationSize)
 {}
 
 template <class C>

@@ -158,7 +158,7 @@ AABB3 BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instan
     gpuSystem.SyncAll();
 
     // Reduce the given AABBs
-    // Cheeckly utilize stack mem as temp mem
+    // Cheekily utilize stack mem as temp mem
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     size_t tempMemSize = DeviceAlgorithms::ReduceTMSize<AABB3>(dAABBs.size(), queue);
     Span<AABB3> dReducedAABB;
@@ -224,10 +224,10 @@ void BaseAcceleratorLinear::CastRays(// Output
     // Copy the ray indices to the local buffer, normally we could utilize
     // global ray partitioner (if available) but
     // - Not all renderers (very simple ones probably) may not have a partitioner
-    // - OptiX (or equavilent on other hardwares hopefully in the future) already
+    // - OptiX (or equivalent on other hardwares hopefully in the future) already
     //   does two-level acceleration in hardware, so we dont need to do this
     queue.MemcpyAsync(dCurrentIndices, dRayIndices);
-    // Continiously do traverse/partition until all rays are missed
+    // Continuously do traverse/partition until all rays are missed
     while(currentRayCount != 0)
     {
         queue.IssueWorkKernel<KCIntersectBaseLinear>
@@ -350,10 +350,10 @@ void BaseAcceleratorLinear::CastVisibilityRays(// Output
     // Copy the ray indices to the local buffer, normally we could utilize
     // global ray partitioner (if available) but
     // - Not all renderers (very simple ones probably) may not have a partitioner
-    // - OptiX (or equavilent on other hardwares hopefully in the future) already
+    // - OptiX (or equivalent on other hardwares hopefully in the future) already
     //   does two-level acceleration in hardware, so we dont need to do this
     queue.MemcpyAsync(dCurrentIndices, dRayIndices);
-    // Continiously do traverse/partition until all rays are missed
+    // Continuously do traverse/partition until all rays are missed
     while(currentRayCount != 0)
     {
         queue.IssueWorkKernel<KCIntersectBaseLinear>

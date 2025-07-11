@@ -107,7 +107,7 @@ class Swapchain
                                    bool tryHDR);
 
     FramebufferPack                 NextFrame(const VulkanBinarySemaphore& imgAvailSignal);
-    void                            PresentFrame(const VulkanBinarySemaphore& waitSingal);
+    void                            PresentFrame(const VulkanBinarySemaphore& waitSignal);
     void                            FBOSizeChanged(Vector2ui newSize);
     Pair<MRayColorSpaceEnum, Float> ColorSpace() const;
     VkColorSpaceKHR                 ColorSpaceVk() const;

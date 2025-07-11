@@ -124,7 +124,7 @@ using RNGDispenser = RNGDispenserT<RandomNumber>;
 // PCG with 32bit state
 // https://www.pcg-random.org
 // This RNG predominantly be used as a "backup" generator,
-// It has minimal state and andvancement capabilities
+// It has minimal state and advancement capabilities
 // (which will be usefull on volume rendering I hope)
 //
 // Each ray probably has one of these when it requires an undeterministic

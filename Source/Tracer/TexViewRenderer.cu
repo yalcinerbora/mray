@@ -134,7 +134,7 @@ void TexViewRenderer::PushAttribute(uint32_t attributeIndex,
                                     TransientData data, const GPUQueue&)
 {
     if(attributeIndex != 0)
-        throw MRayError("{} Unkown attribute index {}",
+        throw MRayError("{} Unknown attribute index {}",
                         TypeName(), attributeIndex);
     newOptions.totalSPP = data.AccessAs<uint32_t>()[0];
 }
@@ -218,7 +218,7 @@ RendererOutput TexViewRenderer::DoRender()
     const GPUQueue& processQueue = device.GetComputeQueue(0);
 
     uint32_t curPixelCount = imageTiler.CurrentTileSize().Multiply();
-    // Do not start writing to device side untill copy is complete
+    // Do not start writing to device side until copy is complete
     // (device buffer is read fully)
     processQueue.IssueWait(renderBuffer->PrevCopyCompleteFence());
     switch(currentOptions.mode)
@@ -241,7 +241,7 @@ RendererOutput TexViewRenderer::DoRender()
             uint32_t texChannelCount = FindTexViewChannelCount(texView);
             auto KernelCall = [&, this]<uint32_t C>()
             {
-                // Do not start writing to device side untill copy is complete
+                // Do not start writing to device side until copy is complete
                 // (device buffer is read fully)
                 processQueue.IssueWorkKernel<KCShowTexture<C>>
                 (

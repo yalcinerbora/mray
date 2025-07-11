@@ -288,7 +288,7 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
                                  1});
     // Again CUDA Init check warns about this, but this should be set?
     // via "AcquireIASConstructionParams". maybe we alloc too much?
-    // Just memset everything (TODO: wastefull due to barrier wait)
+    // Just memset everything (TODO: wasteful due to barrier wait)
     queue.MemsetAsync(Span(static_cast<Byte*>(tempMem), tempMem.Size()), 0x00);
     queue.Barrier().Wait();
 
@@ -514,7 +514,7 @@ void BaseAcceleratorOptiX::GenerateShaders(EmptyHitRecord& rgCommonRecord, Empty
     static constexpr auto CH_INDEX = 0;
     static constexpr auto AH_INDEX = 1;
     static constexpr auto IS_INDEX = 2;
-    // These are runtime, we need persistance
+    // These are runtime, we need persistence
     // to generate multiple data
     std::vector<std::array<std::string, 3>> typeHitPackNames;
     typeHitPackNames.reserve(shaderNames.size());
@@ -695,7 +695,7 @@ void BaseAcceleratorOptiX::CastRays(// Output
     const ComputeCapabilityTypePackOptiX& deviceTypes = optixTypesPerCC[currentCCIndex];
 
     // Copy args
-    ArgumentPackOpitX argPack =
+    ArgumentPackOptiX argPack =
     {
         .mode = RenderModeOptiX::NORMAL,
         .nParams = NormalRayCastArgPackOptiX
@@ -708,7 +708,7 @@ void BaseAcceleratorOptiX::CastRays(// Output
             .dRayIndices        = dRayIndices
         }
     };
-    queue.MemcpyAsync(dLaunchArgPack, Span<const ArgumentPackOpitX>(&argPack, 1));
+    queue.MemcpyAsync(dLaunchArgPack, Span<const ArgumentPackOptiX>(&argPack, 1));
     CUdeviceptr argsPtr = std::bit_cast<CUdeviceptr>(dLaunchArgPack.data());
 
     // Launch!
@@ -739,7 +739,7 @@ void BaseAcceleratorOptiX::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffer
     const ComputeCapabilityTypePackOptiX& deviceTypes = optixTypesPerCC[currentCCIndex];
 
     // Copy args
-    ArgumentPackOpitX argPack =
+    ArgumentPackOptiX argPack =
     {
         .mode = RenderModeOptiX::VISIBILITY,
         .vParams = VisibilityCastArgPackOptiX
@@ -751,7 +751,7 @@ void BaseAcceleratorOptiX::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffer
             .dRayIndices        = dRayIndices
         }
     };
-    queue.MemcpyAsync(dLaunchArgPack, Span<const ArgumentPackOpitX>(&argPack, 1));
+    queue.MemcpyAsync(dLaunchArgPack, Span<const ArgumentPackOptiX>(&argPack, 1));
     CUdeviceptr argsPtr = std::bit_cast<CUdeviceptr>(dLaunchArgPack.data());
 
     // Launch!
@@ -789,7 +789,7 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
     uint32_t batchStartOffset = uint32_t(instanceBatchStartOffsets[dAccelKeyBatchPortion]);
 
     // Copy args
-    ArgumentPackOpitX argPack =
+    ArgumentPackOptiX argPack =
     {
         .mode = RenderModeOptiX::LOCAL,
         .lParams = LocalRayCastArgPackOptiX
@@ -805,7 +805,7 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
             .batchStartOffset = batchStartOffset
         }
     };
-    queue.MemcpyAsync(dLaunchArgPack, Span<const ArgumentPackOpitX>(&argPack, 1));
+    queue.MemcpyAsync(dLaunchArgPack, Span<const ArgumentPackOptiX>(&argPack, 1));
     CUdeviceptr argsPtr = std::bit_cast<CUdeviceptr>(dLaunchArgPack.data());
 
     // Launch!

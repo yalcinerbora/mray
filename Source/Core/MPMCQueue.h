@@ -21,7 +21,7 @@ class MPMCQueue
         size_t                  enqueueLoc;
         size_t                  dequeueLoc;
 
-        std::condition_variable_any enqueWake;
+        std::condition_variable_any enqueueWake;
         std::condition_variable_any dequeueWake;
 
         std::timed_mutex        mutex;
@@ -102,7 +102,7 @@ void MPMCQueue<T>::Dequeue(T& item)
         Increment(dequeueLoc);
         item = std::move(data[dequeueLoc]);
     }
-    enqueWake.notify_one();
+    enqueueWake.notify_one();
 }
 
 template<class T>
@@ -116,7 +116,7 @@ bool MPMCQueue<T>::TryDequeue(T& item)
         Increment(dequeueLoc);
         item = std::move(data[dequeueLoc]);
     }
-    enqueWake.notify_one();
+    enqueueWake.notify_one();
     return true;
 }
 
@@ -135,7 +135,7 @@ bool MPMCQueue<T>::TryDequeue(T& item, D duration)
         Increment(dequeueLoc);
         item = std::move(data[dequeueLoc]);
     }
-    enqueWake.notify_one();
+    enqueueWake.notify_one();
     return true;
 }
 
@@ -144,7 +144,7 @@ void MPMCQueue<T>::Enqueue(T&& item)
 {
     {
         std::unique_lock<std::timed_mutex> lock(mutex);
-        enqueWake.wait(lock, [&]()
+        enqueueWake.wait(lock, [&]()
         {
             return (!IsFullUnsafe() || isTerminated);
         });
@@ -185,7 +185,7 @@ void MPMCQueue<T>::Terminate()
         isTerminated = true;
     }
     dequeueWake.notify_all();
-    enqueWake.notify_all();
+    enqueueWake.notify_all();
 }
 
 template<class T>

@@ -24,7 +24,7 @@ namespace Distribution::BxDF
     Float GSmithSingle(const Vector3& vec, Float alpha);
 
     MRAY_HYBRID
-    Float GSmithCorralated(const Vector3& wO, const Vector3& wI,
+    Float GSmithCorrelated(const Vector3& wO, const Vector3& wI,
                            Float alpha);
 
     MRAY_HYBRID
@@ -227,7 +227,7 @@ Float BxDF::GSmithSingle(const Vector3& vec, Float alpha)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Float BxDF::GSmithCorralated(const Vector3& wO, const Vector3& wI,
+Float BxDF::GSmithCorrelated(const Vector3& wO, const Vector3& wI,
                              Float alpha)
 {
     return Float(1) / (LambdaSmith(wO, alpha) + LambdaSmith(wI, alpha) + Float(1));

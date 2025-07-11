@@ -36,7 +36,7 @@ namespace SurfRDetail
         private:
         static constexpr std::array Names =
         {
-            "AmbientOcculusion",
+            "AmbientOcclusion",
             "Furnace",
             "WorldNormal",
             "WorldPosition",
@@ -90,7 +90,7 @@ namespace SurfRDetail
 
     struct RayStateCommon
     {
-        // Can be position, furance radiance, normal
+        // Can be position, furnace radiance, normal
         // or a false color
         Span<Spectrum>          dOutputData;
         Span<ImageCoordinate>   dImageCoordinates;
@@ -98,7 +98,7 @@ namespace SurfRDetail
     };
     struct RayStateAO
     {
-        // Can be position, furance radiance, normal
+        // Can be position, furnace radiance, normal
         // or a false color
         Span<Spectrum>          dOutputData;
         Span<ImageCoordinate>   dImageCoordinates;

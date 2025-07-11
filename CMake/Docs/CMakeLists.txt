@@ -26,7 +26,7 @@ set(MRAY_DOCS_BUILD_COMMAND ${Python3_EXECUTABLE} -m sphinx
     -D project=${MRAY_PROJECT_NAME})
 
 
-# Get the soruces to IDE (Visual Studio)
+# Get the sources to IDE (Visual Studio)
 set(MRAY_DOCS_SRC
     ${MRAY_DOCS_DIRECTORY}/conf.py
     ${MRAY_DOCS_DIRECTORY}/index.md

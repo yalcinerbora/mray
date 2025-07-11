@@ -570,7 +570,7 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
     size_t tmSize = std::max(reduceTMSize, sortTMSize);
 
     // Temp memory
-    // TODO: Too much memory, some memory can be ailased
+    // TODO: Too much memory, some memory can be aliased
     // since we use a single queue
     Span<AABB3> dSceneAABB;
     Span<Byte> dTemp;
@@ -659,7 +659,7 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
         std::swap(dIndices[0], dIndices[1]);
     }
 
-    // Alias the memory, indces[1], and mortonCode[1] are not used
+    // Alias the memory, indices[1], and mortonCode[1] are not used
     // anymore
     Span<uint32_t> dAtomicCounters = MemAlloc::RepurposeAlloc<uint32_t>(dIndices[1]);
     Span<uint32_t> dLeafParentIndices = MemAlloc::RepurposeAlloc<uint32_t>(dMortonCodes[1]);

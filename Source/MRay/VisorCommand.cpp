@@ -127,8 +127,8 @@ MRayError VisorCommand::Invoke()
                                 visorConfig.responseBufferSize,
     [&visorSystem]()
     {
-        // Trigge event (on glfw) calls "glfwPostEmptyEvent()"
-        // so that when tracer isses a response,
+        // Trigger event (on glfw) calls "glfwPostEmptyEvent()"
+        // so that when tracer isues a response,
         // glfw can process it
         visorSystem->TriggerEvent();
     });
@@ -222,7 +222,7 @@ MRayError VisorCommand::Invoke()
     // First stop the tracer, since tracer commands
     // submit glfw "empty event" to trigger visor rendering
     tracerThread.Stop();
-    // Now we can destory the visor
+    // Now we can destroy the visor
     visorSystem->MTDestroy();
     // All Done!
     return e;

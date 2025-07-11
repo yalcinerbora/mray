@@ -73,7 +73,7 @@ class CameraGroupPinhole : public GenericGroupCamera<CameraGroupPinhole>
     Span<Vector3>   dUpVectors;
     DataSoA         soa;
 
-    std::vector<CameraTransform>    hCameraTansforms;
+    std::vector<CameraTransform>    hCameraTransforms;
     std::vector<Vector4>            hFovAndPlanes;
 
     public:

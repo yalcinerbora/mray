@@ -505,7 +505,7 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
     // Since it requires function minimization etc. So some functionality
     // will be skipped for BC textures. For example, clamping texture
     // resolutions will only happen if there is a mip available for that level
-    // if not one level higher (untill a valid mip is reached) will be used.
+    // if not one level higher (until a valid mip is reached) will be used.
     bool isBlockCompressed = inputParams.pixelType.IsBlockCompressed();
 
     // Round robin deploy textures
@@ -737,7 +737,7 @@ void TextureMemory::PushTextureData(TextureId id, uint32_t mipLevel,
         auto texClampBufferSpan = Span<Byte>(static_cast<Byte*>(texClampBuffer), texClampBuffer.Size());
         auto dataSpan = ToConstSpan(data.AccessAs<Byte>());
 
-        // Utilize the TexClampParamters
+        // Utilize the TexClampParameters
         clampParams.surface = tex.RWView(0);
 
         tex.SetMipToLoaded(mipLevel);

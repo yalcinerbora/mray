@@ -43,9 +43,9 @@ enum class ImageFlagTypes
     //  t -= mid;
     //  return int8_t(t);
     //
-    // This should be equavilent of the conversion of "r * 255 - 128"
+    // This should be equivalent of the conversion of "r * 255 - 128"
     // The difference is that 2's complement integers are not represented like this
-    // Devices (CUDA currently) does not proparly normalize these integers
+    // Devices (CUDA currently) does not properly normalize these integers
     LOAD_AS_SIGNED = 0,
     // Due to HW limitations (CUDA does not directly support 3 channel textures),
     // We might need to pad a 4th channel to the image.
@@ -59,7 +59,7 @@ enum class ImageFlagTypes
     // either top left or bottom left.
     //
     // MRay uses bottom left origin coordinates. Vulkan and OIIO assumes otherwise.
-    // These discrapencies are automatically handled by the system. (Utilizing this flag)
+    // These discrepancies are automatically handled by the system. (Utilizing this flag)
     // User should not set this flag unless it literally wants to flip the Y coordinate.
     //
     // After loading by these functions, the resulting image will be in MRay's coordinate
@@ -73,8 +73,8 @@ using ImageIOFlags = Flag<ImageFlagTypes>;
 using ColorSpacePack = Pair<Float, MRayColorSpaceEnum>;
 
 // TODO: Images are just as complex as the renderer itself...
-// (Too many conventions standarts etc..)
-// OIIO helps tramendously however, it is just a passthrough.
+// (Too many conventions standards etc..)
+// OIIO helps tremendously however, it is just a passthrough.
 //
 // So we restrict the data to some basic formats
 //  - Deep images are ignored (or maybe only the 1st depth is read)

@@ -94,7 +94,7 @@ concept PrimitiveC = requires(PrimType pt,
     // Voxelization
     // Given a scene extent/resolution
     // Generate voxels for this primitive
-    // voxels will be used for approixmate invariant scene representation
+    // voxels will be used for approximate invariant scene representation
     // Many methods require discretized scene representation
     // for GPU-based renderer voxels are a good choice
     {pt.Voxelize(mortonCodes, voxelNormals, bool{},
@@ -114,7 +114,7 @@ concept PrimitiveC = requires(PrimType pt,
     // Accelerator "AnyHit" requirements
     // Acquire primitive's surface parametrization
     // (Aka. uv map)
-    // Good: No data duplication no prinicpiled data for alpha testing
+    // Good: No data duplication no principled data for alpha testing
     //
     // Bad: All prims somehow has uv parametrization (if not available,
     // alpha maping cannot be done, but they can return garbage so its OK)
@@ -150,7 +150,7 @@ concept PrimitiveGroupC = requires(PGType pg, TransientData input)
                             typename PGType::template Primitive<>::Hit>;
 
     // Transform context generator list of the primitive is used to
-    // statically select a appropirate function for given primitive and transform
+    // statically select a appropriate function for given primitive and transform
     //
     // TransformTypes (identity, single, multi, morph target etc.)
     //
@@ -180,7 +180,7 @@ concept PrimitiveGroupC = requires(PGType pg, TransientData input)
 };
 
 // This concept is introduced because of OptiX
-// Optix requires specific types to constrcut accelerators
+// Optix requires specific types to construct accelerators
 template <class PGType>
 concept TrianglePrimGroupC = requires(const PGType& pg)
 {
@@ -198,7 +198,7 @@ concept PrimitiveWithSurfaceC = requires(PrimType mg,
     requires PrimitiveC<PrimType>;
 
     // TODO: Ask on stackoverflow how to
-    // constrain the function to thave a specific
+    // constrain the function to have a specific
     // signature to prevent partial updates
     // when non-derived function exists.
     {mg.GenerateSurface(surface, rcs,
@@ -240,7 +240,7 @@ class GenericGroupPrimitiveT : public GenericGroupT<PrimBatchKey, PrimAttributeI
                 GenericGroupPrimitiveT(uint32_t groupId,
                                        const GPUSystem& sys,
                                        size_t allocationGranularity = 16_MiB,
-                                       size_t initialReservartionSize = 64_MiB);
+                                       size_t initialReservationSize = 64_MiB);
 
     virtual void        ApplyTransformations(const std::vector<PrimBatchKey>& primBatches,
                                              const std::vector<Matrix4x4>& batchTransformations,
@@ -258,7 +258,7 @@ class GenericGroupPrimitive : public GenericGroupPrimitiveT
                         GenericGroupPrimitive(uint32_t groupId,
                                               const GPUSystem& sys,
                                               size_t allocationGranularity = 16_MiB,
-                                              size_t initialReservartionSize = 64_MiB);
+                                              size_t initialReservationSize = 64_MiB);
     void                ApplyTransformations(const std::vector<PrimBatchKey>& primBatches,
                                              const std::vector<Matrix4x4>& batchTransformations,
                                              const GPUQueue& deviceQueue) override;
@@ -378,20 +378,20 @@ inline
 GenericGroupPrimitiveT::GenericGroupPrimitiveT(uint32_t groupId,
                                                const GPUSystem& sys,
                                                size_t allocationGranularity,
-                                               size_t initialReservartionSize)
+                                               size_t initialReservationSize)
     : GenericGroupT<PrimBatchKey, PrimAttributeInfo>(groupId, sys,
                                                      allocationGranularity,
-                                                     initialReservartionSize)
+                                                     initialReservationSize)
 {}
 
 template<class C>
 GenericGroupPrimitive<C>::GenericGroupPrimitive(uint32_t groupId,
                                                 const GPUSystem& sys,
                                                 size_t allocationGranularity,
-                                                size_t initialReservartionSize)
+                                                size_t initialReservationSize)
     : GenericGroupPrimitiveT(groupId, sys,
                              allocationGranularity,
-                             initialReservartionSize)
+                             initialReservationSize)
 {}
 
 template<class C>

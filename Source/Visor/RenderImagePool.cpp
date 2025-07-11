@@ -390,9 +390,9 @@ void RenderImagePool::SaveImage(VisorGUI& visorGUI,
     // not preventing responsiveness of the Visor.
     if(loadEvent.valid()) loadEvent.wait();
 
-    // ============= //
-    //   SUBMISSON   //
-    // ============= //
+    // ============== //
+    //   SUBMISSION   //
+    // ============== //
     auto allStages = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
     VkSemaphoreSubmitInfo waitSemaphore = imgSem.WaitInfo(allStages);
     VkSemaphoreSubmitInfo signalSemaphore = imgSem.SignalInfo(allStages, 1);
@@ -486,9 +486,9 @@ void RenderImagePool::SaveImage(VisorGUI& visorGUI,
 
 void RenderImagePool::IssueClear(const VulkanTimelineSemaphore& imgSem)
 {
-    // ============= //
-    //   SUBMISSON   //
-    // ============= //
+    // ============== //
+    //   SUBMISSION   //
+    // ============== //
     auto allStages = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
     VkSemaphoreSubmitInfo waitSemaphore = imgSem.WaitInfo(allStages);
     VkSemaphoreSubmitInfo signalSemaphore = imgSem.SignalInfo(allStages, 1);
@@ -517,9 +517,9 @@ void RenderImagePool::IssueClear(const VulkanTimelineSemaphore& imgSem)
 
 void RenderImagePool::IssueFullClear(const VulkanTimelineSemaphore& imgSem)
 {
-    // ============= //
-    //   SUBMISSON   //
-    // ============= //
+    // ============== //
+    //   SUBMISSION   //
+    // ============== //
     auto allStages = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
     VkSemaphoreSubmitInfo waitSemaphore = imgSem.WaitInfo(allStages);
     VkSemaphoreSubmitInfo signalSemaphore = imgSem.SignalInfo(allStages, 1);

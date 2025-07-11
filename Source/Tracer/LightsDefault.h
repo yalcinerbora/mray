@@ -207,7 +207,7 @@ namespace LightDetail
 //  PackedTypes<LightGroupPrim<PrimGroupSkinnedTriangle>, TransformGroupMulti>
 // "
 // Somehow PackedTypes<LightGroupPrim<PrimGroupTriangle>, TransformGroupSingle>,
-// linked perfrectly fine (PackedTypes is empty variadic pack class btw)
+// linked perfectly fine (PackedTypes is empty variadic pack class btw)
 // but skinned triangle references could not be found
 //
 // This smells like name mangling issue but dunno

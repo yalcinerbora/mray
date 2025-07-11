@@ -68,7 +68,7 @@ static std::wstring ConvertWCharWin32(const std::string& unicodeStr)
 
 #endif
 
-void* SharedLibrary::GetProcAdressInternal(const std::string& fName) const
+void* SharedLibrary::GetProcAddressInternal(const std::string& fName) const
 {
     #ifdef MRAY_WINDOWS
         FARPROC proc = GetProcAddress(std::bit_cast<HINSTANCE>(libHandle), fName.c_str());

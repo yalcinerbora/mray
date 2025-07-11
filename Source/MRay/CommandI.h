@@ -12,7 +12,7 @@ enum class CommandType
                 // or visor gui (if config is provided), then renders the scene
                 // interactively.
     RENDER,     // Render subcommand, it renders the given scene to a file
-    SCENE_CONV  // Scene conversion subcommond, given a scene it will convert to another
+    SCENE_CONV  // Scene conversion subcommand, given a scene it will convert to another
                 // format
 };
 

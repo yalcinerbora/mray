@@ -46,7 +46,7 @@ enum class VisorUserAction : int
 
     // Movement Related
     // TODO: We need to distinguish the key action and mouse action
-    // since Imgui has seperate function for mouse and key.
+    // since Imgui has separate function for mouse and key.
     // Currently but "MOUSE_" prefix here for verbosity
     //
     MOUSE_ROTATE_MODIFIER,
@@ -76,7 +76,7 @@ struct VisorConfig
     uint32_t    commandBufferSize   = 8;
     uint32_t    responseBufferSize  = 8;
 
-    // TODO: Move the default keymap to somwhere else
+    // TODO: Move the default keymap to somewhere else
     VisorKeyMap keyMap;
 };
 

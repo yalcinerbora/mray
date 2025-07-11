@@ -256,7 +256,7 @@ class GPUQueueCPU
                                     Lambda&&) const;
     // Exact Kernel Calls
     // You 1-1 specify block and grid dimensions
-    // Important: These can not be annottated with launch_bounds
+    // Important: These can not be annotated with launch_bounds
     template<auto Kernel, class... Args>
     MRAY_HOST void  IssueBlockKernel(std::string_view name,
                                      DeviceBlockIssueParams,
@@ -454,7 +454,7 @@ void AtomicWaitValueToAchieve(std::atomic_uint64_t& checkLoc, uint64_t valToAchi
     // We need to wait until "X >= Y" (i.e. completedCount >= achievedCount)
     // but atomic only waits when X == Y returns otherwise.
     //
-    // So we awake the threads alot. Below code somewhat minimizes this.
+    // So we awake the threads a lot. Below code somewhat minimizes this.
     // "wait_predicate" would have been better?
     // Probably hard to implement or most CPU's/Kernels does not have
     // this functionality, I dunno.

@@ -160,7 +160,7 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
                                            const GPUQueue& queue)
 {
     PreprocessResult ppResult = this->PreprocessConstructionParams(p);
-    // Before the allocation hickup, allocate the temp
+    // Before the allocation hiccup, allocate the temp
     // memory as well.
     DeviceLocalMemory tempMem(*queue.Device());
     // Allocate concrete leaf ranges for processing

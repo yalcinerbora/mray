@@ -61,7 +61,7 @@ class GenericGroupTransform : public GenericGroupTransformT
                         GenericGroupTransform(uint32_t transGroupId,
                                               const GPUSystem& sys,
                                               size_t allocationGranularity = 2_MiB,
-                                              size_t initialReservartionSize = 4_MiB);
+                                              size_t initialReservationSize = 4_MiB);
     std::string_view    Name() const override;
 };
 
@@ -127,10 +127,10 @@ template <class C>
 GenericGroupTransform<C>::GenericGroupTransform(uint32_t transGroupId,
                                                 const GPUSystem& sys,
                                                 size_t allocationGranularity,
-                                                size_t initialReservartionSize)
+                                                size_t initialReservationSize)
     : GenericGroupTransformT(transGroupId, sys,
                              allocationGranularity,
-                             initialReservartionSize)
+                             initialReservationSize)
 {}
 
 template <class C>

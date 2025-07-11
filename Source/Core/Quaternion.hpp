@@ -255,14 +255,14 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Quat<T> Quat<T>::NLerp(const Quat<T>& start,
                                  const Quat<T>& end, T t)
 {
-    T cosTetha = start.Dot(end);
+    T cosTheta = start.Dot(end);
     // Select closest approach
-    T cosFlipped = (cosTetha >= 0) ? cosTetha : (-cosTetha);
+    T cosFlipped = (cosTheta >= 0) ? cosTheta : (-cosTheta);
 
     T s0 = (1 - t);
     T s1 = t;
     // Flip scale if cos is flipped
-    s1 = (cosTetha >= 0) ? s1 : (-s1);
+    s1 = (cosTheta >= 0) ? s1 : (-s1);
     Quat<T> result = (start * s0) + (end * s1);
     return result;
 }
@@ -278,9 +278,9 @@ constexpr  Quat<T> Quat<T>::SLerp(const Quat<T>& start,
 
     using namespace MathConstants;
 
-    T cosTetha = start.Dot(end);
+    T cosTheta = start.Dot(end);
     // Select closest approach
-    T cosFlipped = (cosTetha >= 0) ? cosTetha : (-cosTetha);
+    T cosFlipped = (cosTheta >= 0) ? cosTheta : (-cosTheta);
 
     T s0, s1;
     if(cosFlipped < (1 - Epsilon<T>()))
@@ -296,7 +296,7 @@ constexpr  Quat<T> Quat<T>::SLerp(const Quat<T>& start,
         s1 = t;
     }
     // Flip scale if cos is flipped
-    s1 = (cosTetha >= 0) ? s1 : (-s1);
+    s1 = (cosTheta >= 0) ? s1 : (-s1);
     Quat<T> result = (start * s0) + (end * s1);
     return result;
 }

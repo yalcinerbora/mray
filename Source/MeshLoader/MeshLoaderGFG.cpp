@@ -142,7 +142,7 @@ MeshViewGFG::MeshViewGFG(uint32_t innerIndexIn,
         throw MRayError("GFG: Inner index out of range  \"{}\"",
                         gfgFile.Name());
 
-    // Analyse the mesh
+    // Analyze the mesh
     for(const GFGVertexComponent& vc : gfgFile.loader.Header().meshes[innerIndex].components)
     {
         if(vc.internalOffset != 0)

@@ -194,7 +194,7 @@ constexpr void Polygon::ClipEars(Span<Vector3ui, N - 2> localIndicesOut,
             // Now collapse the array
             indices.remove(&indices[i]);
             // When we continue, do not decrement "i"
-            // to compansate the Next(..) function
+            // to compensate the Next(..) function
             // Given a equilateral polygon, this will
             // give similar results to Delunay (sometimes).
             // Otherwise, it will generate fan triangulation

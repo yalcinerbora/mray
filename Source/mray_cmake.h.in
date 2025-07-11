@@ -1,6 +1,6 @@
 
 // Minimal Intrusion by the CMake
-// "configure_file" is just a substititor,
+// "configure_file" is just a substituter,
 // we could create c++ codegen here, but this will be
 // enough for now.
 

@@ -294,22 +294,22 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
             {
                 // First try to get the filename
                 size_t fNameStart = visorState.scene.sceneName.rfind("/") + 1;
-                std::string shrinkedBody = sceneNameBody;
+                std::string shrunkBody = sceneNameBody;
                 if(fNameStart != std::string::npos)
                 {
                     std::string fName = visorState.scene.sceneName.substr(fNameStart);
-                    shrinkedBody = (sceneNamePrefix + fName + sceneNameSuffix);
+                    shrunkBody = (sceneNamePrefix + fName + sceneNameSuffix);
                 }
                 // String is already is relative path (or something),
                 // or even after shrink we still couldn't fit it.
-                if(sceneNameWidth < ImGui::CalcTextSize(shrinkedBody.c_str()).x)
+                if(sceneNameWidth < ImGui::CalcTextSize(shrunkBody.c_str()).x)
                 {
                     // Just display "Rendering ...".
                     // Even this does not fit, ignore
                     ImGui::Text("%s", (sceneNamePrefix + sceneNameSuffix).c_str());
                 }
                 // Shrink was enough render that
-                else ImGui::Text("%s", shrinkedBody.c_str());
+                else ImGui::Text("%s", shrunkBody.c_str());
                 //
                 // Add scene name as a tooltip for both cases
                 if(ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
@@ -426,7 +426,7 @@ void ImageSaveProgress::Render()
                                      ImGuiWindowFlags_NoNav              |
                                      ImGuiWindowFlags_NoMove);
 
-    // TODO: Center to the work posiiton
+    // TODO: Center to the work position
     ImVec2 window_pos = ImVec2(work_pos.x + work_size.x * 0.5f,
                                work_pos.y + PADDING);
 

@@ -67,7 +67,7 @@ void GPUQueueCPU::IssueKernelInternal(std::string_view name,
     // skipping for now
     std::lock_guard _(cb->issueMutex);
 
-    // Give just enough grid to eliminiate grid-stride / block-stride
+    // Give just enough grid to eliminate grid-stride / block-stride
     // loops (for CPU these do more harm than good, unlike GPU)
 
     uint32_t blockCount = DetermineGridStrideBlock(nullptr, 0, tpb,
@@ -148,7 +148,7 @@ void GPUQueueCPU::IssueLambdaInternal(std::string_view name,
     // skipping for now
     std::lock_guard _(cb->issueMutex);
 
-    // Give just enough grid to eliminiate grid-stride / block-stride
+    // Give just enough grid to eliminate grid-stride / block-stride
     // loops (for CPU these do more harm than good, unlike GPU)
 
     uint32_t blockCount = DetermineGridStrideBlock(nullptr, 0, tpb,

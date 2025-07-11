@@ -48,7 +48,7 @@ class GenericTextureI
 
 
     // Here is the hard part, incoming data must be the same type.
-    // Thankfully, we type ereased the incoming data as "TransientData"
+    // Thankfully, we type erased the incoming data as "TransientData"
     // so we can utilize it. Again extents are maximum (3).
     //
     // Internals of this function will be a mess though.

@@ -321,7 +321,7 @@ Expected<MRayPixelTypeRT> ImageFileOIIO::ConvertFormatToRequested(MRayPixelTypeR
         return MRayError("Unable to convert image channels to "
                          "requested channels");
 
-    // Now the actual convertion.
+    // Now the actual conversion.
     // There is a pattern here (we can abuse the enum order etc.)
     // but it will be hard to maintain so just yolo switch here
     switch(e)
@@ -625,7 +625,7 @@ Expected<Image> ImageFileOIIO::ReadImage()
 
         // Due to type safety we need to construct pixels using the formatted
         // type, we need to "visit" the variant to correctly construct the
-        // type-ereased transient data
+        // type-erased transient data
         TransientData pixels = std::visit([totalPixels](auto&& v)
         {
             using T = std::remove_cvref_t<decltype(v)>::Type;

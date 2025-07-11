@@ -17,7 +17,7 @@ void SimulateBasicPathTracer()
     // This is calculated via combining
     // medium type count & surface type count.
     // Technically this should be low. In a case with
-    // uniform paritioning, "only" ~4k elements will be called.
+    // uniform partitioning, "only" ~4k elements will be called.
     static constexpr uint32_t MaxPartitionCount = 256;
 
     DeviceMemory testMemory(system.AllGPUs(), 16_MiB, 256_MiB);
@@ -213,7 +213,7 @@ TEST(RayPartitionerTest, DISABLED_SimulateAdvancedPathTracer)
     //// Skips the shadow ray casting, on partitioning perspective it disables
     //// entire shadow ray partitioning loop
     //static constexpr bool SkipNEE = true;
-    //// Skips multiple medium punchthrough operation. If "OnlyVacuumMedium" is true,
+    //// Skips multiple medium punch-through operation. If "OnlyVacuumMedium" is true,
     //// this flag has no effect. If scene consists nested participating media this should be
     //// set to true.
     //static constexpr bool DoMultipleMediumPunchthroughs = true;
@@ -255,8 +255,8 @@ TEST(RayPartitionerTest, DISABLED_SimulateAdvancedPathTracer)
     // while(aliveShadowRays)
     //  Hit shadow rays
     //  Partition wrt. medium
-    //  punchthrough medium
-    //      If ray could not punchthrough (kill)
+    //  punch-through medium
+    //      If ray could not punch-through (kill)
     //  Partition wrt. surface
     //      If medium transition surface continue
     //      If requested light (surface accumulate and kill ray)

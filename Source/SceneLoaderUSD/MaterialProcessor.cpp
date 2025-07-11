@@ -407,7 +407,7 @@ MRayUSDTexture MaterialConverter::ReadTextureNode(const pxr::UsdPrim& texNodePri
             return MRayTextureEdgeResolveEnum::MR_CLAMP;
         return MRayTextureEdgeResolveEnum::MR_END;
     };
-    auto ConvertColorSpasce = [&tokens](const pxr::TfToken& colorSpace)
+    auto ConvertColorSpace = [&tokens](const pxr::TfToken& colorSpace)
     {
         if(colorSpace == tokens.sRGB)
             return std::pair(MRayColorSpaceEnum::MR_REC_709, Float(2.2));
@@ -420,8 +420,8 @@ MRayUSDTexture MaterialConverter::ReadTextureNode(const pxr::UsdPrim& texNodePri
     // everything (due to MRay being lazy)
     auto wrapS = GetInput(tNode.GetInput(tokens.wrapS), tokens.repeat);
     //auto wrapT = GetInput(tNode.GetInput(tokens.wrapT), tokens.repeat);
-    auto csConverted = ConvertColorSpasce(GetInput(tNode.GetInput(tokens.sourceColorSpace),
-                                                   tokens.autoToken));
+    auto csConverted = ConvertColorSpace(GetInput(tNode.GetInput(tokens.sourceColorSpace),
+                                                  tokens.autoToken));
 
     // Resolve file
     auto fileSdf = GetInput(tNode.GetInput(tokens.file), pxr::SdfAssetPath());
@@ -493,7 +493,7 @@ MaterialConverter::GetTexturedAttribute(const pxr::UsdShadeInput& input,
                                         const T& defaultValue)
 {
     if(!input) return defaultValue;
-    // Punch thorugh the graph and find the connected texture
+    // Punch-through the graph and find the connected texture
     // Or directly return the the value
     if(!input.HasConnectedSource())
     {

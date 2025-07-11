@@ -18,7 +18,7 @@ struct RenderWorkInputs
     // Contiguous
     Span<const RayIndex>    dRayIndices;
     Span<const uint32_t>    dRandomNumbers;
-    // Accesed by index
+    // Accessed by index
     Span<const RayCone>     dRayCones;
     Span<const RayGMem>     dRays;
     Span<const MetaHit>     dHits;

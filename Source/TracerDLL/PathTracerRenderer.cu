@@ -175,7 +175,7 @@ PathTracerRenderer::PathTracerRenderer(const RenderImagePtr& rb,
     : Base(rb, wp, tv, s, tp)
     , metaLightArray(s)
     , rayPartitioner(s)
-    , redererGlobalMem(s.AllGPUs(), 128_MiB, 512_MiB)
+    , rendererGlobalMem(s.AllGPUs(), 128_MiB, 512_MiB)
     , saveImage(true)
 {}
 
@@ -238,7 +238,7 @@ void PathTracerRenderer::PushAttribute(uint32_t attributeIndex,
         case 4: newOptions.russianRouletteRange = data.AccessAs<Vector2ui>()[0]; break;
         case 5: newOptions.lightSampler = PathTraceRDetail::LightSamplerType(std::as_const(data).AccessAsString()); break;
         default:
-            throw MRayError("{} Unkown attribute index {}", TypeName(), attributeIndex);
+            throw MRayError("{} Unknown attribute index {}", TypeName(), attributeIndex);
     }
 }
 
@@ -681,7 +681,7 @@ RendererOutput PathTracerRenderer::DoThroughputSingleTileRender(const GPUDevice&
     }
     else if(saveImage && tilePathCounts[0] == SPPLimit(currentOptions.totalSPP))
     {
-        // We exausted all alive rays while doing SPP limit.
+        // We exhausted all alive rays while doing SPP limit.
         // Trigger a save, and unleash the renderer.
         triggerSave = true;
         saveImage = false;
@@ -770,7 +770,7 @@ RendererOutput PathTracerRenderer::DoLatencyRender(uint32_t passCount,
         Span<RayIndex> dIndices = DoRenderPass(sppLimit, processQueue);
 
         // Find the dead paths again
-        // Every path is processed, so we do not need to use the scambled
+        // Every path is processed, so we do not need to use the scrambled
         // index buffer. Iota again
         //DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
         // Do a 3-way partition,
@@ -902,7 +902,7 @@ PathTracerRenderer::StartRender(const RenderImageParams& rIP,
     // Generate the Filter
     auto FilterGen = this->tracerView.filterGenerators.at(this->tracerView.tracerParams.filmFilter.type);
     if(!FilterGen)
-        throw MRayError("[{}]: Unkown film filter type {}.", TypeName(),
+        throw MRayError("[{}]: Unknown film filter type {}.", TypeName(),
                         uint32_t(this->tracerView.tracerParams.filmFilter.type));
     Float radius = this->tracerView.tracerParams.filmFilter.radius;
     filmFilter = FilterGen->get()(this->gpuSystem, Float(radius));
@@ -940,7 +940,7 @@ PathTracerRenderer::StartRender(const RenderImageParams& rIP,
         }
     );
     if(surfLoc == this->tracerView.camSurfs.cend())
-        throw MRayError("[{:s}]: Unkown camera surface id ({:d})",
+        throw MRayError("[{:s}]: Unknown camera surface id ({:d})",
                         TypeName(), uint32_t(camSurfId));
     curCamSurfaceParams = surfLoc->second;
     // Find the transform/camera work for this specific surface
@@ -978,7 +978,7 @@ PathTracerRenderer::StartRender(const RenderImageParams& rIP,
                                              dRandomNumBuffer,
                                              dWorkHashes, dWorkBatchIds,
                                              dSubCameraBuffer),
-                                    redererGlobalMem,
+                                    rendererGlobalMem,
                                     {maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
@@ -1008,7 +1008,7 @@ PathTracerRenderer::StartRender(const RenderImageParams& rIP,
                                              dRandomNumBuffer,
                                              dWorkHashes, dWorkBatchIds,
                                              dSubCameraBuffer),
-                                    redererGlobalMem,
+                                    rendererGlobalMem,
                                     {maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
@@ -1030,7 +1030,7 @@ PathTracerRenderer::StartRender(const RenderImageParams& rIP,
     }
     queue.MemsetAsync(dHits, 0x00);
 
-    // And initialze the hashes
+    // And initialize the hashes
     workHasher = this->InitializeHashes(dWorkHashes, dWorkBatchIds,
                                         maxRayCount, queue);
 
@@ -1049,7 +1049,7 @@ PathTracerRenderer::StartRender(const RenderImageParams& rIP,
     // Finally generate RNG
     auto RngGen = this->tracerView.rngGenerators.at(this->tracerView.tracerParams.samplerType.type);
     if(!RngGen)
-        throw MRayError("[{}]: Unkown random number generator type {}.", TypeName(),
+        throw MRayError("[{}]: Unknown random number generator type {}.", TypeName(),
                         uint32_t(this->tracerView.tracerParams.samplerType.type));
     uint32_t generatorCount = (rIP.regionMax - rIP.regionMin).Multiply();
     uint64_t seed = this->tracerView.tracerParams.seed;
@@ -1076,7 +1076,7 @@ RendererOutput PathTracerRenderer::DoRender()
     const auto _ = annotation.AnnotateScope();
 
     // TODO: Like many places of this codebase
-    // we are using sinlge queue (thus single GPU)
+    // we are using single queue (thus single GPU)
     // change this later
     const GPUDevice& device = this->gpuSystem.BestDevice();
     const GPUQueue& processQueue = device.GetComputeQueue(0);
@@ -1151,7 +1151,7 @@ size_t PathTracerRenderer::GPUMemoryUsage() const
 {
     return (rayPartitioner.GPUMemoryUsage() +
             rnGenerator->GPUMemoryUsage() +
-            redererGlobalMem.Size());
+            rendererGlobalMem.Size());
 }
 
 static_assert(RendererC<PathTracerRenderer>,

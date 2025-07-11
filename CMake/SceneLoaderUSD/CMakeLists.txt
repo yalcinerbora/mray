@@ -15,8 +15,8 @@ source_group("" FILES ${SRC_COMMON})
 add_library(SceneLoaderUSD SHARED ${SRC_COMMON})
 
 target_include_directories(SceneLoaderUSD
-PRIVATE
-${MRAY_PLATFORM_LIB_DIRECTORY}/usd/include)
+                           PRIVATE
+                           ${MRAY_PLATFORM_LIB_DIRECTORY}/usd/include)
 
 target_link_libraries(SceneLoaderUSD
                       PRIVATE
@@ -24,9 +24,8 @@ target_link_libraries(SceneLoaderUSD
                       ImageLoader
                       TransientPool
                       mray::meta_compile_opts
-                      #usd::usd
+                      # USD-related
                       usd::usd_archive
-                      # Why do we need this? usd is a dll?
                       tbb::tbb)
 
 target_compile_definitions(SceneLoaderUSD

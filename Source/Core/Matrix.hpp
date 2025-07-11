@@ -1016,9 +1016,9 @@ constexpr Matrix<4, T> TransformGen::Perspective(T fovXRadians, T aspectRatio,
 
 template<std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<4, T> TransformGen::Ortogonal(T left, T right,
-                                               T top, T bottom,
-                                               T nearPlane, T farPlane)
+constexpr Matrix<4, T> TransformGen::Orthogonal(T left, T right,
+                                                T top, T bottom,
+                                                T nearPlane, T farPlane)
 {
     //  orto    0       0       0
     //  0       orto    0       0
@@ -1038,8 +1038,8 @@ constexpr Matrix<4, T> TransformGen::Ortogonal(T left, T right,
 
 template<std::floating_point T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<4, T> TransformGen::Ortogonal(T width, T height,
-                                               T nearPlane, T farPlane)
+constexpr Matrix<4, T> TransformGen::Orthogonal(T width, T height,
+                                                T nearPlane, T farPlane)
 {
     //  orto    0       0       0
     //  0       orto    0       0

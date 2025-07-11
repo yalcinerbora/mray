@@ -82,7 +82,7 @@ float BlockLocalReduction<T : IBinaryOp>(in float value, in uint localId, in T o
     sReduceBuffer[localId] = value;
     AllMemoryBarrierWithGroupSync();
 
-    // Hierarhical decay of block local reduction using shared memory
+    // Hierarchical decay of block local reduction using shared memory
     // This is a more generic approach then warp local intrinsics.
     static const uint START = (STATIC_THREAD_PER_BLOCK_1D >> 1);
     [ForceUnroll]
@@ -112,8 +112,8 @@ float BlockLocalReduction<T : IBinaryOp>(in float value, in uint localId, in T o
 //        uint newVal = asuint(newValF);
 //        // TODO: outLoc was directly refers to the params.maxAndAvg[0]...
 //        // but slang couldn't (or I did something wrong) compile it
-//        // in a way that atomic compare and exachange actions on the
-//        // "outLoc" local variable (at least Vulkan validatior said so)
+//        // in a way that atomic compare and exchange actions on the
+//        // "outLoc" local variable (at least Vulkan validator said so)
 //        // So we directly refer the SSBO variables here via a literal
 //        // Old version!
 //        // InterlockedCompareExchange(outLoc, assumed, newVal, old);

@@ -9,7 +9,7 @@
     #include <cuda/half.h>
 #endif
 
-// Floating point type extension for half precision if avial
+// Floating point type extension for half precision if available
 #ifdef MRAY_HETEROGENEOUS
 
     template<typename T>

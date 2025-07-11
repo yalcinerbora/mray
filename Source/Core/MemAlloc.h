@@ -181,9 +181,9 @@ constexpr size_t DefaultSystemAlignment()
     // "AllocateMultiData" should behave as if multiple allocations
     // occurs contiguously, so this alignment should match it
     // Since this is in core library there is no proper way to
-    // programaticcaly check this so it is given as a constant.
+    // programmatically check this so it is given as a constant.
     //
-    // TODO: Programatically check this for each HW vendor that this
+    // TODO: Programmatically check this for each HW vendor that this
     // code is compiled
     return 256;
 }

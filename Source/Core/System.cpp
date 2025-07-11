@@ -35,7 +35,7 @@ static_assert(std::is_same_v<std::thread::native_handle_type, SystemThreadHandle
 #ifdef MRAY_WINDOWS
 
 // this is technically HANDLE = HANDLE, but just to be sure,
-// compiler shoul've failed while parsing the windows.h
+// compiler should've failed while parsing the windows.h
 // when "typedef void* HANDLE" mismatched with the actual windows.h's
 // declaration (aliasing). Maybe user/maintainer will see this
 // and could be able to do an informed action

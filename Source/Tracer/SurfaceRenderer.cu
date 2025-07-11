@@ -1,5 +1,5 @@
+#include "Core/Types.h"
 #include "SurfaceRenderer.h"
-#include "RayGenKernels.h"
 
 #include "Core/Timer.h"
 
@@ -135,7 +135,7 @@ SurfaceRenderer::SurfaceRenderer(const RenderImagePtr& rb,
                                  const RenderWorkPack& wp)
     : RendererT(rb, wp, tv, s, tp)
     , rayPartitioner(s)
-    , redererGlobalMem(s.AllGPUs(), 32_MiB, 512_MiB)
+    , rendererGlobalMem(s.AllGPUs(), 32_MiB, 512_MiB)
     , saveImage(true)
 {}
 
@@ -184,7 +184,7 @@ void SurfaceRenderer::PushAttribute(uint32_t attributeIndex,
         case 2: newOptions.doStochasticFilter = data.AccessAs<bool>()[0]; break;
         case 3: newOptions.tMaxAORatio = data.AccessAs<Float>()[0]; break;
         default:
-            throw MRayError("{} Unkown attribute index {}", TypeName(), attributeIndex);
+            throw MRayError("{} Unknown attribute index {}", TypeName(), attributeIndex);
     }
 }
 
@@ -238,7 +238,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     // Generate the Filter
     auto FilterGen = tracerView.filterGenerators.at(tracerView.tracerParams.filmFilter.type);
     if(!FilterGen)
-        throw MRayError("[{}]: Unkown film filter type {}.", TypeName(),
+        throw MRayError("[{}]: Unknown film filter type {}.", TypeName(),
                         uint32_t(tracerView.tracerParams.filmFilter.type));
     Float radius = tracerView.tracerParams.filmFilter.radius;
     filmFilter = FilterGen->get()(gpuSystem, Float(radius));
@@ -269,7 +269,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
         return pair.first == camSurfId;
     });
     if(surfLoc == tracerView.camSurfs.cend())
-        throw MRayError("[{:s}]: Unkown camera surface id ({:d})",
+        throw MRayError("[{:s}]: Unknown camera surface id ({:d})",
                         TypeName(), uint32_t(camSurfId));
     curCamSurfaceParams = surfLoc->second;
     // Find the transform/camera work for this specific surface
@@ -303,7 +303,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
                                              dRandomNumBuffer,
                                              dWorkHashes, dWorkBatchIds,
                                              dSubCameraBuffer),
-                                    redererGlobalMem,
+                                    rendererGlobalMem,
                                     {maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
@@ -325,7 +325,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
                                              dRandomNumBuffer,
                                              dWorkHashes, dWorkBatchIds,
                                              dSubCameraBuffer),
-                                    redererGlobalMem,
+                                    rendererGlobalMem,
                                     {maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
@@ -338,7 +338,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
         dRayStateAO.dFilmFilterWeights = dRayStateCommon.dFilmFilterWeights;
     }
 
-    // And initialze the hashes
+    // And initialize the hashes
     workHasher = InitializeHashes(dWorkHashes, dWorkBatchIds,
                                   maxRayCount, queue);
 
@@ -361,7 +361,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     // Finally generate RNG
     auto RngGen = tracerView.rngGenerators.at(tracerView.tracerParams.samplerType.type);
     if(!RngGen)
-        throw MRayError("[{}]: Unkown random number generator type {}.", TypeName(),
+        throw MRayError("[{}]: Unknown random number generator type {}.", TypeName(),
                         uint32_t(tracerView.tracerParams.samplerType.type));
     uint32_t generatorCount = (rIP.regionMax - rIP.regionMin).Multiply();
     uint64_t seed = tracerView.tracerParams.seed;
@@ -389,7 +389,7 @@ RendererOutput SurfaceRenderer::DoRender()
     // On each iteration do one tile fully,
     // so we can send it directly.
     // TODO: Like many places of this codebase
-    // we are using sinlge queue (thus single GPU)
+    // we are using single queue (thus single GPU)
     // change this later
     Timer timer; timer.Start();
     const auto& cameraWork = (*curCamWork->get());
@@ -621,7 +621,7 @@ RendererOutput SurfaceRenderer::DoRender()
                                    globalState,
                                    processQueue);
         }
-        else throw MRayError("[{}]: Unkown work id is found ({}).",
+        else throw MRayError("[{}]: Unknown work id is found ({}).",
                              TypeName(), key);
 
     }
@@ -787,5 +787,5 @@ size_t SurfaceRenderer::GPUMemoryUsage() const
 {
     return (rayPartitioner.GPUMemoryUsage() +
             rnGenerator->GPUMemoryUsage() +
-            redererGlobalMem.Size());
+            rendererGlobalMem.Size());
 }

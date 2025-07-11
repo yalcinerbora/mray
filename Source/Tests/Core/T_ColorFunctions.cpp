@@ -54,7 +54,7 @@ TEST(ColorFunctionsTest, ACES)
     // we are doing this to check if we do wrong multiplication order etc.
     static_assert(ColorspaceTransfer<MR_ACES2065_1, MR_ACES_CG>::RGBToRGBMatrix == TRA_1);
     static_assert(ColorspaceTransfer<MR_ACES_CG, MR_ACES2065_1>::RGBToRGBMatrix == TRA_2);
-    // Tightyly bounding these by hand
+    // Tightly bounding these by hand
     static constexpr auto TestEpsilon = Float(2.4e-7);
     EXPECT_NEAR_MRAY(TRA_1, TRA_1_Ref, TestEpsilon);
     EXPECT_NEAR_MRAY(TRA_2, TRA_2_Ref, TestEpsilon);

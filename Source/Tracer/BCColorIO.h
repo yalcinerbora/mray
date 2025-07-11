@@ -464,7 +464,7 @@ Vector3 BC7::ExtractColor(uint32_t i) const
         uint32_t o = (B + 1) * i;
         c[rotation - 1] = uint32_t(FetchSubPortion(b[0], {o, o + B + 1}));
         // This is little bit different than the generic
-        // case migh as well return here
+        // case might as well return here
         uint32_t rb = (rotation == 1) ? (B + 1) : B;
         uint32_t gb = (rotation == 2) ? (B + 1) : B;
         uint32_t bb = (rotation == 3) ? (B + 1) : B;

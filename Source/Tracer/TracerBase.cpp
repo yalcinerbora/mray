@@ -1386,7 +1386,7 @@ CamSurfaceId TracerBase::CreateCameraSurface(CameraSurfaceParams p)
 SurfaceCommitResult TracerBase::CommitSurfaces()
 {
     // Synchronize all here, probably scene load is issued
-    // previously. CPU side is sycnhronized but async calls to GPU may not
+    // previously. CPU side is synchronized but async calls to GPU may not
     // have finished yet. Wait before finalizing groups
     gpuSystem.SyncAll();
 
@@ -1402,7 +1402,7 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     // Finalize the group operations
     // Some groups require post-processing
     // namely triangles (which adjust the local index values
-    // to global one) and tranforms (which invert the transforms and store)
+    // to global one) and transforms (which invert the transforms and store)
     GPUQueueIteratorRoundRobin queueIt(gpuSystem);
     // Finalize the texture operations
     texMem.Finalize();
@@ -1576,7 +1576,7 @@ RendererId TracerBase::CreateRenderer(std::string typeName)
         gpuSystem,
         rendererWorkPack.value()
     );
-    uint32_t rId = redererCounter.fetch_add(1u);
+    uint32_t rId = rendererCounter.fetch_add(1u);
     renderers.try_emplace(RendererId(rId), std::move(renderer));
     return RendererId(rId);
 }
@@ -1699,7 +1699,8 @@ void TracerBase::ClearAll()
     currentRenderer = nullptr;
     currentRendererId = TracerIdInvalid<RendererId>;
 
-    // GroupId 0 is reserved for some default types regen those
+    // GroupId 0 is reserved for some default types,
+    // regenerate those
     GenerateDefaultGroups();
 }
 

@@ -135,7 +135,7 @@ VulkanDeviceAllocator::AllocateForeignObject(VulkanBuffer& buffer,
                                              uint32_t memTypeBits)
 {
     std::string s = vk::to_string(vk::MemoryPropertyFlags(memTypeBits));
-    MRAY_DEBUG_LOG("Forign Mem Flags: {}", s);
+    MRAY_DEBUG_LOG("Foreign Mem Flags: {}", s);
 
     auto loc = std::find_if(memoryList.cbegin(), memoryList.cend(),
                             [memTypeBits](const VkMemoryType& memType)

@@ -42,7 +42,7 @@ TextureViewHIP<D, QT> TextureHIP_Normal<D, T>::View() const
     // Normalize integers requested bu view is created with the same type
     if(texParams.normIntegers)
         throw MRayError("Unable to create a view of texture. "
-                        "View type must be \"Float\" (or vector equavilents) "
+                        "View type must be \"Float\" (or vector equivalents) "
                         "for normalized integers");
     return TextureViewHIP<D, QT>(tex);
 }
@@ -58,7 +58,7 @@ TextureViewHIP<D, QT> TextureHIP_Normal<D, T>::View() const
                                  std::is_same_v<QT, Vector<ChannelCount, Float>>);
     if(texParams.normCoordinates && !IsFloatType)
         throw MRayError("Unable to create a view of texture. "
-                        "View type must be \"Float\" (or vector equavilents) "
+                        "View type must be \"Float\" (or vector equivalents) "
                         "for normalized integers");
     else if(texParams.normCoordinates && IsFloatType)
         return TextureViewHIP<D, QT>(tex);
@@ -88,7 +88,7 @@ TextureViewHIP<2, QT> TextureHIP_BC<T>::View() const
                                   std::is_same_v<QT, Vector<ChannelCount, Float>>);
     if(!IsFloatType)
         throw MRayError("Unable to create a view of texture. "
-                        "View type must be \"Float\" (or vector equavilents) "
+                        "View type must be \"Float\" (or vector equivalents) "
                         "for block compressed textures (BC1-7)");
     return TextureViewHIP<2, QT>(tex);
 };

@@ -172,7 +172,7 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
     }
     // Generate a projection matrix (orthogonal)
     const AABB3 sceneAABB = voxelParams.sceneExtents;
-    Matrix4x4 proj = TransformGen::Ortogonal(sceneAABB.Min()[0], sceneAABB.Max()[0],
+    Matrix4x4 proj = TransformGen::Orthogonal(sceneAABB.Min()[0], sceneAABB.Max()[0],
                                              sceneAABB.Max()[1], sceneAABB.Min()[1],
                                              sceneAABB.Min()[2], sceneAABB.Max()[2]);
 
@@ -564,10 +564,10 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     Vector2 dpdx = TexGradient(a1);
     Vector2 dpdy = TexGradient(a2);
 
-    // Geometry Discretization Compansation
-    // This is shelved, I try to compansate for extreme geometry changes
+    // Geometry Discretization Compensation
+    // This is shelved, I try to compensate for extreme geometry changes
     // on smooth surfaces (It happens on Intel Sponza curtains).
-    // This leaks light a lot. But approach maybe inpoved and used
+    // This leaks light a lot. But approach maybe improved and used
     //                N_v
     //        N_g     ^          N_v vertex normal
     //           ^    |          N_g face normal (geometry normal)

@@ -186,20 +186,20 @@ void CameraPinhole::OverrideTransform(const CameraTransform& t)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-CameraPinhole CameraPinhole::GenerateSubCamera(const Vector2ui& statumIndex,
-                                               const Vector2ui& stataCount) const
+CameraPinhole CameraPinhole::GenerateSubCamera(const Vector2ui& stratumIndex,
+                                               const Vector2ui& strataCount) const
 {
     // DX DY from stratified sample
-    Vector2 delta = Vector2(planeSize[0] / static_cast<Float>(stataCount[0]),
-                            planeSize[1] / static_cast<Float>(stataCount[1]));
+    Vector2 delta = Vector2(planeSize[0] / static_cast<Float>(strataCount[0]),
+                            planeSize[1] / static_cast<Float>(strataCount[1]));
 
-    Vector2 regionlDistance = Vector2(static_cast<Float>(statumIndex[0]),
-                                      static_cast<Float>(statumIndex[1])) * delta;
+    Vector2 regionlDistance = Vector2(static_cast<Float>(stratumIndex[0]),
+                                      static_cast<Float>(stratumIndex[1])) * delta;
     Vector3 regionBottomLeft = bottomLeft + ((regionlDistance[0] * right) +
                                              (regionlDistance[1] * up));
 
-    Vector2 fovRegion = Vector2(fov[0] / static_cast<Float>(stataCount[0]),
-                                fov[1] / static_cast<Float>(stataCount[1]));
+    Vector2 fovRegion = Vector2(fov[0] / static_cast<Float>(strataCount[0]),
+                                fov[1] / static_cast<Float>(strataCount[1]));
 
     CameraPinhole p = CameraPinhole(*this);
     // Change the bottom left, and the FoV

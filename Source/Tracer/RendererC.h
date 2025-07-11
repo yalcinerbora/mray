@@ -369,7 +369,7 @@ class RenderCameraWorkT : public RenderCameraWorkI
 };
 
 // Renderer holds its work in a linear array.
-// by defition (by the key batch width) there should be small amount of groups
+// by definition (by the key batch width) there should be small amount of groups
 // so we will do a linear search (maybe in future binary search) over these
 // values. The reason we do not use hash table or map is that we may move the
 // multi-kernel call to the GPU side in future.
@@ -692,6 +692,7 @@ void RenderWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
 
     queue.MemcpyAsync(dWorkBatchHashes, Span<const CommonKey>(hHashes));
     queue.MemcpyAsync(dWorkBatchIds, Span<const CommonKey>(hBatchIds));
+    queue.Barrier().Wait();
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE

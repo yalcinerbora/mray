@@ -3,7 +3,7 @@
 #include "Error.h"
 #include "Types.h"
 
-// std::expected is not in standart as of c++20 so rolling a simple
+// std::expected is not in standard as of c++20 so rolling a simple
 // version of it, all errors in this codebase is MRayError
 // so no template for it.
 //
@@ -18,7 +18,7 @@ struct Expected : protected Variant<T, MRayError>
     using Base::Base;
 
     // Provide semantically the same API,
-    // we may switch this to actual std::excpected later
+    // we may switch this to actual std::expected later
     // (for better move semantics etc)
     // Utilize bare minimum subset of the API so refactoring will be easier
     explicit
@@ -33,7 +33,7 @@ struct Expected : protected Variant<T, MRayError>
     constexpr MRayError&        error() noexcept;
 
     // This is not technically 1 to 1
-    // but it is more restictive so ok
+    // but it is more restrictive so ok
     constexpr T value_or(const T&) const;
 };
 

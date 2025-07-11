@@ -11,6 +11,8 @@
 
 #include "../GPUTypes.h"
 
+#include "TransientPool/TransientPool.h"
+
 class TimelineSemaphore;
 
 // Cuda Kernel Optimization Hints
@@ -60,7 +62,7 @@ static void WarpSynchronize()
     if constexpr(LOGICAL_WARP_SIZE != 1)
     {
         static constexpr uint32_t FULL_MASK = std::numeric_limits<uint32_t>::max();
-        // Creating all FF's is UB (when doint it via shift, is there any other way to do it)
+        // Creating all FF's is UB (when doing it via shift, is there any other way to do it)
         // since we shift out of bounds so...
         static constexpr uint32_t MASK = (LOGICAL_WARP_SIZE == 32)
             ? FULL_MASK

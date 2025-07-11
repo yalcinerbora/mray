@@ -97,7 +97,7 @@ void FontAtlas::RemoveMonitorFont(GLFWmonitor*)
     // here, if user repeatedly removes adds monitors during a session
     // Imgui's atlas will become large
     // Maybe add full reclear time to time
-    // This should be exteremely rare though...
+    // This should be extremely rare though...
     //
     // Some api like this probably needed (this is probably as
     // time consuming as creating entire atlas so not provided)

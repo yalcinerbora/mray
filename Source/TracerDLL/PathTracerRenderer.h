@@ -94,7 +94,7 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer>
     RayPartitioner              rayPartitioner;
     RNGeneratorPtr              rnGenerator;
     //
-    DeviceMemory        redererGlobalMem;
+    DeviceMemory        rendererGlobalMem;
     Span<MetaHit>       dHits;
     Span<HitKeyPack>    dHitKeys;
     Span<RayGMem>       dRays;

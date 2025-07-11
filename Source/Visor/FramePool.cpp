@@ -45,9 +45,9 @@ void FramePool::PresentThisFrame(Swapchain& swapchain,
     const auto& comExecSem = semaphores.commandsExecutedSignal;
     const auto& imgReadySem = semaphores.imageAvailableSignal;
 
-    // ============= //
-    //   SUBMISSON   //
-    // ============= //
+    // ============== //
+    //   SUBMISSION   //
+    // ============== //
     VkPipelineStageFlags waitStage = (VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
                                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
     StaticVector<VkSemaphoreSubmitInfo, 2> waitSemaphores;

@@ -24,7 +24,7 @@ enum class TextureReadMode : uint8_t
     // Given 2-channel **signed** format,
     // calculate Z channel,
     // assume x/y = [0,1] and
-    // do cocentric octrahedral mapping
+    // do concentric octahedral mapping
     // to find xyz
     TO_3C_OCTA_NORMAL_FROM_SIGNED_2C,
     // Similar to the above but before the conversion
@@ -83,7 +83,7 @@ class TracerTexView<2, T>
     bool                    flipY = false;
 
     public:
-    // Constructors & Desructor
+    // Constructors & Destructor
     MRAY_HOST   TracerTexView(HWTextureView<2> hwView,
                               TextureReadMode mode,
                               bool flipY = false);
@@ -135,7 +135,7 @@ class TracerTexView<3, T>
     bool                flipY = false;
 
     public:
-    // Constructors & Desructor
+    // Constructors & Destructor
     MRAY_HOST   TracerTexView(HWTextureView<3> hwView,
                               TextureReadMode mode,
                               bool flipY = false);

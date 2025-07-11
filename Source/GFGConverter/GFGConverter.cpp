@@ -19,7 +19,7 @@
 #include "Core/GraphicsFunctions.h"
 #include "Core/ThreadPool.h"
 
-// TODO: Type leak change it? (This functionaly is
+// TODO: Type leak change it? (This functionality is
 // highly intrusive, probably needs a redesign?)
 #include "SceneLoaderMRay/NodeNames.h"
 
@@ -90,7 +90,7 @@ Expected<std::vector<MeshGroup>> FindMeshes(const nlohmann::json& sceneJson)
     if(auto primNodes = sceneJson.find(NodeNames::PRIMITIVE_LIST);
        primNodes != sceneJson.end())
     {
-        // Arbitrarly reserve some, to prevent many early mallocs
+        // Arbitrarily reserve some, to prevent many early mallocs
         std::vector<MeshGroup> parsedMeshes;
         parsedMeshes.reserve(512);
         for(const auto& primNode : *primNodes)

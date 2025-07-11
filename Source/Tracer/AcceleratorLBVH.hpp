@@ -134,8 +134,10 @@ uint32_t TraverseLBVHStack(// I-O
     const LBVHBoundingBox* currentBBox  = boxPtr + traverseStartIndex;
     //
     Stack nodeStack; nodeStack.push(ChildIndex(traverseStartIndex));
+    uint32_t i = 0;
     while(!nodeStack.empty())
     {
+        MRAY_LOG("Traverse {}", i++);
         const ChildIndex nodeIndex = nodeStack.top();
         currentNode = nodesPtr + nodeIndex.FetchIndexPortion();
         currentBBox = boxPtr + nodeIndex.FetchIndexPortion();
@@ -146,13 +148,12 @@ uint32_t TraverseLBVHStack(// I-O
         // For every other LBVH; by construction, there are no null children
         // ever. TODO: We should not pay the price for this branch for other LBVH
         // change this later?
-        if(nodeIndex == ChildIndex::InvalidKey())
-            return std::numeric_limits<uint32_t>::max();
-
+        if(nodeIndex == ChildIndex::InvalidKey()) continue;
         // Case: Leaf
         if(nodeIndex.FetchBatchPortion() == IS_LEAF)
         {
             uint32_t leafIndex = nodeIndex.FetchIndexPortion();
+            MRAY_LOG("Entering Func");
             bool breakTraversal = Func(tMinMax, leafIndex);
             if(breakTraversal) break;
         }
@@ -160,8 +161,8 @@ uint32_t TraverseLBVHStack(// I-O
                                    Vector3(Span<const Float, 3>(currentBBox->max)),
                                    tMinMax))
         {
-            nodeStack.push(currentNode->leftIndex);
             nodeStack.push(currentNode->rightIndex);
+            nodeStack.push(currentNode->leftIndex);
         }
     }
     return uint32_t(std::distance(nodesPtr, currentNode));
@@ -429,7 +430,7 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
                                          const GPUQueue& queue)
 {
     PreprocessResult ppResult = this->PreprocessConstructionParams(p);
-    // Before the allocation hickup, allocate the temp
+    // Before the allocation hiccup, allocate the temp
     // memory as well.
     DeviceLocalMemory tempMem(*queue.Device());
     // Allocate concrete leaf ranges for processing
@@ -639,7 +640,7 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
 
     // TODO: The memory usage can be optimized
     // by repurposing some buffers but currently no memory issues
-    // and this happens in intialization time so fine
+    // and this happens in initialization time so fine
 
     // Specific Part 0
     Span<Byte> dTemp;
@@ -671,7 +672,7 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
         totalLeafCount * sizeof(uint32_t)
      });
     DeviceMemory tempMem({queue.Device()}, total, total << 1);
-    // TODO: The memory can be further alised thus; reduced in size.
+    // TODO: The memory can be further aliased thus; reduced in size.
     MemAlloc::AllocateMultiData(std::tie(dTemp, dLeafSegmentRanges,
                                          dNodeSegmentRanges, dAccelAABBs,
                                          dPrimCenters, dLeafAABBs,
@@ -826,7 +827,7 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
         std::swap(dIndices[0], dIndices[1]);
     }
 
-    // Alias the memory, indces[1], and mortonCode[1] are not used
+    // Alias the memory, indices[1], and mortonCode[1] are not used
     // anymore
     Span<uint32_t> dAtomicCounters = MemAlloc::RepurposeAlloc<uint32_t>(dIndices[1]);
     Span<uint32_t> dLeafParentIndices = MemAlloc::RepurposeAlloc<uint32_t>(dMortonCodes[1]);
@@ -905,8 +906,8 @@ void AcceleratorGroupLBVH<PG>::WriteInstanceKeysAndAABBs(Span<AABB3> dAABBWriteR
                                                          Span<AcceleratorKey> dKeyWriteRegion,
                                                          const GPUQueue& queue) const
 {
-    // TODO: This is wastefull, we do a transform-reduce on leaf level
-    // Since we are BVH, root node implictly have the AABB
+    // TODO: This is wasteful, we do a transform-reduce on leaf level
+    // Since we are BVH, root node implicitly have the AABB
     // But this code works, but may have a performance bottleneck
     // in future maybe?
     this->WriteInstanceKeysAndAABBsInternal(dAABBWriteRegion,

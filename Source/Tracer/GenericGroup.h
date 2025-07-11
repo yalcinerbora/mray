@@ -154,7 +154,7 @@ class GenericGroupT : public GenericGroupI<IdTypeT, AttribInfoT>
     public:
             GenericGroupT(uint32_t groupId, const GPUSystem&,
                           size_t allocationGranularity = 2_MiB,
-                          size_t initialReservartionSize = 4_MiB);
+                          size_t initialReservationSize = 4_MiB);
     IdList  Reserve(const std::vector<AttributeCountList>&) override;
     bool    IsInCommitState() const override;
     size_t  GPUMemoryUsage() const override;
@@ -210,7 +210,7 @@ class GenericTexturedGroupT : public GenericGroupT<IdType, AttributeInfoType>
     GenericTexturedGroupT(uint32_t groupId, const GPUSystem&,
                           const TextureViewMap&,
                           size_t allocationGranularity = 2_MiB,
-                          size_t initialReservartionSize = 4_MiB);
+                          size_t initialReservationSize = 4_MiB);
 
     // Extra textured functionality
     virtual void    PushTexAttribute(IdType idStart, IdType idEnd,
@@ -252,7 +252,7 @@ void GenericGroupT<ID, AI>::GenericCommit(std::tuple<Span<Args>&...> output,
                          "you cannot re-commit!", this->Name(), groupId);
         return;
     }
-    // Cacluate offsets
+    // Cactuate offsets
     std::array<size_t, TypeCount> offsets = {0ull};
     for(const auto& c : itemCounts)
     {
@@ -366,11 +366,11 @@ void GenericGroupT<ID, AI>::GenericPushData(const Span<T>& dAttributeRegion,
 template<class ID, class AI>
 GenericGroupT<ID, AI>::GenericGroupT(uint32_t groupId, const GPUSystem& s,
                                      size_t allocationGranularity,
-                                     size_t initialReservartionSize)
+                                     size_t initialReservationSize)
     : gpuSystem(s)
     , isCommitted(false)
     , groupId(groupId)
-    , deviceMem(gpuSystem.AllGPUs(), allocationGranularity, initialReservartionSize)
+    , deviceMem(gpuSystem.AllGPUs(), allocationGranularity, initialReservationSize)
 {}
 
 template<class ID, class AI>
@@ -502,10 +502,10 @@ template<class I, class A>
 GenericTexturedGroupT<I, A>::GenericTexturedGroupT(uint32_t groupId, const GPUSystem& s,
                                                    const TextureViewMap& map,
                                                    size_t allocationGranularity,
-                                                   size_t initialReservartionSize)
+                                                   size_t initialReservationSize)
     : Parent(groupId, s,
              allocationGranularity,
-             initialReservartionSize)
+             initialReservationSize)
     , globalTextureViews(map)
 {}
 

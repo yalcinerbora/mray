@@ -17,7 +17,7 @@ namespace DeviceDebug
     enum WriteMode
     {
         DEFAULT,
-        HEXEDECIMAL,
+        HEXADECIMAL,
         BINARY
     };
 
@@ -27,7 +27,7 @@ template<WriteMode MODE = DEFAULT, class T>
 void DumpGPUMemToStream(std::ostream& s,
                         Span<const T> data,
                         const GPUQueue& queue,
-                        std::string_view seperator = "\n"sv)
+                        std::string_view separator = "\n"sv)
 {
     std::vector<T> hostBuffer(data.size());
     queue.MemcpyAsync(Span<T>(hostBuffer), data);
@@ -43,11 +43,11 @@ void DumpGPUMemToStream(std::ostream& s,
         // So we do  constexpr if to eliminate that code generation
         // If user wants hex, he/she can specify the param
         if constexpr(MODE == DEFAULT)
-            s << MRAY_FORMAT("{}{:s}", d, seperator);
-        else if constexpr(MODE == HEXEDECIMAL)
-            s << MRAY_FORMAT("{:x}{:s}", d, seperator);
+            s << MRAY_FORMAT("{}{:s}", d, separator);
+        else if constexpr(MODE == HEXADECIMAL)
+            s << MRAY_FORMAT("{:X}{:s}", d, separator);
         else if constexpr(MODE == BINARY)
-            s << MRAY_FORMAT("{:b}{:s}", d, seperator);
+            s << MRAY_FORMAT("{:b}{:s}", d, separator);
         else static_assert(MODE < BINARY, "Unkown print mode!");
     }
 }
@@ -56,20 +56,20 @@ template<WriteMode MODE = DEFAULT, class T>
 void DumpGPUMemToFile(const std::string& fName,
                       Span<const T> data,
                       const GPUQueue& queue,
-                      std::string_view seperator = "\n"sv)
+                      std::string_view separator = "\n"sv)
 {
     std::ofstream file(fName);
-    DumpGPUMemToStream<MODE>(file, data, queue, seperator);
+    DumpGPUMemToStream<MODE>(file, data, queue, separator);
 }
 
 template<WriteMode MODE = DEFAULT, class T>
 void DumpGPUMemToStdOut(std::string_view header,
                         Span<const T> data,
                         const GPUQueue& queue,
-                        std::string_view seperator = "\n"sv)
+                        std::string_view separator = "\n"sv)
 {
-    if(!header.empty()) MRAY_DEBUG_LOG("{}", header);
-    DumpGPUMemToStream<MODE>(std::cout, data, queue, seperator);
+    if(!header.empty()) MRAY_LOG("{}", header);
+    DumpGPUMemToStream<MODE>(std::cout, data, queue, separator);
     if(!header.empty()) MRAY_LOG("-------------");
 }
 

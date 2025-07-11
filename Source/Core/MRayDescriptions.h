@@ -43,7 +43,7 @@ namespace MRay
     using CommonIndex = uint32_t;
 
     // I am prepending these with mray just to be sure
-    // Widnows probably will have a AVX512 macros somewhere in the windows.h header
+    // Windows probably will have a AVX512 macros somewhere in the windows.h header
     // (didn't check but just to be sure)
     enum class HostArch
     {

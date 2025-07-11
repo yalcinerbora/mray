@@ -96,7 +96,7 @@ static_assert(SpectraPerSpectrum <= 4,
               "Spectra per spectrum can at most be 4"
               " (Due to Vector template at most hold 4 floats).");
 
-// Untill c++23, we custom define this
+// Until c++23, we custom define this
 // https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2674r0.pdf
 // Directly from the above paper
 template <class T>
@@ -270,8 +270,8 @@ enum class MRayColorSpaceEnum : uint8_t
     // https://openimageio.readthedocs.io/en/latest/stdmetadata.html#color-information
     //
     // TODO: check D60 variants
-    // TODO: Color spaces are overwheling... Reiterate over these
-    // Luminance linearity are not covered by this enum, a seperate enum (or float)
+    // TODO: Color spaces are overwhelming... Reiterate over these
+    // Luminance linearity are not covered by this enum, a separate enum (or float)
     // will define if the color space is log or linear.
     // TODO: There are different eotfs etc. make a better approach
     MR_ACES2065_1,
@@ -318,7 +318,7 @@ enum class MRayTextureReadMode : uint8_t
     // conversion will be applied (which is r/g * 2 - 1);
     // Find tangent space normal sqrt(1 - r^2 - g^2)
     MR_AS_3C_TS_NORMAL_BASIC,
-    // Find tangent space normal via cocentric octahedral
+    // Find tangent space normal via concentric octahedral
     // mapping of hemisphere (The two channels will be
     // used as uv coordinates of the mapping [-1, 1]
     // unsigned->signed conversion will be applied similarly.

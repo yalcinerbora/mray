@@ -120,7 +120,7 @@ class TracerBase : public TracerI
     std::atomic_uint32_t    matGroupCounter     = 0;
     std::atomic_uint32_t    transGroupCounter   = 0;
     std::atomic_uint32_t    lightGroupCounter   = 0;
-    std::atomic_uint32_t    redererCounter      = 0;
+    std::atomic_uint32_t    rendererCounter      = 0;
     // Surface Related
     std::atomic_uint32_t    surfaceCounter      = 0;
     std::atomic_uint32_t    lightSurfaceCounter = 0;

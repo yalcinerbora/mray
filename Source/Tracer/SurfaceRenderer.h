@@ -1,11 +1,8 @@
 #pragma once
 
 #include "RendererC.h"
-#include "RendererCommon.h"
 #include "RayPartitioner.h"
 #include "SurfaceRendererShaders.h"
-
-#include "Core/TypeNameGenerators.h"
 
 class SurfaceRenderer final : public RendererT<SurfaceRenderer>
 {
@@ -58,7 +55,7 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     RayPartitioner      rayPartitioner;
     RNGeneratorPtr      rnGenerator;
     //
-    DeviceMemory        redererGlobalMem;
+    DeviceMemory        rendererGlobalMem;
     Span<MetaHit>       dHits;
     Span<HitKeyPack>    dHitKeys;
     Span<RayGMem>       dRays;

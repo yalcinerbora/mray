@@ -747,7 +747,7 @@ FlatSet<T, Comp, Cont>::insert(T&& t)
     bool shouldInsert = (loc == container.end());
     if(!shouldInsert)
     {
-        // Utilize less than for equavilency check
+        // Utilize less than for equivalency check
         // user may not define other operators (such as '==')
         shouldInsert = !(!compare(t, *loc) &&
                          !compare(*loc, t));

@@ -520,7 +520,7 @@ void DeviceMemoryHIP::ResizeBuffer(size_t newSize)
     // Shrink the memory
     if(!neverDecrease && newSize < allocSize)
     {
-        // We need to shring the memory, meaning we will
+        // We need to shrink the memory, meaning we will
         // do an unmap, so halt all operations on the device
         // TODO: If check is unecessary?
         if(!reservationRelocated)
@@ -533,7 +533,7 @@ void DeviceMemoryHIP::ResizeBuffer(size_t newSize)
             offset -= allocationGranularity;
             if(newSize > offset)
                 break;
-            // Relase the memory
+            // Release the memory
             HIP_DRIVER_CHECK(hipMemUnmap(AdvanceHIPPtr(mPtr, offset), allocationGranularity));
             HIP_DRIVER_CHECK(hipMemRelease(it->handle));
         }

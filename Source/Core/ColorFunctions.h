@@ -11,7 +11,7 @@ namespace Color
     MRAY_HYBRID Vector3 HSVToRGB(const Vector3& hsv);
 
     // Stateless random color,
-    // Neighbouring pixels should have distinct colors
+    // Neighboring pixels should have distinct colors
     MRAY_HYBRID Vector3 RandomColorRGB(uint32_t index);
 
     // Color conversion related
@@ -395,7 +395,7 @@ template <MRayColorSpaceEnum E>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector3 Color::Colorspace<E>::ToXYZ(const Vector3& rgb) const
 {
-    // Assing matrix to local space (GPU does not like static constexpr variables)
+    // Passing matrix to local space (GPU does not like static constexpr variables)
     constexpr auto Mat = ToXYZMatrix;
     return Mat * rgb;
 }
@@ -404,7 +404,7 @@ template <MRayColorSpaceEnum E>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector3 Color::Colorspace<E>::FromXYZ(const Vector3& xyz) const
 {
-    // Assing matrix to local space (GPU does not like static constexpr variables)
+    // Passing matrix to local space (GPU does not like static constexpr variables)
     constexpr auto Mat = FromXYZMatrix;
     return Mat * xyz;
 }
@@ -413,7 +413,7 @@ template <MRayColorSpaceEnum F, MRayColorSpaceEnum T>
 MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Vector3 Color::ColorspaceTransfer<F, T>::Convert(const Vector3& rgb) const
 {
-    // Assing matrix to local space (GPU does not like static constexpr variables)
+    // Passing matrix to local space (GPU does not like static constexpr variables)
     constexpr auto Mat = RGBToRGBMatrix;
     return Mat * rgb;
 }

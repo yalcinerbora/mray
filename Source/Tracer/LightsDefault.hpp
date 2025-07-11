@@ -266,14 +266,14 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 Vector2 CoOctaCoordConverter::DirToUV(const Vector3& dirYUp)
 {
     Vector3 dirZUp = TransformGen::YUpToZUp(dirYUp);
-    Vector2 uv = Graphics::DirectionToCocentricOctahedral(dirZUp);
+    Vector2 uv = Graphics::DirectionToConcentricOctahedral(dirZUp);
     return uv;
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
 Vector3 CoOctaCoordConverter::UVToDir(const Vector2& uv)
 {
-    Vector3 dirZUp = Graphics::CocentricOctahedralToDirection(uv);
+    Vector3 dirZUp = Graphics::ConcentricOctahedralToDirection(uv);
     Vector3 dirYUp = TransformGen::ZUpToYUp(dirZUp);
     return dirYUp;
 }

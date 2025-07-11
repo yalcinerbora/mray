@@ -45,7 +45,7 @@ concept MaterialC = requires(MatType mt,
     // Sample should support BSSRDF (it will return a "ray"
     // instead of a direction)
     // This means for other types ray.pos == surface.pos
-    // At the same time we sample a reflectio
+    // At the same time we sample a reflection
     {mt.SampleBxDF(Vector3{}, typename MatType::Surface{},
                    rng)
     } -> std::same_as<SampleT<BxDFResult>>;
@@ -115,7 +115,7 @@ concept MaterialGroupC = requires(MGType mg)
     // TODO: Some more functions
     // ...
 
-    // TODO: This concept requres "Reserve" function to be visible,
+    // TODO: This concept requires "Reserve" function to be visible,
     // however we switched it so...
     //requires GenericGroupC<MGType>;
 };
@@ -133,8 +133,8 @@ class GenericGroupMaterialT : public GenericTexturedGroupT<MaterialKey, MatAttri
                     GenericGroupMaterialT(uint32_t groupId, const GPUSystem&,
                                           const TextureViewMap&,
                                           size_t allocationGranularity = 2_MiB,
-                                          size_t initialReservartionSize = 4_MiB);
-    // Swap the interfaces (old switcharoo)
+                                          size_t initialReservationSize = 4_MiB);
+    // Swap the interfaces (old switcheroo)
     private:
     IdList          Reserve(const std::vector<AttributeCountList>&) override;
 
@@ -152,7 +152,7 @@ class GenericGroupMaterial : public GenericGroupMaterialT
                         GenericGroupMaterial(uint32_t groupId, const GPUSystem&,
                                              const TextureViewMap&,
                                              size_t allocationGranularity = 2_MiB,
-                                             size_t initialReservartionSize = 4_MiB);
+                                             size_t initialReservationSize = 4_MiB);
     std::string_view    Name() const override;
 };
 
@@ -185,10 +185,10 @@ inline
 GenericGroupMaterialT::GenericGroupMaterialT(uint32_t groupId, const GPUSystem& gpuSystem,
                                              const TextureViewMap& map,
                                              size_t allocationGranularity,
-                                             size_t initialReservartionSize)
+                                             size_t initialReservationSize)
     : Parent(groupId, gpuSystem, map,
              allocationGranularity,
-             initialReservartionSize)
+             initialReservationSize)
 {}
 
 inline typename GenericGroupMaterialT::IdList
@@ -201,8 +201,8 @@ inline typename GenericGroupMaterialT::IdList
 GenericGroupMaterialT::Reserve(const std::vector<AttributeCountList>& countArrayList,
                                const MediumKeyPairList& mediumPairs)
 {
-    // We blocked the virutal chain, but we should be able to use it here
-    // We will do the same here anyways migh as well use it.
+    // We blocked the virtual chain, but we should be able to use it here
+    // We will do the same here anyways might as well use it.
     auto result = Parent::Reserve(countArrayList);
     std::lock_guard lock(mutex);
 
@@ -214,10 +214,10 @@ template <class C>
 GenericGroupMaterial<C>::GenericGroupMaterial(uint32_t groupId, const GPUSystem& system,
                                               const TextureViewMap& map,
                                               size_t allocationGranularity,
-                                              size_t initialReservartionSize)
+                                              size_t initialReservationSize)
     : GenericGroupMaterialT(groupId, system, map,
                             allocationGranularity,
-                            initialReservartionSize)
+                            initialReservationSize)
 {}
 
 template <class C>

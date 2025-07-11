@@ -42,7 +42,7 @@ TextureViewCUDA<D, QT> TextureCUDA_Normal<D, T>::View() const
     // Normalize integers requested bu view is created with the same type
     if(texParams.normIntegers)
         throw MRayError("Unable to create a view of texture. "
-                        "View type must be \"Float\" (or vector equavilents) "
+                        "View type must be \"Float\" (or vector equivalents) "
                         "for normalized integers");
     return TextureViewCUDA<D, QT>(tex);
 }
@@ -58,7 +58,7 @@ TextureViewCUDA<D, QT> TextureCUDA_Normal<D, T>::View() const
                                  std::is_same_v<QT, Vector<ChannelCount, Float>>);
     if(texParams.normCoordinates && !IsFloatType)
         throw MRayError("Unable to create a view of texture. "
-                        "View type must be \"Float\" (or vector equavilents) "
+                        "View type must be \"Float\" (or vector equivalents) "
                         "for normalized integers");
     else if(texParams.normCoordinates && IsFloatType)
         return TextureViewCUDA<D, QT>(tex);
@@ -88,7 +88,7 @@ TextureViewCUDA<2, QT> TextureCUDA_BC<T>::View() const
                                   std::is_same_v<QT, Vector<ChannelCount, Float>>);
     if(!IsFloatType)
         throw MRayError("Unable to create a view of texture. "
-                        "View type must be \"Float\" (or vector equavilents) "
+                        "View type must be \"Float\" (or vector equivalents) "
                         "for block compressed textures (BC1-7)");
     return TextureViewCUDA<2, QT>(tex);
 };

@@ -826,10 +826,10 @@ MRayError TracerThread::MTInitialize(const std::string& tracerConfigFile)
         tracerConfig.dllCreateFuncName,
         tracerConfig.dllDeleteFuncName
     };
-    dllFile = std::make_unique<SharedLibrary>(tracerConfig.dllName);
-    // GPU System may fail to construct which thorws an exception
+    // GPU System may fail to construct which throws an exception
     try
     {
+        dllFile = std::make_unique<SharedLibrary>(tracerConfig.dllName);
         err = dllFile->GenerateObjectWithArgs<TracerConstructorArgs, TracerI>
         (
             tracer, args,

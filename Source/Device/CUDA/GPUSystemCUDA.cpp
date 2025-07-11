@@ -416,7 +416,7 @@ GPUThreadInitFunction GPUSystemCUDA::GetThreadInitFunction() const
 void TimelineSemAcquireInternal(void* params)
 {
     GPUSemaphoreViewCUDA* ts = static_cast<GPUSemaphoreViewCUDA*>(params);
-    // Device side acquision, we cant do much here,
+    // Device side acquisition, we cant do much here,
     // because this is async, so we drop the result and on text iteration
     // GPU driving code may check the semaphore before sending an
     // acquisition code to GPU (a host launch)

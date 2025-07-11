@@ -10,7 +10,7 @@
 
 struct MRayError;
 
-// We gonna use this alot I think
+// We gonna use this a lot I think
 template<size_t N>
 using CStringList = StaticVector<const char*, N>;
 

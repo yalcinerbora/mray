@@ -61,7 +61,7 @@ void AccumImageStage::ImportExternalHandles(const RenderBufferInfo& rbI)
 
     // We will use this as read only,
     // But we don't provide API for it (Vulkan does not provide it)
-    // Up untill here we carry the "const" not its time to let it go
+    // Up until here we carry the "const" not its time to let it go
     Byte* dataPtr = const_cast<Byte*>(rbI.data);
     foreignMemory = dAllocator.AllocateForeignObject(foreignBuffer, dataPtr,
                                                      rbI.totalSize,
@@ -130,7 +130,7 @@ AccumulateStatus AccumImageStage::IssueAccumulation(const RenderImageSection& se
     {
         // Drop the frames. We prematurely deallocated the buffers
         // since Vulkan does not allow memory to be pulled under its feet.
-        // (Eventhough we do not use it explicitly)
+        // (even though we do not use it explicitly)
         syncSemaphore->Release();
         return AccumulateStatus::DROPPING_FRAME;
     }
@@ -215,9 +215,9 @@ AccumulateStatus AccumImageStage::IssueAccumulation(const RenderImageSection& se
     pipeline.BindSet(accumulateCommand, 0, descriptorSets[0]);
     vkCmdDispatch(accumulateCommand, groupSize[0], groupSize[1], 1);
     vkEndCommandBuffer(accumulateCommand);
-    // ============= //
-    //   SUBMISSON   //
-    // ============= //
+    // ============== //
+    //   SUBMISSION   //
+    // ============== //
     auto allStages = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
     VkSemaphoreSubmitInfo waitSemaphore = imgWriteSemaphore.WaitInfo(allStages);
     VkSemaphoreSubmitInfo signalSemaphores = imgWriteSemaphore.SignalInfo(allStages, 1);

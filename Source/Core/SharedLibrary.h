@@ -37,7 +37,7 @@ class SharedLibrary
         void*               libHandle;
 
         // Internal
-        void*               GetProcAdressInternal(const std::string& fName) const;
+        void*               GetProcAddressInternal(const std::string& fName) const;
 
     protected:
     public:
@@ -67,9 +67,9 @@ MRayError SharedLibrary::GenerateObjectWithArgs(SharedLibPtr<T>& ptr,
                   "Shared library class constructor's arguments did not match!");
 
     MRayError err("[DLLError] Exported function name is not found");
-    ObjGeneratorFuncArgs<T, Args&&...> genFunc = reinterpret_cast<ObjGeneratorFuncArgs<T, Args&&...>>(GetProcAdressInternal(mangledNames.mangledConstructorName));
+    ObjGeneratorFuncArgs<T, Args&&...> genFunc = reinterpret_cast<ObjGeneratorFuncArgs<T, Args&&...>>(GetProcAddressInternal(mangledNames.mangledConstructorName));
     if(!genFunc) return err;
-    ObjDestroyerFunc<T> destFunc = reinterpret_cast<ObjDestroyerFunc<T>>(GetProcAdressInternal(mangledNames.mangledDestructorName));
+    ObjDestroyerFunc<T> destFunc = reinterpret_cast<ObjDestroyerFunc<T>>(GetProcAddressInternal(mangledNames.mangledDestructorName));
     if(!destFunc) return err;
     ptr = SharedLibPtr<T>(genFunc(std::forward<Args&&>(args)...), destFunc);
     return MRayError::OK;

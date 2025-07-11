@@ -206,7 +206,7 @@ class GPUQueueHIP
                                     Lambda&&) const;
     // Exact Kernel Calls
     // You 1-1 specify block and grid dimensions
-    // Important: These can not be annottated with launch_bounds
+    // Important: These can not be annotated with launch_bounds
     template<auto Kernel, class... Args>
     MRAY_HOST void  IssueBlockKernel(std::string_view name,
                                      DeviceBlockIssueParams,

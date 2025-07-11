@@ -16,7 +16,7 @@
 //
 // The system does not touch the virtual texture memory system
 // to make it compatible between future APIs (HIP and SCYL).
-// However, we utilize "cudaArrayDefferredMapping" to alias memory
+// However, we utilize "cudaArrayDeferredMapping" to alias memory
 // between textures.
 //
 // The design is similar to the Unreal's MegaTextures system as far
@@ -25,7 +25,7 @@
 //
 // Other approaches include the NVIDIA's OptixToolkit(OTK) Demand texture
 // implementation (https://github.com/NVIDIA/optix-toolkit/tree/master/DemandLoading/DemandLoading)
-// which fully utillizes the hardware's sparse texture / virtual memory system
+// which fully utilizes the hardware's sparse texture / virtual memory system
 //
 // ==================================================
 // Design Principles
@@ -37,7 +37,7 @@
 //  - No disk caching to improve performance of subsequent runs
 //    of the same scene. Every run must start on fresh. Ideally
 //    user will have all of its textures as mipmapped. This will be the
-//    somewhat ideal on disk cache anways. We can provide an offline tool
+//    somewhat ideal on disk cache anyways. We can provide an offline tool
 //    to convert the textures on a ideal tiled/duplicated format later.
 //    The control must be on the user.
 //
@@ -110,7 +110,7 @@
 //    should filter the aliasing.
 //
 //  - Textures smaller than (N x N) can be stored but will waste memory.
-//    NVIDIA allocs minimally allocs 64k chunks for its textures anway so
+//    NVIDIA allocs minimally allocs 64k chunks for its textures anyway so
 //    at best we do not get full HW filtering of mips.
 //
 //  - Each virtual texture has a footprint on the GPU as well. One obvious
@@ -120,18 +120,18 @@
 //    this footprint will store 137 * 137 * 1.5 = ~28,154 bits (virtual tile
 //    size of  RGBA_32F tex is 60x60 due to 2pix padding, so 8192 / 60 = 136.5)
 //    which is around ~3.5 KiB. So on average each texture will have somewhat
-//    negligable memory footprint. For more common case (8k RGBA_8 texture)
+//    negligible memory footprint. For more common case (8k RGBA_8 texture)
 //    it is 0.8KiB.
 //  - This request bitset is set by the texture taps automatically.
 //    Texture will return optional<T> where the pixel type is T
-//    (float, Vector2 etc.). It is shaders or other systems' responsbility
+//    (float, Vector2 etc.). It is shaders or other systems' responsibility
 //    to act accordingly.
 //  - After these bits are set, user will call a function on the CPU side
 //    these bits are transferred back to the CPU processed and new virtual
 //    tiles are processed and send back to the GPU.
 //
 // CPU Side:
-//  - Since we need to support non-mippmapped types, we have an aggresively
+//  - Since we need to support non-mippmapped types, we have an aggressively
 //    allocated CPU side tile pool (probably couple of GiB) since we do not
 //    use the CPU memory much. When a tile is requested we calculate mipmaps
 //    on the GPU and store it on the physical tiles. When the tile is evicted
@@ -147,7 +147,7 @@
 //    order of new requests will fill the physical tiles.
 //  - GPU will tap the textures and use them, unissued taps will set the buffer
 //    again.
-//  - This loop is continued until all texture requestes are finalized.
+//  - This loop is continued until all texture requests are finalized.
 //  - This will reduce the performance but for massively parallel hardware
 //    such as GPUs it is unavoidable.
 //
@@ -286,7 +286,7 @@ struct StreamingTexture
 class StreamingTextureCache
 {
 	private:
-	StreamingTexturePack concereteTextures;
+	StreamingTexturePack concreteTextures;
 
 	//// Aliases - Pair 1 - Square tiles
 	//// These textures will have different sizes
@@ -334,8 +334,8 @@ class StreamingTextureCache
 	// since we need to keep track of two values
 	//
 	// Currently only CUDA supports aliasing
-	// (Eventhough it is not documented but
-	// "cudaArrayDefferredMapping" enables such behaviour.
+	// (even though it is not documented but
+	// "cudaArrayDeferredMapping" enables such behaviour.
 	//
 	// For other backends this will be a hassle to optimize
 	// between **24** different texture types!!!

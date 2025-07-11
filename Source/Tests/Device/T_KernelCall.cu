@@ -163,7 +163,7 @@ void KernelCallLambdaTester(const GPUSystem& system)
 
 
     // Lambda Functor
-    // We can copy everthing except references
+    // We can copy everything except references
     auto LambdaKernel = [=] MRAY_GPU(KernelCallParams params)
     {
         // A grid-stride loop

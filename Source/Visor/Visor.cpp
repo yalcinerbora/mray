@@ -623,7 +623,7 @@ MRayError VisorVulkan::InitImGui()
 {
     // Init Imgui stuff
     if(!IMGUI_CHECKVERSION())
-        return MRayError("ImGui: Version mistmatch!");
+        return MRayError("ImGui: Version mismatch!");
 
     if(ImGui::CreateContext() == nullptr)
         return MRayError("ImGui: Unable to create context!");

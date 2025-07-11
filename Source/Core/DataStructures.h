@@ -19,19 +19,19 @@
 //
 // Stratified alias table increases storage cost but makes
 // the computation O(1). Worst case it will have a size of
-// O(max(k)) insead of O(size(k)) which can be quite large.
+// O(max(k)) instead of O(size(k)) which can be quite large.
 //
 // The idea comes from inverse CDF sampling vs. alias table
 // sampling, but this time it is utilized for range finding.
 //
 // Since this data structure utilize stratification, similar
 // approach can be utilized to fast and **stratified** sampling
-// of discrete probabilities. But for loating points gcd does not
+// of discrete probabilities. But for floating points gcd does not
 // makes sense so different approach should be employed.
 //
 // ***Use-cases***
 // Finding primitive batch id from primitiveId. In common terms,
-// pirmitive batch is a mesh (series of triangles).
+// primitive batch is a mesh (series of triangles).
 // A scene probably consists of multiple batches. Assuming all the
 // mesh primitives are in linearly laid out in memory (this is true
 // for mray). When computation wants to acquire per-primitive variables
@@ -55,9 +55,9 @@
 // to find the primitive id. So worst case corresponds to holding a primitive-batch
 // id on the primitive itself.
 //
-// Unfortunately due to "2-triangle walls" being commong GCD probably be 2.
+// Unfortunately due to "2-triangle walls" being common, GCD probably be 2.
 // In order to save more space, this approach can co-jointly utilized by the scene loader
-// which "pads" meshes to a common alignment (i.e 128) this means GCD will guareanteed
+// which "pads" meshes to a common alignment (i.e 128) this means GCD will guaranteed
 // to be a large number (again 128) and memory can be saved.
 //
 // By this protocol, the explained class is very simple
@@ -104,7 +104,7 @@ class LookupTable
     static constexpr uint32_t VEC_MASK = (VEC_SHIFT == 0) ? 0 : ((1u << VEC_SHIFT) - 1);
 
     private:
-    // Keys and values are seperate,
+    // Keys and values are separate,
     // keys are small, values may be large
     Span<Vector<VL, H>> hashes;
     Span<K>             keys;
@@ -134,7 +134,7 @@ class LookupTable
 // Tries to be API compatible (but not really) with std::vector
 // All is marked "constexpr" however it is hard/impossible (maybe?) to
 // create compile-time version of it for all types trivial/non-trivial
-// (copy/move)-constrcutible types, etc.
+// (copy/move)-constructible types, etc.
 //
 // Lets not make the mistake of old std::vector impl
 enum class StaticVecSize : size_t {};
@@ -332,7 +332,7 @@ class FlatSet
     Container       extract() &&;
     void            replace(Container&&);
 
-    // TODO: erease
+    // TODO: erase
     // TODO: swap
     void            clear();
 

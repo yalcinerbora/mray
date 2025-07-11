@@ -5,6 +5,7 @@
 #include "Device/GPUSystem.h"
 #include "Device/GPUSystem.hpp"
 #include "Device/GPUMemory.h"
+#include "Device/GPUAlgForward.h"
 #include "Device/GPUAlgRadixSort.h"
 
 #include "T_AlgTypes.h"
@@ -178,6 +179,10 @@ TYPED_TEST(DeviceAlgorithmsTest, RadixSortDescending)
     RadixSortTest<false, Key, Value>(system);
 }
 
+// We directly feed "SegmentedRadixSort"
+// to CUDA, it would be a waste to test it.
+#ifdef MRAY_GPU_BACKEND_CUDA
+
 TYPED_TEST(DeviceAlgorithmsTest, SegmentedRadixSortAscending)
 {
     using Key = typename DeviceAlgorithmsTest<TypeParam>::KeyType;
@@ -195,3 +200,5 @@ TYPED_TEST(DeviceAlgorithmsTest, SegmentedRadixSortDescending)
 
     SegmentedRadixSortTest<false, Key, Value>(system);
 }
+
+#endif

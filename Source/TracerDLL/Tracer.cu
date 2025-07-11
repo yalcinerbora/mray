@@ -1,6 +1,6 @@
 #ifdef MRAY_WINDOWS
 // After nvcc passes through
-// some residual code catched by msvc
+// some residual code caught ed by msvc
 // and "unreachable code" is generated
 // TODO: Investigate
 #pragma warning( disable : 4702)

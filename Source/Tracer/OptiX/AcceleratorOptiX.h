@@ -67,7 +67,7 @@ namespace OptiXAccelDetail
         .numAttributeValues = MetaHit::MaxDim,
         .exceptionFlags = OPTIX_EXCEPTION_FLAG_NONE,
         .pipelineLaunchParamsVariableName = "params",
-        // TODO: New OptiX has other fancy types (but in software I gusess?)
+        // TODO: New OptiX has other fancy types (but in software I guess?)
         // specialize these instead of implementing our own later.
         .usesPrimitiveTypeFlags = std::bit_cast<uint32_t>(OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE |
                                                           OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM),
@@ -75,7 +75,7 @@ namespace OptiXAccelDetail
     };
     static_assert(PIPELINE_OPTIONS_OPTIX.numPayloadValues == 2,
                   "Currently OptiX shaders are compiled with "
-                  "single word for index and another sigle word for backup RNG state. "
+                  "single word for index and another single word for backup RNG state. "
                   "Type sizes do not match with this assumption.");
 
     // Phony type to satisfy the concept
@@ -302,7 +302,7 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
     std::vector<ComputeCapabilityTypePackOptiX> optixTypesPerCC;
     // Memory related
     DeviceMemory                allMem;
-    Span<ArgumentPackOpitX>     dLaunchArgPack;
+    Span<ArgumentPackOptiX>     dLaunchArgPack;
     Span<Byte>                  dAccelMemory;
     Span<GenericHitRecord<>>    dHitRecords;
     Span<EmptyHitRecord>        dEmptyRecords;

@@ -39,7 +39,7 @@ Vector2ui ImageTiler::FindOptimumTileSize(const Vector2ui& fbSize,
         // If w/h is small use the full fb w/h
         if(fbSize[i] < tileHint[i]) return fbSize[i];
 
-        // Divide down to get an agressive (lower) count,
+        // Divide down to get an aggressive (lower) count,
         // but on second pass do a conservative divide
         Float tileCountF = Float(fbSize[i]) / Float(tileHint[i]);
         uint32_t tileCount = uint32_t(std::round(tileCountF));
@@ -201,7 +201,7 @@ Optional<RenderImageSection> RenderImage::TransferToHost(const GPUQueue& process
     copyQueue.MemcpyAsync(hPixelsAll, ToConstSpan(dPixelsAll));
     copyQueue.MemcpyAsync(hWeights, ToConstSpan(dWeights));
 
-    // Do not overwrite untill memcpy finishes
+    // Do not overwrite until memcpy finishes
     previousCopyCompleteFence = copyQueue.Barrier();
     // Here, we can not wait on host here, (or we sync)
     // so we Issue the release of the semaphore as host launch

@@ -514,7 +514,7 @@ void DeviceMemoryCUDA::ResizeBuffer(size_t newSize)
     // Shrink the memory
     if(!neverDecrease && newSize < allocSize)
     {
-        // We need to shring the memory, meaning we will
+        // We need to shrink the memory, meaning we will
         // do an unmap, so halt all operations on the device
         // TODO: If check is unecessary?
         if(!reservationRelocated)
@@ -527,7 +527,7 @@ void DeviceMemoryCUDA::ResizeBuffer(size_t newSize)
             offset -= allocationGranularity;
             if(newSize > offset)
                 break;
-            // Relase the memory
+            // Release the memory
             CUDA_DRIVER_CHECK(cuMemUnmap(mPtr + offset, allocationGranularity));
             CUDA_DRIVER_CHECK(cuMemRelease(it->handle));
         }

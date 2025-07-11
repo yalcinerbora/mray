@@ -4,7 +4,7 @@ module ColorFunctions;
 // a linear D65 color space.
 // [To/From]Linear is responsible for EOTF conversion.
 // Currently only ACES-cg has non D65 whitepoint,
-// so we include Bradford chromacity adaptation
+// so we include Bradford chromaticity adaptation
 // matrix to convert the whitepoints.
 // Implementation is from here
 // https://www.color.org/specification/icc1v43_2010-12.pdf
@@ -170,7 +170,7 @@ public struct HDR10ColorConv : IColorConv
     public typedef float GammaParams;
 
     // SMPTE ST 2084 transfer functions
-    // Adjustable parameter is the diplay's peak brightness.
+    // Adjustable parameter is the display's peak brightness.
     // https://en.wikipedia.org/wiki/Perceptual_quantizer
     private static const float c1 = 0.8359375f;
     private static const float c2 = 18.8515625f;

@@ -40,7 +40,7 @@ using MetaHit = MetaHitT<2>;
 //    Vector3 dDdy;
 //};
 //
-// TODO: Check and test for half precision. Angle is revole around (-Pi/2, Pi/2)
+// TODO: Check and test for half precision. Angle is revolve around (-Pi/2, Pi/2)
 // Width is world space related it can be large (but should fit to half)
 // aperture can be 16-bit UNORM as well since it has a fixed range. (We can round down
 // to increase aliasing, since we do monte carlo simulation)
@@ -61,7 +61,7 @@ struct RayConeSurface
 {
     RayCone rayConeFront;   // Incoming ray cone of the surface
     RayCone rayConeBack;    // Potential refracted ray cone
-    Float betaN = Float(0); // Cuvature estimation of surface
+    Float betaN = Float(0); // Curvature estimation of surface
 
     MRAY_HYBRID
     RayCone ConeAfterScatter(const Vector3& wO,
@@ -70,11 +70,11 @@ struct RayConeSurface
 
 // Image coordinate is little bit special.
 // Instead of it being a Vector2 or something
-// The integer part and sub pixel part is seperated.
+// The integer part and sub pixel part is separated.
 //
 // This is due to future stochastic filtering (filtering after shading)
 // implementation. Some simple renderers may also find this usefull.
-// Path tracer; for example, will have a seperate RNG state for each pixel
+// Path tracer; for example, will have a separate RNG state for each pixel
 // So a kernel can directly access the state via the integer part.
 struct alignas(8) ImageCoordinate
 {
@@ -89,7 +89,7 @@ struct alignas(8) ImageCoordinate
 // For spectrum we need wavelengths as well,
 // but for RGB we dont need it.
 //
-// So frequencies are seperate.
+// So frequencies are separate.
 // The intra-render calculations will hold SpectrumT types
 // throughout.
 //
@@ -98,7 +98,7 @@ struct alignas(8) ImageCoordinate
 // or converting to the output image for output boundary case).
 //
 // Pairing these two as a single type is not good because of these.
-// We hold a seperate entity that holds waves
+// We hold a separate entity that holds waves
 //
 // TODO: The design leaks here,
 // change this to prevent Vector + Spectrum addition etc.
@@ -120,20 +120,20 @@ inline constexpr Vector2   VisibleSpectrumRange = Vector2(380, 700);
 inline constexpr Float     VisibleSpectrumMiddle = VisibleSpectrumRange.Sum() * Float(0.5);
 
 // Invalid spectrum, this will be set when some form of numerical
-// error occurs (i.e. a NaN is found). It is specifically oversaturated
+// error occurs (i.e. a NaN is found). It is specifically over-saturated
 // to "pop out" on the image (tonemapper probably darken everything else etc.)
 MRAY_HYBRID MRAY_GPU_INLINE
 constexpr Vector3 BIG_MAGENTA() { return Vector3(1e7, 0.0, 1e7); }
 
 // Invalid texture fetch, this will be set when streaming texture
 // system unable to tap the required texture.
-// It is specifically oversaturated to "pop out" on the
+// It is specifically over-saturated to "pop out" on the
 // image (tonemapper probably darken everything else etc.)
 MRAY_HYBRID MRAY_GPU_INLINE
 constexpr Vector3 BIG_CYAN() { return Vector3(0.0, 1e7, 1e7); }
 
 // Some key types
-// these are defined seperately for fine-tuning
+// these are defined separately for fine-tuning
 // for different use-cases.
 
 // Common Key/Index Types
@@ -209,7 +209,7 @@ struct VoxelizationParameters
     Vector3i    resolution;
 };
 
-// Most barebone leaf
+// Most bare bone leaf
 struct DefaultLeaf
 {
     PrimitiveKey primKey;
@@ -319,7 +319,7 @@ MRAY_HYBRID MRAY_CGPU_INLINE
 std::array<Vector3, 2> RayCone::Project(Vector3 f, Vector3 d) const
 {
     // Equation 8, 9;
-    // Preprocess the eliptic axes
+    // Preprocess the elliptic axes
     Vector3 h1 = d - f.Dot(d) * f;
     Vector3 h2 = Vector3::Cross(f, h1);
     Float r = width * Float(0.5);

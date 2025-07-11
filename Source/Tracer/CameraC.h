@@ -71,7 +71,7 @@ class GenericGroupCameraT : public GenericGroupT<CameraKey, CamAttributeInfo>
     GenericGroupCameraT(uint32_t groupId,
                         const GPUSystem& sys,
                         size_t allocationGranularity = 2_MiB,
-                        size_t initialReservartionSize = 4_MiB);
+                        size_t initialReservationSize = 4_MiB);
 
     virtual CameraTransform AcquireCameraTransform(CameraKey) const = 0;
 };
@@ -85,7 +85,7 @@ class GenericGroupCamera : public GenericGroupCameraT
                      GenericGroupCamera(uint32_t groupId,
                                         const GPUSystem& sys,
                                         size_t allocationGranularity = 2_MiB,
-                                        size_t initialReservartionSize = 4_MiB);
+                                        size_t initialReservationSize = 4_MiB);
     std::string_view Name() const override;
 };
 
@@ -93,20 +93,20 @@ inline
 GenericGroupCameraT::GenericGroupCameraT(uint32_t groupId,
                                          const GPUSystem& sys,
                                          size_t allocationGranularity,
-                                         size_t initialReservartionSize)
+                                         size_t initialReservationSize)
     :GenericGroupT<CameraKey, CamAttributeInfo>(groupId, sys,
                                                 allocationGranularity,
-                                                initialReservartionSize)
+                                                initialReservationSize)
 {}
 
 template <class C>
 GenericGroupCamera<C>::GenericGroupCamera(uint32_t groupId,
                                           const GPUSystem& sys,
                                           size_t allocationGranularity,
-                                          size_t initialReservartionSize)
+                                          size_t initialReservationSize)
     : GenericGroupCameraT(groupId, sys,
                           allocationGranularity,
-                          initialReservartionSize)
+                          initialReservationSize)
 {}
 
 template <class C>

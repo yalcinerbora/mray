@@ -229,7 +229,7 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     // Selectively write if path is alive
     if(!isPathDead)
     {
-        // If alive update througput
+        // If alive update throughput
         params.rayState.dThroughput[rayIndex] = DivideByPDF(throughput, raySample.pdf);
 
         // Save the previous pdf (aka. current pdf, naming is for the user)

@@ -10,8 +10,12 @@
 
 class ThreadPool;
 
+#ifndef PXR_STATIC
+    #error PXR_STATIC must be defined!
+#endif
+
 // CTAD to the rescue!
-static const std::array MRayEquavilentUSDTypes =
+static const std::array MRayEquivalentUSDTypes =
 {
     // Comments are in MRayTerms
     // Primitives

@@ -207,7 +207,7 @@ void KCLocalRayCast(// Output
         // Construct the accelerator view
         Accelerator acc(tSoA, pSoA, aSoA, aId);
 
-        // Do work depending on the prim transorm logic
+        // Do work depending on the prim transform logic
         using enum PrimTransformType;
         if constexpr(PG::TransformLogic == LOCALLY_CONSTANT_TRANSFORM)
         {
@@ -270,7 +270,7 @@ void KCVisibilityRayCast(// Output
         // Construct the accelerator view
         Accelerator acc(tSoA, pSoA, aSoA, aId);
 
-        // Do work depending on the prim transorm logic
+        // Do work depending on the prim transform logic
         using enum PrimTransformType;
         if constexpr(PG::TransformLogic == LOCALLY_CONSTANT_TRANSFORM)
         {

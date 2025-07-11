@@ -104,7 +104,7 @@ target_link_libraries(CoreLib
 set_target_properties(CoreLib PROPERTIES
                       POSITION_INDEPENDENT_CODE ON)
 
-# TODO: This is somehwat a hack?
+# TODO: This is somewhat a hack?
 # When HIP is enabled as a language AMD does not give
 # lib and include variables ?????
 if(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_HIP")

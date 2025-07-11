@@ -3,7 +3,7 @@
 # (We require it already due to std::execution)
 # TBB
 mray_build_ext_dependency_git(
-    NAME usd_tbb_ext
+        NAME usd_tbb_ext
         URL "https://github.com/uxlfoundation/oneTBB"
         TAG "a00cc3b8b5fb4d8115e9de56bf713157073ed68c" # v2021.9.0
         LICENSE_NAME "LICENSE.txt"
@@ -30,12 +30,7 @@ mray_build_ext_dependency_git(
         BUILD_ARGS
             -DBUILD_SHARED_LIBS=OFF
             -DPXR_BUILD_MONOLITHIC=OFF
-
-            -DTBB_INCLUDE_DIRS=${MRAY_LIB_DIRECTORY}/Include
-            -DTBB_LIBRARY=${MRAY_CONFIG_LIB_DIRECTORY}
-            # This is required for TBB on windows
-            -DTBB_USE_DEBUG_BUILD=$<IF:$<CONFIG:Debug>,ON,OFF>
-
+            #
             -DPXR_BUILD_ANIMIX_TESTS=OFF
             -DPXR_BUILD_DOCUMENTATION=OFF
             -DPXR_BUILD_DRACO_PLUGIN=OFF
@@ -74,6 +69,12 @@ mray_build_ext_dependency_git(
             -DPXR_BUILD_ALEMBIC_PLUGIN=OFF
             # Similarly, OpenVDB (for volumetric data)
             -DPXR_ENABLE_OPENVDB_SUPPORT=OFF
+
+            # TBB-related
+            -DTBB_INCLUDE_DIRS=${MRAY_LIB_DIRECTORY}/Include
+            -DTBB_LIBRARY=${MRAY_CONFIG_LIB_DIRECTORY}
+            # This was required for TBB on windows
+            -DTBB_USE_DEBUG_BUILD=$<IF:$<CONFIG:Debug>,ON,OFF>
 
         DEPENDENCIES
             usd_tbb_ext

@@ -57,7 +57,7 @@ struct LocalRayCastArgPackOptiX
 	uint32_t							batchStartOffset;
 };
 
-struct ArgumentPackOpitX
+struct ArgumentPackOptiX
 {
 	RenderModeOptiX mode;
 	union

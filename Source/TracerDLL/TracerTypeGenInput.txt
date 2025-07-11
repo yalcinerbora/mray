@@ -52,7 +52,7 @@ A BVH     BaseAcceleratorLBVH     AcceleratorGroupLBVH    "Tracer/AcceleratorLBV
 A HW      BaseAcceleratorOptiX    AcceleratorGroupOptiX   "Tracer/OptiX/AcceleratorOptiX.h"
 
 # Renderer (Name / Header File / Work Count / Light Work Count / Camera Work Count)
-# Renderer can define multiple kernerls ("works") to do multiple passes or switch to a different kernel
+# Renderer can define multiple kernels ("works") to do multiple passes or switch to a different kernel
 # when renderer parameters is changed.
 # We will use these to explicitly instantiate templates
 

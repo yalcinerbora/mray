@@ -193,7 +193,8 @@ constexpr T Bit::FetchSubPortion(T value, std::array<T, 2> bitRange)
     T bitCount = bitRange[1] - bitRange[0];
     assert(bitRange[0] < bitRange[1]);
     assert(bitCount < sizeof(T) * CHAR_BIT);
-    assert(bitCount >= 0);
+    if constexpr(std::is_signed_v<T>)
+        assert(bitCount >= 0);
 
     T mask = (T(1) << bitCount) - 1;
     return (value >> bitRange[0]) & mask;
@@ -206,7 +207,8 @@ constexpr T Bit::SetSubPortion(T value, C in, std::array<T, 2> bitRange)
     T bitCount = bitRange[1] - bitRange[0];
     assert(bitRange[0] < bitRange[1]);
     assert(bitCount < sizeof(T) * CHAR_BIT);
-    assert(bitCount >= 0);
+    if constexpr(std::is_signed_v<T>)
+        assert(bitCount >= 0);
 
     T inT = T(in);
     T mask0 = (T(1) << bitCount) - 1;
@@ -511,7 +513,7 @@ constexpr R Bit::NormConversion::FromUNormVaryingInsane(T value)
     // Furthermore, this is value not compatible with this approach.
     //
     // But no floating point division so its performant even with a loop?
-    // porbably not. So do not do this :)
+    // probably not. So do not do this :)
     return R(1) - std::bit_cast<R>(rBits);
 }
 

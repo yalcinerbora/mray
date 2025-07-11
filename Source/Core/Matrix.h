@@ -147,12 +147,12 @@ namespace TransformGen
     MRAY_HYBRID constexpr Matrix<4, T>  Perspective(T fovXRadians, T aspectRatio,
                                                     T nearPlane, T farPlane);
     template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<4, T>  Ortogonal(T left, T right,
-                                                  T top, T bottom,
-                                                  T nearPlane, T farPlane);
+    MRAY_HYBRID constexpr Matrix<4, T>  Orthogonal(T left, T right,
+                                                   T top, T bottom,
+                                                   T nearPlane, T farPlane);
     template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<4, T>  Ortogonal(T width, T height,
-                                                  T nearPlane, T farPlane);
+    MRAY_HYBRID constexpr Matrix<4, T>  Orthogonal(T width, T height,
+                                                   T nearPlane, T farPlane);
 
     template<std::floating_point T>
     MRAY_HYBRID constexpr Matrix<4, T>  LookAt(const Vector<3, T>& eyePos,

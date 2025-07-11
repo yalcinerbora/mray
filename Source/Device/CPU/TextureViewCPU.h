@@ -39,7 +39,7 @@ class TextureViewCPU
     };
 
     private:
-    // Type erease data and params
+    // Type erase data and params
     const Byte* const*          dataPtr;
     const TextureInitParams<D>* texParams;
     MRayPixelTypeRT             dt;
@@ -126,7 +126,7 @@ class RWTextureViewCPU
 // C == 3 means it is 3 channel type then Pixel type is Vector3X and it
 // has a inner type. However this generic code is instantiated with
 // multitude of types one of which is "C == 1, Float".
-// Code must be semantically correct I gusess?
+// Code must be semantically correct I guess?
 //
 // So we give "void" when PixelType is arithmetic type
 template<class T> struct InnerTypeT { using Type = void; };

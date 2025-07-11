@@ -3,6 +3,8 @@
 #include "Key.h"
 #include "TracerTypes.h"
 
+#include "Core/MathForward.h"
+
 #include <fmt/format.h>
 #include <fmt/core.h>
 
@@ -43,7 +45,7 @@ auto format_as(const TriKeyT<T, FB, BB, IB>& k)
     return s;
 }
 
-// Rely on overload resolution to write in hexedecimal
+// Rely on overload resolution to write in hexadecimal
 template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
 struct HexKeyT : public KeyT<T, BB, IB>
 {
@@ -82,7 +84,7 @@ auto format_as(const HexTriKeyT<T, FB, BB, IB>& k)
 inline auto format_as(const HitKeyPack& hk)
 {
     return std::tuple(HexKeyT(hk.primKey), HexTriKeyT(hk.lightOrMatKey),
-                 HexKeyT(hk.transKey), HexKeyT(hk.accelKey));
+                      HexKeyT(hk.transKey), HexKeyT(hk.accelKey));
 }
 
 inline auto format_as(const RayGMem& r)

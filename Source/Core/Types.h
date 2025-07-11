@@ -27,14 +27,14 @@ using Pair = std::pair<T0, T1>;
 template <class T>
 using Ref = std::reference_wrapper<T>;
 
-// Simple type package, usefull while metaprogramming
+// Simple type package, usefull while metaprograming
 template<class... T>
 struct PackedTypes {};
 
 namespace std
 {
     // We try to cut tuple instantiations of
-    // GPU kernel genration. But tuple_element
+    // GPU kernel generation. But tuple_element
     // trait is hard to implement efficiently.
     // We rarely rely on it so we fallback to std
     // currently
@@ -84,7 +84,7 @@ template<class T0, std::size_t E0,
 requires std::is_same_v<std::decay_t<T0>, std::decay_t<T1>>
 constexpr bool IsSubspan(Span<T0, E0> checkedSpan, Span<T1, E1> bigSpan);
 
-// This is definately a thing that i cannot even comprahend
+// This is definitely a thing that i cannot even comprehend
 // Thanks to:
 // https://stackoverflow.com/questions/55941964/how-to-filter-duplicate-types-from-tuple-c
 namespace UniqueVariantDetail
@@ -137,7 +137,7 @@ struct SoASpan
 
     private:
     // TODO: Find a way to default initialize this.
-    // My template metaprogramming capabilities was not enough.
+    // My template metaprograming capabilities was not enough.
     // We are setting size to zero at least.
     std::tuple<Args*...> ptrs = NullifyPtrs();
     size_t          size = 0;
@@ -155,7 +155,7 @@ struct SoASpan
     constexpr size_t Size() const;
 };
 
-// Deuction guide for constructor
+// Deduction guide for constructor
 template<class... Spans>
 SoASpan(const Spans&... spans) -> SoASpan<typename Spans::element_type...>;
 
@@ -171,7 +171,7 @@ template<typename Func, class... Args, size_t... Is>
 constexpr bool std::tupleDetail::InvokeAt(size_t idx, const std::tuple<Args...>& t, Func&& F,
                                      std::index_sequence<Is...>)
 {
-    // Parameter pack expansion (comma seperator abuse)
+    // Parameter pack expansion (comma separator abuse)
     bool r = false;
     (
         // Abusing short circuit of "&&"

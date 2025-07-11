@@ -255,7 +255,7 @@ using PrimRangeArray        = std::array<Vector2ui, TracerConstants::MaxPrimBatc
 using LightOrMatKeyArray    = std::array<LightOrMatKey, TracerConstants::MaxPrimBatchPerSurface>;
 // TODO: std::bitset is CPU oriented class holds the data in (at least i checked MSVC std lib) 32/64-bit integer
 // For CUDA, it can be 8/16-bit, properly packed data (since MaxPrimBatchPerSurface
-// is 8 in the current impl.) This should not be a memory concern untill
+// is 8 in the current impl.) This should not be a memory concern until
 // this codebase becomes production level renderer (doubt)
 using CullFaceFlagArray     = Bitset<TracerConstants::MaxPrimBatchPerSurface>;
 using AlphaMapArray         = std::array<Optional<AlphaMap>, TracerConstants::MaxPrimBatchPerSurface>;
@@ -595,7 +595,7 @@ AccelLeafResult AcceleratorGroupT<C, PG, B>::DetermineConcreteAccelCount(std::ve
         // Sort and find the unique primitive groups
         // only generate accelerators for these, refer with other instances
         std::vector<uint32_t>& nonUniqueIndices = acceleratorIndices;
-        // Commonalize the innter lists (sort it)
+        // Commonalize the inner lists (sort it)
         for(SurfacePrimList& lst : instancePrimBatches)
         {
             // Hopefully stl calls insertion sort here or something...
@@ -862,7 +862,7 @@ PreprocessResult AcceleratorGroupT<C, PG, B>::PreprocessConstructionParams(const
     assert(&pg == p.primGroup);
     // Instance Types (determined by transform type)
     AccelPartitionResult partitions = PartitionParamsForWork(p);
-    // Total instance count (equavilently total surface count)
+    // Total instance count (equivalently total surface count)
     auto linSurfData = LinearizeSurfaceData(p, partitions, pg);
     // Find out the concrete accel count and offsets
     auto leafResult = DetermineConcreteAccelCount(std::move(linSurfData.instancePrimBatches),
@@ -1011,7 +1011,7 @@ void AcceleratorGroupT<C, PG, B>::WriteInstanceKeysAndAABBsInternal(Span<AABB3> 
         }
 
         // TODO: This is actually common part, but compiler gives unreachable code error
-        // due to below part is not yet implemented. So it is moved here untill that portion is
+        // due to below part is not yet implemented. So it is moved here until that portion is
         // implemented.
         //
         // Now, copy (and transform) concreteAABBs (which are on local space)
@@ -1324,7 +1324,7 @@ void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
     using namespace Bit;
     maxBitsUsedOnKey = Vector2ui(RequiredBitsToRepresent(keyBatchPortionMax),
                                  RequiredBitsToRepresent(keyIdPortionMax));
-    // Calidate
+    // Validate
     if(maxBitsUsedOnKey[0] > AcceleratorKey::BatchBits ||
        maxBitsUsedOnKey[1] > AcceleratorKey::IdBits)
     {

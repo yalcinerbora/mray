@@ -20,6 +20,17 @@ include("PreventInSourceBuilds")
 set(CMAKE_CONFIGURATION_TYPES Debug;SanitizeR;Release CACHE STRING "Build configurations. SanitizeR is a config with address sanitizer/release")
 set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type for single config generators")
 
+# Control over your own destiny!
+set(CMAKE_C_FLAGS_RELEASE    "" CACHE STRING "")
+set(CMAKE_C_FLAGS_DEBUG      "" CACHE STRING "")
+set(CMAKE_C_FLAGS            "" CACHE STRING "")
+set(CMAKE_CXX_FLAGS_RELEASE  "" CACHE STRING "")
+set(CMAKE_CXX_FLAGS_DEBUG    "" CACHE STRING "")
+set(CMAKE_CXX_FLAGS          "" CACHE STRING "")
+set(CMAKE_CUDA_FLAGS_RELEASE "" CACHE STRING "")
+set(CMAKE_CUDA_FLAGS_DEBUG   "" CACHE STRING "")
+set(CMAKE_CUDA_FLAGS         "" CACHE STRING "")
+
 # Add build runpath $ORIGIN
 # Emulate windows style
 set(CMAKE_BUILD_RPATH $ORIGIN)

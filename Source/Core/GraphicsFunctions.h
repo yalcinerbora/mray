@@ -61,22 +61,22 @@ namespace Graphics
                                                      const Vector2& sinCosPhi);
     MRAY_HYBRID Vector2     CartesianToUnitSpherical(const Vector3&);
 
-    // 2D Vairant of spherical coordinates
+    // 2D Variant of spherical coordinates
     MRAY_HYBRID Vector2     PolarToCartesian(const Vector2&);
     MRAY_HYBRID Vector2     CartesianToPolar(const Vector2&);
     MRAY_HYBRID Vector2     UnitPolarToCartesian(Float);
     MRAY_HYBRID Float       CartesianToUnitPolar(const Vector2&);
 
-    // Cocentric Octohedral Mapping
+    // Concentric Octahedral Mapping
     // https://fileadmin.cs.lth.se/graphics/research/papers/2008/simdmapping/clarberg_simdmapping08_preprint.pdf
-    MRAY_HYBRID Vector2     DirectionToCocentricOctahedral(const Vector3&);
-    MRAY_HYBRID Vector3     CocentricOctahedralToDirection(const Vector2&);
-    MRAY_HYBRID Vector2     CocentricOctahedralWrap(const Vector2&);
+    MRAY_HYBRID Vector2     DirectionToConcentricOctahedral(const Vector3&);
+    MRAY_HYBRID Vector3     ConcentricOctahedralToDirection(const Vector2&);
+    MRAY_HYBRID Vector2     ConcentricOctahedralWrap(const Vector2&);
 
     template<std::integral T>
     MRAY_HYBRID
-    constexpr Vector<2, T>  CocentricOctohedralWrapInt(const Vector<2, T>& st,
-                                                       const Vector<2, T>& dimensions);
+    constexpr Vector<2, T>  ConcentricOctahedralWrapInt(const Vector<2, T>& st,
+                                                        const Vector<2, T>& dimensions);
 
     // Orthonormalization Gram-Schmidt process
     // Returns first (n-1) modified vectors.
@@ -281,7 +281,7 @@ Float CartesianToUnitPolar(const Vector2& xy)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Vector2 DirectionToCocentricOctahedral(const Vector3& dir)
+Vector2 DirectionToConcentricOctahedral(const Vector3& dir)
 {
     using namespace MathConstants;
     constexpr Float TwoOvrPi = InvPi<Float>() * Float{2};
@@ -318,7 +318,7 @@ Vector2 DirectionToCocentricOctahedral(const Vector3& dir)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 CocentricOctahedralToDirection(const Vector2& st)
+Vector3 ConcentricOctahedralToDirection(const Vector2& st)
 {
     using namespace MathConstants;
     constexpr Float PiOvr4 = Pi<Float>() * Float{0.25};
@@ -344,7 +344,7 @@ Vector3 CocentricOctahedralToDirection(const Vector2& st)
     Float sinPhi = (signbit(uv[1]) ? -1 : 1) * sin(phiPrime);
     Float z = (signbit(d) ? -1 : 1) * (1 - radius * radius);
 
-    // Now all is OK do the cocentric disk stuff
+    // Now all is OK do the concentric disk stuff
     Float xyFactor = radius * sqrt(2 - radius * radius);
     Float x = cosPhi * xyFactor;
     Float y = sinPhi * xyFactor;
@@ -353,13 +353,13 @@ Vector3 CocentricOctahedralToDirection(const Vector2& st)
 }
 
 MRAY_HYBRID MRAY_CGPU_INLINE
-Vector2 CocentricOctahedralWrap(const Vector2& st)
+Vector2 ConcentricOctahedralWrap(const Vector2& st)
 {
     // Get a good signed int candidate according to the "Float" type
     using IntType = typename std::conditional_t<std::is_same_v<Float, double>, int64_t, int32_t>;
 
     // Given st => (-inf, inf) convert to [0, 1]
-    // Octohedral Cocentric mapping has straightforward properties
+    // Octahedral Concentric mapping has straightforward properties
     // if either s or t is odd (integral part) we mirror the st on both sides
     // If both is odd or even do not mirror
     // Convert the negative numbers
@@ -382,7 +382,7 @@ Vector2 CocentricOctahedralWrap(const Vector2& st)
 
 template<std::integral T>
 MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<2, T>  CocentricOctohedralWrapInt(const Vector<2, T>& st,
+constexpr Vector<2, T>  ConcentricOctahedralWrapInt(const Vector<2, T>& st,
                                                    const Vector<2, T>& dimensions)
 {
     Vector<2, T> stConv = st;

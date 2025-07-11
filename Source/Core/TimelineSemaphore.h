@@ -8,14 +8,14 @@
 // GPU synchronizations (iGPU vs MRayGPUDevice).
 // So we create a simple vulkan style  timeline semaphore.
 // C++20 has "wait" on atomic variables unfortunately it is not what
-// we need. It waits "atomic != var" we need wait untill "atomic == var".
-// We need to handroll our own wait via mutex/condition_var/uint64_t.
+// we need. It waits "atomic != var" we need wait until "atomic == var".
+// We need to hand roll our own wait via mutex/condition_var/uint64_t.
 //
 // Additionally release operation handled by another thread,
 // for example, on CUDA side driver (or w/e the executor of cudaLaunchHostFunc
 // is) will release when the write operation finishes. Because of that
 // we need to "notify_all" instead of "notify_one" due to thread runaway issue.
-// (Tracer thread started to wait on this "semaphore" without preemtion)
+// (Tracer thread started to wait on this "semaphore" without preemption)
 //
 // Only drawback is that we need to wait/signal on CPU side instead of GPU side.
 // This should not be an issue since we already send the data that we
@@ -66,7 +66,7 @@ bool TimelineSemaphore::Acquire(uint64_t waitVal)
     std::unique_lock lock(mutex);
     cVar.wait(lock, [this, waitVal]()
     {
-        // Wait untill value is exactly the wait value
+        // Wait until value is exactly the wait value
         return value == waitVal || invalid;
     });
     return !invalid;

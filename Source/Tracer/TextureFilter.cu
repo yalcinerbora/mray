@@ -106,8 +106,8 @@ Vector4 FilterPixel(const Vector2ui& pixelCoord,
         Vector4 localPix = FetchData(wPixCoord + xy);
         // Actual calculation
         writePix += weight * localPix * totalSampleInv / pdf;
-        // Do the ingegration seperately as well
-        // we need to compansate
+        // Do the integration separately as well
+        // we need to compensate
         weightSum += weight * totalSampleInv / pdf;
     }
     writePix /= weightSum;
@@ -339,7 +339,7 @@ void KCExpandSamplesToPixels(// Outputs
 
             // Write windows, each sample has "maxPixelPerSample" amount of allocation
             // slots. These are available in a strided fashion, so writes can be coalesced
-            // This is why we do not termiante this double loop, we either write INT_MAX
+            // This is why we do not terminate this double loop, we either write INT_MAX
             // or actually write the result.
             uint32_t writeIndex = stride * sampleCount + sampleIndex;
             dPixelIds[writeIndex] = pixelLinearId;
@@ -383,7 +383,7 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan img,
     using ReduceShMem = typename WarpReduceVec4::TempStorage;
     // Per-Warp Shared Memory
     MRAY_SHARED_MEMORY Vector2ui    sSegmentRange[WARP_PER_BLOCK];
-    MRAY_SHARED_MEMORY CommonKey    sResonsiblePixel[WARP_PER_BLOCK];
+    MRAY_SHARED_MEMORY CommonKey    sResponsiblePixel[WARP_PER_BLOCK];
     MRAY_SHARED_MEMORY ReduceShMem  sReduceMem[WARP_PER_BLOCK];
 
     // Warp-stride loop
@@ -398,18 +398,18 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan img,
         // Load items to warp level
         if(laneId == LOAD_0) sSegmentRange[localWarpId][0] = dStartOffsets[segmentIndex + 0];
         if(laneId == LOAD_1) sSegmentRange[localWarpId][1] = dStartOffsets[segmentIndex + 1];
-        if(laneId == LOAD_2) sResonsiblePixel[localWarpId] = dPixelIds[segmentIndex];
+        if(laneId == LOAD_2) sResponsiblePixel[localWarpId] = dPixelIds[segmentIndex];
         // Wait for these writes to be visible across warp
         WarpSynchronize<LOGICAL_WARP_SIZE>();
 
         // This partition is residuals, we conservatively allocated but not every
         // potential filter slot is not filled. Skip this partition
-        if(sResonsiblePixel[localWarpId] == INVALID_MORTON)
+        if(sResponsiblePixel[localWarpId] == INVALID_MORTON)
             continue;
 
         // Locally compute the coordinates
         namespace Morton = Graphics::MortonCode;
-        Vector2i pixCoordsInt = Vector2i(Morton::Decompose2D(sResonsiblePixel[localWarpId]));
+        Vector2i pixCoordsInt = Vector2i(Morton::Decompose2D(sResponsiblePixel[localWarpId]));
         Vector2 pixCoords = Vector2(pixCoordsInt) + Float(0.5);
 
         uint32_t sampleStart = sSegmentRange[localWarpId][0];
@@ -441,7 +441,7 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan img,
         }
         // Now all is reduced, warp leader can write to the img buffer
         // Here we assume we are the sole warp responsible for this
-        // pixel. However; other writes would've been occured on
+        // pixel. However; other writes would've been occurred on
         // previous calls. So we need do an non-atomic add here.
         if(laneId == 0)
         {

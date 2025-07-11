@@ -74,7 +74,7 @@ DeviceLocalMemoryCPU& DeviceLocalMemoryCPU::operator=(DeviceLocalMemoryCPU&& oth
 
 DeviceLocalMemoryCPU::~DeviceLocalMemoryCPU()
 {
-    // TODO: Checl if aligned versions accept nullptr
+    // TODO: Check if aligned versions accept nullptr
     if(dPtr)
     {
         AlignedFree(dPtr, allocSize, MemAlloc::DefaultSystemAlignment());

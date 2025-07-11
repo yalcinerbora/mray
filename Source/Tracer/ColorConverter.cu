@@ -704,7 +704,7 @@ BCColorConverter::BCColorConverter(std::vector<GenericTexture*>&& bcTex)
             uint32_t  start = uint32_t(range[0]) + i * BC_TEX_PER_BATCH;
             uint32_t  end = uint32_t(range[0]) + (i + 1) * BC_TEX_PER_BATCH;
             end = std::min(end, uint32_t(range[0]) + localTexCount);
-            // "Size()" gives the aligned size (mutiple of 64k in CUDA)
+            // "Size()" gives the aligned size (multiple of 64k in CUDA)
             // so unnecessarily large maybe?
             // TODO: Profile and check this later
             size_t localSize = 0;
@@ -754,7 +754,7 @@ void BCColorConverter::CallBCColorConvertKernels(Span<Byte> dScratchBuffer,
 // throws an error about implicit template instantiated after
 // nvcc's explicit one.
 //
-// I have absoultely no idea but making this function good old
+// I have absolutely no idea but making this function good old
 // functor prevents it.
 // TODO: Report error maybe? (to who though?)
 struct ConvertKernelCallFunctor
