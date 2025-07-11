@@ -7,6 +7,8 @@
 #include <map>
 #include <memory>
 
+#include <assimp/DefaultLogger.hpp>
+
 using MeshLoaderPtr = std::unique_ptr<MeshLoaderI>;
 
 class MeshLoaderPool : public MeshLoaderPoolI

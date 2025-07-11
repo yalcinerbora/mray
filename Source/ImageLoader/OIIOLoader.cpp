@@ -222,7 +222,8 @@ Expected<ColorSpacePack> ImageFileOIIO::ColorSpaceToMRay(const std::string& oiio
         // TODO: New version OIIO finds this, quick google search
         // shows this is rec709 as well (non-linear). Check it properly
         // later
-        MapType{"g22_rec709"sv,   MR_REC_709,     Float(2.222)}
+        MapType{"g22_rec709"sv,   MR_REC_709,     Float(2.222)},
+        MapType{"lin_rec709"sv,   MR_REC_709,     Float(1)}
     };
 
     for(const auto& checkType : LookupList)

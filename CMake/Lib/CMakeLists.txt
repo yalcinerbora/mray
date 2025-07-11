@@ -200,14 +200,16 @@ endfunction()
 function(gen_archive_pack)
     set(options HAS_DEBUG_SUFFIX PACKAGE_WHOLE_ARCHIVE)
     set(oneValueArgs NAME)
-    set(multiValueArgs ARCHIVES EXTRA_INCLUDES EXTRA_DEFINES EXTRA_LIB_FOLDERS)
+    set(multiValueArgs ARCHIVES EXTRA_LIBS EXTRA_INCLUDES EXTRA_DEFINES EXTRA_LIB_FOLDERS)
     cmake_parse_arguments(GEN_ARCHIVE_PACK "${options}" "${oneValueArgs}"
                         "${multiValueArgs}" ${ARGN})
 
     add_library(${GEN_ARCHIVE_PACK_NAME} INTERFACE IMPORTED)
     set_target_properties(${GEN_ARCHIVE_PACK_NAME} PROPERTIES IMPORTED_GLOBAL TRUE)
 
-    list(TRANSFORM GEN_ARCHIVE_PACK_ARCHIVES PREPEND ${CMAKE_STATIC_LIBRARY_PREFIX})
+    if(UNIX AND NOT APPLE)
+        list(TRANSFORM GEN_ARCHIVE_PACK_ARCHIVES PREPEND ${CMAKE_STATIC_LIBRARY_PREFIX})
+    endif()
     # Debug
     set(GEN_ARCHIVE_PACK_DBG_NAMES ${GEN_ARCHIVE_PACK_ARCHIVES})
     if(GEN_ARCHIVE_PACK_HAS_DEBUG_SUFFIX)
@@ -255,9 +257,6 @@ function(gen_archive_pack)
         string(APPEND GEN_ARCHIVE_PACK_REL_NAMES >)
 
     endif()
-    message(STATUS ${GEN_ARCHIVE_PACK_DBG_NAMES})
-    message(STATUS ${GEN_ARCHIVE_PACK_REL_NAMES})
-
     # Finally the link command...
     target_link_libraries(${GEN_ARCHIVE_PACK_NAME}
                           INTERFACE

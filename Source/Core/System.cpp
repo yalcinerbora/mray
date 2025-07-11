@@ -10,6 +10,8 @@
 #ifdef MRAY_WINDOWS
 
     #include <windows.h>
+    #include "DataStructures.h"
+    #include "Error.h"
 
 #elif defined MRAY_LINUX
 
@@ -133,14 +135,14 @@ void* AlignedAlloc(size_t size, size_t alignment)
     // To confuse it is also has its parameters swapped :)
     assert(Bit::PopC(alignment) == 1);
     size_t alignedSize = Math::NextMultiple(size, alignment);
-    return _aligned_malloc(alignedSize, align);
+    return _aligned_malloc(alignedSize, alignment);
 }
 
 void* AlignedRealloc(void* ptr, size_t size, size_t alignment)
 {
     assert(Bit::PopC(alignment) == 1);
     size_t alignedSize = Math::NextMultiple(size, alignment);
-    return _aligned_realloc(ptr, alignedSize, align);
+    return _aligned_realloc(ptr, alignedSize, alignment);
 }
 
 void AlignedFree(void* ptr, size_t, size_t)

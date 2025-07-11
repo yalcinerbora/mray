@@ -5,7 +5,8 @@
 #include <assimp/Logger.hpp>
 #include <assimp/scene.h>
 #include <assimp/Importer.hpp>
-#include <assimp/DefaultLogger.hpp>
+
+#include <fstream>
 
 class MeshFileAssimp;
 
@@ -66,7 +67,7 @@ class MRayAssimpLogger final : public Assimp::Logger
 {
     private:
     static constexpr auto LOG_FILE_NAME = "assimp_log";
-    FILE* f;
+    std::ofstream f;
 
     public:
     // Constructors & Destructor
@@ -75,7 +76,7 @@ class MRayAssimpLogger final : public Assimp::Logger
                         MRayAssimpLogger(MRayAssimpLogger&&) noexcept = delete;
     MRayAssimpLogger&   operator=(const MRayAssimpLogger&) = delete;
     MRayAssimpLogger&   operator=(MRayAssimpLogger&&) noexcept = delete;
-                        ~MRayAssimpLogger();
+                        ~MRayAssimpLogger() = default;
 
     //
     bool attachStream(Assimp::LogStream *pStream, unsigned int severity) override;

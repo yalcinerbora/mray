@@ -28,6 +28,14 @@ target_link_libraries(SceneLoaderUSD
                       usd::usd_archive
                       tbb::tbb)
 
+if(WIN32)
+    target_link_libraries(SceneLoaderUSD PRIVATE
+                          Ws2_32.lib
+                          Shlwapi.lib
+                          Dbghelp.lib
+                         )
+endif()
+
 target_compile_definitions(SceneLoaderUSD
                            PRIVATE
                            MRAY_SCENELOADER_USD_SHARED_EXPORT)

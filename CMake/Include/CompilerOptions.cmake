@@ -49,12 +49,22 @@ set(MRAY_MSVC_OPTIONS
     /external:anglebrackets # Minimize warnings on external stuff
     /external:W0            # i.e. it is included with the <...> syntax.
 
+    /DWIN32
+    /D_WINDOWS
+    /GR
+    /EHsc
+
+    # Debug Default
+    $<$<CONFIG:Debug>:/MDd /Zi /Ob0 /Od /RTC1>
+    # Release Default
+    $<$<CONFIG:Release>:/MD /O2 /Zi /Ob1 /Od /DNDEBUG>
+
     # Release Debug Build
     # Generate pdb and enable optimizations
     # Also flag address sanitizer
-    $<$<CONFIG:SanitizeR>:/O2>
-    $<$<CONFIG:SanitizeR>:/Zi>
-    $<$<CONFIG:SanitizeR>:/Oy->
+    $<$<CONFIG:SanitizeR>:/MD /O2 /Zi /Ob0 /Oy- /Od /RTC1>
+    #$<$<CONFIG:SanitizeR>:/Zi>
+    #$<$<CONFIG:SanitizeR>:/Oy->
     $<$<CONFIG:SanitizeR>:/fsanitize=address>
 
     # Large section tables (too many templates on CPU Device)
@@ -151,12 +161,6 @@ set(MRAY_CUDA_OPTIONS
         -lineinfo,
         $<IF:$<CONFIG:Debug>, -G, -lineinfo>>
 
-    # $<$<AND:,$<CONFIG:Debug>>:-lineinfo>
-    # $<$<NOT:$<AND:$<TARGET_PROPERTY:CUDA_OPTIX_COMPILATION>,$<CONFIG:Debug>>>:-G>
-
-    $<$<CONFIG:Debug>:-G>
-    $<$<CONFIG:SanitizeR>:-lineinfo>
-    $<$<CONFIG:Release>:-lineinfo>
     # Extended Lambdas (__device__ tagged lambdas)
     -extended-lambda
     # Use fast math creates self intersection issues on

@@ -244,23 +244,16 @@ bool MRayAssimpLogger::detachStream(Assimp::LogStream*, unsigned int)
 }
 
 MRayAssimpLogger::MRayAssimpLogger()
-    : f(nullptr)
-{
-    f = std::fopen(LOG_FILE_NAME, "w");
-}
-
-MRayAssimpLogger::~MRayAssimpLogger()
-{
-    std::fclose(f);
-}
+    : f(LOG_FILE_NAME)
+{}
 
 void MRayAssimpLogger::OnDebug(const char* m)
 {
     if constexpr(!MRAY_IS_DEBUG) return;
 
     SystemThreadHandle handle = GetCurrentThreadHandle();
-    fmt::print(f, "[{}] [DEBUG] : {:s}",
-               std::bit_cast<uint64_t>(handle), m);
+    f << fmt::format("[{}] [DEBUG] : {:s}\n",
+                     std::bit_cast<uint64_t>(handle), m);
 }
 
 void MRayAssimpLogger::OnVerboseDebug(const char* m)
@@ -268,27 +261,27 @@ void MRayAssimpLogger::OnVerboseDebug(const char* m)
     if constexpr(!MRAY_IS_DEBUG) return;
 
     SystemThreadHandle handle = GetCurrentThreadHandle();
-    fmt::print(f, "[{}] [DEBUG!] : {:s}",
+    f << fmt::format("[{}] [DEBUG!] : {:s}\n",
                std::bit_cast<uint64_t>(handle), m);
 }
 
 void MRayAssimpLogger::OnInfo(const char* m)
 {
     SystemThreadHandle handle = GetCurrentThreadHandle();
-    fmt::print(f, "[{}] [INFO] : {:s}",
+    f << fmt::format("[{}] [INFO] : {:s}\n",
                std::bit_cast<uint64_t>(handle), m);
 }
 
 void MRayAssimpLogger::OnWarn(const char* m)
 {
     SystemThreadHandle handle = GetCurrentThreadHandle();
-    fmt::print(f, "[{}] [WARN] : {:s}",
+    f << fmt::format("[{}] [WARN] : {:s}\n",
         std::bit_cast<uint64_t>(handle), m);
 }
 
 void MRayAssimpLogger::OnError(const char* m)
 {
     SystemThreadHandle handle = GetCurrentThreadHandle();
-    fmt::print(f, "[{}] [ERR] : {:s}",
+    f << fmt::format("[{}] [ERR] : {:s}\n",
         std::bit_cast<uint64_t>(handle), m);
 }
