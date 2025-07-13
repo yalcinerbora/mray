@@ -1,5 +1,6 @@
 #include "SceneLoaderUSD.h"
 
+#include "Core/Error.h"
 #include "MRayUSDTypes.h"
 #include "MeshProcessor.h"
 #include "MaterialProcessor.h"
@@ -11,6 +12,8 @@
 #include "Core/Algorithm.h"
 
 // Traversal
+#include <pxr/usd/ar/resolverContext.h>
+#include <pxr/usd/ar/defaultResolverContext.h>
 #include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usd/primRange.h>
 #include <pxr/usd/usdGeom/xformCache.h>
@@ -412,7 +415,11 @@ MRayError FindLightTextures(std::map<pxr::UsdPrim, MRayUSDTexture>& extraTexture
         pxr::UsdAttribute fileA = lightPrim.GetTextureFileAttr();
         pxr::SdfAssetPath path; fileA.Get(&path);
         std::string filePath = path.GetResolvedPath();
-        assert(!filePath.empty());
+        if(filePath.empty())
+            return MRayError("[MRayUSD]: Unable to resolve texture path \"{}\". "
+                             "Node \"{}\"",
+                             path.GetAuthoredPath(),
+                             domeLight->uniquePrim.GetPrimPath().GetAsString());
         MRayUSDTexture tex =
         {
             .absoluteFilePath = filePath,
@@ -500,12 +507,14 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                                                  const std::string& filePath)
 {
     Timer t; t.Start();
+    Timer tLocal; tLocal.Start();
     MRayError e = MRayError::OK;
 
     // Load the stage!
+    tLocal.Lap();
     pxr::TfErrorMark pxrErrorMark;
     if(!pxr::UsdStage::IsSupportedFile(filePath))
-        return MRayError("\"{}\" is not a supported USD format", filePath);
+        return MRayError("[MRayUSD]: \"{}\" is not a supported USD format", filePath);
     loadedStage = pxr::UsdStage::Open(filePath);
     // TODO: Is this ok?
     if(!loadedStage)
@@ -513,7 +522,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
         std::string errors;
         if(!pxrErrorMark.IsClean())
         {
-            MRayError pxrErrs = MRayError("Unable to Open {}:\n", filePath);
+            MRayError pxrErrs = MRayError("[MRayUSD]: Unable to Open {}:\n", filePath);
             for(const pxr::TfError& pxrErr : pxrErrorMark)
             {
                 using namespace std::literals;
@@ -523,7 +532,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
             pxrErrorMark.Clear();
             return pxrErrs;
         }
-        else return MRayError("Unable to Open {}", filePath);
+        else return MRayError("[MRayUSD]: Unable to Open {}", filePath);
     }
 
     // Hopefully everything is ok.
@@ -578,7 +587,6 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
         surfaces.emplace_back(false, prim, uniquePrim, toWorld);
     }
     transformCache.Clear();
-
     // Issue warning about un
     if(warnUnkownTypes)
         MRAY_WARNING_LOG("[MRayUSD]: Unsupported geometries detected and skipped. "
@@ -678,6 +686,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
         }
     }
     surfaces.clear();
+    tLocal.Lap(); MRAY_LOG("[MRayUSD]: Open & Traversal took {:.3}s.", tLocal.Elapsed<Second>());
 
     // Report
     //PrintPrims(meshMatPrims, sphereMatPrims, uniqueMaterials,
@@ -697,7 +706,8 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                              uniqueSpherePrimBatches, tracer, threadPool,
                              sphereMatPrims.uniquePrims);
     if(e) return e;
-
+    tLocal.Lap(); MRAY_LOG("[MRayUSD]: Primitive processing took {:.3}s.",
+                           tLocal.Elapsed<Second>());
     // Find extra textures
     // From lights
     std::map<pxr::UsdPrim, MRayUSDTexture> extraTextures;
@@ -714,6 +724,8 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                                tracer, threadPool, uniqueMaterials,
                                extraTextures);
     if(e) return e;
+    tLocal.Lap(); MRAY_LOG("[MRayUSD]: Material processing took {:.3}s.",
+                           tLocal.Elapsed<Second>());
 
     // Process cameras
     // Sort the camera's by name for consistent loads

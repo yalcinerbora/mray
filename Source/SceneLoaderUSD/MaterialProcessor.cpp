@@ -6,6 +6,7 @@
 
 #include "MaterialProcessor.h"
 
+#include "Core/Error.h"
 #include "ImageLoader/EntryPoint.h"
 
 #include "Core/Algorithm.h"
@@ -426,7 +427,12 @@ MRayUSDTexture MaterialConverter::ReadTextureNode(const pxr::UsdPrim& texNodePri
     // Resolve file
     auto fileSdf = GetInput(tNode.GetInput(tokens.file), pxr::SdfAssetPath());
     std::string file = fileSdf.GetResolvedPath();
-    assert(!file.empty());
+    if(file.empty())
+        throw MRayError("[MRayUSD]: Unable to resolve texture path \"{}\". "
+                        "Node \"{}\"",
+                        fileSdf.GetAuthoredPath(),
+                        texNodePrim.GetPrimPath().GetAsString());
+
     // TODO: load "st" and check if it is properly connected
     return MRayUSDTexture
     {
