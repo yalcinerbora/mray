@@ -157,7 +157,7 @@ If you generate image without the GUI run:
 MRay is under the Apache 2.0 License. See [LICENSE][lic] for details.
 
 [2]: https://github.com/yalcinerbora/GFGFileFormat
-[3]: https://drive.google.com/file/d/1yPcrjZuyCDQVhFWHN0ZqMdeOpWn7WR76/view?usp=sharing
+[3]: https://drive.google.com/file/d/1XaVyLcHrGB35qv1rpVHtiP7sUmS9HYEZ/view?usp=sharing
 [4]: https://github.com/mitsuba-renderer/mitsuba3
 [5]: https://github.com/mmp/pbrt-v4
 [6]: https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-research/samples.html
