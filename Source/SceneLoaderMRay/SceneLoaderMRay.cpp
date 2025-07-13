@@ -831,6 +831,12 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
         using Barrier = std::barrier<decltype(BarrierFunc)>;
         auto barrier = std::make_shared<Barrier>(threadCount, BarrierFunc);
 
+        // We are using our own thread pool now, this is no longer required
+        // out thread pool copies/moves the lambda to a shared_ptr once
+        // then each thread uses it etc.
+        // ============= //
+        //  OLD COMMENT  //
+        // ============= //
         // BS_threadpool SubmitTask (all every submit variant I think, passes
         // the lambda by forwarding reference, however in our case we utilize the
         // lambda's scope as a thread local storage, forwarding does not work in this case

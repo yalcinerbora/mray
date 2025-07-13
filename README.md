@@ -39,7 +39,6 @@ Most of the dependencies are handled by the build system itself via CMake extern
 These libraries are automatically managed by the build system (uncommon libraries have their link):
  - fmt
  - nlohmann_json
- - [bs_thread_pool][1]
  - assimp
  - [gfg][2]
  - spdlog
@@ -157,7 +156,6 @@ If you generate image without the GUI run:
 
 MRay is under the Apache 2.0 License. See [LICENSE][lic] for details.
 
-[1]: https://github.com/bshoshany/thread-pool
 [2]: https://github.com/yalcinerbora/GFGFileFormat
 [3]: https://drive.google.com/file/d/1yPcrjZuyCDQVhFWHN0ZqMdeOpWn7WR76/view?usp=sharing
 [4]: https://github.com/mitsuba-renderer/mitsuba3
