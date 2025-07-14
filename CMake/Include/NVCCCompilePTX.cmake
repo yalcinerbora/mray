@@ -28,7 +28,7 @@
 #   SOURCES file1.cu file2.cu ...
 # )
 # This function implictly depends on the following variables:
-# - OPTIX_INCLUDE_DIR           (to include the optix headers)
+# - optix::optix target         (to include the optix headers)
 # - MRAY_CONFIG_BIN_DIRECTORY   (to copy the generated ir files files)
 # - MRAY_GPU_PLATFORM_NAME      (to organize the generated files)
 # - CMAKE_CUDA_ARCHITECTURES    (to determine the compute capabilities)
@@ -91,12 +91,9 @@ function(nvcc_compile_optix)
         target_link_libraries(${TARGET_NAME}
                               PRIVATE
                               ${DEVICE_TARGET_FULL_NAME}
+                              optix::optix
                               mray::meta_compile_opts
                               mray::cuda_extra_compile_opts)
-        #
-        target_include_directories(${TARGET_NAME}
-                                   PRIVATE
-                                   ${OPTIX_INCLUDE_DIR})
         #
         set_target_properties(${TARGET_NAME} PROPERTIES
                               FOLDER ${MRAY_GPU_PLATFORM_NAME}/OptiX)

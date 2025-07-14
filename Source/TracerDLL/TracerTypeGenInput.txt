@@ -46,10 +46,11 @@ L LightGroupSkysphere<CoOctaCoordConverter>       "Tracer/LightsDefault.h"      
 L LightGroupSkysphere<SphericalCoordConverter>    "Tracer/LightsDefault.h"      Transform:TransformGroupIdentity    Transform:TransformGroupSingle
 
 # Transforms (Tag / Name / Header File)
-# There must be one line for each tag
+# There must be one line for each tag.
 A LIN     BaseAcceleratorLinear   AcceleratorGroupLinear  "Tracer/AcceleratorLinear.h"
 A BVH     BaseAcceleratorLBVH     AcceleratorGroupLBVH    "Tracer/AcceleratorLBVH.h"
-A HW      BaseAcceleratorOptiX    AcceleratorGroupOptiX   "Tracer/OptiX/AcceleratorOptiX.h"
+A HW_CUDA BaseAcceleratorOptiX    AcceleratorGroupOptiX   "Tracer/OptiX/AcceleratorOptiX.h"
+A HW_CPU  BaseAcceleratorEmbree   AcceleratorGroupEmbree  "Tracer/Embree/AcceleratorEmbree.h"
 
 # Renderer (Name / Header File / Work Count / Light Work Count / Camera Work Count)
 # Renderer can define multiple kernels ("works") to do multiple passes or switch to a different kernel

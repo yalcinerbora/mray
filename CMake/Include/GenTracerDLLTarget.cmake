@@ -34,20 +34,6 @@ function(gen_tracer_dll_target)
     source_group("Renderers/PathTracer" FILES ${SRC_RENDERERS_PATH_TRACER})
     source_group("" FILES ${SRC_COMMON})
 
-    # Find OptiX if requested
-    if((GEN_TRACER_DLL_MACRO STREQUAL "MRAY_GPU_BACKEND_CUDA")
-        AND GEN_TRACER_DLL_ENABLE_HW_ACCEL)
-
-        find_package(OPTIX 8)
-        if(NOT OPTIX_FOUND)
-            # Maybe we could not able to find the optix
-            # expose the OPTIX_DIR (in cmake-GUI) so user can manually set it
-            message(FATAL_ERROR "OptiX Not Found, either set OPTIX_INSTALL_DIR or \
-                                disable MRAY_ENABLE_HW_ACCELERATION")
-            set(MRAY_ENABLE_HW_ACCELERATION CACHE BOOL OFF)
-        endif()
-    endif()
-
     # Target Generation
     gen_device_target(NAME ${GEN_TRACER_DLL_NAME}
                       MACRO ${GEN_TRACER_DLL_MACRO})
@@ -75,11 +61,12 @@ function(gen_tracer_dll_target)
                        ${TRACER_KERNEL_GEN_HEADERS}
                        ${TRACER_KERNEL_GEN_INSTANTIATIONS}
                        COMMAND TracerKernelGen
-                       ${CURRENT_SOURCE_DIR}/TracerTypeGenInput.txt
-                       ${NUM_CORES}
-                       $<BOOL:${GEN_TRACER_DLL_ENABLE_HW_ACCEL}>
-                       ${CMAKE_CURRENT_BINARY_DIR}
-                       ${GEN_TRACER_DLL_MACRO}
+                            ${CURRENT_SOURCE_DIR}/TracerTypeGenInput.txt
+                            ${NUM_CORES}
+                            $<BOOL:${GEN_TRACER_DLL_ENABLE_HW_ACCEL}>
+                            ${CMAKE_CURRENT_BINARY_DIR}
+                            ${GEN_TRACER_DLL_MACRO}
+                            ${GEN_TRACER_DLL_NAME}
                        COMMENT "Generating Kernel Instantiations and Types..."
                        MAIN_DEPENDENCY "${CURRENT_SOURCE_DIR}/TracerTypeGenInput.txt"
                        DEPENDS TracerKernelGen

@@ -265,6 +265,36 @@ function(gen_archive_pack)
 
 endfunction()
 
+# Find OptiX if requested
+if(MRAY_ENABLE_HW_ACCELERATION AND
+   (MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_CUDA"))
+
+    find_package(OPTIX 8)
+    if(NOT OPTIX_FOUND)
+        # Maybe we could not able to find the optix
+        # expose the OPTIX_DIR (in cmake-GUI) so user can manually set it
+        message(FATAL_ERROR "OptiX Not Found, either set OPTIX_INSTALL_DIR or \
+                            disable MRAY_ENABLE_HW_ACCELERATION")
+        set(MRAY_ENABLE_HW_ACCELERATION CACHE BOOL OFF)
+    endif()
+
+    # OptiX only needs include_dir since it automagically links with the driver
+    add_library(optix INTERFACE)
+    target_include_directories(optix INTERFACE ${OPTIX_INCLUDE_DIR})
+    add_library(optix::optix ALIAS optix)
+endif()
+
+# Create custom embree target if requested
+if(MRAY_ENABLE_HW_ACCELERATION AND MRAY_BUILD_HOST_BACKEND)
+    gen_imported_target(NAME embree4::embree4_cpu SHARED
+                        OVERRIDE_LIB_PREFIX ${MRAY_PLATFORM_LIB_DIRECTORY}/embree/lib
+                        DEBUG_TARGET embree4
+                        RELEASE_TARGET embree4
+                        EXTRA_INCLUDES
+                            ${MRAY_PLATFORM_LIB_DIRECTORY}/embree/include
+                        )
+endif()
+
 # Header only libraries
 # Create mock targets, project layout enables direct access to the headers
 # These are generated for verbosity

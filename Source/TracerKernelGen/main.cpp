@@ -40,6 +40,7 @@ struct AccelLine
     };
     //
     AccelType           type;
+    std::string_view    hwName = "";
     std::string_view    baseName;
     std::string_view    groupName;
     std::string_view    headerFile;
@@ -187,35 +188,38 @@ void ParseBasicLines(pmr::vector<BasicLine>& lines,
 }
 
 void ParseAccelLines(pmr::vector<AccelLine>& lines,
-                       std::string_view section)
+                     std::string_view section)
 {
     AccelLine result;
     int i = 0;
     for(auto ssv = SplitStringView(section, " \t"sv); ssv.HasValue(); ssv.Next(), i++)
     {
-        auto line = ssv.Str();
+        auto column = ssv.Str();
         if(i == 0)
             continue;
         else if(i == 1)
         {
-            if(line == "LIN"sv)
+            if(column == "LIN"sv)
                 result.type = AccelLine::LIN;
-            else if(line == "BVH"sv)
+            else if(column == "BVH"sv)
                 result.type = AccelLine::BVH;
-            else if(line == "HW"sv)
+            else if(column.starts_with("HW_"sv))
+            {
                 result.type = AccelLine::HW;
+                result.hwName = column.substr(column.find_first_of('_') + 1);
+            }
             else
             {
-                fmt::println(stderr, "Unkown accelerator type \"{}\"", line);
+                fmt::println(stderr, "Unkown accelerator type \"{}\"", column);
                 std::exit(1);
             }
         }
         else if(i == 2)
-            result.baseName = line;
+            result.baseName = column;
         else if(i == 3)
-            result.groupName = line;
+            result.groupName = column;
         else if(i == 4)
-            result.headerFile = line;
+            result.headerFile = column;
     }
     lines.push_back(result);
 }
@@ -450,6 +454,7 @@ void FindAccelNames(std::array<std::string_view, 2>& linAccelNamePair,
                     std::array<std::string_view, 2>& bvhAccelNamePair,
                     std::array<std::string_view, 2>& hwAccelNamePair,
                     pmr::string& guardedInclude,
+                    std::string_view hwTag,
                     const LinePack& lp)
 {
     auto Find = [&](std::array<std::string_view, 2>& out,
@@ -459,7 +464,9 @@ void FindAccelNames(std::array<std::string_view, 2>& linAccelNamePair,
                                 lp.accels.end(),
                                 [&](const AccelLine& a)
         {
-            return a.type == t;
+            using enum AccelLine::AccelType;
+            if(t == HW) return a.hwName == name;
+            else        return a.type == t;
         });
 
         if(loc == lp.accels.end())
@@ -475,9 +482,10 @@ void FindAccelNames(std::array<std::string_view, 2>& linAccelNamePair,
             guardedInclude = loc->headerFile;
     };
 
+    using namespace std::string_view_literals;
     Find(linAccelNamePair, AccelLine::LIN, "LIN");
     Find(bvhAccelNamePair, AccelLine::BVH, "BVH");
-    Find(hwAccelNamePair, AccelLine::HW, "HW");
+    Find(hwAccelNamePair, AccelLine::HW, hwTag);
 }
 
 void GenRenderWorkTemplates(pmr::string& works,
@@ -560,7 +568,8 @@ void GenRenderWorkList(pmr::string& workList, const LinePack& lp)
 
 void WriteRequestedTypesFiles(const LinePack& lp,
                               std::filesystem::path outDir,
-                              std::string_view hwAccelHeaderGuard)
+                              std::string_view hwAccelHeaderGuard,
+                              std::string_view hwAccelTag)
 {
     auto includes = pmr::string(&globalAllocator);
     auto guardedInclude = pmr::string(&globalAllocator);
@@ -610,7 +619,8 @@ void WriteRequestedTypesFiles(const LinePack& lp,
     GenMetaLightTemplates(metaLightTypePack, lp);
     GenAcceleratorTemplates(accelGroupTypePack, accelWorkTypePack, lp);
     FindAccelNames(linAccelNamePair, bvhAccelNamePair,
-                   hwAccelNamePair, guardedInclude, lp);
+                   hwAccelNamePair, guardedInclude,
+                   hwAccelTag, lp);
     GenRenderWorkTemplates(renderWorkTypePack, renderLightWorkTypePack,
                            renderCamWorkTypePack, lp);
     GenRenderWorkList(renderWorkList, lp);
@@ -641,8 +651,7 @@ void WriteRequestedTypesFiles(const LinePack& lp,
 
 void GenerateKernelInstantiationFiles(const LinePack& lp,
                                       std::filesystem::path outDir,
-                                      size_t fileCount,
-                                      bool skipHWAccelInstances)
+                                      size_t fileCount)
 {
     static constexpr auto WORK_FMT = "MRAY_RENDERER_KERNEL_INSTANTIATE({}, {}, {}, {}, {});\n"sv;
     static constexpr auto LIGHT_WORK_FMT = "MRAY_RENDERER_LIGHT_KERNEL_INSTANTIATE({}, {}, {}, {});\n"sv;
@@ -728,7 +737,6 @@ void GenerateKernelInstantiationFiles(const LinePack& lp,
     for(const auto& t : lp.trans)
     for(const auto& p : lp.prims)
     {
-        if(a.type == AccelLine::HW && skipHWAccelInstances) continue;
         if(p.typeName == "PrimGroupEmpty"sv) continue;
         if(LookFilterAndSkip(p.transFilters, t)) continue;
         if(LookFilterAndSkip(t.primFilters, p)) continue;
@@ -874,10 +882,26 @@ void GenerateKernelInstantiationFiles(const LinePack& lp,
     }
 }
 
+void RemoveUnusedAccelTypes(pmr::vector<AccelLine>& accelLines,
+                            std::string_view hwAccelTag, bool skipHWAccelInstances)
+{
+    std::erase_if
+    (
+        accelLines,
+        [&](const AccelLine& l)
+        {
+            if(l.type == AccelLine::LIN || l.type == AccelLine::BVH) return false;
+            //
+            return ((skipHWAccelInstances && l.type == AccelLine::HW) ||
+                    (!skipHWAccelInstances && l.hwName != hwAccelTag));
+        }
+    );
+}
+
 int main(int argc, const char* argv[])
 {
     uint32_t argcUInt = static_cast<uint32_t>(argc);
-    static constexpr uint32_t MAX_ARG_COUNT = 5;
+    static constexpr uint32_t MAX_ARG_COUNT = 6;
     if(argcUInt != MAX_ARG_COUNT + 1)
     {
         fmt::println(stderr, "Wrong Argument Count({})", argcUInt);
@@ -908,6 +932,7 @@ int main(int argc, const char* argv[])
 
     auto outDir = args[3];
     auto headerGuard = args[4];
+    auto hwAccelTag = args[5];
 
     // Don't use data() anywhere else like this, it is UB since string_view
     // is not null terminated!!!!
@@ -924,9 +949,11 @@ int main(int argc, const char* argv[])
     // Parse the data
     LinePack lp;
     ParseTypes(lp, data);
-
     //
-    WriteRequestedTypesFiles(lp, outDir, headerGuard);
-    GenerateKernelInstantiationFiles(lp, outDir, fileCount, skipHWAccelInstances);
+    RemoveUnusedAccelTypes(lp.accels, hwAccelTag, skipHWAccelInstances);
+    WriteRequestedTypesFiles(lp, outDir, headerGuard, hwAccelTag);
+
+
+    GenerateKernelInstantiationFiles(lp, outDir, fileCount);
     return 0;
 }
