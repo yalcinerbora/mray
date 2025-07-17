@@ -306,8 +306,25 @@ function(gen_tracer_target)
     # Add Embree4 link
     if(MRAY_TRACER_EMBREE)
         target_link_libraries(${TARGET_FULL_NAME}
-                              PRIVATE
+                              PUBLIC
                               embree4::embree4_cpu)
+
+        # Copy DLLS
+        if(WIN32)
+            add_custom_command(TARGET ${TARGET_FULL_NAME} POST_BUILD
+                               COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                               "${MRAY_PLATFORM_LIB_DIRECTORY}/embree/lib/embree4.dll"
+                               ${MRAY_CONFIG_BIN_DIRECTORY}
+                               COMMENT "Copying Embree DLLs")
+        else()
+            add_custom_command(TARGET ${TARGET_FULL_NAME} POST_BUILD
+                               COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                               "$<TARGET_FILE:embree4::embree4_cpu>"
+                               ${MRAY_CONFIG_BIN_DIRECTORY}
+                               COMMENT "Copying Embree DLLs")
+        endif()
+
+
     endif()
 
     # CUDA-only enable HW seperable compilation and flags

@@ -155,7 +155,7 @@ class alignas(std::max(alignof(T), size_t(8))) StaticVector
     constexpr const T*      ItemAt(size_t) const;
     constexpr void          DestructObjectAt(size_t);
     template<class... Args>
-    constexpr T&            ConstructObjectAt(size_t, Args...);
+    constexpr T&            ConstructObjectAt(size_t, Args&&...);
 
     public:
     // STL type mumbo jumbo

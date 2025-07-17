@@ -145,7 +145,7 @@ constexpr const T* StaticVector<T, N>::ItemAt(size_t i) const
 
 template<class T, size_t N>
 template<class... Args>
-constexpr T& StaticVector<T, N>::ConstructObjectAt(size_t i, Args... args)
+constexpr T& StaticVector<T, N>::ConstructObjectAt(size_t i, Args&&... args)
 {
     return *std::construct_at(reinterpret_cast<T*>(ItemLocation(i)),
                               std::forward<Args>(args)...);

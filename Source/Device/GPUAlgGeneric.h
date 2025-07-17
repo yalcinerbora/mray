@@ -19,9 +19,9 @@ namespace mray::algorithms
     void AdjacentDifference(Span<OutT> dOut, Span<const InT> dIn, const GPUQueue& queue,
                             BinaryFunction&&);
 
-    template <class T, class UnaryFunction>
-    requires requires(UnaryFunction f, T x) { {f(x)} -> std::convertible_to<T>; }
-    void Transform(Span<T> dOut, Span<const T> dIn, const GPUQueue& queue, UnaryFunction&&);
+    template <class OutT, class InT, class UnaryFunction>
+    requires requires(UnaryFunction f, InT x) { { f(x) } -> std::convertible_to<OutT>; }
+    void Transform(Span<OutT> dOut, Span<const InT> dIn, const GPUQueue& queue, UnaryFunction&&);
 
     template <class T, class UnaryFunction>
     requires requires(UnaryFunction f, T x) { {f(x)} -> std::convertible_to<T>; }
@@ -134,9 +134,9 @@ namespace mray::algorithms
         );
     }
 
-    template <class T, class UnaryFunction>
-    requires requires(UnaryFunction f, T x) {{f(x)} -> std::convertible_to<T>; }
-    void Transform(Span<T> dOut, Span<const T> dIn,
+    template <class OutT, class InT, class UnaryFunction>
+    requires requires(UnaryFunction f, InT x) {{f(x)} -> std::convertible_to<OutT>; }
+    void Transform(Span<OutT> dOut, Span<const InT> dIn,
                    const GPUQueue& queue,
                    UnaryFunction&& TransFunction)
     {

@@ -47,15 +47,14 @@ if(WIN32)
     add_custom_command(TARGET SceneLoaderUSD POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
                        "${MRAY_CONFIG_LIB_DIRECTORY}/tbb12$<$<CONFIG:Debug>:_debug>.dll"
-                       #"$<TARGET_FILE:usd::usd>"
                        ${MRAY_CONFIG_BIN_DIRECTORY}
                        COMMENT "Copying USD DLLs")
 else()
     add_custom_command(TARGET SceneLoaderUSD POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
                        "$<TARGET_FILE:tbb::tbb>"
-                       #"$<TARGET_FILE:usd::usd>"
-                       ${MRAY_CONFIG_BIN_DIRECTORY})
+                       ${MRAY_CONFIG_BIN_DIRECTORY}
+                       COMMENT "Copying USD DLLs")
 endif()
 
 # USD Plugin folder

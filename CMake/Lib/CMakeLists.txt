@@ -290,6 +290,8 @@ if(MRAY_ENABLE_HW_ACCELERATION AND MRAY_BUILD_HOST_BACKEND)
                         OVERRIDE_LIB_PREFIX ${MRAY_PLATFORM_LIB_DIRECTORY}/embree/lib
                         DEBUG_TARGET embree4
                         RELEASE_TARGET embree4
+                        EXTRA_DEFINES
+                            RTC_MAX_INSTANCE_LEVEL_COUNT=1
                         EXTRA_INCLUDES
                             ${MRAY_PLATFORM_LIB_DIRECTORY}/embree/include
                         )

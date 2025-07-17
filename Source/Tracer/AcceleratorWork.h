@@ -101,9 +101,12 @@ void KCVisibilityRayCast(// Output
                          MRAY_GRID_CONSTANT const typename AG::DataSoA aSoA,
                          MRAY_GRID_CONSTANT const typename AG::PrimitiveGroup::DataSoA pSoA);
 
-template<AccelGroupC AcceleratorGroupType,
-         TransformGroupC TransformGroupType>
-class AcceleratorWork : public AcceleratorWorkI
+template<class T>
+concept AccelWorkBaseC = std::derived_from<T, AcceleratorWorkI>;
+
+template<AccelGroupC AcceleratorGroupType, TransformGroupC TransformGroupType,
+         AccelWorkBaseC BaseType = AcceleratorWorkI>
+class AcceleratorWork : public BaseType
 {
     public:
     using TransformGroup    = TransformGroupType;
@@ -134,16 +137,16 @@ class AcceleratorWork : public AcceleratorWorkI
                        // Constants
                        const GPUQueue& queue) const override;
 
-    void    CastVisibilityRays(// Output
-                               Bitspan<uint32_t> dIsVisibleBuffer,
-                               // I-O
-                               Span<BackupRNGState> dRNGStates,
-                               // Input
-                               Span<const RayGMem> dRays,
-                               Span<const RayIndex> dRayIndices,
-                               Span<const CommonKey> dAcceleratorKeys,
-                               // Constants
-                               const GPUQueue& queue) const override;
+    void CastVisibilityRays(// Output
+                            Bitspan<uint32_t> dIsVisibleBuffer,
+                            // I-O
+                            Span<BackupRNGState> dRNGStates,
+                            // Input
+                            Span<const RayGMem> dRays,
+                            Span<const RayIndex> dRayIndices,
+                            Span<const CommonKey> dAcceleratorKeys,
+                            // Constants
+                            const GPUQueue& queue) const override;
 
     void GeneratePrimitiveCenters(Span<Vector3> dAllPrimCenters,
                                   Span<const uint32_t> dLeafSegmentRanges,
@@ -175,26 +178,26 @@ class AcceleratorWork : public AcceleratorWorkI
     std::string_view    TransformName() const override;
 };
 
-template<AccelGroupC AG, TransformGroupC TG>
-AcceleratorWork<AG, TG>::AcceleratorWork(const AcceleratorGroupI& ag,
-                                         const GenericGroupTransformT& tg)
+template<AccelGroupC AG, TransformGroupC TG, AccelWorkBaseC BT>
+AcceleratorWork<AG, TG, BT>::AcceleratorWork(const AcceleratorGroupI& ag,
+                                             const GenericGroupTransformT& tg)
     : primGroup(static_cast<const PrimitiveGroup&>(ag.PrimGroup()))
     , accelGroup(static_cast<const AG&>(ag))
     , transGroup(static_cast<const TG&>(tg))
 {}
 
-template<AccelGroupC AG, TransformGroupC TG>
-void AcceleratorWork<AG, TG>::CastLocalRays(// Output
-                                            Span<HitKeyPack> dHitIds,
-                                            Span<MetaHit> dHitParams,
-                                            // I-O
-                                            Span<BackupRNGState> dRNGStates,
-                                            Span<RayGMem> dRays,
-                                            // Input
-                                            Span<const RayIndex> dRayIndices,
-                                            Span<const CommonKey> dAcceleratorKeys,
-                                            // Constants
-                                            const GPUQueue& queue) const
+template<AccelGroupC AG, TransformGroupC TG, AccelWorkBaseC BT>
+void AcceleratorWork<AG, TG, BT>::CastLocalRays(// Output
+                                                Span<HitKeyPack> dHitIds,
+                                                Span<MetaHit> dHitParams,
+                                                // I-O
+                                                Span<BackupRNGState> dRNGStates,
+                                                Span<RayGMem> dRays,
+                                                // Input
+                                                Span<const RayIndex> dRayIndices,
+                                                Span<const CommonKey> dAcceleratorKeys,
+                                                // Constants
+                                                const GPUQueue& queue) const
 {
     assert(dHitIds.size() == dHitParams.size());
     assert(dHitParams.size() == dRNGStates.size());
@@ -220,17 +223,17 @@ void AcceleratorWork<AG, TG>::CastLocalRays(// Output
     );
 }
 
-template<AccelGroupC AG, TransformGroupC TG>
-void AcceleratorWork<AG, TG>::CastVisibilityRays(// Output
-                                                 Bitspan<uint32_t> dIsVisibleBuffer,
-                                                 // I-O
-                                                 Span<BackupRNGState> dRNGStates,
-                                                 // Input
-                                                 Span<const RayGMem> dRays,
-                                                 Span<const RayIndex> dRayIndices,
-                                                 Span<const CommonKey> dAcceleratorKeys,
-                                                 // Constants
-                                                 const GPUQueue& queue) const
+template<AccelGroupC AG, TransformGroupC TG, AccelWorkBaseC BT>
+void AcceleratorWork<AG, TG, BT>::CastVisibilityRays(// Output
+                                                     Bitspan<uint32_t> dIsVisibleBuffer,
+                                                     // I-O
+                                                     Span<BackupRNGState> dRNGStates,
+                                                     // Input
+                                                     Span<const RayGMem> dRays,
+                                                     Span<const RayIndex> dRayIndices,
+                                                     Span<const CommonKey> dAcceleratorKeys,
+                                                     // Constants
+                                                     const GPUQueue& queue) const
 {
     assert(dIsVisibleBuffer.Size() == dRNGStates.size());
     assert(dRNGStates.size() == dRays.size());
@@ -254,12 +257,12 @@ void AcceleratorWork<AG, TG>::CastVisibilityRays(// Output
     );
 }
 
-template<AccelGroupC AG, TransformGroupC TG>
-void AcceleratorWork<AG, TG>::GeneratePrimitiveCenters(Span<Vector3> dAllPrimCenters,
-                                                       Span<const uint32_t> dLeafSegmentRanges,
-                                                       Span<const PrimitiveKey> dAllLeafs,
-                                                       Span<const TransformKey> dTransformKeys,
-                                                       const GPUQueue& queue) const
+template<AccelGroupC AG, TransformGroupC TG, AccelWorkBaseC BT>
+void AcceleratorWork<AG, TG, BT>::GeneratePrimitiveCenters(Span<Vector3> dAllPrimCenters,
+                                                           Span<const uint32_t> dLeafSegmentRanges,
+                                                           Span<const PrimitiveKey> dAllLeafs,
+                                                           Span<const TransformKey> dTransformKeys,
+                                                           const GPUQueue& queue) const
 {
     static constexpr uint32_t TPB = StaticThreadPerBlock1D();
     static constexpr uint32_t BLOCK_PER_INSTANCE = 16;
@@ -286,12 +289,12 @@ void AcceleratorWork<AG, TG>::GeneratePrimitiveCenters(Span<Vector3> dAllPrimCen
     );
 }
 
-template<AccelGroupC AG, TransformGroupC TG>
-void AcceleratorWork<AG, TG>::GeneratePrimitiveAABBs(Span<AABB3> dAllLeafAABBs,
-                                                     Span<const uint32_t> dLeafSegmentRanges,
-                                                     Span<const PrimitiveKey> dAllLeafs,
-                                                     Span<const TransformKey> dTransformKeys,
-                                                     const GPUQueue& queue) const
+template<AccelGroupC AG, TransformGroupC TG, AccelWorkBaseC BT>
+void AcceleratorWork<AG, TG, BT>::GeneratePrimitiveAABBs(Span<AABB3> dAllLeafAABBs,
+                                                         Span<const uint32_t> dLeafSegmentRanges,
+                                                         Span<const PrimitiveKey> dAllLeafs,
+                                                         Span<const TransformKey> dTransformKeys,
+                                                         const GPUQueue& queue) const
 {
     static constexpr uint32_t TPB = StaticThreadPerBlock1D();
     static constexpr uint32_t BLOCK_PER_INSTANCE = 16;
@@ -319,10 +322,10 @@ void AcceleratorWork<AG, TG>::GeneratePrimitiveAABBs(Span<AABB3> dAllLeafAABBs,
     );
 }
 
-template<AccelGroupC AG, TransformGroupC TG>
-void AcceleratorWork<AG, TG>::GetCommonTransforms(Span<Matrix4x4> dTransforms,
-                                                  Span<const TransformKey> dTransformKeys,
-                                                  const GPUQueue& queue) const
+template<AccelGroupC AG, TransformGroupC TG, AccelWorkBaseC BT>
+void AcceleratorWork<AG, TG, BT>::GetCommonTransforms(Span<Matrix4x4> dTransforms,
+                                                      Span<const TransformKey> dTransformKeys,
+                                                      const GPUQueue& queue) const
 {
     static const std::string KernelName = "KCGetCommonTransforms-" + std::string(TG::TypeName());
     uint32_t transformCount = static_cast<uint32_t>(dTransformKeys.size());
@@ -338,15 +341,15 @@ void AcceleratorWork<AG, TG>::GetCommonTransforms(Span<Matrix4x4> dTransforms,
     );
 }
 
-template<AccelGroupC AG, TransformGroupC TG>
-void AcceleratorWork<AG, TG>::TransformLocallyConstantAABBs(// Output
-                                                            Span<AABB3> dInstanceAABBs,
-                                                            // Input
-                                                            Span<const AABB3> dConcreteAABBs,
-                                                            Span<const uint32_t> dConcreteIndicesOfInstances,
-                                                            Span<const TransformKey> dInstanceTransformKeys,
-                                                            // Constants
-                                                            const GPUQueue& queue) const
+template<AccelGroupC AG, TransformGroupC TG, AccelWorkBaseC BT>
+void AcceleratorWork<AG, TG, BT>::TransformLocallyConstantAABBs(// Output
+                                                                Span<AABB3> dInstanceAABBs,
+                                                                // Input
+                                                                Span<const AABB3> dConcreteAABBs,
+                                                                Span<const uint32_t> dConcreteIndicesOfInstances,
+                                                                Span<const TransformKey> dInstanceTransformKeys,
+                                                                // Constants
+                                                                const GPUQueue& queue) const
 {
     using PG = typename AG::PrimitiveGroup;
     if constexpr(PG::TransformLogic ==
@@ -376,14 +379,14 @@ void AcceleratorWork<AG, TG>::TransformLocallyConstantAABBs(// Output
     }
 }
 
-template<AccelGroupC AG, TransformGroupC TG>
-size_t AcceleratorWork<AG, TG>::TransformSoAByteSize() const
+template<AccelGroupC AG, TransformGroupC TG, AccelWorkBaseC BT>
+size_t AcceleratorWork<AG, TG, BT>::TransformSoAByteSize() const
 {
     return sizeof(typename TG::DataSoA);
 }
 
-template<AccelGroupC AG, TransformGroupC TG>
-void AcceleratorWork<AG, TG>::CopyTransformSoA(Span<Byte> dRegion, const GPUQueue& queue) const
+template<AccelGroupC AG, TransformGroupC TG, AccelWorkBaseC BT>
+void AcceleratorWork<AG, TG, BT>::CopyTransformSoA(Span<Byte> dRegion, const GPUQueue& queue) const
 {
     // TODO: Find a way to remove the barrier later
     typename TG::DataSoA tgSoA = transGroup.SoA();
@@ -393,8 +396,8 @@ void AcceleratorWork<AG, TG>::CopyTransformSoA(Span<Byte> dRegion, const GPUQueu
     queue.Barrier().Wait();
 }
 
-template<AccelGroupC AG, TransformGroupC TG>
-std::string_view AcceleratorWork<AG, TG>::TypeName()
+template<AccelGroupC AG, TransformGroupC TG, AccelWorkBaseC BT>
+std::string_view AcceleratorWork<AG, TG, BT>::TypeName()
 {
     using namespace TypeNameGen::CompTime;
     static const std::string Name = AccelWorkTypeName(AG::TypeName(),
@@ -402,8 +405,8 @@ std::string_view AcceleratorWork<AG, TG>::TypeName()
     return Name;
 }
 
-template<AccelGroupC AG, TransformGroupC TG>
-std::string_view AcceleratorWork<AG, TG>::TransformName() const
+template<AccelGroupC AG, TransformGroupC TG, AccelWorkBaseC BT>
+std::string_view AcceleratorWork<AG, TG, BT>::TransformName() const
 {
     return transGroup.Name();
 }

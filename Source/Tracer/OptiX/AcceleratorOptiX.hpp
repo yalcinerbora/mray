@@ -529,13 +529,12 @@ void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
     {
         hConcreteAccelHandles = MultiBuildViaTriangle_PPT(ppResult, queue);
     }
-
-    else if constexpr(!IsTriangle && !PER_PRIM_TRANSFORM)
+    else if constexpr(!IsTriangle && PER_PRIM_TRANSFORM)
     {
         hConcreteAccelHandles = MultiBuildViaAABB_PPT(ppResult, queue);
     }
     else static_assert(!IsTriangle && !PER_PRIM_TRANSFORM,
-                       "Unknown params on OptiX build");
+                       "Unknown params on OptiX build!");
 
     if constexpr(!PER_PRIM_TRANSFORM)
     {

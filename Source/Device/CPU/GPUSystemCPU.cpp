@@ -269,7 +269,14 @@ void GPUSystemCPU::SyncAll() const
     }
 }
 
-void GPUSystemCPU::ThreadInitFunction() {}
+void GPUSystemCPU::ThreadInitFunction()
+{
+    // From the embree tutorials...
+    // For best performance we need to change these
+    // First time setting a control register on x86 device :)
+    _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
+    _MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
+}
 
 GPUAnnotationCPU GPUSystemCPU::CreateAnnotation(std::string_view name) const
 {
