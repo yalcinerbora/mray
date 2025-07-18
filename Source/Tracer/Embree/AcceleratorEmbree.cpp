@@ -45,14 +45,14 @@ void MRayEmbreeContext::ErrorCallback(void*, const RTCError code, const char* st
     std::string_view mode;
     switch(code)
     {
-        case RTC_ERROR_UNKNOWN:             mode = "UNKOWN"; break;
-        case RTC_ERROR_INVALID_ARGUMENT:    mode = "INVALID_ARG";
-        case RTC_ERROR_INVALID_OPERATION:   mode = "INVALID_OP";
-        case RTC_ERROR_OUT_OF_MEMORY:       mode = "OOM";
-        case RTC_ERROR_UNSUPPORTED_CPU:     mode = "CPU";
+        case RTC_ERROR_UNKNOWN:             mode = "UNKOWN";        break;
+        case RTC_ERROR_INVALID_ARGUMENT:    mode = "INVALID_ARG";   break;
+        case RTC_ERROR_INVALID_OPERATION:   mode = "INVALID_OP";    break;
+        case RTC_ERROR_OUT_OF_MEMORY:       mode = "OOM";           break;
+        case RTC_ERROR_UNSUPPORTED_CPU:     mode = "CPU";           break;
         default: break;
     }
-    MRAY_ERROR_LOG("[Embree]: [{}] \"\"", mode, str);
+    MRAY_ERROR_LOG("[Embree]: [{}] \"{}\"", mode, str);
     std::exit(1);
 }
 
@@ -119,7 +119,8 @@ AABB3 BaseAcceleratorEmbree::InternalConstruct(const std::vector<size_t>& instan
     Span<uint32_t> hInstanceHRCounts = hInstanceHRStartOffsets.subspan(1);
     //
     embreeContext.scene = rtcNewScene(embreeContext.device);
-    assert(instanceOffsets.size() == this->generatedAccels.size());
+    assert(instanceOffsets.size() == this->generatedAccels.size() + 1);
+    [[maybe_unused]] uint32_t instanceCounter = 0;
     uint32_t accelI = 0;
     for(const auto& [_, agBase] : this->generatedAccels)
     {
@@ -135,24 +136,34 @@ AABB3 BaseAcceleratorEmbree::InternalConstruct(const std::vector<size_t>& instan
         size_t iLocalSize = iEnd - iStart;
         auto localHandles = hSceneHandles.subspan(iStart, iLocalSize);
         auto localMatrices = hInstanceMatrices.subspan(iStart, iLocalSize);
+        auto localHRCounts = hInstanceHRCounts.subspan(iStart, iLocalSize);
         //
         ag.AcquireIASConstructionParams(localHandles, localMatrices,
-                                        hInstanceHRCounts, localHRPointers,
+                                        localHRCounts, localHRPointers,
                                         queue);
-        ag.OffsetAccelKeyInRecords();
+        ag.OffsetAccelKeyInRecords(uint32_t(instanceOffsets[accelI]));
         queue.Barrier().Wait();
         for(size_t i = 0; i < localHandles.size(); i++)
         {
             auto g = rtcNewGeometry(embreeContext.device, RTC_GEOMETRY_TYPE_INSTANCE);
             rtcSetGeometryInstancedScene(g, localHandles[i]);
-            rtcSetGeometryTransform(g, 0, RTC_FORMAT_FLOAT4X4_ROW_MAJOR,
-                                    &localMatrices[i]);
-            rtcAttachGeometry(embreeContext.scene, g);
+
+            // Maybe there is some optimizations on embree
+            // lets not give identity matrix to embree.
+            if(localMatrices[i] != Matrix4x4::Identity())
+                rtcSetGeometryTransform(g, 0, RTC_FORMAT_FLOAT3X4_ROW_MAJOR,
+                                        &localMatrices[i]);
+            [[maybe_unused]]
+            uint32_t instanceId = rtcAttachGeometry(embreeContext.scene, g);
+            assert(instanceId == instanceCounter++);
             // Remove our reference counts, so that
             // we can release all data via releasing base accelerator
+            rtcCommitGeometry(g);
             rtcReleaseGeometry(g);
             rtcReleaseScene(localHandles[i]);
         }
+        //
+        accelI++;
     }
     rtcCommitScene(embreeContext.scene);
     baseTraversable = rtcGetSceneTraversable(embreeContext.scene);
@@ -196,7 +207,7 @@ void BaseAcceleratorEmbree::CastRays(// Output
     using namespace std::string_view_literals;
     queue.IssueBlockLambda
     (
-        "Ray Casting"sv,
+        "KCEmbreeIntersect"sv,
         DeviceBlockIssueParams
         {
             .gridSize = blockCount,
@@ -210,23 +221,23 @@ void BaseAcceleratorEmbree::CastRays(// Output
             uint32_t localRayCount = rayEnd - rayStart;
 
             EmbreeRayQueryContext rqContext;
+            rtcInitRayQueryContext(&rqContext.baseContext);
             RTCIntersectArguments intersectArgs
             {
                 .flags = RTC_RAY_QUERY_FLAG_INCOHERENT,
                 .feature_mask = RTCFeatureFlags(RTC_FEATURE_FLAG_ALL),
                 .context = reinterpret_cast<RTCRayQueryContext*>(&rqContext),
                 .filter = nullptr,
-                .intersect = nullptr
+                .intersect = nullptr,
             };
+
             // Load the data to stack
-            RTCRayHit16 rh;
+            RTCRayHit16 rh = {};
             std::array<int, EMBREE_BATCH_SIZE> validList = {};
             // Ray
             std::fill_n(validList.begin(), localRayCount, -1);
-            std::fill_n(rh.ray.flags, EMBREE_BATCH_SIZE, 0);
-            std::fill_n(rh.ray.mask, EMBREE_BATCH_SIZE, 0);
-            std::iota(rh.ray.id, rh.ray.id + EMBREE_BATCH_SIZE, 0);
-            std::fill_n(rh.ray.time, EMBREE_BATCH_SIZE, 0.0f);
+            std::fill_n(rh.ray.mask, localRayCount, EMBREE_ALL_VALID_MASK);
+            std::iota(rh.ray.id, rh.ray.id + localRayCount, 0);
             // Hit
             std::fill_n(rh.hit.geomID, EMBREE_BATCH_SIZE,
                         RTC_INVALID_GEOMETRY_ID);
@@ -253,10 +264,18 @@ void BaseAcceleratorEmbree::CastRays(// Output
             }
 
             // Launch!
-            rtcTraversableIntersect16(validList.data(),
-                                      baseTraversable, &rh,
-                                      &intersectArgs);
+            rtcIntersect16(validList.data(),
+                           embreeContext.scene,
+                           &rh, &intersectArgs);
 
+            // No matter what, relaod the rng state back.
+            // Even if there is not hit ray may used it
+            // during traversal.
+            //
+            // Flush the array, RNG class automatically
+            // writes back to the given global buffer
+            rqContext.rng.clear();
+            //
             for(uint32_t i = 0; i < localRayCount; i++)
             {
                 uint32_t rIndex         = dRayIndices[rayStart + i];
@@ -264,15 +283,8 @@ void BaseAcceleratorEmbree::CastRays(// Output
                 uint32_t primIndex      = rh.hit.primID[i];
                 uint32_t instanceIndex  = rh.hit.instID[0][i];
 
-                // No matter what, relaod the rng state back.
-                // Even if there is not hit ray may used it
-                // during traversal.
-                //
-                // Flush the array, RNG class automatically
-                // writes back to the given global buffer
-                rqContext.rng.clear();
-
                 // Skip if no hit has occured,
+                assert(instanceIndex != RTC_INVALID_GEOMETRY_ID);
                 if(primBatchIndex == RTC_INVALID_GEOMETRY_ID)
                     continue;
 
@@ -286,7 +298,13 @@ void BaseAcceleratorEmbree::CastRays(// Output
                     .transKey = record.transformKey,
                     .accelKey = record.acceleratorKey
                 };
-                dHitParams[rIndex] = MetaHit(Vector2(rh.hit.u[i], rh.hit.v[i]));
+
+                // Embree-MRay barycentric coordinate mismatch
+                Vector2 ab = Vector2(rh.hit.u[i], rh.hit.v[i]);
+                if(record.isTriangle)
+                    ab = EmbreeBaryToMRay(ab);
+
+                dHitParams[rIndex] = MetaHit(ab);
                 UpdateTMax(dRays, rIndex, rh.ray.tfar[i]);
             }
         }
@@ -310,7 +328,7 @@ void BaseAcceleratorEmbree::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffe
     using namespace std::string_view_literals;
     queue.IssueBlockLambda
     (
-        "Ray Casting"sv,
+        "KCEmbreeOccluded"sv,
         DeviceBlockIssueParams
         {
             .gridSize = blockCount,
@@ -324,6 +342,7 @@ void BaseAcceleratorEmbree::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffe
             uint32_t localRayCount = rayEnd - rayStart;
 
             EmbreeRayQueryContext rqContext;
+            rtcInitRayQueryContext(&rqContext.baseContext);
             RTCOccludedArguments intersectArgs
             {
                 .flags = RTC_RAY_QUERY_FLAG_INCOHERENT,
@@ -333,14 +352,12 @@ void BaseAcceleratorEmbree::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffe
                 .occluded = nullptr
             };
             // Load the data to stack
-            RTCRay16 r;
+            RTCRay16 r = {};
             std::array<int, EMBREE_BATCH_SIZE> validList = {};
             // Ray
             std::fill_n(validList.begin(), localRayCount, -1);
-            std::fill_n(r.flags, EMBREE_BATCH_SIZE, 0);
-            std::fill_n(r.mask, EMBREE_BATCH_SIZE, 0);
-            std::iota(r.id, r.id + EMBREE_BATCH_SIZE, 0);
-            std::fill_n(r.time, EMBREE_BATCH_SIZE, 0.0f);
+            std::fill_n(r.mask, localRayCount, EMBREE_ALL_VALID_MASK);
+            std::iota(r.id, r.id + localRayCount, 0);
             // From GMem
             for(uint32_t i = 0; i < localRayCount; i++)
             {
@@ -365,23 +382,22 @@ void BaseAcceleratorEmbree::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffe
 
             // Launch!
             rtcTraversableOccluded16(validList.data(),
-                                      baseTraversable, &r,
-                                      &intersectArgs);
+                                     baseTraversable, &r,
+                                     &intersectArgs);
 
+            // No matter what, relaod the rng state back.
+            // Even if there is not hit ray may used it
+            // during traversal.
+            //
+            // Flush the array, RNG class automatically
+            // writes back to the given global buffer
+            rqContext.rng.clear();
+            //
             for(uint32_t i = 0; i < localRayCount; i++)
             {
                 uint32_t rIndex = dRayIndices[rayStart + i];
-                // No matter what, relaod the rng state back.
-                // Even if there is not hit ray may used it
-                // during traversal.
-                //
-                // Flush the array, RNG class automatically
-                // writes back to the given global buffer
-                rqContext.rng.clear();
-
-                constexpr float NEG_INF = -std::numeric_limits<float>::infinity();
-                bool isOccluded = (r.tfar[0] == NEG_INF) ? true : false;
-                dIsVisibleBuffer.SetBitParallel(rIndex, isOccluded);
+                bool isVisible = !(r.tfar[i] == EMBREE_IS_OCCLUDED_RAY);
+                dIsVisibleBuffer.SetBitParallel(rIndex, isVisible);
             }
         }
     );
@@ -430,6 +446,7 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
             RTCScene t = hLocalScenes[accIndex];
 
             EmbreeRayQueryContext rqContext;
+            rtcInitRayQueryContext(&rqContext.baseContext);
             RTCIntersectArguments intersectArgs
             {
                 .flags = RTC_RAY_QUERY_FLAG_INCOHERENT,

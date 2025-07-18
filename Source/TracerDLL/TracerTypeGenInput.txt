@@ -58,8 +58,8 @@ A HW_CPU  BaseAcceleratorEmbree   AcceleratorGroupEmbree  "Tracer/Embree/Acceler
 # We will use these to explicitly instantiate templates
 
 
-#                                                       WorkOverload        LWorkOverload               CWorkOverload       WorkCount   LWorkCount   CWorkCount
-R TexViewRenderer     "Tracer/TexViewRenderer.h"        RenderWork          RenderLightWork             RenderCameraWork        0           0            0
-R SurfaceRenderer     "Tracer/SurfaceRenderer.h"        RenderWork          RenderLightWork             RenderCameraWork        2           1            0
-R PathTracerRenderer  "PathTracerRenderer.h"       PathTracerRenderWork PathTracerRenderLightWork   PathTracerRenderCamWork     2           2            0
+#                                                    WorkOverload             LWorkOverload               CWorkOverload         WorkCount   LWorkCount   CWorkCount
+R TexViewRenderer     "Tracer/TexViewRenderer.h"    RenderWork              RenderLightWork             RenderCameraWork            0           0           0
+R SurfaceRenderer     "Tracer/SurfaceRenderer.h"    SurfaceRenderWork       SurfaceRenderLightWork      SurfaceRenderCamWork        2           1           0
+R PathTracerRenderer  "PathTracerRenderer.h"        PathTracerRenderWork    PathTracerRenderLightWork   PathTracerRenderCamWork     2           2           0
 

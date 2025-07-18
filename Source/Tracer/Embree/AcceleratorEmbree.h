@@ -42,6 +42,19 @@ namespace EmbreeAccelDetail
 
 static constexpr uint32_t EMBREE_BATCH_SIZE = 16;
 
+// I am going insane here why valid ray is -1
+// Abstracting that away
+static constexpr int EMBREE_VALID_RAY = -1;
+static constexpr int EMBREE_INVALID_RAY = 0;
+static constexpr float EMBREE_IS_OCCLUDED_RAY = -std::numeric_limits<float>::infinity();
+static constexpr unsigned int EMBREE_ALL_VALID_MASK = std::numeric_limits<unsigned int>::max();
+
+static constexpr Vector2 EmbreeBaryToMRay(Vector2 ab)
+{
+    Float c = Float(1) - ab[0] - ab[1];
+    return Vector2(c, ab[0]);
+}
+
 // Similar implementation like OptiX.
 template<class PGSoA = void, class TGSoA = void>
 struct EmbreeHitRecord
@@ -74,6 +87,9 @@ struct EmbreeHitRecord
     // intersection routines for triangles
     // so this will be ignored for triangles
     bool                        cullFace;
+    // Embree barycentric coordinates are different from MRay
+    // ray caster can check and reorder the coordinates via this
+    bool                        isTriangle;
 };
 
 struct MRayEmbreeContext
@@ -113,7 +129,7 @@ class AcceleratorGroupEmbreeI : public AcceleratorGroupI
                                               Span<const EmbreeHitRecord<>*> dHitRecordPtrs,
                                               const GPUQueue& queue) const = 0;
 
-    virtual void OffsetAccelKeyInRecords() = 0;
+    virtual void OffsetAccelKeyInRecords(uint32_t instanceRecordStartOffset) = 0;
     virtual size_t HitRecordCount() const = 0;
 };
 
@@ -125,14 +141,21 @@ struct EmbreeRayQueryContext
     RTCRayQueryContext  baseContext;
     ArrayT<BackupRNGState>  rngStates;
     ArrayT<BackupRNG>       rng;
+    ArrayT<AcceleratorKey>  localAccelKeys;
 };
 
-struct EmbreeGeomUserData
+struct EmbreGlobalUserData
 {
     Span<const EmbreeHitRecord<>>   hAllHitRecords;
     Span<const uint32_t>            hInstanceHitRecordOffsets;
     //
     uint32_t globalToLocalOffset = std::numeric_limits<uint32_t>::max();
+};
+
+struct EmbreeGeomUserData
+{
+    const EmbreGlobalUserData*  geomGlobalData = nullptr;
+    uint32_t                    recordIndexForBounds = std::numeric_limits<uint32_t>::max();
 };
 
 template<AccelGroupC AG, TransformGroupC TG>
@@ -183,17 +206,21 @@ class AcceleratorGroupEmbree final
     // Geometry User Pointer generic class.
     // Common for all accelerators in this group.
     // Inner data will be accessed via
-    // instID/geomId/primId fields
-    EmbreeGeomUserData          geomUserData;
+    // instId/geomId/primId fields
+    EmbreGlobalUserData         geomGlobalData;
+    // This is needed for custom geometry
+    // since bounds function does not have instId/geomId/primId
+    // fields
+    Span<EmbreeGeomUserData>    geomUserData;
 
 
-    void MultiBuildTriangle_CLT(const PreprocessResult& ppResult,
-                                const GPUQueue& queue);
-    void MultiBuildAABB_CLT(const PreprocessResult& ppResult,
-                            const GPUQueue& queue);
+    void MultiBuildViaTriangle_CLT(const PreprocessResult& ppResult,
+                                  const GPUQueue& queue);
+    void MultiBuildViaUser_CLT(const PreprocessResult& ppResult,
+                               const GPUQueue& queue);
     void MultiBuildViaTriangle_PPT(const PreprocessResult& ppResult,
                                    const GPUQueue& queue);
-    void MultiBuildViaAABB_PPT(const PreprocessResult& ppResult,
+    void MultiBuildViaUser_PPT(const PreprocessResult& ppResult,
                                const GPUQueue& queue);
 
     public:
@@ -241,7 +268,7 @@ class AcceleratorGroupEmbree final
                                          Span<uint32_t> hInstanceHitRecordCounts,
                                          Span<const EmbreeHitRecord<>*> dHitRecordPtrs,
                                          const GPUQueue& queue) const override;
-    void    OffsetAccelKeyInRecords() override;
+    void    OffsetAccelKeyInRecords(uint32_t instanceRecordStartOffset) override;
     size_t  HitRecordCount() const override;
 
     DataSoA SoA() const;

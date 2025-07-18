@@ -336,58 +336,51 @@ void KCRayGenOptix()
 MRAY_GPU MRAY_GPU_INLINE
 void KCLocalRayGenOptix()
 {
-    //// We Launch linearly
-    //const uint32_t launchDim = optixGetLaunchDimensions().x;
-    //const uint32_t launchIndex = optixGetLaunchIndex().x;
-    //// Should we check this ??
-    //if(launchIndex >= launchDim) return;
+    // We Launch linearly
+    const uint32_t launchDim = optixGetLaunchDimensions().x;
+    const uint32_t launchIndex = optixGetLaunchIndex().x;
+    // Should we check this ??
+    if(launchIndex >= launchDim) return;
 
-    //RayIndex rIndex = params.dRayIndices[launchIndex];
-    //auto [ray, tMM] = (params.doVisibility)
-    //                    ? RayFromGMem(params.dRaysConst, rIndex)
-    //                    : RayFromGMem(params.dRays, rIndex);
+    RayIndex rIndex = params.lParams.dRayIndices[launchIndex];
+    auto [ray, tMM] = RayFromGMem(params.lParams.dRays, rIndex);
+    // If we are doing local ray casting, we can't rely on
+    // OptiX implicit transform changes.
+    assert(params.doLocalCasting);
 
-    //OptixTraversableHandle traversable = params.baseAccelerator;
-    //// If we are doing local ray casting, we can't rely on
-    //// OptiX implicit transform changes.
-    //assert(params.doLocalCasting);
+    AcceleratorKey aKey = params.lParams.dAcceleratorKeys[launchIndex];
+    uint32_t globalIndex = params.lParams.batchStartOffset + aKey.FetchIndexPortion();
+    OptixTraversableHandle traversable = params.lParams.dGlobalInstanceTraversables[globalIndex];
 
-    //AcceleratorKey aKey = params.dAcceleratorKeys[launchIndex];
-    //uint32_t globalIndex = params.batchStartOffset + aKey.FetchIndexPortion();
-    //traversable = params.dGlobalInstanceTraversables[globalIndex];
+    Matrix4x4 invTransform = params.lParams.dGlobalInstanceInvTransforms[globalIndex];
+    Vector3 dir = invTransform * ray.Dir();
+    Vector3 pos = Vector3(invTransform * Vector4(ray.Pos(), Float(1)));
+    ray = Ray(dir, pos);
 
-    //Matrix4x4 invTransform = params.dGlobalInstanceInvTransforms[globalIndex];
-    //Vector3 dir = invTransform * ray.Dir();
-    //Vector3 pos = Vector3(invTransform * Vector4(ray.Pos(), 0));
-    //ray = Ray(dir, pos);
+    // Set the RNG state as payload, any hit shaders will
+    // do stochastic any hit invocation.
+    BackupRNGState rngState = params.lParams.dRNGStates[rIndex];
+    // Set the ray index (indirection) as payload as well
+    // so we do not hit GMem for this.
+    uint32_t flags = OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
+    // Trace!
+    optixTrace(// Accelerator
+              traversable,
+              // Ray Input
+              make_float3(ray.Pos()[0], ray.Pos()[1], ray.Pos()[2]),
+              make_float3(ray.Dir()[0], ray.Dir()[1], ray.Dir()[2]),
+              tMM[0], tMM[1],
+              0.0f,
+              //
+              OptixVisibilityMask(0xFF),
+              // Flags
+              flags,
+              // SBT
+              0, 1, 0,
+              rIndex, rngState);
 
-    //// Set the RNG state as payload, any hit shaders will
-    //// do stochastic any hit invocation.
-    //BackupRNGState rngState = params.dRNGStates[rIndex];
-    //// Set the ray index (indirection) as payload as well
-    //// so we do not hit GMem for this.
-    //uint32_t flags = OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
-    //if(params.doVisibility)
-    //    flags |= OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT;
-
-    //// Trace!
-    //optixTrace(// Accelerator
-    //           params.baseAccelerator,
-    //           // Ray Input
-    //           make_float3(ray.Pos()[0], ray.Pos()[1], ray.Pos()[2]),
-    //           make_float3(ray.Dir()[0], ray.Dir()[1], ray.Dir()[2]),
-    //           tMM[0], tMM[1],
-    //           0.0f,
-    //           //
-    //           OptixVisibilityMask(0xFF),
-    //           // Flags
-    //           flags,
-    //           // SBT
-    //           0, 1, 0,
-    //           rIndex, rngState);
-
-    //// Save the state back
-    //params.dRNGStates[rIndex] = rngState;
+    // Save the state back
+    params.lParams.dRNGStates[rIndex] = rngState;
 
 }
 

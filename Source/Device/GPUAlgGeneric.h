@@ -113,7 +113,7 @@ namespace mray::algorithms
     {
         assert(dOut.size() == dIn.size() - 1);
         assert(dIn.size() > 1);
-        uint32_t workCount = static_cast<uint32_t>(dOut.size() - 1);
+        uint32_t workCount = static_cast<uint32_t>(dIn.size() - 1);
         DeviceWorkIssueParams p
         {
             .workCount = workCount,

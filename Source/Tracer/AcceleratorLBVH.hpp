@@ -134,10 +134,8 @@ uint32_t TraverseLBVHStack(// I-O
     const LBVHBoundingBox* currentBBox  = boxPtr + traverseStartIndex;
     //
     Stack nodeStack; nodeStack.push(ChildIndex(traverseStartIndex));
-    uint32_t i = 0;
     while(!nodeStack.empty())
     {
-        MRAY_LOG("Traverse {}", i++);
         const ChildIndex nodeIndex = nodeStack.top();
         currentNode = nodesPtr + nodeIndex.FetchIndexPortion();
         currentBBox = boxPtr + nodeIndex.FetchIndexPortion();
@@ -153,7 +151,6 @@ uint32_t TraverseLBVHStack(// I-O
         if(nodeIndex.FetchBatchPortion() == IS_LEAF)
         {
             uint32_t leafIndex = nodeIndex.FetchIndexPortion();
-            MRAY_LOG("Entering Func");
             bool breakTraversal = Func(tMinMax, leafIndex);
             if(breakTraversal) break;
         }

@@ -317,8 +317,10 @@ T TextureViewCPU<D, T>::ReadPixel(TextureExtent<D> ijk,
         static constexpr uint32_t IsBCPixel = EnumT::IsBCPixel;
         using PixelType = typename EnumT::Type;
         // Skip, stuff that do not get compiled
-        if constexpr(IsBCPixel)                 return T();
-        else if constexpr((OutC != 3 || C != 4) && OutC != C)  return T();
+        if constexpr(IsBCPixel)
+            return T();
+        else if constexpr((OutC != 3 || C != 4) && OutC != C)
+            return T();
         // Rest should be fine
         else
         {

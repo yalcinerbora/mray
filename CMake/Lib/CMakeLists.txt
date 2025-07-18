@@ -291,7 +291,42 @@ if(MRAY_ENABLE_HW_ACCELERATION AND MRAY_BUILD_HOST_BACKEND)
                         DEBUG_TARGET embree4
                         RELEASE_TARGET embree4
                         EXTRA_DEFINES
-                            RTC_MAX_INSTANCE_LEVEL_COUNT=1
+                            EMBREE_VERSION=4.4.0
+                            EMBREE_VERSION_MAJOR=4
+                            EMBREE_VERSION_MINOR=4
+                            EMBREE_VERSION_PATCH=0
+                            EMBREE_VERSION_NOTE=""
+                            EMBREE_BUILD_TYPE=Release
+                            EMBREE_TASKING_SYSTEM=TBB
+                            EMBREE_TBB_COMPONENT=tbb
+                            #
+                            EMBREE_MAX_ISA=AVX512
+                            EMBREE_ISA_SSE2
+                            EMBREE_ISA_SSE42
+                            EMBREE_ISA_AVX
+                            EMBREE_ISA_AVX2
+                            EMBREE_ISA_AVX512
+                            EMBREE_ISA_AVX512SKX
+                            EMBREE_ISPC_SUPPORT
+                            EMBREE_SYCL_SUPPORT
+                            #
+                            #EMBREE_TUTORIALS
+                            EMBREE_RAY_MASK
+                            #EMBREE_STAT_COUNTERS
+                            EMBREE_FILTER_FUNCTION
+                            EMBREE_GEOMETRY_TRIANGLE
+                            EMBREE_GEOMETRY_QUAD
+                            EMBREE_GEOMETRY_CURVE
+                            EMBREE_GEOMETRY_SUBDIVISION
+                            EMBREE_GEOMETRY_USER
+                            EMBREE_GEOMETRY_INSTANCE
+                            EMBREE_GEOMETRY_INSTANCE_ARRAY
+                            EMBREE_GEOMETRY_GRID
+                            EMBREE_GEOMETRY_POINT
+                            EMBREE_RAY_PACKETS
+                            EMBREE_MAX_INSTANCE_LEVEL_COUNT=1
+                            EMBREE_CURVE_SELF_INTERSECTION_AVOIDANCE_FACTOR=2.0
+                            EMBREE_DISC_POINT_SELF_INTERSECTION_AVOIDANCE
                         EXTRA_INCLUDES
                             ${MRAY_PLATFORM_LIB_DIRECTORY}/embree/include
                         )
@@ -342,7 +377,7 @@ if(MRAY_ENABLE_USD)
     #                     RELEASE_TARGET      usd_ms
     #                     EXTRA_INCLUDES      ${MRAY_PLATFORM_LIB_DIRECTORY}/usd/include)
     # Above one (with USD_MONOLITHIC=ON "Ext" side) does not properly generate the shared
-    # library on Linux. So we manually do it here
+    # library on Linux. So we manually put all the libs to the MRaySceneLoaderUSD.dll
     # Achieve Build of USD
     gen_archive_pack(NAME usd::usd_archive
                      HAS_DEBUG_SUFFIX PACKAGE_WHOLE_ARCHIVE

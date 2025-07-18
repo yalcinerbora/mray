@@ -273,6 +273,7 @@ function(gen_tracer_target)
         target_link_libraries(${TARGET_FULL_NAME}
                               PRIVATE
                               spdlog::spdlog
+                              PUBLIC
                               optix::optix)
 
         if(MRAY_COMPILE_OPTIX_AS_PTX)

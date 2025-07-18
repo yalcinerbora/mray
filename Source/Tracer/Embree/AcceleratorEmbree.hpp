@@ -21,8 +21,11 @@ void BoundsFuncEmbree(const RTCBoundsFunctionArguments* args)
     using HitRecord = EmbreeHitRecord<typename PG::DataSoA, typename TG::DataSoA>;
     //
     uint32_t primIndex = args->primID;
-    // Geometry user ptr is different here directly refers to the actual record
-    const HitRecord& record = *reinterpret_cast<const HitRecord*>(args->geometryUserPtr);
+    // To access primitive data we need to get the index here as well
+    const auto& geomData = *reinterpret_cast<const EmbreeGeomUserData*>(args->geometryUserPtr);
+    const auto& recordIndex = geomData.recordIndexForBounds;
+    const auto& geomGlobalData = *geomData.geomGlobalData;
+    const HitRecord& record = reinterpret_cast<const HitRecord&>(geomGlobalData.hAllHitRecords[recordIndex]);
     PrimitiveKey pKey = record.dPrimKeys[primIndex];
     TransformKey tKey = record.transformKey;
     const auto& tgData = *record.tgData;
@@ -62,19 +65,9 @@ void IntersectFuncEmbree(const RTCIntersectFunctionNArguments* args)
     using Prim = PG::template Primitive<TransContext>;
     using HitRecord = EmbreeHitRecord<typename PG::DataSoA, typename TG::DataSoA>;
     using HitRecordG = EmbreeHitRecord<>;
-    const auto& groupData = *reinterpret_cast<const EmbreeGeomUserData*>(args->geometryUserPtr);
-    // We set the same geometry user data pointer to all geometries in the group.
-    // We utilize instId/primId fields to locate the actual primitive.
-    uint32_t localInstanceId = args->context->instID[0] - groupData.globalToLocalOffset;
-    uint32_t geomIndex = groupData.hInstanceHitRecordOffsets[localInstanceId] + args->geomID;
-    const HitRecordG& recordGeneric = groupData.hAllHitRecords[geomIndex];
-    const HitRecord& record = reinterpret_cast<const HitRecord&>(recordGeneric);
-    //
-    uint32_t primIndex = args->primID;
-    TransformKey tKey = record.transformKey;
-    PrimitiveKey pKey = record.dPrimKeys[primIndex];
-    const auto& tgData = *record.tgData;
-    const auto& pgData = *record.pgData;
+    const auto& geomData = *reinterpret_cast<const EmbreeGeomUserData*>(args->geometryUserPtr);
+    const auto& groupData = *geomData.geomGlobalData;
+    auto& embreeContext = *reinterpret_cast<EmbreeRayQueryContext*>(args->context);
 
     auto Intersect = [&]<size_t N>()
     {
@@ -86,12 +79,30 @@ void IntersectFuncEmbree(const RTCIntersectFunctionNArguments* args)
 
         RTCHitNt<N> potentialHits;
         std::array<int, N> isValid;
+        std::fill_n(isValid.data(), N, EMBREE_INVALID_RAY);
         std::array<Float, N> newTs;
-        std::fill_n(isValid.begin(), N, -1);
+        bool someHasAlphaMaps = false;
         for(uint32_t i = 0; i < N; i++)
         {
-            if(args->valid[i] == 0) continue;
+            if(args->valid[i] == EMBREE_INVALID_RAY) continue;
 
+            // We set the same geometry user data pointer to all geometries in the group.
+            // We utilize instId/primId fields to locate the actual primitive.
+            // If instID is invalid, we are doing local ray cast
+            // acceleratorKey in payload must be valid
+            uint32_t localInstanceId = (args->context->instID[0] == RTC_INVALID_GEOMETRY_ID)
+                ? embreeContext.localAccelKeys[rh.ray.id[i]].FetchIndexPortion()
+                : args->context->instID[0] - groupData.globalToLocalOffset;
+            uint32_t geomIndex = groupData.hInstanceHitRecordOffsets[localInstanceId] + args->geomID;
+            const HitRecordG& recordGeneric = groupData.hAllHitRecords[geomIndex];
+            const HitRecord& record = reinterpret_cast<const HitRecord&>(recordGeneric);
+            //
+            uint32_t primIndex = args->primID;
+            TransformKey tKey = record.transformKey;
+            PrimitiveKey pKey = record.dPrimKeys[primIndex];
+            const auto& tgData = *record.tgData;
+            const auto& pgData = *record.pgData;
+            //
             TransContext tContext = GenerateTransformContext(tgData, pgData, tKey, pKey);
             Prim prim = Prim(tContext, pgData, pKey);
             //
@@ -100,43 +111,39 @@ void IntersectFuncEmbree(const RTCIntersectFunctionNArguments* args)
             Ray r = Ray(dir, pos);
 
             auto hitResult = prim.Intersects(r, record.cullFace);
-            if(hitResult)
+            if(hitResult && (hitResult->t < rh.ray.tfar[i]))
             {
-                isValid[i] = 1;
-                // TODO: Dunno why embree carries the geometry normal.
-                // Investiage.
-                Vector3 gN = prim.SurfaceFromHit(hitResult->hit)->normal;
-                potentialHits.Ng_x[i] = gN[0];
-                potentialHits.Ng_y[i] = gN[1];
-                potentialHits.Ng_z[i] = gN[2];
+                isValid[i] = EMBREE_VALID_RAY;
                 potentialHits.u[i] = hitResult->hit[0];
                 potentialHits.v[i] = hitResult->hit[1];
-
                 potentialHits.geomID[i] = args->geomID;
                 potentialHits.primID[i] = args->primID;
                 potentialHits.instID[0][i] = args->context->instID[0];
                 potentialHits.instPrimID[0][i] = args->context->instPrimID[0];
                 newTs[i] = hitResult->t;
+
+                someHasAlphaMaps |= record.alphaMap.has_value();
             }
         }
-
-        if(record.alphaMap)
+        // Invoke alpha map if any rays requires it
+        if(someHasAlphaMaps)
         {
             RTCFilterFunctionNArguments filterArgs;
             filterArgs.context = args->context;
             filterArgs.geometryUserPtr = args->geometryUserPtr;
             filterArgs.hit = reinterpret_cast<RTCHitN*>(&potentialHits);
             filterArgs.ray = reinterpret_cast<RTCRayN*>(&rh.ray);
-            filterArgs.N = EMBREE_BATCH_SIZE;
+            filterArgs.N = N;
             filterArgs.valid = isValid.data();
             rtcInvokeIntersectFilterFromGeometry(args, &filterArgs);
         }
-        //
+        // Conditionally write the data
         for(uint32_t i = 0; i < N; i++)
         {
-            if(isValid[i] == -1 || isValid[i] == 0) continue;
+            if(isValid[i] == EMBREE_INVALID_RAY) continue;
 
             rh.ray.tfar[i] = newTs[i];
+            rh.hit.primID[i] = args->primID;
             rh.hit.geomID[i] = potentialHits.geomID[i];
             rh.hit.instID[0][i] = potentialHits.instID[0][i];
             rh.hit.instPrimID[0][i] = potentialHits.instPrimID[0][i];
@@ -148,6 +155,7 @@ void IntersectFuncEmbree(const RTCIntersectFunctionNArguments* args)
             rh.hit.v[i] = potentialHits.v[i];
         }
     };
+
     switch(args->N)
     {
         case 1  : Intersect.template operator()<1 >(); break;
@@ -167,19 +175,10 @@ void OccludedFuncEmbree(const RTCOccludedFunctionNArguments* args)
     using Prim = PG::template Primitive<TransContext>;
     using HitRecord = EmbreeHitRecord<typename PG::DataSoA, typename TG::DataSoA>;
     using HitRecordG = EmbreeHitRecord<>;
-    const auto& groupData = *reinterpret_cast<const EmbreeGeomUserData*>(args->geometryUserPtr);
-    // We set the same geometry user data pointer to all geometries in the group.
-    // We utilize instId/primId fields to locate the actual primitive.
-    uint32_t localInstanceId = args->context->instID[0] - groupData.globalToLocalOffset;
-    uint32_t geomIndex = groupData.hInstanceHitRecordOffsets[localInstanceId] + args->geomID;
-    const HitRecordG& recordGeneric = groupData.hAllHitRecords[geomIndex];
-    const HitRecord& record = reinterpret_cast<const HitRecord&>(recordGeneric);
-    //
-    uint32_t primIndex = args->primID;
-    TransformKey tKey = record.transformKey;
-    PrimitiveKey pKey = record.dPrimKeys[primIndex];
-    const auto& tgData = *record.tgData;
-    const auto& pgData = *record.pgData;
+    const auto& geomData = *reinterpret_cast<const EmbreeGeomUserData*>(args->geometryUserPtr);
+    const auto& groupData = *geomData.geomGlobalData;
+    auto& embreeContext = *reinterpret_cast<EmbreeRayQueryContext*>(args->context);
+
     // TODO: AFAIK, this data is the exact data determined by the intersect calls?
     // If it is not, we fail spectecularly (we may check it with ubsan later)
     auto Occluded = [&]<size_t N>()
@@ -190,28 +189,40 @@ void OccludedFuncEmbree(const RTCOccludedFunctionNArguments* args)
 
         RTCHitNt<N> potentialHits;
         std::array<int, N> isValid;
-        std::fill_n(isValid.begin(), N, -1);
+        std::fill_n(isValid.begin(), N, EMBREE_INVALID_RAY);
+        bool someHasAlphaMaps = false;
         for(uint32_t i = 0; i < N; i++)
         {
-            if(args->valid[i] == -1) continue;
+            if(args->valid[i] == EMBREE_INVALID_RAY) continue;
+
+            // We set the same geometry user data pointer to all geometries in the group.
+            // We utilize instId/primId fields to locate the actual primitive.
+            // If instID is invalid, we are doing local ray cast
+            // acceleratorKey in payload must be valid
+            uint32_t localInstanceId = (args->context->instID[0] == RTC_INVALID_GEOMETRY_ID)
+                ? embreeContext.localAccelKeys[r.id[i]].FetchIndexPortion()
+                : args->context->instID[0] - groupData.globalToLocalOffset;
+            uint32_t geomIndex = groupData.hInstanceHitRecordOffsets[localInstanceId] + args->geomID;
+            const HitRecordG& recordGeneric = groupData.hAllHitRecords[geomIndex];
+            const HitRecord& record = reinterpret_cast<const HitRecord&>(recordGeneric);
+            //
+            uint32_t primIndex = args->primID;
+            TransformKey tKey = record.transformKey;
+            PrimitiveKey pKey = record.dPrimKeys[primIndex];
+            const auto& tgData = *record.tgData;
+            const auto& pgData = *record.pgData;
 
             TransContext tContext = GenerateTransformContext(tgData, pgData, tKey, pKey);
             Prim prim = Prim(tContext, pgData, pKey);
             //
             Vector3 dir = Vector3(r.dir_x[i], r.dir_y[i], r.dir_z[i]);
-            Vector3 pos = Vector3(r.org_x[i], r.dir_y[i], r.dir_z[i]);
+            Vector3 pos = Vector3(r.org_x[i], r.org_y[i], r.org_z[i]);
             Ray ray = Ray(dir, pos);
 
             auto hitResult = prim.Intersects(ray, record.cullFace);
             if(hitResult)
             {
-                isValid[i] = 1;
-                // TODO: Should we set all this?
-                // We only need barycentrics potentially?
-                Vector3 gN = prim.SurfaceFromHit(hitResult->hit)->normal;
-                potentialHits.Ng_x[i] = gN[0];
-                potentialHits.Ng_y[i] = gN[1];
-                potentialHits.Ng_z[i] = gN[2];
+                isValid[i] = EMBREE_VALID_RAY;
                 potentialHits.u[i] = hitResult->hit[0];
                 potentialHits.v[i] = hitResult->hit[1];
                 //
@@ -219,22 +230,29 @@ void OccludedFuncEmbree(const RTCOccludedFunctionNArguments* args)
                 potentialHits.primID[i] = args->primID;
                 potentialHits.instID[0][i] = args->context->instID[0];
                 potentialHits.instPrimID[0][i] = args->context->instPrimID[0];
+
+                someHasAlphaMaps |= record.alphaMap.has_value();
             }
         }
 
-        if(record.alphaMap)
+        if(someHasAlphaMaps)
         {
             RTCFilterFunctionNArguments filterArgs;
             filterArgs.context = args->context;
             filterArgs.geometryUserPtr = args->geometryUserPtr;
             filterArgs.hit = reinterpret_cast<RTCHitN*>(&potentialHits);
             filterArgs.ray = reinterpret_cast<RTCRayN*>(&r);
-            filterArgs.N = EMBREE_BATCH_SIZE;
+            filterArgs.N = N;
             filterArgs.valid = isValid.data();
             rtcInvokeOccludedFilterFromGeometry(args, &filterArgs);
         }
-        //
-        std::memcpy(args->valid, isValid.data(), sizeof(int) * EMBREE_BATCH_SIZE);
+
+        for(uint32_t i = 0; i < N; i++)
+        {
+            if(isValid[i] == EMBREE_INVALID_RAY) continue;
+
+            r.tfar[i] = EMBREE_IS_OCCLUDED_RAY;
+        }
     };
 
     switch(args->N)
@@ -256,9 +274,10 @@ void FilterFuncEmbree(const RTCFilterFunctionNArguments* args)
     using Prim = PG::template Primitive<TransContext>;
     using HitRecord = EmbreeHitRecord<typename PG::DataSoA, typename TG::DataSoA>;
     using HitRecordG = EmbreeHitRecord<>;
-    const auto& groupData = *reinterpret_cast<const EmbreeGeomUserData*>(args->geometryUserPtr);
-    //
+    const auto& geomData = *reinterpret_cast<const EmbreeGeomUserData*>(args->geometryUserPtr);
+    const auto& groupData = *geomData.geomGlobalData;
     auto& embreeContext = *reinterpret_cast<EmbreeRayQueryContext*>(args->context);
+    //
     auto Filter = [&]<size_t N>()
     {
         using HitBatch = RTCHitNt<N>;
@@ -268,29 +287,57 @@ void FilterFuncEmbree(const RTCFilterFunctionNArguments* args)
         assert(args->N == N);
         for(uint32_t i = 0; i < N; i++)
         {
-            if(args->valid[i] == 0) continue;
+            if(args->valid[i] == EMBREE_INVALID_RAY) continue;
             // We need to fetch these from the hit in this case
-            uint32_t localInstanceId = h.instID[0][i] - groupData.globalToLocalOffset;
+            uint32_t localInstanceId = (args->context->instID[0] == RTC_INVALID_GEOMETRY_ID)
+                ? embreeContext.localAccelKeys[r.id[i]].FetchIndexPortion()
+                : args->context->instID[0] - groupData.globalToLocalOffset;
             uint32_t geomIndex = groupData.hInstanceHitRecordOffsets[localInstanceId] + h.geomID[i];
             const HitRecordG& recordGeneric = groupData.hAllHitRecords[geomIndex];
             const HitRecord& record = reinterpret_cast<const HitRecord&>(recordGeneric);
-            assert(record.alphaMap.has_value());
+
+            // Embree default triangle routine does not have
+            // runtime-enabled backface culling parameter.
+            // Since we set filter function for all geometries
+            // just check it here.
+            // For user-defined geometries our intersection
+            // routine checked it already so only compile for triangles
+            Vector2 baryCoords(h.u[i], h.v[i]);
+            if constexpr(TrianglePrimGroupC<PG>)
+            {
+                if(record.cullFace)
+                {
+                    // We lost primitive data etc. unlike intersection function
+                    // So do ghetto check via normal and ray dir
+                    Vector3 d = Vector3(r.dir_x[i], r.dir_y[i], r.dir_z[i]);
+                    Vector3 n = Vector3(h.Ng_x[i], h.Ng_y[i], h.Ng_z[i]);
+
+                    args->valid[i] = (n.Dot(d) < Float{0})
+                                        ? EMBREE_VALID_RAY
+                                        : EMBREE_INVALID_RAY;
+
+                    if(args->valid[i] == EMBREE_INVALID_RAY) continue;
+                }
+                // We might as well switch to MRay bary coords
+                baryCoords = EmbreeBaryToMRay(baryCoords);
+            }
+            // Actual transparency
+            if(!record.alphaMap.has_value()) continue;
             //
             const auto& tgData = *record.tgData;
             const auto& pgData = *record.pgData;
             uint32_t primIndex = h.primID[i];
             TransformKey tKey = record.transformKey;
             PrimitiveKey pKey = record.dPrimKeys[primIndex];
+            //
             const auto& aMap = *record.alphaMap;
-
-            // Actual transparency
             TransContext tContext = GenerateTransformContext(tgData, pgData, tKey, pKey);
             Prim prim = Prim(tContext, pgData, pKey);
-            Vector2 uv = prim.SurfaceParametrization(Vector2(h.u[i], h.v[i]));
+            Vector2 uv = prim.SurfaceParametrization(baryCoords);
             Float xi = embreeContext.rng[r.id[i]].NextFloat();
             Float alpha = aMap(uv);
             // Stochastic alpha cull
-            if(xi >= alpha) args->valid[i] = 0;
+            if(xi >= alpha) args->valid[i] = EMBREE_INVALID_RAY;
         }
     };
 
@@ -352,8 +399,8 @@ AcceleratorGroupEmbree<PG>::AcceleratorGroupEmbree(uint32_t accelGroupId,
 {}
 
 template<PrimitiveGroupC PG>
-void AcceleratorGroupEmbree<PG>::MultiBuildTriangle_CLT(const PreprocessResult& ppResult,
-                                                        const GPUQueue&)
+void AcceleratorGroupEmbree<PG>::MultiBuildViaTriangle_CLT(const PreprocessResult& ppResult,
+                                                           const GPUQueue&)
 {
     // For constant local transforms, we can create an accelerator
     // over the base mesh and transform the traced ray beforehand.
@@ -368,20 +415,23 @@ void AcceleratorGroupEmbree<PG>::MultiBuildTriangle_CLT(const PreprocessResult& 
         hConcreteScenes[i] = s;
         for(size_t j = 0; j < primRanges.size(); j++)
         {
+            static constexpr auto INVALID_PRIM_RANGE = Vector2ui(std::numeric_limits<uint32_t>::max());
+            if(primRanges[j] == INVALID_PRIM_RANGE) break;
+            //
             Vector2ui primRange = primRanges[j];
             uint32_t primCount = primRange[1] - primRange[0];
             Span<const Vector3> verts = this->pg.GetVertexPositionSpan();
             Span<const Vector3ui> indices = this->pg.GetIndexSpan();
-            RTCGeometry g = rtcNewGeometry(rtcDevice, RTCGeometryType::RTC_GEOMETRY_TYPE_TRIANGLE);
+            RTCGeometry g = rtcNewGeometry(rtcDevice, RTC_GEOMETRY_TYPE_TRIANGLE);
             rtcSetSharedGeometryBuffer(g, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3,
                                        verts.data(), 0u, sizeof(Vector3), verts.size());
             rtcSetSharedGeometryBuffer(g, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3,
                                        indices.data(), sizeof(Vector3ui) * primRange[0],
                                        sizeof(Vector3ui), primCount);
-
-            rtcSetGeometryUserPrimitiveCount(g, primCount);
-            rtcSetGeometryUserData(g, &geomUserData);
-            rtcSetGeometryOccludedFilterFunction(g, FilterFuncEmbree<PG>);
+            // Triangle does not need a specific user data, just set to the first
+            // one
+            rtcSetGeometryUserData(g, &geomUserData[0]);
+            rtcSetGeometryIntersectFilterFunction(g, FilterFuncEmbree<PG>);
             rtcSetGeometryOccludedFilterFunction(g, FilterFuncEmbree<PG>);
 
             rtcCommitGeometry(g);
@@ -410,8 +460,8 @@ void AcceleratorGroupEmbree<PG>::MultiBuildTriangle_CLT(const PreprocessResult& 
 }
 
 template<PrimitiveGroupC PG>
-void AcceleratorGroupEmbree<PG>::MultiBuildAABB_CLT(const PreprocessResult& ppResult,
-                                                    const GPUQueue&)
+void AcceleratorGroupEmbree<PG>::MultiBuildViaUser_CLT(const PreprocessResult& ppResult,
+                                                       const GPUQueue&)
 {
     // For constant local transforms, we can create an accelerator
     // over the base mesh and transform the traced ray beforehand.
@@ -428,25 +478,31 @@ void AcceleratorGroupEmbree<PG>::MultiBuildAABB_CLT(const PreprocessResult& ppRe
     for(uint32_t i = 0; i < this->InstanceCount(); i++)
         instanceIndicesOfConcreteAccels[this->concreteIndicesOfInstances[i]] = i;
 
+    uint32_t concreteGeomPtrIndex = 0;
     for(size_t i = 0; i < ppResult.concretePrimRanges.size(); i++)
     {
         const PrimRangeArray& primRanges = ppResult.concretePrimRanges[i];
         RTCScene s = rtcNewScene(rtcDevice);
         hConcreteScenes[i] = s;
         uint32_t instanceIndex = instanceIndicesOfConcreteAccels[i];
-        uint32_t geomStart = geomUserData.hInstanceHitRecordOffsets[instanceIndex];
-        uint32_t geomEnd = geomUserData.hInstanceHitRecordOffsets[instanceIndex + 1];
-        auto localRecordSpan = geomUserData.hAllHitRecords.subspan(geomStart, geomEnd - geomStart);
-        for(size_t j = 0; j < primRanges.size(); j++)
+        uint32_t geomStart = geomGlobalData.hInstanceHitRecordOffsets[instanceIndex];
+        uint32_t geomEnd = geomGlobalData.hInstanceHitRecordOffsets[instanceIndex + 1];
+        auto localRecordSpan = geomGlobalData.hAllHitRecords.subspan(geomStart, geomEnd - geomStart);
+        for(uint32_t j = 0; j < uint32_t(primRanges.size()); j++)
         {
-            const EmbreeHitRecord<>& r = localRecordSpan[j];
+            static constexpr auto INVALID_PRIM_RANGE = Vector2ui(std::numeric_limits<uint32_t>::max());
+            if(primRanges[j] == INVALID_PRIM_RANGE) break;
+
+            // Find a geom user data location
+            auto& curGeomUserData = geomUserData[concreteGeomPtrIndex++];
+            curGeomUserData.recordIndexForBounds = geomStart + j;
+            //
             Vector2ui primRange = primRanges[j];
             uint32_t primCount = primRange[1] - primRange[0];
-            RTCGeometry g = rtcNewGeometry(rtcDevice, RTCGeometryType::RTC_GEOMETRY_TYPE_USER);
+            RTCGeometry g = rtcNewGeometry(rtcDevice, RTC_GEOMETRY_TYPE_USER);
             rtcSetGeometryUserPrimitiveCount(g, primCount);
-            rtcSetGeometryUserData(g, &geomUserData);
-            rtcSetGeometryBoundsFunction(g, BoundsFuncEmbree<PG>,
-                                         &const_cast<EmbreeHitRecord<>&>(r));
+            rtcSetGeometryUserData(g, &curGeomUserData);
+            rtcSetGeometryBoundsFunction(g, BoundsFuncEmbree<PG>, nullptr);
             rtcSetGeometryIntersectFunction(g, IntersectFuncEmbree<PG>);
             rtcSetGeometryOccludedFunction(g, OccludedFuncEmbree<PG>);
             rtcSetGeometryIntersectFilterFunction(g, FilterFuncEmbree<PG>);
@@ -490,7 +546,7 @@ void AcceleratorGroupEmbree<PG>::MultiBuildViaTriangle_PPT(const PreprocessResul
 }
 
 template<PrimitiveGroupC PG>
-void AcceleratorGroupEmbree<PG>::MultiBuildViaAABB_PPT(const PreprocessResult& ppResult,
+void AcceleratorGroupEmbree<PG>::MultiBuildViaUser_PPT(const PreprocessResult& ppResult,
                                                        const GPUQueue& queue)
 {
     throw MRayError("NotImplemented!");
@@ -526,21 +582,40 @@ void AcceleratorGroupEmbree<PG>::Construct(AccelGroupConstructParams p,
     transformSoAOffsets[0] = 0;
     // Calculate total subgeometry count and offsets
     // for subspan generation
-    std::vector<uint32_t> hitRecordOffsets(ppResult.surfData.instancePrimBatches.size() + 1);
+    std::vector<uint32_t> hitRecordOffsets(this->InstanceCount() + 1);
     std::transform_inclusive_scan
     (
-        ppResult.surfData.instancePrimBatches.begin(),
-        ppResult.surfData.instancePrimBatches.end(),
+        ppResult.surfData.primRanges.begin(),
+        ppResult.surfData.primRanges.end(),
         hitRecordOffsets.begin() + 1,
         std::plus{},
-        [](const SurfacePrimList& primBatches)
+        [](const PrimRangeArray& primRanges)
         {
-            return uint32_t(primBatches.size());
+            constexpr Vector2ui INVALID_RANGE(std::numeric_limits<uint32_t>::max());
+            uint32_t i = 0;
+            while((i < primRanges.size()) && (primRanges[i] != INVALID_RANGE)) ++i;
+            return i;
         },
         uint32_t(0)
     );
     hitRecordOffsets[0] = 0;
-
+    // Find the geometry user ptr array size
+    //uint32_t geomDataArraySize = (IsTriangle) ? 1 : std::transform_reduce
+    uint32_t geomDataArraySize = std::transform_reduce
+    (
+        ppResult.concretePrimRanges.begin(),
+        ppResult.concretePrimRanges.end(),
+        uint32_t(0),
+        std::plus{},
+        [](const PrimRangeArray& primRanges)
+        {
+            constexpr Vector2ui INVALID_RANGE(std::numeric_limits<uint32_t>::max());
+            uint32_t i = 0;
+            while((i < primRanges.size()) && (primRanges[i] != INVALID_RANGE)) ++i;
+            return i;
+        }
+    );
+    //
     size_t hitRecordCount = hitRecordOffsets.back();
     size_t totalLeafCount = this->concreteLeafRanges.back()[1];
     size_t concreteAccelCount = this->concreteLeafRanges.size();
@@ -553,12 +628,13 @@ void AcceleratorGroupEmbree<PG>::Construct(AccelGroupConstructParams p,
                                          hTransformKeys, hAllHitRecords,
                                          hInstanceHitRecordOffsets,
                                          hAllLeafs, hTransformGroupSoAList,
-                                         pgSoA),
+                                         pgSoA, geomUserData),
                                 mem,
                                 {concreteAccelCount, this->InstanceCount(),
                                  this->InstanceCount(), hitRecordCount,
                                  hitRecordOffsets.size(), totalLeafCount,
-                                 transformSoAOffsets.back(), 1});
+                                 transformSoAOffsets.back(), 1,
+                                 geomDataArraySize});
     // Copy pgSoA to common buffer (easy)
     auto pgSoALocal = this->pg.SoA();
     queue.MemcpyAsync(pgSoA, Span<const PGSoA>(&pgSoALocal, 1));
@@ -639,7 +715,8 @@ void AcceleratorGroupEmbree<PG>::Construct(AccelGroupConstructParams p,
                 .dPrimKeys      = hAllLeafs.subspan(leafRange[0] + localPrimKeyOffset,
                                                     localSize),
                 .alphaMap       = ppResult.surfData.alphaMaps[i][j],
-                .cullFace       = ppResult.surfData.cullFaceFlags[i][j]
+                .cullFace       = ppResult.surfData.cullFaceFlags[i][j],
+                .isTriangle     = IsTriangle
             };
             localPrimKeyOffset += localSize;
         }
@@ -648,18 +725,19 @@ void AcceleratorGroupEmbree<PG>::Construct(AccelGroupConstructParams p,
 
     // We set all the data we need.
     // Let embree to take the wheel
-    geomUserData.hAllHitRecords = ToConstSpan(hAllHitRecords);
-
+    geomGlobalData.hAllHitRecords = ToConstSpan(hAllHitRecords);
+    geomGlobalData.hInstanceHitRecordOffsets = ToConstSpan(hInstanceHitRecordOffsets);
+    for(auto& hr : geomUserData) hr.geomGlobalData = &geomGlobalData;
     // Embree may use its own MT environment
     queue.Barrier().Wait();
     // Create sub scenes
     if constexpr(IsTriangle && !PER_PRIM_TRANSFORM)
     {
-        MultiBuildTriangle_CLT(ppResult, queue);
+        MultiBuildViaTriangle_CLT(ppResult, queue);
     }
     else if constexpr(!IsTriangle && !PER_PRIM_TRANSFORM)
     {
-        MultiBuildAABB_CLT(ppResult, queue);
+        MultiBuildViaUser_CLT(ppResult, queue);
     }
     else if constexpr(IsTriangle && PER_PRIM_TRANSFORM)
     {
@@ -667,7 +745,7 @@ void AcceleratorGroupEmbree<PG>::Construct(AccelGroupConstructParams p,
     }
     else if constexpr(!IsTriangle && PER_PRIM_TRANSFORM)
     {
-        MultiBuildViaAABB_PPT(ppResult, queue);
+        MultiBuildViaUser_PPT(ppResult, queue);
     }
     else static_assert(!IsTriangle && !PER_PRIM_TRANSFORM,
                        "Unknown params on Embree build!");
@@ -752,7 +830,7 @@ void AcceleratorGroupEmbree<PG>::AcquireIASConstructionParams(Span<RTCScene> hSc
 }
 
 template<PrimitiveGroupC PG>
-void AcceleratorGroupEmbree<PG>::OffsetAccelKeyInRecords()
+void AcceleratorGroupEmbree<PG>::OffsetAccelKeyInRecords(uint32_t instanceRecordStartOffset)
 {
     assert(this->globalWorkIdToLocalOffset != std::numeric_limits<uint32_t>::max());
     // Calculate hit records for each build input
@@ -764,6 +842,7 @@ void AcceleratorGroupEmbree<PG>::OffsetAccelKeyInRecords()
         auto accKey = AcceleratorKey::CombinedKey(batch, index);
         hr.acceleratorKey = accKey;
     };
+    geomGlobalData.globalToLocalOffset = instanceRecordStartOffset;
 }
 
 template<PrimitiveGroupC PG>
