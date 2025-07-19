@@ -511,9 +511,9 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     };
     std::array<Vector3, 3> normals =
     {
-        q0.ApplyInvRotation(Vector3::ZAxis()),
-        q1.ApplyInvRotation(Vector3::ZAxis()),
-        q2.ApplyInvRotation(Vector3::ZAxis())
+        q0.OrthoBasisZ(),
+        q1.OrthoBasisZ(),
+        q2.OrthoBasisZ()
     };
     // Curvature approximation
     // Equation 6.

@@ -2,6 +2,9 @@
 #include <gmock/gmock-matchers.h>
 
 #include "Core/Math.h"
+#include "Core/Quaternion.h"
+
+#include "GTestWrappers.h"
 
 TEST(MathTest, Primes)
 {
@@ -425,4 +428,31 @@ TEST(MathTest, Primes)
         uint32_t result = Math::NextPrime(i);
         EXPECT_EQ(result, *std::lower_bound(Primes.cbegin(), Primes.cend(), i));
     }
+}
+
+TEST(QuatTests, OrthoBasis)
+{
+    auto Check = [](Quaternion q)
+    {
+        q.NormalizeSelf();
+        Vector3 basisX = q.OrthoBasisX();
+        Vector3 basisY = q.OrthoBasisY();
+        Vector3 basisZ = q.OrthoBasisZ();
+
+        Vector3 expectedX = q.ApplyInvRotation(Vector3::XAxis());
+        Vector3 expectedY = q.ApplyInvRotation(Vector3::YAxis());
+        Vector3 expectedZ = q.ApplyInvRotation(Vector3::ZAxis());
+
+        EXPECT_EQUAL_MRAY(basisX, expectedX);
+        EXPECT_EQUAL_MRAY(basisY, expectedY);
+        EXPECT_EQUAL_MRAY(basisZ, expectedZ);
+    };
+
+    Check(Quaternion::Identity());
+    Check(Quaternion(0.5, 1, 2, 3));
+    Check(Quaternion(4, 3, 2, 1));
+    Check(Quaternion(3, 5, 7, 9));
+    Check(Quaternion(0, 0, 1, 0));
+
+
 }

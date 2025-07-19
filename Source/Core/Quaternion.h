@@ -62,6 +62,16 @@ class Quat
     MRAY_HYBRID constexpr Vector<3, T>      ApplyInvRotation(const Vector<3, T>&) const;
     MRAY_HYBRID constexpr bool              HasNaN() const;
 
+    // Optimized version of "ApplyInvRotation(Vector3::_Axis())"
+    // Where '_' X, Y, Z. By definition rotation defines a orthonormal
+    // basis so we can fetch the axes via these functions.
+    // These are implemented since MSVC did not optimize the above
+    // code fully. It is an obvious optimization. We just ignore
+    // most of the data since they are  zero.
+    MRAY_HYBRID constexpr Vector<3, T>      OrthoBasisX() const;
+    MRAY_HYBRID constexpr Vector<3, T>      OrthoBasisY() const;
+    MRAY_HYBRID constexpr Vector<3, T>      OrthoBasisZ() const;
+
     static MRAY_HYBRID constexpr Quat<T>    NLerp(const Quat<T>& start,
                                                   const Quat<T>& end, T t);
     static MRAY_HYBRID constexpr Quat<T>    SLerp(const Quat<T>& start,

@@ -169,8 +169,7 @@ SampleT<BxDFResult> ReflectMaterial<ST>::SampleBxDF(const Vector3& wO,
     // since we will need to put wI to local space then convert wO
     // to local space.
     // TODO: Maybe fast reflect (that assumes normal is ZAxis) maybe faster?
-    Vector3 normal = Vector3::ZAxis();
-    Vector3 localNormal = surface.shadingTBN.ApplyInvRotation(normal);
+    Vector3 localNormal = surface.shadingTBN.OrthoBasisZ();
     Vector3 wI = Graphics::Reflect(localNormal, wO);
     // Directly delegate position, this is not a subsurface material
     Ray wIRay = Ray(wI, surface.position);
@@ -293,7 +292,7 @@ SampleT<BxDFResult> RefractMaterial<ST>::SampleBxDF(const Vector3& wO,
     }
 
     // Surface is aligned with the ray (N dot Dir is always positive)
-    const Vector3 nLocal = surface.shadingTBN.ApplyInvRotation(Vector3::ZAxis());
+    const Vector3 nLocal = surface.shadingTBN.OrthoBasisZ();
     Float cosTheta = std::abs(wO.Dot(nLocal));
 
     // Calculate Fresnel Term

@@ -30,6 +30,15 @@ set(CMAKE_CXX_FLAGS          "" CACHE STRING "")
 set(CMAKE_CUDA_FLAGS_RELEASE "" CACHE STRING "")
 set(CMAKE_CUDA_FLAGS_DEBUG   "" CACHE STRING "")
 set(CMAKE_CUDA_FLAGS         "" CACHE STRING "")
+mark_as_advanced(CMAKE_C_FLAGS_RELEASE)
+mark_as_advanced(CMAKE_C_FLAGS_DEBUG)
+mark_as_advanced(CMAKE_C_FLAGS)
+mark_as_advanced(CMAKE_CXX_FLAGS_RELEASE)
+mark_as_advanced(CMAKE_CXX_FLAGS_DEBUG)
+mark_as_advanced(CMAKE_CXX_FLAGS)
+mark_as_advanced(CMAKE_CUDA_FLAGS_RELEASE)
+mark_as_advanced(CMAKE_CUDA_FLAGS_DEBUG)
+mark_as_advanced(CMAKE_CUDA_FLAGS)
 
 # Add build runpath $ORIGIN
 # Emulate windows style

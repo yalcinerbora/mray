@@ -128,9 +128,9 @@ void KCApplyTransformsTriangle(// I-O
             // multiply with the matrices
             // then convert back to the tbn quaternion
             Quaternion tbn = dNormalsInOut[vI];
-            Vector3 t = tbn.ApplyInvRotation(Vector3::XAxis());
-            Vector3 b = tbn.ApplyInvRotation(Vector3::YAxis());
-            Vector3 n = tbn.ApplyInvRotation(Vector3::ZAxis());
+            Vector3 t = tbn.OrthoBasisX();
+            Vector3 b = tbn.OrthoBasisY();
+            Vector3 n = tbn.OrthoBasisZ();
             // We need to multiply these with normal matrix
             t = Vector3(sBatchInvTransform.LeftMultiply(Vector4(t, 0))).Normalize();
             b = Vector3(sBatchInvTransform.LeftMultiply(Vector4(b, 0))).Normalize();

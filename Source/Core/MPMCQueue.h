@@ -21,10 +21,11 @@ class MPMCQueue
         size_t                  enqueueLoc;
         size_t                  dequeueLoc;
 
-        std::condition_variable_any enqueueWake;
-        std::condition_variable_any dequeueWake;
+        std::condition_variable enqueueWake;
+        std::condition_variable dequeueWake;
 
-        std::timed_mutex        mutex;
+        //std::timed_mutex        mutex;
+        std::mutex        mutex;
         std::atomic_bool        isTerminated;
 
         bool                    IsEmptyUnsafe();
@@ -92,7 +93,7 @@ void MPMCQueue<T>::Dequeue(T& item)
 {
     if (isTerminated) return;
     {
-        std::unique_lock<std::timed_mutex> lock(mutex);
+        std::unique_lock<std::mutex> lock(mutex);
         dequeueWake.wait(lock, [&]()
         {
             return (!IsEmptyUnsafe() || isTerminated);
@@ -110,7 +111,7 @@ bool MPMCQueue<T>::TryDequeue(T& item)
 {
     if (isTerminated) return false;
     {
-        std::unique_lock<std::timed_mutex> lock(mutex);
+        std::lock_guard<std::mutex> lock(mutex);
         if(IsEmptyUnsafe() || isTerminated) return false;
 
         Increment(dequeueLoc);
@@ -124,13 +125,19 @@ template<class T>
 template<class D>
 bool MPMCQueue<T>::TryDequeue(T& item, D duration)
 {
+
     if(isTerminated) return false;
     {
-        std::unique_lock<std::timed_mutex> lock(mutex, std::defer_lock);
-        bool result = lock.try_lock_for(duration);
-        //
-        if(IsEmptyUnsafe() || isTerminated || !result)
-            return false;
+        std::unique_lock<std::mutex> lock(mutex);
+        // OK means condition predicate is satisfied
+        bool ok = dequeueWake.wait_for(lock, duration, [&]()
+        {
+            return (!IsEmptyUnsafe() || isTerminated);
+        });
+        // Timeout
+        if(!ok)                 return false;
+        // Condition satisfied but it is satisfied via termination
+        if(ok && isTerminated)  return false;
 
         Increment(dequeueLoc);
         item = std::move(data[dequeueLoc]);
@@ -143,7 +150,7 @@ template<class T>
 void MPMCQueue<T>::Enqueue(T&& item)
 {
     {
-        std::unique_lock<std::timed_mutex> lock(mutex);
+        std::unique_lock<std::mutex> lock(mutex);
         enqueueWake.wait(lock, [&]()
         {
             return (!IsFullUnsafe() || isTerminated);
@@ -161,7 +168,7 @@ bool MPMCQueue<T>::TryEnqueue(T&& item)
 {
     if (isTerminated) return false;
     {
-        std::unique_lock<std::timed_mutex> lock(mutex);
+        std::lock_guard<std::mutex> lock(mutex);
         if(IsFullUnsafe() || isTerminated) return false;
 
         data[enqueueLoc] = std::move(item);
@@ -181,7 +188,7 @@ void MPMCQueue<T>::Terminate()
     // although assignment operator should be "seq_cst"?
     // Anyway, this may be a problem in the future
     {
-        std::unique_lock<std::timed_mutex> lock(mutex);
+        std::unique_lock<std::mutex> lock(mutex);
         isTerminated = true;
     }
     dequeueWake.notify_all();
@@ -197,21 +204,21 @@ bool MPMCQueue<T>::IsTerminated() const
 template<class T>
 bool MPMCQueue<T>::IsEmpty()
 {
-    std::unique_lock<std::timed_mutex> lock(mutex);
+    std::lock_guard<std::mutex> lock(mutex);
     return IsEmptyUnsafe();
 }
 
 template<class T>
 bool MPMCQueue<T>::IsFull()
 {
-    std::unique_lock<std::timed_mutex> lock(mutex);
+    std::lock_guard<std::mutex> lock(mutex);
     return IsFullUnsafe();
 }
 
 template<class T>
 void MPMCQueue<T>::RemoveQueuedTasks(bool reEnable)
 {
-    std::unique_lock<std::timed_mutex> lock(mutex);
+    std::lock_guard<std::mutex> lock(mutex);
     for(T& t : data)
     {
         t = T();

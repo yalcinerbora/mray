@@ -252,6 +252,61 @@ constexpr bool Quat<T>::HasNaN() const
 
 template<FloatingPointC T>
 MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Vector<3, T> Quat<T>::OrthoBasisX() const
+{
+    Float v00 = v[0] * v[0];
+    Float v02 = v[0] * v[2];
+    Float v03 = v[0] * v[3];
+    Float v11 = v[1] * v[1];
+    Float v12 = v[1] * v[2];
+    Float v13 = v[1] * v[3];
+    Float v22 = v[2] * v[2];
+    Float v33 = v[3] * v[3];
+    Float X = (v00 + v11 - v22 - v33);
+    Float Y = (v12 - v03 + v12 - v03);
+    Float Z = (v13 + v02 + v13 + v02);
+    return Vector<3, T>(X, Y, Z);
+}
+
+template<FloatingPointC T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Vector<3, T> Quat<T>::OrthoBasisY() const
+{
+    Float v00 = v[0] * v[0];
+    Float v01 = v[0] * v[1];
+    Float v03 = v[0] * v[3];
+    Float v11 = v[1] * v[1];
+    Float v12 = v[1] * v[2];
+    Float v22 = v[2] * v[2];
+    Float v23 = v[2] * v[3];
+    Float v33 = v[3] * v[3];
+    Float X = (v12 + v03 + v12 + v03);
+    Float Y = (v00 - v11 + v22 - v33);
+    Float Z = (v23 - v01 + v23 - v01);
+    return Vector<3, T>(X, Y, Z);
+
+}
+
+template<FloatingPointC T>
+MRAY_HYBRID MRAY_CGPU_INLINE
+constexpr Vector<3, T> Quat<T>::OrthoBasisZ() const
+{
+    Float v00 = v[0] * v[0];
+    Float v01 = v[0] * v[1];
+    Float v02 = v[0] * v[2];
+    Float v11 = v[1] * v[1];
+    Float v13 = v[1] * v[3];
+    Float v22 = v[2] * v[2];
+    Float v23 = v[2] * v[3];
+    Float v33 = v[3] * v[3];
+    Float X = v13 - v02 + v13 - v02;
+    Float Y = v23 + v01 + v23 + v01;
+    Float Z = v00 - v11 - v22 + v33;
+    return Vector<3, T>(X, Y, Z);
+}
+
+template<FloatingPointC T>
+MRAY_HYBRID MRAY_CGPU_INLINE
 constexpr Quat<T> Quat<T>::NLerp(const Quat<T>& start,
                                  const Quat<T>& end, T t)
 {

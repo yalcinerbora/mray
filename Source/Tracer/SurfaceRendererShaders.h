@@ -154,7 +154,7 @@ void SurfRDetail::WorkFunctionCommon(const Prim&, const Material&, const Surface
             }
             else
             {
-                Vector3 normal = surf.shadingTBN.ApplyInvRotation(Vector3::ZAxis());
+                Vector3 normal = surf.shadingTBN.OrthoBasisZ();
                 normal = tContext.ApplyN(normal).Normalize();
                 normal = (normal + Vector3(1)) * Vector3(0.5);
                 color = normal;
@@ -273,7 +273,7 @@ void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, cons
             geoNormal = normal = surf.normal;
         else
         {
-            normal = surf.shadingTBN.ApplyInvRotation(Vector3::ZAxis());
+            normal = surf.shadingTBN.OrthoBasisZ();
             normal = tContext.ApplyN(normal).Normalize();
             geoNormal = surf.geoNormal;
         }

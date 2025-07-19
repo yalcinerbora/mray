@@ -52,8 +52,8 @@ namespace EyeAnim
     static constexpr auto LegolasLine = "Uruks turn north-east, they're taking the hobbits to Isengard!";
 
     static constexpr auto AnimDurationLong = DurationMS(850);
-    static constexpr auto AnimDurationShort = DurationMS(475);
-    static constexpr auto AnimDurationCommon = DurationMS(25);
+    static constexpr auto AnimDurationShort = DurationMS(450);
+    static constexpr auto AnimDurationCommon = DurationMS(50);
     static constexpr std::array LegolasAnimSheet =
     {
         LegolasLookupElem{"< 0 >", AnimDurationLong},
@@ -107,11 +107,11 @@ void EyeAnim::SimpleProgressBar::Display(Float ratio, uint64_t timeMS,
     static constexpr auto FMT_STR = fmt::string_view("\033[2K({:s}) [{:s}{:s}] {:s}\r");
 
     uint64_t localTime = timeMS % LegolasAnimDurations.back();
-    // TODO: "find_if" probably better
+    // TODO: "find_if" probably better for perf but did not bother
     auto loc = std::upper_bound(LegolasAnimDurations.cbegin(),
                                 LegolasAnimDurations.cend(), localTime);
-    std::ptrdiff_t animIndex = std::distance(LegolasAnimDurations.begin(), loc) - 1;
     assert(loc != LegolasAnimDurations.end());
+    std::ptrdiff_t animIndex = std::distance(LegolasAnimDurations.begin(), loc) - 1;
     std::string_view animSprite = LegolasAnimSheet[static_cast<uint32_t>(animIndex)].first;
 
     // We query this everytime for adjusting the size
@@ -974,6 +974,7 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
                                     totalGPUMem.first, totalGPUMem.second,
                                     rendererInfo.workPerPixel, rendererInfo.wppLimit,
                                     timeLeft);
+
         using namespace EyeAnim;
         SimpleProgressBar().Display(Float(progressRatio),
                                     cmdTimer.ElapsedIntMS(), displaySuffix);

@@ -55,28 +55,19 @@ set(MRAY_MSVC_OPTIONS
     /EHsc
 
     # Debug Default
-    $<$<CONFIG:Debug>:/MDd /Zi /Ob0 /Od /RTC1>
+    $<$<CONFIG:Debug>:/MDd /Zi /Ob0 /Oy- /Od /RTC1>
     # Release Default
-    $<$<CONFIG:Release>:/MD /O2 /Zi /Ob1 /Od /DNDEBUG>
-
+    $<$<CONFIG:Release>:/MD /O2 /Zi /Ob1 /DNDEBUG>
     # Release Debug Build
     # Generate pdb and enable optimizations
     # Also flag address sanitizer
-    $<$<CONFIG:SanitizeR>:/MD /O2 /Zi /Ob0 /Oy- /Od /RTC1>
-    #$<$<CONFIG:SanitizeR>:/Zi>
-    #$<$<CONFIG:SanitizeR>:/Oy->
-    $<$<CONFIG:SanitizeR>:/fsanitize=address>
+    $<$<CONFIG:SanitizeR>:/MD /O1 /Zi /Ob0 /Oy- /RTC1>
+    $<$<CONFIG:SanitizeR>:/fsanitize=${MRAY_SANITIZER_MODE}>
 
     # Large section tables (too many templates on CPU Device)
     /bigobj
-
     # MT Build
     /MP
-
-    # Debug Specific
-    # CMAKE does not have this on debug build (in x64, this is ignored i think bu w/e)
-    $<$<CONFIG:Debug>:/Oy->
-    $<$<CONFIG:Release>:/Zi> # Also add debug info on release builds (for profiling etc.)
 )
 
 # MSVC Arch related
