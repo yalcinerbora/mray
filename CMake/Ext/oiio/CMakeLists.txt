@@ -37,7 +37,7 @@ set(ZLIB_INSTALL_LOC ${OIIO_TMP_DIR}/zlib)
 mray_build_ext_dependency_git(
         NAME oiio_zlib_ext
         URL "https://github.com/madler/zlib.git"
-        TAG "04f42ceca40f73e2978b50e93806c2a18c1281fc" # v1.2.13
+        TAG "51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf" # v1.3.1
         LICENSE_NAME "LICENSE"
 
         OVERRIDE_INSTALL_PREFIX ${ZLIB_INSTALL_LOC}
@@ -165,7 +165,7 @@ set(JPEGTURBO_INSTALL_LOC ${OIIO_TMP_DIR}/jpegTurbo)
 mray_build_ext_dependency_git(
         NAME libjpeg_turbo_ext
         URL "https://github.com/libjpeg-turbo/libjpeg-turbo.git"
-        TAG "6c87537f60941f3c265c339fe60d1e31d2a42ccf" # v3.0.0.0
+        TAG "7723f50f3f66b9da74376e6d8badb6162464212c" # v3.1.1
 
         LICENSE_NAME "LICENSE.md"
         DONT_OVERRIDE_INSTALL_SUFFIXES
@@ -257,6 +257,9 @@ mray_build_ext_dependency_git(
             -DEXPAT_BUILD_TESTS=OFF
             -DEXPAT_BUILD_TOOLS=OFF
             -DEXPAT_SHARED_LIBS=OFF
+            # CMake 4.0.0 onwards dropped support for 3.5,
+            # most libs have this set as minimum. Try to force it
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
 )
 
@@ -276,6 +279,9 @@ mray_build_ext_dependency_git(
             -DYAML_CPP_BUILD_TESTS=OFF
             -DYAML_CPP_BUILD_TOOLS=OFF
             -DYAML_CPP_BUILD_CONTRIB=OFF
+            # CMake 4.0.0 onwards dropped support for 3.5,
+            # most libs have this set as minimum. Try to force it
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
 )
 

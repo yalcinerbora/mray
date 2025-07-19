@@ -13,6 +13,10 @@ mray_build_ext_dependency_git(
         BUILD_ARGS
             -DTBB_TEST=OFF
             -DTBB_STRICT=ON
+
+            # CMake 4.0.0 onwards dropped support for 3.5,
+            # most libs have this set as minimum. Try to force it
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 )
 # And finally usd!
 mray_build_ext_dependency_git(
