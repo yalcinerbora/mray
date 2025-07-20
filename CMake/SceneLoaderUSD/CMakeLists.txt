@@ -53,8 +53,7 @@ else()
     add_custom_command(TARGET SceneLoaderUSD POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
                        "$<TARGET_FILE:tbb::tbb>"
-                       ${MRAY_CONFIG_BIN_DIRECTORY}
-                       COMMENT "Copying USD DLLs")
+                       ${MRAY_CONFIG_BIN_DIRECTORY})
 endif()
 
 # USD Plugin folder

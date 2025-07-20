@@ -267,11 +267,11 @@ endif()
 if(MRAY_DL_EMBREE)
     # Embree v.4.4.0 with SYCL
     if(WIN32)
-        set(EMBREE_ZIP_NAME "embree-4.4.0.sycl.x64.windows.zip")
-        set(EMBREE_SHA256_HASH "D2145CDC9C4FA038BBB708BE35DAE6E526547C53632C6A4A0FACAE5BF71815C0")
+        set(EMBREE_ZIP_NAME "embree-4.4.0.x64.windows.zip")
+        set(EMBREE_SHA256_HASH "D951E5E6BD295C54CDD66BE9CDB44A4E8C42FB38A99F94F79305E48765FC3454")
     elseif(UNIX AND NOT APPLE)
-        set(EMBREE_ZIP_NAME "embree-4.4.0.sycl.x86_64.linux.tar.gz")
-        set(EMBREE_SHA256_HASH "C67F7E7622584686778E0F84AB7370D810AC5AA020AEE2A1C3AE58CEA9462E6D")
+        set(EMBREE_ZIP_NAME "embree-4.4.0.x86_64.linux.tar.gz")
+        set(EMBREE_SHA256_HASH "CB3D4402537FC9165C76C3316B8953DCFEA523CD1EAF588E2DE7639864EE3C57")
     else()
         message(FATAL_ERROR "Unsupported platform for macos(?)")
     endif()
@@ -290,6 +290,26 @@ if(MRAY_DL_EMBREE)
     file(COPY ${EMBREE_INCLUDES} DESTINATION ${MRAY_PLATFORM_LIB_DIRECTORY}/embree/include)
     file(COPY ${EMBREE_BINARIES} DESTINATION ${MRAY_PLATFORM_LIB_DIRECTORY}/embree/lib)
 
+endif()
+
+if(MRAY_DL_EMBREE OR MRAY_BUILD_USD)
+    # TBB
+    mray_build_ext_dependency_git(
+        NAME tbb_ext
+        URL "https://github.com/uxlfoundation/oneTBB"
+        TAG "a00cc3b8b5fb4d8115e9de56bf713157073ed68c" # v2021.9.0
+        LICENSE_NAME "LICENSE.txt"
+
+        APPLY_PATCH "https://github.com/uxlfoundation/oneTBB/commit/a444e95134122ee75ccbdf0e6d3315ba458506f4.patch"
+
+        BUILD_ARGS
+            -DTBB_TEST=OFF
+            -DTBB_STRICT=ON
+
+            # CMake 4.0.0 onwards dropped support for 3.5,
+            # most libs have this set as minimum. Try to force it
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+    )
 endif()
 
 # The boss!

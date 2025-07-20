@@ -314,13 +314,20 @@ function(gen_tracer_target)
         if(WIN32)
             add_custom_command(TARGET ${TARGET_FULL_NAME} POST_BUILD
                                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                               "${MRAY_PLATFORM_LIB_DIRECTORY}/embree/lib/embree4.dll"
+                               "$<TARGET_FILE:embree4::embree4_cpu>"
+                               # We need this as well....
+                               # This means in debug builds, we will have
+                               # two TBB one debug one release
+                               # I've tried to fix this but could not do it properly
+                               "$<$<CONFIG:Debug>:${MRAY_PLATFORM_LIB_DIRECTORY}/embree/lib/tbb12.dll>"
                                ${MRAY_CONFIG_BIN_DIRECTORY}
                                COMMENT "Copying Embree DLLs")
         else()
             add_custom_command(TARGET ${TARGET_FULL_NAME} POST_BUILD
                                COMMAND ${CMAKE_COMMAND} -E copy_if_different
                                "$<TARGET_FILE:embree4::embree4_cpu>"
+                               # Read the comment on the Windows side...
+                               "$<$<CONFIG:Debug>:${MRAY_PLATFORM_LIB_DIRECTORY}/Release/libtbb.so.12>"
                                ${MRAY_CONFIG_BIN_DIRECTORY}
                                COMMENT "Copying Embree DLLs")
         endif()

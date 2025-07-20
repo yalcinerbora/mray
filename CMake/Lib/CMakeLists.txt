@@ -267,7 +267,8 @@ endfunction()
 
 # Find OptiX if requested
 if(MRAY_ENABLE_HW_ACCELERATION AND
-   (MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_CUDA"))
+   (MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_CUDA")
+   AND NOT MRAY_DISABLE_DEVICE_BACKEND)
 
     find_package(OPTIX 8)
     if(NOT OPTIX_FOUND)
@@ -308,7 +309,6 @@ if(MRAY_ENABLE_HW_ACCELERATION AND MRAY_BUILD_HOST_BACKEND)
                             EMBREE_ISA_AVX512
                             EMBREE_ISA_AVX512SKX
                             EMBREE_ISPC_SUPPORT
-                            EMBREE_SYCL_SUPPORT
                             #
                             #EMBREE_TUTORIALS
                             EMBREE_RAY_MASK
@@ -344,7 +344,6 @@ add_library(cli11::cli11 ALIAS cli11)
 
 gen_imported_target(NAME fmt::fmt STATIC DEBUG_TARGET fmt RELEASE_TARGET fmt
                     EXTRA_DEFINES FMT_USE_NONTYPE_TEMPLATE_ARGS=0)
-gen_imported_target(NAME simdjson::simdjson STATIC DEBUG_TARGET simdjsond RELEASE_TARGET simdjson)
 gen_imported_target(NAME assimp::assimp SHARED DEBUG_TARGET assimpd RELEASE_TARGET assimp VERSION 5)
 gen_imported_target(NAME gfgfileio::gfgfileio STATIC DEBUG_TARGET GFGFileIOd RELEASE_TARGET GFGFileIO)
 gen_imported_target(NAME oiio::oiio SHARED DEBUG_TARGET OpenImageIOd RELEASE_TARGET OpenImageIO VERSION 3.0)
