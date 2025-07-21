@@ -209,7 +209,8 @@ Float SphericalCoordConverter::ToSolidAnglePdf(Float pdf, const Vector3& dirYUp)
     // Convert to solid angle pdf
     // http://www.pbr-book.org/3ed-2018/Light_Transport_I_Surface_Reflection/Sampling_Light_Sources.html
     Float sinPhi = sin(thetaPhi[1]);
-    pdf = (sinPhi == 0) ? 0 : pdf / (2 * PiSqr<Float>() * sinPhi);
+    pdf = (sinPhi <= 0) ? 0 : pdf / (2 * PiSqr<Float>() * sinPhi);
+    assert(pdf >= Float(0));
     return pdf;
 }
 
@@ -226,7 +227,8 @@ Float SphericalCoordConverter::ToSolidAnglePdf(Float pdf, const Vector2& uv)
     // Convert to solid angle pdf
     // http://www.pbr-book.org/3ed-2018/Light_Transport_I_Surface_Reflection/Sampling_Light_Sources.html
     Float sinPhi = sin(thetaPhi[1]);
-    pdf = (sinPhi == 0) ? 0 : pdf / (2 * PiSqr<Float>() * sinPhi);
+    pdf = (sinPhi <= 0) ? 0 : pdf / (2 * PiSqr<Float>() * sinPhi);
+    assert(pdf >= Float(0));
     return pdf;
 }
 
@@ -360,6 +362,7 @@ SampleT<Vector3> LightSkysphere<CC, TC, SC>::SampleSolidAngle(RNGDispenser& rng,
     Vector3 worldDir = prim.get().GetTransformContext().ApplyV(dirYUp);
     // Now add the extent of the scene
     Vector3 sampledPoint = distantPoint + worldDir * sceneDiameter;
+    assert(pdf >= Float(0));
     return SampleT<Vector3>
     {
         .value = sampledPoint,

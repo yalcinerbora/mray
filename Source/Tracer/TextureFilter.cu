@@ -1070,7 +1070,7 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
         // We will dedicate N blocks for each texture.
         static constexpr uint32_t THREAD_PER_BLOCK = 512;
         static constexpr uint32_t BLOCK_PER_TEXTURE = 256;
-        static constexpr Vector2ui SPP = Vector2ui(8, 8);
+        static constexpr Vector2ui SPP = (MRAY_IS_DEBUG) ? Vector2ui(2, 2) : Vector2ui(8, 8);
         static constexpr uint32_t BlockPerTexture = std::max(1u, BLOCK_PER_TEXTURE >> 1);
         uint32_t textureCount = static_cast<uint32_t>(dSufViews.size());
         uint32_t blockCount = BlockPerTexture * textureCount;
