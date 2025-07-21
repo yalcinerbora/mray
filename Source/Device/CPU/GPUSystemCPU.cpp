@@ -11,6 +11,9 @@
 #elif defined MRAY_LINUX
     #include <sys/sysinfo.h>
 
+    #include <pmmintrin.h>
+    #include <xmmintrin.h>
+
     void cpuidex_func(int* regs, int i, int j)
     {
         asm volatile

@@ -20,6 +20,8 @@
     #include <sys/types.h>
     #include <sys/ioctl.h>
 
+    #include "Log.h"
+
 #else
 #error System preprocessor definition is not set properly! (CMake should have handled this)
 #endif
@@ -67,18 +69,44 @@ std::string GetProcessPath()
 
 void RenameThread(std::thread::native_handle_type t, const std::string& name)
 {
-    static constexpr size_t MAX_CHARS = 128;
-    StaticVector<wchar_t, MAX_CHARS> wideStr;
-    wideStr.resize(name.size() + 1);
+    // Windows does not impose max length on thread names,
+    // but Linux has a limit of 16. So we follow that here
+    static constexpr size_t MAX_TASK_COMM_LEN = 15;
+    size_t length = std::min(name.size(), MAX_TASK_COMM_LEN);
+    if(name.size() > MAX_TASK_COMM_LEN)
+        MRAY_WARNING_LOG("Thread name is too long! concatenating...");
+
+    StaticVector<wchar_t, MAX_TASK_COMM_LEN + 1> wideStr;
+    wideStr.resize(length + 1, L'\0');
     size_t totalConv = 0;
-    mbstowcs_s(&totalConv, wideStr.data(),
-               wideStr.size(),
-               name.c_str(), MAX_CHARS);
+    mbstowcs_s(&totalConv, wideStr.data(), wideStr.size(),
+               name.c_str(), length);
     assert(totalConv == wideStr.size());
     SetThreadDescription(t, wideStr.data());
 }
 
-std::string_view        GetThreadName(SystemThreadHandle);
+std::string GetCurrentThreadName()
+{
+    PWSTR desc;
+    HRESULT hr = GetThreadDescription(GetCurrentThreadHandle(), &desc);
+    if(SUCCEEDED(hr))
+    {
+        mbstate_t state = {};
+        static constexpr size_t MAX_TASK_COMM_LEN = 15;
+        std::string result(MAX_TASK_COMM_LEN + 1, '\0');
+        size_t inputSize = lstrlenW(desc);
+        size_t totalConv = 0;
+        const wchar_t* constDesc = desc;
+        wcsrtombs_s(&totalConv,
+                    result.data(), MAX_TASK_COMM_LEN + 1,
+                    &constDesc, inputSize,
+                    &state);
+        result.resize(totalConv);
+        LocalFree(desc);
+        return result;
+    }
+    return std::string("Unable to Fetch TName!");
+}
 
 SystemThreadHandle GetCurrentThreadHandle()
 {
@@ -155,7 +183,24 @@ void AlignedFree(void* ptr, size_t, size_t)
 void RenameThread(std::thread::native_handle_type t, const std::string& name)
 {
     static_assert(std::is_same_v<std::thread::native_handle_type, pthread_t>);
+    static constexpr size_t MAX_TASK_COMM_LEN = 15;
+    if(name.size() > MAX_TASK_COMM_LEN)
+    {
+        MRAY_WARNING_LOG("Thread name is too long! concatenating...");
+        std::string nameConcat = name;
+        nameConcat.back() = '\0';
+        pthread_setname_np(t, nameConcat.c_str());
+    }
     pthread_setname_np(t, name.c_str());
+}
+
+std::string GetCurrentThreadName()
+{
+    static_assert(std::is_same_v<std::thread::native_handle_type, pthread_t>);
+    static constexpr size_t MAX_CHARS = 16;
+    std::string result(MAX_CHARS, '\0');
+    pthread_getname_np(GetCurrentThreadHandle(), result.data(), MAX_CHARS);
+    return result;
 }
 
 SystemThreadHandle GetCurrentThreadHandle()

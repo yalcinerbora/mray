@@ -15,6 +15,11 @@
 
 #include <embree4/rtcore.h>
 
+#ifdef MRAY_LINUX
+    #include <pmmintrin.h>
+    #include <xmmintrin.h>
+#endif
+
 MRayEmbreeContext::MRayEmbreeContext()
     : device(rtcNewDevice(""))
 {
@@ -213,7 +218,7 @@ void BaseAcceleratorEmbree::CastRays(// Output
             .gridSize = blockCount,
             .blockSize = 1,
         },
-        [=](KernelCallParams kp)
+        [=, this](KernelCallParams kp)
         {
             uint32_t rayStart = kp.blockId * EMBREE_BATCH_SIZE;
             uint32_t rayEnd = (kp.blockId + 1) * EMBREE_BATCH_SIZE;
@@ -264,9 +269,9 @@ void BaseAcceleratorEmbree::CastRays(// Output
             }
 
             // Launch!
-            rtcIntersect16(validList.data(),
-                           embreeContext.scene,
-                           &rh, &intersectArgs);
+            rtcTraversableIntersect16(validList.data(),
+                                      baseTraversable,
+                                      &rh, &intersectArgs);
 
             // No matter what, relaod the rng state back.
             // Even if there is not hit ray may used it
@@ -334,7 +339,7 @@ void BaseAcceleratorEmbree::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffe
             .gridSize = blockCount,
             .blockSize = 1,
         },
-        [=](KernelCallParams kp)
+        [=, this](KernelCallParams kp)
         {
             uint32_t rayStart = kp.blockId * EMBREE_BATCH_SIZE;
             uint32_t rayEnd = (kp.blockId + 1) * EMBREE_BATCH_SIZE;
@@ -430,7 +435,7 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
     (
         "Ray Casting"sv,
         DeviceWorkIssueParams{ .workCount = rayCount },
-        [=](KernelCallParams kp)
+        [=, this](KernelCallParams kp)
         {
             // We can't guarantee that the adjacent
             // threads have the same accelerator key.

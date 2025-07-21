@@ -51,6 +51,11 @@ ImageLoader::ImageLoader(bool enableMT)
     defaultGenerator = loc->second;
 }
 
+ImageLoader::~ImageLoader()
+{
+    OIIO::shutdown();
+}
+
 Expected<ImageFilePtr> ImageLoader::OpenFile(const std::string& filePath,
                                              ImageSubChannelType subChannels,
                                              ImageIOFlags flags) const

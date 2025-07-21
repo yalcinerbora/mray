@@ -26,6 +26,9 @@ static constexpr std::string_view MinimalValidScene = std::string_view
 		"position" : [0.0, 0.0, 0.0],
 		"up"       : [0.0, 0.0, 0.0]
 	}],
+	"Materials"      : [],
+	"Textures"       : [],
+	"Primitives"     : [],
 
 	//
 	"Boundary":
@@ -73,6 +76,7 @@ static constexpr std::string_view BasicScene = std::string_view
 			   [  0, 0],
 			   [  1, 0]]
 	}],
+	"Textures": [],
 
 	"Boundary":
 	{

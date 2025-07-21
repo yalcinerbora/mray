@@ -486,8 +486,6 @@ void AcceleratorGroupEmbree<PG>::MultiBuildViaUser_CLT(const PreprocessResult& p
         hConcreteScenes[i] = s;
         uint32_t instanceIndex = instanceIndicesOfConcreteAccels[i];
         uint32_t geomStart = geomGlobalData.hInstanceHitRecordOffsets[instanceIndex];
-        uint32_t geomEnd = geomGlobalData.hInstanceHitRecordOffsets[instanceIndex + 1];
-        auto localRecordSpan = geomGlobalData.hAllHitRecords.subspan(geomStart, geomEnd - geomStart);
         for(uint32_t j = 0; j < uint32_t(primRanges.size()); j++)
         {
             static constexpr auto INVALID_PRIM_RANGE = Vector2ui(std::numeric_limits<uint32_t>::max());
@@ -534,8 +532,8 @@ void AcceleratorGroupEmbree<PG>::MultiBuildViaUser_CLT(const PreprocessResult& p
 }
 
 template<PrimitiveGroupC PG>
-void AcceleratorGroupEmbree<PG>::MultiBuildViaTriangle_PPT(const PreprocessResult& ppResult,
-                                                           const GPUQueue& queue)
+void AcceleratorGroupEmbree<PG>::MultiBuildViaTriangle_PPT(const PreprocessResult&,
+                                                           const GPUQueue&)
 {
     // For PPT, we can utilize similar approach of OptiX
     // (As time of this writing OptiX portion is not implemented yet)
@@ -546,8 +544,8 @@ void AcceleratorGroupEmbree<PG>::MultiBuildViaTriangle_PPT(const PreprocessResul
 }
 
 template<PrimitiveGroupC PG>
-void AcceleratorGroupEmbree<PG>::MultiBuildViaUser_PPT(const PreprocessResult& ppResult,
-                                                       const GPUQueue& queue)
+void AcceleratorGroupEmbree<PG>::MultiBuildViaUser_PPT(const PreprocessResult&,
+                                                       const GPUQueue&)
 {
     throw MRayError("NotImplemented!");
 }
@@ -695,7 +693,7 @@ void AcceleratorGroupEmbree<PG>::Construct(AccelGroupConstructParams p,
         auto workOffset = std::upper_bound(this->workInstanceOffsets.cbegin(),
                                            this->workInstanceOffsets.cend(), i);
         assert(workOffset != this->workInstanceOffsets.cend());
-        size_t workId = std::distance(this->workInstanceOffsets.cbegin(), workOffset - 1);
+        size_t workId = size_t(std::distance(this->workInstanceOffsets.cbegin(), workOffset - 1));
         size_t transSoASize = transformSoAOffsets[workId + 1] - transformSoAOffsets[workId];
         const Byte* dTransSoAPtr = hTransformGroupSoAList.subspan(transformSoAOffsets[workId],
                                                                   transSoASize).data();

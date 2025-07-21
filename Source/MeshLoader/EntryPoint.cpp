@@ -17,23 +17,26 @@ class MeshLoaderPool : public MeshLoaderPoolI
 
     private:
     std::map<std::string, GeneratorFunc>  generators;
-    std::unique_ptr<MRayAssimpLogger>     assimpLogger;
-
     public:
                             MeshLoaderPool();
-    virtual                 ~MeshLoaderPool() = default;
+    virtual                 ~MeshLoaderPool();
     virtual MeshLoaderPtr   AcquireALoader(const std::string& extension) const override;
 };
 
 MeshLoaderPool::MeshLoaderPool()
 {
-    assimpLogger = std::make_unique<MRayAssimpLogger>();
-    Assimp::DefaultLogger::set(assimpLogger.get());
+    Assimp::DefaultLogger::set(new MRayAssimpLogger());
+    Assimp::DefaultLogger::get()->setLogSeverity(Assimp::Logger::NORMAL);
 
     generators.emplace(MeshLoaderAssimp::Tag,
                        &GenerateType<MeshLoaderI, MeshLoaderAssimp>);
     generators.emplace(MeshLoaderGFG::Tag,
                        &GenerateType<MeshLoaderI, MeshLoaderGFG>);
+}
+
+MeshLoaderPool::~MeshLoaderPool()
+{
+    Assimp::DefaultLogger::kill();
 }
 
 MeshLoaderPtr MeshLoaderPool::AcquireALoader(const std::string& tag) const

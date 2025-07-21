@@ -9,6 +9,7 @@
 
 #include "Log.h"
 #include "MPMCQueue.h"
+#include "System.h"
 
 // TODO: Check if std has these predefined somewhere?
 // (i.e. concept "callable_as")
@@ -99,11 +100,13 @@ class ThreadPool
     MPMCQueue<std::function<void()>>        taskQueue;
     //
     std::vector<std::jthread>               threads;
-    //
-    std::atomic_uint32_t                    startedTaskCount;
-    std::atomic_uint32_t                    runningTaskCount;
-    std::condition_variable                 waitCondition;
-    std::mutex                              waitMutex;
+    std::atomic_uint64_t                    issuedTaskCount;
+    // completedCounter is mostly written by worker threads,
+    // issuedCounter is written by producer thread(s).
+    // Putting a gap here should eliminate data transfer between
+    // threads
+    alignas(MRayCPUCacheLineDestructive)
+    std::atomic_uint64_t                    completedTaskCount;
 
     void RestartThreadsImpl(uint32_t threadCount, ThreadInitFunction);
 
@@ -175,8 +178,6 @@ std::vector<T> MultiFuture<T>::GetAll()
     return result;
 }
 
-
-
 template<ThreadInitFuncC InitFunction>
 ThreadPool::ThreadPool(uint32_t threadCount, InitFunction&& initFunction,
                        size_t queueSize)
@@ -210,6 +211,7 @@ ThreadPool::SubmitBlocks(uint32_t totalWorkSize, WorkFunc&& wf,
     // Store the work functor somewhere safe.
     // Work functor will be copied once to a shared_ptr,
     // used multiple times, then gets deleted automatically
+    issuedTaskCount.fetch_add(partitionCount);
     auto sharedWork = std::allocate_shared<BlockWorkFunction>(std::pmr::polymorphic_allocator<BlockWorkFunction>(&poolAllocator),
                                                               std::forward<WorkFunc>(wf));
 
@@ -262,6 +264,8 @@ template<ThreadTaskWorkC WorkFunc>
 std::future<std::invoke_result_t<WorkFunc>>
 ThreadPool::SubmitTask(WorkFunc&& wf)
 {
+    issuedTaskCount.fetch_add(1);
+
     using ResultT = std::invoke_result_t<WorkFunc>;
     using AllocT = std::pmr::polymorphic_allocator<std::promise<ResultT>>;
     auto promise = std::allocate_shared<std::promise<ResultT>>(AllocT(&poolAllocator));
@@ -295,6 +299,7 @@ ThreadPool::SubmitTask(WorkFunc&& wf)
 template<ThreadDetachableTaskWorkC WorkFunc>
 void ThreadPool::SubmitDetachedTask(WorkFunc&& wf)
 {
+    issuedTaskCount.fetch_add(1);
     // Here we do not need to copy the functor on a shared location
     // since each task will be executed by a single thread
     // Let the std::function handle it

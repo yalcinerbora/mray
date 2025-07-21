@@ -146,12 +146,10 @@ MRayError VisorCommand::Invoke()
     // We need to do this somewhere here, if we do it on tracer side
     // due to passing between dll boundaries, it crash on destruction.
     threadPool.RestartThreads(threadCount,
-                              [&tracerThread](std::thread::native_handle_type handle, uint32_t threadNumber)
+                              [&tracerThread](std::thread::native_handle_type handle,
+                                              uint32_t threadNumber)
     {
-        using namespace std::string_literals;
-        std::string name = "WorkerThread_"s + std::to_string(threadNumber);
-        RenameThread(handle, name);
-
+        RenameThread(handle, MRAY_FORMAT("{:03d}_[W]MRay", threadNumber));
         auto GPUInit = tracerThread.GetThreadInitFunction();
         GPUInit();
     });

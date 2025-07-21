@@ -47,12 +47,27 @@
     #error System preprocessor definition is not set properly! (CMake should have handled this)
 #endif
 
+// Wow clang-18 do not have these???
+// From this example, it is a good approach
+// https://en.cppreference.com/w/cpp/thread/hardware_destructive_interference_size.html
+#ifdef __cpp_lib_hardware_interference_size
+    static constexpr std::size_t MRayCPUCacheLineConstructive = std::hardware_constructive_interference_size;
+    static constexpr std::size_t MRayCPUCacheLineDestructive = std::hardware_destructive_interference_size;
+#else
+    // x86-64 Only. Intel/Amd has 64 byte L1 cache since forever?
+    // We use these constructs to prevent implicit data sharing between
+    // threads (each thread will write to adjacent locations).
+    static constexpr std::size_t MRayCPUCacheLineConstructive = 64;
+    static constexpr std::size_t MRayCPUCacheLineDestructive = 64;
+#endif
+
 //
 std::string             GetProcessPath();
 bool                    EnableVTMode();
 void                    RenameThread(SystemThreadHandle,
                                      const std::string& name);
 SystemThreadHandle      GetCurrentThreadHandle();
+std::string             GetCurrentThreadName();
 std::array<size_t, 2>   GetTerminalSize();
 
 void*   AlignedAlloc(size_t size, size_t alignment);

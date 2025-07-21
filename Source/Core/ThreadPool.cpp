@@ -1,6 +1,16 @@
 #include "ThreadPool.h"
 #include "System.h"
 
+inline void AtomicWaitValueToAchieve(std::atomic_uint64_t& checkLoc, uint64_t valToAchieve)
+{
+    // For explanation check GPUSystemCPU.h,
+    // "AtomicWaitValueToAchieve" function.
+    for(uint64_t check = checkLoc; check < valToAchieve; check = checkLoc)
+    {
+        checkLoc.wait(check);
+    }
+}
+
 class ThreadLoop
 {
     using ThreadInitFunction = typename ThreadPool::ThreadInitFunction;
@@ -8,18 +18,14 @@ class ThreadLoop
     private:
     MPMCQueue<std::function<void()>>&   taskQueue;
     // For waiting
-    std::atomic_uint32_t&               startedTaskCount;
-    std::atomic_uint32_t&               runningTaskCount;
-    std::condition_variable&            waitCondition;
+    std::atomic_uint64_t&               completedTaskCount;
     //
     ThreadInitFunction                  initFunction;
     uint32_t                            threadNumber;
 
     public:
     ThreadLoop(MPMCQueue<std::function<void()>>& taskQueue,
-               std::atomic_uint32_t& startedTaskCount,
-               std::atomic_uint32_t& runningTaskCount,
-               std::condition_variable& waitCondition,
+               std::atomic_uint64_t& completedTaskCount,
                ThreadInitFunction initFunction, uint32_t threadNumber);
 
     void operator()(std::stop_token token)
@@ -28,36 +34,30 @@ class ThreadLoop
         std::thread::native_handle_type handleCPP = handle;
 
         if(initFunction) initFunction(handleCPP, threadNumber);
-        startedTaskCount++;
-        startedTaskCount.notify_all();
 
-        while(!token.stop_requested() &&
-              !taskQueue.IsTerminated())
+        // Signal that you are in your event loop
+        completedTaskCount.fetch_add(1);
+        completedTaskCount.notify_all();
+
+        while(!token.stop_requested() && !taskQueue.IsTerminated())
         {
             std::function<void()> work;
             taskQueue.Dequeue(work);
-            runningTaskCount++;
             if(work) work();
-            runningTaskCount--;
-
-            if(runningTaskCount == 0 && taskQueue.IsEmpty())
-            {
-                waitCondition.notify_all();
-            }
+            // We do not know if anyone waiting for the
+            // the value here so we directly notify
+            uint64_t val = completedTaskCount.fetch_add(1);
+            completedTaskCount.notify_all();
         }
     }
 };
 
 ThreadLoop::ThreadLoop(MPMCQueue<std::function<void()>>& taskQueue,
-                       std::atomic_uint32_t& startedTaskCount,
-                       std::atomic_uint32_t& runningTaskCount,
-                       std::condition_variable& waitCondition,
+                       std::atomic_uint64_t& completedTaskCount,
                        ThreadInitFunction initFunction,
                        uint32_t threadNumber)
     : taskQueue(taskQueue)
-    , startedTaskCount(startedTaskCount)
-    , runningTaskCount(runningTaskCount)
-    , waitCondition(waitCondition)
+    , completedTaskCount(completedTaskCount)
     , initFunction(initFunction)
     , threadNumber(threadNumber)
 {}
@@ -65,8 +65,8 @@ ThreadLoop::ThreadLoop(MPMCQueue<std::function<void()>>& taskQueue,
 ThreadPool::ThreadPool(size_t queueSize)
     : poolAllocator(&baseAllocator)
     , taskQueue(queueSize)
-    , startedTaskCount(0)
-    , runningTaskCount(0)
+    , issuedTaskCount(0)
+    , completedTaskCount(0)
 {}
 
 ThreadPool::ThreadPool(uint32_t threadCount, size_t queueSize)
@@ -94,13 +94,8 @@ void ThreadPool::Wait()
 {
     if(threads.empty()) return;
 
-    // TODO: This may be wrong, at least it feels like it.
-    // Check it later
-    std::unique_lock<std::mutex> lock(waitMutex);
-    waitCondition.wait(lock, [&]() -> bool
-    {
-        return (runningTaskCount == 0) && taskQueue.IsEmpty();
-    });
+    uint64_t curIssueCount = issuedTaskCount.load();
+    AtomicWaitValueToAchieve(completedTaskCount, curIssueCount);
 }
 
 void ThreadPool::RestartThreadsImpl(uint32_t threadCount, ThreadInitFunction initFunc)
@@ -110,16 +105,16 @@ void ThreadPool::RestartThreadsImpl(uint32_t threadCount, ThreadInitFunction ini
     threads.clear();
     taskQueue.RemoveQueuedTasks(true);
 
+    completedTaskCount.store(0);
     threads.reserve(threadCount);
     for(uint32_t i = 0; i < threadCount; i++)
     {
-        threads.emplace_back(ThreadLoop(taskQueue, startedTaskCount,
-                                        runningTaskCount, waitCondition,
+        threads.emplace_back(ThreadLoop(taskQueue, completedTaskCount,
                                         initFunc, i));
     }
-
-    while(startedTaskCount < threadCount)
-        startedTaskCount.wait(0);
+    // Issue phony init tasks, thread loop will increment these
+    issuedTaskCount.store(threadCount);
+    AtomicWaitValueToAchieve(completedTaskCount, threadCount);
 }
 
 void ThreadPool::ClearTasks()

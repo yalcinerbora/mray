@@ -27,7 +27,15 @@ class SceneLoaderMRayTest : public ::testing::Test
 void SceneLoaderMRayTest::SetUp()
 {
     unsigned int tCount = std::max(1u, std::thread::hardware_concurrency());
-    pool = std::make_unique<ThreadPool>(tCount);
+    pool = std::make_unique<ThreadPool>
+    (
+        tCount,
+        [](std::thread::native_handle_type handle, uint32_t i)
+        {
+            RenameThread(handle, MRAY_FORMAT("{:03d}_[W]MRay", i));
+        }
+    );
+
     dllFile = std::make_unique<SharedLibrary>("SceneLoaderMRay");
 
     SharedLibArgs args
@@ -78,7 +86,13 @@ TEST_F(SceneLoaderMRayTest, Basic)
         MRAY_ERROR_LOG("{}", result.error().GetError());
 }
 
-TEST_F(SceneLoaderMRayTest, Kitchen)
+// This is too slow on debug mode since assimp is also
+// in debug mode
+#ifdef MRAY_DEBUG
+    TEST_F(SceneLoaderMRayTest, DISABLED_Kitchen)
+# else
+    TEST_F(SceneLoaderMRayTest, Kitchen)
+#endif
 {
     static constexpr size_t TOTAL_RUNS = 2;
     double all = 0.0;

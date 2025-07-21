@@ -78,7 +78,8 @@ class ImageLoader final : public ImageLoaderI
                         ImageLoader(bool enableMT = false);
                         ImageLoader(const ImageLoader&) = delete;
         ImageLoader&    operator=(const ImageLoader&) = delete;
-                        ~ImageLoader() = default;
+                        //~ImageLoader() = default;
+                        ~ImageLoader();
 
         // Interface
         Expected<ImageFilePtr>  OpenFile(const std::string& filePath,

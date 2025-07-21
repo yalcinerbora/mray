@@ -210,6 +210,7 @@ class alignas(std::max(alignof(T), size_t(8))) StaticVector
     constexpr size_t        capacity() const;
 
     constexpr void          resize(size_t size);
+    constexpr void          resize(size_t size, const T&);
     constexpr void          clear();
 
     constexpr void          push_back(const T&);

@@ -309,6 +309,7 @@ if(MRAY_ENABLE_HW_ACCELERATION AND MRAY_BUILD_HOST_BACKEND)
                             EMBREE_ISA_AVX512
                             EMBREE_ISA_AVX512SKX
                             EMBREE_ISPC_SUPPORT
+                            #EMBREE_SYCL_SUPPORT
                             #
                             #EMBREE_TUTORIALS
                             EMBREE_RAY_MASK
