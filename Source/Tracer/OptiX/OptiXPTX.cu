@@ -336,6 +336,7 @@ void KCRayGenOptix()
 MRAY_GPU MRAY_GPU_INLINE
 void KCLocalRayGenOptix()
 {
+    assert(params.mode == RenderModeOptiX::LOCAL);
     // We Launch linearly
     const uint32_t launchDim = optixGetLaunchDimensions().x;
     const uint32_t launchIndex = optixGetLaunchIndex().x;
@@ -346,8 +347,6 @@ void KCLocalRayGenOptix()
     auto [ray, tMM] = RayFromGMem(params.lParams.dRays, rIndex);
     // If we are doing local ray casting, we can't rely on
     // OptiX implicit transform changes.
-    assert(params.doLocalCasting);
-
     AcceleratorKey aKey = params.lParams.dAcceleratorKeys[launchIndex];
     uint32_t globalIndex = params.lParams.batchStartOffset + aKey.FetchIndexPortion();
     OptixTraversableHandle traversable = params.lParams.dGlobalInstanceTraversables[globalIndex];

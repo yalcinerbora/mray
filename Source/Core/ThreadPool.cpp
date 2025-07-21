@@ -46,7 +46,7 @@ class ThreadLoop
             if(work) work();
             // We do not know if anyone waiting for the
             // the value here so we directly notify
-            uint64_t val = completedTaskCount.fetch_add(1);
+            completedTaskCount.fetch_add(1);
             completedTaskCount.notify_all();
         }
     }

@@ -99,7 +99,7 @@ TEST_F(SceneLoaderMRayTest, Basic)
     for(uint32_t i = 0; i < TOTAL_RUNS; i++)
     {
         TracerMock tracer(false);
-        auto result = loader->LoadScene(tracer, "Scenes/Kitchen/Kitchen.json");
+        auto result = loader->LoadScene(tracer, "Scenes/Kitchen/kitchen.json");
         EXPECT_FALSE(result.has_error());
 
         if(result.has_error())
@@ -122,7 +122,7 @@ TEST_F(SceneLoaderMRayTest, KitchenGFG)
     for(uint32_t i = 0; i < TOTAL_RUNS; i++)
     {
         TracerMock tracer(false);
-        auto result = loader->LoadScene(tracer, "Scenes/Kitchen/KitchenGFG.json");
+        auto result = loader->LoadScene(tracer, "Scenes/Kitchen/kitchenGFG.json");
         EXPECT_FALSE(result.has_error());
 
         if(result.has_error())
