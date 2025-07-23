@@ -1024,7 +1024,8 @@ MRayError RunCommand::Invoke()
         });
 
         // Set resolution
-        Vector2ui resolution(imgRes[0], imgRes[1]);
+        assert(imgRes.has_value());
+        Vector2ui resolution((*imgRes)[0], (*imgRes)[1]);
         tracerThread.SetInitialResolution(resolution,
                                         Vector2ui::Zero(),
                                         resolution);
@@ -1091,7 +1092,6 @@ CLI::App* RunCommand::GenApp(CLI::App& mainApp)
     using namespace MRayCLI::RunNames;
     CLI::App* converter = mainApp.add_subcommand(std::string(Name),
                                                  std::string(Description));
-
     // Input
     // Dummy add visor config here, user may just change visor command
     // to run command, we should provide that functionality.
@@ -1123,8 +1123,8 @@ CLI::App* RunCommand::GenApp(CLI::App& mainApp)
 
     // TODO: Change this to be a region maybe?
     converter->add_option("--resolution, -r"s, imgRes,
-                          "Initial renderer's resolution. "
-                          "Requires a renderer to be set."s)
+                          "Resolution of the output image "
+                          "(i.e., 1920x1080.)"s)
         ->check(CLI::Number)
         ->delimiter('x')
         ->required()

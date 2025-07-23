@@ -187,7 +187,8 @@ GPUSystemCPU::GPUSystemCPU()
     localTP = std::make_unique<ThreadPool>(std::thread::hardware_concurrency(),
                                            [](SystemThreadHandle handle, uint32_t id)
     {
-        RenameThread(handle, MRAY_FORMAT("GPUEmulator_{}", id));
+        RenameThread(handle, MRAY_FORMAT("{:03d}_[G]MRay", id));
+        ThreadInitFunction();
     }, queueSize);
 
     // TODO: Check NUMA stuff:

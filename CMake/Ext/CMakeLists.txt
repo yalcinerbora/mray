@@ -28,6 +28,7 @@ option(MRAY_BUILD_TESTS "Build Test Libraries (gtest)" ON)
 option(MRAY_BUILD_VISOR "Build Visor Libraries (glfw etc..)" ON)
 option(MRAY_BUILD_USD "Build USD Libraries (usd/tbb/opensubdiv)" OFF)
 option(MRAY_DL_EMBREE "Download Embree Libraries (embree4)" OFF)
+option(MRAY_BUILD_TRACY "Build \"Tracy\" (open-source profiler)")
 
 # Populate the meta directories for this project hierarchy
 include("Macros")
@@ -144,8 +145,11 @@ mray_build_ext_dependency_git(
 mray_build_ext_dependency_git(
     NAME cli11_ext
     URL "https://github.com/CLIUtils/CLI11.git"
-    TAG "6c7b07a878ad834957b98d0f9ce1dbe0cb204fc9" # v2.4.2
+    TAG "4160d259d961cd393fd8d67590a8c7d210207348" # v2.5.0
     LICENSE_NAME "LICENSE"
+
+    APPLY_PATCH "file://${MRAY_CMAKE_DIRECTORY}/Ext/cli11_fix_nested_footer_print.patch"
+
     BUILD_ARGS
         -DBUILD_TESTING=OFF
         -DCLI11_BUILD_EXAMPLES=OFF
@@ -309,6 +313,26 @@ if(MRAY_DL_EMBREE OR MRAY_BUILD_USD)
             # CMake 4.0.0 onwards dropped support for 3.5,
             # most libs have this set as minimum. Try to force it
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+    )
+endif()
+
+if(MRAY_BUILD_TRACY)
+    # Tracy
+    mray_build_ext_dependency_git(
+        NAME tracy_ext
+        URL "https://github.com/wolfpld/tracy.git"
+        TAG "c556831ddc6fe26d2fce01c14c97205a9dad46d5" # v0.12.2
+        LICENSE_NAME "LICENSE"
+
+        BUILD_ARGS
+            -DTRACY_STATIC=OFF
+            -DTRACY_ENABLE=ON
+
+            -DTRACY_NO_VSYNC_CAPTURE=ON
+            -DTRACY_NO_EXIT=ON
+            -DTRACY_NO_FRAME_IMAGE=ON
+            -DTRACY_ON_DEMAND=ON
+            -DTRACY_ONLY_LOCALHOST=ON
     )
 endif()
 

@@ -14,9 +14,13 @@ class TransferQueue;
 
 class RunCommand : public CommandI
 {
-    using Resolution = std::array<uint32_t, 2>;
     using ThroughputAverage = Math::MovingAverage<16>;
     using TimeAverage = Math::MovingAverage<8>;
+    // TODO: Resolution is mandatory in run command,
+    // but there is a bug in new CLI11 that does not
+    // resolve std::array<...> which is a regression...
+    // Change this later
+    using OptionalRes = Optional<std::array<uint32_t, 2>>;
 
     private:
     std::string visorConfString;
@@ -24,7 +28,7 @@ class RunCommand : public CommandI
     std::string tracerConfigFile;
     std::string sceneFile;
     std::string renderConfigFile;
-    Resolution  imgRes = std::array<uint32_t, 2>{0, 0};
+    OptionalRes imgRes;
     uint32_t    threadCount;
 
     // Runtime related

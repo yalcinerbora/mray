@@ -111,6 +111,7 @@ option(MRAY_EXPORT_COMPILE_COMMANDS "Export compile commands for IWYU" ON)
 option(MRAY_ENABLE_PCH "Enable precompiled headers functionality" OFF)
 option(MRAY_BUILD_DOCS "Build Documentation" OFF)
 option(MRAY_ENABLE_USD "Enable usd scene file reading functionality" OFF)
+option(MRAY_ENABLE_TRACY "Build/Hook Tracy to the binaries." OFF)
 
 # Sanitizer Modes for debugging etc.
 set(MRAY_SANITIZER_MODE "address"

@@ -1,0 +1,17 @@
+diff --git a/include/CLI/impl/Formatter_inl.hpp b/include/CLI/impl/Formatter_inl.hpp
+index 0e253cb..f1d4c7d 100644
+--- a/include/CLI/impl/Formatter_inl.hpp
++++ b/include/CLI/impl/Formatter_inl.hpp
+@@ -242,7 +242,11 @@ CLI11_INLINE std::string Formatter::make_expanded(const App *sub, AppFormatMode
+     out << make_positionals(sub);
+     out << make_groups(sub, mode);
+     out << make_subcommands(sub, mode);
+-    detail::streamOutAsParagraph(out, make_footer(sub), footer_paragraph_width_);  // Format footer as paragraph
++	// Skip if we are nested printing (aka. "help-all" command)
++    if(mode != AppFormatMode::Sub)
++        detail::streamOutAsParagraph(out, make_footer(sub), footer_paragraph_width_);  // Format footer as paragraph
++    else for(unsigned int _ = 0; _ < footer_paragraph_width_; _++)
++        out << '=';
+ 
+     out << '\n';
+     return out.str();

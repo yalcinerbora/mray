@@ -28,53 +28,24 @@ set(MRAY_EXT_CONFIG_META_ARGS
         -DMRAY_BUILD_VISOR=${MRAY_BUILD_VISOR}
         -DMRAY_BUILD_USD=${MRAY_ENABLE_USD}
         -DMRAY_DL_EMBREE=${DMRAY_ENABLE_EMBREE}
+        -DMRAY_BUILD_TRACY=${MRAY_ENABLE_TRACY}
 )
-
-set(MRAY_EXTERNAL_LIBRARIES_STAMP ${MRAY_CONFIG_LIB_DIRECTORY}/MRayLib.stamp)
-
-set(MRAY_EXTERNAL_LIBRARIES
-    ${MRAY_CONFIG_LIB_DIRECTORY}/fmt${CMAKE_STATIC_LIBRARY_SUFFIX}
-    ${MRAY_LIB_INCLUDE_DIRECTORY}/nlohmann/json.hpp
-    ${MRAY_LIB_INCLUDE_DIRECTORY}/nlohmann/json_fwd.hpp
-    ${MRAY_CONFIG_LIB_DIRECTORY}/assimp$<$<CONFIG:Debug>:d>
-    ${MRAY_CONFIG_LIB_DIRECTORY}/GFGFileIO$<$<CONFIG:Debug>:d>
-
-    # ${MRAY_CONFIG_LIB_DIRECTORY}/ZLIB$<$<CONFIG:Debug>:d>
-    # ${MRAY_CONFIG_LIB_DIRECTORY}/spdlog$<$<CONFIG:Debug>:d>${CMAKE_SHARED_LIBRARY_SUFFIX}
-    # ${MRAY_CONFIG_LIB_DIRECTORY}/glbinding$<$<CONFIG:Debug>:d>
-    # ${MRAY_CONFIG_LIB_DIRECTORY}/glfw3$<$<CONFIG:Debug>:d>dll
-    # ${MRAY_CONFIG_LIB_DIRECTORY}/imgui$<$<CONFIG:Debug>:d>
-    # ${MRAY_CONFIG_LIB_DIRECTORY}/imgui_tex_inspect$<$<CONFIG:Debug>:d>
-    # ${MRAY_CONFIG_LIB_DIRECTORY}/OpenImageIO$<$<CONFIG:Debug>:d>${CMAKE_SHARED_LIBRARY_SUFFIX}
-    # ${MRAY_CONFIG_LIB_DIRECTORY}/OpenImageIO_Util$<$<CONFIG:Debug>:d>${CMAKE_SHARED_LIBRARY_SUFFIX}
-)
-
-if(MRAY_BUILD_TESTS)
-    set(MRAY_EXTERNAL_LIBRARIES ${MRAY_EXTERNAL_LIBRARIES}
-        ${MRAY_CONFIG_LIB_DIRECTORY}/gtest${CMAKE_SHARED_LIBRARY_SUFFIX}
-        ${MRAY_CONFIG_LIB_DIRECTORY}/gmock${CMAKE_SHARED_LIBRARY_SUFFIX}
-    )
-endif()
-
 # Add a custom command for external library generation
 get_property(MRAY_IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(MRAY_IS_MULTI_CONFIG)
-    add_custom_command(OUTPUT ${MRAY_EXTERNAL_LIBRARIES_STAMP}
+    add_custom_target(MRayExternal
         COMMAND ${CMAKE_COMMAND} ${MRAY_EXT_CONFIG_META_ARGS}
         COMMAND ${CMAKE_COMMAND} --build ${MRAY_EXT_BUILD_DIR} -j --config $<IF:$<CONFIG:SanitizeR>,Release,$<CONFIG>>
-        COMMAND ${CMAKE_COMMAND} -E touch ${MRAY_EXTERNAL_LIBRARIES_STAMP}
         COMMENT "Compiling external libraries($<CONFIG>). This may take a while..."
         USES_TERMINAL)
 else()
-    add_custom_command(OUTPUT ${MRAY_EXTERNAL_LIBRARIES_STAMP}
+    add_custom_target(MRayExternal
         COMMAND ${CMAKE_COMMAND} ${MRAY_EXT_CONFIG_META_ARGS} -DCMAKE_BUILD_TYPE=$<IF:$<CONFIG:SanitizeR>,Release,$<CONFIG>>
         COMMAND ${CMAKE_COMMAND} --build ${MRAY_EXT_BUILD_DIR} -j
-        COMMAND ${CMAKE_COMMAND} -E touch ${MRAY_EXTERNAL_LIBRARIES_STAMP}
         COMMENT "Compiling external libraries($<CONFIG>). This may take a while..."
         USES_TERMINAL)
 endif()
 
-add_custom_target(MRayExternal DEPENDS ${MRAY_EXTERNAL_LIBRARIES_STAMP})
 set_target_properties(MRayExternal PROPERTIES FOLDER ${MRAY_PREDEFINED_TARGETS_FOLDER})
 set_target_properties(MRayExternal PROPERTIES EXCLUDE_FROM_ALL TRUE)
 set_target_properties(MRayExternal PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD TRUE)

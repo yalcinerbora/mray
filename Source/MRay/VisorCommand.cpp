@@ -265,7 +265,8 @@ CLI::App* VisorCommand::GenApp(CLI::App& mainApp)
 
     // TODO: Change this to be a region maybe?
     visorApp->add_option("--resolution, -r"s, imgRes,
-                         "Initial renderer's resolution. "
+                         "Initial renderer's resolution "
+                         "(i.e., 1920x1080). "
                          "Requires a renderer to be set (optional)."s)
         ->check(CLI::Number)
         ->expected(1)

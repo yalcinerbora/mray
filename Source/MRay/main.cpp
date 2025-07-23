@@ -80,14 +80,14 @@ int main(int argc, const char* const argv[])
                  std::string(MRay::Name)};
     app.footer(std::string(MRay::Authors) + "\n" +
                std::string(MRay::License));
-    app.get_formatter()->column_width(40);
     app.option_defaults()->always_capture_default();
-
     app.get_formatter()->label("SUBCOMMAND", "Command");
     app.get_formatter()->label("SUBCOMMANDS", "Commands");
     app.get_formatter()->label("OPTIONS", "Options");
     app.get_formatter()->label("TEXT", "Text");
     app.get_formatter()->label("REQUIRED", "Required");
+    app.set_help_all_flag("--help-all", "All args of sub-commands");
+    app.require_subcommand();
 
     // Version information
     using namespace std::string_literals;
