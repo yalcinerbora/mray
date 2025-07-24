@@ -7,6 +7,8 @@
 
 #include "Core/Types.h"
 #include "Core/Math.h"
+#include "Core/MemAlloc.h"
+#include "Core/Profiling.h"
 
 #include "TransientPool/TransientPool.h"
 
@@ -33,7 +35,13 @@ class ThreadPool;
 
 static constexpr uint32_t StaticThreadPerBlock1D()
 {
-    return 32u;
+    // After manually adjusting this in "Kitchen"
+    // scene, it seems 256 is optimal.
+    // Interestingly it is one of the optimal paramaters
+    // (generic-optimal) for the GPU as well.
+    //
+    // Tested on asymmetric 20 thread laptop CPU (i7-12700H).
+    return 256u;
 }
 
 // TODO: This should not be compile time static
@@ -74,45 +82,27 @@ struct KernelCallParamsGlobal
 // Global list of KP
 inline thread_local KernelCallParamsGlobal globalKCParams;
 
-using AnnotationHandle = void*;
-using AnnotationStringHandle = void*;
-
-class GPUAnnotationCPU
+class GPUAnnotationCPU : public ProfilerAnnotation
 {
+    using SourceLoc = std::source_location;
+    using Base = ProfilerAnnotation;
+
     public:
     friend class GPUSystemCPU;
     friend class GPUQueueCPU;
 
-    class Scope
+    class Scope : public ProfilerAnnotation::Scope
     {
         friend GPUAnnotationCPU;
-
-        private:
-        AnnotationHandle domain;
-
-        Scope(AnnotationHandle);
-        public:
-        // Constructors & Destructor
-                Scope(const Scope&) = delete;
-                Scope(Scope&&) = delete;
-        Scope&  operator=(const Scope&) = delete;
-        Scope&  operator=(Scope&&) = delete;
-                ~Scope();
+        using Base = ProfilerAnnotation::Scope;
+        using Base::Base;
     };
 
     private:
-    AnnotationHandle        domainHandle;
-    AnnotationStringHandle  stringHandle;
-
-    GPUAnnotationCPU(AnnotationHandle, std::string_view name);
+    GPUAnnotationCPU(AnnotationHandle, std::string_view name,
+                     const SourceLoc& s = SourceLoc::current());
 
     public:
-    // Constructors & Destructor
-                        GPUAnnotationCPU(const GPUAnnotationCPU&) = delete;
-                        GPUAnnotationCPU(GPUAnnotationCPU&&) = delete;
-    GPUAnnotationCPU&   operator=(const GPUAnnotationCPU&) = delete;
-    GPUAnnotationCPU&   operator=(GPUAnnotationCPU&&) = delete;
-
     [[nodiscard]]
     Scope               AnnotateScope() const;
 };
@@ -164,12 +154,17 @@ class GPUFenceCPU
 
 class GPUQueueCPU
 {
+    public:
     struct ControlBlockData
     {
         std::atomic_uint64_t    issuedKernelCounter = 0;
         std::atomic_uint64_t    completedKernelCounter = 0;
         std::mutex              issueMutex;
+        //
+        std::atomic_uint32_t    curBlockCounter = 0;
     };
+
+    private:
     using ControlBlockPtr = std::unique_ptr<ControlBlockData>;
 
     friend class GPUFenceCPU;

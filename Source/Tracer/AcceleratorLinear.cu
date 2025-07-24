@@ -207,7 +207,7 @@ void BaseAcceleratorLinear::CastRays(// Output
                                      const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
-    const auto annotation = gpuSystem.CreateAnnotation("Ray Casting"sv);
+    static const auto annotation = gpuSystem.CreateAnnotation("Ray Casting"sv);
     const auto _ = annotation.AnnotateScope();
 
     assert(maxPartitionCount != 0);
@@ -325,7 +325,7 @@ void BaseAcceleratorLinear::CastVisibilityRays(// Output
                                                const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
-    const auto annotation = gpuSystem.CreateAnnotation("Visibility Casting"sv);
+    static const auto annotation = gpuSystem.CreateAnnotation("Visibility Casting"sv);
     const auto _ = annotation.AnnotateScope();
 
     assert(maxPartitionCount != 0);
@@ -453,7 +453,7 @@ void BaseAcceleratorLinear::CastLocalRays(// Output
                                           const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
-    const auto annotation = gpuSystem.CreateAnnotation("Local Ray Casting"sv);
+    static const auto annotation = gpuSystem.CreateAnnotation("Local Ray Casting"sv);
     const auto _ = annotation.AnnotateScope();
 
     auto accelGroupOpt = accelInstances.at(dAccelKeyBatchPortion);

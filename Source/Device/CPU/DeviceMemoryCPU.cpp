@@ -336,7 +336,7 @@ DeviceMemoryCPU::~DeviceMemoryCPU()
 
 void DeviceMemoryCPU::ResizeBuffer(size_t newSize)
 {
-    if(neverDecrease && newSize < size)
+    if(neverDecrease && newSize <= size)
     {
         size = newSize;
         return;

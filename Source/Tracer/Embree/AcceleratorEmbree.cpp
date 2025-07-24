@@ -207,6 +207,10 @@ void BaseAcceleratorEmbree::CastRays(// Output
                                      Span<const RayIndex> dRayIndices,
                                      const GPUQueue& queue)
 {
+    using namespace std::string_view_literals;
+    static const auto annotation = gpuSystem.CreateAnnotation("Ray Casting"sv);
+    const auto _ = annotation.AnnotateScope();
+
     uint32_t rayCount = uint32_t(dRayIndices.size());
     uint32_t blockCount = Math::DivideUp(rayCount, EMBREE_BATCH_SIZE);
     using namespace std::string_view_literals;
@@ -325,7 +329,7 @@ void BaseAcceleratorEmbree::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffe
                                                const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
-    const auto annotation = gpuSystem.CreateAnnotation("Visibilty Casting"sv);
+    static const auto annotation = gpuSystem.CreateAnnotation("Visibilty Casting"sv);
     const auto _ = annotation.AnnotateScope();
 
     uint32_t rayCount = uint32_t(dRayIndices.size());
@@ -421,7 +425,7 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
                                           const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
-    const auto annotation = gpuSystem.CreateAnnotation("Local Ray Casting"sv);
+    static const auto annotation = gpuSystem.CreateAnnotation("Local Ray Casting"sv);
     const auto _ = annotation.AnnotateScope();
 
     size_t groupStart = hInstanceBatchStartOffsets[dAccelKeyBatchPortion];

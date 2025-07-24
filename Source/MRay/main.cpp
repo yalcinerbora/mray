@@ -3,6 +3,7 @@
 #include "Core/Error.h"
 #include "Core/System.h"
 #include "Core/Timer.h"
+#include "Core/Profiling.h"
 
 #include <CLI/CLI.hpp>
 #include "CommandI.h"
@@ -88,6 +89,9 @@ int main(int argc, const char* const argv[])
     app.get_formatter()->label("REQUIRED", "Required");
     app.set_help_all_flag("--help-all", "All args of sub-commands");
     app.require_subcommand();
+    // Profiler (can be set via main app)
+    Optional<bool> enableProfiling;
+    app.add_flag("--profile, -p", enableProfiling, "Enable Tracy Profiling");
 
     // Version information
     using namespace std::string_literals;
@@ -127,6 +131,8 @@ int main(int argc, const char* const argv[])
         return sc.second->parsed();
     });
     assert(appIt != appList.cend());
+
+    ProfilerDLL profilerDLL(enableProfiling);
 
     processTimer.Display();
     MRayError e = appIt->first->Invoke();

@@ -64,7 +64,8 @@ set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/Timer.cpp
     ${CURRENT_SOURCE_DIR}/TimelineSemaphore.h
     ${CURRENT_SOURCE_DIR}/MPMCQueue.h
-    ${CURRENT_SOURCE_DIR}/Filesystem.h)
+    ${CURRENT_SOURCE_DIR}/Filesystem.h
+    ${CURRENT_SOURCE_DIR}/Profiling.h)
 
 set(SRC_DATA_TYPES
     ${CURRENT_SOURCE_DIR}/NamedEnum.h
@@ -98,11 +99,20 @@ add_library(CoreLib STATIC ${SRC_ALL})
 target_link_libraries(CoreLib
                       PUBLIC
                       fmt::fmt
+                      $<$<BOOL:${MRAY_ENABLE_TRACY}>:tracy::tracy_client>
                       PRIVATE
                       mray::meta_compile_opts)
 
 set_target_properties(CoreLib PROPERTIES
                       POSITION_INDEPENDENT_CODE ON)
+
+if(MRAY_ENABLE_TRACY)
+    add_custom_command(TARGET CoreLib POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                       "$<TARGET_FILE:tracy::tracy_client>"
+                       ${MRAY_CONFIG_BIN_DIRECTORY}
+                       COMMENT "Copying TracyClient dll")
+endif()
 
 # TODO: This is somewhat a hack?
 # When HIP is enabled as a language AMD does not give

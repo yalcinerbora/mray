@@ -390,6 +390,18 @@ if(MRAY_ENABLE_USD)
                         VERSION 12)
 endif()
 
+# Make tracy target always active, but selectively enable/disable via TRACY_ENABLE
+gen_imported_target(NAME tracy::tracy_client SHARED DEBUG_TARGET TracyClientd RELEASE_TARGET TracyClient
+
+                    EXTRA_DEFINES
+                        TRACY_IMPORTS
+                        TRACY_NO_VSYNC_CAPTURE
+                        TRACY_NO_FRAME_IMAGE
+                        TRACY_ON_DEMAND
+                        TRACY_ONLY_LOCALHOST
+                        TRACY_DELAYED_INIT
+                        TRACY_MANUAL_LIFETIME)
+
 # gen_imported_target(NAME imgui::imgui_ti STATIC DEBUG_TARGET imgui_tex_inspectd RELEASE_TARGET imgui_tex_inspect)
 
 if(MRAY_BUILD_TESTS)

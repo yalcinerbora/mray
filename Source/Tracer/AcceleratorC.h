@@ -1248,7 +1248,8 @@ void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<AccelGroupCon
 template <class C>
 void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
 {
-    static const auto annotation = gpuSystem.CreateAnnotation("Accelerator Construct");
+    using namespace std::string_view_literals;
+    static const auto annotation = gpuSystem.CreateAnnotation("Accelerator Construct"sv);
     const auto _ = annotation.AnnotateScope();
 
     std::vector<AccelGroupConstructParams> partitions;
@@ -1263,7 +1264,6 @@ void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
     for(auto&& partition : partitions)
     {
         using namespace TypeNameGen::Runtime;
-        using namespace std::string_view_literals;
         std::string accelTypeName = std::string(C::TypeName()) + std::string(partition.primGroup->Name());
         uint32_t aGroupId = idCounter++;
         auto accelGenerator = accelGenerators.at(accelTypeName);

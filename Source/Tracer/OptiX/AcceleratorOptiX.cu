@@ -682,7 +682,7 @@ void BaseAcceleratorOptiX::CastRays(// Output
                                    const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
-    const auto annotation = gpuSystem.CreateAnnotation("Ray Casting"sv);
+    static const auto annotation = gpuSystem.CreateAnnotation("Ray Casting"sv);
     const auto _ = annotation.AnnotateScope();
 
     // TODO: Currently only works for single GPU
@@ -727,7 +727,7 @@ void BaseAcceleratorOptiX::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffer
                                               const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
-    const auto annotation = gpuSystem.CreateAnnotation("Visibilty Casting"sv);
+    static const auto annotation = gpuSystem.CreateAnnotation("Visibilty Casting"sv);
     const auto _ = annotation.AnnotateScope();
 
     // TODO: Currently only works for single GPU
@@ -774,7 +774,7 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
                                          const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
-    const auto annotation = gpuSystem.CreateAnnotation("Local Ray Casting"sv);
+    static const auto annotation = gpuSystem.CreateAnnotation("Local Ray Casting"sv);
     const auto _ = annotation.AnnotateScope();
 
     // TODO: Currently only works for single GPU

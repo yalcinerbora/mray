@@ -531,13 +531,15 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     Vector2 eMax = Vector2(M * edges[maxIndex]);
     //
     Float a1L = a1.Length(), a2L = a2.Length();
-    Float l0 = a1L * a2L / std::sqrt(a1L * a1L * eMin[0] * eMin[0] +
-                                     a2L * a2L * eMin[1] * eMin[1]);
-    Float l1 = a1L * a2L / std::sqrt(a1L * a1L * eMax[0] * eMax[0] +
-                                     a2L * a2L * eMax[1] * eMax[1]);
-    Float lMax = std::max(l0, l1);
-    Float k0 = curvatures[minIndex] * l0 / lMax;
-    Float k1 = curvatures[maxIndex] * l1 / lMax;
+    Float a1LSqr = a1L * a1L, a2LSqr = a2L * a2L;
+    Float a12L = a1L * a2L;
+    Float l0 = a12L / std::sqrt(a1LSqr * eMin[0] * eMin[0] +
+                                a2LSqr * eMin[1] * eMin[1]);
+    Float l1 = a12L / std::sqrt(a1LSqr * eMax[0] * eMax[0] +
+                                a2LSqr * eMax[1] * eMax[1]);
+    Float lMaxRecip = Float(1) / std::max(l0, l1);
+    Float k0 = curvatures[minIndex] * l0 * lMaxRecip;
+    Float k1 = curvatures[maxIndex] * l1 * lMaxRecip;
 
     auto Beta = [&](Float curvature)
     {

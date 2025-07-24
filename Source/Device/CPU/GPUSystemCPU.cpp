@@ -4,8 +4,13 @@
 #include "Core/TimelineSemaphore.h"
 #include "Core/ThreadPool.h"
 
+
+#include "Core/BitFunctions.h"
+#include "Core/ColorFunctions.h"
+#include "Core/GraphicsFunctions.h"
+
 #ifdef MRAY_WINDOWS
-    #include <windows.h>
+    #include <Windows.h>
     #define CPUId __cpuidex
 
 #elif defined MRAY_LINUX
@@ -68,24 +73,16 @@ uint64_t GetTotalCPUMemory()
 namespace mray::host
 {
 
-GPUAnnotationCPU::Scope::Scope(AnnotationHandle d)
-    : domain(d)
+GPUAnnotationCPU::GPUAnnotationCPU(AnnotationHandle,
+                                   std::string_view name,
+                                   const std::source_location& sLoc)
+    : Base(name, sLoc)
 {}
 
-GPUAnnotationCPU::Scope::~Scope()
+typename GPUAnnotationCPU::Scope
+GPUAnnotationCPU::AnnotateScope() const
 {
-}
-
-GPUAnnotationCPU::GPUAnnotationCPU(AnnotationHandle h,
-                                   std::string_view)
-    : domainHandle(h)
-    , stringHandle(nullptr)
-{
-}
-
-GPUAnnotationCPU::Scope GPUAnnotationCPU::AnnotateScope() const
-{
-    return Scope(AnnotationHandle{});
+    return Scope(*this);
 }
 
 GPUSemaphoreViewCPU::GPUSemaphoreViewCPU(TimelineSemaphore* sem,
@@ -181,9 +178,10 @@ GPUQueueCPU::~GPUQueueCPU()
 }
 
 GPUSystemCPU::GPUSystemCPU()
- : localTP(nullptr)
+    : localTP(nullptr)
+    , cpuDomain(nullptr)
 {
-    uint32_t queueSize = Math::NextPowerOfTwo(std::thread::hardware_concurrency() * 8);
+    uint32_t queueSize = Math::NextPowerOfTwo(std::thread::hardware_concurrency() * 128);
     localTP = std::make_unique<ThreadPool>(std::thread::hardware_concurrency(),
                                            [](SystemThreadHandle handle, uint32_t id)
     {
@@ -209,8 +207,7 @@ GPUSystemCPU::GPUSystemCPU(ThreadPool& tp)
 }
 
 GPUSystemCPU::~GPUSystemCPU()
-{
-}
+{}
 
 std::vector<size_t> GPUSystemCPU::SplitWorkToMultipleGPU(uint32_t workCount,
                                                          uint32_t,

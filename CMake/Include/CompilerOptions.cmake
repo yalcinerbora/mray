@@ -64,6 +64,10 @@ set(MRAY_MSVC_OPTIONS
     $<$<CONFIG:SanitizeR>:/MD /O1 /Zi /Ob0 /Oy- /RTC1>
     $<$<CONFIG:SanitizeR>:/fsanitize=${MRAY_SANITIZER_MODE}>
 
+    # FP-related
+    /fp:precise
+    /fp:contract
+
     # Large section tables (too many templates on CPU Device)
     /bigobj
     # MT Build
@@ -214,9 +218,7 @@ set(MRAY_PREPROCESSOR_DEFS_GENERIC
     $<$<CONFIG:Debug>:MRAY_DEBUG>
     $<$<CONFIG:SanitizeR>:MRAY_DEBUG>
     $<$<CONFIG:Release>:NDEBUG>
-
-    #$<$<CONFIG:Release>:MRAY_DEBUG>
-    )
+    $<$<BOOL:${MRAY_ENABLE_TRACY}>:MRAY_ENABLE_TRACY>)
 
 if(MSVC)
     set(MRAY_PREPROCESSOR_DEFS_GENERIC

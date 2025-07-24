@@ -12,7 +12,12 @@ static constexpr uint32_t WarpSize()
 
 template<uint32_t LOGICAL_WARP_SIZE = WarpSize()>
 MRAY_GPU MRAY_GPU_INLINE
-static void WarpSynchronize() {}
+static void WarpSynchronize()
+{
+    static_assert(LOGICAL_WARP_SIZE == std::numeric_limits<uint32_t>::max(),
+                  "CPU Device does not have notion of warps. "
+                  "Please write a CPU specific algorithm.");
+}
 
 MRAY_GPU MRAY_GPU_INLINE
 static void BlockSynchronize() {}
@@ -28,13 +33,17 @@ namespace mray::host
 {
 
 inline
-void NotifyWhenValueReaches(std::atomic_uint64_t& notifyLoc, uint64_t valueToNotify)
+void NotifyWhenValueReaches(GPUQueueCPU::ControlBlockData* cb, uint64_t valueToNotify)
 {
+    std::atomic_uint64_t& notifyLoc = cb->completedKernelCounter;
     uint64_t oldCount = notifyLoc.fetch_add(1);
     // Only notify when all threads of this block is
     // done to minimize unnecessary wake up.
     if(oldCount + 1 == valueToNotify)
+    {
+        cb->curBlockCounter = 0;
         notifyLoc.notify_all();
+    }
 }
 
 MRAY_GPU MRAY_CGPU_INLINE
@@ -82,7 +91,8 @@ void GPUQueueCPU::IssueKernelInternal(std::string_view name,
     // but for this code to work, "for loop Enqueue" portion must be a
     // critical section, instead of the internal queue's data.
     // (see the above "TODO" section)
-    auto* cbRef = &this->cb;
+    //auto* cbRef = &this->cb;
+    ControlBlockData* cbPtr = cb.get();
     [[maybe_unused]]
     auto r = tp->SubmitBlocks
     (
@@ -90,15 +100,23 @@ void GPUQueueCPU::IssueKernelInternal(std::string_view name,
         [
             ... fArgs = std::forward<Args>(fArgs),
             blockCount, oldIssueCount, newIssueCount,
-            cbRef, callerBlockCount, tpb
-            //,name
-        ](uint32_t blockStart, [[maybe_unused]] uint32_t blockEnd)
+            cbPtr, callerBlockCount, tpb,
+            name, domain = this->domain,
+            totalWorkCount
+        ]
+        (
+            [[maybe_unused]] uint32_t blockStart,
+            [[maybe_unused]] uint32_t blockEnd
+        )
         {
             // Wait the previous kernel to finish
             // CUDA style queue emulation.
-            AtomicWaitValueToAchieve((*cbRef)->completedKernelCounter, oldIssueCount);
+            AtomicWaitValueToAchieve(cbPtr->completedKernelCounter, oldIssueCount);
 
             std::atomic_thread_fence(std::memory_order_seq_cst);
+            static const auto threadAnnotation = GPUAnnotationCPU(domain, name);
+            const auto threadAnnotationScope = threadAnnotation.AnnotateScope();
+
             // From this point on it previous kernels should be completed
             assert(blockEnd - blockStart == 1);
             globalKCParams.gridSize = callerBlockCount;
@@ -106,7 +124,11 @@ void GPUQueueCPU::IssueKernelInternal(std::string_view name,
 
             // Do the block stride loop here,
             // each thread may be responsible for one or more blocks
-            for(uint32_t bId = blockStart; bId < callerBlockCount; bId += blockCount)
+            //for(uint32_t bId = blockStart; bId < callerBlockCount; bId += blockCount)
+            auto& blockCounter = cbPtr->curBlockCounter;
+            for(uint32_t bId = blockCounter.fetch_add(1u);
+                bId < callerBlockCount;
+                bId = blockCounter.fetch_add(1u))
             {
                 globalKCParams.blockId = bId;
                 for(uint32_t j = 0; j < tpb; j++)
@@ -118,8 +140,7 @@ void GPUQueueCPU::IssueKernelInternal(std::string_view name,
             }
             //
             std::atomic_thread_fence(std::memory_order_seq_cst);
-            NotifyWhenValueReaches((*cbRef)->completedKernelCounter,
-                                   newIssueCount);
+            NotifyWhenValueReaches(cbPtr, newIssueCount);
         },
         blockCount
     );
@@ -163,24 +184,32 @@ void GPUQueueCPU::IssueLambdaInternal(std::string_view name,
     // but for this code to work, "for loop Enqueue" portion must be a
     // critical section, instead of the internal queue's data.
     // (see the above "TODO" section)
-    auto* cbRef = &this->cb;
+    //auto* cbRef = &this->cb;
+    ControlBlockData* cbPtr = cb.get();
     [[maybe_unused]]
     auto r = tp->SubmitBlocks
     (
         blockCount,
         [
-            //name,
             blockCount, oldIssueCount, newIssueCount,
-            cbRef, callerBlockCount, tpb,
-            func = std::forward<Lambda>(func)
-        ](uint32_t blockStart, [[maybe_unused]] uint32_t blockEnd)
+            cbPtr, callerBlockCount, tpb,
+            func = std::forward<Lambda>(func),
+            name, domain = this->domain,
+            totalWorkCount
+        ]
+        (
+            [[maybe_unused]] uint32_t blockStart,
+            [[maybe_unused]] uint32_t blockEnd
+        )
         {
             // Wait the previous kernel to finish
             // CUDA style queue emulation.
-            AtomicWaitValueToAchieve((*cbRef)->completedKernelCounter, oldIssueCount);
+            AtomicWaitValueToAchieve(cbPtr->completedKernelCounter, oldIssueCount);
 
             // From this point on it previous kernels should be completed
             std::atomic_thread_fence(std::memory_order_seq_cst);
+            static const auto threadAnnotation = GPUAnnotationCPU(domain, name);
+            const auto threadAnnotationScope = threadAnnotation.AnnotateScope();
 
             assert(blockEnd - blockStart == 1);
             globalKCParams.gridSize = callerBlockCount;
@@ -188,7 +217,11 @@ void GPUQueueCPU::IssueLambdaInternal(std::string_view name,
 
             // Do the block stride loop here,
             // each thread may be responsible for one or more blocks
-            for(uint32_t bId = blockStart; bId < callerBlockCount; bId += blockCount)
+            //for(uint32_t bId = blockStart; bId < callerBlockCount; bId += blockCount)
+            auto& blockCounter = cbPtr->curBlockCounter;
+            for(uint32_t bId = blockCounter.fetch_add(1u);
+                bId < callerBlockCount;
+                bId = blockCounter.fetch_add(1u))
             {
                 globalKCParams.blockId = bId;
                 for(uint32_t j = 0; j < tpb; j++)
@@ -201,8 +234,7 @@ void GPUQueueCPU::IssueLambdaInternal(std::string_view name,
             }
             //
             std::atomic_thread_fence(std::memory_order_seq_cst);
-            NotifyWhenValueReaches((*cbRef)->completedKernelCounter,
-                                   newIssueCount);
+            NotifyWhenValueReaches(cbPtr, newIssueCount);
         },
         blockCount
     );

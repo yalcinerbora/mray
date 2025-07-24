@@ -327,12 +327,13 @@ if(MRAY_BUILD_TRACY)
         BUILD_ARGS
             -DTRACY_STATIC=OFF
             -DTRACY_ENABLE=ON
-
             -DTRACY_NO_VSYNC_CAPTURE=ON
-            -DTRACY_NO_EXIT=ON
+            -DTRACY_NO_EXIT=OFF
             -DTRACY_NO_FRAME_IMAGE=ON
             -DTRACY_ON_DEMAND=ON
             -DTRACY_ONLY_LOCALHOST=ON
+            -DTRACY_DELAYED_INIT=ON
+            -DTRACY_MANUAL_LIFETIME=ON
     )
 endif()
 
