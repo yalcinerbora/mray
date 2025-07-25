@@ -4,6 +4,10 @@
 #include "System.h"
 #include "Filesystem.h"
 
+#ifdef MRAY_ENABLE_TRACY
+    #include "Profiling.h"
+#endif
+
 // Env Headers
 #if defined MRAY_WINDOWS
 
@@ -125,6 +129,14 @@ SharedLibrary::SharedLibrary(const std::string& libName)
 
 SharedLibrary::~SharedLibrary()
 {
+    #ifdef MRAY_ENABLE_TRACY
+        // Here we defer destruction of implicitly-loaded DLLs
+        // to the OS.
+        // This is technically a memory leak, and we hope
+        // when process terminates these are unloaded gracefully.
+        if(ProfilerDLL::IsActive()) return;
+    #endif
+    //
     #if defined MRAY_WINDOWS
         if(libHandle != nullptr) FreeLibrary(std::bit_cast<HINSTANCE>(libHandle));
     #elif defined MRAY_LINUX

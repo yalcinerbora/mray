@@ -113,6 +113,8 @@ class ProfilerDLL
     ProfilerDLL& operator=(const ProfilerDLL&) = delete;
     ProfilerDLL& operator=(ProfilerDLL&&) = delete;
     ~ProfilerDLL();
+
+    static bool IsActive();
 };
 
 inline
@@ -186,7 +188,16 @@ inline
 ProfilerDLL::~ProfilerDLL()
 {
     if(!___tracy_profiler_started()) return;
+
+    MRAY_LOG("Shutting down the profiler...");
     ___tracy_shutdown_profiler();
+    MRAY_LOG("Profiler shut down!");
+}
+
+inline
+bool ProfilerDLL::IsActive()
+{
+    return ___tracy_profiler_started();
 }
 
 #endif
