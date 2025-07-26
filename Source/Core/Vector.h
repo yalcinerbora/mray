@@ -45,130 +45,87 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
 
     public:
     // Constructors & Destructor
-    constexpr                       Vector() = default;
+    constexpr           Vector() = default;
     template<std::convertible_to<T> C>
-    MRAY_HYBRID constexpr explicit  Vector(C);
+    MR_PF_DECL explicit Vector(C);
     template<std::convertible_to<T> C>
-    MRAY_HYBRID constexpr explicit  Vector(Span<const C , N> data);
+    MR_PF_DECL explicit Vector(Span<const C , N> data);
     template <std::convertible_to<T>... Args>
-    MRAY_HYBRID constexpr explicit  Vector(const Args... dataList);
+    MR_PF_DECL explicit Vector(const Args... dataList);
     template <class... Args>
-    MRAY_HYBRID constexpr           Vector(const Vector<N - sizeof...(Args), T>&,
-                                           const Args... dataList) requires (N - sizeof...(Args) > 1);
+    MR_PF_DECL explicit Vector(const Vector<N - sizeof...(Args), T>&,
+                               const Args... dataList) requires (N - sizeof...(Args) > 1);
     template<std::convertible_to<T> C>
-    MRAY_HYBRID constexpr explicit  Vector(std::array<C, N>&& data);
+    MR_PF_DECL explicit Vector(std::array<C, N>&& data);
     template<std::convertible_to<T> C>
-    MRAY_HYBRID constexpr explicit  Vector(const Vector<N, C>&);
+    MR_PF_DECL explicit Vector(const Vector<N, C>&);
     template <unsigned int M>
-    MRAY_HYBRID constexpr explicit  Vector(const Vector<M, T>&) requires (M > N);
+    MR_PF_DECL explicit Vector(const Vector<M, T>&) requires (M > N);
     // NormTypes Related Constructors
     template <std::unsigned_integral IT>
-    MRAY_HYBRID constexpr explicit  Vector(const UNorm<N, IT>&) requires (std::floating_point<T>);
+    MR_PF_DECL explicit Vector(const UNorm<N, IT>&) requires (std::floating_point<T>);
     template <std::signed_integral IT>
-    MRAY_HYBRID constexpr explicit  Vector(const SNorm<N, IT>&) requires (std::floating_point<T>);
+    MR_PF_DECL explicit Vector(const SNorm<N, IT>&) requires (std::floating_point<T>);
 
     // Accessors
-    MRAY_HYBRID constexpr T&            operator[](unsigned int);
-    MRAY_HYBRID constexpr const T&      operator[](unsigned int) const;
+    MR_PF_DECL T&       operator[](unsigned int);
+    MR_PF_DECL const T& operator[](unsigned int) const;
     // Structured Binding Helper
-    MRAY_HYBRID
-    constexpr const std::array<T, N>&   AsArray() const;
-    MRAY_HYBRID
-    constexpr std::array<T, N>&         AsArray();
+    MR_PF_DECL  const std::array<T, N>&   AsArray() const;
+    MR_PF_DECL  std::array<T, N>&         AsArray();
 
     // Type cast
     template<unsigned int M, class C>
-    MRAY_HYBRID explicit            operator Vector<M, C>() const requires (M <= N) && std::convertible_to<C, T>;
+    MR_PF_DECL explicit operator Vector<M, C>() const requires (M <= N) && std::convertible_to<C, T>;
 
     // Modify
-    MRAY_HYBRID constexpr void      operator+=(const Vector&);
-    MRAY_HYBRID constexpr void      operator-=(const Vector&);
-    MRAY_HYBRID constexpr void      operator*=(const Vector&);
-    MRAY_HYBRID constexpr void      operator*=(T);
-    MRAY_HYBRID constexpr void      operator/=(const Vector&);
-    MRAY_HYBRID constexpr void      operator/=(T);
+    MR_PF_DECL void     operator+=(const Vector&);
+    MR_PF_DECL void     operator-=(const Vector&);
+    MR_PF_DECL void     operator*=(const Vector&);
+    MR_PF_DECL void     operator*=(T);
+    MR_PF_DECL void     operator/=(const Vector&);
+    MR_PF_DECL void     operator/=(T);
 
-    MRAY_HYBRID constexpr Vector    operator+(const Vector&) const;
-    MRAY_HYBRID constexpr Vector    operator+(T) const;
-    MRAY_HYBRID constexpr Vector    operator-(const Vector&) const;
-    MRAY_HYBRID constexpr Vector    operator-(T) const;
-    MRAY_HYBRID constexpr Vector    operator-() const requires SignedC<T>;
-    MRAY_HYBRID constexpr Vector    operator*(const Vector&) const;
-    MRAY_HYBRID constexpr Vector    operator*(T) const;
-    MRAY_HYBRID constexpr Vector    operator/(const Vector&) const;
-    MRAY_HYBRID constexpr Vector    operator/(T) const;
+    MR_PF_DECL Vector   operator+(const Vector&) const;
+    MR_PF_DECL Vector   operator+(T) const;
+    MR_PF_DECL Vector   operator-(const Vector&) const;
+    MR_PF_DECL Vector   operator-(T) const;
+    MR_PF_DECL Vector   operator-() const               requires SignedC<T>;
+    MR_PF_DECL Vector   operator*(const Vector&) const;
+    MR_PF_DECL Vector   operator*(T) const;
+    MR_PF_DECL Vector   operator/(const Vector&) const;
+    MR_PF_DECL Vector   operator/(T) const;
 
-    MRAY_HYBRID constexpr Vector    operator%(const Vector&) const requires std::floating_point<T>;
-    MRAY_HYBRID constexpr Vector    operator%(T) const requires std::floating_point<T>;
-    MRAY_HYBRID constexpr Vector    operator%(const Vector&) const  requires std::integral<T>;
-    MRAY_HYBRID constexpr Vector    operator%(T) const  requires std::integral<T>;
+    MR_PF_DECL Vector   operator%(const Vector&) const  requires FloatC<T>;
+    MR_PF_DECL Vector   operator%(T) const              requires FloatC<T>;
+    MR_PF_DECL Vector   operator%(const Vector&) const  requires IntegralC<T>;
+    MR_PF_DECL Vector   operator%(T) const              requires IntegralC<T>;
 
     // Logic
-    MRAY_HYBRID constexpr bool      operator==(const Vector&) const;
-    MRAY_HYBRID constexpr bool      operator!=(const Vector&) const;
-    MRAY_HYBRID constexpr bool      operator<(const Vector&) const;
-    MRAY_HYBRID constexpr bool      operator<=(const Vector&) const;
-    MRAY_HYBRID constexpr bool      operator>(const Vector&) const;
-    MRAY_HYBRID constexpr bool      operator>=(const Vector&) const;
-
-    // Utility
-    MRAY_HYBRID constexpr T         Dot(const Vector&) const;
-
+    MR_PF_DECL bool     operator==(const Vector&) const;
+    MR_PF_DECL bool     operator!=(const Vector&) const;
+    MR_PF_DECL bool     operator<(const Vector&) const;
+    MR_PF_DECL bool     operator<=(const Vector&) const;
+    MR_PF_DECL bool     operator>(const Vector&) const;
+    MR_PF_DECL bool     operator>=(const Vector&) const;
     // Reduction
-    MRAY_HYBRID constexpr T         Sum() const;
-    MRAY_HYBRID constexpr T         Multiply() const;
+    MR_PF_DECL T        Sum() const;
+    MR_PF_DECL T        Multiply() const;
     // Max Min Reduction functions are selections instead
     // since it sometimes useful to fetch the which index
     // (axis) is maximum/minimum so that you can do other stuff with it.
-    MRAY_HYBRID constexpr unsigned int  Maximum() const;
-    MRAY_HYBRID constexpr unsigned int  Minimum() const;
-
-    MRAY_HYBRID constexpr T         Length() const requires std::floating_point<T>;
-    MRAY_HYBRID constexpr T         LengthSqr() const;
-
-
-    MRAY_HYBRID NO_DISCARD constexpr Vector Normalize() const requires std::floating_point<T>;
-    MRAY_HYBRID constexpr Vector&           NormalizeSelf() requires std::floating_point<T>;
-
-    MRAY_HYBRID constexpr Vector            Clamp(const Vector&, const Vector&) const;
-    MRAY_HYBRID NO_DISCARD constexpr Vector Clamp(T min, T max) const;
-    MRAY_HYBRID constexpr Vector&           ClampSelf(const Vector&, const Vector&);
-    MRAY_HYBRID constexpr Vector&           ClampSelf(T min, T max);
-    MRAY_HYBRID constexpr bool              HasNaN() const requires std::floating_point<T>;
-
-    MRAY_HYBRID NO_DISCARD constexpr Vector Abs() const requires SignedC<T>;
-    MRAY_HYBRID constexpr Vector&           AbsSelf() requires SignedC<T>;
-    MRAY_HYBRID NO_DISCARD constexpr Vector Round() const requires std::floating_point<T>;
-    MRAY_HYBRID constexpr Vector&           RoundSelf() requires std::floating_point<T>;
-    MRAY_HYBRID NO_DISCARD constexpr Vector Floor() const requires std::floating_point<T>;
-    MRAY_HYBRID constexpr Vector&           FloorSelf() requires std::floating_point<T>;
-    MRAY_HYBRID NO_DISCARD constexpr Vector Ceil() const requires std::floating_point<T>;
-    MRAY_HYBRID constexpr Vector&           CeilSelf() requires std::floating_point<T>;
-
-    static MRAY_HYBRID constexpr Vector     Min(const Vector&, const Vector&);
-    static MRAY_HYBRID constexpr Vector     Min(const Vector&, T);
-    static MRAY_HYBRID constexpr Vector     Max(const Vector&, const Vector&);
-    static MRAY_HYBRID constexpr Vector     Max(const Vector&, T);
-
-    static MRAY_HYBRID constexpr Vector     Lerp(const Vector&, const Vector&, T) requires std::floating_point<T>;
-    static MRAY_HYBRID constexpr Vector     Smoothstep(const Vector&, const Vector&, T) requires std::floating_point<T>;
-    static MRAY_HYBRID constexpr Vector     Sqrt(const Vector&) requires std::floating_point<T>;
-    static MRAY_HYBRID constexpr Vector     SqrtMax(const Vector&) requires std::floating_point<T>;
-
+    MR_PF_DECL unsigned int  Maximum() const;
+    MR_PF_DECL unsigned int  Minimum() const;
     // Literals
-    static MRAY_HYBRID constexpr Vector     Zero();
-
-    // Vector 3 Only
-    static MRAY_HYBRID constexpr Vector     XAxis() requires (N == 3);
-    static MRAY_HYBRID constexpr Vector     YAxis() requires (N == 3);
-    static MRAY_HYBRID constexpr Vector     ZAxis() requires (N == 3);
-    static MRAY_HYBRID constexpr Vector     Cross(const Vector&, const Vector&) requires std::floating_point<T> && (N == 3);
-    static MRAY_HYBRID constexpr Vector     OrthogonalVector(const Vector&) requires std::floating_point<T> && (N == 3);
+    MR_PF_DECL static Vector Zero();
+    MR_PF_DECL static Vector XAxis() requires (N == 3);
+    MR_PF_DECL static Vector YAxis() requires (N == 3);
+    MR_PF_DECL static Vector ZAxis() requires (N == 3);
 };
 
 // Left scalar multiplication
 template<unsigned int N, ArithmeticC T>
-MRAY_HYBRID constexpr Vector<N, T> operator*(T, const Vector<N, T>&);
+MR_PF_DECL Vector<N, T> operator*(T, const Vector<N, T>&);
 
 // Sanity Checks for Vectors
 static_assert(std::is_trivially_default_constructible_v<Vector3> == true, "Vectors has to be trivially destructible");
@@ -182,54 +139,10 @@ static_assert(sizeof(Vector2) == 8, "Vector2 should be tightly packed");
 static_assert(sizeof(Vector3) == 12, "Vector3 should be tightly packed");
 static_assert(sizeof(Vector4) == 16, "Vector4 should be tightly packed");
 
-// Implementation
-#include "Vector.hpp"
-
-// Vector Concept
-// TODO: Check a better way to do this
-template<class T>
-concept VectorC = (std::is_same_v<T, Vector2>   ||
-                   std::is_same_v<T, Vector3>   ||
-                   std::is_same_v<T, Vector4>   ||
-                   std::is_same_v<T, Vector2f>  ||
-                   std::is_same_v<T, Vector3f>  ||
-                   std::is_same_v<T, Vector4f>  ||
-                   std::is_same_v<T, Vector2d>  ||
-                   std::is_same_v<T, Vector3d>  ||
-                   std::is_same_v<T, Vector4d>  ||
-                   std::is_same_v<T, Vector2i>  ||
-                   std::is_same_v<T, Vector3i>  ||
-                   std::is_same_v<T, Vector4i>  ||
-                   std::is_same_v<T, Vector2ui> ||
-                   std::is_same_v<T, Vector3ui> ||
-                   std::is_same_v<T, Vector4ui> ||
-                   std::is_same_v<T, Vector2l>  ||
-                   std::is_same_v<T, Vector2ul> ||
-                   std::is_same_v<T, Vector3ul> ||
-                   std::is_same_v<T, Vector2s>  ||
-                   std::is_same_v<T, Vector2us> ||
-                   std::is_same_v<T, Vector3s>  ||
-                   std::is_same_v<T, Vector3us> ||
-                   std::is_same_v<T, Vector4s>  ||
-                   std::is_same_v<T, Vector4us> ||
-                   std::is_same_v<T, Vector2c>  ||
-                   std::is_same_v<T, Vector2uc> ||
-                   std::is_same_v<T, Vector3c>  ||
-                   std::is_same_v<T, Vector3uc> ||
-                   std::is_same_v<T, Vector4c>  ||
-                   std::is_same_v<T, Vector4uc>);
-
-// This comes up many times, Instead of having 1D vector
-// rely this to filter multi-dimensional fp types
-template<class T>
-concept VectorOrFloatC =
-(
-    (VectorC<T> && std::is_same_v<typename T::InnerType, Float>) ||
-    (std::is_same_v<T, Float>)
-);
-
-
 // TODO: Add more?
 static_assert(ArrayLikeC<Vector2>, "Vec2 is not ArrayLike!");
 static_assert(ArrayLikeC<Vector3>, "Vec3 is not ArrayLike!");
 static_assert(ArrayLikeC<Vector4>, "Vec4 is not ArrayLike!");
+
+// Implementation
+#include "Vector.hpp"

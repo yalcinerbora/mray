@@ -30,7 +30,7 @@ MRAY_GPU MRAY_GPU_INLINE
 Vector<D, T> AtomicAdd(Vector<D, T>& t, Vector<D, T> v)
 {
     Vector<D, T> result;
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < D; i++)
         result[i] = std::atomic_ref<T>(t[i]).fetch_add(v[i]);
 

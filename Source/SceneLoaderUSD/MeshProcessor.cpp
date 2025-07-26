@@ -288,9 +288,10 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
         {
             const auto Normal = [&](uint32_t i0, uint32_t i1, uint32_t i2)
             {
+                using namespace Math;
                 Vector3 e0 = localPositions[i1] - localPositions[i0];
                 Vector3 e1 = localPositions[i2] - localPositions[i0];
-                return Vector3::Cross(e0, e1).Normalize();
+                return Normalize(Cross(e0, e1));
             };
             // we do not know if the triangle is wrong or not
             // Determine the dominant "up" direction as face normal
@@ -300,11 +301,11 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
             // [1, 2, 3]
             Vector3 n1 = Normal(1, 2, 3);
             // [2, 3, 4] or [2, 3, 0]
-             Vector3 n2 = (faceVertexCount == 4)
+            Vector3 n2 = (faceVertexCount == 4)
                 ? Normal(2, 3, 0) : Normal(2, 3, 4);
             // TODO: This fails if two concave vertices are back to back,
             // Change this later
-            return (n0 + n1 + n2).Normalize();
+            return Math::Normalize(n0 + n1 + n2);
         };
         const Vector3 faceNormal = GenFaceNormal();
 
@@ -350,7 +351,7 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
                 // After that, normalize the coordinates (no need for normalization,
                 // but it at least be between [0,1]).
                 Quaternion rot = Quaternion::RotationBetweenZAxis(localNormals[i]);
-                localUVs[i] = Vector2(rot.ApplyRotation(localPositions[i])).Normalize();
+                localUVs[i] = Math::Normalize(Vector2(rot.ApplyRotation(localPositions[i])));
             }
             else
             {
@@ -435,13 +436,13 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
     for(size_t i = 0; i < triangleDataNormals.size(); i++)
     {
         Vector3 n = triangleDataNormals[i];
-        Vector3 t = triangleDataTangents[i].Normalize();
+        Vector3 t = Math::Normalize(triangleDataTangents[i]);
         t = Graphics::GSOrthonormalize(t, n);
         // tangents of the triangles are cancelled or precision
         // error. Generate orthogonal vector again
-        if(t.HasNaN()) t = Vector3::OrthogonalVector(n);
+        if(!Math::IsFinite(t)) t = Graphics::OrthogonalVector(n);
 
-        Vector3 b = Vector3::Cross(n, t);
+        Vector3 b = Math::Cross(n, t);
         Quaternion q = TransformGen::ToSpaceQuat(t, b, n);
         normalBuffer[i] = q;
     }

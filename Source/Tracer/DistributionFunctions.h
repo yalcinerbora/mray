@@ -415,7 +415,7 @@ Pair<uint32_t, Float> Common::BisectSample(Float xi, const Span<Float, N>& weigh
     auto Reduce = [weights]() -> Float
     {
         Float r = 0;
-        UNROLL_LOOP
+        MRAY_UNROLL_LOOP
         for(uint32_t i = 1; i < N; i++)
             r += weights[i];
         return r;
@@ -423,7 +423,7 @@ Pair<uint32_t, Float> Common::BisectSample(Float xi, const Span<Float, N>& weigh
     auto Find = [weights](Float xiScaled) -> uint32_t
     {
         Float sum = 0;
-        UNROLL_LOOP
+        MRAY_UNROLL_LOOP
         for(uint32_t i = 0; i < N; i++)
         {
             sum += weights[i];
@@ -684,7 +684,7 @@ Float MIS::BalanceCancelled(const Span<Float, N>& pdfs,
                             const Span<Float, N>& weights)
 {
     Float result = Float(0);
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(uint32_t i = 0; i < N; i++)
         result += pdfs[i] * weights[i];
     return result;
@@ -705,7 +705,7 @@ constexpr Spectrum Medium::WavesToSpectrumCauchy(const SpectrumWaves& waves,
                                                  const Vector3& coeffs)
 {
     Spectrum result;
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(uint32_t i = 0; i < SpectrumWaves::Dims; i++)
     {
         Float w2 = waves[i] * waves[i];

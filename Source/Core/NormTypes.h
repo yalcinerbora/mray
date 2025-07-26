@@ -4,7 +4,7 @@
 #include <limits>
 
 #include "MathForward.h"
-#include "BitFunctions.h"
+#include "NormConvFunctions.h"
 
 static consteval unsigned int ChooseNormAlignment(unsigned int totalSize)
 {
@@ -40,23 +40,21 @@ class alignas(ChooseNormAlignment(N * sizeof(T))) UNorm
 
     public:
     // Constructors & Destructor
-    constexpr                       UNorm() = default;
+    constexpr           UNorm() = default;
     template<std::convertible_to<T> C>
-    MRAY_HYBRID constexpr explicit  UNorm(Span<const C, N> data);
+    MR_PF_DECL explicit UNorm(Span<const C, N> data) noexcept;
     template<std::unsigned_integral... C>
-    MRAY_HYBRID constexpr explicit  UNorm(C... vals) requires(sizeof...(C) == N);
-    template<std::floating_point F>
-    MRAY_HYBRID constexpr explicit  UNorm(Vector<N, F>);
+    MR_PF_DECL explicit UNorm(C... vals) noexcept requires(sizeof...(C) == N);
+    template<FloatC F>
+    MR_PF_DECL explicit UNorm(Vector<N, F>) noexcept;
     // TODO:
-    MRAY_HYBRID constexpr const T&  operator[](unsigned int) const;
-    MRAY_HYBRID constexpr T&        operator[](unsigned int);
-    MRAY_HYBRID static constexpr T  Max();
-    MRAY_HYBRID static constexpr T  Min();
+    MR_PF_DECL const T& operator[](unsigned int) const noexcept;
+    MR_PF_DECL T&       operator[](unsigned int) noexcept;
+    MR_PF_DECL static T Max() noexcept;
+    MR_PF_DECL static T Min() noexcept;
 
-    MRAY_HYBRID
-    constexpr const std::array<T, N>&   AsArray() const;
-    MRAY_HYBRID
-    constexpr std::array<T, N>&         AsArray();
+    MR_PF_DECL const std::array<T, N>&   AsArray() const noexcept;
+    MR_PF_DECL std::array<T, N>&         AsArray() noexcept;
 };
 
 template <unsigned int N, std::signed_integral T>
@@ -69,33 +67,33 @@ class alignas(ChooseNormAlignment(N * sizeof(T))) SNorm
     static constexpr unsigned int Dims  = N;
 
     private:
-    std::array<T, N>                v;
+    std::array<T, N> v;
 
     public:
     // Constructors & Destructor
-    constexpr                       SNorm() = default;
+    constexpr           SNorm() = default;
     template<std::convertible_to<T> C>
-    MRAY_HYBRID constexpr explicit  SNorm(Span<const C, N> data);
-    template<std::floating_point F>
-    MRAY_HYBRID constexpr explicit  SNorm(Vector<N, F>);
+    MR_PF_DECL explicit SNorm(Span<const C, N> data) noexcept;
+    template<std::signed_integral... C>
+    MR_PF_DECL explicit SNorm(C... vals) noexcept requires(sizeof...(C) == N);
+    template<FloatC F>
+    MR_PF_DECL explicit SNorm(Vector<N, F>) noexcept;
     // TODO:
-    MRAY_HYBRID constexpr const T&  operator[](unsigned int) const;
-    MRAY_HYBRID constexpr T&        operator[](unsigned int);
-    MRAY_HYBRID static constexpr T  Max();
-    MRAY_HYBRID static constexpr T  Min();
-    MRAY_HYBRID
-    constexpr const std::array<T, N>&   AsArray() const;
-    MRAY_HYBRID
-    constexpr std::array<T, N>&         AsArray();
+    MR_PF_DECL const T& operator[](unsigned int) const noexcept;
+    MR_PF_DECL T&       operator[](unsigned int) noexcept;
+    MR_PF_DECL static T Max() noexcept;
+    MR_PF_DECL static T Min() noexcept;
+    //
+    MR_PF_DECL const std::array<T, N>&   AsArray() const noexcept;
+    MR_PF_DECL std::array<T, N>&         AsArray() noexcept;
 
 };
 
 template <unsigned int N, std::unsigned_integral T>
 template<std::convertible_to<T> C>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr UNorm<N, T>::UNorm(Span<const C, N> data)
+MR_PF_DEF UNorm<N, T>::UNorm(Span<const C, N> data) noexcept
 {
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
     {
         v[i] = static_cast<T>(data[i]);
@@ -103,64 +101,56 @@ constexpr UNorm<N, T>::UNorm(Span<const C, N> data)
 }
 
 template <unsigned int N, std::unsigned_integral T>
-template<std::floating_point F>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr UNorm<N, T>::UNorm(Vector<N, F> data)
+template<FloatC F>
+MR_PF_DEF UNorm<N, T>::UNorm(Vector<N, F> data) noexcept
 {
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
     {
-        using Bit::NormConversion::ToUNorm;
+        using NormConversion::ToUNorm;
         v[i] = ToUNorm<T>(data[i]);
     }
 }
 
 template <unsigned int N, std::unsigned_integral T>
 template<std::unsigned_integral... C>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr UNorm<N, T>::UNorm(C... vals)
+MR_PF_DEF UNorm<N, T>::UNorm(C... vals) noexcept
 requires(sizeof...(C) == N)
     : v{static_cast<T>(vals)...}
 {}
 
 template <unsigned int N, std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T& UNorm<N,T>::operator[](unsigned int i)
+MR_PF_DEF T& UNorm<N,T>::operator[](unsigned int i) noexcept
 {
     return v[i];
 }
 
 template <unsigned int N, std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr const T& UNorm<N, T>::operator[](unsigned int i) const
+MR_PF_DEF const T& UNorm<N, T>::operator[](unsigned int i) const noexcept
 {
     return v[i];
 }
 
 template <unsigned int N, std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T UNorm<N, T>::Min()
+MR_PF_DEF T UNorm<N, T>::Min() noexcept
 {
     return std::numeric_limits<T>::min();
 }
 
 template <unsigned int N, std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T UNorm<N, T>::Max()
+MR_PF_DEF T UNorm<N, T>::Max() noexcept
 {
     return std::numeric_limits<T>::max();
 }
 
 template <unsigned int N, std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr const std::array<T, N>& UNorm<N, T>::AsArray() const
+MR_PF_DEF const std::array<T, N>& UNorm<N, T>::AsArray() const noexcept
 {
     return v;
 }
 
 template <unsigned int N, std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr std::array<T, N>& UNorm<N, T>::AsArray()
+MR_PF_DEF std::array<T, N>& UNorm<N, T>::AsArray() noexcept
 {
     return v;
 }
@@ -168,10 +158,9 @@ constexpr std::array<T, N>& UNorm<N, T>::AsArray()
 // =======================================//
 template <unsigned int N, std::signed_integral T>
 template<std::convertible_to<T> C>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr SNorm<N, T>::SNorm(Span<const C, N> data)
+MR_PF_DEF SNorm<N, T>::SNorm(Span<const C, N> data) noexcept
 {
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
     {
         v[i] = static_cast<T>(data[i]);
@@ -179,56 +168,56 @@ constexpr SNorm<N, T>::SNorm(Span<const C, N> data)
 }
 
 template <unsigned int N, std::signed_integral T>
-template<std::floating_point F>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr SNorm<N, T>::SNorm(Vector<N, F> data)
+template<FloatC F>
+MR_PF_DEF SNorm<N, T>::SNorm(Vector<N, F> data) noexcept
 {
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
     {
-        using Bit::NormConversion::ToSNorm;
+        using NormConversion::ToSNorm;
         v[i] = ToSNorm<T>(data[i]);
     }
 }
 
 template <unsigned int N, std::signed_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T& SNorm<N, T>::operator[](unsigned int i)
+template<std::signed_integral... C>
+MR_PF_DEF SNorm<N, T>::SNorm(C... vals) noexcept
+requires(sizeof...(C) == N)
+    : v{static_cast<T>(vals)...}
+{}
+
+template <unsigned int N, std::signed_integral T>
+MR_PF_DEF T& SNorm<N, T>::operator[](unsigned int i) noexcept
 {
     return v[i];
 }
 
 template <unsigned int N, std::signed_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr const T& SNorm<N, T>::operator[](unsigned int i) const
+MR_PF_DEF const T& SNorm<N, T>::operator[](unsigned int i) const noexcept
 {
     return v[i];
 }
 
 template <unsigned int N, std::signed_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T SNorm<N, T>::Min()
+MR_PF_DEF T SNorm<N, T>::Min() noexcept
 {
     return std::numeric_limits<T>::min();
 }
 
 template <unsigned int N, std::signed_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T SNorm<N, T>::Max()
+MR_PF_DEF T SNorm<N, T>::Max() noexcept
 {
     return std::numeric_limits<T>::max();
 }
 
 template <unsigned int N, std::signed_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr const std::array<T, N>& SNorm<N, T>::AsArray() const
+MR_PF_DEF const std::array<T, N>& SNorm<N, T>::AsArray() const noexcept
 {
     return v;
 }
 
 template <unsigned int N, std::signed_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr std::array<T, N>& SNorm<N, T>::AsArray()
+MR_PF_DEF std::array<T, N>& SNorm<N, T>::AsArray() noexcept
 {
     return v;
 }

@@ -363,7 +363,7 @@ void THRDProcessMesh(ErrorList& errors, Span<MeshGroup> meshes,
 
                     // If the tangents are left-handed,
                     // convert them to right-handed
-                    if(Vector3::Cross(t, b).Dot(n) < Float(0))
+                    if(Math::Dot(Math::Cross(t, b), n) < Float(0))
                         t = -t;
                     auto [newT, newB] = Graphics::GSOrthonormalize(t, b, n);
                     Quaternion q = TransformGen::ToSpaceQuat(newT, newB, n);

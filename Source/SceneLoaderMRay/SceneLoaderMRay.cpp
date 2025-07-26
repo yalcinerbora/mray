@@ -422,12 +422,13 @@ void LoadPrimitive(TracerI& tracer,
 
             for(size_t i = 0; i < normalCount; i++)
             {
-                Vector3 t = tangents[i].Normalize();
-                Vector3 b = bitangents[i].Normalize();
-                Vector3 n = normals[i].Normalize();
+                using Math::Normalize;
+                Vector3 t = Normalize(tangents[i]);
+                Vector3 b = Normalize(bitangents[i]);
+                Vector3 n = Normalize(normals[i]);
                 // If the tangents are left-handed,
                 // convert them to right-handed
-                if(Vector3::Cross(t, b).Dot(n) < Float(0))
+                if(Math::Dot(Math::Cross(t, b), n) < Float(0))
                     t = -t;
                 auto [newT, newB] = Graphics::GSOrthonormalize(t, b, n);
                 Quaternion q = TransformGen::ToSpaceQuat(newT, newB, n);

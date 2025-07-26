@@ -20,103 +20,79 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Matrix
 
     public:
     // Constructors & Destructor
-    constexpr                       Matrix() = default;
+    constexpr           Matrix() = default;
     template<std::convertible_to<T> C>
-    MRAY_HYBRID constexpr explicit  Matrix(C);
+    MR_PF_DEF explicit  Matrix(C) noexcept;
     template<std::convertible_to<T> C>
-    MRAY_HYBRID constexpr explicit  Matrix(Span<const C, N*N> data);
+    MR_PF_DEF explicit  Matrix(Span<const C, N*N> data) noexcept;
     template <class... Args>
-    MRAY_HYBRID constexpr explicit  Matrix(const Args... dataList) requires (std::convertible_to<Args, T> && ...) &&
-                                                                            (sizeof...(Args) == N*N);
+    MR_PF_DEF explicit  Matrix(const Args... dataList) noexcept
+    requires (std::convertible_to<Args, T> && ...) && (sizeof...(Args) == N*N);
+
     template <class... Rows>
-    MRAY_HYBRID constexpr explicit  Matrix(const Rows&... rows) requires (std::is_same_v<Rows, Vector<N, T>> && ...) &&
-                                                                         (sizeof...(Rows) == N);
+    MR_PF_DEF explicit  Matrix(const Rows&... rows) noexcept
+    requires (std::is_same_v<Rows, Vector<N, T>> && ...) && (sizeof...(Rows) == N);
+
     template <unsigned int M>
-    MRAY_HYBRID constexpr explicit  Matrix(const Matrix<M, T>&) requires (M > N);
+    MR_PF_DEF explicit  Matrix(const Matrix<M, T>&) noexcept requires (M > N);
 
     // Accessors
-    MRAY_HYBRID constexpr T&            operator[](unsigned int);
-    MRAY_HYBRID constexpr const T&      operator[](unsigned int) const;
-    MRAY_HYBRID constexpr T&            operator()(unsigned int row, unsigned int column);
-    MRAY_HYBRID constexpr const T&      operator()(unsigned int row, unsigned int column) const;
+    MR_PF_DEF T&        operator[](unsigned int) noexcept;
+    MR_PF_DEF const T&  operator[](unsigned int) const noexcept;
+    MR_PF_DEF T&        operator()(unsigned int row, unsigned int column) noexcept;
+    MR_PF_DEF const T&  operator()(unsigned int row, unsigned int column) const noexcept;
     // Structured Binding Helper
-    MRAY_HYBRID
-    constexpr const std::array<T, N*N>& AsArray() const;
-    MRAY_HYBRID
-    constexpr std::array<T, N*N>&       AsArray();
+    MR_PF_DEF const std::array<T, N*N>& AsArray() const noexcept;
+    MR_PF_DEF std::array<T, N*N>&       AsArray() noexcept;
 
     // Modify
-    MRAY_HYBRID constexpr void      operator+=(const Matrix&);
-    MRAY_HYBRID constexpr void      operator-=(const Matrix&);
-    MRAY_HYBRID constexpr void      operator*=(const Matrix&);
-    MRAY_HYBRID constexpr void      operator*=(T);
-    MRAY_HYBRID constexpr void      operator/=(const Matrix&);
-    MRAY_HYBRID constexpr void      operator/=(T);
-
-    MRAY_HYBRID constexpr Matrix        operator+(const Matrix&) const;
-    MRAY_HYBRID constexpr Matrix        operator-(const Matrix&) const;
-    MRAY_HYBRID constexpr Matrix        operator-() const requires SignedC<T>;
-    MRAY_HYBRID constexpr Matrix        operator/(const Matrix&) const;
-    MRAY_HYBRID constexpr Matrix        operator/(T) const;
-    MRAY_HYBRID constexpr Matrix        operator*(const Matrix&) const;
+    MR_PF_DEF void      operator+=(const Matrix&) noexcept;
+    MR_PF_DEF void      operator-=(const Matrix&) noexcept;
+    MR_PF_DEF void      operator*=(const Matrix&) noexcept;
+    MR_PF_DEF void      operator*=(T) noexcept;
+    MR_PF_DEF void      operator/=(const Matrix&) noexcept;
+    MR_PF_DEF void      operator/=(T) noexcept;
+    MR_PF_DEF Matrix    operator+(const Matrix&) const noexcept;
+    MR_PF_DEF Matrix    operator-(const Matrix&) const noexcept;
+    MR_PF_DEF Matrix    operator-() const noexcept requires SignedC<T>;
+    MR_PF_DEF Matrix    operator/(const Matrix&) const noexcept;
+    MR_PF_DEF Matrix    operator/(T) const noexcept;
+    MR_PF_DEF Matrix    operator*(const Matrix&) const noexcept;
     template<unsigned int M>
-    MRAY_HYBRID constexpr Vector<M, T>  operator*(const Vector<M, T>&) const requires (M == N) || ((M + 1) == N);
-    MRAY_HYBRID constexpr Matrix        operator*(T) const;
+    MR_PF_DEF Vector<M, T>  operator*(const Vector<M, T>&) const noexcept requires (M == N) || ((M + 1) == N);
+    MR_PF_DEF Matrix        operator*(T) const noexcept;
 
     // Logic
-    MRAY_HYBRID constexpr bool         operator==(const Matrix&) const;
-    MRAY_HYBRID constexpr bool         operator!=(const Matrix&) const;
+    MR_PF_DEF bool  operator==(const Matrix&) const noexcept;
+    MR_PF_DEF bool  operator!=(const Matrix&) const noexcept;
 
     // Utility
-    MRAY_HYBRID NO_DISCARD constexpr T      Determinant() const requires (N == 2);
-    MRAY_HYBRID NO_DISCARD constexpr T      Determinant() const requires (N == 3);
-    MRAY_HYBRID NO_DISCARD constexpr T      Determinant() const requires (N == 4);
-    MRAY_HYBRID NO_DISCARD constexpr Matrix Inverse() const requires std::floating_point<T> && (N == 2);
-    MRAY_HYBRID NO_DISCARD constexpr Matrix Inverse() const requires std::floating_point<T> && (N == 3);
-    MRAY_HYBRID NO_DISCARD constexpr Matrix Inverse() const requires std::floating_point<T> && (N == 4);
-    MRAY_HYBRID constexpr Matrix&           InverseSelf() requires std::floating_point<T>;
-    MRAY_HYBRID NO_DISCARD constexpr Matrix Transpose() const;
-    MRAY_HYBRID constexpr Matrix&           TransposeSelf();
+    MR_PF_DEF T         Determinant() const noexcept requires (N == 2);
+    MR_PF_DEF T         Determinant() const noexcept requires (N == 3);
+    MR_PF_DEF T         Determinant() const noexcept requires (N == 4);
+    MR_PF_DEF Matrix    Inverse() const noexcept requires FloatC<T> && (N == 2);
+    MR_PF_DEF Matrix    Inverse() const noexcept requires FloatC<T> && (N == 3);
+    MR_PF_DEF Matrix    Inverse() const noexcept requires FloatC<T> && (N == 4);
+    MR_PF_DEF Matrix    Transpose() const noexcept;
 
-    MRAY_HYBRID NO_DISCARD constexpr Matrix Clamp(const Matrix&, const Matrix&) const;
-    MRAY_HYBRID NO_DISCARD constexpr Matrix Clamp(T min, T max) const;
-    MRAY_HYBRID constexpr Matrix&           ClampSelf(const Matrix&, const Matrix&);
-    MRAY_HYBRID constexpr Matrix&           ClampSelf(T min, T max);
-
-    MRAY_HYBRID NO_DISCARD constexpr Matrix Abs() const requires SignedC<T>;
-    MRAY_HYBRID constexpr Matrix&           AbsSelf() requires SignedC<T>;
-
-    MRAY_HYBRID NO_DISCARD constexpr Matrix Round() const requires std::floating_point<T>;
-    MRAY_HYBRID constexpr Matrix&           RoundSelf() requires std::floating_point<T>;
-    MRAY_HYBRID NO_DISCARD constexpr Matrix Floor() const requires std::floating_point<T>;
-    MRAY_HYBRID constexpr Matrix&           FloorSelf() requires std::floating_point<T>;
-    MRAY_HYBRID NO_DISCARD constexpr Matrix Ceil() const requires std::floating_point<T>;
-    MRAY_HYBRID constexpr Matrix&           CeilSelf() requires std::floating_point<T>;
-
-    MRAY_HYBRID constexpr RayT<T>           TransformRay(const RayT<T>&) const requires (N == 3);
-    MRAY_HYBRID constexpr RayT<T>           TransformRay(const RayT<T>&) const requires (N == 4);
+    MR_PF_DEF RayT<T>       TransformRay(const RayT<T>&) const noexcept requires (N == 3);
+    MR_PF_DEF RayT<T>       TransformRay(const RayT<T>&) const noexcept requires (N == 4);
     template <unsigned int M>
-    MRAY_HYBRID constexpr AABB<M, T>        TransformAABB(const AABB<M, T>&) const requires((M+1) == N);
+    MR_PF_DEF AABB<M, T>    TransformAABB(const AABB<M, T>&) const noexcept requires((M+1) == N);
     template <unsigned int M>
-    MRAY_HYBRID constexpr Vector<M, T>      LeftMultiply(const Vector<M, T>&) const requires (M <= N);
+    MR_PF_DEF Vector<M, T>  LeftMultiply(const Vector<M, T>&) const noexcept requires (M <= N);
 
-    static MRAY_HYBRID constexpr Matrix     Lerp(const Matrix&, const Matrix&, T) requires std::floating_point<T>;
-    static MRAY_HYBRID constexpr Matrix     Min(const Matrix&, const Matrix&);
-    static MRAY_HYBRID constexpr Matrix     Min(const Matrix&, T);
-    static MRAY_HYBRID constexpr Matrix     Max(const Matrix&, const Matrix&);
-    static MRAY_HYBRID constexpr Matrix     Max(const Matrix&, T);
-
-    static MRAY_HYBRID constexpr Matrix     Identity();
-    static MRAY_HYBRID constexpr Matrix     Zero();
+    MR_PF_DEF static Matrix     Identity() noexcept;
+    MR_PF_DEF static Matrix     Zero() noexcept;
 };
 
 // Left Scalar operators
 template<unsigned int N, ArithmeticC T>
-MRAY_HYBRID constexpr  Matrix<N, T> operator*(T, const Matrix<N, T>&);
+MR_PF_DEF Matrix<N, T> operator*(T, const Matrix<N, T>&) noexcept;
 
 // Spacial Matrix4x4 -> Matrix3x3
 template<ArithmeticC T>
-MRAY_HYBRID constexpr Matrix<4, T> ToMatrix4x4(const Matrix<3, T>&);
+MR_PF_DEF Matrix<4, T> ToMatrix4x4(const Matrix<3, T>&) noexcept;
 
 // Sanity Checks for Matrices
 static_assert(std::is_trivially_default_constructible_v<Matrix4x4> == true, "Matrices has to be trivially destructible");
@@ -129,56 +105,56 @@ static_assert(ImplicitLifetimeC<Matrix4x4>, "Matrices should have implicit lifet
 namespace TransformGen
 {
     // Extraction Functions
-    template<std::floating_point T>
-    MRAY_HYBRID constexpr Vector<3, T>  ExtractScale(const Matrix<4, T>&);
-    template<std::floating_point T>
-    MRAY_HYBRID constexpr Vector<3, T>  ExtractTranslation(const Matrix<4, T>&);
-    template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<4, T>  Translate(const Vector<3, T>&);
-    template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<4, T>  Scale(T);
-    template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix <4, T> Scale(T x, T y, T z);
-    template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<4, T>  Rotate(T angle, const Vector<3, T>&);
-    template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<4, T>  Rotate(const Quat<T>&);
-    template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<4, T>  Perspective(T fovXRadians, T aspectRatio,
-                                                    T nearPlane, T farPlane);
-    template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<4, T>  Orthogonal(T left, T right,
-                                                   T top, T bottom,
-                                                   T nearPlane, T farPlane);
-    template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<4, T>  Orthogonal(T width, T height,
-                                                   T nearPlane, T farPlane);
+    template<FloatC T>
+    MR_PF_DEF Vector<3, T>  ExtractScale(const Matrix<4, T>&) noexcept;
+    template<FloatC T>
+    MR_PF_DEF Vector<3, T>  ExtractTranslation(const Matrix<4, T>&) noexcept;
+    template<FloatC T>
+    MR_PF_DEF Matrix<4, T>  Translate(const Vector<3, T>&) noexcept;
+    template<FloatC T>
+    MR_PF_DEF Matrix<4, T>  Scale(T) noexcept;
+    template<FloatC T>
+    MR_PF_DEF Matrix <4, T> Scale(T x, T y, T z) noexcept;
+    template<FloatC T>
+    MR_PF_DEF Matrix<4, T>  Rotate(T angle, const Vector<3, T>&) noexcept;
+    template<FloatC T>
+    MR_PF_DEF Matrix<4, T>  Rotate(const Quat<T>&) noexcept;
+    template<FloatC T>
+    MR_PF_DEF Matrix<4, T>  Perspective(T fovXRadians, T aspectRatio,
+                                        T nearPlane, T farPlane) noexcept;
+    template<FloatC T>
+    MR_PF_DEF Matrix<4, T>  Orthogonal(T left, T right,
+                                       T top, T bottom,
+                                       T nearPlane, T farPlane) noexcept;
+    template<FloatC T>
+    MR_PF_DEF Matrix<4, T>  Orthogonal(T width, T height,
+                                       T nearPlane, T farPlane) noexcept;
 
-    template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<4, T>  LookAt(const Vector<3, T>& eyePos,
-                                               const Vector<3, T>& at,
-                                               const Vector<3, T>& up);
-    template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<3, T>  ToSpaceMat(const Vector<3, T>& x,
-                                                   const Vector<3, T>& y,
-                                                   const Vector<3, T>& z);
+    template<FloatC T>
+    MR_PF_DEF Matrix<4, T>  LookAt(const Vector<3, T>& eyePos,
+                                   const Vector<3, T>& at,
+                                   const Vector<3, T>& up) noexcept;
+    template<FloatC T>
+    MR_PF_DEF Matrix<3, T>  ToSpaceMat(const Vector<3, T>& x,
+                                       const Vector<3, T>& y,
+                                       const Vector<3, T>& z) noexcept;
 
-    template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<3, T>  ToInvSpaceMat(const Vector<3, T>& x,
-                                                      const Vector<3, T>& y,
-                                                      const Vector<3, T>& z);
+    template<FloatC T>
+    MR_PF_DEF Matrix<3, T>  ToInvSpaceMat(const Vector<3, T>& x,
+                                          const Vector<3, T>& y,
+                                          const Vector<3, T>& z) noexcept;
 
-    template<std::floating_point T>
-    MRAY_HYBRID constexpr Vector<3, T> YUpToZUp(const Vector<3, T>& vec);
+    template<FloatC T>
+    MR_PF_DEF Vector<3, T> YUpToZUp(const Vector<3, T>& vec) noexcept;
 
-    template<std::floating_point T>
-    MRAY_HYBRID constexpr Vector<3, T> ZUpToYUp(const Vector<3, T>& vec);
+    template<FloatC T>
+    MR_PF_DEF Vector<3, T> ZUpToYUp(const Vector<3, T>& vec) noexcept;
 
-    template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<4, T> YUpToZUpMat();
+    template<FloatC T>
+    MR_PF_DEF Matrix<4, T> YUpToZUpMat() noexcept;
 
-    template<std::floating_point T>
-    MRAY_HYBRID constexpr Matrix<4, T> ZUpToYUpMat();
+    template<FloatC T>
+    MR_PF_DEF Matrix<4, T> ZUpToYUpMat() noexcept;
 }
 
 // Implementation

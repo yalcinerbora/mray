@@ -31,35 +31,32 @@ TEST(GraphicsFunctionsTest, Reflect)
 TEST(GraphicsFunctionsTest, Refract)
 {
     using namespace Graphics;
+    using namespace Math;
+    using namespace MathConstants;
     {
         // Simple Test
         Vector3 normal = Vector3::YAxis();
-        Vector3 v = Vector3(0.5, 0.5, 0.0).Normalize();
-        Float eta0 = static_cast<Float>(1.0);
-        Float eta1 = static_cast<Float>(1.3333);
+        Vector3 v = Normalize(Vector3(0.5, 0.5, 0.0));
+        Float eta0 = Float(1.0);
+        Float eta1 = Float(1.3333);
         // From some online calculator
-        Float Angle = (static_cast<Float>(32.0367) *
-                       MathConstants::DegToRadCoef<Float>());
+        Float Angle = (Float(32.0367) * DegToRadCoef<Float>());
         // Assuming Core/Quaternion Tests are passed.
         Quaternion q(-Angle, Vector3::ZAxis());
 
         Vector3 result = Refract(normal, v, eta0, eta1).value();
-        EXPECT_FLOAT_EQ(result.Length(), Float{1.0});
-        EXPECT_NEAR(result.Dot(-normal), std::cos(Angle),
-                    MathConstants::LargeEpsilon<Float>());
-        EXPECT_EQUAL_MRAY(result, q.ApplyRotation(-normal),
-                          MathConstants::VeryLargeEpsilon<Float>());
+        EXPECT_FLOAT_EQ(Length(result), Float{1.0});
+        EXPECT_NEAR(Dot(result, -normal), Math::Cos(Angle), LargeEpsilon<Float>());
+        EXPECT_EQUAL_MRAY(result, q.ApplyRotation(-normal), VeryLargeEpsilon<Float>());
     }
 
     {
         // Total Internal Reflection
         Vector3 normal = Vector3::YAxis();
-        Vector3 v = Vector3(0.5, 0.5, 0.0).Normalize();
-        Float eta0 = static_cast<Float>(2.419);
-        Float eta1 = static_cast<Float>(1.0);
-
+        Vector3 v = Normalize(Vector3(0.5, 0.5, 0.0));
+        Float eta0 = Float(2.419);
+        Float eta1 = Float(1.0);
         Optional<Vector3> result = Refract(normal, v, eta0, eta1);
-
         EXPECT_THROW((void) result.value(), std::bad_optional_access);
     }
 }
@@ -111,7 +108,7 @@ TEST(GraphicsFunctionsTest, GSOrthonormalize2D)
         // Big difference
         using namespace Graphics;
         Vector3 x = Vector3::XAxis();
-        Vector3 y = Vector3(0.5, 0.5, 0.0).Normalize();
+        Vector3 y = Math::Normalize(Vector3(0.5, 0.5, 0.0));
         // Renormalize Y
         y = GSOrthonormalize(y, x);
         EXPECT_EQUAL_MRAY(y, Vector3::YAxis(), MathConstants::Epsilon<Float>());
@@ -138,7 +135,7 @@ TEST(GraphicsFunctionsTest, GSOrthonormalize3D)
         // Big difference
         using namespace Graphics;
         Vector3 x = Vector3::XAxis();
-        Vector3 y = Vector3(0.0, 0.5, 0.5).Normalize();
+        Vector3 y = Math::Normalize(Vector3(0.0, 0.5, 0.5));
         Vector3 z = Vector3::ZAxis();
         // Renormalize Y
         std::tie(x, y) = GSOrthonormalize(x, y, z);

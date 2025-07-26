@@ -106,7 +106,7 @@ Vector3 GenericFromNorm(const Vector3& t, const SurfViewVariant& surfView)
             else
             {
                 using InnerT = typename PixelType::InnerType;
-                UNROLL_LOOP
+                MRAY_UNROLL_LOOP
                 for(uint32_t c = 0; c < C; c++)
                 {
                     if constexpr(std::is_floating_point_v<InnerT>)
@@ -156,7 +156,7 @@ Vector3 GenericToNorm(const Vector3& t, const SurfViewVariant& surfView)
             else
             {
                 using InnerT = typename PixelType::InnerType;
-                UNROLL_LOOP
+                MRAY_UNROLL_LOOP
                 for(uint32_t c = 0; c < C; c++)
                 {
                     if constexpr(std::is_floating_point_v<InnerT>)

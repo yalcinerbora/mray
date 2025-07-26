@@ -24,7 +24,7 @@ Vector4 GenericRead(const Vector2ui& pixCoords,
                 // We need to manually loop over the channels here
                 if constexpr(C != 1)
                 {
-                    UNROLL_LOOP
+                    MRAY_UNROLL_LOOP
                     for(uint32_t c = 0; c < C; c++)
                         result[c] = static_cast<Float>(rPix[c]);
                 }
@@ -61,7 +61,7 @@ Vector4 GenericReadFromBuffer(const Span<const Byte>& dBufferImage,
                     // Somewhat hard part, first read the data
                     // then convert
                     ReadType data = dPtr[pixCoordLinear];
-                    UNROLL_LOOP
+                    MRAY_UNROLL_LOOP
                     for(uint32_t c = 0; c < C; c++)
                         out[c] = static_cast<Float>(data[c]);
                 }
@@ -93,7 +93,7 @@ void GenericWrite(SurfViewVariant& surf,
                 if constexpr(C != 1)
                 {
                     using InnerT = typename WriteType::InnerType;
-                    UNROLL_LOOP
+                    MRAY_UNROLL_LOOP
                     for(uint32_t c = 0; c < C; c++)
                     {
                         Float v = value[c];

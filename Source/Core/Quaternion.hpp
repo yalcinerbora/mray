@@ -2,82 +2,70 @@
 
 #include "Quaternion.h"
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T>::Quat(T w, T x, T y, T z)
+template<FloatC T>
+MR_PF_DEF Quat<T>::Quat(T w, T x, T y, T z) noexcept
     : v(w, x, y, z)
 {}
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T>::Quat(const T* vv)
+template<FloatC T>
+MR_PF_DEF Quat<T>::Quat(const T* vv) noexcept
     : v(vv)
 {}
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T>::Quat(T angle, const Vector<3, T>& axis)
+template<FloatC T>
+MR_PF_DEF Quat<T>::Quat(T angle, const Vector<3, T>& axis) noexcept
 {
     angle *= T(0.5);
-    T sinAngle = std::sin(angle);
-
+    const auto&[sinAngle, cosAngle] = Math::SinCos(angle);
     v[1] = axis[0] * sinAngle;
     v[2] = axis[1] * sinAngle;
     v[3] = axis[2] * sinAngle;
-    v[0] = std::cos(angle);
+    v[0] = cosAngle;
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T>::Quat(const Vector<4, T>& v)
+template<FloatC T>
+MR_PF_DEF Quat<T>::Quat(const Vector<4, T>& v) noexcept
     : v(v)
 {}
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-Quat<T>::operator Vector<4, T>& ()
+template<FloatC T>
+MR_PF_DEF Quat<T>::operator Vector<4, T>&() noexcept
 {
     return v;
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-Quat<T>::operator const Vector<4, T>& () const
+template<FloatC T>
+MR_PF_DEF Quat<T>::operator const Vector<4, T>&() const noexcept
 {
     return v;
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-Quat<T>::operator T* ()
+template<FloatC T>
+MR_PF_DEF Quat<T>::operator T*() noexcept
 {
     return static_cast<T*>(v);
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-Quat<T>::operator const T* () const
+template<FloatC T>
+MR_PF_DEF Quat<T>::operator const T*() const noexcept
 {
     return static_cast<const T*>(v);
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T& Quat<T>::operator[](unsigned int i)
+template<FloatC T>
+MR_PF_DEF T& Quat<T>::operator[](unsigned int i) noexcept
 {
     return v[i];
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr const T& Quat<T>::operator[](unsigned int i) const
+template<FloatC T>
+MR_PF_DEF const T& Quat<T>::operator[](unsigned int i) const noexcept
 {
     return v[i];
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T> Quat<T>::operator*(const Quat& right) const
+template<FloatC T>
+MR_PF_DEF Quat<T> Quat<T>::operator*(const Quat& right) const noexcept
 {
     return Quat(v[0] * right[0] - v[1] * right[1] - v[2] * right[2] - v[3] * right[3],  // W
                 v[0] * right[1] + v[1] * right[0] + v[2] * right[3] - v[3] * right[2],  // X
@@ -85,147 +73,111 @@ constexpr Quat<T> Quat<T>::operator*(const Quat& right) const
                 v[0] * right[3] + v[1] * right[2] - v[2] * right[1] + v[3] * right[0]); // Z
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T> Quat<T>::operator*(T right) const
+template<FloatC T>
+MR_PF_DEF Quat<T> Quat<T>::operator*(T right) const noexcept
 {
     return Quat<T>(v * right);
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T> Quat<T>::operator+(const Quat& right) const
+template<FloatC T>
+MR_PF_DEF Quat<T> Quat<T>::operator+(const Quat& right) const noexcept
 {
     return Quat(v + right.v);
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T> Quat<T>::operator-(const Quat& right) const
+template<FloatC T>
+MR_PF_DEF Quat<T> Quat<T>::operator-(const Quat& right) const noexcept
 {
     return Quat(v - right.v);
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T> Quat<T>::operator-() const
+template<FloatC T>
+MR_PF_DEF Quat<T> Quat<T>::operator-() const noexcept
 {
     return Quat(-v);
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T> Quat<T>::operator/(T right) const
+template<FloatC T>
+MR_PF_DEF Quat<T> Quat<T>::operator/(T right) const noexcept
 {
     return Quat<T>(v / right);
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr void Quat<T>::operator*=(const Quat& right)
+template<FloatC T>
+MR_PF_DEF void Quat<T>::operator*=(const Quat& right) noexcept
 {
     Quat copy(*this);
     (*this) = copy * right;
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr void Quat<T>::operator*=(T right)
+template<FloatC T>
+MR_PF_DEF void Quat<T>::operator*=(T right) noexcept
 {
     v *= right;
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr void Quat<T>::operator+=(const Quat& right)
+template<FloatC T>
+MR_PF_DEF void Quat<T>::operator+=(const Quat& right) noexcept
 {
     v += right.v;
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr void Quat<T>::operator-=(const Quat& right)
+template<FloatC T>
+MR_PF_DEF void Quat<T>::operator-=(const Quat& right) noexcept
 {
     v -= right.v;
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr void Quat<T>::operator/=(T right)
+template<FloatC T>
+MR_PF_DEF void Quat<T>::operator/=(T right) noexcept
 {
     v /= right;
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr bool Quat<T>::operator==(const Quat& right) const
+template<FloatC T>
+MR_PF_DEF bool Quat<T>::operator==(const Quat& right) const noexcept
 {
     return v == right.v;
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr bool Quat<T>::operator!=(const Quat& right) const
+template<FloatC T>
+MR_PF_DEF bool Quat<T>::operator!=(const Quat& right) const noexcept
 {
     return v != right.v;
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T> Quat<T>::Normalize() const
+template<FloatC T>
+MR_PF_DEF Quat<T> Quat<T>::Normalize() const noexcept
 {
-    return Quat(v.Normalize());
+    return Quat(Math::Normalize(v));
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T>& Quat<T>::NormalizeSelf()
+template<FloatC T>
+MR_PF_DEF T Quat<T>::Length() const noexcept
 {
-    v.NormalizeSelf();
-    return *this;
+    return Math::Length(v);
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T Quat<T>::Length() const
+template<FloatC T>
+MR_PF_DEF T Quat<T>::LengthSqr() const noexcept
 {
-    return v.Length();
+    return Math::Length(v);
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T Quat<T>::LengthSqr() const
-{
-    return v.LengthSqr();
-}
-
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T> Quat<T>::Conjugate() const
+template<FloatC T>
+MR_PF_DEF Quat<T> Quat<T>::Conjugate() const noexcept
 {
     return Quat(v[0], -v[1], -v[2], -v[3]);
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T>& Quat<T>::ConjugateSelf()
+template<FloatC T>
+MR_PF_DEF T Quat<T>::Dot(const Quat& right) const noexcept
 {
-    v[1] = -v[1];
-    v[2] = -v[2];
-    v[3] = -v[3];
-    return *this;
+    return Math::Dot(v, right.v);
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T Quat<T>::Dot(const Quat& right) const
-{
-    return v.Dot(right.v);
-}
-
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<3, T> Quat<T>::ApplyRotation(const Vector<3, T>& vtor) const
+template<FloatC T>
+MR_PF_DEF Vector<3, T> Quat<T>::ApplyRotation(const Vector<3, T>& vtor) const noexcept
 {
     // q * v * qInv
     Quat qInv = Conjugate();
@@ -235,24 +187,21 @@ constexpr Vector<3, T> Quat<T>::ApplyRotation(const Vector<3, T>& vtor) const
     return Vector<3, T>(result[1], result[2], result[3]);
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<3, T> Quat<T>::ApplyInvRotation(const Vector<3, T>& vtor) const
+template<FloatC T>
+MR_PF_DEF Vector<3, T> Quat<T>::ApplyInvRotation(const Vector<3, T>& vtor) const noexcept
 {
     Quat qInv = Conjugate();
     return qInv.ApplyRotation(vtor);
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr bool Quat<T>::HasNaN() const
+template<FloatC T>
+MR_PF_DEF bool Quat<T>::HasNaN() const noexcept
 {
     return v.HasNaN();
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<3, T> Quat<T>::OrthoBasisX() const
+template<FloatC T>
+MR_PF_DEF Vector<3, T> Quat<T>::OrthoBasisX() const noexcept
 {
     Float v00 = v[0] * v[0];
     Float v02 = v[0] * v[2];
@@ -268,9 +217,8 @@ constexpr Vector<3, T> Quat<T>::OrthoBasisX() const
     return Vector<3, T>(X, Y, Z);
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<3, T> Quat<T>::OrthoBasisY() const
+template<FloatC T>
+MR_PF_DEF Vector<3, T> Quat<T>::OrthoBasisY() const noexcept
 {
     Float v00 = v[0] * v[0];
     Float v01 = v[0] * v[1];
@@ -287,9 +235,8 @@ constexpr Vector<3, T> Quat<T>::OrthoBasisY() const
 
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<3, T> Quat<T>::OrthoBasisZ() const
+template<FloatC T>
+MR_PF_DEF Vector<3, T> Quat<T>::OrthoBasisZ() const noexcept
 {
     Float v00 = v[0] * v[0];
     Float v01 = v[0] * v[1];
@@ -305,12 +252,11 @@ constexpr Vector<3, T> Quat<T>::OrthoBasisZ() const
     return Vector<3, T>(X, Y, Z);
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T> Quat<T>::NLerp(const Quat<T>& start,
-                                 const Quat<T>& end, T t)
+template<FloatC T>
+MR_PF_DEF Quat<T> Quat<T>::NLerp(const Quat<T>& start,
+                                 const Quat<T>& end, T t) noexcept
 {
-    T cosTheta = start.Dot(end);
+    T cosTheta = Math::Dot(start, end);
     // Select closest approach
     T cosFlipped = (cosTheta >= 0) ? cosTheta : (-cosTheta);
 
@@ -322,27 +268,23 @@ constexpr Quat<T> Quat<T>::NLerp(const Quat<T>& start,
     return result;
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr  Quat<T> Quat<T>::SLerp(const Quat<T>& start,
-                                  const Quat<T>& end, T t)
+template<FloatC T>
+MR_PF_DEF Quat<T> Quat<T>::SLerp(const Quat<T>& start,
+                                 const Quat<T>& end, T t) noexcept
 {
-    #ifndef MRAY_DEVICE_CODE_PATH
-        using namespace std;
-    #endif
-
     using namespace MathConstants;
 
-    T cosTheta = start.Dot(end);
+    T cosTheta = Math::Dot(start, end);
     // Select closest approach
     T cosFlipped = (cosTheta >= 0) ? cosTheta : (-cosTheta);
 
     T s0, s1;
     if(cosFlipped < (1 - Epsilon<T>()))
     {
-        T angle = acos(cosFlipped);
-        s0 = std::sin(angle * (1 - t)) / sin(angle);
-        s1 = std::sin(angle * t) / sin(angle);
+        T angle = Math::ArcCos(cosFlipped);
+        T sinAngleRecip = T(1) / Math::Sin(angle);
+        s0 = Math::Sin(angle * (1 - t)) * sinAngleRecip;
+        s1 = Math::Sin(angle * t) * sinAngleRecip;
     }
     else
     {
@@ -356,12 +298,11 @@ constexpr  Quat<T> Quat<T>::SLerp(const Quat<T>& start,
     return result;
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T> Quat<T>::BarySLerp(const Quat<T>& q0,
+template<FloatC T>
+MR_PF_DEF Quat<T> Quat<T>::BarySLerp(const Quat<T>& q0,
                                      const Quat<T>& q1,
                                      const Quat<T>& q2,
-                                     T a, T b)
+                                     T a, T b) noexcept
 {
     #ifndef MRAY_DEVICE_CODE_PATH
         using namespace std;
@@ -397,43 +338,40 @@ constexpr Quat<T> Quat<T>::BarySLerp(const Quat<T>& q0,
     return result;
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T> Quat<T>::RotationBetween(const Vector<3, T>& a, const Vector<3, T>& b)
+template<FloatC T>
+MR_PF_DEF Quat<T> Quat<T>::RotationBetween(const Vector<3, T>& a, const Vector<3, T>& b) noexcept
 {
-    Vector<3, T> aCrossB = Cross(a, b);
-    T aDotB = a.Dot(b);
+    Vector<3, T> aCrossB = Math::Cross(a, b);
+    T aDotB = Math::Dot(a, b);
     if(aCrossB != Vector<3, T>::Zero())
-        aCrossB.NormalizeSelf();
-    return Quat<T>(acos(aDotB), aCrossB);
+        aCrossB = Math::Normalize(aCrossB);
+    return Quat<T>(Math::ArcCos(aDotB), aCrossB);
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T> Quat<T>::RotationBetweenZAxis(const Vector<3, T>& b)
+template<FloatC T>
+MR_PF_DEF Quat<T> Quat<T>::RotationBetweenZAxis(const Vector<3, T>& b) noexcept
 {
     using namespace MathConstants;
-
     Vector<3, T> zCrossD(-b[1], b[0], 0);
     T zDotD = b[2];
 
     // Half angle theorem
-    T sin = std::sqrt((1 - zDotD) * T(0.5));
-    T cos = std::sqrt((zDotD + 1) * T(0.5));
+    T sin = Math::Sqrt((1 - zDotD) * T(0.5));
+    T cos = Math::Sqrt((zDotD + 1) * T(0.5));
 
-    zCrossD.NormalizeSelf();
+    zCrossD = Math::Normalize(zCrossD);
     T x = zCrossD[0] * sin;
     T y = zCrossD[1] * sin;
     T z = zCrossD[2] * sin;
     T w = cos;
     // Handle singularities
-    if(std::abs(zDotD + T(1)) < LargeEpsilon<T>())
+    if(Math::Abs(zDotD + T(1)) < LargeEpsilon<T>())
     {
         // Spaces are 180 degree apart
         // Define pi turn
         return Quat<T>(0, 0, 1, 0);
     }
-    else if(std::abs(zDotD - T(1)) < LargeEpsilon<T>())
+    else if(Math::Abs(zDotD - T(1)) < LargeEpsilon<T>())
     {
         // Spaces are nearly equivalent
         // Just turn identity
@@ -442,30 +380,28 @@ constexpr Quat<T> Quat<T>::RotationBetweenZAxis(const Vector<3, T>& b)
     else return Quat<T>(w, x, y, z);
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T> Quat<T>::Identity()
+template<FloatC T>
+MR_PF_DEF Quat<T> Quat<T>::Identity() noexcept
 {
     return Quat<T>(1, 0, 0, 0);
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Quat<T> operator*(T t, const Quat<T>& q)
+template<FloatC T>
+MR_PF_DEF Quat<T> operator*(T t, const Quat<T>& q) noexcept
 {
     return q * t;
 }
 
 template<std::floating_point T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Quat<T> TransformGen::ToSpaceQuat(const Vector<3, T>& xIn,
                                   const Vector<3, T>& y,
-                                  const Vector<3, T>& z)
+                                  const Vector<3, T>& z) noexcept
 {
     Quat<T> q;
     // Flip the coordinate system if inverted
     Vector<3, T> x = xIn;
-    if((Vector3::Cross(x, y) - z).Abs() > Vector3(0.1))
+    if(Math::Abs(Math::Cross(x, y) - z) > Vector3(0.1))
     {
         x = -x;
     }
@@ -512,9 +448,9 @@ Quat<T> TransformGen::ToSpaceQuat(const Vector<3, T>& xIn,
                         x[1] - y[0]);
         }
     }
-    q *= T{0.5} / std::sqrt(t);
-    q.NormalizeSelf();
-    q.ConjugateSelf();
+    q *= T{0.5} / Math::Sqrt(t);
+    q = q.Normalize();
+    q = q.Conjugate();
     return q;
 
     //// Another implementation that i found in stack overflow
@@ -563,10 +499,10 @@ Quat<T> TransformGen::ToSpaceQuat(const Vector<3, T>& xIn,
 }
 
 template <std::floating_point T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Quat<T> TransformGen::ToInvSpaceQuat(const Vector<3, T>& x,
                                      const Vector<3, T>& y,
-                                     const Vector<3, T>& z)
+                                     const Vector<3, T>& z) noexcept
 {
     return Space(x, y, z).Conjugate();
 }

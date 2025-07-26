@@ -18,22 +18,21 @@ class MetaHitT
     // Constructors & Destructor
     template<uint32_t M>
     requires(M <= N)
-    MRAY_HYBRID constexpr   MetaHitT(const Vector<M, Float>&);
-
+    MR_HF_DECL constexpr    MetaHitT(const Vector<M, Float>&);
     // Methods
     template<uint32_t M>
     requires(M <= N)
-    MRAY_HYBRID constexpr
-    Vector<M, Float> AsVector() const;
+    MR_HF_DECL constexpr
+    Vector<M, Float>        AsVector() const;
 };
 
 template<uint32_t N>
 template<uint32_t M>
 requires(M <= N)
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr MetaHitT<N>::MetaHitT(const Vector<M, Float>& v)
+MR_HF_DEF constexpr
+MetaHitT<N>::MetaHitT(const Vector<M, Float>& v)
 {
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP_N(N)
     for(uint32_t i = 0; i < N; i++)
     {
         vec[i] = v[i];
@@ -43,9 +42,8 @@ constexpr MetaHitT<N>::MetaHitT(const Vector<M, Float>& v)
 template<uint32_t N>
 template<uint32_t M>
 requires(M <= N)
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<M, Float>
-MetaHitT<N>::AsVector() const
+MR_HF_DEF constexpr
+Vector<M, Float> MetaHitT<N>::AsVector() const
 {
     return vec;
 }

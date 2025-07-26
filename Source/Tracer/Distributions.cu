@@ -54,7 +54,7 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
 
             // Awfully strided mem read
             Float dataRegisters[ITEMS_PER_THREAD];
-            UNROLL_LOOP
+            MRAY_UNROLL_LOOP
             for(uint32_t i = 0; i < ITEMS_PER_THREAD; i++)
             {
                 // Contiguous index
@@ -114,7 +114,7 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
                                      validItems, Float(0));
 
                 // Normalization
-                UNROLL_LOOP
+                MRAY_UNROLL_LOOP
                 for(uint32_t i = 0; i < ITEMS_PER_THREAD; i++)
                 {
                     dataRegisters[i] *= sTotalRecip;
@@ -194,7 +194,7 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
                 // Due to precision errors, we do this operation
                 // in double precision.
                 double dataRegistersDouble[ITEMS_PER_THREAD];
-                UNROLL_LOOP
+                MRAY_UNROLL_LOOP
                 for(uint32_t i = 0; i < ITEMS_PER_THREAD; i++)
                 {
                     // Function can be negative take the absolute value.
@@ -212,7 +212,7 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
                                          dataRegistersDouble,
                                          PrefixLoader);
 
-                UNROLL_LOOP
+                MRAY_UNROLL_LOOP
                 for(uint32_t i = 0; i < ITEMS_PER_THREAD; i++)
                     dataRegisters[i] = Float(dataRegistersDouble[i]);
 

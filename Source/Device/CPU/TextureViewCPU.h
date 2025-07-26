@@ -159,7 +159,7 @@ T TextureViewCPU<D, T>::Convert(const PixelType& pixel) const
                       std::is_same_v<InnerType<T>, Float>)
     {
         T result;
-        UNROLL_LOOP
+        MRAY_UNROLL_LOOP
         for(uint32_t i = 0; i < C; i++)
         {
             if constexpr(IsSigned)  result[i] = FromSNorm<Float>(pixel[i]);

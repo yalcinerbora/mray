@@ -11,7 +11,7 @@ These are convenience register classes for GPU.
 
 #include "Vector.h"
 
-template<unsigned int N, FloatingPointC T>
+template<unsigned int N, FloatC T>
 class AABB
 {
     static_assert(N == 2 || N == 3 || N == 4, "AABB size should be 2, 3 or 4");
@@ -29,75 +29,44 @@ class AABB
 
     public:
     // Constructors & Destructor
-    constexpr                   AABB() = default;
-    MRAY_HYBRID constexpr       AABB(const Vector<N, T>& min,
-                                     const Vector<N, T>& max);
-    MRAY_HYBRID constexpr       AABB(Span<const T, N> dataMin,
-                                     Span<const T, N> dataMax);
+    constexpr           AABB() = default;
+    MR_PF_DECL explicit AABB(const Vector<N, T>& min,
+                             const Vector<N, T>& max) noexcept;
+    MR_PF_DECL explicit AABB(Span<const T, N> dataMin,
+                             Span<const T, N> dataMax) noexcept;
 
     // Accessors
-    MRAY_HYBRID constexpr const Vector<N, T>&   Min() const;
-    MRAY_HYBRID constexpr const Vector<N, T>&   Max() const;
-    MRAY_HYBRID constexpr Vector<N, T>          Min();
-    MRAY_HYBRID constexpr Vector<N, T>          Max();
+    MR_PF_DECL const Vector<N, T>&   Min() const noexcept;
+    MR_PF_DECL const Vector<N, T>&   Max() const noexcept;
+    MR_PF_DECL Vector<N, T>          Min() noexcept;
+    MR_PF_DECL Vector<N, T>          Max() noexcept;
 
     // Mutators
-    MRAY_HYBRID constexpr void                  SetMin(const Vector<N, T>&);
-    MRAY_HYBRID constexpr void                  SetMax(const Vector<N, T>&);
+    MR_PF_DECL void SetMin(const Vector<N, T>&) noexcept;
+    MR_PF_DECL void SetMax(const Vector<N, T>&) noexcept;
 
     // Functionality
-    MRAY_HYBRID constexpr Vector<N, T>          GeomSpan() const;
-    MRAY_HYBRID constexpr Vector<N, T>          Centroid() const;
-    MRAY_HYBRID NO_DISCARD constexpr AABB       Union(const AABB&) const;
-    MRAY_HYBRID constexpr AABB&                 UnionSelf(const AABB&);
-    MRAY_HYBRID constexpr bool                  IsInside(const Vector<N, T>&) const;
-    MRAY_HYBRID constexpr bool                  IsOutside(const Vector<N, T>&) const;
-    MRAY_HYBRID constexpr Vector<N,T>           FurthestCorner(const Vector<N, T>&) const;
+    MR_PF_DECL Vector<N, T> GeomSpan() const noexcept;
+    MR_PF_DECL Vector<N, T> Centroid() const noexcept;
+    MR_PF_DECL AABB         Union(const AABB&) const noexcept;
+    MR_PF_DECL bool         IsInside(const Vector<N, T>&) const noexcept;
+    MR_PF_DECL bool         IsOutside(const Vector<N, T>&) const noexcept;
+    MR_PF_DECL Vector<N,T>  FurthestCorner(const Vector<N, T>&) const noexcept;
 
     // Intersection
-    MRAY_HYBRID constexpr bool                  IntersectsSphere(const Vector<N, T>& sphrPos,
-                                                                 float sphrRadius) const;
-
-    static MRAY_HYBRID constexpr AABB           Zero();
-    static MRAY_HYBRID constexpr AABB           Covering();
-    static MRAY_HYBRID constexpr AABB           Negative();
+    MR_PF_DECL bool         IntersectsSphere(const Vector<N, T>& sphrPos,
+                                             float sphrRadius) const noexcept;
+    // Constants
+    MR_PF_DECL static AABB  Zero() noexcept;
+    MR_PF_DECL static AABB  Covering() noexcept;
+    MR_PF_DECL static AABB  Negative() noexcept;
 };
 
-// Requirements of Vectors
+// Requirements of AABB
 static_assert(std::is_trivially_default_constructible_v<AABB3> == true, "AABB3 has to be trivially destructible");
 static_assert(std::is_trivially_destructible_v<AABB3> == true, "AABB3 has to be trivially destructible");
 static_assert(std::is_trivially_copyable_v<AABB3> == true, "AABB3 has to be trivially copyable");
 static_assert(std::is_polymorphic_v<AABB3> == false, "AABB3 should not be polymorphic");
-
-struct AABBOffsetChecker
-{
-    //// Some Sanity Traits
-    //static_assert(offsetof(AABB2f, min) == 0,
-    //              "AABB2f::min is not properly aligned for contiguous mem read/write");
-    //static_assert(offsetof(AABB2f, max) == sizeof(Vector<2, float>),
-    //              "AABB2f:: max is not properly aligned for contiguous mem read/write");
-    //static_assert(offsetof(AABB3f, min) == 0,
-    //              "AABB3f::min is not properly aligned for contiguous mem read/write");
-    //static_assert(offsetof(AABB3f, max) == sizeof(Vector<3, float>),
-    //              "AABB3f:: max is not properly aligned for contiguous mem read/write");
-    //static_assert(offsetof(AABB4f, min) == 0,
-    //              "AABB4f::min is not properly aligned for contiguous mem read/write");
-    //static_assert(offsetof(AABB4f, max) == sizeof(Vector<4, float>),
-    //              "AABB4f:: max is not properly aligned for contiguous mem read/write");
-    ////
-    //static_assert(offsetof(AABB2d, min) == 0,
-    //              "AABB2d::min is not properly aligned for contiguous mem read/write");
-    //static_assert(offsetof(AABB2d, max) == sizeof(Vector<2, double>),
-    //              "AABB2d:: max is not properly aligned for contiguous mem read/write");
-    //static_assert(offsetof(AABB3d, min) == 0,
-    //              "AABB3d::min is not properly aligned for contiguous mem read/write");
-    //static_assert(offsetof(AABB3d, max) == sizeof(Vector<3, double>),
-    //              "AABB3d:: max is not properly aligned for contiguous mem read/write");
-    //static_assert(offsetof(AABB4d, min) == 0,
-    //              "AABB4d::min is not properly aligned for contiguous mem read/write");
-    //static_assert(offsetof(AABB4d, max) == sizeof(Vector<4, double>),
-    //              "AABB4d:: max is not properly aligned for contiguous mem read/write");
-};
 
 // Implementation
 #include "AABB.hpp" // CPU & GPU

@@ -266,6 +266,5 @@ constexpr size_t SoASpan<Args...>::Size() const
 template <class T>
 struct IdentityFunctor
 {
-    MRAY_HYBRID MRAY_CGPU_INLINE
-    constexpr T operator()(const T& t) const { return t; }
+    MR_PF_DECL T operator()(const T& t) const noexcept { return t; }
 };

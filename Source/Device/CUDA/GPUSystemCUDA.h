@@ -41,6 +41,8 @@ class TimelineSemaphore;
 
 #define MRAY_SHARED_MEMORY __shared__
 
+#define MRAY_KERNEL __global__
+
 static constexpr uint32_t WarpSize()
 {
     return 32u;

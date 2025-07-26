@@ -639,7 +639,7 @@ TransformContextSkinned::TransformContextSkinned(const typename TransformGroupMu
 
     // Blend Transforms
     transform = Matrix4x4::Zero();
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < TRANSFORM_PER_PRIMITIVE; i++)
     {
         transform += t[indices[i]] * weights[i];
@@ -647,7 +647,7 @@ TransformContextSkinned::TransformContextSkinned(const typename TransformGroupMu
 
     // Blend Inverse Transforms
     invTransform = Matrix4x4::Zero();
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < TRANSFORM_PER_PRIMITIVE; i++)
     {
         invTransform += tInverse[indices[i]] * weights[i];

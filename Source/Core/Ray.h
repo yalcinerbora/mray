@@ -5,12 +5,15 @@ Ray struct for convenient usability.
 
 */
 #include "Vector.h"
+#include "BitFunctions.h"
 
 #include <cstring>
 
-template<FloatingPointC T>
+template<FloatC T>
 class RayT
 {
+    static constexpr auto CoveringTMM = Vector<2, T>(-std::numeric_limits<T>::infinity(),
+                                                     std::numeric_limits<T>::infinity());
     public:
     using InnerType = T;
 
@@ -19,56 +22,52 @@ class RayT
     Vector<3,T>                     position;
     public:
     // Constructors & Destructor
-    constexpr                       RayT() = default;
-    MRAY_HYBRID constexpr explicit  RayT(const Vector<3, T>& direction,
-                                         const Vector<3, T>& position);
-    MRAY_HYBRID constexpr explicit  RayT(const Vector<3, T>[2]);
+    constexpr           RayT() = default;
+    MR_PF_DECL explicit RayT(const Vector<3, T>& direction,
+                             const Vector<3, T>& position) noexcept;
+    MR_PF_DECL explicit RayT(const Vector<3, T>[2]) noexcept;
 
     // Intersections
-    MRAY_HYBRID constexpr bool     IntersectsSphere(Vector<3, T>& pos, T& t,
-                                                    const Vector<3, T>& sphereCenter,
-                                                    T sphereRadius) const;
-    MRAY_HYBRID constexpr bool     IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
-                                                      const Vector<3, T> triVertex[3],
-                                                      bool cullFace = true) const;
-    MRAY_HYBRID constexpr bool     IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
-                                                      const Vector<3, T>& t0,
-                                                      const Vector<3, T>& t1,
-                                                      const Vector<3, T>& t2,
-                                                      bool cullFace = true) const;
-    MRAY_HYBRID constexpr bool     IntersectsPlane(Vector<3, T>& position, T& t,
-                                                   const Vector<3, T>& planePos,
-                                                   const Vector<3, T>& normal);
+    MR_PF_DECL bool  IntersectsSphere(Vector<3, T>& pos, T& t,
+                                      const Vector<3, T>& sphereCenter,
+                                      T sphereRadius) const noexcept;
+    MR_PF_DECL bool  IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
+                                        const Vector<3, T> triVertex[3],
+                                        bool cullFace = true) const noexcept;
+    MR_PF_DECL bool  IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
+                                        const Vector<3, T>& t0,
+                                        const Vector<3, T>& t1,
+                                        const Vector<3, T>& t2,
+                                        bool cullFace = true) const noexcept;
+    MR_PF_DECL bool  IntersectsPlane(Vector<3, T>& position, T& t,
+                                     const Vector<3, T>& planePos,
+                                     const Vector<3, T>& normal) const noexcept;
 
-    MRAY_HYBRID constexpr bool     IntersectsAABB(Vector<2, T>& tOut,
-                                                  const Vector<3, T>& aabbMin,
-                                                  const Vector<3, T>& aabbMax,
-                                                  const Vector<2, T>& tMinMax = Vector<2, T>(-std::numeric_limits<T>::infinity(),
-                                                                                             std::numeric_limits<T>::infinity())) const;
-    MRAY_HYBRID constexpr bool     IntersectsAABB(const Vector<3, T>& min,
-                                                  const Vector<3, T>& max,
-                                                  const Vector<2, T>& tMinMax = Vector<2, T>(-std::numeric_limits<T>::infinity(),
-                                                                                             std::numeric_limits<T>::infinity())) const;
-    MRAY_HYBRID constexpr bool     IntersectsAABB(Vector<3, T>& pos, T& t,
-                                                  const Vector<3, T>& min,
-                                                  const Vector<3, T>& max,
-                                                  const Vector<2, T>& tMinMax = Vector<2, T>(-std::numeric_limits<T>::infinity(),
-                                                                                             std::numeric_limits<T>::infinity())) const;
+    MR_PF_DECL bool  IntersectsAABB(Vector<2, T>& tOut,
+                                    const Vector<3, T>& aabbMin,
+                                    const Vector<3, T>& aabbMax,
+                                    const Vector<2, T>& tMinMax = CoveringTMM) const noexcept;
+    MR_PF_DECL bool  IntersectsAABB(const Vector<3, T>& min,
+                                    const Vector<3, T>& max,
+                                    const Vector<2, T>& tMinMax = CoveringTMM) const noexcept;
+    MR_PF_DECL bool  IntersectsAABB(Vector<3, T>& pos, T& t,
+                                    const Vector<3, T>& min,
+                                    const Vector<3, T>& max,
+                                    const Vector<2, T>& tMinMax = CoveringTMM) const noexcept;
 
-    NO_DISCARD MRAY_HYBRID constexpr RayT           NormalizeDir() const;
-               MRAY_HYBRID constexpr RayT&          NormalizeDirSelf();
-    NO_DISCARD MRAY_HYBRID constexpr RayT           Advance(T) const;
-    NO_DISCARD MRAY_HYBRID constexpr RayT           Advance(T t, const Vector<3,T>& dir) const;
-               MRAY_HYBRID constexpr RayT&          AdvanceSelf(T);
-               MRAY_HYBRID constexpr RayT&          AdvanceSelf(T t, const Vector<3, T>& dir);
-    NO_DISCARD MRAY_HYBRID constexpr Vector<3,T>    AdvancedPos(T t) const;
+    MR_PF_DECL RayT           NormalizeDir() const noexcept;
+    MR_PF_DECL RayT&          NormalizeDirSelf() noexcept;
+    MR_PF_DECL RayT           Advance(T) const noexcept;
+    MR_PF_DECL RayT           Advance(T t, const Vector<3,T>& dir) const noexcept;
+    MR_PF_DECL RayT&          AdvanceSelf(T) noexcept;
+    MR_PF_DECL RayT&          AdvanceSelf(T t, const Vector<3, T>& dir) noexcept;
+    MR_PF_DECL Vector<3,T>    AdvancedPos(T t) const noexcept;
 
-    // TODO: Make these constexpr later (resolve memcpy pattern etc)
-    MRAY_HYBRID NO_DISCARD RayT                     Nudge(const Vector<3, T>& dir) const;
-    MRAY_HYBRID RayT&                               NudgeSelf(const Vector<3, T>& dir);
+    MR_PF_DECL RayT     Nudge(const Vector<3, T>& dir) const noexcept;
+    MR_PF_DECL RayT&    NudgeSelf(const Vector<3, T>& dir) noexcept;
 
-    MRAY_HYBRID constexpr const Vector<3, T>&       Dir() const;
-    MRAY_HYBRID constexpr const Vector<3, T>&       Pos() const;
+    MR_PF_DECL const Vector<3, T>& Dir() const noexcept;
+    MR_PF_DECL const Vector<3, T>& Pos() const noexcept;
 };
 
 // Requirements of IERay

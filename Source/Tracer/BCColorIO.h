@@ -436,7 +436,7 @@ Vector3 BC7::ExtractColor(uint32_t i) const
 
     // R,G,B
     Vector3ui c = Vector3ui::Zero();
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(uint32_t idx = 0; idx < 3; idx++)
     {
         c[idx] = uint32_t(FetchSubPortion(b[0], {O, O + B}));
@@ -556,7 +556,7 @@ void BC7::InjectColor(uint32_t i, const Vector3& colorIn)
     auto b  = RotateRight(block.AsArray(), ColorStartOffset(mode));
 
     // R,G,B
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(uint32_t idx = 0; idx < 3; idx++)
     {
         if(!(hasRotation && rotation == (idx + 1)))

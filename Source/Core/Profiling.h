@@ -157,7 +157,7 @@ ProfilerAnnotation::ProfilerAnnotation(std::string_view name,
     uint32_t n32 = uint32_t(Bit::FetchSubPortion(n, {0, 32}) ^
                             Bit::FetchSubPortion(n, {32, 64}));
     auto color = Color::RandomColorRGB(n32);
-    using Bit::NormConversion::ToUNorm;
+    using NormConversion::ToUNorm;
     uint32_t colorPack = Bit::Compose<8, 8, 8, 8>
     (
         uint32_t(ToUNorm<uint8_t>(color[0])),

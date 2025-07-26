@@ -33,6 +33,8 @@ class ThreadPool;
 // since each block has a single thread
 #define MRAY_SHARED_MEMORY static thread_local
 
+#define MRAY_KERNEL MRAY_FORCE_INLINE
+
 static constexpr uint32_t StaticThreadPerBlock1D()
 {
     // After manually adjusting this in "Kitchen"
