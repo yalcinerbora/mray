@@ -69,24 +69,21 @@ namespace RNGFunctions::HashPCG64
                                                sizeof(T) == sizeof(uint64_t));
     }
 
-    MRAY_HYBRID MRAY_CGPU_INLINE
-    constexpr uint64_t Hash(uint64_t v);
+    MR_HF_DEF constexpr uint64_t Hash(uint64_t v);
 
     template<class... Args>
     requires(Detail::IntCastable_v<Args> && ...)
-    MRAY_HYBRID MRAY_CGPU_INLINE
-    constexpr uint64_t Hash(Args&&...);
+    MR_HF_DEF constexpr uint64_t Hash(Args&&...);
 }
 
 namespace RNGFunctions
 {
     template<std::floating_point F, std::unsigned_integral T>
-    MRAY_HYBRID static F ToFloat01(T);
+    MR_HF_DECL static F ToFloat01(T);
 
     // TODO: Implement double as well
     template<>
-    MRAY_HYBRID MRAY_CGPU_INLINE
-    float ToFloat01<float, uint32_t>(uint32_t v)
+    MR_HF_DEF float ToFloat01<float, uint32_t>(uint32_t v)
     {
         // Sanity Checks
         static_assert(std::numeric_limits<float>::is_iec559, "Non-standard floating point!");
@@ -108,14 +105,14 @@ struct RNGDispenserT
     uint32_t            stride;
 
     public:
-    MRAY_HYBRID         RNGDispenserT(Span<const T> numbers,
+    MR_HF_DECL         RNGDispenserT(Span<const T> numbers,
                                       uint32_t globalId,
                                       uint32_t stride);
 
     template<uint32_t I>
-    MRAY_HYBRID Float   NextFloat();
+    MR_HF_DECL Float   NextFloat();
     template<uint32_t I>
-    MRAY_HYBRID Vector2 NextFloat2D();
+    MR_HF_DECL Vector2 NextFloat2D();
 };
 
 using RandomNumber = uint32_t;
@@ -146,29 +143,29 @@ class PermutedCG32
     public:
     using State         = uint32_t;
 
-    MRAY_HYBRID
+    MR_HF_DECL
     static State    GenerateState(uint32_t seed);
 
     private:
     State&          dState;
     State           rState;
 
-    MRAY_HYBRID
+    MR_HF_DECL
     static State    Step(State r);
-    MRAY_HYBRID
+    MR_HF_DECL
     static uint32_t Permute(State r);
 
     public:
-    MRAY_HYBRID     PermutedCG32(State& dState);
-    MRAY_HYBRID     ~PermutedCG32();
+    MR_HF_DECL     PermutedCG32(State& dState);
+    MR_HF_DECL     ~PermutedCG32();
 
-    MRAY_HYBRID
+    MR_HF_DECL
     uint32_t        Next();
 
-    MRAY_HYBRID
+    MR_HF_DECL
     Float           NextFloat();
 
-    MRAY_HYBRID
+    MR_HF_DECL
     void            Advance(uint32_t delta);
 };
 
@@ -279,8 +276,8 @@ namespace RNGFunctions
 {
 
 // 64->64 variant used to hash 64 bit types
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr uint64_t HashPCG64::Hash(uint64_t v)
+MR_HF_DEF constexpr
+uint64_t HashPCG64::Hash(uint64_t v)
 {
     constexpr uint64_t Multiplier = 6364136223846793005ull;
     constexpr uint64_t Increment = 1442695040888963407ull;
@@ -292,8 +289,8 @@ constexpr uint64_t HashPCG64::Hash(uint64_t v)
 
 template<class... Args>
 requires(HashPCG64::Detail::IntCastable_v<Args> && ...)
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr uint64_t HashPCG64::Hash(Args&&... args)
+MR_HF_DEF constexpr
+uint64_t HashPCG64::Hash(Args&&... args)
 {
     using namespace HashPCG64::Detail;
     // According to the paper recursive hash and add
@@ -313,7 +310,7 @@ constexpr uint64_t HashPCG64::Hash(Args&&... args)
 }
 
 template <std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 RNGDispenserT<T>::RNGDispenserT(Span<const T> numbers,
                                 uint32_t globalId,
                                 uint32_t stride)
@@ -324,7 +321,7 @@ RNGDispenserT<T>::RNGDispenserT(Span<const T> numbers,
 
 template <std::unsigned_integral T>
 template<uint32_t I>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float RNGDispenserT<T>::NextFloat()
 {
     assert((globalId + I * stride) < randomNumbers.size());
@@ -335,7 +332,7 @@ Float RNGDispenserT<T>::NextFloat()
 
 template <std::unsigned_integral T>
 template<uint32_t I>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector2 RNGDispenserT<T>::NextFloat2D()
 {
     assert((globalId + (I + 1) * stride) < randomNumbers.size());
@@ -346,7 +343,7 @@ Vector2 RNGDispenserT<T>::NextFloat2D()
                    RNGFunctions::ToFloat01<Float>(xi1));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 typename PermutedCG32::State
 PermutedCG32::GenerateState(uint32_t seed)
 {
@@ -357,33 +354,33 @@ PermutedCG32::GenerateState(uint32_t seed)
     return r;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 typename PermutedCG32::State
 PermutedCG32::Step(State r)
 {
     return r * Multiplier + Increment;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t PermutedCG32::Permute(State s)
 {
     uint32_t result = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u;
     return (result >> 22u) ^ result;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 PermutedCG32::PermutedCG32(State& dState)
     : dState(dState)
     , rState(dState)
 {}
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 PermutedCG32::~PermutedCG32()
 {
     dState = rState;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t PermutedCG32::Next()
 {
     State newState = Step(rState);
@@ -392,14 +389,14 @@ uint32_t PermutedCG32::Next()
     return r;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float PermutedCG32::NextFloat()
 {
     uint32_t nextInt = Next();
     return RNGFunctions::ToFloat01<Float>(nextInt);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 void PermutedCG32::Advance(uint32_t delta)
 {
     // This is from the PCG32 code,

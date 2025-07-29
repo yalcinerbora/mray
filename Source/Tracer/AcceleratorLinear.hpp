@@ -8,7 +8,7 @@ namespace LinearAccelDetail
 
 template<PrimitiveGroupC PG, TransformGroupC TG>
 template<auto GenerateTransformContext>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 OptionalHitR<PG> AcceleratorLinear<PG, TG>::IntersectionCheck(const Ray& ray,
                                                               const Vector2f& tMinMax,
                                                               Float xi,
@@ -75,7 +75,7 @@ OptionalHitR<PG> AcceleratorLinear<PG, TG>::IntersectionCheck(const Ray& ray,
 }
 
 template<PrimitiveGroupC PG, TransformGroupC TG>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 AcceleratorLinear<PG, TG>::AcceleratorLinear(const TransDataSoA& tSoA,
                                              const PrimDataSoA& pSoA,
                                              const DataSoA& dataSoA,
@@ -91,14 +91,14 @@ AcceleratorLinear<PG, TG>::AcceleratorLinear(const TransDataSoA& tSoA,
 {}
 
 template<PrimitiveGroupC PG, TransformGroupC TG>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 TransformKey AcceleratorLinear<PG, TG>::GetTransformKey() const
 {
     return transformKey;
 }
 
 template<PrimitiveGroupC PG, TransformGroupC TG>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 OptionalHitR<PG> AcceleratorLinear<PG, TG>::ClosestHit(BackupRNG& rng,
                                                        const Ray& ray,
                                                        const Vector2& tMinMax) const
@@ -119,7 +119,7 @@ OptionalHitR<PG> AcceleratorLinear<PG, TG>::ClosestHit(BackupRNG& rng,
 }
 
 template<PrimitiveGroupC PG, TransformGroupC TG>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 OptionalHitR<PG> AcceleratorLinear<PG, TG>::FirstHit(BackupRNG& rng,
                                                      const Ray& ray,
                                                      const Vector2f& tMinMax) const

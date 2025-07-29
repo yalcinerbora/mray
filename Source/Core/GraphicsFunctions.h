@@ -36,17 +36,17 @@ namespace Graphics
     // So wi should be aligned with the normal, it is caller's responsibility
     // to provide the appropriate normal. It returns wo again "outwards" from the
     // surface. Both "normal" and "wi" is assumed to be normalized.
-    MR_HF_DECL
-    Optional<Vector3>   Refract(const Vector3& normal, const Vector3& v,
-                                Float etaFrom, Float etaTo);
+    MR_HF_DECL constexpr
+    Optional<Vector3> Refract(const Vector3& normal, const Vector3& v,
+                              Float etaFrom, Float etaTo);
 
     // Changes the direction of vector "v" towards n
     MR_HF_DECL constexpr
-    Vector3   Orient(const Vector3& v, const Vector3& n);
+    Vector3 Orient(const Vector3& v, const Vector3& n);
 
     // Return an orthogonal vector
     MR_HF_DECL constexpr
-    Vector3   OrthogonalVector(const Vector3&);
+    Vector3 OrthogonalVector(const Vector3&);
 
     // Coordinate Conversions
     // Spherical <-> Cartesian
@@ -58,29 +58,41 @@ namespace Graphics
     //         0 is the "north pole"
     //
     // Results lie on the scaled unit sphere where north pole is +Z
-    MR_HF_DECL Vector3      SphericalToCartesian(const Vector3&);
-    MR_HF_DECL Vector3      CartesianToSpherical(const Vector3&);
-    MR_HF_DECL Vector3      UnitSphericalToCartesian(const Vector2&);
-    MR_HF_DECL Vector3      UnitSphericalToCartesian(const Vector2& sinCosTheta,
-                                                     const Vector2& sinCosPhi);
-    MR_HF_DECL Vector2      CartesianToUnitSpherical(const Vector3&);
+    MR_HF_DECL constexpr
+    Vector3 SphericalToCartesian(const Vector3&);
+    MR_HF_DECL constexpr
+    Vector3 CartesianToSpherical(const Vector3&);
+    MR_HF_DECL constexpr
+    Vector3 UnitSphericalToCartesian(const Vector2&);
+    MR_HF_DECL constexpr
+    Vector3 UnitSphericalToCartesian(const Vector2& sinCosTheta,
+                                     const Vector2& sinCosPhi);
+    MR_HF_DECL constexpr
+    Vector2 CartesianToUnitSpherical(const Vector3&);
 
     // 2D Variant of spherical coordinates
-    MR_HF_DECL Vector2      PolarToCartesian(const Vector2&);
-    MR_HF_DECL Vector2      CartesianToPolar(const Vector2&);
-    MR_HF_DECL Vector2      UnitPolarToCartesian(Float);
-    MR_HF_DECL Float        CartesianToUnitPolar(const Vector2&);
+    MR_HF_DECL constexpr
+    Vector2 PolarToCartesian(const Vector2&);
+    MR_HF_DECL constexpr
+    Vector2 CartesianToPolar(const Vector2&);
+    MR_HF_DECL constexpr
+    Vector2 UnitPolarToCartesian(Float);
+    MR_HF_DECL constexpr
+    Float   CartesianToUnitPolar(const Vector2&);
 
     // Concentric Octahedral Mapping
     // https://fileadmin.cs.lth.se/graphics/research/papers/2008/simdmapping/clarberg_simdmapping08_preprint.pdf
-    MR_HF_DECL Vector2      DirectionToConcentricOctahedral(const Vector3&);
-    MR_HF_DECL Vector3      ConcentricOctahedralToDirection(const Vector2&);
-    MR_HF_DECL Vector2      ConcentricOctahedralWrap(const Vector2&);
+    MR_HF_DECL constexpr
+    Vector2 DirectionToConcentricOctahedral(const Vector3&);
+    MR_HF_DECL constexpr
+    Vector3 ConcentricOctahedralToDirection(const Vector2&);
+    MR_HF_DECL constexpr
+    Vector2 ConcentricOctahedralWrap(const Vector2&);
 
     template<std::integral T>
     MR_HF_DECL constexpr
-    Vector<2, T>            ConcentricOctahedralWrapInt(const Vector<2, T>& st,
-                                                        const Vector<2, T>& dimensions);
+    Vector<2, T> ConcentricOctahedralWrapInt(const Vector<2, T>& st,
+                                             const Vector<2, T>& dimensions);
 
     // Orthonormalization Gram-Schmidt process
     // Returns first (n-1) modified vectors.
@@ -93,27 +105,27 @@ namespace Graphics
                                              const Vector3& z);
 
     MR_HF_DECL constexpr
-    Vector2                 UVToSphericalAngles(const Vector2& uv);
+    Vector2 UVToSphericalAngles(const Vector2& uv);
     MR_HF_DECL constexpr
-    Vector2                 SphericalAnglesToUV(const Vector2& thetaPhi);
+    Vector2 SphericalAnglesToUV(const Vector2& thetaPhi);
 
     template<class DimType>
     MR_HF_DECL constexpr
-    DimType                 TextureMipSize(const DimType& resolution,
+    DimType TextureMipSize(const DimType& resolution,
                                            uint32_t mipLevel);
     template<class DimType>
     MR_HF_DECL constexpr
-    uint32_t                TextureMipCount(const DimType& resolution);
+    uint32_t TextureMipCount(const DimType& resolution);
     template<class DimType>
     MR_HF_DECL constexpr
-    uint32_t                TextureMipPixelStart(const DimType& baseResolution,
-                                                 uint32_t mipLevel);
+    uint32_t TextureMipPixelStart(const DimType& baseResolution,
+                                  uint32_t mipLevel);
 
     template<uint32_t C>
     MR_HF_DECL constexpr
-    Vector<C, Float>        ConvertPixelIndices(const Vector<C, Float>& inputIndex,
-                                                const Vector<C, Float>& toResolution,
-                                                const Vector<C, Float>& fromResolution);
+    Vector<C, Float> ConvertPixelIndices(const Vector<C, Float>& inputIndex,
+                                         const Vector<C, Float>& toResolution,
+                                         const Vector<C, Float>& fromResolution);
 
     namespace MortonCode
     {
@@ -152,7 +164,7 @@ Vector3 Reflect(const Vector3& normal, const Vector3& v)
     return result;
 }
 
-MR_HF_DEF
+MR_HF_DEF constexpr
 Optional<Vector3> Refract(const Vector3& normal,
                           const Vector3& v, Float etaFrom, Float etaTo)
 {
@@ -185,14 +197,14 @@ Optional<Vector3> Refract(const Vector3& normal,
     return (etaRatio * (-v) + (etaRatio * cosIn - cosOut) * normal);
 }
 
-MR_HF_DEF
-constexpr Vector3 Orient(const Vector3& v, const Vector3& n)
+MR_HF_DEF constexpr
+Vector3 Orient(const Vector3& v, const Vector3& n)
 {
     return Math::Dot(v, n) >= Float{0} ? v : (-v);
 }
 
-MR_HF_DEF
-constexpr Vector3 OrthogonalVector(const Vector3& v)
+MR_HF_DEF constexpr
+Vector3 OrthogonalVector(const Vector3& v)
 {
     // PBRT Book
     // https://www.pbr-book.org/3ed-2018/Geometry_and_Transformations/Vectors#CoordinateSystem
@@ -204,7 +216,7 @@ constexpr Vector3 OrthogonalVector(const Vector3& v)
         return Vector3(0, v[2], -v[1]) / Sqrt(v[1] * v[1] + v[2] * v[2]);
 }
 
-MR_HF_DEF
+MR_HF_DEF constexpr
 Vector3 SphericalToCartesian(const Vector3& sphrRTP)
 {
     using Math::SinCos;
@@ -217,7 +229,7 @@ Vector3 SphericalToCartesian(const Vector3& sphrRTP)
     return Vector3(x, y, z);
 }
 
-MR_HF_DEF
+MR_HF_DEF constexpr
 Vector3 CartesianToSpherical(const Vector3& xyz)
 {
     // Convert to Spherical Coordinates
@@ -232,7 +244,7 @@ Vector3 CartesianToSpherical(const Vector3& xyz)
 }
 
 // Unit version
-MR_HF_DEF
+MR_HF_DEF constexpr
 Vector3 UnitSphericalToCartesian(const Vector2& sphrTP)
 {
     const auto& [theta, phi] = sphrTP.AsArray();
@@ -244,7 +256,7 @@ Vector3 UnitSphericalToCartesian(const Vector2& sphrTP)
     return Vector3(x, y, z);
 }
 
-MR_HF_DEF
+MR_HF_DEF constexpr
 Vector3 UnitSphericalToCartesian(const Vector2& sinCosTheta,
                                  const Vector2& sinCosPhi)
 {
@@ -254,12 +266,12 @@ Vector3 UnitSphericalToCartesian(const Vector2& sinCosTheta,
     return Vector3(x, y, z);
 }
 
-MR_HF_DEF
+MR_HF_DEF constexpr
 Vector2 CartesianToUnitSpherical(const Vector3& xyz)
 {
     // Convert to Spherical Coordinates
     // range [-pi, pi]
-    Float azimuth = std::atan2(xyz[1], xyz[0]);
+    Float azimuth = Math::ArcTan2(xyz[1], xyz[0]);
     // range [0, pi]
     // Sometimes normalized cartesian coords may invoke NaN here
     // clamp it to the range
@@ -267,7 +279,7 @@ Vector2 CartesianToUnitSpherical(const Vector3& xyz)
     return Vector2(azimuth, incl);
 }
 
-MR_HF_DEF
+MR_HF_DEF constexpr
 Vector2 PolarToCartesian(const Vector2& polarRT)
 {
     const auto& [r, theta] = polarRT.AsArray();
@@ -277,7 +289,7 @@ Vector2 PolarToCartesian(const Vector2& polarRT)
     return Vector2(x, y);
 }
 
-MR_HF_DEF
+MR_HF_DEF constexpr
 Vector2 CartesianToPolar(const Vector2& xy)
 {
     Float r = Math::Length(xy);
@@ -285,20 +297,20 @@ Vector2 CartesianToPolar(const Vector2& xy)
     return Vector2(r, theta);
 }
 
-MR_HF_DEF
+MR_HF_DEF constexpr
 Vector2 UnitPolarToCartesian(Float theta)
 {
     const auto& [x, y] = Math::SinCos(theta);
     return Vector2(x, y);
 }
 
-MR_HF_DEF
+MR_HF_DEF constexpr
 Float CartesianToUnitPolar(const Vector2& xy)
 {
     return Math::ArcTan2(xy[1], xy[0]);
 }
 
-MR_HF_DEF
+MR_HF_DEF constexpr
 Vector2 DirectionToConcentricOctahedral(const Vector3& dir)
 {
     using namespace MathConstants;
@@ -325,8 +337,8 @@ Vector2 DirectionToConcentricOctahedral(const Vector3& dir)
         v = vPrime;
     }
     // Sign extend the uv
-    u *= Math::SignPM1(dir[0]); // (std::signbit(dir[0]) ? Float{-1} : Float{1});
-    v *= Math::SignPM1(dir[1]); // (std::signbit(dir[1]) ? Float{-1} : Float{1});
+    u *= Math::SignPM1(dir[0]);
+    v *= Math::SignPM1(dir[1]);
 
     // Finally
     // [-1,1] to [0,1]
@@ -335,7 +347,7 @@ Vector2 DirectionToConcentricOctahedral(const Vector3& dir)
     return st;
 }
 
-MR_HF_DEF
+MR_HF_DEF constexpr
 Vector3 ConcentricOctahedralToDirection(const Vector2& st)
 {
     using namespace MathConstants;
@@ -346,13 +358,14 @@ Vector3 ConcentricOctahedralToDirection(const Vector2& st)
 
     // Radius
     Float d = 1 - uvAbs.Sum();
-    Float radius = 1 - abs(d);
+    Float radius = 1 - Math::Abs(d);
     Float phiPrime = 0;
     // Avoid division by zero
     if(radius != 0) phiPrime = ((uvAbs[1] - uvAbs[0]) / radius + 1) * PiOvr4;
     // Coords
-    Float cosPhi = Math::SignPM1(uv[0]) * cos(phiPrime);
-    Float sinPhi = Math::SignPM1(uv[1]) * sin(phiPrime);
+    const auto& [sinPhiP, cosPhiP] = Math::SinCos(phiPrime);
+    Float cosPhi = Math::SignPM1(uv[0]) * cosPhiP;
+    Float sinPhi = Math::SignPM1(uv[1]) * sinPhiP;
     Float z = Math::SignPM1(d) * (1 - radius * radius);
 
     // Now all is OK do the concentric disk stuff
@@ -363,7 +376,7 @@ Vector3 ConcentricOctahedralToDirection(const Vector2& st)
     return Vector3(x, y, z);
 }
 
-MR_HF_DEF
+MR_HF_DEF constexpr
 Vector2 ConcentricOctahedralWrap(const Vector2& st)
 {
     // Get a good signed int candidate according to the "Float" type
@@ -471,7 +484,7 @@ DimType TextureMipSize(const DimType& resolution, uint32_t mipLevel)
     for(uint32_t i = 0; i < DimType::Dims; i++)
         mipRes[i] = resolution[i] >> mipLevel;
 
-    return DimType::Max(mipRes, DimType(1));
+    return Math::Max(mipRes, DimType(1));
 }
 
 template<>
@@ -519,7 +532,7 @@ Vector<C, Float> ConvertPixelIndices(const Vector<C, Float>& inputIndex,
     Vector<C, Float> result;
     Vector<C, Float> uvRatio = toResolution / fromResolution;
     result = (inputIndex + Float(0.5)) * uvRatio - Float(0.5);
-    result.ClampSelf(Vector2::Zero(), toResolution - Vector2(1));
+    result = Math::Clamp(result, Vector2::Zero(), toResolution - Vector2(1));
     return result;
 }
 

@@ -55,22 +55,22 @@ namespace LinearAccelDetail
         const PrimDataSoA&          primitiveSoA;
 
         template<auto = MRAY_PRIM_TGEN_FUNCTION(PrimGroup, TransGroup)>
-        MRAY_GPU
+        MR_GF_DECL
         Optional<HitResult>     IntersectionCheck(const Ray& ray,
                                                   const Vector2& tMinMax,
                                                   Float xi,
                                                   const PrimitiveKey& primKey) const;
         public:
         // Constructors & Destructor
-        MRAY_GPU                AcceleratorLinear(const TransDataSoA& tSoA,
+        MR_GF_DECL              AcceleratorLinear(const TransDataSoA& tSoA,
                                                   const PrimDataSoA& pSoA,
                                                   const DataSoA& dataSoA,
                                                   AcceleratorKey aId);
-        MRAY_GPU
+        MR_GF_DECL
         TransformKey            GetTransformKey() const;
-        MRAY_GPU
+        MR_GF_DECL
         Optional<HitResult>     ClosestHit(BackupRNG& rng, const Ray&, const Vector2&) const;
-        MRAY_GPU
+        MR_GF_DECL
         Optional<HitResult>     FirstHit(BackupRNG& rng, const Ray&, const Vector2&) const;
     };
 }

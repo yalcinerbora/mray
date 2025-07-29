@@ -12,7 +12,7 @@ namespace LBVHAccelDetail
 {
 
 template <uint32_t MAX_DEPTH, class IntersectFunc>
-MRAY_HYBRID MRAY_GPU_INLINE
+MR_GF_DEF
 uint32_t TraverseLBVH(BitStack& bitStack,
                       // Traversal data
                       const Span<const LBVHNode>& nodes,
@@ -109,7 +109,7 @@ uint32_t TraverseLBVH(BitStack& bitStack,
 #ifdef MRAY_GPU_BACKEND_CPU
 
 template <uint32_t MAX_DEPTH, class IntersectFunc>
-MRAY_HYBRID MRAY_GPU_INLINE
+MR_GF_DEF
 uint32_t TraverseLBVHStack(// I-O
                            BitStack&,
                            // Traversal data
@@ -166,57 +166,57 @@ uint32_t TraverseLBVHStack(// I-O
 }
 #endif
 
-MRAY_HYBRID MRAY_GPU_INLINE
+MR_HF_DEF
 BitStack::BitStack()
     : stack(0)
     , depth(MAX_DEPTH)
 {}
 
-MRAY_HYBRID MRAY_GPU_INLINE
+MR_HF_DEF
 BitStack::BitStack(uint64_t initialState, uint32_t initialDepth)
     : stack(initialState)
     , depth(initialDepth)
 {}
 
-MRAY_HYBRID MRAY_GPU_INLINE
+MR_HF_DEF
 void BitStack::WipeLowerBits()
 {
     uint64_t mask = std::numeric_limits<uint64_t>::max() << (depth - 1);
     stack &= mask;
 }
 
-MRAY_HYBRID MRAY_GPU_INLINE
+MR_HF_DEF
 typename BitStack::TraverseState BitStack::CurrentState() const
 {
     return TraverseState((stack >> (depth - 2)) & 0x3u);
 }
 
-MRAY_HYBRID MRAY_GPU_INLINE
+MR_HF_DEF
 void BitStack::MarkAsTraversed()
 {
     stack += (uint64_t(1) << (depth - 1));
 }
 
-MRAY_HYBRID MRAY_GPU_INLINE
+MR_HF_DEF
 void BitStack::Descend()
 {
     depth--;
 }
 
-MRAY_HYBRID MRAY_GPU_INLINE
+MR_HF_DEF
 void BitStack::Ascend()
 {
     depth++;
 }
 
-MRAY_HYBRID MRAY_GPU_INLINE
+MR_HF_DEF
 uint32_t BitStack::Depth() const
 {
     return depth;
 }
 
 template<uint32_t SBits, uint32_t DBits>
-MRAY_HYBRID MRAY_GPU_INLINE
+MR_HF_DEF
 uint32_t BitStack::CompressState() const
 {
     return uint32_t(Bit::Compose<SBits, DBits>(stack, depth));
@@ -224,7 +224,7 @@ uint32_t BitStack::CompressState() const
 
 template<PrimitiveGroupC PG, TransformGroupC TG>
 template<auto GenerateTransformContext>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 OptionalHitR<PG> AcceleratorLBVH<PG, TG>::IntersectionCheck(const Ray& ray,
                                                             const Vector2f& tMinMax,
                                                             Float xi,
@@ -292,7 +292,7 @@ OptionalHitR<PG> AcceleratorLBVH<PG, TG>::IntersectionCheck(const Ray& ray,
 }
 
 template<PrimitiveGroupC PG, TransformGroupC TG>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 AcceleratorLBVH<PG, TG>::AcceleratorLBVH(const TransDataSoA& tSoA,
                                          const PrimDataSoA& pSoA,
                                          const DataSoA& dataSoA,
@@ -310,14 +310,14 @@ AcceleratorLBVH<PG, TG>::AcceleratorLBVH(const TransDataSoA& tSoA,
 {}
 
 template<PrimitiveGroupC PG, TransformGroupC TG>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 TransformKey AcceleratorLBVH<PG, TG>::GetTransformKey() const
 {
     return transformKey;
 }
 
 template<PrimitiveGroupC PG, TransformGroupC TG>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 OptionalHitR<PG> AcceleratorLBVH<PG, TG>::ClosestHit(BackupRNG& rng,
                                                      const Ray& ray,
                                                      const Vector2& tMinMax) const
@@ -366,7 +366,7 @@ OptionalHitR<PG> AcceleratorLBVH<PG, TG>::ClosestHit(BackupRNG& rng,
 }
 
 template<PrimitiveGroupC PG, TransformGroupC TG>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 OptionalHitR<PG> AcceleratorLBVH<PG, TG>::FirstHit(BackupRNG& rng,
                                                    const Ray& ray,
                                                    const Vector2& tMinMax) const
@@ -451,7 +451,7 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
     for(const Vector2ui& leafRange : this->concreteLeafRanges)
     {
         uint32_t localLeafCount = leafRange[1] - leafRange[0];
-        uint32_t localNodeCount = std::max(1u, localLeafCount - 1);
+        uint32_t localNodeCount = Math::Max(1u, localLeafCount - 1);
         hConcreteNodeRangesVec.push_back(Vector2ui(nodeOffset, nodeOffset + localNodeCount));
         nodeOffset += localNodeCount;
     }
@@ -652,7 +652,7 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
     size_t segTRMemSize = SegmentedTransformReduceTMSize<AABB3, PrimitiveKey>(processedAccelCount, queue);
     size_t segSortTMSize = SegmentedRadixSortTMSize<true, uint64_t, uint32_t>(totalLeafCount,
                                                                               processedAccelCount, queue);
-    size_t tempMemSize = std::max(segTRMemSize, segSortTMSize);
+    size_t tempMemSize = Math::Max(segTRMemSize, segSortTMSize);
     // For simplicity we are allocating twice here
     // So we can repurpose
     size_t total = MemAlloc::RequiredAllocation<10>

@@ -58,14 +58,14 @@ inline Optional<CameraTransform> MovementSchemeFPS::Update(const InputChecker& i
 
         // Y Rotation
         lookDir = transform.gazePoint - transform.position;
-        Vector3 side = Vector3::Cross(transform.up, lookDir).NormalizeSelf();
+        Vector3 side = Math::Normalize(Math::Cross(transform.up, lookDir));
         Quaternion rotateY(diff[1] * Sensitivity, side);
         rotated = rotateY.ApplyRotation((lookDir));
         transform.gazePoint = transform.position + rotated;
 
         // Redefine up
         // Enforce an up vector which is orthogonal to the xz plane
-        transform.up = Vector3::Cross(rotated, side);
+        transform.up = Math::Cross(rotated, side);
         transform.up[0] = 0.0f;
         transform.up[1] = (transform.up[1] < 0.0f) ? -1.0f : 1.0f;
         transform.up[2] = 0.0f;
@@ -97,8 +97,8 @@ inline Optional<CameraTransform> MovementSchemeFPS::Update(const InputChecker& i
         if(!result) result = state.transform;
         CameraTransform& transform = result.value();
 
-        Vector3 lookDir = (transform.gazePoint - transform.position).NormalizeSelf();
-        Vector3 side = Vector3::Cross(transform.up, lookDir).NormalizeSelf();
+        Vector3 lookDir = Math::Normalize(transform.gazePoint - transform.position);
+        Vector3 side = Math::Normalize(Math::Cross(transform.up, lookDir));
         if(MovePresses[0])
         {
             transform.position += lookDir * movementRatio;

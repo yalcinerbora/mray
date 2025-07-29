@@ -45,20 +45,20 @@ DeviceAlgorithms::SegmentedRadixSort<true, uint64_t, uint32_t>
 
 struct MortonDiffFunctor
 {
-    MRAY_HYBRID MRAY_CGPU_INLINE
-    uint32_t operator()(uint64_t l, uint64_t r) const
+    MR_PF_DECL
+    uint32_t operator()(uint64_t l, uint64_t r) const noexcept
     {
         return (l != r) ? 1u : 0u;
     }
 };
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-LBVHAccelDetail::Delta::Delta(const Span<const uint64_t>& dMCs)
+MR_PF_DEF
+LBVHAccelDetail::Delta::Delta(const Span<const uint64_t>& dMCs) noexcept
     : dMortonCodes(dMCs)
 {}
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-int32_t LBVHAccelDetail::Delta::operator()(int32_t i, int32_t j) const
+MR_PF_DEF
+int32_t LBVHAccelDetail::Delta::operator()(int32_t i, int32_t j) const noexcept
 {
     if(j < 0 || j >= static_cast<int32_t>(dMortonCodes.size()))
         return -1;
@@ -142,11 +142,11 @@ void KCGenMortonCode(// Output
             Vector3 diff = center - bottomLeft;
             // Diff still can have numeric errors
             // Make it positive
-            diff = Vector3::Max(diff, Vector3::Zero());
+            diff = Math::Max(diff, Vector3::Zero());
             // Quantize the center relative to the AABB
-            auto result = Vector3(Vector3d(diff) * deltaRecip).Round();
+            auto result = Math::RoundInt(Vector3(Vector3d(diff) * deltaRecip));
             Vector3ui xyz(result[0], result[1], result[2]);
-            xyz = xyz.Clamp(0u, LastValue);
+            xyz = Math::Clamp(xyz, 0u, LastValue);
             uint64_t code = Compose3D<uint64_t>(xyz);
             dLocalMortonCode[i] = code;
         }
@@ -248,12 +248,12 @@ void KCConstructLBVHInternalNodes(// Output
                 if(delta(i, i + (s + t) * d) > deltaNode)
                     s += t;
             }
-            int32_t gamma = i + s * d + std::min(d, 0);
+            int32_t gamma = i + s * d + Math::Min(d, 0);
             assert(gamma >= 0 && gamma < totalNodes);
 
             // Finally write
             LBVHNode& myNode = dLocalNodes[uint32_t(i)];
-            if(std::min(i, j) == gamma)
+            if(Math::Min(i, j) == gamma)
             {
                 uint32_t indirectLeafIndex = dLocalIndices[uint32_t(gamma)];
                 myNode.leftIndex = ChildIndex::CombinedKey(IS_LEAF, indirectLeafIndex);
@@ -265,7 +265,7 @@ void KCConstructLBVHInternalNodes(// Output
                 dLocalNodes[uint32_t(gamma)].parentIndex = uint32_t(i);
             }
             //
-            if(std::max(i, j) == (gamma + 1))
+            if(Math::Max(i, j) == (gamma + 1))
             {
                 uint32_t indirectLeafIndex = dLocalIndices[uint32_t(gamma + 1)];
                 myNode.rightIndex = ChildIndex::CombinedKey(IS_LEAF, indirectLeafIndex);
@@ -527,7 +527,7 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
     // Allocate persistent memory
     size_t instanceCount = instanceOffsets.back();
     // By definition LBVH has n-1 nodes
-    size_t nodeCount = std::max(instanceCount - 1u, size_t(1));
+    size_t nodeCount = Math::Max(instanceCount - 1u, size_t(1));
 
     MemAlloc::AllocateMultiData(std::tie(dLeafKeys, dLeafAABBs,
                                          dNodes, dBoundingBoxes),
@@ -567,7 +567,7 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
 
     size_t reduceTMSize = ReduceTMSize<AABB3>(instanceCount, queue);
     size_t sortTMSize = RadixSortTMSize<true, uint64_t, uint32_t>(instanceCount, queue);
-    size_t tmSize = std::max(reduceTMSize, sortTMSize);
+    size_t tmSize = Math::Max(reduceTMSize, sortTMSize);
 
     // Temp memory
     // TODO: Too much memory, some memory can be aliased
@@ -606,7 +606,7 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
 
     //
     std::array<uint32_t, 2> hLeafSegmentRangeArray = {0u, uint32_t(instanceCount)};
-    std::array<uint32_t, 2> hNodeSegmentRangeArray = {0u, std::max(1u, uint32_t(instanceCount - 1))};
+    std::array<uint32_t, 2> hNodeSegmentRangeArray = {0u, Math::Max(1u, uint32_t(instanceCount - 1))};
     queue.MemcpyAsync(dLeafSegmentRange, Span<const uint32_t>(hLeafSegmentRangeArray));
     queue.MemcpyAsync(dNodeSegmentRange, Span<const uint32_t>(hNodeSegmentRangeArray));
 

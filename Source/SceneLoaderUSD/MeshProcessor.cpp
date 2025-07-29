@@ -521,8 +521,8 @@ MRayError MeshProcessorThread::PreprocessIndicesSingle(uint32_t index)
 
     // Reset the buffers
     auto subsets = pxr::UsdGeomSubset::GetAllGeomSubsets(mesh);
-    primLocalPrimCounts.resize(std::max(size_t(1), subsets.size()));
-    primTransientData.back().resize(std::max(size_t(1), subsets.size()));
+    primLocalPrimCounts.resize(Math::Max(size_t(1), subsets.size()));
+    primTransientData.back().resize(Math::Max(size_t(1), subsets.size()));
     if(subsets.empty())
     {
         // Reset the hash table & buffers

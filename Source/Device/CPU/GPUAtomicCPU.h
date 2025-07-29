@@ -7,26 +7,26 @@
 namespace mray::host::atomic
 {
     template<class T>
-    MRAY_GPU T AtomicAdd(T& t, T v);
+    MR_GF_DECL T AtomicAdd(T& t, T v);
 
     template<class T>
     requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
-    MRAY_GPU T AtomicAnd(T& t, T v);
+    MR_GF_DECL T AtomicAnd(T& t, T v);
 
     template<class T>
     requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
-    MRAY_GPU T AtomicOr(T& t, T v);
+    MR_GF_DECL T AtomicOr(T& t, T v);
 
     template<class T>
     requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
-    MRAY_GPU T AtomicXor(T& t, T v);
+    MR_GF_DECL T AtomicXor(T& t, T v);
 }
 
 namespace mray::host::atomic
 {
 
 template<unsigned int D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 Vector<D, T> AtomicAdd(Vector<D, T>& t, Vector<D, T> v)
 {
     Vector<D, T> result;
@@ -38,7 +38,7 @@ Vector<D, T> AtomicAdd(Vector<D, T>& t, Vector<D, T> v)
 }
 
 template<class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T AtomicAdd(T& t, T v)
 {
     return std::atomic_ref<T>(t).fetch_add(v);
@@ -46,7 +46,7 @@ T AtomicAdd(T& t, T v)
 
 template<class T>
 requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T AtomicAnd(T& t, T v)
 {
     return std::atomic_ref<T>(t).fetch_and(v);
@@ -54,7 +54,7 @@ T AtomicAnd(T& t, T v)
 
 template<class T>
 requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T AtomicOr(T& t, T v)
 {
     return std::atomic_ref<T>(t).fetch_or(v);
@@ -62,7 +62,7 @@ T AtomicOr(T& t, T v)
 
 template<class T>
 requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T AtomicXor(T& t, T v)
 {
     return std::atomic_ref<T>(t).fetch_xor(v);

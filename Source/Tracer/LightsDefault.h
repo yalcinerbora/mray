@@ -29,32 +29,32 @@ namespace LightDetail
 
     struct SphericalCoordConverter
     {
-        MRAY_HYBRID
+        MR_HF_DECL
         static Vector2  DirToUV(const Vector3& dirYUp);
-        MRAY_HYBRID
+        MR_HF_DECL
         static Vector3  UVToDir(const Vector2& uv);
-        MRAY_HYBRID
+        MR_HF_DECL
         static Float    ToSolidAnglePdf(Float pdf, const Vector3& dirYUp);
-        MRAY_HYBRID
+        MR_HF_DECL
         static Float    ToSolidAnglePdf(Float pdf, const Vector2& uv);
 
-        MRAY_HYBRID
+        MR_HF_DECL
         static std::array<Vector2, 2> Gradient(Float coneAperture,
                                                const Vector3& dirYUp);
     };
 
     struct CoOctaCoordConverter
     {
-        MRAY_HYBRID
+        MR_HF_DECL
         static Vector2  DirToUV(const Vector3& dirYUp);
-        MRAY_HYBRID
+        MR_HF_DECL
         static Vector3  UVToDir(const Vector2& uv);
-        MRAY_HYBRID
+        MR_HF_DECL
         static Float    ToSolidAnglePdf(Float pdf, const Vector3& dirYUp);
-        MRAY_HYBRID
+        MR_HF_DECL
         static Float    ToSolidAnglePdf(Float pdf, const Vector2& uv);
 
-        MRAY_HYBRID
+        MR_HF_DECL
         static std::array<Vector2, 2> Gradient(Float coneAperture,
                                                const Vector3& dirYUp);
     };
@@ -80,26 +80,26 @@ namespace LightDetail
         bool                    isTwoSided;
 
         public:
-        MRAY_HYBRID         LightPrim(const SpectrumConverter& sTransContext,
+        MR_HF_DECL          LightPrim(const SpectrumConverter& sTransContext,
                                       const Primitive& p,
                                       const LightData& soa, LightKey);
 
-        MRAY_HYBRID
+        MR_HF_DECL
         SampleT<Vector3>    SampleSolidAngle(RNGDispenser& rng,
                                              const Vector3& distantPoint) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Float               PdfSolidAngle(const typename Primitive::Hit& hit,
                                           const Vector3& distantPoint,
                                           const Vector3& dir) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         SampleT<Ray>        SampleRay(RNGDispenser& rng) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Float               PdfRay(const Ray&) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Spectrum            EmitViaHit(const Vector3& wO,
                                        const typename Primitive::Hit& hit,
                                        const RayCone& rayCone) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Spectrum            EmitViaSurfacePoint(const Vector3& wO,
                                                 const Vector3& surfacePoint,
                                                 const RayCone& rayCone) const;
@@ -129,32 +129,32 @@ namespace LightDetail
         RadianceMap             radiance;
         Float                   sceneDiameter;
 
-        MRAY_HYBRID
+        MR_HF_DECL
         SampleT<Vector2>    SampleUV(Vector2 xi) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Float               PdfUV(Vector2 uv) const;
 
         public:
-        MRAY_HYBRID         LightSkysphere(const SpectrumConverter& sTransContext,
+        MR_HF_DECL          LightSkysphere(const SpectrumConverter& sTransContext,
                                            const Primitive& p,
                                            const DataSoA& soa, LightKey);
 
-        MRAY_HYBRID
+        MR_HF_DECL
         SampleT<Vector3>    SampleSolidAngle(RNGDispenser& dispenser,
                                              const Vector3& distantPoint) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Float               PdfSolidAngle(const typename Primitive::Hit& hit,
                                           const Vector3& distantPoint,
                                           const Vector3& dir) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         SampleT<Ray>        SampleRay(RNGDispenser& dispenser) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Float               PdfRay(const Ray&) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Spectrum            EmitViaHit(const Vector3& wO,
                                        const typename Primitive::Hit& hit,
                                        const RayCone& rayCone) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Spectrum            EmitViaSurfacePoint(const Vector3& wO,
                                                 const Vector3& surfacePoint,
                                                 const RayCone& rayCone) const;
@@ -173,26 +173,26 @@ namespace LightDetail
         static constexpr uint32_t SampleSolidAngleRNCount   = 0;
         static constexpr uint32_t SampleRayRNCount          = 0;
 
-        MRAY_HYBRID         LightNull(const SpectrumConverter& sTransContext,
+        MR_HF_DECL          LightNull(const SpectrumConverter& sTransContext,
                                       const Primitive& p,
                                       const DataSoA& soa, LightKey);
 
-        MRAY_HYBRID
+        MR_HF_DECL
         SampleT<Vector3>    SampleSolidAngle(RNGDispenser&,
                                              const Vector3&) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Float               PdfSolidAngle(const typename Primitive::Hit&,
                                           const Vector3&,
                                           const Vector3&) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         SampleT<Ray>        SampleRay(RNGDispenser&) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Float               PdfRay(const Ray&) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Spectrum            EmitViaHit(const Vector3&,
                                        const typename Primitive::Hit&,
                                        const RayCone&) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Spectrum            EmitViaSurfacePoint(const Vector3&, const Vector3&,
                                                 const RayCone&) const;
     };

@@ -138,6 +138,7 @@ namespace Math
     template<FloatC T> MR_PF_DECL T FMod(T, T) noexcept;
     template<FloatC T> MR_PF_DECL auto ModF(T) noexcept -> std::array<T, 2>;
     template<FloatC T> MR_PF_DECL auto ModFInt(T) noexcept -> std::pair<IntegralSister<T>, T>;
+    template<FloatC T> MR_PF_DECL T Pow(T, T) noexcept;
     // For vector types, we add as we needed in generic code,
     // Or friction is good here. When implementing cost of the routine
     // will be present on the caller side.
@@ -149,7 +150,7 @@ namespace Math
     template<FloatVectorC T> MR_PF_DECL T Round(const T&) noexcept;
     template<FloatVectorC T> MR_PF_DECL T Ceil(const T&) noexcept;
     template<FloatVectorC T> MR_PF_DECL T Floor(const T&) noexcept;
-    template<FloatVectorC T> MR_PF_DECL auto RoundInt(const T&) noexcept -> Vector<T::Dims, IntegralSister<T>>;
+    template<FloatVectorC T> MR_PF_DECL auto RoundInt(const T&) noexcept -> Vector<T::Dims, IntegralSister<typename T::InnerType>>;
     //
     template<FloatVectorC T> MR_PF_DECL T Sqrt(T) noexcept;
     template<FloatVectorC T> MR_PF_DECL T SqrtMax(T) noexcept;
@@ -237,14 +238,16 @@ MR_PF_DEF T NextMultiple(const T& value, const T& divisor) noexcept
 template<IntegralC T>
 MR_PF_DEF T NextPowerOfTwo(T value) noexcept
 {
-    assert(value > (T(1) << (std::numeric_limits<T>::digits - 1)));
-    return T(1) << Bit::RequiredBitsToRepresent(value);
+    assert(value < (T(1) << (std::numeric_limits<T>::digits - 1)));
+    if(value <= T(1)) return T(1);
+    return T(1) << Bit::RequiredBitsToRepresent(value - 1);
 }
 
 template<IntegralC T>
 MR_PF_DEF T PrevPowerOfTwo(T value) noexcept
 {
     assert(value <= T(1));
+    if(value <= T(0)) return T(0);
     return T(1) << (Bit::RequiredBitsToRepresent(value) - 1);
 }
 
@@ -301,7 +304,6 @@ MR_PF_DEF T Abs(T v) noexcept
         return std::abs(v);
     // GPU Code path
     #else
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)      return fabsf(v);
         if constexpr(std::is_same_v<T, double>)     return fabs(v);
         if constexpr(std::is_same_v<T, int64_t>)    return llabs(v);
@@ -327,12 +329,10 @@ MR_PF_DEF T AbsDif(T x, T y) noexcept
         else return (x > y) ? (x - y) : (y - x);
     // GPU Code path
     #else
-        static_assert(std::is_same<T, long double>, "Long double is not supported yet!");
-
         if constexpr(std::is_same_v<T, float>)
-            return fdimf(v);
+            return fdimf(x, y);
         if constexpr(std::is_same_v<T, double>)
-            return fdim(v);
+            return fdim(x, y);
         else return (x > y) ? (x - y) : (y - x);
     #endif
 }
@@ -346,7 +346,6 @@ MR_PF_DEF T Max(T x, T y) noexcept
         return std::max(x, y);
     // GPU Code path
     #else
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)   return fmaxf(x, y);
         if constexpr(std::is_same_v<T, double>)  return fmax(x, y);
         if constexpr(std::is_same_v<T, int64_t>) return max(x, y);
@@ -367,7 +366,6 @@ MR_PF_DEF T Min(T x, T y) noexcept
         return std::min(x, y);
     // GPU Code path
     #else
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)   return fminf(x, y);
         if constexpr(std::is_same_v<T, double>)  return fmin(x, y);
         if constexpr(std::is_same_v<T, int64_t>) return min(x, y);
@@ -425,7 +423,7 @@ MR_PF_DEF T Clamp(T v, T min, T max) noexcept
     constexpr unsigned int N = T::Dims;
     MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; ++i)
-        r[i] = Min(v[i]);
+        r[i] = Clamp(v[i], min[i], max[i]);
     return r;
 }
 
@@ -501,7 +499,6 @@ MR_PF_DEF T Cos(T v) noexcept
         return std::cos(v);
     // GPU Code path
     #else
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return cosf(v);
         if constexpr(std::is_same_v<T, double>) return cos(v);
     #endif
@@ -519,7 +516,6 @@ MR_PF_DEF T Sin(T v) noexcept
         return std::sin(v);
     // GPU Code path
     #else
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return sinf(v);
         if constexpr(std::is_same_v<T, double>) return sin(v);
     #endif
@@ -562,7 +558,6 @@ MR_PF_DEF T Tan(T v) noexcept
         return std::tan(v);
     // GPU Code path
     #else
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return tanf(v);
         if constexpr(std::is_same_v<T, double>) return tan(v);
     #endif
@@ -571,6 +566,7 @@ MR_PF_DEF T Tan(T v) noexcept
 template<FloatC T>
 MR_PF_DEF T ArcCos(T x) noexcept
 {
+    assert(T(-1) <= x && x <= T(1));
     // njuffa
     // https://stackoverflow.com/a/7380529
     if(std::is_constant_evaluated())
@@ -581,7 +577,6 @@ MR_PF_DEF T ArcCos(T x) noexcept
         return std::acos(x);
     // GPU Code path
     #else
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return acosf(x);
         if constexpr(std::is_same_v<T, double>) return acos(x);
     #endif
@@ -590,6 +585,7 @@ MR_PF_DEF T ArcCos(T x) noexcept
 template<FloatC T>
 MR_PF_DEF T ArcSin(T x) noexcept
 {
+    assert(T(-1) <= x && x <= T(1));
     // njuffa
     // https://stackoverflow.com/a/7380529
     if(std::is_constant_evaluated())
@@ -600,7 +596,6 @@ MR_PF_DEF T ArcSin(T x) noexcept
         return std::asin(x);
     // GPU Code path
     #else
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return asinf(x);
         if constexpr(std::is_same_v<T, double>) return asin(x);
     #endif
@@ -635,7 +630,6 @@ MR_PF_DEF T ArcTan(T x) noexcept
         return std::atan(x);
     // GPU Code path
     #else
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return atan(x);
         if constexpr(std::is_same_v<T, double>) return atan(x);
     #endif
@@ -671,7 +665,6 @@ MR_PF_DEF T ArcTan2(T y, T x) noexcept
         return std::atan2(y, x);
     // GPU Code path
     #else
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return atan2(y, x);
         if constexpr(std::is_same_v<T, double>) return atan2(y, x);
     #endif
@@ -688,9 +681,8 @@ MR_PF_DEF std::array<T, 2> SinCos(T x) noexcept
         return {Math::Sin(x), Math::Cos(x)};
     #else
         std::array<T, 2> r;
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
-        if constexpr(std::is_same_v<T, float>)  return sincosf(x, r.data() + 0, r.data() + 1);
-        if constexpr(std::is_same_v<T, double>) return sincos(x, r.data() + 0, r.data() + 1);
+        if constexpr(std::is_same_v<T, float>)  sincosf(x, r.data() + 0, r.data() + 1);
+        if constexpr(std::is_same_v<T, double>) sincos(x, r.data() + 0, r.data() + 1);
         return r;
     #endif
 }
@@ -720,7 +712,6 @@ MR_PF_DEF T ErrFunc(T x) noexcept
     #ifndef MRAY_DEVICE_CODE_PATH
         return std::erf(x);
     #else
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return erff(x);
         if constexpr(std::is_same_v<T, double>) return erf(x);
     #endif
@@ -730,7 +721,6 @@ template<FloatC T>
 MR_PF_DEF T InvErrFunc(T x) noexcept
 {
     #ifdef MRAY_DEVICE_CODE_PATH
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return erfinvf(x);
         if constexpr(std::is_same_v<T, double>) return erfinv(x);
     #endif
@@ -815,7 +805,6 @@ MR_PF_DEF T Exp(T x) noexcept
     #ifndef MRAY_DEVICE_CODE_PATH
         return std::exp(x);
     #else
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return expf(x);
         if constexpr(std::is_same_v<T, double>) return exp(x);
     #endif
@@ -847,7 +836,6 @@ MR_PF_DEF T Exp2(T x) noexcept
     #ifndef MRAY_DEVICE_CODE_PATH
         return std::exp2(x);
     #else
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return exp2f(x);
         if constexpr(std::is_same_v<T, double>) return exp2(x);
     #endif
@@ -862,10 +850,9 @@ MR_PF_DEF T Log(T x) noexcept
     {
         using F = float;
         using I = IntegralSister<F>;
-        F m, r, s, t, i, f;
         I e = (Bit::BitCast<I>(x) - I(0x3F2AAAAB)) & I(0xFF800000);
         F m = Bit::BitCast<F>(Bit::BitCast<I>(x) - e);
-        i = (F)e * 1.19209290e-7f; // 0x1.0p-23
+        F i = (F)e * 1.19209290e-7f; // 0x1.0p-23
         // m in [2/3, 4/3]
         F f = m - 1.0f;
         F s = f * f;
@@ -880,7 +867,6 @@ MR_PF_DEF T Log(T x) noexcept
     #ifndef MRAY_DEVICE_CODE_PATH
         return std::log(x);
     #else
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return logf(x);
         if constexpr(std::is_same_v<T, double>) return log(x);
     #endif
@@ -930,7 +916,6 @@ MR_PF_DEF T Log2(T x) noexcept
     #ifndef MRAY_DEVICE_CODE_PATH
         return std::log2(x);
     #else
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return log2f(x);
         if constexpr(std::is_same_v<T, double>) return log2(x);
     #endif
@@ -941,7 +926,7 @@ MR_PF_DEF T Gaussian(T x, T sigma, T mu) noexcept
 {
     assert(sigma > 0);
     using namespace MathConstants;
-    static constexpr T InvSqrt2Pi = (T(1) / Sqrt2<T>()) *  (T(1) / SqrtPi<T>());
+    constexpr T InvSqrt2Pi = (T(1) / Sqrt2<T>()) *  (T(1) / SqrtPi<T>());
     T sigmaInv = T(1) / sigma;
     T result = InvSqrt2Pi * sigmaInv;
     T pow = (x - mu) * sigmaInv;
@@ -958,14 +943,13 @@ MR_PF_DEF T Round(T x) noexcept
         // so no undefined behavour is allowed
         // we can get sloppy code.
         using I = IntegralSister<T>;
-        if(x < T(0)) return I(x - NextFloat(0.5));
-        else         return I(x + NextFloat(0.5));
+        if(x < T(0)) return T(I(x - NextFloat(0.5)));
+        else         return T(I(x + NextFloat(0.5)));
     }
     #ifndef MRAY_DEVICE_CODE_PATH
         return std::round(x);
     #else
         //
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return roundf(x);
         if constexpr(std::is_same_v<T, double>) return round(x);
     #endif
@@ -989,7 +973,6 @@ MR_PF_DEF T Ceil(T x) noexcept
         return std::ceil(x);
     #else
         //
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return ceilf(x);
         if constexpr(std::is_same_v<T, double>) return ceil(x);
     #endif
@@ -1012,7 +995,6 @@ MR_PF_DEF T Floor(T x) noexcept
         return std::floor(x);
     #else
         //
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return floorf(x);
         if constexpr(std::is_same_v<T, double>) return floor(x);
     #endif
@@ -1026,12 +1008,10 @@ MR_PF_DEF auto RoundInt(T x) noexcept -> IntegralSister<T>
         return IntegralSister<T>(Round(x));
     }
     #ifndef MRAY_DEVICE_CODE_PATH
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return std::lround(x);
-        if constexpr(std::is_same_v<T, double>) return std::llround(x);
+        else                                    return std::llround(x);
     #else
         //
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return lroundf(x);
         if constexpr(std::is_same_v<T, double>) return llround(x);
     #endif
@@ -1061,12 +1041,11 @@ MR_PF_DEF T Sqrt(T x) noexcept
     }
     assert(x >= T(0));
     #ifndef MRAY_DEVICE_CODE_PATH
-        return T(1) / Sqrt(x);
+        return std::sqrt(x);
     #else
         //
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
-        if constexpr(std::is_same_v<T, float>)  return rsqrtf(x);
-        if constexpr(std::is_same_v<T, double>) return rsqrt(x);
+        if constexpr(std::is_same_v<T, float>)  return sqrtf(x);
+        if constexpr(std::is_same_v<T, double>) return sqrt(x);
     #endif
 }
 
@@ -1088,7 +1067,6 @@ MR_PF_DEF T RSqrt(T x) noexcept
         return T(1) / Sqrt(x);
     #else
         //
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return rsqrtf(x);
         if constexpr(std::is_same_v<T, double>) return rsqrt(x);
     #endif
@@ -1200,11 +1178,10 @@ MR_PF_DEF T NextFloat(T x) noexcept
         I v = Bit::BitCast<I>(x);
         return Bit::BitCast<T>(++v);
     }
-    static constexpr T MAX = std::numeric_limits<T>::max();
+    constexpr T MAX = std::numeric_limits<T>::max();
     #ifndef MRAY_DEVICE_CODE_PATH
         return std::nextafter(x, MAX);
     #else
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return nextafterf(x, MAX);
         if constexpr(std::is_same_v<T, double>) return nextafter(x, MAX);
     #endif
@@ -1219,11 +1196,10 @@ MR_PF_DEF T PrevFloat(T x) noexcept
         I v = Bit::BitCast<I>(x);
         return Bit::BitCast<T>(--v);
     }
-    static constexpr T MIN = -std::numeric_limits<T>::max();
+    constexpr T MIN = -std::numeric_limits<T>::max();
     #ifndef MRAY_DEVICE_CODE_PATH
         return std::nextafter(x, MIN);
     #else
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  return nextafterf(x, MIN);
         if constexpr(std::is_same_v<T, double>) return nextafter(x, MIN);
     #endif
@@ -1240,9 +1216,8 @@ MR_PF_DEF T FMA(T a, T b, T c) noexcept
         return std::fma(a, b, c);
     // GPU Code path
     #else
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
-        if constexpr(std::is_same_v<T, float>)  return fmaf(v);
-        if constexpr(std::is_same_v<T, double>) return fma(v);
+        if constexpr(std::is_same_v<T, float>)  return fmaf(a, b, c);
+        if constexpr(std::is_same_v<T, double>) return fma(a, b, c);
     #endif
 }
 
@@ -1256,9 +1231,8 @@ MR_PF_DEF T FMod(T x, T y) noexcept
     #ifndef MRAY_DEVICE_CODE_PATH
         return std::fmod(x, y);
     #else
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
-        if constexpr(std::is_same_v<T, float>)  return fmodf(x);
-        if constexpr(std::is_same_v<T, double>) return fmod(x);
+        if constexpr(std::is_same_v<T, float>)  return fmodf(x, y);
+        if constexpr(std::is_same_v<T, double>) return fmod(x, y);
     #endif
 }
 
@@ -1268,14 +1242,13 @@ MR_PF_DEF auto ModF(T x) noexcept -> std::array<T, 2>
     if(std::is_constant_evaluated())
     {
         T intPart = Math::Ceil(x);
-        T fracPart = fracPart - intPart;
+        T fracPart = x - intPart;
         return {intPart, fracPart};
     }
     T intPart, fracPart;
     #ifndef MRAY_DEVICE_CODE_PATH
         fracPart = std::modf(x, &intPart);
     #else
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
         if constexpr(std::is_same_v<T, float>)  fracPart = modff(x, &intPart);
         if constexpr(std::is_same_v<T, double>) fracPart = modf(x, &intPart);
     #endif
@@ -1287,6 +1260,23 @@ MR_PF_DEF auto ModFInt(T x) noexcept -> std::pair<IntegralSister<T>, T>
 {
     const auto& [i, f] = ModF(x);
     return std::pair(static_cast<IntegralSister<T>>(i), f);
+}
+
+template<FloatC T>
+MR_PF_DECL T Pow(T x, T y) noexcept
+{
+    if(std::is_constant_evaluated())
+    {
+        // Invoke undefined behaviour since it is not yet implemented
+        //return T(std::numeric_limits<int32_t>::max() + 1);
+        return T(0);
+    }
+    #ifndef MRAY_DEVICE_CODE_PATH
+        return std::pow(x, y);
+    #else
+        if constexpr(std::is_same_v<T, float>)  return powf(x, y);
+        if constexpr(std::is_same_v<T, double>) return pow(x, y);
+    #endif
 }
 
 template<FloatVectorC T>
@@ -1381,9 +1371,10 @@ MR_PF_DEF T Floor(const T& v) noexcept
 }
 
 template<FloatVectorC T>
-MR_PF_DECL auto RoundInt(const T& v) noexcept -> Vector<T::Dims, IntegralSister<T>>
+MR_PF_DECL auto RoundInt(const T& v) noexcept -> Vector<T::Dims, IntegralSister<typename T::InnerType>>
 {
-    T r;
+    using VecXInt = Vector<T::Dims, IntegralSister<typename T::InnerType>>;
+    VecXInt r;
     constexpr unsigned int N = T::Dims;
     MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
@@ -1490,11 +1481,10 @@ MR_PF_DEF auto Length(const T& v) noexcept -> typename T::InnerType
     #ifdef MRAY_DEVICE_CODE_PATH
         constexpr unsigned int N = T::Dims;
         using F = typename T::InnerType;
-        static_assert(std::is_same_v<T, long double>, "Long double is not supported yet!");
-        if constexpr(N == 3 && std::is_same<F, float>)  return norm3df(v[0], v[1], v[2]);
-        if constexpr(N == 4 && std::is_same<F, float>)  return norm4df(v[0], v[1], v[2], v[3]);
-        if constexpr(N == 3 && std::is_same<F, double>) return norm3d(v[0], v[1], v[2]);
-        if constexpr(N == 4 && std::is_same<F, double>) return norm4d(v[0], v[1], v[2], v[3]);
+        if constexpr(N == 3 && std::is_same_v<F, float>)  return norm3df(v[0], v[1], v[2]);
+        if constexpr(N == 4 && std::is_same_v<F, float>)  return norm4df(v[0], v[1], v[2], v[3]);
+        if constexpr(N == 3 && std::is_same_v<F, double>) return norm3d(v[0], v[1], v[2]);
+        if constexpr(N == 4 && std::is_same_v<F, double>) return norm4d(v[0], v[1], v[2], v[3]);
     #endif
     return Sqrt(LengthSqr(v));
 }
@@ -1516,9 +1506,9 @@ MR_PF_DEF T Normalize(const T& v) noexcept
 template<FloatC T>
 MR_PF_DEF Vector<3, T> Cross(const Vector<3, T>& v0, const Vector<3, T>& v1) noexcept
 {
-    Vector<3, T> result(FMA(v0[1], v1[2], -v0[2]) * v1[1],
-                        FMA(v0[2], v1[0], -v0[0]) * v1[2],
-                        FMA(v0[0], v1[1], -v0[1]) * v1[0]);
+    Vector<3, T> result(FMA(v0[1], v1[2], -v0[2] * v1[1]) ,
+                        FMA(v0[2], v1[0], -v0[0] * v1[2]) ,
+                        FMA(v0[0], v1[1], -v0[1] * v1[0]) );
     return result;
 }
 

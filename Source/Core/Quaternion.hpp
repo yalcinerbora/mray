@@ -274,7 +274,7 @@ MR_PF_DEF Quat<T> Quat<T>::SLerp(const Quat<T>& start,
 {
     using namespace MathConstants;
 
-    T cosTheta = Math::Dot(start, end);
+    T cosTheta = Math::Dot(start.v, end.v);
     // Select closest approach
     T cosFlipped = (cosTheta >= 0) ? cosTheta : (-cosTheta);
 
@@ -356,8 +356,8 @@ MR_PF_DEF Quat<T> Quat<T>::RotationBetweenZAxis(const Vector<3, T>& b) noexcept
     T zDotD = b[2];
 
     // Half angle theorem
-    T sin = Math::Sqrt((1 - zDotD) * T(0.5));
-    T cos = Math::Sqrt((zDotD + 1) * T(0.5));
+    T sin = Math::SqrtMax((T(1) - zDotD) * T(0.5));
+    T cos = Math::SqrtMax((zDotD + T(1)) * T(0.5));
 
     zCrossD = Math::Normalize(zCrossD);
     T x = zCrossD[0] * sin;
@@ -464,7 +464,7 @@ Quat<T> TransformGen::ToSpaceQuat(const Vector<3, T>& xIn,
     //static constexpr T sign = 1;
     //T t = x[0] + y[1] + z[2];
     //T m = max(max(x[0], y[1]), max(z[2], t));
-    //T qmax = static_cast<T>(0.5) * sqrt(1 - t + 2 * m);
+    //T qmax = static_cast<T>(0.5) * Math::Sqrt(1 - t + 2 * m);
     //T denom = static_cast<T>(0.25) * (1 / qmax);
     //if(m == x[0])
     //{

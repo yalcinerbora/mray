@@ -131,6 +131,12 @@ void BinaryPartition(Span<T> dOutput,
             Span<const T> dLocalInput = dInput.subspan(offset, localWCount);
             for(const T& v : dLocalInput)
             {
+                if(((globalOffset.left + localOffset[0]) >= dOutput.size()) &&
+                   ((globalOffset.right + localOffset[1]) >= dOutput.size()))
+                {
+                    __debugbreak();
+                }
+
                 if(op(v))   dOutput[globalOffset.left +  (localOffset[0]++)] = v;
                 else        dOutput[globalOffset.right + (localOffset[1]++)] = v;
             }

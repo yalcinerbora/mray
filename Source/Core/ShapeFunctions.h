@@ -11,21 +11,21 @@ namespace Triangle
 {
     static constexpr uint32_t TRI_VERTEX_COUNT = 3;
 
-    MRAY_HYBRID AABB3   BoundingBox(Span<const Vector3, TRI_VERTEX_COUNT> positions);
-    MRAY_HYBRID Float   Area(Span<const Vector3, TRI_VERTEX_COUNT> positions);
-    MRAY_HYBRID Vector3 Normal(Span<const Vector3, TRI_VERTEX_COUNT> positions);
-    MRAY_HYBRID Vector3 CalculateTangent(const Vector3& p0Normal,
+    MR_HF_DECL AABB3    BoundingBox(Span<const Vector3, TRI_VERTEX_COUNT> positions);
+    MR_HF_DECL Float    Area(Span<const Vector3, TRI_VERTEX_COUNT> positions);
+    MR_HF_DECL Vector3  Normal(Span<const Vector3, TRI_VERTEX_COUNT> positions);
+    MR_HF_DECL Vector3  CalculateTangent(const Vector3& p0Normal,
                                          const std::array<Vector3, 3>& positions,
                                          const std::array<Vector2, 3>& uvs);
-    MRAY_HYBRID Vector3 Project(Span<const Vector3, TRI_VERTEX_COUNT> positions,
+    MR_HF_DECL Vector3  Project(Span<const Vector3, TRI_VERTEX_COUNT> positions,
                                 const Vector3& point);
-    MRAY_HYBRID Vector3 PointToBarycentrics(Span<const Vector3, TRI_VERTEX_COUNT> positions,
+    MR_HF_DECL Vector3  PointToBarycentrics(Span<const Vector3, TRI_VERTEX_COUNT> positions,
                                             const Vector3& point);
 }
 
 namespace Sphere
 {
-    MRAY_HYBRID AABB3 BoundingBox(const Vector3& center, Float radius);
+    MR_HF_DECL AABB3 BoundingBox(const Vector3& center, Float radius);
 }
 
 namespace Polygon
@@ -34,17 +34,17 @@ namespace Polygon
     // calculate triangulation of such polygon via "ear clipping"
     // method. Polygon winding order must be clockwise
     template<size_t N>
-    MRAY_HYBRID
-    constexpr void ClipEars(Span<Vector3ui, N - 2> localIndicesOut,
-                            Span<const Vector3, N> vertices,
-                            const Vector3& normal);
+    MR_HF_DECL constexpr
+    void ClipEars(Span<Vector3ui, N - 2> localIndicesOut,
+                  Span<const Vector3, N> vertices,
+                  const Vector3& normal);
 }
 }
 
 namespace Shape
 {
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 AABB3 Triangle::BoundingBox(Span<const Vector3, TRI_VERTEX_COUNT> positions)
 {
     AABB3 aabb(positions[0], positions[0]);
@@ -55,7 +55,7 @@ AABB3 Triangle::BoundingBox(Span<const Vector3, TRI_VERTEX_COUNT> positions)
     return aabb;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float Triangle::Area(Span<const Vector3, TRI_VERTEX_COUNT> positions)
 {
     Vector3 e0 = positions[1] - positions[0];
@@ -63,7 +63,7 @@ Float Triangle::Area(Span<const Vector3, TRI_VERTEX_COUNT> positions)
     return Math::Length(Math::Cross(e0, e1)) * static_cast<Float>(0.5);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector3 Triangle::Normal(Span<const Vector3, TRI_VERTEX_COUNT> positions)
 {
     Vector3 e0 = positions[1] - positions[0];
@@ -71,7 +71,7 @@ Vector3 Triangle::Normal(Span<const Vector3, TRI_VERTEX_COUNT> positions)
     return Math::Normalize(Math::Cross(e0, e1));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector3 Triangle::CalculateTangent(const Vector3& p0Normal,
                                    const std::array<Vector3, 3>& p,
                                    const std::array<Vector2, 3>& uv)
@@ -108,7 +108,7 @@ Vector3 Triangle::CalculateTangent(const Vector3& p0Normal,
     return (det < Float(0)) ? -tangent : tangent;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector3 Triangle::Project(Span<const Vector3, TRI_VERTEX_COUNT> positions,
                           const Vector3& point)
 {
@@ -118,7 +118,7 @@ Vector3 Triangle::Project(Span<const Vector3, TRI_VERTEX_COUNT> positions,
     return point - Math::Dot(dir, n) * n;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector3 Triangle::PointToBarycentrics(Span<const Vector3, TRI_VERTEX_COUNT> positions,
                                       const Vector3& point)
 {
@@ -139,17 +139,17 @@ Vector3 Triangle::PointToBarycentrics(Span<const Vector3, TRI_VERTEX_COUNT> posi
     return Vector3(a, b, c);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 AABB3 Sphere::BoundingBox(const Vector3& center, Float radius)
 {
     return AABB3(center - radius, center + radius);
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr void Polygon::ClipEars(Span<Vector3ui, N - 2> localIndicesOut,
-                                 Span<const Vector3, N> vertices,
-                                 const Vector3& normal)
+MR_HF_DEF constexpr
+void Polygon::ClipEars(Span<Vector3ui, N - 2> localIndicesOut,
+                       Span<const Vector3, N> vertices,
+                       const Vector3& normal)
 {
     // We "expand" the vertices to previous/next we will access elements
     // via this

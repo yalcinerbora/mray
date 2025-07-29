@@ -64,7 +64,7 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
             nSpan[index[2]] += normal;
         }
         // And normalize it
-        for(auto& n : nSpan) n.NormalizeSelf();
+        for(auto& n : nSpan) n = Math::Normalize(n);
     }
     Span<Vector3> nSpan = normals.value().AccessAs<Vector3>();
 
@@ -157,12 +157,12 @@ AABB3 JsonTriangle::AABB() const
     std::for_each(indexSpan.begin(), indexSpan.end(),
                   [&result, positionSpan](const Vector3ui& index)
     {
-        result.UnionSelf(AABB3(positionSpan[index[0]],
-                               positionSpan[index[0]]));
-        result.UnionSelf(AABB3(positionSpan[index[1]],
-                               positionSpan[index[1]]));
-        result.UnionSelf(AABB3(positionSpan[index[2]],
-                               positionSpan[index[2]]));
+        result = result.Union(AABB3(positionSpan[index[0]],
+                                    positionSpan[index[0]]));
+        result = result.Union(AABB3(positionSpan[index[1]],
+                                    positionSpan[index[1]]));
+        result = result.Union(AABB3(positionSpan[index[2]],
+                                    positionSpan[index[2]]));
     });
     return result;
 }

@@ -478,17 +478,17 @@ class RenderWorkHasher
                                uint32_t maxRayCount,
                                const GPUQueue& queue);
 
-    MRAY_HYBRID
+    MR_HF_DECL
     Vector2ui WorkBatchDataRange() const;
-    MRAY_HYBRID
+    MR_HF_DECL
     Vector2ui WorkBatchBitRange() const;
-    MRAY_HYBRID
+    MR_HF_DECL
     CommonKey BisectBatchPortion(CommonKey key) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     CommonKey HashWorkBatchPortion(HitKeyPack p) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     CommonKey HashWorkDataPortion(HitKeyPack p, RayIndex i) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     CommonKey GenerateWorkKeyGPU(HitKeyPack p, RayIndex i) const;
 };
 
@@ -645,9 +645,9 @@ void RenderWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
         uint32_t primCount = uint32_t(tracerView.primGroups.at(primGroupId)->get()->TotalPrimCount());
         uint32_t matCount = uint32_t(tracerView.matGroups.at(matGroupId)->get()->TotalItemCount());
         uint32_t transformCount = uint32_t(tracerView.transGroups.at(transGroupId)->get()->TotalItemCount());
-        primMaxCount = std::max(primMaxCount, primCount);
-        lmMaxCount = std::max(lmMaxCount, matCount);
-        transMaxCount = std::max(transMaxCount, transformCount);
+        primMaxCount = Math::Max(primMaxCount, primCount);
+        lmMaxCount = Math::Max(lmMaxCount, matCount);
+        transMaxCount = Math::Max(transMaxCount, transformCount);
     }
     // Push light hashes
     for(const auto& work : curLightWorks)
@@ -673,8 +673,8 @@ void RenderWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
 
         uint32_t lightCount = uint32_t(lightGroup->TotalItemCount());
         uint32_t transformCount = uint32_t(transformGroup->TotalItemCount());
-        lmMaxCount = std::max(lmMaxCount, lightCount);
-        transMaxCount = std::max(transMaxCount, transformCount);
+        lmMaxCount = Math::Max(lmMaxCount, lightCount);
+        transMaxCount = Math::Max(transMaxCount, transformCount);
     }
     // TODO: Add camera hashes as well, it may require some redesign
     // Currently we "FF..F" these since we do not support light tracing yet
@@ -695,25 +695,25 @@ void RenderWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
     queue.Barrier().Wait();
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector2ui RenderWorkHasher::WorkBatchDataRange() const
 {
     return Vector2ui(0, dataBits);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector2ui RenderWorkHasher::WorkBatchBitRange() const
 {
     return Vector2ui(dataBits, dataBits + batchBits);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 CommonKey RenderWorkHasher::BisectBatchPortion(CommonKey key) const
 {
     return Bit::FetchSubPortion(key, {dataBits, dataBits + batchBits});
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 CommonKey RenderWorkHasher::HashWorkBatchPortion(HitKeyPack p) const
 {
     static_assert(PrimitiveKey::BatchBits + LightOrMatKey::BatchBits +
@@ -734,7 +734,7 @@ CommonKey RenderWorkHasher::HashWorkBatchPortion(HitKeyPack p) const
     return r;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 CommonKey RenderWorkHasher::HashWorkDataPortion(HitKeyPack p, RayIndex i) const
 {
     // Get the Id portions
@@ -766,7 +766,7 @@ CommonKey RenderWorkHasher::HashWorkDataPortion(HitKeyPack p, RayIndex i) const
     CommonKey result = 0;
     auto WriteKey = [&](uint32_t maxItemBitCount, CommonKey item) -> bool
     {
-        uint32_t bitsForItem = std::min(maxItemBitCount, remainingBits);
+        uint32_t bitsForItem = Math::Min(maxItemBitCount, remainingBits);
         if(bitsForItem == 0) return false;
 
         uint32_t start = currentBit;
@@ -790,7 +790,7 @@ CommonKey RenderWorkHasher::HashWorkDataPortion(HitKeyPack p, RayIndex i) const
     return result;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 CommonKey RenderWorkHasher::GenerateWorkKeyGPU(HitKeyPack p, RayIndex rayIndex) const
 {
     CommonKey batchHash = HashWorkBatchPortion(p);

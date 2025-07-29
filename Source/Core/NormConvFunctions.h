@@ -102,34 +102,26 @@ MR_PF_DEF R NormConversion::FromUNormVarying(T in,T bits) noexcept
 template<std::unsigned_integral T, FloatC R>
 MR_PF_DEF T NormConversion::ToUNorm(R in) noexcept
 {
-    #ifndef MRAY_DEVICE_CODE_PATH
-        using std::round;
-    #endif
-
     assert(in >= R(0) && in <= R(1));
     constexpr R MAX = R(std::numeric_limits<T>::max());
     constexpr R MIN = R(std::numeric_limits<T>::min());
     constexpr R DIFF = (MAX - MIN);
 
     in *= DIFF;
-    in = round(in);
+    in = Math::Round(in);
     return T(in);
 }
 
 template<std::unsigned_integral T, FloatC R>
 MR_PF_DEF T NormConversion::ToUNormVarying(R in, T bits) noexcept
 {
-    #ifndef MRAY_DEVICE_CODE_PATH
-        using std::round;
-    #endif
-
     assert(in >= R(0) && in <= R(1));
     R max = R((T(1) << bits) - T(1));
     R min = R(std::numeric_limits<T>::min());
     R diff = (max - min);
 
     in *= diff;
-    in = round(in);
+    in = Math::Round(in);
     return T(in);
 }
 
@@ -162,10 +154,6 @@ MR_PF_DEF R NormConversion::FromSNorm(T in) noexcept
 template<std::signed_integral T, FloatC R>
 MR_PF_DEF T NormConversion::ToSNorm(R in) noexcept
 {
-    #ifndef MRAY_DEVICE_CODE_PATH
-        using std::round;
-    #endif
-
     assert(in >= R(-1) && in <= R(1));
     // Check "FromSNorm" for more info
     //
@@ -176,6 +164,6 @@ MR_PF_DEF T NormConversion::ToSNorm(R in) noexcept
     constexpr R DIFF = (MAX - R(0));
 
     in *= DIFF;
-    in = round(in);
+    in = Math::Round(in);
     return T(in);
 }

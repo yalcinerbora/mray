@@ -11,7 +11,7 @@ namespace LightDetail
 {
 
 template<PrimitiveC P, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 LightPrim<P, SC>::LightPrim(const SpectrumConverter& specTransformer,
                             const P& p, const LightData& soa, LightKey key)
     : prim(p)
@@ -20,18 +20,19 @@ LightPrim<P, SC>::LightPrim(const SpectrumConverter& specTransformer,
 {}
 
 template<PrimitiveC P, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 SampleT<Vector3> LightPrim<P, SC>::SampleSolidAngle(RNGDispenser& rng,
                                                     const Vector3& distantPoint) const
 {
     const P& primitive = prim.get();
     SampleT<BasicSurface> surfaceSample = primitive.SampleSurface(rng);
     Vector3 sampledDir = (distantPoint - surfaceSample.value.position);
-    Float distSqr = sampledDir.LengthSqr();
-    sampledDir.NormalizeSelf();
+    Float distSqr = Math::LengthSqr(sampledDir);
+    sampledDir = Math::Normalize(sampledDir);
 
-    Float NdL = surfaceSample.value.normal.Dot(sampledDir);
-    NdL = (isTwoSided) ? std::abs(NdL) : std::max(Float{0}, NdL);
+    const auto& N = surfaceSample.value.normal;
+    Float NdL = Math::Dot(N, sampledDir);
+    NdL = (isTwoSided) ? Math::Abs(NdL) : Math::Max(Float{0}, NdL);
     // Get projected area
     Float pdf = (NdL == 0) ? Float{0.0} : surfaceSample.pdf / NdL;
     pdf *= distSqr;
@@ -44,15 +45,11 @@ SampleT<Vector3> LightPrim<P, SC>::SampleSolidAngle(RNGDispenser& rng,
 }
 
 template<PrimitiveC P, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float LightPrim<P, SC>::PdfSolidAngle(const typename P::Hit& hit,
                                       const Vector3& distantPoint,
                                       const Vector3& dir) const
 {
-    #ifndef MRAY_DEVICE_CODE_PATH
-        using namespace std;
-    #endif
-
     const P& primitive = prim.get();
     // Project point to surface
     Optional<BasicSurface> surfaceOpt = primitive.SurfaceFromHit(hit);
@@ -60,16 +57,16 @@ Float LightPrim<P, SC>::PdfSolidAngle(const typename P::Hit& hit,
     const BasicSurface& surface = surfaceOpt.value();
 
     Float pdf = primitive.PdfSurface(hit);
-    Float NdL = surface.normal.Dot(-dir);
-    NdL = (isTwoSided) ? abs(NdL) : std::max(Float{0}, NdL);
+    Float NdL = Math::Dot(surface.normal, -dir);
+    NdL = (isTwoSided) ? abs(NdL) : Math::Max(Float{0}, NdL);
     // Get projected area
     pdf = (NdL == 0) ? Float{0} : pdf / NdL;
-    pdf *= (distantPoint - surface.position).LengthSqr();
+    pdf *= Math::LengthSqr(distantPoint - surface.position);
     return pdf;
 }
 
 template<PrimitiveC P, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 SampleT<Ray> LightPrim<P, SC>::SampleRay(RNGDispenser& rng) const
 {
     using Distribution::Common::SampleUniformDirection;
@@ -99,7 +96,7 @@ SampleT<Ray> LightPrim<P, SC>::SampleRay(RNGDispenser& rng) const
 }
 
 template<PrimitiveC P, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float LightPrim<P, SC>::PdfRay(const Ray& ray) const
 {
     using Hit = typename P::Hit;
@@ -112,7 +109,7 @@ Float LightPrim<P, SC>::PdfRay(const Ray& ray) const
     Optional<BasicSurface> surf = primitive.SurfaceFromHit(*hit);
     if(!surf.has_value()) return Float(0);
 
-    Float NdL = (*surf).normal.Dot(ray.Dir());
+    Float NdL = Math::Dot((*surf).normal, ray.Dir());
     if(!isTwoSided && NdL <= Float(0))
         return Float(0);
 
@@ -124,7 +121,7 @@ Float LightPrim<P, SC>::PdfRay(const Ray& ray) const
 }
 
 template<PrimitiveC P, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Spectrum LightPrim<P, SC>::EmitViaHit(const Vector3& wO,
                                       const typename P::Hit& hit,
                                       const RayCone&) const
@@ -138,7 +135,7 @@ Spectrum LightPrim<P, SC>::EmitViaHit(const Vector3& wO,
     Optional<BasicSurface> surf = primitive.SurfaceFromHit(hit);
     if(!surf.has_value()) return Spectrum::Zero();
 
-    Float NdL = (*surf).normal.Dot(wO);
+    Float NdL = Math::Dot((*surf).normal, wO);
     if(!isTwoSided && NdL <= Float(0))
         return Spectrum::Zero();
 
@@ -147,7 +144,7 @@ Spectrum LightPrim<P, SC>::EmitViaHit(const Vector3& wO,
 }
 
 template<PrimitiveC P, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Spectrum LightPrim<P, SC>::EmitViaSurfacePoint(const Vector3& wO,
                                                const Vector3& surfacePoint,
                                                const RayCone&) const
@@ -163,7 +160,7 @@ Spectrum LightPrim<P, SC>::EmitViaSurfacePoint(const Vector3& wO,
     Optional<BasicSurface> surf = primitive.SurfaceFromHit(*hit);
     if(!surf.has_value()) return Spectrum::Zero();
 
-    Float NdL = (*surf).normal.Dot(wO);
+    Float NdL = Math::Dot((*surf).normal, wO);
     if(!isTwoSided && NdL <= Float(0))
         return Spectrum::Zero();
 
@@ -176,7 +173,7 @@ Spectrum LightPrim<P, SC>::EmitViaSurfacePoint(const Vector3& wO,
 namespace LightDetail
 {
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector2 SphericalCoordConverter::DirToUV(const Vector3& dirYUp)
 {
     Vector3 dirZUp = TransformGen::YUpToZUp(dirYUp);
@@ -185,7 +182,7 @@ Vector2 SphericalCoordConverter::DirToUV(const Vector3& dirYUp)
     return uv;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector3 SphericalCoordConverter::UVToDir(const Vector2& uv)
 {
     Vector2 thetaPhi = Graphics::UVToSphericalAngles(uv);
@@ -194,13 +191,9 @@ Vector3 SphericalCoordConverter::UVToDir(const Vector2& uv)
     return dirYUp;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float SphericalCoordConverter::ToSolidAnglePdf(Float pdf, const Vector3& dirYUp)
 {
-    #ifndef MRAY_DEVICE_CODE_PATH
-        using namespace std;
-    #endif
-
     using namespace MathConstants;
     // There is code duplication here hopefully this will optimized out
     Vector3 dirZUp = TransformGen::YUpToZUp(dirYUp);
@@ -208,38 +201,31 @@ Float SphericalCoordConverter::ToSolidAnglePdf(Float pdf, const Vector3& dirYUp)
 
     // Convert to solid angle pdf
     // http://www.pbr-book.org/3ed-2018/Light_Transport_I_Surface_Reflection/Sampling_Light_Sources.html
-    Float sinPhi = sin(thetaPhi[1]);
+    Float sinPhi = Math::Sin(thetaPhi[1]);
     pdf = (sinPhi <= 0) ? 0 : pdf / (2 * PiSqr<Float>() * sinPhi);
     assert(pdf >= Float(0));
     return pdf;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float SphericalCoordConverter::ToSolidAnglePdf(Float pdf, const Vector2& uv)
 {
-    #ifndef MRAY_DEVICE_CODE_PATH
-        using namespace std;
-    #endif
-
     using namespace MathConstants;
     // Similar to the direction version, code duplication here
     Vector2 thetaPhi = Graphics::UVToSphericalAngles(uv);
     // Convert to solid angle pdf
     // http://www.pbr-book.org/3ed-2018/Light_Transport_I_Surface_Reflection/Sampling_Light_Sources.html
-    Float sinPhi = sin(thetaPhi[1]);
+    Float sinPhi = Math::Sin(thetaPhi[1]);
     pdf = (sinPhi <= 0) ? 0 : pdf / (2 * PiSqr<Float>() * sinPhi);
     assert(pdf >= Float(0));
     return pdf;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 std::array<Vector2, 2>
 SphericalCoordConverter::Gradient(Float coneAperture,
                                   const Vector3& dirYUp)
 {
-    #ifndef MRAY_DEVICE_CODE_PATH
-        using namespace std;
-    #endif
     // Ray Tracing Gems I Chapter 21
     // requires the texture width.
     // We do not have these on the system (which should be
@@ -249,7 +235,7 @@ SphericalCoordConverter::Gradient(Float coneAperture,
     // For Lat/Lon mapping, we can find the cos(phi) to increase
     // the resolution towards poles.
     Float cosPhi = MathConstants::Pi<Float>() * Float(0.5);
-    cosPhi -= abs(dirYUp[1]);
+    cosPhi -= Math::Abs(dirYUp[1]);
 
     // On horizon, du change is constant and is between [0 2pi)
     Float coneAngle = coneAperture * Float(0.5);
@@ -264,7 +250,7 @@ SphericalCoordConverter::Gradient(Float coneAperture,
     return {Vector2(dpdx, 0), Vector2(0, dpdy)};
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector2 CoOctaCoordConverter::DirToUV(const Vector3& dirYUp)
 {
     Vector3 dirZUp = TransformGen::YUpToZUp(dirYUp);
@@ -272,7 +258,7 @@ Vector2 CoOctaCoordConverter::DirToUV(const Vector3& dirYUp)
     return uv;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector3 CoOctaCoordConverter::UVToDir(const Vector2& uv)
 {
     Vector3 dirZUp = Graphics::ConcentricOctahedralToDirection(uv);
@@ -280,21 +266,21 @@ Vector3 CoOctaCoordConverter::UVToDir(const Vector2& uv)
     return dirYUp;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float CoOctaCoordConverter::ToSolidAnglePdf(Float pdf, const Vector3&)
 {
     using namespace MathConstants;
     return pdf * Float(0.25) * InvPi<Float>();
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float CoOctaCoordConverter::ToSolidAnglePdf(Float pdf, const Vector2&)
 {
     using namespace MathConstants;
     return pdf * Float(0.25) * InvPi<Float>();
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 std::array<Vector2, 2>
 CoOctaCoordConverter::Gradient(Float coneAperture,
                                const Vector3&)
@@ -311,7 +297,7 @@ CoOctaCoordConverter::Gradient(Float coneAperture,
     //
     Float omega = MathConstants::Pi<Float>() * Float(2);
     Float coneAngle = coneAperture * Float(0.5);
-    omega *= Float(1) - std::cos(coneAngle);
+    omega *= Float(1) - Math::Cos(coneAngle);
 
     // Omega changes wrt. entire solid angle domain which is 4pi
     Float duv = omega * MathConstants::Inv4Pi<Float>();
@@ -320,7 +306,7 @@ CoOctaCoordConverter::Gradient(Float coneAperture,
 }
 
 template<CoordConverterC CC, TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 SampleT<Vector2> LightSkysphere<CC, TC, SC>::SampleUV(Vector2 xi) const
 {
     if(radiance.IsConstant())
@@ -330,7 +316,7 @@ SampleT<Vector2> LightSkysphere<CC, TC, SC>::SampleUV(Vector2 xi) const
 }
 
 template<CoordConverterC CC, TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float LightSkysphere<CC, TC, SC>::PdfUV(Vector2 uv) const
 {
     if(radiance.IsConstant())
@@ -340,7 +326,7 @@ Float LightSkysphere<CC, TC, SC>::PdfUV(Vector2 uv) const
 }
 
 template<CoordConverterC CC, TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 LightSkysphere<CC, TC, SC>::LightSkysphere(const SpectrumConverter& specTransformer,
                                            const Primitive& p, const LightSkysphereData& soa, LightKey key)
     : prim(p)
@@ -350,7 +336,7 @@ LightSkysphere<CC, TC, SC>::LightSkysphere(const SpectrumConverter& specTransfor
 {}
 
 template<CoordConverterC CC, TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 SampleT<Vector3> LightSkysphere<CC, TC, SC>::SampleSolidAngle(RNGDispenser& rng,
                                                               const Vector3& distantPoint) const
 {
@@ -371,20 +357,20 @@ SampleT<Vector3> LightSkysphere<CC, TC, SC>::SampleSolidAngle(RNGDispenser& rng,
 }
 
 template<CoordConverterC CC, TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float LightSkysphere<CC, TC, SC>::PdfSolidAngle(const typename EmptyPrimitive<TC>::Hit&,
                                                 const Vector3&,
                                                 const Vector3& dir) const
 {
     Vector3 dirYUp = prim.get().GetTransformContext().InvApplyV(dir);
-    Vector2 uv = CC::DirToUV(dirYUp.Normalize());
+    Vector2 uv = CC::DirToUV(Math::Normalize(dirYUp));
     Float pdf = PdfUV(uv);
     pdf = CC::ToSolidAnglePdf(pdf, dirYUp);
     return pdf;
 }
 
 template<CoordConverterC CC, TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 SampleT<Ray> LightSkysphere<CC, TC, SC>::SampleRay(RNGDispenser& rng) const
 {
     // What is the probability?
@@ -407,7 +393,7 @@ SampleT<Ray> LightSkysphere<CC, TC, SC>::SampleRay(RNGDispenser& rng) const
 }
 
 template<CoordConverterC CC, TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float LightSkysphere<CC, TC, SC>::PdfRay(const Ray& ray) const
 {
     Vector3 dirYUp = prim.get().GetTransformContext().InvApplyV(-ray.Dir());
@@ -418,12 +404,12 @@ Float LightSkysphere<CC, TC, SC>::PdfRay(const Ray& ray) const
 }
 
 template<CoordConverterC CC, TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Spectrum LightSkysphere<CC, TC, SC>::EmitViaHit(const Vector3& wO,
                                                 const typename EmptyPrimitive<TC>::Hit&,
                                                 const RayCone&) const
 {
-    Vector3 dirYUp = prim.get().GetTransformContext().InvApplyV(-wO).Normalize();
+    Vector3 dirYUp = Math::Normalize(prim.get().GetTransformContext().InvApplyV(-wO));
     Vector2 uv = radiance.IsConstant()
                     ? Vector2::Zero()
                     : CC::DirToUV(dirYUp);
@@ -437,12 +423,12 @@ Spectrum LightSkysphere<CC, TC, SC>::EmitViaHit(const Vector3& wO,
 }
 
 template<CoordConverterC CC, TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Spectrum LightSkysphere<CC, TC, SC>::EmitViaSurfacePoint(const Vector3& wO,
                                                          const Vector3&,
                                                          const RayCone&) const
 {
-    Vector3 dirYUp = prim.get().GetTransformContext().InvApplyV(-wO).Normalize();
+    Vector3 dirYUp = Math::Normalize(prim.get().GetTransformContext().InvApplyV(-wO));
     Vector2 uv = radiance.IsConstant()
                     ? Vector2::Zero()
                     : CC::DirToUV(dirYUp);
@@ -451,7 +437,7 @@ Spectrum LightSkysphere<CC, TC, SC>::EmitViaSurfacePoint(const Vector3& wO,
     // Probably we need to have a distribution for each mip level to make it
     // work?
     //auto [dpdx, dpdy] = CC::Gradient(rayCone.aperture, dirYUp);
-    //return radiance(uv, dpdx, dpdy).value();
+    //return radiance(uv, dpdx, dpdy);
     return radiance(uv);
 }
 
@@ -464,14 +450,14 @@ namespace LightDetail
 {
 
 template<TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 LightNull<TC, SC>::LightNull(const SpectrumConverter&,
                              const Primitive&,
                              const DataSoA&, LightKey)
 {}
 
 template<TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 SampleT<Vector3> LightNull<TC, SC>::SampleSolidAngle(RNGDispenser&,
                                                      const Vector3&) const
 {
@@ -484,7 +470,7 @@ SampleT<Vector3> LightNull<TC, SC>::SampleSolidAngle(RNGDispenser&,
 }
 
 template<TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float LightNull<TC, SC>::PdfSolidAngle(const typename Primitive::Hit&,
                                        const Vector3&,
                                        const Vector3&) const
@@ -493,7 +479,7 @@ Float LightNull<TC, SC>::PdfSolidAngle(const typename Primitive::Hit&,
 }
 
 template<TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 SampleT<Ray> LightNull<TC, SC>::SampleRay(RNGDispenser&) const
 {
     return SampleT<Ray>
@@ -504,14 +490,14 @@ SampleT<Ray> LightNull<TC, SC>::SampleRay(RNGDispenser&) const
 }
 
 template<TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float LightNull<TC, SC>::PdfRay(const Ray&) const
 {
     return Float(0.0);
 }
 
 template<TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Spectrum LightNull<TC, SC>::EmitViaHit(const Vector3&,
                                        const typename Primitive::Hit&,
                                        const RayCone&) const
@@ -520,7 +506,7 @@ Spectrum LightNull<TC, SC>::EmitViaHit(const Vector3&,
 }
 
 template<TransformContextC TC, class SC>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Spectrum LightNull<TC, SC>::EmitViaSurfacePoint(const Vector3&, const Vector3&,
                                                 const RayCone&) const
 {

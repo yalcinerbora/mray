@@ -51,7 +51,7 @@ namespace Color
     constexpr Vector2 D65Whitepoint = Vector2(0.31272, 0.32903);
     constexpr Vector2 D75Whitepoint = Vector2(0.29902, 0.31485);
 
-    MR_PF_DECL Primaries FindPrimaries(MRayColorSpaceEnum) noexcept;
+    MR_PF_DECL Primaries FindPrimaries(MRayColorSpaceEnum);
 
     // Colorspace guarantees whitepoints match
     // by enforcing every colorspace to convert to D65
@@ -89,7 +89,7 @@ namespace Color
         public:
         ColorspaceTransfer() = default;
 
-        MR_HF_DECL Vector3 Convert(const Vector3& rgb) const noexcept;
+        MR_PF_DECL Vector3 Convert(const Vector3& rgb) const noexcept;
     };
 
     // EOTF/OETF (Gamma) Related Conversions
@@ -111,7 +111,7 @@ namespace Color
     class OpticalTransferIdentity
     {
         public:
-        MR_HF_DECL Vector3 ToLinear(const Vector3& color) const noexcept;
+        MR_PF_DEF Vector3 ToLinear(const Vector3& color) const noexcept;
     };
 }
 
@@ -231,7 +231,7 @@ MR_PF_DEF Matrix3x3 Color::GenXYZToRGB(const Primaries& p) noexcept
     return GenRGBToXYZ(p).Inverse();
 }
 
-MR_PF_DEF Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E) noexcept
+MR_PF_DEF Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E)
 {
     using ColorspacePrimaryList = std::array<Pair<MRayColorSpaceEnum, Primaries>,
                                              static_cast<size_t>(MRayColorSpaceEnum::MR_END)>;
@@ -341,7 +341,7 @@ MR_PF_DEF Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E) noexcept
         }
 
         #ifndef MRAY_DEVICE_CODE_PATH
-        // Throw as verbose as possible
+            // Throw as verbose as possible
             throw MRayError("Unkown colorspace enumeration ({})! Enum should be "
                             "\"{} <= E < {}\"",
                             static_cast<uint32_t>(E), uint32_t(0),
@@ -373,8 +373,7 @@ MR_PF_DEF Vector3 Color::Colorspace<E>::FromXYZ(const Vector3& xyz) const noexce
 }
 
 template <MRayColorSpaceEnum F, MRayColorSpaceEnum T>
-MR_PF_DEF constexpr
-Vector3 Color::ColorspaceTransfer<F, T>::Convert(const Vector3& rgb) const noexcept
+MR_PF_DEF Vector3 Color::ColorspaceTransfer<F, T>::Convert(const Vector3& rgb) const noexcept
 {
     // Passing matrix to local space (GPU does not like static constexpr variables)
     constexpr auto Mat = RGBToRGBMatrix;
@@ -393,8 +392,7 @@ MR_PF_DEF Vector3 Color::OpticalTransferGamma::ToLinear(const Vector3& color) co
                    Math::Pow(color[2], gamma));
 }
 
-MR_PF_DEF constexpr
-Vector3 Color::OpticalTransferIdentity::ToLinear(const Vector3& color) const noexcept
+MR_PF_DEF Vector3 Color::OpticalTransferIdentity::ToLinear(const Vector3& color) const noexcept
 {
     return color;
 }

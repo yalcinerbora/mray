@@ -11,8 +11,8 @@
 template <class T>
 struct Transformer
 {
-    MRAY_HYBRID MRAY_CGPU_INLINE
-    T operator()(const T& t) const
+    MR_PF_DECL
+    T operator()(const T& t) const noexcept
     {
         return t * T(2);
     }

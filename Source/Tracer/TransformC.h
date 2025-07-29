@@ -10,7 +10,7 @@
 
 struct KCInvertTransforms
 {
-    MRAY_HYBRID Matrix4x4 operator()(const Matrix4x4&) const;
+    MR_PF_DECL Matrix4x4 operator()(const Matrix4x4&) const noexcept;
 };
 
 template <class TContext>
@@ -69,20 +69,20 @@ class TransformContextIdentity
 {
     public:
     // Constructors & Destructor
-                        TransformContextIdentity() = default;
-    MRAY_HYBRID         TransformContextIdentity(const EmptyType&, TransformKey) {}
+                TransformContextIdentity() = default;
+    MR_PF_DECL  TransformContextIdentity(const EmptyType&, TransformKey) {}
     //
-    MRAY_HYBRID Vector3 Scale() const;
-    MRAY_HYBRID Vector3 ApplyP(const Vector3& point) const;
-    MRAY_HYBRID Vector3 ApplyV(const Vector3& vec) const;
-    MRAY_HYBRID Vector3 ApplyN(const Vector3& norm) const;
-    MRAY_HYBRID AABB3   Apply(const AABB3& aabb) const;
-    MRAY_HYBRID Ray     Apply(const Ray& ray) const;
-    MRAY_HYBRID Vector3 InvApplyP(const Vector3& point) const;
-    MRAY_HYBRID Vector3 InvApplyV(const Vector3& vec) const;
-    MRAY_HYBRID Vector3 InvApplyN(const Vector3& norm) const;
-    MRAY_HYBRID AABB3   InvApply(const AABB3& aabb) const;
-    MRAY_HYBRID Ray     InvApply(const Ray& ray) const;
+    MR_PF_DECL Vector3  Scale() const noexcept;
+    MR_PF_DECL Vector3  ApplyP(const Vector3& point) const noexcept;
+    MR_PF_DECL Vector3  ApplyV(const Vector3& vec) const noexcept;
+    MR_PF_DECL Vector3  ApplyN(const Vector3& norm) const noexcept;
+    MR_PF_DECL AABB3    Apply(const AABB3& aabb) const noexcept;
+    MR_PF_DECL Ray      Apply(const Ray& ray) const noexcept;
+    MR_PF_DECL Vector3  InvApplyP(const Vector3& point) const noexcept;
+    MR_PF_DECL Vector3  InvApplyV(const Vector3& vec) const noexcept;
+    MR_PF_DECL Vector3  InvApplyN(const Vector3& norm) const noexcept;
+    MR_PF_DECL AABB3    InvApply(const AABB3& aabb) const noexcept;
+    MR_PF_DECL Ray      InvApply(const Ray& ray) const noexcept;
 
 };
 
@@ -93,7 +93,7 @@ class TransformGroupIdentity final : public GenericGroupTransform<TransformGroup
     using DataSoA           = EmptyType;
     static std::string_view TypeName();
 
-    MRAY_HYBRID
+    MR_HF_DECL
     static Matrix4x4 AcquireCommonTransform(DataSoA, TransformKey);
 
     public:
@@ -117,8 +117,8 @@ class TransformGroupIdentity final : public GenericGroupTransform<TransformGroup
     DataSoA         SoA() const;
 };
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-Matrix4x4 KCInvertTransforms::operator()(const Matrix4x4& matrix) const
+MR_PF_DEF
+Matrix4x4 KCInvertTransforms::operator()(const Matrix4x4& matrix) const noexcept
 {
     return matrix.Inverse();
 }
@@ -143,75 +143,64 @@ std::string_view GenericGroupTransform<C>::Name() const
 static_assert(TransformContextC<TransformContextIdentity>);
 static_assert(TransformGroupC<TransformGroupIdentity>);
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 TransformContextIdentity::Scale() const
+MR_PF_DEF Vector3 TransformContextIdentity::Scale() const noexcept
 {
     return Vector3(1);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 TransformContextIdentity::ApplyP(const Vector3& point) const
+MR_PF_DEF Vector3 TransformContextIdentity::ApplyP(const Vector3& point) const noexcept
 {
     return point;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 TransformContextIdentity::ApplyV(const Vector3& vec) const
+MR_PF_DEF Vector3 TransformContextIdentity::ApplyV(const Vector3& vec) const noexcept
 {
     return vec;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 TransformContextIdentity::ApplyN(const Vector3& norm) const
+MR_PF_DEF Vector3 TransformContextIdentity::ApplyN(const Vector3& norm) const noexcept
 {
     return norm;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-AABB3 TransformContextIdentity::Apply(const AABB3& aabb) const
+MR_PF_DEF AABB3 TransformContextIdentity::Apply(const AABB3& aabb) const noexcept
 {
     return aabb;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-Ray TransformContextIdentity::Apply(const Ray& ray) const
+MR_PF_DEF Ray TransformContextIdentity::Apply(const Ray& ray) const noexcept
 {
     return ray;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 TransformContextIdentity::InvApplyP(const Vector3& point) const
+MR_PF_DEF Vector3 TransformContextIdentity::InvApplyP(const Vector3& point) const noexcept
 {
     return point;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 TransformContextIdentity::InvApplyV(const Vector3& vec) const
+MR_PF_DEF Vector3 TransformContextIdentity::InvApplyV(const Vector3& vec) const noexcept
 {
     return vec;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 TransformContextIdentity::InvApplyN(const Vector3& norm) const
+MR_PF_DEF Vector3 TransformContextIdentity::InvApplyN(const Vector3& norm) const noexcept
 {
     return norm;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-AABB3 TransformContextIdentity::InvApply(const AABB3& aabb) const
+MR_PF_DEF AABB3 TransformContextIdentity::InvApply(const AABB3& aabb) const noexcept
 {
     return aabb;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-Ray TransformContextIdentity::InvApply(const Ray& ray) const
+MR_PF_DEF Ray TransformContextIdentity::InvApply(const Ray& ray) const noexcept
 {
     return ray;
 }
 
 // Meta Transform Generator Functions
 template <class PrimitiveGroupSoA>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 TransformContextIdentity GenTContextIdentity(const typename TransformGroupIdentity::DataSoA&,
                                              const PrimitiveGroupSoA&,
                                              TransformKey,
@@ -228,7 +217,7 @@ inline std::string_view TransformGroupIdentity::TypeName()
     return TransformTypeName<Name>;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Matrix4x4 TransformGroupIdentity::AcquireCommonTransform(DataSoA, TransformKey)
 {
     return Matrix4x4::Identity();

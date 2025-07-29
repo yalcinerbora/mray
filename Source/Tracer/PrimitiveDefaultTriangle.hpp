@@ -6,7 +6,7 @@ namespace DefaultTriangleDetail
 {
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Triangle<T>::Triangle(const T& transform,
                       const TriangleData& data,
                       PrimitiveKey key)
@@ -26,7 +26,7 @@ Triangle<T>::Triangle(const T& transform,
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Optional<TriIntersection> Triangle<T>::Intersects(const Ray& ray, bool cullBackface) const
 {
     // Intersection
@@ -45,15 +45,11 @@ Optional<TriIntersection> Triangle<T>::Intersects(const Ray& ray, bool cullBackf
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 SampleT<BasicSurface> Triangle<T>::SampleSurface(RNGDispenser& rng) const
 {
-    #ifndef MRAY_DEVICE_CODE_PATH
-        using namespace std;
-    #endif
-
     Vector2 xi = rng.NextFloat2D<0>();
-    Float r1 = sqrt(xi[0]);
+    Float r1 = Math::Sqrt(xi[0]);
     Float r2 = xi[1];
     // Generate Random Barycentrics
     // Osada 2002
@@ -80,7 +76,7 @@ SampleT<BasicSurface> Triangle<T>::SampleSurface(RNGDispenser& rng) const
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float Triangle<T>::PdfSurface(const Hit& hit) const
 {
     Vector3 baryCoords = Vector3(hit[0], hit[1], 1 - hit[0] - hit[1]);
@@ -94,21 +90,21 @@ Float Triangle<T>::PdfSurface(const Hit& hit) const
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float Triangle<T>::GetSurfaceArea() const
 {
     return Shape::Triangle::Area(positions);
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 AABB3 Triangle<T>::GetAABB() const
 {
     return Shape::Triangle::BoundingBox(positions);
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector3 Triangle<T>::GetCenter() const
 {
     Vector3 center = (positions[0] * Float(0.333333333) +
@@ -118,7 +114,7 @@ Vector3 Triangle<T>::GetCenter() const
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
                                Span<Vector2us>& normals,
                                bool onlyCalculateSize,
@@ -126,21 +122,12 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
 {
     using namespace MathConstants;
     using namespace Graphics;
-
-    // Clang signbit definition is only on std namespace
-    // this is a crappy workaround, since this is only a device function
-    // but clang gives an error
-    #ifndef MRAY_DEVICE_CODE_PATH
-        using namespace std;
-    #endif
-
     // World Space Normal (Will be used to determine best projection plane)
     Vector3 normal = Shape::Triangle::Normal(positions);
     normal = transformContext.ApplyN(normal);
     // Find the best projection plane (XY, YZ, XZ)
-    unsigned int domAxis = normal.Abs().Maximum();
-    bool hasNegSign = signbit(normal[domAxis]);
-    float domSign = hasNegSign ? Float{-1} : Float{1};
+    unsigned int domAxis = Math::Abs(normal).Maximum();
+    Float domSign = Math::SignPM1(normal[domAxis]);
 
     // Calculate Spherical UV Coordinates of the normal
     Vector2 sphrCoords = Graphics::CartesianToUnitSpherical(normal);
@@ -150,7 +137,7 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
     // clamp it
     Vector2i sphrUnormInt = Vector2i(static_cast<int32_t>(sphrCoords[0] * Float{65535}),
                                      static_cast<int32_t>(sphrCoords[1] * Float{65535}));
-    sphrUnormInt.ClampSelf(0, 65535);
+    sphrUnormInt = Math::Clamp(sphrUnormInt, 0, 65535);
     Vector2us sphrUnorm = Vector2us(sphrUnormInt[0], sphrUnormInt[1]);
 
     // Look towards to the dominant axis
@@ -159,7 +146,7 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
     {
         case 0: rot = Quaternion(Pi<Float>() * Float {0.5}, -domSign * Vector3::YAxis()); break;
         case 1: rot = Quaternion(Pi<Float>() * Float {0.5},  domSign * Vector3::XAxis()); break;
-        case 2: rot = (hasNegSign) ? Quaternion(Pi<Float>(), Vector3::YAxis()) : Quaternion::Identity(); break;
+        case 2: rot = (domSign == Float(-1)) ? Quaternion(Pi<Float>(), Vector3::YAxis()) : Quaternion::Identity(); break;
         default: assert(false); return 0;
     }
     Vector2i rasterResolution;
@@ -196,13 +183,13 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
     // Find AABB then start scan line
     Vector2 aabbMin = Vector2(std::numeric_limits<Float>::max());
     Vector2 aabbMax = Vector2(-std::numeric_limits<Float>::max());
-    aabbMin = Vector2::Min(aabbMin, positions2D[0]);
-    aabbMin = Vector2::Min(aabbMin, positions2D[1]);
-    aabbMin = Vector2::Min(aabbMin, positions2D[2]);
+    aabbMin = Math::Min(aabbMin, positions2D[0]);
+    aabbMin = Math::Min(aabbMin, positions2D[1]);
+    aabbMin = Math::Min(aabbMin, positions2D[2]);
 
-    aabbMax = Vector2::Max(aabbMax, positions2D[0]);
-    aabbMax = Vector2::Max(aabbMax, positions2D[1]);
-    aabbMax = Vector2::Max(aabbMax, positions2D[2]);
+    aabbMax = Math::Max(aabbMax, positions2D[0]);
+    aabbMax = Math::Max(aabbMax, positions2D[1]);
+    aabbMax = Math::Max(aabbMax, positions2D[2]);
 
     // Convert to [0, resolution] (pixel space)
     Vector2i xRangeInt(floor((Float{0.5} + Float{0.5} * aabbMin[0]) * Float(rasterResolution[0])),
@@ -210,8 +197,8 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
     Vector2i yRangeInt(floor((Float{0.5} + Float{0.5} * aabbMin[1]) * Float(rasterResolution[1])),
                        ceil((Float{0.5} + Float{0.5} * aabbMax[1]) * Float(rasterResolution[1])));
     // Clip the range
-    xRangeInt.ClampSelf(0, rasterResolution[0]);
-    yRangeInt.ClampSelf(0, rasterResolution[1]);
+    xRangeInt = Math::Clamp(xRangeInt, 0, rasterResolution[0]);
+    yRangeInt = Math::Clamp(yRangeInt, 0, rasterResolution[1]);
 
     // Conservative Rasterization
     // Move all the edges "outwards" at least half a pixel
@@ -223,23 +210,23 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
     // with a single cross product you can find the line equation
     // ax + by + c = 0 (planes variable holds a,b,c)
     Vector3 planes[3];
-    planes[0] = Vector3::Cross(Vector3(positions2D[1] - positions2D[0], 0),
-                               Vector3(positions2D[0], 1));
-    planes[1] = Vector3::Cross(Vector3(positions2D[2] - positions2D[1], 0),
-                               Vector3(positions2D[1], 1));
-    planes[2] = Vector3::Cross(Vector3(positions2D[0] - positions2D[2], 0),
-                               Vector3(positions2D[2], 1));
+    planes[0] = Math::Cross(Vector3(positions2D[1] - positions2D[0], 0),
+                            Vector3(positions2D[0], 1));
+    planes[1] = Math::Cross(Vector3(positions2D[2] - positions2D[1], 0),
+                            Vector3(positions2D[1], 1));
+    planes[2] = Math::Cross(Vector3(positions2D[0] - positions2D[2], 0),
+                            Vector3(positions2D[2], 1));
     // Move the planes by the appropriate diagonal
-    planes[0][2] -= halfPixel.Dot(Vector2(planes[0]).Abs());
-    planes[1][2] -= halfPixel.Dot(Vector2(planes[1]).Abs());
-    planes[2][2] -= halfPixel.Dot(Vector2(planes[2]).Abs());
+    planes[0][2] -= Math::Abs(Math::Dot(halfPixel, Vector2(planes[0])));
+    planes[1][2] -= Math::Abs(Math::Dot(halfPixel, Vector2(planes[1])));
+    planes[2][2] -= Math::Abs(Math::Dot(halfPixel, Vector2(planes[2])));
     // Compute the intersection point of the planes.
     // Again this code utilizes cross product to find x,y positions with (w)
     // which was implicitly divided by the rasterizer pipeline
     Vector3 positionsConserv[3];
-    positionsConserv[0] = Vector3::Cross(planes[0], planes[2]);
-    positionsConserv[1] = Vector3::Cross(planes[0], planes[1]);
-    positionsConserv[2] = Vector3::Cross(planes[1], planes[2]);
+    positionsConserv[0] = Math::Cross(planes[0], planes[2]);
+    positionsConserv[1] = Math::Cross(planes[0], planes[1]);
+    positionsConserv[2] = Math::Cross(planes[1], planes[2]);
     // Manually divide "w" (in this case Z) manually
     Vector2 positionsConsv2D[3];
     positionsConsv2D[0] = Vector2(positionsConserv[0]) / positionsConserv[0][2];
@@ -299,10 +286,10 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
 
                 // TODO: This sometimes happen but it shouldn't??
                 // Clamp the Voxel due to numerical errors
-                voxelIndex.ClampSelf(Vector3ui::Zero(),
-                                     Vector3ui(voxelParams.resolution[0] - 1,
-                                               voxelParams.resolution[1] - 1,
-                                               voxelParams.resolution[2] - 1));
+                Vector3ui lastVoxIndex(voxelParams.resolution[0] - 1,
+                                       voxelParams.resolution[1] - 1,
+                                       voxelParams.resolution[2] - 1);
+                voxelIndex = Math::Clamp(voxelIndex, Vector3ui::Zero(), lastVoxIndex);
 
                 uint64_t voxelIndexMorton = MortonCode::Compose3D<uint64_t>(voxelIndex);
                 // Write the found voxel
@@ -323,7 +310,7 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
 
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Optional<BasicSurface> Triangle<T>::SurfaceFromHit(const Hit& hit) const
 {
     Vector3 baryCoords = Vector3(hit[0], hit[1], Float(1) - hit[0] - hit[1]);
@@ -357,7 +344,7 @@ Optional<BasicSurface> Triangle<T>::SurfaceFromHit(const Hit& hit) const
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Optional<TriHit> Triangle<T>::ProjectedHit(const Vector3& point) const
 {
     using namespace Shape::Triangle;
@@ -367,7 +354,7 @@ Optional<TriHit> Triangle<T>::ProjectedHit(const Vector3& point) const
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector2 Triangle<T>::SurfaceParametrization(const Hit& hit) const
 {
     Vector3ui index = data.get().indexList[key.FetchIndexPortion()];
@@ -385,14 +372,14 @@ Vector2 Triangle<T>::SurfaceParametrization(const Hit& hit) const
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 const T& Triangle<T>::GetTransformContext() const
 {
     return transformContext;
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 void Triangle<T>::GenerateSurface(EmptySurface&,
                                   RayConeSurface& rayConeSurface,
                                   // Inputs
@@ -409,7 +396,7 @@ void Triangle<T>::GenerateSurface(EmptySurface&,
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 void Triangle<T>::GenerateSurface(BasicSurface& result,
                                   RayConeSurface& rayConeSurface,
                                   // Inputs
@@ -429,7 +416,7 @@ void Triangle<T>::GenerateSurface(BasicSurface& result,
     using Shape::Triangle::Normal;
     Vector3 geoNormal = Normal(positions);
 
-    bool backSide = (geoNormal.Dot(ray.Dir()) > 0.0f);
+    bool backSide = (Math::Dot(geoNormal, ray.Dir()) > 0.0f);
     if(backSide) geoNormal = -geoNormal;
 
     result = BasicSurface
@@ -446,7 +433,7 @@ void Triangle<T>::GenerateSurface(BasicSurface& result,
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 void Triangle<T>::GenerateSurface(DefaultSurface& result,
                                   RayConeSurface& rayConeSurface,
                                   // Inputs
@@ -471,7 +458,7 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     Quaternion q1 = data.get().tbnRotations[index[1]];
     Quaternion q2 = data.get().tbnRotations[index[2]];
     Quaternion tbn = Quaternion::BarySLerp(q0, q1, q2, a, b);
-    tbn.NormalizeSelf();
+    tbn = tbn.Normalize();
 
     // UV
     Vector2 uv0 = data.get().uvs[index[0]];
@@ -480,7 +467,7 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     Vector2 uv = uv0 * a + uv1 * b + uv2 * c;
 
     // Flip the surface definitions (normal, geometric normal)
-    Float dDotN = geoNormal.Dot(ray.Dir().Normalize());
+    Float dDotN = Math::Dot(geoNormal, Math::Normalize(ray.Dir()));
     bool backSide = (dDotN) > Float(0);
     if(backSide)
     {
@@ -497,10 +484,11 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     // Now the cone generation...
     // RT Gems I chapter 20 and
     // https://www.jcgt.org/published/0010/01/01/
+    using Math::Normalize;
     Vector3 f = geoNormal;
-    Vector3 d = ray.Dir().Normalize();
+    Vector3 d = Normalize(ray.Dir());
     auto [a1, a2] = rayCone.Project(f, d);
-    Matrix3x3 M = Matrix3x3(a1.Normalize(), a2.Normalize(), geoNormal);
+    Matrix3x3 M = Matrix3x3(Normalize(a1), Normalize(a2), geoNormal);
 
     // Curvatures
     std::array<Vector3, 3> edges =
@@ -519,7 +507,7 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     // Equation 6.
     auto CurvatureEdge = [](Vector3 dp, Vector3 dn) -> Float
     {
-        return dn.Dot(dp) / dp.Dot(dp);
+        return Math::Dot(dn, dp) / Math::Dot(dp, dp);
     };
     Vector3 curvatures = Vector3(CurvatureEdge(edges[0], normals[1] - normals[0]),
                                  CurvatureEdge(edges[1], normals[2] - normals[0]),
@@ -530,35 +518,35 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     Vector2 eMin = Vector2(M * edges[minIndex]);
     Vector2 eMax = Vector2(M * edges[maxIndex]);
     //
-    Float a1L = a1.Length(), a2L = a2.Length();
+    Float a1L = Math::Length(a1), a2L = Math::Length(a2);
     Float a1LSqr = a1L * a1L, a2LSqr = a2L * a2L;
     Float a12L = a1L * a2L;
-    Float l0 = a12L / std::sqrt(a1LSqr * eMin[0] * eMin[0] +
+    Float l0 = a12L / Math::Sqrt(a1LSqr * eMin[0] * eMin[0] +
                                 a2LSqr * eMin[1] * eMin[1]);
-    Float l1 = a12L / std::sqrt(a1LSqr * eMax[0] * eMax[0] +
-                                a2LSqr * eMax[1] * eMax[1]);
-    Float lMaxRecip = Float(1) / std::max(l0, l1);
+    Float l1 = a12L / Math::Sqrt(a1LSqr * eMax[0] * eMax[0] +
+                                 a2LSqr * eMax[1] * eMax[1]);
+    Float lMaxRecip = Float(1) / Math::Max(l0, l1);
     Float k0 = curvatures[minIndex] * l0 * lMaxRecip;
     Float k1 = curvatures[maxIndex] * l1 * lMaxRecip;
 
     auto Beta = [&](Float curvature)
     {
-        return Float(-1) * curvature * std::abs(rayCone.width) / dDotN;
+        return Float(-1) * curvature * Math::Abs(rayCone.width) / dDotN;
     };
     Float beta0 = Beta(k0);
     Float beta1 = Beta(k1);
-    Float betaFinal = (std::abs(rayCone.aperture + beta0) >=
-                       std::abs(rayCone.aperture + beta1))
+    Float betaFinal = (Math::Abs(rayCone.aperture + beta0) >=
+                       Math::Abs(rayCone.aperture + beta1))
                         ? beta0 : beta1;
     // Texture derivatives
     // https://www.jcgt.org/published/0010/01/01/
     // Listing 1
-    Float areaRecip = Float(1) / f.Dot(Vector3::Cross(edges[0], edges[1]));
+    Float areaRecip = Float(1) / Math::Dot(f, Math::Cross(edges[0], edges[1]));
     auto TexGradient = [&](Vector3 offset)
     {
         Vector3 eP = pos - positions[0] + offset;
-        Float a = f.Dot(Vector3::Cross(eP, edges[1]) * areaRecip);
-        Float b = f.Dot(Vector3::Cross(edges[0], eP) * areaRecip);
+        Float a = Math::Dot(f, Math::Cross(eP, edges[1]) * areaRecip);
+        Float b = Math::Dot(f, Math::Cross(edges[0], eP) * areaRecip);
         Float c = Float(1) - a - b;
         Vector2 uvAtOffset = uv0 * c + uv1 * a + uv2 * b;
         return uvAtOffset - uv;
@@ -587,7 +575,7 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     //    // Concave region, skip.
     //    if(curvatures[vIndex] < Float(0)) return 0;
     //    //
-    //    Float cosTheta = n.Dot(g);
+    //    Float cosTheta = Math::Dot(n, g);
     //    Float sinTheta = Math::SqrtMax(Float(1) - cosTheta * cosTheta);
     //    return (pos - positions[vIndex]).Length() * sinTheta * Float(2) * areaRecip;
     //};
@@ -596,8 +584,8 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     //              FindTipOffset(1) * b +
     //              FindTipOffset(2) * c);
     // Or This
-    //Float tMin = std::min(FindTipOffset(0), FindTipOffset(1));
-    //tMin = std::min(tMin, FindTipOffset(2));
+    //Float tMin = Math::Min(FindTipOffset(0), FindTipOffset(1));
+    //tMin = Math::Min(tMin, FindTipOffset(2));
 
     // Transform to the requested space
     // pos already pre-transformed
@@ -626,7 +614,7 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
 namespace DefaultSkinnedTriangleDetail
 {
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 TransformContextSkinned::TransformContextSkinned(const typename TransformGroupMulti::DataSoA& transformData,
                                                  const SkinnedTriangleData& triData,
                                                  TransformKey tK,
@@ -655,7 +643,7 @@ TransformContextSkinned::TransformContextSkinned(const typename TransformGroupMu
 }
 
 // Transform Context Generators
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 TransformContextSkinned GenTContextSkinned(const typename TransformGroupMulti::DataSoA& tData,
                                            const SkinnedTriangleData& pData,
                                            TransformKey tK,

@@ -551,7 +551,7 @@ TEST(Dist_Uniform, ZeroVariance)
             Float x = result.value;
             Float t = (x < 0) ? (x / -a) : (x / b);
             t = (x < 0) ? (x / a) : (x / b);
-            t = std::abs(t);
+            t =  Math::Abs(t);
 
             Float eval = Float(1);
             Float estimate = eval / result.pdf;
@@ -603,7 +603,7 @@ TEST(Dist_UniformHemisphere, Sample)
             Vector2 xi(dist0(rng0), dist1(rng1));
             SampleT<Vector3> sample = SampleUniformDirection(xi);
             // Integral of cos(theta) d(omega)
-            double functionVal = static_cast<double>(sample.value.Dot(Vector3::ZAxis()));
+            double functionVal = double(Math::Dot(sample.value, Vector3::ZAxis()));
             functionVal *= MathConstants::InvPi<double>();
             total += (functionVal / static_cast<double>(sample.pdf));
         }
@@ -658,7 +658,7 @@ TEST(Dist_CosineHemisphere, Sample)
             Vector2 xi(dist0(rng0), dist1(rng1));
             SampleT<Vector3> sample = SampleCosDirection(xi);
             // Integral of cos(theta) d(omega)
-            double functionVal = static_cast<double>(sample.value.Dot(Vector3::ZAxis()));
+            double functionVal = double(Math::Dot(sample.value, Vector3::ZAxis()));
             functionVal *= MathConstants::InvPi<double>();
             total += (functionVal / static_cast<double>(sample.pdf));
         }
@@ -673,7 +673,7 @@ TEST(Dist_CosineHemisphere, PDF)
     using Distribution::Common::PDFCosDirection;
     // As simple as it gets
     // Provided for completeness
-    Vector3 v = Vector3(1, 2, 3).Normalize();
-    Float expected = MathConstants::InvPi<Float>() * v.Dot(Vector3::ZAxis());
+    Vector3 v = Math::Normalize(Vector3(1, 2, 3));
+    Float expected = MathConstants::InvPi<Float>() * Math::Dot(v, Vector3::ZAxis());
     EXPECT_EQ(PDFCosDirection(v), expected);
 }

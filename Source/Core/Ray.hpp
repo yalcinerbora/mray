@@ -116,16 +116,12 @@ MR_PF_DEF bool RayT<T>::IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
                                            bool cullFace) const noexcept
 {
     using namespace MathConstants;
-    #ifndef MRAY_DEVICE_CODE_PATH
-        using namespace std;
-    #endif
-
     // Moller-Trumbore
     // Ray-Tri Intersection
     Vector<3, T> e0 = t1 - t0;
     Vector<3, T> e1 = t2 - t0;
     Vector<3, T> p = Math::Cross(direction, e1);
-    T det = e0.Dot(p);
+    T det = Math::Dot(e0, p);
 
     if((cullFace && (det < SmallEpsilon<T>())) ||
        // Ray-Tri nearly parallel skip
@@ -193,8 +189,8 @@ MR_PF_DEF bool RayT<T>::IntersectsAABB(Vector<2, T>& tOut,
     {
         if(invD[i] < 0) std::swap(t0[i], t1[i]);
 
-        tOut[0] = Math::Max(tOut[0], min(t0[i], t1[i]));
-        tOut[1] = Math::Min(tOut[1], max(t0[i], t1[i]));
+        tOut[0] = Math::Max(tOut[0], Math::Min(t0[i], t1[i]));
+        tOut[1] = Math::Min(tOut[1], Math::Max(t0[i], t1[i]));
     }
     return tOut[1] >= tOut[0];
 }
@@ -225,44 +221,44 @@ MR_PF_DEF bool RayT<T>::IntersectsAABB(Vector<3, T>& pos, T& tOut,
     return intersects;
 }
 
-template<FloatC T>
-MR_PF_DEF RayT<T> RayT<T>::NormalizeDir() const noexcept
-{
-    return Ray(Math::Normalize(direction), position);
-}
-
-template<FloatC T>
-MR_PF_DEF RayT<T>& RayT<T>::NormalizeDirSelf() noexcept
-{
-    direction = Math::Normalize(direction);
-    return *this;
-}
-
-template<FloatC T>
-MR_PF_DEF RayT<T> RayT<T>::Advance(T t) const noexcept
-{
-    return Ray(direction, position + t * direction);
-}
-
-template<FloatC T>
-MR_PF_DEF RayT<T> RayT<T>::Advance(T t, const Vector<3, T>& dir) const noexcept
-{
-    return Ray(direction, position + t * dir);
-}
-
-template<FloatC T>
-MR_PF_DEF RayT<T>& RayT<T>::AdvanceSelf(T t) noexcept
-{
-    position += t * direction;
-    return *this;
-}
-
-template<FloatC T>
-MR_PF_DEF RayT<T>& RayT<T>::AdvanceSelf(T t, const Vector<3, T>& dir) noexcept
-{
-    position += t * dir;
-    return *this;
-}
+//template<FloatC T>
+//MR_PF_DEF RayT<T> RayT<T>::NormalizeDir() const noexcept
+//{
+//    return Ray(Math::Normalize(direction), position);
+//}
+//
+//template<FloatC T>
+//MR_PF_DEF RayT<T>& RayT<T>::NormalizeDirSelf() noexcept
+//{
+//    direction = Math::Normalize(direction);
+//    return *this;
+//}
+//
+//template<FloatC T>
+//MR_PF_DEF RayT<T> RayT<T>::Advance(T t) const noexcept
+//{
+//    return Ray(direction, position + t * direction);
+//}
+//
+//template<FloatC T>
+//MR_PF_DEF RayT<T> RayT<T>::Advance(T t, const Vector<3, T>& dir) const noexcept
+//{
+//    return Ray(direction, position + t * dir);
+//}
+//
+//template<FloatC T>
+//MR_PF_DEF RayT<T>& RayT<T>::AdvanceSelf(T t) noexcept
+//{
+//    position += t * direction;
+//    return *this;
+//}
+//
+//template<FloatC T>
+//MR_PF_DEF RayT<T>& RayT<T>::AdvanceSelf(T t, const Vector<3, T>& dir) noexcept
+//{
+//    position += t * dir;
+//    return *this;
+//}
 
 template<FloatC T>
 MR_PF_DEF Vector<3, T> RayT<T>::AdvancedPos(T t) const noexcept
@@ -275,9 +271,9 @@ MR_PF_DEF RayT<float> RayT<float>::Nudge(const Vector3f& dir) const noexcept
 {
     // From RayTracing Gems I
     // Chapter 6
-    static constexpr float ORIGIN = 1.0f / 32.0f;
-    static constexpr float FLOAT_SCALE = 1.0f / 65536.0f;
-    static constexpr float INT_SCALE = 256.0f;
+    constexpr float ORIGIN = 1.0f / 32.0f;
+    constexpr float FLOAT_SCALE = 1.0f / 65536.0f;
+    constexpr float INT_SCALE = 256.0f;
 
     const Vector3f& p = position;
     Vector3i ofi = Vector3i(INT_SCALE * dir[0],
@@ -314,9 +310,9 @@ MR_PF_DEF RayT<double> RayT<double>::Nudge(const Vector3d& dir) const noexcept
 {
     // From RayTracing Gems I
     // Chapter 6
-    static constexpr double ORIGIN = 1.0 / 32.0;
-    static constexpr double FLOAT_SCALE = 1.0 / 65536.0;
-    static constexpr double INT_SCALE = 256.0;
+    constexpr double ORIGIN = 1.0 / 32.0;
+    constexpr double FLOAT_SCALE = 1.0 / 65536.0;
+    constexpr double INT_SCALE = 256.0;
 
     const Vector3d& p = position;
 
@@ -348,14 +344,14 @@ MR_PF_DEF RayT<double> RayT<double>::Nudge(const Vector3d& dir) const noexcept
     nextPos[2] = (Abs(p[2]) < ORIGIN) ? (p[2] + FLOAT_SCALE * dir[2]) : pointI[2];
     return RayT(direction, nextPos);
 }
-
-template<FloatC T>
-MR_PF_DEF RayT<T>& RayT<T>::NudgeSelf(const Vector<3, T>& dir) noexcept
-{
-    RayT<T> r = Nudge(dir);
-    (*this) = r;
-    return *this;
-}
+//
+//template<FloatC T>
+//MR_PF_DEF RayT<T>& RayT<T>::NudgeSelf(const Vector<3, T>& dir) noexcept
+//{
+//    RayT<T> r = Nudge(dir);
+//    (*this) = r;
+//    return *this;
+//}
 
 template<FloatC T>
 MR_PF_DEF const Vector<3, T>& RayT<T>::Dir() const noexcept

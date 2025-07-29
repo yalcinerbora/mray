@@ -1504,7 +1504,7 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     //
     // Since we are Y up always, get the diameter over XZ plane?
     // Obviously uncommented one is being used
-    Float sceneDiameter = Vector2(sceneSpan[0], sceneSpan[2]).Length();
+    Float sceneDiameter = Math::Length(Vector2(sceneSpan[0], sceneSpan[2]));
     //
     for(auto& g : lightGroups.GetMap())
         g.second->SetSceneDiameter(sceneDiameter);

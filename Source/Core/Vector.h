@@ -8,7 +8,6 @@ N should be 2, 3 or 4 at most.
 
 */
 
-#include <cmath>
 #include <type_traits>
 #include <concepts>
 #include <array>
@@ -79,12 +78,12 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
     MR_PF_DECL explicit operator Vector<M, C>() const requires (M <= N) && std::convertible_to<C, T>;
 
     // Modify
-    MR_PF_DECL void     operator+=(const Vector&);
-    MR_PF_DECL void     operator-=(const Vector&);
-    MR_PF_DECL void     operator*=(const Vector&);
-    MR_PF_DECL void     operator*=(T);
-    MR_PF_DECL void     operator/=(const Vector&);
-    MR_PF_DECL void     operator/=(T);
+    MR_PF_DECL_V void   operator+=(const Vector&);
+    MR_PF_DECL_V void   operator-=(const Vector&);
+    MR_PF_DECL_V void   operator*=(const Vector&);
+    MR_PF_DECL_V void   operator*=(T);
+    MR_PF_DECL_V void   operator/=(const Vector&);
+    MR_PF_DECL_V void   operator/=(T);
 
     MR_PF_DECL Vector   operator+(const Vector&) const;
     MR_PF_DECL Vector   operator+(T) const;

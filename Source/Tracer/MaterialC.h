@@ -13,17 +13,17 @@ class alignas(8) MediumKeyPair
     MediumKey backKey;
 
     public:
-    MRAY_HYBRID MediumKeyPair(MediumKey frontKey, MediumKey backKey);
+    MR_PF_DECL MediumKeyPair(MediumKey frontKey, MediumKey backKey) noexcept;
 
-    MRAY_HYBRID MediumKey Back() const;
-    MRAY_HYBRID MediumKey Front() const;
+    MR_PF_DECL MediumKey Back() const noexcept;
+    MR_PF_DECL MediumKey Front() const noexcept;
 };
 
 namespace MaterialCommon
 {
     static constexpr Float SpecularThreshold = Float(0.95);
 
-    MRAY_HYBRID bool IsSpecular(Float specularity);
+    MR_PF_DECL bool IsSpecular(Float specularity) noexcept;
 }
 
 using MediumKeyPairList = std::vector<MediumKeyPair>;
@@ -156,26 +156,26 @@ class GenericGroupMaterial : public GenericGroupMaterialT
     std::string_view    Name() const override;
 };
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-MediumKeyPair::MediumKeyPair(MediumKey f, MediumKey b)
+MR_PF_DEF
+MediumKeyPair::MediumKeyPair(MediumKey f, MediumKey b) noexcept
     : frontKey(f)
     , backKey(b)
 {}
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-MediumKey MediumKeyPair::Back() const
+MR_PF_DEF
+MediumKey MediumKeyPair::Back() const noexcept
 {
     return backKey;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-MediumKey MediumKeyPair::Front() const
+MR_PF_DEF
+MediumKey MediumKeyPair::Front() const noexcept
 {
     return frontKey;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-bool MaterialCommon::IsSpecular(Float specularity)
+MR_PF_DEF
+bool MaterialCommon::IsSpecular(Float specularity) noexcept
 {
     constexpr auto Threshold = SpecularThreshold;
     return specularity >= Threshold;

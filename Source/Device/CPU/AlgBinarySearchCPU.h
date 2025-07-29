@@ -8,7 +8,7 @@ namespace mray::host::algorithms
 {
 
 template <class T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DECL
 size_t LowerBound(Span<const T> range, const T& value)
 {
     auto it = std::lower_bound(range.data(), range.data() + range.size(), value);

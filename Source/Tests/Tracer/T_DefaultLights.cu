@@ -102,7 +102,7 @@ void KCReadLights(MRAY_GRID_CONSTANT const MetaLightArrayView lightArrayView,
 {
     Vector3 DistantPoint = Vector3(2, 3, 4);
     MetaHit Hit = MetaHit(Vector2(0.5, 0.3));
-    Vector3 Dir = Vector3(2, 3, 4).Normalize();
+    Vector3 Dir = Math::Normalize(Vector3(2, 3, 4));
     Ray TestRay = Ray(Dir, DistantPoint);
 
     using MLVIdentity = typename MetaLightArrayView::template MetaLightView<SpectrumConverterIdentity>;
@@ -375,8 +375,9 @@ TEST(DefaultLights, PrimLight_Triangle)
         auto sample0 = l0.SampleSolidAngle(rng0, Vector3::Zero());
         auto sample1 = l1.SampleSolidAngle(rng1, Vector3::Zero());
 
-        Ray r0 = Ray(sample0.value.Normalize(), Vector3::Zero());
-        Ray r1 = Ray(sample1.value.Normalize(), Vector3::Zero());
+        using Math::Normalize;
+        Ray r0 = Ray(Normalize(sample0.value), Vector3::Zero());
+        Ray r1 = Ray(Normalize(sample1.value), Vector3::Zero());
 
         Float pdf0 = l0.PdfSolidAngle(tri0.Intersects(r0, false).value().hit,
                                       r0.Pos(), r0.Dir());

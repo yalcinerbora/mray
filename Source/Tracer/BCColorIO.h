@@ -27,9 +27,9 @@ namespace BlockCompressedIO
         using ColorPack = std::array<Vector3, 2>;
         using BlockType = Vector2ui;
 
-        MRAY_HYBRID
+        MR_HF_DECL
         static ColorPack    ExtractColors(Vector2ui block);
-        MRAY_HYBRID
+        MR_HF_DECL
         static Vector2ui    InjectColors(Vector2ui block, const ColorPack& colorIn,
                                          bool skipAlpha = false);
     };
@@ -39,9 +39,9 @@ namespace BlockCompressedIO
         using ColorPack = std::array<Vector3, 2>;
         using BlockType = Vector4ui;
 
-        MRAY_HYBRID
+        MR_HF_DECL
         static ColorPack    ExtractColors(Vector4ui block);
-        MRAY_HYBRID
+        MR_HF_DECL
         static Vector4ui    InjectColors(Vector4ui block, const ColorPack& colorIn);
     };
 
@@ -50,9 +50,9 @@ namespace BlockCompressedIO
         using ColorPack = std::array<Vector3, 2>;
         using BlockType = Vector4ui;
 
-        MRAY_HYBRID
+        MR_HF_DECL
         static ColorPack   ExtractColors(Vector4ui block);
-        MRAY_HYBRID
+        MR_HF_DECL
         static Vector4ui   InjectColors(Vector4ui block, const ColorPack& colorIn);
     };
 
@@ -62,9 +62,9 @@ namespace BlockCompressedIO
         using ColorPack = std::array<Vector3, 2>;
         using BlockType = Vector2ui;
 
-        MRAY_HYBRID
+        MR_HF_DECL
         static ColorPack    ExtractColors(Vector2ui block);
-        MRAY_HYBRID
+        MR_HF_DECL
         static Vector2ui    InjectColors(Vector2ui block, const ColorPack& colorIn);
     };
 
@@ -74,9 +74,9 @@ namespace BlockCompressedIO
         using ColorPack = std::array<Vector3, 2>;
         using BlockType = Vector4ui;
 
-        MRAY_HYBRID
+        MR_HF_DECL
         static ColorPack    ExtractColors(Vector4ui block);
-        MRAY_HYBRID
+        MR_HF_DECL
         static Vector4ui    InjectColors(Vector4ui block, const ColorPack& colorIn);
     };
 
@@ -86,9 +86,9 @@ namespace BlockCompressedIO
         using ColorPack = std::array<Vector3, 4>;
         using BlockType = Vector4ui;
 
-        MRAY_HYBRID
+        MR_HF_DECL
         static ColorPack    ExtractColors(Vector4ui block);
-        MRAY_HYBRID
+        MR_HF_DECL
         static Vector4ui    InjectColors(Vector4ui block, const ColorPack& colorIn);
     };
 
@@ -100,28 +100,28 @@ namespace BlockCompressedIO
         private:
         Vector2ul   block;
 
-        MRAY_HYBRID
+        MR_HF_DECL
         uint32_t    Mode() const;
-        MRAY_HYBRID
+        MR_HF_DECL
         uint32_t    ColorStartOffset(uint32_t mode) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         uint32_t    ColorBits(uint32_t mode) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         uint32_t    ColorCount(uint32_t mode) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         bool        HasUniquePBits(uint32_t mode) const;
 
         public:
-        MRAY_HYBRID BC7(const Vector4ui block);
+        MR_HF_DECL  BC7(const Vector4ui block);
 
-        MRAY_HYBRID
+        MR_HF_DECL
         Vector4ui   Block() const;
 
-        MRAY_HYBRID
+        MR_HF_DECL
         Vector3     ExtractColor(uint32_t i) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         void        InjectColor(uint32_t i, const Vector3& colorIn);
-        MRAY_HYBRID
+        MR_HF_DECL
         uint32_t    ColorCount() const;
     };
 }
@@ -129,13 +129,13 @@ namespace BlockCompressedIO
 namespace BlockCompressedIO
 {
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 typename BC1::ColorPack
 BC1::ExtractColors(Vector2ui block)
 {
     auto BisectColor565 = [](uint32_t color) -> Vector3
     {
-        using Bit::NormConversion::FromUNormVarying;
+        using NormConversion::FromUNormVarying;
         uint32_t b = Bit::FetchSubPortion(color, {0, 5});
         uint32_t g = Bit::FetchSubPortion(color, {5, 11});
         uint32_t r = Bit::FetchSubPortion(color, {11, 16});
@@ -149,14 +149,14 @@ BC1::ExtractColors(Vector2ui block)
     return { BisectColor565(color0), BisectColor565(color1) };
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector2ui BC1::InjectColors(Vector2ui block, const ColorPack& colorIn,
                             bool skipAlpha)
 {
     auto ComposeColor565 = [](Vector3 color) -> uint32_t
     {
-        color.ClampSelf(Float(0), Float(1));
-        using Bit::NormConversion::ToUNormVarying;
+        color = Math::Clamp(color, Float(0), Float(1));
+        using NormConversion::ToUNormVarying;
         uint32_t r = ToUNormVarying<uint32_t>(color[0], 5);
         uint32_t g = ToUNormVarying<uint32_t>(color[1], 6);
         uint32_t b = ToUNormVarying<uint32_t>(color[2], 5);
@@ -203,14 +203,14 @@ Vector2ui BC1::InjectColors(Vector2ui block, const ColorPack& colorIn,
     return Vector2ui(block0Out, block[1]);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 typename BC2::ColorPack
 BC2::ExtractColors(Vector4ui block)
 {
     return BC1::ExtractColors(Vector2ui(block[2], block[3]));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector4ui BC2::InjectColors(Vector4ui block, const ColorPack& colorIn)
 {
     auto b0 = BC1::InjectColors(Vector2ui(block[2], block[3]), colorIn,
@@ -218,14 +218,14 @@ Vector4ui BC2::InjectColors(Vector4ui block, const ColorPack& colorIn)
     return Vector4ui(block[0], block[1], b0[0], block[3]);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 typename BC3::ColorPack
 BC3::ExtractColors(Vector4ui block)
 {
     return BC1::ExtractColors(Vector2ui(block[2], block[3]));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector4ui BC3::InjectColors(Vector4ui block, const ColorPack& colorIn)
 {
     auto b0 = BC1::InjectColors(Vector2ui(block[2], block[3]), colorIn,
@@ -234,7 +234,7 @@ Vector4ui BC3::InjectColors(Vector4ui block, const ColorPack& colorIn)
 }
 
 template <bool IsSigned>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 typename BC4<IsSigned>::ColorPack
 BC4<IsSigned>::ExtractColors(Vector2ui block)
 {
@@ -258,7 +258,7 @@ BC4<IsSigned>::ExtractColors(Vector2ui block)
 }
 
 template <bool IsSigned>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector2ui BC4<IsSigned>::InjectColors(Vector2ui block, const ColorPack& colorIn)
 {
     using namespace Bit;
@@ -314,7 +314,7 @@ Vector2ui BC4<IsSigned>::InjectColors(Vector2ui block, const ColorPack& colorIn)
 }
 
 template<bool IsSigned>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 typename BC5<IsSigned>::ColorPack
 BC5<IsSigned>::ExtractColors(Vector4ui block)
 {
@@ -325,7 +325,7 @@ BC5<IsSigned>::ExtractColors(Vector4ui block)
 }
 
 template<bool IsSigned>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector4ui BC5<IsSigned>::InjectColors(Vector4ui block, const ColorPack& colorIn)
 {
     using BC4ColorPack = typename BC4<IsSigned>::ColorPack;
@@ -337,7 +337,7 @@ Vector4ui BC5<IsSigned>::InjectColors(Vector4ui block, const ColorPack& colorIn)
 }
 
 template<bool IsSigned>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 typename BC6H<IsSigned>::ColorPack
 BC6H<IsSigned>::ExtractColors(Vector4ui)
 {
@@ -345,26 +345,26 @@ BC6H<IsSigned>::ExtractColors(Vector4ui)
 }
 
 template<bool IsSigned>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector4ui BC6H<IsSigned>::InjectColors(Vector4ui, const ColorPack&)
 {
     return Vector4ui::Zero();
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 BC7::BC7(const Vector4ui b)
     : block(Bit::Compose<32, 32>(uint64_t(b[0]), b[1]),
             Bit::Compose<32, 32>(uint64_t(b[2]), b[3]))
 {}
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t BC7::Mode() const
 {
     uint32_t mode = Bit::CountTZero(uint32_t(block[0]));
-    return std::min(mode, 8u);
+    return Math::Min(mode, 8u);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t BC7::ColorStartOffset(uint32_t mode) const
 {
     if(mode == 0)       return 1 + 4;
@@ -378,7 +378,7 @@ uint32_t BC7::ColorStartOffset(uint32_t mode) const
 
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t BC7::ColorBits(uint32_t mode) const
 {
     if(mode == 0)
@@ -391,7 +391,7 @@ uint32_t BC7::ColorBits(uint32_t mode) const
         return 7;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t BC7::ColorCount(uint32_t mode) const
 {
     if(mode == 0 || mode == 2)
@@ -402,20 +402,20 @@ uint32_t BC7::ColorCount(uint32_t mode) const
         return 2;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 bool BC7::HasUniquePBits(uint32_t mode) const
 {
     return (mode == 0 || mode == 3 || mode == 6 || mode == 7);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector4ui BC7::Block() const
 {
     return Vector4ui(block[0] & 0xFFFFFFFF, block[0] >> 32,
                      block[1] & 0xFFFFFFFF, block[1] >> 32);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector3 BC7::ExtractColor(uint32_t i) const
 {
     using Bit::FetchSubPortion;
@@ -484,13 +484,13 @@ Vector3 BC7::ExtractColor(uint32_t i) const
     c[0] |= (c[0] >> cBitCount[0]);
     c[1] |= (c[1] >> cBitCount[1]);
     c[2] |= (c[2] >> cBitCount[2]);
-    using namespace Bit::NormConversion;
+    using namespace NormConversion;
     return Vector3(FromUNorm<Float>(uint8_t(c[0])),
                    FromUNorm<Float>(uint8_t(c[1])),
                    FromUNorm<Float>(uint8_t(c[2])));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 void BC7::InjectColor(uint32_t i, const Vector3& colorIn)
 {
     uint32_t mode = Mode();
@@ -507,7 +507,7 @@ void BC7::InjectColor(uint32_t i, const Vector3& colorIn)
     Vector3ui cBitCount = Vector3ui::Zero();
     if(mode == 5 || mode == 4)
     {
-        using namespace Bit::NormConversion;
+        using namespace NormConversion;
         uint32_t colorBits = B;
         uint32_t rb = (rotation == 1) ? colorBits + 1 : colorBits;
         uint32_t gb = (rotation == 2) ? colorBits + 1 : colorBits;
@@ -520,7 +520,7 @@ void BC7::InjectColor(uint32_t i, const Vector3& colorIn)
         cBitCount = Vector3ui(colorBits);
     }
     // Convert back to full 8-bit
-    using namespace Bit::NormConversion;
+    using namespace NormConversion;
     Vector3ui c = Vector3ui(ToUNorm<uint8_t>(colorIn[0]),
                             ToUNorm<uint8_t>(colorIn[1]),
                             ToUNorm<uint8_t>(colorIn[2]));
@@ -529,13 +529,13 @@ void BC7::InjectColor(uint32_t i, const Vector3& colorIn)
     // There is a UB when 8-bit color is given "1 << 7u - cBits[0]"
     // so we shift one and shift back one more to prevent an if
     c[0] <<= 1;
-    c[0] = std::min(c[0] + (1u << (8u - cBitCount[0])), 255u);
+    c[0] = Math::Min(c[0] + (1u << (8u - cBitCount[0])), 255u);
     c[0] >>= (9u - cBitCount[0]);
     c[1] <<= 1;
-    c[1] = std::min(c[1] + (1u << (8u - cBitCount[1])), 255u);
+    c[1] = Math::Min(c[1] + (1u << (8u - cBitCount[1])), 255u);
     c[1] >>= (9u - cBitCount[1]);
     c[2] <<= 1;
-    c[2] = std::min(c[2] + (1u << (8u - cBitCount[2])), 255u);
+    c[2] = Math::Min(c[2] + (1u << (8u - cBitCount[2])), 255u);
     c[2] >>= (9u - cBitCount[2]);
     // Fetch pBit from the color
     uint32_t pBit = 0;
@@ -597,7 +597,7 @@ void BC7::InjectColor(uint32_t i, const Vector3& colorIn)
     block = Vector2ul(b[0], b[1]);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t BC7::ColorCount() const
 {
     return ColorCount(Mode());

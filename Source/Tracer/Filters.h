@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Core/Vector.h"
-
 #include "DistributionFunctions.h"
 
 class BoxFilter
@@ -13,13 +12,13 @@ class BoxFilter
     // Constructors & Destructor
     MRAY_HOST           BoxFilter(Float radius);
     //
-    MRAY_HYBRID
+    MR_HF_DECL
     Float               Evaluate(const Vector2& duv) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     SampleT<Vector2>    Sample(const Vector2& xi) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     Float               Pdf(const Vector2& duv) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     Float               Radius() const;
 };
 
@@ -33,13 +32,13 @@ class TentFilter
     // Constructors & Destructor
     MRAY_HOST           TentFilter(Float radius);
     //
-    MRAY_HYBRID
+    MR_HF_DECL
     Float               Evaluate(const Vector2& duv) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     SampleT<Vector2>    Sample(const Vector2& xi) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     Float               Pdf(const Vector2& duv) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     Float               Radius() const;
 };
 
@@ -53,13 +52,13 @@ class GaussianFilter
     // Constructors & Destructor
     MRAY_HOST           GaussianFilter(Float radius);
     //
-    MRAY_HYBRID
+    MR_HF_DECL
     Float               Evaluate(const Vector2& duv) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     SampleT<Vector2>    Sample(const Vector2& xi) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     Float               Pdf(const Vector2& duv) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     Float               Radius() const;
 };
 
@@ -92,13 +91,13 @@ class MitchellNetravaliFilter
                                                 Float b = Float(0.33333),
                                                 Float c = Float(0.33333));
     //
-    MRAY_HYBRID
+    MR_HF_DECL
     Float               Evaluate(const Vector2& duv) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     SampleT<Vector2>    Sample(const Vector2& xi) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     Float               Pdf(const Vector2& duv) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     Float               Radius() const;
 };
 
@@ -107,17 +106,17 @@ BoxFilter::BoxFilter(Float r)
     : radius(r)
 {}
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float BoxFilter::Evaluate(const Vector2& duv) const
 {
-    Vector2 t = duv.Abs();
+    Vector2 t = Math::Abs(duv);
     Float rr = Float(1) / radius;
     return (t[0] <= radius && t[1] <= radius)
                 ? (Float(0.25) * rr * rr)
                 : Float(0);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 SampleT<Vector2> BoxFilter::Sample(const Vector2& xi) const
 {
     using namespace Distribution;
@@ -130,7 +129,7 @@ SampleT<Vector2> BoxFilter::Sample(const Vector2& xi) const
     };
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float BoxFilter::Pdf(const Vector2& duv) const
 {
     using namespace Distribution;
@@ -138,7 +137,7 @@ Float BoxFilter::Pdf(const Vector2& duv) const
             Common::PDFUniformRange(duv[1], -radius, radius));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float BoxFilter::Radius() const
 {
     return radius;
@@ -150,11 +149,11 @@ TentFilter::TentFilter(Float r)
     , recipRadius(1.0f / radius)
 {}
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float TentFilter::Evaluate(const Vector2& duv) const
 {
     using namespace Math;
-    Vector2 t = (duv * recipRadius).Abs();
+    Vector2 t = Abs(duv * recipRadius);
     Float capSqrt = Float(1) / radius;
     // TODO: This seems wrong? Pyramdi cap (height)
     // should be 3/(4 * r^2) ?
@@ -164,7 +163,7 @@ Float TentFilter::Evaluate(const Vector2& duv) const
     return x * y;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 SampleT<Vector2> TentFilter::Sample(const Vector2& xi) const
 {
     using namespace Distribution;
@@ -177,7 +176,7 @@ SampleT<Vector2> TentFilter::Sample(const Vector2& xi) const
     };
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float TentFilter::Pdf(const Vector2& duv) const
 {
     using namespace Distribution;
@@ -186,7 +185,7 @@ Float TentFilter::Pdf(const Vector2& duv) const
     return x * y;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float TentFilter::Radius() const
 {
     return radius;
@@ -199,14 +198,14 @@ GaussianFilter::GaussianFilter(Float r)
     , sigma(r * Float(0.285714))
 {}
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float GaussianFilter::Evaluate(const Vector2& duv) const
 {
     return (Math::Gaussian(duv[0], sigma) *
             Math::Gaussian(duv[1], sigma));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 SampleT<Vector2> GaussianFilter::Sample(const Vector2& xi) const
 {
     using namespace Distribution;
@@ -219,7 +218,7 @@ SampleT<Vector2> GaussianFilter::Sample(const Vector2& xi) const
     };
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float GaussianFilter::Pdf(const Vector2& duv) const
 {
     using namespace Distribution;
@@ -227,7 +226,7 @@ Float GaussianFilter::Pdf(const Vector2& duv) const
             Common::PDFGaussian(duv[1], sigma));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float GaussianFilter::Radius() const
 {
     return radius;
@@ -254,13 +253,13 @@ MitchellNetravaliFilter::MitchellNetravaliFilter(Float r, Float b, Float c)
     coeffs12[3] = F * (Float(8) * b + Float(24) * c);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float MitchellNetravaliFilter::Evaluate(const Vector2& duv) const
 {
     auto Mitchell1D = [this](Float x)
     {
         x = Float(2) * x * radiusRecip;
-        x = std::abs(x);
+        x = Math::Abs(x);
         Float x2 = x * x;
         Float x3 = x2 * x;
 
@@ -278,7 +277,7 @@ Float MitchellNetravaliFilter::Evaluate(const Vector2& duv) const
     return mitchell2D.Multiply();
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 SampleT<Vector2> MitchellNetravaliFilter::Sample(const Vector2& xi) const
 {
     // And here we go
@@ -350,7 +349,7 @@ SampleT<Vector2> MitchellNetravaliFilter::Sample(const Vector2& xi) const
     };
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float MitchellNetravaliFilter::Pdf(const Vector2& duv) const
 {
     using namespace Distribution;
@@ -372,7 +371,7 @@ Float MitchellNetravaliFilter::Pdf(const Vector2& duv) const
     return mis0 * mis1;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float MitchellNetravaliFilter::Radius() const
 {
     return radius;

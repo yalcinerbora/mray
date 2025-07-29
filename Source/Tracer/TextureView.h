@@ -78,9 +78,9 @@ class TracerTexView<2, T>
     };
     // TODO: coalesce these reads (compiler does 1 byte reads here)
     // Better to get a word (32-bit) and do bit stuff maybe?
-    uint8_t                 index;
-    TextureReadMode         mode;
-    bool                    flipY = false;
+    uint8_t         index;
+    TextureReadMode mode;
+    bool            flipY = false;
 
     public:
     // Constructors & Destructor
@@ -92,19 +92,19 @@ class TracerTexView<2, T>
                               bool flipY = false);
 
     // Base Access
-    MRAY_GPU T  operator()(UV uv) const;
+    MR_GF_DECL T    operator()(UV uv) const;
     // Gradient Access
-    MRAY_GPU T  operator()(UV uv,
-                           UV dpdx,
-                           UV dpdy) const;
+    MR_GF_DECL T    operator()(UV uv,
+                               UV dpdx,
+                               UV dpdy) const;
 
     // Direct Mip Access
-    MRAY_GPU T  operator()(UV uv, Float mipLevel) const;
+    MR_GF_DECL T    operator()(UV uv, Float mipLevel) const;
 
     // Texture Residency check
-    MRAY_GPU bool IsResident(UV uv, Float mipLevel) const;
-    MRAY_GPU bool IsResident(UV uv, UV dpdx, UV dpdy) const;
-    MRAY_GPU bool IsResident(UV uv) const;
+    MR_GF_DECL bool IsResident(UV uv, Float mipLevel) const;
+    MR_GF_DECL bool IsResident(UV uv, UV dpdx, UV dpdy) const;
+    MR_GF_DECL bool IsResident(UV uv) const;
 };
 
 template<class T>
@@ -140,18 +140,18 @@ class TracerTexView<3, T>
                               TextureReadMode mode,
                               bool flipY = false);
     // Base Access
-    MRAY_GPU T  operator()(UV uv) const;
+    MR_GF_DECL T    operator()(UV uv) const;
     // Gradient Access
-    MRAY_GPU T  operator()(UV uv,
-                           UV dpdx,
-                           UV dpdy) const;
+    MR_GF_DECL T    operator()(UV uv,
+                               UV dpdx,
+                               UV dpdy) const;
     // Direct Mip Access
-    MRAY_GPU T  operator()(UV uv, Float mipLevel) const;
+    MR_GF_DECL T    operator()(UV uv, Float mipLevel) const;
 
     // Texture Residency check
-    MRAY_GPU bool IsResident(UV, Float) const { return true; }
-    MRAY_GPU bool IsResident(UV, UV, UV) const { return true; }
-    MRAY_GPU bool IsResident(UV) const { return true; }
+    MR_GF_DECL bool IsResident(UV, Float) const { return true; }
+    MR_GF_DECL bool IsResident(UV, UV, UV) const { return true; }
+    MR_GF_DECL bool IsResident(UV) const { return true; }
 };
 
 template<class T>

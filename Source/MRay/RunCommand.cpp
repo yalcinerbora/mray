@@ -127,8 +127,8 @@ void EyeAnim::SimpleProgressBar::Display(Float ratio, uint64_t timeMS,
     uint32_t leftover = static_cast<uint32_t>(terminalSize[0] - postfix.size());
     leftover -= static_cast<uint32_t>(LegolasAnimSheet.front().first.size());
     leftover -= 20; // Arbitrary 20 character padding
-    leftover = std::min(leftover, MAX_WIDTH);
-    uint32_t eqCount = static_cast<uint32_t>(std::round(Float(leftover) * ratio));
+    leftover = Math::Min(leftover, MAX_WIDTH);
+    uint32_t eqCount = static_cast<uint32_t>(Math::Round(Float(leftover) * ratio));
     uint32_t spaceCount = leftover - eqCount;
 
     fmt::print(FMT_STR,
@@ -918,10 +918,10 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
         // other renderers makes their file names.
         std::string filePath = MRAY_FORMAT("{:s}_{:08.0f}wpp",
                                            saveInfo.prefix,
-                                           std::round(saveInfo.workPerPixel));
+                                           Math::Round(saveInfo.workPerPixel));
         //std::string filePath = MRAY_FORMAT("{:s}_{:08.0f}wpp_{:.2f}s",
         //                                   saveInfo.prefix,
-        //                                   std::round(saveInfo.workPerPixel),
+        //                                   Math::Round(saveInfo.workPerPixel),
         //                                   saveInfo.time);
         MRAY_LOG("Saving \"{}\"...", filePath);
 
@@ -953,11 +953,11 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
         double sppLeft = rendererInfo.wppLimit - rendererInfo.workPerPixel;
         //
         uint64_t totalMS = lastReceiveMS;
-        uint64_t wppCurrent = uint64_t(std::round(rendererInfo.workPerPixel));
+        uint64_t wppCurrent = uint64_t(Math::Round(rendererInfo.workPerPixel));
         if(wppCurrent != 0)
         {
             totalMS /= wppCurrent;
-            totalMS *= uint64_t(std::round(sppLeft));
+            totalMS *= uint64_t(Math::Round(sppLeft));
         }
         else totalMS = std::numeric_limits<uint64_t>::max();
 
@@ -984,7 +984,7 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
 }
 
 RunCommand::RunCommand()
-    : threadCount(std::max(1u, std::thread::hardware_concurrency()))
+    : threadCount(Math::Max(1u, std::thread::hardware_concurrency()))
     , rendererInfo({})
 {
     // To prevent

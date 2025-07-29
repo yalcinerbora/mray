@@ -145,15 +145,13 @@ class TextureViewCUDA
     cudaTextureObject_t     texHandle;
 
     public:
-    MRAY_HOST   TextureViewCUDA(cudaTextureObject_t t) : texHandle(t) {}
+    MRAY_HOST       TextureViewCUDA(cudaTextureObject_t t) : texHandle(t) {}
     // Base Access
-    MRAY_GPU T  operator()(UV uv) const;
+    MR_GF_DECL T    operator()(UV uv) const;
     // Gradient Access
-    MRAY_GPU T  operator()(UV uv,
-                           UV dpdx,
-                           UV dpdy) const;
+    MR_GF_DECL T    operator()(UV uv, UV dpdx, UV dpdy) const;
     // Direct Mip Access
-    MRAY_GPU T  operator()(UV uv, Float mipLevel) const;
+    MR_GF_DECL T    operator()(UV uv, Float mipLevel) const;
 };
 
 // Writable texture views (disregards normalization etc)
@@ -179,7 +177,7 @@ class RWTextureViewCUDA
         MRAY_GPU            PixRef(cudaSurfaceObject_t s,
                                    TextureExtent<DIM> ij);
         public:
-        MRAY_GPU PixRef&    operator=(const T&);
+        MR_GF_DECL PixRef&  operator=(const T&);
     };
 
     static constexpr uint32_t Channels = PixRef::Channels;
@@ -195,13 +193,13 @@ class RWTextureViewCUDA
     // Full Texture object access
     MRAY_HOST       RWTextureViewCUDA(cudaSurfaceObject_t t) : surfHandle(t) {}
     // Write
-    MRAY_GPU PixRef operator()(TextureExtent<DIM>);
+    MR_GF_DECL PixRef operator()(TextureExtent<DIM>);
     // Read
-    MRAY_GPU T      operator()(TextureExtent<DIM>) const;
+    MR_GF_DECL T      operator()(TextureExtent<DIM>) const;
 };
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T TextureViewCUDA<D, T>::operator()(UV uv) const
 {
     bool isResident = false;
@@ -230,7 +228,7 @@ T TextureViewCUDA<D, T>::operator()(UV uv) const
 }
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T TextureViewCUDA<D, T>::operator()(UV uv,
                                     UV dpdx,
                                     UV dpdy) const
@@ -266,7 +264,7 @@ T TextureViewCUDA<D, T>::operator()(UV uv,
 }
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T TextureViewCUDA<D, T>::operator()(UV uv, Float mipLevel) const
 {
     bool isResident = false;
@@ -297,7 +295,7 @@ T TextureViewCUDA<D, T>::operator()(UV uv, Float mipLevel) const
 }
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 RWTextureViewCUDA<D, T>::PixRef::PixRef(cudaSurfaceObject_t s,
                                         TextureExtent<D> in)
     : surfHandle(s)
@@ -305,7 +303,7 @@ RWTextureViewCUDA<D, T>::PixRef::PixRef(cudaSurfaceObject_t s,
 {}
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 typename RWTextureViewCUDA<D, T>::PixRef&
 RWTextureViewCUDA<D, T>::PixRef::operator=(const T& val)
 {
@@ -358,7 +356,7 @@ RWTextureViewCUDA<D, T>::PixRef::operator=(const T& val)
 }
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 typename RWTextureViewCUDA<D, T>::PixRef
 RWTextureViewCUDA<D, T>::operator()(TextureExtent<D> ij)
 {
@@ -366,7 +364,7 @@ RWTextureViewCUDA<D, T>::operator()(TextureExtent<D> ij)
 }
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T RWTextureViewCUDA<D, T>::operator()(TextureExtent<D> ij) const
 {
     using PaddedCudaType = typename PixRef::PaddedCudaType;

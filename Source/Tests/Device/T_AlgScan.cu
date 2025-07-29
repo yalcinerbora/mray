@@ -11,8 +11,8 @@
 template <class T>
 struct Adder
 {
-    MRAY_HYBRID MRAY_CGPU_INLINE
-    T operator()(const T& l, const T& r) const
+    MR_PF_DECL
+    T operator()(const T& l, const T& r) const noexcept
     {
         return r + l;
     }

@@ -91,11 +91,11 @@ class Bitset
         Bitset&     reference;
         uint32_t    index;
         // Constructors & Destructor
-        MR_PF_DECL          BitRef(Bitset&, uint32_t) noexcept;
+        MR_HF_DECL          BitRef(Bitset&, uint32_t) noexcept;
         public:
-        MR_PF_DECL BitRef&  operator=(bool) noexcept;
-        MR_PF_DECL bool     operator~() const noexcept;
-        MR_PF_DECL          operator bool() const noexcept;
+        MR_HF_DECL BitRef&  operator=(bool) noexcept;
+        MR_HF_DECL bool     operator~() const noexcept;
+        MR_HF_DECL          operator bool() const noexcept;
     };
 
     private:
@@ -105,46 +105,46 @@ class Bitset
     // GPU does not have a concept of string so skipping that constructor
     // Constructors & Destructor
                 Bitset() = default;
-    MR_PF_DECL  Bitset(Type) noexcept;
+    MR_HF_DECL  Bitset(Type) noexcept;
     //
-    MR_PF_DECL bool     operator==(const Bitset& rhs) const noexcept;
-    MR_PF_DECL bool     operator[](uint32_t pos) const noexcept;
-    MR_PF_DECL BitRef   operator[](uint32_t pos) noexcept;
+    MR_HF_DECL bool     operator==(const Bitset& rhs) const noexcept;
+    MR_HF_DECL bool     operator[](uint32_t pos) const noexcept;
+    MR_HF_DECL BitRef   operator[](uint32_t pos) noexcept;
 
-    MR_PF_DECL bool  All() const noexcept;
-    MR_PF_DECL bool  Any() const noexcept;
-    MR_PF_DECL bool  None() const noexcept;
+    MR_HF_DECL bool  All() const noexcept;
+    MR_HF_DECL bool  Any() const noexcept;
+    MR_HF_DECL bool  None() const noexcept;
 
     // Specifically utilize 32-bit here
     // 64-bit(std::size_t) may use two registers maybe?
-    MR_PF_DECL uint32_t  Count() const noexcept;
-    MR_PF_DECL uint32_t  Size() const noexcept;
+    MR_HF_DECL uint32_t  Count() const noexcept;
+    MR_HF_DECL uint32_t  Size() const noexcept;
     // How many bits is set
-    MR_PF_DECL uint32_t  PopCount() const noexcept;
+    MR_HF_DECL uint32_t  PopCount() const noexcept;
 
-    MR_PF_DECL Bitset& operator&=(const Bitset&) noexcept;
-    MR_PF_DECL Bitset& operator|=(const Bitset&) noexcept;
-    MR_PF_DECL Bitset& operator^=(const Bitset&) noexcept;
-    MR_PF_DECL Bitset  operator~() const noexcept;
+    MR_HF_DECL Bitset& operator&=(const Bitset&) noexcept;
+    MR_HF_DECL Bitset& operator|=(const Bitset&) noexcept;
+    MR_HF_DECL Bitset& operator^=(const Bitset&) noexcept;
+    MR_HF_DECL Bitset  operator~() const noexcept;
 
-    MR_PF_DECL Bitset& Set() noexcept;
-    MR_PF_DECL Bitset& Set(uint32_t pos, bool value = true) noexcept;
-    MR_PF_DECL Bitset& Reset() noexcept;
-    MR_PF_DECL Bitset& Reset(uint32_t pos) noexcept;
-    MR_PF_DECL Bitset& Flip() noexcept;
-    MR_PF_DECL Bitset& Flip(uint32_t pos) noexcept;
+    MR_HF_DECL Bitset& Set() noexcept;
+    MR_HF_DECL Bitset& Set(uint32_t pos, bool value = true) noexcept;
+    MR_HF_DECL Bitset& Reset() noexcept;
+    MR_HF_DECL Bitset& Reset(uint32_t pos) noexcept;
+    MR_HF_DECL Bitset& Flip() noexcept;
+    MR_HF_DECL Bitset& Flip(uint32_t pos) noexcept;
 
-    MR_PF_DECL explicit operator Type() noexcept;
+    MR_HF_DECL explicit operator Type() noexcept;
 };
 
 template<size_t N>
-MR_PF_DECL Bitset<N> operator&(const Bitset<N>& lhs, const Bitset<N>& rhs) noexcept;
+MR_HF_DECL Bitset<N> operator&(const Bitset<N>& lhs, const Bitset<N>& rhs) noexcept;
 
 template<size_t N>
-MR_PF_DECL Bitset<N> operator|(const Bitset<N>& lhs, const Bitset<N>& rhs) noexcept;
+MR_HF_DECL Bitset<N> operator|(const Bitset<N>& lhs, const Bitset<N>& rhs) noexcept;
 
 template<size_t N>
-MR_PF_DECL Bitset<N> operator^(const Bitset<N>& lhs, const Bitset<N>& rhs) noexcept;
+MR_HF_DECL Bitset<N> operator^(const Bitset<N>& lhs, const Bitset<N>& rhs) noexcept;
 
 template<class R, class T>
 MR_PF_DEF R Bit::BitCast(const T& value) noexcept
@@ -452,13 +452,13 @@ MR_PF_DEF uint32_t Bit::GenerateFourCC(char byte0, char byte1,
 }
 
 template<size_t N>
-MR_PF_DEF Bitset<N>::BitRef::BitRef(Bitset<N>& bs, uint32_t i) noexcept
+MR_HF_DECL Bitset<N>::BitRef::BitRef(Bitset<N>& bs, uint32_t i) noexcept
     : reference(bs)
     , index(i)
 {}
 
 template<size_t N>
-MR_PF_DEF Bitset<N>::BitRef& Bitset<N>::BitRef::operator=(bool b) noexcept
+MR_HF_DECL Bitset<N>::BitRef& Bitset<N>::BitRef::operator=(bool b) noexcept
 {
     Type mask = Type(1u << index);
     reference.bits = (b)
@@ -468,114 +468,114 @@ MR_PF_DEF Bitset<N>::BitRef& Bitset<N>::BitRef::operator=(bool b) noexcept
 }
 
 template<size_t N>
-MR_PF_DEF bool Bitset<N>::BitRef::operator~() const noexcept
+MR_HF_DECL bool Bitset<N>::BitRef::operator~() const noexcept
 {
     return static_cast<bool>(((reference.bits >> index) ^ 0x1) & 0x1);
 }
 
 template<size_t N>
-MR_PF_DEF Bitset<N>::BitRef::operator bool() const noexcept
+MR_HF_DECL Bitset<N>::BitRef::operator bool() const noexcept
 {
     return static_cast<bool>((reference.bits >> index) & 0x1);
 }
 
 template<size_t N>
-MR_PF_DEF Bitset<N>::Bitset(Type t) noexcept
+MR_HF_DECL Bitset<N>::Bitset(Type t) noexcept
     : bits(t)
 {}
 
 template<size_t N>
-MR_PF_DEF bool Bitset<N>::operator==(const Bitset& rhs) const noexcept
+MR_HF_DECL bool Bitset<N>::operator==(const Bitset& rhs) const noexcept
 {
     return (rhs.bits == bits);
 }
 
 template<size_t N>
-MR_PF_DEF bool Bitset<N>::operator[](uint32_t pos) const noexcept
+MR_HF_DECL bool Bitset<N>::operator[](uint32_t pos) const noexcept
 {
     assert(pos < N);
     return static_cast<bool>((bits >> pos) & 0x1);
 }
 
 template<size_t N>
-MR_PF_DEF Bitset<N>::BitRef Bitset<N>::operator[](uint32_t pos) noexcept
+MR_HF_DECL Bitset<N>::BitRef Bitset<N>::operator[](uint32_t pos) noexcept
 {
     assert(pos < N);
     return BitRef(*this, pos);
 }
 
 template<size_t N>
-MR_PF_DEF bool Bitset<N>::All() const noexcept
+MR_HF_DECL bool Bitset<N>::All() const noexcept
 {
     return (bits == MASK);
 }
 
 template<size_t N>
-MR_PF_DEF bool Bitset<N>::Any() const noexcept
+MR_HF_DECL bool Bitset<N>::Any() const noexcept
 {
     return (bits > 0);
 }
 
 template<size_t N>
-MR_PF_DEF bool Bitset<N>::None() const noexcept
+MR_HF_DECL bool Bitset<N>::None() const noexcept
 {
     return (bits == 0);
 }
 
 template<size_t N>
-MR_PF_DEF uint32_t Bitset<N>::Count() const noexcept
+MR_HF_DECL uint32_t Bitset<N>::Count() const noexcept
 {
     return N;
 }
 
 template<size_t N>
-MR_PF_DEF uint32_t Bitset<N>::Size() const noexcept
+MR_HF_DECL uint32_t Bitset<N>::Size() const noexcept
 {
     return CHAR_BIT * sizeof(Type);
 }
 
 template<size_t N>
-MR_PF_DEF uint32_t Bitset<N>::PopCount() const noexcept
+MR_HF_DECL uint32_t Bitset<N>::PopCount() const noexcept
 {
     return Bit::PopC<Type>(MASK & bits);
 }
 
 template<size_t N>
-MR_PF_DEF Bitset<N>& Bitset<N>::operator&=(const Bitset& rhs) noexcept
+MR_HF_DECL Bitset<N>& Bitset<N>::operator&=(const Bitset& rhs) noexcept
 {
     bits &= rhs.bits;
     return *this;
 }
 
 template<size_t N>
-MR_PF_DEF Bitset<N>& Bitset<N>::operator|=(const Bitset& rhs) noexcept
+MR_HF_DECL Bitset<N>& Bitset<N>::operator|=(const Bitset& rhs) noexcept
 {
     bits |= rhs.bits;
     return *this;
 }
 
 template<size_t N>
-MR_PF_DEF Bitset<N>& Bitset<N>::operator^=(const Bitset& rhs) noexcept
+MR_HF_DECL Bitset<N>& Bitset<N>::operator^=(const Bitset& rhs) noexcept
 {
     bits ^= rhs.bits;
     return *this;
 }
 
 template<size_t N>
-MR_PF_DEF Bitset<N> Bitset<N>::operator~() const noexcept
+MR_HF_DECL Bitset<N> Bitset<N>::operator~() const noexcept
 {
     return Bitset<N>(~bits);
 }
 
 template<size_t N>
-MR_PF_DEF Bitset<N>& Bitset<N>::Set() noexcept
+MR_HF_DECL Bitset<N>& Bitset<N>::Set() noexcept
 {
     bits = MASK;
     return *this;
 }
 
 template<size_t N>
-MR_PF_DEF Bitset<N>& Bitset<N>::Set(uint32_t pos, bool value) noexcept
+MR_HF_DECL Bitset<N>& Bitset<N>::Set(uint32_t pos, bool value) noexcept
 {
     assert(pos < N);
     BitRef br(*this, pos);
@@ -584,14 +584,14 @@ MR_PF_DEF Bitset<N>& Bitset<N>::Set(uint32_t pos, bool value) noexcept
 }
 
 template<size_t N>
-MR_PF_DEF Bitset<N>& Bitset<N>::Reset() noexcept
+MR_HF_DECL Bitset<N>& Bitset<N>::Reset() noexcept
 {
     bits = 0x0;
     return *this;
 }
 
 template<size_t N>
-MR_PF_DEF Bitset<N>& Bitset<N>::Reset(uint32_t pos) noexcept
+MR_HF_DECL Bitset<N>& Bitset<N>::Reset(uint32_t pos) noexcept
 {
     assert(pos < N);
     BitRef br(*this, pos);
@@ -600,14 +600,14 @@ MR_PF_DEF Bitset<N>& Bitset<N>::Reset(uint32_t pos) noexcept
 }
 
 template<size_t N>
-MR_PF_DEF Bitset<N>& Bitset<N>::Flip() noexcept
+MR_HF_DECL Bitset<N>& Bitset<N>::Flip() noexcept
 {
     bits = ~bits;
     return *this;
 }
 
 template<size_t N>
-MR_PF_DEF Bitset<N>& Bitset<N>::Flip(uint32_t pos) noexcept
+MR_HF_DECL Bitset<N>& Bitset<N>::Flip(uint32_t pos) noexcept
 {
     assert(pos < N);
     BitRef br(*this, pos);
@@ -616,25 +616,25 @@ MR_PF_DEF Bitset<N>& Bitset<N>::Flip(uint32_t pos) noexcept
 }
 
 template<size_t N>
-MR_PF_DEF Bitset<N>::operator Type() noexcept
+MR_HF_DECL Bitset<N>::operator Type() noexcept
 {
     return bits;
 }
 
 template<size_t N>
-MR_PF_DEF Bitset<N> operator&(const Bitset<N>& lhs, const Bitset<N>& rhs) noexcept
+MR_HF_DECL Bitset<N> operator&(const Bitset<N>& lhs, const Bitset<N>& rhs) noexcept
 {
     return lhs.bits & rhs.bits;
 }
 
 template<size_t N>
-MR_PF_DEF Bitset<N> operator|(const Bitset<N>& lhs, const Bitset<N>& rhs) noexcept
+MR_HF_DECL Bitset<N> operator|(const Bitset<N>& lhs, const Bitset<N>& rhs) noexcept
 {
     return lhs.bits | rhs.bits;
 }
 
 template<size_t N>
-MR_PF_DEF Bitset<N> operator^(const Bitset<N>& lhs, const Bitset<N>& rhs) noexcept
+MR_HF_DECL Bitset<N> operator^(const Bitset<N>& lhs, const Bitset<N>& rhs) noexcept
 {
     return lhs.bits ^ rhs.bits;
 }

@@ -91,21 +91,21 @@ namespace OptiXAccelDetail
         using DataSoA       = EmptyType;
 
         public:
-        MRAY_GPU MRAY_GPU_INLINE
+        MR_PF_DECL
         AcceleratorOptiX(TransDataSoA, PrimDataSoA,
                          DataSoA, AcceleratorKey) {}
 
-        MRAY_GPU MRAY_GPU_INLINE
+        MR_PF_DECL
         Optional<HitResult>
         ClosestHit(BackupRNG& rng, const Ray&, const Vector2&) const
         { return std::nullopt; }
 
-        MRAY_GPU MRAY_GPU_INLINE
+        MR_PF_DECL
         Optional<HitResult>
         FirstHit(BackupRNG& rng, const Ray&, const Vector2&) const
         { return std::nullopt; }
 
-        MRAY_GPU MRAY_GPU_INLINE
+        MR_PF_DECL
         TransformKey
         GetTransformKey() const { return TransformKey::InvalidKey(); }
     };

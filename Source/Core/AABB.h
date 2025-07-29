@@ -42,8 +42,8 @@ class AABB
     MR_PF_DECL Vector<N, T>          Max() noexcept;
 
     // Mutators
-    MR_PF_DECL void SetMin(const Vector<N, T>&) noexcept;
-    MR_PF_DECL void SetMax(const Vector<N, T>&) noexcept;
+    MR_PF_DECL_V void SetMin(const Vector<N, T>&) noexcept;
+    MR_PF_DECL_V void SetMax(const Vector<N, T>&) noexcept;
 
     // Functionality
     MR_PF_DECL Vector<N, T> GeomSpan() const noexcept;

@@ -279,7 +279,7 @@ MRayError ProcessCameras(CameraGroupId& camGroupId,
                          const std::vector<MRayUSDPrimSurface>& cameras,
                          const pxr::UsdStageRefPtr& loadedStage)
 {
-    size_t camCount = std::max(size_t(1), cameras.size());
+    size_t camCount = Math::Max(size_t(1), cameras.size());
 
     using namespace std::string_view_literals;
     static constexpr auto CAMERA_NAME = "Pinhole"sv;

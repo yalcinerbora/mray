@@ -25,7 +25,7 @@
 extern "C" __constant__ ArgumentPackOptiX params;
 
 template<class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 T* DriverPtrToType(CUdeviceptr ptrInt)
 {
     // TODO: std::bit_cast fails when optixir used in
@@ -37,7 +37,7 @@ T* DriverPtrToType(CUdeviceptr ptrInt)
 
 template <VectorC Hit, bool IsTriangle>
 requires std::is_floating_point_v<typename Hit::InnerType>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 MetaHit ReadHitFromAttributes()
 {
     static_assert(Hit::Dims >= MetaHit::MaxDim,
@@ -63,7 +63,7 @@ MetaHit ReadHitFromAttributes()
 
 template <VectorC Hit>
 requires std::is_floating_point_v<typename Hit::InnerType>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 void ReportIntersection(const IntersectionT<Hit>& intersection, unsigned int hitKind)
 {
     Float t = intersection.t;
@@ -89,7 +89,7 @@ void ReportIntersection(const IntersectionT<Hit>& intersection, unsigned int hit
                                 __float_as_uint(float(h[3])));
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 void SetRayIndexAsPayload(RayIndex rIndex)
 {
     // Sanity check
@@ -97,7 +97,7 @@ void SetRayIndexAsPayload(RayIndex rIndex)
     optixSetPayload_0(rIndex);
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 void SetRNGStateAsPayload(BackupRNGState s)
 {
     // TODO: We use PCG32 as a backup generator,
@@ -107,13 +107,13 @@ void SetRNGStateAsPayload(BackupRNGState s)
     optixSetPayload_1(s);
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 RayIndex GetRayIndexFromPayload()
 {
     return RayIndex(optixGetPayload_0());
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 BackupRNGState GetRNGStateFromPayload()
 {
     // TODO: We use PCG32 as a backup generator,
@@ -124,7 +124,7 @@ BackupRNGState GetRNGStateFromPayload()
 // Meta Closest Hit Shader
 //template<PrimitiveGroupC PGroup>
 template<class PGroup>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 void KCClosestHit()
 {
     using enum RenderModeOptiX;
@@ -182,7 +182,7 @@ void KCClosestHit()
 
 // Meta Any Hit Shader
 template<PrimitiveGroupC PGroup>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 void KCAnyHit()
 {
     using Primitive = typename PGroup:: template Primitive<>;
@@ -222,7 +222,7 @@ void KCAnyHit()
 // Meta Intersect Shader
 template<PrimitiveGroupC PGroup, TransformGroupC TGroup,
          auto GenerateTransformContext = MRAY_PRIM_TGEN_FUNCTION(PGroup, TGroup)>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 void KCIntersect()
 {
     using enum PrimTransformType;
@@ -265,7 +265,7 @@ void KCIntersect()
     if(result) ReportIntersection(*result, 0);
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 void KCMissOptiX()
 {
     using enum RenderModeOptiX;
@@ -277,7 +277,7 @@ void KCMissOptiX()
     params.vParams.dIsVisibleBuffer.SetBitParallel(rIndex, true);
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 void KCRayGenOptix()
 {
     using enum RenderModeOptiX;
@@ -333,7 +333,7 @@ void KCRayGenOptix()
         params.nParams.dRNGStates[rIndex] = rngState;
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 void KCLocalRayGenOptix()
 {
     assert(params.mode == RenderModeOptiX::LOCAL);

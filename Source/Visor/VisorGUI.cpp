@@ -53,15 +53,15 @@ Pair<Vector2, Vector2> GenAspectCorrectVP(const Vector2& fbSize,
     Float screenAspect = fbSize[0] / fbSize[1];
     if(imgAspect > screenAspect)
     {
-        Float ySize = std::round(fbSize[1] * screenAspect / imgAspect);
-        Float yOffset = std::round((fbSize[1] - ySize) * Float(0.5));
+        Float ySize = Math::Round(fbSize[1] * screenAspect / imgAspect);
+        Float yOffset = Math::Round((fbSize[1] - ySize) * Float(0.5));
         vpSize = Vector2(fbSize[0], ySize);
         vpOffset = Vector2(0, yOffset);
     }
     else
     {
-        Float xSize = std::round(fbSize[0] * imgAspect / screenAspect);
-        float xOffset = std::round((fbSize[0] - xSize) * Float(0.5));
+        Float xSize = Math::Round(fbSize[0] * imgAspect / screenAspect);
+        float xOffset = Math::Round((fbSize[0] - xSize) * Float(0.5));
         vpSize = Vector2(xSize, fbSize[1]);
         vpOffset = Vector2(xOffset, 0);
     }
@@ -520,7 +520,7 @@ Optional<int32_t> VisorGUI::ShowRendererComboBox(const VisorState& visorState)
     using namespace std::string_literals;
     static const std::string RENDERER_DASHED = "Renderer-"s;
     float maxSize = std::transform_reduce(rTypes.cbegin(), rTypes.cend(), 0.0f,
-    [](float a, float b) { return std::max(a, b); },
+    [](float a, float b) { return Math::Max(a, b); },
     [](const std::string& s)
     {
         return ImGui::CalcTextSize((RENDERER_DASHED + s).c_str()).x;

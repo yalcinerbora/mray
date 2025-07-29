@@ -7,7 +7,7 @@ namespace DefaultSphereDetail
 {
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Sphere<T>::Sphere(const T& transform,
                   const SphereData& data,
                   PrimitiveKey key)
@@ -17,7 +17,7 @@ Sphere<T>::Sphere(const T& transform,
 {}
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Optional<SphereIntersection> Sphere<T>::Intersects(const Ray& ray, bool cullBackFace) const
 {
     Ray transformedRay = transformContext.get().InvApply(ray);
@@ -29,10 +29,10 @@ Optional<SphereIntersection> Sphere<T>::Intersects(const Ray& ray, bool cullBack
                                                       center, radius);
     if(!intersects) return std::nullopt;
 
-    Vector3 unitDir = (hitPos - center).Normalize();
+    Vector3 unitDir = Math::Normalize(hitPos - center);
     Vector2 hit = Graphics::CartesianToUnitSpherical(unitDir);
 
-    bool isInside = (transformedRay.Pos() - center).Length() < radius;
+    bool isInside = Math::Length(transformedRay.Pos() - center) < radius;
     if(cullBackFace && isInside)
         return std::nullopt;
 
@@ -44,7 +44,7 @@ Optional<SphereIntersection> Sphere<T>::Intersects(const Ray& ray, bool cullBack
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 SampleT<BasicSurface> Sphere<T>::SampleSurface(RNGDispenser& rng) const
 {
     // Sampling sphere surface
@@ -55,7 +55,7 @@ SampleT<BasicSurface> Sphere<T>::SampleSurface(RNGDispenser& rng) const
     Float cosPhi = Float(2) * xi[1] - Float(1);
     Float sinPhi = sqrtf(fmaxf(Float(0), Float(1) - cosPhi * cosPhi));
 
-    auto sinCosTheta = Vector2(std::sin(theta), std::cos(theta));
+    auto sinCosTheta = Vector2(Math::SinCos(theta));
     auto sinCosPhi = Vector2(sinPhi, cosPhi);
     Vector3 unitPos = Graphics::UnitSphericalToCartesian(sinCosTheta,
                                                          sinCosPhi);
@@ -66,7 +66,7 @@ SampleT<BasicSurface> Sphere<T>::SampleSurface(RNGDispenser& rng) const
 
     Vector3 sphrLoc = center + radius * unitPos;
     sphrLoc = transformContext.get().ApplyP(sphrLoc);
-    Vector3 normal = transformContext.get().ApplyN(unitPos.Normalize());
+    Vector3 normal = transformContext.get().ApplyN(Math::Normalize(unitPos));
 
     return SampleT<BasicSurface>
     {
@@ -80,14 +80,14 @@ SampleT<BasicSurface> Sphere<T>::SampleSurface(RNGDispenser& rng) const
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float Sphere<T>::PdfSurface(const Hit&) const
 {
     return Float(1) / GetSurfaceArea();
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float Sphere<T>::GetSurfaceArea() const
 {
     // https://math.stackexchange.com/questions/942561/surface-area-of-transformed-sphere
@@ -95,17 +95,17 @@ Float Sphere<T>::GetSurfaceArea() const
     static constexpr Float pRecip = Float(1) / p;
 
     Vector3 semiAxes = radius * transformContext.get().Scale();
-    Float approxArea = std::pow(semiAxes[1] * semiAxes[2], p);
-    approxArea += std::pow(semiAxes[2] * semiAxes[0], p);
-    approxArea += std::pow(semiAxes[0] * semiAxes[1], p);
+    Float approxArea = Math::Pow(semiAxes[1] * semiAxes[2], p);
+    approxArea += Math::Pow(semiAxes[2] * semiAxes[0], p);
+    approxArea += Math::Pow(semiAxes[0] * semiAxes[1], p);
     approxArea *= Float(0.33333333);
-    approxArea = std::pow(approxArea, pRecip);
+    approxArea = Math::Pow(approxArea, pRecip);
     approxArea *= Float(4) * MathConstants::Pi<Float>();
     return approxArea;
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 AABB3 Sphere<T>::GetAABB() const
 {
     AABB3 aabb = Shape::Sphere::BoundingBox(center, radius);
@@ -113,14 +113,14 @@ AABB3 Sphere<T>::GetAABB() const
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector3 Sphere<T>::GetCenter() const
 {
     return transformContext.get().ApplyP(center);
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t Sphere<T>::Voxelize(Span<uint64_t>&,
                              Span<Vector2us>&,
                              bool,
@@ -131,7 +131,7 @@ uint32_t Sphere<T>::Voxelize(Span<uint64_t>&,
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Optional<BasicSurface> Sphere<T>::SurfaceFromHit(const Hit& hit) const
 {
     // Convert spherical hit to cartesian
@@ -142,7 +142,7 @@ Optional<BasicSurface> Sphere<T>::SurfaceFromHit(const Hit& hit) const
     position = transformContext.get().ApplyP(position);
     // Generate Geometric world space normal
     // In sphere case it is equivalent to the normal
-    Vector3 geoNormal = transformContext.get().ApplyN(normal).Normalize();
+    Vector3 geoNormal = Math::Normalize(transformContext.get().ApplyN(normal));
     return BasicSurface
     {
         .position = position,
@@ -151,18 +151,18 @@ Optional<BasicSurface> Sphere<T>::SurfaceFromHit(const Hit& hit) const
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Optional<SphereHit> Sphere<T>::ProjectedHit(const Vector3& point) const
 {
     using namespace Shape::Triangle;
-    Vector3 projPoint = (point - center).Normalize();
+    Vector3 projPoint = Math::Normalize(point - center);
     Vector2 sphrCoords = Graphics::CartesianToUnitSpherical(projPoint);
 
     return Hit(sphrCoords);
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector2 Sphere<T>::SurfaceParametrization(const Hit& hit) const
 {
     // Gen UV
@@ -175,14 +175,14 @@ Vector2 Sphere<T>::SurfaceParametrization(const Hit& hit) const
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 const T& Sphere<T>::GetTransformContext() const
 {
     return transformContext;
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 void Sphere<T>::GenerateSurface(EmptySurface&,
                                 RayConeSurface& rayConeSurface,
                                 // Inputs
@@ -199,7 +199,7 @@ void Sphere<T>::GenerateSurface(EmptySurface&,
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 void Sphere<T>::GenerateSurface(BasicSurface& result,
                                 RayConeSurface& rayConeSurface,
                                 // Inputs
@@ -217,7 +217,7 @@ void Sphere<T>::GenerateSurface(BasicSurface& result,
 }
 
 template<TransformContextC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 void Sphere<T>::GenerateSurface(DefaultSurface& result,
                                 RayConeSurface& rayConeSurface,
                                 // Inputs
@@ -229,18 +229,19 @@ void Sphere<T>::GenerateSurface(DefaultSurface& result,
 
     // Convert spherical hit to cartesian
     Vector3 normal = Graphics::UnitSphericalToCartesian(hit);
-    Vector3 geoNormal = transform.ApplyN(normal).Normalize();
+    Vector3 geoNormal = transform.ApplyN(normal);
+    geoNormal = Math::Normalize(geoNormal);
     // Calculate local position using the normal
     // then convert it to world position
     Vector3 position = center + normal * radius;
     position = transform.ApplyP(position);
 
     // Align this normal to Z axis to define tangent space rotation
-    Quaternion tbn = Quaternion::RotationBetweenZAxis(normal.Normalize()).Conjugate();
+    Quaternion tbn = Quaternion::RotationBetweenZAxis(Math::Normalize(normal)).Conjugate();
 
     // Spheres are always two sided, check if we are inside
-    Vector3 rDir = ray.Dir().Normalize();
-    Float dDotN = geoNormal.Dot(rDir);
+    Vector3 rDir = Math::Normalize(ray.Dir());
+    Float dDotN = Math::Dot(geoNormal, rDir);
     bool backSide = (dDotN > Float(0));
     if(backSide)
     {
@@ -263,8 +264,8 @@ void Sphere<T>::GenerateSurface(DefaultSurface& result,
     Vector3 centerWorld = transform.ApplyP(center);
     // The sphere may be transformed via non-uniform scale
     // so we need to calculate "radius" from the world positions
-    Float r = (centerWorld - position).Length();
-    Float betaN = Float(-1) * std::abs(rayCone.width) / (dDotN * r);
+    Float r = Math::Length(centerWorld - position);
+    Float betaN = Float(-1) * Math::Abs(rayCone.width) / (dDotN * r);
     betaN = backSide ? -betaN : betaN;
     // Texture space differentials
     auto [a1, a2] = rayCone.Project(geoNormal, rDir);
@@ -276,7 +277,7 @@ void Sphere<T>::GenerateSurface(DefaultSurface& result,
         // But this is costly.
         // TODO: Optimize this maybe?
         Vector3 offsetP = (position + offset);
-        Vector3 n = (transform.InvApplyP(offsetP) - center).Normalize();
+        Vector3 n = Math::Normalize(transform.InvApplyP(offsetP) - center);
         Vector2 sphrCoords = Graphics::CartesianToUnitSpherical(n);
         Vector2 texCoord = SurfaceParametrization(sphrCoords);
         return texCoord - uv;

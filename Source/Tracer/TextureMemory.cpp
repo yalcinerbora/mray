@@ -519,31 +519,31 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
     Vector<D, uint32_t> newSize = size;
     if constexpr(D == 2)
     {
-
         // Here we need to clamp the resolution of the texture
         // if requested.
         uint32_t maxDim = size[size.Maximum()];
         uint32_t clampCheck = inputParams.ignoreResClamp ? maxDim : tracerParams.clampedTexRes;
-        uint32_t clampRes = std::min(clampCheck, maxDim);
+        uint32_t clampRes = Math::Min(clampCheck, maxDim);
 
         uint32_t ratio = Math::DivideUp(maxDim, clampRes);
-        int32_t mipReduceAmount = int32_t(std::ceil(std::log2(ratio)));
+        int32_t mipReduceAmount = int32_t(Math::Ceil(Math::Log2(Float(ratio))));
+        //int32_t mipReduceAmount = int32_t(Math::NextPowerOfTwo(ratio));
         // We will have atleast one mip
-        int32_t mipCountI = std::max(1, int32_t(mipCount) - mipReduceAmount);
+        int32_t mipCountI = Math::Max(1, int32_t(mipCount) - mipReduceAmount);
 
         // For BC textures, find highest available mip level
         // (We can not generate these)
         // For other textures we can generate mips,
         // so directly generate these
         mipReduceAmount = (isBlockCompressed)
-            ? std::min(mipCountI - 1, mipReduceAmount)
+            ? Math::Min(mipCountI - 1, mipReduceAmount)
             : mipReduceAmount;
 
         // Finally the new size
         newSize = Graphics::TextureMipSize(size, uint32_t(mipReduceAmount));
         //
         uint32_t ignoredMipCount = uint32_t(mipReduceAmount);
-        uint32_t filteredMip = std::min(ignoredMipCount, mipCount - 1);
+        uint32_t filteredMip = Math::Min(ignoredMipCount, mipCount - 1);
         bool willBeFiltered = (ignoredMipCount > (mipCount - 1));
         // Store the last ignored mip (we will use this to
         // filtering during load time).
@@ -551,7 +551,7 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
         {
             auto filterInPixCount = Graphics::TextureMipSize(size, uint32_t(filteredMip));
             size_t total = filterInPixCount.Multiply() * inputParams.pixelType.PaddedPixelSize();
-            texClampBufferSize = std::max(texClampBufferSize, total);
+            texClampBufferSize = Math::Max(texClampBufferSize, total);
         }
         // Create the clamp params
         tClampParams = TexClampParameters

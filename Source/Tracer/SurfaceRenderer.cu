@@ -9,8 +9,8 @@
 struct IsValidRayFunctor
 {
     private:
-    MRAY_HYBRID MRAY_CGPU_INLINE
-    static bool AllNaN(const Vector3& v)
+    MR_PF_DECL
+    static bool AllNaN(const Vector3& v) noexcept
     {
         return (v[0] != v[0] &&
                 v[1] != v[1] &&
@@ -25,8 +25,8 @@ struct IsValidRayFunctor
         : dRays(dRaysIn)
     {}
 
-    MRAY_HYBRID MRAY_CGPU_INLINE
-    bool operator()(RayIndex i) const
+    MR_PF_DECL
+    bool operator()(RayIndex i) const noexcept
     {
         RayGMem r = dRays[i];
         return !(AllNaN(r.dir) && AllNaN(r.pos) &&
@@ -198,7 +198,7 @@ uint32_t SurfaceRenderer::FindMaxSamplePerIteration(uint32_t rayCount, SurfRDeta
 
     uint32_t maxSample = camSample;
     if(mode == AO)
-        maxSample = std::max(maxSample, 2u);
+        maxSample = Math::Max(maxSample, 2u);
     else if(mode == FURNACE)
     {
         maxSample = std::transform_reduce
@@ -206,7 +206,7 @@ uint32_t SurfaceRenderer::FindMaxSamplePerIteration(uint32_t rayCount, SurfRDeta
             currentWorks.cbegin(), currentWorks.cend(), maxSample,
             [](uint32_t l, uint32_t r) -> uint32_t
             {
-                return std::max(l, r);
+                return Math::Max(l, r);
             },
             [](const auto& renderWorkStruct) -> uint32_t
             {
@@ -355,7 +355,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     tracerView.baseAccelerator.AllocateForTraversal(maxRayCount);
 
     // Calculate tMax for ambient occlusion
-    curTMaxAO = tracerView.baseAccelerator.SceneAABB().GeomSpan().Length();
+    curTMaxAO = Math::Length(tracerView.baseAccelerator.SceneAABB().GeomSpan());
     curTMaxAO *= currentOptions.tMaxAORatio;
 
     // Finally generate RNG

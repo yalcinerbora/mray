@@ -20,21 +20,21 @@ namespace EmbreeAccelDetail
         using DataSoA       = EmptyType;
 
         public:
-        MRAY_GPU MRAY_GPU_INLINE
+        MR_GF_DECL
         AcceleratorEmbree(TransDataSoA, PrimDataSoA,
                          DataSoA, AcceleratorKey) {}
 
-        MRAY_GPU MRAY_GPU_INLINE
+        MR_GF_DECL
         Optional<HitResult>
         ClosestHit(BackupRNG&, const Ray&, const Vector2&) const
         { return std::nullopt; }
 
-        MRAY_GPU MRAY_GPU_INLINE
+        MR_GF_DECL
         Optional<HitResult>
         FirstHit(BackupRNG&, const Ray&, const Vector2&) const
         { return std::nullopt; }
 
-        MRAY_GPU MRAY_GPU_INLINE
+        MR_GF_DECL
         TransformKey
         GetTransformKey() const { return TransformKey::InvalidKey(); }
     };

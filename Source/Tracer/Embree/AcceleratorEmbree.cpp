@@ -177,7 +177,7 @@ AABB3 BaseAcceleratorEmbree::InternalConstruct(const std::vector<size_t>& instan
     DeviceAlgorithms::InPlaceTransform(hGlobalInstanceInvTransforms, queue,
                                        [](Matrix4x4& m)
     {
-        m.InverseSelf();
+        m = m.Inverse();
     });
 
     // Do the scan on this thread
@@ -226,7 +226,7 @@ void BaseAcceleratorEmbree::CastRays(// Output
         {
             uint32_t rayStart = kp.blockId * EMBREE_BATCH_SIZE;
             uint32_t rayEnd = (kp.blockId + 1) * EMBREE_BATCH_SIZE;
-            rayEnd = std::min(rayEnd, rayCount);
+            rayEnd = Math::Min(rayEnd, rayCount);
             uint32_t localRayCount = rayEnd - rayStart;
 
             EmbreeRayQueryContext rqContext;
@@ -347,7 +347,7 @@ void BaseAcceleratorEmbree::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffe
         {
             uint32_t rayStart = kp.blockId * EMBREE_BATCH_SIZE;
             uint32_t rayEnd = (kp.blockId + 1) * EMBREE_BATCH_SIZE;
-            rayEnd = std::min(rayEnd, rayCount);
+            rayEnd = Math::Min(rayEnd, rayCount);
             uint32_t localRayCount = rayEnd - rayStart;
 
             EmbreeRayQueryContext rqContext;

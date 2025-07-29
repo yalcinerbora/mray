@@ -452,14 +452,6 @@ MR_PF_DEF Matrix<N, T> Matrix<N, T>::Inverse() const noexcept requires FloatC<T>
     return inv * detInv;
 }
 
-//template <unsigned int N, ArithmeticC T>
-//MR_PF_DEF Matrix<N, T>& Matrix<N, T>::InverseSelf() requires FloatC<T>
-//{
-//    Matrix<N, T> m = Inverse();
-//    (*this) = m;
-//    return (*this);
-//}
-
 template <unsigned int N, ArithmeticC T>
 MR_PF_DEF Matrix<N, T> Matrix<N, T>::Transpose() const noexcept
 {
@@ -475,242 +467,6 @@ MR_PF_DEF Matrix<N, T> Matrix<N, T>::Transpose() const noexcept
     }
     return m;
 }
-
-//template <unsigned int N, ArithmeticC T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//constexpr Matrix<N, T>& Matrix<N, T>::TransposeSelf()
-//{
-//    MRAY_UNROLL_LOOP
-//    for(unsigned int i = 1; i < N; i++)
-//    {
-//        MRAY_UNROLL_LOOP
-//        for(unsigned int j = 0; j < i; j++)
-//        {
-//            T a = (*this)(i, j);
-//            (*this)(i, j) = (*this)(j, i);
-//            (*this)(j, i) = a;
-//        }
-//    }
-//    return *this;
-//}
-
-//template <unsigned int N, ArithmeticC T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//constexpr Matrix<N, T> Matrix<N, T>::Clamp(const Matrix& minVal, const Matrix& maxVal) const
-//{
-//    Matrix m;
-//    MRAY_UNROLL_LOOP
-//    for(unsigned int i = 0; i < N * N; i++)
-//    {
-//        m[i] = min(max(minVal[i], matrix[i]), maxVal[i]);
-//    }
-//    return m;
-//}
-//
-//template <unsigned int N, ArithmeticC T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//constexpr Matrix<N, T> Matrix<N, T>::Clamp(T minVal, T maxVal) const
-//{
-//    Matrix m;
-//    MRAY_UNROLL_LOOP
-//    for(unsigned int i = 0; i < N * N; i++)
-//    {
-//        m[i] = min(max(minVal, matrix[i]), maxVal);
-//    }
-//    return m;
-//}
-//
-//template <unsigned int N, ArithmeticC T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//constexpr Matrix<N, T>& Matrix<N, T>::ClampSelf(const Matrix& minVal, const Matrix& maxVal)
-//{
-//    MRAY_UNROLL_LOOP
-//    for(unsigned int i = 0; i < N * N; i++)
-//    {
-//        matrix[i] = min(max(minVal[i], matrix[i]), maxVal[i]);
-//    }
-//    return *this;
-//}
-//
-//template <unsigned int N, ArithmeticC T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//constexpr Matrix<N, T>& Matrix<N, T>::ClampSelf(T minVal, T maxVal)
-//{
-//    MRAY_UNROLL_LOOP
-//    for(unsigned int i = 0; i < N * N; i++)
-//    {
-//        matrix[i] = min(max(minVal, matrix[i]), maxVal);
-//    }
-//    return *this;
-//}
-//
-//template <unsigned int N, ArithmeticC T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//constexpr Matrix<N, T> Matrix<N, T>::Abs() const requires SignedC<T>
-//{
-//    Matrix m;
-//    MRAY_UNROLL_LOOP
-//    for(unsigned int i = 0; i < N * N; i++)
-//    {
-//        m[i] = abs(matrix[i]);
-//    }
-//    return m;
-//}
-//
-//template <unsigned int N, ArithmeticC T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//constexpr Matrix<N, T>& Matrix<N, T>::AbsSelf() requires SignedC<T>
-//{
-//    MRAY_UNROLL_LOOP
-//    for(unsigned int i = 0; i < N * N; i++)
-//    {
-//        matrix[i] = abs(matrix[i]);
-//    }
-//    return *this;
-//}
-//
-//template <unsigned int N, ArithmeticC T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//constexpr Matrix<N, T> Matrix<N, T>::Round() const requires FloatC<T>
-//{
-//    Matrix m;
-//    MRAY_UNROLL_LOOP
-//    for(unsigned int i = 0; i < N * N; i++)
-//    {
-//        m[i] = round(matrix[i]);
-//    }
-//    return m;
-//}
-//
-//template <unsigned int N, ArithmeticC T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//constexpr Matrix<N, T>& Matrix<N, T>::RoundSelf() requires FloatC<T>
-//{
-//    MRAY_UNROLL_LOOP
-//    for(unsigned int i = 0; i < N * N; i++)
-//    {
-//        matrix[i] = round(matrix[i]);
-//    }
-//    return *this;
-//}
-//
-//template <unsigned int N, ArithmeticC T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//constexpr Matrix<N, T> Matrix<N, T>::Floor() const requires FloatC<T>
-//{
-//    Matrix m;
-//    MRAY_UNROLL_LOOP
-//    for(unsigned int i = 0; i < N * N; i++)
-//    {
-//        m[i] = floor(matrix[i]);
-//    }
-//    return m;
-//}
-//
-//template <unsigned int N, ArithmeticC T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//constexpr Matrix<N, T>& Matrix<N, T>::FloorSelf() requires FloatC<T>
-//{
-//    MRAY_UNROLL_LOOP
-//    for(unsigned int i = 0; i < N * N; i++)
-//    {
-//        matrix[i] = floor(matrix[i]);
-//    }
-//    return *this;
-//}
-//
-//template <unsigned int N, ArithmeticC T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//constexpr Matrix<N, T> Matrix<N, T>::Ceil() const requires FloatC<T>
-//{
-//    Matrix m;
-//    MRAY_UNROLL_LOOP
-//    for(unsigned int i = 0; i < N * N; i++)
-//    {
-//        m[i] = ceil(matrix[i]);
-//    }
-//    return m;
-//}
-//
-//template <unsigned int N, ArithmeticC T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//constexpr Matrix<N, T>& Matrix<N, T>::CeilSelf() requires FloatC<T>
-//{
-//    MRAY_UNROLL_LOOP
-//    for(unsigned int i = 0; i < N * N; i++)
-//    {
-//        matrix[i] = ceil(matrix[i]);
-//    }
-//    return *this;
-//}
-
-//template <unsigned int N, ArithmeticC T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//constexpr Matrix<N, T> Matrix<N, T>::Lerp(const Matrix& mat0,
-//                                          const Matrix& mat1,
-//                                          T t)  requires FloatC<T>
-//{
-//    assert(t >= 0 && t <= 1);
-//    Matrix m;
-//    MRAY_UNROLL_LOOP
-//    for(unsigned int i = 0; i < N * N; i++)
-//    {
-//        m[i] = (1 - t) * mat0[i] + t * mat1[i];
-//    }
-//    return m;
-//}
-//
-//template <unsigned int N, ArithmeticC T>
-// MRAY_HYBRID MRAY_CGPU_INLINE
-//     constexpr Matrix<N, T> Matrix<N, T>::Min(const Matrix& mat0, const Matrix& mat1)
-//{
-//    Matrix m;
-//    MRAY_UNROLL_LOOP
-//    for(unsigned int i = 0; i < N * N; i++)
-//    {
-//        m[i] = min(mat0[i], mat1[i]);
-//    }
-//    return m;
-//}
-//
-//template <unsigned int N, ArithmeticC T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//constexpr Matrix<N, T> Matrix<N, T>::Min(const Matrix& mat0, T t)
-//{
-//    Matrix m;
-//    MRAY_UNROLL_LOOP
-//    for(unsigned int i = 0; i < N * N; i++)
-//    {
-//        m[i] = min(mat0[i], t);
-//    }
-//    return m;
-//}
-//
-//template <unsigned int N, ArithmeticC T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//constexpr Matrix<N, T> Matrix<N, T>::Max(const Matrix& mat0, const Matrix& mat1)
-//{
-//    Matrix m;
-//    MRAY_UNROLL_LOOP
-//    for(unsigned int i = 0; i < N * N; i++)
-//    {
-//        m[i] = max(mat0[i], mat1[i]);
-//    }
-//    return m;
-//}
-//
-//template <unsigned int N, ArithmeticC T>
-//MRAY_HYBRID MRAY_CGPU_INLINE
-//constexpr Matrix<N, T> Matrix<N, T>::Max(const Matrix& mat0, T t)
-//{
-//    Matrix m;
-//    MRAY_UNROLL_LOOP
-//    for(unsigned int i = 0; i < N * N; i++)
-//    {
-//        m[i] = max(mat0[i], t);
-//    }
-//    return m;
-//}
 
 template <unsigned int N, ArithmeticC T>
 MR_PF_DEF Matrix<N, T> Matrix<N, T>::Identity() noexcept
@@ -765,8 +521,8 @@ MR_PF_DEF AABB<M, T> Matrix<N, T>::TransformAABB(const AABB<M, T>& aabb) const n
         vertex[M] = T{1};
         vertex = (*this) * vertex;
 
-        result.SetMax(Vector<M, T>::Max(result.Max(), Vector<M, T>(vertex)));
-        result.SetMin(Vector<M, T>::Min(result.Min(), Vector<M, T>(vertex)));
+        result.SetMax(Math::Max(result.Max(), Vector<M, T>(vertex)));
+        result.SetMin(Math::Min(result.Min(), Vector<M, T>(vertex)));
     }
     return result;
 }
@@ -821,9 +577,9 @@ MR_PF_DEF Vector<3, T> TransformGen::ExtractScale(const Matrix<4, T>& m) noexcep
     // https://theswissbay.ch/pdf/Gentoomen%20Library/Game%20Development/Programming/Graphics%20Gems%202.pdf
     // Chapter VII
 
-    T sX = Vector<3, T>(m[0], m[1], m[2]).Length();
-    T sY = Vector<3, T>(m[4], m[5], m[6]).Length();
-    T sZ = Vector<3, T>(m[8], m[9], m[10]).Length();
+    T sX = Math::Length(Vector<3, T>(m[0], m[1], m[2]));
+    T sY = Math::Length(Vector<3, T>(m[4], m[5], m[6]));
+    T sZ = Math::Length(Vector<3, T>(m[8], m[9], m[10]));
     return Vector<3, T>(sX, sY, sZ);
 }
 
@@ -1006,15 +762,15 @@ MR_PF_DEF Matrix<4, T> TransformGen::LookAt(const Vector<3, T>& eyePos,
                                             const Vector<3, T>& up) noexcept
 {
     // Calculate Orthogonal Vectors for this rotation
-    Vector<3, T> zAxis = (eyePos - at).NormalizeSelf();
-    Vector<3, T> xAxis = up.CrossProduct(zAxis).NormalizeSelf();
-    Vector<3, T> yAxis = zAxis.CrossProduct(xAxis).NormalizeSelf();
+    Vector<3, T> zAxis = Math::Normalize(eyePos - at);
+    Vector<3, T> xAxis = Math::Normalize(Math::Cross(up, zAxis));
+    Vector<3, T> yAxis = Math::Normalize(Math::Cross(zAxis, xAxis));
 
     // Also Add Translation part
-    return Matrix<4, T>(xAxis[0], xAxis[1], xAxis[2], -xAxis.Dot(eyePos),
-                        yAxis[0], yAxis[1], yAxis[2], -yAxis.Dot(eyePos),
-                        zAxis[0], zAxis[1], zAxis[2], -zAxis.Dot(eyePos),
-                               0,        0,        0,                  1);
+    return Matrix<4, T>(xAxis[0], xAxis[1], xAxis[2], Math::Dot(xAxis, eyePos),
+                        yAxis[0], yAxis[1], yAxis[2], Math::Dot(yAxis, eyePos),
+                        zAxis[0], zAxis[1], zAxis[2], Math::Dot(zAxis, eyePos),
+                        0,        0,        0,        1);
 }
 
 template<FloatC T>

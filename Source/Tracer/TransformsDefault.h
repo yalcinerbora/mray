@@ -30,20 +30,20 @@ class TransformContextSingle
     Ref<const Matrix4x4>    invTransform;
 
     public:
-    MRAY_HYBRID         TransformContextSingle(const typename TransformDetail::SingleTransformSoA&,
-                                                   TransformKey tId);
+    MR_HF_DECL          TransformContextSingle(const typename TransformDetail::SingleTransformSoA&,
+                                               TransformKey tId);
 
-    MRAY_HYBRID Vector3 Scale() const;
-    MRAY_HYBRID Vector3 ApplyP(const Vector3& point) const;
-    MRAY_HYBRID Vector3 ApplyV(const Vector3& vec) const;
-    MRAY_HYBRID Vector3 ApplyN(const Vector3& normal) const;
-    MRAY_HYBRID AABB3   Apply(const AABB3&) const;
-    MRAY_HYBRID Ray     Apply(const Ray&) const;
-    MRAY_HYBRID Vector3 InvApplyP(const Vector3& point) const;
-    MRAY_HYBRID Vector3 InvApplyV(const Vector3& vec) const;
-    MRAY_HYBRID Vector3 InvApplyN(const Vector3& normal) const;
-    MRAY_HYBRID AABB3   InvApply(const AABB3&) const;
-    MRAY_HYBRID Ray     InvApply(const Ray&) const;
+    MR_HF_DECL Vector3 Scale() const;
+    MR_HF_DECL Vector3 ApplyP(const Vector3& point) const;
+    MR_HF_DECL Vector3 ApplyV(const Vector3& vec) const;
+    MR_HF_DECL Vector3 ApplyN(const Vector3& normal) const;
+    MR_HF_DECL AABB3   Apply(const AABB3&) const;
+    MR_HF_DECL Ray     Apply(const Ray&) const;
+    MR_HF_DECL Vector3 InvApplyP(const Vector3& point) const;
+    MR_HF_DECL Vector3 InvApplyV(const Vector3& vec) const;
+    MR_HF_DECL Vector3 InvApplyN(const Vector3& normal) const;
+    MR_HF_DECL AABB3   InvApply(const AABB3&) const;
+    MR_HF_DECL Ray     InvApply(const Ray&) const;
 };
 
 class TransformGroupSingle final : public GenericGroupTransform<TransformGroupSingle>
@@ -53,7 +53,7 @@ class TransformGroupSingle final : public GenericGroupTransform<TransformGroupSi
     using DataSoA               = typename TransformDetail::SingleTransformSoA;
     static std::string_view     TypeName();
 
-    MRAY_HYBRID
+    MR_HF_DECL
     static Matrix4x4 AcquireCommonTransform(DataSoA, TransformKey);
 
     private:
@@ -90,7 +90,7 @@ class TransformGroupMulti final : public GenericGroupTransform<TransformGroupMul
     using DataSoA               = typename TransformDetail::MultiTransformSoA;
     static std::string_view     TypeName();
 
-    MRAY_HYBRID
+    MR_HF_DECL
     static Matrix4x4 AcquireCommonTransform(DataSoA, TransformKey);
 
     private:
@@ -126,7 +126,7 @@ class TransformGroupMulti final : public GenericGroupTransform<TransformGroupMul
 // Meta Transform Generator Functions
 // (Primitive invariant)
 template <class PrimitiveGroupSoA>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 TransformContextSingle GenTContextSingle(const typename TransformGroupSingle::DataSoA& transformData,
                                          const PrimitiveGroupSoA&,
                                          TransformKey tId,
@@ -151,14 +151,14 @@ inline std::string_view TransformGroupMulti::TypeName()
     return TransformTypeName<Name>;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Matrix4x4 TransformGroupSingle::AcquireCommonTransform(DataSoA soa, TransformKey tKey)
 {
     CommonKey index = tKey.FetchIndexPortion();
     return  soa.transforms[index];
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Matrix4x4 TransformGroupMulti::AcquireCommonTransform(DataSoA, TransformKey)
 {
     // We return identity, there is no common transform

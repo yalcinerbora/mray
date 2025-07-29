@@ -31,28 +31,28 @@ namespace LambertMatDetail
         MediumKeyPair               mediumKeys;
 
         public:
-        MRAY_GPU
+        MR_GF_DECL
         LambertMaterial(const SpectrumConverter& sTransContext,
                         const DataSoA& soa, MaterialKey mk);
 
-        MRAY_GPU
+        MR_GF_DECL
         SampleT<BxDFResult> SampleBxDF(const Vector3& wO,
                                        const Surface& surface,
                                        RNGDispenser& dispenser) const;
-        MRAY_GPU Float      Pdf(const Ray& wI,
+        MR_GF_DECL Float    Pdf(const Ray& wI,
                                 const Vector3& wO,
                                 const Surface& surface) const;
 
-        MRAY_GPU Spectrum   Evaluate(const Ray& wI,
+        MR_GF_DECL Spectrum Evaluate(const Ray& wI,
                                      const Vector3& wO,
                                      const Surface& surface) const;
-        MRAY_GPU bool       IsEmissive() const;
-        MRAY_GPU Spectrum   Emit(const Vector3& wO,
+        MR_GF_DECL bool     IsEmissive() const;
+        MR_GF_DECL Spectrum Emit(const Vector3& wO,
                                  const Surface& surf) const;
-        MRAY_GPU bool       IsAllTexturesAreResident(const Surface& surface) const;
-        MRAY_GPU Float      Specularity(const Surface&) const;
+        MR_GF_DECL bool     IsAllTexturesAreResident(const Surface& surface) const;
+        MR_GF_DECL Float    Specularity(const Surface&) const;
 
-        MRAY_GPU
+        MR_GF_DECL
         RayConeSurface      RefractRayCone(const RayConeSurface&, const Vector3& wO,
                                            const Surface&) const;
     };
@@ -79,27 +79,27 @@ namespace ReflectMatDetail
         MediumKeyPair  mediumKeys;
 
         public:
-        MRAY_GPU
+        MR_GF_DECL
         ReflectMaterial(const SpectrumConverter& sTransContext,
                         const DataSoA& soa, MaterialKey mk);
 
-        MRAY_GPU
+        MR_GF_DECL
         SampleT<BxDFResult> SampleBxDF(const Vector3& wO,
                                            const Surface& surface,
                                            RNGDispenser& dispenser) const;
-        MRAY_GPU Float      Pdf(const Ray& wI,
+        MR_GF_DECL Float    Pdf(const Ray& wI,
                                     const Vector3& wO,
                                     const Surface& surface) const;
-        MRAY_GPU Spectrum    Evaluate(const Ray& wI,
-                                         const Vector3& wO,
-                                         const Surface& surface) const;
-        MRAY_GPU bool        IsEmissive() const;
-        MRAY_GPU Spectrum    Emit(const Vector3& wO,
-                                     const Surface& surf) const;
-        MRAY_GPU bool        IsAllTexturesAreResident(const Surface& surface) const;
-        MRAY_GPU Float       Specularity(const Surface&) const;
+        MR_GF_DECL Spectrum Evaluate(const Ray& wI,
+                                     const Vector3& wO,
+                                     const Surface& surface) const;
+        MR_GF_DECL bool     IsEmissive() const;
+        MR_GF_DECL Spectrum Emit(const Vector3& wO,
+                                 const Surface& surf) const;
+        MR_GF_DECL bool     IsAllTexturesAreResident(const Surface& surface) const;
+        MR_GF_DECL Float    Specularity(const Surface&) const;
 
-        MRAY_GPU
+        MR_GF_DECL
         RayConeSurface      RefractRayCone(const RayConeSurface&, const Vector3& wO,
                                            const Surface&) const;
     };
@@ -129,28 +129,28 @@ namespace RefractMatDetail
         Spectrum        backIoR;
 
         public:
-        MRAY_GPU
+        MR_GF_DECL
         RefractMaterial(const SpectrumConverter& sTransContext,
                         const DataSoA& soa, MaterialKey mk);
 
-        MRAY_GPU
+        MR_GF_DECL
         SampleT<BxDFResult> SampleBxDF(const Vector3& wO,
                                        const Surface& surface,
                                        RNGDispenser& dispenser) const;
-        MRAY_GPU Float      Pdf(const Ray& wI,
+        MR_GF_DECL Float    Pdf(const Ray& wI,
                                 const Vector3& wO,
                                 const Surface& surface) const;
 
-        MRAY_GPU Spectrum   Evaluate(const Ray& wI,
+        MR_GF_DECL Spectrum Evaluate(const Ray& wI,
                                      const Vector3& wO,
                                      const Surface& surface) const;
-        MRAY_GPU bool       IsEmissive() const;
-        MRAY_GPU Spectrum   Emit(const Vector3& wO,
+        MR_GF_DECL bool     IsEmissive() const;
+        MR_GF_DECL Spectrum Emit(const Vector3& wO,
                                  const Surface& surf) const;
-        MRAY_GPU bool       IsAllTexturesAreResident(const Surface& surface) const;
-        MRAY_GPU Float      Specularity(const Surface&) const;
+        MR_GF_DECL bool     IsAllTexturesAreResident(const Surface& surface) const;
+        MR_GF_DECL Float    Specularity(const Surface&) const;
 
-        MRAY_GPU
+        MR_GF_DECL
         RayConeSurface      RefractRayCone(const RayConeSurface&, const Vector3& wO,
                                            const Surface&) const;
     };
@@ -191,39 +191,39 @@ namespace UnrealMatDetail
 
         MediumKeyPair               mediumKeys;
 
-        MRAY_GPU
+        MR_GF_DECL
         Float MISRatio(Float metallic, Float specular, Float avgAlbedo) const;
-        MRAY_GPU
+        MR_GF_DECL
         Spectrum CalculateF0(Spectrum albedo, Float metallic, Float specular) const;
-        MRAY_GPU
+        MR_GF_DECL
         Float ConvertProbHToL(Float VdH, Float pdfH) const;
-        MRAY_GPU
+        MR_GF_DECL
         std::tuple<Float, Float, Float, Spectrum>
         FetchData(const Surface&) const;
 
         public:
-        MRAY_GPU
+        MR_GF_DECL
         UnrealMaterial(const SpectrumConverter& sTransContext,
                        const DataSoA& soa, MaterialKey mk);
 
-        MRAY_GPU
+        MR_GF_DECL
         SampleT<BxDFResult> SampleBxDF(const Vector3& wO,
                                        const Surface& surface,
                                        RNGDispenser& dispenser) const;
-        MRAY_GPU Float      Pdf(const Ray& wI,
+        MR_GF_DECL Float    Pdf(const Ray& wI,
                                 const Vector3& wO,
                                 const Surface& surface) const;
 
-        MRAY_GPU Spectrum   Evaluate(const Ray& wI,
+        MR_GF_DECL Spectrum Evaluate(const Ray& wI,
                                      const Vector3& wO,
                                      const Surface& surface) const;
-        MRAY_GPU bool       IsEmissive() const;
-        MRAY_GPU Spectrum   Emit(const Vector3& wO,
+        MR_GF_DECL bool     IsEmissive() const;
+        MR_GF_DECL Spectrum Emit(const Vector3& wO,
                                  const Surface& surf) const;
-        MRAY_GPU bool       IsAllTexturesAreResident(const Surface& surface) const;
-        MRAY_GPU Float      Specularity(const Surface&) const;
+        MR_GF_DECL bool     IsAllTexturesAreResident(const Surface& surface) const;
+        MR_GF_DECL Float    Specularity(const Surface&) const;
 
-        MRAY_GPU
+        MR_GF_DECL
         RayConeSurface      RefractRayCone(const RayConeSurface&, const Vector3& wO,
                                            const Surface&) const;
     };

@@ -12,7 +12,7 @@ struct LightSampleOutput
     Vector3     position;
     Spectrum    emission;
 
-    MRAY_HYBRID
+    MR_HF_DECL
     Pair<Ray, Vector2>  SampledRay(const Vector3& distantPoint) const;
 };
 using LightSample = SampleT<LightSampleOutput>;
@@ -46,17 +46,17 @@ class DirectLightSamplerUniform
                               const LightLookupTable&);
 
     template <class SpectrumConverter>
-    MRAY_HYBRID
+    MR_HF_DECL
     LightSample SampleLight(RNGDispenser& rng,
                             const SpectrumConverter&,
                             const Vector3& distantPoint,
                             const Vector3& distantNormal,
                             const RayConeSurface& distantRayConeSurface) const;
 
-    MRAY_HYBRID
+    MR_HF_DECL
     Float       PdfLight(uint32_t index, const MetaHit& hit,
                          const Ray& r) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     Float       PdfLight(const HitKeyPack&, const MetaHit& hit,
                          const Ray& r) const;
 };

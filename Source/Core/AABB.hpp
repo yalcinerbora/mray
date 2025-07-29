@@ -67,8 +67,8 @@ MR_PF_DEF Vector<N, T> AABB<N, T>::Centroid() const noexcept
 template<unsigned int N, FloatC T>
 MR_PF_DEF AABB<N, T> AABB<N, T>::Union(const AABB<N, T>& aabb) const noexcept
 {
-    return AABB<N, T>(Vector<N, T>::Min(min, aabb.min),
-                      Vector<N, T>::Max(max, aabb.max));
+    return AABB<N, T>(Math::Min(min, aabb.min),
+                      Math::Max(max, aabb.max));
 }
 
 template<unsigned int N, FloatC T>

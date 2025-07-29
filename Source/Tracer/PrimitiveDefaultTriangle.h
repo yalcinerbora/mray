@@ -47,45 +47,45 @@ namespace DefaultTriangleDetail
         Vector3                     positions[Shape::Triangle::TRI_VERTEX_COUNT];
 
         public:
-        MRAY_HYBRID             Triangle(const TransContextType& transform,
+        MR_HF_DECL              Triangle(const TransContextType& transform,
                                          const TriangleData& data, PrimitiveKey key);
-        MRAY_HYBRID
+        MR_HF_DECL
         Intersection            Intersects(const Ray& ray, bool cullBackface) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         SampleT<BasicSurface>   SampleSurface(RNGDispenser& rng) const;
-        MRAY_HYBRID Float       PdfSurface(const Hit& hit) const;
-        MRAY_HYBRID Float       GetSurfaceArea() const;
-        MRAY_HYBRID AABB3       GetAABB() const;
+        MR_HF_DECL Float        PdfSurface(const Hit& hit) const;
+        MR_HF_DECL Float        GetSurfaceArea() const;
+        MR_HF_DECL AABB3        GetAABB() const;
         MRAY_HYBRID Vector3     GetCenter() const;
         MRAY_HYBRID uint32_t    Voxelize(Span<uint64_t>& mortonCodes,
                                          Span<Vector2us>& normals,
                                          bool onlyCalculateSize,
                                          const VoxelizationParameters& voxelParams) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Optional<BasicSurface>  SurfaceFromHit(const Hit& hit) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Optional<Hit>           ProjectedHit(const Vector3& point) const;
-        MRAY_HYBRID Vector2     SurfaceParametrization(const Hit& hit) const;
+        MR_HF_DECL Vector2      SurfaceParametrization(const Hit& hit) const;
 
-        MRAY_HYBRID
+        MR_HF_DECL
         const TransContextType& GetTransformContext() const;
 
         // Surface Generation
-        MRAY_HYBRID void        GenerateSurface(EmptySurface&,
+        MR_HF_DECL void         GenerateSurface(EmptySurface&,
                                                 RayConeSurface&,
                                                 // Inputs
                                                 const Hit&,
                                                 const Ray&,
                                                 const RayCone&) const;
 
-        MRAY_HYBRID void        GenerateSurface(BasicSurface&,
+        MR_HF_DECL void         GenerateSurface(BasicSurface&,
                                                 RayConeSurface&,
                                                 // Inputs
                                                 const Hit&,
                                                 const Ray&,
                                                 const RayCone&) const;
 
-        MRAY_HYBRID void        GenerateSurface(DefaultSurface&,
+        MR_HF_DECL void         GenerateSurface(DefaultSurface&,
                                                 RayConeSurface&,
                                                 // Inputs
                                                 const Hit&,
@@ -122,81 +122,81 @@ namespace DefaultSkinnedTriangleDetail
         Matrix4x4 invTransform;
 
         public:
-        MRAY_HYBRID
+        MR_HF_DECL
         TransformContextSkinned(const typename TransformGroupMulti::DataSoA& transformData,
                                 const SkinnedTriangleData& triData,
                                 TransformKey tId,
                                 PrimitiveKey pId);
 
-        MRAY_HYBRID MRAY_CGPU_INLINE
+        MR_PF_DECL
         Vector3 Scale() const
         {
             return TransformGen::ExtractScale(transform);
         }
 
-        MRAY_HYBRID MRAY_CGPU_INLINE
-        Vector3 ApplyP(const Vector3& point) const
+        MR_PF_DECL
+        Vector3 ApplyP(const Vector3& point) const noexcept
         {
             return Vector3(transform *  Vector4(point, 1));
         }
 
-        MRAY_HYBRID MRAY_CGPU_INLINE
-        Vector3 ApplyV(const Vector3& vec) const
+        MR_PF_DECL
+        Vector3 ApplyV(const Vector3& vec) const noexcept
         {
             return transform * vec;
         }
 
-        MRAY_HYBRID MRAY_CGPU_INLINE
-        Vector3 ApplyN(const Vector3& norm) const
+        MR_PF_DECL
+        Vector3 ApplyN(const Vector3& norm) const noexcept
         {
             return invTransform.LeftMultiply(norm);
         }
 
-        MRAY_HYBRID MRAY_CGPU_INLINE
-        AABB3 Apply(const AABB3& aabb) const
+        MR_PF_DECL
+        AABB3 Apply(const AABB3& aabb) const noexcept
         {
             return transform.TransformAABB(aabb);
         }
 
-        MRAY_HYBRID MRAY_CGPU_INLINE
-        Ray Apply(const Ray& ray) const
+        MR_PF_DECL
+        Ray Apply(const Ray& ray) const noexcept
         {
             return transform.TransformRay(ray);
         }
 
-        MRAY_HYBRID MRAY_CGPU_INLINE
-        Vector3 InvApplyP(const Vector3& point) const
+        MR_PF_DECL
+        Vector3 InvApplyP(const Vector3& point) const noexcept
         {
             return Vector3(invTransform * Vector4(point, 1));
         }
 
-        MRAY_HYBRID MRAY_CGPU_INLINE
-        Vector3 InvApplyV(const Vector3& vec) const
+        MR_PF_DECL
+        Vector3 InvApplyV(const Vector3& vec) const noexcept
         {
             return invTransform * vec;
         }
 
-        MRAY_HYBRID MRAY_CGPU_INLINE
-        Vector3 InvApplyN(const Vector3& norm) const
+        MR_PF_DECL
+        Vector3 InvApplyN(const Vector3& norm) const noexcept
         {
             return transform.LeftMultiply(norm);
         }
 
-        MRAY_HYBRID MRAY_CGPU_INLINE
-        AABB3 InvApply(const AABB3& aabb) const
+        MR_PF_DECL
+        AABB3 InvApply(const AABB3& aabb) const noexcept
         {
             return invTransform.TransformAABB(aabb);
         }
 
-        MRAY_HYBRID MRAY_CGPU_INLINE
-        Ray InvApply(const Ray& ray) const
+        MR_PF_DECL
+        Ray InvApply(const Ray& ray) const noexcept
         {
             return invTransform.TransformRay(ray);
         }
     };
 
     // Transform Context Generators
-    MRAY_HYBRID
+    MR_HF_DECL
     TransformContextSkinned GenTContextSkinned(const typename TransformGroupMulti::DataSoA&,
                                                const SkinnedTriangleData&,
                                                TransformKey,

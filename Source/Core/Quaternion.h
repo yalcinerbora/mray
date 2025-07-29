@@ -40,11 +40,11 @@ class Quat
     MR_PF_DECL Quat  operator-() const noexcept;
     MR_PF_DECL Quat  operator/(T) const noexcept;
 
-    MR_PF_DECL void  operator*=(const Quat&) noexcept;
-    MR_PF_DECL void  operator*=(T) noexcept;
-    MR_PF_DECL void  operator+=(const Quat&) noexcept;
-    MR_PF_DECL void  operator-=(const Quat&) noexcept;
-    MR_PF_DECL void  operator/=(T) noexcept;
+    MR_PF_DECL_V void  operator*=(const Quat&) noexcept;
+    MR_PF_DECL_V void  operator*=(T) noexcept;
+    MR_PF_DECL_V void  operator+=(const Quat&) noexcept;
+    MR_PF_DECL_V void  operator-=(const Quat&) noexcept;
+    MR_PF_DECL_V void  operator/=(T) noexcept;
     // Logic
     MR_PF_DECL bool  operator==(const Quat&) const noexcept;
     MR_PF_DECL bool  operator!=(const Quat&) const noexcept;
