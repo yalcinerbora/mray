@@ -448,7 +448,7 @@ Quat<T> TransformGen::ToSpaceQuat(const Vector<3, T>& xIn,
                         x[1] - y[0]);
         }
     }
-    q *= T{0.5} / Math::Sqrt(t);
+    q *= T{0.5} * Math::RSqrt(t);
     q = q.Normalize();
     q = q.Conjugate();
     return q;

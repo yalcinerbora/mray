@@ -521,10 +521,10 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     Float a1L = Math::Length(a1), a2L = Math::Length(a2);
     Float a1LSqr = a1L * a1L, a2LSqr = a2L * a2L;
     Float a12L = a1L * a2L;
-    Float l0 = a12L / Math::Sqrt(a1LSqr * eMin[0] * eMin[0] +
-                                a2LSqr * eMin[1] * eMin[1]);
-    Float l1 = a12L / Math::Sqrt(a1LSqr * eMax[0] * eMax[0] +
-                                 a2LSqr * eMax[1] * eMax[1]);
+    Float l0 = a12L * Math::RSqrt(a1LSqr * eMin[0] * eMin[0] +
+                                  a2LSqr * eMin[1] * eMin[1]);
+    Float l1 = a12L * Math::RSqrt(a1LSqr * eMax[0] * eMax[0] +
+                                  a2LSqr * eMax[1] * eMax[1]);
     Float lMaxRecip = Float(1) / Math::Max(l0, l1);
     Float k0 = curvatures[minIndex] * l0 * lMaxRecip;
     Float k1 = curvatures[maxIndex] * l1 * lMaxRecip;

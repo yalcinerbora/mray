@@ -27,10 +27,10 @@
     #define MRAY_UNROLL_LOOP_N(N)
 #elif defined(MRAY_CLANG)
     #define MRAY_UNROLL_LOOP        _Pragma("loop unroll")
-    #define MRAY_UNROLL_LOOP_N(N)   _Pragma("loop unroll "#N)
+    #define MRAY_UNROLL_LOOP_N(N)   _Pragma("loop unroll " N)
 #elif defined(MRAY_GCC)
     #define MRAY_UNROLL_LOOP        _Pragma("gcc unroll 8")
-    #define MRAY_UNROLL_LOOP_N(N)   _Pragma("gcc unroll "#N)
+    #define MRAY_UNROLL_LOOP_N(N)   _Pragma("gcc unroll " N)
 #endif
 
 #if defined MRAY_GPU_BACKEND_CUDA
@@ -46,23 +46,22 @@
         #define MRAY_DEVICE_CODE_PATH_CUDA
     #endif
 
+    #undef MRAY_FORCE_INLINE_DECL
+    #undef MRAY_FORCE_INLINE_DEF
+    #define MRAY_FORCE_INLINE_DECL  __forceinline__
+    #define MRAY_FORCE_INLINE_DEF   __forceinline__
     // Use CUDA's inline if we are compiling with CUDA
     #ifdef MRAY_DEVICE_CODE_PATH_CUDA
-        #undef MRAY_FORCE_INLINE_DECL
-        #undef MRAY_FORCE_INLINE_DEF
-        #define MRAY_FORCE_INLINE_DECL  inline
-        #define MRAY_FORCE_INLINE_DEF   inline
-
         #undef MRAY_UNROLL_LOOP
         #undef MRAY_UNROLL_LOOP_N
         #define MRAY_UNROLL_LOOP        _Pragma("unroll")
-        #define MRAY_UNROLL_LOOP_N(N)   _Pragma("unroll") // TODO: put N later
+        #define MRAY_UNROLL_LOOP_N(N)   _Pragma("unroll " N)
     #endif
 
-    #define MRAY_GPU_INLINE_DECL    MRAY_FORCE_INLINE_DECL
-    #define MRAY_GPU_INLINE_DEF     MRAY_FORCE_INLINE_DEF
-    #define MRAY_HYBRID_INLINE_DECL MRAY_FORCE_INLINE_DECL
-    #define MRAY_HYBRID_INLINE_DEF  MRAY_FORCE_INLINE_DEF
+    #define MRAY_GPU_INLINE_DECL
+    #define MRAY_GPU_INLINE_DEF     inline
+    #define MRAY_HYBRID_INLINE_DECL
+    #define MRAY_HYBRID_INLINE_DEF  inline
 
     #define NO_DISCARD [[nodiscard]]
 
@@ -80,22 +79,21 @@
     #endif
 
     // HIP mimics CUDA so same code
+    #undef MRAY_FORCE_INLINE_DECL
+    #undef MRAY_FORCE_INLINE_DEF
+    #define MRAY_FORCE_INLINE_DECL  __forceinline__
+    #define MRAY_FORCE_INLINE_DEF   __forceinline__
     #ifdef MRAY_DEVICE_CODE_PATH_HIP
-        #undef MRAY_FORCE_INLINE_DECL
-        #undef MRAY_FORCE_INLINE_DEF
-        #define MRAY_FORCE_INLINE_DECL  __forceinline__
-        #define MRAY_FORCE_INLINE_DEF   __forceinline__
-
         #undef  MRAY_UNROLL_LOOP
         #undef  MRAY_UNROLL_LOOP_N
         #define MRAY_UNROLL_LOOP        _Pragma("unroll")
-        #define MRAY_UNROLL_LOOP_N(N)   _Pragma("unroll "#N)
+        #define MRAY_UNROLL_LOOP_N(N)   _Pragma("unroll " N)
     #endif
 
-    #define MRAY_GPU_INLINE_DECL    MRAY_FORCE_INLINE_DECL
-    #define MRAY_GPU_INLINE_DEF     MRAY_FORCE_INLINE_DEF
-    #define MRAY_HYBRID_INLINE_DECL MRAY_FORCE_INLINE_DECL
-    #define MRAY_HYBRID_INLINE_DEF  MRAY_FORCE_INLINE_DEF
+    #define MRAY_GPU_INLINE_DECL
+    #define MRAY_GPU_INLINE_DEF     inline
+    #define MRAY_HYBRID_INLINE_DECL
+    #define MRAY_HYBRID_INLINE_DEF  inline
 
     // TODO: Hip does not like the order.
     // "__host__ [[nodiscard]]", but NVCC does not like
@@ -110,9 +108,9 @@
     #define MRAY_HOST
     // CPUs can have deep stacks etc, so just default to inline.
     // Let the compiler do its thing
-    #define MRAY_GPU_INLINE_DECL    inline
+    #define MRAY_GPU_INLINE_DECL
     #define MRAY_GPU_INLINE_DEF     inline
-    #define MRAY_HYBRID_INLINE_DECL inline
+    #define MRAY_HYBRID_INLINE_DECL
     #define MRAY_HYBRID_INLINE_DEF  inline
 
     #define NO_DISCARD [[nodiscard]]
@@ -123,9 +121,9 @@
     #define MRAY_GPU
     #define MRAY_HOST
     //
-    #define MRAY_GPU_INLINE_DECL    inline
+    #define MRAY_GPU_INLINE_DECL
     #define MRAY_GPU_INLINE_DEF     inline
-    #define MRAY_HYBRID_INLINE_DECL inline
+    #define MRAY_HYBRID_INLINE_DECL
     #define MRAY_HYBRID_INLINE_DEF  inline
 
     #define NO_DISCARD [[nodiscard]]

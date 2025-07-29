@@ -295,7 +295,7 @@ SampleT<Vector3> BxDF::VNDFGGXSmithSample(const Vector3& V, Float alpha,
     // Section 4.1 Find orthonormal basis in the sphere
     Float len2 = Math::LengthSqr(Vector2(VHemi));
     Vector3 T1 = (len2 > 0)
-                    ? Vector3(-VHemi[1], VHemi[0], 0.0f) / Math::Sqrt(len2)
+                    ? Vector3(-VHemi[1], VHemi[0], 0.0f) * Math::RSqrt(len2)
                     : Vector3(1, 0, 0);
     Vector3 T2 = Math::Cross(VHemi, T1);
     // Section 4.2 Sampling using projected area
@@ -316,7 +316,7 @@ SampleT<Vector3> BxDF::VNDFGGXSmithSample(const Vector3& V, Float alpha,
     if(nLen2 < MathConstants::Epsilon<Float>())
         NMicrofacet = Vector3::ZAxis();
     else
-        NMicrofacet *= (Float(1) / Math::Sqrt(nLen2));
+        NMicrofacet *= Math::RSqrt(nLen2);
 
     return SampleT<Vector3>
     {
