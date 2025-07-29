@@ -4,15 +4,18 @@
 
     #define TRACY_ENABLE
     #include <tracy/tracy/TracyC.h>
-    #include <string_view>
     #include <cassert>
     #include <limits>
 
     #include "BitFunctions.h"
     #include "ColorFunctions.h"
     #include "SharedLibrary.h"
+#else
+    #include "Log.h"
 #endif
 
+#include "Types.h"
+#include <string_view>
 #include <source_location>
 
 #ifndef MRAY_ENABLE_TRACY
@@ -24,6 +27,7 @@ class ProfilerAnnotation
     public:
     class Scope
     {
+        friend ProfilerAnnotation;
         private:
         // Constructors
                 Scope(const ProfilerAnnotation&) {}
@@ -45,13 +49,19 @@ class ProfilerAnnotation
     ProfilerAnnotation& operator=(ProfilerAnnotation&&) = delete;
 
     [[nodiscard]]
-    Scope               AnnotateScope() const {};
+    Scope               AnnotateScope() const { return Scope(*this); };
 };
 
 class ProfilerDLL
 {
     public:
-                    ProfilerDLL(Optional<bool> = std::nullopt) {}
+                    ProfilerDLL(Optional<bool> v = std::nullopt)
+                    {
+                        if(v && *v)
+                        MRAY_WARNING_LOG("[Prof]  : Profiling is requested "
+                                         "but MRay is *not* compiled with \"MRAY_ENABLE_TRACY\". "
+                                         "Profiling flag will be ignored!");
+                    }
                     ProfilerDLL(const ProfilerDLL&) = delete;
                     ProfilerDLL(ProfilerDLL&&) = delete;
     ProfilerDLL&    operator=(const ProfilerDLL&) = delete;
@@ -188,10 +198,9 @@ inline
 ProfilerDLL::~ProfilerDLL()
 {
     if(!___tracy_profiler_started()) return;
-
-    MRAY_LOG("Shutting down the profiler...");
+    MRAY_LOG("[Prof]  : Shutting down the profiler...");
     ___tracy_shutdown_profiler();
-    MRAY_LOG("Profiler shut down!");
+    MRAY_LOG("[Prof]  : Shutdown!");
 }
 
 inline

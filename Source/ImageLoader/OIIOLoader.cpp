@@ -2,6 +2,7 @@
 
 #include "Core/Expected.h"
 #include "Core/Log.h"
+#include "Core/Profiling.h"
 
 #include <OpenImageIO/imageio.h>
 
@@ -486,6 +487,9 @@ ImageFileOIIO::ImageFileOIIO(const std::string& filePath,
 
 Expected<ImageHeader> ImageFileOIIO::ReadHeader()
 {
+    static const ProfilerAnnotation _("OIIO Read Header");
+    auto annotation = _.AnnotateScope();
+
     oiioFile = OIIO::ImageInput::open(filePath);
     if(!oiioFile) return MRayError("OIIO Error ({})", OIIO::geterror());
 
@@ -581,6 +585,9 @@ Expected<ImageHeader> ImageFileOIIO::ReadHeader()
 
 Expected<Image> ImageFileOIIO::ReadImage()
 {
+    static const ProfilerAnnotation _("OIIO Read Image");
+    auto annotation = _.AnnotateScope();
+
     Image result;
     result.header = header;
 

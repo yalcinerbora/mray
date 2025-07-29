@@ -831,9 +831,6 @@ void ColorConverter::ConvertColor(std::vector<MipArray<SurfRefVariant>> textures
                                   std::vector<GenericTexture*> bcTextures,
                                   MRayColorSpaceEnum globalColorSpace) const
 {
-    // TODO: Report bug on NVCC, "NVCC Language Frontend"
-    // hangs (inf loop) when these literals are changed to "..."sv
-    //using namespace std::string_view_literals;
     static const auto mainA = gpuSystem.CreateAnnotation("ConvertColor");
     static const auto normA = gpuSystem.CreateAnnotation("ConvertColor_N");
     static const auto bcA   = gpuSystem.CreateAnnotation("ConvertColor_BC");

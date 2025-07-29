@@ -7,6 +7,7 @@
 #include "Core/TypeNameGenerators.h"
 #include "Core/GraphicsFunctions.h"
 #include "Core/ThreadPool.h"
+#include "Core/Profiling.h"
 
 #include "ImageLoader/EntryPoint.h"
 #include "MeshLoader/EntryPoint.h"
@@ -409,6 +410,9 @@ void LoadPrimitive(TracerI& tracer,
            meshFileView->AttributeLayout(BITANGENT).Name() == MR_VECTOR_3 &&
            meshFileView->AttributeLayout(NORMAL).Name() == MR_VECTOR_3)
         {
+            static const ProfilerAnnotation _("Prim Normal to Quat");
+            auto annotation = _.AnnotateScope();
+
             size_t normalCount = meshFileView->MeshAttributeCount();
             TransientData quats(std::in_place_type_t<Quaternion>{}, normalCount);
             // Utilize TBN matrix directly
@@ -849,6 +853,9 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
         const auto LoadTask = [&, loader, barrier = barrier,
                                groupEntityList](size_t start, size_t end)
         {
+            static const ProfilerAnnotation _(loader.Name());
+            auto annotation = _.AnnotateScope();
+
             // Explicitly copy the loader
             // Doing this because lambda capture trick
             // [loader = loader] did not work (maybe MSVC bug?)
@@ -922,6 +929,9 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
 
 void SceneLoaderMRay::LoadTextures(TracerI& tracer, ErrorList& exceptions)
 {
+    static const ProfilerAnnotation _("LoadTextures");
+    auto annotation = _.AnnotateScope();
+
     using TextureIdList = std::vector<std::pair<SceneTexId, TextureId>>;
 
     // Construct Image Loader
@@ -964,6 +974,8 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ErrorList& exceptions)
     // Copy the shared pointers, capture by reference the rest
     const auto TextureLoadTask = [&, texIdListPtr, imgLoader, barrier](size_t start, size_t end)
     {
+        static const ProfilerAnnotation ldTexAnnot("LoadTextures");
+        auto annotation = ldTexAnnot.AnnotateScope();
         // TODO: check if the twice opening is a bottleneck?
         // We are opening here to determining size/format
         // and on the other iteration we actual memcpy it
@@ -1134,6 +1146,9 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ErrorList& exceptions)
 
 void SceneLoaderMRay::LoadMediums(TracerI& tracer, ErrorList& exceptions)
 {
+    static const ProfilerAnnotation _("LoadMedia");
+    auto annotation = _.AnnotateScope();
+
     struct MediumLoader
     {
         private:
@@ -1146,6 +1161,8 @@ void SceneLoaderMRay::LoadMediums(TracerI& tracer, ErrorList& exceptions)
             : tracer(t)
             , texMappings(texMappings)
         {}
+
+        std::string_view Name() const { return "LoadMedia"; }
 
         MediumGroupId CreateGroup(std::string gn)
         {
@@ -1205,6 +1222,9 @@ void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
                                     ErrorList& exceptions,
                                     uint32_t boundaryMediumId)
 {
+    static const ProfilerAnnotation _("LoadMaterials");
+    auto annotation = _.AnnotateScope();
+
     struct MaterialLoader
     {
         private:
@@ -1223,6 +1243,8 @@ void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
             , texMappings(texMappings)
             , mediumMappings(mediumMappings)
         {}
+
+        std::string_view Name() const { return "LoadMaterials"; }
 
         MatGroupId CreateGroup(std::string gn)
         {
@@ -1295,6 +1317,8 @@ void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
 
 void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ErrorList& exceptions)
 {
+    static const ProfilerAnnotation _("LoadTransforms");
+    auto annotation = _.AnnotateScope();
     struct TransformLoader
     {
         private:
@@ -1303,6 +1327,8 @@ void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ErrorList& exceptions)
 
         public:
         TransformLoader(TracerI& t) : tracer(t) {}
+
+        std::string_view Name() const { return "LoadTransforms"; }
 
         TransGroupId CreateGroup(std::string gn)
         {
@@ -1356,6 +1382,9 @@ void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ErrorList& exceptions)
 
 void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ErrorList& exceptions)
 {
+    static const ProfilerAnnotation _("LoadPrimitives");
+    auto annotation = _.AnnotateScope();
+
     std::shared_ptr<const MeshLoaderPoolI> meshLoaderPool = CreateMeshLoaderPool();
 
     // Most of the shared pointers (except "meshLoaderPool")
@@ -1407,6 +1436,8 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ErrorList& exceptions)
             , scenePath(sp)
             , meshLoaderPool(mlp)
         {}
+
+        std::string_view Name() const { return "LoadPrimitives"; }
 
         PrimGroupId CreateGroup(std::string gn)
         {
@@ -1496,6 +1527,9 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ErrorList& exceptions)
 
 void SceneLoaderMRay::LoadCameras(TracerI& tracer, ErrorList& exceptions)
 {
+    static const ProfilerAnnotation _("LoadCameras");
+    auto annotation = _.AnnotateScope();
+
     struct CameraLoader
     {
         private:
@@ -1504,14 +1538,19 @@ void SceneLoaderMRay::LoadCameras(TracerI& tracer, ErrorList& exceptions)
 
         public:
         CameraLoader(TracerI& t) : tracer(t) {}
+
+        std::string_view Name() const { return "LoadCameras"; }
+
         CameraGroupId CreateGroup(std::string gn)
         {
             return tracer.CreateCameraGroup(AddCameraPrefix(gn));
         }
+
         void CommitReservations(CameraGroupId groupId)
         {
             return tracer.CommitCamReservations(groupId);
         }
+
         CameraIdList THRDReserveEntities(CameraGroupId groupId,
                                          Span<const JsonNode> nodes)
         {
@@ -1524,6 +1563,7 @@ void SceneLoaderMRay::LoadCameras(TracerI& tracer, ErrorList& exceptions)
             totalCounts = GenericFindAttributeCounts(attributeCounts, list, nodes);
             return tracer.ReserveCameras(groupId, attributeCounts);
         }
+
         void THRDLoadEntities(CameraGroupId groupId,
                               const CameraIdList& ids,
                               Span<const JsonNode> nodes)
@@ -1553,6 +1593,9 @@ void SceneLoaderMRay::LoadCameras(TracerI& tracer, ErrorList& exceptions)
 
 void SceneLoaderMRay::LoadLights(TracerI& tracer, ErrorList& exceptions)
 {
+    static const ProfilerAnnotation _("LoadLights");
+    auto annotation = _.AnnotateScope();
+
     struct LightLoader
     {
         private:
@@ -1568,6 +1611,8 @@ void SceneLoaderMRay::LoadLights(TracerI& tracer, ErrorList& exceptions)
             , texMappings(texMappings)
             , primMappings(primMappings)
         {}
+
+        std::string_view Name() const { return "LoadLights"; }
 
         LightGroupId CreateGroup(std::string gn, const JsonNode& firstNode)
         {
@@ -1661,6 +1706,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
                                         const SceneLightSurfList& lightSurfaces,
                                         const LightSurfaceStruct& boundary)
 {
+    static const ProfilerAnnotation ctmAnnot("GenTypeMapping");
+    auto annotation = ctmAnnot.AnnotateScope();
     // Given N definition items, and M references on those items
     // where M >= N, create a map of common definitions -> referred definition list.
 
@@ -1706,6 +1753,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     std::future<void> primHTReady = threadPool.SubmitTask(
     [&primHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
+        static const ProfilerAnnotation _("Prim HT Gen");
+        auto annotation = _.AnnotateScope();
         CreateHT(primHT, sceneJsonIn.at(NodeNames::PRIMITIVE_LIST));
     });
     // Materials
@@ -1714,6 +1763,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     std::future<void> matHTReady = threadPool.SubmitTask(
     [&matHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
+        static const ProfilerAnnotation _("Mat HT Gen");
+        auto annotation = _.AnnotateScope();
         CreateHT(matHT, sceneJsonIn.at(NodeNames::MATERIAL_LIST));
     });
     // Cameras
@@ -1722,6 +1773,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     std::future<void> camHTReady = threadPool.SubmitTask(
     [&camHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
+        static const ProfilerAnnotation _("Cam HT Gen");
+        auto annotation = _.AnnotateScope();
         CreateHT(camHT, sceneJsonIn.at(NodeNames::CAMERA_LIST));
     });
     // Lights
@@ -1731,6 +1784,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     std::future<void> lightHTReady = threadPool.SubmitTask(
     [&lightHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
+        static const ProfilerAnnotation _("Light HT Gen");
+        auto annotation = _.AnnotateScope();
         CreateHT(lightHT, sceneJsonIn.at(NodeNames::LIGHT_LIST));
     });
     // Transforms
@@ -1741,6 +1796,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     std::future<void> transformHTReady = threadPool.SubmitTask(
     [&transformHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
+        static const ProfilerAnnotation _("Trans HT Gen");
+        auto annotation = _.AnnotateScope();
         CreateHT(transformHT, sceneJsonIn.at(NodeNames::TRANSFORM_LIST));
     });
 
@@ -1755,7 +1812,9 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     std::future<void> mediumHTReady = threadPool.SubmitTask(
     [&mediumHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
-        return CreateHT(mediumHT, sceneJsonIn.at(NodeNames::MEDIUM_LIST));
+        static const ProfilerAnnotation _("Media HT Gen");
+        auto annotation = _.AnnotateScope();
+        CreateHT(mediumHT, sceneJsonIn.at(NodeNames::MEDIUM_LIST));
     });
     // Textures
     // It is hard to find estimate the worst case texture count as well.
@@ -1768,7 +1827,9 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     std::future<void> textureHTReady = threadPool.SubmitTask(
     [&textureHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
-        return CreateHT(textureHT, sceneJsonIn.at(NodeNames::TEXTURE_LIST));
+        static const ProfilerAnnotation _("Texture HT Gen");
+        auto annotation = _.AnnotateScope();
+        CreateHT(textureHT, sceneJsonIn.at(NodeNames::TEXTURE_LIST));
     });
 
     // Check boundary first
@@ -1938,6 +1999,9 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     // Eliminate the duplicates
     auto EliminateDuplicates = [](std::vector<JsonNode>& nodes)
     {
+        static const ProfilerAnnotation _("EliminateDuplicates");
+        auto annotation = _.AnnotateScope();
+
         std::sort(nodes.begin(), nodes.end());
         auto endIt = std::unique(nodes.begin(), nodes.end(),
                                  [](const JsonNode& n0,
@@ -1978,6 +2042,9 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     });
     threadPool.SubmitDetachedTask([this]()
     {
+        static const ProfilerAnnotation _("EliminateTexDuplicates");
+        auto annotation = _.AnnotateScope();
+
         auto LessThan = [](const auto& lhs, const auto& rhs)
         {
             return std::get<0>(lhs) < std::get<0>(rhs);
@@ -2195,9 +2262,14 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
         // probably consists of mid-thousands of surfaces.
         // Also this has a single bottleneck unlike tracer groups,
         // so it probably not worth it.
-        CreateSurfaces(tracer, surfaces);
-        CreateLightSurfaces(tracer, lightSurfs, boundary);
-        CreateCamSurfaces(tracer, camSurfs);
+        {
+            static const ProfilerAnnotation _("Create Surfaces");
+            auto annotation = _.AnnotateScope();
+
+            CreateSurfaces(tracer, surfaces);
+            CreateLightSurfaces(tracer, lightSurfs, boundary);
+            CreateCamSurfaces(tracer, camSurfs);
+        }
     }
     // MRay related errors
     catch(const MRayError& e)
@@ -2294,6 +2366,9 @@ SceneLoaderMRay::SceneLoaderMRay(ThreadPool& pool)
 Expected<TracerIdPack> SceneLoaderMRay::LoadScene(TracerI& tracer,
                                                   const std::string& filePath)
 {
+    static const ProfilerAnnotation _("Load Scene from File");
+    auto annotation = _.AnnotateScope();
+
     Timer t; t.Start();
     MRayError e = MRayError::OK;
     if((e = OpenFile(filePath))) return e;
@@ -2307,6 +2382,9 @@ Expected<TracerIdPack> SceneLoaderMRay::LoadScene(TracerI& tracer,
 Expected<TracerIdPack> SceneLoaderMRay::LoadScene(TracerI& tracer,
                                                   std::istream& sceneData)
 {
+    static const ProfilerAnnotation _("Load Scene from Stream");
+    auto annotation = _.AnnotateScope();
+
     Timer t; t.Start();
     MRayError e = MRayError::OK;
     if((e = ReadStream(sceneData))) return e;

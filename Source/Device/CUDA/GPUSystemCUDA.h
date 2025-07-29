@@ -13,6 +13,10 @@
 
 #include "TransientPool/TransientPool.h"
 
+#ifdef MRAY_ENABLE_TRACY
+    namespace tracy { class CUDACtx;}
+#endif
+
 class TimelineSemaphore;
 
 // Cuda Kernel Optimization Hints
@@ -391,6 +395,10 @@ class GPUSystemCUDA
     public:
     using GPUList = std::vector<GPUDeviceCUDA>;
     using GPUPtrList = std::vector<const GPUDeviceCUDA*>;
+
+    #ifdef MRAY_ENABLE_TRACY
+       tracy::CUDACtx*  tracyCUDACtx;
+    #endif
 
     private:
     GPUList             systemGPUs;

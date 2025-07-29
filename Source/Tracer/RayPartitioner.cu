@@ -264,8 +264,7 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
                                                     const GPUQueue& queue,
                                                     bool onlySortForBatches) const
 {
-    using namespace std::string_view_literals;
-    static const auto annotation = system.CreateAnnotation("Ray N-way Partition"sv);
+    static const auto annotation = system.CreateAnnotation("Ray N-way Partition");
     const auto _ = annotation.AnnotateScope();
 
     using namespace DeviceAlgorithms;

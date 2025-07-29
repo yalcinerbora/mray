@@ -392,7 +392,7 @@ endif()
 
 # Make tracy target always active, but selectively enable/disable via TRACY_ENABLE
 gen_imported_target(NAME tracy::tracy_client SHARED DEBUG_TARGET TracyClientd RELEASE_TARGET TracyClient
-
+                    EXTRA_INCLUDES ${MRAY_LIB_DIRECTORY}/Include/tracy
                     EXTRA_DEFINES
                         TRACY_IMPORTS
                         TRACY_NO_VSYNC_CAPTURE

@@ -4,6 +4,7 @@
 #include "Core/Flag.h"
 #include "Core/Expected.h"
 #include "Core/GraphicsFunctions.h"
+#include "Core/Profiling.h"
 
 #include <filesystem>
 
@@ -502,6 +503,9 @@ ImageFileDDS::ImageFileDDS(const std::string& filePath,
 
 Expected<ImageHeader> ImageFileDDS::ReadHeader()
 {
+    static const ProfilerAnnotation _("DDS Read Header");
+    auto annotation = _.AnnotateScope();
+
     if(headerIsRead) return header;
 
     size_t fileSize = std::filesystem::file_size(std::filesystem::path(filePath));
@@ -615,6 +619,9 @@ Expected<ImageHeader> ImageFileDDS::ReadHeader()
 
 Expected<Image> ImageFileDDS::ReadImage()
 {
+    static const ProfilerAnnotation _("DDS Read Image");
+    auto annotation = _.AnnotateScope();
+
     assert(header.dimensions[2] == 1);
 
     Image result;

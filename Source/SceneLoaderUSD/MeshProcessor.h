@@ -121,15 +121,7 @@ class IndexLookupTable
         values.resize(allocSize);
     }
 
-    std::pair<const uint32_t*, bool> Insert(IndexTriplet key, uint32_t value)
-    {
-        using LT = LookupTable<IndexTriplet, uint32_t,
-                               uint32_t, 4, IndexLookupStrategy>;
-        //
-        return LT(std::span(hashes.begin(), hashes.end()),
-                  std::span(keys.begin(), keys.end()),
-                  std::span(values.begin(), values.end())).Insert(key, value);
-    }
+    std::pair<const uint32_t*, bool> Insert(IndexTriplet key, uint32_t value);
 };
 
 struct MeshProcessorThread

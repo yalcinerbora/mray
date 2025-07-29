@@ -1,15 +1,16 @@
 #include "SceneLoaderUSD.h"
 
 #include "Core/Error.h"
-#include "MRayUSDTypes.h"
-#include "MeshProcessor.h"
-#include "MaterialProcessor.h"
-
 #include "Core/TracerI.h"
 #include "Core/Log.h"
 #include "Core/Timer.h"
 #include "Core/TypeNameGenerators.h"
 #include "Core/Algorithm.h"
+#include "Core/Profiling.h"
+
+#include "MRayUSDTypes.h"
+#include "MeshProcessor.h"
+#include "MaterialProcessor.h"
 
 // Traversal
 #include <pxr/usd/ar/resolverContext.h>
@@ -506,6 +507,9 @@ SceneLoaderUSD::SceneLoaderUSD(ThreadPool& tp)
 Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                                                  const std::string& filePath)
 {
+    static const ProfilerAnnotation _("LoadScene USD");
+    auto annotation = _.AnnotateScope();
+
     Timer t; t.Start();
     Timer tLocal; tLocal.Start();
     MRayError e = MRayError::OK;

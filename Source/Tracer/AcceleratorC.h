@@ -1248,8 +1248,7 @@ void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<AccelGroupCon
 template <class C>
 void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
 {
-    using namespace std::string_view_literals;
-    static const auto annotation = gpuSystem.CreateAnnotation("Accelerator Construct"sv);
+    static const auto annotation = gpuSystem.CreateAnnotation("Accelerator Construct");
     const auto _ = annotation.AnnotateScope();
 
     std::vector<AccelGroupConstructParams> partitions;

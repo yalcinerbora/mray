@@ -5,6 +5,7 @@
 #include "Core/TypeNameGenerators.h"
 #include "Core/ShapeFunctions.h"
 #include "Core/ThreadPool.h"
+#include "Core/Profiling.h"
 
 #include <barrier>
 
@@ -112,10 +113,27 @@ inline uint32_t AttributeIndexer::operator()(uint32_t perVertexPerFaceCounter) c
     }
 }
 
+inline
+std::pair<const uint32_t*, bool> IndexLookupTable::Insert(IndexTriplet key, uint32_t value)
+{
+    static const ProfilerAnnotation _("Index LUT");
+    auto annotation = _.AnnotateScope();
+
+    using LT = LookupTable<IndexTriplet, uint32_t,
+    uint32_t, 4, IndexLookupStrategy>;
+//
+    return LT(std::span(hashes.begin(), hashes.end()),
+              std::span(keys.begin(), keys.end()),
+              std::span(values.begin(), values.end())).Insert(key, value);
+}
+
 bool Triangulate(Span<Vector3ui> localIndicesOut,
                  Span<const Vector3> vertices,
                  const Vector3 normal)
 {
+    static const ProfilerAnnotation _("Triangulate");
+    auto annotation = _.AnnotateScope();
+
     using Shape::Polygon::ClipEars;
     // Doing this static functions to enable some unrolling etc.
     // Probably not worth it but w/e
@@ -177,6 +195,9 @@ MRayError MeshProcessorThread::AllocateTransientBuffers(Span<Vector3ui>& indexBu
                                                         SubGeomTransientData& transientDataList,
                                                         uint32_t primCount, uint32_t attributeCount)
 {
+    static const ProfilerAnnotation _("Alloc Transient Buffers");
+    auto annotation = _.AnnotateScope();
+
     uint32_t indexAttribI = std::numeric_limits<uint32_t>::max();
     uint32_t posAttribI = std::numeric_limits<uint32_t>::max();
     uint32_t normalAttribI = std::numeric_limits<uint32_t>::max();
@@ -241,6 +262,10 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
                                                                const pxr::VtArray<pxr::GfVec3f>& normals,
                                                                const pxr::VtArray<pxr::GfVec2f>& uvs)
 {
+    static const ProfilerAnnotation _("Triangulate and Find Tangents");
+    auto a0 = _.AnnotateScope();
+
+
     uint32_t indexCounter = 0;
     for(int faceIndex : faceIndices.AsConst())
     {
@@ -361,40 +386,46 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
         }
 
         // Now calculate tangents while writing
-        for(uint32_t i = 0; i < faceTriCount; i++)
         {
-            Vector3ui outIndex;
-            for(uint32_t j = 0; j < 3; j++)
+            static const ProfilerAnnotation tCalcAnnot("Calc Tangents");
+            auto a1 = tCalcAnnot.AnnotateScope();
+
+            for(uint32_t i = 0; i < faceTriCount; i++)
             {
-                uint32_t localIndex = localIndicesTriangulated[i][j];
-                IndexTriplet indexTriplet =
+                Vector3ui outIndex;
+                for(uint32_t j = 0; j < 3; j++)
                 {
-                    usdPosIndices[localIndex],
-                    usdUVIndices[localIndex],
-                    usdNormalIndices[localIndex]
-                };
-                auto [indexLoc, isInserted] = indexLookupTable.Insert(indexTriplet, indexCounter);
-                outIndex[j] = *indexLoc;
+                    uint32_t localIndex = localIndicesTriangulated[i][j];
+                    IndexTriplet indexTriplet =
+                    {
+                        usdPosIndices[localIndex],
+                        usdUVIndices[localIndex],
+                        usdNormalIndices[localIndex]
+                    };
+                    auto [indexLoc, isInserted] = indexLookupTable.Insert(indexTriplet,
+                                                                          indexCounter);
+                    outIndex[j] = *indexLoc;
 
-                if(isInserted)
-                {
-                    indexCounter++;
-                    triangleDataTangents.push_back(Vector3::Zero());
-                    triangleDataNormals.push_back(localNormals[localIndex]);
-                    usdDataIndices.push_back(indexTriplet);
+                    if(isInserted)
+                    {
+                        indexCounter++;
+                        triangleDataTangents.push_back(Vector3::Zero());
+                        triangleDataNormals.push_back(localNormals[localIndex]);
+                        usdDataIndices.push_back(indexTriplet);
+                    }
                 }
-            }
-            triangleIndices.push_back(outIndex);
+                triangleIndices.push_back(outIndex);
 
-            Vector3 t0 = CalculateTriangleTangent(localIndicesTriangulated[i], 0,
-                                                  localPositions, localNormals, localUVs);
-            Vector3 t1 = CalculateTriangleTangent(localIndicesTriangulated[i], 1,
-                                                  localPositions, localNormals, localUVs);
-            Vector3 t2 = CalculateTriangleTangent(localIndicesTriangulated[i], 2,
-                                                  localPositions, localNormals, localUVs);
-            triangleDataTangents[outIndex[0]] += t0;
-            triangleDataTangents[outIndex[1]] += t1;
-            triangleDataTangents[outIndex[2]] += t2;
+                Vector3 t0 = CalculateTriangleTangent(localIndicesTriangulated[i], 0,
+                                                      localPositions, localNormals, localUVs);
+                Vector3 t1 = CalculateTriangleTangent(localIndicesTriangulated[i], 1,
+                                                      localPositions, localNormals, localUVs);
+                Vector3 t2 = CalculateTriangleTangent(localIndicesTriangulated[i], 2,
+                                                      localPositions, localNormals, localUVs);
+                triangleDataTangents[outIndex[0]] += t0;
+                triangleDataTangents[outIndex[1]] += t1;
+                triangleDataTangents[outIndex[2]] += t2;
+            }
         }
     }
     // Write prim locals
@@ -457,6 +488,9 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
 
 MRayError MeshProcessorThread::PreprocessIndicesSingle(uint32_t index)
 {
+    static const ProfilerAnnotation _("Mesh Preprocessing");
+    auto annotation = _.AnnotateScope();
+
     primTransientData.emplace_back();
 
     using PrimVar = pxr::UsdGeomPrimvar;
@@ -644,6 +678,9 @@ MRayError ProcessUniqueMeshes(// Output
                               // Input
                               const std::set<pxr::UsdPrim>& uniquePrims)
 {
+    static const ProfilerAnnotation procMeshAnnot("Process Meshes");
+    auto annotation = procMeshAnnot.AnnotateScope();
+
     size_t uniquePrimCount = uint32_t(uniquePrims.size());
     std::vector<std::vector<PrimBatchId>> outPrimBatchesFlat;
     outPrimBatchesFlat.resize(uniquePrimCount);
@@ -683,6 +720,9 @@ MRayError ProcessUniqueMeshes(// Output
 
     const auto THRD_ProcessMeshes = [&](uint32_t start, uint32_t end) -> void
     {
+        static const ProfilerAnnotation _("Process Mesh Task");
+        auto annotation = _.AnnotateScope();
+
         // Subset the data to per core
         std::span myPrimRange(flatUniques.begin() + start, end - start);
         std::span myPrimBatchOutput(outPrimBatchesFlat.begin() + start, end - start);
@@ -776,6 +816,8 @@ MRayError  ProcessUniqueSpheres(// Output
                                 // Input
                                 const std::set<pxr::UsdPrim>&)
 {
+    static const ProfilerAnnotation _("Process Spheres");
+    auto annotation = _.AnnotateScope();
     // TODO: ...
     return MRayError::OK;
 }
