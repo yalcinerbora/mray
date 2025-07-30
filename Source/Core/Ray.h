@@ -23,9 +23,9 @@ class RayT
     public:
     // Constructors & Destructor
     constexpr           RayT() = default;
-    MR_PF_DECL explicit RayT(const Vector<3, T>& direction,
+    MR_PF_DECL_V explicit RayT(const Vector<3, T>& direction,
                              const Vector<3, T>& position) noexcept;
-    MR_PF_DECL explicit RayT(const Vector<3, T>[2]) noexcept;
+    MR_PF_DECL_V explicit RayT(const Vector<3, T>[2]) noexcept;
 
     // Intersections
     MR_PF_DECL bool  IntersectsSphere(Vector<3, T>& pos, T& t,
@@ -55,16 +55,8 @@ class RayT
                                     const Vector<3, T>& max,
                                     const Vector<2, T>& tMinMax = CoveringTMM) const noexcept;
 
-    //MR_PF_DECL RayT           NormalizeDir() const noexcept;
-    //MR_PF_DECL RayT&          NormalizeDirSelf() noexcept;
-    //MR_PF_DECL RayT           Advance(T) const noexcept;
-    //MR_PF_DECL RayT           Advance(T t, const Vector<3,T>& dir) const noexcept;
-    //MR_PF_DECL RayT&          AdvanceSelf(T) noexcept;
-    //MR_PF_DECL RayT&          AdvanceSelf(T t, const Vector<3, T>& dir) noexcept;
     MR_PF_DECL Vector<3,T>  AdvancedPos(T t) const noexcept;
     MR_PF_DECL RayT         Nudge(const Vector<3, T>& dir) const noexcept;
-    //MR_PF_DECL RayT&    NudgeSelf(const Vector<3, T>& dir) noexcept;
-
     MR_PF_DECL const Vector<3, T>& Dir() const noexcept;
     MR_PF_DECL const Vector<3, T>& Pos() const noexcept;
 };

@@ -22,77 +22,77 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Matrix
     // Constructors & Destructor
     constexpr           Matrix() = default;
     template<std::convertible_to<T> C>
-    MR_PF_DEF explicit  Matrix(C) noexcept;
+    MR_PF_DECL_V explicit  Matrix(C) noexcept;
     template<std::convertible_to<T> C>
-    MR_PF_DEF explicit  Matrix(Span<const C, N*N> data) noexcept;
+    MR_PF_DECL_V explicit  Matrix(Span<const C, N*N> data) noexcept;
     template <class... Args>
-    MR_PF_DEF explicit  Matrix(const Args... dataList) noexcept
+    MR_PF_DECL_V explicit  Matrix(const Args... dataList) noexcept
     requires (std::convertible_to<Args, T> && ...) && (sizeof...(Args) == N*N);
 
     template <class... Rows>
-    MR_PF_DEF explicit  Matrix(const Rows&... rows) noexcept
+    MR_PF_DECL_V explicit  Matrix(const Rows&... rows) noexcept
     requires (std::is_same_v<Rows, Vector<N, T>> && ...) && (sizeof...(Rows) == N);
 
     template <unsigned int M>
-    MR_PF_DEF explicit  Matrix(const Matrix<M, T>&) noexcept requires (M > N);
+    MR_PF_DECL_V explicit  Matrix(const Matrix<M, T>&) noexcept requires (M > N);
 
     // Accessors
-    MR_PF_DEF T&        operator[](unsigned int) noexcept;
-    MR_PF_DEF const T&  operator[](unsigned int) const noexcept;
-    MR_PF_DEF T&        operator()(unsigned int row, unsigned int column) noexcept;
-    MR_PF_DEF const T&  operator()(unsigned int row, unsigned int column) const noexcept;
+    MR_PF_DECL T&        operator[](unsigned int) noexcept;
+    MR_PF_DECL const T&  operator[](unsigned int) const noexcept;
+    MR_PF_DECL T&        operator()(unsigned int row, unsigned int column) noexcept;
+    MR_PF_DECL const T&  operator()(unsigned int row, unsigned int column) const noexcept;
     // Structured Binding Helper
-    MR_PF_DEF const std::array<T, N*N>& AsArray() const noexcept;
-    MR_PF_DEF std::array<T, N*N>&       AsArray() noexcept;
+    MR_PF_DECL const std::array<T, N*N>& AsArray() const noexcept;
+    MR_PF_DECL std::array<T, N*N>&       AsArray() noexcept;
 
     // Modify
-    MR_PF_DEF void      operator+=(const Matrix&) noexcept;
-    MR_PF_DEF void      operator-=(const Matrix&) noexcept;
-    MR_PF_DEF void      operator*=(const Matrix&) noexcept;
-    MR_PF_DEF void      operator*=(T) noexcept;
-    MR_PF_DEF void      operator/=(const Matrix&) noexcept;
-    MR_PF_DEF void      operator/=(T) noexcept;
-    MR_PF_DEF Matrix    operator+(const Matrix&) const noexcept;
-    MR_PF_DEF Matrix    operator-(const Matrix&) const noexcept;
-    MR_PF_DEF Matrix    operator-() const noexcept requires SignedC<T>;
-    MR_PF_DEF Matrix    operator/(const Matrix&) const noexcept;
-    MR_PF_DEF Matrix    operator/(T) const noexcept;
-    MR_PF_DEF Matrix    operator*(const Matrix&) const noexcept;
+    MR_PF_DECL_V void   operator+=(const Matrix&) noexcept;
+    MR_PF_DECL_V void   operator-=(const Matrix&) noexcept;
+    MR_PF_DECL_V void   operator*=(const Matrix&) noexcept;
+    MR_PF_DECL_V void   operator*=(T) noexcept;
+    MR_PF_DECL_V void   operator/=(const Matrix&) noexcept;
+    MR_PF_DECL_V void   operator/=(T) noexcept;
+    MR_PF_DECL Matrix   operator+(const Matrix&) const noexcept;
+    MR_PF_DECL Matrix   operator-(const Matrix&) const noexcept;
+    MR_PF_DECL Matrix   operator-() const noexcept requires SignedC<T>;
+    MR_PF_DECL Matrix   operator/(const Matrix&) const noexcept;
+    MR_PF_DECL Matrix   operator/(T) const noexcept;
+    MR_PF_DECL Matrix   operator*(const Matrix&) const noexcept;
     template<unsigned int M>
-    MR_PF_DEF Vector<M, T>  operator*(const Vector<M, T>&) const noexcept requires (M == N) || ((M + 1) == N);
-    MR_PF_DEF Matrix        operator*(T) const noexcept;
+    MR_PF_DECL Vector<M, T> operator*(const Vector<M, T>&) const noexcept requires (M == N) || ((M + 1) == N);
+    MR_PF_DECL Matrix       operator*(T) const noexcept;
 
     // Logic
-    MR_PF_DEF bool  operator==(const Matrix&) const noexcept;
-    MR_PF_DEF bool  operator!=(const Matrix&) const noexcept;
+    MR_PF_DECL bool operator==(const Matrix&) const noexcept;
+    MR_PF_DECL bool operator!=(const Matrix&) const noexcept;
 
     // Utility
-    MR_PF_DEF T         Determinant() const noexcept requires (N == 2);
-    MR_PF_DEF T         Determinant() const noexcept requires (N == 3);
-    MR_PF_DEF T         Determinant() const noexcept requires (N == 4);
-    MR_PF_DEF Matrix    Inverse() const noexcept requires FloatC<T> && (N == 2);
-    MR_PF_DEF Matrix    Inverse() const noexcept requires FloatC<T> && (N == 3);
-    MR_PF_DEF Matrix    Inverse() const noexcept requires FloatC<T> && (N == 4);
-    MR_PF_DEF Matrix    Transpose() const noexcept;
+    MR_PF_DECL T         Determinant() const noexcept requires (N == 2);
+    MR_PF_DECL T         Determinant() const noexcept requires (N == 3);
+    MR_PF_DECL T         Determinant() const noexcept requires (N == 4);
+    MR_PF_DECL Matrix    Inverse() const noexcept requires FloatC<T> && (N == 2);
+    MR_PF_DECL Matrix    Inverse() const noexcept requires FloatC<T> && (N == 3);
+    MR_PF_DECL Matrix    Inverse() const noexcept requires FloatC<T> && (N == 4);
+    MR_PF_DECL Matrix    Transpose() const noexcept;
 
-    MR_PF_DEF RayT<T>       TransformRay(const RayT<T>&) const noexcept requires (N == 3);
-    MR_PF_DEF RayT<T>       TransformRay(const RayT<T>&) const noexcept requires (N == 4);
+    MR_PF_DECL RayT<T>          TransformRay(const RayT<T>&) const noexcept requires (N == 3);
+    MR_PF_DECL RayT<T>          TransformRay(const RayT<T>&) const noexcept requires (N == 4);
     template <unsigned int M>
-    MR_PF_DEF AABB<M, T>    TransformAABB(const AABB<M, T>&) const noexcept requires((M+1) == N);
+    MR_PF_DECL AABB<M, T>       TransformAABB(const AABB<M, T>&) const noexcept requires((M+1) == N);
     template <unsigned int M>
-    MR_PF_DEF Vector<M, T>  LeftMultiply(const Vector<M, T>&) const noexcept requires (M <= N);
+    MR_PF_DECL Vector<M, T>     LeftMultiply(const Vector<M, T>&) const noexcept requires (M <= N);
 
-    MR_PF_DEF static Matrix     Identity() noexcept;
-    MR_PF_DEF static Matrix     Zero() noexcept;
+    MR_PF_DECL static Matrix    Identity() noexcept;
+    MR_PF_DECL static Matrix    Zero() noexcept;
 };
 
 // Left Scalar operators
 template<unsigned int N, ArithmeticC T>
-MR_PF_DEF Matrix<N, T> operator*(T, const Matrix<N, T>&) noexcept;
+MR_PF_DECL Matrix<N, T> operator*(T, const Matrix<N, T>&) noexcept;
 
 // Spacial Matrix4x4 -> Matrix3x3
 template<ArithmeticC T>
-MR_PF_DEF Matrix<4, T> ToMatrix4x4(const Matrix<3, T>&) noexcept;
+MR_PF_DECL Matrix<4, T> ToMatrix4x4(const Matrix<3, T>&) noexcept;
 
 // Sanity Checks for Matrices
 static_assert(std::is_trivially_default_constructible_v<Matrix4x4> == true, "Matrices has to be trivially destructible");

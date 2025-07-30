@@ -3,14 +3,14 @@
 #include "Ray.h"
 
 template<FloatC T>
-MR_PF_DEF RayT<T>::RayT(const Vector<3, T>& direction,
+MR_PF_DEF_V RayT<T>::RayT(const Vector<3, T>& direction,
                         const Vector<3, T>& position) noexcept
     : direction(direction)
     , position(position)
 {}
 
 template<FloatC T>
-MR_PF_DEF RayT<T>::RayT(const Vector<3, T> vec[2]) noexcept
+MR_PF_DEF_V RayT<T>::RayT(const Vector<3, T> vec[2]) noexcept
     : direction(vec[0])
     , position(vec[1])
 {}

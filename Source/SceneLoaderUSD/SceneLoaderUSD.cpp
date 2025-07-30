@@ -497,11 +497,6 @@ MRayError ProcessLights(std::vector<std::pair<LightGroupId, LightId>>&,
 SceneLoaderUSD::SceneLoaderUSD(ThreadPool& tp)
     : threadPool(tp)
 {
-    // using namespace std::string_view_literals;
-    // namespace fs = std::filesystem;
-
-    // std::string s = (fs::path(GetProcessPath())/ "usd"sv).string();
-    // pxr::PlugRegistry::GetInstance().RegisterPlugins(s);
 }
 
 Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,

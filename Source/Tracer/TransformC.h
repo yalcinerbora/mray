@@ -69,8 +69,8 @@ class TransformContextIdentity
 {
     public:
     // Constructors & Destructor
-                TransformContextIdentity() = default;
-    MR_PF_DECL  TransformContextIdentity(const EmptyType&, TransformKey) {}
+                    TransformContextIdentity() = default;
+    MR_PF_DECL_V    TransformContextIdentity(const EmptyType&, TransformKey) {}
     //
     MR_PF_DECL Vector3  Scale() const noexcept;
     MR_PF_DECL Vector3  ApplyP(const Vector3& point) const noexcept;

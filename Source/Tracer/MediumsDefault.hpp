@@ -9,7 +9,7 @@ namespace MediumDetail
 //===========================//
 //           Vacuum          //
 //===========================//
-MR_PF_DEF
+MR_PF_DEF_V
 MediumVacuum::MediumVacuum(const SpectrumConverter&,
                            const DataSoA&, MediumKey) noexcept
 {}

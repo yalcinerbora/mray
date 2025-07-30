@@ -16,11 +16,11 @@ class Quat
 
     public:
     // Constructors & Destructor
-    constexpr           Quat() = default;
-    MR_PF_DECL explicit Quat(T w, T x, T y, T z) noexcept;
-    MR_PF_DECL explicit Quat(const T*) noexcept;
-    MR_PF_DECL explicit Quat(const Vector<4, T>& vec) noexcept;
-    MR_PF_DECL explicit Quat(T angle, const Vector<3, T>& axis) noexcept;
+    constexpr             Quat() = default;
+    MR_PF_DECL_V explicit Quat(T w, T x, T y, T z) noexcept;
+    MR_PF_DECL_V explicit Quat(const T*) noexcept;
+    MR_PF_DECL_V explicit Quat(const Vector<4, T>& vec) noexcept;
+    MR_PF_DECL_V explicit Quat(T angle, const Vector<3, T>& axis) noexcept;
 
     // Type casting
     MR_PF_DECL explicit operator Vector<4, T>&() noexcept;

@@ -27,10 +27,6 @@ static constexpr uint32_t INVALID_MORTON = std::numeric_limits<uint32_t>::max();
 MR_HF_DECL
 int32_t FilterRadiusToPixelWH(Float filterRadius)
 {
-    #ifndef MRAY_DEVICE_CODE_PATH
-        using namespace std;
-    #endif
-
     // At every 0.5 increment, conservative pixel estimate is increasing
     // [0]          = Single Pixel (Special Case)
     // (0, 0.5]     = 2x2
@@ -42,7 +38,7 @@ int32_t FilterRadiusToPixelWH(Float filterRadius)
     if(filterRadius == Float(0)) return result;
     // Do division
     int32_t quot = static_cast<int32_t>(filterRadius / Float(0.5));
-    float remainder = fmod(filterRadius, Float(0.5));
+    Float remainder = Math::FMod(filterRadius, Float(0.5));
     // Exact divisions reside on previous segment
     if(remainder == Float(0)) quot -= 1;
 

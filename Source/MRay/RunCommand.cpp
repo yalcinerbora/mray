@@ -406,11 +406,10 @@ void Accum::AccumulateScanline(RGBWeightSpan<double> output,
         output.Get<W>()[i] = totalSample;
     };
 
-
     // TODO: With scanline, we cannot guarantee memory
     // alignment, (due to image width is not aligned
-    // with SIMD registers)
-    // So the code below is slower!
+    // with SIMD width)
+    // So the code below should be slower.
     size_t loopSize = output.Size() / SIMD_WIDTH;
     size_t residual = output.Size() % SIMD_WIDTH;
     for(size_t i = 0; i < loopSize; i++)
@@ -430,11 +429,6 @@ void Accum::AccumulateScanline(RGBWeightSpan<double> output,
     {
        Iteration_Common(i);
     }
-
-    // for(size_t i = 0; i < output.Size(); i++)
-    // {
-    //     Iteration_Common(i);
-    // }
 }
 
 void Accum::AccumulatePortionBulk(double* MRAY_RESTRICT rOutPtr,
@@ -594,16 +588,20 @@ void Accum::AccumulatePortionBulk(double* MRAY_RESTRICT rOutPtr,
         }
     }
 
+    // Early skip, most of the images should be
+    // multiple of 2, 4 or 8
+    if(residual == 0) [[likely]] return;
+
     size_t offset = loopSize * SIMD_WIDTH;
+    if(residual > 0) Iteration_Common(offset + 0);
+    if(residual > 1) Iteration_Common(offset + 1);
+    if(residual > 2) Iteration_Common(offset + 2);
+    if(residual > 3) Iteration_Common(offset + 3);
+    if(residual > 4) Iteration_Common(offset + 4);
+    if(residual > 5) Iteration_Common(offset + 5);
+    if(residual > 6) Iteration_Common(offset + 6);
+    if(residual > 7) Iteration_Common(offset + 7);
     static_assert(SIMD_WIDTH <= 8, "Expand this loop unroll");
-    if(residual + 0 < SIMD_WIDTH) Iteration_Common(offset + 0);
-    if(residual + 1 < SIMD_WIDTH) Iteration_Common(offset + 1);
-    if(residual + 2 < SIMD_WIDTH) Iteration_Common(offset + 2);
-    if(residual + 3 < SIMD_WIDTH) Iteration_Common(offset + 3);
-    if(residual + 4 < SIMD_WIDTH) Iteration_Common(offset + 4);
-    if(residual + 5 < SIMD_WIDTH) Iteration_Common(offset + 5);
-    if(residual + 6 < SIMD_WIDTH) Iteration_Common(offset + 6);
-    if(residual + 7 < SIMD_WIDTH) Iteration_Common(offset + 7);
 }
 
 MultiFuture<void>
@@ -628,16 +626,13 @@ Accum::AccumulateImage(RGBWeightSpan<double> output,
         constexpr size_t SIMD_WIDTH = MRay::HostArchSIMDWidth<double>();
         size_t totalPixels = rBI.resolution.Multiply();
         size_t bulkCount = Math::DivideUp(totalPixels, SIMD_WIDTH);
-        // Enforce copy of the function between threads
-        // via const. (Or barrier shared pointer will not work)
-        const auto WorkFuncBulk = [=](uint32_t start, uint32_t end) -> void
+
+        auto WorkFuncBulk = [=](uint32_t start, uint32_t end) -> void
         {
             size_t offsetInOut = start * SIMD_WIDTH;
             size_t bulkEnd = std::min(end * SIMD_WIDTH, totalPixels);
             size_t bulkWidth = bulkEnd - offsetInOut;
 
-            Timer t;  t.Start();
-            //
             AccumulatePortionBulk(output.Get<R>().subspan(offsetInOut, bulkWidth).data(),
                                   output.Get<G>().subspan(offsetInOut, bulkWidth).data(),
                                   output.Get<B>().subspan(offsetInOut, bulkWidth).data(),
@@ -654,16 +649,14 @@ Accum::AccumulateImage(RGBWeightSpan<double> output,
         };
         //
         return threadPool.SubmitBlocks(uint32_t(bulkCount),
-                                       WorkFuncBulk);
+                                       std::move(WorkFuncBulk), threadCount);
     }
     else
     {
         uint32_t scanlineWidth = rIS.pixelMax[0] - rIS.pixelMin[0];
         uint32_t scanlineCount = rIS.pixelMax[1] - rIS.pixelMin[1];
 
-        // Enforce copy of the function between threads
-        // via const. (Or barrier shared pointer will not work)
-        const auto WorkFuncScanline = [=](uint32_t start, uint32_t end) -> void
+        auto WorkFuncScanline = [=](uint32_t start, uint32_t end) -> void
         {
             for(uint32_t i = start; i < end; i++)
             {
@@ -694,7 +687,7 @@ Accum::AccumulateImage(RGBWeightSpan<double> output,
         };
         //
         return threadPool.SubmitBlocks(scanlineCount,
-                                       WorkFuncScanline, threadCount);
+                                       std::move(WorkFuncScanline), threadCount);
     }
 }
 
@@ -717,7 +710,8 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
 
     TracerResponse response;
     auto& vView = transferQueue.GetVisorView();
-    while(vView.TryDequeue(response, EyeAnim::AnimDurationCommon))
+    using enum TimedDequeueResult;
+    while(vView.TryDequeue(response, EyeAnim::AnimDurationCommon) == SUCCESS)
     {
         using RespType = typename TracerResponse::Type;
         RespType tp = static_cast<RespType>(response.index());
@@ -808,6 +802,8 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
         if(stopConsuming) break;
     }
 
+    // Tracer is terminated it closed the queue.
+    if(vView.IsTerminated()) return true;
     //
     if(newRenderBuffer)
     {

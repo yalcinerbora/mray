@@ -96,10 +96,10 @@ void GPUQueueCPU::IssueKernelInternal(std::string_view name,
         blockCount,
         [
             ... fArgs = std::forward<Args>(fArgs),
-            blockCount, oldIssueCount, newIssueCount,
+            oldIssueCount, newIssueCount,
             cbPtr, callerBlockCount, tpb,
-            name, domain = this->domain,
-            totalWorkCount
+            name, domain = this->domain
+            //, totalWorkCount, blockCount
         ]
         (
             [[maybe_unused]] uint32_t blockStart,
@@ -188,11 +188,11 @@ void GPUQueueCPU::IssueLambdaInternal(std::string_view name,
     (
         blockCount,
         [
-            blockCount, oldIssueCount, newIssueCount,
+            oldIssueCount, newIssueCount,
             cbPtr, callerBlockCount, tpb,
             func = std::forward<Lambda>(func),
-            name, domain = this->domain,
-            totalWorkCount
+            name, domain = this->domain
+            //, totalWorkCount, blockCount
         ]
         (
             [[maybe_unused]] uint32_t blockStart,

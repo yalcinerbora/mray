@@ -379,9 +379,6 @@ Vector3 ConcentricOctahedralToDirection(const Vector2& st)
 MR_HF_DEF constexpr
 Vector2 ConcentricOctahedralWrap(const Vector2& st)
 {
-    // Get a good signed int candidate according to the "Float" type
-    using IntType = typename std::conditional_t<std::is_same_v<Float, double>, int64_t, int32_t>;
-
     // Given st => (-inf, inf) convert to [0, 1]
     // Octahedral Concentric mapping has straightforward properties
     // if either s or t is odd (integral part) we mirror the st on both sides
@@ -512,7 +509,6 @@ uint32_t TextureMipPixelStart(const DimType& baseResolution, uint32_t mipLevel)
 {
     assert(TextureMipCount(baseResolution) > mipLevel);
     uint32_t mipPixelStart = 0;
-    MRAY_UNROLL_LOOP
     for(uint32_t i = 0; i < mipLevel; i++)
     {
         if constexpr(std::is_same_v<DimType, uint32_t>)

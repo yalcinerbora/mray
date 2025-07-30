@@ -3,17 +3,17 @@
 #include "Quaternion.h"
 
 template<FloatC T>
-MR_PF_DEF Quat<T>::Quat(T w, T x, T y, T z) noexcept
+MR_PF_DEF_V Quat<T>::Quat(T w, T x, T y, T z) noexcept
     : v(w, x, y, z)
 {}
 
 template<FloatC T>
-MR_PF_DEF Quat<T>::Quat(const T* vv) noexcept
+MR_PF_DEF_V Quat<T>::Quat(const T* vv) noexcept
     : v(vv)
 {}
 
 template<FloatC T>
-MR_PF_DEF Quat<T>::Quat(T angle, const Vector<3, T>& axis) noexcept
+MR_PF_DEF_V Quat<T>::Quat(T angle, const Vector<3, T>& axis) noexcept
 {
     angle *= T(0.5);
     const auto&[sinAngle, cosAngle] = Math::SinCos(angle);
@@ -24,7 +24,7 @@ MR_PF_DEF Quat<T>::Quat(T angle, const Vector<3, T>& axis) noexcept
 }
 
 template<FloatC T>
-MR_PF_DEF Quat<T>::Quat(const Vector<4, T>& v) noexcept
+MR_PF_DEF_V Quat<T>::Quat(const Vector<4, T>& v) noexcept
     : v(v)
 {}
 
@@ -104,32 +104,32 @@ MR_PF_DEF Quat<T> Quat<T>::operator/(T right) const noexcept
 }
 
 template<FloatC T>
-MR_PF_DEF void Quat<T>::operator*=(const Quat& right) noexcept
+MR_PF_DEF_V void Quat<T>::operator*=(const Quat& right) noexcept
 {
     Quat copy(*this);
     (*this) = copy * right;
 }
 
 template<FloatC T>
-MR_PF_DEF void Quat<T>::operator*=(T right) noexcept
+MR_PF_DEF_V void Quat<T>::operator*=(T right) noexcept
 {
     v *= right;
 }
 
 template<FloatC T>
-MR_PF_DEF void Quat<T>::operator+=(const Quat& right) noexcept
+MR_PF_DEF_V void Quat<T>::operator+=(const Quat& right) noexcept
 {
     v += right.v;
 }
 
 template<FloatC T>
-MR_PF_DEF void Quat<T>::operator-=(const Quat& right) noexcept
+MR_PF_DEF_V void Quat<T>::operator-=(const Quat& right) noexcept
 {
     v -= right.v;
 }
 
 template<FloatC T>
-MR_PF_DEF void Quat<T>::operator/=(T right) noexcept
+MR_PF_DEF_V void Quat<T>::operator/=(T right) noexcept
 {
     v /= right;
 }
@@ -304,9 +304,6 @@ MR_PF_DEF Quat<T> Quat<T>::BarySLerp(const Quat<T>& q0,
                                      const Quat<T>& q2,
                                      T a, T b) noexcept
 {
-    #ifndef MRAY_DEVICE_CODE_PATH
-        using namespace std;
-    #endif
     // Proper way to do this is
     // http://www.acsu.buffalo.edu/~johnc/ave_quat07.pdf
     //
@@ -327,7 +324,7 @@ MR_PF_DEF Quat<T> Quat<T>::BarySLerp(const Quat<T>& q0,
 
     T c = (1 - a - b);
     Quat<T> result;
-    if(abs(a + b) < Epsilon<T>())
+    if(Math::Abs(a + b) < Epsilon<T>())
         result = qC;
     else
     {
@@ -457,9 +454,6 @@ Quat<T> TransformGen::ToSpaceQuat(const Vector<3, T>& xIn,
     //// https://stackoverflow.com/questions/63734840/how-to-convert-rotation-matrix-to-quaternion
     //// Clang min definition is only on std namespace
     //// this is a crappy workaround
-    //#ifndef MRAY_DEVICE_CODE_PATH
-    //    using namespace std;
-    //#endif
     //// Our sign is one (according to the above link)
     //static constexpr T sign = 1;
     //T t = x[0] + y[1] + z[2];

@@ -27,8 +27,8 @@ class alignas(sizeof(T)) KeyT
 
     public:
     // Constructors & Destructor
-    constexpr           KeyT() = default;
-    MR_PF_DECL explicit KeyT(T v) noexcept;
+    constexpr             KeyT() = default;
+    MR_PF_DECL_V explicit KeyT(T v) noexcept;
     //
     MR_PF_DECL explicit operator T() const noexcept;
     MR_PF_DECL explicit operator T() noexcept;
@@ -73,8 +73,8 @@ class alignas(sizeof(T)) TriKeyT
 
     public:
     // Constructors & Destructor
-    constexpr           TriKeyT() = default;
-    MR_PF_DECL explicit TriKeyT(T v) noexcept;
+    constexpr             TriKeyT() = default;
+    MR_PF_DECL_V explicit TriKeyT(T v) noexcept;
     //
     MR_PF_DECL explicit operator T() const noexcept;
     MR_PF_DECL explicit operator T() noexcept;
@@ -99,7 +99,7 @@ class alignas(sizeof(T)) TriKeyT
 };
 
 template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
-MR_PF_DEF
+MR_PF_DEF_V
 KeyT<T, BB, IB>::KeyT(T v) noexcept
     : value(v)
 {}
@@ -162,7 +162,7 @@ KeyT<T, BB, IB> KeyT<T, BB, IB>::InvalidKey() noexcept
 }
 
 template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
-MR_PF_DEF
+MR_PF_DEF_V
 TriKeyT<T, FB, BB, IB>::TriKeyT(T v) noexcept
     : value(v)
 {}

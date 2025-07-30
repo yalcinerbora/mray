@@ -42,11 +42,11 @@ class alignas(ChooseNormAlignment(N * sizeof(T))) UNorm
     // Constructors & Destructor
     constexpr           UNorm() = default;
     template<std::convertible_to<T> C>
-    MR_PF_DECL explicit UNorm(Span<const C, N> data) noexcept;
+    MR_PF_DECL_V explicit UNorm(Span<const C, N> data) noexcept;
     template<std::unsigned_integral... C>
-    MR_PF_DECL explicit UNorm(C... vals) noexcept requires(sizeof...(C) == N);
+    MR_PF_DECL_V explicit UNorm(C... vals) noexcept requires(sizeof...(C) == N);
     template<FloatC F>
-    MR_PF_DECL explicit UNorm(Vector<N, F>) noexcept;
+    MR_PF_DECL_V explicit UNorm(Vector<N, F>) noexcept;
     // TODO:
     MR_PF_DECL const T& operator[](unsigned int) const noexcept;
     MR_PF_DECL T&       operator[](unsigned int) noexcept;
@@ -73,11 +73,11 @@ class alignas(ChooseNormAlignment(N * sizeof(T))) SNorm
     // Constructors & Destructor
     constexpr           SNorm() = default;
     template<std::convertible_to<T> C>
-    MR_PF_DECL explicit SNorm(Span<const C, N> data) noexcept;
+    MR_PF_DECL_V explicit SNorm(Span<const C, N> data) noexcept;
     template<std::signed_integral... C>
-    MR_PF_DECL explicit SNorm(C... vals) noexcept requires(sizeof...(C) == N);
+    MR_PF_DECL_V explicit SNorm(C... vals) noexcept requires(sizeof...(C) == N);
     template<FloatC F>
-    MR_PF_DECL explicit SNorm(Vector<N, F>) noexcept;
+    MR_PF_DECL_V explicit SNorm(Vector<N, F>) noexcept;
     // TODO:
     MR_PF_DECL const T& operator[](unsigned int) const noexcept;
     MR_PF_DECL T&       operator[](unsigned int) noexcept;
@@ -91,7 +91,7 @@ class alignas(ChooseNormAlignment(N * sizeof(T))) SNorm
 
 template <unsigned int N, std::unsigned_integral T>
 template<std::convertible_to<T> C>
-MR_PF_DEF UNorm<N, T>::UNorm(Span<const C, N> data) noexcept
+MR_PF_DEF_V UNorm<N, T>::UNorm(Span<const C, N> data) noexcept
 {
     MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
@@ -102,7 +102,7 @@ MR_PF_DEF UNorm<N, T>::UNorm(Span<const C, N> data) noexcept
 
 template <unsigned int N, std::unsigned_integral T>
 template<FloatC F>
-MR_PF_DEF UNorm<N, T>::UNorm(Vector<N, F> data) noexcept
+MR_PF_DEF_V UNorm<N, T>::UNorm(Vector<N, F> data) noexcept
 {
     MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
@@ -114,7 +114,7 @@ MR_PF_DEF UNorm<N, T>::UNorm(Vector<N, F> data) noexcept
 
 template <unsigned int N, std::unsigned_integral T>
 template<std::unsigned_integral... C>
-MR_PF_DEF UNorm<N, T>::UNorm(C... vals) noexcept
+MR_PF_DEF_V UNorm<N, T>::UNorm(C... vals) noexcept
 requires(sizeof...(C) == N)
     : v{static_cast<T>(vals)...}
 {}
@@ -158,7 +158,7 @@ MR_PF_DEF std::array<T, N>& UNorm<N, T>::AsArray() noexcept
 // =======================================//
 template <unsigned int N, std::signed_integral T>
 template<std::convertible_to<T> C>
-MR_PF_DEF SNorm<N, T>::SNorm(Span<const C, N> data) noexcept
+MR_PF_DEF_V SNorm<N, T>::SNorm(Span<const C, N> data) noexcept
 {
     MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
@@ -169,7 +169,7 @@ MR_PF_DEF SNorm<N, T>::SNorm(Span<const C, N> data) noexcept
 
 template <unsigned int N, std::signed_integral T>
 template<FloatC F>
-MR_PF_DEF SNorm<N, T>::SNorm(Vector<N, F> data) noexcept
+MR_PF_DEF_V SNorm<N, T>::SNorm(Vector<N, F> data) noexcept
 {
     MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
@@ -181,7 +181,7 @@ MR_PF_DEF SNorm<N, T>::SNorm(Vector<N, F> data) noexcept
 
 template <unsigned int N, std::signed_integral T>
 template<std::signed_integral... C>
-MR_PF_DEF SNorm<N, T>::SNorm(C... vals) noexcept
+MR_PF_DEF_V SNorm<N, T>::SNorm(C... vals) noexcept
 requires(sizeof...(C) == N)
     : v{static_cast<T>(vals)...}
 {}

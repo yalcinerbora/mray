@@ -101,17 +101,16 @@ namespace Color
 
         public:
         // Constructors & Destructor
-        MR_PF_DEF         OpticalTransferGamma(Float gamma) noexcept;
-
+        MR_PF_DECL_V       OpticalTransferGamma(Float gamma) noexcept;
         // Only providing "To" function here since renderer works in
         // linear space. "From" function is on Visor
-        MR_PF_DEF Vector3 ToLinear(const Vector3& color) const noexcept;
+        MR_PF_DECL Vector3 ToLinear(const Vector3& color) const noexcept;
     };
 
     class OpticalTransferIdentity
     {
         public:
-        MR_PF_DEF Vector3 ToLinear(const Vector3& color) const noexcept;
+        MR_PF_DECL Vector3 ToLinear(const Vector3& color) const noexcept;
     };
 }
 
@@ -381,7 +380,7 @@ MR_PF_DEF Vector3 Color::ColorspaceTransfer<F, T>::Convert(const Vector3& rgb) c
 }
 
 // Constructors & Destructor
-MR_PF_DEF Color::OpticalTransferGamma::OpticalTransferGamma(Float g) noexcept
+MR_PF_DEF_V Color::OpticalTransferGamma::OpticalTransferGamma(Float g) noexcept
     : gamma(g)
 {}
 

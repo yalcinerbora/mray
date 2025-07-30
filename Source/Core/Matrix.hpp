@@ -2,7 +2,7 @@
 
 template <unsigned int N, ArithmeticC T>
 template <std::convertible_to<T> C>
-MR_PF_DEF Matrix<N, T>::Matrix(C t) noexcept
+MR_PF_DEF_V Matrix<N, T>::Matrix(C t) noexcept
 {
     MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
@@ -13,7 +13,7 @@ MR_PF_DEF Matrix<N, T>::Matrix(C t) noexcept
 
 template <unsigned int N, ArithmeticC T>
 template <std::convertible_to<T> C>
-MR_PF_DEF Matrix<N, T>::Matrix(Span<const C, N*N> data) noexcept
+MR_PF_DEF_V Matrix<N, T>::Matrix(Span<const C, N*N> data) noexcept
 {
     MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
@@ -24,14 +24,14 @@ MR_PF_DEF Matrix<N, T>::Matrix(Span<const C, N*N> data) noexcept
 
 template <unsigned int N, ArithmeticC T>
 template <class... Args>
-MR_PF_DEF Matrix<N, T>::Matrix(const Args... dataList) noexcept
+MR_PF_DEF_V Matrix<N, T>::Matrix(const Args... dataList) noexcept
 requires(std::convertible_to<Args, T> && ...) && (sizeof...(Args) == N * N)
     : matrix{static_cast<T>(dataList) ...}
 {}
 
 template <unsigned int N, ArithmeticC T>
 template <class... Rows>
-MR_PF_DEF Matrix<N, T>::Matrix(const Rows&... rows) noexcept
+MR_PF_DEF_V Matrix<N, T>::Matrix(const Rows&... rows) noexcept
 requires(std::is_same_v<Rows, Vector<N, T>> && ...) && (sizeof...(Rows) == N)
 {
     auto Write = [this](const Vector3& v, unsigned int row) -> void
@@ -61,7 +61,7 @@ requires(std::is_same_v<Rows, Vector<N, T>> && ...) && (sizeof...(Rows) == N)
 
 template <unsigned int N, ArithmeticC T>
 template <unsigned int M>
-MR_PF_DEF Matrix<N, T>::Matrix(const Matrix<M, T>& other) noexcept requires (M > N)
+MR_PF_DEF_V Matrix<N, T>::Matrix(const Matrix<M, T>& other) noexcept requires (M > N)
 {
     MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N; i++)
@@ -112,7 +112,7 @@ MR_PF_DEF std::array<T, N*N>& Matrix<N, T>::AsArray() noexcept
 }
 
 template <unsigned int N, ArithmeticC T>
-MR_PF_DEF void Matrix<N, T>::operator+=(const Matrix& right) noexcept
+MR_PF_DEF_V void Matrix<N, T>::operator+=(const Matrix& right) noexcept
 {
     MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
@@ -122,7 +122,7 @@ MR_PF_DEF void Matrix<N, T>::operator+=(const Matrix& right) noexcept
 }
 
 template <unsigned int N, ArithmeticC T>
-MR_PF_DEF void Matrix<N, T>::operator-=(const Matrix& right) noexcept
+MR_PF_DEF_V void Matrix<N, T>::operator-=(const Matrix& right) noexcept
 {
     MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
@@ -132,14 +132,14 @@ MR_PF_DEF void Matrix<N, T>::operator-=(const Matrix& right) noexcept
 }
 
 template <unsigned int N, ArithmeticC T>
-MR_PF_DEF void Matrix<N, T>::operator*=(const Matrix& right) noexcept
+MR_PF_DEF_V void Matrix<N, T>::operator*=(const Matrix& right) noexcept
 {
     Matrix m = (*this) * right;
     *this = m;
 }
 
 template <unsigned int N, ArithmeticC T>
-MR_PF_DEF void Matrix<N, T>::operator*=(T right) noexcept
+MR_PF_DEF_V void Matrix<N, T>::operator*=(T right) noexcept
 {
     MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
@@ -149,7 +149,7 @@ MR_PF_DEF void Matrix<N, T>::operator*=(T right) noexcept
 }
 
 template <unsigned int N, ArithmeticC T>
-MR_PF_DEF void Matrix<N, T>::operator/=(const Matrix& right) noexcept
+MR_PF_DEF_V void Matrix<N, T>::operator/=(const Matrix& right) noexcept
 {
     MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
@@ -159,7 +159,7 @@ MR_PF_DEF void Matrix<N, T>::operator/=(const Matrix& right) noexcept
 }
 
 template <unsigned int N, ArithmeticC T>
-MR_PF_DEF void Matrix<N, T>::operator/=(T right) noexcept
+MR_PF_DEF_V void Matrix<N, T>::operator/=(T right) noexcept
 {
     MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
@@ -169,7 +169,7 @@ MR_PF_DEF void Matrix<N, T>::operator/=(T right) noexcept
 }
 
 template <unsigned int N, ArithmeticC T>
-MR_PF_DEF Matrix<N, T> Matrix<N, T>::operator+(const Matrix& right) const noexcept
+MR_PF_DEF_V Matrix<N, T> Matrix<N, T>::operator+(const Matrix& right) const noexcept
 {
     Matrix m;
     MRAY_UNROLL_LOOP
@@ -631,35 +631,33 @@ MR_PF_DEF Matrix<4, T> TransformGen::Scale(T x, T y, T z) noexcept
 template<FloatC T>
 MR_PF_DEF Matrix<4, T> TransformGen::Rotate(T angle, const Vector<3, T>& axis) noexcept
 {
-    using namespace std;
     //  r       r       r       0
     //  r       r       r       0
     //  r       r       r       0
     //  0       0       0       1
     T tmp1, tmp2;
 
-    T cosAngle = cos(angle);
-    T sinAngle = sin(angle);
-    T t = 1 - cosAngle;
+    const auto& [sinTheta, cosTheta] = Math::SinCos(angle);
+    T t = 1 - cosTheta;
 
     tmp1 = axis[0] * axis[1] * t;
-    tmp2 = axis[2] * sinAngle;
+    tmp2 = axis[2] * sinTheta;
     T m21 = tmp1 + tmp2;
     T m12 = tmp1 - tmp2;
 
     tmp1 = axis[0] * axis[2] * t;
-    tmp2 = axis[1] * sinAngle;
+    tmp2 = axis[1] * sinTheta;
     T m31 = tmp1 - tmp2;
     T m13 = tmp1 + tmp2;
 
     tmp1 = axis[1] * axis[2] * t;
-    tmp2 = axis[0] * sinAngle;
+    tmp2 = axis[0] * sinTheta;
     T m32 = tmp1 + tmp2;
     T m23 = tmp1 - tmp2;
 
-    T m11 = cosAngle + axis[0] * axis[0] * t;
-    T m22 = cosAngle + axis[1] * axis[1] * t;
-    T m33 = cosAngle + axis[2] * axis[2] * t;
+    T m11 = cosTheta + axis[0] * axis[0] * t;
+    T m22 = cosTheta + axis[1] * axis[1] * t;
+    T m33 = cosTheta + axis[2] * axis[2] * t;
 
     return Matrix<4, T>(m11, m12, m13, 0,
                         m21, m22, m23, 0,

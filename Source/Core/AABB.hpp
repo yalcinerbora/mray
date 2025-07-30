@@ -3,15 +3,15 @@
 #include "AABB.h"
 
 template<unsigned int N, FloatC T>
-MR_PF_DEF AABB<N, T>::AABB(const Vector<N, T>& min,
-                           const Vector<N, T>& max) noexcept
+MR_PF_DEF_V AABB<N, T>::AABB(const Vector<N, T>& min,
+                             const Vector<N, T>& max) noexcept
     : min(min)
     , max(max)
 {}
 
 template<unsigned int N, FloatC T>
-MR_PF_DEF AABB<N, T>::AABB(Span<const T, N> dataMin,
-                           Span<const T, N> dataMax) noexcept
+MR_PF_DEF_V AABB<N, T>::AABB(Span<const T, N> dataMin,
+                             Span<const T, N> dataMax) noexcept
     : min(dataMin)
     , max(dataMax)
 {}
@@ -41,13 +41,13 @@ MR_PF_DEF Vector<N, T> AABB<N, T>::Max() noexcept
 }
 
 template<unsigned int N, FloatC T>
-MR_PF_DEF void AABB<N, T>::SetMin(const Vector<N, T>& v) noexcept
+MR_PF_DEF_V void AABB<N, T>::SetMin(const Vector<N, T>& v) noexcept
 {
     min = v;
 }
 
 template<unsigned int N, FloatC T>
-MR_PF_DEF void AABB<N, T>::SetMax(const Vector<N, T>& v) noexcept
+MR_PF_DEF_V void AABB<N, T>::SetMax(const Vector<N, T>& v) noexcept
 {
     max = v;
 }

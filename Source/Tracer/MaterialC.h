@@ -13,7 +13,7 @@ class alignas(8) MediumKeyPair
     MediumKey backKey;
 
     public:
-    MR_PF_DECL MediumKeyPair(MediumKey frontKey, MediumKey backKey) noexcept;
+    MR_PF_DECL_V MediumKeyPair(MediumKey frontKey, MediumKey backKey) noexcept;
 
     MR_PF_DECL MediumKey Back() const noexcept;
     MR_PF_DECL MediumKey Front() const noexcept;
@@ -156,7 +156,7 @@ class GenericGroupMaterial : public GenericGroupMaterialT
     std::string_view    Name() const override;
 };
 
-MR_PF_DEF
+MR_PF_DEF_V
 MediumKeyPair::MediumKeyPair(MediumKey f, MediumKey b) noexcept
     : frontKey(f)
     , backKey(b)

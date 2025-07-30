@@ -58,7 +58,7 @@ Float LightPrim<P, SC>::PdfSolidAngle(const typename P::Hit& hit,
 
     Float pdf = primitive.PdfSurface(hit);
     Float NdL = Math::Dot(surface.normal, -dir);
-    NdL = (isTwoSided) ? abs(NdL) : Math::Max(Float{0}, NdL);
+    NdL = (isTwoSided) ? Math::Abs(NdL) : Math::Max(Float{0}, NdL);
     // Get projected area
     pdf = (NdL == 0) ? Float{0} : pdf / NdL;
     pdf *= Math::LengthSqr(distantPoint - surface.position);
@@ -683,10 +683,6 @@ void LightGroupPrim<PG>::Finalize(const GPUQueue& q)
 template <CoordConverterC CC>
 std::string_view LightGroupSkysphere<CC>::TypeName()
 {
-    // using namespace TypeNameGen::CompTime;
-    // using namespace std::string_view_literals;
-    // static constexpr auto Name = "Skysphere"sv;
-    // return LightTypeName<Name>;
     if constexpr(std::is_same_v<CC, LightDetail::CoOctaCoordConverter>)
         return "(L)Skysphere_CoOcta";
     else if constexpr(std::is_same_v<CC, LightDetail::SphericalCoordConverter>)

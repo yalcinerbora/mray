@@ -3,20 +3,13 @@
 #include "Definitions.h"
 #include "MathConstants.h"
 #include "MathForward.h"
-
-#include <bit>
-#include <numeric>
-
 #include "BitFunctions.h"
 
+#include <numeric>
 #include <cmath>
 #include <cstdlib>
 
-//#ifndef MRAY_DEVICE_CODE_PATH
-//    #define MRAY_PULL_STD_FUNC(FNC) using std::FNC
-//#else
-//    #define MRAY_PULL_MATH_FUNC(FNC)
-//#endif
+#include "Log.h"
 
 namespace Math
 {
@@ -82,11 +75,12 @@ namespace Math
     template<ArithmeticC T> MR_PF_DECL T Clamp(T, T min, T max) noexcept;
 
     template<VectorC T> MR_PF_DECL T Abs(const T&) noexcept;
+    template<VectorC T> MR_PF_DECL T AbsDif(const T&, const T&) noexcept;
     template<VectorC T> MR_PF_DECL T Max(const T&, const T&) noexcept;
     template<VectorC T> MR_PF_DECL T Min(const T&, const T&) noexcept;
     template<VectorC T> MR_PF_DECL T Clamp(T, T min, T max) noexcept;
     template<VectorC T> MR_PF_DECL T Clamp(T, typename T::InnerType min,
-                                            typename T::InnerType max) noexcept;
+                                           typename T::InnerType max) noexcept;
     // =============== //
     //   FLOAT ONLY    //
     // =============== //
@@ -142,11 +136,6 @@ namespace Math
     // For vector types, we add as we needed in generic code,
     // Or friction is good here. When implementing cost of the routine
     // will be present on the caller side.
-    template<FloatVectorC T> MR_PF_DECL T Abs(const T&) noexcept;
-    template<FloatVectorC T> MR_PF_DECL T AbsDif(const T&, const T&) noexcept;
-    template<FloatVectorC T> MR_PF_DECL T Max(const T&) noexcept;
-    template<FloatVectorC T> MR_PF_DECL T Min(const T&) noexcept;
-
     template<FloatVectorC T> MR_PF_DECL T Round(const T&) noexcept;
     template<FloatVectorC T> MR_PF_DECL T Ceil(const T&) noexcept;
     template<FloatVectorC T> MR_PF_DECL T Floor(const T&) noexcept;
@@ -391,6 +380,17 @@ MR_PF_DEF T Abs(const T& v) noexcept
     MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; ++i)
         r[i] = Abs(v[i]);
+    return r;
+}
+
+template<VectorC T>
+MR_PF_DEF T AbsDif(const T& v0, const T& v1) noexcept
+{
+    T r;
+    constexpr unsigned int N = T::Dims;
+    MRAY_UNROLL_LOOP_N(N)
+        for(unsigned int i = 0; i < N; ++i)
+            r[i] = AbsDif(v0[i], v1[i]);
     return r;
 }
 
@@ -793,7 +793,7 @@ MR_PF_DEF T Exp(T x) noexcept
         r = FMA(r, f, 1.00000000e+0f);      // 0x1.000000p+0
         // exp(a) = 2**i * r
         I i = static_cast<I>(j);
-        I ix = (i > 0) ? 0 : 0x83000000;
+        I ix = (i > 0) ? 0 : std::bit_cast<I>(0x83000000);
         s = Bit::BitCast<F>(0x7f000000 + ix);
         t = Bit::BitCast<F>((i << 23) - ix);
         r = r * s;
@@ -822,10 +822,10 @@ MR_PF_DEF T Exp2(T x) noexcept
         constexpr D FP64_MIN_EXPO = -1022; // exponent of minimum binary64 normal
         constexpr I FP64_MANT_BITS = 52;   // number of stored mantissa (significand) bits
         constexpr D FP64_EXPO_BIAS = 1023; // binary64 exponent bias
-        D p = (x < FP64_MIN_EXPO) ? FP64_MIN_EXPO : D(x); // clamp below
+        D p = (D(x) < FP64_MIN_EXPO) ? FP64_MIN_EXPO : D(x); // clamp below
         // 2**p = 2**(w+z), with w an integer and z in [0, 1)
         D w = Floor(p); // integral part
-        D z = x - w;     // fractional part
+        D z = D(x) - w;     // fractional part
         // approximate 2**z-1 for z in [0, 1)
         D approx = -0x1.6e75d58p+2 + 0x1.bba7414p+4;
         approx /= (0x1.35eccbap+2 - z) - 0x1.f5e53c2p-2 * z;
@@ -852,7 +852,7 @@ MR_PF_DEF T Log(T x) noexcept
         using I = IntegralSister<F>;
         I e = (Bit::BitCast<I>(x) - I(0x3F2AAAAB)) & I(0xFF800000);
         F m = Bit::BitCast<F>(Bit::BitCast<I>(x) - e);
-        F i = (F)e * 1.19209290e-7f; // 0x1.0p-23
+        F i = F(e) * 1.19209290e-7f; // 0x1.0p-23
         // m in [2/3, 4/3]
         F f = m - 1.0f;
         F s = f * f;
@@ -881,6 +881,9 @@ MR_PF_DEF T Log2(T x) noexcept
     {
         using F = float;
         using I = IntegralSister<F>;
+        // Some bit manipulation is better with uints
+        // less undefined behaviour
+        using UI = std::make_unsigned_t<I>;
         F m, r;
         F i = 0.0f;
         if (x < 1.175494351e-38f)   // 0x1.0p-126
@@ -888,22 +891,22 @@ MR_PF_DEF T Log2(T x) noexcept
             x = x * 8388608.0f;     // 0x1.0p+23
             i = -23.0f;
         }
-        I e = (Bit::BitCast<I>(x) - 0x3f3504f3) & 0xff800000;
+        I e = I(Bit::BitCast<UI>(x) - UI(0x3f3504f3) & UI(0xff800000));
         m = Bit::BitCast<F>(Bit::BitCast<I>(x) - e);
-        i = fmaf ((float)e, 1.19209290e-7f, i); // 0x1.0p-23
+        i = FMA(float(e), 1.19209290e-7f, i); // 0x1.0p-23
         m = m - 1.0f;
         // Compute log2(1+m) for m in [sqrt(0.5)-1, sqrt(2.0)-1]
-        r =             -1.09985352e-1f;  // -0x1.c28000p-4
-        r = fmaf (r, m,  1.86182275e-1f); //  0x1.7d4d22p-3
-        r = fmaf (r, m, -1.91066533e-1f); // -0x1.874de4p-3
-        r = fmaf (r, m,  2.04593703e-1f); //  0x1.a30206p-3
-        r = fmaf (r, m, -2.39627063e-1f); // -0x1.eac198p-3
-        r = fmaf (r, m,  2.88573444e-1f); //  0x1.277fccp-2
-        r = fmaf (r, m, -3.60695332e-1f); // -0x1.715a1ep-2
-        r = fmaf (r, m,  4.80897635e-1f); //  0x1.ec706ep-2
-        r = fmaf (r, m, -7.21347392e-1f); // -0x1.715472p-1
-        r = fmaf (r, m,  4.42695051e-1f); //  0x1.c551dap-2
-        r = fmaf (r, m, m);
+        r =           -1.09985352e-1f;  // -0x1.c28000p-4
+        r = FMA (r, m, 1.86182275e-1f); //  0x1.7d4d22p-3
+        r = FMA(r, m, -1.91066533e-1f); // -0x1.874de4p-3
+        r = FMA(r, m,  2.04593703e-1f); //  0x1.a30206p-3
+        r = FMA(r, m, -2.39627063e-1f); // -0x1.eac198p-3
+        r = FMA(r, m,  2.88573444e-1f); //  0x1.277fccp-2
+        r = FMA(r, m, -3.60695332e-1f); // -0x1.715a1ep-2
+        r = FMA(r, m,  4.80897635e-1f); //  0x1.ec706ep-2
+        r = FMA(r, m, -7.21347392e-1f); // -0x1.715472p-1
+        r = FMA(r, m,  4.42695051e-1f); //  0x1.c551dap-2
+        r = FMA(r, m, m);
         r = r + i;
         // Check for and handle special cases
         constexpr F Inf = Bit::BitCast<F>(0x7f800000); // +INF
@@ -911,7 +914,7 @@ MR_PF_DEF T Log2(T x) noexcept
         // This is one place that is different from the link above.
         if(x <= 0.0f)   return -std::numeric_limits<F>::infinity();
         if(x > Inf)     return std::numeric_limits<F>::infinity();
-                        return T(r);
+        else            return T(r);
     }
     #ifndef MRAY_DEVICE_CODE_PATH
         return std::log2(x);
@@ -943,8 +946,8 @@ MR_PF_DEF T Round(T x) noexcept
         // so no undefined behavour is allowed
         // we can get sloppy code.
         using I = IntegralSister<T>;
-        if(x < T(0)) return T(I(x - NextFloat(0.5)));
-        else         return T(I(x + NextFloat(0.5)));
+        if(x < T(0)) return T(I(x - NextFloat(T(0.5))));
+        else         return T(I(x + NextFloat(T(0.5))));
     }
     #ifndef MRAY_DEVICE_CODE_PATH
         return std::round(x);
@@ -1007,13 +1010,14 @@ MR_PF_DEF auto RoundInt(T x) noexcept -> IntegralSister<T>
     {
         return IntegralSister<T>(Round(x));
     }
+    using I = IntegralSister<T>;
     #ifndef MRAY_DEVICE_CODE_PATH
-        if constexpr(std::is_same_v<T, float>)  return std::lround(x);
-        else                                    return std::llround(x);
+        if constexpr(std::is_same_v<T, float>)  return I(std::lround(x));
+        else                                    return I(std::llround(x));
     #else
         //
-        if constexpr(std::is_same_v<T, float>)  return lroundf(x);
-        if constexpr(std::is_same_v<T, double>) return llround(x);
+        if constexpr(std::is_same_v<T, float>)  return I(lroundf(x));
+        if constexpr(std::is_same_v<T, double>) return I(llround(x));
     #endif
 }
 
@@ -1061,6 +1065,10 @@ MR_PF_DEF T RSqrt(T x) noexcept
     if(std::is_constant_evaluated())
     {
         return T(1) / Sqrt(x);
+    }
+    if(x < T(0) || !IsFinite(x))
+    {
+        MRAY_LOG("X!!! {}", x);
     }
     assert(x >= T(0));
     #ifndef MRAY_DEVICE_CODE_PATH
@@ -1277,58 +1285,6 @@ MR_PF_DECL T Pow(T x, T y) noexcept
         if constexpr(std::is_same_v<T, float>)  return powf(x, y);
         if constexpr(std::is_same_v<T, double>) return pow(x, y);
     #endif
-}
-
-template<FloatVectorC T>
-MR_PF_DEF T Abs(const T& v) noexcept
-{
-    T r;
-    constexpr unsigned int N = T::Dims;
-    MRAY_UNROLL_LOOP_N(N)
-    for(unsigned int i = 0; i < N; i++)
-    {
-        r[i] = Abs(v[i]);
-    }
-    return r;
-}
-
-template<FloatVectorC T>
-MR_PF_DEF T AbsDif(const T& v0, const T& v1) noexcept
-{
-    T r;
-    constexpr unsigned int N = T::Dims;
-    MRAY_UNROLL_LOOP_N(N)
-    for(unsigned int i = 0; i < N; i++)
-    {
-        r[i] = AbsDif(v0[i], v1[i]);
-    }
-    return r;
-}
-
-template<FloatVectorC T>
-MR_PF_DEF T Max(const T& v) noexcept
-{
-    T r;
-    constexpr unsigned int N = T::Dims;
-    MRAY_UNROLL_LOOP_N(N)
-    for(unsigned int i = 0; i < N; i++)
-    {
-        r[i] = Max(v[i]);
-    }
-    return r;
-}
-
-template<FloatVectorC T>
-MR_PF_DEF T Min(const T& v) noexcept
-{
-    T r;
-    constexpr unsigned int N = T::Dims;
-    MRAY_UNROLL_LOOP_N(N)
-    for(unsigned int i = 0; i < N; i++)
-    {
-        r[i] = Min(v[i]);
-    }
-    return r;
 }
 
 template<FloatVectorC T>

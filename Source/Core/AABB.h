@@ -30,10 +30,10 @@ class AABB
     public:
     // Constructors & Destructor
     constexpr           AABB() = default;
-    MR_PF_DECL explicit AABB(const Vector<N, T>& min,
-                             const Vector<N, T>& max) noexcept;
-    MR_PF_DECL explicit AABB(Span<const T, N> dataMin,
-                             Span<const T, N> dataMax) noexcept;
+    MR_PF_DECL_V explicit AABB(const Vector<N, T>& min,
+                               const Vector<N, T>& max) noexcept;
+    MR_PF_DECL_V explicit AABB(Span<const T, N> dataMin,
+                               Span<const T, N> dataMax) noexcept;
 
     // Accessors
     MR_PF_DECL const Vector<N, T>&   Min() const noexcept;

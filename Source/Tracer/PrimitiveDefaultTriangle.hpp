@@ -190,12 +190,17 @@ uint32_t Triangle<T>::Voxelize(Span<uint64_t>& mortonCodes,
     aabbMax = Math::Max(aabbMax, positions2D[0]);
     aabbMax = Math::Max(aabbMax, positions2D[1]);
     aabbMax = Math::Max(aabbMax, positions2D[2]);
-
-    // Convert to [0, resolution] (pixel space)
-    Vector2i xRangeInt(floor((Float{0.5} + Float{0.5} * aabbMin[0]) * Float(rasterResolution[0])),
-                       ceil((Float{0.5} + Float{0.5} * aabbMax[0]) * Float(rasterResolution[0])));
-    Vector2i yRangeInt(floor((Float{0.5} + Float{0.5} * aabbMin[1]) * Float(rasterResolution[1])),
-                       ceil((Float{0.5} + Float{0.5} * aabbMax[1]) * Float(rasterResolution[1])));
+    Vector2i xRangeInt, yRangeInt;
+    {
+        // Convert to [0, resolution] (pixel space)
+        using F = Float;
+        using Math::Floor, Math::Ceil, Math::FMA;
+        static constexpr F HALF = Float{0.5};
+        xRangeInt = Vector2i(Floor(FMA(HALF, aabbMin[0], HALF) * Float(rasterResolution[0])),
+                             Ceil (FMA(HALF, aabbMax[0], HALF) * Float(rasterResolution[0])));
+        yRangeInt = Vector2i(Floor(FMA(HALF, aabbMin[1], HALF) * Float(rasterResolution[1])),
+                             Ceil (FMA(HALF, aabbMax[1], HALF) * Float(rasterResolution[1])));
+    }
     // Clip the range
     xRangeInt = Math::Clamp(xRangeInt, 0, rasterResolution[0]);
     yRangeInt = Math::Clamp(yRangeInt, 0, rasterResolution[1]);
@@ -488,7 +493,10 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     Vector3 f = geoNormal;
     Vector3 d = Normalize(ray.Dir());
     auto [a1, a2] = rayCone.Project(f, d);
+    assert(Math::IsFinite(a1) && Math::IsFinite(a2));
     Matrix3x3 M = Matrix3x3(Normalize(a1), Normalize(a2), geoNormal);
+    assert(std::all_of(M.AsArray().begin(), M.AsArray().end(),
+                       [](const auto& a) { return Math::IsFinite(a); }));
 
     // Curvatures
     std::array<Vector3, 3> edges =
@@ -507,7 +515,8 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     // Equation 6.
     auto CurvatureEdge = [](Vector3 dp, Vector3 dn) -> Float
     {
-        return Math::Dot(dn, dp) / Math::Dot(dp, dp);
+        assert(Math::LengthSqr(dp) != 0);
+        return Math::Dot(dn, dp) / Math::LengthSqr(dp);
     };
     Vector3 curvatures = Vector3(CurvatureEdge(edges[0], normals[1] - normals[0]),
                                  CurvatureEdge(edges[1], normals[2] - normals[0]),

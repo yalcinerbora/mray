@@ -312,15 +312,24 @@ RayCone RayConeSurface::ConeAfterScatter(const Vector3& wO, const Vector3& n) co
 MR_PF_DEF
 std::array<Vector3, 2> RayCone::Project(Vector3 f, Vector3 d) const noexcept
 {
+    static constexpr Float Epsilon = MathConstants::Epsilon<Float>();
+    // https://www.jcgt.org/published/0010/01/01/
     // Equation 8, 9;
     // Preprocess the elliptic axes
-    Vector3 h1 = d - Math::Dot(f, d) * f;
+    //
+    // If f and d is parallel, projected vector h1 will be zero
+    // we prevent it via this
+    Float fDotD = Math::Dot(f, d);
+    if(Math::Abs(fDotD + Float(1)) < Epsilon)
+        d += Vector3(Epsilon);
+
+    Vector3 h1 = d - fDotD * f;
     Vector3 h2 = Math::Cross(f, h1);
     Float r = width * Float(0.5);
     auto EllipseAxes = [&](Vector3 h) -> Vector3
     {
         Float denom = Math::Length(h - Math::Dot(d, h) * d);
-        denom = Math::Max(MathConstants::Epsilon<Float>(), denom);
+        denom = Math::Max(Epsilon, denom);
         Vector3 result = (r / denom) * h;
         assert(Math::IsFinite(result));
         return result;

@@ -100,7 +100,6 @@ class ProfilerAnnotation
     private:
     std::string_view    name;
     TracySRData         srcLocData;
-    bool                runtimeFlag;
     public:
     // Constructors & Destructor
                         ProfilerAnnotation(std::string_view name,

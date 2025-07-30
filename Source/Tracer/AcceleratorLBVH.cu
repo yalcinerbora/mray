@@ -52,7 +52,7 @@ struct MortonDiffFunctor
     }
 };
 
-MR_PF_DEF
+MR_PF_DEF_V
 LBVHAccelDetail::Delta::Delta(const Span<const uint64_t>& dMCs) noexcept
     : dMortonCodes(dMCs)
 {}

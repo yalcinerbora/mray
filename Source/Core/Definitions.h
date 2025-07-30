@@ -8,17 +8,27 @@
 #include <algorithm>
 
 // Commonize some  non-standart attributes etc.
+#define MR_STAMP_PRAGMA_(X)     _Pragma(#X)
+#define MR_STAMP_PRAGMA(X)      MR_STAMP_PRAGMA_(X)
+
 #ifdef MRAY_MSVC
     #define MRAY_FORCE_INLINE_DECL  [[msvc::forceinline]] inline
     #define MRAY_FORCE_INLINE_DEF   inline
     #define MRAY_ATTRIB_FLATTEN     [[msvc::flatten]]
     #define MRAY_ATTRIB_PURE
+    #define MRAY_DEBUG_BREAK        __debugbreak()
 
 #elif defined(MRAY_CLANG) || defined(MRAY_GCC)
-    #define MRAY_FORCE_INLINE_DECL  [[gcc::always_inline]] inline
+    #define MRAY_FORCE_INLINE_DECL  [[gnu::always_inline]] inline
     #define MRAY_FORCE_INLINE_DEF   inline
-    #define MRAY_FLATTEN            [[gcc::flatten]]
-    #define MRAY_ATTRIB_PURE        [[gcc::pure]]
+    #define MRAY_FLATTEN            [[gnu::flatten]]
+    #define MRAY_ATTRIB_PURE        [[gnu::pure]]
+#endif
+
+#ifdef MRAY_CLANG
+    #define MRAY_DEBUG_BREAK        __builtin_debugtrap()
+#elif defined(MRAY_GCC)
+    #define MRAY_DEBUG_BREAK        __asm__ __volatile__("int 3")
 #endif
 
 #ifdef MRAY_MSVC
@@ -26,11 +36,11 @@
     #define MRAY_UNROLL_LOOP
     #define MRAY_UNROLL_LOOP_N(N)
 #elif defined(MRAY_CLANG)
-    #define MRAY_UNROLL_LOOP        _Pragma("loop unroll")
-    #define MRAY_UNROLL_LOOP_N(N)   _Pragma("loop unroll " N)
+    #define MRAY_UNROLL_LOOP        MR_STAMP_PRAGMA(unroll)
+    #define MRAY_UNROLL_LOOP_N(N)   MR_STAMP_PRAGMA(unroll N)
 #elif defined(MRAY_GCC)
-    #define MRAY_UNROLL_LOOP        _Pragma("gcc unroll 8")
-    #define MRAY_UNROLL_LOOP_N(N)   _Pragma("gcc unroll " N)
+    #define MRAY_UNROLL_LOOP        MR_STAMP_PRAGMA(gcc unroll 8)
+    #define MRAY_UNROLL_LOOP_N(N)   MR_STAMP_PRAGMA(gcc unroll N)
 #endif
 
 #if defined MRAY_GPU_BACKEND_CUDA
@@ -132,8 +142,9 @@
 
 // Pure function definition / declaration attributes
 #define MR_PF_DECL   MRAY_HYBRID NO_DISCARD MRAY_ATTRIB_PURE MRAY_FORCE_INLINE_DECL constexpr
-#define MR_PF_DECL_V MRAY_HYBRID MRAY_ATTRIB_PURE MRAY_FORCE_INLINE_DECL constexpr
 #define MR_PF_DEF    MRAY_HYBRID MRAY_ATTRIB_PURE MRAY_FORCE_INLINE_DEF constexpr
+#define MR_PF_DECL_V MRAY_HYBRID MRAY_FORCE_INLINE_DECL constexpr
+#define MR_PF_DEF_V  MRAY_HYBRID MRAY_FORCE_INLINE_DEF constexpr
 // GPU function definition / declaration attributes
 #define MR_GF_DECL MRAY_GPU MRAY_GPU_INLINE_DECL
 #define MR_GF_DEF  MRAY_GPU MRAY_GPU_INLINE_DEF

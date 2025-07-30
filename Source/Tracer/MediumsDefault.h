@@ -35,7 +35,7 @@ namespace MediumDetail
         static constexpr uint32_t SampleScatteringRNCount = 0;
 
         public:
-        MR_PF_DECL       MediumVacuum(const SpectrumConverter&,
+        MR_PF_DECL_V    MediumVacuum(const SpectrumConverter&,
                                      const DataSoA&, MediumKey) noexcept;
 
         MR_PF_DECL

@@ -55,7 +55,7 @@ namespace LBVHAccelDetail
         const Span<const uint64_t>& dMortonCodes;
 
         public:
-        MR_PF_DECL Delta(const Span<const uint64_t>&) noexcept;
+        MR_PF_DECL_V Delta(const Span<const uint64_t>&) noexcept;
 
         MR_PF_DECL
         int32_t operator()(int32_t i, int32_t j) const noexcept;

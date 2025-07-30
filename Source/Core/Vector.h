@@ -46,25 +46,25 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
     // Constructors & Destructor
     constexpr           Vector() = default;
     template<std::convertible_to<T> C>
-    MR_PF_DECL explicit Vector(C);
+    MR_PF_DECL_V explicit Vector(C);
     template<std::convertible_to<T> C>
-    MR_PF_DECL explicit Vector(Span<const C , N> data);
+    MR_PF_DECL_V explicit Vector(Span<const C , N> data);
     template <std::convertible_to<T>... Args>
-    MR_PF_DECL explicit Vector(const Args... dataList);
+    MR_PF_DECL_V explicit Vector(const Args... dataList);
     template <class... Args>
-    MR_PF_DECL explicit Vector(const Vector<N - sizeof...(Args), T>&,
+    MR_PF_DECL_V explicit Vector(const Vector<N - sizeof...(Args), T>&,
                                const Args... dataList) requires (N - sizeof...(Args) > 1);
     template<std::convertible_to<T> C>
-    MR_PF_DECL explicit Vector(std::array<C, N>&& data);
+    MR_PF_DECL_V explicit Vector(std::array<C, N>&& data);
     template<std::convertible_to<T> C>
-    MR_PF_DECL explicit Vector(const Vector<N, C>&);
+    MR_PF_DECL_V explicit Vector(const Vector<N, C>&);
     template <unsigned int M>
-    MR_PF_DECL explicit Vector(const Vector<M, T>&) requires (M > N);
+    MR_PF_DECL_V explicit Vector(const Vector<M, T>&) requires (M > N);
     // NormTypes Related Constructors
     template <std::unsigned_integral IT>
-    MR_PF_DECL explicit Vector(const UNorm<N, IT>&) requires (std::floating_point<T>);
+    MR_PF_DECL_V explicit Vector(const UNorm<N, IT>&) requires (std::floating_point<T>);
     template <std::signed_integral IT>
-    MR_PF_DECL explicit Vector(const SNorm<N, IT>&) requires (std::floating_point<T>);
+    MR_PF_DECL_V explicit Vector(const SNorm<N, IT>&) requires (std::floating_point<T>);
 
     // Accessors
     MR_PF_DECL T&       operator[](unsigned int);

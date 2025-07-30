@@ -115,6 +115,7 @@ T TracerTexView<2, T>::operator()(UV uv) const
     else if(index == 2) transient = Vector4(tV3(uv), 0);
     else if(index == 3) transient =         tV4(uv);
     else if(index == 4) transient =         sT (uv);
+    else MRAY_UNREACHABLE;
 
     return PostprocessTexel<T>(mode, transient);
 }
@@ -131,6 +132,7 @@ T TracerTexView<2, T>::operator()(UV uv, UV dpdx, UV dpdy) const
     else if(index == 2) transient = Vector4(tV3(uv, dpdx, dpdy), 0);
     else if(index == 3) transient =         tV4(uv, dpdx, dpdy);
     else if(index == 4) transient =         sT (uv, dpdx, dpdy);
+    else MRAY_UNREACHABLE;
 
     return PostprocessTexel<T>(mode, transient);
 }
@@ -147,6 +149,7 @@ T TracerTexView<2, T>::operator()(UV uv, Float mipLevel) const
     else if(index == 2) transient = Vector4(tV3(uv, mipLevel), 0);
     else if(index == 3) transient =         tV4(uv, mipLevel);
     else if(index == 4) transient =         sT (uv, mipLevel);
+    else MRAY_UNREACHABLE;
 
     return PostprocessTexel<T>(mode, transient);
 }
@@ -185,6 +188,7 @@ T TracerTexView<3, T>::operator()(UV uv) const
     else if(index == 1) transient = Vector4(tV2(uv), 0, 0);
     else if(index == 2) transient = Vector4(tV3(uv), 0);
     else if(index == 3) transient =         tV4(uv);
+    else MRAY_UNREACHABLE;
 
     return PostprocessTexel<T>(mode, transient);
 }
@@ -200,6 +204,7 @@ T TracerTexView<3, T>::operator()(UV uv, UV dpdx, UV dpdy) const
     else if(index == 1) transient = Vector4(tV2(uv, dpdx, dpdy), 0, 0);
     else if(index == 2) transient = Vector4(tV3(uv, dpdx, dpdy), 0);
     else if(index == 3) transient =         tV4(uv, dpdx, dpdy);
+    else MRAY_UNREACHABLE;
 
     return PostprocessTexel<T>(mode, transient);
 }
@@ -215,6 +220,8 @@ T TracerTexView<3, T>::operator()(UV uv, Float mipLevel) const
     else if(index == 1) transient = Vector4(tV2(uv, mipLevel), 0, 0);
     else if(index == 2) transient = Vector4(tV3(uv, mipLevel), 0);
     else if(index == 3) transient = tV4(uv, mipLevel);
+    else MRAY_UNREACHABLE;
+
     return PostprocessTexel<T>(mode, transient);
 }
 

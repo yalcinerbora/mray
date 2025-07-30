@@ -4,7 +4,7 @@
 
 template <unsigned int N, ArithmeticC T>
 template<std::convertible_to<T> C>
-MR_PF_DEF Vector<N, T>::Vector(C data)
+MR_PF_DEF_V Vector<N, T>::Vector(C data)
 {
     MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
@@ -15,7 +15,7 @@ MR_PF_DEF Vector<N, T>::Vector(C data)
 
 template <unsigned int N, ArithmeticC T>
 template<std::convertible_to<T> C>
-MR_PF_DEF Vector<N, T>::Vector(Span<const C, N> data)
+MR_PF_DEF_V Vector<N, T>::Vector(Span<const C, N> data)
 {
     MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
@@ -26,14 +26,15 @@ MR_PF_DEF Vector<N, T>::Vector(Span<const C, N> data)
 
 template <unsigned int N, ArithmeticC T>
 template <std::convertible_to<T>... Args>
-MR_PF_DEF Vector<N, T>::Vector(const Args... dataList)
+MR_PF_DEF_V Vector<N, T>::Vector(const Args... dataList)
     : vector{static_cast<T>(dataList) ...}
 {}
 
 template <unsigned int N, ArithmeticC T>
 template <class... Args>
-MR_PF_DEF Vector<N, T>::Vector(const Vector<N - sizeof...(Args), T>& v,
-                               const Args... dataList)  requires (N - sizeof...(Args) > 1)
+MR_PF_DEF_V
+Vector<N, T>::Vector(const Vector<N - sizeof...(Args), T>& v,
+                     const Args... dataList)  requires (N - sizeof...(Args) > 1)
 {
     constexpr int VS = N - sizeof...(dataList);
     MRAY_UNROLL_LOOP_N(VS)
@@ -51,13 +52,14 @@ MR_PF_DEF Vector<N, T>::Vector(const Vector<N - sizeof...(Args), T>& v,
 
 template <unsigned int N, ArithmeticC T>
 template<std::convertible_to<T> C>
-MR_PF_DEF Vector<N, T>::Vector(std::array<C, N>&& data)
+MR_PF_DEF_V
+Vector<N, T>::Vector(std::array<C, N>&& data)
     : vector(data)
 {}
 
 template <unsigned int N, ArithmeticC T>
 template<std::convertible_to<T> C>
-MR_PF_DEF Vector<N, T>::Vector(const Vector<N, C>& other)
+MR_PF_DEF_V Vector<N, T>::Vector(const Vector<N, C>& other)
 {
     MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
@@ -68,7 +70,7 @@ MR_PF_DEF Vector<N, T>::Vector(const Vector<N, C>& other)
 
 template <unsigned int N, ArithmeticC T>
 template <unsigned int M>
-MR_PF_DEF Vector<N, T>::Vector(const Vector<M, T>& other) requires (M > N)
+MR_PF_DEF_V Vector<N, T>::Vector(const Vector<M, T>& other) requires (M > N)
 {
     MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
@@ -79,7 +81,7 @@ MR_PF_DEF Vector<N, T>::Vector(const Vector<M, T>& other) requires (M > N)
 
 template <unsigned int N, ArithmeticC T>
 template <std::unsigned_integral IT>
-MR_PF_DEF Vector<N, T>::Vector(const UNorm<N, IT>& unorm)  requires (std::floating_point<T>)
+MR_PF_DEF_V Vector<N, T>::Vector(const UNorm<N, IT>& unorm)  requires (std::floating_point<T>)
 {
     MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
@@ -91,7 +93,7 @@ MR_PF_DEF Vector<N, T>::Vector(const UNorm<N, IT>& unorm)  requires (std::floati
 
 template <unsigned int N, ArithmeticC T>
 template <std::signed_integral IT>
-MR_PF_DEF Vector<N, T>::Vector(const SNorm<N, IT>& snorm)  requires (std::floating_point<T>)
+MR_PF_DEF_V Vector<N, T>::Vector(const SNorm<N, IT>& snorm)  requires (std::floating_point<T>)
 {
     MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
@@ -139,7 +141,7 @@ MR_PF_DEF std::array<T, N>& Vector<N, T>::AsArray()
 }
 
 template <unsigned int N, ArithmeticC T>
-MR_PF_DEF void Vector<N, T>::operator+=(const Vector& right)
+MR_PF_DEF_V void Vector<N, T>::operator+=(const Vector& right)
 {
     MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
@@ -149,7 +151,7 @@ MR_PF_DEF void Vector<N, T>::operator+=(const Vector& right)
 }
 
 template <unsigned int N, ArithmeticC T>
-MR_PF_DEF void Vector<N, T>::operator-=(const Vector& right)
+MR_PF_DEF_V void Vector<N, T>::operator-=(const Vector& right)
 {
     MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
@@ -159,7 +161,7 @@ MR_PF_DEF void Vector<N, T>::operator-=(const Vector& right)
 }
 
 template <unsigned int N, ArithmeticC T>
-MR_PF_DEF void Vector<N, T>::operator*=(const Vector& right)
+MR_PF_DEF_V void Vector<N, T>::operator*=(const Vector& right)
 {
     MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
@@ -169,7 +171,7 @@ MR_PF_DEF void Vector<N, T>::operator*=(const Vector& right)
 }
 
 template <unsigned int N, ArithmeticC T>
-MR_PF_DEF void Vector<N, T>::operator*=(T right)
+MR_PF_DEF_V void Vector<N, T>::operator*=(T right)
 {
     MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
@@ -179,7 +181,7 @@ MR_PF_DEF void Vector<N, T>::operator*=(T right)
 }
 
 template <unsigned int N, ArithmeticC T>
-MR_PF_DEF void Vector<N, T>::operator/=(const Vector& right)
+MR_PF_DEF_V void Vector<N, T>::operator/=(const Vector& right)
 {
     MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
@@ -189,7 +191,7 @@ MR_PF_DEF void Vector<N, T>::operator/=(const Vector& right)
 }
 
 template <unsigned int N, ArithmeticC T>
-MR_PF_DEF void Vector<N, T>::operator/=(T right)
+MR_PF_DEF_V void Vector<N, T>::operator/=(T right)
 {
     MRAY_UNROLL_LOOP_N(N)
     for(unsigned int i = 0; i < N; i++)
