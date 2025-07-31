@@ -1066,10 +1066,6 @@ MR_PF_DEF T RSqrt(T x) noexcept
     {
         return T(1) / Sqrt(x);
     }
-    if(x < T(0) || !IsFinite(x))
-    {
-        MRAY_LOG("X!!! {}", x);
-    }
     assert(x >= T(0));
     #ifndef MRAY_DEVICE_CODE_PATH
         return T(1) / Sqrt(x);
