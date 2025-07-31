@@ -289,7 +289,9 @@ RayCone RayCone::Advance(Float t) const noexcept
         // Exact version
         //.width = width + tanf(aperture * Float(0.5)) * t * Float(2)
         // Approx version in the paper (RT Gems chapter 20, Eq. under Figure 20-5)
-        .width = width + aperture * t
+        // TODO: Width explodes rarely, we do not have a good number since we do not have
+        // the scene scale. Putting a large value here that is not near inf
+        .width = Math::Min(width + aperture * t, Float(1e6))
     };
 }
 

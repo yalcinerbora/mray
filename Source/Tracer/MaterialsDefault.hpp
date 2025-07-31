@@ -473,12 +473,14 @@ RayConeSurface RefractMaterial<ST>::RefractRayCone(const RayConeSurface& rayCone
     Float sign = Math::SignPM1(tu[0] * tl[1] - tu[1] * tl[0]);
     Float cosTheta = Math::Clamp(Dot(tu, tl), Float(-1), Float(1));
     Float newConeAperture = Math::ArcCos(cosTheta) * sign;
+    newConeAperture = Math::Max(newConeAperture, MathConstants::Epsilon<Float>());
 
     Float width = wu + wl;
     RayConeSurface result = rayConeSurfIn;
     // We save the state **as if** it is pre-refracted (thus adding betaN,
     // "ConeAfterScatter" function will subtract it back
     assert(Math::IsFinite(newConeAperture));
+    assert(newConeAperture != Float(0));
     result.rayConeBack = RayCone
     {
         .aperture = newConeAperture + rayConeSurfIn.betaN,
