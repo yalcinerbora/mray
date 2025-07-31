@@ -314,7 +314,7 @@ RayCone RayConeSurface::ConeAfterScatter(const Vector3& wO, const Vector3& n) co
 MR_PF_DEF
 std::array<Vector3, 2> RayCone::Project(Vector3 f, Vector3 d) const noexcept
 {
-    static constexpr Float Epsilon = MathConstants::Epsilon<Float>();
+    constexpr Float Epsilon = MathConstants::Epsilon<Float>();
     // https://www.jcgt.org/published/0010/01/01/
     // Equation 8, 9;
     // Preprocess the elliptic axes

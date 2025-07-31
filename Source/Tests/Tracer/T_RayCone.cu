@@ -5,9 +5,9 @@
 
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCRayConeTest(MRAY_GRID_CONSTANT RayCone cone,
-                   MRAY_GRID_CONSTANT Vector3 f,
-                   MRAY_GRID_CONSTANT Vector3 d)
+void KCRayConeTest(MRAY_GRID_CONSTANT const RayCone cone,
+                   MRAY_GRID_CONSTANT const Vector3 f,
+                   MRAY_GRID_CONSTANT const Vector3 d)
 {
     KernelCallParams kp;
     if(kp.GlobalId() != 0) return;
