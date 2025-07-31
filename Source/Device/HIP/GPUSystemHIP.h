@@ -35,6 +35,8 @@ class TimelineSemaphore;
 
 #define MRAY_SHARED_MEMORY __shared__
 
+#define MRAY_KERNEL __global__
+
 // A Good guess for TPB
 static constexpr uint32_t StaticThreadPerBlock1D()
 {

@@ -9,13 +9,13 @@ namespace MediumDetail
 //===========================//
 //           Vacuum          //
 //===========================//
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF_V
 MediumVacuum::MediumVacuum(const SpectrumConverter&,
-                           const DataSoA&, MediumKey)
+                           const DataSoA&, MediumKey) noexcept
 {}
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-ScatterSample MediumVacuum::SampleScattering(const Vector3&, RNGDispenser&) const
+MR_PF_DEF
+ScatterSample MediumVacuum::SampleScattering(const Vector3&, RNGDispenser&) const noexcept
 {
     return ScatterSample
     {
@@ -28,26 +28,26 @@ ScatterSample MediumVacuum::SampleScattering(const Vector3&, RNGDispenser&) cons
     };
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-Float MediumVacuum::PdfScattering(const Vector3&, const Vector3&) const
+MR_PF_DEF
+Float MediumVacuum::PdfScattering(const Vector3&, const Vector3&) const noexcept
 {
     return Float(0.0);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum MediumVacuum::SigmaA(const Vector3&) const
+MR_PF_DEF
+Spectrum MediumVacuum::SigmaA(const Vector3&) const noexcept
 {
     return Spectrum::Zero();
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum MediumVacuum::SigmaS(const Vector3&) const
+MR_PF_DEF
+Spectrum MediumVacuum::SigmaS(const Vector3&) const noexcept
 {
     return Spectrum::Zero();
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-Spectrum MediumVacuum::Emission(const Vector3&) const
+MR_PF_DEF
+Spectrum MediumVacuum::Emission(const Vector3&) const noexcept
 {
     return Spectrum::Zero();
 }
@@ -56,7 +56,7 @@ Spectrum MediumVacuum::Emission(const Vector3&) const
 //        Homogeneous        //
 //===========================//
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 MediumHomogeneous<ST>::MediumHomogeneous(const SpectrumConverter& sc,
                                          const DataSoA& soa, MediumKey k)
     : sigmaA(sc.Convert(soa.Get<SIGMA_A>()[k.FetchIndexPortion()]))
@@ -66,7 +66,7 @@ MediumHomogeneous<ST>::MediumHomogeneous(const SpectrumConverter& sc,
 {}
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 ScatterSample MediumHomogeneous<ST>::SampleScattering(const Vector3& wO,
                                                       RNGDispenser& rng) const
 {
@@ -88,31 +88,31 @@ ScatterSample MediumHomogeneous<ST>::SampleScattering(const Vector3& wO,
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float MediumHomogeneous<ST>::PdfScattering(const Vector3& wI,
                                            const Vector3& wO) const
 {
     using namespace Distribution::Medium;
-    Float cosTheta = wI.Dot(wO);
+    Float cosTheta = Math::Dot(wI, wO);
     return HenyeyGreensteinPhase(cosTheta, g);
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Spectrum MediumHomogeneous<ST>::SigmaA(const Vector3&) const
 {
     return sigmaA;
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Spectrum MediumHomogeneous<ST>::SigmaS(const Vector3&) const
 {
     return sigmaS;
 }
 
 template <class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Spectrum MediumHomogeneous<ST>::Emission(const Vector3&) const
 {
     return emission;

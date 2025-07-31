@@ -79,10 +79,10 @@ struct LuminanceExtractParams
     MRayColorSpaceEnum  colorSpace;
 };
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 Vector3 GenericFromNorm(const Vector3& t, const SurfViewVariant& surfView)
 {
-    using namespace Bit::NormConversion;
+    using namespace NormConversion;
     // Utilize the surfView variant to get the type etc
     return DeviceVisit(surfView, [t](auto&& sv) -> Vector3
     {
@@ -106,7 +106,7 @@ Vector3 GenericFromNorm(const Vector3& t, const SurfViewVariant& surfView)
             else
             {
                 using InnerT = typename PixelType::InnerType;
-                UNROLL_LOOP
+                MRAY_UNROLL_LOOP
                 for(uint32_t c = 0; c < C; c++)
                 {
                     if constexpr(std::is_floating_point_v<InnerT>)
@@ -122,10 +122,10 @@ Vector3 GenericFromNorm(const Vector3& t, const SurfViewVariant& surfView)
     });
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 Vector3 GenericToNorm(const Vector3& t, const SurfViewVariant& surfView)
 {
-    using namespace Bit::NormConversion;
+    using namespace NormConversion;
     // Utilize the surfView variant to get the type etc
     return DeviceVisit(surfView, [t](auto&& sv) -> Vector3
     {
@@ -156,7 +156,7 @@ Vector3 GenericToNorm(const Vector3& t, const SurfViewVariant& surfView)
             else
             {
                 using InnerT = typename PixelType::InnerType;
-                UNROLL_LOOP
+                MRAY_UNROLL_LOOP
                 for(uint32_t c = 0; c < C; c++)
                 {
                     if constexpr(std::is_floating_point_v<InnerT>)
@@ -178,7 +178,7 @@ Vector3 GenericToNorm(const Vector3& t, const SurfViewVariant& surfView)
     });
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 Vector3 GenericReadFromView(const Vector2& uv, GenericTextureView& view)
 {
     return DeviceVisit(view, [&](auto&& t) -> Vector3
@@ -195,7 +195,7 @@ Vector3 GenericReadFromView(const Vector2& uv, GenericTextureView& view)
         else if constexpr(T::Channels == 4)
             return Vector3(t(uv));
         //
-        else return Vector3::Zero();
+        MRAY_UNREACHABLE;
     });
 }
 
@@ -428,7 +428,6 @@ void KCExtractLuminance(// I-O
         //
         Vector2ui res = curParams.imgSize;
         Vector2 resRecip = Vector2(1) / Vector2(res);
-        //if(std::holds_alternative<std::monostate>(texView)) continue;
 
         // Loop over the blocks for this tex
         static constexpr Vector2ui TILE_SIZE = Vector2ui(32, 16);
@@ -583,7 +582,7 @@ void BCColorConverter::CallKernelForType(Span<Byte> dScratchBuffer,
     for(uint32_t batchIndex = 0; batchIndex < batchCount; batchIndex++)
     {
         uint32_t  start = batchIndex * BC_TEX_PER_BATCH;
-        uint32_t  end = std::min((batchIndex + 1) * BC_TEX_PER_BATCH, localTexCount);
+        uint32_t  end = Math::Min((batchIndex + 1) * BC_TEX_PER_BATCH, localTexCount);
         auto localTextures = textureRange.subspan(start, uint32_t(end - start));
         //
         uint64_t texBlockOffset = 0;
@@ -703,7 +702,7 @@ BCColorConverter::BCColorConverter(std::vector<GenericTexture*>&& bcTex)
         {
             uint32_t  start = uint32_t(range[0]) + i * BC_TEX_PER_BATCH;
             uint32_t  end = uint32_t(range[0]) + (i + 1) * BC_TEX_PER_BATCH;
-            end = std::min(end, uint32_t(range[0]) + localTexCount);
+            end = Math::Min(end, uint32_t(range[0]) + localTexCount);
             // "Size()" gives the aligned size (multiple of 64k in CUDA)
             // so unnecessarily large maybe?
             // TODO: Profile and check this later
@@ -711,7 +710,7 @@ BCColorConverter::BCColorConverter(std::vector<GenericTexture*>&& bcTex)
             for(uint32_t j = start; j < end; j++)
                 localSize += bcTextures[j]->Size();
 
-            bufferSize = std::max(bufferSize, localSize);
+            bufferSize = Math::Max(bufferSize, localSize);
         }
     }
 }
@@ -772,7 +771,7 @@ struct ConvertKernelCallFunctor
         // We will dedicate N blocks for each texture.
         static constexpr uint32_t BLOCK_PER_TEXTURE = 256;
         static constexpr uint32_t TPB = 512;
-        constexpr uint32_t BlockPerTexture = std::max(1u, TPB >> 1);
+        constexpr uint32_t BlockPerTexture = Math::Max(1u, TPB >> 1);
         // Get Compile Time Type
         using ConvListType = std::remove_cvref_t<decltype(ConvList)>;
         uint32_t texCount = static_cast<uint32_t>(dSufViews.size());
@@ -832,9 +831,6 @@ void ColorConverter::ConvertColor(std::vector<MipArray<SurfRefVariant>> textures
                                   std::vector<GenericTexture*> bcTextures,
                                   MRayColorSpaceEnum globalColorSpace) const
 {
-    // TODO: Report bug on NVCC, "NVCC Language Frontend"
-    // hangs (inf loop) when these literals are changed to "..."sv
-    //using namespace std::string_view_literals;
     static const auto mainA = gpuSystem.CreateAnnotation("ConvertColor");
     static const auto normA = gpuSystem.CreateAnnotation("ConvertColor_N");
     static const auto bcA   = gpuSystem.CreateAnnotation("ConvertColor_BC");
@@ -902,7 +898,7 @@ void ColorConverter::ConvertColor(std::vector<MipArray<SurfRefVariant>> textures
                                                     std::numeric_limits<uint8_t>::min(),
         [](uint8_t l, uint8_t r)
         {
-            return std::max(l, r);
+            return Math::Max(l, r);
         },
         [](const ColorConvParams& p) -> uint8_t
         {

@@ -7,8 +7,8 @@
 
 #include "Core/Definitions.h"
 #include "Core/System.h"
+#include "Core/Profiling.h"
 #include "TransientPool/TransientPool.h"
-
 
 MeshViewAssimp::MeshViewAssimp(uint32_t innerIndexIn, const MeshFileAssimp& fileIn)
     : innerIndex(innerIndexIn)
@@ -102,6 +102,8 @@ TransientData MeshViewAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) 
                   "Currently \"MeshLoaderAssimp\" do not support double "
                   "precision mode change this later.");
 
+    static const ProfilerAnnotation _("Assimp Load Prim Data");
+    auto annotation = _.AnnotateScope();
 
     const auto& mesh = assimpFile.scene->mMeshes[innerIndex];
     if(attribLogic == PrimitiveAttributeLogic::INDEX)
@@ -177,6 +179,9 @@ MeshFileAssimp::MeshFileAssimp(Assimp::Importer& imp,
     , importer(imp)
     , scene(nullptr)
 {
+    static const ProfilerAnnotation _("Assimp Read File");
+    auto annotation = _.AnnotateScope();
+
     // TODO: GCC warns redundant cast, but MSVC says default enum type is
     // int. so we obey MSVC's warning.
     unsigned int flags = static_cast<unsigned int>

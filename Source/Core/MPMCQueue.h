@@ -12,6 +12,13 @@ simple implementation (single lock and cond var used)
 #include <condition_variable>
 #include <cassert>
 
+enum class TimedDequeueResult
+{
+    TERMINATED = 0,
+    TIMEOUT = 1,
+    SUCCESS = 2
+};
+
 template<class T>
 class MPMCQueue
 {
@@ -46,7 +53,7 @@ class MPMCQueue
         void                    Dequeue(T&);
         bool                    TryDequeue(T&);
         template<class D>
-        bool                    TryDequeue(T&, D);
+        TimedDequeueResult      TryDequeue(T&, D);
         void                    Enqueue(T&&);
         bool                    TryEnqueue(T&&);
         //
@@ -123,10 +130,11 @@ bool MPMCQueue<T>::TryDequeue(T& item)
 
 template<class T>
 template<class D>
-bool MPMCQueue<T>::TryDequeue(T& item, D duration)
+TimedDequeueResult
+MPMCQueue<T>::TryDequeue(T& item, D duration)
 {
-
-    if(isTerminated) return false;
+    using enum TimedDequeueResult;
+    if(isTerminated) return TERMINATED;
     {
         std::unique_lock<std::mutex> lock(mutex);
         // OK means condition predicate is satisfied
@@ -135,15 +143,15 @@ bool MPMCQueue<T>::TryDequeue(T& item, D duration)
             return (!IsEmptyUnsafe() || isTerminated);
         });
         // Timeout
-        if(!ok)                 return false;
+        if(!ok)                 return TIMEOUT;
         // Condition satisfied but it is satisfied via termination
-        if(ok && isTerminated)  return false;
+        if(ok && isTerminated)  return TERMINATED;
 
         Increment(dequeueLoc);
         item = std::move(data[dequeueLoc]);
     }
     enqueueWake.notify_one();
-    return true;
+    return SUCCESS;
 }
 
 template<class T>

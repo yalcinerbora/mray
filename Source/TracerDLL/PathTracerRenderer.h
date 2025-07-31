@@ -22,8 +22,8 @@ class ConstAddFunctor
     public:
     ConstAddFunctor(uint32_t c) : constant(c) {}
 
-    MRAY_HYBRID MRAY_GPU_INLINE
-    void operator()(uint32_t& i) const
+    MR_GF_DECL
+    void operator()(uint32_t& i) const noexcept
     {
         i += constant;
     }

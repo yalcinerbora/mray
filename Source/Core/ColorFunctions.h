@@ -8,11 +8,11 @@
 namespace Color
 {
     // Representation conversions
-    MRAY_HYBRID Vector3 HSVToRGB(const Vector3& hsv);
+    MR_PF_DECL Vector3 HSVToRGB(const Vector3& hsv) noexcept;
 
     // Stateless random color,
     // Neighboring pixels should have distinct colors
-    MRAY_HYBRID Vector3 RandomColorRGB(uint32_t index);
+    MR_PF_DECL Vector3 RandomColorRGB(uint32_t index) noexcept;
 
     // Color conversion related
     //
@@ -24,28 +24,20 @@ namespace Color
         Vector2 xyWhite;
     };
     //
-    MRAY_HYBRID
-    constexpr Vector3   XYZToYxy(const Vector3& xyz);
+    MR_PF_DECL Vector3   XYZToYxy(const Vector3& xyz) noexcept;
 
-    MRAY_HYBRID
-    constexpr Vector3   YxyToXYZ(const Vector3& yXY);
+    MR_PF_DECL Vector3   YxyToXYZ(const Vector3& yXY) noexcept;
 
-    MRAY_HYBRID
-    constexpr Matrix3x3 BradfordMatrix();
+    MR_PF_DECL Matrix3x3 BradfordMatrix() noexcept;
 
-    MRAY_HYBRID
-    constexpr Matrix3x3 InvBradfordMatrix();
+    MR_PF_DECL Matrix3x3 InvBradfordMatrix() noexcept;
 
-    MRAY_HYBRID
-    constexpr Matrix3x3 GenWhitepointMatrix(const Vector2& fromWhite,
-                                            const Vector2& toWhite);
-    MRAY_HYBRID
-    constexpr Vector3   GenWhitepointXYZ(const Vector2& xy);
+    MR_PF_DECL Matrix3x3 GenWhitepointMatrix(const Vector2& fromWhite,
+                                             const Vector2& toWhite) noexcept;
+    MR_PF_DECL Vector3   GenWhitepointXYZ(const Vector2& xy) noexcept;
 
-    MRAY_HYBRID
-    constexpr Matrix3x3 GenRGBToXYZ(const Primaries&);
-    MRAY_HYBRID
-    constexpr Matrix3x3 GenXYZToRGB(const Primaries&);
+    MR_PF_DECL Matrix3x3 GenRGBToXYZ(const Primaries&) noexcept;
+    MR_PF_DECL Matrix3x3 GenXYZToRGB(const Primaries&) noexcept;
 
     // https://en.wikipedia.org/wiki/Standard_illuminant
     // Some whitepoints are commented out, current support
@@ -59,8 +51,7 @@ namespace Color
     constexpr Vector2 D65Whitepoint = Vector2(0.31272, 0.32903);
     constexpr Vector2 D75Whitepoint = Vector2(0.29902, 0.31485);
 
-    MRAY_HYBRID
-    constexpr Primaries FindPrimaries(MRayColorSpaceEnum);
+    MR_PF_DECL Primaries FindPrimaries(MRayColorSpaceEnum);
 
     // Colorspace guarantees whitepoints match
     // by enforcing every colorspace to convert to D65
@@ -82,11 +73,8 @@ namespace Color
         public:
         Colorspace() = default;
 
-        MRAY_HYBRID
-        constexpr Vector3 ToXYZ(const Vector3&) const;
-
-        MRAY_HYBRID
-        constexpr Vector3 FromXYZ(const Vector3&) const;
+        MR_PF_DECL Vector3 ToXYZ(const Vector3&) const noexcept;
+        MR_PF_DECL Vector3 FromXYZ(const Vector3&) const noexcept;
     };
 
     template <MRayColorSpaceEnum FromE, MRayColorSpaceEnum ToE>
@@ -101,8 +89,7 @@ namespace Color
         public:
         ColorspaceTransfer() = default;
 
-        MRAY_HYBRID
-        constexpr Vector3 Convert(const Vector3& rgb) const;
+        MR_PF_DECL Vector3 Convert(const Vector3& rgb) const noexcept;
     };
 
     // EOTF/OETF (Gamma) Related Conversions
@@ -114,26 +101,21 @@ namespace Color
 
         public:
         // Constructors & Destructor
-        MRAY_HYBRID         OpticalTransferGamma(Float gamma);
-
+        MR_PF_DECL_V       OpticalTransferGamma(Float gamma) noexcept;
         // Only providing "To" function here since renderer works in
         // linear space. "From" function is on Visor
-        MRAY_HYBRID Vector3 ToLinear(const Vector3& color) const;
+        MR_PF_DECL Vector3 ToLinear(const Vector3& color) const noexcept;
     };
 
     class OpticalTransferIdentity
     {
         public:
-        MRAY_HYBRID Vector3 ToLinear(const Vector3& color) const;
+        MR_PF_DECL Vector3 ToLinear(const Vector3& color) const noexcept;
     };
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 Color::HSVToRGB(const Vector3& hsv)
+MR_PF_DEF Vector3 Color::HSVToRGB(const Vector3& hsv) noexcept
 {
-    #ifndef MRAY_DEVICE_CODE_PATH
-        using namespace std;
-    #endif
     // H, S, V both normalized
     // H: [0-1) (meaning 0 is 0, 1 is 360)
     // S: [0-1] (meaning 0 is 0, 1 is 100)
@@ -143,21 +125,13 @@ Vector3 Color::HSVToRGB(const Vector3& hsv)
 
     Float c = hsv[2] * hsv[1];
     Float m = hsv[2] - c;
-    Float x;
-    if constexpr(std::is_same_v<Float, float>)
-    {
-        x = fmodf(h * o60, Float(2));
-        x = fabsf(x - Float(1));
-    }
-    else
-    {
-        x = fmod(h * o60, Float(2));
-        x = fabs(x - Float(1));
-    }
+    Float x = Math::FMod(h * o60, Float(2));
+    x = Math::Abs(x - Float(1));
     x = c * (Float(1) - x);
 
     Vector3 result;
-    int sextant = static_cast<int>(h) / 60 % 6;
+    using I = IntegralSister<Float>;
+    I sextant = static_cast<I>(h) / I(60) % I(6);
     switch(sextant)
     {
         case 0: result = Vector3(c, x, 0); break;
@@ -171,8 +145,7 @@ Vector3 Color::HSVToRGB(const Vector3& hsv)
     return result;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 Color::RandomColorRGB(uint32_t index)
+MR_PF_DEF Vector3 Color::RandomColorRGB(uint32_t index) noexcept
 {
     // https://martin.ankerl.com/2009/12/09/how-to-create-random-colors-programmatically/
     // Specifically using double here to get some precision
@@ -181,13 +154,12 @@ Vector3 Color::RandomColorRGB(uint32_t index)
     constexpr double GOLDEN_RATIO_CONJ = 0.618033988749895;
     // For large numbers use double arithmetic here
     double hue = 0.1 + static_cast<double>(index) * GOLDEN_RATIO_CONJ;
-    hue -= std::floor(hue);
+    hue -= Math::Floor(hue);
 
     return HSVToRGB(Vector3(hue, SATURATION, VALUE));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector3 Color::XYZToYxy(const Vector3& xyz)
+MR_PF_DEF Vector3 Color::XYZToYxy(const Vector3& xyz) noexcept
 {
     Float sum = (xyz[0] + xyz[1] + xyz[2]);
     Float invSum = (sum == Float(0)) ? Float(0) : Float(1) / sum;
@@ -197,8 +169,7 @@ constexpr Vector3 Color::XYZToYxy(const Vector3& xyz)
     return Vector3(xyz[1], x, y);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector3 Color::YxyToXYZ(const Vector3& yXY)
+MR_PF_DEF Vector3 Color::YxyToXYZ(const Vector3& yXY) noexcept
 {
     // https://www.easyrgb.com/en/math.php
     Float yy = (yXY[2] == Float(0)) ? Float(0) : (yXY[0] / yXY[2]);
@@ -208,23 +179,20 @@ constexpr Vector3 Color::YxyToXYZ(const Vector3& yXY)
     return Vector3(x, y, z);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix3x3 Color::BradfordMatrix()
+MR_PF_DEF Matrix3x3 Color::BradfordMatrix() noexcept
 {
     return Matrix3x3( 0.8951f,  0.2664f, -0.1614f,
                      -0.7502f,  1.7135f,  0.0367f,
                       0.0389f, -0.0685f,  1.0296f);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix3x3 Color::InvBradfordMatrix()
+MR_PF_DEF Matrix3x3 Color::InvBradfordMatrix() noexcept
 {
     return BradfordMatrix().Inverse();
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix3x3 Color::GenWhitepointMatrix(const Vector2& fromWhite,
-                                               const Vector2& toWhite)
+MR_PF_DEF Matrix3x3 Color::GenWhitepointMatrix(const Vector2& fromWhite,
+                                               const Vector2& toWhite) noexcept
 {
     Vector3 fwXYZ = YxyToXYZ(Vector3(1, fromWhite[0], fromWhite[1]));
     Vector3 twXYZ = YxyToXYZ(Vector3(1, toWhite[0], toWhite[1]));
@@ -235,14 +203,12 @@ constexpr Matrix3x3 Color::GenWhitepointMatrix(const Vector2& fromWhite,
     return InvBradfordMatrix() * scaleMatrix * BradfordMatrix();
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector3 Color::GenWhitepointXYZ(const Vector2& xy)
+MR_PF_DEF Vector3 Color::GenWhitepointXYZ(const Vector2& xy) noexcept
 {
     return YxyToXYZ(Vector3(1, xy[0], xy[1]));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix3x3 Color::GenRGBToXYZ(const Primaries& p)
+MR_PF_DEF Matrix3x3 Color::GenRGBToXYZ(const Primaries& p) noexcept
 {
     // http://www.brucelindbloom.com/index.html?Eqn_RGB_XYZ_Matrix.html
     Vector3 xyzRed = YxyToXYZ(Vector3(1, p.xyRed[0], p.xyRed[1]));
@@ -259,14 +225,12 @@ constexpr Matrix3x3 Color::GenRGBToXYZ(const Primaries& p)
                      xyzBlue  * s[2]).Transpose();
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix3x3 Color::GenXYZToRGB(const Primaries& p)
+MR_PF_DEF Matrix3x3 Color::GenXYZToRGB(const Primaries& p) noexcept
 {
     return GenRGBToXYZ(p).Inverse();
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E)
+MR_PF_DEF Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E)
 {
     using ColorspacePrimaryList = std::array<Pair<MRayColorSpaceEnum, Primaries>,
                                              static_cast<size_t>(MRayColorSpaceEnum::MR_END)>;
@@ -376,11 +340,11 @@ constexpr Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E)
         }
 
         #ifndef MRAY_DEVICE_CODE_PATH
-        // Throw as verbose as possible
-        throw MRayError("Unkown colorspace enumeration ({})! Enum should be "
-                        "\"{} <= E < {}\"",
-                        static_cast<uint32_t>(E), uint32_t(0),
-                        static_cast<uint32_t>(MR_END));
+            // Throw as verbose as possible
+            throw MRayError("Unkown colorspace enumeration ({})! Enum should be "
+                            "\"{} <= E < {}\"",
+                            static_cast<uint32_t>(E), uint32_t(0),
+                            static_cast<uint32_t>(MR_END));
         #elif defined MRAY_DEVICE_CODE_PATH_CUDA
             // TODO: This is CUDA only
             __trap();
@@ -392,8 +356,7 @@ constexpr Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E)
 }
 
 template <MRayColorSpaceEnum E>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector3 Color::Colorspace<E>::ToXYZ(const Vector3& rgb) const
+MR_PF_DEF Vector3 Color::Colorspace<E>::ToXYZ(const Vector3& rgb) const noexcept
 {
     // Passing matrix to local space (GPU does not like static constexpr variables)
     constexpr auto Mat = ToXYZMatrix;
@@ -401,8 +364,7 @@ constexpr Vector3 Color::Colorspace<E>::ToXYZ(const Vector3& rgb) const
 }
 
 template <MRayColorSpaceEnum E>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector3 Color::Colorspace<E>::FromXYZ(const Vector3& xyz) const
+MR_PF_DEF Vector3 Color::Colorspace<E>::FromXYZ(const Vector3& xyz) const noexcept
 {
     // Passing matrix to local space (GPU does not like static constexpr variables)
     constexpr auto Mat = FromXYZMatrix;
@@ -410,8 +372,7 @@ constexpr Vector3 Color::Colorspace<E>::FromXYZ(const Vector3& xyz) const
 }
 
 template <MRayColorSpaceEnum F, MRayColorSpaceEnum T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector3 Color::ColorspaceTransfer<F, T>::Convert(const Vector3& rgb) const
+MR_PF_DEF Vector3 Color::ColorspaceTransfer<F, T>::Convert(const Vector3& rgb) const noexcept
 {
     // Passing matrix to local space (GPU does not like static constexpr variables)
     constexpr auto Mat = RGBToRGBMatrix;
@@ -419,21 +380,18 @@ constexpr Vector3 Color::ColorspaceTransfer<F, T>::Convert(const Vector3& rgb) c
 }
 
 // Constructors & Destructor
-MRAY_HYBRID MRAY_CGPU_INLINE
-Color::OpticalTransferGamma::OpticalTransferGamma(Float g)
+MR_PF_DEF_V Color::OpticalTransferGamma::OpticalTransferGamma(Float g) noexcept
     : gamma(g)
 {}
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 Color::OpticalTransferGamma::ToLinear(const Vector3& color) const
+MR_PF_DEF Vector3 Color::OpticalTransferGamma::ToLinear(const Vector3& color) const noexcept
 {
-    return Vector3(std::pow(color[0], gamma),
-                   std::pow(color[1], gamma),
-                   std::pow(color[2], gamma));
+    return Vector3(Math::Pow(color[0], gamma),
+                   Math::Pow(color[1], gamma),
+                   Math::Pow(color[2], gamma));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-Vector3 Color::OpticalTransferIdentity::ToLinear(const Vector3& color) const
+MR_PF_DEF Vector3 Color::OpticalTransferIdentity::ToLinear(const Vector3& color) const noexcept
 {
     return color;
 }

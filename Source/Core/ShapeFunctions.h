@@ -11,21 +11,21 @@ namespace Triangle
 {
     static constexpr uint32_t TRI_VERTEX_COUNT = 3;
 
-    MRAY_HYBRID AABB3   BoundingBox(Span<const Vector3, TRI_VERTEX_COUNT> positions);
-    MRAY_HYBRID Float   Area(Span<const Vector3, TRI_VERTEX_COUNT> positions);
-    MRAY_HYBRID Vector3 Normal(Span<const Vector3, TRI_VERTEX_COUNT> positions);
-    MRAY_HYBRID Vector3 CalculateTangent(const Vector3& p0Normal,
+    MR_HF_DECL AABB3    BoundingBox(Span<const Vector3, TRI_VERTEX_COUNT> positions);
+    MR_HF_DECL Float    Area(Span<const Vector3, TRI_VERTEX_COUNT> positions);
+    MR_HF_DECL Vector3  Normal(Span<const Vector3, TRI_VERTEX_COUNT> positions);
+    MR_HF_DECL Vector3  CalculateTangent(const Vector3& p0Normal,
                                          const std::array<Vector3, 3>& positions,
                                          const std::array<Vector2, 3>& uvs);
-    MRAY_HYBRID Vector3 Project(Span<const Vector3, TRI_VERTEX_COUNT> positions,
+    MR_HF_DECL Vector3  Project(Span<const Vector3, TRI_VERTEX_COUNT> positions,
                                 const Vector3& point);
-    MRAY_HYBRID Vector3 PointToBarycentrics(Span<const Vector3, TRI_VERTEX_COUNT> positions,
+    MR_HF_DECL Vector3  PointToBarycentrics(Span<const Vector3, TRI_VERTEX_COUNT> positions,
                                             const Vector3& point);
 }
 
 namespace Sphere
 {
-    MRAY_HYBRID AABB3 BoundingBox(const Vector3& center, Float radius);
+    MR_HF_DECL AABB3 BoundingBox(const Vector3& center, Float radius);
 }
 
 namespace Polygon
@@ -34,46 +34,44 @@ namespace Polygon
     // calculate triangulation of such polygon via "ear clipping"
     // method. Polygon winding order must be clockwise
     template<size_t N>
-    MRAY_HYBRID
-    constexpr void ClipEars(Span<Vector3ui, N - 2> localIndicesOut,
-                            Span<const Vector3, N> vertices,
-                            const Vector3& normal);
+    MR_HF_DECL constexpr
+    void ClipEars(Span<Vector3ui, N - 2> localIndicesOut,
+                  Span<const Vector3, N> vertices,
+                  const Vector3& normal);
 }
 }
 
 namespace Shape
 {
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 AABB3 Triangle::BoundingBox(Span<const Vector3, TRI_VERTEX_COUNT> positions)
 {
     AABB3 aabb(positions[0], positions[0]);
-    aabb.SetMin(Vector3::Min(aabb.Min(), positions[1]));
-    aabb.SetMin(Vector3::Min(aabb.Min(), positions[2]));
-    aabb.SetMax(Vector3::Max(aabb.Max(), positions[1]));
-    aabb.SetMax(Vector3::Max(aabb.Max(), positions[2]));
+    aabb.SetMin(Math::Min(aabb.Min(), positions[1]));
+    aabb.SetMin(Math::Min(aabb.Min(), positions[2]));
+    aabb.SetMax(Math::Max(aabb.Max(), positions[1]));
+    aabb.SetMax(Math::Max(aabb.Max(), positions[2]));
     return aabb;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float Triangle::Area(Span<const Vector3, TRI_VERTEX_COUNT> positions)
 {
     Vector3 e0 = positions[1] - positions[0];
     Vector3 e1 = positions[2] - positions[0];
-
-    return Vector3::Cross(e0, e1).Length() * static_cast<Float>(0.5);
+    return Math::Length(Math::Cross(e0, e1)) * static_cast<Float>(0.5);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector3 Triangle::Normal(Span<const Vector3, TRI_VERTEX_COUNT> positions)
 {
     Vector3 e0 = positions[1] - positions[0];
     Vector3 e1 = positions[2] - positions[0];
-
-    return Vector3::Cross(e0, e1).Normalize();
+    return Math::Normalize(Math::Cross(e0, e1));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector3 Triangle::CalculateTangent(const Vector3& p0Normal,
                                    const std::array<Vector3, 3>& p,
                                    const std::array<Vector2, 3>& uv)
@@ -88,17 +86,17 @@ Vector3 Triangle::CalculateTangent(const Vector3& p0Normal,
     Float det = (dUV0[0] * dUV1[1] -
                  dUV1[0] * dUV0[1]);
     // Numeric precision issues
-    if(std::abs(det) < MathConstants::Epsilon<Float>())
+    if(Math::Abs(det) < MathConstants::Epsilon<Float>())
     {
         // From PBRT-v4
         // https://github.com/mmp/pbrt-v4/blob/779d1a78b74aab393853544198189729434121b5/src/pbrt/shapes.h#L911
         // Basically just generate random tangent related to shading normal
         Vector3 normal = Shape::Triangle::Normal(p);
         // Triangle is degenerate (line probably)
-        normal = (normal.HasNaN()) ? p0Normal : normal;
+        normal = (Math::IsFinite(normal)) ? normal : p0Normal;
         // If tangent is still has issues, we tried...
         // return it
-        Vector3 tangent = Vector3::OrthogonalVector(normal);
+        Vector3 tangent = Graphics::OrthogonalVector(normal);
         return tangent;
     }
     // Calculate as normal
@@ -110,17 +108,17 @@ Vector3 Triangle::CalculateTangent(const Vector3& p0Normal,
     return (det < Float(0)) ? -tangent : tangent;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector3 Triangle::Project(Span<const Vector3, TRI_VERTEX_COUNT> positions,
                           const Vector3& point)
 {
     Vector3 n = Normal(positions);
     Vector3 dir = point - positions[0];
     n = Graphics::Orient(n, dir);
-    return point - dir.Dot(n) * n;
+    return point - Math::Dot(dir, n) * n;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector3 Triangle::PointToBarycentrics(Span<const Vector3, TRI_VERTEX_COUNT> positions,
                                       const Vector3& point)
 {
@@ -129,11 +127,11 @@ Vector3 Triangle::PointToBarycentrics(Span<const Vector3, TRI_VERTEX_COUNT> posi
     Vector3 e1 = positions[2] - positions[0];
     Vector3 v = point - positions[0];
 
-    Float d00 = e0.Dot(e0);
-    Float d01 = e0.Dot(e1);
-    Float d11 = e1.Dot(e1);
-    Float d20 = v.Dot(e0);
-    Float d21 = v.Dot(e1);
+    Float d00 = Math::Dot(e0, e0);
+    Float d01 = Math::Dot(e0, e1);
+    Float d11 = Math::Dot(e1, e1);
+    Float d20 = Math::Dot(v, e0);
+    Float d21 = Math::Dot(v, e1);
     Float denom = Float(1) / (d00 * d11 - d01 * d01);
     Float a = (d11 * d20 - d01 * d21) * denom;
     Float b = (d00 * d21 - d01 * d20) * denom;
@@ -141,17 +139,17 @@ Vector3 Triangle::PointToBarycentrics(Span<const Vector3, TRI_VERTEX_COUNT> posi
     return Vector3(a, b, c);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 AABB3 Sphere::BoundingBox(const Vector3& center, Float radius)
 {
     return AABB3(center - radius, center + radius);
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr void Polygon::ClipEars(Span<Vector3ui, N - 2> localIndicesOut,
-                                 Span<const Vector3, N> vertices,
-                                 const Vector3& normal)
+MR_HF_DEF constexpr
+void Polygon::ClipEars(Span<Vector3ui, N - 2> localIndicesOut,
+                       Span<const Vector3, N> vertices,
+                       const Vector3& normal)
 {
     // We "expand" the vertices to previous/next we will access elements
     // via this
@@ -172,8 +170,8 @@ constexpr void Polygon::ClipEars(Span<Vector3ui, N - 2> localIndicesOut,
     {
         Vector3 e0 = vertices[i[2]] - vertices[i[1]];
         Vector3 e1 = vertices[i[0]] - vertices[i[1]];
-        Vector3 nV = Vector3::Cross(e0, e1);
-        return nV.Dot(normal) >= Float(0);
+        Vector3 nV = Math::Cross(e0, e1);
+        return Math::Dot(nV, normal) >= Float(0);
     };
     // Basic ear clipping algorithm
     // Traverse the contigious triplets

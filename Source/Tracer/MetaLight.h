@@ -37,11 +37,11 @@ struct LightSurfKeyPack
 
 struct LightSurfKeyHasher
 {
-    MRAY_HYBRID
+    MR_HF_DECL
     static uint32_t Hash(const LightSurfKeyPack&);
-    MRAY_HYBRID
+    MR_HF_DECL
     static bool     IsSentinel(uint32_t);
-    MRAY_HYBRID
+    MR_HF_DECL
     static bool     IsEmpty(uint32_t);
 };
 
@@ -116,35 +116,35 @@ class MetaLightViewT
     const LightVariant&         light;
 
     public:
-    MRAY_HYBRID         MetaLightViewT(const LightVariant&,
+    MR_HF_DECL          MetaLightViewT(const LightVariant&,
                                        const SpectrumConverter& sTransContext);
 
-    MRAY_HYBRID
+    MR_HF_DECL
     SampleT<Vector3>    SampleSolidAngle(RNGDispenser& dispenser,
                                          const Vector3& distantPoint) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     Float               PdfSolidAngle(const MetaHit& hit,
                                       const Vector3& distantPoint,
                                       const Vector3& dir) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     uint32_t            SampleSolidAngleRNCount() const;
-    MRAY_HYBRID
+    MR_HF_DECL
     SampleT<Ray>        SampleRay(RNGDispenser& dispenser) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     Float               PdfRay(const Ray&) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     uint32_t            SampleRayRNCount() const;
 
-    MRAY_HYBRID
+    MR_HF_DECL
     Spectrum            EmitViaHit(const Vector3& wO,
                                    const MetaHit& hit,
                                    const RayCone& rayCone) const;
-    MRAY_HYBRID
+    MR_HF_DECL
     Spectrum            EmitViaSurfacePoint(const Vector3& wO,
                                             const Vector3& surfacePoint,
                                             const RayCone& rayCone) const;
 
-    MRAY_HYBRID bool    IsPrimitiveBackedLight() const;
+    MR_HF_DECL bool     IsPrimitiveBackedLight() const;
 };
 
 template<class... TLTuples>
@@ -274,11 +274,11 @@ class MetaLightArrayT
         View(Span<const MetaLight> d);
 
         template<class SpectrumConverter>
-        MRAY_HYBRID
+        MR_HF_DECL
         MetaLightView<SpectrumConverter>
         operator()(const SpectrumConverter&, uint32_t index) const;
 
-        MRAY_HYBRID
+        MR_HF_DECL
         uint32_t Size() const;
     };
 

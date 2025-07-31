@@ -33,6 +33,8 @@ class ThreadPool;
 // since each block has a single thread
 #define MRAY_SHARED_MEMORY static thread_local
 
+#define MRAY_KERNEL
+
 static constexpr uint32_t StaticThreadPerBlock1D()
 {
     // After manually adjusting this in "Kitchen"
@@ -66,9 +68,9 @@ struct KernelCallParamsCPU
     uint32_t blockId;
     uint32_t threadId;
 
-    MRAY_GPU                KernelCallParamsCPU();
-    MRAY_HYBRID uint32_t    GlobalId() const;
-    MRAY_HYBRID uint32_t    TotalSize() const;
+    MR_GF_DECL          KernelCallParamsCPU();
+    MR_PF_DECL uint32_t GlobalId() const noexcept;
+    MR_PF_DECL uint32_t TotalSize() const noexcept;
 };
 
 struct KernelCallParamsGlobal
@@ -142,14 +144,14 @@ class GPUFenceCPU
     friend class GPUQueueCPU;
 
     public:
-    MRAY_HYBRID                 GPUFenceCPU(const GPUQueueCPU&);
-                                GPUFenceCPU(const GPUFenceCPU&) = delete;
-    MRAY_HYBRID                 GPUFenceCPU(GPUFenceCPU&&) noexcept = default;
-    GPUFenceCPU&                operator=(const GPUFenceCPU&) = delete;
-    MRAY_HYBRID GPUFenceCPU&    operator=(GPUFenceCPU&&) noexcept = default;
-    MRAY_HYBRID                 ~GPUFenceCPU() = default;
+    MR_HF_DECL              GPUFenceCPU(const GPUQueueCPU&);
+                            GPUFenceCPU(const GPUFenceCPU&) = delete;
+    MR_HF_DECL              GPUFenceCPU(GPUFenceCPU&&) noexcept = default;
+    GPUFenceCPU&            operator=(const GPUFenceCPU&) = delete;
+    MR_HF_DECL GPUFenceCPU& operator=(GPUFenceCPU&&) noexcept = default;
+    MR_HF_DECL              ~GPUFenceCPU() = default;
 
-    MRAY_HYBRID void            Wait() const;
+    MR_HF_DECL void         Wait() const;
 };
 
 class GPUQueueCPU
@@ -170,17 +172,17 @@ class GPUQueueCPU
     friend class GPUFenceCPU;
 
     template<auto Kernel, class... Args>
-    MRAY_HYBRID void IssueKernelInternal(std::string_view name,
-                                         uint32_t totalWorkCount,
-                                         uint32_t tpb,
-                                         //
-                                         Args&&...) const;
+    MR_HF_DECL void IssueKernelInternal(std::string_view name,
+                                        uint32_t totalWorkCount,
+                                        uint32_t tpb,
+                                        //
+                                        Args&&...) const;
 
     template<class Lambda>
-    MRAY_HYBRID void IssueLambdaInternal(std::string_view name,
-                                         uint32_t totalWorkCount,
-                                         uint32_t tpb,
-                                         Lambda&&) const;
+    MR_HF_DECL void IssueLambdaInternal(std::string_view name,
+                                        uint32_t totalWorkCount,
+                                        uint32_t tpb,
+                                        Lambda&&) const;
 
     private:
     AnnotationHandle    domain;
@@ -209,16 +211,16 @@ class GPUQueueCPU
     friend void algorithms::ExclusiveScan(Span<T>, Span<Byte>, Span<const T>,
                                           const T&, const GPUQueueCPU&, B&& op);
 
-    MRAY_HYBRID
+    MR_HF_DECL
     uint32_t    RecommendedBlockCountDevice(const void* kernelPtr,
                                             uint32_t threadsPerBlock,
                                             uint32_t sharedMemSize) const;
 
-    MRAY_HYBRID
+    MR_HF_DECL
     uint32_t    RecommendedBlockCountSM(const void* kernelPtr,
                                         uint32_t threadsPerBlock,
                                         uint32_t sharedMemSize);
-    MRAY_HYBRID
+    MR_HF_DECL
     uint32_t    DetermineGridStrideBlock(const void* kernelPtr,
                                          uint32_t sharedMemSize,
                                          uint32_t threadCount,
@@ -227,10 +229,10 @@ class GPUQueueCPU
     public:
     // Constructors & Destructor
                     GPUQueueCPU() = default;
-                    GPUQueueCPU(ThreadPool& tp,
+    MRAY_HOST       GPUQueueCPU(ThreadPool& tp,
                                 AnnotationHandle domain,
                                 const GPUDeviceCPU* device);
-                                GPUQueueCPU(const GPUQueueCPU&) = delete;
+                    GPUQueueCPU(const GPUQueueCPU&) = delete;
                     GPUQueueCPU(GPUQueueCPU&&) noexcept = default;
     GPUQueueCPU&    operator=(const GPUQueueCPU&) = delete;
     GPUQueueCPU&    operator=(GPUQueueCPU&&) noexcept = default;
@@ -268,22 +270,22 @@ class GPUQueueCPU
     // because of that even if we dont call the kernel from the
     // device.
     template<auto Kernel, class... Args>
-    MRAY_GPU void   DeviceIssueWorkKernel(std::string_view name,
+    MR_GF_DECL void DeviceIssueWorkKernel(std::string_view name,
                                           DeviceWorkIssueParams,
                                           //
                                           Args&&...) const;
     template<class Lambda>
-    MRAY_GPU void   DeviceIssueWorkLambda(std::string_view name,
+    MR_GF_DECL void DeviceIssueWorkLambda(std::string_view name,
                                           DeviceWorkIssueParams,
                                           //
                                           Lambda&&) const;
     template<auto Kernel, class... Args>
-    MRAY_GPU void   DeviceIssueBlockKernel(std::string_view name,
+    MR_GF_DECL void DeviceIssueBlockKernel(std::string_view name,
                                            DeviceBlockIssueParams,
                                            //
                                            Args&&...) const;
     template<class Lambda, uint32_t Bounds = StaticThreadPerBlock1D()>
-    MRAY_GPU void   DeviceIssueBlockLambda(std::string_view name,
+    MR_GF_DECL void DeviceIssueBlockLambda(std::string_view name,
                                            DeviceBlockIssueParams,
                                            //
                                            Lambda&&) const;
@@ -305,7 +307,7 @@ class GPUQueueCPU
     MRAY_HOST void      IssueBufferForDestruction(TransientData data) const;
 
     // Synchronization
-    MRAY_HYBRID NO_DISCARD
+    MR_HF_DECL NO_DISCARD
     GPUFenceCPU         Barrier() const;
     MRAY_HOST
     void                IssueSemaphoreWait(GPUSemaphoreViewCPU&) const;
@@ -314,7 +316,7 @@ class GPUQueueCPU
     MRAY_HOST
     void                IssueWait(const GPUFenceCPU&) const;
 
-    MRAY_HYBRID
+    MR_HF_DECL
     uint32_t            SMCount() const;
 
     // Annotation for profiling etc. (uses rocTX)
@@ -428,15 +430,14 @@ class GPUSystemCPU
     GPUAnnotationCPU        CreateAnnotation(std::string_view) const;
 };
 
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t KernelCallParamsCPU::GlobalId() const
+MR_PF_DEF
+uint32_t KernelCallParamsCPU::GlobalId() const noexcept
 {
     return blockId * blockSize + threadId;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t KernelCallParamsCPU::TotalSize() const
+MR_PF_DEF
+uint32_t KernelCallParamsCPU::TotalSize() const noexcept
 {
     return gridSize * blockSize;
 }
@@ -471,19 +472,19 @@ void AtomicWaitValueToAchieve(std::atomic_uint64_t& checkLoc, uint64_t valToAchi
         checkLoc.wait(check);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 GPUFenceCPU::GPUFenceCPU(const GPUQueueCPU& q)
     : valueToWait(q.cb->issuedKernelCounter.load())
     , completedKernelCounter(&q.cb->completedKernelCounter)
 {}
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 void GPUFenceCPU::Wait() const
 {
     AtomicWaitValueToAchieve(*completedKernelCounter, valueToWait);
 }
 
-MRAY_HYBRID inline
+MRAY_HOST inline
 GPUQueueCPU::GPUQueueCPU(ThreadPool& tp,
                          AnnotationHandle domain,
                          const GPUDeviceCPU* device)
@@ -495,7 +496,7 @@ GPUQueueCPU::GPUQueueCPU(ThreadPool& tp,
 
 // Memory Movement (Async)
 template <class T>
-MRAY_HOST
+MRAY_HOST inline
 void GPUQueueCPU::MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const
 {
     using namespace std::string_view_literals;
@@ -536,7 +537,7 @@ void GPUQueueCPU::MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const
 }
 
 template <class T>
-MRAY_HOST
+MRAY_HOST inline
 void GPUQueueCPU::MemcpyAsync2D(Span<T> regionTo, size_t toStride,
                                 Span<const T> regionFrom, size_t fromStride,
                                 Vector2ui copySize) const
@@ -573,7 +574,7 @@ void GPUQueueCPU::MemcpyAsync2D(Span<T> regionTo, size_t toStride,
 }
 
 template <class T>
-MRAY_HOST
+MRAY_HOST inline
 void GPUQueueCPU::MemcpyAsyncStrided(Span<T> regionTo, size_t outputByteStride,
                                      Span<const T> regionFrom, size_t inputByteStride) const
 {
@@ -611,7 +612,7 @@ void GPUQueueCPU::MemcpyAsyncStrided(Span<T> regionTo, size_t outputByteStride,
 }
 
 template <class T>
-MRAY_HOST
+MRAY_HOST inline
 void GPUQueueCPU::MemsetAsync(Span<T> region, uint8_t perByteValue) const
 {
     using namespace std::string_view_literals;
@@ -661,7 +662,7 @@ void GPUQueueCPU::IssueBufferForDestruction(TransientData data) const
     );
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 GPUFenceCPU GPUQueueCPU::Barrier() const
 {
     return GPUFenceCPU(*this);
@@ -717,25 +718,25 @@ void GPUQueueCPU::IssueWait(const GPUFenceCPU& barrier) const
     );
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t GPUQueueCPU::RecommendedBlockCountSM(const void*, uint32_t, uint32_t)
 {
     return 1u;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t GPUQueueCPU::RecommendedBlockCountDevice(const void*, uint32_t, uint32_t) const
 {
     return SMCount();
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t GPUQueueCPU::SMCount() const
 {
     return myDevice->SMCount();
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t GPUQueueCPU::DetermineGridStrideBlock(const void*,
                                                uint32_t,
                                                uint32_t tbp,
@@ -770,7 +771,7 @@ void GPUSystemCPU::Memcpy(Span<T> regionTo, Span<const T> regionFrom) const
 }
 
 template <class T>
-MRAY_HOST
+MRAY_HOST inline
 void GPUSystemCPU::Memset(Span<T> region, uint8_t perByteValue) const
 {
     std::memset(region.data(), int(perByteValue), region.size_bytes());

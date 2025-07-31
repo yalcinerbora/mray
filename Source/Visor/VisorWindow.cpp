@@ -360,17 +360,17 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
     bool useApiSize = (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max());
     swapchainInfo.extent = (useApiSize) ? capabilities.currentExtent
                                         : VkExtent2D{fboSize[0], fboSize[0]};
-    swapchainInfo.extent.width = std::clamp(swapchainInfo.extent.width,
-                                            capabilities.minImageExtent.width,
-                                            capabilities.maxImageExtent.width);
-    swapchainInfo.extent.height = std::clamp(swapchainInfo.extent.height,
-                                             capabilities.minImageExtent.height,
-                                             capabilities.maxImageExtent.height);
+    swapchainInfo.extent.width = Math::Clamp(swapchainInfo.extent.width,
+                                             capabilities.minImageExtent.width,
+                                             capabilities.maxImageExtent.width);
+    swapchainInfo.extent.height = Math::Clamp(swapchainInfo.extent.height,
+                                              capabilities.minImageExtent.height,
+                                              capabilities.maxImageExtent.height);
 
     // Images
     uint32_t requestedImgCount = capabilities.minImageCount + 1;
     if(capabilities.maxImageCount != 0)
-        requestedImgCount = std::min(requestedImgCount, capabilities.maxImageCount);
+        requestedImgCount = Math::Min(requestedImgCount, capabilities.maxImageCount);
 
     VkSwapchainCreateInfoKHR createInfo =
     {

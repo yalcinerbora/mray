@@ -24,13 +24,9 @@ enum class FilterMode
 
 static constexpr uint32_t INVALID_MORTON = std::numeric_limits<uint32_t>::max();
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DECL
 int32_t FilterRadiusToPixelWH(Float filterRadius)
 {
-    #ifndef MRAY_DEVICE_CODE_PATH
-        using namespace std;
-    #endif
-
     // At every 0.5 increment, conservative pixel estimate is increasing
     // [0]          = Single Pixel (Special Case)
     // (0, 0.5]     = 2x2
@@ -42,7 +38,7 @@ int32_t FilterRadiusToPixelWH(Float filterRadius)
     if(filterRadius == Float(0)) return result;
     // Do division
     int32_t quot = static_cast<int32_t>(filterRadius / Float(0.5));
-    float remainder = fmod(filterRadius, Float(0.5));
+    Float remainder = Math::FMod(filterRadius, Float(0.5));
     // Exact divisions reside on previous segment
     if(remainder == Float(0)) quot -= 1;
 
@@ -50,7 +46,7 @@ int32_t FilterRadiusToPixelWH(Float filterRadius)
     return result;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DECL
 Vector2i FilterRadiusPixelRange(int32_t wh)
 {
     Vector2i range(-(wh - 1) / 2, (wh + 2) / 2);
@@ -58,7 +54,7 @@ Vector2i FilterRadiusPixelRange(int32_t wh)
 }
 
 template<class Filter, class DataFetcher>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 Vector4 FilterPixel(const Vector2ui& pixelCoord,
                     //
                     const Vector2ui& spp,
@@ -114,10 +110,10 @@ Vector4 FilterPixel(const Vector2ui& pixelCoord,
     return writePix;
 }
 
-MRAY_HYBRID MRAY_GPU_INLINE
+MR_GF_DECL
 std::tuple<Vector3, Float> ConvertNaNsToColor(Spectrum value, Float weight)
 {
-    if(value.HasNaN())
+    if(!Math::IsFinite(value))
         return std::tuple(BIG_MAGENTA(), weight * Float(128.0));
     else
         return std::tuple(Vector3(value), weight);
@@ -192,7 +188,7 @@ void KCGenerateMipmaps(// I-O
                 rPixCoord = ConvertPixelIndices(rPixCoord,
                                                 Vector2(parentRes),
                                                 Vector2(mipRes));
-                Vector2ui rPixCoordInt = Vector2ui(rPixCoord.RoundSelf());
+                Vector2ui rPixCoordInt = Vector2ui(Math::RoundInt(rPixCoord));
                 return GenericRead(rPixCoordInt, readSurf);
             });
             // Finally write the pixel
@@ -247,7 +243,7 @@ void KCClampImage(// Output
             rPixCoord = ConvertPixelIndices(rPixCoord,
                                             Vector2(bufferImageRes),
                                             Vector2(surfaceImageRes));
-            Vector2ui rPixCoordInt = Vector2ui(rPixCoord.RoundSelf());
+            Vector2ui rPixCoordInt = Vector2ui(Math::Round(rPixCoord));
             // Data is tightly packed, we can directly find the lienar index
             uint32_t pixCoordLinear = (rPixCoordInt[1] * bufferImageRes[0] +
                                        rPixCoordInt[0]);
@@ -290,9 +286,11 @@ void KCExpandSamplesToPixels(// Outputs
     {
         Vector2 imgCoords = dImgCoords[sampleIndex].GetPixelIndex();
         imgCoords += Vector2(0.5);
-        Vector2 relImgCoords;
-        Vector2 fractions = Vector2(std::modf(imgCoords[0], &(relImgCoords[0])),
-                                    std::modf(imgCoords[1], &(relImgCoords[1])));
+
+        auto [iCoordX, fX] = Math::ModF(imgCoords[0]);
+        auto [iCoordY, fY] = Math::ModF(imgCoords[1]);
+        Vector2 relImgCoords = Vector2(iCoordX, iCoordY);
+        Vector2 fractions = Vector2(fX, fY);
 
         // If fractions is on the left subpixel and radius is odd,
         // shift the filter window
@@ -313,7 +311,7 @@ void KCExpandSamplesToPixels(// Outputs
             Vector2 pixCenter = pixCoord + Float(0.5);
             // TODO: Should we use pixCoord or center coord
             // which one is better?
-            Float lengthSqr = (imgCoords - pixCenter).LengthSqr();
+            Float lengthSqr = Math::LengthSqr(imgCoords - pixCenter);
 
             // Skip if this pixel is out of range,
             // Filter WH is a conservative estimate
@@ -558,9 +556,11 @@ void KCFilterToImgAtomicRGB(MRAY_GRID_CONSTANT const ImageSpan img,
     {
         Vector2 imgCoords = dImgCoords[i].GetPixelIndex();
         imgCoords += Vector2(0.5);
-        Vector2 relImgCoords;
-        Vector2 fractions = Vector2(std::modf(imgCoords[0], &(relImgCoords[0])),
-                                    std::modf(imgCoords[1], &(relImgCoords[1])));
+
+        auto [iCoordX, fX] = Math::ModF(imgCoords[0]);
+        auto [iCoordY, fY] = Math::ModF(imgCoords[1]);
+        Vector2 relImgCoords = Vector2(iCoordX, iCoordY);
+        Vector2 fractions = Vector2(fX, fY);
 
         // If fractions is on the left subpixel and radius is odd,
         // shift the filter window
@@ -580,7 +580,7 @@ void KCFilterToImgAtomicRGB(MRAY_GRID_CONSTANT const ImageSpan img,
             Vector2 pixCenter = pixCoord + Float(0.5);
             // TODO: Should we use pixCoord or center coord
             // which one is better?
-            Float lengthSqr = (imgCoords - pixCenter).LengthSqr();
+            Float lengthSqr = Math::LengthSqr(imgCoords - pixCenter);
 
             // Skip if this pixel is out of range,
             // Filter WH is a conservative estimate
@@ -600,7 +600,7 @@ void KCFilterToImgAtomicRGB(MRAY_GRID_CONSTANT const ImageSpan img,
             // globalPixCoord is index
             Float weight = filter.Evaluate(imgCoords - pixCenter) * scalarWeightMultiplier;
             Vector3 value = Vector3(dValues[i]) * weight;
-            if(std::abs(weight) < MathConstants::Epsilon<Float>()) continue;
+            if(Math::Abs(weight) < MathConstants::Epsilon<Float>()) continue;
 
             img.AddToPixelAtomic(value, globalPixCoord);
             img.AddToWeightAtomic(weight, globalPixCoord);
@@ -861,7 +861,7 @@ void ReconFilterGenericRGB(// Output
     static constexpr uint32_t WORK_PER_THREAD = 16;
     uint32_t logicalWarpSize = Math::DivideUp(averageSPP, WORK_PER_THREAD);
     logicalWarpSize = Math::PrevPowerOfTwo(logicalWarpSize);
-    logicalWarpSize = std::min(logicalWarpSize, WarpSize());
+    logicalWarpSize = Math::Min(logicalWarpSize, WarpSize());
 
     // Some boilerplate to make the code more readable
     auto KernelCall = [&]<auto Kernel>(std::string_view Name)
@@ -989,7 +989,7 @@ void MultiPassReconFilterGenericRGB(// Output
     for(uint32_t i = 0; i < iterations; i++)
     {
         uint32_t start = workPerIter * i;
-        uint32_t end = std::min(workPerIter * (i + 1), totalWork);
+        uint32_t end = Math::Min(workPerIter * (i + 1), totalWork);
         uint32_t count = end - start;
 
         Span<const Spectrum> dLocalValues = dValues.subspan(start, count);
@@ -1054,7 +1054,7 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
                                                  std::numeric_limits<uint16_t>::min(),
     [](uint16_t l, uint16_t r)
     {
-        return std::max(l, r);
+        return Math::Max(l, r);
     },
     [](const MipGenParams& p) -> uint16_t
     {
@@ -1071,7 +1071,7 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
         static constexpr uint32_t THREAD_PER_BLOCK = 512;
         static constexpr uint32_t BLOCK_PER_TEXTURE = 256;
         static constexpr Vector2ui SPP = (MRAY_IS_DEBUG) ? Vector2ui(2, 2) : Vector2ui(8, 8);
-        static constexpr uint32_t BlockPerTexture = std::max(1u, BLOCK_PER_TEXTURE >> 1);
+        static constexpr uint32_t BlockPerTexture = Math::Max(1u, BLOCK_PER_TEXTURE >> 1);
         uint32_t textureCount = static_cast<uint32_t>(dSufViews.size());
         uint32_t blockCount = BlockPerTexture * textureCount;
 

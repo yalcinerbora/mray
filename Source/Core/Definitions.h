@@ -7,25 +7,71 @@
 #include <string_view>
 #include <algorithm>
 
-#ifdef MRAY_GPU_BACKEND_CUDA
+// Commonize some  non-standart attributes etc.
+#define MR_STAMP_PRAGMA_(X)     _Pragma(#X)
+#define MR_STAMP_PRAGMA(X)      MR_STAMP_PRAGMA_(X)
+
+#ifdef MRAY_MSVC
+    #define MRAY_FORCE_INLINE_DECL  [[msvc::forceinline]] inline
+    #define MRAY_FORCE_INLINE_DEF   inline
+    #define MRAY_ATTRIB_FLATTEN     [[msvc::flatten]]
+    #define MRAY_ATTRIB_PURE
+    #define MRAY_DEBUG_BREAK        __debugbreak()
+
+#elif defined(MRAY_CLANG) || defined(MRAY_GCC)
+    #define MRAY_FORCE_INLINE_DECL  [[gnu::always_inline]] inline
+    #define MRAY_FORCE_INLINE_DEF   inline
+    #define MRAY_FLATTEN            [[gnu::flatten]]
+    #define MRAY_ATTRIB_PURE        [[gnu::pure]]
+#endif
+
+#ifdef MRAY_CLANG
+    #define MRAY_DEBUG_BREAK        __builtin_debugtrap()
+#elif defined(MRAY_GCC)
+    #define MRAY_DEBUG_BREAK        __asm__ __volatile__("int 3")
+#endif
+
+#ifdef MRAY_MSVC
+    // MSVC does not have parameter for this, keep it empty
+    #define MRAY_UNROLL_LOOP
+    #define MRAY_UNROLL_LOOP_N(N)
+#elif defined(MRAY_CLANG)
+    #define MRAY_UNROLL_LOOP        MR_STAMP_PRAGMA(unroll)
+    #define MRAY_UNROLL_LOOP_N(N)   MR_STAMP_PRAGMA(unroll N)
+#elif defined(MRAY_GCC)
+    #define MRAY_UNROLL_LOOP        MR_STAMP_PRAGMA(gcc unroll 8)
+    #define MRAY_UNROLL_LOOP_N(N)   MR_STAMP_PRAGMA(gcc unroll N)
+#endif
+
+#if defined MRAY_GPU_BACKEND_CUDA
 
     #include <cuda_runtime.h>
 
     #define MRAY_HYBRID __host__ __device__
     #define MRAY_GPU __device__
     #define MRAY_HOST __host__
-    #define MRAY_KERNEL __global__
-
-    #ifdef MRAY_WINDOWS
-        #define MRAY_GPU_INLINE __forceinline__
-    #else
-        #define MRAY_GPU_INLINE inline
-    #endif
 
     #ifdef __CUDA_ARCH__
         #define MRAY_DEVICE_CODE_PATH
         #define MRAY_DEVICE_CODE_PATH_CUDA
     #endif
+
+    #undef MRAY_FORCE_INLINE_DECL
+    #undef MRAY_FORCE_INLINE_DEF
+    #define MRAY_FORCE_INLINE_DECL  __forceinline__
+    #define MRAY_FORCE_INLINE_DEF   __forceinline__
+    // Use CUDA's inline if we are compiling with CUDA
+    #ifdef MRAY_DEVICE_CODE_PATH_CUDA
+        #undef MRAY_UNROLL_LOOP
+        #undef MRAY_UNROLL_LOOP_N
+        #define MRAY_UNROLL_LOOP        _Pragma("unroll")
+        #define MRAY_UNROLL_LOOP_N(N)   _Pragma("unroll " N)
+    #endif
+
+    #define MRAY_GPU_INLINE_DECL
+    #define MRAY_GPU_INLINE_DEF     inline
+    #define MRAY_HYBRID_INLINE_DECL
+    #define MRAY_HYBRID_INLINE_DEF  inline
 
     #define NO_DISCARD [[nodiscard]]
 
@@ -36,18 +82,28 @@
     #define MRAY_HYBRID __host__ __device__
     #define MRAY_GPU __device__
     #define MRAY_HOST __host__
-    #define MRAY_KERNEL __global__
-
-    #ifdef MRAY_WINDOWS
-        #define MRAY_GPU_INLINE __forceinline__
-    #else
-        #define MRAY_GPU_INLINE inline
-    #endif
 
     #ifdef __HIP_DEVICE_COMPILE__
         #define MRAY_DEVICE_CODE_PATH
         #define MRAY_DEVICE_CODE_PATH_HIP
     #endif
+
+    // HIP mimics CUDA so same code
+    #undef MRAY_FORCE_INLINE_DECL
+    #undef MRAY_FORCE_INLINE_DEF
+    #define MRAY_FORCE_INLINE_DECL  __forceinline__
+    #define MRAY_FORCE_INLINE_DEF   __forceinline__
+    #ifdef MRAY_DEVICE_CODE_PATH_HIP
+        #undef  MRAY_UNROLL_LOOP
+        #undef  MRAY_UNROLL_LOOP_N
+        #define MRAY_UNROLL_LOOP        _Pragma("unroll")
+        #define MRAY_UNROLL_LOOP_N(N)   _Pragma("unroll " N)
+    #endif
+
+    #define MRAY_GPU_INLINE_DECL
+    #define MRAY_GPU_INLINE_DEF     inline
+    #define MRAY_HYBRID_INLINE_DECL
+    #define MRAY_HYBRID_INLINE_DEF  inline
 
     // TODO: Hip does not like the order.
     // "__host__ [[nodiscard]]", but NVCC does not like
@@ -55,18 +111,50 @@
     // So, we will not use NO_DISCARD for now
     #define NO_DISCARD
 
-#else
-
-    #define MRAY_GPU_INLINE inline
+#elif defined MRAY_GPU_BACKEND_CPU
 
     #define MRAY_HYBRID
     #define MRAY_GPU
     #define MRAY_HOST
-    #define MRAY_KERNEL
+    // CPUs can have deep stacks etc, so just default to inline.
+    // Let the compiler do its thing
+    #define MRAY_GPU_INLINE_DECL
+    #define MRAY_GPU_INLINE_DEF     inline
+    #define MRAY_HYBRID_INLINE_DECL
+    #define MRAY_HYBRID_INLINE_DEF  inline
+
+    #define NO_DISCARD [[nodiscard]]
+
+#else
+
+    #define MRAY_HYBRID
+    #define MRAY_GPU
+    #define MRAY_HOST
+    //
+    #define MRAY_GPU_INLINE_DECL
+    #define MRAY_GPU_INLINE_DEF     inline
+    #define MRAY_HYBRID_INLINE_DECL
+    #define MRAY_HYBRID_INLINE_DEF  inline
 
     #define NO_DISCARD [[nodiscard]]
 
 #endif
+
+// Pure function definition / declaration attributes
+#define MR_PF_DECL   MRAY_HYBRID NO_DISCARD MRAY_ATTRIB_PURE MRAY_FORCE_INLINE_DECL constexpr
+#define MR_PF_DEF    MRAY_HYBRID MRAY_ATTRIB_PURE MRAY_FORCE_INLINE_DEF constexpr
+#define MR_PF_DECL_V MRAY_HYBRID MRAY_FORCE_INLINE_DECL constexpr
+#define MR_PF_DEF_V  MRAY_HYBRID MRAY_FORCE_INLINE_DEF constexpr
+// GPU function definition / declaration attributes
+#define MR_GF_DECL MRAY_GPU MRAY_GPU_INLINE_DECL
+#define MR_GF_DEF  MRAY_GPU MRAY_GPU_INLINE_DEF
+//#define MR_GF_DECL MRAY_GPU MRAY_FORCE_INLINE_DECL
+//#define MR_GF_DEF  MRAY_GPU MRAY_FORCE_INLINE_DEF
+// Hybrid function definition / declaration attributes
+#define MR_HF_DECL MRAY_HYBRID MRAY_HYBRID_INLINE_DECL
+#define MR_HF_DEF  MRAY_HYBRID MRAY_HYBRID_INLINE_DEF
+//#define MR_HF_DECL MRAY_HYBRID MRAY_FORCE_INLINE_DECL
+//#define MR_HF_DEF  MRAY_HYBRID MRAY_FORCE_INLINE_DEF
 
 // Change to constexpr directly from this
 #ifdef MRAY_DEBUG
@@ -75,20 +163,31 @@
     constexpr bool MRAY_IS_DEBUG = false;
 #endif
 
-// We are on Device Compiler
-#ifdef MRAY_DEVICE_CODE_PATH
-    #define UNROLL_LOOP _Pragma("unroll")
-    #define UNROLL_LOOP_COUNT(count) _Pragma("unroll")(count)
-
-#else  // We are on Host Compiler
-    #define UNROLL_LOOP
-    #define UNROLL_LOOP_COUNT(count)
+// TODO: This did not work?
+// Atleast for eliminating the warning "no return statement"
+// Investigate later...
+//MR_PF_DECL_V
+//constexpr void MRayUnreachable()
+//{
+//  #if defined(MRAY_DEVICE_CODE_PATH_CUDA) || \
+//        defined(MRAY_CLANG) || defined(MRAY_GCC)
+//      __builtin_unreachable();
+//  // MSVC
+//  #else
+//      #define __assume(0);
+//  #endif
+//}
+// This works
+#if defined(MRAY_DEVICE_CODE_PATH_CUDA) || \
+    defined(MRAY_CLANG) || defined(MRAY_GCC)
+    #define MRAY_UNREACHABLE __builtin_unreachable()
+// MSVC
+#else
+    #define MRAY_UNREACHABLE __assume(0)
 #endif
 
-// Hybrid function inline
-#define MRAY_CGPU_INLINE inline
 
-// Comes from build system
+// TODO: Should come from build system
 #define MRAY_SPECTRA_PER_SPECTRUM 4
 
 static constexpr int SpectraPerSpectrum = MRAY_SPECTRA_PER_SPECTRUM;

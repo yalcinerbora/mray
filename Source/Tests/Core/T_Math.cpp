@@ -6,6 +6,28 @@
 
 #include "GTestWrappers.h"
 
+template<class T>
+static constexpr auto DefaultErr = MathConstants::LargeEpsilon<T>();
+
+#define TrigCompare(FUNCNAME, FUNC)                         \
+auto FUNCNAME = []<FloatC F>(F v, F check,                  \
+                             F err = DefaultErr<F>) -> bool \
+{                                                           \
+    using MathConstants::DegToRadCoef;                      \
+    using MathConstants::LargeEpsilon;                      \
+    auto r = FUNC<F>(v * DegToRadCoef<F>());                \
+    return Math::AbsDif(r, check) < err;                    \
+}
+
+#define BasicCompare(FUNCNAME, FUNC)                        \
+auto FUNCNAME = []<FloatC F>(F v, F check,                  \
+                             F err = DefaultErr<F>) -> bool \
+{                                                           \
+    using MathConstants::LargeEpsilon;                      \
+    auto r = FUNC<F>(v);                                    \
+    return Math::AbsDif(r, check) < err;                    \
+}
+
 TEST(MathTest, Primes)
 {
     using namespace Math;
@@ -434,7 +456,7 @@ TEST(QuatTests, OrthoBasis)
 {
     auto Check = [](Quaternion q)
     {
-        q.NormalizeSelf();
+        q = q.Normalize();
         Vector3 basisX = q.OrthoBasisX();
         Vector3 basisY = q.OrthoBasisY();
         Vector3 basisZ = q.OrthoBasisZ();
@@ -453,6 +475,68 @@ TEST(QuatTests, OrthoBasis)
     Check(Quaternion(4, 3, 2, 1));
     Check(Quaternion(3, 5, 7, 9));
     Check(Quaternion(0, 0, 1, 0));
+
+
+}
+
+TEST(MathTest, ConstexprCalls)
+{
+    using namespace MathConstants;
+
+    // ============ //
+    //     FMA      //
+    // ============ //
+    auto FMATest = []<FloatC F>(F a, F b, F c, F check) -> bool      \
+    {
+        using MathConstants::LargeEpsilon;
+        auto r = Math::FMA<F>(a, b, c);
+        return Math::AbsDif(r, check) < LargeEpsilon<F>();
+    };
+    //
+    static_assert(FMATest(Float(1), Float(2), Float(3), Float(5)), "Wrong!");
+
+
+    // We check with large epsilon (10^-5 so these are not good
+    // approximations)
+    TrigCompare(CosTest, Math::Cos);
+    static_assert(CosTest(Float(-90), Float(0)), "Wrong!");
+    static_assert(CosTest(Float(-45), Float(0.70710678118)), "Wrong!");
+    static_assert(CosTest(Float(0), Float(1)), "Wrong!");
+    static_assert(CosTest(Float(1), Float(0.99984769515)), "Wrong!");
+    static_assert(CosTest(Float(45), Float(0.70710678118)), "Wrong!");
+    static_assert(CosTest(Float(90), Float(0)), "Wrong!");
+    static_assert(CosTest(Float(135), Float(-0.70710678118)), "Wrong!");
+    static_assert(CosTest(Float(180), Float(-1)), "Wrong!");
+    static_assert(CosTest(Float(359), Float(0.99984769515)), "Wrong!");
+    static_assert(CosTest(Float(90 + 360 * 2), Float(0)), "Wrong!");
+
+    TrigCompare(SinTest, Math::Sin);
+    static_assert(SinTest(Float(-90), Float(-1)), "Wrong!");
+    static_assert(SinTest(Float(-45), Float(-0.70710678118)), "Wrong!");
+    static_assert(SinTest(Float(90 + 360 * 2), Float(1)), "Wrong!");
+    static_assert(SinTest(Float(90), Float(1)), "Wrong!");
+    static_assert(SinTest(Float(45), Float(0.70710678118)), "Wrong!");
+    static_assert(SinTest(Float(1), Float(0.01745240643)), "Wrong!");
+    static_assert(SinTest(Float(0), Float(0)), "Wrong!");
+
+    TrigCompare(TanTest, Math::Tan);
+    static_assert(TanTest(Float(-80), Float(-5.67128181962)), "Wrong!");
+    static_assert(TanTest(Float(-135), Float(-1)), "Wrong!");
+    static_assert(TanTest(Float(-45), Float(-1)), "Wrong!");
+    static_assert(TanTest(Float(0), Float(0)), "Wrong!");
+    static_assert(TanTest(Float(1), Float(0.01745506492)), "Wrong!");
+    static_assert(TanTest(Float(45), Float(1)), "Wrong!");
+    static_assert(TanTest(Float(60), Float(1.7320508075)), "Wrong!");
+    static_assert(TanTest(Float(80), Float(5.67128181962)), "Wrong!");
+    static_assert(TanTest(Float(89), Float(57.2899616308)), "Wrong!");
+    // These two are not that accurate on constexpr context
+    static_assert(TanTest(Float(89.92), Float(716.196778492),
+                          HugeEpsilon<Float>()), "Wrong!");
+    static_assert(TanTest(Float(89 + 360 * 2), Float(57.2899616308),
+                          HugeEpsilon<Float>()), "Wrong!");
+
+
+
 
 
 }

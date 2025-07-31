@@ -11,19 +11,16 @@ static constexpr uint32_t WarpSize()
 }
 
 template<uint32_t LOGICAL_WARP_SIZE = WarpSize()>
-MRAY_GPU MRAY_GPU_INLINE
-static void WarpSynchronize()
+MR_GF_DEF static void WarpSynchronize()
 {
     static_assert(LOGICAL_WARP_SIZE == std::numeric_limits<uint32_t>::max(),
                   "CPU Device does not have notion of warps. "
                   "Please write a CPU specific algorithm.");
 }
 
-MRAY_GPU MRAY_GPU_INLINE
-static void BlockSynchronize() {}
+MR_GF_DEF static void BlockSynchronize() {}
 
-MRAY_GPU MRAY_GPU_INLINE
-static void ThreadFenceGrid()
+MR_GF_DEF static void ThreadFenceGrid()
 {
     // TODO: Reason about this
     std::atomic_thread_fence(std::memory_order_acq_rel);
@@ -46,7 +43,7 @@ void NotifyWhenValueReaches(GPUQueueCPU::ControlBlockData* cb, uint64_t valueToN
     }
 }
 
-MRAY_GPU MRAY_CGPU_INLINE
+MR_GF_DEF
 KernelCallParamsCPU::KernelCallParamsCPU()
     : gridSize(globalKCParams.gridSize)
     , blockSize(globalKCParams.blockSize)
@@ -55,7 +52,7 @@ KernelCallParamsCPU::KernelCallParamsCPU()
 {}
 
 template<auto Kernel, class... Args>
-MRAY_HYBRID inline
+MR_HF_DEF
 void GPUQueueCPU::IssueKernelInternal(std::string_view name,
                                       uint32_t totalWorkCount,
                                       uint32_t tpb,
@@ -99,10 +96,10 @@ void GPUQueueCPU::IssueKernelInternal(std::string_view name,
         blockCount,
         [
             ... fArgs = std::forward<Args>(fArgs),
-            blockCount, oldIssueCount, newIssueCount,
+            oldIssueCount, newIssueCount,
             cbPtr, callerBlockCount, tpb,
-            name, domain = this->domain,
-            totalWorkCount
+            name, domain = this->domain
+            //, totalWorkCount, blockCount
         ]
         (
             [[maybe_unused]] uint32_t blockStart,
@@ -149,7 +146,7 @@ void GPUQueueCPU::IssueKernelInternal(std::string_view name,
 }
 
 template<class Lambda>
-MRAY_HYBRID inline
+MR_HF_DEF
 void GPUQueueCPU::IssueLambdaInternal(std::string_view name,
                                       uint32_t totalWorkCount,
                                       uint32_t tpb,
@@ -191,11 +188,11 @@ void GPUQueueCPU::IssueLambdaInternal(std::string_view name,
     (
         blockCount,
         [
-            blockCount, oldIssueCount, newIssueCount,
+            oldIssueCount, newIssueCount,
             cbPtr, callerBlockCount, tpb,
             func = std::forward<Lambda>(func),
-            name, domain = this->domain,
-            totalWorkCount
+            name, domain = this->domain
+            //, totalWorkCount, blockCount
         ]
         (
             [[maybe_unused]] uint32_t blockStart,
@@ -308,7 +305,7 @@ void GPUQueueCPU::IssueBlockLambda(std::string_view name,
 }
 
 template<auto Kernel, class... Args>
-MRAY_GPU inline
+MR_GF_DEF
 void GPUQueueCPU::DeviceIssueWorkKernel(std::string_view,
                                         DeviceWorkIssueParams,
                                         //
@@ -336,7 +333,7 @@ void GPUQueueCPU::DeviceIssueWorkKernel(std::string_view,
 }
 
 template<class Lambda>
-MRAY_GPU inline
+MR_GF_DEF
 void GPUQueueCPU::DeviceIssueWorkLambda(std::string_view name,
                                         DeviceWorkIssueParams,
                                         //
@@ -348,7 +345,7 @@ void GPUQueueCPU::DeviceIssueWorkLambda(std::string_view name,
 }
 
 template<auto Kernel, class... Args>
-MRAY_GPU inline
+MR_GF_DEF
 void GPUQueueCPU::DeviceIssueBlockKernel(std::string_view name,
                                          DeviceBlockIssueParams,
                                          //
@@ -360,7 +357,7 @@ void GPUQueueCPU::DeviceIssueBlockKernel(std::string_view name,
 }
 
 template<class Lambda, uint32_t Bounds>
-MRAY_GPU inline
+MR_GF_DEF
 void GPUQueueCPU::DeviceIssueBlockLambda(std::string_view name,
                                          DeviceBlockIssueParams,
                                          //

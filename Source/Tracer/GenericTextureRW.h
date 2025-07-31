@@ -4,7 +4,20 @@
 #include "Core/DeviceVisit.h"
 #include "TextureCommon.h"
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
+Vector4 GenericRead(const Vector2ui& pixCoords,
+                    const SurfViewVariant& surf);
+
+MR_GF_DECL
+Vector4 GenericReadFromBuffer(const Span<const Byte>& dBufferImage,
+                              const SurfViewVariant& surfToVisit,
+                              uint32_t pixCoordLinear);
+
+MR_GF_DECL
+void GenericWrite(SurfViewVariant& surf, const Vector4& value,
+                  const Vector2ui& pixCoords);
+
+MR_GF_DEF
 Vector4 GenericRead(const Vector2ui& pixCoords,
                     const SurfViewVariant& surf)
 {
@@ -24,7 +37,7 @@ Vector4 GenericRead(const Vector2ui& pixCoords,
                 // We need to manually loop over the channels here
                 if constexpr(C != 1)
                 {
-                    UNROLL_LOOP
+                    MRAY_UNROLL_LOOP
                     for(uint32_t c = 0; c < C; c++)
                         result[c] = static_cast<Float>(rPix[c]);
                 }
@@ -36,7 +49,7 @@ Vector4 GenericRead(const Vector2ui& pixCoords,
     return v;
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 Vector4 GenericReadFromBuffer(const Span<const Byte>& dBufferImage,
                               const SurfViewVariant& surfToVisit,
                               uint32_t pixCoordLinear)
@@ -61,7 +74,7 @@ Vector4 GenericReadFromBuffer(const Span<const Byte>& dBufferImage,
                     // Somewhat hard part, first read the data
                     // then convert
                     ReadType data = dPtr[pixCoordLinear];
-                    UNROLL_LOOP
+                    MRAY_UNROLL_LOOP
                     for(uint32_t c = 0; c < C; c++)
                         out[c] = static_cast<Float>(data[c]);
                 }
@@ -73,7 +86,7 @@ Vector4 GenericReadFromBuffer(const Span<const Byte>& dBufferImage,
     );
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 void GenericWrite(SurfViewVariant& surf,
                   const Vector4& value,
                   const Vector2ui& pixCoords)
@@ -93,14 +106,14 @@ void GenericWrite(SurfViewVariant& surf,
                 if constexpr(C != 1)
                 {
                     using InnerT = typename WriteType::InnerType;
-                    UNROLL_LOOP
+                    MRAY_UNROLL_LOOP
                     for(uint32_t c = 0; c < C; c++)
                     {
                         Float v = value[c];
                         if constexpr(std::is_integral_v<InnerT>)
                         {
                             using Math::Clamp;
-                            v = Clamp(std::round(v),
+                            v = Clamp(Math::Round(v),
                                       Float(std::numeric_limits<InnerT>::min()),
                                       Float(std::numeric_limits<InnerT>::max()));
                         }
@@ -113,7 +126,7 @@ void GenericWrite(SurfViewVariant& surf,
                     if constexpr(std::is_integral_v<WriteType>)
                     {
                         using Math::Clamp;
-                        v = Clamp(std::round(v),
+                        v = Clamp(Math::Round(v),
                                   Float(std::numeric_limits<WriteType>::min()),
                                   Float(std::numeric_limits<WriteType>::max()));
                     }

@@ -13,20 +13,28 @@
 #ifdef MRAY_HETEROGENEOUS
 
     template<typename T>
-    concept FloatingPointC = std::floating_point<T> || std::same_as<T, half>;
+    concept FloatC = std::floating_point<T> || std::same_as<T, half>;
 
 #else
 
     template<typename T>
-    concept FloatingPointC = std::floating_point<T>;
+    concept FloatC = std::floating_point<T>;
 
 #endif
 
+// We do not need this but, for consistency we define it
 template<typename T>
-concept ArithmeticC = std::integral<T> || FloatingPointC<T>;
+concept IntegralC = std::integral<T>;
 
 template<typename T>
-concept SignedC = std::signed_integral<T> || FloatingPointC<T>;
+concept SignedIntegralC = std::signed_integral<T>;
+
+
+template<typename T>
+concept ArithmeticC = std::integral<T> || FloatC<T>;
+
+template<typename T>
+concept SignedC = std::signed_integral<T> || FloatC<T>;
 
 template<unsigned int N, ArithmeticC T>
 class Vector;
@@ -34,13 +42,13 @@ class Vector;
 template<unsigned int N, ArithmeticC T>
 class Matrix;
 
-template<FloatingPointC T>
+template<FloatC T>
 class Quat;
 
-template<FloatingPointC T>
+template<FloatC T>
 class RayT;
 
-template<unsigned int N, FloatingPointC T>
+template<unsigned int N, FloatC T>
 class AABB;
 
 // Vector Alias
@@ -151,6 +159,9 @@ using AABB4d = AABB<4, double>;
     using AABB4h = AABB<4, half>;
 #endif
 
+template<FloatC T>
+using IntegralSister = std::conditional_t<std::is_same_v<T, float>, int32_t, int64_t>;
+
 template<class T>
 concept ArrayLikeC = requires(T t, Span<const typename T::InnerType, T::Dims> span)
 {
@@ -161,11 +172,54 @@ concept ArrayLikeC = requires(T t, Span<const typename T::InnerType, T::Dims> sp
     { std::as_const(t).AsArray() } -> std::same_as<const std::array<typename T::InnerType, T::Dims>&>;
 };
 
+// Vector Concept
+// TODO: Check a better way to do this
+template<class T>
+concept VectorC = (std::is_same_v<T, Vector2>   ||
+                   std::is_same_v<T, Vector3>   ||
+                   std::is_same_v<T, Vector4>   ||
+                   std::is_same_v<T, Vector2f>  ||
+                   std::is_same_v<T, Vector3f>  ||
+                   std::is_same_v<T, Vector4f>  ||
+                   std::is_same_v<T, Vector2d>  ||
+                   std::is_same_v<T, Vector3d>  ||
+                   std::is_same_v<T, Vector4d>  ||
+                   std::is_same_v<T, Vector2i>  ||
+                   std::is_same_v<T, Vector3i>  ||
+                   std::is_same_v<T, Vector4i>  ||
+                   std::is_same_v<T, Vector2ui> ||
+                   std::is_same_v<T, Vector3ui> ||
+                   std::is_same_v<T, Vector4ui> ||
+                   std::is_same_v<T, Vector2l>  ||
+                   std::is_same_v<T, Vector2ul> ||
+                   std::is_same_v<T, Vector3ul> ||
+                   std::is_same_v<T, Vector2s>  ||
+                   std::is_same_v<T, Vector2us> ||
+                   std::is_same_v<T, Vector3s>  ||
+                   std::is_same_v<T, Vector3us> ||
+                   std::is_same_v<T, Vector4s>  ||
+                   std::is_same_v<T, Vector4us> ||
+                   std::is_same_v<T, Vector2c>  ||
+                   std::is_same_v<T, Vector2uc> ||
+                   std::is_same_v<T, Vector3c>  ||
+                   std::is_same_v<T, Vector3uc> ||
+                   std::is_same_v<T, Vector4c>  ||
+                   std::is_same_v<T, Vector4uc>);
+
+template<class T>
+concept FloatVectorC = (VectorC<T> && std::is_same_v<typename T::InnerType, Float>);
+
+template<class T>
+concept IntegralVectorC = (VectorC<T> && !FloatVectorC<T>);
+
+template<class T>
+concept FloatVectorOrFloatC = (FloatVectorC<T> || std::floating_point<T>);
+
 // Vector, AABB print helpers
 template <ArrayLikeC V>
 auto format_as(const V& v) { return v.AsArray(); }
 
-template <unsigned int N, FloatingPointC T>
+template <unsigned int N, FloatC T>
 auto format_as(const AABB<N, T>& v)
 {
     std::array<std::array<T, N>, 2> result;

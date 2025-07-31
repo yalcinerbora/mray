@@ -314,8 +314,8 @@ RenderImagePool::RenderImagePool(ThreadPool* tp,
                            VK_FORMAT_R16G16B16A16_UNORM,
                            sdrImgUsageFlags, initInfo.extent);
 
-    size_t outBufferSize = std::max(hdrImage.MemRequirements().second,
-                                    sdrImage.MemRequirements().second);
+    size_t outBufferSize = Math::Max(hdrImage.MemRequirements().second,
+                                     sdrImage.MemRequirements().second);
     outStageBuffer = VulkanBuffer(*handlesVk,
                                   VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                                   outBufferSize);

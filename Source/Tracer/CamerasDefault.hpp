@@ -5,7 +5,7 @@
 namespace CameraDetail
 {
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 CameraPinhole::CameraPinhole(const DataSoA& soa, CameraKey key)
 {
     position = soa.position[key.FetchIndexPortion()];
@@ -22,9 +22,9 @@ CameraPinhole::CameraPinhole(const DataSoA& soa, CameraKey key)
 
     // Camera Vector Correction
     gazeDir = gaze - position;
-    right = Vector3::Cross(gazeDir, up).Normalize();
-    up = Vector3::Cross(right, gazeDir).Normalize();
-    gazeDir = Vector3::Cross(up, right).Normalize();
+    right   = Math::Normalize(Math::Cross(gazeDir, up));
+    up      = Math::Normalize(Math::Cross(right, gazeDir));
+    gazeDir = Math::Normalize(Math::Cross(up, right));
 
     // Camera parameters
     bottomLeft = (position
@@ -35,7 +35,7 @@ CameraPinhole::CameraPinhole(const DataSoA& soa, CameraKey key)
     planeSize = Vector2(widthHalf, heightHalf) * Float(2.0);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 RaySample CameraPinhole::SampleRay(// Input
                                    const Vector2ui& generationIndex,
                                    const Vector2ui& stratumCount,
@@ -53,7 +53,7 @@ RaySample CameraPinhole::SampleRay(// Input
     Vector3 samplePoint = bottomLeft;
     samplePoint += sampleDistance[0] * right;
     samplePoint += sampleDistance[1] * up;
-    Vector3 rayDir = (samplePoint - position).Normalize();
+    Vector3 rayDir = Math::Normalize(samplePoint - position);
 
     // Local Coords
     // We are quantizing here, we probably have a validation
@@ -80,7 +80,7 @@ RaySample CameraPinhole::SampleRay(// Input
             // Ray Tracing Gems I. Chapter2 equation 30
             .rayCone = RayCone
             {
-                .aperture = Float(2) * std::tan(fov[1] * Float(0.5)) / Float(stratumCount[1]),
+                .aperture = Float(2) * Math::Tan(fov[1] * Float(0.5)) / Float(stratumCount[1]),
                 .width = Float(0)
             }
         },
@@ -88,7 +88,7 @@ RaySample CameraPinhole::SampleRay(// Input
     };
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 RaySample CameraPinhole::EvaluateRay(const Vector2ui& generationIndex,
                                      const Vector2ui& stratumCount,
                                      const Vector2& stratumOffset,
@@ -105,7 +105,7 @@ RaySample CameraPinhole::EvaluateRay(const Vector2ui& generationIndex,
     samplePoint += sampleDistance[0] * right;
     samplePoint += sampleDistance[1] * up;
 
-    Vector3 rayDir = (samplePoint - position).Normalize();
+    Vector3 rayDir = Math::Normalize(samplePoint - position);
 
     // Local Coords
     // We are quantizing here, we probably have a validation
@@ -129,7 +129,7 @@ RaySample CameraPinhole::EvaluateRay(const Vector2ui& generationIndex,
             .imgCoords = imgCoords,
             .rayCone = RayCone
             {
-                .aperture = Float(2) * std::tan(fov[1] * Float(0.5)) / Float(stratumCount[1]),
+                .aperture = Float(2) * Math::Tan(fov[1] * Float(0.5)) / Float(stratumCount[1]),
                 .width = Float(0)
             }
         },
@@ -137,23 +137,23 @@ RaySample CameraPinhole::EvaluateRay(const Vector2ui& generationIndex,
     };
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float CameraPinhole::PdfRay(const Ray&) const
 {
     // We can not request pdf of a pinhole camera
     return Float(0.0);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 bool CameraPinhole::CanBeSampled() const
 {
     return false;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 CameraTransform CameraPinhole::GetCameraTransform() const
 {
-    Vector3 dir = Vector3::Cross(up, right).Normalize();
+    Vector3 dir = Math::Normalize(Math::Cross(up, right));
     return CameraTransform
     {
         .position   = position,
@@ -162,7 +162,7 @@ CameraTransform CameraPinhole::GetCameraTransform() const
     };
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 void CameraPinhole::OverrideTransform(const CameraTransform& t)
 {
     position = t.position;
@@ -171,9 +171,9 @@ void CameraPinhole::OverrideTransform(const CameraTransform& t)
 
     // Camera Vector Correction
     gazeDir = gazePoint - position;
-    right = Vector3::Cross(gazeDir, up).Normalize();
-    up = Vector3::Cross(right, gazeDir).Normalize();
-    gazeDir = Vector3::Cross(up, right).Normalize();
+    right   = Math::Normalize(Math::Cross(gazeDir, up));
+    up      = Math::Normalize(Math::Cross(right, gazeDir));
+    gazeDir = Math::Normalize(Math::Cross(up, right));
 
     // Camera parameters
     float widthHalf = planeSize[0] * Float(0.5);
@@ -185,7 +185,7 @@ void CameraPinhole::OverrideTransform(const CameraTransform& t)
                   + gazeDir * nearFar[0]);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 CameraPinhole CameraPinhole::GenerateSubCamera(const Vector2ui& stratumIndex,
                                                const Vector2ui& strataCount) const
 {

@@ -546,8 +546,8 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
     // Initialize the memory allocator
     // Find the common alignment
     const auto& limits = selectedDeviceProps.properties.limits;
-    deviceAlignment = uint32_t(std::max(limits.minStorageBufferOffsetAlignment,
-                                        limits.minUniformBufferOffsetAlignment));
+    deviceAlignment = uint32_t(Math::Max(limits.minStorageBufferOffsetAlignment,
+                                         limits.minUniformBufferOffsetAlignment));
     Span<const VkMemoryType> memTypeSpan(memProps.memoryTypes,
                                          memProps.memoryTypeCount);
     VulkanDeviceAllocator::Instance(deviceVk,

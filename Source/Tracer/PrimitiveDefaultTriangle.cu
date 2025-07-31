@@ -132,9 +132,9 @@ void KCApplyTransformsTriangle(// I-O
             Vector3 b = tbn.OrthoBasisY();
             Vector3 n = tbn.OrthoBasisZ();
             // We need to multiply these with normal matrix
-            t = Vector3(sBatchInvTransform.LeftMultiply(Vector4(t, 0))).Normalize();
-            b = Vector3(sBatchInvTransform.LeftMultiply(Vector4(b, 0))).Normalize();
-            n = Vector3(sBatchInvTransform.LeftMultiply(Vector4(n, 0))).Normalize();
+            t = Math::Normalize(Vector3(sBatchInvTransform.LeftMultiply(Vector4(t, 0))));
+            b = Math::Normalize(Vector3(sBatchInvTransform.LeftMultiply(Vector4(b, 0))));
+            n = Math::Normalize(Vector3(sBatchInvTransform.LeftMultiply(Vector4(n, 0))));
             auto[tN, bN] = Graphics::GSOrthonormalize(t, b, n);
             //
             Quaternion tbnOut = TransformGen::ToSpaceQuat(tN, bN, n);

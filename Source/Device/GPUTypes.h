@@ -202,7 +202,7 @@ struct TextureInitParams
 };
 
 template<uint32_t D>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DECL constexpr
 UVType<D> LinearToTexelCoordinates(const TextureExtent<D>& extents,
                                    uint32_t linearIndex)
 {
@@ -219,7 +219,7 @@ UVType<D> LinearToTexelCoordinates(const TextureExtent<D>& extents,
 }
 
 template<uint32_t D>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DECL constexpr
 UVType<D> LinearToUV(const TextureExtent<D>& extents,
                      uint32_t linearIndex)
 {

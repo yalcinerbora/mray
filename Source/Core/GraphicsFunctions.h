@@ -18,8 +18,8 @@ namespace Graphics
     // So wi should be aligned with the normal, it is callers responsibility
     // to provide the appropriate normal. It returns wo, again outwards from the
     // surface.
-    MRAY_HYBRID
-    constexpr Vector3   Reflect(const Vector3& normal, const Vector3& v);
+    MR_HF_DECL constexpr
+    Vector3 Reflect(const Vector3& normal, const Vector3& v);
 
     // Convention of wi (v) and normal is as follows
     //          wo (out)
@@ -36,13 +36,17 @@ namespace Graphics
     // So wi should be aligned with the normal, it is caller's responsibility
     // to provide the appropriate normal. It returns wo again "outwards" from the
     // surface. Both "normal" and "wi" is assumed to be normalized.
-    MRAY_HYBRID
-    Optional<Vector3>   Refract(const Vector3& normal, const Vector3& v,
-                                Float etaFrom, Float etaTo);
+    MR_HF_DECL constexpr
+    Optional<Vector3> Refract(const Vector3& normal, const Vector3& v,
+                              Float etaFrom, Float etaTo);
 
     // Changes the direction of vector "v" towards n
-    MRAY_HYBRID
-    constexpr Vector3   Orient(const Vector3& v, const Vector3& n);
+    MR_HF_DECL constexpr
+    Vector3 Orient(const Vector3& v, const Vector3& n);
+
+    // Return an orthogonal vector
+    MR_HF_DECL constexpr
+    Vector3 OrthogonalVector(const Vector3&);
 
     // Coordinate Conversions
     // Spherical <-> Cartesian
@@ -54,90 +58,98 @@ namespace Graphics
     //         0 is the "north pole"
     //
     // Results lie on the scaled unit sphere where north pole is +Z
-    MRAY_HYBRID Vector3     SphericalToCartesian(const Vector3&);
-    MRAY_HYBRID Vector3     CartesianToSpherical(const Vector3&);
-    MRAY_HYBRID Vector3     UnitSphericalToCartesian(const Vector2&);
-    MRAY_HYBRID Vector3     UnitSphericalToCartesian(const Vector2& sinCosTheta,
-                                                     const Vector2& sinCosPhi);
-    MRAY_HYBRID Vector2     CartesianToUnitSpherical(const Vector3&);
+    MR_HF_DECL constexpr
+    Vector3 SphericalToCartesian(const Vector3&);
+    MR_HF_DECL constexpr
+    Vector3 CartesianToSpherical(const Vector3&);
+    MR_HF_DECL constexpr
+    Vector3 UnitSphericalToCartesian(const Vector2&);
+    MR_HF_DECL constexpr
+    Vector3 UnitSphericalToCartesian(const Vector2& sinCosTheta,
+                                     const Vector2& sinCosPhi);
+    MR_HF_DECL constexpr
+    Vector2 CartesianToUnitSpherical(const Vector3&);
 
     // 2D Variant of spherical coordinates
-    MRAY_HYBRID Vector2     PolarToCartesian(const Vector2&);
-    MRAY_HYBRID Vector2     CartesianToPolar(const Vector2&);
-    MRAY_HYBRID Vector2     UnitPolarToCartesian(Float);
-    MRAY_HYBRID Float       CartesianToUnitPolar(const Vector2&);
+    MR_HF_DECL constexpr
+    Vector2 PolarToCartesian(const Vector2&);
+    MR_HF_DECL constexpr
+    Vector2 CartesianToPolar(const Vector2&);
+    MR_HF_DECL constexpr
+    Vector2 UnitPolarToCartesian(Float);
+    MR_HF_DECL constexpr
+    Float   CartesianToUnitPolar(const Vector2&);
 
     // Concentric Octahedral Mapping
     // https://fileadmin.cs.lth.se/graphics/research/papers/2008/simdmapping/clarberg_simdmapping08_preprint.pdf
-    MRAY_HYBRID Vector2     DirectionToConcentricOctahedral(const Vector3&);
-    MRAY_HYBRID Vector3     ConcentricOctahedralToDirection(const Vector2&);
-    MRAY_HYBRID Vector2     ConcentricOctahedralWrap(const Vector2&);
+    MR_HF_DECL constexpr
+    Vector2 DirectionToConcentricOctahedral(const Vector3&);
+    MR_HF_DECL constexpr
+    Vector3 ConcentricOctahedralToDirection(const Vector2&);
+    MR_HF_DECL constexpr
+    Vector2 ConcentricOctahedralWrap(const Vector2&);
 
     template<std::integral T>
-    MRAY_HYBRID
-    constexpr Vector<2, T>  ConcentricOctahedralWrapInt(const Vector<2, T>& st,
-                                                        const Vector<2, T>& dimensions);
+    MR_HF_DECL constexpr
+    Vector<2, T> ConcentricOctahedralWrapInt(const Vector<2, T>& st,
+                                             const Vector<2, T>& dimensions);
 
     // Orthonormalization Gram-Schmidt process
     // Returns first (n-1) modified vectors.
-    MRAY_HYBRID
-    constexpr Vector3                   GSOrthonormalize(const Vector3& x,
-                                                         const Vector3& y);
-    MRAY_HYBRID
-    constexpr Pair<Vector3, Vector3>    GSOrthonormalize(const Vector3& x,
-                                                         const Vector3& y,
-                                                         const Vector3& z);
+    MR_HF_DECL constexpr
+    Vector3                 GSOrthonormalize(const Vector3& x,
+                                             const Vector3& y);
+    MR_HF_DECL constexpr
+    std::array<Vector3, 2>  GSOrthonormalize(const Vector3& x,
+                                             const Vector3& y,
+                                             const Vector3& z);
 
-    MRAY_HYBRID constexpr Vector2       UVToSphericalAngles(const Vector2& uv);
-    MRAY_HYBRID constexpr Vector2       SphericalAnglesToUV(const Vector2& thetaPhi);
+    MR_HF_DECL constexpr
+    Vector2 UVToSphericalAngles(const Vector2& uv);
+    MR_HF_DECL constexpr
+    Vector2 SphericalAnglesToUV(const Vector2& thetaPhi);
 
     template<class DimType>
-    MRAY_HYBRID constexpr
-    DimType                 TextureMipSize(const DimType& resolution,
+    MR_HF_DECL constexpr
+    DimType TextureMipSize(const DimType& resolution,
                                            uint32_t mipLevel);
     template<class DimType>
-    MRAY_HYBRID constexpr
-    uint32_t                TextureMipCount(const DimType& resolution);
+    MR_HF_DECL constexpr
+    uint32_t TextureMipCount(const DimType& resolution);
     template<class DimType>
-    MRAY_HYBRID constexpr
-    uint32_t                TextureMipPixelStart(const DimType& baseResolution,
-                                                 uint32_t mipLevel);
+    MR_HF_DECL constexpr
+    uint32_t TextureMipPixelStart(const DimType& baseResolution,
+                                  uint32_t mipLevel);
 
     template<uint32_t C>
-    MRAY_HYBRID constexpr
-    Vector<C, Float>        ConvertPixelIndices(const Vector<C, Float>& inputIndex,
-                                                const Vector<C, Float>& toResolution,
-                                                const Vector<C, Float>& fromResolution);
+    MR_HF_DECL constexpr
+    Vector<C, Float> ConvertPixelIndices(const Vector<C, Float>& inputIndex,
+                                         const Vector<C, Float>& toResolution,
+                                         const Vector<C, Float>& fromResolution);
 
     namespace MortonCode
     {
         template <class T>
-        MRAY_HYBRID
-        constexpr T         MaxBits3D();
+        MR_PF_DECL T         MaxBits3D() noexcept;
         template <class T>
-        MRAY_HYBRID
-        constexpr T         Compose3D(const Vector3ui&);
+        MR_PF_DECL T         Compose3D(const Vector3ui&) noexcept;
         template <class T>
-        MRAY_HYBRID
-        constexpr Vector3ui Decompose3D(T code);
+        MR_PF_DECL Vector3ui Decompose3D(T code) noexcept;
         //
         template <class T>
-        MRAY_HYBRID
-        constexpr T         MaxBits2D();
+        MR_PF_DECL T         MaxBits2D() noexcept;
         template <class T>
-        MRAY_HYBRID
-        constexpr T         Compose2D(const Vector2ui&);
+        MR_PF_DECL T         Compose2D(const Vector2ui&) noexcept;
         template <class T>
-        MRAY_HYBRID
-        constexpr Vector2ui Decompose2D(T code);
+        MR_PF_DECL Vector2ui Decompose2D(T code) noexcept;
     }
 }
 
 namespace Graphics
 {
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector3 Reflect(const Vector3& normal, const Vector3& v)
+MR_HF_DEF constexpr
+Vector3 Reflect(const Vector3& normal, const Vector3& v)
 {
     // Convention of wi (v) and normal is as follows
     //        normal
@@ -148,15 +160,15 @@ constexpr Vector3 Reflect(const Vector3& normal, const Vector3& v)
     //        \ | /
     //   --------------- Boundary
     //
-    Vector3 result = Float{2} * v.Dot(normal) * normal - v;
+    Vector3 result = Float{2} * Math::Dot(v, normal) * normal - v;
     return result;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF constexpr
 Optional<Vector3> Refract(const Vector3& normal,
                           const Vector3& v, Float etaFrom, Float etaTo)
 {
-    using Math::SqrtMax;
+    using namespace Math;
     // Convention of wi (v) and normal is as follows
     //          wo (out)
     //          ^
@@ -173,8 +185,8 @@ Optional<Vector3> Refract(const Vector3& normal,
     // to provide the appropriate normal. It returns wo again "outwards" from the
     // surface. Both "normal" and "wi" is assumed to be normalized.
     Float etaRatio = etaFrom / etaTo;
-    Float cosIn = normal.Dot(v);
-    Float sinInSqr = std::max(Float{0}, Float{1} - cosIn * cosIn);
+    Float cosIn = Dot(normal, v);
+    Float sinInSqr = Max(Float{0}, Float{1} - cosIn * cosIn);
     // Snell's Law
     Float sinOutSqr = etaRatio * etaRatio * sinInSqr;
     Float cosOut = SqrtMax(Float{1} - sinOutSqr);
@@ -185,48 +197,66 @@ Optional<Vector3> Refract(const Vector3& normal,
     return (etaRatio * (-v) + (etaRatio * cosIn - cosOut) * normal);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector3 Orient(const Vector3& v, const Vector3& n)
+MR_HF_DEF constexpr
+Vector3 Orient(const Vector3& v, const Vector3& n)
 {
-    return v.Dot(n) >= Float{0} ? v : (-v);
+    return Math::Dot(v, n) >= Float{0} ? v : (-v);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF constexpr
+Vector3 OrthogonalVector(const Vector3& v)
+{
+    // PBRT Book
+    // https://www.pbr-book.org/3ed-2018/Geometry_and_Transformations/Vectors#CoordinateSystem
+    using Math::Abs;
+    using Math::Sqrt;
+    if(Abs(v[0]) > Abs(v[1]))
+        return Vector3(-v[2], 0, v[0]) / Sqrt(v[0] * v[0] + v[2] * v[2]);
+    else
+        return Vector3(0, v[2], -v[1]) / Sqrt(v[1] * v[1] + v[2] * v[2]);
+}
+
+MR_HF_DEF constexpr
 Vector3 SphericalToCartesian(const Vector3& sphrRTP)
 {
+    using Math::SinCos;
     const auto& [r, theta, phi] = sphrRTP.AsArray();
-    Float x = r * std::cos(theta) * std::sin(phi);
-    Float y = r * std::sin(theta) * std::sin(phi);
-    Float z = r * std::cos(phi);
+    const auto& [sT, cT] = Math::SinCos(theta);
+    const auto& [sP, cP] = Math::SinCos(phi);
+    Float x = r * cT * sP;
+    Float y = r * sT * sP;
+    Float z = r * cP;
     return Vector3(x, y, z);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF constexpr
 Vector3 CartesianToSpherical(const Vector3& xyz)
 {
     // Convert to Spherical Coordinates
-    Vector3 norm = xyz.Normalize();
-    Float r = xyz.Length();
+    Vector3 norm = Math::Normalize(xyz);
+    Float r = Math::Length(xyz);
     // range [-pi, pi]
-    Float azimuth = std::atan2(norm[1], norm[0]);
+    Float azimuth = Math::ArcTan2(norm[1], norm[0]);
     // range [0, pi]
     // Dot product between ZAxis and normalized vector
-    Float incl = std::acos(norm[2]);
+    Float incl = Math::ArcCos(norm[2]);
     return Vector3(r, azimuth, incl);
 }
 
 // Unit version
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF constexpr
 Vector3 UnitSphericalToCartesian(const Vector2& sphrTP)
 {
     const auto& [theta, phi] = sphrTP.AsArray();
-    Float x = std::cos(theta) * std::sin(phi);
-    Float y = std::sin(theta) * std::sin(phi);
-    Float z = std::cos(phi);
+    const auto& [sT, cT] = Math::SinCos(theta);
+    const auto& [sP, cP] = Math::SinCos(phi);
+    Float x = cT * sP;
+    Float y = sT * sP;
+    Float z = cP;
     return Vector3(x, y, z);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF constexpr
 Vector3 UnitSphericalToCartesian(const Vector2& sinCosTheta,
                                  const Vector2& sinCosPhi)
 {
@@ -236,51 +266,51 @@ Vector3 UnitSphericalToCartesian(const Vector2& sinCosTheta,
     return Vector3(x, y, z);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF constexpr
 Vector2 CartesianToUnitSpherical(const Vector3& xyz)
 {
     // Convert to Spherical Coordinates
     // range [-pi, pi]
-    Float azimuth = std::atan2(xyz[1], xyz[0]);
+    Float azimuth = Math::ArcTan2(xyz[1], xyz[0]);
     // range [0, pi]
     // Sometimes normalized cartesian coords may invoke NaN here
     // clamp it to the range
-    Float incl = std::acos(Math::Clamp<Float>(xyz[2], -1, 1));
+    Float incl = Math::ArcCos(Math::Clamp<Float>(xyz[2], -1, 1));
     return Vector2(azimuth, incl);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF constexpr
 Vector2 PolarToCartesian(const Vector2& polarRT)
 {
     const auto& [r, theta] = polarRT.AsArray();
-    Float x = r * std::cos(theta);
-    Float y = r * std::sin(theta);
+    const auto& [s, c] = Math::SinCos(theta);
+    Float x = r * s;
+    Float y = r * c;
     return Vector2(x, y);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF constexpr
 Vector2 CartesianToPolar(const Vector2& xy)
 {
-    Float r = xy.Length();
-    Float theta = std::atan2(xy[1], xy[0]);
+    Float r = Math::Length(xy);
+    Float theta = Math::ArcTan2(xy[1], xy[0]);
     return Vector2(r, theta);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF constexpr
 Vector2 UnitPolarToCartesian(Float theta)
 {
-    Float x = std::cos(theta);
-    Float y = std::sin(theta);
+    const auto& [x, y] = Math::SinCos(theta);
     return Vector2(x, y);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF constexpr
 Float CartesianToUnitPolar(const Vector2& xy)
 {
-    return std::atan2(xy[1], xy[0]);
+    return Math::ArcTan2(xy[1], xy[0]);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF constexpr
 Vector2 DirectionToConcentricOctahedral(const Vector3& dir)
 {
     using namespace MathConstants;
@@ -289,17 +319,17 @@ Vector2 DirectionToConcentricOctahedral(const Vector3& dir)
     // Edge case
     if(dir[0] == 0 && dir[1] == 0) return Vector2(0);
 
-    Float xAbs = std::abs(dir[0]);
-    Float yAbs = std::abs(dir[1]);
+    Float xAbs = Math::Abs(dir[0]);
+    Float yAbs = Math::Abs(dir[1]);
     Float atanIn = yAbs / xAbs;
-    Float phiPrime = std::atan(atanIn);
+    Float phiPrime = Math::ArcTan(atanIn);
 
-    Float radius = std::sqrt(Float{1} - std::abs(dir[2]));
+    Float radius = Math::Sqrt(Float{1} - Math::Abs(dir[2]));
 
     Float v = radius * TwoOvrPi * phiPrime;
     Float u = radius - v;
     // Now convert to the quadrant
-    if(dir[2] < 0)
+    if(dir[2] < Float(0))
     {
         Float uPrime = Float{1} - v;
         Float vPrime = Float{1} - u;
@@ -307,8 +337,8 @@ Vector2 DirectionToConcentricOctahedral(const Vector3& dir)
         v = vPrime;
     }
     // Sign extend the uv
-    u *= (std::signbit(dir[0]) ? Float{-1} : Float{1});
-    v *= (std::signbit(dir[1]) ? Float{-1} : Float{1});
+    u *= Math::SignPM1(dir[0]);
+    v *= Math::SignPM1(dir[1]);
 
     // Finally
     // [-1,1] to [0,1]
@@ -317,47 +347,38 @@ Vector2 DirectionToConcentricOctahedral(const Vector3& dir)
     return st;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF constexpr
 Vector3 ConcentricOctahedralToDirection(const Vector2& st)
 {
     using namespace MathConstants;
     constexpr Float PiOvr4 = Pi<Float>() * Float{0.25};
-
-    // Clang signbit definition is only on std namespace
-    // this is a crappy workaround
-    #ifndef MRAY_DEVICE_CODE_PATH
-    using namespace std;
-    #endif
-
     // [0,1] to [-1,1]
     Vector2 uv = st * 2 - 1;
-    Vector2 uvAbs = uv.Abs();
+    Vector2 uvAbs = Math::Abs(uv);
 
     // Radius
     Float d = 1 - uvAbs.Sum();
-    Float radius = 1 - abs(d);
+    Float radius = 1 - Math::Abs(d);
     Float phiPrime = 0;
     // Avoid division by zero
     if(radius != 0) phiPrime = ((uvAbs[1] - uvAbs[0]) / radius + 1) * PiOvr4;
     // Coords
-    Float cosPhi = (signbit(uv[0]) ? -1 : 1) * cos(phiPrime);
-    Float sinPhi = (signbit(uv[1]) ? -1 : 1) * sin(phiPrime);
-    Float z = (signbit(d) ? -1 : 1) * (1 - radius * radius);
+    const auto& [sinPhiP, cosPhiP] = Math::SinCos(phiPrime);
+    Float cosPhi = Math::SignPM1(uv[0]) * cosPhiP;
+    Float sinPhi = Math::SignPM1(uv[1]) * sinPhiP;
+    Float z = Math::SignPM1(d) * (1 - radius * radius);
 
     // Now all is OK do the concentric disk stuff
-    Float xyFactor = radius * sqrt(2 - radius * radius);
+    Float xyFactor = radius * Math::Sqrt(Float(2) - radius * radius);
     Float x = cosPhi * xyFactor;
     Float y = sinPhi * xyFactor;
 
     return Vector3(x, y, z);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF constexpr
 Vector2 ConcentricOctahedralWrap(const Vector2& st)
 {
-    // Get a good signed int candidate according to the "Float" type
-    using IntType = typename std::conditional_t<std::is_same_v<Float, double>, int64_t, int32_t>;
-
     // Given st => (-inf, inf) convert to [0, 1]
     // Octahedral Concentric mapping has straightforward properties
     // if either s or t is odd (integral part) we mirror the st on both sides
@@ -366,12 +387,10 @@ Vector2 ConcentricOctahedralWrap(const Vector2& st)
     Vector2f stConv = st;
     if(st[0] < 0) stConv[0] = -2 - st[0];
     if(st[1] < 0) stConv[1] = -2 - st[1];
-
-    Float iS; Float fS = std::abs(std::modf(stConv[0], &iS));
-    Float iT; Float fT = std::abs(std::modf(stConv[1], &iT));
-    IntType iSInt = static_cast<IntType>(iS);
-    IntType iTInt = static_cast<IntType>(iT);
-    bool doMirror = static_cast<bool>((iSInt & 0x1) ^ (iTInt & 0x1));
+    auto [iS, fS] = Math::ModFInt(stConv[0]);
+    auto [iT, fT] = Math::ModFInt(stConv[1]);
+    fS = Math::Abs(fS); fT = Math::Abs(fT);
+    bool doMirror = static_cast<bool>((iS & 0x1) ^ (iT & 0x1));
     if(doMirror)
     {
         fS = 1 - fS;
@@ -381,9 +400,9 @@ Vector2 ConcentricOctahedralWrap(const Vector2& st)
 }
 
 template<std::integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<2, T>  ConcentricOctahedralWrapInt(const Vector<2, T>& st,
-                                                   const Vector<2, T>& dimensions)
+MR_HF_DEF constexpr
+Vector<2, T>  ConcentricOctahedralWrapInt(const Vector<2, T>& st,
+                                          const Vector<2, T>& dimensions)
 {
     Vector<2, T> stConv = st;
     if constexpr(std::is_signed_v<T>)
@@ -403,24 +422,24 @@ constexpr Vector<2, T>  ConcentricOctahedralWrapInt(const Vector<2, T>& st,
     return fracPart;
 }
 
-MRAY_HYBRID
-constexpr Vector3 GSOrthonormalize(const Vector3& x, const Vector3& y)
+MR_HF_DEF constexpr
+Vector3 GSOrthonormalize(const Vector3& x, const Vector3& y)
 {
-    return (x - y * x.Dot(y)).Normalize();
+    return Math::Normalize(x - y * Math::Dot(x, y));
 }
 
-MRAY_HYBRID
-constexpr Pair<Vector3, Vector3> GSOrthonormalize(const Vector3& x,
-                                                  const Vector3& y,
-                                                  const Vector3& z)
+MR_HF_DEF constexpr
+std::array<Vector3, 2> GSOrthonormalize(const Vector3& x,
+                                        const Vector3& y,
+                                        const Vector3& z)
 {
     Vector3 rY = GSOrthonormalize(y, z);
     Vector3 rX = GSOrthonormalize(x, rY);
-    return std::make_pair(rX, rY);
+    return {rX, rY};
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector2 UVToSphericalAngles(const Vector2& uv)
+MR_HF_DEF constexpr
+Vector2 UVToSphericalAngles(const Vector2& uv)
 {
     using namespace MathConstants;
     return Vector2(// [-pi, pi]
@@ -429,8 +448,8 @@ constexpr Vector2 UVToSphericalAngles(const Vector2& uv)
                    (1 - uv[1]) * Pi<Float>());
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector2 SphericalAnglesToUV(const Vector2& thetaPhi)
+MR_HF_DEF constexpr
+Vector2 SphericalAnglesToUV(const Vector2& thetaPhi)
 {
     using namespace MathConstants;
     // Theta range [-pi, pi)
@@ -446,28 +465,27 @@ constexpr Vector2 SphericalAnglesToUV(const Vector2& thetaPhi)
 }
 
 template<>
-MRAY_HYBRID constexpr
+MR_HF_DEF constexpr
 uint32_t TextureMipSize<uint32_t>(const uint32_t& resolution, uint32_t mipLevel)
 {
-    return std::max(resolution >> mipLevel, 1u);
+    return Math::Max(resolution >> mipLevel, 1u);
 }
 
 template<class DimType>
 requires(std::is_same_v<DimType, Vector2ui> || std::is_same_v<DimType, Vector3ui>)
-MRAY_HYBRID constexpr
-DimType TextureMipSize(const DimType& resolution,
-                       uint32_t mipLevel)
+MR_HF_DEF constexpr
+DimType TextureMipSize(const DimType& resolution, uint32_t mipLevel)
 {
     DimType mipRes;
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP_N(DimType::Dims)
     for(uint32_t i = 0; i < DimType::Dims; i++)
         mipRes[i] = resolution[i] >> mipLevel;
 
-    return DimType::Max(mipRes, DimType(1));
+    return Math::Max(mipRes, DimType(1));
 }
 
 template<>
-MRAY_HYBRID constexpr
+MR_HF_DEF constexpr
 uint32_t TextureMipCount<uint32_t>(const uint32_t& resolution)
 {
     return Bit::RequiredBitsToRepresent(resolution);
@@ -475,7 +493,7 @@ uint32_t TextureMipCount<uint32_t>(const uint32_t& resolution)
 
 template<class DimType>
 requires(std::is_same_v<DimType, Vector2ui> || std::is_same_v<DimType, Vector3ui>)
-MRAY_HYBRID constexpr
+MR_HF_DEF constexpr
 uint32_t TextureMipCount(const DimType& resolution)
 {
     uint32_t maxDim = resolution[resolution.Maximum()];
@@ -486,12 +504,11 @@ template<class DimType>
 requires(std::is_same_v<DimType, Vector2ui> ||
          std::is_same_v<DimType, Vector3ui> ||
          std::is_same_v<DimType, uint32_t>)
-MRAY_HYBRID constexpr
+MR_HF_DEF constexpr
 uint32_t TextureMipPixelStart(const DimType& baseResolution, uint32_t mipLevel)
 {
     assert(TextureMipCount(baseResolution) > mipLevel);
     uint32_t mipPixelStart = 0;
-    UNROLL_LOOP
     for(uint32_t i = 0; i < mipLevel; i++)
     {
         if constexpr(std::is_same_v<DimType, uint32_t>)
@@ -503,7 +520,7 @@ uint32_t TextureMipPixelStart(const DimType& baseResolution, uint32_t mipLevel)
 }
 
 template<uint32_t C>
-MRAY_HYBRID constexpr
+MR_HF_DEF constexpr
 Vector<C, Float> ConvertPixelIndices(const Vector<C, Float>& inputIndex,
                                      const Vector<C, Float>& toResolution,
                                      const Vector<C, Float>& fromResolution)
@@ -511,27 +528,24 @@ Vector<C, Float> ConvertPixelIndices(const Vector<C, Float>& inputIndex,
     Vector<C, Float> result;
     Vector<C, Float> uvRatio = toResolution / fromResolution;
     result = (inputIndex + Float(0.5)) * uvRatio - Float(0.5);
-    result.ClampSelf(Vector2::Zero(), toResolution - Vector2(1));
+    result = Math::Clamp(result, Vector2::Zero(), toResolution - Vector2(1));
     return result;
 }
 
 template <>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr uint32_t MortonCode::MaxBits3D()
+MR_PF_DEF uint32_t MortonCode::MaxBits3D() noexcept
 {
     return 10u;
 }
 
 template <>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr uint64_t MortonCode::MaxBits3D()
+MR_PF_DEF uint64_t MortonCode::MaxBits3D() noexcept
 {
     return 21u;
 }
 
 template <>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr uint32_t MortonCode::Compose3D(const Vector3ui& val)
+MR_PF_DEF uint32_t MortonCode::Compose3D(const Vector3ui& val) noexcept
 {
     auto Expand3D = [](uint32_t x) -> uint32_t
     {
@@ -551,8 +565,7 @@ constexpr uint32_t MortonCode::Compose3D(const Vector3ui& val)
 }
 
 template <>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr uint64_t MortonCode::Compose3D(const Vector3ui& val)
+MR_PF_DEF uint64_t MortonCode::Compose3D(const Vector3ui& val) noexcept
 {
     auto Expand3D = [](uint32_t v) -> uint64_t
     {
@@ -574,8 +587,7 @@ constexpr uint64_t MortonCode::Compose3D(const Vector3ui& val)
 }
 
 template <>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector3ui MortonCode::Decompose3D(uint32_t code)
+MR_PF_DEF Vector3ui MortonCode::Decompose3D(uint32_t code) noexcept
 {
     auto Shrink3D = [](uint32_t x) -> uint32_t
     {
@@ -594,8 +606,7 @@ constexpr Vector3ui MortonCode::Decompose3D(uint32_t code)
 }
 
 template <>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector3ui MortonCode::Decompose3D(uint64_t code)
+MR_PF_DEF Vector3ui MortonCode::Decompose3D(uint64_t code) noexcept
 {
     auto Shrink3D = [](uint64_t x) -> uint32_t
     {
@@ -615,22 +626,19 @@ constexpr Vector3ui MortonCode::Decompose3D(uint64_t code)
 }
 
 template <>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr uint32_t MortonCode::MaxBits2D()
+MR_PF_DEF uint32_t MortonCode::MaxBits2D() noexcept
 {
     return 16u;
 }
 
 template <>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr uint64_t MortonCode::MaxBits2D()
+MR_PF_DEF uint64_t MortonCode::MaxBits2D() noexcept
 {
     return 32u;
 }
 
 template <>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr uint32_t MortonCode::Compose2D(const Vector2ui& val)
+MR_PF_DEF uint32_t MortonCode::Compose2D(const Vector2ui& val) noexcept
 {
     auto Expand2D = [](uint32_t val) -> uint32_t
     {
@@ -649,8 +657,7 @@ constexpr uint32_t MortonCode::Compose2D(const Vector2ui& val)
 }
 
 template <>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr uint64_t MortonCode::Compose2D(const Vector2ui& val)
+MR_PF_DEF uint64_t MortonCode::Compose2D(const Vector2ui& val) noexcept
 {
     auto Expand2D = [](uint32_t val) -> uint64_t
     {
@@ -670,8 +677,7 @@ constexpr uint64_t MortonCode::Compose2D(const Vector2ui& val)
 }
 
 template <>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector2ui MortonCode::Decompose2D(uint32_t code)
+MR_PF_DEF Vector2ui MortonCode::Decompose2D(uint32_t code) noexcept
 {
     auto Shrink2D = [](uint32_t x)
     {
@@ -688,8 +694,7 @@ constexpr Vector2ui MortonCode::Decompose2D(uint32_t code)
 }
 
 template <>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector2ui MortonCode::Decompose2D(uint64_t code)
+MR_PF_DEF Vector2ui MortonCode::Decompose2D(uint64_t code) noexcept
 {
     auto Shrink2D = [](uint64_t x)
     {

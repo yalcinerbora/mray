@@ -126,9 +126,17 @@ void BinaryPartition(Span<T> dOutput,
 
             uint32_t offset = kp.blockId * workPerBlock;
             uint32_t localWCount = std::min(offset + workPerBlock, elemCount) - offset;
+            if(offset >= dInput.size())
+                MRAY_DEBUG_BREAK;
             Span<const T> dLocalInput = dInput.subspan(offset, localWCount);
             for(const T& v : dLocalInput)
             {
+                if(((globalOffset.left + localOffset[0]) >= dOutput.size()) &&
+                   ((globalOffset.right + localOffset[1]) >= dOutput.size()))
+                {
+                    MRAY_DEBUG_BREAK;
+                }
+
                 if(op(v))   dOutput[globalOffset.left +  (localOffset[0]++)] = v;
                 else        dOutput[globalOffset.right + (localOffset[1]++)] = v;
             }

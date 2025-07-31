@@ -2,10 +2,9 @@
 
 template <unsigned int N, ArithmeticC T>
 template <std::convertible_to<T> C>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T>::Matrix(C t)
+MR_PF_DEF_V Matrix<N, T>::Matrix(C t) noexcept
 {
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
     {
         matrix[i] = static_cast<T>(t);
@@ -14,10 +13,9 @@ constexpr Matrix<N, T>::Matrix(C t)
 
 template <unsigned int N, ArithmeticC T>
 template <std::convertible_to<T> C>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T>::Matrix(Span<const C, N*N> data)
+MR_PF_DEF_V Matrix<N, T>::Matrix(Span<const C, N*N> data) noexcept
 {
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
     {
         matrix[i] = static_cast<T>(data[i]);
@@ -26,19 +24,19 @@ constexpr Matrix<N, T>::Matrix(Span<const C, N*N> data)
 
 template <unsigned int N, ArithmeticC T>
 template <class... Args>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T>::Matrix(const Args... dataList) requires (std::convertible_to<Args, T> && ...) && (sizeof...(Args) == N * N)
+MR_PF_DEF_V Matrix<N, T>::Matrix(const Args... dataList) noexcept
+requires(std::convertible_to<Args, T> && ...) && (sizeof...(Args) == N * N)
     : matrix{static_cast<T>(dataList) ...}
 {}
 
 template <unsigned int N, ArithmeticC T>
 template <class... Rows>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T>::Matrix(const Rows&... rows) requires (std::is_same_v<Rows, Vector<N, T>> && ...) && (sizeof...(Rows) == N)
+MR_PF_DEF_V Matrix<N, T>::Matrix(const Rows&... rows) noexcept
+requires(std::is_same_v<Rows, Vector<N, T>> && ...) && (sizeof...(Rows) == N)
 {
     auto Write = [this](const Vector3& v, unsigned int row) -> void
     {
-        UNROLL_LOOP
+        MRAY_UNROLL_LOOP
         for(unsigned int j = 0; j < N; j++)
         {
             matrix[row * N + j] = v[j];
@@ -63,14 +61,13 @@ constexpr Matrix<N, T>::Matrix(const Rows&... rows) requires (std::is_same_v<Row
 
 template <unsigned int N, ArithmeticC T>
 template <unsigned int M>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T>::Matrix(const Matrix<M, T>& other) requires (M > N)
+MR_PF_DEF_V Matrix<N, T>::Matrix(const Matrix<M, T>& other) noexcept requires (M > N)
 {
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N; i++)
     {
         Vector<N, T> v = Vector<N, T>(other.matrix + i * M);
-        UNROLL_LOOP
+        MRAY_UNROLL_LOOP
         for(int j = 0; j < N; j++)
         {
             matrix[i * N + j] = v[j];
@@ -79,52 +76,45 @@ constexpr Matrix<N, T>::Matrix(const Matrix<M, T>& other) requires (M > N)
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T& Matrix<N, T>::operator[](unsigned int i)
+MR_PF_DEF T& Matrix<N, T>::operator[](unsigned int i) noexcept
 {
     return matrix[i];
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr const T& Matrix<N, T>::operator[](unsigned int i) const
+MR_PF_DEF const T& Matrix<N, T>::operator[](unsigned int i) const noexcept
 {
     return matrix[i];
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T& Matrix<N, T>::operator()(unsigned int row, unsigned int column)
+MR_PF_DEF T& Matrix<N, T>::operator()(unsigned int row, unsigned int column) noexcept
 {
     return matrix[row * N + column];
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr const T& Matrix<N, T>::operator()(unsigned int row, unsigned int column) const
+MR_PF_DEF const T& Matrix<N, T>::operator()(unsigned int row, unsigned int column) const noexcept
 {
     return matrix[row * N + column];
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr const std::array<T, N*N>& Matrix<N, T>::AsArray() const
+MR_PF_DEF const std::array<T, N*N>& Matrix<N, T>::AsArray() const noexcept
 {
     return matrix;
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr std::array<T, N*N>& Matrix<N, T>::AsArray()
+MR_PF_DEF std::array<T, N*N>& Matrix<N, T>::AsArray() noexcept
 {
     return matrix;
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr void Matrix<N, T>::operator+=(const Matrix& right)
+MR_PF_DEF_V void Matrix<N, T>::operator+=(const Matrix& right) noexcept
 {
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
     {
         matrix[i] += right.matrix[i];
@@ -132,10 +122,9 @@ constexpr void Matrix<N, T>::operator+=(const Matrix& right)
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr void Matrix<N, T>::operator-=(const Matrix& right)
+MR_PF_DEF_V void Matrix<N, T>::operator-=(const Matrix& right) noexcept
 {
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
     {
         matrix[i] -= right.matrix[i];
@@ -143,18 +132,16 @@ constexpr void Matrix<N, T>::operator-=(const Matrix& right)
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr void Matrix<N, T>::operator*=(const Matrix& right)
+MR_PF_DEF_V void Matrix<N, T>::operator*=(const Matrix& right) noexcept
 {
     Matrix m = (*this) * right;
     *this = m;
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr void Matrix<N, T>::operator*=(T right)
+MR_PF_DEF_V void Matrix<N, T>::operator*=(T right) noexcept
 {
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
     {
         matrix[i] *= right;
@@ -162,10 +149,9 @@ constexpr void Matrix<N, T>::operator*=(T right)
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr void Matrix<N, T>::operator/=(const Matrix& right)
+MR_PF_DEF_V void Matrix<N, T>::operator/=(const Matrix& right) noexcept
 {
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
     {
         matrix[i] /= right.matrix[i];
@@ -173,10 +159,9 @@ constexpr void Matrix<N, T>::operator/=(const Matrix& right)
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr void Matrix<N, T>::operator/=(T right)
+MR_PF_DEF_V void Matrix<N, T>::operator/=(T right) noexcept
 {
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
     {
         matrix[i] /= right;
@@ -184,11 +169,10 @@ constexpr void Matrix<N, T>::operator/=(T right)
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::operator+(const Matrix& right) const
+MR_PF_DEF_V Matrix<N, T> Matrix<N, T>::operator+(const Matrix& right) const noexcept
 {
     Matrix m;
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
     {
         m.matrix[i] = matrix[i] + right.matrix[i];
@@ -197,11 +181,10 @@ constexpr Matrix<N, T> Matrix<N, T>::operator+(const Matrix& right) const
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::operator-(const Matrix& right) const
+MR_PF_DEF Matrix<N, T> Matrix<N, T>::operator-(const Matrix& right) const noexcept
 {
     Matrix m;
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
     {
         m.matrix[i] = matrix[i] - right.matrix[i];
@@ -210,11 +193,10 @@ constexpr Matrix<N, T> Matrix<N, T>::operator-(const Matrix& right) const
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::operator-() const requires SignedC<T>
+MR_PF_DEF Matrix<N, T> Matrix<N, T>::operator-() const noexcept requires SignedC<T>
 {
     Matrix m;
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
     {
         m.matrix[i] = -matrix[i];
@@ -223,11 +205,10 @@ constexpr Matrix<N, T> Matrix<N, T>::operator-() const requires SignedC<T>
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::operator/(const Matrix& right) const
+MR_PF_DEF Matrix<N, T> Matrix<N, T>::operator/(const Matrix& right) const noexcept
 {
     Matrix m;
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
     {
         m.matrix[i] = matrix[i] / right.matrix[i];
@@ -236,11 +217,10 @@ constexpr Matrix<N, T> Matrix<N, T>::operator/(const Matrix& right) const
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::operator/(T right) const
+MR_PF_DEF Matrix<N, T> Matrix<N, T>::operator/(T right) const noexcept
 {
     Matrix m;
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
     {
         m.matrix[i] = matrix[i] / right;
@@ -249,27 +229,27 @@ constexpr Matrix<N, T> Matrix<N, T>::operator/(T right) const
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::operator*(const Matrix& right) const
+MR_PF_DEF Matrix<N, T> Matrix<N, T>::operator*(const Matrix& right) const noexcept
 {
     Matrix m;
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N; i++)
     {
         // Load the right column vector for this iteration
         // This is strided access unfortunately
         Vector<N, T> col;
-        UNROLL_LOOP
+        MRAY_UNROLL_LOOP
         for(unsigned int j = 0; j < N; j++)
         {
             col[j] = right.matrix[i + j * N];
         }
         // Dot product with each row, write is strided again
-        UNROLL_LOOP
+        MRAY_UNROLL_LOOP
         for(unsigned int j = 0; j < N; j++)
         {
+            using Math::Dot;
             auto leftRow = Vector<N, T>(Span<const T, N>(matrix.data() + j * N, N));
-            m(j, i) = leftRow.Dot(col);
+            m(j, i) = Dot(leftRow, col);
         }
     }
     return m;
@@ -277,25 +257,24 @@ constexpr Matrix<N, T> Matrix<N, T>::operator*(const Matrix& right) const
 
 template <unsigned int N, ArithmeticC T>
 template <unsigned int M>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<M, T> Matrix<N, T>::operator*(const Vector<M, T>& right) const requires (M == N) || ((M + 1) == N)
+MR_PF_DEF Vector<M, T> Matrix<N, T>::operator*(const Vector<M, T>& right) const noexcept requires (M == N) || ((M + 1) == N)
 {
     Vector<M, T> v;
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < M; i++)
     {
+        using Math::Dot;
         auto leftRow = Vector<M, T>(Span<const T, M>(matrix.data() + i * N, M));
-        v[i] = leftRow.Dot(right);
+        v[i] = Dot(leftRow, right);
     }
     return v;
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::operator*(T right) const
+MR_PF_DEF Matrix<N, T> Matrix<N, T>::operator*(T right) const noexcept
 {
     Matrix m;
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
     {
         m.matrix[i] = matrix[i] * right;
@@ -304,11 +283,10 @@ constexpr Matrix<N, T> Matrix<N, T>::operator*(T right) const
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr bool Matrix<N, T>::operator==(const Matrix& right) const
+MR_PF_DEF bool Matrix<N, T>::operator==(const Matrix& right) const noexcept
 {
     bool eq = true;
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N * N; i++)
     {
         eq &= matrix[i] == right.matrix[i];
@@ -317,23 +295,20 @@ constexpr bool Matrix<N, T>::operator==(const Matrix& right) const
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr bool Matrix<N, T>::operator!=(const Matrix& right) const
+MR_PF_DEF bool Matrix<N, T>::operator!=(const Matrix& right) const noexcept
 {
     return !(*this == right);
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T Matrix<N, T>::Determinant() const requires (N == 2)
+MR_PF_DEF T Matrix<N, T>::Determinant() const noexcept requires (N == 2)
 {
     const T* m = matrix;
     return m[0] * m[3] - m[1] * m[2];
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T Matrix<N, T>::Determinant() const requires (N == 3)
+MR_PF_DEF T Matrix<N, T>::Determinant() const noexcept requires (N == 3)
 {
     const T* m = matrix;
     T det1 = m[0] * (m[4] * m[8] - m[7] * m[5]);
@@ -343,8 +318,7 @@ constexpr T Matrix<N, T>::Determinant() const requires (N == 3)
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T Matrix<N, T>::Determinant() const requires (N == 4)
+MR_PF_DEF T Matrix<N, T>::Determinant() const noexcept requires (N == 4)
 {
     const T* m = matrix;
     // Changing this to the PBRT-v4 version
@@ -377,8 +351,7 @@ constexpr T Matrix<N, T>::Determinant() const requires (N == 4)
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::Inverse() const requires std::floating_point<T> && (N == 2)
+MR_PF_DEF Matrix<N, T> Matrix<N, T>::Inverse() const noexcept requires FloatC<T> && (N == 2)
 {
     const T* m = matrix;
     Matrix<2, T> result;
@@ -392,8 +365,7 @@ constexpr Matrix<N, T> Matrix<N, T>::Inverse() const requires std::floating_poin
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::Inverse() const requires std::floating_point<T> && (N == 3)
+MR_PF_DEF Matrix<N, T> Matrix<N, T>::Inverse() const noexcept requires FloatC<T> && (N == 3)
 {
     // Do not use determinant function here hand craft it
     // Some data is used on the matrix itself
@@ -416,19 +388,15 @@ constexpr Matrix<N, T> Matrix<N, T>::Inverse() const requires std::floating_poin
     T m22 = Det2x2(m[0], m[1], m[3], m[4]);
 
     T det = m[0] * m00 - m[1] * m01 + m[2] * m02;
-    T detInv = 1 / det;
+    T detInv = T(1) / det;
 
-    //return detInv * Matrix<3, T>( m00, -m01,  m02,
-    //                             -m10,  m11, -m12,
-    //                              m20, -m21,  m22);
     return detInv * Matrix<3, T>(m00, -m10, m20,
                                  -m01, m11, -m21,
                                  m02, -m12, m22);
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::Inverse() const requires std::floating_point<T> && (N == 4)
+MR_PF_DEF Matrix<N, T> Matrix<N, T>::Inverse() const noexcept requires FloatC<T> && (N == 4)
 {
     // Changing this to the PBRT-v4 version
     // https://www.geometrictools.com/Documentation/LaplaceExpansionTheorem.pdf
@@ -485,23 +453,13 @@ constexpr Matrix<N, T> Matrix<N, T>::Inverse() const requires std::floating_poin
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T>& Matrix<N, T>::InverseSelf() requires std::floating_point<T>
-{
-    Matrix<N, T> m = Inverse();
-    (*this) = m;
-    return (*this);
-}
-
-template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::Transpose() const
+MR_PF_DEF Matrix<N, T> Matrix<N, T>::Transpose() const noexcept
 {
     Matrix m;
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < N; i++)
     {
-        UNROLL_LOOP
+        MRAY_UNROLL_LOOP
         for(unsigned int j = 0; j < N; j++)
         {
             m(j, i) = (*this)(i, j);
@@ -511,250 +469,13 @@ constexpr Matrix<N, T> Matrix<N, T>::Transpose() const
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T>& Matrix<N, T>::TransposeSelf()
-{
-    UNROLL_LOOP
-    for(unsigned int i = 1; i < N; i++)
-    {
-        UNROLL_LOOP
-        for(unsigned int j = 0; j < i; j++)
-        {
-            T a = (*this)(i, j);
-            (*this)(i, j) = (*this)(j, i);
-            (*this)(j, i) = a;
-        }
-    }
-    return *this;
-}
-
-template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::Clamp(const Matrix& minVal, const Matrix& maxVal) const
-{
-    Matrix m;
-    UNROLL_LOOP
-    for(unsigned int i = 0; i < N * N; i++)
-    {
-        m[i] = min(max(minVal[i], matrix[i]), maxVal[i]);
-    }
-    return m;
-}
-
-template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::Clamp(T minVal, T maxVal) const
-{
-    Matrix m;
-    UNROLL_LOOP
-    for(unsigned int i = 0; i < N * N; i++)
-    {
-        m[i] = min(max(minVal, matrix[i]), maxVal);
-    }
-    return m;
-}
-
-template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T>& Matrix<N, T>::ClampSelf(const Matrix& minVal, const Matrix& maxVal)
-{
-    UNROLL_LOOP
-    for(unsigned int i = 0; i < N * N; i++)
-    {
-        matrix[i] = min(max(minVal[i], matrix[i]), maxVal[i]);
-    }
-    return *this;
-}
-
-template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T>& Matrix<N, T>::ClampSelf(T minVal, T maxVal)
-{
-    UNROLL_LOOP
-    for(unsigned int i = 0; i < N * N; i++)
-    {
-        matrix[i] = min(max(minVal, matrix[i]), maxVal);
-    }
-    return *this;
-}
-
-template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::Abs() const requires SignedC<T>
-{
-    Matrix m;
-    UNROLL_LOOP
-    for(unsigned int i = 0; i < N * N; i++)
-    {
-        m[i] = abs(matrix[i]);
-    }
-    return m;
-}
-
-template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T>& Matrix<N, T>::AbsSelf() requires SignedC<T>
-{
-    UNROLL_LOOP
-    for(unsigned int i = 0; i < N * N; i++)
-    {
-        matrix[i] = abs(matrix[i]);
-    }
-    return *this;
-}
-
-template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::Round() const requires std::floating_point<T>
-{
-    Matrix m;
-    UNROLL_LOOP
-    for(unsigned int i = 0; i < N * N; i++)
-    {
-        m[i] = round(matrix[i]);
-    }
-    return m;
-}
-
-template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T>& Matrix<N, T>::RoundSelf() requires std::floating_point<T>
-{
-    UNROLL_LOOP
-    for(unsigned int i = 0; i < N * N; i++)
-    {
-        matrix[i] = round(matrix[i]);
-    }
-    return *this;
-}
-
-template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::Floor() const requires std::floating_point<T>
-{
-    Matrix m;
-    UNROLL_LOOP
-    for(unsigned int i = 0; i < N * N; i++)
-    {
-        m[i] = floor(matrix[i]);
-    }
-    return m;
-}
-
-template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T>& Matrix<N, T>::FloorSelf() requires std::floating_point<T>
-{
-    UNROLL_LOOP
-    for(unsigned int i = 0; i < N * N; i++)
-    {
-        matrix[i] = floor(matrix[i]);
-    }
-    return *this;
-}
-
-template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::Ceil() const requires std::floating_point<T>
-{
-    Matrix m;
-    UNROLL_LOOP
-    for(unsigned int i = 0; i < N * N; i++)
-    {
-        m[i] = ceil(matrix[i]);
-    }
-    return m;
-}
-
-template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T>& Matrix<N, T>::CeilSelf() requires std::floating_point<T>
-{
-    UNROLL_LOOP
-    for(unsigned int i = 0; i < N * N; i++)
-    {
-        matrix[i] = ceil(matrix[i]);
-    }
-    return *this;
-}
-
-template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::Lerp(const Matrix& mat0,
-                                          const Matrix& mat1,
-                                          T t)  requires std::floating_point<T>
-{
-    assert(t >= 0 && t <= 1);
-    Matrix m;
-    UNROLL_LOOP
-    for(unsigned int i = 0; i < N * N; i++)
-    {
-        m[i] = (1 - t) * mat0[i] + t * mat1[i];
-    }
-    return m;
-}
-
-template <unsigned int N, ArithmeticC T>
- MRAY_HYBRID MRAY_CGPU_INLINE
-     constexpr Matrix<N, T> Matrix<N, T>::Min(const Matrix& mat0, const Matrix& mat1)
-{
-    Matrix m;
-    UNROLL_LOOP
-    for(unsigned int i = 0; i < N * N; i++)
-    {
-        m[i] = min(mat0[i], mat1[i]);
-    }
-    return m;
-}
-
-template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::Min(const Matrix& mat0, T t)
-{
-    Matrix m;
-    UNROLL_LOOP
-    for(unsigned int i = 0; i < N * N; i++)
-    {
-        m[i] = min(mat0[i], t);
-    }
-    return m;
-}
-
-template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::Max(const Matrix& mat0, const Matrix& mat1)
-{
-    Matrix m;
-    UNROLL_LOOP
-    for(unsigned int i = 0; i < N * N; i++)
-    {
-        m[i] = max(mat0[i], mat1[i]);
-    }
-    return m;
-}
-
-template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::Max(const Matrix& mat0, T t)
-{
-    Matrix m;
-    UNROLL_LOOP
-    for(unsigned int i = 0; i < N * N; i++)
-    {
-        m[i] = max(mat0[i], t);
-    }
-    return m;
-}
-
-template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::Identity()
+MR_PF_DEF Matrix<N, T> Matrix<N, T>::Identity() noexcept
 {
     Matrix<N, T> matrix;
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int y = 0; y < N; y++)
     {
-        UNROLL_LOOP
+        MRAY_UNROLL_LOOP
         for(unsigned int  x = 0; x < N; x++)
         {
             matrix[y * N + x] = (x == y) ? T{1} : T{0};
@@ -764,22 +485,19 @@ constexpr Matrix<N, T> Matrix<N, T>::Identity()
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> Matrix<N, T>::Zero()
+MR_PF_DEF Matrix<N, T> Matrix<N, T>::Zero() noexcept
 {
     return Matrix<N, T>(T{0});
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr RayT<T> Matrix<N, T>::TransformRay(const RayT<T>& r) const requires (N == 3)
+MR_PF_DEF RayT<T> Matrix<N, T>::TransformRay(const RayT<T>& r) const noexcept requires (N == 3)
 {
     return RayT<T>((*this) * r.Dir(), (*this) * r.Pos());
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr RayT<T> Matrix<N, T>::TransformRay(const RayT<T>& r) const requires (N == 4)
+MR_PF_DEF RayT<T> Matrix<N, T>::TransformRay(const RayT<T>& r) const noexcept requires (N == 4)
 {
     auto tDir = Vector<N - 1, T>((*this) * Vector<N, T>(r.Dir(), T{0}));
     auto tPos = Vector<N - 1, T>((*this) * Vector<N, T>(r.Pos(), T{1}));
@@ -789,14 +507,13 @@ constexpr RayT<T> Matrix<N, T>::TransformRay(const RayT<T>& r) const requires (N
 
 template <unsigned int N, ArithmeticC T>
 template <unsigned int M>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr AABB<M, T> Matrix<N, T>::TransformAABB(const AABB<M, T>& aabb) const requires((M + 1) == N)
+MR_PF_DEF AABB<M, T> Matrix<N, T>::TransformAABB(const AABB<M, T>& aabb) const noexcept requires((M + 1) == N)
 {
     AABB<M, T> result = AABB<M, T>::Negative();
     for(unsigned int i = 0; i < AABB<M, T>::AABBVertexCount; i++)
     {
         Vector<N, T> vertex;
-        UNROLL_LOOP
+        MRAY_UNROLL_LOOP
         for(unsigned int j = 0; j < M; j ++)
         {
             vertex[j] = ((i >> j) & 0b1) ? aabb.Max()[j] : aabb.Min()[j];
@@ -804,26 +521,25 @@ constexpr AABB<M, T> Matrix<N, T>::TransformAABB(const AABB<M, T>& aabb) const r
         vertex[M] = T{1};
         vertex = (*this) * vertex;
 
-        result.SetMax(Vector<M, T>::Max(result.Max(), Vector<M, T>(vertex)));
-        result.SetMin(Vector<M, T>::Min(result.Min(), Vector<M, T>(vertex)));
+        result.SetMax(Math::Max(result.Max(), Vector<M, T>(vertex)));
+        result.SetMin(Math::Min(result.Min(), Vector<M, T>(vertex)));
     }
     return result;
 }
 
 template <unsigned int N, ArithmeticC T>
 template <unsigned int M>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<M, T> Matrix<N, T>::LeftMultiply(const Vector<M, T>& normal)  const requires (M <= N)
+MR_PF_DEF Vector<M, T> Matrix<N, T>::LeftMultiply(const Vector<M, T>& normal) const noexcept requires (M <= N)
 {
     // Special case of left multiply
     // Instead of transposing matrix multiplying
     // the vector from "left"
     Vector<M, T> v;
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < M; i++)
     {
         T result = 0;
-        UNROLL_LOOP
+        MRAY_UNROLL_LOOP
         for(unsigned int k = 0; k < M; k++)
         {
             result += matrix[i + N * k] * normal[k];
@@ -835,16 +551,14 @@ constexpr Vector<M, T> Matrix<N, T>::LeftMultiply(const Vector<M, T>& normal)  c
 }
 
 template <unsigned int N, ArithmeticC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<N, T> operator*(T t, const Matrix<N, T>& mat)
+MR_PF_DEF Matrix<N, T> operator*(T t, const Matrix<N, T>& mat) noexcept
 {
     return mat * t;
 }
 
 // Spacial Matrix4x4 -> Matrix3x3
-template<std::floating_point T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<4, T> ToMatrix4x4(const Matrix<3, T>& m)
+template<FloatC T>
+MR_PF_DEF Matrix<4, T> ToMatrix4x4(const Matrix<3, T>& m) noexcept
 {
     return Matrix<4, T>(m[0], m[1], m[2], 0,
                         m[3], m[4], m[5], 0,
@@ -852,9 +566,8 @@ constexpr Matrix<4, T> ToMatrix4x4(const Matrix<3, T>& m)
                         0,    0,    0,    1);
 }
 
-template<std::floating_point T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<3, T> TransformGen::ExtractScale(const Matrix<4, T>& m)
+template<FloatC T>
+MR_PF_DEF Vector<3, T> TransformGen::ExtractScale(const Matrix<4, T>& m) noexcept
 {
     // This is not proper!
     // This should fail if transform matrix has shear
@@ -864,22 +577,20 @@ constexpr Vector<3, T> TransformGen::ExtractScale(const Matrix<4, T>& m)
     // https://theswissbay.ch/pdf/Gentoomen%20Library/Game%20Development/Programming/Graphics%20Gems%202.pdf
     // Chapter VII
 
-    T sX = Vector<3, T>(m[0], m[1], m[2]).Length();
-    T sY = Vector<3, T>(m[4], m[5], m[6]).Length();
-    T sZ = Vector<3, T>(m[8], m[9], m[10]).Length();
+    T sX = Math::Length(Vector<3, T>(m[0], m[1], m[2]));
+    T sY = Math::Length(Vector<3, T>(m[4], m[5], m[6]));
+    T sZ = Math::Length(Vector<3, T>(m[8], m[9], m[10]));
     return Vector<3, T>(sX, sY, sZ);
 }
 
-template<std::floating_point T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<3, T> TransformGen::ExtractTranslation(const Matrix<4, T>& m)
+template<FloatC T>
+MR_PF_DEF Vector<3, T> TransformGen::ExtractTranslation(const Matrix<4, T>& m) noexcept
 {
     return Vector<3, T>(m[12], m[13], m[14]);
 }
 
-template<std::floating_point T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<4, T> TransformGen::Translate(const Vector<3, T>& v)
+template<FloatC T>
+MR_PF_DEF Matrix<4, T> TransformGen::Translate(const Vector<3, T>& v) noexcept
 {
     //  1       0       0       tx
     //  0       1       0       ty
@@ -891,9 +602,8 @@ constexpr Matrix<4, T> TransformGen::Translate(const Vector<3, T>& v)
                         0, 0, 0,   1);
 }
 
-template<std::floating_point T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<4, T> TransformGen::Scale(T s)
+template<FloatC T>
+MR_PF_DEF Matrix<4, T> TransformGen::Scale(T s) noexcept
 {
     //  s       0       0       0
     //  0       s       0       0
@@ -905,9 +615,8 @@ constexpr Matrix<4, T> TransformGen::Scale(T s)
                         0, 0, 0, 1);
 }
 
-template<std::floating_point T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<4, T> TransformGen::Scale(T x, T y, T z)
+template<FloatC T>
+MR_PF_DEF Matrix<4, T> TransformGen::Scale(T x, T y, T z) noexcept
 {
     //  sx      0       0       0
     //  0       sy      0       0
@@ -919,39 +628,36 @@ constexpr Matrix<4, T> TransformGen::Scale(T x, T y, T z)
                         0, 0, 0, 1);
 }
 
-template<std::floating_point T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<4, T> TransformGen::Rotate(T angle, const Vector<3, T>& axis)
+template<FloatC T>
+MR_PF_DEF Matrix<4, T> TransformGen::Rotate(T angle, const Vector<3, T>& axis) noexcept
 {
-    using namespace std;
     //  r       r       r       0
     //  r       r       r       0
     //  r       r       r       0
     //  0       0       0       1
     T tmp1, tmp2;
 
-    T cosAngle = cos(angle);
-    T sinAngle = sin(angle);
-    T t = 1 - cosAngle;
+    const auto& [sinTheta, cosTheta] = Math::SinCos(angle);
+    T t = 1 - cosTheta;
 
     tmp1 = axis[0] * axis[1] * t;
-    tmp2 = axis[2] * sinAngle;
+    tmp2 = axis[2] * sinTheta;
     T m21 = tmp1 + tmp2;
     T m12 = tmp1 - tmp2;
 
     tmp1 = axis[0] * axis[2] * t;
-    tmp2 = axis[1] * sinAngle;
+    tmp2 = axis[1] * sinTheta;
     T m31 = tmp1 - tmp2;
     T m13 = tmp1 + tmp2;
 
     tmp1 = axis[1] * axis[2] * t;
-    tmp2 = axis[0] * sinAngle;
+    tmp2 = axis[0] * sinTheta;
     T m32 = tmp1 + tmp2;
     T m23 = tmp1 - tmp2;
 
-    T m11 = cosAngle + axis[0] * axis[0] * t;
-    T m22 = cosAngle + axis[1] * axis[1] * t;
-    T m33 = cosAngle + axis[2] * axis[2] * t;
+    T m11 = cosTheta + axis[0] * axis[0] * t;
+    T m22 = cosTheta + axis[1] * axis[1] * t;
+    T m33 = cosTheta + axis[2] * axis[2] * t;
 
     return Matrix<4, T>(m11, m12, m13, 0,
                         m21, m22, m23, 0,
@@ -959,9 +665,8 @@ constexpr Matrix<4, T> TransformGen::Rotate(T angle, const Vector<3, T>& axis)
                         0,   0,   0,   1);
 }
 
-template<std::floating_point T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<4, T> TransformGen::Rotate(const Quat<T>& q)
+template<FloatC T>
+MR_PF_DEF Matrix<4, T> TransformGen::Rotate(const Quat<T>& q) noexcept
 {
     Matrix<4, T> result;
     T xx = q[1] * q[1];
@@ -995,10 +700,9 @@ constexpr Matrix<4, T> TransformGen::Rotate(const Quat<T>& q)
     return result;
 }
 
-template<std::floating_point T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<4, T> TransformGen::Perspective(T fovXRadians, T aspectRatio,
-                                                 T nearPlane, T farPlane)
+template<FloatC T>
+MR_PF_DEF Matrix<4, T> TransformGen::Perspective(T fovXRadians, T aspectRatio,
+                                                 T nearPlane, T farPlane) noexcept
 {
     //  p       0       0       0
     //  0       p       0       0
@@ -1014,11 +718,10 @@ constexpr Matrix<4, T> TransformGen::Perspective(T fovXRadians, T aspectRatio,
                         0, 0, -1, 0);
 }
 
-template<std::floating_point T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<4, T> TransformGen::Orthogonal(T left, T right,
+template<FloatC T>
+MR_PF_DEF Matrix<4, T> TransformGen::Orthogonal(T left, T right,
                                                 T top, T bottom,
-                                                T nearPlane, T farPlane)
+                                                T nearPlane, T farPlane) noexcept
 {
     //  orto    0       0       0
     //  0       orto    0       0
@@ -1036,10 +739,9 @@ constexpr Matrix<4, T> TransformGen::Orthogonal(T left, T right,
                           0,  0,  0, 1);
 }
 
-template<std::floating_point T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<4, T> TransformGen::Orthogonal(T width, T height,
-                                                T nearPlane, T farPlane)
+template<FloatC T>
+MR_PF_DEF Matrix<4, T> TransformGen::Orthogonal(T width, T height,
+                                                T nearPlane, T farPlane) noexcept
 {
     //  orto    0       0       0
     //  0       orto    0       0
@@ -1052,60 +754,55 @@ constexpr Matrix<4, T> TransformGen::Orthogonal(T width, T height,
                         0, 0, zt, 1);
 }
 
-template<std::floating_point T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<4, T> TransformGen::LookAt(const Vector<3, T>& eyePos,
+template<FloatC T>
+MR_PF_DEF Matrix<4, T> TransformGen::LookAt(const Vector<3, T>& eyePos,
                                             const Vector<3, T>& at,
-                                            const Vector<3, T>& up)
+                                            const Vector<3, T>& up) noexcept
 {
     // Calculate Orthogonal Vectors for this rotation
-    Vector<3, T> zAxis = (eyePos - at).NormalizeSelf();
-    Vector<3, T> xAxis = up.CrossProduct(zAxis).NormalizeSelf();
-    Vector<3, T> yAxis = zAxis.CrossProduct(xAxis).NormalizeSelf();
+    Vector<3, T> zAxis = Math::Normalize(eyePos - at);
+    Vector<3, T> xAxis = Math::Normalize(Math::Cross(up, zAxis));
+    Vector<3, T> yAxis = Math::Normalize(Math::Cross(zAxis, xAxis));
 
     // Also Add Translation part
-    return Matrix<4, T>(xAxis[0], xAxis[1], xAxis[2], -xAxis.Dot(eyePos),
-                        yAxis[0], yAxis[1], yAxis[2], -yAxis.Dot(eyePos),
-                        zAxis[0], zAxis[1], zAxis[2], -zAxis.Dot(eyePos),
-                               0,        0,        0,                  1);
+    return Matrix<4, T>(xAxis[0], xAxis[1], xAxis[2], Math::Dot(xAxis, eyePos),
+                        yAxis[0], yAxis[1], yAxis[2], Math::Dot(yAxis, eyePos),
+                        zAxis[0], zAxis[1], zAxis[2], Math::Dot(zAxis, eyePos),
+                        0,        0,        0,        1);
 }
 
-template<std::floating_point T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<3, T> TransformGen::ToSpaceMat(const Vector<3, T>& x,
+template<FloatC T>
+MR_PF_DEF Matrix<3, T> TransformGen::ToSpaceMat(const Vector<3, T>& x,
                                                 const Vector<3, T>& y,
-                                                const Vector<3, T>& z)
+                                                const Vector<3, T>& z) noexcept
 {
     return Matrix<3, T>(x, y, z);
 }
 
-template<std::floating_point T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Matrix<3, T> TransformGen::ToInvSpaceMat(const Vector<3, T>& x,
+template<FloatC T>
+MR_PF_DEF Matrix<3, T> TransformGen::ToInvSpaceMat(const Vector<3, T>& x,
                                                    const Vector<3, T>& y,
-                                                   const Vector<3, T>& z)
+                                                   const Vector<3, T>& z) noexcept
 {
     return Matrix<3, T>(x[0], y[0], z[0],
                         x[1], y[1], z[1],
                         x[2], y[2], z[2]);
 }
 
-template<std::floating_point T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<3, T> TransformGen::YUpToZUp(const Vector<3, T>& v)
+template<FloatC T>
+MR_PF_DEF Vector<3, T> TransformGen::YUpToZUp(const Vector<3, T>& v) noexcept
 {
     return Vector<3, T>(v[2], v[0], v[1]);
 }
 
-template<std::floating_point T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<3, T> TransformGen::ZUpToYUp(const Vector<3, T>& v)
+template<FloatC T>
+MR_PF_DEF Vector<3, T> TransformGen::ZUpToYUp(const Vector<3, T>& v) noexcept
 {
     return Vector<3, T>(v[1], v[2], v[0]);
 }
 
-template<std::floating_point T>
-MRAY_HYBRID constexpr Matrix<4, T> TransformGen::YUpToZUpMat()
+template<FloatC T>
+MR_PF_DEF Matrix<4, T> TransformGen::YUpToZUpMat() noexcept
 {
     return Matrix<4, T>(0, 0, 1, 0,
                         1, 0, 0, 0,
@@ -1113,8 +810,8 @@ MRAY_HYBRID constexpr Matrix<4, T> TransformGen::YUpToZUpMat()
                         0, 0, 0, 1);
 }
 
-template<std::floating_point T>
-MRAY_HYBRID constexpr Matrix<4, T> TransformGen::ZUpToYUpMat()
+template<FloatC T>
+MR_PF_DEF Matrix<4, T> TransformGen::ZUpToYUpMat() noexcept
 {
     return Matrix<4, T>(0, 1, 0, 0,
                         0, 0, 1, 0,

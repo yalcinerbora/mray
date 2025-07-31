@@ -103,7 +103,7 @@ struct SetPathStateFunctor
         , firstInit(firstInit)
     {}
 
-    MRAY_HYBRID MRAY_CGPU_INLINE
+    MR_HF_DECL
     void operator()(PathTraceRDetail::PathDataPack& s) const
     {
         if(firstInit) s.status.Reset();
@@ -127,8 +127,8 @@ class IsDeadAliveInvalidFunctor
         : dPathDataPack(dPathDataPackIn)
     {}
 
-    MRAY_HYBRID MRAY_CGPU_INLINE
-    uint32_t operator()(RayIndex index) const
+    MR_HF_DECL
+    uint32_t operator()(RayIndex index) const noexcept
     {
         using namespace PathTraceRDetail;
         const PathStatus state = dPathDataPack[index].status;
@@ -155,7 +155,7 @@ class IsAliveFunctor
         , checkInvalidAsDead(checkInvalidAsDeadIn)
     {}
 
-    MRAY_HYBRID MRAY_CGPU_INLINE
+    MR_HF_DECL
     bool operator()(RayIndex index) const
     {
         using namespace PathTraceRDetail;
@@ -254,15 +254,15 @@ uint32_t PathTracerRenderer::FindMaxSamplePerIteration(uint32_t rayCount,
         this->currentWorks.cbegin(), this->currentWorks.cend(), maxSample,
         [](uint32_t l, uint32_t r) -> uint32_t
         {
-            return std::max(l, r);
+            return Math::Max(l, r);
         },
         [sampleMode](const auto& renderWorkStruct) -> uint32_t
         {
             if(sampleMode == PURE)
                 return renderWorkStruct.workPtr->SampleRNCount(0);
             else
-                return std::max(renderWorkStruct.workPtr->SampleRNCount(0),
-                                renderWorkStruct.workPtr->SampleRNCount(1));
+                return Math::Max(renderWorkStruct.workPtr->SampleRNCount(0),
+                                 renderWorkStruct.workPtr->SampleRNCount(1));
         }
     );
     return rayCount * maxSample;
@@ -304,9 +304,9 @@ PathTracerRenderer::ReloadPaths(Span<const RayIndex> dIndices,
     {
         uint64_t& tilePixIndex = tilePathCounts[this->imageTiler.CurrentTileIndex1D()];
         uint64_t localPathLimit = SPPLimit(sppLimit);
-        uint64_t pixelIndexLimit = std::min(tilePixIndex + deadRayCount, localPathLimit);
+        uint64_t pixelIndexLimit = Math::Min(tilePixIndex + deadRayCount, localPathLimit);
         uint32_t fillRayCount = static_cast<uint32_t>(pixelIndexLimit - tilePixIndex);
-        fillRayCount = std::min(deadRayCount, fillRayCount);
+        fillRayCount = Math::Min(deadRayCount, fillRayCount);
         aliveRayCount += fillRayCount;
 
         if(fillRayCount != 0)
@@ -759,7 +759,7 @@ RendererOutput PathTracerRenderer::DoLatencyRender(uint32_t passCount,
     uint32_t tileSPP = static_cast<uint32_t>(tileSPPs[tileIndex]);
     uint32_t sppLimit = tileSPP + passCount;
     if(saveImage)
-        sppLimit = std::min(sppLimit, currentOptions.totalSPP);
+        sppLimit = Math::Min(sppLimit, currentOptions.totalSPP);
 
     tileSPPs[tileIndex] = sppLimit;
     uint32_t currentPassCount = sppLimit - tileSPP;

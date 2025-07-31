@@ -312,9 +312,9 @@ void FilterFuncEmbree(const RTCFilterFunctionNArguments* args)
                     Vector3 d = Vector3(r.dir_x[i], r.dir_y[i], r.dir_z[i]);
                     Vector3 n = Vector3(h.Ng_x[i], h.Ng_y[i], h.Ng_z[i]);
 
-                    args->valid[i] = (n.Dot(d) < Float{0})
-                                        ? EMBREE_VALID_RAY
-                                        : EMBREE_INVALID_RAY;
+                    args->valid[i] = (Math::Dot(n, d) < Float{0})
+                            ? EMBREE_VALID_RAY
+                            : EMBREE_INVALID_RAY;
 
                     if(args->valid[i] == EMBREE_INVALID_RAY) continue;
                 }

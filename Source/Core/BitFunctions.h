@@ -4,99 +4,63 @@
 #include <cassert>
 #include <bit>
 #include <type_traits>
-
 #include <climits>
 
-#include "Math.h"
+#include "Definitions.h"
 
 namespace Bit
 {
     template <class T>
     using TPair = std::array<T, 2>;
 
+    template<class To, class From>
+    MR_PF_DECL To BitCast(const From& value) noexcept;
+
     template<std::integral T>
-    constexpr T FetchSubPortion(T value, TPair<T> bitRange);
+    MR_PF_DECL T FetchSubPortion(T value, TPair<T> bitRange) noexcept;
 
     template<std::integral T, std::integral C>
     requires (std::convertible_to<C, T>)
-    [[nodiscard]]
-    constexpr T SetSubPortion(T value, C in, TPair<T> bitRange);
+    MR_PF_DECL T SetSubPortion(T value, C in, TPair<T> bitRange) noexcept;
 
     template<size_t... Is, std::unsigned_integral... Ts>
     requires(sizeof...(Is) == sizeof...(Ts))
-    constexpr std::tuple_element_t<0, std::tuple<Ts...>>
-    Compose(Ts... values);
+    MR_PF_DECL std::tuple_element_t<0, std::tuple<Ts...>>
+    Compose(Ts... values) noexcept;
 
     template<std::unsigned_integral T>
-    constexpr T     RotateLeft(T value, T shiftAmount);
+    MR_PF_DECL T RotateLeft(T value, T shiftAmount) noexcept;
 
     template<std::unsigned_integral T>
-    constexpr T     RotateRight(T value, T shiftAmount);
+    MR_PF_DECL T RotateRight(T value, T shiftAmount) noexcept;
 
     // 128-bit variant (used for BC stuff)
-    constexpr
-    TPair<uint64_t> RotateLeft(TPair<uint64_t> value, uint32_t shiftAmount);
-
-    constexpr
-    TPair<uint64_t> RotateRight(TPair<uint64_t> value, uint32_t shiftAmount);
+    MR_PF_DECL TPair<uint64_t> RotateLeft(TPair<uint64_t> value, uint32_t shiftAmount) noexcept;
+    MR_PF_DECL TPair<uint64_t> RotateRight(TPair<uint64_t> value, uint32_t shiftAmount) noexcept;
 
     template<std::unsigned_integral T>
-    constexpr T     RequiredBitsToRepresent(T value);
+    MR_PF_DECL T RequiredBitsToRepresent(T value) noexcept;
 
     template<std::unsigned_integral T>
-    constexpr T     BitReverse(T value,
-                               T width = sizeof(T) * CHAR_BIT);
+    MR_PF_DECL T BitReverse(T value, T width = sizeof(T) * CHAR_BIT) noexcept;
 
     template<std::unsigned_integral T>
-    constexpr T     CountLZero(T value);
+    MR_PF_DECL T CountLZero(T value) noexcept;
 
     template<std::unsigned_integral T>
-    constexpr T     CountTZero(T value);
+    MR_PF_DECL T CountTZero(T value) noexcept;
 
     template<std::unsigned_integral T>
-    constexpr T     CountLOne(T value);
+    MR_PF_DECL T CountLOne(T value) noexcept;
 
     template<std::unsigned_integral T>
-    constexpr T     CountTOne(T value);
+    MR_PF_DECL T CountTOne(T value) noexcept;
 
     template<std::unsigned_integral T>
-    constexpr T     PopC(T value);
+    MR_PF_DECL T PopC(T value) noexcept;
 
-    constexpr
-    uint32_t        GenerateFourCC(char byte0, char byte1,
-                                   char byte2, char byte3);
-
-    namespace NormConversion
-    {
-        template<std::floating_point R, std::unsigned_integral T>
-        MRAY_HYBRID
-        constexpr R FromUNorm(T in);
-
-        template<std::floating_point R, uint32_t Bits,
-                 std::unsigned_integral T>
-        MRAY_HYBRID
-        constexpr R FromUNormVaryingInsane(T value);
-
-        template<std::floating_point R, std::unsigned_integral T>
-        MRAY_HYBRID
-        constexpr R FromUNormVarying(T in, T bits);
-
-        template<std::unsigned_integral T, std::floating_point R>
-        MRAY_HYBRID
-        constexpr T ToUNorm(R in);
-
-        template<std::unsigned_integral T, std::floating_point R>
-        MRAY_HYBRID
-        constexpr T ToUNormVarying(R in, T bits);
-
-        template<std::floating_point R, std::signed_integral T>
-        MRAY_HYBRID
-        constexpr R FromSNorm(T in);
-
-        template<std::signed_integral T, std::floating_point R>
-        MRAY_HYBRID
-        constexpr T ToSNorm(R in);
-    }
+    MR_PF_DECL uint32_t GenerateFourCC(char byte0, char byte1,
+                                       char byte2, char byte3) noexcept;
 }
 
 // Bitset is constexpr in c++23, we should not rely on it on CUDA
@@ -127,12 +91,11 @@ class Bitset
         Bitset&     reference;
         uint32_t    index;
         // Constructors & Destructor
-        MRAY_HYBRID constexpr           BitRef(Bitset&, uint32_t);
-
+        MR_HF_DECL          BitRef(Bitset&, uint32_t) noexcept;
         public:
-        MRAY_HYBRID constexpr BitRef&   operator=(bool);
-        MRAY_HYBRID constexpr bool      operator~() const;
-        MRAY_HYBRID constexpr           operator bool() const;
+        MR_HF_DECL BitRef&  operator=(bool) noexcept;
+        MR_HF_DECL bool     operator~() const noexcept;
+        MR_HF_DECL          operator bool() const noexcept;
     };
 
     private:
@@ -141,54 +104,88 @@ class Bitset
     public:
     // GPU does not have a concept of string so skipping that constructor
     // Constructors & Destructor
-                            Bitset() = default;
-    MRAY_HYBRID constexpr   Bitset(Type);
-
+                Bitset() = default;
+    MR_HF_DECL  Bitset(Type) noexcept;
     //
-    MRAY_HYBRID constexpr bool      operator==(const Bitset& rhs) const;
-    MRAY_HYBRID constexpr bool      operator[](uint32_t pos) const;
-    MRAY_HYBRID constexpr BitRef    operator[](uint32_t pos);
+    MR_HF_DECL bool     operator==(const Bitset& rhs) const noexcept;
+    MR_HF_DECL bool     operator[](uint32_t pos) const noexcept;
+    MR_HF_DECL BitRef   operator[](uint32_t pos) noexcept;
 
-    MRAY_HYBRID constexpr bool  All() const;
-    MRAY_HYBRID constexpr bool  Any() const;
-    MRAY_HYBRID constexpr bool  None() const;
+    MR_HF_DECL bool  All() const noexcept;
+    MR_HF_DECL bool  Any() const noexcept;
+    MR_HF_DECL bool  None() const noexcept;
 
     // Specifically utilize 32-bit here
     // 64-bit(std::size_t) may use two registers maybe?
-    MRAY_HYBRID constexpr uint32_t  Count() const;
-    MRAY_HYBRID constexpr uint32_t  Size() const;
+    MR_HF_DECL uint32_t  Count() const noexcept;
+    MR_HF_DECL uint32_t  Size() const noexcept;
     // How many bits is set
-    MRAY_HYBRID constexpr uint32_t  PopCount() const;
+    MR_HF_DECL uint32_t  PopCount() const noexcept;
 
-    MRAY_HYBRID constexpr Bitset& operator&=(const Bitset&);
-    MRAY_HYBRID constexpr Bitset& operator|=(const Bitset&);
-    MRAY_HYBRID constexpr Bitset& operator^=(const Bitset&);
-    MRAY_HYBRID constexpr Bitset  operator~() const;
+    MR_HF_DECL Bitset& operator&=(const Bitset&) noexcept;
+    MR_HF_DECL Bitset& operator|=(const Bitset&) noexcept;
+    MR_HF_DECL Bitset& operator^=(const Bitset&) noexcept;
+    MR_HF_DECL Bitset  operator~() const noexcept;
 
-    MRAY_HYBRID constexpr Bitset& Set();
-    MRAY_HYBRID constexpr Bitset& Set(uint32_t pos, bool value = true);
-    MRAY_HYBRID constexpr Bitset& Reset();
-    MRAY_HYBRID constexpr Bitset& Reset(uint32_t pos);
-    MRAY_HYBRID constexpr Bitset& Flip();
-    MRAY_HYBRID constexpr Bitset& Flip(uint32_t pos);
+    MR_HF_DECL Bitset& Set() noexcept;
+    MR_HF_DECL Bitset& Set(uint32_t pos, bool value = true) noexcept;
+    MR_HF_DECL Bitset& Reset() noexcept;
+    MR_HF_DECL Bitset& Reset(uint32_t pos) noexcept;
+    MR_HF_DECL Bitset& Flip() noexcept;
+    MR_HF_DECL Bitset& Flip(uint32_t pos) noexcept;
 
-    MRAY_HYBRID constexpr explicit operator Type();
+    MR_HF_DECL explicit operator Type() noexcept;
 };
 
 template<size_t N>
-MRAY_HYBRID constexpr
-Bitset<N> operator&(const Bitset<N>& lhs, const Bitset<N>& rhs);
+MR_HF_DECL Bitset<N> operator&(const Bitset<N>& lhs, const Bitset<N>& rhs) noexcept;
 
 template<size_t N>
-MRAY_HYBRID constexpr
-Bitset<N> operator|(const Bitset<N>& lhs, const Bitset<N>& rhs);
+MR_HF_DECL Bitset<N> operator|(const Bitset<N>& lhs, const Bitset<N>& rhs) noexcept;
 
 template<size_t N>
-MRAY_HYBRID constexpr
-Bitset<N> operator^(const Bitset<N>& lhs, const Bitset<N>& rhs);
+MR_HF_DECL Bitset<N> operator^(const Bitset<N>& lhs, const Bitset<N>& rhs) noexcept;
+
+template<class R, class T>
+MR_PF_DEF R Bit::BitCast(const T& value) noexcept
+{
+    if(std::is_constant_evaluated())
+        return std::bit_cast<R>(value);
+    // This was failed once on CUDA (OptixIR compilation)
+    // So wrapping it around
+    #ifndef MRAY_GPU_CODE_PATH
+        return std::bit_cast<R>(value);
+    #else
+        template<class A, class B>
+        static constexpr TypeEq = std::is_same_v<R, A> && std::is_same_v<T, B>)
+
+        if constexpr(TypeEq<float, uint32_t>) return __uint_as_float(value);
+        if constexpr(TypeEq<uint32_t, float>) return __float_as_uint(value);
+        if constexpr(TypeEq<float, int32_t>)  return __int_as_float(value);
+        if constexpr(TypeEq<int32_t, float>)  return __float_as_int(value);
+        //
+        if constexpr(TypeEq<double, uint64_t>)
+        {
+            int64_t r;
+            memcpy(&r, &v, sizeof(int64_t));
+            return __longlong_as_double(T(r));
+        }
+        if constexpr(TypeEq<uint64_t, double>)
+        {
+            int64_t v = __double_as_longlong(value);
+            uint64_t r;
+            memcpy(&r, &v, sizeof(uint64_t));
+            return r;
+        }
+        if constexpr(TypeEq<double, int64_t>)  return __longlong_as_double(value);
+        if constexpr(TypeEq<int64_t, double>)  return __double_as_longlong(value);
+        // Rely on c++ bit_cast for the rest
+        return std::bit_cast<R>(value);
+    #endif
+}
 
 template<std::integral T>
-constexpr T Bit::FetchSubPortion(T value, std::array<T, 2> bitRange)
+MR_PF_DEF T Bit::FetchSubPortion(T value, std::array<T, 2> bitRange) noexcept
 {
     T bitCount = bitRange[1] - bitRange[0];
     assert(bitRange[0] < bitRange[1]);
@@ -202,7 +199,7 @@ constexpr T Bit::FetchSubPortion(T value, std::array<T, 2> bitRange)
 
 template<std::integral T, std::integral C>
 requires (std::convertible_to<C, T>)
-constexpr T Bit::SetSubPortion(T value, C in, std::array<T, 2> bitRange)
+MR_PF_DEF T Bit::SetSubPortion(T value, C in, std::array<T, 2> bitRange) noexcept
 {
     T bitCount = bitRange[1] - bitRange[0];
     assert(bitRange[0] < bitRange[1]);
@@ -218,8 +215,8 @@ constexpr T Bit::SetSubPortion(T value, C in, std::array<T, 2> bitRange)
 
 template<size_t... Is, std::unsigned_integral... Ts>
 requires(sizeof...(Is) == sizeof...(Ts))
-constexpr std::tuple_element_t<0, std::tuple<Ts...>>
-Bit::Compose(Ts... values)
+MR_PF_DEF std::tuple_element_t<0, std::tuple<Ts...>>
+Bit::Compose(Ts... values) noexcept
 {
     constexpr uint32_t E = sizeof...(Is);
     using RetT = std::tuple_element_t<0, std::tuple<Ts...>>;
@@ -241,7 +238,7 @@ Bit::Compose(Ts... values)
         ));
     }
     // Do scan
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(uint32_t i = 1; i < E; i++)
     {
         offsets[i] += offsets[i - 1];
@@ -257,7 +254,7 @@ Bit::Compose(Ts... values)
 }
 
 template<std::unsigned_integral T>
-constexpr T Bit::RotateLeft(T value, T shiftAmount)
+MR_PF_DEF T Bit::RotateLeft(T value, T shiftAmount) noexcept
 {
     constexpr T Bits = sizeof(T) * CHAR_BIT;
     assert(shiftAmount < Bits);
@@ -269,7 +266,7 @@ constexpr T Bit::RotateLeft(T value, T shiftAmount)
 }
 
 template<std::unsigned_integral T>
-constexpr T Bit::RotateRight(T value, T shiftAmount)
+MR_PF_DEF T Bit::RotateRight(T value, T shiftAmount) noexcept
 {
     constexpr T Bits = sizeof(T) * CHAR_BIT;
     assert(shiftAmount < Bits);
@@ -280,9 +277,8 @@ constexpr T Bit::RotateRight(T value, T shiftAmount)
     return result;
 }
 
-constexpr inline
-typename Bit::TPair<uint64_t>
-Bit::RotateLeft(TPair<uint64_t> value, uint32_t shift)
+MR_PF_DEF typename Bit::TPair<uint64_t>
+Bit::RotateLeft(TPair<uint64_t> value, uint32_t shift) noexcept
 {
     uint64_t shift64 = uint64_t(shift);
     constexpr uint64_t Bits = sizeof(uint64_t) * CHAR_BIT;
@@ -303,9 +299,8 @@ Bit::RotateLeft(TPair<uint64_t> value, uint32_t shift)
     return result;
 }
 
-constexpr inline
-typename Bit::TPair<uint64_t>
-Bit::RotateRight(TPair<uint64_t> value, uint32_t shift)
+MR_PF_DEF typename Bit::TPair<uint64_t>
+Bit::RotateRight(TPair<uint64_t> value, uint32_t shift) noexcept
 {
     uint64_t shift64 = uint64_t(shift);
     constexpr uint64_t Bits = sizeof(uint64_t) * CHAR_BIT;
@@ -325,17 +320,18 @@ Bit::RotateRight(TPair<uint64_t> value, uint32_t shift)
     result[1] |= (value[0] << invShift);
     return result;
 }
+
 template<std::unsigned_integral T>
-constexpr T Bit::RequiredBitsToRepresent(T value)
+MR_PF_DEF T Bit::RequiredBitsToRepresent(T value) noexcept
 {
     constexpr T Bits = sizeof(T) * CHAR_BIT;
     return (Bits - CountLZero(value));
 }
 
 template<std::unsigned_integral T>
-constexpr T Bit::BitReverse(T value, T width)
+MR_PF_DEF T Bit::BitReverse(T value, T width) noexcept
 {
-    constexpr auto Func = [](T value, T width) -> T
+    constexpr auto Eval = [](T value, T width) -> T
     {
         // TODO: Is there a good way to do this
         // other than O(n)
@@ -351,7 +347,7 @@ constexpr T Bit::BitReverse(T value, T width)
 
     if(std::is_constant_evaluated())
     {
-        return Func(value, width);
+        return Eval(value, width);
     }
     else
     {
@@ -364,7 +360,7 @@ constexpr T Bit::BitReverse(T value, T width)
         }
         #else
         {
-            return Func(value, width);
+            return Eval(value, width);
         }
         #endif
     }
@@ -372,7 +368,7 @@ constexpr T Bit::BitReverse(T value, T width)
 }
 
 template<std::unsigned_integral T>
-constexpr T Bit::CountLZero(T value)
+MR_PF_DEF T Bit::CountLZero(T value) noexcept
 {
     if(std::is_constant_evaluated())
     {
@@ -394,7 +390,7 @@ constexpr T Bit::CountLZero(T value)
 }
 
 template<std::unsigned_integral T>
-constexpr T Bit::CountTZero(T value)
+MR_PF_DEF T Bit::CountTZero(T value) noexcept
 {
     #ifdef MRAY_DEVICE_CODE_PATH_CUDA
         // This is intrinsic so its fine
@@ -406,7 +402,7 @@ constexpr T Bit::CountTZero(T value)
 }
 
 template<std::unsigned_integral T>
-constexpr T Bit::CountLOne(T value)
+MR_PF_DEF T Bit::CountLOne(T value) noexcept
 {
     #ifdef MRAY_DEVICE_CODE_PATH_CUDA
         T vR = ~value;
@@ -417,7 +413,7 @@ constexpr T Bit::CountLOne(T value)
 }
 
 template<std::unsigned_integral T>
-constexpr T Bit::CountTOne(T value)
+MR_PF_DEF T Bit::CountTOne(T value) noexcept
 {
     #ifdef MRAY_DEVICE_CODE_PATH_CUDA
         T vR = ~value;
@@ -428,7 +424,7 @@ constexpr T Bit::CountTOne(T value)
 }
 
 template<std::unsigned_integral T>
-constexpr T Bit::PopC(T value)
+MR_PF_DEF T Bit::PopC(T value) noexcept
 {
     #ifdef MRAY_DEVICE_CODE_PATH_CUDA
         if constexpr(std::is_same_v<T, uint64_t>)
@@ -440,8 +436,8 @@ constexpr T Bit::PopC(T value)
     #endif
 }
 
-constexpr uint32_t Bit::GenerateFourCC(char byte0, char byte1,
-                                       char byte2, char byte3)
+MR_PF_DEF uint32_t Bit::GenerateFourCC(char byte0, char byte1,
+                                       char byte2, char byte3) noexcept
 {
     constexpr uint32_t p0 = CHAR_BIT * 0;
     constexpr uint32_t p1 = CHAR_BIT * 1;
@@ -455,177 +451,14 @@ constexpr uint32_t Bit::GenerateFourCC(char byte0, char byte1,
             (b2 << p2) | (b3 << p3));
 }
 
-template<std::floating_point R, std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr R Bit::NormConversion::FromUNorm(T in)
-{
-    constexpr R MAX = R(std::numeric_limits<T>::max());
-    constexpr R MIN = R(std::numeric_limits<T>::min());
-    constexpr R DELTA = 1 / (MAX - MIN);
-    // TODO: Specialize using intrinsics maybe?
-    // For GPU (GPUs should have these?)
-    // Also check more precise way to do this (if available?)
-    R result = MIN + static_cast<R>(in) * DELTA;
-    return result;
-}
-
-template<std::floating_point R, uint32_t BITS,
-         std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr R Bit::NormConversion::FromUNormVaryingInsane(T value)
-{
-    // We can do divide an all, but we get our hands dirty for
-    // bisecting BC compressions for color conversion
-    // So lets do a cool version of unorm generation directly
-    // embedding to the mantissa of the float
-     // Directly embed these to mantissa
-    static_assert(std::numeric_limits<Float>::is_iec559,
-                  "IEEE-754 floats are required for this function");
-    using IntT = std::conditional_t<(std::is_same_v<Float, float>),
-                                    uint32_t,
-                                    uint64_t>;
-    constexpr IntT MANTISSA_SIZE = std::is_same_v<Float, float>
-                                    ? 23u
-                                    : 52u;
-    static_assert(BITS <= MANTISSA_SIZE, "Bit count exceeds mantissa");
-    assert(value >> BITS == 0);
-    // Set the exponent side via the compiler
-    // lets not get fancy (thanks to bit_cast)
-    IntT rBits = std::bit_cast<IntT>(R(1));
-    IntT input = value;
-    input <<= (MANTISSA_SIZE - BITS);
-    // Here is the fancy part we copy the value to the mantissa
-    // starting from MSB of the mantissa
-    constexpr IntT StampCount = Math::DivideUp(MANTISSA_SIZE, BITS);
-    UNROLL_LOOP
-    for(IntT i = 0; i < StampCount; i++)
-    {
-        rBits |= input;
-        input >>= BITS;
-    }
-    // All this work makes sense when Float is 1.0, extract 1.
-    //
-    // Is this worth it? Definitely no.
-    // NVCC recommends to not mix float -> int conversions, we did that
-    // a classical approach
-    // R(input) / R((1 << bitSize) - 1) also have type conversions
-    // so we did not gained anything
-    // Furthermore, this is value not compatible with this approach.
-    //
-    // But no floating point division so its performant even with a loop?
-    // probably not. So do not do this :)
-    return R(1) - std::bit_cast<R>(rBits);
-}
-
-template<std::floating_point R, std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr R Bit::NormConversion::FromUNormVarying(T in,T bits)
-{
-    R max = R((T(1) << bits) - T(1));
-    R min = R(std::numeric_limits<T>::min());
-    R delta = 1 / (max - min);
-    // TODO: Specialize using intrinsics maybe?
-    // For GPU (GPUs should have these?)
-    // Also check more precise way to do this (if available?)
-    R result = min + static_cast<R>(in) * delta;
-    return result;
-}
-
-template<std::unsigned_integral T, std::floating_point R>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T Bit::NormConversion::ToUNorm(R in)
-{
-    #ifndef MRAY_DEVICE_CODE_PATH
-        using std::round;
-    #endif
-
-    assert(in >= R(0) && in <= R(1));
-    constexpr R MAX = R(std::numeric_limits<T>::max());
-    constexpr R MIN = R(std::numeric_limits<T>::min());
-    constexpr R DIFF = (MAX - MIN);
-
-    in *= DIFF;
-    in = round(in);
-    return T(in);
-}
-
-template<std::unsigned_integral T, std::floating_point R>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T Bit::NormConversion::ToUNormVarying(R in, T bits)
-{
-    #ifndef MRAY_DEVICE_CODE_PATH
-        using std::round;
-    #endif
-
-    assert(in >= R(0) && in <= R(1));
-    R max = R((T(1) << bits) - T(1));
-    R min = R(std::numeric_limits<T>::min());
-    R diff = (max - min);
-
-    in *= diff;
-    in = round(in);
-    return T(in);
-}
-
-template<std::floating_point R, std::signed_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr R Bit::NormConversion::FromSNorm(T in)
-{
-    // Math representation (assuming T is char)
-    // [-128, ..., 0, ..., 127]
-    // However due to 2's complement, bit to data layout is
-    // [0, ..., 127, -128, ..., -1]
-    // DirectX representation is
-    // [0, ..., 127, -127, -127, ..., -1]
-    //               ----^-----
-    //               notice the two -127's
-    // https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-data-conversion
-    // we will use DX version since these will be used to
-    // fetch BC textures.
-    static_assert(std::numeric_limits<T>::max() +
-                  std::numeric_limits<T>::min() == -1,
-                  "Not two's complement int type?");
-    constexpr T MIN = std::numeric_limits<T>::min();
-    constexpr R MAX = R(std::numeric_limits<T>::max());
-    constexpr R DELTA = R(1) / (MAX - R(0));
-
-    in = (in == MIN) ? (in + 1) : in;
-    R result = R(in) * DELTA;
-    return result;
-}
-
-template<std::signed_integral T, std::floating_point R>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T Bit::NormConversion::ToSNorm(R in)
-{
-    #ifndef MRAY_DEVICE_CODE_PATH
-        using std::round;
-    #endif
-
-    assert(in >= R(-1) && in <= R(1));
-    // Check "FromSNorm" for more info
-    //
-    static_assert(std::numeric_limits<T>::max() +
-                  std::numeric_limits<T>::min() == -1,
-                  "Not two's complement int type?");
-    constexpr R MAX = R(std::numeric_limits<T>::max());
-    constexpr R DIFF = (MAX - R(0));
-
-    in *= DIFF;
-    in = round(in);
-    return T(in);
-}
-
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitset<N>::BitRef::BitRef(Bitset<N>& bs, uint32_t i)
+MR_HF_DECL Bitset<N>::BitRef::BitRef(Bitset<N>& bs, uint32_t i) noexcept
     : reference(bs)
     , index(i)
 {}
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitset<N>::BitRef& Bitset<N>::BitRef::operator=(bool b)
+MR_HF_DECL Bitset<N>::BitRef& Bitset<N>::BitRef::operator=(bool b) noexcept
 {
     Type mask = Type(1u << index);
     reference.bits = (b)
@@ -635,132 +468,114 @@ constexpr Bitset<N>::BitRef& Bitset<N>::BitRef::operator=(bool b)
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr bool Bitset<N>::BitRef::operator~() const
+MR_HF_DECL bool Bitset<N>::BitRef::operator~() const noexcept
 {
     return static_cast<bool>(((reference.bits >> index) ^ 0x1) & 0x1);
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitset<N>::BitRef::operator bool() const
+MR_HF_DECL Bitset<N>::BitRef::operator bool() const noexcept
 {
     return static_cast<bool>((reference.bits >> index) & 0x1);
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitset<N>::Bitset(Type t)
+MR_HF_DECL Bitset<N>::Bitset(Type t) noexcept
     : bits(t)
 {}
 
 template<size_t N>
-MRAY_HYBRID
-constexpr bool Bitset<N>::operator==(const Bitset& rhs) const
+MR_HF_DECL bool Bitset<N>::operator==(const Bitset& rhs) const noexcept
 {
     return (rhs.bits == bits);
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr bool Bitset<N>::operator[](uint32_t pos) const
+MR_HF_DECL bool Bitset<N>::operator[](uint32_t pos) const noexcept
 {
     assert(pos < N);
     return static_cast<bool>((bits >> pos) & 0x1);
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitset<N>::BitRef Bitset<N>::operator[](uint32_t pos)
+MR_HF_DECL Bitset<N>::BitRef Bitset<N>::operator[](uint32_t pos) noexcept
 {
     assert(pos < N);
     return BitRef(*this, pos);
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr bool Bitset<N>::All() const
+MR_HF_DECL bool Bitset<N>::All() const noexcept
 {
     return (bits == MASK);
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr bool Bitset<N>::Any() const
+MR_HF_DECL bool Bitset<N>::Any() const noexcept
 {
     return (bits > 0);
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr bool Bitset<N>::None() const
+MR_HF_DECL bool Bitset<N>::None() const noexcept
 {
     return (bits == 0);
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr uint32_t Bitset<N>::Count() const
+MR_HF_DECL uint32_t Bitset<N>::Count() const noexcept
 {
     return N;
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr uint32_t Bitset<N>::Size() const
+MR_HF_DECL uint32_t Bitset<N>::Size() const noexcept
 {
     return CHAR_BIT * sizeof(Type);
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr uint32_t Bitset<N>::PopCount() const
+MR_HF_DECL uint32_t Bitset<N>::PopCount() const noexcept
 {
     return Bit::PopC<Type>(MASK & bits);
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitset<N>& Bitset<N>::operator&=(const Bitset& rhs)
+MR_HF_DECL Bitset<N>& Bitset<N>::operator&=(const Bitset& rhs) noexcept
 {
     bits &= rhs.bits;
     return *this;
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitset<N>& Bitset<N>::operator|=(const Bitset& rhs)
+MR_HF_DECL Bitset<N>& Bitset<N>::operator|=(const Bitset& rhs) noexcept
 {
     bits |= rhs.bits;
     return *this;
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitset<N>& Bitset<N>::operator^=(const Bitset& rhs)
+MR_HF_DECL Bitset<N>& Bitset<N>::operator^=(const Bitset& rhs) noexcept
 {
     bits ^= rhs.bits;
     return *this;
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitset<N> Bitset<N>::operator~() const
+MR_HF_DECL Bitset<N> Bitset<N>::operator~() const noexcept
 {
     return Bitset<N>(~bits);
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitset<N>& Bitset<N>::Set()
+MR_HF_DECL Bitset<N>& Bitset<N>::Set() noexcept
 {
     bits = MASK;
     return *this;
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitset<N>& Bitset<N>::Set(uint32_t pos, bool value)
+MR_HF_DECL Bitset<N>& Bitset<N>::Set(uint32_t pos, bool value) noexcept
 {
     assert(pos < N);
     BitRef br(*this, pos);
@@ -769,16 +584,14 @@ constexpr Bitset<N>& Bitset<N>::Set(uint32_t pos, bool value)
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitset<N>& Bitset<N>::Reset()
+MR_HF_DECL Bitset<N>& Bitset<N>::Reset() noexcept
 {
     bits = 0x0;
     return *this;
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitset<N>& Bitset<N>::Reset(uint32_t pos)
+MR_HF_DECL Bitset<N>& Bitset<N>::Reset(uint32_t pos) noexcept
 {
     assert(pos < N);
     BitRef br(*this, pos);
@@ -787,16 +600,14 @@ constexpr Bitset<N>& Bitset<N>::Reset(uint32_t pos)
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitset<N>& Bitset<N>::Flip()
+MR_HF_DECL Bitset<N>& Bitset<N>::Flip() noexcept
 {
     bits = ~bits;
     return *this;
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitset<N>& Bitset<N>::Flip(uint32_t pos)
+MR_HF_DECL Bitset<N>& Bitset<N>::Flip(uint32_t pos) noexcept
 {
     assert(pos < N);
     BitRef br(*this, pos);
@@ -805,29 +616,25 @@ constexpr Bitset<N>& Bitset<N>::Flip(uint32_t pos)
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitset<N>::operator Type()
+MR_HF_DECL Bitset<N>::operator Type() noexcept
 {
     return bits;
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitset<N> operator&(const Bitset<N>& lhs, const Bitset<N>& rhs)
+MR_HF_DECL Bitset<N> operator&(const Bitset<N>& lhs, const Bitset<N>& rhs) noexcept
 {
     return lhs.bits & rhs.bits;
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitset<N> operator|(const Bitset<N>& lhs, const Bitset<N>& rhs)
+MR_HF_DECL Bitset<N> operator|(const Bitset<N>& lhs, const Bitset<N>& rhs) noexcept
 {
     return lhs.bits | rhs.bits;
 }
 
 template<size_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Bitset<N> operator^(const Bitset<N>& lhs, const Bitset<N>& rhs)
+MR_HF_DECL Bitset<N> operator^(const Bitset<N>& lhs, const Bitset<N>& rhs) noexcept
 {
     return lhs.bits ^ rhs.bits;
 }

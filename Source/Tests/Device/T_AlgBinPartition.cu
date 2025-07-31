@@ -12,8 +12,8 @@
 template <class T>
 struct Partitioner
 {
-    MRAY_HYBRID MRAY_CGPU_INLINE
-    bool operator()(const T& t) const
+    MR_PF_DECL
+    bool operator()(const T& t) const noexcept
     {
         return t != T(0);
     }

@@ -7,136 +7,113 @@
 
 namespace Distribution::BxDF
 {
-    MRAY_HYBRID
-    Float FresnelDielectric(Float cosFront, Float etaFront, Float etaBack);
-
+    MR_PF_DECL Float FresnelDielectric(Float cosFront, Float etaFront, Float etaBack);
     template<VectorC T>
-    MRAY_HYBRID
-    Float FresnelConductor(Float cosFront, const T& etaFront, const T& etaBack);
+    MR_PF_DECL Float FresnelConductor(Float cosFront, const T& etaFront, const T& etaBack);
+    MR_PF_DECL Float DGGX(Float NdH, Float alpha);
 
-    MRAY_HYBRID
-    Float DGGX(Float NdH, Float alpha);
+    MR_PF_DECL Float LambdaSmith(const Vector3& vec, Float alpha);
 
-    MRAY_HYBRID
-    Float LambdaSmith(const Vector3& vec, Float alpha);
+    MR_PF_DECL Float GSmithSingle(const Vector3& vec, Float alpha);
+    MR_PF_DECL Float GSmithCorrelated(const Vector3& wO, const Vector3& wI, Float alpha);
+    MR_PF_DECL Float GSmithSeparable(const Vector3& wO, const Vector3& wI, Float alpha);
+    MR_PF_DECL Float GSchlick(Float cosTheta, Float alpha);
+    MR_PF_DECL Float GeomGGX(Float cosTheta, Float alpha);
 
-    MRAY_HYBRID
-    Float GSmithSingle(const Vector3& vec, Float alpha);
-
-    MRAY_HYBRID
-    Float GSmithCorrelated(const Vector3& wO, const Vector3& wI,
-                           Float alpha);
-
-    MRAY_HYBRID
-    Float GSmithSeparable(const Vector3& wO, const Vector3& wI,
-                          Float alpha);
-
-    MRAY_HYBRID
-    Float GSchlick(Float cosTheta, Float alpha);
-
-    MRAY_HYBRID
-    Float GeomGGX(Float cosTheta, Float alpha);
-
-    MRAY_HYBRID
-    Spectrum FSchlick(Float VdH, const Spectrum& f0);
-
-    MRAY_HYBRID
-    Float VNDFGGXSmithPDF(const Vector3& V, const Vector3& H, Float alpha);
-
-    MRAY_HYBRID
-    SampleT<Vector3> VNDFGGXSmithSample(const Vector3& V, Float alpha,
-                                        const Vector2& xi);
-
-    MRAY_HYBRID
-    Float BurleyDiffuseCorrection(Float NdL, Float NdV, Float LdH, Float roughness);
+    MR_PF_DECL Spectrum         FSchlick(Float VdH, const Spectrum& f0);
+    MR_PF_DECL Float            VNDFGGXSmithPDF(const Vector3& V, const Vector3& H, Float alpha);
+    MR_PF_DECL SampleT<Vector3> VNDFGGXSmithSample(const Vector3& V, Float alpha, const Vector2& xi);
+    MR_PF_DECL Float            BurleyDiffuseCorrection(Float NdL, Float NdV, Float LdH, Float roughness);
 }
 
 namespace Distribution::Medium
 {
-    MRAY_HYBRID
-    constexpr Spectrum  WavesToSpectrumCauchy(const SpectrumWaves& waves,
+    MR_PF_DECL
+    Spectrum            WavesToSpectrumCauchy(const SpectrumWaves& waves,
                                               const Vector3& coeffs);
-    MRAY_HYBRID
+    MR_PF_DECL
     Float               HenyeyGreensteinPhase(Float cosTheta, Float g);
 
-    MRAY_HYBRID
+    MR_HF_DECL
     SampleT<Vector3>    SampleHenyeyGreensteinPhase(const Vector3& wO, Float g,
                                                     const Vector2& xi);
 }
 
 namespace Distribution::Common
 {
-    template<VectorOrFloatC  T>
-    MRAY_HYBRID T       DivideByPDF(T, Float pdf);
-    MRAY_HYBRID Float   DotN(Vector3);
+    template<class T>
+    concept FloatOrVecFloatC = FloatVectorC<T> || FloatC<T>;
 
-    MRAY_HYBRID
+    template<FloatOrVecFloatC  T>
+    MR_PF_DECL T       DivideByPDF(T, Float pdf);
+    MR_PF_DECL Float   DotN(Vector3);
+
+    MR_PF_DECL
     Pair<uint32_t, Float>   BisectSample1(Float xi, Float weight);
-    MRAY_HYBRID
+    MR_PF_DECL
     Pair<uint32_t, Float>   BisectSample2(Float xi, Vector2 weights,
                                           bool isAlreadyNorm = false);
     template<uint32_t N>
-    MRAY_HYBRID
+    MR_PF_DECL
     Pair<uint32_t, Float>   BisectSample(Float xi, const Span<Float, N>& weights,
                                          bool isAlreadyNorm = false);
 
-    MRAY_HYBRID
+    MR_PF_DECL
     SampleT<Float>  SampleGaussian(Float xi, Float sigma = Float(1),
                                    Float mu = Float(0));
-    MRAY_HYBRID
+    MR_PF_DECL
     Float           PDFGaussian(Float x, Float sigma = Float(1),
                                 Float mu = Float(0));
 
     // TODO: Only providing isotropic version
     // here, anisotropic version may not be useful
     // We may provide a spherical version later.
-    MRAY_HYBRID
+    MR_PF_DECL
     SampleT<Vector2>    SampleGaussian2D(Vector2 xi, Float sigma = Float(1),
                                          Vector2 mu = Vector2::Zero());
-    MRAY_HYBRID
+    MR_PF_DECL
     Float               PDFGaussian2D(Vector2 xy, Float sigma = Float(1),
                                       Vector2 mu = Vector2::Zero());
 
-    MRAY_HYBRID
+    MR_PF_DECL
     SampleT<Float>  SampleLine(Float xi, Float c, Float d);
-    MRAY_HYBRID
+    MR_PF_DECL
     Float           PDFLine(Float x, Float c, Float d);
 
-    MRAY_HYBRID
+    MR_PF_DECL
     SampleT<Float>  SampleTent(Float xi, Float a, Float b);
-    MRAY_HYBRID
+    MR_PF_DECL
     Float           PDFTent(Float x, Float a, Float b);
 
-    MRAY_HYBRID
+    MR_PF_DECL
     SampleT<Float>  SampleUniformRange(Float xi, Float a, Float b);
-    MRAY_HYBRID
+    MR_PF_DECL
     Float           PDFUniformRange(Float x, Float a, Float b);
     //
-    MRAY_HYBRID
+    MR_PF_DECL
     SampleT<Vector3>    SampleCosDirection(const Vector2& xi);
-    MRAY_HYBRID
-    constexpr Float     PDFCosDirection(const Vector3& v, const Vector3& n);
-    MRAY_HYBRID
-    constexpr Float     PDFCosDirection(const Vector3& v);
-    MRAY_HYBRID
+    MR_PF_DECL
+    Float               PDFCosDirection(const Vector3& v, const Vector3& n);
+    MR_PF_DECL
+    Float               PDFCosDirection(const Vector3& v);
+    MR_PF_DECL
     SampleT<Vector3>    SampleUniformDirection(const Vector2& xi);
-    MRAY_HYBRID
-    constexpr Float     PDFUniformDirection();
+    MR_PF_DECL
+    Float               PDFUniformDirection();
     //
-    MRAY_HYBRID
-    constexpr Optional<Spectrum> RussianRoulette(Spectrum, Float probability,
-                                                 Float xi);
+    MR_PF_DECL
+    Optional<Spectrum>  RussianRoulette(Spectrum, Float probability, Float xi);
 }
 
 namespace Distribution::MIS
 {
     template<uint32_t N>
-    MRAY_HYBRID
+    MR_PF_DECL
     Float BalanceCancelled(const Span<Float, N>& pdfs,
                            const Span<Float, N>& weights);
 
     template<uint32_t N>
-    MRAY_HYBRID
+    MR_PF_DECL
     Float Balance(uint32_t pdfIndex,
                   const Span<Float, N>& pdfs,
                   const Span<Float, N>& weights);
@@ -145,7 +122,7 @@ namespace Distribution::MIS
 namespace Distribution
 {
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Float BxDF::FresnelDielectric(Float cosFront, Float etaFront, Float etaBack)
 {
     // Calculate Sin from Snell's Law
@@ -170,7 +147,7 @@ Float BxDF::FresnelDielectric(Float cosFront, Float etaFront, Float etaBack)
 }
 
 template<VectorC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Float BxDF::FresnelConductor(Float cosTheta, const T& eta, const T& k)
 {
     // https://pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission#FrConductor
@@ -183,8 +160,8 @@ Float BxDF::FresnelConductor(Float cosTheta, const T& eta, const T& k)
     T k2 = k * k;
     //
     T diff = eta2 - k2 - T(sinTheta2);
-    T a2b2 = T::SqrtMax(diff * diff + Float(4) * eta2 * k2);
-    T a = T::SqrtMax(T(0.5) * (a2b2 + diff));
+    T a2b2 = Math::SqrtMax(diff * diff + Float(4) * eta2 * k2);
+    T a = Math::SqrtMax(T(0.5) * (a2b2 + diff));
     //
     T sT1 = a2b2 + cosTheta2;
     T sT2 = a * (Float(2) * cosTheta);
@@ -197,7 +174,7 @@ Float BxDF::FresnelConductor(Float cosTheta, const T& eta, const T& k)
     return (rP + rS) * Float(0.5);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Float BxDF::DGGX(Float NdH, Float alpha)
 {
     Float alpha2 = alpha * alpha;
@@ -208,39 +185,39 @@ Float BxDF::DGGX(Float NdH, Float alpha)
     return result;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Float BxDF::LambdaSmith(const Vector3& vec, Float alpha)
 {
     Vector3 vSqr = vec * vec;
     Float alpha2 = alpha * alpha;
     Float inner = alpha2 * (vSqr[0] + vSqr[1]) / vSqr[2];
-    Float lambda = std::sqrt(Float(1) + inner) - Float(1);
+    Float lambda = Math::Sqrt(Float(1) + inner) - Float(1);
     lambda *= Float(0.5);
     return lambda;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Float BxDF::GSmithSingle(const Vector3& vec, Float alpha)
 {
     return Float(1) / (Float(1) + LambdaSmith(vec, alpha));
 
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Float BxDF::GSmithCorrelated(const Vector3& wO, const Vector3& wI,
                              Float alpha)
 {
     return Float(1) / (LambdaSmith(wO, alpha) + LambdaSmith(wI, alpha) + Float(1));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Float BxDF::GSmithSeparable(const Vector3& wO, const Vector3& wI,
                             Float alpha)
 {
     return GSmithSingle(wO, alpha) * GSmithSingle(wI, alpha);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Float BxDF::GSchlick(Float cosTheta, Float alpha)
 {
     if(cosTheta == Float(0)) return Float(0);
@@ -248,7 +225,7 @@ Float BxDF::GSchlick(Float cosTheta, Float alpha)
     return cosTheta / (cosTheta * (1 - k) + k);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Float BxDF::GeomGGX(Float NdV, Float alpha)
 {
     // Straight from paper (Eq. 34)
@@ -261,11 +238,11 @@ Float BxDF::GeomGGX(Float NdV, Float alpha)
     Float cosTheta2 = NdV * NdV;
     Float tan2 = (Float(1) - cosTheta2) / cosTheta2;
     Float alpha2 = alpha * alpha;
-    Float denom = Float(1) + std::sqrt(Float(1) + tan2 * alpha2);
+    Float denom = Float(1) + Math::Sqrt(Float(1) + tan2 * alpha2);
     return Float(2) / denom;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Spectrum BxDF::FSchlick(Float VdH, const Spectrum& f0)
 {
     // Classic Schlick's approx of fresnel term
@@ -278,12 +255,12 @@ Spectrum BxDF::FSchlick(Float VdH, const Spectrum& f0)
     return result;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Float BxDF::VNDFGGXSmithPDF(const Vector3& V, const Vector3& H, Float alpha)
 {
-    Float VdH = std::max(Float(0), H.Dot(V));
-    Float NdH = std::max(Float(0), H[2]);
-    Float NdV = std::max(Float(0), V[2]);
+    Float VdH = Math::Max(Float(0), Math::Dot(H, V));
+    Float NdH = Math::Max(Float(0), H[2]);
+    Float NdV = Math::Max(Float(0), V[2]);
     Float D = DGGX(NdH, alpha);
     Float GSingle = GSmithSingle(V, alpha);
     //
@@ -292,7 +269,7 @@ Float BxDF::VNDFGGXSmithPDF(const Vector3& V, const Vector3& H, Float alpha)
     return VdH * D * GSingle / NdV;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 SampleT<Vector3> BxDF::VNDFGGXSmithSample(const Vector3& V, Float alpha,
                                           const Vector2& xi)
 {
@@ -314,31 +291,32 @@ SampleT<Vector3> BxDF::VNDFGGXSmithSample(const Vector3& V, Float alpha,
     // Rename alpha for easier reading
     Float a = alpha;
     // Section 3.2 Ellipsoid to Spherical
-    Vector3 VHemi = Vector3(a * V[0], a * V[1], V[2]).Normalize();
+    Vector3 VHemi = Math::Normalize(Vector3(a * V[0], a * V[1], V[2]));
     // Section 4.1 Find orthonormal basis in the sphere
-    Float len2 = Vector2f(VHemi).LengthSqr();
+    Float len2 = Math::LengthSqr(Vector2(VHemi));
     Vector3 T1 = (len2 > 0)
-                    ? Vector3(-VHemi[1], VHemi[0], 0.0f) / std::sqrt(len2)
+                    ? Vector3(-VHemi[1], VHemi[0], 0.0f) * Math::RSqrt(len2)
                     : Vector3(1, 0, 0);
-    Vector3 T2 = Vector3::Cross(VHemi, T1);
+    Vector3 T2 = Math::Cross(VHemi, T1);
     // Section 4.2 Sampling using projected area
-    Float r = std::sqrt(xi[0]);
+    Float r = Math::Sqrt(xi[0]);
     Float phi = Float(2) * MathConstants::Pi<Float>() * xi[1];
-    Float t1 = r * std::cos(phi);
-    Float t2 = r * std::sin(phi);
+    const auto& [sinPhi, cosPhi] = Math::SinCos(phi);
+    Float t1 = r * cosPhi;
+    Float t2 = r * sinPhi;
     Float s = Float(0.5) * (Float(1) + VHemi[2]);
-    t2 = (Float(1) - s) * std::sqrt(Float(1) - t1 * t1) + s * t2;
+    t2 = (Float(1) - s) * Math::Sqrt(Float(1) - t1 * t1) + s * t2;
     // Section 4.3: Projection onto hemisphere
     float val = Float(1) - t1 * t1 - t2 * t2;
     Vector3 NHemi = t1 * T1 + t2 * T2 + Math::SqrtMax(val) * VHemi;
     // Section 3.4: Finally back to Ellipsoid
     Vector3 NMicrofacet = Vector3(a * NHemi[0], a * NHemi[1],
                                   Math::SqrtMax(NHemi[2]));
-    Float nLen2 = NMicrofacet.LengthSqr();
+    Float nLen2 = Math::LengthSqr(NMicrofacet);
     if(nLen2 < MathConstants::Epsilon<Float>())
         NMicrofacet = Vector3::ZAxis();
     else
-        NMicrofacet *= (Float(1) / std::sqrt(nLen2));
+        NMicrofacet *= Math::RSqrt(nLen2);
 
     return SampleT<Vector3>
     {
@@ -347,7 +325,7 @@ SampleT<Vector3> BxDF::VNDFGGXSmithSample(const Vector3& V, Float alpha,
     };
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Float BxDF::BurleyDiffuseCorrection(Float NdL, Float NdV, Float LdH, Float roughness)
 {
     // https://media.disneyanimation.com/uploads/production/publication_asset/48/asset/s2012_pbs_disney_brdf_notes_v3.pdf
@@ -362,8 +340,8 @@ Float BxDF::BurleyDiffuseCorrection(Float NdL, Float NdV, Float LdH, Float rough
     return F(NdL) * F(NdV);
 }
 
-template<VectorOrFloatC  T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+template<Common::FloatOrVecFloatC  T>
+MR_PF_DEF
 T Common::DivideByPDF(T t, Float pdf)
 {
     assert(pdf >= Float(0));
@@ -377,19 +355,19 @@ T Common::DivideByPDF(T t, Float pdf)
     else return t / pdf;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Float Common::DotN(Vector3 v)
 {
     return v[2];
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Pair<uint32_t, Float> Common::BisectSample1(Float xi, Float)
 {
     return {0, xi};
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Pair<uint32_t, Float> Common::BisectSample2(Float xi, Vector2 weights,
                                             bool isAlreadyNorm)
 {
@@ -401,13 +379,13 @@ Pair<uint32_t, Float> Common::BisectSample2(Float xi, Vector2 weights,
     Float localXi = (xi < w)
             ? xi / w
             : (xi - w) / (Float(1) - w);
-    localXi = std::min(localXi, PrevFloat<Float>(1));
+    localXi = Math::Min(localXi, PrevFloat<Float>(1));
     assert(localXi >= 0 && localXi < 1);
     return Pair<uint32_t, Float>(i, localXi);
 }
 
 template<uint32_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Pair<uint32_t, Float> Common::BisectSample(Float xi, const Span<Float, N>& weights,
                                            bool isAlreadyNorm)
 {
@@ -415,7 +393,7 @@ Pair<uint32_t, Float> Common::BisectSample(Float xi, const Span<Float, N>& weigh
     auto Reduce = [weights]() -> Float
     {
         Float r = 0;
-        UNROLL_LOOP
+        MRAY_UNROLL_LOOP
         for(uint32_t i = 1; i < N; i++)
             r += weights[i];
         return r;
@@ -423,7 +401,7 @@ Pair<uint32_t, Float> Common::BisectSample(Float xi, const Span<Float, N>& weigh
     auto Find = [weights](Float xiScaled) -> uint32_t
     {
         Float sum = 0;
-        UNROLL_LOOP
+        MRAY_UNROLL_LOOP
         for(uint32_t i = 0; i < N; i++)
         {
             sum += weights[i];
@@ -443,12 +421,12 @@ Pair<uint32_t, Float> Common::BisectSample(Float xi, const Span<Float, N>& weigh
     if(i > 1) diff += weights[1];
     Float localXi = (xiScaled - diff) / weights[i];
     localXi = (isAlreadyNorm) ? localXi : localXi * sum;
-    localXi = std::min(localXi, PrevFloat<Float>(1));
+    localXi = Math::Min(localXi, PrevFloat<Float>(1));
     assert(localXi >= 0 && localXi < 1);
     return Pair<uint32_t, Float>(i, localXi);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 SampleT<Float> Common::SampleGaussian(Float xi, Float sigma, Float mu)
 {
     Float x = MathConstants::Sqrt2<Float>() * sigma;
@@ -470,22 +448,21 @@ SampleT<Float> Common::SampleGaussian(Float xi, Float sigma, Float mu)
     };
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Float Common::PDFGaussian(Float x, Float sigma, Float mu)
 {
     return Math::Gaussian(x, sigma, mu);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 SampleT<Vector2> Common::SampleGaussian2D(Vector2 xi, Float sigma,
                                           Vector2 mu)
 {
     using namespace MathConstants;
-    using Math::SinCos;
     // Instead of doing two gauss inverse sampling,
     // doing Box-Muller transform
-    Float scalar = std::sqrt(Float(-2) * std::log(xi[0]));
-    auto[s, c] = SinCos(Pi<Float>() * Float(2) * xi[1]);
+    Float scalar = Math::Sqrt(Float(-2) * Math::Log(xi[0]));
+    auto [s, c] = Math::SinCos(Pi<Float>() * Float(2) * xi[1]);
 
     // Since rng is [0, 1) it can get zero then above function
     // If scalar is inf, we are at outer ring (infinitely long)
@@ -498,7 +475,7 @@ SampleT<Vector2> Common::SampleGaussian2D(Vector2 xi, Float sigma,
     return { xy, pdf };
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Float Common::PDFGaussian2D(Vector2 xy, Float sigma,
                             Vector2 mu)
 {
@@ -507,7 +484,7 @@ Float Common::PDFGaussian2D(Vector2 xy, Float sigma,
             Math::Gaussian(xy[1], sigma, mu[1]));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 SampleT<Float> Common::SampleLine(Float xi, Float c, Float d)
 {
     using namespace Math;
@@ -519,17 +496,17 @@ SampleT<Float> Common::SampleLine(Float xi, Float c, Float d)
         return SampleT{epsilon, normVal * epsilon};
 
     Float denom = Lerp(c * c, d * d, xi);
-    denom = c + std::sqrt(denom);
+    denom = c + Math::Sqrt(denom);
     Float x = (c + d) * xi / denom;
     using Math::PrevFloat;
     return SampleT<Float>
     {
-        .value = std::min(x, PrevFloat<Float>(1)),
+        .value = Math::Min(x, PrevFloat<Float>(1)),
         .pdf = normVal * Lerp(c, d, x)
     };
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Float Common::PDFLine(Float x, Float c, Float d)
 {
     if(x < 0 && x > 1) return Float(0);
@@ -537,7 +514,7 @@ Float Common::PDFLine(Float x, Float c, Float d)
     return normVal * Math::Lerp(c, d, x);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 SampleT<Float> Common::SampleTent(Float xi, Float a, Float b)
 {
     // Dirac delta like, return as if dirac delta
@@ -558,7 +535,7 @@ SampleT<Float> Common::SampleTent(Float xi, Float a, Float b)
     };
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Float Common::PDFTent(Float x, Float a, Float b)
 {
     assert(a <= x && b >= x);
@@ -566,7 +543,7 @@ Float Common::PDFTent(Float x, Float a, Float b)
         return Float(1) / (b - a);
 
     //Float mid = a + (b - a) * Float(0.5);
-    Float x01 = std::abs(1 - x);
+    Float x01 = Math::Abs(1 - x);
     x01 = (x < 0) ? (x / a) : (x / b);
     //Float pdf = (x < 0) ? (-a) : b;
     Float pdf = Float(1) / (b - a);
@@ -574,7 +551,7 @@ Float Common::PDFTent(Float x, Float a, Float b)
     return pdf;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 SampleT<Float> Common::SampleUniformRange(Float xi, Float a, Float b)
 {
     return SampleT<Float>
@@ -584,14 +561,14 @@ SampleT<Float> Common::SampleUniformRange(Float xi, Float a, Float b)
     };
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Float Common::PDFUniformRange(Float x, Float a, Float b)
 {
     if(x < a && x > b) return 0;
     return Float(1) / (b - a);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 SampleT<Vector3> Common::SampleCosDirection(const Vector2& xi)
 {
     using namespace MathConstants;
@@ -599,12 +576,13 @@ SampleT<Vector3> Common::SampleCosDirection(const Vector2& xi)
 
     // Generated direction is on unit space (+Z oriented hemisphere)
     Float xi1Angle = Float{2} * Pi<Float>() * xi[1];
-    Float xi0Sqrt = std::sqrt(xi[0]);
+    Float xi0Sqrt = Math::Sqrt(xi[0]);
 
     Vector3 dir;
-    dir[0] = xi0Sqrt * std::cos(xi1Angle);
-    dir[1] = xi0Sqrt * std::sin(xi1Angle);
-    dir[2] = SqrtMax(Float{1} - Vector2(dir).Dot(Vector2(dir)));
+    const auto& [s, c] = Math::SinCos(xi1Angle);
+    dir[0] = xi0Sqrt * c;
+    dir[1] = xi0Sqrt * s;
+    dir[2] = SqrtMax(Float{1} - Math::LengthSqr(Vector2(dir)));
 
     // Fast tangent space dot product and domain constant
     Float pdf = dir[2] * InvPi<Float>();
@@ -617,17 +595,17 @@ SampleT<Vector3> Common::SampleCosDirection(const Vector2& xi)
     };
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Float Common::PDFCosDirection(const Vector3& v, const Vector3& n)
+MR_PF_DEF
+Float Common::PDFCosDirection(const Vector3& v, const Vector3& n)
 {
     using namespace MathConstants;
-    Float pdf = n.Dot(v) * InvPi<Float>();
+    Float pdf = Math::Dot(n, v) * InvPi<Float>();
     pdf = (pdf <= Epsilon<Float>()) ? Float(0) : pdf;
     return pdf;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Float Common::PDFCosDirection(const Vector3& v)
+MR_PF_DEF
+Float Common::PDFCosDirection(const Vector3& v)
 {
     using namespace MathConstants;
     Float pdf = v[2] * InvPi<Float>();
@@ -635,7 +613,7 @@ constexpr Float Common::PDFCosDirection(const Vector3& v)
     return pdf;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 SampleT<Vector3> Common::SampleUniformDirection(const Vector2& xi)
 {
     using namespace MathConstants;
@@ -644,9 +622,10 @@ SampleT<Vector3> Common::SampleUniformDirection(const Vector2& xi)
     Float xi0Sqrt = SqrtMax(Float{1} - xi[0] * xi[0]);
     Float xi1Angle = 2 * Pi<Float>() * xi[1];
 
+    const auto& [sinX1, cosX1] = Math::SinCos(xi1Angle);
     Vector3 dir;
-    dir[0] = xi0Sqrt * std::cos(xi1Angle);
-    dir[1] = xi0Sqrt * std::sin(xi1Angle);
+    dir[0] = xi0Sqrt * cosX1;
+    dir[1] = xi0Sqrt * sinX1;
     dir[2] = xi[0];
 
     // Uniform pdf is invariant
@@ -658,16 +637,16 @@ SampleT<Vector3> Common::SampleUniformDirection(const Vector2& xi)
     };
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Float Common::PDFUniformDirection()
+MR_PF_DEF
+Float Common::PDFUniformDirection()
 {
     return MathConstants::InvPi<Float>() * Float{0.5};
 }
 
 //
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Optional<Spectrum> Common::RussianRoulette(Spectrum throughput,
-                                                     Float probability, Float xi)
+MR_PF_DEF
+Optional<Spectrum> Common::RussianRoulette(Spectrum throughput,
+                                           Float probability, Float xi)
 {
     // We clamp the probability here.
     // If prob is too low, fireflies become too large (value wise)
@@ -679,19 +658,19 @@ constexpr Optional<Spectrum> Common::RussianRoulette(Spectrum throughput,
 }
 
 template<uint32_t N>
-MRAY_HYBRID
+MR_PF_DEF
 Float MIS::BalanceCancelled(const Span<Float, N>& pdfs,
                             const Span<Float, N>& weights)
 {
     Float result = Float(0);
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(uint32_t i = 0; i < N; i++)
         result += pdfs[i] * weights[i];
     return result;
 }
 
 template<uint32_t N>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Float MIS::Balance(uint32_t pdfIndex,
                    const Span<Float, N>& pdfs,
                    const Span<Float, N>& weights)
@@ -700,12 +679,12 @@ Float MIS::Balance(uint32_t pdfIndex,
     return weights[pdfIndex] * pdfs[pdfIndex] / denom;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Spectrum Medium::WavesToSpectrumCauchy(const SpectrumWaves& waves,
-                                                 const Vector3& coeffs)
+MR_PF_DEF
+Spectrum Medium::WavesToSpectrumCauchy(const SpectrumWaves& waves,
+                                       const Vector3& coeffs)
 {
     Spectrum result;
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(uint32_t i = 0; i < SpectrumWaves::Dims; i++)
     {
         Float w2 = waves[i] * waves[i];
@@ -715,7 +694,7 @@ constexpr Spectrum Medium::WavesToSpectrumCauchy(const SpectrumWaves& waves,
     return result;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 Float Medium::HenyeyGreensteinPhase(Float cosTheta, Float g)
 {
     // From the PBR book
@@ -732,7 +711,7 @@ Float Medium::HenyeyGreensteinPhase(Float cosTheta, Float g)
     return nom / denom;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 SampleT<Vector3> Medium::SampleHenyeyGreensteinPhase(const Vector3& wO, Float g,
                                                      const Vector2& xi)
 {
@@ -752,7 +731,7 @@ SampleT<Vector3> Medium::SampleHenyeyGreensteinPhase(const Vector3& wO, Float g,
     hg *= Float(-1) / (Float(2) * g);
     // https://www.desmos.com/calculator/7ogsbedc2r
     // cosTheta when g is near zero should be inverted maybe?
-    bool isNearZero = (std::abs(g) < MathConstants::VeryLargeEpsilon<Float>());
+    bool isNearZero = (Abs(g) < MathConstants::VeryLargeEpsilon<Float>());
     Float cosTheta = (isNearZero)
                         ? (Float(2) * xi[1] - Float(1))
                         : hg;

@@ -108,7 +108,7 @@ namespace SurfRDetail
 
     template<PrimitiveC Prim, MaterialC Material, class Surface, class TContext,
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-    MRAY_HYBRID
+    MR_HF_DECL
     void WorkFunctionCommon(const Prim&, const Material&, const Surface&,
                             const RayConeSurface&, const TContext&, RNGDispenser&,
                             const RenderWorkParams<GlobalState, RayStateCommon, PG, MG, TG>& params,
@@ -116,14 +116,14 @@ namespace SurfRDetail
 
     template<PrimitiveC Prim, MaterialC Material, class Surface, class TContext,
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-    MRAY_HYBRID
+    MR_HF_DECL
     void WorkFunctionFurnaceOrAO(const Prim&, const Material&, const Surface&,
                                  const RayConeSurface&, const TContext&, RNGDispenser&,
                                  const RenderWorkParams<GlobalState, RayStateAO, PG, MG, TG>& params,
                                  RayIndex rayIndex);
 
     template<LightC Light, LightGroupC LG, TransformGroupC TG>
-    MRAY_HYBRID
+    MR_HF_DECL
     void LightWorkFunctionCommon(const Light&, RNGDispenser&,
                                  const RenderLightWorkParams<GlobalState, RayStateCommon, LG, TG>& params,
                                  RayIndex rayIndex);
@@ -133,7 +133,7 @@ namespace SurfRDetail
 template<PrimitiveC Prim, MaterialC Material,
          class Surface, class TContext,
          PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 void SurfRDetail::WorkFunctionCommon(const Prim&, const Material&, const Surface& surf,
                                      const RayConeSurface&, const TContext& tContext, RNGDispenser&,
                                      const RenderWorkParams<GlobalState, RayStateCommon, PG, MG, TG>& params,
@@ -155,7 +155,7 @@ void SurfRDetail::WorkFunctionCommon(const Prim&, const Material&, const Surface
             else
             {
                 Vector3 normal = surf.shadingTBN.OrthoBasisZ();
-                normal = tContext.ApplyN(normal).Normalize();
+                normal = Math::Normalize(tContext.ApplyN(normal));
                 normal = (normal + Vector3(1)) * Vector3(0.5);
                 color = normal;
             }
@@ -240,7 +240,7 @@ void SurfRDetail::WorkFunctionCommon(const Prim&, const Material&, const Surface
 template<PrimitiveC Prim, MaterialC Material,
          class Surface, class TContext,
          PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, const Surface& surf,
                                           const RayConeSurface&, const TContext& tContext, RNGDispenser& rng,
                                           const RenderWorkParams<GlobalState, RayStateAO, PG, MG, TG>& params,
@@ -254,11 +254,11 @@ void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, cons
         using Distribution::Common::DivideByPDF;
         auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
         Vector3 wO = rayIn.Dir();
-        wO = tContext.InvApplyN(wO).Normalize();
+        wO = Math::Normalize(tContext.InvApplyN(wO));
         auto raySample = mat.SampleBxDF(-wO, surf, rng);
 
         Spectrum refl;
-        if(raySample.value.reflectance.HasNaN() || Math::IsNan(raySample.pdf))
+        if(!Math::IsFinite(raySample.value.reflectance) || Math::IsNaN(raySample.pdf))
             refl = Spectrum(BIG_MAGENTA(), 0.0);
         else
             refl = DivideByPDF(raySample.value.reflectance, raySample.pdf);
@@ -274,7 +274,7 @@ void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, cons
         else
         {
             normal = surf.shadingTBN.OrthoBasisZ();
-            normal = tContext.ApplyN(normal).Normalize();
+            normal = Math::Normalize(tContext.ApplyN(normal));
             geoNormal = surf.geoNormal;
         }
 
@@ -294,16 +294,16 @@ void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, cons
         params.rayState.dOutputData[rayIndex] = Spectrum(aoMultiplier, 0);
 
         // New ray
-        Ray rayOut = Ray(direction, surf.position);
-        rayOut.NudgeSelf(geoNormal);
+        Ray rayOut = Ray(direction, surf.position).Nudge(geoNormal);
         Float tMax = params.globalState.tMaxAO;
-        RayToGMem(params.rayState.dVisibilityRays, rayIndex, rayOut, Vector2(0, tMax));
+        RayToGMem(params.rayState.dVisibilityRays, rayIndex, rayOut,
+                  Vector2(0, tMax));
     }
     else params.rayState.dOutputData[rayIndex] = Spectrum(BIG_MAGENTA(), 0);
 }
 
 template<LightC Light, LightGroupC LG, TransformGroupC TG>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 void SurfRDetail::LightWorkFunctionCommon(const Light&, RNGDispenser&,
                                           const RenderLightWorkParams<GlobalState,
                                                                       RayStateCommon, LG, TG>& params,

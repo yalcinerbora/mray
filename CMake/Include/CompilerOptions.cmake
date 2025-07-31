@@ -57,11 +57,11 @@ set(MRAY_MSVC_OPTIONS
     # Debug Default
     $<$<CONFIG:Debug>:/MDd /Zi /Ob0 /Oy- /Od /RTC1>
     # Release Default
-    $<$<CONFIG:Release>:/MD /O2 /Zi /Ob1 /DNDEBUG>
+    $<$<CONFIG:Release>:/MD /O2 /Zi /Ob3 /DNDEBUG>
     # Release Debug Build
     # Generate pdb and enable optimizations
     # Also flag address sanitizer
-    $<$<CONFIG:SanitizeR>:/MD /O1 /Zi /Ob0 /Oy- /RTC1>
+    $<$<CONFIG:SanitizeR>:/MD /O1 /Zi /Ob0 /Oy->
     $<$<CONFIG:SanitizeR>:/fsanitize=${MRAY_SANITIZER_MODE}>
 
     # FP-related

@@ -42,50 +42,50 @@ namespace DefaultSphereDetail
         Ref<const TransContextType> transformContext;
 
         public:
-        MRAY_HYBRID             Sphere(const TransContextType& transform,
+        MR_HF_DECL              Sphere(const TransContextType& transform,
                                        const SphereData& data, PrimitiveKey key);
-        MRAY_HYBRID
+        MR_HF_DECL
         Intersection            Intersects(const Ray& ray, bool cullBackface) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         SampleT<BasicSurface>   SampleSurface(RNGDispenser& rng) const;
-        MRAY_HYBRID Float       PdfSurface(const Hit& hit) const;
-        MRAY_HYBRID Float       GetSurfaceArea() const;
-        MRAY_HYBRID AABB3       GetAABB() const;
-        MRAY_HYBRID Vector3     GetCenter() const;
-        MRAY_HYBRID uint32_t    Voxelize(Span<uint64_t>& mortonCodes,
+        MR_HF_DECL Float        PdfSurface(const Hit& hit) const;
+        MR_HF_DECL Float        GetSurfaceArea() const;
+        MR_HF_DECL AABB3        GetAABB() const;
+        MR_HF_DECL Vector3      GetCenter() const;
+        MR_HF_DECL uint32_t     Voxelize(Span<uint64_t>& mortonCodes,
                                          Span<Vector2us>& normals,
                                          bool onlyCalculateSize,
                                          const VoxelizationParameters& voxelParams) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Optional<BasicSurface>  SurfaceFromHit(const Hit& hit) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Optional<Hit>           ProjectedHit(const Vector3& point) const;
-        MRAY_HYBRID Vector2     SurfaceParametrization(const Hit& hit) const;
+        MR_HF_DECL Vector2      SurfaceParametrization(const Hit& hit) const;
 
-        MRAY_HYBRID
+        MR_HF_DECL
         const TransContextType& GetTransformContext() const;
 
         // Surface Generation
-        MRAY_HYBRID void        GenerateSurface(EmptySurface&,
-                                                RayConeSurface&,
-                                                // Inputs
-                                                const Hit&,
-                                                const Ray&,
-                                                const RayCone&) const;
+        MR_HF_DECL void GenerateSurface(EmptySurface&,
+                                        RayConeSurface&,
+                                        // Inputs
+                                        const Hit&,
+                                        const Ray&,
+                                        const RayCone&) const;
 
-        MRAY_HYBRID void        GenerateSurface(BasicSurface&,
-                                                RayConeSurface&,
-                                                // Inputs
-                                                const Hit&,
-                                                const Ray&,
-                                                const RayCone&) const;
+        MR_HF_DECL void GenerateSurface(BasicSurface&,
+                                        RayConeSurface&,
+                                        // Inputs
+                                        const Hit&,
+                                        const Ray&,
+                                        const RayCone&) const;
 
-        MRAY_HYBRID void        GenerateSurface(DefaultSurface&,
-                                                RayConeSurface&,
-                                                // Inputs
-                                                const Hit&,
-                                                const Ray&,
-                                                const RayCone&) const;
+        MR_HF_DECL void GenerateSurface(DefaultSurface&,
+                                        RayConeSurface&,
+                                        // Inputs
+                                        const Hit&,
+                                        const Ray&,
+                                        const RayCone&) const;
     };
 
 }

@@ -56,8 +56,8 @@ concept AccelC = requires(AccelType acc,
 
 struct UnionAABB3Functor
 {
-    MRAY_GPU MRAY_GPU_INLINE
-    AABB3 operator()(const AABB3& l, const AABB3& r) const
+    MR_PF_DECL
+    AABB3 operator()(const AABB3& l, const AABB3& r) const noexcept
     {
         return l.Union(r);
     }
@@ -73,8 +73,8 @@ class AABBFetchFunctor
         : pData(pd)
     {}
 
-    MRAY_HYBRID MRAY_CGPU_INLINE
-    AABB3 operator()(PrimitiveKey k) const
+    MR_PF_DECL
+    AABB3 operator()(PrimitiveKey k) const noexcept
     {
         using Prim = typename PG:: template Primitive<>;
         Prim prim(TransformContextIdentity{}, pData, k);
@@ -99,8 +99,8 @@ class KeyGeneratorFunctor
         , dLocalKeyWriteRegion(dWriteRegions)
     {}
 
-    MRAY_HYBRID MRAY_CGPU_INLINE
-    void operator()(KernelCallParams kp) const
+    MR_PF_DECL_V
+    void operator()(KernelCallParams kp) const noexcept
     {
         uint32_t keyCount = static_cast<uint32_t>(dLocalKeyWriteRegion.size());
         for(uint32_t i = kp.GlobalId(); i < keyCount; i += kp.TotalSize())
@@ -323,15 +323,15 @@ using AccelGroupGenMap = Map<std::string_view, AccelGroupGenerator>;
 // to access the data.
 // Since at most (currently 8) prim batch can be available on an accelerator instance,
 // just linear searches over the ranges.
-MRAY_HYBRID MRAY_CGPU_INLINE
-uint32_t FindPrimBatchIndex(const PrimRangeArray& primRanges, PrimitiveKey k)
+MR_PF_DECL
+uint32_t FindPrimBatchIndex(const PrimRangeArray& primRanges, PrimitiveKey k) noexcept
 {
-    static constexpr uint32_t N = static_cast<uint32_t>(std::tuple_size_v<LightOrMatKeyArray>);
+    constexpr uint32_t N = static_cast<uint32_t>(std::tuple_size_v<LightOrMatKeyArray>);
 
     // Linear search over the index
     // List has few elements so linear search should suffice
     CommonKey primIndex = k.FetchIndexPortion();
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(uint32_t i = 0; i < N; i++)
     {
         // Do not do early break here (not every accelerator will use all 8
@@ -1248,8 +1248,7 @@ void BaseAcceleratorT<C>::AddLightSurfacesToPartitions(std::vector<AccelGroupCon
 template <class C>
 void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
 {
-    using namespace std::string_view_literals;
-    static const auto annotation = gpuSystem.CreateAnnotation("Accelerator Construct"sv);
+    static const auto annotation = gpuSystem.CreateAnnotation("Accelerator Construct");
     const auto _ = annotation.AnnotateScope();
 
     std::vector<AccelGroupConstructParams> partitions;
@@ -1319,7 +1318,7 @@ void BaseAcceleratorT<C>::Construct(BaseAccelConstructParams p)
                                                      uint32_t(0),
     [](uint32_t rhs, uint32_t lhs)
     {
-        return std::max(rhs, lhs);
+        return Math::Max(rhs, lhs);
     },
     [](const auto& pair)
     {
@@ -1377,14 +1376,14 @@ size_t BaseAcceleratorT<C>::TotalInstanceCount() const
 //
 // This kernel is shared by the all accelerators, but the body
 // is in "AcceleratorLinear.cu" file
-extern MRAY_KERNEL
+MRAY_KERNEL
 void KCGeneratePrimitiveKeys(MRAY_GRID_CONSTANT const Span<PrimitiveKey> dAllLeafs,
                              //
                              MRAY_GRID_CONSTANT const Span<const PrimRangeArray> dConcretePrimRanges,
                              MRAY_GRID_CONSTANT const Span<const Vector2ui> dConcreteLeafRanges,
                              MRAY_GRID_CONSTANT const CommonKey groupId);
 
-extern MRAY_KERNEL
+MRAY_KERNEL
 void KCSetIsVisibleIndirect(MRAY_GRID_CONSTANT const Bitspan<uint32_t> dIsVisibleBuffer,
                             //
                             MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices);

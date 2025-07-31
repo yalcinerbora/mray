@@ -1,6 +1,7 @@
 #include "MeshLoaderGFG.h"
 
 #include "Core/ShapeFunctions.h"
+#include "Core/Profiling.h"
 
 #include <filesystem>
 #include <gfg/GFGFileExporter.h>
@@ -138,6 +139,9 @@ MeshViewGFG::MeshViewGFG(uint32_t innerIndexIn,
     : innerIndex(innerIndexIn)
     , gfgFile(gfgFileIn)
 {
+    static const ProfilerAnnotation _("GFG Read Header");
+    auto annotation = _.AnnotateScope();
+
     if(innerIndex >= gfgFile.loader.Header().meshes.size())
         throw MRayError("GFG: Inner index out of range  \"{}\"",
                         gfgFile.Name());
@@ -193,6 +197,9 @@ bool MeshViewGFG::HasAttribute(PrimitiveAttributeLogic logic) const
 TransientData MeshViewGFG::GetAttribute(PrimitiveAttributeLogic logic) const
 {
     const auto& m = gfgFile.loader.Header().meshes[innerIndex];
+
+    static const ProfilerAnnotation _("GFG Load Prim Data");
+    auto annotation = _.AnnotateScope();
 
     if(logic == PrimitiveAttributeLogic::INDEX)
     {

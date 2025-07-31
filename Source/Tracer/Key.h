@@ -27,23 +27,21 @@ class alignas(sizeof(T)) KeyT
 
     public:
     // Constructors & Destructor
-                                    KeyT() = default;
-    MRAY_HYBRID explicit constexpr  KeyT(T v);
+    constexpr             KeyT() = default;
+    MR_PF_DECL_V explicit KeyT(T v) noexcept;
     //
-    MRAY_HYBRID explicit constexpr  operator T() const;
-    MRAY_HYBRID explicit constexpr  operator T();
+    MR_PF_DECL explicit operator T() const noexcept;
+    MR_PF_DECL explicit operator T() noexcept;
 
-    MRAY_HYBRID bool                operator==(const KeyT& rhs) const;
-    MRAY_HYBRID bool                operator<(const KeyT& rhs) const;
+    MR_PF_DECL bool     operator<(const KeyT& rhs) const noexcept;
+    MR_PF_DECL bool     operator==(const KeyT& rhs) const noexcept;
 
     // Access
-    MRAY_HYBRID constexpr T         FetchBatchPortion() const;
-    MRAY_HYBRID constexpr T         FetchIndexPortion() const;
+    MR_PF_DECL T        FetchBatchPortion() const noexcept;
+    MR_PF_DECL T        FetchIndexPortion() const noexcept;
 
-    MRAY_HYBRID
-    static constexpr KeyT           CombinedKey(T batch, T id);
-    MRAY_HYBRID
-    static constexpr KeyT           InvalidKey();
+    MR_PF_DECL static KeyT  CombinedKey(T batch, T id) noexcept;
+    MR_PF_DECL static KeyT  InvalidKey() noexcept;
 
     // Sanity Checks
     static_assert((IdBits + BatchBits) == std::numeric_limits<T>::digits,
@@ -75,24 +73,22 @@ class alignas(sizeof(T)) TriKeyT
 
     public:
     // Constructors & Destructor
-                                    TriKeyT() = default;
-    MRAY_HYBRID explicit constexpr  TriKeyT(T v);
+    constexpr             TriKeyT() = default;
+    MR_PF_DECL_V explicit TriKeyT(T v) noexcept;
     //
-    MRAY_HYBRID explicit constexpr  operator T() const;
-    MRAY_HYBRID explicit constexpr  operator T();
+    MR_PF_DECL explicit operator T() const noexcept;
+    MR_PF_DECL explicit operator T() noexcept;
 
-    MRAY_HYBRID bool                operator==(const TriKeyT& rhs) const;
-    MRAY_HYBRID bool                operator<(const TriKeyT& rhs) const;
+    MR_PF_DECL bool     operator==(const TriKeyT& rhs) const noexcept;
+    MR_PF_DECL bool     operator<(const TriKeyT& rhs) const noexcept;
 
     // Access
-    MRAY_HYBRID constexpr T         FetchFlagPortion() const;
-    MRAY_HYBRID constexpr T         FetchBatchPortion() const;
-    MRAY_HYBRID constexpr T         FetchIndexPortion() const;
+    MR_PF_DECL T         FetchFlagPortion() const noexcept;
+    MR_PF_DECL T         FetchBatchPortion() const noexcept;
+    MR_PF_DECL T         FetchIndexPortion() const noexcept;
 
-    MRAY_HYBRID
-    static constexpr TriKeyT        CombinedKey(T flag, T batch, T id);
-    MRAY_HYBRID
-    static constexpr TriKeyT        InvalidKey();
+    MR_PF_DECL static TriKeyT   CombinedKey(T flag, T batch, T id) noexcept;
+    MR_PF_DECL static TriKeyT   InvalidKey() noexcept;
 
     // Sanity Checks
     static_assert((IdBits + BatchBits + FlagBits) == std::numeric_limits<T>::digits,
@@ -103,56 +99,55 @@ class alignas(sizeof(T)) TriKeyT
 };
 
 template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr KeyT<T, BB, IB>::KeyT(T v)
+MR_PF_DEF_V
+KeyT<T, BB, IB>::KeyT(T v) noexcept
     : value(v)
 {}
 
 template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr KeyT<T, BB, IB>::operator T() const
+MR_PF_DEF
+KeyT<T, BB, IB>::operator T() const noexcept
 {
     return value;
 }
 
 template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr KeyT<T, BB, IB>::operator T()
+MR_PF_DEF KeyT<T, BB, IB>::operator T() noexcept
 {
     return value;
 }
 
 template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
-MRAY_HYBRID MRAY_CGPU_INLINE
-bool KeyT<T, BB, IB>::operator==(const KeyT& rhs) const
+MR_PF_DEF
+bool KeyT<T, BB, IB>::operator==(const KeyT& rhs) const noexcept
 {
     return (value == rhs.value);
 }
 
 template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
-MRAY_HYBRID MRAY_CGPU_INLINE
-bool KeyT<T, BB, IB>::operator<(const KeyT& rhs) const
+MR_PF_DEF
+bool KeyT<T, BB, IB>::operator<(const KeyT& rhs) const noexcept
 {
     return (value < rhs.value);
 }
 
 template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T KeyT<T, BB, IB>::FetchBatchPortion() const
+MR_PF_DEF
+T KeyT<T, BB, IB>::FetchBatchPortion() const noexcept
 {
     return (value & BatchMask) >> IdBits;
 }
 
 template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T KeyT<T, BB, IB>::FetchIndexPortion() const
+MR_PF_DEF
+T KeyT<T, BB, IB>::FetchIndexPortion() const noexcept
 {
     return value & IdMask;
 }
 
 template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr KeyT<T, BB, IB> KeyT<T, BB, IB>::CombinedKey(T batch, T id)
+MR_PF_DEF
+KeyT<T, BB, IB> KeyT<T, BB, IB>::CombinedKey(T batch, T id) noexcept
 {
     assert(batch <= BatchMask);
     assert(id <= IdMask);
@@ -160,70 +155,70 @@ constexpr KeyT<T, BB, IB> KeyT<T, BB, IB>::CombinedKey(T batch, T id)
 }
 
 template <std::unsigned_integral T, uint32_t BB, uint32_t IB>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr KeyT<T, BB, IB> KeyT<T, BB, IB>::InvalidKey()
+MR_PF_DEF
+KeyT<T, BB, IB> KeyT<T, BB, IB>::InvalidKey() noexcept
 {
     return KeyT(std::numeric_limits<T>::max());
 }
 
 template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr TriKeyT<T, FB, BB, IB>::TriKeyT(T v)
+MR_PF_DEF_V
+TriKeyT<T, FB, BB, IB>::TriKeyT(T v) noexcept
     : value(v)
 {}
 
 template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr TriKeyT<T, FB, BB, IB>::operator T() const
+MR_PF_DEF
+TriKeyT<T, FB, BB, IB>::operator T() const noexcept
 {
     return value;
 }
 
 template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr TriKeyT<T, FB, BB, IB>::operator T()
+MR_PF_DEF
+TriKeyT<T, FB, BB, IB>::operator T() noexcept
 {
     return value;
 }
 
 template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
-MRAY_HYBRID MRAY_CGPU_INLINE
-bool TriKeyT<T, FB, BB, IB>::operator==(const TriKeyT& rhs) const
+MR_PF_DEF
+bool TriKeyT<T, FB, BB, IB>::operator==(const TriKeyT& rhs) const noexcept
 {
     return (value == rhs.value);
 }
 
 template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
-MRAY_HYBRID MRAY_CGPU_INLINE
-bool TriKeyT<T, FB, BB, IB>::operator<(const TriKeyT& rhs) const
+MR_PF_DEF
+bool TriKeyT<T, FB, BB, IB>::operator<(const TriKeyT& rhs) const noexcept
 {
     return (value < rhs.value);
 }
 
 template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T TriKeyT<T, FB, BB, IB>::FetchFlagPortion() const
+MR_PF_DEF
+T TriKeyT<T, FB, BB, IB>::FetchFlagPortion() const noexcept
 {
     return (value & FlagMask) >> (BatchBits + IdBits);
 }
 
 template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T TriKeyT<T, FB, BB, IB>::FetchBatchPortion() const
+MR_PF_DEF
+T TriKeyT<T, FB, BB, IB>::FetchBatchPortion() const noexcept
 {
     return (value & BatchMask) >> IdBits;
 }
 
 template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr T TriKeyT<T, FB, BB, IB>::FetchIndexPortion() const
+MR_PF_DEF
+T TriKeyT<T, FB, BB, IB>::FetchIndexPortion() const noexcept
 {
     return (value & IdMask);
 }
 
 template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr TriKeyT<T, FB, BB, IB> TriKeyT<T, FB, BB, IB>::CombinedKey(T flag, T batch, T id)
+MR_PF_DEF
+TriKeyT<T, FB, BB, IB> TriKeyT<T, FB, BB, IB>::CombinedKey(T flag, T batch, T id) noexcept
 {
     assert(flag <= FlagMask);
     assert(batch <= BatchMask);
@@ -235,8 +230,8 @@ constexpr TriKeyT<T, FB, BB, IB> TriKeyT<T, FB, BB, IB>::CombinedKey(T flag, T b
 }
 
 template <std::unsigned_integral T, uint32_t FB, uint32_t BB, uint32_t IB>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr TriKeyT<T, FB, BB, IB> TriKeyT<T, FB, BB, IB>::InvalidKey()
+MR_PF_DEF
+TriKeyT<T, FB, BB, IB> TriKeyT<T, FB, BB, IB>::InvalidKey() noexcept
 {
     return TriKeyT(std::numeric_limits<T>::max());
 }

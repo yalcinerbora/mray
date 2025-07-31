@@ -101,15 +101,15 @@ size_t PartitionerDeviceBufferSize(size_t maxElementEstimate, const GPUSystem& g
     size_t radixSortTM = 0u, partitionTM = 0u;
     for(const auto& gpu : gpuSystem.SystemDevices())
     {
-        radixSortTM = std::max(RadixSortTMSize<false, CommonKey, CommonIndex>(maxElementEstimate,
-                                                                              gpu.GetComputeQueue(0)),
+        radixSortTM = Math::Max(RadixSortTMSize<false, CommonKey, CommonIndex>(maxElementEstimate,
+                                                                               gpu.GetComputeQueue(0)),
                                radixSortTM);
-        partitionTM = std::max(BinPartitionTMSize<CommonIndex>(maxElementEstimate,
-                                                               gpu.GetComputeQueue(0)),
+        partitionTM = Math::Max(BinPartitionTMSize<CommonIndex>(maxElementEstimate,
+                                                                gpu.GetComputeQueue(0)),
                                partitionTM);
     }
 
-    size_t totalTempMem = std::max(radixSortTM, partitionTM);
+    size_t totalTempMem = Math::Max(radixSortTM, partitionTM);
     static constexpr size_t Alignment = MemAlloc::DefaultSystemAlignment();
     using Math::NextMultiple;
 
@@ -205,11 +205,11 @@ RayPartitioner::InitialBuffers RayPartitioner::Start(uint32_t rayCountIn,
     rayCount = rayCountIn;
     maxPartitionCount = maxPartitionCountIn;
     // We may binary/ternary partition, support at least 3
-    maxPartitionCount = std::max(maxPartitionCount, 3u);
+    maxPartitionCount = Math::Max(maxPartitionCount, 3u);
 
     size_t tempMemSizeIf = DeviceAlgorithms::BinPartitionTMSize<CommonKey>(rayCount, queue);
     size_t tempMemSizeSort = DeviceAlgorithms::RadixSortTMSize<true, CommonKey, CommonIndex>(rayCount, queue);
-    size_t totalTempMemSize = std::max(tempMemSizeIf, tempMemSizeSort);
+    size_t totalTempMemSize = Math::Max(tempMemSizeIf, tempMemSizeSort);
 
     if(isResultsInHostVisible)
     {
@@ -264,8 +264,7 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
                                                     const GPUQueue& queue,
                                                     bool onlySortForBatches) const
 {
-    using namespace std::string_view_literals;
-    static const auto annotation = system.CreateAnnotation("Ray N-way Partition"sv);
+    static const auto annotation = system.CreateAnnotation("Ray N-way Partition");
     const auto _ = annotation.AnnotateScope();
 
     using namespace DeviceAlgorithms;

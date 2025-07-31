@@ -2,13 +2,13 @@
 
 #include "StreamingTextureView.h"
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 Vector4 TextureStreamingContext::FetchTextureBase(VirtualTextureId texId, Vector2 uv)
 {
 	return FetchTextureLod(texId, uv, Float(0));
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 Vector4 TextureStreamingContext::FetchTextureGrad(VirtualTextureId tid, Vector2 uv,
 												  Vector2 dpdx, Vector2 dpdy)
 {
@@ -58,7 +58,7 @@ Vector4 TextureStreamingContext::FetchTextureGrad(VirtualTextureId tid, Vector2 
 	return Vector4(BIG_CYAN(), 0);
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 Vector4 TextureStreamingContext::FetchTextureLod(VirtualTextureId tid, Vector2 uv,
 												 Float lod)
 {
@@ -108,19 +108,19 @@ Vector4 TextureStreamingContext::FetchTextureLod(VirtualTextureId tid, Vector2 u
 	return Vector4(BIG_CYAN(), 0);
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 Vector4 StreamingTextureView::operator()(UV uv) const
 {
 	return context->FetchTextureBase(texId, uv);
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 Vector4 StreamingTextureView::operator()(UV uv, UV dpdx, UV dpdy) const
 {
 	return context->FetchTextureGrad(texId, uv, dpdx, dpdy);
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 Vector4 StreamingTextureView::operator()(UV uv, Float lod) const
 {
 	return context->FetchTextureLod(texId, uv, lod);

@@ -46,36 +46,34 @@ class TextureViewCPU
 
     private:
     template<uint32_t C, bool IsSigned, class PixelType>
-    MRAY_GPU T              Convert(const PixelType&) const;
-    MRAY_GPU T              ReadPixel(TextureExtent<D> ijk,
+    MR_GF_DECL T            Convert(const PixelType&) const;
+    MR_GF_DECL T            ReadPixel(TextureExtent<D> ijk,
                                       TextureExtent<D> mipSize,
                                       size_t mipPixelStartOffset) const;
-    MRAY_GPU T              ReadInterpolatedPixel(UV uv, TextureExtent<D> mipSize,
+    MR_GF_DECL T            ReadInterpolatedPixel(UV uv, TextureExtent<D> mipSize,
                                                   size_t mipPixelStartOffset) const requires(FloatPixelC<T>);
-    MRAY_GPU T              ReadInterpolatedPixel(UV uv, TextureExtent<D> mipSize,
+    MR_GF_DECL T            ReadInterpolatedPixel(UV uv, TextureExtent<D> mipSize,
                                                   size_t mipPixelStartOffset) const requires(!FloatPixelC<T>);
-    MRAY_GPU
+    MR_GF_DECL
     TextureExtent<D>        ResolveEdge(TextureSignedExtent<D> ijk,
                                         TextureExtent<D> mipSize) const;
-    MRAY_GPU
+    MR_GF_DECL
     TextureSignedExtent<D>  NearestPixel(UV texel) const;
-    MRAY_GPU
+    MR_GF_DECL
     Interpolants            FindInterpolants(UV uv, TextureExtent<D> mipSize) const;
-    MRAY_GPU UV             IfUVConvertToTexel(UV texelOrUV, TextureExtent<D> mipSize) const;
-    MRAY_GPU UV             IfTexelConvertToUV(UV texelOrUV, TextureExtent<D> mipSize) const;
+    MR_GF_DECL UV           IfUVConvertToTexel(UV texelOrUV, TextureExtent<D> mipSize) const;
+    MR_GF_DECL UV           IfTexelConvertToUV(UV texelOrUV, TextureExtent<D> mipSize) const;
 
     public:
     MRAY_HOST               TextureViewCPU(const Byte* const* data,
                                            const TextureInitParams<D>* texParams,
                                            MRayPixelTypeRT dt);
     // Base Access
-    MRAY_GPU T              operator()(UV uv) const;
+    MR_GF_DECL T    operator()(UV uv) const;
     // Gradient Access
-    MRAY_GPU T              operator()(UV uv,
-                                       UV dpdx,
-                                       UV dpdy) const;
+    MR_GF_DECL T    operator()(UV uv, UV dpdx, UV dpdy) const;
     // Direct Mip Access
-    MRAY_GPU T              operator()(UV uv, Float mipLevel) const;
+    MR_GF_DECL T    operator()(UV uv, Float mipLevel) const;
 };
 
 // Writable texture views (disregards normalization etc)
@@ -95,9 +93,9 @@ class RWTextureViewCPU
         private:
         PaddedChannelType&  pixel;
         // Constructor
-        MRAY_GPU            PixRef(PaddedChannelType& pixel);
+        MR_GF_DECL            PixRef(PaddedChannelType& pixel);
         public:
-        MRAY_GPU PixRef&    operator=(const T&);
+        MR_GF_DECL PixRef&    operator=(const T&);
     };
     static constexpr uint32_t Channels = PixRef::Channels;
     using Type              = T;
@@ -112,9 +110,9 @@ class RWTextureViewCPU
     MRAY_HOST       RWTextureViewCPU(Span<PaddedChannelType> pixels,
                                      TextureExtent<DIM> dim);
     // Write
-    MRAY_GPU PixRef operator()(TextureExtent<DIM>);
+    MR_GF_DECL PixRef operator()(TextureExtent<DIM>);
     // Read
-    MRAY_GPU T      operator()(TextureExtent<DIM>) const;
+    MR_GF_DECL T      operator()(TextureExtent<DIM>) const;
 };
 
 // Some Inner Type metaprogramming, CPU compiler
@@ -135,11 +133,11 @@ template<class T> using InnerType = typename InnerTypeT<T>::Type;
 
 template<uint32_t D, class T>
 template<uint32_t C, bool IsSigned, class PixelType>
-MRAY_GPU
+MR_GF_DEF
 T TextureViewCPU<D, T>::Convert(const PixelType& pixel) const
 {
     // Fetch the inner type if any (for multi-channel types)
-    using namespace Bit::NormConversion;
+    using namespace NormConversion;
 
     // Identity Conversion read type and query type is same
     if constexpr(std::is_same_v<PixelType, T>)
@@ -159,7 +157,7 @@ T TextureViewCPU<D, T>::Convert(const PixelType& pixel) const
                       std::is_same_v<InnerType<T>, Float>)
     {
         T result;
-        UNROLL_LOOP
+        MRAY_UNROLL_LOOP
         for(uint32_t i = 0; i < C; i++)
         {
             if constexpr(IsSigned)  result[i] = FromSNorm<Float>(pixel[i]);
@@ -173,7 +171,7 @@ T TextureViewCPU<D, T>::Convert(const PixelType& pixel) const
 }
 
 template<uint32_t D, class T>
-MRAY_GPU
+MR_GF_DEF
 UVType<D> TextureViewCPU<D, T>::IfUVConvertToTexel(UV texelOrUV,
                                                    TextureExtent<D> mipSize) const
 {
@@ -183,7 +181,7 @@ UVType<D> TextureViewCPU<D, T>::IfUVConvertToTexel(UV texelOrUV,
 }
 
 template<uint32_t D, class T>
-MRAY_GPU
+MR_GF_DEF
 UVType<D> TextureViewCPU<D, T>::IfTexelConvertToUV(UV texelOrUV,
                                                    TextureExtent<D> mipSize) const
 {
@@ -193,7 +191,7 @@ UVType<D> TextureViewCPU<D, T>::IfTexelConvertToUV(UV texelOrUV,
 }
 
 template<uint32_t D, class T>
-MRAY_GPU
+MR_GF_DEF
 TextureExtent<D> TextureViewCPU<D, T>::ResolveEdge(TextureSignedExtent<D> ijk,
                                                    TextureExtent<D> mipSizeIn) const
 {
@@ -205,8 +203,7 @@ TextureExtent<D> TextureViewCPU<D, T>::ResolveEdge(TextureSignedExtent<D> ijk,
         using enum MRayTextureEdgeResolveEnum;
         case MR_CLAMP:
         {
-            if constexpr(D == 1)    ijk = Math::Clamp(ijk, 0, mipSize);
-            else                    ijk = ijk.Clamp(VecXi(0), mipSize);
+            ijk = Math::Clamp(ijk, VecXi(0), mipSize);
             break;
         }
         case MR_MIRROR:
@@ -247,21 +244,21 @@ TextureExtent<D> TextureViewCPU<D, T>::ResolveEdge(TextureSignedExtent<D> ijk,
 }
 
 template<uint32_t D, class T>
-MRAY_GPU
+MR_GF_DEF
 TextureSignedExtent<D> TextureViewCPU<D, T>::NearestPixel(UV texel) const
 {
     TextureSignedExtent<D> result;
     if constexpr(D == 1)
-        result = int32_t(std::round(texel - Float(0.5)));
+        result = int32_t(Math::Round(texel - Float(0.5)));
     else for(uint32_t i = 0; i < D; i++)
     {
-        result[i] = int32_t(std::round(texel[i] - Float(0.5)));
+        result[i] = int32_t(Math::Round(texel[i] - Float(0.5)));
     }
     return TextureSignedExtent<D>(result);
 }
 
 template<uint32_t D, class T>
-MRAY_GPU
+MR_GF_DEF
 typename TextureViewCPU<D, T>::Interpolants
 TextureViewCPU<D, T>::FindInterpolants(UV uv, TextureExtent<D> mipSize) const
 {
@@ -269,33 +266,33 @@ TextureViewCPU<D, T>::FindInterpolants(UV uv, TextureExtent<D> mipSize) const
     UV texel = uv * UV(mipSize) - UV(0.5);
     if constexpr(D == 1)
     {
-        Float base;
-        result.fractions[0] = std::modf(texel, &base);
+        auto [base, frac] = Math::ModF(texel);
+        result.fractions[0] = frac;
         result.startPixel = TextureSignedExtent<D>(base);
         // Make modf to behave as if it is positive
         if(result.fractions[0] < Float(0))
         {
             result.startPixel -= 1;
-            result.fractions[0] = std::abs(result.fractions[0]);
+            result.fractions[0] = Math::Abs(result.fractions[0]);
         }
     }
     else for(uint32_t i = 0; i < D; i++)
     {
-        Float base;
-        result.fractions[i] = std::modf(texel[i], &base);
+        auto [base, frac] = Math::ModF(texel[i]);
+        result.fractions[i] = frac;
         result.startPixel[i] = int32_t(base);
         // Make modf to behave as if it is positive
         if(result.fractions[i] < Float(0))
         {
             result.startPixel[i] -= 1;
-            result.fractions[i] = std::abs(result.fractions[i]);
+            result.fractions[i] = Math::Abs(result.fractions[i]);
         }
     }
     return result;
 }
 
 template<uint32_t D, class T>
-MRAY_GPU
+MR_GF_DEF
 T TextureViewCPU<D, T>::ReadPixel(TextureExtent<D> ijk,
                                   TextureExtent<D> mipSize,
                                   size_t mipPixelStartOffset) const
@@ -333,7 +330,7 @@ T TextureViewCPU<D, T>::ReadPixel(TextureExtent<D> ijk,
 }
 
 template<uint32_t D, class T>
-MRAY_GPU
+MR_GF_DEF
 T TextureViewCPU<D, T>::ReadInterpolatedPixel(UV, TextureExtent<D>, size_t) const
 requires (!FloatPixelC<T>)
 {
@@ -341,7 +338,7 @@ requires (!FloatPixelC<T>)
 }
 
 template<uint32_t D, class T>
-MRAY_GPU
+MR_GF_DEF
 T TextureViewCPU<D, T>::ReadInterpolatedPixel(UV uv, TextureExtent<D> mipSize,
                                               size_t mipPixelStartOffset) const
 requires (FloatPixelC<T>)
@@ -370,10 +367,7 @@ requires (FloatPixelC<T>)
     // Lerp part
     for(uint32_t pass = D; pass > 0; pass--)
     for(uint32_t i = 0; i < pass; i++)
-        if constexpr(std::is_same_v<Float, T>)
-            pix[i] = Math::Lerp(pix[i * 2], pix[i * 2 + 1], fractions[i]);
-        else
-            pix[i] = T::Lerp(pix[i * 2], pix[i * 2 + 1], fractions[i]);
+        pix[i] = Math::Lerp(pix[i * 2], pix[i * 2 + 1], fractions[i]);
     //
     return pix[0];
 }
@@ -389,7 +383,7 @@ TextureViewCPU<D, T>::TextureViewCPU(const Byte* const* data,
 {}
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T TextureViewCPU<D, T>::operator()(UV uv) const
 {
     if(texParams->interp != MRayTextureInterpEnum::MR_LINEAR)
@@ -407,7 +401,7 @@ T TextureViewCPU<D, T>::operator()(UV uv) const
 }
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T TextureViewCPU<D, T>::operator()(UV uv, UV dpdx, UV dpdy) const
 {
     // TODO: We ignore AF, change this later
@@ -416,14 +410,15 @@ T TextureViewCPU<D, T>::operator()(UV uv, UV dpdx, UV dpdy) const
         dpdx *= UV(texParams->size);
         dpdy *= UV(texParams->size);
     }
-    Float maxLenSqr = std::max(dpdx.LengthSqr(), dpdy.LengthSqr());
-    Float mipLevel = Float(0.5) * std::log2(maxLenSqr);
+    using Math::LengthSqr;
+    Float maxLenSqr = Math::Max(LengthSqr(dpdx), LengthSqr(dpdy));
+    Float mipLevel = Float(0.5) * Math::Log2(maxLenSqr);
 
     return (*this)(uv, mipLevel);
 }
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T TextureViewCPU<D, T>::operator()(UV uv, Float mipLevel) const
 {
     using Graphics::TextureMipPixelStart;
@@ -434,9 +429,8 @@ T TextureViewCPU<D, T>::operator()(UV uv, Float mipLevel) const
     // when differentials are small
     // Other one is probably never happen but we support it
     mipLevel = Math::Clamp(mipLevel, Float(0), Float(texParams->mipCount - 1));
-    Float m0F;
-    Float frac = std::modf(mipLevel, &m0F);
-    uint32_t m0 = uint32_t(m0F);
+    const auto&[m0Int, frac] = Math::ModFInt(mipLevel);
+    uint32_t m0 = uint32_t(m0Int);
     uint32_t m1 = Math::Clamp(m0 + 1u, 0u, texParams->mipCount - 1);
 
     if(texParams->interp != MRayTextureInterpEnum::MR_LINEAR)
@@ -471,22 +465,18 @@ T TextureViewCPU<D, T>::operator()(UV uv, Float mipLevel) const
         T pix0  = FetchPix(m0);
         if(m0 == m1) return pix0;
         T pix1 = FetchPix(m1);
-
-        if constexpr(std::is_same_v<Float, T>)
-            return Math::Lerp(pix0, pix1, frac);
-        else
-            return T::Lerp(pix0, pix1, frac);
+        return Math::Lerp(pix0, pix1, frac);
     }
 }
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 RWTextureViewCPU<D, T>::PixRef::PixRef(PaddedChannelType& p)
     : pixel(p)
 {}
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 typename RWTextureViewCPU<D, T>::PixRef&
 RWTextureViewCPU<D, T>::PixRef::operator=(const T& val)
 {
@@ -507,7 +497,7 @@ RWTextureViewCPU<D, T>::RWTextureViewCPU(Span<PaddedChannelType> pixels,
 {}
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 typename RWTextureViewCPU<D, T>::PixRef
 RWTextureViewCPU<D, T>::operator()(TextureExtent<D> ij)
 {
@@ -518,7 +508,7 @@ RWTextureViewCPU<D, T>::operator()(TextureExtent<D> ij)
 }
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T RWTextureViewCPU<D, T>::operator()(TextureExtent<D> ij) const
 {
     if constexpr(D == 1)        return T(pixels[ij]);

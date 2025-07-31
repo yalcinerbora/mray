@@ -69,7 +69,7 @@ void KCGeneratePrimitiveKeys(MRAY_GRID_CONSTANT const Span<PrimitiveKey> dAllLea
     }
 }
 
-extern MRAY_KERNEL
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCSetIsVisibleIndirect(MRAY_GRID_CONSTANT const Bitspan<uint32_t> dIsVisibleBuffer,
                             //
                             MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices)

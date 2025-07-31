@@ -124,13 +124,13 @@ MetaLightListConstructionParams::Partition() const
 }
 
 template<class V, class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 MetaLightViewT<V, ST>::MetaLightViewT(const V& v, const SpectrumConverter& sc)
     : sConv(sc)
     , light(v)
 {}
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t LightSurfKeyHasher::Hash(const LightSurfKeyPack& pack)
 {
     using RNGFunctions::HashPCG64::Hash;
@@ -146,20 +146,20 @@ uint32_t LightSurfKeyHasher::Hash(const LightSurfKeyPack& pack)
     return result;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 bool LightSurfKeyHasher::IsSentinel(uint32_t hash)
 {
     return hash == std::numeric_limits<uint32_t>::max() - 1u;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 bool LightSurfKeyHasher::IsEmpty(uint32_t hash)
 {
     return hash == std::numeric_limits<uint32_t>::max();
 }
 
 template<class V, class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 SampleT<Vector3> MetaLightViewT<V, ST>::SampleSolidAngle(RNGDispenser& rng,
                                                          const Vector3& distantPoint) const
 {
@@ -173,7 +173,7 @@ SampleT<Vector3> MetaLightViewT<V, ST>::SampleSolidAngle(RNGDispenser& rng,
 }
 
 template<class V, class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float MetaLightViewT<V, ST>::PdfSolidAngle(const MetaHit& hit,
                                            const Vector3& distantPoint,
                                            const Vector3& dir) const
@@ -195,7 +195,7 @@ Float MetaLightViewT<V, ST>::PdfSolidAngle(const MetaHit& hit,
 }
 
 template<class V, class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t MetaLightViewT<V, ST>::SampleSolidAngleRNCount() const
 {
     return DeviceVisit(light, [](auto&& l) -> uint32_t
@@ -208,7 +208,7 @@ uint32_t MetaLightViewT<V, ST>::SampleSolidAngleRNCount() const
 }
 
 template<class V, class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 SampleT<Ray> MetaLightViewT<V, ST>::SampleRay(RNGDispenser& rng) const
 {
     return DeviceVisit(light, [&](auto&& l) -> SampleT<Ray>
@@ -221,7 +221,7 @@ SampleT<Ray> MetaLightViewT<V, ST>::SampleRay(RNGDispenser& rng) const
 }
 
 template<class V, class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float MetaLightViewT<V, ST>::PdfRay(const Ray& ray) const
 {
     return DeviceVisit(light, [&](auto&& l) -> Float
@@ -234,7 +234,7 @@ Float MetaLightViewT<V, ST>::PdfRay(const Ray& ray) const
 }
 
 template<class V, class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t MetaLightViewT<V, ST>::SampleRayRNCount() const
 {
     return DeviceVisit(light, [](auto&& l) -> uint32_t
@@ -247,7 +247,7 @@ uint32_t MetaLightViewT<V, ST>::SampleRayRNCount() const
 }
 
 template<class V, class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Spectrum MetaLightViewT<V, ST>::EmitViaHit(const Vector3& wO,
                                            const MetaHit& hit,
                                            const RayCone& rayCone) const
@@ -273,7 +273,7 @@ Spectrum MetaLightViewT<V, ST>::EmitViaHit(const Vector3& wO,
 }
 
 template<class V, class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Spectrum MetaLightViewT<V, ST>::EmitViaSurfacePoint(const Vector3& wO,
                                                     const Vector3& surfacePoint,
                                                     const RayCone& rayCone) const
@@ -288,7 +288,7 @@ Spectrum MetaLightViewT<V, ST>::EmitViaSurfacePoint(const Vector3& wO,
 }
 
 template<class V, class ST>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 bool MetaLightViewT<V, ST>::IsPrimitiveBackedLight() const
 {
     return DeviceVisit(light, [](auto&& l) -> bool
@@ -307,7 +307,7 @@ MetaLightArrayT<TLT...>::View::View(Span<const MetaLight> dLights)
 
 template<LightTransPairC... TLT>
 template<class SConverter>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 typename MetaLightArrayT<TLT...>::View::template MetaLightView<SConverter>
 MetaLightArrayT<TLT...>::View::operator()(const SConverter& sc,
                                           uint32_t i) const
@@ -317,7 +317,7 @@ MetaLightArrayT<TLT...>::View::operator()(const SConverter& sc,
 }
 
 template<LightTransPairC... TLT>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t MetaLightArrayT<TLT...>::View::Size() const
 {
     return static_cast<uint32_t>(dMetaLights.size());

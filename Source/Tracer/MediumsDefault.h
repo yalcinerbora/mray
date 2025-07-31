@@ -35,20 +35,20 @@ namespace MediumDetail
         static constexpr uint32_t SampleScatteringRNCount = 0;
 
         public:
-        MRAY_HYBRID     MediumVacuum(const SpectrumConverter&,
-                                     const DataSoA&, MediumKey);
+        MR_PF_DECL_V    MediumVacuum(const SpectrumConverter&,
+                                     const DataSoA&, MediumKey) noexcept;
 
-        MRAY_HYBRID
-        ScatterSample   SampleScattering(const Vector3& wO, RNGDispenser& rng) const;
-        MRAY_HYBRID
-        Float           PdfScattering(const Vector3& wI, const Vector3& wO) const;
+        MR_PF_DECL
+        ScatterSample   SampleScattering(const Vector3& wO, RNGDispenser& rng) const noexcept;
+        MR_PF_DECL
+        Float           PdfScattering(const Vector3& wI, const Vector3& wO) const noexcept;
 
-        MRAY_HYBRID
-        Spectrum        SigmaA(const Vector3& uv) const;
-        MRAY_HYBRID
-        Spectrum        SigmaS(const Vector3& uv) const;
-        MRAY_HYBRID
-        Spectrum        Emission(const Vector3& uv) const;
+        MR_PF_DECL
+        Spectrum        SigmaA(const Vector3& uv) const noexcept;
+        MR_PF_DECL
+        Spectrum        SigmaS(const Vector3& uv) const noexcept;
+        MR_PF_DECL
+        Spectrum        Emission(const Vector3& uv) const noexcept;
     };
 
     template <class SpectrumTransformer = SpectrumConverterContextIdentity>
@@ -68,19 +68,19 @@ namespace MediumDetail
         Float    g;
 
         public:
-        MRAY_HYBRID     MediumHomogeneous(const SpectrumConverter& specConverter,
+        MR_HF_DECL      MediumHomogeneous(const SpectrumConverter& specConverter,
                                           const DataSoA&, MediumKey);
 
-        MRAY_HYBRID
+        MR_HF_DECL
         ScatterSample   SampleScattering(const Vector3& wO, RNGDispenser& rng) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Float           PdfScattering(const Vector3& wI, const Vector3& wO) const;
 
-        MRAY_HYBRID
+        MR_HF_DECL
         Spectrum        SigmaA(const Vector3& uv) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Spectrum        SigmaS(const Vector3& uv) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Spectrum        Emission(const Vector3& uv) const;
     };
 }

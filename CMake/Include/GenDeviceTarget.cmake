@@ -180,8 +180,22 @@ function(gen_device_target)
         target_link_libraries(${TARGET_FULL_NAME}
                               PUBLIC
                               CUDA::cuda_driver
+                              $<$<BOOL:${MRAY_ENABLE_TRACY}>:CUDA::cupti>
                               PRIVATE
                               mray::cuda_extra_compile_opts)
+
+    # TODO: CUPIT dll is not near cudart.dll, so CUDA installation does not put it on path.
+    # We copy it to our binary directory, but check if this is OK?
+    if(MRAY_ENABLE_TRACY AND WIN32)
+        # $<TARGET_FILE:CUDA::cupti> gives the lib file...
+        # Configure time copying wont work folders may not be
+        # created yet. CUDA 12.6
+        # add_custom_command(TARGET ${TARGET_FULL_NAME} POST_BUILD
+        #                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        #                    "$<TARGET_FILE:CUDA::cupti>"
+        #                    ${MRAY_CONFIG_BIN_DIRECTORY}
+        #                    COMMENT "Copying CUPTI dll")
+    endif()
 
         set_target_properties(${TARGET_FULL_NAME} PROPERTIES
                               CUDA_SEPARABLE_COMPILATION ON

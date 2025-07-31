@@ -2,15 +2,15 @@
 
 #include "LightSampler.h"
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 std::pair<Ray, Vector2> LightSampleOutput::SampledRay(const Vector3& distantPoint) const
 {
-    Vector3 dir = (position - distantPoint).Normalize();
+    Vector3 dir = Math::Normalize(position - distantPoint);
     // Nudge the position back here, this will be used
     // for visibility check
     // TODO: Bad usage of API, constructing a ray to nudge a position
     Vector3 pos = Ray(Vector3::Zero(), position).Nudge(-dir).Pos();
-    Float length = (pos - distantPoint).Length();
+    Float length = Math::Length(pos - distantPoint);
     return std::pair(Ray(dir, distantPoint), Vector2(0, length * 0.999f));
 }
 
@@ -23,7 +23,7 @@ inline DirectLightSamplerUniform<ML>::DirectLightSamplerUniform(const MetaLightA
 
 template <class ML>
 template <class SpectrumConverter>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 LightSample DirectLightSamplerUniform<ML>::SampleLight(RNGDispenser& rng,
                                                        const SpectrumConverter& stConverter,
                                                        const Vector3& distantPoint,
@@ -47,8 +47,8 @@ LightSample DirectLightSamplerUniform<ML>::SampleLight(RNGDispenser& rng,
     SampleT<Vector3> pointSample = metaLight.SampleSolidAngle(rng, distantPoint);
 
     Vector3 wO = (distantPoint - pointSample.value);
-    Float distance = wO.Length();
-    wO.NormalizeSelf();
+    Float distance = Math::Length(wO);
+    wO = Math::Normalize(wO);
     RayCone surfaceCone = distantRayConeSurf.ConeAfterScatter(wO, distantNormal);
     surfaceCone = surfaceCone.Advance(distance);
     Spectrum emission = metaLight.EmitViaSurfacePoint(wO, pointSample.value,
@@ -68,7 +68,7 @@ LightSample DirectLightSamplerUniform<ML>::SampleLight(RNGDispenser& rng,
 }
 
 template <class ML>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float DirectLightSamplerUniform<ML>::PdfLight(uint32_t index,
                                               const MetaHit& hit,
                                               const Ray& ray) const
@@ -90,7 +90,7 @@ Float DirectLightSamplerUniform<ML>::PdfLight(uint32_t index,
 }
 
 template <class ML>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Float DirectLightSamplerUniform<ML>::PdfLight(const HitKeyPack& hitPack,
                                               const MetaHit& hit,
                                               const Ray& r) const

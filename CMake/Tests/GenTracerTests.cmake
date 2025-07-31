@@ -18,7 +18,9 @@ function(gen_tracer_test)
         ${CURRENT_SOURCE_DIR}/T_DefaultLights.cu
         ${CURRENT_SOURCE_DIR}/T_Distributions.cu
         ${CURRENT_SOURCE_DIR}/T_Materials.cu
-        ${CURRENT_SOURCE_DIR}/T_StreamingTexture.cu)
+        ${CURRENT_SOURCE_DIR}/T_StreamingTexture.cu
+        ${CURRENT_SOURCE_DIR}/T_RayCone.cu
+    )
 
     source_group("" FILES ${SRC_COMMON})
 
@@ -35,6 +37,7 @@ function(gen_tracer_test)
         ${CURRENT_SOURCE_DIR}/T_Distributions.cu
         ${CURRENT_SOURCE_DIR}/T_Materials.cu
         ${CURRENT_SOURCE_DIR}/T_StreamingTexture.cu
+        ${CURRENT_SOURCE_DIR}/T_RayCone.cu
     )
 
     set(TARGET_FULL_NAME "TTracer${GEN_TRACER_TEST_NAME}")

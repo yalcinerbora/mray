@@ -8,15 +8,14 @@ class JsonNode;
 
 namespace JsonMeshNames
 {
-    using namespace std;
-    using namespace literals;
+    using namespace std::string_view_literals;
 
-    static constexpr string_view NODE_POSITION  = "position"sv;
-    static constexpr string_view NODE_NORMAL    = "normal"sv;
-    static constexpr string_view NODE_UV        = "uv"sv;
-    static constexpr string_view NODE_INDEX     = "index"sv;
-    static constexpr string_view NODE_RADIUS    = "radius"sv;
-    static constexpr string_view NODE_CENTER    = "center"sv;
+    static constexpr auto NODE_POSITION = "position"sv;
+    static constexpr auto NODE_NORMAL   = "normal"sv;
+    static constexpr auto NODE_UV       = "uv"sv;
+    static constexpr auto NODE_INDEX    = "index"sv;
+    static constexpr auto NODE_RADIUS   = "radius"sv;
+    static constexpr auto NODE_CENTER   = "center"sv;
 }
 
 class JsonTriangle : public MeshFileViewI

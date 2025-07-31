@@ -5,10 +5,14 @@
 
 #include <cuda.h>
 #include <nvtx3/nvToolsExt.h>
+#include <fmt/color.h>
 
 #include "Core/Timer.h"
 
-#include <fmt/color.h>
+#ifdef MRAY_ENABLE_TRACY_DISABLED_FOR_NOW
+    #include "Core/Profiling.h"
+    #include <tracy/tracy/TracyCUDA.hpp>
+#endif
 
 namespace mray::cuda
 {
@@ -92,6 +96,10 @@ GPUAnnotationCUDA::GPUAnnotationCUDA(AnnotationHandle h,
     : domainHandle(h)
     , stringHandle(nullptr)
 {
+    assert(name.data()[name.size()] == '\0' &&
+           "Annotation name string_view must be a "
+           "null-terminated string!");
+
     nvtxDomainHandle_t nvtxDomain = std::bit_cast<nvtxDomainHandle_t>(h);
     stringHandle = nvtxDomainRegisterStringA(nvtxDomain, name.data());
 
@@ -103,7 +111,6 @@ GPUAnnotationCUDA::Scope GPUAnnotationCUDA::AnnotateScope() const
     nvtxEventAttributes_t attrib = {};
     attrib.version = NVTX_VERSION;
     attrib.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE;
-    //NVTX_MESSAGE_TYPE_ASCII;
     attrib.messageType = NVTX_MESSAGE_TYPE_REGISTERED;
     attrib.message.registered = std::bit_cast<nvtxStringHandle_t>(stringHandle);
 
@@ -242,7 +249,7 @@ const GPUQueueCUDA& GPUDeviceCUDA::GetTransferQueue() const
 }
 
 GPUSystemCUDA::GPUSystemCUDA()
-    : nvtxDomain(nvtxDomainCreateA("MRayCUDA"))
+    : nvtxDomain(nullptr)
 {
     if(globalGPUListPtr) throw MRayError("One process can only have "
                                          "a single GPUSystem object!");
@@ -261,6 +268,22 @@ GPUSystemCUDA::GPUSystemCUDA()
         throw MRayError("No device is found!");
     }
 
+    // TODO: Tracy crashes sometimes with this
+    // and does not support NVTX names.
+    #ifdef MRAY_ENABLE_TRACY_DISABLED_FOR_NOW
+        if(ProfilerDLL::IsActive())
+        {
+            using namespace std::string_literals;
+            static const auto Name = "MRayCUDA-Tracy"s;
+            tracyCUDACtx = tracy::CUDACtx::Create();
+            tracyCUDACtx->Name(Name.c_str(), uint16_t(Name.size()));
+            tracyCUDACtx->StartProfiling();
+        }
+    #endif
+    // Nvtx is always active
+    nvtxDomain = nvtxDomainCreateA("MRayCUDA");
+
+
     // All Fine Start Query Devices
     for(int i = 0; i < deviceCount; i++)
     {
@@ -270,14 +293,19 @@ GPUSystemCUDA::GPUSystemCUDA()
     // TODO: Do topology stuff here
     // handle selection etc. this is too
     // primitive currently
-
-
     // TODO: a design leak but what else you can do?
     globalGPUListPtr = &systemGPUs;
 }
 
 GPUSystemCUDA::~GPUSystemCUDA()
 {
+    #ifdef MRAY_ENABLE_TRACY_DISABLED_FOR_NOW
+        if(ProfilerDLL::IsActive())
+        {
+            tracyCUDACtx->StopProfiling();
+            tracy::CUDACtx::Destroy(tracyCUDACtx);
+        }
+    #endif
     nvtxDomainDestroy(static_cast<nvtxDomainHandle_t>(nvtxDomain));
 
     for(const auto& device : systemGPUs)

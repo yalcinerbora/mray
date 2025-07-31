@@ -144,7 +144,7 @@ namespace PathTraceRDetail
 
     template<PrimitiveC Prim, MaterialC Material, class Surface, class TContext,
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-    MRAY_HYBRID
+    MR_HF_DECL
     void WorkFunction(const Prim&, const Material&, const Surface&,
                       const RayConeSurface&, const TContext&, RNGDispenser&,
                       const WorkParams<EmptyType, PG, MG, TG>& params,
@@ -153,20 +153,20 @@ namespace PathTraceRDetail
     template<class LightSampler,
              PrimitiveC Prim, MaterialC Material, class Surface, class TContext,
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-    MRAY_HYBRID
+    MR_HF_DECL
     void WorkFunctionNEE(const Prim&, const Material&, const Surface&,
                          const RayConeSurface&, const TContext&, RNGDispenser&,
                          const WorkParams<LightSampler, PG, MG, TG>& params,
                          RayIndex rayIndex);
 
     template<LightC Light, LightGroupC LG, TransformGroupC TG>
-    MRAY_HYBRID
+    MR_HF_DECL
     void LightWorkFunction(const Light&, RNGDispenser&,
                            const LightWorkParams<EmptyType, LG, TG>& params,
                            RayIndex rayIndex);
     template<class LightSampler, LightC Light,
              LightGroupC LG, TransformGroupC TG>
-    MRAY_HYBRID
+    MR_HF_DECL
     void LightWorkFunctionWithNEE(const Light&, RNGDispenser&,
                                   const LightWorkParams<LightSampler, LG, TG>& params,
                                   RayIndex rayIndex);
@@ -178,7 +178,7 @@ namespace PathTraceRDetail
 template<PrimitiveC Prim, MaterialC Material,
          class Surface, class TContext,
          PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surface& surf,
                                     const RayConeSurface& surfRayCone, const TContext& tContext, RNGDispenser& rng,
                                     const WorkParams<EmptyType, PG, MG, TG>& params,
@@ -193,10 +193,10 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     // Sample Material  //
     // ================ //
     auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
-    Vector3 wO = tContext.InvApplyN(-rayIn.Dir()).Normalize();
+    Vector3 wO = Math::Normalize(tContext.InvApplyN(-rayIn.Dir()));
     RayConeSurface rConeRefract = mat.RefractRayCone(surfRayCone, wO, surf);
     SampleT<BxDFResult> raySample = mat.SampleBxDF(wO, surf, rng);
-    Vector3 wI = tContext.ApplyN(raySample.value.wI.Dir()).Normalize();
+    Vector3 wI = Math::Normalize(tContext.ApplyN(raySample.value.wI.Dir()));
 
     Spectrum throughput = params.rayState.dThroughput[rayIndex];
     throughput *= raySample.value.reflectance;
@@ -252,8 +252,8 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
         Vector3 nudgeNormal = surf.geoNormal;
         if(raySample.value.isPassedThrough)
             nudgeNormal *= Float(-1);
-        Ray rayOut = Ray(wI, surf.position);
-        rayOut.NudgeSelf(nudgeNormal);
+        Ray rayOut = Ray(wI, surf.position).Nudge(nudgeNormal);
+
         // If I remember correctly, OptiX does not like INF on rays,
         // so we put flt_max here.
         Vector2 tMMOut = Vector2(0, std::numeric_limits<Float>::max());
@@ -273,7 +273,7 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
 //   PURE PATH TRACE LIGHT  //
 // ======================== //
 template<LightC Light, LightGroupC LG, TransformGroupC TG>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 void PathTraceRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
                                          const LightWorkParams<EmptyType, LG, TG>& params,
                                          RayIndex rayIndex)
@@ -320,9 +320,9 @@ void PathTraceRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
 //    NEE AND/OR MIS EXT    //
 // ======================== //
 template<class LightSampler, PrimitiveC Prim, MaterialC Material,
-    class Surface, class TContext,
-    PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-MRAY_HYBRID MRAY_CGPU_INLINE
+         class Surface, class TContext,
+         PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
+MR_HF_DEF
 void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const Surface& surf,
                                        const RayConeSurface& surfRayCone, const TContext& tContext, RNGDispenser& rng,
                                        const WorkParams<LightSampler, PG, MG, TG>& params,
@@ -343,7 +343,7 @@ void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const S
     //       NEE        //
     // ================ //
     auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
-    Vector3 wO = -tContext.InvApplyN(rayIn.Dir()).Normalize();
+    Vector3 wO = Math::Normalize(-tContext.InvApplyN(rayIn.Dir()));
     const LightSampler& lightSampler = params.globalState.lightSampler;
     Vector3 worldPos = surf.position;
     RayConeSurface refractedRayCone = mat.RefractRayCone(surfRayCone, wO, surf);
@@ -387,7 +387,7 @@ void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const S
         // TODO: We need to check if material is transmissive
         // If transmissive we can set the geoNormal towards the
         // shadow ray and nudge
-        shadowRay.NudgeSelf(surf.geoNormal);
+        shadowRay = shadowRay.Nudge(surf.geoNormal);
         RayToGMem(params.rayState.dOutRays, rayIndex,
                   shadowRay, shadowTMM);
         // We can't overwrite the path throughput,
@@ -402,7 +402,7 @@ void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const S
 // NEE/MIS PATH TRACE LIGHT //
 // ======================== //
 template<class LightSampler, LightC Light, LightGroupC LG, TransformGroupC TG>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 void PathTraceRDetail::LightWorkFunctionWithNEE(const Light& l, RNGDispenser&,
                                                 const LightWorkParams<LightSampler, LG, TG>& params,
                                                 RayIndex rayIndex)

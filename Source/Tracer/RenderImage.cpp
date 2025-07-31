@@ -28,8 +28,8 @@ Vector2ui ImageTiler::FindOptimumTileSize(const Vector2ui& fbSize,
     // Start with an ~ aspect ratio tile
     // and adjust it
     Float aspectRatio = Float(fbSize[0]) / Float(fbSize[1]);
-    Float factor = std::sqrt(Float(parallelizationHint) / aspectRatio);
-    Vector2ui tileHint(std::round(aspectRatio * factor), std::roundf(factor));
+    Float factor = Math::Sqrt(Float(parallelizationHint) / aspectRatio);
+    Vector2ui tileHint(Math::Round(aspectRatio * factor), Math::Round(factor));
 
     // Find optimal tile size that evenly divides the image
     // This may not happen (i.e., width or height is prime)
@@ -42,7 +42,7 @@ Vector2ui ImageTiler::FindOptimumTileSize(const Vector2ui& fbSize,
         // Divide down to get an aggressive (lower) count,
         // but on second pass do a conservative divide
         Float tileCountF = Float(fbSize[i]) / Float(tileHint[i]);
-        uint32_t tileCount = uint32_t(std::round(tileCountF));
+        uint32_t tileCount = uint32_t(Math::Round(tileCountF));
         // Try to minimize residuals so that
         // GPU does consistent work
         uint32_t result = fbSize[i] / tileCount;
@@ -96,7 +96,7 @@ Vector2ui ImageTiler::LocalTileEnd() const
 {
     Vector2ui tileIndex2D = CurrentTileIndex();
     Vector2ui end = (tileIndex2D + 1u) * coveringTileSize;
-    end = Vector2ui::Min(end, ResponsibleSize());
+    end = Math::Min(end, ResponsibleSize());
     return end;
 }
 

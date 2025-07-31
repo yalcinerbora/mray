@@ -49,12 +49,11 @@ struct alignas(8) RayCone
     Float aperture  = Float(0);
     Float width     = Float(0);
 
-    MRAY_HYBRID
-    RayCone Advance(Float t) const;
+    MR_PF_DECL RayCone Advance(Float t) const noexcept;
 
-    MRAY_HYBRID
+    MR_PF_DECL
     std::array<Vector3, 2>
-    Project(Vector3 surfaceNormal, Vector3 dirTowards) const;
+    Project(Vector3 surfaceNormal, Vector3 dirTowards) const noexcept;
 };
 
 struct RayConeSurface
@@ -63,9 +62,9 @@ struct RayConeSurface
     RayCone rayConeBack;    // Potential refracted ray cone
     Float betaN = Float(0); // Curvature estimation of surface
 
-    MRAY_HYBRID
+    MR_PF_DECL
     RayCone ConeAfterScatter(const Vector3& wO,
-                             const Vector3& surfNormal) const;
+                             const Vector3& surfNormal) const noexcept;
 };
 
 // Image coordinate is little bit special.
@@ -81,8 +80,7 @@ struct alignas(8) ImageCoordinate
     Vector2us   pixelIndex;
     SNorm2x16   offset;
 
-    MRAY_HYBRID
-    Vector2 GetPixelIndex() const;
+    MR_PF_DECL Vector2 GetPixelIndex() const noexcept;
 };
 
 // Spectral Samples or RGB color etc.
@@ -122,15 +120,13 @@ inline constexpr Float     VisibleSpectrumMiddle = VisibleSpectrumRange.Sum() * 
 // Invalid spectrum, this will be set when some form of numerical
 // error occurs (i.e. a NaN is found). It is specifically over-saturated
 // to "pop out" on the image (tonemapper probably darken everything else etc.)
-MRAY_HYBRID MRAY_GPU_INLINE
-constexpr Vector3 BIG_MAGENTA() { return Vector3(1e7, 0.0, 1e7); }
+MR_PF_DECL Vector3 BIG_MAGENTA() noexcept { return Vector3(1e7, 0.0, 1e7); }
 
 // Invalid texture fetch, this will be set when streaming texture
 // system unable to tap the required texture.
 // It is specifically over-saturated to "pop out" on the
 // image (tonemapper probably darken everything else etc.)
-MRAY_HYBRID MRAY_GPU_INLINE
-constexpr Vector3 BIG_CYAN() { return Vector3(0.0, 1e7, 1e7); }
+MR_PF_DECL Vector3 BIG_CYAN() noexcept { return Vector3(0.0, 1e7, 1e7); }
 
 // Some key types
 // these are defined separately for fine-tuning
@@ -248,17 +244,17 @@ struct alignas(32) RayGMem
 
 };
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-Pair<Ray, Vector2> RayFromGMem(Span<const RayGMem> gRays, RayIndex index)
+MR_PF_DECL
+Pair<Ray, Vector2> RayFromGMem(Span<const RayGMem> gRays, RayIndex index) noexcept
 {
     RayGMem rayGMem = gRays[index];
     return std::make_pair(Ray(rayGMem.dir, rayGMem.pos),
                           Vector2(rayGMem.tMin, rayGMem.tMax));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DECL_V
 void RayToGMem(Span<RayGMem> gRays, RayIndex index,
-               const Ray& r, const Vector2& tMinMax)
+               const Ray& r, const Vector2& tMinMax) noexcept
 {
     RayGMem rayGMem =
     {
@@ -270,22 +266,22 @@ void RayToGMem(Span<RayGMem> gRays, RayIndex index,
     gRays[index] = rayGMem;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-void UpdateTMax(Span<RayGMem> gRays, RayIndex index, Float tMax)
+MR_PF_DECL_V
+void UpdateTMax(Span<RayGMem> gRays, RayIndex index, Float tMax) noexcept
 {
     gRays[index].tMax = tMax;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-Vector2 ImageCoordinate::GetPixelIndex() const
+MR_PF_DEF
+Vector2 ImageCoordinate::GetPixelIndex() const noexcept
 {
     Vector2 result(pixelIndex);
     result += Vector2(offset);
     return result;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-RayCone RayCone::Advance(Float t) const
+MR_PF_DEF
+RayCone RayCone::Advance(Float t) const noexcept
 {
     return RayCone
     {
@@ -293,13 +289,14 @@ RayCone RayCone::Advance(Float t) const
         // Exact version
         //.width = width + tanf(aperture * Float(0.5)) * t * Float(2)
         // Approx version in the paper (RT Gems chapter 20, Eq. under Figure 20-5)
-        .width = width + aperture * t
+        // TODO: Width explodes rarely, we do not have a good number since we do not have
+        // the scene scale. Putting a large value here that is not near inf
+        .width = Math::Min(width + aperture * t, Float(1e6))
     };
 }
 
-
-MRAY_HYBRID MRAY_CGPU_INLINE
-RayCone RayConeSurface::ConeAfterScatter(const Vector3& wO, const Vector3& n) const
+MR_PF_DEF
+RayCone RayConeSurface::ConeAfterScatter(const Vector3& wO, const Vector3& n) const noexcept
 {
     auto rcFront = RayCone
     {
@@ -311,23 +308,33 @@ RayCone RayConeSurface::ConeAfterScatter(const Vector3& wO, const Vector3& n) co
         .aperture = rayConeBack.aperture - betaN,
         .width = rayConeBack.width
     };
-
-    return (wO.Dot(n) > Float(0)) ? rcFront : rcBack;
+    return (Math::Dot(wO, n) > Float(0)) ? rcFront : rcBack;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-std::array<Vector3, 2> RayCone::Project(Vector3 f, Vector3 d) const
+MR_PF_DEF
+std::array<Vector3, 2> RayCone::Project(Vector3 f, Vector3 d) const noexcept
 {
+    static constexpr Float Epsilon = MathConstants::Epsilon<Float>();
+    // https://www.jcgt.org/published/0010/01/01/
     // Equation 8, 9;
     // Preprocess the elliptic axes
-    Vector3 h1 = d - f.Dot(d) * f;
-    Vector3 h2 = Vector3::Cross(f, h1);
+    //
+    // If f and d is parallel, projected vector h1 will be zero
+    // we prevent it via this
+    Float fDotD = Math::Dot(f, d);
+    if(Math::Abs(fDotD + Float(1)) < Epsilon)
+        d += Vector3(Epsilon);
+
+    Vector3 h1 = d - fDotD * f;
+    Vector3 h2 = Math::Cross(f, h1);
     Float r = width * Float(0.5);
     auto EllipseAxes = [&](Vector3 h) -> Vector3
     {
-        Float denom = (h - d.Dot(h) * d).Length();
-        denom = std::max(MathConstants::Epsilon<Float>(), denom);
-        return (r / denom) * h;
+        Float denom = Math::Length(h - Math::Dot(d, h) * d);
+        denom = Math::Max(Epsilon, denom);
+        Vector3 result = (r / denom) * h;
+        assert(Math::IsFinite(result));
+        return result;
     };
     Vector3 a1 = EllipseAxes(h1);
     Vector3 a2 = EllipseAxes(h2);

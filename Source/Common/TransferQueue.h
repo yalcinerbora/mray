@@ -120,14 +120,14 @@ class TransferQueue
         VisorTriggerCommand VisorTrigger;
 
         public:
-                TracerView(TransferQueue&,
-                           VisorTriggerCommand&&);
-        void    Dequeue(VisorAction&);
-        bool    TryDequeue(VisorAction&);
+                            TracerView(TransferQueue&,
+                                       VisorTriggerCommand&&);
+        void                Dequeue(VisorAction&);
+        bool                TryDequeue(VisorAction&);
         template<class D>
-        bool    TryDequeue(VisorAction&, D duration);
-        void    Enqueue(TracerResponse&&);
-        bool    TryEnqueue(TracerResponse&&);
+        TimedDequeueResult  TryDequeue(VisorAction&, D duration);
+        void                Enqueue(TracerResponse&&);
+        bool                TryEnqueue(TracerResponse&&);
         //
         void    Terminate();
         bool    IsTerminated() const;
@@ -136,15 +136,15 @@ class TransferQueue
     class VisorView
     {
         private:
-        TransferQueue&  tq;
+        TransferQueue&      tq;
         public:
-                VisorView(TransferQueue&);
-        void    Dequeue(TracerResponse&);
-        bool    TryDequeue(TracerResponse&);
+                            VisorView(TransferQueue&);
+        void                Dequeue(TracerResponse&);
+        bool                TryDequeue(TracerResponse&);
         template<class D>
-        bool    TryDequeue(TracerResponse&, D duration);
-        void    Enqueue(VisorAction&&);
-        bool    TryEnqueue(VisorAction&&);
+        TimedDequeueResult  TryDequeue(TracerResponse&, D duration);
+        void                Enqueue(VisorAction&&);
+        bool                TryEnqueue(VisorAction&&);
         //
         void    Terminate();
         bool    IsTerminated() const;
@@ -193,7 +193,8 @@ inline bool TransferQueue::TracerView::TryDequeue(VisorAction& vc)
 }
 
 template<class D>
-inline bool TransferQueue::TracerView::TryDequeue(VisorAction& vc, D duration)
+inline TimedDequeueResult
+TransferQueue::TracerView::TryDequeue(VisorAction& vc, D duration)
 {
     return tq.commands.TryDequeue(vc, duration);
 }
@@ -239,7 +240,8 @@ inline bool TransferQueue::VisorView::TryDequeue(TracerResponse& tr)
 }
 
 template<class D>
-inline bool TransferQueue::VisorView::TryDequeue(TracerResponse& vc, D duration)
+inline TimedDequeueResult
+TransferQueue::VisorView::TryDequeue(TracerResponse& vc, D duration)
 {
     return tq.responses.TryDequeue(vc, duration);
 }

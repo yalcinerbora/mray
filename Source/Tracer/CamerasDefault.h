@@ -31,29 +31,29 @@ namespace CameraDetail
         Vector3 right;
 
         public:
-        MRAY_HYBRID CameraPinhole(const DataSoA&, CameraKey);
+        MR_HF_DECL CameraPinhole(const DataSoA&, CameraKey);
         // Ray Sampling
-        MRAY_HYBRID
+        MR_HF_DECL
         RaySample   SampleRay(// Input
                               const Vector2ui& generationIndex,
                               const Vector2ui& stratumCount,
                               // I-O
                               RNGDispenser&) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         RaySample   EvaluateRay(const Vector2ui& generationIndex,
                                 const Vector2ui& stratumCount,
                                 const Vector2& stratumOffset,
                                 const Vector2& stratumRange) const;
-        MRAY_HYBRID
+        MR_HF_DECL
         Float       PdfRay(const Ray&) const;
         // Misc
-        MRAY_HYBRID
+        MR_HF_DECL
         bool        CanBeSampled() const;
-        MRAY_HYBRID
+        MR_HF_DECL
         CameraTransform GetCameraTransform() const;
-        MRAY_HYBRID
+        MR_HF_DECL
         void            OverrideTransform(const CameraTransform&);
-        MRAY_HYBRID
+        MR_HF_DECL
         CameraPinhole   GenerateSubCamera(const Vector2ui& regionId,
                                           const Vector2ui& regionCount) const;
     };

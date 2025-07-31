@@ -52,7 +52,7 @@ namespace std
 
 
 
-namespace std::tupleDetail
+namespace TupleDetail
 {
     template<class... Args, std::size_t... I>
     constexpr std::tuple<Args&...> ToTupleRef(std::tuple<Args...>&t,
@@ -161,14 +161,14 @@ SoASpan(const Spans&... spans) -> SoASpan<typename Spans::element_type...>;
 
 
 template<class... Args, std::size_t... I>
-constexpr std::tuple<Args&...> std::tupleDetail::ToTupleRef(std::tuple<Args...>& t,
-                                                  std::index_sequence<I...>)
+constexpr std::tuple<Args&...> TupleDetail::ToTupleRef(std::tuple<Args...>& t,
+                                                       std::index_sequence<I...>)
 {
     return std::tie(std::get<I>(t)...);
 }
 
 template<typename Func, class... Args, size_t... Is>
-constexpr bool std::tupleDetail::InvokeAt(size_t idx, const std::tuple<Args...>& t, Func&& F,
+constexpr bool TupleDetail::InvokeAt(size_t idx, const std::tuple<Args...>& t, Func&& F,
                                      std::index_sequence<Is...>)
 {
     // Parameter pack expansion (comma separator abuse)
@@ -185,14 +185,14 @@ constexpr bool std::tupleDetail::InvokeAt(size_t idx, const std::tuple<Args...>&
 template<class... Args, typename Indices>
 constexpr std::tuple<Args&...> ToTupleRef(std::tuple<Args...>& t)
 {
-    return std::tupleDetail::ToTupleRef(t, Indices{});
+    return TupleDetail::ToTupleRef(t, Indices{});
 }
 
 template<class Func, class... Args>
 requires(std::is_same_v<std::invoke_result_t<Func, Args>, bool> && ...)
 constexpr bool InvokeAt(uint32_t index, const std::tuple<Args...>& t, Func&& F)
 {
-    return std::tupleDetail::InvokeAt(index, t,
+    return TupleDetail::InvokeAt(index, t,
                                  std::forward<Func>(F),
                                  std::make_index_sequence<sizeof...(Args)>{});
 }
@@ -266,6 +266,5 @@ constexpr size_t SoASpan<Args...>::Size() const
 template <class T>
 struct IdentityFunctor
 {
-    MRAY_HYBRID MRAY_CGPU_INLINE
-    constexpr T operator()(const T& t) const { return t; }
+    MR_PF_DECL T operator()(const T& t) const noexcept { return t; }
 };

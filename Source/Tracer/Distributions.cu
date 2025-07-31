@@ -54,7 +54,7 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
 
             // Awfully strided mem read
             Float dataRegisters[ITEMS_PER_THREAD];
-            UNROLL_LOOP
+            MRAY_UNROLL_LOOP
             for(uint32_t i = 0; i < ITEMS_PER_THREAD; i++)
             {
                 // Contiguous index
@@ -114,7 +114,7 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
                                      validItems, Float(0));
 
                 // Normalization
-                UNROLL_LOOP
+                MRAY_UNROLL_LOOP
                 for(uint32_t i = 0; i < ITEMS_PER_THREAD; i++)
                 {
                     dataRegisters[i] *= sTotalRecip;
@@ -194,7 +194,7 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
                 // Due to precision errors, we do this operation
                 // in double precision.
                 double dataRegistersDouble[ITEMS_PER_THREAD];
-                UNROLL_LOOP
+                MRAY_UNROLL_LOOP
                 for(uint32_t i = 0; i < ITEMS_PER_THREAD; i++)
                 {
                     // Function can be negative take the absolute value.
@@ -204,7 +204,7 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
                     // We did filter that image while doing a texture clamp
                     // and used Mitchell-Netravali filter which can generate
                     // negative values.
-                    dataRegistersDouble[i] = std::abs(double(dataRegisters[i]));
+                    dataRegistersDouble[i] = Math::Abs(double(dataRegisters[i]));
                 }
 
                 // Actual Scan
@@ -212,7 +212,7 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
                                          dataRegistersDouble,
                                          PrefixLoader);
 
-                UNROLL_LOOP
+                MRAY_UNROLL_LOOP
                 for(uint32_t i = 0; i < ITEMS_PER_THREAD; i++)
                     dataRegisters[i] = Float(dataRegistersDouble[i]);
 
@@ -270,7 +270,7 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
             double sum = 0.0;
             for(uint32_t i = 0; i < segmentSize; i++)
             {
-                sum += double(std::abs(rowIn[i]));
+                sum += double(Math::Abs(rowIn[i]));
                 rowOut[i] = Float(sum);
             }
         }
@@ -356,7 +356,7 @@ struct SetupDistPointers
     Span<Distribution2D> dDist;
     typename DistributionGroupPwC2D::DistData d;
 
-    MRAY_GPU MRAY_CGPU_INLINE
+    MR_GF_DECL
     void operator()(KernelCallParams kp) const
     {
         for(uint32_t i = kp.GlobalId(); i < yCount;

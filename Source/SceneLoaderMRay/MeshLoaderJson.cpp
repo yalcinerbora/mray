@@ -64,7 +64,7 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
             nSpan[index[2]] += normal;
         }
         // And normalize it
-        for(auto& n : nSpan) n.NormalizeSelf();
+        for(auto& n : nSpan) n = Math::Normalize(n);
     }
     Span<Vector3> nSpan = normals.value().AccessAs<Vector3>();
 
@@ -88,8 +88,6 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
         for(size_t i = 0; i < primCount; i++)
         {
             Vector3ui index = iSpan[i];
-
-            using namespace Shape::Triangle;
             Vector3 n0 = nSpan[index[0]];
             Vector3 n1 = nSpan[index[1]];
             Vector3 n2 = nSpan[index[2]];
@@ -103,19 +101,18 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
             Vector2 uv2 = uvSpan[index[2]];
 
             // Generate the tangents for this triangle orientation
-            Vector3 t0 = CalculateTangent(n0,
-                                          {p0, p1, p2},
+            using namespace Shape::Triangle;
+            Vector3 t0 = CalculateTangent(n0, {p0, p1, p2},
                                           {uv0, uv1, uv2});
-            Vector3 t1 = CalculateTangent(n1,
-                                          {p1, p2, p0},
+            Vector3 t1 = CalculateTangent(n1, {p1, p2, p0},
                                           {uv1, uv2, uv0});
-            Vector3 t2 = CalculateTangent(n2,
-                                          {p2, p0, p1},
+            Vector3 t2 = CalculateTangent(n2, {p2, p0, p1},
                                           {uv2, uv0, uv1});
-
-            if(t0.HasNaN()) t0 = Vector3::OrthogonalVector(n0);
-            if(t1.HasNaN()) t1 = Vector3::OrthogonalVector(n1);
-            if(t2.HasNaN()) t2 = Vector3::OrthogonalVector(n2);
+            using Math::IsFinite;
+            using Graphics::OrthogonalVector;
+            if(!IsFinite(t0)) t0 = OrthogonalVector(n0);
+            if(!IsFinite(t1)) t1 = OrthogonalVector(n1);
+            if(!IsFinite(t2)) t2 = OrthogonalVector(n2);
 
             // Add the normals these may be shared
             tSpan[index[0]] += t0;
@@ -126,8 +123,8 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
         // Normalize and calculate bitangent
         for(size_t i = 0; i < attribCount; i++)
         {
-            tSpan[i].NormalizeSelf();
-            bSpan[i] = Vector3::Cross(nSpan[i], tSpan[i]);
+            tSpan[i] = Math::Normalize(tSpan[i]);
+            bSpan[i] = Math::Cross(nSpan[i], tSpan[i]);
         }
     }
     // Just put random orthogonal spaces
@@ -136,8 +133,8 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
         for(size_t i = 0; i < attribCount; i++)
         {
             Vector3 n = normals.value().AccessAs<Vector3>()[i];
-            Vector3 t = Vector3::OrthogonalVector(n);
-            Vector3 b = Vector3::Cross(n, t);
+            Vector3 t = Graphics::OrthogonalVector(n);
+            Vector3 b = Math::Cross(n, t);
             tSpan[i] = t;
             bSpan[i] = b;
         }
@@ -160,12 +157,12 @@ AABB3 JsonTriangle::AABB() const
     std::for_each(indexSpan.begin(), indexSpan.end(),
                   [&result, positionSpan](const Vector3ui& index)
     {
-        result.UnionSelf(AABB3(positionSpan[index[0]],
-                               positionSpan[index[0]]));
-        result.UnionSelf(AABB3(positionSpan[index[1]],
-                               positionSpan[index[1]]));
-        result.UnionSelf(AABB3(positionSpan[index[2]],
-                               positionSpan[index[2]]));
+        result = result.Union(AABB3(positionSpan[index[0]],
+                                    positionSpan[index[0]]));
+        result = result.Union(AABB3(positionSpan[index[1]],
+                                    positionSpan[index[1]]));
+        result = result.Union(AABB3(positionSpan[index[2]],
+                                    positionSpan[index[2]]));
     });
     return result;
 }

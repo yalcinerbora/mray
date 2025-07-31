@@ -50,6 +50,7 @@ set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/MemAlloc.cpp
     ${CURRENT_SOURCE_DIR}/TypeFinder.h
     ${CURRENT_SOURCE_DIR}/NormTypes.h
+    ${CURRENT_SOURCE_DIR}/NormConvFunctions.h
     ${CURRENT_SOURCE_DIR}/Log.h
     ${CURRENT_SOURCE_DIR}/Log.cpp
     ${CURRENT_SOURCE_DIR}/Error.h

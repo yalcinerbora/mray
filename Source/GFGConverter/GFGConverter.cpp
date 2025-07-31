@@ -218,9 +218,9 @@ void THRDProcessMesh(ErrorList& errors, Span<MeshGroup> meshes,
             header.topology = GFGTopology::TRIANGLE;
             header.vertexCount = vertexCount;
 
-            size_t alignment = std::max(alignof(Vector3), alignof(Vector2));
+            size_t alignment = Math::Max(alignof(Vector3), alignof(Vector2));
             if(flags[NORMAL_AS_QUATERNION])
-                alignment = std::max(alignment, alignof(Quaternion));
+                alignment = Math::Max(alignment, alignof(Quaternion));
 
             std::vector<GFGVertexComponent> components;
             components.reserve(header.componentCount);
@@ -363,7 +363,7 @@ void THRDProcessMesh(ErrorList& errors, Span<MeshGroup> meshes,
 
                     // If the tangents are left-handed,
                     // convert them to right-handed
-                    if(Vector3::Cross(t, b).Dot(n) < Float(0))
+                    if(Math::Dot(Math::Cross(t, b), n) < Float(0))
                         t = -t;
                     auto [newT, newB] = Graphics::GSOrthonormalize(t, b, n);
                     Quaternion q = TransformGen::ToSpaceQuat(newT, newB, n);

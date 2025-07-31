@@ -65,13 +65,13 @@ template <std::unsigned_integral T>
 class StratifiedIntegerAliasTable
 {
     private:
-    T               gcdShift;
-    const T*        gAliasRanges;
+    T           gcdShift;
+    const T*    gAliasRanges;
 
     public:
-    MRAY_HYBRID     StratifiedIntegerAliasTable(const T* aliasRanges, T gcd);
-    MRAY_HYBRID
-    uint32_t        FindIndex(T id) const;
+    MR_HF_DEF   StratifiedIntegerAliasTable(const T* aliasRanges, T gcd);
+    MR_HF_DEF
+    uint32_t    FindIndex(T id) const;
 };
 
 // A simple lookup table with linear probing.
@@ -111,13 +111,13 @@ class LookupTable
     Span<V>             values;
 
     public:
-    MRAY_HYBRID         LookupTable(const Span<Vector<VL, H>>& hashes,
+    MR_HF_DEF         LookupTable(const Span<Vector<VL, H>>& hashes,
                                     const Span<K>& keys,
                                     const Span<V>& values);
 
-    MRAY_HYBRID
+    MR_HF_DEF
     Optional<V>             Search(const K&) const;
-    MRAY_HYBRID
+    MR_HF_DEF
     Pair<const V*, bool>    Insert(const K&, const V&) const;
 
 };

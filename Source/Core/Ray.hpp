@@ -2,33 +2,24 @@
 
 #include "Ray.h"
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr RayT<T>::RayT(const Vector<3, T>& direction,
-                        const Vector<3, T>& position)
+template<FloatC T>
+MR_PF_DEF_V RayT<T>::RayT(const Vector<3, T>& direction,
+                        const Vector<3, T>& position) noexcept
     : direction(direction)
     , position(position)
 {}
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr RayT<T>::RayT(const Vector<3, T> vec[2])
+template<FloatC T>
+MR_PF_DEF_V RayT<T>::RayT(const Vector<3, T> vec[2]) noexcept
     : direction(vec[0])
     , position(vec[1])
 {}
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr bool RayT<T>::IntersectsSphere(Vector<3, T>& intersectPos, T& t,
+template<FloatC T>
+MR_PF_DEF bool RayT<T>::IntersectsSphere(Vector<3, T>& intersectPos, T& t,
                                          const Vector<3, T>& sphereCenter,
-                                         T sphereRadius) const
+                                         T sphereRadius) const noexcept
 {
-    // Clang min definition is only on std namespace
-    // this is a crappy workaround
-    #ifndef MRAY_DEVICE_CODE_PATH
-        using namespace std;
-    #endif
-
     // RayTracing Gems
     // Chapter 7: Precision Improvements for Ray/Sphere Intersection
     // This is similar to the geometric solution below
@@ -53,18 +44,18 @@ constexpr bool RayT<T>::IntersectsSphere(Vector<3, T>& intersectPos, T& t,
     // extremely large sphere is being intersected
     //
     // Second one is for spheres that is far away
-    T dirLengthInv = 1.0f / direction.Length();
+    T dirLengthInv = 1.0f / Math::Length(direction);
     Vector<3, T> dirNorm = direction * dirLengthInv;
     Vector<3, T> centerDir = sphereCenter - position;
-    T beamCenterDist = dirNorm.Dot(centerDir);
-    T cDirLengthSqr = centerDir.LengthSqr();
+    T beamCenterDist = Math::Dot(dirNorm, centerDir);
+    T cDirLengthSqr = Math::LengthSqr(centerDir);
 
     // Below code is from the source
     Vector<3, T> remedyTerm = centerDir - beamCenterDist * dirNorm;
-    T discriminant = sphereRadius * sphereRadius - remedyTerm.LengthSqr();
+    T discriminant = sphereRadius * sphereRadius - Math::LengthSqr(remedyTerm);
     if(discriminant >= 0)
     {
-        T beamHalfLength = sqrt(discriminant);
+        T beamHalfLength = Math::Sqrt(discriminant);
 
         T t0 = (beamCenterDist >= 0)
             ? (beamCenterDist + beamHalfLength)
@@ -74,8 +65,8 @@ constexpr bool RayT<T>::IntersectsSphere(Vector<3, T>& intersectPos, T& t,
         // TODO: is there a better way to do this?
         // Select a T
         t = std::numeric_limits<T>::max();
-        if(t0 > 0) t = min(t, t0);
-        if(t1 > 0) t = min(t, t1);
+        if(t0 > 0) t = Math::Min(t, t0);
+        if(t1 > 0) t = Math::Min(t, t1);
         if(t != std::numeric_limits<T>::max())
         {
             t *= dirLengthInv;
@@ -87,29 +78,28 @@ constexpr bool RayT<T>::IntersectsSphere(Vector<3, T>& intersectPos, T& t,
 
     // Geometric solution
     //Vector<3, T> centerDir = sphereCenter - position;
-    //T beamCenterDistance = centerDir.Dot(direction);
-    //T beamNormalLengthSqr = (centerDir.Dot(centerDir) -
+    //T beamCenterDistance = Math::Dot(centerDir, direction);
+    //T beamNormalLengthSqr = (Math::LengthSqr(centerDir) -
     //                         beamCenterDistance * beamCenterDistance);
     //T beamHalfLengthSqr = sphereRadius * sphereRadius - beamNormalLengthSqr;
     //if(beamHalfLengthSqr > 0)
     //{
     //    // Inside Square
-    //    T beamHalfLength = sqrt(beamHalfLengthSqr);
+    //    T beamHalfLength = Math::Sqrt(beamHalfLengthSqr);
     //    T t0 = beamCenterDistance - beamHalfLength;
     //    T t1 = beamCenterDistance + beamHalfLength;
 
-    //    t = (fabs(t0) <= fabs(t1)) ? t0 : t1;
+    //    t = (Math::Abs(t0) <= Math::Abs(t1)) ? t0 : t1;
     //    intersectPos = position + t * direction;
     //    return true;
     //}
     //return false;
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr bool RayT<T>::IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
+template<FloatC T>
+MR_PF_DEF bool RayT<T>::IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
                                            const Vector<3, T> triCorners[3],
-                                           bool cullFace) const
+                                           bool cullFace) const noexcept
 {
     return IntersectsTriangle(baryCoords, t,
                               triCorners[0],
@@ -118,46 +108,41 @@ constexpr bool RayT<T>::IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
                               cullFace);
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr bool RayT<T>::IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
+template<FloatC T>
+MR_PF_DEF bool RayT<T>::IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
                                            const Vector<3, T>& t0,
                                            const Vector<3, T>& t1,
                                            const Vector<3, T>& t2,
-                                           bool cullFace) const
+                                           bool cullFace) const noexcept
 {
     using namespace MathConstants;
-    #ifndef MRAY_DEVICE_CODE_PATH
-        using namespace std;
-    #endif
-
     // Moller-Trumbore
     // Ray-Tri Intersection
     Vector<3, T> e0 = t1 - t0;
     Vector<3, T> e1 = t2 - t0;
-    Vector<3, T> p = Vector3::Cross(direction, e1);
-    T det = e0.Dot(p);
+    Vector<3, T> p = Math::Cross(direction, e1);
+    T det = Math::Dot(e0, p);
 
     if((cullFace && (det < SmallEpsilon<T>())) ||
        // Ray-Tri nearly parallel skip
-       (abs(det) < SmallEpsilon<T>()))
+       (Math::Abs(det) < SmallEpsilon<T>()))
         return false;
 
     T invDet = 1 / det;
 
     Vector<3, T> tVec = position - t0;
-    baryCoords[0] = tVec.Dot(p) * invDet;
+    baryCoords[0] = Math::Dot(tVec, p) * invDet;
     // Early Skip
     if(baryCoords[0] < 0 || baryCoords[0] > 1)
         return false;
 
-    Vector<3, T> qVec = Vector3::Cross(tVec, e0);
-    baryCoords[1] = direction.Dot(qVec) * invDet;
+    Vector<3, T> qVec = Math::Cross(tVec, e0);
+    baryCoords[1] = Math::Dot(direction, qVec) * invDet;
     // Early Skip 2
     if((baryCoords[1] < 0) || (baryCoords[1] + baryCoords[0]) > 1)
         return false;
 
-    t = e1.Dot(qVec) * invDet;
+    t = Math::Dot(e1, qVec) * invDet;
     if(t <= SmallEpsilon<T>())
         return false;
 
@@ -169,11 +154,10 @@ constexpr bool RayT<T>::IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
     return true;
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr bool RayT<T>::IntersectsPlane(Vector<3, T>& intersectPos, T& t,
+template<FloatC T>
+MR_PF_DEF bool RayT<T>::IntersectsPlane(Vector<3, T>& intersectPos, T& t,
                                         const Vector<3, T>& planePos,
-                                        const Vector<3, T>& normal)
+                                        const Vector<3, T>& normal) const noexcept
 {
     using namespace MathConstants;
 
@@ -189,51 +173,43 @@ constexpr bool RayT<T>::IntersectsPlane(Vector<3, T>& intersectPos, T& t,
     return true;
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr bool RayT<T>::IntersectsAABB(Vector<2, T>& tOut,
+template<FloatC T>
+MR_PF_DEF bool RayT<T>::IntersectsAABB(Vector<2, T>& tOut,
                                        const Vector<3, T>& aabbMin,
                                        const Vector<3, T>& aabbMax,
-                                       const Vector<2, T>& tMinMax) const
+                                       const Vector<2, T>& tMinMax) const noexcept
 {
-    // CPU code max/min is on std namespace but CUDA has its global namespace
-    #ifndef MRAY_DEVICE_CODE_PATH
-    using namespace std;
-    #endif
-
     Vector<3, T> invD = Vector<3, T>(1) / direction;
     Vector<3, T> t0 = (aabbMin - position) * invD;
     Vector<3, T> t1 = (aabbMax - position) * invD;
     tOut = tMinMax;
 
-    UNROLL_LOOP
+    MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < 3; i++)
     {
         if(invD[i] < 0) std::swap(t0[i], t1[i]);
 
-        tOut[0] = max(tOut[0], min(t0[i], t1[i]));
-        tOut[1] = min(tOut[1], max(t0[i], t1[i]));
+        tOut[0] = Math::Max(tOut[0], Math::Min(t0[i], t1[i]));
+        tOut[1] = Math::Min(tOut[1], Math::Max(t0[i], t1[i]));
     }
     return tOut[1] >= tOut[0];
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr bool RayT<T>::IntersectsAABB(const Vector<3, T>& aabbMin,
+template<FloatC T>
+MR_PF_DEF bool RayT<T>::IntersectsAABB(const Vector<3, T>& aabbMin,
                                        const Vector<3, T>& aabbMax,
-                                       const Vector<2, T>& tMinMax) const
+                                       const Vector<2, T>& tMinMax) const noexcept
 {
     Vector<2, T> tOut;
     return IntersectsAABB(tOut, aabbMin, aabbMax,
                           tMinMax);
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr bool RayT<T>::IntersectsAABB(Vector<3, T>& pos, T& tOut,
+template<FloatC T>
+MR_PF_DEF bool RayT<T>::IntersectsAABB(Vector<3, T>& pos, T& tOut,
                                        const Vector<3, T>& aabbMin,
                                        const Vector<3, T>& aabbMax,
-                                       const Vector<2, T>& tMinMax) const
+                                       const Vector<2, T>& tMinMax) const noexcept
 {
     Vector<2, T> t;
     bool intersects = IntersectsAABB(t, aabbMin, aabbMax, tMinMax);
@@ -245,67 +221,59 @@ constexpr bool RayT<T>::IntersectsAABB(Vector<3, T>& pos, T& tOut,
     return intersects;
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr RayT<T> RayT<T>::NormalizeDir() const
-{
-    return Ray(direction.Normalize(), position);
-}
+//template<FloatC T>
+//MR_PF_DEF RayT<T> RayT<T>::NormalizeDir() const noexcept
+//{
+//    return Ray(Math::Normalize(direction), position);
+//}
+//
+//template<FloatC T>
+//MR_PF_DEF RayT<T>& RayT<T>::NormalizeDirSelf() noexcept
+//{
+//    direction = Math::Normalize(direction);
+//    return *this;
+//}
+//
+//template<FloatC T>
+//MR_PF_DEF RayT<T> RayT<T>::Advance(T t) const noexcept
+//{
+//    return Ray(direction, position + t * direction);
+//}
+//
+//template<FloatC T>
+//MR_PF_DEF RayT<T> RayT<T>::Advance(T t, const Vector<3, T>& dir) const noexcept
+//{
+//    return Ray(direction, position + t * dir);
+//}
+//
+//template<FloatC T>
+//MR_PF_DEF RayT<T>& RayT<T>::AdvanceSelf(T t) noexcept
+//{
+//    position += t * direction;
+//    return *this;
+//}
+//
+//template<FloatC T>
+//MR_PF_DEF RayT<T>& RayT<T>::AdvanceSelf(T t, const Vector<3, T>& dir) noexcept
+//{
+//    position += t * dir;
+//    return *this;
+//}
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr RayT<T>& RayT<T>::NormalizeDirSelf()
-{
-    direction.NormalizeSelf();
-    return *this;
-}
-
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr RayT<T> RayT<T>::Advance(T t) const
-{
-    return Ray(direction, position + t * direction);
-}
-
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr RayT<T> RayT<T>::Advance(T t, const Vector<3, T>& dir) const
-{
-    return Ray(direction, position + t * dir);
-}
-
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr RayT<T>& RayT<T>::AdvanceSelf(T t)
-{
-    position += t * direction;
-    return *this;
-}
-
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr RayT<T>& RayT<T>::AdvanceSelf(T t, const Vector<3, T>& dir)
-{
-    position += t * dir;
-    return *this;
-}
-
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector<3, T> RayT<T>::AdvancedPos(T t) const
+template<FloatC T>
+MR_PF_DEF Vector<3, T> RayT<T>::AdvancedPos(T t) const noexcept
 {
     return position + t * direction;
 }
 
 template<>
-MRAY_HYBRID MRAY_CGPU_INLINE
-RayT<float> RayT<float>::Nudge(const Vector3f& dir) const
+MR_PF_DEF RayT<float> RayT<float>::Nudge(const Vector3f& dir) const noexcept
 {
     // From RayTracing Gems I
     // Chapter 6
-    static constexpr float ORIGIN = 1.0f / 32.0f;
-    static constexpr float FLOAT_SCALE = 1.0f / 65536.0f;
-    static constexpr float INT_SCALE = 256.0f;
+    constexpr float ORIGIN = 1.0f / 32.0f;
+    constexpr float FLOAT_SCALE = 1.0f / 65536.0f;
+    constexpr float INT_SCALE = 256.0f;
 
     const Vector3f& p = position;
     Vector3i ofi = Vector3i(INT_SCALE * dir[0],
@@ -313,27 +281,18 @@ RayT<float> RayT<float>::Nudge(const Vector3f& dir) const
                             INT_SCALE * dir[2]);
 
     Vector3f pointI;
-    #ifdef MRAY_DEVICE_CODE_PATH_CUDA
-        pointI[0] = __int_as_float(__float_as_int(p[0]) + ((p[0] < 0) ? -ofi[0] : ofi[0]));
-        pointI[1] = __int_as_float(__float_as_int(p[1]) + ((p[1] < 0) ? -ofi[1] : ofi[1]));
-        pointI[2] = __int_as_float(__float_as_int(p[2]) + ((p[2] < 0) ? -ofi[2] : ofi[2]));
-    #else
-        // CPU code (this will be optimized out)
-        // and it is not UB
-        static_assert(sizeof(int32_t) == sizeof(float));
-        Vector3i pInt;
-        std::memcpy(&(pInt[0]), &(p[0]), sizeof(float));
-        std::memcpy(&(pInt[1]), &(p[1]), sizeof(float));
-        std::memcpy(&(pInt[2]), &(p[2]), sizeof(float));
+    Vector3i pInt;
+    pInt[0] = Bit::BitCast<int32_t>(p[0]);
+    pInt[1] = Bit::BitCast<int32_t>(p[1]);
+    pInt[2] = Bit::BitCast<int32_t>(p[2]);
 
-        pInt[0] += ((p[0] < 0) ? -ofi[0] : ofi[0]);
-        pInt[1] += ((p[1] < 0) ? -ofi[1] : ofi[1]);
-        pInt[2] += ((p[2] < 0) ? -ofi[2] : ofi[2]);
+    pInt[0] += ((p[0] < 0) ? -ofi[0] : ofi[0]);
+    pInt[1] += ((p[1] < 0) ? -ofi[1] : ofi[1]);
+    pInt[2] += ((p[2] < 0) ? -ofi[2] : ofi[2]);
 
-        std::memcpy(&(pointI[0]), &(pInt[0]), sizeof(float));
-        std::memcpy(&(pointI[1]), &(pInt[1]), sizeof(float));
-        std::memcpy(&(pointI[2]), &(pInt[2]), sizeof(float));
-    #endif
+    pointI[0] = Bit::BitCast<float>(pInt[0]);
+    pointI[1] = Bit::BitCast<float>(pInt[1]);
+    pointI[2] = Bit::BitCast<float>(pInt[2]);
 
     // Find the next floating point towards
     // Either use an epsilon (float_scale in this case)
@@ -347,14 +306,13 @@ RayT<float> RayT<float>::Nudge(const Vector3f& dir) const
 }
 
 template<>
-MRAY_HYBRID MRAY_CGPU_INLINE
-RayT<double> RayT<double>::Nudge(const Vector3d& dir) const
+MR_PF_DEF RayT<double> RayT<double>::Nudge(const Vector3d& dir) const noexcept
 {
     // From RayTracing Gems I
     // Chapter 6
-    static constexpr double ORIGIN = 1.0 / 32.0;
-    static constexpr double FLOAT_SCALE = 1.0 / 65536.0;
-    static constexpr double INT_SCALE = 256.0;
+    constexpr double ORIGIN = 1.0 / 32.0;
+    constexpr double FLOAT_SCALE = 1.0 / 65536.0;
+    constexpr double INT_SCALE = 256.0;
 
     const Vector3d& p = position;
 
@@ -363,52 +321,46 @@ RayT<double> RayT<double>::Nudge(const Vector3d& dir) const
                            INT_SCALE * dir[2]);
 
     Vector3d pointI;
-    // Utilize memcpy here, it is not UBO
-    // and should be optimized since it is in register space
-    static_assert(sizeof(int64_t) == sizeof(double));
-    Vector<3, int64_t> pInt;
-    std::memcpy(&(pInt[0]), &(p[0]), sizeof(double));
-    std::memcpy(&(pInt[1]), &(p[1]), sizeof(double));
-    std::memcpy(&(pInt[2]), &(p[2]), sizeof(double));
+    Vector3l pInt;
+    pInt[0] = Bit::BitCast<int64_t>(p[0]);
+    pInt[1] = Bit::BitCast<int64_t>(p[1]);
+    pInt[2] = Bit::BitCast<int64_t>(p[2]);
 
     pInt[0] += ((p[0] < 0) ? -ofi[0] : ofi[0]);
     pInt[1] += ((p[1] < 0) ? -ofi[1] : ofi[1]);
     pInt[2] += ((p[2] < 0) ? -ofi[2] : ofi[2]);
 
-    std::memcpy(&(pointI[0]), &(pInt[0]), sizeof(double));
-    std::memcpy(&(pointI[1]), &(pInt[1]), sizeof(double));
-    std::memcpy(&(pointI[2]), &(pInt[2]), sizeof(double));
+    pointI[0] = Bit::BitCast<double>(pInt[0]);
+    pointI[1] = Bit::BitCast<double>(pInt[1]);
+    pointI[2] = Bit::BitCast<double>(pInt[2]);
 
     // Find the next floating point towards
     // Either use an epsilon (float_scale in this case)
     // or use the calculated offset
+    using Math::Abs;
     Vector3d nextPos;
-    nextPos[0] = (fabs(p[0]) < ORIGIN) ? (p[0] + FLOAT_SCALE * dir[0]) : pointI[0];
-    nextPos[1] = (fabs(p[1]) < ORIGIN) ? (p[1] + FLOAT_SCALE * dir[1]) : pointI[1];
-    nextPos[2] = (fabs(p[2]) < ORIGIN) ? (p[2] + FLOAT_SCALE * dir[2]) : pointI[2];
-
+    nextPos[0] = (Abs(p[0]) < ORIGIN) ? (p[0] + FLOAT_SCALE * dir[0]) : pointI[0];
+    nextPos[1] = (Abs(p[1]) < ORIGIN) ? (p[1] + FLOAT_SCALE * dir[1]) : pointI[1];
+    nextPos[2] = (Abs(p[2]) < ORIGIN) ? (p[2] + FLOAT_SCALE * dir[2]) : pointI[2];
     return RayT(direction, nextPos);
 }
+//
+//template<FloatC T>
+//MR_PF_DEF RayT<T>& RayT<T>::NudgeSelf(const Vector<3, T>& dir) noexcept
+//{
+//    RayT<T> r = Nudge(dir);
+//    (*this) = r;
+//    return *this;
+//}
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-RayT<T>& RayT<T>::NudgeSelf(const Vector<3, T>& dir)
-{
-    RayT<T> r = Nudge(dir);
-    (*this) = r;
-    return *this;
-}
-
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr const Vector<3, T>& RayT<T>::Dir() const
+template<FloatC T>
+MR_PF_DEF const Vector<3, T>& RayT<T>::Dir() const noexcept
 {
     return direction;
 }
 
-template<FloatingPointC T>
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr const Vector<3, T>& RayT<T>::Pos() const
+template<FloatC T>
+MR_PF_DEF const Vector<3, T>& RayT<T>::Pos() const noexcept
 {
     return position;
 }

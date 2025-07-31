@@ -1,15 +1,16 @@
 #include "SceneLoaderUSD.h"
 
 #include "Core/Error.h"
-#include "MRayUSDTypes.h"
-#include "MeshProcessor.h"
-#include "MaterialProcessor.h"
-
 #include "Core/TracerI.h"
 #include "Core/Log.h"
 #include "Core/Timer.h"
 #include "Core/TypeNameGenerators.h"
 #include "Core/Algorithm.h"
+#include "Core/Profiling.h"
+
+#include "MRayUSDTypes.h"
+#include "MeshProcessor.h"
+#include "MaterialProcessor.h"
 
 // Traversal
 #include <pxr/usd/ar/resolverContext.h>
@@ -279,7 +280,7 @@ MRayError ProcessCameras(CameraGroupId& camGroupId,
                          const std::vector<MRayUSDPrimSurface>& cameras,
                          const pxr::UsdStageRefPtr& loadedStage)
 {
-    size_t camCount = std::max(size_t(1), cameras.size());
+    size_t camCount = Math::Max(size_t(1), cameras.size());
 
     using namespace std::string_view_literals;
     static constexpr auto CAMERA_NAME = "Pinhole"sv;
@@ -496,16 +497,14 @@ MRayError ProcessLights(std::vector<std::pair<LightGroupId, LightId>>&,
 SceneLoaderUSD::SceneLoaderUSD(ThreadPool& tp)
     : threadPool(tp)
 {
-    // using namespace std::string_view_literals;
-    // namespace fs = std::filesystem;
-
-    // std::string s = (fs::path(GetProcessPath())/ "usd"sv).string();
-    // pxr::PlugRegistry::GetInstance().RegisterPlugins(s);
 }
 
 Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                                                  const std::string& filePath)
 {
+    static const ProfilerAnnotation _("LoadScene USD");
+    auto annotation = _.AnnotateScope();
+
     Timer t; t.Start();
     Timer tLocal; tLocal.Start();
     MRayError e = MRayError::OK;

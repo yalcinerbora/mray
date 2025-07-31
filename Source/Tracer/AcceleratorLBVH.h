@@ -31,18 +31,17 @@ namespace LBVHAccelDetail
         uint32_t    depth;
 
         public:
-        MRAY_HYBRID                 BitStack();
-        MRAY_HYBRID                 BitStack(uint64_t state, uint32_t depth);
-        MRAY_HYBRID
-        MRAY_HYBRID void            WipeLowerBits();
-        MRAY_HYBRID TraverseState   CurrentState() const;
-        MRAY_HYBRID void            MarkAsTraversed();
-        MRAY_HYBRID void            Descend();
-        MRAY_HYBRID void            Ascend();
+        MR_HF_DECL                 BitStack();
+        MR_HF_DECL                 BitStack(uint64_t state, uint32_t depth);
+        MR_HF_DECL void            WipeLowerBits();
+        MR_HF_DECL TraverseState   CurrentState() const;
+        MR_HF_DECL void            MarkAsTraversed();
+        MR_HF_DECL void            Descend();
+        MR_HF_DECL void            Ascend();
         // Access
-        MRAY_HYBRID uint32_t        Depth() const;
+        MR_HF_DECL uint32_t        Depth() const;
         template<uint32_t SBits, uint32_t DBits>
-        MRAY_HYBRID uint32_t        CompressState() const;
+        MR_HF_DECL uint32_t        CompressState() const;
     };
 
     // Utilize "Key" type here to use the MSB as a flag
@@ -56,12 +55,11 @@ namespace LBVHAccelDetail
         const Span<const uint64_t>& dMortonCodes;
 
         public:
-        MRAY_HYBRID Delta(const Span<const uint64_t>&);
+        MR_PF_DECL_V Delta(const Span<const uint64_t>&) noexcept;
 
-        MRAY_HYBRID
-        int32_t operator()(int32_t i, int32_t j) const;
+        MR_PF_DECL
+        int32_t operator()(int32_t i, int32_t j) const noexcept;
     };
-
 
     struct LBVHNode
     {
@@ -124,22 +122,22 @@ namespace LBVHAccelDetail
         const PrimDataSoA&          primitiveSoA;
 
         template<auto = MRAY_PRIM_TGEN_FUNCTION(PrimGroup, TransGroup)>
-        MRAY_GPU
+        MR_GF_DECL
         Optional<HitResult>     IntersectionCheck(const Ray& ray,
                                                   const Vector2& tMinMax,
                                                   Float xi,
                                                   const PrimitiveKey& primKey) const;
         public:
         // Constructors & Destructor
-        MRAY_GPU                AcceleratorLBVH(const TransDataSoA& tSoA,
+        MR_GF_DECL              AcceleratorLBVH(const TransDataSoA& tSoA,
                                                 const PrimDataSoA& pSoA,
                                                 const DataSoA& dataSoA,
                                                 AcceleratorKey aId);
-        MRAY_GPU
+        MR_GF_DECL
         TransformKey            GetTransformKey() const;
-        MRAY_GPU
+        MR_GF_DECL
         Optional<HitResult>     ClosestHit(BackupRNG& rng, const Ray&, const Vector2&) const;
-        MRAY_GPU
+        MR_GF_DECL
         Optional<HitResult>     FirstHit(BackupRNG& rng, const Ray&, const Vector2&) const;
     };
 }

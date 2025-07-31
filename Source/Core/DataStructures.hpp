@@ -3,7 +3,7 @@
 #include "DataStructures.h"
 
 template <std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DECL
 StratifiedIntegerAliasTable<T>::StratifiedIntegerAliasTable(const T* dAliasRanges, T gcd)
     : gcdShift(static_cast<T>(std::popcount(gcd - 1)))
     , gAliasRanges(dAliasRanges)
@@ -12,7 +12,7 @@ StratifiedIntegerAliasTable<T>::StratifiedIntegerAliasTable(const T* dAliasRange
 }
 
 template <std::unsigned_integral T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DECL
 uint32_t StratifiedIntegerAliasTable<T>::FindIndex(T id) const
 {
     uint32_t tableIndex = id >> gcdShift;
@@ -21,7 +21,7 @@ uint32_t StratifiedIntegerAliasTable<T>::FindIndex(T id) const
 
 template <LookupKeyC K, class V, std::unsigned_integral H,
           uint32_t VECL, LookupStrategyC<H, K> S>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DECL
 LookupTable<K, V, H, VECL, S>::LookupTable(const Span<Vector<VL, H>>& hashes,
                                            const Span<K>& keys,
                                            const Span<V>& values)
@@ -35,7 +35,7 @@ LookupTable<K, V, H, VECL, S>::LookupTable(const Span<Vector<VL, H>>& hashes,
 
 template <LookupKeyC K, class V, std::unsigned_integral H,
           uint32_t VECL, LookupStrategyC<H, K> S>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DECL
 Optional<V> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
 {
     uint32_t tableSize = static_cast<uint32_t>(keys.size());
@@ -48,7 +48,7 @@ Optional<V> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
         uint32_t vectorIndex = index >> VEC_SHIFT;
         uint32_t innerIndex = index & VEC_MASK;
         Vector<VL, H> hashChunk = hashes[vectorIndex];
-        UNROLL_LOOP
+        MRAY_UNROLL_LOOP
         for(uint32_t i = innerIndex; i < VL; i++)
         {
             uint32_t globalIndex = (vectorIndex << VEC_SHIFT) + i;
@@ -72,7 +72,7 @@ Optional<V> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
 
 template <LookupKeyC K, class V, std::unsigned_integral H,
           uint32_t VECL, LookupStrategyC<H, K> S>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DECL
 std::pair<const V*, bool> LookupTable<K, V, H, VECL, S>::Insert(const K& k, const V& v) const
 {
     uint32_t tableSize = static_cast<uint32_t>(keys.size());
@@ -85,7 +85,7 @@ std::pair<const V*, bool> LookupTable<K, V, H, VECL, S>::Insert(const K& k, cons
         uint32_t vectorIndex = index >> VEC_SHIFT;
         uint32_t innerIndex = index & VEC_MASK;
         Vector<VL, H> hashChunk = hashes[vectorIndex];
-        UNROLL_LOOP
+        MRAY_UNROLL_LOOP
         for(uint32_t i = innerIndex; i < VL; i++)
         {
             uint32_t globalIndex = (vectorIndex << VEC_SHIFT) + i;
@@ -114,6 +114,8 @@ std::pair<const V*, bool> LookupTable<K, V, H, VECL, S>::Insert(const K& k, cons
         index = (index >= tableSize) ? 0 : index;
         assert(index != hashVal % tableSize);
     }
+
+    assert(false && "HT Full!");
     return std::pair(nullptr, false);
 }
 

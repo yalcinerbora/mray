@@ -77,6 +77,8 @@ void KCGenerateCamRays(// Output (Only dRayIndices pointed data should be writte
                   raySample.value.tMinMax);
 
         // Write the differentials
+        assert(Math::IsFinite(raySample.value.rayCone.aperture) &&
+               Math::IsFinite(raySample.value.rayCone.width));
         dRayCones[writeIndex] = raySample.value.rayCone;
 
         // Finally write
@@ -144,6 +146,8 @@ void KCGenerateCamRaysStochastic(// Output (Only dRayIndices pointed data should
                   raySample.value.tMinMax);
 
         // Write the differentials
+        assert(Math::IsFinite(raySample.value.rayCone.aperture) &&
+               Math::IsFinite(raySample.value.rayCone.width));
         dRayCones[writeIndex] = raySample.value.rayCone;
         // Write filter weights (pdf normalized)
         raySample.pdf = weight / offsetSample.pdf;

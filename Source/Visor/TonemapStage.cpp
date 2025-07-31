@@ -655,8 +655,8 @@ void TonemapStage::ChangeImage(const VulkanImage* hdrImageIn,
     Vector2ui extents = hdrImageIn->Extent();
     for(auto& [_, tm] : tonemappers)
     {
-        stagingBufferSize = std::max(stagingBufferSize,
-                                     tm->StagingBufferSize(extents));
+        stagingBufferSize = Math::Max(stagingBufferSize,
+                                      tm->StagingBufferSize(extents));
     }
 
     // TODO: Should we shrink to fit or use large memory?
@@ -741,7 +741,7 @@ size_t TonemapStage::UniformBufferSize() const
                                            size_t(0),
     [](size_t l, size_t r) -> size_t
     {
-        return std::max(l, r);
+        return Math::Max(l, r);
     },
     [](const auto& kv) ->size_t
     {

@@ -12,6 +12,7 @@
 #include "Core/Algorithm.h"
 #include "Core/TypeNameGenerators.h"
 #include "Core/ThreadPool.h"
+#include "Core/Profiling.h"
 
 using MatKeyValPair = std::pair<const pxr::UsdPrim*, const MRayUSDMaterialProps*>;
 
@@ -511,6 +512,9 @@ MaterialConverter::GetTexturedAttribute(const pxr::UsdShadeInput& input,
 
 MRayUSDMaterialProps MaterialConverter::ResolveMatPropsSingle(const MRayUSDBoundMaterial& m)
 {
+    static const ProfilerAnnotation _("Resolve Material Properties");
+    auto annotation = _.AnnotateScope();
+
     const auto& tokens = MRayUSDShadeTokens();
     if(std::holds_alternative<MRayUSDFallbackMaterial>(m))
     {
@@ -603,6 +607,9 @@ MaterialConverter::ResolveMatProps(const MRayUSDMaterialMap& uniqueMaterials)
 FlatSet<std::pair<pxr::UsdPrim, MRayUSDTexture>>
 MaterialConverter::ResolveTextures(const std::vector<MRayUSDMaterialProps>& props)
 {
+    static const ProfilerAnnotation _("Resolve Textures");
+    auto annotation = _.AnnotateScope();
+
     FlatSet<std::pair<pxr::UsdPrim, MRayUSDTexture>> textures;
     auto ReadAndEmplace = [this, &textures](const auto& t, bool isColor,
                                             bool isNormal = false)
@@ -637,6 +644,9 @@ MRayError MaterialConverter::LoadTextures(std::map<pxr::UsdPrim, TextureId>& res
                                           FlatSet<std::pair<pxr::UsdPrim, MRayUSDTexture>>&& tex,
                                           TracerI& tracer, ThreadPool& threadPool)
 {
+    static const ProfilerAnnotation ldTexAnnot("Load Textures");
+    auto annotation = ldTexAnnot.AnnotateScope();
+
     auto flatTextures = std::move(tex).extract();
     uint32_t textureCount = static_cast<uint32_t>(flatTextures.size());
     std::vector<std::pair<pxr::UsdPrim, TextureId>> texIds(textureCount);
@@ -668,6 +678,9 @@ MRayError MaterialConverter::LoadTextures(std::map<pxr::UsdPrim, TextureId>& res
     const auto THRD_ProcessTextures =
     [&, imgLoader](uint32_t start, uint32_t end) -> void
     {
+        static const ProfilerAnnotation ldTexTaskAnnot("Load Texture Task");
+        auto annotation = ldTexTaskAnnot.AnnotateScope();
+
         MRayError err = MRayError::OK;
         // Subset the data to per core
         std::span myTextureRange(flatTextures.begin() + start, end - start);
@@ -800,6 +813,9 @@ MaterialConverter::CreateMaterials(TracerI& tracer,
                                    const std::vector<MRayUSDMaterialProps>& flatMatProps,
                                    const std::map<pxr::UsdPrim, TextureId>& texLookup)
 {
+    static const ProfilerAnnotation _("Create Materials");
+    auto annotation = _.AnnotateScope();
+
     std::vector<MatKeyValPair> combinedMatKVPairs;
     combinedMatKVPairs.reserve(flatMatNames.size());
     assert(flatMatNames.size() == flatMatProps.size());
@@ -910,6 +926,9 @@ MRayError ProcessUniqueMaterials(std::map<pxr::UsdPrim, MRayUSDMatAlphaPack>& ou
                                  const MRayUSDMaterialMap& uniqueMaterials,
                                  const std::map<pxr::UsdPrim, MRayUSDTexture>& extraTextures)
 {
+    static const ProfilerAnnotation ldMatAnnot("Load Materials");
+    auto annotation = ldMatAnnot.AnnotateScope();
+
     std::vector<pxr::UsdPrim> flatKeys;
     flatKeys.reserve(uniqueMaterials.size());
     for(const auto& [name, _] : uniqueMaterials)

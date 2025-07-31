@@ -18,8 +18,8 @@ class TernaryToBinaryFunctor
         : F(f)
     {}
 
-    MRAY_HYBRID MRAY_CGPU_INLINE
-    bool operator()(CommonIndex i) const
+    MR_PF_DECL
+    bool operator()(CommonIndex i) const noexcept
     {
         return F(i) == SELECTION;
     }

@@ -13,6 +13,10 @@
 
 #include "TransientPool/TransientPool.h"
 
+#ifdef MRAY_ENABLE_TRACY
+    namespace tracy { class CUDACtx;}
+#endif
+
 class TimelineSemaphore;
 
 // Cuda Kernel Optimization Hints
@@ -41,13 +45,15 @@ class TimelineSemaphore;
 
 #define MRAY_SHARED_MEMORY __shared__
 
+#define MRAY_KERNEL __global__
+
 static constexpr uint32_t WarpSize()
 {
     return 32u;
 }
 
 template<uint32_t LOGICAL_WARP_SIZE = WarpSize()>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 static void WarpSynchronize()
 {
     // Dirty fix to make host side happy
@@ -75,7 +81,7 @@ static void WarpSynchronize()
     #endif
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 static void BlockSynchronize()
 {
     // Dirty fix to make host side happy
@@ -84,7 +90,7 @@ static void BlockSynchronize()
     #endif
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 static void ThreadFenceGrid()
 {
     // Dirty fix to make host side happy
@@ -125,9 +131,9 @@ struct KernelCallParamsCUDA
     uint32_t blockId;
     uint32_t threadId;
 
-    MRAY_GPU                KernelCallParamsCUDA();
-    MRAY_HYBRID uint32_t    GlobalId() const;
-    MRAY_HYBRID uint32_t    TotalSize() const;
+    MR_PF_DECL          KernelCallParamsCUDA();
+    MR_PF_DECL uint32_t GlobalId() const;
+    MR_PF_DECL uint32_t TotalSize() const;
 };
 
 using AnnotationHandle = void*;
@@ -206,14 +212,14 @@ class GPUFenceCUDA
     cudaEvent_t                 eventC;
 
     public:
-    MRAY_HYBRID                 GPUFenceCUDA(const GPUQueueCUDA&);
+    MR_HF_DECL                  GPUFenceCUDA(const GPUQueueCUDA&);
                                 GPUFenceCUDA(const GPUFenceCUDA&) = delete;
-    MRAY_HYBRID                 GPUFenceCUDA(GPUFenceCUDA&&) noexcept;
+    MR_HF_DECL                  GPUFenceCUDA(GPUFenceCUDA&&) noexcept;
     GPUFenceCUDA&               operator=(const GPUFenceCUDA&) = delete;
-    MRAY_HYBRID GPUFenceCUDA&   operator=(GPUFenceCUDA&&) noexcept;
-    MRAY_HYBRID                 ~GPUFenceCUDA();
+    MR_HF_DECL GPUFenceCUDA&    operator=(GPUFenceCUDA&&) noexcept;
+    MR_HF_DECL                  ~GPUFenceCUDA();
 
-    MRAY_HYBRID void            Wait() const;
+    MR_HF_DECL void             Wait() const;
 };
 
 class GPUQueueCUDA
@@ -227,18 +233,18 @@ class GPUQueueCUDA
     AnnotationHandle        nvtxDomain          = nullptr;
     const GPUDeviceCUDA*    myDevice            = nullptr;
 
-    MRAY_HYBRID
+    MR_HF_DECL
     uint32_t            DetermineGridStrideBlock(const void* kernelPtr,
                                                  uint32_t sharedMemSize,
                                                  uint32_t threadCount,
                                                  uint32_t workCount) const;
 
-    MRAY_HYBRID
+    MR_HF_DECL
     uint32_t            RecommendedBlockCountDevice(const void* kernelPtr,
                                                     uint32_t threadsPerBlock,
                                                     uint32_t sharedMemSize) const;
 
-    MRAY_HYBRID
+    MR_HF_DECL
     static uint32_t     RecommendedBlockCountSM(const void* kernelPtr,
                                                 uint32_t threadsPerBlock,
                                                 uint32_t sharedMemSize);
@@ -249,14 +255,14 @@ class GPUQueueCUDA
     MRAY_HOST                   GPUQueueCUDA(uint32_t multiprocessorCount,
                                              AnnotationHandle domain,
                                              const GPUDeviceCUDA* device);
-    MRAY_GPU                    GPUQueueCUDA(uint32_t multiprocessorCount,
+    MR_GF_DECL                  GPUQueueCUDA(uint32_t multiprocessorCount,
                                              AnnotationHandle domain,
                                              DeviceQueueType t);
                                 GPUQueueCUDA(const GPUQueueCUDA&) = delete;
-    MRAY_HYBRID                 GPUQueueCUDA(GPUQueueCUDA&&) noexcept;
+    MR_HF_DECL                  GPUQueueCUDA(GPUQueueCUDA&&) noexcept;
     GPUQueueCUDA&               operator=(const GPUQueueCUDA&) = delete;
-    MRAY_HYBRID GPUQueueCUDA&   operator=(GPUQueueCUDA&&) noexcept;
-    MRAY_HYBRID                 ~GPUQueueCUDA();
+    MR_HF_DECL GPUQueueCUDA&    operator=(GPUQueueCUDA&&) noexcept;
+    MR_HF_DECL                  ~GPUQueueCUDA();
 
     // Grid-Stride Kernels
     // Kernel is launched just enough blocks to
@@ -291,22 +297,22 @@ class GPUQueueCUDA
     // because of that even if we dont call the kernel from the
     // device.
     template<auto Kernel, class... Args>
-    MRAY_GPU void   DeviceIssueWorkKernel(std::string_view name,
+    MR_GF_DECL void DeviceIssueWorkKernel(std::string_view name,
                                           DeviceWorkIssueParams,
                                           //
                                           Args&&...) const;
     template<class Lambda>
-    MRAY_GPU void   DeviceIssueWorkLambda(std::string_view name,
+    MR_GF_DECL void DeviceIssueWorkLambda(std::string_view name,
                                           DeviceWorkIssueParams,
                                           //
                                           Lambda&&) const;
     template<auto Kernel, class... Args>
-    MRAY_GPU void   DeviceIssueBlockKernel(std::string_view name,
+    MR_GF_DECL void DeviceIssueBlockKernel(std::string_view name,
                                            DeviceBlockIssueParams,
                                            //
                                            Args&&...) const;
     template<class Lambda, uint32_t Bounds = StaticThreadPerBlock1D()>
-    MRAY_GPU void   DeviceIssueBlockLambda(std::string_view name,
+    MR_GF_DECL void DeviceIssueBlockLambda(std::string_view name,
                                            DeviceBlockIssueParams,
                                            //
                                            Lambda&&) const;
@@ -328,7 +334,7 @@ class GPUQueueCUDA
     MRAY_HOST void      IssueBufferForDestruction(TransientData data) const;
 
     // Synchronization
-    MRAY_HYBRID [[nodiscard]]
+    MR_HF_DECL [[nodiscard]]
     GPUFenceCUDA        Barrier() const;
     MRAY_HOST
     void                IssueSemaphoreWait(GPUSemaphoreViewCUDA&) const;
@@ -390,6 +396,10 @@ class GPUSystemCUDA
     using GPUList = std::vector<GPUDeviceCUDA>;
     using GPUPtrList = std::vector<const GPUDeviceCUDA*>;
 
+    #ifdef MRAY_ENABLE_TRACY
+       tracy::CUDACtx*  tracyCUDACtx;
+    #endif
+
     private:
     GPUList             systemGPUs;
     GPUPtrList          systemGPUPtrs;
@@ -447,19 +457,19 @@ class GPUSystemCUDA
 };
 
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 uint32_t KernelCallParamsCUDA::GlobalId() const
 {
     return blockId * blockSize + threadId;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 uint32_t KernelCallParamsCUDA::TotalSize() const
 {
     return gridSize * blockSize;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 GPUFenceCUDA::GPUFenceCUDA(const GPUQueueCUDA& q)
     : eventC(cudaEvent_t(0))
 {
@@ -468,14 +478,14 @@ GPUFenceCUDA::GPUFenceCUDA(const GPUQueueCUDA& q)
     CUDA_CHECK(cudaEventRecord(eventC, stream));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 GPUFenceCUDA::GPUFenceCUDA(GPUFenceCUDA&& other) noexcept
     : eventC(other.eventC)
 {
     other.eventC = cudaEvent_t(0);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 GPUFenceCUDA& GPUFenceCUDA::operator=(GPUFenceCUDA&& other) noexcept
 {
     eventC = other.eventC;
@@ -483,14 +493,14 @@ GPUFenceCUDA& GPUFenceCUDA::operator=(GPUFenceCUDA&& other) noexcept
     return *this;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 GPUFenceCUDA::~GPUFenceCUDA()
 {
     if(eventC != cudaEvent_t(0))
         CUDA_CHECK(cudaEventDestroy(eventC));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 void GPUFenceCUDA::Wait() const
 {
     #ifndef __CUDA_ARCH__
@@ -515,7 +525,7 @@ GPUQueueCUDA::GPUQueueCUDA(uint32_t multiprocessorCount,
                                          cudaStreamNonBlocking));
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 GPUQueueCUDA::GPUQueueCUDA(uint32_t multiprocessorCount,
                            AnnotationHandle domain,
                            DeviceQueueType t)
@@ -545,7 +555,7 @@ GPUQueueCUDA::GPUQueueCUDA(uint32_t multiprocessorCount,
     }
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 GPUQueueCUDA::GPUQueueCUDA(GPUQueueCUDA&& other) noexcept
     : stream(other.stream)
     , multiprocessorCount(other.multiprocessorCount)
@@ -555,7 +565,7 @@ GPUQueueCUDA::GPUQueueCUDA(GPUQueueCUDA&& other) noexcept
     other.stream = cudaStream_t(0);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 GPUQueueCUDA& GPUQueueCUDA::operator=(GPUQueueCUDA&& other) noexcept
 {
     multiprocessorCount = other.multiprocessorCount;
@@ -566,7 +576,7 @@ GPUQueueCUDA& GPUQueueCUDA::operator=(GPUQueueCUDA&& other) noexcept
     return *this;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 GPUQueueCUDA::~GPUQueueCUDA()
 {
     #ifdef __CUDA_ARCH__
@@ -583,7 +593,7 @@ GPUQueueCUDA::~GPUQueueCUDA()
 
 // Memory Movement (Async)
 template <class T>
-MRAY_HOST
+MRAY_HOST inline
 void GPUQueueCUDA::MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const
 {
     assert(regionTo.size_bytes() >= regionFrom.size_bytes());
@@ -593,7 +603,7 @@ void GPUQueueCUDA::MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const
 }
 
 template <class T>
-MRAY_HOST
+MRAY_HOST inline
 void GPUQueueCUDA::MemcpyAsync2D(Span<T> regionTo, size_t toStride,
                                  Span<const T> regionFrom, size_t fromStride,
                                  Vector2ui copySize) const
@@ -619,7 +629,7 @@ void GPUQueueCUDA::MemcpyAsync2D(Span<T> regionTo, size_t toStride,
 }
 
 template <class T>
-MRAY_HOST
+MRAY_HOST inline
 void GPUQueueCUDA::MemcpyAsyncStrided(Span<T> regionTo, size_t outputByteStride,
                                       Span<const T> regionFrom, size_t inputByteStride) const
 {
@@ -641,7 +651,7 @@ void GPUQueueCUDA::MemcpyAsyncStrided(Span<T> regionTo, size_t outputByteStride,
 }
 
 template <class T>
-MRAY_HOST
+MRAY_HOST inline
 void GPUQueueCUDA::MemsetAsync(Span<T> region, uint8_t perByteValue) const
 {
     // TODO: Check if memory is not pure-host memory
@@ -656,7 +666,7 @@ void GPUQueueCUDA::IssueBufferForDestruction(TransientData data) const
     CUDA_CHECK(cudaLaunchHostFunc(stream, &TransientPoolDestroyCallback, ptr));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 GPUFenceCUDA GPUQueueCUDA::Barrier() const
 {
     return GPUFenceCUDA(*this);
@@ -681,13 +691,13 @@ void GPUQueueCUDA::IssueWait(const GPUFenceCUDA& barrier) const
                                    cudaEventWaitDefault));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t GPUQueueCUDA::SMCount() const
 {
     return multiprocessorCount;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t GPUQueueCUDA::RecommendedBlockCountSM(const void* kernelPtr,
                                                uint32_t threadsPerBlock,
                                                uint32_t sharedMemSize)
@@ -700,7 +710,7 @@ uint32_t GPUQueueCUDA::RecommendedBlockCountSM(const void* kernelPtr,
     return static_cast<uint32_t>(numBlocks);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t GPUQueueCUDA::RecommendedBlockCountDevice(const void* kernelPtr,
                                                    uint32_t threadsPerBlock,
                                                    uint32_t sharedMemSize) const
@@ -710,7 +720,7 @@ uint32_t GPUQueueCUDA::RecommendedBlockCountDevice(const void* kernelPtr,
     return multiprocessorCount * blockPerSM;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t GPUQueueCUDA::DetermineGridStrideBlock(const void* kernelPtr,
                                                 uint32_t sharedMemSize,
                                                 uint32_t threadCount,
@@ -756,13 +766,13 @@ void GPUSystemCUDA::Memset(Span<T> region, uint8_t perByteValue) const
                           region.size_bytes()));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 cudaStream_t ToHandleCUDA(const GPUQueueCUDA& q)
 {
     return q.stream;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 cudaEvent_t ToHandleCUDA(const GPUFenceCUDA& f)
 {
     return f.eventC;

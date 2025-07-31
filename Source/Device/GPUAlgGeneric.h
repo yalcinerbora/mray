@@ -49,7 +49,7 @@ namespace mray::algorithms
         queue.IssueWorkLambda
         (
             "KCIota", p,
-            [=] MRAY_HYBRID(KernelCallParams kp)
+            [=] MRAY_GPU(KernelCallParams kp)
             {
                 for(uint32_t i = kp.GlobalId();
                     i < static_cast<uint32_t>(dOut.size());
@@ -122,7 +122,7 @@ namespace mray::algorithms
         queue.IssueWorkLambda
         (
             "KCAdjacentDifference", p,
-            [=] MRAY_HYBRID(KernelCallParams kp)
+            [=] MRAY_GPU(KernelCallParams kp)
             {
                 for(uint32_t i = kp.GlobalId();
                     i < workCount;
@@ -149,7 +149,7 @@ namespace mray::algorithms
         queue.IssueWorkLambda
         (
             "KCTransform", p,
-            [=] MRAY_HYBRID(KernelCallParams kp)
+            [=] MRAY_GPU(KernelCallParams kp)
             {
                 for(uint32_t i = kp.GlobalId();
                     i < static_cast<uint32_t>(dOut.size());
@@ -174,7 +174,7 @@ namespace mray::algorithms
         queue.IssueWorkLambda
         (
             "KCInPlaceTransform", p,
-            [=] MRAY_HYBRID(KernelCallParams kp)
+            [=] MRAY_GPU(KernelCallParams kp)
             {
                 for(uint32_t i = kp.GlobalId();
                     i < static_cast<uint32_t>(dInOut.size());
@@ -199,7 +199,7 @@ namespace mray::algorithms
         queue.IssueWorkLambda
         (
             "KCInPlaceTransformIndirect", p,
-            [=] MRAY_HYBRID(KernelCallParams kp)
+            [=] MRAY_GPU(KernelCallParams kp)
             {
                 for(uint32_t i = kp.GlobalId();
                     i < static_cast<uint32_t>(dIndices.size());

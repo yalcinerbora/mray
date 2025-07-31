@@ -189,12 +189,12 @@ class PhysicalTileId
 	uint32_t value;
 	public:
 	// Constructors & Destructor
-	MRAY_HYBRID PhysicalTileId(uint32_t physicalArrayIndex,
-							   uint32_t physicalTileIndex);
+	MR_HF_DECL PhysicalTileId(uint32_t physicalArrayIndex,
+							  uint32_t physicalTileIndex);
 	//
-	MRAY_HYBRID explicit	operator uint32_t();
-	MRAY_HYBRID uint32_t	ArrayIndex();
-	MRAY_HYBRID uint32_t	TileIndex();
+	MR_HF_DECL explicit	operator uint32_t();
+	MR_HF_DECL uint32_t	ArrayIndex();
+	MR_HF_DECL uint32_t	TileIndex();
 };
 
 class VirtualTextureId
@@ -222,14 +222,14 @@ class VirtualTextureId
 	uint32_t value;
 	public:
 	// Constructors & Destructor
-	MRAY_HYBRID VirtualTextureId(uint32_t packIndex,
-								 uint32_t typeIndex,
-								 uint32_t textureIndex);
+	MR_HF_DECL VirtualTextureId(uint32_t packIndex,
+								uint32_t typeIndex,
+								uint32_t textureIndex);
 	//
-	MRAY_HYBRID explicit	operator uint32_t();
-	MRAY_HYBRID uint32_t	PackIndex();
-	MRAY_HYBRID uint32_t	TypeIndex();
-	MRAY_HYBRID uint32_t	TextureIndex();
+	MR_HF_DECL explicit	operator uint32_t();
+	MR_HF_DECL uint32_t	PackIndex();
+	MR_HF_DECL uint32_t	TypeIndex();
+	MR_HF_DECL uint32_t	TextureIndex();
 };
 
 struct StreamingTextureDeviceData
@@ -258,7 +258,7 @@ struct TextureStreamingContext
 		static constexpr H EMPTY_VAL	= std::numeric_limits<H>::max();
 		static constexpr H SENTINEL_VAL = EMPTY_VAL - H(1);
 		//
-		MRAY_HYBRID
+		MR_HF_DECL
 		static H Hash(K v)
 		{
 			uint64_t hash = RNGFunctions::HashPCG64::Hash(v);
@@ -272,9 +272,9 @@ struct TextureStreamingContext
 			if(hashFold == SENTINEL_VAL)	return 1u;
 			return hashFold;
 		}
-		MRAY_HYBRID
+		MR_HF_DECL
 		static bool IsSentinel(H h) { return h == SENTINEL_VAL; }
-		MRAY_HYBRID
+		MR_HF_DECL
 		static bool IsEmpty(H h) { return h == EMPTY_VAL; }
 	};
 
@@ -292,42 +292,42 @@ struct TextureStreamingContext
 	Bitspan<uint32_t>		requestBits;
 
 	private:
-	MRAY_HYBRID static
+	MR_HF_DECL static
 	std::array<Vector2, 3>		CalculatePhysicalUVsGrad(const VirtualTexInfo& texInfo,
 													     PhysicalTileId pTid,
 													     Vector2 uv,
 													     Vector2 dpdx,
 													     Vector2 dpdy);
-	MRAY_HYBRID static
+	MR_HF_DECL static
 	std::pair<Vector2, Float>	CalculatePhysicalUVsLod(const VirtualTexInfo& texInfo,
 													    PhysicalTileId,
 													    Vector2 uv, Float lod);
 	public:
-	MRAY_HYBRID static constexpr
+	MR_HF_DECL static constexpr
 	uint32_t 		TileBitOffset(const VirtualTexInfo& texInfo,
 								  uint32_t virtualMipIndex,
 								  uint32_t virtualTileIndex);
 
-	MRAY_HYBRID static constexpr
+	MR_HF_DECL static constexpr
 	uint64_t		GenerateVirtualTextureKey(uint32_t virtualTextureIndex,
 											  uint32_t virtualMipIndex,
 											  uint32_t virtualTileIndex);
 
-	MRAY_HYBRID static constexpr
+	MR_HF_DECL static constexpr
 	uint32_t		FetchChannelCount(MRayPixelEnum pixType);
-	MRAY_HYBRID static constexpr
+	MR_HF_DECL static constexpr
 	Vector2ui		FetchTileSize(MRayPixelEnum pixType, bool isPhysical);
-	MRAY_HYBRID static
+	MR_HF_DECL static
 	Vector2ui 		GenVirtualMipAndTileLod(const VirtualTexInfo& texInfo,
 											Vector2 texel, Float lod);
-	MRAY_HYBRID static
+	MR_HF_DECL static
 	Vector2ui		GenVirtualMipAndTileGrad(const VirtualTexInfo& texInfo,
 											 Vector2 uv, Vector2 ddx, Vector2 ddy);
 	public:
-	MRAY_GPU Vector4 FetchTextureBase(VirtualTextureId, Vector2 uv);
-	MRAY_GPU Vector4 FetchTextureGrad(VirtualTextureId, Vector2 uv,
+	MR_GF_DECL Vector4 FetchTextureBase(VirtualTextureId, Vector2 uv);
+	MR_GF_DECL Vector4 FetchTextureGrad(VirtualTextureId, Vector2 uv,
 									  Vector2 dpdx, Vector2 dpdy);
-	MRAY_GPU Vector4 FetchTextureLod(VirtualTextureId, Vector2 uv,
+	MR_GF_DECL Vector4 FetchTextureLod(VirtualTextureId, Vector2 uv,
 								     Float mipLevel);
 };
 
@@ -340,73 +340,71 @@ class StreamingTextureView
 	VirtualTextureId			texId;
 
 	public:
-	MRAY_HYBRID	StreamingTextureView(VirtualTextureId,
+	MR_HF_DECL	StreamingTextureView(VirtualTextureId,
 									 TextureStreamingContext*);
 
-	MRAY_GPU Vector4 operator()(UV uv) const;
-
-	MRAY_GPU Vector4 operator()(UV uv, UV dpdx, UV dpdy) const;
-
-	MRAY_GPU Vector4 operator()(UV uv, Float lod) const;
+	MR_GF_DECL Vector4 operator()(UV uv) const;
+	MR_GF_DECL Vector4 operator()(UV uv, UV dpdx, UV dpdy) const;
+	MR_GF_DECL Vector4 operator()(UV uv, Float lod) const;
 };
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 PhysicalTileId::PhysicalTileId(uint32_t physicalArrayIndex,
 							   uint32_t physicalTileIndex)
 	: value(Bit::Compose<PA_BITS, TI_BITS>(physicalArrayIndex,
 										   physicalTileIndex))
 {}
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 PhysicalTileId::operator uint32_t()
 {
 	return value;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t PhysicalTileId::ArrayIndex()
 {
 	return Bit::FetchSubPortion(value, {PA_BITS_START, PA_BITS_END});
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t PhysicalTileId::TileIndex()
 {
 	return Bit::FetchSubPortion(value, {TI_BITS_START, TI_BITS_END});
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 VirtualTextureId::VirtualTextureId(uint32_t packIndex,
 								   uint32_t typeIndex,
 								   uint32_t textureIndex)
 	: value(Bit::Compose<PI_BITS, TI_BITS, TEX_BITS>(packIndex, typeIndex, textureIndex))
 {}
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 VirtualTextureId::operator uint32_t()
 {
 	return value;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t VirtualTextureId::PackIndex()
 {
 	return Bit::FetchSubPortion(value, {PI_BITS_START, PI_BITS_END});
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t VirtualTextureId::TypeIndex()
 {
 	return Bit::FetchSubPortion(value, {TI_BITS_START, TI_BITS_END});
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t VirtualTextureId::TextureIndex()
 {
 	return Bit::FetchSubPortion(value, {TEX_BITS_START, TEX_BITS_END});
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 constexpr uint32_t TextureStreamingContext::TileBitOffset(const VirtualTexInfo& texInfo,
 														  uint32_t virtMipIndex,
 														  uint32_t virtTileIndex)
@@ -420,7 +418,7 @@ constexpr uint32_t TextureStreamingContext::TileBitOffset(const VirtualTexInfo& 
 	return offset;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 std::array<Vector2, 3>
 TextureStreamingContext::CalculatePhysicalUVsGrad(const VirtualTexInfo& texInfo,
 												  PhysicalTileId,
@@ -429,20 +427,12 @@ TextureStreamingContext::CalculatePhysicalUVsGrad(const VirtualTexInfo& texInfo,
 												  Vector2 dpdy)
 {
 	using namespace StreamingTexParams;
-
 	//static constexpr Vector2ui TilesPerTex = TilePerPhysicalTexMip0;
 	//static constexpr auto TileSizeListGPU = TypeTileSizeList;
-
 	Vector2ui tileSize = FetchTileSize(texInfo.pixType, true);
 	Vector2ui physicalTexResolution = tileSize * Vector2ui(TilePerPhysicalTexMip0);
-
 	// We scale the differentials and uv with this ratio
 	Vector2 dimRatio = Vector2(texInfo.dim) / Vector2(physicalTexResolution);
-
-
-
-	//uint32_t tileIndex = pTid.TileIndex();
-
 	return
 	{
 		uv,
@@ -451,7 +441,7 @@ TextureStreamingContext::CalculatePhysicalUVsGrad(const VirtualTexInfo& texInfo,
 	};
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 std::pair<Vector2, Float>
 TextureStreamingContext::CalculatePhysicalUVsLod(const VirtualTexInfo&,
 												  PhysicalTileId,
@@ -460,10 +450,10 @@ TextureStreamingContext::CalculatePhysicalUVsLod(const VirtualTexInfo&,
 	return std::pair{uv, lod};
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr  uint64_t TextureStreamingContext::GenerateVirtualTextureKey(uint32_t virtTextureIndex,
-																	   uint32_t virtMipIndex,
-																	   uint32_t virtTileIndex)
+MR_HF_DEF constexpr
+uint64_t TextureStreamingContext::GenerateVirtualTextureKey(uint32_t virtTextureIndex,
+														    uint32_t virtMipIndex,
+															uint32_t virtTileIndex)
 {
 	// 24-bit virtual tile id (supports 16kx16k, 10x10, rgb32f udims)
 	// Because we assume udim's are single large texture.
@@ -477,8 +467,8 @@ constexpr  uint64_t TextureStreamingContext::GenerateVirtualTextureKey(uint32_t 
 									uint64_t(virtTileIndex));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr uint32_t TextureStreamingContext::FetchChannelCount(MRayPixelEnum pixType)
+MR_HF_DEF constexpr
+uint32_t TextureStreamingContext::FetchChannelCount(MRayPixelEnum pixType)
 {
 	using namespace StreamingTexParams;
 	switch(pixType)
@@ -533,8 +523,8 @@ constexpr uint32_t TextureStreamingContext::FetchChannelCount(MRayPixelEnum pixT
 	}
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
-constexpr Vector2ui TextureStreamingContext::FetchTileSize(MRayPixelEnum pixType, bool isPhysical)
+MR_HF_DEF constexpr
+Vector2ui TextureStreamingContext::FetchTileSize(MRayPixelEnum pixType, bool isPhysical)
 {
 	using namespace StreamingTexParams;
 	// We converted the TypeTileSizeList to switch/case
@@ -583,7 +573,7 @@ constexpr Vector2ui TextureStreamingContext::FetchTileSize(MRayPixelEnum pixType
 		case MR_BC6H_UFLOAT:	tileSize = TypeTileSizeList[static_cast<int>(MR_BC6H_UFLOAT)]; break;
 		case MR_BC6H_SFLOAT:	tileSize = TypeTileSizeList[static_cast<int>(MR_BC6H_SFLOAT)]; break;
 		case MR_BC7_UNORM:		tileSize = TypeTileSizeList[static_cast<int>(MR_BC7_UNORM)]; break;
-		default:				tileSize = Vector2ui::Zero(); break;
+		default:				MRAY_UNREACHABLE;
 	}
 
 	if(!isPhysical)
@@ -591,12 +581,12 @@ constexpr Vector2ui TextureStreamingContext::FetchTileSize(MRayPixelEnum pixType
 	return tileSize;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector2ui TextureStreamingContext::GenVirtualMipAndTileLod(const VirtualTexInfo& texInfo,
 														   Vector2 uv, Float lod)
 {
 	// UV to mip level texel
-	uint32_t baseMip = uint32_t(std::floor(lod));
+	uint32_t baseMip = uint32_t(Math::Floor(lod));
 	Vector2ui mipDims = Graphics::TextureMipSize(texInfo.dim, baseMip);
 	Vector2ui mipTexel = Vector2ui(uv * Vector2(mipDims));
 
@@ -609,7 +599,7 @@ Vector2ui TextureStreamingContext::GenVirtualMipAndTileLod(const VirtualTexInfo&
 	return Vector2ui(baseMip, mipTileLinear);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 Vector2ui TextureStreamingContext::GenVirtualMipAndTileGrad(const VirtualTexInfo& texInfo,
 															Vector2 uv, Vector2 ddx,
 															Vector2 ddy)
@@ -617,17 +607,17 @@ Vector2ui TextureStreamingContext::GenVirtualMipAndTileGrad(const VirtualTexInfo
 	// https://registry.khronos.org/OpenGL/extensions/EXT/EXT_texture_filter_anisotropic.txt
 	ddx *= Vector2(texInfo.dim);
 	ddy *= Vector2(texInfo.dim);
-	Float pX = ddx.Length();
-	Float pY = ddy.Length();
-	Float pMax = std::max(pX, pY);
-	Float pMin = std::min(pX, pY);
-	Float n = std::min(std::ceil(pMax / pMin), Float(StreamingTexParams::MaxAnisotropy));
-	Float lod = std::log2(pMax / n);
+	Float pX = Math::Length(ddx);
+	Float pY = Math::Length(ddy);
+	Float pMax = Math::Max(pX, pY);
+	Float pMin = Math::Min(pX, pY);
+	Float n = Math::Min(Math::Ceil(pMax / pMin), Float(StreamingTexParams::MaxAnisotropy));
+	Float lod = Math::Log2(pMax / n);
 
 	return GenVirtualMipAndTileLod(texInfo, uv, lod);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 StreamingTextureView::StreamingTextureView(VirtualTextureId tid,
 										   TextureStreamingContext* c)
 	: context(c)
