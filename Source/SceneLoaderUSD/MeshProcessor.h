@@ -93,9 +93,10 @@ class IndexLookupTable
 
 
     private:
-    std::vector<Vector<4, uint32_t>> hashes;
-    std::vector<IndexTriplet> keys;
-    std::vector<uint32_t> values;
+    MemAlloc::AlignedMemory     mem;
+    Span<Vector<4, uint32_t>>   hashes;
+    Span<IndexTriplet>          keys;
+    Span<uint32_t>              values;
     public:
     IndexLookupTable() = default;
 
@@ -115,10 +116,12 @@ class IndexLookupTable
         size_t allocSize = (loc == PRIMES.cend())
             ? Math::NextMultiple(requestedSize, PRIMES.back())
             : *loc;
+        size_t hashPackSize = Math::DivideUp(allocSize, size_t(4));
 
-        hashes.resize(Math::DivideUp(allocSize, size_t(4)), Vector4ui::Zero());
-        keys.resize(allocSize);
-        values.resize(allocSize);
+        MemAlloc::AllocateMultiData(std::tie(hashes, keys, values),
+                                    mem,
+                                    {hashPackSize, allocSize, allocSize});
+        Clear();
     }
 
     std::pair<const uint32_t*, bool> Insert(IndexTriplet key, uint32_t value);

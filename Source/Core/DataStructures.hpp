@@ -114,6 +114,8 @@ std::pair<const V*, bool> LookupTable<K, V, H, VECL, S>::Insert(const K& k, cons
         index = (index >= tableSize) ? 0 : index;
         assert(index != hashVal % tableSize);
     }
+
+    assert(false && "HT Full!");
     return std::pair(nullptr, false);
 }
 

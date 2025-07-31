@@ -116,24 +116,16 @@ inline uint32_t AttributeIndexer::operator()(uint32_t perVertexPerFaceCounter) c
 inline
 std::pair<const uint32_t*, bool> IndexLookupTable::Insert(IndexTriplet key, uint32_t value)
 {
-    static const ProfilerAnnotation _("Index LUT");
-    auto annotation = _.AnnotateScope();
-
     using LT = LookupTable<IndexTriplet, uint32_t,
-    uint32_t, 4, IndexLookupStrategy>;
-//
-    return LT(std::span(hashes.begin(), hashes.end()),
-              std::span(keys.begin(), keys.end()),
-              std::span(values.begin(), values.end())).Insert(key, value);
+                           uint32_t, 4, IndexLookupStrategy>;
+    //
+    return LT(hashes, keys, values).Insert(key, value);
 }
 
 bool Triangulate(Span<Vector3ui> localIndicesOut,
                  Span<const Vector3> vertices,
                  const Vector3 normal)
 {
-    static const ProfilerAnnotation _("Triangulate");
-    auto annotation = _.AnnotateScope();
-
     using Shape::Polygon::ClipEars;
     // Doing this static functions to enable some unrolling etc.
     // Probably not worth it but w/e
@@ -262,9 +254,8 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
                                                                const pxr::VtArray<pxr::GfVec3f>& normals,
                                                                const pxr::VtArray<pxr::GfVec2f>& uvs)
 {
-    static const ProfilerAnnotation _("Triangulate and Find Tangents");
-    auto a0 = _.AnnotateScope();
-
+    static const ProfilerAnnotation _0("Triangulate and Find Tangents");
+    auto a0 = _0.AnnotateScope();
 
     uint32_t indexCounter = 0;
     for(int faceIndex : faceIndices.AsConst())
@@ -386,46 +377,41 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
         }
 
         // Now calculate tangents while writing
+        for(uint32_t i = 0; i < faceTriCount; i++)
         {
-            static const ProfilerAnnotation tCalcAnnot("Calc Tangents");
-            auto a1 = tCalcAnnot.AnnotateScope();
-
-            for(uint32_t i = 0; i < faceTriCount; i++)
+            Vector3ui outIndex;
+            for(uint32_t j = 0; j < 3; j++)
             {
-                Vector3ui outIndex;
-                for(uint32_t j = 0; j < 3; j++)
+                uint32_t localIndex = localIndicesTriangulated[i][j];
+                IndexTriplet indexTriplet =
                 {
-                    uint32_t localIndex = localIndicesTriangulated[i][j];
-                    IndexTriplet indexTriplet =
-                    {
-                        usdPosIndices[localIndex],
-                        usdUVIndices[localIndex],
-                        usdNormalIndices[localIndex]
-                    };
-                    auto [indexLoc, isInserted] = indexLookupTable.Insert(indexTriplet,
-                                                                          indexCounter);
-                    outIndex[j] = *indexLoc;
+                    usdPosIndices[localIndex],
+                    usdUVIndices[localIndex],
+                    usdNormalIndices[localIndex]
+                };
+                auto [indexLoc, isInserted] = indexLookupTable.Insert(indexTriplet,
+                                                                        indexCounter);
+                outIndex[j] = *indexLoc;
 
-                    if(isInserted)
-                    {
-                        indexCounter++;
-                        triangleDataTangents.push_back(Vector3::Zero());
-                        triangleDataNormals.push_back(localNormals[localIndex]);
-                        usdDataIndices.push_back(indexTriplet);
-                    }
+                if(isInserted)
+                {
+                    indexCounter++;
+                    triangleDataTangents.push_back(Vector3::Zero());
+                    triangleDataNormals.push_back(localNormals[localIndex]);
+                    usdDataIndices.push_back(indexTriplet);
                 }
-                triangleIndices.push_back(outIndex);
-
-                Vector3 t0 = CalculateTriangleTangent(localIndicesTriangulated[i], 0,
-                                                      localPositions, localNormals, localUVs);
-                Vector3 t1 = CalculateTriangleTangent(localIndicesTriangulated[i], 1,
-                                                      localPositions, localNormals, localUVs);
-                Vector3 t2 = CalculateTriangleTangent(localIndicesTriangulated[i], 2,
-                                                      localPositions, localNormals, localUVs);
-                triangleDataTangents[outIndex[0]] += t0;
-                triangleDataTangents[outIndex[1]] += t1;
-                triangleDataTangents[outIndex[2]] += t2;
             }
+            triangleIndices.push_back(outIndex);
+
+            Vector3 t0 = CalculateTriangleTangent(localIndicesTriangulated[i], 0,
+                                                    localPositions, localNormals, localUVs);
+            Vector3 t1 = CalculateTriangleTangent(localIndicesTriangulated[i], 1,
+                                                    localPositions, localNormals, localUVs);
+            Vector3 t2 = CalculateTriangleTangent(localIndicesTriangulated[i], 2,
+                                                    localPositions, localNormals, localUVs);
+            triangleDataTangents[outIndex[0]] += t0;
+            triangleDataTangents[outIndex[1]] += t1;
+            triangleDataTangents[outIndex[2]] += t2;
         }
     }
     // Write prim locals
@@ -446,38 +432,43 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
                                              primLocalPrimCounts[subgeomIndex].attributeCount);
     if(err) return err;
 
-    // Indirect copy the uv and positions
-    uint32_t attribCounter = 0;
-    for(const auto& indexTriplet : usdDataIndices)
+    // Copy and generate quaternions
     {
-        pxr::GfVec3f pos = positions[indexTriplet[0]];
-        bool noUV = uvs.empty() || indexTriplet[1] > uvs.size();
-        pxr::GfVec2f uv = noUV ? pxr::GfVec2f(0) : uvs[indexTriplet[1]];
-        //
-        posBuffer[attribCounter] = Vector3(pos[0], pos[1], pos[2]);
-        uvBuffer[attribCounter] = Vector2(uv[0], uv[1]);
-        attribCounter++;
+        static const ProfilerAnnotation _1("Copy And Quat Normal Gen");
+        auto a1 = _1.AnnotateScope();
+
+        // Indirect copy the uv and positions
+        uint32_t attribCounter = 0;
+        for(const auto& indexTriplet : usdDataIndices)
+        {
+            pxr::GfVec3f pos = positions[indexTriplet[0]];
+            bool noUV = uvs.empty() || indexTriplet[1] > uvs.size();
+            pxr::GfVec2f uv = noUV ? pxr::GfVec2f(0) : uvs[indexTriplet[1]];
+            //
+            posBuffer[attribCounter] = Vector3(pos[0], pos[1], pos[2]);
+            uvBuffer[attribCounter] = Vector2(uv[0], uv[1]);
+            attribCounter++;
+        }
+        // Memcpy the indices
+        assert(triangleIndices.size() == indexBuffer.size());
+        std::copy(triangleIndices.cbegin(), triangleIndices.cend(), indexBuffer.begin());
+
+        // Calculate the Quaternion
+        assert(triangleDataNormals.size() == triangleDataTangents.size());
+        for(size_t i = 0; i < triangleDataNormals.size(); i++)
+        {
+            Vector3 n = triangleDataNormals[i];
+            Vector3 t = Math::Normalize(triangleDataTangents[i]);
+            t = Graphics::GSOrthonormalize(t, n);
+            // tangents of the triangles are cancelled or precision
+            // error. Generate orthogonal vector again
+            if(!Math::IsFinite(t)) t = Graphics::OrthogonalVector(n);
+
+            Vector3 b = Math::Cross(n, t);
+            Quaternion q = TransformGen::ToSpaceQuat(t, b, n);
+            normalBuffer[i] = q;
+        }
     }
-    // Memcpy the indices
-    assert(triangleIndices.size() == indexBuffer.size());
-    std::copy(triangleIndices.cbegin(), triangleIndices.cend(), indexBuffer.begin());
-
-    // Calculate the Quaternion
-    assert(triangleDataNormals.size() == triangleDataTangents.size());
-    for(size_t i = 0; i < triangleDataNormals.size(); i++)
-    {
-        Vector3 n = triangleDataNormals[i];
-        Vector3 t = Math::Normalize(triangleDataTangents[i]);
-        t = Graphics::GSOrthonormalize(t, n);
-        // tangents of the triangles are cancelled or precision
-        // error. Generate orthogonal vector again
-        if(!Math::IsFinite(t)) t = Graphics::OrthogonalVector(n);
-
-        Vector3 b = Math::Cross(n, t);
-        Quaternion q = TransformGen::ToSpaceQuat(t, b, n);
-        normalBuffer[i] = q;
-    }
-
     //MRAY_LOG("[{}] After single-index triangulation: primCount {}, vertexCount {}",
     //         subgeomIndex, primLocalPrimCounts[subgeomIndex].primCount,
     //         primLocalPrimCounts[subgeomIndex].attributeCount);
@@ -594,7 +585,6 @@ MRayError MeshProcessorThread::PreprocessIndicesSingle(uint32_t index)
         pxr::VtArray<int> faceIndices;
         subset.GetIndicesAttr().Get(&faceIndices);
         indexLookupTable.Reserve(faceIndices.size() * 4);
-        //MRAY_LOG("    {: >2} Subset: FaceCount {}", i, faceIndices.size());
 
         // All the work is here
         MRayError err = TriangulateAndCalculateTangents(i, changeToCW ,
