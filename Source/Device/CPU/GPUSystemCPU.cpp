@@ -1,4 +1,5 @@
 #include "GPUSystemCPU.h"
+#include "Core/System.h"
 #include "DeviceMemoryCPU.h"
 
 #include "Core/TimelineSemaphore.h"
@@ -8,6 +9,7 @@
 #include "Core/BitFunctions.h"
 #include "Core/ColorFunctions.h"
 #include "Core/GraphicsFunctions.h"
+#include <atomic>
 
 #ifdef MRAY_WINDOWS
     #include <Windows.h>
@@ -188,7 +190,6 @@ GPUSystemCPU::GPUSystemCPU()
         RenameThread(handle, MRAY_FORMAT("{:03d}_[G]MRay", id));
         ThreadInitFunction();
     }, queueSize);
-
     // TODO: Check NUMA stuff:
     //  - Put a flag, to auto combine or split
     //    NUMA nodes as separate "Device"

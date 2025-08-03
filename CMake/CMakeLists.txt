@@ -96,13 +96,18 @@ else()
                         "Please set MRAY_DEVICE_BACKEND to a valid backend")
 endif()
 
-# Secret Host backend and Device disabling
-# These are secret because CPU backend is not implemented
-# and disable option is to develop CPU-backend faster (to not waste compilation time)
+# Backend related functionality. User can enable CPU backend in addition
+# to a device backend. If user want to only compile for host,
+# he/she need to disable device backend explicitly.
+# This is specifically frictional since we mandate CUDA (in future HIP, SYCL)
+# in configuration process and CPU renderer is not have priority.
 option(MRAY_BUILD_HOST_BACKEND "Compile CPU backend in addition to GPU backend" OFF)
-# Secrect Device disable option
 option(MRAY_DISABLE_DEVICE_BACKEND "Disable GPU backend" OFF)
-mark_as_advanced(MRAY_BUILD_HOST_BACKEND MRAY_DISABLE_DEVICE_BACKEND)
+
+# We do not expose this to the user. IPO does not increase (as much)
+# runtime perf in our case, but increases link times slower.
+# We can check it time to time by switching this
+set(MRAY_HOST_BACKEND_IPO_MODE FALSE)
 
 option(MRAY_ENABLE_HW_ACCELERATION "Try to find, compile and and use HW acceleration (i.e. this means OptiX for CUDA)" OFF)
 option(MRAY_BUILD_TESTS "Build Tests" ON)
@@ -209,7 +214,7 @@ target_include_directories(meta_compile_opts
 # Device LTO is slow so we disabled it.
 # TODO: Enable LTO via config maybe?
 # or enable LTO only for Host side (check if this is possible)
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE FASLE)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_DEBUG FALSE)
 
 # PCH

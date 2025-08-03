@@ -18,7 +18,7 @@ namespace CudaKernelCalls
 namespace mray::cuda
 {
 
-MR_PF_DEF
+MR_PF_DEF_V
 KernelCallParamsCUDA::KernelCallParamsCUDA()
     : gridSize(gridDim.x)
     , blockSize(blockDim.x)

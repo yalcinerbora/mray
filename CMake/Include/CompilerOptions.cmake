@@ -102,7 +102,6 @@ set(MRAY_CLANG_OPTIONS
     -Wformat=2              # warn on security issues around functions that format output (ie printf)
     -Wimplicit-fallthrough  # warn on statements that fallthrough without an explicit annotation
 
-
     $<$<CONFIG:SanitizeR>:-fsanitize=${MRAY_SANITIZER_MODE}>
     $<$<CONFIG:SanitizeR>:-fno-sanitize-recover=undefined>
     $<$<CONFIG:SanitizeR>:-fno-omit-frame-pointer>
@@ -111,6 +110,10 @@ set(MRAY_CLANG_OPTIONS
 
     $<$<CONFIG:Release>:-O3>
     $<$<CONFIG:Release>:-g> # Also add debug info on release builds (for profiling etc.)
+
+    # FP system
+    $<$<CONFIG:Release>:-funsafe-math-optimizations>
+    $<$<CONFIG:Release>:-fno-math-errno>
 
     $<$<CONFIG:Debug>:-g>
 )

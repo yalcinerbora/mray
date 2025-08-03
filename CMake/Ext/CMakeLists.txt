@@ -100,6 +100,7 @@ mray_build_ext_dependency_git(
         -DASSIMP_INSTALL=ON
         -DBUILD_SHARED_LIBS=ON
         -DASSIMP_HUNTER_ENABLED=OFF
+        -DASSIMP_WARNINGS_AS_ERRORS=OFF
         # Non-unix related
         -DASSIMP_LIB_INSTALL_DIR=${MRAY_PLATFORM_NAME}/$<CONFIG>
         -DASSIMP_INCLUDE_INSTALL_DIR=Include

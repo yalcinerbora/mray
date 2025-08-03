@@ -91,7 +91,7 @@ namespace OptiXAccelDetail
         using DataSoA       = EmptyType;
 
         public:
-        MR_PF_DECL
+        MR_PF_DECL_V
         AcceleratorOptiX(TransDataSoA, PrimDataSoA,
                          DataSoA, AcceleratorKey) {}
 

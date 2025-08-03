@@ -60,25 +60,26 @@ using AnnotationHandle = void*;
 class GPUQueueCPU;
 class GPUDeviceCPU;
 
+struct KernelCallParamsGlobal
+{
+    const uint32_t gridSize  = 0;
+    const uint32_t blockSize = 0;
+    uint32_t blockId         = 0;
+    uint32_t threadId        = 0;
+};
+
 // Generic Call Parameters
 struct KernelCallParamsCPU
 {
-    uint32_t gridSize;
-    uint32_t blockSize;
-    uint32_t blockId;
-    uint32_t threadId;
+    const uint32_t gridSize  = 0;
+    const uint32_t blockSize = 0;
+    const uint32_t blockId   = 0;
+    const uint32_t threadId  = 0;
 
+    constexpr           KernelCallParamsCPU(const KernelCallParamsGlobal&) {};
     MR_GF_DECL          KernelCallParamsCPU();
     MR_PF_DECL uint32_t GlobalId() const noexcept;
     MR_PF_DECL uint32_t TotalSize() const noexcept;
-};
-
-struct KernelCallParamsGlobal
-{
-    uint32_t gridSize   = 0;
-    uint32_t blockSize  = 0;
-    uint32_t blockId    = 0;
-    uint32_t threadId   = 0;
 };
 
 // Global list of KP
@@ -171,17 +172,15 @@ class GPUQueueCPU
 
     friend class GPUFenceCPU;
 
-    template<auto Kernel, class... Args>
+    template<auto Kernel, uint32_t TPB, class... Args>
     MR_HF_DECL void IssueKernelInternal(std::string_view name,
                                         uint32_t totalWorkCount,
-                                        uint32_t tpb,
                                         //
                                         Args&&...) const;
 
-    template<class Lambda>
+    template<uint32_t TPB, class Lambda>
     MR_HF_DECL void IssueLambdaInternal(std::string_view name,
                                         uint32_t totalWorkCount,
-                                        uint32_t tpb,
                                         Lambda&&) const;
 
     private:

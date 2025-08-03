@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Core/Error.h"
 #include "GPUSystemCPU.h"
 #include "../GPUSystem.h"
 
@@ -51,11 +52,10 @@ KernelCallParamsCPU::KernelCallParamsCPU()
     , threadId(globalKCParams.threadId)
 {}
 
-template<auto Kernel, class... Args>
+template<auto Kernel, uint32_t TPB, class... Args>
 MR_HF_DEF
 void GPUQueueCPU::IssueKernelInternal(std::string_view name,
                                       uint32_t totalWorkCount,
-                                      uint32_t tpb,
                                       //
                                       Args&&... fArgs) const
 {
@@ -76,9 +76,9 @@ void GPUQueueCPU::IssueKernelInternal(std::string_view name,
     // Give just enough grid to eliminate grid-stride / block-stride
     // loops (for CPU these do more harm than good, unlike GPU)
 
-    uint32_t blockCount = DetermineGridStrideBlock(nullptr, 0, tpb,
+    uint32_t blockCount = DetermineGridStrideBlock(nullptr, 0, TPB,
                                                    totalWorkCount);
-    uint32_t callerBlockCount = Math::DivideUp(totalWorkCount, tpb);
+    uint32_t callerBlockCount = Math::DivideUp(totalWorkCount, TPB);
     //
     uint64_t oldIssueCount = cb->issuedKernelCounter.fetch_add(blockCount);
     uint64_t newIssueCount = oldIssueCount + blockCount;
@@ -97,7 +97,7 @@ void GPUQueueCPU::IssueKernelInternal(std::string_view name,
         [
             ... fArgs = std::forward<Args>(fArgs),
             oldIssueCount, newIssueCount,
-            cbPtr, callerBlockCount, tpb,
+            cbPtr, callerBlockCount,
             name, domain = this->domain
             //, totalWorkCount, blockCount
         ]
@@ -111,33 +111,38 @@ void GPUQueueCPU::IssueKernelInternal(std::string_view name,
             AtomicWaitValueToAchieve(cbPtr->completedKernelCounter, oldIssueCount);
 
             std::atomic_thread_fence(std::memory_order_seq_cst);
-            static const auto threadAnnotation = GPUAnnotationCPU(domain, name);
-            const auto threadAnnotationScope = threadAnnotation.AnnotateScope();
-
-            // From this point on it previous kernels should be completed
-            assert(blockEnd - blockStart == 1);
-            globalKCParams.gridSize = callerBlockCount;
-            globalKCParams.blockSize = tpb;
-
-            // Do the block stride loop here,
-            // each thread may be responsible for one or more blocks
-            //for(uint32_t bId = blockStart; bId < callerBlockCount; bId += blockCount)
-            auto& blockCounter = cbPtr->curBlockCounter;
-            for(uint32_t bId = blockCounter.fetch_add(1u);
-                bId < callerBlockCount;
-                bId = blockCounter.fetch_add(1u))
             {
-                globalKCParams.blockId = bId;
-                for(uint32_t j = 0; j < tpb; j++)
+                static const auto thrdWorkAnnot = GPUAnnotationCPU(domain, name);
+                const auto thrdWorkScope = thrdWorkAnnot.AnnotateScope();
+
+                // From this point on it previous kernels should be completed
+                assert(blockEnd - blockStart == 1);
+                const_cast<uint32_t&>(globalKCParams.gridSize) = callerBlockCount;
+                const_cast<uint32_t&>(globalKCParams.blockSize) = TPB;
+
+                // Do the block stride loop here,
+                // each thread may be responsible for one or more blocks
+                //for(uint32_t bId = blockStart; bId < callerBlockCount; bId += blockCount)
+                auto& blockCounter = cbPtr->curBlockCounter;
+                for(uint32_t bId = blockCounter.fetch_add(1u);
+                    bId < callerBlockCount;
+                    bId = blockCounter.fetch_add(1u))
                 {
-                    // For kernel call params to work
-                    globalKCParams.threadId = j;
-                    Kernel(fArgs...);
+                    globalKCParams.blockId = bId;
+                    for(uint32_t j = 0; j < TPB; j++)
+                    {
+                        // For kernel call params to work
+                        globalKCParams.threadId = j;
+                        Kernel(fArgs...);
+                    }
                 }
             }
-            //
             std::atomic_thread_fence(std::memory_order_seq_cst);
-            NotifyWhenValueReaches(cbPtr, newIssueCount);
+            {
+                static const auto thrdDoneAnnot = GPUAnnotationCPU(domain, "WorkDoneSignal");
+                const auto thrdDoneScope = thrdDoneAnnot.AnnotateScope();
+                NotifyWhenValueReaches(cbPtr, newIssueCount);
+            }
         },
         blockCount
     );
@@ -145,11 +150,10 @@ void GPUQueueCPU::IssueKernelInternal(std::string_view name,
     if constexpr(MRAY_IS_DEBUG) r.GetAll();
 }
 
-template<class Lambda>
+template<uint32_t TPB, class Lambda>
 MR_HF_DEF
 void GPUQueueCPU::IssueLambdaInternal(std::string_view name,
                                       uint32_t totalWorkCount,
-                                      uint32_t tpb,
                                       Lambda&& func) const
 {
     static const auto annotation = GPUAnnotationCPU(domain, name);
@@ -169,9 +173,9 @@ void GPUQueueCPU::IssueLambdaInternal(std::string_view name,
     // Give just enough grid to eliminate grid-stride / block-stride
     // loops (for CPU these do more harm than good, unlike GPU)
 
-    uint32_t blockCount = DetermineGridStrideBlock(nullptr, 0, tpb,
+    uint32_t blockCount = DetermineGridStrideBlock(nullptr, 0, TPB,
                                                    totalWorkCount);
-    uint32_t callerBlockCount = Math::DivideUp(totalWorkCount, tpb);
+    uint32_t callerBlockCount = Math::DivideUp(totalWorkCount, TPB);
     //
     uint64_t oldIssueCount = cb->issuedKernelCounter.fetch_add(blockCount);
     uint64_t newIssueCount = oldIssueCount + blockCount;
@@ -189,7 +193,7 @@ void GPUQueueCPU::IssueLambdaInternal(std::string_view name,
         blockCount,
         [
             oldIssueCount, newIssueCount,
-            cbPtr, callerBlockCount, tpb,
+            cbPtr, callerBlockCount,
             func = std::forward<Lambda>(func),
             name, domain = this->domain
             //, totalWorkCount, blockCount
@@ -205,33 +209,39 @@ void GPUQueueCPU::IssueLambdaInternal(std::string_view name,
 
             // From this point on it previous kernels should be completed
             std::atomic_thread_fence(std::memory_order_seq_cst);
-            static const auto threadAnnotation = GPUAnnotationCPU(domain, name);
-            const auto threadAnnotationScope = threadAnnotation.AnnotateScope();
-
-            assert(blockEnd - blockStart == 1);
-            globalKCParams.gridSize = callerBlockCount;
-            globalKCParams.blockSize = tpb;
-
-            // Do the block stride loop here,
-            // each thread may be responsible for one or more blocks
-            //for(uint32_t bId = blockStart; bId < callerBlockCount; bId += blockCount)
-            auto& blockCounter = cbPtr->curBlockCounter;
-            for(uint32_t bId = blockCounter.fetch_add(1u);
-                bId < callerBlockCount;
-                bId = blockCounter.fetch_add(1u))
             {
-                globalKCParams.blockId = bId;
-                for(uint32_t j = 0; j < tpb; j++)
+                static const auto thrdWorkAnnot = GPUAnnotationCPU(domain, name);
+                const auto thrdWorkScope = thrdWorkAnnot.AnnotateScope();
+
+                assert(blockEnd - blockStart == 1);
+                const_cast<uint32_t&>(globalKCParams.gridSize) = callerBlockCount;
+                const_cast<uint32_t&>(globalKCParams.blockSize) = TPB;
+
+                // Do the block stride loop here,
+                // each thread may be responsible for one or more blocks
+                //for(uint32_t bId = blockStart; bId < callerBlockCount; bId += blockCount)
+                auto& blockCounter = cbPtr->curBlockCounter;
+                for(uint32_t bId = blockCounter.fetch_add(1u);
+                    bId < callerBlockCount;
+                    bId = blockCounter.fetch_add(1u))
                 {
-                    // For kernel call params to work
-                    globalKCParams.threadId = j;
-                    KernelCallParams kp;
-                    func(kp);
+                    globalKCParams.blockId = bId;
+                    for(uint32_t j = 0; j < TPB; j++)
+                    {
+                        // For kernel call params to work
+                        globalKCParams.threadId = j;
+                        KernelCallParams kp;
+                        func(kp);
+                    }
                 }
             }
-            //
             std::atomic_thread_fence(std::memory_order_seq_cst);
-            NotifyWhenValueReaches(cbPtr, newIssueCount);
+            {
+                static const auto thrdDoneAnnot = GPUAnnotationCPU(domain, "WorkDoneSignal");
+                const auto thrdDoneScope = thrdDoneAnnot.AnnotateScope();
+                //
+                NotifyWhenValueReaches(cbPtr, newIssueCount);
+            }
         },
         blockCount
     );
@@ -247,9 +257,9 @@ void GPUQueueCPU::IssueWorkKernel(std::string_view name,
                                   Args&&... fArgs) const
 {
     assert(p.workCount != 0);
-    IssueKernelInternal<Kernel>
+    IssueKernelInternal<Kernel, StaticThreadPerBlock1D()>
     (
-        name, p.workCount, StaticThreadPerBlock1D(), std::forward<Args>(fArgs)...
+        name, p.workCount, std::forward<Args>(fArgs)...
     );
 }
 
@@ -261,9 +271,9 @@ void GPUQueueCPU::IssueWorkLambda(std::string_view name,
                                   Lambda&& func) const
 {
     assert(p.workCount != 0);
-    IssueLambdaInternal
+    IssueLambdaInternal<StaticThreadPerBlock1D()>
     (
-        name, p.workCount, StaticThreadPerBlock1D(), std::forward<Lambda>(func)
+        name, p.workCount, std::forward<Lambda>(func)
     );
 }
 
@@ -279,10 +289,21 @@ void GPUQueueCPU::IssueBlockKernel(std::string_view name,
     // TODO: Reason about this
     uint32_t workCount = p.blockSize * p.gridSize;
     //
-    IssueKernelInternal<Kernel>
-    (
-        name, workCount, p.blockSize, std::forward<Args>(fArgs)...
-    );
+    #define KCall(BLOCK_SIZE)                               \
+        IssueKernelInternal<Kernel, BLOCK_SIZE>             \
+        (                                                   \
+            name, workCount, std::forward<Args>(fArgs)...   \
+        )
+    //
+    switch (p.blockSize)
+    {
+        case 1  : KCall(1u);    break;
+        case 128: KCall(128u);  break;
+        case 256: KCall(256u);  break;
+        case 512: KCall(512u);  break;
+        default : throw MRayError("Unable to Call Kernel {}", name);
+    }
+    #undef KCall
 }
 
 template<class Lambda, uint32_t Bounds>
@@ -298,10 +319,21 @@ void GPUQueueCPU::IssueBlockLambda(std::string_view name,
     // TODO: Reason about this
     uint32_t workCount = p.blockSize * p.gridSize;
     //
-    IssueLambdaInternal
-    (
-        name, workCount, p.blockSize, std::forward<Lambda>(func)
-    );
+    #define KCall(BLOCK_SIZE)                               \
+        IssueLambdaInternal<BLOCK_SIZE>                     \
+        (                                                   \
+            name, workCount, std::forward<Lambda>(func)     \
+        )
+    //
+    switch (p.blockSize)
+    {
+        case 1  : KCall(1u);    break;
+        case 128: KCall(128u);  break;
+        case 256: KCall(256u);  break;
+        case 512: KCall(512u);  break;
+        default : throw MRayError("Unable to Call Kernel {}", name);
+    }
+    #undef KCall
 }
 
 template<auto Kernel, class... Args>

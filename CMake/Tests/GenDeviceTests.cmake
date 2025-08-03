@@ -59,6 +59,10 @@ function(gen_device_test)
         set_target_properties(${TARGET_FULL_NAME} PROPERTIES
                               CUDA_SEPARABLE_COMPILATION ON
                               CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+    elseif(GEN_DEVICE_TEST_BACKEND STREQUAL "MRAY_GPU_BACKEND_CPU")
+        set_target_properties(${TARGET_FULL_NAME} PROPERTIES
+                              INTERPROCEDURAL_OPTIMIZATION_RELEASE
+                              ${MRAY_HOST_BACKEND_IPO_MODE})
     endif()
 
     add_precompiled_headers(TARGET ${TARGET_FULL_NAME})

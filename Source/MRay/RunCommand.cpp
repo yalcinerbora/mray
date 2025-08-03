@@ -1,4 +1,5 @@
 #include "RunCommand.h"
+#include "Core/Profiling.h"
 #include "TracerThread.h"
 
 #include "Core/Timer.h"
@@ -611,6 +612,9 @@ Accum::AccumulateImage(RGBWeightSpan<double> output,
                        const RenderImageSection& rIS,
                        const RenderBufferInfo& rBI)
 {
+    static const auto issueAnnot = ProfilerAnnotation("AccumPortion-Issue");
+    const auto issueScope = issueAnnot.AnnotateScope();
+
     const Float* rStart = reinterpret_cast<const Float*>(rBI.data + rIS.pixStartOffsets[R]);
     const Float* gStart = reinterpret_cast<const Float*>(rBI.data + rIS.pixStartOffsets[G]);
     const Float* bStart = reinterpret_cast<const Float*>(rBI.data + rIS.pixStartOffsets[B]);
@@ -629,6 +633,9 @@ Accum::AccumulateImage(RGBWeightSpan<double> output,
 
         auto WorkFuncBulk = [=](uint32_t start, uint32_t end) -> void
         {
+            static const auto _ = ProfilerAnnotation("AccumPortion-Bulk");
+            const auto scope = _.AnnotateScope();
+
             size_t offsetInOut = start * SIMD_WIDTH;
             size_t bulkEnd = std::min(end * SIMD_WIDTH, totalPixels);
             size_t bulkWidth = bulkEnd - offsetInOut;
@@ -658,6 +665,9 @@ Accum::AccumulateImage(RGBWeightSpan<double> output,
 
         auto WorkFuncScanline = [=](uint32_t start, uint32_t end) -> void
         {
+            static const auto _ = ProfilerAnnotation("AccumPortion-Scanline");
+            const auto scope = _.AnnotateScope();
+
             for(uint32_t i = start; i < end; i++)
             {
                 uint32_t offsetOut = (rIS.pixelMin[1] + i) * rBI.resolution[0];
@@ -915,10 +925,6 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
         std::string filePath = MRAY_FORMAT("{:s}_{:08.0f}wpp",
                                            saveInfo.prefix,
                                            Math::Round(saveInfo.workPerPixel));
-        //std::string filePath = MRAY_FORMAT("{:s}_{:08.0f}wpp_{:.2f}s",
-        //                                   saveInfo.prefix,
-        //                                   Math::Round(saveInfo.workPerPixel),
-        //                                   saveInfo.time);
         MRAY_LOG("Saving \"{}\"...", filePath);
 
         MRayError e = imgLoader->WriteImage(imgInfo, filePath,

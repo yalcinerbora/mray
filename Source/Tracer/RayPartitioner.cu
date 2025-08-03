@@ -1,3 +1,4 @@
+#include "Core/MathForward.h"
 #include "RayPartitioner.h"
 
 #include <limits>
@@ -286,30 +287,40 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
     // TODO: Why are we doing two separate sorts? Keys almost always should be contiguous.
     // If not we are wasting information space here.
     // So a single pass should suffice maybe? Reason about this more later
-    if(!onlySortForBatches)
+    auto IssueSort = [&](const Vector2ui& sortRange)
     {
-        assert(keyDataBitRange[0] != keyDataBitRange[1]);
         uint32_t outIndex = RadixSort<true>(Span<Span<CommonKey>, 2>(dKeysDB),
                                             Span<Span<CommonIndex>, 2>(dIndicesDB),
                                             dTempMemory, queue,
-                                            keyDataBitRange);
+                                            sortRange);
         if(outIndex == 1)
         {
             std::swap(dKeysDB[0], dKeysDB[1]);
             std::swap(dIndicesDB[0], dIndicesDB[1]);
         }
-    }
-    // Then sort batch portion
-    uint32_t outIndex = RadixSort<true>(Span<Span<CommonKey>, 2>(dKeysDB),
-                                        Span<Span<CommonIndex>, 2>(dIndicesDB),
-                                        dTempMemory, queue,
-                                        keyBatchBitRange);
-    if(outIndex == 1)
+    };
+    if(onlySortForBatches)
     {
-        std::swap(dKeysDB[0], dKeysDB[1]);
-        std::swap(dIndicesDB[0], dIndicesDB[1]);
+        assert(keyBatchBitRange[0] != keyBatchBitRange[1]);
+        // Then sort batch portion
+        IssueSort(keyBatchBitRange);
     }
-
+    // We sort both for batches and data, but if ket range
+    // is contiguous we can get away with a single sort
+    else if(keyDataBitRange[1] == keyBatchBitRange[0])
+    {
+        Vector2ui keyFullRange(keyDataBitRange[0],
+                               keyBatchBitRange[1]);
+        assert(keyFullRange[0] != keyFullRange[1]);
+        IssueSort(keyFullRange);
+    }
+    else
+    {
+        assert(keyBatchBitRange[0] != keyBatchBitRange[1]);
+        assert(keyDataBitRange[0] != keyDataBitRange[1]);
+        IssueSort(keyDataBitRange);
+        IssueSort(keyBatchBitRange);
+    }
     // Rename/Repurpose buffers for readability
     Span<CommonIndex> dSortedRayIndices = dIndicesDB[0];
     Span<CommonKey> dSortedKeys = dKeysDB[0];

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Definitions.h"
+#include "Core/MathConstants.h"
 #include "Core/Vector.h"
 #include "Core/Ray.h"
 #include "Core/AABB.h"
@@ -283,6 +284,7 @@ Vector2 ImageCoordinate::GetPixelIndex() const noexcept
 MR_PF_DEF
 RayCone RayCone::Advance(Float t) const noexcept
 {
+    using MathConstants::Epsilon;
     return RayCone
     {
         .aperture = aperture,
@@ -291,7 +293,7 @@ RayCone RayCone::Advance(Float t) const noexcept
         // Approx version in the paper (RT Gems chapter 20, Eq. under Figure 20-5)
         // TODO: Width explodes rarely, we do not have a good number since we do not have
         // the scene scale. Putting a large value here that is not near inf
-        .width = Math::Min(width + aperture * t, Float(1e6))
+        .width = Math::Clamp(width + aperture * t, Epsilon<Float>(), Float(1e6))
     };
 }
 

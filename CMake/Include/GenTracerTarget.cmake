@@ -343,6 +343,10 @@ function(gen_tracer_target)
         set_target_properties(${TARGET_FULL_NAME} PROPERTIES
                               CUDA_SEPARABLE_COMPILATION ON
                               CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+    elseif(GEN_TRACER_TARGET_MACRO STREQUAL "MRAY_GPU_BACKEND_CPU")
+        set_target_properties(${TARGET_FULL_NAME} PROPERTIES
+                              INTERPROCEDURAL_OPTIMIZATION_RELEASE
+                              ${MRAY_HOST_BACKEND_IPO_MODE})
     endif()
 
     # Return the generated target

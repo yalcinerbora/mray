@@ -422,7 +422,7 @@ Span<RayIndex> PathTracerRenderer::DoRenderPass(uint32_t sppLimit,
 
     // Generate work keys from hit packs
     using namespace std::string_literals;
-    static const std::string GenWorkKernelName = std::string(TypeName()) + "-KCGenerateWorkKeys"s;
+    static const std::string GenWorkKernelName = std::string(TypeName()) + "-KCGenerateWorkKeysIndirect"s;
     processQueue.IssueWorkKernel<KCGenerateWorkKeysIndirect>
     (
         GenWorkKernelName,

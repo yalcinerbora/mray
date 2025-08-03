@@ -300,6 +300,22 @@ void TracerThread::HandleRendering()
                 .workPerPixel = currentWPP
             }
         ));
+        // TODO: We are wasting a single "DoRender"
+        // when the "Visor" is the RunCommand
+        // since RunCommand is not interactive and will terminate
+        // and start the termination process of the TracerThread.
+        // However; TracerThread can only terminate when
+        // it is checking the Request/Response queue,
+        // so if run command does not send the terminate signal
+        // fast enough tracer may start rendering again.
+        //
+        // This is not an issue for correctness sake since output
+        // of that frame should not be used. This only prevents
+        // termination of the process for an extra frame time.
+        // Which is noticable for CPU Tracer.
+        //
+        // Fix requires tracer to know which "Visor" it is
+        // communicating with, which is current not passed.
     }
 }
 
@@ -373,7 +389,7 @@ void TracerThread::HandleSceneChange(const std::string& newScene)
     else
     {
         sceneIds = std::move(result.value());
-        MRAY_LOG("[Tracer]: Scene \"{}\" loaded in {}ms",
+        MRAY_LOG("[Tracer]: Scene \"{}\" loaded in {:.2f}ms",
                     newScene, sceneIds.loadTimeMS);
     }
     // Commit the surfaces
@@ -388,10 +404,10 @@ void TracerThread::HandleSceneChange(const std::string& newScene)
     // so we can't directly measure from GPU.
     tracer->Flush();
     timer.Split();
-    MRAY_LOG("[Tracer]: Surfaces committed in {}ms\n"
-             "    AABB      : {}\n"
-             "    Instances : {}\n"
-             "    Accels    : {}",
+    MRAY_LOG("[Tracer]: Surfaces committed in {:.2f}ms\n"
+             "    AABB     : {}\n"
+             "    Instances: {}\n"
+             "    Accels   : {}",
              timer.Elapsed<Millisecond>(),
              currentSceneAABB,
              instanceCount, accelCount);

@@ -1,5 +1,7 @@
 #include "TracerBase.h"
 
+#include "Core/Timer.h"
+
 using FilterFuncPair = Pair< const FilterType::E, TexFilterGenerator>;
 template<class T>
 static constexpr auto FilterGenFuncPack = FilterFuncPair
@@ -1484,6 +1486,9 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     // So again wait the "Finalize" calls of the groups and the texture.
     gpuSystem.SyncAll();
 
+    Timer t;
+    t.Start();
+    MRAY_LOG("[Tracer]:     Constructing Accelerators ...");
     accelerator->Construct(BaseAccelConstructParams
     {
         .texViewMap = texMem.TextureViews(),
@@ -1493,6 +1498,9 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
         .mSurfList = surfaces.Vec(),
         .lSurfList = Span<const LightSurfP>(lSurfList)
     });
+    t.Lap();
+    MRAY_LOG("[Tracer]:     Accelerator construction took {:.2f}ms.",
+             t.Elapsed<Millisecond>());
 
     // Set scene diameter for lights (should only be useful for
     // boundary lights but we try to set for every light)

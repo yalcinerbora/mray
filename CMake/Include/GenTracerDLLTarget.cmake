@@ -114,6 +114,11 @@ function(gen_tracer_dll_target)
         set_target_properties(${TARGET_NAME} PROPERTIES
                               CUDA_SEPARABLE_COMPILATION ON
                               CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+    elseif(GEN_TRACER_DLL_MACRO STREQUAL "MRAY_GPU_BACKEND_CPU")
+
+        set_target_properties(${TARGET_NAME} PROPERTIES
+                              INTERPROCEDURAL_OPTIMIZATION_RELEASE
+                              ${MRAY_HOST_BACKEND_IPO_MODE})
     endif()
 
     target_include_directories(${TARGET_NAME}

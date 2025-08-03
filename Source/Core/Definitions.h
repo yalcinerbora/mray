@@ -64,8 +64,8 @@
     #ifdef MRAY_DEVICE_CODE_PATH_CUDA
         #undef MRAY_UNROLL_LOOP
         #undef MRAY_UNROLL_LOOP_N
-        #define MRAY_UNROLL_LOOP        _Pragma("unroll")
-        #define MRAY_UNROLL_LOOP_N(N)   _Pragma("unroll " N)
+        #define MRAY_UNROLL_LOOP        MR_STAMP_PRAGMA(unroll)
+        #define MRAY_UNROLL_LOOP_N(N)   MR_STAMP_PRAGMA(unroll N)
     #endif
 
     #define MRAY_GPU_INLINE_DECL
@@ -96,8 +96,8 @@
     #ifdef MRAY_DEVICE_CODE_PATH_HIP
         #undef  MRAY_UNROLL_LOOP
         #undef  MRAY_UNROLL_LOOP_N
-        #define MRAY_UNROLL_LOOP        _Pragma("unroll")
-        #define MRAY_UNROLL_LOOP_N(N)   _Pragma("unroll " N)
+        #define MRAY_UNROLL_LOOP        MR_STAMP_PRAGMA(unroll)
+        #define MRAY_UNROLL_LOOP_N(N)   MR_STAMP_PRAGMA(unroll N)
     #endif
 
     #define MRAY_GPU_INLINE_DECL

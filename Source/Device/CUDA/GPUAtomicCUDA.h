@@ -66,7 +66,7 @@ T EmulateAtomicOp(T* address, T val, Func&& F)
         while(assumed != old);
         return std::bit_cast<T>(old);
     #else
-        return T(0);
+        return F(*address + val);
     #endif
 }
 

@@ -208,7 +208,7 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
         //
         queue.IssueBlockLambda
         (
-            "KCRadixSort-DetermineBuckets"sv,
+            "KCRadixSort-WritePass"sv,
             DeviceBlockIssueParams
             {
                 .gridSize = blockCount,

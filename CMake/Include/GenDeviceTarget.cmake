@@ -184,22 +184,27 @@ function(gen_device_target)
                               PRIVATE
                               mray::cuda_extra_compile_opts)
 
-    # TODO: CUPIT dll is not near cudart.dll, so CUDA installation does not put it on path.
-    # We copy it to our binary directory, but check if this is OK?
-    if(MRAY_ENABLE_TRACY AND WIN32)
-        # $<TARGET_FILE:CUDA::cupti> gives the lib file...
-        # Configure time copying wont work folders may not be
-        # created yet. CUDA 12.6
-        # add_custom_command(TARGET ${TARGET_FULL_NAME} POST_BUILD
-        #                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        #                    "$<TARGET_FILE:CUDA::cupti>"
-        #                    ${MRAY_CONFIG_BIN_DIRECTORY}
-        #                    COMMENT "Copying CUPTI dll")
-    endif()
+        # TODO: CUPIT dll is not near cudart.dll, so CUDA installation does not put it on path.
+        # We copy it to our binary directory, but check if this is OK?
+        if(MRAY_ENABLE_TRACY AND WIN32)
+            # $<TARGET_FILE:CUDA::cupti> gives the lib file...
+            # Configure time copying wont work folders may not be
+            # created yet. CUDA 12.6
+            # add_custom_command(TARGET ${TARGET_FULL_NAME} POST_BUILD
+            #                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            #                    "$<TARGET_FILE:CUDA::cupti>"
+            #                    ${MRAY_CONFIG_BIN_DIRECTORY}
+            #                    COMMENT "Copying CUPTI dll")
+        endif()
 
         set_target_properties(${TARGET_FULL_NAME} PROPERTIES
                               CUDA_SEPARABLE_COMPILATION ON
                               CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+
+    elseif(GEN_DEVICE_TARGET_MACRO STREQUAL "MRAY_GPU_BACKEND_CPU")
+        set_target_properties(${TARGET_FULL_NAME} PROPERTIES
+                              INTERPROCEDURAL_OPTIMIZATION_RELEASE
+                              ${MRAY_HOST_BACKEND_IPO_MODE})
     endif()
     # elseif(${GEN_DEVICE_TARGET_MACRO} STREQUAL "MRAY_GPU_BACKEND_HIP")
     #     # target_link_libraries(${TARGET_FULL_NAME}

@@ -54,7 +54,7 @@ static constexpr uint32_t WarpSize()
 
 template<uint32_t LOGICAL_WARP_SIZE = WarpSize()>
 MR_GF_DECL
-static void WarpSynchronize()
+inline void WarpSynchronize()
 {
     // Dirty fix to make host side happy
     #ifdef __CUDA_ARCH__
@@ -82,7 +82,7 @@ static void WarpSynchronize()
 }
 
 MR_GF_DECL
-static void BlockSynchronize()
+inline void BlockSynchronize()
 {
     // Dirty fix to make host side happy
     #ifdef __CUDA_ARCH__
@@ -91,7 +91,7 @@ static void BlockSynchronize()
 }
 
 MR_GF_DECL
-static void ThreadFenceGrid()
+inline void ThreadFenceGrid()
 {
     // Dirty fix to make host side happy
     #ifdef __CUDA_ARCH__
@@ -131,7 +131,7 @@ struct KernelCallParamsCUDA
     uint32_t blockId;
     uint32_t threadId;
 
-    MR_PF_DECL          KernelCallParamsCUDA();
+    MR_PF_DECL_V        KernelCallParamsCUDA();
     MR_PF_DECL uint32_t GlobalId() const;
     MR_PF_DECL uint32_t TotalSize() const;
 };
