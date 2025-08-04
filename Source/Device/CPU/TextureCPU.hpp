@@ -1,5 +1,7 @@
 #pragma once
 
+#include "TextureCPU.h"
+
 namespace mray::host
 {
 
