@@ -11,38 +11,50 @@
 
 // Explicitly instantiate these
 // These are used by "AcceleratorGroupLBVH::MultiBuildBVH"
-template size_t
-DeviceAlgorithms::SegmentedTransformReduceTMSize<AABB3, PrimitiveKey>(size_t, const GPUQueue&);
+//
+// GCC Does not like non-nested namespace
+// so we need to explciity define for each backend
+//
+// TODO: This shouldnt leak here TBH, define a macro on the backend
+// side and use that instead of this (i.e MRAY_BACKEND_ALGORITHMS_NAMESPACE)
+#ifdef MRAY_GPU_BACKEND_CPU
+    namespace mray::host::algorithms
+#elif defined(MRAY_GPU_BACKEND_CUDA)
+    namespace mray::cuda::algorithms
+#else
+    #error "Add nested name specifier here for the new backend!"
+#endif
+{
+    template size_t
+    SegmentedTransformReduceTMSize<AABB3, PrimitiveKey>(size_t, const GPUQueue&);
 
-template size_t
-DeviceAlgorithms::SegmentedRadixSortTMSize<true, uint64_t, uint32_t>(size_t, size_t, const GPUQueue&);
+    template size_t
+    SegmentedRadixSortTMSize<true, uint64_t, uint32_t>(size_t, size_t, const GPUQueue&);
 
-template void
-DeviceAlgorithms::
-SegmentedTransformReduce
-<AABB3, AABB3, UnionAABB3Functor, IdentityFunctor<AABB3>>
-(
-    Span<AABB3>,
-    Span<Byte>,
-    Span<const AABB3>,
-    Span<const uint32_t>,
-    const AABB3&,
-    const GPUQueue&,
-    UnionAABB3Functor&& ,
-    IdentityFunctor<AABB3>&&
-);
+    template void
+    SegmentedTransformReduce
+    <AABB3, AABB3, UnionAABB3Functor, IdentityFunctor<AABB3>>
+    (
+        Span<AABB3>,
+        Span<Byte>,
+        Span<const AABB3>,
+        Span<const uint32_t>,
+        const AABB3&,
+        const GPUQueue&,
+        UnionAABB3Functor&& ,
+        IdentityFunctor<AABB3>&&
+    );
 
-template uint32_t
-DeviceAlgorithms::SegmentedRadixSort<true, uint64_t, uint32_t>
-(
-    Span<Span<uint64_t>, 2>,
-    Span<Span<uint32_t>, 2>,
-    Span<Byte>,
-    Span<const uint32_t>,
-    const GPUQueue&,
-    const Vector2ui&
-);
-
+    template uint32_t SegmentedRadixSort<true, uint64_t, uint32_t>
+    (
+        Span<Span<uint64_t>, 2>,
+        Span<Span<uint32_t>, 2>,
+        Span<Byte>,
+        Span<const uint32_t>,
+        const GPUQueue&,
+        const Vector2ui&
+    );
+}
 struct MortonDiffFunctor
 {
     MR_PF_DECL

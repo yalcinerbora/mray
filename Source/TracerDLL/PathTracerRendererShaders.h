@@ -21,7 +21,7 @@ namespace PathTraceRDetail
         //
         END
     };
-    static constexpr std::array LightSamplerNames =
+    inline constexpr std::array LightSamplerNames =
     {
         "Uniform",
         "IrradianceWeighted"
@@ -36,7 +36,7 @@ namespace PathTraceRDetail
         //
         END
     };
-    static constexpr std::array SampleModeNames =
+    inline constexpr std::array SampleModeNames =
     {
         "Pure",
         "WithNextEventEstimation",
@@ -51,7 +51,7 @@ namespace PathTraceRDetail
         //
         END
     };
-    static constexpr std::array RenderModeNames =
+    inline constexpr std::array RenderModeNames =
     {
         "Throughput",
         "Latency"

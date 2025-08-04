@@ -26,8 +26,17 @@ MRayEmbreeContext::MRayEmbreeContext()
     // From the tutorials for best performance
     // we need to change these
     // First time setting a control register on x86 device :)
+    #ifdef MRAY_GCC
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wsign-conversion"
+    #endif
+
     _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
     _MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
+
+    #ifdef MRAY_GCC
+        #pragma GCC diagnostic pop
+    #endif
 
     ErrorCallback(nullptr, rtcGetDeviceError(device),
                   rtcGetDeviceLastErrorMessage(device));

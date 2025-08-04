@@ -51,10 +51,10 @@ void KCAdjustIndices(// I-O
         auto& dVI = dVertexIndices;
         for(uint32_t j = localTid; j < vICount;)
         {
-                            dVI[vIStart + j] += vStart; j += kp.blockSize;
-            if(j < vICount) dVI[vIStart + j] += vStart; j += kp.blockSize;
-            if(j < vICount) dVI[vIStart + j] += vStart; j += kp.blockSize;
-            if(j < vICount) dVI[vIStart + j] += vStart; j += kp.blockSize;
+                            {dVI[vIStart + j] += vStart;} j += kp.blockSize;
+            if(j < vICount) {dVI[vIStart + j] += vStart;} j += kp.blockSize;
+            if(j < vICount) {dVI[vIStart + j] += vStart;} j += kp.blockSize;
+            if(j < vICount) {dVI[vIStart + j] += vStart;} j += kp.blockSize;
         }
         // Before writing new shared memory values wait all threads to end
         BlockSynchronize();

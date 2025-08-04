@@ -1,14 +1,24 @@
+#ifdef MRAY_GCC
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wcpp"
+#endif
+
 #include <pxr/usd/usd/primDefinition.h>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdShade/material.h>
 #include <pxr/usd/usdShade/shader.h>
+
+#ifdef MRAY_GCC
+    #pragma GCC diagnostic pop
+#endif
+
 #include <barrier>
 
 #include "MaterialProcessor.h"
 
-#include "Core/Error.h"
 #include "ImageLoader/EntryPoint.h"
 
+#include "Core/Error.h"
 #include "Core/Algorithm.h"
 #include "Core/TypeNameGenerators.h"
 #include "Core/ThreadPool.h"

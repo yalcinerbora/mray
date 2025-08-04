@@ -329,7 +329,11 @@ SampleT<Vector2> MitchellNetravaliFilter::Sample(const Vector2& xi) const
                 sampleVal = r.value;
                 break;
             }
-            default: assert(false);
+            default:
+            {
+                pdfs = {};
+                assert(false);
+            }
         }
         using namespace Distribution;
         Float misWeight = MIS::BalanceCancelled<3>(pdfs, weights);

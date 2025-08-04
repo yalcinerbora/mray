@@ -390,7 +390,8 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
                     usdNormalIndices[localIndex]
                 };
                 auto [indexLoc, isInserted] = indexLookupTable.Insert(indexTriplet,
-                                                                        indexCounter);
+                                                                      indexCounter);
+                assert(indexLoc != nullptr);
                 outIndex[j] = *indexLoc;
 
                 if(isInserted)

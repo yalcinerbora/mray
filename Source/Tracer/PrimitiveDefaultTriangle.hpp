@@ -570,9 +570,9 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     //                N_v
     //        N_g     ^          N_v vertex normal
     //           ^    |          N_g face normal (geometry normal)
-    //            \  / \
-    //             \/   \   Approx Neig. Triangle
-    //             /     \
+    //            \  / \         .
+    //             \/   \        Approx Neig. Triangle
+    //             /     \       .
     //
     // We assume a reflected triangle exists and vertex normal is used to
     // smooth the discretization.

@@ -466,8 +466,19 @@ RayConeSurface RefractMaterial<ST>::RefractRayCone(const RayConeSurface& rayCone
     Vector2 tl = Refract2D(dl, nl, fromEta, toEta);
 
     orthoD = Vector2(-d[1], d[0]);
-    Float wl = -uHitX * tu[1] / Dot(orthoD, Vector2(-tu[1], tu[0]));
-    Float wu = +lHitX * tl[1] / Dot(orthoD, Vector2(-tl[1], tl[0]));
+    // **********
+    // TODO: Report GCC-13 bug, this destroys constructor deduction
+    // of Vector2(Args...) "where args are constrained with std::convertible_to"
+    // of some? subsequent constructor usage
+    //
+    // Float wl = -uHitX * tu[1] / Dot(orthoD, Vector2(-tu[1], tu[0]));
+    // Float wu = +lHitX * tl[1] / Dot(orthoD, Vector2(-tl[1], tl[0]));
+    // **********
+    // Trying to circumvent the trigger (it didn't take too long)
+    Float wl = -uHitX * tu[1];
+    wl /= Dot(orthoD, Vector2(-tu[1], tu[0]));
+    Float wu = +lHitX * tl[1];
+    wu /= Dot(orthoD, Vector2(-tl[1], tl[0]));
 
     // Calculate the new cone
     Float sign = Math::SignPM1(tu[0] * tl[1] - tu[1] * tl[0]);

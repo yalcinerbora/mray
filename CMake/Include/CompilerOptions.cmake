@@ -143,6 +143,10 @@ set(MRAY_GCC_OPTIONS
     # so skipping
     # -Wuseless-cast              # warn if you perform a cast to the same type
 
+    # TODO: We do not expose these classes outside, but if we need to later
+    # (Through TracerI interface) we may need to reason about it later
+    -Wno-interference-size   # Do not warn about interference size usage
+
     -Wno-shadow
     -Wno-abi                  # Disable ABI warnings (it occurred due to nvcc)
 )

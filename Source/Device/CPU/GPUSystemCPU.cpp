@@ -274,8 +274,20 @@ void GPUSystemCPU::ThreadInitFunction()
     // From the embree tutorials...
     // For best performance we need to change these
     // First time setting a control register on x86 device :)
+    //
+    // GCC complains about this usage, but its all macros etc.
+    // nothing we can do about it...
+    #ifdef MRAY_GCC
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wsign-conversion"
+    #endif
+
     _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
     _MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
+
+    #ifdef MRAY_GCC
+        #pragma GCC diagnostic pop
+    #endif
 }
 
 GPUAnnotationCPU GPUSystemCPU::CreateAnnotation(std::string_view name) const

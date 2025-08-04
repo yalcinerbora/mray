@@ -356,7 +356,7 @@ requires (FloatPixelC<T>)
     for(uint32_t i = 0; i < I; i++)
     {
         TextureSignedExtent<D> ijk = ijkStart;
-        if constexpr(D == 1)        ijk += i;
+        if constexpr(D == 1)        ijk += int32_t(i);
         else if constexpr(D == 2)   ijk += TextureSignedExtent<D>(i, j);
         else                        ijk += TextureSignedExtent<D>(i, j, k);
         //

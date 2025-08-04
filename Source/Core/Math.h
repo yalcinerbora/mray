@@ -889,7 +889,7 @@ MR_PF_DEF T Log2(T x) noexcept
             x = x * 8388608.0f;     // 0x1.0p+23
             i = -23.0f;
         }
-        I e = I(Bit::BitCast<UI>(x) - UI(0x3f3504f3) & UI(0xff800000));
+        I e = I((Bit::BitCast<UI>(x) - UI(0x3f3504f3)) & UI(0xff800000));
         m = Bit::BitCast<F>(Bit::BitCast<I>(x) - e);
         i = FMA(float(e), 1.19209290e-7f, i); // 0x1.0p-23
         m = m - 1.0f;

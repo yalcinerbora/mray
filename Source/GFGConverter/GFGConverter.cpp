@@ -332,6 +332,7 @@ void THRDProcessMesh(ErrorList& errors, Span<MeshGroup> meshes,
             }
             // Positions
             static_assert(sizeof(Vector3) == sizeof(aiVector3D));
+            static_assert(alignof(Vector3) == alignof(aiVector3D));
             std::memcpy(positions.data(), meshIn->mVertices,
                         vertexCount * sizeof(Vector3));
             // UVs

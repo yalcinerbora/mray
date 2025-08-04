@@ -6,10 +6,6 @@
 
 using GPUThreadInitFunction = void(*)();
 
-static constexpr uint32_t WarpSize();
-static constexpr uint32_t StaticThreadPerBlock1D();
-static constexpr uint32_t TotalQueuePerDevice();
-
 static constexpr uint32_t ComputeQueuePerDevice = 4;
 static_assert(ComputeQueuePerDevice > 0,
               "At least one compute queue must "

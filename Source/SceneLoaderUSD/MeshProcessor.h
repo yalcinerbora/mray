@@ -1,9 +1,18 @@
 #pragma once
 
+#ifdef MRAY_GCC
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wcpp"
+#endif
+
 #include <pxr/usd/usd/primDefinition.h>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/base/tf/token.h>
 #include <pxr/base/vt/array.h>
+
+#ifdef MRAY_GCC
+    #pragma GCC diagnostic pop
+#endif
 
 #include <array>
 #include <cstdint>

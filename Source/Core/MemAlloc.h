@@ -224,7 +224,7 @@ std::vector<Span<T>>
 AllocateSegmentedData(Memory& memory, const std::vector<size_t>& counts,
                       size_t alignment)
 {
-    std::vector<size_t> alignedByteOffsets(counts.size() + 1);
+    std::vector<size_t> alignedByteOffsets(counts.size() + 1u);
     alignedByteOffsets[0] = 0;
 
     std::transform_inclusive_scan

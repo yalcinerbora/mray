@@ -452,7 +452,7 @@ void KCExtractLuminance(// I-O
             Vector2 uv = (Vector2(pixCoord) + Vector2(0.5)) * resRecip;
             Vector3 localPixRGB = GenericReadFromView(uv, texView);
 
-            Float luminance;
+            Float luminance = Float{0};
             // Do the conversion
             uint32_t i = static_cast<uint32_t>(curParams.colorSpace);
             [[maybe_unused]]

@@ -39,8 +39,9 @@
     #define MRAY_UNROLL_LOOP        MR_STAMP_PRAGMA(unroll)
     #define MRAY_UNROLL_LOOP_N(N)   MR_STAMP_PRAGMA(unroll N)
 #elif defined(MRAY_GCC)
-    #define MRAY_UNROLL_LOOP        MR_STAMP_PRAGMA(gcc unroll 8)
-    #define MRAY_UNROLL_LOOP_N(N)   MR_STAMP_PRAGMA(gcc unroll N)
+    #define MRAY_UNROLL_LOOP        MR_STAMP_PRAGMA(GCC unroll 8)
+    // https://stackoverflow.com/questions/63404539/portable-loop-unrolling-with-template-parameter-in-c-with-gcc-icc
+    #define MRAY_UNROLL_LOOP_N(N)   MR_STAMP_PRAGMA(GCC unroll 8)
 #endif
 
 #if defined MRAY_GPU_BACKEND_CUDA
@@ -169,7 +170,7 @@
 //MR_PF_DECL_V
 //constexpr void MRayUnreachable()
 //{
-//  #if defined(MRAY_DEVICE_CODE_PATH_CUDA) || \
+//  #if defined(MRAY_DEVICE_CODE_PATH_CUDA) ||
 //        defined(MRAY_CLANG) || defined(MRAY_GCC)
 //      __builtin_unreachable();
 //  // MSVC

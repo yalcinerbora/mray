@@ -1,8 +1,17 @@
 #pragma once
 
+#ifdef MRAY_GCC
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wcpp"
+#endif
+
 #include <pxr/usd/usd/common.h>
 #include <pxr/usd/usdGeom/tokens.h>
 #include <pxr/usd/usdLux/tokens.h>
+
+#ifdef MRAY_GCC
+    #pragma GCC diagnostic pop
+#endif
 
 #include "Core/SceneLoaderI.h"
 #include "Core/TracerI.h"
