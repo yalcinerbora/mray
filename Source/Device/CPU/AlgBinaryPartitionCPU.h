@@ -1,9 +1,7 @@
 #pragma once
 // IWYU pragma: private; include "AlgBinaryPartition.h"
-
-#include <new>
-
 #include "Core/Definitions.h"
+#include "Core/System.h"
 #include "Core/Types.h"
 #include "GPUSystemCPU.h"
 
@@ -78,10 +76,13 @@ void BinaryPartition(Span<T> dOutput,
             uint32_t offset = kp.blockId * workPerBlock;
             uint32_t localWCount = std::min(offset + workPerBlock, elemCount) - offset;
             Span<const T> dLocalInput = dInput.subspan(offset, localWCount);
+
+            LRCounter& myCounter = dCounters[kp.blockId + 1];
+            assert(myCounter.left == 0 && myCounter.right == 0);
             for(const T& v : dLocalInput)
             {
-                if(op(v))   dCounters[kp.blockId + 1].left += 1;
-                else        dCounters[kp.blockId + 1].right += 1;
+                if(op(v))   myCounter.left += 1;
+                else        myCounter.right += 1;
             }
         }
     );
@@ -126,17 +127,9 @@ void BinaryPartition(Span<T> dOutput,
 
             uint32_t offset = kp.blockId * workPerBlock;
             uint32_t localWCount = std::min(offset + workPerBlock, elemCount) - offset;
-            if(offset >= dInput.size())
-                MRAY_DEBUG_BREAK;
             Span<const T> dLocalInput = dInput.subspan(offset, localWCount);
             for(const T& v : dLocalInput)
             {
-                if(((globalOffset.left + localOffset[0]) >= dOutput.size()) &&
-                   ((globalOffset.right + localOffset[1]) >= dOutput.size()))
-                {
-                    MRAY_DEBUG_BREAK;
-                }
-
                 if(op(v))   dOutput[globalOffset.left +  (localOffset[0]++)] = v;
                 else        dOutput[globalOffset.right + (localOffset[1]++)] = v;
             }

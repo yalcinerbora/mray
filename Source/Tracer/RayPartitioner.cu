@@ -6,7 +6,7 @@
 #include "Core/BitFunctions.h"
 
 #include "Device/GPUSystem.h"
-#include "Device/GPUSystem.hpp"
+#include "Device/GPUSystem.hpp"     // IWYU pragma: keep
 #include "Device/GPUAlgRadixSort.h"
 
 static constexpr auto INVALID_LOCATION = std::numeric_limits<uint32_t>::max();

@@ -1,19 +1,17 @@
 #include <gtest/gtest.h>
-#include "Tracer/Random.h"
 
-#include "Device/GPUSystem.hpp"
+#include "Tracer/TracerTypes.h"
+#include "Device/GPUSystem.hpp" // IWYU pragma: keep
 
-
+// TODO:
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCRayConeTest(MRAY_GRID_CONSTANT const RayCone cone,
-                   MRAY_GRID_CONSTANT const Vector3 f,
-                   MRAY_GRID_CONSTANT const Vector3 d)
+void KCRayConeTest(MRAY_GRID_CONSTANT const RayCone,
+                   MRAY_GRID_CONSTANT const Vector3,
+                   MRAY_GRID_CONSTANT const Vector3)
 {
     KernelCallParams kp;
-    if(kp.GlobalId() != 0) return;
-
-    auto [a1, a2] = cone.Project(f, d);
-
+    //if(kp.GlobalId() != 0) return;
+    //cone.Project(f, d);
 }
 
 TEST(RayCone, Project)

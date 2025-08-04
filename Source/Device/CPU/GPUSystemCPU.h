@@ -7,7 +7,6 @@
 
 #include "Core/Types.h"
 #include "Core/Math.h"
-#include "Core/MemAlloc.h"
 #include "Core/Profiling.h"
 
 #include "TransientPool/TransientPool.h"
@@ -94,6 +93,9 @@ class GPUAnnotationCPU : public ProfilerAnnotation
     friend class GPUSystemCPU;
     friend class GPUQueueCPU;
 
+    template<uint32_t TPB, class Kernel>
+    friend struct GenericWorkFunctor;
+
     class Scope : public ProfilerAnnotation::Scope
     {
         friend GPUAnnotationCPU;
@@ -163,8 +165,6 @@ class GPUQueueCPU
         std::atomic_uint64_t    issuedKernelCounter = 0;
         std::atomic_uint64_t    completedKernelCounter = 0;
         std::mutex              issueMutex;
-        //
-        std::atomic_uint32_t    curBlockCounter = 0;
     };
 
     private:
@@ -172,16 +172,10 @@ class GPUQueueCPU
 
     friend class GPUFenceCPU;
 
-    template<auto Kernel, uint32_t TPB, class... Args>
-    MR_HF_DECL void IssueKernelInternal(std::string_view name,
-                                        uint32_t totalWorkCount,
-                                        //
-                                        Args&&...) const;
-
-    template<uint32_t TPB, class Lambda>
-    MR_HF_DECL void IssueLambdaInternal(std::string_view name,
-                                        uint32_t totalWorkCount,
-                                        Lambda&&) const;
+    template<uint32_t TPB, class WrappedKernel>
+    MR_HF_DECL void IssueInternal(std::string_view name,
+                                  uint32_t totalWorkCount,
+                                  WrappedKernel&& kernel) const;
 
     private:
     AnnotationHandle    domain;
@@ -501,9 +495,9 @@ void GPUQueueCPU::MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const
     using namespace std::string_view_literals;
 
     assert(regionTo.size() >= regionFrom.size());
+    static constexpr uint32_t TPB = 4096;
     uint32_t elemCount = uint32_t(regionFrom.size());
-    uint32_t tpb = StaticThreadPerBlock1D();
-    uint32_t blockCount = Math::DivideUp(elemCount, tpb);
+    uint32_t blockCount = Math::DivideUp(elemCount, TPB);
     // We find grid size via StaticTPB, we only set
     // single thread for each block. We want to use
     // memcpy, instead of thread copy assigning variables
@@ -516,21 +510,21 @@ void GPUQueueCPU::MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const
             .gridSize= blockCount,
             .blockSize = 1u
         },
-        [=](KernelCallParamsCPU kp)
+        [regionFrom, regionTo](KernelCallParamsCPU kp)
         {
             uint32_t elemCount = uint32_t(regionFrom.size());
 
             uint32_t i = kp.GlobalId();
-            uint32_t writeBound = std::min(elemCount, (i + 1) * tpb);
-            writeBound -= i * tpb;
-
-            auto localFromSpan = regionFrom.subspan(i * tpb, writeBound);
-            auto localToSpan = regionTo.subspan(i * tpb, writeBound);
-            if(writeBound != 0)
-            {
-                assert(localFromSpan.size() == localToSpan.size());
-                std::memcpy(localToSpan.data(), localFromSpan.data(), localFromSpan.size_bytes());
-            }
+            uint32_t writeBound = std::min(elemCount, (i + 1) * TPB);
+            writeBound -= i * TPB;
+            assert(writeBound <= TPB);
+            auto localFromSpan = regionFrom.subspan(i * TPB, writeBound);
+            auto localToSpan = regionTo.subspan(i * TPB, writeBound);
+            if(writeBound == 0) return;
+            //
+            assert(localFromSpan.size() == localToSpan.size());
+            std::memcpy(localToSpan.data(), localFromSpan.data(), localFromSpan.size_bytes());
+            //
         }
     );
 }
@@ -616,9 +610,10 @@ void GPUQueueCPU::MemsetAsync(Span<T> region, uint8_t perByteValue) const
 {
     using namespace std::string_view_literals;
 
+    assert(region.size() > 0);
+    static constexpr uint32_t TPB = 4096;
     uint32_t elemCount = static_cast<uint32_t>(region.size());
-    uint32_t tpb = StaticThreadPerBlock1D();
-    uint32_t blockCount = Math::DivideUp(elemCount, tpb);
+    uint32_t blockCount = Math::DivideUp(elemCount, TPB);
     IssueBlockLambda
     (
         "MemsetAsync"sv,
@@ -627,16 +622,19 @@ void GPUQueueCPU::MemsetAsync(Span<T> region, uint8_t perByteValue) const
             .gridSize = blockCount,
             .blockSize = 1u,
         },
-        [=](KernelCallParamsCPU kp)
+        [region, perByteValue](KernelCallParamsCPU kp)
         {
+            uint32_t elemCount = uint32_t(region.size());
+
             uint32_t i = kp.GlobalId();
-            uint32_t writeBound = std::min(elemCount, (i + 1) * tpb);
-            writeBound -= i * tpb;
-            if(writeBound != 0)
-            {
-                auto localRegion = region.subspan(i * tpb, writeBound);
-                std::memset(localRegion.data(), perByteValue, localRegion.size_bytes());
-            }
+            uint32_t writeBound = std::min(elemCount, (i + 1) * TPB);
+            writeBound -= i * TPB;
+            assert(writeBound <= TPB);
+            if(writeBound == 0) return;
+            //
+            auto localRegion = region.subspan(i * TPB, writeBound);
+            std::memset(localRegion.data(), perByteValue, localRegion.size_bytes());
+            //
         }
     );
 }

@@ -986,7 +986,7 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
 }
 
 RunCommand::RunCommand()
-    : threadCount(Math::Max(1u, std::thread::hardware_concurrency()))
+    : threadCount(Math::Max(1u, std::thread::hardware_concurrency() - 1))
     , rendererInfo({})
 {
     // To prevent

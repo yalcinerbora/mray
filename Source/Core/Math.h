@@ -9,8 +9,6 @@
 #include <cmath>
 #include <cstdlib>
 
-#include "Log.h"
-
 namespace Math
 {
     template<uint32_t N>

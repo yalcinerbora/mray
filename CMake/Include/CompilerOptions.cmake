@@ -107,14 +107,13 @@ set(MRAY_CLANG_OPTIONS
     $<$<CONFIG:SanitizeR>:-fno-omit-frame-pointer>
     $<$<CONFIG:SanitizeR>:-O2>
     $<$<CONFIG:SanitizeR>:-g>
-
+    #
     $<$<CONFIG:Release>:-O3>
     $<$<CONFIG:Release>:-g> # Also add debug info on release builds (for profiling etc.)
-
     # FP system
     $<$<CONFIG:Release>:-funsafe-math-optimizations>
     $<$<CONFIG:Release>:-fno-math-errno>
-
+    #
     $<$<CONFIG:Debug>:-g>
 )
 

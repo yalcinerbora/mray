@@ -7,10 +7,9 @@
 #include <future>
 #include <memory_resource>
 #include <memory>
-#include <array>
 
 #include "Log.h"
-#include "MPMCQueue.h"
+#include "MPMCQueueAtomic.h"
 #include "System.h"
 
 // TODO: Check if std has these predefined somewhere?
@@ -158,6 +157,24 @@ struct TPCallable
         }
     }
 
+    template<ThreadBlockWorkC T>
+    static void DetachedBlockTaskCall(const void* workFuncRaw, void*,
+                                       uint32_t start, uint32_t end)
+    {
+        const T* wfPtr = reinterpret_cast<const T*>(workFuncRaw);
+        wfPtr = std::launder(wfPtr);
+        const T& wf = *wfPtr;
+        try
+        {
+            wf(start, end);
+        }
+        catch(...)
+        {
+            MRAY_ERROR_LOG("Exception caught on a detached block task! Terminating process");
+            std::exit(1);
+        }
+    }
+
     template<ThreadDetachableTaskWorkC T>
     static void DetachedTaskCall(const void* workFuncRaw, void*, uint32_t, uint32_t)
     {
@@ -192,6 +209,7 @@ struct TPCallable
         assert(p != nullptr);
         call = static_cast<InternalFunc>(&BlockTaskCall<T, R>);
     }
+
     template<ThreadTaskWorkC T, class R>
     TPCallable(std::shared_ptr<T> work, std::shared_ptr<std::promise<R>> p)
         : workFunc(work)
@@ -201,7 +219,18 @@ struct TPCallable
     {
         assert(work != nullptr);
         assert(p != nullptr);
-        call = static_cast<InternalFunc>(&TPCallable::TaskCall<T, R>);
+        call = static_cast<InternalFunc>(&TaskCall<T, R>);
+    }
+
+    template<ThreadBlockWorkC T>
+    TPCallable(std::shared_ptr<T> work, uint32_t start, uint32_t end)
+        : workFunc(work)
+        , promise(nullptr)
+        , start(start)
+        , end(end)
+    {
+        assert(work != nullptr);
+        call = static_cast<InternalFunc>(&DetachedBlockTaskCall<T>);
     }
 
     template<ThreadDetachableTaskWorkC T>
@@ -235,7 +264,7 @@ class ThreadPool
     std::pmr::monotonic_buffer_resource     baseAllocator;
     std::pmr::synchronized_pool_resource    poolAllocator;
     //
-    MPMCQueue<TPCallable>                   taskQueue;
+    MPMCQueueAtomic<TPCallable>             taskQueue;
     //
     std::vector<std::jthread>               threads;
     std::atomic_uint64_t                    issuedTaskCount;
@@ -269,8 +298,6 @@ class ThreadPool
     void            Wait();
     void            ClearTasks();
 
-
-
     //
     template<ThreadBlockWorkC WorkFunc>
     MultiFuture<void>
@@ -280,6 +307,10 @@ class ThreadPool
     template<ThreadTaskWorkC WorkFunc>
     std::future<std::invoke_result_t<WorkFunc>>
     SubmitTask(WorkFunc&&);
+
+    template<ThreadBlockWorkC WorkFunc>
+    void SubmitDetachedBlocks(uint32_t totalWorkSize, WorkFunc&&,
+                              uint32_t partitionCount = 0);
 
     template<ThreadDetachableTaskWorkC WorkFunc>
     void SubmitDetachedTask(WorkFunc&&);
@@ -411,6 +442,50 @@ ThreadPool::SubmitTask(WorkFunc&& wf)
 
     taskQueue.Enqueue(TPCallable(sharedWork, promise));
     return future;
+}
+
+template<ThreadBlockWorkC WorkFunc>
+void ThreadPool::SubmitDetachedBlocks(uint32_t totalWorkSize, WorkFunc&& wf,
+                                      uint32_t partitionCount)
+{
+    if(totalWorkSize == 0) return;
+
+    // Determine partition size etc..
+    if(partitionCount == 0)
+        partitionCount = static_cast<uint32_t>(threads.size());
+    partitionCount = std::min(totalWorkSize, partitionCount);
+    uint32_t sizePerPartition = totalWorkSize / partitionCount;
+    uint32_t residual = totalWorkSize - sizePerPartition * partitionCount;
+    issuedTaskCount.fetch_add(partitionCount);
+
+    // Store the work functor somewhere safe.
+    // Work functor will be copied once to a shared_ptr,
+    // used multiple times, then gets deleted automatically
+    // TODO: Clang has a bug in which it does not generate
+    // code for some functions.
+    // https://github.com/llvm/llvm-project/issues/57561
+    // Wrapping it to std function fixes the issue
+    // (Although defeats the entire purpose of the new system...)
+    //using WFType = std::remove_cvref_t<WorkFunc>;
+    using WFType = std::function<void(uint32_t, uint32_t)>;
+    auto sharedWork = std::allocate_shared<WFType>(std::pmr::polymorphic_allocator<WFType>(&poolAllocator),
+                                                   std::forward<WorkFunc>(wf));
+    // Enqueue the type erased works to the queue
+    uint32_t startOffset = 0;
+    for(uint32_t i = 0; i < partitionCount; i++)
+    {
+        uint32_t start = startOffset;
+        uint32_t end = start + sizePerPartition;
+        if(residual > 0)
+        {
+            end++;
+            residual--;
+        }
+        startOffset = end;
+        taskQueue.Enqueue(TPCallable(sharedWork, start, end));
+    }
+    assert(residual == 0);
+    assert(startOffset == totalWorkSize);
 }
 
 template<ThreadDetachableTaskWorkC WorkFunc>

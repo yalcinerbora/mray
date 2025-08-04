@@ -5,12 +5,6 @@
 #include "Core/TimelineSemaphore.h"
 #include "Core/ThreadPool.h"
 
-
-#include "Core/BitFunctions.h"
-#include "Core/ColorFunctions.h"
-#include "Core/GraphicsFunctions.h"
-#include <atomic>
-
 #ifdef MRAY_WINDOWS
     #include <Windows.h>
     #define CPUId __cpuidex
@@ -184,12 +178,16 @@ GPUSystemCPU::GPUSystemCPU()
     , cpuDomain(nullptr)
 {
     uint32_t queueSize = Math::NextPowerOfTwo(std::thread::hardware_concurrency() * 128);
-    localTP = std::make_unique<ThreadPool>(std::thread::hardware_concurrency(),
-                                           [](SystemThreadHandle handle, uint32_t id)
-    {
-        RenameThread(handle, MRAY_FORMAT("{:03d}_[G]MRay", id));
-        ThreadInitFunction();
-    }, queueSize);
+    localTP = std::make_unique<ThreadPool>
+    (
+        std::thread::hardware_concurrency(),
+        [](SystemThreadHandle handle, uint32_t id)
+        {
+            RenameThread(handle, MRAY_FORMAT("{:03d}_[G]MRay", id));
+            ThreadInitFunction();
+        },
+        queueSize
+    );
     // TODO: Check NUMA stuff:
     //  - Put a flag, to auto combine or split
     //    NUMA nodes as separate "Device"

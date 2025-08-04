@@ -1,8 +1,8 @@
 #pragma once
 
 #include "AcceleratorC.h"
-#include "OptiXPTX.h"
-#include "AcceleratorWork.h"
+#include "OptiXPTX.h"           // IWYU pragma: keep
+#include "AcceleratorWork.h"    // IWYU pragma: keep
 
 #include <optix_host.h>
 #include <optix_stubs.h>

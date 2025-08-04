@@ -16,7 +16,7 @@ class ThreadLoop
     using ThreadInitFunction = typename ThreadPool::ThreadInitFunction;
 
     private:
-    MPMCQueue<TPCallable>&  taskQueue;
+    MPMCQueueAtomic<TPCallable>&  taskQueue;
     // For waiting
     std::atomic_uint64_t&   completedTaskCount;
     //
@@ -24,7 +24,7 @@ class ThreadLoop
     uint32_t                threadNumber;
 
     public:
-    ThreadLoop(MPMCQueue<TPCallable>& taskQueue,
+    ThreadLoop(MPMCQueueAtomic<TPCallable>& taskQueue,
                std::atomic_uint64_t& completedTaskCount,
                ThreadInitFunction initFunction, uint32_t threadNumber);
 
@@ -52,7 +52,7 @@ class ThreadLoop
     }
 };
 
-ThreadLoop::ThreadLoop(MPMCQueue<TPCallable>& taskQueue,
+ThreadLoop::ThreadLoop(MPMCQueueAtomic<TPCallable>& taskQueue,
                        std::atomic_uint64_t& completedTaskCount,
                        ThreadInitFunction initFunction,
                        uint32_t threadNumber)

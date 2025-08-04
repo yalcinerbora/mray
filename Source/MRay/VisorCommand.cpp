@@ -99,7 +99,7 @@ namespace MRayCLI::VisorNames
 };
 
 VisorCommand::VisorCommand()
-    : threadCount(std::max(1u, std::thread::hardware_concurrency()))
+    : threadCount(std::max(1u, std::thread::hardware_concurrency() - 1))
 {}
 
 MRayError VisorCommand::Invoke()

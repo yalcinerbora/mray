@@ -1,7 +1,7 @@
 #pragma once
 
 #include "GPUSystemCUDA.h"
-#include "../GPUSystem.h"
+#include "../GPUSystem.h" // IWYU pragma: keep
 
 namespace CudaKernelCalls
 {
