@@ -326,7 +326,7 @@ using AccelGroupGenMap = Map<std::string_view, AccelGroupGenerator>;
 MR_PF_DECL
 uint32_t FindPrimBatchIndex(const PrimRangeArray& primRanges, PrimitiveKey k) noexcept
 {
-    constexpr uint32_t N = static_cast<uint32_t>(std::tuple_size_v<LightOrMatKeyArray>);
+    constexpr uint32_t N = static_cast<uint32_t>(LightOrMatKeyArray().size());
 
     // Linear search over the index
     // List has few elements so linear search should suffice
@@ -954,10 +954,10 @@ void AcceleratorGroupT<C, PG, B>::WriteInstanceKeysAndAABBsInternal(Span<AABB3> 
         Span<AABB3> dConcreteAABBs;
         Span<uint32_t> dConcreteLeafOffsets;
         Span<Byte> dTransformSegReduceTM;
-        MemAlloc::AllocateMultiData(std::tie(dConcreteIndicesOfInstances,
-                                             dConcreteAABBs,
-                                             dConcreteLeafOffsets,
-                                             dTransformSegReduceTM),
+        MemAlloc::AllocateMultiData(Tie(dConcreteIndicesOfInstances,
+                                        dConcreteAABBs,
+                                        dConcreteLeafOffsets,
+                                        dTransformSegReduceTM),
                                     tempMem,
                                     {totalInstanceCount, concreteAccelCount,
                                      concreteAccelCount + 1,

@@ -114,11 +114,11 @@ AABB3 BaseAcceleratorEmbree::InternalConstruct(const std::vector<size_t>& instan
     );
     size_t totalRecordCount = groupHitRecordOffsets.back();
 
-    MemAlloc::AllocateMultiData(std::tie(hInstanceBatchStartOffsets,
-                                         hInstanceHRStartOffsets,
-                                         hAllHitRecordPtrs,
-                                         hGlobalInstanceInvTransforms,
-                                         hGlobalSceneHandles),
+    MemAlloc::AllocateMultiData(Tie(hInstanceBatchStartOffsets,
+                                    hInstanceHRStartOffsets,
+                                    hAllHitRecordPtrs,
+                                    hGlobalInstanceInvTransforms,
+                                    hGlobalSceneHandles),
                                 allMem,
                                 {instanceOffsets.size(), totalInstanceCount + 1,
                                 totalRecordCount, totalInstanceCount,

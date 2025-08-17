@@ -111,12 +111,12 @@ Vector4 FilterPixel(const Vector2ui& pixelCoord,
 }
 
 MR_GF_DECL
-std::tuple<Vector3, Float> ConvertNaNsToColor(Spectrum value, Float weight)
+Tuple<Vector3, Float> ConvertNaNsToColor(Spectrum value, Float weight)
 {
     if(!Math::IsFinite(value))
-        return std::tuple(BIG_MAGENTA(), weight * Float(128.0));
+        return Tuple(BIG_MAGENTA(), weight * Float(128.0));
     else
-        return std::tuple(Vector3(value), weight);
+        return Tuple(Vector3(value), weight);
 }
 
 // TODO: Should we dedicate a warp per pixel?
@@ -1017,7 +1017,7 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
     DeviceLocalMemory mem(gpuSystem.BestDevice());
     Span<MipArray<SurfViewVariant>> dSufViews;
     Span<MipGenParams> dMipGenParams;
-    MemAlloc::AllocateMultiData(std::tie(dSufViews, dMipGenParams),
+    MemAlloc::AllocateMultiData(Tie(dSufViews, dMipGenParams),
                                 mem, {textures.size(), textures.size()});
 
     // Copy references
@@ -1119,13 +1119,13 @@ void ClampImageFromBufferGeneric(// Output
     static constexpr uint32_t THREAD_PER_BLOCK = TILE_SIZE.Multiply();
     uint32_t blockCount = DivideUp(surfImageDims, TILE_SIZE).Multiply();
 
-    SurfViewVariant surfRef = std::visit([](auto&& v) -> SurfViewVariant
+    SurfViewVariant surfRef = DeviceVisit(surf, [](auto&& v) -> SurfViewVariant
     {
         using T = std::remove_cvref_t<decltype(v)>;
         if constexpr(std::is_same_v<T, std::monostate>)
             return std::monostate{};
         else return v.View();
-    }, surf);
+    });
 
     using namespace std::string_view_literals;
     queue.IssueBlockKernel<KCClampImage<THREAD_PER_BLOCK, Filter>>

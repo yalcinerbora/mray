@@ -110,7 +110,7 @@ option(MRAY_DISABLE_DEVICE_BACKEND "Disable GPU backend" OFF)
 set(MRAY_HOST_BACKEND_IPO_MODE FALSE)
 
 option(MRAY_ENABLE_HW_ACCELERATION "Try to find, compile and and use HW acceleration (i.e. this means OptiX for CUDA)" OFF)
-option(MRAY_BUILD_TESTS "Build Tests" ON)
+option(MRAY_BUILD_TESTS "Build Tests" OFF)
 option(MRAY_BUILD_VISOR "Build Visor (Interactive Vulkan Viewer)" ON)
 option(MRAY_EXPORT_COMPILE_COMMANDS "Export compile commands for IWYU" ON)
 option(MRAY_ENABLE_PCH "Enable precompiled headers functionality" OFF)

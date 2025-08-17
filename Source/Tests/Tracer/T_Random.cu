@@ -56,9 +56,9 @@ TEST(Hash, Constexpr)
     //GPUSystem s;
     //DeviceLocalMemory memo(s.BestDevice());
 
-    //MemAlloc::AllocateMultiData(std::tie(dOutputs,
-    //                                     dInput2A, dInput2B,
-    //                                     dInput2C, dInput2D),
+    //MemAlloc::AllocateMultiData(Tie(dOutputs,
+    //                                dInput2A, dInput2B,
+    //                                dInput2C, dInput2D),
     //                            memo,
     //                            {TOTAL_THREADS, TOTAL_THREADS,
     //                             TOTAL_THREADS, TOTAL_THREADS,

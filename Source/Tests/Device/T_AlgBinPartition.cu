@@ -31,7 +31,7 @@ void BinPartitionTest(const GPUSystem& system)
     Span<Value> dOutputs;
     Span<uint32_t> dOffset;
     Span<Byte> dTempMemory;
-    MemAlloc::AllocateMultiData(std::tie(dInputs, dOutputs, dTempMemory, dOffset),
+    MemAlloc::AllocateMultiData(Tie(dInputs, dOutputs, dTempMemory, dOffset),
                                 mem, {ElementCount, ElementCount, tempMemSize, 1});
 
     std::vector<Value> hInputs(ElementCount, Value(0));

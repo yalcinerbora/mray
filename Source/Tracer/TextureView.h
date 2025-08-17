@@ -43,7 +43,7 @@ enum class TextureReadMode : uint8_t
 };
 
 template<uint32_t DIM>
-using HWTextureView = Variant
+using HWTextureView = std::variant
 <
     TextureView<DIM, Float>,
     TextureView<DIM, Vector2>,
@@ -204,7 +204,7 @@ TracerTexView<3, T>::TracerTexView(HWTextureView<3> hw,
 }
 
 // Texture Related types
-using GenericTextureView = Variant
+using GenericTextureView = std::variant
 <
     TracerTexView<2, Float>,
     TracerTexView<2, Vector2>,

@@ -390,7 +390,7 @@ TextureReadMode DetermineReadMode(MRayPixelTypeRT pixelType,
 
 bool FindNormIntegers(MRayPixelTypeRT pixelType)
 {
-    return std::visit([](auto&& v) -> bool
+    return pixelType.SwitchCase([](auto&& v) -> bool
     {
         using VisitedType = std::remove_cvref_t<decltype(v)>;
         constexpr auto Enum = VisitedType::Name;
@@ -405,7 +405,7 @@ bool FindNormIntegers(MRayPixelTypeRT pixelType)
             return std::is_integral_v<typename PixType::InnerType>;
         else
             return std::is_integral_v<PixType>;
-    }, pixelType);
+    });
 }
 
 void TextureMemory::ConvertColorspaces()
@@ -577,7 +577,7 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
     p.eResolve = inputParams.edgeResolve;
     p.interp = inputParams.interpolation;
     p.normIntegers = FindNormIntegers(inputParams.pixelType);
-    TextureId texId = std::visit([&](auto&& v) -> TextureId
+    TextureId texId = inputParams.pixelType.SwitchCase([&](auto&& v) -> TextureId
     {
         using enum MRayPixelEnum;
         using ArgType = std::remove_cvref_t<decltype(v)>;
@@ -599,7 +599,7 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
             return id;
         }
         else throw MRayError("3D Block compressed textures are not supported!");
-    }, inputParams.pixelType);
+    });
 
     return texId;
 }

@@ -9,10 +9,10 @@
 //
 // Piggybacking variant here for most of the construction stuff
 template<class T>
-struct Expected : protected Variant<T, MRayError>
+struct Expected : protected std::variant<T, MRayError>
 {
     private:
-    using Base = Variant<T, MRayError>;
+    using Base = std::variant<T, MRayError>;
 
     public:
     using Base::Base;

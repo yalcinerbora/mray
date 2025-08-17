@@ -667,7 +667,7 @@ void TonemapStage::ChangeImage(const VulkanImage* hdrImageIn,
         stagingBuffer = VulkanBuffer(*handlesVk, usage, stagingBufferSize);
 
         auto deviceAllocator = VulkanDeviceAllocator::Instance();
-        stagingMemory = deviceAllocator.AllocateMultiObject(std::tie(stagingBuffer),
+        stagingMemory = deviceAllocator.AllocateMultiObject(Tie(stagingBuffer),
                                                             VulkanDeviceAllocator::DEVICE);
         for(auto& [_, tm] : tonemappers)
         {

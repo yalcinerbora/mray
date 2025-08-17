@@ -1,73 +1,72 @@
 #include "MRayDataType.h"
 
-MRayDataEnum MRayDataTypeRT::Name() const
-{
-    return std::visit([](auto&& d) -> MRayDataEnum
-    {
-        return std::remove_cvref_t<decltype(d)>::Name;
-    }, *this);
-}
-
 size_t MRayDataTypeRT::Size() const
 {
-    return std::visit([](auto&& d) -> size_t
+    return SwitchCase([](auto&& d) -> bool
     {
         return std::remove_cvref_t<decltype(d)>::Size;
-    }, *this);
+    });
 }
 
 size_t MRayDataTypeRT::Alignment() const
 {
-    return std::visit([](auto&& d) -> size_t
+    return SwitchCase([](auto&& d) -> bool
     {
         return std::remove_cvref_t<decltype(d)>::Alignment;
-    }, *this);
-}
-
-MRayPixelEnum MRayPixelTypeRT::Name() const
-{
-    return std::visit([](auto&& d) -> MRayPixelEnum
-    {
-        return std::remove_cvref_t<decltype(d)>::Name;
-    }, *this);
+    });
 }
 
 size_t MRayPixelTypeRT::ChannelCount() const
 {
-    return std::visit([](auto&& d) -> size_t
+    size_t result;
+    SwitchCase([&result](auto&& d) -> bool
     {
-        return std::remove_cvref_t<decltype(d)>::ChannelCount;
-    }, *this);
+        result = std::remove_cvref_t<decltype(d)>::ChannelCount;
+        return true;
+    });
+    return result;
 }
 
 bool MRayPixelTypeRT::IsBlockCompressed() const
 {
-    return std::visit([](auto&& d) -> bool
+    bool result;
+    SwitchCase([&result](auto&& d) -> bool
     {
-        return std::remove_cvref_t<decltype(d)>::IsBCPixel;
-    }, *this);
+        result = std::remove_cvref_t<decltype(d)>::IsBCPixel;
+        return true;
+    });
+    return result;
 }
 
 bool MRayPixelTypeRT::IsSigned() const
 {
-    return std::visit([](auto&& d) -> bool
+    bool result;
+    SwitchCase([&result](auto&& d) -> bool
     {
-        return std::remove_cvref_t<decltype(d)>::IsSigned;
-    }, *this);
+        result = std::remove_cvref_t<decltype(d)>::IsSigned;
+        return true;
+    });
+    return result;
 }
 
 size_t MRayPixelTypeRT::PixelSize() const
 {
-    return std::visit([](auto&& d) -> size_t
+    size_t result;
+    SwitchCase([&result](auto&& d) -> bool
     {
-        return std::remove_cvref_t<decltype(d)>::PixelSize;
-    }, *this);
+        result = std::remove_cvref_t<decltype(d)>::PixelSize;
+        return true;
+    });
+    return result;
 }
 
 size_t MRayPixelTypeRT::PaddedPixelSize() const
 {
-    return std::visit([](auto&& d) -> size_t
+    size_t result;
+    SwitchCase([&result](auto&& d) -> bool
     {
-        return std::remove_cvref_t<decltype(d)>::PaddedPixelSize;
-    }, *this);
+        result = std::remove_cvref_t<decltype(d)>::PaddedPixelSize;
+        return true;
+    });
+    return result;
 }

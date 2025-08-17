@@ -24,9 +24,9 @@ void RadixSortTest(const GPUSystem& system)
     Span<Key> dKeys[2];
     Span<Value> dValues[2];
     Span<Byte> dTempMemory;
-    MemAlloc::AllocateMultiData(std::tie(dKeys[0], dKeys[1],
-                                         dValues[0], dValues[1],
-                                         dTempMemory),
+    MemAlloc::AllocateMultiData(Tie(dKeys[0], dKeys[1],
+                                    dValues[0], dValues[1],
+                                    dTempMemory),
                                 mem,
                                 {ElementCount, ElementCount,
                                  ElementCount, ElementCount,
@@ -89,9 +89,9 @@ void SegmentedRadixSortTest(const GPUSystem& system)
     Span<Value> dValues[2];
     Span<Byte> dTempMemory;
     Span<uint32_t> dSegmentRanges;
-    MemAlloc::AllocateMultiData(std::tie(dKeys[0], dKeys[1],
-                                         dValues[0], dValues[1],
-                                         dSegmentRanges, dTempMemory),
+    MemAlloc::AllocateMultiData(Tie(dKeys[0], dKeys[1],
+                                    dValues[0], dValues[1],
+                                    dSegmentRanges, dTempMemory),
                                 mem,
                                 {ElementCount, ElementCount,
                                  ElementCount, ElementCount,

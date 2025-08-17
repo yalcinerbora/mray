@@ -17,7 +17,7 @@ TransformGroupSingle::TransformGroupSingle(uint32_t groupId,
 
 void TransformGroupSingle::CommitReservations()
 {
-    GenericCommit( std::tie(dTransforms, dInvTransforms),{0, 0});
+    GenericCommit( Tie(dTransforms, dInvTransforms),{0, 0});
 
     soa.transforms = ToConstSpan(dTransforms);
     soa.invTransforms = ToConstSpan(dInvTransforms);
@@ -30,7 +30,7 @@ TransAttributeInfoList TransformGroupSingle::AttributeInfo() const
     using enum AttributeIsArray;
     static const TransAttributeInfoList LogicList =
     {
-        TransAttributeInfo("Transform", MRayDataType<MR_MATRIX_4x4>(), IS_SCALAR, MR_MANDATORY)
+        TransAttributeInfo("Transform", MRayDataTypeRT(MR_MATRIX_4x4), IS_SCALAR, MR_MANDATORY)
     };
     return LogicList;
 }
@@ -98,8 +98,8 @@ TransformGroupMulti::TransformGroupMulti(uint32_t groupId,
 void TransformGroupMulti::CommitReservations()
 {
 
-    GenericCommit(std::tie(dTransforms, dInvTransforms,
-                           dTransformSpan, dInvTransformSpan),
+    GenericCommit(Tie(dTransforms, dInvTransforms,
+                      dTransformSpan, dInvTransformSpan),
                   {0, 1, -1, -1});
 
     // TODO: Improve this?
@@ -107,7 +107,7 @@ void TransformGroupMulti::CommitReservations()
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     DeviceLocalMemory tempMemory(gpuSystem.BestDevice());
     Span<Vector<2, size_t>> dFlattenedRanges;
-    MemAlloc::AllocateMultiData(std::tie(dFlattenedRanges),
+    MemAlloc::AllocateMultiData(Tie(dFlattenedRanges),
                                 tempMemory, {itemRanges.size()});
 
     std::vector<Vector<2, size_t>> hFlattenedRanges;
@@ -152,7 +152,7 @@ TransAttributeInfoList TransformGroupMulti::AttributeInfo() const
     using enum AttributeIsArray;
     static const TransAttributeInfoList LogicList =
     {
-        TransAttributeInfo("Transform", MRayDataType<MR_MATRIX_4x4>(), IS_ARRAY, MR_MANDATORY)
+        TransAttributeInfo("Transform", MRayDataTypeRT(MR_MATRIX_4x4), IS_ARRAY, MR_MANDATORY)
     };
     return LogicList;
 }

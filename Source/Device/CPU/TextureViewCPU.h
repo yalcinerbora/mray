@@ -305,7 +305,7 @@ T TextureViewCPU<D, T>::ReadPixel(TextureExtent<D> ijk,
                                         ijk[1] * mipSize[0] +
                                         ijk[0]);
 
-    T pixResult = std::visit([&](auto&& pt) -> T
+    T pixResult = dt.SwitchCase([&](auto&& pt) -> T
     {
         using EnumT = std::remove_cvref_t<decltype(pt)>;
         static constexpr uint32_t OutC = VectorTypeToChannels<T>();
@@ -325,7 +325,7 @@ T TextureViewCPU<D, T>::ReadPixel(TextureExtent<D> ijk,
             pixels += mipPixelStartOffset;
             return Convert<OutC, IsSigned, PixelType>(pixels[linearIndex]);
         }
-    }, dt);
+    });
     return pixResult;
 }
 

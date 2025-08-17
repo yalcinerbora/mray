@@ -169,18 +169,17 @@ MRayError TracerThread::CreateRendererFromConfig(const std::string& configJsonPa
         uint32_t attribIndex = 0;
         for(const auto& attrib : attributes)
         {
-            using enum GenericAttributeInfo::E;
             using enum AttributeIsArray;
-            if(std::get<IS_ARRAY_INDEX>(attrib) == IS_ARRAY)
+            if(attrib.isArray == IS_ARRAY)
                 return MRayError("Config read \"{}\": Array renderer attributes "
                                  "are not supported yet",
                                  configJsonPath);
 
-            AttributeOptionality optionality = std::get<OPTIONALITY_INDEX>(attrib);
-            std::string_view name = std::get<LOGIC_INDEX>(attrib);
-            MRayDataTypeRT type = std::get<LAYOUT_INDEX>(attrib);
+            AttributeOptionality optionality = attrib.isOptional;
+            std::string_view name = attrib.name;
+            MRayDataTypeRT type = attrib.dataType;
 
-            MRayError e = std::visit([&, this](auto&& t) -> MRayError
+            MRayError e = type.SwitchCase([&, this](auto&& t) -> MRayError
             {
                 using enum AttributeOptionality;
                 using MRDataType = std::remove_cvref_t<decltype(t)>;
@@ -210,7 +209,7 @@ MRayError TracerThread::CreateRendererFromConfig(const std::string& configJsonPa
                                                   std::move(data));
                 }
                 return MRayError::OK;
-            }, type);
+            });
 
             if(e) return e;
             attribIndex++;
@@ -927,10 +926,10 @@ void TracerThread::DisplayTypeAttributes(std::string_view typeName)
         MRAY_LOG("--------------------------------------------------------");
         for(const auto& a : attribInfo)
         {
-            std::string logic = std::get<GenericAttributeInfo::LOGIC_INDEX>(a);
-            MRayDataTypeRT layout = std::get<GenericAttributeInfo::LAYOUT_INDEX>(a);
-            AttributeIsArray isArray = std::get<GenericAttributeInfo::IS_ARRAY_INDEX>(a);
-            AttributeOptionality isOptional = std::get<GenericAttributeInfo::OPTIONALITY_INDEX>(a);
+            std::string logic = a.name;
+            MRayDataTypeRT layout = a.dataType;
+            AttributeIsArray isArray = a.isArray;
+            AttributeOptionality isOptional = a.isOptional;
 
             MRAY_LOG("{:<16} | {:<16} | {:<6s} | {:<9s}",
                      logic,
@@ -948,10 +947,10 @@ void TracerThread::DisplayTypeAttributes(std::string_view typeName)
         MRAY_LOG("--------------------------------------------------------");
         for(const auto& a : attribInfo)
         {
-            PrimitiveAttributeLogic logic = std::get<GenericAttributeInfo::LOGIC_INDEX>(a);
-            MRayDataTypeRT layout = std::get<GenericAttributeInfo::LAYOUT_INDEX>(a);
-            AttributeIsArray isArray = std::get<GenericAttributeInfo::IS_ARRAY_INDEX>(a);
-            AttributeOptionality isOptional = std::get<GenericAttributeInfo::OPTIONALITY_INDEX>(a);
+            PrimitiveAttributeLogic logic = a.logic;
+            MRayDataTypeRT layout = a.dataType;
+            AttributeIsArray isArray = a.isArray;
+            AttributeOptionality isOptional = a.isOptional;
 
             MRAY_LOG("{:<16} | {:<16} | {:<6s} | {:<9s}",
                      PrimAttributeStringifier::ToString(logic),
@@ -970,12 +969,12 @@ void TracerThread::DisplayTypeAttributes(std::string_view typeName)
                  "---------------------------------------");
         for(const auto& a : attribInfo)
         {
-            std::string logic = std::get<TexturedAttributeInfo::LOGIC_INDEX>(a);
-            MRayDataTypeRT layout = std::get<TexturedAttributeInfo::LAYOUT_INDEX>(a);
-            AttributeIsArray isArray = std::get<TexturedAttributeInfo::IS_ARRAY_INDEX>(a);
-            AttributeOptionality isOptional = std::get<TexturedAttributeInfo::OPTIONALITY_INDEX>(a);
-            AttributeTexturable isTexturable = std::get<TexturedAttributeInfo::TEXTURABLE_INDEX>(a);
-            AttributeIsColor isColor = std::get<TexturedAttributeInfo::COLORIMETRY_INDEX>(a);
+            std::string logic = a.name;
+            MRayDataTypeRT layout = a.dataType;
+            AttributeIsArray isArray = a.isArray;
+            AttributeOptionality isOptional = a.isOptional;
+            AttributeTexturable isTexturable = a.isTexturable;
+            AttributeIsColor isColor = a.isColor;
 
             std::string_view texturability;
             switch(isTexturable)

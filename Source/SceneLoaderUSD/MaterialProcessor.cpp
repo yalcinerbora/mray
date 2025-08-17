@@ -452,7 +452,7 @@ MRayUSDTexture MaterialConverter::ReadTextureNode(const pxr::UsdPrim& texNodePri
         .isNormal = isNormal,
         .params = MRayTextureParameters
         {
-            .pixelType = MRayPixelType<MRayPixelEnum::MR_R_HALF>(),
+            .pixelType = MRayPixelTypeRT(MRayPixelEnum::MR_R_HALF),
             .colorSpace = csConverted.first,
             .gamma = csConverted.second,
             .ignoreResClamp = false,

@@ -821,8 +821,8 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
             accumulateFuture.WaitAll();
 
         size_t pixelCount = newRenderBuffer->resolution.Multiply();
-        MemAlloc::AllocateMultiData(std::tie(imageRData, imageGData,
-                                             imageBData, imageSData),
+        MemAlloc::AllocateMultiData(Tie(imageRData, imageGData,
+                                        imageBData, imageSData),
                                     imageMem,
                                     {pixelCount, pixelCount,
                                     pixelCount, pixelCount});
@@ -886,8 +886,7 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
         // Convert to AoS
         Span<Vector3> rgbData;
         MemAlloc::AlignedMemory saveMem;
-        MemAlloc::AllocateMultiData(std::tie(rgbData), saveMem,
-                                    {pixCount});
+        MemAlloc::AllocateMultiData(Tie(rgbData), saveMem, {pixCount});
         for(size_t i = 0; i < pixCount; i++)
         {
             rgbData[i] = Vector3(imageRData[i],
@@ -896,7 +895,7 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
         }
         const Byte* rgbPtr = reinterpret_cast<Byte*>(rgbData.data());
         using enum MRayPixelEnum;
-        auto pixType = MRayPixelTypeRT(MRayPixelType<MR_RGB_FLOAT>{});
+        auto pixType = MRayPixelTypeRT(MR_RGB_FLOAT);
         size_t paddedImageSize = pixType.PixelSize() * pixCount;
         MRayColorSpaceEnum colorSpace = renderBufferInfo.renderColorSpace;
         WriteImageParams imgInfo =

@@ -429,7 +429,7 @@ MRayError FindLightTextures(std::map<pxr::UsdPrim, MRayUSDTexture>& extraTexture
             .params = MRayTextureParameters
             {
                 // Random ass type this will be overriden
-                .pixelType = MRayPixelType<MRayPixelEnum::MR_R_HALF>(),
+                .pixelType = MRayPixelTypeRT(MRayPixelEnum::MR_R_HALF),
                 .colorSpace = MRayColorSpaceEnum::MR_DEFAULT,
                 .gamma = Float(1),
                 // Ignore the resolution clamping

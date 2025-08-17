@@ -320,7 +320,7 @@ void RenderWork<R, PG, MG, TG>::DoWorkInternal(// I-O
     using S = typename M::Surface;
     static constexpr auto WF = R::template WorkFunctions<P, M, S, TC, PG, MG, TG>;
 
-    if constexpr(I >= std::tuple_size_v<decltype(WF)>)
+    if constexpr(I >= WF.TypeCount)
     {
         throw MRayError("[{}]: Runtime call to \"DoWork_{}\" which does not have a kernel "
                         "associated with it!", R::TypeName(), I);
@@ -351,7 +351,7 @@ void RenderWork<R, PG, MG, TG>::DoWorkInternal(// I-O
         uint32_t rayCount = static_cast<uint32_t>(params.in.dRayIndices.size());
         using namespace std::string_literals;
         static const std::string KernelName = std::string(TypeName()) + "-Work"s;
-        static constexpr auto WorkFunc = std::get<I>(WF);
+        static constexpr auto WorkFunc = get<I>(WF);
         static constexpr auto Kernel = KCRenderWork<R, I, PG, MG, TG, WorkFunc>;
         queue.IssueWorkKernel<Kernel>
         (
@@ -417,7 +417,7 @@ void RenderLightWork<R, LG, TG>::DoBoundaryWorkInternal(// I-O
     using L     = typename LG::template Light<TC, typename R::SpectrumConverterContext>;
     static constexpr auto WF = R:: template LightWorkFunctions<L, LG, TG>;
 
-    if constexpr(I >= std::tuple_size_v<decltype(WF)>)
+    if constexpr(I >= WF.TypeCount)
     {
         throw MRayError("[{}]: Runtime call to \"DoBoundaryWork_{}\" which does not have a kernel "
                         "associated with it!", R::TypeName(), I);
@@ -449,7 +449,7 @@ void RenderLightWork<R, LG, TG>::DoBoundaryWorkInternal(// I-O
         uint32_t rayCount = static_cast<uint32_t>(params.in.dRayIndices.size());
         using namespace std::string_literals;
         static const std::string KernelName = std::string(TypeName()) + "-BoundaryWork"s;
-        static constexpr auto WorkFunc = std::get<I>(WF);
+        static constexpr auto WorkFunc = get<I>(WF);
         static constexpr auto Kernel = KCRenderLightWork<R, I, LG, TG, WorkFunc>;
         queue.IssueWorkKernel<Kernel>
         (

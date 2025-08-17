@@ -119,41 +119,25 @@ TEST(DefaultTriangle, TypeCheck)
     PrimAttributeInfoList list = triGroup.AttributeInfo();
 
     using namespace std::literals;
-    EXPECT_EQ(std::get<PrimAttributeInfo::LOGIC_INDEX>(list[0]),
-              PrimitiveAttributeLogic::POSITION);
-    EXPECT_EQ(std::get<PrimAttributeInfo::LAYOUT_INDEX>(list[0]).Name(),
-              MRayDataEnum::MR_VECTOR_3);
-    EXPECT_EQ(std::get<PrimAttributeInfo::OPTIONALITY_INDEX>(list[0]),
-              AttributeOptionality::MR_MANDATORY);
-    EXPECT_EQ(std::get<PrimAttributeInfo::IS_ARRAY_INDEX>(list[0]),
-              AttributeIsArray::IS_SCALAR);
+    EXPECT_EQ(list[0].logic, PrimitiveAttributeLogic::POSITION);
+    EXPECT_EQ(list[0].dataType.Name(), MRayDataEnum::MR_VECTOR_3);
+    EXPECT_EQ(list[0].isOptional, AttributeOptionality::MR_MANDATORY);
+    EXPECT_EQ(list[0].isArray, AttributeIsArray::IS_SCALAR);
 
-    EXPECT_EQ(std::get<PrimAttributeInfo::LOGIC_INDEX>(list[1]),
-              PrimitiveAttributeLogic::NORMAL);
-    EXPECT_EQ(std::get<PrimAttributeInfo::LAYOUT_INDEX>(list[1]).Name(),
-              MRayDataEnum::MR_QUATERNION);
-    EXPECT_EQ(std::get<PrimAttributeInfo::OPTIONALITY_INDEX>(list[1]),
-              AttributeOptionality::MR_MANDATORY);
-    EXPECT_EQ(std::get<PrimAttributeInfo::IS_ARRAY_INDEX>(list[1]),
-              AttributeIsArray::IS_SCALAR);
+    EXPECT_EQ(list[1].logic, PrimitiveAttributeLogic::NORMAL);
+    EXPECT_EQ(list[1].dataType.Name(), MRayDataEnum::MR_QUATERNION);
+    EXPECT_EQ(list[1].isOptional, AttributeOptionality::MR_MANDATORY);
+    EXPECT_EQ(list[1].isArray, AttributeIsArray::IS_SCALAR);
 
-    EXPECT_EQ(std::get<PrimAttributeInfo::LOGIC_INDEX>(list[2]),
-              PrimitiveAttributeLogic::UV0);
-    EXPECT_EQ(std::get<PrimAttributeInfo::LAYOUT_INDEX>(list[2]).Name(),
-              MRayDataEnum::MR_VECTOR_2);
-    EXPECT_EQ(std::get<PrimAttributeInfo::OPTIONALITY_INDEX>(list[2]),
-              AttributeOptionality::MR_MANDATORY);
-    EXPECT_EQ(std::get<PrimAttributeInfo::IS_ARRAY_INDEX>(list[2]),
-              AttributeIsArray::IS_SCALAR);
+    EXPECT_EQ(list[2].logic, PrimitiveAttributeLogic::UV0);
+    EXPECT_EQ(list[2].dataType.Name(), MRayDataEnum::MR_VECTOR_2);
+    EXPECT_EQ(list[2].isOptional, AttributeOptionality::MR_MANDATORY);
+    EXPECT_EQ(list[2].isArray, AttributeIsArray::IS_SCALAR);
 
-    EXPECT_EQ(std::get<PrimAttributeInfo::LOGIC_INDEX>(list[3]),
-              PrimitiveAttributeLogic::INDEX);
-    EXPECT_EQ(std::get<PrimAttributeInfo::LAYOUT_INDEX>(list[3]).Name(),
-              MRayDataEnum::MR_VECTOR_3UI);
-    EXPECT_EQ(std::get<PrimAttributeInfo::OPTIONALITY_INDEX>(list[3]),
-              AttributeOptionality::MR_MANDATORY);
-    EXPECT_EQ(std::get<PrimAttributeInfo::IS_ARRAY_INDEX>(list[3]),
-              AttributeIsArray::IS_SCALAR);
+    EXPECT_EQ(list[3].logic, PrimitiveAttributeLogic::INDEX);
+    EXPECT_EQ(list[3].dataType.Name(), MRayDataEnum::MR_VECTOR_3UI);
+    EXPECT_EQ(list[3].isOptional, AttributeOptionality::MR_MANDATORY);
+    EXPECT_EQ(list[3].isArray, AttributeIsArray::IS_SCALAR);
 }
 
 TEST(DefaultTriangle, Load)
@@ -202,7 +186,7 @@ TEST(DefaultTriangle, Load)
     Span<uint8_t> dIsValid;
     Span<PrimitiveKey> dPrimKeys;
     HostLocalMemory mem(system);
-    MemAlloc::AllocateMultiData(std::tie(dIsValid, dPrimKeys), mem, {1, 1});
+    MemAlloc::AllocateMultiData(Tie(dIsValid, dPrimKeys), mem, {1, 1});
 
     // Eliminate false positives
     queue.MemsetAsync(dIsValid, 0x00);
@@ -289,7 +273,7 @@ TEST(DefaultTriangle, LoadMulti)
     Span<uint8_t> dIsValid;
     Span<PrimitiveKey> dPrimKeys;
     HostLocalMemory mem(system);
-    MemAlloc::AllocateMultiData(std::tie(dIsValid, dPrimKeys), mem,
+    MemAlloc::AllocateMultiData(Tie(dIsValid, dPrimKeys), mem,
                                 {TRI_COUNT, TRI_COUNT});
 
     // Eliminate false positives

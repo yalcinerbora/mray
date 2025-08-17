@@ -17,9 +17,6 @@ using Optional = std::optional<T>;
 template <class T, std::size_t Extent = std::dynamic_extent>
 using Span = std::span<T, Extent>;
 
-template <class... Types>
-using Variant = std::variant<Types...>;
-
 template <class T0, class T1>
 using Pair = std::pair<T0, T1>;
 
@@ -27,52 +24,7 @@ using Pair = std::pair<T0, T1>;
 template <class T>
 using Ref = std::reference_wrapper<T>;
 
-// Simple type package, usefull while metaprograming
-template<class... T>
-struct PackedTypes {};
 
-namespace std
-{
-    // We try to cut tuple instantiations of
-    // GPU kernel generation. But tuple_element
-    // trait is hard to implement efficiently.
-    // We rarely rely on it so we fallback to std
-    // currently
-    template<std::size_t I, class... T>
-    struct tuple_element<I, PackedTypes<T...>>
-    {
-        using type = std::tuple_element_t<I, std::tuple<T...>>;
-    };
-
-    template<class... Args>
-    struct tuple_size<::PackedTypes<Args...>>
-        : std::integral_constant<std::size_t, sizeof...(Args)>
-    {};
-}
-
-
-
-namespace TupleDetail
-{
-    template<class... Args, std::size_t... I>
-    constexpr std::tuple<Args&...> ToTupleRef(std::tuple<Args...>&t,
-                                         std::index_sequence<I...>);
-
-    template<typename Func, class... Args, size_t... Is>
-    constexpr bool InvokeAt(size_t idx, const std::tuple<Args...>& t, Func&& F,
-                            std::index_sequence<Is...>);
-}
-
-template<class... Args, typename Indices = std::index_sequence_for<Args...>>
-constexpr std::tuple<Args&...> ToTupleRef(std::tuple<Args...>& t);
-
-// https://stackoverflow.com/questions/28997271/c11-way-to-index-tuple-at-runtime-without-using-switch
-// From here, recursive expansion of if(i == I) F(std::get<I>(tuple));
-// returning bool here to show out of bounds access (so not function is called)
-// Predicate function must return bool to abuse short circuiting.
-template<class Func, class... Args>
-requires(std::is_same_v<std::invoke_result_t<Func, Args>, bool> && ...)
-constexpr bool InvokeAt(uint32_t index, const std::tuple<Args...>& t, Func&& F);
 
 // Some span wrappers for convenience
 template<class T, std::size_t Extent = std::dynamic_extent>
@@ -93,10 +45,10 @@ template <typename T, typename... Ts>
 struct Unique : std::type_identity<T> {};
 
 template <typename... Ts, typename U, typename... Us>
-struct Unique<Variant<Ts...>, U, Us...>
+struct Unique<std::variant<Ts...>, U, Us...>
     : std::conditional_t<(std::is_same_v<U, Ts> || ...)
-    , Unique<Variant<Ts...>, Us...>
-    , Unique<Variant<Ts..., U>, Us...>> {};
+    , Unique<std::variant<Ts...>, Us...>
+    , Unique<std::variant<Ts..., U>, Us...>> {};
 }
 
 namespace UniqueTupleDetail
@@ -112,7 +64,7 @@ namespace UniqueTupleDetail
 }
 
 template <typename... Ts>
-using UniqueVariant = typename UniqueVariantDetail::Unique<Variant<>, Ts...>::type;
+using UniqueVariant = typename UniqueVariantDetail::Unique<std::variant<>, Ts...>::type;
 
 template <typename... Ts>
 using UniqueTuple = typename UniqueTupleDetail::Unique<std::tuple<>, Ts...>::type;
@@ -158,44 +110,6 @@ struct SoASpan
 // Deduction guide for constructor
 template<class... Spans>
 SoASpan(const Spans&... spans) -> SoASpan<typename Spans::element_type...>;
-
-
-template<class... Args, std::size_t... I>
-constexpr std::tuple<Args&...> TupleDetail::ToTupleRef(std::tuple<Args...>& t,
-                                                       std::index_sequence<I...>)
-{
-    return std::tie(std::get<I>(t)...);
-}
-
-template<typename Func, class... Args, size_t... Is>
-constexpr bool TupleDetail::InvokeAt(size_t idx, const std::tuple<Args...>& t, Func&& F,
-                                     std::index_sequence<Is...>)
-{
-    // Parameter pack expansion (comma separator abuse)
-    bool r = false;
-    (
-        // Abusing short circuit of "&&"
-        static_cast<void>(r |= (Is == idx) && F(std::get<Is>(t))),
-        // And expand
-        ...
-    );
-    return r;
-}
-
-template<class... Args, typename Indices>
-constexpr std::tuple<Args&...> ToTupleRef(std::tuple<Args...>& t)
-{
-    return TupleDetail::ToTupleRef(t, Indices{});
-}
-
-template<class Func, class... Args>
-requires(std::is_same_v<std::invoke_result_t<Func, Args>, bool> && ...)
-constexpr bool InvokeAt(uint32_t index, const std::tuple<Args...>& t, Func&& F)
-{
-    return TupleDetail::InvokeAt(index, t,
-                                 std::forward<Func>(F),
-                                 std::make_index_sequence<sizeof...(Args)>{});
-}
 
 template<class T, std::size_t Extent>
 constexpr Span<const T, Extent> ToConstSpan(Span<T, Extent> s)

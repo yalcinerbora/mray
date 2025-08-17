@@ -17,7 +17,7 @@ Most of the dependencies are handled by the build system itself via CMake extern
 #### Common
 
 - CMake. A recent version of CMake should suffice. Tested with v3.30.0.
-- C++20 compliant C++ compiler. Only tested with latest MSVC and Clang-18.
+- C++20 compliant C++ compiler. Only tested with latest MSVC, Clang-18/19 and gcc-13 (gcc-13 has quite a bit of warnings which are not fixed yet).
 - CUDA Installation. Version 12 and above is recommended.
 - Nvidia OptiX installation (Required for HW accelerated ray tracing, which is strongly recommended)
 - For documentation a python installation with these packages are required:
@@ -30,7 +30,6 @@ Most of the dependencies are handled by the build system itself via CMake extern
  Besides the common packages, building the project in Windows do not require and extra packages. Vulkan-SDK is recommended for validation layer for debugging. We do not auto build/install the entire vulkan sdk but only the headers and libraries.
 
 #### Linux (apt package names)
-- libtbb-dev (required for parallel execution of c++ std library)
 - xorg-dev (for Visor, dependency of glfw)
 - libx11-dev (for Visor, dependency of glfw)
 
@@ -56,9 +55,15 @@ These libraries are automatically managed by the build system (uncommon librarie
     - libtiff
     - libjpeg-turbo
     - libpng
+    - OpenColorIO
+        - expat
+        - minizip_ng
+        - yaml-cpp
+        - pystring
 - OpenUSD [^3]
     - oneTBB
-    - openSubdiv
+- tracy [^4]
+- Embree [^5]
 
 [^1]: Only when Visor is built.
 
@@ -66,41 +71,61 @@ These libraries are automatically managed by the build system (uncommon librarie
 
 [^3]: Only when OpenUSD support is enabled.
 
+[^4]: Only when tracy support is enabled.
+
+[^5]: Only when CPU-backend is built and `MRAY_ENABLE_HW_ACCELERATION` CMake variable is set.
+
 ### CMake Build
 
-Build system is somewhat principled. External projects will be installed into `Ext` folder in the project's root directory. `Lib` directory will contain built packages in a platform/configuration specific manner.
+Build directory structure is somewhat principled. External projects will be installed into `Ext` folder in the project's root directory. `Lib` directory will contain built packages in a platform/configuration specific manner.
 
 We recommend CMake output directory `Bin/CMake` but it should work with any out-of-source build location **inside the project's root directory**. Final binaries and shaders (if applicable) will be written `Bin/{platform_name}/{configuration}`. This is your installation as well. You can directly copy the contents of this folder if you like (You can delete the `.lib` / `.a` files).
 
-Only tested `ninja` and `Visual Studio Solution` platform configurations.
+Only tested `ninja` (on Linux) and `Visual Studio Solution` (on Windows) platform configurations.
+
+> [!Note]
+> While configuring the project, you need to set `CMAKE_C_COMPILER` as well as a `CMAKE_CXX_COMPILER`. Although project does not use any pure C code, this flag will be propagated to the external projects that are written in C (such as libtiff). You may need to set `CMAKE_CUDA_COMPILER` on Linux platforms if nvcc is not in your `PATH`.
 
 #### CMake Flags
 
-These flags are not required to be set and all of which has a default value. `MRAY_ENABLE_HW_ACCELERATION` is highly recommended yo utilize GPU's native ray tracing capabilities.
+These flags are not required to be set and all of which has a default value. Although, `MRAY_ENABLE_HW_ACCELERATION` is highly recommended to utilize GPU's native ray tracing capabilities.
 
-- `CMAKE_CUDA_ACHITECTURES`: Select the CUDA SM level for compilation (default: "native").
+- `CMAKE_CUDA_ACHITECTURES`: Select the CUDA SM level for compilation (default: "native"). Accepted values are: "native", "52", "60", "61", "70", "72", "75", "86", "89", "90", "all" and "all-major".
+
 - `MRAY_BUILD_DOCS`: Generate documentation build command (default: false).
-- `MRAY_BUILD_TESTS`: Generate test projects (default: false).
-- `MRAY_BUILD_VISOR`: Enable Visor project. Visor is real-time image viewer/tone mapper for the renderer (for interactive rendering)
 
-- `MRAY_ENABLE_USD`: Enable OpenUSD support. MRay will try to load the USD scene. (**Experimental**)
+- `MRAY_BUILD_TESTS`: Generate test targets (default: false).
 
-- `MRAY_ENABLE_HW_ACCELERATION`: Enables GPU Hardware acceleration for ray tracing. CMake script look common locations for the required libraries
-(only CUDA/OptiX at the moment).
+- `MRAY_BUILD_VISOR`: Enable Visor project. Visor is real-time image viewer/tone mapper for the renderer which is used for interactive rendering. (default: on)
+
+- `MRAY_ENABLE_TRACY`: Enable tracy profiling support. MRay.exe will accept -p flag for profiling. (default: off)
+
+- `MRAY_ENABLE_USD`: Enable OpenUSD support. MRay will try to load USD scenes. (**Experimental**, default: off)
+
+- `MRAY_ENABLE_HW_ACCELERATION`: Enables GPU Hardware acceleration for ray tracing. CMake script look common locations for the required libraries (only CUDA/OptiX at the moment).
+
     - `OPTIX_INSTALL_DIR`: If script could not find the required library location, you need to manually set this variable (i.e. `C:/ProgramData/NVIDIA Corporation/OptiX SDK 8.1.0`).
 
 - `MRAY_ENABLE_PCH`: Enable precompiled headers. It does not benefit the build much since the main bottleneck is nvcc which do not support precompiled headers (default: false).
 
-- `MRAY_EXPORT_COMPILE_COMMANDS`: Exports compile commands for lsp and include-what-you-use purposes.
+- `MRAY_EXPORT_COMPILE_COMMANDS`: Exports compile commands for lsp (such as clangd) and include-what-you-use purposes (default: on).
 
-- `MRAY_DEVICE_BACKEND`: Select the device backend. Currently only CUDA is supported. Hopefully we will add more backends in future. (default: "MRAY_GPU_BACKEND_CUDA").
+- `MRAY_DEVICE_BACKEND`: Select the device backend. Currently only CUDA is supported. Hopefully we will add more backends in future (default: "MRAY_GPU_BACKEND_CUDA").
+
+- `MRAY_DISABLE_DEVICE_BACKEND`: Disables compilation of the selected device backend. This is useful only when you enable CPU backend (default: off).
+
+- `MRAY_ENABLE_HOST_BACKEND`: Creates a CPU target that emulates GPU via custom thread pool. Since it runs GPU-optimized code, its performance is not competitive.
 
 - `MRAY_HOST_ARCH`: Hint the compiler for the underlying host architecture. Supported values are "MRAY_HOST_ARCH_BASIC", "MRAY_HOST_ARCH_AVX2" "MRAY_HOST_ARCH_AVX512" (default: "MRAY_HOST_ARCH_BASIC").
+
+- `MRAY_SANITIZER_MODE`: Mode of the SanitizeR configuration. Supported values differ depending on the cpp compiler. For MSVC only "address" is supported. For gcc and clang: all supported -fsanitize modes should be available (default: "address").
 
 After configuring the project, you need to first run `MRayExternal` project/target. This target will generate automatically managed libraries/executables. After that building the solution / or "all" target will generate the binaries.
 
 > [!Note]
-> `MRayExternal` target specifically exempt from the "all" target. It takes considerable amount of time (especially in Windows) just to check if the target is up to date. You need to explicitly build this target first.
+> `MRayExternal` target specifically exempt from the "all" target. It takes considerable amount of time (especially in Windows) just to check if the target is up to date. You need to explicitly build this target first and re-run it when you change the configuration that requires additional dependencies.
+
+Additionally, you need to run `MRayExternal` for both "Release" and "Debug" configurations. There is a 3rd configuration "SanitizeR" which compiles the project with a sanitizer support by checking `MRAY_SANITIZER_MODE` CMake flag. SanitizeR compiled with most of the optimizations and uses Release target's external dependencies.
 
 ## Usage
 
@@ -124,10 +149,10 @@ For example; `Numpad 3` and `Numpad 1` in "SurfaceRenderer" toggle between AO/Fu
  - `Numpad 5` locks/unlocks the movement.
  - `P` pauses the rendering, `O` starts/stops the rendering.
  - `Escape` closes the window
- - `G` saves the image as an SDR Image.
- - `H` saves the image as an HDR Image.
+ - `G` saves the current image as an SDR Image.
+ - `H` saves the current image as an HDR Image.
 
-If you generate image without the GUI run:
+If you want to generate an image without the GUI run:
 
 > `/path/to/MRay.exe run -r 1920x1080 -s Scenes/CrySponza/crySponza.json  --tConf tracerConfig.json --rConf renderConfig.json`
 
@@ -137,10 +162,11 @@ If you generate image without the GUI run:
 > Documentation is not yet available! (TODO!)
 
 ## Future Work
- - Implement a "host" renderer (CPU).
- - Implement "device" abstraction layers for Intel and AMD gpus (via HIP and SYCL respectively). Functionality is abstracted away, so this should be relatively straightforward.
+ - ~~Implement a "host" renderer (CPU).~~
+ - Implement "device" abstraction layers for Intel and AMD gpus (via SYCL and HIP respectively). Functionality is abstracted away, so this should be relatively straightforward given these APIs have all the functionality of CUDA that we use.
  - Add support for volume rendering
  - Add support for spectral rendering (Again abstraction is there but not correct at the moment it requires quite a bit of work).
+ - Out-of-core texturing support (texture streaming).
 
 ## Similar Projects
 

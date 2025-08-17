@@ -54,4 +54,4 @@ class SceneLoaderI
     virtual void                    ClearScene() = 0;
 };
 
-using SceneLoaderConstructorArgs = PackedTypes<ThreadPool&>;
+using SceneLoaderConstructorArgs = TypePack<ThreadPool&>;

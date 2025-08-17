@@ -45,18 +45,18 @@ requires(std::is_same_v<Rows, Vector<N, T>> && ...) && (sizeof...(Rows) == N)
     auto GenSequence = [Write]<unsigned int... I>
     (
         std::integer_sequence<unsigned int, I...>,
-        std::tuple<const Rows&...> tuple
+        Tuple<const Rows&...> tuple
     ) -> void
     {
         // Parameter pack expansion
         (
-            (Write(std::get<I>(tuple), I)),
+            (Write(get<I>(tuple), I)),
             ...
         );
     };
     // Utilize "std::get" via tuple
     GenSequence(std::make_integer_sequence<unsigned int, sizeof...(Rows)>{},
-                std::tuple<const Rows&...>(rows...));
+                Tuple<const Rows&...>(rows...));
 }
 
 template <unsigned int N, ArithmeticC T>

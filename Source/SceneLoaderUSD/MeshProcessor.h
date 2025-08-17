@@ -127,7 +127,7 @@ class IndexLookupTable
             : *loc;
         size_t hashPackSize = Math::DivideUp(allocSize, size_t(4));
 
-        MemAlloc::AllocateMultiData(std::tie(hashes, keys, values),
+        MemAlloc::AllocateMultiData(Tie(hashes, keys, values),
                                     mem,
                                     {hashPackSize, allocSize, allocSize});
         Clear();

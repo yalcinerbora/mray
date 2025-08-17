@@ -67,8 +67,9 @@ void MainUniformBuffer::AllocateUniformBuffers(const std::array<UniformMemoryReq
                                      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
                                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                      totalSize);
-    mainMemory = VulkanDeviceAllocator::Instance().AllocateMultiObject(std::tie(mainUniformBuffer),
-                                                                       VulkanDeviceAllocator::HOST_VISIBLE);
+    using VKAlloc = VulkanDeviceAllocator;
+    mainMemory = VKAlloc::Instance().AllocateMultiObject(Tie(mainUniformBuffer),
+                                                         VulkanDeviceAllocator::HOST_VISIBLE);
     void* hPtr;
     vkMapMemory(handlesVk->deviceVk, mainMemory.Memory(), 0,
                 totalSize, 0, &hPtr);

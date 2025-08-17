@@ -29,7 +29,7 @@ void ReduceTest(const GPUSystem& system)
     Span<Value> dInputs;
     Span<Value> dOutput;
     Span<Byte> dTempMemory;
-    MemAlloc::AllocateMultiData(std::tie(dInputs, dTempMemory, dOutput),
+    MemAlloc::AllocateMultiData(Tie(dInputs, dTempMemory, dOutput),
                                 mem, {ElementCount, tempMemSize, 1});
 
     std::vector<Value> hInputs(ElementCount, Value(0));

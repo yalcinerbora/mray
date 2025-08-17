@@ -174,12 +174,12 @@ inline MRayPixelTypeRT ImageLoaderI::TryExpandTo4CFormat(MRayPixelTypeRT pt)
     using enum MRayPixelEnum;
     switch(pf)
     {
-        case MR_RGB8_UNORM:     return MRayPixelTypeRT(MRayPixelType<MR_RGBA8_UNORM>{});
-        case MR_RGB16_UNORM:    return MRayPixelTypeRT(MRayPixelType<MR_RGBA16_UNORM>{});
-        case MR_RGB8_SNORM:     return MRayPixelTypeRT(MRayPixelType<MR_RGBA8_SNORM>{});
-        case MR_RGB16_SNORM:    return MRayPixelTypeRT(MRayPixelType<MR_RGBA16_SNORM>{});
-        case MR_RGB_HALF:       return MRayPixelTypeRT(MRayPixelType<MR_RGBA_HALF>{});
-        case MR_RGB_FLOAT:      return MRayPixelTypeRT(MRayPixelType<MR_RGBA_FLOAT>{});
+        case MR_RGB8_UNORM:     return MRayPixelTypeRT(MR_RGBA8_UNORM);
+        case MR_RGB16_UNORM:    return MRayPixelTypeRT(MR_RGBA16_UNORM);
+        case MR_RGB8_SNORM:     return MRayPixelTypeRT(MR_RGBA8_SNORM);
+        case MR_RGB16_SNORM:    return MRayPixelTypeRT(MR_RGBA16_SNORM);
+        case MR_RGB_HALF:       return MRayPixelTypeRT(MR_RGBA_HALF);
+        case MR_RGB_FLOAT:      return MRayPixelTypeRT(MR_RGBA_FLOAT);
         default:                return pt;
     }
 }

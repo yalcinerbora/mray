@@ -87,8 +87,8 @@ auto DeviceVisitDetail::IfElseVisitImpl(UIntTConst<O>, VariantT&& v, Func&& f) -
            "add more\"COND_INVOKE\"s");
     if constexpr(VSize > O + STAMP_COUNT)
         return IfElseVisitImpl(UIntTConst<O + STAMP_COUNT>{},
-                                std::forward<VariantT>(v),
-                                std::forward<Func>(f));
+                               std::forward<VariantT>(v),
+                               std::forward<Func>(f));
     MRAY_UNREACHABLE;
 }
 

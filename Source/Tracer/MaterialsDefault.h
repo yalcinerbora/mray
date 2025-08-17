@@ -170,6 +170,14 @@ namespace UnrealMatDetail
         Span<const MediumKeyPair>                       dMediumKeys;
     };
 
+    struct UnrealMatParamPack
+    {
+        Float       roughness;
+        Float       metallic;
+        Float       specular;
+        Spectrum    albedo;
+    };
+
     template <class SpectrumTransformer = SpectrumConverterContextIdentity>
     struct UnrealMaterial
     {
@@ -198,7 +206,7 @@ namespace UnrealMatDetail
         MR_GF_DECL
         Float ConvertProbHToL(Float VdH, Float pdfH) const;
         MR_GF_DECL
-        std::tuple<Float, Float, Float, Spectrum>
+        UnrealMatParamPack
         FetchData(const Surface&) const;
 
         public:

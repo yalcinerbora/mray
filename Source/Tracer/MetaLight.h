@@ -148,8 +148,8 @@ class MetaLightViewT
 };
 
 template<class... TLTuples>
-concept LightTransPairC = ((LightGroupC<std::tuple_element_t<0, TLTuples>> && ...) &&
-                           (TransformGroupC<std::tuple_element_t<1, TLTuples>> && ...));
+concept LightTransPairC = ((LightGroupC<TypePackElement<0, TLTuples>> && ...) &&
+                           (TransformGroupC<TypePackElement<1, TLTuples>> && ...));
 
 template<LightTransPairC... TransformLightTuple>
 class MetaLightArrayT
@@ -159,51 +159,51 @@ class MetaLightArrayT
     // Some sanity checks
     static_assert(MetaLightDetail::AllImplicitLifetime
                   <
-                      MetaLightDetail::PrimType<std::tuple_element_t<0, TransformLightTuple>,
-                                                std::tuple_element_t<1, TransformLightTuple>>
+                      MetaLightDetail::PrimType<TypePackElement<0, TransformLightTuple>,
+                                                TypePackElement<1, TransformLightTuple>>
                       ...
                   >(), "Primitive types are not implicit lifetime!");
     static_assert(MetaLightDetail::AllImplicitLifetime
                   <
-                      MetaLightDetail::TContextType<std::tuple_element_t<0, TransformLightTuple>,
-                                                    std::tuple_element_t<1, TransformLightTuple>>
+                      MetaLightDetail::TContextType<TypePackElement<0, TransformLightTuple>,
+                                                    TypePackElement<1, TransformLightTuple>>
                       ...
                   >(), "Transform context types are not implicit lifetime!");
     static_assert(MetaLightDetail::AllImplicitLifetime
-                  <typename std::tuple_element_t<0, TransformLightTuple>::DataSoA...>(),
+                  <typename TypePackElement<0, TransformLightTuple>::DataSoA...>(),
                   "Light SoA types are not implicit lifetime!");
     static_assert(MetaLightDetail::AllImplicitLifetime
-                  <typename std::tuple_element_t<1, TransformLightTuple>::DataSoA...>(),
+                  <typename TypePackElement<1, TransformLightTuple>::DataSoA...>(),
                   "Transform SoA types are not implicit lifetime!");
     static_assert(MetaLightDetail::AllImplicitLifetime
-                  <typename std::tuple_element_t<0, TransformLightTuple>::PrimGroup::DataSoA...>(),
+                  <typename TypePackElement<0, TransformLightTuple>::PrimGroup::DataSoA...>(),
                   "Prim SoA types are not implicit lifetime!");
     //
     static constexpr Pair<size_t, size_t> PrimVariantSize = MetaLightDetail::MaxSizeAlign
     <
-        MetaLightDetail::PrimType<std::tuple_element_t<0, TransformLightTuple>,
-                                  std::tuple_element_t<1, TransformLightTuple>>
+        MetaLightDetail::PrimType<TypePackElement<0, TransformLightTuple>,
+        TypePackElement<1, TransformLightTuple>>
         ...
     >();
     static constexpr Pair<size_t, size_t> TContextVariantSize = MetaLightDetail::MaxSizeAlign
     <
-        MetaLightDetail::TContextType<std::tuple_element_t<0, TransformLightTuple>,
-                                      std::tuple_element_t<1, TransformLightTuple>>
+        MetaLightDetail::TContextType<TypePackElement<0, TransformLightTuple>,
+                                      TypePackElement<1, TransformLightTuple>>
         ...
     >();
     static constexpr Pair<size_t, size_t> LightSoAVariantSize = MetaLightDetail::MaxSizeAlign
     <
-        typename std::tuple_element_t<0, TransformLightTuple>::DataSoA
+        typename TypePackElement<0, TransformLightTuple>::DataSoA
         ...
     >();
     static constexpr Pair<size_t, size_t> PrimSoAVariantSize = MetaLightDetail::MaxSizeAlign
     <
-        typename std::tuple_element_t<0, TransformLightTuple>::PrimGroup::DataSoA
+        typename TypePackElement<0, TransformLightTuple>::PrimGroup::DataSoA
         ...
     >();
     static constexpr Pair<size_t, size_t> TransSoAVariantSize = MetaLightDetail::MaxSizeAlign
     <
-        typename std::tuple_element_t<1, TransformLightTuple>::DataSoA
+        typename TypePackElement<1, TransformLightTuple>::DataSoA
         ...
     >();
 
@@ -223,21 +223,21 @@ class MetaLightArrayT
 
     private:
     // Actual light variant
-    using LightVariant = Variant
+    using LightVariant = std::variant
     <
         std::monostate,
-        MetaLightDetail::LightType<std::tuple_element_t<0, TransformLightTuple>,
-                                   std::tuple_element_t<1, TransformLightTuple>>
+        MetaLightDetail::LightType<TypePackElement<0, TransformLightTuple>,
+                                   TypePackElement<1, TransformLightTuple>>
         ...
     >;
 
-    using VariantLightSoA = Variant<typename std::tuple_element_t<0, TransformLightTuple>::DataSoA...>;
-    using VariantPrimSoA = UniqueVariant<typename std::tuple_element_t<0, TransformLightTuple>::PrimGroup::DataSoA...>;
-    using VariantTransformSoA = UniqueVariant<typename std::tuple_element_t<1, TransformLightTuple>::DataSoA...>;
+    using VariantLightSoA = std::variant<typename TypePackElement<0, TransformLightTuple>::DataSoA...>;
+    using VariantPrimSoA = UniqueVariant<typename TypePackElement<0, TransformLightTuple>::PrimGroup::DataSoA...>;
+    using VariantTransformSoA = UniqueVariant<typename TypePackElement<1, TransformLightTuple>::DataSoA...>;
     //
     using IdentitySConverter = typename SpectrumConverterContextIdentity::Converter;
     //
-    using TLGroupPtrTuple = std::tuple<TransformLightTuple*...>;
+    using TLGroupPtrTuple = Tuple<TransformLightTuple*...>;
     // We will memcpy the SoA's these must be implicit lifetime types.
     // And we pray that std::variant implementation does not break between CPU/GPU.
     static_assert(ImplicitLifetimeC<VariantLightSoA>);
@@ -249,15 +249,15 @@ class MetaLightArrayT
     using MetaLight = LightVariant;
     static constexpr uint32_t SampleSolidAngleRNCountWorst = MetaLightDetail::SampleSolidAngleRNCountWorstCase
     <
-        MetaLightDetail::LightType<std::tuple_element_t<0, TransformLightTuple>,
-                                   std::tuple_element_t<1, TransformLightTuple>>
+        MetaLightDetail::LightType<TypePackElement<0, TransformLightTuple>,
+                                   TypePackElement<1, TransformLightTuple>>
         ...
     >();
 
     static constexpr uint32_t SampleRayRNCountWorst = MetaLightDetail::SampleRayRNCountWorstCase
     <
-        MetaLightDetail::LightType<std::tuple_element_t<0, TransformLightTuple>,
-                                   std::tuple_element_t<1, TransformLightTuple>>
+        MetaLightDetail::LightType<TypePackElement<0, TransformLightTuple>,
+                                   TypePackElement<1, TransformLightTuple>>
         ...
     >();
 

@@ -53,7 +53,7 @@ struct SurfaceStruct
     public:
     static constexpr size_t MATERIAL_INDEX = 0;
     static constexpr size_t PRIM_INDEX = 1;
-    using IdPair        = std::tuple<uint32_t, uint32_t>;
+    using IdPair        = Tuple<uint32_t, uint32_t>;
     using IdPairList    = std::array<IdPair, PPS>;
     using TextureList   = std::array<Optional<SceneTexId>, PPS>;
     using CullList      = std::array<bool, PPS>;
@@ -137,9 +137,9 @@ class JsonNode
     Optional<TransientData> AccessOptionalDataArray(std::string_view name) const;
     // Texturable (either data T, or texture struct)
     template<class T>
-    Variant<SceneTexId, T>   AccessTexturableData(std::string_view name) const;
-    SceneTexId               AccessTexture(std::string_view name) const;
-    Optional<SceneTexId>     AccessOptionalTexture(std::string_view name) const;
+    std::variant<SceneTexId, T> AccessTexturableData(std::string_view name) const;
+    SceneTexId                  AccessTexture(std::string_view name) const;
+    Optional<SceneTexId>        AccessOptionalTexture(std::string_view name) const;
 };
 
 #include "JsonNode.hpp"

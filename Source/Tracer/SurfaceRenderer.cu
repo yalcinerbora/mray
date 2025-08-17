@@ -1,10 +1,12 @@
-#include "Core/Types.h"
+
 #include "SurfaceRenderer.h"
 
 #include "Core/Timer.h"
+#include "Core/Tuple.h"
 
 #include "Device/GPUSystem.hpp"
 #include "Device/GPUAlgGeneric.h"
+#include "Device/GPUAlgBinaryPartition.h"
 
 struct IsValidRayFunctor
 {
@@ -280,7 +282,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     auto packLoc = std::find_if(currentCameraWorks.cbegin(), currentCameraWorks.cend(),
     [camGroupId, transGroupId](const auto& pack)
     {
-        return pack.idPack == std::pair(camGroupId, transGroupId);
+        return (pack.cgId == camGroupId && pack.tgId == transGroupId);
     });
     curCamWork = &packLoc->workPtr;
 
@@ -293,16 +295,16 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     if(currentOptions.mode == SurfRDetail::Mode::AO)
     {
         uint32_t isVisibleIntCount = Bitspan<uint32_t>::CountT(maxRayCount);
-        MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys,
-                                             dRays, dRayCones,
-                                             dRayStateAO.dVisibilityRays,
-                                             dRayStateAO.dImageCoordinates,
-                                             dRayStateAO.dOutputData,
-                                             dRayStateAO.dFilmFilterWeights,
-                                             dIsVisibleBuffer,
-                                             dRandomNumBuffer,
-                                             dWorkHashes, dWorkBatchIds,
-                                             dSubCameraBuffer),
+        MemAlloc::AllocateMultiData(Tie(dHits, dHitKeys,
+                                        dRays, dRayCones,
+                                        dRayStateAO.dVisibilityRays,
+                                        dRayStateAO.dImageCoordinates,
+                                        dRayStateAO.dOutputData,
+                                        dRayStateAO.dFilmFilterWeights,
+                                        dIsVisibleBuffer,
+                                        dRandomNumBuffer,
+                                        dWorkHashes, dWorkBatchIds,
+                                        dSubCameraBuffer),
                                     rendererGlobalMem,
                                     {maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
@@ -317,14 +319,14 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     }
     else
     {
-        MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys,
-                                             dRays, dRayCones,
-                                             dRayStateCommon.dImageCoordinates,
-                                             dRayStateCommon.dOutputData,
-                                             dRayStateCommon.dFilmFilterWeights,
-                                             dRandomNumBuffer,
-                                             dWorkHashes, dWorkBatchIds,
-                                             dSubCameraBuffer),
+        MemAlloc::AllocateMultiData(Tie(dHits, dHitKeys,
+                                        dRays, dRayCones,
+                                        dRayStateCommon.dImageCoordinates,
+                                        dRayStateCommon.dOutputData,
+                                        dRayStateCommon.dFilmFilterWeights,
+                                        dRandomNumBuffer,
+                                        dWorkHashes, dWorkBatchIds,
+                                        dSubCameraBuffer),
                                     rendererGlobalMem,
                                     {maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
@@ -667,7 +669,8 @@ RendererOutput SurfaceRenderer::DoRender()
     {
         SetImagePixels
         (
-            filmSpan, ToConstSpan(dRayStateCommon.dOutputData),
+            filmSpan,
+            ToConstSpan(dRayStateCommon.dOutputData),
             ToConstSpan(dRayStateCommon.dFilmFilterWeights),
             ToConstSpan(dRayStateCommon.dImageCoordinates),
             Float(1), processQueue
@@ -776,10 +779,10 @@ SurfaceRenderer::StaticAttributeInfo()
     using enum AttributeOptionality;
     return AttribInfoList
     {
-        {"totalSPP",            MRayDataType<MR_UINT32>{}, IS_SCALAR, MR_MANDATORY},
-        {"renderType",          MRayDataType<MR_STRING>{}, IS_SCALAR, MR_MANDATORY},
-        {"doStochasticFilter",  MRayDataType<MR_BOOL>{}, IS_SCALAR, MR_MANDATORY},
-        {"tMaxAORatio",         MRayDataType<MR_FLOAT>{}, IS_SCALAR, MR_MANDATORY}
+        {"totalSPP",            MRayDataTypeRT(MR_UINT32),  IS_SCALAR, MR_MANDATORY},
+        {"renderType",          MRayDataTypeRT(MR_STRING),  IS_SCALAR, MR_MANDATORY},
+        {"doStochasticFilter",  MRayDataTypeRT(MR_BOOL),    IS_SCALAR, MR_MANDATORY},
+        {"tMaxAORatio",         MRayDataTypeRT(MR_FLOAT),   IS_SCALAR, MR_MANDATORY}
     };
 }
 

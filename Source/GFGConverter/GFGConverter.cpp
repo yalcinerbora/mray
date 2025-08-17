@@ -290,7 +290,7 @@ void THRDProcessMesh(ErrorList& errors, Span<MeshGroup> meshes,
                 offset += Math::NextMultiple(vertexCount * components.back().stride, alignment);
             }
             Span<Vector3ui> indices;
-            MemAlloc::AllocateMultiData(std::tie(indices), indexMem,
+            MemAlloc::AllocateMultiData(Tie(indices), indexMem,
                                         {meshIn->mNumFaces}, alignof(Vector3ui));
 
 
@@ -302,8 +302,8 @@ void THRDProcessMesh(ErrorList& errors, Span<MeshGroup> meshes,
             Span<Vector3> bitangents;
             if(flags[NORMAL_AS_QUATERNION])
             {
-                MemAlloc::AllocateMultiData(std::tie(positions, uvs,
-                                                     normalsQuat),
+                MemAlloc::AllocateMultiData(Tie(positions, uvs,
+                                                normalsQuat),
                                             meshMem,
                                             {vertexCount, vertexCount,
                                              vertexCount},
@@ -311,8 +311,8 @@ void THRDProcessMesh(ErrorList& errors, Span<MeshGroup> meshes,
             }
             else
             {
-                MemAlloc::AllocateMultiData(std::tie(positions, uvs,
-                                                     normals, tangents, bitangents),
+                MemAlloc::AllocateMultiData(Tie(positions, uvs,
+                                                normals, tangents, bitangents),
                                             meshMem,
                                             {vertexCount, vertexCount,
                                             vertexCount, vertexCount,

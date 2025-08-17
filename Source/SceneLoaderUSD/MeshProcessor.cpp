@@ -200,9 +200,9 @@ MRayError MeshProcessorThread::AllocateTransientBuffers(Span<Vector3ui>& indexBu
     uint32_t attribIndex = 0;
     for(const PrimAttributeInfo& attribInfo : mrayPrimAttribInfoList)
     {
-        PrimitiveAttributeLogic logic = std::get<PrimAttributeInfo::LOGIC_INDEX>(attribInfo);
-        MRayDataTypeRT dataType = std::get<PrimAttributeInfo::LAYOUT_INDEX>(attribInfo);
-        MRayError err = std::visit([&](auto&& type) -> MRayError
+        PrimitiveAttributeLogic logic = attribInfo.logic;
+        MRayDataTypeRT dataType = attribInfo.dataType;
+        MRayError err = dataType.SwitchCase([&](auto&& type) -> MRayError
         {
             using DataType = typename std::remove_cvref_t<decltype(type)>::Type;
             size_t elementCount = (logic == PrimitiveAttributeLogic::INDEX)
@@ -230,7 +230,7 @@ MRayError MeshProcessorThread::AllocateTransientBuffers(Span<Vector3ui>& indexBu
                                  "from Tracer's triangle layout");
             }
             return MRayError::OK;
-        }, dataType);
+        });
         //
         if(err) return err;
         //

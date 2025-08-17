@@ -118,9 +118,9 @@ inline auto operator<=>(const MRayTextureParameters& l,
                         const MRayTextureParameters& r)
 {
     #define MRAY_GEN_TUPLE(a) \
-        std::tuple(a.pixelType.Name(), a.colorSpace, a.gamma, \
-                   a.ignoreResClamp, a.isColor, a.edgeResolve, \
-                   a.interpolation, a.readMode)
+        Tuple(a.pixelType.Name(), a.colorSpace, a.gamma, \
+              a.ignoreResClamp, a.isColor, a.edgeResolve, \
+              a.interpolation, a.readMode)
 
     // Little bit of overkill but w/e
     return (MRAY_GEN_TUPLE(l) <=> MRAY_GEN_TUPLE(r));
@@ -129,6 +129,6 @@ inline auto operator<=>(const MRayTextureParameters& l,
 
 inline auto MRayUSDTexture::operator<=>(const MRayUSDTexture& t) const
 {
-    return (std::tuple(absoluteFilePath, params) <=>
-            std::tuple(t.absoluteFilePath, t.params));
+    return (Tuple(absoluteFilePath, params) <=>
+            Tuple(t.absoluteFilePath, t.params));
 }

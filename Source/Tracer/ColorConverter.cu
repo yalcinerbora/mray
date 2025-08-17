@@ -25,7 +25,7 @@ using BCColorConvParamList = std::array<BCColorConvParams, BC_TEX_PER_BATCH>;
 
 // Order is important here
 template <MRayColorSpaceEnum E>
-using ConverterList = std::tuple
+using ConverterList = Tuple
 <
     Color::ColorspaceTransfer<MRayColorSpaceEnum::MR_ACES2065_1,    E>,
     Color::ColorspaceTransfer<MRayColorSpaceEnum::MR_ACES_CG,       E>,
@@ -37,15 +37,15 @@ using ConverterList = std::tuple
 
 // TODO: This cannot be alised or clang throws fatal error
 // Report.
-static constexpr auto ConverterLists = std::tuple
-{
+static constexpr auto ConverterLists = Tuple
+(
     ConverterList<MRayColorSpaceEnum::MR_ACES2065_1>{},
     ConverterList<MRayColorSpaceEnum::MR_ACES_CG>{},
     ConverterList<MRayColorSpaceEnum::MR_REC_709>{},
     ConverterList<MRayColorSpaceEnum::MR_REC_2020>{},
     ConverterList<MRayColorSpaceEnum::MR_DCI_P3>{},
     ConverterList<MRayColorSpaceEnum::MR_ADOBE_RGB>{}
-};
+);
 
 using BCTypeMap = TypeFinder::E_TMapper<MRayPixelEnum>;
 using BCReaderFinder = BCTypeMap::Map
@@ -63,7 +63,7 @@ using BCReaderFinder = BCTypeMap::Map
 >;
 
 // Luminance Extract related
-using ColorspaceList = std::tuple
+using ColorspaceList = Tuple
 <
     Color::Colorspace<MRayColorSpaceEnum::MR_ACES2065_1>,
     Color::Colorspace<MRayColorSpaceEnum::MR_ACES_CG>,
@@ -402,7 +402,7 @@ void KCExtractLuminance(// I-O
                         MRAY_GRID_CONSTANT const Span<const Span<Float>> dLuminanceOutput,
                         // Inputs
                         MRAY_GRID_CONSTANT const Span<const LuminanceExtractParams> dLuminanceParams,
-                        MRAY_GRID_CONSTANT const Span<const Variant<std::monostate, GenericTextureView>> dTextureViews,
+                        MRAY_GRID_CONSTANT const Span<const std::variant<std::monostate, GenericTextureView>> dTextureViews,
                         // Constants
                         MRAY_GRID_CONSTANT const uint32_t blockPerTexture)
 {
@@ -730,7 +730,7 @@ void BCColorConverter::CallBCColorConvertKernels(Span<Byte> dScratchBuffer,
     for(size_t pIndex = 0; pIndex < partitions.size(); pIndex++)
     {
         const Vector2ul& range = partitions[pIndex];
-        std::visit([&, this](auto&& v)
+        bcTextures[range[0]]->PixelType().SwitchCase([&, this](auto&& v)
         {
             using PT = std::remove_cvref_t<decltype(v)>;
             constexpr MRayPixelEnum E = PT::Name;
@@ -740,7 +740,7 @@ void BCColorConverter::CallBCColorConvertKernels(Span<Byte> dScratchBuffer,
                 CallKernelForType<E>(dScratchBuffer, rangeI32,
                                      globalColorSpace, queue);
             }
-        }, bcTextures[range[0]]->PixelType());
+        });
     }
 }
 
@@ -853,7 +853,7 @@ void ColorConverter::ConvertColor(std::vector<MipArray<SurfRefVariant>> textures
 
     // Alias the memory, normal color conversion and BC color conversion
     // will be serialized
-    MemAlloc::AllocateMultiData(std::tie(dSufViews, dColorConvParams),
+    MemAlloc::AllocateMultiData(Tie(dSufViews, dColorConvParams),
                                 mem, {textures.size(), textures.size()});
 
     //==============================//
@@ -879,7 +879,6 @@ void ColorConverter::ConvertColor(std::vector<MipArray<SurfRefVariant>> textures
                     if constexpr(std::is_same_v<T, std::monostate>)
                         return std::monostate{};
                     else return v.View();
-
                 }, surf);
             }
             hSurfViews.push_back(mipViews);
@@ -926,7 +925,7 @@ void ColorConverter::ExtractLuminance(std::vector<Span<Float>> hLuminanceBuffers
                                       const GPUQueue& queue)
 {
     std::vector<LuminanceExtractParams> hLuminanceExtractParams;
-    std::vector<Variant<std::monostate, GenericTextureView>> hTextureViews;
+    std::vector<std::variant<std::monostate, GenericTextureView>> hTextureViews;
     hLuminanceExtractParams.reserve(textures.size());
     hTextureViews.reserve(textures.size());
     size_t totalTexSize = textures.size();
@@ -957,16 +956,16 @@ void ColorConverter::ExtractLuminance(std::vector<Span<Float>> hLuminanceBuffers
     DeviceLocalMemory localMem(*queue.Device());
     //
     Span<Span<Float>> dLuminanceBuffers;
-    Span<Variant<std::monostate, GenericTextureView>> dTextureViews;
+    Span<std::variant<std::monostate, GenericTextureView>> dTextureViews;
     Span<LuminanceExtractParams> dLuminanceExtractParams;
-    MemAlloc::AllocateMultiData(std::tie(dLuminanceExtractParams,
-                                         dTextureViews,
-                                         dLuminanceBuffers),
+    MemAlloc::AllocateMultiData(Tie(dLuminanceExtractParams,
+                                    dTextureViews,
+                                    dLuminanceBuffers),
                                 localMem,
                                 {totalTexSize, totalTexSize, totalTexSize});
 
     queue.MemcpyAsync(dTextureViews,
-                      Span<const Variant<std::monostate, GenericTextureView>>(hTextureViews));
+                      Span<const std::variant<std::monostate, GenericTextureView>>(hTextureViews));
     queue.MemcpyAsync(dLuminanceExtractParams,
                       Span<const LuminanceExtractParams>(hLuminanceExtractParams));
     queue.MemcpyAsync(dLuminanceBuffers, Span<const Span<Float>>(hLuminanceBuffers));

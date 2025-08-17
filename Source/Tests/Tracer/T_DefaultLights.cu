@@ -18,12 +18,12 @@ using LightGroupSkysphereSpherical = LightGroupSkysphere<SphericalCoordConverter
 
 using MetaLightList = MetaLightArrayT
 <
-    PackedTypes<LightGroupNull, TransformGroupIdentity>,
-    PackedTypes<LightGroupSkysphereCoOcta, TransformGroupIdentity>,
-    PackedTypes<LightGroupSkysphereCoOcta, TransformGroupSingle>,
-    PackedTypes<LightGroupPrim<PrimGroupTriangle>, TransformGroupIdentity>,
-    PackedTypes<LightGroupPrim<PrimGroupTriangle>, TransformGroupSingle>,
-    PackedTypes<LightGroupPrim<PrimGroupSkinnedTriangle>, TransformGroupMulti>
+    TypePack<LightGroupNull, TransformGroupIdentity>,
+    TypePack<LightGroupSkysphereCoOcta, TransformGroupIdentity>,
+    TypePack<LightGroupSkysphereCoOcta, TransformGroupSingle>,
+    TypePack<LightGroupPrim<PrimGroupTriangle>, TransformGroupIdentity>,
+    TypePack<LightGroupPrim<PrimGroupTriangle>, TransformGroupSingle>,
+    TypePack<LightGroupPrim<PrimGroupSkinnedTriangle>, TransformGroupMulti>
 >;
 
 using MetaLight = typename MetaLightList::MetaLight;
@@ -304,7 +304,7 @@ TEST(DefaultLights, MetaLight)
 
     Span<RandomNumber> dRandomNumbers;
     DeviceLocalMemory rnMem(*queue.Device());
-    MemAlloc::AllocateMultiData(std::tie(dRandomNumbers), rnMem,
+    MemAlloc::AllocateMultiData(Tie(dRandomNumbers), rnMem,
                                 {1024});
     //
     MetaLightArrayView lightView = lightList.Array();

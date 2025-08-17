@@ -1,12 +1,48 @@
-.bd-page-width {
+html[data-theme="light"]
+{
+    --pst-color-inline-code: rgb(109, 65, 72);
+}
+
+html[data-theme="dark"]
+{
+    --pst-color-inline-code: rgb(216, 160, 168);
+    --pst-color-accent: rgb(255, 0, 38);
+}
+
+.bd-page-width
+{
   max-width: 110rem;
 }
 
-.cBox {
+.cBox
+{
     max-width: 200px;
     max-height: 200px;
     width: 100%;
     aspect-ratio: 1 / 1;
     margin-left: auto;
     margin-right: auto;
+}
+
+.footer-block p
+{
+    font-size: 0.85em;
+    margin: 0.2em 0;
+}
+
+/* Make the blockquote text monospace. */
+blockquote, .blockquote,
+div.admonition.note blockquote,
+div.admonition blockquote
+{
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'SF Mono', monospace !important;
+    font-size: 0.9em;
+}
+
+blockquote code
+{
+    font-family: inherit;
+    background: rgba(0, 0, 0, 0.1);
+    padding: 2px 4px;
+    border-radius: 3px;
 }

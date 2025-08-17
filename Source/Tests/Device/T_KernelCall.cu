@@ -71,7 +71,7 @@ void KernelCallFreeFunctionTester(const GPUSystem& system)
     DeviceLocalMemory mem(system.BestDevice());
     Span<uint32_t> dWriteSpan;
     Span<uint32_t> dRefSpan;
-    MemAlloc::AllocateMultiData(std::tie(dWriteSpan, dRefSpan),
+    MemAlloc::AllocateMultiData(Tie(dWriteSpan, dRefSpan),
                                 mem,
                                 {totalThreads, 1});
     // Copy reference to host
@@ -135,7 +135,7 @@ void KernelCallLambdaTester(const GPUSystem& system)
     DeviceLocalMemory mem(system.BestDevice());
     Span<uint32_t> dWriteSpan;
     Span<uint32_t> dRefSpan;
-    MemAlloc::AllocateMultiData(std::tie(dWriteSpan, dRefSpan),
+    MemAlloc::AllocateMultiData(Tie(dWriteSpan, dRefSpan),
                                 mem,
                                 {totalThreads, 1});
     // Copy reference to host
@@ -212,7 +212,7 @@ void KernelCallLambdaTester(const GPUSystem& system)
         DeviceLocalMemory mem(system.BestDevice());
         Span<uint32_t> dWriteSpan;
         Span<uint32_t> dRefSpan;
-        MemAlloc::AllocateMultiData(std::tie(dWriteSpan, dRefSpan),
+        MemAlloc::AllocateMultiData(Tie(dWriteSpan, dRefSpan),
                                     mem,
                                     {totalThreads, 1});
         // Copy reference to host

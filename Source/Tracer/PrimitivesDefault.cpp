@@ -16,7 +16,7 @@ PrimGroupSphere::PrimGroupSphere(uint32_t primGroupId,
 
 void PrimGroupSphere::CommitReservations()
 {
-    GenericCommit(std::tie(dCenters, dRadius), {0, 0});
+    GenericCommit(Tie(dCenters, dRadius), {0, 0});
 
     soa.centers = ToConstSpan(dCenters);
     soa.radius = ToConstSpan(dRadius);
@@ -32,8 +32,8 @@ PrimAttributeInfoList PrimGroupSphere::AttributeInfo() const
     // and not primitive batches
     static const PrimAttributeInfoList LogicList =
     {
-        PrimAttributeInfo(POSITION, MRayDataType<MR_VECTOR_3>(),    IS_SCALAR, MR_MANDATORY),
-        PrimAttributeInfo(RADIUS,   MRayDataType<MR_FLOAT>(),       IS_SCALAR, MR_MANDATORY)
+        PrimAttributeInfo(POSITION, MRayDataTypeRT(MR_VECTOR_3),IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(RADIUS,   MRayDataTypeRT(MR_FLOAT),   IS_SCALAR, MR_MANDATORY)
     };
     return LogicList;
 }

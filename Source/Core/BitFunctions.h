@@ -7,6 +7,7 @@
 #include <climits>
 
 #include "Definitions.h"
+#include "Tuple.h"
 
 namespace Bit
 {
@@ -25,7 +26,7 @@ namespace Bit
 
     template<size_t... Is, std::unsigned_integral... Ts>
     requires(sizeof...(Is) == sizeof...(Ts))
-    MR_PF_DECL std::tuple_element_t<0, std::tuple<Ts...>>
+    MR_PF_DECL TupleElement<0, Tuple<Ts...>>
     Compose(Ts... values) noexcept;
 
     template<std::unsigned_integral T>
@@ -215,11 +216,11 @@ MR_PF_DEF T Bit::SetSubPortion(T value, C in, std::array<T, 2> bitRange) noexcep
 
 template<size_t... Is, std::unsigned_integral... Ts>
 requires(sizeof...(Is) == sizeof...(Ts))
-MR_PF_DEF std::tuple_element_t<0, std::tuple<Ts...>>
+MR_PF_DEF TupleElement<0, Tuple<Ts...>>
 Bit::Compose(Ts... values) noexcept
 {
     constexpr uint32_t E = sizeof...(Is);
-    using RetT = std::tuple_element_t<0, std::tuple<Ts...>>;
+    using RetT = TupleElement<0, Tuple<Ts...>>;
     // Compile time check the bits
     static_assert((Is + ...) <= sizeof(RetT) * CHAR_BIT,
                   "Template \"Is\" must not exceed the entire bit range");

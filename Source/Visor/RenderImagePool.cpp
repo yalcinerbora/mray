@@ -320,11 +320,12 @@ RenderImagePool::RenderImagePool(ThreadPool* tp,
                                   VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                                   outBufferSize);
 
-    auto& deviceAllocator = VulkanDeviceAllocator::Instance();
-    imgMemory = deviceAllocator.AllocateMultiObject(std::tie(hdrImage,
-                                                             sdrImage,
-                                                             hdrSampleImage),
-                                                    VulkanDeviceAllocator::DEVICE);
+    using VkAlloc = VulkanDeviceAllocator;
+    auto& deviceAllocator = VkAlloc::Instance();
+    imgMemory = deviceAllocator.AllocateMultiObject(Tie(hdrImage,
+                                                        sdrImage,
+                                                        hdrSampleImage),
+                                                    VkAlloc::DEVICE);
     // If we create view before attaching memory,
     // validation layer whines. So creating views after allocation.
     hdrImage.CreateView();
@@ -332,8 +333,8 @@ RenderImagePool::RenderImagePool(ThreadPool* tp,
     hdrSampleImage.CreateView();
 
     // Staging memory related
-    stageMemory = deviceAllocator.AllocateMultiObject(std::tie(outStageBuffer),
-                                                      VulkanDeviceAllocator::HOST_VISIBLE);
+    stageMemory = deviceAllocator.AllocateMultiObject(Tie(outStageBuffer),
+                                                      VkAlloc::HOST_VISIBLE);
     void* ptr;
     vkMapMemory(handlesVk->deviceVk, stageMemory.Memory(),
                 0, VK_WHOLE_SIZE, 0, &ptr);
@@ -428,11 +429,11 @@ void RenderImagePool::SaveImage(VisorGUI& visorGUI,
         // TODO: Find the proper tight size
         using enum MRayPixelEnum;
         auto outPixelType = (t == HDR)
-            ? MRayPixelTypeRT(MRayPixelType<MR_RGB_FLOAT>{})
-            : MRayPixelTypeRT(MRayPixelType<MR_RGB16_UNORM>{});
+            ? MRayPixelTypeRT(MR_RGB_FLOAT)
+            : MRayPixelTypeRT(MR_RGB16_UNORM);
         auto inPixelType = (t == HDR)
-            ? MRayPixelTypeRT(MRayPixelType<MR_RGBA_FLOAT>{})
-            : MRayPixelTypeRT(MRayPixelType<MR_RGBA16_UNORM>{});
+            ? MRayPixelTypeRT(MR_RGBA_FLOAT)
+            : MRayPixelTypeRT(MR_RGBA16_UNORM);
         auto imgFileType = (t == HDR)
             ? ImageType::EXR
             : ImageType::PNG;

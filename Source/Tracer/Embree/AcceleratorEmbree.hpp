@@ -622,11 +622,11 @@ void AcceleratorGroupEmbree<PG>::Construct(AccelGroupConstructParams p,
     if constexpr(PER_PRIM_TRANSFORM)
         concreteAccelCount = 0;
     //
-    MemAlloc::AllocateMultiData(std::tie(hConcreteScenes, hInstanceScenes,
-                                         hTransformKeys, hAllHitRecords,
-                                         hInstanceHitRecordOffsets,
-                                         hAllLeafs, hTransformGroupSoAList,
-                                         pgSoA, geomUserData),
+    MemAlloc::AllocateMultiData(Tie(hConcreteScenes, hInstanceScenes,
+                                    hTransformKeys, hAllHitRecords,
+                                    hInstanceHitRecordOffsets,
+                                    hAllLeafs, hTransformGroupSoAList,
+                                    pgSoA, geomUserData),
                                 mem,
                                 {concreteAccelCount, this->InstanceCount(),
                                  this->InstanceCount(), hitRecordCount,

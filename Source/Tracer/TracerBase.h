@@ -45,14 +45,14 @@ using BaseAccelGenerator = GeneratorFuncType<BaseAcceleratorI,
                                              const AccelWorkGenMap&>;
 
 // Type packed surfaces
-using MaterialWorkBatchInfo = std::tuple<GenericGroupTransformT*,
-                                         GenericGroupMaterialT*,
-                                         GenericGroupPrimitiveT*>;
-using LightWorkBatchInfo = std::pair<GenericGroupTransformT*,
-                                     GenericGroupLightT*>;
+using MaterialWorkBatchInfo = Tuple<GenericGroupTransformT*,
+                                    GenericGroupMaterialT*,
+                                    GenericGroupPrimitiveT*>;
+using LightWorkBatchInfo = Tuple<GenericGroupTransformT*,
+                                 GenericGroupLightT*>;
 
-using CameraWorkBatchInfo = std::pair<GenericGroupTransformT*,
-                                      GenericGroupCameraT*>;
+using CameraWorkBatchInfo = Tuple<GenericGroupTransformT*,
+                                  GenericGroupCameraT*>;
 
 struct WorkBatchInfo
 {

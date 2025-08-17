@@ -167,8 +167,8 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
     // Copy device
     Span<Vector2ui> dConcreteLeafRanges;
     Span<PrimRangeArray> dConcretePrimRanges;
-    MemAlloc::AllocateMultiData(std::tie(dConcreteLeafRanges,
-                                         dConcretePrimRanges),
+    MemAlloc::AllocateMultiData(Tie(dConcreteLeafRanges,
+                                    dConcretePrimRanges),
                                 tempMem,
                                 {this->concreteLeafRanges.size(),
                                  ppResult.concretePrimRanges.size()});
@@ -177,13 +177,13 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
     // Copy these host vectors to GPU
     // For linear accelerator we only need these at GPU memory
     // additionally we will create instance's globalAABB
-    MemAlloc::AllocateMultiData(std::tie(dCullFaceFlags,
-                                         dAlphaMaps,
-                                         dLightOrMatKeys,
-                                         dPrimitiveRanges,
-                                         dTransformKeys,
-                                         dLeafs,
-                                         dAllLeafs),
+    MemAlloc::AllocateMultiData(Tie(dCullFaceFlags,
+                                    dAlphaMaps,
+                                    dLightOrMatKeys,
+                                    dPrimitiveRanges,
+                                    dTransformKeys,
+                                    dLeafs,
+                                    dAllLeafs),
                                 mem,
                                 {this->InstanceCount(), this->InstanceCount(),
                                  this->InstanceCount(), this->InstanceCount(),

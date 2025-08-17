@@ -16,25 +16,25 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     //
     using SpectrumConverterContext = SpectrumConverterContextIdentity;
     // Work States
-    using GlobalStateList   = PackedTypes<SurfRDetail::GlobalState, SurfRDetail::GlobalState>;
-    using RayStateList      = PackedTypes<SurfRDetail::RayStateCommon, SurfRDetail::RayStateAO>;
-    using RayStateCommon    = std::tuple_element_t<0, RayStateList>;
-    using RayStateAO        = std::tuple_element_t<1, RayStateList>;
+    using GlobalStateList   = TypePack<SurfRDetail::GlobalState, SurfRDetail::GlobalState>;
+    using RayStateList      = TypePack<SurfRDetail::RayStateCommon, SurfRDetail::RayStateAO>;
+    using RayStateCommon    = TypePackElement<0, RayStateList>;
+    using RayStateAO        = TypePackElement<1, RayStateList>;
     // Work Functions
     template<PrimitiveC P, MaterialC M, class S, class TContext,
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-    static constexpr auto WorkFunctions = std::tuple
+    static constexpr auto WorkFunctions = Tuple
     {
         &SurfRDetail::WorkFunctionCommon<P, M, S, TContext, PG, MG, TG>,
         &SurfRDetail::WorkFunctionFurnaceOrAO<P, M, S, TContext, PG, MG, TG>
     };
     template<LightC L, LightGroupC LG, TransformGroupC TG>
-    static constexpr auto LightWorkFunctions = std::tuple
+    static constexpr auto LightWorkFunctions = Tuple
     {
         &SurfRDetail::LightWorkFunctionCommon<L, LG, TG>
     };
     template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
-    static constexpr auto CamWorkFunctions = std::tuple{};
+    static constexpr auto CamWorkFunctions = Tuple{};
 
     private:
     Options     currentOptions  = {};

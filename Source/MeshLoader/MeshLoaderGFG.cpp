@@ -32,58 +32,58 @@ MRayDataTypeRT MeshViewGFG::GFGDataTypeToMRayDataType(GFGDataType t)
     using enum MRayDataEnum;
     switch(t)
     {
-        case GFGDataType::FLOAT_1:  return MRayDataTypeRT(MRayDataType<MR_FLOAT>{});
-        case GFGDataType::FLOAT_2:  return MRayDataTypeRT(MRayDataType<MR_VECTOR_2>{});
-        case GFGDataType::FLOAT_3:  return MRayDataTypeRT(MRayDataType<MR_VECTOR_3>{});
-        case GFGDataType::FLOAT_4:  return MRayDataTypeRT(MRayDataType<MR_VECTOR_4>{});
+        case GFGDataType::FLOAT_1:  return MRayDataTypeRT(MR_FLOAT);
+        case GFGDataType::FLOAT_2:  return MRayDataTypeRT(MR_VECTOR_2);
+        case GFGDataType::FLOAT_3:  return MRayDataTypeRT(MR_VECTOR_3);
+        case GFGDataType::FLOAT_4:  return MRayDataTypeRT(MR_VECTOR_4);
 
-        case GFGDataType::INT8_1:   return MRayDataTypeRT(MRayDataType<MR_INT8>{});
-        case GFGDataType::INT8_2:   return MRayDataTypeRT(MRayDataType<MR_VECTOR_2C>{});
-        case GFGDataType::INT8_3:   return MRayDataTypeRT(MRayDataType<MR_VECTOR_3C>{});
-        case GFGDataType::INT8_4:   return MRayDataTypeRT(MRayDataType<MR_VECTOR_4C>{});
+        case GFGDataType::INT8_1:   return MRayDataTypeRT(MR_INT8);
+        case GFGDataType::INT8_2:   return MRayDataTypeRT(MR_VECTOR_2C);
+        case GFGDataType::INT8_3:   return MRayDataTypeRT(MR_VECTOR_3C);
+        case GFGDataType::INT8_4:   return MRayDataTypeRT(MR_VECTOR_4C);
 
-        case GFGDataType::UINT8_1:  return MRayDataTypeRT(MRayDataType<MR_UINT8>{});
-        case GFGDataType::UINT8_2:  return MRayDataTypeRT(MRayDataType<MR_VECTOR_2UC>{});
-        case GFGDataType::UINT8_3:  return MRayDataTypeRT(MRayDataType<MR_VECTOR_3UC>{});
-        case GFGDataType::UINT8_4:  return MRayDataTypeRT(MRayDataType<MR_VECTOR_4UC>{});
+        case GFGDataType::UINT8_1:  return MRayDataTypeRT(MR_UINT8);
+        case GFGDataType::UINT8_2:  return MRayDataTypeRT(MR_VECTOR_2UC);
+        case GFGDataType::UINT8_3:  return MRayDataTypeRT(MR_VECTOR_3UC);
+        case GFGDataType::UINT8_4:  return MRayDataTypeRT(MR_VECTOR_4UC);
 
-        case GFGDataType::INT16_1: return MRayDataTypeRT(MRayDataType<MR_INT16>{});
-        case GFGDataType::INT16_2: return MRayDataTypeRT(MRayDataType<MR_VECTOR_2S>{});
-        case GFGDataType::INT16_3: return MRayDataTypeRT(MRayDataType<MR_VECTOR_3S>{});
-        case GFGDataType::INT16_4: return MRayDataTypeRT(MRayDataType<MR_VECTOR_4S>{});
+        case GFGDataType::INT16_1: return MRayDataTypeRT(MR_INT16);
+        case GFGDataType::INT16_2: return MRayDataTypeRT(MR_VECTOR_2S);
+        case GFGDataType::INT16_3: return MRayDataTypeRT(MR_VECTOR_3S);
+        case GFGDataType::INT16_4: return MRayDataTypeRT(MR_VECTOR_4S);
 
-        case GFGDataType::UINT16_1: return MRayDataTypeRT(MRayDataType<MR_UINT16>{});
-        case GFGDataType::UINT16_2: return MRayDataTypeRT(MRayDataType<MR_VECTOR_2US>{});
-        case GFGDataType::UINT16_3: return MRayDataTypeRT(MRayDataType<MR_VECTOR_3US>{});
-        case GFGDataType::UINT16_4: return MRayDataTypeRT(MRayDataType<MR_VECTOR_4US>{});
+        case GFGDataType::UINT16_1: return MRayDataTypeRT(MR_UINT16);
+        case GFGDataType::UINT16_2: return MRayDataTypeRT(MR_VECTOR_2US);
+        case GFGDataType::UINT16_3: return MRayDataTypeRT(MR_VECTOR_3US);
+        case GFGDataType::UINT16_4: return MRayDataTypeRT(MR_VECTOR_4US);
 
-        case GFGDataType::INT32_1: return MRayDataTypeRT(MRayDataType<MR_INT32>{});
-        case GFGDataType::INT32_2: return MRayDataTypeRT(MRayDataType<MR_VECTOR_2I>{});
-        case GFGDataType::INT32_3: return MRayDataTypeRT(MRayDataType<MR_VECTOR_3I>{});
-        case GFGDataType::INT32_4: return MRayDataTypeRT(MRayDataType<MR_VECTOR_4I>{});
+        case GFGDataType::INT32_1: return MRayDataTypeRT(MR_INT32);
+        case GFGDataType::INT32_2: return MRayDataTypeRT(MR_VECTOR_2I);
+        case GFGDataType::INT32_3: return MRayDataTypeRT(MR_VECTOR_3I);
+        case GFGDataType::INT32_4: return MRayDataTypeRT(MR_VECTOR_4I);
 
-        case GFGDataType::UINT32_1: return MRayDataTypeRT(MRayDataType<MR_UINT32>{});
-        case GFGDataType::UINT32_2: return MRayDataTypeRT(MRayDataType<MR_VECTOR_2UI>{});
-        case GFGDataType::UINT32_3: return MRayDataTypeRT(MRayDataType<MR_VECTOR_3UI>{});
-        case GFGDataType::UINT32_4: return MRayDataTypeRT(MRayDataType<MR_VECTOR_4UI>{});
+        case GFGDataType::UINT32_1: return MRayDataTypeRT(MR_UINT32);
+        case GFGDataType::UINT32_2: return MRayDataTypeRT(MR_VECTOR_2UI);
+        case GFGDataType::UINT32_3: return MRayDataTypeRT(MR_VECTOR_3UI);
+        case GFGDataType::UINT32_4: return MRayDataTypeRT(MR_VECTOR_4UI);
 
-        case GFGDataType::INT64_1: return MRayDataTypeRT(MRayDataType<MR_INT64>{});
-        case GFGDataType::INT64_2: return MRayDataTypeRT(MRayDataType<MR_VECTOR_2L>{});
-        case GFGDataType::INT64_3: return MRayDataTypeRT(MRayDataType<MR_VECTOR_3L>{});
-        case GFGDataType::INT64_4: return MRayDataTypeRT(MRayDataType<MR_VECTOR_4L>{});
+        case GFGDataType::INT64_1: return MRayDataTypeRT(MR_INT64);
+        case GFGDataType::INT64_2: return MRayDataTypeRT(MR_VECTOR_2L);
+        case GFGDataType::INT64_3: return MRayDataTypeRT(MR_VECTOR_3L);
+        case GFGDataType::INT64_4: return MRayDataTypeRT(MR_VECTOR_4L);
 
-        case GFGDataType::UINT64_1: return MRayDataTypeRT(MRayDataType<MR_UINT64>{});
-        case GFGDataType::UINT64_2: return MRayDataTypeRT(MRayDataType<MR_VECTOR_2UL>{});
-        case GFGDataType::UINT64_3: return MRayDataTypeRT(MRayDataType<MR_VECTOR_3UL>{});
-        case GFGDataType::UINT64_4: return MRayDataTypeRT(MRayDataType<MR_VECTOR_4UL>{});
+        case GFGDataType::UINT64_1: return MRayDataTypeRT(MR_UINT64);
+        case GFGDataType::UINT64_2: return MRayDataTypeRT(MR_VECTOR_2UL);
+        case GFGDataType::UINT64_3: return MRayDataTypeRT(MR_VECTOR_3UL);
+        case GFGDataType::UINT64_4: return MRayDataTypeRT(MR_VECTOR_4UL);
 
-        case GFGDataType::NORM8_4:  return MRayDataTypeRT(MRayDataType<MR_SNORM_4x8>{});
-        case GFGDataType::UNORM8_4: return MRayDataTypeRT(MRayDataType<MR_UNORM_4x8>{});
+        case GFGDataType::NORM8_4:  return MRayDataTypeRT(MR_SNORM_4x8);
+        case GFGDataType::UNORM8_4: return MRayDataTypeRT(MR_UNORM_4x8);
 
-        case GFGDataType::NORM16_2: return MRayDataTypeRT(MRayDataType<MR_SNORM_2x16>{});
-        case GFGDataType::UNORM16_2:return MRayDataTypeRT(MRayDataType<MR_UNORM_2x16>{});
+        case GFGDataType::NORM16_2: return MRayDataTypeRT(MR_SNORM_2x16);
+        case GFGDataType::UNORM16_2:return MRayDataTypeRT(MR_UNORM_2x16);
 
-        case GFGDataType::QUATERNION: return MRayDataTypeRT(MRayDataType<MR_QUATERNION>{});
+        case GFGDataType::QUATERNION: return MRayDataTypeRT(MR_QUATERNION);
 
         // These are not supported
         // TODO: Change this
@@ -207,13 +207,13 @@ TransientData MeshViewGFG::GetAttribute(PrimitiveAttributeLogic logic) const
         using enum MRayDataEnum;
         switch(m.headerCore.indexSize)
         {
-            case 1: dataType = MRayDataTypeRT(MRayDataType<MR_VECTOR_3UC>{}); break;
-            case 2: dataType = MRayDataTypeRT(MRayDataType<MR_VECTOR_3US>{}); break;
-            case 4: dataType = MRayDataTypeRT(MRayDataType<MR_VECTOR_3UI>{}); break;
-            case 8: dataType = MRayDataTypeRT(MRayDataType<MR_VECTOR_3UL>{}); break;
+            case 1: dataType = MRayDataTypeRT(MR_VECTOR_3UC); break;
+            case 2: dataType = MRayDataTypeRT(MR_VECTOR_3US); break;
+            case 4: dataType = MRayDataTypeRT(MR_VECTOR_3UI); break;
+            case 8: dataType = MRayDataTypeRT(MR_VECTOR_3UL); break;
             default: throw MRayError("GFG: Unkown index layout \"{}\"", gfgFile.Name());
         }
-        return std::visit([&](auto&& v) -> TransientData
+        return dataType.SwitchCase([&](auto&& v) -> TransientData
         {
             using T = std::remove_cvref_t<decltype(v)>::Type;
             size_t count = gfgFile.loader.MeshIndexDataSize(innerIndex) / v.Size;
@@ -224,7 +224,7 @@ TransientData MeshViewGFG::GetAttribute(PrimitiveAttributeLogic logic) const
                                          innerIndex);
             return result;
 
-        }, dataType);
+        });
     }
     else
     {
@@ -236,7 +236,7 @@ TransientData MeshViewGFG::GetAttribute(PrimitiveAttributeLogic logic) const
         const auto& comp = c.value();
         MRayDataTypeRT type = GFGDataTypeToMRayDataType(comp.dataType);
 
-        return std::visit([&](auto&& v) -> TransientData
+        return type.SwitchCase([&](auto&& v) -> TransientData
         {
             using T = std::remove_cvref_t<decltype(v)>::Type;
             size_t count = gfgFile.loader.MeshVertexComponentDataGroupSize(innerIndex,
@@ -249,7 +249,7 @@ TransientData MeshViewGFG::GetAttribute(PrimitiveAttributeLogic logic) const
             gfgFile.loader.MeshVertexComponentDataGroup(reinterpret_cast<uint8_t*>(span.data()),
                                                         innerIndex, comp.logic);
             return result;
-        }, type);
+        });
     }
 }
 
@@ -261,10 +261,10 @@ MRayDataTypeRT MeshViewGFG::AttributeLayout(PrimitiveAttributeLogic logic) const
     {
         switch(m.headerCore.indexSize)
         {
-            case 1: return MRayDataTypeRT(MRayDataType<MR_VECTOR_3UC>{});
-            case 2: return MRayDataTypeRT(MRayDataType<MR_VECTOR_3US>{});
-            case 4: return MRayDataTypeRT(MRayDataType<MR_VECTOR_3UI>{});
-            case 8: return MRayDataTypeRT(MRayDataType<MR_VECTOR_3UL>{});
+            case 1: return MRayDataTypeRT(MR_VECTOR_3UC);
+            case 2: return MRayDataTypeRT(MR_VECTOR_3US);
+            case 4: return MRayDataTypeRT(MR_VECTOR_3UI);
+            case 8: return MRayDataTypeRT(MR_VECTOR_3UL);
             default: throw MRayError("GFG: Unkown index layout \"{}\"", gfgFile.Name());
         }
     }

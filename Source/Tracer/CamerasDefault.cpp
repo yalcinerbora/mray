@@ -20,7 +20,7 @@ CameraGroupPinhole::CameraGroupPinhole(uint32_t groupId,
 
 void CameraGroupPinhole::CommitReservations()
 {
-    GenericCommit(std::tie(dFovAndPlanes, dGazePoints, dPositions, dUpVectors),
+    GenericCommit(Tie(dFovAndPlanes, dGazePoints, dPositions, dUpVectors),
                   {0, 0, 0, 0});
 
     soa = DataSoA
@@ -40,10 +40,10 @@ CamAttributeInfoList CameraGroupPinhole::AttributeInfo() const
     using enum AttributeIsArray;
     static const CamAttributeInfoList LogicList =
     {
-        CamAttributeInfo("FovAndPlanes", MRayDataType<MR_VECTOR_4>(), IS_SCALAR, MR_MANDATORY),
-        CamAttributeInfo("gaze",         MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY),
-        CamAttributeInfo("position",     MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY),
-        CamAttributeInfo("up",           MRayDataType<MR_VECTOR_3>(), IS_SCALAR, MR_MANDATORY)
+        CamAttributeInfo("FovAndPlanes", MRayDataTypeRT(MR_VECTOR_4), IS_SCALAR, MR_MANDATORY),
+        CamAttributeInfo("gaze",         MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR, MR_MANDATORY),
+        CamAttributeInfo("position",     MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR, MR_MANDATORY),
+        CamAttributeInfo("up",           MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR, MR_MANDATORY)
     };
     return LogicList;
 }

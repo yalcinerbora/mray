@@ -201,7 +201,7 @@ AcceleratorGroupOptiX<PG>::MultiBuildGeneric_CLT(const PreprocessResult& ppResul
     // Might as well allocate these for prim key generation
     Span<Vector2ui> dConcreteLeafRanges;
     Span<PrimRangeArray> dConcretePrimRanges;
-    MemAlloc::AllocateMultiData(std::tie(dAcceleratorMem, dBuildTempMem,
+    MemAlloc::AllocateMultiData(Tie(dAcceleratorMem, dBuildTempMem,
                                          dCompactSizes, dConcreteLeafRanges,
                                          dConcretePrimRanges),
                                 tempMem,
@@ -271,7 +271,7 @@ AcceleratorGroupOptiX<PG>::MultiBuildGeneric_CLT(const PreprocessResult& ppResul
                                       MemAlloc::DefaultSystemAlignment());
         }
     );
-    MemAlloc::AllocateMultiData(std::tie(dAllAccelerators, dAllLeafs,
+    MemAlloc::AllocateMultiData(Tie(dAllAccelerators, dAllLeafs,
                                          dTransformKeys, dPrimGroupSoA,
                                          dTransformGroupSoAList),
                                 memory,
@@ -413,7 +413,7 @@ AcceleratorGroupOptiX<PG>::MultiBuildAABB_CLT(const PreprocessResult& ppResult,
      });
 
     DeviceMemory tempMem({queue.Device()}, total, total << 1);
-    MemAlloc::AllocateMultiData(std::tie(dLeafAABBs, dTempLeafs,
+    MemAlloc::AllocateMultiData(Tie(dLeafAABBs, dTempLeafs,
                                          dConcretePrimRanges, dConcreteLeafRanges,
                                          dConcreteLeafOffsets),
                                 tempMem,

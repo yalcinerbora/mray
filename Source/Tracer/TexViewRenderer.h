@@ -8,19 +8,19 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     static std::string_view TypeName();
     static AttribInfoList StaticAttributeInfo();
 
-    using GlobalStateList   = PackedTypes<>;
-    using RayStateList      = PackedTypes<>;
+    using GlobalStateList   = TypePack<>;
+    using RayStateList      = TypePack<>;
     using SpectrumConverterContext = SpectrumConverterContextIdentity;
 
     template<PrimitiveC P, MaterialC M, class S, class TContext,
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-    static constexpr auto WorkFunctions = std::tuple{};
+    static constexpr auto WorkFunctions = Tuple{};
 
     template<LightC L, LightGroupC LG, TransformGroupC TG>
-    static constexpr auto LightWorkFunctions = std::tuple{};
+    static constexpr auto LightWorkFunctions = Tuple{};
 
     template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
-    static constexpr auto CamWorkFunctions = std::tuple{};
+    static constexpr auto CamWorkFunctions = Tuple{};
 
     enum Mode
     {

@@ -6,6 +6,7 @@
 #include "Core/BitFunctions.h"
 #include "Core/Types.h"
 #include "Core/TracerI.h"
+#include "Core/Variant.h"
 
 #include <array>
 
@@ -76,3 +77,6 @@ using SurfRefVariant = Variant
     RWTextureRef<2, Vector3s>,
     RWTextureRef<2, Vector4s>
 >;
+
+static_assert(SurfViewVariant::TD, "\"SurfViewVariant\" is GPU-facing."
+              " It's alternatives must be all trivially destructible");

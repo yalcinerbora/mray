@@ -68,8 +68,8 @@ struct DistTester2D
         Span<Vector2> dRandomNumbers;
         Span<Float> dFunction;
         DeviceMemory mem({&system.BestDevice()}, 32_MiB, 128_MiB);
-        MemAlloc::AllocateMultiData(std::tie(dFunction, dRandomNumbers,
-                                             dOutSamples, dOutPdfs),
+        MemAlloc::AllocateMultiData(Tie(dFunction, dRandomNumbers,
+                                        dOutSamples, dOutPdfs),
                                     mem,
                                     {sizeLinear, sampleCount, sampleCount, sampleCount});
         queue.MemcpyAsync(dFunction, Span<const Float>(hFunction.cbegin(), hFunction.cend()));

@@ -3,3 +3,6 @@ If:
 
 CompileFlags:
   Add: [-xc++-header]
+
+Completion:
+  HeaderInsertion: never

@@ -44,7 +44,7 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
 
     public:
     // Constructors & Destructor
-    constexpr           Vector() = default;
+    constexpr             Vector() = default;
     template<std::convertible_to<T> C>
     MR_PF_DECL_V explicit Vector(C);
     template<std::convertible_to<T> C>

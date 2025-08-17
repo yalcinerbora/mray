@@ -14,6 +14,7 @@
 
 #include "Core/TracerI.h"
 #include "Core/Algorithm.h"
+#include "Core/TypePack.h"
 
 #include "TransientPool/TransientPool.h"
 
@@ -121,7 +122,13 @@ using RenderCameraWorkGenerator = GeneratorFuncType<RenderCameraWorkI,
 using RenderWorkGenMap = Map<std::string_view, RenderWorkGenerator>;
 using RenderLightWorkGenMap = Map<std::string_view, RenderLightWorkGenerator>;
 using RenderCamWorkGenMap = Map<std::string_view, RenderCameraWorkGenerator>;
-using RenderWorkPack = std::tuple<RenderWorkGenMap, RenderLightWorkGenMap, RenderCamWorkGenMap>;
+
+struct RenderWorkPack
+{
+    RenderWorkGenMap        workMap;
+    RenderLightWorkGenMap   lightWorkMap;
+    RenderCamWorkGenMap     camWorkMap;
+};
 
 template<class RendererType>
 concept RendererC = requires(RendererType rt,
@@ -209,7 +216,7 @@ namespace RendererDetail
 
     template<RendererC R, uint32_t I>
     struct RenderGlobalState<R, I, true>
-    { using type = std::tuple_element_t<I, typename R::GlobalStateList>; };
+    { using type = TypePackElement<I, typename R::GlobalStateList>; };
 
     template<RendererC R, uint32_t I, bool B>
     struct RenderRayState;
@@ -219,14 +226,14 @@ namespace RendererDetail
 
     template<RendererC R, uint32_t I>
     struct RenderRayState<R, I, true>
-    { using type = std::tuple_element_t<I, typename R::RayStateList>; };
+    { using type = TypePackElement<I, typename R::RayStateList>; };
 
 }
 
 template<RendererC R, uint32_t I>
-using RenderGlobalState = RendererDetail::RenderGlobalState<R, I, I < std::tuple_size_v<typename R::GlobalStateList>>::type;
+using RenderGlobalState = RendererDetail::RenderGlobalState<R, I, I < TypePackSize<typename R::GlobalStateList>>::type;
 template<RendererC R, uint32_t I>
-using RenderRayState = RendererDetail::RenderRayState<R, I, I < std::tuple_size_v<typename R::RayStateList>>::type;
+using RenderRayState = RendererDetail::RenderRayState<R, I, I < TypePackSize<typename R::RayStateList>>::type;
 
 // Some renderers will require multiple "work"
 // per tuple/pair. Renderer itself (orchestrator)
@@ -377,39 +384,40 @@ template<class R>
 struct RenderWorkStruct
 {
     using WorkPtr = std::unique_ptr<RenderWorkT<R>>;
-    using IdTuple = std::tuple<MatGroupId, PrimGroupId, TransGroupId>;
+    //
+    MatGroupId   mgId;
+    PrimGroupId  pgId;
+    TransGroupId tgId;
+    CommonKey    workGroupId;
+    WorkPtr      workPtr;
 
-    IdTuple     idPack;
-    CommonKey   workGroupId;
-    WorkPtr     workPtr;
-    // For sorting
-    auto operator<=>(const RenderWorkStruct& right) const;
+    auto operator<=>(const RenderWorkStruct&) const noexcept;
 };
 
 template<class R>
 struct RenderLightWorkStruct
 {
     using WorkPtr = std::unique_ptr<RenderLightWorkT<R>>;
-    using IdPair = Pair<LightGroupId, TransGroupId>;
+    //
+    LightGroupId lgId;
+    TransGroupId tgId;
+    CommonKey    workGroupId;
+    WorkPtr      workPtr;
 
-    IdPair      idPack;
-    CommonKey   workGroupId;
-    WorkPtr     workPtr;
-    // For sorting
-    auto operator<=>(const RenderLightWorkStruct& right) const;
+    auto operator<=>(const RenderLightWorkStruct&) const noexcept;
 };
 
 template<class R>
 struct RenderCameraWorkStruct
 {
     using WorkPtr = std::unique_ptr<RenderCameraWorkT<R>>;
-    using IdPair = Pair<CameraGroupId, TransGroupId>;
+    //
+    CameraGroupId cgId;
+    TransGroupId  tgId;
+    CommonKey     workGroupId;
+    WorkPtr       workPtr;
 
-    IdPair      idPack;
-    CommonKey   workGroupId;
-    WorkPtr     workPtr;
-    // For sorting
-    auto operator<=>(const RenderCameraWorkStruct& right) const;
+    auto operator<=>(const RenderCameraWorkStruct&) const noexcept;
 };
 
 template<class R>
@@ -566,25 +574,25 @@ inline bool FlatSurfParams::operator<(const FlatSurfParams& right) const
         return std::bit_cast<TransformKey>(id).FetchBatchPortion();
     };
 
-    using T = std::tuple<CommonKey, CommonKey, CommonKey>;
+    using T = Tuple<CommonKey, CommonKey, CommonKey>;
     return (T(GetMG(mId), GetTG(tId), GetPG(pId)) <
             T(GetMG(right.mId), GetTG(right.tId), GetPG(right.pId)));
 }
 
 template<class R>
-auto RenderWorkStruct<R>::operator<=>(const RenderWorkStruct& right) const
+auto RenderWorkStruct<R>::operator<=>(const RenderWorkStruct& right) const noexcept
 {
     return workGroupId <=> right.workGroupId;
 }
 
 template<class R>
-auto RenderLightWorkStruct<R>::operator<=>(const RenderLightWorkStruct& right) const
+auto RenderLightWorkStruct<R>::operator<=>(const RenderLightWorkStruct& right) const noexcept
 {
     return workGroupId <=> right.workGroupId;
 }
 
 template<class R>
-auto RenderCameraWorkStruct<R>::operator<=>(const RenderCameraWorkStruct& right) const
+auto RenderCameraWorkStruct<R>::operator<=>(const RenderCameraWorkStruct& right) const noexcept
 {
     return workGroupId <=> right.workGroupId;
 }
@@ -624,9 +632,9 @@ void RenderWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
 
     for(const auto& work : curWorks)
     {
-        MatGroupId matGroupId = std::get<0>(work.idPack);
-        PrimGroupId primGroupId = std::get<1>(work.idPack);
-        TransGroupId transGroupId = std::get<2>(work.idPack);
+        MatGroupId matGroupId = work.mgId;
+        PrimGroupId primGroupId = work.pgId;
+        TransGroupId transGroupId = work.tgId;
 
         auto pK = PrimitiveKey::CombinedKey(std::bit_cast<CommonKey>(primGroupId), 0u);
         auto mK = LightOrMatKey::CombinedKey(IS_MAT_KEY_FLAG, std::bit_cast<CommonKey>(matGroupId), 0u);
@@ -652,8 +660,8 @@ void RenderWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
     // Push light hashes
     for(const auto& work : curLightWorks)
     {
-        LightGroupId lightGroupId = std::get<0>(work.idPack);
-        TransGroupId transGroupId = std::get<1>(work.idPack);
+        LightGroupId lightGroupId = work.lgId;
+        TransGroupId transGroupId = work.tgId;
         const auto& lightGroup = tracerView.lightGroups.at(lightGroupId)->get();
         const auto& transformGroup = tracerView.transGroups.at(transGroupId)->get();
         CommonKey primGroupId = lightGroup->GenericPrimGroup().GroupId();
@@ -840,7 +848,7 @@ uint32_t RendererT<C>::GenerateWorkMappings(uint32_t workStart)
         using TypeNameGen::Runtime::CreateRenderWorkType;
         std::string workName = CreateRenderWorkType(mgName, pgName, tgName);
 
-        auto loc = std::get<0>(workPack).at(workName);
+        auto loc = workPack.workMap.at(workName);
         if(!loc.has_value())
         {
             throw MRayError("[{}]: Could not find a renderer \"work\" for Mat/Prim/Transform "
@@ -857,10 +865,9 @@ uint32_t RendererT<C>::GenerateWorkMappings(uint32_t workStart)
         (
             RenderWorkStruct
             {
-                .idPack = std::tuple<MatGroupId, PrimGroupId, TransGroupId>
-                (
-                    mgId, pgId, tgId
-                ),
+                .mgId = mgId,
+                .pgId = pgId,
+                .tgId = tgId,
                 .workGroupId = workStart++,
                 .workPtr = std::move(renderTypedPtr)
             }
@@ -885,8 +892,8 @@ uint32_t RendererT<C>::GenerateLightWorkMappings(uint32_t workStart)
         {
             return std::bit_cast<TransformKey>(id).FetchBatchPortion();
         };
-        return (std::tuple(GetLG(left.second.lightId), GetTG(left.second.transformId)) <
-                std::tuple(GetLG(right.second.lightId), GetTG(right.second.transformId)));
+        return (Tuple(GetLG(left.second.lightId), GetTG(left.second.transformId)) <
+                Tuple(GetLG(right.second.lightId), GetTG(right.second.transformId)));
     };
     assert(std::is_sorted(lightSurfs.cbegin(), lightSurfs.cend(),
                           LightSurfIsLess));
@@ -909,7 +916,7 @@ uint32_t RendererT<C>::GenerateLightWorkMappings(uint32_t workStart)
         using TypeNameGen::Runtime::CreateRenderLightWorkType;
         std::string workName = CreateRenderLightWorkType(lgName, tgName);
 
-        auto loc = std::get<1>(workPack).at(workName);
+        auto loc = workPack.lightWorkMap.at(workName);
         if(!loc.has_value())
         {
             throw MRayError("[{}]: Could not find a renderer \"work\" for Light/Transform "
@@ -953,7 +960,8 @@ uint32_t RendererT<C>::GenerateLightWorkMappings(uint32_t workStart)
         (
             RenderLightWorkStruct
             {
-                .idPack = Pair<LightGroupId, TransGroupId>(lgId, tgId),
+                .lgId = lgId,
+                .tgId = tgId,
                 .workGroupId = workStart++,
                 .workPtr = std::move(renderTypedPtr)
             }
@@ -986,8 +994,8 @@ uint32_t RendererT<C>::GenerateCameraWorkMappings(uint32_t workStart)
         {
             return std::bit_cast<TransformKey>(id).FetchBatchPortion();
         };
-        return (std::tuple(GetCG(left.second.cameraId), GetTG(left.second.transformId)) <
-                std::tuple(GetCG(right.second.cameraId), GetTG(right.second.transformId)));
+        return (Tuple(GetCG(left.second.cameraId), GetTG(left.second.transformId)) <
+                Tuple(GetCG(right.second.cameraId), GetTG(right.second.transformId)));
     };
     assert(std::is_sorted(camSurfs.cbegin(), camSurfs.cend(),
                           CamSurfIsLess));
@@ -1009,7 +1017,7 @@ uint32_t RendererT<C>::GenerateCameraWorkMappings(uint32_t workStart)
         using TypeNameGen::Runtime::CreateRenderCameraWorkType;
         std::string workName = CreateRenderCameraWorkType(cgName, tgName);
 
-        auto loc = std::get<2>(workPack).at(workName);
+        auto loc = workPack.camWorkMap.at(workName);
         if(!loc.has_value())
         {
             throw MRayError("[{}]: Could not find a renderer \"work\" for Camera/Transform "
@@ -1026,7 +1034,8 @@ uint32_t RendererT<C>::GenerateCameraWorkMappings(uint32_t workStart)
         (
             RenderCameraWorkStruct
             {
-                .idPack = Pair<CameraGroupId, TransGroupId>(cgId, tgId),
+                .cgId = cgId,
+                .tgId = tgId,
                 .workGroupId = workStart++,
                 .workPtr = std::move(renderTypedPtr)
             }
@@ -1127,43 +1136,43 @@ inline void AddSingleRenderWork(Map<std::string_view, RenderWorkPack>& workMap,
     //================//
     // Material Works //
     //================//
-    using WorkGenArgs = PackedTypes<const GenericGroupMaterialT&,
-                                    const GenericGroupPrimitiveT&,
-                                    const GenericGroupTransformT&,
-                                    const GPUSystem&>;
+    using WorkGenArgs = TypePack<const GenericGroupMaterialT&,
+                                 const GenericGroupPrimitiveT&,
+                                 const GenericGroupTransformT&,
+                                 const GPUSystem&>;
     WorkGenArgs* workArgsResolver = nullptr;
     WorkTypes* workTypesResolver = nullptr;
     GenerateMapping<RenderWorkGenerator, RenderWorkI>
     (
-        std::get<0>(workPack),
+        workPack.workMap,
         workArgsResolver,
         workTypesResolver
     );
     //================//
     //   Light Works  //
     //================//
-    using LightWorkGenArgs = PackedTypes<const GenericGroupLightT&,
-                                         const GenericGroupTransformT&,
-                                         const GPUSystem&>;
+    using LightWorkGenArgs = TypePack<const GenericGroupLightT&,
+                                      const GenericGroupTransformT&,
+                                      const GPUSystem&>;
     LightWorkGenArgs* lightWorkArgsResolver = nullptr;
     LightWorkTypes* lightWorkTypesResolver = nullptr;
     GenerateMapping<RenderLightWorkGenerator, RenderLightWorkI>
     (
-        std::get<1>(workPack),
+        workPack.lightWorkMap,
         lightWorkArgsResolver,
         lightWorkTypesResolver
     );
     //================//
     //  Camera Works  //
     //================//
-    using CameraWorkGenArgs = PackedTypes<const GenericGroupCameraT&,
-                                          const GenericGroupTransformT&,
-                                          const GPUSystem&>;
+    using CameraWorkGenArgs = TypePack<const GenericGroupCameraT&,
+                                       const GenericGroupTransformT&,
+                                       const GPUSystem&>;
     CameraWorkGenArgs* cameraWorkArgsResolver = nullptr;
     CameraWorkTypes* cameraWorkTypesResolver = nullptr;
     GenerateMapping<RenderCameraWorkGenerator, RenderCameraWorkI>
     (
-        std::get<2>(workPack),
+        workPack.camWorkMap,
         cameraWorkArgsResolver,
         cameraWorkTypesResolver
     );
@@ -1171,7 +1180,7 @@ inline void AddSingleRenderWork(Map<std::string_view, RenderWorkPack>& workMap,
 
 template <class... Args>
 void AddRenderWorks(Map<std::string_view, RenderWorkPack>& workMap,
-                    PackedTypes<Args...>*)
+                    TypePack<Args...>*)
 {
     auto AddRenderWorksInternal =
     []<class TupleT, size_t... Is>(Map<std::string_view, RenderWorkPack>& workMap,
@@ -1180,12 +1189,12 @@ void AddRenderWorks(Map<std::string_view, RenderWorkPack>& workMap,
     {
         // Param pack expansion over the index sequence
         (
-            (AddSingleRenderWork<std::tuple_element_t<Is, TupleT>>(workMap, nullptr)),
+            (AddSingleRenderWork<TypePackElement<Is, TupleT>>(workMap, nullptr)),
             ...
         );
     };
 
-    std::tuple<Args...>* list = nullptr;
+    TypePack<Args...>* list = nullptr;
     AddRenderWorksInternal(workMap, list,
                            std::index_sequence_for<Args...>{});
 }

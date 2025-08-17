@@ -16,10 +16,10 @@ Expected<MRayPixelTypeRT> ImageFileOIIO::PixelFormatToMRay(const OIIO::ImageSpec
         {
             switch(spec.nchannels)
             {
-                case 1: return ResultT(MRayPixelType<MR_R8_UNORM>{});    break;
-                case 2: return ResultT(MRayPixelType<MR_RG8_UNORM>{});   break;
-                case 3: return ResultT(MRayPixelType<MR_RGB8_UNORM>{});  break;
-                case 4: return ResultT(MRayPixelType<MR_RGBA8_UNORM>{}); break;
+                case 1: return MRayPixelTypeRT(MR_R8_UNORM);    break;
+                case 2: return MRayPixelTypeRT(MR_RG8_UNORM);   break;
+                case 3: return MRayPixelTypeRT(MR_RGB8_UNORM);  break;
+                case 4: return MRayPixelTypeRT(MR_RGBA8_UNORM); break;
                 default: break;
             }
             break;
@@ -28,10 +28,10 @@ Expected<MRayPixelTypeRT> ImageFileOIIO::PixelFormatToMRay(const OIIO::ImageSpec
         {
             switch(spec.nchannels)
             {
-                case 1: return MRayPixelType<MR_R8_SNORM>{};    break;
-                case 2: return MRayPixelType<MR_RG8_SNORM>{};   break;
-                case 3: return MRayPixelType<MR_RGB8_SNORM>{};  break;
-                case 4: return MRayPixelType<MR_RGBA8_SNORM>{}; break;
+                case 1: return MRayPixelTypeRT(MR_R8_SNORM);    break;
+                case 2: return MRayPixelTypeRT(MR_RG8_SNORM);   break;
+                case 3: return MRayPixelTypeRT(MR_RGB8_SNORM);  break;
+                case 4: return MRayPixelTypeRT(MR_RGBA8_SNORM); break;
                 default: break;
             }
             break;
@@ -40,10 +40,10 @@ Expected<MRayPixelTypeRT> ImageFileOIIO::PixelFormatToMRay(const OIIO::ImageSpec
         {
             switch(spec.nchannels)
             {
-                case 1: return MRayPixelType<MR_R16_UNORM>{};       break;
-                case 2: return MRayPixelType<MR_RG16_UNORM>{};      break;
-                case 3: return MRayPixelType<MR_RGB16_UNORM>{};     break;
-                case 4: return MRayPixelType<MR_RGBA16_UNORM>{};    break;
+                case 1: return MRayPixelTypeRT(MR_R16_UNORM);       break;
+                case 2: return MRayPixelTypeRT(MR_RG16_UNORM);      break;
+                case 3: return MRayPixelTypeRT(MR_RGB16_UNORM);     break;
+                case 4: return MRayPixelTypeRT(MR_RGBA16_UNORM);    break;
                 default: break;
             }
             break;
@@ -52,10 +52,10 @@ Expected<MRayPixelTypeRT> ImageFileOIIO::PixelFormatToMRay(const OIIO::ImageSpec
         {
             switch(spec.nchannels)
             {
-                case 1: return MRayPixelType<MR_R16_SNORM>{};       break;
-                case 2: return MRayPixelType<MR_RG16_SNORM>{};      break;
-                case 3: return MRayPixelType<MR_RGB16_SNORM>{};     break;
-                case 4: return MRayPixelType<MR_RGBA16_SNORM>{};    break;
+                case 1: return MRayPixelTypeRT(MR_R16_SNORM);       break;
+                case 2: return MRayPixelTypeRT(MR_RG16_SNORM);      break;
+                case 3: return MRayPixelTypeRT(MR_RGB16_SNORM);     break;
+                case 4: return MRayPixelTypeRT(MR_RGBA16_SNORM);    break;
                 default: break;
             }
             break;
@@ -73,10 +73,10 @@ Expected<MRayPixelTypeRT> ImageFileOIIO::PixelFormatToMRay(const OIIO::ImageSpec
         {
             switch(spec.nchannels)
             {
-                case 1: return MRayPixelType<MR_R_HALF>{};     break;
-                case 2: return MRayPixelType<MR_RG_HALF>{};    break;
-                case 3: return MRayPixelType<MR_RGB_HALF>{};   break;
-                case 4: return MRayPixelType<MR_RGBA_HALF>{};  break;
+                case 1: return MRayPixelTypeRT(MR_R_HALF);      break;
+                case 2: return MRayPixelTypeRT(MR_RG_HALF);     break;
+                case 3: return MRayPixelTypeRT(MR_RGB_HALF);    break;
+                case 4: return MRayPixelTypeRT(MR_RGBA_HALF);   break;
                 default: break;
             }
             break;
@@ -85,10 +85,10 @@ Expected<MRayPixelTypeRT> ImageFileOIIO::PixelFormatToMRay(const OIIO::ImageSpec
         {
             switch(spec.nchannels)
             {
-                case 1: return MRayPixelType<MR_R_FLOAT>{};         break;
-                case 2: return MRayPixelType<MR_RG_FLOAT>{};        break;
-                case 3: return MRayPixelType<MR_RGB_FLOAT>{};       break;
-                case 4: return MRayPixelType<MR_RGBA_FLOAT>{};      break;
+                case 1: return MRayPixelTypeRT(MR_R_FLOAT);     break;
+                case 2: return MRayPixelTypeRT(MR_RG_FLOAT);    break;
+                case 3: return MRayPixelTypeRT(MR_RGB_FLOAT);   break;
+                case 4: return MRayPixelTypeRT(MR_RGBA_FLOAT);  break;
                 default: break;
             }
             break;
@@ -200,7 +200,7 @@ Expected<ColorSpacePack> ImageFileOIIO::ColorSpaceToMRay(const std::string& oiio
 {
     using namespace std::literals;
     using enum MRayColorSpaceEnum;
-    using MapType = std::tuple<std::string_view, MRayColorSpaceEnum, Float>;
+    using MapType = Tuple<std::string_view, MRayColorSpaceEnum, Float>;
     // TODO: unicode utf8 etc...
     std::string lowercaseStr(oiioString.size(), '\n');
     std::transform(oiioString.cbegin(), oiioString.cend(),
@@ -229,11 +229,11 @@ Expected<ColorSpacePack> ImageFileOIIO::ColorSpaceToMRay(const std::string& oiio
 
     for(const auto& checkType : LookupList)
     {
-        if(std::get<0>(checkType) != lowercaseStr) continue;
+        if(get<0>(checkType) != lowercaseStr) continue;
         return ColorSpacePack
         {
-            std::get<2>(checkType),
-            std::get<1>(checkType)
+            get<2>(checkType),
+            get<1>(checkType)
         };
     }
     // Special case: OIIO returned "GammaX.Y" (maybe)
@@ -336,19 +336,19 @@ Expected<MRayPixelTypeRT> ImageFileOIIO::ConvertFormatToRequested(MRayPixelTypeR
         switch(subChannels)
         {
             using enum ImageSubChannelType;
-            case R:     return MRayPixelTypeRT(MRayPixelType<MR_R8_UNORM>{});
-            case G:     return MRayPixelTypeRT(MRayPixelType<MR_R8_UNORM>{});
-            case B:     return MRayPixelTypeRT(MRayPixelType<MR_R8_UNORM>{});
-            case A:     return MRayPixelTypeRT(MRayPixelType<MR_R8_UNORM>{});
+            case R:     return MRayPixelTypeRT(MR_R8_UNORM);
+            case G:     return MRayPixelTypeRT(MR_R8_UNORM);
+            case B:     return MRayPixelTypeRT(MR_R8_UNORM);
+            case A:     return MRayPixelTypeRT(MR_R8_UNORM);
 
-            case RG:    return MRayPixelTypeRT(MRayPixelType<MR_RG8_UNORM>{});
-            case GB:    return MRayPixelTypeRT(MRayPixelType<MR_RG8_UNORM>{});
-            case BA:    return MRayPixelTypeRT(MRayPixelType<MR_RG8_UNORM>{});
+            case RG:    return MRayPixelTypeRT(MR_RG8_UNORM);
+            case GB:    return MRayPixelTypeRT(MR_RG8_UNORM);
+            case BA:    return MRayPixelTypeRT(MR_RG8_UNORM);
 
-            case RGB:   return MRayPixelTypeRT(MRayPixelType<MR_RGB8_UNORM>{});
-            case GBA:   return MRayPixelTypeRT(MRayPixelType<MR_RGB8_UNORM>{});
+            case RGB:   return MRayPixelTypeRT(MR_RGB8_UNORM);
+            case GBA:   return MRayPixelTypeRT(MR_RGB8_UNORM);
 
-            case RGBA:  return MRayPixelTypeRT(MRayPixelType<MR_RGBA8_UNORM>{});
+            case RGBA:  return MRayPixelTypeRT(MR_RGBA8_UNORM);
             default:    break;
         }
         break;
@@ -360,19 +360,19 @@ Expected<MRayPixelTypeRT> ImageFileOIIO::ConvertFormatToRequested(MRayPixelTypeR
         switch(subChannels)
         {
             using enum ImageSubChannelType;
-            case R:     return MRayPixelTypeRT(MRayPixelType<MR_R16_UNORM>{});
-            case G:     return MRayPixelTypeRT(MRayPixelType<MR_R16_UNORM>{});
-            case B:     return MRayPixelTypeRT(MRayPixelType<MR_R16_UNORM>{});
-            case A:     return MRayPixelTypeRT(MRayPixelType<MR_R16_UNORM>{});
+            case R:     return MRayPixelTypeRT(MR_R16_UNORM);
+            case G:     return MRayPixelTypeRT(MR_R16_UNORM);
+            case B:     return MRayPixelTypeRT(MR_R16_UNORM);
+            case A:     return MRayPixelTypeRT(MR_R16_UNORM);
 
-            case RG:    return MRayPixelTypeRT(MRayPixelType<MR_RG16_UNORM>{});
-            case GB:    return MRayPixelTypeRT(MRayPixelType<MR_RG16_UNORM>{});
-            case BA:    return MRayPixelTypeRT(MRayPixelType<MR_RG16_UNORM>{});
+            case RG:    return MRayPixelTypeRT(MR_RG16_UNORM);
+            case GB:    return MRayPixelTypeRT(MR_RG16_UNORM);
+            case BA:    return MRayPixelTypeRT(MR_RG16_UNORM);
 
-            case RGB:   return MRayPixelTypeRT(MRayPixelType<MR_RGB16_UNORM>{});
-            case GBA:   return MRayPixelTypeRT(MRayPixelType<MR_RGB16_UNORM>{});
+            case RGB:   return MRayPixelTypeRT(MR_RGB16_UNORM);
+            case GBA:   return MRayPixelTypeRT(MR_RGB16_UNORM);
 
-            case RGBA:  return MRayPixelTypeRT(MRayPixelType<MR_RGBA16_UNORM>{});
+            case RGBA:  return MRayPixelTypeRT(MR_RGBA16_UNORM);
             default:    break;
         }
         break;
@@ -384,19 +384,19 @@ Expected<MRayPixelTypeRT> ImageFileOIIO::ConvertFormatToRequested(MRayPixelTypeR
         switch(subChannels)
         {
             using enum ImageSubChannelType;
-            case R:     return MRayPixelTypeRT(MRayPixelType<MR_R8_SNORM>{});
-            case G:     return MRayPixelTypeRT(MRayPixelType<MR_R8_SNORM>{});
-            case B:     return MRayPixelTypeRT(MRayPixelType<MR_R8_SNORM>{});
-            case A:     return MRayPixelTypeRT(MRayPixelType<MR_R8_SNORM>{});
+            case R:     return MRayPixelTypeRT(MR_R8_SNORM);
+            case G:     return MRayPixelTypeRT(MR_R8_SNORM);
+            case B:     return MRayPixelTypeRT(MR_R8_SNORM);
+            case A:     return MRayPixelTypeRT(MR_R8_SNORM);
 
-            case RG:    return MRayPixelTypeRT(MRayPixelType<MR_RG8_SNORM>{});
-            case GB:    return MRayPixelTypeRT(MRayPixelType<MR_RG8_SNORM>{});
-            case BA:    return MRayPixelTypeRT(MRayPixelType<MR_RG8_SNORM>{});
+            case RG:    return MRayPixelTypeRT(MR_RG8_SNORM);
+            case GB:    return MRayPixelTypeRT(MR_RG8_SNORM);
+            case BA:    return MRayPixelTypeRT(MR_RG8_SNORM);
 
-            case RGB:   return MRayPixelTypeRT(MRayPixelType<MR_RGB8_SNORM>{});
-            case GBA:   return MRayPixelTypeRT(MRayPixelType<MR_RGB8_SNORM>{});
+            case RGB:   return MRayPixelTypeRT(MR_RGB8_SNORM);
+            case GBA:   return MRayPixelTypeRT(MR_RGB8_SNORM);
 
-            case RGBA:  return MRayPixelTypeRT(MRayPixelType<MR_RGBA8_SNORM>{});
+            case RGBA:  return MRayPixelTypeRT(MR_RGBA8_SNORM);
             default:    break;
         }
         break;
@@ -408,19 +408,19 @@ Expected<MRayPixelTypeRT> ImageFileOIIO::ConvertFormatToRequested(MRayPixelTypeR
         switch(subChannels)
         {
             using enum ImageSubChannelType;
-            case R:     return MRayPixelTypeRT(MRayPixelType<MR_R16_SNORM>{});
-            case G:     return MRayPixelTypeRT(MRayPixelType<MR_R16_SNORM>{});
-            case B:     return MRayPixelTypeRT(MRayPixelType<MR_R16_SNORM>{});
-            case A:     return MRayPixelTypeRT(MRayPixelType<MR_R16_SNORM>{});
+            case R:     return MRayPixelTypeRT(MR_R16_SNORM);
+            case G:     return MRayPixelTypeRT(MR_R16_SNORM);
+            case B:     return MRayPixelTypeRT(MR_R16_SNORM);
+            case A:     return MRayPixelTypeRT(MR_R16_SNORM);
 
-            case RG:    return MRayPixelTypeRT(MRayPixelType<MR_RG16_SNORM>{});
-            case GB:    return MRayPixelTypeRT(MRayPixelType<MR_RG16_SNORM>{});
-            case BA:    return MRayPixelTypeRT(MRayPixelType<MR_RG16_SNORM>{});
+            case RG:    return MRayPixelTypeRT(MR_RG16_SNORM);
+            case GB:    return MRayPixelTypeRT(MR_RG16_SNORM);
+            case BA:    return MRayPixelTypeRT(MR_RG16_SNORM);
 
-            case RGB:   return MRayPixelTypeRT(MRayPixelType<MR_RGB16_SNORM>{});
-            case GBA:   return MRayPixelTypeRT(MRayPixelType<MR_RGB16_SNORM>{});
+            case RGB:   return MRayPixelTypeRT(MR_RGB16_SNORM);
+            case GBA:   return MRayPixelTypeRT(MR_RGB16_SNORM);
 
-            case RGBA:  return MRayPixelTypeRT(MRayPixelType<MR_RGBA16_SNORM>{});
+            case RGBA:  return MRayPixelTypeRT(MR_RGBA16_SNORM);
             default:    break;
         }
         break;
@@ -432,19 +432,19 @@ Expected<MRayPixelTypeRT> ImageFileOIIO::ConvertFormatToRequested(MRayPixelTypeR
         switch(subChannels)
         {
             using enum ImageSubChannelType;
-            case R:     return MRayPixelTypeRT(MRayPixelType<MR_R_HALF>{});
-            case G:     return MRayPixelTypeRT(MRayPixelType<MR_R_HALF>{});
-            case B:     return MRayPixelTypeRT(MRayPixelType<MR_R_HALF>{});
-            case A:     return MRayPixelTypeRT(MRayPixelType<MR_R_HALF>{});
+            case R:     return MRayPixelTypeRT(MR_R_HALF);
+            case G:     return MRayPixelTypeRT(MR_R_HALF);
+            case B:     return MRayPixelTypeRT(MR_R_HALF);
+            case A:     return MRayPixelTypeRT(MR_R_HALF);
 
-            case RG:    return MRayPixelTypeRT(MRayPixelType<MR_RG_HALF>{});
-            case GB:    return MRayPixelTypeRT(MRayPixelType<MR_RG_HALF>{});
-            case BA:    return MRayPixelTypeRT(MRayPixelType<MR_RG_HALF>{});
+            case RG:    return MRayPixelTypeRT(MR_RG_HALF);
+            case GB:    return MRayPixelTypeRT(MR_RG_HALF);
+            case BA:    return MRayPixelTypeRT(MR_RG_HALF);
 
-            case RGB:   return MRayPixelTypeRT(MRayPixelType<MR_RGB_HALF>{});
-            case GBA:   return MRayPixelTypeRT(MRayPixelType<MR_RGB_HALF>{});
+            case RGB:   return MRayPixelTypeRT(MR_RGB_HALF);
+            case GBA:   return MRayPixelTypeRT(MR_RGB_HALF);
 
-            case RGBA:  return MRayPixelTypeRT(MRayPixelType<MR_RGBA_HALF>{});
+            case RGBA:  return MRayPixelTypeRT(MR_RGBA_HALF);
             default:    break;
         }
         break;
@@ -456,19 +456,19 @@ Expected<MRayPixelTypeRT> ImageFileOIIO::ConvertFormatToRequested(MRayPixelTypeR
         switch(subChannels)
         {
             using enum ImageSubChannelType;
-            case R:     return MRayPixelTypeRT(MRayPixelType<MR_R_FLOAT>{});
-            case G:     return MRayPixelTypeRT(MRayPixelType<MR_R_FLOAT>{});
-            case B:     return MRayPixelTypeRT(MRayPixelType<MR_R_FLOAT>{});
-            case A:     return MRayPixelTypeRT(MRayPixelType<MR_R_FLOAT>{});
+            case R:     return MRayPixelTypeRT(MR_R_FLOAT);
+            case G:     return MRayPixelTypeRT(MR_R_FLOAT);
+            case B:     return MRayPixelTypeRT(MR_R_FLOAT);
+            case A:     return MRayPixelTypeRT(MR_R_FLOAT);
 
-            case RG:    return MRayPixelTypeRT(MRayPixelType<MR_RG_FLOAT>{});
-            case GB:    return MRayPixelTypeRT(MRayPixelType<MR_RG_FLOAT>{});
-            case BA:    return MRayPixelTypeRT(MRayPixelType<MR_RG_FLOAT>{});
+            case RG:    return MRayPixelTypeRT(MR_RG_FLOAT);
+            case GB:    return MRayPixelTypeRT(MR_RG_FLOAT);
+            case BA:    return MRayPixelTypeRT(MR_RG_FLOAT);
 
-            case RGB:   return MRayPixelTypeRT(MRayPixelType<MR_RGB_FLOAT>{});
-            case GBA:   return MRayPixelTypeRT(MRayPixelType<MR_RGB_FLOAT>{});
+            case RGB:   return MRayPixelTypeRT(MR_RGB_FLOAT);
+            case GBA:   return MRayPixelTypeRT(MR_RGB_FLOAT);
 
-            case RGBA:  return MRayPixelTypeRT(MRayPixelType<MR_RGBA_FLOAT>{});
+            case RGBA:  return MRayPixelTypeRT(MR_RGBA_FLOAT);
             default:    break;
         }
         break;
@@ -634,11 +634,11 @@ Expected<Image> ImageFileOIIO::ReadImage()
         // Due to type safety we need to construct pixels using the formatted
         // type, we need to "visit" the variant to correctly construct the
         // type-erased transient data
-        TransientData pixels = std::visit([totalPixels](auto&& v)
+        TransientData pixels = dataPixelType.SwitchCase([totalPixels](auto&& v) -> TransientData
         {
             using T = std::remove_cvref_t<decltype(v)>::Type;
             return TransientData(std::in_place_type_t<T>{}, totalPixels);
-        }, dataPixelType);
+        });
         pixels.ReserveAll();
 
         // Read inverted, OIIO has DirectX

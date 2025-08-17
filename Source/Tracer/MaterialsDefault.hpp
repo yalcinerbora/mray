@@ -543,15 +543,16 @@ Spectrum UnrealMaterial<ST>::CalculateF0(Spectrum albedo, Float metallic,
 
 template <class ST>
 MR_GF_DEF
-std::tuple<Float, Float, Float, Spectrum>
+UnrealMatParamPack
 UnrealMaterial<ST>::FetchData(const Surface& s) const
 {
-    Float roughness = roughnessTex(s.uv, s.dpdx, s.dpdy);
-    Float metallic = metallicTex(s.uv, s.dpdx, s.dpdy);
-    Float specular = specularTex(s.uv, s.dpdx, s.dpdy);
-    Spectrum albedo = albedoTex(s.uv, s.dpdx, s.dpdy);
-    using Tup = std::tuple<Float, Float, Float, Spectrum>;
-    return Tup(roughness, metallic, specular, albedo);
+    return UnrealMatParamPack
+    {
+        .roughness = roughnessTex(s.uv, s.dpdx, s.dpdy),
+        .metallic = metallicTex(s.uv, s.dpdx, s.dpdy),
+        .specular = specularTex(s.uv, s.dpdx, s.dpdy),
+        .albedo = albedoTex(s.uv, s.dpdx, s.dpdy)
+    };
 }
 
 template <class SpectrumTransformer>

@@ -6,6 +6,27 @@
 // Cornell Box is embedded into the shader
 // as 3 unit (vec3(-1), vec3(1)) AABBs
 //
+// There are many cornell boxes on shader toy
+// (one good example https://www.shadertoy.com/view/dtlGD2)
+//
+// This code follows similar approach, all elements in the scene
+// are boxes. To demonstrate a slightly different approach,
+// intersections are calculated in local space.
+//
+// Also minimized the pass count as much as possible. Currently
+// this pass and single accumulation pass is used to render the scene.
+//
+// This file (named "cBox.frag") has a license differs from
+// the general license of the repository.
+// ========================================================= //
+// CornellBox Shader (cBox.frag) by Bora Yalçıner            //
+// is marked CC0 1.0. To view a copy of this mark, visit     //
+// https://creativecommons.org/publicdomain/zero/1.0/        //
+// ========================================================= //
+//
+// The license above is only valid for this file alone.
+// No other file on this repository is marked as public domain.
+// Please check LICENSE.md for the repository license.
 //
 precision highp float;
 precision highp int;
@@ -204,7 +225,6 @@ Hit IntersectScene(in RayPack ray)
     else
     {
         h.albedoOrRadiance = uBGColor;
-        //h.albedoOrRadiance = vec3(100);
         h.isMissed = true;
     }
     return h;

@@ -334,7 +334,7 @@ TexViewRenderer::StaticAttributeInfo()
     using enum AttributeOptionality;
     return AttribInfoList
     {
-        {"totalSPP", MRayDataType<MR_UINT32>{}, IS_SCALAR, MR_MANDATORY}
+        {"totalSPP", MRayDataTypeRT(MR_UINT32), IS_SCALAR, MR_MANDATORY}
     };
 }
 

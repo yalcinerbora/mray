@@ -47,26 +47,26 @@ class PathTracerRenderer final : public RendererT<PathTracerRenderer>
     using AttribInfoList            = typename Base::AttribInfoList;
     using SpectrumConverterContext  = SpectrumConverterContextIdentity;
     //
-    using GlobalStateList   = PackedTypes<PathTraceRDetail::GlobalState<EmptyType>,
+    using GlobalStateList   = TypePack<PathTraceRDetail::GlobalState<EmptyType>,
                                           PathTraceRDetail::GlobalState<UniformLightSampler>>;
-    using RayStateList      = PackedTypes<PathTraceRDetail::RayState, PathTraceRDetail::RayState>;
+    using RayStateList      = TypePack<PathTraceRDetail::RayState, PathTraceRDetail::RayState>;
 
     // Work Functions
     template<PrimitiveC P, MaterialC M, class S, class TContext,
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-    static constexpr auto WorkFunctions = std::tuple
+    static constexpr auto WorkFunctions = Tuple
     {
         &PathTraceRDetail::WorkFunction<P, M, S, TContext, PG, MG, TG>,
         &PathTraceRDetail::WorkFunctionNEE<UniformLightSampler, P, M, S, TContext, PG, MG, TG>
     };
     template<LightC L, LightGroupC LG, TransformGroupC TG>
-    static constexpr auto LightWorkFunctions = std::tuple
+    static constexpr auto LightWorkFunctions = Tuple
     {
         &PathTraceRDetail::LightWorkFunction<L, LG, TG>,
         &PathTraceRDetail::LightWorkFunctionWithNEE<UniformLightSampler, L, LG, TG>
     };
     template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
-    static constexpr auto CamWorkFunctions = std::tuple{};
+    static constexpr auto CamWorkFunctions = Tuple{};
 
     // On throughput mode, we do this burst, on latency mode
     // burst is implicit and is 1

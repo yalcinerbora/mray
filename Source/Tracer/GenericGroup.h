@@ -123,11 +123,8 @@ class GenericGroupT : public GenericGroupI<IdTypeT, AttribInfoT>
 
     const AttributeRanges&      FindRange(IdInt) const;
 
-    //template <class... Args>
-    //std::tuple<Span<Args>...>    GenericCommit(std::array<size_t, sizeof...(Args)> countLookup);
-
     template <class... Args>
-    void GenericCommit(std::tuple<Span<Args>&...> output,
+    void GenericCommit(Tuple<Span<Args>&...> output,
                        std::array<int32_t, sizeof...(Args)> countLookup);
 
     template <class T>
@@ -242,7 +239,7 @@ const AttributeRanges& GenericGroupT<ID, AI>::FindRange(IdInt id) const
 
 template<class ID, class AI>
 template <class... Args>
-void GenericGroupT<ID, AI>::GenericCommit(std::tuple<Span<Args>&...> output,
+void GenericGroupT<ID, AI>::GenericCommit(Tuple<Span<Args>&...> output,
                                           std::array<int32_t, sizeof...(Args)> countLookup)
 {
     constexpr size_t TypeCount = sizeof...(Args);

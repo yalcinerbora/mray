@@ -243,9 +243,7 @@ TYPED_TEST(GPUMemoryAlloc, MultiAlloc)
     Span<Float> dFloats;
     Span<Vector3> dVectors;
     Span<Matrix4x4> dMatrices;
-    MemAlloc::AllocateMultiData(std::tie(dFloats,
-                                         dVectors,
-                                         dMatrices),
+    MemAlloc::AllocateMultiData(Tie(dFloats, dVectors, dMatrices),
                                 *(this->memory),
                                 {100, 50, 40});
 

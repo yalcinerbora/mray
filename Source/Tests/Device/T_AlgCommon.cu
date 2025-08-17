@@ -26,7 +26,7 @@ void IotaTest(const GPUSystem& system)
     DeviceMemory mem({&system.BestDevice()}, 1_MiB, 8_MiB);
 
     Span<Value> dOutputs;
-    MemAlloc::AllocateMultiData(std::tie(dOutputs), mem, {ElementCount});
+    MemAlloc::AllocateMultiData(Tie(dOutputs), mem, {ElementCount});
 
     Value initialValue = Value(0);
 
@@ -54,7 +54,7 @@ void TransformTest(const GPUSystem& system)
     DeviceMemory mem({&system.BestDevice()}, 1_MiB, 8_MiB);
 
     Span<Value> dOutputs, dInputs;
-    MemAlloc::AllocateMultiData(std::tie(dOutputs, dInputs), mem,
+    MemAlloc::AllocateMultiData(Tie(dOutputs, dInputs), mem,
                                 {ElementCount, ElementCount});
 
     Value initialValue = Value(0);

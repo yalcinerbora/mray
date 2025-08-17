@@ -309,9 +309,10 @@ Optional<TransientData> JsonNode::AccessOptionalDataArray(std::string_view name)
 
 // Texturable (either data T, or texture struct)
 template<class T>
-Variant<SceneTexId, T> JsonNode::AccessTexturableData(std::string_view name) const
+std::variant<SceneTexId, T>
+JsonNode::AccessTexturableData(std::string_view name) const
 {
-    using V = Variant<SceneTexId, T>;
+    using V = std::variant<SceneTexId, T>;
     const auto& n = (isMultiNode) ? node->at(name).at(innerIndex)
                                   : node->at(name);
     return (n.is_object()) ? V(n.get<SceneTexId>())
