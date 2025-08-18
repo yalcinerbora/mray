@@ -114,7 +114,7 @@ inline uint32_t AttributeIndexer::operator()(uint32_t perVertexPerFaceCounter) c
 }
 
 inline
-std::pair<const uint32_t*, bool> IndexLookupTable::Insert(IndexTriplet key, uint32_t value)
+Pair<const uint32_t*, bool> IndexLookupTable::Insert(IndexTriplet key, uint32_t value)
 {
     using LT = LookupTable<IndexTriplet, uint32_t,
                            uint32_t, 4, IndexLookupStrategy>;

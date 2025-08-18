@@ -402,7 +402,7 @@ void KCExtractLuminance(// I-O
                         MRAY_GRID_CONSTANT const Span<const Span<Float>> dLuminanceOutput,
                         // Inputs
                         MRAY_GRID_CONSTANT const Span<const LuminanceExtractParams> dLuminanceParams,
-                        MRAY_GRID_CONSTANT const Span<const std::variant<std::monostate, GenericTextureView>> dTextureViews,
+                        MRAY_GRID_CONSTANT const Span<const Variant<std::monostate, GenericTextureView>> dTextureViews,
                         // Constants
                         MRAY_GRID_CONSTANT const uint32_t blockPerTexture)
 {
@@ -925,7 +925,8 @@ void ColorConverter::ExtractLuminance(std::vector<Span<Float>> hLuminanceBuffers
                                       const GPUQueue& queue)
 {
     std::vector<LuminanceExtractParams> hLuminanceExtractParams;
-    std::vector<std::variant<std::monostate, GenericTextureView>> hTextureViews;
+    using V = Variant<std::monostate, GenericTextureView>;
+    std::vector<Variant<std::monostate, GenericTextureView>> hTextureViews;
     hLuminanceExtractParams.reserve(textures.size());
     hTextureViews.reserve(textures.size());
     size_t totalTexSize = textures.size();
@@ -934,7 +935,7 @@ void ColorConverter::ExtractLuminance(std::vector<Span<Float>> hLuminanceBuffers
     {
         if(!t)
         {
-            hTextureViews.push_back(std::monostate{});
+            hTextureViews.emplace_back(std::monostate{});
             continue;
         }
 
@@ -945,7 +946,7 @@ void ColorConverter::ExtractLuminance(std::vector<Span<Float>> hLuminanceBuffers
             .colorSpace = t->ColorSpace()
         };
         hLuminanceExtractParams.push_back(params);
-        hTextureViews.push_back(t->View(TextureReadMode::DIRECT));
+        hTextureViews.emplace_back(t->View(TextureReadMode::DIRECT));
     }
 
     // All texture's are nullptr,
@@ -956,7 +957,7 @@ void ColorConverter::ExtractLuminance(std::vector<Span<Float>> hLuminanceBuffers
     DeviceLocalMemory localMem(*queue.Device());
     //
     Span<Span<Float>> dLuminanceBuffers;
-    Span<std::variant<std::monostate, GenericTextureView>> dTextureViews;
+    Span<Variant<std::monostate, GenericTextureView>> dTextureViews;
     Span<LuminanceExtractParams> dLuminanceExtractParams;
     MemAlloc::AllocateMultiData(Tie(dLuminanceExtractParams,
                                     dTextureViews,
@@ -965,7 +966,7 @@ void ColorConverter::ExtractLuminance(std::vector<Span<Float>> hLuminanceBuffers
                                 {totalTexSize, totalTexSize, totalTexSize});
 
     queue.MemcpyAsync(dTextureViews,
-                      Span<const std::variant<std::monostate, GenericTextureView>>(hTextureViews));
+                      Span<const Variant<std::monostate, GenericTextureView>>(hTextureViews));
     queue.MemcpyAsync(dLuminanceExtractParams,
                       Span<const LuminanceExtractParams>(hLuminanceExtractParams));
     queue.MemcpyAsync(dLuminanceBuffers, Span<const Span<Float>>(hLuminanceBuffers));

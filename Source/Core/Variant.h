@@ -22,6 +22,7 @@
 // could've been achieved if unions accept inheritance (see Tuple.h).
 // Alas, it is not allowed :(
 
+#include <concepts>
 #include <utility>
 #include <cstddef>
 #include <cstdint>
@@ -33,12 +34,31 @@
 #include <variant>
 
 template<class... Types>
-class Variant;
+struct Variant;
+
+template <class T, class... Types>
+constexpr bool HoldsAlternative(const Variant<Types...>& v) noexcept;
+
+template <uint32_t I, class VariantT>
+constexpr decltype(auto) Alternative(VariantT&& v) noexcept;
+
+template <class T, class VariantT>
+constexpr decltype(auto) Alternative(VariantT&& v) noexcept;
+
+template<class VariantT, class Func>
+constexpr auto Visit(VariantT&& v, Func&& f) -> decltype(auto);
 
 namespace VariantDetail
 {
     template<uint32_t I>
     using UIntTConst = std::integral_constant<uint32_t, I>;
+
+    template<class T>
+    struct IndexOfResult
+    {
+        T    Index;
+        bool IsUnique;
+    };
 
     template<template<class> class X, class... Args>
     constexpr bool AllTrait(TypePack<Args...>);
@@ -131,82 +151,109 @@ namespace VariantDetail
     {};
 
     template<class R, class T, class... Types>
-    constexpr R IndexOfType();
+    constexpr IndexOfResult<R> IndexOfTypeImpl();
 
     template<uint32_t O, class VariantT, class Func>
     constexpr auto IfElseVisitImpl(UIntTConst<O>, VariantT&& v, Func&& f) -> decltype(auto);
+
+    template <class Tp>
+    struct TypePackToVariant;
+
+    template <class... Ts>
+    struct TypePackToVariant<TypePack<Ts...>>
+    {
+        using Type = Variant<Ts...>;
+    };
+
+    template<class... Types>
+    class VariantImpl
+    {
+        // Logistics stuff (Lifetime and data movement)
+        public:
+        using TP = TypePack<Types...>;
+        static constexpr bool TC  = AllTrait<std::is_trivially_constructible>(TP{});
+        static constexpr bool TD  = AllTrait<std::is_trivially_destructible >(TP{});
+        static constexpr bool TCC = AllTrait<std::is_trivially_copy_constructible>(TP{});
+        static constexpr bool TMC = AllTrait<std::is_trivially_move_constructible>(TP{});
+        static constexpr bool TCA = AllTrait<std::is_trivially_copy_assignable>(TP{});
+        static constexpr bool TMA = AllTrait<std::is_trivially_move_assignable>(TP{});
+        // Is first type default constructible ?
+        using FirstType = TypePackElement<0, TP>;
+        static constexpr bool FIRST_DC = std::is_default_constructible_v<FirstType>;
+        static constexpr bool FIRST_TDC = std::is_trivially_default_constructible_v<FirstType>;
+
+        private:
+        // Index type related
+        using VariantIndex = SelectVariantIndex<sizeof...(Types)>;
+        static constexpr auto INVALID_INDEX = std::numeric_limits<VariantIndex>::max();
+        // Storage type related
+        using StorageType = UnionStorage<TC, TD, 0, sizeof...(Types), TypePack<Types...>>;
+        // Friends
+        template <class T, class... Ts>
+        friend constexpr bool ::HoldsAlternative(const Variant<Ts...>&) noexcept;
+
+        template <uint32_t I, class VariantT>
+        friend constexpr decltype(auto) ::Alternative(VariantT&& v) noexcept;
+
+        private:
+        StorageType     storage;
+        VariantIndex    tag = 0;
+
+        // Helpers
+        template<class T, class... Args>
+        constexpr void  ConstrcutAlternative(Args&&... args);
+        constexpr void  DestroyAlternative();
+
+        public:
+        template<class T>
+        static constexpr auto IndexOfType = IndexOfTypeImpl<VariantIndex, T, Types...>();
+        static constexpr auto TypeCount = sizeof...(Types);
+
+        // Constructors & Destructor
+        constexpr             VariantImpl() noexcept requires(FIRST_DC);
+        template<class T>
+        constexpr             VariantImpl(T&&) noexcept requires(!std::derived_from<std::remove_cvref_t<T>, VariantImpl>);
+        template<size_t I, class... Args>
+        constexpr             VariantImpl(std::in_place_index_t<I>, Args&&... args);
+        template<class T>
+        constexpr VariantImpl& operator=(T&&) noexcept requires(!std::derived_from<std::remove_cvref_t<T>, VariantImpl>);
+        // Logistics
+        constexpr              VariantImpl(const VariantImpl& other) noexcept requires(!TCC);
+        constexpr              VariantImpl(VariantImpl&& other) noexcept      requires(!TMC);
+        constexpr VariantImpl& operator=(const VariantImpl& other) noexcept   requires(!TCA);
+        constexpr VariantImpl& operator=(VariantImpl&& other) noexcept        requires(!TMA);
+        constexpr              ~VariantImpl() noexcept                        requires(!TD)
+        {
+            // TODO: MSVC Bug? Cant define outside class. It says it is ambiguous
+            if(tag != INVALID_INDEX) DestroyAlternative();
+        }
+        //
+        constexpr              VariantImpl(const VariantImpl& other) noexcept requires(TCC) = default;
+        constexpr              VariantImpl(VariantImpl&& other) noexcept      requires(TMC) = default;
+        constexpr VariantImpl& operator=(const VariantImpl& other) noexcept   requires(TCA) = default;
+        constexpr VariantImpl& operator=(VariantImpl&& other) noexcept        requires(TMA) = default;
+        constexpr              ~VariantImpl() noexcept                        requires(TD)  = default;
+        //
+        constexpr VariantIndex Index() const { return tag; };
+        constexpr VariantIndex Index() { return tag; };
+
+        constexpr VariantIndex index() const { return tag; };
+        constexpr VariantIndex index() { return tag; };
+    };
 }
 
+// I guess we need to wrap the actual implementation
+// to an inner/base class, for nested template generations
+// (Variant<Variant<int>, int>  etc.)
 template<class... Types>
-class Variant
+struct Variant : public VariantDetail::VariantImpl<Types...>
 {
-    // Logistics stuff (Lifetime and data movement)
-    public:
-    using TP = TypePack<Types...>;
-    static constexpr bool TC  = VariantDetail::template AllTrait<std::is_trivially_constructible>(TP{});
-    static constexpr bool TD  = VariantDetail::template AllTrait<std::is_trivially_destructible >(TP{});
-    static constexpr bool TCC = VariantDetail::template AllTrait<std::is_trivially_copy_constructible>(TP{});
-    static constexpr bool TMC = VariantDetail::template AllTrait<std::is_trivially_move_constructible>(TP{});
-    static constexpr bool TCA = VariantDetail::template AllTrait<std::is_trivially_copy_assignable>(TP{});
-    static constexpr bool TMA = VariantDetail::template AllTrait<std::is_trivially_move_assignable>(TP{});
+    using Base = VariantDetail::VariantImpl<Types...>;
+    using Base::Base;
 
-    private:
-    // Index type related
-    using VariantIndex = VariantDetail::SelectVariantIndex<sizeof...(Types)>;
-    static constexpr auto INVALID_INDEX = std::numeric_limits<VariantIndex>::max();
-    // Storage type related
-    using StorageType = VariantDetail::UnionStorage<TC, TD, 0, sizeof...(Types), TypePack<Types...>>;
-    // Is first type default constructible ?
-    static constexpr bool FIRST_DC = std::is_default_constructible_v<TypePackElement<0, TP>>;
-    // Friends
-    template <class T, class... Ts>
-    friend constexpr bool HoldsAlternative(const Variant<Ts...>&) noexcept;
-
-    template <uint32_t I, class VariantT>
-    friend constexpr decltype(auto) Alternative(VariantT&& v) noexcept;
-
-    private:
-    StorageType     storage;
-    VariantIndex    tag;
-
-    // Helpers
-    template<class T, class... Args>
-    void            ConstrcutAlternative(Args&&... args);
-    void            DestroyAlternative();
-
-    public:
     template<class T>
-    static constexpr auto IndexOfType = VariantDetail::IndexOfType<VariantIndex, T, Types...>();
+    static constexpr auto IndexOfType = Base::template IndexOfType<T>;
     static constexpr auto TypeCount = sizeof...(Types);
-
-    // Constructors & Destructor
-    constexpr           Variant() noexcept requires(FIRST_DC);
-    template<class T>
-    constexpr           Variant(T&&) noexcept requires(!std::is_same_v<std::remove_cvref_t<T>, Variant>);
-    template<class T>
-    constexpr Variant&  operator=(T&&) noexcept;
-    // Logistics
-    constexpr           Variant(const Variant& other) noexcept   requires(!TCC);
-    constexpr           Variant(Variant&& other) noexcept        requires(!TMC);
-    constexpr Variant&  operator=(const Variant& other) noexcept requires(!TCA);
-    constexpr Variant&  operator=(Variant&& other) noexcept      requires(!TMA);
-    // TODO: MSVC Bug? Cant define outside class. It says it is ambiguous
-    constexpr           ~Variant() noexcept                      requires(!TD)
-    {
-        if(tag != INVALID_INDEX) DestroyAlternative();
-    }
-    //
-    constexpr           Variant(const Variant& other) noexcept   requires(TCC) = default;
-    constexpr           Variant(Variant&& other) noexcept        requires(TMC) = default;
-    constexpr Variant&  operator=(const Variant& other) noexcept requires(TCA) = default;
-    constexpr Variant&  operator=(Variant&& other) noexcept      requires(TMA) = default;
-    constexpr           ~Variant() noexcept                      requires(TD)  = default;
-    //
-    constexpr VariantIndex  Index() const { return tag; };
-    constexpr VariantIndex  Index() { return tag; };
-
-    constexpr VariantIndex  index() const { return tag; };
-    constexpr VariantIndex  index() { return tag; };
 };
 
 template<size_t I, class... Types>
@@ -214,6 +261,9 @@ using VariantAlternative = VariantDetail::VariantAlternative<I, Types...>;
 
 template<class T>
 static constexpr auto VariantSize = VariantDetail::VariantSizeV<T>::value;
+
+template <class... Ts>
+using UniqueVariant = typename VariantDetail::TypePackToVariant<UniqueTypePack<Ts...>>::Type;
 
 // Try to utilize execution unit of the compiler instead of
 // instantiation unit. (NVCC reports too many conjunction instantiations)
@@ -244,7 +294,8 @@ VariantDetail::MetaGet(StorageT&& s)
 }
 
 template<class R, class T, class... Types>
-constexpr R VariantDetail::IndexOfType()
+constexpr VariantDetail::IndexOfResult<R>
+VariantDetail::IndexOfTypeImpl()
 {
     R INVALID_INDEX = std::numeric_limits<R>::max();
     constexpr auto N = sizeof...(Types);
@@ -258,9 +309,7 @@ constexpr R VariantDetail::IndexOfType()
         duplicate++;
         tag = i;
     }
-    if(duplicate != 1 || tag == INVALID_INDEX)
-        return INVALID_INDEX;
-    return tag;
+    return IndexOfResult<R>{ .Index = tag, .IsUnique = (duplicate == R(1)) };
 }
 
 template<uint32_t O, class VariantT, class Func>
@@ -268,7 +317,7 @@ constexpr auto VariantDetail::IfElseVisitImpl(UIntTConst<O>, VariantT&& v, Func&
 {
     using V = std::remove_cvref_t<VariantT>;
     constexpr uint32_t STAMP_COUNT = 16;
-    constexpr uint32_t VSize = uint32_t(VariantSize<V>);
+    constexpr uint32_t VSize = uint32_t(V::TypeCount);
     uint32_t index = uint32_t(v.Index());
     // I dunno how to make this compile time
     // so we check it runtime
@@ -309,12 +358,9 @@ constexpr auto VariantDetail::IfElseVisitImpl(UIntTConst<O>, VariantT&& v, Func&
 
 template<class ... Types>
 template<class TT, class... Args>
-void Variant<Types...>::ConstrcutAlternative(Args&&... args)
+constexpr
+void VariantDetail::VariantImpl<Types...>::ConstrcutAlternative(Args&&... args)
 {
-    // Since we are going to call the visit.
-    // check that the tag is pre set.
-    assert(tag == IndexOfType<TT>);
-
     // Skip if this type is trivially default constructible
     // and deduced "ConstrcutAlternative" is called to default construct
     // the alternative
@@ -323,7 +369,7 @@ void Variant<Types...>::ConstrcutAlternative(Args&&... args)
         return;
     //
     // Or do the if else dance...
-    else Visit(*this, [&](auto& t)
+    else Visit(*this, [&args...](auto& t)
     {
         using T = std::remove_cvref_t<decltype(t)>;
         if constexpr(std::is_same_v<TT, T>)
@@ -332,58 +378,82 @@ void Variant<Types...>::ConstrcutAlternative(Args&&... args)
 }
 
 template<class ... Types>
-void Variant<Types...>::DestroyAlternative()
+constexpr
+void VariantDetail::VariantImpl<Types...>::DestroyAlternative()
 {
     assert(tag != INVALID_INDEX);
     // If all the types are trivially destructible just skip
     if constexpr(!TD) return;
     //
     // Or do the if else dance...
-    else Visit(*this, [](auto&& t)
+    else Visit(*this, [](auto& t)
     {
-        using TIn = decltype(t);
-        std::destroy_at(&std::forward<TIn>(t));
+        std::destroy_at(&t);
     });
 }
 
 template<class... Types>
-constexpr Variant<Types...>::Variant() noexcept requires(FIRST_DC)
+constexpr
+VariantDetail::VariantImpl<Types...>::VariantImpl() noexcept
+requires(FIRST_DC)
     : tag(VariantIndex(0))
 {
-    using FirstT = VariantAlternative<0, Types...>;
-    constexpr bool FIRST_TDC = std::is_trivially_default_constructible_v<FirstT>;
     if constexpr(FIRST_TDC)
     {
-        std::construct_at<FirstT>(&VariantDetail::MetaGet<0, 0, TypeCount>(storage));
+        std::construct_at<FirstType>(&MetaGet<0, 0, TypeCount>(storage));
     }
 }
 
 template<class... Types>
 template<class T>
-constexpr Variant<Types...>::Variant(T&& other) noexcept requires(!std::is_same_v<std::remove_cvref_t<T>, Variant>)
+constexpr
+VariantDetail::VariantImpl<Types...>::VariantImpl(T&& other) noexcept
+requires(!std::derived_from<std::remove_cvref_t<T>, VariantImpl>)
 {
     using TBase = std::remove_cvref_t<T>;
-    constexpr auto I = VariantDetail::IndexOfType<VariantIndex, TBase, Types...>();
-    static_assert(I != INVALID_INDEX, "Unable to Construct Variant with type T");
-    tag = I;
+    constexpr auto R = IndexOfType<TBase>;
+    static_assert(R.IsUnique, "Given type is not unique in variant! "
+                  "Cannot call \"Variant(T&&)\"");
+    static_assert(R.Index != INVALID_INDEX, "Unable to Construct Variant with type T");
+    //
+    tag = R.Index;
     ConstrcutAlternative<TBase>(std::forward<T>(other));
+}
+
+template<class... Types>
+template<size_t I, class... Args>
+constexpr
+VariantDetail::VariantImpl<Types...>::VariantImpl(std::in_place_index_t<I>, Args&&... args)
+{
+    static_assert(I < TypeCount, "Given \"I\" is out of range!");
+    using T = TypePackElement<0, TP>;
+    //
+    tag = I;
+    ConstrcutAlternative<T>(std::forward<Args>(args)...);
 }
 
 template<class ... Types>
 template<class T>
-constexpr Variant<Types...>& Variant<Types...>::operator=(T&& t) noexcept
+constexpr VariantDetail::VariantImpl<Types...>&
+VariantDetail::VariantImpl<Types...>::operator=(T&& t) noexcept
+requires(!std::derived_from<std::remove_cvref_t<T>, VariantImpl>)
 {
     using TBase = std::remove_cvref_t<T>;
-    constexpr auto I = VariantDetail::IndexOfType<VariantIndex, T, Types...>();
-    static_assert(I != INVALID_INDEX, "Unable to Construct Variant with type T");
+    constexpr auto R = IndexOfType<TBase>;
+    static_assert(R.IsUnique, "Given type is not unique in variant! "
+                  "Cannot call \"operator=(T&&)\"");
+    static_assert(R.Index != INVALID_INDEX, "Unable to Construct Variant with type T");
+    //
     if(tag != INVALID_INDEX) DestroyAlternative();
-    tag = I;
+    tag = R.Index;
     ConstrcutAlternative<TBase>(std::forward<T>(t));
     return *this;
 }
 
 template<class ... Types>
-constexpr Variant<Types...>::Variant(const Variant& other) noexcept requires(!TCC)
+constexpr
+VariantDetail::VariantImpl<Types...>::VariantImpl(const VariantImpl& other) noexcept
+requires(!TCC)
 {
     tag = other.tag;
     //
@@ -393,13 +463,17 @@ constexpr Variant<Types...>::Variant(const Variant& other) noexcept requires(!TC
         {
             using Left = decltype(left);
             using LeftT = std::remove_cvref_t<Left>;
-            std::forward<Left>(left) = Alternative<LeftT>(other);
+            // We cannot use the type directly, it may be duplicated
+            constexpr auto I = IndexOfType<LeftT>.Index;
+            left = Alternative<I>(other);
         });
     }
 }
 
 template<class ... Types>
-constexpr Variant<Types...>::Variant(Variant&& other) noexcept requires(!TMC)
+constexpr
+VariantDetail::VariantImpl<Types...>::VariantImpl(VariantImpl&& other) noexcept
+requires(!TMC)
 {
     tag = other.tag;
     if(tag != INVALID_INDEX)
@@ -408,8 +482,9 @@ constexpr Variant<Types...>::Variant(Variant&& other) noexcept requires(!TMC)
         {
             using Left = decltype(left);
             using LeftT = std::remove_cvref_t<Left>;
-            // This probably do not work? (Not guaranteed to be copy since we dereference ptr?)
-            std::forward<Left>(left) = std::move(Alternative<LeftT>(std::forward<Variant>(other)));
+            // We cannot use the type directly, it may be duplicated
+            constexpr auto I = IndexOfType<LeftT>.Index;
+            left = Alternative<I>(std::forward<VariantImpl>(other));
         });
     }
     // Other is in "moved from" state. Revert back to monostate?
@@ -417,8 +492,9 @@ constexpr Variant<Types...>::Variant(Variant&& other) noexcept requires(!TMC)
 }
 
 template<class ... Types>
-constexpr Variant<Types...>&
-Variant<Types...>::operator=(const Variant& other) noexcept requires(!TCA)
+constexpr VariantDetail::VariantImpl<Types...>&
+VariantDetail::VariantImpl<Types...>::operator=(const VariantImpl& other) noexcept
+requires(!TCA)
 {
     assert(this != &other);
     if(tag != INVALID_INDEX) DestroyAlternative();
@@ -430,15 +506,18 @@ Variant<Types...>::operator=(const Variant& other) noexcept requires(!TCA)
         {
             using Left = decltype(left);
             using LeftT = std::remove_cvref_t<Left>;
-            std::forward<Left>(left) = *Get<LeftT>(other);
+            // We cannot use the type directly, it may be duplicated
+            constexpr auto I = IndexOfType<LeftT>.Index;
+            left = Alternative<I>(other);
         });
     }
     return *this;
 }
 
 template<class ... Types>
-constexpr Variant<Types...>&
-Variant<Types...>::operator=(Variant&& other) noexcept requires(!TMA)
+constexpr VariantDetail::VariantImpl<Types...>&
+VariantDetail::VariantImpl<Types...>::operator=(VariantImpl&& other) noexcept
+requires(!TMA)
 {
     assert(this != &other);
     if(tag != INVALID_INDEX) DestroyAlternative();
@@ -450,8 +529,9 @@ Variant<Types...>::operator=(Variant&& other) noexcept requires(!TMA)
         {
             using Left = decltype(left);
             using LeftT = std::remove_cvref_t<Left>;
-            // This probably do not work? (Not guaranteed to be copy since we dereference ptr?)
-            std::forward<Left>(left) = std::move(Alternative<LeftT>(std::forward<Variant>(other)));
+            // We cannot use the type directly, it may be duplicated
+            constexpr auto I = IndexOfType<LeftT>.Index;
+            left = Alternative<I>(std::forward<VariantImpl>(other));
         });
     }
     // Other is in "moved from" state, or in other term "valueless"
@@ -463,8 +543,10 @@ Variant<Types...>::operator=(Variant&& other) noexcept requires(!TMA)
 template <class T, class... Types>
 constexpr bool HoldsAlternative(const Variant<Types...>& v) noexcept
 {
-    using VariantIndex = typename Variant<Types...>::VariantIndex;
-    return v.tag == Variant<Types...>::template IndexOfType<T>;
+    constexpr auto R = Variant<Types...>::template IndexOfType<T>;
+    static_assert(R.IsUnique, "Given type is not unique in variant! "
+                  "Cannot call \"HoldsAlternative\"");
+    return v.tag == R.Index;
 }
 
 template <uint32_t I, class VariantT>
@@ -482,8 +564,10 @@ constexpr decltype(auto)
 Alternative(VariantT&& v) noexcept
 {
     using V = std::remove_cvref_t<VariantT>;
-    constexpr auto I = V::template IndexOfType<T>;
-    return Alternative<I>(std::forward<VariantT>(v));
+    constexpr auto R = V::template IndexOfType<T>;
+    static_assert(R.IsUnique, "Given type is not unique in variant! "
+                  "Use index version of \"Alternative\"");
+    return Alternative<R.Index>(std::forward<VariantT>(v));
 }
 
 template<class VariantT, class Func>
@@ -529,6 +613,20 @@ namespace std
     get(const Variant<Args...>& v)
     {
         return Alternative<I>(v);
+    }
+
+    template <class T, class... Args>
+    constexpr T&
+    get(Variant<Args...>& v)
+    {
+        return Alternative<T>(v);
+    }
+
+    template <class T, class... Args>
+    constexpr const T&
+    get(const Variant<Args...>& v)
+    {
+        return Alternative<T>(v);
     }
 
     template<class... Args>

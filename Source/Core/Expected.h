@@ -2,6 +2,7 @@
 
 #include "Error.h"
 #include "Types.h"
+#include "Variant.h"
 
 // std::expected is not in standard as of c++20 so rolling a simple
 // version of it, all errors in this codebase is MRayError
@@ -9,13 +10,16 @@
 //
 // Piggybacking variant here for most of the construction stuff
 template<class T>
-struct Expected : protected std::variant<T, MRayError>
+struct Expected : protected Variant<T, MRayError>
 {
     private:
-    using Base = std::variant<T, MRayError>;
+    using Base = Variant<T, MRayError>;
 
     public:
     using Base::Base;
+    // Our variant does not deduce implicit conversions
+    // So exclusively construct
+    Expected(MRayError::Type E) : Base(MRayError(E)) {}
 
     // Provide semantically the same API,
     // we may switch this to actual std::expected later

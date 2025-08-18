@@ -4,6 +4,7 @@
 #include <utility>
 #include "Definitions.h"
 #include "Types.h"
+#include "Span.h"
 
 #ifdef MRAY_HETEROGENEOUS
     #include <cuda/half.h>

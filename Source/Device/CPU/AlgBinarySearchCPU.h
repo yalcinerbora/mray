@@ -3,6 +3,7 @@
 
 #include "Core/Definitions.h"
 #include "Core/Types.h"
+#include "Core/Span.h"
 
 namespace mray::host::algorithms
 {

@@ -18,7 +18,7 @@ enum class CommandType
 
 class CommandI;
 
-using TypedCommand = std::pair<CommandI*, CLI::App*>;
+using TypedCommand = Pair<CommandI*, CLI::App*>;
 
 class CommandI
 {

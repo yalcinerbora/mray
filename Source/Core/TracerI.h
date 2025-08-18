@@ -417,7 +417,7 @@ namespace TracerConstants
     static constexpr PrimBatchId EmptyPrimBatchId       = PrimBatchId{0};
 
     static constexpr TextureId InvalidTexture           = TextureId{0};
-    static constexpr MediumPair VacuumMediumPair        = std::make_pair(VacuumMediumId, VacuumMediumId);
+    static constexpr MediumPair VacuumMediumPair        = Pair(VacuumMediumId, VacuumMediumId);
 
     static const auto NoAlphaMapList = OptionalAlphaMapList(StaticVecSize(MaxPrimBatchPerSurface),
                                                             std::nullopt);

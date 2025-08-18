@@ -7,6 +7,8 @@
 
 #include "Definitions.h"
 
+#include "Variant.h"
+
 // Rename the std::optional, gpu may not like it
 // most(all after c++20) of optional is constexpr
 // so the "relaxed-constexpr" flag of nvcc will be able to compile it
@@ -14,167 +16,22 @@
 template <class T>
 using Optional = std::optional<T>;
 
-template <class T, std::size_t Extent = std::dynamic_extent>
-using Span = std::span<T, Extent>;
-
-template <class T0, class T1>
-using Pair = std::pair<T0, T1>;
+template<class First, class Second>
+using Pair = std::pair<First, Second>;
 
 // TODO: reference_wrapper<T> vs. span<T,1> which is better?
 template <class T>
 using Ref = std::reference_wrapper<T>;
 
-
-
-// Some span wrappers for convenience
-template<class T, std::size_t Extent = std::dynamic_extent>
-constexpr Span<const T, Extent> ToConstSpan(Span<T, Extent> s);
-
-//
-template<class T0, std::size_t E0,
-         class T1, std::size_t E1>
-requires std::is_same_v<std::decay_t<T0>, std::decay_t<T1>>
-constexpr bool IsSubspan(Span<T0, E0> checkedSpan, Span<T1, E1> bigSpan);
-
-// This is definitely a thing that i cannot even comprehend
-// Thanks to:
-// https://stackoverflow.com/questions/55941964/how-to-filter-duplicate-types-from-tuple-c
-namespace UniqueVariantDetail
-{
-template <typename T, typename... Ts>
-struct Unique : std::type_identity<T> {};
-
-template <typename... Ts, typename U, typename... Us>
-struct Unique<std::variant<Ts...>, U, Us...>
-    : std::conditional_t<(std::is_same_v<U, Ts> || ...)
-    , Unique<std::variant<Ts...>, Us...>
-    , Unique<std::variant<Ts..., U>, Us...>> {};
-}
-
-namespace UniqueTupleDetail
-{
-    template <typename T, typename... Ts>
-    struct Unique : std::type_identity<T> {};
-
-    template <typename... Ts, typename U, typename... Us>
-    struct Unique<std::tuple<Ts...>, U, Us...>
-        : std::conditional_t<(std::is_same_v<U, Ts> || ...)
-        , Unique<std::tuple<Ts...>, Us...>
-        , Unique<std::tuple<Ts..., U>, Us...>> {};
-}
-
-template <typename... Ts>
-using UniqueVariant = typename UniqueVariantDetail::Unique<std::variant<>, Ts...>::type;
-
-template <typename... Ts>
-using UniqueTuple = typename UniqueTupleDetail::Unique<std::tuple<>, Ts...>::type;
+template<class E>
+using EnumNameArray = std::array<std::string_view, static_cast<uint32_t>(E::END)>;
 
 template <class T>
 struct SampleT
 {
-    T           value;
-    Float       pdf;
+    T       value;
+    Float   pdf;
 };
-
-template<class E>
-using EnumNameArray = std::array<std::string_view, static_cast<uint32_t>(E::END)>;
-
-// SoA style span
-// This may be usefull when DataSoA structures become too large
-// due to holding size_t for all spans. Currently not used.
-template<class... Args>
-struct SoASpan
-{
-    constexpr std::tuple<Args*...> NullifyPtrs();
-
-    private:
-    // TODO: Find a way to default initialize this.
-    // My template metaprograming capabilities was not enough.
-    // We are setting size to zero at least.
-    std::tuple<Args*...> ptrs = NullifyPtrs();
-    size_t          size = 0;
-
-    public:
-                    SoASpan() = default;
-    template<class... Spans>
-    constexpr       SoASpan(const Spans&... args);
-
-    template<size_t I>
-    constexpr auto   Get() -> Span<std::tuple_element_t<I, std::tuple<Args...>>>;
-    template<size_t I>
-    constexpr auto   Get() const -> Span<std::tuple_element_t<I, std::tuple<Args...>>>;
-    //
-    constexpr size_t Size() const;
-};
-
-// Deduction guide for constructor
-template<class... Spans>
-SoASpan(const Spans&... spans) -> SoASpan<typename Spans::element_type...>;
-
-template<class T, std::size_t Extent>
-constexpr Span<const T, Extent> ToConstSpan(Span<T, Extent> s)
-{
-    return Span<const T, Extent>(s);
-}
-
-// TODO: add arrays maybe? (decay changes c arrays to ptrs)
-template<class T0, std::size_t E0,
-         class T1, std::size_t E1>
-requires std::is_same_v<std::decay_t<T0>, std::decay_t<T1>>
-constexpr bool IsSubspan(Span<T0, E0> checkedSpan, Span<T1, E1> bigSpan)
-{
-    ptrdiff_t diff = checkedSpan.data() - bigSpan.data();
-    if(diff >= 0)
-    {
-        size_t diffS = static_cast<size_t>(diff);
-        bool ptrInRange = diffS < bigSpan.size();
-        bool backInRange = (diffS + checkedSpan.size()) <= bigSpan.size();
-        return (ptrInRange && backInRange);
-    }
-    else return false;
-}
-
-template<class... Args>
-constexpr std::tuple<Args*...> SoASpan<Args...>::NullifyPtrs()
-{
-    std::tuple<Args*...> result;
-    std::apply([](auto&&... args)
-    {
-        ((args = nullptr), ...);
-    }, result);
-    return result;
-}
-
-template<class... Args>
-template<class... Spans>
-constexpr SoASpan<Args...>::SoASpan(const Spans&... args)
-    : ptrs(args.data()...)
-    , size(std::get<0>(std::tuple<Spans...>(args...)).size())
-{
-    assert(((args.size() == size) &&...));
-}
-
-template<class... Args>
-template<size_t I>
-constexpr auto SoASpan<Args...>::Get() -> Span<std::tuple_element_t<I, std::tuple<Args...>>>
-{
-    using ResulT = Span<std::tuple_element_t<I, std::tuple<Args...>>>;
-    return ResulT(std::get<I>(ptrs), size);
-}
-
-template<class... Args>
-template<size_t I>
-constexpr auto SoASpan<Args...>::Get() const -> Span<std::tuple_element_t<I, std::tuple<Args...>>>
-{
-    using ResulT = Span<std::tuple_element_t<I, std::tuple<Args...>>>;
-    return ResulT(std::get<I>(ptrs), size);
-}
-
-template<class... Args>
-constexpr size_t SoASpan<Args...>::Size() const
-{
-    return size;
-}
 
 // TODO: Move this later
 template <class T>

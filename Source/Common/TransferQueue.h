@@ -3,6 +3,7 @@
 #include "Core/MPMCQueue.h"
 #include "Core/TracerI.h"
 #include "Core/TimelineSemaphore.h"
+#include "Core/Variant.h"
 
 #include "AnalyticStructs.h"
 #include "RenderImageStructs.h"
@@ -29,10 +30,10 @@ struct TracerResponse : public std::variant
 >
 {
     using Base = std::variant<CameraTransform, SceneAnalyticData,
-                              TracerAnalyticData, RendererAnalyticData,
-                              RendererOptionPack, RenderBufferInfo,
-                              bool, RenderImageSection, RenderImageSaveInfo,
-                              RenderImageSaveInfo, uint64_t>;
+                         TracerAnalyticData, RendererAnalyticData,
+                         RendererOptionPack, RenderBufferInfo,
+                         bool, RenderImageSection, RenderImageSaveInfo,
+                         RenderImageSaveInfo, uint64_t>;
     enum Type
     {
         CAMERA_INIT_TRANSFORM = 0,  // Return a camera initial transform when
@@ -73,10 +74,10 @@ struct VisorAction : public std::variant
 >
 {
     using Base = std::variant<CameraTransform, uint32_t,
-                              std::string, uint32_t, uint32_t, std::string,
-                              float, bool, bool,
-                              SemaphoreInfo, bool, bool,
-                              std::string>;
+                         std::string, uint32_t, uint32_t, std::string,
+                         float, bool, bool,
+                         SemaphoreInfo, bool, bool,
+                         std::string>;
     enum Type
     {
         CHANGE_CAM_TRANSFORM = 0,   // Give new transform to the tracer

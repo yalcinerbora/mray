@@ -293,15 +293,15 @@ struct TextureStreamingContext
 
 	private:
 	MR_HF_DECL static
-	std::array<Vector2, 3>		CalculatePhysicalUVsGrad(const VirtualTexInfo& texInfo,
-													     PhysicalTileId pTid,
-													     Vector2 uv,
-													     Vector2 dpdx,
-													     Vector2 dpdy);
+	std::array<Vector2, 3>	CalculatePhysicalUVsGrad(const VirtualTexInfo& texInfo,
+													 PhysicalTileId pTid,
+													 Vector2 uv,
+													 Vector2 dpdx,
+													 Vector2 dpdy);
 	MR_HF_DECL static
-	std::pair<Vector2, Float>	CalculatePhysicalUVsLod(const VirtualTexInfo& texInfo,
-													    PhysicalTileId,
-													    Vector2 uv, Float lod);
+	Pair<Vector2, Float>	CalculatePhysicalUVsLod(const VirtualTexInfo& texInfo,
+													PhysicalTileId,
+													Vector2 uv, Float lod);
 	public:
 	MR_HF_DECL static constexpr
 	uint32_t 		TileBitOffset(const VirtualTexInfo& texInfo,
@@ -442,12 +442,12 @@ TextureStreamingContext::CalculatePhysicalUVsGrad(const VirtualTexInfo& texInfo,
 }
 
 MR_HF_DEF
-std::pair<Vector2, Float>
+Pair<Vector2, Float>
 TextureStreamingContext::CalculatePhysicalUVsLod(const VirtualTexInfo&,
-												  PhysicalTileId,
-												  Vector2 uv, Float lod)
+												 PhysicalTileId,
+												 Vector2 uv, Float lod)
 {
-	return std::pair{uv, lod};
+	return Pair{uv, lod};
 }
 
 MR_HF_DEF constexpr

@@ -133,7 +133,7 @@ class IndexLookupTable
         Clear();
     }
 
-    std::pair<const uint32_t*, bool> Insert(IndexTriplet key, uint32_t value);
+    Pair<const uint32_t*, bool> Insert(IndexTriplet key, uint32_t value);
 };
 
 struct MeshProcessorThread

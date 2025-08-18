@@ -34,10 +34,10 @@ struct TracerIdPack
     MaterialIdMappings  mats;
     MediumIdMappings    mediums;
     TextureIdMappings   textures;
-    std::vector<std::pair<uint32_t, SurfaceId>>         surfaces;
-    std::vector<std::pair<uint32_t, CamSurfaceId>>      camSurfaces;
-    std::vector<std::pair<uint32_t, LightSurfaceId>>    lightSurfaces;
-    std::pair<uint32_t, LightSurfaceId>                 boundarySurface;
+    std::vector<Pair<uint32_t, SurfaceId>>      surfaces;
+    std::vector<Pair<uint32_t, CamSurfaceId>>   camSurfaces;
+    std::vector<Pair<uint32_t, LightSurfaceId>> lightSurfaces;
+    Pair<uint32_t, LightSurfaceId>              boundarySurface;
 
     double  loadTimeMS = 0.0;
 };

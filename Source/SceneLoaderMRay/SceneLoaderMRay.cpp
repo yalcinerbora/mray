@@ -296,7 +296,7 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
                 l.dataType.SwitchCase([&](auto&& dataType)
                 {
                     using T = std::remove_cvref_t<decltype(dataType)>::Type;
-                    std::variant<SceneTexId, T> texturable = node.AccessTexturableData<T>(name);
+                    Variant<SceneTexId, T> texturable = node.AccessTexturableData<T>(name);
                     if(std::holds_alternative<SceneTexId>(texturable))
                     {
                         TextureId id = texMappings.at(std::get<SceneTexId>(texturable));
@@ -866,7 +866,7 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
                     auto& groupList = *groupEntityList;
                     Pair<GroupIdType, IdType> value(groupId,
                                                     generatedIds[localI]);
-                    groupList[i] = std::make_pair(nodes[i].Id(), value);
+                    groupList[i] = Pair(nodes[i].Id(), value);
                 }
 
                 // Commit barrier
@@ -922,7 +922,7 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ErrorList& exceptions)
     static const ProfilerAnnotation _("LoadTextures");
     auto annotation = _.AnnotateScope();
 
-    using TextureIdList = std::vector<std::pair<SceneTexId, TextureId>>;
+    using TextureIdList = std::vector<Pair<SceneTexId, TextureId>>;
 
     // Construct Image Loader
     std::shared_ptr<ImageLoaderI> imgLoader = CreateImageLoader();
@@ -1064,7 +1064,7 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ErrorList& exceptions)
                 }
 
                 auto& texIdList = *texIdListPtr;
-                texIdList[i] = std::make_pair(sceneTexId, tId);
+                texIdList[i] = Pair(sceneTexId, tId);
             }
 
             // Barrier code is invoked, and all textures are allocated
@@ -1717,16 +1717,16 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
             const auto& node = definitions[i];
             const auto idNode = node.at(NodeNames::ID);
             ItemLocation itemLoc;
-            std::get<ARRAY_INDEX>(itemLoc) = i;
+            get<ARRAY_INDEX>(itemLoc) = i;
             if(!idNode.is_array())
             {
-                std::get<INNER_INDEX>(itemLoc) = 0;
+                get<INNER_INDEX>(itemLoc) = 0;
                 result.emplace(idNode.get<uint32_t>(), itemLoc);
             }
             else for(uint32_t j = 0; j < idNode.size(); j++)
             {
                 const auto& id = idNode[j];
-                std::get<INNER_INDEX>(itemLoc) = j;
+                get<INNER_INDEX>(itemLoc) = j;
                 result.emplace(id.get<uint32_t>(), itemLoc);
             }
         }
@@ -1834,9 +1834,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
                             "located in \"{:s}\"",
                             id, listName);
         const auto& location =  it->second;
-        uint32_t arrayIndex = std::get<ARRAY_INDEX>(location);
-        uint32_t innerIndex = std::get<INNER_INDEX>(location);
-
+        auto [arrayIndex, innerIndex] = location;
         auto node = JsonNode(sceneJsonIn[listName][arrayIndex], innerIndex);
         //std::string type = Annotate(std::string(node.Type()));
         std::string type = std::string(node.Type());
@@ -1862,8 +1860,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     {
         for(uint8_t i = 0; i < s.pairCount; i++)
         {
-            uint32_t matId = std::get<SurfaceStruct::MATERIAL_INDEX>(s.matPrimBatchPairs[i]);
-            uint32_t primId = std::get<SurfaceStruct::PRIM_INDEX>(s.matPrimBatchPairs[i]);
+            uint32_t matId = get<SurfaceStruct::MATERIAL_INDEX>(s.matPrimBatchPairs[i]);
+            uint32_t primId = get<SurfaceStruct::PRIM_INDEX>(s.matPrimBatchPairs[i]);
             PushToTypeMapping(materialNodes, matHT, matId, MATERIAL_LIST);
             PushToTypeMapping(primNodes, primHT, primId, PRIMITIVE_LIST);
             PushToTypeMapping(transformNodes, transformHT,
@@ -1897,8 +1895,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
                             "located in \"{:s}\"",
                             l.lightId, LIGHT_LIST);
         const auto& location = lightLoc->second;
-        uint32_t arrayIndex = std::get<ARRAY_INDEX>(location);
-        uint32_t innerIndex = std::get<INNER_INDEX>(location);
+        uint32_t arrayIndex = get<ARRAY_INDEX>(location);
+        uint32_t innerIndex = get<INNER_INDEX>(location);
 
         auto node = JsonNode(sceneJson[LIGHT_LIST][arrayIndex], innerIndex);
         std::string_view lightTypeName = node.Type();
@@ -1915,7 +1913,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
                                 "located in \"{:s}\". Requested by Light({:d})",
                                 primId, PRIMITIVE_LIST, l.lightId);
 
-            uint32_t primListIndex = std::get<ARRAY_INDEX>(primLoc->second);
+            uint32_t primListIndex = get<ARRAY_INDEX>(primLoc->second);
             std::string_view primTypeName = sceneJson[PRIMITIVE_LIST]
                                                      [primListIndex]
                                                      [TYPE].get<std::string_view>();
@@ -1976,8 +1974,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
                             "located in {:s}",
                             uint32_t(t), TEXTURE_LIST);
         const auto& location = it->second;
-        uint32_t arrayIndex = std::get<ARRAY_INDEX>(location);
-        uint32_t innerIndex = std::get<INNER_INDEX>(location);
+        uint32_t arrayIndex = get<ARRAY_INDEX>(location);
+        uint32_t innerIndex = get<INNER_INDEX>(location);
         auto node = JsonNode(sceneJson[TEXTURE_LIST][arrayIndex], innerIndex);
         // TODO: Add support for 3D textures.
         textureNodes.emplace_back(t, std::move(node));
@@ -2034,11 +2032,11 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
 
         auto LessThan = [](const auto& lhs, const auto& rhs)
         {
-            return std::get<0>(lhs) < std::get<0>(rhs);
+            return get<0>(lhs) < get<0>(rhs);
         };
         auto Equal = [](const auto& lhs, const auto& rhs)
         {
-            return std::get<0>(lhs) == std::get<0>(rhs);
+            return get<0>(lhs) == get<0>(rhs);
         };
         std::sort(textureNodes.begin(), textureNodes.end(), LessThan);
         auto last = std::unique(textureNodes.begin(), textureNodes.end(), Equal);
@@ -2066,8 +2064,8 @@ void SceneLoaderMRay::CreateSurfaces(TracerI& tracer, const std::vector<SurfaceS
             static constexpr size_t PI = SurfaceStruct::PRIM_INDEX;
             static constexpr size_t MI = SurfaceStruct::MATERIAL_INDEX;
 
-            PrimBatchId pId = primMappings.map.at(std::get<PI>(surf.matPrimBatchPairs[i])).second;
-            MaterialId mId = matMappings.map.at(std::get<MI>(surf.matPrimBatchPairs[i])).second;
+            PrimBatchId pId = primMappings.map.at(get<PI>(surf.matPrimBatchPairs[i])).second;
+            MaterialId mId = matMappings.map.at(get<MI>(surf.matPrimBatchPairs[i])).second;
             Optional<TextureId> tId;
             if(surf.alphaMaps[i].has_value())
                 tId = texMappings.at(surf.alphaMaps[i].value());
@@ -2086,7 +2084,7 @@ void SceneLoaderMRay::CreateSurfaces(TracerI& tracer, const std::vector<SurfaceS
             cullFace
         };
         SurfaceId mRaySurf = tracer.CreateSurface(surfParams);
-        mRaySurfaces.push_back(std::pair(surfaceId++, mRaySurf));
+        mRaySurfaces.push_back(Pair(surfaceId++, mRaySurf));
     }
 }
 
@@ -2112,7 +2110,7 @@ void SceneLoaderMRay::CreateLightSurfaces(TracerI& tracer, const std::vector<Lig
 
         LightSurfaceParams lSurfParams = SurfStructToSurfParams(surf);
         LightSurfaceId mRaySurf = tracer.CreateLightSurface(lSurfParams);
-        mRayLightSurfaces.push_back(std::pair(lightSurfaceId++, mRaySurf));
+        mRayLightSurfaces.push_back(Pair(lightSurfaceId++, mRaySurf));
     }
     mRayBoundaryLightSurface = tracer.SetBoundarySurface(SurfStructToSurfParams(boundary));
 }
@@ -2134,7 +2132,7 @@ void SceneLoaderMRay::CreateCamSurfaces(TracerI& tracer, const std::vector<Camer
             cId, tId, mId
         };
         CamSurfaceId mRaySurf = tracer.CreateCameraSurface(cSurfParams);
-        mRayCamSurfaces.push_back(std::pair(camSurfaceId++, mRaySurf));
+        mRayCamSurfaces.push_back(Pair(camSurfaceId++, mRaySurf));
     }
 }
 
@@ -2330,7 +2328,7 @@ TracerIdPack SceneLoaderMRay::MoveIdPack(double durationMS)
         .surfaces = std::move(mRaySurfaces),
         .camSurfaces = std::move(mRayCamSurfaces),
         .lightSurfaces = std::move(mRayLightSurfaces),
-        .boundarySurface = std::pair(0, mRayBoundaryLightSurface),
+        .boundarySurface = Pair(0u, mRayBoundaryLightSurface),
         .loadTimeMS = durationMS
     };
 }

@@ -26,11 +26,27 @@ namespace TypePackDetail
 
     template<size_t... Is, class... Ts>
     struct FindViaOverloadT<std::index_sequence<Is...>, Ts...>
-        : public OverloadTag <Is, Ts> ...
+        : public OverloadTag<Is, Ts> ...
     {};
 
     template<size_t I, class T>
     static auto Finder(OverloadTag<I, T>&&) -> OverloadTag<I, T>;
+
+    // This is definitely a thing that i cannot even comprehend
+    // Thanks to:
+    // https://stackoverflow.com/questions/55941964/how-to-filter-duplicate-types-from-tuple-c
+    template <class T, class... Ts>
+    struct Unique : std::type_identity<T> {};
+
+    template <class... Ts, class U, class... Us>
+    struct Unique<TypePack<Ts...>, U, Us...>
+        : std::conditional_t
+            <
+                (std::is_same_v<U, Ts> || ...),
+                Unique<TypePack<Ts...>, Us...>,
+                Unique<TypePack<Ts..., U>, Us...>
+            >
+    {};
 }
 
 // ======================== //
@@ -59,6 +75,12 @@ struct TypePackElementT<I, TypePack<Ts...>>
 
 template<size_t I, class T>
 using TypePackElement = typename TypePackElementT<I, T>::Type;
+
+// ======================== //
+//     Unique Type Pack     //
+// ======================== //
+template<class... Ts>
+using UniqueTypePack = TypePackDetail::Unique<TypePack<>, Ts...>::type;
 
 // ======================== //
 //     Type Pack Size       //

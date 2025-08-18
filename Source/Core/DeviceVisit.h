@@ -86,9 +86,9 @@ auto DeviceVisitDetail::IfElseVisitImpl(UIntTConst<O>, VariantT&& v, Func&& f) -
     assert(invokeCount == STAMP_COUNT && "Invalid Visit implementation, "
            "add more\"COND_INVOKE\"s");
     if constexpr(VSize > O + STAMP_COUNT)
-        return IfElseVisitImpl(UIntTConst<O + STAMP_COUNT>{},
-                               std::forward<VariantT>(v),
-                               std::forward<Func>(f));
+        return DeviceVisitDetail::IfElseVisitImpl(UIntTConst<O + STAMP_COUNT>{},
+                                                  std::forward<VariantT>(v),
+                                                  std::forward<Func>(f));
     MRAY_UNREACHABLE;
 }
 
@@ -96,7 +96,11 @@ template<class VariantT, class Func>
 MR_GF_DECL constexpr
 auto DeviceVisit(VariantT&& v, Func&& f) -> decltype(auto)
 {
-    using namespace DeviceVisitDetail;
-    //return RecurseVisitImpl<0>(std::forward<VariantT>(v), std::forward<Func>(f));
-    return IfElseVisitImpl(UIntTConst<0>{}, std::forward<VariantT>(v), std::forward<Func>(f));
+    //return DeviceVisitDetail::RecurseVisitImpl<0>(std::forward<VariantT>(v), std::forward<Func>(f));
+    return DeviceVisitDetail::IfElseVisitImpl
+    (
+        DeviceVisitDetail::UIntTConst<0>{},
+        std::forward<VariantT>(v),
+        std::forward<Func>(f)
+    );
 }

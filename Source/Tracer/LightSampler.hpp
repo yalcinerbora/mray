@@ -3,7 +3,7 @@
 #include "LightSampler.h"
 
 MR_HF_DEF
-std::pair<Ray, Vector2> LightSampleOutput::SampledRay(const Vector3& distantPoint) const
+Pair<Ray, Vector2> LightSampleOutput::SampledRay(const Vector3& distantPoint) const
 {
     Vector3 dir = Math::Normalize(position - distantPoint);
     // Nudge the position back here, this will be used
@@ -11,7 +11,7 @@ std::pair<Ray, Vector2> LightSampleOutput::SampledRay(const Vector3& distantPoin
     // TODO: Bad usage of API, constructing a ray to nudge a position
     Vector3 pos = Ray(Vector3::Zero(), position).Nudge(-dir).Pos();
     Float length = Math::Length(pos - distantPoint);
-    return std::pair(Ray(dir, distantPoint), Vector2(0, length * 0.999f));
+    return Pair(Ray(dir, distantPoint), Vector2(0, length * 0.999f));
 }
 
 template<class ML>

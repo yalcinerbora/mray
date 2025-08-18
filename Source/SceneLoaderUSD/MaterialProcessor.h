@@ -40,7 +40,7 @@ struct MRayUSDTextureTerminal
 };
 
 template<class T>
-using MaterialTerminalVariant = std::variant<MRayUSDTextureTerminal, T>;
+using MaterialTerminalVariant = Variant<MRayUSDTextureTerminal, T>;
 
 // Hard-coded material definition
 struct MRayUSDMaterialProps
@@ -94,11 +94,11 @@ struct MaterialConverter
     std::vector<MRayUSDMaterialProps>
     ResolveMatProps(const MRayUSDMaterialMap& uniqueMaterials);
     //
-    FlatSet<std::pair<pxr::UsdPrim, MRayUSDTexture>>
+    FlatSet<Pair<pxr::UsdPrim, MRayUSDTexture>>
     ResolveTextures(const std::vector<MRayUSDMaterialProps>&);
     //
     MRayError LoadTextures(std::map<pxr::UsdPrim, TextureId>& result,
-                           FlatSet<std::pair<pxr::UsdPrim, MRayUSDTexture>>&& tex,
+                           FlatSet<Pair<pxr::UsdPrim, MRayUSDTexture>>&& tex,
                            TracerI& tracer, ThreadPool& threadPool);
 
     std::map<pxr::UsdPrim, MRayUSDMatAlphaPack>

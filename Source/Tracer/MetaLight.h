@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Core/Types.h"
+#include "Core/Variant.h"
+
 #include "ParamVaryingData.h"
 #include "TransformC.h"
 #include "LightC.h"
@@ -223,7 +225,7 @@ class MetaLightArrayT
 
     private:
     // Actual light variant
-    using LightVariant = std::variant
+    using LightVariant = Variant
     <
         std::monostate,
         MetaLightDetail::LightType<TypePackElement<0, TransformLightTuple>,
@@ -231,7 +233,7 @@ class MetaLightArrayT
         ...
     >;
 
-    using VariantLightSoA = std::variant<typename TypePackElement<0, TransformLightTuple>::DataSoA...>;
+    using VariantLightSoA = Variant<typename TypePackElement<0, TransformLightTuple>::DataSoA...>;
     using VariantPrimSoA = UniqueVariant<typename TypePackElement<0, TransformLightTuple>::PrimGroup::DataSoA...>;
     using VariantTransformSoA = UniqueVariant<typename TypePackElement<1, TransformLightTuple>::DataSoA...>;
     //

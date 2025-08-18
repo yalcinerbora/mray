@@ -28,13 +28,13 @@ static const std::array MRayEquivalentUSDTypes =
 {
     // Comments are in MRayTerms
     // Primitives
-    std::pair(pxr::UsdGeomTokens->Mesh,         "Triangle"),
-    std::pair(pxr::UsdGeomTokens->Sphere,       "Sphere"),
+    Pair(pxr::UsdGeomTokens->Mesh,         std::string_view("Triangle")),
+    Pair(pxr::UsdGeomTokens->Sphere,       std::string_view("Sphere")),
     // Cameras
-    std::pair(pxr::UsdGeomTokens->Camera,       "Pinhole"),
+    Pair(pxr::UsdGeomTokens->Camera,       std::string_view("Pinhole")),
     // Lights
-    std::pair(pxr::UsdLuxTokens->GeometryLight, "Primitive"),
-    std::pair(pxr::UsdLuxTokens->DomeLight,     "Skysphere_Spherical"),
+    Pair(pxr::UsdLuxTokens->GeometryLight, std::string_view("Primitive")),
+    Pair(pxr::UsdLuxTokens->DomeLight,     std::string_view("Skysphere_Spherical"))
 };
 
 class SceneLoaderUSD : public SceneLoaderI

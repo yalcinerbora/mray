@@ -13,7 +13,7 @@ class ParamVaryingData
     using UV = Vector<DIMS, Float>;
 
     private:
-    std::variant<Texture, T> t;
+    Variant<Texture, T> t;
 
     public:
     MR_HF_DECL  ParamVaryingData(const T&);

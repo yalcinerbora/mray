@@ -17,7 +17,7 @@ struct CameraTransform
 
 struct TracerAnalyticData
 {
-    using TypeCountPair = Pair<std::string, uint32_t>;
+    //using TypeCountPair = Tuple<std::string, uint32_t>;
 
     std::vector<std::string> camTypes;
     std::vector<std::string> lightTypes;

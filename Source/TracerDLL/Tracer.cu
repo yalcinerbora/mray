@@ -10,6 +10,8 @@
 #include "RequestedTypes.h"
 #include "RequestedRenderers.h"
 
+#include "Core/Variant.h"
+
 #include "Tracer/TextureView.hpp"
 
 #include "Device/GPUAlgReduce.h"

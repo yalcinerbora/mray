@@ -18,7 +18,7 @@ using Descriptor2DList = DescriptorSetList<DescriptorBindList<T>>;
 
 struct ShaderBindingData
 {
-    using DescriptorInfo = std::variant<VkDescriptorBufferInfo, VkDescriptorImageInfo>;
+    using DescriptorInfo = Variant<VkDescriptorBufferInfo, VkDescriptorImageInfo>;
     uint32_t            index;
     VkDescriptorType    type;
     DescriptorInfo      dataInfo;

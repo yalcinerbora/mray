@@ -281,7 +281,7 @@ uint64_t PathTracerRenderer::SPPLimit(uint32_t spp) const
     return result;
 }
 
-std::pair<Span<RayIndex>, uint32_t>
+Pair<Span<RayIndex>, uint32_t>
 PathTracerRenderer::ReloadPaths(Span<const RayIndex> dIndices,
                                 uint32_t sppLimit,
                                 const GPUQueue& processQueue)
@@ -365,7 +365,7 @@ PathTracerRenderer::ReloadPaths(Span<const RayIndex> dIndices,
     }
     // Index buffer may be invalidated (Binary partition should not
     // invalidate but lets return the new buffer)
-    return std::pair(dDeadAliveRayIndices, aliveRayCount);
+    return Pair(dDeadAliveRayIndices, aliveRayCount);
 }
 
 void PathTracerRenderer::ResetAllPaths(const GPUQueue& queue)

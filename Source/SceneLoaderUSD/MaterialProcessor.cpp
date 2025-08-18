@@ -24,14 +24,14 @@
 #include "Core/ThreadPool.h"
 #include "Core/Profiling.h"
 
-using MatKeyValPair = std::pair<const pxr::UsdPrim*, const MRayUSDMaterialProps*>;
+using MatKeyValPair = Pair<const pxr::UsdPrim*, const MRayUSDMaterialProps*>;
 
 static const std::array MRayMaterialTypes =
 {
-    std::pair(MRayUSDMaterialType::DIFFUSE,                 "Lambert"),
-    std::pair(MRayUSDMaterialType::SPECULAR_DIFFUSE_COMBO,  "Unreal"),
-    std::pair(MRayUSDMaterialType::PURE_REFLECT,            "Reflect"),
-    std::pair(MRayUSDMaterialType::PURE_REFRACT,            "Refract"),
+    Pair(MRayUSDMaterialType::DIFFUSE,                 std::string_view("Lambert")),
+    Pair(MRayUSDMaterialType::SPECULAR_DIFFUSE_COMBO,  std::string_view("Unreal")),
+    Pair(MRayUSDMaterialType::PURE_REFLECT,            std::string_view("Reflect")),
+    Pair(MRayUSDMaterialType::PURE_REFRACT,            std::string_view("Refract")),
 };
 
 // Usd have some "reflection" functionality (via macros),
@@ -136,12 +136,12 @@ ImageSubChannelType ResolveSubchannel(pxr::TfToken& outName)
 
 
 template<class T>
-std::pair<T, Optional<TextureId>>
+Pair<T, Optional<TextureId>>
 ReadUSDMatAttribute(const MaterialTerminalVariant<T>& mt,
                     const std::map<pxr::UsdPrim, TextureId>& texLookup)
 {
     using MTT = MRayUSDTextureTerminal;
-    using ResultT = std::pair<T, Optional<TextureId>>;
+    using ResultT = Pair<T, Optional<TextureId>>;
 
     ResultT result = ResultT(T(), std::nullopt);
     if(std::holds_alternative<MTT>(mt))
@@ -422,9 +422,9 @@ MRayUSDTexture MaterialConverter::ReadTextureNode(const pxr::UsdPrim& texNodePri
     auto ConvertColorSpace = [&tokens](const pxr::TfToken& colorSpace)
     {
         if(colorSpace == tokens.sRGB)
-            return std::pair(MRayColorSpaceEnum::MR_REC_709, Float(2.2));
+            return Pair(MRayColorSpaceEnum::MR_REC_709, Float(2.2));
         else
-            return std::pair(MRayColorSpaceEnum::MR_DEFAULT, Float(1));
+            return Pair(MRayColorSpaceEnum::MR_DEFAULT, Float(1));
     };
 
     pxr::UsdShadeShader tNode(texNodePrim);
@@ -614,13 +614,13 @@ MaterialConverter::ResolveMatProps(const MRayUSDMaterialMap& uniqueMaterials)
     return matProps;
 }
 
-FlatSet<std::pair<pxr::UsdPrim, MRayUSDTexture>>
+FlatSet<Pair<pxr::UsdPrim, MRayUSDTexture>>
 MaterialConverter::ResolveTextures(const std::vector<MRayUSDMaterialProps>& props)
 {
     static const ProfilerAnnotation _("Resolve Textures");
     auto annotation = _.AnnotateScope();
 
-    FlatSet<std::pair<pxr::UsdPrim, MRayUSDTexture>> textures;
+    FlatSet<Pair<pxr::UsdPrim, MRayUSDTexture>> textures;
     auto ReadAndEmplace = [this, &textures](const auto& t, bool isColor,
                                             bool isNormal = false)
     {
@@ -651,7 +651,7 @@ MaterialConverter::ResolveTextures(const std::vector<MRayUSDMaterialProps>& prop
 }
 
 MRayError MaterialConverter::LoadTextures(std::map<pxr::UsdPrim, TextureId>& result,
-                                          FlatSet<std::pair<pxr::UsdPrim, MRayUSDTexture>>&& tex,
+                                          FlatSet<Pair<pxr::UsdPrim, MRayUSDTexture>>&& tex,
                                           TracerI& tracer, ThreadPool& threadPool)
 {
     static const ProfilerAnnotation ldTexAnnot("Load Textures");
@@ -659,7 +659,7 @@ MRayError MaterialConverter::LoadTextures(std::map<pxr::UsdPrim, TextureId>& res
 
     auto flatTextures = std::move(tex).extract();
     uint32_t textureCount = static_cast<uint32_t>(flatTextures.size());
-    std::vector<std::pair<pxr::UsdPrim, TextureId>> texIds(textureCount);
+    std::vector<Pair<pxr::UsdPrim, TextureId>> texIds(textureCount);
 
     const auto BarrierFunc = [&]() noexcept
     {
@@ -757,7 +757,7 @@ MRayError MaterialConverter::LoadTextures(std::map<pxr::UsdPrim, TextureId>& res
                 tId = tracer.CreateTexture2D(Vector2ui(header.dimensions),
                                              header.mipCount,
                                              params);
-                myId = std::make_pair(myTex.first, tId);
+                myId = Pair(myTex.first, tId);
             }
             // Barrier code is invoked, and all textures are allocated
             barrier->arrive_and_wait();
@@ -890,7 +890,7 @@ void PrintMaterials(const std::vector<MRayUSDMaterialProps>& matPropList,
         });
         if(loc != MRayMaterialTypes.cend())
             return loc->second;
-        else return "";
+        else return std::string_view();
     };
     auto AttributeToString = []<class T>(const MaterialTerminalVariant<T>& t)
     {

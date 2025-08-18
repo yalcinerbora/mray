@@ -3,6 +3,7 @@
 #include "Core/Types.h"
 #include "Core/TracerI.h"
 #include "Core/SceneLoaderI.h"
+#include "Core/Variant.h"
 
 #include "Common/JsonCommon.h" // IWYU pragma: keep
 
@@ -137,9 +138,9 @@ class JsonNode
     Optional<TransientData> AccessOptionalDataArray(std::string_view name) const;
     // Texturable (either data T, or texture struct)
     template<class T>
-    std::variant<SceneTexId, T> AccessTexturableData(std::string_view name) const;
-    SceneTexId                  AccessTexture(std::string_view name) const;
-    Optional<SceneTexId>        AccessOptionalTexture(std::string_view name) const;
+    Variant<SceneTexId, T>  AccessTexturableData(std::string_view name) const;
+    SceneTexId              AccessTexture(std::string_view name) const;
+    Optional<SceneTexId>    AccessOptionalTexture(std::string_view name) const;
 };
 
 #include "JsonNode.hpp"

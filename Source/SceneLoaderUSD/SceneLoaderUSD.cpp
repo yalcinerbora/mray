@@ -275,7 +275,7 @@ MRayUSDGeomMatResolWarnings ExpandGeomsAndFindMaterials(CollapsedPrims& subGeomP
 }
 
 MRayError ProcessCameras(CameraGroupId& camGroupId,
-                         std::vector<std::pair<pxr::UsdPrim, CameraId>>& outCamIds,
+                         std::vector<Pair<pxr::UsdPrim, CameraId>>& outCamIds,
                          TracerI& tracer, ThreadPool&,
                          const std::vector<MRayUSDPrimSurface>& cameras,
                          const pxr::UsdStageRefPtr& loadedStage)
@@ -447,7 +447,7 @@ MRayError FindLightTextures(std::map<pxr::UsdPrim, MRayUSDTexture>& extraTexture
     return MRayError::OK;
 }
 
-MRayError ProcessLights(std::vector<std::pair<LightGroupId, LightId>>&,
+MRayError ProcessLights(std::vector<Pair<LightGroupId, LightId>>&,
                         LightGroupId& domeLightGroupId, LightId& domeLightId,
                         TracerI& tracer, ThreadPool&,
                         const std::vector<MRayUSDPrimSurface>& meshGeomLights,
@@ -735,14 +735,14 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
         return l.surfacePrim < r.surfacePrim;
     });
     CameraGroupId camGroupId;
-    std::vector<std::pair<pxr::UsdPrim, CameraId>> outCameras;
+    std::vector<Pair<pxr::UsdPrim, CameraId>> outCameras;
     e = ProcessCameras(camGroupId, outCameras, tracer,
                        threadPool, cameras, loadedStage);
     if(e) return e;
 
     LightGroupId boundaryLightGroup;
     LightId boundaryLight;
-    std::vector<std::pair<LightGroupId, LightId>> outLights;
+    std::vector<Pair<LightGroupId, LightId>> outLights;
     e = ProcessLights(outLights, boundaryLightGroup, boundaryLight,
                       tracer, threadPool,
                       meshMatPrims.geomLightSurfaces,
@@ -990,7 +990,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
             auto end = stringConcat.size();
             stringRange.emplace_back(start, end);
             result.prims.emplace(globalCounter++,
-                                 std::pair(meshPrimGroupId, batchList[i]));
+                                 Pair(meshPrimGroupId, batchList[i]));
         }
     }
     for(const auto& [prim, batchList] : uniqueSpherePrimBatches)
@@ -1005,7 +1005,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
             auto end = stringConcat.size();
             stringRange.emplace_back(start, end);
             result.prims.emplace(globalCounter++,
-                                 std::pair(spherePrimGroupId, batchList[i]));
+                                 Pair(spherePrimGroupId, batchList[i]));
         }
     }
     // Cameras
@@ -1020,7 +1020,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
         auto end = stringConcat.size();
         stringRange.emplace_back(start, end);
         result.cams.emplace(globalCounter++,
-                            std::pair(camGroupId, camId));
+                            Pair(camGroupId, camId));
     }
     // Lights
     {
@@ -1032,7 +1032,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
         auto end = stringConcat.size();
         stringRange.emplace_back(start, end);
         result.lights.emplace(globalCounter++,
-                              std::pair(boundaryLightGroup, boundaryLight));
+                              Pair(boundaryLightGroup, boundaryLight));
     }
     // Materials
     for(const auto& [matPrim, matPack] : outMaterials)
@@ -1044,7 +1044,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
         auto end = stringConcat.size();
         stringRange.emplace_back(start, end);
         result.mats.emplace(globalCounter++,
-                            std::pair(matPack.groupId, matPack.materialId));
+                            Pair(matPack.groupId, matPack.materialId));
     }
     // Textures
     for(const auto& [texPrim, texId] : uniqueTextureIds)

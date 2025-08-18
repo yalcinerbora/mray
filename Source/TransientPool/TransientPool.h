@@ -7,6 +7,7 @@
 #include "Core/Definitions.h"
 #include "Core/System.h"
 #include "Core/Types.h"
+#include "Core/Span.h"
 
 #ifdef MRAY_TRANSIENT_POOL_SHARED_EXPORT
     #define MRAY_TRANSIENT_POOL_ENTRYPOINT MRAY_DLL_EXPORT

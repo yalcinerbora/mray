@@ -45,6 +45,7 @@ set(SRC_TYPES
     ${CURRENT_SOURCE_DIR}/TypePack.h
     ${CURRENT_SOURCE_DIR}/Tuple.h
     ${CURRENT_SOURCE_DIR}/Variant.h
+    ${CURRENT_SOURCE_DIR}/Span.h
 )
 
 set(SRC_UTILITY

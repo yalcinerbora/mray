@@ -387,7 +387,6 @@ constexpr uint32_t CalculateBCBytesPerBlock()
             return 0;
     }
 }
-
 Pair<Vector2ui, uint32_t> MipSizeToBlockSize(MRayPixelTypeRT pf, const Vector2ui& mipSize)
 {
     static constexpr uint32_t BLOCK_SIZE = 4;
