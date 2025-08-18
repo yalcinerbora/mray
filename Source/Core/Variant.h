@@ -27,6 +27,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <array>
+#include <limits>
+#include <functional>
 
 #include "Definitions.h"
 #include "TypePack.h"
@@ -340,23 +342,23 @@ constexpr auto VariantDetail::IfElseVisitImpl(UIntTConst<O>, VariantT&& v, Func&
             );                                               \
         }
     // End COND_INVOKE
-         COND_INVOKE(0)
-    else COND_INVOKE(1)
-    else COND_INVOKE(2)
-    else COND_INVOKE(3)
-    else COND_INVOKE(4)
-    else COND_INVOKE(5)
-    else COND_INVOKE(6)
-    else COND_INVOKE(7)
-    else COND_INVOKE(8)
-    else COND_INVOKE(9)
-    else COND_INVOKE(10)
-    else COND_INVOKE(11)
-    else COND_INVOKE(12)
-    else COND_INVOKE(13)
-    else COND_INVOKE(14)
-    else COND_INVOKE(15)
-    else if constexpr(VSize > O + STAMP_COUNT)
+    COND_INVOKE(0)
+    COND_INVOKE(1)
+    COND_INVOKE(2)
+    COND_INVOKE(3)
+    COND_INVOKE(4)
+    COND_INVOKE(5)
+    COND_INVOKE(6)
+    COND_INVOKE(7)
+    COND_INVOKE(8)
+    COND_INVOKE(9)
+    COND_INVOKE(10)
+    COND_INVOKE(11)
+    COND_INVOKE(12)
+    COND_INVOKE(13)
+    COND_INVOKE(14)
+    COND_INVOKE(15)
+    if constexpr(VSize > O + STAMP_COUNT)
         return IfElseVisitImpl(UIntTConst<O + STAMP_COUNT>{},
                                std::forward<VariantT>(v),
                                std::forward<Func>(f));
@@ -384,23 +386,23 @@ constexpr void VariantDetail::IfElseIndexImpl(UIntTConst<O>, VariantT&& v, Func&
             );                                           \
         }
     // End COND_INVOKE
-         COND_INVOKE(0)
-    else COND_INVOKE(1)
-    else COND_INVOKE(2)
-    else COND_INVOKE(3)
-    else COND_INVOKE(4)
-    else COND_INVOKE(5)
-    else COND_INVOKE(6)
-    else COND_INVOKE(7)
-    else COND_INVOKE(8)
-    else COND_INVOKE(9)
-    else COND_INVOKE(10)
-    else COND_INVOKE(11)
-    else COND_INVOKE(12)
-    else COND_INVOKE(13)
-    else COND_INVOKE(14)
-    else COND_INVOKE(15)
-    else if constexpr(VSize > O + STAMP_COUNT)
+    COND_INVOKE(0)
+    COND_INVOKE(1)
+    COND_INVOKE(2)
+    COND_INVOKE(3)
+    COND_INVOKE(4)
+    COND_INVOKE(5)
+    COND_INVOKE(6)
+    COND_INVOKE(7)
+    COND_INVOKE(8)
+    COND_INVOKE(9)
+    COND_INVOKE(10)
+    COND_INVOKE(11)
+    COND_INVOKE(12)
+    COND_INVOKE(13)
+    COND_INVOKE(14)
+    COND_INVOKE(15)
+    if constexpr(VSize > O + STAMP_COUNT)
         return IfElseIndexImpl(UIntTConst<O + STAMP_COUNT>{},
                                std::forward<VariantT>(v),
                                std::forward<Func>(f));

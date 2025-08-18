@@ -925,7 +925,6 @@ void ColorConverter::ExtractLuminance(std::vector<Span<Float>> hLuminanceBuffers
                                       const GPUQueue& queue)
 {
     std::vector<LuminanceExtractParams> hLuminanceExtractParams;
-    using V = Variant<std::monostate, GenericTextureView>;
     std::vector<Variant<std::monostate, GenericTextureView>> hTextureViews;
     hLuminanceExtractParams.reserve(textures.size());
     hTextureViews.reserve(textures.size());

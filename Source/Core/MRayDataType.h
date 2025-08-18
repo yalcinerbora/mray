@@ -16,6 +16,7 @@
 #include "AABB.h"       // IWYU pragma: keep
 
 #include <string>
+#include <functional>
 
 // This implementation is quite taxing on compilation times.
 // It is used to "automatically" create switch/case statements
@@ -236,8 +237,11 @@ constexpr bool MRayPixelType<E>::FindIsSigned()
 namespace DataTypeDetail
 {
 
+template<uint32_t I>
+using UIntTConst = std::integral_constant<uint32_t, I>;
+
 template<class EnumType, template<auto> class DataType, class Func, uint32_t O>
-auto StampIfOverEnum(std::in_place_index_t<O>, Func&& F, unsigned int name) -> decltype(auto)
+auto StampIfOverEnum(UIntTConst<O>, Func&& F, unsigned int name) -> decltype(auto)
 {
     constexpr uint32_t STAMP_COUNT = 16;
     constexpr uint32_t VSize = uint32_t(EnumType::MR_END);
@@ -277,7 +281,7 @@ auto StampIfOverEnum(std::in_place_index_t<O>, Func&& F, unsigned int name) -> d
     if constexpr(VSize > O + STAMP_COUNT)
         return StampIfOverEnum<EnumType, DataType>
         (
-            std::in_place_index_t<O + STAMP_COUNT>{},
+            UIntTConst<O + STAMP_COUNT>{},
             std::forward<Func>(F), name
         );
     MRAY_UNREACHABLE;
@@ -288,7 +292,7 @@ auto SwitchCaseAsIfStatements(Func&& F, unsigned int name) -> decltype(auto)
 {
     return StampIfOverEnum<EnumType, DataType>
     (
-        std::in_place_index_t<0u>{},
+        UIntTConst<0u>{},
         std::forward<Func>(F), name
     );
 }

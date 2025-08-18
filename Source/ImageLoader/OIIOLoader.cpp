@@ -8,7 +8,6 @@
 
 Expected<MRayPixelTypeRT> ImageFileOIIO::PixelFormatToMRay(const OIIO::ImageSpec& spec)
 {
-    using ResultT = Expected<MRayPixelTypeRT>;
     using enum MRayPixelEnum;
     switch(spec.format.basetype)
     {

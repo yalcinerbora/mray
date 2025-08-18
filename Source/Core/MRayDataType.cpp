@@ -2,7 +2,7 @@
 
 size_t MRayDataTypeRT::Size() const
 {
-    return SwitchCase([](auto&& d) -> bool
+    return SwitchCase([](auto&& d) -> size_t
     {
         return std::remove_cvref_t<decltype(d)>::Size;
     });
@@ -10,7 +10,7 @@ size_t MRayDataTypeRT::Size() const
 
 size_t MRayDataTypeRT::Alignment() const
 {
-    return SwitchCase([](auto&& d) -> bool
+    return SwitchCase([](auto&& d) -> size_t
     {
         return std::remove_cvref_t<decltype(d)>::Alignment;
     });

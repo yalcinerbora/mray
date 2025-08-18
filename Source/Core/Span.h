@@ -37,7 +37,7 @@ struct SoASpan
     using IthElement = std::remove_pointer_t<TupleElement<I, PtrTuple>>;
 
     private:
-    PtrTuple ptrs = Tuple((Args*)(nullptr)...);
+    PtrTuple ptrs = Tuple(static_cast<Args*>(nullptr)...);
     size_t   size = 0;
 
     public:
