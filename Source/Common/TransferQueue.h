@@ -14,7 +14,7 @@ struct SemaphoreInfo
     uint32_t            importMemAlignment  = 0;
 };
 
-struct TracerResponse : public std::variant
+struct TracerResponse : public Variant
 <
     CameraTransform,        // initial cam transform
     SceneAnalyticData,      // scene analytics
@@ -29,7 +29,7 @@ struct TracerResponse : public std::variant
     uint64_t                // memory usage
 >
 {
-    using Base = std::variant<CameraTransform, SceneAnalyticData,
+    using Base = Variant<CameraTransform, SceneAnalyticData,
                          TracerAnalyticData, RendererAnalyticData,
                          RendererOptionPack, RenderBufferInfo,
                          bool, RenderImageSection, RenderImageSaveInfo,
@@ -56,7 +56,7 @@ struct TracerResponse : public std::variant
     using Base::Base;
 };
 
-struct VisorAction : public std::variant
+struct VisorAction : public Variant
 <
     CameraTransform,        // transform
     uint32_t,               // camera index
@@ -73,7 +73,7 @@ struct VisorAction : public std::variant
     std::string             // Initial Render Config
 >
 {
-    using Base = std::variant<CameraTransform, uint32_t,
+    using Base = Variant<CameraTransform, uint32_t,
                          std::string, uint32_t, uint32_t, std::string,
                          float, bool, bool,
                          SemaphoreInfo, bool, bool,

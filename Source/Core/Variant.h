@@ -156,6 +156,10 @@ namespace VariantDetail
     template<uint32_t O, class VariantT, class Func>
     constexpr auto IfElseVisitImpl(UIntTConst<O>, VariantT&& v, Func&& f) -> decltype(auto);
 
+    template<uint32_t O, class VariantT, class Func>
+    constexpr void IfElseIndexImpl(UIntTConst<O>, VariantT&& v, Func&& f);
+
+
     template <class Tp>
     struct TypePackToVariant;
 
@@ -240,6 +244,11 @@ namespace VariantDetail
         constexpr VariantIndex index() const { return tag; };
         constexpr VariantIndex index() { return tag; };
     };
+
+    template<class... Types>
+    struct VariantSizeV<VariantImpl<Types...>>
+        : std::integral_constant<size_t, sizeof...(Types)>
+    {};
 }
 
 // I guess we need to wrap the actual implementation
@@ -287,7 +296,7 @@ VariantDetail::MetaGet(StorageT&& s)
     constexpr bool IS_LEAF_R = (E - 1 == MID && I == MID);
     // TODO: Expand it a little to reduce compile times maybe?
     using US = StorageT;
-    if constexpr(IS_LEAF_L) return std::forward<US>(s).Left();
+         if constexpr(IS_LEAF_L) return std::forward<US>(s).Left();
     else if constexpr(IS_LEAF_R) return std::forward<US>(s).Right();
     else if constexpr(I < MID)   return MetaGet<I, S, MID>(std::forward<US>(s).l);
     else                         return MetaGet<I, MID, E  >(std::forward<US>(s).r);
@@ -349,6 +358,50 @@ constexpr auto VariantDetail::IfElseVisitImpl(UIntTConst<O>, VariantT&& v, Func&
     else COND_INVOKE(15)
     else if constexpr(VSize > O + STAMP_COUNT)
         return IfElseVisitImpl(UIntTConst<O + STAMP_COUNT>{},
+                               std::forward<VariantT>(v),
+                               std::forward<Func>(f));
+    MRAY_UNREACHABLE;
+
+    #undef COND_INVOKE
+}
+
+template<uint32_t O, class VariantT, class Func>
+constexpr void VariantDetail::IfElseIndexImpl(UIntTConst<O>, VariantT&& v, Func&& f)
+{
+    using V = std::remove_cvref_t<VariantT>;
+    constexpr uint32_t STAMP_COUNT = 16;
+    constexpr uint32_t VSize = uint32_t(V::TypeCount);
+    uint32_t index = uint32_t(v.Index());
+    // I dunno how to make this compile time
+    // so we check it runtime
+    #define COND_INVOKE(I)                               \
+        if constexpr(VSize > (I + O)) if(index == O + I) \
+        {                                                \
+            return std::invoke                           \
+            (                                            \
+                std::forward<Func>(f),                   \
+                std::in_place_index<O + I>               \
+            );                                           \
+        }
+    // End COND_INVOKE
+         COND_INVOKE(0)
+    else COND_INVOKE(1)
+    else COND_INVOKE(2)
+    else COND_INVOKE(3)
+    else COND_INVOKE(4)
+    else COND_INVOKE(5)
+    else COND_INVOKE(6)
+    else COND_INVOKE(7)
+    else COND_INVOKE(8)
+    else COND_INVOKE(9)
+    else COND_INVOKE(10)
+    else COND_INVOKE(11)
+    else COND_INVOKE(12)
+    else COND_INVOKE(13)
+    else COND_INVOKE(14)
+    else COND_INVOKE(15)
+    else if constexpr(VSize > O + STAMP_COUNT)
+        return IfElseIndexImpl(UIntTConst<O + STAMP_COUNT>{},
                                std::forward<VariantT>(v),
                                std::forward<Func>(f));
     MRAY_UNREACHABLE;
@@ -426,7 +479,7 @@ constexpr
 VariantDetail::VariantImpl<Types...>::VariantImpl(std::in_place_index_t<I>, Args&&... args)
 {
     static_assert(I < TypeCount, "Given \"I\" is out of range!");
-    using T = TypePackElement<0, TP>;
+    using T = TypePackElement<I, TP>;
     //
     tag = I;
     ConstrcutAlternative<T>(std::forward<Args>(args)...);
@@ -459,13 +512,9 @@ requires(!TCC)
     //
     if(tag != INVALID_INDEX)
     {
-        Visit(*this, [&](auto&& left)
+        IfElseIndexImpl(UIntTConst<0>{}, *this, [&]<size_t I>(std::in_place_index_t<I>)
         {
-            using Left = decltype(left);
-            using LeftT = std::remove_cvref_t<Left>;
-            // We cannot use the type directly, it may be duplicated
-            constexpr auto I = IndexOfType<LeftT>.Index;
-            left = Alternative<I>(other);
+            std::construct_at(&Alternative<I>(*this), Alternative<I>(other));
         });
     }
 }
@@ -478,13 +527,10 @@ requires(!TMC)
     tag = other.tag;
     if(tag != INVALID_INDEX)
     {
-        Visit(*this, [&](auto&& left)
+        IfElseIndexImpl(UIntTConst<0>{}, * this, [&]<size_t I>(std::in_place_index_t<I>)
         {
-            using Left = decltype(left);
-            using LeftT = std::remove_cvref_t<Left>;
-            // We cannot use the type directly, it may be duplicated
-            constexpr auto I = IndexOfType<LeftT>.Index;
-            left = Alternative<I>(std::forward<VariantImpl>(other));
+            std::construct_at(&Alternative<I>(*this),
+                              Alternative<I>(std::forward<VariantImpl>(other)));
         });
     }
     // Other is in "moved from" state. Revert back to monostate?
@@ -502,13 +548,9 @@ requires(!TCA)
     tag = other.tag;
     if(tag != INVALID_INDEX)
     {
-        Visit(*this, [&](auto&& left)
+        IfElseIndexImpl(UIntTConst<0>{}, * this, [&]<size_t I>(std::in_place_index_t<I>)
         {
-            using Left = decltype(left);
-            using LeftT = std::remove_cvref_t<Left>;
-            // We cannot use the type directly, it may be duplicated
-            constexpr auto I = IndexOfType<LeftT>.Index;
-            left = Alternative<I>(other);
+            std::construct_at(&Alternative<I>(*this), Alternative<I>(other));
         });
     }
     return *this;
@@ -525,13 +567,10 @@ requires(!TMA)
     tag = other.tag;
     if(tag != INVALID_INDEX)
     {
-        Visit(*this, [&](auto&& left)
+        IfElseIndexImpl(UIntTConst<0>{}, * this, [&]<size_t I>(std::in_place_index_t<I>)
         {
-            using Left = decltype(left);
-            using LeftT = std::remove_cvref_t<Left>;
-            // We cannot use the type directly, it may be duplicated
-            constexpr auto I = IndexOfType<LeftT>.Index;
-            left = Alternative<I>(std::forward<VariantImpl>(other));
+            std::construct_at(&Alternative<I>(*this),
+                              Alternative<I>(std::forward<VariantImpl>(other)));
         });
     }
     // Other is in "moved from" state, or in other term "valueless"

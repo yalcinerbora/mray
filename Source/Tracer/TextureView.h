@@ -204,7 +204,7 @@ TracerTexView<3, T>::TracerTexView(HWTextureView<3> hw,
 }
 
 // Texture Related types
-using GenericTextureView = Variant//std::variant
+using GenericTextureView = Variant
 <
     TracerTexView<2, Float>,
     TracerTexView<2, Vector2>,
